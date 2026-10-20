@@ -172,7 +172,21 @@ const BASELINE = {
   "CitationList.test.tsx": 15,
   // Phase 294-03 (DEC-03, Pitfall 7) — the claim-ordinal parity fence: 1 non-vacuity case + 2 per
   // fixture case (16 cases in citation_ordinals_v1.json). Measured green on a run of the suite alone.
-  "citationOrdinals.parity.test.tsx": 33,
+  // Phase 294-05 Task 2 raised it 33 -> 49: + 1 case per fixture case (16), the
+  // (data-citation-ordinal, n) pairs assertion plan 05 decorates by. Measured on the suite alone.
+  "citationOrdinals.parity.test.tsx": 49,
+  // Phase 294-05 (DEC-03) — the citation-check client, vocabulary, store, action, marker and peek
+  // suites, measured green on a run of these suites alone (2026-10-20).
+  "citationChecks.contract.test.ts": 8,
+  "citationVerdicts.parity.test.ts": 10,
+  "citationCheckStore.test.ts": 10,
+  "CitationCheckAction.test.tsx": 10,
+  "CitedMarkdown.verdict.test.tsx": 17,
+  "CitationPeek.verdict.test.tsx": 5,
+  // Phase 294-04 (DEC-01) — the engine cards and the engine-id parity fence. 294-04 left them
+  // un-adopted (handover); adopted here, measured green on a run of the two suites alone.
+  "RerankEngineBlock.test.tsx": 24,
+  "rerankEngines.parity.test.ts": 7,
   "RunCard.test.tsx": 29,
   "RunCard.timer.test.tsx": 7,
   "ChatArea.approval.test.tsx": 3,
@@ -4748,6 +4762,15 @@ const TARGETS = [
   "src/components/chat/__tests__/CitationList.test.tsx",
   // Phase 294-03 — BOTH KNOBS, SAME COMMIT: without this entry the parity fence runs in no gate.
   "src/components/chat/__tests__/citationOrdinals.parity.test.tsx",
+  // Phase 294-05 — BOTH KNOBS, SAME COMMIT (the 294-03 rule): each entry pairs a BASELINE pin.
+  "src/components/chat/__tests__/citationChecks.contract.test.ts",
+  "src/components/chat/__tests__/citationVerdicts.parity.test.ts",
+  "src/components/chat/__tests__/citationCheckStore.test.ts",
+  "src/components/chat/__tests__/CitationCheckAction.test.tsx",
+  "src/components/chat/__tests__/CitedMarkdown.verdict.test.tsx",
+  "src/components/chat/__tests__/CitationPeek.verdict.test.tsx",
+  "src/components/settings/__tests__/RerankEngineBlock.test.tsx",
+  "src/components/settings/__tests__/rerankEngines.parity.test.ts",
   "src/components/chat/RunCard.test.tsx",
   "src/components/chat/RunCard.timer.test.tsx",
   "src/components/chat/__tests__/ChatArea.approval.test.tsx",

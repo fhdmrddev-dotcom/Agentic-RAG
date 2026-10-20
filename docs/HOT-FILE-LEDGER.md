@@ -11219,12 +11219,12 @@ cells rot within days.
 
 | File | commits / phases / lines | G-5 | Disposition |
 |---|---|---|---|
-| [`backend/app/services/openai_service.py`](docs/HOT-FILE-LEDGER.md#backendappservicesopenai_servicepy) | 79 / 40 / 2602 (was `78 / 39 / 2569`) | ⚠ **FIRES** | **282-01**: `get_llm_client` + keyword-only `timeout_s`/`max_retries` in the constructor, before `wrap_openai`; embedding client gets the named no-budget values. honoured by construction |
+| [`backend/app/services/openai_service.py`](docs/HOT-FILE-LEDGER.md#backendappservicesopenai_servicepy) | 81 / 41 / 2623 (was `79 / 40 / 2602`) | ⚠ **FIRES** | 294-01: ONE optional `instruction` string on SEARCH_DOCUMENTS_TOOL (+12; provider-safe: no anyOf, no type array). Honoured by construction |
 | [`backend/app/services/retrieval_rpc.py`](docs/HOT-FILE-LEDGER.md#backendappservicesretrieval_rpcpy) | 3 / 1 / 232 (was `0 / 0 / 0`) | no (young) | young. 272-03 `document_ids`; **272-05** constants MEASURED (T=2000, relaxed_order). ⛔ unfiltered SQL byte-identical; both RPCs pin custom plans (mig 201) |
 | [`backend/app/services/retrieval_rank.py`](docs/HOT-FILE-LEDGER.md#backendappservicesretrieval_rankpy) | 4 / 1 / 161 (was `3 / 1 / 151`) | no (young) | young. **272-05 D-27**: best row per matched doc (marked); coverage cut; filtered dedup same-document only. ⛔ no I/O |
 | [`backend/app/services/retrieval_documents.py`](docs/HOT-FILE-LEDGER.md#backendappservicesretrieval_documentspy) | 3 / 3 / 206 (was `1 / 1 / 174`) | ⚠ **FIRES** | ⚠ now FIRES (3 phases). **275-02**: `.eq(RETRIEVABLE_COLUMN, True)` on resolve_document_id / resolve_document / fetch_full_document; 272 pins retired by name |
 | [`backend/app/services/retrieval_scope.py`](docs/HOT-FILE-LEDGER.md#backendappservicesretrieval_scopepy) | 7 / 5 / 503 (was `6 / 4 / 463`) | ⚠ **FIRES** | **284-04**: `_fetch_all` moved in VERBATIM from the Find core (its only remaining caller); function-local imports (Pitfall 5). Honoured by construction. ⛔ ids/counts RLS-intersected |
-| [`backend/app/services/search_documents_tool.py`](docs/HOT-FILE-LEDGER.md#backendappservicessearch_documents_toolpy) | 10 / 2 / 1522 (was `4 / 1 / 1163`) | no (young) | **289-REVIEW WR-04**: + `REFUSED_SEARCH_ERRORS` and a pure `ran_retrieval(tr)` naming the two arms that refuse without retrieving. ⚠ row was stale (`4 / 1 / 1163`) |
+| [`backend/app/services/search_documents_tool.py`](docs/HOT-FILE-LEDGER.md#backendappservicessearch_documents_toolpy) | 11 / 3 / 1544 (was `10 / 2 / 1522`) | ⚠ **FIRES** | ⚠ now FIRES (294). 294-01: _clamp_instruction (300 chars, control chars stripped) forwards the agent's steering as data (+25 −3). Extraction FIRST next |
 | [`frontend/src/components/chat/StepRow.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentschatsteprowtsx) | 3 / 2 / 253 (was `2 / 1 / 249`) | no (2 phases) | 273-05: `refused` node state (UI-D-02 amber pair). ⛔ derived from the result marker in toolStepDerivation, never from a tool name |
 | [`frontend/src/components/chat/ToolCallDetails.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentschattoolcalldetailstsx) | 3 / 2 / 181 (was `2 / 1 / 171`) | no (2 phases) | 273-05: ToolArgsBlock hidden for show_artifact (L-2); dispatched BEFORE the `parsed.error` arm (L-3/L-4). ⛔ `detail` never rendered |
 | [`frontend/src/components/chat/tool-bodies/index.ts`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentschattoolbodiesindexts) | 2 / 2 / 79 (was `1 / 1 / 59`) | no (2 phases) | 273-05: ShowArtifactBody + `ARGS_HIDDEN`, the ONE home both rail readers import. ⛔ do not widen livePanel beyond execute_code + show_artifact |
@@ -11294,7 +11294,7 @@ cells rot within days.
 | [`frontend/src/components/chat/useStartWorkflowInThread.ts`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentschatusestartworkflowinthreadts) | 1 / 1 / 85 | no (young) | young (created 287-03). list-on-open, form-or-start, UN-AWAITED sendMessage `Run <name>`. ⛔ no createThread, no conversation read (fence with positive control) |
 | [`frontend/src/components/chat/ToolCallPanel.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentschattoolcallpaneltsx) | 55 / 23 / 409 (was `54 / 22 / 407`) | ⚠ **FIRES** | ✅ G-5 DISCHARGED (227-02). **273-05**: `stepLabel` + `ARGS_HIDDEN.livePanel` replace one name check; no new branch |
 | [`frontend/src/components/chat/tool-bodies/SearchDocumentsBody.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentschattool-bodiessearchdocumentsbodytsx) | 3 / 3 / 71 | ⚠ **FIRES** (crossed in 272) | ⚠ absent its ENTIRE LIFE — row added 272-05. **F-3**: `summarize` names refused / invalid / empty / not-searchable / unavailable |
-| [`frontend/src/components/chat/MessageItem.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentschatmessageitemtsx) | 80 / 37 / 1036 (was `79 / 37 / 1029`) | ⚠ **FIRES** | **276-REVIEW B-WR-01**: the avatar's cap-pause argument also requires a Continue left (`!continueExhausted && continuesRemaining > 0`). No hook, no store read |
+| [`frontend/src/components/chat/MessageItem.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentschatmessageitemtsx) | 81 / 38 / 1037 (was `80 / 37 / 1036`) | ⚠ **FIRES** | 294-05: checkMessageId on the two existing citation mounts (+2 −1); useState 3, useEffect 0, 5 props. Honoured by construction |
 | [`backend/app/api/threads.py`](docs/HOT-FILE-LEDGER.md#backendappapithreadspy) | 271 / 91 / 2544 (was `265 / 90 / 2459`) | ⚠ **FIRES** | honoured by construction (**279-02**): ONE `_require_thread_org` at 4 doors; send stays 11 `if`s (pinned); OV-279-01 not required. ⛔ 0 new send-path branches |
 | [`frontend/src/providers/StreamsProvider.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrcprovidersstreamsprovidertsx) | 109 / 42 / 5004 (was `107 / 41 / 4991`) | ⚠ **FIRES** | honoured by construction (**287-03**): ONE passthrough field `inputs: opts?.inputs`, 0 branches. ⛔ `onTurnBoundary` still FLUSHES before moving |
 | [`frontend/src/hooks/useMessages.ts`](docs/HOT-FILE-LEDGER.md#frontendsrchooksusemessagests) | 74 / 27 / 127 | ⚠ **FIRES** | extraction due |
@@ -11356,19 +11356,20 @@ cells rot within days.
 | [`frontend/src/components/workflows/RunEvidenceReport.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentsworkflowsrunevidencereporttsx) | 1 / 1 / 462 (was `0 / 0 / 0`) | no (young) | young (created 289-04). The finished-run report; S1-S4 driven live. ⛔ no write control; never imports RunReceipt. Follow-ups F-A..F-E open |
 | [`frontend/src/lib/api/runEvidence.ts`](docs/HOT-FILE-LEDGER.md#frontendsrclibapirunevidencets) | 1 / 1 / 123 (was `0 / 0 / 0`) | no (young) | young (created 289-04). getRunEvidence + RunEvidence types; contract pinned both sides (289-05 I1). ⛔ not re-exported through lib/api.ts |
 | [`frontend/src/lib/runDeepLink.ts`](docs/HOT-FILE-LEDGER.md#frontendsrclibrundeeplinkts) | 1 / 1 / 63 (was `0 / 0 / 0`) | no (young) | young (created 289-04). ?run=<uuid> read/write/clear. ⛔ strict UUID only; the boot read never strips the param |
-| [`frontend/src/index.css`](docs/HOT-FILE-LEDGER.md#frontendsrcindexcss) | 34 / 18 / 1196 | **FIRES** | ⚠ absent its ENTIRE LIFE at 18 phases — row added 289-05. **289-04**: ONE `@media print` block keyed on `[data-print-root]` (+40 L) |
+| [`frontend/src/index.css`](docs/HOT-FILE-LEDGER.md#frontendsrcindexcss) | 35 / 19 / 1239 (was `34 / 18 / 1196`) | ⚠ **FIRES** | 294-05: ONE verdict block keyed only on citation-marker--v-* and __verdict (+43). ⛔ no app-wide rule |
 | [`frontend/src/components/chat/OutputFileCard.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentschatoutputfilecardtsx) | 8 / 7 / 219 | **FIRES** | honoured by construction (195) |
 | [`frontend/src/components/panel/FilesSection.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentspanelfilessectiontsx) | 12 / 8 / 354 (was `10 / 6 / 363`) | ⚠ **FIRES** | ⚠ STALE (`10/6/363`). **274-04**: 1 import, 1 trailing-slot line, 1 Shift+F10 arm, 2 signatures widened to `string \| null`; agent rows byte-identical |
 | [`frontend/src/lib/api.ts`](docs/HOT-FILE-LEDGER.md#frontendsrclibapits) | 210 / 125 / 530 (was `208 / 124 / 523`) | ⚠ **FIRES** | **284-01**: re-exports the paged clients. **284-05**: the five whole-list clients' barrel lines DELETED; `libraryListFence.test.ts` fails on any re-export of them |
 | [`frontend/src/types/index.ts`](docs/HOT-FILE-LEDGER.md#frontendsrctypesindexts) | 100 / 79 / 1656 (was `99 / 78 / 1546`) | ⚠ **FIRES** | **284-01**: the paged wire types (`DocumentListResponse`, `LibrarySummary`, page params, the four per-document pages); additive only. Seam OWED |
-| [`backend/app/main.py`](docs/HOT-FILE-LEDGER.md#backendappmainpy) | 91 / 66 / 978 (was `90 / 65 / 977`) | **FIRES** | **289-03**: ONE `include_router` + one import token (+2 −1). Honoured by construction. ⛔ scheduler_service untouched |
+| [`backend/app/main.py`](docs/HOT-FILE-LEDGER.md#backendappmainpy) | 92 / 67 / 979 (was `91 / 66 / 978`) | ⚠ **FIRES** | 294-03: ONE include_router (citation_checks) + one import token (+2 −1). Honoured by construction |
 | [`backend/app/config.py`](docs/HOT-FILE-LEDGER.md#backendappconfigpy) | 93 / 54 / 1809 (was `92 / 54 / 1790`) | ⚠ **FIRES** | **282-01** ceiling 1800 + boot check + DB-tier clamp; **282-04** `DEFAULT_LLM_CALL_TIMEOUT_SECONDS_SELF_HOSTED` 900 via the mig 180 predicate. No env var. honoured by construction |
 | [`backend/app/api/admin.py`](docs/HOT-FILE-LEDGER.md#backendappapiadminpy) | 43 / 17 / 2051 (was `42 / 17 / 2024`) | ⚠ **FIRES** | honoured by construction (**282-01** / **282-04**): ONE `_timeout_out_of_range_detail` helper serves the PATCH and Add model by ID; the add gains an optional bound timeout. ⛔ add still lands disabled |
 | [`backend/app/api/settings.py`](docs/HOT-FILE-LEDGER.md#backendappapisettingspy) | 44 / 23 / 1159 (was `41 / 21 / 1048`) | ⚠ **FIRES** | honoured by construction (**294-04**): ONE refusal arm, rerank_provider vs registry `ACCEPTED_PROVIDER_IDS` → 400. ⛔ never a retyped id list; GET never echoes a key |
 | [`backend/app/services/multimodal_service.py`](docs/HOT-FILE-LEDGER.md#backendappservicesmultimodal_servicepy) | 14 / 7 / 984 | ⚠ **FIRES** | ⚠ absent from BOTH for its ENTIRE LIFE at **7 phases** — row added SEED-227, which is also where its silent truncation was found |
 | [`backend/app/api/documents.py`](docs/HOT-FILE-LEDGER.md#backendappapidocumentspy) | 99 / 39 / 2698 (was `97 / 38 / 2653`) | ⚠ **FIRES** | Honoured by construction. **285-03** (D-12): both enqueue paths failed → the doc is marked `failed` (guard `status='pending'`) and 201 `failed` returned, like the storage-fail arm. Minter untouched |
-| [`scripts/vitest-count-gate.cjs`](docs/HOT-FILE-LEDGER.md#scriptsvitest-count-gatecjs) | 317 / 72 / 6568 (was `314 / 69 / 6539`) | ⚠ **FIRES** | last touch **289-REVIEW**: `ChatLayout.runDeepLink` adopted in both knobs; `PendingAskCard.paused` 4 → 6, `evidenceView` 29 → 31. ⚠ row was stale (`314 / 69 / 6539`) |
-| [`scripts/build-public-openapi.cjs`](docs/HOT-FILE-LEDGER.md#scriptsbuild-public-openapicjs) | 5 / 2 / 465 | no (2 phases) | **275-03**: `retention` tag in the Documents group (one line). ⛔ `scripts/` is gate-exempt |
+| [`scripts/vitest-count-gate.cjs`](docs/HOT-FILE-LEDGER.md#scriptsvitest-count-gatecjs) | 319 / 73 / 6596 (was `317 / 72 / 6568`) | ⚠ **FIRES** | 294-03 + 294-05: 10 suites adopted in both knobs; citationOrdinals 33 → 49. ⚠ row was stale (294-03 not re-derived) |
+| [`scripts/check-deploy-drift.sh`](docs/HOT-FILE-LEDGER.md#scriptscheck-deploy-driftsh) | 5 / 4 / 267 | ⚠ **FIRES** | ⚠ absent its ENTIRE LIFE — row added 294-05. 294-01: DECISION_ENGINE_FAULT_BASE_URL registered as intentionally omitted (+2) |
+| [`scripts/build-public-openapi.cjs`](docs/HOT-FILE-LEDGER.md#scriptsbuild-public-openapicjs) | 7 / 3 / 468 (was `5 / 2 / 465`) | ⚠ **FIRES** | ⚠ now FIRES (294). 294-03: the citation_checks tag (one line). ⛔ scripts/ is gate-exempt |
 | [`backend/app/services/eval_runner_service.py`](docs/HOT-FILE-LEDGER.md#backendappserviceseval_runner_servicepy) | 13 / 8 / 1040 | ⚠ **FIRES** | ⚠ STALE at `12/7/959`, and absent until 196 at 7 phases. **256-03**: its finalize stopped passing `input_tokens=None`. Re-derived by 256-04 |
 | [`frontend/src/components/panel/PhaseCard.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentspanelphasecardtsx) | 18 / 12 / 796 (was `17 / 11 / 788`) | ⚠ **FIRES** | **281-03** (`0b9841e55`): ONE `template_fields_missing` copy entry (never says "citation") + `whitespace-pre-line` on the reason. honoured by construction (200 / 214 / 281) |
 | [`frontend/src/components/panel/PhaseTimeline.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentspanelphasetimelinetsx) | 10 / 8 / 404 | ⚠ **FIRES** | ⚠ row STALE (`9/7/385`) — 252 touched it. NOT modified by 253; re-derived under CR-08. honoured by construction (**214**); absent from BOTH until 200 |
@@ -11494,7 +11495,7 @@ cells rot within days.
 | [`frontend/src/lib/connectionMark.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrclibconnectionmarktsx) | 7 / 4 / 313 | ⚠ **FIRES** | ✅ **the move IS the seam, and it was TAKEN (214-08)** — `settings/` → `lib/`; four run + canvas surfaces now import ONE map |
 | [`frontend/src/components/ingestion/DocumentList.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentsingestiondocumentlisttsx) | 31 / 15 / 372 (was `31 / 16 / 372`) | ⚠ **FIRES** | **275-02/04**: 409 → HoldRefusalNotice; ONE `retention` prop; a HELD row's delete opens straight into the refusal (`requestDelete`). Seven `<td>` kept |
 | [`frontend/src/pages/LibraryPage.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrcpageslibrarypagetsx) | 63 / 20 / 1344 (was `57 / 19 / 1297`) | ⚠ **FIRES** | **284-01**: extraction TAKEN (`useLibraryDocuments.ts`); the page derives nothing from documents. **284-03**: states + exact pager. Lines ROSE 1302 → 1344: G-5 NOT discharged |
-| [`backend/app/services/retrieval_service.py`](docs/HOT-FILE-LEDGER.md#backendappservicesretrievalservicepy) | 24 / 13 / 176 (was `23 / 12 / 174`) | ⚠ **FIRES** | ✅ extraction DISCHARGED (272-01), MEASURED at 278-04 (SEAM-02): one top-level def, test_272_pure_move 9 passed; one comment line, AST-identical. ⛔ 7 re-exports stay (D-10) |
+| [`backend/app/services/retrieval_service.py`](docs/HOT-FILE-LEDGER.md#backendappservicesretrievalservicepy) | 25 / 14 / 181 (was `24 / 13 / 176`) | ⚠ **FIRES** | ✅ extraction DISCHARGED (272-01). 294-01: keyword-only instruction, conditional kwargs at the one rerank call, process_inputs (+6 −1). Honoured by construction |
 | [`backend/app/services/recall_eval.py`](docs/HOT-FILE-LEDGER.md#backendappservicesrecallevalpy) | 4 / 3 / 1070 | ⚠ **FIRES** | Phase 246 landing: safe as-is (offline test/eval harness, zero request-path side effects, clean 2-layer design). Added `inspect_execution_plan` (EXPLAIN + `idx_scan > 0`) & latency p50/p95 |
 | [`scripts/build-recall-bench.py`](docs/HOT-FILE-LEDGER.md#scriptsbuild-recall-benchpy) | 4 / 1 / 1088 | no (1 phase) | ⚠ row ADDED at 241-04 — the only `DROP DATABASE` in the repo. Guard + constant-interpolation + AST fence, all driven RED. It built GREEN and unreadable; assert the READ |
 | [`backend/app/services/retrieval_tuning.py`](docs/HOT-FILE-LEDGER.md#backendappservicesretrievaltuningpy) | 4 / 2 / 364 | no (2 phases) | young (241, 246). ⛔ `ef_search` is the lever (200 → recall 1.000); dynamic server probe + 60s TTL cache (246, SEED-268) |
@@ -11591,7 +11592,7 @@ cells rot within days.
 | [`frontend/src/components/chat/ActiveConnectorChips.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentschatactiveconnectorchipstsx) | 2 / 2 / 82 | no (2 phases) | ⚠ absent for its entire life — row added 244-05 at its SECOND phase. **244**: the row container HOISTED out; it is bare chips now, `null` on empty (D-244-26) |
 | [`frontend/src/stores/streamsStore.ts`](docs/HOT-FILE-LEDGER.md#frontendsrcstoresstreamsstorets) | 24 / 16 / 607 (was `22 / 14 / 572`) | **FIRES** | honoured by construction (**287-03**): ONE optional `inputs` type field on sendMessage opts, 0 branches. **244-13**: `WorkflowLock.mode` is a REAL discriminator |
 | [`frontend/src/lib/toolMeta.ts`](docs/HOT-FILE-LEDGER.md#frontendsrclibtoolmetats) | 12 / 8 / 367 (was `11 / 7 / 352`) | ⚠ **FIRES** | **273-05**: `stepLabel` (show_artifact phrase, every other tool byte-identical to `toolLabel`). ⛔ the ONE home of the activity string |
-| [`scripts/full-schema-supplement.sql`](docs/HOT-FILE-LEDGER.md#scriptsfull-schema-supplementsql) | 21 / 14 / 838 (was `15 / 10 / 690`) | ⚠ **FIRES** | **284-02**: mig 207's `library_documents` grant block mirrored (SELECT-only, closed to PUBLIC / anon; ACL parity 349/349). ⛔ `scripts/` is gate-EXEMPT: kept by hand |
+| [`scripts/full-schema-supplement.sql`](docs/HOT-FILE-LEDGER.md#scriptsfull-schema-supplementsql) | 23 / 15 / 848 (was `21 / 14 / 838`) | ⚠ **FIRES** | 294-03: mig 211 message_citation_checks ACL block mirrored (+9). Honoured by construction |
 | [`scripts/check-schema-acl-parity.cjs`](docs/HOT-FILE-LEDGER.md#scriptscheck-schema-acl-paritycjs) | 4 / 2 / 1156 | no (2 phases) | ⚠ row STALE at `3/2/883` ONE PLAN LATER, same day — lines rot faster than phases. **253-03**: it finally READS `full-schema.sql` (`assertTailIdentity`); 29 → 35 self-test arms |
 | [`scripts/check-greenfield-privileges.py`](docs/HOT-FILE-LEDGER.md#scriptscheck-greenfield-privilegespy) | 2 / 1 / 1312 | no (1 phase) | ⚠ row STALE at `1/1/1157` the same day it was written. **253-03**: `_statements` replaces `line.find("--")`; ⛔ a SKIP is exit 2, never 0 |
 | [`.claude/hooks/schema-acl-parity-guard.js`](docs/HOT-FILE-LEDGER.md#claudehooksschema-acl-parity-guardjs) | 2 / 1 / 145 | no (1 phase) | young (created 253-02). Row added AT CREATION — `.claude/` is EXEMPT, so no gate can ever demand it. ⛔ its SILENCE reads as "clear": every path a payload can carry must be extracted |
@@ -11601,7 +11602,7 @@ cells rot within days.
 | [`backend/app/services/task_service.py`](docs/HOT-FILE-LEDGER.md#backendappservicestask_servicepy) | 27 / 14 / 1023 (was `26 / 14 / 1018`) | **FIRES** | **289-REVIEW WR-04**: `kb_search_calls` skips a refused search (`ran_retrieval`), so a step whose only searches were refused shows no 'nothing matched' line. +5 L |
 | [`backend/app/services/run_reconciler.py`](docs/HOT-FILE-LEDGER.md#backendappservicesrun_reconcilerpy) | 3 / 2 / 325 | no (2 phases) | ⚠ absent its ENTIRE LIFE — row added 256-02; NOT modified by 256 (D-256-08 site #7 is REGISTERED, not fixed). ⛔ its BOOT sweep NULLs a `cap_paused` run's real totals — `SEED-297` |
 | [`backend/app/services/forced_emit.py`](docs/HOT-FILE-LEDGER.md#backendappservicesforced_emitpy) | 13 / 8 / 724 (was `12 / 8 / 724`) | ⚠ **FIRES** | honoured by construction (**282-01** budget per rung; **282-04** `provider=provider` on the one lookup). ⛔ accumulators init `None` never `0` |
-| [`backend/app/services/pricing_service.py`](docs/HOT-FILE-LEDGER.md#backendappservicespricing_servicepy) | 2 / 1 / 103 | no (new) | young (created 257-01). The single home of token-to-USD conversion (METER-02 / D-257-13). CostResult with Decimal arithmetic and None on unrated. |
+| [`backend/app/services/pricing_service.py`](docs/HOT-FILE-LEDGER.md#backendappservicespricing_servicepy) | 4 / 2 / 156 (was `2 / 1 / 103`) | no (2 phases) | 294-01: + compute_token_cost_usd_unquantized (a ~$0.00002 engine call quantised to 0.0000). ⛔ the single token × rate home (test_257) |
 | [`backend/app/db/rates.py`](docs/HOT-FILE-LEDGER.md#backendappdbratespy) | 9 / 2 / 898 (was `2 / 1 / 507`) | no (2 phases) | **268-02**: ONE `per_root` CTE feeds every spend query; root-only predicate appears ONCE. ⛔ never register a rate for model `unknown` (shell USD would double-count) |
 | [`backend/app/api/admin_spend.py`](docs/HOT-FILE-LEDGER.md#backendappapiadmin_spendpy) | 4 / 2 / 247 (was `1 / 1 / 202`) | no (2 phases) | honoured by construction (**268-02**): ONE validated `expert` Query on both routes (422 before the rates layer); 4 additive summary keys, every 257 key unchanged |
 | [`frontend/src/types/spend.ts`](docs/HOT-FILE-LEDGER.md#frontendsrctypesspendts) | 3 / 2 / 115 (was `1 / 1 / 70`) | no (2 phases) | **268-02**: `ExpertSpendLine` + additive summary/run fields. Not firing |
@@ -11649,7 +11650,7 @@ cells rot within days.
 | [`frontend/src/landing/components/LandingFooter.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrclandingcomponentslandingfootertsx) | 4 / 2 / 57 (was `3 / 2 / 52`) | no (2 phases) | ⚠ absent its ENTIRE LIFE — row added AT 276 PLANNING. 276-01 mark + © Syrel; 276-03 Docs/Changelog links, absolute hashes. ⛔ shared by landing AND docs entries |
 | [`frontend/src/landing/components/Navigation.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrclandingcomponentsnavigationtsx) | 5 / 2 / 153 (was `4 / 2 / 150`) | no (2 phases) | ⚠ STALE (`4/2/150`). **G4-1**: ONE optional `drawerClassName` prop passed through. ⛔ shared by BOTH entries — landing passes no docs props |
 | [`frontend/src/landing/components/HeroSection.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrclandingcomponentsherosectiontsx) | 2 / 2 / 885 (was `1 / 1 / 820`) | no (1 phase) | 276-05: static PromoSlot; `import("./HeroPromo")` only after load + scroll + ≥50% visible; mock rail + avatar → static Iris mark. ⛔ no static Remotion import (first-paint fence) |
-| [`backend/app/api/api_docs.py`](docs/HOT-FILE-LEDGER.md#backendappapiapi_docspy) | 1 / 1 / 111 | no (1 phase) | young (created 276-01). DOCS-04: gated /docs /redoc /openapi.json. ⛔ decides per REQUEST from settings.environment; no import-time gate |
+| [`backend/app/api/api_docs.py`](docs/HOT-FILE-LEDGER.md#backendappapiapi_docspy) | 3 / 2 / 144 (was `1 / 1 / 111`) | no (2 phases) | 294-01: the ENVIRONMENT read moved to utils/environment.py (shared with the fault guard); one call, behaviour unchanged. ⛔ decides per REQUEST |
 | [`frontend/src/docs/main.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrcdocsmaintsx) | 2 / 1 / 15 (was `0 / 0 / 0`) | no (new) | young (created 276). Row added AT PLANNING. 276-02: docs entry mount. ⛔ no providers, no app imports (docsBundleFence) |
 | [`frontend/src/docs/DocsApp.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrcdocsdocsapptsx) | 5 / 1 / 188 (was `4 / 1 / 182`) | no (new) | young (created 276). Row added AT PLANNING. 276-02 interim, 276-03 route → page, 276-07 build-story case. ⛔ the ONE route→page switch; no app imports |
 | [`frontend/src/docs/router.ts`](docs/HOT-FILE-LEDGER.md#frontendsrcdocsrouterts) | 3 / 1 / 55 (was `2 / 1 / 53`) | no (new) | young (created 276). Row added AT PLANNING. 276-02: resolveRoute + navigate. 276-07: build-story BEFORE the version branch. ⛔ the app has no router — keep this docs-only |
@@ -11807,30 +11808,30 @@ cells rot within days.
 | [`frontend/src/components/workflows/builderCopy.ts`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentsworkflowsbuildercopyts) | 1 / 1 / 174 | no (young) | young (286-02). Leaf of the Builder's 8 copy constants; RE-EXPORTED by `WorkflowBuilderPage.tsx` so every import and `?raw` fence resolves |
 | [`frontend/src/hooks/useWorkflowRun.ts`](docs/HOT-FILE-LEDGER.md#frontendsrchooksuseworkflowrunts) | 1 / 1 / 218 | no (young) | young (286-03). Run read + stale guard + `refreshRun`; 5 s poll + terminal edge. ⛔ poll called AFTER `isTerminal` (CR-01); invariant-8 tokens never appear here |
 | [`frontend/src/components/workflows/library/WorkflowCardMenu.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentsworkflowslibraryworkflowcardmenutsx) | 1 / 1 / 473 | no (young) | young (286-04). ⋯ menu + armed draft delete + its prompt (`useDraftDelete`). ⛔ WR-03 five roles; D-18 endpoint rule; in `LIBRARY_SUBTREE_PATHS` |
-| [`backend/app/services/rerank_service.py`](docs/HOT-FILE-LEDGER.md#backendappservicesrerank_servicepy) | 3 / 0 / 122 | no (0 phases) | ⚠ absent its ENTIRE LIFE — row added at 294 planning. 294-01: thin dispatcher over rerank_engines/; fallback == off ([:n]). ⛔ keeps rerank() positional signature |
-| [`backend/app/services/rerank_engines/__init__.py`](docs/HOT-FILE-LEDGER.md#backendappservicesrerank_engines__init__py) | 0 / 0 / 0 | no (young) | young (planned 294-01, row added at planning). get_engine, resolve_credentials, availability, resolve_endpoint (loopback-only dev fault base). ⛔ never logs or returns a key |
-| [`backend/app/services/rerank_engines/registry.py`](docs/HOT-FILE-LEDGER.md#backendappservicesrerank_enginesregistrypy) | 0 / 0 / 0 | no (young) | young (planned 294-01, row added at planning). THE engine table + EngineId Literal (?raw parity with rerankEngines.ts). ⛔ data only, no I/O; prices are vendor facts |
-| [`backend/app/services/rerank_engines/prune.py`](docs/HOT-FILE-LEDGER.md#backendappservicesrerank_enginesprunepy) | 0 / 0 / 0 | no (young) | young (planned 294-01, row added at planning). PURE D-07 prune: floor 0.1, keep ≥3, ≤top_n, never empty, keep_documents coverage. ⛔ probabilistic engines only |
-| [`backend/app/services/rerank_engines/cohere.py`](docs/HOT-FILE-LEDGER.md#backendappservicesrerank_enginescoherepy) | 0 / 0 / 0 | no (young) | young (planned 294-01, row added at planning). Verbatim move of _rerank_api; reorder + top_n only (D-08). ⛔ never thresholded |
-| [`backend/app/services/rerank_engines/local.py`](docs/HOT-FILE-LEDGER.md#backendappservicesrerank_engineslocalpy) | 0 / 0 / 0 | no (young) | young (planned 294-01, row added at planning). CrossEncoder rerank + per-name cache; first use loads in the background and falls back. ⛔ never per request; reorder only |
-| [`backend/app/services/rerank_engines/jev.py`](docs/HOT-FILE-LEDGER.md#backendappservicesrerank_enginesjevpy) | 0 / 0 / 0 | no (young) | young (planned 294-01, row added at planning). OpenRouter /api/alpha/decisions: noul rerank (≤30 / ≤28 KB per call, ≤4 in flight) + post_decisions. ⛔ untrusted text only in state |
-| [`backend/app/services/rerank_engines/openai_decisions.py`](docs/HOT-FILE-LEDGER.md#backendappservicesrerank_enginesopenai_decisionspy) | 0 / 0 / 0 | no (young) | young (planned 294-01, row added at planning). POST /v1/decisions gpt-6-luna: predicate rerank + post_decisions; raw httpx (SDK lacks decisions). ⛔ refusal → fallback |
-| [`backend/app/services/rerank_engines/tracing.py`](docs/HOT-FILE-LEDGER.md#backendappservicesrerank_enginestracingpy) | 0 / 0 / 0 | no (young) | young (planned 294-01, row added at planning). redact_inputs (process_inputs) + EngineCall capture for the harness. ⛔ user_settings / api_key / supabase never traced |
+| [`backend/app/services/rerank_service.py`](docs/HOT-FILE-LEDGER.md#backendappservicesrerank_servicepy) | 5 / 1 / 114 (was `3 / 0 / 122`) | no (1 phase) | 294-01: thin dispatcher over rerank_engines; a failure returns documents[:n]. ⛔ first 4 params positional; process_inputs=redact_inputs |
+| [`backend/app/services/rerank_engines/__init__.py`](docs/HOT-FILE-LEDGER.md#backendappservicesrerank_engines__init__py) | 3 / 1 / 224 (was `0 / 0 / 0`) | no (young) | young (created 294-01; 294-03 reuses). get_engine, resolve_credentials, citation_check_availability, loopback-only fault URL. ⛔ a key is never logged, traced or returned |
+| [`backend/app/services/rerank_engines/registry.py`](docs/HOT-FILE-LEDGER.md#backendappservicesrerank_enginesregistrypy) | 1 / 1 / 96 (was `0 / 0 / 0`) | no (young) | young (created 294-01). THE engine table + EngineId Literal (?raw-pinned by rerankEngines.ts). ⛔ no I/O; imported by api/settings.py |
+| [`backend/app/services/rerank_engines/prune.py`](docs/HOT-FILE-LEDGER.md#backendappservicesrerank_enginesprunepy) | 1 / 1 / 36 (was `0 / 0 / 0`) | no (young) | young (created 294-01). Pure D-07 prune: floor 0.1, keep ≥ 3, ≤ top_n, never []. ⛔ hosted engines only (D-08) |
+| [`backend/app/services/rerank_engines/cohere.py`](docs/HOT-FILE-LEDGER.md#backendappservicesrerank_enginescoherepy) | 2 / 1 / 66 (was `0 / 0 / 0`) | no (young) | young (created 294-01). _rerank_api moved verbatim behind _http_client(). ⛔ reorder + [:top_n] only (uncalibrated scores, D-08) |
+| [`backend/app/services/rerank_engines/local.py`](docs/HOT-FILE-LEDGER.md#backendappservicesrerank_engineslocalpy) | 2 / 1 / 150 (was `0 / 0 / 0`) | no (young) | young (created 294-01). CrossEncoder; one resident model, reloads once on a rerank_model change, warms off-thread. ⛔ never per request; no 0.1 floor |
+| [`backend/app/services/rerank_engines/jev.py`](docs/HOT-FILE-LEDGER.md#backendappservicesrerank_enginesjevpy) | 2 / 1 / 210 (was `0 / 0 / 0`) | no (young) | young (created 294-01). noul per passage, batched by count + bytes, 4 in flight, 5 s. ⛔ untrusted text only inside state JSON (D-10); any bad answer raises |
+| [`backend/app/services/rerank_engines/openai_decisions.py`](docs/HOT-FILE-LEDGER.md#backendappservicesrerank_enginesopenai_decisionspy) | 2 / 1 / 195 (was `0 / 0 / 0`) | no (young) | young (created 294-01). predicate per passage, ≤ 200 per request, 8 s; cost via pricing_service. ⛔ refusal raises in rerank, couldnt_check in the check |
+| [`backend/app/services/rerank_engines/tracing.py`](docs/HOT-FILE-LEDGER.md#backendappservicesrerank_enginestracingpy) | 2 / 1 / 83 (was `0 / 0 / 0`) | no (young) | young (created 294-01). redact_inputs for every traceable + engine-call capture. ⛔ redacts user_settings, api_key and supabase |
 | [`backend/app/utils/environment.py`](docs/HOT-FILE-LEDGER.md#backendapputilsenvironmentpy) | 1 / 1 / 21 | no (young) | young (created 294-01). current_environment(): the ONE ENVIRONMENT reader (A-IN-11), shared by api_docs and the fault guard. ⛔ per call; never os.getenv |
-| [`backend/app/services/decision_eval.py`](docs/HOT-FILE-LEDGER.md#backendappservicesdecision_evalpy) | 0 / 0 / 0 | no (young) | young (planned 294-02, row added at planning). D-18/D-19 harness over the REAL search_documents; reuses recall_eval. ⛔ refuses rather than invents; never writes app_settings |
-| [`backend/app/services/citation_claims.py`](docs/HOT-FILE-LEDGER.md#backendappservicescitation_claimspy) | 0 / 0 / 0 | no (young) | young (planned 294-03, row added at planning). PURE claim extraction + marker ordinals + dedup_paragraphs port. ⛔ ordinals pinned to CitedMarkdown by a shared fixture |
-| [`backend/app/services/citation_check_service.py`](docs/HOT-FILE-LEDGER.md#backendappservicescitation_check_servicepy) | 0 / 0 / 0 | no (young) | young (planned 294-03, row added at planning). Runs the check (choice per claim, grouped by source) + the pool upsert. ⛔ ids bound from the message row; refusal → couldnt_check |
-| [`backend/app/models/citation_check.py`](docs/HOT-FILE-LEDGER.md#backendappmodelscitation_checkpy) | 0 / 0 / 0 | no (young) | young (planned 294-03, row added at planning). Verdict + EngineId Literals, CitationCheckResult v1 (extra=forbid). ⛔ unknown label → couldnt_check before validation |
-| [`backend/app/api/citation_checks.py`](docs/HOT-FILE-LEDGER.md#backendappapicitation_checkspy) | 0 / 0 / 0 | no (young) | young (planned 294-03, row added at planning). GET availability+checks, POST run (404 same body, 422, 409 in flight). ⛔ a route, NOT a tool (30 stays); never returns a key |
-| [`frontend/src/components/settings/rerankEngines.ts`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentssettingsrerankenginests) | 0 / 0 / 0 | no (young) | young (planned 294-04, row added at planning). THE engine-card fact table + engineFor() own-property accessor. ⛔ ids pinned to registry.py via ?raw; no fact in component logic |
-| [`frontend/src/components/settings/RerankEngineBlock.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentssettingsrerankengineblocktsx) | 0 / 0 / 0 | no (young) | young (planned 294-04, row added at planning). Sketch 294 B engine cards + keep-at-most + missing-key + egress lines. ⛔ props in, callbacks out; no fetch, no useState |
-| [`frontend/src/lib/api/citationChecks.ts`](docs/HOT-FILE-LEDGER.md#frontendsrclibapicitationchecksts) | 0 / 0 / 0 | no (young) | young (planned 294-05, row added at planning). getCitationChecks / runCitationCheck + wire types. ⛔ own specifier; NOT re-exported through lib/api.ts |
-| [`frontend/src/stores/citationCheckStore.ts`](docs/HOT-FILE-LEDGER.md#frontendsrcstorescitationcheckstorets) | 0 / 0 / 0 | no (young) | young (planned 294-05, row added at planning). byMessage + availability; microtask-batched ensure() → one GET. ⛔ never a slice of streamsStore.ts; reset in setupTests |
-| [`frontend/src/components/chat/citationVerdicts.ts`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentschatcitationverdictsts) | 0 / 0 / 0 | no (young) | young (planned 294-05, row added at planning). THE verdict vocabulary: glyph, word, class, fixed reason line. ⛔ labels pinned to models/citation_check.py; unknown → couldn't check |
-| [`frontend/src/components/chat/CitationCheckAction.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentschatcitationcheckactiontsx) | 0 / 0 / 0 | no (young) | young (planned 294-05, row added at planning). References-header action: Check → Checking N → count pills + Re-check + checked-by line, or the ⓘ reason. ⛔ sibling of the trigger button |
-| [`frontend/src/components/chat/CitedMarkdown.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentschatcitedmarkdowntsx) | 2 / 1 / 294 | no (1 phase) | ⚠ absent its ENTIRE LIFE — row added at 294 planning. 294-05: optional checkMessageId + data-citation-ordinal + verdict decoration in the existing layout effect. ⛔ effect owns innerHTML |
-| [`frontend/src/components/chat/CitationList.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentschatcitationlisttsx) | 4 / 3 / 73 | ⚠ **FIRES** | ⚠ absent its ENTIRE LIFE at 3 phases — row added at 294 planning. 294-05: ONE optional checkMessageId prop + ONE CitationCheckAction mount. ⛔ label + defaultOpen=false pinned |
-| [`frontend/src/components/chat/CitationPeek.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentschatcitationpeektsx) | 1 / 1 / 189 | no (1 phase) | ⚠ absent its ENTIRE LIFE — row added at 294 planning. 294-05: optional verdict section between body and footer; absent verdict → DOM unchanged |
+| [`backend/app/services/decision_eval.py`](docs/HOT-FILE-LEDGER.md#backendappservicesdecision_evalpy) | 1 / 1 / 703 (was `0 / 0 / 0`) | no (young) | young (created 294-02). Real search path per arm, frozen held-out sha, fallback arms refused. ⛔ recall_eval.py untouched |
+| [`backend/app/services/citation_claims.py`](docs/HOT-FILE-LEDGER.md#backendappservicescitation_claimspy) | 1 / 1 / 279 (was `0 / 0 / 0`) | no (young) | young (created 294-03). Pure: dedup port + claim units + ordinals == the rendered markers (shared fixture). ⛔ no agent_loop import |
+| [`backend/app/services/citation_check_service.py`](docs/HOT-FILE-LEDGER.md#backendappservicescitation_check_servicepy) | 1 / 1 / 330 (was `0 / 0 / 0`) | no (young) | young (created 294-03). One choice per claim, grouped per source, canonical labels; pool upsert binds ids from the row. ⛔ never defaults to supported |
+| [`backend/app/models/citation_check.py`](docs/HOT-FILE-LEDGER.md#backendappmodelscitation_checkpy) | 1 / 1 / 74 (was `0 / 0 / 0`) | no (young) | young (created 294-03). Verdict / CheckEngineId / UnavailableReason Literals one per line (frontend ?raw parity) + strict CitationCheckResult v1. ⛔ extra=forbid |
+| [`backend/app/api/citation_checks.py`](docs/HOT-FILE-LEDGER.md#backendappapicitation_checkspy) | 1 / 1 / 175 (was `0 / 0 / 0`) | no (young) | young (created 294-03). GET availability + checks, POST run; one 404 body; 409 {reason}; ids from the message row. ⛔ an API route, never a tool (7 / 1 / 30) |
+| [`frontend/src/components/settings/rerankEngines.ts`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentssettingsrerankenginests) | 1 / 1 / 123 (was `0 / 0 / 0`) | no (young) | young (created 294-04). THE engine-card fact table; engineFor is total (api / unknown → Cohere). ⛔ ids ?raw-pinned to registry.py |
+| [`frontend/src/components/settings/RerankEngineBlock.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentssettingsrerankengineblocktsx) | 1 / 1 / 283 (was `0 / 0 / 0`) | no (young) | young (created 294-04). Sketch 294 B engine cards; owns no fetch, no state. ⛔ facts from rerankEngines.ts only; never rewrites "api" on mount |
+| [`frontend/src/lib/api/citationChecks.ts`](docs/HOT-FILE-LEDGER.md#frontendsrclibapicitationchecksts) | 1 / 1 / 117 (was `0 / 0 / 0`) | no (young) | young (created 294-05). getCitationChecks / runCitationCheck + wire types verbatim; the 409 reason is kept. ⛔ not re-exported through lib/api.ts |
+| [`frontend/src/stores/citationCheckStore.ts`](docs/HOT-FILE-LEDGER.md#frontendsrcstorescitationcheckstorets) | 1 / 1 / 143 (was `0 / 0 / 0`) | no (young) | young (created 294-05). byMessage + availability, microtask-batched GET ≤ 100, run. ⛔ its own module; the client is loaded lazily (setupTests import) |
+| [`frontend/src/components/chat/citationVerdicts.ts`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentschatcitationverdictsts) | 2 / 1 / 142 (was `0 / 0 / 0`) | no (young) | young (created 294-05). VERDICT_META + availability and error lines; unknown → couldn't check. ⛔ Verdict ?raw-pinned to models/citation_check.py |
+| [`frontend/src/components/chat/CitationCheckAction.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentschatcitationcheckactiontsx) | 1 / 1 / 123 (was `0 / 0 / 0`) | no (young) | young (created 294-05). Sketch 294 A header action; reads only the store; ensure on mount, run on click. ⛔ a sibling of the fold trigger; never runs by itself |
+| [`frontend/src/components/chat/CitedMarkdown.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentschatcitedmarkdowntsx) | 3 / 2 / 387 (was `2 / 1 / 294`) | no (2 phases) | 294-05: data-citation-ordinal + decorateMarkers (n must match); decorates in place on arrival. ⛔ the layout effect still owns innerHTML; verdicts via a ref |
+| [`frontend/src/components/chat/CitationList.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentschatcitationlisttsx) | 5 / 5 / 91 (was `4 / 3 / 73`) | ⚠ **FIRES** | 294-05: optional checkMessageId → ONE CitationCheckAction beside the trigger (+24 −6). Label and defaultOpen false unchanged. Extraction FIRST next |
+| [`frontend/src/components/chat/CitationPeek.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentschatcitationpeektsx) | 2 / 2 / 227 (was `1 / 1 / 189`) | no (2 phases) | 294-05: optional verdict → ONE section between passage and footer (+38). Absent → DOM unchanged |
 
 
 
@@ -18956,6 +18957,12 @@ Every triple below was re-derived with the CLAUDE.md recipe AFTER the phase's la
 
 Scan-list cell as written at Phase 272 (replaced by 289-REVIEW WR-04, moved verbatim): 4 / 1 / 1163 (was `0 / 0 / 0`) | no (young) | young (272-01 move; 272-04 kinds, D-09 lock, ONE audit writer, vocabulary). **272-REVIEW WR-01**: vocabulary values checked + JSON-quoted, note capped (2000). Split OWED → 273
 
+### `backend/app/services/search_documents_tool.py` — Phase 294 (294-01)
+
+**`11 / 3 / 1544` (was `10 / 2 / 1522`).** ⚠ **Crosses to 3 phases in 294, so G-5 now fires.** +25 −3: `_clamp_instruction` (non-string ignored, control characters stripped, whitespace collapsed, 300-char cap, empty → None) and the pass-through to `retrieval_service.search_documents`. The text stays untrusted and reaches an engine only as data (D-10). The next phase that touches this file should take an extraction first.
+
+Scan-list cell as of 2026-10-20 (replaced by 294-05, moved verbatim): 10 / 2 / 1522 (was `4 / 1 / 1163`) | no (young) | **289-REVIEW WR-04**: + `REFUSED_SEARCH_ERRORS` and a pure `ran_retrieval(tr)` naming the two arms that refuse without retrieving. ⚠ row was stale (`4 / 1 / 1163`)
+
 ## Phase 272 — post-ruling re-derivation (2026-10-03, plan `272-05` Task 4 rulings)
 
 The operator ruled on findings F-1/F-2/F-3 at the Task 4 checkpoint (`272-VALIDATION.md` §4). Two of them changed source after the close re-derivation above, so these four triples were re-derived again with the CLAUDE.md recipe after the last source edit (the F-3 commit). Rows and sections are updated in the same commit.
@@ -19143,6 +19150,14 @@ Every triple below was re-derived with the CLAUDE.md recipe AFTER the phase's la
 
 **`80 / 37 / 1036`** after 276-REVIEW B-WR-01 (2026-10-05, counting its fix commit). One plain expression grows into a named `capPauseWaiting` const: the last row's cap pause reads as waiting only while a Continue is still possible (`!continueExhausted && workflowLock.continuesRemaining > 0`), so an exhausted pause (the card's no-action stop message) settles to idle. Hook call sites 6 → 6, no new store read; `continueExhausted` is the existing local state. The ask/approval live-gating itself lives in `irisState.ts`.
 
+### `frontend/src/components/chat/MessageItem.tsx` — Phase 294 (294-05)
+
+**`81 / 38 / 1037` (was `80 / 37 / 1036`).** +2 −1: `checkMessageId={!isStreaming && !message.id.startsWith("temp-") ? message.id : undefined}` on the existing `CitedMarkdown` and `CitationList` mounts, nothing else (pinned by the source fence in `CitedMarkdown.verdict.test.tsx`). Three six-digit quick-task buckets (`260328`, `260405`, `260630`) are excluded from the phase count.
+
+Scan-list cell as of 2026-10-20 (replaced by 294-05, moved verbatim): 80 / 37 / 1036 (was `79 / 37 / 1029`) | ⚠ **FIRES** | **276-REVIEW B-WR-01**: the avatar's cap-pause argument also requires a Continue left (`!continueExhausted && continuesRemaining > 0`). No hook, no store read
+
+CLAUDE.md FIRING cell as of 2026-10-20 (replaced by 294-05, moved verbatim): 80 / 37 / 1036 (was `79 / 37 / 1029`) | last touch 276-REVIEW B-WR-01
+
 ### `frontend/src/components/chat/StepRow.tsx` — Phase 273 close
 
 **`3 / 2 / 253`** at 273 close (was `2 / 1 / 249`). G-5: no (2 phases). 273-05: `refused` node state (UI-D-02 amber pair). ⛔ derived from the result marker in toolStepDerivation, never from a tool name.
@@ -19292,6 +19307,12 @@ Thirty-seven watched files named by 276 plans had no scan row (six existing land
 **`1 / 1 / 111`** measured in 276-01's own creating commit. One router-level dependency (`require_api_docs_access`) over four `include_in_schema=False` routes; the token check is the existing `get_current_user` called directly, so no auth code is duplicated. `/openapi.json` returns `request.app.openapi()`, which keeps the Phase 182 canvas filter.
 
 **294-01 (Task 4):** `_environment()` now delegates to `app.utils.environment.current_environment()` (same normalisation, same per-request read); the `settings` import is replaced by that one. No route, gate value or log line changes; `test_276_api_docs_gate` green.
+
+### `backend/app/api/api_docs.py` — Phase 294 (294-01)
+
+**`3 / 2 / 144` (was `1 / 1 / 111`).** +4 −3 (111 → 144 includes a 276-era change between the row and today). `_environment()` now returns `app.utils.environment.current_environment()`, so the docs gate and the decision-engine fault guard read ENVIRONMENT through one function. Behaviour unchanged; the per-request decision held.
+
+Scan-list cell as of 2026-10-20 (replaced by 294-05, moved verbatim): 1 / 1 / 111 | no (1 phase) | young (created 276-01). DOCS-04: gated /docs /redoc /openapi.json. ⛔ decides per REQUEST from settings.environment; no import-time gate
 
 ### `backend/app/main.py` — Phase 276, honoured by construction
 
@@ -20186,6 +20207,12 @@ Crossed the G-5 threshold on 275-02's touch (271, 276, 275).
 
 No row existed. 275-03 edited it under Rule 3 (`[ungrouped-tag] retention` refused to build). Row added at 275-05 so the next touch is visible.
 
+### `scripts/build-public-openapi.cjs` — Phase 294 (294-03)
+
+**`7 / 3 / 468` (was `5 / 2 / 465`).** ⚠ Crosses to 3 phases in 294. +1 −1: the `citation_checks` tag in its group.
+
+Scan-list cell as of 2026-10-20 (replaced by 294-05, moved verbatim): 5 / 2 / 465 | no (2 phases) | **275-03**: `retention` tag in the Documents group (one line). ⛔ `scripts/` is gate-exempt
+
 ## Phase 278 rows — added AT PLANNING (2026-10-13)
 
 The G-5 gate (`node scripts/check-hot-file-ledger.cjs 278`, over every file the four 278 plans name) needs a row for every module this phase CREATES, because the gate has no existence check (precedent: 273's planning commit `f76473497`). Twelve modules are new: the eleven files of the `backend/app/services/tools/` package (SEAM-03, the `tool_dispatcher.py` registry/handler split, 278-03) and `backend/app/services/document_vocabulary.py` (DEBT-09, 278-02). Every row reads `0 / 0 / 0` at planning; 278-04 re-derives the triples on the merged tree with the CLAUDE.md recipe. The existing files 278 modifies (`tool_dispatcher.py`, `retrieval_scope.py`, `document_search_service.py`, `view_filter_compiler.py`, `retrieval_service.py`) already have rows; their cells are written LAST, in 278-04, so no two wave-1 worktrees edit this file.
@@ -20288,6 +20315,14 @@ Every earlier "split still OWED" sentence in this file's sections (244, 264, 267
 ### `backend/app/services/retrieval_service.py` — Phase 278 close
 
 **`24 / 13 / 176` (was `23 / 12 / 174`).** ✅ extraction DISCHARGED (272-01). SEAM-02 was MEASURED at 278-04: one top-level def (`search_documents`), `test_272_pure_move.py` 9 passed, and the comment-only commit `2757b9e51` is AST-identical. ⛔ 7 re-exports stay (D-10). Full record: the *"CORRECTED 2026-10-13"* paragraph in this file's main section. The CLAUDE.md row (`19 / 11 / 456`, *"extraction still OWED"*) is corrected in the same commit, with the original struck through beside the fix (D-11).
+
+### `backend/app/services/retrieval_service.py` — Phase 294 (294-01)
+
+**`25 / 14 / 181` (was `24 / 13 / 176`).** +6 −1: keyword-only `instruction`, forwarded to `rerank` only when set; `keep_documents` passed only on the filtered path; `@traceable(..., process_inputs=redact_inputs)`. One top-level def, the 7 re-exports and the unfiltered `[:top_k]` are unchanged. Honoured by construction.
+
+Scan-list cell as of 2026-10-20 (replaced by 294-05, moved verbatim): 24 / 13 / 176 (was `23 / 12 / 174`) | ⚠ **FIRES** | ✅ extraction DISCHARGED (272-01), MEASURED at 278-04 (SEAM-02): one top-level def, test_272_pure_move 9 passed; one comment line, AST-identical. ⛔ 7 re-exports stay (D-10)
+
+CLAUDE.md FIRING cell as of 2026-10-20 (replaced by 294-05, moved verbatim): 24 / 13 / 176 (was `19 / 11 / 456`) | ~~⛔ extraction still OWED (SEED-224, since 231)~~ ✅ DISCHARGED 272-01 (278)
 
 ### `backend/app/services/retrieval_scope.py` — Phase 278 close
 
@@ -20682,6 +20717,14 @@ Scan-list disposition cell before 280-04 (replaced):
 CLAUDE.md verdict cell as of 2026-10-14 (replaced by 280-04):
 
 > last touch 275-03 · ⛔
+
+### `backend/app/main.py` — Phase 294 (294-03)
+
+**`92 / 67 / 979` (was `91 / 66 / 978`).** +2 −1: one `include_router(citation_checks.router)` and its import token. No middleware, no lifespan change. Honoured by construction.
+
+Scan-list cell as of 2026-10-20 (replaced by 294-05, moved verbatim): 91 / 66 / 978 (was `90 / 65 / 977`) | **FIRES** | **289-03**: ONE `include_router` + one import token (+2 −1). Honoured by construction. ⛔ scheduler_service untouched
+
+CLAUDE.md FIRING cell as of 2026-10-20 (replaced by 294-05, moved verbatim): 91 / 66 / 978 (was `90 / 65 / 977`) | 289-03: ONE include_router (+2 −1) · ⛔
 
 ### `backend/app/utils/db.py` — Phase 280 close
 
@@ -21131,6 +21174,14 @@ Scan-list disposition cell before 282-03 (replaced):
 CLAUDE.md verdict cell as of 2026-10-15 (replaced by 282-03):
 
 > ⛔ FIRES at 36 phases · absent its ENTIRE LIFE — row added 262
+
+### `backend/app/services/openai_service.py` — Phase 294 (294-01)
+
+**`81 / 41 / 2623` (was `79 / 40 / 2602`).** +12: one optional `instruction` property (plain `string`, no `maxLength`; the handler clamps it) on `SEARCH_DOCUMENTS_TOOL`. `resolve_calling_mode`'s gate order is untouched. The schema change is what makes the D-21 8-row roster owed (294-05 Task 4, R1-R8).
+
+Scan-list cell as of 2026-10-20 (replaced by 294-05, moved verbatim): 79 / 40 / 2602 (was `78 / 39 / 2569`) | ⚠ **FIRES** | **282-01**: `get_llm_client` + keyword-only `timeout_s`/`max_retries` in the constructor, before `wrap_openai`; embedding client gets the named no-budget values. honoured by construction
+
+CLAUDE.md FIRING cell as of 2026-10-20 (replaced by 294-05, moved verbatim): 79 / 40 / 2602 (was `72 / 36 / 2268`) | ⛔ FIRES at 40 phases · honoured by construction (282-01: client kwargs)
 
 ### `backend/app/services/provider_gateway/anthropic.py` — Phase 282 close
 
@@ -21979,6 +22030,14 @@ CLAUDE.md verdict cell as of 2026-10-16 (replaced by 284-05):
 > ⚠ row STALE · last touch 266-01 · ⛔
 
 
+### `scripts/full-schema-supplement.sql` — Phase 294 (294-03)
+
+**`23 / 15 / 848` (was `21 / 14 / 838`).** +9: the migration 211 grant block (owner SELECT, service_role writes) mirrored for ACL parity.
+
+Scan-list cell as of 2026-10-20 (replaced by 294-05, moved verbatim): 21 / 14 / 838 (was `15 / 10 / 690`) | ⚠ **FIRES** | **284-02**: mig 207's `library_documents` grant block mirrored (SELECT-only, closed to PUBLIC / anon; ACL parity 349/349). ⛔ `scripts/` is gate-EXEMPT: kept by hand
+
+CLAUDE.md FIRING cell as of 2026-10-20 (replaced by 294-05, moved verbatim): 21 / 14 / 838 (was `15 / 10 / 690`) | 284-02: mig 207 view grants mirrored (ACL parity) · ⛔
+
 ### `scripts/vitest-count-gate.cjs` — 289-REVIEW
 
 **`317 / 72 / 6568` (was `314 / 69 / 6539`).** +29 lines measured from the stale row (6539 → 6568; 289-05's own adoption is inside that delta). This commit: `ChatLayout.runDeepLink.test.tsx` (new, WR-05) pinned at 2 in BASELINE and listed FILE-LEVEL in TARGETS (no `src/components/layout` directory entry); `PendingAskCard.paused.test.tsx` 4 → 6 (CR-02) and `evidenceView.test.ts` 29 → 31 (WR-03), each the focused run's own count. ⚠ The row was stale: 289-05 adopted seven suites without re-deriving it.
@@ -21986,6 +22045,14 @@ CLAUDE.md verdict cell as of 2026-10-16 (replaced by 284-05):
 CLAUDE.md verdict cell as of 2026-10-19 or earlier (replaced by 289-REVIEW WR-05, moved verbatim): | `scripts/vitest-count-gate.cjs` | 314 / 69 / 6539 (was `308 / 68 / 6483`) | last touch 287-04 (6 suites adopted, 2 pins raised) |
 
 Scan-list cell as of 2026-10-19 or earlier (replaced by 289-REVIEW WR-05, moved verbatim): 314 / 69 / 6539 (was `308 / 68 / 6483`) | ⚠ **FIRES** | last touch **287-04**: 6 suites adopted, 2 pins raised (detail below).
+
+### `scripts/vitest-count-gate.cjs` — Phase 294 (294-03, 294-05)
+
+**`319 / 73 / 6596` (was `317 / 72 / 6568`).** 294-03 adopted `citationOrdinals.parity.test.tsx` (33); 294-05 raised it to 49 and adopted the six 294-05 suites plus 294-04's `RerankEngineBlock.test.tsx` (24) and `rerankEngines.parity.test.ts` (7), each in BASELINE and TARGETS in the same commit. Six-digit buckets `260807`, `260808`, `260814` are excluded.
+
+Scan-list cell as of 2026-10-20 (replaced by 294-05, moved verbatim): 317 / 72 / 6568 (was `314 / 69 / 6539`) | ⚠ **FIRES** | last touch **289-REVIEW**: `ChatLayout.runDeepLink` adopted in both knobs; `PendingAskCard.paused` 4 → 6, `evidenceView` 29 → 31. ⚠ row was stale (`314 / 69 / 6539`)
+
+CLAUDE.md FIRING cell as of 2026-10-20 (replaced by 294-05, moved verbatim): 317 / 72 / 6568 (was `314 / 69 / 6539`) | 289-REVIEW: 1 suite adopted, 2 pins raised (row was stale)
 
 ## Phase 285 close (2026-10-16, 285-03)
 
@@ -22584,41 +22651,103 @@ Scan-list cell as of 2026-10-19 (replaced by 289-05, moved verbatim): 0 / 0 / 0 
 
 **`34 / 18 / 1196`.** ⚠ **Absent from the ledger for its ENTIRE LIFE at 18 phases**: no scan-list row and no section until 289-05 measured it (289-04 flagged it). **289-04**: ONE `@media print` block (+40 L, 1156 → 1196): everything hidden except `[data-print-root]`, its ancestors unclipped through `*:has([data-print-root])`, theme tokens re-pointed to dark-on-white inside the root. Cosmetic only in print. ⛔ Any new global rule here is app-wide; a print rule must stay keyed on the print-root attribute.
 
+### `frontend/src/index.css` — Phase 294 (294-05)
+
+**`35 / 19 / 1239` (was `34 / 18 / 1196`).** +43: one block after `.citation-marker--attach`. Every selector is `.citation-marker.citation-marker--v-*` (out-ranks the hover rule so a checked chip keeps its colour) or `.citation-marker .citation-marker__verdict`. Couldn't check uses a dashed border, not an outline, so the shared focus ring still shows.
+
+Scan-list cell as of 2026-10-20 (replaced by 294-05, moved verbatim): 34 / 18 / 1196 | **FIRES** | ⚠ absent its ENTIRE LIFE at 18 phases — row added 289-05. **289-04**: ONE `@media print` block keyed on `[data-print-root]` (+40 L)
+
+CLAUDE.md FIRING cell as of 2026-10-20 (replaced by 294-05, moved verbatim): 34 / 18 / 1196 | ⚠ absent its ENTIRE LIFE — row added 289-05 · ONE print block
+
 ## `backend/app/services/rerank_service.py`
 
 **`3 / 0 / 122` — measured at 294 planning (2026-10-20).** ⚠ Absent from the ledger for its entire life (three commits, no phase-tagged subject). **294-01** turns it into a thin dispatcher: the engine logic moves into `backend/app/services/rerank_engines/`, the local-model singleton defect (caches the first model forever, ignores `rerank_model`) is fixed in `rerank_engines/local.py`, and the fallback returns `documents[:n]` so a failure equals rerank-off byte-for-byte (D-11 + D-12). ⛔ **Binding invariants:** `rerank(query, documents, top_n=None, user_settings=None, *, instruction=None, keep_documents=False)`: the first four parameters stay positional (fixed-signature fakes in `test_272_filtered_both_arms`, `test_260_*`, `test_267_cr02_*`); the new ones are keyword-only; `@traceable(name="rerank-documents")` carries `process_inputs=redact_inputs` so no key reaches LangSmith (SC#6). Plan 05 re-derives the triple.
+
+### `backend/app/services/rerank_service.py` — Phase 294 (294-01)
+
+**`5 / 1 / 114` (was `3 / 0 / 122`).** +67 −75 (122 → 114): the engine bodies moved into `rerank_engines/`; the dispatcher keeps the signature and falls back to `documents[:n]` (rerank-off byte-for-byte). Invariants held.
+
+Scan-list cell as of 2026-10-20 (replaced by 294-05, moved verbatim): 3 / 0 / 122 | no (0 phases) | ⚠ absent its ENTIRE LIFE — row added at 294 planning. 294-01: thin dispatcher over rerank_engines/; fallback == off ([:n]). ⛔ keeps rerank() positional signature
 
 ## `backend/app/services/rerank_engines/__init__.py`
 
 **`0 / 0 / 0` — planned (294-01); row and section added at planning.** The engine lookup and the one place a key is resolved (`resolve_credentials`: Cohere `rerank_api_key`, Jev the stored OpenRouter key, OpenAI Decisions the stored OpenAI key; env fallback only when `user_settings is None`) plus `citation_check_availability` (reasons `off` / `engine_reorders_only` / `key_missing`) and `resolve_endpoint`, which honours the dev-only `DECISION_ENGINE_FAULT_BASE_URL` only for a strictly validated loopback URL (rebuilt from its parts) under an EXPLICIT local / development / dev / test ENVIRONMENT, and then sends a dummy bearer token instead of the stored key (294-01 Task 4), so a key can never be redirected off-box. ⛔ A key never enters a log line, an exception message, a traced argument or a return value other than the adapter call itself. Plan 05 re-derives the triple.
 
+### `backend/app/services/rerank_engines/__init__.py` — Phase 294 (294-01)
+
+**`3 / 1 / 224` (was `0 / 0 / 0`).** Created at 224 lines (three 294-01 commits). Invariants held as planned.
+
+Scan-list cell as of 2026-10-20 (replaced by 294-05, moved verbatim): 0 / 0 / 0 | no (young) | young (planned 294-01, row added at planning). get_engine, resolve_credentials, availability, resolve_endpoint (loopback-only dev fault base). ⛔ never logs or returns a key
+
 ## `backend/app/services/rerank_engines/registry.py`
 
 **`0 / 0 / 0` — planned (294-01); row and section added at planning.** The one engine table (`ENGINES`, `EngineSpec`), the `EngineId` `Literal` that `frontend/src/components/settings/rerankEngines.ts` pins through a `?raw` fence, the accepted provider ids for the Settings allowlist, both decision endpoints as constants (the Jev URL is never derived from the stored OpenRouter `base_url`), batch limits and per-engine timeouts. ⛔ No I/O; it is imported by `api/settings.py`, so it must stay import-cheap. Plan 05 re-derives the triple.
+
+### `backend/app/services/rerank_engines/registry.py` — Phase 294 (294-01)
+
+**`1 / 1 / 96` (was `0 / 0 / 0`).** Created at 96 lines.
+
+Scan-list cell as of 2026-10-20 (replaced by 294-05, moved verbatim): 0 / 0 / 0 | no (young) | young (planned 294-01, row added at planning). THE engine table + EngineId Literal (?raw parity with rerankEngines.ts). ⛔ data only, no I/O; prices are vendor facts
 
 ## `backend/app/services/rerank_engines/prune.py`
 
 **`0 / 0 / 0` — planned (294-01); row and section added at planning.** `prune(scored, top_n, *, keep_documents=False)`, `PRUNE_FLOOR = 0.1`, `MIN_KEEP = 3` (D-07). ⛔ **Binding invariants:** pure (no I/O, no settings read); never returns `[]` for non-empty input; copies rows with every key (`low_similarity` must survive, `retrieval_service.py` depends on it); called for Jev and OpenAI Decisions only — never for Cohere or Local, whose scores are not calibrated probabilities (D-08). Plan 05 re-derives the triple.
 
+### `backend/app/services/rerank_engines/prune.py` — Phase 294 (294-01)
+
+**`1 / 1 / 36` (was `0 / 0 / 0`).** Created at 36 lines.
+
+Scan-list cell as of 2026-10-20 (replaced by 294-05, moved verbatim): 0 / 0 / 0 | no (young) | young (planned 294-01, row added at planning). PURE D-07 prune: floor 0.1, keep ≥3, ≤top_n, never empty, keep_documents coverage. ⛔ probabilistic engines only
+
 ## `backend/app/services/rerank_engines/cohere.py`
 
 **`0 / 0 / 0` — planned (294-01); row and section added at planning.** `_rerank_api` moved out of `rerank_service.py` with behaviour unchanged (30 s timeout, `rerank-v3.5`), now behind a `_http_client()` factory so the off-path test can assert it is never constructed. ⛔ Reorder plus `[:top_n]` only: Cohere documents `relevance_score` as a ranking score, not a probability (D-08). Plan 05 re-derives the triple.
+
+### `backend/app/services/rerank_engines/cohere.py` — Phase 294 (294-01)
+
+**`2 / 1 / 66` (was `0 / 0 / 0`).** Created at 66 lines.
+
+Scan-list cell as of 2026-10-20 (replaced by 294-05, moved verbatim): 0 / 0 / 0 | no (young) | young (planned 294-01, row added at planning). Verbatim move of _rerank_api; reorder + top_n only (D-08). ⛔ never thresholded
 
 ## `backend/app/services/rerank_engines/local.py`
 
 **`0 / 0 / 0` — planned (294-01); row and section added at planning.** `_rerank_local` moved out of `rerank_service.py`, plus the fixed cache: one `(model_name, CrossEncoder)` resident, double-checked under a `threading.Lock` so two threadpool requests never double-load. ⛔ **Binding invariants:** never loads per request; reloads exactly once when `rerank_model` changes; reorder plus `[:top_n]` only (sigmoid output is not a calibrated probability, D-08). First use of `BAAI/bge-reranker-v2-m3` downloads about 2.3 GB (RESEARCH A1), so a non-resident model loads once on a background thread while `rerank` raises `LocalModelWarming` and the search falls back; `warm(name, wait=True)` is the explicit warm-up. Plan 05 re-derives the triple.
 
+### `backend/app/services/rerank_engines/local.py` — Phase 294 (294-01)
+
+**`2 / 1 / 150` (was `0 / 0 / 0`).** Created at 150 lines. The singleton defect (first model cached forever) is fixed here.
+
+Scan-list cell as of 2026-10-20 (replaced by 294-05, moved verbatim): 0 / 0 / 0 | no (young) | young (planned 294-01, row added at planning). CrossEncoder rerank + per-name cache; first use loads in the background and falls back. ⛔ never per request; reorder only
+
 ## `backend/app/services/rerank_engines/jev.py`
 
 **`0 / 0 / 0` — planned (294-01; `post_decisions` reused by 294-03); row and section added at planning.** Jev via OpenRouter only (D-03). Per-passage `noul` (D-06), batched by count and serialised bytes, at most 4 calls in flight, `httpx.Timeout(5.0, connect=2.0)`, no retries. ⛔ **Binding invariants:** query, instruction and passages travel only inside `state` as JSON; question `instructions` are module constants naming ids only (D-10); any missing answer, non-[0,1] number or HTTP error raises so the dispatcher falls back (D-11); each call is a LangSmith `llm` span with tokens, vendor cost and latency, and its inputs are redacted. Plan 05 re-derives the triple.
+
+### `backend/app/services/rerank_engines/jev.py` — Phase 294 (294-01)
+
+**`2 / 1 / 210` (was `0 / 0 / 0`).** Created at 210 lines; `post_decisions` is reused by 294-03's citation check.
+
+Scan-list cell as of 2026-10-20 (replaced by 294-05, moved verbatim): 0 / 0 / 0 | no (young) | young (planned 294-01, row added at planning). OpenRouter /api/alpha/decisions: noul rerank (≤30 / ≤28 KB per call, ≤4 in flight) + post_decisions. ⛔ untrusted text only in state
 
 ## `backend/app/services/rerank_engines/openai_decisions.py`
 
 **`0 / 0 / 0` — planned (294-01; `post_decisions` reused by 294-03); row and section added at planning.** One request per pool (≤ 200 questions), per-passage `predicate` (D-06), `httpx.Timeout(8.0, connect=2.0)`, no retries. Cost is computed through `pricing_service` (the AST single-home fence). ⛔ **Binding invariants:** untrusted text only inside `input` as JSON; constant question instructions (D-10); a `refusal` answer or any malformed body raises in rerank (fallback, D-11) and maps to `couldnt_check` in the citation check (D-17). Plan 05 re-derives the triple.
 
+### `backend/app/services/rerank_engines/openai_decisions.py` — Phase 294 (294-01)
+
+**`2 / 1 / 195` (was `0 / 0 / 0`).** Created at 195 lines. Live: HTTP 403 "The project does not have access to this model." at 294-02 (owed at Task 4).
+
+Scan-list cell as of 2026-10-20 (replaced by 294-05, moved verbatim): 0 / 0 / 0 | no (young) | young (planned 294-01, row added at planning). POST /v1/decisions gpt-6-luna: predicate rerank + post_decisions; raw httpx (SDK lacks decisions). ⛔ refusal → fallback
+
 ## `backend/app/services/rerank_engines/tracing.py`
 
 **`0 / 0 / 0` — planned (294-01); row and section added at planning.** `redact_inputs` for `@traceable(process_inputs=...)` on `rerank-documents`, `search-documents` and every engine span (RESEARCH Pitfall 1: both traceables shipped every decrypted provider key to LangSmith); `EngineCall`, `record_engine_call` and `capture_engine_calls` so `decision_eval.py` can read per-call tokens, cost, latency and fallbacks without a second code path. ⛔ The redacted names are `user_settings`, `api_key` and `supabase`. Plan 05 re-derives the triple.
+
+### `backend/app/services/rerank_engines/tracing.py` — Phase 294 (294-01)
+
+**`2 / 1 / 83` (was `0 / 0 / 0`).** Created at 83 lines. Live LangSmith uploads are refused (403) with the current key, so the `<redacted>` trace row is owed at Task 4.
+
+Scan-list cell as of 2026-10-20 (replaced by 294-05, moved verbatim): 0 / 0 / 0 | no (young) | young (planned 294-01, row added at planning). redact_inputs (process_inputs) + EngineCall capture for the harness. ⛔ user_settings / api_key / supabase never traced
 
 ## `backend/app/utils/environment.py`
 
@@ -22628,54 +22757,152 @@ Scan-list cell as of 2026-10-19 (replaced by 289-05, moved verbatim): 0 / 0 / 0 
 
 **`0 / 0 / 0` — planned (294-02); row and section added at planning.** Drives `retrieval_service.search_documents` in-process per arm (off, local, jev, openai_decisions), with arm settings applied by `model_copy`, identical cached query vectors, and the frozen held-out set checked by sha256. ⛔ **Binding invariants:** imports `EVAL_PROBES`, `compute_metrics`, `RecallUnmeasurable` and `describe_dsn` from `recall_eval.py` and never modifies it; an arm whose engine fell back on any search is refused, never reported as measured; no request-path side effects. Plan 05 re-derives the triple.
 
+### `backend/app/services/decision_eval.py` — Phase 294 (294-02)
+
+**`1 / 1 / 703` (was `0 / 0 / 0`).** Created at 703 lines. `recall_eval.py` was not modified (its row stays "safe as-is"). Arms left UNMEASURED for a missing or refused key are re-run at 294-05 Task 4 (M1).
+
+Scan-list cell as of 2026-10-20 (replaced by 294-05, moved verbatim): 0 / 0 / 0 | no (young) | young (planned 294-02, row added at planning). D-18/D-19 harness over the REAL search_documents; reuses recall_eval. ⛔ refuses rather than invents; never writes app_settings
+
 ## `backend/app/services/citation_claims.py`
 
 **`0 / 0 / 0` — planned (294-03); row and section added at planning.** A Python port of `messageText.ts::dedupParagraphs`, the code-span skip reused from `citation_markers.py` (`_CODE_RE`, `_MARKER_RE` imported, never re-typed), list-item / table-row / heading units, and 0-based marker ordinals in document order. ⛔ **Binding invariants:** pure and dependency-free (no `agent_loop` import, the cycle `citation_markers.py` documents); ordinals must equal the frontend's `data-citation-ordinal` for the same content, pinned by `backend/tests/unit/fixtures/citation_ordinals_v1.json` from both stacks. Plan 05 re-derives the triple.
+
+### `backend/app/services/citation_claims.py` — Phase 294 (294-03)
+
+**`1 / 1 / 279` (was `0 / 0 / 0`).** Created at 279 lines. 294-05 made the frontend half of the ordinal pin stricter: `citationOrdinals.parity.test.tsx` now also asserts `(data-citation-ordinal, n)` equals the backend's `(ordinal, n)` for all 16 fixture cases.
+
+Scan-list cell as of 2026-10-20 (replaced by 294-05, moved verbatim): 0 / 0 / 0 | no (young) | young (planned 294-03, row added at planning). PURE claim extraction + marker ordinals + dedup_paragraphs port. ⛔ ordinals pinned to CitedMarkdown by a shared fixture
 
 ## `backend/app/services/citation_check_service.py`
 
 **`0 / 0 / 0` — planned (294-03); row and section added at planning.** Groups claims by source, asks one `choice` question per claim through `jev.post_decisions` / `openai_decisions.post_decisions` with the canonical label order, validates labels against the closed set, and upserts `message_citation_checks` through the pool. ⛔ **Binding invariants:** every SQL value is a `$N` placeholder; `user_id` / `org_id` / `thread_id` come from the message row, never the request; one source's failure marks only its claims `couldnt_check`; nothing ever defaults to `supported` (D-17). Plan 05 re-derives the triple.
 
+### `backend/app/services/citation_check_service.py` — Phase 294 (294-03)
+
+**`1 / 1 / 330` (was `0 / 0 / 0`).** Created at 330 lines. Invariants held: `$N` placeholders only; ids from the message row; one source's failure marks only its claims `couldnt_check`.
+
+Scan-list cell as of 2026-10-20 (replaced by 294-05, moved verbatim): 0 / 0 / 0 | no (young) | young (planned 294-03, row added at planning). Runs the check (choice per claim, grouped by source) + the pool upsert. ⛔ ids bound from the message row; refusal → couldnt_check
+
 ## `backend/app/models/citation_check.py`
 
 **`0 / 0 / 0` — planned (294-03); row and section added at planning.** The wire contract: `Verdict` (`supported`, `partly_supported`, `not_supported`, `contradicted`, `couldnt_check`), `CheckEngineId`, `CitationClaimResult`, `CitationCheckResult` (version 1), `CitationCheckAvailability`. Module-level `Literal`s so `frontend/src/components/chat/citationVerdicts.ts` can pin them through `?raw`. Plan 05 re-derives the triple.
+
+### `backend/app/models/citation_check.py` — Phase 294 (294-03)
+
+**`1 / 1 / 74` (was `0 / 0 / 0`).** Created at 74 lines. 294-05 reads `Verdict` and `UnavailableReason` from this source in `citationVerdicts.parity.test.ts`, and its result fixture's keys in `citationChecks.contract.test.ts`; both green.
+
+Scan-list cell as of 2026-10-20 (replaced by 294-05, moved verbatim): 0 / 0 / 0 | no (young) | young (planned 294-03, row added at planning). Verdict + EngineId Literals, CitationCheckResult v1 (extra=forbid). ⛔ unknown label → couldnt_check before validation
 
 ## `backend/app/api/citation_checks.py`
 
 **`0 / 0 / 0` — planned (294-03); row and section added at planning.** `GET /citation-checks?message_ids=` (≤ 100) and `POST /citation-checks/{message_id}`. ⛔ **Binding invariants:** reads go through the user-JWT client wrapped in `aexec` / `maybe_row` (RLS decides; not-found and not-yours share one 404 body); the write goes through the pool with ids from the message row; an in-flight Redis `SET NX EX 60` claim per message gives 409; no response carries a key or a base URL; it is an API route, so the closed core stays 7 / 1 / 30 (D-13). Plan 05 re-derives the triple.
 
+### `backend/app/api/citation_checks.py` — Phase 294 (294-03)
+
+**`1 / 1 / 175` (was `0 / 0 / 0`).** Created at 175 lines. 409 bodies are `{"reason": off | engine_reorders_only | key_missing | in_flight}`; 422 for a non-assistant message, no passages, or no cited claim; GET takes at most 100 uuid ids. The binding invariants recorded at planning held: user-JWT reads through `aexec`/`maybe_row`, pool write with ids from the message row, Redis `SET NX EX 60` released by compare-and-delete, no key or base URL in any response.
+
+Scan-list cell as of 2026-10-20 (replaced by 294-05, moved verbatim): 0 / 0 / 0 | no (young) | young (planned 294-03, row added at planning). GET availability+checks, POST run (404 same body, 422, 409 in flight). ⛔ a route, NOT a tool (30 stays); never returns a key
+
 ## `frontend/src/components/settings/rerankEngines.ts`
 
 **`0 / 0 / 0` — planned (294-04); row and section added at planning.** One exported table of engine-card facts (name, where it runs, vendor, model id, key source, price string, cuts / reorders, steering, citation check), the 024 rule: preset data never hardcoded in component logic. `engineFor(id)` resolves the legacy `"api"` and any unknown id to a declared row. ⛔ Engine ids pinned to `backend/app/services/rerank_engines/registry.py` through a `?raw` parity fence. Plan 05 re-derives the triple.
+
+### `frontend/src/components/settings/rerankEngines.ts` — Phase 294 (294-04)
+
+**`1 / 1 / 123` (was `0 / 0 / 0`).** Created at 123 lines. 294-05's chat vocabulary reads `engineFor().shortName` / `keyName` from it. Its parity suite (7) was adopted into the count gate by 294-05.
+
+Scan-list cell as of 2026-10-20 (replaced by 294-05, moved verbatim): 0 / 0 / 0 | no (young) | young (planned 294-04, row added at planning). THE engine-card fact table + engineFor() own-property accessor. ⛔ ids pinned to registry.py via ?raw; no fact in component logic
 
 ## `frontend/src/components/settings/RerankEngineBlock.tsx`
 
 **`0 / 0 / 0` — planned (294-04); row and section added at planning.** The Reranking card body (sketch 294 B, the D-20a acceptance bar): a 2×2 radio grid of engine cards, the keep-at-most line bound to `retrieval_top_k` (orchestrator decision OQ1), the pool line bound to `rerank_top_n`, the missing-key line, the amber egress notice for hosted engines (D-05), and the organisation-scope save line (D-04). ⛔ **Binding invariants:** owns no fetch and no state; every fact comes from `rerankEngines.ts`; glyph plus word, never colour alone; it never rewrites `"api"` on mount (`SettingsPage.changedFields`). Plan 05 re-derives the triple.
 
+### `frontend/src/components/settings/RerankEngineBlock.tsx` — Phase 294 (294-04)
+
+**`1 / 1 / 283` (was `0 / 0 / 0`).** Created at 283 lines. Its suite (24) was adopted into the count gate by 294-05.
+
+Scan-list cell as of 2026-10-20 (replaced by 294-05, moved verbatim): 0 / 0 / 0 | no (young) | young (planned 294-04, row added at planning). Sketch 294 B engine cards + keep-at-most + missing-key + egress lines. ⛔ props in, callbacks out; no fetch, no useState
+
 ## `frontend/src/lib/api/citationChecks.ts`
 
 **`0 / 0 / 0` — planned (294-05); row and section added at planning.** The two clients and the wire types copied verbatim from `backend/app/models/citation_check.py`, pinned by `backend/tests/unit/fixtures/citation_check_result_v1.json` (`satisfies`). ⛔ Imported by its own specifier, never through the `lib/api.ts` barrel (the hottest file). Plan 05 re-derives the triple.
+
+### `frontend/src/lib/api/citationChecks.ts` — Phase 294 (294-05)
+
+**`1 / 1 / 117` (was `0 / 0 / 0`).** Created at 117 lines. `CitationCheckApiError` extends `ApiError` with `reason` and `detail`.
+
+Scan-list cell as of 2026-10-20 (replaced by 294-05, moved verbatim): 0 / 0 / 0 | no (young) | young (planned 294-05, row added at planning). getCitationChecks / runCitationCheck + wire types. ⛔ own specifier; NOT re-exported through lib/api.ts
 
 ## `frontend/src/stores/citationCheckStore.ts`
 
 **`0 / 0 / 0` — planned (294-05); row and section added at planning.** A small zustand store (the `askDraftStore.ts` precedent): `byMessage`, `availability`, `inFlight`, `ensure(id)` batched per microtask into one `GET /citation-checks?message_ids=`, and `run(id)`. ⛔ **Binding invariants:** its own module, never a slice of `streamsStore.ts` (G-5 FIRES there); stable empty references (zustand v5); `resetCitationChecks()` registered in `setupTests.ts`. Plan 05 re-derives the triple.
 
+### `frontend/src/stores/citationCheckStore.ts` — Phase 294 (294-05)
+
+**`1 / 1 / 143` (was `0 / 0 / 0`).** Created at 143 lines. ⚠ The client is a dynamic import, measured necessary: a setup-file import is cached before any suite's `vi.mock`, and one such import of `lib/api/runEvidence` turned all 3 `runEvidence.test.ts` cases red.
+
+Scan-list cell as of 2026-10-20 (replaced by 294-05, moved verbatim): 0 / 0 / 0 | no (young) | young (planned 294-05, row added at planning). byMessage + availability; microtask-batched ensure() → one GET. ⛔ never a slice of streamsStore.ts; reset in setupTests
+
 ## `frontend/src/components/chat/citationVerdicts.ts`
 
 **`0 / 0 / 0` — planned (294-05); row and section added at planning.** Five rows (✓ supported · ◐ partly supported · ○ not supported · ✕ contradicted · ? couldn't check), each with a fixed one-line reason (decision engines return no text), the ⓘ availability reasons, and an own-property-guarded accessor. ⛔ Labels pinned to `Verdict` in `backend/app/models/citation_check.py` through `?raw`; glyph plus word plus raw confidence, never colour alone. Plan 05 re-derives the triple.
+
+### `frontend/src/components/chat/citationVerdicts.ts` — Phase 294 (294-05)
+
+**`2 / 1 / 142` (was `0 / 0 / 0`).** Created at 124 lines, +18 in Task 2 (`claimConfidence`, `verdictSpoken`). Every word the chat shows for a check is here; no server text is rendered.
+
+Scan-list cell as of 2026-10-20 (replaced by 294-05, moved verbatim): 0 / 0 / 0 | no (young) | young (planned 294-05, row added at planning). THE verdict vocabulary: glyph, word, class, fixed reason line. ⛔ labels pinned to models/citation_check.py; unknown → couldn't check
 
 ## `frontend/src/components/chat/CitationCheckAction.tsx`
 
 **`0 / 0 / 0` — planned (294-05); row and section added at planning.** The action of sketch 294 A in the References footer header. ⛔ **Binding invariants:** a sibling of the `CollapsibleTrigger` button (no nested buttons) and visible while the footer is folded; never renders for an unsettled message; reads only the store. Plan 05 re-derives the triple.
 
+### `frontend/src/components/chat/CitationCheckAction.tsx` — Phase 294 (294-05)
+
+**`1 / 1 / 123` (was `0 / 0 / 0`).** Created at 123 lines (`useState(` 0, `useEffect(` 1: the mount-time `ensure`). States: nothing until availability is known; Checking N citations; count pills + Re-check + checked-by line; the ⓘ reason line; one fixed error line that never hides stored pills.
+
+Scan-list cell as of 2026-10-20 (replaced by 294-05, moved verbatim): 0 / 0 / 0 | no (young) | young (planned 294-05, row added at planning). References-header action: Check → Checking N → count pills + Re-check + checked-by line, or the ⓘ reason. ⛔ sibling of the trigger button
+
 ## `frontend/src/components/chat/CitedMarkdown.tsx`
 
 **`2 / 1 / 294` — measured at 294 planning (2026-10-20).** ⚠ Absent from the ledger for its entire life (Phase 153). **294-05**: one optional `checkMessageId` prop; each upgraded in-range marker gains `data-citation-ordinal` from the existing `staggerIndex` count; after a check the marker gains the verdict glyph and class only when the claim's `n` equals the marker's `n` (RESEARCH Pitfall 7). ⛔ **Binding invariants:** the `useLayoutEffect` solely owns `innerHTML`, so the decoration lives inside it; verdicts are read through a ref so an arrival never tears down the listeners; an unchecked marker renders exactly as today. Plan 05 re-derives the triple.
+
+### `frontend/src/components/chat/CitedMarkdown.tsx` — Phase 294 (294-05)
+
+**`3 / 2 / 387` (was `2 / 1 / 294`).** +97 −4 (294 → 387). `createMarker` sets `data-citation-ordinal`; module-level `decorateMarkers` clears then applies class + glyph + aria-label only when the claim's `n` equals the marker's; the rebuild effect re-applies it after its innerHTML reset (reading the result through a ref) and a second layout effect decorates existing markers in place. `CitedMarkdown.test.tsx` passes unedited.
+
+Scan-list cell as of 2026-10-20 (replaced by 294-05, moved verbatim): 2 / 1 / 294 | no (1 phase) | ⚠ absent its ENTIRE LIFE — row added at 294 planning. 294-05: optional checkMessageId + data-citation-ordinal + verdict decoration in the existing layout effect. ⛔ effect owns innerHTML
 
 ## `frontend/src/components/chat/CitationList.tsx`
 
 **`4 / 3 / 73` — measured at 294 planning (2026-10-20).** ⚠ Absent from the ledger for its entire life at three phases (041, 153, 224; the raw recipe also prints an ambiguous `27` bucket, not counted). **294-05**: one optional prop and one mount of `CitationCheckAction` beside the trigger. Honoured by construction. ⛔ **Binding invariants:** the `References · N sources` label is pinned by Phase 153 tests; `defaultOpen={false}` stays (224-05); no nested buttons. Plan 05 re-derives the triple.
 
+### `frontend/src/components/chat/CitationList.tsx` — Phase 294 (294-05)
+
+**`5 / 5 / 91` (was `4 / 3 / 73`).** +24 −6 (73 → 91). The trigger element is hoisted into a `trigger` const; with `checkMessageId` it sits in a flex row beside ONE `CitationCheckAction`, without it the JSX is the old trigger unchanged. The Phase 153 label sentence and `defaultOpen = false` (224-05) are unchanged; `CitationList.test.tsx` passes unedited. ⚠ It fires at 5 phases on 91 lines, so the next touch takes the header row out as its own component first.
+
+Scan-list cell as of 2026-10-20 (replaced by 294-05, moved verbatim): 4 / 3 / 73 | ⚠ **FIRES** | ⚠ absent its ENTIRE LIFE at 3 phases — row added at 294 planning. 294-05: ONE optional checkMessageId prop + ONE CitationCheckAction mount. ⛔ label + defaultOpen=false pinned
+
 ## `frontend/src/components/chat/CitationPeek.tsx`
 
 **`1 / 1 / 189` — measured at 294 planning (2026-10-20).** ⚠ Absent from the ledger for its entire life (Phase 153). **294-05**: one optional `verdict` prop rendering verdict word, raw confidence (2 decimals) and the fixed reason line between the body and the footer. ⛔ With no `verdict` the rendered DOM is byte-identical to today (existing peek tests stay green). Plan 05 re-derives the triple.
+
+### `frontend/src/components/chat/CitationPeek.tsx` — Phase 294 (294-05)
+
+**`2 / 2 / 227` (was `1 / 1 / 189`).** +38: optional `verdict` prop and a module-private `PeekVerdict` (glyph aria-hidden + word + `confidence 0.87` or "no verdict" + the fixed reason). `CitationPeek.test.tsx` and the a11y suite pass unedited.
+
+Scan-list cell as of 2026-10-20 (replaced by 294-05, moved verbatim): 1 / 1 / 189 | no (1 phase) | ⚠ absent its ENTIRE LIFE — row added at 294 planning. 294-05: optional verdict section between body and footer; absent verdict → DOM unchanged
+
+## Phase 294 — files with no earlier section (294-05, 2026-10-20)
+
+### `backend/app/services/pricing_service.py` — Phase 294 (294-01)
+
+**`4 / 2 / 156` (was `2 / 1 / 103`).** +25: `compute_token_cost_usd_unquantized`, the quantised function's None rules without the 4-decimal quantize (Pitfall 8). It lives here because `test_257_single_token_conversion_home.py` allows token × rate nowhere else.
+
+Scan-list cell as of 2026-10-20 (replaced by 294-05, moved verbatim): 2 / 1 / 103 | no (new) | young (created 257-01). The single home of token-to-USD conversion (METER-02 / D-257-13). CostResult with Decimal arithmetic and None on unrated.
+
+### `scripts/check-deploy-drift.sh` — Phase 294 (294-01)
+
+**`5 / 4 / 267`.** ⚠ **Absent from the ledger for its entire life at 4 phases.** 294-01 added the dev-only `DECISION_ENGINE_FAULT_BASE_URL` to the script's intentionally-omitted list (+2), so the deploy-artifact drift check knows it is not a onebox variable.
+
+No scan-list row existed before 294-05 (2026-10-20).
