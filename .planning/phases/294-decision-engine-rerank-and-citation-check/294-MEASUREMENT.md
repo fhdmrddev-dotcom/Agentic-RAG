@@ -39,7 +39,7 @@ Cohere and Local only reorder and keep today's `top_n` cut. With `top_k` fixed t
 | off | measured | 73.7% (42) | — | baseline | 4.54 | baseline | 966.2 | — | $0 | baseline | — | 0 / 0 ms |
 | local | measured | 80.7% (46) | +7.02 pp | **pass** | 4.54 → 4.54 | N/A (reorders only, D-08) | 966.2 → 1167.6 | — | $0 (runs on this server) | N/A (reorders only, D-08) | sends as many passages as off; it picks longer ones (+201 tokens per search) | **18,499 / 121,620 ms** |
 | jev | measured | 80.7% (46) | +7.02 pp | **pass** | 4.54 → 4.02 | **pass** | 966.2 → 891.3 | $0.00002246 | $0.00022959 | **fail** | **costs $0.00020713 more than it saves per search; breaks even if a search's passages are re-sent 11 times in a chat** | 773 / 927 ms |
-| openai_decisions | **UNMEASURED** | — | — | — | — | — | — | — | — | — | engine fell back on 3 of 3 searches (stopped after the first 3 of 57 all fell back); reasons: `HTTPStatusError:403`. Vendor text: *"The project does not have access to this model."* (`invalid_request_error`) | — |
+| openai_decisions | measured 2026-10-20 (operator re-run, `--arms off,openai_decisions`) | 80.7% | +7.0 pp | **pass** | 4.54 → 3.75 | **pass** | not printed by the console run | — | — | **fail** | **costs $0.00060824 more than it saves per search; breaks even if a search's passages are re-sent 17 times in a chat** | 742 / 1,375 ms |
 | cohere | measured | 80.7% (46) | +7.02 pp | **pass** | 4.54 → 4.54 | N/A (reorders only, D-08) | 966.2 → 1082.9 | — | unpriced (Cohere publishes no per-search price) | N/A (reorders only, D-08) | sends as many passages as off; it picks longer ones (+117 tokens per search) | 830 / 1,658 ms |
 
 Ranked metrics (from `compute_metrics`, imported from `recall_eval`):
@@ -51,12 +51,14 @@ Ranked metrics (from `compute_metrics`, imported from `recall_eval`):
 | jev | 0.6667 | 0.7895 | 0.8070 | 0.7266 | 39 / 48 | 7 / 9 |
 | cohere | 0.5439 | 0.7544 | 0.8070 | 0.6518 | 39 / 48 | 7 / 9 |
 
+⚠ **CORRECTED 2026-10-20 — the openai_decisions row above was UNMEASURED at 294-02.** The original row read: *engine fell back on 3 of 3 searches (stopped after the first 3 of 57 all fell back); reasons: `HTTPStatusError:403`. Vendor text: "The project does not have access to this model." (`invalid_request_error`)*. The operator enabled `gpt-6-luna` on the OpenAI project and re-ran `scripts/measure-decision-engines.py --arms off,openai_decisions` from the console (held-out sha256 `bbbd6bdd…3d796`, matching the sidecar; 66.1 s wall time). The console run printed no ranked metrics or token counts and wrote no JSON, so its Hit@k / MRR row is not recorded here and `294-measurement.json` is unchanged.
+
 ### Flips (found with rerank off → absent with the engine)
 
 - **local:** none
 - **jev:** none
 - **cohere:** none
-- **openai_decisions:** not measured
+- **openai_decisions:** none (re-run 2026-10-20)
 
 ### Gains (absent with rerank off → found with the engine)
 
@@ -79,7 +81,8 @@ All three measured engines found the same four extra targets, each of which sat 
 
 - **Local:** keeps recall within 2 points (it raises it by 7.0 points, no flips). Chunks and cost are N/A under D-08 because it only reorders. It is too slow on this CPU-only box: 18.5 s median added per search.
 - **Jev:** keeps recall within 2 points (+7.0 points, no flips) and sends fewer chunks (4.54 → 4.02 per search). It **fails the cost gate**: it costs $0.00020713 more than it saves per search against `deepseek-v4-flash`, and breaks even only if a search's passages are re-sent 11 times in a chat. That is reported as a cost, not a saving.
-- **OpenAI Decisions:** **UNMEASURED.** OpenAI returned 403, *"The project does not have access to this model."*, on the first three searches, so the arm was stopped. The configured OpenAI key's project has no access to `gpt-6-luna`. This is an operator action (enable Decisions access for that project, or store a key that has it); then re-run with `--arms off,openai_decisions` (294-VALIDATION.md row M1). Its `predicate` probability calibration is unverified by the vendor (RESEARCH A6), so this measurement, once it runs, is the calibration check.
+- **OpenAI Decisions (measured 2026-10-20):** keeps recall within 2 points (+7.0 points, no flips) and sends the fewest chunks of any engine (4.54 → 3.75 per search). It **fails the cost gate** by more than Jev: it costs $0.00060824 more than it saves per search against `deepseek-v4-flash` and breaks even only at 17 re-sends (Jev: $0.00020713, 11 re-sends). Engine latency p50 742 ms, p95 1,375 ms. Recall is the same as every other engine, so the `predicate` calibration check (RESEARCH A6) shows no harm on this set.
+- ~~**OpenAI Decisions:** **UNMEASURED.**~~ (original 294-02 verdict, kept) OpenAI returned 403, *"The project does not have access to this model."*, on the first three searches, so the arm was stopped. The configured OpenAI key's project has no access to `gpt-6-luna`. This is an operator action (enable Decisions access for that project, or store a key that has it); then re-run with `--arms off,openai_decisions` (294-VALIDATION.md row M1). Its `predicate` probability calibration is unverified by the vendor (RESEARCH A6), so this measurement, once it runs, is the calibration check.
 - **Cohere:** keeps recall within 2 points (+7.0 points, no flips). Chunks and cost are N/A under D-08. Its engine cost is unpriced because Cohere publishes no per-search price.
 
 ## Reproduce
