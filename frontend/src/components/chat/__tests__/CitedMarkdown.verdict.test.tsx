@@ -252,10 +252,13 @@ describe("MessageItem — the D-23 source fence", () => {
     expect((src.match(/\buseEffect\(/g) ?? []).length).toBe(0)
   })
 
-  it("exactly two checkMessageId props, both behind the settled guard", () => {
-    const guard = 'checkMessageId={!isStreaming && !message.id.startsWith("temp-") ? message.id : undefined}'
+  // BUG-261020-04 moved the settled guard into `usePersistedMessageId` (its own test pins the
+  // streaming / temp / failed-send arms). The inline `temp-` guard WAS the bug: it hid the action
+  // on every freshly finished answer until the thread was re-opened.
+  it("exactly two checkMessageId props, both from the one settled-id hook", () => {
     expect((src.match(/checkMessageId=/g) ?? []).length).toBe(2)
-    expect(src.split(guard).length - 1).toBe(2)
+    expect(src.split("checkMessageId={checkMessageId}").length - 1).toBe(2)
+    expect(src.split("usePersistedMessageId(message, isStreaming)").length - 1).toBe(1)
   })
 
   it("the Props interface still has its 5 members", () => {

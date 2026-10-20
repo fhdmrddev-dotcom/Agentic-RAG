@@ -11294,7 +11294,7 @@ cells rot within days.
 | [`frontend/src/components/chat/useStartWorkflowInThread.ts`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentschatusestartworkflowinthreadts) | 1 / 1 / 85 | no (young) | young (created 287-03). list-on-open, form-or-start, UN-AWAITED sendMessage `Run <name>`. ⛔ no createThread, no conversation read (fence with positive control) |
 | [`frontend/src/components/chat/ToolCallPanel.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentschattoolcallpaneltsx) | 55 / 23 / 409 (was `54 / 22 / 407`) | ⚠ **FIRES** | ✅ G-5 DISCHARGED (227-02). **273-05**: `stepLabel` + `ARGS_HIDDEN.livePanel` replace one name check; no new branch |
 | [`frontend/src/components/chat/tool-bodies/SearchDocumentsBody.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentschattool-bodiessearchdocumentsbodytsx) | 3 / 3 / 71 | ⚠ **FIRES** (crossed in 272) | ⚠ absent its ENTIRE LIFE — row added 272-05. **F-3**: `summarize` names refused / invalid / empty / not-searchable / unavailable |
-| [`frontend/src/components/chat/MessageItem.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentschatmessageitemtsx) | 81 / 38 / 1037 (was `80 / 37 / 1036`) | ⚠ **FIRES** | 294-05: checkMessageId on the two existing citation mounts (+2 −1); useState 3, useEffect 0, 5 props. Honoured by construction |
+| [`frontend/src/components/chat/MessageItem.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentschatmessageitemtsx) | 82 / 38 / 1040 (was `81 / 38 / 1037`) | ⚠ **FIRES** | BUG-261020-04: +1 hook (usePersistedMessageId) feeds both citation mounts (+5 −2); useState 3, useEffect 0, 5 props. Fences updated |
 | [`backend/app/api/threads.py`](docs/HOT-FILE-LEDGER.md#backendappapithreadspy) | 271 / 91 / 2544 (was `265 / 90 / 2459`) | ⚠ **FIRES** | honoured by construction (**279-02**): ONE `_require_thread_org` at 4 doors; send stays 11 `if`s (pinned); OV-279-01 not required. ⛔ 0 new send-path branches |
 | [`frontend/src/providers/StreamsProvider.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrcprovidersstreamsprovidertsx) | 109 / 42 / 5004 (was `107 / 41 / 4991`) | ⚠ **FIRES** | honoured by construction (**287-03**): ONE passthrough field `inputs: opts?.inputs`, 0 branches. ⛔ `onTurnBoundary` still FLUSHES before moving |
 | [`frontend/src/hooks/useMessages.ts`](docs/HOT-FILE-LEDGER.md#frontendsrchooksusemessagests) | 74 / 27 / 127 | ⚠ **FIRES** | extraction due |
@@ -19157,6 +19157,14 @@ Every triple below was re-derived with the CLAUDE.md recipe AFTER the phase's la
 Scan-list cell as of 2026-10-20 (replaced by 294-05, moved verbatim): 80 / 37 / 1036 (was `79 / 37 / 1029`) | ⚠ **FIRES** | **276-REVIEW B-WR-01**: the avatar's cap-pause argument also requires a Continue left (`!continueExhausted && continuesRemaining > 0`). No hook, no store read
 
 CLAUDE.md FIRING cell as of 2026-10-20 (replaced by 294-05, moved verbatim): 80 / 37 / 1036 (was `79 / 37 / 1029`) | last touch 276-REVIEW B-WR-01
+
+### `frontend/src/components/chat/MessageItem.tsx` — BUG-261020-04 (294 follow-up)
+
+**`82 / 38 / 1040` (was `81 / 38 / 1037`).** +5 −2: ONE new hook call, `usePersistedMessageId(message, isStreaming)`, and both citation mounts now read `checkMessageId={checkMessageId}`. The inline `temp-` guard that 294-05 added WAS the defect: a finished live answer keeps its `temp-` id until the thread is refetched, so "Check citations" stayed hidden until the thread was re-opened. The hook resolves the stored id by run id from the thread's messages, once per finished run, and keeps today's rule for stored rows. It lives in its own file so `StreamsProvider.tsx` (G-5) is untouched. Fences updated consciously in the same commit: `CitedMarkdown.verdict.test.tsx` (the guard pin) and `MessageItem.transcriptEvent.test.tsx` (hook count 7 → 8; useState 3 and useEffect 0 unchanged). Driven live 2026-10-20: the action rendered on a fresh answer and the check reached the stored message.
+
+Scan-list cell as of 2026-10-20 (replaced by BUG-261020-04, moved verbatim): 81 / 38 / 1037 (was `80 / 37 / 1036`) | ⚠ **FIRES** | 294-05: checkMessageId on the two existing citation mounts (+2 −1); useState 3, useEffect 0, 5 props. Honoured by construction
+
+CLAUDE.md FIRING cell as of 2026-10-20 (replaced by BUG-261020-04, moved verbatim): 81 / 38 / 1037 (was `80 / 37 / 1036`) | 294-05: checkMessageId on the two citation mounts (+2 −1)
 
 ### `frontend/src/components/chat/StepRow.tsx` — Phase 273 close
 

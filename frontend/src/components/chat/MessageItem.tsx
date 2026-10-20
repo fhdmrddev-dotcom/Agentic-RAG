@@ -63,6 +63,7 @@ import { CitedMarkdown } from "./CitedMarkdown"
 import { AbsenceHint } from "./AbsenceHint"
 import { ConfidenceBadge } from "./ConfidenceBadge"
 import { CitationList } from "./CitationList"
+import { usePersistedMessageId } from "./usePersistedMessageId"
 import { SuggestionPills } from "./SuggestionPills"
 import { MessageFeedback } from "./MessageFeedback"
 import { OutputFileCard } from "./OutputFileCard"
@@ -287,6 +288,8 @@ export const MessageItem = memo(function MessageItem({ message, isStreaming, onS
   // footer). A callback ref that stores the node in state makes it reactive
   // without prop-drilling; adding it changes no DOM (byte-identical, G-5).
   const [messageBody, setMessageBody] = useState<HTMLDivElement | null>(null)
+  // BUG-261020-04: a finished live answer still has its temp id; the check needs the stored one.
+  const checkMessageId = usePersistedMessageId(message, isStreaming)
 
   /**
    * ── Phase 244 (244-05 T3 / SHELL-04 / D-244-22) — THE ATTACHMENTS THIS ROW CARRIES ──────
@@ -739,7 +742,7 @@ export const MessageItem = memo(function MessageItem({ message, isStreaming, onS
               // answer routes to CitedMarkdown, which upgrades validated [n] to
               // interactive markers over the SAME dedupParagraphs output. This is
               // the ONLY new branch; the else path stays byte-identical (D-12/D-14).
-              <CitedMarkdown content={dedupParagraphs(message.content)} citations={message.citations} checkMessageId={!isStreaming && !message.id.startsWith("temp-") ? message.id : undefined} />
+              <CitedMarkdown content={dedupParagraphs(message.content)} citations={message.citations} checkMessageId={checkMessageId} />
             ) : (
               <MarkdownRenderer content={message.role === "assistant" ? dedupParagraphs(message.content) : message.content} />
             )}
@@ -775,7 +778,7 @@ export const MessageItem = memo(function MessageItem({ message, isStreaming, onS
                 defaultOpen={false}
                 // Scope the row→marker flash to this message's marker host.
                 flashContainer={messageBody}
-                checkMessageId={!isStreaming && !message.id.startsWith("temp-") ? message.id : undefined}
+                checkMessageId={checkMessageId}
               />
             )}
             {!isStreaming && message.suggestions && message.suggestions.length > 0 && onSendMessage && (
