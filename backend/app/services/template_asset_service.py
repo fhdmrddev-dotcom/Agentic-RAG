@@ -117,6 +117,53 @@ def own_claim_for_ctx(ctx: Any) -> str:
     return str(wf) if wf is not None else DEEP_CLAIM
 
 
+# ── Branch 2's eligibility predicate: ONE home, read by the resolver AND the run-start probe ──
+# Phase 295 (D-13 / D-45). The WHERE clause below is byte-for-byte the one Branch 2 has
+# carried since Phase 141 / 274 WR-01; it moved here, unchanged, so the chat kickoff can ask
+# "would this run find a template?" with the SAME predicate the run will resolve with.
+# Binds: $1 thread_id, $2 user_id, $3 own_claim. A second copy would be the drift that lets a
+# kickoff admit a run its own resolver then refuses.
+_STAGED_TEMPLATE_WHERE = """thread_id = $1
+          AND created_by = $2
+          AND kind = 'template_input'
+          AND (expires_at IS NULL OR expires_at > now())
+          AND (expires_at IS NOT NULL OR $3::text IS NULL OR $3::text = 'deep')
+          AND (run_claim IS NULL OR run_claim = $3 OR $3 IS NULL)"""
+
+_BRANCH_TWO_SELECT = f"""
+        SELECT id, thread_id, path, mime_type, content_inline,
+               content_storage_path, created_by, created_at, kind, expires_at, run_claim
+        FROM workspace_files
+        WHERE {_STAGED_TEMPLATE_WHERE}
+        ORDER BY created_at DESC
+        LIMIT 1
+        """
+
+_STAGED_TEMPLATE_PROBE = f"SELECT 1 FROM workspace_files WHERE {_STAGED_TEMPLATE_WHERE} LIMIT 1"
+
+PENDING_RUN_CLAIM = "pending-run"
+"""The claim the run-start probe binds for a run that does not exist yet. It is neither NULL
+nor ``'deep'``, so the thread-life gate excludes a chat attachment (``expires_at`` NULL,
+Pitfall 9) exactly as it does for a real workflow run, and only an UNCLAIMED staged upload
+matches (no row is ever stamped with this value)."""
+
+
+async def has_staged_template(
+    pool: "asyncpg.Pool",
+    *,
+    thread_id: str,
+    user_id: str,
+    own_claim: str = PENDING_RUN_CLAIM,
+) -> bool:
+    """Is a template staged on this thread that a new workflow run here would resolve?
+
+    The Branch-2 predicate of :func:`resolve_template_source`, read through the shared
+    constant, as one ``fetchval``. Owner-scoped on ``created_by`` (T-295-02-03).
+    """
+    found = await pool.fetchval(_STAGED_TEMPLATE_PROBE, thread_id, user_id, own_claim)
+    return found is not None
+
+
 async def resolve_template_source(
     *,
     pool: "asyncpg.Pool",
@@ -207,19 +254,7 @@ async def resolve_template_source(
         )
 
     row = await pool.fetchrow(
-        """
-        SELECT id, thread_id, path, mime_type, content_inline,
-               content_storage_path, created_by, created_at, kind, expires_at, run_claim
-        FROM workspace_files
-        WHERE thread_id = $1
-          AND created_by = $2
-          AND kind = 'template_input'
-          AND (expires_at IS NULL OR expires_at > now())
-          AND (expires_at IS NOT NULL OR $3::text IS NULL OR $3::text = 'deep')
-          AND (run_claim IS NULL OR run_claim = $3 OR $3 IS NULL)
-        ORDER BY created_at DESC
-        LIMIT 1
-        """,
+        _BRANCH_TWO_SELECT,  # Phase 295: the shared predicate, moved verbatim (see its home)
         thread_id,
         user_id,
         own_claim,

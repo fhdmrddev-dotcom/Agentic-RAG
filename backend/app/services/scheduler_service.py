@@ -51,6 +51,17 @@ logger = logging.getLogger(__name__)
 LAUNCH_FAILED = "launch_failed"
 
 
+class ScheduledLaunchRefused(Exception):
+    """Phase 295 (D-13) — a scheduled launch refused BEFORE anything was written, with words.
+
+    ``str(exc)`` is the author-facing sentence, already recorded on the schedule's
+    ``last_status`` by :func:`launch_scheduled_run`. It is raised rather than returned as
+    ``None`` because ``None`` means "could not be loaded" to both callers: the tick would
+    overwrite the sentence with ``launch_failed`` and the run-now route would say the workflow
+    was deleted.
+    """
+
+
 async def launch_scheduled_run(
     schedule: dict[str, Any],
     *,
@@ -117,6 +128,25 @@ async def launch_scheduled_run(
             )
             return None
     definition = WorkflowDefinition.model_validate(raw_def)
+
+    # ── Phase 295 (D-13) — a fill step with no template is refused BEFORE the thread insert ──
+    # On the definition asset ALONE: an unattended run has no launch upload and no thread yet,
+    # so nothing can be staged for it. Recorded on the schedule in the lint finding's own words
+    # (one sentence, one home: ``emit_cause``), then raised so neither caller rewrites it.
+    from app.services.harness.reachability import lint_workflow
+
+    _no_template = [e for e in lint_workflow(definition) if e.code == "no_template_bound"]
+    if _no_template:
+        from app.db.schedules import record_schedule_outcome
+
+        sentence = _no_template[0].message
+        logger.warning(
+            "schedule %s not launched: workflow %s has a fill step with no template",
+            schedule.get("id"),
+            workflow_id,
+        )
+        await record_schedule_outcome(pool, _as_uuid(schedule["id"]), status=sentence)
+        raise ScheduledLaunchRefused(sentence)
 
     # ── the run's thread anchor ────────────────────────────────────────────────────────
     # `create_workflow_run` requires a thread (it sets `threads.active_workflow_run_id`).
@@ -386,6 +416,9 @@ class SchedulerService:
                 run_id = await launch_scheduled_run(
                     schedule, pool=self._pool, redis=self._redis
                 )
+            except ScheduledLaunchRefused:
+                # Phase 295: refused with words, already recorded; never overwrite them.
+                continue
             except Exception:  # noqa: BLE001
                 logger.exception("schedule %s failed to launch", schedule.get("id"))
                 run_id = None

@@ -248,6 +248,26 @@ async def preflight_workflow_kickoff(*, request, body, thread_id, thread_row, su
             _raw_def = json.loads(_raw_def)
         _kickoff_definition = WorkflowDefinition.model_validate(_raw_def)
         _kickoff_definition_id = _def_row["id"]
+        # ── Phase 295 (D-13 / D-45) — a fill step with no template is refused BEFORE phase 1 ──
+        # Only when NEITHER the definition carries a template asset (the lint finding says so)
+        # NOR one is staged on this thread (the Run modal's launch upload, read through the
+        # SAME predicate the run's resolver uses). Placed before the scope assert and the
+        # snapshot materialize, so a refused kickoff writes nothing; and the probe runs only
+        # for a template-less fill workflow, so no other kickoff gains a DB call. The words
+        # are the lint finding's, which ``emit_cause`` composes: one sentence, one home.
+        from app.services.harness.reachability import lint_workflow
+        _no_template = [
+            e for e in lint_workflow(_kickoff_definition) if e.code == "no_template_bound"
+        ]
+        if _no_template:
+            from app.services import template_asset_service as _template_assets
+            if not await _template_assets.has_staged_template(
+                await get_pg_pool(), thread_id=str(thread_id), user_id=str(current_user["id"]),
+            ):
+                raise HTTPException(
+                    status_code=status.HTTP_400_BAD_REQUEST,
+                    detail=_no_template[0].message,
+                )
         # 099-07: the materialized snapshots live in the skill_snapshots SIBLING column
         # (not the locked definition JSONB) → load them so the kickoff seam can graft
         # them back onto the parsed definition (idempotent 2nd-kickoff). May arrive as a

@@ -750,6 +750,12 @@ _INCOMPLETE_CODES: frozenset[str] = frozenset(
         # fail-loud warning on EVERY canvas edit — the opposite of the grey "still building"
         # this verdict is for.
         "unbound_retrieval",
+        # Phase 295 (D-45, overriding UI-SPEC decided item 8's "error"): a fill step with no
+        # template is a DESIGNED shape, because the Run modal uploads one at launch. So the
+        # save is never rejected and the canvas says "still building"; publish and run start
+        # still refuse it. It is LINT-minted (``reachability.LINT_CODES``), so it follows the
+        # ``input_unsatisfied`` precedent: registered HERE ONLY, never in _ROUTE_ASSIGNED_CODES.
+        "no_template_bound",
     }
 )
 

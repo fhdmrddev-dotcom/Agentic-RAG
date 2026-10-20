@@ -94,6 +94,9 @@ def test_owning_modules_publish_their_canonical_code_sets():
             "upstream_unreachable",
             "shape_unknown",
             "unrenderable",
+            # Phase 295 (D-12) — a fill step with no template attached. A literal emit site in
+            # `reachability._check_template_bound`, so the scanner below sees it directly.
+            "no_template_bound",
         }
     )
     assert grounding.GROUNDING_VERDICT_CODES == frozenset(
