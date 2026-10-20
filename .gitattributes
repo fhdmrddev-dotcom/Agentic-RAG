@@ -3,3 +3,6 @@
 backend/app/experts/corpora/** -text
 backend/app/experts/corpora/**/*.md text eol=lf
 backend/app/experts/corpora/**/*.json text eol=lf
+# Phase 294-02 (D-18): the held-out set is hashed into its sha256 sidecar, so its bytes must be LF in every checkout.
+backend/tests/unit/fixtures/decision_heldout_v1.json text eol=lf
+backend/tests/unit/fixtures/decision_heldout_v1.sha256 text eol=lf
