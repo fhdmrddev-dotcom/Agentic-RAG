@@ -218,6 +218,11 @@ Decisions:
 - **D-51 (D-32 resolved).** The seam is taken first. The engine-ask disposition (`_resolve_failure_with_ask_user` and its helpers) moves **verbatim** into `backend/app/services/harness/engine_ask.py`, with the names re-exported from `harness_engine.py` so patch targets survive (Pitfall 8). The engine gate keeps `on_failure="fail_run"` in `grounding.py`, and a pure predicate identifies it (`test_185:77` stays green; no new author-writable disposition literal).
 - **SC#5 baseline (D-09, from RESEARCH §G):** runs ending in a `citations_required` failure: live **13/227 (5.7%)**, golden **14/58 (24.1%)**, combined **27/285 (9.5%)**. Query in RESEARCH §G. Backend unit baseline at research: **70 failed / 8421 passed**. Re-derive it at execute; never quote it.
 
+- **D-52 (G-8, plan count 7, justified) [informational].** The planner produced 7 plans in 4 waves, not the 5 D-34 suggested. Two things genuinely cannot share a worktree:
+  1. Plan 01 is the pure-move seam. D-51 requires it to land alone with zero behaviour change, so a pure-move proof can see it.
+  2. The frontend splits in two. `PendingAskCard.tsx` (1,052 L, FIRES) is plan 06, and the read-side change across ~33 files is plan 05. Each fits one executor's context budget only when separate.
+  - The verifier, TDD RED drives, security review and migration discipline are not cut.
+
 ### Claude's Discretion
 - Exact wording of the pause prompt and choices, within D-02's plain-language rule and the copy/vocabulary files the ledger names.
 - Whether the per-run folder override lives on the phase row or in run inputs (D-03), provided it is recorded and never written to the definition.
