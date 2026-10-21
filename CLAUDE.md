@@ -457,7 +457,7 @@ node scripts/check-hot-file-ledger.cjs <phase-dir>   # 0 clear · 1 missing rows
 | `backend/app/api/panel.py` | 6 / 5 / 285 | 295-03: ONE engine_pause key on /pending · honoured by construction |
 | `backend/app/services/harness/human_input.py` | 6 / 3 / 375 (was `5 / 3 / 355`) | 295-09 CR-01: consumes only its own question's answer · ⛔ |
 | `backend/app/middleware/canvas_gate.py` | 9 / 6 / 396 (was `8 / 5 / 391`) | 289-03: ONE gated path (…/evidence) · ⛔ test_182 never imports it |
-| `backend/app/services/harness_engine.py` | 67 / 26 / 2957 (was `62 / 25 / 3396`) | 295-01: seam TAKEN (−499 L) · armed-block seam still OWED · ⛔ |
+| `backend/app/services/harness_engine.py` | 68 / 26 / 2961 (was `67 / 26 / 2957`) | 295-09 WR-07: one pause write per engine ask · armed seam OWED · ⛔ |
 | `frontend/src/components/chat/ThinkingBlock.tsx` | 6 / 2 / 320 | ⚠ row STALE; does NOT fire yet · ⛔ |
 | `frontend/src/components/chat/RunCard.tsx` | 31 / 16 / 729 | last touch 276-06 (D-27) · ⛔ |
 | `frontend/src/components/chat/MessageInput.tsx` | 41 / 20 / 1007 | ⚠ STALE · last touch 268-03 · ⛔ |

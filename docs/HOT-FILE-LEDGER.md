@@ -2034,6 +2034,14 @@ Scan-list cell as of 2026-10-21 (replaced by 295-07, moved verbatim): 62 / 25 / 
 
 CLAUDE.md verdict cell as of 2026-10-21 (replaced by 295-07, moved verbatim): | `backend/app/services/harness_engine.py` | 62 / 25 / 3396 (was `61 / 24 / 3387`) | 289-REVIEW WR-01: resume shell INSERT moved last (no new code) · F3 owed |
 
+### `backend/app/services/harness_engine.py` — 295-09 (WR-07, 2026-10-21)
+
+**`68 / 26 / 2961`** (the row read `67 / 26 / 2957`). 295-REVIEW WR-07 (driven RED first, the interleaving reproduced through `run_workflow` with the real `engine_pause`): `engine_pause` writes `pause_run` first and releases the lease, then the arm in `run_workflow` wrote `pause_run` again. An answer landing in that gap (`resume_run` → `active`, a fresh claim) was flipped back to `paused` while its re-drive ran. The arm now writes the pause only when `run_handoff.take_pause_written(ctx)` is False; the audit row and the `run_paused` emit are unchanged. A human-step pause (HumanInputTimeout) still writes it, since nothing marks it. One guarded call: module ast.If 86 → 87, defs 25 → 25. The armed-block seam is still owed.
+
+Scan-list cell as of 2026-10-21 (replaced by 295-09, moved verbatim): 67 / 26 / 2957 (was `62 / 25 / 3396`) | ⚠ **FIRES** | 295-01: D-51 seam TAKEN (engine-ask family out, −499 L, If 107→83). 295-03/04: consume call, sweep arm, D-14 expr, resume terminalize. Armed-block seam still OWED |
+
+CLAUDE.md verdict cell as of 2026-10-21 (replaced by 295-09, moved verbatim): | `backend/app/services/harness_engine.py` | 67 / 26 / 2957 (was `62 / 25 / 3396`) | 295-01: seam TAKEN (−499 L) · armed-block seam still OWED · ⛔ |
+
 ## `frontend/src/components/chat/ThinkingBlock.tsx`
 
 **Created 2026-09-11 (Phase 243, plan `243-02`):** `1 commit / 1 phase / 117 L` · **G-5 does NOT fire** (1 phase against a threshold of 3).
@@ -11349,8 +11357,8 @@ cells rot within days.
 |---|---|---|---|
 | [`backend/app/api/panel.py`](docs/HOT-FILE-LEDGER.md#backendappapipanelpy) | 6 / 5 / 285 | ⚠ **FIRES** | 295-03: ONE additive `engine_pause` key on /pending beside `draft`. Honoured by construction. 295-07: triple re-derived, unchanged since 295-03 |
 | [`backend/app/services/harness/human_input.py`](docs/HOT-FILE-LEDGER.md#backendappservicesharnesshuman_inputpy) | 6 / 3 / 375 (was `5 / 3 / 355`) | ⚠ **FIRES** | 295-09 CR-01: ONE guard (+1 def `_answers_this_step`, If 15→17): a re-drive consumes only an answer to THIS step's question, never an engine ask's or another step's. Honoured by construction |
-| [`backend/app/services/harness/engine_ask.py`](docs/HOT-FILE-LEDGER.md#backendappservicesharnessengine_askpy) | 8 / 1 / 1358 (was `7 / 1 / 1350`) | no (young) | young. 295-09: WR-01 outage, WR-02 searched set, WR-06 folder list narrowed to the run's org (`restrict_org_ids`, IfExp 15→16). ⛔ one allow-list shared with the route's 422 |
-| [`backend/app/services/harness/run_handoff.py`](docs/HOT-FILE-LEDGER.md#backendappservicesharnessrun_handoffpy) | 7 / 1 / 401 (was `6 / 1 / 386`) | no (young) | young. 295-09: WR-01 sub-agent helpers (+2 defs); WR-03 the engine surfaces only after the executor was silenced (If 22→22). ⛔ no app import; one guarded terminal write |
+| [`backend/app/services/harness/engine_ask.py`](docs/HOT-FILE-LEDGER.md#backendappservicesharnessengine_askpy) | 9 / 1 / 1361 (was `8 / 1 / 1358`) | no (young) | young. 295-09: WR-01 outage, WR-02 searched set, WR-06 org-narrowed folders, WR-07 marks its own pause write (If 79→79). ⛔ one allow-list shared with the route's 422 |
+| [`backend/app/services/harness/run_handoff.py`](docs/HOT-FILE-LEDGER.md#backendappservicesharnessrun_handoffpy) | 8 / 1 / 431 (was `7 / 1 / 401`) | no (young) | young. 295-09: WR-01 sub-agent helpers, WR-03 surface-after-silence, WR-07 `mark_pause_written` / `take_pause_written` (+2 defs, If 22→23). ⛔ no app import; one guarded terminal write |
 | [`backend/app/services/harness/run_read_wire.py`](docs/HOT-FILE-LEDGER.md#backendappservicesharnessrun_read_wirepy) | 1 / 1 / 150 | no (young) | young (295-05). Pure leaf: unsourced_for_wire, end_reason_for_wire, resolve_end_reason, deadline_passed. ⛔ no app imports; a stored user id is REPLACED by words |
 | [`frontend/src/components/panel/AskFolderChoice.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentspanelaskfolderchoicetsx) | 1 / 1 / 70 | no (young) | young (295-06). Leaf on the shadcn Select: rows only from `engine_pause.folders`, visible label `Folder to search`. ⛔ no API import, no folder picker |
 | [`frontend/src/components/panel/enginePause.ts`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentspanelenginepausets) | 1 / 1 / 102 | no (young) | young (295-06). Pure helper: readEnginePause, needsFolder, answeredHeader, answeredReceipt + the three choice labels. ⛔ no React, no API import |
@@ -11471,7 +11479,7 @@ cells rot within days.
 | [`frontend/src/components/panel/WorkspacePanel.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentspanelworkspacepaneltsx) | 17 / 11 / 646 (was `16 / 10 / 646`) | **FIRES** | honoured by construction (194 / 194.1 / **282-02**: ONE `home="panel"` prop on the existing `PendingAskStack` mount; the `pendingAsks.length > 0 &&` condition byte-identical) |
 | [`backend/app/services/run_lifecycle.py`](docs/HOT-FILE-LEDGER.md#backendappservicesrun_lifecyclepy) | 10 / 6 / 776 (was `9 / 5 / 756`) | ⚠ **FIRES** | 295-04: `cancel_workflow_run_internals(..., stopped_by=...)` calls `record_stop` before its own finish_run (If 11→11). Honoured by construction |
 | [`backend/app/api/runs.py`](docs/HOT-FILE-LEDGER.md#backendappapirunspy) | 48 / 21 / 1929 (was `47 / 21 / 1907`) | ⚠ **FIRES** | 295-09 CR-01: ONE 409 before the 422 allow-list (+1 def `_is_current_question`, If 56→57): an answer must be for the run's newest unanswered question. Honoured by construction |
-| [`backend/app/services/harness_engine.py`](docs/HOT-FILE-LEDGER.md#backendappservicesharness_enginepy) | 67 / 26 / 2957 (was `62 / 25 / 3396`) | ⚠ **FIRES** | 295-01: D-51 seam TAKEN (engine-ask family out, −499 L, If 107→83). 295-03/04: consume call, sweep arm, D-14 expr, resume terminalize. Armed-block seam still OWED |
+| [`backend/app/services/harness_engine.py`](docs/HOT-FILE-LEDGER.md#backendappservicesharness_enginepy) | 68 / 26 / 2961 (was `67 / 26 / 2957`) | ⚠ **FIRES** | 295-09 WR-07: the pause arm skips its `pause_run` when the engine ask already wrote it (ONE guarded line, If 86→87), so a re-driven run is never flipped back. Armed-block seam still OWED |
 | [`frontend/src/components/chat/RunCard.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentschatruncardtsx) | 31 / 16 / 729 (was `28 / 14 / 710`) | **FIRES** | ⭐ G-5 DISCHARGED (243-02). **276-06**: avatar pulse + header spinner removed (D-27: one live avatar); provider logo static. ⛔ Bot stays the unknown-provider fallback |
 | [`frontend/src/components/chat/WorkingBadge.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentschatworkingbadgetsx) | 3 / 2 / 50 (was `2 / 1 / 56`) | no (2 phases) | ⚠ absent its ENTIRE LIFE; row added at 276-06 planning. 276-06: the ✦ glyph and its pulse gone (the Iris avatar is the motion); the word stays. ⛔ memo equality unchanged |
 | [`frontend/src/components/chat/irisState.ts`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentschatirisstatets) | 1 / 1 / 44 (was `0 / 0 / 0`) | no (new) | young (created 276-06). Row added AT PLANNING. ⛔ the ONE home of the avatar precedence (error > cancelled > waiting > tool > thinking > streaming > idle); pure, no store reads |
@@ -23351,6 +23359,12 @@ Scan-list cell as of 2026-10-21 (replaced by 295-09, moved verbatim): 6 / 1 / 13
 
 Scan-list cell as of 2026-10-21 (replaced by 295-09, moved verbatim): 7 / 1 / 1350 (was `6 / 1 / 1345`) | no (young) | young. 295-09 WR-01: errored sub-agent = outage; WR-02: a folder chosen earlier counts as searched (If 78→79). ⛔ one allow-list shared with the route's 422 |
 
+### `backend/app/services/harness/engine_ask.py` — 295-09 (WR-07, 2026-10-21)
+
+**`9 / 1 / 1361`** (the row read `8 / 1 / 1358`). 295-REVIEW WR-07: as `engine_pause` returns its `pause_run` outcome it calls `run_handoff.mark_pause_written(ctx)`, so the engine's pause arm does not write the pause a second time. One import (run_handoff is a leaf with no `app` import, so the cycle note above is untouched) and one call; ast.If 79 → 79.
+
+Scan-list cell as of 2026-10-21 (replaced by 295-09, moved verbatim): 8 / 1 / 1358 (was `7 / 1 / 1350`) | no (young) | young. 295-09: WR-01 outage, WR-02 searched set, WR-06 folder list narrowed to the run's org (`restrict_org_ids`, IfExp 15→16). ⛔ one allow-list shared with the route's 422 |
+
 ## `backend/app/services/harness/run_handoff.py`
 
 **Row added 2026-10-21 by 295-07 (new in Phase 295).** Created by 295-03 as a pure leaf (`phase_scope_ids`, 25 lines). 295-04 put every new branch of its plan here so the hot files spent call lines only: `handoff_text`, `claim_failure_message` / `surface_unless_engine_owns` / `surface_if_engine_owned`, `end_run` (the ONE guarded terminal write: `UPDATE ... WHERE status = ANY(...) RETURNING`), `resume_with_terminalize`, `fail_unloadable_definition`, `resume_shell_status`, `expire_unless_paused`, `record_stop`, `record_failed_end`, `finish_golden_run`. **Measured `5 / 1 / 355`**, ast.If 20, Try 10, defs 17. ⛔ Invariants: no `from app` / `import app` at module level; only the winner of a terminal end writes words; no exception text reaches a stored reason. Live (295-07): `end_run` is what the reconciler used to end the planted stuck run, and `record_stop` wrote the S7 armed run's Stop reason.
@@ -23366,6 +23380,12 @@ Scan-list cell as of 2026-10-21 (replaced by 295-09, moved verbatim): 5 / 1 / 35
 **`7 / 1 / 401`** (the row read `6 / 1 / 386`). 295-REVIEW WR-03 (driven RED first): `surface_if_engine_owned` keyed on `engine_owns_failure_message`, which is True for every phase with validators, so a non-emit step routed by a valid `skip_to` (zero chat messages before 295) gained a mid-run "gate failed" message. The executor side (`surface_unless_engine_owns`) now records `ctx.engine_silenced_failure_message` when it stays silent, `claim_failure_message` clears it per phase, and the engine side surfaces only when it is set. A non-emit step is back to its pre-295 behaviour; an emit step still gets exactly one message. No harness_engine.py change. ast.If 22 → 22.
 
 Scan-list cell as of 2026-10-21 (replaced by 295-09, moved verbatim): 6 / 1 / 386 (was `5 / 1 / 355`) | no (young) | young. 295-09 WR-01: `sub_agent_text` + `sub_agent_error_mark` (+2 defs, If 20→22) so phase_types spends call lines only. ⛔ no app import; one guarded terminal write |
+
+### `backend/app/services/harness/run_handoff.py` — 295-09 (WR-07, 2026-10-21)
+
+**`8 / 1 / 431`** (the row read `7 / 1 / 401`). 295-REVIEW WR-07: `mark_pause_written(ctx)` (set by `engine_pause`) and `take_pause_written(ctx)` (single-use, read by the engine's pause arm), so an engine ask's pause is written exactly once. defs 19 → 21, If 22 → 23. Still no module-level `app` import.
+
+Scan-list cell as of 2026-10-21 (replaced by 295-09, moved verbatim): 7 / 1 / 401 (was `6 / 1 / 386`) | no (young) | young. 295-09: WR-01 sub-agent helpers (+2 defs); WR-03 the engine surfaces only after the executor was silenced (If 22→22). ⛔ no app import; one guarded terminal write |
 
 ## `backend/app/services/harness/run_read_wire.py`
 

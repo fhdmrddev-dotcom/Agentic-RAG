@@ -60,6 +60,7 @@ from app.db.workflows import (
     write_audit,
 )
 from app.services.harness.phase_confidence import resolve_kb_label
+from app.services.harness.run_handoff import mark_pause_written
 # Bound from the engine (see "THE HONEST LEAF INVARIANT" above). Safe ONLY because the
 # engine imports this module at its END, after both names are bound.
 from app.services.harness_engine import PhaseOutcome, _emit
@@ -1065,7 +1066,9 @@ async def engine_pause(
         )
     except Exception:  # noqa: BLE001
         logger.exception("engine ask: ask_user_prompt emit failed run=%s", run_id)
-    # 6. The shipped pause arm does the rest.
+    # 6. The shipped pause arm does the rest — WITHOUT a second pause write (295-REVIEW
+    #    WR-07): an answer that already re-drove the run must not be flipped back to paused.
+    mark_pause_written(ctx)
     return PhaseOutcome("pause_run", None, None, f"Waiting for your answer on “{step_label}”.")
 
 

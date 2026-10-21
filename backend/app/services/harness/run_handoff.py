@@ -22,6 +22,8 @@ __all__ = [
     "handoff_text",
     "sub_agent_text",
     "sub_agent_error_mark",
+    "mark_pause_written",
+    "take_pause_written",
     "claim_failure_message",
     "surface_unless_engine_owns",
     "surface_if_engine_owned",
@@ -118,6 +120,34 @@ def sub_agent_error_mark(results) -> dict:
     if any(isinstance(r, dict) and r.get("status") == "error" for r in results or []):
         return {"sub_agent_status": "error"}
     return {}
+
+
+# ── 295-REVIEW WR-07: ONE pause write per engine ask ────────────────────────────────────────
+#
+# ``engine_pause`` writes ``pause_run`` FIRST (releasing the lease, so an answer can re-drive at
+# once), then the prompt row, then the card. The engine's pause arm used to write ``pause_run``
+# AGAIN after that, so an answer landing in the gap (``resume_run`` → ``active``, a fresh claim)
+# was flipped back to ``paused`` while its re-drive ran, and its claim was cleared. The engine
+# ask now marks that it already wrote the pause, and the arm skips its own write when marked.
+
+
+def mark_pause_written(ctx) -> None:
+    """Called by ``engine_pause`` as it returns its ``pause_run`` outcome."""
+    try:
+        ctx.engine_pause_written = True
+    except (AttributeError, TypeError):
+        pass
+
+
+def take_pause_written(ctx) -> bool:
+    """Single-use: True (and cleared) when an engine ask already wrote this pause."""
+    written = bool(getattr(ctx, "engine_pause_written", False))
+    if written:
+        try:
+            ctx.engine_pause_written = False
+        except (AttributeError, TypeError):
+            pass
+    return written
 
 
 # ── D-23 (BUG-261015-01): one failure, one message ──────────────────────────────────────────
