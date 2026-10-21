@@ -224,8 +224,8 @@ Plans:
 Plans:
 **Wave 1**
 
-- [ ] 290-01-PLAN.md — team derivation `deriveTeam`, its vocabulary leaf, planted fixtures, canvas header pin (TDD, wave 1)
-- [ ] 290-02-PLAN.md — the card chip line: `resolveStepLine` + `StepChipLine`, one block on the card (TDD, wave 1)
+- [x] 290-01-PLAN.md — team derivation `deriveTeam`, its vocabulary leaf, planted fixtures, canvas header pin (TDD, wave 1)
+- [x] 290-02-PLAN.md — the card chip line: `resolveStepLine` + `StepChipLine`, one block on the card (TDD, wave 1)
 
 **Wave 2** *(blocked on Wave 1 completion)*
 
