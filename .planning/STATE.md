@@ -3,7 +3,7 @@ gsd_state_version: 1.0
 milestone: v4.7
 milestone_name: Workflows You Can See and Start Anywhere
 status: ready_to_plan
-last_updated: "2026-10-21T18:05:01.247Z"
+last_updated: "2026-10-21T18:06:35.650Z"
 progress:
   total_phases: 17
   completed_phases: 6
@@ -28,7 +28,7 @@ See: `.planning/PROJECT.md` (updated 2026-10-18)
 
 **Core value:** The agent acts as an AI colleague — it knows your knowledge base, can run code, and
 can be taught new behaviours (skills) that persist and can be shared.
-**Current focus:** Phase 294 — decision-engine-rerank-and-citation-check
+**Current focus:** Phase 290 — the-card-and-the-team-picture
 
 ---
 
@@ -41,9 +41,9 @@ reviewer exists, so a phase closes `verification_mode: self-verified`, never `re
 
 ## Current Position
 
-Phase: 295 (runs-that-don-t-dead-end) — EXECUTED, human_needed (2026-10-21). 7 plans + 3 gap fixes (2 rounds, G-7 cap reached) + 1 fast fix; verifier 5/5 SC. Phase 290 context gathered (2026-10-21). Chip-line sketch approved (winner B, step-type words, 2026-10-21). Next: `/gsd:plan-phase 290`. 295 G-4 sign-off (S1 first) and D-uat-02 still owed.
+Phase: 290 (the-card-and-the-team-picture) — EXECUTING
 Previous: Phase: 294 (decision-engine-rerank-and-citation-check) — EXECUTED, human_needed (2026-10-20)
-Plan: 5 of 5 — all plans executed (2026-10-20). 294-05 Task 4 driven in pass 2 (partial live: Jev rerank, citation check end to end, reload, Cohere reason line, order probe); G4 sign-off and the operator-gated rows remain owed (294-VALIDATION.md "Drive pass 2"). Verifier: human_needed, 6/6 success criteria met in code (294-VERIFICATION.md). Closed as a DECISION with owed live rows (294-HUMAN-UAT.md); run test 1 (G-4 sign-off) first. Not pushed; migration 211 is applied LOCALLY only (cloud paste + get_advisors owed before any deploy).
+Plan: 1 of 4
 
 ### Roadmap Evolution
 
