@@ -2511,7 +2511,10 @@ const BASELINE = {
   //   Phase 286 — the suite measured 128 at the phase base `d45bef9e2` (run on the base tree,
   //   286-05-GATES.md), so the pin had been 10 behind its own suite before this phase began.
   //   Folded in here because raising a pin only tightens it; the split is stated, not smoothed.
-  "librarySubtree.fences.test.ts": 133,
+  // 290-02 (2026-10-21, VIS-04): RAISED 133 -> 143 from this script's own actual column. All +10 are 290-02's:
+  //   ./stepLine.ts and ./StepChipLine.tsx joined LIBRARY_SUBTREE_PATHS (15 -> 17), and each path runs five it.each
+  //   sweeps. The suite measured 133 at the phase base 1f9673d25 (run on the base tree, 290-04-GATES.md).
+  "librarySubtree.fences.test.ts": 143,
   // ── 192.1-07 Task 1 (LIB-05 / D-19 / D-20 / D-36): a NEW suite, pinned in its first commit ─
   // 162-B's name prompt, in `RunModal.a11y.test.tsx`'s posture (the four Radix jsdom shims,
   // `axe()` on the OPEN dialog, roles and accessible names rather than class-name reading).
@@ -2628,7 +2631,11 @@ const BASELINE = {
   // that no template is needed. Two separate expectations would drift apart without failing.
   //
   // Read from THIS SCRIPT'S OWN `actual` column (`WorkflowCard.test.tsx 80 90 +10`).
-  "WorkflowCard.test.tsx": 128,
+  // 290-02 (2026-10-21, VIS-04): RAISED 128 -> 133 from this script's own actual column. +3 are 290-02's
+  //   (the chip-line content cases: DEF words, one chip and no toggle, no row-steps at 0 steps). The other +2
+  //   PREDATE 290: the suite measured 130 at the phase base 1f9673d25 (run on the base tree, 290-04-GATES.md).
+  //   Folded in because raising a pin only tightens it; the split is stated, not smoothed.
+  "WorkflowCard.test.tsx": 133,
   // ── Phase 192.2 gap round 1 — THE CR-01 REGRESSION TESTS WERE DELETABLE WITH A GREEN GATE ────
   //
   // ⚠ Found by the round's own code review (`192.2-REVIEW-R1.md`, WR-01) and confirmed against
@@ -4338,6 +4345,17 @@ const BASELINE = {
   "runEvidence.contract.test.ts": 3, // 289-05 I1 — RunEvidence vs the shared contract fixture
   // 289-REVIEW WR-05 (2026-10-20) — created by the review fix, adopted in BOTH knobs in one commit.
   "ChatLayout.runDeepLink.test.tsx": 2, // ?run= is cleared when a LIVE run page is left
+  // -- Phase 290-04 (2026-10-21, VIS-01 / VIS-04): the seven suites 290-01..03 created, pinned at the
+  // gate's own printed actuals (count gate OK, failed 0). All seven sit under the src/components/workflows
+  // directory entry in TARGETS (headerPin under __tests__/, two under library/), so they need a pin only.
+  // Deleting a case in any of them now reds the gate.
+  "teamModel.test.ts": 243, // 290-01 (VIS-01 / D-11): deriveTeam's honesty surface; jump only for a resolvable skip, citations check only for detected
+  "teamVocabulary.test.ts": 15, // 290-01: zero-import leaf, exact strings, no step sentence or seal label copied in
+  "WorkflowCanvas.headerPin.test.tsx": 6, // 290-01: canvas header characterization pin (6 snapshots) that 290-03 left byte-unchanged
+  "TeamPicture.test.tsx": 36, // 290-03 (VIS-01 / D-06): one SVG path per lines[] item, nothing focusable, author text literal
+  "WorkflowCanvas.team.test.tsx": 7, // 290-03: Steps | Team switch only with the team prop; keyboard reorder gated (F-6); run page passes none
+  "stepLine.test.ts": 25, // 290-02 (VIS-04 / D-01, D-04): type-sentence chips in run order, first 3 + more, null at 0 steps
+  "StepChipLine.test.tsx": 11, // 290-02 (VIS-04 / D-03): row-steps block, +N more / Show less, no title attribute
 }
 
 // Still COMPUTED, never hand-written — the reduce is the single source, so the
