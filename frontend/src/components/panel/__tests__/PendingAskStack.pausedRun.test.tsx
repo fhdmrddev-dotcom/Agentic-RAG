@@ -64,6 +64,7 @@ vi.mock("@/providers/StreamsProvider", () => ({
 import { PAUSED_WAITING_LINE, PendingAskStack, RUN_STOPPED_RETIREMENT_LINE } from "../PendingAskCard"
 import { useStreamsStore } from "@/stores/streamsStore"
 import { useAskDraftStore } from "@/stores/askDraftStore"
+import { answerAskUser, ApiError } from "@/lib/api"
 
 beforeAll(() => {
   // Radix Select needs these in jsdom (the AskFolderChoice.test.tsx precedent).
@@ -227,5 +228,57 @@ describe("295-08 — the retirement guard still holds in both directions", () =>
     expect(screen.getByRole("button", { name: "Send Answer" })).toBeInTheDocument()
     // And a Deep ask is not a paused run: the clock stays, the paused line does not appear.
     expect(screen.queryByText(PAUSED_WAITING_LINE)).not.toBeInTheDocument()
+  })
+})
+
+describe("295-08 — WR-04: an engine ask is answered by its choices, and a refusal keeps its words", () => {
+  it("an engine ask draws no free-text box and no 'or' divider; only the server's choices answer it", () => {
+    hookState.asks = [foundNothingAsk]
+    stackState.phases = [{ ...HUMAN_STEP, slug: "search-kb", phaseIndex: 0, phaseType: "llm_single" }]
+    setRunStatus("paused")
+    render(<PendingAskStack home="panel" />)
+    expect(screen.getByRole("radiogroup")).toBeInTheDocument()
+    expect(screen.queryByRole("textbox")).not.toBeInTheDocument()
+    expect(screen.queryByText("Reason")).not.toBeInTheDocument()
+    expect(screen.queryByText("or")).not.toBeInTheDocument()
+  })
+
+  it("an ordinary ask with choices keeps its Reason box (guard)", () => {
+    hookState.asks = [approvalAsk]
+    stackState.phases = [HUMAN_STEP]
+    setRunStatus("paused")
+    render(<PendingAskStack home="panel" />)
+    expect(screen.getByRole("textbox")).toBeInTheDocument()
+    expect(screen.getByText("Reason")).toBeInTheDocument()
+  })
+
+  it("a 4xx refusal that carries the server's sentence shows that sentence, not the bare status", async () => {
+    const user = userEvent.setup()
+    const words = "This step must prove its sources, so it cannot continue without them."
+    vi.mocked(answerAskUser).mockRejectedValueOnce(new ApiError(words, 422))
+    hookState.asks = [approvalAsk]
+    stackState.phases = [HUMAN_STEP]
+    setRunStatus("paused")
+    render(<PendingAskStack home="panel" />)
+    await user.click(screen.getByRole("radio", { name: /Approve/ }))
+    await user.click(sendButton())
+    const alert = await screen.findByRole("alert")
+    expect(alert.textContent).toContain(words)
+    expect(alert.textContent).not.toContain("(422)")
+    // The card stays answerable: a refusal is not a settle.
+    expect(sendButton().disabled).toBe(false)
+  })
+
+  it("a 4xx with no server sentence still names the status (guard)", async () => {
+    const user = userEvent.setup()
+    vi.mocked(answerAskUser).mockRejectedValueOnce(new ApiError("Failed to submit ask_user answer", 422))
+    hookState.asks = [approvalAsk]
+    stackState.phases = [HUMAN_STEP]
+    setRunStatus("paused")
+    render(<PendingAskStack home="panel" />)
+    await user.click(screen.getByRole("radio", { name: /Approve/ }))
+    await user.click(sendButton())
+    const alert = await screen.findByRole("alert")
+    expect(alert.textContent).toBe("Your answer was refused (422). It has not been saved.")
   })
 })
