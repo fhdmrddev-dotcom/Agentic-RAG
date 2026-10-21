@@ -2990,3 +2990,4 @@ reuses 267-B's event-card shape.
 | # | Name | Design Question | Winner | Tags |
 |---|------|----------------|--------|------|
 | 290 | team-picture | How a multi-agent workflow reads as a truthful team (org chart / office floor / layers), with no edge the definition lacks | ★ A org chart (operator, 2026-10-20) | phase-290, vis-01, seed-086, schema-truth |
+| 290 | card-chip-line | How the one step line reads on the shipped 179 C card (pills with step names / pills with step-type words / quiet numbered line) | pending | phase-290, vis-04, seed-155, real-card-dom |
