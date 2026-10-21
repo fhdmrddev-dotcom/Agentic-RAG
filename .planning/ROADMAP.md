@@ -229,7 +229,7 @@ Plans:
 
 **Wave 2** *(blocked on Wave 1 completion)*
 
-- [ ] 290-03-PLAN.md — `TeamPicture` render + the `Steps | Team` switch: one prop and one branch in the canvas (wave 2)
+- [x] 290-03-PLAN.md — `TeamPicture` render + the `Steps | Team` switch: one prop and one branch in the canvas (wave 2)
 
 **Wave 3** *(blocked on Wave 2 completion)*
 
