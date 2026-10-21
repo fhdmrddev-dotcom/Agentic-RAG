@@ -416,17 +416,17 @@ node scripts/check-hot-file-ledger.cjs <phase-dir>   # 0 clear · 1 missing rows
 | `frontend/src/hooks/useMessages.ts` | 74 / 27 / 127 | extraction due |
 | `backend/app/services/anthropic_service.py` | 12 / 11 / 373 (was `11 / 10 / 354`) | honoured by construction (282-01: constructor kwargs) · adapter audit due |
 | `backend/app/services/embedding_service.py` | 9 / 5 / 354 | ⚠ absent for its entire life at 5 phases — row added 236 (SC#2) |
-| `frontend/src/components/workflows/WorkflowCanvas.tsx` | 31 / 9 / 1708 | 286 forecast: 290 team picture is a separate view; ≤ 1 gated mount |
+| `frontend/src/components/workflows/WorkflowCanvas.tsx` | 32 / 10 / 1744 (was `31 / 9 / 1708`) | 290-03: Team view = 1 prop, 1 state, 1 early return · extraction FIRST next · ⛔ |
 | `frontend/src/components/workflows/FlowEdge.tsx` | 3 / 3 / 462 | honoured by construction (200) |
-| `frontend/src/components/workflows/PhaseNodeCard.tsx` | 18 / 9 / 490 (was `17 / 8 / 489`) | 286 forecast: 290 adds one prop; chip words from libraryVocabulary |
+| `frontend/src/components/workflows/PhaseNodeCard.tsx` | 18 / 9 / 490 (was `17 / 8 / 489`) | 290: forecast unused — chips went on the library card, not here |
 | `backend/app/services/harness/phase_types.py` | 60 / 30 / 3057 (was `59 / 30 / 3053`) | 295-09 WR-01: sub-agent error mark, 4 call lines, If 113→113 · G-5 OWED |
 | `frontend/src/pages/WorkflowsPage.tsx` | 45 / 18 / 1447 (was `43 / 17 / 1415`) | 286 forecast: 287 starters are data, fork reuses its hook; one prop |
-| `frontend/src/components/workflows/library/WorkflowCard.tsx` | 22 / 8 / 1354 (was `19 / 6 / 1616`) | seam TAKEN (286-04): ⋯ menu + armed delete → WorkflowCardMenu |
-| `frontend/src/components/workflows/library/libraryVocabulary.ts` | 11 / 5 / 766 (was `10 / 4 / 727`) | 286 forecast: 290 chip labels are vocabulary entries (data), no logic |
+| `frontend/src/components/workflows/library/WorkflowCard.tsx` | 23 / 9 / 1361 (was `22 / 8 / 1354`) | 290-02: ONE chip-line block from row.def; still 0 useState |
+| `frontend/src/components/workflows/library/libraryVocabulary.ts` | 12 / 6 / 802 (was `11 / 5 / 766`) | 290-02: six STEP_LINE_ entries (data), no logic |
 | `frontend/src/components/workflows/library/libraryFilter.ts` | 6 / 4 / 435 | ⚠ absent at 4 phases and NO PLAN NAMED IT (192.2) |
 | `frontend/src/components/workflows/library/libraryRow.ts` | 4 / 3 / 201 | ⚠ absent, on the boundary (added 192.2) |
 | `frontend/src/components/workflows/WorkflowDoorSwitch.tsx` | 18 / 12 / 1075 | honoured by construction (193 / 193.1 / 199 / **214**) |
-| `frontend/src/pages/WorkflowBuilderPage.tsx` | 59 / 24 / 2808 (was `58 / 23 / 2803`) | 288-01: ONE prop at the existing card call · ⛔ |
+| `frontend/src/pages/WorkflowBuilderPage.tsx` | 60 / 25 / 2810 (was `59 / 24 / 2808`) | 290-03: ONE prop (team) at the canvas call, no state · ⛔ |
 | `frontend/src/components/workflows/DraftArrivalCard.tsx` | 4 / 3 / 625 (was `1 / 1 / 338`) | 288-01: ONE prop, closed branch only · ⛔ |
 | `frontend/src/components/workflows/decisionsVocabulary.ts` | 4 / 3 / 327 (was `1 / 1 / 226`) | 288-01: 3 string consts, no logic · ⛔ |
 | `backend/app/api/workflows.py` | 46 / 24 / 1653 (was `45 / 23 / 1647`) | 295-02: one code in _INCOMPLETE_CODES · split OWED (>1,500 L) |
@@ -497,7 +497,7 @@ node scripts/check-hot-file-ledger.cjs <phase-dir>   # 0 clear · 1 missing rows
 | `frontend/src/components/workflows/soulData.ts` | 13 / 11 / 523 (was `12 / 10 / 499`) | 287-01: +2 pure required-field helpers · history in detail file |
 | `frontend/src/components/workflows/PublishGauntlet.tsx` | 21 / 11 / 1385 (was `20 / 10 / 1372`) | 288-02: ONE auto_answered block, server words |
 | `frontend/src/landing/facts.ts` | 6 / 3 / 546 (was `5 / 2 / 546`) | ⚠ now FIRES (288-02) — row added · Pause string only |
-| `frontend/src/components/workflows/PhaseSpineGraph.tsx` | 8 / 6 / 723 (was `5 / 5 / 473`) | 286 forecast: 290 adds one optional prop for labelled chips |
+| `frontend/src/components/workflows/PhaseSpineGraph.tsx` | 8 / 6 / 723 (was `5 / 5 / 473`) | 290: forecast unused — chips went on the library card, not here |
 | `frontend/src/components/workflows/doorVocabulary.ts` | 6 / 4 / 540 | no seam proposed |
 | `frontend/src/components/workflows/StepTypePicker.tsx` | 7 / 3 / 522 | honoured by construction (199) |
 | `frontend/src/components/workflows/library/RunModal.tsx` | 9 / 6 / 732 (was `8 / 5 / 713`) | 287-01: handleRun refuses empty required field; 214-12 discharge stands |

@@ -11444,17 +11444,17 @@ cells rot within days.
 | [`frontend/src/providers/StreamsProvider.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrcprovidersstreamsprovidertsx) | 112 / 43 / 5016 (was `111 / 43 / 5009`) | ⚠ **FIRES** | 295-10 (D-r1-02): the answer settle also proceeds for a `paused` run (one guard conjunct), and a producer stream's end runs the existing phase refresh. 0 lock writers. · ⛔ |
 | [`frontend/src/hooks/useMessages.ts`](docs/HOT-FILE-LEDGER.md#frontendsrchooksusemessagests) | 74 / 27 / 127 | ⚠ **FIRES** | extraction due |
 | [`backend/app/services/anthropic_service.py`](docs/HOT-FILE-LEDGER.md#backendappservicesanthropic_servicepy) | 12 / 11 / 373 (was `11 / 10 / 354`) | ⚠ **FIRES** | **282-01**: ONE `_anthropic_client` builder (budget in the constructor, connect 5 s, cloud retries 2) + trailing `timeout_s` on `stream_anthropic`. honoured by construction; adapter-pattern audit due |
-| [`frontend/src/components/workflows/WorkflowCanvas.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentsworkflowsworkflowcanvastsx) | 31 / 9 / 1708 | **FIRES** | 286 forecast (290): the team picture is a SEPARATE read-only view (VIS-01: never a second canvas); at most ONE gated mount here. honoured by construction (199 / 200 / 214) |
+| [`frontend/src/components/workflows/WorkflowCanvas.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentsworkflowsworkflowcanvastsx) | 32 / 10 / 1744 (was `31 / 9 / 1708`) | **FIRES** | **290-03** Team view: 1 optional prop, 1 `useState` (8→9), 1 gated early return; the 286 forecast (separate read-only view) met. ⛔ the next concern proposes the extraction FIRST |
 | [`frontend/src/components/workflows/FlowEdge.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentsworkflowsflowedgetsx) | 3 / 3 / 462 | ⚠ **FIRES — EXACTLY AT THRESHOLD** | honoured by construction (200) — ⚠ absent, and it crossed the threshold in the commit that added its row |
-| [`frontend/src/components/workflows/PhaseNodeCard.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentsworkflowsphasenodecardtsx) | 18 / 9 / 490 (was `17 / 8 / 489`) | **FIRES** | 286 forecast (290): ONE prop; the chip words come from `libraryVocabulary`, never literals here. honoured by construction (199) — ⚠ the 200 canvas port stays REVERTED |
+| [`frontend/src/components/workflows/PhaseNodeCard.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentsworkflowsphasenodecardtsx) | 18 / 9 / 490 (was `17 / 8 / 489`) | **FIRES** | 290: the 286 forecast went UNUSED (the chips went on the library card, UI-SPEC §9); file untouched. honoured by construction (199) — ⚠ the 200 canvas port stays REVERTED |
 | [`backend/app/services/harness/phase_types.py`](docs/HOT-FILE-LEDGER.md#backendappservicesharnessphase_typespy) | 60 / 30 / 3057 (was `59 / 30 / 3053`) | ⚠ **FIRES** | 295-09 WR-01: four call lines (`sub_agent_text` ×2, `sub_agent_error_mark` ×2); the branches live in `run_handoff`. If 113→113. G-5 OWED |
 | [`frontend/src/pages/WorkflowsPage.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrcpagesworkflowspagetsx) | 45 / 18 / 1447 (was `43 / 17 / 1415`) | **FIRES** | 286 forecast (287): starters are DATA; fork reuses the existing fork hook; ONE prop. The 192 / 192.1 extraction stays TAKEN |
-| [`frontend/src/components/workflows/library/WorkflowCard.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentsworkflowslibraryworkflowcardtsx) | 22 / 8 / 1354 (was `19 / 6 / 1616`) | **FIRES** | **286-04** seam TAKEN (named 3×): ⋯ menu + armed draft delete → `WorkflowCardMenu.tsx`; card holds 0 `useState`, drawing only. ⚠ compiler lint now covers the whole card |
-| [`frontend/src/components/workflows/library/libraryVocabulary.ts`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentsworkflowslibrarylibraryvocabularyts) | 11 / 5 / 766 (was `10 / 4 / 727`) | ⚠ **FIRES** | 286 forecast (290): chip labels are added as vocabulary ENTRIES (data), no logic. No seam proposed |
+| [`frontend/src/components/workflows/library/WorkflowCard.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentsworkflowslibraryworkflowcardtsx) | 23 / 9 / 1361 (was `22 / 8 / 1354`) | **FIRES** | **290-02** one value (`resolveStepLine(row.def)`) + one `StepChipLine` block; no state, no prop, still 0 `useState`. 286-04 seam TAKEN (⋯ menu → `WorkflowCardMenu.tsx`) |
+| [`frontend/src/components/workflows/library/libraryVocabulary.ts`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentsworkflowslibrarylibraryvocabularyts) | 12 / 6 / 802 (was `11 / 5 / 766`) | ⚠ **FIRES** | **290-02** six `STEP_LINE_` entries (data), no logic: the 286 forecast, met. No seam proposed |
 | [`frontend/src/components/workflows/library/libraryFilter.ts`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentsworkflowslibrarylibraryfilterts) | 6 / 4 / 435 | ⚠ **FIRES** | ⚠ absent at 4 phases and NO PLAN NAMED IT (192.2) |
 | [`frontend/src/components/workflows/library/libraryRow.ts`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentsworkflowslibrarylibraryrowts) | 4 / 3 / 201 | ⚠ **FIRES — EXACTLY AT THRESHOLD** | ⚠ absent, on the boundary (added 192.2) |
 | [`frontend/src/components/workflows/WorkflowDoorSwitch.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentsworkflowsworkflowdoorswitchtsx) | 18 / 12 / 1075 | **FIRES** | honoured by construction (193 / 193.1 / 199 / **214**) — 214-13 added the service picker and its refusal as CHILDREN |
-| [`frontend/src/pages/WorkflowBuilderPage.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrcpagesworkflowbuilderpagetsx) | 58 / 23 / 2803 (was `57 / 22 / 2993`) | **FIRES** | **286-02** seam TAKEN: id-to-name maps + mount read → `useBuilderNameMaps.ts`; 8 copy constants → `builderCopy.ts` (page re-exports). `FLAG_OFF_HEADER_MARKUP` stayed; 288 lands by useDraftPersistence |
+| [`frontend/src/pages/WorkflowBuilderPage.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrcpagesworkflowbuilderpagetsx) | 60 / 25 / 2810 (was `58 / 23 / 2803`) | **FIRES** | **290-03** ONE prop (`team`) at the existing canvas call; `useState` unchanged (20). 286-02 seam TAKEN (`useBuilderNameMaps.ts`, `builderCopy.ts`) |
 | [`backend/app/api/workflows.py`](docs/HOT-FILE-LEDGER.md#backendappapiworkflowspy) | 46 / 24 / 1653 (was `45 / 23 / 1647`) | ⚠ **FIRES** | 295-02: `no_template_bound` added to `_INCOMPLETE_CODES` only (D-45 comment, +6 L, If 20→20). Honoured by construction; split still OWED (>1,500 L) |
 | [`backend/app/api/workflow_runs.py`](docs/HOT-FILE-LEDGER.md#backendappapiworkflow_runspy) | 18 / 13 / 1455 (was `17 / 12 / 1295`) | ⚠ **FIRES** | 295-05 OVER budget: +5 defs (name chain `waiting_who`, unsourced words, end-reason read), If 31→36, +160 L. Extraction FIRST next: the wording helpers |
 | [`backend/app/services/harness/phase_confidence.py`](docs/HOT-FILE-LEDGER.md#backendappservicesharnessphase_confidencepy) | 1 / 1 / 153 (was `0 / 0 / 0`) | no (young) | young (created 289-02). Pure confidence helper + wire allow-list + KB label read (duck-typed, never raises). ⛔ no provider import; chat's _compute_confidence only |
@@ -11523,7 +11523,7 @@ cells rot within days.
 | [`frontend/src/components/admin/ModelRegistryTab.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentsadminmodelregistrytabtsx) | 19 / 7 / 1705 (was `17 / 7 / 1679`) | ⚠ **FIRES** | honoured by construction (**282-01** help line; **282-04** ONE Timeout field in `AddModelForm`, placeholder = provider default, blank sends no key). `AddModelForm` seam OWED |
 | [`frontend/src/components/workflows/soulData.ts`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentsworkflowssouldatats) | 12 / 10 / 499 | ⚠ **FIRES** | honoured by construction (214 / **214.1**); ⚠ absent until 197, at 7 phases |
 | [`frontend/src/components/workflows/PublishGauntlet.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentsworkflowspublishgauntlettsx) | 21 / 11 / 1385 (was `20 / 10 / 1372`) | ⚠ **FIRES** | 288-02: ONE `auto-answered` block, server words verbatim; Pause stage copy corrected. honoured by construction |
-| [`frontend/src/components/workflows/PhaseSpineGraph.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentsworkflowsphasespinegraphtsx) | 8 / 6 / 723 (was `5 / 5 / 473`) | ⚠ **FIRES** | 286 forecast (290): ONE optional prop for labelled chips. honoured by construction (200) |
+| [`frontend/src/components/workflows/PhaseSpineGraph.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentsworkflowsphasespinegraphtsx) | 8 / 6 / 723 (was `5 / 5 / 473`) | ⚠ **FIRES** | 290: the 286 forecast went UNUSED (the chips went on the library card, UI-SPEC §9); file untouched. honoured by construction (200) |
 | [`frontend/src/components/workflows/phaseDuration.ts`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentsworkflowsphasedurationts) | 5 / 1 / 525 | no (1 phase) | young (200) |
 | [`frontend/src/components/workflows/receiptVocabulary.ts`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentsworkflowsreceiptvocabularyts) | 3 / 1 / 303 | no (1 phase) | young (200) |
 | [`frontend/src/components/workflows/RunReceipt.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentsworkflowsrunreceipttsx) | 3 / 1 / 241 | no (young) | young (200); does not fire (1 phase). **Phase 289 NOT EDITED**: the 286 forecast's chip went to StepEvidenceLine; the report never imports this file |
@@ -11977,12 +11977,12 @@ cells rot within days.
 | [`frontend/src/components/chat/CitedMarkdown.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentschatcitedmarkdowntsx) | 3 / 2 / 387 (was `2 / 1 / 294`) | no (2 phases) | 294-05: data-citation-ordinal + decorateMarkers (n must match); decorates in place on arrival. ⛔ the layout effect still owns innerHTML; verdicts via a ref |
 | [`frontend/src/components/chat/CitationList.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentschatcitationlisttsx) | 5 / 5 / 91 (was `4 / 3 / 73`) | ⚠ **FIRES** | 294-05: optional checkMessageId → ONE CitationCheckAction beside the trigger (+24 −6). Label and defaultOpen false unchanged. Extraction FIRST next |
 | [`frontend/src/components/chat/CitationPeek.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentschatcitationpeektsx) | 2 / 2 / 227 (was `1 / 1 / 189`) | no (2 phases) | 294-05: optional verdict → ONE section between passage and footer (+38). Absent → DOM unchanged |
-| [`frontend/src/components/workflows/teamModel.ts`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentsworkflowsteammodelts) | 0 / 0 / 0 | no (young) | young (planned 290-01). Pure `deriveTeam`: steps, gates, `lines[]` with source paths (D-11). ⛔ no React or `@/lib/api`; a jump ONLY for a resolvable skip; `own()` reads |
-| [`frontend/src/components/workflows/teamVocabulary.ts`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentsworkflowsteamvocabularyts) | 0 / 0 / 0 | no (young) | young (planned 290-01). Every team-picture string; zero-import leaf. ⛔ swept by `governanceVocabulary.test.ts`; step words never copied here (D-15) |
-| [`frontend/src/components/workflows/TeamPicture.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentsworkflowsteampicturetsx) | 0 / 0 / 0 | no (young) | young (planned 290-03). Read-only org chart over `deriveTeam`; one SVG line per `lines[]` item. ⛔ no focusable node, no xyflow, no raw HTML |
-| [`frontend/src/components/workflows/__fixtures__/teamFixtures.ts`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentsworkflows__fixtures__teamfixturests) | 0 / 0 / 0 | no (young) | young (planned 290-01). Planted 7-step stress, batch-20, malformed, grounded and armed shapes. ⛔ test-only, no I/O; `canvasFixtures` imported, never edited |
-| [`frontend/src/components/workflows/library/stepLine.ts`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentsworkflowslibrarysteplinets) | 0 / 0 / 0 | no (young) | young (planned 290-02). Pure `resolveStepLine(def)`: type-sentence chips in run order, first 3 + more, `null` at 0 steps. ⛔ in `LIBRARY_SUBTREE_PATHS` |
-| [`frontend/src/components/workflows/library/StepChipLine.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentsworkflowslibrarystepchiplinetsx) | 0 / 0 / 0 | no (young) | young (planned 290-02). The card's `row-steps` block; owns the one expand `useState`, so the card stays at 0. ⛔ no `title=` (F1); no `PhaseSpine` reuse |
+| [`frontend/src/components/workflows/teamModel.ts`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentsworkflowsteammodelts) | 2 / 1 / 403 (was `0 / 0 / 0`) | no (young) | young (created 290-01). Pure `deriveTeam`: steps, gates, `lines[]` with source paths (D-11). ⛔ no React or `@/lib/api`; a jump ONLY for a resolvable skip; `own()` reads |
+| [`frontend/src/components/workflows/teamVocabulary.ts`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentsworkflowsteamvocabularyts) | 1 / 1 / 202 (was `0 / 0 / 0`) | no (young) | young (created 290-01). Every team-picture string; zero-import leaf. ⛔ swept by `governanceVocabulary.test.ts`; step words never copied here (D-15) |
+| [`frontend/src/components/workflows/TeamPicture.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentsworkflowsteampicturetsx) | 1 / 1 / 470 (was `0 / 0 / 0`) | no (young) | young (created 290-03). Read-only org chart over `deriveTeam`; one SVG line per `lines[]` item. ⛔ no focusable node, no xyflow, no raw HTML |
+| [`frontend/src/components/workflows/__fixtures__/teamFixtures.ts`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentsworkflows__fixtures__teamfixturests) | 1 / 1 / 198 (was `0 / 0 / 0`) | no (young) | young (created 290-01). Planted 7-step stress, batch-20, malformed, grounded and armed shapes. ⛔ test-only, no I/O; `canvasFixtures` imported, never edited |
+| [`frontend/src/components/workflows/library/stepLine.ts`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentsworkflowslibrarysteplinets) | 2 / 1 / 74 (was `0 / 0 / 0`) | no (young) | young (created 290-02). Pure `resolveStepLine(def)`: type-sentence chips in run order, first 3 + more, `null` at 0 steps. ⛔ in `LIBRARY_SUBTREE_PATHS` |
+| [`frontend/src/components/workflows/library/StepChipLine.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentsworkflowslibrarystepchiplinetsx) | 2 / 1 / 110 (was `0 / 0 / 0`) | no (young) | young (created 290-02). The card's `row-steps` block; owns the one expand `useState`, so the card stays at 0. ⛔ no `title=` (F1); no `PhaseSpine` reuse |
 
 
 
@@ -23535,22 +23535,127 @@ Scan-list cell as of 2026-10-21 (replaced by 295-09, moved verbatim): 7 / 1 / 40
 
 **`0 / 0 / 0`** at 290 planning (2026-10-21). Young; row added AT PLANNING (the 273 precedent), so `check-hot-file-ledger.cjs 290` binds before the file exists. Created by **290-01** (TDD). The ONE pure derivation behind the team picture (D-11): `deriveTeam(phases, kbTools, nameContext)` returns the ordered steps, the gates (declared `validators[]` plus the two engine-added checks, D-17/D-18) and `lines[]`, each line carrying a `source` path into the definition. ⛔ **Inherited invariants:** no React and no `@/lib/api` import (the `cardFace.ts` leaf pattern, pinned by a `?raw` fence with a positive control); the ONLY step-to-step line is `kind: "jump"`, and it exists only when `parseSkipTarget(on_failure)` names a slug the definition has (D-09, D-10, SC#3); every keyed read goes through `own()` (WR-04); `technicalTitle` / `groundingCauseOf` are called only behind a `config`-is-an-object guard, because both read `phase.config` unguarded; the derived citations check exists only for `groundingCauseOf(...) === "detected"` (D-18, RESEARCH F-2), never for `escalated` or `already-set`; the run order is `canvasModel.ts`'s comparator (`phase_index`, then slug), so Steps and Team never disagree. Named `teamModel.ts` rather than RESEARCH's `teamPicture.ts`: on this Windows checkout `./TeamPicture` would resolve case-insensitively to `teamPicture.ts`. Does not fire.
 
+**Phase 290 close (290-04), 2026-10-21.** Measured `2 / 1 / 403` (the row read `0 / 0 / 0`). Created as the RED contract stub at `0aa1e9464`, implemented at `62dd59431` (GREEN, 243/243; the RED suite was not edited). 290-01 also recorded: an untyped step's technical form floors to `A step with no type · <slug>`; a present-but-invalid `max_parallel_agents` is sourced as `= <json> (engine default 5)`; a non-string `phase.name` is passed to `nodeTitle` as a copy with `name: undefined` (no mutation). ⚠ **Observation, not acted on** (`phaseVocabulary.ts` is G-5-firing): `nodeTitle` / `technicalTitle` read their maps by bracket lookup, so a `constructor` type returns a function, and `technicalTitle` / `groundingCauseOf` / `intersectingKbToolOf` throw on a step with no `config`. This module guards all four; the `malformed` fixture pins each guard. Pinned in the count gate at 290-04 (`teamModel.test.ts`).
+
+Scan-list cell as of 2026-10-21 (replaced by 290-04, moved verbatim): 0 / 0 / 0 | no (young) | young (planned 290-01). Pure `deriveTeam`: steps, gates, `lines[]` with source paths (D-11). ⛔ no React or `@/lib/api`; a jump ONLY for a resolvable skip; `own()` reads |
+
 ### `frontend/src/components/workflows/teamVocabulary.ts`
 
 **`0 / 0 / 0`** at 290 planning (2026-10-21). Young; row added AT PLANNING. Created by **290-01**. Every string the team picture and the `Steps | Team` switch render (UI-SPEC §3.6, with RESEARCH F-3 and F-5 applied): constants plus small total formatters (`orchestratorTitle`, `gateEyebrow`, `seatsLabel`, `failRedoThen`, `failJump`). ⛔ **Inherited invariants:** imports NOTHING (the `decisionsVocabulary.ts` zero-import leaf, asserted with positive controls), so the step words (`PHASE_TYPE_SENTENCES`) and `GOVERNANCE_SEAL_LABEL` are composed in `teamModel.ts`, never copied here (D-15, one vocabulary); `governanceVocabulary.test.ts` sweeps this file, so no retired badge string (`Must cite its sources`), banned word or overclaim phrase may appear; tests assert exact strings only. Does not fire.
+
+**Phase 290 close (290-04), 2026-10-21.** Measured `1 / 1 / 202` (the row read `0 / 0 / 0`). Created at `d8eb324f0` (290-01 Task 1). Its suite's value sweep needed a typing fix at `1103c9dcb` (the namespace widened to `Record<string, unknown>` before the type predicate; 3 tsc errors removed, runtime unchanged), test file only. `TEAM_NO_GATES` = "Nothing checks this work." is the string the D-20 report (`BUG-261021-05`) cites on an escalated step. Pinned in the count gate at 290-04 (`teamVocabulary.test.ts`).
+
+Scan-list cell as of 2026-10-21 (replaced by 290-04, moved verbatim): 0 / 0 / 0 | no (young) | young (planned 290-01). Every team-picture string; zero-import leaf. ⛔ swept by `governanceVocabulary.test.ts`; step words never copied here (D-15) |
 
 ### `frontend/src/components/workflows/TeamPicture.tsx`
 
 **`0 / 0 / 0`** at 290 planning (2026-10-21). Young; row added AT PLANNING. Created by **290-03**. The read-only org chart (D-08, sketch 290 winner A): a `<figure>` holding the orchestrator paragraph, an `<ol>` of steps and a nested `<ul>` of gates per step, plus one `aria-hidden` SVG layer with one path per `lines[]` item carrying `data-line-kind` and `data-line-source`. It owns the `useMemo(() => deriveTeam(...))`, so `WorkflowCanvas.tsx` gains no memo. Also exports the `Steps | Team` tablist the canvas header mounts. ⛔ **Inherited invariants:** no node is focusable or clickable and there is no xyflow instance (D-06: never a second canvas); author text renders as JSX text only (no `dangerouslySetInnerHTML`, fenced); `ResizeObserver` is guarded because jsdom has none; judges and checks get no glyph (icon convention §4, D-16). Does not fire.
 
+**Phase 290 close (290-04), 2026-10-21.** Measured `1 / 1 / 470` (the row read `0 / 0 / 0`). Created at `70aad7dd0` (290-03 Task 1 GREEN, after the RED `b2a3b2686`). Phase glyphs render through `createElement(Glyph, …)` (the `StepChipLine.tsx` idiom), because `react-hooks/static-components` rejects `<Glyph />` from a lookup. The ⌥ ledger renders after the `<figure>`, and its stroke samples carry no `data-line-kind`, so the drawn-line set stays exactly `lines[]`. It joined `CANVAS_SUBTREE_PATHS` (length 3 → 4). ⚠ **Outside 290-03's `files_modified`:** its `TeamViewSwitch` (`role="tab"`) became the second selectable-role carrier seen by `settings/__tests__/connectionVerbFence.test.ts`, which the count gate turned red. It is exempted by path as a reviewed carrier at `75160a9ed` (the 294-04 `RerankEngineBlock` precedent), with the needle and its positive control unchanged. That fence is a test file, so it needs no ledger row. Pinned in the count gate at 290-04 (`TeamPicture.test.tsx`).
+
+Scan-list cell as of 2026-10-21 (replaced by 290-04, moved verbatim): 0 / 0 / 0 | no (young) | young (planned 290-03). Read-only org chart over `deriveTeam`; one SVG line per `lines[]` item. ⛔ no focusable node, no xyflow, no raw HTML |
+
 ### `frontend/src/components/workflows/__fixtures__/teamFixtures.ts`
 
 **`0 / 0 / 0`** at 290 planning (2026-10-21). Young; row added AT PLANNING (`__fixtures__/` is NOT exempt from the ledger gate, measured by RESEARCH). Created by **290-01**. Hand-authored, test-only shapes that exist in no production definition (CONTEXT "Production definitions are small"): the 7-step all-types stress workflow with one judge carrying `config.criteria`, two checks and one resolvable `skip_to_phase`; batch with `max_parallel_agents: 20`; malformed (`constructor` type, unknown kind, `skip_to_phase:gone`, a phase with no `config`); grounded 3-step; armed step; production-shaped 2-step. ⛔ No I/O; `canvasFixtures.ts` is imported, never edited (it feeds many suites). Does not fire.
+
+**Phase 290 close (290-04), 2026-10-21.** Measured `1 / 1 / 198` (the row read `0 / 0 / 0`). Created at `d8eb324f0` (290-01 Task 1). One recorded change from the plan: `escalatedStep` is an `llm_agent` with `available_tools: ["web_search"]`, not an `llm_single`. `llm_single` is not a grounding-dial type, so its cause would be `null`, and D-18's "never for `escalated`" would have been asserted against a fixture that is never escalated. The suite asserts `groundingCauseOf(...) === "escalated"` as a positive control first. `canvasFixtures.ts` has an empty numstat against the phase base.
+
+Scan-list cell as of 2026-10-21 (replaced by 290-04, moved verbatim): 0 / 0 / 0 | no (young) | young (planned 290-01). Planted 7-step stress, batch-20, malformed, grounded and armed shapes. ⛔ test-only, no I/O; `canvasFixtures` imported, never edited |
 
 ### `frontend/src/components/workflows/library/stepLine.ts`
 
 **`0 / 0 / 0`** at 290 planning (2026-10-21). Young; row added AT PLANNING. Created by **290-02** (TDD). `resolveStepLine(def)` → `{ chips, shown, more } | null`: the card chip line's one value-only face decision (the `cardFace.ts` pattern). ⛔ **Inherited invariants:** chip words are `own(PHASE_TYPE_SENTENCES, type)`, with the raw type string as the only floor for a type outside the seven (D-04): never `phase.name`, never `PHASE_TYPE_LABELS`, never a slug; `Array.isArray` guard on `def.phases` (`defOf` is an unchecked cast); stable `phase_index` sort (the `PhaseSpine.tsx` idiom); `null` at zero steps so the card draws no empty row (D-01); joins `LIBRARY_SUBTREE_PATHS` in its creating commit. Does not fire.
 
+**Phase 290 close (290-04), 2026-10-21.** Measured `2 / 1 / 74` (the row read `0 / 0 / 0`). Created as the RED contract stub at `b663394ab` (which also added it to `LIBRARY_SUBTREE_PATHS`, length 15 → 17 with `StepChipLine.tsx`, read off the failing diff) and implemented at `2d32103a5` (GREEN; neither test file edited between the two). A non-number or non-finite `phase_index` sorts as 0; entries that are not objects are skipped, and `null` is returned if none remain. Pinned in the count gate at 290-04 (`stepLine.test.ts`; 290-02 left it unpinned).
+
+Scan-list cell as of 2026-10-21 (replaced by 290-04, moved verbatim): 0 / 0 / 0 | no (young) | young (planned 290-02). Pure `resolveStepLine(def)`: type-sentence chips in run order, first 3 + more, `null` at 0 steps. ⛔ in `LIBRARY_SUBTREE_PATHS` |
+
 ### `frontend/src/components/workflows/library/StepChipLine.tsx`
 
 **`0 / 0 / 0`** at 290 planning (2026-10-21). Young; row added AT PLANNING. Created by **290-02**. The card's `data-testid="row-steps"` block: an `<ol>` of glyph + type-sentence pills joined by `→`, then `+N more` / `Show less` outside the clipped track (D-03). It OWNS the one expand `useState` (the `FieldGuidance.tsx` pattern), so `WorkflowCard.tsx` stays at 0 `useState` ("290 adds faces, not state"). ⛔ **Inherited invariants:** no JSX `title` attribute (the library F1 fence, RESEARCH F-1); does not reuse `PhaseSpine` or `WorkflowSoul` (that re-emits the cut `soul-spine` testid and changes `StarterTemplatePicker.tsx` / `WorkflowDoorSwitch.tsx`); every string from `libraryVocabulary.ts`; joins `LIBRARY_SUBTREE_PATHS` in its creating commit. Does not fire.
+
+**Phase 290 close (290-04), 2026-10-21.** Measured `2 / 1 / 110` (the row read `0 / 0 / 0`). Created as the RED contract stub at `b663394ab`, implemented at `2d32103a5`. The glyph renders through `createElement(Glyph, { className: "h-4 w-4 flex-none", "aria-hidden": true })` rather than JSX, because `react-hooks/static-components` rejects a component variable resolved during render (the `ArtifactBlock.tsx` precedent; same DOM). The toggle is named "Show N more steps" and carries `aria-expanded`; the `→` joiner stays in the expanded state, so the toggle does not move. Pinned in the count gate at 290-04 (`StepChipLine.test.tsx`; 290-02 left it unpinned).
+
+Scan-list cell as of 2026-10-21 (replaced by 290-04, moved verbatim): 0 / 0 / 0 | no (young) | young (planned 290-02). The card's `row-steps` block; owns the one expand `useState`, so the card stays at 0. ⛔ no `title=` (F1); no `PhaseSpine` reuse |
+
+### `frontend/src/components/workflows/WorkflowCanvas.tsx` — Phase 290 (290-03)
+
+**`32 / 10 / 1744` (was `31 / 9 / 1708`), re-derived 2026-10-21 by 290-04.** 290-03 added the `Steps | Team` switch and the read-only Team view. Against the phase base `1f9673d25` the numstat is +40 / −4 (net +36; 290-03-SUMMARY recorded +39 / −3). `useState` went from 8 to 9, `useMemo` stayed at 8 (the team memo lives in `TeamPicture.tsx`), and there are two new imports (`TeamPicture, TeamViewSwitch`; `TEAM_HEADER_HINT`). **The six budget items spent** (line numbers at HEAD `ed9792704`):
+
+1. An optional prop `team?: { workflowName: string }`, docblocked and destructured after `session` (`:668`, `:688`).
+2. `const [view, setView] = useState<"steps" | "team">("steps")` (`:1155`).
+3. `const teamShown = team !== undefined && view === "team"` (`:1156`).
+4. The keyboard reorder effect gets `|| teamShown` in its early return and `teamShown` in its deps (RESEARCH F-6, T-290-11) (`:1160`, `:1216`).
+5. Header: `editable && !teamShown` on the left-side ternary, the mode line swapped to `TEAM_HEADER_HINT` when `teamShown`, and one gated `{team ? <TeamViewSwitch …/> : null}` before the ⌥ toggle (`:1269`, `:1284`, `:1289`).
+6. One early return `if (teamShown)` mounting `<TeamPicture>` under `{header}`, placed before the empty-draft return, with every hook above it (`:1407-1419`).
+
+**Against the 286 forecast:** the forecast said "a separate read-only view (VIS-01: never a second canvas); at most one gated mount". That was met. The view is a separate module with no xyflow instance, and the canvas holds one gated mount plus one early return. It also spent **one hook and one branch** on top of the mount. ⛔ **So the NEXT concern in this file must propose the extraction FIRST** (the header-and-mode block is the natural seam: `{header}` plus the view switch plus the mode line) rather than absorb it. The run page passes no `team`, so it shows no switch. Its header is byte-identical to the 290-01 characterization pin (`__tests__/WorkflowCanvas.headerPin.test.tsx`, 6 snapshots; empty numstat across 290-03). `WorkflowCanvas.test.tsx` changed by +3 / −1 (`CANVAS_SUBTREE_PATHS` gains `./TeamPicture.tsx`, length pin 3 → 4); every existing canvas fence stayed green over the added source.
+
+CLAUDE.md verdict cell as of 2026-10-21 (replaced by 290-04):
+
+> 286 forecast: 290 team picture is a separate view; ≤ 1 gated mount
+
+Scan-list disposition cell as of 2026-10-21 (replaced by 290-04):
+
+> 286 forecast (290): the team picture is a SEPARATE read-only view (VIS-01: never a second canvas); at most ONE gated mount here. honoured by construction (199 / 200 / 214)
+
+### `frontend/src/pages/WorkflowBuilderPage.tsx` — Phase 290 (290-03)
+
+**`60 / 25 / 2810` (was `59 / 24 / 2808` in CLAUDE.md; the scan list still read `58 / 23 / 2803`, stale since 288), re-derived 2026-10-21 by 290-04.** 290-03 spent +2 / −0: one comment, and `team={{ workflowName: … }}` built inline from `meta` at the existing `<WorkflowCanvas>` call (`:2080`). It falls back to `meta.slug` and then "Untitled workflow". `useState` is unchanged at 20, with no new hook, branch or import. The page seam286 pin (`pages/__tests__/WorkflowBuilderPage.seam286.pin.test.tsx`) and `WorkflowBuilderPage.canvas.test.tsx` both pass unedited. The two pages `.snap` files are not part of 290's diff. ⛔ The 288-01 constraints recorded in this file's earlier sections still bind.
+
+CLAUDE.md verdict cell as of 2026-10-21 (replaced by 290-04):
+
+> 288-01: ONE prop at the existing card call · ⛔
+
+Scan-list disposition cell as of 2026-10-21 (replaced by 290-04):
+
+> **286-02** seam TAKEN: id-to-name maps + mount read → `useBuilderNameMaps.ts`; 8 copy constants → `builderCopy.ts` (page re-exports). `FLAG_OFF_HEADER_MARKUP` stayed; 288 lands by useDraftPersistence
+
+### `frontend/src/components/workflows/library/WorkflowCard.tsx` — Phase 290 (290-02)
+
+**`23 / 9 / 1361` (was `22 / 8 / 1354`), re-derived 2026-10-21 by 290-04.** 290-02 spent +7 / −0: one import, one derived value `const stepLine = resolveStepLine(row.def)` (`:951`) and one gated block `{stepLine && <StepChipLine line={stepLine} />}` (`:1188`). No state, no prop. `useState` is **still 0**, so "290 adds faces, not state" (286-04's own forecast) held. The expand state lives in `StepChipLine.tsx`. **Tests moved by decision:** seven child-order pins in `WorkflowCard.test.tsx` shift by one, because `row-steps` now sits at column child index 2 and identity moves to 3. Each carries a `// 290-02:` comment and the test titles are unchanged. Three content cases were added (`describe("290-02 — the card's chip line (row-steps)")`). The card seam286 `.snap` (`library/__tests__/__snapshots__/WorkflowCard.seam286.pin.test.tsx.snap`) was re-captured, and a scripted check showed the ONLY change is one inserted `row-steps` block per resting snapshot (5 blocks removed → byte-identical to the pre-change file). `WorkflowCard.baseline.test.tsx` (29) is unedited. The 286-04 unmasked compiler lint covered the new lines, and eslint is clear on them.
+
+CLAUDE.md verdict cell as of 2026-10-21 (replaced by 290-04):
+
+> seam TAKEN (286-04): ⋯ menu + armed delete → WorkflowCardMenu
+
+Scan-list disposition cell as of 2026-10-21 (replaced by 290-04):
+
+> **286-04** seam TAKEN (named 3×): ⋯ menu + armed draft delete → `WorkflowCardMenu.tsx`; card holds 0 `useState`, drawing only. ⚠ compiler lint now covers the whole card
+
+### `frontend/src/components/workflows/library/libraryVocabulary.ts` — Phase 290 (290-02)
+
+**`12 / 6 / 802` (was `11 / 5 / 766`), re-derived 2026-10-21 by 290-04.** 290-02 spent +36 / −0, all of it data: six `STEP_LINE_` entries (`STEP_LINE_LABEL` "Steps, in run order", `STEP_LINE_JOINER` "→", `stepLineMore(n)`, `stepLineMoreLabel(n)`, `STEP_LINE_LESS` "Show less", `STEP_LINE_UNTYPED` "A step with no type"; `:782-802`). The two formatters are total one-liners and there is no other logic. No `PHASE_TYPE_SENTENCES` value is copied in (chip words are read through `own()` in `stepLine.ts`). The 286 forecast ("chip labels are vocabulary entries (data), no logic") was met exactly. No seam proposed.
+
+CLAUDE.md verdict cell as of 2026-10-21 (replaced by 290-04):
+
+> 286 forecast: 290 chip labels are vocabulary entries (data), no logic
+
+Scan-list disposition cell as of 2026-10-21 (replaced by 290-04):
+
+> 286 forecast (290): chip labels are added as vocabulary ENTRIES (data), no logic. No seam proposed
+
+### `frontend/src/components/workflows/PhaseSpineGraph.tsx` — Phase 290: forecast unused
+
+**`8 / 6 / 723` (unchanged; re-derived 2026-10-21 by 290-04).** The 286 forecast ("290 adds one optional prop for labelled chips") went **unused**. The chips went on the library card (`library/StepChipLine.tsx`, UI-SPEC §9), not on the spine graph, and the file has an empty diff across Phase 290 (scope fence (d) in `290-04-GATES.md`). Nothing was spent here, so the forecast lapses. A later phase that wants labelled chips on the spine starts from this file's earlier sections, not from 290.
+
+CLAUDE.md verdict cell as of 2026-10-21 (replaced by 290-04):
+
+> 286 forecast: 290 adds one optional prop for labelled chips
+
+Scan-list disposition cell as of 2026-10-21 (replaced by 290-04):
+
+> 286 forecast (290): ONE optional prop for labelled chips. honoured by construction (200)
+
+### `frontend/src/components/workflows/PhaseNodeCard.tsx` — Phase 290: forecast unused
+
+**`18 / 9 / 490` (unchanged; re-derived 2026-10-21 by 290-04).** The 286 forecast ("290 adds one prop; chip words from libraryVocabulary") went **unused**. The chip line lives on the library card, and the canvas node face is unchanged: empty diff across Phase 290 (scope fence (d) in `290-04-GATES.md`). The canvas seal this file mounts (`NodeCornerMarks`) is one half of the escalated-seal drift filed as `BUG-261021-05` (D-20), which was filed and NOT fixed. ⚠ The 200 canvas port stays REVERTED.
+
+CLAUDE.md verdict cell as of 2026-10-21 (replaced by 290-04):
+
+> 286 forecast: 290 adds one prop; chip words from libraryVocabulary
+
+Scan-list disposition cell as of 2026-10-21 (replaced by 290-04):
+
+> 286 forecast (290): ONE prop; the chip words come from `libraryVocabulary`, never literals here. honoured by construction (199) — ⚠ the 200 canvas port stays REVERTED
