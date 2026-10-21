@@ -254,7 +254,7 @@ describe("teamVocabulary — a TRUE LEAF that carries no step sentence and no se
       tok("Produce the ", "deliverable"),
       tok("Must prove ", "it"),
     ]
-    const values = Object.values(teamVocabulary).filter(
+    const values = Object.values(teamVocabulary as Record<string, unknown>).filter(
       (v): v is string => typeof v === "string",
     )
     const kindWords = Object.values(GATE_KIND_WORDS)
