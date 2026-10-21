@@ -683,3 +683,71 @@ def test_wr06_the_pause_passes_the_runs_org():
             produced_output={"text": "t", "citations": []}, is_pre=False,
         ))
     assert seen and str(seen[0].get("org_id")) == ORG_A
+
+
+# ═════════════════════════════════════════════════════════════════════════════════════════
+# WR-07 — the second pause write can never flip a re-driven (running) run back to paused
+# ═════════════════════════════════════════════════════════════════════════════════════════
+def _drive_engine_pause_through_run_workflow(*, answer_lands_in_the_gap: bool):
+    """``run_workflow`` over ONE step whose gate pauses through the REAL ``engine_pause``.
+    ``answer_lands_in_the_gap`` re-drives the run (paused → active, a fresh claim) the moment
+    the live card is emitted — i.e. after ``engine_pause`` wrote the pause and before the
+    engine's pause arm runs. Returns the run's final status and the run_paused emits."""
+    from contextlib import ExitStack
+
+    from app.services import harness_engine
+    from app.services.harness import engine_ask
+    from tests.unit.engine_ask_fakes import World
+    from tests.unit.test_295_truthful_run_ends import _definition
+    from tests.unit.test_scheduler_circuit_breaker import _FakeRedis, _RecordingPool, _rows
+
+    state = {"status": "active", "pause_writes": 0}
+
+    async def _pause_run(pool, run_id):  # the shipped SQL's semantics: NOT IN terminal
+        state["pause_writes"] += 1
+        if state["status"] not in ("completed", "failed", "cancelled"):
+            state["status"] = "paused"
+
+    world = World("p0", kb_label="Contracts")
+
+    async def _emit(redis, stream_id, event, **kw):
+        world.events.append(("emit", world.tick(), event, kw))
+        if event == "ask_user_prompt" and answer_lands_in_the_gap:
+            state["status"] = "active"  # resume_run + claim_run: the re-drive is RUNNING
+
+    async def _gates(phase, accumulated, ctx, *, run_id, pool, redis, **_kw):
+        return await engine_ask.engine_pause(
+            phase, kind="no_sources", error_message="citations_required: planted",
+            produced_output={"text": "t", "citations": []}, failed_idx=0, run_id=run_id,
+            pool=pool, redis=redis, ctx=ctx, _audit_user_id=None,
+        )
+
+    definition = _definition(validators=[], phases=1)
+    run_id = uuid4()
+    ctx = world.ctx(definition=None, run_id=run_id, emit=_emit)
+    with ExitStack() as stack:
+        world.enter(stack, emit=False)
+        for p in (
+            patch.object(engine_ask, "pause_run", _pause_run),
+            patch.object(engine_ask, "_emit", _emit),
+            patch.object(harness_engine, "pause_run", _pause_run),
+            patch.object(harness_engine, "_emit", _emit),
+            patch.object(harness_engine, "_run_phase_with_gates", _gates),
+        ):
+            stack.enter_context(p)
+        asyncio.run(harness_engine.run_workflow(
+            run_id, definition, ctx, pool=_RecordingPool(rows=_rows(1)), redis=_FakeRedis(),
+        ))
+    return state, world.emits("run_paused")
+
+
+def test_wr07_an_answer_in_the_gap_is_not_flipped_back_to_paused():
+    state, _paused = _drive_engine_pause_through_run_workflow(answer_lands_in_the_gap=True)
+    assert state["status"] == "active", "the second pause write flipped a running re-drive"
+    assert state["pause_writes"] == 1, "the engine ask's pause must be the only pause write"
+
+
+def test_wr07_without_an_answer_the_run_is_paused_and_says_so():
+    state, paused = _drive_engine_pause_through_run_workflow(answer_lands_in_the_gap=False)
+    assert state["status"] == "paused"
+    assert len(paused) == 1, "the pause arm still announces the pause"
