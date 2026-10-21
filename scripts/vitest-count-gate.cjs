@@ -194,7 +194,7 @@ const BASELINE = {
   "RunEndReasonLine.test.tsx": 13,
   "AskFolderChoice.test.tsx": 7,
   "enginePause.test.ts": 17,
-  "threads.engineAsk.test.ts": 2,
+  "threads.engineAsk.test.ts": 4, // 295-08 WR-04: 2 -> 4 (answerAskUser reads the refusal detail)
   // Phase 294-04 (DEC-01) — the engine cards and the engine-id parity fence. 294-04 left them
   // un-adopted (handover); adopted here, measured green on a run of the two suites alone.
   "RerankEngineBlock.test.tsx": 25,  // 294-REVIEW WR-04: +1, a cleared Keep at most never reports 0
@@ -1409,7 +1409,10 @@ const BASELINE = {
   // on the skip branch), and did the same to a `failed` row and to an unnameable one. Four
   // of the five were observed RED; the fifth is the positive control that a genuinely
   // completed row below the cursor is unaffected.
-  "PhaseReconcile.test.tsx": 19,
+  // 295-08 (SEED-361): 19 → 28. The pin had sat at 19 while the file ran 26; 295-08 adds two
+  // cases (reconcilePhases records the run status: `paused` for a paused run, null once the
+  // anchor is gone), both observed RED. Raised to the measured 28 so the new cases are guarded.
+  "PhaseReconcile.test.tsx": 28,
   // ── 188-12: the four suites Phase 188 CREATED (or deliberately adopted), pinned now. ──
   // Each was put into TARGETS by the plan that created it — in the same commit, because an
   // entry pointing at a not-yet-existing path makes the gate ERROR (exit 2) rather than fail —
@@ -4322,6 +4325,8 @@ const BASELINE = {
   // in one commit. Counts are the per-file actuals from a focused `--reporter=json` run at
   // `GSD_VITEST_MAX_WORKERS=2`, never hand-counted. The three `src/components/workflows` suites
   // are inside that DIRECTORY entry and need a pin only; the other four are FILE-LEVEL below.
+  // 295-08 (SEED-361) — a paused run's ask stays answerable in the chat thread; guard both ways.
+  "PendingAskStack.pausedRun.test.tsx": 11, // 295-08 WR-04: 7 -> 11 (engine ask has no free text; a refusal keeps its words)
   "PendingAskCard.paused.test.tsx": 6, // 289-REVIEW CR-02: 4 -> 6 (pending -> expired -> paused re-render, 404 stays terminal). 289-01 — the paused card keeps its answer control
   "StepEvidenceLine.test.tsx": 15, // 289-02 — the KB evidence line or nothing
   "evidenceView.test.ts": 31, // 289-REVIEW WR-03: 29 -> 31 (final-attempt Checks fact, timed-out kind). 289-04 — payload to view-model, privacy applied twice
@@ -6324,6 +6329,8 @@ const TARGETS = [
   // Phase 289-05 — FILE-LEVEL (no `src/lib` or `src/components/panel` directory entry), in the
   // SAME commit as their BASELINE pins.
   "src/components/panel/__tests__/PendingAskCard.paused.test.tsx",
+  // Phase 295-08 — FILE-LEVEL, SAME commit as its BASELINE pin.
+  "src/components/panel/__tests__/PendingAskStack.pausedRun.test.tsx",
   "src/lib/runDeepLink.test.ts",
   "src/lib/api/runEvidence.test.ts",
   "src/lib/api/__tests__/runEvidence.contract.test.ts",

@@ -3,15 +3,15 @@ seed_id: SEED-361
 title: The chat panel's PendingAskStack cannot tell a paused workflow run, so its card stays countdown-driven ("agent stopped") while the run page offers the answer
 created: 2026-10-19
 surface: Agentic-RAG
-status: open
+status: folded
 partial: false
-status_note: "TRIGGER FIRED IN PHASE 295 and was not routed at discuss: 295-05 and 295-06 named StreamsProvider.tsx and PendingAskCard.tsx. Measured live by 295-07 (2026-10-21): since 295-03 made every engine ask a durable pause, the chat panel card for a paused found-nothing or approval ask reads RETIRED 'The run was stopped, so this question no longer needs an answer' with Send disabled (runs 3ec118a2, 108bb381). Cause: PendingAskCard.tsx:897 derives runIsOver = workflowLock == null && phases.length > 0, and the client seeds the lock only when locked && !lock_is_stale (StreamsProvider.tsx:2536, ChatArea.tsx:380); a durable pause has no live producer, so lock_is_stale is true. Proposed: /gsd:fast with a RED test (one derived conjunct reading run_status paused / cap_paused). 295-VALIDATION.md S1."
+status_note: "FOLDED INTO 295 by gap round 1 (295-08, 2026-10-21): RED 14ffe7c2f, GREEN a2866c3ea. reconcilePhases records run_status in ONE store field (workflowRunStatusByThread); PendingAskStack derives paused and runIsOver is false while the run is paused; paused is passed to the card. Owed before closed: the live re-drive of 295-VALIDATION.md S1 in the chat panel after merge. Earlier note: TRIGGER FIRED IN PHASE 295 and was not routed at discuss: 295-05 and 295-06 named StreamsProvider.tsx and PendingAskCard.tsx. Measured live by 295-07 (2026-10-21): since 295-03 made every engine ask a durable pause, the chat panel card for a paused found-nothing or approval ask reads RETIRED 'The run was stopped, so this question no longer needs an answer' with Send disabled (runs 3ec118a2, 108bb381). Cause: PendingAskCard.tsx:897 derives runIsOver = workflowLock == null && phases.length > 0, and the client seeds the lock only when locked && !lock_is_stale (StreamsProvider.tsx:2536, ChatArea.tsx:380); a durable pause has no live producer, so lock_is_stale is true. Proposed: /gsd:fast with a RED test (one derived conjunct reading run_status paused / cap_paused). 295-VALIDATION.md S1."
 trigger_when: "The next phase whose files_modified names frontend/src/providers/StreamsProvider.tsx or frontend/src/stores/streamsStore.ts; or any report that a paused workflow run's chat-panel card says 'agent stopped'."
 trigger_paths: ["frontend/src/providers/StreamsProvider.tsx", "frontend/src/stores/streamsStore.ts", "frontend/src/components/panel/PendingAskCard.tsx"]
 trigger_surfaces: ["panel", "workflow"]
 migration_note:
 relates_to: ["SEED-360", ".planning/phases/289-the-run-page-and-its-evidence/289-01-SUMMARY.md (## Named gap: PendingAskStack)", ".planning/phases/289-the-run-page-and-its-evidence/289-VALIDATION.md"]
-folded_into: null
+folded_into: "295"
 renumbered_from: null
 renumbered_because: null
 ---

@@ -1504,8 +1504,12 @@ export async function answerAskUser(
     body: JSON.stringify(body),
     signal,
   })
-  if (!res.ok) throw new ApiError("Failed to submit ask_user answer", res.status)
+  // 295-08 (WR-04): the server's own refusal sentence rides the error; the constant only without one.
+  if (!res.ok) await throwThreadRefusal(res, ASK_ANSWER_FAILED)
 }
+
+/** The client's message for a refused answer the server gave no sentence for (295-08 / WR-04). */
+export const ASK_ANSWER_FAILED = "Failed to submit ask_user answer"
 
 /** Phase 063 (D-063-03): server-side Stop. DELETE /runs/{runId} cancels the
  * producer; the terminal sentinel arrives via the open SSE subscription;

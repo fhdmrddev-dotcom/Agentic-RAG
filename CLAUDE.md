@@ -412,7 +412,7 @@ node scripts/check-hot-file-ledger.cjs <phase-dir>   # 0 clear · 1 missing rows
 | `frontend/src/components/chat/MessageItem.tsx` | 82 / 38 / 1040 (was `81 / 38 / 1037`) | BUG-261020-04: +1 hook feeds both citation mounts (+5 −2) |
 | `frontend/src/components/chat/CitationList.tsx` | 5 / 5 / 91 | 294-05: ONE CitationCheckAction beside the trigger · extraction FIRST |
 | `backend/app/api/threads.py` | 273 / 92 / 2567 (was `271 / 91 / 2544`) | 295-05: unsourced kwarg + lazy name lookup (+1 If) · ⛔ |
-| `frontend/src/providers/StreamsProvider.tsx` | 110 / 43 / 5006 (was `109 / 42 / 5004`) | 295-05: ONE field per row mapper · honoured by construction · ⛔ |
+| `frontend/src/providers/StreamsProvider.tsx` | 111 / 43 / 5009 (was `110 / 43 / 5006`) | 295-08: ONE run_status write, no fetch · ⛔ |
 | `frontend/src/hooks/useMessages.ts` | 74 / 27 / 127 | extraction due |
 | `backend/app/services/anthropic_service.py` | 12 / 11 / 373 (was `11 / 10 / 354`) | honoured by construction (282-01: constructor kwargs) · adapter audit due |
 | `backend/app/services/embedding_service.py` | 9 / 5 / 354 | ⚠ absent for its entire life at 5 phases — row added 236 (SC#2) |
@@ -464,11 +464,11 @@ node scripts/check-hot-file-ledger.cjs <phase-dir>   # 0 clear · 1 missing rows
 | `frontend/src/components/chat/ActiveConnectorChips.tsx` | 2 / 2 / 82 | ⚠ absent its ENTIRE LIFE — row added 244-05 |
 | `frontend/src/components/chat/MessageList.tsx` | 24 / 11 / 376 | ⚠ STALE · last touch 267-04 |
 | `frontend/src/components/chat/ChatArea.tsx` | 94 / 44 / 1189 (was `93 / 43 / 1186`) | honoured by construction (287-03: ONE mount, 0 hooks) · ⛔ |
-| `frontend/src/stores/streamsStore.ts` | 24 / 16 / 607 (was `22 / 14 / 572`) | honoured by construction (287-03: ONE type field) · ⛔ |
+| `frontend/src/stores/streamsStore.ts` | 25 / 17 / 626 (was `24 / 16 / 607`) | 295-08: ONE field + its one writer, no action · ⛔ |
 | `frontend/src/components/chat/ThreadWorkflowPicker.tsx` | 1 / 1 / 91 | young (created 287-03) · reads no conversation · ⛔ |
 | `frontend/src/components/chat/useStartWorkflowInThread.ts` | 1 / 1 / 85 | young (created 287-03) · no createThread · ⛔ |
 | `frontend/src/lib/toolMeta.ts` | 10 / 6 / 218 | ⚠ absent its ENTIRE LIFE — row added 244-13 · ⛔ |
-| `frontend/src/components/panel/PendingAskCard.tsx` | 20 / 11 / 1080 (was `19 / 10 / 1052`) | 295-06: one read + one mount, no new hook · honoured by construction |
+| `frontend/src/components/panel/PendingAskCard.tsx` | 22 / 11 / 1095 (was `21 / 11 / 1086`) | 295-08: paused not over; engine ask: choices only |
 | `frontend/src/pages/WorkflowRunPage.tsx` | 33 / 13 / 1594 (was `31 / 12 / 1580`) | 289-04: ONE early return → evidence report; no new hook · ⛔ |
 | `frontend/src/components/workflows/WaitingOnLine.tsx` | 1 / 1 / 26 | young (created 288-03) · leaf, no hook · ⛔ |
 | `frontend/src/components/chat/OutputFileCard.tsx` | 8 / 7 / 219 | honoured by construction (195) |
@@ -481,7 +481,7 @@ node scripts/check-hot-file-ledger.cjs <phase-dir>   # 0 clear · 1 missing rows
 | `backend/app/api/settings.py` | 44 / 23 / 1159 (was `41 / 21 / 1048`) | honoured by construction (294-04: ONE rerank_provider refusal) · ⛔ |
 | `backend/app/services/multimodal_service.py` | 14 / 7 / 984 | ⚠ absent from BOTH for its ENTIRE LIFE at **7 phases** |
 | `backend/app/api/documents.py` | 99 / 39 / 2698 (was `97 / 38 / 2653`) | honoured by construction (285-03: enqueue-fail → doc failed, 201) · ⛔ |
-| `scripts/vitest-count-gate.cjs` | 319 / 73 / 6596 (was `317 / 72 / 6568`) | 294-05: 9 suites adopted, 1 pin raised (row was stale) |
+| `scripts/vitest-count-gate.cjs` | 325 / 74 / 6619 (was `324 / 74 / 6619`) | 295-08: 1 suite adopted, 2 pins raised |
 | `scripts/check-deploy-drift.sh` | 5 / 4 / 267 | ⚠ absent its ENTIRE LIFE — row added 294-05 · fault var omitted |
 | `scripts/build-public-openapi.cjs` | 7 / 3 / 468 | ⚠ now FIRES (294) · 294-03: citation_checks tag (one line) |
 | `backend/app/services/eval_runner_service.py` | 13 / 8 / 1040 | ⚠ STALE · last touch 256-03 |
@@ -531,7 +531,7 @@ node scripts/check-hot-file-ledger.cjs <phase-dir>   # 0 clear · 1 missing rows
 | `backend/app/services/workflow_kickoff.py` | 10 / 8 / 585 (was `8 / 6 / 554`) | 295-02: run-start refusal before any write (If 13→15) |
 | `frontend/src/components/workflows/WorkflowScheduleModal.tsx` | 3 / 3 / 601 | ⚠ absent for its entire life; it crossed the threshold in 214-09 on a  |
 | `frontend/src/components/workflows/nodePresentation.ts` | 8 / 7 / 221 | ⚠ absent from BOTH for its ENTIRE LIFE at **7 phases** |
-| `frontend/src/lib/api/threads.ts` | 20 / 12 / 1975 (was `16 / 10 / 1935`) | 295-05: one mapper field (unsourced) |
+| `frontend/src/lib/api/threads.ts` | 21 / 12 / 1979 (was `20 / 12 / 1975`) | 295-08: answerAskUser keeps the server's refusal words |
 | `frontend/src/lib/api/connectors.ts` | 17 / 11 / 740 | honoured by construction (244-06) · ⛔ |
 | `frontend/src/lib/api/workflows.ts` | 11 / 11 / 1141 (was `10 / 10 / 1129`) | 295-05: two optional fields, no behaviour |
 | `frontend/src/lib/connectionMark.tsx` | 7 / 4 / 313 | ✅ **the move IS the seam, and it was TAKEN (214-08)** |

@@ -13,7 +13,8 @@ vi.mock("@/lib/api/_core", async (importActual) => {
   return { ...actual, API_BASE: "http://api.test", getAuthHeaders: vi.fn().mockResolvedValue({}) }
 })
 
-import { subscribeToRun, type StreamCallbacks } from "@/lib/api/threads"
+import { ASK_ANSWER_FAILED, answerAskUser, subscribeToRun, type StreamCallbacks } from "@/lib/api/threads"
+import { ApiError } from "@/lib/api/_core"
 import type { EnginePause, PendingAsk } from "@/types"
 
 function mockSseFetch(chunks: string[]) {
@@ -72,5 +73,32 @@ describe("ask_user_prompt SSE — engine_pause rides the mapper (295-05)", () =>
     const ask = await drive({ tool_call_id: "t2", prompt: "Approve?", options: ["Yes"], timeout_seconds: 300 })
     expect(ask.engine_pause).toBeUndefined()
     expect(ask.timeout_seconds).toBe(300)
+  })
+})
+
+// 295-08 (WR-04): a refused answer carries the server's own sentence, never only the status.
+describe("answerAskUser — a refusal keeps the server's words (295-08 / WR-04)", () => {
+  const BODY = { tool_call_id: "t1", response_text: "typed", choice_index: null }
+
+  it("a 422 with a string detail rejects with that sentence and the status", async () => {
+    const detail = "That choice is not one this question offers."
+    vi.stubGlobal(
+      "fetch",
+      vi.fn().mockResolvedValue({ ok: false, status: 422, json: () => Promise.resolve({ detail }) }),
+    )
+    const err = await answerAskUser("run-1", BODY).catch((e: unknown) => e)
+    expect(err).toBeInstanceOf(ApiError)
+    expect((err as ApiError).status).toBe(422)
+    expect((err as ApiError).message).toBe(detail)
+  })
+
+  it("a refusal with no readable body keeps the client's constant", async () => {
+    vi.stubGlobal(
+      "fetch",
+      vi.fn().mockResolvedValue({ ok: false, status: 500, json: () => Promise.reject(new Error("no body")) }),
+    )
+    const err = await answerAskUser("run-1", BODY).catch((e: unknown) => e)
+    expect((err as ApiError).status).toBe(500)
+    expect((err as ApiError).message).toBe(ASK_ANSWER_FAILED)
   })
 })
