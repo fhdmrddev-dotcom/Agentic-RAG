@@ -1,7 +1,8 @@
 ---
 phase: 290
 slug: the-card-and-the-team-picture
-status: draft
+status: approved
+reviewed_at: 2026-10-21
 shadcn_initialized: true
 preset: none (components.json style "default", baseColor "slate", iconLibrary "lucide"; no preset string)
 created: 2026-10-21
@@ -140,7 +141,7 @@ Light mode: use the tokens above, never the sketch's dark-only `hsl(...)` litera
 - Structure: an `<ol aria-label="Steps, in run order">` holding the chips as `<li>`, followed by the `+N more` button as a separate, non-shrinking element. The `→` joiners are `aria-hidden`.
 - Layout: `mt-2 flex items-center gap-1 min-w-0`. The chip track is `flex min-w-0 flex-1 items-center gap-1 overflow-hidden flex-nowrap`. The `→ +N more` pair is `flex-none` and sits **outside** the clipped track, so it can never be cut off, including at 375px.
 - Order: steps sorted by `phase_index` ascending (ties keep array order). The first **3** show (D-03).
-- Chip: `inline-flex min-w-0 max-w-[170px] items-center gap-1 rounded-full border border-border bg-muted/40 py-0.5 pl-1 pr-2 text-[12px] leading-4 text-foreground`.
+- Chip: `inline-flex min-w-0 max-w-[168px] items-center gap-1 rounded-full border border-border bg-muted/40 py-0.5 pl-1 pr-2 text-[12px] leading-4 text-foreground`.
   - Glyph: the `phaseGlyph(phase_type)` component at 16×16, `aria-hidden`. An unknown type renders **no glyph** (no `•`, no emoji).
   - Words: `PHASE_TYPE_SENTENCES[phase_type]`, truncated with an ellipsis inside the chip (`truncate`). **Never** `phase.name`, never `nodeTitle()`, never `PHASE_TYPE_LABELS`, never the slug or the raw type id (D-04). The only exception is a `phase_type` outside the closed set of 7: it echoes its raw string, which is the shipped `nodeTitle` floor and the honest answer for a type this client does not know.
   - Each chip also carries `title={words}` as a desktop convenience. It is never the only carrier of the words.
@@ -244,7 +245,7 @@ A value-only module (no React, no API import; the `cardFace.ts` pattern), e.g. `
 - It is drawn whenever there is at least one step. It is the engine, not a phase: it carries no number, no glyph and no gate (D-09).
 
 **Step** (`bg-card border-border`, rounded-lg, `px-3 py-2`; `programmatic` uses `bg-muted/40`; `llm_human_input` uses `border-warning/45 bg-warning/10`):
-- Row 1: step number pill (mono 10px, 18×18, `rounded-full border`) then the `phaseGlyph` mark at 24px. No corner role word (D-15).
+- Row 1: step number pill (mono 10px, 20×20, `rounded-full border`) then the `phaseGlyph` mark at 24px. No corner role word (D-15).
 - Row 2, title (13px/600, 2-line clamp): `nodeTitle(phase, nameContext)`, the same face the Steps view shows, so a person switching views recognises the step.
 - Row 3, role (11px, `text-muted-foreground`): `PHASE_TYPE_SENTENCES[type]`, the same words as the card chip (D-15). When row 2 already equals that sentence (an unnamed step on the floor tier), row 3 shows `PHASE_TYPE_SUBTITLES[type]` instead, so the node never says one thing twice.
 - ⌥ Technical names on: row 3 becomes `technicalTitle(phase)` (`AI agent step · research`). The title does not change (the shipped "swap the subtitle, not the title" convention).
@@ -335,7 +336,7 @@ Strings for the picture live in a **new vocabulary leaf**, not in `phaseVocabula
 
 When the app-wide ⌥ toggle is on, in Team mode only:
 - Step row 3 swaps to `technicalTitle(phase)`; gate words swap to the raw kind; the rubric quote hides.
-- A ledger panel appears **below the caption**: heading `Every line on this picture` (mono 10px uppercase), then one row per entry in `lines[]`: a 30px line sample in that line's stroke, the plain words (`Orchestrator → step 1`, `Judge → step 3`, `⤳ step 2 → step 5, only if the check fails`), and the `source` path in mono 10px. Seat rows follow (`Step 3: up to 5 assistants`, source `phases[2].config.max_parallel_agents = 5`). It ends with `LEDGER_NO_LINKS`.
+- A ledger panel appears **below the caption**: heading `Every line on this picture` (mono 10px uppercase), then one row per entry in `lines[]`: a 32px line sample in that line's stroke, the plain words (`Orchestrator → step 1`, `Judge → step 3`, `⤳ step 2 → step 5, only if the check fails`), and the `source` path in mono 10px. Seat rows follow (`Step 3: up to 5 assistants`, source `phases[2].config.max_parallel_agents = 5`). It ends with `LEDGER_NO_LINKS`.
 - ⌥ off: no ledger renders. The plain caption is the whole honesty surface for the business audience.
 
 ### 3.8 Interaction and accessibility
@@ -438,20 +439,20 @@ Each is driven in the real app with Chrome MCP at verification, with a screensho
 
 ---
 
-## 11. Open items for the orchestrator (not blocking the checker)
+## 11. Resolved items (operator / orchestrator, 2026-10-21)
 
-1. **Reachability at the shipped default.** `visual_workflow_canvas` ships OFF (`models/user_settings.py`), and `WorkflowCanvas` only mounts when it is on. Under this contract the team picture is reachable wherever the canvas is on, which matches the 286 forecast (one gated mount in `WorkflowCanvas.tsx`) and gives the picture the `kbTools` it needs for §3.5. If the operator wants the picture available with the canvas off, the switch must also mount on the spine path in `WorkflowBuilderPage.tsx`, which breaks that file's flag-off "no wrapper" pin and costs `kbTools` (empty when the flag is off). Recommendation: keep it canvas-only for 290 and confirm the flag's production value at UAT.
-2. **Derived gates (§3.5).** Recommendation: keep them, because the alternative makes `Nothing checks this work.` false on grounded workflows.
+1. **Reachability — RESOLVED: canvas-only.** ~~`visual_workflow_canvas` ships OFF~~ **CORRECTED 2026-10-21:** the cold default was flipped to `everyone` in Phase 214 (D-214-19, `models/user_settings.py:1599`), and production `app_settings.feature_visibility.visual_workflow_canvas.audience` reads `everyone` (Supabase MCP read, 2026-10-21). `WorkflowCanvas` only mounts when it is on. Under this contract the team picture is reachable wherever the canvas is on, which matches the 286 forecast (one gated mount in `WorkflowCanvas.tsx`) and gives the picture the `kbTools` it needs for §3.5. If the operator wants the picture available with the canvas off, the switch must also mount on the spine path in `WorkflowBuilderPage.tsx`, which breaks that file's flag-off "no wrapper" pin and costs `kbTools` (empty when the flag is off). Decision: canvas-only for 290; the picture is reachable for every user at the shipped default.
+2. **Derived gates (§3.5) — RESOLVED by the operator 2026-10-21: show them as Checks.** The engine-added `citations_required` gate (and the armed action-risk checkpoint) are drawn as Checks, because the alternative makes `Nothing checks this work.` false on grounded workflows. The fallback copy is not used.
 
 ---
 
 ## Checker Sign-Off
 
-- [ ] Dimension 1 Copywriting: PASS
-- [ ] Dimension 2 Visuals: PASS
-- [ ] Dimension 3 Color: PASS
-- [ ] Dimension 4 Typography: PASS
-- [ ] Dimension 5 Spacing: PASS
-- [ ] Dimension 6 Registry Safety: PASS
+- [x] Dimension 1 Copywriting: PASS
+- [x] Dimension 2 Visuals: PASS
+- [x] Dimension 3 Color: PASS
+- [x] Dimension 4 Typography: FLAG (4 sizes 1px apart; non-blocking — hierarchy rides weight and case)
+- [x] Dimension 5 Spacing: FLAG → fixed (18→20, 170→168, 30→32); 2px chip padding is the declared sketch-B exception
+- [x] Dimension 6 Registry Safety: PASS
 
-**Approval:** pending
+**Approval:** approved 2026-10-21 (gsd-ui-checker, 3 non-blocking FLAGs)
