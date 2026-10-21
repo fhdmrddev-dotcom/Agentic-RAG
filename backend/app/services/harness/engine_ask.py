@@ -60,6 +60,7 @@ from app.db.workflows import (
     write_audit,
 )
 from app.services.harness.phase_confidence import resolve_kb_label
+from app.services.harness.run_handoff import mark_pause_written
 # Bound from the engine (see "THE HONEST LEAF INVARIANT" above). Safe ONLY because the
 # engine imports this module at its END, after both names are bound.
 from app.services.harness_engine import PhaseOutcome, _emit
@@ -748,11 +749,12 @@ def is_locked(phase) -> bool:
 def finding_from_output(output) -> str:
     """The citations finding from the keys the validator reads (RESEARCH Pattern 3).
 
-    ``retrieval_error`` → ``"outage"``; no ``citations`` → ``"no_sources"``; else
-    ``"no_markers"``. The validator's messages are never sniffed.
+    ``retrieval_error``, or an errored sub-agent (295-REVIEW WR-01) → ``"outage"``; no
+    ``citations`` → ``"no_sources"``; else ``"no_markers"``. The validator's messages are
+    never sniffed.
     """
     out = output if isinstance(output, dict) else {}
-    if out.get("retrieval_error"):
+    if out.get("retrieval_error") or out.get("sub_agent_status") == "error":
         return "outage"
     if not out.get("citations"):
         return "no_sources"
@@ -824,7 +826,7 @@ def _folder_depth(folder_id: str, by_id: dict) -> int:
 
 
 async def permitted_folder_options(
-    definition, *, phase, searched_ids, supabase, user_id
+    definition, *, phase, searched_ids, supabase, user_id, org_id=None
 ) -> list[dict]:
     """The folders "Search another folder" may offer — D-03 / D-39, never a second rule.
 
@@ -838,6 +840,11 @@ async def permitted_folder_options(
 
     An unbound definition (``project_folder_id`` None) searches the whole knowledge base, so
     another folder cannot widen anything and none is offered. Returns ``[{id, name, depth}]``.
+
+    295-REVIEW WR-06: the candidates are the owner's folders narrowed to the RUN's org
+    (``restrict_org_ids``, the publish gate's WR-05 / T-182-54 rule), so a two-org owner's
+    org-A run is never offered org B's shared folders. An unknown org passes ``set()``:
+    owned folders only (fail closed, never wider).
     """
     if definition is None or getattr(definition, "project_folder_id", None) is None:
         return []
@@ -847,7 +854,9 @@ async def permitted_folder_options(
     from app.services.harness.publish_service import _clean_label  # noqa: PLC0415
     from app.utils.folder_utils import fetch_visible_folders  # noqa: PLC0415
 
-    visible = await fetch_visible_folders(supabase, str(user_id))
+    visible = await fetch_visible_folders(
+        supabase, str(user_id), restrict_org_ids={str(org_id)} if org_id else set(),
+    )
     by_id = {str(f.get("id")): f for f in visible if f.get("id") is not None}
     searched = {str(x) for x in (searched_ids or [])}
     step_scope = {str(x) for x in (getattr(getattr(phase, "config", None), "folder_scope", None) or [])}
@@ -878,8 +887,13 @@ async def permitted_folder_options(
 
 
 def _searched_ids(ctx, phase) -> list[str] | None:
-    """What this step searched: the run's resolved subtree, narrowed by the step's scope."""
+    """What this step searched: the run's resolved subtree plus any folder chosen on an earlier
+    "Search another folder" answer (295-REVIEW WR-02: else the folder that just came up empty
+    is offered again), narrowed by the step's scope."""
     proj = getattr(ctx, "folder_subtree_ids", None)
+    chosen = (getattr(ctx, "phase_scope_override", None) or {}).get(getattr(phase, "slug", None))
+    if chosen:
+        proj = list(proj or []) + [f for f in chosen if f not in (proj or [])]
     step_scope = getattr(getattr(phase, "config", None), "folder_scope", None)
     if proj is None:
         return None
@@ -938,6 +952,7 @@ async def engine_pause(
                 definition, phase=phase, searched_ids=_searched_ids(ctx, phase),
                 supabase=getattr(ctx, "supabase", None),
                 user_id=(getattr(ctx, "current_user", None) or {}).get("id"),
+                org_id=getattr(ctx, "org_id", None),  # 295-REVIEW WR-06
             )
         prompt, options = compose_engine_choices(
             kind, step_label=step_label, folder_label=folder_label, locked=locked,
@@ -1051,7 +1066,9 @@ async def engine_pause(
         )
     except Exception:  # noqa: BLE001
         logger.exception("engine ask: ask_user_prompt emit failed run=%s", run_id)
-    # 6. The shipped pause arm does the rest.
+    # 6. The shipped pause arm does the rest — WITHOUT a second pause write (295-REVIEW
+    #    WR-07): an answer that already re-drove the run must not be flipped back to paused.
+    mark_pause_written(ctx)
     return PhaseOutcome("pause_run", None, None, f"Waiting for your answer on “{step_label}”.")
 
 

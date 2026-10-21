@@ -1939,7 +1939,10 @@ async def run_workflow(
         # the first draft of this comment did exactly that and G1 named this file. It is
         # the ``PhaseFormPanel.test.tsx`` trap (RESEARCH Pitfall 6), on the backend.
         if outcome.kind == "pause_run":
-            await pause_run(pool, run_id)
+            # 295-REVIEW WR-07: an engine ask already wrote this pause; a second write could
+            # flip an answer's running re-drive back to paused. One pause write per ask.
+            if not take_pause_written(ctx):
+                await pause_run(pool, run_id)
             await write_audit(
                 pool, run_id, user_id=_audit_user_id,
                 event_type="policy_applied",
@@ -2941,6 +2944,7 @@ from app.services.harness.run_handoff import (  # noqa: E402,F401 — Phase 295 
     resume_shell_status,
     resume_with_terminalize,
     surface_if_engine_owned,
+    take_pause_written,  # 295-REVIEW WR-07
 )
 from app.services.harness.engine_ask import (  # noqa: E402,F401
     _ABORT_LIKE_CHOICES,

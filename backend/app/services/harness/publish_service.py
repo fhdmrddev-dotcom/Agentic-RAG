@@ -1834,9 +1834,9 @@ async def _judge_golden_output(
     from app.config import get_model_capability
     from app.models.user_settings import load_app_settings_async  # function-local (Pitfall 4)
     from app.services.harness.validator_kinds import (  # function-local
-        JUDGE_RUBRIC_CORE,
         JudgeVerdict,
         _judge_graded_text,
+        judge_system_prompt,
         resolve_judge_model,
     )
 
@@ -1868,7 +1868,9 @@ async def _judge_golden_output(
     # The author's per-workflow criteria ride the llm_judge_rubric ValidatorSpec.config
     # if the definition declares one; else the standard core alone.
     author_criteria = _author_judge_criteria(definition) or "(none)"
-    system_prompt = JUDGE_RUBRIC_CORE.format(
+    # 295-REVIEW WR-05: the rubric, plus the design note (system-side) for a recorded action.
+    system_prompt = judge_system_prompt(
+        final_output,
         business_requirement=(definition.business_requirement or "(not declared)"),
         author_criteria=author_criteria,
     )

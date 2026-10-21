@@ -419,7 +419,7 @@ node scripts/check-hot-file-ledger.cjs <phase-dir>   # 0 clear · 1 missing rows
 | `frontend/src/components/workflows/WorkflowCanvas.tsx` | 31 / 9 / 1708 | 286 forecast: 290 team picture is a separate view; ≤ 1 gated mount |
 | `frontend/src/components/workflows/FlowEdge.tsx` | 3 / 3 / 462 | honoured by construction (200) |
 | `frontend/src/components/workflows/PhaseNodeCard.tsx` | 18 / 9 / 490 (was `17 / 8 / 489`) | 286 forecast: 290 adds one prop; chip words from libraryVocabulary |
-| `backend/app/services/harness/phase_types.py` | 59 / 30 / 3053 (was `57 / 29 / 3050`) | 295-03/04: three call lines, If 113→113 · G-5 OWED |
+| `backend/app/services/harness/phase_types.py` | 60 / 30 / 3057 (was `59 / 30 / 3053`) | 295-09 WR-01: sub-agent error mark, 4 call lines, If 113→113 · G-5 OWED |
 | `frontend/src/pages/WorkflowsPage.tsx` | 45 / 18 / 1447 (was `43 / 17 / 1415`) | 286 forecast: 287 starters are data, fork reuses its hook; one prop |
 | `frontend/src/components/workflows/library/WorkflowCard.tsx` | 22 / 8 / 1354 (was `19 / 6 / 1616`) | seam TAKEN (286-04): ⋯ menu + armed delete → WorkflowCardMenu |
 | `frontend/src/components/workflows/library/libraryVocabulary.ts` | 11 / 5 / 766 (was `10 / 4 / 727`) | 286 forecast: 290 chip labels are vocabulary entries (data), no logic |
@@ -440,8 +440,8 @@ node scripts/check-hot-file-ledger.cjs <phase-dir>   # 0 clear · 1 missing rows
 | `frontend/src/hooks/useThreads.ts` | 5 / 3 / 65 | ⚠ now FIRES · last touch 267-04 · ⛔ |
 | `backend/app/services/harness/grounding.py` | 23 / 10 / 1437 (was `21 / 8 / 1414`) | 295-03: ONE pure predicate (is_engine_citation_gate) |
 | `frontend/src/components/workflows/PhaseFormPanel.tsx` | 30 / 14 / 1566 | honoured by construction ×6 (185 / 193 / 193.1 / 199 / 200 / **214**) |
-| `backend/app/db/workflows.py` | 57 / 29 / 2802 (was `54 / 28 / 2767`) | 295-03 stash writer + lease release · 295-05 two read keys |
-| `backend/app/services/harness/publish_service.py` | 33 / 15 / 2008 (was `31 / 14 / 2001`) | 295-04: golden finally helper · 295-07: no D-17 change |
+| `backend/app/db/workflows.py` | 58 / 29 / 2808 (was `57 / 29 / 2802`) | 295-09 CR-01: the answer read names its question (2 keys) |
+| `backend/app/services/harness/publish_service.py` | 34 / 15 / 2010 (was `33 / 15 / 2008`) | 295-09 WR-05: judge system prompt via one helper (If 70→70) |
 | `backend/app/services/workflow_authoring.py` | 17 / 11 / 1025 (was `15 / 9 / 989`) | 286 forecast: 291 template text = one more grounding input (untrusted) |
 | `backend/app/models/harness.py` | 20 / 19 / 766 | honoured by construction (193.2 / **214**) |
 | `frontend/src/components/workflows/builderStore.ts` | 14 / 8 / 968 | 286 forecast: 288 draft config rides useDraftPersistence; ≤ 1 store field |
@@ -453,11 +453,11 @@ node scripts/check-hot-file-ledger.cjs <phase-dir>   # 0 clear · 1 missing rows
 | `backend/app/services/task_service.py` | 27 / 14 / 1023 (was `26 / 14 / 1018`) | 289-REVIEW WR-04: refused searches no longer count as KB searches |
 | `backend/app/services/run_reconciler.py` | 5 / 3 / 406 (was `3 / 2 / 325`) | 295-04: ONE workflow-run sweep · live-proven 295-07 · ⚠ now FIRES |
 | `backend/app/services/circuit_breaker.py` | 1 / 1 / 331 | ⚠ absent its ENTIRE LIFE — row added 256-02 · ⛔ |
-| `backend/app/api/runs.py` | 47 / 21 / 1907 (was `45 / 20 / 1845`) | 295-03: 422 allow-list before persist · 295-04: stopped_by kwarg |
+| `backend/app/api/runs.py` | 48 / 21 / 1929 (was `47 / 21 / 1907`) | 295-09 CR-01: 409 unless the answer is for the current question |
 | `backend/app/api/panel.py` | 6 / 5 / 285 | 295-03: ONE engine_pause key on /pending · honoured by construction |
-| `backend/app/services/harness/human_input.py` | 5 / 3 / 355 | 295-04: skip + cancel sibling · honoured by construction · ⛔ |
+| `backend/app/services/harness/human_input.py` | 6 / 3 / 375 (was `5 / 3 / 355`) | 295-09 CR-01: consumes only its own question's answer · ⛔ |
 | `backend/app/middleware/canvas_gate.py` | 9 / 6 / 396 (was `8 / 5 / 391`) | 289-03: ONE gated path (…/evidence) · ⛔ test_182 never imports it |
-| `backend/app/services/harness_engine.py` | 67 / 26 / 2957 (was `62 / 25 / 3396`) | 295-01: seam TAKEN (−499 L) · armed-block seam still OWED · ⛔ |
+| `backend/app/services/harness_engine.py` | 68 / 26 / 2961 (was `67 / 26 / 2957`) | 295-09 WR-07: one pause write per engine ask · armed seam OWED · ⛔ |
 | `frontend/src/components/chat/ThinkingBlock.tsx` | 6 / 2 / 320 | ⚠ row STALE; does NOT fire yet · ⛔ |
 | `frontend/src/components/chat/RunCard.tsx` | 31 / 16 / 729 | last touch 276-06 (D-27) · ⛔ |
 | `frontend/src/components/chat/MessageInput.tsx` | 41 / 20 / 1007 | ⚠ STALE · last touch 268-03 · ⛔ |
@@ -489,7 +489,7 @@ node scripts/check-hot-file-ledger.cjs <phase-dir>   # 0 clear · 1 missing rows
 | `frontend/src/components/panel/PhaseCard.tsx` | 20 / 13 / 811 (was `18 / 12 / 796`) | 295-05: ONE mount in the identity column |
 | `frontend/src/components/panel/PhaseTimeline.tsx` | 10 / 8 / 404 | ⚠ row STALE · honoured by construction (214) |
 | `frontend/src/components/panel/phaseStatusMeta.ts` | 4 / 4 / 291 | ⚠ row STALE · crossed the threshold (200) |
-| `backend/app/services/harness/validator_kinds.py` | 16 / 8 / 845 (was `15 / 7 / 791`) | 295-02: judge note table · 295-07: no D-17 entry |
+| `backend/app/services/harness/validator_kinds.py` | 18 / 8 / 899 (was `17 / 8 / 853`) | 295-09 WR-05: judge note in system prompt, data fenced |
 | `backend/app/services/harness/programmatic.py` | 3 / 3 / 137 | ⚠ FIRES · absent its ENTIRE LIFE — row added 255 · ⛔ |
 | `backend/app/services/harness/emitters.py` | 4 / 2 / 188 | ⚠ absent its ENTIRE LIFE — row added 255 · ⛔ |
 | `frontend/src/components/admin/ModelRegistryTab.tsx` | 19 / 7 / 1705 (was `17 / 7 / 1679`) | honoured by construction (282-04: Add-form Timeout) · AddModelForm seam OWED · ⛔ |

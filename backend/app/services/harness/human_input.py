@@ -111,6 +111,18 @@ def _resolve_answer_text(response_text, choice_index, options) -> str:
 
 
 
+def _answers_this_step(durable: dict, prompt) -> bool:
+    """295-REVIEW CR-01: does a durable answer belong to the question this step asks?
+
+    ``get_ask_user_response`` hands back the joined prompt's words and whether it was an
+    engine ask. An engine ask's answer is never this step's; a prompt that reads differently
+    is another step's. A reader that carries neither key (an older fake) is not second-guessed.
+    """
+    if durable.get("engine_pause"):
+        return False
+    return "prompt" not in durable or durable.get("prompt") == prompt
+
+
 async def _exec_llm_human_input(phase, accumulated_outputs: dict, ctx) -> dict:
     """Pause for human input via the ask_user pub/sub flow, block on the answer.
 
@@ -177,6 +189,14 @@ async def _exec_llm_human_input(phase, accumulated_outputs: dict, ctx) -> dict:
             from app.db.workflows import get_ask_user_response  # noqa: PLC0415
 
             _durable = await get_ask_user_response(_pool, run_id, str(_resume_tcid))
+            # 295-REVIEW CR-01: consume ONLY an answer to THIS step's question. An engine
+            # ask's answer, or another step's, is never borrowed: this step asks its own.
+            if _durable is not None and not _answers_this_step(_durable, prompt):
+                logger.warning(
+                    "llm_human_input: the resume flag names another question's answer "
+                    "run=%s tcid=%s — asking this step's own question", run_id, _resume_tcid,
+                )
+                _durable = None
             if _durable is not None:
                 _answer = _resolve_answer_text(
                     _durable.get("response_text"), _durable.get("choice_index"), options

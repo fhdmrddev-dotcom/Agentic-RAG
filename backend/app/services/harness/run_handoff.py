@@ -20,6 +20,10 @@ logger = logging.getLogger("app.services.harness_engine")
 __all__ = [
     "phase_scope_ids",
     "handoff_text",
+    "sub_agent_text",
+    "sub_agent_error_mark",
+    "mark_pause_written",
+    "take_pause_written",
     "claim_failure_message",
     "surface_unless_engine_owns",
     "surface_if_engine_owned",
@@ -89,6 +93,63 @@ def handoff_text(out) -> str | None:
     return text
 
 
+# ── 295-REVIEW WR-01 (BUG-261021-01): a sub-agent's error is an OUTAGE, not an answer ──────
+#
+# When a sub-agent's model call raises, ``run_task_sub_agent`` returns ``status="error"`` and
+# ``summary = "Sub-agent failed: <str(e)>"`` — the VENDOR'S message body (an account id, a
+# quota, a masked key, a host). Kept as the step's ``text`` it read as "found nothing" to the
+# citations gate, and Continue then stored it as a deliverable and handed it downstream. The
+# step's text is now this fixed sentence instead (the vendor body stays in the server log and
+# the sub-agent's own ``runs.error``), and the output carries ONE mark the gate reads as an
+# outage, so the run fails with the outage sentence rather than offering to continue.
+
+SUB_AGENT_FAILED_TEXT = "This step could not get an answer from its model, so it has no result."
+
+
+def sub_agent_text(result) -> str:
+    """The ``text`` a step keeps from ONE sub-agent result: its summary, or the fixed sentence
+    when the sub-agent errored (never the vendor's message)."""
+    if result.get("status") == "error":
+        return SUB_AGENT_FAILED_TEXT
+    return result["summary"]
+
+
+def sub_agent_error_mark(results) -> dict:
+    """``{"sub_agent_status": "error"}`` when ANY sub-agent errored, else ``{}`` (absent, so a
+    working step's output is byte-identical)."""
+    if any(isinstance(r, dict) and r.get("status") == "error" for r in results or []):
+        return {"sub_agent_status": "error"}
+    return {}
+
+
+# ── 295-REVIEW WR-07: ONE pause write per engine ask ────────────────────────────────────────
+#
+# ``engine_pause`` writes ``pause_run`` FIRST (releasing the lease, so an answer can re-drive at
+# once), then the prompt row, then the card. The engine's pause arm used to write ``pause_run``
+# AGAIN after that, so an answer landing in the gap (``resume_run`` → ``active``, a fresh claim)
+# was flipped back to ``paused`` while its re-drive ran, and its claim was cleared. The engine
+# ask now marks that it already wrote the pause, and the arm skips its own write when marked.
+
+
+def mark_pause_written(ctx) -> None:
+    """Called by ``engine_pause`` as it returns its ``pause_run`` outcome."""
+    try:
+        ctx.engine_pause_written = True
+    except (AttributeError, TypeError):
+        pass
+
+
+def take_pause_written(ctx) -> bool:
+    """Single-use: True (and cleared) when an engine ask already wrote this pause."""
+    written = bool(getattr(ctx, "engine_pause_written", False))
+    if written:
+        try:
+            ctx.engine_pause_written = False
+        except (AttributeError, TypeError):
+            pass
+    return written
+
+
 # ── D-23 (BUG-261015-01): one failure, one message ──────────────────────────────────────────
 
 
@@ -102,24 +163,39 @@ def claim_failure_message(ctx, phase) -> None:
     executor's own message stays the only one (D-50: the suppression never drops it). Re-set on
     every phase, so a later phase without validators is never silenced by an earlier one. A
     frozen / slotted ctx is tolerated, as ``human_input`` tolerates it for its resume flag.
+
+    295-REVIEW WR-03: it also clears ``ctx.engine_silenced_failure_message``, which only the
+    executor side sets, when it actually suppressed a message in THIS phase.
     """
     try:
         ctx.engine_owns_failure_message = bool(getattr(phase, "validators", None))
+        ctx.engine_silenced_failure_message = False
     except (AttributeError, TypeError):
         pass
 
 
 async def surface_unless_engine_owns(ctx, run_id, reason, pool, surface):
-    """The executor side: persist the failure message unless the engine owns it."""
+    """The executor side: persist the failure message unless the engine owns it. When it
+    stays silent it records that it did, so the engine knows it owes the one message."""
     if getattr(ctx, "engine_owns_failure_message", False):
+        try:
+            ctx.engine_silenced_failure_message = True
+        except (AttributeError, TypeError):
+            pass
         return None
     return await surface(ctx, run_id, reason, pool)
 
 
 async def surface_if_engine_owned(ctx, run_id, reason, pool, surface):
-    """The engine side, for the arms that did not surface before 295: only when the executor
-    was silenced, so a phase without validators never gets a second message."""
-    if not getattr(ctx, "engine_owns_failure_message", False):
+    """The engine side, for the arms that did not surface before 295: ONLY when the executor
+    was actually silenced in this phase.
+
+    295-REVIEW WR-03: this used to key on ``engine_owns_failure_message`` alone, which is True
+    for every phase with validators. Only the emit executor ever surfaces, so a non-emit step
+    routed by a valid ``skip_to`` (zero messages before 295) gained a mid-run "gate failed"
+    message. Keyed on the silence instead, that branch is back to its pre-295 behaviour, and
+    an emit step still gets its one message."""
+    if not getattr(ctx, "engine_silenced_failure_message", False):
         return None
     return await surface(ctx, run_id, reason, pool)
 
