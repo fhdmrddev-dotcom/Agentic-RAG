@@ -389,3 +389,74 @@ def test_wr01_an_errored_kb_step_fails_with_the_outage_sentence_and_never_pauses
     assert "service outage" in outcome.reason
     assert VENDOR not in outcome.reason
     assert world.prompt_rows() == [], "an outage was offered as a found-nothing question"
+
+
+# ═════════════════════════════════════════════════════════════════════════════════════════
+# WR-02 — after "Search another folder" finds nothing again, that folder is not re-offered
+# ═════════════════════════════════════════════════════════════════════════════════════════
+def _plain_kb_phase(folder_scope=None):
+    from app.models.harness import PhaseSpec
+
+    cfg = {"phase_type": "llm_agent", "prompt": "p", "available_tools": ["search_documents"]}
+    if folder_scope is not None:
+        cfg["folder_scope"] = folder_scope
+    return PhaseSpec(slug=SLUG, phase_index=0, name=STEP, config=cfg)
+
+
+def test_wr02_the_folder_just_searched_counts_as_searched():
+    from app.services.harness.engine_ask import _searched_ids
+
+    ctx = SimpleNamespace(folder_subtree_ids=["P", "P-child"],
+                          phase_scope_override={SLUG: ["F", "F-child"]})
+    got = set(_searched_ids(ctx, _plain_kb_phase()))
+    assert {"F", "F-child"} <= got, got
+    assert {"P", "P-child"} <= got, "the bound folder stops counting as searched"
+
+
+def test_wr02_the_step_scope_still_narrows_what_was_searched():
+    from app.services.harness.engine_ask import _searched_ids
+
+    P, F, F_CHILD = (str(uuid4()) for _ in range(3))
+    ctx = SimpleNamespace(folder_subtree_ids=[P], phase_scope_override={SLUG: [F, F_CHILD]})
+    assert set(_searched_ids(ctx, _plain_kb_phase(folder_scope=[F]))) == {F}
+
+
+def test_wr02_a_run_with_no_override_is_unchanged():
+    from app.services.harness.engine_ask import _searched_ids
+
+    ctx = SimpleNamespace(folder_subtree_ids=["P", "P-child"], phase_scope_override={})
+    assert _searched_ids(ctx, _plain_kb_phase()) == ["P", "P-child"]
+    ctx = SimpleNamespace(folder_subtree_ids=None)
+    assert _searched_ids(ctx, _plain_kb_phase()) is None
+
+
+def test_wr02_the_re_pause_does_not_offer_the_folder_that_came_up_empty():
+    """Through ``permitted_folder_options`` for real: the run searched P, the person chose F,
+    F found nothing again. The new question must not offer F (a dead option)."""
+    from app.models.harness import WorkflowDefinition
+    from app.services.harness import engine_ask
+
+    P, F, G = (str(uuid4()) for _ in range(3))
+    tree = [{"id": P, "name": "Contracts", "parent_id": None},
+            {"id": F, "name": "Archive", "parent_id": None},
+            {"id": G, "name": "Board papers", "parent_id": None}]
+    definition = WorkflowDefinition(
+        slug="w", name="W", version=1, project_folder_id=P,
+        phases=[{"slug": SLUG, "phase_index": 0, "config": {
+            "phase_type": "llm_agent", "prompt": "p", "available_tools": ["search_documents"]}}],
+    )
+    ctx = SimpleNamespace(folder_subtree_ids=[P], phase_scope_override={SLUG: [F]})
+
+    async def _fetch(_supabase, _user_id, **_kw):
+        return [dict(f) for f in tree]
+
+    with patch("app.services.harness.scope.fetch_visible_folders", _fetch), \
+         patch("app.utils.folder_utils.fetch_visible_folders", _fetch):
+        out = asyncio.run(engine_ask.permitted_folder_options(
+            definition, phase=definition.phases[0],
+            searched_ids=engine_ask._searched_ids(ctx, definition.phases[0]),
+            supabase=object(), user_id=str(uuid4()),
+        ))
+    ids = [f["id"] for f in out]
+    assert F not in ids, "the folder that just came up empty was offered again"
+    assert ids == [G]
