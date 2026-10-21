@@ -4,12 +4,12 @@ title: For a two-org account, creating a folder or a workflow ignores the chosen
 reported: 2026-10-21
 surface: Agentic-RAG
 severity: major
-status: open
+status: deferred
 affected_areas: [backend/folders, backend/workflows, backend/org-scoping]
 folded_into: null
 verified_closed_by: null
 related_seeds: []
-re_open_trigger: null
+re_open_trigger: "The next phase whose files_modified names backend/app/api/folders.py or backend/app/api/workflows.py, or that touches X-Org-Id handling; or any report of a folder or workflow created in the wrong org."
 reproduces_on:
   branch: develop
   commit: 128266ef6

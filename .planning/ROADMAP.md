@@ -331,22 +331,22 @@ Plans:
 
 **Wave 1**
 
-- [ ] 295-01-PLAN.md — take the G-5 seam: move the engine-ask disposition verbatim into `harness/engine_ask.py`, re-exported, proven pure (D-51) — wave 1
-- [ ] 295-02-PLAN.md — base captures (SC#5 baseline, DMT before); `no_template_bound` refused at publish and run start, named at save; the judge told what a recorded-not-sent step produces (RUN-02, RUN-03) — wave 1
-- [ ] 295-05-PLAN.md — the read side: `unsourced` and `end_reason` on every run read, the deadline-true window, the mark in four places, the end-reason line (RUN-01, RUN-04) — wave 1
+- [x] 295-01-PLAN.md — take the G-5 seam: move the engine-ask disposition verbatim into `harness/engine_ask.py`, re-exported, proven pure (D-51) — wave 1
+- [x] 295-02-PLAN.md — base captures (SC#5 baseline, DMT before); `no_template_bound` refused at publish and run start, named at save; the judge told what a recorded-not-sent step produces (RUN-02, RUN-03) — wave 1
+- [x] 295-05-PLAN.md — the read side: `unsourced` and `end_reason` on every run read, the deadline-true window, the mark in four places, the end-reason line (RUN-01, RUN-04) — wave 1
 
 **Wave 2** *(blocked on Wave 1 completion)*
 
-- [ ] 295-03-PLAN.md — engine asks pause durably with server-built choices, the bounded folder re-run, the locked refusal, consume on re-drive, the sweep never re-asks (RUN-01, RUN-04) — wave 2
-- [ ] 295-06-PLAN.md — the pause card: one helper, one folder leaf, no false clock, Stop recorded as a stop — wave 2
+- [x] 295-03-PLAN.md — engine asks pause durably with server-built choices, the bounded folder re-run, the locked refusal, consume on re-drive, the sweep never re-asks (RUN-01, RUN-04) — wave 2
+- [x] 295-06-PLAN.md — the pause card: one helper, one folder leaf, no false clock, Stop recorded as a stop — wave 2
 
 **Wave 3** *(blocked on Wave 2 completion)*
 
-- [ ] 295-04-PLAN.md — truthful ends: the answer reaches the next step, one failure one message, cancel reads cancelled, resume/golden/F2/reconciler finalise with reasons (RUN-04, BUG-261020-01, BUG-261015-01) — wave 3
+- [x] 295-04-PLAN.md — truthful ends: the answer reaches the next step, one failure one message, cancel reads cancelled, resume/golden/F2/reconciler finalise with reasons (RUN-04, BUG-261020-01, BUG-261015-01) — wave 3
 
 **Wave 4** *(blocked on Wave 3 completion)*
 
-- [ ] 295-07-PLAN.md — live proof S1-S7, SC#3 and SC#5 measured with their queries, the D-47 re-drive, the four-axis roster, the ledger and every gate once — wave 4
+- [x] 295-07-PLAN.md — live proof S1-S7, SC#3 and SC#5 measured with their queries, the D-47 re-drive, the four-axis roster, the ledger and every gate once — wave 4
 
 **UI hint**: yes
 **Flags**: **Evidence**: `BUG-261020-07`..`12` (folded here) and memory `project_workflow_blocking_measured_20261020`. **Route at discuss**: `BUG-261020-01` (a human step's answer never reaches the next step) belongs to the same "doesn't run as intended" family and is the first candidate to fold. **Not in scope**: branching or loops (`SEED-295` stays parked; the 2026-10-20 measure found no failure caused by a route the engine cannot express). `ValidatorSpec.on_failure` already accepts `ask_user` (D-11), so RUN-01 may be mostly a default and a worded pause; verify before adding engine code. **G-2 sketch** for the found-nothing pause. **G-4**. Hot files: `harness_engine.py`, `phase_types.py`, `validator_kinds.py`, `publish_service.py`, `run_reconciler.py`, `PendingAskCard.tsx`; read their ledger sections.
@@ -364,7 +364,7 @@ Plans:
 | 292. More Ways to Show It | 0/TBD | Not started | - |
 | 293. Start From Outside, and Close Out | 0/TBD | Not started | - |
 | 294. Decision Engine: Rerank and Citation Check | 5/5 | complete (2026-10-20) | 6/6 SC met in code; 294-HUMAN-UAT 9/9 passed live; roster R2 ⛔ Anthropic billing, glm-5.3 ⛔ BUG-261020-06; not pushed; cloud mig 211 owed before deploy |
-| 295. Runs That Don't Dead-End | 0/TBD | Not started | - |
+| 295. Runs That Don't Dead-End | 7/7 (+3 gap fixes) | human_needed (2026-10-21) | 5/5 SC + RUN-01..04 verified (295-VERIFICATION.md); 2 gap rounds (G-7 cap reached); G-4 sign-off owed, run S1 first (295-HUMAN-UAT.md); Anthropic row blocked on billing; deferred BUG-261021-02/03, SEED-366/367; not pushed |
 
 ---
 
