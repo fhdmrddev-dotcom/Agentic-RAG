@@ -55,6 +55,7 @@ import { useStreamsStore } from "@/stores/streamsStore"
 // eight suites that mock `@/providers/StreamsProvider` with an allow-list are unaffected.
 import { useAskDraft, useAskDraftStore, useAskSettled, usePanelHomeMounted } from "@/stores/askDraftStore"
 import { answerAskUser, ApiError } from "@/lib/api"
+import { ASK_ANSWER_FAILED } from "@/lib/api/threads"
 import type { PendingAsk } from "@/types"
 // Phase 295-06 (D-32) — the found-nothing pause: ONE pure reading of `ask.engine_pause`, ONE leaf.
 import { answeredHeader, answeredReceipt, needsFolder, readEnginePause } from "./enginePause"
@@ -496,6 +497,8 @@ export function PendingAskCard({
         // "Failed to submit ask_user answer", which is exactly the uninformative shape this
         // change exists to remove. Surfacing the real detail means teaching the client to
         // read the body; that is a separate change and is not pretended at here.
+        // ⚠ CORRECTED 295-08 (WR-04): `answerAskUser` now reads `detail`, so `err.message` IS the
+        // server's sentence when one was sent. This arm still retires with its own words.
         //
         // ⚠ It retires rather than erroring, because a dead run is not a failure the person
         // can act on — offering a retry on it is the defect this replaces.
@@ -508,7 +511,9 @@ export function PendingAskCard({
         // difference between a person retrying usefully and retrying blindly.
         setSubmitError("The server couldn't record your answer. It has not been saved.")
       } else if (status !== null) {
-        setSubmitError(`Your answer was refused (${status}). It has not been saved.`)
+        // 295-08 (WR-04): the server's own sentence when it sent one (answerAskUser reads `detail`).
+        const words = err instanceof Error && err.message !== ASK_ANSWER_FAILED ? err.message : ""
+        setSubmitError(`${words || `Your answer was refused (${status}).`} It has not been saved.`)
       } else {
         // No status at all — the request never reached the server (offline, dropped,
         // aborted). This is the ONE case where trying again is genuinely the right advice.
@@ -790,8 +795,10 @@ export function PendingAskCard({
         />
       )}
 
-      {/* "or" divider — only meaningful when both surfaces are present. */}
-      {options.length > 0 && (
+      {/* "or" divider — only meaningful when both surfaces are present. 295-08 (WR-04): an engine
+          ask is answered by the server's choices only (a typed answer is always refused), so it
+          draws neither the divider nor the free-text box. */}
+      {options.length > 0 && !enginePause && (
         <div className="text-center font-mono text-[10px] uppercase tracking-wider text-[hsl(var(--muted-foreground-dim))]">
           or
         </div>
@@ -815,6 +822,7 @@ export function PendingAskCard({
 
               Still tied by `htmlFor`/`id`, so the accessible name is the visible text and
               the two cannot drift — which is exactly what an `sr-only` label risks. */}
+        {!enginePause && (<>
         <label
           htmlFor={`ask-${tool_call_id}-free`}
           data-testid="ask-free-label"
@@ -830,6 +838,7 @@ export function PendingAskCard({
           rows={2}
           className="resize-y rounded-md border border-border bg-background px-2.5 py-2 text-[13px] text-foreground focus:border-[hsl(var(--warning))] focus:outline-none"
         />
+        </>)}
         <button
           type="button"
           onClick={handleSubmit}

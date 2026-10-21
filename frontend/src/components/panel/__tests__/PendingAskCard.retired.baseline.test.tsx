@@ -263,8 +263,13 @@ describe("194.1-01 — the three shipped retirement sentences, READ from source"
      * reads the run status from ONE store field and `runIsOver` gains `&& !paused`; the stack
      * passes `paused` to the card. `useState` 7 → 7, `useEffect` 3 → 3. Retirement fences
      * untouched and green.
+     *
+     * 2026-10-21 — 295-08 WR-04 RE-BASELINED 1087 → 1096, not loosened: an engine ask draws no
+     * free-text box or "or" divider (one `!enginePause` condition each), and a 4xx refusal shows
+     * the server's sentence when it sent one. `useState` 7 → 7, `useEffect` 3 → 3. Retirement
+     * fences untouched and green.
      */
-    expect(src.split("\n").length).toBe(1087)
+    expect(src.split("\n").length).toBe(1096)
   })
 
   /** (a) The 404-expiry constant — `setExpiredMessage("…")` in the catch. */

@@ -194,7 +194,7 @@ const BASELINE = {
   "RunEndReasonLine.test.tsx": 13,
   "AskFolderChoice.test.tsx": 7,
   "enginePause.test.ts": 17,
-  "threads.engineAsk.test.ts": 2,
+  "threads.engineAsk.test.ts": 4, // 295-08 WR-04: 2 -> 4 (answerAskUser reads the refusal detail)
   // Phase 294-04 (DEC-01) — the engine cards and the engine-id parity fence. 294-04 left them
   // un-adopted (handover); adopted here, measured green on a run of the two suites alone.
   "RerankEngineBlock.test.tsx": 25,  // 294-REVIEW WR-04: +1, a cleared Keep at most never reports 0
@@ -4326,7 +4326,7 @@ const BASELINE = {
   // `GSD_VITEST_MAX_WORKERS=2`, never hand-counted. The three `src/components/workflows` suites
   // are inside that DIRECTORY entry and need a pin only; the other four are FILE-LEVEL below.
   // 295-08 (SEED-361) — a paused run's ask stays answerable in the chat thread; guard both ways.
-  "PendingAskStack.pausedRun.test.tsx": 7,
+  "PendingAskStack.pausedRun.test.tsx": 11, // 295-08 WR-04: 7 -> 11 (engine ask has no free text; a refusal keeps its words)
   "PendingAskCard.paused.test.tsx": 6, // 289-REVIEW CR-02: 4 -> 6 (pending -> expired -> paused re-render, 404 stays terminal). 289-01 — the paused card keeps its answer control
   "StepEvidenceLine.test.tsx": 15, // 289-02 — the KB evidence line or nothing
   "evidenceView.test.ts": 31, // 289-REVIEW WR-03: 29 -> 31 (final-attempt Checks fact, timed-out kind). 289-04 — payload to view-model, privacy applied twice
