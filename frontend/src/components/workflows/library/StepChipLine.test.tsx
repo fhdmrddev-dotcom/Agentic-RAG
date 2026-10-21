@@ -95,8 +95,12 @@ describe("StepChipLine — a long line (7 steps), first three then +N more (D-03
     expect(toggle.textContent).toBe(stepLineMore(4))
     expect(toggle).toHaveAttribute("aria-label", stepLineMoreLabel(4))
     expect(toggle).toHaveAttribute("aria-expanded", "false")
-    // The accessible name is the full sentence, so a screen reader hears what the toggle does.
-    expect(within(root).getByRole("button", { name: "Show 4 more steps" })).toBe(toggle)
+    // 290 WR-05 (WCAG 2.5.3 Label in Name): the accessible name STARTS with the visible text,
+    // so a voice user who says what they see ("click plus 4 more") is matched.
+    expect(within(root).getByRole("button", { name: "+4 more steps" })).toBe(toggle)
+    const name = toggle.getAttribute("aria-label") ?? ""
+    expect(toggle.textContent).not.toBe("")
+    expect(name.startsWith(toggle.textContent ?? "")).toBe(true)
   })
 
   it("collapsed: the list never wraps; the toggle group never shrinks", () => {
@@ -145,7 +149,7 @@ describe("StepChipLine — a long line (7 steps), first three then +N more (D-03
     const four = lineOf(SEVEN_TYPES.slice(0, 4).map(chip))
     render(<StepChipLine line={four} />)
     const toggle = within(screen.getByTestId("row-steps")).getByTestId("row-steps-toggle")
-    expect(toggle).toHaveAttribute("aria-label", "Show 1 more step")
+    expect(toggle).toHaveAttribute("aria-label", "+1 more step")
     expect(toggle.textContent).toBe("+1 more")
   })
 })

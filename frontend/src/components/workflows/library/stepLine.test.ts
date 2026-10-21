@@ -202,8 +202,10 @@ describe("the frame words (libraryVocabulary.ts entries)", () => {
     expect(STEP_LINE_LABEL).toBe("Steps, in run order")
     expect(STEP_LINE_JOINER).toBe("→")
     expect(stepLineMore(4)).toBe("+4 more")
-    expect(stepLineMoreLabel(1)).toBe("Show 1 more step")
-    expect(stepLineMoreLabel(4)).toBe("Show 4 more steps")
+    // 290 WR-05: the name starts with the visible text (WCAG 2.5.3 Label in Name).
+    expect(stepLineMoreLabel(1)).toBe("+1 more step")
+    expect(stepLineMoreLabel(4)).toBe("+4 more steps")
+    for (const n of [1, 4, 12]) expect(stepLineMoreLabel(n).startsWith(stepLineMore(n))).toBe(true)
     expect(STEP_LINE_LESS).toBe("Show less")
     expect(STEP_LINE_UNTYPED).toBe("A step with no type")
   })

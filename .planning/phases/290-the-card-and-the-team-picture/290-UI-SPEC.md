@@ -146,7 +146,7 @@ Light mode: use the tokens above, never the sketch's dark-only `hsl(...)` litera
   - Words: `PHASE_TYPE_SENTENCES[phase_type]`, truncated with an ellipsis inside the chip (`truncate`). **Never** `phase.name`, never `nodeTitle()`, never `PHASE_TYPE_LABELS`, never the slug or the raw type id (D-04). The only exception is a `phase_type` outside the closed set of 7: it echoes its raw string, which is the shipped `nodeTitle` floor and the honest answer for a type this client does not know.
   - Each chip also carries `title={words}` as a desktop convenience. It is never the only carrier of the words.
 - Joiner: `→`, `text-[11px] text-muted-foreground`, `aria-hidden`, between every pair of shown chips and before `+N more`.
-- `+N more`: a `<button type="button">`, `text-[11px] text-primary`, `rounded-full border border-dashed border-border px-2 py-0.5`, `aria-expanded="false"`, accessible name `Show N more steps`. Rendered only when there are more than 3 steps; N = steps − 3.
+- `+N more`: a `<button type="button">`, `text-[11px] text-primary`, `rounded-full border border-dashed border-border px-2 py-0.5`, `aria-expanded="false"`, accessible name `+N more steps` (corrected by 290-REVIEW WR-05 from `Show N more steps`: WCAG 2.5.3 Label in Name needs the name to contain the visible text). Rendered only when there are more than 3 steps; N = steps − 3.
 - No hover state on chips (they are not interactive). The card root is not clickable, so the button needs no propagation guard.
 
 ### 1.3 Expanded state (`+N more` pressed)
@@ -172,7 +172,7 @@ Light mode: use the tokens above, never the sketch's dark-only `hsl(...)` litera
 | `STEP_LINE_LABEL` | `Steps, in run order` |
 | `STEP_LINE_JOINER` | `→` |
 | `stepLineMore(n)` | `+${n} more` |
-| `stepLineMoreLabel(n)` | `Show ${n} more step${n === 1 ? "" : "s"}` (accessible name) |
+| `stepLineMoreLabel(n)` | `${stepLineMore(n)} step${n === 1 ? "" : "s"}`, i.e. `+N more steps` (accessible name; 290-REVIEW WR-05, was `Show N more steps`) |
 | `STEP_LINE_LESS` | `Show less` |
 
 The chip **words** are not copied into `libraryVocabulary.ts`; they are read from `PHASE_TYPE_SENTENCES` so there is one home for them. Naming note: `CHIP_WORDS` / `CHIP_ORDER` already exist in that file for the filter chips, so these use the `STEP_LINE_` prefix.

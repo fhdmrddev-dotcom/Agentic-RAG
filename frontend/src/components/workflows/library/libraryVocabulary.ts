@@ -789,10 +789,16 @@ export function stepLineMore(n: number): string {
   return `+${n} more`
 }
 
-/** The collapsed toggle's accessible name. The plural is a separate arm, not a built `s`. */
+/**
+ * The collapsed toggle's accessible name. The plural is a separate arm, not a built `s`.
+ *
+ * ⚠ IT STARTS WITH THE VISIBLE TEXT, BY CONSTRUCTION (290 WR-05, WCAG 2.5.3 Label in Name):
+ * a voice-control user says what they see, "click plus 4 more", and a name that read
+ * `Show 4 more steps` matched nothing. So the name is `stepLineMore(n)` plus the noun.
+ */
 export function stepLineMoreLabel(n: number): string {
-  if (n === 1) return "Show 1 more step"
-  return `Show ${n} more steps`
+  if (n === 1) return `${stepLineMore(n)} step`
+  return `${stepLineMore(n)} steps`
 }
 
 /** The expanded toggle's text: fold the line back to its first steps. */
