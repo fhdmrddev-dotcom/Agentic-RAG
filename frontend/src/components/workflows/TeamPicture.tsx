@@ -113,10 +113,37 @@ const STEP_MIN = 128
 const STEP_GAP = 16
 const ORCHESTRATOR_WIDTH = 300
 
+/*
+ * ── LINES NEVER RUN BEHIND A CARD THEY DO NOT JOIN (290 WR-03, WR-04) ──────────────────────
+ * The cards are translucent, so a line drawn behind one shows through and reads as a link.
+ *  - A gate line leaves its card's LEFT edge into a rail inside the column's left indent
+ *    (the gate list is indented `GATE_INDENT`), then runs up to its step's bottom. Each gate
+ *    in a step has its own rail, and a later gate's rail sits further out, so it never
+ *    touches an earlier gate's stub or card.
+ *  - A jump leaves its check's RIGHT edge into the column gutter, runs down to its own LANE
+ *    below the lowest gate, across, up the target column's gutter and into the target
+ *    step's right edge. Each jump has its own lane (y) and gutter offset (x), so two jumps
+ *    never share a segment, and each label sits on its own lane.
+ */
+const GATE_INDENT = 16
+/** Rail x range inside the indent, measured from the step's left edge: outermost, innermost. */
+const RAIL_OUTER = 4
+const RAIL_INNER = 13
+const RAIL_STEP = 3
+/** Gutter offsets past a column's right edge, cycled by lane; the gutter is `STEP_GAP` wide. */
+const JUMP_GUTTER = [4, 8, 12] as const
+/** Vertical distance between two jump lanes; it clears the 11px label under each lane. */
+const LANE_GAP = 22
+/** The step row's bottom padding with one jump lane (`pb-14`); each extra lane adds `LANE_GAP`. */
+const JUMP_PAD = 56
+
 interface Box {
   top: number
   bottom: number
+  left: number
+  right: number
   cx: number
+  cy: number
 }
 
 interface LabelBox {
@@ -132,13 +159,32 @@ interface Geometry {
 
 const DEGENERATE = "M0 0"
 
+/** A gate's place in its step's list, and how many gates that step has. */
+interface Rank {
+  k: number
+  of: number
+}
+
+/** The rail x for gate `k` of `of`, from its step's left edge: later gates sit further out. */
+function railX(stepLeft: number, { k, of }: Rank): number {
+  const step = of > 1 ? Math.min(RAIL_STEP, (RAIL_INNER - RAIL_OUTER) / (of - 1)) : 0
+  return stepLeft + RAIL_INNER - k * step
+}
+
 /** One `d` per line, from the measured node boxes. A missing box yields the degenerate path. */
-function layoutLines(lines: readonly TeamLine[], box: (id: string) => Box | null, lowestGate: number): Geometry {
+function layoutLines(
+  lines: readonly TeamLine[],
+  box: (id: string) => Box | null,
+  rankOf: (gateId: string) => Rank,
+  lowestGate: number,
+): Geometry {
   const d: string[] = []
   const labels: Record<number, LabelBox> = {}
+  let lane = 0
   lines.forEach((line, i) => {
     const from = box(line.from)
     const to = box(line.to)
+    if (line.kind === "jump") lane += 1
     if (from === null || to === null) {
       d.push(DEGENERATE)
       return
@@ -146,11 +192,16 @@ function layoutLines(lines: readonly TeamLine[], box: (id: string) => Box | null
     if (line.kind === "handoff") {
       d.push(`M${from.cx} ${from.bottom} V${from.bottom + BUS_DROP} H${to.cx} V${to.top}`)
     } else if (line.kind === "jump") {
-      const y = lowestGate + JUMP_DROP
-      d.push(`M${from.cx} ${from.bottom} V${y} H${to.cx} V${to.bottom}`)
-      labels[i] = { left: Math.min(from.cx, to.cx), top: y + 4, width: Math.abs(to.cx - from.cx) }
+      const own = lane - 1
+      const off = JUMP_GUTTER[own % JUMP_GUTTER.length]
+      const y = lowestGate + JUMP_DROP + own * LANE_GAP
+      const sx = from.right + off
+      const tx = to.right + off
+      d.push(`M${from.right} ${from.cy} H${sx} V${y} H${tx} V${to.cy} H${to.right}`)
+      labels[i] = { left: Math.min(sx, tx), top: y + 4, width: Math.abs(tx - sx) }
     } else {
-      d.push(`M${from.cx} ${from.top} V${to.bottom}`)
+      const x = railX(to.left, rankOf(line.from))
+      d.push(`M${from.left} ${from.cy} H${x} V${to.bottom}`)
     }
   })
   return { d, labels }
@@ -339,14 +390,27 @@ export function TeamPicture({ phases, kbTools, nameContext, showTechnical, workf
         const el = nodes.get(id)
         if (!el) return null
         const r = el.getBoundingClientRect()
-        return { top: r.top - base.top, bottom: r.bottom - base.top, cx: r.left - base.left + r.width / 2 }
+        const top = r.top - base.top
+        const left = r.left - base.left
+        return {
+          top,
+          bottom: r.bottom - base.top,
+          left,
+          right: r.right - base.left,
+          cx: left + r.width / 2,
+          cy: top + r.height / 2,
+        }
       }
       let lowestGate = 0
+      const ranks = new Map<string, Rank>()
       for (const g of model.gates) {
         const b = box(g.id)
         if (b !== null) lowestGate = Math.max(lowestGate, b.bottom)
+        const siblings = model.gates.filter((s) => s.stepId === g.stepId)
+        ranks.set(g.id, { k: siblings.indexOf(g), of: siblings.length })
       }
-      const next = layoutLines(model.lines, box, lowestGate)
+      const rankOf = (id: string): Rank => ranks.get(id) ?? { k: 0, of: 1 }
+      const next = layoutLines(model.lines, box, rankOf, lowestGate)
       setGeometry((prev) => (sameGeometry(prev, next) ? prev : next))
     }
     measure()
@@ -369,7 +433,7 @@ export function TeamPicture({ phases, kbTools, nameContext, showTechnical, workf
   }
 
   const gatesOf = (stepId: string) => model.gates.filter((g) => g.stepId === stepId)
-  const hasJump = model.lines.some((l) => l.kind === "jump")
+  const jumps = model.lines.filter((l) => l.kind === "jump").length
   const minWidth = Math.max(ORCHESTRATOR_WIDTH, n * STEP_MIN + (n - 1) * STEP_GAP)
 
   return (
@@ -428,8 +492,12 @@ export function TeamPicture({ phases, kbTools, nameContext, showTechnical, workf
           </p>
 
           <ol
-            className={["relative mt-14 grid gap-4", hasJump ? "pb-14" : ""].join(" ")}
-            style={{ gridTemplateColumns: `repeat(${n}, minmax(${STEP_MIN}px, 1fr))` }}
+            className="relative mt-14 grid gap-4"
+            style={{
+              gridTemplateColumns: `repeat(${n}, minmax(${STEP_MIN}px, 1fr))`,
+              // One lane per jump (WR-04): the first takes `pb-14`, each further one a lane gap.
+              paddingBottom: jumps > 0 ? JUMP_PAD + (jumps - 1) * LANE_GAP : undefined,
+            }}
           >
             {model.steps.map((step) => {
               const gates = gatesOf(step.id)
@@ -437,7 +505,7 @@ export function TeamPicture({ phases, kbTools, nameContext, showTechnical, workf
                 <li key={step.id} data-testid="team-step" data-step-number={step.number} className="min-w-0">
                   <StepNode step={step} showTechnical={showTechnical} />
                   {gates.length > 0 ? (
-                    <ul className="mt-8 flex flex-col gap-2">
+                    <ul className="mt-8 flex flex-col gap-2" style={{ marginLeft: GATE_INDENT }}>
                       {gates.map((g) => (
                         <GateCard key={g.id} gate={g} showTechnical={showTechnical} />
                       ))}

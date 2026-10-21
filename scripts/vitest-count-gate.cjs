@@ -4352,7 +4352,7 @@ const BASELINE = {
   "teamModel.test.ts": 248, // 290-REVIEW WR-06: 247 -> 248 (max_retries read as lax int, negative = no redo). WR-01: 246 -> 247 (unknown on_failure reads stop the run). CR-01: 243 -> 246 (unflagged external_action armed + its control + ARMED_TYPES drift fence). 290-01 (VIS-01 / D-11): deriveTeam's honesty surface; jump only for a resolvable skip, citations check only for detected
   "teamVocabulary.test.ts": 15, // 290-01: zero-import leaf, exact strings, no step sentence or seal label copied in
   "WorkflowCanvas.headerPin.test.tsx": 6, // 290-01: canvas header characterization pin (6 snapshots) that 290-03 left byte-unchanged
-  "TeamPicture.test.tsx": 36, // 290-03 (VIS-01 / D-06): one SVG path per lines[] item, nothing focusable, author text literal
+  "TeamPicture.test.tsx": 42, // 290-REVIEW WR-03/WR-04: 36 -> 42 (planted-layout geometry: no line inside a card, jumps on own lanes, one rail per gate). 290-03 (VIS-01 / D-06): one SVG path per lines[] item, nothing focusable, author text literal
   "WorkflowCanvas.team.test.tsx": 7, // 290-03: Steps | Team switch only with the team prop; keyboard reorder gated (F-6); run page passes none
   "stepLine.test.ts": 25, // 290-02 (VIS-04 / D-01, D-04): type-sentence chips in run order, first 3 + more, null at 0 steps
   "StepChipLine.test.tsx": 11, // 290-02 (VIS-04 / D-03): row-steps block, +N more / Show less, no title attribute

@@ -342,6 +342,160 @@ describe("TeamPicture — nothing is interactive (D-06)", () => {
   })
 })
 
+// ── line geometry (290 WR-03, WR-04) ──────────────────────────────────────────────────────
+
+/** A planted layout: 128px columns with a 16px gap, gates indented 16px and stacked 8px apart. */
+function plantedRect(el: Element): DOMRect {
+  const id = (el as HTMLElement).dataset?.teamNode ?? ""
+  let r = { left: 0, top: 0, right: 0, bottom: 0 }
+  const step = /^step-(\d+)$/.exec(id)
+  const gate = /^gate-(\d+)-(\w+)$/.exec(id)
+  if (id === "orchestrator") r = { left: 200, top: 0, right: 500, bottom: 60 }
+  else if (step) {
+    const left = Number(step[1]) * 144
+    r = { left, top: 120, right: left + 128, bottom: 200 }
+  } else if (gate) {
+    const left = Number(gate[1]) * 144
+    const siblings = Array.from(document.querySelectorAll(`[data-team-node^="gate-${gate[1]}-"]`))
+    const top = 232 + siblings.indexOf(el) * 60
+    r = { left: left + 16, top, right: left + 128, bottom: top + 52 }
+  }
+  const { left, top, right, bottom } = r
+  return { x: left, y: top, left, top, right, bottom, width: right - left, height: bottom - top, toJSON: () => r }
+}
+
+type Seg = { x1: number; y1: number; x2: number; y2: number }
+
+/** Every straight run of an `M … H … V …` path. */
+function segments(d: string): Seg[] {
+  const out: Seg[] = []
+  let x = 0
+  let y = 0
+  for (const [, cmd, args] of d.matchAll(/([MHV])\s*([^MHV]*)/g)) {
+    const nums = args.trim().split(/\s+/).map(Number)
+    if (cmd === "M") [x, y] = nums
+    else {
+      const next = cmd === "H" ? { x: nums[0], y } : { x, y: nums[0] }
+      out.push({ x1: x, y1: y, x2: next.x, y2: next.y })
+      ;({ x, y } = next)
+    }
+  }
+  return out
+}
+
+/** Whether a straight run passes through the strict inside of a box (its edges do not count). */
+const crosses = (s: Seg, b: DOMRect) =>
+  Math.max(s.x1, s.x2) > b.left &&
+  Math.min(s.x1, s.x2) < b.right &&
+  Math.max(s.y1, s.y2) > b.top &&
+  Math.min(s.y1, s.y2) < b.bottom
+
+/** Whether two runs lie on the same line and share a stretch of positive length. */
+const shareInk = (a: Seg, b: Seg) => {
+  if (a.y1 === a.y2 && b.y1 === b.y2 && a.y1 === b.y1) {
+    return Math.min(Math.max(a.x1, a.x2), Math.max(b.x1, b.x2)) > Math.max(Math.min(a.x1, a.x2), Math.min(b.x1, b.x2))
+  }
+  if (a.x1 === a.x2 && b.x1 === b.x2 && a.x1 === b.x1) {
+    return Math.min(Math.max(a.y1, a.y2), Math.max(b.y1, b.y2)) > Math.max(Math.min(a.y1, a.y2), Math.min(b.y1, b.y2))
+  }
+  return false
+}
+
+/** Four steps; step 1 has three gates, two of them jumps whose column ranges overlap. */
+const crowded: PhaseSpecJSON[] = [
+  {
+    slug: "a",
+    phase_index: 0,
+    config: { phase_type: "llm_agent" },
+    validators: [
+      { kind: "regex_match", on_failure: "skip_to_phase:d" },
+      { kind: "llm_judge_rubric", config: { criteria: "Is it right" } },
+      { kind: "structure_check", on_failure: "skip_to_phase:c" },
+    ],
+  },
+  {
+    slug: "b",
+    phase_index: 1,
+    config: { phase_type: "llm_single" },
+    validators: [{ kind: "regex_match", on_failure: "skip_to_phase:c" }],
+  },
+  { slug: "c", phase_index: 2, config: { phase_type: "llm_single" } },
+  { slug: "d", phase_index: 3, config: { phase_type: "external_action" } },
+]
+
+describe("TeamPicture — lines never imply a link the definition lacks (WR-03, WR-04)", () => {
+  const drawn = (phases: PhaseSpecJSON[]) => {
+    const spy = vi.spyOn(Element.prototype, "getBoundingClientRect").mockImplementation(function (this: Element) {
+      return plantedRect(this)
+    })
+    try {
+      const { container } = renderPicture(phases)
+      const nodes = Array.from(container.querySelectorAll("[data-team-node]")).map(plantedRect)
+      const lines = Array.from(container.querySelectorAll<SVGPathElement>("[data-line-kind]")).map((el) => ({
+        kind: el.getAttribute("data-line-kind"),
+        segs: segments(el.getAttribute("d") ?? ""),
+      }))
+      return { nodes, lines }
+    } finally {
+      spy.mockRestore()
+    }
+  }
+
+  it("POSITIVE CONTROL — the detectors fire on the old straight-up and shared-lane shapes", () => {
+    const upper = plantedRect({ dataset: { teamNode: "" } } as unknown as Element)
+    expect(upper.width).toBe(0)
+    // The pre-fix gate line: straight up through the gate card above it.
+    const card = { left: 16, top: 232, right: 128, bottom: 284 } as DOMRect
+    expect(crosses({ x1: 72, y1: 292, x2: 72, y2: 200 }, card)).toBe(true)
+    // A run along a card's edge is not inside it.
+    expect(crosses({ x1: 16, y1: 300, x2: 16, y2: 200 }, card)).toBe(false)
+    // The pre-fix jumps: every horizontal run on one y.
+    expect(shareInk({ x1: 64, y1: 380, x2: 496, y2: 380 }, { x1: 208, y1: 380, x2: 352, y2: 380 })).toBe(true)
+    expect(shareInk({ x1: 64, y1: 380, x2: 496, y2: 380 }, { x1: 208, y1: 402, x2: 352, y2: 402 })).toBe(false)
+  })
+
+  it.each([
+    ["crowded", crowded],
+    ["vendorRiskReview", vendorRiskReview],
+    ["branching", branching],
+  ] as const)("%s: no line passes through the inside of any card", (_name, phases) => {
+    const { nodes, lines } = drawn(phases as PhaseSpecJSON[])
+    expect(lines.length).toBeGreaterThan(0)
+    expect(lines.every((l) => l.segs.length > 0)).toBe(true)
+    for (const { kind, segs } of lines) {
+      for (const s of segs) {
+        for (const b of nodes) expect(crosses(s, b), `${kind} ${JSON.stringify(s)}`).toBe(false)
+      }
+    }
+  })
+
+  it("crowded: no two jumps share a stretch of line, and each label has its own lane", () => {
+    const { lines } = drawn(crowded)
+    const jumps = lines.filter((l) => l.kind === "jump")
+    expect(jumps).toHaveLength(3)
+    for (let i = 0; i < jumps.length; i += 1) {
+      for (let j = i + 1; j < jumps.length; j += 1) {
+        // The last run INTO a shared target step may meet at that step; every other run is apart.
+        const a = jumps[i].segs.slice(0, -1)
+        const b = jumps[j].segs.slice(0, -1)
+        for (const s of a) for (const t of b) expect(shareInk(s, t), `jump ${i} vs ${j}`).toBe(false)
+      }
+    }
+    const lanes = jumps.map((l) => l.segs[2].y1)
+    expect(new Set(lanes).size).toBe(3)
+  })
+
+  it("crowded: a step's gates each have their own rail", () => {
+    const { lines } = drawn(crowded)
+    const checks = lines.filter((l) => l.kind === "check" || l.kind === "judge")
+    for (let i = 0; i < checks.length; i += 1) {
+      for (let j = i + 1; j < checks.length; j += 1) {
+        for (const s of checks[i].segs) for (const t of checks[j].segs) expect(shareInk(s, t)).toBe(false)
+      }
+    }
+  })
+})
+
 describe("TeamPicture — accessibility", () => {
   it("has no axe violations on the 7-step stress shape", async () => {
     const { container } = renderPicture(vendorRiskReview, { showTechnical: true })

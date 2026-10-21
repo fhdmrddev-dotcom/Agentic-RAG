@@ -232,8 +232,10 @@ A value-only module (no React, no API import; the `cardFace.ts` pattern), e.g. `
 - Step row: a CSS grid of `repeat(N, minmax(128px, 1fr))`, 16px gap, in run order. At 7 steps the row is 7×128 + 6×16 = 992px minimum, so the stress case scrolls inside the plane in a typical builder column. That is the intended behaviour; text never drops below the sizes in Typography.
 - Gate row: the same grid columns, 32px below the step row. Each column stacks the gates of the step above it, 8px apart, in validator order, derived gates last.
 - Handoff lines: from the orchestrator's bottom edge down 28px to a horizontal bus, then down to the top of each step. One per step, no more.
-- Gate lines: from the top of each gate card straight up to the bottom of its own step.
-- ⤳ jump: from the bottom of the owning check, down to 32px below the lowest gate card, across to the target step's column, up to the target step's bottom edge, with the label `⤳ only if the check fails` centered under the horizontal run (`text-[11px] text-warning`).
+- ~~Gate lines: from the top of each gate card straight up to the bottom of its own step.~~
+  ⚠ **CORRECTED by 290-REVIEW WR-03 (2026-10-22):** that line passed behind every gate card above it, and the cards are translucent, so a second check read as joined to the first. The gate list is now indented 16px; each gate line leaves its card's left edge into its own rail inside that indent (a later gate's rail sits further out) and runs up to its step's bottom edge.
+- ~~⤳ jump: from the bottom of the owning check, down to 32px below the lowest gate card, across to the target step's column, up to the target step's bottom edge, with the label `⤳ only if the check fails` centered under the horizontal run (`text-[11px] text-warning`).~~
+  ⚠ **CORRECTED by 290-REVIEW WR-03 / WR-04 (2026-10-22):** the last run crossed the target's own gate cards, and every jump shared one y, so two jumps could read as one. Each jump now has its own lane (32px below the lowest gate card, then 22px per further lane) and its own gutter offset: it leaves the owning check's right edge into the column gutter, runs down to its lane, across, up the target column's gutter and into the target step's right edge. Its label sits under its own lane.
 - `retry` is **never** drawn as a loop; it is written in the gate's "If it fails" line (D-10).
 
 ### 3.3 Node faces
