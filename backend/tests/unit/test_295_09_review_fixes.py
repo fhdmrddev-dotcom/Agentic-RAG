@@ -460,3 +460,29 @@ def test_wr02_the_re_pause_does_not_offer_the_folder_that_came_up_empty():
     ids = [f["id"] for f in out]
     assert F not in ids, "the folder that just came up empty was offered again"
     assert ids == [G]
+
+
+# ═════════════════════════════════════════════════════════════════════════════════════════
+# WR-03 — a valid skip_to on a NON-emit step posts no new chat failure message
+# ═════════════════════════════════════════════════════════════════════════════════════════
+def test_wr03_a_non_emit_step_routed_by_skip_to_posts_no_failure_message():
+    """Before 295 a non-emit step whose gate routed by ``skip_to_phase`` wrote ZERO chat
+    failure messages (its executor never surfaces one). D-23 made the skip_to arm surface
+    whenever the phase had validators, so the thread gained "Phase N gate failed …" mid-run
+    while the run went on and completed. The executor here returns plain output, as
+    ``llm_agent`` / ``llm_single`` / batch do."""
+    from tests.unit.test_295_truthful_run_ends import _definition, _drive_workflow, _messages, _validator
+
+    plain = {"text": "Nothing relevant was found."}
+    run = _drive_workflow(
+        _definition(validators=[_validator("skip_to_phase:p1")]), [dict(plain), dict(plain)],
+    )
+    assert _messages(run) == [], _messages(run)
+
+
+def test_wr03_a_non_emit_step_whose_gate_fails_the_run_still_says_why_once():
+    from tests.unit.test_295_truthful_run_ends import _definition, _drive_workflow, _messages, _validator
+
+    plain = {"text": "Nothing relevant was found."}
+    run = _drive_workflow(_definition(validators=[_validator()]), [dict(plain), dict(plain)])
+    assert len(_messages(run)) == 1
