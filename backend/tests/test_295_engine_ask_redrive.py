@@ -203,8 +203,12 @@ def test_get_ask_user_response_returns_folder_id_additively():
     new = asyncio.run(get_ask_user_response(
         _Pool({"response_text": "x", "choice_index": 0, "folder_id": "f"}), uuid4(), "t"))
     old = asyncio.run(get_ask_user_response(_Pool({"response_text": "x"}), uuid4(), "t"))
-    assert new == {"response_text": "x", "choice_index": 0, "folder_id": "f"}
-    assert old == {"response_text": "x", "choice_index": None, "folder_id": None}
+    # 295-09 (CR-01): ``prompt`` / ``engine_pause`` joined the result, additively (no prompt
+    # row in this fake, so the question is unknown and is not an engine ask).
+    assert new == {"response_text": "x", "choice_index": 0, "folder_id": "f",
+                   "prompt": None, "engine_pause": False}
+    assert old == {"response_text": "x", "choice_index": None, "folder_id": None,
+                   "prompt": None, "engine_pause": False}
 
 
 # ── the re-drive ──────────────────────────────────────────────────────────────────────────

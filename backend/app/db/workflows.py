@@ -2350,7 +2350,7 @@ async def get_ask_user_response(
     """
     row = await pool.fetchrow(
         """
-        SELECT r.tool_calls
+        SELECT r.tool_calls, p.tool_calls AS prompt_tool_calls
         FROM messages r
         JOIN workflow_runs wr ON wr.thread_id = r.thread_id
         JOIN messages p
@@ -2374,12 +2374,18 @@ async def get_ask_user_response(
         return None
     tcs = row["tool_calls"] or []
     payload = tcs[0] if tcs else {}
+    # 295-REVIEW CR-01: the question this answers (the joined prompt row), so a consumer can
+    # refuse an answer to someone else's question. Additive.
+    ptcs = row.get("prompt_tool_calls") or []
+    prompt = ptcs[0] if ptcs and isinstance(ptcs[0], dict) else {}
     return {
         "response_text": payload.get("response_text"),
         "choice_index": payload.get("choice_index"),
         # Phase 295 (D-03): the folder an engine ask's "Search another folder" answer chose.
         # Additive — None on every older row.
         "folder_id": payload.get("folder_id"),
+        "prompt": prompt.get("prompt"),
+        "engine_pause": isinstance(prompt.get("engine_pause"), dict),
     }
 
 

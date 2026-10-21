@@ -1547,6 +1547,14 @@ Scan-list cell as of 2026-10-21 (replaced by 295-07, moved verbatim): 54 / 28 / 
 
 CLAUDE.md verdict cell as of 2026-10-21 (replaced by 295-07, moved verbatim): | `backend/app/db/workflows.py` | 54 / 28 / 2767 (was `53 / 27 / 2767`) | 289-01: two SQL casts ($1::uuid::text), no new function |
 
+### `backend/app/db/workflows.py` — 295-09 (CR-01, 2026-10-21)
+
+**`58 / 29 / 2808`** (the row read `57 / 29 / 2802`). 295-REVIEW CR-01: `get_ask_user_response` already joined the prompt row; it now SELECTs it too (`p.tool_calls AS prompt_tool_calls`) and returns two additive keys, `prompt` and `engine_pause` (a bool), so the human step can refuse an answer to another question. No new function, no new statement; ast.If 32 → 32, IfExp 9 → 10. The one exact-shape pin (`tests/test_295_engine_ask_redrive.py`) was updated for the two keys.
+
+Scan-list cell as of 2026-10-21 (replaced by 295-09, moved verbatim): 57 / 29 / 2802 (was `54 / 28 / 2767`) | ⚠ **FIRES** | 295-03: `stash_awaiting_answer` (+1 def), `pause_run` releases claimed_at, folder_id on the answer; 295-05: created_at + engine_pause on the unanswered read. If 32→32 |
+
+CLAUDE.md verdict cell as of 2026-10-21 (replaced by 295-09, moved verbatim): | `backend/app/db/workflows.py` | 57 / 29 / 2802 (was `54 / 28 / 2767`) | 295-03 stash writer + lease release · 295-05 two read keys |
+
 ## `backend/app/services/harness/publish_service.py`
 
 #### Phase 288 (288-02) -- publish_service.py
@@ -1922,6 +1930,14 @@ Scan-list cell as of 2026-10-20 (replaced by 289-REVIEW WR-06, moved verbatim): 
 Scan-list cell as of 2026-10-21 (replaced by 295-07, moved verbatim): 45 / 20 / 1845 (was `44 / 20 / 1827`) | **FIRES** | **289-REVIEW WR-06**: an answered paused run whose definition will not load ends `failed` with words via the SAME `_fail_redrive` (`from_statuses=('paused',)`). Claim-false arm owed
 
 CLAUDE.md verdict cell as of 2026-10-21 (replaced by 295-07, moved verbatim): | `backend/app/api/runs.py` | 45 / 20 / 1845 (was `44 / 20 / 1827`) | 289-REVIEW WR-06: unloadable-definition answer ends failed (same helper) |
+
+### `backend/app/api/runs.py` — 295-09 (CR-01, 2026-10-21)
+
+**`48 / 21 / 1929`** (the row read `47 / 21 / 1907`). 295-REVIEW CR-01 (driven RED first): an answer to a harness run was never checked against the question the run waits on now, so a stale or replayed answer re-drove the run (the step re-ran and the answer was thrown away, or a human step took it). The route now refuses it with 409 "This question is no longer the one the run is waiting on." BEFORE anything is persisted or re-driven. ONE new def `_is_current_question`, which reuses `get_unanswered_ask_user` (no second query shape). Module ast.If 56 → 57, defs 12 → 13. Harness answers only; the Deep path is byte-identical.
+
+Scan-list cell as of 2026-10-21 (replaced by 295-09, moved verbatim): 47 / 21 / 1907 (was `45 / 20 / 1845`) | ⚠ **FIRES** | 295-03: ONE allow-list refusal (422) before persist (+1 def `_engine_answer_refusal`, +1 If). 295-04: `stopped_by` passed to cancel (If 56→56). Honoured by construction |
+
+CLAUDE.md verdict cell as of 2026-10-21 (replaced by 295-09, moved verbatim): | `backend/app/api/runs.py` | 47 / 21 / 1907 (was `45 / 20 / 1845`) | 295-03: 422 allow-list before persist · 295-04: stopped_by kwarg |
 
 ## `backend/app/services/harness_engine.py`
 
@@ -11316,7 +11332,7 @@ cells rot within days.
 | File | commits / phases / lines | G-5 | Disposition |
 |---|---|---|---|
 | [`backend/app/api/panel.py`](docs/HOT-FILE-LEDGER.md#backendappapipanelpy) | 6 / 5 / 285 | ⚠ **FIRES** | 295-03: ONE additive `engine_pause` key on /pending beside `draft`. Honoured by construction. 295-07: triple re-derived, unchanged since 295-03 |
-| [`backend/app/services/harness/human_input.py`](docs/HOT-FILE-LEDGER.md#backendappservicesharnesshuman_inputpy) | 5 / 3 / 355 | ⚠ **FIRES** | 295-04: ONE skip in `_latest_phase_text` (D-46), one cancel sibling (D-49). Honoured by construction. 295-07: triple re-derived, unchanged |
+| [`backend/app/services/harness/human_input.py`](docs/HOT-FILE-LEDGER.md#backendappservicesharnesshuman_inputpy) | 6 / 3 / 375 (was `5 / 3 / 355`) | ⚠ **FIRES** | 295-09 CR-01: ONE guard (+1 def `_answers_this_step`, If 15→17): a re-drive consumes only an answer to THIS step's question, never an engine ask's or another step's. Honoured by construction |
 | [`backend/app/services/harness/engine_ask.py`](docs/HOT-FILE-LEDGER.md#backendappservicesharnessengine_askpy) | 5 / 1 / 1344 | no (young) | young (295-01 D-51 seam, verbatim move). 295-03 grew it 599→1338 L, If 24→77: the durable engine ask. ⛔ one allow-list shared with the route's 422 |
 | [`backend/app/services/harness/run_handoff.py`](docs/HOT-FILE-LEDGER.md#backendappservicesharnessrun_handoffpy) | 5 / 1 / 355 | no (young) | young. 295-03 created it (phase_scope_ids); 295-04 put every new branch of its plan here (5→355 L, If 0→20, 17 defs). ⛔ no app import; one guarded terminal write |
 | [`backend/app/services/harness/run_read_wire.py`](docs/HOT-FILE-LEDGER.md#backendappservicesharnessrun_read_wirepy) | 1 / 1 / 150 | no (young) | young (295-05). Pure leaf: unsourced_for_wire, end_reason_for_wire, resolve_end_reason, deadline_passed. ⛔ no app imports; a stored user id is REPLACED by words |
@@ -11431,14 +11447,14 @@ cells rot within days.
 | [`frontend/src/hooks/useThreads.ts`](docs/HOT-FILE-LEDGER.md#frontendsrchooksusethreadsts) | 5 / 3 / 65 (was `4 / 2 / 64`) | ⚠ **NOW FIRES — 3 phases** | ⚠ row STALE (`4/2/64`), now FIRES. **267-04**: `newThread` takes an optional Expert id, so an invite on a brand-new chat reaches the row (D-267-21; live G4-1). ⛔ `selectThread` stays a bare setState |
 | [`backend/app/services/harness/grounding.py`](docs/HOT-FILE-LEDGER.md#backendappservicesharnessgroundingpy) | 23 / 10 / 1437 (was `22 / 9 / 1417`) | ⚠ **FIRES** | 295-03: ONE pure predicate `is_engine_citation_gate` (+1 def, If 24→24); `on_failure="fail_run"` kept (D-51). Honoured by construction |
 | [`frontend/src/components/workflows/PhaseFormPanel.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentsworkflowsphaseformpaneltsx) | 30 / 14 / 1566 | **FIRES** | honoured by construction ×6 (185 / 193 / 193.1 / 199 / 200 / **214**) |
-| [`backend/app/db/workflows.py`](docs/HOT-FILE-LEDGER.md#backendappdbworkflowspy) | 57 / 29 / 2802 (was `54 / 28 / 2767`) | ⚠ **FIRES** | 295-03: `stash_awaiting_answer` (+1 def), `pause_run` releases claimed_at, folder_id on the answer; 295-05: created_at + engine_pause on the unanswered read. If 32→32 |
+| [`backend/app/db/workflows.py`](docs/HOT-FILE-LEDGER.md#backendappdbworkflowspy) | 58 / 29 / 2808 (was `57 / 29 / 2802`) | ⚠ **FIRES** | 295-09 CR-01: `get_ask_user_response` also returns the joined prompt's words and whether it was an engine ask (one SELECT column, two additive keys). If 32→32 |
 | [`backend/app/services/harness/publish_service.py`](docs/HOT-FILE-LEDGER.md#backendappservicesharnesspublish_servicepy) | 33 / 15 / 2008 (was `31 / 14 / 2001`) | ⚠ **FIRES** | 295-04: the golden run's `finally` calls `finish_golden_run` (If 70→70). 295-07: D-47 found no judge citing the auto-answer, so no D-17 note. Honoured by construction |
 | [`backend/app/services/workflow_authoring.py`](docs/HOT-FILE-LEDGER.md#backendappservicesworkflow_authoringpy) | 17 / 11 / 1025 (was `16 / 10 / 1002`) | **FIRES** | 286 forecast (291): uploaded template / form / reference text = ONE more grounding input to the existing generate path; tools + phase types stay closed; asset text is untrusted |
 | [`backend/app/models/harness.py`](docs/HOT-FILE-LEDGER.md#backendappmodelsharnesspy) | 20 / 19 / 766 | **FIRES** | honoured by construction (193.2 / **214**) |
 | [`frontend/src/components/workflows/builderStore.ts`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentsworkflowsbuilderstorets) | 14 / 8 / 968 | **FIRES** | 286 forecast (288): draft config persistence rides `useDraftPersistence` (186-07); at most ONE store field. honoured by construction (193.2 / 197 / 214.1) |
 | [`frontend/src/components/panel/WorkspacePanel.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentspanelworkspacepaneltsx) | 17 / 11 / 646 (was `16 / 10 / 646`) | **FIRES** | honoured by construction (194 / 194.1 / **282-02**: ONE `home="panel"` prop on the existing `PendingAskStack` mount; the `pendingAsks.length > 0 &&` condition byte-identical) |
 | [`backend/app/services/run_lifecycle.py`](docs/HOT-FILE-LEDGER.md#backendappservicesrun_lifecyclepy) | 10 / 6 / 776 (was `9 / 5 / 756`) | ⚠ **FIRES** | 295-04: `cancel_workflow_run_internals(..., stopped_by=...)` calls `record_stop` before its own finish_run (If 11→11). Honoured by construction |
-| [`backend/app/api/runs.py`](docs/HOT-FILE-LEDGER.md#backendappapirunspy) | 47 / 21 / 1907 (was `45 / 20 / 1845`) | ⚠ **FIRES** | 295-03: ONE allow-list refusal (422) before persist (+1 def `_engine_answer_refusal`, +1 If). 295-04: `stopped_by` passed to cancel (If 56→56). Honoured by construction |
+| [`backend/app/api/runs.py`](docs/HOT-FILE-LEDGER.md#backendappapirunspy) | 48 / 21 / 1929 (was `47 / 21 / 1907`) | ⚠ **FIRES** | 295-09 CR-01: ONE 409 before the 422 allow-list (+1 def `_is_current_question`, If 56→57): an answer must be for the run's newest unanswered question. Honoured by construction |
 | [`backend/app/services/harness_engine.py`](docs/HOT-FILE-LEDGER.md#backendappservicesharness_enginepy) | 67 / 26 / 2957 (was `62 / 25 / 3396`) | ⚠ **FIRES** | 295-01: D-51 seam TAKEN (engine-ask family out, −499 L, If 107→83). 295-03/04: consume call, sweep arm, D-14 expr, resume terminalize. Armed-block seam still OWED |
 | [`frontend/src/components/chat/RunCard.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentschatruncardtsx) | 31 / 16 / 729 (was `28 / 14 / 710`) | **FIRES** | ⭐ G-5 DISCHARGED (243-02). **276-06**: avatar pulse + header spinner removed (D-27: one live avatar); provider logo static. ⛔ Bot stays the unknown-provider fallback |
 | [`frontend/src/components/chat/WorkingBadge.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentschatworkingbadgetsx) | 3 / 2 / 50 (was `2 / 1 / 56`) | no (2 phases) | ⚠ absent its ENTIRE LIFE; row added at 276-06 planning. 276-06: the ✦ glyph and its pulse gone (the Iris avatar is the motion); the word stays. ⛔ memo equality unchanged |
@@ -23168,6 +23184,14 @@ CLAUDE.md verdict cell as of 2026-10-21 (replaced by 295-07, moved verbatim): | 
 Scan-list cell as of 2026-10-21 (replaced by 295-07, moved verbatim): 5 / 3 / 355 (was `3 / 2 / 340`) | ⚠ **FIRES** | ⚠ absent its ENTIRE LIFE — row added 295-04. 295-04: ONE skip in `_latest_phase_text` (D-46), one cancel sibling (D-49). Honoured by construction
 
 CLAUDE.md verdict cell as of 2026-10-21 (replaced by 295-07, moved verbatim): | `backend/app/services/harness/human_input.py` | 5 / 3 / 355 (was `3 / 2 / 340`) | ⚠ absent its ENTIRE LIFE — row added 295-04 · skip + cancel sibling · ⛔ |
+
+### `backend/app/services/harness/human_input.py` — 295-09 (CR-01, 2026-10-21)
+
+**`6 / 3 / 375`** (the row read `5 / 3 / 355`). 295-REVIEW CR-01 (driven RED first): the resume branch consumed whatever answer the flag named, so a human step could complete with an engine ask's "Continue without sources". It now consumes only an answer whose prompt is not an engine ask and reads as this step's own prompt (`_answers_this_step`, fed by the two keys `get_ask_user_response` now returns); otherwise it asks its own question. ast.If 15 → 17, defs 4 → 5. The leaf invariant holds: no import of `phase_types`. The live block (`answer = ""`) is byte-identical (CRITERION 20).
+
+Scan-list cell as of 2026-10-21 (replaced by 295-09, moved verbatim): 5 / 3 / 355 | ⚠ **FIRES** | 295-04: ONE skip in `_latest_phase_text` (D-46), one cancel sibling (D-49). Honoured by construction. 295-07: triple re-derived, unchanged |
+
+CLAUDE.md verdict cell as of 2026-10-21 (replaced by 295-09, moved verbatim): | `backend/app/services/harness/human_input.py` | 5 / 3 / 355 | 295-04: skip + cancel sibling · honoured by construction · ⛔ |
 
 ## Phase 295 — ledger write for files whose history lives under `###` headings (295-07, 2026-10-21)
 

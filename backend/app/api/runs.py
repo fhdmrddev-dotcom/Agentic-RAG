@@ -596,6 +596,20 @@ async def _engine_answer_refusal(run_id: UUID, thread_id, body: "AskUserResponse
     )
 
 
+async def _is_current_question(run_id: UUID, tool_call_id: str) -> bool:
+    """295-REVIEW CR-01: is ``tool_call_id`` the run's newest UNANSWERED prompt?
+
+    The same read ``/workflow-runs`` uses for "who is this run waiting on"
+    (``get_unanswered_ask_user``, run-scoped by the prompt's ``run_id``). The caller has
+    already passed the owner + thread-anchor check for this run.
+    """
+    from app.db.workflows import get_unanswered_ask_user  # noqa: PLC0415
+    from app.dependencies import get_pg_pool  # noqa: PLC0415
+
+    pending = await get_unanswered_ask_user(await get_pg_pool(), run_id)
+    return bool(pending) and str(pending.get("tool_call_id")) == str(tool_call_id)
+
+
 _REDRIVE_FAILED_REASON = "Your answer was saved, but the run could not continue."
 # 289-REVIEW WR-06: the paused run's definition could not be loaded, so it was never re-driven.
 _REDRIVE_NO_DEFINITION_REASON = "Your answer was saved, but the workflow could not be loaded."
@@ -992,6 +1006,14 @@ async def submit_ask_user_response(
     # list, or "Continue without sources" on a locked step is refused with plain words, so the
     # card stays answerable and nothing is re-driven. Harness answers only; a prompt without
     # ``engine_pause`` is unaffected.
+    # 295-REVIEW CR-01: a harness answer must be for the question the run is waiting on NOW
+    # (its newest unanswered prompt). A stale or replayed answer used to re-drive the run, so
+    # the step re-ran and threw the answer away, or a human step took it as its own.
+    if _origin == "harness" and not await _is_current_question(run_id, body.tool_call_id):
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail="This question is no longer the one the run is waiting on.",
+        )
     _refusal = (
         await _engine_answer_refusal(run_id, row["thread_id"], body)
         if _origin == "harness" else None

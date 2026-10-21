@@ -440,7 +440,7 @@ node scripts/check-hot-file-ledger.cjs <phase-dir>   # 0 clear · 1 missing rows
 | `frontend/src/hooks/useThreads.ts` | 5 / 3 / 65 | ⚠ now FIRES · last touch 267-04 · ⛔ |
 | `backend/app/services/harness/grounding.py` | 23 / 10 / 1437 (was `21 / 8 / 1414`) | 295-03: ONE pure predicate (is_engine_citation_gate) |
 | `frontend/src/components/workflows/PhaseFormPanel.tsx` | 30 / 14 / 1566 | honoured by construction ×6 (185 / 193 / 193.1 / 199 / 200 / **214**) |
-| `backend/app/db/workflows.py` | 57 / 29 / 2802 (was `54 / 28 / 2767`) | 295-03 stash writer + lease release · 295-05 two read keys |
+| `backend/app/db/workflows.py` | 58 / 29 / 2808 (was `57 / 29 / 2802`) | 295-09 CR-01: the answer read names its question (2 keys) |
 | `backend/app/services/harness/publish_service.py` | 33 / 15 / 2008 (was `31 / 14 / 2001`) | 295-04: golden finally helper · 295-07: no D-17 change |
 | `backend/app/services/workflow_authoring.py` | 17 / 11 / 1025 (was `15 / 9 / 989`) | 286 forecast: 291 template text = one more grounding input (untrusted) |
 | `backend/app/models/harness.py` | 20 / 19 / 766 | honoured by construction (193.2 / **214**) |
@@ -453,9 +453,9 @@ node scripts/check-hot-file-ledger.cjs <phase-dir>   # 0 clear · 1 missing rows
 | `backend/app/services/task_service.py` | 27 / 14 / 1023 (was `26 / 14 / 1018`) | 289-REVIEW WR-04: refused searches no longer count as KB searches |
 | `backend/app/services/run_reconciler.py` | 5 / 3 / 406 (was `3 / 2 / 325`) | 295-04: ONE workflow-run sweep · live-proven 295-07 · ⚠ now FIRES |
 | `backend/app/services/circuit_breaker.py` | 1 / 1 / 331 | ⚠ absent its ENTIRE LIFE — row added 256-02 · ⛔ |
-| `backend/app/api/runs.py` | 47 / 21 / 1907 (was `45 / 20 / 1845`) | 295-03: 422 allow-list before persist · 295-04: stopped_by kwarg |
+| `backend/app/api/runs.py` | 48 / 21 / 1929 (was `47 / 21 / 1907`) | 295-09 CR-01: 409 unless the answer is for the current question |
 | `backend/app/api/panel.py` | 6 / 5 / 285 | 295-03: ONE engine_pause key on /pending · honoured by construction |
-| `backend/app/services/harness/human_input.py` | 5 / 3 / 355 | 295-04: skip + cancel sibling · honoured by construction · ⛔ |
+| `backend/app/services/harness/human_input.py` | 6 / 3 / 375 (was `5 / 3 / 355`) | 295-09 CR-01: consumes only its own question's answer · ⛔ |
 | `backend/app/middleware/canvas_gate.py` | 9 / 6 / 396 (was `8 / 5 / 391`) | 289-03: ONE gated path (…/evidence) · ⛔ test_182 never imports it |
 | `backend/app/services/harness_engine.py` | 67 / 26 / 2957 (was `62 / 25 / 3396`) | 295-01: seam TAKEN (−499 L) · armed-block seam still OWED · ⛔ |
 | `frontend/src/components/chat/ThinkingBlock.tsx` | 6 / 2 / 320 | ⚠ row STALE; does NOT fire yet · ⛔ |
