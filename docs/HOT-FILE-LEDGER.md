@@ -11492,7 +11492,7 @@ cells rot within days.
 | [`frontend/src/hooks/useFollowScroll.ts`](docs/HOT-FILE-LEDGER.md#frontendsrchooksusefollowscrollts) | 4 / 2 / 314 | does not fire | ⛔ **NO ROW FOR ITS ENTIRE LIFE — added 243-03**, then STALE at `3/2/265` one phase on. **243-06:** the re-arm now asks whether the reader is STILL leaving, not what they last did |
 | [`frontend/src/lib/throttle.ts`](docs/HOT-FILE-LEDGER.md#frontendsrclibthrottlets) | 2 / 2 / 108 | does not fire | ⛔ **NO ROW FOR ITS ENTIRE LIFE — added 243-03.** TWO opposite primitives on purpose; ⛔ never unify them — one of the two call sites breaks silently |
 | [`frontend/src/components/chat/ChatArea.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentschatchatareatsx) | 94 / 44 / 1189 (was `93 / 43 / 1186`) | **FIRES** | honoured by construction (**287-03**): ONE mount of ThreadWorkflowPicker, zero new hooks, no logic. ⛔ no scope branch in send |
-| [`frontend/src/components/panel/PendingAskCard.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentspanelpendingaskcardtsx) | 23 / 11 / 1101 (was `22 / 11 / 1095`) | ⚠ **FIRES** | 295-10 (D-r1-01): the 409 arm shows the server's sentence when sent (else the old words) and, on a paused run, re-reads the stack's asks once. useState 7→7, useEffect 3→3 |
+| [`frontend/src/components/panel/PendingAskCard.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentspanelpendingaskcardtsx) | 24 / 11 / 1103 (was `23 / 11 / 1101`) | ⚠ **FIRES** | 295 D-r2-01: any non-terminal run status is live, so a re-driven active run's next ask is not retired. useState 7→7, useEffect 3→3 |
 | [`frontend/src/pages/WorkflowRunPage.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrcpagesworkflowrunpagetsx) | 33 / 13 / 1594 (was `31 / 12 / 1580`) | **FIRES** | **289-01** one `paused` attribute; **289-04** ONE early return → RunEvidenceReport (+14 L). No new hook/state/effect. RunHero now dead here (F-D). ⛔ invariants unchanged |
 | [`frontend/src/components/workflows/WaitingOnLine.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentsworkflowswaitingonlinetsx) | 1 / 1 / 26 | does not fire | young (created **288-03**): leaf that renders the server-composed waiting-on sentence verbatim; no hook, no API import |
 | [`frontend/src/components/workflows/StepEvidenceLine.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentsworkflowsstepevidencelinetsx) | 2 / 2 / 145 (was `1 / 1 / 93`) | no (2 phases) | 295-05: the unsourced arm; the confidence arm is byte-unchanged (an innerHTML test pins it). Two phases; does not fire |
@@ -21503,6 +21503,14 @@ CLAUDE.md verdict cell as of 2026-10-15 (replaced by 282-03):
 Scan-list cell as of 2026-10-21 (replaced by 295-10, moved verbatim): 22 / 11 / 1095 (was `21 / 11 / 1086`) | ⚠ **FIRES** | 295-08 WR-04: `!enginePause` hides free text + divider; a 4xx shows the server's sentence. SEED-361: paused is not over. useState 7→7, useEffect 3→3 |
 
 CLAUDE.md verdict cell as of 2026-10-21 (replaced by 295-10, moved verbatim): | `frontend/src/components/panel/PendingAskCard.tsx` | 22 / 11 / 1095 (was `21 / 11 / 1086`) | 295-08: paused not over; engine ask: choices only |
+
+### `frontend/src/components/panel/PendingAskCard.tsx` — 295 D-r2-01 (fast fix after gap round 2)
+
+**`24 / 11 / 1103`** (was `23 / 11 / 1101`). The round-2 live check (runs `8f534cf1`, `5416b7b8`, `0ba3e0e5`) found that after an answer in the same tab, the next in-stream approval card read "The run was stopped" for 241 s while the run waited. The tab holds no lock, and the recorded status read `active`, which `runIsOver` counted as over because only `paused` was exempt. Now any status other than `completed` / `failed` / `cancelled` / `timed_out` counts as live; a missing status still retires, as before. One RED case first (`b27a00f7c`). useState 7 → 7, useEffect 3 → 3. The `?raw` line pin was re-baselined 1102 → 1104 with a dated note. Fixed under G-3 as a fast fix, not a round 3 (G-7).
+
+Scan-list cell as of 2026-10-21 (replaced by D-r2-01, moved verbatim): 23 / 11 / 1101 (was `22 / 11 / 1095`) | ⚠ **FIRES** | 295-10 (D-r1-01): the 409 arm shows the server's sentence when sent (else the old words) and, on a paused run, re-reads the stack's asks once. useState 7→7, useEffect 3→3 |
+
+CLAUDE.md verdict cell as of 2026-10-21 (replaced by D-r2-01, moved verbatim): | `frontend/src/components/panel/PendingAskCard.tsx` | 23 / 11 / 1101 (was `22 / 11 / 1095`) | 295-10: 409 shows server words; paused run re-reads asks |
 
 ### `frontend/src/components/panel/WorkspacePanel.tsx` — Phase 282 close
 

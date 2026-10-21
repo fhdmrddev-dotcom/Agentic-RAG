@@ -469,7 +469,7 @@ node scripts/check-hot-file-ledger.cjs <phase-dir>   # 0 clear · 1 missing rows
 | `frontend/src/components/chat/ThreadWorkflowPicker.tsx` | 1 / 1 / 91 | young (created 287-03) · reads no conversation · ⛔ |
 | `frontend/src/components/chat/useStartWorkflowInThread.ts` | 1 / 1 / 85 | young (created 287-03) · no createThread · ⛔ |
 | `frontend/src/lib/toolMeta.ts` | 10 / 6 / 218 | ⚠ absent its ENTIRE LIFE — row added 244-13 · ⛔ |
-| `frontend/src/components/panel/PendingAskCard.tsx` | 23 / 11 / 1101 (was `22 / 11 / 1095`) | 295-10: 409 shows server words; paused run re-reads asks |
+| `frontend/src/components/panel/PendingAskCard.tsx` | 24 / 11 / 1103 (was `23 / 11 / 1101`) | D-r2-01: any non-terminal run status is live; not retired |
 | `frontend/src/pages/WorkflowRunPage.tsx` | 33 / 13 / 1594 (was `31 / 12 / 1580`) | 289-04: ONE early return → evidence report; no new hook · ⛔ |
 | `frontend/src/components/workflows/WaitingOnLine.tsx` | 1 / 1 / 26 | young (created 288-03) · leaf, no hook · ⛔ |
 | `frontend/src/components/chat/OutputFileCard.tsx` | 8 / 7 / 219 | honoured by construction (195) |

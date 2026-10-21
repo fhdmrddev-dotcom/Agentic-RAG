@@ -272,8 +272,12 @@ describe("194.1-01 — the three shipped retirement sentences, READ from source"
      * 2026-10-21 — 295-10 (D-r1-01) RE-BASELINED 1096 → 1102, not loosened: the 409 arm shows the
      * server's sentence when it sent one (else the old words), and on a paused run re-reads the
      * stack's asks once. `useState` 7 → 7, `useEffect` 3 → 3. Retirement fences untouched and green.
+     *
+     * 2026-10-21 — 295 D-r2-01 RE-BASELINED 1102 → 1104, not loosened: the stack treats any
+     * non-terminal run status (not only `paused`) as live, so a re-driven `active` run's next ask
+     * is not retired. `useState` 7 → 7, `useEffect` 3 → 3. Retirement fences untouched and green.
      */
-    expect(src.split("\n").length).toBe(1102)
+    expect(src.split("\n").length).toBe(1104)
   })
 
   /** (a) The 404-expiry constant — `setExpiredMessage("…")` in the catch. */

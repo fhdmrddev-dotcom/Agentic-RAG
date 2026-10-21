@@ -911,10 +911,12 @@ export function PendingAskStack({ home = "chat" }: { home?: "chat" | "panel" } =
   const { data: phases } = usePhases(threadId)
   // 295-08 (SEED-361): a PAUSED run has no live producer, so the server reports its lock stale and
   // `lock == null` holds while the run waits on the person. The run status from the phase
-  // reconcile's own read (store field, no fetch here) says so; a paused run is not over.
+  // reconcile's own read (store field, no fetch here) says so; a paused run is not over. D-r2-01:
+  // neither is an `active` one re-driven after an answer, so only a terminal or unknown status ends it.
   const runStatus = useStreamsStore((s) => (threadId ? s.workflowRunStatusByThread.get(threadId) : null))
   const paused = runStatus === "paused"
-  const runIsOver = workflowLock == null && phases.length > 0 && !paused
+  const runLive = runStatus != null && !["completed", "failed", "cancelled", "timed_out"].includes(runStatus)
+  const runIsOver = workflowLock == null && phases.length > 0 && !runLive
 
   // ── Phase 214-11 Task 2 (STEP-04 / D-214-16 / D-214-14) — THE STACK RESOLVES; THE CARD
   //    RENDERS.
