@@ -292,6 +292,8 @@ import {
   MATCH_REASON_WORDS,
 } from "./libraryVocabulary"
 import type { RowIdentity } from "./rowIdentity"
+import { StepChipLine } from "./StepChipLine"
+import { resolveStepLine } from "./stepLine"
 import {
   WorkflowDeleteSheet,
   type WorkflowDeleteSheetHandle,
@@ -944,6 +946,9 @@ export function WorkflowCard({
    * stub nobody authored. A UAT row driven against any other slug cannot see this feature.
    */
   const templateMark = templateAdmission(row.def) === "admits" ? [CARD_TEMPLATE_MARK] : []
+  // 290-02 (VIS-04 / D-01): derived from row.def in the card, no new prop; null renders nothing,
+  // so a step-less card composes byte-identically. The expand state lives in StepChipLine.
+  const stepLine = resolveStepLine(row.def)
 
   /**
    * Phase 192.1-06 (D-03 / D-06) — the identity line's parts AFTER the owner word, in the one
@@ -1179,6 +1184,8 @@ export function WorkflowCard({
               </>
             )}
           </div>
+
+          {stepLine && <StepChipLine line={stepLine} />}
 
           {/* ── THE 14TH ATOM — THE IDENTITY LINE (D-06 / D-08 / D-09 / D-10) ───────────
               161-A's PLACE, 160-B's CONTENT: DOM POSITION 2 inside this `min-w-0` column,

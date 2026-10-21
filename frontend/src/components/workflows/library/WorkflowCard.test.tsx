@@ -77,6 +77,8 @@ import type { MatchReason } from "./libraryFilter"
 // merely that some string appeared — a fixture whose arm is assumed is the 192 CR-01 defect
 // ("both failure tests pinned the correct branch without ever entering the wrong one").
 import { templateAdmission } from "@/components/workflows/soulData"
+// 290-02: the chip words' one home (D-04), imported rather than re-typed.
+import { PHASE_TYPE_SENTENCES } from "@/components/workflows/phaseVocabulary"
 import {
   CARD_TEMPLATE_MARK,
   LINEAGE_COPY_OF,
@@ -784,16 +786,19 @@ describe("D-08 / D-11 — one identity line per card, at DOM position 3", () => 
     const column = line.parentElement as HTMLElement
     expect(column).not.toBeNull()
 
-    expect(column.children).toHaveLength(4)
+    // 290-02: `DEF` has two steps, so the chip line (row-steps) takes index 2 and the rest shift by one.
+    expect(column.children).toHaveLength(5)
     // 0 — the name/version row, which really carries the name (so index 0 is not an accident)
     expect(column.children[0].textContent).toContain(row.name)
     // 1 — D-01's line 2, asserted as the SAME NODE the answer testid resolves to, so this
     //     index cannot be satisfied by any node that merely happens to sit there.
     expect(column.children[1]).toBe(within(card).getByTestId("row-answer"))
-    // 2 — D-08's position, one lower than it was and still above the chip
-    expect(column.children[2]).toBe(line)
-    // 3 — the folder chip, still BELOW the line
-    expect(column.children[3].textContent).toContain("Risk & Compliance")
+    // 2 — 290-02's chip line, between line 2 and the identity line (VIS-04 / D-01)
+    expect(column.children[2]).toBe(within(card).getByTestId("row-steps"))
+    // 3 — D-08's line, one lower than it was and still above the chip
+    expect(column.children[3]).toBe(line)
+    // 4 — the folder chip, still BELOW the line
+    expect(column.children[4].textContent).toContain("Risk & Compliance")
   })
 
   it("with no folder chip the line is STILL child index 2, and is the column's last child", () => {
@@ -803,8 +808,40 @@ describe("D-08 / D-11 — one identity line per card, at DOM position 3", () => 
     const { card } = renderCard(PUBLISHED, { folderName: null })
     const line = within(card).getByTestId("row-identity")
     const column = line.parentElement as HTMLElement
-    expect(column.children).toHaveLength(3)
-    expect(column.children[2]).toBe(line)
+    // 290-02: the chip line sits at index 2 on a step card, so the identity line is index 3 and last.
+    expect(column.children).toHaveLength(4)
+    expect(column.children[3]).toBe(line)
+  })
+})
+
+// 290-02 (VIS-04 / D-01 / D-04): the chip line on the card — present on step cards, absent otherwise.
+// The step toggle is queried INSIDE row-steps only: `+N more` is also `automationMoreCount`'s text.
+describe("290-02 — the card's chip line (row-steps)", () => {
+  it("a two-step card names its steps in type sentences, in run order", () => {
+    const { card } = renderCard(PUBLISHED)
+    const steps = within(card).getByTestId("row-steps")
+    expect(within(steps).getAllByTestId("row-steps-chip").map((li) => li.lastChild?.textContent)).toEqual([
+      PHASE_TYPE_SENTENCES.llm_agent,
+      PHASE_TYPE_SENTENCES.llm_emit,
+    ])
+    expect(PHASE_TYPE_SENTENCES.llm_agent).toBe("Work out how to do it")
+    expect(PHASE_TYPE_SENTENCES.llm_emit).toBe("Produce the deliverable")
+  })
+
+  it("a one-step card shows one chip and no toggle", () => {
+    const { card } = renderCard(PUBLISHED_NO_TEMPLATE)
+    const steps = within(card).getByTestId("row-steps")
+    expect(within(steps).getAllByTestId("row-steps-chip")).toHaveLength(1)
+    expect(within(steps).queryByTestId("row-steps-toggle")).toBeNull()
+  })
+
+  it("a card with no steps renders no row-steps node, and its column is the pre-290 shape", () => {
+    const { card } = renderCard(PUBLISHED_UNKNOWN_DEF, { folderName: "Risk & Compliance" })
+    expect(within(card).queryByTestId("row-steps")).toBeNull()
+    const column = within(card).getByTestId("row-identity").parentElement as HTMLElement
+    // The pre-290 resting count: name row, line 2, identity line, folder chip.
+    expect(column.children).toHaveLength(4)
+    expect(column.children[2]).toBe(within(card).getByTestId("row-identity"))
   })
 })
 
@@ -1045,11 +1082,13 @@ describe("AUTH-03 — the template mark, and the silence on either side of it", 
     expect(within(card).queryAllByTestId("row-identity")).toHaveLength(1)
     const line = within(card).getByTestId("row-identity")
     const column = line.parentElement as HTMLElement
-    expect(column.children).toHaveLength(4)
+    // 290-02: the chip line takes index 2 on this step card; the identity line moves to 3.
+    expect(column.children).toHaveLength(5)
     expect(column.children[0].textContent).toContain(PUBLISHED.name)
     expect(column.children[1]).toBe(within(card).getByTestId("row-answer"))
-    expect(column.children[2]).toBe(line)
-    expect(column.children[3].textContent).toContain("Risk & Compliance")
+    expect(column.children[2]).toBe(within(card).getByTestId("row-steps"))
+    expect(column.children[3]).toBe(line)
+    expect(column.children[4].textContent).toContain("Risk & Compliance")
     // …and the mark really is inside the line rather than beside it.
     expect(identityParts(line)).toContain(CARD_TEMPLATE_MARK)
   })
@@ -1575,7 +1614,11 @@ describe("the shipped surface survives the 14th atom at scale", () => {
       expect(lines).toHaveLength(1)
       // ⚠ index 2, not 1 — D-01's line 2 takes position 2 on every one of the 106 rows, not
       // only on the four the unit cases drive. See the block-level ⚠ at D-08 / D-11.
-      expect((lines[0].parentElement as HTMLElement).children[2]).toBe(lines[0])
+      // 290-02: a card with steps carries the chip line at index 2, so its identity line is 3.
+      const column = lines[0].parentElement as HTMLElement
+      const steps = within(card).queryByTestId("row-steps")
+      if (steps) expect(column.children[2]).toBe(steps)
+      expect(column.children[steps ? 3 : 2]).toBe(lines[0])
     }
   })
 
@@ -2070,7 +2113,8 @@ describe("192.2-09 (WR-04) — the reason line CANNOT appear on a resting card",
     // makes it by DOM shape, in the suite that owns child-order assertions.
     const { card } = renderCard(PUBLISHED, { folderName: "Risk & Compliance" })
     const column = within(card).getByTestId("row-identity").parentElement as HTMLElement
-    expect(column.children).toHaveLength(4)
+    // 290-02: 5, not 4 — `DEF` has steps, so the chip line is one more resting child.
+    expect(column.children).toHaveLength(5)
   })
 })
 
@@ -2127,20 +2171,23 @@ describe("192.2-09 (WR-04) — with reasons, it says exactly what put the row he
     })
     const line = within(card).getByTestId("row-match-reason")
     const column = line.parentElement as HTMLElement
-    expect(column.children).toHaveLength(5)
+    // 290-02: the chip line takes index 2 on this step card; everything after it shifts by one.
+    expect(column.children).toHaveLength(6)
     expect(column.children[0].textContent).toContain(PUBLISHED.name)
     expect(column.children[1]).toBe(within(card).getByTestId("row-answer"))
-    expect(column.children[2]).toBe(within(card).getByTestId("row-identity"))
-    expect(column.children[3].textContent).toContain("Risk & Compliance")
-    expect(column.children[4]).toBe(line)
+    expect(column.children[2]).toBe(within(card).getByTestId("row-steps"))
+    expect(column.children[3]).toBe(within(card).getByTestId("row-identity"))
+    expect(column.children[4].textContent).toContain("Risk & Compliance")
+    expect(column.children[5]).toBe(line)
   })
 
   it("with no folder chip it is STILL last — child index 3, not 4", () => {
     const { card } = renderCard(PUBLISHED, { folderName: null, matchReasons: ["purpose"] })
     const line = within(card).getByTestId("row-match-reason")
     const column = line.parentElement as HTMLElement
-    expect(column.children).toHaveLength(4)
-    expect(column.children[3]).toBe(line)
+    // 290-02: index 4 now — the chip line (row-steps) is one more child above it on a step card.
+    expect(column.children).toHaveLength(5)
+    expect(column.children[4]).toBe(line)
   })
 
   it.each<[Provenance, LibraryRow]>([
