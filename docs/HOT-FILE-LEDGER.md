@@ -11491,7 +11491,7 @@ cells rot within days.
 | [`frontend/src/hooks/useFollowScroll.ts`](docs/HOT-FILE-LEDGER.md#frontendsrchooksusefollowscrollts) | 4 / 2 / 314 | does not fire | ⛔ **NO ROW FOR ITS ENTIRE LIFE — added 243-03**, then STALE at `3/2/265` one phase on. **243-06:** the re-arm now asks whether the reader is STILL leaving, not what they last did |
 | [`frontend/src/lib/throttle.ts`](docs/HOT-FILE-LEDGER.md#frontendsrclibthrottlets) | 2 / 2 / 108 | does not fire | ⛔ **NO ROW FOR ITS ENTIRE LIFE — added 243-03.** TWO opposite primitives on purpose; ⛔ never unify them — one of the two call sites breaks silently |
 | [`frontend/src/components/chat/ChatArea.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentschatchatareatsx) | 94 / 44 / 1189 (was `93 / 43 / 1186`) | **FIRES** | honoured by construction (**287-03**): ONE mount of ThreadWorkflowPicker, zero new hooks, no logic. ⛔ no scope branch in send |
-| [`frontend/src/components/panel/PendingAskCard.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentspanelpendingaskcardtsx) | 22 / 11 / 1095 (was `21 / 11 / 1086`) | ⚠ **FIRES** | 295-08 WR-04: `!enginePause` hides free text + divider; a 4xx shows the server's sentence. SEED-361: paused is not over. useState 7→7, useEffect 3→3 |
+| [`frontend/src/components/panel/PendingAskCard.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentspanelpendingaskcardtsx) | 23 / 11 / 1101 (was `22 / 11 / 1095`) | ⚠ **FIRES** | 295-10 (D-r1-01): the 409 arm shows the server's sentence when sent (else the old words) and, on a paused run, re-reads the stack's asks once. useState 7→7, useEffect 3→3 |
 | [`frontend/src/pages/WorkflowRunPage.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrcpagesworkflowrunpagetsx) | 33 / 13 / 1594 (was `31 / 12 / 1580`) | **FIRES** | **289-01** one `paused` attribute; **289-04** ONE early return → RunEvidenceReport (+14 L). No new hook/state/effect. RunHero now dead here (F-D). ⛔ invariants unchanged |
 | [`frontend/src/components/workflows/WaitingOnLine.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentsworkflowswaitingonlinetsx) | 1 / 1 / 26 | does not fire | young (created **288-03**): leaf that renders the server-composed waiting-on sentence verbatim; no hook, no API import |
 | [`frontend/src/components/workflows/StepEvidenceLine.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentsworkflowsstepevidencelinetsx) | 2 / 2 / 145 (was `1 / 1 / 93`) | no (2 phases) | 295-05: the unsourced arm; the confidence arm is byte-unchanged (an innerHTML test pins it). Two phases; does not fire |
@@ -11511,7 +11511,7 @@ cells rot within days.
 | [`backend/app/api/settings.py`](docs/HOT-FILE-LEDGER.md#backendappapisettingspy) | 44 / 23 / 1159 (was `41 / 21 / 1048`) | ⚠ **FIRES** | honoured by construction (**294-04**): ONE refusal arm, rerank_provider vs registry `ACCEPTED_PROVIDER_IDS` → 400. ⛔ never a retyped id list; GET never echoes a key |
 | [`backend/app/services/multimodal_service.py`](docs/HOT-FILE-LEDGER.md#backendappservicesmultimodal_servicepy) | 14 / 7 / 984 | ⚠ **FIRES** | ⚠ absent from BOTH for its ENTIRE LIFE at **7 phases** — row added SEED-227, which is also where its silent truncation was found |
 | [`backend/app/api/documents.py`](docs/HOT-FILE-LEDGER.md#backendappapidocumentspy) | 99 / 39 / 2698 (was `97 / 38 / 2653`) | ⚠ **FIRES** | Honoured by construction. **285-03** (D-12): both enqueue paths failed → the doc is marked `failed` (guard `status='pending'`) and 201 `failed` returned, like the storage-fail arm. Minter untouched |
-| [`scripts/vitest-count-gate.cjs`](docs/HOT-FILE-LEDGER.md#scriptsvitest-count-gatecjs) | 326 / 74 / 6623 (was `325 / 74 / 6619`) | ⚠ **FIRES** | 295-10: `streamsProvider_295_10_follow_after_answer` adopted in both knobs (6, file-level) |
+| [`scripts/vitest-count-gate.cjs`](docs/HOT-FILE-LEDGER.md#scriptsvitest-count-gatecjs) | 327 / 74 / 6623 (was `326 / 74 / 6623`) | ⚠ **FIRES** | 295-10: `PendingAskStack.pausedRun` pin 11 → 14 (D-r1-01, counted growth); follow-after-answer suite adopted (6) |
 | [`scripts/check-deploy-drift.sh`](docs/HOT-FILE-LEDGER.md#scriptscheck-deploy-driftsh) | 5 / 4 / 267 | ⚠ **FIRES** | ⚠ absent its ENTIRE LIFE — row added 294-05. 294-01: DECISION_ENGINE_FAULT_BASE_URL registered as intentionally omitted (+2) |
 | [`scripts/build-public-openapi.cjs`](docs/HOT-FILE-LEDGER.md#scriptsbuild-public-openapicjs) | 7 / 3 / 468 (was `5 / 2 / 465`) | ⚠ **FIRES** | ⚠ now FIRES (294). 294-03: the citation_checks tag (one line). ⛔ scripts/ is gate-exempt |
 | [`backend/app/services/eval_runner_service.py`](docs/HOT-FILE-LEDGER.md#backendappserviceseval_runner_servicepy) | 13 / 8 / 1040 | ⚠ **FIRES** | ⚠ STALE at `12/7/959`, and absent until 196 at 7 phases. **256-03**: its finalize stopped passing `input_tokens=None`. Re-derived by 256-04 |
@@ -21495,6 +21495,14 @@ CLAUDE.md verdict cell as of 2026-10-15 (replaced by 282-03):
 
 > G-5 FIRES · honoured by construction (244-15)
 
+### `frontend/src/components/panel/PendingAskCard.tsx` — 295-10 (D-r1-01, gap round 2)
+
+**`23 / 11 / 1101`** (was `22 / 11 / 1095`). Since 295-09 (CR-01) the answer route's 409 has two meanings: the run has ended, or a newer question is waiting. The 409 arm used to show its own words for both ("This run has already ended — your answer was not saved"), which was false for the second. It now shows the server's sentence, with "Your answer was not saved." after it, whenever `answerAskUser` carried one (the same `ASK_ANSWER_FAILED` test the 4xx arm uses), and keeps the old words when there is none. It still retires the card. On a run the stack reads as `paused`, it then calls the `reconcile` prop once, so the stale tab's newer card appears. A run not known to be waiting is not re-read, so an ended run's card keeps its ended reading (re-reading would remove it, because `/ask_user/pending` omits ended runs). useState 7 → 7, useEffect 3 → 3. The `?raw` line pin in `PendingAskCard.retired.baseline.test.tsx` was re-baselined 1096 → 1102 with a dated note.
+
+Scan-list cell as of 2026-10-21 (replaced by 295-10, moved verbatim): 22 / 11 / 1095 (was `21 / 11 / 1086`) | ⚠ **FIRES** | 295-08 WR-04: `!enginePause` hides free text + divider; a 4xx shows the server's sentence. SEED-361: paused is not over. useState 7→7, useEffect 3→3 |
+
+CLAUDE.md verdict cell as of 2026-10-21 (replaced by 295-10, moved verbatim): | `frontend/src/components/panel/PendingAskCard.tsx` | 22 / 11 / 1095 (was `21 / 11 / 1086`) | 295-08: paused not over; engine ask: choices only |
+
 ### `frontend/src/components/panel/WorkspacePanel.tsx` — Phase 282 close
 
 **`17 / 11 / 646` (was `16 / 10 / 646`).** **282-02** (`3b88e0c26`, +1 / -1): `<PendingAskStack />` → `<PendingAskStack home="panel" />`. The mount condition is byte-identical.
@@ -22295,6 +22303,14 @@ CLAUDE.md verdict cell as of 2026-10-21 (replaced by 295-08, moved verbatim): | 
 Scan-list cell as of 2026-10-21 (replaced by 295-10, moved verbatim): 325 / 74 / 6619 (was `324 / 74 / 6619`) | ⚠ **FIRES** | 295-08: pausedRun adopted (7 → 11 after WR-04); threads.engineAsk 2 → 4; PhaseReconcile pin 19 → 28 |
 
 CLAUDE.md verdict cell as of 2026-10-21 (replaced by 295-10, moved verbatim): | `scripts/vitest-count-gate.cjs` | 325 / 74 / 6619 (was `324 / 74 / 6619`) | 295-08: 1 suite adopted, 2 pins raised |
+
+### `scripts/vitest-count-gate.cjs` — 295-10 (D-r1-01)
+
+**`327 / 74 / 6623`** (was `326 / 74 / 6623`). One pin raised in place, with a dated note: `PendingAskStack.pausedRun.test.tsx` 11 → 14, the three D-r1-01 cases (two observed RED first, one guard).
+
+Scan-list cell as of 2026-10-21 (replaced by 295-10, moved verbatim): 326 / 74 / 6623 (was `325 / 74 / 6619`) | ⚠ **FIRES** | 295-10: `streamsProvider_295_10_follow_after_answer` adopted in both knobs (6, file-level) |
+
+CLAUDE.md verdict cell as of 2026-10-21 (replaced by 295-10, moved verbatim): | `scripts/vitest-count-gate.cjs` | 326 / 74 / 6623 (was `325 / 74 / 6619`) | 295-10: 1 suite adopted (6) |
 
 ## Phase 285 close (2026-10-16, 285-03)
 

@@ -4328,7 +4328,7 @@ const BASELINE = {
   // 295-08 (SEED-361) — a paused run's ask stays answerable in the chat thread; guard both ways.
   // 295-10 (D-r1-02, 2026-10-21) — after an answer the open tab follows the re-driven run.
   "streamsProvider_295_10_follow_after_answer.test.tsx": 6,
-  "PendingAskStack.pausedRun.test.tsx": 11, // 295-08 WR-04: 7 -> 11 (engine ask has no free text; a refusal keeps its words)
+  "PendingAskStack.pausedRun.test.tsx": 14, // 295-10 D-r1-01 (2026-10-21): 11 -> 14 (a 409 shows the server's words, re-reads on a paused run). 295-08 WR-04: 7 -> 11
   "PendingAskCard.paused.test.tsx": 6, // 289-REVIEW CR-02: 4 -> 6 (pending -> expired -> paused re-render, 404 stays terminal). 289-01 — the paused card keeps its answer control
   "StepEvidenceLine.test.tsx": 15, // 289-02 — the KB evidence line or nothing
   "evidenceView.test.ts": 31, // 289-REVIEW WR-03: 29 -> 31 (final-attempt Checks fact, timed-out kind). 289-04 — payload to view-model, privacy applied twice

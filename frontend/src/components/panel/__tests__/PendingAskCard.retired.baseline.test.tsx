@@ -268,8 +268,12 @@ describe("194.1-01 — the three shipped retirement sentences, READ from source"
      * free-text box or "or" divider (one `!enginePause` condition each), and a 4xx refusal shows
      * the server's sentence when it sent one. `useState` 7 → 7, `useEffect` 3 → 3. Retirement
      * fences untouched and green.
+     *
+     * 2026-10-21 — 295-10 (D-r1-01) RE-BASELINED 1096 → 1102, not loosened: the 409 arm shows the
+     * server's sentence when it sent one (else the old words), and on a paused run re-reads the
+     * stack's asks once. `useState` 7 → 7, `useEffect` 3 → 3. Retirement fences untouched and green.
      */
-    expect(src.split("\n").length).toBe(1096)
+    expect(src.split("\n").length).toBe(1102)
   })
 
   /** (a) The 404-expiry constant — `setExpiredMessage("…")` in the catch. */

@@ -468,7 +468,7 @@ node scripts/check-hot-file-ledger.cjs <phase-dir>   # 0 clear · 1 missing rows
 | `frontend/src/components/chat/ThreadWorkflowPicker.tsx` | 1 / 1 / 91 | young (created 287-03) · reads no conversation · ⛔ |
 | `frontend/src/components/chat/useStartWorkflowInThread.ts` | 1 / 1 / 85 | young (created 287-03) · no createThread · ⛔ |
 | `frontend/src/lib/toolMeta.ts` | 10 / 6 / 218 | ⚠ absent its ENTIRE LIFE — row added 244-13 · ⛔ |
-| `frontend/src/components/panel/PendingAskCard.tsx` | 22 / 11 / 1095 (was `21 / 11 / 1086`) | 295-08: paused not over; engine ask: choices only |
+| `frontend/src/components/panel/PendingAskCard.tsx` | 23 / 11 / 1101 (was `22 / 11 / 1095`) | 295-10: 409 shows server words; paused run re-reads asks |
 | `frontend/src/pages/WorkflowRunPage.tsx` | 33 / 13 / 1594 (was `31 / 12 / 1580`) | 289-04: ONE early return → evidence report; no new hook · ⛔ |
 | `frontend/src/components/workflows/WaitingOnLine.tsx` | 1 / 1 / 26 | young (created 288-03) · leaf, no hook · ⛔ |
 | `frontend/src/components/chat/OutputFileCard.tsx` | 8 / 7 / 219 | honoured by construction (195) |
@@ -481,7 +481,7 @@ node scripts/check-hot-file-ledger.cjs <phase-dir>   # 0 clear · 1 missing rows
 | `backend/app/api/settings.py` | 44 / 23 / 1159 (was `41 / 21 / 1048`) | honoured by construction (294-04: ONE rerank_provider refusal) · ⛔ |
 | `backend/app/services/multimodal_service.py` | 14 / 7 / 984 | ⚠ absent from BOTH for its ENTIRE LIFE at **7 phases** |
 | `backend/app/api/documents.py` | 99 / 39 / 2698 (was `97 / 38 / 2653`) | honoured by construction (285-03: enqueue-fail → doc failed, 201) · ⛔ |
-| `scripts/vitest-count-gate.cjs` | 326 / 74 / 6623 (was `325 / 74 / 6619`) | 295-10: 1 suite adopted (6) |
+| `scripts/vitest-count-gate.cjs` | 327 / 74 / 6623 (was `326 / 74 / 6623`) | 295-10: 1 suite adopted, 1 pin raised |
 | `scripts/check-deploy-drift.sh` | 5 / 4 / 267 | ⚠ absent its ENTIRE LIFE — row added 294-05 · fault var omitted |
 | `scripts/build-public-openapi.cjs` | 7 / 3 / 468 | ⚠ now FIRES (294) · 294-03: citation_checks tag (one line) |
 | `backend/app/services/eval_runner_service.py` | 13 / 8 / 1040 | ⚠ STALE · last touch 256-03 |
