@@ -233,7 +233,7 @@ Plans:
 
 **Wave 3** *(blocked on Wave 2 completion)*
 
-- [ ] 290-04-PLAN.md — close-out: phase gates, count-gate pins, ledger in one commit, the escalated-seal BUG report (wave 3)
+- [x] 290-04-PLAN.md — close-out: phase gates, count-gate pins, ledger in one commit, the escalated-seal BUG report (wave 3)
 
 **UI hint**: yes
 **Flags**: **G-2 sketch FIRST for both** (the card has an approved sketch; VIS-01 needs a new one). **G-4**. Hot files: `WorkflowCard.tsx`, `PhaseSpineGraph.tsx`, `WorkflowCanvas.tsx`, `PhaseNodeCard.tsx`, `libraryVocabulary.ts`; read the card's ledger section. Canvas glyph vocabulary: `references/icon-convention.md` section 4. Seeds `SEED-155`, `SEED-086`.
