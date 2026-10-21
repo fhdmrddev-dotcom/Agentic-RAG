@@ -40,3 +40,7 @@ This is the main reason the operator reports that workflows "block most of the t
 ## Surface classification
 
 Agentic-RAG: the workflow engine in this app.
+
+## Phase 295 record (295-07, 2026-10-21)
+
+Addressed by 295-01 (seam), 295-03 (the durable found-nothing pause, its choices and the folder re-run), 295-05 (the unsourced mark on every read) and 295-06 (the card and folder chooser). Live in `.planning/phases/295-runs-that-don-t-dead-end/295-VALIDATION.md` S1/S2/S3 and the eight-row scoreboard: 15 gate firings in the UAT window, 13 completed, 0 ended in a `citations_required` failure (SC#5 after). ⚠ Still open in one home: the chat thread's Workspace panel shows the live ask RETIRED (S1 FAIL, `PendingAskCard.tsx:897`, SEED-361). Not closed.

@@ -35,3 +35,7 @@ This may already be fixed by Phase 288 (pauses that publish). Verify before buil
 ## Surface classification
 
 Agentic-RAG: the workflow engine in this app.
+
+## Phase 295 record (295-07, 2026-10-21)
+
+Addressed by 295-03 (the armed approval is a durable pause) and 295-04 (a Stop ends `cancelled` with `Stopped by <name>.`). Live in `.planning/phases/295-runs-that-don-t-dead-end/295-VALIDATION.md` S7: the armed run read `Paused for your answer`, and its Stop read `Cancelled` + `Why it stopped: Stopped by the person who started this run.` ⚠ In the chat panel the waiting approval card is shown RETIRED (S1 finding). Not closed.

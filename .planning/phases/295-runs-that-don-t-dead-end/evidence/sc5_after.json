@@ -1,0 +1,157 @@
+{
+  "since": "2026-10-20T23:58:10Z",
+  "query": "with term as (\n  select wr.id, wr.is_golden_run, wr.status,\n         (select ha.metadata #>> '{}' from harness_audit ha\n           where ha.run_id = wr.id and ha.event_type = 'run_failed'\n           order by ha.created_at desc limit 1) as fail_md\n  from workflow_runs wr\n  where wr.status in ('completed','failed','cancelled')\n    and wr.created_at >= :since\n)\nselect is_golden_run,\n       count(*)                                                            as terminal_runs,\n       count(*) filter (where status='failed')                             as failed_runs,\n       count(*) filter (where status='failed' and fail_md ilike '%citations_required%') as citations_failed,\n       round(100.0 * count(*) filter (where status='failed' and fail_md ilike '%citations_required%')\n             / nullif(count(*),0), 1)                                      as pct_of_terminal\nfrom term group by is_golden_run order by is_golden_run;",
+  "combined_query": "with term as (\n  select wr.id, wr.is_golden_run, wr.status,\n         (select ha.metadata #>> '{}' from harness_audit ha\n           where ha.run_id = wr.id and ha.event_type = 'run_failed'\n           order by ha.created_at desc limit 1) as fail_md\n  from workflow_runs wr\n  where wr.status in ('completed','failed','cancelled')\n    and wr.created_at >= :since\n)\nselect count(*) terminal_runs, count(*) filter (where status='failed') failed_runs,\n       count(*) filter (where status='failed' and fail_md ilike '%citations_required%') citations_failed,\n       round(100.0 * count(*) filter (where status='failed' and fail_md ilike '%citations_required%') / nullif(count(*),0), 1) pct_of_terminal\nfrom term;",
+  "behaviour_query": "select wr.id, wr.is_golden_run, wr.status,\n       (select count(*) from harness_audit ha where ha.run_id = wr.id and ha.event_type = 'policy_applied'\n          and ha.metadata #>> '{}' like '%\"engine_ask_pause\"%') as engine_pauses,\n       (select ha.metadata #>> '{}' from harness_audit ha where ha.run_id = wr.id and ha.event_type = 'policy_applied'\n          and ha.metadata #>> '{}' like '%\"engine_ask_pause\"%' order by ha.created_at limit 1) as first_pause,\n       (select ha.metadata #>> '{}' from harness_audit ha where ha.run_id = wr.id and ha.event_type = 'run_failed'\n          order by ha.created_at desc limit 1) as fail_md\nfrom workflow_runs wr\nwhere wr.created_at >= :since\n  and (exists (select 1 from harness_audit ha where ha.run_id = wr.id and ha.event_type = 'policy_applied'\n               and ha.metadata #>> '{}' like '%\"engine_ask_pause\"%')\n       or (wr.is_golden_run and exists (select 1 from harness_audit ha where ha.run_id = wr.id and ha.event_type = 'run_failed'\n               and ha.metadata #>> '{}' ilike '%during the trial run%')))\norder by wr.created_at;",
+  "by_golden": [
+    {
+      "is_golden_run": false,
+      "terminal_runs": 18,
+      "failed_runs": 1,
+      "citations_failed": 0,
+      "pct_of_terminal": "0.0"
+    },
+    {
+      "is_golden_run": true,
+      "terminal_runs": 5,
+      "failed_runs": 0,
+      "citations_failed": 0,
+      "pct_of_terminal": "0.0"
+    }
+  ],
+  "combined": [
+    {
+      "terminal_runs": 23,
+      "failed_runs": 1,
+      "citations_failed": 0,
+      "pct_of_terminal": "0.0"
+    }
+  ],
+  "behaviour": [
+    {
+      "id": "b8a3e6f3-e2f0-42b7-b2a5-3c4532d70bd0",
+      "is_golden_run": false,
+      "status": "completed",
+      "engine_pauses": 1,
+      "first_pause": "{\"policy\": \"engine_ask_pause\", \"phase\": \"research\", \"finding\": \"no_sources\"}",
+      "fail_md": null
+    },
+    {
+      "id": "d5d77eed-9453-43cc-8a46-602be6adbf27",
+      "is_golden_run": false,
+      "status": "completed",
+      "engine_pauses": 1,
+      "first_pause": "{\"policy\": \"engine_ask_pause\", \"phase\": \"research\", \"finding\": \"no_sources\"}",
+      "fail_md": null
+    },
+    {
+      "id": "b9c4635d-d3f0-4c11-a7d0-b2b6b9beeb3c",
+      "is_golden_run": false,
+      "status": "failed",
+      "engine_pauses": 1,
+      "first_pause": "{\"policy\": \"engine_ask_pause\", \"phase\": \"research\", \"finding\": \"no_sources\"}",
+      "fail_md": "{\"reason\": \"Searched 295-07 empty KB folder and found nothing for \\u201cFind the project status\\u201d. Stopped by the person who started this run.\"}"
+    },
+    {
+      "id": "15fadac6-9606-4be2-85a8-167c31451b23",
+      "is_golden_run": false,
+      "status": "cancelled",
+      "engine_pauses": 1,
+      "first_pause": "{\"policy\": \"engine_ask_pause\", \"phase\": \"act\", \"finding\": \"action_risk\"}",
+      "fail_md": null
+    },
+    {
+      "id": "31270f19-821b-4ba6-9146-3cd5262e7cb2",
+      "is_golden_run": false,
+      "status": "completed",
+      "engine_pauses": 1,
+      "first_pause": "{\"policy\": \"engine_ask_pause\", \"phase\": \"research\", \"finding\": \"no_sources\"}",
+      "fail_md": null
+    },
+    {
+      "id": "7a58cce3-6ff4-4b88-ada7-009a8755766a",
+      "is_golden_run": false,
+      "status": "completed",
+      "engine_pauses": 1,
+      "first_pause": "{\"policy\": \"engine_ask_pause\", \"phase\": \"research\", \"finding\": \"no_sources\"}",
+      "fail_md": null
+    },
+    {
+      "id": "b87cb924-0322-49b1-9827-f1ad100a8e3e",
+      "is_golden_run": false,
+      "status": "completed",
+      "engine_pauses": 1,
+      "first_pause": "{\"policy\": \"engine_ask_pause\", \"phase\": \"research\", \"finding\": \"no_sources\"}",
+      "fail_md": null
+    },
+    {
+      "id": "c56ce422-752c-4efc-ace5-c72796716072",
+      "is_golden_run": false,
+      "status": "completed",
+      "engine_pauses": 1,
+      "first_pause": "{\"policy\": \"engine_ask_pause\", \"phase\": \"research\", \"finding\": \"no_sources\"}",
+      "fail_md": null
+    },
+    {
+      "id": "dc41bf73-5709-41ce-950d-18da2a759b29",
+      "is_golden_run": false,
+      "status": "completed",
+      "engine_pauses": 1,
+      "first_pause": "{\"policy\": \"engine_ask_pause\", \"phase\": \"research\", \"finding\": \"no_sources\"}",
+      "fail_md": null
+    },
+    {
+      "id": "e883f07c-b5ec-4a8b-93ea-0a98033d9d4f",
+      "is_golden_run": false,
+      "status": "completed",
+      "engine_pauses": 1,
+      "first_pause": "{\"policy\": \"engine_ask_pause\", \"phase\": \"research\", \"finding\": \"no_sources\"}",
+      "fail_md": null
+    },
+    {
+      "id": "36cb19b3-5c7d-4e81-aaa1-13a1e143c39c",
+      "is_golden_run": false,
+      "status": "completed",
+      "engine_pauses": 1,
+      "first_pause": "{\"policy\": \"engine_ask_pause\", \"phase\": \"research\", \"finding\": \"no_sources\"}",
+      "fail_md": null
+    },
+    {
+      "id": "126f1adf-4dbb-4650-a367-84de0123802e",
+      "is_golden_run": false,
+      "status": "completed",
+      "engine_pauses": 1,
+      "first_pause": "{\"policy\": \"engine_ask_pause\", \"phase\": \"research\", \"finding\": \"no_sources\"}",
+      "fail_md": null
+    },
+    {
+      "id": "1880cf56-ec62-41b3-94e8-c7d8180ee81a",
+      "is_golden_run": false,
+      "status": "completed",
+      "engine_pauses": 1,
+      "first_pause": "{\"policy\": \"engine_ask_pause\", \"phase\": \"research\", \"finding\": \"no_sources\"}",
+      "fail_md": null
+    },
+    {
+      "id": "6a5a7342-4b4f-4f41-80f7-23b03c274420",
+      "is_golden_run": false,
+      "status": "completed",
+      "engine_pauses": 1,
+      "first_pause": "{\"policy\": \"engine_ask_pause\", \"phase\": \"research\", \"finding\": \"no_sources\"}",
+      "fail_md": null
+    },
+    {
+      "id": "7efbc5cf-9d0c-41f4-a56b-c74a15aa15ce",
+      "is_golden_run": false,
+      "status": "completed",
+      "engine_pauses": 1,
+      "first_pause": "{\"policy\": \"engine_ask_pause\", \"phase\": \"research\", \"finding\": \"no_sources\"}",
+      "fail_md": null
+    }
+  ],
+  "gate_failed_cit": [
+    {
+      "cit": 42
+    }
+  ]
+}
