@@ -11440,7 +11440,7 @@ cells rot within days.
 | [`frontend/src/components/chat/tool-bodies/SearchDocumentsBody.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentschattool-bodiessearchdocumentsbodytsx) | 3 / 3 / 71 | ⚠ **FIRES** (crossed in 272) | ⚠ absent its ENTIRE LIFE — row added 272-05. **F-3**: `summarize` names refused / invalid / empty / not-searchable / unavailable |
 | [`frontend/src/components/chat/MessageItem.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentschatmessageitemtsx) | 82 / 38 / 1040 (was `81 / 38 / 1037`) | ⚠ **FIRES** | BUG-261020-04: +1 hook (usePersistedMessageId) feeds both citation mounts (+5 −2); useState 3, useEffect 0, 5 props. Fences updated |
 | [`backend/app/api/threads.py`](docs/HOT-FILE-LEDGER.md#backendappapithreadspy) | 273 / 92 / 2567 (was `271 / 91 / 2544`) | ⚠ **FIRES** | 295-05: the planned `unsourced` kwarg plus a lazy one-time name lookup (+1 If, +10 L against a budget of one kwarg; recorded). ⛔ SSE transport discharge unchanged |
-| [`frontend/src/providers/StreamsProvider.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrcprovidersstreamsprovidertsx) | 111 / 43 / 5009 (was `110 / 43 / 5006`) | ⚠ **FIRES** | 295-08 (SEED-361): ONE call records the reconcile's own `run_status`; no fetch, 0 branches. Honoured by construction · ⛔ |
+| [`frontend/src/providers/StreamsProvider.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrcprovidersstreamsprovidertsx) | 112 / 43 / 5016 (was `111 / 43 / 5009`) | ⚠ **FIRES** | 295-10 (D-r1-02): the answer settle also proceeds for a `paused` run (one guard conjunct), and a producer stream's end runs the existing phase refresh. 0 lock writers. · ⛔ |
 | [`frontend/src/hooks/useMessages.ts`](docs/HOT-FILE-LEDGER.md#frontendsrchooksusemessagests) | 74 / 27 / 127 | ⚠ **FIRES** | extraction due |
 | [`backend/app/services/anthropic_service.py`](docs/HOT-FILE-LEDGER.md#backendappservicesanthropic_servicepy) | 12 / 11 / 373 (was `11 / 10 / 354`) | ⚠ **FIRES** | **282-01**: ONE `_anthropic_client` builder (budget in the constructor, connect 5 s, cloud retries 2) + trailing `timeout_s` on `stream_anthropic`. honoured by construction; adapter-pattern audit due |
 | [`frontend/src/components/workflows/WorkflowCanvas.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentsworkflowsworkflowcanvastsx) | 31 / 9 / 1708 | **FIRES** | 286 forecast (290): the team picture is a SEPARATE read-only view (VIS-01: never a second canvas); at most ONE gated mount here. honoured by construction (199 / 200 / 214) |
@@ -11511,7 +11511,7 @@ cells rot within days.
 | [`backend/app/api/settings.py`](docs/HOT-FILE-LEDGER.md#backendappapisettingspy) | 44 / 23 / 1159 (was `41 / 21 / 1048`) | ⚠ **FIRES** | honoured by construction (**294-04**): ONE refusal arm, rerank_provider vs registry `ACCEPTED_PROVIDER_IDS` → 400. ⛔ never a retyped id list; GET never echoes a key |
 | [`backend/app/services/multimodal_service.py`](docs/HOT-FILE-LEDGER.md#backendappservicesmultimodal_servicepy) | 14 / 7 / 984 | ⚠ **FIRES** | ⚠ absent from BOTH for its ENTIRE LIFE at **7 phases** — row added SEED-227, which is also where its silent truncation was found |
 | [`backend/app/api/documents.py`](docs/HOT-FILE-LEDGER.md#backendappapidocumentspy) | 99 / 39 / 2698 (was `97 / 38 / 2653`) | ⚠ **FIRES** | Honoured by construction. **285-03** (D-12): both enqueue paths failed → the doc is marked `failed` (guard `status='pending'`) and 201 `failed` returned, like the storage-fail arm. Minter untouched |
-| [`scripts/vitest-count-gate.cjs`](docs/HOT-FILE-LEDGER.md#scriptsvitest-count-gatecjs) | 325 / 74 / 6619 (was `324 / 74 / 6619`) | ⚠ **FIRES** | 295-08: pausedRun adopted (7 → 11 after WR-04); threads.engineAsk 2 → 4; PhaseReconcile pin 19 → 28 |
+| [`scripts/vitest-count-gate.cjs`](docs/HOT-FILE-LEDGER.md#scriptsvitest-count-gatecjs) | 326 / 74 / 6623 (was `325 / 74 / 6619`) | ⚠ **FIRES** | 295-10: `streamsProvider_295_10_follow_after_answer` adopted in both knobs (6, file-level) |
 | [`scripts/check-deploy-drift.sh`](docs/HOT-FILE-LEDGER.md#scriptscheck-deploy-driftsh) | 5 / 4 / 267 | ⚠ **FIRES** | ⚠ absent its ENTIRE LIFE — row added 294-05. 294-01: DECISION_ENGINE_FAULT_BASE_URL registered as intentionally omitted (+2) |
 | [`scripts/build-public-openapi.cjs`](docs/HOT-FILE-LEDGER.md#scriptsbuild-public-openapicjs) | 7 / 3 / 468 (was `5 / 2 / 465`) | ⚠ **FIRES** | ⚠ now FIRES (294). 294-03: the citation_checks tag (one line). ⛔ scripts/ is gate-exempt |
 | [`backend/app/services/eval_runner_service.py`](docs/HOT-FILE-LEDGER.md#backendappserviceseval_runner_servicepy) | 13 / 8 / 1040 | ⚠ **FIRES** | ⚠ STALE at `12/7/959`, and absent until 196 at 7 phases. **256-03**: its finalize stopped passing `input_tokens=None`. Re-derived by 256-04 |
@@ -22288,6 +22288,14 @@ Scan-list cell as of 2026-10-21 (replaced by 295-08, moved verbatim): 319 / 73 /
 
 CLAUDE.md verdict cell as of 2026-10-21 (replaced by 295-08, moved verbatim): | `scripts/vitest-count-gate.cjs` | 319 / 73 / 6596 (was `317 / 72 / 6568`) | 294-05: 9 suites adopted, 1 pin raised (row was stale) |
 
+### `scripts/vitest-count-gate.cjs` — 295-10 (D-r1-02)
+
+**`326 / 74 / 6623`** (was `325 / 74 / 6619`). One suite adopted in BOTH knobs: `src/__tests__/providers/streamsProvider_295_10_follow_after_answer.test.tsx` (6, a file-level TARGETS entry, because `src/__tests__/providers` is not a directory entry, see 244-15). The count is the focused run's own total.
+
+Scan-list cell as of 2026-10-21 (replaced by 295-10, moved verbatim): 325 / 74 / 6619 (was `324 / 74 / 6619`) | ⚠ **FIRES** | 295-08: pausedRun adopted (7 → 11 after WR-04); threads.engineAsk 2 → 4; PhaseReconcile pin 19 → 28 |
+
+CLAUDE.md verdict cell as of 2026-10-21 (replaced by 295-10, moved verbatim): | `scripts/vitest-count-gate.cjs` | 325 / 74 / 6619 (was `324 / 74 / 6619`) | 295-08: 1 suite adopted, 2 pins raised |
+
 ## Phase 285 close (2026-10-16, 285-03)
 
 All triples below were re-derived on the merged tree at `cca4e5a90` (285-01..03 code merged) with the CLAUDE.md recipe; six-digit quick-task buckets are subtracted and named per file. The set is every non-test source file the phase changed since PHASE_BASE `c8c764e90` (`git diff --name-only c8c764e90 HEAD -- backend/app frontend/src`, tests excluded): **7 files**. Migration 209, `scripts/apply_migration_209.py` and `supabase/full-schema.sql` are gate-exempt. Each subsection quotes the scan-list cell it replaced and, where the file had one, the CLAUDE.md FIRING verdict cell it replaced, verbatim. **Newly FIRING or absent from CLAUDE.md, row ADDED:** `watch_service.py` (6), `db/watches.py` (4), `RunHistoryList.tsx` (3). `ingest_splice.py` and `db/ingestion_jobs.py` were NOT touched (D-12).
@@ -22755,6 +22763,14 @@ CLAUDE.md verdict cell as of 2026-10-21 (replaced by 295-07, moved verbatim): | 
 Scan-list cell as of 2026-10-21 (replaced by 295-08, moved verbatim): 110 / 43 / 5006 (was `109 / 42 / 5004`) | ⚠ **FIRES** | 295-05: ONE field (`unsourced`) in each of its two row mappers (useState 0→0, useEffect 27→27). Honoured by construction · ⛔ |
 
 CLAUDE.md verdict cell as of 2026-10-21 (replaced by 295-08, moved verbatim): | `frontend/src/providers/StreamsProvider.tsx` | 110 / 43 / 5006 (was `109 / 42 / 5004`) | 295-05: ONE field per row mapper · honoured by construction · ⛔ |
+
+### `frontend/src/providers/StreamsProvider.tsx` — 295-10 (D-r1-02, gap round 2)
+
+**`112 / 43 / 5016`** (was `111 / 43 / 5009`). Two changes, no new fetch site and no new writer. (1) `releaseSettledWorkflowLock`'s early return gains one conjunct: it no longer returns when the thread's recorded run status (295-08's `workflowRunStatusByThread`) is `paused`. A paused run holds no lock (its lock reads stale) and no kickoff mark, so the settle used to skip the read entirely, and the re-drive's new producer stream (minted before the answer's 200) was never attached. The settle's shipped live arm now attaches it. (2) `subscribeProducerStream`'s terminal wrapper calls the existing `refreshPhaseSpineAfterStop`, so when a re-attached segment ends (done, failed, or paused again) one read sets the panel and the recorded status from the server (D-v2.5-03). Still 0 `setWorkflowLockForThread` calls in the settle, no timer (244-15 Test 8 green), and the Deep-thread guard holds (Tests 13-16 green). useState 0 → 0, useEffect 27 → 27. Not fixed, by decision: a run started elsewhere while the thread sits open has no signal into the tab (no Realtime on runs), so it shows on the next thread switch; a poll would be a new capability. Known: during a re-driven segment the composer is not locked (the settle sets no lock, by design).
+
+Scan-list cell as of 2026-10-21 (replaced by 295-10, moved verbatim): 111 / 43 / 5009 (was `110 / 43 / 5006`) | ⚠ **FIRES** | 295-08 (SEED-361): ONE call records the reconcile's own `run_status`; no fetch, 0 branches. Honoured by construction · ⛔ |
+
+CLAUDE.md verdict cell as of 2026-10-21 (replaced by 295-10, moved verbatim): | `frontend/src/providers/StreamsProvider.tsx` | 111 / 43 / 5009 (was `110 / 43 / 5006`) | 295-08: ONE run_status write, no fetch · ⛔ |
 
 ## `frontend/src/stores/streamsStore.ts` — `287-03` (START-01)
 

@@ -412,7 +412,7 @@ node scripts/check-hot-file-ledger.cjs <phase-dir>   # 0 clear · 1 missing rows
 | `frontend/src/components/chat/MessageItem.tsx` | 82 / 38 / 1040 (was `81 / 38 / 1037`) | BUG-261020-04: +1 hook feeds both citation mounts (+5 −2) |
 | `frontend/src/components/chat/CitationList.tsx` | 5 / 5 / 91 | 294-05: ONE CitationCheckAction beside the trigger · extraction FIRST |
 | `backend/app/api/threads.py` | 273 / 92 / 2567 (was `271 / 91 / 2544`) | 295-05: unsourced kwarg + lazy name lookup (+1 If) · ⛔ |
-| `frontend/src/providers/StreamsProvider.tsx` | 111 / 43 / 5009 (was `110 / 43 / 5006`) | 295-08: ONE run_status write, no fetch · ⛔ |
+| `frontend/src/providers/StreamsProvider.tsx` | 112 / 43 / 5016 (was `111 / 43 / 5009`) | 295-10: settle follows a paused run; stream end re-reads · ⛔ |
 | `frontend/src/hooks/useMessages.ts` | 74 / 27 / 127 | extraction due |
 | `backend/app/services/anthropic_service.py` | 12 / 11 / 373 (was `11 / 10 / 354`) | honoured by construction (282-01: constructor kwargs) · adapter audit due |
 | `backend/app/services/embedding_service.py` | 9 / 5 / 354 | ⚠ absent for its entire life at 5 phases — row added 236 (SC#2) |
@@ -481,7 +481,7 @@ node scripts/check-hot-file-ledger.cjs <phase-dir>   # 0 clear · 1 missing rows
 | `backend/app/api/settings.py` | 44 / 23 / 1159 (was `41 / 21 / 1048`) | honoured by construction (294-04: ONE rerank_provider refusal) · ⛔ |
 | `backend/app/services/multimodal_service.py` | 14 / 7 / 984 | ⚠ absent from BOTH for its ENTIRE LIFE at **7 phases** |
 | `backend/app/api/documents.py` | 99 / 39 / 2698 (was `97 / 38 / 2653`) | honoured by construction (285-03: enqueue-fail → doc failed, 201) · ⛔ |
-| `scripts/vitest-count-gate.cjs` | 325 / 74 / 6619 (was `324 / 74 / 6619`) | 295-08: 1 suite adopted, 2 pins raised |
+| `scripts/vitest-count-gate.cjs` | 326 / 74 / 6623 (was `325 / 74 / 6619`) | 295-10: 1 suite adopted (6) |
 | `scripts/check-deploy-drift.sh` | 5 / 4 / 267 | ⚠ absent its ENTIRE LIFE — row added 294-05 · fault var omitted |
 | `scripts/build-public-openapi.cjs` | 7 / 3 / 468 | ⚠ now FIRES (294) · 294-03: citation_checks tag (one line) |
 | `backend/app/services/eval_runner_service.py` | 13 / 8 / 1040 | ⚠ STALE · last touch 256-03 |

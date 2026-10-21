@@ -4326,6 +4326,8 @@ const BASELINE = {
   // `GSD_VITEST_MAX_WORKERS=2`, never hand-counted. The three `src/components/workflows` suites
   // are inside that DIRECTORY entry and need a pin only; the other four are FILE-LEVEL below.
   // 295-08 (SEED-361) — a paused run's ask stays answerable in the chat thread; guard both ways.
+  // 295-10 (D-r1-02, 2026-10-21) — after an answer the open tab follows the re-driven run.
+  "streamsProvider_295_10_follow_after_answer.test.tsx": 6,
   "PendingAskStack.pausedRun.test.tsx": 11, // 295-08 WR-04: 7 -> 11 (engine ask has no free text; a refusal keeps its words)
   "PendingAskCard.paused.test.tsx": 6, // 289-REVIEW CR-02: 4 -> 6 (pending -> expired -> paused re-render, 404 stays terminal). 289-01 — the paused card keeps its answer control
   "StepEvidenceLine.test.tsx": 15, // 289-02 — the KB evidence line or nothing
@@ -6331,6 +6333,8 @@ const TARGETS = [
   "src/components/panel/__tests__/PendingAskCard.paused.test.tsx",
   // Phase 295-08 — FILE-LEVEL, SAME commit as its BASELINE pin.
   "src/components/panel/__tests__/PendingAskStack.pausedRun.test.tsx",
+  // Phase 295-10 — FILE-LEVEL (no `src/__tests__/providers` directory entry, see 244-15), SAME commit as its pin.
+  "src/__tests__/providers/streamsProvider_295_10_follow_after_answer.test.tsx",
   "src/lib/runDeepLink.test.ts",
   "src/lib/api/runEvidence.test.ts",
   "src/lib/api/__tests__/runEvidence.contract.test.ts",

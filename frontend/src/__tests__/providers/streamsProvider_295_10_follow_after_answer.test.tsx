@@ -272,6 +272,33 @@ describe("295-10 / D-r1-02 — after an answer, the open tab follows the re-driv
     expect(useStreamsStore.getState().viewedThreadId).toBe(THREAD_ID)
   })
 
+  it("when the re-attached stream ends, one read records the server's status and phases", async () => {
+    await openPausedThread()
+    await answer("Continue without sources")
+    await waitFor(() => expect(streams.has(NEW_PRODUCER)).toBe(true))
+
+    // The run finished on the server; the stream ends. The status must not stay `paused`.
+    frame = {
+      ...PAUSED_FRAME,
+      active_workflow_run_id: null,
+      locked: false,
+      lock_is_stale: false,
+      mode: "deep",
+      run_status: "completed",
+      phases: [
+        { phase_index: 0, slug: "research", status: "completed", phase_type: "llm_agent" },
+        { phase_index: 1, slug: "wrap", status: "completed", phase_type: "llm_single" },
+      ],
+    }
+    const before = mockGetThreadWorkflow.mock.calls.length
+    await act(async () => {
+      streams.get(NEW_PRODUCER)!.onTerminal?.("done")
+    })
+    await waitFor(() => expect(phaseStatuses()).toEqual(["research:done", "wrap:done"]))
+    expect(useStreamsStore.getState().workflowRunStatusByThread.get(THREAD_ID)).toBe("completed")
+    expect(mockGetThreadWorkflow.mock.calls.length - before).toBe(1)
+  })
+
   it("a pause that lands during the re-attached stream shows its card, answerable", async () => {
     await openPausedThread()
     await answer("Continue without sources")
