@@ -1,7 +1,7 @@
 # Phase 290: The Card and the Team Picture - Context
 
 **Gathered:** 2026-10-21
-**Status:** Ready for planning, after the chip-line sketch (D-05) is approved
+**Status:** Ready for planning (chip-line sketch approved: winner B, 2026-10-21)
 
 <domain>
 ## Phase Boundary
@@ -26,8 +26,8 @@ Out of scope: a live "who is working now" run view, the LibraryToolbar rework, a
 - **D-01:** Keep the 179 C card exactly as shipped. Add **one third line** of labelled step chips under line 2. Render it **only when the definition has at least one step**. Never draw an empty chip row.
 - **D-02:** The purpose or description stays off the resting card (179 C stands). VIS-04's "description no longer dominates" is met by the shipped card. The UAT records that as a measurement, not as new work.
 - **D-03:** Overflow: show **the first 3 steps in run order, then a `+N more` chip**. The line never wraps. `+N more` names the remaining steps **in visible words**, not only in `title=`, because touch has no hover (SEED-155 item 1, the D-14 hover problem).
-- **D-04:** Chip words are the shipped step words from `phaseVocabulary.ts` (`PHASE_TYPE_LABELS` / the label the node face already uses, together with `PHASE_GLYPHS`). Never type ids, never literals in the card. Any new string is a vocabulary **entry** in `libraryVocabulary.ts` (the 286 forecast: data, no logic).
-- **D-05 (G-2):** **Sketch the chip line before planning.** It is a small sketch that **renders the real card component** (or its generated build contract) with the chip line added. SEED-155's rule is that a sketch of a surface that consumes an existing component must render that component, not redraw it. The operator approves it, and it becomes the screenshot bar for SC#1. Sketch 163's hand-drawn chips are reference only, not the bar.
+- **D-04:** Chip words are the **type sentence**, `PHASE_TYPE_SENTENCES` in `phaseVocabulary.ts` (e.g. "Work out how to do it"), with the `PHASE_GLYPHS` glyph. **Never the author's step name and never `PHASE_TYPE_LABELS`** (that map is the ⌥ technical-names vocabulary). Settled by sketch 290-card-chip-line, winner B (2026-10-21): author names run to 54 characters and truncate to stubs on a card. Never type ids, never literals in the card. Any new string is a vocabulary **entry** in `libraryVocabulary.ts` (the 286 forecast: data, no logic).
+- **D-05 (G-2):** ✅ DONE 2026-10-21: `.planning/sketches/290-card-chip-line/`, winner **B** (bordered pills, glyph + type sentence, `→`, first 3 + `+N more` that expands in place). It is the SC#1 screenshot bar. Original decision: **Sketch the chip line before planning.** It is a small sketch that **renders the real card component** (or its generated build contract) with the chip line added. SEED-155's rule is that a sketch of a surface that consumes an existing component must render that component, not redraw it. The operator approves it, and it becomes the screenshot bar for SC#1. Sketch 163's hand-drawn chips are reference only, not the bar.
 
 ### Where the team picture opens (VIS-01)
 - **D-06:** **One entry point:** a `Steps | Team` switch in the workflow builder header, as sketch 290 has it. At most **one gated mount** in `WorkflowCanvas.tsx` (286 forecast). The picture is a separate read-only view, never a second canvas. There is no entry from the library card or the run page in this phase.
@@ -68,7 +68,7 @@ Out of scope: a live "who is working now" run view, the LibraryToolbar rework, a
 - `.planning/sketches/290-team-picture/README.md` + `index.html`: the team-picture sketch, winner **A**, with the schema-truth rules D-08..D-11 come from. View it via `python -m http.server 8765` in `.planning/sketches`.
 - `.planning/sketches/179-what-the-eye-lands-on-honestly/README.md`: the card language that shipped (winner C). D-01/D-02 keep it.
 - `.planning/sketches/163-the-assembled-card/README.md` + `BUILD-CONTRACT.generated.md`: the older card bar. Reference for chip style only (D-05).
-- The chip-line sketch from D-05, once it exists. It becomes the SC#1 bar.
+- `.planning/sketches/290-card-chip-line/README.md` + `index.html`: the chip-line bar, **winner B**. It renders real captured card DOM with the app's CSS. **SC#1 screenshot bar.**
 
 ### Requirements and seeds
 - `.planning/ROADMAP.md` § Phase 290: goal, SC#1-4, "How we'd know this failed".
@@ -107,7 +107,7 @@ Out of scope: a live "who is working now" run view, the LibraryToolbar rework, a
 <specifics>
 ## Specific Ideas
 
-- The chip-line style example from sketch 163: `👋 Waits for you → 📦 Makes the file`.
+- Chip line as approved (sketch 290-card-chip-line B): `🧭 Work out how to do it → 📦 Produce the deliverable`, and `+3 more` on a 6-step card.
 - UAT must drive both a real 2-3 step production-shaped workflow and the 7-step stress workflow. ROADMAP's failure line, "looks good on the sketch's example and breaks on a real 7-phase workflow", applies both ways.
 - G-4 failure scenarios to set at UI-SPEC time: chips show type ids; a line appears between two steps; a 1-step workflow shows a worker that doesn't exist; a no-judge workflow shows an empty judge slot with no words.
 

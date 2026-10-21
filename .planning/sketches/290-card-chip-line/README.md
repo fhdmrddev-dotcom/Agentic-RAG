@@ -2,7 +2,7 @@
 sketch: 290
 name: card-chip-line
 question: "On the shipped library card (sketch 179 C), how should the one new line of step chips read: which words, and how much weight?"
-winner: null
+winner: "B"
 tags: [phase-290, vis-04, seed-155, real-card-dom]
 ---
 
@@ -40,6 +40,9 @@ and phone width (375 px).
   variant. Named steps run up to 54 characters (the 90th percentile is 35), which is why A truncates
   hard on the DMT and QBR cards.
 - Production: 7 of 29 definitions have steps, all with 2-3.
+
+## Winner (operator, 2026-10-21)
+**B: pills with step-type words.** The chip words are always the type sentence (`PHASE_TYPE_SENTENCES`), never the author's step name, so every card stays short and consistent. Bordered pills, glyph + words, joined by `→`, first 3 then `+N more` (expands in place, names the rest in words). This is the SC#1 screenshot bar for Phase 290.
 
 ## What to Look For
 1. Does the line keep 179 C's calm, or does it start to dominate the card again?
