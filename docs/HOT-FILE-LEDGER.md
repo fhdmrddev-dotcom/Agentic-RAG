@@ -6355,6 +6355,14 @@ Scan-list cell as of 2026-10-21 (replaced by 295-07, moved verbatim): 57 / 29 / 
 
 CLAUDE.md verdict cell as of 2026-10-21 (replaced by 295-07, moved verbatim): | `backend/app/services/harness/phase_types.py` | 57 / 29 / 3050 (was `56 / 28 / 3027`) | 289-02: ONE confidence key via helper (ifs 113→113) · G-5 OWED |
 
+### `backend/app/services/harness/phase_types.py` — 295-09 (WR-01, 2026-10-21)
+
+**`60 / 30 / 3057`** (the row read `59 / 30 / 3053`). 295-REVIEW WR-01 / BUG-261021-01 (driven RED first): an errored sub-agent's `summary` is the vendor's message body, and both agent executors stored it as the step's `text`, which the citations gate read as "found nothing". The two executors now call `run_handoff.sub_agent_text` (a fixed sentence when the sub-agent errored) and spread `run_handoff.sub_agent_error_mark` (ONE optional key, `sub_agent_status: "error"`, absent on a working step). Call lines only: module ast.If 113 → 113, IfExp 19 → 19, defs 55 → 55. The named seam is still owed.
+
+Scan-list cell as of 2026-10-21 (replaced by 295-09, moved verbatim): 59 / 30 / 3053 (was `57 / 29 / 3050`) | ⚠ **FIRES** | 295-03: ONE call `phase_scope_ids(ctx, phase)`; 295-04: two call substitutions (`handoff_text`, `surface_unless_engine_owns`). If 113→113. G-5 OWED |
+
+CLAUDE.md verdict cell as of 2026-10-21 (replaced by 295-09, moved verbatim): | `backend/app/services/harness/phase_types.py` | 59 / 30 / 3053 (was `57 / 29 / 3050`) | 295-03/04: three call lines, If 113→113 · G-5 OWED |
+
 ## `backend/app/services/harness/publish_service.py`
 
 **Measured at `206.3-01`'s commit (2026-08-25): `21 commits / 11 phases / 1223 L` · G-5 FIRES (11 phases vs threshold 3).**
@@ -11333,8 +11341,8 @@ cells rot within days.
 |---|---|---|---|
 | [`backend/app/api/panel.py`](docs/HOT-FILE-LEDGER.md#backendappapipanelpy) | 6 / 5 / 285 | ⚠ **FIRES** | 295-03: ONE additive `engine_pause` key on /pending beside `draft`. Honoured by construction. 295-07: triple re-derived, unchanged since 295-03 |
 | [`backend/app/services/harness/human_input.py`](docs/HOT-FILE-LEDGER.md#backendappservicesharnesshuman_inputpy) | 6 / 3 / 375 (was `5 / 3 / 355`) | ⚠ **FIRES** | 295-09 CR-01: ONE guard (+1 def `_answers_this_step`, If 15→17): a re-drive consumes only an answer to THIS step's question, never an engine ask's or another step's. Honoured by construction |
-| [`backend/app/services/harness/engine_ask.py`](docs/HOT-FILE-LEDGER.md#backendappservicesharnessengine_askpy) | 5 / 1 / 1344 | no (young) | young (295-01 D-51 seam, verbatim move). 295-03 grew it 599→1338 L, If 24→77: the durable engine ask. ⛔ one allow-list shared with the route's 422 |
-| [`backend/app/services/harness/run_handoff.py`](docs/HOT-FILE-LEDGER.md#backendappservicesharnessrun_handoffpy) | 5 / 1 / 355 | no (young) | young. 295-03 created it (phase_scope_ids); 295-04 put every new branch of its plan here (5→355 L, If 0→20, 17 defs). ⛔ no app import; one guarded terminal write |
+| [`backend/app/services/harness/engine_ask.py`](docs/HOT-FILE-LEDGER.md#backendappservicesharnessengine_askpy) | 6 / 1 / 1345 (was `5 / 1 / 1344`) | no (young) | young. 295-09 WR-01: `finding_from_output` reads an errored sub-agent as an outage (one `or`, If 78→78). ⛔ one allow-list shared with the route's 422 |
+| [`backend/app/services/harness/run_handoff.py`](docs/HOT-FILE-LEDGER.md#backendappservicesharnessrun_handoffpy) | 6 / 1 / 386 (was `5 / 1 / 355`) | no (young) | young. 295-09 WR-01: `sub_agent_text` + `sub_agent_error_mark` (+2 defs, If 20→22) so phase_types spends call lines only. ⛔ no app import; one guarded terminal write |
 | [`backend/app/services/harness/run_read_wire.py`](docs/HOT-FILE-LEDGER.md#backendappservicesharnessrun_read_wirepy) | 1 / 1 / 150 | no (young) | young (295-05). Pure leaf: unsourced_for_wire, end_reason_for_wire, resolve_end_reason, deadline_passed. ⛔ no app imports; a stored user id is REPLACED by words |
 | [`frontend/src/components/panel/AskFolderChoice.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentspanelaskfolderchoicetsx) | 1 / 1 / 70 | no (young) | young (295-06). Leaf on the shadcn Select: rows only from `engine_pause.folders`, visible label `Folder to search`. ⛔ no API import, no folder picker |
 | [`frontend/src/components/panel/enginePause.ts`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentspanelenginepausets) | 1 / 1 / 102 | no (young) | young (295-06). Pure helper: readEnginePause, needsFolder, answeredHeader, answeredReceipt + the three choice labels. ⛔ no React, no API import |
@@ -11422,7 +11430,7 @@ cells rot within days.
 | [`frontend/src/components/workflows/WorkflowCanvas.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentsworkflowsworkflowcanvastsx) | 31 / 9 / 1708 | **FIRES** | 286 forecast (290): the team picture is a SEPARATE read-only view (VIS-01: never a second canvas); at most ONE gated mount here. honoured by construction (199 / 200 / 214) |
 | [`frontend/src/components/workflows/FlowEdge.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentsworkflowsflowedgetsx) | 3 / 3 / 462 | ⚠ **FIRES — EXACTLY AT THRESHOLD** | honoured by construction (200) — ⚠ absent, and it crossed the threshold in the commit that added its row |
 | [`frontend/src/components/workflows/PhaseNodeCard.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentsworkflowsphasenodecardtsx) | 18 / 9 / 490 (was `17 / 8 / 489`) | **FIRES** | 286 forecast (290): ONE prop; the chip words come from `libraryVocabulary`, never literals here. honoured by construction (199) — ⚠ the 200 canvas port stays REVERTED |
-| [`backend/app/services/harness/phase_types.py`](docs/HOT-FILE-LEDGER.md#backendappservicesharnessphase_typespy) | 59 / 30 / 3053 (was `57 / 29 / 3050`) | ⚠ **FIRES** | 295-03: ONE call `phase_scope_ids(ctx, phase)`; 295-04: two call substitutions (`handoff_text`, `surface_unless_engine_owns`). If 113→113. G-5 OWED |
+| [`backend/app/services/harness/phase_types.py`](docs/HOT-FILE-LEDGER.md#backendappservicesharnessphase_typespy) | 60 / 30 / 3057 (was `59 / 30 / 3053`) | ⚠ **FIRES** | 295-09 WR-01: four call lines (`sub_agent_text` ×2, `sub_agent_error_mark` ×2); the branches live in `run_handoff`. If 113→113. G-5 OWED |
 | [`frontend/src/pages/WorkflowsPage.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrcpagesworkflowspagetsx) | 45 / 18 / 1447 (was `43 / 17 / 1415`) | **FIRES** | 286 forecast (287): starters are DATA; fork reuses the existing fork hook; ONE prop. The 192 / 192.1 extraction stays TAKEN |
 | [`frontend/src/components/workflows/library/WorkflowCard.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentsworkflowslibraryworkflowcardtsx) | 22 / 8 / 1354 (was `19 / 6 / 1616`) | **FIRES** | **286-04** seam TAKEN (named 3×): ⋯ menu + armed draft delete → `WorkflowCardMenu.tsx`; card holds 0 `useState`, drawing only. ⚠ compiler lint now covers the whole card |
 | [`frontend/src/components/workflows/library/libraryVocabulary.ts`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentsworkflowslibrarylibraryvocabularyts) | 11 / 5 / 766 (was `10 / 4 / 727`) | ⚠ **FIRES** | 286 forecast (290): chip labels are added as vocabulary ENTRIES (data), no logic. No seam proposed |
@@ -11494,7 +11502,7 @@ cells rot within days.
 | [`frontend/src/components/panel/PhaseCard.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentspanelphasecardtsx) | 20 / 13 / 811 (was `18 / 12 / 796`) | ⚠ **FIRES** | 295-05: ONE `<StepEvidenceLine>` mount in the always-visible identity column (useState 2→2). Honoured by construction |
 | [`frontend/src/components/panel/PhaseTimeline.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentspanelphasetimelinetsx) | 10 / 8 / 404 | ⚠ **FIRES** | ⚠ row STALE (`9/7/385`) — 252 touched it. NOT modified by 253; re-derived under CR-08. honoured by construction (**214**); absent from BOTH until 200 |
 | [`frontend/src/components/panel/phaseStatusMeta.ts`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentspanelphasestatusmetats) | 4 / 4 / 291 | ⚠ **FIRES** | ⚠ row STALE (`3/3/236`) — 252 touched it. NOT modified by 253; re-derived under CR-08. It crossed the threshold in the very commit that added its row (200) |
-| [`backend/app/services/harness/validator_kinds.py`](docs/HOT-FILE-LEDGER.md#backendappservicesharnessvalidator_kindspy) | 16 / 8 / 845 (was `15 / 7 / 791`) | ⚠ **FIRES** | 295-02: `_DESIGN_NOTES` table + `_render_design_data` (+1 def, If 54→56). 295-07: D-47 re-drive found no auto-answer citation, so no sibling entry. Honoured by construction |
+| [`backend/app/services/harness/validator_kinds.py`](docs/HOT-FILE-LEDGER.md#backendappservicesharnessvalidator_kindspy) | 17 / 8 / 853 (was `16 / 8 / 845`) | ⚠ **FIRES** | 295-09 WR-01: the citations gate names an errored step an outage (one `if`, If 56→57), never "nothing was retrieved", and quotes no vendor text. Honoured by construction |
 | [`frontend/src/components/admin/ModelRegistryTab.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentsadminmodelregistrytabtsx) | 19 / 7 / 1705 (was `17 / 7 / 1679`) | ⚠ **FIRES** | honoured by construction (**282-01** help line; **282-04** ONE Timeout field in `AddModelForm`, placeholder = provider default, blank sends no key). `AddModelForm` seam OWED |
 | [`frontend/src/components/workflows/soulData.ts`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentsworkflowssouldatats) | 12 / 10 / 499 | ⚠ **FIRES** | honoured by construction (214 / **214.1**); ⚠ absent until 197, at 7 phases |
 | [`frontend/src/components/workflows/PublishGauntlet.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentsworkflowspublishgauntlettsx) | 21 / 11 / 1385 (was `20 / 10 / 1372`) | ⚠ **FIRES** | 288-02: ONE `auto-answered` block, server words verbatim; Pause stage copy corrected. honoured by construction |
@@ -23217,6 +23225,14 @@ Scan-list cell as of 2026-10-21 (replaced by 295-07, moved verbatim): 15 / 7 / 7
 
 CLAUDE.md verdict cell as of 2026-10-21 (replaced by 295-07, moved verbatim): | `backend/app/services/harness/validator_kinds.py` | 15 / 7 / 791 | ⚠ row STALE · honoured by construction (256-05) |
 
+### `backend/app/services/harness/validator_kinds.py` — 295-09 (WR-01, 2026-10-21)
+
+**`17 / 8 / 853`** (the row read `16 / 8 / 845`). 295-REVIEW WR-01: `_validate_citations_required`'s presence / retrieved_and_cited branch gains ONE `if` after the shipped `retrieval_error` arm: an output carrying `sub_agent_status: "error"` fails with "the model call for this step failed — this is a service outage, not model non-compliance". The rubric and every other message are byte-unchanged; ast.If 56 → 57.
+
+Scan-list cell as of 2026-10-21 (replaced by 295-09, moved verbatim): 16 / 8 / 845 (was `15 / 7 / 791`) | ⚠ **FIRES** | 295-02: `_DESIGN_NOTES` table + `_render_design_data` (+1 def, If 54→56). 295-07: D-47 re-drive found no auto-answer citation, so no sibling entry. Honoured by construction |
+
+CLAUDE.md verdict cell as of 2026-10-21 (replaced by 295-09, moved verbatim): | `backend/app/services/harness/validator_kinds.py` | 16 / 8 / 845 (was `15 / 7 / 791`) | 295-02: judge note table · 295-07: no D-17 entry |
+
 ## `backend/app/services/run_producer.py`
 
 ### `backend/app/services/run_producer.py` — Phase 295 (re-derived 2026-10-21 by 295-07)
@@ -23301,9 +23317,21 @@ CLAUDE.md verdict cell as of 2026-10-21 (replaced by 295-07, moved verbatim): | 
 
 **Row added 2026-10-21 by 295-07 (new in Phase 295).** Created by 295-01 as the D-51 seam: the engine-ask disposition family moved verbatim out of `harness_engine.py` (599 lines, ast.If 24, defs 6), proven by an AST-identity test against base `7fdf86e70`. Its logger keeps the name `app.services.harness_engine`. 295-03 made it the durable engine ask (`engine_pause`, `consume_engine_answer`, `engine_answer_refusal`): 599 → 1338 lines, If 24 → 77, defs 6 → 28. 295-04 added the D-49 cancel sibling (If 77 → 78). **Measured `5 / 1 / 1344`** (one phase, so G-5 does not fire yet, but it is already the size of a hot file). ⛔ Invariants: the exact-label allow-list (`engine_answer_refusal`) is the ONE list both the answer route (422) and the consume step read; a forged or unoffered answer never proceeds. Live (295-07): S3's forged continue by label and by index both got 422 and the run stayed paused. **Named seam for the next touch:** the found-nothing choice builder (folders, options) as its own module.
 
+### `backend/app/services/harness/engine_ask.py` — 295-09 (WR-01, 2026-10-21)
+
+**`6 / 1 / 1345`** (the row read `5 / 1 / 1344`). 295-REVIEW WR-01: `finding_from_output` returns `"outage"` when the output carries `sub_agent_status: "error"`, so the shipped D-06 route fails the run instead of pausing with the found-nothing choices. One `or` on an existing condition: ast.If 78 → 78.
+
+Scan-list cell as of 2026-10-21 (replaced by 295-09, moved verbatim): 5 / 1 / 1344 | no (young) | young (295-01 D-51 seam, verbatim move). 295-03 grew it 599→1338 L, If 24→77: the durable engine ask. ⛔ one allow-list shared with the route's 422 |
+
 ## `backend/app/services/harness/run_handoff.py`
 
 **Row added 2026-10-21 by 295-07 (new in Phase 295).** Created by 295-03 as a pure leaf (`phase_scope_ids`, 25 lines). 295-04 put every new branch of its plan here so the hot files spent call lines only: `handoff_text`, `claim_failure_message` / `surface_unless_engine_owns` / `surface_if_engine_owned`, `end_run` (the ONE guarded terminal write: `UPDATE ... WHERE status = ANY(...) RETURNING`), `resume_with_terminalize`, `fail_unloadable_definition`, `resume_shell_status`, `expire_unless_paused`, `record_stop`, `record_failed_end`, `finish_golden_run`. **Measured `5 / 1 / 355`**, ast.If 20, Try 10, defs 17. ⛔ Invariants: no `from app` / `import app` at module level; only the winner of a terminal end writes words; no exception text reaches a stored reason. Live (295-07): `end_run` is what the reconciler used to end the planted stuck run, and `record_stop` wrote the S7 armed run's Stop reason.
+
+### `backend/app/services/harness/run_handoff.py` — 295-09 (WR-01, 2026-10-21)
+
+**`6 / 1 / 386`** (the row read `5 / 1 / 355`). 295-REVIEW WR-01: two pure helpers so `phase_types.py` (FIRING) spends call lines only. `sub_agent_text` returns the summary, or `SUB_AGENT_FAILED_TEXT` when the sub-agent errored (the vendor body never becomes a step's text); `sub_agent_error_mark` returns `{"sub_agent_status": "error"}` when any sub-agent errored, else `{}`. defs 17 → 19, If 20 → 22. Still no module-level `app` import.
+
+Scan-list cell as of 2026-10-21 (replaced by 295-09, moved verbatim): 5 / 1 / 355 | no (young) | young. 295-03 created it (phase_scope_ids); 295-04 put every new branch of its plan here (5→355 L, If 0→20, 17 defs). ⛔ no app import; one guarded terminal write |
 
 ## `backend/app/services/harness/run_read_wire.py`
 

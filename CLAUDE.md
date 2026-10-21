@@ -419,7 +419,7 @@ node scripts/check-hot-file-ledger.cjs <phase-dir>   # 0 clear · 1 missing rows
 | `frontend/src/components/workflows/WorkflowCanvas.tsx` | 31 / 9 / 1708 | 286 forecast: 290 team picture is a separate view; ≤ 1 gated mount |
 | `frontend/src/components/workflows/FlowEdge.tsx` | 3 / 3 / 462 | honoured by construction (200) |
 | `frontend/src/components/workflows/PhaseNodeCard.tsx` | 18 / 9 / 490 (was `17 / 8 / 489`) | 286 forecast: 290 adds one prop; chip words from libraryVocabulary |
-| `backend/app/services/harness/phase_types.py` | 59 / 30 / 3053 (was `57 / 29 / 3050`) | 295-03/04: three call lines, If 113→113 · G-5 OWED |
+| `backend/app/services/harness/phase_types.py` | 60 / 30 / 3057 (was `59 / 30 / 3053`) | 295-09 WR-01: sub-agent error mark, 4 call lines, If 113→113 · G-5 OWED |
 | `frontend/src/pages/WorkflowsPage.tsx` | 45 / 18 / 1447 (was `43 / 17 / 1415`) | 286 forecast: 287 starters are data, fork reuses its hook; one prop |
 | `frontend/src/components/workflows/library/WorkflowCard.tsx` | 22 / 8 / 1354 (was `19 / 6 / 1616`) | seam TAKEN (286-04): ⋯ menu + armed delete → WorkflowCardMenu |
 | `frontend/src/components/workflows/library/libraryVocabulary.ts` | 11 / 5 / 766 (was `10 / 4 / 727`) | 286 forecast: 290 chip labels are vocabulary entries (data), no logic |
@@ -489,7 +489,7 @@ node scripts/check-hot-file-ledger.cjs <phase-dir>   # 0 clear · 1 missing rows
 | `frontend/src/components/panel/PhaseCard.tsx` | 20 / 13 / 811 (was `18 / 12 / 796`) | 295-05: ONE mount in the identity column |
 | `frontend/src/components/panel/PhaseTimeline.tsx` | 10 / 8 / 404 | ⚠ row STALE · honoured by construction (214) |
 | `frontend/src/components/panel/phaseStatusMeta.ts` | 4 / 4 / 291 | ⚠ row STALE · crossed the threshold (200) |
-| `backend/app/services/harness/validator_kinds.py` | 16 / 8 / 845 (was `15 / 7 / 791`) | 295-02: judge note table · 295-07: no D-17 entry |
+| `backend/app/services/harness/validator_kinds.py` | 17 / 8 / 853 (was `16 / 8 / 845`) | 295-09 WR-01: errored step = outage sentence (one if) |
 | `backend/app/services/harness/programmatic.py` | 3 / 3 / 137 | ⚠ FIRES · absent its ENTIRE LIFE — row added 255 · ⛔ |
 | `backend/app/services/harness/emitters.py` | 4 / 2 / 188 | ⚠ absent its ENTIRE LIFE — row added 255 · ⛔ |
 | `frontend/src/components/admin/ModelRegistryTab.tsx` | 19 / 7 / 1705 (was `17 / 7 / 1679`) | honoured by construction (282-04: Add-form Timeout) · AddModelForm seam OWED · ⛔ |

@@ -20,6 +20,8 @@ logger = logging.getLogger("app.services.harness_engine")
 __all__ = [
     "phase_scope_ids",
     "handoff_text",
+    "sub_agent_text",
+    "sub_agent_error_mark",
     "claim_failure_message",
     "surface_unless_engine_owns",
     "surface_if_engine_owned",
@@ -87,6 +89,35 @@ def handoff_text(out) -> str | None:
     if out.get("unsourced"):
         return f"{UNSOURCED_NOTE}\n\n{text}"
     return text
+
+
+# ── 295-REVIEW WR-01 (BUG-261021-01): a sub-agent's error is an OUTAGE, not an answer ──────
+#
+# When a sub-agent's model call raises, ``run_task_sub_agent`` returns ``status="error"`` and
+# ``summary = "Sub-agent failed: <str(e)>"`` — the VENDOR'S message body (an account id, a
+# quota, a masked key, a host). Kept as the step's ``text`` it read as "found nothing" to the
+# citations gate, and Continue then stored it as a deliverable and handed it downstream. The
+# step's text is now this fixed sentence instead (the vendor body stays in the server log and
+# the sub-agent's own ``runs.error``), and the output carries ONE mark the gate reads as an
+# outage, so the run fails with the outage sentence rather than offering to continue.
+
+SUB_AGENT_FAILED_TEXT = "This step could not get an answer from its model, so it has no result."
+
+
+def sub_agent_text(result) -> str:
+    """The ``text`` a step keeps from ONE sub-agent result: its summary, or the fixed sentence
+    when the sub-agent errored (never the vendor's message)."""
+    if result.get("status") == "error":
+        return SUB_AGENT_FAILED_TEXT
+    return result["summary"]
+
+
+def sub_agent_error_mark(results) -> dict:
+    """``{"sub_agent_status": "error"}`` when ANY sub-agent errored, else ``{}`` (absent, so a
+    working step's output is byte-identical)."""
+    if any(isinstance(r, dict) and r.get("status") == "error" for r in results or []):
+        return {"sub_agent_status": "error"}
+    return {}
 
 
 # ── D-23 (BUG-261015-01): one failure, one message ──────────────────────────────────────────

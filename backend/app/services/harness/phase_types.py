@@ -75,7 +75,7 @@ from app.services.harness.grounding import EXTERNAL_ACTION_CAPABILITIES
 from app.services.harness.phase_confidence import phase_confidence
 from app.services.harness.programmatic import PROGRAMMATIC_PHASE_REGISTRY
 # 295-03 (D-03): a pure leaf with no app imports, so it cannot close any cycle.
-from app.services.harness.run_handoff import handoff_text, phase_scope_ids, surface_unless_engine_owns  # noqa: E501
+from app.services.harness.run_handoff import handoff_text, phase_scope_ids, sub_agent_error_mark, sub_agent_text, surface_unless_engine_owns  # noqa: E501
 
 # 214.1-03 (BUG-260828-03) — ONE scrubber, TWO callers. ``_clean_label`` is the shipped
 # Unicode-category scrub + 72-char clamp for author- and model-authored strings, and the
@@ -930,7 +930,10 @@ async def _exec_llm_agent(phase, accumulated_outputs: dict, ctx) -> dict:
     # SUMMARIZE phase's prose (the final phase has none of its own).
     agent_source_refs = result.get("source_refs") or []
     return {
-        "text": result["summary"],
+        # 295-REVIEW WR-01: an errored sub-agent keeps a fixed sentence, never the vendor body,
+        # and carries ONE mark the citations gate reads as an outage.
+        "text": sub_agent_text(result),
+        **sub_agent_error_mark([result]),
         "sub_run_id": str(result["sub_run_id"]),
         "source_refs": agent_source_refs,
         "citations": result.get("citations") or [],
@@ -1043,7 +1046,7 @@ async def _exec_llm_batch_agents(phase, accumulated_outputs: dict, ctx) -> dict:
     # itself across N concurrent coroutines on a plain dict.
     for _r in results:
         _record_run_usage(ctx, _r.get("input_tokens"), _r.get("output_tokens"))
-    summaries = [r["summary"] for r in results]
+    summaries = [sub_agent_text(r) for r in results]  # 295-REVIEW WR-01: never a vendor body
     sub_run_ids = [str(r["sub_run_id"]) for r in results]
 
     if phase.config.merge_strategy == "concat_numbered":
@@ -1071,6 +1074,7 @@ async def _exec_llm_batch_agents(phase, accumulated_outputs: dict, ctx) -> dict:
     )
     return {
         "text": merged,
+        **sub_agent_error_mark(results),  # 295-REVIEW WR-01: any errored branch is an outage
         "sub_run_ids": sub_run_ids,
         "source_refs": batch_source_refs,
         "citations": batch_citations,

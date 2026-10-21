@@ -352,6 +352,14 @@ async def _validate_citations_required(output: dict, config: dict, ctx) -> GateR
                 False,
                 f"citations_required: retrieval failed ({provider}: {detail}) — this is a service outage, not model non-compliance",
             )
+        # 295-REVIEW WR-01: the step's own model call failed (its sub-agent errored). That is an
+        # outage too, never "nothing was retrieved" — and no vendor text is quoted here.
+        if output.get("sub_agent_status") == "error":
+            return GateResult(
+                False,
+                "citations_required: the model call for this step failed — this is a service "
+                "outage, not model non-compliance",
+            )
 
         # Phase 185 half (a) — real retrieval evidence, checked FIRST so a step that
         # retrieved nothing gets the honest reason rather than a marker count. The

@@ -748,11 +748,12 @@ def is_locked(phase) -> bool:
 def finding_from_output(output) -> str:
     """The citations finding from the keys the validator reads (RESEARCH Pattern 3).
 
-    ``retrieval_error`` → ``"outage"``; no ``citations`` → ``"no_sources"``; else
-    ``"no_markers"``. The validator's messages are never sniffed.
+    ``retrieval_error``, or an errored sub-agent (295-REVIEW WR-01) → ``"outage"``; no
+    ``citations`` → ``"no_sources"``; else ``"no_markers"``. The validator's messages are
+    never sniffed.
     """
     out = output if isinstance(output, dict) else {}
-    if out.get("retrieval_error"):
+    if out.get("retrieval_error") or out.get("sub_agent_status") == "error":
         return "outage"
     if not out.get("citations"):
         return "no_sources"

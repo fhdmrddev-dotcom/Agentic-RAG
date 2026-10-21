@@ -4,9 +4,9 @@ title: A knowledge-base step whose model call fails is offered as "found nothing
 reported: 2026-10-21
 surface: Agentic-RAG
 severity: major
-status: open
+status: folded
 affected_areas: [backend/harness, workflow/runs, RAG/grounding]
-folded_into: null
+folded_into: "295"
 verified_closed_by: null
 related_seeds: [SEED-366]
 re_open_trigger: null
@@ -51,3 +51,9 @@ Agentic-RAG. The provider error is external, but offering it as found-nothing is
 ## Workarounds (prompt-side, code-side, or UI-side)
 
 Choose "Stop the run" when the step output is an error message, then fix the provider key or billing and run again.
+
+## Fix (295-09, gap fix round 1, 2026-10-21)
+
+Folded into Phase 295 as review finding WR-01. An errored sub-agent now keeps a fixed sentence as the step's text (the provider's message stays in the server log and the sub-agent's own run row), and its output carries `sub_agent_status: "error"`. The citations gate and `finding_from_output` read that as an outage, so the run fails with the outage sentence instead of offering "Search another folder" or "Continue without sources". Proven by unit tests in `backend/tests/unit/test_295_09_review_fixes.py` (the `wr01` tests).
+
+**Not closed yet:** closing needs a live re-drive of a KB step whose provider call fails (for example a provider with no credit), checking that the run ends failed with the outage words, offers no choices, and stores no provider message as the step's output.
