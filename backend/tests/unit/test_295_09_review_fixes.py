@@ -243,3 +243,149 @@ def test_cr01_the_durable_answer_read_names_the_question_it_answers():
     assert got["response_text"] == "Stop the run"
     assert got["prompt"] == "…"
     assert got["engine_pause"] is True
+
+
+# ═════════════════════════════════════════════════════════════════════════════════════════
+# WR-01 — a sub-agent / provider error is an OUTAGE, never "found nothing"
+# ═════════════════════════════════════════════════════════════════════════════════════════
+VENDOR = "Your credit balance is too low to access the API (org-AbC123, model claude-x)"
+
+
+def _mock_agent_phase():
+    from unittest.mock import MagicMock
+
+    phase = MagicMock()
+    phase.slug = "research"
+    phase.config = MagicMock()
+    phase.config.prompt = "Find the renewal terms"
+    phase.config.allowed_tools = ["search_documents"]
+    phase.config.tools_budget = 5
+    phase.config.max_steps = 3
+    phase.config.max_parallel_agents = 2
+    phase.config.merge_strategy = "concat"
+    phase.config.skill_snapshot = None
+    phase.validators = []
+    return phase
+
+
+def _mock_agent_ctx():
+    from unittest.mock import MagicMock
+
+    ctx = MagicMock()
+    ctx.prior_run = None
+    ctx.folder_subtree_ids = None
+    ctx.user_settings = MagicMock()
+    ctx.user_settings.embedding_provider = "openai"
+    return ctx
+
+
+def _sub_agent(status="error", summary=f"Sub-agent failed: {VENDOR}"):
+    return {
+        "sub_run_id": "sub-1", "summary": summary, "status": status, "source_refs": [],
+        "citations": [], "similarity_scores": [], "input_tokens": None, "output_tokens": None,
+        "retrieval_error": None, "kb_search_calls": 0,
+    }
+
+
+def test_wr01_an_errored_sub_agent_marks_the_output_and_keeps_no_vendor_text():
+    from app.services.harness.phase_types import _exec_llm_agent
+
+    with patch("app.services.harness.phase_types.run_task_sub_agent",
+               AsyncMock(return_value=_sub_agent())), \
+         patch("app.services.harness.phase_types._record_run_usage"):
+        out = asyncio.run(_exec_llm_agent(_mock_agent_phase(), {}, _mock_agent_ctx()))
+    assert out.get("sub_agent_status") == "error"
+    assert VENDOR not in out["text"] and "org-AbC123" not in out["text"]
+    assert out["text"].strip(), "an errored step must still say something in plain words"
+
+
+def test_wr01_a_completed_sub_agent_output_is_unchanged():
+    from app.services.harness.phase_types import _exec_llm_agent
+
+    with patch("app.services.harness.phase_types.run_task_sub_agent",
+               AsyncMock(return_value=_sub_agent("completed", "The term renews yearly [1]."))), \
+         patch("app.services.harness.phase_types._record_run_usage"):
+        out = asyncio.run(_exec_llm_agent(_mock_agent_phase(), {}, _mock_agent_ctx()))
+    assert "sub_agent_status" not in out
+    assert out["text"] == "The term renews yearly [1]."
+
+
+def test_wr01_a_batch_with_an_errored_branch_marks_the_output_and_keeps_no_vendor_text():
+    from app.services.harness.phase_types import _exec_llm_batch_agents
+
+    results = [_sub_agent("completed", "Branch one found it [1]."), _sub_agent()]
+    with patch("app.services.harness.phase_types.run_task_sub_agent",
+               AsyncMock(side_effect=results)), \
+         patch("app.services.harness.phase_types._record_run_usage"), \
+         patch("app.services.harness.phase_types._collect_sub_questions",
+               return_value=["q1", "q2"]), \
+         patch("app.services.harness.phase_types._effective_model_checked",
+               AsyncMock(return_value="m")), \
+         patch("app.services.harness.phase_types._phase_tools_override", return_value=[]), \
+         patch("app.services.harness.phase_types._build_phase_tool_context",
+               return_value=object()):
+        out = asyncio.run(_exec_llm_batch_agents(_mock_agent_phase(), {}, _mock_agent_ctx()))
+    assert out.get("sub_agent_status") == "error"
+    assert VENDOR not in out["text"]
+    assert "Branch one found it [1]." in out["text"]
+
+
+def test_wr01_finding_from_output_reads_an_errored_sub_agent_as_an_outage():
+    from app.services.harness.engine_ask import finding_from_output
+
+    assert finding_from_output({"text": "x", "citations": [], "sub_agent_status": "error"}) == "outage"
+    assert finding_from_output({"text": "x", "citations": []}) == "no_sources"
+
+
+def test_wr01_the_citations_gate_names_an_errored_step_an_outage_not_found_nothing():
+    from app.services.harness.validator_kinds import _validate_citations_required
+
+    res = asyncio.run(_validate_citations_required(
+        {"text": "x", "citations": [], "sub_agent_status": "error"},
+        {"mode": "retrieved_and_cited", "min_markers": 1}, None,
+    ))
+    assert not res.passed
+    assert "service outage" in res.error_message
+    assert "nothing was retrieved" not in res.error_message
+
+
+def test_wr01_an_errored_kb_step_fails_with_the_outage_sentence_and_never_pauses():
+    """End to end through ``_run_phase_with_gates``: the step's sub-agent errored, so the run
+    must not offer "Search another folder" / "Continue without sources" (no prompt row), and the
+    failure reason is the outage sentence with no vendor body in it."""
+    from contextlib import ExitStack
+
+    from app.models.harness import PhaseSpec
+    from app.services import harness_engine
+    from app.services.harness.grounding import effective_phase
+    from tests.unit.engine_ask_fakes import FakePool, World
+
+    raw = PhaseSpec(
+        slug=SLUG, phase_index=0, name=STEP,
+        config={"phase_type": "llm_agent", "prompt": "Find the terms and cite them.",
+                "available_tools": ["search_documents"]},
+    )
+    phase = effective_phase(raw, total_phases=1)
+    world = World(SLUG, kb_label="Contracts", folders=[{"id": "f", "name": "Archive", "depth": 0}])
+    ctx = world.ctx(definition=None)
+
+    async def body(phase, accumulated, ctx):
+        return {"text": "This step could not get an answer.", "sub_run_id": "s",
+                "citations": [], "sub_agent_status": "error"}
+
+    with ExitStack() as stack:
+        world.enter(stack)
+        for p in (
+            patch.object(harness_engine, "_execute_phase", body),
+            patch.object(harness_engine, "write_audit", world.write_audit),
+            patch.object(harness_engine, "_emit", world.emit),
+        ):
+            stack.enter_context(p)
+        outcome = asyncio.run(harness_engine._run_phase_with_gates(
+            phase, {}, ctx, run_id=uuid4(), pool=FakePool(), redis=object(), wall_clock=30,
+            _audit_user_id=uuid4(), total_phases=1,
+        ))
+    assert outcome.kind == "fail_run", outcome
+    assert "service outage" in outcome.reason
+    assert VENDOR not in outcome.reason
+    assert world.prompt_rows() == [], "an outage was offered as a found-nothing question"
