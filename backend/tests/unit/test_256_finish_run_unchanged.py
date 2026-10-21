@@ -113,7 +113,9 @@ _EXPECTED_CALL_SITES = {
     #   allow-list loader) landed above `_fail_redrive`. Re-derived with
     #   `grep -n "await finish_run(" backend/app/api/runs.py`.
     #   api/runs.py:618 → 653
-    "api/runs.py:653",
+    # ⚠ RE-DERIVED at 295-09 (CR-01): COUNTS identical; +14 when `_is_current_question` landed
+    #   above `_fail_redrive`. The call is byte-unchanged. api/runs.py:653 → 667
+    "api/runs.py:667",
     # ⚠ RE-DERIVED at Phase 258 Plan 03: +7 line shift in api/workflows.py (import + decorators)
     #   api/workflows.py:1802 → 1809 → 1812 (v4.3 audit: +3 lines, require_capability on authoring writes; the call itself unchanged)
     # ⚠ RE-DERIVED at Phase 286 Plan 01: check (a), the per-file COUNTS, stayed identical
@@ -156,9 +158,12 @@ _EXPECTED_CALL_SITES = {
     #   `_run_phase_with_gates` above all three, then +6 more above the third when the valid
     #   skip_to and completed-with-failure arms gained their one `surface_if_engine_owned` line.
     #   The calls are byte-unchanged. 1956 → 1962 · 1997 → 2003 · 2294 → 2306
-    "services/harness_engine.py:1962",
-    "services/harness_engine.py:2003",
-    "services/harness_engine.py:2306",
+    # ⚠ RE-DERIVED at 295-09 (WR-07): (a) the COUNTS stayed identical; +3 when the pause arm
+    #   above all three gained its ONE guarded `take_pause_written(ctx)` line + comment.
+    #   The calls are byte-unchanged. 1962 → 1965 · 2003 → 2006 · 2306 → 2309
+    "services/harness_engine.py:1965",
+    "services/harness_engine.py:2006",
+    "services/harness_engine.py:2309",
     # ⚠ RE-DERIVED at Phase 268 Plan 01: +8 line shift in services/run_lifecycle.py —
     #   register_run_start gained `org_id` / `expert_id` kwargs, their forward to insert_run and
     #   a 4-line docstring note, all ABOVE this call. Check (a), the per-file COUNTS, stayed
@@ -175,7 +180,9 @@ _EXPECTED_CALL_SITES = {
     #   Task 3 (+15: the F2 / reconciler reason constants and `_claim_terminal` above it):
     #   run_handoff.py:186 → 201, then -2 when the reconciler's sentence moved home to
     #   run_reconciler.py: 201 → 199
-    "services/harness/run_handoff.py:199",
+    # ⚠ RE-DERIVED at 295-09: +76 when the WR-01 sub-agent helpers and the WR-07 pause-write
+    #   mark landed above it (the call is byte-unchanged; COUNTS identical): 199 → 275
+    "services/harness/run_handoff.py:275",
 }
 
 _CALL_RE = re.compile(r"await\s+finish_run\s*\(")
