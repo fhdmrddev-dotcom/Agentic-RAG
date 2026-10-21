@@ -162,7 +162,7 @@ Decision rule (D-47 / D-17): add the `_golden_run_mock` sibling note only if the
 
 | # | Scenario | The failure the operator would recognise | Verdict |
 |---|---|---|---|
-| S1 | A KB step over an empty folder pauses with its worded choices; reload, still paused; answer "Search another folder" with a populated folder; the run completes, cited | The run fails instead of pausing; the card says the window passed or the agent stopped; the folder list shows a folder outside the run's scope; the re-run ignores the folder; the band reads ● Running while it waits | **FAIL (chat-panel home)**: PASS on the run page (`b8a3e6f3`), but the Workspace panel shows the live ask RETIRED: "The run was stopped, so this question no longer needs an answer" (`PendingAskCard.tsx:897`) |
+| S1 | A KB step over an empty folder pauses with its worded choices; reload, still paused; answer "Search another folder" with a populated folder; the run completes, cited | The run fails instead of pausing; the card says the window passed or the agent stopped; the folder list shows a folder outside the run's scope; the re-run ignores the folder; the band reads ● Running while it waits | **FAIL (chat-panel home)**: PASS on the run page (`b8a3e6f3`), but the Workspace panel shows the live ask RETIRED: "The run was stopped, so this question no longer needs an answer" (`PendingAskCard.tsx:897`). **Re-driven 2026-10-21 after gap round 1: the retirement is fixed in the chat panel (`b5678cc3`); two new defects in the same home, D-r1-01 and D-r1-02. See "Gap round 1 re-drive (2026-10-21)" below.** |
 | S2 | Same plant, answer "Continue without sources"; the step, the evidence page and the export all say unsourced | Any of the four places shows the step done with no `Unsourced` text; the export lacks `unsourced.continued_by` / `at`; the mark is grey and quiet | **PASS** (`d5d77eed`) |
 | S3 | S1's exact plant (empty KB folder plus at least one other permitted populated folder) with `grounding_escalated` planted by direct DB (D-36): the locked step PAUSES offering Search another folder and Stop the run with the locked addendum, never Continue; a forged continue POST (by label and by index) is refused | The run fails instead of pausing; `Continue without sources` appears anywhere in the DOM; the forged POST returns 2xx, persists a response row, or completes the step | **PASS** (`b9c4635d`; four forged answers got 422 and wrote no row). The `Answered · run stopped` header was not observed live |
 | S4 | Saving a report step with no template is named (warning, save succeeds); publishing is refused naming the template; starting a run is refused naming the template (Run modal and thread entry show the server's words) | The save is rejected; the message names a citation code; publish or run start succeeds; the client shows a constant instead of the server's sentence | **PASS** (Builder, publish route, Run modal, thread entry) |
@@ -289,6 +289,104 @@ That signature is exactly `_reconcile_workflow_runs`' **cancelled** arm (last st
 - **Not touched:** the 15 historical `test_214` rows (already absent), and no production data of any kind.
 - **After the diff:** three more runs were made after `snap_after`, for the S3 header recheck and the panel finding: `6ec2f298` (contaminated by the unit gate), `3ec118a2` and `108bb381`. Their threads are `d5d872ce`, `a5bf61a7` and `38cdf37f`. All three were stopped through `DELETE /runs/{id}` and read `cancelled` with ONE `run_cancelled` reason each. They are kept as evidence. At the end, `workflow_runs` held 0 `active` / `paused` rows, and no `runs` shell was left `streaming`.
 
+
+---
+
+## Gap round 1 re-drive (2026-10-21)
+
+**What was driven, and how.** Driven from 02:26Z to 03:08Z on the merged develop checkout at `128266ef6`, which carries 295-08 (frontend) and 295-09 (backend). The servers were the operator's own: `:8000` (worker reloaded 06:23:46 +04, after the 06:22:53 merge) and vite on `5173`. Nothing was restarted.
+
+The method is 295-07's: headless Chromium through `frontend/node_modules/playwright`, signed in with a magic-link session placed in `localStorage` (no password read), and every verdict read from the live DOM text and checked against a local DB read.
+
+- The local-DB lock was taken at 02:26:34Z with noclobber and released at 03:08:04Z.
+- No unit suite or TestClient suite was run.
+- No Supabase MCP call of any kind was made.
+- Screenshots are in `evidence/r1_*.png`. Records are in `evidence/r1_cr01_api.json`, `r1_wr06_offered.json`, `r1_wr05_publish.json`, `r1_wr01_export.json` and `r1_s2_export.json`.
+
+### S1 in the chat panel: before and after
+
+| | Before (295-07, runs `3ec118a2`, `108bb381`) | After (r1, run `b5678cc3`) |
+|---|---|---|
+| Panel card on a paused found-nothing run | `RETIRED` · "The run was stopped, so this question no longer needs an answer", Send disabled | `NEEDS YOU` · "No deadline — the run is waiting for your answer and will not continue on its own", three worded choices, Send enabled once a choice is made |
+| Panel card on a paused armed approval | `RETIRED`, Send disabled | `NEEDS YOU`, Approve this step / Do not run it, answerable (run `9cb788d0`) |
+
+| # | 295-08 re-drive item | Verdict | Run | The evidence that decides it |
+|---|---|---|---|---|
+| 1 | "Needs you", not "Retired" | **PASS** | `b5678cc3` | The panel text reads `NEEDS YOU` and the no-deadline line, and the word Retired does not appear (`r1_s1_live_arrival.png`). The DB read `paused` at 02:33:25.6Z. |
+| 2 | Three worded choices, no free-text box | **PASS** | `b5678cc3` | The panel shows Search another folder, Continue without sources and Stop the run, in that order. It has 0 `textarea`s, no `ask-free-label`, and no "Reason" label. |
+| 3 | Search another folder lists the server's folders, and Send stays disabled until one is chosen | **PASS** | `b5678cc3` | Send was disabled after the choice and enabled after a folder was picked. The list held 31 names: every folder the owner can see, minus the empty folder that was already searched (`r1_s1_panel_folder_list.png`). |
+| 4 | Resume, then complete with citations | **PASS in the DB, FAIL in the open tab** | `b5678cc3`, `c4232e01` | **DB:** the run went `paused` → `active` 0.8 s after Send. The research step completed with 25 citations (12 passages, confidence medium), and `run_completed` followed 28 s later. **Same tab** (`c4232e01`, no reload): the panel read `research — Running` for 90 s, which is 62 s past `run_completed` at 03:05:30Z. Only a thread switch showed `wrap — Complete · 30 sources` (`r1_s1resume_same_tab_90s.png`, `r1_s1resume_after_switch.png`). This is **D-r1-02** below. |
+| 5 | Reload while paused: still answerable | **PASS** | `b5678cc3` | The app has no URL router, so a reload lands on the home screen (`r1_s1_after_reload.png`). Reopening the thread showed `NEEDS YOU` and the three choices, and the answer in item 3 was sent from that card (`r1_s1_panel_before.png`). |
+| 6 | Stop a paused run: the card turns Retired with the stop sentence | **Not observed as written. The expectation is changed** (see HUMAN-UAT test 1) | `3f231cab`, `15867461` | The chat thread has **no Stop control** for a paused run (0 `Stop run` buttons), so the Stop was pressed on the run page. The run page then read `Cancelled` and "Why it stopped: Stopped by the person who started this run." A thread opened afterwards shows **no card**, only `research — Stopped`. That is because `/ask_user/pending` serves no prompt of a run that has ended (by design, D-06). A tab that was already open kept `NEEDS YOU` for 30 s. Answering it got `404 {"detail":"Run not found"}`, and the card then read `EXPIRED · This prompt has expired — the run is no longer active` (`r1_s1stop2_tab1_*.png`). Nothing claims the run is live after the next read. |
+| 7 | Panel closed: the full card is in the chat column. Panel open: a one-line pointer | **PASS** | `b5678cc3` | **Panel closed:** the three choices are in the chat column, the page has 1 Send Answer, and there is no pointer (`r1_s1_panel_closed_chat_card.png`). **Panel reopened:** the chat column has 0 choices and the pointer `NEEDS YOU · Searched 295-07 empty KB folder and found nothing … · No answer yet · Answer in panel →`, and the page still has 1 Send Answer (`r1_s1_panel_open_pointer.png`). |
+| 8 | A pause that lands while the thread is already open | **Answerable at once if this tab started the run. Not seen if the run was started elsewhere** | `b5678cc3`, `3f231cab` | **Started from this tab** ("Run a workflow"): the card was answerable in the panel 60 s after the start, which is the same moment the DB read `paused`. **Started through the API** while the thread sat open: the panel read "No workspace activity yet" for 155 s after the pause. A thread switch then showed the answerable card (`r1_s1api_live_arrival.png`, `r1_s1api_after_switch.png`). This is the reconcile-trigger limit 295-08 recorded, now measured. |
+| 9 | Type in the composer while paused | **Recorded: 409, then a dead-end instruction** | `b5678cc3`, `3f231cab` | The composer is enabled ("Ask anything…"). Sending gives `POST /threads/{id}/messages → 409 {"detail":"Thread is workflow-locked — cancel the active workflow to switch back to Deep mode."}`. The typed message is rolled back, and the column reads "This thread is running a workflow — cancel it to send a Deep message." But the thread offers no cancel control for a paused run (item 6). This is **D-r1-03**. |
+| 10 | Armed approval in the panel | **PASS** | `9cb788d0` | The card arrived 6 s after the start. It shows the no-deadline line, the two choices, no countdown and no text box. The 289 line ("The answer window has passed…") does not show, and that is correct: an engine ask has no answer window. "Do not run it" → `failed`, reason "the person who started this run chose not to run “Email the note”, so the run stopped." No email was sent. ⚠ 7 s after the run had failed, the same tab still read `act — Running · paused, waiting on a person` (D-r1-02). |
+
+**S1 verdict.** The defect that gap round 1 was opened for is fixed. The chat panel no longer retires a live paused ask, and the card is answerable in both of the chat homes (panel and chat column) as well as on the run page. But the chat home is not yet a clean experience. After an answer, the thread does not follow the run (D-r1-02). A stale card's refusal is worded falsely (D-r1-01, under CR-01). And the composer tells the person to cancel a run that the thread cannot cancel (D-r1-03).
+
+### 295-09's re-drive list
+
+| Row | Verdict | Run | The evidence that decides it |
+|---|---|---|---|
+| **CR-01**: a stale answer is refused, nothing re-runs, and the current card still resumes | **PASS on the server. The card's words FAIL (D-r1-01)** | `1c95e132` | Tab A held card T1 with Continue chosen. Tab B answered T1 with Search another folder → "295-r1 second empty folder", and the run paused again on T2 54 s later. Tab A then pressed Send: `409 {"detail":"This question is no longer the one the run is waiting on."}`. Two API replays of T1 got the same 409. **Before → after the replays:** `phase_started` 2 → 2, `runs` rows 8 → 8, prompt rows 2 → 2, response rows 1 → 1, and the status stayed `paused`. `/threads/{id}/ask_user/pending` listed only T2 (`d87b9c1a…`). T2 was answered from the panel (PM Demo): `paused` → `active` in 0.9 s, then `completed` 22 s later, cited. ⚠ **The stale card in tab A read `EXPIRED · This run has already ended — your answer was not saved`**, which is false: the run was paused, waiting on T2 (`r1_cr01_tabA_stale_send.png`). Tab A never showed T2. |
+| **WR-01 / BUG-261021-01**: a KB step on a provider with no credit | **PASS** | `f0d5d678` | `claude-opus-5-5` on `anthropic`. The 3 sub-runs (`claude-haiku-4-5-20251001`) failed with "credit balance is too low", and that text is kept only in `runs.error`. The run **failed in 3 s, with no pause and no prompt row**. `run_failed`: "Phase 1 (research) gate failed after 3 attempt(s): citations_required: the model call for this step failed — this is a service outage, not model non-compliance". **No vendor text** in `workflow_phases`, `harness_audit`, `messages`, `GET /workflow-runs/{id}`, the evidence page's text or HTML, or the downloaded export (`r1_wr01_evidence.png`, `r1_wr01_export.json`). No found-nothing choice appears on the page. ⚠ The failed step keeps only its failure reason, so the fixed sentence 295-09 wrote ("This step could not get an answer…") is not visible here. It is used where the step completes. ⚠ Observation, not a 295-09 regression: the reason a person reads carries the internal name `citations_required:` (pre-295 wording). |
+| **WR-02**: the folder just searched is not offered again | **PASS** | `1c95e132` | T1's list (31 names) included "295-r1 second empty folder". T2's list (30 names), after that folder came up empty, omits it and also omits the first empty folder. Checked in the prompt row's `engine_pause.folders` and in the UI chooser (`r1_cr01_tabB_T2_folder_list.png`). |
+| **WR-06**: a run in one org offers no folders from the other | **FAIL for the row. PASS for the half the review named** | `e9f5f925` (org `22f9c615`), `df323914` (org `c1f18150`) | Driven as `fhdmrd.dev@gmail.com`, the two-org account. The org is proven by each run row's `org_id`, set by `X-Org-Id` on the thread. **Org-A run:** 12 folders. 10 are org-A shared folders, and **2 are the account's own org-B folders** ("295-r1 WR-06 org-B empty project", "… org-B other folder"). The UI chooser shows the same 12 (`r1_wr06_orgA_folder_list.png`). **Org-B run:** 2 folders, "org-B other folder" and **the account's own org-A folder** "295-r1 WR-06 org-A empty project". None of org-A's 10 shared folders is offered. So the fix narrows shared folders as the review asked, but the owner's own folders still cross orgs in both directions. This is **D-r1-04**. Both runs were stopped afterwards. |
+| **WR-03**: a non-emit step routed by `skip_to` posts no "gate failed" message | **PASS** | `a99ca39a` | The research gate failed ("citations_required: no field_map on output"). Then `phase_transition research → wrap via skip_to_phase`, and the run completed in 21 s. The thread's messages are the user prompt and the wrap answer only. Observation: the step "middle", which was jumped over, still reads `pending` in the completed run. |
+| **WR-05**: the DMT shape still publishes | **PASS for the publish. ⛔ for the trace** | `9f40b1a7` | This is a byte copy of `edd81b32` under a new slug. `POST /publish` → `200 {"published":true}` in 61 s. `judge_verdict`: `overall_passed: true`, score 10, with the summary "The drafted email is well-structured, comprehensive, and grounded in the provided project evidence…" (`r1_wr05_publish.json`). ⛔ Whether the note sits in the judge's system prompt was **not checked**: this session has no LangSmith MCP tool. |
+| **WR-07**: paused reads paused; answered reads active, then done | **PASS** | `b5678cc3`, `1c95e132`, `74493c29` | The DB watch logs read `paused` while each run waited. Each went `paused` → `active` within 1 s of the answer, and none went back to `paused` (`b5678cc3`: 02:33:25.6 paused, 02:34:53.4 active, 02:35:20.5 completed). |
+
+### Regression spot-check
+
+| Row | Verdict | Run | The evidence that decides it |
+|---|---|---|---|
+| **S2** | **PASS** | `74493c29` | Continue was sent from the chat panel. Research completed with `unsourced {at, continued_by}`. Yes was answered on the run page, and the run completed. **Evidence page:** `◌ Unsourced · continued by fhdmrd@gmail.com (you)` with its note (`step-unsourced-line` count 1). **Export:** `phase_log[0].unsourced = {continued_by: "fhdmrd@gmail.com (you)", at}`, and no user id appears in the file. The wrap quotes "Yes". ⚠ The chat panel read `research — Running` for 120 s while the run waited on its approval, and the approval card did not appear. After a thread switch, both the unsourced mark and the card showed (D-r1-02). |
+| **S6** | **PASS** | `ae5e412b` | The KB step was cited (24 citations, 10 passages). Yes was answered on the run page. The wrap reads: "The person answered "Yes" to the approval question. …" |
+
+### New defects (recorded, not fixed)
+
+| Id | What | Where | Sized fix |
+|---|---|---|---|
+| **D-r1-01** | A stale card that is refused under CR-01 says **"This run has already ended — your answer was not saved"** while the run is paused on a newer question. The server's sentence ("This question is no longer the one the run is waiting on.") is not shown, and the stale tab never shows the new card. | `frontend/src/components/panel/PendingAskCard.tsx`, the 409 arm (~line 484-507): it keeps its own words. 295-08 left that arm unchanged before CR-01 gave 409 this second meaning. | In the 409 arm, show `err.message` when it is the server's sentence (not `ASK_ANSWER_FAILED`), and keep the retire. Optionally refetch the stack's pending list so the current card appears. About 3-6 lines plus one case in `PendingAskStack.pausedRun.test.tsx`. Fits G-3 (`/gsd:fast`). |
+| **D-r1-02** | **After an answer is given in the chat thread, the thread stops following the run.** The step reads `Running` until the person switches threads, past the run's end and through the next question. Measured three times: S1 `c4232e01` (62 s past completion), S2 `74493c29` (120 s while the run waited on approval, with no card shown), and armed `9cb788d0` (Running after the run failed). This is a 295 consequence: every engine ask is now a durable pause, re-driven by a new producer that the tab is not subscribed to. | `frontend/src/providers/StreamsProvider.tsx` (FIRING): the answer-settle reconcile runs once, while the re-drive is only starting. | After an engine-ask answer, reconcile again until the run leaves `active` (a bounded poll, for example every 3 s until the run ends or pauses), or attach to the new producer's stream. About 15-30 lines in a FIRING hot file, plus a test. Not G-3 sized. It is a gap plan (G-7: one round has run, so a second is allowed) or a named follow-up. It keeps SC#4 ("waiting reads waiting") unmet in the chat home. |
+| **D-r1-03** | On a paused run, the composer is enabled, the send is refused with 409, and the client says "cancel it to send a Deep message". But the thread has **no Stop control** for a paused run. | `backend/app/services/workflow_kickoff.py:147-182` refuses. `backend/app/api/threads.py` F2 backstop (~2153-2175) reports the lock as stale, so the client unlocks the composer and shows no Stop. This is the 295-08 finding, now seen live. | **Small option:** word the refusal for a paused run ("This thread's workflow is waiting for your answer in the panel."). That is ~3 lines in `workflow_kickoff.py` plus the client showing the server's words, and fits G-3. **Structural option** (295-08's): exempt `paused` from the F2 stale rule so the lock holds, the composer locks and the Stop control shows. That is ~10-20 lines across two hot files. |
+| **D-r1-04** | The WR-06 fix narrows **shared** folders only. A two-org owner's **own** folders from the other org are still offered, in both directions. | `backend/app/utils/folder_utils.py:268-278`: `f["user_id"] == user_id` admits owned folders whatever their `org_id`. | When `restrict_org_ids` is given, an owned folder must also be in the allowed orgs. That is ~2 lines plus one test in `test_295_09_review_fixes.py`. It also tightens publish stage 2.6, whose docstring asks for exactly that. Check `scope.resolve_run_scope_root` for the same rule on a per-run folder override (inherited, D-39 parity). |
+
+**Observation, outside 295's files:** for the two-org account, `POST /folders` and `POST /workflows` ignored `X-Org-Id`, and both landed in the account's own org `c1f18150`. `POST /threads` honoured the header. The WR-06 plants were therefore moved by direct DB update (listed below). Route this separately if it proves real.
+
+### SC#1 now
+
+**Met in both homes for the property it names:** a run pauses with choices, survives a reload, and is answerable. The run page proved it in 295-07, and the chat panel and chat column prove it in this re-drive.
+
+The chat home's lived experience is still owed two fixes:
+- **D-r1-02:** after an answer, the thread does not follow the run. This also leaves **SC#4 unmet in the chat home**: the panel read Running while the run waited on its approval.
+- **D-r1-01:** a stale card's false words.
+
+The Anthropic roster row stays ⛔ (billing). The credit was still out at 02:46Z (`f0d5d678`'s sub-runs).
+
+### Plants, cleanup and the id-snapshot diff
+
+**Plants made through the app:**
+- the folder "295-r1 second empty folder" (`3e4d1a16`);
+- eleven threads named `295-r1 …`;
+- WR-03 definition `c75e6500`;
+- DMT copy `9f40b1a7`, published by the gauntlet;
+- as the dev account, folders `c8ce1ab5`, `d1d38ee7` and `b1192620`, and definitions `2398e6f3` and `19ce7dba`.
+
+**Direct-DB plants** (the 295-07 precedent):
+- folder `c8ce1ab5` was moved to org `22f9c615`;
+- definition `2398e6f3` was moved to org `22f9c615` and set to published;
+- definitions `19ce7dba` and `c75e6500` were set to published.
+
+All of these are kept, because this section cites them.
+
+**Snapshot diff:** 48,255 ids → 48,814. **0 ids were removed** in any table except `connector_sync_runs` (2 added and 2 removed by the operator's background watch loop). Added:
+- `folders` +4, `workflow_definitions` +4, `threads` +12 (one is the publish golden run's), `workflow_runs` +13, `workflow_phases` +30;
+- `messages` +41, `runs` +56, `harness_audit` +137, `audit_log` +241;
+- auth rows +8 (the magic-link sessions).
+
+**End state:** `workflow_runs` has 0 `active` / `paused` rows, and `runs` has 0 `streaming` rows.
 
 ---
 

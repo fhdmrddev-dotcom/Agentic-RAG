@@ -3,7 +3,7 @@ status: pending
 phase: 295-runs-that-don-t-dead-end
 source: [295-VALIDATION.md, 295-UI-SPEC.md]
 started: 2026-10-21T00:56:00Z
-updated: 2026-10-21T00:56:00Z
+updated: 2026-10-21T03:10:00Z
 ---
 
 ## Current Test
@@ -14,7 +14,12 @@ updated: 2026-10-21T00:56:00Z
 
 - Use the local app (`/app`) with the backend on `:8000` and vite on `5173`, signed in as yourself.
 - The fixtures 295-07 left in place are named `295-07 …` in the Workflows library and the chat list. The empty folder is `295-07 empty KB folder`.
-- ⚠ **Do S1 after the chat-panel fix lands.** 295-07 found that the chat thread's Workspace panel shows a live found-nothing or approval ask as **RETIRED** ("The run was stopped, so this question no longer needs an answer"). The run page (`/app?run=<id>`) shows it correctly. If you run S1 before that fix, you will see the failure below, and that result is already known.
+- ✅ **The chat-panel fix has landed** (295-08, merged at `128266ef6`). The agent re-drove S1 on 2026-10-21 (295-VALIDATION.md, "Gap round 1 re-drive"). The panel now shows a live paused ask as `NEEDS YOU` and you can answer it there.
+- ⚠ **Three things are known and still open, so you will see them:**
+  - **After you answer in the chat thread, the thread does not follow the run.** The step keeps reading "Running" until you switch to another thread and back (D-r1-02).
+  - **A card left open in a second tab can say the run "has already ended"** when it has only moved on to a newer question (D-r1-01).
+  - **Typing into the composer while the run waits is refused**, and the message tells you to cancel a run that the thread has no Stop button for (D-r1-03).
+- The app has no URL router. A browser reload lands on the home screen, so reopen the thread from the chat list.
 
 ## Tests
 
@@ -25,14 +30,21 @@ expected: Run the `295-07 S1 found nothing` workflow from a chat thread ("Run a 
 
 Both should show the same card: "Searched 295-07 empty KB folder and found nothing for “Find the project status”. How should the run continue?", then three choices in this order (Search another folder, Continue without sources, Stop the run), then "No deadline — the run is waiting for your answer…", and no countdown. The band reads "Paused for your answer". Reload: the card comes back. Choose Search another folder: a "Folder to search" list appears, holding only folders you can see and not the empty one. Pick "PM Demo Project (sample data)" and press Send Answer. The run should complete, and the step should show cited sources.
 
+**Also check, in the chat thread (expectations changed after the 2026-10-21 re-drive):**
+- With the Workspace panel closed, the full card is in the chat column. With the panel open, the chat column shows a one-line "Needs you … Answer in panel →" pointer instead.
+- **Stopping a paused run.** The chat thread has no Stop button for a paused run, so stop it on the run page ("Open the run"). The run page reads Cancelled and "Why it stopped: Stopped by …".
+  - Back in the chat thread, the question is gone and the step reads "Stopped".
+  - A thread tab that was already open still shows the card until you switch threads. Answering it there reads "This prompt has expired — the run is no longer active".
+  - This replaces the earlier expectation that the card turns "Retired · The run was stopped …". That line is not reachable for a paused run.
+
 You'd recognise failure as:
 - the run fails instead of pausing;
-- either home says the run was stopped, that the window passed, or that the agent stopped;
+- either home says the run was stopped, that the window passed, or that the agent stopped, while it is still waiting;
 - a folder you cannot see appears in the list;
 - the re-run ignores the folder;
-- the band reads ● Running while it waits.
+- the band reads ● Running while it waits. ⚠ Known in the chat thread after an answer, until you switch threads (D-r1-02).
 
-result: [pending — known FAIL in the chat panel until PendingAskCard.tsx:897 is fixed; PASS on the run page per 295-VALIDATION.md S1]
+result: [pending — the agent's re-drive on 2026-10-21 PASSED the panel fix (`b5678cc3`): `NEEDS YOU`, three choices, no text box, server folder list, resumed and completed cited. D-r1-01 and D-r1-02 are open in the chat home. PASS on the run page per 295-07]
 
 ### 2. S3 — a step set to "Must prove it" never offers Continue
 expected: Run `295-07 S3 locked found nothing`. The card should offer only Search another folder and Stop the run. Its prompt should say "This step is set to Must prove it, so it can't continue without sources." The words "Continue without sources" must appear nowhere on the page. Choose Stop the run and Send: the card header should read "Answered · run stopped" (this header was NOT seen live by the agent). The run's record should then say "Why it stopped: Searched 295-07 empty KB folder and found nothing for “Find the project status”. Stopped by …".
@@ -94,7 +106,7 @@ result: [pending]
 ### 8. Anthropic roster row (D-33)
 expected: Re-run the S1 roster row on Anthropic once billing is restored. On 2026-10-21 every KB sub-run failed with "Your credit balance is too low to access the Anthropic API".
 
-result: [blocked: billing]
+result: [blocked: billing — still out of credit at 2026-10-21 02:46Z (run `f0d5d678`). That run now fails with the outage sentence instead of offering the found-nothing choices (WR-01)]
 
 ## Summary
 
@@ -107,6 +119,12 @@ blocked: 1
 
 ## Gaps
 
-- **Chat-panel retirement of a live engine ask** (295 regression, found by 295-07). A paused found-nothing or approval ask is shown RETIRED in the chat thread's Workspace panel because the client never seeds the workflow lock for a durable pause (`lock_is_stale` is true with no live producer). Code: `frontend/src/components/panel/PendingAskCard.tsx:897`, `frontend/src/providers/StreamsProvider.tsx:2536`, `frontend/src/components/chat/ChatArea.tsx:380`. Not yet a bug report; proposed for `/gsd:fast` with a RED test, then the live re-drive of test 1.
-- **A provider error on the KB step is offered as "found nothing"** (found on the Anthropic roster row). The step text is the raw provider error, and Continue keeps it as an unsourced output. Not yet a bug report.
+- ✅ **CLOSED: chat-panel retirement of a live engine ask.** Fixed by 295-08 and verified live on 2026-10-21 (run `b5678cc3`, 295-VALIDATION.md "Gap round 1 re-drive"). The original text is kept below.
+- ✅ **CLOSED: a provider error on the KB step offered as "found nothing".** Fixed by 295-09 WR-01 and verified live on 2026-10-21 (run `f0d5d678`). BUG-261021-01 is closed.
+- **OPEN, D-r1-01:** a stale card refused under CR-01 says "This run has already ended" while the run waits on a newer question (`PendingAskCard.tsx` 409 arm).
+- **OPEN, D-r1-02:** after an answer in the chat thread, the thread stops following the run. It reads Running until a thread switch (`StreamsProvider.tsx`).
+- **OPEN, D-r1-03:** on a paused run, the composer is refused with 409 and told to cancel, but the thread has no Stop control for a paused run.
+- **OPEN, D-r1-04:** the "Search another folder" list still offers the owner's own folders from the other org (`folder_utils.py`). WR-06 narrowed only shared folders.
+- (original) **Chat-panel retirement of a live engine ask** (295 regression, found by 295-07). A paused found-nothing or approval ask is shown RETIRED in the chat thread's Workspace panel because the client never seeds the workflow lock for a durable pause (`lock_is_stale` is true with no live producer). Code: `frontend/src/components/panel/PendingAskCard.tsx:897`, `frontend/src/providers/StreamsProvider.tsx:2536`, `frontend/src/components/chat/ChatArea.tsx:380`. Not yet a bug report; proposed for `/gsd:fast` with a RED test, then the live re-drive of test 1.
+- (original) **A provider error on the KB step is offered as "found nothing"** (found on the Anthropic roster row). The step text is the raw provider error, and Continue keeps it as an unsourced output. Not yet a bug report.
 - **A Stop that reaches a live producer records no "Stopped by" reason** (295-04's recorded gap). Seen live on run `b0a8203a`.

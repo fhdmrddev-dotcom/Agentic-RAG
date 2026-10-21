@@ -4,10 +4,10 @@ title: A knowledge-base step whose model call fails is offered as "found nothing
 reported: 2026-10-21
 surface: Agentic-RAG
 severity: major
-status: folded
+status: closed
 affected_areas: [backend/harness, workflow/runs, RAG/grounding]
 folded_into: "295"
-verified_closed_by: null
+verified_closed_by: "295"
 related_seeds: [SEED-366]
 re_open_trigger: null
 reproduces_on:
@@ -57,3 +57,15 @@ Choose "Stop the run" when the step output is an error message, then fix the pro
 Folded into Phase 295 as review finding WR-01. An errored sub-agent now keeps a fixed sentence as the step's text (the provider's message stays in the server log and the sub-agent's own run row), and its output carries `sub_agent_status: "error"`. The citations gate and `finding_from_output` read that as an outage, so the run fails with the outage sentence instead of offering "Search another folder" or "Continue without sources". Proven by unit tests in `backend/tests/unit/test_295_09_review_fixes.py` (the `wr01` tests).
 
 **Not closed yet:** closing needs a live re-drive of a KB step whose provider call fails (for example a provider with no credit), checking that the run ends failed with the outage words, offers no choices, and stores no provider message as the step's output.
+
+## Verified closed (2026-10-21, live re-drive after gap round 1)
+
+Driven on develop `128266ef6` against the operator's `:8000`. Run `f0d5d678` ran the `295-07 S1 found nothing` plant on `claude-opus-5-5` / `anthropic`, where the account is still out of credit. Its three KB sub-runs failed with "credit balance is too low", and that text is kept only in each sub-run's `runs.error`.
+
+- **The run failed in 3 s, with no pause and no question.** No prompt row was written, and no found-nothing choice appears on the run page.
+- **The reason is the outage sentence:** "Phase 1 (research) gate failed after 3 attempt(s): citations_required: the model call for this step failed — this is a service outage, not model non-compliance".
+- **No vendor text appears anywhere a person reads.** It is absent from the step row, `harness_audit`, the thread's messages, `GET /workflow-runs/{id}`, the evidence page (text and HTML) and the downloaded export.
+
+Record: `.planning/phases/295-runs-that-don-t-dead-end/295-VALIDATION.md` → "Gap round 1 re-drive (2026-10-21)" → WR-01. Evidence: `evidence/r1_wr01_evidence.png`, `evidence/r1_wr01_export.json`.
+
+Not part of this bug, and recorded there as an observation: the reason a person reads still names the internal check `citations_required:` (pre-295 wording).
