@@ -189,6 +189,22 @@ describe("295-08 — a paused workflow run's ask is answerable in the chat threa
     expect(screen.getAllByTestId("ask-pointer")).toHaveLength(1)
     expect(screen.getAllByRole("button", { name: "Send Answer" })).toHaveLength(1)
   })
+
+  // 295 gap round 2 live check, D-r2-01: after an answer in the same tab, the next in-stream
+  // question arrived while the recorded status read `active` (the tab holds no lock), and the
+  // card read "The run was stopped" for 241 s while the run waited (runs 8f534cf1, 5416b7b8).
+  it("no lock + phases + run active (re-driven after an answer) → NOT retired", async () => {
+    const user = userEvent.setup()
+    hookState.asks = [approvalAsk]
+    stackState.phases = [HUMAN_STEP]
+    setRunStatus("active")
+    const { container } = render(<PendingAskStack home="panel" />)
+
+    expect(container.textContent ?? "").not.toContain("Retired")
+    expect(container.textContent ?? "").not.toContain(RUN_STOPPED_RETIREMENT_LINE)
+    await user.click(screen.getByRole("radio", { name: /Approve/ }))
+    expect(sendButton().disabled).toBe(false)
+  })
 })
 
 describe("295-08 — the retirement guard still holds in both directions", () => {
