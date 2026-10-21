@@ -11349,7 +11349,7 @@ cells rot within days.
 |---|---|---|---|
 | [`backend/app/api/panel.py`](docs/HOT-FILE-LEDGER.md#backendappapipanelpy) | 6 / 5 / 285 | ⚠ **FIRES** | 295-03: ONE additive `engine_pause` key on /pending beside `draft`. Honoured by construction. 295-07: triple re-derived, unchanged since 295-03 |
 | [`backend/app/services/harness/human_input.py`](docs/HOT-FILE-LEDGER.md#backendappservicesharnesshuman_inputpy) | 6 / 3 / 375 (was `5 / 3 / 355`) | ⚠ **FIRES** | 295-09 CR-01: ONE guard (+1 def `_answers_this_step`, If 15→17): a re-drive consumes only an answer to THIS step's question, never an engine ask's or another step's. Honoured by construction |
-| [`backend/app/services/harness/engine_ask.py`](docs/HOT-FILE-LEDGER.md#backendappservicesharnessengine_askpy) | 7 / 1 / 1350 (was `6 / 1 / 1345`) | no (young) | young. 295-09 WR-01: errored sub-agent = outage; WR-02: a folder chosen earlier counts as searched (If 78→79). ⛔ one allow-list shared with the route's 422 |
+| [`backend/app/services/harness/engine_ask.py`](docs/HOT-FILE-LEDGER.md#backendappservicesharnessengine_askpy) | 8 / 1 / 1358 (was `7 / 1 / 1350`) | no (young) | young. 295-09: WR-01 outage, WR-02 searched set, WR-06 folder list narrowed to the run's org (`restrict_org_ids`, IfExp 15→16). ⛔ one allow-list shared with the route's 422 |
 | [`backend/app/services/harness/run_handoff.py`](docs/HOT-FILE-LEDGER.md#backendappservicesharnessrun_handoffpy) | 7 / 1 / 401 (was `6 / 1 / 386`) | no (young) | young. 295-09: WR-01 sub-agent helpers (+2 defs); WR-03 the engine surfaces only after the executor was silenced (If 22→22). ⛔ no app import; one guarded terminal write |
 | [`backend/app/services/harness/run_read_wire.py`](docs/HOT-FILE-LEDGER.md#backendappservicesharnessrun_read_wirepy) | 1 / 1 / 150 | no (young) | young (295-05). Pure leaf: unsourced_for_wire, end_reason_for_wire, resolve_end_reason, deadline_passed. ⛔ no app imports; a stored user id is REPLACED by words |
 | [`frontend/src/components/panel/AskFolderChoice.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentspanelaskfolderchoicetsx) | 1 / 1 / 70 | no (young) | young (295-06). Leaf on the shadcn Select: rows only from `engine_pause.folders`, visible label `Folder to search`. ⛔ no API import, no folder picker |
@@ -23344,6 +23344,12 @@ Scan-list cell as of 2026-10-21 (replaced by 295-09, moved verbatim): 5 / 1 / 13
 **`7 / 1 / 1350`** (the row read `6 / 1 / 1345`). 295-REVIEW WR-02 (driven RED first): after "Search another folder" found nothing again, `_searched_ids` built "already searched" from the run's bound subtree only, so the folder that just came up empty was offered again (D-03: a dead option is worse than a missing one). It now unions the folder chosen on the earlier answer (`ctx.phase_scope_override[slug]`) before the step's own scope narrows it. One `if`: ast.If 78 → 79.
 
 Scan-list cell as of 2026-10-21 (replaced by 295-09, moved verbatim): 6 / 1 / 1345 (was `5 / 1 / 1344`) | no (young) | young. 295-09 WR-01: `finding_from_output` reads an errored sub-agent as an outage (one `or`, If 78→78). ⛔ one allow-list shared with the route's 422 |
+
+### `backend/app/services/harness/engine_ask.py` — 295-09 (WR-06, 2026-10-21)
+
+**`8 / 1 / 1358`** (the row read `7 / 1 / 1350`). 295-REVIEW WR-06 (driven RED first, with a two-org owner): `permitted_folder_options` called `fetch_visible_folders` with no org restriction, so an org-A run could offer org B's shared folders. It now takes `org_id` (the pause passes `ctx.org_id`) and narrows with `restrict_org_ids={org}`, or `set()` when the org is unknown (owned folders only, fail closed) — the same rule the publish gate already uses (WR-05 / T-182-54) and `threads.py:1061` precedent. One IfExp: 15 → 16, ast.If 79 → 79.
+
+Scan-list cell as of 2026-10-21 (replaced by 295-09, moved verbatim): 7 / 1 / 1350 (was `6 / 1 / 1345`) | no (young) | young. 295-09 WR-01: errored sub-agent = outage; WR-02: a folder chosen earlier counts as searched (If 78→79). ⛔ one allow-list shared with the route's 422 |
 
 ## `backend/app/services/harness/run_handoff.py`
 

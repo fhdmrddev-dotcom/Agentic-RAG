@@ -825,7 +825,7 @@ def _folder_depth(folder_id: str, by_id: dict) -> int:
 
 
 async def permitted_folder_options(
-    definition, *, phase, searched_ids, supabase, user_id
+    definition, *, phase, searched_ids, supabase, user_id, org_id=None
 ) -> list[dict]:
     """The folders "Search another folder" may offer — D-03 / D-39, never a second rule.
 
@@ -839,6 +839,11 @@ async def permitted_folder_options(
 
     An unbound definition (``project_folder_id`` None) searches the whole knowledge base, so
     another folder cannot widen anything and none is offered. Returns ``[{id, name, depth}]``.
+
+    295-REVIEW WR-06: the candidates are the owner's folders narrowed to the RUN's org
+    (``restrict_org_ids``, the publish gate's WR-05 / T-182-54 rule), so a two-org owner's
+    org-A run is never offered org B's shared folders. An unknown org passes ``set()``:
+    owned folders only (fail closed, never wider).
     """
     if definition is None or getattr(definition, "project_folder_id", None) is None:
         return []
@@ -848,7 +853,9 @@ async def permitted_folder_options(
     from app.services.harness.publish_service import _clean_label  # noqa: PLC0415
     from app.utils.folder_utils import fetch_visible_folders  # noqa: PLC0415
 
-    visible = await fetch_visible_folders(supabase, str(user_id))
+    visible = await fetch_visible_folders(
+        supabase, str(user_id), restrict_org_ids={str(org_id)} if org_id else set(),
+    )
     by_id = {str(f.get("id")): f for f in visible if f.get("id") is not None}
     searched = {str(x) for x in (searched_ids or [])}
     step_scope = {str(x) for x in (getattr(getattr(phase, "config", None), "folder_scope", None) or [])}
@@ -944,6 +951,7 @@ async def engine_pause(
                 definition, phase=phase, searched_ids=_searched_ids(ctx, phase),
                 supabase=getattr(ctx, "supabase", None),
                 user_id=(getattr(ctx, "current_user", None) or {}).get("id"),
+                org_id=getattr(ctx, "org_id", None),  # 295-REVIEW WR-06
             )
         prompt, options = compose_engine_choices(
             kind, step_label=step_label, folder_label=folder_label, locked=locked,
