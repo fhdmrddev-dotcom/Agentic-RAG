@@ -219,7 +219,14 @@ Plans:
   4. A single-agent workflow shows no team picture, or an honest single-node one, and never an invented worker (VIS-01).
 
 **How we'd know this failed**: the card still leads with a paragraph; chips show type ids instead of words; the team picture draws arrows that look right but are not in the definition; it looks good on the sketch's example and breaks on a real 7-phase workflow; the new view becomes a second runtime or second canvas.
-**Plans**: TBD (target 3-5)
+**Plans:** 4 plans (3 waves)
+
+Plans:
+- [ ] 290-01-PLAN.md — team derivation `deriveTeam`, its vocabulary leaf, planted fixtures, canvas header pin (TDD, wave 1)
+- [ ] 290-02-PLAN.md — the card chip line: `resolveStepLine` + `StepChipLine`, one block on the card (TDD, wave 1)
+- [ ] 290-03-PLAN.md — `TeamPicture` render + the `Steps | Team` switch: one prop and one branch in the canvas (wave 2)
+- [ ] 290-04-PLAN.md — close-out: phase gates, count-gate pins, ledger in one commit, the escalated-seal BUG report (wave 3)
+
 **UI hint**: yes
 **Flags**: **G-2 sketch FIRST for both** (the card has an approved sketch; VIS-01 needs a new one). **G-4**. Hot files: `WorkflowCard.tsx`, `PhaseSpineGraph.tsx`, `WorkflowCanvas.tsx`, `PhaseNodeCard.tsx`, `libraryVocabulary.ts`; read the card's ledger section. Canvas glyph vocabulary: `references/icon-convention.md` section 4. Seeds `SEED-155`, `SEED-086`.
 
