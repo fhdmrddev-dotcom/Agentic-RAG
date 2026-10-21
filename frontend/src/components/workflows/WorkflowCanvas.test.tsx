@@ -102,6 +102,8 @@ const CANVAS_SUBTREE_PATHS = [
   "./WorkflowCanvas.tsx",
   "./PlaneEditingLayer.tsx",
   "./editAffordance.ts",
+  // 290-03 (2026-10-21) — the mounted team picture, so the canvas's negative fences cover it.
+  "./TeamPicture.tsx",
 ] as const
 const CANVAS_MODULES = import.meta.glob("./*.{ts,tsx}", {
   query: "?raw",
@@ -681,7 +683,7 @@ describe("WorkflowCanvas — the scope fences (source guard)", () => {
     // NON-VACUITY: a truncated list or a glob that resolved to nothing cannot satisfy the
     // two lines above by accident, because both the list's length and the record's
     // non-emptiness are pinned here (the `PhaseFormPanel.rails.test.tsx:440` control shape).
-    expect(CANVAS_SUBTREE_PATHS).toHaveLength(3)
+    expect(CANVAS_SUBTREE_PATHS).toHaveLength(4)
     expect(Object.keys(CANVAS_MODULES).length).toBeGreaterThan(5)
     // …and the two DESTINATIONS are named individually, because a length pin catches a
     // TRUNCATION but not a SUBSTITUTION: swapping `./PlaneEditingLayer.tsx` for any other

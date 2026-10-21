@@ -2076,6 +2076,8 @@ export function WorkflowBuilderPage({
           // in this single object: the toolbar's save reading, the tray's server-derived
           // findings, and the three callbacks. The canvas composes; it derives nothing.
           session={canvasSession}
+          // 290-03 (VIS-01 / D-06, D-07) — the Steps | Team switch; the canvas reads the phases it already has, so the picture costs no request.
+          team={{ workflowName: typeof meta.name === "string" && meta.name.length > 0 ? meta.name : meta.slug ?? "Untitled workflow" }}
         />
       </Suspense>
     ) : (
