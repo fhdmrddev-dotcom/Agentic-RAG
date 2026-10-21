@@ -11356,6 +11356,7 @@ cells rot within days.
 | File | commits / phases / lines | G-5 | Disposition |
 |---|---|---|---|
 | [`backend/app/api/panel.py`](docs/HOT-FILE-LEDGER.md#backendappapipanelpy) | 6 / 5 / 285 | ⚠ **FIRES** | 295-03: ONE additive `engine_pause` key on /pending beside `draft`. Honoured by construction. 295-07: triple re-derived, unchanged since 295-03 |
+| [`backend/app/utils/folder_utils.py`](docs/HOT-FILE-LEDGER.md#backendapputilsfolder_utilspy) | 9 / 5 / 302 | ⚠ **FIRES** | ⚠ absent its ENTIRE LIFE — row added 295-10. D-r1-04: a non-empty org restriction narrows OWNED folders too; `None` and `set()` unchanged · ⛔ |
 | [`backend/app/services/harness/human_input.py`](docs/HOT-FILE-LEDGER.md#backendappservicesharnesshuman_inputpy) | 6 / 3 / 375 (was `5 / 3 / 355`) | ⚠ **FIRES** | 295-09 CR-01: ONE guard (+1 def `_answers_this_step`, If 15→17): a re-drive consumes only an answer to THIS step's question, never an engine ask's or another step's. Honoured by construction |
 | [`backend/app/services/harness/engine_ask.py`](docs/HOT-FILE-LEDGER.md#backendappservicesharnessengine_askpy) | 9 / 1 / 1361 (was `8 / 1 / 1358`) | no (young) | young. 295-09: WR-01 outage, WR-02 searched set, WR-06 org-narrowed folders, WR-07 marks its own pause write (If 79→79). ⛔ one allow-list shared with the route's 422 |
 | [`backend/app/services/harness/run_handoff.py`](docs/HOT-FILE-LEDGER.md#backendappservicesharnessrun_handoffpy) | 8 / 1 / 431 (was `7 / 1 / 401`) | no (young) | young. 295-09: WR-01 sub-agent helpers, WR-03 surface-after-silence, WR-07 `mark_pause_written` / `take_pause_written` (+2 defs, If 22→23). ⛔ no app import; one guarded terminal write |
@@ -23280,6 +23281,14 @@ No scan-list row existed before 294-05 (2026-10-20).
 Scan-list cell as of 2026-10-21 (replaced by 295-07, moved verbatim): 6 / 5 / 285 (was `5 / 4 / 282`) | ⚠ **FIRES** | ⚠ absent its ENTIRE LIFE at 4 phases — row added 295-03. 295-03: ONE additive `engine_pause` key on /pending beside `draft`. Honoured by construction
 
 CLAUDE.md verdict cell as of 2026-10-21 (replaced by 295-07, moved verbatim): | `backend/app/api/panel.py` | 6 / 5 / 285 (was `5 / 4 / 282`) | ⚠ absent its ENTIRE LIFE — row added 295-03 · ONE engine_pause key |
+
+## `backend/app/utils/folder_utils.py`
+
+**Re-derived at 295-10's base `61eedca76` with the `CLAUDE.md` recipe, BEFORE the edit: `8 commits / 4 phases / 294 L`.** Phase buckets, verbatim: `058` · `164` · `165` · `182`, plus the dated quick-task bucket `260405` (subtracted) and `seed` (non-numeric). ⚠ **G-5 FIRES at 4 phases, and the file had NO ROW in either document for its entire life** (`grep -c folder_utils.py CLAUDE.md` returned `0`). It is the ONE home of the service-role folder-visibility rule (SEED-124 / D-165-04), so every org-scoping fix lands here. ⛔ **Binding invariants:** the positional signature of `fetch_visible_folders` is fixed (suites drive it positionally and `harness/scope.py` patches it as a module global); `restrict_org_ids=None` is unrestricted and `set()` is fail-closed (owned only), and neither reading may be swapped; a second predicate one layer up (a post-filter) is how the SEED-124 leak re-opens.
+
+### `backend/app/utils/folder_utils.py` — 295-10 (D-r1-04, gap round 2)
+
+**`9 / 5 / 302`** (was `8 / 4 / 294`). The round-1 re-drive measured a two-org owner's org-A run offering the owner's own org-B folders, and the org-B run its own org-A folder: 295-09's WR-06 narrowed shared folders only, because the owned branch (`f["user_id"] == user_id`) ignored `org_id`. A NON-EMPTY `restrict_org_ids` now also requires an owned folder's `org_id` to be allowed. `None` (every unrestricted caller: chat, the `/folders` routes, run start, resume, Continue, NL generation, the per-run override gate in `scope.resolve_run_scope_root`) and `set()` (owned only) are byte-identical in outcome; `set()` cannot filter owned rows because `folders.org_id` is NOT NULL since mig 105. Callers that pass a non-empty set: publish stage 2.6 (now also refuses a project root the publisher owns in another org, which its docstring already asked for), `permitted_folder_options` and `threads._authorize_thread_folder` (which re-checked the row's org itself, so unchanged). Inherited and not changed: `resolve_run_scope_root`'s override gate is unrestricted, so a per-run folder override at run start may still name the owner's folder in another org.
 
 ## `backend/app/services/harness/human_input.py`
 
