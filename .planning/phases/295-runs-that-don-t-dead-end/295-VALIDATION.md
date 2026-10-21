@@ -532,3 +532,23 @@ Row method: drive the S1 plant (KB step over an empty folder) as a real run with
 | D-04, D-22, D-37 (read side) | `backend/tests/unit/test_295_run_read_wire.py`, `test_200_1_deliverable_text.py`, `test_288_waiting_on.py`, evidence contract | 05 |
 | D-04, D-22 (render) | `StepEvidenceLine`, `RunSpine`, `RunEvidenceReport`, `evidenceView`, `RunEndReasonLine`, `PhaseCard`, `WorkflowRunPage` suites | 05 |
 | D-02, D-03, D-37 (card) | `enginePause`, `AskFolderChoice`, `askDraftStore`, `PendingAskCard*`, `PendingAskStack.oneInput` suites | 06 |
+
+---
+
+## Post-close agent drive (2026-10-21, after `ff6501b92`)
+
+Driven through Chrome MCP in a chat thread ("Run a workflow"), default model (deepseek-v4-flash), local stack. Evidence for the operator's G-4 pass, not the sign-off.
+
+| Row | Verdict | Runs | Measured |
+|---|---|---|---|
+| S3 card | **PASS** | `0884a5d3`, `9cb36d72`, `e8716bdc` | Paused 42 s after start. Panel card: `Searched 295-07 empty KB folder and found nothing for “Find the project status”. This step is set to Must prove it, so it can't continue without sources. How should the run continue?`, choices `Search another folder` · `Stop the run`. `Continue without sources` absent from the whole page. |
+| S3 `Answered · run stopped` | **PASS, on screen ~90 ms** | `e8716bdc` | Sampled every 10 ms after Send. 1794 ms: header `Answered · run stopped`, receipt `You answered Stop the run`. 1884 ms: the card is gone and the step reads `✕ Failed` with `WHY IT STOPPED: Searched 295-07 empty KB folder and found nothing for “Find the project status”. Stopped by the person who started this run.` First seen live here. `failed` is the decided outcome of a Stop answer (CONTEXT D-line 45). The receipt is too brief to read, which is the same class as D-r2-03 (accepted). |
+| S6 | **PASS (content); see D-uat-01** | `6b4afbc0` | Approval card arrived 15 s after start. Yes was sent in the panel. The run completed and the panel read `wrap — Complete` within 3 s, same tab. Wrap output: `The person answered "Yes" to the approval question. …`. |
+| S7 records | **PASS** | `51924c91`, `a77ed2c0`, `5aa42b6b`, `ef53f1fc` | Cancelled, Cancelled, `✕ Failed` + `No reason was recorded when this run failed.`, `✕ Failed` + `Why it stopped: Finalised by the reconciler: its steps had ended.` None reads Running. Info: the two swept runs read `Cancelled after 887h 47m` / `741h 11m`, measured up to the reconciler's sweep. |
+| S7 armed, Stop | **PASS on the run page; see D-uat-02** | `b5561edf` | DB `paused`. Run page band `Paused for your answer` + `Waiting on … (you) to answer "Step 2 of 2, "Email the note", is about to run…"`. Stop → `Cancelled after 55s`, `Why it stopped: Stopped by the person who started this run.` The send step never ran. |
+| Count gate | **OK** | — | `count gate OK — 486/486 pinned files present, no per-file decrease, 0 failing.` Total 11015 (pinned 10247). First OK since 295. |
+
+**New findings (G-7 cap reached, so each is fast-fix / defer / accept):**
+
+- **D-uat-01 (filed BUG-261021-04):** in the tab that followed a run to Complete after an answer, the chat column never shows the run's final answer. The thread read only `Run 295-07 S6 approve then wrap` while the DB held the assistant message (`origin harness`). A thread switch showed it, with its confidence line and 12 references. Same end-of-run path as BUG-261021-03.
+- **D-uat-02 (operator decision):** while the run is `paused` on the armed approval, the chat panel reads `act — Running` and a `● Running` chip beside `paused, waiting on a person`. The run page band reads `Paused for your answer`. Cause: the step row is `active` in the DB while the run is `paused`, and the panel header and chip read the step. Before 295-10 the same tab read this after the run had ended (row 10 above); this is while it waits. Decide: accept it (the run-level band is right and the step line says it waits) or treat it as SC#4 in the chat home.

@@ -364,7 +364,7 @@ Plans:
 | 292. More Ways to Show It | 0/TBD | Not started | - |
 | 293. Start From Outside, and Close Out | 0/TBD | Not started | - |
 | 294. Decision Engine: Rerank and Citation Check | 5/5 | complete (2026-10-20) | 6/6 SC met in code; 294-HUMAN-UAT 9/9 passed live; roster R2 ⛔ Anthropic billing, glm-5.3 ⛔ BUG-261020-06; not pushed; cloud mig 211 owed before deploy |
-| 295. Runs That Don't Dead-End | 7/7 (+3 gap fixes) | human_needed (2026-10-21) | 5/5 SC + RUN-01..04 verified (295-VERIFICATION.md); 2 gap rounds (G-7 cap reached); G-4 sign-off owed, run S1 first (295-HUMAN-UAT.md); Anthropic row blocked on billing; deferred BUG-261021-02/03, SEED-366/367; not pushed |
+| 295. Runs That Don't Dead-End | 7/7 (+3 gap fixes) | human_needed (2026-10-21) | 5/5 SC + RUN-01..04 verified (295-VERIFICATION.md); 2 gap rounds (G-7 cap reached); G-4 sign-off owed, run S1 first (295-HUMAN-UAT.md); Anthropic row blocked on billing; deferred BUG-261021-02/03/04, SEED-366/367; count gate OK post-close; not pushed |
 
 ---
 

@@ -3,7 +3,7 @@ status: pending
 phase: 295-runs-that-don-t-dead-end
 source: [295-VALIDATION.md, 295-UI-SPEC.md]
 started: 2026-10-21T00:56:00Z
-updated: 2026-10-21T05:00:00Z
+updated: 2026-10-21T14:10:00Z
 ---
 
 ## Current Test
@@ -54,11 +54,13 @@ You'd recognise failure as:
 result: [pending — the agent's drives on 2026-10-21 PASSED: the panel fix in round 1 (`b5678cc3`), then the follow-after-answer check in round 2 (`b5540647`: Complete 0.2 s after `run_completed`, same tab). The two-tab stale send shows the current question (`5b1477d6`). PASS on the run page per 295-07]
 
 ### 2. S3 — a step set to "Must prove it" never offers Continue
-expected: Run `295-07 S3 locked found nothing`. The card should offer only Search another folder and Stop the run. Its prompt should say "This step is set to Must prove it, so it can't continue without sources." The words "Continue without sources" must appear nowhere on the page. Choose Stop the run and Send: the card header should read "Answered · run stopped" (this header was NOT seen live by the agent). The run's record should then say "Why it stopped: Searched 295-07 empty KB folder and found nothing for “Find the project status”. Stopped by …".
+expected: Run `295-07 S3 locked found nothing`. The card should offer only Search another folder and Stop the run. Its prompt should say "This step is set to Must prove it, so it can't continue without sources." The words "Continue without sources" must appear nowhere on the page. Choose Stop the run and Send: the card header should read "Answered · run stopped". The agent saw it live on 2026-10-21 (`e8716bdc`), but it stays on screen for only about 0.1 s before the card gives way to the ended step, so you may not catch it. The run's record should then say "Why it stopped: Searched 295-07 empty KB folder and found nothing for “Find the project status”. Stopped by …".
 
 You'd recognise failure as: a Continue choice anywhere, the run failing instead of pausing, or a header that says the agent resumed.
 
-result: [pending]
+The step then reads `✕ Failed`. That is by design: a Stop answer ends the run `failed`, with the reason line (CONTEXT, "Stop: the run ends `failed`").
+
+result: [pending — agent drive 2026-10-21 PASSED: card, two choices, no Continue on the page, header seen (`0884a5d3`, `9cb36d72`, `e8716bdc`)]
 
 ### 3. S2 — Continue without sources is marked in all four places
 expected: Run `295-07 S2 continue without sources` and answer Continue without sources. The step should carry the amber "◌ Unsourced · continued by <you>" mark and the note "This output was kept without sources — it does not cite your documents." in four places:
@@ -86,7 +88,9 @@ You'd recognise failure as: any run reading ● Running or active, a failed run 
 
 ⚠ Decide whether a Cancelled record should carry the ⊘ glyph (it reads "Cancelled" with no glyph, while a failure reads "✕ Failed").
 
-result: [pending]
+⚠ **Decide (D-uat-02):** while the armed run waits, the chat thread's panel reads `act — Running` with a `● Running` chip beside `paused, waiting on a person`. The run page reads `Paused for your answer`. Accept it, or count it as a waiting run reading Running.
+
+result: [pending — agent drive 2026-10-21 PASSED on the run page: all four records, and `b5561edf` paused → Stop → Cancelled, "Stopped by the person who started this run."]
 
 ### 5. S4 — a report step with no template is named, then refused
 expected:
@@ -112,7 +116,9 @@ expected: Run `295-07 S6 approve then wrap` and answer Yes. The final step's tex
 
 You'd recognise failure as: the final step talking as if no one answered.
 
-result: [pending]
+⚠ **Known (BUG-261021-04, deferred):** if you answer in the chat thread's panel and stay in that tab, the run's answer does not appear in the chat column. Switch threads and back to see it.
+
+result: [pending — agent drive 2026-10-21 PASSED on content (`6b4afbc0`: "The person answered "Yes" to the approval question. …")]
 
 ### 8. Anthropic roster row (D-33)
 expected: Re-run the S1 roster row on Anthropic once billing is restored. On 2026-10-21 every KB sub-run failed with "Your credit balance is too low to access the Anthropic API".
@@ -137,6 +143,8 @@ blocked: 1
 - ✅ **CLOSED, D-r1-03:** on a paused run, the composer refusal told the person to cancel a run the thread cannot cancel. Fixed by 295-10, and the new sentence was seen live on 2026-10-21 (`603a0785`).
 - ✅ **CLOSED, D-r1-04:** the "Search another folder" list offered the owner's own folders from the other org. Fixed by 295-10, and checked live in both orgs on 2026-10-21 (`a812cf02`, `25092977`).
 - ✅ **CLOSED, D-r2-01:** after an answer in the same tab, an in-stream approval step's card read "Retired · The run was stopped" while the run waited. Fixed by `07b7632bc` (`PendingAskCard.tsx` `runIsOver`), and re-driven live on 2026-10-21 in a fresh browser context: runs `80f7d411` and `77c91d0b` showed the card answerable for the whole 20 s wait (40 of 40 samples), Send enabled once a choice was picked, and the run completed with the panel following. The stop guard held (`406625a5`: a stopped run shows no live card in a freshly opened thread).
+- **OPEN, D-uat-01 (deferred as BUG-261021-04):** in the tab that followed a run to its end after an answer, the run's final answer is missing from the chat column until the thread is reopened. Same path as D-r2-02.
+- **OPEN, D-uat-02 (operator decision):** the chat panel reads `act — Running` while the armed run is paused (the step row is `active`). The run page band is right.
 - **OPEN, D-r2-02 (defer):** after the panel follows a Continue run to its end in the same tab, the step loses its Unsourced mark until the thread is reopened. It is somewhere in `StreamsProvider.tsx`'s end-of-run path, and the cause is not isolated.
 - **ACCEPTED, D-r2-03:** a stale card's refusal words are on screen for 0.2 s before the current question replaces them.
 - (original) **Chat-panel retirement of a live engine ask** (295 regression, found by 295-07). A paused found-nothing or approval ask is shown RETIRED in the chat thread's Workspace panel because the client never seeds the workflow lock for a durable pause (`lock_is_stale` is true with no live producer). Code: `frontend/src/components/panel/PendingAskCard.tsx:897`, `frontend/src/providers/StreamsProvider.tsx:2536`, `frontend/src/components/chat/ChatArea.tsx:380`. Not yet a bug report; proposed for `/gsd:fast` with a RED test, then the live re-drive of test 1.
