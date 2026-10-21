@@ -60,8 +60,42 @@ Measured 2026-10-20 20:02:57Z, base `7fdf86e70`, local DB `127.0.0.1:54322`, asy
 
 ## SC#5 after (filled by 295-07)
 
-- The same query with `:since` = the 295 UAT start instant: _(owed)_
-- Behaviour-level count (so the drop cannot be read as a renaming): over the same window, runs where the engine citations gate fired (`policy_applied` with `policy = 'engine_ask_pause'`, or a golden `run_failed` carrying the D-07 sentence) and how each ended (`paused` / `completed` / `failed`). Query text recorded beside the result: _(owed)_
+**Measured 2026-10-21 00:37:25Z by 295-07**, local DB `127.0.0.1:54322`, asyncpg inside a read-only transaction (`SET default_transaction_read_only = on`). Script: the 295-07 scratchpad `sc5.py`, results saved beside it as `sc5_after.json`.
+
+**`:since` = `2026-10-20T23:58:10Z`**, the UAT start instant: the id snapshot was taken at that second, before the first plant. It is later than 20:10Z, so the four 295-02 before-publishes are outside the window, as 295-02 asked.
+
+- **The same query, verbatim** (the §G text above). The only change is the bind: `:since` became `$1::text::timestamptz`, passed `'2026-10-20T23:58:10Z'`. The combined row comes from the same `term` CTE with no `group by`.
+
+| | terminal | failed | citations_failed | share |
+|---|---|---|---|---|
+| live | 18 | 1 | 0 | **0.0 %** |
+| golden | 5 | 0 | 0 | **0.0 %** |
+| combined | 23 | 1 | 0 | **0.0 %** |
+
+  Beside the baseline: since 2026-09-01 the combined share was **8.3 %** (1 of 12); all time it was **10.0 %** (27 of 270). The one live failure in the window is S3's Stop (`b9c4635d`, reason `Searched 295-07 empty KB folder and found nothing for “Find the project status”. Stopped by the person who started this run.`), and it carries no citation code.
+
+- **Behaviour-level count** (so the drop cannot be read as a renaming). Query text, verbatim, with the same bind:
+
+```sql
+select wr.id, wr.is_golden_run, wr.status,
+       (select count(*) from harness_audit ha where ha.run_id = wr.id and ha.event_type = 'policy_applied'
+          and ha.metadata #>> '{}' like '%"engine_ask_pause"%') as engine_pauses,
+       (select ha.metadata #>> '{}' from harness_audit ha where ha.run_id = wr.id and ha.event_type = 'policy_applied'
+          and ha.metadata #>> '{}' like '%"engine_ask_pause"%' order by ha.created_at limit 1) as first_pause,
+       (select ha.metadata #>> '{}' from harness_audit ha where ha.run_id = wr.id and ha.event_type = 'run_failed'
+          order by ha.created_at desc limit 1) as fail_md
+from workflow_runs wr
+where wr.created_at >= :since
+  and (exists (select 1 from harness_audit ha where ha.run_id = wr.id and ha.event_type = 'policy_applied'
+               and ha.metadata #>> '{}' like '%"engine_ask_pause"%')
+       or (wr.is_golden_run and exists (select 1 from harness_audit ha where ha.run_id = wr.id and ha.event_type = 'run_failed'
+               and ha.metadata #>> '{}' ilike '%during the trial run%')))
+order by wr.created_at;
+```
+
+  Result: **15 runs** in which the engine gate fired. How they ended: **13 completed, 1 failed** (S3, stopped by the person), **1 cancelled** (S7's armed step, stopped while it waited). 14 were `no_sources` pauses on the `research` step and 1 was an `action_risk` pause on `act`. No golden run hit the found-nothing gate in the window. In the same window, 42 `gate_failed` audit rows carry `citations_required`, which shows the gate DID fire: it fired, it asked a person, and the runs did not end in a citation failure.
+
+⚠ **What this number is and is not.** The window holds only this plan's own UAT drives: 23 terminal runs, most of them deliberately planted over an empty folder so that the gate would fire. So the 0.0 % shows the mechanism working (every gate firing became a pause, never a `citations_required` failure). It is **not** a production rate. A rate needs real use over time, and the operator's production DB was not read (no read was needed by this plan).
 
 ## SC#3 DMT drive — before (filled by 295-02 Task 1; D-16)
 
@@ -94,16 +128,31 @@ Golden run 1, read from the DB: `gather-dmt-info` completed (it read all five do
 
 ## SC#3 DMT drive — after (filled by 295-07; D-16)
 
-Same local definition, published after 295-02's judge note: _(owed)_
+**Driven 2026-10-21 00:28Z by 295-07**, against the merged code live on `:8000`. The same route the Builder calls was used (`POST /workflows/{id}/publish`), with the same golden input as the before-drive, and nothing was changed on the draft.
+
+| | definition | golden run | publish | `blocked_stage` | judge `overall_passed` / score | judge summary (quoted verbatim) |
+|---|---|---|---|---|---|---|
+| **after** | `edd81b32-38d9-4d56-bbad-1b37f7c8b835` (295-02's untouched draft) | `41f76119-d2fd-42d1-9ada-9596c93b1d95` | **published v1** (39 s) | none | true / 8 | "The recorded action is a well-formed Project Meridian status email and fits the designed behavior of recording an intended outbound action rather than sending it. It satisfies the apparent business requirement for what would have been emailed." |
+| before (4 publishes, 295-02) | `e96b2d97` / `6a3e5e4d` / `e2575151` / `26205b9b` | see above | published v1 ×4 | none | true / 100, 100, 95, 100 | "…correctly indicates that the email was not sent…" (graded the NOT-SENT envelope) |
+
+**Verdict: S5 PASS.** The DMT shape publishes after the fix. ⭐ **What changed, measured:** the before-summaries graded whether the email was honestly *not sent*. The after-summary grades **what the email says** ("a well-formed Project Meridian status email") and checks it against the business requirement. That is D-16's intent: grade the content, not the envelope. 295-02 classified the base evidence as neither (a) nor (b) and shipped the default shape (the note plus the full recorded inputs). The risk 295-02 named, that grading the content could now fail a publish the envelope had passed, did not happen on this sample.
+
+⚠ **One sample, and a score with no scale.** One publish is one sample of a stochastic judge. The score `8` is not comparable with the before-scores (100 / 100 / 95 / 100): the rubric (`JUDGE_RUBRIC_CORE`) names no scale, and the gate reads only `overall_passed`. Two of the four D-47 judge calls below answered `10` and two answered `100`, so this judge picks its own scale call by call. That is recorded as an observation about the rubric, not as a 295 defect.
 
 ## D-47 / SEED-360 F-2: the 288 pause plant, 4 publishes after D-10
 
-| # | Verdict | Judge score | Quoted evidence | Cites the auto-answer? |
-|---|---|---|---|---|
-| 1 | _(owed)_ | | | |
-| 2 | _(owed)_ | | | |
-| 3 | _(owed)_ | | | |
-| 4 | _(owed)_ | | | |
+**Driven 2026-10-21 00:29-00:31Z by 295-07**, against the merged code live on `:8000`, with D-10 already merged (295-04).
+
+**The plant.** This is the 288 S3 shape: `intro` "Draft the note" (`llm_single`), then `approve` "Approve the note" (`llm_human_input`, options Yes / No, `timeout_seconds: 300`), then `wrap` "Finalise" (`llm_single`). Four byte-identical drafts were made through `POST /workflows` (slugs `p295-07-d47-pause-a…d`) and each was published through `POST /workflows/{id}/publish`, with golden input *"Write a short note on why weekly status updates help a team, and get it approved before it is finalised."* Every publish response carried `auto_answered: [{phase: "approve", …}]`, so the pause step was answered automatically each time.
+
+| # | definition / golden run | Verdict | Judge score | Quoted evidence (judge summary, verbatim) | Cites the auto-answer? |
+|---|---|---|---|---|---|
+| 1 | `18b43a28-…` / `cb438c18-…` | **published v1** | 10 | "The response is concise, relevant, and addresses the benefits of weekly status updates clearly." | **no** |
+| 2 | `9c7c91bd-…` / `902df6f5-…` | **published v1** | 100 | "The response clearly and succinctly explains the value of weekly status updates and satisfies the prompt." | **no** |
+| 3 | `a2f1f76d-…` / `49bae8ed-…` | **published v1** | 100 | "The provided text is clear, relevant, and well-grounded in the user's prompt, effectively summarizing why weekly status updates matter." | **no** |
+| 4 | `63059416-…` / `177868cd-…` | **published v1** | 10 | "The provided text is clear, relevant, and fully aligned with the user’s statement about weekly status updates." | **no** |
+
+**Decision (D-47 / D-17): no `_golden_run_mock` note.** 4 of 4 published, and no summary mentions the auto-answered step. Before D-10, 288 measured 3 of 4 blocked in the UI and 3 of 4 via the API, with summaries like "User only replied 'Yes.' with no task context". The cause 288 suspected, that the wrap step never received the answer (BUG-261020-01), is what D-10 fixed. Neither `validator_kinds.py` nor `publish_service.py` was changed by 295-07: `git diff --numstat 018fbd5c7 -- backend/app/services/harness/validator_kinds.py backend/app/services/harness/publish_service.py` prints nothing. Because no code changed, there is no after-merge re-drive to owe.
 
 Decision rule (D-47 / D-17): add the `_golden_run_mock` sibling note only if the judge still cites the auto-answer; record the counts either way. If the note is added, the after-publishes run only once that commit is merged to develop and the live :8000 worker is proven to serve it; until then the after-row reads OWED ("awaiting merge of <sha>").
 
@@ -113,17 +162,133 @@ Decision rule (D-47 / D-17): add the `_golden_run_mock` sibling note only if the
 
 | # | Scenario | The failure the operator would recognise | Verdict |
 |---|---|---|---|
-| S1 | A KB step over an empty folder pauses with its worded choices; reload, still paused; answer "Search another folder" with a populated folder; the run completes, cited | The run fails instead of pausing; the card says the window passed or the agent stopped; the folder list shows a folder outside the run's scope; the re-run ignores the folder; the band reads ● Running while it waits | _(owed)_ |
-| S2 | Same plant, answer "Continue without sources"; the step, the evidence page and the export all say unsourced | Any of the four places shows the step done with no `Unsourced` text; the export lacks `unsourced.continued_by` / `at`; the mark is grey and quiet | _(owed)_ |
-| S3 | S1's exact plant (empty KB folder plus at least one other permitted populated folder) with `grounding_escalated` planted by direct DB (D-36): the locked step PAUSES offering Search another folder and Stop the run with the locked addendum, never Continue; a forged continue POST (by label and by index) is refused | The run fails instead of pausing; `Continue without sources` appears anywhere in the DOM; the forged POST returns 2xx, persists a response row, or completes the step | _(owed)_ |
-| S4 | Saving a report step with no template is named (warning, save succeeds); publishing is refused naming the template; starting a run is refused naming the template (Run modal and thread entry show the server's words) | The save is rejected; the message names a citation code; publish or run start succeeds; the client shows a constant instead of the server's sentence | _(owed)_ |
-| S5 | The DMT-shaped workflow (KB → summary → recorded email) publishes | Still blocked by the judge (recorded FAIL with the judge's evidence, never a silent pass) | _(owed)_ |
-| S6 | KB → approve → wrap, where the wrap quotes the real answer | The wrap's output does not contain the person's answer | _(owed)_ |
-| S7 | The two stuck runs (`51924c91…` "200-Word Essay Writer", `a77ed2c0…` "Knowledge Base Library Structure Summary") and the reasonless failed runs read truthfully after the reconcile | A stuck run still reads `active` / ● Running; a failed run shows a blank reason; the no-reason sentence shows where a reason was recorded; a run is hidden instead of finalised | _(owed)_ |
+| S1 | A KB step over an empty folder pauses with its worded choices; reload, still paused; answer "Search another folder" with a populated folder; the run completes, cited | The run fails instead of pausing; the card says the window passed or the agent stopped; the folder list shows a folder outside the run's scope; the re-run ignores the folder; the band reads ● Running while it waits | **FAIL (chat-panel home)**: PASS on the run page (`b8a3e6f3`), but the Workspace panel shows the live ask RETIRED: "The run was stopped, so this question no longer needs an answer" (`PendingAskCard.tsx:897`) |
+| S2 | Same plant, answer "Continue without sources"; the step, the evidence page and the export all say unsourced | Any of the four places shows the step done with no `Unsourced` text; the export lacks `unsourced.continued_by` / `at`; the mark is grey and quiet | **PASS** (`d5d77eed`) |
+| S3 | S1's exact plant (empty KB folder plus at least one other permitted populated folder) with `grounding_escalated` planted by direct DB (D-36): the locked step PAUSES offering Search another folder and Stop the run with the locked addendum, never Continue; a forged continue POST (by label and by index) is refused | The run fails instead of pausing; `Continue without sources` appears anywhere in the DOM; the forged POST returns 2xx, persists a response row, or completes the step | **PASS** (`b9c4635d`; four forged answers got 422 and wrote no row). The `Answered · run stopped` header was not observed live |
+| S4 | Saving a report step with no template is named (warning, save succeeds); publishing is refused naming the template; starting a run is refused naming the template (Run modal and thread entry show the server's words) | The save is rejected; the message names a citation code; publish or run start succeeds; the client shows a constant instead of the server's sentence | **PASS** (Builder, publish route, Run modal, thread entry) |
+| S5 | The DMT-shaped workflow (KB → summary → recorded email) publishes | Still blocked by the judge (recorded FAIL with the judge's evidence, never a silent pass) | **PASS** (`edd81b32` published; see SC#3 after) |
+| S6 | KB → approve → wrap, where the wrap quotes the real answer | The wrap's output does not contain the person's answer | **PASS** (`dda11389`) |
+| S7 | The two stuck runs (`51924c91…` "200-Word Essay Writer", `a77ed2c0…` "Knowledge Base Library Structure Summary") and the reasonless failed runs read truthfully after the reconcile | A stuck run still reads `active` / ● Running; a failed run shows a blank reason; the no-reason sentence shows where a reason was recorded; a run is hidden instead of finalised | **PASS, with a corrected cause** (see S7 below) |
 
-S7 before (RESEARCH Q-9a / Q-9b, 2026-10-20): both stuck runs `active`, anchored, phases terminal (`…:completed | act:cancelled`); 20 failed runs with no `run_failed` (15 `test_214` fixtures from 2026-08-28, 5 June F2 escapes). After: _(owed)_
+S7 before (RESEARCH Q-9a / Q-9b, 2026-10-20): both stuck runs `active`, anchored, phases terminal (`…:completed | act:cancelled`); 20 failed runs with no `run_failed` (15 `test_214` fixtures from 2026-08-28, 5 June F2 escapes). After: see **S7** in the drive record below (the two runs were already `cancelled` before the merged code was live; a fresh stuck run was planted and the merged reconciler ended it).
 
 **Operator G-4 sign-off:** OWED (autonomous run). The agent's drives are evidence, not the operator's recognition test.
+
+### Drive record (295-07, 2026-10-20 23:57Z to 2026-10-21 00:45Z)
+
+**Set-up, proven before the first drive.**
+- **The merged code is live on `:8000`.** `GET /health` answered `{"status":"ok","redis":"ok","maintenance":false}`. `POST /workflows/validate` with a template-less `llm_emit` step answered `200 {"ok":false,"verdicts":[{"code":"no_template_bound","phase":"report","message":"“Write the report” fills a template, but no template is attached to this workflow. Attach a template before you publish or run it.","severity":"incomplete"}]}`. `GET /workflow-runs/<a failed run>` carried the `end_reason` key. The operator's worker log (`backend/logs/backend.53124.log`) shows the reload at `2026-10-21 03:42:42` local (23:42:42Z), after the 295-04 merge. Nothing was restarted.
+- **Org proven:** `org_members` holds one row for `fhdmrd@gmail.com` (`d8a54002-…`): org `22f9c615-0eec-440a-8804-ed4784d6f57f`, role `org-admin`.
+- **Driver:** headless Chromium through `frontend/node_modules/playwright` (1.60.0) against vite on `localhost:5173`. ⚠ **Deviation from 288/289:** the session was not typed into the login form. A real GoTrue session was minted through the local admin `generate_link` (magic link) plus `/auth/v1/verify`, the 295-02 method (no password read or changed), and placed in the browser's `localStorage` where supabase-js reads it. API-level steps used the same token, through the routes the app calls. No token is recorded here.
+- **DB discipline:** the local-DB lock was taken at 23:57:57Z (noclobber). Every `id` / `run_id` in 87 `public` + `auth` tables was snapshotted at 23:58:10Z (47,146 ids) and diffed after cleanup (see Cleanup). No Supabase MCP call of any kind.
+
+**The plants** (created through `POST /workflows`, then flipped to `published` with the same `UPDATE` that `publish_definition` runs, the 289-05 precedent of keeping the stochastic judge out of UAT fixtures):
+- An empty folder `295-07 empty KB folder` (`d886d6a8-…`), made through `POST /folders`, with 0 documents.
+- **S1 plant** `3b6794c0-…` (`p295-07-s1-found-nothing`): `project_folder_id` = the empty folder, no per-phase `folder_scope` (an unscoped project). Step 1 `research` "Find the project status" (`llm_agent`, `search_documents`), step 2 `wrap` (`llm_single`). The owner can see 30 other folders, several of them populated.
+- **S2 plant** `5d58c517-…`: the same KB step, then `approve` (`llm_human_input`, Yes / No), then `wrap`, so the run stays live after the KB step and the spine can be read.
+- **S3 plant** `0589c0e1-…`: a byte copy of the S1 definition with `grounding_escalated: true` written on the KB phase by direct DB insert (D-36).
+- **S6 plant** `dfb4e0df-…`: a KB step over "PM Demo Project (sample data)" (populated), then `approve` (Yes / No, 600 s window), then a `wrap` that must quote the answer.
+- **S7 armed plant** `7cd9c45a-…`: `draft` (`llm_single`), then `act` (`external_action`, `send_email` through the local "Email (SMTP)" connection, `action_risk_armed: true`). It was stopped before approval, so nothing was sent.
+- **S4 plant** `5eec4aa6-…`: one `llm_emit` step with no template asset. It was a draft for the Builder and publish drives, then flipped to published past lint (the D-14 precedent) so the Run modal would offer it. It was deleted at cleanup.
+
+#### S1: FAIL in the chat-panel home (PASS on the run page)
+Run `b8a3e6f3-e2f0-42b7-b2a5-3c4532d70bd0`, thread `156c78e6-…`, owner default model `deepseek-v4-flash`. Everything below PASSES on the run page (`/app?run=<id>`), which is where it was driven. ⛔ **The same paused ask in the chat thread's Workspace panel is shown RETIRED.** Measured on runs `3ec118a2` (S3 plant) and `108bb381` (the armed plant), both `paused`, in a fresh session. The panel card reads `RETIRED` / the prompt / **`The run was stopped, so this question no longer needs an answer`**, with `Send Answer` disabled (`evidence/s3c_thread_view.png`, `s7armed_thread_panel.png`). That is the scenario's own failure ("the card says … the agent stopped"), in one of the two homes.
+- **Cause, read from code (not yet driven RED):** `PendingAskStack` derives `const runIsOver = workflowLock == null && phases.length > 0` at **`frontend/src/components/panel/PendingAskCard.tsx:897`**. For a durable pause the server's `GET /threads/{id}/workflow` answers `locked: true, run_status: "paused", lock_is_stale: true` (no live producer, by design since 295-03). The client seeds the workflow lock only when `locked && !lock_is_stale` (**`frontend/src/providers/StreamsProvider.tsx:2536`**, **`frontend/src/components/chat/ChatArea.tsx:380`**), so the lock is null and the card retires.
+- **Why it is a 295 regression and not only inherited:** before 295-03 the armed approval waited in-process with its producer alive (the lock held, so the panel card was live). Now every engine ask is a durable pause, so it lands in this branch. The 289 human-step pause after its window has the same shape, but 289 drove it on the run page only.
+- **Route (for the orchestrator):** one derived conjunct, so that a thread whose workflow read says `paused` / `cap_paused` is not "over". It is about 1-3 lines in a G-5-firing file, with a RED test in `PendingAskCard.retired.baseline.test.tsx`. That fits `/gsd:fast` under G-3 (or a G-7-counted gap round if the verifier prefers). The live re-drive is owed after merge.
+- **DB:** 3 `gate_failed` (`citations_required: nothing was retrieved (0 sources)`), then `policy_applied {policy: engine_ask_pause, finding: no_sources}` at 00:01:44Z, and the run went `paused` 58 s after start.
+- **Card on the run page (DOM text):** `NEEDS YOU` / `No deadline — the run is waiting for your answer and will not continue on its own` / the draft / `Searched 295-07 empty KB folder and found nothing for “Find the project status”. How should the run continue?` / chips in order `Search another folder`, `Continue without sources`, `Stop the run` / `Send Answer`. The band read `Paused for your answer` and `Waiting on fhdmrd@gmail.com (you) to answer "Searched 295-07 empty KB folder and found nothing for “Find the project…".` There was no countdown, and no `● Running` while it waited.
+- **Reload:** the page was reloaded and the same three choices came back.
+- **Folder list:** after picking `Search another folder`, the chooser listed 30 names. The prompt row's `engine_pause.folders` held the same 30. The owner can see 31 folders (owned, or org-shared in the org), and the only one not offered is the empty folder that was already searched. That matches `resolve_run_scope_root`'s rule for an unscoped definition (any owner-visible folder), and no folder outside the owner's view appears.
+- **Answer:** `PM Demo Project (sample data)`, Send Answer at 00:03:36.194Z (UI).
+- **DB after:** `validator_ask_user_approved {choice: "Search another folder", finding: no_sources, folder_id: "1564da7e-…"}` at 00:03:37Z. Then `gate_passed`, `research` completed with 10 cited passages (confidence `medium`, 0.47), `wrap` completed, `run_completed` at 00:03:58Z. That is 22 s from the click to completed.
+- Screenshots: `evidence/s1_before.png`, `s1_after_reload.png`, `s1_folder_list.png`, `s1_after_send.png`.
+
+#### S2: PASS
+Run `d5d77eed-9453-43cc-8a46-602be6adbf27`, thread `b2315257-…`.
+- Paused with the three choices. `Continue without sources` was sent through the UI at 00:07:31Z.
+- **DB:** `research.output.unsourced = {"at": "2026-10-21T00:07:32.902990+00:00", "continued_by": "d8a54002-…"}`, with the produced text kept as produced and `citations: []`.
+- **The four places:**
+  1. **Run-page spine** (while the run waited at the approval step): `step-unsourced-line` inside `spine-step-research`: `◌ Unsourced · continued by fhdmrd@gmail.com (you)` / `This output was kept without sources — it does not cite your documents.` (`evidence/s2marks_runpage_spine.png`).
+  2. **Chat panel PhaseCard** (thread view, Workspace panel): `research · ◌ Unsourced · continued by fhdmrd@gmail.com (you) · This output was kept without sources — it does not cite your documents. · ✓ Complete` (`evidence/s2_panel_phasecard_unsourced.png`).
+  3. **Evidence page** (after `Yes` was answered and the run completed at 00:15:05Z): the same line, with `step-unsourced-line` count 1 (`evidence/s2_evidence.png`).
+  4. **Downloaded JSON** `run-evidence-d5d77eed.json`: `phase_log[0].unsourced = {"continued_by": "fhdmrd@gmail.com (you)", "at": "2026-10-21T00:07:32.902990+00:00"}`, and the other steps read `null`. The stored user id does not appear anywhere in the file.
+- The mark is the bordered amber `◌ Unsourced` chip, not grey (panel screenshot).
+- The wrap step said: "The first step reported that no documents or sources were found for the latest project status, and the person answered “Yes” to approving the note without sources." So the answer and the unsourced note both reached the next model (D-10 / D-11).
+
+#### S3: PASS
+Run `b9c4635d-d3f0-4c11-a7d0-b2b6b9beeb3c`, thread `d385ff48-…`, the S3 plant (S1's exact plant plus the D-36 bit).
+- **It paused, and did not fail.** `engine_pause = {kind: no_sources, locked: true, continue_allowed: false}`. The options were `["Search another folder", "Stop the run"]`, and the same 30 folders were offered.
+- **Prompt, verbatim:** `Searched 295-07 empty KB folder and found nothing for “Find the project status”. This step is set to Must prove it, so it can't continue without sources. How should the run continue?`
+- **DOM:** after a reload, `Continue without sources` appears **nowhere** in the page HTML (`page.content()` checked), and `Must prove it` is in the text (`evidence/s3_after_reload.png`).
+- **Forged answers** (`POST /runs/b9c4635d…/ask_user_response`, verbatim bodies):
+  - by label `{"response_text": "Continue without sources"}` → `422 {"detail":"This step is set to Must prove it, so it can't continue without sources."}`
+  - by label and index `{"response_text": "Continue without sources", "choice_index": 1}` → the same `422`.
+  - index only `{"response_text": "anything", "choice_index": 1}` → `422 {"detail":"That choice is not one this question offers."}`
+  - an unoffered folder (the searched empty one) → `422 {"detail":"That folder is not one this question offers."}`
+  - Response rows in the thread: **0 before, 0 after**. The run was still `paused`.
+- **Stop the run** was sent through the UI at 00:06:50Z. The run went `failed`, with ONE `run_failed {"reason": "Searched 295-07 empty KB folder and found nothing for “Find the project status”. Stopped by the person who started this run."}`. The evidence page read `Why it stopped: Searched 295-07 empty KB folder and found nothing for “Find the project status”. Stopped by the person who started this run.` The name is the fallback words, because the dev profile has no display name, and the email is never used.
+- **The `Answered · run stopped` header: NOT OBSERVED live.** On the run page, the card unmounts as soon as the run leaves `paused`. A text sample 5 s after Send already read the re-driving spine (`● Running`), and the card was gone. In the chat panel the card is retired before it can be answered (see S1). The header is covered only by 295-06's suites, so it is owed to the operator's G-4 pass once the S1 panel defect is fixed.
+- ⚠ A second S3 run (`6ec2f298`) was contaminated by this plan's own unit gate (see S7) and was stopped. It is not used as evidence for anything except that.
+
+#### S4: PASS
+- **Builder (UI):** the draft `295-07 S4 report with no template` was opened from the Workflows library. The library card itself reads `NEEDS A TEMPLATE`. The tray showed `“Write the report” fills a template, but no template is attached to this workflow. Attach a template before you publish or run it.` The `◆ Publish…` control was **disabled** and `Save draft` was enabled. Pressing `Save draft` gave `PATCH /workflows/5eec4aa6… → 200` and `Saved · still a draft`, so the save succeeded (`evidence/s4_builder_tray.png`, `s4_after_save.png`).
+- **Publish (route):** `POST /workflows/5eec4aa6…/publish` → `200 {"published":false,"blocked_stage":"lint","named_failures":[{"code":"no_template_bound","phase":"report","message":"“Write the report” fills a template, but no template is attached to this workflow. Attach a template before you publish or run it."}]}`. No citation code appears in it.
+- **Run modal (UI):** with the plant flipped to published past lint, the library card's `Run` opened the modal, which offered `Template to fill · Upload template`. Pressing `▶ Run workflow` without a template gave `POST /threads/5a77ab0a…/messages → 400 {"detail":"“Write the report” fills a template, but no template is attached to this workflow. Attach a template before you publish or run it."}`, and that sentence is in the DOM after the click (`evidence/s4_run_modal_after.png`). ⚠ **Observation (not this phase's code):** the modal had already created its thread (`POST /threads → 201`) before the refusal, so a refused start leaves an empty thread behind. It was deleted at cleanup.
+- **Thread entry (UI):** in an existing thread, `Run a workflow`, then the S4 workflow, gave `POST /threads/da71784d…/messages → 400` with the same sentence, and the sentence is in the DOM (`evidence/s4_thread_refused.png`). ⚠ The first attempt of this drive read no sentence, but that was the driver's fault, not the app's: a second click landed on an unrelated sidebar thread named "Run workflow" and navigated away. The corrected drive clicks nothing after the pick.
+- **Attaching a template clears it:** `/validate` on the same definition with `assets: [{kind: "template", …}]` answered `200 {"ok":true,"verdicts":[]}`. This was API-level. The Builder upload was not driven.
+- No run was created for any refused start (`workflow_runs` on both threads: 0 for S4).
+
+#### S5: PASS
+See "SC#3 DMT drive — after" above.
+
+#### S6: PASS
+Run `dda11389-b67b-4d0e-8cd4-538b04629e1b`, thread `fd1eb848-…`. The KB step searched "PM Demo Project (sample data)" and cited 11 passages. The approval paused after its 600 s window, and `Yes` was answered through the UI at 00:16:39Z. **DB:** `approve.output = {"text": "Approve the note?", "answer": "Yes"}`. `wrap.output.text` = "The person answered the approval question with "Yes". Project Meridian is at Week 9 of 24 with an overall AMBER status, driven by escalated data-quality and third-party integration risks." The wrap quotes the real answer. Completed at 00:16:44Z.
+
+#### S7: PASS, with the cause corrected
+
+**The two historical stuck runs were already finalised before the merged code was live, and not by it.** Read-only, 2026-10-21 00:00Z:
+- `51924c91` "200-Word Essay Writer": `cancelled`, `updated_at 2026-10-20 23:22:22.497Z`.
+- `a77ed2c0` "Knowledge Base Library Structure Summary": `cancelled`, `updated_at 23:22:22.665Z`.
+- Their last steps were already `cancelled`, and their `claimed_at` values are unchanged (10-19 18:58 / 10-20 00:17).
+- **No `harness_audit` row was written at 23:22** (no `run_failed`, no `policy_applied`). Two `ask_user_response {expired: true}` system rows were written at 23:22:22.6Z in 51924c91's thread.
+- No other `workflow_runs` row changed in 23:15-23:45Z.
+
+That signature is exactly `_reconcile_workflow_runs`' **cancelled** arm (last step cancelled → `cancelled`, no `run_failed`, prompts expired). But the 295-04 merge landed at 23:41:43Z and the operator's worker reloaded at 23:42:42Z. The operator's `:8000` log has **no line between 03:20 and 03:23 local**, and none of the backend logs mentions either id. 23:22:22Z (03:22:22 +04) falls between 295-04's Task 3 RED commit (03:20:47) and GREEN commit (03:26:57), the window in which that executor had the sweep drafted in its worktree and ran its suites against the local DB under the lock.
+
+**Cause (inferred, strongly supported, not proven to the process):** a test process in the 295-04 worktree booted the app's lifespan (a `TestClient(app)` context), and its boot reconciler ran the worktree's new sweep against the real local DB. This is the SEED-363 hazard 289-05 recorded, when an unprotected TestClient run claimed these same two runs. ⭐ **The same mechanism was reproduced in this plan:** 295-07's own backend unit gate started at about 00:38:40Z. At 00:40:08Z a run this plan had just started (`6ec2f298`, S3 recheck) got a second `phase_started` and a resume shell (`runs.model = unknown`, the `_build_resume_context` signature), with no request to `:8000` that explains it. So a unit-test process re-drove a live run from worktree code. **The finding for the orchestrator:** the unit suite can boot the real lifespan against the operator's local DB. Any worktree run of `tests/unit` while live runs exist can terminalize or re-drive them. SEED-363 is the record, and this is now its second and third observation.
+
+**After, read through the app.** Both runs' evidence pages read `RESULT Cancelled`, with no reason line, which UI-SPEC C.1 specifies for a cancelled run with no recorded reason. Their `end_reason` is `null` on both `GET /workflow-runs/{id}` and the evidence read. They are shown, not hidden.
+- ⚠ The evidence report's result fact reads `Cancelled` with no `⊘` glyph, while a failed run reads `✕ Failed`. This is an observation for the operator's G-4 pass, not a reading the row requires.
+- ⚠ Neither run carries the plan's expected "Finalised by the reconciler" sentence. The sweep's cancelled arm writes no reason by design (D-21), and the sweep that ended them was not the merged one.
+
+**The merged reconciler, proven on a fresh plant.** A stuck run was planted at 00:00:27Z: `ef53f1fc-8e17-411b-b120-58c18d26af78`, `active`, both steps `completed`, row `updated_at` 20 min old (older than the 300 s lease). The periodic sweep on `:8000` (every 120 s) ended it at **00:00:50.74Z**: `failed`, ONE `run_failed {"reason": "Finalised by the reconciler: its steps had ended."}`. Log, verbatim: `2026-10-21 04:00:50,803 INFO app.services.run_reconciler Run reconciler terminalized 1 orphaned run(s)` / `2026-10-21 04:00:50,803 INFO app.main Periodic run reconciler closed 1 orphan(s)`. The run page and evidence page read `✕ Failed` / `Why it stopped: Finalised by the reconciler: its steps had ended.` (`evidence/s7_ef53f1fc.png`).
+
+**The reasonless failed runs.** Q-9b (RESEARCH, verbatim) now returns **5 rows, not 20**. The 15 `test_214` fixtures are gone from the local DB (295-02 and 295-04 recorded the operator's deletion). The 5 June runs (`5aa42b6b`, `e0d1f740`, `575e7345`, `a7f415ad`, `4ea9bc56`) have `end_reason: null` on both reads, and their pages read `✕ Failed` / `No reason was recorded when this run failed.` (seen on `5aa42b6b` and `575e7345`, `evidence/s7_*.png`). Q-9a returns no stuck run, only this plan's live runs at the moment of the read.
+
+**Waiting for approval reads paused; a Stop reads cancelled.** Run `15fadac6-9606-4be2-85a8-167c31451b23` (S7 armed plant):
+- `policy_applied {engine_ask_pause, finding: action_risk}` and the run went `paused` 3 s after start. The band read **`Paused for your answer`**, with no `● Running` and no `✕ Failed` in the page. The card read `No deadline — the run is waiting for your answer and will not continue on its own` and offered `Approve this step` / `Do not run it` (`evidence/s7armed_paused_band.png`).
+- `Stop` on the run page gave `cancelled` at 00:17:20.96Z, with ONE `policy_applied {policy: run_cancelled, reason: "Stopped by the person who started this run."}`. The page read `Cancelled` and `Why it stopped: Stopped by the person who started this run.` (`evidence/s7armed_after_stop.png`).
+- The plan 04 residual (a duplicate `action_risk_pending` on an approved re-drive) was not exercised: this run was stopped, not approved, so it shows one `action_risk_pending`.
+- **The plan 04 gap, observed live:** run `b0a8203a` (a run of the "Compliance Gap Report" starter this plan started by mistake, see Cleanup) was cancelled through `DELETE /runs/{id}` while its producer was live. It ended `cancelled` with **no** "Stopped by" reason. That is the recorded D-19 gap (a Stop that reaches a live producer), and it was left as is.
+
+#### Cleanup and the id-snapshot diff
+- **Deleted:**
+  - the thread of the accidental Compliance Gap run (`c2e21bfb-…`, via `DELETE /threads`). The driver's card locator first matched the wrong library card and pressed `Run workflow` on a shared starter. The run was cancelled 21 s later and its thread deleted, together with its one orphaned `harness_audit` row;
+  - the empty thread the refused Run modal left (`5a77ab0a-…`);
+  - the S4 plant definition (`5eec4aa6-…`, direct local delete). A published row is immutable and the API deletes only drafts, and a published workflow that lint refuses should not stay in the library.
+- **Kept, because this file cites them:**
+  - the empty folder;
+  - the definitions S1, S2, S3, S6, S7-armed, the two axis plants and the four D-47 plants;
+  - the DMT definition `edd81b32` (now published);
+  - every cited run and thread.
+- **Diff** (`snap_before` 47,146 ids → `snap_after` 48,117), with **0 ids removed** in any table except `connector_sync_runs` (2 added and 2 removed by the operator's background watch loop, not by this plan). Added by this plan:
+  - `workflow_definitions` +11, `workflow_runs` +23, `workflow_phases` +53, `threads` +23, `messages` +71, `runs` +83, `harness_audit` +271, `code_executions` +3, `folders` +1;
+  - `auth.sessions` +21 and related auth rows (the magic-link sessions);
+  - `audit_log` +298 (the app's own route audit).
+- **Not touched:** the 15 historical `test_214` rows (already absent), and no production data of any kind.
+- **After the diff:** three more runs were made after `snap_after`, for the S3 header recheck and the panel finding: `6ec2f298` (contaminated by the unit gate), `3ec118a2` and `108bb381`. Their threads are `d5d872ce`, `a5bf61a7` and `38cdf37f`. All three were stopped through `DELETE /runs/{id}` and read `cancelled` with ONE `run_cancelled` reason each. They are kept as evidence. At the end, `workflow_runs` held 0 `active` / `paused` rows, and no `runs` shell was left `streaming`.
+
 
 ---
 
@@ -131,22 +296,38 @@ S7 before (RESEARCH Q-9a / Q-9b, 2026-10-20): both stuck runs `active`, anchored
 
 Row method: drive the S1 plant (KB step over an empty folder) as a real run with a per-request `model` + `provider` on `POST /threads/{id}/messages`; expect `workflow_runs.status = paused` with an `engine_pause` prompt row; answer `Continue without sources`; expect `completed` with `unsourced` on the KB phase. Verdicts are read from `workflow_runs` / `workflow_phases` / `harness_audit`. Record each row's actual model. The roster is DERIVED at drive time from `MODEL_CAPABILITIES` grouped by provider (newest registry-backed id), never re-typed from here; the column below is the research-time reading.
 
-| # | Provider | Model (research-time; re-derive) | Paused with choices | Continue → completed + unsourced | Verdict |
-|---|---|---|---|---|---|
-| 1 | OpenAI | gpt-5.6-sol | | | _(owed)_ |
-| 2 | Anthropic | claude-opus-4-8 / registry claude-opus-5-5 (billing-blocked in 288/289/294: re-test, do not assume) | | | _(owed)_ |
-| 3 | Google | gemini-3.5-flash / registry gemini-3.8-flash | | | _(owed)_ |
-| 4 | DeepSeek | deepseek-v4-pro | | | _(owed)_ |
-| 5 | Zhipu / GLM | glm-5.2 / registry glm-5.3 | | | _(owed)_ |
-| 6 | MiniMax | MiniMax-M3 | | | _(owed)_ |
-| 7 | Moonshot / Kimi | kimi-k2.6 / registry kimi-k3 (coerce tier) | | | _(owed)_ |
-| 8 | OpenRouter | deepseek/deepseek-v4-pro or z-ai/glm-5.2 (non-native tool path) | | | _(owed)_ |
+**Driven 2026-10-21 00:31-00:37Z by 295-07**, against the merged code live on `:8000`. Each row is one real run of the S1 plant (`3b6794c0`, a KB step over the empty folder), started with a per-request `model` and `provider` on `POST /threads/{id}/messages`, with no global setting touched. A row passes when (a) the run went `paused` with an `engine_pause` prompt row and three choices, (b) `Continue without sources` (sent through `POST /runs/{id}/ask_user_response`, the route the card calls) answered 200, and (c) the run ended `completed` with `unsourced` on the KB step. All verdicts were read from `workflow_runs` / `workflow_phases` / `messages` / `runs`.
+
+**Roster derivation** (from `MODEL_CAPABILITIES` in `config.py`, grouped by `provider`, plus the local Model Registry rows in `model_capabilities_overrides`; newest enabled registry-backed id per provider):
+- openai: `gpt-5.6-sol` (seed).
+- anthropic: `claude-opus-5-5` (registry, `native_tools: true`; newer than the seed's `claude-sonnet-5`).
+- google: `gemini-3.8-flash` (registry; the seed's newest is `gemini-3.5-flash`).
+- deepseek: `deepseek-v4-pro`.
+- zhipu: `glm-5.3` (registry).
+- minimax: `MiniMax-M3` (seed).
+- moonshot: `kimi-k3` (registry).
+- openrouter: `deepseek/deepseek-v4-pro` (seed and registry).
+
+⚠ **What "the actual model" means here, measured:** `workflow_runs.model` records the requested model, but the KB step's agent calls (`runs` sub-run shells) ran on each provider's **sub-agent model**, not the requested one. The KB column below names that model, so a reader can see which model actually faced the empty search.
+
+| # | Provider | Requested (= `workflow_runs.model`) | KB step ran on (sub-runs) | Paused with choices | Continue → completed + unsourced | Verdict |
+|---|---|---|---|---|---|---|
+| 1 | OpenAI | `gpt-5.6-sol` | `gpt-5.4-mini` | yes, 18 s, 3 choices | yes (`7a58cce3`) | **PASS** |
+| 2 | Anthropic | `claude-opus-5-5` | `claude-haiku-4-5-20251001`, **all 3 sub-runs `failed`**: `Your credit balance is too low to access the Anthropic API` | yes, 6 s | yes (`b87cb924`) | ⛔ **BLOCKED (billing), re-tested, not assumed.** The pause and continue mechanics did run, but the KB step never searched. See the finding below. |
+| 3 | Google | `gemini-3.8-flash` | `gemini-3.5-flash` | yes, 104 s | yes (`31270f19`) | **PASS** |
+| 4 | DeepSeek | `deepseek-v4-pro` | `deepseek-v4-flash` | yes, 49 s | yes (`dc41bf73`) | **PASS** |
+| 5 | Zhipu / GLM | `glm-5.3` | `glm-5-turbo` | yes, 97 s | yes (`c56ce422`) | **PASS** |
+| 6 | MiniMax | `MiniMax-M3` | `MiniMax-M2.7-highspeed` | yes, 49 s | yes (`e883f07c`) | **PASS** |
+| 7 | Moonshot / Kimi | `kimi-k3` (coerce tier) | `kimi-k2.6` | yes, 101 s | yes (`36cb19b3`) | **PASS** |
+| 8 | OpenRouter | `deepseek/deepseek-v4-pro` | `deepseek-v4-flash` (via openrouter) | yes, 58 s | yes (`6a5a7342`) | **PASS** (non-native tool path) |
+
+⚠ **Finding, Anthropic row (for the orchestrator; not fixed here):** when the KB step's agent fails at the provider (here a billing refusal, HTTP 400), the step is **not** treated as an outage. `retrieval_error` is `null`, the step's text is the raw provider error (`Sub-agent failed: Error code: 400 - {... 'credit balance is too low' ...}`), and the citations gate reads it as **"found nothing (0 sources)"**. So the person is offered `Search another folder` / `Continue without sources` for what is a provider failure, and `Continue` keeps the error text as an "unsourced" output that is handed to the next step. D-06 says an outage keeps failing with its outage sentence; this path is a sub-agent failure that never reaches retrieval, so D-06's check does not see it. Proposed routing: a reported bug ("a provider error on the KB step is offered as found nothing"), with the fix at the point where the sub-agent failure becomes the step output, so it fails with words.
 
 | Axis | Row | Verdict |
 |---|---|---|
-| Multi-tool | the KB step carries `search_documents` + `execute_code`; one run uses both before the gate pauses | _(owed)_ |
-| Parallel-thread | thread A paused at the found-nothing card while thread B starts and completes a run | _(owed)_ |
-| Long-message | a ≥ 5 KB kickoff prompt into the KB step; the pause and the answer still work | _(owed)_ |
+| Multi-tool | Plant `e7645ff8` (KB step with `search_documents` and `execute_code`; prompt: compute 17 × 23, then search). Run `1880cf56`, default model. **Both tools ran:** 3 `code_executions` rows in the KB sub-run's thread `15a2e042` (one per attempt; log `Sandbox session opened for thread 15a2e042…`), and the step text reads `Computed value: 17 × 23 = 391` followed by the five empty searches. Then paused (64 s), Continue, completed, `unsourced` set. | **PASS** |
+| Parallel-thread | Thread A (`c72eafb4`, run `7efbc5cf`, S1 plant) paused at the found-nothing card after 67 s. While A waited, thread B (`4950fe58`, run `a61e9ee1`, plant `09aa6525` over the populated folder) started at 00:35:49Z and **completed in 27 s** (both steps completed). A still read `paused` when B finished. Then A was answered Continue → 200 → `completed`, `unsourced` set. | **PASS** |
+| Long-message | A **7,009-byte** kickoff prompt (21 numbered paragraphs) into the S1 plant. Run `126f1adf`, default model. Paused (64 s) with the three choices, Continue → 200 → `completed`, `unsourced` set. | **PASS** |
 
 ---
 
