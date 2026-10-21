@@ -455,6 +455,26 @@ Everything made is kept, because this section cites it.
 
 **End state:** `workflow_runs` has 0 `active` / `paused` rows, and `runs` has 0 `streaming` rows. That was read at 04:58Z, after the last stop.
 
+### D-r2-01 fast-fix re-drive (2026-10-21)
+
+**What was driven.** Commit `07b7632bc` ("a re-driven active run's next ask is not read as stopped"), on develop, served by the operator's own vite (`5173`) and backend (`8000`); nothing was started or restarted. Each drive used a **fresh headless Chromium context** (no cached bundle). The page's store was read at the end of each drive: it still held no workflow lock and a recorded status of `active`, which is exactly the state that used to read as "stopped". The local-DB lock was taken before driving and released after the last read. No unit or TestClient suite was run, and no Supabase MCP call was made. Screenshots are `evidence/r2b_*.png`, records `evidence/r2b_d1_record.json` and `r2b_d2_record.json`.
+
+**Drive method.** Same tab, chat thread with the Workspace panel open, no reload, no thread switch. The S2 workflow ("295-07 S2 continue without sources") was started from the thread. When the found-nothing card came, "Continue without sources" was answered in the panel. When the "Approve the note?" card came, it was **left alone for 20 s** and sampled every second (Retired, "run was stopped", "answer window has passed", Expired, Needs you, radio count, Send state). Then Yes was picked, Send was read, and Send was pressed. The panel was then followed for 40 s.
+
+| Drive | Verdict | Run | The evidence that decides it |
+|---|---|---|---|
+| S2 approval, same tab, drive 1 | **PASS** | `80f7d411` (thread `3bcbdfe9`) | Continue sent 05:12:07.6Z; DB `paused` → `active` 05:12:08.2; approve step `active` 05:12:09.8. The approval card was on screen at 05:12:10.3 as `NEEDS YOU · Approve the note?` with Yes / No. **All 20 one-second samples over the 20 s wait read `Needs you`, 2 radios, and none read Retired, "The run was stopped", "The answer window has passed", or Expired.** The step line read `approve — Running · Needs you` and the Unsourced mark showed beside it. Send was disabled with no choice picked, and **enabled once Yes was picked**. Yes was sent 05:12:34.4. The DB wrote approve `completed` 05:12:35.2; the panel read `approve — Complete` at 05:12:36.0. `run_completed` 05:12:37.3; the panel read `wrap — Complete` at 05:12:38.1 (lag 0.8 s). |
+| S2 approval, same tab, drive 2 | **PASS** | `77c91d0b` (thread `391b9048`) | Same shape. Approve `active` 05:14:43.8, card up at 05:14:44.3. 20 of 20 samples answerable (`Needs you`, 2 radios, no Retired / stopped / window / Expired). Send disabled until Yes was picked, then enabled. Yes sent 05:15:08.3. Approve complete in the DB 05:15:09.2, in the panel 05:15:10.0. Run `completed` 05:15:11.3; panel `wrap — Complete` 05:15:12.0 (lag 0.7 s). |
+| Guard: Stop a paused run from its run page; a freshly opened thread shows no live card | **PASS** | `406625a5` (thread `afef4433`) | The run paused on found-nothing (the run page band read "Paused for your answer"). Stop was pressed on the run page at 05:17:10Z. The run read `Cancelled · Why it stopped: Stopped by the person who started this run`; the DB read run `cancelled`, research `cancelled`. A **fresh context opened the thread**: the panel shows `research — Stopped`, `approve not reached`, and no card; the chat column shows "Stopped by you". On the whole page there was no `Needs you`, no Send Answer button, 0 radios, and no Retired. So the fix did not make a stopped run look live. |
+
+**Result.** D-r2-01 is fixed live: the next in-stream question after an answer is answerable in the same tab for as long as the run waits (2 of 2 drives, 40 of 40 samples), and the stop guard still holds (1 of 1).
+
+**Side observation, not a closure of D-r2-02.** In both drives the research step in the same tab kept its `Unsourced · continued by …` mark through to the end (`wrap — Complete`), where round 2 saw it drop. Two samples on a different build is not enough to call D-r2-02 closed, so it stays recorded as deferred until someone drives it on purpose.
+
+**Plants and cleanup.** Three threads were made through the app: `295-r2b S2 drive 1`, `S2 drive 2` and `stop guard`. Definition `5d58c517` was reused. Everything is kept. **End state:** 0 `workflow_runs` active or paused, 0 `runs` streaming.
+
+---
+
 ---
 
 ## Four-axis scoreboard (CLAUDE.md UAT recipe, CONTEXT D-33)

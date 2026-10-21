@@ -21,7 +21,7 @@ updated: 2026-10-21T05:00:00Z
   - Typing into the composer while the run waits now says: "This thread's workflow is paused, waiting for your answer. Answer it in the panel or on the run page. To stop the run instead, open its run page and stop it there." (D-r1-03).
   - A run in one of your orgs no longer offers your own folders from your other org (D-r1-04).
 - ⚠ **Two things are known and still open, so you will see them:**
-  - **An approval step that comes after an answer reads "Retired · The run was stopped" in the same tab**, while the run is really waiting for you (S2's "Approve the note?"). Switch to another thread and back, and the card is answerable (D-r2-01, proposed as a fast fix).
+  - ✅ **Fixed 2026-10-21 (D-r2-01, `07b7632bc`), checked live twice:** the approval step that comes after an answer (S2's "Approve the note?") is answerable in the same tab while the run waits. It no longer reads "Retired · The run was stopped".
   - **In the tab that followed a Continue-without-sources run to its end, the step shows no Unsourced mark.** Reopen the thread and the mark is there (D-r2-02, deferred).
 - The app has no URL router. A browser reload lands on the home screen, so reopen the thread from the chat list.
 
@@ -70,7 +70,7 @@ expected: Run `295-07 S2 continue without sources` and answer Continue without s
 You'd recognise failure as: any of the four showing the step plainly done, or the mark being grey and quiet.
 
 ⚠ **Known on 2026-10-21 (gap round 2), so you will see these in place 1:**
-- If you stay in the same tab after Continue, the "Approve the note?" card reads "Retired · The run was stopped". Switch threads and back to answer it there, or answer on the run page (D-r2-01).
+- (Fixed since: the "Approve the note?" card used to read "Retired · The run was stopped" in the same tab after Continue. After `07b7632bc` it reads answerable, and you can answer it there. D-r2-01.)
 - If you stay in the tab until the run ends, the step reads plainly Complete there. Reopen the thread to see the mark (D-r2-02).
 
 result: [pending]
@@ -136,7 +136,7 @@ blocked: 1
 - ✅ **CLOSED, D-r1-02:** after an answer in the chat thread, the thread stopped following the run. Fixed by 295-10 for durable pauses, ends and failures, and checked live on 2026-10-21 (`b5540647`, `dac3d557`, `74c56c63`). The in-stream next question is D-r2-01.
 - ✅ **CLOSED, D-r1-03:** on a paused run, the composer refusal told the person to cancel a run the thread cannot cancel. Fixed by 295-10, and the new sentence was seen live on 2026-10-21 (`603a0785`).
 - ✅ **CLOSED, D-r1-04:** the "Search another folder" list offered the owner's own folders from the other org. Fixed by 295-10, and checked live in both orgs on 2026-10-21 (`a812cf02`, `25092977`).
-- **OPEN, D-r2-01 (fast-fix):** after an answer in the same tab, an in-stream approval step's card reads "Retired · The run was stopped" while the run waits. The cause is `PendingAskCard.tsx` `runIsOver`: no lock, phases exist, and a recorded status of `active` that it does not treat as live. The fix is about 1-3 lines plus a test.
+- ✅ **CLOSED, D-r2-01:** after an answer in the same tab, an in-stream approval step's card read "Retired · The run was stopped" while the run waited. Fixed by `07b7632bc` (`PendingAskCard.tsx` `runIsOver`), and re-driven live on 2026-10-21 in a fresh browser context: runs `80f7d411` and `77c91d0b` showed the card answerable for the whole 20 s wait (40 of 40 samples), Send enabled once a choice was picked, and the run completed with the panel following. The stop guard held (`406625a5`: a stopped run shows no live card in a freshly opened thread).
 - **OPEN, D-r2-02 (defer):** after the panel follows a Continue run to its end in the same tab, the step loses its Unsourced mark until the thread is reopened. It is somewhere in `StreamsProvider.tsx`'s end-of-run path, and the cause is not isolated.
 - **ACCEPTED, D-r2-03:** a stale card's refusal words are on screen for 0.2 s before the current question replaces them.
 - (original) **Chat-panel retirement of a live engine ask** (295 regression, found by 295-07). A paused found-nothing or approval ask is shown RETIRED in the chat thread's Workspace panel because the client never seeds the workflow lock for a durable pause (`lock_is_stale` is true with no live producer). Code: `frontend/src/components/panel/PendingAskCard.tsx:897`, `frontend/src/providers/StreamsProvider.tsx:2536`, `frontend/src/components/chat/ChatArea.tsx:380`. Not yet a bug report; proposed for `/gsd:fast` with a RED test, then the live re-drive of test 1.
