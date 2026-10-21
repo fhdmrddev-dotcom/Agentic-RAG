@@ -1081,3 +1081,58 @@ describe("Phase 214 — the two Phase-RETURNING literals in reconcilePhases decl
     expect([...harnessKeys].sort()).toEqual([...historicalKeys].sort())
   })
 })
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Phase 295 gap round 1 (295-08 / SEED-361) — the phase reconcile carries the run status.
+// ─────────────────────────────────────────────────────────────────────────────
+//
+// A paused run has no live producer, so the server reads `lock_is_stale: true` and the client
+// never sets the workflow lock. `PendingAskStack` can then tell "paused and waiting" from "over"
+// only by the run status, which this SAME `getThreadWorkflow` read already returns. The reconcile
+// writes it to ONE store field; nothing else fetches it.
+
+const THREAD_PAUSED = "thread-295-paused"
+const THREAD_STOPPED = "thread-295-stopped"
+
+describe("295-08 — reconcilePhases records the thread's run status (SEED-361)", () => {
+  beforeEach(() => {
+    resetPhases()
+    useStreamsStore.setState({ workflowRunStatusByThread: new Map<string, string | null>() })
+  })
+
+  it("a paused run (stale lock, anchor set) records `paused` for its thread", async () => {
+    mockGetThreadWorkflow.mockResolvedValue({
+      mode: "harness",
+      lock_is_stale: true,
+      run_status: "paused",
+      current_phase_index: 0,
+      total_phases: 2,
+      phases: [
+        { slug: "search-kb", phase_index: 0, status: "active", phase_type: "llm_single" },
+        { slug: "wrap", phase_index: 1, status: "pending", phase_type: "llm_single" },
+      ],
+    })
+    mountRealProvider()
+    const { result } = renderHook(() => RealStreams.usePhases(THREAD_PAUSED))
+    await waitFor(() => expect(result.current.data).toHaveLength(2))
+    expect(useStreamsStore.getState().workflowRunStatusByThread.get(THREAD_PAUSED)).toBe("paused")
+  })
+
+  it("a stopped run (anchor cleared, run_status null) records null, never a leftover status", async () => {
+    useStreamsStore.setState({
+      workflowRunStatusByThread: new Map<string, string | null>([[THREAD_STOPPED, "paused"]]),
+    })
+    mockGetThreadWorkflow.mockResolvedValue({
+      mode: "deep",
+      lock_is_stale: false,
+      run_status: null,
+      current_phase_index: null,
+      total_phases: null,
+      phases: [{ slug: "search-kb", phase_index: 0, status: "cancelled", phase_type: "llm_single" }],
+    })
+    mountRealProvider()
+    const { result } = renderHook(() => RealStreams.usePhases(THREAD_STOPPED))
+    await waitFor(() => expect(result.current.data).toHaveLength(1))
+    expect(useStreamsStore.getState().workflowRunStatusByThread.get(THREAD_STOPPED)).toBeNull()
+  })
+})
