@@ -299,8 +299,8 @@ interface PendingAskCardProps {
    * PAUSED_WAITING_LINE where the clock was. Passed by `WorkflowRunPage`, which holds the run row.
    *
    * ⚠ OPTIONAL, defaulting to false, so every existing caller renders exactly the card it
-   * rendered before this prop existed. `PendingAskStack` cannot derive it (289-01-SUMMARY.md,
-   * "Named gap: PendingAskStack") and does not pass it.
+   * rendered before this prop existed. `PendingAskStack` passes it since 295-08 (SEED-361), from
+   * the run status its phase reconcile already reads (289-01's "Named gap: PendingAskStack").
    */
   paused?: boolean
 }
@@ -894,7 +894,12 @@ export function PendingAskStack({ home = "chat" }: { home?: "chat" | "panel" } =
   // new place.
   const workflowLock = useWorkflowLockForThread(threadId)
   const { data: phases } = usePhases(threadId)
-  const runIsOver = workflowLock == null && phases.length > 0
+  // 295-08 (SEED-361): a PAUSED run has no live producer, so the server reports its lock stale and
+  // `lock == null` holds while the run waits on the person. The run status from the phase
+  // reconcile's own read (store field, no fetch here) says so; a paused run is not over.
+  const runStatus = useStreamsStore((s) => (threadId ? s.workflowRunStatusByThread.get(threadId) : null))
+  const paused = runStatus === "paused"
+  const runIsOver = workflowLock == null && phases.length > 0 && !paused
 
   // ── Phase 214-11 Task 2 (STEP-04 / D-214-16 / D-214-14) — THE STACK RESOLVES; THE CARD
   //    RENDERS.
@@ -987,6 +992,7 @@ export function PendingAskStack({ home = "chat" }: { home?: "chat" | "panel" } =
               service={pausedStep?.serviceName ?? null}
               shape={stepMarkShape(pausedStep?.capability, pausedStep?.toolName)}
               home={home}
+              paused={paused}
             />
           )}
         </div>

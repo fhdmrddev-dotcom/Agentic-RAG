@@ -11400,7 +11400,7 @@ cells rot within days.
 | [`frontend/src/components/chat/tool-bodies/SearchDocumentsBody.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentschattool-bodiessearchdocumentsbodytsx) | 3 / 3 / 71 | ⚠ **FIRES** (crossed in 272) | ⚠ absent its ENTIRE LIFE — row added 272-05. **F-3**: `summarize` names refused / invalid / empty / not-searchable / unavailable |
 | [`frontend/src/components/chat/MessageItem.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentschatmessageitemtsx) | 82 / 38 / 1040 (was `81 / 38 / 1037`) | ⚠ **FIRES** | BUG-261020-04: +1 hook (usePersistedMessageId) feeds both citation mounts (+5 −2); useState 3, useEffect 0, 5 props. Fences updated |
 | [`backend/app/api/threads.py`](docs/HOT-FILE-LEDGER.md#backendappapithreadspy) | 273 / 92 / 2567 (was `271 / 91 / 2544`) | ⚠ **FIRES** | 295-05: the planned `unsourced` kwarg plus a lazy one-time name lookup (+1 If, +10 L against a budget of one kwarg; recorded). ⛔ SSE transport discharge unchanged |
-| [`frontend/src/providers/StreamsProvider.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrcprovidersstreamsprovidertsx) | 110 / 43 / 5006 (was `109 / 42 / 5004`) | ⚠ **FIRES** | 295-05: ONE field (`unsourced`) in each of its two row mappers (useState 0→0, useEffect 27→27). Honoured by construction · ⛔ |
+| [`frontend/src/providers/StreamsProvider.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrcprovidersstreamsprovidertsx) | 111 / 43 / 5009 (was `110 / 43 / 5006`) | ⚠ **FIRES** | 295-08 (SEED-361): ONE call records the reconcile's own `run_status`; no fetch, 0 branches. Honoured by construction · ⛔ |
 | [`frontend/src/hooks/useMessages.ts`](docs/HOT-FILE-LEDGER.md#frontendsrchooksusemessagests) | 74 / 27 / 127 | ⚠ **FIRES** | extraction due |
 | [`backend/app/services/anthropic_service.py`](docs/HOT-FILE-LEDGER.md#backendappservicesanthropic_servicepy) | 12 / 11 / 373 (was `11 / 10 / 354`) | ⚠ **FIRES** | **282-01**: ONE `_anthropic_client` builder (budget in the constructor, connect 5 s, cloud retries 2) + trailing `timeout_s` on `stream_anthropic`. honoured by construction; adapter-pattern audit due |
 | [`frontend/src/components/workflows/WorkflowCanvas.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentsworkflowsworkflowcanvastsx) | 31 / 9 / 1708 | **FIRES** | 286 forecast (290): the team picture is a SEPARATE read-only view (VIS-01: never a second canvas); at most ONE gated mount here. honoured by construction (199 / 200 / 214) |
@@ -11451,7 +11451,7 @@ cells rot within days.
 | [`frontend/src/hooks/useFollowScroll.ts`](docs/HOT-FILE-LEDGER.md#frontendsrchooksusefollowscrollts) | 4 / 2 / 314 | does not fire | ⛔ **NO ROW FOR ITS ENTIRE LIFE — added 243-03**, then STALE at `3/2/265` one phase on. **243-06:** the re-arm now asks whether the reader is STILL leaving, not what they last did |
 | [`frontend/src/lib/throttle.ts`](docs/HOT-FILE-LEDGER.md#frontendsrclibthrottlets) | 2 / 2 / 108 | does not fire | ⛔ **NO ROW FOR ITS ENTIRE LIFE — added 243-03.** TWO opposite primitives on purpose; ⛔ never unify them — one of the two call sites breaks silently |
 | [`frontend/src/components/chat/ChatArea.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentschatchatareatsx) | 94 / 44 / 1189 (was `93 / 43 / 1186`) | **FIRES** | honoured by construction (**287-03**): ONE mount of ThreadWorkflowPicker, zero new hooks, no logic. ⛔ no scope branch in send |
-| [`frontend/src/components/panel/PendingAskCard.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentspanelpendingaskcardtsx) | 20 / 11 / 1080 (was `19 / 10 / 1052`) | ⚠ **FIRES** | 295-06: ONE `readEnginePause` read, ONE `<AskFolderChoice>` mount, folder-gated Send. useState 7→7, useEffect 3→3. Honoured by construction |
+| [`frontend/src/components/panel/PendingAskCard.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentspanelpendingaskcardtsx) | 21 / 11 / 1086 (was `20 / 11 / 1080`) | ⚠ **FIRES** | 295-08 (SEED-361): the stack reads ONE store field; `runIsOver` gains `&& !paused`; `paused` passed to the card. useState 7→7, useEffect 3→3. Honoured by construction |
 | [`frontend/src/pages/WorkflowRunPage.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrcpagesworkflowrunpagetsx) | 33 / 13 / 1594 (was `31 / 12 / 1580`) | **FIRES** | **289-01** one `paused` attribute; **289-04** ONE early return → RunEvidenceReport (+14 L). No new hook/state/effect. RunHero now dead here (F-D). ⛔ invariants unchanged |
 | [`frontend/src/components/workflows/WaitingOnLine.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentsworkflowswaitingonlinetsx) | 1 / 1 / 26 | does not fire | young (created **288-03**): leaf that renders the server-composed waiting-on sentence verbatim; no hook, no API import |
 | [`frontend/src/components/workflows/StepEvidenceLine.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentsworkflowsstepevidencelinetsx) | 2 / 2 / 145 (was `1 / 1 / 93`) | no (2 phases) | 295-05: the unsourced arm; the confidence arm is byte-unchanged (an innerHTML test pins it). Two phases; does not fire |
@@ -11471,7 +11471,7 @@ cells rot within days.
 | [`backend/app/api/settings.py`](docs/HOT-FILE-LEDGER.md#backendappapisettingspy) | 44 / 23 / 1159 (was `41 / 21 / 1048`) | ⚠ **FIRES** | honoured by construction (**294-04**): ONE refusal arm, rerank_provider vs registry `ACCEPTED_PROVIDER_IDS` → 400. ⛔ never a retyped id list; GET never echoes a key |
 | [`backend/app/services/multimodal_service.py`](docs/HOT-FILE-LEDGER.md#backendappservicesmultimodal_servicepy) | 14 / 7 / 984 | ⚠ **FIRES** | ⚠ absent from BOTH for its ENTIRE LIFE at **7 phases** — row added SEED-227, which is also where its silent truncation was found |
 | [`backend/app/api/documents.py`](docs/HOT-FILE-LEDGER.md#backendappapidocumentspy) | 99 / 39 / 2698 (was `97 / 38 / 2653`) | ⚠ **FIRES** | Honoured by construction. **285-03** (D-12): both enqueue paths failed → the doc is marked `failed` (guard `status='pending'`) and 201 `failed` returned, like the storage-fail arm. Minter untouched |
-| [`scripts/vitest-count-gate.cjs`](docs/HOT-FILE-LEDGER.md#scriptsvitest-count-gatecjs) | 319 / 73 / 6596 (was `317 / 72 / 6568`) | ⚠ **FIRES** | 294-03 + 294-05: 10 suites adopted in both knobs; citationOrdinals 33 → 49. ⚠ row was stale (294-03 not re-derived) |
+| [`scripts/vitest-count-gate.cjs`](docs/HOT-FILE-LEDGER.md#scriptsvitest-count-gatecjs) | 324 / 74 / 6619 (was `319 / 73 / 6596`) | ⚠ **FIRES** | 295-08: `PendingAskStack.pausedRun` adopted in both knobs (7); PhaseReconcile pin 19 → 28 (it ran 26). ⚠ row was stale |
 | [`scripts/check-deploy-drift.sh`](docs/HOT-FILE-LEDGER.md#scriptscheck-deploy-driftsh) | 5 / 4 / 267 | ⚠ **FIRES** | ⚠ absent its ENTIRE LIFE — row added 294-05. 294-01: DECISION_ENGINE_FAULT_BASE_URL registered as intentionally omitted (+2) |
 | [`scripts/build-public-openapi.cjs`](docs/HOT-FILE-LEDGER.md#scriptsbuild-public-openapicjs) | 7 / 3 / 468 (was `5 / 2 / 465`) | ⚠ **FIRES** | ⚠ now FIRES (294). 294-03: the citation_checks tag (one line). ⛔ scripts/ is gate-exempt |
 | [`backend/app/services/eval_runner_service.py`](docs/HOT-FILE-LEDGER.md#backendappserviceseval_runner_servicepy) | 13 / 8 / 1040 | ⚠ **FIRES** | ⚠ STALE at `12/7/959`, and absent until 196 at 7 phases. **256-03**: its finalize stopped passing `input_tokens=None`. Re-derived by 256-04 |
@@ -11694,7 +11694,7 @@ cells rot within days.
 | [`frontend/src/components/chat/ConnectedFilePickerModal.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentschatconnectedfilepickermodaltsx) | 3 / 2 / 336 | no (2 phases) | ⚠ **absent for its ENTIRE LIFE — row added 244-06, and the ledger gate FAILED on it at this phase's base (C-8).** 244-06 REBUILT it: select-then-confirm, and the commit is the parent's |
 | [`frontend/src/components/chat/useComposerAttachments.ts`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentschatusecomposerattachmentsts) | 3 / 2 / 183 (was `2 / 1 / 183`) | no (2 phases) | Both attach doors' state + verbs. **274-03**: ONE edit — the composer uploads with `lifetime "thread"`. ⛔ it CANNOT reach `setValue` |
 | [`frontend/src/components/chat/ActiveConnectorChips.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentschatactiveconnectorchipstsx) | 2 / 2 / 82 | no (2 phases) | ⚠ absent for its entire life — row added 244-05 at its SECOND phase. **244**: the row container HOISTED out; it is bare chips now, `null` on empty (D-244-26) |
-| [`frontend/src/stores/streamsStore.ts`](docs/HOT-FILE-LEDGER.md#frontendsrcstoresstreamsstorets) | 24 / 16 / 607 (was `22 / 14 / 572`) | **FIRES** | honoured by construction (**287-03**): ONE optional `inputs` type field on sendMessage opts, 0 branches. **244-13**: `WorkflowLock.mode` is a REAL discriminator |
+| [`frontend/src/stores/streamsStore.ts`](docs/HOT-FILE-LEDGER.md#frontendsrcstoresstreamsstorets) | 25 / 17 / 626 (was `24 / 16 / 607`) | **FIRES** | 295-08 (SEED-361): ONE ephemeral field `workflowRunStatusByThread` + its one writer `recordWorkflowRunStatus`. 0 actions added. **244-13**: `WorkflowLock.mode` is a REAL discriminator |
 | [`frontend/src/lib/toolMeta.ts`](docs/HOT-FILE-LEDGER.md#frontendsrclibtoolmetats) | 12 / 8 / 367 (was `11 / 7 / 352`) | ⚠ **FIRES** | **273-05**: `stepLabel` (show_artifact phrase, every other tool byte-identical to `toolLabel`). ⛔ the ONE home of the activity string |
 | [`scripts/full-schema-supplement.sql`](docs/HOT-FILE-LEDGER.md#scriptsfull-schema-supplementsql) | 23 / 15 / 848 (was `21 / 14 / 838`) | ⚠ **FIRES** | 294-03: mig 211 message_citation_checks ACL block mirrored (+9). Honoured by construction |
 | [`scripts/check-schema-acl-parity.cjs`](docs/HOT-FILE-LEDGER.md#scriptscheck-schema-acl-paritycjs) | 4 / 2 / 1156 | no (2 phases) | ⚠ row STALE at `3/2/883` ONE PLAN LATER, same day — lines rot faster than phases. **253-03**: it finally READS `full-schema.sql` (`assertTailIdentity`); 29 → 35 self-test arms |
@@ -14940,6 +14940,15 @@ inherits `15 / 8 / 836`.**
 Scan-list cell as of 2026-10-21 (replaced by 295-07, moved verbatim): 19 / 10 / 1052 (was `18 / 10 / 1042`) | **FIRES** | **289-REVIEW CR-02**: ONE `useEffect` returns a CLOCK-expired card to pending when `paused` arrives; a 404/409 expiry stays terminal. useState 7, useEffect 2 → 3
 
 CLAUDE.md verdict cell as of 2026-10-21 (replaced by 295-07, moved verbatim): | `frontend/src/components/panel/PendingAskCard.tsx` | 19 / 10 / 1052 (was `18 / 10 / 1042`) | 289-REVIEW CR-02: one effect returns a clock-expired card when paused |
+
+
+### `frontend/src/components/panel/PendingAskCard.tsx` — 295-08 (SEED-361)
+
+**`21 / 11 / 1086`** (was `20 / 11 / 1080`). 295-08 (SEED-361): `PendingAskStack` reads the thread's run status from ONE store field through `useStreamsStore` (never `useStreamActions`, per the 244-15 comment), derives `paused = runStatus === "paused"`, ANDs `!paused` onto `runIsOver`, and passes `paused` to the card (the 289-01 prop). No fetch in the stack. useState 7 → 7, useEffect 3 → 3, `if (` 26 → 26. Both `runIsOver` conjuncts keep their meaning: a stopped run (cancelled, or no status) still retires; a Deep thread (no phases) never does.
+
+Scan-list cell as of 2026-10-21 (replaced by 295-08, moved verbatim): 20 / 11 / 1080 (was `19 / 10 / 1052`) | ⚠ **FIRES** | 295-06: ONE `readEnginePause` read, ONE `<AskFolderChoice>` mount, folder-gated Send. useState 7→7, useEffect 3→3. Honoured by construction |
+
+CLAUDE.md verdict cell as of 2026-10-21 (replaced by 295-08, moved verbatim): | `frontend/src/components/panel/PendingAskCard.tsx` | 20 / 11 / 1080 (was `19 / 10 / 1052`) | 295-06: one read + one mount, no new hook · honoured by construction |
 
 ## `scripts/vitest-count-gate.cjs` — `244-15`
 
@@ -22210,6 +22219,17 @@ CLAUDE.md FIRING cell as of 2026-10-20 (replaced by 294-05, moved verbatim): 317
 
 **294-REVIEW WR-04 (`6600` lines).** `RerankEngineBlock.test.tsx` RAISED 24 → 25 (one case).
 
+
+### `scripts/vitest-count-gate.cjs` — 295-08 (SEED-361)
+
+### `scripts/vitest-count-gate.cjs` — 295-08 (SEED-361)
+
+**`324 / 74 / 6619`** (the row read `319 / 73 / 6596`, stale since 295-07). One suite adopted in BOTH knobs: `PendingAskStack.pausedRun.test.tsx` (7, file-level TARGETS entry). `PhaseReconcile.test.tsx` pin 19 → 28: it was running 26 under a pin of 19, and 295-08 adds two cases.
+
+Scan-list cell as of 2026-10-21 (replaced by 295-08, moved verbatim): 319 / 73 / 6596 (was `317 / 72 / 6568`) | ⚠ **FIRES** | 294-03 + 294-05: 10 suites adopted in both knobs; citationOrdinals 33 → 49. ⚠ row was stale (294-03 not re-derived) |
+
+CLAUDE.md verdict cell as of 2026-10-21 (replaced by 295-08, moved verbatim): | `scripts/vitest-count-gate.cjs` | 319 / 73 / 6596 (was `317 / 72 / 6568`) | 294-05: 9 suites adopted, 1 pin raised (row was stale) |
+
 ## Phase 285 close (2026-10-16, 285-03)
 
 All triples below were re-derived on the merged tree at `cca4e5a90` (285-01..03 code merged) with the CLAUDE.md recipe; six-digit quick-task buckets are subtracted and named per file. The set is every non-test source file the phase changed since PHASE_BASE `c8c764e90` (`git diff --name-only c8c764e90 HEAD -- backend/app frontend/src`, tests excluded): **7 files**. Migration 209, `scripts/apply_migration_209.py` and `supabase/full-schema.sql` are gate-exempt. Each subsection quotes the scan-list cell it replaced and, where the file had one, the CLAUDE.md FIRING verdict cell it replaced, verbatim. **Newly FIRING or absent from CLAUDE.md, row ADDED:** `watch_service.py` (6), `db/watches.py` (4), `RunHistoryList.tsx` (3). `ingest_splice.py` and `db/ingestion_jobs.py` were NOT touched (D-12).
@@ -22669,9 +22689,27 @@ Scan-list cell as of 2026-10-21 (replaced by 295-07, moved verbatim): 109 / 42 /
 
 CLAUDE.md verdict cell as of 2026-10-21 (replaced by 295-07, moved verbatim): | `frontend/src/providers/StreamsProvider.tsx` | 109 / 42 / 5004 (was `107 / 41 / 4991`) | honoured by construction (287-03: ONE passthrough field) · ⛔ |
 
+
+### `frontend/src/providers/StreamsProvider.tsx` — 295-08 (SEED-361)
+
+**`111 / 43 / 5009`** (was `110 / 43 / 5006`). 295-08 (SEED-361): `reconcilePhases` passes the `run_status` its own `getThreadWorkflow` read already returned to `recordWorkflowRunStatus` (one import, one call, +3 L). No new fetch, no branch, no change to either `Phase` literal (the PhaseReconcile key-set fence still reads two equal sets). useState 0 → 0, useEffect 27 → 27.
+
+Scan-list cell as of 2026-10-21 (replaced by 295-08, moved verbatim): 110 / 43 / 5006 (was `109 / 42 / 5004`) | ⚠ **FIRES** | 295-05: ONE field (`unsourced`) in each of its two row mappers (useState 0→0, useEffect 27→27). Honoured by construction · ⛔ |
+
+CLAUDE.md verdict cell as of 2026-10-21 (replaced by 295-08, moved verbatim): | `frontend/src/providers/StreamsProvider.tsx` | 110 / 43 / 5006 (was `109 / 42 / 5004`) | 295-05: ONE field per row mapper · honoured by construction · ⛔ |
+
 ## `frontend/src/stores/streamsStore.ts` — `287-03` (START-01)
 
 **`24 / 16 / 607` (was `22 / 14 / 572`; phase count RE-DERIVED at 287-04 with the recipe, was 15).** ONE passthrough field: optional `inputs?: Record<string, string>` on the `sendMessage` opts type. 0 branches.
+
+
+### `frontend/src/stores/streamsStore.ts` — 295-08 (SEED-361)
+
+**`25 / 17 / 626`** (was `24 / 16 / 607`; 295 is a new phase bucket for this file). ONE ephemeral field, `workflowRunStatusByThread: Map<string, string | null>`, and ONE writer beside `recordExpertReading`, on that function's pattern: a module function over `setState`, not a provider-registered action, so the eight suites that mount `PendingAskStack` with the provider mocked need nothing new. An unchanged value writes nothing. Known limit: no request ordering (unlike `recordExpertReading`); two overlapping reconciles of one thread can land out of order, and the next reconcile corrects it.
+
+Scan-list cell as of 2026-10-21 (replaced by 295-08, moved verbatim): 24 / 16 / 607 (was `22 / 14 / 572`) | **FIRES** | honoured by construction (**287-03**): ONE optional `inputs` type field on sendMessage opts, 0 branches. **244-13**: `WorkflowLock.mode` is a REAL discriminator
+
+CLAUDE.md verdict cell as of 2026-10-21 (replaced by 295-08, moved verbatim): | `frontend/src/stores/streamsStore.ts` | 24 / 16 / 607 (was `22 / 14 / 572`) | honoured by construction (287-03: ONE type field) · ⛔ |
 
 ## `backend/app/services/harness/phase_confidence.py`
 

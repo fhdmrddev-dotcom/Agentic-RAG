@@ -95,6 +95,7 @@ import { useOrgOptional } from "@/providers/OrgProvider"
 import {
   useStreamsStore,
   recordExpertReading,
+  recordWorkflowRunStatus,
   type SurfaceId,
   type StreamsState,
   type WorkflowLock,
@@ -4639,6 +4640,8 @@ function refreshPhaseSpineAfterStop(threadId: string): void {
 
 async function reconcilePhases(threadId: string, signal?: AbortSignal): Promise<Phase[]> {
   const wf = await getThreadWorkflow(threadId, signal)
+  // 295-08 (SEED-361): the same read's run status, kept so PendingAskStack can tell a PAUSED run.
+  recordWorkflowRunStatus(threadId, wf.run_status ?? null)
   // Live/ACTIVE harness run → the forward-only skeleton floor: total_phases rows, the
   // current one running, with the REAL step identity overlaid from `wf.phases`.
   //

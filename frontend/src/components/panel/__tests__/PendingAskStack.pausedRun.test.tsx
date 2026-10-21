@@ -116,7 +116,7 @@ const foundNothingAsk: PendingAsk = {
   options: ["Search another folder", "Continue without sources", "Stop the run"],
   timeout_seconds: null,
   engine_pause: {
-    kind: "found_nothing",
+    kind: "no_sources",
     phase: "search-kb",
     continue_allowed: true,
     locked: false,
@@ -125,7 +125,7 @@ const foundNothingAsk: PendingAsk = {
       { id: "f-hr", name: "HR", depth: 1 },
     ],
   },
-} as PendingAsk
+}
 
 const sendButton = () => screen.getByRole("button", { name: "Send Answer" }) as HTMLButtonElement
 

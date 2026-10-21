@@ -258,8 +258,13 @@ describe("194.1-01 — the three shipped retirement sentences, READ from source"
      * chips, `folder_id` on the answer only for the search choice, Send gated on a chosen folder,
      * and the answered header read from the helper (D-02 / D-03 / D-32). `useState` 7 → 7,
      * `useEffect` 3 → 3. Retirement fences untouched and green.
+     *
+     * 2026-10-21 — 295-08 (SEED-361) RE-BASELINED 1081 → 1087, not loosened: `PendingAskStack`
+     * reads the run status from ONE store field and `runIsOver` gains `&& !paused`; the stack
+     * passes `paused` to the card. `useState` 7 → 7, `useEffect` 3 → 3. Retirement fences
+     * untouched and green.
      */
-    expect(src.split("\n").length).toBe(1081)
+    expect(src.split("\n").length).toBe(1087)
   })
 
   /** (a) The 404-expiry constant — `setExpiredMessage("…")` in the catch. */
