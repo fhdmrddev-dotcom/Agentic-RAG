@@ -133,24 +133,39 @@ def claim_failure_message(ctx, phase) -> None:
     executor's own message stays the only one (D-50: the suppression never drops it). Re-set on
     every phase, so a later phase without validators is never silenced by an earlier one. A
     frozen / slotted ctx is tolerated, as ``human_input`` tolerates it for its resume flag.
+
+    295-REVIEW WR-03: it also clears ``ctx.engine_silenced_failure_message``, which only the
+    executor side sets, when it actually suppressed a message in THIS phase.
     """
     try:
         ctx.engine_owns_failure_message = bool(getattr(phase, "validators", None))
+        ctx.engine_silenced_failure_message = False
     except (AttributeError, TypeError):
         pass
 
 
 async def surface_unless_engine_owns(ctx, run_id, reason, pool, surface):
-    """The executor side: persist the failure message unless the engine owns it."""
+    """The executor side: persist the failure message unless the engine owns it. When it
+    stays silent it records that it did, so the engine knows it owes the one message."""
     if getattr(ctx, "engine_owns_failure_message", False):
+        try:
+            ctx.engine_silenced_failure_message = True
+        except (AttributeError, TypeError):
+            pass
         return None
     return await surface(ctx, run_id, reason, pool)
 
 
 async def surface_if_engine_owned(ctx, run_id, reason, pool, surface):
-    """The engine side, for the arms that did not surface before 295: only when the executor
-    was silenced, so a phase without validators never gets a second message."""
-    if not getattr(ctx, "engine_owns_failure_message", False):
+    """The engine side, for the arms that did not surface before 295: ONLY when the executor
+    was actually silenced in this phase.
+
+    295-REVIEW WR-03: this used to key on ``engine_owns_failure_message`` alone, which is True
+    for every phase with validators. Only the emit executor ever surfaces, so a non-emit step
+    routed by a valid ``skip_to`` (zero messages before 295) gained a mid-run "gate failed"
+    message. Keyed on the silence instead, that branch is back to its pre-295 behaviour, and
+    an emit step still gets its one message."""
+    if not getattr(ctx, "engine_silenced_failure_message", False):
         return None
     return await surface(ctx, run_id, reason, pool)
 
