@@ -120,6 +120,9 @@ const LIBRARY_SUBTREE_PATHS = [
   "./runFacts.ts",
   // ── 286-04 (2026-10-18, REG-07 / D-08): the card's `⋯` menu + armed delete, moved out ──
   "./WorkflowCardMenu.tsx",
+  // ── 290-02 (2026-10-21, VIS-04 / D-01): the card's chip line — pure resolver, then its render ──
+  "./stepLine.ts",
+  "./StepChipLine.tsx",
 ] as const
 
 /** The house `?raw` / `import.meta.glob` idiom (`PhaseFormPanel.rails.test.tsx:422`). */
@@ -168,7 +171,10 @@ describe("the sweep is looking at something (non-vacuity)", () => {
     // FIVE held for the SECOND consecutive addition — the suite printed `1 failed | 127 passed
     // (128)` against 123 at the previous commit. The module is `./runFacts.ts`, the run truth's
     // wire→words resolver.
-    expect(LIBRARY_SUBTREE_PATHS).toHaveLength(15)
+    // ⚠ 290-02 read it the same way: `expected [ './libraryRow.ts', …(16) ] to have a length of
+    // 15 but got 17` was OBSERVED before the 17 was written (two modules: `./stepLine.ts` and
+    // `./StepChipLine.tsx`, the card's chip line, VIS-04).
+    expect(LIBRARY_SUBTREE_PATHS).toHaveLength(17)
     for (const later of [
       "./RunModal.tsx",
       "./WorkflowDeleteSheet.tsx",
