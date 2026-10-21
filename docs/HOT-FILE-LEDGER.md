@@ -11341,7 +11341,7 @@ cells rot within days.
 |---|---|---|---|
 | [`backend/app/api/panel.py`](docs/HOT-FILE-LEDGER.md#backendappapipanelpy) | 6 / 5 / 285 | ⚠ **FIRES** | 295-03: ONE additive `engine_pause` key on /pending beside `draft`. Honoured by construction. 295-07: triple re-derived, unchanged since 295-03 |
 | [`backend/app/services/harness/human_input.py`](docs/HOT-FILE-LEDGER.md#backendappservicesharnesshuman_inputpy) | 6 / 3 / 375 (was `5 / 3 / 355`) | ⚠ **FIRES** | 295-09 CR-01: ONE guard (+1 def `_answers_this_step`, If 15→17): a re-drive consumes only an answer to THIS step's question, never an engine ask's or another step's. Honoured by construction |
-| [`backend/app/services/harness/engine_ask.py`](docs/HOT-FILE-LEDGER.md#backendappservicesharnessengine_askpy) | 6 / 1 / 1345 (was `5 / 1 / 1344`) | no (young) | young. 295-09 WR-01: `finding_from_output` reads an errored sub-agent as an outage (one `or`, If 78→78). ⛔ one allow-list shared with the route's 422 |
+| [`backend/app/services/harness/engine_ask.py`](docs/HOT-FILE-LEDGER.md#backendappservicesharnessengine_askpy) | 7 / 1 / 1350 (was `6 / 1 / 1345`) | no (young) | young. 295-09 WR-01: errored sub-agent = outage; WR-02: a folder chosen earlier counts as searched (If 78→79). ⛔ one allow-list shared with the route's 422 |
 | [`backend/app/services/harness/run_handoff.py`](docs/HOT-FILE-LEDGER.md#backendappservicesharnessrun_handoffpy) | 6 / 1 / 386 (was `5 / 1 / 355`) | no (young) | young. 295-09 WR-01: `sub_agent_text` + `sub_agent_error_mark` (+2 defs, If 20→22) so phase_types spends call lines only. ⛔ no app import; one guarded terminal write |
 | [`backend/app/services/harness/run_read_wire.py`](docs/HOT-FILE-LEDGER.md#backendappservicesharnessrun_read_wirepy) | 1 / 1 / 150 | no (young) | young (295-05). Pure leaf: unsourced_for_wire, end_reason_for_wire, resolve_end_reason, deadline_passed. ⛔ no app imports; a stored user id is REPLACED by words |
 | [`frontend/src/components/panel/AskFolderChoice.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentspanelaskfolderchoicetsx) | 1 / 1 / 70 | no (young) | young (295-06). Leaf on the shadcn Select: rows only from `engine_pause.folders`, visible label `Folder to search`. ⛔ no API import, no folder picker |
@@ -23322,6 +23322,12 @@ CLAUDE.md verdict cell as of 2026-10-21 (replaced by 295-07, moved verbatim): | 
 **`6 / 1 / 1345`** (the row read `5 / 1 / 1344`). 295-REVIEW WR-01: `finding_from_output` returns `"outage"` when the output carries `sub_agent_status: "error"`, so the shipped D-06 route fails the run instead of pausing with the found-nothing choices. One `or` on an existing condition: ast.If 78 → 78.
 
 Scan-list cell as of 2026-10-21 (replaced by 295-09, moved verbatim): 5 / 1 / 1344 | no (young) | young (295-01 D-51 seam, verbatim move). 295-03 grew it 599→1338 L, If 24→77: the durable engine ask. ⛔ one allow-list shared with the route's 422 |
+
+### `backend/app/services/harness/engine_ask.py` — 295-09 (WR-02, 2026-10-21)
+
+**`7 / 1 / 1350`** (the row read `6 / 1 / 1345`). 295-REVIEW WR-02 (driven RED first): after "Search another folder" found nothing again, `_searched_ids` built "already searched" from the run's bound subtree only, so the folder that just came up empty was offered again (D-03: a dead option is worse than a missing one). It now unions the folder chosen on the earlier answer (`ctx.phase_scope_override[slug]`) before the step's own scope narrows it. One `if`: ast.If 78 → 79.
+
+Scan-list cell as of 2026-10-21 (replaced by 295-09, moved verbatim): 6 / 1 / 1345 (was `5 / 1 / 1344`) | no (young) | young. 295-09 WR-01: `finding_from_output` reads an errored sub-agent as an outage (one `or`, If 78→78). ⛔ one allow-list shared with the route's 422 |
 
 ## `backend/app/services/harness/run_handoff.py`
 

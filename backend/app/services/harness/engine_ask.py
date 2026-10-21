@@ -879,8 +879,13 @@ async def permitted_folder_options(
 
 
 def _searched_ids(ctx, phase) -> list[str] | None:
-    """What this step searched: the run's resolved subtree, narrowed by the step's scope."""
+    """What this step searched: the run's resolved subtree plus any folder chosen on an earlier
+    "Search another folder" answer (295-REVIEW WR-02: else the folder that just came up empty
+    is offered again), narrowed by the step's scope."""
     proj = getattr(ctx, "folder_subtree_ids", None)
+    chosen = (getattr(ctx, "phase_scope_override", None) or {}).get(getattr(phase, "slug", None))
+    if chosen:
+        proj = list(proj or []) + [f for f in chosen if f not in (proj or [])]
     step_scope = getattr(getattr(phase, "config", None), "folder_scope", None)
     if proj is None:
         return None
