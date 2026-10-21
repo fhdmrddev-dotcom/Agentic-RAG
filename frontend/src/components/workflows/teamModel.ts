@@ -218,16 +218,36 @@ function seatsOf(config: Row, original: number): { seats: number; source: string
   }
 }
 
+/** A whole-number string as Pydantic's lax `int` reads it: `" 3 "`, `"+2"`, `"1_0"`, `"3.0"`. */
+const INT_STRING = /^[+-]?\d+(?:_\d+)*(?:\.0+)?$/
+
+/**
+ * How many redos the engine runs for a `max_retries` value (290 WR-06).
+ *
+ * `ValidatorSpec.max_retries: int = 2` is lax, so Pydantic turns a whole-number string,
+ * a whole float or a boolean into an int, and nothing bounds it below. The engine stops
+ * redoing once `attempt >= max_retries` with `attempt` starting at 0, so a negative value
+ * means no redo at all. Measured against `ValidatorSpec` 2026-10-21. An absent value, and
+ * anything Pydantic refuses (`3.5`, `""`, `null`, `"0x3"`), reads as the default: a refused
+ * value fails validation, so the engine never runs that definition with any count.
+ */
+function retriesOf(raw: unknown): number {
+  let n: number | null = null
+  if (typeof raw === "number" && Number.isInteger(raw)) n = raw
+  else if (typeof raw === "boolean") n = raw ? 1 : 0
+  else if (typeof raw === "string" && INT_STRING.test(raw.trim())) {
+    n = Number.parseInt(raw.trim().replace(/_/g, ""), 10)
+  }
+  if (n === null) return DEFAULT_MAX_RETRIES
+  return Math.max(0, n)
+}
+
 /** The failure words for a declared gate (D-10, D-19), plus its resolved jump target. */
 function failureWords(
   v: Row,
   stepNumberOf: ReadonlyMap<string, number>,
 ): { failure: string; raw: string; jumpTo: number | null } {
-  const rawRetries = v.max_retries
-  const retries =
-    typeof rawRetries === "number" && Number.isInteger(rawRetries) && rawRetries >= 0
-      ? rawRetries
-      : DEFAULT_MAX_RETRIES
+  const retries = retriesOf(v.max_retries)
   const pre = v.timing === "pre"
   const raw = typeof v.on_failure === "string" ? v.on_failure : "fail_run"
   const target = parseSkipTarget(raw)

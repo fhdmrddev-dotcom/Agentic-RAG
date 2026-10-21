@@ -448,9 +448,41 @@ describe("deriveTeam — failure words follow the engine's retry loop (D-19)", (
     }
     expect(model.lines.filter((l) => l.kind === "jump")).toEqual([])
   })
+
+  it("max_retries reads the way Pydantic's lax int and the engine read it (WR-06)", () => {
+    // [stored value, the redo count the engine runs]; measured against ValidatorSpec.
+    const cases: [unknown, number][] = [
+      [-1, 0],
+      ["3", 3],
+      [" 3 ", 3],
+      ["+2", 2],
+      ["1_0", 10],
+      ["3.0", 3],
+      [3.0, 3],
+      [true, 1],
+      [false, 0],
+      ["-2", 0],
+      [3.5, 2],
+      ["", 2],
+      [null, 2],
+      ["0x3", 2],
+      [undefined, 2],
+    ]
+    const model = deriveTeam([
+      {
+        slug: "check",
+        phase_index: 0,
+        config: { phase_type: "llm_single" },
+        validators: cases.map(([max_retries]) => ({ kind: "regex_match", max_retries })),
+      } as unknown as PhaseSpecJSON,
+    ])
+    expect(model.gates.map((g) => g.failure)).toEqual(
+      cases.map(([, n]) => (n === 0 ? FAIL_STOP : failRedoThen(n, FAIL_STOP))),
+    )
+  })
 })
 
-// ── absence (D-12, D-13)──────────────────────────────────────────────────────────────────
+// ── absence (D-12, D-13) ──────────────────────────────────────────────────────────────────
 
 describe("deriveTeam — absence, said once", () => {
   it("planExecuteVerify → checks but no judge", () => {
