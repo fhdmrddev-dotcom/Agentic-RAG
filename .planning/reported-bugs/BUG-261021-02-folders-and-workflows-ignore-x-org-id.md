@@ -51,7 +51,7 @@ A person who works in two orgs and picks org A in the app can create a folder or
 
 ## Workarounds (prompt-side, code-side, or UI-side)
 
-Switch the app to the org the folder or workflow should belong to only helps if the server reads the choice, which it appears not to. Today the only workaround is a direct database update of `org_id`, which is an operator action.
+Switching the app to the right org does not help, because the server appears not to read that choice on these two routes. Today the only workaround is a direct database update of `org_id`, which is an operator action.
 
 ## Reference / evidence links
 
