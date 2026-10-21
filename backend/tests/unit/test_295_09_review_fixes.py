@@ -598,3 +598,88 @@ def test_wr05_both_judges_send_the_note_as_the_system_prompt():
     assert seen, "the publish judge never called forced_emit"
     assert _NOTE_WORDS in seen[0]["system_prompt"]
     assert all(_NOTE_WORDS not in m["content"] for m in seen[0]["messages"])
+
+
+# ═════════════════════════════════════════════════════════════════════════════════════════
+# WR-06 — the "Search another folder" list is narrowed to the RUN's org
+# ═════════════════════════════════════════════════════════════════════════════════════════
+ORG_A, ORG_B = str(uuid4()), str(uuid4())
+
+
+def _two_org_options(org_id):
+    """A two-org owner: org A's run, an org-B org-shared folder the owner can also see."""
+    from app.models.harness import WorkflowDefinition
+    from app.services.harness import engine_ask
+
+    P, A_SHARED, B_SHARED = (str(uuid4()) for _ in range(3))
+    by_org = {
+        None: [{"id": P, "name": "Contracts", "parent_id": None},
+               {"id": A_SHARED, "name": "Org A shared", "parent_id": None},
+               {"id": B_SHARED, "name": "Org B shared", "parent_id": None}],
+    }
+    restricts: list = []
+
+    async def _visible(_supabase, _user_id, **kw):
+        restrict = kw.get("restrict_org_ids")
+        restricts.append(restrict)
+        rows = list(by_org[None])
+        if restrict is not None:
+            rows = [r for r in rows if r["id"] == P or (r["id"] == A_SHARED and ORG_A in restrict)]
+        return [dict(r) for r in rows]
+
+    async def _owner_visible(_supabase, _user_id, **_kw):
+        return [dict(r) for r in by_org[None]]
+
+    definition = WorkflowDefinition(
+        slug="w", name="W", version=1, project_folder_id=P,
+        phases=[{"slug": SLUG, "phase_index": 0, "config": {
+            "phase_type": "llm_agent", "prompt": "p", "available_tools": ["search_documents"]}}],
+    )
+    with patch("app.utils.folder_utils.fetch_visible_folders", _visible), \
+         patch("app.services.harness.scope.fetch_visible_folders", _owner_visible):
+        out = asyncio.run(engine_ask.permitted_folder_options(
+            definition, phase=definition.phases[0], searched_ids=[P],
+            supabase=object(), user_id=str(uuid4()), org_id=org_id,
+        ))
+    return {f["name"] for f in out}, restricts
+
+
+def test_wr06_an_org_a_run_is_never_offered_an_org_b_folder():
+    names, restricts = _two_org_options(ORG_A)
+    assert "Org B shared" not in names, "an org-B folder was offered to an org-A run"
+    assert names == {"Org A shared"}
+    assert restricts == [{ORG_A}]
+
+
+def test_wr06_an_unknown_org_fails_closed_to_owned_folders():
+    names, restricts = _two_org_options(None)
+    assert restricts == [set()], "an unknown org must narrow to owned folders, never widen"
+    assert "Org B shared" not in names and "Org A shared" not in names
+
+
+def test_wr06_the_pause_passes_the_runs_org():
+    from contextlib import ExitStack
+
+    from app.services import harness_engine
+    from app.services.harness import engine_ask
+    from app.services.harness.grounding import effective_phase
+    from tests.unit.engine_ask_fakes import FakePool, World
+
+    seen: list = []
+
+    async def _options(*a, **kw):
+        seen.append(kw)
+        return []
+
+    world = World(SLUG, kb_label="Contracts")
+    phase = effective_phase(_plain_kb_phase(), total_phases=1)
+    ctx = world.ctx(definition=None, org_id=ORG_A)
+    with ExitStack() as stack:
+        world.enter(stack)
+        stack.enter_context(patch.object(engine_ask, "permitted_folder_options", _options))
+        asyncio.run(harness_engine._resolve_failure_with_ask_user(
+            phase, "citations_required: planted", 2, len(phase.validators) - 1,
+            run_id=uuid4(), pool=FakePool(), redis=object(), ctx=ctx, _audit_user_id=uuid4(),
+            produced_output={"text": "t", "citations": []}, is_pre=False,
+        ))
+    assert seen and str(seen[0].get("org_id")) == ORG_A
