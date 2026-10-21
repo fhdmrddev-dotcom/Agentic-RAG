@@ -163,7 +163,8 @@ export const malformed: PhaseSpecJSON[] = [
 /**
  * The FAILURE-WORDS matrix — hand-authored, test-only, no database row is seeded from
  * this. One step whose validators cover every `on_failure` disposition, the backend
- * default, an unknown value, `max_retries` 0 and 1, and a PRE `retry` (D-19).
+ * default, an unknown value (which stops the run, as the engine routes it to `fail_run`),
+ * `max_retries` 0 and 1, and a PRE `retry` (D-19).
  */
 export const retryMatrix: PhaseSpecJSON[] = [
   {

@@ -418,7 +418,7 @@ describe("deriveTeam — failure words follow the engine's retry loop (D-19)", (
       failRedoThen(2, FAIL_STOP),
       failRedoThen(2, FAIL_ASK),
       failRedoThen(2, FAIL_STOP),
-      failRedoThen(2, "explode"),
+      failRedoThen(2, FAIL_STOP),
       FAIL_STOP,
       failRedoThen(1, FAIL_STOP),
       FAIL_STOP,
@@ -429,9 +429,28 @@ describe("deriveTeam — failure words follow the engine's retry loop (D-19)", (
     )
     expect(model.lines.filter((l) => l.kind === "jump")).toEqual([])
   })
+
+  it("an unrecognised on_failure reads 'stop the run', never its raw text (WR-01)", () => {
+    // `engine_ask._parse_on_failure` routes every unknown value to fail_run.
+    const typos = ["explode", "ask-user", "skip_to:review", ""]
+    const model = deriveTeam([
+      { slug: "review", phase_index: 0, config: { phase_type: "llm_single" } },
+      {
+        slug: "check",
+        phase_index: 1,
+        config: { phase_type: "llm_single" },
+        validators: typos.map((on_failure) => ({ kind: "regex_match", on_failure })),
+      },
+    ])
+    expect(model.gates.map((g) => g.failure)).toEqual(typos.map(() => failRedoThen(2, FAIL_STOP)))
+    for (const typo of typos.filter(Boolean)) {
+      expect(model.gates.some((g) => g.failure?.includes(typo))).toBe(false)
+    }
+    expect(model.lines.filter((l) => l.kind === "jump")).toEqual([])
+  })
 })
 
-// ── absence (D-12, D-13) ──────────────────────────────────────────────────────────────────
+// ── absence (D-12, D-13)──────────────────────────────────────────────────────────────────
 
 describe("deriveTeam — absence, said once", () => {
   it("planExecuteVerify → checks but no judge", () => {

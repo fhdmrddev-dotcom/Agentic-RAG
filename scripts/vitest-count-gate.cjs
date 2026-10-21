@@ -4349,7 +4349,7 @@ const BASELINE = {
   // gate's own printed actuals (count gate OK, failed 0). All seven sit under the src/components/workflows
   // directory entry in TARGETS (headerPin under __tests__/, two under library/), so they need a pin only.
   // Deleting a case in any of them now reds the gate.
-  "teamModel.test.ts": 246, // 290-REVIEW CR-01: 243 -> 246 (unflagged external_action armed + its control + ARMED_TYPES drift fence). 290-01 (VIS-01 / D-11): deriveTeam's honesty surface; jump only for a resolvable skip, citations check only for detected
+  "teamModel.test.ts": 247, // 290-REVIEW WR-01: 246 -> 247 (unknown on_failure reads stop the run). CR-01: 243 -> 246 (unflagged external_action armed + its control + ARMED_TYPES drift fence). 290-01 (VIS-01 / D-11): deriveTeam's honesty surface; jump only for a resolvable skip, citations check only for detected
   "teamVocabulary.test.ts": 15, // 290-01: zero-import leaf, exact strings, no step sentence or seal label copied in
   "WorkflowCanvas.headerPin.test.tsx": 6, // 290-01: canvas header characterization pin (6 snapshots) that 290-03 left byte-unchanged
   "TeamPicture.test.tsx": 36, // 290-03 (VIS-01 / D-06): one SVG path per lines[] item, nothing focusable, author text literal

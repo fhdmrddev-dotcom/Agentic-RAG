@@ -244,10 +244,11 @@ function failureWords(
     }
   } else if (raw === "ask_user") {
     then = FAIL_ASK
-  } else if (raw === "fail_run" || raw === "retry") {
-    then = FAIL_STOP
   } else {
-    then = raw
+    // `fail_run`, `retry` (its redos ran out) and EVERY unrecognised value: the engine's
+    // `engine_ask._parse_on_failure` routes an unknown string to `fail_run` (fail-safe), so
+    // a typo such as `ask-user` stops the run and must read that way (290 WR-01).
+    then = FAIL_STOP
   }
 
   const failure = pre || retries === 0 ? then : failRedoThen(retries, then)
