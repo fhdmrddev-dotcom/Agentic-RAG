@@ -502,9 +502,15 @@ export function PendingAskCard({
         //
         // ⚠ It retires rather than erroring, because a dead run is not a failure the person
         // can act on — offering a retry on it is the defect this replaces.
-        setExpiredMessage("This run has already ended — your answer was not saved")
+        // 295-10 (D-r1-01): since CR-01 a 409 can also mean "a newer question is waiting", so
+        // the server's sentence wins; on a paused run the asks are re-read so that card appears.
+        const words = err instanceof Error && err.message !== ASK_ANSWER_FAILED ? err.message : ""
+        setExpiredMessage(
+          words ? `${words} Your answer was not saved.` : "This run has already ended — your answer was not saved",
+        )
         setState("expired")
         markSettled(tool_call_id)
+        if (paused) void reconcile()
       } else if (status !== null && status >= 500) {
         // ⚠ NAMED, NOT "try again". A 500 means the answer was NOT recorded, and clicking
         // the same button again will do the same thing. Saying which half failed is the

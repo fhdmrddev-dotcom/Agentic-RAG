@@ -19,7 +19,7 @@
  * STORE module is not mocked, which is how the stack reads the run status in production.
  */
 import { describe, it, expect, vi, afterEach, beforeAll } from "vitest"
-import { render, screen, within } from "@testing-library/react"
+import { render, screen, waitFor, within } from "@testing-library/react"
 import userEvent from "@testing-library/user-event"
 import { mockPendingAskWithRunId } from "./fixtures"
 import type { PendingAsk } from "@/types"
@@ -46,7 +46,10 @@ vi.mock("@/lib/api", async () => {
 
 const THREAD = "thread-paused"
 
-const hookState: { asks: PendingAsk[] } = { asks: [] }
+const hookState: { asks: PendingAsk[]; reconcile: ReturnType<typeof vi.fn> } = {
+  asks: [],
+  reconcile: vi.fn().mockResolvedValue(undefined),
+}
 const stackState: { lock: null; phases: unknown[] } = { lock: null, phases: [] }
 
 vi.mock("@/providers/StreamsProvider", () => ({
@@ -55,7 +58,7 @@ vi.mock("@/providers/StreamsProvider", () => ({
     data: hookState.asks,
     isLoading: false,
     error: null,
-    reconcile: vi.fn().mockResolvedValue(undefined),
+    reconcile: hookState.reconcile,
   }),
   useWorkflowLockForThread: () => stackState.lock,
   usePhases: () => ({ data: stackState.phases, isLoading: false, error: null, reconcile: vi.fn() }),
@@ -280,5 +283,54 @@ describe("295-08 — WR-04: an engine ask is answered by its choices, and a refu
     await user.click(sendButton())
     const alert = await screen.findByRole("alert")
     expect(alert.textContent).toBe("Your answer was refused (422). It has not been saved.")
+  })
+})
+
+describe("295-10 — D-r1-01: a stale card's 409 says what the server said, then shows the current question", () => {
+  const NEWER = "This question is no longer the one the run is waiting on."
+
+  it("a 409 carrying the server's sentence shows that sentence, not 'the run has already ended'", async () => {
+    const user = userEvent.setup()
+    vi.mocked(answerAskUser).mockRejectedValueOnce(new ApiError(NEWER, 409))
+    hookState.asks = [approvalAsk]
+    stackState.phases = [HUMAN_STEP]
+    setRunStatus("paused")
+    const { container } = render(<PendingAskStack home="panel" />)
+    await user.click(screen.getByRole("radio", { name: /Approve/ }))
+    await user.click(sendButton())
+    expect(await screen.findByText(new RegExp(NEWER))).toBeInTheDocument()
+    expect(container.textContent ?? "").not.toContain("This run has already ended")
+    // Still settled: the stale question offers no Send.
+    expect(screen.queryByRole("button", { name: "Send Answer" })).toBeNull()
+  })
+
+  it("after that 409 on a paused run, the stack re-reads its asks so the current card appears", async () => {
+    const user = userEvent.setup()
+    vi.mocked(answerAskUser).mockRejectedValueOnce(new ApiError(NEWER, 409))
+    hookState.asks = [approvalAsk]
+    stackState.phases = [HUMAN_STEP]
+    setRunStatus("paused")
+    render(<PendingAskStack home="panel" />)
+    hookState.reconcile.mockClear()
+    await user.click(screen.getByRole("radio", { name: /Approve/ }))
+    await user.click(sendButton())
+    // The card has taken the refusal (it no longer offers Send), whatever words it shows.
+    await waitFor(() => expect(screen.queryByRole("button", { name: "Send Answer" })).toBeNull())
+    expect(hookState.reconcile).toHaveBeenCalledTimes(1)
+  })
+
+  it("a 409 with no server sentence keeps the old words, and a run not known to be waiting is not re-read (guard)", async () => {
+    const user = userEvent.setup()
+    vi.mocked(answerAskUser).mockRejectedValueOnce(new ApiError("Failed to submit ask_user answer", 409))
+    hookState.asks = [approvalAsk]
+    stackState.phases = []
+    render(<PendingAskStack home="panel" />)
+    hookState.reconcile.mockClear()
+    await user.click(screen.getByRole("radio", { name: /Approve/ }))
+    await user.click(sendButton())
+    expect(
+      await screen.findByText("This run has already ended — your answer was not saved"),
+    ).toBeInTheDocument()
+    expect(hookState.reconcile).not.toHaveBeenCalled()
   })
 })

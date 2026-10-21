@@ -170,6 +170,17 @@ async def preflight_workflow_kickoff(*, request, body, thread_id, thread_row, su
             # *definition* id (not the run id), any kickoff against a locked thread
             # is a different-workflow attempt → refuse. The lock is cleared by
             # cancel / natural terminal (Plan 03), never by this handler.
+            # 295-10 (D-r1-03): a PAUSED run has no cancel control in the thread, so say where
+            # it waits. Not the lock prefix: the client shows any other 409 sentence as sent.
+            if _anchor_status == "paused":
+                raise HTTPException(
+                    status_code=status.HTTP_409_CONFLICT,
+                    detail=(
+                        "This thread's workflow is paused, waiting for your answer. Answer it in "
+                        "the panel or on the run page. To stop the run instead, open its run page "
+                        "and stop it there."
+                    ),
+                )
             raise HTTPException(
                 status_code=status.HTTP_409_CONFLICT,
                 detail=(
