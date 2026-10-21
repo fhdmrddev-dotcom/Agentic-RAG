@@ -11612,7 +11612,7 @@ cells rot within days.
 | [`backend/app/services/settings_broadcast.py`](docs/HOT-FILE-LEDGER.md#backendappservicessettings_broadcastpy) | 1 / 1 / 228 | no (1 phase) | young (**BUG-260902-06**) — the cross-worker cache-invalidation leaf: one channel, one payload builder, one re-warm dispatcher, one subscriber |
 | [`backend/app/services/connectors/args.py`](docs/HOT-FILE-LEDGER.md#backendappservicesconnectorsargspy) | 2 / 1 / 474 | no (1 phase) | young (214-01) — the shared argument leaf: resolution, satisfiability, and ONE schema accessor |
 | [`backend/app/services/harness/reachability.py`](docs/HOT-FILE-LEDGER.md#backendappservicesharnessreachabilitypy) | 5 / 5 / 498 (was `4 / 4 / 463`) | ⚠ **FIRES** | 295-02: `no_template_bound` in LINT_CODES + pure `_check_template_bound` (+1 def, If 20→22). ⚠ now FIRES at 5 phases |
-| [`backend/app/services/workflow_kickoff.py`](docs/HOT-FILE-LEDGER.md#backendappservicesworkflow_kickoffpy) | 10 / 8 / 585 (was `8 / 6 / 554`) | ⚠ **FIRES** | 295-02: run-start refusal right after the definition parses, before any write; probes only for a template-less fill (If 13→15). Honoured by construction |
+| [`backend/app/services/workflow_kickoff.py`](docs/HOT-FILE-LEDGER.md#backendappservicesworkflow_kickoffpy) | 11 / 8 / 596 (was `10 / 8 / 585`) | ⚠ **FIRES** | 295-10 (D-r1-03): a send on a PAUSED anchor gets its own 409 sentence (where it waits, how to stop it); every other live status keeps the lock wording (If 15→16). Honoured by construction |
 | [`frontend/src/components/layout/ChatLaunchForm.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentslayoutchatlaunchformtsx) | 1 / 1 / 157 | no (1 phase) | young (214-12); does not fire (1 phase). **286**: 287 reuses it through `ChatLayout.doRun` — never a second launch form. Path is `components/layout/`, not `components/chat/` |
 | [`frontend/src/components/workflows/ArgumentEditor.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentsworkflowsargumenteditortsx) | 1 / 1 / 226 | no (1 phase) | young (214-07) — the argument form; the raw-JSON surface it replaced was DELETED, not hidden |
 | [`frontend/src/components/workflows/ArgumentRow.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentsworkflowsargumentrowtsx) | 1 / 1 / 362 | no (1 phase) | young (214-07) — one row, one three-arm source picker, one gutter that WIDENS rather than inserts |
@@ -23373,6 +23373,14 @@ CLAUDE.md verdict cell as of 2026-10-21 (replaced by 295-07, moved verbatim): | 
 Scan-list cell as of 2026-10-21 (replaced by 295-07, moved verbatim): 8 / 6 / 554 | ⚠ **FIRES** | ⚠ absent for its ENTIRE LIFE at **6 phases** — and 214-16 records that this invisibility is WHY the `ctx.inputs` mirror went unowned
 
 CLAUDE.md verdict cell as of 2026-10-21 (replaced by 295-07, moved verbatim): | `backend/app/services/workflow_kickoff.py` | 8 / 6 / 554 | ⚠ absent for its ENTIRE LIFE at **6 phases** |
+
+### `backend/app/services/workflow_kickoff.py` — 295-10 (D-r1-03, gap round 2)
+
+**`11 / 8 / 596`** (was `10 / 8 / 585`). On a paused run the composer is enabled (the thread's lock reads stale, threads.py F2), and a send was refused 409 "Thread is workflow-locked — cancel the active workflow…", but the thread has no cancel control for a paused run. The anchor-status branch now raises a separate 409 when the status is `paused`: "This thread's workflow is paused, waiting for your answer. Answer it in the panel or on the run page. To stop the run instead, open its run page and stop it there." It deliberately does NOT start with `Thread is workflow-locked`, the prefix `StreamsProvider`'s `WORKFLOW_LOCK_DETAIL_PREFIX` replaces with its own copy; any other send 409 already reaches the client's generic arm with the server's words (279-03 D-15), so no client change was needed. `active` / `cap_paused` / any other live status keep the old sentence byte for byte (the `?raw` prefix pin in `streamsProvider.test.tsx` Test 3c still holds). The F2 stale-lock rule in threads.py is unchanged. If 15 → 16.
+
+Scan-list cell as of 2026-10-21 (replaced by 295-10, moved verbatim): 10 / 8 / 585 (was `8 / 6 / 554`) | ⚠ **FIRES** | 295-02: run-start refusal right after the definition parses, before any write; probes only for a template-less fill (If 13→15). Honoured by construction |
+
+CLAUDE.md verdict cell as of 2026-10-21 (replaced by 295-10, moved verbatim): | `backend/app/services/workflow_kickoff.py` | 10 / 8 / 585 (was `8 / 6 / 554`) | 295-02: run-start refusal before any write (If 13→15) |
 
 ## `frontend/src/components/panel/PhaseCard.tsx`
 
