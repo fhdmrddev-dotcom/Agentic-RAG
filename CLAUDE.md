@@ -441,7 +441,7 @@ node scripts/check-hot-file-ledger.cjs <phase-dir>   # 0 clear · 1 missing rows
 | `backend/app/services/harness/grounding.py` | 23 / 10 / 1437 (was `21 / 8 / 1414`) | 295-03: ONE pure predicate (is_engine_citation_gate) |
 | `frontend/src/components/workflows/PhaseFormPanel.tsx` | 30 / 14 / 1566 | honoured by construction ×6 (185 / 193 / 193.1 / 199 / 200 / **214**) |
 | `backend/app/db/workflows.py` | 58 / 29 / 2808 (was `57 / 29 / 2802`) | 295-09 CR-01: the answer read names its question (2 keys) |
-| `backend/app/services/harness/publish_service.py` | 33 / 15 / 2008 (was `31 / 14 / 2001`) | 295-04: golden finally helper · 295-07: no D-17 change |
+| `backend/app/services/harness/publish_service.py` | 34 / 15 / 2010 (was `33 / 15 / 2008`) | 295-09 WR-05: judge system prompt via one helper (If 70→70) |
 | `backend/app/services/workflow_authoring.py` | 17 / 11 / 1025 (was `15 / 9 / 989`) | 286 forecast: 291 template text = one more grounding input (untrusted) |
 | `backend/app/models/harness.py` | 20 / 19 / 766 | honoured by construction (193.2 / **214**) |
 | `frontend/src/components/workflows/builderStore.ts` | 14 / 8 / 968 | 286 forecast: 288 draft config rides useDraftPersistence; ≤ 1 store field |
@@ -489,7 +489,7 @@ node scripts/check-hot-file-ledger.cjs <phase-dir>   # 0 clear · 1 missing rows
 | `frontend/src/components/panel/PhaseCard.tsx` | 20 / 13 / 811 (was `18 / 12 / 796`) | 295-05: ONE mount in the identity column |
 | `frontend/src/components/panel/PhaseTimeline.tsx` | 10 / 8 / 404 | ⚠ row STALE · honoured by construction (214) |
 | `frontend/src/components/panel/phaseStatusMeta.ts` | 4 / 4 / 291 | ⚠ row STALE · crossed the threshold (200) |
-| `backend/app/services/harness/validator_kinds.py` | 17 / 8 / 853 (was `16 / 8 / 845`) | 295-09 WR-01: errored step = outage sentence (one if) |
+| `backend/app/services/harness/validator_kinds.py` | 18 / 8 / 899 (was `17 / 8 / 853`) | 295-09 WR-05: judge note in system prompt, data fenced |
 | `backend/app/services/harness/programmatic.py` | 3 / 3 / 137 | ⚠ FIRES · absent its ENTIRE LIFE — row added 255 · ⛔ |
 | `backend/app/services/harness/emitters.py` | 4 / 2 / 188 | ⚠ absent its ENTIRE LIFE — row added 255 · ⛔ |
 | `frontend/src/components/admin/ModelRegistryTab.tsx` | 19 / 7 / 1705 (was `17 / 7 / 1679`) | honoured by construction (282-04: Add-form Timeout) · AddModelForm seam OWED · ⛔ |

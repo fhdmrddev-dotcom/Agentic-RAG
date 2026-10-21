@@ -6387,6 +6387,14 @@ Scan-list cell as of 2026-10-21 (replaced by 295-07, moved verbatim): 31 / 14 / 
 
 CLAUDE.md verdict cell as of 2026-10-21 (replaced by 295-07, moved verbatim): | `backend/app/services/harness/publish_service.py` | 31 / 14 / 2001 (was `29 / 13 / 1942`) | 288-02: timeout check + auto_answered in existing seams · ⛔ |
 
+### `backend/app/services/harness/publish_service.py` — 295-09 (WR-05, 2026-10-21)
+
+**`34 / 15 / 2010`** (the row read `33 / 15 / 2008`). 295-REVIEW WR-05: `_judge_golden_output` now builds its system prompt with `validator_kinds.judge_system_prompt(final_output, ...)` instead of `JUDGE_RUBRIC_CORE.format(...)`, so the D-15 design note reaches the judge as a system instruction, the same way the in-run validator sends it. One import swapped, one expression changed; ast.If 70 → 70, defs 23 → 23. For any output without `recorded_intent` the prompt is byte-identical.
+
+Scan-list cell as of 2026-10-21 (replaced by 295-09, moved verbatim): 33 / 15 / 2008 (was `31 / 14 / 2001`) | ⚠ **FIRES** | 295-04: the golden run's `finally` calls `finish_golden_run` (If 70→70). 295-07: D-47 found no judge citing the auto-answer, so no D-17 note. Honoured by construction |
+
+CLAUDE.md verdict cell as of 2026-10-21 (replaced by 295-09, moved verbatim): | `backend/app/services/harness/publish_service.py` | 33 / 15 / 2008 (was `31 / 14 / 2001`) | 295-04: golden finally helper · 295-07: no D-17 change |
+
 ## Phase 208 · 2026-08-25 — rows that had NO section here at all
 
 ⚠ **These 39 files carried a row in `CLAUDE.md` and had no section in this file** — the
@@ -11456,7 +11464,7 @@ cells rot within days.
 | [`backend/app/services/harness/grounding.py`](docs/HOT-FILE-LEDGER.md#backendappservicesharnessgroundingpy) | 23 / 10 / 1437 (was `22 / 9 / 1417`) | ⚠ **FIRES** | 295-03: ONE pure predicate `is_engine_citation_gate` (+1 def, If 24→24); `on_failure="fail_run"` kept (D-51). Honoured by construction |
 | [`frontend/src/components/workflows/PhaseFormPanel.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentsworkflowsphaseformpaneltsx) | 30 / 14 / 1566 | **FIRES** | honoured by construction ×6 (185 / 193 / 193.1 / 199 / 200 / **214**) |
 | [`backend/app/db/workflows.py`](docs/HOT-FILE-LEDGER.md#backendappdbworkflowspy) | 58 / 29 / 2808 (was `57 / 29 / 2802`) | ⚠ **FIRES** | 295-09 CR-01: `get_ask_user_response` also returns the joined prompt's words and whether it was an engine ask (one SELECT column, two additive keys). If 32→32 |
-| [`backend/app/services/harness/publish_service.py`](docs/HOT-FILE-LEDGER.md#backendappservicesharnesspublish_servicepy) | 33 / 15 / 2008 (was `31 / 14 / 2001`) | ⚠ **FIRES** | 295-04: the golden run's `finally` calls `finish_golden_run` (If 70→70). 295-07: D-47 found no judge citing the auto-answer, so no D-17 note. Honoured by construction |
+| [`backend/app/services/harness/publish_service.py`](docs/HOT-FILE-LEDGER.md#backendappservicesharnesspublish_servicepy) | 34 / 15 / 2010 (was `33 / 15 / 2008`) | ⚠ **FIRES** | 295-09 WR-05: the publish judge builds its system prompt through `judge_system_prompt` (one import swap, one expression; If 70→70). Honoured by construction |
 | [`backend/app/services/workflow_authoring.py`](docs/HOT-FILE-LEDGER.md#backendappservicesworkflow_authoringpy) | 17 / 11 / 1025 (was `16 / 10 / 1002`) | **FIRES** | 286 forecast (291): uploaded template / form / reference text = ONE more grounding input to the existing generate path; tools + phase types stay closed; asset text is untrusted |
 | [`backend/app/models/harness.py`](docs/HOT-FILE-LEDGER.md#backendappmodelsharnesspy) | 20 / 19 / 766 | **FIRES** | honoured by construction (193.2 / **214**) |
 | [`frontend/src/components/workflows/builderStore.ts`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentsworkflowsbuilderstorets) | 14 / 8 / 968 | **FIRES** | 286 forecast (288): draft config persistence rides `useDraftPersistence` (186-07); at most ONE store field. honoured by construction (193.2 / 197 / 214.1) |
@@ -11502,7 +11510,7 @@ cells rot within days.
 | [`frontend/src/components/panel/PhaseCard.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentspanelphasecardtsx) | 20 / 13 / 811 (was `18 / 12 / 796`) | ⚠ **FIRES** | 295-05: ONE `<StepEvidenceLine>` mount in the always-visible identity column (useState 2→2). Honoured by construction |
 | [`frontend/src/components/panel/PhaseTimeline.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentspanelphasetimelinetsx) | 10 / 8 / 404 | ⚠ **FIRES** | ⚠ row STALE (`9/7/385`) — 252 touched it. NOT modified by 253; re-derived under CR-08. honoured by construction (**214**); absent from BOTH until 200 |
 | [`frontend/src/components/panel/phaseStatusMeta.ts`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentspanelphasestatusmetats) | 4 / 4 / 291 | ⚠ **FIRES** | ⚠ row STALE (`3/3/236`) — 252 touched it. NOT modified by 253; re-derived under CR-08. It crossed the threshold in the very commit that added its row (200) |
-| [`backend/app/services/harness/validator_kinds.py`](docs/HOT-FILE-LEDGER.md#backendappservicesharnessvalidator_kindspy) | 17 / 8 / 853 (was `16 / 8 / 845`) | ⚠ **FIRES** | 295-09 WR-01: the citations gate names an errored step an outage (one `if`, If 56→57), never "nothing was retrieved", and quotes no vendor text. Honoured by construction |
+| [`backend/app/services/harness/validator_kinds.py`](docs/HOT-FILE-LEDGER.md#backendappservicesharnessvalidator_kindspy) | 18 / 8 / 899 (was `17 / 8 / 853`) | ⚠ **FIRES** | 295-09: WR-01 outage `if`; WR-05 the judge note moved to the system prompt (`judge_system_prompt`), graded data fenced by a data-keyed line (+4 defs, If 57→57). Rubric byte-unchanged |
 | [`frontend/src/components/admin/ModelRegistryTab.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentsadminmodelregistrytabtsx) | 19 / 7 / 1705 (was `17 / 7 / 1679`) | ⚠ **FIRES** | honoured by construction (**282-01** help line; **282-04** ONE Timeout field in `AddModelForm`, placeholder = provider default, blank sends no key). `AddModelForm` seam OWED |
 | [`frontend/src/components/workflows/soulData.ts`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentsworkflowssouldatats) | 12 / 10 / 499 | ⚠ **FIRES** | honoured by construction (214 / **214.1**); ⚠ absent until 197, at 7 phases |
 | [`frontend/src/components/workflows/PublishGauntlet.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentsworkflowspublishgauntlettsx) | 21 / 11 / 1385 (was `20 / 10 / 1372`) | ⚠ **FIRES** | 288-02: ONE `auto-answered` block, server words verbatim; Pause stage copy corrected. honoured by construction |
@@ -23232,6 +23240,14 @@ CLAUDE.md verdict cell as of 2026-10-21 (replaced by 295-07, moved verbatim): | 
 Scan-list cell as of 2026-10-21 (replaced by 295-09, moved verbatim): 16 / 8 / 845 (was `15 / 7 / 791`) | ⚠ **FIRES** | 295-02: `_DESIGN_NOTES` table + `_render_design_data` (+1 def, If 54→56). 295-07: D-47 re-drive found no auto-answer citation, so no sibling entry. Honoured by construction |
 
 CLAUDE.md verdict cell as of 2026-10-21 (replaced by 295-09, moved verbatim): | `backend/app/services/harness/validator_kinds.py` | 16 / 8 / 845 (was `15 / 7 / 791`) | 295-02: judge note table · 295-07: no D-17 entry |
+
+### `backend/app/services/harness/validator_kinds.py` — 295-09 (WR-05, 2026-10-21)
+
+**`18 / 8 / 899`** (the row read `17 / 8 / 853`). 295-REVIEW WR-05 (driven RED first): the D-15 design note sat inside the graded user turn under a heading claiming "(data, written by the server)", with no end marker on the data after it, so document-derived text could print the same heading. The note is now part of the SYSTEM prompt: `judge_system_prompt(output, ...)` returns `JUDGE_RUBRIC_CORE.format(...)` byte-for-byte for every output without `recorded_intent`, and appends the note only when the key is present. The note names the fence and says no text in the graded output is server-written. `_judge_graded_text` keeps only the recorded inputs, between `<<<RECORDED_ACTION <tag>>>` and `<<<END RECORDED_ACTION <tag>>>`, where `<tag>` is a sha256 prefix of the data itself (`_design_fence`), so the data cannot print its own real end line. Still data-driven (`_DESIGN_NOTES`). `JUDGE_RUBRIC_CORE` is byte-unchanged (pinned). defs 14 → 18, ast.If 57 → 57. `test_295_judge_recorded_intent.py` was re-pinned to the new placement.
+
+Scan-list cell as of 2026-10-21 (replaced by 295-09, moved verbatim): 17 / 8 / 853 (was `16 / 8 / 845`) | ⚠ **FIRES** | 295-09 WR-01: the citations gate names an errored step an outage (one `if`, If 56→57), never "nothing was retrieved", and quotes no vendor text. Honoured by construction |
+
+CLAUDE.md verdict cell as of 2026-10-21 (replaced by 295-09, moved verbatim): | `backend/app/services/harness/validator_kinds.py` | 17 / 8 / 853 (was `16 / 8 / 845`) | 295-09 WR-01: errored step = outage sentence (one if) |
 
 ## `backend/app/services/run_producer.py`
 
