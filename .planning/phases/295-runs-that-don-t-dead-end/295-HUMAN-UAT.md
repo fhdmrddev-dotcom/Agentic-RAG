@@ -3,7 +3,7 @@ status: pending
 phase: 295-runs-that-don-t-dead-end
 source: [295-VALIDATION.md, 295-UI-SPEC.md]
 started: 2026-10-21T00:56:00Z
-updated: 2026-10-21T03:10:00Z
+updated: 2026-10-21T05:00:00Z
 ---
 
 ## Current Test
@@ -15,10 +15,14 @@ updated: 2026-10-21T03:10:00Z
 - Use the local app (`/app`) with the backend on `:8000` and vite on `5173`, signed in as yourself.
 - The fixtures 295-07 left in place are named `295-07 …` in the Workflows library and the chat list. The empty folder is `295-07 empty KB folder`.
 - ✅ **The chat-panel fix has landed** (295-08, merged at `128266ef6`). The agent re-drove S1 on 2026-10-21 (295-VALIDATION.md, "Gap round 1 re-drive"). The panel now shows a live paused ask as `NEEDS YOU` and you can answer it there.
-- ⚠ **Three things are known and still open, so you will see them:**
-  - **After you answer in the chat thread, the thread does not follow the run.** The step keeps reading "Running" until you switch to another thread and back (D-r1-02).
-  - **A card left open in a second tab can say the run "has already ended"** when it has only moved on to a newer question (D-r1-01).
-  - **Typing into the composer while the run waits is refused**, and the message tells you to cancel a run that the thread has no Stop button for (D-r1-03).
+- ✅ **Round 1's four open defects are fixed** (295-10, merged at `9f11f3b21`, and checked live on 2026-10-21: 295-VALIDATION.md, "Gap round 2 live check"):
+  - After you answer in the chat thread, the thread now follows the run. The panel reads Complete or Failed within about a second of the run ending, and a second found-nothing question appears on its own (D-r1-02).
+  - A card left open in a second tab no longer says the run "has already ended". The current question replaces it, and you can answer it there (D-r1-01). The refusal words flash for only about 0.2 s, so you will not be able to read them. This is accepted (D-r2-03).
+  - Typing into the composer while the run waits now says: "This thread's workflow is paused, waiting for your answer. Answer it in the panel or on the run page. To stop the run instead, open its run page and stop it there." (D-r1-03).
+  - A run in one of your orgs no longer offers your own folders from your other org (D-r1-04).
+- ⚠ **Two things are known and still open, so you will see them:**
+  - **An approval step that comes after an answer reads "Retired · The run was stopped" in the same tab**, while the run is really waiting for you (S2's "Approve the note?"). Switch to another thread and back, and the card is answerable (D-r2-01, proposed as a fast fix).
+  - **In the tab that followed a Continue-without-sources run to its end, the step shows no Unsourced mark.** Reopen the thread and the mark is there (D-r2-02, deferred).
 - The app has no URL router. A browser reload lands on the home screen, so reopen the thread from the chat list.
 
 ## Tests
@@ -42,9 +46,12 @@ You'd recognise failure as:
 - either home says the run was stopped, that the window passed, or that the agent stopped, while it is still waiting;
 - a folder you cannot see appears in the list;
 - the re-run ignores the folder;
-- the band reads ● Running while it waits. ⚠ Known in the chat thread after an answer, until you switch threads (D-r1-02).
+- the band reads ● Running while it waits;
+- after your answer, the chat thread keeps reading "Running" once the run has finished (this was D-r1-02, fixed on 2026-10-21).
 
-result: [pending — the agent's re-drive on 2026-10-21 PASSED the panel fix (`b5678cc3`): `NEEDS YOU`, three choices, no text box, server folder list, resumed and completed cited. D-r1-01 and D-r1-02 are open in the chat home. PASS on the run page per 295-07]
+**Also check, after the 2026-10-21 gap round 2:** answer the card in the panel and stay in the same thread. The panel should move on without a thread switch: research reads done, then wrap reads Complete within a second or two of the run finishing. A card left open in a second tab is replaced by the current question when you press Send there.
+
+result: [pending — the agent's drives on 2026-10-21 PASSED: the panel fix in round 1 (`b5678cc3`), then the follow-after-answer check in round 2 (`b5540647`: Complete 0.2 s after `run_completed`, same tab). The two-tab stale send shows the current question (`5b1477d6`). PASS on the run page per 295-07]
 
 ### 2. S3 — a step set to "Must prove it" never offers Continue
 expected: Run `295-07 S3 locked found nothing`. The card should offer only Search another folder and Stop the run. Its prompt should say "This step is set to Must prove it, so it can't continue without sources." The words "Continue without sources" must appear nowhere on the page. Choose Stop the run and Send: the card header should read "Answered · run stopped" (this header was NOT seen live by the agent). The run's record should then say "Why it stopped: Searched 295-07 empty KB folder and found nothing for “Find the project status”. Stopped by …".
@@ -61,6 +68,10 @@ expected: Run `295-07 S2 continue without sources` and answer Continue without s
 4. the downloaded JSON (`unsourced.continued_by` and `unsourced.at`).
 
 You'd recognise failure as: any of the four showing the step plainly done, or the mark being grey and quiet.
+
+⚠ **Known on 2026-10-21 (gap round 2), so you will see these in place 1:**
+- If you stay in the same tab after Continue, the "Approve the note?" card reads "Retired · The run was stopped". Switch threads and back to answer it there, or answer on the run page (D-r2-01).
+- If you stay in the tab until the run ends, the step reads plainly Complete there. Reopen the thread to see the mark (D-r2-02).
 
 result: [pending]
 
@@ -121,10 +132,13 @@ blocked: 1
 
 - ✅ **CLOSED: chat-panel retirement of a live engine ask.** Fixed by 295-08 and verified live on 2026-10-21 (run `b5678cc3`, 295-VALIDATION.md "Gap round 1 re-drive"). The original text is kept below.
 - ✅ **CLOSED: a provider error on the KB step offered as "found nothing".** Fixed by 295-09 WR-01 and verified live on 2026-10-21 (run `f0d5d678`). BUG-261021-01 is closed.
-- **OPEN, D-r1-01:** a stale card refused under CR-01 says "This run has already ended" while the run waits on a newer question (`PendingAskCard.tsx` 409 arm).
-- **OPEN, D-r1-02:** after an answer in the chat thread, the thread stops following the run. It reads Running until a thread switch (`StreamsProvider.tsx`).
-- **OPEN, D-r1-03:** on a paused run, the composer is refused with 409 and told to cancel, but the thread has no Stop control for a paused run.
-- **OPEN, D-r1-04:** the "Search another folder" list still offers the owner's own folders from the other org (`folder_utils.py`). WR-06 narrowed only shared folders.
+- ✅ **CLOSED, D-r1-01:** a stale card refused under CR-01 said "This run has already ended" while the run waited on a newer question. Fixed by 295-10 and checked live on 2026-10-21 (runs `6bb3e0ff`, `5b1477d6`). The refusal words now flash for 0.2 s only (D-r2-03, accepted).
+- ✅ **CLOSED, D-r1-02:** after an answer in the chat thread, the thread stopped following the run. Fixed by 295-10 for durable pauses, ends and failures, and checked live on 2026-10-21 (`b5540647`, `dac3d557`, `74c56c63`). The in-stream next question is D-r2-01.
+- ✅ **CLOSED, D-r1-03:** on a paused run, the composer refusal told the person to cancel a run the thread cannot cancel. Fixed by 295-10, and the new sentence was seen live on 2026-10-21 (`603a0785`).
+- ✅ **CLOSED, D-r1-04:** the "Search another folder" list offered the owner's own folders from the other org. Fixed by 295-10, and checked live in both orgs on 2026-10-21 (`a812cf02`, `25092977`).
+- **OPEN, D-r2-01 (fast-fix):** after an answer in the same tab, an in-stream approval step's card reads "Retired · The run was stopped" while the run waits. The cause is `PendingAskCard.tsx` `runIsOver`: no lock, phases exist, and a recorded status of `active` that it does not treat as live. The fix is about 1-3 lines plus a test.
+- **OPEN, D-r2-02 (defer):** after the panel follows a Continue run to its end in the same tab, the step loses its Unsourced mark until the thread is reopened. It is somewhere in `StreamsProvider.tsx`'s end-of-run path, and the cause is not isolated.
+- **ACCEPTED, D-r2-03:** a stale card's refusal words are on screen for 0.2 s before the current question replaces them.
 - (original) **Chat-panel retirement of a live engine ask** (295 regression, found by 295-07). A paused found-nothing or approval ask is shown RETIRED in the chat thread's Workspace panel because the client never seeds the workflow lock for a durable pause (`lock_is_stale` is true with no live producer). Code: `frontend/src/components/panel/PendingAskCard.tsx:897`, `frontend/src/providers/StreamsProvider.tsx:2536`, `frontend/src/components/chat/ChatArea.tsx:380`. Not yet a bug report; proposed for `/gsd:fast` with a RED test, then the live re-drive of test 1.
 - (original) **A provider error on the KB step is offered as "found nothing"** (found on the Anthropic roster row). The step text is the raw provider error, and Continue keeps it as an unsourced output. Not yet a bug report.
 - **A Stop that reaches a live producer records no "Stopped by" reason** (295-04's recorded gap). Seen live on run `b0a8203a`.
