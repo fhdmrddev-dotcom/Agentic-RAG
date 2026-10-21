@@ -137,6 +137,19 @@ const CITATIONS_MAX_RETRIES = 2
 const BATCH_TYPE = "llm_batch_agents"
 const JUDGE_KIND = "llm_judge_rubric"
 
+/**
+ * The step types the ENGINE always arms, whatever the stored `action_risk_armed` says
+ * (290 CR-01). The rule's homes are the backend `PhaseSpec` D-04 validator
+ * (`backend/app/models/harness.py`, which coerces every `ExternalActionPhaseConfig` step to
+ * `action_risk_armed = True` on `model_validate`) and, on the client, `ARM_PINNED_TYPES` in
+ * `GovernanceSection.tsx` (`:142`). This leaf may not import that component, so it keeps a
+ * copy, and `teamModel.test.ts` asserts the two lists still read the same.
+ *
+ * The stored flag alone is not enough: `minimalPhaseFor` writes no `action_risk_armed`, and
+ * the builder hands the picture its in-memory phases, so a fresh step arrives unflagged.
+ */
+const ARMED_TYPES: readonly string[] = ["external_action"]
+
 /** Module-scope so an omitted argument hands the same reference on every call. */
 const NO_KB_TOOLS: readonly string[] = Object.freeze([])
 const NO_NAME_CONTEXT: NameContext = Object.freeze({})
@@ -266,7 +279,8 @@ function derivedGates(
       source: `phases[${original}].config.available_tools includes "${tool ?? ""}" (the engine adds citations_required)`,
     })
   }
-  if (actionRiskArmed(phase)) {
+  const stored = actionRiskArmed(phase)
+  if (stored || ARMED_TYPES.includes(step.phaseType)) {
     gates.push({
       id: `gate-${runIndex}-armed`,
       stepId: step.id,
@@ -278,7 +292,9 @@ function derivedGates(
       criteria: null,
       failure: null,
       jumpTo: null,
-      source: `phases[${original}].action_risk_armed = true`,
+      source: stored
+        ? `phases[${original}].action_risk_armed = true`
+        : `phases[${original}].config.phase_type = "${step.phaseType}" (the engine always arms it)`,
     })
   }
   return gates

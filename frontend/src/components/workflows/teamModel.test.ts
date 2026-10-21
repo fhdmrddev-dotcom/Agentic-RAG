@@ -11,6 +11,7 @@
 import { describe, it, expect } from "vitest"
 
 import teamModelSource from "./teamModel?raw"
+import governanceSectionSource from "./GovernanceSection?raw"
 import { deriveTeam, SEAT_DOT_CAP, type TeamGate, type TeamLine } from "./teamModel"
 import {
   FAIL_ASK,
@@ -266,8 +267,11 @@ describe("deriveTeam — vendorRiskReview (the 7-step stress shape)", () => {
     })
   })
 
-  it("three gates, one judge → no absence line", () => {
-    expect(model.gates).toHaveLength(3)
+  it("four gates, one judge → no absence line (the unflagged notify step is armed, CR-01)", () => {
+    expect(model.gates).toHaveLength(4)
+    expect(model.gates.filter((g) => g.derived === "armed").map((g) => g.id)).toEqual([
+      "gate-5-armed",
+    ])
     expect(model.absence).toBeNull()
     expect(model.oneStep).toBe(false)
   })
@@ -357,6 +361,50 @@ describe("deriveTeam — the derived gates", () => {
       { kind: "check", from: "gate-0-armed", to: "step-0", source: "phases[0].action_risk_armed = true" },
     ])
     expect(model.absence).toBe("noJudge")
+  })
+
+  it("an external_action step WITHOUT a stored flag is still armed — the engine arms it (CR-01)", () => {
+    // `harness.py`'s PhaseSpec D-04 validator coerces every external_action step to armed,
+    // and `minimalPhaseFor` writes no flag, so a fresh step arrives unflagged or false.
+    const source = 'phases[0].config.phase_type = "external_action" (the engine always arms it)'
+    for (const flag of [undefined, false]) {
+      const model = deriveTeam([
+        { slug: "send", phase_index: 0, config: { phase_type: "external_action" }, action_risk_armed: flag },
+      ])
+      expect(model.gates).toEqual<TeamGate[]>([
+        {
+          id: "gate-0-armed",
+          stepId: "step-0",
+          stepNumber: 1,
+          judge: false,
+          derived: "armed",
+          kind: "action_risk_approval",
+          words: GATE_ARMED_WORDS,
+          criteria: null,
+          failure: null,
+          jumpTo: null,
+          source,
+        },
+      ])
+      expect(model.lines.filter((l) => l.kind === "check")).toEqual([
+        { kind: "check", from: "gate-0-armed", to: "step-0", source },
+      ])
+      expect(model.absence).toBe("noJudge")
+    }
+  })
+
+  it("POSITIVE CONTROL — an unflagged step of another type gets no armed check", () => {
+    const model = deriveTeam([{ slug: "a", phase_index: 0, config: { phase_type: "llm_agent" } }])
+    expect(model.gates).toEqual([])
+    expect(model.absence).toBe("none")
+  })
+
+  it("the always-armed list matches GovernanceSection's ARM_PINNED_TYPES (one rule, two copies)", () => {
+    const list = /: readonly string\[\] = (\[[^\]]*\])/
+    const team = teamModelSource.match(new RegExp(`const ARMED_TYPES${list.source}`))
+    const governance = governanceSectionSource.match(new RegExp(`const ARM_PINNED_TYPES${list.source}`))
+    expect(team?.[1]).toBe('["external_action"]')
+    expect(governance?.[1]).toBe(team?.[1])
   })
 })
 
