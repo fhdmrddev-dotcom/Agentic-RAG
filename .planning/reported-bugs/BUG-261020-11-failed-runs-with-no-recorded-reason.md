@@ -35,3 +35,7 @@ These runs failed through a path that does not write `run_failed`. It may be old
 ## Surface classification
 
 Agentic-RAG: the workflow engine in this app.
+
+## Phase 295 record (295-07, 2026-10-21)
+
+Addressed by 295-04 (F2 and golden-run `run_failed`, the reconciler's reason, the test_214 seed fix) and 295-05 (the no-reason sentence on the run read and the evidence page). Live in `.planning/phases/295-runs-that-don-t-dead-end/295-VALIDATION.md` S7: Q-9b now returns 5 rows (the 15 fixtures are gone); each reads `No reason was recorded when this run failed.` Not closed (verifier's call).

@@ -35,3 +35,7 @@ The judge prompt is not told what an `external_action` step is designed to produ
 ## Surface classification
 
 Agentic-RAG: the workflow engine in this app.
+
+## Phase 295 record (295-07, 2026-10-21)
+
+Addressed by 295-02 (the recorded-intent judge note, `_DESIGN_NOTES`). Live in `.planning/phases/295-runs-that-don-t-dead-end/295-VALIDATION.md` SC#3 after / S5: the DMT draft `edd81b32` published, and the judge summary now grades the email's content. One sample; not closed (verifier's call).

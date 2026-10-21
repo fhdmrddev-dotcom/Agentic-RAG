@@ -35,3 +35,7 @@ A missing template is knowable when the workflow is saved or published; nothing 
 ## Surface classification
 
 Agentic-RAG: the workflow engine in this app.
+
+## Phase 295 record (295-07, 2026-10-21)
+
+Addressed by 295-02 (`no_template_bound` at save as incomplete, at publish as a lint refusal, at run start in kickoff and the scheduler) and 295-04 (D-14: the gate's `validator_error` carries the composed cause). Live in `.planning/phases/295-runs-that-don-t-dead-end/295-VALIDATION.md` S4: Builder tray sentence + Publish disabled + save succeeds; publish `blocked_stage: lint`; Run modal and thread entry refused with the server's sentence. Not closed (verifier's call).

@@ -187,6 +187,14 @@ const BASELINE = {
   "CitationCheckAction.test.tsx": 11,
   "CitedMarkdown.verdict.test.tsx": 17,
   "CitationPeek.verdict.test.tsx": 5,
+  // Phase 295-07 (D-32) — the four suites 295-05 / 295-06 created, which ran in NO gate (295-06's
+  // handover). Pins measured green on a run of the four suites alone (2026-10-21, 39 passed).
+  // RunEndReasonLine.test.tsx is already TARGETED by the "src/components/workflows" directory entry,
+  // so it needs only this pin; the other three get a TARGETS entry in the same commit.
+  "RunEndReasonLine.test.tsx": 13,
+  "AskFolderChoice.test.tsx": 7,
+  "enginePause.test.ts": 17,
+  "threads.engineAsk.test.ts": 2,
   // Phase 294-04 (DEC-01) — the engine cards and the engine-id parity fence. 294-04 left them
   // un-adopted (handover); adopted here, measured green on a run of the two suites alone.
   "RerankEngineBlock.test.tsx": 25,  // 294-REVIEW WR-04: +1, a cleared Keep at most never reports 0
@@ -4773,6 +4781,10 @@ const TARGETS = [
   "src/components/chat/__tests__/CitationCheckAction.test.tsx",
   "src/components/chat/__tests__/CitedMarkdown.verdict.test.tsx",
   "src/components/chat/__tests__/CitationPeek.verdict.test.tsx",
+  // Phase 295-07 — BOTH KNOBS, SAME COMMIT (the 294-03 rule): each entry pairs a BASELINE pin.
+  "src/components/panel/__tests__/AskFolderChoice.test.tsx",
+  "src/components/panel/__tests__/enginePause.test.ts",
+  "src/lib/api/__tests__/threads.engineAsk.test.ts",
   "src/components/settings/__tests__/RerankEngineBlock.test.tsx",
   "src/components/settings/__tests__/rerankEngines.parity.test.ts",
   "src/components/chat/RunCard.test.tsx",

@@ -35,3 +35,7 @@ A cancel path finalises the phase but not the run, or the reconciler re-touches 
 ## Surface classification
 
 Agentic-RAG: the workflow engine in this app.
+
+## Phase 295 record (295-07, 2026-10-21)
+
+Addressed by 295-04 (resume terminalize, golden finally, the workflow-run reconciler sweep). Live in `.planning/phases/295-runs-that-don-t-dead-end/295-VALIDATION.md` S7: a planted stuck run was ended by the merged `:8000` reconciler 23 s after planting (`Finalised by the reconciler: its steps had ended.`). ⚠ The two historical runs (`51924c91`, `a77ed2c0`) were already `cancelled` at 2026-10-20 23:22:22Z, BEFORE the merge, by a test process in the 295-04 worktree (SEED-363), not by the shipped code. Not closed (verifier's call).

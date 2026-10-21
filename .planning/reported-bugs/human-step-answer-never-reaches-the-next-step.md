@@ -39,3 +39,7 @@ A workflow that pauses to ask a person "approve?" and then ignores the reply is 
 ## Fix direction (not a decision)
 
 Carry the answer into what the next step sees. Either the human step's `text` includes the answer once it is answered, or `_prior_output_text` reads the answer field. Pin it with a test where the wrap step's input contains the stored answer.
+
+## Phase 295 record (295-07, 2026-10-21)
+
+Addressed by 295-04 (D-10/D-11/D-46: `handoff_text` hands over the question and the answer; human outputs are skipped as the latest produced text). Live in `.planning/phases/295-runs-that-don-t-dead-end/295-VALIDATION.md` S6: the wrap step quoted `"Yes"`; S2's wrap restated the answer and the unsourced note. Not closed (verifier's call).
