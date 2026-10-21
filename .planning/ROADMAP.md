@@ -222,9 +222,17 @@ Plans:
 **Plans:** 4 plans (3 waves)
 
 Plans:
+**Wave 1**
+
 - [ ] 290-01-PLAN.md — team derivation `deriveTeam`, its vocabulary leaf, planted fixtures, canvas header pin (TDD, wave 1)
 - [ ] 290-02-PLAN.md — the card chip line: `resolveStepLine` + `StepChipLine`, one block on the card (TDD, wave 1)
+
+**Wave 2** *(blocked on Wave 1 completion)*
+
 - [ ] 290-03-PLAN.md — `TeamPicture` render + the `Steps | Team` switch: one prop and one branch in the canvas (wave 2)
+
+**Wave 3** *(blocked on Wave 2 completion)*
+
 - [ ] 290-04-PLAN.md — close-out: phase gates, count-gate pins, ledger in one commit, the escalated-seal BUG report (wave 3)
 
 **UI hint**: yes
