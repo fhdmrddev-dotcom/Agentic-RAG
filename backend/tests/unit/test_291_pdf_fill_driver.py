@@ -301,6 +301,27 @@ def test_forced_readback_mismatch_fails_the_run_in_words(driver, tmp_path, monke
     assert "read back" in verdict["error"]
 
 
+def test_a_pdf_with_no_fillable_fields_is_never_delivered_as_filled(
+    driver, tmp_path, monkeypatch, capsys
+):
+    """The bind door does not require fields, so a flat PDF can be bound. Handing it back
+    unchanged would be a blank form passed off as a filled one (D-29): fail it in words."""
+    from reportlab.lib.pagesizes import letter
+    from reportlab.pdfgen import canvas
+
+    buf = io.BytesIO()
+    c = canvas.Canvas(buf, pagesize=letter)
+    c.drawString(50, 700, "Name: ____________")
+    c.showPage()
+    c.save()
+    verdict, _ = _run_main(driver, tmp_path, monkeypatch, capsys, {"name": "Ann"}, pdf=buf.getvalue())
+    assert verdict["rendered"] is False
+    assert verdict["opened"] is False
+    assert verdict["error"] == (
+        "This PDF has no fillable fields, so none of the answers could be written into it."
+    )
+
+
 def test_docx_arms_still_fail_on_leftover_tokens(driver, tmp_path):
     from docx import Document
 

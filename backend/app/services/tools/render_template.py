@@ -366,6 +366,15 @@ def fill_acroform(template_path, flat_values, out_path):
     from pypdf.generic import NameObject
 
     fields = _read_acroform(template_path)
+    if not fields:
+        # A flat PDF handed back unchanged would be a blank form passed off as filled (D-29).
+        return {
+            "rendered": False,
+            "error": "This PDF has no fillable fields, so none of the answers could be written into it.",
+            "refused": [],
+            "readback_mismatch": [],
+            "non_latin": False,
+        }
     by_name = {f["name"]: f for f in fields}
     values = {}
     refused = []
