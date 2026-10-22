@@ -96,6 +96,11 @@ vi.mock("@/lib/api", () => ({
   discoverConnectorTools: () => Promise.resolve([]),
   updateConnectorGrants: () => Promise.resolve({}),
   readTemplatePlaceholdersFromFile: mockReadPlaceholders,
+  // 291-04 — the describe door now reads through `readDescribeFile`, so the SAME spy answers
+  // it (its call COUNT is what these cases measure). The reference bind is declared too, so a
+  // factory missing it cannot fail far from its cause (the 196-08 lesson).
+  readDescribeFile: mockReadPlaceholders,
+  uploadWorkflowReference: vi.fn(),
   uploadWorkflowTemplate: mockUploadTemplate,
   // 196-08 (AUTH-04) — see the note in `WorkflowBuilderPage.describe.test.tsx`: the hosted
   // Builder reads the author model registry at mount and this factory must declare it.
@@ -103,6 +108,31 @@ vi.mock("@/lib/api", () => ({
 }))
 
 import { WorkflowDoorSwitch } from "./WorkflowDoorSwitch"
+
+/** 291-04 — a `{{ }}` template answer in the describe read door's shape. */
+function templateAnswer(keys: string[], filename = "weekly-status.docx") {
+  return {
+    role: "form",
+    arm: "template_fields",
+    suggested_from: null,
+    filename,
+    fields: keys.map((key) => ({
+      key,
+      label: key,
+      type: "text",
+      enum_options: [],
+      origin: "exact",
+      line_before: null,
+      line_after: null,
+      anchor_kind: null,
+      anchor_label: null,
+    })),
+    unplaced: [],
+    text: "",
+    cut_short: null,
+    refused: null,
+  }
+}
 
 /** A strict definition (citation_policy 'strict' + the full gate set) for the soul preview. */
 const strictDef = {
@@ -949,10 +979,7 @@ describe("WorkflowDoorSwitch.tsx — the pre-draft attach row on the LOOSE door"
      * a blind draft arriving through the door the row was supposed to close. The seed is what
      * makes that unreachable, and this case measures the seed rather than trusting it.
      */
-    mockReadPlaceholders.mockResolvedValue({
-      read: "ok",
-      placeholders: ["project_name", "overall_rag_status"],
-    })
+    mockReadPlaceholders.mockResolvedValue(templateAnswer(["project_name", "overall_rag_status"]))
     render(<WorkflowDoorSwitch def={strictDef} onDescribeDraft={vi.fn()} />)
 
     openDescribeAndPick(docxFile())
@@ -970,9 +997,14 @@ describe("WorkflowDoorSwitch.tsx — the pre-draft attach row on the LOOSE door"
     expect(mockReadPlaceholders).toHaveBeenCalledTimes(1)
     // …and the very first body carries the fields of the document the author supplied on
     // the OTHER screen, which is the whole of D-24's crossing.
-    expect(mockGenerateWorkflow.mock.calls[0][0]).toMatchObject({
-      template_placeholders: ["project_name", "overall_rag_status"],
+    //
+    // 291-04: the read RESULT now travels as `form` (the server reads a template's keys off
+    // it), so the crossing is asserted on that key — and on the old one being ABSENT.
+    expect(mockGenerateWorkflow.mock.calls[0][0].form).toMatchObject({
+      arm: "template_fields",
+      fields: [{ key: "project_name" }, { key: "overall_rag_status" }],
     })
+    expect(mockGenerateWorkflow.mock.calls[0][0]).not.toHaveProperty("template_placeholders")
   })
 
   it("WorkflowDoorSwitch.tsx: with NO document the hand-off is byte-identical to today — no key, no read", async () => {
@@ -1034,7 +1066,7 @@ describe("WorkflowDoorSwitch.tsx — the pre-draft attach row on the LOOSE door"
      * the hand-off is a one-shot and must not re-fire, but a considered pick is not undone by
      * looking around. The held document follows that rule rather than acquiring a second one.
      */
-    mockReadPlaceholders.mockResolvedValue({ read: "ok", placeholders: ["project_name"] })
+    mockReadPlaceholders.mockResolvedValue(templateAnswer(["project_name"]))
     render(<WorkflowDoorSwitch def={strictDef} initialDoor="describe" />)
 
     fireEvent.change(screen.getByTestId("describe-template-input"), {
@@ -1112,8 +1144,12 @@ const DESCRIBE_ATOMS_199 = [
   "Build it myself ›",
   "What this will do",
   "Have a document to fill in?",
-  "Attach a template",
-  "Word, PowerPoint or Excel — .docx, .pptx or .xlsx, up to 10 MB.",
+  // ⚠ 291-04 RE-BASELINE (sketch 291-describe-files B / UI-SPEC Surface 1): the slot takes
+  // FORMS as well as templates, so its label and types note became the door's own. The shipped
+  // pair was "Attach a template" and "Word, PowerPoint or Excel — .docx, .pptx or .xlsx, up to
+  // 10 MB." — kept on the deliverable step's rail, unchanged (UI-SPEC decision 3).
+  "Attach a form or template",
+  "A form (PDF or Word) or a template (.docx, .pptx or .xlsx), up to 10 MB.",
 ]
 
 describe("199-08 Task 1 — the RESTING inventory of the door surface (pinned PRESENT)", () => {
@@ -1187,15 +1223,24 @@ describe("199-08 Task 1 — the RESTING inventory of the door surface (pinned PR
      * threading a new prop through four files. That is plumbing, not wiring, and it was
      * declined rather than faked.
      */
+    //
+    // ── ⚠ RE-BASELINED BY 291-04 — SIX BECOMES SEVEN, AND THE ADDITION IS DELIBERATE ──────
+    //
+    //     + describe-reference-input    ← the references section's native picker
+    //
+    // It is a MOUNT of sketch 291-describe-files winner B's peer section (UI-SPEC Surface 2),
+    // between the template row and the starter shelf. At rest it adds that one control and no
+    // other: its Remove buttons exist only once a reference is held.
     expect(controls).toEqual([
       "both-doors",
       "describe-box",
       "describe-draft",
       "describe-template-input",
+      "describe-reference-input",
       "starter-door-trigger",
       "switch-to-govern",
     ])
-    expect(controls).toHaveLength(6)
+    expect(controls).toHaveLength(7)
     expect(screen.queryByTestId("describe-kb-upload")).toBeNull()
   })
 })
@@ -1240,8 +1285,12 @@ describe("199-08 Task 1 — THE REFUSAL ROW: does a gating predicate already exi
     // from renders a loading sentence of its own. Recorded so the reconciliation's refusal row
     // covers BOTH terms rather than only the one the sheet drew.
     expect(workflowDoorSwitchSource).toContain('templateRead.kind !== "loading"')
-    expect(describeTemplateRowSource).toContain("FOOTING_LOADING")
-    expect(describeTemplateRowSource).toContain("TEMPLATE_FIELDS_LOADING")
+    // 291-04: the in-flight pair is the door's own now (the slot reads forms too) — the shipped
+    // `FOOTING_LOADING` / `TEMPLATE_FIELDS_LOADING` pair stays on the rail.
+    expect(describeTemplateRowSource).toContain("FOOTING_READING_DOCUMENT")
+    expect(describeTemplateRowSource).toContain("DESCRIBE_READING")
+    // …and the references' reads are the third term, spoken by the section's own footing.
+    expect(workflowDoorSwitchSource).toContain("!referenceReads.anyReading")
   })
 })
 

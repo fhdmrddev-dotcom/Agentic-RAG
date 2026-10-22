@@ -1052,6 +1052,14 @@ const BASELINE = {
   //
   // Read from THIS SCRIPT'S OWN `actual` column (`DescribeTemplateRow.test.tsx — 42 new`).
   "DescribeTemplateRow.test.tsx": 42,
+  // 291-04 (AUTH-02, sketch 291-describe-files winner B) — ADOPTED in the plan that creates it.
+  // `src/components/workflows` is already a DIRECTORY entry in `TARGETS`, so no `TARGETS` edit.
+  // What would be unguarded without this entry: the references section's honesty properties —
+  // one live region and never an alert, fact lines in the foreground with no colour, the 5-of-5
+  // disabled picker saying why through `aria-describedby`, the powers/keep lines shown only
+  // while a file is held, filenames rendered as TEXT, and the UI-SPEC `?raw` spacing fence.
+  // Read from THIS SCRIPT'S OWN `actual` column (`DescribeReferencesSection.test.tsx — 21 new`).
+  "DescribeReferencesSection.test.tsx": 21,
   // 193.1-07 (D-06 / D-25) — a FIRST PIN on a suite that has shipped since Phase 186 and that
   // this gate has NEVER EXECUTED. ⚠ Unlike every other entry in this map it needs BOTH knobs:
   // there is no `src/hooks` entry anywhere in `TARGETS`, so the accompanying `TARGETS` line is

@@ -256,6 +256,10 @@ export type {
   GenerateReadiness,
   GenerateResult,
   GenerateWorkflowBody,
+  GenerateRemoved,
+  GenerateField,
+  DescribeFormBody,
+  DescribeReferenceBody,
   PublishOutcome,
 } from "./api/knowledge"
 
@@ -286,6 +290,11 @@ export {
   uploadWorkflowTemplate,
   getWorkflowTemplatePlaceholders,
   readTemplatePlaceholdersFromFile,
+  // Phase 291-04 (AUTH-02) — the describe door's read and its reference bind, added to the
+  // domain module AND here in the SAME commit; every whole-module mock of this path that
+  // reaches them declares them in that commit too.
+  readDescribeFile,
+  uploadWorkflowReference,
   createWorkflowDraft,
   listDraftWorkflows,
   updateWorkflowDraft,
@@ -304,6 +313,13 @@ export {
 export type {
   WorkflowTemplateAsset,
   WorkflowTemplatePlaceholders,
+  DescribeRole,
+  DescribeArm,
+  DescribeField,
+  DescribeUnplaced,
+  DescribeReadResult,
+  ReferenceAssetDescriptor,
+  WordAnchor,
   Verdict,
   ValidateResponse,
   GroundingBundle,

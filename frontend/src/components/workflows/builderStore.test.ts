@@ -1141,6 +1141,77 @@ describe("builderStore — setDeclaredInputs writes meta.inputs (Phase 214.1)", 
   })
 })
 
+// ── Phase 291-04 (D-07) — the describe door's reference files, appended beside the template ──
+
+describe("builderStore — addReferenceAssets appends reference entries (Phase 291-04)", () => {
+  const template = { kind: "template" as const, asset_id: "u/_library/d/form.pdf", filename: "form.pdf", mime: "application/pdf" }
+  function ref(name: string) {
+    return { kind: "reference" as const, asset_id: `u/_library/d/${name}`, filename: name, mime: "text/plain" }
+  }
+
+  it("appends kind=reference entries after whatever is already there, and arms dirty", () => {
+    const store = createBuilderStore(draft())
+    store.getState().setTemplateAsset(template)
+    store.getState().markSaved()
+    expect(store.getState().dirty).toBe(false)
+
+    store.getState().addReferenceAssets([ref("terms.md"), ref("notes.txt")])
+
+    expect(store.getState().meta.assets).toEqual([template, ref("terms.md"), ref("notes.txt")])
+    expect(store.getState().dirty).toBe(true)
+  })
+
+  it("de-duplicates by asset_id — the same reference bound twice is stored once", () => {
+    const store = createBuilderStore(draft())
+    store.getState().addReferenceAssets([ref("terms.md")])
+    store.getState().addReferenceAssets([ref("terms.md"), ref("notes.txt")])
+    store.getState().addReferenceAssets([ref("notes.txt"), ref("notes.txt")])
+
+    const ids = (store.getState().meta.assets as Array<{ asset_id: string }>).map((a) => a.asset_id)
+    expect(ids).toEqual(["u/_library/d/terms.md", "u/_library/d/notes.txt"])
+  })
+
+  it("PRESERVES the template entry — and a later setTemplateAsset preserves the references", () => {
+    const store = createBuilderStore(draft())
+    store.getState().addReferenceAssets([ref("terms.md")])
+    store.getState().setTemplateAsset(template)
+    store.getState().addReferenceAssets([ref("notes.txt")])
+
+    const assets = store.getState().meta.assets as Array<{ kind: string }>
+    expect(assets.filter((a) => a.kind === "template")).toHaveLength(1)
+    expect(assets.filter((a) => a.kind === "reference")).toHaveLength(2)
+  })
+
+  it("treats a NON-ARRAY assets value as empty, never spreads it", () => {
+    const store = createBuilderStore({ ...draft(), assets: "corrupt" as unknown as never })
+    store.getState().addReferenceAssets([ref("terms.md")])
+    expect(store.getState().meta.assets).toEqual([ref("terms.md")])
+  })
+
+  it("an EMPTY list writes nothing and arms nothing", () => {
+    const store = createBuilderStore(draft())
+    const metaBefore = store.getState().meta
+    store.getState().addReferenceAssets([])
+    expect(store.getState().meta).toBe(metaBefore)
+    expect(store.getState().dirty).toBe(false)
+  })
+
+  it("a non-drafted builder is a NO-OP, like every meta-writing sibling", () => {
+    const store = createBuilderStore(null)
+    const metaBefore = store.getState().meta
+    store.getState().addReferenceAssets([ref("terms.md")])
+    expect(store.getState().meta).toBe(metaBefore)
+    expect(store.getState().dirty).toBe(false)
+  })
+
+  it("is UNTRACKED — an undo never takes a reference away", () => {
+    const store = createBuilderStore(draft())
+    const depthBefore = past(store).length
+    store.getState().addReferenceAssets([ref("terms.md")])
+    expect(past(store)).toHaveLength(depthBefore)
+  })
+})
+
 describe("builderStore — zero network calls across the entire suite (D-184-03)", () => {
   it("the fetch spy recorded exactly 0 calls", () => {
     expect(fetchSpy).not.toHaveBeenCalled()

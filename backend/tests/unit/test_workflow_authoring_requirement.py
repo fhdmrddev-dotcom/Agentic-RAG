@@ -1493,18 +1493,10 @@ ACCEPTED_BUT_NEVER_SENT: dict[str, str] = {
         "template-binding contract change — AUTH-03's surface, not AUTH-02's. RE-OPEN: the "
         "next phase that takes up template binding"
     ),
-    # Phase 291-02 (2026-10-22): the SERVER half of the describe door's files landed first, by
-    # plan. The client half is plans 291-04 / 291-05 (`useTemplateFirstDraft.ts` forwards the
-    # read results). RE-OPEN: those plans delete both entries in the commit that wires them —
-    # this fence then reds if either is wired without deleting its entry, or deleted unwired.
-    "form": (
-        "291-02 created the server contract (GenerateRequest.form, fenced as data, coverage "
-        "checked); the client send lands in 291-04/05"
-    ),
-    "references": (
-        "291-02 created the server contract (GenerateRequest.references, max 5, fenced as "
-        "data, powers guarded); the client send lands in 291-04/05"
-    ),
+    # Phase 291-02 / 291-04 (2026-10-22): `form` and `references` were allowlisted by 291-02
+    # while only the server half existed; 291-04 wired the client send
+    # (`useTemplateFirstDraft.ts`) and deleted both entries in that same commit, as 291-02's
+    # re-open note required.
 }
 
 
