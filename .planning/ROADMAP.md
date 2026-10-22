@@ -261,8 +261,8 @@ Plans:
 
 **Wave 2** *(blocked on Wave 1 completion)*
 
-- [ ] 291-02-PLAN.md — Draft from the files: user-turn fence, coverage + server-added inputs, file-blind powers guard with Removed words, degraded refusal, S5 roster harness (W2)
-- [ ] 291-03-PLAN.md — Fill the form back: acroform arm in render_template, person's answers overlay, read-back proof (W2)
+- [x] 291-02-PLAN.md — Draft from the files: user-turn fence, coverage + server-added inputs, file-blind powers guard with Removed words, degraded refusal, S5 roster harness (W2)
+- [x] 291-03-PLAN.md — Fill the form back: acroform arm in render_template, person's answers overlay, read-back proof (W2)
 
 **Wave 3** *(blocked on Wave 2 completion)*
 
