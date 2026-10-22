@@ -395,3 +395,18 @@ describe("decisionsVocabulary — the module is a TRUE LEAF", () => {
     expect(stripped).not.toMatch(/trailing/)
   })
 })
+
+// ── 7. 291-05 — the removed line's glyph (D-15, sketch 291-draft-removed A) ──────────────────
+
+describe("291-05 — REMOVED_GLYPH, the one glyph this module adds for the removed line", () => {
+  it("is the circled-slash mark, by codepoint (the UI-SPEC copy table)", () => {
+    // Pinned by codepoint so this file holds no second spelling of the glyph.
+    expect(decisionsVocabulary.REMOVED_GLYPH).toBe(String.fromCodePoint(0x2298))
+  })
+
+  it("is a glyph, not a sentence — the server owns every word of the removed line (SEED-221)", () => {
+    const glyph = String(decisionsVocabulary.REMOVED_GLYPH)
+    expect([...glyph]).toHaveLength(1)
+    expect(glyph).not.toMatch(/[A-Za-z]/)
+  })
+})
