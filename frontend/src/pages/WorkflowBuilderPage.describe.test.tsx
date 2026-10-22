@@ -169,6 +169,11 @@ vi.mock("@/lib/api", () => {
     getWorkflowDeletePreview: mockDeletePreview,
     deleteWorkflowCascade: mockDeleteCascade,
     readTemplatePlaceholdersFromFile: mockReadPlaceholders,
+    // 291-04 — the describe door now reads through `readDescribeFile`, so the SAME spy answers
+    // it (its call COUNT is what these cases measure). The reference bind is declared too, so
+    // a factory missing it cannot fail far from its cause (the 196-08 lesson).
+    readDescribeFile: mockReadPlaceholders,
+    uploadWorkflowReference: vi.fn(),
     uploadWorkflowTemplate: mockUploadTemplate,
     WorkflowConflictError,
     WorkflowNotFoundError,
@@ -192,9 +197,34 @@ import {
 // would be a second home for a governed sentence and would go stale silently at the next
 // reword, which is the exact defect `doorVocabulary` exists to remove.
 import {
-  FOOTING_LOADING,
+  FOOTING_READING_DOCUMENT,
   footingFields,
 } from "@/components/workflows/templateFirstVocabulary"
+
+/** 291-04 — a `{{ }}` template answer in the describe read door's shape. */
+function templateAnswer(keys: string[]) {
+  return {
+    role: "form",
+    arm: "template_fields",
+    suggested_from: null,
+    filename: "status-report.docx",
+    fields: keys.map((key) => ({
+      key,
+      label: key,
+      type: "text",
+      enum_options: [],
+      origin: "exact",
+      line_before: null,
+      line_after: null,
+      anchor_kind: null,
+      anchor_label: null,
+    })),
+    unplaced: [],
+    text: "",
+    cut_short: null,
+    refused: null,
+  }
+}
 
 /** The canvas flag is OFF in every one of these. Three ways of being off, because
  *  D-181-01 is a statement about all of them and "operators too" is the one that a
@@ -707,16 +737,16 @@ describe("WorkflowBuilderPage.tsx — supplying a document on THIS page's descri
     await waitFor(() => expect(screen.getByRole("button", { name: DESCRIBE_CTA })).toBeDisabled())
     // ⚠ D-09 ships WITH D-07: a control that is waiting and does not say why reads as broken.
     // The sentence is READ OFF the vocabulary module, never re-typed here.
-    expect(screen.getByTestId("describe-template-footing")).toHaveTextContent(FOOTING_LOADING)
+    // 291-04: the in-flight footing is the door's own (the slot reads forms too).
+    expect(screen.getByTestId("describe-template-footing")).toHaveTextContent(FOOTING_READING_DOCUMENT)
     // Nothing was generated while waiting.
     expect(mockGenerate).toHaveBeenCalledTimes(0)
   })
 
   it("WorkflowBuilderPage.tsx: when the read resolves to fields the CTA re-enables and the spec block lists the names", async () => {
-    mockReadPlaceholders.mockResolvedValue({
-      read: "ok",
-      placeholders: ["project_name", "overall_rag_status", "risks_blockers"],
-    })
+    mockReadPlaceholders.mockResolvedValue(
+      templateAnswer(["project_name", "overall_rag_status", "risks_blockers"]),
+    )
     await renderDescribeScreen(OFF_VARIANTS[0].value)
 
     fireEvent.change(screen.getByLabelText("business requirement"), {
@@ -745,7 +775,7 @@ describe("WorkflowBuilderPage.tsx — supplying a document on THIS page's descri
      * reach this body from this screen at all, which is why Plan 07's two key-set literals
      * correctly did NOT move.
      */
-    mockReadPlaceholders.mockResolvedValue({ read: "ok", placeholders: ["project_name"] })
+    mockReadPlaceholders.mockResolvedValue(templateAnswer(["project_name"]))
     mockGenerate.mockResolvedValue({ ok: true, definition: { slug: "s", phases: [] } })
     await renderDescribeScreen(OFF_VARIANTS[0].value)
 
@@ -757,11 +787,16 @@ describe("WorkflowBuilderPage.tsx — supplying a document on THIS page's descri
 
     fireEvent.click(screen.getByRole("button", { name: DESCRIBE_CTA }))
     await waitFor(() => expect(mockGenerate).toHaveBeenCalledTimes(1))
-    expect(mockGenerate.mock.calls[0][0]).toMatchObject({ template_placeholders: ["project_name"] })
+    // 291-04: the read RESULT travels as `form` (the server reads a template's keys off it).
+    expect(mockGenerate.mock.calls[0][0].form).toMatchObject({
+      arm: "template_fields",
+      fields: [{ key: "project_name" }],
+    })
+    expect(mockGenerate.mock.calls[0][0]).not.toHaveProperty("template_placeholders")
   })
 
   it("WorkflowBuilderPage.tsx: removing the document returns the screen to its no-document state", async () => {
-    mockReadPlaceholders.mockResolvedValue({ read: "ok", placeholders: ["project_name"] })
+    mockReadPlaceholders.mockResolvedValue(templateAnswer(["project_name"]))
     await renderDescribeScreen(OFF_VARIANTS[0].value)
 
     pickDocument(docxFile())

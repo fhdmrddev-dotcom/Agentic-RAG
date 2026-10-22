@@ -1033,10 +1033,9 @@ export function useTemplateFirstDraft(args: TemplateFirstDraftArgs): TemplateFir
         // absent verdict is a fact about what the server said and it survives this hop as
         // `undefined`. This is the ONLY boundary in the chain that could drop it, which is
         // why the whole of D-13's client work is this one argument.
-        //
+        onDraftedRef.current(def, result.readiness, { removed: result.removed, fields: result.fields })
         // 291-04: the extras travel UNTOUCHED by the same rule — each is the response's own
         // value or `undefined`, never a list this module made up.
-        onDraftedRef.current(def, result.readiness, { removed: result.removed, fields: result.fields })
       } else {
         // ok:false is an HONEST failure — never a renderable broken draft.
         // Phase 281 (D-11/D-13, SEED-221): the store holds the table KEY (the code joined to its
