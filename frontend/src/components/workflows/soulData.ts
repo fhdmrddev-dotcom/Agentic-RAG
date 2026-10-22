@@ -15,6 +15,7 @@
  * from the API client; a tier / glyph / deliverable is DERIVED, never fetched.
  */
 import { deriveTier, type CitationPolicy, type ValidatorKind } from "@/components/workflows/deriveTier"
+import { inputOptionsHint } from "@/components/workflows/declaredInputsVocabulary"
 
 // ── Phase-type glyph vocabulary (the ONE shared copy; the 6th llm_emit
 //    "deliverable" entry). All soul surfaces import THIS map. ──
@@ -85,7 +86,17 @@ export interface DefShape {
   // could not tell a required field from an optional one and drew them identically. Widening
   // the member is the whole fix — `entryInputFields` below carries it, and
   // `LaunchInputFields` renders it as the SHIPPED mark rather than a new string.
-  inputs?: Array<{ key?: string; label?: string | null; required?: boolean | null }> | null
+  // ── 291-05 (D-09 / D-11) — THE THIRD WIDENING, by the same method: `source`, `type` and
+  // `enum_options` have always travelled on `InputFieldSpec` and this shape threw them away,
+  // so a launcher could not skip a Look-it-up input or say which answers a choice accepts.
+  inputs?: Array<{
+    key?: string
+    label?: string | null
+    required?: boolean | null
+    source?: string | null
+    type?: string | null
+    enum_options?: string[] | null
+  }> | null
   input_keys?: string[] | null
   phases?: Array<{
     slug?: string
@@ -197,6 +208,9 @@ export interface EntryInputField {
    * `missingRequiredFields` below — Phase 287-01 took the 214.1-01 re-open trigger.
    */
   required?: boolean
+  /** 291-05 (D-09) — where the answer comes from, carried through ONLY when the input has one
+   *  (`user` / `kb_auto` / `template_derived`). ABSENT means the definition says nothing. */
+  source?: string
 }
 
 /**
@@ -236,16 +250,27 @@ export function entryInputFields(def: DefShape | null | undefined): EntryInputFi
     return def.input_keys.map((key) => ({ key, required: true }))
   }
   const fromInputs = (def.inputs ?? [])
-    .filter((i): i is { key?: string; label?: string | null; required?: boolean | null } => !!i)
+    .filter((i): i is NonNullable<DefShape["inputs"]>[number] => !!i)
     .map((i) => {
       const key = i.key ?? ""
-      const label = typeof i.label === "string" ? i.label.trim() : ""
+      let label = typeof i.label === "string" ? i.label.trim() : ""
       // ⚠ ABSENT reads TRUE, matching `InputFieldSpec.required = True`. Only an explicit
       // `false` is falsy here, so a `null` or a missing key both mean required.
       const required = i.required !== false
+      // 291-05 (D-11) — a fixed set of answers is SAID in the label, so the person types one
+      // the fill accepts. A label-less input uses its key as the base so the hint is never
+      // lost; every other input is byte-identical to before.
+      const options = Array.isArray(i.enum_options) ? i.enum_options : []
+      if (i.type === "enum" && options.length > 0) {
+        const base = label && label !== key ? label : key
+        label = `${base} ${inputOptionsHint(options)}`
+      }
       // An empty or whitespace-only label is an ABSENCE, not a value to print — and so is a
       // label EQUAL TO ITS KEY, which carries nothing the key does not (see the docblock).
-      return label && label !== key ? { key, label, required } : { key, required }
+      const field: EntryInputField = label && label !== key ? { key, label, required } : { key, required }
+      // 291-05 (D-09) — `source` rides along only when the input carries one.
+      if (typeof i.source === "string") field.source = i.source
+      return field
     })
     .filter((f) => !!f.key)
   if (fromInputs.length > 0) return fromInputs
@@ -301,7 +326,13 @@ export const RESERVED_LAUNCH_INPUT_KEYS: ReadonlySet<string> = new Set([
  * extra"* and a caller renders no field region at all.
  */
 export function launchInputFields(def: DefShape | null | undefined): EntryInputField[] {
-  return entryInputFields(def).filter((f) => !RESERVED_LAUNCH_INPUT_KEYS.has(f.key))
+  return (
+    entryInputFields(def)
+      .filter((f) => !RESERVED_LAUNCH_INPUT_KEYS.has(f.key))
+      // 291-05 (D-09) — a Look-it-up input is found in the documents when the workflow runs,
+      // so a launcher never draws it as a box and `missingRequiredFields` never blocks on it.
+      .filter((f) => f.source !== "kb_auto")
+  )
 }
 
 /**

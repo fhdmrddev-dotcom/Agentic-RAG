@@ -51,6 +51,7 @@
  */
 import { useCallback, useId, useState } from "react"
 
+import { FORM_FIELDS_HEADING } from "@/components/workflows/templateFirstVocabulary"
 import { useTemplatePlaceholders } from "@/hooks/useTemplatePlaceholders"
 import { uploadWorkflowTemplate, WorkflowTemplateUploadError } from "@/lib/api"
 import type { WorkflowTemplateAsset } from "@/lib/api"
@@ -314,7 +315,10 @@ export function TemplateAttachSection({
           {fieldsState.kind === "fields" && (
             <>
               <p data-testid="template-fields-heading" className={NOTE_CLASSES}>
-                {TEMPLATE_FIELDS_HEADING}
+                {/* 291-05 (D-07 / S3) — a bound PDF is a FORM, and its fields read as one. */}
+                {(filename ?? "").toLowerCase().endsWith(".pdf")
+                  ? FORM_FIELDS_HEADING
+                  : TEMPLATE_FIELDS_HEADING}
               </p>
               {/* Names are ordinary React text children — escaped by construction. They
                   originate in a user-uploaded document and nothing here goes near

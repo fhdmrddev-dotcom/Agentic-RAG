@@ -1,8 +1,9 @@
 ---
 seed_id: SEED-051
 title: Generalized NL→Workflow authoring — describe-it + upload-assets → AI-derived inputs/phases/tools, KB-grounded, human-refined, lint-safe, locked-on-publish
-status: folded
-status_note: "Folded into Phase 291 (2026-10-22, discuss-phase D-18): its upload-assets to derived inputs, phases and tools arm."
+status: partially-answered
+partial: true
+status_note: "291 delivered the upload-assets → derived inputs/phases/tools arm (D-18); the rest of the vision stays open."
 folded_into: "291"
 planted: 2026-06-03
 planted_by: orchestrator (/gsd:explore session with operator — "create workflows naturally by describing to the AI; how it differs from skills")
@@ -13,6 +14,8 @@ surface: Agentic-RAG
 ---
 
 # SEED-051: Generalized NL→Workflow Authoring
+
+> **2026-10-23 (291-05 close-out):** `folded` → `partially-answered`. Phase 291 shipped the upload-assets arm (a form or template plus up to 5 references → declared inputs, steps and tools derived from them, server-checked, D-18). Steps reading references at run time went to SEED-369; the rest of this vision stays open. Prior status_note: "Folded into Phase 291 (2026-10-22, discuss-phase D-18): its upload-assets to derived inputs, phases and tools arm."
 
 ## Context (how it surfaced)
 

@@ -60,6 +60,7 @@ export type DescribeRefusalKey =
   | "connection_not_allowed:action_not_allowed"
   | "no_authoring_model"
   | "could_not_generate"
+  | "could_not_generate:grounding_unavailable"
   | "grounding_failed"
 
 /** One plain sentence and one next step — the whole of what an author reads (D-11). */
@@ -93,6 +94,12 @@ export const REFUSAL_FOR_KEY: Record<DescribeRefusalKey, RefusalWords> = {
   could_not_generate: {
     sentence: "The model couldn't produce a usable draft.",
     next: "Try again, or describe the work in more detail.",
+  },
+  // 291-05 (D-20 / SEED-133 / SEED-221) — the degraded-registry refusal 291-02 returns BEFORE
+  // any provider call. It is about us, not the model, so it must not read the row above.
+  "could_not_generate:grounding_unavailable": {
+    sentence: "We couldn't read your folders, skills or tools just now, so the draft wasn't written.",
+    next: "Try again in a moment.",
   },
   grounding_failed: {
     sentence: "The draft pointed at a tool, skill or folder this workflow can't use.",

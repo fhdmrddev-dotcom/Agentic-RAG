@@ -57,6 +57,7 @@ import {
   DECISION_ROW_ORDER,
   DECISION_TEMPLATE_NONE,
   decisionRowLabel,
+  templateRowReferencesLine,
 } from "./decisionsVocabulary"
 
 // ── fixtures ─────────────────────────────────────────────────────────────────────────
@@ -1253,5 +1254,40 @@ describe("DecisionsList — the row wash lands only where there is something to 
       DECISION_CHANGE_ACTION,
     ])
     expect(rowAtoms("name")).toEqual([decisionRowLabel("name"), WORKFLOW_NAME])
+  })
+})
+
+// ── 291-05 (D-07 / D-32 / S3) — the references, after a reload, on the template row ──────
+
+describe("DecisionsList — 291-05: the template row names the reference files", () => {
+  it("with reference names, ONE sub-line under the template row reads the formatter's words", () => {
+    renderList({ referenceNames: ["vendor-terms.pdf", "policy.md"] })
+    const line = screen.getByTestId("decision-template-references")
+    expect(line.textContent).toBe(templateRowReferencesLine(["vendor-terms.pdf", "policy.md"]))
+    expect(line.textContent).toBe(
+      "Read first: vendor-terms.pdf, policy.md. Used to write this draft; steps don't read them when the workflow runs.",
+    )
+    // It sits INSIDE the template row, never as a sixth row.
+    expect(line.closest("[data-row-key]")?.getAttribute("data-row-key")).toBe("template")
+    expect(screen.getByTestId("decisions-list").querySelectorAll("li")).toHaveLength(5)
+    // The row's existing secondary-text class, muted.
+    expect(line.className).toContain("text-muted-foreground")
+    expect(line.className).toContain("text-[11.5px]")
+  })
+
+  it("with no references (absent or empty) there is no sub-line, and the five rows are unchanged", () => {
+    const plain = renderList()
+    expect(screen.queryByTestId("decision-template-references")).toBeNull()
+    const first = allRowAtoms()
+    plain.unmount()
+    renderList({ referenceNames: [] })
+    expect(screen.queryByTestId("decision-template-references")).toBeNull()
+    expect(allRowAtoms()).toEqual(first)
+  })
+
+  it("a reference name carrying markup is TEXT, never markup", () => {
+    const { container } = renderList({ referenceNames: ['<img src=x onerror="1">'] })
+    expect(container.querySelector("img")).toBeNull()
+    expect(screen.getByTestId("decision-template-references").textContent).toContain("<img")
   })
 })

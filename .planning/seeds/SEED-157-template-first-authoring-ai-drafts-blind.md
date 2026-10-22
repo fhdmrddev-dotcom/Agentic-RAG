@@ -1,8 +1,8 @@
 ---
 seed_id: SEED-157
 title: The AI drafts a workflow BLIND to the template it will have to fill
-status: folded
-status_note: "Folded into Phase 291 (2026-10-22, D-19): placeholder NAMES already reach generate since 193.1; 291 sends file CONTENT too."
+status: shipped
+status_note: "Shipped by 291-02 (D-19): file content reaches generate as fenced user-turn documents."
 folded_into: "291"
 planted: 2026-08-14
 planted_by: Quick task 260814-q5r — operator critique during the end-to-end UAT
@@ -18,6 +18,8 @@ trigger_when: unset
 ---
 
 # The AI drafts blind to the template
+
+> **2026-10-23 (291-05 close-out):** `folded` → `shipped`. 291-02 sends the attached files' content to generate as fenced user-turn documents (D-19), and 291-04 wires both describe doors to send it. Prior status_note: "Folded into Phase 291 (2026-10-22, D-19): placeholder NAMES already reach generate since 193.1; 291 sends file CONTENT too."
 
 ## The operator's words (2026-08-14)
 

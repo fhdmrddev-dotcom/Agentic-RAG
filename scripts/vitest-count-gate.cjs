@@ -1060,6 +1060,15 @@ const BASELINE = {
   // while a file is held, filenames rendered as TEXT, and the UI-SPEC `?raw` spacing fence.
   // Read from THIS SCRIPT'S OWN `actual` column (`DescribeReferencesSection.test.tsx — 21 new`).
   "DescribeReferencesSection.test.tsx": 21,
+  // 291-05 (AUTH-02, sketch 291-draft-removed winner A) — ADOPTED in the plan that creates it.
+  // `src/components/workflows` is already a DIRECTORY entry in `TARGETS`, so no `TARGETS` edit.
+  // What would be unguarded without this entry: the arrival card's inputs fold — rows in the
+  // form's order, the type word from the ONE formatter, a native radiogroup per asked field,
+  // "Written by a step", the added-by mark ONLY from `origin === "server_added"`, the extra-input
+  // note, labels and notes rendered as TEXT, the `?raw` spacing fence, the components-only export
+  // rule, and the banned-word sweep over the new vocabulary.
+  // Read from THIS SCRIPT'S OWN `actual` column (`DraftInputsFold.test.tsx — 26 new`).
+  "DraftInputsFold.test.tsx": 26,
   // 193.1-07 (D-06 / D-25) — a FIRST PIN on a suite that has shipped since Phase 186 and that
   // this gate has NEVER EXECUTED. ⚠ Unlike every other entry in this map it needs BOTH knobs:
   // there is no `src/hooks` entry anywhere in `TARGETS`, so the accompanying `TARGETS` line is
