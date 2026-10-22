@@ -111,49 +111,83 @@
  * which is the fence working, not the fence misfiring. Refer to the CTA by `DESCRIBE_CTA`,
  * never by its words.
  */
-import { useCallback, useEffect, useRef, useState } from "react"
+import { useCallback, useEffect, useMemo, useRef, useState } from "react"
 import {
   generateWorkflow,
-  readTemplatePlaceholdersFromFile,
+  readDescribeFile,
+  uploadWorkflowReference,
   uploadWorkflowTemplate,
 } from "@/lib/api"
 // 197-06 (D-13) — the response type's new arm, imported as a TYPE. The client half of this
 // concern already lives in that module; declaring a structurally-similar shape here would be
 // the `TemplateReadAnswer` mistake in a second place — two homes for one server answer.
 import type { GenerateReadiness } from "@/lib/api"
+// 291-04 — the describe door's wire types, imported as TYPES from the same single home.
+import type {
+  DescribeFormBody,
+  DescribeReadResult,
+  DescribeReferenceBody,
+  DescribeRole,
+  GenerateField,
+  GenerateRemoved,
+  ReferenceAssetDescriptor,
+  WordAnchor,
+} from "@/lib/api"
 import type { BuilderPhase, BuilderStore, TemplateAssetDescriptor } from "./builderStore"
 // Phase 281 (FIX-10) — the describe refusal table's KEY builders. A leaf module: it imports
 // only the door vocabulary, so no cycle back to the page or the door shell can form here.
 import { REQUEST_FAILED_KEY, refusalKey } from "./describeRefusalVocabulary"
 import { ENTITLEMENT_REFUSED_KEY } from "./describeRefusalVocabulary"
+// 291-04 — the references' notices are worded in the vocabulary leaf; this module passes DATA.
+import {
+  REFS_REFUSED_FALLBACK,
+  refsDuplicate,
+  refsOverflow,
+  refsRefused,
+} from "./templateFirstVocabulary"
 // Imported from `_core` directly (not the `@/lib/api` barrel), so suites that mock the
 // barrel wholesale still see the real class.
 import { EntitlementRefusalError } from "@/lib/api/_core"
-import type { TemplatePlaceholdersState } from "@/hooks/useTemplatePlaceholders"
 
 /**
- * ── 193.1-07 (D-07 / D-08 / D-25) — THE PRE-DRAFT READ, AND WHY ITS UNION IS IMPORTED ──
+ * ── 291-04 (D-04 / D-08 / D-27) — THE PRE-DRAFT READ, ONE UNION FOR EVERY FILE ON THE DOOR ──
  *
- * The five honest readings are `useTemplatePlaceholders.ts`'s, imported rather than
- * re-declared, and that is a constraint rather than a convenience. The row that renders
- * them types its `state` prop on THAT union and says why in its own docblock: *one wire
- * shape for both doors means the two surfaces cannot derive different arms from the same
- * server answer.* A second, structurally-similar union declared here would typecheck at
- * every site except the one that matters and would let the two doors drift.
+ * The describe door now reads a form, a template or a reference through ONE server door, and
+ * the server names the ARM. So the reading is four kinds, not five: nothing held, in flight,
+ * the server's whole answer, or no answer. Every field, type, line and sentence inside `read`
+ * is the server's own — the row renders it and derives none.
  *
- * ⚠ **A MEASURED CORRECTION TO THIS PLAN, RECORDED BESIDE THE CLAIM RATHER THAN OVER IT.**
- * The plan asks for a SIXTH arm — `notWord` — derived here "so the union is the whole answer
- * and the row stays purely presentational". Measured at HEAD that premise is false: the row
- * ALREADY derives `notWord` itself, from `none` plus the held filename, gated on EMPTINESS
- * rather than on the extension alone so a deck that somehow did yield fields still renders
- * them. That derivation has one home, the row is not in this plan's `files_modified`, and a
- * sixth arm would be a value the shipped component cannot accept. So the union stays FIVE and
- * this hook supplies the row's OTHER input — the held file — instead of a second predicate.
+ * ⚠ THIS SUPERSEDES 193.1-07's RE-USE OF THE RAIL'S UNION, and the reason is measured rather
+ * than preferred: the rail's `TemplatePlaceholdersState` answers *"which `{{ }}` names does a
+ * BOUND template carry"*, and its route still answers only that. The door's question grew — a
+ * PDF form, a Word blank, a scan — and a union that can only say `fields: string[]` would
+ * have had to drop the types, the lines and the server's sentences on the floor. The rail's
+ * union is NOT changed; the door's surfaces (both of them) share THIS one, which keeps the
+ * one-wire-shape-for-both-doors rule that 193.1-07 recorded.
+ *
+ * `none` and `unavailable` still may never merge: `read` with arm `none` is a fact about the
+ * DOCUMENT; `unavailable` is a fact about US.
  */
-export type TemplateReadState = TemplatePlaceholdersState
+export type DescribeReadState =
+  /** Nothing held — zero requests have been issued (D-08). */
+  | { kind: "idle" }
+  /** Asked, still waiting — including while a REPLACED file's answer is outstanding. */
+  | { kind: "loading" }
+  /** The server read the file; its arm, fields and sentences are all here, verbatim. */
+  | { kind: "read"; result: DescribeReadResult }
+  /**
+   * No usable answer. `unreadable` is the read door REFUSING the file (a 422) and carries the
+   * server's sentence; `unreachable` is no answer at all, and carries none.
+   */
+  | { kind: "unavailable"; reason: "unreadable" | "unreachable"; detail: string | null }
+
+/** The name both doors already import; it now names the describe door's own union. */
+export type TemplateReadState = DescribeReadState
 
 /**
- * The server's answer PLUS THE SUBJECT IT ANSWERED FOR.
+ * The server's answer PLUS THE SUBJECT IT ANSWERED FOR — and, since 291-04, the blanks the
+ * author unticked on it (D-27). Ticks belong to the file they were made on, so they live in
+ * the answer and a new file starts with every blank ticked.
  *
  * ⚠ THE SUBJECT IS THE `File` OBJECT, COMPARED BY IDENTITY — never `file.name`. The analog
  * keys on an asset id, a STRING, where identity and equality coincide; here two different
@@ -161,14 +195,12 @@ export type TemplateReadState = TemplatePlaceholdersState
  * under the second document's filename. **No shipped hook proves `File`-identity keying**, so
  * the suite asserts it directly, including the same-name / different-object case.
  *
- * Exported because Plan 08 carries a COMPLETED answer across the door handoff as a seed.
+ * Exported because the fast door carries a COMPLETED answer across the handoff as a seed.
  */
 export type TemplateReadAnswer = {
   file: File
-  state: Extract<
-    TemplateReadState,
-    { kind: "fields" } | { kind: "none" } | { kind: "unavailable" }
-  >
+  state: Extract<DescribeReadState, { kind: "read" } | { kind: "unavailable" }>
+  unticked: readonly string[]
 }
 
 /**
@@ -179,8 +211,10 @@ export type TemplateReadAnswer = {
  * identity — so a fresh `{kind:"idle"}` object each render would re-create the callback, and
  * re-running that effect is how a one-shot becomes a loop.
  */
-const READ_IDLE: TemplateReadState = { kind: "idle" }
-const READ_LOADING: TemplateReadState = { kind: "loading" }
+const READ_IDLE: DescribeReadState = { kind: "idle" }
+const READ_LOADING: DescribeReadState = { kind: "loading" }
+/** No blank unticked — frozen for the same identity reason. */
+const NO_UNTICKED: readonly string[] = Object.freeze([])
 
 /** The shipped `usePanelReconcile.ts:84-92` double-shaped check — an abort is not a failure. */
 function isAbortError(err: unknown): boolean {
@@ -191,23 +225,33 @@ function isAbortError(err: unknown): boolean {
 }
 
 /**
- * Read a held document's fill-in fields, once per `File` OBJECT.
- *
- * A LEAF, exported separately because BOTH describe screens need it and only one of them
- * hosts the rest of this module's concern (the other never calls `/generate` at all — its
- * CTA is a handoff). Plan 08 mounts it on the second door directly.
- *
- * @param file The held document, or `null` when none is held. `null` ⇒ `idle` and ZERO
- *             requests — which is the whole of D-08: no document ⇒ nothing to wait for ⇒ the
- *             CTA is never disabled, with no second conditional to get wrong.
- * @param seed A COMPLETED answer carried across the door handoff. It is installed only for
- *             the exact `File` it answered for, so a seed that does not match the held
- *             document is ignored rather than trusted.
+ * The read door REFUSED the file (a 422 carrying a server sentence), or `null` when the
+ * failure was ours (no answer at all). Read by SHAPE rather than by class, so a suite that
+ * mocks the client barrel wholesale cannot turn a refusal into a crash.
  */
-export function useTemplateRead(
+function refusedSentence(err: unknown): { detail: string | null } | null {
+  if (!err || typeof err !== "object") return null
+  const status = (err as { status?: unknown }).status
+  if (status !== 422) return null
+  const detail = (err as { detail?: unknown }).detail
+  return { detail: typeof detail === "string" ? detail : null }
+}
+
+/**
+ * THE ONE PER-FILE READ ROUTINE. Every file on the door — the slot and each of the five
+ * reference places — is read by THIS, so there is one abort rule, one identity rule and one
+ * positive comparison rather than a second state machine (291-04).
+ *
+ * @param onRefused Called when the read door REFUSES the file, with the server's sentence. The
+ *                  references use it to take the file back off the list (D-03); the slot does
+ *                  not, because a refused form stays attached and says so (UI-SPEC).
+ */
+function useDescribeRead(
   file: File | null,
-  seed?: TemplateReadAnswer | null,
-): TemplateReadState {
+  role: DescribeRole,
+  seed: TemplateReadAnswer | null | undefined,
+  onRefused?: (file: File, detail: string | null) => void,
+) {
   // ⚠ The seed is read as an INITIAL value AND re-checked in the effect below. The handoff
   // mounts a fresh host, so the initial read is the live path; the effect's check is what
   // makes a seed arriving one render later still cost zero requests.
@@ -217,14 +261,15 @@ export function useTemplateRead(
   // that had already been answered — noise that reads exactly like a staleness bug.
   const answerRef = useRef<TemplateReadAnswer | null>(seed ?? null)
   const seedRef = useRef<TemplateReadAnswer | null>(seed ?? null)
+  const onRefusedRef = useRef(onRefused)
   // ⚠ MIRRORED IN AN EFFECT, NOT ASSIGNED DURING RENDER — this module's own shipped idiom for
   // the callback refs below, and `react-hooks/refs` enforces it. Declaration order is what
   // makes it correct rather than merely legal: effects run in declaration order within a
   // commit, so this one has already run by the time the read effect below consults the ref on
-  // the same commit. On the FIRST render the `useRef` initialiser has already done the job,
-  // which is the path the handoff actually takes.
+  // the same commit.
   useEffect(() => {
     seedRef.current = seed ?? null
+    onRefusedRef.current = onRefused
   })
 
   const install = useCallback((next: TemplateReadAnswer) => {
@@ -245,43 +290,226 @@ export function useTemplateRead(
     }
 
     const controller = new AbortController()
-    readTemplatePlaceholdersFromFile(file, controller.signal)
-      .then((res) => {
+    readDescribeFile(file, role, controller.signal)
+      .then((result) => {
         if (controller.signal.aborted) return
-        // ⚠ COMPARE POSITIVELY. `read !== "unreadable"` would wave through `undefined` from
-        // an older server or a shape change; TypeScript types the field as a two-value union
-        // and will NOT protect you at runtime.
-        if (res.read !== "ok") {
-          install({ file, state: { kind: "unavailable", reason: "unreadable" } })
-          return
-        }
-        const fields = res.placeholders ?? []
-        // NON-EMPTY BY CONTRACT: an empty read is `none`, never `fields` with `[]`. "A
-        // document with no fields presented as a document with fields" is therefore not a
-        // state a caller can construct.
-        install(
-          fields.length > 0
-            ? { file, state: { kind: "fields", fields } }
-            : { file, state: { kind: "none" } },
-        )
+        install({ file, state: { kind: "read", result }, unticked: NO_UNTICKED })
       })
       .catch((err: unknown) => {
         // An abort caused by unmount or by a replaced document is silent by design.
         if (isAbortError(err)) return
         if (controller.signal.aborted) return
-        install({ file, state: { kind: "unavailable", reason: "unreachable" } })
+        // ⚠ COMPARE POSITIVELY: only a 422 is the door's refusal. Anything else — a network
+        // failure, a 5xx, a shape we do not know — is "no answer", never "refused".
+        const refused = refusedSentence(err)
+        if (refused) {
+          install({
+            file,
+            state: { kind: "unavailable", reason: "unreadable", detail: refused.detail },
+            unticked: NO_UNTICKED,
+          })
+          onRefusedRef.current?.(file, refused.detail)
+          return
+        }
+        install({
+          file,
+          state: { kind: "unavailable", reason: "unreachable", detail: null },
+          unticked: NO_UNTICKED,
+        })
       })
 
     return () => controller.abort()
     // Keyed on the FILE OBJECT — the change detector. Replacing one document with another of
     // the same name is a new subject, and the previous answer must not survive it.
-  }, [file, install])
+  }, [file, role, install])
+
+  /** Untick a blank, or tick it again. The question stays in the reading either way (D-27). */
+  const toggleBlank = useCallback(
+    (key: string) => {
+      const current = answerRef.current
+      if (!current) return
+      const unticked = current.unticked.includes(key)
+        ? current.unticked.filter((k) => k !== key)
+        : [...current.unticked, key]
+      install({ ...current, unticked })
+    },
+    [install],
+  )
 
   // The waiting readings are DERIVED, never stored. An answer about a different document
   // reads as `loading`, not as its own stale self.
-  if (!file) return READ_IDLE
-  if (!answer || answer.file !== file) return READ_LOADING
-  return answer.state
+  const current = file && answer && answer.file === file ? answer : null
+  const state: DescribeReadState = !file ? READ_IDLE : current ? current.state : READ_LOADING
+  return {
+    state,
+    untickedKeys: current ? current.unticked : NO_UNTICKED,
+    toggleBlank,
+    answer: current,
+  }
+}
+
+/**
+ * Read a held document, once per `File` OBJECT.
+ *
+ * A LEAF, exported separately because BOTH describe screens need it and only one of them
+ * hosts the rest of this module's concern (the other never calls `/generate` at all — its
+ * CTA is a handoff).
+ *
+ * @param file The held document, or `null` when none is held. `null` ⇒ `idle` and ZERO
+ *             requests — which is the whole of D-08: no document ⇒ nothing to wait for ⇒ the
+ *             CTA is never disabled, with no second conditional to get wrong.
+ * @param role `form` for the slot (the default), `reference` for a reference place.
+ * @param seed A COMPLETED answer carried across the door handoff. It is installed only for
+ *             the exact `File` it answered for, so a seed that does not match the held
+ *             document is ignored rather than trusted.
+ */
+export function useTemplateRead(
+  file: File | null,
+  role: DescribeRole = "form",
+  seed?: TemplateReadAnswer | null,
+) {
+  return useDescribeRead(file, role, seed)
+}
+
+/** How many references the door holds (D-03). */
+export const REFERENCE_LIMIT = 5
+/** The client's size cap; the server's is authoritative (T-291-33). */
+const REFERENCE_MAX_BYTES = 10 * 1024 * 1024
+
+/** One line under the references picker, already worded (the component renders it). */
+export type ReferenceNotice = { kind: "refused" | "overflow" | "duplicate"; text: string }
+
+/** One held reference and its reading, in the order the author added them. */
+export type HeldReference = { file: File; state: DescribeReadState }
+
+type ReferenceSlots = { slots: readonly (File | null)[]; order: readonly number[] }
+
+function initialSlots(initial: readonly TemplateReadAnswer[] | null | undefined): ReferenceSlots {
+  const slots: (File | null)[] = Array.from({ length: REFERENCE_LIMIT }, () => null)
+  const order: number[] = []
+  for (const [i, answer] of (initial ?? []).slice(0, REFERENCE_LIMIT).entries()) {
+    slots[i] = answer.file
+    order.push(i)
+  }
+  return { slots, order }
+}
+
+/**
+ * 291-04 (D-03) — the references' reads: up to five files, each read by THE SAME per-file
+ * routine at FIVE FIXED PLACES.
+ *
+ * ⚠ FIXED PLACES, NOT A LIST, AND THE REASON IS HOOK ORDER PLUS IDENTITY. A hook may not be
+ * called a variable number of times, so the five calls are always made; a removed file frees
+ * its place rather than shifting the others down, because a shifted file would land in a
+ * place whose answer is about a DIFFERENT file and would be read again. The author's order is
+ * kept separately (`order`), so the list renders in pick order whatever place a file sits in.
+ *
+ * @param initial COMPLETED reads carried across the fast door's handoff. Seeded per place, so
+ *                they cost zero requests.
+ */
+export function useReferenceReads(initial?: readonly TemplateReadAnswer[] | null) {
+  const [held, setHeld] = useState<ReferenceSlots>(() => initialSlots(initial))
+  // ⚠ The source of truth for the two writers below, kept IN STEP with every `setHeld` call
+  // (assigned in the callbacks, never during render). `addFiles` must word its notice from the
+  // same snapshot it writes, which a functional update could only do with a side effect.
+  const heldRef = useRef<ReferenceSlots>(held)
+  const [seeds] = useState<readonly (TemplateReadAnswer | null)[]>(() =>
+    Array.from({ length: REFERENCE_LIMIT }, (_, i) => (initial ?? [])[i] ?? null),
+  )
+  const [notice, setNotice] = useState<ReferenceNotice | null>(null)
+
+  const write = useCallback((next: ReferenceSlots) => {
+    heldRef.current = next
+    setHeld(next)
+  }, [])
+
+  /** The read door refused a file: take it back off the list and say why, in its words. */
+  const onRefused = useCallback(
+    (file: File, detail: string | null) => {
+      const current = heldRef.current
+      const place = current.slots.indexOf(file)
+      if (place < 0) return
+      const slots = [...current.slots]
+      slots[place] = null
+      write({ slots, order: current.order.filter((p) => p !== place) })
+      setNotice({ kind: "refused", text: refsRefused(file.name, detail ?? REFS_REFUSED_FALLBACK) })
+    },
+    [write],
+  )
+
+  // FIVE CALLS, ALWAYS — see the docblock. Each place is read by the one routine.
+  const r0 = useDescribeRead(held.slots[0], "reference", seeds[0], onRefused)
+  const r1 = useDescribeRead(held.slots[1], "reference", seeds[1], onRefused)
+  const r2 = useDescribeRead(held.slots[2], "reference", seeds[2], onRefused)
+  const r3 = useDescribeRead(held.slots[3], "reference", seeds[3], onRefused)
+  const r4 = useDescribeRead(held.slots[4], "reference", seeds[4], onRefused)
+  const s0 = r0.state
+  const s1 = r1.state
+  const s2 = r2.state
+  const s3 = r3.state
+  const s4 = r4.state
+
+  const references = useMemo<readonly HeldReference[]>(() => {
+    const states = [s0, s1, s2, s3, s4]
+    return held.order.flatMap((place) => {
+      const file = held.slots[place]
+      return file ? [{ file, state: states[place] }] : []
+    })
+  }, [held, s0, s1, s2, s3, s4])
+
+  const anyReading = [s0, s1, s2, s3, s4].some((s) => s.kind === "loading")
+
+  const addFiles = useCallback(
+    (files: readonly File[]) => {
+      const current = heldRef.current
+      const slots = [...current.slots]
+      const order = [...current.order]
+      const overflow: string[] = []
+      let duplicate: File | null = null
+      let tooBig: File | null = null
+      for (const file of files) {
+        const isHeld = slots.some((h) => h !== null && h.name === file.name && h.size === file.size)
+        if (isHeld) {
+          duplicate = file
+          continue
+        }
+        if (file.size > REFERENCE_MAX_BYTES) {
+          tooBig = file
+          continue
+        }
+        const free = slots.indexOf(null)
+        if (free < 0) {
+          overflow.push(file.name)
+          continue
+        }
+        slots[free] = file
+        order.push(free)
+      }
+      write({ slots, order })
+      // ONE line, for the most consequential thing this pick did.
+      if (overflow.length > 0) setNotice({ kind: "overflow", text: refsOverflow(overflow) })
+      else if (tooBig) setNotice({ kind: "refused", text: refsRefused(tooBig.name, REFS_REFUSED_FALLBACK) })
+      else if (duplicate) setNotice({ kind: "duplicate", text: refsDuplicate(duplicate.name) })
+      else setNotice(null)
+    },
+    [write],
+  )
+
+  /** Un-pick the reference at `index` in the rendered list. Frees its place; no confirmation. */
+  const removeAt = useCallback(
+    (index: number) => {
+      const current = heldRef.current
+      const place = current.order[index]
+      if (place === undefined) return
+      const slots = [...current.slots]
+      slots[place] = null
+      write({ slots, order: current.order.filter((_, i) => i !== index) })
+      setNotice(null)
+    },
+    [write],
+  )
+
+  return { references, addFiles, removeAt, notice, anyReading }
 }
 
 /**
@@ -291,6 +519,113 @@ export function useTemplateRead(
 export type TemplateFirstDefinition = Parameters<
   ReturnType<BuilderStore["getState"]>["setDrafted"]
 >[0]
+
+/**
+ * 291-04 — what else the generate result carried, handed out UNTOUCHED. Each member is the
+ * response's own value: ABSENT means the server said nothing, never an empty list.
+ */
+export type DraftedExtras = {
+  removed: GenerateRemoved[] | undefined
+  fields: GenerateField[] | undefined
+}
+
+// ── 291-04 — the generate body's caps, mirrored so a body the server would refuse is never
+//    built. The server's limits are authoritative; these only keep the draft from failing. ──
+const FORM_FIELDS_MAX = 200
+const FORM_TEXT_MAX = 250_000
+const FORM_LABEL_MAX = 200
+const FORM_ENUM_MAX = 50
+// The server's own refusal for a field key: control characters or template syntax.
+// eslint-disable-next-line no-control-regex
+const FIELD_KEY_FORBIDDEN = /[\x00-\x1f\x7f{}%<>]/
+
+/**
+ * The slot's read result as the generate body carries it (Pitfall 11: the RESULT travels, the
+ * bytes are never read twice), or `null` when the server's caps would refuse it.
+ *
+ * For Word blanks the fields are the TICKED placed blanks only (D-27): an unticked blank stays
+ * empty in the copy, so the draft must not be built to fill it.
+ */
+function formBodyFor(result: DescribeReadResult, unticked: readonly string[]): DescribeFormBody | null {
+  if (result.arm === "reference") return null
+  const fields =
+    result.arm === "blanks" ? result.fields.filter((f) => !unticked.includes(f.key)) : result.fields
+  const sendable =
+    fields.length <= FORM_FIELDS_MAX &&
+    result.text.length <= FORM_TEXT_MAX &&
+    fields.every(
+      (f) =>
+        f.key.length > 0 &&
+        f.key.length <= FORM_LABEL_MAX &&
+        !FIELD_KEY_FORBIDDEN.test(f.key) &&
+        f.label.length <= FORM_LABEL_MAX &&
+        f.enum_options.length <= FORM_ENUM_MAX &&
+        f.enum_options.every((o) => o.length <= FORM_LABEL_MAX),
+    )
+  if (!sendable) return null
+  return {
+    filename: result.filename,
+    arm: result.arm,
+    fields: fields.map(({ key, label, type, enum_options, origin }) => ({
+      key,
+      label,
+      type,
+      enum_options,
+      origin,
+    })),
+    text: result.text,
+  }
+}
+
+/** The references' read text, in pick order — only those the server actually read. */
+function referenceBodiesFor(references: readonly HeldReference[]): DescribeReferenceBody[] {
+  return references.flatMap((r) =>
+    r.state.kind === "read" && r.state.result.arm === "reference"
+      ? [{ filename: r.state.result.filename, text: r.state.result.text }]
+      : [],
+  )
+}
+
+/**
+ * 291-04 (D-07) — WHICH DOOR the slot's file is stored through at the first save.
+ *
+ *  · a template, a fillable PDF form, or a deck → the TEMPLATE door, the shipped way;
+ *  · Word blanks → the template door WITH the ticked anchors, which stores the fillable copy;
+ *    with every blank unticked there is nothing to fill, so it is kept as a reference;
+ *  · a file with no fields, a flat or scanned PDF, or a Word file a copy cannot be made of →
+ *    the REFERENCE door: it is used as a reference, so it is kept as one;
+ *  · a read that never answered → the shipped template upload, except a PDF, which the
+ *    template door can only fill when it has fields, so it is kept as a reference.
+ *
+ * ⚠ A deck stays a TEMPLATE: the reference door does not take decks, and a deck template is
+ * filled at run time by the shipped engine.
+ */
+function bindPlanFor(
+  file: File,
+  answer: TemplateReadAnswer | null,
+): { door: "template"; anchors?: WordAnchor[] } | { door: "reference" } {
+  if (!answer) return { door: "template" }
+  if (answer.state.kind === "unavailable") {
+    return file.name.toLowerCase().endsWith(".pdf") ? { door: "reference" } : { door: "template" }
+  }
+  const result = answer.state.result
+  switch (result.arm) {
+    case "template_fields":
+    case "form_fields":
+    case "not_word":
+      return { door: "template" }
+    case "blanks": {
+      const anchors = result.fields.flatMap((f) =>
+        !answer.unticked.includes(f.key) && f.anchor_kind !== null && f.anchor_label !== null
+          ? [{ key: f.key, anchor_kind: f.anchor_kind, anchor_label: f.anchor_label }]
+          : [],
+      )
+      return anchors.length > 0 ? { door: "template", anchors } : { door: "reference" }
+    }
+    default:
+      return { door: "reference" }
+  }
+}
 
 export interface TemplateFirstDraftArgs {
   /** The Builder's store instance. The ONLY thing this hook reaches into directly, and it
@@ -361,10 +696,16 @@ export interface TemplateFirstDraftArgs {
    * live store selector.* This verdict is what the server said about THE GENERATION, so a
    * consumer that re-derives it from the author's later edits is answering a different
    * question with this value's authority.
+   *
+   * ── 291-04 — THE THIRD ARGUMENT: THE RESULT'S EXTRAS (`removed`, `fields`) ───────────────
+   *
+   * Same rule, same reason: read off the SAME result and handed out untouched, absent as
+   * absent. The arrival card is what spends them (291-05).
    */
   onDrafted: (
     definition: TemplateFirstDefinition,
     readiness: GenerateReadiness | undefined,
+    extras: DraftedExtras,
   ) => void
   /**
    * 193.1-07 (D-06) — the bind's descriptor, handed to the host's SINGLE writer.
@@ -379,6 +720,12 @@ export interface TemplateFirstDraftArgs {
    */
   onTemplateBound: (asset: TemplateAssetDescriptor) => void
   /**
+   * 291-04 (D-07) — the reference descriptors of ONE bind, handed to the host in ONE batch so
+   * it writes `assets[]` once. REQUIRED for the reason `onTemplateBound` is. Never called with
+   * an empty list.
+   */
+  onReferencesBound: (assets: ReferenceAssetDescriptor[]) => void
+  /**
    * 193.1-07 / Plan 08 — the document picked on the OTHER describe screen, carried across the
    * handoff. Absent for a fresh build. The precedent is `initialProjectFolderId` (187-26):
    * pre-draft state chosen on the other door that only this host can spend.
@@ -390,6 +737,11 @@ export interface TemplateFirstDraftArgs {
    * blind-draft race D-07 exists to make impossible. Installed only for the `File` it names.
    */
   initialTemplateRead?: TemplateReadAnswer | null
+  /**
+   * 291-04 (D-03) — the references picked on the other describe screen, each WITH its
+   * completed reading, for the same seed-do-not-re-read reason.
+   */
+  initialReferences?: readonly TemplateReadAnswer[] | null
 }
 
 export interface TemplateFirstDraft {
@@ -408,15 +760,29 @@ export interface TemplateFirstDraft {
   /** The held document, or `null`. The row's filename comes from HERE, so the name on screen
    *  and the reading below it answer for the same object. */
   templateFile: File | null
-  /** The reading, as one of five honest arms. */
+  /** The slot's reading. */
   templateRead: TemplateReadState
   /** The author picked a document. */
   onPickTemplateFile: (file: File) => void
   /** The author removed it — one press undoes a mis-pick, and the reading returns to `idle`. */
   onClearTemplateFile: () => void
+  /** 291-04 (D-27) — the Word blanks the author unticked on the held file. */
+  untickedKeys: readonly string[]
+  /** 291-04 (D-27) — untick a blank, or tick it again. */
+  onToggleBlank: (key: string) => void
+  /** 291-04 (D-03) — the held references, in pick order, each with its reading. */
+  references: readonly HeldReference[]
+  /** 291-04 — the one line under the references picker, or `null`. */
+  referenceNotice: ReferenceNotice | null
+  /** 291-04 — the author picked one or more references. */
+  onAddReferenceFiles: (files: readonly File[]) => void
+  /** 291-04 — the author removed the reference at this index of `references`. */
+  onRemoveReference: (index: number) => void
+  /** 291-04 — any file on the door is still being read (the CTA waits; Pitfall 11). */
+  anyReading: boolean
   /**
-   * D-06's bind. Uploads the held document to the definition that now exists and hands the
-   * returned descriptor to `onTemplateBound`.
+   * D-06's bind. Uploads the held document — and, since 291-04, each held reference — to the
+   * definition that now exists and hands the returned descriptors to the host's writers.
    *
    * ⚠ **IT CATCHES EVERYTHING AND NEVER REJECTS, AND THAT IS THE WHOLE GUARD.** Its one caller
    * is the write loop's created-id callback, which is invoked from INSIDE that loop's own
@@ -435,11 +801,6 @@ export interface TemplateFirstDraft {
    * prose, a status code or an id (`library/useWorkflowFork.ts:205`'s posture). The raw error
    * goes to `console.error` at the boundary, where the developer's evidence and the person's
    * sentence stay two different things and neither replaces the other.
-   *
-   * ⚠ The plan specifies a "two-field" object. That was descriptive of the analog, whose
-   * second field selects a branch in ITS sentence; this sentence takes a filename only, so a
-   * second field would be data with no reader. ONE field ships, which satisfies the
-   * disclosure property strictly more than two would — and the suite asserts the key list.
    */
   bindFailed: { filename: string } | null
 }
@@ -456,8 +817,10 @@ export function useTemplateFirstDraft(args: TemplateFirstDraftArgs): TemplateFir
     onDraftStarted,
     onDrafted,
     onTemplateBound,
+    onReferencesBound,
     initialTemplateFile,
     initialTemplateRead,
+    initialReferences,
   } = args
 
   const [describe, setDescribe] = useState(initialDescribe ?? "")
@@ -472,15 +835,21 @@ export function useTemplateFirstDraft(args: TemplateFirstDraftArgs): TemplateFir
 
   // 193.1-07 (D-06 / D-07) — the held document and its reading.
   const [templateFile, setTemplateFile] = useState<File | null>(initialTemplateFile ?? null)
-  const templateRead = useTemplateRead(templateFile, initialTemplateRead)
+  const slot = useTemplateRead(templateFile, "form", initialTemplateRead)
+  const templateRead = slot.state
+  const untickedKeys = slot.untickedKeys
+  // 291-04 (D-03) — the references, on the same per-file read.
+  const referenceReads = useReferenceReads(initialReferences)
+  const referencesReading = referenceReads.anyReading
+  const anyReading = templateRead.kind === "loading" || referencesReading
 
-  // ⚠ ONE `&&` TERM, AND D-08 IS WHY THERE IS NO SECOND ONE. The reading is `idle` — never
-  // `loading` — whenever no document is held, so the absence of a read IS the absence of a
-  // gate. A `templateFile !== null &&` guard would be a second conditional that can be got
-  // wrong, and it would read green against every behaviour the suite drives. The suite fences
-  // this expression's SHAPE for exactly that reason, not only its outcome.
+  // ⚠ D-08 IS WHY THERE IS NO "HAS A FILE" TERM. Each reading is `idle` — never `loading` —
+  // whenever nothing is held, so the absence of a read IS the absence of a gate. A
+  // `templateFile !== null &&` guard would be a second conditional that can be got wrong, and
+  // it would read green against every behaviour the suite drives. The suite fences this
+  // expression's SHAPE for exactly that reason, not only its outcome.
   const canDraft =
-    describe.trim().length > 0 && builderPhase !== "composing" && templateRead.kind !== "loading"
+    describe.trim().length > 0 && builderPhase !== "composing" && templateRead.kind !== "loading" && !referencesReading
 
   // ⚠ THE CALLBACKS ARE READ THROUGH REFS, and the reason is a measurement rather than a
   // style: `onDraft`'s dependency list on the page was `[describe, projectFolderId, store]`,
@@ -509,7 +878,10 @@ export function useTemplateFirstDraft(args: TemplateFirstDraftArgs): TemplateFir
   // render. Reading the file at FIRE time is also the correct semantics — the bind runs when
   // the row is created, which is strictly after the pick.
   const templateFileRef = useRef<File | null>(templateFile)
+  const templateAnswerRef = useRef<TemplateReadAnswer | null>(slot.answer)
+  const referencesRef = useRef<readonly HeldReference[]>(referenceReads.references)
   const onTemplateBoundRef = useRef(onTemplateBound)
+  const onReferencesBoundRef = useRef(onReferencesBound)
   /**
    * 214-13 — the ticked vocabulary, read at FIRE time through a ref.
    *
@@ -526,11 +898,14 @@ export function useTemplateFirstDraft(args: TemplateFirstDraftArgs): TemplateFir
    */
   const allowedConnectionIdsRef = useRef<string[] | undefined>(initialAllowedConnectionIds)
   // Mirrored in an effect for the reason recorded on the two callback refs above, and safe
-  // here for a stronger one: the ONLY reader is the async bind, which cannot run until a row
-  // exists — long after every effect on the commit that held the pick has flushed.
+  // here for a stronger one: the ONLY readers are the async bind and the generate call, which
+  // run after every effect on the commit that held the pick has flushed.
   useEffect(() => {
     templateFileRef.current = templateFile
+    templateAnswerRef.current = slot.answer
+    referencesRef.current = referenceReads.references
     onTemplateBoundRef.current = onTemplateBound
+    onReferencesBoundRef.current = onReferencesBound
     allowedConnectionIdsRef.current = initialAllowedConnectionIds
   })
 
@@ -538,25 +913,52 @@ export function useTemplateFirstDraft(args: TemplateFirstDraftArgs): TemplateFir
 
   const bindHeldTemplate = useCallback(async (definitionId: string) => {
     const file = templateFileRef.current
+    const references = referencesRef.current
     // NO DOCUMENT, NO ACT. SC#4's fast path is untouched by construction rather than by a
     // flag: a session that supplied nothing performs no upload and can raise no failure.
-    if (!file) return
-    try {
-      const asset = await uploadWorkflowTemplate(definitionId, file)
-      setBindFailed(null)
-      // The host's single writer. This module appends nothing to `assets[]` itself.
-      onTemplateBoundRef.current(asset)
-    } catch (err) {
-      // The developer's evidence, at the boundary, in full.
-      console.error(err)
-      // …and the person's, which cannot carry any of it.
-      setBindFailed({ filename: file.name })
+    if (!file && references.length === 0) return
+    const referenceAssets: ReferenceAssetDescriptor[] = []
+    if (file) {
+      try {
+        const plan = bindPlanFor(file, templateAnswerRef.current)
+        if (plan.door === "reference") {
+          referenceAssets.push(await uploadWorkflowReference(definitionId, file))
+        } else {
+          // ⚠ Without anchors the call is the shipped one, argument for argument.
+          const asset =
+            plan.anchors !== undefined
+              ? await uploadWorkflowTemplate(definitionId, file, plan.anchors)
+              : await uploadWorkflowTemplate(definitionId, file)
+          setBindFailed(null)
+          // The host's single writer. This module appends nothing to `assets[]` itself.
+          onTemplateBoundRef.current(asset)
+        }
+      } catch (err) {
+        // The developer's evidence, at the boundary, in full.
+        console.error(err)
+        // …and the person's, which cannot carry any of it.
+        setBindFailed({ filename: file.name })
+      }
     }
+    // 291-04 (D-07) — every held reference, kept with the draft. One failure names its file
+    // and does not stop the others.
+    for (const reference of references) {
+      try {
+        referenceAssets.push(await uploadWorkflowReference(definitionId, reference.file))
+      } catch (err) {
+        console.error(err)
+        setBindFailed({ filename: reference.file.name })
+      }
+    }
+    if (referenceAssets.length > 0) onReferencesBoundRef.current(referenceAssets)
   }, [])
 
   const onDraft = useCallback(async () => {
     const text = describe.trim()
     if (text.length === 0) return
+    // 291-04 (Pitfall 11) — the draft is written FROM the reads, so it waits for them. The CTA
+    // is already disabled while anything reads; this is the same refusal on the call itself.
+    if (anyReading) return
     store.getState().setComposing()
     // The page's one selection contract is released, and — 186-07 — only the RENDERED draft
     // id resets. The write loop's own mirror needs none: this callback is reachable only from
@@ -564,32 +966,39 @@ export function useTemplateFirstDraft(args: TemplateFirstDraftArgs): TemplateFir
     // requires the drafted view, and the sole way back is a generate failure, which creates
     // nothing).
     onDraftStartedRef.current()
+    // ── 291-04 (D-04 / Pitfall 11) — THE FILES' READ RESULTS, NEVER THEIR BYTES ───────────
+    //
+    // ⚠ EACH SPREAD IS GATED ON ITS OWN ARM, AND AN EMPTY LIST IS NEVER SENT. `form` travels
+    // only on a `read` slot (a failed read is no document); `references` only when at least
+    // one was read. With nothing attached neither key exists, so the body is byte-identical
+    // to the shipped one — the suite snapshots it.
+    const formBody = templateRead.kind === "read" ? formBodyFor(templateRead.result, untickedKeys) : null
+    const referenceBodies = referenceBodiesFor(referencesRef.current)
     try {
       const result = await generateWorkflow({
         describe: text,
         // Phase 103-ux: bind the generated workflow to the chosen project (KB). The
         // backend GenerateRequest accepts project_folder_id; omit when none picked.
         ...(projectFolderId ? { project_folder_id: projectFolderId } : {}),
+        ...(formBody !== null ? { form: formBody } : {}),
         // ── 193.1-07 (SC#1 / D-19) — THE FIELDS THE SUPPLIED DOCUMENT ACTUALLY ASKS FOR ──
         //
-        // ⚠ THIS IS NOT A HINT. Measured across four hops: the value is rendered into the
-        // authoring grounding, and the authoring prompt's deliverable rule branches on that
-        // section — so sending it FLIPS A BRANCH rather than adding colour. `193.1-11`
-        // measured the branch firing 3 of 3 with key coverage 8/8, against 0 of 3 before.
+        // ⚠ SINCE 291-04 THIS IS THE NO-FORM BRANCH ONLY. The server reads a template's keys
+        // off `form` itself, so the shipped list is sent only when a template's read could
+        // not travel as a form (the server's caps would refuse it) — the draft is then still
+        // built to the template's fields, the shipped way, rather than blind. It is never sent
+        // beside `form`, and an empty array is never sent: `[]` and an absent key are two
+        // DIFFERENT statements to the model.
         //
-        // ⚠ SENT ONLY ON THE `fields` ARM, AND AN EMPTY ARRAY IS NEVER SENT. The prompt
-        // renders the list with a join, so `[]` and an absent key are two DIFFERENT
-        // statements to the model — "this document asks for nothing" versus "no document was
-        // supplied". The four other readings all mean the second one, including the two that
-        // failed for our reasons rather than the document's.
-        //
-        // ⚠ AND IT IS INDIVISIBLE FROM THE BIND BELOW (D-19). A deliverable step written to
-        // fill a document that was never attached is TERMINAL at run and can never publish —
-        // strictly worse than the blind draft it replaces. The two ship together or not at
-        // all, which is why both live in this one callback's module.
-        ...(templateRead.kind === "fields"
-          ? { template_placeholders: templateRead.fields }
+        // ⚠ AND IT IS INDIVISIBLE FROM THE BIND ABOVE (D-19). A deliverable step written to
+        // fill a document that was never attached is TERMINAL at run and can never publish.
+        ...(formBody === null &&
+        templateRead.kind === "read" &&
+        templateRead.result.arm === "template_fields" &&
+        templateRead.result.fields.length > 0
+          ? { template_placeholders: templateRead.result.fields.map((f) => f.key) }
           : {}),
+        ...(referenceBodies.length > 0 ? { references: referenceBodies } : {}),
         // ── 214-13 (STEP-06 / D-214-20) — THE AUTHOR'S TICKED SERVICES, AS THE GENERATOR'S
         //    VOCABULARY ─────────────────────────────────────────────────────────
         //
@@ -624,7 +1033,10 @@ export function useTemplateFirstDraft(args: TemplateFirstDraftArgs): TemplateFir
         // absent verdict is a fact about what the server said and it survives this hop as
         // `undefined`. This is the ONLY boundary in the chain that could drop it, which is
         // why the whole of D-13's client work is this one argument.
-        onDraftedRef.current(def, result.readiness)
+        //
+        // 291-04: the extras travel UNTOUCHED by the same rule — each is the response's own
+        // value or `undefined`, never a list this module made up.
+        onDraftedRef.current(def, result.readiness, { removed: result.removed, fields: result.fields })
       } else {
         // ok:false is an HONEST failure — never a renderable broken draft.
         // Phase 281 (D-11/D-13, SEED-221): the store holds the table KEY (the code joined to its
@@ -641,9 +1053,9 @@ export function useTemplateFirstDraft(args: TemplateFirstDraftArgs): TemplateFir
     }
     // ⚠ `templateRead` JOINS THE DEPENDENCY LIST, which is why the reading and the wire must
     // live in ONE module: a reading held on the host would either be stale in this closure or
-    // would re-create this callback on every render. The two waiting readings are frozen at
-    // module scope precisely so this list does not churn — see `READ_IDLE` / `READ_LOADING`.
-  }, [describe, projectFolderId, store, templateRead])
+    // would re-create this callback on every render. The waiting readings and the empty tick
+    // list are frozen at module scope precisely so this list does not churn.
+  }, [describe, projectFolderId, store, templateRead, untickedKeys, anyReading])
 
   // Phase 124 CR-01 fix: when handed off from the loose door's `DESCRIBE_CTA` button
   // (autoDraft), run the EXISTING generate→draft flow ONCE with the seeded text — so the fast
@@ -660,12 +1072,13 @@ export function useTemplateFirstDraft(args: TemplateFirstDraftArgs): TemplateFir
       // The other door's hand-off fires this once, automatically, so a gate that lived only
       // on a button would leave the fast path sending the blind body. When the reading is
       // seeded (Plan 08) this term is already false at mount and costs a fire nothing.
-      templateRead.kind !== "loading"
+      // 291-04: the references are waited for the same way.
+      !anyReading
     ) {
       autoDraftFiredRef.current = true
       void onDraft()
     }
-  }, [autoDraft, initialDescribe, builderPhase, onDraft, templateRead])
+  }, [autoDraft, initialDescribe, builderPhase, onDraft, anyReading])
 
   return {
     describe,
@@ -678,6 +1091,13 @@ export function useTemplateFirstDraft(args: TemplateFirstDraftArgs): TemplateFir
     templateRead,
     onPickTemplateFile,
     onClearTemplateFile,
+    untickedKeys,
+    onToggleBlank: slot.toggleBlank,
+    references: referenceReads.references,
+    referenceNotice: referenceReads.notice,
+    onAddReferenceFiles: referenceReads.addFiles,
+    onRemoveReference: referenceReads.removeAt,
+    anyReading,
     bindHeldTemplate,
     bindFailed,
   }

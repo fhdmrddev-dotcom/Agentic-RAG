@@ -137,10 +137,12 @@ const KNOWN_SERVICES: readonly ServiceCatalogEntry[] = [
 function completedTemplateAnswer(
   file: File | null,
   state: TemplateReadState,
+  unticked: readonly string[],
 ): TemplateReadAnswer | null {
   if (!file) return null
   if (state.kind === "idle" || state.kind === "loading") return null
-  return { file, state }
+  // 291-04 (D-27): the blanks the author unticked travel WITH the answer they were made on.
+  return { file, state, unticked }
 }
 
 export interface WorkflowDoorSwitchProps {
@@ -283,8 +285,8 @@ export function WorkflowDoorSwitch({
    */
   const [allowedConnectionIds, setAllowedConnectionIds] = useState<string[]>([])
   const [connectedServiceIds, setConnectedServiceIds] = useState<string[]>([])
-  const templateRead = useTemplateRead(templateFile)
-  const templateAnswer = completedTemplateAnswer(templateFile, templateRead)
+  const { state: templateRead, untickedKeys } = useTemplateRead(templateFile)
+  const templateAnswer = completedTemplateAnswer(templateFile, templateRead, untickedKeys)
   /**
    * ⚠ ONE NEW `&&` TERM, THE SAME SHAPE AND THE SAME REASON AS THE BUILDER'S (D-07 / D-08).
    * This door's CTA makes no network call — it is a HAND-OFF that arms the Builder's one-shot

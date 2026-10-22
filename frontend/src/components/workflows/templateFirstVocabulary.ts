@@ -236,3 +236,27 @@ export function nameCheckRunInputNote(count: number): string {
 export function showAllLabel(count: number): string {
   return `Show all ${count}`
 }
+
+// ── 291 · Surface 2 · the references section's notices (UI-SPEC copy, verbatim) ─────────
+//
+// The interpolated half is DATA (a filename, a list of names, a server sentence); the words
+// around it live here. The server's sentence is passed through whole, never re-worded.
+
+/** A refused file with no server sentence to relay. */
+export const REFS_REFUSED_FALLBACK =
+  "That file couldn't be read. Add a PDF, Word or text file under 10 MB."
+
+/** The read door declined a file the author picked; `sentence` is the server's own. */
+export function refsRefused(filename: string, sentence: string): string {
+  return `Couldn't add ${filename}. ${sentence}`
+}
+
+/** A multi-pick that did not fit in the five places (D-03). */
+export function refsOverflow(names: readonly string[]): string {
+  return `Only 5 references fit, so these weren't added: ${names.join(", ")}.`
+}
+
+/** The same name and size as a file already held. */
+export function refsDuplicate(filename: string): string {
+  return `${filename} is already added.`
+}

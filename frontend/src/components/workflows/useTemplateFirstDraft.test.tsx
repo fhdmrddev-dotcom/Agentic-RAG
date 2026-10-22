@@ -682,6 +682,8 @@ describe("useTemplateFirstDraft — the loose door's one-shot auto-draft", () =>
         // 193.1-07: REQUIRED, so the typechecker enumerated this second call site rather
         // than a default hiding it — which is exactly why it is required.
         onTemplateBound: () => {},
+        // 291-04: REQUIRED for the same reason, so this site was enumerated too.
+        onReferencesBound: () => {},
       }),
     )
     await waitFor(() => expect(mockedGenerate).not.toHaveBeenCalled())
@@ -822,15 +824,21 @@ describe("useTemplateFirstDraft D-24(b) — the extracted module cannot import e
     // the definition parameter AND the readiness parameter — because the property it defends is
     // "the whole surface is this args interface", and a fence loosened to `/onDrafted:/` would
     // pass against a callback that had quietly grown a store setter.
+    // 291-04: widened once more, to the result's extras — re-spelled again, pinning all THREE.
     expect(templateFirstDraftSource).toMatch(
-      /onDrafted: \(\s*definition: TemplateFirstDefinition,\s*readiness: GenerateReadiness \| undefined,\s*\) => void/,
+      /onDrafted: \(\s*definition: TemplateFirstDefinition,\s*readiness: GenerateReadiness \| undefined,\s*extras: DraftedExtras,\s*\) => void/,
     )
     // POSITIVE CONTROL — the re-spelled matcher DISCRIMINATES. Against the shipped
     // single-parameter spelling it must NOT match, or "the verdict crosses this boundary"
     // would be a claim this fence passes without checking. A matcher that matches everything
     // it is pointed at reads exactly like a fence that holds (this suite's own header rule).
     expect("  onDrafted: (definition: TemplateFirstDefinition) => void").not.toMatch(
-      /onDrafted: \(\s*definition: TemplateFirstDefinition,\s*readiness: GenerateReadiness \| undefined,\s*\) => void/,
+      /onDrafted: \(\s*definition: TemplateFirstDefinition,\s*readiness: GenerateReadiness \| undefined,\s*extras: DraftedExtras,\s*\) => void/,
+    )
+    expect(
+      ["  onDrafted: (", "definition: TemplateFirstDefinition,", "readiness: GenerateReadiness | undefined,", ") => void"].join(" "),
+    ).not.toMatch(
+      /onDrafted: \(\s*definition: TemplateFirstDefinition,\s*readiness: GenerateReadiness \| undefined,\s*extras: DraftedExtras,\s*\) => void/,
     )
     // POSITIVE CONTROL for the shape of what would be wrong.
     expect("  setDraftId: (id: string | null) => void").toMatch(/setDraftId/)
@@ -1117,7 +1125,8 @@ describe("useTemplateRead — the per-file read leaf (291-04)", () => {
 
   it("a 422 ⇒ unavailable/unreadable with the server sentence; a network failure ⇒ unreachable, null", async () => {
     mockedRead.mockRejectedValueOnce(refusal("That file is not a PDF."))
-    const a = renderHook(() => useTemplateRead(fileNamed("bad.pdf"), "form"))
+    const bad = fileNamed("bad.pdf")
+    const a = renderHook(() => useTemplateRead(bad, "form"))
     await waitFor(() =>
       expect(a.result.current.state).toEqual({
         kind: "unavailable",
@@ -1126,7 +1135,8 @@ describe("useTemplateRead — the per-file read leaf (291-04)", () => {
       }),
     )
     mockedRead.mockRejectedValueOnce(new WorkflowTemplateUploadError("network", null))
-    const b = renderHook(() => useTemplateRead(fileNamed("ok.pdf"), "form"))
+    const ok = fileNamed("ok.pdf")
+    const b = renderHook(() => useTemplateRead(ok, "form"))
     await waitFor(() =>
       expect(b.result.current.state).toEqual({ kind: "unavailable", reason: "unreachable", detail: null }),
     )
@@ -1134,7 +1144,8 @@ describe("useTemplateRead — the per-file read leaf (291-04)", () => {
 
   it("the role is FORWARDED — a reference read asks the door as a reference", async () => {
     mockedRead.mockResolvedValue(referenceOf("terms.md"))
-    renderHook(() => useTemplateRead(fileNamed("terms.md"), "reference"))
+    const terms = fileNamed("terms.md")
+    renderHook(() => useTemplateRead(terms, "reference"))
     await waitFor(() => expect(mockedRead).toHaveBeenCalledTimes(1))
     expect(mockedRead.mock.calls[0][1]).toBe("reference")
   })
