@@ -3,7 +3,7 @@ gsd_state_version: 1.0
 milestone: v4.7
 milestone_name: Workflows You Can See and Start Anywhere
 status: ready_to_plan
-last_updated: "2026-10-21T18:06:35.650Z"
+last_updated: "2026-10-22T00:00:00.000Z"
 progress:
   total_phases: 17
   completed_phases: 6
@@ -28,7 +28,7 @@ See: `.planning/PROJECT.md` (updated 2026-10-18)
 
 **Core value:** The agent acts as an AI colleague — it knows your knowledge base, can run code, and
 can be taught new behaviours (skills) that persist and can be shared.
-**Current focus:** Phase 290 — the-card-and-the-team-picture
+**Current focus:** Phase 291 — describe-it-from-your-own-files (context gathered 2026-10-22; sketch next). Phase 290 executed, G-4 UAT owed.
 
 ---
 
