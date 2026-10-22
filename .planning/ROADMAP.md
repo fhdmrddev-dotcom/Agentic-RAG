@@ -257,7 +257,7 @@ Plans:
 Plans:
 **Wave 1**
 
-- [ ] 291-01-PLAN.md — Read the files: stateless describe read door, AcroForm/Word-blank/scan/reference reader, Word fillable copy, pdf + reference binds, ledger rows (W1)
+- [x] 291-01-PLAN.md — Read the files: stateless describe read door, AcroForm/Word-blank/scan/reference reader, Word fillable copy, pdf + reference binds, ledger rows (W1)
 
 **Wave 2** *(blocked on Wave 1 completion)*
 
