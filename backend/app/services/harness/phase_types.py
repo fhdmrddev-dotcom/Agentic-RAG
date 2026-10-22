@@ -1158,6 +1158,9 @@ def _template_oracle(src: dict) -> dict | None:
     the keys the template needs and the citation gate can validate coverage BEFORE
     the sandbox render. ``None`` (no oracle, behavior unchanged) for non-docx
     templates, unreadable bytes, or token-free files — never a crash."""
+    if str(src.get("filename") or "").lower().endswith(".pdf"):  # Phase 291: the form's own fields
+        from app.services.describe_files import acroform_oracle  # noqa: PLC0415
+        return acroform_oracle(src["bytes"]) if src.get("bytes") else None
     if not str(src.get("filename") or "").lower().endswith(".docx"):
         return None
     data = src.get("bytes")
@@ -1707,6 +1710,13 @@ async def _exec_llm_emit(phase, accumulated_outputs: dict, ctx) -> dict:
                     + list(legacy_map.get("collections", {}).keys())
                 )
             )
+            # Phase 291 (D-09): the person's own answers, each with a server-minted input:<key> id
+            # admitted to BOTH gates (here, and the handler's via resolved["retrieved_ids"]).
+            from app.services.harness.form_inputs import overlay_user_inputs  # noqa: PLC0415
+            legacy_map, input_ids = overlay_user_inputs(
+                legacy_map, definition, getattr(ctx, "inputs", None), placeholder_keys
+            )
+            retrieved_ids = set(retrieved_ids) | input_ids
             await _emit_phase_substep(ctx, phase, status="validating")  # citation/coverage gate + truncation guard
             gate = check_coverage(legacy_map, retrieved_ids, placeholder_keys)
             missing_keys = [k for k in placeholder_keys if k not in gate["covered_keys"]]
