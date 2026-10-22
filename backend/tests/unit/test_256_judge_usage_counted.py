@@ -743,6 +743,10 @@ async def test_publish_workflow_actually_issues_the_judge_usage_write_on_a_BLOCK
 #:   REGISTERED            — a ``runs`` row that carries NO ``token_coverage`` marker;
 #:                           SEED-300 hole 3, open with a trigger
 _EXPECTED_FORCED_EMIT_SITES: dict[str, str] = {
+    # Phase 291 (291-01, AUTH-02). Found the way 263's and 267's sites were: this gate went red at
+    # 291-01's full-suite run. NO-RUN: the read-time field proposal is called from the stateless
+    # `POST /workflows/describe/read` door before any draft, `runs` or `workflow_runs` row exists.
+    "services/describe_files.py": "NO-RUN",
     "services/embedding_service.py": "NO-RUN",
     "services/eval_runner_service.py": "REGISTERED (SEED-300 hole 3 — an eval `runs` row, no token_coverage marker)",
     "services/expert_authoring.py": "NO-RUN",
