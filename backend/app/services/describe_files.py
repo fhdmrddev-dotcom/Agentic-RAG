@@ -129,6 +129,50 @@ def cut_short_sentence(kind: Literal["pages", "scan_pages", "chars"], read: int,
     return f"Only the first {read:,} of {total:,} characters were read."
 
 
+def couldnt_place_duplicate(label: str, times: int) -> str:
+    count = "twice" if times == 2 else f"{times} times"
+    return (
+        f"Couldn't place “{label}”: that label appears {count} in the document. "
+        "It stays blank in the filled copy."
+    )
+
+
+def couldnt_place_split(label: str) -> str:
+    return (
+        f"Couldn't place “{label}”: its blank is split in a way that can't be found "
+        "exactly. It stays blank in the filled copy."
+    )
+
+
+def couldnt_place_bad_key(label: str) -> str:
+    return (
+        f"Couldn't place “{label}”: its field name can't be used in a template. "
+        "It stays blank in the filled copy."
+    )
+
+
+def couldnt_place_taken(label: str) -> str:
+    return (
+        f"Couldn't place “{label}”: its blank is already used by another field. "
+        "It stays blank in the filled copy."
+    )
+
+
+def couldnt_place_key_reused(label: str, key: str) -> str:
+    return (
+        f"Couldn't place “{label}”: another blank already uses the field “{key}”. "
+        "It stays blank in the filled copy."
+    )
+
+
+COPY_REFUSED_SENTENCE = (
+    "This document already contains {{ }} or {% %} marks that aren't fields, so a fillable "
+    "copy can't be made from it. Remove them and attach it again."
+)
+
+UNREADABLE_SENTENCE = "The document could not be read."
+
+
 # ── Reference caps ────────────────────────────────────────────────────────────
 
 
@@ -568,6 +612,241 @@ def word_blank_candidates(raw: bytes) -> list[dict]:
     return out
 
 
+# ── The Word fillable copy (D-26, D-27, D-28) ─────────────────────────────────
+#
+# The AI only NAMES a spot (anchor_kind + anchor_label). Everything below decides where that
+# spot is, deterministically, and refuses in words what it cannot find exactly. The token is
+# ``{{ key.value }}`` — never a bare ``{{ key }}``, which renders a Cited dict's repr through
+# docxtpl and still passes the residual check (BUG-261022-01).
+
+
+@dataclass
+class Placement:
+    ok: bool
+    sentence: str | None = None
+    target: tuple | None = None  # identity of the blank, so two fields never share one
+    paragraph: Any = None
+    span: tuple[int, int] | None = None
+    cell: Any = None
+    line_before: str | None = None
+    line_after: str | None = None
+
+
+@dataclass
+class FillableCopyResult:
+    copy: bytes | None
+    placed: list[str]
+    unplaced: list[tuple[str, str]]
+    refused: str | None
+
+
+def _norm_label(label: str) -> str:
+    return re.sub(r"\s+", " ", (label or "").strip()).rstrip(":").strip()
+
+
+def _all_paragraphs(document: Any) -> list:
+    """Body paragraphs, then every table cell's paragraphs, each element once (a merged cell
+    repeats in ``row.cells``)."""
+    seen: set = set()
+    out: list = []
+
+    def _add(p: Any) -> None:
+        if p._p in seen:
+            return
+        seen.add(p._p)
+        out.append(p)
+
+    for p in document.paragraphs:
+        _add(p)
+    for table in document.tables:
+        for row in table.rows:
+            for cell in row.cells:
+                for p in cell.paragraphs:
+                    _add(p)
+    return out
+
+
+def place_anchor(document: Any, anchor_kind: str, anchor_label: str) -> Placement:
+    """Find the ONE blank an anchor names, or say in words why it cannot be found.
+
+    ``line``: the paragraph whose run text holds the label followed by a ``___`` blank.
+    ``cell``: the empty cell immediately right of the cell whose text is the label.
+    Zero matches → the split-blank sentence; more than one → the duplicate sentence."""
+    label = _norm_label(anchor_label)
+    shown = (anchor_label or "").strip() or label
+    if not label:
+        return Placement(ok=False, sentence=couldnt_place_split(shown))
+    if anchor_kind == "line":
+        pat = re.compile(r"(?<![\w])" + re.escape(label) + r"\s*:?\s*(_{3,})")
+        matches = []
+        for i, p in enumerate(_all_paragraphs(document)):
+            text = "".join(r.text for r in p.runs)
+            for m in pat.finditer(text):
+                matches.append((i, p, m.span(1), text))
+        if not matches:
+            return Placement(ok=False, sentence=couldnt_place_split(shown))
+        if len(matches) > 1:
+            return Placement(ok=False, sentence=couldnt_place_duplicate(shown, len(matches)))
+        i, p, (s, e), text = matches[0]
+        return Placement(
+            ok=True,
+            target=("line", i, s),
+            paragraph=p,
+            span=(s, e),
+            line_before=text[:s],
+            line_after=text[e:],
+        )
+    if anchor_kind == "cell":
+        found: list = []
+        seen: set = set()
+        for ti, table in enumerate(document.tables):
+            for ri, row in enumerate(table.rows):
+                cells = row.cells
+                for ci in range(len(cells) - 1):
+                    left, right = cells[ci], cells[ci + 1]
+                    if right._tc is left._tc or right._tc in seen:
+                        continue
+                    if _norm_label(left.text) == label and not right.text.strip():
+                        seen.add(right._tc)
+                        found.append(((ti, ri, ci + 1), left, right))
+        if not found:
+            return Placement(ok=False, sentence=couldnt_place_split(shown))
+        if len(found) > 1:
+            return Placement(ok=False, sentence=couldnt_place_duplicate(shown, len(found)))
+        where, left, right = found[0]
+        return Placement(
+            ok=True,
+            target=("cell",) + where,
+            cell=right,
+            line_before=left.text.strip(),
+            line_after="",
+        )
+    return Placement(ok=False, sentence=couldnt_place_split(shown))
+
+
+def _insert_into_line(paragraph: Any, span: tuple[int, int], token: str) -> None:
+    """Run-preserving span walk: only the runs overlapping the blank change; the first gets
+    the token, later ones lose only their blank characters (RESEARCH, measured)."""
+    s, e = span
+    pos = 0
+    first = True
+    for run in paragraph.runs:
+        a, b = pos, pos + len(run.text)
+        pos = b
+        if b <= s or a >= e:
+            continue
+        lo, hi = max(a, s) - a, min(b, e) - a
+        run.text = run.text[:lo] + (token if first else "") + run.text[hi:]
+        first = False
+
+
+def _insert_into_cell(cell: Any, token: str) -> None:
+    paragraph = cell.paragraphs[0] if cell.paragraphs else cell.add_paragraph()
+    paragraph.text = token
+
+
+def _has_template_marks(docx_bytes: bytes) -> bool:
+    text = _strip_tags_text(docx_bytes)
+    return "{{" in text or "{%" in text
+
+
+def count_token_occurrences(docx: bytes, key: str) -> int:
+    """How many ``{{ key(.attr)* }}`` tokens the document's body, headers and footers carry.
+    ``parse_docx_template_variables`` returns a SET, so exactly-once needs its own count."""
+    text = _strip_tags_text(docx)
+    if not text:
+        return 0
+    return len(re.findall(r"\{\{\s*%s(?:\.[A-Za-z_]\w*)*\s*\}\}" % re.escape(key), text))
+
+
+def _anchor_dict(a: Any) -> dict:
+    if hasattr(a, "model_dump"):
+        return a.model_dump()
+    return dict(a)
+
+
+def make_fillable_copy(original: bytes, anchors: list, _exclude: frozenset = frozenset()) -> FillableCopyResult:
+    """Write ``{{ key.value }}`` into a COPY at each ticked anchor; never mutates ``original``.
+
+    Refuses the whole copy in words when the original already carries ``{{`` / ``{%`` text
+    (RESEARCH Pitfall 13: it would become a live field). After writing, the copy is re-read
+    and every placed key must appear EXACTLY once — a server check, not a prompt ask; a key
+    found more than once is dropped and the copy rebuilt without it."""
+    from app.models.message import RESERVED_RUN_INPUT_KEYS  # noqa: PLC0415
+    from app.services.template_render_service import parse_docx_template_variables  # noqa: PLC0415
+
+    source = bytes(original)
+    if _has_template_marks(source):
+        return FillableCopyResult(copy=None, placed=[], unplaced=[], refused=COPY_REFUSED_SENTENCE)
+    try:
+        import docx  # noqa: PLC0415
+
+        document = docx.Document(io.BytesIO(source))
+    except Exception:  # noqa: BLE001
+        return FillableCopyResult(copy=None, placed=[], unplaced=[], refused=UNREADABLE_SENTENCE)
+
+    unplaced: list[tuple[str, str]] = []
+    plans: list[tuple[str, str, Placement]] = []
+    keys: set[str] = set()
+    taken: set = set()
+    for raw_anchor in anchors or []:
+        a = _anchor_dict(raw_anchor)
+        key = str(a.get("key") or "").strip()
+        kind = a.get("anchor_kind")
+        label = str(a.get("anchor_label") or "").strip()
+        shown = label or key
+        if not KEY_RE.match(key) or key in RESERVED_RUN_INPUT_KEYS:
+            unplaced.append((shown, couldnt_place_bad_key(shown)))
+            continue
+        if key in _exclude:
+            unplaced.append((shown, couldnt_place_split(shown)))
+            continue
+        if key in keys:
+            unplaced.append((shown, couldnt_place_key_reused(shown, key)))
+            continue
+        loc = place_anchor(document, kind, label)
+        if not loc.ok:
+            unplaced.append((shown, loc.sentence or couldnt_place_split(shown)))
+            continue
+        if loc.target in taken:
+            unplaced.append((shown, couldnt_place_taken(shown)))
+            continue
+        taken.add(loc.target)
+        keys.add(key)
+        plans.append((key, shown, loc))
+
+    # Cells are independent; line spans are written right-to-left so an earlier span in the
+    # same paragraph keeps its offsets.
+    for key, _, loc in plans:
+        if loc.cell is not None:
+            _insert_into_cell(loc.cell, "{{ %s.value }}" % key)
+    for key, _, loc in sorted(
+        (pl for pl in plans if pl[2].paragraph is not None), key=lambda pl: -pl[2].span[0]
+    ):
+        _insert_into_line(loc.paragraph, loc.span, "{{ %s.value }}" % key)
+
+    buf = io.BytesIO()
+    document.save(buf)
+    copy = buf.getvalue()
+
+    parsed = parse_docx_template_variables(copy) or {}
+    names = set(parsed.get("scalars") or [])
+    placed: list[str] = []
+    many: set[str] = set()
+    for key, shown, _ in plans:
+        n = count_token_occurrences(copy, key)
+        if n == 1 and key in names:
+            placed.append(key)
+            continue
+        if n > 1:
+            many.add(key)
+        else:
+            unplaced.append((shown, couldnt_place_split(shown)))
+    if many:
+        return make_fillable_copy(original, anchors, _exclude=_exclude | frozenset(many))
+    return FillableCopyResult(copy=copy, placed=placed, unplaced=unplaced, refused=None)
+
+
 # ── The read-time AI proposal ─────────────────────────────────────────────────
 
 
@@ -854,7 +1133,63 @@ def _read_docx_form(raw: bytes, filename: str, propose: Callable | None) -> Desc
             text=text,
             cut_short=note,
         )
-    return DescribeReadResult(role="form", arm="none", filename=filename, text=text, cut_short=note)
+    if _has_template_marks(raw):
+        # Stray ``{{`` / ``{%`` that are not parseable fields: it is not a template, and a
+        # copy made from it would turn them live (Pitfall 13). Said in words, never guessed.
+        return DescribeReadResult(
+            role="form",
+            arm="copy_refused",
+            filename=filename,
+            text=text,
+            cut_short=note,
+            refused=COPY_REFUSED_SENTENCE,
+        )
+    candidates = word_blank_candidates(raw)
+    if not candidates:
+        return DescribeReadResult(role="form", arm="none", filename=filename, text=text, cut_short=note)
+
+    import docx  # noqa: PLC0415
+
+    # A DRY RUN on a parsed copy: placement is decided here, nothing is written or saved.
+    document = docx.Document(io.BytesIO(raw))
+    fields: list[dict] = []
+    unplaced: list[dict] = []
+    taken: set = set()
+    for p in _clean_proposals(_call_propose(propose, text, candidates)):
+        kind, label = p["anchor_kind"], p["anchor_label"]
+        shown = label or p["label"]
+        if not kind or not label:
+            unplaced.append({"label": shown, "sentence": couldnt_place_split(shown)})
+            continue
+        loc = place_anchor(document, kind, label)
+        if not loc.ok:
+            unplaced.append({"label": shown, "sentence": loc.sentence or couldnt_place_split(shown)})
+            continue
+        if loc.target in taken:
+            unplaced.append({"label": shown, "sentence": couldnt_place_taken(shown)})
+            continue
+        taken.add(loc.target)
+        fields.append(
+            _field(
+                p["key"],
+                p["label"],
+                p["type"],
+                "ai_proposed",
+                line_before=loc.line_before,
+                line_after=loc.line_after,
+                anchor_kind=kind,
+                anchor_label=label,
+            )
+        )
+    return DescribeReadResult(
+        role="form",
+        arm="blanks" if (fields or unplaced) else "none",
+        filename=filename,
+        fields=fields,
+        unplaced=unplaced,
+        text=text,
+        cut_short=note,
+    )
 
 
 def _read_pdf_form(raw: bytes, filename: str, app_settings: Any, propose: Callable | None) -> DescribeReadResult:
