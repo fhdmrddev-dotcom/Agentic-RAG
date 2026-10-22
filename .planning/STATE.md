@@ -2,14 +2,14 @@
 gsd_state_version: 1.0
 milestone: v4.7
 milestone_name: Workflows You Can See and Start Anywhere
-status: ready_to_plan
-last_updated: "2026-10-22T00:00:00.000Z"
+status: ready_to_execute
+last_updated: "2026-10-22T17:05:14.346Z"
 progress:
   total_phases: 17
-  completed_phases: 6
-  total_plans: 35
-  completed_plans: 34
-  percent: 35
+  completed_phases: 7
+  total_plans: 40
+  completed_plans: 38
+  percent: 41
 ---
 
 # Project State
@@ -41,12 +41,13 @@ reviewer exists, so a phase closes `verification_mode: self-verified`, never `re
 
 ## Current Position
 
-Phase: 290 (the-card-and-the-team-picture) — EXECUTING
-Previous: Phase: 294 (decision-engine-rerank-and-citation-check) — EXECUTED, human_needed (2026-10-20)
-Plan: 1 of 4
+Phase: 291 (describe-it-from-your-own-files) — PLANNED, ready to execute (2026-10-22)
+Previous: Phase: 290 (the-card-and-the-team-picture) — EXECUTED, human_needed (2026-10-22)
+Plan: 0 of 5
 
 ### Roadmap Evolution
 
+- Phase 291 planned (2026-10-22, autonomous run): 5 plans in 4 waves (W1: 01 read the files · W2: 02 draft from the files ‖ 03 fill the form back · W3: 04 the describe door · W4: 05 arrival card + close-out). Research, PATTERNS, UI-SPEC (approved rev 1). Planning-time decisions D-31..D-35 added to CONTEXT; D-32 narrows D-05 (references not read at run time) and D-33 narrows D-07 (reload counted from first autosave) — owed: operator ack. Plan check passed in round 2 (2 blockers + 4 warnings fixed in round 1; W2 null-keys closed by hand). Decisions 35/35 cited in must_haves (gate parses 21; rest checked by hand). Filed BUG-261022-01. Next: `/gsd:execute-phase 291`.
 - Phase 294 added (2026-10-20, operator): Decision Engine: Rerank and Citation Check (DEC-01..03). It is outside the workflow theme, independent of 290-293, and can run any time after 289. Intake research: `phases/294-decision-engine-rerank-and-citation-check/294-INTAKE-RESEARCH.md`. `gsd-sdk query phase.add` wrote the entry under the v3.0 section; it was moved by hand into v4.7.
 - Phase 294 context gathered (2026-10-20): `phases/294-decision-engine-rerank-and-citation-check/294-CONTEXT.md` (D-01..D-24). DEC-01 amended: Jev via OpenRouter only. Next for 294: `/gsd:sketch` (D-20, G-2) before `/gsd:plan-phase 294`. Phase 290 is still the current position.
 - Phase 295 added (2026-10-20, operator): Runs That Don't Dead-End (RUN-01..04). It came from a measurement during sketch 290: 35 of 36 workflow gate failures in 60 days are `citations_required`, and no failure came from a missing branch or loop (`SEED-295` stays parked). Bugs `BUG-261020-07`..`12` are folded. `gsd-sdk query phase.add` wrote the entry under the v3.0 section again; it was moved by hand into v4.7. Sketch 290 winner: A org chart (`46c23fe00`).

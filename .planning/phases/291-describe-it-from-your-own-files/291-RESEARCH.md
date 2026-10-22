@@ -446,18 +446,18 @@ count = len(re.findall(r"\{\{\s*%s(?:\.[A-Za-z_]\w*)*\s*\}\}" % re.escape(key), 
 | A8 | Reference-doc cap: total ≈ 35% of `resolve_context_budget` tokens × 3.5 chars, split across files, clamped to [8,000, 60,000] chars per file (≈ 20 k chars/file on 100 k-token providers) | Discretion | Truncation too aggressive or too loose |
 | A9 | "Steps can cite or read them at run time" (D-05): there is **no run-time consumer of `assets[kind=reference]` today** (grep-verified); 291 stores and lists them, and draft-time use is the only use | Open Q2 | D-05's run-time half would be a new capability (a phase, per G-7's closure rule) |
 
-## Open Questions
+## Open Questions (RESOLVED)
 
-1. **D-14 describe-text half: file-blind emit vs ticks-only.**
+1. **D-14 describe-text half: file-blind emit vs ticks-only.** RESOLVED: D-31 (file-blind describe-only call, fail-closed to ticks).
    - What we know: ticks are resolved server-side today. Describe-text "intent" is semantic.
    - Unclear: whether one extra small emit per file-bearing generate is acceptable.
    - Recommendation: file-blind emit, fail-closed to ticks-only. Ask the operator at plan time only if cost is a concern.
-2. **D-05 "read them at run time".**
+2. **D-05 "read them at run time".** RESOLVED: D-32 (stored and shown; run-time reading deferred to a new seed).
    - What we know: `assets[kind=reference]` has zero run-time consumers. Only `kind=template` is read (`_emit_bound_asset_ref`, `reachability._check_template_bound`).
    - Recommendation: 291 stores, lists and re-reads references at authoring time (draft + reload). Run-time reading is a new capability: plant a seed rather than build it inside a 3-5 plan phase. Confirm with the operator.
-3. **Pre-draft reload (S3 scope).** See A6. Recommendation: define S3 as after the first autosave and state the pre-draft behaviour in words on the door.
-4. **SEED-327 fold?** 291 drives 8 providers on a `forced_emit` path whose system prompt reaches only 2. Its trigger fires only if 291 names `forced_emit.py` or the adapters, which this plan avoids by putting everything in the user turn. Recommendation: do not fold. Record in VALIDATION that S5 measures the shipping path, and that rows 3-8 run without `AUTHORING_SYSTEM_PROMPT`.
-5. **Latent bug, not 291's to fix:** a library template authored with bare `{{ name }}` renders a dict repr through docxtpl and passes the residual check (measured). Recommend filing a `.planning/reported-bugs/` report (`surface: Agentic-RAG`).
+3. **Pre-draft reload (S3 scope).** RESOLVED: D-33 (counted from the first autosave; stated in words on the door). See A6. Recommendation: define S3 as after the first autosave and state the pre-draft behaviour in words on the door.
+4. **SEED-327 fold?** RESOLVED: D-35 (not folded; fence in the user turn; VALIDATION records it). 291 drives 8 providers on a `forced_emit` path whose system prompt reaches only 2. Its trigger fires only if 291 names `forced_emit.py` or the adapters, which this plan avoids by putting everything in the user turn. Recommendation: do not fold. Record in VALIDATION that S5 measures the shipping path, and that rows 3-8 run without `AUTHORING_SYSTEM_PROMPT`.
+5. **Latent bug, not 291's to fix:** RESOLVED: filed as `BUG-261022-01` (`.planning/reported-bugs/docx-template-bare-token-may-render-a-dict-repr.md`), not 291 scope. a library template authored with bare `{{ name }}` renders a dict repr through docxtpl and passes the residual check (measured). Recommend filing a `.planning/reported-bugs/` report (`surface: Agentic-RAG`).
 
 ## Environment Availability
 

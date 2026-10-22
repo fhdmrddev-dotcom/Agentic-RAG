@@ -252,7 +252,26 @@ Plans:
   5. A run hands back the author's own form filled in, without the author adding placeholders: a fillable PDF through its own fields, and a Word document's blanks through a copy the author confirmed while authoring (AUTH-02; added 2026-10-22, 291-CONTEXT D-25..D-29).
 
 **How we'd know this failed**: inputs are guessed from the prompt and ignore the form; the draft names a tool that does not exist; an uploaded document gains the power to grant a tool; only one provider was driven; the asset text is lost on reload; the form's questions are asked but the run hands back no filled form, or a half-filled one.
-**Plans**: TBD (target 3-5)
+**Plans**: 5 plans (4 waves)
+
+Plans:
+**Wave 1**
+
+- [ ] 291-01-PLAN.md — Read the files: stateless describe read door, AcroForm/Word-blank/scan/reference reader, Word fillable copy, pdf + reference binds, ledger rows (W1)
+
+**Wave 2** *(blocked on Wave 1 completion)*
+
+- [ ] 291-02-PLAN.md — Draft from the files: user-turn fence, coverage + server-added inputs, file-blind powers guard with Removed words, degraded refusal, S5 roster harness (W2)
+- [ ] 291-03-PLAN.md — Fill the form back: acroform arm in render_template, person's answers overlay, read-back proof (W2)
+
+**Wave 3** *(blocked on Wave 2 completion)*
+
+- [ ] 291-04-PLAN.md — The describe door: form slot arms, references section on both doors, generate forwarding and bind (W3)
+
+**Wave 4** *(blocked on Wave 3 completion)*
+
+- [ ] 291-05-PLAN.md — The arrival card (Removed line, inputs fold), kb_auto launch skip, post-reload homes, ledger/seeds close-out (W4)
+
 **UI hint**: yes
 **Flags**: **Provider-docs-first** (structured output per provider). **SC#10 four-axis UAT, full roster**. security_enforcement: asset content is untrusted. Closed core recount. Hot files: `workflow_authoring.py` (17/11/1025), `workflows.py`, `useTemplateFirstDraft.ts`. Seed `SEED-051`.
 
