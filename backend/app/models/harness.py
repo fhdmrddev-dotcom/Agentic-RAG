@@ -658,6 +658,8 @@ class InputFieldSpec(_StrictBase):
     source: Literal["user", "kb_auto", "template_derived"] = "user"  # open-Q (i) settled
     enum_options: list[str] = []
     folder_scope: list[UUID] | None = None  # if kb_auto: RESOLVED ids, not a path (open-Q iii)
+    origin: Literal["ai_proposed", "server_added"] | None = None  # 291 D-12 — stamped server-side, never read off the payload
+    note: str | None = None  # 291 D-10 — why an input that is not a form field exists
 
 
 class AssetRef(_StrictBase):

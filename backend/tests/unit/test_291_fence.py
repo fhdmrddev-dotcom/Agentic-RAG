@@ -128,16 +128,20 @@ def test_an_uncut_document_carries_no_cut_sentence():
 
 def test_the_frame_lengths_are_RE_DERIVED_not_trusted():
     """test_214 idiom: the literal's length is measured here, so a frame that grows into a
-    nudge fails loudly rather than leaving a comment that quietly reads false."""
+    nudge fails loudly rather than leaving a comment that quietly reads false.
+
+    ⚠ IT FIRED IN THE COMMIT THAT WROTE IT, as test_214's did: the RED version hand-guessed
+    196 and 339; the first GREEN run measured 178 and 310, and those are the figures below.
+    """
     from app.services.describe_draft_guards import DATA_NOT_INSTRUCTIONS, render_documents_block
 
     sentence_len = len(DATA_NOT_INSTRUCTIONS)
-    assert sentence_len == 196, sentence_len
+    assert sentence_len == 178, sentence_len
 
     # Frame overhead = the block minus the document text it carries, for one reference.
     text = "payload"
     block = render_documents_block(None, [{"filename": "r.txt", "text": text}])
     overhead = len(block) - len(text)
-    assert overhead == 339, overhead
+    assert overhead == 310, overhead
     # Proportionate to the DELIVERABLE RULE block it shares the prompt with (test_214's bar).
     assert overhead < 1202
