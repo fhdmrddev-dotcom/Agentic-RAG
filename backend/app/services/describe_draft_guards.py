@@ -222,6 +222,16 @@ def add_server_inputs(wd, fields: list[dict], keys: list[str]):
     return wd.model_copy(update={"inputs": [*(wd.inputs or []), *additions]})
 
 
+def server_add_missing(wd, fields: list[dict]) -> tuple[Any, list[str]]:
+    """``add_server_inputs`` for every still-missing field; returns the keys ACTUALLY added
+    (a reserved or already-declared key is not added and is not stamped ``server_added``)."""
+    if not fields:
+        return wd, []
+    before = set(_input_keys(wd))
+    out = add_server_inputs(wd, fields, missing_fields(wd, fields))
+    return out, [k for k in _input_keys(out) if k not in before]
+
+
 def stamp_input_origins(wd, fields: list[dict], added_keys: list[str]):
     """Stamp ``origin`` and keep ``note`` SERVER-SIDE on every generation (T-291-13).
 

@@ -46,12 +46,12 @@ import json
 import logging
 import re
 import zipfile
-from typing import Literal
+from typing import Annotated, Literal
 from uuid import UUID, uuid4
 
 import anyio.from_thread
 from fastapi import Depends, File, Form, HTTPException, Query, UploadFile, status
-from pydantic import BaseModel, ValidationError
+from pydantic import BaseModel, Field, StringConstraints, ValidationError, field_validator
 from starlette.concurrency import run_in_threadpool
 from supabase import Client
 
@@ -90,6 +90,60 @@ from app.services.workspace_service import BUCKET_NAME, MAX_FILE_SIZE
 logger = logging.getLogger("app.api.workflows")
 
 
+# ── Phase 291-02 (AUTH-02) — the describe door's files, as the generate body carries them ────
+#
+# UNTRUSTED, every byte: these are client-held READ RESULTS from ``/describe/read`` (Pitfall 11 —
+# the bytes are not re-read at generate time). The server re-caps each text and fences it as
+# data (``describe_draft_guards``); nothing here can grant a tool, a connection or an action.
+# ``_GENERATE_TEXT_MAX`` bounds the body (T-291-14); the per-model re-cap is far below it.
+_GENERATE_TEXT_MAX = 250_000
+_FIELD_KEY_FORBIDDEN = re.compile(r"[\x00-\x1f\x7f{}%<>]")
+
+
+class DescribeFormFieldIn(BaseModel):
+    model_config = {"extra": "forbid"}
+
+    key: str = Field(min_length=1, max_length=200)
+    label: str = Field("", max_length=200)
+    type: Literal["text", "number", "date", "enum"]
+    enum_options: list[Annotated[str, StringConstraints(max_length=200)]] = Field(
+        default_factory=list, max_length=50
+    )
+    origin: Literal["exact", "ai_proposed"]
+
+    @field_validator("key")
+    @classmethod
+    def _key_is_not_template_syntax(cls, value: str) -> str:
+        if _FIELD_KEY_FORBIDDEN.search(value):
+            raise ValueError("a field name may not contain control characters or { } % < >")
+        return value
+
+
+class DescribeFormIn(BaseModel):
+    model_config = {"extra": "forbid"}
+
+    filename: str = Field(max_length=255)
+    arm: Literal[
+        "template_fields",
+        "form_fields",
+        "suggested_fields",
+        "blanks",
+        "none",
+        "not_word",
+        "scan_unreadable",
+        "copy_refused",
+    ]
+    fields: list[DescribeFormFieldIn] = Field(default_factory=list, max_length=200)
+    text: str = Field("", max_length=_GENERATE_TEXT_MAX)
+
+
+class DescribeReferenceIn(BaseModel):
+    model_config = {"extra": "forbid"}
+
+    filename: str = Field(max_length=255)
+    text: str = Field(max_length=_GENERATE_TEXT_MAX)
+
+
 class GenerateRequest(BaseModel):
     """The NL-authoring body (D-103-CONF-2). ``describe`` is the plain-language task;
     template grounding is OPTIONAL — a library ``template_asset_id`` OR a direct
@@ -114,6 +168,10 @@ class GenerateRequest(BaseModel):
     # generation on a malformed id the ENFORCEMENT below would otherwise simply refuse to
     # honour — an unrecognised id constrains, it never widens.
     allowed_connection_ids: list[str] | None = None
+    # Phase 291-02 (D-03 / D-05) — the attached form and up to five references. Both absent is
+    # today's request exactly; ``references=[]`` stays ``[]`` (absent and empty never collapse).
+    form: DescribeFormIn | None = None
+    references: list[DescribeReferenceIn] | None = Field(None, max_length=5)
 
 
 async def generate_workflow(
@@ -150,6 +208,9 @@ async def generate_workflow(
         # Every one of those collapses the absent arm into the empty one or the reverse, and
         # the two mean opposite things (see the field's own declaration above).
         allowed_connection_ids=body.allowed_connection_ids,
+        # ⚠ FORWARDED VERBATIM too: None stays None and [] stays [].
+        form=body.form.model_dump() if body.form is not None else None,
+        references=[r.model_dump() for r in body.references] if body.references is not None else None,
     )
     return result
 

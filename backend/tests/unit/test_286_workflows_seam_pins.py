@@ -53,6 +53,19 @@ its Phase 291 paragraph); ``workflows_moved_ast.json`` +2 / −2 (the ``body_sha
 ``upload_workflow_template`` and of ``get_workflow_template_placeholders``; both decorator
 digests unchanged). ``_MOVE_SET`` stays 25: the new handlers are pinned in
 ``test_291_describe_read_door.py``, not here.
+
+DELIBERATE RE-BASELINE (Phase 291-02, 2026-10-22): the generate body gained the describe
+door's files — ``GenerateRequest.form`` (``DescribeFormIn``) and ``GenerateRequest.references``
+(``list[DescribeReferenceIn]``, max 5) — and ``generate_workflow`` forwards both verbatim.
+``InputFieldSpec`` (reached from the ``/workflows`` sub-document) gained the optional
+``origin`` / ``note`` pair. ``PIN286_CAPTURE=1`` was run once and each fixture diff was read:
+``workflows_openapi.json`` +167 / −0 (the three new schemas ``DescribeFormFieldIn`` /
+``DescribeFormIn`` / ``DescribeReferenceIn``, the two ``GenerateRequest`` properties, and
+``InputFieldSpec``'s ``origin`` + ``note``); ``workflows_moved_ast.json`` +2 / −2 (the
+``body_sha256`` of ``GenerateRequest`` and of ``generate_workflow``; decorator digests
+unchanged); ``workflows_routes.json`` byte-unchanged (the capture rewrote only its line endings,
+restored). ``_MOVE_SET`` stays 25; the new request models are pinned in
+``test_291_generate_degraded.py``.
 """
 
 from __future__ import annotations
