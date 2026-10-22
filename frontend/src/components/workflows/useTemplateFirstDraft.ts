@@ -487,7 +487,7 @@ export function useReferenceReads(initial?: readonly TemplateReadAnswer[] | null
       }
       write({ slots, order })
       // ONE line, for the most consequential thing this pick did.
-      if (overflow.length > 0) setNotice({ kind: "overflow", text: refsOverflow(overflow) })
+      if (overflow.length > 0) setNotice({ kind: "overflow", text: refsOverflow(...overflow) })
       else if (tooBig) setNotice({ kind: "refused", text: refsRefused(tooBig.name, REFS_REFUSED_FALLBACK) })
       else if (duplicate) setNotice({ kind: "duplicate", text: refsDuplicate(duplicate.name) })
       else setNotice(null)

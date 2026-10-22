@@ -237,10 +237,166 @@ export function showAllLabel(count: number): string {
   return `Show all ${count}`
 }
 
-// ── 291 · Surface 2 · the references section's notices (UI-SPEC copy, verbatim) ─────────
+// ── 291 · Surface 1 · the form slot (UI-SPEC copy, verbatim) ─────────────────────────────
+//
+// The slot takes a FORM (a PDF or a Word document with blanks) as well as a `{{ }}` template.
+// The rail's own label, types note and filter are not changed (UI-SPEC decision 3): these are
+// the door's. Server-sourced sentences (couldn't place, cut short, copy refused) are NOT here —
+// they are rendered as received.
+
+/** The slot's picker label. */
+export const DESCRIBE_FORM_ATTACH_LABEL = "Attach a form or template"
+
+/** What the slot accepts, in words. */
+export const DESCRIBE_FORM_TYPES_NOTE =
+  "A form (PDF or Word) or a template (.docx, .pptx or .xlsx), up to 10 MB."
+
+/** The slot's native filter. */
+export const DESCRIBE_FORM_ACCEPT = ".pdf,.docx,.pptx,.xlsx"
+
+/** The read is in flight, for any kind of file. */
+export const DESCRIBE_READING = "Reading this document…"
+
+/** The in-flight footing. */
+export const FOOTING_READING_DOCUMENT =
+  "Reading the document — the draft will be built to whatever it asks for."
+
+/** A form's fields heading — on the door, and on the rail when the bound file is a PDF. */
+export const FORM_FIELDS_HEADING = "What this form asks for"
+
+/** Provenance: the form DECLARES these fields. */
+export const FORM_PROVENANCE_EXACT = "Read from the form's own fields."
+
+/** Provenance: the AI named them, from the form's text. */
+export const FORM_PROVENANCE_SUGGESTED_TEXT = "Suggested by AI from the text of this form."
+
+/** Provenance: the AI named them, from a reading of a scan. */
+export const FORM_PROVENANCE_SUGGESTED_SCAN = "Suggested by AI from a reading of this scan."
+
+/** The tag on an AI-named field. Provenance, not a verdict. */
+export const FIELD_SUGGESTED_TAG = "suggested"
+
+/** What a run does with a fillable PDF. The filename is DATA. */
+export function formBackLinePdf(filename: string): string {
+  return `Answers go into this form's own fields. Each run hands back ${filename}, filled in.`
+}
+
+/** A PDF with no fillable fields: the answers cannot be written onto it (SEED-368 case 4). */
+export const FORM_BACK_FLAT =
+  "This PDF has no fillable fields, so runs can't write the answers onto it."
+
+/** The Word placement list's heading (D-27). */
+export const PLACES_HEADING = "Where each answer goes"
+
+/** …and its provenance, which also says what a tick does. */
+export const PLACES_PROVENANCE =
+  "Suggested by AI from the blanks in this document. Untick any blank it shouldn't fill."
+
+/** The real-DOM marker after an unticked line. The row renders the space before it. */
+export const PLACE_STAYS_BLANK = "· stays blank"
+
+/** What a run does with a Word form. The filename is DATA. */
+export function formBackLineWord(filename: string): string {
+  return `Answers are written into a copy of ${filename}. Your original isn't changed.`
+}
+
+/** The footing for AI-suggested fields: the draft ASKS for them (it cannot fill the file). */
+export function footingAsks(count: number): string {
+  return count === 1
+    ? "Your draft will ask for this 1 field."
+    : `Your draft will ask for these ${count} fields.`
+}
+
+/** D-02 — opened, and nothing to fill: the file is used as a reference. */
+export function noFieldsLine(filename: string): string {
+  return `No fields found in ${filename}, so it's used as reference only.`
+}
+
+/** The footing for a file used as a reference. */
+export const FOOTING_REFERENCE_ONLY =
+  "Your draft will be written from your description, using this document as a reference."
+
+/** D-08 — a scan nothing could be read from. Shared by the slot and the references. */
+export const SCAN_UNREADABLE =
+  "Couldn't read this scan. It stays attached, but the draft can't use what's in it. To use it, type what matters into your description."
+
+/** The footing when the file cannot inform the draft. */
+export const FOOTING_WITHOUT_IT = "Your draft will be written without it."
+
+/** A PDF we could not read — a fact about US, never about the document. */
+export const FORM_UNAVAILABLE =
+  "We couldn't read this form. It's still attached — this says nothing about what's in it. To try again, remove it and attach it once more."
+
+/** …and its footing. */
+export const FOOTING_FORM_UNAVAILABLE =
+  "We couldn't read this form, so your draft will be written from your description alone."
+
+/** The input a type word is computed from: a field's type and, for a choice, its options. */
+export type FieldTypeInput = { type: string; enum_options?: readonly string[] | null }
+
+/**
+ * ONE formatter for a field's type word, on the door and on the arrival card alike.
+ *
+ * `enum` whose options are exactly yes and no (case-insensitive) reads `yes / no`; any other
+ * `enum` reads `choice of {n}`. Accepts the type alone too, so a caller holding only a type
+ * string gets the same word.
+ */
+export function fieldTypeWord(input: FieldTypeInput | string): string {
+  const type = typeof input === "object" && input !== null ? input.type : String(input)
+  const options = typeof input === "object" && input !== null ? (input.enum_options ?? []) : []
+  if (type !== "enum") return type
+  const lower = options.map((o) => o.toLowerCase())
+  if (lower.length === 2 && lower.includes("yes") && lower.includes("no")) return "yes / no"
+  return `choice of ${options.length}`
+}
+
+// ── 291 · Surface 2 · the references section (UI-SPEC copy, verbatim) ───────────────────
 //
 // The interpolated half is DATA (a filename, a list of names, a server sentence); the words
 // around it live here. The server's sentence is passed through whole, never re-worded.
+
+/** The section's question. */
+export const REFS_PROMPT = "Anything it should read first?"
+
+/** The section's note — what they are for and where they are kept. */
+export const REFS_NOTE =
+  "Up to 5 documents. The draft uses what's in them to write its steps. They're kept with this workflow, not added to your Library."
+
+/** The picker label. */
+export const REFS_LABEL = "Add a reference"
+
+/** The count beside the picker label. */
+export function refsCount(count: number): string {
+  return `· ${count} of 5`
+}
+
+/** The references' native filter. */
+export const REFS_ACCEPT = ".pdf,.docx,.txt,.md"
+
+/** What the section accepts, in words. */
+export const REFS_TYPES = "PDF, Word or text (.pdf, .docx, .txt or .md), up to 10 MB each."
+
+/** At the limit — and the reason the disabled picker gives. */
+export const REFS_FULL = "5 of 5. Remove one to add another."
+
+/** A row's remove control, visibly. */
+export const REFS_REMOVE = "Remove file"
+
+/** …and its accessible name, which names the file. */
+export function refsRemoveLabel(filename: string): string {
+  return `Remove ${filename}`
+}
+
+/** A reference being read. */
+export const REFS_READING = "Reading…"
+
+/** A reference read whole. */
+export const REFS_READ_FULL = "Read in full."
+
+/** A reference whose read got no answer — the file stays. */
+export function refsSendFailed(filename: string): string {
+  return `Couldn't send ${filename}. Check your connection, then add it again.`
+}
 
 /** A refused file with no server sentence to relay. */
 export const REFS_REFUSED_FALLBACK =
@@ -251,8 +407,8 @@ export function refsRefused(filename: string, sentence: string): string {
   return `Couldn't add ${filename}. ${sentence}`
 }
 
-/** A multi-pick that did not fit in the five places (D-03). */
-export function refsOverflow(names: readonly string[]): string {
+/** A multi-pick that did not fit in the five places (D-03). Each name is DATA. */
+export function refsOverflow(...names: string[]): string {
   return `Only 5 references fit, so these weren't added: ${names.join(", ")}.`
 }
 
@@ -260,3 +416,15 @@ export function refsOverflow(names: readonly string[]): string {
 export function refsDuplicate(filename: string): string {
   return `${filename} is already added.`
 }
+
+/** While any file reads — the reason the CTA waits (Pitfall 11). */
+export const REFS_FOOTING_READING =
+  "Reading your files — you can write the draft once they're read."
+
+/** A STRUCTURAL claim about what files can do (D-17): never a claim that a file is fine. */
+export const REFS_POWERS =
+  "Files can shape the steps. Only your description and the services you tick can add actions."
+
+/** Orchestrator decision 3: the files survive a reload only from the first autosave. */
+export const REFS_KEEP =
+  "Your files are kept once the draft is first saved. Leave this page before then and you'll need to add them again."
