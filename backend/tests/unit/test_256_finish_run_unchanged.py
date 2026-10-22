@@ -127,7 +127,12 @@ _EXPECTED_CALL_SITES = {
     #   Only the position shifted (+6), when `_INCOMPLETE_CODES` gained `no_template_bound` and
     #   its D-45 comment above the call; delete_workflow_cascade and the call are unchanged.
     #   api/workflows.py:1550 → 1556
-    "api/workflows.py:1556",
+    # ⚠ RE-DERIVED at Phase 291 Plan 01: (a) the COUNTS stayed identical ("api/workflows.py": 1).
+    #   Only the position shifted (+16): four import names and the `/describe/read`
+    #   registration (12 lines) land above it; delete_workflow_cascade and the call are unchanged.
+    #   Re-derived with `grep -n "await finish_run(" backend/app/api/workflows.py`.
+    #   api/workflows.py:1556 → 1572
+    "api/workflows.py:1572",
     # ⚠ RE-DERIVED at Phase 256 round 1 (plan 256-05), and the originals are recorded
     # beside the new values rather than over them, because this fence's own docstring
     # asks for exactly that: check (a) — the per-file COUNTS — stayed identical, so no

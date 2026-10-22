@@ -125,12 +125,14 @@ from app.services.template_render_service import (
 from app.api.workflow_wire import (
     BlockedStep,
     DeletePreview,
+    DescribeReadResponse,
     DraftCreateResponse,
     GroundingBundleResponse,
     PaletteFolder,
     PaletteSkill,
     PublishRequest,
     PublishVerdict,
+    ReferenceAssetRef,
     TemplateAssetRef,
     TemplatePlaceholdersResponse,
     ValidateResponse,
@@ -148,7 +150,9 @@ from app.api.workflow_authoring_doors import (
     GenerateRequest,
     generate_workflow,
     get_workflow_template_placeholders,
+    read_describe_file,
     read_template_placeholders,
+    upload_workflow_reference,
     upload_workflow_template,
 )
 
@@ -1075,6 +1079,18 @@ async def get_grounding_bundle(
     )
 
 
+# Phase 291 (AUTH-02, 291-01): the describe door's stateless file read lives in
+# ``workflow_authoring_doors.py``. Registered BEFORE the first ``/{definition_id}`` pattern.
+router.post(
+    "/describe/read",
+    response_model=DescribeReadResponse,
+    dependencies=[
+        Depends(require_visible("workflow_authoring")),  # Phase 148 (VIS-01) — authoring gate
+        Depends(require_capability("workflows")),  # v4.3 audit (TIER-01) — every authoring write, not two
+    ],
+)(read_describe_file)
+
+
 # ── Phase 102 (QUAL-01 / D-07) — the server-side publish path ─────────────────
 # G-5 RED LINE: this endpoint joins THIS router (api/workflows.py), NEVER
 # api/threads.py (the hot-file ledger forbids growing threads.py). The publish flip
@@ -1642,6 +1658,18 @@ router.post(
         Depends(require_capability("workflows")),  # v4.3 audit (TIER-01) — every authoring write, not two
     ],
 )(upload_workflow_template)
+
+
+# Phase 291 (AUTH-02, 291-01): ``upload_workflow_reference`` lives in ``workflow_authoring_doors.py``.
+router.post(
+    "/{definition_id}/reference",
+    response_model=ReferenceAssetRef,
+    status_code=status.HTTP_201_CREATED,
+    dependencies=[
+        Depends(require_visible("workflow_authoring")),  # Phase 148 (VIS-01) — authoring gate
+        Depends(require_capability("workflows")),  # v4.3 audit (TIER-01) — every authoring write, not two
+    ],
+)(upload_workflow_reference)
 
 
 # Phase 286 (286-01): ``get_workflow_template_placeholders`` lives in ``workflow_authoring_doors.py``.

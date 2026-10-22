@@ -118,6 +118,55 @@
       ]
     },
     {
+      "path": "/workflows/describe/read",
+      "methods": [
+        "POST"
+      ],
+      "name": "read_describe_file",
+      "endpoint": "read_describe_file",
+      "response_model": "DescribeReadResponse",
+      "status_code": null,
+      "route_dependencies": [
+        {
+          "qualname": "require_visible.<locals>._dep",
+          "closure_strings": [
+            "workflow_authoring"
+          ]
+        },
+        {
+          "qualname": "require_capability.<locals>._require_capability",
+          "closure_strings": [
+            "workflows"
+          ]
+        }
+      ],
+      "query_params": [],
+      "path_params": [],
+      "header_params": [],
+      "body_params": [
+        "file",
+        "role"
+      ],
+      "sub_dependencies": [
+        {
+          "qualname": "require_visible.<locals>._dep",
+          "closure_strings": [
+            "workflow_authoring"
+          ]
+        },
+        {
+          "qualname": "require_capability.<locals>._require_capability",
+          "closure_strings": [
+            "workflows"
+          ]
+        },
+        {
+          "qualname": "get_current_user",
+          "closure_strings": []
+        }
+      ]
+    },
+    {
       "path": "/workflows/{definition_id}/publish",
       "methods": [
         "POST"
@@ -546,6 +595,61 @@
       ],
       "header_params": [],
       "body_params": [
+        "file",
+        "anchors"
+      ],
+      "sub_dependencies": [
+        {
+          "qualname": "require_visible.<locals>._dep",
+          "closure_strings": [
+            "workflow_authoring"
+          ]
+        },
+        {
+          "qualname": "require_capability.<locals>._require_capability",
+          "closure_strings": [
+            "workflows"
+          ]
+        },
+        {
+          "qualname": "get_current_user",
+          "closure_strings": []
+        },
+        {
+          "qualname": "get_user_supabase_client",
+          "closure_strings": []
+        }
+      ]
+    },
+    {
+      "path": "/workflows/{definition_id}/reference",
+      "methods": [
+        "POST"
+      ],
+      "name": "upload_workflow_reference",
+      "endpoint": "upload_workflow_reference",
+      "response_model": "ReferenceAssetRef",
+      "status_code": 201,
+      "route_dependencies": [
+        {
+          "qualname": "require_visible.<locals>._dep",
+          "closure_strings": [
+            "workflow_authoring"
+          ]
+        },
+        {
+          "qualname": "require_capability.<locals>._require_capability",
+          "closure_strings": [
+            "workflows"
+          ]
+        }
+      ],
+      "query_params": [],
+      "path_params": [
+        "definition_id"
+      ],
+      "header_params": [],
+      "body_params": [
         "file"
       ],
       "sub_dependencies": [
@@ -640,6 +744,12 @@
       ]
     },
     {
+      "path": "/workflows/describe/read",
+      "methods": [
+        "POST"
+      ]
+    },
+    {
       "path": "/workflows/{definition_id}/publish",
       "methods": [
         "POST"
@@ -695,6 +805,12 @@
     },
     {
       "path": "/workflows/{definition_id}/template",
+      "methods": [
+        "POST"
+      ]
+    },
+    {
+      "path": "/workflows/{definition_id}/reference",
       "methods": [
         "POST"
       ]
