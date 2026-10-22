@@ -33,6 +33,11 @@ const EXPECTED_KEYS: DescribeRefusalKey[] = [
   "connection_not_allowed:action_not_allowed",
   "no_authoring_model",
   "could_not_generate",
+  // 291-05 (D-20 / SEED-133 / SEED-221) — the FOURTH sub-reason, on a different code: the
+  // degraded-registry refusal 291-02 returns before any provider call. Added to the contract
+  // here because the table now words it; without the row it would read the generic
+  // `could_not_generate` sentence, which blames the model for a registry it never reached.
+  "could_not_generate:grounding_unavailable",
   "grounding_failed",
 ]
 
@@ -52,7 +57,7 @@ const FORBIDDEN = [
 ]
 
 describe("281 (D-11) — the table is total and every row is real words", () => {
-  it("maps exactly the four codes and three sub-reasons", () => {
+  it("maps exactly the four codes and four sub-reasons (291-05 added grounding_unavailable)", () => {
     expect([...ALL_KEYS].sort()).toEqual([...EXPECTED_KEYS].sort())
   })
 
@@ -180,5 +185,32 @@ describe("281 (D-13) — refusalKey joins the code and the additive sub-reason",
     expect(refusalKey("no_authoring_model")).toBe("no_authoring_model")
     expect(refusalKey("no_authoring_model", null)).toBe("no_authoring_model")
     expect(refusalKey("no_authoring_model", "")).toBe("no_authoring_model")
+  })
+})
+
+describe("291-05 (D-20, SEED-221) — the degraded-registry refusal is a sentence and a next step", () => {
+  it("could_not_generate:grounding_unavailable reads in words, never the code", () => {
+    const r = describeRefusal(
+      refusalKey("could_not_generate", "grounding_unavailable"),
+      "The tool registry is degraded: folders.",
+    )
+    expect(r.sentence).toBe(
+      "We couldn't read your folders, skills or tools just now, so the draft wasn't written.",
+    )
+    expect(r.next).toBe("Try again in a moment.")
+    expect(r.sentence).not.toContain("grounding_unavailable")
+    expect(r.next).not.toContain("grounding_unavailable")
+  })
+
+  it("the raw code shows ONLY in the technical-names reveal", () => {
+    const r = describeRefusal("could_not_generate:grounding_unavailable", "detail")
+    expect(r.technical).toBe("could_not_generate · grounding_unavailable")
+    expect(r.technicalDetail).toBe("detail")
+  })
+
+  it("it is NOT the generic could_not_generate sentence, which would blame the model", () => {
+    expect(describeRefusal("could_not_generate:grounding_unavailable").sentence).not.toBe(
+      describeRefusal("could_not_generate").sentence,
+    )
   })
 })
