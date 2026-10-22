@@ -266,7 +266,7 @@ Plans:
 
 **Wave 3** *(blocked on Wave 2 completion)*
 
-- [ ] 291-04-PLAN.md — The describe door: form slot arms, references section on both doors, generate forwarding and bind (W3)
+- [x] 291-04-PLAN.md — The describe door: form slot arms, references section on both doors, generate forwarding and bind (W3)
 
 **Wave 4** *(blocked on Wave 3 completion)*
 
