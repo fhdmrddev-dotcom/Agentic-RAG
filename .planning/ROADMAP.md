@@ -270,7 +270,7 @@ Plans:
 
 **Wave 4** *(blocked on Wave 3 completion)*
 
-- [ ] 291-05-PLAN.md — The arrival card (Removed line, inputs fold), kb_auto launch skip, post-reload homes, ledger/seeds close-out (W4)
+- [x] 291-05-PLAN.md — The arrival card (Removed line, inputs fold), kb_auto launch skip, post-reload homes, ledger/seeds close-out (W4)
 
 **UI hint**: yes
 **Flags**: **Provider-docs-first** (structured output per provider). **SC#10 four-axis UAT, full roster**. security_enforcement: asset content is untrusted. Closed core recount. Hot files: `workflow_authoring.py` (17/11/1025), `workflows.py`, `useTemplateFirstDraft.ts`. Seed `SEED-051`.
