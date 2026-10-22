@@ -419,17 +419,19 @@ node scripts/check-hot-file-ledger.cjs <phase-dir>   # 0 clear · 1 missing rows
 | `frontend/src/components/workflows/WorkflowCanvas.tsx` | 32 / 10 / 1744 (was `31 / 9 / 1708`) | 290-03: Team view = 1 prop, 1 state, 1 early return · extraction FIRST next · ⛔ |
 | `frontend/src/components/workflows/FlowEdge.tsx` | 3 / 3 / 462 | honoured by construction (200) |
 | `frontend/src/components/workflows/PhaseNodeCard.tsx` | 18 / 9 / 490 (was `17 / 8 / 489`) | 290: forecast unused — chips went on the library card, not here |
-| `backend/app/services/harness/phase_types.py` | 60 / 30 / 3057 (was `59 / 30 / 3053`) | 295-09 WR-01: sub-agent error mark, 4 call lines, If 113→113 · G-5 OWED |
+| `backend/app/services/harness/phase_types.py` | 61 / 31 / 3067 (was `60 / 30 / 3057`) | 291-03: +10 call lines for the PDF fill-back · G-5 OWED |
 | `frontend/src/pages/WorkflowsPage.tsx` | 45 / 18 / 1447 (was `43 / 17 / 1415`) | 286 forecast: 287 starters are data, fork reuses its hook; one prop |
 | `frontend/src/components/workflows/library/WorkflowCard.tsx` | 23 / 9 / 1361 (was `22 / 8 / 1354`) | 290-02: ONE chip-line block from row.def; still 0 useState |
 | `frontend/src/components/workflows/library/libraryVocabulary.ts` | 12 / 6 / 802 (was `11 / 5 / 766`) | 290-02: six STEP_LINE_ entries (data), no logic |
 | `frontend/src/components/workflows/library/libraryFilter.ts` | 6 / 4 / 435 | ⚠ absent at 4 phases and NO PLAN NAMED IT (192.2) |
 | `frontend/src/components/workflows/library/libraryRow.ts` | 4 / 3 / 201 | ⚠ absent, on the boundary (added 192.2) |
-| `frontend/src/components/workflows/WorkflowDoorSwitch.tsx` | 18 / 12 / 1075 | honoured by construction (193 / 193.1 / 199 / **214**) |
-| `frontend/src/pages/WorkflowBuilderPage.tsx` | 60 / 25 / 2810 (was `59 / 24 / 2808`) | 290-03: ONE prop (team) at the canvas call, no state · ⛔ |
-| `frontend/src/components/workflows/DraftArrivalCard.tsx` | 4 / 3 / 625 (was `1 / 1 / 338`) | 288-01: ONE prop, closed branch only · ⛔ |
-| `frontend/src/components/workflows/decisionsVocabulary.ts` | 4 / 3 / 327 (was `1 / 1 / 226`) | 288-01: 3 string consts, no logic · ⛔ |
-| `backend/app/api/workflows.py` | 46 / 24 / 1653 (was `45 / 23 / 1647`) | 295-02: one code in _INCOMPLETE_CODES · split OWED (>1,500 L) |
+| `frontend/src/components/workflows/WorkflowDoorSwitch.tsx` | 20 / 13 / 1104 (was `18 / 12 / 1075`) | 291-04: one hook, one mount, one handoff spread (+33 −4) |
+| `frontend/src/pages/WorkflowBuilderPage.tsx` | 62 / 26 / 2897 (was `60 / 25 / 2810`) | 291-05: one snapshot state, two card props · ⛔ |
+| `frontend/src/components/workflows/DraftArrivalCard.tsx` | 5 / 4 / 688 (was `4 / 3 / 625`) | 291-05: two optional props + one fold boolean; rows in a leaf · ⛔ |
+| `frontend/src/components/workflows/DecisionsList.tsx` | 5 / 3 / 429 | ⚠ now FIRES (291) · 291-05: one optional prop, one template-row sub-line |
+| `frontend/src/components/workflows/decisionsVocabulary.ts` | 6 / 4 / 344 (was `4 / 3 / 327`) | 291-05: one glyph + one formatter, still a zero-import leaf · ⛔ |
+| `backend/app/api/workflows.py` | 47 / 25 / 1681 (was `46 / 24 / 1653`) | 291-01: two route registrations, handlers in doors · split OWED |
+| `backend/app/api/workflow_wire.py` | 3 / 3 / 517 | ⚠ now FIRES (291) · 291-01: describe read + reference wire models, additive |
 | `backend/app/api/workflow_runs.py` | 18 / 13 / 1455 (was `17 / 12 / 1295`) | 295-05: +5 defs, +160 L, over budget · extraction FIRST next |
 | `backend/app/models/thread.py` | 24 / 16 / 545 (was `22 / 15 / 537`) | 295-05: ONE field (unsourced) |
 | `frontend/src/components/workflows/canvasModel.ts` | 13 / 6 / 752 | ⚠ absent from BOTH at 6 phases (added 200) |
@@ -442,9 +444,9 @@ node scripts/check-hot-file-ledger.cjs <phase-dir>   # 0 clear · 1 missing rows
 | `frontend/src/components/workflows/PhaseFormPanel.tsx` | 30 / 14 / 1566 | honoured by construction ×6 (185 / 193 / 193.1 / 199 / 200 / **214**) |
 | `backend/app/db/workflows.py` | 58 / 29 / 2808 (was `57 / 29 / 2802`) | 295-09 CR-01: the answer read names its question (2 keys) |
 | `backend/app/services/harness/publish_service.py` | 34 / 15 / 2010 (was `33 / 15 / 2008`) | 295-09 WR-05: judge system prompt via one helper (If 70→70) |
-| `backend/app/services/workflow_authoring.py` | 17 / 11 / 1025 (was `15 / 9 / 989`) | 286 forecast: 291 template text = one more grounding input (untrusted) |
-| `backend/app/models/harness.py` | 20 / 19 / 766 | honoured by construction (193.2 / **214**) |
-| `frontend/src/components/workflows/builderStore.ts` | 14 / 8 / 968 | 286 forecast: 288 draft config rides useDraftPersistence; ≤ 1 store field |
+| `backend/app/services/workflow_authoring.py` | 18 / 12 / 1120 (was `17 / 11 / 1025`) | 291-02: files = one more untrusted grounding input (+98 −3) |
+| `backend/app/models/harness.py` | 22 / 20 / 776 (was `20 / 19 / 766`) | 291-02: InputFieldSpec origin + note, omitted when absent |
+| `frontend/src/components/workflows/builderStore.ts` | 16 / 9 / 1039 (was `14 / 8 / 968`) | 291: two actions (refs, input source), no state field |
 | `frontend/src/components/panel/WorkspacePanel.tsx` | 17 / 11 / 646 (was `16 / 10 / 646`) | honoured by construction (194 / 194.1 / 282-02: one prop) |
 | `backend/app/services/run_lifecycle.py` | 10 / 6 / 776 (was `9 / 5 / 756`) | 295-04: stopped_by → record_stop (If 11→11) |
 | `backend/app/db/runs.py` | 9 / 8 / 266 | ⚠ absent its ENTIRE LIFE — row added 268 · ⛔ |
@@ -474,7 +476,7 @@ node scripts/check-hot-file-ledger.cjs <phase-dir>   # 0 clear · 1 missing rows
 | `frontend/src/components/workflows/WaitingOnLine.tsx` | 1 / 1 / 26 | young (created 288-03) · leaf, no hook · ⛔ |
 | `frontend/src/components/chat/OutputFileCard.tsx` | 8 / 7 / 219 | honoured by construction (195) |
 | `frontend/src/components/panel/FilesSection.tsx` | 12 / 8 / 354 (was `10 / 6 / 363`) | ⚠ STALE · last touch 274-04 |
-| `frontend/src/lib/api.ts` | 210 / 125 / 530 (was `208 / 124 / 523`) | 284-05: five whole-list re-exports deleted (D-16) |
+| `frontend/src/lib/api.ts` | 211 / 126 / 546 (was `210 / 125 / 530`) | 291-04: +16 barrel re-exports (describe read, references) |
 | `frontend/src/types/index.ts` | 101 / 80 / 1674 (was `100 / 79 / 1656`) | 295-05: three additive fields · seam OWED |
 | `backend/app/main.py` | 92 / 67 / 979 (was `91 / 66 / 978`) | 294-03: ONE include_router (+2 −1) · ⛔ |
 | `backend/app/config.py` | 93 / 54 / 1809 (was `92 / 54 / 1790`) | honoured by construction (282-04: self-hosted default 900) · seam OWED · ⛔ |
@@ -482,7 +484,7 @@ node scripts/check-hot-file-ledger.cjs <phase-dir>   # 0 clear · 1 missing rows
 | `backend/app/api/settings.py` | 44 / 23 / 1159 (was `41 / 21 / 1048`) | honoured by construction (294-04: ONE rerank_provider refusal) · ⛔ |
 | `backend/app/services/multimodal_service.py` | 14 / 7 / 984 | ⚠ absent from BOTH for its ENTIRE LIFE at **7 phases** |
 | `backend/app/api/documents.py` | 99 / 39 / 2698 (was `97 / 38 / 2653`) | honoured by construction (285-03: enqueue-fail → doc failed, 201) · ⛔ |
-| `scripts/vitest-count-gate.cjs` | 327 / 74 / 6623 (was `326 / 74 / 6623`) | 295-10: 1 suite adopted, 1 pin raised |
+| `scripts/vitest-count-gate.cjs` | 335 / 76 / 6658 (was `327 / 74 / 6623`) | 291: 2 suites adopted, no pin moved |
 | `scripts/check-deploy-drift.sh` | 5 / 4 / 267 | ⚠ absent its ENTIRE LIFE — row added 294-05 · fault var omitted |
 | `scripts/build-public-openapi.cjs` | 7 / 3 / 468 | ⚠ now FIRES (294) · 294-03: citation_checks tag (one line) |
 | `backend/app/services/eval_runner_service.py` | 13 / 8 / 1040 | ⚠ STALE · last touch 256-03 |
@@ -494,7 +496,7 @@ node scripts/check-hot-file-ledger.cjs <phase-dir>   # 0 clear · 1 missing rows
 | `backend/app/services/harness/programmatic.py` | 3 / 3 / 137 | ⚠ FIRES · absent its ENTIRE LIFE — row added 255 · ⛔ |
 | `backend/app/services/harness/emitters.py` | 4 / 2 / 188 | ⚠ absent its ENTIRE LIFE — row added 255 · ⛔ |
 | `frontend/src/components/admin/ModelRegistryTab.tsx` | 19 / 7 / 1705 (was `17 / 7 / 1679`) | honoured by construction (282-04: Add-form Timeout) · AddModelForm seam OWED · ⛔ |
-| `frontend/src/components/workflows/soulData.ts` | 13 / 11 / 523 (was `12 / 10 / 499`) | 287-01: +2 pure required-field helpers · history in detail file |
+| `frontend/src/components/workflows/soulData.ts` | 14 / 12 / 554 (was `13 / 11 / 523`) | 291-05: launch skips kb_auto; enum labels carry options hint |
 | `frontend/src/components/workflows/PublishGauntlet.tsx` | 21 / 11 / 1385 (was `20 / 10 / 1372`) | 288-02: ONE auto_answered block, server words |
 | `frontend/src/landing/facts.ts` | 6 / 3 / 546 (was `5 / 2 / 546`) | ⚠ now FIRES (288-02) — row added · Pause string only |
 | `frontend/src/components/workflows/PhaseSpineGraph.tsx` | 8 / 6 / 723 (was `5 / 5 / 473`) | 290: forecast unused — chips went on the library card, not here |
@@ -502,7 +504,7 @@ node scripts/check-hot-file-ledger.cjs <phase-dir>   # 0 clear · 1 missing rows
 | `frontend/src/components/workflows/StepTypePicker.tsx` | 7 / 3 / 522 | honoured by construction (199) |
 | `frontend/src/components/workflows/library/RunModal.tsx` | 9 / 6 / 732 (was `8 / 5 / 713`) | 287-01: handleRun refuses empty required field; 214-12 discharge stands |
 | `frontend/src/components/panel/PanelEmpty.tsx` | 4 / 4 / 52 | ⚠ absent at 4 phases |
-| `frontend/src/components/workflows/useTemplateFirstDraft.ts` | 8 / 4 / 684 (was `7 / 4 / 677`) | 286 forecast: 291 forwards one more upload kind to /generate |
+| `frontend/src/components/workflows/useTemplateFirstDraft.ts` | 11 / 5 / 1103 (was `8 / 4 / 684`) | 291-04: reads, binds and extras (+537 −118) · extraction FIRST next |
 | `frontend/src/components/workflows/RunSpine.tsx` | 7 / 5 / 441 (was `6 / 4 / 433`) | 295-05: ONE prop (unsourced) |
 | `frontend/src/components/workflows/RunTranscript.tsx` | 7 / 3 / 652 | ⚠ **FIRES on a component with NO MOUNT in the product** |
 | `frontend/src/components/settings/ConnectionsTab.tsx` | 25 / 9 / 1635 | ⚠ the row was STALE at `17 / 7 / 1477`. honoured by construction (**22 |
@@ -534,7 +536,7 @@ node scripts/check-hot-file-ledger.cjs <phase-dir>   # 0 clear · 1 missing rows
 | `frontend/src/components/workflows/nodePresentation.ts` | 8 / 7 / 221 | ⚠ absent from BOTH for its ENTIRE LIFE at **7 phases** |
 | `frontend/src/lib/api/threads.ts` | 21 / 12 / 1979 (was `20 / 12 / 1975`) | 295-08: answerAskUser keeps the server's refusal words |
 | `frontend/src/lib/api/connectors.ts` | 17 / 11 / 740 | honoured by construction (244-06) · ⛔ |
-| `frontend/src/lib/api/workflows.ts` | 11 / 11 / 1141 (was `10 / 10 / 1129`) | 295-05: two optional fields, no behaviour |
+| `frontend/src/lib/api/workflows.ts` | 12 / 12 / 1285 (was `11 / 11 / 1141`) | 291-04: describe read + reference upload clients (+144) |
 | `frontend/src/lib/connectionMark.tsx` | 7 / 4 / 313 | ✅ **the move IS the seam, and it was TAKEN (214-08)** |
 | `frontend/src/components/ingestion/DocumentList.tsx` | 31 / 15 / 372 (was `31 / 16 / 372`) | last touch 275-02/04 |
 | `frontend/src/pages/LibraryPage.tsx` | 63 / 20 / 1344 (was `57 / 19 / 1297`) | seam TAKEN (284-01 hook); lines rose → G-5 NOT discharged · ⛔ |
@@ -634,7 +636,7 @@ node scripts/check-hot-file-ledger.cjs <phase-dir>   # 0 clear · 1 missing rows
 | `frontend/src/components/experts/ScopeLedger.tsx` | 6 / 3 / 126 | ⚠ now FIRES (279) — row added 279-04 · extraction FIRST · ⛔ |
 | `backend/app/services/sources/adapters/microsoft_graph.py` | 8 / 5 / 507 (was `3 / 2 / 376`) | ⚠ now FIRES (5 phases) — row added 280-04 · honoured by construction |
 | `frontend/src/components/workflows/runVocabulary.ts` | 10 / 5 / 662 | ⚠ FIRES, absent here — row added 281-04 · honoured by construction |
-| `frontend/src/lib/api/knowledge.ts` | 7 / 6 / 847 (was `6 / 5 / 841`) | 288-02: optional auto_answered field, additive · ⛔ |
+| `frontend/src/lib/api/knowledge.ts` | 8 / 7 / 910 (was `7 / 6 / 847`) | 291-04: generate body + result extras, additive · ⛔ |
 | `backend/app/services/google_service.py` | 12 / 8 / 661 | ⚠ absent its ENTIRE LIFE — row added 282 · 282-01: ONE builder · ⛔ |
 | `backend/app/services/provider_gateway/anthropic.py` | 5 / 5 / 125 | ⚠ absent its ENTIRE LIFE — row added 282 · 282-01: ONE kwarg · ⛔ |
 | `backend/app/services/provider_gateway/google.py` | 4 / 4 / 107 | ⚠ absent its ENTIRE LIFE — row added 282 · 282-01: ONE kwarg · ⛔ |
