@@ -327,6 +327,10 @@ export interface BuilderStoreState extends TrackedSlice {
    *  and arms `dirty` itself for the same reason the five actions above it do; see its
    *  implementation docblock in the factory below. */
   setDeclaredInputs: (inputs: readonly DeclaredInput[]) => void
+  /** Phase 291-05 (D-09) — flip ONE declared input's `source` between asking the person
+   *  (`user`) and looking it up (`kb_auto`). Every other member and every other input is kept.
+   *  Untracked, arms `dirty`; an unknown key or an unchanged source writes nothing. */
+  setInputSource: (key: string, source: "user" | "kb_auto") => void
   /** The ONLY thing that clears `dirty`. Never writes anything. */
   markSaved: () => void
   /** Commit a coalescing run of config edits NOW (a field blur, a view change). */
@@ -928,6 +932,30 @@ export function createBuilderStore(initial: BuilderDefinition | null): BuilderSt
           const s = get()
           if (s.builderPhase !== "drafted") return
           set({ meta: { ...s.meta, inputs: [...inputs] }, dirty: true })
+        },
+
+        /**
+         * Phase 291-05 (D-09) — the arrival card's inputs fold flips where ONE answer comes
+         * from. `setDeclaredInputs`' sibling and its rules: bails outside `drafted`, untracked,
+         * arms `dirty` in the same `set()`. ⚠ IT SPREADS EACH ENTRY AND CHANGES ONLY `source`,
+         * because a file-derived input carries members the declared-input door does not own
+         * (`type`, `enum_options`, `origin`, `note`) and dropping any of them would lose what
+         * the form said. A NON-ARRAY `inputs`, an unknown key and an unchanged source all
+         * write nothing, so a click on the selected segment never arms a save.
+         */
+        setInputSource: (key, source) => {
+          const s = get()
+          if (s.builderPhase !== "drafted") return
+          if (!Array.isArray(s.meta.inputs)) return
+          const prior = s.meta.inputs as unknown[]
+          const at = prior.findIndex(
+            (i) => typeof i === "object" && i !== null && (i as { key?: unknown }).key === key,
+          )
+          if (at === -1) return
+          const current = prior[at] as Record<string, unknown>
+          if (current.source === source) return
+          const next = prior.map((i, index) => (index === at ? { ...current, source } : i))
+          set({ meta: { ...s.meta, inputs: next }, dirty: true })
         },
 
         markSaved: () => set({ dirty: false }),

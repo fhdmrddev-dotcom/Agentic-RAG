@@ -139,3 +139,22 @@ export const INPUT_ADDED_BY_SYREL =
 export function inputExtraNote(filename: string, note: string): string {
   return `Not in ${filename}. ${note}`
 }
+
+/** How many options the launch label lists before it stops (T-291-45: a form can carry a long
+ *  choice list, and a label is not the place for all of it). */
+const OPTIONS_HINT_CAP = 12
+
+/**
+ * 291-05 (D-11) — the hint a launch form's label carries for an input with a FIXED set of
+ * answers, so the person types a value the fill will accept: `(yes or no)` for exactly yes and
+ * no (any case), otherwise `(one of: A, B, C)` in the field's own order, capped at the first 12
+ * then `…`. No options ⇒ the empty string. The options are the server's read of the form,
+ * returned as plain text; the launcher renders them as a text label.
+ */
+export function inputOptionsHint(options: readonly string[]): string {
+  if (options.length === 0) return ""
+  const lower = options.map((o) => o.toLowerCase())
+  if (lower.length === 2 && lower.includes("yes") && lower.includes("no")) return "(yes or no)"
+  const shown = options.slice(0, OPTIONS_HINT_CAP).join(", ")
+  return options.length > OPTIONS_HINT_CAP ? `(one of: ${shown}, …)` : `(one of: ${shown})`
+}

@@ -395,6 +395,13 @@ describe("291-05 vocabulary — no banned word, no machine code", () => {
     ["inputSourceGroupLabel", inputSourceGroupLabel("Country")],
     ["inputExtraNote", inputExtraNote("terms.pdf", "Your description asks for it.")],
     ["REMOVED_GLYPH", String(decisionsVocabulary.REMOVED_GLYPH)],
+    // 291-05 Task 2 — the launch label's options hint and the references sub-line.
+    ["inputOptionsHint(yes/no)", declaredInputsVocabulary.inputOptionsHint(["Yes", "No"])],
+    ["inputOptionsHint(list)", declaredInputsVocabulary.inputOptionsHint(["US", "CA", "MX"])],
+    [
+      "templateRowReferencesLine",
+      decisionsVocabulary.templateRowReferencesLine(["vendor-terms.pdf", "policy.md"]),
+    ],
     // Every string the declared-inputs module exports, so a later addition is swept too.
     ...Object.entries(declaredInputsVocabulary)
       .filter(([, v]) => typeof v === "string")
