@@ -3,7 +3,7 @@ gsd_state_version: 1.0
 milestone: v4.7
 milestone_name: Workflows You Can See and Start Anywhere
 status: ready_to_execute
-last_updated: "2026-10-22T17:05:14.346Z"
+last_updated: "2026-10-22T17:08:27.691Z"
 progress:
   total_phases: 17
   completed_phases: 7
@@ -28,7 +28,7 @@ See: `.planning/PROJECT.md` (updated 2026-10-18)
 
 **Core value:** The agent acts as an AI colleague — it knows your knowledge base, can run code, and
 can be taught new behaviours (skills) that persist and can be shared.
-**Current focus:** Phase 291 — describe-it-from-your-own-files (context gathered 2026-10-22; sketch next). Phase 290 executed, G-4 UAT owed.
+**Current focus:** Phase 291 — describe-it-from-your-own-files
 
 ---
 
@@ -41,9 +41,9 @@ reviewer exists, so a phase closes `verification_mode: self-verified`, never `re
 
 ## Current Position
 
-Phase: 291 (describe-it-from-your-own-files) — PLANNED, ready to execute (2026-10-22)
+Phase: 291 (describe-it-from-your-own-files) — EXECUTING
 Previous: Phase: 290 (the-card-and-the-team-picture) — EXECUTED, human_needed (2026-10-22)
-Plan: 0 of 5
+Plan: 1 of 5
 
 ### Roadmap Evolution
 
