@@ -31,7 +31,7 @@ import re
 from typing import Annotated, Any, Literal, Union
 from uuid import UUID
 
-from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
+from pydantic import BaseModel, ConfigDict, Field, field_validator, model_serializer, model_validator
 
 logger = logging.getLogger(__name__)
 
@@ -658,6 +658,16 @@ class InputFieldSpec(_StrictBase):
     source: Literal["user", "kb_auto", "template_derived"] = "user"  # open-Q (i) settled
     enum_options: list[str] = []
     folder_scope: list[UUID] | None = None  # if kb_auto: RESOLVED ids, not a path (open-Q iii)
+    origin: Literal["ai_proposed", "server_added"] | None = None  # 291 D-12 — stamped server-side, never read off the payload
+    note: str | None = None  # 291 D-10 — why an input that is not a form field exists
+
+    @model_serializer(mode="wrap")
+    def _omit_absent_291_marks(self, handler):  # 291 W2: a no-file draft dumps byte-identical
+        data = handler(self)
+        for name in ("origin", "note"):
+            if isinstance(data, dict) and data.get(name, False) is None:
+                del data[name]
+        return data
 
 
 class AssetRef(_StrictBase):

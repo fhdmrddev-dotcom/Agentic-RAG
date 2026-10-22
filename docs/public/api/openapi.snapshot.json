@@ -18093,6 +18093,101 @@
     "title": "DescribeField",
     "description": "One field found in an attached form.\n\n``origin`` is server-stamped: ``exact`` when the file DECLARES the field (a PDF AcroForm\nfield or a ``{{ }}`` token, so the key is the file's own name), ``ai_proposed`` when the\nread model named it (Word blanks, flat or scanned PDFs, D-01b/c). ``line_before`` /\n``line_after`` are the document's own line split around the blank (Word blanks, D-27)."
    },
+   "DescribeFormFieldIn": {
+    "properties": {
+     "key": {
+      "type": "string",
+      "maxLength": 200,
+      "minLength": 1,
+      "title": "Key"
+     },
+     "label": {
+      "type": "string",
+      "maxLength": 200,
+      "title": "Label",
+      "default": ""
+     },
+     "type": {
+      "type": "string",
+      "enum": [
+       "text",
+       "number",
+       "date",
+       "enum"
+      ],
+      "title": "Type"
+     },
+     "enum_options": {
+      "items": {
+       "type": "string",
+       "maxLength": 200
+      },
+      "type": "array",
+      "maxItems": 50,
+      "title": "Enum Options"
+     },
+     "origin": {
+      "type": "string",
+      "enum": [
+       "exact",
+       "ai_proposed"
+      ],
+      "title": "Origin"
+     }
+    },
+    "additionalProperties": false,
+    "type": "object",
+    "required": [
+     "key",
+     "type",
+     "origin"
+    ],
+    "title": "DescribeFormFieldIn"
+   },
+   "DescribeFormIn": {
+    "properties": {
+     "filename": {
+      "type": "string",
+      "maxLength": 255,
+      "title": "Filename"
+     },
+     "arm": {
+      "type": "string",
+      "enum": [
+       "template_fields",
+       "form_fields",
+       "suggested_fields",
+       "blanks",
+       "none",
+       "not_word",
+       "scan_unreadable",
+       "copy_refused"
+      ],
+      "title": "Arm"
+     },
+     "fields": {
+      "items": {
+       "$ref": "#/components/schemas/DescribeFormFieldIn"
+      },
+      "type": "array",
+      "maxItems": 200,
+      "title": "Fields"
+     },
+     "text": {
+      "type": "string",
+      "maxLength": 250000,
+      "title": "Text",
+      "default": ""
+     }
+    },
+    "additionalProperties": false,
+    "type": "object",
+    "required": [
+     "filename",
+     "arm"
+    ],
+    "title": "DescribeFormIn"
+   },
    "DescribeReadResponse": {
     "properties": {
      "role": {
@@ -18188,6 +18283,27 @@
     ],
     "title": "DescribeReadResponse",
     "description": "What one attached file holds, read before any draft exists (D-04).\n\nA file that never opened is an HTTP 422 with a server sentence, never an arm: ``none``\nmeans only *opened, and no fields found* (D-02). ``filename`` is the server-sanitised\nname. ``cut_short`` / ``refused`` are server sentences the client renders verbatim."
+   },
+   "DescribeReferenceIn": {
+    "properties": {
+     "filename": {
+      "type": "string",
+      "maxLength": 255,
+      "title": "Filename"
+     },
+     "text": {
+      "type": "string",
+      "maxLength": 250000,
+      "title": "Text"
+     }
+    },
+    "additionalProperties": false,
+    "type": "object",
+    "required": [
+     "filename",
+     "text"
+    ],
+    "title": "DescribeReferenceIn"
    },
    "DescribeUnplaced": {
     "properties": {
@@ -21458,6 +21574,31 @@
        }
       ],
       "title": "Allowed Connection Ids"
+     },
+     "form": {
+      "anyOf": [
+       {
+        "$ref": "#/components/schemas/DescribeFormIn"
+       },
+       {
+        "type": "null"
+       }
+      ]
+     },
+     "references": {
+      "anyOf": [
+       {
+        "items": {
+         "$ref": "#/components/schemas/DescribeReferenceIn"
+        },
+        "type": "array",
+        "maxItems": 5
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "References"
      }
     },
     "type": "object",
@@ -22201,6 +22342,32 @@
        }
       ],
       "title": "Folder Scope"
+     },
+     "origin": {
+      "anyOf": [
+       {
+        "type": "string",
+        "enum": [
+         "ai_proposed",
+         "server_added"
+        ]
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Origin"
+     },
+     "note": {
+      "anyOf": [
+       {
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Note"
      }
     },
     "additionalProperties": false,
