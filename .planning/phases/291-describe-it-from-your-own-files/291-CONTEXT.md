@@ -116,6 +116,13 @@ Driven on the full native provider roster plus OpenRouter (SC#4).
   - **S7** (D-26..D-28) A **Word document with `Name: ____` blanks and an empty table cell**. The author sees "Where each answer goes", unticks one blank and confirms. The run's output has the answers in the blanks, the unticked blank stays empty, the layout is unchanged and the original file is untouched. A label that appears twice shows the "Couldn't place …" line.
 - **D-24 (SC#10):** The four-axis UAT covers cross-provider (S5), multi-file (1 form + 5 refs), and long input (a reference doc ≥ 5 KB). The parallel-thread axis is recorded as N/A with its reason, or covered by two describe attempts at once; the planner decides. Rows go in VALIDATION.md, never in PLAN tasks.
 
+### Planning-time decisions (orchestrator, 2026-10-22, from 291-RESEARCH.md Open Questions; autonomous run)
+- **D-31 (D-14's description half):** the allow-set for powers is derived by a **second, description-only call that never sees file text**, unioned with the author's ticks. It runs only when files are attached; with no files the path is unchanged. If that call fails, the allow-set **fails closed to ticks only**. This keeps D-14's "describe text or ticks" literal.
+- **D-32 (narrows D-05, deliberate deviation):** reference files are **saved with the draft and shown on it**, but **steps do not read them at run time** in 291. Run-time reading is a new capability and goes to a new seed. The UI says so in words (UI-SPEC `templateRowReferencesLine`). Verification scores D-05 against this narrowed text.
+- **D-33 (S3 scope):** reload survival (D-07, S3) is counted **from the draft's first autosave**. Before that, the door says in words that files are kept once the draft is first saved. Research assumption A6.
+- **D-34 ("powers"):** the tool set D-14 walls off is research assumption **A1** (`web_search`, `save_skill`, `attach_skill_file`, `remember`, plus every `external_action` step, connection and MCP tool, and any grant).
+- **D-35 (SEED-327 not folded):** file text is fenced in the **user message** (research Pattern 2), so 291 does not touch `forced_emit.py` or the provider adapters. VALIDATION records that S5 rows for providers other than Anthropic and Google run without `AUTHORING_SYSTEM_PROMPT`, as the shipping path does today.
+
 ### Claude's Discretion
 - **Reference-doc length.** A per-file character cap, set per provider from context windows. The author is told when a file was cut short ("Only the first … was read"). Never cut silently.
 - Where attached files live in Storage (the D-06 template-bytes precedent: client-held until save, then a `_library/{definition_id}/` path) and how the draft view shows which file a step came from.
