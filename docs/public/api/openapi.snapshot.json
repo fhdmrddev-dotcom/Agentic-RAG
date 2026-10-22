@@ -7507,6 +7507,53 @@
     }
    }
   },
+  "/workflows/describe/read": {
+   "post": {
+    "tags": [
+     "workflows"
+    ],
+    "summary": "Read Describe File",
+    "description": "Read ONE attached file before any draft exists, persisting nothing (D-04, D-06).\n\nThe 193.1 shape, copied rather than shared (the sibling's body is AST-pinned):\n**no Supabase client, no pool, no workflow id and no Storage path** \u2014 the bytes arrive\nin the request and the answer leaves in the response, so the cross-tenant Storage-read\nclass has nothing to attach to. ``test_291_describe_read_door.py`` sweeps this body.\n\nTHE GATES, in the shipped order: declared size before ``.read()``; the extension\n(``role=\"reference\"`` refuses ``.pptx``/``.xlsx``); empty / oversized body; the magic\nbytes via ``validate_upload`` (``%PDF-``, the OOXML container, text NUL-reject); and\nthe uncompressed-total cap for OOXML ONLY. A parse failure past the gates is a 422\n*\"The document could not be read.\"* \u2014 never the \"none\" arm (D-02's honesty ordering).\n\nThe settings read is the global cached app-settings read, not a caller-supplied path.\nThe echoed filename is the server-sanitised name.",
+    "operationId": "read_describe_file_workflows_describe_read_post",
+    "requestBody": {
+     "content": {
+      "multipart/form-data": {
+       "schema": {
+        "$ref": "#/components/schemas/Body_read_describe_file_workflows_describe_read_post"
+       }
+      }
+     },
+     "required": true
+    },
+    "responses": {
+     "200": {
+      "description": "Successful Response",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/DescribeReadResponse"
+        }
+       }
+      }
+     },
+     "422": {
+      "description": "Validation Error",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      }
+     }
+    },
+    "security": [
+     {
+      "HTTPBearer": []
+     }
+    ]
+   }
+  },
   "/workflows/{definition_id}/publish": {
    "post": {
     "tags": [
@@ -7948,7 +7995,7 @@
      "workflows"
     ],
     "summary": "Upload Workflow Template",
-    "description": "Upload a template and store it durably against a workflow the caller OWNS.\n\nThe order of the gates is load-bearing and each one is a decision:\n\n  1. **Owner-gate first** \u2014 ``_owned_slug_or_404`` is the SAME owner-scoped\n     ``created_by`` WHERE the delete/preview routes use, and its 404 is deliberately\n     indistinguishable from not-found: a 403 would confirm that a workflow exists\n     (no existence oracle). The workflow cluster reads through a service-role pool\n     which bypasses RLS, so this WHERE is the route's authorization boundary.\n  2. **The DECLARED part size, before the body is materialised** (workspace.py:250,\n     the WR-04 fix) \u2014 uvicorn/FastAPI impose no body cap, so ``.read()`` of a\n     multi-GB part would buffer it all in RAM.\n  3. **The extension**, before the body is read at all \u2014 a ``.png`` costs nothing.\n  4. **The magic bytes** via the shipped ``validate_upload`` \u2014 a renamed binary\n     wearing a ``.docx`` name never reaches Storage.\n\nNothing is persisted on any refusal: the single write is the LAST statement before\nthe return. The blocking supabase-py upload is ``run_in_threadpool``-wrapped\n(CLAUDE.md / D-v2.5-01).",
+    "description": "Upload a template and store it durably against a workflow the caller OWNS.\n\nThe order of the gates is load-bearing and each one is a decision:\n\n  1. **Owner-gate first** \u2014 ``_owned_slug_or_404`` is the SAME owner-scoped\n     ``created_by`` WHERE the delete/preview routes use, and its 404 is deliberately\n     indistinguishable from not-found: a 403 would confirm that a workflow exists\n     (no existence oracle). The workflow cluster reads through a service-role pool\n     which bypasses RLS, so this WHERE is the route's authorization boundary.\n  2. **The DECLARED part size, before the body is materialised** (workspace.py:250,\n     the WR-04 fix) \u2014 uvicorn/FastAPI impose no body cap, so ``.read()`` of a\n     multi-GB part would buffer it all in RAM.\n  3. **The extension**, before the body is read at all \u2014 a ``.png`` costs nothing.\n  4. **The magic bytes** via the shipped ``validate_upload`` \u2014 a renamed binary\n     wearing a ``.docx`` name never reaches Storage.\n\nNothing is persisted on any refusal: the single write is the LAST statement before\nthe return. The blocking supabase-py upload is ``run_in_threadpool``-wrapped\n(CLAUDE.md / D-v2.5-01).\n\nPhase 291 (D-25 / D-26) widens it twice, and no further: a fillable ``.pdf`` binds\nas-is (its AcroForm field names ARE the placeholders), and a ``.docx`` sent with\n``anchors`` binds as the server-made fillable COPY \u2014 ``describe_files.make_fillable_copy``\nwrites ``{{ key.value }}`` at each ticked blank and proves each appears exactly once.\nThe author's original bytes are never written anywhere. A refused copy, or one that\nplaced nothing, is a 422 with the server's sentence; ``anchors`` on anything but a\n``.docx`` is a 422.",
     "operationId": "upload_workflow_template_workflows__definition_id__template_post",
     "security": [
      {
@@ -7984,6 +8031,65 @@
        "application/json": {
         "schema": {
          "$ref": "#/components/schemas/TemplateAssetRef"
+        }
+       }
+      }
+     },
+     "422": {
+      "description": "Validation Error",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      }
+     }
+    }
+   }
+  },
+  "/workflows/{definition_id}/reference": {
+   "post": {
+    "tags": [
+     "workflows"
+    ],
+    "summary": "Upload Workflow Reference",
+    "description": "Store a reference document with a workflow the caller OWNS (Phase 291, D-05).\n\nThe template door's gates, in its order: owner-gate first (404 on non-owner, no\nexistence oracle), declared size, extension (``.pdf .docx .txt .md``), empty /\noversized body, magic bytes, and the zip-bomb cap for ``.docx``. The object lands at\n``{user_id}/_library/{definition_id}/{uuid8}-{safe_name}``, beside the template, and the\nreturned descriptor is written into ``definition.assets[]`` by the Builder's one draft\nsave \u2014 this route writes no row. References are NOT ingested into the Library (D-06).\nThe 1 + 5 limit (D-03) is counted by the describe door; this door stores one file.",
+    "operationId": "upload_workflow_reference_workflows__definition_id__reference_post",
+    "security": [
+     {
+      "HTTPBearer": []
+     }
+    ],
+    "parameters": [
+     {
+      "name": "definition_id",
+      "in": "path",
+      "required": true,
+      "schema": {
+       "type": "string",
+       "format": "uuid",
+       "title": "Definition Id"
+      }
+     }
+    ],
+    "requestBody": {
+     "required": true,
+     "content": {
+      "multipart/form-data": {
+       "schema": {
+        "$ref": "#/components/schemas/Body_upload_workflow_reference_workflows__definition_id__reference_post"
+       }
+      }
+     }
+    },
+    "responses": {
+     "201": {
+      "description": "Successful Response",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/ReferenceAssetRef"
         }
        }
       }
@@ -16455,6 +16561,29 @@
     ],
     "title": "Body_import_skill_skills_import_post"
    },
+   "Body_read_describe_file_workflows_describe_read_post": {
+    "properties": {
+     "file": {
+      "type": "string",
+      "format": "binary",
+      "title": "File"
+     },
+     "role": {
+      "type": "string",
+      "enum": [
+       "form",
+       "reference"
+      ],
+      "title": "Role",
+      "default": "form"
+     }
+    },
+    "type": "object",
+    "required": [
+     "file"
+    ],
+    "title": "Body_read_describe_file_workflows_describe_read_post"
+   },
    "Body_read_template_placeholders_workflows_template_placeholders_post": {
     "properties": {
      "file": {
@@ -16522,12 +16651,37 @@
     ],
     "title": "Body_upload_template_threads__thread_id__workspace_files_post"
    },
+   "Body_upload_workflow_reference_workflows__definition_id__reference_post": {
+    "properties": {
+     "file": {
+      "type": "string",
+      "format": "binary",
+      "title": "File"
+     }
+    },
+    "type": "object",
+    "required": [
+     "file"
+    ],
+    "title": "Body_upload_workflow_reference_workflows__definition_id__reference_post"
+   },
    "Body_upload_workflow_template_workflows__definition_id__template_post": {
     "properties": {
      "file": {
       "type": "string",
       "format": "binary",
       "title": "File"
+     },
+     "anchors": {
+      "anyOf": [
+       {
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Anchors"
      }
     },
     "type": "object",
@@ -17843,6 +17997,217 @@
     ],
     "title": "DeletePreview",
     "description": "The victim-naming sheet's exact Removed/Kept counts (D-LOCK-03). ``versions`` +\n``runs`` are Removed; ``threads`` are Kept (they become normal chats); ``in_flight``\nis the count of runs STILL LIVE \u2014 the honest signal the sheet's amber cancel-first\nbanner gates on (D-LOCK-05). Defaults to 0 so an older client that ignores it is\nunaffected (additive field)."
+   },
+   "DescribeField": {
+    "properties": {
+     "key": {
+      "type": "string",
+      "title": "Key"
+     },
+     "label": {
+      "type": "string",
+      "title": "Label"
+     },
+     "type": {
+      "type": "string",
+      "enum": [
+       "text",
+       "number",
+       "date",
+       "enum"
+      ],
+      "title": "Type"
+     },
+     "enum_options": {
+      "items": {
+       "type": "string"
+      },
+      "type": "array",
+      "title": "Enum Options"
+     },
+     "origin": {
+      "type": "string",
+      "enum": [
+       "exact",
+       "ai_proposed"
+      ],
+      "title": "Origin"
+     },
+     "line_before": {
+      "anyOf": [
+       {
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Line Before"
+     },
+     "line_after": {
+      "anyOf": [
+       {
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Line After"
+     },
+     "anchor_kind": {
+      "anyOf": [
+       {
+        "type": "string",
+        "enum": [
+         "line",
+         "cell"
+        ]
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Anchor Kind"
+     },
+     "anchor_label": {
+      "anyOf": [
+       {
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Anchor Label"
+     }
+    },
+    "additionalProperties": false,
+    "type": "object",
+    "required": [
+     "key",
+     "label",
+     "type",
+     "origin"
+    ],
+    "title": "DescribeField",
+    "description": "One field found in an attached form.\n\n``origin`` is server-stamped: ``exact`` when the file DECLARES the field (a PDF AcroForm\nfield or a ``{{ }}`` token, so the key is the file's own name), ``ai_proposed`` when the\nread model named it (Word blanks, flat or scanned PDFs, D-01b/c). ``line_before`` /\n``line_after`` are the document's own line split around the blank (Word blanks, D-27)."
+   },
+   "DescribeReadResponse": {
+    "properties": {
+     "role": {
+      "type": "string",
+      "enum": [
+       "form",
+       "reference"
+      ],
+      "title": "Role"
+     },
+     "arm": {
+      "type": "string",
+      "enum": [
+       "template_fields",
+       "form_fields",
+       "suggested_fields",
+       "blanks",
+       "none",
+       "not_word",
+       "scan_unreadable",
+       "copy_refused",
+       "reference"
+      ],
+      "title": "Arm"
+     },
+     "suggested_from": {
+      "anyOf": [
+       {
+        "type": "string",
+        "enum": [
+         "text",
+         "scan"
+        ]
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Suggested From"
+     },
+     "filename": {
+      "type": "string",
+      "title": "Filename"
+     },
+     "fields": {
+      "items": {
+       "$ref": "#/components/schemas/DescribeField"
+      },
+      "type": "array",
+      "title": "Fields"
+     },
+     "unplaced": {
+      "items": {
+       "$ref": "#/components/schemas/DescribeUnplaced"
+      },
+      "type": "array",
+      "title": "Unplaced"
+     },
+     "text": {
+      "type": "string",
+      "title": "Text",
+      "default": ""
+     },
+     "cut_short": {
+      "anyOf": [
+       {
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Cut Short"
+     },
+     "refused": {
+      "anyOf": [
+       {
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Refused"
+     }
+    },
+    "additionalProperties": false,
+    "type": "object",
+    "required": [
+     "role",
+     "arm",
+     "filename"
+    ],
+    "title": "DescribeReadResponse",
+    "description": "What one attached file holds, read before any draft exists (D-04).\n\nA file that never opened is an HTTP 422 with a server sentence, never an arm: ``none``\nmeans only *opened, and no fields found* (D-02). ``filename`` is the server-sanitised\nname. ``cut_short`` / ``refused`` are server sentences the client renders verbatim."
+   },
+   "DescribeUnplaced": {
+    "properties": {
+     "label": {
+      "type": "string",
+      "title": "Label"
+     },
+     "sentence": {
+      "type": "string",
+      "title": "Sentence"
+     }
+    },
+    "additionalProperties": false,
+    "type": "object",
+    "required": [
+     "label",
+     "sentence"
+    ],
+    "title": "DescribeUnplaced",
+    "description": "A blank the server could not place exactly, and the server sentence saying so (D-28)."
    },
    "DiscoverRequest": {
     "properties": {
@@ -25406,6 +25771,37 @@
     ],
     "title": "ReextractRequest",
     "description": "POST /documents/{id}/reextract body schema (Phase 071 D-071-09).\n\n`engine` is REQUIRED \u2014 distinct from /reingest which uses the global default.\nInvalid values produce FastAPI auto-422 via Pydantic Literal validation\n(T-071-04-02 mitigation \u2014 invalid engine cannot crash downstream get_extractor).\n\nPhase 071.3 Plan 04 (D-071.3-09): 'docling' removed from the Literal \u2014\nDocling adapters were hard-deleted; submitting 'docling' now returns 422."
+   },
+   "ReferenceAssetRef": {
+    "properties": {
+     "kind": {
+      "type": "string",
+      "const": "reference",
+      "title": "Kind",
+      "default": "reference"
+     },
+     "asset_id": {
+      "type": "string",
+      "title": "Asset Id"
+     },
+     "filename": {
+      "type": "string",
+      "title": "Filename"
+     },
+     "mime": {
+      "type": "string",
+      "title": "Mime"
+     }
+    },
+    "additionalProperties": false,
+    "type": "object",
+    "required": [
+     "asset_id",
+     "filename",
+     "mime"
+    ],
+    "title": "ReferenceAssetRef",
+    "description": "The ``AssetRef`` a reference upload mints (``kind=\"reference\"``). Its own model, so\n``TemplateAssetRef``'s \"never mints references\" stays true."
    },
    "RelationshipCreate": {
     "properties": {

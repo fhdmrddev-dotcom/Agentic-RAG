@@ -29,23 +29,39 @@ The template-door invariants travel unchanged (D-06), because the bodies are byt
 
 No cycle: this module imports wire symbols from ``workflow_wire`` and never imports
 ``app.api.workflows``.
+
+Phase 291 (AUTH-02, plan 291-01) adds two handlers here, registered the same way:
+``read_describe_file`` (``POST /workflows/describe/read`` — stateless, the 193.1 shape) and
+``upload_workflow_reference`` (``POST /workflows/{definition_id}/reference`` — the template
+door's gates). It widens ``upload_workflow_template`` (a ``.pdf``; Word ``anchors`` → the
+server-made fillable copy) and ``get_workflow_template_placeholders`` (one ``.pdf`` branch).
+Every file read goes through ``app.services.describe_files``. The 286 pins moved by a written
+re-baseline (``test_286_workflows_seam_pins.py``).
 """
 from __future__ import annotations
 
+import functools
 import io
+import json
 import logging
 import re
 import zipfile
+from typing import Literal
 from uuid import UUID, uuid4
 
-from fastapi import Depends, File, HTTPException, Query, UploadFile, status
-from pydantic import BaseModel
+import anyio.from_thread
+from fastapi import Depends, File, Form, HTTPException, Query, UploadFile, status
+from pydantic import BaseModel, ValidationError
 from starlette.concurrency import run_in_threadpool
 from supabase import Client
 
 from app.api.workflow_wire import (
+    DescribeReadResponse,
+    ReferenceAssetRef,
     TemplateAssetRef,
     TemplatePlaceholdersResponse,
+    WordAnchorIn,
+    _DESCRIBE_MIME_BY_EXT,
     _TEMPLATE_MAX_UNCOMPRESSED_BYTES,
     _TEMPLATE_MIME_BY_EXT,
     _coerce_user_id,
@@ -59,7 +75,8 @@ from app.dependencies import (
     get_supabase,
     get_user_supabase_client,
 )
-from app.services import workflow_authoring
+from app.models.user_settings import load_user_settings
+from app.services import describe_files, workflow_authoring
 from app.services.harness import grounding
 from app.services.template_render_service import (
     parse_docx_template_variables,
@@ -249,9 +266,144 @@ async def read_template_placeholders(
     )
 
 
+# ── Phase 291 (AUTH-02, plan 291-01) — the describe door's file read ──────────
+
+#: A form may be any describe type; a reference is something to READ, so the slide and sheet
+#: formats (no text model for them here) are refused at the door rather than read as empty.
+_DESCRIBE_FORM_EXTS = frozenset(_DESCRIBE_MIME_BY_EXT)
+_DESCRIBE_REFERENCE_EXTS = frozenset({".pdf", ".docx", ".txt", ".md"})
+#: The zip-bomb cap applies to OOXML containers ONLY: a PDF or a text file is not a zip, and
+#: opening one as a zip would refuse every one of them.
+_OOXML_EXTS = frozenset({".docx", ".pptx", ".xlsx"})
+#: Ticked Word blanks accepted per bind (a form with more blanks than this is not a form).
+_MAX_WORD_ANCHORS = 200
+
+
+def _propose_from_worker_thread(text: str, candidates: list[dict], *, user_id: str) -> list[dict]:
+    """The read leaf runs in a worker thread (``run_in_threadpool``); the proposal is an async
+    model call. ``anyio.from_thread.run`` schedules it on the request's own event loop, so the
+    async provider clients are never driven from a second loop."""
+
+    async def _call() -> list[dict]:
+        return await describe_files.propose_fields_via_model(
+            text, candidates, user_id=user_id, settings=settings
+        )
+
+    return anyio.from_thread.run(_call)
+
+
+async def read_describe_file(
+    file: UploadFile = File(...),
+    role: Literal["form", "reference"] = Form("form"),
+    current_user: dict = Depends(get_current_user),
+) -> DescribeReadResponse:
+    """Read ONE attached file before any draft exists, persisting nothing (D-04, D-06).
+
+    The 193.1 shape, copied rather than shared (the sibling's body is AST-pinned):
+    **no Supabase client, no pool, no workflow id and no Storage path** — the bytes arrive
+    in the request and the answer leaves in the response, so the cross-tenant Storage-read
+    class has nothing to attach to. ``test_291_describe_read_door.py`` sweeps this body.
+
+    THE GATES, in the shipped order: declared size before ``.read()``; the extension
+    (``role="reference"`` refuses ``.pptx``/``.xlsx``); empty / oversized body; the magic
+    bytes via ``validate_upload`` (``%PDF-``, the OOXML container, text NUL-reject); and
+    the uncompressed-total cap for OOXML ONLY. A parse failure past the gates is a 422
+    *"The document could not be read."* — never the "none" arm (D-02's honesty ordering).
+
+    The settings read is the global cached app-settings read, not a caller-supplied path.
+    The echoed filename is the server-sanitised name.
+    """
+    if not isinstance(role, str):  # called directly, the Form default object arrives
+        role = "form"
+    if role not in ("form", "reference"):
+        raise HTTPException(422, "A file is attached either as a form or as a reference.")
+
+    if file.size is not None and file.size > MAX_FILE_SIZE:  # WR-04 — before .read()
+        raise HTTPException(422, "File too large. Maximum size is 10 MB.")
+
+    original = file.filename or ""
+    ext = "." + original.rsplit(".", 1)[-1].lower() if "." in original else ""
+    if role == "reference" and ext not in _DESCRIBE_REFERENCE_EXTS:
+        raise HTTPException(
+            422,
+            "A reference must be a .pdf, .docx, .txt or .md document "
+            f"(got {ext or 'a file with no extension'}).",
+        )
+    if ext not in _DESCRIBE_FORM_EXTS:
+        raise HTTPException(
+            422,
+            "A form must be a .pdf, .docx, .pptx, .xlsx, .txt or .md document "
+            f"(got {ext or 'a file with no extension'}).",
+        )
+
+    raw = await file.read()
+    if len(raw) == 0:
+        raise HTTPException(422, "File is empty")
+    if len(raw) > MAX_FILE_SIZE:  # a lying/absent declared size does not get past this
+        raise HTTPException(422, "File too large. Maximum size is 10 MB.")
+    validate_upload(original, raw)  # magic-byte / container / text gate -> 422
+
+    if ext in _OOXML_EXTS:
+        try:
+            with zipfile.ZipFile(io.BytesIO(raw)) as zf:
+                uncompressed = sum(zi.file_size for zi in zf.infolist())
+        except Exception:  # noqa: BLE001 — the container gate already proved it is a zip
+            raise HTTPException(422, "File is not a valid Office document (its archive could not be read).")
+        if uncompressed > _TEMPLATE_MAX_UNCOMPRESSED_BYTES:
+            raise HTTPException(
+                422,
+                "This document expands to more than "
+                f"{_TEMPLATE_MAX_UNCOMPRESSED_BYTES // (1024 * 1024)} MB when opened and "
+                "was not read.",
+            )
+
+    # Echoed back for the "No fields found in …" / "Couldn't read this scan" sentences, so it
+    # is the sanitised name: no path separators, no markup (T-291-06).
+    shown_name = re.sub(r"[^a-zA-Z0-9._\- ]", "_", original)
+    shown_name = re.sub(r"\.{2,}", ".", shown_name).strip() or f"document{ext}"
+
+    user_id = str(current_user["id"])
+    app_settings = await run_in_threadpool(load_user_settings, user_id)
+    propose = functools.partial(_propose_from_worker_thread, user_id=user_id)
+    try:
+        # Blocking parse + (for scans) the vision calls run off the loop (D-v2.5-01).
+        result = await run_in_threadpool(describe_files.read_describe_file, raw, ext, shown_name, role, app_settings=app_settings, propose=propose)
+    except Exception:
+        logger.warning("Describe file read failed (relaying clean error)", exc_info=True)
+        raise HTTPException(422, "The document could not be read.")
+    return DescribeReadResponse(
+        role=result.role,
+        arm=result.arm,
+        suggested_from=result.suggested_from,
+        filename=result.filename,
+        fields=result.fields,
+        unplaced=result.unplaced,
+        text=result.text,
+        cut_short=result.cut_short,
+        refused=result.refused,
+    )
+
+
+def _parse_word_anchors(payload: str) -> list[WordAnchorIn]:
+    """The ticked Word blanks, validated; any malformed payload is one 422 in words."""
+    try:
+        data = json.loads(payload)
+    except ValueError:
+        raise HTTPException(422, "The blank placements could not be read.")
+    if not isinstance(data, list) or len(data) > _MAX_WORD_ANCHORS:
+        raise HTTPException(422, "The blank placements could not be read.")
+    try:
+        return [WordAnchorIn.model_validate(item) for item in data]
+    except ValidationError:
+        raise HTTPException(422, "The blank placements could not be read.")
+
+
 async def upload_workflow_template(
     definition_id: UUID,
     file: UploadFile = File(...),
+    # Phase 291 (D-26): the ticked Word blanks as a JSON list of ``WordAnchorIn``. Present →
+    # the server writes a fillable COPY and stores THAT; absent → today's upload, unchanged.
+    anchors: str | None = Form(None),
     current_user: dict = Depends(get_current_user),
     # The per-request user-JWT client (ANON key + Bearer), NOT the service role. The
     # ``workspace_storage_insert_own`` policy (migration 054:91) requires the first path
@@ -278,6 +430,14 @@ async def upload_workflow_template(
     Nothing is persisted on any refusal: the single write is the LAST statement before
     the return. The blocking supabase-py upload is ``run_in_threadpool``-wrapped
     (CLAUDE.md / D-v2.5-01).
+
+    Phase 291 (D-25 / D-26) widens it twice, and no further: a fillable ``.pdf`` binds
+    as-is (its AcroForm field names ARE the placeholders), and a ``.docx`` sent with
+    ``anchors`` binds as the server-made fillable COPY — ``describe_files.make_fillable_copy``
+    writes ``{{ key.value }}`` at each ticked blank and proves each appears exactly once.
+    The author's original bytes are never written anywhere. A refused copy, or one that
+    placed nothing, is a 422 with the server's sentence; ``anchors`` on anything but a
+    ``.docx`` is a 422.
     """
     pool = await get_pg_pool()
     user_id = _coerce_user_id(current_user)
@@ -288,12 +448,17 @@ async def upload_workflow_template(
 
     original = file.filename or ""
     ext = "." + original.rsplit(".", 1)[-1].lower() if "." in original else ""
-    if ext not in _TEMPLATE_MIME_BY_EXT:
+    if ext not in _TEMPLATE_MIME_BY_EXT and ext != ".pdf":
         raise HTTPException(
             422,
-            "A workflow template must be a .docx, .pptx or .xlsx document "
+            "A workflow template must be a .docx, .pptx, .xlsx or .pdf document "
             f"(got {ext or 'a file with no extension'}).",
         )
+    word_anchors = None
+    if isinstance(anchors, str) and anchors.strip():  # a direct call passes the Form default
+        if ext != ".docx":
+            raise HTTPException(422, "Blank placements can only be made in a Word (.docx) document.")
+        word_anchors = _parse_word_anchors(anchors)
 
     raw = await file.read()
     if len(raw) == 0:
@@ -302,13 +467,40 @@ async def upload_workflow_template(
         raise HTTPException(422, "File too large. Maximum size is 10 MB.")
     validate_upload(original, raw)  # magic-byte / OOXML-container gate -> 422
 
+    if word_anchors is not None:
+        # The copy maker opens the container, so the zip-bomb cap applies here too.
+        try:
+            with zipfile.ZipFile(io.BytesIO(raw)) as zf:
+                uncompressed = sum(zi.file_size for zi in zf.infolist())
+        except Exception:  # noqa: BLE001
+            raise HTTPException(422, "File is not a valid Office document (its archive could not be read).")
+        if uncompressed > _TEMPLATE_MAX_UNCOMPRESSED_BYTES:
+            raise HTTPException(
+                422,
+                "This document expands to more than "
+                f"{_TEMPLATE_MAX_UNCOMPRESSED_BYTES // (1024 * 1024)} MB when opened and "
+                "was not read.",
+            )
+        made = await run_in_threadpool(describe_files.make_fillable_copy, raw, [a.model_dump() for a in word_anchors])
+        if made.refused:
+            raise HTTPException(422, made.refused)
+        if not made.placed or made.copy is None:
+            raise HTTPException(
+                422,
+                " ".join(
+                    ["None of the ticked blanks could be placed, so no fillable copy was made."]
+                    + [sentence for _, sentence in made.unplaced]
+                ),
+            )
+        raw = made.copy  # the COPY is stored; the original is never written
+
     # WR-05 (100-REVIEW) sanitisation, same shape as workspace.py:265 — ordinary names
     # ("Q3 Report (final).docx", "P&L 2026.xlsx") must not 422 at a user who never typed
     # a path, while '/' and '..' are stripped so the object can only ever land under the
     # user-keyed prefix built below.
     safe_name = re.sub(r"[^a-zA-Z0-9._\- ]", "_", original)
     safe_name = re.sub(r"\.{2,}", ".", safe_name).strip() or f"template{ext}"
-    mime = _TEMPLATE_MIME_BY_EXT[ext]
+    mime = _DESCRIBE_MIME_BY_EXT[ext]
     # The layout the seeded library fixtures already use and Branch 1 already reads
     # (RESEARCH Q1): {user_id}/_library/{workflow}/{uuid8}-{name}. The uuid8 makes a
     # re-upload of the same filename a NEW object rather than an overwrite, so a draft
@@ -331,6 +523,109 @@ async def upload_workflow_template(
         raise HTTPException(502, "The template could not be stored. Please try again.")
 
     return TemplateAssetRef(asset_id=asset_id, filename=safe_name, mime=mime)
+
+
+async def upload_workflow_reference(
+    definition_id: UUID,
+    file: UploadFile = File(...),
+    current_user: dict = Depends(get_current_user),
+    # The per-request user-JWT client, NOT the service role: Storage RLS
+    # (``workspace_storage_insert_own``) is the second boundary under the owner-gate.
+    supabase: Client = Depends(get_user_supabase_client),
+) -> ReferenceAssetRef:
+    """Store a reference document with a workflow the caller OWNS (Phase 291, D-05).
+
+    The template door's gates, in its order: owner-gate first (404 on non-owner, no
+    existence oracle), declared size, extension (``.pdf .docx .txt .md``), empty /
+    oversized body, magic bytes, and the zip-bomb cap for ``.docx``. The object lands at
+    ``{user_id}/_library/{definition_id}/{uuid8}-{safe_name}``, beside the template, and the
+    returned descriptor is written into ``definition.assets[]`` by the Builder's one draft
+    save — this route writes no row. References are NOT ingested into the Library (D-06).
+    The 1 + 5 limit (D-03) is counted by the describe door; this door stores one file.
+    """
+    pool = await get_pg_pool()
+    user_id = _coerce_user_id(current_user)
+    await _owned_slug_or_404(pool, definition_id, user_id)  # 404 on non-owner / unknown
+
+    if file.size is not None and file.size > MAX_FILE_SIZE:  # WR-04 — before .read()
+        raise HTTPException(422, "File too large. Maximum size is 10 MB.")
+
+    original = file.filename or ""
+    ext = "." + original.rsplit(".", 1)[-1].lower() if "." in original else ""
+    if ext not in _DESCRIBE_REFERENCE_EXTS:
+        raise HTTPException(
+            422,
+            "A reference must be a .pdf, .docx, .txt or .md document "
+            f"(got {ext or 'a file with no extension'}).",
+        )
+
+    raw = await file.read()
+    if len(raw) == 0:
+        raise HTTPException(422, "File is empty")
+    if len(raw) > MAX_FILE_SIZE:
+        raise HTTPException(422, "File too large. Maximum size is 10 MB.")
+    validate_upload(original, raw)  # magic-byte / container / text gate -> 422
+
+    if ext in _OOXML_EXTS:
+        try:
+            with zipfile.ZipFile(io.BytesIO(raw)) as zf:
+                uncompressed = sum(zi.file_size for zi in zf.infolist())
+        except Exception:  # noqa: BLE001
+            raise HTTPException(422, "File is not a valid Office document (its archive could not be read).")
+        if uncompressed > _TEMPLATE_MAX_UNCOMPRESSED_BYTES:
+            raise HTTPException(
+                422,
+                "This document expands to more than "
+                f"{_TEMPLATE_MAX_UNCOMPRESSED_BYTES // (1024 * 1024)} MB when opened and "
+                "was not read.",
+            )
+
+    safe_name = re.sub(r"[^a-zA-Z0-9._\- ]", "_", original)
+    safe_name = re.sub(r"\.{2,}", ".", safe_name).strip() or f"reference{ext}"
+    mime = _DESCRIBE_MIME_BY_EXT[ext]
+    asset_id = f"{user_id}/_library/{definition_id}/{uuid4().hex[:8]}-{safe_name}"
+    try:
+        await run_in_threadpool(
+            supabase.storage.from_(BUCKET_NAME).upload,
+            asset_id,
+            raw,
+            {"content-type": mime, "upsert": "true"},
+        )
+    except Exception:
+        logger.warning(
+            "Workflow reference upload failed for definition=%s (relaying clean error)",
+            definition_id,
+            exc_info=True,
+        )
+        raise HTTPException(502, "The reference could not be stored. Please try again.")
+
+    return ReferenceAssetRef(asset_id=asset_id, filename=safe_name, mime=mime)
+
+
+async def _pdf_template_placeholders(*, supabase, pool, user_id: str, asset_id: str) -> tuple[list[str], str]:
+    """A bound fillable PDF's field names, through the ONE AcroForm reader, in document
+    order. The same three-state honesty as ``grounding.resolve_template_placeholders``:
+    no bytes (or bytes that are not a PDF) is ``unreadable``; an opened PDF with no fields
+    is ``ok`` + ``[]``."""
+    from app.models.harness import AssetRef  # function-local (Pitfall 4)
+    from app.services.template_asset_service import resolve_template_source
+
+    try:
+        resolved = await resolve_template_source(
+            pool=pool,
+            supabase=supabase,
+            thread_id="",  # library path (Branch 1) ignores thread_id
+            user_id=user_id,
+            asset_ref=AssetRef(asset_id=asset_id, filename=asset_id, kind="template", mime="application/pdf"),
+        )
+        data = resolved.get("bytes")
+    except Exception:  # noqa: BLE001 — a miss is unreadable, never a crash
+        logger.warning("Bound PDF template read failed; reporting unreadable", exc_info=True)
+        return [], "unreadable"
+    if not data or not await run_in_threadpool(describe_files.pdf_opens, data):
+        return [], "unreadable"
+    oracle = await run_in_threadpool(describe_files.acroform_oracle, data)
+    return list((oracle or {}).get("scalars") or []), "ok"
 
 
 async def get_workflow_template_placeholders(
@@ -390,6 +685,12 @@ async def get_workflow_template_placeholders(
 
     if not asset_id.startswith(f"{user_id}/") or ".." in asset_id.split("/"):
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="template not found")
+
+    if asset_id.lower().endswith(".pdf"):  # Phase 291 (D-25): a fillable PDF's own field names
+        placeholders, read = await _pdf_template_placeholders(
+            supabase=supabase, pool=pool, user_id=str(user_id), asset_id=asset_id
+        )
+        return TemplatePlaceholdersResponse(read=read, placeholders=placeholders)
 
     placeholders, read = await grounding.resolve_template_placeholders(
         supabase=supabase,

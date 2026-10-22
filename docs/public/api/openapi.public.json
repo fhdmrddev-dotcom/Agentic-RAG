@@ -6317,6 +6317,52 @@
         ]
       }
     },
+    "/workflows/describe/read": {
+      "post": {
+        "tags": [
+          "workflows"
+        ],
+        "summary": "Read Describe File",
+        "operationId": "read_describe_file_workflows_describe_read_post",
+        "requestBody": {
+          "content": {
+            "multipart/form-data": {
+              "schema": {
+                "$ref": "#/components/schemas/Body_read_describe_file_workflows_describe_read_post"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DescribeReadResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ]
+      }
+    },
     "/workflows/{definition_id}/publish": {
       "post": {
         "tags": [
@@ -6786,6 +6832,64 @@
               "application/json": {
                 "schema": {
                   "$ref": "#/components/schemas/TemplateAssetRef"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/workflows/{definition_id}/reference": {
+      "post": {
+        "tags": [
+          "workflows"
+        ],
+        "summary": "Upload Workflow Reference",
+        "operationId": "upload_workflow_reference_workflows__definition_id__reference_post",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "definition_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Definition Id"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "multipart/form-data": {
+              "schema": {
+                "$ref": "#/components/schemas/Body_upload_workflow_reference_workflows__definition_id__reference_post"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ReferenceAssetRef"
                 }
               }
             }
@@ -13915,6 +14019,29 @@
         ],
         "title": "Body_import_skill_skills_import_post"
       },
+      "Body_read_describe_file_workflows_describe_read_post": {
+        "properties": {
+          "file": {
+            "type": "string",
+            "format": "binary",
+            "title": "File"
+          },
+          "role": {
+            "type": "string",
+            "enum": [
+              "form",
+              "reference"
+            ],
+            "title": "Role",
+            "default": "form"
+          }
+        },
+        "type": "object",
+        "required": [
+          "file"
+        ],
+        "title": "Body_read_describe_file_workflows_describe_read_post"
+      },
       "Body_read_template_placeholders_workflows_template_placeholders_post": {
         "properties": {
           "file": {
@@ -13982,12 +14109,37 @@
         ],
         "title": "Body_upload_template_threads__thread_id__workspace_files_post"
       },
+      "Body_upload_workflow_reference_workflows__definition_id__reference_post": {
+        "properties": {
+          "file": {
+            "type": "string",
+            "format": "binary",
+            "title": "File"
+          }
+        },
+        "type": "object",
+        "required": [
+          "file"
+        ],
+        "title": "Body_upload_workflow_reference_workflows__definition_id__reference_post"
+      },
       "Body_upload_workflow_template_workflows__definition_id__template_post": {
         "properties": {
           "file": {
             "type": "string",
             "format": "binary",
             "title": "File"
+          },
+          "anchors": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Anchors"
           }
         },
         "type": "object",
@@ -15283,6 +15435,216 @@
         ],
         "title": "DeletePreview",
         "description": "Defaults to 0 so an older client that ignores it is unaffected (additive field)."
+      },
+      "DescribeField": {
+        "properties": {
+          "key": {
+            "type": "string",
+            "title": "Key"
+          },
+          "label": {
+            "type": "string",
+            "title": "Label"
+          },
+          "type": {
+            "type": "string",
+            "enum": [
+              "text",
+              "number",
+              "date",
+              "enum"
+            ],
+            "title": "Type"
+          },
+          "enum_options": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Enum Options"
+          },
+          "origin": {
+            "type": "string",
+            "enum": [
+              "exact",
+              "ai_proposed"
+            ],
+            "title": "Origin"
+          },
+          "line_before": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Line Before"
+          },
+          "line_after": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Line After"
+          },
+          "anchor_kind": {
+            "anyOf": [
+              {
+                "type": "string",
+                "enum": [
+                  "line",
+                  "cell"
+                ]
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Anchor Kind"
+          },
+          "anchor_label": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Anchor Label"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "key",
+          "label",
+          "type",
+          "origin"
+        ],
+        "title": "DescribeField",
+        "description": "One field found in an attached form."
+      },
+      "DescribeReadResponse": {
+        "properties": {
+          "role": {
+            "type": "string",
+            "enum": [
+              "form",
+              "reference"
+            ],
+            "title": "Role"
+          },
+          "arm": {
+            "type": "string",
+            "enum": [
+              "template_fields",
+              "form_fields",
+              "suggested_fields",
+              "blanks",
+              "none",
+              "not_word",
+              "scan_unreadable",
+              "copy_refused",
+              "reference"
+            ],
+            "title": "Arm"
+          },
+          "suggested_from": {
+            "anyOf": [
+              {
+                "type": "string",
+                "enum": [
+                  "text",
+                  "scan"
+                ]
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Suggested From"
+          },
+          "filename": {
+            "type": "string",
+            "title": "Filename"
+          },
+          "fields": {
+            "items": {
+              "$ref": "#/components/schemas/DescribeField"
+            },
+            "type": "array",
+            "title": "Fields"
+          },
+          "unplaced": {
+            "items": {
+              "$ref": "#/components/schemas/DescribeUnplaced"
+            },
+            "type": "array",
+            "title": "Unplaced"
+          },
+          "text": {
+            "type": "string",
+            "title": "Text",
+            "default": ""
+          },
+          "cut_short": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Cut Short"
+          },
+          "refused": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Refused"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "role",
+          "arm",
+          "filename"
+        ],
+        "title": "DescribeReadResponse",
+        "description": "``filename`` is the server-sanitised name. ``cut_short`` / ``refused`` are server sentences the client renders verbatim."
+      },
+      "DescribeUnplaced": {
+        "properties": {
+          "label": {
+            "type": "string",
+            "title": "Label"
+          },
+          "sentence": {
+            "type": "string",
+            "title": "Sentence"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "label",
+          "sentence"
+        ],
+        "title": "DescribeUnplaced"
       },
       "DocumentChunkPage": {
         "properties": {
@@ -22572,6 +22934,37 @@
         ],
         "title": "ReextractRequest",
         "description": "`engine` is REQUIRED — distinct from /reingest which uses the global default."
+      },
+      "ReferenceAssetRef": {
+        "properties": {
+          "kind": {
+            "type": "string",
+            "const": "reference",
+            "title": "Kind",
+            "default": "reference"
+          },
+          "asset_id": {
+            "type": "string",
+            "title": "Asset Id"
+          },
+          "filename": {
+            "type": "string",
+            "title": "Filename"
+          },
+          "mime": {
+            "type": "string",
+            "title": "Mime"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "asset_id",
+          "filename",
+          "mime"
+        ],
+        "title": "ReferenceAssetRef",
+        "description": "The ``AssetRef`` a reference upload mints (``kind=\"reference\"``). Its own model, so ``TemplateAssetRef``'s \"never mints references\" stays true."
       },
       "RelationshipCreate": {
         "properties": {

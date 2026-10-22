@@ -116,12 +116,12 @@
   },
   "upload_workflow_template": {
     "kind": "async_function",
-    "body_sha256": "55b9ec815eaa8df7013985c430ffb429b6f9c705e2c4991b2d426e0ce9521f5c",
+    "body_sha256": "1774905c99bf88ee950a0ba2aa60d0722af02e1033a9d79f6f2ff6db34e70e30",
     "decorator_sha256": "5321252cb017515a631be2ef54959f621c6658f7528ab7995d439c95b0beca9a"
   },
   "get_workflow_template_placeholders": {
     "kind": "async_function",
-    "body_sha256": "58c955bfe4c52f10887632786921103e1e60837f7e1e36553d8a93905d13427f",
+    "body_sha256": "37e33894034ea2a8308dea672834ea913b0b6401a17e84c59ad7c1630e9e09ad",
     "decorator_sha256": "82abf42130c6f9b0cf3c6cc1330d56df5255a162cf2aec5d559af1a1315f703d"
   }
 }
