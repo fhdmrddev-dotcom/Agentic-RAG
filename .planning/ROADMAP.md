@@ -249,8 +249,9 @@ Plans:
   2. Every tool and phase type in the draft comes from the existing closed set; a draft the model proposes with an unknown tool is refused, not saved (AUTH-02).
   3. Instructions hidden inside an uploaded asset do not change the draft's tools or grants; driven with a planted injection in a reference document (AUTH-02).
   4. The path is driven on the full native provider roster plus OpenRouter, with blocked rows recorded, never omitted (AUTH-02).
+  5. A run hands back the author's own form filled in, without the author adding placeholders: a fillable PDF through its own fields, and a Word document's blanks through a copy the author confirmed while authoring (AUTH-02; added 2026-10-22, 291-CONTEXT D-25..D-29).
 
-**How we'd know this failed**: inputs are guessed from the prompt and ignore the form; the draft names a tool that does not exist; an uploaded document gains the power to grant a tool; only one provider was driven; the asset text is lost on reload.
+**How we'd know this failed**: inputs are guessed from the prompt and ignore the form; the draft names a tool that does not exist; an uploaded document gains the power to grant a tool; only one provider was driven; the asset text is lost on reload; the form's questions are asked but the run hands back no filled form, or a half-filled one.
 **Plans**: TBD (target 3-5)
 **UI hint**: yes
 **Flags**: **Provider-docs-first** (structured output per provider). **SC#10 four-axis UAT, full roster**. security_enforcement: asset content is untrusted. Closed core recount. Hot files: `workflow_authoring.py` (17/11/1025), `workflows.py`, `useTemplateFirstDraft.ts`. Seed `SEED-051`.

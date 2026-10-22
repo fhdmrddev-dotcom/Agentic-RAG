@@ -12,11 +12,13 @@ The describe door already takes one template (.docx/.pptx/.xlsx). It reads that 
 2. **Inputs from the files.** The draft's declared inputs come from the fields found in the form or template, and the server checks this.
 3. **The closed set.** Every tool and phase type in the draft comes from the existing closed set. A draft that names an unknown tool is refused and not saved. This already holds today and must keep holding.
 4. **No borrowed powers.** Text inside an uploaded file can shape steps but can never add a tool, a grant or a connection.
+5. **The form comes back filled** (added 2026-10-22 by the operator, D-25..D-30). Authors do not need a file with `{{placeholders}}`. A fillable PDF is filled through its own fields. A Word document's blanks are turned into a fillable copy once, while authoring.
 
 Driven on the full native provider roster plus OpenRouter (SC#4).
 
 **Out of scope:**
-- Any new phase type, tool, executor or input type. The Extension Contract stays closed, and the core set is recounted unchanged.
+- Any new phase type, tool, executor or input type. The Extension Contract stays closed, and the core set is recounted unchanged. ⚠ D-25 widens the **output formats of the existing `render_template` tool** (docx/pptx/xlsx, plus pdf). That adds no tool, so the recount must still read the same number.
+- A finished example turned into a template, writing onto a scanned PDF, and blanks in PowerPoint or Excel (cases 3 and 4 and the rest, `SEED-368`).
 - Ingesting reference docs into the Library or knowledge base (rejected in D-06).
 - An injection-text detector (rejected in D-17).
 - Run-time template upload, which was SEED-110 (closed).
@@ -41,7 +43,7 @@ Driven on the full native provider roster plus OpenRouter (SC#4).
   - **(b) Word documents with blanks** (`Name: ____`, empty table cells). The AI reads the text and proposes field names, and **each is marked AI-proposed**.
   - **(c) Flat or scanned PDFs.** Text-layer PDFs are read as text and the AI proposes fields. Scans go through the **existing image-reading path** (D-08).
   - Templates keep today's `{{placeholder}}` read unchanged.
-- **D-02:** When a file yields **no fields**, the author is told so in words, for example *"No fields found in vendor-form.pdf, so it's used as reference only"*. The file is still used and the draft goes ahead. It is never refused for having no fields.
+- **D-02:** When a file yields **no fields**, the author is told so in words, for example *"No fields found in vendor-form.pdf, so it's used as reference only"*. The file is still used and the draft goes ahead. It is never refused for having no fields. ⚠ A finished example with real values but no blanks (last time's contract) also lands here in 291. Turning its values into fields is `SEED-368`, case 3.
 - **D-03:** **Limits: 1 template-or-form plus up to 5 reference documents** per describe attempt. This keeps today's single-template row as the first slot.
 - **D-04:** **The fields found are listed before the author drafts.** This extends today's "8 fields found" row pattern. The author sees that the read worked before spending a draft.
 
@@ -67,6 +69,35 @@ Driven on the full native provider roster plus OpenRouter (SC#4).
 - **D-16:** **File text may shape the step instructions** the draft writes, for example "summarise in French". That is the point of uploading. Only tools, grants and connections are walled off.
 - **D-17:** **No injection-text detector or "this file looks safe" badge.** A detector misses things and raises false alarms, and the structural guard makes it unnecessary for tools and grants. The UI must never claim a file is safe.
 
+### Filling the file back (operator, 2026-10-22, after the sketch: "cases 1+2 in 291")
+- **Measured first:**
+  - Today's fill writes **only `{{name}}` tokens**: `render_docx_template` (`template_render_service.py:665`, docxtpl) and `run_replace_docx` (`:757`).
+  - Output is **docx, pptx or xlsx only** (`tools/render_template.py:372`).
+  - So without D-25 and D-26, D-01's (a) and (b) would read a form's questions and could not write the answers back. S1 would pass on screen while the run fails to hand back the form.
+  - `pypdf==5.1.0` is already in `Dockerfile.sandbox`, so no new package and no image tag change are needed.
+- **One rule covers both cases:** *the AI decides where each answer goes **once, while authoring**, with the author watching. Runs fill the file deterministically and the AI never writes the file's bytes* (the TMPL-03 invariant: "docxtpl owns the bytes; the LLM never does"). An AI writing into the document on each run is rejected: results would vary between runs, layouts would drift, and file text could steer it (D-13).
+- **D-25 (case 1): a fillable PDF comes back filled.**
+  - At run time the answers are written into the form's **own AcroForm fields, by field name**, inside the sandbox with pypdf. The field names are the placeholders, so no conversion is needed and no AI is involved.
+  - The output is that PDF, filled in. The values must show in ordinary PDF viewers; research confirms the pypdf 5.1.0 fill call and appearance handling rather than assuming them.
+  - A checkbox or choice value must be one of the field's own allowed values (the D-11 read). An invalid value is refused in words and never written.
+- **D-26 (case 2): a Word document with blanks gets a fillable copy, made once while authoring.**
+  - The AI proposes **where** each field goes, as an anchor: the label text and the kind of blank (underscores, an empty table cell).
+  - The **server** inserts `{{field}}` at that spot in a **copy**. The AI only names spots and never edits the bytes.
+  - The original is kept unchanged. The copy becomes the workflow's template (the D-06 path precedent), and runs use today's unchanged docx fill path.
+- **D-27: the author sees where each answer goes before drafting.**
+  - Each field shows the document's own line with the blank marked, and a tick.
+  - Unticking leaves that blank empty in the filled copy.
+  - This replaces the plain field list for Word forms. It is the D-04 list, so it is not a second list.
+- **D-28: a blank that can't be placed exactly is said in words, never guessed.**
+  - Examples: the label appears twice, or the blank is split in a way the server cannot locate.
+  - The author sees, for example, *"Couldn't place 'Signature': that label appears twice in the document. It stays blank in the filled copy."*
+  - **The server checks after inserting:** it re-reads the copy with `parse_docx_template_variables`, and every ticked field must appear exactly once. The prompt asking for this guarantees nothing.
+- **D-29: each run proves its fill.**
+  - DOCX: the output contains no leftover `{{…}}` (today's `residual_tags_in` / `assert_integrity`).
+  - PDF: the fields are read back and must equal what was written.
+  - A mismatch fails the run in words, rather than shipping a half-filled form.
+- **D-30: plan proportion (G-8).** This half is one wave-sized unit (fill-back), so the phase stays **3-5 plans**. The planner names where it goes rather than adding a sixth.
+
 ### Folded seeds and todo (routing written back into each file)
 - **D-18:** **SEED-051** (the generalized NL→workflow vision). This phase delivers its upload-assets → derived inputs/phases/tools arm.
 - **D-19:** **SEED-157** (the AI drafts blind to the template). Closed by D-05: content, not only names, now reaches the model.
@@ -81,6 +112,8 @@ Driven on the full native provider roster plus OpenRouter (SC#4).
   - **S3** Reload or come back later: the attached files and fields found are still there (D-07).
   - **S4** A file with no fields says so and still drafts (D-02).
   - **S5** The 8-row provider roster (7 native plus OpenRouter, derived from `MODEL_CAPABILITIES`), with blocked rows recorded as ⛔ and never omitted (SC#4).
+  - **S6** (D-25) A **real vendor fillable PDF**: run the workflow, download the output, and open it. It is the same form with the answers in its fields: a screenshot of the rendered PDF, plus the field values read back.
+  - **S7** (D-26..D-28) A **Word document with `Name: ____` blanks and an empty table cell**. The author sees "Where each answer goes", unticks one blank and confirms. The run's output has the answers in the blanks, the unticked blank stays empty, the layout is unchanged and the original file is untouched. A label that appears twice shows the "Couldn't place …" line.
 - **D-24 (SC#10):** The four-axis UAT covers cross-provider (S5), multi-file (1 form + 5 refs), and long input (a reference doc ≥ 5 KB). The parallel-thread axis is recorded as N/A with its reason, or covered by two describe attempts at once; the planner decides. Rows go in VALIDATION.md, never in PLAN tasks.
 
 ### Claude's Discretion
@@ -131,6 +164,9 @@ Driven on the full native provider roster plus OpenRouter (SC#4).
 - `backend/app/services/harness/grounding.py` — the shared fidelity rules and `GroundingBundle.degraded`.
 - `backend/app/services/multimodal_service.py` — the vision path for scans (D-08).
 - `backend/app/services/template_asset_service.py` — the Storage-path contract (`asset_id` IS a path).
+- `backend/app/services/template_render_service.py` — `parse_docx_template_variables` (D-28's re-read), `render_docx_template` and `run_replace_docx` (the fill paths D-26's copy feeds, unchanged).
+- `backend/app/services/tools/render_template.py` — the sandbox fill script (`residual_tags_in`, `assert_integrity`, `_SAFE_OUT_FILENAME_RE` at :372). D-25 adds the pdf arm here; the tool count is unchanged.
+- `backend/Dockerfile.sandbox` — `pypdf==5.1.0` already installed (D-25).
 
 ### Established Patterns
 - **Prompt halves guarantee nothing.** Every "the model may not …" has a server check after the emit (the Phase 214 block in `workflow_authoring.py`).
@@ -157,6 +193,7 @@ Driven on the full native provider roster plus OpenRouter (SC#4).
 - **Injection-text detector or warning badge.** Rejected (D-17). Re-open only if the structural guard (D-14) is shown to be bypassable.
 - **Ingesting reference docs into the knowledge base.** Rejected (D-06). A future "save this reference to my Library" action would be its own capability.
 - **No limit on files.** Rejected in favour of 1 + 5 (D-03). Re-open trigger: an operator case that needs more than 5 references.
+- **Turning a finished example into a template** (case 3), **writing onto a scanned or flat PDF** (case 4), and **blanks in PowerPoint or Excel** → `SEED-368`. These were deferred by the operator on 2026-10-22, with the trigger set at 291's verification.
 
 </deferred>
 
