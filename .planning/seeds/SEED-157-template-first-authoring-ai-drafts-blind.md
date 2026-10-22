@@ -1,7 +1,9 @@
 ---
 seed_id: SEED-157
 title: The AI drafts a workflow BLIND to the template it will have to fill
-status: open
+status: folded
+status_note: "Folded into Phase 291 (2026-10-22, D-19): placeholder NAMES already reach generate since 193.1; 291 sends file CONTENT too."
+folded_into: "291"
 planted: 2026-08-14
 planted_by: Quick task 260814-q5r — operator critique during the end-to-end UAT
 surface: Agentic-RAG

@@ -1,7 +1,9 @@
 ---
 seed_id: SEED-133
 title: NL workflow generation ignores GroundingBundle.degraded — a folder-blind draft is presented as ok
-status: open
+status: folded
+status_note: "Folded into Phase 291 (2026-10-22, D-20): NL drafting branches on GroundingBundle.degraded."
+folded_into: "291"
 planted: 2026-07-25
 planted_by: Phase 182 round-3 gap closure
 surface: Agentic-RAG

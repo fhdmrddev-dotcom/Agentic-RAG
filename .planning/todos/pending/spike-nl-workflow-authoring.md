@@ -47,3 +47,6 @@ Do NOT pre-commit the `inputs`/`assets` schema before this runs.
 
 Findings feed the v2.9 `inputs` + `assets` schema design and the open decisions in
 `.planning/research/questions.md`. Then plan D-092-AUTHOR Phase B/C on the evidence.
+
+
+> **Folded into Phase 291 (2026-10-22, 291-CONTEXT.md D-21).** Closes when 291 verifies.
