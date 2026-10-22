@@ -289,3 +289,123 @@ describe("templateFirstVocabulary — the module is a TRUE LEAF (rule 4)", () =>
     }
   })
 })
+
+// ══════════════════════════════════════════════════════════════════════════════════════
+// Phase 291-04 — the describe door with files: UI-SPEC Surface 1 (the form slot) and
+// Surface 2 (the references section). Every value is the UI-SPEC copy table VERBATIM, so a
+// rewording reds here before it reaches a screenshot.
+// ══════════════════════════════════════════════════════════════════════════════════════
+
+describe("templateFirstVocabulary — 291 Surface 1 + 2 copy, verbatim", () => {
+  const EXACT: [string, unknown, string][] = [
+    ["DESCRIBE_FORM_ATTACH_LABEL", mod.DESCRIBE_FORM_ATTACH_LABEL, "Attach a form or template"],
+    ["DESCRIBE_FORM_TYPES_NOTE", mod.DESCRIBE_FORM_TYPES_NOTE, "A form (PDF or Word) or a template (.docx, .pptx or .xlsx), up to 10 MB."],
+    ["DESCRIBE_FORM_ACCEPT", mod.DESCRIBE_FORM_ACCEPT, ".pdf,.docx,.pptx,.xlsx"],
+    ["DESCRIBE_READING", mod.DESCRIBE_READING, "Reading this document…"],
+    ["FOOTING_READING_DOCUMENT", mod.FOOTING_READING_DOCUMENT, "Reading the document — the draft will be built to whatever it asks for."],
+    ["FORM_FIELDS_HEADING", mod.FORM_FIELDS_HEADING, "What this form asks for"],
+    ["FORM_PROVENANCE_EXACT", mod.FORM_PROVENANCE_EXACT, "Read from the form's own fields."],
+    ["FORM_PROVENANCE_SUGGESTED_TEXT", mod.FORM_PROVENANCE_SUGGESTED_TEXT, "Suggested by AI from the text of this form."],
+    ["FORM_PROVENANCE_SUGGESTED_SCAN", mod.FORM_PROVENANCE_SUGGESTED_SCAN, "Suggested by AI from a reading of this scan."],
+    ["FIELD_SUGGESTED_TAG", mod.FIELD_SUGGESTED_TAG, "suggested"],
+    ["FORM_BACK_FLAT", mod.FORM_BACK_FLAT, "This PDF has no fillable fields, so runs can't write the answers onto it."],
+    ["PLACES_HEADING", mod.PLACES_HEADING, "Where each answer goes"],
+    ["PLACES_PROVENANCE", mod.PLACES_PROVENANCE, "Suggested by AI from the blanks in this document. Untick any blank it shouldn't fill."],
+    ["PLACE_STAYS_BLANK", mod.PLACE_STAYS_BLANK, "· stays blank"],
+    ["FOOTING_REFERENCE_ONLY", mod.FOOTING_REFERENCE_ONLY, "Your draft will be written from your description, using this document as a reference."],
+    ["SCAN_UNREADABLE", mod.SCAN_UNREADABLE, "Couldn't read this scan. It stays attached, but the draft can't use what's in it. To use it, type what matters into your description."],
+    ["FOOTING_WITHOUT_IT", mod.FOOTING_WITHOUT_IT, "Your draft will be written without it."],
+    ["FORM_UNAVAILABLE", mod.FORM_UNAVAILABLE, "We couldn't read this form. It's still attached — this says nothing about what's in it. To try again, remove it and attach it once more."],
+    ["FOOTING_FORM_UNAVAILABLE", mod.FOOTING_FORM_UNAVAILABLE, "We couldn't read this form, so your draft will be written from your description alone."],
+    ["REFS_PROMPT", mod.REFS_PROMPT, "Anything it should read first?"],
+    ["REFS_NOTE", mod.REFS_NOTE, "Up to 5 documents. The draft uses what's in them to write its steps. They're kept with this workflow, not added to your Library."],
+    ["REFS_LABEL", mod.REFS_LABEL, "Add a reference"],
+    ["REFS_ACCEPT", mod.REFS_ACCEPT, ".pdf,.docx,.txt,.md"],
+    ["REFS_TYPES", mod.REFS_TYPES, "PDF, Word or text (.pdf, .docx, .txt or .md), up to 10 MB each."],
+    ["REFS_FULL", mod.REFS_FULL, "5 of 5. Remove one to add another."],
+    ["REFS_REMOVE", mod.REFS_REMOVE, "Remove file"],
+    ["REFS_READING", mod.REFS_READING, "Reading…"],
+    ["REFS_READ_FULL", mod.REFS_READ_FULL, "Read in full."],
+    ["REFS_REFUSED_FALLBACK", mod.REFS_REFUSED_FALLBACK, "That file couldn't be read. Add a PDF, Word or text file under 10 MB."],
+    ["REFS_FOOTING_READING", mod.REFS_FOOTING_READING, "Reading your files — you can write the draft once they're read."],
+    ["REFS_POWERS", mod.REFS_POWERS, "Files can shape the steps. Only your description and the services you tick can add actions."],
+    ["REFS_KEEP", mod.REFS_KEEP, "Your files are kept once the draft is first saved. Leave this page before then and you'll need to add them again."],
+  ]
+
+  it.each(EXACT)("%s is the UI-SPEC copy exactly", (_id, value, expected) => {
+    expect(value).toBe(expected)
+  })
+
+  it("the formatters produce the UI-SPEC sentences, with the data interpolated", () => {
+    expect(mod.formBackLinePdf("w9.pdf")).toBe("Answers go into this form's own fields. Each run hands back w9.pdf, filled in.")
+    expect(mod.formBackLineWord("supplier.docx")).toBe(
+      "Answers are written into a copy of supplier.docx. Your original isn't changed.",
+    )
+    expect(mod.footingAsks(1)).toBe("Your draft will ask for this 1 field.")
+    expect(mod.footingAsks(4)).toBe("Your draft will ask for these 4 fields.")
+    expect(mod.noFieldsLine("notes.docx")).toBe("No fields found in notes.docx, so it's used as reference only.")
+    expect(mod.refsCount(2)).toBe("· 2 of 5")
+    expect(mod.refsRemoveLabel("terms.md")).toBe("Remove terms.md")
+    expect(mod.refsSendFailed("terms.md")).toBe("Couldn't send terms.md. Check your connection, then add it again.")
+    expect(mod.refsRefused("bad.md", "That file is empty.")).toBe("Couldn't add bad.md. That file is empty.")
+    expect(mod.refsOverflow("f.md", "g.md")).toBe("Only 5 references fit, so these weren't added: f.md, g.md.")
+    expect(mod.refsDuplicate("terms.md")).toBe("terms.md is already added.")
+  })
+
+  it("fieldTypeWord maps every type to its word, and only exactly yes/no reads `yes / no`", () => {
+    expect(mod.fieldTypeWord({ type: "text" })).toBe("text")
+    expect(mod.fieldTypeWord({ type: "number" })).toBe("number")
+    expect(mod.fieldTypeWord({ type: "date" })).toBe("date")
+    expect(mod.fieldTypeWord({ type: "file" })).toBe("file")
+    expect(mod.fieldTypeWord({ type: "enum", enum_options: ["yes", "no"] })).toBe("yes / no")
+    expect(mod.fieldTypeWord({ type: "enum", enum_options: ["No", "YES"] })).toBe("yes / no")
+    expect(mod.fieldTypeWord({ type: "enum", enum_options: ["/1", "/Off"] })).toBe("choice of 2")
+    expect(mod.fieldTypeWord({ type: "enum", enum_options: ["yes", "no", "maybe"] })).toBe("choice of 3")
+    expect(mod.fieldTypeWord({ type: "enum", enum_options: ["yes", "yes"] })).toBe("choice of 2")
+  })
+})
+
+describe("templateFirstVocabulary — 291 BANNED WORDS (D-17 / D-32, T-291-31 / T-291-34)", () => {
+  // Every string this module can render, constants AND formatter outputs, with realistic data.
+  const SAMPLE_OUTPUTS = (): [string, string][] => [
+    ...ALL_CONSTANTS,
+    ["formBackLinePdf", mod.formBackLinePdf("w9.pdf")],
+    ["formBackLineWord", mod.formBackLineWord("supplier.docx")],
+    ["footingAsks", mod.footingAsks(3)],
+    ["noFieldsLine", mod.noFieldsLine("notes.docx")],
+    ["refsCount", mod.refsCount(3)],
+    ["refsRemoveLabel", mod.refsRemoveLabel("terms.md")],
+    ["refsSendFailed", mod.refsSendFailed("terms.md")],
+    ["refsRefused", mod.refsRefused("bad.md", mod.REFS_REFUSED_FALLBACK)],
+    ["refsOverflow", mod.refsOverflow("f.md", "g.md")],
+    ["refsDuplicate", mod.refsDuplicate("terms.md")],
+  ]
+  // The words D-17 forbids, plus the stems a "this file is fine" claim is made of.
+  const BANNED = /\b(safe|safely|scanned|checked|verified|trusted|clean|malicious|suspicious|injection)\b/i
+  const MACHINE = /grounding_failed|external_action/
+  // A claim that a STEP reads a reference when the workflow RUNS (orchestrator decision 2).
+  const RUN_TIME_READ =
+    /\bsteps?\b[^.]*\b(reads?|reading|uses?)\b[^.]*\b(when (the|this) workflow runs|at run time|each run)\b/i
+
+  it("POSITIVE CONTROLS — each pattern really fires on the thing it forbids", () => {
+    expect(BANNED.test("This file is safe.")).toBe(true)
+    expect(BANNED.test("Checked for injection")).toBe(true)
+    expect(MACHINE.test("grounding_failed")).toBe(true)
+    expect(RUN_TIME_READ.test("Each step reads your references when the workflow runs.")).toBe(true)
+  })
+
+  it("no value calls a file safe, checked, scanned, verified, trusted or clean, and shows no code", () => {
+    const outputs = SAMPLE_OUTPUTS()
+    expect(outputs.length).toBeGreaterThan(40)
+    for (const [id, value] of outputs) {
+      expect(BANNED.test(value), `${id} carries a banned word: ${value}`).toBe(false)
+      expect(MACHINE.test(value), `${id} carries a machine code: ${value}`).toBe(false)
+    }
+  })
+
+  it("no value says a step reads a reference when the workflow runs", () => {
+    for (const [id, value] of SAMPLE_OUTPUTS()) {
+      expect(RUN_TIME_READ.test(value), `${id} claims run-time reading: ${value}`).toBe(false)
+    }
+  })
+})
