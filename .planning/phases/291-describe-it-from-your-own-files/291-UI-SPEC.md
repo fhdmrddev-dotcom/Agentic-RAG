@@ -86,7 +86,7 @@ Sketch values **not** carried over:
 
 ## Typography
 
-**The final set: four sizes and two weights across every surface this phase touches.** No other size may appear in new markup.
+**The final set: four sizes; new markup uses two weights (400 and 500) only, and the shipped 600 step-count heading is untouched.** No other size may appear in new markup.
 
 | Size | Status | Weight | Line height | Role, and every place it is used |
 |------|--------|--------|-------------|----------------------------------|
