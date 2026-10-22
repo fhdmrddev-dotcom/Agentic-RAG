@@ -11983,6 +11983,18 @@ cells rot within days.
 | [`frontend/src/components/workflows/__fixtures__/teamFixtures.ts`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentsworkflows__fixtures__teamfixturests) | 1 / 1 / 198 (was `0 / 0 / 0`) | no (young) | young (created 290-01). Planted 7-step stress, batch-20, malformed, grounded and armed shapes. ⛔ test-only, no I/O; `canvasFixtures` imported, never edited |
 | [`frontend/src/components/workflows/library/stepLine.ts`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentsworkflowslibrarysteplinets) | 2 / 1 / 74 (was `0 / 0 / 0`) | no (young) | young (created 290-02). Pure `resolveStepLine(def)`: type-sentence chips in run order, first 3 + more, `null` at 0 steps. ⛔ in `LIBRARY_SUBTREE_PATHS` |
 | [`frontend/src/components/workflows/library/StepChipLine.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentsworkflowslibrarystepchiplinetsx) | 2 / 1 / 110 (was `0 / 0 / 0`) | no (young) | young (created 290-02). The card's `row-steps` block; owns the one expand `useState`, so the card stays at 0. ⛔ no `title=` (F1); no `PhaseSpine` reuse |
+| [`backend/app/services/template_render_service.py`](docs/HOT-FILE-LEDGER.md#backendappservicestemplate_render_servicepy) | 8 / 3 / 988 | ⚠ **FIRES** | ⚠ absent its ENTIRE LIFE at 3 phases — row added 291-01. 291 READS its parser only; 291-03 leaves `select_engine` unedited. ⛔ docxtpl owns the bytes |
+| [`frontend/src/components/workflows/DescribeTemplateRow.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentsworkflowsdescribetemplaterowtsx) | 1 / 1 / 276 | no (1 phase) | row added 291-01. 291-04 extends it to forms (one status region, one arm per state); never a second row (SEED-155). ⛔ names render as escaped text |
+| [`frontend/src/components/workflows/TemplateAttachSection.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentsworkflowstemplateattachsectiontsx) | 3 / 1 / 403 | no (1 phase) | row added 291-01. 291-05: ONE heading conditional; `TEMPLATE_ACCEPT` unchanged. ⛔ the four readings never collapse (260814-q5r) |
+| [`frontend/src/components/workflows/templateFirstVocabulary.ts`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentsworkflowstemplatefirstvocabularyts) | 1 / 1 / 238 | no (1 phase) | row added 291-01. 291-04/05 add UI-SPEC copy consts (data). ⛔ server sentences are rendered as received, never copied here |
+| [`frontend/src/hooks/useDraftPersistence.ts`](docs/HOT-FILE-LEDGER.md#frontendsrchooksusedraftpersistencets) | 15 / 1 / 1081 | no (1 phase) | row added 291-01 (15 commits, absent). 291-04 forecast: empty diff, D-07 rides `definition.assets[]`. ⛔ one timer, one writer (186) |
+| [`frontend/src/hooks/useTemplatePlaceholders.ts`](docs/HOT-FILE-LEDGER.md#frontendsrchooksusetemplateplaceholdersts) | 1 / 0 / 154 | no (0 phases) | row added 291-01. 291-04 forecast: empty diff; the rail's state is not re-pointed. ⛔ five readings never collapse (260814-q5r) |
+| [`backend/app/services/describe_files.py`](docs/HOT-FILE-LEDGER.md#backendappservicesdescribe_filespy) | 0 / 0 / 0 | no (young) | young (created 291-01). ONE AcroForm reader + docx/pdf/scan/reference read + Word fillable copy. ⛔ pure leaf: no DB client; vision via `vision_text` only |
+| [`backend/app/services/describe_draft_guards.py`](docs/HOT-FILE-LEDGER.md#backendappservicesdescribe_draft_guardspy) | 0 / 0 / 0 | no (young) | young (created 291-02). Fence + powers guard + coverage check for file-bearing drafts. ⛔ the server walks what was emitted |
+| [`backend/app/services/harness/form_inputs.py`](docs/HOT-FILE-LEDGER.md#backendappservicesharnessform_inputspy) | 0 / 0 / 0 | no (young) | young (created 291-03). Pure transform for the fill-back inputs. ⛔ the AI never writes the file's bytes (TMPL-03) |
+| [`frontend/src/components/workflows/DescribeReferencesSection.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentsworkflowsdescribereferencessectiontsx) | 0 / 0 / 0 | no (young) | young (created 291-04). Peer references section beside `DescribeTemplateRow` (sketch B). ⛔ classes from `surfaceClasses.ts` only |
+| [`frontend/src/components/workflows/surfaceClasses.ts`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentsworkflowssurfaceclassests) | 0 / 0 / 0 | no (young) | young (created 291-04). ROW/NOTE/FOOTING/FILENAME class consts moved out of the row. ⛔ a `.ts` leaf (react-refresh rule) |
+| [`frontend/src/components/workflows/DraftInputsFold.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentsworkflowsdraftinputsfoldtsx) | 0 / 0 / 0 | no (young) | young (created 291-05). The inputs fold on the arrival card: one row per field, Ask / Look it up. ⛔ server-added rows say so |
 
 
 
@@ -23659,3 +23671,53 @@ CLAUDE.md verdict cell as of 2026-10-21 (replaced by 290-04):
 Scan-list disposition cell as of 2026-10-21 (replaced by 290-04):
 
 > 286 forecast (290): ONE prop; the chip words come from `libraryVocabulary`, never literals here. honoured by construction (199) — ⚠ the 200 canvas port stays REVERTED
+
+## Phase 291 rows added at planning (291-01, 2026-10-22)
+
+### `backend/app/services/template_render_service.py`
+
+**`8 / 3 / 988`, re-derived 2026-10-22 at 291-01 (phases 101, 101.1, 193.1).** ⚠ **Absent from the scan list for its entire life at 3 phases**, so G-5 could never fire on it. It is the deterministic template-fill core: `parse_docx_template_variables` (the `{{ }}` oracle), `placeholder_names_from_parsed` (one name assembly, two doors), `check_coverage`, `render_docx_template` (docxtpl) and `run_replace_docx`. **Phase 291 reads it and does not edit it:** 291-01's `describe_files.py` calls the parser for the template arm and for the Word fillable-copy re-read; 291-03 keeps `select_engine` unedited and picks the AcroForm engine in the handler. ⛔ Invariant: docxtpl owns the bytes, the LLM never does (TMPL-03). A bare `{{ key }}` renders a dict repr through docxtpl and still passes the residual check (BUG-261022-01), so server-made tokens are `{{ key.value }}`.
+
+### `frontend/src/components/workflows/DescribeTemplateRow.tsx`
+
+**`1 / 1 / 276`, re-derived 2026-10-22 at 291-01.** Created by 193.1-06 (the pre-draft template row, five unconfusable arms, one derived count). Row added AT PLANNING for Phase 291: **291-04** extends this shipped row to accept forms (sketch `291-describe-files` winner B), keeping ONE `role="status"` region with exactly one arm per read state. ⛔ Never a second row and never a redraw (SEED-155). Field names render as escaped React text. Spacing classes move to `surfaceClasses.ts` (291-04) so the references section can share them by name.
+
+### `frontend/src/components/workflows/TemplateAttachSection.tsx`
+
+**`3 / 1 / 403`, re-derived 2026-10-22 at 291-01** (`193-AUTH-03`, `260814-q5r` quick, an untagged step-panel port). Row added AT PLANNING for Phase 291. **291-05** forecast: one heading conditional on the fields arm (`TEMPLATE_FIELDS_HEADING`); `TEMPLATE_ACCEPT` stays unchanged. ⛔ The four readings on the template section never collapse into each other (260814-q5r).
+
+### `frontend/src/components/workflows/templateFirstVocabulary.ts`
+
+**`1 / 1 / 238`, re-derived 2026-10-22 at 291-01.** Created by 193.1-06 (the 22nd governed id; one home for every word on the template-first surface). Row added AT PLANNING for Phase 291. **291-04 / 291-05** add the UI-SPEC Surface 1 and 2 copy constants and formatters, as data. ⛔ Server-sourced sentences (couldn't place, cut short, copy refused) are NOT copied into this module; the client renders them as received (SEED-221).
+
+### `frontend/src/hooks/useDraftPersistence.ts`
+
+**`15 / 1 / 1081`, re-derived 2026-10-22 at 291-01.** All 15 commits are Phase 186 (autosave: one timer, one writer, never two PATCHes; conflict halts the loop). ⚠ Absent from the scan list at 15 commits. Row added AT PLANNING for Phase 291. **291-04** forecast: an EMPTY diff here; D-07's reload survival rides `definition.assets[]` through the existing save (the 286 forecast "288 draft config rides useDraftPersistence; ≤ 1 store field").
+
+### `frontend/src/hooks/useTemplatePlaceholders.ts`
+
+**`1 / 0 / 154`, re-derived 2026-10-22 at 291-01.** Created by quick task 260814-q5r (one typed call, one leaf hook, five readings); the six-digit bucket is not a phase. Row added AT PLANNING for Phase 291. **291-04** forecast: an EMPTY diff; the rail's `TemplatePlaceholdersState` is not re-pointed (the new describe read state lives in `useTemplateFirstDraft.ts`). The owner-gated re-read door it calls gains a pdf arm in 291-01 on the server, with no client change.
+
+### `backend/app/services/describe_files.py`
+
+**`0 / 0 / 0` at 291 planning (2026-10-22). Young; created by 291-01.** The pure leaf for authoring-time file reads: ONE AcroForm reader (`read_acroform_fields`, also behind `acroform_oracle` for the bound re-read and plan 03's `_template_oracle`), docx/pdf text and Word blank candidates, scan transcription through `vision_text` with a 3-page cap, per-provider reference caps, and the Word fillable-copy maker with its exactly-once check. ⛔ Invariants: imports no Supabase client and no pool (the door is stateless); never `multimodal_service.describe_image` (a caption, not a transcription); every reader returns a value or None; server sentences are owned here and rendered verbatim.
+
+### `backend/app/services/describe_draft_guards.py`
+
+**`0 / 0 / 0` at 291 planning (2026-10-22). Young; created by 291-02.** The fence for file content in the user turn, the post-emit powers guard (D-14: only the author's words or ticks grant), and the field coverage check (D-10 / D-12). ⛔ Prompt text guarantees nothing; every guarantee is a server walk of what was emitted.
+
+### `backend/app/services/harness/form_inputs.py`
+
+**`0 / 0 / 0` at 291 planning (2026-10-22). Young; created by 291-03.** Pure transform from run inputs to the fill-back values (D-25 / D-29). ⛔ Runs fill the file deterministically; the AI never writes the file's bytes (TMPL-03).
+
+### `frontend/src/components/workflows/DescribeReferencesSection.tsx`
+
+**`0 / 0 / 0` at 291 planning (2026-10-22). Young; created by 291-04.** The peer references section mounted after `DescribeTemplateRow` (sketch `291-describe-files` winner B; up to 5 references, D-03). ⛔ Spacing classes come from `surfaceClasses.ts` by name, never re-typed (the `?raw` spacing fence).
+
+### `frontend/src/components/workflows/surfaceClasses.ts`
+
+**`0 / 0 / 0` at 291 planning (2026-10-22). Young; created by 291-04.** ROW / NOTE / FOOTING / FILENAME class constants moved out of `DescribeTemplateRow.tsx` so the references section and the inputs fold share them. ⛔ A `.ts` module because `react-refresh/only-export-components` forbids runtime consts beside a component.
+
+### `frontend/src/components/workflows/DraftInputsFold.tsx`
+
+**`0 / 0 / 0` at 291 planning (2026-10-22). Young; created by 291-05.** The inputs fold on the draft arrival card: one row per field with an Ask the person / Look it up switch, and "Added by Syrel, not the AI" on server-added rows (D-12). ⛔ With nothing to show the arrival card stays byte-for-byte today's card.
