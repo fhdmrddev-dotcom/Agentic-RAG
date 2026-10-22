@@ -101,9 +101,15 @@ import {
   DRAFT_SETTINGS_HEADING,
   DRAFT_SETTINGS_OPEN_ACTION,
   GROUNDING_FOLD_ACTION,
+  REMOVED_GLYPH,
   decisionsFoldSummary,
   groundingFoldSummary,
 } from "@/components/workflows/decisionsVocabulary"
+import {
+  DraftInputsFoldBody,
+  DraftInputsFoldTrigger,
+  type DraftInputsFoldProps,
+} from "@/components/workflows/DraftInputsFold"
 import {
   SEED_RECEIPT_DISMISS_GLYPH,
   SEED_RECEIPT_DISMISS_LABEL,
@@ -116,6 +122,12 @@ import {
   type PhaseSpecJSON,
 } from "@/components/workflows/phaseVocabulary"
 import { SeedReceipt } from "@/components/workflows/SeedReceipt"
+import {
+  FOLD_ACTION_CLASS,
+  FOLD_BODY_CLASS,
+  FOLD_GLYPH,
+  FOLD_LINE_CLASS,
+} from "@/components/workflows/surfaceClasses"
 import { cn } from "@/lib/utils"
 
 export interface DraftArrivalCardProps {
@@ -145,6 +157,17 @@ export interface DraftArrivalCardProps {
    *  draft's whole life. The receipt stays arrival-only: `open` is unchanged and the row
    *  authors no past-tense narration. Default false keeps the closed branch null. */
   settingsRow?: boolean
+
+  /** Phase 291-05 (D-15, sketch 291-draft-removed A) — what the server's powers guard removed
+   *  from this generation, one `{ lead, reason }` pair each, BOTH in the server's words
+   *  (SEED-221). Absent or empty ⇒ no line at all and the card is byte-identical to before.
+   *  ⚠ Typed structurally rather than imported from the API client's module, because this file
+   *  touches that module in no form (the suite's fence 3). */
+  removed?: readonly { lead: string; reason: string }[]
+
+  /** Phase 291-05 (D-09 / D-10 / D-12) — the inputs fold, given only when the draft was built
+   *  to a form's or template's fields. The card owns its open state and its body id. */
+  inputsFold?: Omit<DraftInputsFoldProps, "open" | "onToggle" | "bodyId">
 }
 
 /**
@@ -188,17 +211,9 @@ const RECEIPT_SUPPRESSION_CLASS = [
   "[&_[data-testid=seed-receipt-close]]:hidden",
 ].join(" ")
 
-/** The disclosure mark, `aria-hidden` so the announcement is carried by the button's own
- *  text and its expanded state rather than by a glyph. Sketch 174 draws it. */
-const FOLD_GLYPH = "▸"
-
-const FOLD_LINE_CLASS = cn(
-  "mt-1 flex w-full items-baseline gap-2 rounded px-1 py-[3px] text-left text-[12.5px]",
-  "text-muted-foreground hover:text-foreground focus:outline-none focus:ring-1 focus:ring-primary",
-)
-
-const FOLD_ACTION_CLASS =
-  "shrink-0 underline decoration-dotted underline-offset-2"
+/* 291-05 — the disclosure mark and the two fold class strings that sat here were MOVED,
+   byte-identical, to `surfaceClasses.ts`, with the fold-body literal extracted beside them, so
+   the inputs-fold leaf draws the same trigger and body from the same home. */
 
 /**
  * ── SKETCH 200 — THE APPLIED PAIRS, AND THE ONE THE WIRE USUALLY CANNOT SUPPORT ───────
@@ -242,6 +257,8 @@ export function DraftArrivalCard({
   onDismiss,
   decisions,
   settingsRow = false,
+  removed,
+  inputsFold,
 }: DraftArrivalCardProps) {
   /**
    * ⚠ READ OFF `decisions`, NEVER MIRRORED INTO STATE. These three are LIVE off the definition
@@ -268,6 +285,11 @@ export function DraftArrivalCard({
   /** 288-01 — the closed branch's own disclosure, collapsed on mount, local like its siblings. */
   const [settingsOpen, setSettingsOpen] = useState(false)
   const settingsBodyId = useId()
+  /** 291-05 — the inputs fold's own disclosure, closed on mount like its siblings. Its body id
+   *  is DERIVED from the heading's rather than drawn from a new `useId`, so a card given no
+   *  inputs fold draws exactly the ids it drew before. */
+  const [inputsOpen, setInputsOpen] = useState(false)
+  const inputsBodyId = `${headingId}-inputs`
 
   // DERIVED from the ONE home (187-24), never re-implemented and never read back out of
   // the DOM. A second consumer of one predicate is not a second predicate.
@@ -414,6 +436,28 @@ export function DraftArrivalCard({
           {heading}
         </p>
 
+        {/* ── 291-05 · WHAT THE FILES COULD NOT DO (D-15, sketch 291-draft-removed A) ─────────
+            One line per removal, in the server's order, with no cap and no fold. Both halves
+            are the SERVER's words, rendered as plain React text. No colour: a hairline rule and
+            muted text, the lead weighted. ⚠ ABSENT OR EMPTY ⇒ NO NODE AT ALL, so a draft with
+            nothing removed paints exactly the card it painted before. */}
+        {removed !== undefined && removed.length > 0
+          ? removed.map((item, index) => (
+              <p
+                key={`${index}-${item.lead}`}
+                data-testid="draft-arrival-removed"
+                className="flex items-baseline gap-2 border-l-2 border-border py-1 pl-4 text-[13.5px] leading-[1.5] text-muted-foreground"
+              >
+                <span aria-hidden="true" className="flex-none">
+                  {REMOVED_GLYPH}
+                </span>
+                <span>
+                  <span className="font-medium text-foreground">{item.lead}</span> {item.reason}
+                </span>
+              </p>
+            ))
+          : null}
+
         {/* ── THE SOURCE LINE — WHAT THE AUTHOR ASKED FOR, ECHOED BACK ──────────────────
             The sheet quotes the request behind a 2px rule and puts a control beside it. The
             echo is CLAMPED at rest, because a requirement can be a page long and this card's
@@ -479,6 +523,16 @@ export function DraftArrivalCard({
       <div className="flex items-center justify-between gap-3 border-t border-border bg-background/50 px-6 py-4 pl-8">
         <div className="flex min-w-0 flex-wrap items-center gap-3">
 
+          {/* 291-05 — the inputs fold leads the strip, and only when the draft has form fields. */}
+          {inputsFold !== undefined ? (
+            <DraftInputsFoldTrigger
+              {...inputsFold}
+              bodyId={inputsBodyId}
+              open={inputsOpen}
+              onToggle={() => setInputsOpen((wasOpen) => !wasOpen)}
+            />
+          ) : null}
+
           {groundingSummary ? (
             <button
               type="button"
@@ -534,11 +588,20 @@ export function DraftArrivalCard({
           three REGIONS inside this one card, and the two that are not the arrival moment sit
           behind the folds sketch 174 measured — which is also what keeps the resting card the
           four lines this file exists to preserve. */}
+      {inputsFold !== undefined && inputsOpen ? (
+        <DraftInputsFoldBody
+          {...inputsFold}
+          bodyId={inputsBodyId}
+          open={inputsOpen}
+          onToggle={() => setInputsOpen((wasOpen) => !wasOpen)}
+        />
+      ) : null}
+
       {groundingOpen ? (
         <div
           id={groundingBodyId}
           data-testid="draft-arrival-grounding-body"
-          className="flex flex-col gap-4 border-t border-border px-6 py-5 pl-8"
+          className={FOLD_BODY_CLASS}
         >
           {appliedPairs.length > 0 ? (
             /* ── THE `What I applied` BLOCK ────────────────────────────────────────────
@@ -591,7 +654,7 @@ export function DraftArrivalCard({
         <div
           id={decisionsBodyId}
           data-testid="draft-arrival-decisions-body"
-          className="flex flex-col gap-4 border-t border-border px-6 py-5 pl-8"
+          className={FOLD_BODY_CLASS}
         >
           {/* The sheet's own heading over the list, in its `data-md` uppercase register.
               The rows themselves belong to `DecisionsList` and are untouched here.

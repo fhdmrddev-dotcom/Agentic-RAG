@@ -325,3 +325,7 @@ export const APPLIED_READS_LABEL = "Reads from"
 
 /** The template pair's label. */
 export const APPLIED_FILLS_LABEL = "Fills in"
+
+/** 291-05 (D-15, sketch 291-draft-removed A) — the removed line's mark, `aria-hidden` on the
+ *  card. The line's words are the SERVER's (SEED-221); this module holds the glyph only. */
+export const REMOVED_GLYPH = "⊘"

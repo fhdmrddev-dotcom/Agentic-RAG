@@ -92,3 +92,50 @@ export const DECLARED_INPUT_REQUIRED_TOGGLE = "Required"
  * missing: a workflow that needs no launch input is a perfectly good workflow.
  */
 export const DECLARED_INPUTS_EMPTY = "This workflow asks for nothing when it starts."
+
+// ── 291-05 · the arrival card's inputs fold (UI-SPEC Surface 3b copy, verbatim) ───────────
+//
+// Sketch 291-draft-removed's shared fold (D-09 / D-10 / D-12). The interpolated half of each
+// formatter is DATA (a count, a filename, a field label, a server-kept note); the words around
+// it live here. A caller passes data and never assembles a sentence.
+
+/** The fold trigger's summary: how many of the form's fields became inputs. Empty at zero or
+ *  for any non-finite count, so the card is never handed "NaN inputs". */
+export function inputsFoldSummary(count: number, filename: string): string {
+  const n = Number.isFinite(count) && count > 0 ? Math.trunc(count) : 0
+  if (n === 0) return ""
+  return n === 1 ? `1 input from ${filename}` : `${n} inputs from ${filename}`
+}
+
+/** The fold trigger's action. */
+export const INPUTS_FOLD_ACTION = "review"
+
+/** The fold body's heading. */
+export const INPUTS_BODY_HEADING = "Where each answer comes from"
+
+/** What the two sources mean, said once above the rows. */
+export const INPUT_SOURCE_EXPLANATION =
+  "Ask the person: it's a box on the form that starts this workflow. Look it up: it's found in your documents when the workflow runs."
+
+/** The switch's two segments: `source: "user"` and `source: "kb_auto"`. */
+export const INPUT_SOURCE_ASK = "Ask the person"
+export const INPUT_SOURCE_LOOKUP = "Look it up"
+
+/** The switch's accessible name, per row. */
+export function inputSourceGroupLabel(label: string): string {
+  return `Where the answer to ${label} comes from`
+}
+
+/** In place of the switch, for a field a step writes. */
+export const INPUT_FROM_STEP = "Written by a step"
+
+/** The server-added mark (D-12). Shown only from `origin === "server_added"`, which the server
+ *  stamps and never reads off the model's payload. */
+export const INPUT_ADDED_BY_SYREL =
+  "Added by Syrel, not the AI: the draft left this field out, so it's asked when the workflow runs."
+
+/** In place of the type word, for an input the AI added beyond the form (D-10): the server-kept
+ *  reason, passed through whole. */
+export function inputExtraNote(filename: string, note: string): string {
+  return `Not in ${filename}. ${note}`
+}
