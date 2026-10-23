@@ -274,7 +274,7 @@ Plans:
 
 **Gap closure (round 1)**
 
-- [ ] 291-06-PLAN.md — Close SC#3 (execute_code is a power) and SC#1 (no silent form drop: real-form caps, a refusal in words); WR-08/09/10; defer the rest with triggers (W1)
+- [x] 291-06-PLAN.md — Close SC#3 (execute_code is a power) and SC#1 (no silent form drop: real-form caps, a refusal in words); WR-08/09/10; defer the rest with triggers (W1)
 
 **UI hint**: yes
 **Flags**: **Provider-docs-first** (structured output per provider). **SC#10 four-axis UAT, full roster**. security_enforcement: asset content is untrusted. Closed core recount. Hot files: `workflow_authoring.py` (17/11/1025), `workflows.py`, `useTemplateFirstDraft.ts`. Seed `SEED-051`.
