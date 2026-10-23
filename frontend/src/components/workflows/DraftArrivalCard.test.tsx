@@ -234,6 +234,24 @@ describe("DraftArrivalCard — one card", () => {
 
 // ── 2. THE COLLAPSED ARRIVAL STATE — sketch 174's four lines ─────────────────────────
 
+describe("DraftArrivalCard — a long card scrolls in place (291 UAT S1)", () => {
+  it("wraps ALL the content in one scroll box inside the frame; the accent rule stays on the frame", () => {
+    renderCard()
+    const card = screen.getByTestId("draft-arrival-card")
+    const scroll = screen.getByTestId("draft-arrival-scroll")
+    // The frame bounds the scroll box (flex column, the box takes the rest and may shrink).
+    expect(card.className).toMatch(/\bflex\b/)
+    expect(card.className).toMatch(/\bflex-col\b/)
+    expect(scroll.className).toMatch(/\bmin-h-0\b/)
+    expect(scroll.className).toMatch(/\boverflow-y-auto\b/)
+    // Exactly two children: the accent rule and the scroll box; the closing line scrolls too.
+    expect(card.children).toHaveLength(2)
+    expect(card.children[0].getAttribute("aria-hidden")).toBe("true")
+    expect(card.children[1]).toBe(scroll)
+    expect(scroll.contains(screen.getByTestId("draft-arrival-close"))).toBe(true)
+  })
+})
+
 describe("DraftArrivalCard — the four-line arrival state", () => {
   it("mounts with BOTH folds closed — neither child is in the DOM", () => {
     renderCard()

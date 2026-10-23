@@ -382,12 +382,17 @@ export function DraftArrivalCard({
       data-testid="draft-arrival-card"
       aria-labelledby={headingId}
       className={cn(
-        "relative w-full max-w-[720px] overflow-hidden rounded border border-border bg-card shadow-lg",
+        "relative flex w-full max-w-[720px] flex-col overflow-hidden rounded border border-border bg-card shadow-lg",
         "animate-in fade-in-0 slide-in-from-bottom-1 duration-100 motion-reduce:animate-none",
       )}
     >
       <span aria-hidden="true" className="absolute bottom-0 left-0 top-0 w-[4px] bg-primary" />
 
+      {/* The builder column clamps this card to its grid row, so a long card (a 23-field form's
+          inputs fold) must scroll in place; before, everything past the row was clipped and
+          unreachable (measured at 291 UAT S1: 1703 px of content in a 485 px box). The content
+          scrolls inside this wrapper, so the accent rule and the radius stay on the frame. */}
+      <div data-testid="draft-arrival-scroll" className="min-h-0 flex-1 overflow-y-auto">
       <div className="flex flex-col gap-4 p-6 pl-8">
         {/* The state chip and the dismiss control share the sheet's header row. */}
         <div className="flex items-start justify-between gap-3">
@@ -683,6 +688,7 @@ export function DraftArrivalCard({
       >
         {SEED_RECEIPT_NOTHING_COMMITTED}
       </p>
+      </div>
     </section>
   )
 }
