@@ -14,7 +14,19 @@ updated: 2026-10-23T00:00:00Z
 
 ### 1. G-4 Chrome UAT rows S1-S7 (291-VALIDATION.md). Run S1 first
 expected: The lived-experience scenarios pass: template, form and reference upload; the arrival card; launch; the fillable-PDF fill and the Word fill. A large fillable PDF (state or country dropdown, 200+ fields) drafts with every field. A form that can't be sent shows the stated refusal, not a silent drop.
-result: [pending]
+result: S1 BLOCKED at the draft step (2026-10-23, Chrome, blank IRS W-9 `fw9.pdf`, 23 AcroForm fields, no /TU tooltips).
+  - Door half PASSED with a finding: all 23 fields listed (15 text, 8 yes/no, types carried over), no raw `topmostSubform[0]…` name shown. FINDING: labels inferred from page text are often wrong or empty: ".", "–" ×3, "3.", "on", "Print", a duplicated "6 City, state, and ZIP code", and instruction sentences ("Note: If the account is…"). Choice-of-n: not covered (the W-9 has no dropdown).
+  - Draft half BLOCKED: `POST /workflows/generate` returned `{"ok":false,"error":"could_not_generate","detail":"provider_error"}` twice. LangSmith trace 3b362033-db1b-40b8-a9e5-48a88f8cfbbb: Anthropic `claude-opus-4-8` 400 "Your credit balance is too low" (req_011CgJuqe1mdA6KwVSc1yqnb). Operator billing, not a code defect.
+  - FINDING (copy): the card says "The model couldn't produce a usable draft. Try again, or describe the work in more detail." for a billing failure. Retrying or rewording cannot help. The retry also re-sent the whole prompt with "Your emission failed strict validation: provider_error".
+  - FINDING (SECURITY): the LangSmith trace of `stream_anthropic` records the provider API key in its inputs. `anthropic_service.stream_anthropic`, `google_service` streaming_chat and `web_search_service.web_search` are `@traceable` without `process_inputs=redact_inputs` (the redactor already exists in `rerank_engines/tracing.py`). Rotate the key.
+  - Card fold and DB inputs count: not reached on Anthropic.
+  - RE-RUN 2026-10-23 on `HARNESS_AUTHORING_MODEL=gpt-5.5` (backend restarted 13:18). Draft arrived in ~70 s. Workflow `909eab02-fc51-4640-bcb1-3730a264944b` saved.
+    - Card: "23 inputs from fw9.pdf"; the "Where each answer comes from" fold lists all 23. Header "Asked when this runs 23".
+    - DB (`/workflows/drafts` definition): 23 inputs, 23 distinct keys, each one an exact AcroForm name; 1 step `llm_emit` / `render_template`; asset `template:fw9.pdf:application/pdf`. **R1-WR-02 live check PASSED on gpt-5.5:** with the field names grounded by reference, the drafter still chose `render_template` and used every exact key.
+    - Types: 14 text, 8 yes/no, plus 1 the model turned from text into enum `["", "C", "S", "P"]` (f1_03, LLC classification). FINDING: the read type (text) was overridden, and an empty-string option was accepted.
+    - FINDING (labels, lived experience): the inputs the model stored have GOOD labels ("Line 1: vendor legal name / …"), but the door AND the card fold show the page-text guesses (".", "–", "3.", "on"…). The author reviews the worse set.
+    - Minor: one `GET …/template/placeholders?asset_id=fw9.pdf` 404 fires before the bind (the filename is passed as the asset id); it repeats correctly after the PATCH. Harmless noise.
+  - S1 VERDICT: ⚠ PARTIAL. The mechanics pass (every field, types, fold, one input per field in DB). Label quality fails the "I'd recognize failure here" bar on a tooltip-less real form. Model: gpt-5.5 (not yet S5-verified, Pitfall 10).
 
 ### 2. SC#4: authoring roster run (`RUN_291_AUTHORING_ROSTER=1 backend/tests/integration/test_291_authoring_roster.py`)
 expected: Every native provider row plus OpenRouter passes, or is recorded as blocked with a reason and an issue id. Include a "calculate the totals" description that does NOT grant execute_code.
