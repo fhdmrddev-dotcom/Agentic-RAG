@@ -764,21 +764,25 @@ for (const banned of ["dangerouslySetInnerHTML", "innerHTML", "mermaid", "new Fu
 | A4 | The best-overlap sentence excerpt is closer to "the clause" than the chunk head | Pattern 3 | G4-1/G4-2 hover shows a less relevant sentence; cosmetic, not provenance-wrong |
 | A5 | A matrix that scrolls sideways inside its card is acceptable (D-16's no-sideways rule is the diagram's) | Pattern 7 | Operator may want a stacked phone layout; cheap to add |
 
-## Open Questions
+## Open Questions (RESOLVED)
 
 1. **Verdict words: favourability or yes/no?**
    - What we know: D-05 (locked) says `y | n | m | q` = yes / no / partly / not stated. The approved sketch's key and fixture read them as favourable / unfavourable / neutral / not stated (`index.html:381`; e.g. "Auto-renewal: None — must re-sign" is `y`).
    - What's unclear: whether the operator approved the words or only the visuals.
    - Recommendation: implement D-05's words (it is the locked decision) in aria-labels, the key and the tool description; note the sketch difference in the plan so G4-2 is judged against D-05.
+   - **RESOLVED (orchestrator, 2026-10-24): the recommendation above is SUPERSEDED.** D-05 was corrected to the sketch's key: `y | n | m | q` = favourable / unfavourable / neutral / not stated in the document (UI-D-292-10). Plans 01 and 02 implement those words.
 2. **Node boxes: HTML over SVG, or pure SVG?**
    - What we know: D-16 says "React SVG elements"; its ⛔ is innerHTML/Mermaid. The sketch (approved) is HTML node boxes over an SVG edge layer, which wraps labels natively.
    - Recommendation: the sketch structure, rendered entirely as React elements; record in the plan that this satisfies D-16's ⛔. If the planner reads D-16 strictly, use `<foreignObject>` per node (same React text, more SVG plumbing).
+   - **RESOLVED:** HTML node boxes over one SVG edge layer, all React elements, no `dangerouslySetInnerHTML` (UI-D-292-07; plan 02).
 3. **G4-4 "force a component outside the six".**
    - What we know: the DB CHECK makes an unknown-component stored row impossible; a crafted bad row must be a valid component with a bad spec (e.g. a diagram edge to a missing node, inserted in the local SQL editor).
    - Recommendation: drive the model-side refusal with a direct handler call from a board/dev script (`component: "mindmap"`), and the stored-row half with a crafted diagram row; the frontend unknown-component notice stays a unit test.
+   - **RESOLVED:** as recommended (plan 03 Task 4: handler probe + crafted diagram row).
 4. **KB documents for the board and G-4.**
    - What we know: 273's board needed none (inline CSV); D-21..D-23 need a process document and two contracts so `source` handles resolve.
    - Recommendation: Plan 03's `seed()` uploads three small fixture documents (generated text, no real data) for the test user and waits for `status = completed`; requires a working local embedding provider.
+   - **RESOLVED:** as recommended (plan 03 Task 2 generates and seeds three fixture documents).
 
 ## Environment Availability
 

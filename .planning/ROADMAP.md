@@ -292,7 +292,18 @@ Plans:
   4. The tool count stays 30; `show_artifact` is extended by registry entries only (VIS-02).
 
 **How we'd know this failed**: a component is added without a schema guard so model-supplied props render raw; the set grows because it was easy rather than chosen at sketch; artifacts vanish on reload; the tool count moves; sandboxed HTML (direction B in the seed) creeps in without its own operator decision.
-**Plans**: TBD (target 3-4)
+**Plans**: 3 plans (2 waves)
+
+Plans:
+**Wave 1**
+
+- [ ] 292-01-PLAN.md — backend: six-name vocabulary, three arms, per-element sources, history rewrite, widened show_artifact schema, migration 213 applied locally, live Gemini probe (wave 1)
+- [ ] 292-02-PLAN.md — frontend: guard arms, copy and captions, 2A diagram, 3A comparison, 4A timeline, shared tooltip, six-entry registry (wave 1, parallel)
+
+**Wave 2** *(blocked on Wave 1 completion)*
+
+- [ ] 292-03-PLAN.md — cross-stack fence, merged-tree gates, ledger close, SEED-337, 8-row SC#10 board, G4-1..G4-5 in Chrome (wave 2)
+
 **UI hint**: yes
 **Flags**: **G-2 sketch**. Closed registry only; sandboxed HTML needs its own operator decision and is out of this phase. Files: `frontend/src/components/chat/artifacts/**`, `backend/app/models/artifact.py`, `backend/app/services/show_artifact_tool.py`. Migration only if the `message_artifacts` constraint needs a new literal. Seed `SEED-337`.
 

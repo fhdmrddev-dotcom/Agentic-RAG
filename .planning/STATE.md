@@ -3,11 +3,11 @@ gsd_state_version: 1.0
 milestone: v4.7
 milestone_name: Workflows You Can See and Start Anywhere
 status: ready_to_execute
-last_updated: "2026-10-23T23:08:51.681Z"
+last_updated: "2026-10-23T23:54:53.262Z"
 progress:
   total_phases: 17
   completed_phases: 8
-  total_plans: 41
+  total_plans: 44
   completed_plans: 44
   percent: 47
 ---
