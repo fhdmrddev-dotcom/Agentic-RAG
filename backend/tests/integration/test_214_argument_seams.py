@@ -1094,8 +1094,13 @@ def test_S7_the_generate_refusal_returns_the_new_code_from_the_real_service():
     assert re.search(r'"ok":\s*False', code), "the refusal is not the structured ok:false shape"
     # Phase 281 (D-13): each of the three connection_not_allowed returns carries an ADDITIVE
     # sub-reason, so the describe door can word each situation on its own.
-    assert len(re.findall(r'"reason_code":', code)) == 3, (
+    # 291-02 added the degraded-registry refusal (D-20); 291-06 narrowed this pin to the values
+    # so a new refusal elsewhere cannot red it, and so removing a connection sub-reason still does.
+    assert len(re.findall(r'"reason_code":\s*CONNECTION_REFUSAL_', code)) == 3, (
         "expected the additive reason_code on exactly the three connection_not_allowed returns"
+    )
+    assert len(re.findall(r'"reason_code":\s*"grounding_unavailable"', code)) == 1, (
+        "expected exactly one degraded-registry refusal (291-02, D-20)"
     )
 
 

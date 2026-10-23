@@ -267,6 +267,40 @@ async def generate(**overrides):
 ALL_COVERED = [_inp("vendor_name"), _inp("start_date"), _inp("tier"), _inp("Summary")]
 
 
+# ── 291-06 (CR-02) — a real fillable-PDF shape: options cut for the PROMPT only ───────────
+
+COUNTRIES = [f"Country {i:03d}" for i in range(195)]
+BIG_PDF_FIELDS = [
+    {"key": "Country", "label": "Country", "type": "enum", "enum_options": COUNTRIES, "origin": "exact"},
+    {"key": "Rate %", "label": "Rate %", "type": "text", "enum_options": [], "origin": "exact"},
+]
+
+
+def test_the_prompt_shows_25_options_and_says_how_many_more():
+    from app.services.describe_draft_guards import render_documents_block
+
+    block = render_documents_block(make_form(fields=BIG_PDF_FIELDS), None)
+    line = next(ln for ln in block.splitlines() if ln.startswith("- Country:"))
+    assert "Country 024" in line
+    assert "Country 025" not in line
+    assert line.endswith("; and 170 more)")
+
+
+@pytest.mark.asyncio
+async def test_a_big_pdf_form_keeps_EVERY_option_on_the_server_added_input(monkeypatch):
+    h = Harness(monkeypatch, [_definition(inputs=[]), _definition(inputs=[])])
+    result = await generate(form=make_form(fields=BIG_PDF_FIELDS))
+    assert result["ok"] is True
+    by_key = {i["key"]: i for i in result["definition"]["inputs"]}
+    assert "Rate %" in by_key
+    assert by_key["Country"]["enum_options"] == COUNTRIES
+    assert by_key["Country"]["origin"] == "server_added"
+    # The prompt the drafter saw carried the bounded list, never all 195.
+    first = h.draft_calls[0]["messages"][0]["content"]
+    assert "Country 194" not in first
+    assert "and 170 more" in first
+
+
 @pytest.mark.asyncio
 async def test_no_files_prompt_is_byte_identical_and_result_has_no_new_keys(monkeypatch):
     h = Harness(monkeypatch, [_definition(inputs=[_inp("budget", note="n", origin="server_added")])])
