@@ -245,6 +245,38 @@ def test_fillable_pdf_reads_form_fields_with_types_carried_over():
     assert sorted(by["payment"]["enum_options"]) == ["card", "invoice"]
 
 
+def _long_tooltip_pdf(tooltip: str) -> bytes:
+    from reportlab.lib.pagesizes import letter
+    from reportlab.pdfgen import canvas
+
+    buf = io.BytesIO()
+    c = canvas.Canvas(buf, pagesize=letter)
+    c.acroForm.textfield(name="Rate %", x=150, y=690, width=200, height=20, tooltip=tooltip)
+    c.showPage()
+    c.save()
+    return buf.getvalue()
+
+
+def test_a_long_tooltip_label_is_capped_at_read_time_and_the_key_is_unchanged():
+    """291-06 (W1 / CR-02): a /TU tooltip over 200 characters used to trip the generate body's
+    label cap, so the whole form was dropped. The label is DISPLAY text, so it is cut at read
+    time; the field key is the AcroForm name and is never touched. The reader itself
+    (AcroField.tooltip) stays uncut — test_291_acroform_reader_parity pins it."""
+    from app.services.describe_files import LABEL_MAX_CHARS, read_acroform_fields
+
+    tooltip = ("Enter the agreed hourly rate as a percentage of the base fee " * 5)[:300]
+    assert len(tooltip) == 300
+    raw = _long_tooltip_pdf(tooltip)
+    assert read_acroform_fields(raw)[0].tooltip == tooltip
+    res = _read(raw, ".pdf", "rates.pdf")
+    assert res.arm == "form_fields"
+    (field,) = res.fields
+    assert field["key"] == "Rate %"
+    assert len(field["label"]) <= LABEL_MAX_CHARS
+    assert tooltip.startswith(field["label"])
+    assert field["label"] == field["label"].strip()
+
+
 def test_label_fallback_tooltip_then_page_text_then_proposer():
     proposer = _FakeProposer([{"key": "ref_code", "label": "Reference code", "type": "text"}])
     res = _read(_acro_pdf(), ".pdf", "vendor-form.pdf", propose=proposer)

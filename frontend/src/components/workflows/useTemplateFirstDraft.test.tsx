@@ -57,6 +57,8 @@ import { createBuilderStore, type BuilderPhase, type BuilderStore } from "./buil
 import { REQUEST_FAILED_KEY, refusalKey } from "./describeRefusalVocabulary"
 // 281-REVIEW WR-03 — the typed entitlement signal and its client-only key.
 import { ENTITLEMENT_REFUSED_KEY } from "./describeRefusalVocabulary"
+// 291-06 (CR-02) — the client-only key for a form the drafter cannot be sent.
+import { FORM_NOT_SENDABLE_KEY, describeRefusal } from "./describeRefusalVocabulary"
 import { EntitlementRefusalError } from "@/lib/api/_core"
 import {
   generateWorkflow,
@@ -1513,10 +1515,11 @@ describe("useTemplateFirstDraft — the wire", () => {
     expect(Object.keys(mockedGenerate.mock.calls[0][0]).sort()).toEqual(["describe"])
   })
 
-  it("a form the generate body would REFUSE (over 200 fields) falls back to today's template_placeholders", async () => {
+  it("a form the generate body would REFUSE (over 1000 fields) falls back to today's template_placeholders", async () => {
     // The one branch `template_placeholders` still has: a template whose read the server's
     // `form` cap cannot carry still drafts to its fields, the shipped way.
-    const keys = Array.from({ length: 201 }, (_, i) => `field_${i}`)
+    // 291-06 raised FORM_FIELDS_MAX to 1000, so the case that trips the cap is now 1001.
+    const keys = Array.from({ length: 1001 }, (_, i) => `field_${i}`)
     const body = await draftWithRead(templateFieldsOf(keys))
     expect(Object.keys(body).sort()).toEqual(["describe", "template_placeholders"])
     expect(body.template_placeholders).toEqual(keys)
@@ -1549,6 +1552,100 @@ describe("useTemplateFirstDraft — the wire", () => {
     expect(bare.removed).toBeUndefined()
     expect(bare.fields).toBeUndefined()
     expect(bare.removed).not.toEqual([])
+  })
+})
+
+// ══════════════════════════════════════════════════════════════════════════════════════
+// 291-06 (CR-02) — a real fillable PDF is SENT, and a form that cannot be sent is REFUSED IN
+// WORDS. Before 291-06 a 250-field / 195-option / "Rate %" PDF was dropped from the body
+// without a word, and the draft was written blind.
+// ══════════════════════════════════════════════════════════════════════════════════════
+
+const COUNTRIES = Array.from({ length: 195 }, (_, i) => `Country ${i}`)
+
+function pdfFormOf(fields: DescribeField[]): DescribeReadResult {
+  return readOf({ arm: "form_fields", filename: "vendor.pdf", fields, text: "PDF text" })
+}
+
+function linesOf(n: number): DescribeField[] {
+  return Array.from({ length: n }, (_, i) => fieldOf(`line_${i}`))
+}
+
+describe("useTemplateFirstDraft — a real fillable PDF (291-06, CR-02)", () => {
+  async function draftPdf(answer: DescribeReadResult) {
+    mockedGenerate.mockResolvedValue({ ok: true, definition: definitionOf() } as GenerateResult)
+    mockedRead.mockResolvedValue(answer)
+    const mounted = mountHook()
+    const { view } = mounted
+    act(() => view.result.current.setDescribe("onboard a vendor from their form"))
+    await act(async () => {
+      view.result.current.onPickTemplateFile(fileNamed("vendor.pdf"))
+    })
+    await waitFor(() => expect(view.result.current.templateRead.kind).toBe("read"))
+    await act(async () => {
+      await view.result.current.onDraft()
+    })
+    return mounted
+  }
+
+  it("250 fields, a 195-option dropdown and 'Rate %' travel WHOLE as the form", async () => {
+    const fields = [
+      fieldOf("Country", { type: "enum", enum_options: COUNTRIES }),
+      fieldOf("Rate %"),
+      ...linesOf(248),
+    ]
+    await draftPdf(pdfFormOf(fields))
+    expect(mockedGenerate).toHaveBeenCalledTimes(1)
+    const body = mockedGenerate.mock.calls[0][0]
+    expect(Object.keys(body).sort()).toEqual(["describe", "form"])
+    expect(body.form?.fields).toHaveLength(250)
+    expect(body.form?.fields[0].enum_options).toEqual(COUNTRIES)
+    expect(body.form?.fields[1].key).toBe("Rate %")
+  })
+
+  it("1001 fields: generate is NEVER called, and the author reads why — in words", async () => {
+    const { store, onDraftedSpy } = await draftPdf(pdfFormOf(linesOf(1001)))
+    expect(mockedGenerate).not.toHaveBeenCalled()
+    const s = store.getState()
+    expect(s.builderPhase).toBe("error")
+    expect(s.errorMessage).toBe(FORM_NOT_SENDABLE_KEY)
+    const r = describeRefusal(s.errorMessage, s.errorDetail)
+    expect(r.sentence).toBe("This form can't be sent to the drafter as it is, so no draft was made.")
+    expect(r.next).toBe(
+      "Remove the form to draft from your description alone, or attach a different copy of the form.",
+    )
+    expect(s.errorDetail).toContain("1001")
+    expect(s.errorDetail).toContain("1000")
+    expect(r.technicalDetail).toBe(s.errorDetail)
+    expect(onDraftedSpy).toHaveBeenCalledTimes(0)
+  })
+
+  it.each([
+    {
+      name: "an option of 201 characters",
+      fields: [fieldOf("Pick", { type: "enum", enum_options: ["x".repeat(201)] })],
+      names: ["option", "200 characters"],
+    },
+    {
+      name: "a PDF field named 'Total {net}' (braces stay refused on every arm)",
+      fields: [fieldOf("Total {net}")],
+      names: ["{ } < >"],
+    },
+    {
+      name: "a field with 501 options",
+      fields: [fieldOf("Pick", { type: "enum", enum_options: Array.from({ length: 501 }, (_, i) => `o${i}`) })],
+      names: ["501", "500"],
+    },
+  ])("$name is refused in words, and errorDetail names its own cap", async ({ fields, names }) => {
+    const { store, onDraftedSpy } = await draftPdf(pdfFormOf(fields))
+    expect(mockedGenerate).not.toHaveBeenCalled()
+    const s = store.getState()
+    expect(s.errorMessage).toBe(FORM_NOT_SENDABLE_KEY)
+    expect(describeRefusal(s.errorMessage, s.errorDetail).sentence).toBe(
+      "This form can't be sent to the drafter as it is, so no draft was made.",
+    )
+    for (const n of names) expect(s.errorDetail).toContain(n)
+    expect(onDraftedSpy).toHaveBeenCalledTimes(0)
   })
 })
 
