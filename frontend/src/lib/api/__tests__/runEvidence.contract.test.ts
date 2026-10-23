@@ -33,6 +33,8 @@ const SAMPLE = {
     model: "deepseek-v4-flash",
     viewer_is_owner: true,
     thread_id: "bed19e8c-fc59-4598-ae05-2ec7604cf271",
+    // 295-05 (D-22): why a failed or cancelled run stopped, server-resolved; null otherwise.
+    end_reason: null,
   },
   definition: {
     recorded: true,
@@ -64,6 +66,8 @@ const SAMPLE = {
         kb_label: "Weekly reports",
       },
       human_input: { answered: true, question: "Approve?", answer: "Yes", answered_by: "Dana" },
+      // 295-05 (D-04): the mark on a step kept without sources; the words are viewer-aware.
+      unsourced: { continued_by: "Dana Whitfield (you)", at: "2026-10-19T18:51:09Z" },
     },
   ],
   verdicts: [
@@ -103,7 +107,7 @@ function samplePaths(): Record<string, string[]> {
 }
 
 describe("289 I1 — RunEvidence matches the shared contract fixture", () => {
-  it("the fixture names the twelve object paths of the contract", () => {
+  it("the fixture names the thirteen object paths of the contract", () => {
     expect(Object.keys(contract.paths).sort()).toEqual(
       [
         "$",
@@ -116,6 +120,7 @@ describe("289 I1 — RunEvidence matches the shared contract fixture", () => {
         "phase_log[]",
         "phase_log[].confidence",
         "phase_log[].human_input",
+        "phase_log[].unsourced",
         "verdicts[]",
         "sources[]",
       ].sort(),

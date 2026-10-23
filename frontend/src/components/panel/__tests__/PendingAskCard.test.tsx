@@ -6,7 +6,7 @@
  * the GET-reconciled prompt (run_id present) and the pure-SSE prompt (run_id
  * ABSENT — A2 / Pitfall 1: submit must be gated + reconcile triggered).
  */
-import { describe, it, expect, vi, afterEach, beforeEach } from "vitest"
+import { describe, it, expect, vi, afterEach, beforeAll, beforeEach } from "vitest"
 import { act, render, screen, waitFor, cleanup, within } from "@testing-library/react"
 import userEvent from "@testing-library/user-event"
 import { axe } from "vitest-axe"
@@ -998,5 +998,153 @@ describe("PendingAskCard (282-02) — radio keyboard, non-colour mark, one share
     const { container } = render(<PendingAskCard ask={threeOptionAsk} reconcile={noopReconcile} />)
     await user.click(screen.getAllByRole("radio")[1])
     expect(await axe(container)).toHaveNoViolations()
+  })
+})
+
+// ── Phase 295-06 (D-02 / D-03 / D-36 / D-37 / UI-SPEC A.2-A.4) — the found-nothing pause ─────────
+//
+// The server builds the prompt and the choices (295-03) and sends them with `engine_pause`; the
+// card renders them verbatim, in the server's order, and composes nothing. The ONE addition is the
+// folder chooser beneath "Search another folder", fed only by `engine_pause.folders`.
+// Every case asserts rendered words, never a testid alone.
+describe("PendingAskCard (295-06) — the found-nothing pause", () => {
+  beforeAll(() => {
+    // Radix Select in jsdom (the ChatArea.expertThread precedent).
+    Element.prototype.scrollIntoView = vi.fn()
+    if (!Element.prototype.hasPointerCapture) Element.prototype.hasPointerCapture = () => false
+    if (!Element.prototype.setPointerCapture) Element.prototype.setPointerCapture = () => {}
+    if (!Element.prototype.releasePointerCapture) Element.prototype.releasePointerCapture = () => {}
+  })
+
+  const PROMPT = "Searched Policies and found nothing for “Find the clauses”. How should the run continue?"
+  const engineAsk: PendingAsk = {
+    tool_call_id: "tc-found-nothing",
+    prompt: PROMPT,
+    options: ["Search another folder", "Continue without sources", "Stop the run"],
+    timeout_seconds: null,
+    run_id: "wr-found-nothing",
+    engine_pause: {
+      kind: "no_sources",
+      phase: "find_clauses",
+      continue_allowed: true,
+      locked: false,
+      folders: [
+        { id: "f-contracts", name: "Contracts", depth: 0 },
+        { id: "f-leases", name: "Leases", depth: 1 },
+      ],
+    },
+  }
+
+  it("renders the server's prompt and its three choices verbatim, in the server's order", () => {
+    render(<PendingAskCard ask={engineAsk} reconcile={noopReconcile} />)
+    expect(screen.getByText(PROMPT)).toBeInTheDocument()
+    expect(screen.getAllByRole("radio").map((r) => r.textContent)).toEqual([
+      "Search another folder",
+      "Continue without sources",
+      "Stop the run",
+    ])
+    // The chooser is not drawn until the search choice is selected.
+    expect(screen.queryByText("Folder to search")).toBeNull()
+  })
+
+  it("Search another folder → the chooser lists ONLY the server's folders; Send waits for one; the answer carries folder_id", async () => {
+    const user = userEvent.setup()
+    render(<PendingAskCard ask={engineAsk} reconcile={noopReconcile} />)
+    await user.click(screen.getByRole("radio", { name: "Search another folder" }))
+
+    expect(screen.getByText("Folder to search")).toBeInTheDocument()
+    expect(screen.getByLabelText("Folder to search")).toHaveTextContent("Choose a folder…")
+    expect(
+      screen.getByText("The step runs once more, searching only this folder. The workflow itself is not changed."),
+    ).toBeInTheDocument()
+    const send = screen.getByRole("button", { name: /send answer/i })
+    expect(send).toBeDisabled()
+
+    await user.click(screen.getByLabelText("Folder to search"))
+    const options = await screen.findAllByRole("option")
+    expect(options.map((o) => o.textContent)).toEqual(["Contracts", "Leases"])
+    await user.click(screen.getByRole("option", { name: "Leases" }))
+
+    expect(screen.getByLabelText("Folder to search")).toHaveTextContent("Leases")
+    expect(useAskDraftStore.getState().drafts["tc-found-nothing"]?.folderId).toBe("f-leases")
+    expect(send).toBeEnabled()
+    await user.click(send)
+
+    expect(vi.mocked(answerAskUser)).toHaveBeenCalledTimes(1)
+    expect(vi.mocked(answerAskUser).mock.calls[0]).toEqual([
+      "wr-found-nothing",
+      {
+        tool_call_id: "tc-found-nothing",
+        response_text: "Search another folder",
+        choice_index: 0,
+        folder_id: "f-leases",
+      },
+    ])
+    expect(await screen.findByText("Answered · agent resumed")).toBeInTheDocument()
+    const receipt = screen.getByText(/You answered/)
+    expect(receipt.textContent).toBe("You answered Search another folder — Leases")
+  })
+
+  it("Continue without sources → no chooser, no folder_id, and the shipped receipt", async () => {
+    const user = userEvent.setup()
+    render(<PendingAskCard ask={engineAsk} reconcile={noopReconcile} />)
+    await user.click(screen.getByRole("radio", { name: "Search another folder" }))
+    await user.click(screen.getByRole("radio", { name: "Continue without sources" }))
+    expect(screen.queryByText("Folder to search")).toBeNull()
+    await user.click(screen.getByRole("button", { name: /send answer/i }))
+
+    const body = vi.mocked(answerAskUser).mock.calls[0][1]
+    expect(body).toEqual({
+      tool_call_id: "tc-found-nothing",
+      response_text: "Continue without sources",
+      choice_index: 1,
+    })
+    expect(body).not.toHaveProperty("folder_id")
+    expect(await screen.findByText("Answered · agent resumed")).toBeInTheDocument()
+    expect(screen.getByText(/You answered/).textContent).toBe("You answered Continue without sources")
+  })
+
+  it("Stop the run → Answered · run stopped, and never agent resumed", async () => {
+    const user = userEvent.setup()
+    render(<PendingAskCard ask={engineAsk} reconcile={noopReconcile} />)
+    await user.click(screen.getByRole("radio", { name: "Stop the run" }))
+    await user.click(screen.getByRole("button", { name: /send answer/i }))
+
+    expect(vi.mocked(answerAskUser).mock.calls[0][1]).toMatchObject({ choice_index: 2, response_text: "Stop the run" })
+    expect(await screen.findByText("Answered · run stopped")).toBeInTheDocument()
+    expect(screen.queryByText(/agent resumed/)).toBeNull()
+    expect(screen.getByText(/You answered/).textContent).toBe("You answered Stop the run")
+  })
+
+  it("a locked step: the server left out Continue without sources, and the card adds nothing", () => {
+    const locked: PendingAsk = {
+      ...engineAsk,
+      tool_call_id: "tc-locked",
+      prompt:
+        "Searched Policies and found nothing for “Find the clauses”. This step is set to Must prove it, so it can't continue without sources. How should the run continue?",
+      options: ["Search another folder", "Stop the run"],
+      engine_pause: { ...engineAsk.engine_pause!, continue_allowed: false, locked: true },
+    }
+    const { container } = render(<PendingAskCard ask={locked} reconcile={noopReconcile} />)
+    expect(screen.getAllByRole("radio").map((r) => r.textContent)).toEqual(["Search another folder", "Stop the run"])
+    expect(container.textContent).not.toContain("Continue without sources")
+    expect(document.body.textContent).not.toContain("Continue without sources")
+  })
+
+  it("an ordinary ask whose option reads the same words gets no chooser and the shipped header", async () => {
+    const user = userEvent.setup()
+    const plain: PendingAsk = {
+      ...mockPendingAskWithRunId,
+      tool_call_id: "tc-plain-words",
+      options: ["Search another folder", "Stop the run"],
+    }
+    render(<PendingAskCard ask={plain} reconcile={noopReconcile} />)
+    await user.click(screen.getByRole("radio", { name: "Search another folder" }))
+    expect(screen.queryByText("Folder to search")).toBeNull()
+    expect(screen.getByRole("button", { name: /send answer/i })).toBeEnabled()
+    await user.click(screen.getByRole("radio", { name: "Stop the run" }))
+    await user.click(screen.getByRole("button", { name: /send answer/i }))
+    expect(await screen.findByText("Answered · agent resumed")).toBeInTheDocument()
+    expect(vi.mocked(answerAskUser).mock.calls[0][1]).not.toHaveProperty("folder_id")
   })
 })

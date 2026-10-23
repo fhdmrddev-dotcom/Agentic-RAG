@@ -141,6 +141,7 @@ import {
   DECISION_ROW_ORDER,
   DECISION_TEMPLATE_NONE,
   decisionRowLabel,
+  templateRowReferencesLine,
 } from "@/components/workflows/decisionsVocabulary"
 import type { GenerateReadiness } from "@/lib/api"
 import { cn } from "@/lib/utils"
@@ -154,6 +155,9 @@ export interface DecisionsListProps {
   folderName: string | null
   /** The bound template's filename, or `null` when none is bound. */
   templateFilename: string | null
+  /** 291-05 (D-07 / D-32) — LIVE: the reference files saved with the draft, by filename, in
+   *  `assets[]` order. Absent or empty ⇒ the template row draws no sub-line. */
+  referenceNames?: readonly string[]
   /** The durable business requirement. `""` when absent — never `null`. */
   businessRequirement: string
   /** The workflow's name. `""` when absent — never `null`. */
@@ -204,6 +208,7 @@ const ROW_HOVER_CLASS = "transition-colors duration-150 hover:bg-accent/30"
 export function DecisionsList({
   folderName,
   templateFilename,
+  referenceNames,
   businessRequirement,
   name,
   deliverableStepSlug,
@@ -297,6 +302,17 @@ export function DecisionsList({
                   >
                     {DECISION_OPEN_STEP_ACTION}
                   </button>
+                ) : null
+              // 291-05 (D-07 / D-32) — the references, under the row's value, in the row's
+              // existing secondary-text class. Only when the draft has references.
+              verdict =
+                referenceNames !== undefined && referenceNames.length > 0 ? (
+                  <p
+                    data-testid="decision-template-references"
+                    className="mt-1 pl-[136px] text-[11.5px] leading-[1.45] text-muted-foreground"
+                  >
+                    {templateRowReferencesLine(referenceNames)}
+                  </p>
                 ) : null
               break
             case "requirement":

@@ -315,6 +315,11 @@ export interface StreamsState {
   // ChatArea reconciles the Expert chip from it, so a server-side clear removes the chip. Ephemeral.
   /** Per-thread server reading of the thread's Expert. Absent key = the server has not said. */
   expertReadingsByThread: Map<string, ExpertReading>
+  // 295-08 (SEED-361): the anchored run's `run_status` from the phase reconcile's own
+  // getThreadWorkflow read, through `recordWorkflowRunStatus` only. PendingAskStack reads it so a
+  // PAUSED run (no live producer, so no lock) keeps its ask answerable. Ephemeral.
+  /** Per-thread workflow run status. Absent key = the reconcile has not answered. */
+  workflowRunStatusByThread: Map<string, string | null>
   actions: {
     setMessagesForBucket: (
       surface: SurfaceId,
@@ -542,6 +547,8 @@ export const useStreamsStore = create<StreamsState>()(subscribeWithSelector(() =
   // 267-REVIEW-INDEPENDENT CR-03(c): ephemeral, never persisted.
   // Type: expertReadingsByThread: Map<string, ExpertReading>
   expertReadingsByThread: new Map<string, ExpertReading>(),
+  // 295-08 (SEED-361): ephemeral, never persisted.
+  workflowRunStatusByThread: new Map<string, string | null>(),
   actions: {
     setMessagesForBucket: () => {},
     clearThreadBucket: () => {},
@@ -603,5 +610,17 @@ export function recordExpertReading(threadId: string, expertId: string | null, r
     return {
       expertReadingsByThread: new Map(s.expertReadingsByThread).set(threadId, { expertId, requestedAt }),
     }
+  })
+}
+
+/**
+ * 295-08 (SEED-361) — THE ONE writer of `workflowRunStatusByThread`, called by `reconcilePhases`
+ * with the `run_status` its getThreadWorkflow read returned (null once the anchor is gone). An
+ * unchanged value writes nothing, so a repeat reconcile re-renders no reader.
+ */
+export function recordWorkflowRunStatus(threadId: string, status: string | null): void {
+  useStreamsStore.setState((s) => {
+    if (s.workflowRunStatusByThread.get(threadId) === status) return {}
+    return { workflowRunStatusByThread: new Map(s.workflowRunStatusByThread).set(threadId, status) }
   })
 }

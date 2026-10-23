@@ -1,0 +1,51 @@
+{
+  "tcid": "397cc78491e042699b523699e369925f",
+  "prompt": "Searched 295-07 empty KB folder and found nothing for \u201cFind the project status\u201d. This step is set to Must prove it, so it can't continue without sources. How should the run continue?",
+  "options": [
+    "Search another folder",
+    "Stop the run"
+  ],
+  "results": [
+    {
+      "body": {
+        "tool_call_id": "397cc78491e042699b523699e369925f",
+        "response_text": "Continue without sources"
+      },
+      "status": 422,
+      "resp": "{\"detail\":\"This step is set to Must prove it, so it can't continue without sources.\"}"
+    },
+    {
+      "body": {
+        "tool_call_id": "397cc78491e042699b523699e369925f",
+        "response_text": "Continue without sources",
+        "choice_index": 1
+      },
+      "status": 422,
+      "resp": "{\"detail\":\"This step is set to Must prove it, so it can't continue without sources.\"}"
+    },
+    {
+      "body": {
+        "tool_call_id": "397cc78491e042699b523699e369925f",
+        "response_text": "anything",
+        "choice_index": 1
+      },
+      "status": 422,
+      "resp": "{\"detail\":\"That choice is not one this question offers.\"}"
+    },
+    {
+      "body": {
+        "tool_call_id": "397cc78491e042699b523699e369925f",
+        "response_text": "Search another folder",
+        "choice_index": 0,
+        "folder_id": "d886d6a8-bbad-4e7a-b188-aea65d651fd1"
+      },
+      "status": 422,
+      "resp": "{\"detail\":\"That folder is not one this question offers.\"}"
+    }
+  ],
+  "response_rows": [
+    0,
+    0
+  ],
+  "status": "paused"
+}

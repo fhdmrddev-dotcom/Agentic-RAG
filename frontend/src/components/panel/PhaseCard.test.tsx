@@ -1184,6 +1184,42 @@ describe("PhaseCard 281-03 — template_fields_missing never reads as a citation
 // closed-taxonomy copy is only the never-empty fallback when no sentence reached the client.
 // The strings below are the composer's REAL output shape (`emit_cause.compose_emit_failure`).
 // ═══════════════════════════════════════════════════════════════════════════════════════════
+// ── Phase 295-05 (RUN-01 / D-04 / UI-SPEC B.2) — the unsourced mark on the panel's card ──────
+// Asserted by the rendered WORDS (presence assertions miss content drift), and on a COLLAPSED
+// done card: a step kept without sources must not look like a quiet completed step.
+describe("PhaseCard 295-05 — an unsourced step reads unsourced, even folded", () => {
+  const NOTE = "This output was kept without sources — it does not cite your documents."
+
+  it("a done, collapsed card shows Unsourced, who continued, and the note", () => {
+    render(
+      <PhaseCard
+        phase={fillPhase({
+          phaseType: "llm_agent",
+          status: "done",
+          unsourced: { continued_by: "Fahad Murad (you)", at: "2026-10-20T12:30:00Z" },
+        })}
+        position={0}
+      />,
+    )
+    const button = screen.getByRole("button")
+    expect(button.getAttribute("aria-expanded")).toBe("false")
+    const text = button.textContent ?? ""
+    expect(text).toContain("Unsourced")
+    expect(text).toContain("continued by Fahad Murad (you)")
+    expect(text).toContain(NOTE)
+  })
+
+  it("a sourced card reads none of it", () => {
+    const { container } = render(
+      <PhaseCard phase={fillPhase({ phaseType: "llm_agent", status: "done" })} position={0} />,
+    )
+    const text = container.textContent ?? ""
+    expect(text).not.toContain("Unsourced")
+    expect(text).not.toContain("continued by")
+    expect(text).not.toContain(NOTE)
+  })
+})
+
 describe("PhaseCard 281-REVIEW CR-01 — the composed cause wins over the fixed copy on a live run", () => {
   const PROVIDER_CAUSE =
     "This step failed after 1 attempt:\n• 1 attempt — the model provider returned an error. Check that this step's model provider is reachable."

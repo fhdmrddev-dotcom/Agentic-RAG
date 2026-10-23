@@ -18,6 +18,8 @@ import {
   REFUSAL_FOR_KEY,
   REQUEST_FAILED_KEY,
   ENTITLEMENT_REFUSED_KEY,
+  FORM_NOT_SENDABLE_KEY,
+  FORM_NOT_SENDABLE_WORDS,
   describeRefusal,
   refusalKey,
   type DescribeRefusalKey,
@@ -33,6 +35,14 @@ const EXPECTED_KEYS: DescribeRefusalKey[] = [
   "connection_not_allowed:action_not_allowed",
   "no_authoring_model",
   "could_not_generate",
+  // 291-05 (D-20 / SEED-133 / SEED-221) — the FOURTH sub-reason, on a different code: the
+  // degraded-registry refusal 291-02 returns before any provider call. Added to the contract
+  // here because the table now words it; without the row it would read the generic
+  // `could_not_generate` sentence, which blames the model for a registry it never reached.
+  "could_not_generate:grounding_unavailable",
+  // 291-06 (WR-08) — the powers guard's own refusal: a removal of file-planted actions left a
+  // draft that cannot run. Without the row it read the generic sentence, blaming the model.
+  "could_not_generate:removed_powers_broke_draft",
   "grounding_failed",
 ]
 
@@ -52,7 +62,7 @@ const FORBIDDEN = [
 ]
 
 describe("281 (D-11) — the table is total and every row is real words", () => {
-  it("maps exactly the four codes and three sub-reasons", () => {
+  it("maps exactly the four codes and five sub-reasons (291-05 grounding_unavailable, 291-06 removed_powers_broke_draft)", () => {
     expect([...ALL_KEYS].sort()).toEqual([...EXPECTED_KEYS].sort())
   })
 
@@ -180,5 +190,96 @@ describe("281 (D-13) — refusalKey joins the code and the additive sub-reason",
     expect(refusalKey("no_authoring_model")).toBe("no_authoring_model")
     expect(refusalKey("no_authoring_model", null)).toBe("no_authoring_model")
     expect(refusalKey("no_authoring_model", "")).toBe("no_authoring_model")
+  })
+})
+
+describe("291-05 (D-20, SEED-221) — the degraded-registry refusal is a sentence and a next step", () => {
+  it("could_not_generate:grounding_unavailable reads in words, never the code", () => {
+    const r = describeRefusal(
+      refusalKey("could_not_generate", "grounding_unavailable"),
+      "The tool registry is degraded: folders.",
+    )
+    expect(r.sentence).toBe(
+      "We couldn't read your folders, skills or tools just now, so the draft wasn't written.",
+    )
+    expect(r.next).toBe("Try again in a moment.")
+    expect(r.sentence).not.toContain("grounding_unavailable")
+    expect(r.next).not.toContain("grounding_unavailable")
+  })
+
+  it("the raw code shows ONLY in the technical-names reveal", () => {
+    const r = describeRefusal("could_not_generate:grounding_unavailable", "detail")
+    expect(r.technical).toBe("could_not_generate · grounding_unavailable")
+    expect(r.technicalDetail).toBe("detail")
+  })
+
+  it("it is NOT the generic could_not_generate sentence, which would blame the model", () => {
+    expect(describeRefusal("could_not_generate:grounding_unavailable").sentence).not.toBe(
+      describeRefusal("could_not_generate").sentence,
+    )
+  })
+})
+
+/** UI-SPEC 291 — banned on every surface in this phase. */
+const UI_SPEC_BANNED = [
+  "safe", "scanned", "checked", "verified", "trusted", "clean", "malicious", "suspicious", "injection",
+]
+
+describe("291-06 (WR-08) — the powers guard's refusal reads the SERVER's own sentence", () => {
+  // Copied from backend/app/services/describe_draft_guards.py:_BROKE_DRAFT_DETAIL. The two
+  // halves of the table row must join back to it exactly (UI-SPEC: "renders the server's
+  // sentence verbatim").
+  const BROKE_DRAFT_DETAIL =
+    "Your attached files asked for actions only your description can add. Removing them left " +
+    "a workflow that cannot run, so no draft was made. Describe the steps you want and try again."
+
+  it("sentence and next are the server's words, and together they ARE the server's detail", () => {
+    const r = describeRefusal(refusalKey("could_not_generate", "removed_powers_broke_draft"))
+    expect(r.sentence).toBe(
+      "Your attached files asked for actions only your description can add. Removing them left a workflow that cannot run, so no draft was made.",
+    )
+    expect(r.next).toBe("Describe the steps you want and try again.")
+    expect(`${r.sentence} ${r.next}`).toBe(BROKE_DRAFT_DETAIL)
+  })
+
+  it("it is NOT the generic sentence that blames the model, and the code is reveal-only", () => {
+    const r = describeRefusal("could_not_generate:removed_powers_broke_draft")
+    expect(r.sentence).not.toBe(REFUSAL_FOR_KEY.could_not_generate.sentence)
+    expect(r.technical).toBe("could_not_generate · removed_powers_broke_draft")
+  })
+})
+
+describe("291-06 (CR-02) — a form the drafter cannot be sent is refused in words, never dropped", () => {
+  it("FORM_NOT_SENDABLE_KEY is client-only, never a table code", () => {
+    expect(typeof FORM_NOT_SENDABLE_KEY).toBe("string")
+    expect(ALL_KEYS as string[]).not.toContain(FORM_NOT_SENDABLE_KEY)
+    expect(FORM_NOT_SENDABLE_KEY).not.toBe(REQUEST_FAILED_KEY)
+    expect(FORM_NOT_SENDABLE_KEY).not.toBe(ENTITLEMENT_REFUSED_KEY)
+  })
+
+  it("reads one generic sentence; the tripped cap is the technical detail only", () => {
+    const r = describeRefusal(FORM_NOT_SENDABLE_KEY, "1001 fields; at most 1000 can be sent")
+    expect(r.sentence).toBe("This form can't be sent to the drafter as it is, so no draft was made.")
+    expect(r.next).toBe(
+      "Remove the form to draft from your description alone, or attach a different copy of the form.",
+    )
+    expect(r.sentence).toBe(FORM_NOT_SENDABLE_WORDS.sentence)
+    expect(r.technical).toBeNull()
+    expect(r.technicalDetail).toBe("1001 fields; at most 1000 can be sent")
+    expect(r.sentence).not.toBe(REFUSAL_FALLBACK.sentence)
+  })
+
+  it("neither new sentence carries a code, a never-say word or a UI-SPEC banned word", () => {
+    const words = [
+      FORM_NOT_SENDABLE_WORDS.sentence,
+      FORM_NOT_SENDABLE_WORDS.next,
+      REFUSAL_FOR_KEY["could_not_generate:removed_powers_broke_draft"].sentence,
+      REFUSAL_FOR_KEY["could_not_generate:removed_powers_broke_draft"].next,
+    ]
+    for (const w of words) {
+      for (const f of [...FORBIDDEN, ...UI_SPEC_BANNED, "removed_powers_broke_draft", FORM_NOT_SENDABLE_KEY]) {
+        expect(w.toLowerCase().includes(f.toLowerCase()), `"${w}" carries "${f}"`).toBe(false)
+      }
+    }
   })
 })

@@ -213,6 +213,26 @@ checkpoint is owed (D-187-02). P3 joins the set for the same reason the four ext
 — with nobody asked, ``armed_refused_typed``'s body RUNS, which is exactly the Phase-185
 BLOCKER shape and exactly what P3 exists to see.
 
+## Re-expressed against the DURABLE pause (Phase 295 / D-18, plan 295-03)
+
+The property is unchanged; its OBSERVABLE moved. Before 295 the armed checkpoint blocked
+in-process on ``subscribe_for_response``, so "the person was asked" was an await on that
+primitive. After D-18 an engine-owned ask pauses DURABLY: ``pause_run`` is written, the
+question becomes a durable prompt row, and the run returns ``pause_run`` with the body
+un-run. The answer comes back on a RE-DRIVE (``ctx.resume_answered_tool_call_id``), where
+``engine_ask.consume_engine_answer`` reads it through the exact-label allow-list.
+
+So every drive below is now TWO drives over one in-memory durable world
+(``tests/unit/engine_ask_fakes.World``): the first must pause before the body, and the
+scripted armed answer is then persisted the way ``POST /ask_user_response`` persists it and
+the phase is re-driven. "Asked" means a durable prompt row carrying the armed sentence (or,
+for an AUTHOR's own ``ask_user`` gate, which still waits in-process, the shipped
+await). The three properties read exactly as before: P1 body ⇒ asked first; P2 reaching
+the body ⇒ asked exactly once (across BOTH drives — the re-drive consumes, it never
+re-asks); P3 a refusal runs nothing and writes no approval receipt. Every line that pins
+them is the one that shipped; only the harness under them changed. The retired in-process
+shape is named in ``test_295_engine_ask_seam.py``'s ``RETIRED_ARMED_ASSERTIONS``.
+
 Imports INSIDE the body, per this suite's convention.
 """
 
@@ -435,22 +455,12 @@ CASE_IDS: tuple[str, ...] = tuple(c["id"] for c in CASES)
 
 
 # ── shared helpers ───────────────────────────────────────────────────────────
-def _ctx():
-    """The minimal ctx the disposition accepts — ``test_ask_user_disposition.py:66-72``.
-
-    ``supabase=None`` skips the durable-row insert (no DB); ``producer_run_id`` routes the
-    ``ask_user_prompt`` emit onto the producer stream, which is the emit this file joins
-    to ``subscribe_for_response`` by ``tool_call_id``; ``retry_feedback`` is present
-    because ``_clear_retry_feedback`` writes it on a passing gate.
-    """
-    return SimpleNamespace(
-        supabase=None,
-        thread_id=None,
-        current_user={"id": uuid4()},
-        producer_run_id=uuid4(),
-        emit=AsyncMock(),
-        retry_feedback=None,
-    )
+def _ctx(world):
+    """The run ctx over the durable world (Phase 295): a fake supabase for the durable
+    prompt row, a thread, the owner, a producer stream and ``retry_feedback`` (written by
+    ``_clear_retry_feedback`` on a passing gate). ``resume_answered_tool_call_id`` starts
+    empty; the answer route sets it on the re-drive."""
+    return world.ctx(emit=AsyncMock())
 
 
 def _approve_label() -> str:
@@ -475,13 +485,20 @@ class _Recorder:
     identified by ``_approval_sentence``'s output instead of by a hand-written fragment.
     """
 
-    def __init__(self, answers):
+    def __init__(self, answers, approve: str = ""):
         self._n = 0
         self.prompts: dict[str, str] = {}         # tool_call_id -> prompt text
-        self.asks: list[tuple[str, int]] = []     # (tool_call_id, order)
+        self.asks: list[tuple[str, int]] = []     # (tool_call_id, order) — in-process awaits
         self.body_order: int | None = None
         self.body_invoked = False
         self._answers = list(answers)
+        # Phase 295: an answer to the ARMED prompt is persisted and consumed on the re-drive;
+        # an AUTHOR gate's answer is still handed back in-process (and again on the re-drive,
+        # because the pre-gate pass runs again before the checkpoint — D-187-02).
+        self.author_answers = [a for a in self._answers if isinstance(a, str) and a != approve]
+        _armed = [a for a in self._answers if not (isinstance(a, str) and a != approve)]
+        self.armed_answer = _armed[0] if _armed else None
+        self.world = None                         # the durable world (set by ``_drive``)
         self.answers_consumed = 0
         self.exhausted_asks = 0
 
@@ -498,16 +515,14 @@ class _Recorder:
     # -- app.services.ask_user_service.subscribe_for_response ----------------
     async def subscribe(self, redis, run_id, tool_call_id, timeout):
         self.asks.append((tool_call_id, self._tick()))
-        if not self._answers:
+        if not self.author_answers:
             # An unscripted prompt is recorded rather than raising: returning None is the
             # engine's own honest-unanswered path, so the property assertions stay the
             # thing that reports, and an over-asking engine is visible in this counter.
             self.exhausted_asks += 1
             return None
-        answer = self._answers.pop(0)
+        answer = self.author_answers[0]
         self.answers_consumed += 1
-        if isinstance(answer, dict):
-            return answer
         return {"kind": "response", "response_text": answer}
 
     # -- harness_engine._execute_phase ---------------------------------------
@@ -518,12 +533,21 @@ class _Recorder:
 
     # -- derived -------------------------------------------------------------
     def ask_orders_for(self, prompt_text: str) -> list[int]:
-        """The order indexes of the awaits whose prompt was ``prompt_text``."""
-        return [
+        """The order indexes at which the person was ASKED ``prompt_text``.
+
+        Phase 295: an engine-owned ask is a DURABLE prompt row (the world's log); an
+        author gate's ask is still an in-process await joined to its emit by tool_call_id.
+        """
+        durable = [
+            order for order, row in (self.world.prompt_rows() if self.world else [])
+            if row["tool_calls"][0].get("prompt") == prompt_text
+        ]
+        in_process = [
             order
             for tcid, order in self.asks
             if self.prompts.get(tcid) == prompt_text
         ]
+        return sorted(durable + in_process)
 
 
 def _drive(case: dict):
@@ -533,11 +557,18 @@ def _drive(case: dict):
     """
     from app.models.harness import PhaseSpec, ValidatorSpec
     from app.services import harness_engine
+    from app.services.harness import engine_ask
     from app.services.harness.grounding import _approval_sentence, effective_phase
+
+    from contextlib import ExitStack
+
+    from tests.unit.engine_ask_fakes import FakePool, World
 
     approve = _approve_label()
     answers = tuple(approve if a == APPROVE else a for a in case["answers"])
-    recorder = _Recorder(answers)
+    recorder = _Recorder(answers, approve)
+    world = World(ARMED_SLUG, tick=recorder._tick)
+    recorder.world = world
 
     # The RAW author-authored phase: armed, carrying ONLY the author's own set.
     raw = PhaseSpec(
@@ -553,20 +584,17 @@ def _drive(case: dict):
     # THE ARMED PROMPT, from the composer. Never re-typed.
     approval_sentence = _approval_sentence(raw, TOTAL_PHASES)
 
-    ctx = _ctx()
+    ctx = _ctx(world)
     ctx.emit = AsyncMock(side_effect=recorder.emit)
     write_audit = AsyncMock()
+    run_id, audit_user, pool = uuid4(), uuid4(), FakePool()
 
-    with patch.object(harness_engine, "_execute_phase", recorder.body), \
-         patch.object(harness_engine, "write_audit", write_audit), \
-         patch.object(harness_engine, "_emit", AsyncMock()), \
-         patch("app.services.ask_user_service.subscribe_for_response",
-               AsyncMock(side_effect=recorder.subscribe)):
-        outcome = asyncio.run(
+    def _drive_once():
+        return asyncio.run(
             harness_engine._run_phase_with_gates(
                 eff, {}, ctx,
-                run_id=uuid4(), pool=object(), redis=object(),
-                wall_clock=30, _audit_user_id=uuid4(),
+                run_id=run_id, pool=pool, redis=object(),
+                wall_clock=30, _audit_user_id=audit_user,
                 # HARNESS FIX (plan 187-11), not a relaxation. This file predates the
                 # ``total_phases`` keyword plan 187-06 added, and ``run_workflow`` — the
                 # ONE production call site — always passes ``len(definition.phases)``. A
@@ -580,6 +608,29 @@ def _drive(case: dict):
                 total_phases=TOTAL_PHASES,
             )
         )
+
+    with ExitStack() as stack:
+        world.enter(stack, emit=False, audit=False, subscribe=False)
+        stack.enter_context(patch.object(harness_engine, "_execute_phase", recorder.body))
+        stack.enter_context(patch.object(harness_engine, "write_audit", write_audit))
+        stack.enter_context(patch.object(engine_ask, "write_audit", write_audit))
+        stack.enter_context(patch.object(harness_engine, "_emit", AsyncMock()))
+        stack.enter_context(patch.object(engine_ask, "_emit", AsyncMock()))
+        stack.enter_context(patch("app.services.ask_user_service.subscribe_for_response",
+                                  AsyncMock(side_effect=recorder.subscribe)))
+        outcome = _drive_once()
+        # Phase 295 (D-18): the armed ask PAUSED durably. The person answers on the card —
+        # persisted exactly as POST /ask_user_response persists it — and the answer route
+        # re-drives the phase with the answered tool_call_id set on the ctx.
+        if (outcome is not None and outcome.kind == "pause_run"
+                and world.prompt_rows() and recorder.armed_answer is not None):
+            armed = recorder.armed_answer
+            if isinstance(armed, dict):
+                tcid = world.answer(armed.get("response_text") or "", armed.get("choice_index"))
+            else:
+                tcid = world.answer(armed)
+            ctx.resume_answered_tool_call_id = tcid
+            outcome = _drive_once()
 
     return outcome, recorder, write_audit, approval_sentence
 

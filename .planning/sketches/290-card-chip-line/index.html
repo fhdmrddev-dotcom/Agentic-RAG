@@ -1,0 +1,112 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>290 · Card chip line</title>
+<!-- The app's own compiled stylesheet (Vite dev output of src/index.css, 2026-10-21), so the
+     captured card DOM renders with the real classes. Only the chip line below is new CSS. -->
+<link rel="stylesheet" href="app.css">
+<script src="data.js"></script>
+<style>
+  body { padding-top: 92px; }
+  #nav { position: fixed; top: 0; left: 0; right: 0; z-index: 50; padding: 10px 16px; display: flex; flex-wrap: wrap; gap: 8px; align-items: center; font: 13px system-ui; border-bottom: 1px solid hsl(var(--border)); background: hsl(var(--background)); }
+  #nav button { padding: 5px 10px; border-radius: 6px; border: 1px solid hsl(var(--border)); background: hsl(var(--card)); color: hsl(var(--foreground)); cursor: pointer; }
+  #nav button.on { background: hsl(var(--primary)); color: hsl(var(--primary-foreground)); border-color: transparent; }
+  #nav .sep { width: 1px; height: 20px; background: hsl(var(--border)); margin: 0 4px; }
+  #note { position: fixed; top: 48px; left: 0; right: 0; z-index: 49; padding: 6px 16px; font: 12px system-ui; color: hsl(var(--muted-foreground)); background: hsl(var(--background)); border-bottom: 1px solid hsl(var(--border)); }
+  #stage { padding: 16px; margin: 0 auto; }
+  #stage.phone { max-width: 375px; }
+  #stage.phone .grid { grid-template-columns: 1fr !important; }
+  .ico3d { flex: none; display: inline-block; }
+  .inert-run, [aria-label="Workflow actions"] { pointer-events: none; }
+
+  /* ── The chip line (the ONLY new markup) ─────────────────────────────── */
+  .stepline { margin-top: 8px; display: flex; align-items: center; gap: 4px; min-width: 0; flex-wrap: nowrap; overflow: hidden; }
+  .stepline.open { flex-wrap: wrap; overflow: visible; row-gap: 6px; }
+  .stepline .arrow { flex: none; color: hsl(var(--muted-foreground)); font-size: 11px; }
+  .stepline .more { flex: none; font-size: 11px; cursor: pointer; background: none; border: 0; padding: 2px 4px; color: hsl(var(--primary)); }
+  .stepline .more:focus-visible { outline: 1px solid hsl(var(--ring)); border-radius: 4px; }
+  .stepline .chip { display: inline-flex; align-items: center; gap: 5px; min-width: 0; font-size: 12px; color: hsl(var(--foreground)); }
+  .stepline .chip .t { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .stepline.open .chip .t { white-space: normal; }
+
+  /* A: bordered pills, glyph + the node face (nodeTitle), joined by → */
+  .vA .chip { border: 1px solid hsl(var(--border)); border-radius: 999px; padding: 2px 8px 2px 4px; background: hsl(var(--muted) / 0.4); max-width: 170px; }
+  .vA .stepline.open .chip { max-width: 100%; }
+  .vA .more { border: 1px dashed hsl(var(--border)); border-radius: 999px; padding: 2px 8px; }
+  /* B: same pills, but the words are always the TYPE sentence (author names ignored) */
+  .vB .chip { border: 1px solid hsl(var(--border)); border-radius: 999px; padding: 2px 8px 2px 4px; background: hsl(var(--muted) / 0.4); max-width: 170px; }
+  .vB .stepline.open .chip { max-width: 100%; }
+  .vB .more { border: 1px dashed hsl(var(--border)); border-radius: 999px; padding: 2px 8px; }
+  /* C: no boxes — a quiet numbered run of glyph + face, separated by middots */
+  .vC .chip { color: hsl(var(--muted-foreground)); max-width: 190px; }
+  .vC .chip .n { font-family: ui-monospace, monospace; font-size: 10px; opacity: .8; }
+  .vC .stepline.open .chip { max-width: 100%; }
+
+  #tools { position: fixed; bottom: 12px; right: 12px; z-index: 60; font: 12px system-ui; background: rgba(0,0,0,.75); color: #fff; padding: 8px 12px; border-radius: 8px; opacity: .45; transition: opacity .2s; display: flex; gap: 6px; }
+  #tools:hover { opacity: 1; }
+  #tools button { background: #333; color: #fff; border: 1px solid #555; border-radius: 5px; padding: 3px 8px; cursor: pointer; }
+</style>
+</head>
+<body class="bg-background text-foreground">
+<div id="nav">
+  <strong>290 · Card chip line</strong><span class="sep"></span>
+  <button data-v="A" class="on">A: Pills · step names</button>
+  <button data-v="B">B: Pills · step-type words ★ Selected</button>
+  <button data-v="C">C: Quiet numbered line</button>
+</div>
+<div id="note">Real cards captured from the running app (2026-10-21, local DB), rendered with the app's own CSS. Only the step line is new. Tap “+N more” — it names the rest in words, no hover needed.</div>
+<div id="stage"><div id="grid"></div></div>
+<div id="tools">
+  <button id="theme">Dark</button>
+  <button id="width">Phone 375</button>
+</div>
+<script>
+const D = window.SKETCH_DATA;
+let ICO = 0;
+function glyph(slug, size) {
+  const g = D.glyphs[slug]; if (!g) return '';
+  const uid = 'g' + (++ICO);
+  const body = g.body.replace(/id="([^"]+)"/g, (m, id) => `id="${id}-${uid}"`).replace(/url\(#([^)]+)\)/g, (m, id) => `url(#${id}-${uid})`);
+  return `<svg class="ico3d" width="${size}" height="${size}" viewBox="0 0 ${g.w} ${g.h}" aria-hidden="true">${body}</svg>`;
+}
+const esc = s => String(s).replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
+const SHOW = 3;
+function chip(p, i, v) {
+  const words = v === 'B' ? p.sentence : p.title;
+  const n = v === 'C' ? `<span class="n">${i + 1}</span>` : '';
+  return `<span class="chip" title="${esc(words)}">${n}${glyph(p.glyph, v === 'C' ? 14 : 16)}<span class="t">${esc(words)}</span></span>`;
+}
+function line(card, v, open) {
+  const ps = card.phases; if (!ps.length) return '';           // D-01: no steps, no line
+  const shown = open ? ps : ps.slice(0, SHOW);
+  const joiner = v === 'C' ? '<span class="arrow">·</span>' : '<span class="arrow">→</span>';
+  let html = shown.map((p, i) => chip(p, i, v)).join(joiner);
+  const rest = ps.length - SHOW;
+  if (rest > 0) {
+    html += open
+      ? `<button class="more" data-k="${card.key}" aria-expanded="true">Show less</button>`
+      : `${joiner}<button class="more" data-k="${card.key}" aria-expanded="false" aria-label="Show ${rest} more steps">+${rest} more</button>`;
+  }
+  return `<div class="stepline${open ? ' open' : ''}" data-testid="row-steps" aria-label="Steps, in run order">${html}</div>`;
+}
+let V = 'A'; const OPEN = new Set();
+function render() {
+  const grid = document.getElementById('grid');
+  grid.className = D.grid + ' v' + V;
+  grid.innerHTML = D.cards.map(c => c.html.replace('<!--CHIPS-->', line(c, V, OPEN.has(c.key)))).join('');
+}
+document.getElementById('grid').addEventListener('click', e => {
+  const b = e.target.closest('.more'); if (!b) return;
+  const k = b.dataset.k; OPEN.has(k) ? OPEN.delete(k) : OPEN.add(k); render();
+});
+document.querySelectorAll('#nav [data-v]').forEach(b => b.onclick = () => {
+  V = b.dataset.v; document.querySelectorAll('#nav [data-v]').forEach(x => x.classList.toggle('on', x === b)); render();
+});
+document.getElementById('theme').onclick = e => { const d = document.documentElement.classList.toggle('dark'); e.target.textContent = d ? 'Light' : 'Dark'; };
+document.getElementById('width').onclick = e => { const p = document.getElementById('stage').classList.toggle('phone'); e.target.textContent = p ? 'Desktop 1200' : 'Phone 375'; };
+render();
+</script>
+</body>
+</html>

@@ -68,6 +68,15 @@ import {
   seedReceiptHeading,
 } from "./definitionOps"
 import type { PhaseSpecJSON } from "./phaseVocabulary"
+import { FOLD_GLYPH } from "./surfaceClasses"
+import { REMOVED_GLYPH } from "./decisionsVocabulary"
+import {
+  INPUTS_FOLD_ACTION,
+  INPUT_SOURCE_LOOKUP,
+  inputSourceGroupLabel,
+  inputsFoldSummary,
+} from "./declaredInputsVocabulary"
+import type { GenerateField } from "@/lib/api/knowledge"
 
 // ── fixtures ─────────────────────────────────────────────────────────────────────────
 
@@ -224,6 +233,24 @@ describe("DraftArrivalCard — one card", () => {
 })
 
 // ── 2. THE COLLAPSED ARRIVAL STATE — sketch 174's four lines ─────────────────────────
+
+describe("DraftArrivalCard — a long card scrolls in place (291 UAT S1)", () => {
+  it("wraps ALL the content in one scroll box inside the frame; the accent rule stays on the frame", () => {
+    renderCard()
+    const card = screen.getByTestId("draft-arrival-card")
+    const scroll = screen.getByTestId("draft-arrival-scroll")
+    // The frame bounds the scroll box (flex column, the box takes the rest and may shrink).
+    expect(card.className).toMatch(/\bflex\b/)
+    expect(card.className).toMatch(/\bflex-col\b/)
+    expect(scroll.className).toMatch(/\bmin-h-0\b/)
+    expect(scroll.className).toMatch(/\boverflow-y-auto\b/)
+    // Exactly two children: the accent rule and the scroll box; the closing line scrolls too.
+    expect(card.children).toHaveLength(2)
+    expect(card.children[0].getAttribute("aria-hidden")).toBe("true")
+    expect(card.children[1]).toBe(scroll)
+    expect(scroll.contains(screen.getByTestId("draft-arrival-close"))).toBe(true)
+  })
+})
 
 describe("DraftArrivalCard — the four-line arrival state", () => {
   it("mounts with BOTH folds closed — neither child is in the DOM", () => {
@@ -725,7 +752,12 @@ describe("DraftArrivalCard — the five charter clauses, each fenced", () => {
     const mapped = [...draftArrivalCardSource.matchAll(/([A-Za-z_$][\w$]*)\.map\(/g)].map(
       (m) => m[1],
     )
-    expect(mapped).toEqual(["appliedPairs"])
+    /**
+     * ⚠ 291-05 (D-15, sketch 291-draft-removed A) — AND NOW EXACTLY TWO: `removed`, the server's
+     * removed-power lines, which are this card's OWN prop (one line each, in the server's order)
+     * and belong to neither child. Named explicitly so a THIRD mapped expression is still red.
+     */
+    expect([...mapped].sort()).toEqual(["appliedPairs", "removed"])
     // …and neither child's row source is read here at all.
     expect(draftArrivalCardSource).not.toContain("DECISION_ROW_ORDER.map")
     expect(draftArrivalCardSource).not.toContain("phases.map")
@@ -870,10 +902,12 @@ describe("DraftArrivalCard — every rendered handle is queried by this suite", 
 // feeling. The real px reading stays OWED to a G-4 row, exactly as the suppression's
 // appearance does.
 
-/** The card's own private disclosure mark, read out of its source rather than spelled a
- *  second time here. A private constant has no vocabulary module to be locked in, and a
- *  literal copy would be exactly the second spelling this file exists to avoid. */
-const FOLD_GLYPH_ATOM = (/const FOLD_GLYPH = "([^"]+)"/.exec(draftArrivalCardSource) ?? [])[1] ?? ""
+/** The card's disclosure mark, IMPORTED from its one home rather than spelled a second time
+ *  here. ⚠ 291-05 MOVED IT, byte-identical, out of the card into `surfaceClasses.ts` (with the
+ *  two fold class strings and the extracted fold-body class), because the inputs-fold leaf
+ *  draws the same trigger and a second copy would be a second home to drift. Until 291-05 it
+ *  was read out of the card's source by regex; that regex would now match nothing. */
+const FOLD_GLYPH_ATOM = FOLD_GLYPH ?? ""
 
 /** Every atom an author READS inside `root`, trimmed, empty ones dropped, in DOCUMENT
  *  order. An ORDERED array rather than a set: two atoms swapping places is a presentation
@@ -933,8 +967,26 @@ function declaredBox(root: HTMLElement): { boxPx: number; linePx: number; totalP
 }
 
 describe("DraftArrivalCard — the 199-04 resting inventory", () => {
-  it("reads the card's own disclosure mark out of its source, not out of a second spelling", () => {
+  it("takes its disclosure mark from the ONE home, and declares no second copy (291-05 move)", () => {
     expect(FOLD_GLYPH_ATOM.length).toBeGreaterThan(0)
+    // The card imports the mark and both fold class strings by name, and declares none of them.
+    const importLine = draftArrivalCardSource.match(
+      /import\s*\{([^}]*)\}\s*from\s*"@\/components\/workflows\/surfaceClasses"/,
+    )
+    expect(importLine).not.toBeNull()
+    for (const name of ["FOLD_GLYPH", "FOLD_LINE_CLASS", "FOLD_ACTION_CLASS", "FOLD_BODY_CLASS"]) {
+      expect(importLine?.[1] ?? "", `${name} is imported`).toMatch(new RegExp(`\\b${name}\\b`))
+      expect(draftArrivalCardSource, `${name} is re-declared`).not.toMatch(
+        new RegExp(`const ${name}\\s*=`),
+      )
+    }
+  })
+
+  it("both shipped fold bodies use the extracted FOLD_BODY_CLASS, never the inline literal", () => {
+    // The literal is assembled so this file cannot satisfy its own needle.
+    const LITERAL = ["py-5", "pl-8"].join(" ")
+    expect(withoutComments(draftArrivalCardSource)).not.toContain(LITERAL)
+    expect(draftArrivalCardSource.match(/className=\{FOLD_BODY_CLASS\}/g) ?? []).toHaveLength(2)
   })
 
   it("AT REST the card paints exactly these atoms, in this order", () => {
@@ -1398,5 +1450,179 @@ describe("DraftArrivalCard — sheet c5 asks for a vocabulary this surface does 
         subject,
       )
     }
+  })
+})
+
+// ── 10. 291-05 — WHAT THE FILES COULD NOT DO, AND WHERE EACH ANSWER COMES FROM ─────────────
+//
+// Sketch 291-draft-removed winner A (D-14 / D-15) and the shared inputs fold (D-09 / D-10 /
+// D-12). ⚠ THE WORDS ARE THE DELIVERABLE, so every case below reads rendered TEXT. The removed
+// sentences are the SERVER's (SEED-221); these fixtures are this suite's own data and are
+// compared to themselves.
+
+const REMOVED_ONE = [
+  {
+    lead: "Removed: send email.",
+    reason: "Only your description can add actions, not vendor-terms.pdf.",
+  },
+]
+const REMOVED_THREE = [
+  { lead: "Removed: send email.", reason: "Only your description can add actions, not your attached files." },
+  { lead: "Removed: web search.", reason: "Only your description can add actions, not your attached files." },
+  { lead: "Removed: use Acme CRM.", reason: "Only your description can add actions, not your attached files." },
+]
+
+const FORM_FILENAME = "vendor-onboarding-form.pdf"
+const FORM_FIELDS: GenerateField[] = [
+  { key: "supplier_name", label: "Supplier name", type: "text", enum_options: [], covered_by: "input" },
+  { key: "country", label: "Country", type: "enum", enum_options: ["US", "CA"], covered_by: "input" },
+]
+
+function inputsFoldProp(onSetSource = vi.fn()) {
+  return {
+    fields: FORM_FIELDS,
+    inputs: [
+      { key: "supplier_name", label: "Supplier name", type: "text", source: "user" },
+      { key: "country", label: "Country", type: "enum", enum_options: ["US", "CA"], source: "user" },
+    ],
+    filename: FORM_FILENAME,
+    onSetSource,
+  }
+}
+
+/** The card's HTML with every React-generated id normalised: two separate renders draw ids from
+ *  one global counter, so raw id VALUES differ between renders while the DOM is otherwise the
+ *  same. Every attribute that can carry a `useId` value is folded to one placeholder. */
+function normalisedHtml(container: HTMLElement): string {
+  return container.innerHTML.replace(
+    /\b(id|aria-labelledby|aria-controls|aria-describedby|for|name)="[^"]*"/g,
+    '$1="ID"',
+  )
+}
+
+describe("DraftArrivalCard — 291-05: the removed lines (D-15, sketch 291-draft-removed A)", () => {
+  it("⚠ NOTHING REMOVED ⇒ THE CARD IS BYTE-IDENTICAL TO TODAY — absent and [] alike", () => {
+    const today = renderCard()
+    const todayHtml = normalisedHtml(today.container)
+    today.unmount()
+    const empty = renderCard({ removed: [] })
+    expect(normalisedHtml(empty.container)).toBe(todayHtml)
+    expect(screen.queryByTestId("draft-arrival-removed")).toBeNull()
+    empty.unmount()
+    const absent = renderCard({ removed: undefined })
+    expect(normalisedHtml(absent.container)).toBe(todayHtml)
+    // NON-VACUITY: the comparison is over a real card, not two empty strings.
+    expect(todayHtml.length).toBeGreaterThan(500)
+  })
+
+  it("one removal ⇒ one line, after the heading and before the source line, in the server's words", () => {
+    renderCard({ removed: REMOVED_ONE })
+    const lines = screen.getAllByTestId("draft-arrival-removed")
+    expect(lines).toHaveLength(1)
+    const line = lines[0]
+    expect(line.tagName).toBe("P")
+    expect(line.textContent).toBe(`${REMOVED_GLYPH}${REMOVED_ONE[0].lead} ${REMOVED_ONE[0].reason}`)
+    expect(line.textContent).toBe(
+      "⊘Removed: send email. Only your description can add actions, not vendor-terms.pdf.",
+    )
+    const heading = screen.getByTestId("draft-arrival-heading")
+    const source = screen.getByTestId("draft-arrival-source")
+    expect(heading.compareDocumentPosition(line) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy()
+    expect(line.compareDocumentPosition(source) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy()
+  })
+
+  it("the glyph is aria-hidden and the LEAD is the weighted clause; the reason is plain", () => {
+    renderCard({ removed: REMOVED_ONE })
+    const line = screen.getByTestId("draft-arrival-removed")
+    const glyph = line.querySelector("[aria-hidden=true]")
+    expect(glyph?.textContent).toBe(REMOVED_GLYPH)
+    const lead = within(line).getByText(REMOVED_ONE[0].lead)
+    expect(lead.className).toContain("font-medium")
+    expect(lead.className).toContain("text-foreground")
+    // The visible text a reader hears carries no glyph.
+    const spoken = [...line.childNodes]
+      .filter((n) => !(n instanceof HTMLElement && n.getAttribute("aria-hidden") === "true"))
+      .map((n) => n.textContent ?? "")
+      .join("")
+    expect(spoken).toBe(`${REMOVED_ONE[0].lead} ${REMOVED_ONE[0].reason}`)
+  })
+
+  it("three removals ⇒ three lines, in the server's order, with no cap and no fold", () => {
+    renderCard({ removed: REMOVED_THREE })
+    const lines = screen.getAllByTestId("draft-arrival-removed")
+    expect(lines.map((l) => l.textContent)).toEqual(
+      REMOVED_THREE.map((r) => `${REMOVED_GLYPH}${r.lead} ${r.reason}`),
+    )
+  })
+
+  it("the line carries NO colour — a 2px border-border rule, muted text, no amber/red/badge (D-17)", () => {
+    renderCard({ removed: REMOVED_ONE })
+    const line = screen.getByTestId("draft-arrival-removed")
+    expect(line.className).toBe(
+      "flex items-baseline gap-2 border-l-2 border-border py-1 pl-4 text-[13.5px] leading-[1.5] text-muted-foreground",
+    )
+    expect(line.outerHTML).not.toMatch(/warning|amber|red-|destructive|green-|badge/)
+  })
+
+  it("server words render as TEXT, never as markup (T-291-40)", () => {
+    const payload = '<img src=x onerror="alert(1)">'
+    const { container } = renderCard({ removed: [{ lead: payload, reason: payload }] })
+    expect(container.querySelector("img")).toBeNull()
+    expect(screen.getByTestId("draft-arrival-removed").textContent).toContain(payload)
+  })
+})
+
+describe("DraftArrivalCard — 291-05: the inputs fold (D-09 / D-10 / D-12)", () => {
+  it("no inputsFold prop ⇒ no inputs trigger and no inputs body", () => {
+    renderCard()
+    expect(screen.queryByTestId("draft-arrival-fold-inputs")).toBeNull()
+    expect(screen.queryByTestId("draft-arrival-inputs-body")).toBeNull()
+  })
+
+  it("with the prop the inputs trigger is FIRST in the footer strip, before grounding and decisions", () => {
+    renderCard({ inputsFold: inputsFoldProp() })
+    const trigger = screen.getByTestId("draft-arrival-fold-inputs")
+    const grounding = screen.getByTestId("draft-arrival-fold-grounding")
+    const decisions = screen.getByTestId("draft-arrival-fold-decisions")
+    expect(trigger.parentElement).toBe(grounding.parentElement)
+    expect(trigger.parentElement?.firstElementChild).toBe(trigger)
+    expect(trigger.compareDocumentPosition(grounding) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy()
+    expect(grounding.compareDocumentPosition(decisions) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy()
+    expect(trigger.textContent).toBe(
+      `${FOLD_GLYPH_ATOM}${inputsFoldSummary(FORM_FIELDS.length, FORM_FILENAME)}${INPUTS_FOLD_ACTION}`,
+    )
+    expect(trigger.textContent).toContain("2 inputs from vendor-onboarding-form.pdf")
+  })
+
+  it("the fold is CLOSED on mount and opens a body whose id the trigger controls", async () => {
+    const user = userEvent.setup()
+    renderCard({ inputsFold: inputsFoldProp() })
+    const trigger = screen.getByTestId("draft-arrival-fold-inputs")
+    expect(trigger.getAttribute("aria-expanded")).toBe("false")
+    expect(screen.queryByTestId("draft-arrival-inputs-body")).toBeNull()
+    await user.click(trigger)
+    const body = screen.getByTestId("draft-arrival-inputs-body")
+    expect(trigger.getAttribute("aria-expanded")).toBe("true")
+    expect(trigger.getAttribute("aria-controls")).toBe(body.id)
+    expect(body.id).not.toBe("")
+    expect(screen.getAllByTestId("draft-arrival-input-row")).toHaveLength(FORM_FIELDS.length)
+  })
+
+  it("flipping a switch reaches the caller's onSetSource with the key and kb_auto", async () => {
+    const user = userEvent.setup()
+    const onSetSource = vi.fn()
+    renderCard({ inputsFold: inputsFoldProp(onSetSource) })
+    await user.click(screen.getByTestId("draft-arrival-fold-inputs"))
+    const group = screen.getByRole("radiogroup", { name: inputSourceGroupLabel("Country") })
+    await user.click(within(group).getByText(INPUT_SOURCE_LOOKUP))
+    expect(onSetSource).toHaveBeenCalledWith("country", "kb_auto")
+  })
+
+  it("opening the inputs fold leaves the other two folds closed", async () => {
+    const user = userEvent.setup()
+    renderCard({ inputsFold: inputsFoldProp() })
+    await user.click(screen.getByTestId("draft-arrival-fold-inputs"))
+    expect(screen.queryByTestId("draft-arrival-grounding-body")).toBeNull()
+    expect(screen.queryByTestId("draft-arrival-decisions-body")).toBeNull()
   })
 })

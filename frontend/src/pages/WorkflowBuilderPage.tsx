@@ -166,6 +166,7 @@ import {
   UNSAVED_LEAVE_PROMPT,
 } from "@/components/workflows/builderCopy"
 import type { TemplateReadAnswer } from "@/components/workflows/useTemplateFirstDraft"
+import type { DraftedExtras } from "@/components/workflows/useTemplateFirstDraft"
 // 193.1-07 (D-06 rule 2) — the bind's own sentence. Authored in its module, never here: an
 // interpolating string is a function in a `.ts` vocabulary file, and the filename is DATA.
 import { templateBindFailedMessage } from "@/components/workflows/templateFirstVocabulary"
@@ -173,6 +174,9 @@ import { templateBindFailedMessage } from "@/components/workflows/templateFirstV
 // ONE component, two mounts: the marginal cost of the second is a mount and a prop, and the
 // alternative is two surfaces that drift. See the mount below for WHERE it lands and why.
 import { DescribeTemplateRow } from "@/components/workflows/DescribeTemplateRow"
+// 291-04 (sketch 291-describe-files winner B) — the template row's PEER, mounted beside it on
+// this screen and on the loose door's, for the same one-component-two-mounts reason.
+import { DescribeReferencesSection } from "@/components/workflows/DescribeReferencesSection"
 import { PhaseSpineGraph } from "@/components/workflows/PhaseSpineGraph"
 import {
   groundingCauseOf,
@@ -597,6 +601,9 @@ export interface WorkflowBuilderPageProps {
    */
   initialTemplateFile?: File | null
   initialTemplateRead?: TemplateReadAnswer | null
+  /** 291-04 (D-03) — the references picked on the loose door, each WITH its finished reading,
+   *  for the same seed-do-not-re-read reason. BOTH ABSENT ⇒ nothing changes. */
+  initialReferences?: readonly TemplateReadAnswer[] | null
   /**
    * Phase 184-11 (D-184-16 debt 1) — the unsaved-work leave guard's registration seam.
    *
@@ -641,6 +648,7 @@ export function WorkflowBuilderPage({
   initialAllowedConnectionIds,
   initialTemplateFile,
   initialTemplateRead,
+  initialReferences,
   registerCanLeave,
   headerLead,
   headerTrail,
@@ -715,6 +723,14 @@ export function WorkflowBuilderPage({
    * second generation replace the first one's card rather than blend with it.
    */
   const [readiness, setReadiness] = useState<GenerateReadiness | undefined>(undefined)
+  /**
+   * 291-05 (D-15 / D-09 / D-12) — the generation's EXTRAS: the powers the server's guard
+   * removed and the attached form's fields. The SAME class of value as `readiness` above — a
+   * SNAPSHOT of ONE generation, replaced on every generation, never read through the store.
+   * The card renders `removed` verbatim and opens the inputs fold only when `fields` is
+   * non-empty; `undefined` until the first generation lands.
+   */
+  const [arrivalExtras, setArrivalExtras] = useState<DraftedExtras | undefined>(undefined)
   // 187-15 (Req 1 / D-187-05) — the ONE name context: values this page already holds, memoised
   // so the memoised `toCanvas` does not re-project every render. `assets` is DEFINITION-level
   // (a workflow's, never a phase's), which is why 187-04 gates the template tier on
@@ -736,6 +752,14 @@ export function WorkflowBuilderPage({
     const filename = typeof found.filename === "string" ? found.filename : undefined
     const assetId = typeof found.asset_id === "string" ? found.asset_id : undefined
     return { filename, assetId }
+  }, [meta])
+  // 291-05 (D-07 / D-32) — the reference files saved with the draft, by filename, for the
+  // decisions template row. LIVE off `meta.assets`, read with the same defensive coercion.
+  const referenceNames = useMemo(() => {
+    const assets = Array.isArray(meta.assets) ? (meta.assets as Array<Record<string, unknown>>) : []
+    return assets
+      .filter((a) => a?.kind === "reference" && typeof a.filename === "string")
+      .map((a) => a.filename as string)
   }, [meta])
 
   const nameContext = useMemo<NameContext>(
@@ -793,6 +817,14 @@ export function WorkflowBuilderPage({
     onClearTemplateFile,
     bindHeldTemplate,
     bindFailed,
+    // 291-04 — the ticks and the references, forwarded to the two door sections as they are.
+    untickedKeys,
+    onToggleBlank,
+    references,
+    referenceNotice,
+    onAddReferenceFiles,
+    onRemoveReference,
+    anyReading,
   } = useTemplateFirstDraft({
     store,
     builderPhase,
@@ -808,6 +840,7 @@ export function WorkflowBuilderPage({
     // the loose door's.
     initialTemplateFile,
     initialTemplateRead,
+    initialReferences,
     initialDefinitionFolderId: initial?.definition.project_folder_id,
     onDraftStarted: () => {
       setSelectedSlug(null)
@@ -823,10 +856,14 @@ export function WorkflowBuilderPage({
     //
     // All three writes are ONE snapshot of ONE generation, taken in the same batch as the
     // store's single `setDrafted` transition — see `readiness`' own block above.
-    onDrafted: (def, verdict) => {
+    // ⚠ 291-05 — the THIRD parameter is named for the same reason: a two-parameter callback
+    // assigns to this three-parameter signature in silence, and would drop what the guard
+    // removed and the form's fields. A `canvas.test.tsx` case reds when it is deleted.
+    onDrafted: (def, verdict, extras) => {
       setShowReceipt(true)
       setReceiptPhases(def.phases)
       setReadiness(verdict)
+      setArrivalExtras(extras)
     },
     // ⚠ 193.1-07 (D-06 / S-3) — THE SHIPPED ATTACH HANDLER, REACHED THROUGH AN ARROW, and
     // the arrow is load-bearing rather than stylistic. `onTemplateAttached` is declared far
@@ -836,9 +873,38 @@ export function WorkflowBuilderPage({
     // evaluated. Passing THIS handler rather than a second copy of it is what keeps
     // `setTemplateAsset` + `saveNow` the ONE writer on the definition JSONB.
     onTemplateBound: (asset) => onTemplateAttached(asset),
+    // 291-04 (D-07) — the references of ONE bind, through the same ONE writer and the same
+    // save, reached through an arrow for the same declared-below reason.
+    onReferencesBound: (assets) => {
+      store.getState().addReferenceAssets(assets)
+      void persistence.saveNow()
+    },
   })
 
   const panelOpen = selectedSlug !== null
+
+  /**
+   * 291-05 (D-09 / D-10 / D-12) — the arrival card's inputs fold, ONLY when the generation
+   * was built to a form's fields. `fields` is the SNAPSHOT; `inputs` are LIVE off the
+   * definition, so the switch shows the author's own flips; a flip goes through the store's
+   * one action and so through the draft autosave.
+   */
+  const arrivalInputsFold = useMemo(() => {
+    const fields = arrivalExtras?.fields
+    if (fields === undefined || fields.length === 0) return undefined
+    const inputs = Array.isArray(meta.inputs)
+      ? (meta.inputs as Array<{ key: string }>).filter(
+          (i) => typeof i === "object" && i !== null && typeof i.key === "string",
+        )
+      : []
+    return {
+      fields,
+      inputs,
+      filename: templateFile?.name ?? templateAsset?.filename ?? "",
+      onSetSource: (key: string, source: "user" | "kb_auto") =>
+        store.getState().setInputSource(key, source),
+    }
+  }, [arrivalExtras, meta, templateFile, templateAsset, store])
 
   // Phase 183-07 (D-183-03) — the three-part fail-closed gate, now read through the ONE
   // exported rule (see `useCanvasGate`'s docblock: 184.1 gave the two ancestor band
@@ -1683,6 +1749,7 @@ export function WorkflowBuilderPage({
     () => ({
       folderName: boundFolderName,
       templateFilename: templateAsset?.filename ?? null,
+      referenceNames,
       businessRequirement:
         typeof meta.business_requirement === "string" ? meta.business_requirement : "",
       name: typeof meta.name === "string" ? meta.name : "",
@@ -1696,6 +1763,7 @@ export function WorkflowBuilderPage({
     [
       boundFolderName,
       templateAsset,
+      referenceNames,
       meta,
       definition,
       readiness,
@@ -1964,6 +2032,21 @@ export function WorkflowBuilderPage({
             filename={templateFile?.name}
             onPickFile={onPickTemplateFile}
             onClear={onClearTemplateFile}
+            untickedKeys={untickedKeys}
+            onToggleBlank={onToggleBlank}
+          />
+
+          {/* 291-04 — the references section, the template row's peer (sketch B): rule, then
+              the section, then the CTA group. Outside the pinned group and outside the canvas
+              flag for the template row's own measured reasons above. */}
+          <div aria-hidden="true" className="h-px w-full bg-border" />
+          <DescribeReferencesSection
+            references={references}
+            notice={referenceNotice}
+            anyFileHeld={templateFile !== null || references.length > 0}
+            anyReading={anyReading}
+            onAddFiles={onAddReferenceFiles}
+            onRemove={onRemoveReference}
           />
 
           <div className="flex flex-col items-center gap-3">
@@ -2076,6 +2159,8 @@ export function WorkflowBuilderPage({
           // in this single object: the toolbar's save reading, the tray's server-derived
           // findings, and the three callbacks. The canvas composes; it derives nothing.
           session={canvasSession}
+          // 290-03 (VIS-01 / D-06, D-07) — the Steps | Team switch; the canvas reads the phases it already has, so the picture costs no request.
+          team={{ workflowName: typeof meta.name === "string" && meta.name.length > 0 ? meta.name : meta.slug ?? "Untitled workflow" }}
         />
       </Suspense>
     ) : (
@@ -2176,6 +2261,10 @@ export function WorkflowBuilderPage({
         // draft rows, and `onGauntletPublished` returns to the library (WorkflowsPage), so a
         // published workflow is never on this surface. `showReceipt` is untouched (D-01).
         settingsRow
+        // 291-05 (D-15 / D-09) — the generation's extras, from the ONE snapshot `onDrafted`
+        // writes. `removed` absent or empty paints the card exactly as before.
+        removed={arrivalExtras?.removed}
+        inputsFold={arrivalInputsFold}
       />
       {graphChild}
     </div>

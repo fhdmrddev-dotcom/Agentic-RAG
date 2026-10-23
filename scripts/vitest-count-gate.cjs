@@ -187,6 +187,14 @@ const BASELINE = {
   "CitationCheckAction.test.tsx": 11,
   "CitedMarkdown.verdict.test.tsx": 17,
   "CitationPeek.verdict.test.tsx": 5,
+  // Phase 295-07 (D-32) — the four suites 295-05 / 295-06 created, which ran in NO gate (295-06's
+  // handover). Pins measured green on a run of the four suites alone (2026-10-21, 39 passed).
+  // RunEndReasonLine.test.tsx is already TARGETED by the "src/components/workflows" directory entry,
+  // so it needs only this pin; the other three get a TARGETS entry in the same commit.
+  "RunEndReasonLine.test.tsx": 13,
+  "AskFolderChoice.test.tsx": 7,
+  "enginePause.test.ts": 17,
+  "threads.engineAsk.test.ts": 4, // 295-08 WR-04: 2 -> 4 (answerAskUser reads the refusal detail)
   // Phase 294-04 (DEC-01) — the engine cards and the engine-id parity fence. 294-04 left them
   // un-adopted (handover); adopted here, measured green on a run of the two suites alone.
   "RerankEngineBlock.test.tsx": 25,  // 294-REVIEW WR-04: +1, a cleared Keep at most never reports 0
@@ -1044,6 +1052,23 @@ const BASELINE = {
   //
   // Read from THIS SCRIPT'S OWN `actual` column (`DescribeTemplateRow.test.tsx — 42 new`).
   "DescribeTemplateRow.test.tsx": 42,
+  // 291-04 (AUTH-02, sketch 291-describe-files winner B) — ADOPTED in the plan that creates it.
+  // `src/components/workflows` is already a DIRECTORY entry in `TARGETS`, so no `TARGETS` edit.
+  // What would be unguarded without this entry: the references section's honesty properties —
+  // one live region and never an alert, fact lines in the foreground with no colour, the 5-of-5
+  // disabled picker saying why through `aria-describedby`, the powers/keep lines shown only
+  // while a file is held, filenames rendered as TEXT, and the UI-SPEC `?raw` spacing fence.
+  // Read from THIS SCRIPT'S OWN `actual` column (`DescribeReferencesSection.test.tsx — 21 new`).
+  "DescribeReferencesSection.test.tsx": 21,
+  // 291-05 (AUTH-02, sketch 291-draft-removed winner A) — ADOPTED in the plan that creates it.
+  // `src/components/workflows` is already a DIRECTORY entry in `TARGETS`, so no `TARGETS` edit.
+  // What would be unguarded without this entry: the arrival card's inputs fold — rows in the
+  // form's order, the type word from the ONE formatter, a native radiogroup per asked field,
+  // "Written by a step", the added-by mark ONLY from `origin === "server_added"`, the extra-input
+  // note, labels and notes rendered as TEXT, the `?raw` spacing fence, the components-only export
+  // rule, and the banned-word sweep over the new vocabulary.
+  // Read from THIS SCRIPT'S OWN `actual` column (`DraftInputsFold.test.tsx — 26 new`).
+  "DraftInputsFold.test.tsx": 26,
   // 193.1-07 (D-06 / D-25) — a FIRST PIN on a suite that has shipped since Phase 186 and that
   // this gate has NEVER EXECUTED. ⚠ Unlike every other entry in this map it needs BOTH knobs:
   // there is no `src/hooks` entry anywhere in `TARGETS`, so the accompanying `TARGETS` line is
@@ -1401,7 +1426,10 @@ const BASELINE = {
   // on the skip branch), and did the same to a `failed` row and to an unnameable one. Four
   // of the five were observed RED; the fifth is the positive control that a genuinely
   // completed row below the cursor is unaffected.
-  "PhaseReconcile.test.tsx": 19,
+  // 295-08 (SEED-361): 19 → 28. The pin had sat at 19 while the file ran 26; 295-08 adds two
+  // cases (reconcilePhases records the run status: `paused` for a paused run, null once the
+  // anchor is gone), both observed RED. Raised to the measured 28 so the new cases are guarded.
+  "PhaseReconcile.test.tsx": 28,
   // ── 188-12: the four suites Phase 188 CREATED (or deliberately adopted), pinned now. ──
   // Each was put into TARGETS by the plan that created it — in the same commit, because an
   // entry pointing at a not-yet-existing path makes the gate ERROR (exit 2) rather than fail —
@@ -2500,7 +2528,10 @@ const BASELINE = {
   //   Phase 286 — the suite measured 128 at the phase base `d45bef9e2` (run on the base tree,
   //   286-05-GATES.md), so the pin had been 10 behind its own suite before this phase began.
   //   Folded in here because raising a pin only tightens it; the split is stated, not smoothed.
-  "librarySubtree.fences.test.ts": 133,
+  // 290-02 (2026-10-21, VIS-04): RAISED 133 -> 143 from this script's own actual column. All +10 are 290-02's:
+  //   ./stepLine.ts and ./StepChipLine.tsx joined LIBRARY_SUBTREE_PATHS (15 -> 17), and each path runs five it.each
+  //   sweeps. The suite measured 133 at the phase base 1f9673d25 (run on the base tree, 290-04-GATES.md).
+  "librarySubtree.fences.test.ts": 143,
   // ── 192.1-07 Task 1 (LIB-05 / D-19 / D-20 / D-36): a NEW suite, pinned in its first commit ─
   // 162-B's name prompt, in `RunModal.a11y.test.tsx`'s posture (the four Radix jsdom shims,
   // `axe()` on the OPEN dialog, roles and accessible names rather than class-name reading).
@@ -2617,7 +2648,11 @@ const BASELINE = {
   // that no template is needed. Two separate expectations would drift apart without failing.
   //
   // Read from THIS SCRIPT'S OWN `actual` column (`WorkflowCard.test.tsx 80 90 +10`).
-  "WorkflowCard.test.tsx": 128,
+  // 290-02 (2026-10-21, VIS-04): RAISED 128 -> 133 from this script's own actual column. +3 are 290-02's
+  //   (the chip-line content cases: DEF words, one chip and no toggle, no row-steps at 0 steps). The other +2
+  //   PREDATE 290: the suite measured 130 at the phase base 1f9673d25 (run on the base tree, 290-04-GATES.md).
+  //   Folded in because raising a pin only tightens it; the split is stated, not smoothed.
+  "WorkflowCard.test.tsx": 133,
   // ── Phase 192.2 gap round 1 — THE CR-01 REGRESSION TESTS WERE DELETABLE WITH A GREEN GATE ────
   //
   // ⚠ Found by the round's own code review (`192.2-REVIEW-R1.md`, WR-01) and confirmed against
@@ -4314,6 +4349,10 @@ const BASELINE = {
   // in one commit. Counts are the per-file actuals from a focused `--reporter=json` run at
   // `GSD_VITEST_MAX_WORKERS=2`, never hand-counted. The three `src/components/workflows` suites
   // are inside that DIRECTORY entry and need a pin only; the other four are FILE-LEVEL below.
+  // 295-08 (SEED-361) — a paused run's ask stays answerable in the chat thread; guard both ways.
+  // 295-10 (D-r1-02, 2026-10-21) — after an answer the open tab follows the re-driven run.
+  "streamsProvider_295_10_follow_after_answer.test.tsx": 6,
+  "PendingAskStack.pausedRun.test.tsx": 15, // 295 D-r2-01 (2026-10-21): 14 -> 15 (a re-driven active run is live). 295-10 D-r1-01: 11 -> 14 (a 409 shows the server's words, re-reads on a paused run). 295-08 WR-04: 7 -> 11
   "PendingAskCard.paused.test.tsx": 6, // 289-REVIEW CR-02: 4 -> 6 (pending -> expired -> paused re-render, 404 stays terminal). 289-01 — the paused card keeps its answer control
   "StepEvidenceLine.test.tsx": 15, // 289-02 — the KB evidence line or nothing
   "evidenceView.test.ts": 31, // 289-REVIEW WR-03: 29 -> 31 (final-attempt Checks fact, timed-out kind). 289-04 — payload to view-model, privacy applied twice
@@ -4323,6 +4362,17 @@ const BASELINE = {
   "runEvidence.contract.test.ts": 3, // 289-05 I1 — RunEvidence vs the shared contract fixture
   // 289-REVIEW WR-05 (2026-10-20) — created by the review fix, adopted in BOTH knobs in one commit.
   "ChatLayout.runDeepLink.test.tsx": 2, // ?run= is cleared when a LIVE run page is left
+  // -- Phase 290-04 (2026-10-21, VIS-01 / VIS-04): the seven suites 290-01..03 created, pinned at the
+  // gate's own printed actuals (count gate OK, failed 0). All seven sit under the src/components/workflows
+  // directory entry in TARGETS (headerPin under __tests__/, two under library/), so they need a pin only.
+  // Deleting a case in any of them now reds the gate.
+  "teamModel.test.ts": 248, // 290-REVIEW WR-06: 247 -> 248 (max_retries read as lax int, negative = no redo). WR-01: 246 -> 247 (unknown on_failure reads stop the run). CR-01: 243 -> 246 (unflagged external_action armed + its control + ARMED_TYPES drift fence). 290-01 (VIS-01 / D-11): deriveTeam's honesty surface; jump only for a resolvable skip, citations check only for detected
+  "teamVocabulary.test.ts": 15, // 290-01: zero-import leaf, exact strings, no step sentence or seal label copied in
+  "WorkflowCanvas.headerPin.test.tsx": 6, // 290-01: canvas header characterization pin (6 snapshots) that 290-03 left byte-unchanged
+  "TeamPicture.test.tsx": 42, // 290-REVIEW WR-03/WR-04: 36 -> 42 (planted-layout geometry: no line inside a card, jumps on own lanes, one rail per gate). 290-03 (VIS-01 / D-06): one SVG path per lines[] item, nothing focusable, author text literal
+  "WorkflowCanvas.team.test.tsx": 7, // 290-03: Steps | Team switch only with the team prop; keyboard reorder gated (F-6); run page passes none
+  "stepLine.test.ts": 25, // 290-02 (VIS-04 / D-01, D-04): type-sentence chips in run order, first 3 + more, null at 0 steps
+  "StepChipLine.test.tsx": 11, // 290-02 (VIS-04 / D-03): row-steps block, +N more / Show less, no title attribute
 }
 
 // Still COMPUTED, never hand-written — the reduce is the single source, so the
@@ -4773,6 +4823,10 @@ const TARGETS = [
   "src/components/chat/__tests__/CitationCheckAction.test.tsx",
   "src/components/chat/__tests__/CitedMarkdown.verdict.test.tsx",
   "src/components/chat/__tests__/CitationPeek.verdict.test.tsx",
+  // Phase 295-07 — BOTH KNOBS, SAME COMMIT (the 294-03 rule): each entry pairs a BASELINE pin.
+  "src/components/panel/__tests__/AskFolderChoice.test.tsx",
+  "src/components/panel/__tests__/enginePause.test.ts",
+  "src/lib/api/__tests__/threads.engineAsk.test.ts",
   "src/components/settings/__tests__/RerankEngineBlock.test.tsx",
   "src/components/settings/__tests__/rerankEngines.parity.test.ts",
   "src/components/chat/RunCard.test.tsx",
@@ -6312,6 +6366,10 @@ const TARGETS = [
   // Phase 289-05 — FILE-LEVEL (no `src/lib` or `src/components/panel` directory entry), in the
   // SAME commit as their BASELINE pins.
   "src/components/panel/__tests__/PendingAskCard.paused.test.tsx",
+  // Phase 295-08 — FILE-LEVEL, SAME commit as its BASELINE pin.
+  "src/components/panel/__tests__/PendingAskStack.pausedRun.test.tsx",
+  // Phase 295-10 — FILE-LEVEL (no `src/__tests__/providers` directory entry, see 244-15), SAME commit as its pin.
+  "src/__tests__/providers/streamsProvider_295_10_follow_after_answer.test.tsx",
   "src/lib/runDeepLink.test.ts",
   "src/lib/api/runEvidence.test.ts",
   "src/lib/api/__tests__/runEvidence.contract.test.ts",

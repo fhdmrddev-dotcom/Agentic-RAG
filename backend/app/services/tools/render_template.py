@@ -68,7 +68,8 @@ _RENDER_DRIVER_SRC = r'''
 
 argv: <engine> <template_path> <field_map_json_path> <out_path>
   engine: "docxtpl" (trusted/library, Jinja row-growth) | "run_replace"
-          (arbitrary upload, non-Jinja scalar replace).
+          (arbitrary upload, non-Jinja scalar replace) | "acroform" (Phase 291: a fillable
+          PDF, each answer written into its own field by name, validated, read back).
 
 Prints exactly ONE JSON line as the LAST stdout line:
   {"rendered":bool, "opened":bool, "residual_clean":bool, "residual_tags":[...],
@@ -204,6 +205,291 @@ def run_replace_docx(template_path, flat_scalars, out_path):
     return {"rendered": True, "error": None}
 
 
+# ── Phase 291 (D-25 / D-29): the "acroform" engine — fill a fillable PDF by field name ──
+# _read_acroform is an INLINED copy of describe_files.read_acroform_fields (the sandbox has no
+# backend package on its path). test_291_acroform_reader_parity.py pins the two together.
+_FF_RADIO = 1 << 15
+_FF_PUSHBUTTON = 1 << 16
+_CHECKBOX_TRUE = {"yes", "y", "true", "x", "checked", "on", "1"}
+_CHECKBOX_FALSE = {"no", "n", "false", "unchecked", "off", "0", ""}
+_NON_LATIN_LIMIT = (
+    "Some answers use characters this form's font cannot show; viewers that redraw fields "
+    "will show them."
+)
+# out_path -> the fill result, read by residual_tags_in / assert_integrity for fmt "pdf".
+_FILL_RESULTS = {}
+
+
+def _acro_str(v):
+    return str(v) if v is not None else ""
+
+
+def _acro_opt_values(opt):
+    out = []
+    for item in opt or []:
+        try:
+            item = item.get_object() if hasattr(item, "get_object") else item
+        except Exception:
+            continue
+        if isinstance(item, (list, tuple)) and item:
+            out.append(_acro_str(item[0]))
+        else:
+            out.append(_acro_str(item))
+    return out
+
+
+def _acro_ap_states(widget):
+    try:
+        ap = widget.get("/AP")
+        ap = ap.get_object() if ap is not None else None
+        n = ap.get("/N") if ap is not None else None
+        n = n.get_object() if n is not None else None
+        if hasattr(n, "keys"):
+            return [str(k) for k in n.keys()]
+    except Exception:
+        pass
+    return []
+
+
+def _read_acroform(path):
+    """Every terminal AcroForm field in document order as a dict: name, field_type, states,
+    options, tooltip, value (/V) and widget_as (each widget's /AS). [] when none."""
+    from pypdf import PdfReader
+
+    reader = PdfReader(path)
+    root = reader.trailer["/Root"].get_object()
+    acro = root.get("/AcroForm")
+    if acro is None:
+        return []
+    acro = acro.get_object()
+    top = acro.get("/Fields")
+    top = top.get_object() if top is not None else None
+    if not top:
+        return []
+    out = []
+    seen = set()
+
+    def _walk(ref, prefix, inherited, depth):
+        if depth > 32:
+            return
+        idnum = getattr(ref, "idnum", None)
+        if idnum is not None:
+            if idnum in seen:
+                return
+            seen.add(idnum)
+        node = ref.get_object()
+        t = node.get("/T")
+        name = (("%s.%s" % (prefix, t)) if prefix else _acro_str(t)) if t is not None else prefix
+        inh = {
+            "ft": node.get("/FT", inherited.get("ft")),
+            "ff": node.get("/Ff", inherited.get("ff")),
+            "opt": node.get("/Opt", inherited.get("opt")),
+        }
+        kids = node.get("/Kids")
+        kids = list(kids.get_object()) if kids is not None else []
+        field_kids = [k for k in kids if "/T" in k.get_object()]
+        if field_kids:
+            for k in field_kids:
+                _walk(k, name, inh, depth + 1)
+            return
+        if not name or inh["ft"] is None:
+            return
+        widgets = [k.get_object() for k in kids] if kids else [node]
+        ft = str(inh["ft"])
+        ff = int(inh["ff"] or 0)
+        if ft == "/Tx":
+            ftype = "text"
+        elif ft == "/Ch":
+            ftype = "choice"
+        elif ft == "/Btn":
+            if ff & _FF_PUSHBUTTON:
+                return
+            ftype = "radio" if ff & _FF_RADIO else "checkbox"
+        else:
+            return
+        states = []
+        if ftype in ("checkbox", "radio"):
+            for w in widgets:
+                for s in _acro_ap_states(w):
+                    if s not in states:
+                        states.append(s)
+            if ftype == "radio":
+                states = [s for s in states if s != "/Off"]
+            elif "/Off" not in states:
+                states.insert(0, "/Off")
+        options = _acro_opt_values(inh["opt"]) if ftype == "choice" else []
+        tu = node.get("/TU")
+        v = node.get("/V")
+        out.append({
+            "name": name,
+            "field_type": ftype,
+            "states": states,
+            "options": options,
+            "tooltip": (_acro_str(tu).strip() or None) if tu is not None else None,
+            "value": None if v is None else _acro_str(v),
+            "widget_as": [_acro_str(w.get("/AS")) for w in widgets if w.get("/AS") is not None],
+        })
+
+    for ref in top:
+        _walk(ref, "", {}, 0)
+    return out
+
+
+def _match_choice(value, field):
+    """The field's OWN spelling for ``value`` (trimmed, case-insensitive), or None."""
+    v = str(value).strip().casefold()
+    if field["field_type"] in ("checkbox", "radio"):
+        bare = v[1:] if v.startswith("/") else v
+        for s in field["states"]:
+            if s == "/Off":
+                continue
+            if s.lstrip("/").casefold() == bare:
+                return s
+        return None
+    for opt in field["options"]:
+        if opt.strip().casefold() == v:
+            return opt
+    return None
+
+
+def _refused_sentence(field):
+    label = field.get("tooltip") or field["name"]
+    return "The answer for “%s” isn't one of this form's choices, so it was left blank." % label
+
+
+def _write_values(writer, values):
+    writer.update_page_form_field_values(None, values, auto_regenerate=False)
+
+
+def fill_acroform(template_path, flat_values, out_path):
+    from pypdf import PdfReader, PdfWriter
+    from pypdf.generic import NameObject
+
+    fields = _read_acroform(template_path)
+    if not fields:
+        # A flat PDF handed back unchanged would be a blank form passed off as filled (D-29).
+        return {
+            "rendered": False,
+            "error": "This PDF has no fillable fields, so none of the answers could be written into it.",
+            "refused": [],
+            "readback_mismatch": [],
+            "non_latin": False,
+        }
+    by_name = {f["name"]: f for f in fields}
+    values = {}
+    refused = []
+    # 291 UAT S6b: a refused answer is LEFT BLANK, as its sentence says. A form that already
+    # carried a value there (a dropdown's default) would otherwise show that default under
+    # "left blank". Cleared fields are written empty (a choice) or Off (a box) and read back.
+    cleared = {}
+    for key, raw in (flat_values or {}).items():
+        field = by_name.get(key)
+        if field is None:
+            continue
+        text = "" if raw is None else str(raw)
+        ftype = field["field_type"]
+        if ftype == "text":
+            if text == "":
+                continue
+            values[key] = text
+            continue
+        if ftype == "checkbox":
+            word = text.strip().casefold()
+            on = next((s for s in field["states"] if s != "/Off"), None)
+            if word in _CHECKBOX_FALSE:
+                values[key] = "/Off"
+                continue
+            matched = _match_choice(text, field)
+            if matched is None and word in _CHECKBOX_TRUE:
+                matched = on
+            if matched is None:
+                refused.append({"field": key, "sentence": _refused_sentence(field)})
+                cleared[key] = "/Off"
+                continue
+            values[key] = matched
+            continue
+        # radio / choice: empty means no answer; anything else must be one of the field's own.
+        if text.strip() == "":
+            continue
+        matched = _match_choice(text, field)
+        if matched is None:
+            refused.append({"field": key, "sentence": _refused_sentence(field)})
+            cleared[key] = "/Off" if ftype == "radio" else ""
+            continue
+        values[key] = matched
+
+    writer = PdfWriter(clone_from=PdfReader(template_path))
+    if values or cleared:
+        _write_values(writer, {**cleared, **values})
+    writer.set_need_appearances_writer(True)
+    acro = writer._root_object.get("/AcroForm")
+    if acro is not None:
+        acro = acro.get_object()
+        if "/XFA" in acro:
+            del acro[NameObject("/XFA")]
+    with open(out_path, "wb") as fh:
+        writer.write(fh)
+
+    # D-29: read back every written value (/V, and /AS on every button widget).
+    back = {f["name"]: f for f in _read_acroform(out_path)}
+    mismatch = []
+    for key, want in values.items():
+        got = back.get(key)
+        if got is None:
+            mismatch.append(key)
+            continue
+        if got["field_type"] in ("checkbox", "radio"):
+            ases = got["widget_as"]
+            if want == "/Off":
+                ok = (got["value"] in (None, "/Off")) and all(a == "/Off" for a in ases)
+            else:
+                ok = got["value"] == want and want in ases
+        else:
+            ok = got["value"] == want
+        if not ok:
+            mismatch.append(key)
+    for key, want in cleared.items():
+        got = back.get(key)
+        if got is None:
+            continue
+        if want == "/Off":
+            ok = (got["value"] in (None, "/Off")) and all(a == "/Off" for a in got["widget_as"])
+        else:
+            ok = got["value"] in (None, "")
+        if not ok:
+            mismatch.append(key)
+
+    non_latin = any(
+        by_name[k]["field_type"] in ("text", "choice") and any(ord(ch) > 255 for ch in v)
+        for k, v in values.items()
+    )
+    result = {
+        "rendered": True,
+        "error": None,
+        "refused": refused,
+        "readback_mismatch": mismatch,
+        "non_latin": non_latin,
+    }
+    _FILL_RESULTS[out_path] = result
+    return result
+
+
+def _pdf_documented_limit(fill):
+    parts = []
+    refused = fill.get("refused") or []
+    if refused:
+        n = len(refused)
+        head = (
+            "1 answer wasn't one of the form's choices and was left blank: "
+            if n == 1
+            else "%d answers weren't one of the form's choices and were left blank: " % n
+        )
+        parts.append(head + " ".join(r["sentence"] for r in refused))
+    if fill.get("non_latin"):
+        parts.append(_NON_LATIN_LIMIT)
+    return " ".join(parts) or None
+
+
 def _hits(texts):
     out = []
     for txt in texts:
@@ -251,6 +537,9 @@ def residual_tags_in(out_path, fmt):
                     if isinstance(val, str):
                         texts.append(val)
         return _hits(texts)
+    if fmt == "pdf":
+        # A PDF form has no {{ }} markup: what stays unfilled is each REFUSED field, by name.
+        return [r["field"] for r in (_FILL_RESULTS.get(out_path) or {}).get("refused") or []]
     raise ValueError("residual_tags_in: unsupported fmt %r" % fmt)
 
 
@@ -286,6 +575,25 @@ def assert_integrity(out_path, fmt):
         has_chart = any(getattr(ws, "_charts", None) for ws in wb.worksheets)
         if has_chart:
             documented_limit = "openpyxl drops charts on save"
+    elif fmt == "pdf":
+        from pypdf import PdfReader
+
+        PdfReader(out_path).trailer["/Root"]  # raises if corrupt / won't open
+        fill = _FILL_RESULTS.get(out_path) or {}
+        mismatch = fill.get("readback_mismatch") or []
+        # A refused answer is a DOCUMENTED blank (golden-run safe), never a residual failure.
+        return {
+            "opened": not mismatch,
+            "rows": 0,
+            "residual_tags": residuals,
+            "residual_clean": True,
+            "documented_limit": _pdf_documented_limit(fill),
+            "refused": fill.get("refused") or [],
+            "error": (
+                "The filled form did not read back as written for: %s. It was not delivered."
+                % ", ".join(mismatch)
+            ) if mismatch else None,
+        }
     else:
         raise ValueError("assert_integrity: unsupported fmt %r" % fmt)
     return {
@@ -329,6 +637,9 @@ def main():
         elif engine == "run_replace":
             flat = _flat_scalars(field_map)
             render_res = run_replace_docx(template_path, flat, out_path)
+        elif engine == "acroform":
+            fmt = "pdf"
+            render_res = fill_acroform(template_path, _flat_scalars(field_map), out_path)
         else:
             verdict["error"] = "unknown engine %r" % engine
             print(json.dumps(verdict))
@@ -348,6 +659,10 @@ def main():
             verdict["residual_tags"] = integ.get("residual_tags") or []
             verdict["documented_limit"] = integ.get("documented_limit")
             verdict["rows"] = integ.get("rows", 0)
+            if integ.get("refused"):
+                verdict["refused"] = integ["refused"]
+            if integ.get("error"):
+                verdict["error"] = integ["error"]
         except Exception as exc:  # produced file is corrupt / won't re-open
             verdict["opened"] = False
             verdict["error"] = "integrity re-open failed: %s" % exc
@@ -369,25 +684,29 @@ if __name__ == "__main__":
 # structural second. A bad name falls back to a safe default so the happy path keeps
 # working (least-surprising — documented in _handle_render_template's docstring).
 
-_SAFE_OUT_FILENAME_RE = _re_filename.compile(r"^[A-Za-z0-9._ -]+\.(docx|pptx|xlsx)$")
-# The engine token is server-generated (select_engine) but we whitelist it before
-# interpolation anyway (defense-in-depth — CR-01 step 3).
-_VALID_RENDER_ENGINES = frozenset({"docxtpl", "run_replace"})
+_SAFE_OUT_FILENAME_RE = _re_filename.compile(r"^[A-Za-z0-9._ -]+\.(docx|pptx|xlsx|pdf)$")
+# The engine token is server-generated (select_engine, or "acroform" for a .pdf template —
+# Phase 291) but we whitelist it before interpolation anyway (defense-in-depth — CR-01 step 3).
+_VALID_RENDER_ENGINES = frozenset({"docxtpl", "run_replace", "acroform"})
 
 
 def _safe_out_filename(raw: str | None, template_ext: str) -> str:
-    """101-06 CR-01 — coerce a model-supplied out_filename to a SAFE OOXML basename.
+    """101-06 CR-01 — coerce a model-supplied out_filename to a SAFE basename.
 
-    Accepts a single basename matching ``^[A-Za-z0-9._ -]+\\.(docx|pptx|xlsx)$`` (no
+    Accepts a single basename matching ``^[A-Za-z0-9._ -]+\\.(docx|pptx|xlsx|pdf)$`` (no
     ``/`` ``\\`` ``..`` and no shell metacharacters ``; | & $ ( ) ` < > * ? '"``).
+    The returned extension is ALWAYS the template's (291 WR-03); the model picks only the stem.
     On reject, falls back to ``deliverable.<ext>`` using the TEMPLATE's extension
-    (always one of docx/pptx/xlsx; defaults to docx) so the happy path keeps working
+    (one of docx/pptx/xlsx/pdf; defaults to docx) so the happy path keeps working
     rather than failing the whole render on a cosmetic filename.
     """
+    ext = template_ext if template_ext in ("docx", "pptx", "xlsx", "pdf") else "docx"
     candidate = (raw or "").strip()
     if candidate and _SAFE_OUT_FILENAME_RE.match(candidate):
-        return candidate
-    ext = template_ext if template_ext in ("docx", "pptx", "xlsx") else "docx"
+        # 291 WR-03: the output kind is the template's kind, whatever name the model asked
+        # for. A Word template named "report.pdf" would render docx bytes into a .pdf and fail
+        # integrity, so the model's stem is kept and the extension follows the template.
+        return f"{candidate.rsplit('.', 1)[0]}.{ext}"
     return f"deliverable.{ext}"
 
 
@@ -566,6 +885,13 @@ async def _handle_render_template(args: dict, ctx: ToolContext) -> ToolResult:
     # `out_filename` is the SANITIZED value — it is what reaches the sandbox command,
     # the harvest match, and the workspace persist path.
     out_filename = _safe_out_filename(raw_out_filename, template_ext)
+
+    # Phase 291 (D-25): a fillable PDF is filled through its OWN fields. The engine follows the
+    # template's extension here; select_engine stays the docx provenance boundary, unchanged.
+    # The output of a PDF form is always a .pdf (_safe_out_filename ties every output's
+    # extension to the template's — 291 WR-03).
+    if template_ext == "pdf":
+        engine = "acroform"
 
     # ── 4. Render in the SEALED sandbox (Pitfall 4 / D-12 / D-13) ────────────────
     # No local-venv fallback — that would breach TMPL-03 (render MUST be sandboxed).

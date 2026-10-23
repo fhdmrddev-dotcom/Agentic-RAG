@@ -2984,3 +2984,17 @@ reuses 267-B's event-card shape.
 |---|------|----------------|--------|------|
 | 294 | rerank-engine-block | How the Reranking card shows the engine, its key, and that text leaves the server (select+footer / engine cards / off-local-hosted) | ★ B engine cards (operator, 2026-10-20) | phase-294, dec-01, settings, egress |
 | 294 | citation-check | Where the citation-check verdict sits on each cited sentence (marker carries verdict / sentence underline / margin gutter) | ★ A marker carries the verdict (operator, 2026-10-20) | phase-294, dec-03, citations |
+
+## Sketch 290 — The Team Picture (Phase 290, G-2 gate, VIS-01)
+
+| # | Name | Design Question | Winner | Tags |
+|---|------|----------------|--------|------|
+| 290 | team-picture | How a multi-agent workflow reads as a truthful team (org chart / office floor / layers), with no edge the definition lacks | ★ A org chart (operator, 2026-10-20) | phase-290, vis-01, seed-086, schema-truth |
+| 290 | card-chip-line | How the one step line reads on the shipped 179 C card (pills with step names / pills with step-type words / quiet numbered line) | ★ B pills, step-type words (operator, 2026-10-21) | phase-290, vis-04, seed-155, real-card-dom |
+
+## Sketch 291 — Describe It From Your Own Files (Phase 291, G-2 gate, D-22)
+
+| # | Name | Design Question | Winner | Tags |
+|---|------|----------------|--------|------|
+| 291 | describe-files | How the describe door's one-file row holds 1 template or form + up to 5 references, each with its reading (one row extended / two questions / one tray with roles) | ★ B two questions (operator, 2026-10-22) | phase-291, auth-02, seed-155, real-door-dom |
+| 291 | draft-removed | Where "Removed: …" and the fields→inputs mapping show when the draft lands (line on the card / third fold / ghost step in the list) | ★ A line on the card face (operator, 2026-10-22) | phase-291, auth-02, d-15, draft-arrival |

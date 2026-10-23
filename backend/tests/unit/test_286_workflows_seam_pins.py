@@ -36,6 +36,45 @@ DELIBERATE RE-BASELINE (Phase 288-04, 2026-10-19): plan 288-02 added ONE optiona
 The OpenAPI fixture and the ``PublishVerdict`` body hash were recaptured for that field alone;
 the diff was checked to be exactly +5 lines (the one property) and one hash. The route table
 fixture is byte-unchanged. A further change to either needs its own written reason here.
+
+DELIBERATE RE-BASELINE (Phase 291-01, 2026-10-22): AUTH-02's describe door added TWO routes —
+``POST /workflows/describe/read`` (the stateless file read, registered before the first
+``/{definition_id}`` pattern) and ``POST /workflows/{definition_id}/reference`` (beside the
+template upload) — and widened two moved handlers: ``upload_workflow_template`` (accepts a
+fillable ``.pdf``; an optional ``anchors`` form field binds a server-made Word fillable copy)
+and ``get_workflow_template_placeholders`` (one ``.pdf`` branch through the AcroForm oracle).
+``_EXPECTED_ROUTES`` was edited by hand to 17 entries, then ``PIN286_CAPTURE=1`` was run once and
+each fixture diff was read: ``workflows_routes.json`` +116 / −0 (the two route rows, the two
+``app`` slice rows, and ``anchors`` in the template door's ``body_params``);
+``workflows_openapi.json`` +397 / −1 (the two new paths, their two ``Body_*`` schemas,
+``DescribeReadResponse`` / ``DescribeField`` / ``DescribeUnplaced`` / ``ReferenceAssetRef``, the
+``anchors`` property, and the ONE replaced line: the template door's description, which gained
+its Phase 291 paragraph); ``workflows_moved_ast.json`` +2 / −2 (the ``body_sha256`` of
+``upload_workflow_template`` and of ``get_workflow_template_placeholders``; both decorator
+digests unchanged). ``_MOVE_SET`` stays 25: the new handlers are pinned in
+``test_291_describe_read_door.py``, not here.
+
+DELIBERATE RE-BASELINE (Phase 291-02, 2026-10-22): the generate body gained the describe
+door's files — ``GenerateRequest.form`` (``DescribeFormIn``) and ``GenerateRequest.references``
+(``list[DescribeReferenceIn]``, max 5) — and ``generate_workflow`` forwards both verbatim.
+``InputFieldSpec`` (reached from the ``/workflows`` sub-document) gained the optional
+``origin`` / ``note`` pair. ``PIN286_CAPTURE=1`` was run once and each fixture diff was read:
+``workflows_openapi.json`` +167 / −0 (the three new schemas ``DescribeFormFieldIn`` /
+``DescribeFormIn`` / ``DescribeReferenceIn``, the two ``GenerateRequest`` properties, and
+``InputFieldSpec``'s ``origin`` + ``note``); ``workflows_moved_ast.json`` +2 / −2 (the
+``body_sha256`` of ``GenerateRequest`` and of ``generate_workflow``; decorator digests
+unchanged); ``workflows_routes.json`` byte-unchanged (the capture rewrote only its line endings,
+restored). ``_MOVE_SET`` stays 25; the new request models are pinned in
+``test_291_generate_degraded.py``.
+
+DELIBERATE RE-BASELINE (Phase 291-06, 2026-10-23): gap round 1, CR-02. A common fillable PDF
+(250 fields, a 195-country dropdown) was dropped from generation without a word, so the body
+caps were raised: ``DescribeFormFieldIn.enum_options`` 50 → 500 and ``DescribeFormIn.fields``
+200 → 1000 (an aggregate 20,000-option model validator bounds the body and is invisible to
+OpenAPI). ``PIN286_CAPTURE=1`` was run once and each fixture diff was read:
+``workflows_openapi.json`` +2 / −2 (exactly the two ``maxItems`` values);
+``workflows_moved_ast.json`` and ``workflows_routes.json`` showed no numstat (the capture
+rewrote only their line endings, restored).
 """
 
 from __future__ import annotations
@@ -62,12 +101,14 @@ _AST_FIXTURE = _FIXTURES / "workflows_moved_ast.json"
 
 _CAPTURE = os.environ.get("PIN286_CAPTURE") == "1"
 
-#: The 15 routes ``workflows.router`` declares, as (method, path) — the non-vacuity floor.
+#: The 17 routes ``workflows.router`` declares, as (method, path) — the non-vacuity floor.
+#: (15 at 286; Phase 291-01 added ``/describe/read`` and ``/{definition_id}/reference``.)
 _EXPECTED_ROUTES = (
     ("GET", "/workflows/published"),
     ("GET", "/workflows/starters"),
     ("POST", "/workflows/validate"),
     ("GET", "/workflows/grounding-bundle"),
+    ("POST", "/workflows/describe/read"),
     ("POST", "/workflows/{definition_id}/publish"),
     ("POST", "/workflows"),
     ("GET", "/workflows/drafts"),
@@ -78,6 +119,7 @@ _EXPECTED_ROUTES = (
     ("POST", "/workflows/generate"),
     ("POST", "/workflows/template/placeholders"),
     ("POST", "/workflows/{definition_id}/template"),
+    ("POST", "/workflows/{definition_id}/reference"),
     ("GET", "/workflows/{definition_id}/template/placeholders"),
 )
 

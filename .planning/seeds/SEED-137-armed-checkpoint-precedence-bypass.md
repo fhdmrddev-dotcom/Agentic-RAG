@@ -35,6 +35,7 @@ priority: medium
 suggested_phase: "**FOLDED INTO PHASE 187 as SC#6 on 2026-07-31** (operator direction: plan it ahead, land it in any phase before 188). Originally suggested for 188 alongside the `action_risk_pending` consumer; the operator moved it EARLIER deliberately. Phase 187 is the right home on merit, not just on timing: its SC#3 claims the AI seed is 'safe-by-construction' and that a seeded grounded node auto-gets its gate — this seed is precisely the case where a governance gate is silently NOT applied, so shipping 187's claim over an unfixed precedence bypass would make that claim false in the one direction that matters. Phase 186 (Concurrency & Autosave) was the alternative on earliest-lands grounds and was NOT chosen: folding a governance-precedence fix into an autosave phase is off-topic scope-add, and there is no race between 186 and 187 because the re-open trigger (the Phase-103 background-job publish) is not scheduled in this milestone at all."
 surface: Agentic-RAG
 trigger_when: unset
+status_note: "FOLDED into 187 as SC#6. Phase 295 (295-03, D-08 + D-48) is its record for the post gate: the D-08 precedence test pins that an armed step whose citations gate pauses still asks the armed approval first, and the D-48 fix runs the engine citations gate after an author post ask_user Proceed, so an unsourced output cannot pass unmarked (test_295_found_nothing_choices.py). Drafts only today: publish still refuses author ask_user validators."
 ---
 
 # SEED-137 — the armed checkpoint's guarantee is positional, not structural

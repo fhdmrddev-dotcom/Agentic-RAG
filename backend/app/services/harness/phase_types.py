@@ -74,6 +74,8 @@ from app.services.harness.grounding import EXTERNAL_ACTION_CAPABILITIES
 # cannot close the harness_engine -> harness -> phase_types cycle. It owns every branch (D-16).
 from app.services.harness.phase_confidence import phase_confidence
 from app.services.harness.programmatic import PROGRAMMATIC_PHASE_REGISTRY
+# 295-03 (D-03): a pure leaf with no app imports, so it cannot close any cycle.
+from app.services.harness.run_handoff import handoff_text, phase_scope_ids, sub_agent_error_mark, sub_agent_text, surface_unless_engine_owns  # noqa: E501
 
 # 214.1-03 (BUG-260828-03) — ONE scrubber, TWO callers. ``_clean_label`` is the shipped
 # Unicode-category scrub + 72-char clamp for author- and model-authored strings, and the
@@ -180,10 +182,9 @@ def _prior_output_text(accumulated_outputs: dict) -> str:
     if not accumulated_outputs:
         return ""
     # dicts preserve insertion order; the engine inserts in phase_index order.
-    texts = [
-        (v.get("text") if isinstance(v, dict) else None)
-        for v in accumulated_outputs.values()
-    ]
+    # Phase 295 (D-10 / D-11 / D-46): a human step hands over its question AND answer, an
+    # unsourced output its note — the reading lives in ``run_handoff.handoff_text``.
+    texts = [handoff_text(v) for v in accumulated_outputs.values()]
     texts = [t for t in texts if t]
     if not texts:
         return ""
@@ -381,7 +382,9 @@ async def _surface_failure_message(ctx, run_id, reason, pool):
     """
     from app.services.harness_engine import _surface_failure_message as _engine_surface
 
-    return await _engine_surface(ctx, run_id, reason, pool)
+    # Phase 295 (D-23, BUG-261015-01): silenced while the engine owns the failure's words
+    # (the phase has validators, so it will retry or route and surface the cause ONCE).
+    return await surface_unless_engine_owns(ctx, run_id, reason, pool, _engine_surface)
 
 
 def _retry_suffix(ctx) -> str:
@@ -633,7 +636,7 @@ def _build_phase_tool_context(phase, ctx, *, model: str | None = None) -> ToolCo
     # never silently "fixes" an invalid scope — it only restricts to the declared subset.
     # Keep the channel a list (Pitfall 1: a set would raise in supabase-py json.dumps on
     # the RPC p_folder_ids param). None project subtree (unbound / Deep) → None (no narrowing).
-    _proj = getattr(ctx, "folder_subtree_ids", None)            # the resolved project subtree (or None)
+    _proj = phase_scope_ids(ctx, phase)  # the resolved project subtree, or a 295 folder re-run's override (or None)
     _phase_scope = getattr(phase.config, "folder_scope", None)  # PROJ-02 resolved id list (or None on non-retrieval phases)
     _effective = (
         [f for f in _proj if f in set(map(str, _phase_scope))]  # narrow-only ∩ — keep a list (Pitfall 1)
@@ -927,7 +930,10 @@ async def _exec_llm_agent(phase, accumulated_outputs: dict, ctx) -> dict:
     # SUMMARIZE phase's prose (the final phase has none of its own).
     agent_source_refs = result.get("source_refs") or []
     return {
-        "text": result["summary"],
+        # 295-REVIEW WR-01: an errored sub-agent keeps a fixed sentence, never the vendor body,
+        # and carries ONE mark the citations gate reads as an outage.
+        "text": sub_agent_text(result),
+        **sub_agent_error_mark([result]),
         "sub_run_id": str(result["sub_run_id"]),
         "source_refs": agent_source_refs,
         "citations": result.get("citations") or [],
@@ -1040,7 +1046,7 @@ async def _exec_llm_batch_agents(phase, accumulated_outputs: dict, ctx) -> dict:
     # itself across N concurrent coroutines on a plain dict.
     for _r in results:
         _record_run_usage(ctx, _r.get("input_tokens"), _r.get("output_tokens"))
-    summaries = [r["summary"] for r in results]
+    summaries = [sub_agent_text(r) for r in results]  # 295-REVIEW WR-01: never a vendor body
     sub_run_ids = [str(r["sub_run_id"]) for r in results]
 
     if phase.config.merge_strategy == "concat_numbered":
@@ -1068,6 +1074,7 @@ async def _exec_llm_batch_agents(phase, accumulated_outputs: dict, ctx) -> dict:
     )
     return {
         "text": merged,
+        **sub_agent_error_mark(results),  # 295-REVIEW WR-01: any errored branch is an outage
         "sub_run_ids": sub_run_ids,
         "source_refs": batch_source_refs,
         "citations": batch_citations,
@@ -1151,6 +1158,9 @@ def _template_oracle(src: dict) -> dict | None:
     the keys the template needs and the citation gate can validate coverage BEFORE
     the sandbox render. ``None`` (no oracle, behavior unchanged) for non-docx
     templates, unreadable bytes, or token-free files — never a crash."""
+    if str(src.get("filename") or "").lower().endswith(".pdf"):  # Phase 291: the form's own fields
+        from app.services.describe_files import acroform_oracle  # noqa: PLC0415
+        return acroform_oracle(src["bytes"]) if src.get("bytes") else None
     if not str(src.get("filename") or "").lower().endswith(".docx"):
         return None
     data = src.get("bytes")
@@ -1700,6 +1710,13 @@ async def _exec_llm_emit(phase, accumulated_outputs: dict, ctx) -> dict:
                     + list(legacy_map.get("collections", {}).keys())
                 )
             )
+            # Phase 291 (D-09): the person's own answers, each with a server-minted input:<key> id
+            # admitted to BOTH gates (here, and the handler's via resolved["retrieved_ids"]).
+            from app.services.harness.form_inputs import overlay_user_inputs  # noqa: PLC0415
+            legacy_map, input_ids = overlay_user_inputs(
+                legacy_map, definition, getattr(ctx, "inputs", None), placeholder_keys
+            )
+            retrieved_ids = set(retrieved_ids) | input_ids
             await _emit_phase_substep(ctx, phase, status="validating")  # citation/coverage gate + truncation guard
             gate = check_coverage(legacy_map, retrieved_ids, placeholder_keys)
             missing_keys = [k for k in placeholder_keys if k not in gate["covered_keys"]]
@@ -1910,6 +1927,11 @@ async def _exec_llm_emit(phase, accumulated_outputs: dict, ctx) -> dict:
                 f"Produced the filled deliverable: {path}" if path
                 else "Produced the filled deliverable."
             )
+            # 291 UAT S6b: a fill limit the engine stated (an answer that was not one of the
+            # form's choices, left blank) is said where the person reads the step, not dropped.
+            _limit = (render_out.get("verdict") or {}).get("documented_limit")
+            if _limit:
+                base_text = f"{base_text}\n\n{_limit}"
             # D-01: a non-strict policy delivery carries its summary VISIBLY in the chat
             # message (the user always SEES the deliverable is marked/blanked/DRAFT —
             # never a silent pass-off, T-102-04-03).

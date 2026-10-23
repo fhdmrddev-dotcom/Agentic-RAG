@@ -1,10 +1,12 @@
 import httpx
 from langsmith import traceable
 
+from app.services.rerank_engines.tracing import redact_inputs  # a traced call never records a key
+
 TAVILY_API_URL = "https://api.tavily.com/search"
 
 
-@traceable(name="web_search")
+@traceable(name="web_search", process_inputs=redact_inputs)
 def web_search(query: str, api_key: str, max_results: int = 5) -> str:
     """Search the web using Tavily and return formatted results with attribution."""
     with httpx.Client(timeout=10.0) as client:

@@ -53,6 +53,11 @@ from app.api.workflow_runs import _parse_instant
 from app.dependencies import canvas_caller, require_canvas
 from app.services import run_evidence as ev
 from app.services.harness.phase_confidence import KB_LABEL_DEFAULT, resolve_kb_label
+from app.services.harness.run_read_wire import (
+    END_REASON_AUDIT_KINDS,
+    UnsourcedMark,
+    resolve_end_reason,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -79,6 +84,11 @@ class RunEvidenceRun(BaseModel):
     model: str | None = None
     viewer_is_owner: bool
     thread_id: str | None = Field(default=None, description="The owner's thread; null for anyone else.")
+    # 295-05 (RUN-04 / D-22) — the run read's rule, off the same helper (run_read_wire).
+    end_reason: str | None = Field(
+        default=None,
+        description="Why a failed or cancelled run stopped, as recorded; null when nothing was.",
+    )
 
 
 class RunEvidenceDefinitionPhase(BaseModel):
@@ -135,6 +145,8 @@ class RunEvidenceLogEntry(BaseModel):
     failure_reason: str | None = None
     confidence: RunEvidenceConfidence | None = None
     human_input: RunEvidenceHumanInput | None = None
+    # 295-05 (RUN-01 / D-04) — {continued_by: <viewer-aware words>, at: <ISO>}; never an id.
+    unsourced: UnsourcedMark | None = None
 
 
 class RunEvidenceVerdict(BaseModel):
@@ -329,6 +341,18 @@ async def read_run_evidence(
     )
     steps = ev.step_numbers(phase_log)
 
+    # 295-05 (D-22): the failed steps' reasons come off the composed log (no second parse);
+    # the audit is read only when none was recorded there, and a failed read is "none".
+    failed_reasons = [e["failure_reason"] for e in phase_log if e["status"] == "failed"]
+    end_reason = resolve_end_reason(run["status"], failed_reasons, [])
+    if end_reason is None and run["status"] in ("failed", "cancelled"):
+        end_rows = await _optional(
+            "end reason", run_id, pool.fetch(_AUDIT_SQL, run_id, list(END_REASON_AUDIT_KINDS))
+        )
+        end_reason = resolve_end_reason(
+            run["status"], failed_reasons, [dict(r) for r in (end_rows or [])]
+        )
+
     file_id = None
     path = ev.deliverable_path(phase_rows)
     if viewer_is_owner and path is not None:
@@ -353,6 +377,7 @@ async def read_run_evidence(
             model=run.get("model"),
             viewer_is_owner=viewer_is_owner,
             thread_id=str(run["thread_id"]) if viewer_is_owner and run.get("thread_id") else None,
+            end_reason=end_reason,
         ),
         definition=RunEvidenceDefinition(**definition),
         definition_changed=RunEvidenceDefinitionChanged(**changed),

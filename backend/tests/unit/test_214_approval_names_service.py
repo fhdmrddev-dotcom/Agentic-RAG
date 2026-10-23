@@ -41,6 +41,7 @@ import pytest
 
 from app.models.harness import PhaseSpec
 from app.services import connector_service, harness_engine
+from app.services.harness import engine_ask
 from app.services.connector_service import ConnectorDisabled
 
 # ══════════════════════════════════════════════════════════════════════════════════
@@ -175,14 +176,26 @@ def _drive(
     org_id: str | None = ORG_ID,
     golden: bool = False,
     fetch_error: BaseException | None = None,
+    approve: bool = False,
 ) -> _Drive:
     """Run ONE armed checkpoint through the REAL engine and return the record.
 
     ``row`` is what the injected ``_fetch_connection_row`` returns — ``None`` models a
     connection that is absent or belongs to another org, which the resolver refuses
     indistinguishably (``ConnectorNotFound``).
+
+    Phase 295 (D-18, plan 295-03): the armed ask PAUSES DURABLY now, over the in-memory
+    world in ``tests/unit/engine_ask_fakes.py`` — the sentence still reaches ``ctx.emit`` as
+    the ``ask_user_prompt`` prompt, which is what every case here reads. ``approve=True`` then
+    answers the card the way ``POST /ask_user_response`` persists it and re-drives the phase,
+    which is where the approval RECEIPT is written (the ledger cases).
     """
+    from contextlib import ExitStack
+
+    from tests.unit.engine_ask_fakes import FakePool, World
+
     rec = _Drive()
+    world = World(phase.slug)
 
     async def _fetch(connection_id, fetch_org_id):
         rec.fetch_calls.append((str(connection_id), str(fetch_org_id)))
@@ -190,34 +203,44 @@ def _drive(
             raise fetch_error
         return row
 
-    ctx = SimpleNamespace(
-        supabase=None,
-        thread_id=None,
-        current_user={"id": uuid4()},
-        producer_run_id=uuid4(),
+    ctx = world.ctx(
         emit=rec.emit,
-        retry_feedback=None,
         org_id=org_id,
         inputs=dict(inputs or {}),
         is_golden_run=golden,
     )
 
-    approve = {"kind": "response", "response_text": harness_engine._ACTION_RISK_APPROVE_CHOICE}
+    approval = {"kind": "response", "response_text": harness_engine._ACTION_RISK_APPROVE_CHOICE}
+    run_id, audit_user, pool = uuid4(), uuid4(), FakePool()
 
-    with patch.object(harness_engine, "_execute_phase", rec.body), \
-         patch.object(harness_engine, "write_audit", rec.write_audit), \
-         patch.object(harness_engine, "_emit", AsyncMock()), \
-         patch.object(connector_service, "_fetch_connection_row", _fetch), \
-         patch.object(connector_service, "get_cipher", lambda: object()), \
-         patch("app.services.ask_user_service.subscribe_for_response",
-               AsyncMock(return_value=approve)):
-        asyncio.run(
+    def _once():
+        return asyncio.run(
             harness_engine._run_phase_with_gates(
                 phase, dict(accumulated or {}), ctx,
-                run_id=uuid4(), pool=object(), redis=object(),
-                wall_clock=30, _audit_user_id=uuid4(), total_phases=1,
+                run_id=run_id, pool=pool, redis=object(),
+                wall_clock=30, _audit_user_id=audit_user, total_phases=1,
             )
         )
+
+    with ExitStack() as stack:
+        world.enter(stack, emit=False, audit=False, subscribe=False)
+        for p in (
+            patch.object(harness_engine, "_execute_phase", rec.body),
+            patch.object(harness_engine, "write_audit", rec.write_audit),
+            patch.object(engine_ask, "write_audit", rec.write_audit),
+            patch.object(harness_engine, "_emit", AsyncMock()),
+            patch.object(engine_ask, "_emit", AsyncMock()),
+            patch.object(connector_service, "_fetch_connection_row", _fetch),
+            patch.object(connector_service, "get_cipher", lambda: object()),
+            patch("app.services.ask_user_service.subscribe_for_response",
+                  AsyncMock(return_value=approval)),
+        ):
+            stack.enter_context(p)
+        outcome = _once()
+        if approve and outcome is not None and outcome.kind == "pause_run" \
+                and world.prompt_rows():
+            ctx.resume_answered_tool_call_id = world.answer(approval["response_text"])
+            _once()
     return rec
 
 
@@ -608,6 +631,7 @@ def _ledger_drive() -> tuple[_Drive, str]:
         row=_mcp_row(tools=[THREE_SOURCE_TOOL]),
         inputs={"who": asked},
         accumulated={"draft": {"text": "the renewal draft"}},
+        approve=True,
     )
     assert asked in rec.prompt, "the drive is vacuous — the value never reached the pause"
     assert rec.audit_calls, "the drive is vacuous — no audit row was written at all"

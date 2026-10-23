@@ -113,7 +113,10 @@ export function ChatLaunchForm({
       data-testid="chat-launch-form"
       className="fixed inset-0 z-[9000] grid place-items-center bg-black/60 p-6 backdrop-blur-sm"
     >
-      <div className="w-[min(560px,92%)] overflow-hidden rounded-lg border border-border bg-card shadow-lg">
+      {/* 291 UAT S6: a 23-field form (the IRS W-9) was 1561px tall in a 639px window and the
+          panel did not scroll, so Run could not be reached. The panel is capped at the window
+          and only the questions scroll; the title and the Run button stay in view. */}
+      <div className="flex max-h-[calc(100dvh-3rem)] w-[min(560px,92%)] flex-col overflow-hidden rounded-lg border border-border bg-card shadow-lg">
         <div className="flex items-center justify-between gap-2 border-b border-border px-5 py-4">
           <h2 className="truncate text-[17px] font-semibold text-foreground">
             Run {workflowName}
@@ -129,7 +132,7 @@ export function ChatLaunchForm({
           </button>
         </div>
 
-        <div className="flex flex-col gap-4 px-5 py-4">
+        <div data-testid="chat-launch-body" className="flex min-h-0 flex-1 flex-col gap-4 overflow-y-auto px-5 py-4">
           {/* The one honest sentence about WHY there is a form here: the workflow declared these,
               and this run cannot supply them from anywhere else. It says what is asked, not what
               will be done with it — the run's own record is where that belongs. */}

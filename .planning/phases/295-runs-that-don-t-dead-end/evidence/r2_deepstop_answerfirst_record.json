@@ -1,0 +1,59 @@
+{
+  "net": [
+    {
+      "t": "2026-10-21T04:49:02.638Z",
+      "m": "POST",
+      "u": "/threads/1b10a5b9-7365-44e2-aac9-902af5f972e4/messages",
+      "s": 201,
+      "b": "{\"message_id\":\"68191271-97e7-4dbe-b234-78f8c402b518\",\"run_id\":\"4e4fe26a-7231-4c45-96a2-e40b4daf2344\",\"model\":\"deepseek-v4-flash\",\"provider\":\"deepseek\"}"
+    },
+    {
+      "t": "2026-10-21T04:49:07.780Z",
+      "m": "POST",
+      "u": "/runs/4e4fe26a-7231-4c45-96a2-e40b4daf2344/ask_user_response",
+      "s": 200,
+      "b": "{\"status\":\"ok\"}"
+    },
+    {
+      "t": "2026-10-21T04:49:07.782Z",
+      "m": "DELETE",
+      "u": "/runs/4e4fe26a-7231-4c45-96a2-e40b4daf2344",
+      "s": 204,
+      "b": ""
+    }
+  ],
+  "slot": [
+    {
+      "t": "2026-10-21T04:49:06.192Z",
+      "tag": "before",
+      "stop": 1,
+      "stopping": 0,
+      "not_confirmed": 0
+    }
+  ],
+  "sent_at": "2026-10-21T04:49:01.504Z",
+  "card_s": 3,
+  "card_ok": true,
+  "stop_controls_before": {
+    "composer_stop": 1,
+    "panel_stop": 0,
+    "tray_stop": 0
+  },
+  "answer_at": "2026-10-21T04:49:06.844Z",
+  "stop_at": "2026-10-21T04:49:07.554Z",
+  "observer": [
+    {
+      "t": "2026-10-21T04:49:06.837Z",
+      "k": "stop=1 stopping=0 notconf=0"
+    },
+    {
+      "t": "2026-10-21T04:49:07.638Z",
+      "k": "stop=0 stopping=1 notconf=0"
+    },
+    {
+      "t": "2026-10-21T04:49:08.433Z",
+      "k": "stop=0 stopping=0 notconf=0"
+    }
+  ],
+  "main_tail": "olour do you prefer?\" with the options Red and Blue. Wait for my answer, then reply with one sentence naming my choice.\n\ncancelled — no output yet\n\nUse the ask_user tool to ask me exactly one question: \"Which colour do you prefer?\" with the options Green and Yellow. Wait for my answer, then reply with one sentence naming my choice.\n\ncancelled — no output yet\n\nUse the ask_user tool to ask me exactly one question: \"Which colour do you prefer?\" with the options Purple and Orange. Wait for my answer, then reply with one sentence naming my choice.\n\nRun · 1 step\ndeepseek-v4-flash\n⏱\n5.7s\n■ cancelled\nThought for 1 second\ncancelled — no output yet\nResponse stopped\nAsk a person\nopen panel ↗\nWhich colour do you prefer?\nYou answered Purple\nRun a workflow\nUSING:\nAll your documents\ndeepseek\ndeepseek-v4-flash\nGeneral\nEnter ↵ · Shift+Enter for newline\n\nAI can make mistakes. Verify important information."
+}

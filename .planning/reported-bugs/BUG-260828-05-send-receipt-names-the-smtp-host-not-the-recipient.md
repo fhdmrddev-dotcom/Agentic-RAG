@@ -8,7 +8,7 @@ folded_into: null
 reported: 2026-08-28
 reported_by: operator, driving Phase 214's G-4 checkpoint
 affected_areas: [backend/app/services/harness/phase_types.py, run-surfaces]
-re_open_trigger: n/a — open
+re_open_trigger: "A phase whose scope is the external_action receipt or SEED-223. Reviewed at 295 discuss (2026-10-20) and left: RUN-03 changes what the judge is told, not what the receipt records."
 ---
 # "Destination: smtp.gmail.com" answers the wrong question
 

@@ -46,6 +46,8 @@ except ImportError:  # pragma: no cover — langsmith always installed in prod
             return fn
         return _wrap
 
+from app.services.rerank_engines.tracing import redact_inputs  # a traced call never records a key
+
 if TYPE_CHECKING:
     from app.models.user_settings import UserEffectiveSettings
 
@@ -166,7 +168,7 @@ def _anthropic_client(api_key: str, timeout_s: float | None) -> anthropic.Anthro
 # asserts the decorator resolves to the real langsmith.traceable, not
 # the no-op fallback stub at lines 38-42. Live trace fetch is a manual
 # UAT row per the CLAUDE.md UAT scoreboard rule (Plan 05 Wave 0).
-@_ls_traceable(name="ChatAnthropic", run_type="llm")
+@_ls_traceable(name="ChatAnthropic", run_type="llm", process_inputs=redact_inputs)
 def stream_anthropic(
     messages: list[dict],
     tools: list[dict],

@@ -196,6 +196,29 @@ RETIRED: dict[str, str] = {
         "slicing a whole list; its JSON output is pinned BYTE-IDENTICAL to the pre-284 algorithm by "
         "test_284_view_resolve.py::test_the_agent_answer_is_byte_identical_to_pre_284."
     ),
+    "_RENDER_DRIVER_SRC": (
+        "Phase 291 (291-03, D-25, 2026-10-22): deliberate post-move edit. The sealed driver gains "
+        "an 'acroform' engine (fill a fillable PDF by field name, validate against the field's own "
+        "states/options, drop /XFA, read every value back) plus pdf arms in residual_tags_in and "
+        "assert_integrity. Pinned now by test_291_pdf_fill_driver.py."
+    ),
+    "_SAFE_OUT_FILENAME_RE": (
+        "Phase 291 (291-03, D-25, 2026-10-22): deliberate post-move edit. The output-name "
+        "allow-list admits .pdf beside docx/pptx/xlsx. Pinned now by test_291_pdf_fill_driver.py."
+    ),
+    "_VALID_RENDER_ENGINES": (
+        "Phase 291 (291-03, D-25, 2026-10-22): deliberate post-move edit. The engine whitelist "
+        "admits 'acroform'. Pinned now by test_291_pdf_fill_driver.py."
+    ),
+    "_safe_out_filename": (
+        "Phase 291 (291-03, D-25, 2026-10-22): deliberate post-move edit. The fallback "
+        "extension list admits pdf (deliverable.pdf). Pinned now by test_291_pdf_fill_driver.py."
+    ),
+    "_handle_render_template": (
+        "Phase 291 (291-03, D-25, 2026-10-22): deliberate post-move edit. A .pdf template picks "
+        "engine 'acroform' and its output name is forced to .pdf; select_engine is unchanged. "
+        "Pinned now by test_291_pdf_fill_driver.py."
+    ),
 }
 
 _EXPECTED_FAMILY_COUNTS = {

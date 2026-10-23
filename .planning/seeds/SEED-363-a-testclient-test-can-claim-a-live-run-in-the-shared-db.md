@@ -5,7 +5,7 @@ created: 2026-10-19
 surface: Agentic-RAG
 status: planted
 partial: false
-status_note:
+status_note: "Measured twice more in Phase 295 (295-07, 2026-10-21). (1) The two historical stuck runs 51924c91 / a77ed2c0 were ended cancelled at 2026-10-20 23:22:22Z, before the 295-04 merge, with the signature of 295-04's new reconciler sweep and no line in the :8000 log: a test process in the 295-04 worktree booted the lifespan against the local DB. (2) 295-07's own tests/unit gate, started ~00:38:40Z, re-drove a live run (6ec2f298) at 00:40:08Z: a second phase_started and a model=unknown resume shell. Any worktree run of tests/unit while live runs exist can terminalize or re-drive them. 295-VALIDATION.md S7."
 trigger_when: "The next phase touching backend/app/main.py's lifespan, the resume sweep (resume_stranded_workflows) or the run reconciler; or the next time a live drive and a backend test suite share the local DB."
 trigger_paths: ["backend/app/main.py", "backend/tests/conftest.py", "backend/app/services/run_reconciler.py"]
 trigger_surfaces: ["harness", "workflow"]

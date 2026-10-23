@@ -185,6 +185,14 @@ export const BLOCKED_SENTENCE: Record<string, string> = {
   draft_changed:
     "Blocked at the last step — the draft changed while it was being checked",
   /**
+   * Phase 295-02 (RUN-02 · UI-SPEC E.3) — the structure stage now refuses a workflow that is
+   * MISSING something it needs (a fill step with no template), not only one whose shape is
+   * broken. The headline says the run never started, and the shipped lint row below it
+   * carries the server's own sentence naming what is missing. No component change.
+   */
+  lint:
+    "Blocked before the trial run — the workflow is missing something it needs, named below. Nothing was run.",
+  /**
    * ── BUG-260815-06, THE HALF A CLIENT CAN CLOSE (2026-08-20) ─────────────────────────
    *
    * The report's fifth requirement, verbatim: *"Distinguish 'the run failed' from 'the

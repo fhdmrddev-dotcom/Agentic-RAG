@@ -1791,10 +1791,14 @@ async def get_unanswered_ask_user(pool: asyncpg.Pool, run_id: UUID) -> dict | No
     ``tool_calls->0->>'run_id'`` and the response row carries the matching ``tool_call_id``,
     so the scope is the WHERE clause (pool reads bypass RLS): the caller has already passed
     the id+user_id ownership select for this run.
+
+    295-05 (D-37): ``created_at`` (the prompt row's own time) and the payload's
+    ``engine_pause`` ride the result, so the caller computes "the window passed" from the
+    prompt's deadline and names an engine pause's phase, never inferring either from status.
     """
     row = await pool.fetchrow(
         """
-        SELECT m.tool_calls
+        SELECT m.tool_calls, m.created_at
         FROM messages m
         JOIN workflow_runs wr ON wr.thread_id = m.thread_id
         WHERE wr.id = $1
@@ -1822,6 +1826,8 @@ async def get_unanswered_ask_user(pool: asyncpg.Pool, run_id: UUID) -> dict | No
         "prompt": payload.get("prompt"),
         "options": payload.get("options"),
         "timeout_seconds": payload.get("timeout_seconds"),
+        "created_at": row.get("created_at"),
+        "engine_pause": payload.get("engine_pause"),
     }
 
 
@@ -2255,10 +2261,36 @@ async def pause_run(pool: asyncpg.Pool, workflow_run_id: UUID) -> None:
     CALLER (the engine reached this run through an owner-scoped kickoff or an
     owner-scoped, anchor-confirmed answer), the same division ``cancel_active_phases``
     keeps.
+
+    ⚠ PHASE 295 (D-50 / RESEARCH Pitfall 1): THE SAME UPDATE RELEASES THE CLAIM LEASE
+    (``claimed_at = NULL``). ``claim_run`` matches only an unset or expired lease, and nothing
+    else ever cleared it, so a SECOND pause answered within ``harness_resume_lease_seconds`` of a
+    re-drive failed its claim and nothing re-drove the durable answer until the next boot. A
+    paused run has no producer, so it holds no lease.
     """
     await pool.execute(
-        "UPDATE workflow_runs SET status = 'paused' WHERE id = $1 AND status NOT IN ('completed', 'failed', 'cancelled')",
+        "UPDATE workflow_runs SET status = 'paused', claimed_at = NULL WHERE id = $1 AND status NOT IN ('completed', 'failed', 'cancelled')",
         workflow_run_id,
+    )
+
+
+async def stash_awaiting_answer(pool: asyncpg.Pool, phase_id: UUID, awaiting: dict) -> None:
+    """Stash an engine ask's re-drive state on the ACTIVE phase row (Phase 295 / D-40).
+
+    Written under ONE nested key, ``output._awaiting_answer``, and nowhere else: the top-level
+    keys of the active row's output are left as they are, so no reader of ``output["text"]``
+    sees the produced-but-unaccepted output, and ``_is_llm_human_input`` (which keys on a
+    top-level ``tool_call_id``) stays False. A non-object output is replaced by ``{}`` first,
+    because ``jsonb_set`` cannot set a path inside a scalar.
+
+    ``WHERE id = $1 AND status = 'active'``: a step that already ended (a Stop on another
+    worker) is never written. PHASE-KEYED write. Pass the plain dict, never ``json.dumps`` (the
+    ``record_phase_not_sent`` / 200.1 binding).
+    """
+    await pool.execute(
+        "UPDATE workflow_phases SET output = jsonb_set(CASE WHEN jsonb_typeof(output) = 'object' THEN output ELSE '{}'::jsonb END, '{_awaiting_answer}', $2::jsonb), updated_at = now() WHERE id = $1 AND status = 'active'",
+        phase_id,
+        awaiting,
     )
 
 
@@ -2318,7 +2350,7 @@ async def get_ask_user_response(
     """
     row = await pool.fetchrow(
         """
-        SELECT r.tool_calls
+        SELECT r.tool_calls, p.tool_calls AS prompt_tool_calls
         FROM messages r
         JOIN workflow_runs wr ON wr.thread_id = r.thread_id
         JOIN messages p
@@ -2342,9 +2374,18 @@ async def get_ask_user_response(
         return None
     tcs = row["tool_calls"] or []
     payload = tcs[0] if tcs else {}
+    # 295-REVIEW CR-01: the question this answers (the joined prompt row), so a consumer can
+    # refuse an answer to someone else's question. Additive.
+    ptcs = row.get("prompt_tool_calls") or []
+    prompt = ptcs[0] if ptcs and isinstance(ptcs[0], dict) else {}
     return {
         "response_text": payload.get("response_text"),
         "choice_index": payload.get("choice_index"),
+        # Phase 295 (D-03): the folder an engine ask's "Search another folder" answer chose.
+        # Additive — None on every older row.
+        "folder_id": payload.get("folder_id"),
+        "prompt": prompt.get("prompt"),
+        "engine_pause": isinstance(prompt.get("engine_pause"), dict),
     }
 
 

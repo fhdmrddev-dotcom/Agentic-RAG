@@ -1141,9 +1141,138 @@ describe("builderStore — setDeclaredInputs writes meta.inputs (Phase 214.1)", 
   })
 })
 
+// ── Phase 291-04 (D-07) — the describe door's reference files, appended beside the template ──
+
+describe("builderStore — addReferenceAssets appends reference entries (Phase 291-04)", () => {
+  const template = { kind: "template" as const, asset_id: "u/_library/d/form.pdf", filename: "form.pdf", mime: "application/pdf" }
+  function ref(name: string) {
+    return { kind: "reference" as const, asset_id: `u/_library/d/${name}`, filename: name, mime: "text/plain" }
+  }
+
+  it("appends kind=reference entries after whatever is already there, and arms dirty", () => {
+    const store = createBuilderStore(draft())
+    store.getState().setTemplateAsset(template)
+    store.getState().markSaved()
+    expect(store.getState().dirty).toBe(false)
+
+    store.getState().addReferenceAssets([ref("terms.md"), ref("notes.txt")])
+
+    expect(store.getState().meta.assets).toEqual([template, ref("terms.md"), ref("notes.txt")])
+    expect(store.getState().dirty).toBe(true)
+  })
+
+  it("de-duplicates by asset_id — the same reference bound twice is stored once", () => {
+    const store = createBuilderStore(draft())
+    store.getState().addReferenceAssets([ref("terms.md")])
+    store.getState().addReferenceAssets([ref("terms.md"), ref("notes.txt")])
+    store.getState().addReferenceAssets([ref("notes.txt"), ref("notes.txt")])
+
+    const ids = (store.getState().meta.assets as Array<{ asset_id: string }>).map((a) => a.asset_id)
+    expect(ids).toEqual(["u/_library/d/terms.md", "u/_library/d/notes.txt"])
+  })
+
+  it("PRESERVES the template entry — and a later setTemplateAsset preserves the references", () => {
+    const store = createBuilderStore(draft())
+    store.getState().addReferenceAssets([ref("terms.md")])
+    store.getState().setTemplateAsset(template)
+    store.getState().addReferenceAssets([ref("notes.txt")])
+
+    const assets = store.getState().meta.assets as Array<{ kind: string }>
+    expect(assets.filter((a) => a.kind === "template")).toHaveLength(1)
+    expect(assets.filter((a) => a.kind === "reference")).toHaveLength(2)
+  })
+
+  it("treats a NON-ARRAY assets value as empty, never spreads it", () => {
+    const store = createBuilderStore({ ...draft(), assets: "corrupt" as unknown as never })
+    store.getState().addReferenceAssets([ref("terms.md")])
+    expect(store.getState().meta.assets).toEqual([ref("terms.md")])
+  })
+
+  it("an EMPTY list writes nothing and arms nothing", () => {
+    const store = createBuilderStore(draft())
+    const metaBefore = store.getState().meta
+    store.getState().addReferenceAssets([])
+    expect(store.getState().meta).toBe(metaBefore)
+    expect(store.getState().dirty).toBe(false)
+  })
+
+  it("a non-drafted builder is a NO-OP, like every meta-writing sibling", () => {
+    const store = createBuilderStore(null)
+    const metaBefore = store.getState().meta
+    store.getState().addReferenceAssets([ref("terms.md")])
+    expect(store.getState().meta).toBe(metaBefore)
+    expect(store.getState().dirty).toBe(false)
+  })
+
+  it("is UNTRACKED — an undo never takes a reference away", () => {
+    const store = createBuilderStore(draft())
+    const depthBefore = past(store).length
+    store.getState().addReferenceAssets([ref("terms.md")])
+    expect(past(store)).toHaveLength(depthBefore)
+  })
+})
+
 describe("builderStore — zero network calls across the entire suite (D-184-03)", () => {
   it("the fetch spy recorded exactly 0 calls", () => {
     expect(fetchSpy).not.toHaveBeenCalled()
     expect(fetchSpy.mock.calls).toHaveLength(0)
+  })
+})
+
+// ── Phase 291-05 (D-09) — the inputs fold's flip, through ONE action ──────────────────────
+
+describe("builderStore — setInputSource flips ONE input's source (Phase 291-05)", () => {
+  const INPUTS = [
+    { key: "country", label: "Country", type: "enum", enum_options: ["US", "CA"], source: "user", origin: "ai_proposed", note: null, required: true },
+    { key: "start_date", label: "Start date", type: "date", source: "user", origin: "server_added", note: "kept", required: false },
+  ]
+  function withInputs() {
+    return { ...draft(), inputs: structuredClone(INPUTS) }
+  }
+
+  it("changes only that input's source, keeps every other member and every other input, and arms dirty", () => {
+    const store = createBuilderStore(withInputs())
+    store.getState().markSaved()
+    store.getState().setInputSource("country", "kb_auto")
+    expect(store.getState().meta.inputs).toEqual([{ ...INPUTS[0], source: "kb_auto" }, INPUTS[1]])
+    expect(store.getState().dirty).toBe(true)
+    store.getState().setInputSource("country", "user")
+    expect(store.getState().meta.inputs).toEqual(INPUTS)
+  })
+
+  it("an UNKNOWN key is a no-op — nothing written, nothing armed", () => {
+    const store = createBuilderStore(withInputs())
+    store.getState().markSaved()
+    const metaBefore = store.getState().meta
+    store.getState().setInputSource("nope", "kb_auto")
+    expect(store.getState().meta).toBe(metaBefore)
+    expect(store.getState().dirty).toBe(false)
+  })
+
+  it("the SAME source is a no-op, so a click on the selected segment arms no save", () => {
+    const store = createBuilderStore(withInputs())
+    store.getState().markSaved()
+    const metaBefore = store.getState().meta
+    store.getState().setInputSource("country", "user")
+    expect(store.getState().meta).toBe(metaBefore)
+    expect(store.getState().dirty).toBe(false)
+  })
+
+  it("a NON-ARRAY inputs value and a non-drafted builder are both no-ops", () => {
+    const corrupt = createBuilderStore({ ...draft(), inputs: "corrupt" as unknown as never })
+    const before = corrupt.getState().meta
+    corrupt.getState().setInputSource("country", "kb_auto")
+    expect(corrupt.getState().meta).toBe(before)
+    const idle = createBuilderStore(null)
+    const idleBefore = idle.getState().meta
+    idle.getState().setInputSource("country", "kb_auto")
+    expect(idle.getState().meta).toBe(idleBefore)
+  })
+
+  it("is UNTRACKED — an undo restores steps, never an input's source", () => {
+    const store = createBuilderStore(withInputs())
+    const depthBefore = past(store).length
+    store.getState().setInputSource("country", "kb_auto")
+    expect(past(store)).toHaveLength(depthBefore)
   })
 })

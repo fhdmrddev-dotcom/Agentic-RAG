@@ -4,9 +4,9 @@ title: A validated emit failure writes N+1 chat messages that disagree on the at
 reported: 2026-10-15
 surface: Agentic-RAG
 severity: minor
-status: open
+status: folded
 affected_areas: [backend/harness, chat]
-folded_into: null
+folded_into: "295"
 verified_closed_by: null
 related_seeds: []
 re_open_trigger: "The next phase whose files_modified names backend/app/services/harness/phase_types.py or backend/app/services/harness_engine.py, OR any report of a workflow run's chat thread showing the same failure more than once."
@@ -40,3 +40,7 @@ Suppress the executor's per-invocation surface while the engine will still retry
 set in `_run_phase_with_gates` while `attempt < phase_max_retries`, read by `_surface_failure_message`),
 so the engine's final message is the only one and equals the gauntlet's cause. Needs a test that counts
 the thread's assistant rows for one failed run (expect 1).
+
+## Phase 295 record (295-07, 2026-10-21)
+
+Addressed by 295-04 (D-23: `claim_failure_message` / `surface_unless_engine_owns`; one failed validated emit writes ONE message, driven through the real loop in `test_295_truthful_run_ends.py`). Not driven live by 295-07 (no emit-failure plant). Not closed (verifier's call).

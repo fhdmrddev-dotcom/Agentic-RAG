@@ -204,7 +204,9 @@ def resolve_authoring_model(settings) -> str | None:
     ``emit_workflow_definition`` shot is guaranteed forceable.
 
     Resolution order:
-      1. ``settings.harness_authoring_model`` if set.
+      1. ``settings.harness_authoring_model`` if set — the Settings control (migration 212) when
+         ``settings`` is the owner's effective settings, the env value when it is the app config.
+      1b. else ``HARNESS_AUTHORING_MODEL`` (the env override, kept so existing deploys don't move).
       2. else the first registry default in ``("claude-opus-4-8", "gpt-5.5")`` whose
          ``get_model_capability(candidate).get("forced_emission")`` is truthy.
       3. else ``None`` (the caller emits an honest "no authoring model resolved" failure).
@@ -214,6 +216,10 @@ def resolve_authoring_model(settings) -> str | None:
         return model
 
     from app.config import get_model_capability  # function-local (Pitfall 4 discipline)
+    from app.config import settings as env_settings  # function-local (Pitfall 4 discipline)
+
+    if env_settings.harness_authoring_model:
+        return env_settings.harness_authoring_model
 
     for candidate in ("claude-opus-4-8", "gpt-5.5"):
         cap = get_model_capability(candidate) or {}
@@ -262,6 +268,8 @@ async def _assemble_grounding(
     project_folder_id: str | None,
     template_asset_id: str | None = None,
     template_placeholders: list[str] | None = None,
+    degraded_out: set[str] | None = None,  # 291-02 D-20: filled with bundle.degraded; arity stays 3
+    placeholders_in_form_block: bool = False,  # 291 R1-WR-02: names grounded by reference
 ) -> tuple[str, set[str], set[str]]:
     """Assemble the server-side grounding bundle and return ``(grounded_prompt,
     tool_names, skill_ids)``. All accessors are OWNER-scoped reads; the valid folder /
@@ -288,7 +296,11 @@ async def _assemble_grounding(
         template_asset_id=template_asset_id,
         template_placeholders=template_placeholders,
     )
-    grounded = render_grounding_prompt(bundle, project_folder_id)
+    grounded = render_grounding_prompt(
+        bundle, project_folder_id, placeholders_in_form_block=placeholders_in_form_block
+    )
+    if degraded_out is not None:
+        degraded_out.update(bundle.degraded)
     return grounded, bundle.tool_names, bundle.skill_ids
 
 
@@ -660,6 +672,13 @@ async def generate_workflow_definition(
     # An ``or None`` / ``or []`` anywhere on this path turns one into the other — the same
     # ``0``-vs-``null`` family this project documents on ``WorkflowRunPhase.step_count``.
     allowed_connection_ids: list[str] | None = None,
+    # ── Phase 291-02 (AUTH-02) — the author's FILES: one form read and up to five references ──
+    # ``None`` for both is today's path EXACTLY (byte-identical prompt, no guard, no extra
+    # call). Either one present means files were supplied: their text reaches the model only as
+    # fenced user-turn data, and every power in the draft is then checked against the ticks plus
+    # a description-only call — with files, ``allowed_connection_ids is None`` grants NOTHING.
+    form: dict | None = None,
+    references: list[dict] | None = None,
 ) -> dict:
     """Generate ONE grounded ``WorkflowDefinition`` draft from an NL description.
 
@@ -693,12 +712,31 @@ async def generate_workflow_definition(
 
     Provider-call budget (REQ-2 a/b): EXACTLY one call on a valid first emit; EXACTLY two
     (attempt 1 then 2, no third) on a first-pass ValidationError; each call emits one
-    ``nl_generation_attempt`` structured-log event.
+    ``nl_generation_attempt`` structured-log event. Phase 291-02: at most three drafting calls
+    (one more when a form's fields are left uncovered), plus at most one description-only power
+    call when files are attached and the draft carries a power.
     """
     from app.config import get_model_capability  # function-local
+    from app.services import describe_draft_guards as ddg  # function-local (Pitfall 4)
     from app.services.forced_emit import forced_emit  # function-local
 
-    authoring_model = resolve_authoring_model(settings)
+    # The gateway resolves the provider key + active provider from a per-USER settings
+    # object (``UserEffectiveSettings.active_provider``) — NOT the app-level ``Settings``.
+    # The judge (publish_service) loads owner settings the same way. Passing the app
+    # ``Settings`` straight through made the forced shot raise
+    # ``AttributeError('active_provider')`` inside the gateway → the backstop reported a
+    # generic ``provider_error`` and NL authoring silently failed (UAT-103 live fix).
+    from app.models.user_settings import load_user_settings  # function-local (Pitfall 4)
+
+    try:
+        owner_settings = load_user_settings(user_id)
+    except Exception:  # noqa: BLE001 — reported below, after the model check, as before
+        owner_settings = None
+
+    # Migration 212: the Settings control wins when set; unset keeps the passed settings' value
+    # (HARNESS_AUTHORING_MODEL) and then the registry defaults, exactly as before.
+    chosen = getattr(owner_settings, "harness_authoring_model", "") if owner_settings is not None else ""
+    authoring_model = chosen if isinstance(chosen, str) and chosen else resolve_authoring_model(settings)
     if authoring_model is None:
         return {
             "ok": False,
@@ -713,24 +751,26 @@ async def generate_workflow_definition(
             "detail": f"no provider for authoring model {authoring_model!r}",
         }
 
-    # The gateway resolves the provider key + active provider from a per-USER settings
-    # object (``UserEffectiveSettings.active_provider``) — NOT the app-level ``Settings``.
-    # The judge (publish_service) loads owner settings the same way. Passing the app
-    # ``Settings`` straight through made the forced shot raise
-    # ``AttributeError('active_provider')`` inside the gateway → the backstop reported a
-    # generic ``provider_error`` and NL authoring silently failed (UAT-103 live fix).
-    from app.models.user_settings import load_user_settings  # function-local (Pitfall 4)
-
-    try:
-        owner_settings = load_user_settings(user_id)
-    except Exception:  # noqa: BLE001 — no resolvable user settings → honest fail, never a crash
+    if owner_settings is None:  # no resolvable user settings → honest fail, never a crash
         return {
             "ok": False,
             "error": "could_not_generate",
             "detail": "no user settings resolved for the authoring call",
         }
 
+    files_supplied = form is not None or bool(references)
+    fields = list((form or {}).get("fields") or [])
+    # A fillable arm's keys ARE the template's own fields (an exact read or a server-placed Word
+    # copy), so they ground the deliverable exactly as a template's placeholders do.
+    # 291 R1-WR-02: those keys are file-derived, and they already sit escaped in the form's
+    # <form_fields> block, so the grounding refers to that block instead of relisting them.
+    placeholders_in_form_block = False
+    if form is not None and form.get("arm") in ddg.FILLABLE_ARMS and fields and template_placeholders is None:
+        template_placeholders = [str(f["key"]) for f in fields]
+        placeholders_in_form_block = True
+
     project_id_str = str(project_folder_id) if project_folder_id is not None else None
+    degraded: set[str] = set()
     grounded_prompt, tool_names, skill_ids = await _assemble_grounding(
         supabase=supabase,
         pool=pool,
@@ -738,7 +778,20 @@ async def generate_workflow_definition(
         project_folder_id=project_id_str,
         template_asset_id=str(template_asset_id) if template_asset_id is not None else None,
         template_placeholders=template_placeholders,
+        degraded_out=degraded,
+        placeholders_in_form_block=placeholders_in_form_block,
     )
+    # D-20 / SEED-133 — a registry we could not read is refused in the gate's own words, never a
+    # silent blind draft, and BEFORE any paid call.
+    if degraded:
+        from app.services.harness.grounding import grounding_unavailable_finding  # function-local
+
+        return {
+            "ok": False,
+            "error": "could_not_generate",
+            "reason_code": "grounding_unavailable",
+            "detail": grounding_unavailable_finding(frozenset(degraded))["message"],
+        }
 
     # ── Phase 214 (STEP-06) — THE VOCABULARY, RESOLVED SERVER-SIDE, THEN SPENT TWICE ──────
     #
@@ -757,10 +810,18 @@ async def generate_workflow_definition(
         _render_vocabulary_block(allowed_vocabulary) if allowed_connection_ids is not None else ""
     )
 
+    # D-13 / D-35 — files are fenced DATA at the TOP of the USER turn, task last; never in the
+    # system prompt (it reaches 2 of 8 providers, SEED-327). No files ⇒ "" ⇒ byte-identical.
+    documents_block = (
+        ddg.render_documents_block(form, references, provider=provider, model=authoring_model)
+        if files_supplied
+        else ""
+    )
     base_messages = [
         {
             "role": "user",
-            "content": grounded_prompt
+            "content": documents_block
+            + grounded_prompt
             + "\n\n"
             + vocabulary_block
             + "## The task to author\n"
@@ -809,6 +870,14 @@ async def generate_workflow_definition(
                 "detail": res2.get("failure") or "model_failed_to_emit",
             }
 
+    # 291-02 D-10 / D-12 — ONE coverage retry naming the uncovered fields; its emission is kept
+    # only when it validates and covers strictly more. A separate budget (≤ 3 drafting calls).
+    if fields and ddg.coverage_score(wd, fields) != (0, 0):
+        res3 = await _shot(base_messages + ddg.coverage_retry_messages(wd, fields), 3 if res1.get("emitted") is None else 2)
+        retry_wd = res3.get("emitted")
+        if retry_wd is not None and ddg.coverage_score(retry_wd, fields) < ddg.coverage_score(wd, fields):
+            wd = retry_wd
+
     # Grounding fidelity (only on a non-None wd) — distinct from model_validate.
     fidelity = await _check_grounding_fidelity(
         wd, supabase=supabase, user_id=user_id, tool_names=tool_names, skill_ids=skill_ids
@@ -827,6 +896,42 @@ async def generate_workflow_definition(
     # a runnable or partial draft). ``allowed_connection_ids is None`` short-circuits inside
     # ``_check_allowed_connections``, so the unconstrained path reaches this line and leaves it
     # having done nothing.
+    #
+    # ── 291-02 (D-14 / D-15 / D-31) — THE POWERS GUARD runs FIRST, and only when files came in.
+    # ⚠ WHY BEFORE THE VOCABULARY REFUSAL: on the fast door's ``[]`` ticks a FILE-planted step
+    # must be REMOVED and told (D-15), not refuse the whole draft. A step the DESCRIPTION asked
+    # for survives the guard and then meets today's refusal unchanged.
+    removed: list[dict] = []
+    if files_supplied and ddg.draft_powers(wd):
+        names_vocabulary = await _resolve_allowed_vocabulary(
+            supabase=supabase, user_id=user_id, allowed_connection_ids=ddg.external_connection_ids(wd)
+        )
+        try:  # the description ALONE — never file text — so a file cannot widen the allow-set
+            powers = ddg.powers_from_emit(
+                await forced_emit(
+                    messages=ddg.describe_powers_messages(
+                        describe, [str(m.get("name") or "") for m in names_vocabulary.values()]
+                    ),
+                    model=authoring_model,
+                    provider=provider,
+                    emitter="emit_describe_powers",
+                    tools=[ddg.DESCRIBE_POWERS_TOOL],
+                    user_settings=owner_settings,
+                    schema_model=ddg.DescribePowers,
+                    strict=False,
+                )
+            )
+        except Exception:  # noqa: BLE001 — fail CLOSED: the allow-set is the ticks alone (D-31)
+            logger.warning("291 D-31: description-only power call failed; ticks only", exc_info=True)
+            powers = ddg.DescribePowers()
+        powers = ddg.narrow_to_description(powers, describe)  # 291 UAT S5: code must be named
+        guarded = ddg.remove_unasked_powers(
+            wd, powers, allowed_connection_ids, names_vocabulary, ddg.file_names(form, references)
+        )
+        if isinstance(guarded, dict):
+            return guarded
+        wd, removed = guarded
+
     vocabulary_refusal = _check_allowed_connections(wd, allowed_connection_ids, allowed_vocabulary)
     if vocabulary_refusal is not None:
         return vocabulary_refusal
@@ -842,6 +947,16 @@ async def generate_workflow_definition(
     # ⚠ It runs BEFORE the slug mint and the readiness verdict deliberately: the verdict
     # must describe the definition actually returned, and the definition actually returned
     # is the one whose asked arguments are declared.
+    #
+    # 291-02 D-12 — fields still uncovered become ask-the-person inputs; then origin/note are
+    # stamped server-side on EVERY generation (never read off the payload, T-291-13).
+    # 291 UAT S3-F4 — assets are bound by the author-time door, never written by the model. A
+    # model-emitted ref names a file by its filename (``asset_id: "fw9.pdf"``), so it points at
+    # no stored file and sat beside the real bound one. Dropped here, on every generation.
+    if wd.assets is not None:
+        wd = wd.model_copy(update={"assets": None})
+    wd, added_keys = ddg.server_add_missing(wd, fields)
+    wd = ddg.stamp_input_origins(wd, fields, added_keys)
     wd = _declare_asked_arguments(wd)
 
     # ── Phase 187 (VOCAB-01 / REQ-3, D-187-03) — stamp the name PROVENANCE.
@@ -861,13 +976,19 @@ async def generate_workflow_definition(
     #
     # This sits on the SINGLE success path, so a first-emit result and a retry-emit
     # result are stamped identically.
+    #
+    # 291 UAT S1 (2026-10-23): the same rebuild renumbers phase_index 0..N-1. A model that
+    # numbered from 1 (or left gaps) produced a draft that saved but could never publish
+    # ("phase_index must be contiguous 0..0, got [1]"). Order follows the model's own numbers,
+    # ties keep the emitted order, and slugs (what every cross-step reference uses) are untouched.
+    ordered = sorted(enumerate(wd.phases), key=lambda ip: (ip[1].phase_index, ip[0]))
     wd = wd.model_copy(
         update={
             "phases": [
                 p.model_copy(
-                    update={"name_seeded_by_ai": bool(p.name and p.name.strip())}
+                    update={"name_seeded_by_ai": bool(p.name and p.name.strip()), "phase_index": i}
                 )
-                for p in wd.phases
+                for i, (_pos, p) in enumerate(ordered)
             ]
         }
     )
@@ -1018,8 +1139,14 @@ async def generate_workflow_definition(
         )
     }
 
-    return {
+    result: dict = {
         "ok": True,
         "definition": wd.model_dump(mode="json"),
         "readiness": readiness,
     }
+    # 291-02 — additive keys, each ABSENT when empty (absence means absence, as readiness above).
+    if removed:
+        result["removed"] = removed
+    if fields:
+        result["fields"] = ddg.fields_report(wd, fields)
+    return result

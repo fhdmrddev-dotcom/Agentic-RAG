@@ -66,6 +66,22 @@ export async function setJudgeModel(model: string): Promise<FullAppSettings> {
   return updateSettings({ harness_judge_model: model })
 }
 
+/** Migration 212 — the workflow-drafting model, same shape as the judge pair. `options` are the
+ *  models that can draft (the server validates the save against the same rule). */
+export async function getAuthoringModel(): Promise<{ model: string; resolved: string | null; options: string[] }> {
+  const s = await getSettings()
+  return {
+    model: s.harness_authoring_model ?? "",
+    resolved: s.resolved_harness_authoring_model ?? null,
+    options: s.authoring_model_options ?? [],
+  }
+}
+
+/** Set the drafting model ("" clears back to the fallback). Returns the refreshed settings. */
+export async function setAuthoringModel(model: string): Promise<FullAppSettings> {
+  return updateSettings({ harness_authoring_model: model })
+}
+
 // ─────────────────────────────────────────────────────────────────────────────
 // Phase 167 VIS-02 (D-167-04) — the per-user default-model preference client.
 //

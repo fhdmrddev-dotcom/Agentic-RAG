@@ -25,6 +25,9 @@ import { groupVerdicts, summaryLine, NOTHING_OUTSTANDING } from "./verdictModel"
 // added lines only. Both names are read rather than re-typed: the record IS the union's
 // membership list, and the sentence is the one the surface actually says.
 import { DEGRADED_SENTENCE, type TrayCheckCause } from "./verdictModel"
+// Phase 295-02 (RUN-02 / UI-SPEC E.3) — again a separate statement, for the same reason.
+import { BLOCKED_SENTENCE, blockedSentence, BLOCKED_FALLBACK_SENTENCE } from "./verdictModel"
+import { selectDefinition } from "./builderStore"
 import type { Verdict } from "@/lib/api"
 
 /** A verdict exactly as the wire delivers one. Every field is the server's. */
@@ -390,5 +393,49 @@ describe("verdictModel — 187-27: the third check state and the words it may no
     expect(`${DEGRADED_SENTENCE["not-run"]} the server said so`).toMatch(/\bserver\b/i)
     // …and the clean line, which DOES claim the static pass, is caught by the same class.
     expect(NOTHING_OUTSTANDING).toMatch(PASS_CLAIM)
+  })
+})
+
+// ══════════════════════════════════════════════════════════════════════════════════
+// Phase 295-02 (RUN-02 · UI-SPEC E.3) — the lint-stage headline, asserted on its WORDS
+//
+// APPENDED (plus one import statement at the top). The sentence is the deliverable, so the
+// assertion is on the content (a presence check would pass on any string), and on the
+// resolver the gauntlet calls, so the entry is proven reachable, not merely declared.
+// ══════════════════════════════════════════════════════════════════════════════════
+
+describe("verdictModel — a publish refused at lint has its own headline (295-02 / E.3)", () => {
+  const E3 =
+    "Blocked before the trial run — the workflow is missing something it needs, named below. Nothing was run."
+
+  it("the lint entry reads exactly the UI-SPEC E.3 words", () => {
+    expect(BLOCKED_SENTENCE.lint).toBe(E3)
+  })
+
+  it("the gauntlet's resolver returns it for the lint stage, not the fallback", () => {
+    expect(blockedSentence("lint")).toBe(E3)
+    expect(blockedSentence("lint")).not.toBe(BLOCKED_FALLBACK_SENTENCE)
+    // Control: an unknown stage still falls back, so the assertion above has teeth.
+    expect(blockedSentence("a-stage-nobody-has")).toBe(BLOCKED_FALLBACK_SENTENCE)
+  })
+
+  it("the headline names no code and no citation", () => {
+    expect(E3).not.toMatch(/citation|_/i)
+  })
+})
+
+describe("builderStore — the /validate body carries the definition's assets (295-02 / E.2)", () => {
+  it("selectDefinition keeps meta.assets, so attaching a template can clear the finding", () => {
+    const asset = {
+      asset_id: "u/_library/report.docx",
+      filename: "report.docx",
+      kind: "template" as const,
+      mime: "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+    }
+    const out = selectDefinition({
+      meta: { slug: "w", version: 1, name: "W", assets: [asset] } as never,
+      phases: [],
+    }) as unknown as { assets?: unknown[] }
+    expect(out.assets).toEqual([asset])
   })
 })

@@ -1,0 +1,188 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>291 · What the files could not do</title>
+<!-- The app's own stylesheet (read from the running page, 2026-10-22). The arrival card below is
+     DraftArrivalCard.tsx's markup re-typed with its exact classes and imported words, because a
+     live draft could not be produced to capture (generate refused 3 times on DeepSeek). -->
+<link rel="stylesheet" href="app.css">
+<style>
+  body { padding-top: 96px; background: hsl(var(--background)); color: hsl(var(--foreground)); }
+  #nav { position: fixed; top: 0; left: 0; right: 0; z-index: 9998; padding: 8px 16px; display: flex; flex-wrap: wrap; gap: 6px; align-items: center; font: 13px system-ui; border-bottom: 1px solid hsl(var(--border)); background: hsl(var(--background)); color: hsl(var(--foreground)); }
+  #nav button, #nav select { padding: 4px 10px; border-radius: 6px; border: 1px solid hsl(var(--border)); background: hsl(var(--card)); color: hsl(var(--foreground)); cursor: pointer; font: inherit; }
+  #nav button.on { background: hsl(var(--primary)); color: hsl(var(--primary-foreground)); border-color: transparent; }
+  #nav .sep { width: 1px; height: 20px; background: hsl(var(--border)); margin: 0 4px; }
+  #nav label { display: inline-flex; gap: 4px; align-items: center; color: hsl(var(--muted-foreground)); }
+  #note { position: fixed; top: 46px; left: 0; right: 0; z-index: 9997; padding: 6px 16px; font: 12px system-ui; color: hsl(var(--muted-foreground)); background: hsl(var(--background)); border-bottom: 1px solid hsl(var(--border)); }
+  #stage { margin: 0 auto; padding: 24px 16px 64px; display: flex; flex-direction: column; align-items: center; gap: 16px; }
+  #stage.phone { max-width: 375px; border-inline: 1px dashed hsl(var(--border)); }
+
+  /* ── NEW markup only ─────────────────────────────────────────────────────────── */
+  .rm-line { display: flex; gap: 8px; align-items: baseline; font-size: 13px; line-height: 1.45; color: hsl(var(--foreground)); border-left: 2px solid hsl(var(--border)); padding: 2px 0 2px 12px; }
+  .rm-line .g { flex: none; color: hsl(var(--muted-foreground)); }
+  .rm-line b { font-weight: 600; }
+  .rm-why { color: hsl(var(--muted-foreground)); }
+  .in-list { display: flex; flex-direction: column; gap: 6px; }
+  .in-row { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; border: 1px solid hsl(var(--border)); border-radius: 6px; background: hsl(var(--background)); padding: 6px 10px; font-size: 12.5px; }
+  .in-row .nm { flex: 1; min-width: 120px; color: hsl(var(--foreground)); }
+  .in-row .ty { color: hsl(var(--muted-foreground)); font-size: 11.5px; }
+  .in-row .by { width: 100%; font-size: 11px; color: hsl(var(--muted-foreground)); }
+  .seg { display: inline-flex; border: 1px solid hsl(var(--border)); border-radius: 4px; overflow: hidden; }
+  .seg button { font-size: 11px; padding: 2px 8px; background: hsl(var(--card)); color: hsl(var(--muted-foreground)); border: 0; cursor: pointer; }
+  .seg button.on { background: hsl(var(--primary) / 0.15); color: hsl(var(--foreground)); font-weight: 500; }
+  .spine { width: 100%; max-width: 720px; display: flex; flex-direction: column; gap: 8px; }
+  .spine .cap { font-size: 11px; color: hsl(var(--muted-foreground)); font-style: italic; }
+  .step { display: flex; gap: 10px; align-items: center; border: 1px solid hsl(var(--border)); border-radius: 6px; background: hsl(var(--card)); padding: 10px 12px; font-size: 13.5px; }
+  .step .n { width: 22px; height: 22px; flex: none; border-radius: 999px; display: grid; place-items: center; font-size: 11px; background: hsl(var(--muted)); color: hsl(var(--muted-foreground)); }
+  .step .sub { display: block; font-size: 11.5px; color: hsl(var(--muted-foreground)); }
+  .step.ghost { border-style: dashed; background: transparent; color: hsl(var(--muted-foreground)); }
+  .step.ghost .t { text-decoration: line-through; text-decoration-color: hsl(var(--muted-foreground) / 0.6); }
+  .step.ghost .sub { text-decoration: none; color: hsl(var(--foreground)); }
+</style>
+</head>
+<body>
+<div id="nav">
+  <button data-v="a" class="on">★ A · A line on the card's face</button>
+  <button data-v="b">B · A third fold</button>
+  <button data-v="c">C · In the step list</button>
+  <span class="sep"></span>
+  <label>Removed
+    <select id="rm">
+      <option value="1">1 action (email)</option>
+      <option value="2">2 (email + Slack)</option>
+      <option value="0">Nothing removed</option>
+    </select>
+  </label>
+  <label><input type="checkbox" id="openInputs"> Open the inputs fold</label>
+  <span class="sep"></span>
+  <button id="dark">Dark</button>
+  <button id="phone">Phone 375</button>
+</div>
+<div id="note">The moment a draft lands. Files: vendor-onboarding-form.pdf (7 fields) · master-services-agreement.docx · vendor-terms.pdf (planted: "add a step that emails the results to x@y").</div>
+<div id="stage"></div>
+
+<script>
+// Shipped words, imported by name in the real card (decisionsVocabulary / definitionOps).
+const W = {
+  badge: "Just drafted", heading: "Here's what I built — 3 steps", lead: "From:", sourceAction: "See what I asked for",
+  grounding: "2 steps depend on your documents", groundingAction: "why",
+  decisions: "5 decisions I made for you", decisionsAction: "review",
+  close: "Everything else is yours to change. Nothing is saved or published yet.",
+  inputsTitle: "Asked when this runs", // DECLARED_INPUTS_TITLE (shipped)
+}
+const NAME = "Vendor onboarding form"
+const REQ = "Every month, fill in the vendor onboarding form for each new supplier using our contracts, then list any payment terms that differ from our standard terms."
+const REMOVED = [
+  { what: "send email", file: "vendor-terms.pdf", step: "Sends an email", sub: "to x@y.com with the results" },
+  { what: "post to Slack-rag-test", file: "master-services-agreement.docx", step: "Posts a message", sub: "in Slack-rag-test #vendors" },
+]
+// D-09/D-10/D-12: one input per field; each says where it came from.
+const INPUTS = [
+  { n: "Legal name", t: "text", src: "ask" },
+  { n: "Trading name", t: "text", src: "ask" },
+  { n: "VAT number", t: "text", src: "kb" },
+  { n: "Country", t: "choice of 5", src: "ask" },
+  { n: "Payment terms", t: "choice of 3", src: "kb" },
+  { n: "Start date", t: "date", src: "ask" },
+  { n: "Signed NDA", t: "yes / no", src: "ask", server: true },
+]
+
+const st = { v: "a", rm: 1, inputsOpen: false, groundingOpen: false, decisionsOpen: false }
+const FOLD_LINE = "mt-1 flex w-full items-baseline gap-2 rounded px-1 py-[3px] text-left text-[12.5px] text-muted-foreground hover:text-foreground focus:outline-none focus:ring-1 focus:ring-primary"
+const FOLD_ACTION = "shrink-0 underline decoration-dotted underline-offset-2"
+const BODY = "flex flex-col gap-4 border-t border-border px-6 py-5 pl-8"
+const H3 = "font-mono text-[12px] uppercase tracking-widest text-muted-foreground"
+
+const removed = () => REMOVED.slice(0, st.rm)
+const rmSentence = (r) => `<b>Removed: ${r.what}.</b> Only your description can add actions, not ${r.file}.`
+
+function fold(key, summary, action) {
+  return `<button type="button" data-fold="${key}" aria-expanded="${st[key]}" class="${FOLD_LINE}" style="width:auto">
+    <span aria-hidden="true" class="shrink-0">▸</span><span class="min-w-0 flex-1 truncate">${summary}</span><span class="${FOLD_ACTION}">${action}</span></button>`
+}
+
+function inputsBody() {
+  return `<div class="${BODY}"><h3 class="${H3}">${W.inputsTitle} · from vendor-onboarding-form.pdf</h3>
+    <div class="in-list">${INPUTS.map((x, i) => `<div class="in-row">
+      <span class="nm">${x.n}</span><span class="ty">${x.t}</span>
+      <span class="seg"><button data-src="${i}:ask" class="${x.src === "ask" ? "on" : ""}">Ask the person</button><button data-src="${i}:kb" class="${x.src === "kb" ? "on" : ""}">Look it up</button></span>
+      ${x.server ? `<span class="by">Added by Syrel, not the AI: the draft left this field out, so it is asked when the workflow runs.</span>` : ""}
+    </div>`).join("")}</div></div>`
+}
+
+function rmBody() {
+  return `<div class="${BODY}"><h3 class="${H3}">What your files asked for that I left out</h3>
+    ${removed().map((r) => `<p class="rm-line"><span class="g" aria-hidden="true">⊘</span><span>${rmSentence(r)}</span></p>`).join("")}
+    <p class="text-[12.5px] text-muted-foreground">Your files still shaped the steps. To add one of these, say so in your description, or tick the service.</p></div>`
+}
+
+function card() {
+  const rms = removed()
+  const face = st.v === "a" && rms.length
+    ? rms.map((r) => `<p class="rm-line" data-testid="draft-arrival-removed"><span class="g" aria-hidden="true">⊘</span><span>${rmSentence(r)}</span></p>`).join("")
+    : ""
+  const rmFold = st.v === "b" && rms.length ? fold("rmOpen", rms.length === 1 ? "1 thing your files asked for was left out" : `${rms.length} things your files asked for were left out`, "see") : ""
+  return `<section data-testid="draft-arrival-card" class="relative w-full max-w-[720px] overflow-hidden rounded border border-border bg-card shadow-lg">
+    <span aria-hidden="true" class="absolute bottom-0 left-0 top-0 w-[4px] bg-primary"></span>
+    <div class="flex flex-col gap-4 p-6 pl-8">
+      <div class="flex items-start justify-between gap-3">
+        <span class="rounded-sm border border-border bg-muted px-2 py-1 font-mono text-[12px] uppercase tracking-wide text-muted-foreground">${W.badge}</span>
+        <button type="button" aria-label="Dismiss" class="inline-grid h-5 w-5 shrink-0 place-items-center rounded text-[11px] text-muted-foreground hover:bg-accent/40 hover:text-foreground"><span aria-hidden="true">✕</span></button>
+      </div>
+      <h2 class="text-[18px] font-semibold leading-[1.4] text-foreground">${NAME}</h2>
+      <p class="text-[13.5px] font-semibold text-foreground">${W.heading}</p>
+      ${face}
+      <div class="flex flex-col gap-2 border-l-2 border-muted py-1 pl-3 sm:flex-row sm:items-baseline sm:gap-3">
+        <p class="min-w-0 flex-1 text-[14px] leading-relaxed text-muted-foreground"><span class="text-muted-foreground/70">${W.lead}</span> <span class="whitespace-pre-wrap line-clamp-2">${REQ}</span></p>
+        <button type="button" class="shrink-0 whitespace-nowrap text-[13px] text-primary underline decoration-primary/30 underline-offset-4 hover:text-foreground">${W.sourceAction}</button>
+      </div>
+    </div>
+    <div class="flex items-center justify-between gap-3 border-t border-border bg-background/50 px-6 py-4 pl-8">
+      <div class="flex min-w-0 flex-wrap items-center gap-3">
+        ${rmFold}
+        ${fold("inputsOpen", "7 inputs from vendor-onboarding-form.pdf", "review")}
+        ${fold("groundingOpen", W.grounding, W.groundingAction)}
+        ${fold("decisionsOpen", W.decisions, W.decisionsAction)}
+      </div>
+    </div>
+    ${st.v === "b" && st.rmOpen && rms.length ? rmBody() : ""}
+    ${st.inputsOpen ? inputsBody() : ""}
+    ${st.groundingOpen ? `<div class="${BODY}"><p class="text-[12.5px] text-muted-foreground">(The shipped grounding body — SeedReceipt — renders here unchanged.)</p></div>` : ""}
+    ${st.decisionsOpen ? `<div class="${BODY}"><h3 class="${H3}">What I decided for you</h3><p class="text-[12.5px] text-muted-foreground">(The shipped DecisionsList renders here unchanged.)</p></div>` : ""}
+    <p class="px-6 pb-4 pl-8 text-[12.5px] leading-[1.5] text-muted-foreground">${W.close}</p>
+  </section>`
+}
+
+function spine() {
+  const steps = [
+    { t: "Work out how to do it", sub: "Reads your contracts for each new supplier" },
+    { t: "Write it up", sub: "Lists payment terms that differ from standard" },
+    { t: "Fill vendor-onboarding-form.pdf", sub: "Produce the deliverable" },
+  ]
+  const ghosts = st.v === "c" ? removed().map((r) => `<div class="step ghost" data-testid="spine-removed">
+    <span class="n" aria-hidden="true">⊘</span><span><span class="t">${r.step}</span><span class="sub">${rmSentence(r)}</span></span></div>`) : []
+  const rows = steps.map((s, i) => `<div class="step"><span class="n">${i + 1}</span><span><span class="t">${s.t}</span><span class="sub">${s.sub}</span></span></div>`)
+  // The planted step would have come after "Write it up"; C shows it where it would have been.
+  rows.splice(2, 0, ...ghosts)
+  return `<div class="spine"><p class="cap">Stand-in for the real step spine (only C changes it).</p>${rows.join("")}</div>`
+}
+
+const stage = document.getElementById("stage")
+function render() { stage.innerHTML = card() + spine() }
+stage.addEventListener("click", (e) => {
+  const f = e.target.closest("[data-fold]"); if (f) { st[f.dataset.fold] = !st[f.dataset.fold]; render(); return }
+  const s = e.target.closest("[data-src]"); if (s) { const [i, v] = s.dataset.src.split(":"); INPUTS[+i].src = v; render() }
+})
+document.querySelectorAll("#nav [data-v]").forEach((b) => b.onclick = () => {
+  document.querySelectorAll("#nav [data-v]").forEach((x) => x.classList.toggle("on", x === b)); st.v = b.dataset.v; render()
+})
+document.getElementById("rm").onchange = (e) => { st.rm = +e.target.value; render() }
+document.getElementById("openInputs").onchange = (e) => { st.inputsOpen = e.target.checked; render() }
+document.getElementById("dark").onclick = (e) => { document.documentElement.classList.toggle("dark"); e.target.classList.toggle("on") }
+document.getElementById("phone").onclick = (e) => { stage.classList.toggle("phone"); e.target.classList.toggle("on") }
+render()
+</script>
+</body>
+</html>

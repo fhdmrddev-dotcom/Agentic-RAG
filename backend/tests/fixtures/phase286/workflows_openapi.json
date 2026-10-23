@@ -210,6 +210,53 @@
         }
       }
     },
+    "/workflows/describe/read": {
+      "post": {
+        "tags": [
+          "workflows"
+        ],
+        "summary": "Read Describe File",
+        "description": "Read ONE attached file before any draft exists, persisting nothing (D-04, D-06).\n\nThe 193.1 shape, copied rather than shared (the sibling's body is AST-pinned):\n**no Supabase client, no pool, no workflow id and no Storage path** — the bytes arrive\nin the request and the answer leaves in the response, so the cross-tenant Storage-read\nclass has nothing to attach to. ``test_291_describe_read_door.py`` sweeps this body.\n\nTHE GATES, in the shipped order: declared size before ``.read()``; the extension\n(``role=\"reference\"`` refuses ``.pptx``/``.xlsx``); empty / oversized body; the magic\nbytes via ``validate_upload`` (``%PDF-``, the OOXML container, text NUL-reject); and\nthe uncompressed-total cap for OOXML ONLY. A parse failure past the gates is a 422\n*\"The document could not be read.\"* — never the \"none\" arm (D-02's honesty ordering).\n\nThe settings read is the global cached app-settings read, not a caller-supplied path.\nThe echoed filename is the server-sanitised name.",
+        "operationId": "read_describe_file_workflows_describe_read_post",
+        "requestBody": {
+          "content": {
+            "multipart/form-data": {
+              "schema": {
+                "$ref": "#/components/schemas/Body_read_describe_file_workflows_describe_read_post"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DescribeReadResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ]
+      }
+    },
     "/workflows/{definition_id}/publish": {
       "post": {
         "tags": [
@@ -651,7 +698,7 @@
           "workflows"
         ],
         "summary": "Upload Workflow Template",
-        "description": "Upload a template and store it durably against a workflow the caller OWNS.\n\nThe order of the gates is load-bearing and each one is a decision:\n\n  1. **Owner-gate first** — ``_owned_slug_or_404`` is the SAME owner-scoped\n     ``created_by`` WHERE the delete/preview routes use, and its 404 is deliberately\n     indistinguishable from not-found: a 403 would confirm that a workflow exists\n     (no existence oracle). The workflow cluster reads through a service-role pool\n     which bypasses RLS, so this WHERE is the route's authorization boundary.\n  2. **The DECLARED part size, before the body is materialised** (workspace.py:250,\n     the WR-04 fix) — uvicorn/FastAPI impose no body cap, so ``.read()`` of a\n     multi-GB part would buffer it all in RAM.\n  3. **The extension**, before the body is read at all — a ``.png`` costs nothing.\n  4. **The magic bytes** via the shipped ``validate_upload`` — a renamed binary\n     wearing a ``.docx`` name never reaches Storage.\n\nNothing is persisted on any refusal: the single write is the LAST statement before\nthe return. The blocking supabase-py upload is ``run_in_threadpool``-wrapped\n(CLAUDE.md / D-v2.5-01).",
+        "description": "Upload a template and store it durably against a workflow the caller OWNS.\n\nThe order of the gates is load-bearing and each one is a decision:\n\n  1. **Owner-gate first** — ``_owned_slug_or_404`` is the SAME owner-scoped\n     ``created_by`` WHERE the delete/preview routes use, and its 404 is deliberately\n     indistinguishable from not-found: a 403 would confirm that a workflow exists\n     (no existence oracle). The workflow cluster reads through a service-role pool\n     which bypasses RLS, so this WHERE is the route's authorization boundary.\n  2. **The DECLARED part size, before the body is materialised** (workspace.py:250,\n     the WR-04 fix) — uvicorn/FastAPI impose no body cap, so ``.read()`` of a\n     multi-GB part would buffer it all in RAM.\n  3. **The extension**, before the body is read at all — a ``.png`` costs nothing.\n  4. **The magic bytes** via the shipped ``validate_upload`` — a renamed binary\n     wearing a ``.docx`` name never reaches Storage.\n\nNothing is persisted on any refusal: the single write is the LAST statement before\nthe return. The blocking supabase-py upload is ``run_in_threadpool``-wrapped\n(CLAUDE.md / D-v2.5-01).\n\nPhase 291 (D-25 / D-26) widens it twice, and no further: a fillable ``.pdf`` binds\nas-is (its AcroForm field names ARE the placeholders), and a ``.docx`` sent with\n``anchors`` binds as the server-made fillable COPY — ``describe_files.make_fillable_copy``\nwrites ``{{ key.value }}`` at each ticked blank and proves each appears exactly once.\nThe author's original bytes are never written anywhere. A refused copy, or one that\nplaced nothing, is a 422 with the server's sentence; ``anchors`` on anything but a\n``.docx`` is a 422.",
         "operationId": "upload_workflow_template_workflows__definition_id__template_post",
         "security": [
           {
@@ -687,6 +734,65 @@
               "application/json": {
                 "schema": {
                   "$ref": "#/components/schemas/TemplateAssetRef"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/workflows/{definition_id}/reference": {
+      "post": {
+        "tags": [
+          "workflows"
+        ],
+        "summary": "Upload Workflow Reference",
+        "description": "Store a reference document with a workflow the caller OWNS (Phase 291, D-05).\n\nThe template door's gates, in its order: owner-gate first (404 on non-owner, no\nexistence oracle), declared size, extension (``.pdf .docx .txt .md``), empty /\noversized body, magic bytes, and the zip-bomb cap for ``.docx``. The object lands at\n``{user_id}/_library/{definition_id}/{uuid8}-{safe_name}``, beside the template, and the\nreturned descriptor is written into ``definition.assets[]`` by the Builder's one draft\nsave — this route writes no row. References are NOT ingested into the Library (D-06).\nThe 1 + 5 limit (D-03) is counted by the describe door; this door stores one file.",
+        "operationId": "upload_workflow_reference_workflows__definition_id__reference_post",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "definition_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Definition Id"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "multipart/form-data": {
+              "schema": {
+                "$ref": "#/components/schemas/Body_upload_workflow_reference_workflows__definition_id__reference_post"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ReferenceAssetRef"
                 }
               }
             }
@@ -1013,6 +1119,29 @@
         "title": "BlockedStep",
         "description": "WHICH step of the AUTHOR'S OWN workflow stopped a publish, and why (BUG-260828-09).\n\n── WHY THIS IS A FIELD OF ITS OWN AND NOT ANOTHER ``named_failures`` ENTRY ────────────\n``named_failures`` is POLYMORPHIC across the gauntlet's stages and its consumers are\nrequired to detect shape PER ENTRY, never to switch on ``blocked_stage``\n(``PublishGauntlet.tsx`` docblock rule 4). Adding a sixth shape to that array would make\nevery consumer's detection set grow, and a refusal that leads the surface is exactly the\nthing that must not be reachable only by a successful shape guess. So the array is\nUNTOUCHED — every existing entry renders byte-for-byte as it did — and the step identity\nrides its own optional field.\n\n⚠ **``step_name`` IS ``None`` WHEN THE AUTHOR NAMED NOTHING, AND IS NEVER THE SLUG.**\nThat is property (1) of the report — *by the author's step name, never a slug or a stage\nindex* — enforced at the producer rather than trusted at the consumer. The client resolves\nthe visible face through ``phaseVocabulary.nodeTitle``, the shipped four-tier ladder whose\nstated floor is that the slug never appears in its output. ``step_slug`` and ``step_index``\nare carried for correlation (a run link, a canvas focus), NOT for display.\n\n⚠ **``cause`` LEADS AND ``reason`` IS DEMOTED — BOTH ARE SENT.** ``reason`` is the engine's\nverbatim sentence including its ``Phase {n} ({slug}) …:`` prefix; ``cause`` is that sentence\nwith the prefix removed. When the prefix does not match, ``cause`` IS ``reason``, so a\nsurface leading with ``cause`` can never render empty."
       },
+      "Body_read_describe_file_workflows_describe_read_post": {
+        "properties": {
+          "file": {
+            "type": "string",
+            "format": "binary",
+            "title": "File"
+          },
+          "role": {
+            "type": "string",
+            "enum": [
+              "form",
+              "reference"
+            ],
+            "title": "Role",
+            "default": "form"
+          }
+        },
+        "type": "object",
+        "required": [
+          "file"
+        ],
+        "title": "Body_read_describe_file_workflows_describe_read_post"
+      },
       "Body_read_template_placeholders_workflows_template_placeholders_post": {
         "properties": {
           "file": {
@@ -1027,12 +1156,37 @@
         ],
         "title": "Body_read_template_placeholders_workflows_template_placeholders_post"
       },
+      "Body_upload_workflow_reference_workflows__definition_id__reference_post": {
+        "properties": {
+          "file": {
+            "type": "string",
+            "format": "binary",
+            "title": "File"
+          }
+        },
+        "type": "object",
+        "required": [
+          "file"
+        ],
+        "title": "Body_upload_workflow_reference_workflows__definition_id__reference_post"
+      },
       "Body_upload_workflow_template_workflows__definition_id__template_post": {
         "properties": {
           "file": {
             "type": "string",
             "format": "binary",
             "title": "File"
+          },
+          "anchors": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Anchors"
           }
         },
         "type": "object",
@@ -1074,6 +1228,333 @@
         ],
         "title": "DeletePreview",
         "description": "The victim-naming sheet's exact Removed/Kept counts (D-LOCK-03). ``versions`` +\n``runs`` are Removed; ``threads`` are Kept (they become normal chats); ``in_flight``\nis the count of runs STILL LIVE — the honest signal the sheet's amber cancel-first\nbanner gates on (D-LOCK-05). Defaults to 0 so an older client that ignores it is\nunaffected (additive field)."
+      },
+      "DescribeField": {
+        "properties": {
+          "key": {
+            "type": "string",
+            "title": "Key"
+          },
+          "label": {
+            "type": "string",
+            "title": "Label"
+          },
+          "type": {
+            "type": "string",
+            "enum": [
+              "text",
+              "number",
+              "date",
+              "enum"
+            ],
+            "title": "Type"
+          },
+          "enum_options": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Enum Options"
+          },
+          "origin": {
+            "type": "string",
+            "enum": [
+              "exact",
+              "ai_proposed"
+            ],
+            "title": "Origin"
+          },
+          "line_before": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Line Before"
+          },
+          "line_after": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Line After"
+          },
+          "anchor_kind": {
+            "anyOf": [
+              {
+                "type": "string",
+                "enum": [
+                  "line",
+                  "cell"
+                ]
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Anchor Kind"
+          },
+          "anchor_label": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Anchor Label"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "key",
+          "label",
+          "type",
+          "origin"
+        ],
+        "title": "DescribeField",
+        "description": "One field found in an attached form.\n\n``origin`` is server-stamped: ``exact`` when the file DECLARES the field (a PDF AcroForm\nfield or a ``{{ }}`` token, so the key is the file's own name), ``ai_proposed`` when the\nread model named it (Word blanks, flat or scanned PDFs, D-01b/c). ``line_before`` /\n``line_after`` are the document's own line split around the blank (Word blanks, D-27)."
+      },
+      "DescribeFormFieldIn": {
+        "properties": {
+          "key": {
+            "type": "string",
+            "maxLength": 200,
+            "minLength": 1,
+            "title": "Key"
+          },
+          "label": {
+            "type": "string",
+            "maxLength": 200,
+            "title": "Label",
+            "default": ""
+          },
+          "type": {
+            "type": "string",
+            "enum": [
+              "text",
+              "number",
+              "date",
+              "enum"
+            ],
+            "title": "Type"
+          },
+          "enum_options": {
+            "items": {
+              "type": "string",
+              "maxLength": 200
+            },
+            "type": "array",
+            "maxItems": 500,
+            "title": "Enum Options"
+          },
+          "origin": {
+            "type": "string",
+            "enum": [
+              "exact",
+              "ai_proposed"
+            ],
+            "title": "Origin"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "key",
+          "type",
+          "origin"
+        ],
+        "title": "DescribeFormFieldIn"
+      },
+      "DescribeFormIn": {
+        "properties": {
+          "filename": {
+            "type": "string",
+            "maxLength": 255,
+            "title": "Filename"
+          },
+          "arm": {
+            "type": "string",
+            "enum": [
+              "template_fields",
+              "form_fields",
+              "suggested_fields",
+              "blanks",
+              "none",
+              "not_word",
+              "scan_unreadable",
+              "copy_refused"
+            ],
+            "title": "Arm"
+          },
+          "fields": {
+            "items": {
+              "$ref": "#/components/schemas/DescribeFormFieldIn"
+            },
+            "type": "array",
+            "maxItems": 1000,
+            "title": "Fields"
+          },
+          "text": {
+            "type": "string",
+            "maxLength": 250000,
+            "title": "Text",
+            "default": ""
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "filename",
+          "arm"
+        ],
+        "title": "DescribeFormIn"
+      },
+      "DescribeReadResponse": {
+        "properties": {
+          "role": {
+            "type": "string",
+            "enum": [
+              "form",
+              "reference"
+            ],
+            "title": "Role"
+          },
+          "arm": {
+            "type": "string",
+            "enum": [
+              "template_fields",
+              "form_fields",
+              "suggested_fields",
+              "blanks",
+              "none",
+              "not_word",
+              "scan_unreadable",
+              "copy_refused",
+              "reference"
+            ],
+            "title": "Arm"
+          },
+          "suggested_from": {
+            "anyOf": [
+              {
+                "type": "string",
+                "enum": [
+                  "text",
+                  "scan"
+                ]
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Suggested From"
+          },
+          "filename": {
+            "type": "string",
+            "title": "Filename"
+          },
+          "fields": {
+            "items": {
+              "$ref": "#/components/schemas/DescribeField"
+            },
+            "type": "array",
+            "title": "Fields"
+          },
+          "unplaced": {
+            "items": {
+              "$ref": "#/components/schemas/DescribeUnplaced"
+            },
+            "type": "array",
+            "title": "Unplaced"
+          },
+          "text": {
+            "type": "string",
+            "title": "Text",
+            "default": ""
+          },
+          "cut_short": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Cut Short"
+          },
+          "refused": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Refused"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "role",
+          "arm",
+          "filename"
+        ],
+        "title": "DescribeReadResponse",
+        "description": "What one attached file holds, read before any draft exists (D-04).\n\nA file that never opened is an HTTP 422 with a server sentence, never an arm: ``none``\nmeans only *opened, and no fields found* (D-02). ``filename`` is the server-sanitised\nname. ``cut_short`` / ``refused`` are server sentences the client renders verbatim."
+      },
+      "DescribeReferenceIn": {
+        "properties": {
+          "filename": {
+            "type": "string",
+            "maxLength": 255,
+            "title": "Filename"
+          },
+          "text": {
+            "type": "string",
+            "maxLength": 250000,
+            "title": "Text"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "filename",
+          "text"
+        ],
+        "title": "DescribeReferenceIn"
+      },
+      "DescribeUnplaced": {
+        "properties": {
+          "label": {
+            "type": "string",
+            "title": "Label"
+          },
+          "sentence": {
+            "type": "string",
+            "title": "Sentence"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "label",
+          "sentence"
+        ],
+        "title": "DescribeUnplaced",
+        "description": "A blank the server could not place exactly, and the server sentence saying so (D-28)."
       },
       "DraftCreateResponse": {
         "properties": {
@@ -1327,6 +1808,31 @@
               }
             ],
             "title": "Allowed Connection Ids"
+          },
+          "form": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/DescribeFormIn"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "references": {
+            "anyOf": [
+              {
+                "items": {
+                  "$ref": "#/components/schemas/DescribeReferenceIn"
+                },
+                "type": "array",
+                "maxItems": 5
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "References"
           }
         },
         "type": "object",
@@ -1457,6 +1963,40 @@
               }
             ],
             "title": "Folder Scope"
+          },
+          "origin": {
+            "anyOf": [
+              {
+                "type": "string",
+                "enum": [
+                  "ai_proposed",
+                  "server_added"
+                ]
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Origin"
+          },
+          "note": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Note"
+          },
+          "fills": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Fills",
+            "description": "The one form field key this input's answer fills, when the input's own key is not the field key. Each form field is filled by exactly one input."
           }
         },
         "additionalProperties": false,
@@ -2274,6 +2814,37 @@
         ],
         "title": "PublishedWorkflow",
         "description": "A picker row — the minimum the Deep/Harness toggle needs to list and start\na workflow (id to kick off via MessageCreate.workflow_definition_id; name +\nslug for display).\n\nPhase 103-06 (REQ-7 D9/D10): ``definition`` is ADDITIVE — the Workflows page\ncard derives its client-side strictness tier + phase chain from the real\ndefinition JSONB. It is optional so the pre-103 picker callers (the composer\nHarness dropdown) keep validating against the id/slug/name shape unchanged.\n\nPhase 192 (LIB-01 / D-04): ``is_mine`` + ``is_system_global`` are ADDITIVE and\nDEFAULTED, following the ``definition`` precedent — the 22 frontend references and\nthe three production consumers (``WorkflowsPage.tsx``, ``panel/WorkspacePanel.tsx``,\n``workflows/StarterTemplatePicker.tsx``) keep validating unchanged, and a frontend\ndeployed AHEAD of this backend degrades to \"nothing is mine\" rather than crashing.\nThey exist so the Workflows-page *Yours* and *Starters* chips filter client-side with\nhonest SIMULTANEOUS counts instead of a ``?scope=mine`` server round-trip.\n\nBINDING RULE — ``is_mine`` IS COMPUTED SERVER-SIDE FROM THE AUTHENTICATED CALLER, AND\nA RAW ``created_by`` IS DELIBERATELY NOT PROJECTED ONTO THIS MODEL. ``list_published_\nworkflows`` runs on a service-role asyncpg pool that BYPASSES RLS, so the predicate\n``(is_system_global = true OR created_by = $1)`` is the ONLY boundary — whatever this\nmodel carries, the caller receives. A raw ``created_by`` is safe under TODAY's predicate\n(the sole non-caller rows are migration-seeded globals) and starts emitting other users'\nidentifiers the moment a later phase widens it — and v3.4's co-tenant ``org_id`` /\n``is_org_shared`` model is exactly that widening, with no code change here and no review.\nThat is the mig-116 / CR-01 shape, applied prospectively. ``is_mine`` CANNOT widen: it\ndiscloses one bit about the caller themselves. ``is_system_global`` describes the ROW,\nnever a person.\n\nPhase 192.1 (LIB-05 / D-15): ``updated_at`` is ADDITIVE and DEFAULTED on the same\n``definition`` / ``is_mine`` precedent — a frontend deployed AHEAD of this backend reads\n``undefined`` and renders no *changed* segment, which degrades rather than crashing. It\nfeeds the library identity line's recency half (\"changed 2 months ago\").\n\nIT PASSES THE BINDING RULE ABOVE, FOR THE RULE'S OWN STATED REASON — it \"describes the\nROW, never a person\", exactly as ``is_system_global`` does. It discloses WHEN a row the\ncaller can ALREADY see last changed, and it can never begin emitting a second user's\nidentifier however the predicate later widens. Recorded here so a reviewer meeting a new\nfield on this model does not have to re-litigate it as the mig-116 / CR-01 shape.\n\nTYPED ``str``, NEVER ``datetime``, AND THE REASON IS THE ONE ``DraftCreateResponse.token``\nALREADY BANKED (:184-188): a ``datetime``-typed field re-serializes through Pydantic and\nDROPS the fractional part when microseconds are 0, so the wire string's width would vary\nwith the clock. Typing it ``str`` and calling ``.isoformat()`` in the builder makes the\nwire value exactly what the database returned.\n\n⚠ D-17 — ON A PUBLISHED ROW THIS IS THE PUBLISH TIME, AND THAT IS HONEST, NOT A BUG.\n``workflow_definitions_block_published`` (``full-schema.sql:3764``) makes a published row\nimmutable, so its ``updated_at`` is frozen at the publish flip — which IS the last time\nit changed. Do NOT add a second field to \"fix\" this.\n\nPhase 192.2 (LIB-06 / D-07): ``last_run_at`` + ``last_run_status`` are ADDITIVE and\nDEFAULTED on that same precedent — a frontend deployed AHEAD of this backend reads\n``undefined`` and renders *unknown*, which degrades rather than crashing or, worse,\nfabricating. They answer LIB-06's question — *does this one work* — from ``workflow_runs``\nrows that already exist (228 of them; **no migration, no new column, no new write**).\n\n⚠ THESE ARE **NOT** ``updated_at``, AND THE PARAGRAPH DIRECTLY ABOVE IS WHY THAT MATTERS.\nOn a published row ``updated_at`` is the PUBLISH time, deliberately. ``last_run_at`` is a\nRUN's own ``created_at``, from a different table. A surface that showed one as the other\nwould be lying about the exact fact this field exists to tell the truth about. D-08's\nthree arms follow from the pair being independent: a real time + a real status is *it\nworked / it failed*; BOTH ``null`` is *never run*; the keys ABSENT is *this backend cannot\nsay*. None of the three may render blank, a fabricated time, or a green tick.\n\n⚠ ``last_run_status`` IS A PLAIN NULLABLE ``str``, NEVER AN ENUM, AND THAT IS BINDING.\n``workflow_runs.status`` is written by the run lifecycle (six values today under the\ntable's CHECK); a seventh terminal state added by a later phase must flow through\nverbatim, because a validation error here would 500 the LIBRARY — a read path the Phase\n148 RUN CARVE-OUT deliberately leaves ungated for every user.\n\n⚠ ``last_run_at`` IS TYPED ``str`` FOR THE REASON ``updated_at`` IS, four paragraphs up:\na ``datetime``-typed field re-serializes through Pydantic and DROPS the fractional part\nwhen microseconds are 0, so the wire string's width would vary with the clock. The plan\nfor this phase wrote ``datetime | None`` in one sentence and *\"matching the ``updated_at``\nprecedent exactly\"* in the next; the precedent wins, because it is the one backed by a\nmeasurement.\n\nTHEY PASS THIS MODEL'S BINDING RULE FOR THE RULE'S OWN STATED REASON — they \"describe the\nROW, never a person\". ⚠ And the join behind them is OWNER-SCOPED (``r.user_id = $1``), so\non a world-readable ``is_system_global`` row a caller sees THEIR run of it and never\nanother tenant's; the raw ``user_id`` is never projected onto this model at all.\n\n── Phase 192.2 gap round 1 (CR-01 / DEC-08-A) — ``has_any_run`` ──────────────────────\n\n**What it is:** whether ANY run of this definition exists, by ANYBODY. A ROW-LEVEL fact.\n\n⚠ **What it is NOT, and the pair is the whole point of the field.** It is not\n``last_run_at`` / ``last_run_status``, which are OWNER-SCOPED and answer *did MY last run\nof this work?*. The two DISAGREE on exactly the rows CR-01 named, and that disagreement is\nthe message rather than an inconsistency: **``has_any_run=true`` with ``last_run_at=null``\nmeans *somebody ran it, and it was not you*.** Before this field existed the surface had\nonly the second half and rendered it as the first — printing an explicit \"Never run\" about\nfive ``is_system_global`` rows carrying 20 / 15 / 11 / 7 / 1 real runs, to every caller but\nthe one user who ran them. A caller-scoped fact rendered as a row-level one is FALSE, not\nmerely unhelpful.\n\n⚠ **The disclosure budget is EXISTENCE ONLY** — no count, no timestamp, no user id, no org\nid, no status. The argument is recorded ONCE, on ``_HAS_ANY_RUN_SQL``'s docblock in\n``app/db/workflows.py``; it is not restated here, because a rule written twice drifts.\n\n⚠ **It is ``bool | None`` and it DEFAULTS TO ``None``, never to ``False`` (DEC-08-C).** A\nSQL ``EXISTS`` is never null, so live the value is always ``True``/``False``; ``None``\nexists for exactly one case — a read path that omits the column. Coercing that absence to\n``False`` would manufacture the affirmative claim *\"nobody has run this\"* out of nothing,\nwhich is the shape of this very bug one layer down. The serializers use\n``r.get(\"has_any_run\")``, never ``bool(...)``.\n\n⚠ **THE ``response_model`` TRAP, verbatim from ``192.2-03``'s finding:** these routes\ndeclare ``response_model``, which DROPS UNDECLARED KEYS SILENTLY — a green backend test\nbeside an unchanged UI. The model and the builders move together or the column never\nreaches the client."
+      },
+      "ReferenceAssetRef": {
+        "properties": {
+          "kind": {
+            "type": "string",
+            "const": "reference",
+            "title": "Kind",
+            "default": "reference"
+          },
+          "asset_id": {
+            "type": "string",
+            "title": "Asset Id"
+          },
+          "filename": {
+            "type": "string",
+            "title": "Filename"
+          },
+          "mime": {
+            "type": "string",
+            "title": "Mime"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "asset_id",
+          "filename",
+          "mime"
+        ],
+        "title": "ReferenceAssetRef",
+        "description": "The ``AssetRef`` a reference upload mints (``kind=\"reference\"``). Its own model, so\n``TemplateAssetRef``'s \"never mints references\" stays true."
       },
       "SkillSnapshot": {
         "properties": {

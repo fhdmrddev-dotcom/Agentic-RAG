@@ -65,6 +65,15 @@ _EXPECTED_CALL_COUNTS = {
     "api/workflows.py": 1,
     "services/harness_engine.py": 3,
     "services/run_lifecycle.py": 1,
+    # ⚠ A NEW CALLER, ADDED DELIBERATELY at Phase 295 Plan 04 (D-19 / D-20 / D-21 / D-41). This
+    #   IS a contract change, recorded as one: `run_handoff.end_run` is the ONE home for every
+    #   new truthful run end (a resumed run that escaped, the sweep's unloadable definition, the
+    #   golden run's finally, run_producer's F2, the boot reconciler). It calls finish_run ONLY
+    #   after its own guarded `UPDATE ... WHERE status = ANY(...) RETURNING id` won, for the
+    #   thread-anchor clear in the same transaction finish_run owns — so the value-identity
+    #   contract holds (both writes carry the same status) and no usage column is ever named
+    #   (SEED-297). finish_run's body is byte-unchanged (the digest above).
+    "services/harness/run_handoff.py": 1,
 }
 
 # The POSITIONS, pinned as well because the plan asks for the file:line set.
@@ -99,7 +108,14 @@ _EXPECTED_CALL_SITES = {
     # ⚠ RE-DERIVED at 289-REVIEW WR-06: (a) the COUNTS stayed identical again; +13 when
     #   `_fail_redrive` gained `from_statuses` / `reason` and the second reason constant.
     #   api/runs.py:605 → 618
-    "api/runs.py:618",
+    # ⚠ RE-DERIVED at Phase 295 Plan 03: (a) the COUNTS stayed identical ("api/runs.py": 1);
+    #   +35 when `AskUserResponseBody.folder_id` and `_engine_answer_refusal` (the engine-ask
+    #   allow-list loader) landed above `_fail_redrive`. Re-derived with
+    #   `grep -n "await finish_run(" backend/app/api/runs.py`.
+    #   api/runs.py:618 → 653
+    # ⚠ RE-DERIVED at 295-09 (CR-01): COUNTS identical; +14 when `_is_current_question` landed
+    #   above `_fail_redrive`. The call is byte-unchanged. api/runs.py:653 → 667
+    "api/runs.py:667",
     # ⚠ RE-DERIVED at Phase 258 Plan 03: +7 line shift in api/workflows.py (import + decorators)
     #   api/workflows.py:1802 → 1809 → 1812 (v4.3 audit: +3 lines, require_capability on authoring writes; the call itself unchanged)
     # ⚠ RE-DERIVED at Phase 286 Plan 01: check (a), the per-file COUNTS, stayed identical
@@ -107,7 +123,16 @@ _EXPECTED_CALL_SITES = {
     #   above it moved to workflow_wire.py; delete_workflow_cascade and the call are unchanged.
     #   Re-derived with `grep -n "await finish_run(" backend/app/api/workflows.py`.
     #   api/workflows.py:1812 → 1550
-    "api/workflows.py:1550",
+    # ⚠ RE-DERIVED at Phase 295 Plan 02: (a) the COUNTS stayed identical ("api/workflows.py": 1).
+    #   Only the position shifted (+6), when `_INCOMPLETE_CODES` gained `no_template_bound` and
+    #   its D-45 comment above the call; delete_workflow_cascade and the call are unchanged.
+    #   api/workflows.py:1550 → 1556
+    # ⚠ RE-DERIVED at Phase 291 Plan 01: (a) the COUNTS stayed identical ("api/workflows.py": 1).
+    #   Only the position shifted (+16): four import names and the `/describe/read`
+    #   registration (12 lines) land above it; delete_workflow_cascade and the call are unchanged.
+    #   Re-derived with `grep -n "await finish_run(" backend/app/api/workflows.py`.
+    #   api/workflows.py:1556 → 1572
+    "api/workflows.py:1572",
     # ⚠ RE-DERIVED at Phase 256 round 1 (plan 256-05), and the originals are recorded
     # beside the new values rather than over them, because this fence's own docstring
     # asks for exactly that: check (a) — the per-file COUNTS — stayed identical, so no
@@ -121,16 +146,48 @@ _EXPECTED_CALL_SITES = {
     #   identical; only positions shifted, by +75 then +90, when the emit-cause precedence
     #   block, `_attempt_identity` and the `reason_is_final` threading landed above them.
     #   harness_engine.py:2390 → 2465 · 2431 → 2506 · 2713 → 2803
-    "services/harness_engine.py:2465",
-    "services/harness_engine.py:2506",
-    "services/harness_engine.py:2803",
+    # ⚠ RE-DERIVED at Phase 295 Plan 01 (D-51): check (a), the per-file COUNTS, stayed
+    #   identical; only positions shifted, by -522, when the engine-ask disposition family
+    #   (`_OnFailure` … `_resolve_failure_with_ask_user`, 57 + 469 lines out, a 3-line
+    #   pointer comment + 1 blank left behind) moved VERBATIM above them into harness/engine_ask.py. The three calls
+    #   are byte-unchanged. Re-derived with the grep above.
+    #   harness_engine.py:2465 → 1943 · 2506 → 1984 · 2803 → 2281
+    # ⚠ RE-DERIVED at Phase 295 Plan 03: (a) the COUNTS stayed identical; +11 when the ONE
+    #   `consume_engine_answer(...)` call (and its comment) landed at the top of
+    #   `_run_phase_with_gates`, above all three. The calls are byte-unchanged.
+    #   harness_engine.py:1943 → 1954 · 1984 → 1995 · 2281 → 2292
+    #   then +2 in 295-03 Task 3 (`get_ask_user_response` / `resume_run` joined the db import
+    #   block for the sweep's engine-ask arm): 1954 → 1956 · 1995 → 1997 · 2292 → 2294
+    # ⚠ RE-DERIVED at Phase 295 Plan 04 Task 1: (a) the COUNTS stayed identical; +6 when the ONE
+    #   `claim_failure_message(ctx, phase)` call and the D-14 `validator_error` comment landed in
+    #   `_run_phase_with_gates` above all three, then +6 more above the third when the valid
+    #   skip_to and completed-with-failure arms gained their one `surface_if_engine_owned` line.
+    #   The calls are byte-unchanged. 1956 → 1962 · 1997 → 2003 · 2294 → 2306
+    # ⚠ RE-DERIVED at 295-09 (WR-07): (a) the COUNTS stayed identical; +3 when the pause arm
+    #   above all three gained its ONE guarded `take_pause_written(ctx)` line + comment.
+    #   The calls are byte-unchanged. 1962 → 1965 · 2003 → 2006 · 2306 → 2309
+    "services/harness_engine.py:1965",
+    "services/harness_engine.py:2006",
+    "services/harness_engine.py:2309",
     # ⚠ RE-DERIVED at Phase 268 Plan 01: +8 line shift in services/run_lifecycle.py —
     #   register_run_start gained `org_id` / `expert_id` kwargs, their forward to insert_run and
     #   a 4-line docstring note, all ABOVE this call. Check (a), the per-file COUNTS, stayed
     #   identical (no caller appeared or vanished); the call itself is byte-unchanged.
     #   Re-derived with `grep -n "await finish_run(" backend/app/services/run_lifecycle.py`.
     #   run_lifecycle.py:521 → 529
-    "services/run_lifecycle.py:529",
+    # ⚠ RE-DERIVED at Phase 295 Plan 04 Task 2: (a) the COUNTS stayed identical
+    #   ("services/run_lifecycle.py": 1); +15 when `cancel_workflow_run_internals` gained the
+    #   `stopped_by` kwarg, its D-19 docstring paragraph and the ONE `record_stop(...)` call (with
+    #   its lazy import) just above this call. The call itself is byte-unchanged.
+    #   run_lifecycle.py:529 → 544
+    "services/run_lifecycle.py:544",
+    # Phase 295 Plan 04: the new caller's one site (see the COUNTS note above). Re-derived at
+    #   Task 3 (+15: the F2 / reconciler reason constants and `_claim_terminal` above it):
+    #   run_handoff.py:186 → 201, then -2 when the reconciler's sentence moved home to
+    #   run_reconciler.py: 201 → 199
+    # ⚠ RE-DERIVED at 295-09: +76 when the WR-01 sub-agent helpers and the WR-07 pause-write
+    #   mark landed above it (the call is byte-unchanged; COUNTS identical): 199 → 275
+    "services/harness/run_handoff.py:275",
 }
 
 _CALL_RE = re.compile(r"await\s+finish_run\s*\(")

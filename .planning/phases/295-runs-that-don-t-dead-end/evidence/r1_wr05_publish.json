@@ -1,0 +1,13 @@
+{
+  "definition_id": "9f40b1a7-6d7f-40e9-9922-ddf5aced6e87",
+  "status": 200,
+  "body": {
+    "published": true,
+    "version": 1,
+    "golden_run_id": "6b67da11-9ac7-43ec-a740-f119f4edfce2",
+    "blocked_stage": null,
+    "named_failures": [],
+    "blocked_step": null,
+    "auto_answered": []
+  }
+}

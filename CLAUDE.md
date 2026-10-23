@@ -411,96 +411,101 @@ node scripts/check-hot-file-ledger.cjs <phase-dir>   # 0 clear · 1 missing rows
 | `frontend/src/components/chat/ToolCallPanel.tsx` | 51 / 23 / 351 | ✅ **G-5 DISCHARGED (227-02)** |
 | `frontend/src/components/chat/MessageItem.tsx` | 82 / 38 / 1040 (was `81 / 38 / 1037`) | BUG-261020-04: +1 hook feeds both citation mounts (+5 −2) |
 | `frontend/src/components/chat/CitationList.tsx` | 5 / 5 / 91 | 294-05: ONE CitationCheckAction beside the trigger · extraction FIRST |
-| `backend/app/api/threads.py` | 271 / 91 / 2544 (was `265 / 90 / 2459`) | honoured by construction (279-02: ONE org helper) · ⛔ |
-| `frontend/src/providers/StreamsProvider.tsx` | 109 / 42 / 5004 (was `107 / 41 / 4991`) | honoured by construction (287-03: ONE passthrough field) · ⛔ |
+| `backend/app/api/threads.py` | 273 / 92 / 2567 (was `271 / 91 / 2544`) | 295-05: unsourced kwarg + lazy name lookup (+1 If) · ⛔ |
+| `frontend/src/providers/StreamsProvider.tsx` | 112 / 43 / 5016 (was `111 / 43 / 5009`) | 295-10: settle follows a paused run; stream end re-reads · ⛔ |
 | `frontend/src/hooks/useMessages.ts` | 74 / 27 / 127 | extraction due |
 | `backend/app/services/anthropic_service.py` | 12 / 11 / 373 (was `11 / 10 / 354`) | honoured by construction (282-01: constructor kwargs) · adapter audit due |
 | `backend/app/services/embedding_service.py` | 9 / 5 / 354 | ⚠ absent for its entire life at 5 phases — row added 236 (SC#2) |
-| `frontend/src/components/workflows/WorkflowCanvas.tsx` | 31 / 9 / 1708 | 286 forecast: 290 team picture is a separate view; ≤ 1 gated mount |
+| `frontend/src/components/workflows/WorkflowCanvas.tsx` | 32 / 10 / 1744 (was `31 / 9 / 1708`) | 290-03: Team view = 1 prop, 1 state, 1 early return · extraction FIRST next · ⛔ |
 | `frontend/src/components/workflows/FlowEdge.tsx` | 3 / 3 / 462 | honoured by construction (200) |
-| `frontend/src/components/workflows/PhaseNodeCard.tsx` | 18 / 9 / 490 (was `17 / 8 / 489`) | 286 forecast: 290 adds one prop; chip words from libraryVocabulary |
-| `backend/app/services/harness/phase_types.py` | 57 / 29 / 3050 (was `56 / 28 / 3027`) | 289-02: ONE confidence key via helper (ifs 113→113) · G-5 OWED |
+| `frontend/src/components/workflows/PhaseNodeCard.tsx` | 18 / 9 / 490 (was `17 / 8 / 489`) | 290: forecast unused — chips went on the library card, not here |
+| `backend/app/services/harness/phase_types.py` | 61 / 31 / 3067 (was `60 / 30 / 3057`) | 291-03: +10 call lines for the PDF fill-back · G-5 OWED |
 | `frontend/src/pages/WorkflowsPage.tsx` | 45 / 18 / 1447 (was `43 / 17 / 1415`) | 286 forecast: 287 starters are data, fork reuses its hook; one prop |
-| `frontend/src/components/workflows/library/WorkflowCard.tsx` | 22 / 8 / 1354 (was `19 / 6 / 1616`) | seam TAKEN (286-04): ⋯ menu + armed delete → WorkflowCardMenu |
-| `frontend/src/components/workflows/library/libraryVocabulary.ts` | 11 / 5 / 766 (was `10 / 4 / 727`) | 286 forecast: 290 chip labels are vocabulary entries (data), no logic |
+| `frontend/src/components/workflows/library/WorkflowCard.tsx` | 23 / 9 / 1361 (was `22 / 8 / 1354`) | 290-02: ONE chip-line block from row.def; still 0 useState |
+| `frontend/src/components/workflows/library/libraryVocabulary.ts` | 12 / 6 / 802 (was `11 / 5 / 766`) | 290-02: six STEP_LINE_ entries (data), no logic |
 | `frontend/src/components/workflows/library/libraryFilter.ts` | 6 / 4 / 435 | ⚠ absent at 4 phases and NO PLAN NAMED IT (192.2) |
 | `frontend/src/components/workflows/library/libraryRow.ts` | 4 / 3 / 201 | ⚠ absent, on the boundary (added 192.2) |
-| `frontend/src/components/workflows/WorkflowDoorSwitch.tsx` | 18 / 12 / 1075 | honoured by construction (193 / 193.1 / 199 / **214**) |
-| `frontend/src/pages/WorkflowBuilderPage.tsx` | 59 / 24 / 2808 (was `58 / 23 / 2803`) | 288-01: ONE prop at the existing card call · ⛔ |
-| `frontend/src/components/workflows/DraftArrivalCard.tsx` | 4 / 3 / 625 (was `1 / 1 / 338`) | 288-01: ONE prop, closed branch only · ⛔ |
-| `frontend/src/components/workflows/decisionsVocabulary.ts` | 4 / 3 / 327 (was `1 / 1 / 226`) | 288-01: 3 string consts, no logic · ⛔ |
-| `backend/app/api/workflows.py` | 45 / 23 / 1647 (was `43 / 23 / 2261`) | seam TAKEN (286-01): wire + authoring doors out; split OWED (>1,500 L) |
-| `backend/app/api/workflow_runs.py` | 17 / 12 / 1295 (was `14 / 11 / 1240`) | 289-02 confidence field; 289-05 paused sentence restored after S5 |
-| `backend/app/models/thread.py` | 22 / 15 / 537 (was `21 / 14 / 537`) | last touch 279-01 (docstring repoint only) |
+| `frontend/src/components/workflows/WorkflowDoorSwitch.tsx` | 20 / 13 / 1104 (was `18 / 12 / 1075`) | 291-04: one hook, one mount, one handoff spread (+33 −4) |
+| `frontend/src/pages/WorkflowBuilderPage.tsx` | 62 / 26 / 2897 (was `60 / 25 / 2810`) | 291-05: one snapshot state, two card props · ⛔ |
+| `frontend/src/components/workflows/DraftArrivalCard.tsx` | 5 / 4 / 688 (was `4 / 3 / 625`) | 291-05: two optional props + one fold boolean; rows in a leaf · ⛔ |
+| `frontend/src/components/workflows/DecisionsList.tsx` | 5 / 3 / 429 | ⚠ now FIRES (291) · 291-05: one optional prop, one template-row sub-line |
+| `frontend/src/components/workflows/decisionsVocabulary.ts` | 6 / 4 / 344 (was `4 / 3 / 327`) | 291-05: one glyph + one formatter, still a zero-import leaf · ⛔ |
+| `backend/app/api/workflows.py` | 47 / 25 / 1681 (was `46 / 24 / 1653`) | 291-01: two route registrations, handlers in doors · split OWED |
+| `backend/app/api/workflow_wire.py` | 3 / 3 / 517 | ⚠ now FIRES (291) · 291-01: describe read + reference wire models, additive |
+| `backend/app/api/workflow_runs.py` | 18 / 13 / 1455 (was `17 / 12 / 1295`) | 295-05: +5 defs, +160 L, over budget · extraction FIRST next |
+| `backend/app/models/thread.py` | 24 / 16 / 545 (was `22 / 15 / 537`) | 295-05: ONE field (unsourced) |
 | `frontend/src/components/workflows/canvasModel.ts` | 13 / 6 / 752 | ⚠ absent from BOTH at 6 phases (added 200) |
 | `frontend/src/components/layout/ChatLayout.tsx` | 63 / 32 / 1147 (was `62 / 32 / 1140`) | 289-REVIEW WR-05: ONE effect clears ?run= when the run view is left |
 | `frontend/src/components/layout/ChatLaunchForm.tsx` | 2 / 2 / 172 (was `1 / 1 / 157`) | 287-01: required block, 1 helper import; reuse stays, no 2nd form |
 | `frontend/src/components/workflows/LaunchInputFields.tsx` | 3 / 3 / 145 | 287-01: leaf stays non-blocking; docblock only · 214.1-01 trigger TAKEN |
 | `frontend/src/components/layout/ChatHistoryColumn.tsx` | 7 / 2 / 513 | ⚠ absent its ENTIRE LIFE — row added 244-01 |
 | `frontend/src/hooks/useThreads.ts` | 5 / 3 / 65 | ⚠ now FIRES · last touch 267-04 · ⛔ |
-| `backend/app/services/harness/grounding.py` | 21 / 8 / 1414 | honoured by construction (193.1 / 211 / **214**) |
+| `backend/app/services/harness/grounding.py` | 23 / 10 / 1437 (was `21 / 8 / 1414`) | 295-03: ONE pure predicate (is_engine_citation_gate) |
 | `frontend/src/components/workflows/PhaseFormPanel.tsx` | 30 / 14 / 1566 | honoured by construction ×6 (185 / 193 / 193.1 / 199 / 200 / **214**) |
-| `backend/app/db/workflows.py` | 54 / 28 / 2767 (was `53 / 27 / 2767`) | 289-01: two SQL casts ($1::uuid::text), no new function |
-| `backend/app/services/harness/publish_service.py` | 31 / 14 / 2001 (was `29 / 13 / 1942`) | 288-02: timeout check + auto_answered in existing seams · ⛔ |
-| `backend/app/services/workflow_authoring.py` | 17 / 11 / 1025 (was `15 / 9 / 989`) | 286 forecast: 291 template text = one more grounding input (untrusted) |
-| `backend/app/models/harness.py` | 20 / 19 / 766 | honoured by construction (193.2 / **214**) |
-| `frontend/src/components/workflows/builderStore.ts` | 14 / 8 / 968 | 286 forecast: 288 draft config rides useDraftPersistence; ≤ 1 store field |
+| `backend/app/db/workflows.py` | 58 / 29 / 2808 (was `57 / 29 / 2802`) | 295-09 CR-01: the answer read names its question (2 keys) |
+| `backend/app/services/harness/publish_service.py` | 34 / 15 / 2010 (was `33 / 15 / 2008`) | 295-09 WR-05: judge system prompt via one helper (If 70→70) |
+| `backend/app/services/workflow_authoring.py` | 18 / 12 / 1120 (was `17 / 11 / 1025`) | 291-02: files = one more untrusted grounding input (+98 −3) |
+| `backend/app/models/harness.py` | 22 / 20 / 776 (was `20 / 19 / 766`) | 291-02: InputFieldSpec origin + note, omitted when absent |
+| `frontend/src/components/workflows/builderStore.ts` | 16 / 9 / 1039 (was `14 / 8 / 968`) | 291: two actions (refs, input source), no state field |
 | `frontend/src/components/panel/WorkspacePanel.tsx` | 17 / 11 / 646 (was `16 / 10 / 646`) | honoured by construction (194 / 194.1 / 282-02: one prop) |
-| `backend/app/services/run_lifecycle.py` | 9 / 5 / 756 | ⚠ STALE · last touch 268-01 · ⛔ |
+| `backend/app/services/run_lifecycle.py` | 10 / 6 / 776 (was `9 / 5 / 756`) | 295-04: stopped_by → record_stop (If 11→11) |
 | `backend/app/db/runs.py` | 9 / 8 / 266 | ⚠ absent its ENTIRE LIFE — row added 268 · ⛔ |
 | `frontend/src/pages/admin/AdminSpendPage.tsx` | 9 / 3 / 974 | ⚠ NOW FIRES (crossed in 268) · extraction FIRST next · ⛔ |
-| `backend/app/services/run_producer.py` | 23 / 11 / 1145 (was `21 / 10 / 1117`) | honoured by construction (282-01: ONE `_timed_out_error` helper) |
+| `backend/app/services/run_producer.py` | 24 / 12 / 1150 (was `23 / 11 / 1145`) | 295-04: F2 record_failed_end first (If 22→22) |
 | `backend/app/services/task_service.py` | 27 / 14 / 1023 (was `26 / 14 / 1018`) | 289-REVIEW WR-04: refused searches no longer count as KB searches |
-| `backend/app/services/run_reconciler.py` | 3 / 2 / 325 | ⚠ absent its ENTIRE LIFE — row added 256-02 (SEED-297) · ⛔ |
+| `backend/app/services/run_reconciler.py` | 5 / 3 / 406 (was `3 / 2 / 325`) | 295-04: ONE workflow-run sweep · live-proven 295-07 · ⚠ now FIRES |
 | `backend/app/services/circuit_breaker.py` | 1 / 1 / 331 | ⚠ absent its ENTIRE LIFE — row added 256-02 · ⛔ |
-| `backend/app/api/runs.py` | 45 / 20 / 1845 (was `44 / 20 / 1827`) | 289-REVIEW WR-06: unloadable-definition answer ends failed (same helper) |
+| `backend/app/api/runs.py` | 48 / 21 / 1929 (was `47 / 21 / 1907`) | 295-09 CR-01: 409 unless the answer is for the current question |
+| `backend/app/api/panel.py` | 6 / 5 / 285 | 295-03: ONE engine_pause key on /pending · honoured by construction |
+| `backend/app/utils/folder_utils.py` | 9 / 5 / 302 | ⚠ absent its ENTIRE LIFE — row added 295-10 · ⛔ |
+| `backend/app/services/harness/human_input.py` | 6 / 3 / 375 (was `5 / 3 / 355`) | 295-09 CR-01: consumes only its own question's answer · ⛔ |
 | `backend/app/middleware/canvas_gate.py` | 9 / 6 / 396 (was `8 / 5 / 391`) | 289-03: ONE gated path (…/evidence) · ⛔ test_182 never imports it |
-| `backend/app/services/harness_engine.py` | 62 / 25 / 3396 (was `61 / 24 / 3387`) | 289-REVIEW WR-01: resume shell INSERT moved last (no new code) · F3 owed |
+| `backend/app/services/harness_engine.py` | 68 / 26 / 2961 (was `67 / 26 / 2957`) | 295-09 WR-07: one pause write per engine ask · armed seam OWED · ⛔ |
 | `frontend/src/components/chat/ThinkingBlock.tsx` | 6 / 2 / 320 | ⚠ row STALE; does NOT fire yet · ⛔ |
 | `frontend/src/components/chat/RunCard.tsx` | 31 / 16 / 729 | last touch 276-06 (D-27) · ⛔ |
 | `frontend/src/components/chat/MessageInput.tsx` | 41 / 20 / 1007 | ⚠ STALE · last touch 268-03 · ⛔ |
 | `frontend/src/components/chat/ActiveConnectorChips.tsx` | 2 / 2 / 82 | ⚠ absent its ENTIRE LIFE — row added 244-05 |
 | `frontend/src/components/chat/MessageList.tsx` | 24 / 11 / 376 | ⚠ STALE · last touch 267-04 |
 | `frontend/src/components/chat/ChatArea.tsx` | 94 / 44 / 1189 (was `93 / 43 / 1186`) | honoured by construction (287-03: ONE mount, 0 hooks) · ⛔ |
-| `frontend/src/stores/streamsStore.ts` | 24 / 16 / 607 (was `22 / 14 / 572`) | honoured by construction (287-03: ONE type field) · ⛔ |
+| `frontend/src/stores/streamsStore.ts` | 25 / 17 / 626 (was `24 / 16 / 607`) | 295-08: ONE field + its one writer, no action · ⛔ |
 | `frontend/src/components/chat/ThreadWorkflowPicker.tsx` | 1 / 1 / 91 | young (created 287-03) · reads no conversation · ⛔ |
 | `frontend/src/components/chat/useStartWorkflowInThread.ts` | 1 / 1 / 85 | young (created 287-03) · no createThread · ⛔ |
 | `frontend/src/lib/toolMeta.ts` | 10 / 6 / 218 | ⚠ absent its ENTIRE LIFE — row added 244-13 · ⛔ |
-| `frontend/src/components/panel/PendingAskCard.tsx` | 19 / 10 / 1052 (was `18 / 10 / 1042`) | 289-REVIEW CR-02: one effect returns a clock-expired card when paused |
+| `frontend/src/components/panel/PendingAskCard.tsx` | 24 / 11 / 1103 (was `23 / 11 / 1101`) | D-r2-01: any non-terminal run status is live; not retired |
 | `frontend/src/pages/WorkflowRunPage.tsx` | 33 / 13 / 1594 (was `31 / 12 / 1580`) | 289-04: ONE early return → evidence report; no new hook · ⛔ |
 | `frontend/src/components/workflows/WaitingOnLine.tsx` | 1 / 1 / 26 | young (created 288-03) · leaf, no hook · ⛔ |
 | `frontend/src/components/chat/OutputFileCard.tsx` | 8 / 7 / 219 | honoured by construction (195) |
 | `frontend/src/components/panel/FilesSection.tsx` | 12 / 8 / 354 (was `10 / 6 / 363`) | ⚠ STALE · last touch 274-04 |
-| `frontend/src/lib/api.ts` | 210 / 125 / 530 (was `208 / 124 / 523`) | 284-05: five whole-list re-exports deleted (D-16) |
-| `frontend/src/types/index.ts` | 100 / 79 / 1656 (was `99 / 78 / 1546`) | 284-01: paged wire types, additive. Seam OWED |
+| `frontend/src/lib/api.ts` | 211 / 126 / 546 (was `210 / 125 / 530`) | 291-04: +16 barrel re-exports (describe read, references) |
+| `frontend/src/types/index.ts` | 101 / 80 / 1674 (was `100 / 79 / 1656`) | 295-05: three additive fields · seam OWED |
 | `backend/app/main.py` | 92 / 67 / 979 (was `91 / 66 / 978`) | 294-03: ONE include_router (+2 −1) · ⛔ |
 | `backend/app/config.py` | 93 / 54 / 1809 (was `92 / 54 / 1790`) | honoured by construction (282-04: self-hosted default 900) · seam OWED · ⛔ |
 | `backend/app/api/admin.py` | 43 / 17 / 2051 (was `42 / 17 / 2024`) | honoured by construction (282-04: one refusal helper, add timeout) · ⛔ |
 | `backend/app/api/settings.py` | 44 / 23 / 1159 (was `41 / 21 / 1048`) | honoured by construction (294-04: ONE rerank_provider refusal) · ⛔ |
 | `backend/app/services/multimodal_service.py` | 14 / 7 / 984 | ⚠ absent from BOTH for its ENTIRE LIFE at **7 phases** |
 | `backend/app/api/documents.py` | 99 / 39 / 2698 (was `97 / 38 / 2653`) | honoured by construction (285-03: enqueue-fail → doc failed, 201) · ⛔ |
-| `scripts/vitest-count-gate.cjs` | 319 / 73 / 6596 (was `317 / 72 / 6568`) | 294-05: 9 suites adopted, 1 pin raised (row was stale) |
+| `scripts/vitest-count-gate.cjs` | 335 / 76 / 6658 (was `327 / 74 / 6623`) | 291: 2 suites adopted, no pin moved |
 | `scripts/check-deploy-drift.sh` | 5 / 4 / 267 | ⚠ absent its ENTIRE LIFE — row added 294-05 · fault var omitted |
 | `scripts/build-public-openapi.cjs` | 7 / 3 / 468 | ⚠ now FIRES (294) · 294-03: citation_checks tag (one line) |
 | `backend/app/services/eval_runner_service.py` | 13 / 8 / 1040 | ⚠ STALE · last touch 256-03 |
-| `backend/app/services/scheduler_service.py` | 6 / 3 / 421 | ⚠ NOW FIRES at 3 phases · last touch 256-03 |
-| `frontend/src/components/panel/PhaseCard.tsx` | 18 / 12 / 796 (was `17 / 11 / 788`) | honoured by construction (281-03: one copy entry + one className) |
+| `backend/app/services/scheduler_service.py` | 8 / 5 / 471 (was `6 / 3 / 421`) | 295-02: ScheduledLaunchRefused + one except arm |
+| `frontend/src/components/panel/PhaseCard.tsx` | 20 / 13 / 811 (was `18 / 12 / 796`) | 295-05: ONE mount in the identity column |
 | `frontend/src/components/panel/PhaseTimeline.tsx` | 10 / 8 / 404 | ⚠ row STALE · honoured by construction (214) |
 | `frontend/src/components/panel/phaseStatusMeta.ts` | 4 / 4 / 291 | ⚠ row STALE · crossed the threshold (200) |
-| `backend/app/services/harness/validator_kinds.py` | 15 / 7 / 791 | ⚠ row STALE · honoured by construction (256-05) |
+| `backend/app/services/harness/validator_kinds.py` | 18 / 8 / 899 (was `17 / 8 / 853`) | 295-09 WR-05: judge note in system prompt, data fenced |
 | `backend/app/services/harness/programmatic.py` | 3 / 3 / 137 | ⚠ FIRES · absent its ENTIRE LIFE — row added 255 · ⛔ |
 | `backend/app/services/harness/emitters.py` | 4 / 2 / 188 | ⚠ absent its ENTIRE LIFE — row added 255 · ⛔ |
 | `frontend/src/components/admin/ModelRegistryTab.tsx` | 19 / 7 / 1705 (was `17 / 7 / 1679`) | honoured by construction (282-04: Add-form Timeout) · AddModelForm seam OWED · ⛔ |
-| `frontend/src/components/workflows/soulData.ts` | 13 / 11 / 523 (was `12 / 10 / 499`) | 287-01: +2 pure required-field helpers · history in detail file |
+| `frontend/src/components/workflows/soulData.ts` | 14 / 12 / 554 (was `13 / 11 / 523`) | 291-05: launch skips kb_auto; enum labels carry options hint |
 | `frontend/src/components/workflows/PublishGauntlet.tsx` | 21 / 11 / 1385 (was `20 / 10 / 1372`) | 288-02: ONE auto_answered block, server words |
 | `frontend/src/landing/facts.ts` | 6 / 3 / 546 (was `5 / 2 / 546`) | ⚠ now FIRES (288-02) — row added · Pause string only |
-| `frontend/src/components/workflows/PhaseSpineGraph.tsx` | 8 / 6 / 723 (was `5 / 5 / 473`) | 286 forecast: 290 adds one optional prop for labelled chips |
+| `frontend/src/components/workflows/PhaseSpineGraph.tsx` | 8 / 6 / 723 (was `5 / 5 / 473`) | 290: forecast unused — chips went on the library card, not here |
 | `frontend/src/components/workflows/doorVocabulary.ts` | 6 / 4 / 540 | no seam proposed |
 | `frontend/src/components/workflows/StepTypePicker.tsx` | 7 / 3 / 522 | honoured by construction (199) |
 | `frontend/src/components/workflows/library/RunModal.tsx` | 9 / 6 / 732 (was `8 / 5 / 713`) | 287-01: handleRun refuses empty required field; 214-12 discharge stands |
 | `frontend/src/components/panel/PanelEmpty.tsx` | 4 / 4 / 52 | ⚠ absent at 4 phases |
-| `frontend/src/components/workflows/useTemplateFirstDraft.ts` | 8 / 4 / 684 (was `7 / 4 / 677`) | 286 forecast: 291 forwards one more upload kind to /generate |
-| `frontend/src/components/workflows/RunSpine.tsx` | 6 / 4 / 433 (was `5 / 3 / 426`) | 289-02: ONE StepEvidenceLine mount (+7 L) |
+| `frontend/src/components/workflows/useTemplateFirstDraft.ts` | 12 / 5 / 1155 (was `11 / 5 / 1103`) | 291-06: caps + one refusal in onDraft (G-5 by construction) · extraction FIRST |
+| `frontend/src/components/workflows/RunSpine.tsx` | 7 / 5 / 441 (was `6 / 4 / 433`) | 295-05: ONE prop (unsourced) |
 | `frontend/src/components/workflows/RunTranscript.tsx` | 7 / 3 / 652 | ⚠ **FIRES on a component with NO MOUNT in the product** |
 | `frontend/src/components/settings/ConnectionsTab.tsx` | 25 / 9 / 1635 | ⚠ the row was STALE at `17 / 7 / 1477`. honoured by construction (**22 |
 | `frontend/src/components/settings/ConnectionFormPanel.tsx` | 28 / 10 / 2477 | ⭐ NAMED SEAM TAKEN (239-08) · wider seam OWED · ⛔ |
@@ -525,13 +530,13 @@ node scripts/check-hot-file-ledger.cjs <phase-dir>   # 0 clear · 1 missing rows
 | `backend/app/services/mcp_client.py` | 9 / 6 / 526 | ⚠ row STALE TWICE (SEED-258) |
 | `backend/app/models/message.py` | 23 / 15 / 285 (was `21 / 13 / 278`) | last touch 279-01 (comment repoint only) |
 | `backend/app/models/user_settings.py` | 57 / 35 / 1742 (was `55 / 34 / 1723`) | ⚠ STALE · last touch 270-02 · ⛔ |
-| `backend/app/services/harness/reachability.py` | 4 / 4 / 463 | ⚠ absent from BOTH for its ENTIRE LIFE at **4 phases** |
-| `backend/app/services/workflow_kickoff.py` | 8 / 6 / 554 | ⚠ absent for its ENTIRE LIFE at **6 phases** |
+| `backend/app/services/harness/reachability.py` | 5 / 5 / 498 (was `4 / 4 / 463`) | 295-02: one pure lint check (no_template_bound) |
+| `backend/app/services/workflow_kickoff.py` | 11 / 8 / 596 (was `10 / 8 / 585`) | 295-10: paused-run 409 says where it waits (If 15→16) |
 | `frontend/src/components/workflows/WorkflowScheduleModal.tsx` | 3 / 3 / 601 | ⚠ absent for its entire life; it crossed the threshold in 214-09 on a  |
 | `frontend/src/components/workflows/nodePresentation.ts` | 8 / 7 / 221 | ⚠ absent from BOTH for its ENTIRE LIFE at **7 phases** |
-| `frontend/src/lib/api/threads.ts` | 16 / 10 / 1935 | ⚠ STALE · last touch 268-03 |
+| `frontend/src/lib/api/threads.ts` | 21 / 12 / 1979 (was `20 / 12 / 1975`) | 295-08: answerAskUser keeps the server's refusal words |
 | `frontend/src/lib/api/connectors.ts` | 17 / 11 / 740 | honoured by construction (244-06) · ⛔ |
-| `frontend/src/lib/api/workflows.ts` | 10 / 10 / 1129 (was `9 / 9 / 1111`) | 289-02: RunPhaseConfidence type + optional field; no behaviour |
+| `frontend/src/lib/api/workflows.ts` | 12 / 12 / 1285 (was `11 / 11 / 1141`) | 291-04: describe read + reference upload clients (+144) |
 | `frontend/src/lib/connectionMark.tsx` | 7 / 4 / 313 | ✅ **the move IS the seam, and it was TAKEN (214-08)** |
 | `frontend/src/components/ingestion/DocumentList.tsx` | 31 / 15 / 372 (was `31 / 16 / 372`) | last touch 275-02/04 |
 | `frontend/src/pages/LibraryPage.tsx` | 63 / 20 / 1344 (was `57 / 19 / 1297`) | seam TAKEN (284-01 hook); lines rose → G-5 NOT discharged · ⛔ |
@@ -551,7 +556,7 @@ node scripts/check-hot-file-ledger.cjs <phase-dir>   # 0 clear · 1 missing rows
 | `frontend/src/components/ingestion/ViewsGroup.tsx` | 5 / 3 / 259 | ⚠ absent for its ENTIRE LIFE at **3 phases** |
 | `frontend/src/components/ui/tabs.tsx` | 3 / 3 / 78 | ⚠ absent for its ENTIRE LIFE |
 | `frontend/src/components/panel/CsvTablePreview.tsx` | 3 / 3 / 134 | ⚠ absent for its ENTIRE LIFE |
-| `frontend/src/components/workflows/verdictModel.ts` | 6 / 3 / 355 | ⚠ absent for its ENTIRE LIFE |
+| `frontend/src/components/workflows/verdictModel.ts` | 8 / 4 / 363 (was `6 / 3 / 355`) | 295-02: one Record entry (BLOCKED_SENTENCE.lint) |
 | `frontend/src/components/library/IngestionTab.tsx` | 20 / 7 / 706 (was `17 / 6 / 512`) | 284-03: summary + three paged status lists; layout unchanged · ⛔ |
 | `frontend/src/components/ingestion/__tests__/IngestionStrip.test.tsx` | 3 / 3 / 516 | ⚠ absent; row added 233, which repaired the INHERITED red `229-03` cau |
 | `frontend/src/components/layout/NavPanel.tsx` | 26 / 14 / 420 (was `25 / 14 / 416`) | last touch 276-01 / 276-06 (D-27) |
@@ -577,7 +582,7 @@ node scripts/check-hot-file-ledger.cjs <phase-dir>   # 0 clear · 1 missing rows
 | `scripts/full-schema-supplement.sql` | 23 / 15 / 848 (was `21 / 14 / 838`) | 294-03: mig 211 citation-check grants mirrored (ACL parity) · ⛔ |
 | `.claude/settings.json` | 14 / 6 / 214 | ⚠ STALE · last touch 276 · ⛔ |
 | `backend/app/services/forced_emit.py` | 13 / 8 / 724 (was `12 / 8 / 724`) | honoured by construction (282-04: provider kwarg) · ⛔ |
-| `backend/app/services/template_asset_service.py` | 4 / 3 / 344 | ⚠ absent its ENTIRE LIFE — row added 274-REVIEW WR-01 |
+| `backend/app/services/template_asset_service.py` | 5 / 4 / 379 (was `4 / 3 / 344`) | 295-02: has_staged_template (Branch-2 WHERE shared) |
 | `backend/app/db/entitlements.py` | 2 / 1 / 169 | young (created 258) |
 | `backend/app/services/entitlement_service.py` | 2 / 1 / 130 | young (created 258) |
 | `backend/app/db/experts.py` | 5 / 4 / 749 | ⚠ row STALE · last touch 266-01 · ⛔ |
@@ -631,7 +636,7 @@ node scripts/check-hot-file-ledger.cjs <phase-dir>   # 0 clear · 1 missing rows
 | `frontend/src/components/experts/ScopeLedger.tsx` | 6 / 3 / 126 | ⚠ now FIRES (279) — row added 279-04 · extraction FIRST · ⛔ |
 | `backend/app/services/sources/adapters/microsoft_graph.py` | 8 / 5 / 507 (was `3 / 2 / 376`) | ⚠ now FIRES (5 phases) — row added 280-04 · honoured by construction |
 | `frontend/src/components/workflows/runVocabulary.ts` | 10 / 5 / 662 | ⚠ FIRES, absent here — row added 281-04 · honoured by construction |
-| `frontend/src/lib/api/knowledge.ts` | 7 / 6 / 847 (was `6 / 5 / 841`) | 288-02: optional auto_answered field, additive · ⛔ |
+| `frontend/src/lib/api/knowledge.ts` | 8 / 7 / 910 (was `7 / 6 / 847`) | 291-04: generate body + result extras, additive · ⛔ |
 | `backend/app/services/google_service.py` | 12 / 8 / 661 | ⚠ absent its ENTIRE LIFE — row added 282 · 282-01: ONE builder · ⛔ |
 | `backend/app/services/provider_gateway/anthropic.py` | 5 / 5 / 125 | ⚠ absent its ENTIRE LIFE — row added 282 · 282-01: ONE kwarg · ⛔ |
 | `backend/app/services/provider_gateway/google.py` | 4 / 4 / 107 | ⚠ absent its ENTIRE LIFE — row added 282 · 282-01: ONE kwarg · ⛔ |

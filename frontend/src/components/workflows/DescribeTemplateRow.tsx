@@ -62,41 +62,82 @@
  * RAW copy fence, prose included: a docblock quoting a governed door word is a second home for
  * it and reds the fence, which is the fence working rather than misfiring.
  */
-import { useId } from "react"
+/*
+ * ── 291-04 (sketch 291-describe-files winner B, UI-SPEC Surface 1) — THE FORM SLOT ─────────
+ * This row is EXTENDED in place, never forked: it now reads a PDF form, a Word document with
+ * blanks or a scan as well as a `{{ }}` template, and renders the SERVER'S arm — fields, type
+ * words, the document's own lines and every server sentence exactly as received. It still
+ * owns no fetch; the ticks it shows arrive as a prop and leave as a callback.
+ *
+ * Every class string this phase added that needs an off-grid value is a NAMED constant from
+ * `./surfaceClasses` (the UI-SPEC `?raw` spacing fence), and the four shipped row constants
+ * were moved there byte-identical.
+ */
+import { useId, useState } from "react"
 
 import { DESCRIBE_ATTACH_PROMPT } from "./doorVocabulary"
 import {
+  FACT_CLASSES,
+  FIELD_GRID_CLASSES,
+  FILENAME_CLASSES,
+  FOOTING_CLASSES,
+  NOTE_CLASSES,
+  PLACES_LIST_CLASSES,
+  ROW_CLASSES,
+} from "./surfaceClasses"
+import {
   ATTACH_NOTE,
-  FOOTING_LOADING,
-  FOOTING_NONE,
+  DESCRIBE_FORM_ACCEPT,
+  DESCRIBE_FORM_ATTACH_LABEL,
+  DESCRIBE_FORM_TYPES_NOTE,
+  DESCRIBE_READING,
+  FIELD_SUGGESTED_TAG,
+  FOOTING_FORM_UNAVAILABLE,
   FOOTING_NOT_WORD,
+  FOOTING_READING_DOCUMENT,
+  FOOTING_REFERENCE_ONLY,
   FOOTING_UNAVAILABLE,
+  FOOTING_WITHOUT_IT,
+  FORM_BACK_FLAT,
+  FORM_FIELDS_HEADING,
+  FORM_PROVENANCE_EXACT,
+  FORM_PROVENANCE_SUGGESTED_SCAN,
+  FORM_PROVENANCE_SUGGESTED_TEXT,
+  FORM_UNAVAILABLE,
+  PLACES_HEADING,
+  PLACES_PROVENANCE,
+  PLACE_STAYS_BLANK,
+  SCAN_UNREADABLE,
   SPEC_FILENAME_LEAD,
+  fieldTypeWord,
+  footingAsks,
   footingFields,
+  formBackLinePdf,
+  formBackLineWord,
+  noFieldsLine,
+  showAllLabel,
 } from "./templateFirstVocabulary"
 import {
-  TEMPLATE_ACCEPT,
-  TEMPLATE_ATTACH_LABEL,
   TEMPLATE_FIELDS_HEADING,
-  TEMPLATE_FIELDS_LOADING,
-  TEMPLATE_FIELDS_NONE,
   TEMPLATE_FIELDS_NOT_WORD,
   TEMPLATE_FIELDS_UNAVAILABLE,
-  TEMPLATE_TYPES_NOTE,
 } from "./TemplateAttachSection"
 
-import type { TemplatePlaceholdersState } from "@/hooks/useTemplatePlaceholders"
+import type { DescribeReadState } from "./useTemplateFirstDraft"
 
 /** The control that removes a held document, so a mis-pick is one press from undone. */
 export const DESCRIBE_TEMPLATE_CLEAR_LABEL = "Remove this document"
 
+type ReadResult = Extract<DescribeReadState, { kind: "read" }>["result"]
+type ReadField = ReadResult["fields"][number]
+
 export interface DescribeTemplateRowProps {
   /**
-   * The read's current answer. ⚠ THE SAME UNION THE RAIL'S HOOK RETURNS, imported rather than
+   * The read's current answer. ⚠ THE SAME UNION THE DOOR'S HOOK RETURNS, imported rather than
    * re-declared: one wire shape for both doors means the two surfaces cannot derive different
    * arms from the same server answer.
    */
-  state: TemplatePlaceholdersState
+  state: DescribeReadState
   /**
    * The held document's name, or `undefined` when none is held. Supplied by the caller from the
    * same place the bytes came from, so the name and the reading can never disagree about which
@@ -107,38 +148,153 @@ export interface DescribeTemplateRowProps {
   onPickFile: (file: File) => void
   /** The author removed the held document. */
   onClear: () => void
+  /** 291-04 (D-27): the Word blanks the author unticked. Absent ⇒ every blank is ticked. */
+  untickedKeys?: readonly string[]
+  /** 291-04 (D-27): a tick was pressed. The row keeps no tick state of its own. */
+  onToggleBlank?: (key: string) => void
 }
 
-const ROW_CLASSES = "mt-3 w-full rounded border border-border bg-muted/40 px-2.5 py-2 text-left"
-const NOTE_CLASSES = "mt-1.5 text-[10.5px] leading-snug text-muted-foreground"
-const FOOTING_CLASSES = "mt-1.5 text-[11px] leading-snug text-foreground"
-const FILENAME_CLASSES =
-  "mt-1.5 flex items-center gap-1.5 text-[11px] leading-snug text-foreground"
+/** How many PDF fields show before `showAllLabel` (UI-SPEC decision 7). Words are never capped. */
+const FIELD_CAP = 8
+const DECK_EXTENSIONS = [".pptx", ".xlsx"]
+const NO_UNTICKED: readonly string[] = []
+
+const TAG_CLASSES = "ml-1 rounded-sm border border-border px-1 text-[11px] text-muted-foreground"
+const TYPE_WORD_CLASSES = "whitespace-nowrap text-muted-foreground"
+const MARK_TICKED = "rounded-sm border-b border-dashed border-primary/60 bg-primary/15 px-1 text-foreground"
+const MARK_UNTICKED = "rounded-sm border-b border-dashed border-border bg-transparent px-1 text-muted-foreground"
+const SHOW_ALL_CLASSES =
+  "mt-1 min-h-6 text-[11px] text-muted-foreground underline underline-offset-2 hover:text-foreground focus:outline-none focus:ring-1 focus:ring-primary"
+
+/**
+ * Which reading the slot shows — the server's arm, with two client facts folded in that the
+ * arm alone cannot carry: whether the held file is a DECK (the Word-only sentence is true only
+ * of decks, UI-SPEC decision 4), and whether a field list is actually empty (then it reads as
+ * the D-02 line, never as an empty list).
+ */
+type View =
+  | { arm: "idle" }
+  | { arm: "loading" }
+  | { arm: "template"; fields: ReadField[] }
+  | { arm: "form"; fields: ReadField[] }
+  | { arm: "suggested"; fields: ReadField[]; from: "text" | "scan"; cutShort: string | null }
+  | { arm: "blanks"; result: ReadResult }
+  | { arm: "none" }
+  | { arm: "notWord" }
+  | { arm: "scan" }
+  | { arm: "copyRefused"; sentence: string | null }
+  | { arm: "unavailable"; pdf: boolean }
+
+function viewOf(state: DescribeReadState, filename: string): View {
+  const lower = filename.toLowerCase()
+  const deck = DECK_EXTENSIONS.some((ext) => lower.endsWith(ext))
+  switch (state.kind) {
+    case "idle":
+      return { arm: "idle" }
+    case "loading":
+      return { arm: "loading" }
+    case "unavailable":
+      return { arm: "unavailable", pdf: lower.endsWith(".pdf") }
+    case "read": {
+      const r = state.result
+      switch (r.arm) {
+        case "template_fields":
+          return r.fields.length > 0 ? { arm: "template", fields: r.fields } : deck ? { arm: "notWord" } : { arm: "none" }
+        case "form_fields":
+          return r.fields.length > 0 ? { arm: "form", fields: r.fields } : { arm: "none" }
+        case "suggested_fields":
+          return r.fields.length > 0
+            ? { arm: "suggested", fields: r.fields, from: r.suggested_from ?? "text", cutShort: r.cut_short }
+            : { arm: "none" }
+        case "blanks":
+          return { arm: "blanks", result: r }
+        case "scan_unreadable":
+          return { arm: "scan" }
+        case "copy_refused":
+          return { arm: "copyRefused", sentence: r.refused }
+        // `not_word`, `none` (and a reference arm, which the slot never asks for): the
+        // Word-only sentence is true only of a deck, so everything else gets the D-02 line.
+        default:
+          return deck ? { arm: "notWord" } : { arm: "none" }
+      }
+    }
+  }
+}
 
 /**
  * Which footing line belongs to a reading — EXACTLY ONE, for every arm including the in-flight
  * one (D-09: a control that is waiting and does not say why reads as broken).
  *
- * ⚠ `notWord` is DERIVED, not a member of the union, and it is gated on EMPTINESS rather than
- * on the extension alone — the shipped rule, copied in kind. A document that somehow DID yield
- * fields renders its fields; this branch exists only for the empty case, so it can never become
- * a stale second copy of the server's own parser predicate.
+ * ⚠ EVERY COUNT IS DERIVED FROM THE LIST RENDERED ABOVE IT. For Word blanks it is the TICKED
+ * placed rows; with none ticked there is nothing to fill, so the file is used as a reference.
  */
-function footingFor(state: TemplatePlaceholdersState, notWord: boolean): string | null {
-  switch (state.kind) {
+function footingFor(view: View, ticked: number): string | null {
+  switch (view.arm) {
     case "idle":
       return null
     case "loading":
-      return FOOTING_LOADING
-    case "fields":
-      // ⚠ DERIVED FROM THE LIST ITSELF. This is the same array the render maps over below, so
-      // the number stated and the number shown cannot disagree.
-      return footingFields(state.fields.length)
+      return FOOTING_READING_DOCUMENT
+    case "template":
+    case "form":
+      return footingFields(view.fields.length)
+    case "suggested":
+      return footingAsks(view.fields.length)
+    case "blanks":
+      return ticked > 0 ? footingFields(ticked) : FOOTING_REFERENCE_ONLY
     case "none":
-      return notWord ? FOOTING_NOT_WORD : FOOTING_NONE
+      return FOOTING_REFERENCE_ONLY
+    case "notWord":
+      return FOOTING_NOT_WORD
+    case "scan":
+    case "copyRefused":
+      return FOOTING_WITHOUT_IT
     case "unavailable":
-      return FOOTING_UNAVAILABLE
+      return view.pdf ? FOOTING_FORM_UNAVAILABLE : FOOTING_UNAVAILABLE
   }
+}
+
+/** The PDF field grid: label · type word, in the server's order, capped with an in-place expand. */
+function FieldGrid({ fields, suggested }: { fields: ReadField[]; suggested: boolean }) {
+  const [expanded, setExpanded] = useState(false)
+  const shown = expanded ? fields : fields.slice(0, FIELD_CAP)
+  return (
+    <>
+      <div role="list" data-testid="describe-form-fields" className={FIELD_GRID_CLASSES}>
+        {shown.map((field) => (
+          <FieldGridRow key={field.key} field={field} suggested={suggested} />
+        ))}
+      </div>
+      {fields.length > FIELD_CAP && (
+        <button
+          type="button"
+          data-testid="describe-form-show-all"
+          aria-expanded={expanded}
+          onClick={() => setExpanded((v) => !v)}
+          className={SHOW_ALL_CLASSES}
+        >
+          {showAllLabel(fields.length)}
+        </button>
+      )}
+    </>
+  )
+}
+
+function FieldGridRow({ field, suggested }: { field: ReadField; suggested: boolean }) {
+  return (
+    <>
+      {/* The LABEL as the server read it — never the raw qualified field name when a label
+          exists. Escaped by construction: it is an ordinary React text child. */}
+      <span role="listitem" className="text-foreground [overflow-wrap:anywhere]">
+        {field.label || field.key}
+        {suggested && (
+          <span data-testid="describe-form-suggested-tag" className={TAG_CLASSES}>
+            {FIELD_SUGGESTED_TAG}
+          </span>
+        )}
+      </span>
+      <span className={TYPE_WORD_CLASSES}>{fieldTypeWord(field)}</span>
+    </>
+  )
 }
 
 export function DescribeTemplateRow({
@@ -146,14 +302,17 @@ export function DescribeTemplateRow({
   filename,
   onPickFile,
   onClear,
+  untickedKeys = NO_UNTICKED,
+  onToggleBlank,
 }: DescribeTemplateRowProps) {
   const inputId = useId()
 
-  // Gated on EMPTINESS, never on the extension alone — see `footingFor`.
-  const notWord = state.kind === "none" && !(filename ?? "").toLowerCase().endsWith(".docx")
-
-  const footing = footingFor(state, notWord)
+  const view = viewOf(state, filename ?? "")
+  const placed = view.arm === "blanks" ? view.result.fields : []
+  const ticked = placed.filter((f) => !untickedKeys.includes(f.key)).length
+  const footing = footingFor(view, ticked)
   const holding = state.kind !== "idle"
+  const shownName = filename ?? (state.kind === "read" ? state.result.filename : "")
 
   return (
     <section data-testid="describe-template-row" className={ROW_CLASSES}>
@@ -166,7 +325,7 @@ export function DescribeTemplateRow({
       </p>
 
       <label htmlFor={inputId} className="mt-2 block text-[11px] font-medium text-foreground">
-        {TEMPLATE_ATTACH_LABEL}
+        {DESCRIBE_FORM_ATTACH_LABEL}
       </label>
       {/* The NATIVE picker, on purpose — the shipped section's reasoning, inherited: it is
           keyboard-reachable and announces itself without a hidden-input-behind-a-button proxy. */}
@@ -174,7 +333,7 @@ export function DescribeTemplateRow({
         id={inputId}
         type="file"
         data-testid="describe-template-input"
-        accept={TEMPLATE_ACCEPT}
+        accept={DESCRIBE_FORM_ACCEPT}
         onChange={(event) => {
           const file = event.target.files?.[0]
           // Reset the control NOW rather than after: picking the same file twice in a row must
@@ -197,30 +356,32 @@ export function DescribeTemplateRow({
       )}
 
       <p data-testid="describe-template-types" className={NOTE_CLASSES}>
-        {TEMPLATE_TYPES_NOTE}
+        {DESCRIBE_FORM_TYPES_NOTE}
       </p>
 
       {/* ONE stable wrapper with a live role, present across every non-idle arm — the correct
-          aria pattern for a late-settling fact, and it means ONE announcement rather than four
-          competing ones. Assistive tech observes the change INSIDE a node it already watches. */}
+          aria pattern for a late-settling fact, and it means ONE announcement rather than
+          several competing ones. Assistive tech observes the change INSIDE a node it watches. */}
       {holding && (
         <div data-testid="describe-template-fields-region" role="status">
-          {state.kind === "loading" && (
+          {view.arm === "loading" && (
             <p data-testid="describe-template-fields-loading" className={NOTE_CLASSES}>
-              {TEMPLATE_FIELDS_LOADING}
+              {DESCRIBE_READING}
             </p>
           )}
 
-          {state.kind === "fields" && (
+          {(view.arm === "template" || view.arm === "form" || view.arm === "suggested" || view.arm === "blanks") &&
+            shownName.length > 0 && (
+              <p data-testid="describe-template-filename" className={FILENAME_CLASSES}>
+                <span aria-hidden="true">📄</span>
+                <span className="min-w-0 break-all">
+                  {SPEC_FILENAME_LEAD} {shownName}
+                </span>
+              </p>
+            )}
+
+          {view.arm === "template" && (
             <>
-              {typeof filename === "string" && filename.length > 0 && (
-                <p data-testid="describe-template-filename" className={FILENAME_CLASSES}>
-                  <span aria-hidden="true">📄</span>
-                  <span className="min-w-0 break-all">
-                    {SPEC_FILENAME_LEAD} {filename}
-                  </span>
-                </p>
-              )}
               <p data-testid="describe-template-fields-heading" className={NOTE_CLASSES}>
                 {TEMPLATE_FIELDS_HEADING}
               </p>
@@ -229,37 +390,151 @@ export function DescribeTemplateRow({
                   raw-markup escape hatch of any kind (asserted by grep, which is why the
                   identifier is not spelled here). Rendered in the SERVER'S order and never
                   re-sorted: the order is part of the answer. */}
-              <ul
-                data-testid="describe-template-fields"
-                className={`${NOTE_CLASSES} list-disc pl-4`}
-              >
-                {state.fields.map((name) => (
-                  <li key={name} className="break-all">
-                    {name}
+              <ul data-testid="describe-template-fields" className={`${NOTE_CLASSES} list-disc pl-4`}>
+                {view.fields.map((field) => (
+                  <li key={field.key} className="break-all">
+                    {field.key}
                   </li>
                 ))}
               </ul>
             </>
           )}
 
-          {/* ⚠ THE TWO SENTENCES THAT MAY NEVER MERGE — see the file docblock. Different nodes,
-              different words, so a change that renders one for the other turns a test red. */}
-          {state.kind === "none" &&
-            (notWord ? (
-              <p data-testid="describe-template-fields-not-word" className={NOTE_CLASSES}>
-                {TEMPLATE_FIELDS_NOT_WORD}
+          {view.arm === "form" && (
+            <>
+              <p data-testid="describe-form-heading" className={NOTE_CLASSES}>
+                {FORM_FIELDS_HEADING} · {FORM_PROVENANCE_EXACT}
               </p>
-            ) : (
-              <p data-testid="describe-template-fields-none" className={NOTE_CLASSES}>
-                {TEMPLATE_FIELDS_NONE}
+              <FieldGrid fields={view.fields} suggested={false} />
+              <p data-testid="describe-form-back" className={NOTE_CLASSES}>
+                {formBackLinePdf(shownName)}
               </p>
-            ))}
+            </>
+          )}
 
-          {state.kind === "unavailable" && (
-            <p data-testid="describe-template-fields-unavailable" className={NOTE_CLASSES}>
-              {TEMPLATE_FIELDS_UNAVAILABLE}
+          {view.arm === "suggested" && (
+            <>
+              <p data-testid="describe-form-heading" className={NOTE_CLASSES}>
+                {FORM_FIELDS_HEADING} ·{" "}
+                {view.from === "scan" ? FORM_PROVENANCE_SUGGESTED_SCAN : FORM_PROVENANCE_SUGGESTED_TEXT}
+              </p>
+              <FieldGrid fields={view.fields} suggested />
+              {/* The server's sentence, verbatim — never cut silently. */}
+              {view.cutShort !== null && (
+                <p data-testid="describe-form-cut-short" className={FACT_CLASSES}>
+                  {view.cutShort}
+                </p>
+              )}
+              <p data-testid="describe-form-back-flat" className={FACT_CLASSES}>
+                {FORM_BACK_FLAT}
+              </p>
+            </>
+          )}
+
+          {view.arm === "blanks" && (
+            <>
+              <p data-testid="describe-form-heading" className={NOTE_CLASSES}>
+                {PLACES_HEADING} · {PLACES_PROVENANCE}
+              </p>
+              {/* THE D-04 LIST FOR WORD FORMS, never capped: the author must see where every
+                  answer lands (D-27). The whole row is the label, so the hit area is the line. */}
+              <ul data-testid="describe-form-places" className={PLACES_LIST_CLASSES}>
+                {view.result.fields.map((field) => {
+                  const isTicked = !untickedKeys.includes(field.key)
+                  return (
+                    <li key={field.key}>
+                      <label className="flex min-h-6 items-baseline gap-2">
+                        <input
+                          type="checkbox"
+                          checked={isTicked}
+                          onChange={() => onToggleBlank?.(field.key)}
+                          className="focus:outline-none focus:ring-1 focus:ring-primary"
+                        />
+                        <span className="min-w-0 [overflow-wrap:anywhere]">
+                          {field.line_before !== null && field.line_before.length > 0 && (
+                            <span className="text-muted-foreground">{field.line_before}</span>
+                          )}
+                          <span
+                            data-testid="describe-form-place-mark"
+                            className={isTicked ? MARK_TICKED : MARK_UNTICKED}
+                          >
+                            {field.label}
+                          </span>
+                          {field.line_after !== null && field.line_after.length > 0 && (
+                            <span className="text-muted-foreground">{field.line_after}</span>
+                          )}
+                          {field.origin === "ai_proposed" && (
+                            <span data-testid="describe-form-suggested-tag" className={TAG_CLASSES}>
+                              {FIELD_SUGGESTED_TAG}
+                            </span>
+                          )}
+                          {/* REAL DOM text, never a pseudo-element and never a strike-through:
+                              an unticked blank stays BLANK, it is not deleted. */}
+                          {!isTicked && (
+                            <span data-testid="describe-form-place-stays-blank" className="text-muted-foreground">
+                              {` ${PLACE_STAYS_BLANK}`}
+                            </span>
+                          )}
+                        </span>
+                        <span className={`ml-auto text-[11px] ${TYPE_WORD_CLASSES}`}>{fieldTypeWord(field)}</span>
+                      </label>
+                    </li>
+                  )
+                })}
+                {/* D-28 — the server's own sentence, after the placed rows, never counted. */}
+                {view.result.unplaced.map((unplaced, i) => (
+                  <li
+                    key={`unplaced-${i}`}
+                    data-testid="describe-form-unplaced"
+                    className="flex items-baseline gap-2 text-foreground"
+                  >
+                    <span aria-hidden="true">·</span>
+                    <span className="min-w-0 [overflow-wrap:anywhere]">{unplaced.sentence}</span>
+                  </li>
+                ))}
+              </ul>
+              <p data-testid="describe-form-back-word" className={NOTE_CLASSES}>
+                {formBackLineWord(shownName)}
+              </p>
+            </>
+          )}
+
+          {/* ⚠ THE TWO READINGS THAT MAY NEVER MERGE — see the file docblock. Different nodes,
+              different words, so a change that renders one for the other turns a test red. */}
+          {view.arm === "none" && (
+            <p data-testid="describe-form-no-fields" className={FACT_CLASSES}>
+              {noFieldsLine(shownName)}
             </p>
           )}
+
+          {view.arm === "notWord" && (
+            <p data-testid="describe-template-fields-not-word" className={NOTE_CLASSES}>
+              {TEMPLATE_FIELDS_NOT_WORD}
+            </p>
+          )}
+
+          {view.arm === "scan" && (
+            <p data-testid="describe-form-scan-unreadable" className={FACT_CLASSES}>
+              {SCAN_UNREADABLE}
+            </p>
+          )}
+
+          {view.arm === "copyRefused" && view.sentence !== null && (
+            <p data-testid="describe-form-copy-refused" className={FACT_CLASSES}>
+              {view.sentence}
+            </p>
+          )}
+
+          {view.arm === "unavailable" &&
+            (view.pdf ? (
+              <p data-testid="describe-form-unavailable" className={NOTE_CLASSES}>
+                {FORM_UNAVAILABLE}
+              </p>
+            ) : (
+              <p data-testid="describe-template-fields-unavailable" className={NOTE_CLASSES}>
+                {TEMPLATE_FIELDS_UNAVAILABLE}
+              </p>
+            ))}
 
           {/* EXACTLY ONE footing line, on every arm — 166-B's shape and D-09's requirement. */}
           {footing !== null && (

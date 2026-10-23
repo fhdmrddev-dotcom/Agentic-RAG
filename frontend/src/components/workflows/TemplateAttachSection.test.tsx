@@ -78,6 +78,8 @@ import {
   TEMPLATE_UNSAVED_REFUSAL,
 } from "./TemplateAttachSection"
 import { createBuilderStore } from "./builderStore"
+// Plan 291-05 Task 2 — a separate statement so this file's diff stays additive.
+import { FORM_FIELDS_HEADING } from "./templateFirstVocabulary"
 
 const uploadMock = vi.mocked(uploadWorkflowTemplate)
 const fieldsMock = vi.mocked(getWorkflowTemplatePlaceholders)
@@ -697,5 +699,32 @@ describe("260814-q5r — the region is one live node, and it spends no new colou
     const node = await screen.findByTestId("template-fields-unavailable")
     expect(node.className).toContain("text-muted-foreground")
     expect(node.className).not.toContain("38 92%")
+  })
+})
+
+// ── Plan 291-05 (D-07 / S3) — after a reload, a bound PDF form's fields read as a FORM's ──
+
+describe("291-05 — the rail's heading names a form when the bound file is a PDF", () => {
+  it("a bound .pdf reads FORM_FIELDS_HEADING over the same fields arm", async () => {
+    fieldsMock.mockResolvedValue({ read: "ok", placeholders: ["supplier_name", "country"] })
+    await renderAttached({ filename: "vendor-onboarding-form.pdf" })
+    await waitFor(() => expect(screen.getByTestId("template-fields")).toBeInTheDocument())
+    expect(screen.getByTestId("template-fields-heading").textContent).toBe(FORM_FIELDS_HEADING)
+    expect(screen.getByTestId("template-fields-heading").textContent).toBe("What this form asks for")
+  })
+
+  it("the extension check is case-insensitive", async () => {
+    fieldsMock.mockResolvedValue({ read: "ok", placeholders: ["a"] })
+    await renderAttached({ filename: "W-9 FORM.PDF" })
+    await waitFor(() => expect(screen.getByTestId("template-fields")).toBeInTheDocument())
+    expect(screen.getByTestId("template-fields-heading").textContent).toBe(FORM_FIELDS_HEADING)
+  })
+
+  it("a bound .docx keeps the shipped template heading, and the accept list is unchanged", async () => {
+    fieldsMock.mockResolvedValue({ read: "ok", placeholders: ["a"] })
+    await renderAttached({ filename: "brief.docx" })
+    await waitFor(() => expect(screen.getByTestId("template-fields")).toBeInTheDocument())
+    expect(screen.getByTestId("template-fields-heading").textContent).toBe(TEMPLATE_FIELDS_HEADING)
+    expect(TEMPLATE_ACCEPT).toBe(".docx,.pptx,.xlsx")
   })
 })

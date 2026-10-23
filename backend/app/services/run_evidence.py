@@ -39,9 +39,11 @@ from app.api.workflow_runs import (
     _WAITING_FALLBACK_NAME,
     _coerce_definition,
     _slug_to_phase_type,
+    unsourced_who,
 )
 from app.models.thread import declared_phase_measure, phase_output_object
 from app.services.harness.phase_confidence import confidence_for_wire
+from app.services.harness.run_read_wire import unsourced_for_wire
 
 # ── verdict kinds (R-03) ──────────────────────────────────────────────────────────────────
 # Checks: the run asked a question of its own output and recorded the answer.
@@ -224,6 +226,9 @@ def compose_phase_log(
     """
     names = _name_by_slug(definition)
     types = _slug_to_phase_type(_coerce_definition(definition))
+    # 295-05 (D-04): the viewer's words for the unsourced mark, through the one name chain.
+    # ``owner_name`` already went through it (``started_by``); a colleague gets no name.
+    who = unsourced_who(is_owner=viewer_is_owner, display_name=owner_name, viewer_email=None)
     log: list[dict] = []
     for n, row in enumerate(_ordered_rows(rows), start=1):
         slug = row.get("slug") if isinstance(row.get("slug"), str) else ""
@@ -236,6 +241,7 @@ def compose_phase_log(
         raw_reason = obj.get("_failure_reason") if isinstance(obj, dict) else None
         failure_reason = _nonblank(raw_reason)
         raw_confidence = obj.get("confidence") if isinstance(obj, dict) else None
+        raw_unsourced = obj.get("unsourced") if isinstance(obj, dict) else None
         human_input = None
         if phase_type == _HUMAN_INPUT:
             answer = _nonblank(obj.get("answer")) if isinstance(obj, dict) else None
@@ -276,6 +282,8 @@ def compose_phase_log(
                 "failure_reason": failure_reason,
                 "confidence": confidence_for_wire(raw_confidence, kb_label),
                 "human_input": human_input,
+                # 295-05: the stored uuid is replaced by the words, never copied.
+                "unsourced": unsourced_for_wire(raw_unsourced, who=who),
             }
         )
     return log

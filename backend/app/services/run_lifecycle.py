@@ -405,7 +405,9 @@ async def finalize_run_terminal(
     await redis.zrem(f"runs_by_thread:{thread_id}", str(run_id))
 
 
-async def cancel_workflow_run_internals(*, pool, workflow_run_id, redis=None) -> bool:
+async def cancel_workflow_run_internals(
+    *, pool, workflow_run_id, redis=None, stopped_by=None
+) -> bool:
     """The ONE workflow-side cancel composition — status + the interrupted phase (194).
 
     ``db.workflows.finish_run`` with the status ``'cancelled'`` (the
@@ -497,6 +499,15 @@ async def cancel_workflow_run_internals(*, pool, workflow_run_id, redis=None) ->
     cross-worker interleave paragraph above makes: the far worker's escape handler writes
     ``cancelled``, this composition writes ``cancelled``, ``finish_run`` is idempotent.
     THE ONE THING THAT WOULD BREAK IT IS THE TWO SIDES DISAGREEING ON THE VALUE.
+
+    PHASE 295 (D-19) -- A STOP SAYS WHO STOPPED IT. ``stopped_by`` is the id of the person who
+    pressed Stop, passed ONLY by the two Stop routes (``api/runs.py``'s no-producer arm and Step
+    3b below, reached from the owner's ``cancel_run``). When it is given and THIS call is the one
+    that moves the run to ``cancelled``, ONE ``policy_applied`` audit records the reason
+    "Stopped by <display name>." (never an email). The circuit breaker composes this same cancel
+    and passes nothing, so a budget trip never names a person. ``policy_applied`` is an existing
+    audit kind: no migration, no new kind. The write is best-effort and never costs the two
+    writes below (``run_handoff.record_stop`` cannot raise).
     """
     try:
         # Late import (S3 / the module's shipped discipline) — this file already
@@ -526,6 +537,10 @@ async def cancel_workflow_run_internals(*, pool, workflow_run_id, redis=None) ->
                 workflow_run_id,
             )
 
+        # Phase 295 (D-19): the winner of a person's Stop records why the run ended.
+        from app.services.harness.run_handoff import record_stop  # noqa: PLC0415
+
+        await record_stop(pool, _wf, stopped_by, policy="run_cancelled")
         await finish_run(pool, _wf, "cancelled")
         await cancel_active_phases(pool, _wf)
         return True
@@ -543,8 +558,12 @@ async def _cancel_run_internals(
     thread_id,
     redis,
     supabase,
+    stopped_by=None,
 ) -> str:
     """The shared cancel / zombie-heal discipline (D-062-* / D-02 refactor-to-share).
+
+    Phase 295 (D-19): ``stopped_by`` is passed by the owner's ``cancel_run`` only (never the
+    operator Kill) and forwarded to the workflow half so the Stop's reason is recorded.
 
     Performs Steps 2/3a/3b of the DELETE-run cancel verb VERBATIM (extracted from
     ``api/runs.py:cancel_run``) so a single correct discipline is reused by BOTH the
@@ -682,7 +701,8 @@ async def _cancel_run_internals(
             # cross-worker arm (RUN_TASKS missed, so the producer is on the OTHER
             # worker), i.e. the exact path L-01 exists for.
             await cancel_workflow_run_internals(
-                pool=await get_pg_pool(), workflow_run_id=wf_id, redis=redis
+                pool=await get_pg_pool(), workflow_run_id=wf_id, redis=redis,
+                stopped_by=stopped_by,
             )
         except Exception:
             logger.exception(

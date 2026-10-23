@@ -226,6 +226,9 @@ async def get_pending_ask_user(
                 # D-12: the prior-phase draft the user is confirming (defensive .get —
                 # older prompt rows predate the draft field → None, harmless).
                 "draft": payload.get("draft"),
+                # Phase 295 (D-02 / D-03): an engine ask's server-built wire half (kind,
+                # lock, the bounded folder list) — None on every other prompt row.
+                "engine_pause": payload.get("engine_pause"),
                 "created_at": r["created_at"].isoformat() if r["created_at"] else None,
             })
         return result

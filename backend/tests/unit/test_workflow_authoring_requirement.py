@@ -1493,6 +1493,10 @@ ACCEPTED_BUT_NEVER_SENT: dict[str, str] = {
         "template-binding contract change — AUTH-03's surface, not AUTH-02's. RE-OPEN: the "
         "next phase that takes up template binding"
     ),
+    # Phase 291-02 / 291-04 (2026-10-22): `form` and `references` were allowlisted by 291-02
+    # while only the server half existed; 291-04 wired the client send
+    # (`useTemplateFirstDraft.ts`) and deleted both entries in that same commit, as 291-02's
+    # re-open note required.
 }
 
 

@@ -240,6 +240,10 @@ import { PlaneEditingLayer } from "@/components/workflows/PlaneEditingLayer"
 import { ProblemsTray } from "@/components/workflows/ProblemsTray"
 import type { NodeRunState } from "@/components/workflows/runVocabulary"
 import { StepTypePicker } from "@/components/workflows/StepTypePicker"
+// 290-03 (VIS-01 / D-06) — the read-only team picture and its header switch, in their own
+// file so this G-5 hot file spends one prop, one branch and one mount on them.
+import { TeamPicture, TeamViewSwitch } from "@/components/workflows/TeamPicture"
+import { TEAM_HEADER_HINT } from "@/components/workflows/teamVocabulary"
 import type { VerdictGroups } from "@/components/workflows/verdictModel"
 import { useTechnicalNamesOptional } from "@/providers/TechnicalNamesProvider"
 // 200-06 (BUG-260813-01) — the NON-THROWING accessor, deliberately. The throwing
@@ -656,6 +660,12 @@ export interface WorkflowCanvasProps {
    * region at all. See `CanvasSession`.
    */
   session?: CanvasSession
+
+  /**
+   * 290-03, VIS-01 / D-06: present only on the builder; absent (the run page and every
+   * existing suite) renders no switch and a byte-identical header.
+   */
+  team?: { workflowName: string }
 }
 
 export function WorkflowCanvas({
@@ -675,6 +685,7 @@ export function WorkflowCanvas({
   onRequestRemove,
   notice,
   session,
+  team,
 }: WorkflowCanvasProps) {
   // The app-wide reveal, READ (never owned) here. Null outside a provider.
   const technicalNames = useTechnicalNamesOptional()
@@ -1140,8 +1151,13 @@ export function WorkflowCanvas({
    */
   const [announcement, setAnnouncement] = useState("")
 
+  // 290-03 (VIS-01 / D-06) — which view the header switch shows. Local, never persisted.
+  const [view, setView] = useState<"steps" | "team">("steps")
+  const teamShown = team !== undefined && view === "team"
+
   useEffect(() => {
-    if (!editable || selectedSlug === null) return
+    // 290-03 (RESEARCH F-6): the read-only Team view must never reorder
+    if (!editable || selectedSlug === null || teamShown) return
 
     const handler = (event: globalThis.KeyboardEvent) => {
       if (!event.altKey) return
@@ -1197,7 +1213,7 @@ export function WorkflowCanvas({
 
     window.addEventListener("keydown", handler)
     return () => window.removeEventListener("keydown", handler)
-  }, [editable, selectedSlug, phaseOrder, nodesWithMove, onCommitNodes])
+  }, [editable, selectedSlug, phaseOrder, nodesWithMove, onCommitNodes, teamShown])
 
   /**
    * The keyboard half of D-183-05 — the rule IS shared with the mouse, and the
@@ -1250,7 +1266,7 @@ export function WorkflowCanvas({
   // without a tooltip.
   const header = (
     <div className="flex flex-wrap items-center gap-2 border-b border-border/60 px-4 py-2">
-      {editable ? (
+      {editable && !teamShown ? (
         <>
           <span className="rounded bg-muted px-2 py-0.5 font-mono text-[11px] font-medium text-muted-foreground">
             ✎ Editing
@@ -1265,11 +1281,12 @@ export function WorkflowCanvas({
             👁 View only
           </span>
           <span className="text-[11px] text-muted-foreground">
-            the plane pans · steps stay put
+            {teamShown ? TEAM_HEADER_HINT : "the plane pans · steps stay put"}
           </span>
         </>
       )}
       <span className="flex-1" />
+      {team ? <TeamViewSwitch view={view} onChange={setView} /> : null}
       {technicalNames ? (
         <TechnicalNamesToggle enabled={showTechnical} onToggle={technicalNames.toggle} />
       ) : null}
@@ -1382,6 +1399,25 @@ export function WorkflowCanvas({
         />
       </div>
     ) : null
+
+  // 290-03 (VIS-01 / D-06, UI-SPEC §2) — EARLY RETURN for the Team view, BEFORE the empty
+  // draft's so a 0-step Team still shows its own empty state. It replaces the plane, the
+  // notice and the session regions in place; every hook above still runs, and the picture
+  // reads the same in-memory phases, so Steps comes back with selection and edits intact.
+  if (teamShown) {
+    return (
+      <section aria-label={sectionLabel} className="flex h-full min-w-0 flex-col bg-background">
+        {header}
+        <TeamPicture
+          phases={phases}
+          kbTools={kbTools}
+          nameContext={nameContext}
+          showTechnical={showTechnical}
+          workflowName={team.workflowName}
+        />
+      </section>
+    )
+  }
 
   // D-183-11 — EARLY RETURN. Nothing below this line mounts on an empty definition.
   if (nodes.length === 0) {

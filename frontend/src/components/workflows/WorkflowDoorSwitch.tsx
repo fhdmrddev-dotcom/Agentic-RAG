@@ -47,8 +47,11 @@ import { DoorHeaderStrip } from "@/components/workflows/DoorHeaderStrip"
 // two implementations of one control is how the two doors would start answering differently
 // to the same document.
 import { DescribeTemplateRow } from "@/components/workflows/DescribeTemplateRow"
+// 291-04 (sketch 291-describe-files winner B) — the template row's PEER, on both doors.
+import { DescribeReferencesSection } from "@/components/workflows/DescribeReferencesSection"
 import { StarterTemplatePicker } from "@/components/workflows/StarterTemplatePicker"
 import {
+  useReferenceReads,
   useTemplateRead,
   type TemplateReadAnswer,
   type TemplateReadState,
@@ -137,10 +140,12 @@ const KNOWN_SERVICES: readonly ServiceCatalogEntry[] = [
 function completedTemplateAnswer(
   file: File | null,
   state: TemplateReadState,
+  unticked: readonly string[],
 ): TemplateReadAnswer | null {
   if (!file) return null
   if (state.kind === "idle" || state.kind === "loading") return null
-  return { file, state }
+  // 291-04 (D-27): the blanks the author unticked travel WITH the answer they were made on.
+  return { file, state, unticked }
 }
 
 export interface WorkflowDoorSwitchProps {
@@ -283,8 +288,16 @@ export function WorkflowDoorSwitch({
    */
   const [allowedConnectionIds, setAllowedConnectionIds] = useState<string[]>([])
   const [connectedServiceIds, setConnectedServiceIds] = useState<string[]>([])
-  const templateRead = useTemplateRead(templateFile)
-  const templateAnswer = completedTemplateAnswer(templateFile, templateRead)
+  const { state: templateRead, untickedKeys, toggleBlank } = useTemplateRead(templateFile)
+  const templateAnswer = completedTemplateAnswer(templateFile, templateRead, untickedKeys)
+  // 291-04 (D-03) — the references, on the same per-file read. Like `templateFile` they are
+  // NOT cleared by `goBoth`; the hand-off carries only the ones already read, WITH their
+  // answers, so the Builder never reads them again (the seed-do-not-re-read rule).
+  const referenceReads = useReferenceReads()
+  const handoffReferences: TemplateReadAnswer[] = referenceReads.references.flatMap((r) =>
+    r.state.kind === "read" ? [{ file: r.file, state: r.state, unticked: [] }] : [],
+  )
+  const anyFileReading = templateRead.kind === "loading" || referenceReads.anyReading
   /**
    * ⚠ ONE NEW `&&` TERM, THE SAME SHAPE AND THE SAME REASON AS THE BUILDER'S (D-07 / D-08).
    * This door's CTA makes no network call — it is a HAND-OFF that arms the Builder's one-shot
@@ -297,7 +310,7 @@ export function WorkflowDoorSwitch({
    * A second conditional here could be got wrong and would read green against every behaviour
    * a suite drives.
    */
-  const canDraft = describe.trim().length > 0 && templateRead.kind !== "loading"
+  const canDraft = describe.trim().length > 0 && templateRead.kind !== "loading" && !referenceReads.anyReading
   /**
    * 199-08 (DES-01 · sheet `c9-doors-describe` §3) — WHEN THE BOX IS REFUSING SOMETHING THE
    * AUTHOR ACTUALLY TYPED.
@@ -434,6 +447,8 @@ export function WorkflowDoorSwitch({
             {...(templateAnswer
               ? { initialTemplateFile: templateAnswer.file, initialTemplateRead: templateAnswer }
               : {})}
+            // 291-04 — the read references, crossing the same hand-off by the same idiom.
+            {...(handoffReferences.length > 0 ? { initialReferences: handoffReferences } : {})}
             // SPREAD-CONDITIONAL, the D-14 idiom this file's sibling `rails` prop uses:
             // without `inline` the two slots must be genuinely ABSENT from the element, not
             // present-and-undefined, so the Builder's flag-off branch is reached by a page
@@ -845,6 +860,20 @@ export function WorkflowDoorSwitch({
             filename={templateFile?.name}
             onPickFile={setTemplateFile}
             onClear={() => setTemplateFile(null)}
+            untickedKeys={untickedKeys}
+            onToggleBlank={toggleBlank}
+          />
+
+          {/* 291-04 — the references section, the template row's peer (sketch B): template row,
+              rule, references, then the existing rule and the starter shelf (UI-SPEC order). */}
+          <div aria-hidden="true" className="h-px w-full bg-border" />
+          <DescribeReferencesSection
+            references={referenceReads.references}
+            notice={referenceReads.notice}
+            anyFileHeld={templateFile !== null || referenceReads.references.length > 0}
+            anyReading={anyFileReading}
+            onAddFiles={referenceReads.addFiles}
+            onRemove={referenceReads.removeAt}
           />
 
           <div aria-hidden="true" className="h-px w-full bg-border" />

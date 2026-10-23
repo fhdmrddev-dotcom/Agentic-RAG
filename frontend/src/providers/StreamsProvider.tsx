@@ -95,6 +95,7 @@ import { useOrgOptional } from "@/providers/OrgProvider"
 import {
   useStreamsStore,
   recordExpertReading,
+  recordWorkflowRunStatus,
   type SurfaceId,
   type StreamsState,
   type WorkflowLock,
@@ -1888,6 +1889,9 @@ export function StreamsProvider({ children }: PropsWithChildren) {
           ),
         }))
         originalOnTerminal(kind, errorPayload)
+        // 295-10 (D-r1-02): the segment ended (done, failed, or paused again). One read so the
+        // panel and the recorded run status match the server (D-v2.5-03), not the stream alone.
+        refreshPhaseSpineAfterStop(threadId)
       }
       subscribeToRun(
         producerRunId,
@@ -3694,10 +3698,14 @@ export function StreamsProvider({ children }: PropsWithChildren) {
           // the synchronous pre-lock kickoff window holds the MARK with no lock, and a guard
           // demanding the lock would return early exactly there. Read off the store, ABOVE the
           // fetch, so a thread with nothing to release also costs nothing to settle.
+          // 295-10 (D-r1-02): a PAUSED run holds neither (its lock reads stale), yet the answer
+          // re-drives it on a new producer before the 200. The status the phase reconcile
+          // recorded lets it through, so the live arm below attaches that stream.
           const settleState = useStreamsStore.getState()
           if (
             !settleState.workflowLockByThread.has(threadId) &&
-            !settleState.harnessKickoffThreads.has(threadId)
+            !settleState.harnessKickoffThreads.has(threadId) &&
+            settleState.workflowRunStatusByThread.get(threadId) !== "paused"
           ) {
             return
           }
@@ -4639,6 +4647,8 @@ function refreshPhaseSpineAfterStop(threadId: string): void {
 
 async function reconcilePhases(threadId: string, signal?: AbortSignal): Promise<Phase[]> {
   const wf = await getThreadWorkflow(threadId, signal)
+  // 295-08 (SEED-361): the same read's run status, kept so PendingAskStack can tell a PAUSED run.
+  recordWorkflowRunStatus(threadId, wf.run_status ?? null)
   // Live/ACTIVE harness run → the forward-only skeleton floor: total_phases rows, the
   // current one running, with the REAL step identity overlaid from `wf.phases`.
   //
@@ -4759,6 +4769,7 @@ async function reconcilePhases(threadId: string, signal?: AbortSignal): Promise<
         toolName: row?.tool_name,
         capability: row?.capability,
         serviceName: row?.service_name,
+        unsourced: row?.unsourced,
       }
     })
   }
@@ -4809,6 +4820,7 @@ async function reconcilePhases(threadId: string, signal?: AbortSignal): Promise<
       toolName: r.tool_name,
       capability: r.capability,
       serviceName: r.service_name,
+      unsourced: r.unsourced,
   }))
 }
 
