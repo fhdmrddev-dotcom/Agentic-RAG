@@ -4268,4 +4268,87 @@ describe("WorkflowBuilderPage 197-09 — the arrival card is mounted, and the tw
     // must be GONE from the identity slot, not merely outranked.
     expect(screen.queryAllByText("vendor-brief")).toHaveLength(0)
   })
+
+  // ── 291-05 (D-15 / D-09 / D-12) — THE GENERATION'S EXTRAS REACH THE CARD ─────────────────
+  //
+  // `onDrafted`'s THIRD parameter carries what the server said about ONE generation: the
+  // powers it removed and the form's fields. It is the 197-09 hop again — a callback that
+  // names two parameters assigns to a three-parameter signature with NO TypeScript error, so
+  // the page would compile while silently dropping both. The source fence below reds on that
+  // deletion; the behaviour cases prove the words reach the screen.
+
+  it("291-05 — the page's onDrafted NAMES its third parameter and spends it in the same batch", () => {
+    const CALLBACK = ["onDrafted", ": (def, verdict, extras)"].join("")
+    const atCallback = builderSource.indexOf(CALLBACK)
+    expect(atCallback).toBeGreaterThan(-1)
+    // POSITIVE CONTROL — the needle discriminates against the two-parameter spelling.
+    expect(["onDrafted", ": (def, verdict) => {"].join("")).not.toContain(CALLBACK)
+    const EXTRAS_SETTER = ["setArrivalExtras", "(extras)"].join("")
+    // In the same batch as the other three snapshot writes.
+    expect(builderSource.slice(atCallback, atCallback + 260)).toContain(EXTRAS_SETTER)
+    expect(builderSource.slice(atCallback, atCallback + 260)).toContain(
+      ["setShowReceipt", "(true)"].join(""),
+    )
+    // Exactly one write, so no second site can hand the card a later snapshot.
+    expect(
+      builderSource.match(new RegExp(["setArrivalExtras", "\\("].join(""), "g")) ?? [],
+    ).toHaveLength(1)
+    // …and still exactly one card mount.
+    expect(builderSource.match(/<DraftArrivalCard\b/g) ?? []).toHaveLength(1)
+  })
+
+  it("291-05 — a removal the server reports reaches the card's face in the server's words", async () => {
+    const LEAD = "Removed: send email."
+    const REASON = "Only your description can add actions, not vendor-terms.pdf."
+    mockGenerate.mockResolvedValue({
+      ok: true,
+      definition: structuredClone(arrivalDef),
+      removed: [{ lead: LEAD, reason: REASON }],
+    })
+    const card = await draftAndArrive()
+    const lines = within(card).getAllByTestId("draft-arrival-removed")
+    expect(lines).toHaveLength(1)
+    expect(lines[0].textContent).toContain(`${LEAD} ${REASON}`)
+    // No fields were returned, so there is no inputs fold.
+    expect(within(card).queryByTestId("draft-arrival-fold-inputs")).toBeNull()
+  })
+
+  it("291-05 — no extras ⇒ no removed line and no inputs fold (the card as it was)", async () => {
+    const card = await draftAndArrive()
+    expect(within(card).queryByTestId("draft-arrival-removed")).toBeNull()
+    expect(within(card).queryByTestId("draft-arrival-fold-inputs")).toBeNull()
+    // The graph column still has exactly three children.
+    expect(countChildren(graphColumn())).toBe(3)
+  })
+
+  it("291-05 — the form's fields open the inputs fold, and a flip writes the LIVE definition", async () => {
+    const withInputs = {
+      ...structuredClone(arrivalDef),
+      inputs: [{ key: "supplier_name", label: "Supplier name", type: "text", required: true, source: "user" }],
+    }
+    mockGenerate.mockResolvedValue({
+      ok: true,
+      definition: withInputs,
+      fields: [
+        { key: "supplier_name", label: "Supplier name", type: "text", enum_options: [], covered_by: "input" },
+      ],
+    })
+    const card = await draftAndArrive()
+    const trigger = within(card).getByTestId("draft-arrival-fold-inputs")
+    expect(trigger.textContent).toContain("1 input from")
+    // FIRST in the footer strip.
+    expect(trigger.parentElement?.firstElementChild).toBe(trigger)
+    fireEvent.click(trigger)
+    const body = await within(card).findByTestId("draft-arrival-inputs-body")
+    const group = within(body).getByRole("radiogroup", {
+      name: "Where the answer to Supplier name comes from",
+    })
+    const look = within(group).getByLabelText("Look it up") as HTMLInputElement
+    const ask = within(group).getByLabelText("Ask the person") as HTMLInputElement
+    expect(ask.checked).toBe(true)
+    fireEvent.click(look)
+    // The switch is CONTROLLED by the live definition, so it moving IS the store write.
+    await waitFor(() => expect((within(group).getByLabelText("Look it up") as HTMLInputElement).checked).toBe(true))
+    expect((within(group).getByLabelText("Ask the person") as HTMLInputElement).checked).toBe(false)
+  })
 })

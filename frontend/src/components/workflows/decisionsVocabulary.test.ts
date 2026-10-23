@@ -71,7 +71,14 @@ function withoutComments(src: string): string {
 const CODE_ONLY = withoutComments(decisionsVocabularySource)
 
 /** The three exported FUNCTIONS, named rather than discovered — see the totality guard below. */
-const FUNCTION_EXPORTS = ["decisionRowLabel", "groundingFoldSummary", "decisionsFoldSummary"]
+/** 291-05 (D-32) adds a FOURTH, `templateRowReferencesLine`, deliberately: the totality guard
+ *  below demands it be named here AND driven in `ALL_COPY`, so the D-20 sweep stays total. */
+const FUNCTION_EXPORTS = [
+  "decisionRowLabel",
+  "groundingFoldSummary",
+  "decisionsFoldSummary",
+  "templateRowReferencesLine",
+]
 
 /** Every plain string value the module exports. */
 const STRING_EXPORTS: { id: string; text: string }[] = Object.entries(decisionsVocabulary)
@@ -91,6 +98,10 @@ const ALL_COPY: { id: string; text: string }[] = [
     { id: `groundingFoldSummary(${n})`, text: groundingFoldSummary(n) },
     { id: `decisionsFoldSummary(${n})`, text: decisionsFoldSummary(n) },
   ]),
+  {
+    id: "templateRowReferencesLine(2)",
+    text: decisionsVocabulary.templateRowReferencesLine(["terms.pdf", "notes.md"]),
+  },
 ]
 
 // ── 1. the row order is DATA, and it is five (D-07) ───────────────────────────────────────
@@ -393,5 +404,35 @@ describe("decisionsVocabulary — the module is a TRUE LEAF", () => {
     expect(stripped).not.toMatch(/GONE/)
     expect(stripped).toMatch(/export const KEPT/)
     expect(stripped).not.toMatch(/trailing/)
+  })
+})
+
+// ── 7. 291-05 — the removed line's glyph (D-15, sketch 291-draft-removed A) ──────────────────
+
+describe("291-05 — REMOVED_GLYPH, the one glyph this module adds for the removed line", () => {
+  it("is the circled-slash mark, by codepoint (the UI-SPEC copy table)", () => {
+    // Pinned by codepoint so this file holds no second spelling of the glyph.
+    expect(decisionsVocabulary.REMOVED_GLYPH).toBe(String.fromCodePoint(0x2298))
+  })
+
+  it("is a glyph, not a sentence — the server owns every word of the removed line (SEED-221)", () => {
+    const glyph = String(decisionsVocabulary.REMOVED_GLYPH)
+    expect([...glyph]).toHaveLength(1)
+    expect(glyph).not.toMatch(/[A-Za-z]/)
+  })
+})
+
+describe("291-05 — templateRowReferencesLine, the references sub-line (D-32)", () => {
+  it("names the files in order and says plainly that steps do NOT read them at run time", () => {
+    expect(decisionsVocabulary.templateRowReferencesLine(["vendor-terms.pdf", "policy.md"])).toBe(
+      "Read first: vendor-terms.pdf, policy.md. Used to write this draft; steps don't read them when the workflow runs.",
+    )
+    expect(decisionsVocabulary.templateRowReferencesLine(["one.txt"])).toBe(
+      "Read first: one.txt. Used to write this draft; steps don't read them when the workflow runs.",
+    )
+  })
+
+  it("is total: no names ⇒ the empty string, so the row draws no sub-line", () => {
+    expect(decisionsVocabulary.templateRowReferencesLine([])).toBe("")
   })
 })

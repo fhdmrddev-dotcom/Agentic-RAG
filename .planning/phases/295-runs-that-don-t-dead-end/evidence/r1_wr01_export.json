@@ -1,0 +1,167 @@
+{
+  "run": {
+    "id": "f0d5d678-3070-4eee-a1dd-9541d49f6231",
+    "status": "failed",
+    "workflow_name": "295-07 S1 found nothing",
+    "started_at": "2026-10-21T02:46:31.017574Z",
+    "completed_at": "2026-10-21T02:46:34.532486Z",
+    "started_by": {
+      "name": "fhdmrd@gmail.com",
+      "email": "fhdmrd@gmail.com",
+      "is_you": true
+    },
+    "org_name": "fhdmrd@gmail.com's Organization",
+    "model": "claude-opus-5-5",
+    "viewer_is_owner": true,
+    "thread_id": "6b5346d8-5ad6-4f84-8ee2-920eef5592f8",
+    "end_reason": "Phase 1 (research) gate failed after 3 attempt(s): citations_required: the model call for this step failed — this is a service outage, not model non-compliance"
+  },
+  "definition": {
+    "recorded": true,
+    "version": 1,
+    "phases": [
+      {
+        "n": 1,
+        "slug": "research",
+        "name": "Find the project status",
+        "phase_type": "llm_agent"
+      },
+      {
+        "n": 2,
+        "slug": "wrap",
+        "name": "Wrap up",
+        "phase_type": "llm_single"
+      }
+    ],
+    "full": {
+      "name": "295-07 S1 found nothing",
+      "slug": "p295-07-s1-found-nothing",
+      "assets": null,
+      "inputs": null,
+      "phases": [
+        {
+          "name": "Find the project status",
+          "slug": "research",
+          "config": {
+            "model": null,
+            "prompt": "Search the knowledge base for the latest project status: progress, open risks and next steps. Use the search_documents tool, and cite every document you use with its [n] marker. If nothing is found, say so plainly.",
+            "max_steps": 8,
+            "skill_ref": null,
+            "phase_type": "llm_agent",
+            "folder_scope": null,
+            "skill_snapshot": null,
+            "available_tools": [
+              "search_documents"
+            ],
+            "wall_clock_seconds": null
+          },
+          "validators": [],
+          "phase_index": 0,
+          "action_risk_armed": false,
+          "name_seeded_by_ai": false,
+          "grounding_escalated": false
+        },
+        {
+          "name": "Wrap up",
+          "slug": "wrap",
+          "config": {
+            "model": null,
+            "prompt": "In two sentences, summarise what the previous step found about the project status.",
+            "skill_ref": null,
+            "phase_type": "llm_single",
+            "temperature": null,
+            "folder_scope": null,
+            "skill_snapshot": null
+          },
+          "validators": [],
+          "phase_index": 1,
+          "action_risk_armed": false,
+          "name_seeded_by_ai": false,
+          "grounding_escalated": false
+        }
+      ],
+      "status": "draft",
+      "version": 1,
+      "category": null,
+      "provenance": "source",
+      "is_stateful": false,
+      "version_policy": "supersede-by-filename",
+      "reingest_output": false,
+      "project_folder_id": "d886d6a8-bbad-4e7a-b188-aea65d651fd1",
+      "business_requirement": "Report the project status from the project's documents.",
+      "output_target_folder": null,
+      "business_requirement_seeded_by_ai": false
+    }
+  },
+  "definition_changed": {
+    "changed": false,
+    "current_version": null
+  },
+  "kb_label": "295-07 empty KB folder",
+  "deliverable": {
+    "kind": "none",
+    "name": null,
+    "file_id": null
+  },
+  "phase_log": [
+    {
+      "n": 1,
+      "slug": "research",
+      "name": "Find the project status",
+      "phase_type": "llm_agent",
+      "status": "failed",
+      "started_at": "2026-10-21T02:46:31.017574Z",
+      "completed_at": "2026-10-21T02:46:34.532486Z",
+      "step_count": null,
+      "step_noun": null,
+      "output_text": null,
+      "failure_reason": "Phase 1 (research) gate failed after 3 attempt(s): citations_required: the model call for this step failed — this is a service outage, not model non-compliance",
+      "confidence": null,
+      "human_input": null,
+      "unsourced": null
+    },
+    {
+      "n": 2,
+      "slug": "wrap",
+      "name": "Wrap up",
+      "phase_type": "llm_single",
+      "status": "pending",
+      "started_at": null,
+      "completed_at": null,
+      "step_count": null,
+      "step_noun": null,
+      "output_text": null,
+      "failure_reason": null,
+      "confidence": null,
+      "human_input": null,
+      "unsourced": null
+    }
+  ],
+  "verdicts": [
+    {
+      "step_n": 1,
+      "phase_slug": "research",
+      "kind": "gate_failed",
+      "result": "failed",
+      "checked": [],
+      "at": "2026-10-21T02:46:32.441502Z"
+    },
+    {
+      "step_n": 1,
+      "phase_slug": "research",
+      "kind": "gate_failed",
+      "result": "failed",
+      "checked": [],
+      "at": "2026-10-21T02:46:33.532019Z"
+    },
+    {
+      "step_n": 1,
+      "phase_slug": "research",
+      "kind": "gate_failed",
+      "result": "failed",
+      "checked": [],
+      "at": "2026-10-21T02:46:34.529454Z"
+    }
+  ],
+  "sources": []
+}

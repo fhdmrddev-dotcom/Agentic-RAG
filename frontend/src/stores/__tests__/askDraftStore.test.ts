@@ -118,6 +118,65 @@ describe("askDraftStore (282-02 / D-12) — one draft per ask", () => {
     expect(nullThread.result.current).toBe(false)
   })
 
+  // ── Phase 295-06 (D-03 / D-32) — the chosen folder for "Search another folder" lives in the
+  // SAME draft, keyed by `tool_call_id`, so the chat pointer and the panel card never disagree
+  // about it (282-02's one-draft rule). One field, one action.
+  describe("Test 7 (295-06): the chosen folder is part of the one draft", () => {
+    it("7a: setFolder stores the folder on that ask's draft and useAskDraft returns it", () => {
+      const s = useAskDraftStore.getState()
+      s.setChoice("tc-f", 0)
+      s.setFolder("tc-f", "f-leases")
+      expect(useAskDraftStore.getState().drafts["tc-f"]).toEqual({
+        choiceIndex: 0,
+        freeText: "",
+        folderId: "f-leases",
+      })
+      const { result } = renderHook(() => useAskDraft("tc-f"))
+      expect(result.current.folderId).toBe("f-leases")
+      // Another ask's draft is untouched.
+      expect(useAskDraftStore.getState().drafts["tc-other"]).toBeUndefined()
+    })
+
+    it("7b: setChoice and setFreeText keep the chosen folder", () => {
+      const s = useAskDraftStore.getState()
+      s.setFolder("tc-f", "f-hr")
+      s.setChoice("tc-f", 1)
+      s.setFreeText("tc-f", "note")
+      expect(useAskDraftStore.getState().drafts["tc-f"]).toEqual({
+        choiceIndex: 1,
+        freeText: "note",
+        folderId: "f-hr",
+      })
+    })
+
+    it("7c: clearDraft and markSettled drop the chosen folder with the rest of the draft", () => {
+      const s = useAskDraftStore.getState()
+      s.setFolder("tc-c", "f-a")
+      s.clearDraft("tc-c")
+      expect(useAskDraftStore.getState().drafts["tc-c"]).toBeUndefined()
+      const cleared = renderHook(() => useAskDraft("tc-c"))
+      expect(cleared.result.current.folderId).toBeUndefined()
+
+      s.setFolder("tc-s", "f-b")
+      s.markSettled("tc-s")
+      expect(useAskDraftStore.getState().drafts["tc-s"]).toBeUndefined()
+      const settled = renderHook(() => useAskDraft("tc-s"))
+      expect(settled.result.current.folderId).toBeUndefined()
+    })
+
+    it("7d: EMPTY_DRAFT stays ONE frozen reference with no folder after a setFolder elsewhere", () => {
+      useAskDraftStore.getState().setFolder("tc-x", "f-x")
+      expect(Object.isFrozen(EMPTY_DRAFT)).toBe(true)
+      expect(EMPTY_DRAFT).toEqual({ choiceIndex: null, freeText: "" })
+      expect("folderId" in EMPTY_DRAFT).toBe(false)
+      const { result, rerender } = renderHook(() => useAskDraft("tc-none"))
+      const first = result.current
+      rerender()
+      expect(result.current).toBe(first)
+      expect(first).toBe(EMPTY_DRAFT)
+    })
+  })
+
   describe("Test 6: resetAskDrafts, and the global afterEach that calls it", () => {
     it("6a: resetAskDrafts empties drafts, settled and panelHomes (and leaves state behind for 6b)", () => {
       const s = useAskDraftStore.getState()

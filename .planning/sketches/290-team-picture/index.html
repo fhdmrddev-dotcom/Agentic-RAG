@@ -1,0 +1,353 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Sketch 290 — The Team Picture</title>
+<link rel="stylesheet" href="../themes/default.css">
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+<script src="../themes/phase-icons-3d.js"></script>
+<script src="icons-extra.js"></script>
+<style>
+*{box-sizing:border-box}
+body{margin:0;background:var(--color-bg);color:var(--color-text);font-family:var(--font-sans);font-size:var(--text-base)}
+.bar{display:flex;align-items:center;gap:8px;padding:10px 16px;border-bottom:1px solid var(--color-border);flex-wrap:wrap}
+.lbl{font-family:var(--font-mono);font-size:var(--text-xs);color:var(--color-text-dim);margin-right:6px}
+.tab{background:transparent;border:1px solid var(--color-border);color:var(--color-text-muted);font-size:var(--text-xs);padding:6px 12px;border-radius:999px;cursor:pointer;font-family:inherit}
+.vtab.active{background:var(--color-primary-dim);border-color:var(--color-primary);color:var(--color-primary)}
+.ftab.active{background:var(--color-accent);color:var(--color-text);border-color:var(--color-text-dim)}
+.tog{display:inline-flex;align-items:center;gap:6px;font-size:var(--text-xs);color:var(--color-text-muted);margin-left:8px;cursor:pointer}
+#note{padding:8px 16px;font-size:var(--text-sm);color:var(--color-text-muted);border-bottom:1px solid var(--color-border-soft);line-height:1.5}
+#note b{color:var(--color-text)}
+
+#frame{display:grid;grid-template-columns:minmax(0,1fr) 320px;gap:16px;margin:16px}
+#frame.noledger{grid-template-columns:minmax(0,1fr)}
+#frame.noledger #ledgerCol{display:none}
+
+/* mock builder chrome */
+.builder{border:1px solid var(--color-border);border-radius:12px;background:var(--color-surface);overflow:hidden}
+.bhead{display:flex;align-items:center;gap:10px;padding:10px 14px;border-bottom:1px solid var(--color-border)}
+.bhead .wf{font-weight:600}
+.bhead .meta{font-family:var(--font-mono);font-size:10px;color:var(--color-text-dim)}
+.seg{display:inline-flex;border:1px solid var(--color-border);border-radius:8px;overflow:hidden;margin-left:auto}
+.seg span{font-size:var(--text-xs);padding:5px 12px;color:var(--color-text-muted)}
+.seg span.on{background:var(--color-primary-dim);color:var(--color-primary)}
+.seg span.off{color:var(--color-text-dim);text-decoration:none;cursor:not-allowed}
+.ro{font-family:var(--font-mono);font-size:10px;color:var(--color-text-dim);border:1px solid var(--color-border);border-radius:999px;padding:2px 8px}
+#canvasWrap{overflow-x:auto;background:var(--color-bg)}
+#canvas{position:relative;padding:22px 22px 72px;min-height:420px}
+#edges{position:absolute;inset:0;pointer-events:none;overflow:visible}
+.caption{font-size:var(--text-xs);color:var(--color-text-dim);padding:10px 14px;border-top:1px solid var(--color-border-soft);line-height:1.6}
+.caption b{color:var(--color-text-muted)}
+
+/* shared node faces */
+.node{position:relative;background:var(--color-surface);border:1px solid var(--color-border);border-radius:10px;padding:9px 10px;z-index:1}
+.node .top{display:flex;align-items:center;gap:7px}
+.node .num{font-family:var(--font-mono);font-size:10px;color:var(--color-text-dim);border:1px solid var(--color-border);border-radius:999px;min-width:18px;height:18px;display:inline-flex;align-items:center;justify-content:center;flex:none}
+.node .role{font-family:var(--font-mono);font-size:9.5px;text-transform:uppercase;letter-spacing:.07em;color:var(--color-text-dim);margin-left:auto}
+.node .t{font-weight:600;font-size:var(--text-sm);margin-top:6px;line-height:1.3;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden}
+.node .s{font-size:11px;color:var(--color-text-muted);margin-top:3px;line-height:1.35}
+.node.human{border-color:hsl(38 92% 60% / .45);background:hsl(38 40% 9%)}
+.node.fixed{background:hsl(220 30% 6%);border-style:solid;border-color:var(--color-border-soft)}
+.node.orch{border-color:hsl(239 100% 82% / .45);background:hsl(239 40% 10%)}
+.node.orch .t{-webkit-line-clamp:3}
+.seats{display:flex;align-items:center;gap:4px;margin-top:7px;font-size:10px;color:var(--color-text-muted)}
+.seat{width:12px;height:12px;border-radius:50%;border:1px solid hsl(239 100% 82% / .55);background:var(--color-primary-dim)}
+.gate{background:hsl(220 30% 6%);border:1px solid var(--color-border);border-radius:8px;padding:6px 8px;font-size:11px;position:relative;z-index:1}
+.gate .k{font-family:var(--font-mono);font-size:9.5px;text-transform:uppercase;letter-spacing:.07em;color:var(--color-text-dim)}
+.gate.judge{border-color:hsl(258 90% 66% / .55);background:hsl(258 40% 10%)}
+.gate.judge .k{color:hsl(258 90% 80%)}
+.gate .w{color:var(--color-text);margin-top:2px}
+.gate .f{color:var(--color-text-muted);margin-top:2px}
+.gate .f .skip{color:var(--color-warning)}
+.absent{font-size:11px;color:var(--color-text-dim);font-style:italic}
+
+/* A — org chart */
+.A .orchRow{display:flex;justify-content:center;margin-bottom:56px}
+.A .orchRow .node{width:300px}
+.A .row{display:grid;gap:14px}
+.A .gates{display:grid;gap:14px;margin-top:34px}
+.A .gcol{display:flex;flex-direction:column;gap:8px}
+
+/* B — office floor */
+.B .room{position:relative;border:1px solid var(--color-border);border-radius:14px;padding:16px;background:
+  repeating-linear-gradient(0deg,transparent 0 39px,hsl(220 20% 16% / .25) 39px 40px),
+  repeating-linear-gradient(90deg,transparent 0 39px,hsl(220 20% 16% / .25) 39px 40px)}
+.B .roomlbl{position:absolute;top:-9px;left:14px;background:var(--color-bg);padding:0 6px;font-family:var(--font-mono);font-size:10px;color:var(--color-text-dim);text-transform:uppercase;letter-spacing:.07em}
+.B .head{display:grid;grid-template-columns:280px 1fr 220px;gap:16px;align-items:start;margin-bottom:22px}
+.B .record{border:1px dashed hsl(239 100% 82% / .35);border-radius:10px;padding:9px 10px;font-size:11px;color:var(--color-text-muted);line-height:1.5}
+.B .record b{color:var(--color-text)}
+.B .bench{display:flex;flex-direction:column;gap:8px}
+.B .benchlbl{font-family:var(--font-mono);font-size:10px;color:var(--color-text-dim);text-transform:uppercase;letter-spacing:.07em}
+.B .desks{display:grid;grid-template-columns:repeat(4,minmax(128px,1fr));gap:18px}
+.B .desk.wide{grid-column:span 2}
+.B .tags{display:flex;flex-wrap:wrap;gap:4px;margin-top:7px}
+.B .tag{font-size:10px;border:1px solid var(--color-border);border-radius:999px;padding:1px 7px;color:var(--color-text-muted)}
+.B .door{margin-top:26px;display:flex;gap:16px;align-items:flex-start}
+.B .doorlbl{font-family:var(--font-mono);font-size:10px;color:var(--color-text-dim);text-transform:uppercase;letter-spacing:.07em;width:110px;padding-top:10px}
+
+/* C — bands */
+.C .grid{display:grid;column-gap:14px;row-gap:0}
+.C .lane{font-family:var(--font-mono);font-size:10px;text-transform:uppercase;letter-spacing:.07em;color:var(--color-text-dim);padding:12px 8px 0 0;border-top:1px solid var(--color-border-soft)}
+.C .cell{border-top:1px solid var(--color-border-soft);padding:12px 0 14px;min-height:20px}
+.C .orchbar{border:1px solid hsl(239 100% 82% / .45);background:hsl(239 40% 10%);border-radius:10px;padding:8px 12px;font-size:var(--text-sm);display:flex;align-items:center;gap:10px}
+.C .orchbar .s{font-size:11px;color:var(--color-text-muted)}
+.C .ticks{display:grid;column-gap:14px;margin-top:8px}
+.C .tick{text-align:center;font-family:var(--font-mono);font-size:10px;color:var(--color-text-dim)}
+.C .tick span{display:inline-block;border:1px solid var(--color-border);border-radius:999px;min-width:18px;padding:0 4px}
+
+/* single node */
+.single{display:flex;flex-direction:column;align-items:center;gap:14px;padding:40px 0}
+.single .node{width:300px}
+.single p{max-width:440px;text-align:center;color:var(--color-text-muted);font-size:var(--text-sm);line-height:1.5;margin:0}
+
+/* ledger */
+#ledgerCol h3{font-family:var(--font-mono);font-size:10px;font-weight:500;text-transform:uppercase;letter-spacing:.07em;color:var(--color-text-dim);margin:0 0 8px}
+.ledger{border:1px solid var(--color-border);border-radius:12px;padding:12px;background:var(--color-surface);font-size:12px}
+.lrow{display:grid;grid-template-columns:52px 1fr;gap:8px;padding:7px 0;border-bottom:1px solid var(--color-border-soft)}
+.lrow:last-child{border-bottom:0}
+.lrow .w{color:var(--color-text)}
+.lrow .src{font-family:var(--font-mono);font-size:10px;color:var(--color-text-dim);margin-top:2px;word-break:break-all}
+.lrow svg{margin-top:4px}
+.notdrawn{margin-top:12px;padding-top:10px;border-top:1px solid var(--color-border);color:var(--color-text-muted);line-height:1.55}
+.notdrawn b{color:var(--color-text)}
+.count{display:inline-block;white-space:nowrap;font-family:var(--font-mono);font-size:10px;border:1px solid var(--color-border);border-radius:999px;padding:1px 7px;margin-right:4px;color:var(--color-text-muted)}
+.legend{margin:0 16px 20px;font-size:var(--text-xs);color:var(--color-text-dim);line-height:1.7}
+.legend b{color:var(--color-text-muted)}
+</style>
+</head>
+<body>
+<div class="bar" id="vnav"><span class="lbl">290 · team picture</span>
+  <button class="tab vtab active" data-v="A">★ A · Org chart (winner)</button>
+  <button class="tab vtab" data-v="B">B · Office floor</button>
+  <button class="tab vtab" data-v="C">C · Layers (control room)</button>
+</div>
+<div class="bar" id="fnav"><span class="lbl">workflow definition</span>
+  <button class="tab ftab active" data-f="vendor">Vendor risk review · 7 steps</button>
+  <button class="tab ftab" data-f="lit">Literature review · 3 steps (seeded)</button>
+  <button class="tab ftab" data-f="pev">Plan → Execute → Verify · 3 steps (seeded)</button>
+  <button class="tab ftab" data-f="single">Draft a reply · 1 step</button>
+  <label class="tog"><input type="checkbox" id="tLedger" checked> Show where each line comes from</label>
+  <label class="tog"><input type="checkbox" id="tTech"> ⌥ Technical names</label>
+</div>
+<div id="note"></div>
+<div id="frame">
+  <div>
+    <div class="builder">
+      <div class="bhead">
+        <span class="wf" id="wfName"></span><span class="meta" id="wfMeta"></span>
+        <span class="seg"><span>Steps</span><span id="segTeam" class="on">Team</span></span>
+        <span class="ro">read-only</span>
+      </div>
+      <div id="canvasWrap"><div id="canvas"></div></div>
+      <div class="caption" id="caption"></div>
+    </div>
+  </div>
+  <div id="ledgerCol"><h3>Every line on this picture</h3><div class="ledger" id="ledger"></div></div>
+</div>
+<div class="legend">
+  <b>Rules every variant keeps:</b> the picture is computed from the workflow definition and nothing else — no run data, no second canvas, read-only.
+  The orchestrator is the engine, not a step: it runs steps in <code>phase_index</code> order and keeps the shared record (every step reads all earlier outputs).
+  Steps never link to each other — the definition has no such field — so no step-to-step line is ever drawn. The only step-to-step mark is <b>⤳</b>, and only where a check's <code>on_failure</code> says <code>skip_to_phase</code>.
+  A <b>judge</b> is a <code>llm_judge_rubric</code> gate on one step: it has no node of its own in the Steps view, so here it sits beside the step it grades and draws one line to it. Other gates are <b>checks</b>, not judges.
+  A parallel step shows <b>up to N</b> seats from <code>max_parallel_agents</code> — a cap, not a headcount.
+</div>
+<script>
+/* ── fixtures: real WorkflowDefinition shape (models/harness.py) ─────────────── */
+const DEFS = {
+  vendor:{slug:"vendor_risk_review",version:3,name:"Vendor risk review",status:"published",phases:[
+    {slug:"prepare",phase_index:0,name:"Prepare the vendor list",config:{phase_type:"programmatic"}},
+    {slug:"research",phase_index:1,name:"Research each vendor's breach history",config:{phase_type:"llm_agent",available_tools:["search_documents","web_search"]},
+      validators:[{kind:"citations_required",on_failure:"skip_to_phase:confirm",max_retries:2}]},
+    {slug:"score",phase_index:2,name:"Score each vendor on risk",config:{phase_type:"llm_batch_agents",available_tools:["search_documents"],max_parallel_agents:5},
+      validators:[{kind:"llm_judge_rubric",on_failure:"retry",max_retries:2,config:{rubric:"Each score cites a finding and states its severity."}}]},
+    {slug:"summarise",phase_index:3,name:"Summarise the scores",config:{phase_type:"llm_single"}},
+    {slug:"confirm",phase_index:4,name:"Confirm escalations",config:{phase_type:"llm_human_input",options:["Escalate","Hold","Drop"]}},
+    {slug:"report",phase_index:5,name:"Produce the risk report",config:{phase_type:"llm_emit"},
+      validators:[{kind:"output_file_valid",on_failure:"fail_run",max_retries:2}]},
+    {slug:"notify",phase_index:6,name:"Post the summary to #procurement",config:{phase_type:"external_action",capability:"post_message"}}
+  ]},
+  lit:{slug:"literature_review",version:1,name:"Literature review",status:"published",phases:[
+    {slug:"split",phase_index:0,name:null,config:{phase_type:"programmatic"}},
+    {slug:"review",phase_index:1,name:null,config:{phase_type:"llm_batch_agents",available_tools:["search_documents"],max_parallel_agents:5}},
+    {slug:"merge",phase_index:2,name:null,config:{phase_type:"llm_single"}}
+  ]},
+  pev:{slug:"plan_execute_verify",version:1,name:"Plan → Execute → Verify",status:"published",phases:[
+    {slug:"plan",phase_index:0,name:null,config:{phase_type:"llm_single"}},
+    {slug:"execute",phase_index:1,name:null,config:{phase_type:"llm_agent",available_tools:["search_documents","execute_code"]}},
+    {slug:"verify",phase_index:2,name:null,config:{phase_type:"llm_single"},validators:[{kind:"regex_match",on_failure:"retry",max_retries:2}]}
+  ]},
+  single:{slug:"draft_reply",version:2,name:"Draft a reply",status:"draft",phases:[
+    {slug:"draft",phase_index:0,name:"Draft a reply from the policy library",config:{phase_type:"llm_agent",available_tools:["search_documents"]}}
+  ]}
+};
+
+/* ── shipped vocabulary (phaseVocabulary.ts / soulData.ts) ─────────────────── */
+const SENTENCE={programmatic:"Prepare the inputs",llm_single:"Write it up",llm_agent:"Work out how to do it",llm_batch_agents:"Work on the parts together",llm_human_input:"Check with you",llm_emit:"Produce the deliverable",external_action:"Reach outside"};
+const SUBTITLE={programmatic:"A fixed step the server runs",llm_single:"Writes one piece in one pass",llm_agent:"Searches and decides its own next move",llm_batch_agents:"Several assistants work in parallel",llm_human_input:"Pauses here until you answer",llm_emit:"Fills your template and produces the file",external_action:"Stops for your approval before it acts outside"};
+const LABEL={programmatic:"Server step",llm_single:"AI write step",llm_agent:"AI agent step",llm_batch_agents:"Parallel agents",llm_human_input:"Needs you",llm_emit:"Deliverable",external_action:"External action"};
+const GLYPH={programmatic:"programmatic",llm_single:"llm_single",llm_agent:"llm_agent_compass",llm_batch_agents:"llm_batch_agents_alt",llm_human_input:"llm_human_input",llm_emit:"llm_emit",external_action:"external_action"};
+/* PROPOSAL (net-new, flagged): the team-role word in the node's corner */
+const ROLE={programmatic:"fixed step",llm_single:"writer",llm_agent:"agent",llm_batch_agents:"team",llm_human_input:"you",llm_emit:"producer",external_action:"outside"};
+const GATE_WORD={llm_judge_rubric:"Grades the output against a rubric",citations_required:"Must cite its sources",output_file_valid:"The file must open",regex_match:"Must match a pattern",json_schema:"Must match a shape",workspace_file_exists:"A file must exist",freshness:"Sources must be recent",structure_check:"Must have the right sections",programmatic:"A server check",action_risk_approval:"Asks you before acting"};
+
+let V="A", F="vendor", LEDGER=true, TECH=false;
+
+/* ── the ONE derivation: definition → picture model. Variants only draw it. ── */
+function model(def){
+  const ph=[...def.phases].sort((a,b)=>a.phase_index-b.phase_index);
+  const idx=Object.fromEntries(ph.map((p,i)=>[p.slug,i]));
+  const steps=ph.map((p,i)=>({i,n:i+1,slug:p.slug,type:p.config.phase_type,title:p.name||SENTENCE[p.config.phase_type],
+    seats:p.config.phase_type==="llm_batch_agents"?(p.config.max_parallel_agents??5):0,human:p.config.phase_type==="llm_human_input",fixed:p.config.phase_type==="programmatic"}));
+  const gates=[], edges=[];
+  ph.forEach((p,i)=>{
+    edges.push({kind:"handoff",from:"orch",to:"s"+i,src:`phases[${i}].phase_index = ${p.phase_index}`,w:`Orchestrator → step ${i+1}`});
+    (p.validators||[]).forEach((v,k)=>{
+      const id=`g${i}_${k}`, judge=v.kind==="llm_judge_rubric";
+      let fail, skipTo=null;
+      if(v.on_failure.startsWith("skip_to_phase:")){skipTo=idx[v.on_failure.split(":")[1]];fail=`<span class="skip">⤳ jump to step ${skipTo+1}</span>`;}
+      else fail={retry:`redo the step (up to ${v.max_retries})`,fail_run:"stop the run",ask_user:"ask you"}[v.on_failure]||"stop the run";
+      gates.push({id,step:i,judge,kind:v.kind,fail,rubric:v.config&&v.config.rubric});
+      edges.push({kind:judge?"judge":"check",from:id,to:"s"+i,src:`phases[${i}].validators[${k}].kind = "${v.kind}"`,w:`${judge?"Judge":"Check"} → step ${i+1}`});
+      if(skipTo!=null) edges.push({kind:"skip",from:id,fromStep:"s"+i,to:"s"+skipTo,src:`phases[${i}].validators[${k}].on_failure = "${v.on_failure}"`,w:`⤳ step ${i+1} → step ${skipTo+1}, only if the check fails`});
+    });
+  });
+  return {def,steps,gates,edges,single:steps.length<2};
+}
+
+/* ── node faces ─────────────────────────────────────────────────────────── */
+const sub=s=>TECH?`${LABEL[s.type]} · ${s.slug}`:SUBTITLE[s.type];
+function stepNode(s,extra=""){
+  const cls=s.human?"human":s.fixed?"fixed":"";
+  const seats=s.seats?`<div class="seats">${'<span class="seat"></span>'.repeat(s.seats)}<span>up to ${s.seats} at once</span></div>`:"";
+  return `<div class="node ${cls}" data-node="s${s.i}">
+    <div class="top"><span class="num">${s.n}</span>${icon3d(GLYPH[s.type],24)}<span class="role">${ROLE[s.type]}</span></div>
+    <div class="t">${s.title}</div><div class="s">${sub(s)}</div>${seats}${extra}</div>`;
+}
+function gateNode(g){
+  const w=TECH?g.kind:GATE_WORD[g.kind]||g.kind;
+  return `<div class="gate ${g.judge?"judge":""}" data-node="${g.id}"><div class="k">${g.judge?"Judge":"Check"} · step ${g.step+1}</div>
+    <div class="w">${w}</div>${g.rubric&&!TECH?`<div class="f">“${g.rubric}”</div>`:""}<div class="f">If it fails: ${g.fail}</div></div>`;
+}
+const orchNode=(m,extra="")=>`<div class="node orch" data-node="orch"><div class="top"><span class="role" style="margin-left:0">orchestrator</span></div>
+  <div class="t">Syrel runs the ${m.steps.length} steps in order</div><div class="s">Hands each step its turn and keeps the shared record — every step reads what the earlier ones produced.</div>${extra}</div>`;
+
+/* ── variants ───────────────────────────────────────────────────────────── */
+function drawA(m){
+  const cols=`repeat(${m.steps.length},minmax(128px,1fr))`;
+  const gcols=m.steps.map(s=>`<div class="gcol">${m.gates.filter(g=>g.step===s.i).map(gateNode).join("")}</div>`).join("");
+  const anyGate=m.gates.length?"":`<div class="absent" style="margin-top:22px;text-align:center">No judge and no checks on this workflow — none drawn.</div>`;
+  return `<div class="A"><div class="orchRow">${orchNode(m)}</div>
+    <div class="row" style="grid-template-columns:${cols}">${m.steps.map(s=>stepNode(s)).join("")}</div>
+    ${m.gates.length?`<div class="gates" style="grid-template-columns:${cols}">${gcols}</div>`:anyGate}</div>`;
+}
+function drawB(m){
+  const inside=m.steps.filter(s=>!s.human);
+  const judges=m.gates.filter(g=>g.judge), checks=m.gates.filter(g=>!g.judge);
+  const desk=s=>{
+    const tags=checks.filter(g=>g.step===s.i).map(g=>`<span class="tag">check: ${TECH?g.kind:GATE_WORD[g.kind]}${g.fail.includes("⤳")?` · ${g.fail.replace(/<[^>]+>/g,"")}`:""}</span>`).join("");
+    return `<div class="desk ${s.seats?"wide":""}">${stepNode(s,tags?`<div class="tags">${tags}</div>`:"")}</div>`;
+  };
+  const bench=judges.length?judges.map(gateNode).join(""):`<div class="absent">No judge on this workflow.</div>`;
+  const humans=m.steps.filter(s=>s.human);
+  return `<div class="B"><div class="room"><span class="roomlbl">the room</span>
+    <div class="head">${orchNode(m)}
+      <div class="record"><b>The shared record</b><br>Outputs land here in order: ${m.steps.map(s=>s.n).join(" → ")}.<br>Desks don't pass work to each other — each one reads the record.</div>
+      <div class="bench"><span class="benchlbl">judge's bench</span>${bench}</div></div>
+    <div class="desks">${inside.map(desk).join("")}</div></div>
+    ${humans.length?`<div class="door"><span class="doorlbl">at your door</span>${humans.map(s=>`<div style="width:220px">${stepNode(s)}</div>`).join("")}</div>`:""}</div>`;
+}
+function drawC(m){
+  const n=m.steps.length, cols=`110px repeat(${n},minmax(128px,1fr))`;
+  const lane=(label,cellFn)=>`<div class="lane">${label}</div>`+m.steps.map(s=>`<div class="cell">${cellFn(s)}</div>`).join("");
+  const anyHuman=m.steps.some(s=>s.human);
+  const ticks=`<div class="ticks" style="grid-template-columns:repeat(${n},minmax(128px,1fr))">${m.steps.map(s=>`<div class="tick"><span data-node="t${s.i}">${s.n}</span></div>`).join("")}</div>`;
+  const orch=`<div class="lane">Runs the work</div><div class="cell" style="grid-column:span ${n}"><div class="orchbar" data-node="orch"><span class="role" style="font-family:var(--font-mono);font-size:9.5px;text-transform:uppercase;letter-spacing:.07em;color:var(--color-text-dim)">orchestrator</span><span>Syrel runs the steps in order</span><span class="s">· keeps the shared record every step reads</span></div>${ticks}</div>`;
+  const work=lane("Does the work",s=>s.human?"":stepNode(s));
+  const you=anyHuman?lane("Waits for you",s=>s.human?stepNode(s):""):"";
+  const checks=m.gates.length?lane("Checks the work",s=>m.gates.filter(g=>g.step===s.i).map(gateNode).join(`<div style="height:8px"></div>`))
+    :`<div class="lane">Checks the work</div><div class="cell absent" style="grid-column:span ${n}">No judge and no checks on this workflow — none drawn.</div>`;
+  return `<div class="C"><div class="grid" style="grid-template-columns:${cols}">${orch}${work}${you}${checks}</div></div>`;
+}
+function drawSingle(m){
+  const s=m.steps[0];
+  return `<div class="single">${stepNode(s)}<p>This workflow has one step. One agent does the work alone, so there is no team to picture — and none is invented.</p></div>`;
+}
+
+/* ── edges: computed from the model, drawn between rendered nodes ─────────── */
+const STYLE={handoff:{stroke:"hsl(239 100% 82% / .45)",dash:"",w:1.4},judge:{stroke:"hsl(258 90% 75%)",dash:"2 4",w:1.6},check:{stroke:"hsl(220 16% 55%)",dash:"2 4",w:1.3},skip:{stroke:"hsl(38 92% 60%)",dash:"6 5",w:1.6}};
+function edgeSample(kind){const st=STYLE[kind];return `<svg width="30" height="10"><line x1="0" y1="5" x2="30" y2="5" stroke="${st.stroke}" stroke-width="${st.w}" stroke-dasharray="${st.dash}"/></svg>`;}
+function drawEdges(m){
+  const cv=document.getElementById("canvas");
+  let svg=document.getElementById("edges"); if(svg) svg.remove();
+  svg=document.createElementNS("http://www.w3.org/2000/svg","svg"); svg.id="edges";
+  svg.setAttribute("width",cv.scrollWidth); svg.setAttribute("height",cv.scrollHeight);
+  cv.prepend(svg);
+  const base=cv.getBoundingClientRect();
+  const box=id=>{const el=cv.querySelector(`[data-node="${id}"]`); if(!el) return null; const r=el.getBoundingClientRect(); return {x:r.left-base.left,y:r.top-base.top,w:r.width,h:r.height,cx:r.left-base.left+r.width/2,cy:r.top-base.top+r.height/2};};
+  let out="";
+  const path=(d,kind)=>{const st=STYLE[kind];out+=`<path d="${d}" fill="none" stroke="${st.stroke}" stroke-width="${st.w}" stroke-dasharray="${st.dash}" stroke-linecap="round"/>`;};
+  const drawn=new Set();
+  m.edges.forEach(e=>{
+    if(V==="B" && e.kind==="handoff") return;            // B shows order by number, not lines
+    if(V==="B" && e.kind==="check") return;              // B puts checks ON the desk as tags
+    const fromId = (V==="C" && e.kind==="handoff") ? "t"+e.to.slice(1) : (V==="B" && e.kind==="skip") ? e.fromStep : e.from;
+    const a=box(fromId), b=box(e.to); if(!a||!b) return;
+    drawn.add(e);
+    if(e.kind==="handoff"){
+      if(V==="A"){const busY=a.y+a.h+28; path(`M${a.cx},${a.y+a.h} V${busY} H${b.cx} V${b.y}`,"handoff");}
+      else path(`M${a.cx},${a.y+a.h} V${b.y}`,"handoff");
+    } else if(e.kind==="judge"||e.kind==="check"){
+      if(V==="B"){ const x=Math.min(Math.max(a.cx,b.x+14),b.x+b.w-14); path(`M${a.cx},${a.y+a.h} L${x},${b.y}`,e.kind); }
+      else path(`M${a.cx},${a.y} V${b.y+b.h}`,e.kind);
+    } else if(e.kind==="skip"){
+      const sx=b.cx, ex=a.cx;
+      if(V==="B"){ const gx=a.x-9; path(gx>b.x&&gx<b.x+b.w?`M${a.x},${a.cy} H${gx} V${b.y}`:`M${a.x},${a.cy} H${gx} V${b.cy} H${b.x+b.w}`,"skip"); out+=`<text x="${a.x-14}" y="${b.cy-8}" fill="hsl(38 92% 60%)" font-size="12" text-anchor="end">⤳ only if the check fails</text>`; }
+      else { const gb=[...cv.querySelectorAll(".gate")].map(g=>g.getBoundingClientRect().bottom-base.top); const low=Math.max(a.y+a.h,b.y+b.h,...gb)+30; path(`M${a.cx},${a.y+a.h} V${low} H${b.cx} V${b.y+b.h}`,"skip");
+        out+=`<text x="${(a.cx+b.cx)/2}" y="${low+16}" fill="hsl(38 92% 60%)" font-size="12" text-anchor="middle">⤳ only if the check fails</text>`; }
+    }
+  });
+  svg.innerHTML=out;
+  return drawn;
+}
+
+/* ── ledger: the SC#3 surface — every drawn line names its schema source ───── */
+function ledger(m,drawn){
+  const how=e=>V==="B"&&e.kind==="handoff"?"shown as the desk number, not a line":V==="B"&&e.kind==="check"?"shown as a tag on the desk, not a line":"";
+  const rows=m.edges.map(e=>`<div class="lrow">${drawn.has(e)?edgeSample(e.kind):'<span class="count">no line</span>'}<div><div class="w">${e.w}</div>${how(e)?`<div class="src" style="color:var(--color-text-muted)">${how(e)}</div>`:""}<div class="src">${e.src}</div></div></div>`).join("");
+  const seats=m.steps.filter(s=>s.seats).map(s=>`<div class="lrow"><span class="count">seats</span><div><div class="w">Step ${s.n}: up to ${s.seats} assistants</div><div class="src">phases[${s.i}].config.max_parallel_agents = ${s.seats}</div><div class="src" style="color:var(--color-text-muted)">a cap — how many actually ran is only known in a run</div></div></div>`).join("");
+  const nJudge=m.gates.filter(g=>g.judge).length;
+  return rows+seats+`<div class="notdrawn"><span class="count">0</span><b>step-to-step links</b> — the definition has no field for one, so none is drawn. Steps share work only through the orchestrator's record.<br>
+    <span class="count">${nJudge}</span><b>judge${nJudge===1?"":"s"}</b>${nJudge?"":" — none in this definition, so none is shown"}.</div>`;
+}
+
+/* ── chrome + notes ─────────────────────────────────────────────────────── */
+const NOTES={
+  A:"<b>A · Org chart.</b> The orchestrator sits on top and branches to every step in run order; judges and checks hang under the step they grade. Most literal and the easiest to test: one line per real relationship. Risk: at 7 steps it is wide, and a tree can read as “a hierarchy of bosses” when the engine is really a sequence.",
+  B:"<b>B · Office floor.</b> A room of desks: the orchestrator's desk and the shared record at the head, a judge's bench on the side, your step at the door. Almost no lines — order is the desk number, checks are tags on the desk. Warmest and most “team-like”; risk: the metaphor carries meaning the engine doesn't have (desks look like they could talk to each other).",
+  C:"<b>C · Layers (control room).</b> Lanes for who runs the work, who does it, who waits for you, who checks it — each step keeps its column, so order reads left to right and everything about one step lines up vertically. Scales to 7+ steps without a fan of branches, and shows where a person enters at a glance. Risk: the least “cute” of the three."
+};
+function render(){
+  const m=model(DEFS[F]);
+  document.getElementById("wfName").textContent=m.def.name;
+  document.getElementById("wfMeta").textContent=`v${m.def.version} · ${m.def.status} · ${m.steps.length} step${m.steps.length>1?"s":""}`;
+  const seg=document.getElementById("segTeam");
+  seg.className=m.single?"off":"on"; seg.textContent=m.single?"Team · one step, no team":"Team";
+  document.getElementById("note").innerHTML=NOTES[V];
+  const cv=document.getElementById("canvas");
+  cv.innerHTML=m.single?drawSingle(m):({A:drawA,B:drawB,C:drawC}[V])(m);
+  document.getElementById("caption").innerHTML=m.single
+    ?"<b>Single step.</b> The Team view is not offered for a one-step workflow (the segment is disabled); if opened by link it shows this honest single node."
+    :`<b>Built from the definition only.</b> ${m.steps.length} steps · ${m.gates.filter(g=>g.judge).length} judge · ${m.gates.filter(g=>!g.judge).length} check · ${m.edges.filter(e=>e.kind==="skip").length} ⤳ jump · 0 step-to-step links.`;
+  requestAnimationFrame(()=>{const drawn=m.single?new Set():drawEdges(m); document.getElementById("ledger").innerHTML=m.single?'<div class="notdrawn" style="margin:0;border:0;padding:0"><span class="count">0</span><b>lines</b> — one step has nothing to connect to.</div>':ledger(m,drawn);});
+  document.getElementById("frame").classList.toggle("noledger",!LEDGER);
+}
+document.querySelectorAll(".vtab").forEach(b=>b.onclick=()=>{document.querySelectorAll(".vtab").forEach(x=>x.classList.remove("active"));b.classList.add("active");V=b.dataset.v;render();});
+document.querySelectorAll(".ftab").forEach(b=>b.onclick=()=>{document.querySelectorAll(".ftab").forEach(x=>x.classList.remove("active"));b.classList.add("active");F=b.dataset.f;render();});
+document.getElementById("tLedger").onchange=e=>{LEDGER=e.target.checked;render();};
+document.getElementById("tTech").onchange=e=>{TECH=e.target.checked;render();};
+window.addEventListener("resize",()=>render());
+render();
+</script>
+</body>
+</html>

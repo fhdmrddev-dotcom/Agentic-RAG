@@ -559,6 +559,55 @@ class AskUserResponseBody(BaseModel):
     tool_call_id: str
     response_text: str
     choice_index: "int | None" = None
+    # Phase 295 (D-03): the folder an engine ask's "Search another folder" answer chose. Only
+    # ever one of the ids the prompt row's ``engine_pause.folders`` offered (allow-listed below).
+    folder_id: "str | None" = None
+
+
+async def _engine_answer_refusal(run_id: UUID, thread_id, body: "AskUserResponseBody") -> "str | None":
+    """Phase 295 (T-295-03-01 / -02): refuse an answer an ENGINE ask never offered.
+
+    Loads this run's prompt row for ``body.tool_call_id`` (run-scoped: the prompt carries the
+    workflow run id) and hands it to ``engine_ask.engine_answer_refusal`` — the one allow-list,
+    shared with the consume step. A prompt without ``engine_pause`` returns None (unaffected).
+    """
+    from app.dependencies import get_pg_pool  # noqa: PLC0415
+    from app.services.harness.engine_ask import engine_answer_refusal  # noqa: PLC0415
+
+    pool = await get_pg_pool()
+    prompt = await pool.fetchrow(
+        """
+        SELECT tool_calls FROM messages
+        WHERE thread_id = $1::uuid AND role = 'system'
+          AND tool_calls @> '[{"kind": "ask_user_prompt"}]'::jsonb
+          AND tool_calls->0->>'tool_call_id' = $2
+          AND tool_calls->0->>'run_id' = $3
+        ORDER BY created_at DESC LIMIT 1
+        """,
+        str(thread_id), body.tool_call_id, str(run_id),
+    )
+    tcs = prompt["tool_calls"] if prompt is not None else None
+    if isinstance(tcs, str):
+        tcs = json.loads(tcs)
+    tool_call = tcs[0] if isinstance(tcs, list) and tcs else None
+    return engine_answer_refusal(
+        tool_call, response_text=body.response_text,
+        choice_index=body.choice_index, folder_id=body.folder_id,
+    )
+
+
+async def _is_current_question(run_id: UUID, tool_call_id: str) -> bool:
+    """295-REVIEW CR-01: is ``tool_call_id`` the run's newest UNANSWERED prompt?
+
+    The same read ``/workflow-runs`` uses for "who is this run waiting on"
+    (``get_unanswered_ask_user``, run-scoped by the prompt's ``run_id``). The caller has
+    already passed the owner + thread-anchor check for this run.
+    """
+    from app.db.workflows import get_unanswered_ask_user  # noqa: PLC0415
+    from app.dependencies import get_pg_pool  # noqa: PLC0415
+
+    pending = await get_unanswered_ask_user(await get_pg_pool(), run_id)
+    return bool(pending) and str(pending.get("tool_call_id")) == str(tool_call_id)
 
 
 _REDRIVE_FAILED_REASON = "Your answer was saved, but the run could not continue."
@@ -741,9 +790,17 @@ async def _redrive_paused_workflow_run(run_id: UUID, tool_call_id: str, redis) -
 
     async def _wake():
         _failed = False
+        _escape = None
         try:
             await _resume_run(run_id, definition, ctx, pool=pool, redis=redis)
-        except Exception:
+        except asyncio.CancelledError as _cancel:
+            # Phase 295 (D-41): a cancelled re-drive's shell reads cancelled, never completed
+            # (``except Exception`` below never saw a CancelledError). The run row itself was
+            # finalised by ``_resume_run`` (run_handoff.resume_with_terminalize).
+            _escape = _cancel
+            raise
+        except Exception as _exc:
+            _escape = _exc
             _failed = True
             logger.exception("ask_user_response: re-drive failed for run %s", run_id)
             await _fail_redrive(
@@ -755,6 +812,9 @@ async def _redrive_paused_workflow_run(run_id: UUID, tool_call_id: str, redis) -
             if _pid is not None:
                 try:
                     from app.db.runs import finalize_run  # noqa: PLC0415
+                    from app.services.harness.run_handoff import (  # noqa: PLC0415
+                        resume_shell_status,
+                    )
                     from datetime import datetime as _dt, timezone as _tz  # noqa: PLC0415
 
                     # METER-05 site 1 (Phase 256 / D-256-08). This shell hardcoded a NULL
@@ -783,7 +843,7 @@ async def _redrive_paused_workflow_run(run_id: UUID, tool_call_id: str, redis) -
                     await finalize_run(
                         pool,
                         run_id=_pid,
-                        status="failed" if _failed else "completed",
+                        status=resume_shell_status(_escape),
                         error="ask_user re-drive failed" if _failed else None,
                         completed_at=_dt.now(_tz.utc),
                         message_id=None,
@@ -941,6 +1001,26 @@ async def submit_ask_user_response(
             detail=f"This run has already {_TERMINAL_RUN_WORDS.get(_run_status, 'ended')}.",
         )
 
+    # ── Step 1c (Phase 295, T-295-03-01 / -02): an ENGINE ask's answer is allow-listed ──
+    # BEFORE it is persisted: an unoffered label or index, a folder outside the server-built
+    # list, or "Continue without sources" on a locked step is refused with plain words, so the
+    # card stays answerable and nothing is re-driven. Harness answers only; a prompt without
+    # ``engine_pause`` is unaffected.
+    # 295-REVIEW CR-01: a harness answer must be for the question the run is waiting on NOW
+    # (its newest unanswered prompt). A stale or replayed answer used to re-drive the run, so
+    # the step re-ran and threw the answer away, or a human step took it as its own.
+    if _origin == "harness" and not await _is_current_question(run_id, body.tool_call_id):
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail="This question is no longer the one the run is waiting on.",
+        )
+    _refusal = (
+        await _engine_answer_refusal(run_id, row["thread_id"], body)
+        if _origin == "harness" else None
+    )
+    if _refusal:
+        raise HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, detail=_refusal)
+
     # ── Step 2: persist messages row FIRST (durability — RESEARCH §A.7) ──
     # If this fails, return 500 — the agent loop has no live SUBSCRIBE we
     # could wake instead, and we don't want to silently drop the response.
@@ -958,6 +1038,7 @@ async def submit_ask_user_response(
                     "tool_call_id": body.tool_call_id,
                     "response_text": body.response_text,
                     "choice_index": body.choice_index,
+                    "folder_id": body.folder_id,  # Phase 295 (D-03), additive
                 }],
             })
         )
@@ -1786,7 +1867,8 @@ async def cancel_run(
                             run_id,
                         )
                     _wrote = await cancel_workflow_run_internals(
-                        pool=pool, workflow_run_id=run_id
+                        # Phase 295 (D-19): this Stop's reason names the person who pressed it.
+                        pool=pool, workflow_run_id=run_id, stopped_by=current_user["id"],
                     )
                     # ⚠ CR-03 (194 code review) — THIS ARM MAY NOT REPORT A WRITE IT
                     # CANNOT KNOW HAPPENED. The comment here used to read "Postgres is
@@ -1838,6 +1920,8 @@ async def cancel_run(
         # Phase 163 (D-05): shared run-lifecycle writer — service-role (matches the
         # operator Kill path); the owner gate above already enforced RLS ownership.
         supabase=service_supabase,
+        # Phase 295 (D-19): the owner's Stop is recorded with their name (Kill passes none).
+        stopped_by=current_user["id"],
     )
 
     # Always 204 — every sub-path (terminal-noop / task-cancelled / zombie-healed)

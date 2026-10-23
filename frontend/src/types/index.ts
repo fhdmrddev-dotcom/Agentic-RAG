@@ -1368,6 +1368,19 @@ export interface PendingAsk {
    *  ask_user_prompt SSE event; absent on older rows. The visible render is Phase 094;
    *  093 only plumbs it onto the shape. */
   draft?: string
+  /** Phase 295 (D-02 / D-37): present when the ENGINE asked (nothing found, uncited, or an
+   *  armed approval). Such a question has no deadline and never expires by clock. */
+  engine_pause?: EnginePause
+}
+
+/** Phase 295 (D-02 / D-37 / D-39) — the engine pause's server-built facts; the card renders
+ *  them and composes nothing. `folders` are the folders the run may search instead. */
+export interface EnginePause {
+  kind: "no_sources" | "no_markers" | "action_risk"
+  phase: string
+  continue_allowed: boolean
+  locked: boolean
+  folders: { id: string; name: string; depth: number }[]
 }
 
 /** GET /threads/{tid}/tasks (panel.py:156) + SSE sub_agent_start/done TASK
@@ -1543,6 +1556,9 @@ export interface Phase {
    *  `WorkflowRunPhase.step_count` already documents one wire over. A fence in
    *  `lib/apiRunFields.fences.test.ts` sweeps `src/` for that collapse at zero occurrences. */
   failureReason?: string | null
+  /** Phase 295 (RUN-01 / D-04): the mark on a step kept without sources — server-built words
+   *  and the time of the choice. Absent means no such choice was made. */
+  unsourced?: { continued_by: string; at: string } | null
   /** Phase 214 (STEP-04 / D-214-16) — the ACTION this step runs, by its wire name, derived
    *  server-side from the definition that executed. `undefined` / `null` on every phase type
    *  that is not `external_action`. */
@@ -1631,6 +1647,8 @@ export interface AskUserAnswerBody {
   tool_call_id: string
   response_text: string
   choice_index: number | null
+  /** Phase 295 (D-03): the folder chosen for "Search another folder"; the server allow-lists it. */
+  folder_id?: string
 }
 
 /** Phase 240 (SRC-05 SC#3) — one message of a mail conversation, as the detail panel

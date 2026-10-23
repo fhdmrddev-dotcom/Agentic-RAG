@@ -68,6 +68,7 @@ __all__ = [
     "classify_rejection",
     "terminal_failure_value",
     "compose_emit_failure",
+    "no_template_bound_sentence",
 ]
 
 # ── The cause kinds (the merge key) ─────────────────────────────────────────────
@@ -124,6 +125,17 @@ _INTEGRITY_FAILED_SENTENCE = (
     "the filled file did not open cleanly, or still had unfilled placeholders."
 )
 _UNEXPECTED_SENTENCE = "the step stopped on an unexpected error."
+
+#: Phase 295 (D-12 / UI-SPEC E.1) — the PRE-RUN refusal for a fill step with no template.
+#: ONE home for every surface that says it before a run starts: the lint finding
+#: (``reachability``), so ``/validate`` and the publish refusal, then the chat kickoff and the
+#: scheduled launch, which read it off that finding. It names no code. The run-time bullet
+#: body above (``_NO_TEMPLATE_SENTENCE``) is a different sentence for a different moment (a
+#: run that already started) and stays as shipped.
+_NO_TEMPLATE_BOUND_REFUSAL = (
+    "“{step}” fills a template, but no template is attached to this workflow. "
+    "Attach a template before you publish or run it."
+)
 
 #: Exactly one "Check …" line per kind (D-03) — worded as CHECK, never as fix.
 _CHECK_LINES: dict[str, str] = {
@@ -333,3 +345,13 @@ def compose_emit_failure(records: list[dict], *, step_name: str | None = None) -
             f"{sentence} {_CHECK_LINES[kind]}"
         )
     return "\n".join(lines)
+
+
+def no_template_bound_sentence(step_label: str | None) -> str:
+    """Phase 295 (D-12) — the one sentence a fill step with no template is refused with.
+
+    ``step_label`` is the step's authored name, or its slug when it has none (the caller
+    decides; this leaf derives nothing). With neither, the step is "This step".
+    """
+    label = str(step_label).strip() if step_label else ""
+    return _NO_TEMPLATE_BOUND_REFUSAL.format(step=label or "This step")

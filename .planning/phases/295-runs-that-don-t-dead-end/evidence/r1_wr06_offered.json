@@ -1,0 +1,71 @@
+{
+  "A": {
+    "run": {
+      "id": "e9f5f925-b515-4d9f-b321-c9ea5c61253e",
+      "status": "paused",
+      "org": "22f9c615-0eec-440a-8804-ed4784d6f57f"
+    },
+    "options": [
+      "Search another folder",
+      "Continue without sources",
+      "Stop the run"
+    ],
+    "n_folders": 12,
+    "folder_names": [
+      "Client ACME",
+      "Q3 Contracts",
+      "HR Policies",
+      "Financial Reports & Filings",
+      "Contracts & Agreements",
+      "HR Policies & Handbook",
+      "Security & Compliance Policies",
+      "Operations & Supply Chain",
+      "Cloud",
+      "DBA",
+      "295-r1 WR-06 org-B empty project",
+      "295-r1 WR-06 org-B other folder"
+    ],
+    "folder_orgs": [
+      "22f9c615-0eec-440a-8804-ed4784d6f57f",
+      "c1f18150-65d3-49c2-a303-52d6b681431e"
+    ],
+    "other_org_offered": [
+      "295-r1 WR-06 org-B empty project",
+      "295-r1 WR-06 org-B other folder"
+    ]
+  },
+  "B": {
+    "run": {
+      "id": "df323914-6193-4814-a582-0a3beacb349b",
+      "status": "paused",
+      "org": "c1f18150-65d3-49c2-a303-52d6b681431e"
+    },
+    "options": [
+      "Search another folder",
+      "Continue without sources",
+      "Stop the run"
+    ],
+    "n_folders": 2,
+    "folder_names": [
+      "295-r1 WR-06 org-B other folder",
+      "295-r1 WR-06 org-A empty project"
+    ],
+    "folder_orgs": [
+      "22f9c615-0eec-440a-8804-ed4784d6f57f",
+      "c1f18150-65d3-49c2-a303-52d6b681431e"
+    ],
+    "other_org_offered": [
+      "295-r1 WR-06 org-A empty project"
+    ]
+  },
+  "visible_by_org": [
+    {
+      "org": "c1f18150-65d3-49c2-a303-52d6b681431e",
+      "n": 2
+    },
+    {
+      "org": "22f9c615-0eec-440a-8804-ed4784d6f57f",
+      "n": 11
+    }
+  ]
+}

@@ -93,9 +93,15 @@ def test_exactly_one_211_migration_with_a_digits_only_prefix():
     assert re.fullmatch(r"211_[a-z0-9_]+\.sql", p.name), p.name
 
 
-def test_211_is_the_latest_migration():
+def test_211_is_unique_and_every_later_migration_is_numbered_after_it():
+    # Was `test_211_is_the_latest_migration`, which pinned 211 as the newest file and so had to
+    # fail on the next migration. Retired deliberately on 2026-10-23 when 212 (the drafting-model
+    # setting) landed. What it was protecting still holds: 211 has one file, and nothing is
+    # numbered into the gap before it.
     names = sorted(p.name for p in MIGRATIONS.glob("*.sql"))
-    assert names[-1] == _migration().name, names[-3:]
+    assert [n for n in names if n.startswith("211_")] == [_migration().name], names[-3:]
+    later = [n for n in names if n > _migration().name]
+    assert all(int(n.split("_", 1)[0]) > 211 for n in later), later
 
 
 def test_the_migration_owns_its_transaction():

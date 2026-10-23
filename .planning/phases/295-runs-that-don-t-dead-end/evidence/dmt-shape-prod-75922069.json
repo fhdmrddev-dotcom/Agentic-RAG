@@ -1,0 +1,23 @@
+{
+  "_source": "production workflow_definitions id 75922069-906f-4b89-b141-b7bfa243c65c, read via Supabase MCP SELECT on 2026-10-20 (read-only). Stored in prod as a jsonb STRING scalar (jsonb_typeof = 'string'), unwrapped here. connection_id and folder ids are production ids; remap locally.",
+  "name": "DMT Project Status Summary & Email",
+  "business_requirement": "Produce a written summary of the DMT project's key progress, risks, and plans from the DMT knowledge base, and record an email delivery of that summary to the requester.",
+  "project_folder_id": "b6741e5b-8d2c-497a-83d1-a1f8a5c6372f",
+  "assets": null,
+  "phases": [
+    {"slug": "gather-dmt-info", "phase_index": 0, "name": "Gather DMT project information from the knowledge base",
+     "config": {"phase_type": "llm_agent", "max_steps": 12, "folder_scope": ["b6741e5b-8d2c-497a-83d1-a1f8a5c6372f"],
+       "available_tools": ["search_documents","read_document","query_documents","get_related_documents","fetch_document_file","ls","tree"],
+       "prompt": "Search the DMT project knowledge base to gather information about the project's current state. Pull details relevant to (a) progress and recent accomplishments, (b) open risks and issues, and (c) upcoming plans and next steps. Use the available tools to read the relevant documents and collect concrete, sourced facts. If a category has no supporting information in the knowledge base, note that plainly rather than inventing anything."},
+     "validators": [], "grounding_escalated": false, "action_risk_armed": false},
+    {"slug": "summarize-status", "phase_index": 1, "name": "Write the progress, risks, and plans summary",
+     "config": {"phase_type": "llm_single",
+       "prompt": "Using the DMT project information gathered in the previous step, write a clear plain-text/markdown status summary organized into three sections: Key Progress, Risks, and Plans. Keep it concise and factual, grounded only in the gathered information. If any section lacks supporting information, state plainly that it could not be found rather than inventing content. This summary is the email body."},
+     "validators": [], "grounding_escalated": false, "action_risk_armed": false},
+    {"slug": "email-summary", "phase_index": 2, "name": "Send the DMT status summary by email",
+     "config": {"phase_type": "external_action", "capability": "send_email", "available_tools": ["send_email"],
+       "connection_id": "3ae356b9-c1bf-4a7a-8bce-8f045fa444a8", "tool_name": null, "tool_args": {}},
+     "validators": [], "grounding_escalated": false, "action_risk_armed": true}
+  ],
+  "_observation": "Two of three DMT drafts in prod store `definition` as a jsonb string, not an object (the published sibling ee53ed2c is an object). Not in 295 scope; noted for the researcher/planner in case publish/lint reads definition shape."
+}

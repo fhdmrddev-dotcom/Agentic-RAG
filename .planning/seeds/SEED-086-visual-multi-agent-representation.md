@@ -1,7 +1,10 @@
 ---
 seed_id: SEED-086
 title: Engaging visual representation of the multi-agent engine — orchestrator + specialist agents + judge/reviewer shown as a team/office/org-tree/layered "control room", not just a linear phase spine
-status: planted
+status: folded
+partial: true
+status_note: "Folded into Phase 290 for the AUTHORING moment only (2026-10-21, sketch 290 winner A, D-06..D-14). The live run view (who is working now) stays open here."
+folded_into: "290"
 planted: 2026-06-14
 phase_origin: "Phase 103 live UAT session 2026-06-14 — operator idea: 'our engine is very rich and comprehensive, we should think of an engaging way to represent this visually'"
 category: UX / design exploration — a richer authoring + run visualization; design-first (sketch/spike), NOT a committed build

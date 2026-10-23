@@ -37,7 +37,7 @@ from typing import Literal
 from uuid import UUID
 
 from fastapi import HTTPException, status
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, ConfigDict, Field
 
 
 def _coerce_definition(raw: object) -> dict | None:
@@ -420,3 +420,98 @@ class TemplatePlaceholdersResponse(BaseModel):
 # passes BOTH size gates above and then materialises in RAM. 50 MB is ~5x the compressed
 # cap — far beyond any real brief, far below a bomb.
 _TEMPLATE_MAX_UNCOMPRESSED_BYTES = 50 * 1024 * 1024
+
+
+# ── Phase 291 (AUTH-02, plan 291-01) — the describe-door read ─────────────────
+# A NEW constant rather than a widened ``_TEMPLATE_MIME_BY_EXT``: that one is pinned (286) and
+# read by the template upload door, whose accepted set is a decision of its own.
+_DESCRIBE_MIME_BY_EXT = {
+    ".docx": "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+    ".pptx": "application/vnd.openxmlformats-officedocument.presentationml.presentation",
+    ".xlsx": "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+    ".pdf": "application/pdf",
+    ".txt": "text/plain",
+    ".md": "text/markdown",
+}
+
+
+class DescribeField(BaseModel):
+    """One field found in an attached form.
+
+    ``origin`` is server-stamped: ``exact`` when the file DECLARES the field (a PDF AcroForm
+    field or a ``{{ }}`` token, so the key is the file's own name), ``ai_proposed`` when the
+    read model named it (Word blanks, flat or scanned PDFs, D-01b/c). ``line_before`` /
+    ``line_after`` are the document's own line split around the blank (Word blanks, D-27)."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    key: str
+    label: str
+    type: Literal["text", "number", "date", "enum"]
+    enum_options: list[str] = Field(default_factory=list)
+    origin: Literal["exact", "ai_proposed"]
+    line_before: str | None = None
+    line_after: str | None = None
+    anchor_kind: Literal["line", "cell"] | None = None
+    anchor_label: str | None = None
+
+
+class DescribeUnplaced(BaseModel):
+    """A blank the server could not place exactly, and the server sentence saying so (D-28)."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    label: str
+    sentence: str
+
+
+class DescribeReadResponse(BaseModel):
+    """What one attached file holds, read before any draft exists (D-04).
+
+    A file that never opened is an HTTP 422 with a server sentence, never an arm: ``none``
+    means only *opened, and no fields found* (D-02). ``filename`` is the server-sanitised
+    name. ``cut_short`` / ``refused`` are server sentences the client renders verbatim."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    role: Literal["form", "reference"]
+    arm: Literal[
+        "template_fields",
+        "form_fields",
+        "suggested_fields",
+        "blanks",
+        "none",
+        "not_word",
+        "scan_unreadable",
+        "copy_refused",
+        "reference",
+    ]
+    suggested_from: Literal["text", "scan"] | None = None
+    filename: str
+    fields: list[DescribeField] = Field(default_factory=list)
+    unplaced: list[DescribeUnplaced] = Field(default_factory=list)
+    text: str = ""
+    cut_short: str | None = None
+    refused: str | None = None
+
+
+class ReferenceAssetRef(BaseModel):
+    """The ``AssetRef`` a reference upload mints (``kind="reference"``). Its own model, so
+    ``TemplateAssetRef``'s "never mints references" stays true."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    kind: Literal["reference"] = "reference"
+    asset_id: str
+    filename: str
+    mime: str
+
+
+class WordAnchorIn(BaseModel):
+    """One ticked Word blank the author confirmed (D-26 / D-27); the server places it."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    key: str
+    anchor_kind: Literal["line", "cell"]
+    anchor_label: str

@@ -1,0 +1,177 @@
+[
+  {
+    "kind": "dmt",
+    "definition_id": "edd81b32-38d9-4d56-bbad-1b37f7c8b835",
+    "status": 200,
+    "elapsed_s": 39,
+    "body": {
+      "published": true,
+      "version": 1,
+      "golden_run_id": "41f76119-d2fd-42d1-9ada-9596c93b1d95",
+      "blocked_stage": null,
+      "named_failures": [],
+      "blocked_step": null,
+      "auto_answered": []
+    },
+    "audit": [
+      {
+        "event": "judge_verdict",
+        "definition_id": "edd81b32-38d9-4d56-bbad-1b37f7c8b835",
+        "overall_passed": true,
+        "overall_score": 8,
+        "summary": "The recorded action is a well-formed Project Meridian status email and fits the designed behavior of recording an intended outbound action rather than sending it. It satisfies the apparent business requirement for what would have been emailed.",
+        "failure": null
+      },
+      {
+        "event": "publish_succeeded",
+        "definition_id": "edd81b32-38d9-4d56-bbad-1b37f7c8b835",
+        "version": 1,
+        "golden_run_id": "41f76119-d2fd-42d1-9ada-9596c93b1d95"
+      }
+    ]
+  },
+  {
+    "kind": "d47-a",
+    "definition_id": "18b43a28-c812-4817-be3a-07dda2403017",
+    "status": 200,
+    "elapsed_s": 10,
+    "body": {
+      "published": true,
+      "version": 1,
+      "golden_run_id": "cb438c18-fafe-4eb4-ae76-d4125f60ce0a",
+      "blocked_stage": null,
+      "named_failures": [],
+      "blocked_step": null,
+      "auto_answered": [
+        {
+          "phase": "approve",
+          "message": "The pause step \"Approve the note\" was answered automatically during validation and has not been exercised by a person."
+        }
+      ]
+    },
+    "audit": [
+      {
+        "event": "judge_verdict",
+        "definition_id": "18b43a28-c812-4817-be3a-07dda2403017",
+        "overall_passed": true,
+        "overall_score": 10,
+        "summary": "The response is concise, relevant, and addresses the benefits of weekly status updates clearly.",
+        "failure": null
+      },
+      {
+        "event": "publish_succeeded",
+        "definition_id": "18b43a28-c812-4817-be3a-07dda2403017",
+        "version": 1,
+        "golden_run_id": "cb438c18-fafe-4eb4-ae76-d4125f60ce0a"
+      }
+    ]
+  },
+  {
+    "kind": "d47-b",
+    "definition_id": "9c7c91bd-3750-462d-86a3-f7d3864e2d65",
+    "status": 200,
+    "elapsed_s": 11,
+    "body": {
+      "published": true,
+      "version": 1,
+      "golden_run_id": "902df6f5-dbeb-4eb8-9f13-4081a90b40f2",
+      "blocked_stage": null,
+      "named_failures": [],
+      "blocked_step": null,
+      "auto_answered": [
+        {
+          "phase": "approve",
+          "message": "The pause step \"Approve the note\" was answered automatically during validation and has not been exercised by a person."
+        }
+      ]
+    },
+    "audit": [
+      {
+        "event": "judge_verdict",
+        "definition_id": "9c7c91bd-3750-462d-86a3-f7d3864e2d65",
+        "overall_passed": true,
+        "overall_score": 100,
+        "summary": "The response clearly and succinctly explains the value of weekly status updates and satisfies the prompt.",
+        "failure": null
+      },
+      {
+        "event": "publish_succeeded",
+        "definition_id": "9c7c91bd-3750-462d-86a3-f7d3864e2d65",
+        "version": 1,
+        "golden_run_id": "902df6f5-dbeb-4eb8-9f13-4081a90b40f2"
+      }
+    ]
+  },
+  {
+    "kind": "d47-c",
+    "definition_id": "a2f1f76d-f681-45c7-b9c1-113d1c76754d",
+    "status": 200,
+    "elapsed_s": 11,
+    "body": {
+      "published": true,
+      "version": 1,
+      "golden_run_id": "49bae8ed-649e-49b3-8301-9c1fdd5fba6d",
+      "blocked_stage": null,
+      "named_failures": [],
+      "blocked_step": null,
+      "auto_answered": [
+        {
+          "phase": "approve",
+          "message": "The pause step \"Approve the note\" was answered automatically during validation and has not been exercised by a person."
+        }
+      ]
+    },
+    "audit": [
+      {
+        "event": "judge_verdict",
+        "definition_id": "a2f1f76d-f681-45c7-b9c1-113d1c76754d",
+        "overall_passed": true,
+        "overall_score": 100,
+        "summary": "The provided text is clear, relevant, and well-grounded in the user's prompt, effectively summarizing why weekly status updates matter.",
+        "failure": null
+      },
+      {
+        "event": "publish_succeeded",
+        "definition_id": "a2f1f76d-f681-45c7-b9c1-113d1c76754d",
+        "version": 1,
+        "golden_run_id": "49bae8ed-649e-49b3-8301-9c1fdd5fba6d"
+      }
+    ]
+  },
+  {
+    "kind": "d47-d",
+    "definition_id": "63059416-b726-4c40-a3bc-58030aca6666",
+    "status": 200,
+    "elapsed_s": 9,
+    "body": {
+      "published": true,
+      "version": 1,
+      "golden_run_id": "177868cd-51bc-480b-b42a-11e6e42418ec",
+      "blocked_stage": null,
+      "named_failures": [],
+      "blocked_step": null,
+      "auto_answered": [
+        {
+          "phase": "approve",
+          "message": "The pause step \"Approve the note\" was answered automatically during validation and has not been exercised by a person."
+        }
+      ]
+    },
+    "audit": [
+      {
+        "event": "judge_verdict",
+        "definition_id": "63059416-b726-4c40-a3bc-58030aca6666",
+        "overall_passed": true,
+        "overall_score": 10,
+        "summary": "The provided text is clear, relevant, and fully aligned with the user\u2019s statement about weekly status updates.",
+        "failure": null
+      },
+      {
+        "event": "publish_succeeded",
+        "definition_id": "63059416-b726-4c40-a3bc-58030aca6666",
+        "version": 1,
+        "golden_run_id": "177868cd-51bc-480b-b42a-11e6e42418ec"
+      }
+    ]
+  }
+]

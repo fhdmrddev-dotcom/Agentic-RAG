@@ -206,6 +206,18 @@ export interface TemplateAssetDescriptor {
   mime: string
 }
 
+/**
+ * Phase 291-04 (D-07) — one `kind === "reference"` entry, as the reference door mints it
+ * (`ReferenceAssetRef`). Declared here for the same fence as `TemplateAssetDescriptor` above,
+ * and structurally identical to the client's own type for the same reason.
+ */
+export interface ReferenceAssetDescriptor {
+  kind: "reference"
+  asset_id: string
+  filename: string
+  mime: string
+}
+
 export interface BuilderStoreState extends TrackedSlice {
   /**
    * The working definition MINUS `phases` — slug, version, business_requirement,
@@ -300,6 +312,9 @@ export interface BuilderStoreState extends TrackedSlice {
    *  write Phase 193's authoring door needs. Untracked, and arms `dirty` itself for the
    *  same reason its two `meta`-writing siblings do; see its implementation docblock. */
   setTemplateAsset: (asset: TemplateAssetDescriptor) => void
+  /** Phase 291-04 (D-07): append the describe door's reference files to `meta.assets[]`,
+   *  de-duplicated by `asset_id`. Untracked and arms `dirty`, like `setTemplateAsset`. */
+  addReferenceAssets: (assets: readonly ReferenceAssetDescriptor[]) => void
   /** Set the workflow's human-readable name (D-15) — the FOURTH `meta`-writing sibling.
    *  Untracked, and arms `dirty` itself for the same reason the three actions above it do;
    *  see its implementation docblock in the factory below. Writes exactly ONE `meta` key,
@@ -312,6 +327,10 @@ export interface BuilderStoreState extends TrackedSlice {
    *  and arms `dirty` itself for the same reason the five actions above it do; see its
    *  implementation docblock in the factory below. */
   setDeclaredInputs: (inputs: readonly DeclaredInput[]) => void
+  /** Phase 291-05 (D-09) — flip ONE declared input's `source` between asking the person
+   *  (`user`) and looking it up (`kb_auto`). Every other member and every other input is kept.
+   *  Untracked, arms `dirty`; an unknown key or an unchanged source writes nothing. */
+  setInputSource: (key: string, source: "user" | "kb_auto") => void
   /** The ONLY thing that clears `dirty`. Never writes anything. */
   markSaved: () => void
   /** Commit a coalescing run of config edits NOW (a field blur, a view change). */
@@ -770,6 +789,34 @@ export function createBuilderStore(initial: BuilderDefinition | null): BuilderSt
         },
 
         /**
+         * Phase 291-04 (D-07) — the describe door's reference files, stored with the draft.
+         *
+         * `setTemplateAsset`'s sibling and its rules: bails outside `drafted`, untracked, arms
+         * `dirty` in the same `set()`, and a NON-ARRAY `assets` is treated as empty. It APPENDS
+         * (references are many) and PRESERVES every other entry, the template included. An
+         * entry whose `asset_id` is already present is not added twice, and an empty list
+         * writes nothing — so a bind that stored nothing cannot arm a save.
+         */
+        addReferenceAssets: (assets) => {
+          const s = get()
+          if (s.builderPhase !== "drafted") return
+          const prior = Array.isArray(s.meta.assets) ? (s.meta.assets as unknown[]) : []
+          const seen = new Set(
+            prior
+              .map((a) => (typeof a === "object" && a !== null ? (a as { asset_id?: unknown }).asset_id : undefined))
+              .filter((id): id is string => typeof id === "string"),
+          )
+          const added: ReferenceAssetDescriptor[] = []
+          for (const asset of assets) {
+            if (seen.has(asset.asset_id)) continue
+            seen.add(asset.asset_id)
+            added.push(asset)
+          }
+          if (added.length === 0) return
+          set({ meta: { ...s.meta, assets: [...prior, ...added] }, dirty: true })
+        },
+
+        /**
          * Phase 197 (AUTH-02 · D-15) — write the workflow's human-readable name.
          *
          * A FOURTH STRUCTURAL MIRROR of `setProjectFolder` / `setBusinessRequirement` /
@@ -885,6 +932,30 @@ export function createBuilderStore(initial: BuilderDefinition | null): BuilderSt
           const s = get()
           if (s.builderPhase !== "drafted") return
           set({ meta: { ...s.meta, inputs: [...inputs] }, dirty: true })
+        },
+
+        /**
+         * Phase 291-05 (D-09) — the arrival card's inputs fold flips where ONE answer comes
+         * from. `setDeclaredInputs`' sibling and its rules: bails outside `drafted`, untracked,
+         * arms `dirty` in the same `set()`. ⚠ IT SPREADS EACH ENTRY AND CHANGES ONLY `source`,
+         * because a file-derived input carries members the declared-input door does not own
+         * (`type`, `enum_options`, `origin`, `note`) and dropping any of them would lose what
+         * the form said. A NON-ARRAY `inputs`, an unknown key and an unchanged source all
+         * write nothing, so a click on the selected segment never arms a save.
+         */
+        setInputSource: (key, source) => {
+          const s = get()
+          if (s.builderPhase !== "drafted") return
+          if (!Array.isArray(s.meta.inputs)) return
+          const prior = s.meta.inputs as unknown[]
+          const at = prior.findIndex(
+            (i) => typeof i === "object" && i !== null && (i as { key?: unknown }).key === key,
+          )
+          if (at === -1) return
+          const current = prior[at] as Record<string, unknown>
+          if (current.source === source) return
+          const next = prior.map((i, index) => (index === at ? { ...current, source } : i))
+          set({ meta: { ...s.meta, inputs: next }, dirty: true })
         },
 
         markSaved: () => set({ dirty: false }),

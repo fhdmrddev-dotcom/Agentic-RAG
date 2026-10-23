@@ -170,6 +170,11 @@ class FullSettingsResponse(BaseModel):
     # not a secret -> exposed through the settings contract (CLAUDE.md).
     harness_judge_model: str
     resolved_harness_judge_model: str | None
+    # Migration 212 — the workflow-drafting model: raw ("" = unset), what drafting will actually
+    # use, and the models that can draft (registry + forced emission), for the Settings picker.
+    harness_authoring_model: str = ""
+    resolved_harness_authoring_model: str | None = None
+    authoring_model_options: list[str] = []
     # Phase 075.3 D-075.3-13: registry-known model_ids (frontend uses this set
     # to decide whether to render the "unverified" badge inline next to each
     # model in the main LLM dropdown + selected-label).
@@ -197,6 +202,31 @@ class FullSettingsResponse(BaseModel):
     # light the informational "deprecated" badge — deprecated ≠ disabled, the model
     # stays selectable (only `enabled` controls availability). Sorted for stable diffs.
     deprecated_models: list[str]
+
+
+def authoring_model_options() -> list[str]:
+    """Migration 212 — the models that can draft a workflow: registry-known (built-ins) and able
+    to force an emission, because drafting IS one forced emission. Sorted for stable diffs."""
+    from app.config import MODEL_CAPABILITIES, get_model_capability  # function-local (Pitfall 4)
+
+    return sorted(m for m in MODEL_CAPABILITIES if (get_model_capability(m) or {}).get("forced_emission"))
+
+
+def validate_authoring_model(model: str) -> str:
+    """"" is the reset; anything else must be a model that can draft, else a worded 400."""
+    if not model:
+        return ""
+    from app.config import get_model_capability  # function-local (Pitfall 4)
+
+    cap = get_model_capability(model) or {}
+    if cap.get("capability_source") != "registry":
+        raise HTTPException(status_code=400, detail=f"Unknown drafting model: {model}")
+    if not cap.get("forced_emission"):
+        raise HTTPException(
+            status_code=400,
+            detail=f"{model} can't draft workflows: it can't be made to return a structured draft.",
+        )
+    return model
 
 
 def _verified_model_ids(overrides: dict[str, dict]) -> list[str]:
@@ -349,6 +379,8 @@ class SettingsUpdate(BaseModel):
     # pointed at an unroutable model. "" = unset (the resolver falls back to the
     # effective default — claude-opus-4-8).
     harness_judge_model: str | None = None
+    # Migration 212 — validated by validate_authoring_model ("" clears back to the fallback).
+    harness_authoring_model: str | None = None
 
 
 # ── Helpers ───────────────────────────────────────────────────────────────────
@@ -360,6 +392,7 @@ async def _build_response(s=None) -> FullSettingsResponse:
     # publish judge. Function-local import keeps the harness validators registry off the
     # settings module-load path; NEVER introduce a second resolver (T-137.1-J2).
     from app.services.harness.validator_kinds import resolve_judge_model
+    from app.services.workflow_authoring import resolve_authoring_model
     # Phase 149 (MODEL-01 / D-149-05) — the enabled deprecated models for the picker badge.
     # Reads the enabled-only hot cache (deprecated ≠ disabled — a deprecated model stays
     # enabled); _load_model_overrides never raises (returns the stale/empty cache on a blip).
@@ -447,6 +480,9 @@ async def _build_response(s=None) -> FullSettingsResponse:
         # value is "" when unset and the resolved label surfaces the effective default.
         harness_judge_model=s.harness_judge_model,
         resolved_harness_judge_model=resolve_judge_model(s),
+        harness_authoring_model=getattr(s, "harness_authoring_model", "") or "",
+        resolved_harness_authoring_model=resolve_authoring_model(s),
+        authoring_model_options=authoring_model_options(),
         # Phase 075.3 D-075.3-13: snapshot of registry-known model_ids
         # (sorted for stable client diffs / test assertions).
         # Phase 249 (MODEL-05): the UNION — built-ins PLUS operator-entered override rows.
@@ -928,6 +964,10 @@ async def update_settings(
                     detail=f"Unknown judge model: {body.harness_judge_model}",
                 )
         updates["harness_judge_model"] = body.harness_judge_model
+
+    # Migration 212 — the workflow-drafting model. Only a model that can draft is accepted.
+    if body.harness_authoring_model is not None:
+        updates["harness_authoring_model"] = validate_authoring_model(body.harness_authoring_model)
 
     # MDL-01: Validate sub_agent_model against active provider's model list
     if body.sub_agent_model:

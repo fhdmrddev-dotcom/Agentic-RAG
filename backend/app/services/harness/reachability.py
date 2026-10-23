@@ -132,6 +132,7 @@ LINT_CODES: frozenset[str] = frozenset(
     {
         "bad_index",
         "input_unsatisfied",
+        "no_template_bound",  # Phase 295 (D-12) — a fill step with no template attached
         "no_terminal",
         "orphan_phase",
         "unsatisfiable_skip",
@@ -330,6 +331,37 @@ def _check_input_contracts(
     return errors
 
 
+def _check_template_bound(phases, definition) -> list[LintError]:
+    """Phase 295 (D-12) — a ``render_template`` fill step needs a template on the workflow.
+
+    The template is not a phase field: it is ``WorkflowDefinition.assets[kind="template"]``,
+    so this reads ``definition.assets`` and nothing else (pure, no I/O). One finding per
+    fill step, in step order, each carrying the one sentence ``emit_cause`` composes.
+
+    ⚠ A STAGED UPLOAD IS NOT VISIBLE HERE, AND THAT IS WHY ``/validate`` CALLS THIS
+    "incomplete" (D-45). The Run modal can upload a template at launch, so a definition with
+    no template asset is a designed shape. Publish still refuses it (the golden run has no
+    upload); the chat kickoff refuses it only when nothing is staged on the thread.
+    """
+    from app.services.harness.emit_cause import no_template_bound_sentence  # pure leaf
+
+    assets = getattr(definition, "assets", None) or []
+    if any(getattr(a, "kind", None) == "template" for a in assets):
+        return []
+    errors: list[LintError] = []
+    for p in sorted(phases, key=lambda q: q.phase_index):
+        config = getattr(p, "config", None)
+        if (
+            getattr(config, "phase_type", None) == "llm_emit"
+            and getattr(config, "emitter", None) == "render_template"
+        ):
+            errors.append(LintError(
+                "no_template_bound", p.slug,
+                no_template_bound_sentence(getattr(p, "name", None) or p.slug),
+            ))
+    return errors
+
+
 def parse_skip_target(on_failure: str) -> str | None:
     """Return the slug after ``skip_to_phase:`` or None for non-skip dispositions.
 
@@ -459,5 +491,8 @@ def lint_workflow(
     errors.extend(
         _check_input_contracts(phases, definition=definition, tool_schemas=tool_schemas)
     )
+
+    # ── NO_TEMPLATE_BOUND (Phase 295 / D-12): a fill step with no template attached ──
+    errors.extend(_check_template_bound(phases, definition))
 
     return errors

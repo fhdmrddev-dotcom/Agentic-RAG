@@ -113,6 +113,10 @@ _CANVAS_SCHEMAS = (
     "RunEvidenceHumanInput",
     "RunEvidenceVerdict",
     "RunEvidenceSource",
+    # Phase 295 (RUN-01 / D-04) — measured at 295-05 off the real filter: the unsourced mark's
+    # wire model is referenced only by the run read and the evidence read, so it leaves with
+    # them (the chat panel's `WorkflowPhaseState.unsourced` is a plain dict, not this model).
+    "UnsourcedMark",
 )
 
 # CONTROLS — a schema and a path from NON-canvas routes on the same router. These are what

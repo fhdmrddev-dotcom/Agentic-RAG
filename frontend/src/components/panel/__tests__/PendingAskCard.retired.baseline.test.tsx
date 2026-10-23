@@ -252,8 +252,32 @@ describe("194.1-01 — the three shipped retirement sentences, READ from source"
      * 2026-10-20 — 289-REVIEW CR-02 RE-BASELINED 1043 → 1053, not loosened: ONE `useEffect`
      * that returns a CLOCK-expired card to pending when `paused` arrives (a server-driven expiry
      * stays terminal). `useState` 7 → 7, `useEffect` 2 → 3. Retirement fences untouched and green.
+     *
+     * 2026-10-21 — 295-06 RE-BASELINED 1053 → 1081, not loosened: ONE read of `ask.engine_pause`
+     * through the pure `enginePause.ts` helper, ONE gated `<AskFolderChoice>` mount beneath the
+     * chips, `folder_id` on the answer only for the search choice, Send gated on a chosen folder,
+     * and the answered header read from the helper (D-02 / D-03 / D-32). `useState` 7 → 7,
+     * `useEffect` 3 → 3. Retirement fences untouched and green.
+     *
+     * 2026-10-21 — 295-08 (SEED-361) RE-BASELINED 1081 → 1087, not loosened: `PendingAskStack`
+     * reads the run status from ONE store field and `runIsOver` gains `&& !paused`; the stack
+     * passes `paused` to the card. `useState` 7 → 7, `useEffect` 3 → 3. Retirement fences
+     * untouched and green.
+     *
+     * 2026-10-21 — 295-08 WR-04 RE-BASELINED 1087 → 1096, not loosened: an engine ask draws no
+     * free-text box or "or" divider (one `!enginePause` condition each), and a 4xx refusal shows
+     * the server's sentence when it sent one. `useState` 7 → 7, `useEffect` 3 → 3. Retirement
+     * fences untouched and green.
+     *
+     * 2026-10-21 — 295-10 (D-r1-01) RE-BASELINED 1096 → 1102, not loosened: the 409 arm shows the
+     * server's sentence when it sent one (else the old words), and on a paused run re-reads the
+     * stack's asks once. `useState` 7 → 7, `useEffect` 3 → 3. Retirement fences untouched and green.
+     *
+     * 2026-10-21 — 295 D-r2-01 RE-BASELINED 1102 → 1104, not loosened: the stack treats any
+     * non-terminal run status (not only `paused`) as live, so a re-driven `active` run's next ask
+     * is not retired. `useState` 7 → 7, `useEffect` 3 → 3. Retirement fences untouched and green.
      */
-    expect(src.split("\n").length).toBe(1053)
+    expect(src.split("\n").length).toBe(1104)
   })
 
   /** (a) The 404-expiry constant — `setExpiredMessage("…")` in the catch. */

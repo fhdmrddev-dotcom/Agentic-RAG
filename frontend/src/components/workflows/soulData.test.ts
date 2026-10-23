@@ -49,6 +49,9 @@ import {
 // Plan 214.1-01 Task 3, as SEPARATE statements so this file's diff stays additive.
 import { entryInputFields, launchInputFields } from "./soulData"
 import { declaredInputFor } from "./declaredInputs"
+// Plan 291-05 Task 2, as SEPARATE statements so this file's diff stays additive.
+import { missingRequiredFields } from "./soulData"
+import { inputOptionsHint } from "./declaredInputsVocabulary"
 
 /** A strict workflow: a terminal llm_emit with citation_policy "strict" → STRICT. */
 const strictDef: DefShape = {
@@ -719,5 +722,94 @@ describe("soulData — purity (D-02: surfaces existing fields only, no backend t
     const tierExports = soulDataSource.match(/export function tierForDefinition/g) ?? []
     expect(glyphExports).toHaveLength(1)
     expect(tierExports).toHaveLength(1)
+  })
+})
+
+// ── Plan 291-05 (D-09 / D-11) — a Look-it-up input never reaches a launch form, and a fixed ──
+// ── set of options is said in the label so the person can type a value the fill accepts ──
+
+describe("291-05 — launchInputFields skips kb_auto; entryInputFields carries source", () => {
+  const def: DefShape = {
+    inputs: [
+      { key: "supplier", label: "Supplier", required: true, source: "user" },
+      { key: "country_code", label: "Country code", required: true, source: "kb_auto" },
+      { key: "notes", label: "Notes", required: true },
+    ],
+  }
+
+  it("a kb_auto input is NOT a launch field; a user input and a source-less input are", () => {
+    expect(launchInputFields(def).map((f) => f.key)).toEqual(["supplier", "notes"])
+  })
+
+  it("so missingRequiredFields can never block on a Look-it-up input (both launch doors)", () => {
+    const missing = missingRequiredFields(launchInputFields(def), { supplier: "Acme", notes: "x" })
+    expect(missing).toEqual([])
+  })
+
+  it("entryInputFields carries source when the input has one, and adds no key when it has none", () => {
+    const out = entryInputFields(def)
+    expect(out[0]).toStrictEqual({ key: "supplier", label: "Supplier", required: true, source: "user" })
+    expect(out[1]).toStrictEqual({ key: "country_code", label: "Country code", required: true, source: "kb_auto" })
+    // An input without source is BYTE-IDENTICAL to before: no `source` key at all.
+    expect(out[2]).toStrictEqual({ key: "notes", label: "Notes", required: true })
+  })
+})
+
+describe("291-05 — the options hint on a fixed-choice label (D-11, T-291-45)", () => {
+  it("exactly yes/no (any case) reads \"(yes or no)\"", () => {
+    expect(inputOptionsHint(["Yes", "No"])).toBe("(yes or no)")
+    expect(inputOptionsHint(["no", "YES"])).toBe("(yes or no)")
+  })
+
+  it("any other set reads \"(one of: A, B, C)\" in the field's own order", () => {
+    expect(inputOptionsHint(["US", "CA", "MX"])).toBe("(one of: US, CA, MX)")
+    expect(inputOptionsHint(["Yes", "No", "Maybe"])).toBe("(one of: Yes, No, Maybe)")
+  })
+
+  it("is capped at the first 12 options, then an ellipsis", () => {
+    const many = Array.from({ length: 15 }, (_, i) => `O${i + 1}`)
+    expect(inputOptionsHint(many)).toBe(
+      "(one of: O1, O2, O3, O4, O5, O6, O7, O8, O9, O10, O11, O12, …)",
+    )
+    const twelve = many.slice(0, 12)
+    expect(inputOptionsHint(twelve)).toBe("(one of: O1, O2, O3, O4, O5, O6, O7, O8, O9, O10, O11, O12)")
+  })
+
+  it("no options ⇒ no hint", () => {
+    expect(inputOptionsHint([])).toBe("")
+  })
+
+  it("entryInputFields appends the hint to an enum label, and uses the KEY when there is no label", () => {
+    const out = entryInputFields({
+      inputs: [
+        { key: "country", label: "Country", type: "enum", enum_options: ["US", "CA", "MX"] },
+        { key: "agree", label: "Agree", type: "enum", enum_options: ["yes", "no"] },
+        { key: "region", type: "enum", enum_options: ["EU", "NA"] },
+        { key: "same_as_key", label: "same_as_key", type: "enum", enum_options: ["a", "b"] },
+      ],
+    })
+    expect(out.map((f) => f.label)).toEqual([
+      "Country (one of: US, CA, MX)",
+      "Agree (yes or no)",
+      "region (one of: EU, NA)",
+      "same_as_key (one of: a, b)",
+    ])
+  })
+
+  it("a non-enum input, and an enum without options, are byte-identical to before", () => {
+    const out = entryInputFields({
+      inputs: [
+        { key: "name", label: "Name", type: "text", enum_options: ["ignored"] },
+        { key: "pick", label: "Pick", type: "enum", enum_options: [] },
+        { key: "bare", type: "enum" },
+      ],
+    })
+    expect(out[0]).toStrictEqual({ key: "name", label: "Name", required: true })
+    expect(out[1]).toStrictEqual({ key: "pick", label: "Pick", required: true })
+    expect(out[2]).toStrictEqual({ key: "bare", required: true })
+  })
+
+  it("option text renders as given — the hint is a plain string, never markup", () => {
+    expect(inputOptionsHint(["<b>x</b>", "y"])).toBe("(one of: <b>x</b>, y)")
   })
 })

@@ -48,6 +48,7 @@ import { EngineHealthCard } from "@/components/settings/EngineHealthCard"
 import { SourceFileCeilingCard } from "@/components/settings/SourceFileCeilingCard"
 import { SOURCE_CEILING_RECOMMENDED_MB } from "@/components/settings/sourceCeilingCopy"
 import { JudgeModelPicker } from "@/components/settings/JudgeModelPicker"
+import { AuthoringModelPicker } from "@/components/settings/AuthoringModelPicker"
 // ⚠ MOVED 2026-10-15 (Phase 283, FIX-01 / D-02): the per-user default-model picker
 // (`ModelDefaultPreference`, Phase 167) and the "Show technical names" toggle
 // (`TechnicalNamesToggle` + `useTechnicalNames`, Phase 154) are no longer imported here.
@@ -1278,6 +1279,9 @@ export function SettingsPage() {
               <JudgeModelPicker
                 registryModels={registryModels.length > 0 ? registryModels : [...verifiedModels]}
               />
+              {/* Migration 212 — the workflow-drafting model; self-fetches its options and saves
+                  itself, like the judge picker above (outside the AI Model save cycle). */}
+              <AuthoringModelPicker />
             </div>
           </TabsContent>
           )}

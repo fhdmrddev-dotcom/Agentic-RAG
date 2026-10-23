@@ -2,7 +2,7 @@
 title: SPIKE — NL→workflow authoring (describe + upload-template → AI-derived inputs/phases → KB-grounded fill → human refine → run) on a real case
 date: 2026-06-03
 priority: high
-status: pending
+status: completed
 trigger: v2.9 milestone kickoff — run as the FIRST move of v2.9, BEFORE designing any inputs/assets schema (do NOT start during v2.8; finish 094→095→096 first)
 related: SEED-051, SEED-050, D-092-AUTHOR, .planning/research/questions.md, .planning/notes/workflow-authoring-exploration-2026-06-03.md
 resolves_phase: 152
@@ -47,3 +47,8 @@ Do NOT pre-commit the `inputs`/`assets` schema before this runs.
 
 Findings feed the v2.9 `inputs` + `assets` schema design and the open decisions in
 `.planning/research/questions.md`. Then plan D-092-AUTHOR Phase B/C on the evidence.
+
+
+> **Folded into Phase 291 (2026-10-22, 291-CONTEXT.md D-21).** Closes when 291 verifies.
+
+> **Closed by Phase 291 (describe → upload → draft → refine → run); verified at /gsd:verify-work 291.** Moved from `todos/pending/` by 291-05 (2026-10-23). ⚠ If 291 fails verification, verify-work moves this file back to `pending/` and re-opens it.

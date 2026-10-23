@@ -650,6 +650,12 @@ export interface FullAppSettings {
   // default exists). Mirrors the skill_builder_model pair above; ONE resolver (D-11).
   harness_judge_model: string
   resolved_harness_judge_model: string | null
+  // Migration 212 — the workflow-drafting model. Raw ("" => unset), the model drafting will
+  // actually use, and the models that can draft (registry + forced emission). Optional so an
+  // older backend that sends none still type-checks; the picker then offers nothing to pick.
+  harness_authoring_model?: string
+  resolved_harness_authoring_model?: string | null
+  authoring_model_options?: string[]
   llm_max_output_tokens: number
   openrouter_tool_strategy: "quality" | "native" | "xml"
   // Phase 075.3 D-075.3-13: registry-known model_ids — frontend uses this set
@@ -743,6 +749,7 @@ export interface SettingsUpdate {
   // Phase 137.1 (D-12) — the independent judge model id (registry-validated server-side;
   // "" clears back to the resolver default). Any provider incl. local — no SPOF.
   harness_judge_model?: string
+  harness_authoring_model?: string
   llm_max_output_tokens?: number
   openrouter_tool_strategy?: "quality" | "native" | "xml"
 }

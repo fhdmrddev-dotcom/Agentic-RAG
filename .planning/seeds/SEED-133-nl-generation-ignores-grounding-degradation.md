@@ -1,7 +1,9 @@
 ---
 seed_id: SEED-133
 title: NL workflow generation ignores GroundingBundle.degraded — a folder-blind draft is presented as ok
-status: open
+status: shipped
+status_note: "Shipped by 291-02 (D-20): generate refuses in words on a degraded registry before any provider call."
+folded_into: "291"
 planted: 2026-07-25
 planted_by: Phase 182 round-3 gap closure
 surface: Agentic-RAG
@@ -17,6 +19,8 @@ trigger_when: unset
 ---
 
 # SEED-133 — NL generation is the one grounding consumer that does not branch on `degraded`
+
+> **2026-10-23 (291-05 close-out):** `folded` → `shipped`. 291-02 makes generate refuse with `could_not_generate` / `grounding_unavailable` on a degraded registry before any provider call (D-20), and 291-05 words that refusal on the describe door as a sentence and a next step (SEED-221). Prior status_note: "Folded into Phase 291 (2026-10-22, D-20): NL drafting branches on GroundingBundle.degraded."
 
 ## What
 

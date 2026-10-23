@@ -134,7 +134,16 @@ def test_gate_failed_audit_and_sse_carry_the_cause_and_keep_the_validator_text()
                  if c.kwargs.get("event_type") == "gate_failed"]
     assert len(gate_rows) == 3
     assert gate_rows[-1]["error"] == outcome.reason
-    assert all(row["validator_error"] == VALIDATOR_TEXT for row in gate_rows)
+    # ⚠ RE-PINNED DELIBERATELY at Phase 295 plan 04 (D-14 / D-44), retired by name rather than
+    #   tripped by surprise (the SEED-177 rule). This line used to read
+    #   ``assert all(row["validator_error"] == VALIDATOR_TEXT for row in gate_rows)``: 281 kept
+    #   the validator's text in the audit "so nothing is lost". For a DIAGNOSED emit failure that
+    #   text is the validator reading the failure output's SHAPE ("no field_map on output"), so
+    #   a no-template run's ledger named a citation error that never happened. The audit's
+    #   validator_error is now the executor's composed cause, the same string as ``error``. An
+    #   undiagnosed failure still records the validator's own message (test_295_truthful_run_ends).
+    assert all(row["validator_error"] == row["error"] for row in gate_rows)
+    assert not any(VALIDATOR_TEXT in row["validator_error"] for row in gate_rows)
     # attempt 0's row already carries the composed cause SO FAR (3 records).
     first = _ec().compose_emit_failure(_golden_invocations()[0], step_name="Write the report")
     assert gate_rows[0]["error"] == first

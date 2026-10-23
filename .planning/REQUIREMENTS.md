@@ -18,7 +18,7 @@ Seeds folded at intake: SEED-232, SEED-195, SEED-014, SEED-084, SEED-164, SEED-0
 ### Author (AUTH)
 
 - [ ] **AUTH-01**: A workflow that pauses for a person can be published, and the run surface shows who it is waiting on. — `SEED-164`
-- [ ] **AUTH-02**: Describe-it authoring can take uploaded assets (template, form, reference docs) and derive the inputs, phases and tools from them. — `SEED-051`
+- [x] **AUTH-02**: Describe-it authoring can take uploaded assets (template, form, reference docs) and derive the inputs, phases and tools from them. — `SEED-051`
 - [ ] **AUTH-03**: A draft's configuration does not vanish when the author navigates away. — `SEED-183`
 
 ### See (VIS)
@@ -42,6 +42,13 @@ Seeds folded at intake: SEED-232, SEED-195, SEED-014, SEED-084, SEED-164, SEED-0
 - [ ] **DEC-01**: A Settings switch turns the decision engine on or off and picks the engine: Jev (TypeSafe, ~~direct or~~ via OpenRouter), OpenAI Decisions (`gpt-6-luna`), or a local model. Off is the default and leaves retrieval exactly as it is today. *Amended 2026-10-20 (294-CONTEXT D-03, operator): Jev ships via OpenRouter only; TypeSafe direct is deferred.*
 - [ ] **DEC-02**: When on, knowledge-base search reranks its candidates with the chosen engine, accepts an optional steering instruction from the agent, and drops only candidates below a conservative threshold. Any engine failure falls back to the current order.
 - [ ] **DEC-03**: A user can check an answer's citations and see, for each cited sentence, whether its source supports it fully, partly, not at all, or contradicts it, with a confidence.
+
+### Runs (RUN) — added 2026-10-20 by the operator, from measured run failures
+
+- [x] **RUN-01**: A knowledge-base step that finds nothing, or answers without citations, pauses the run and asks the person (search elsewhere / continue unsourced, visibly marked / stop) instead of failing it; a locked must-prove-it workflow never offers continue-unsourced. — `BUG-261020-07`
+- [x] **RUN-02**: A report step with no template is refused when the workflow is saved or published, with a message that names the missing template. — `BUG-261020-08`
+- [x] **RUN-03**: The publish judge does not fail a workflow because a recorded-not-sent action did not send. — `BUG-261020-09`
+- [x] **RUN-04**: Every run ends in a true state with a reason: none stays active after its phases end, none fails without a recorded reason, and a run waiting for approval reads waiting. — `BUG-261020-10`, `-11`, `-12`
 
 ## Future Requirements (deferred)
 
@@ -73,7 +80,7 @@ Seeds folded at intake: SEED-232, SEED-195, SEED-014, SEED-084, SEED-164, SEED-0
 | TRUST-01 | Phase 289 | Complete |
 | VIS-04 | Phase 290 | Pending |
 | VIS-01 | Phase 290 | Pending |
-| AUTH-02 | Phase 291 | Pending |
+| AUTH-02 | Phase 291 | Complete (2026-10-24) |
 | VIS-02 | Phase 292 | Pending |
 | START-02 | Phase 293 | Pending |
 | START-04 | Phase 293 | Pending |
@@ -81,8 +88,12 @@ Seeds folded at intake: SEED-232, SEED-195, SEED-014, SEED-084, SEED-164, SEED-0
 | DEC-01 | Phase 294 | Pending |
 | DEC-02 | Phase 294 | Pending |
 | DEC-03 | Phase 294 | Pending |
+| RUN-01 | Phase 295 | Verified (2026-10-21; G-4 sign-off owed) |
+| RUN-02 | Phase 295 | Verified (2026-10-21; G-4 sign-off owed) |
+| RUN-03 | Phase 295 | Verified (2026-10-21; G-4 sign-off owed) |
+| RUN-04 | Phase 295 | Verified (2026-10-21; G-4 sign-off owed) |
 
-Mapped: 14/14, no orphans, no duplicates.
+Mapped: 21/21, no orphans, no duplicates.
 
 ---
 *Requirements defined: 2026-10-18*

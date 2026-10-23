@@ -101,12 +101,12 @@
   },
   "GenerateRequest": {
     "kind": "class",
-    "body_sha256": "d029956884db7b033d8a34997c3dcd2d9cc73c4986fa73f4125c6dce6c62c366",
+    "body_sha256": "0a108c2c16420b02719b105b8cd27d254cf6e1485cf0270d60cdcddf2cd154d7",
     "decorator_sha256": null
   },
   "generate_workflow": {
     "kind": "async_function",
-    "body_sha256": "a76071728446980d6c6f36f3a50b121f59f99b1c119d95aefee0d637d3625dce",
+    "body_sha256": "6b34bff2e28700232f33bfb4a00f289df191acc25febd4769bcc12147af4860e",
     "decorator_sha256": "b0fff742aed104f68dec4549c96e2dd4d8acf65631c7f2cb8a69459e9e3b7e66"
   },
   "read_template_placeholders": {
@@ -116,12 +116,12 @@
   },
   "upload_workflow_template": {
     "kind": "async_function",
-    "body_sha256": "55b9ec815eaa8df7013985c430ffb429b6f9c705e2c4991b2d426e0ce9521f5c",
+    "body_sha256": "1774905c99bf88ee950a0ba2aa60d0722af02e1033a9d79f6f2ff6db34e70e30",
     "decorator_sha256": "5321252cb017515a631be2ef54959f621c6658f7528ab7995d439c95b0beca9a"
   },
   "get_workflow_template_placeholders": {
     "kind": "async_function",
-    "body_sha256": "58c955bfe4c52f10887632786921103e1e60837f7e1e36553d8a93905d13427f",
+    "body_sha256": "37e33894034ea2a8308dea672834ea913b0b6401a17e84c59ad7c1630e9e09ad",
     "decorator_sha256": "82abf42130c6f9b0cf3c6cc1330d56df5255a162cf2aec5d559af1a1315f703d"
   }
 }

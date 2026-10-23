@@ -1,0 +1,32 @@
+{
+  "t1": "c617390ae5ad4fef9a9a7078677dcde1",
+  "t2": "d87b9c1a42cc458da66879903300408a",
+  "replays": [
+    [
+      409,
+      "{\"detail\":\"This question is no longer the one the run is waiting on.\"}"
+    ],
+    [
+      409,
+      "{\"detail\":\"This question is no longer the one the run is waiting on.\"}"
+    ]
+  ],
+  "pending_raw": "[{'message_id': 'a3eaa611-b3eb-4fb0-9beb-a7810092498f', 'tool_call_id': 'd87b9c1a42cc458da66879903300408a', 'prompt': 'Searched 295-r1 second empty folder and found nothing for \u201cFind the project status\u201d. How should the run continue?', 'options': ['Search another folder', 'Continue without sources', 'Stop the run'], 'timeout_seconds': None, 'run_id': '1c95e132-1315-4cf0-9b76-c94e1814167f', 'draft': '**I found nothing \u2014 the knowledge base returned no documents for this question.**\\n\\nHere\\'s what I searched and what came back:\\n\\n| Search | Result |\\n|---|---|\\n| \"latest project status progress ",
+  "ps": [
+    2,
+    2
+  ],
+  "runs": [
+    8,
+    8
+  ],
+  "prompts": [
+    2,
+    2
+  ],
+  "responses": [
+    1,
+    1
+  ],
+  "status": "paused"
+}

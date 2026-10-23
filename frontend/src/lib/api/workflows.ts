@@ -135,10 +135,15 @@ export class WorkflowTemplateUploadError extends Error {
 export async function uploadWorkflowTemplate(
   definitionId: string,
   file: File,
+  // Phase 291-04 (D-26 / D-27): the Word blanks the author left ticked. The server places each
+  // one and stores a fillable COPY instead of the original. ABSENT ⇒ no part is appended and
+  // the request is byte-identical to the shipped one.
+  anchors?: WordAnchor[],
 ): Promise<WorkflowTemplateAsset> {
   const token = await getAuthToken()
   const formData = new FormData()
   formData.append("file", file)
+  if (anchors !== undefined) formData.append("anchors", JSON.stringify(anchors))
   let res: Response
   try {
     res = await fetch(`${API_BASE}/workflows/${definitionId}/template`, {
@@ -262,6 +267,145 @@ export async function readTemplatePlaceholdersFromFile(
     throw new WorkflowTemplateUploadError(res.status, detail)
   }
   return (await res.json()) as WorkflowTemplatePlaceholders
+}
+
+/**
+ * ── Phase 291-04 (AUTH-02) — THE DESCRIBE DOOR'S FILES ─────────────────────────────────────
+ *
+ * Mirrors of the server's wire models (`backend/app/api/workflow_wire.py`), field for field.
+ * Every field, type, line and sentence here is the SERVER'S; the client renders them and
+ * infers none (D-04 / SEED-221).
+ */
+export type DescribeRole = "form" | "reference"
+
+export type DescribeArm =
+  | "template_fields"
+  | "form_fields"
+  | "suggested_fields"
+  | "blanks"
+  | "none"
+  | "not_word"
+  | "scan_unreadable"
+  | "copy_refused"
+  | "reference"
+
+/** One field found in an attached form. `origin` is server-stamped; `line_before` /
+ *  `line_after` are the document's own line around a Word blank (D-27). */
+export interface DescribeField {
+  key: string
+  label: string
+  type: "text" | "number" | "date" | "enum"
+  enum_options: string[]
+  origin: "exact" | "ai_proposed"
+  line_before: string | null
+  line_after: string | null
+  anchor_kind: "line" | "cell" | null
+  anchor_label: string | null
+}
+
+/** A blank the server could not place exactly, with the server's sentence saying so (D-28). */
+export interface DescribeUnplaced {
+  label: string
+  sentence: string
+}
+
+/** What one attached file holds, read before any draft exists (`DescribeReadResponse`).
+ *  A file that never opened is a 422 with a server sentence, never an arm. */
+export interface DescribeReadResult {
+  role: DescribeRole
+  arm: DescribeArm
+  suggested_from: "text" | "scan" | null
+  filename: string
+  fields: DescribeField[]
+  unplaced: DescribeUnplaced[]
+  text: string
+  cut_short: string | null
+  refused: string | null
+}
+
+/** The `AssetRef` the reference door mints (`ReferenceAssetRef`). Its own type, so the
+ *  template descriptor's "never mints references" stays true. */
+export interface ReferenceAssetDescriptor {
+  kind: "reference"
+  asset_id: string
+  filename: string
+  mime: string
+}
+
+/** One ticked Word blank the author confirmed; the server places it (`WordAnchorIn`). */
+export interface WordAnchor {
+  key: string
+  anchor_kind: "line" | "cell"
+  anchor_label: string
+}
+
+/**
+ * POST /workflows/describe/read — what ONE attached file holds, read from bytes alone.
+ *
+ * `readTemplatePlaceholdersFromFile`'s shape exactly, plus the `role` part: FormData, Bearer,
+ * NO `Content-Type` (the browser writes the boundary), abortable. A network failure is
+ * `WorkflowTemplateUploadError("network", null)`; a refusal relays the server's `detail`
+ * sentence rather than re-wording it. Like its sibling it persists nothing.
+ */
+export async function readDescribeFile(
+  file: File,
+  role: DescribeRole,
+  signal?: AbortSignal,
+): Promise<DescribeReadResult> {
+  const token = await getAuthToken()
+  const formData = new FormData()
+  formData.append("file", file)
+  formData.append("role", role)
+  let res: Response
+  try {
+    res = await fetch(`${API_BASE}/workflows/describe/read`, {
+      method: "POST",
+      headers: { Authorization: `Bearer ${token}` },  // NO Content-Type — browser sets the boundary
+      body: formData,
+      signal,
+    })
+  } catch {
+    throw new WorkflowTemplateUploadError("network", null)
+  }
+  if (!res.ok) {
+    const body = (await res.json().catch(() => null)) as { detail?: unknown } | null
+    const detail = typeof body?.detail === "string" ? body.detail : null
+    throw new WorkflowTemplateUploadError(res.status, detail)
+  }
+  return (await res.json()) as DescribeReadResult
+}
+
+/**
+ * POST /workflows/{id}/reference — store ONE reference file with a saved draft (D-07).
+ *
+ * `uploadWorkflowTemplate`'s shape and its contract: it returns the descriptor and writes no
+ * definition; the caller appends it to `assets[]` through the one draft-save path. ⚠ The
+ * five-reference limit is NOT enforced at this door (one file per call) — the describe door
+ * enforces it before anything is sent.
+ */
+export async function uploadWorkflowReference(
+  definitionId: string,
+  file: File,
+): Promise<ReferenceAssetDescriptor> {
+  const token = await getAuthToken()
+  const formData = new FormData()
+  formData.append("file", file)
+  let res: Response
+  try {
+    res = await fetch(`${API_BASE}/workflows/${definitionId}/reference`, {
+      method: "POST",
+      headers: { Authorization: `Bearer ${token}` },  // NO Content-Type — browser sets the boundary
+      body: formData,
+    })
+  } catch {
+    throw new WorkflowTemplateUploadError("network", null)
+  }
+  if (!res.ok) {
+    const body = (await res.json().catch(() => null)) as { detail?: unknown } | null
+    const detail = typeof body?.detail === "string" ? body.detail : null
+    throw new WorkflowTemplateUploadError(res.status, detail)
+  }
+  return (await res.json()) as ReferenceAssetDescriptor
 }
 
 /** POST /workflows — create a draft. Returns {id, version, token} (Phase 186: the
@@ -662,6 +806,15 @@ export interface WorkflowRunPhase {
    *  or the run predates the field). Render NOTHING for it — never a low chip, never "n/a"
    *  (D-09). A step that searched and matched nothing carries `level: "none"` instead. */
   confidence?: RunPhaseConfidence | null
+  /** Phase 295-05 (RUN-01 / D-04) — present when the person kept this step's output without
+   *  sources. `continued_by` is WORDS resolved server-side for the viewer, never an id. */
+  unsourced?: RunPhaseUnsourced | null
+}
+
+/** Phase 295-05 — the wire twin of `run_read_wire.UnsourcedMark`. */
+export interface RunPhaseUnsourced {
+  continued_by: string
+  at: string
 }
 
 /** Phase 289 (TRUST-01) — the wire twin of the backend's `confidence_for_wire` output.
@@ -754,6 +907,9 @@ export interface WorkflowRunRead {
   model?: string | null
   /** Phase 288 (AUTH-01): present only while the run waits on a human-input step. */
   waiting_on?: WorkflowRunWaitingOn | null
+  /** Phase 295-05 (RUN-04 / D-22): why a failed or cancelled run stopped, as recorded;
+   *  null when nothing was (the page then says so for a failed run). */
+  end_reason?: string | null
 }
 
 /**

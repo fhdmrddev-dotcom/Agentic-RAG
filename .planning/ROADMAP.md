@@ -37,7 +37,7 @@
 ## v4.7 Workflows You Can See and Start Anywhere — 🚧 IN PROGRESS
 
 **Started:** 2026-10-18. **Roadmap created:** 2026-10-18.
-Requirements: [`REQUIREMENTS.md`](REQUIREMENTS.md). **17 v4.7 requirements, 17 mapped, 0 orphans** (4 START · 3 AUTH · 4 VIS · 1 TRUST · 2 REG · 3 DEC). DEC-01..03 (Phase 294) were added 2026-10-20 by the operator, outside the workflow theme.
+Requirements: [`REQUIREMENTS.md`](REQUIREMENTS.md). **21 v4.7 requirements, 21 mapped, 0 orphans** (4 START · 3 AUTH · 4 VIS · 1 TRUST · 2 REG · 3 DEC · 4 RUN). DEC-01..03 (Phase 294) were added 2026-10-20 by the operator, outside the workflow theme. RUN-01..04 (Phase 295) were added 2026-10-20 by the operator, from measured run failures.
 
 **Goal:** Workflows become easier to start, finish authoring and understand at a glance, with visuals that show what a run did.
 
@@ -67,6 +67,7 @@ Requirements: [`REQUIREMENTS.md`](REQUIREMENTS.md). **17 v4.7 requirements, 17 m
 | 292 | More Ways to Show It | The agent can show artifact types beyond chart, table and metric, from a closed registry | VIS-02 | 4 | **G-2 sketch** (choose the set at sketch time) · closed registry only, no new tool · migration only if the message_artifacts constraint needs it · G-4 · UI hint |
 | 293 | Start From Outside, and Close Out | An external system starts a run and reads the result; every run shows how it began; seed statuses match reality | START-02, START-04, REG-06 | 6 | ⛔ **security_enforcement** (opens an external door) · anti-injection + egress · org-scoped, rate-limited, audited · migration likely (next free) · **G-4** · depends on 287 and 289 · UI hint |
 | 294 | Decision Engine: Rerank and Citation Check | Knowledge-base search can rerank and prune its candidates with a fast decision model, and a user can check whether citations are supported; all behind a Settings switch | DEC-01, DEC-02, DEC-03 | 6 | **provider-docs-first** (Jev, OpenAI Decisions) · **G-2 sketch** (settings block, citation check) · **G-4** · measure before/after · migration likely (next free) · keys encrypted · no new tool · G-5 (`retrieval_service.py`, `config.py`, `user_settings.py`, `SettingsPage.tsx`, `MessageItem.tsx`) · UI hint |
+| 295 | Runs That Don't Dead-End | A workflow run never dead-ends: an empty or uncited knowledge-base step pauses and asks the person, misconfigurations are refused before a run, and every run ends in a truthful state with its reason | RUN-01, RUN-02, RUN-03, RUN-04 | 5 | **measured first** (BUG-261020-07..12) · **G-2 sketch** (the found-nothing pause) · **G-4** · governance-sensitive ("must prove it" stays strict) · G-5 (`harness_engine.py`, `phase_types.py`, `validator_kinds.py`, `publish_service.py`, `run_reconciler.py`) · UI hint |
 
 **Dependency order:** 286 → 287 → 288 → 289 → 290 → 291 → 292 → 293. The real constraints are narrower:
 
@@ -77,6 +78,7 @@ Requirements: [`REQUIREMENTS.md`](REQUIREMENTS.md). **17 v4.7 requirements, 17 m
 - **290 and 292** are independent of each other and of 291; they can swap order.
 - **291 after 288.** Both author through the builder / describe door; `useTemplateFirstDraft.ts` and the builder store settle in 288 first.
 - **294 is independent of 290-293.** It touches retrieval, Settings and the chat message, not workflow files. It can run any time after 289; if it runs before 293, they must not take the same migration number.
+- **295 after 288 and 289.** It reuses 288's pause and 289's run page and confidence. It shares `harness_engine.py` / `phase_types.py` with 291, so the two must not run concurrently. It may run before 290 if the operator wants reliability first.
 
 ### Phase Checklist
 
@@ -85,10 +87,11 @@ Requirements: [`REQUIREMENTS.md`](REQUIREMENTS.md). **17 v4.7 requirements, 17 m
 - [ ] **Phase 288: Drafts That Survive, Pauses That Publish**: draft configuration persists across navigation; a human-pause workflow publishes and the run shows who it waits on (AUTH-03, AUTH-01)
 - [x] **Phase 289: The Run Page and Its Evidence** (closed 2026-10-20, operator-approved; Anthropic row blocked on billing; BUG-261020-01/02 filed): one read-only finished-run page with export; confidence on KB-derived phase outputs (VIS-03, TRUST-01)
 - [ ] **Phase 290: The Card and the Team Picture**: card matches its approved sketch; truthful orchestrator / workers / judge view (VIS-04, VIS-01)
-- [ ] **Phase 291: Describe It From Your Own Files**: describe-it authoring from uploaded template, form and reference documents (AUTH-02)
+- [x] **Phase 291: Describe It From Your Own Files**: describe-it authoring from uploaded template, form and reference documents (AUTH-02) — verified passed 2026-10-24 (G-4 + SC#4 roster + SC#5 live fill run; findings routed in deferred-items.md)
 - [ ] **Phase 292: More Ways to Show It**: new artifact types from a closed registry, set chosen at sketch time (VIS-02)
 - [ ] **Phase 293: Start From Outside, and Close Out**: authenticated inbound run start with read-back, trigger provenance and last/next run, seed statuses reconciled (START-02, START-04, REG-06)
 - [ ] **Phase 294: Decision Engine: Rerank and Citation Check**: a Settings switch picks Jev, OpenAI Decisions or a local model to rerank and prune search candidates, and a citation check labels each cited sentence (DEC-01, DEC-02, DEC-03)
+- [ ] **Phase 295: Runs That Don't Dead-End**: an empty or uncited KB step pauses and asks instead of failing; misconfigurations refused before a run; the judge stops failing recorded-not-sent actions; every run ends truthfully with a reason (RUN-01..04)
 
 ### Phase Details
 
@@ -216,7 +219,22 @@ Plans:
   4. A single-agent workflow shows no team picture, or an honest single-node one, and never an invented worker (VIS-01).
 
 **How we'd know this failed**: the card still leads with a paragraph; chips show type ids instead of words; the team picture draws arrows that look right but are not in the definition; it looks good on the sketch's example and breaks on a real 7-phase workflow; the new view becomes a second runtime or second canvas.
-**Plans**: TBD (target 3-5)
+**Plans:** 4 plans (3 waves)
+
+Plans:
+**Wave 1**
+
+- [x] 290-01-PLAN.md — team derivation `deriveTeam`, its vocabulary leaf, planted fixtures, canvas header pin (TDD, wave 1)
+- [x] 290-02-PLAN.md — the card chip line: `resolveStepLine` + `StepChipLine`, one block on the card (TDD, wave 1)
+
+**Wave 2** *(blocked on Wave 1 completion)*
+
+- [x] 290-03-PLAN.md — `TeamPicture` render + the `Steps | Team` switch: one prop and one branch in the canvas (wave 2)
+
+**Wave 3** *(blocked on Wave 2 completion)*
+
+- [x] 290-04-PLAN.md — close-out: phase gates, count-gate pins, ledger in one commit, the escalated-seal BUG report (wave 3)
+
 **UI hint**: yes
 **Flags**: **G-2 sketch FIRST for both** (the card has an approved sketch; VIS-01 needs a new one). **G-4**. Hot files: `WorkflowCard.tsx`, `PhaseSpineGraph.tsx`, `WorkflowCanvas.tsx`, `PhaseNodeCard.tsx`, `libraryVocabulary.ts`; read the card's ledger section. Canvas glyph vocabulary: `references/icon-convention.md` section 4. Seeds `SEED-155`, `SEED-086`.
 
@@ -231,9 +249,33 @@ Plans:
   2. Every tool and phase type in the draft comes from the existing closed set; a draft the model proposes with an unknown tool is refused, not saved (AUTH-02).
   3. Instructions hidden inside an uploaded asset do not change the draft's tools or grants; driven with a planted injection in a reference document (AUTH-02).
   4. The path is driven on the full native provider roster plus OpenRouter, with blocked rows recorded, never omitted (AUTH-02).
+  5. A run hands back the author's own form filled in, without the author adding placeholders: a fillable PDF through its own fields, and a Word document's blanks through a copy the author confirmed while authoring (AUTH-02; added 2026-10-22, 291-CONTEXT D-25..D-29).
 
-**How we'd know this failed**: inputs are guessed from the prompt and ignore the form; the draft names a tool that does not exist; an uploaded document gains the power to grant a tool; only one provider was driven; the asset text is lost on reload.
-**Plans**: TBD (target 3-5)
+**How we'd know this failed**: inputs are guessed from the prompt and ignore the form; the draft names a tool that does not exist; an uploaded document gains the power to grant a tool; only one provider was driven; the asset text is lost on reload; the form's questions are asked but the run hands back no filled form, or a half-filled one.
+**Plans**: 6 plans (4 waves + 1 gap-closure round)
+
+Plans:
+**Wave 1**
+
+- [x] 291-01-PLAN.md — Read the files: stateless describe read door, AcroForm/Word-blank/scan/reference reader, Word fillable copy, pdf + reference binds, ledger rows (W1)
+
+**Wave 2** *(blocked on Wave 1 completion)*
+
+- [x] 291-02-PLAN.md — Draft from the files: user-turn fence, coverage + server-added inputs, file-blind powers guard with Removed words, degraded refusal, S5 roster harness (W2)
+- [x] 291-03-PLAN.md — Fill the form back: acroform arm in render_template, person's answers overlay, read-back proof (W2)
+
+**Wave 3** *(blocked on Wave 2 completion)*
+
+- [x] 291-04-PLAN.md — The describe door: form slot arms, references section on both doors, generate forwarding and bind (W3)
+
+**Wave 4** *(blocked on Wave 3 completion)*
+
+- [x] 291-05-PLAN.md — The arrival card (Removed line, inputs fold), kb_auto launch skip, post-reload homes, ledger/seeds close-out (W4)
+
+**Gap closure (round 1)**
+
+- [x] 291-06-PLAN.md — Close SC#3 (execute_code is a power) and SC#1 (no silent form drop: real-form caps, a refusal in words); WR-08/09/10; defer the rest with triggers (W1)
+
 **UI hint**: yes
 **Flags**: **Provider-docs-first** (structured output per provider). **SC#10 four-axis UAT, full roster**. security_enforcement: asset content is untrusted. Closed core recount. Hot files: `workflow_authoring.py` (17/11/1025), `workflows.py`, `useTemplateFirstDraft.ts`. Seed `SEED-051`.
 
@@ -308,6 +350,46 @@ Plans:
 **UI hint**: yes
 **Flags**: **Provider-docs-first**: Jev (`/api/alpha/decisions` on OpenRouter; TypeSafe direct; about 30 documents per call, about 32k tokens per call) and OpenAI Decisions (`POST /v1/decisions`, `gpt-6-luna`, 1-200 questions, refusal answers; SDK 2.28.0 may lack `client.decisions`, so raw `httpx` is acceptable). Local: Qwen3-Reranker (takes an instruction) or bge-reranker-v2-m3; check licences. **Extends the existing seam** `rerank_service.py` (Cohere / local today, off by default) instead of adding a second one. The steering instruction is an optional argument on the existing search tool, and the citation check is an API route, so the tool count stays 30. Migration only if settings need new columns (next free after 210; re-run `ls`). **G-2 sketch** for the Settings block and the citation-check view. **G-4**. Hot files: `retrieval_service.py`, `config.py`, `user_settings.py`, `api/settings.py`, `SettingsPage.tsx`, `MessageItem.tsx`; read their ledger sections. Deferred to future requirements: model routing, chunk tagging at ingestion. Intake research and sources: `phases/294-decision-engine-rerank-and-citation-check/294-INTAKE-RESEARCH.md`; re-verify at discuss.
 
+#### Phase 295: Runs That Don't Dead-End
+
+**Goal**: A workflow run does not dead-end. When a knowledge-base step finds nothing or forgets its citations, the run pauses and asks the person what to do instead of failing. Misconfigurations are refused before a run starts, and every run ends in a state that is true and says why.
+**Depends on**: Phase 288 (the pause), Phase 289 (the run page and confidence).
+**Requirements**: RUN-01, RUN-02, RUN-03, RUN-04
+**Success Criteria** (what must be TRUE):
+
+  1. A KB step that retrieves 0 sources, or answers with 0 citation markers, pauses the run with a worded choice: search another folder, continue without sources (the output is marked unsourced on the step, the run page and the receipt), or stop. It no longer fails the run. A workflow whose author locked grounding ("must prove it") offers no continue-without-sources (RUN-01).
+  2. A report step with no template bound is refused when the workflow is saved or published, and the message names the missing template, never a citation error (RUN-02).
+  3. A workflow whose external action is recorded-not-sent can pass the publish judge. Driven with the 2026-08-26 *DMT Project Status Summary & Email* shape, which was blocked 4 times (RUN-03).
+  4. No run reads `active` once all its phases are terminal; no failed run lacks a recorded reason; a run waiting for an approval reads waiting, not failed. The two stuck runs and the 20 reasonless runs found on 2026-10-20 are reconciled or explained (RUN-04).
+  5. Re-measured with the 2026-10-20 queries over the phase's UAT runs, the share of runs ending in a `citations_required` failure falls, and the before/after is recorded in VERIFICATION, measured rather than asserted (RUN-01).
+
+**How we'd know this failed**: "continue without sources" becomes a silent pass, so an unsourced output looks sourced anywhere; a locked must-prove-it workflow can skip its evidence; the pause has no timeout or loses the person's choice (the BUG-261020-01 family); the template check fires only at publish while drafts still fail at run time; the judge is loosened for every workflow instead of told what a recorded-not-sent step produces; stuck runs are hidden in the UI instead of finalised; the failure share is quoted without the query that produced it.
+**Plans**: 7 plans in 4 waves (CONTEXT D-34 suggested 5; plan 01 is the pure-move seam D-51 requires on its own, and the frontend is split so the 1,052-line PendingAskCard does not share a worktree with the 33-file read change)
+
+Plans:
+
+**Wave 1**
+
+- [x] 295-01-PLAN.md — take the G-5 seam: move the engine-ask disposition verbatim into `harness/engine_ask.py`, re-exported, proven pure (D-51) — wave 1
+- [x] 295-02-PLAN.md — base captures (SC#5 baseline, DMT before); `no_template_bound` refused at publish and run start, named at save; the judge told what a recorded-not-sent step produces (RUN-02, RUN-03) — wave 1
+- [x] 295-05-PLAN.md — the read side: `unsourced` and `end_reason` on every run read, the deadline-true window, the mark in four places, the end-reason line (RUN-01, RUN-04) — wave 1
+
+**Wave 2** *(blocked on Wave 1 completion)*
+
+- [x] 295-03-PLAN.md — engine asks pause durably with server-built choices, the bounded folder re-run, the locked refusal, consume on re-drive, the sweep never re-asks (RUN-01, RUN-04) — wave 2
+- [x] 295-06-PLAN.md — the pause card: one helper, one folder leaf, no false clock, Stop recorded as a stop — wave 2
+
+**Wave 3** *(blocked on Wave 2 completion)*
+
+- [x] 295-04-PLAN.md — truthful ends: the answer reaches the next step, one failure one message, cancel reads cancelled, resume/golden/F2/reconciler finalise with reasons (RUN-04, BUG-261020-01, BUG-261015-01) — wave 3
+
+**Wave 4** *(blocked on Wave 3 completion)*
+
+- [x] 295-07-PLAN.md — live proof S1-S7, SC#3 and SC#5 measured with their queries, the D-47 re-drive, the four-axis roster, the ledger and every gate once — wave 4
+
+**UI hint**: yes
+**Flags**: **Evidence**: `BUG-261020-07`..`12` (folded here) and memory `project_workflow_blocking_measured_20261020`. **Route at discuss**: `BUG-261020-01` (a human step's answer never reaches the next step) belongs to the same "doesn't run as intended" family and is the first candidate to fold. **Not in scope**: branching or loops (`SEED-295` stays parked; the 2026-10-20 measure found no failure caused by a route the engine cannot express). `ValidatorSpec.on_failure` already accepts `ask_user` (D-11), so RUN-01 may be mostly a default and a worded pause; verify before adding engine code. **G-2 sketch** for the found-nothing pause. **G-4**. Hot files: `harness_engine.py`, `phase_types.py`, `validator_kinds.py`, `publish_service.py`, `run_reconciler.py`, `PendingAskCard.tsx`; read their ledger sections.
+
 ### Progress
 
 | Phase | Plans Complete | Status | Completed |
@@ -321,6 +403,7 @@ Plans:
 | 292. More Ways to Show It | 0/TBD | Not started | - |
 | 293. Start From Outside, and Close Out | 0/TBD | Not started | - |
 | 294. Decision Engine: Rerank and Citation Check | 5/5 | complete (2026-10-20) | 6/6 SC met in code; 294-HUMAN-UAT 9/9 passed live; roster R2 ⛔ Anthropic billing, glm-5.3 ⛔ BUG-261020-06; not pushed; cloud mig 211 owed before deploy |
+| 295. Runs That Don't Dead-End | 7/7 (+3 gap fixes) | human_needed (2026-10-21) | 5/5 SC + RUN-01..04 verified (295-VERIFICATION.md); 2 gap rounds (G-7 cap reached); G-4 sign-off owed, run S1 first (295-HUMAN-UAT.md); Anthropic row blocked on billing; deferred BUG-261021-02/03/04, SEED-366/367; count gate OK post-close; not pushed |
 
 ---
 

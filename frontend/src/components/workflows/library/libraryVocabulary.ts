@@ -764,3 +764,45 @@ export const AUTOMATION_CADENCE: Record<string, string> = {
 export function automationMoreCount(n: number): string {
   return `+${n} more`
 }
+
+/**
+ * Phase 290-02 (2026-10-21, VIS-04 / D-01..D-05) — the card's STEP LINE words.
+ *
+ * ⚠ THE CHIP WORDS THEMSELVES ARE NOT HERE, AND THAT IS D-04. Each chip reads the step's type
+ * sentence from `phaseVocabulary.ts`'s `PHASE_TYPE_SENTENCES`, so there is ONE home for them;
+ * a copy here would be the second home that drifts. These entries are only the frame around
+ * the chips: the list's accessible name, the joiner, the overflow toggle and the no-type floor.
+ *
+ * ⚠ `stepLineMore(n)` PRINTS THE SAME TEXT AS `automationMoreCount(n)` ABOVE, AND STAYS A
+ * SEPARATE ENTRY. One entry per meaning: the other one counts schedules, this one counts steps,
+ * and a copy change to either must never move the other. Tests query this toggle inside
+ * `row-steps` for exactly that reason.
+ */
+/** The chip list's accessible name (the `<ol aria-label>`). */
+export const STEP_LINE_LABEL = "Steps, in run order"
+
+/** Between two chips, and before the overflow toggle. Decorative: rendered `aria-hidden`. */
+export const STEP_LINE_JOINER = "→"
+
+/** The collapsed toggle's visible text: the steps not shown yet. */
+export function stepLineMore(n: number): string {
+  return `+${n} more`
+}
+
+/**
+ * The collapsed toggle's accessible name. The plural is a separate arm, not a built `s`.
+ *
+ * ⚠ IT STARTS WITH THE VISIBLE TEXT, BY CONSTRUCTION (290 WR-05, WCAG 2.5.3 Label in Name):
+ * a voice-control user says what they see, "click plus 4 more", and a name that read
+ * `Show 4 more steps` matched nothing. So the name is `stepLineMore(n)` plus the noun.
+ */
+export function stepLineMoreLabel(n: number): string {
+  if (n === 1) return `${stepLineMore(n)} step`
+  return `${stepLineMore(n)} steps`
+}
+
+/** The expanded toggle's text: fold the line back to its first steps. */
+export const STEP_LINE_LESS = "Show less"
+
+/** The floor for a step with no `phase_type`, so no chip is ever empty. */
+export const STEP_LINE_UNTYPED = "A step with no type"

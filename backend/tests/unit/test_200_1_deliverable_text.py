@@ -132,13 +132,17 @@ _EXPECTED_PHASE_KEYS = {
     # 289 (TRUST-01 / D-08) — chat's retrieval confidence on a KB step, plus the server-stamped
     # KB label (R-05). Read BY NAME off the same single parse; `None` on every non-KB step.
     "confidence",
+    # 295-05 (RUN-01 / D-04) — the mark on a step kept without sources, read BY NAME off the
+    # same single parse and rewritten by `unsourced_for_wire` (the stored uuid never ships).
+    "unsourced",
 }
 
 # The keys the serializer reads BY NAME off the unwrapped `obj`. One until Phase 214, two now.
 # ⚠ `_failure_reason` is read off the SAME single parse — a third fact through the one door,
 # never a second door. The fence below is what keeps that true.
 # ⚠ 289 ADDS A THIRD: `confidence`, coerced through `confidence_for_wire`'s own allow-list.
-_ALLOW_LISTED_OUTPUT_KEYS = {"text", "_failure_reason", "confidence"}
+# ⚠ 295-05 ADDS A FOURTH: `unsourced`, coerced through `unsourced_for_wire`'s own allow-list.
+_ALLOW_LISTED_OUTPUT_KEYS = {"text", "_failure_reason", "confidence", "unsourced"}
 
 _DEFINITION_JSON = {
     "slug": "quarterly-report",

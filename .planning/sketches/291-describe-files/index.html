@@ -1,0 +1,319 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>291 · Describe door with files</title>
+<!-- The app's own stylesheet, read from the running page's document.styleSheets (2026-10-22),
+     so the captured door DOM renders with the real classes. Only the attach block is new. -->
+<link rel="stylesheet" href="app.css">
+<script src="data.js"></script>
+<style>
+  body { padding-top: 96px; background: hsl(var(--background)); }
+  #nav { position: fixed; top: 0; left: 0; right: 0; z-index: 9998; padding: 8px 16px; display: flex; flex-wrap: wrap; gap: 6px; align-items: center; font: 13px system-ui; border-bottom: 1px solid hsl(var(--border)); background: hsl(var(--background)); color: hsl(var(--foreground)); }
+  #nav button, #nav select { padding: 4px 10px; border-radius: 6px; border: 1px solid hsl(var(--border)); background: hsl(var(--card)); color: hsl(var(--foreground)); cursor: pointer; font: inherit; }
+  #nav button.on { background: hsl(var(--primary)); color: hsl(var(--primary-foreground)); border-color: transparent; }
+  #nav .sep { width: 1px; height: 20px; background: hsl(var(--border)); margin: 0 4px; }
+  #nav label { display: inline-flex; gap: 4px; align-items: center; color: hsl(var(--muted-foreground)); }
+  #note { position: fixed; top: 46px; left: 0; right: 0; z-index: 9997; padding: 6px 16px; font: 12px system-ui; color: hsl(var(--muted-foreground)); background: hsl(var(--background)); border-bottom: 1px solid hsl(var(--border)); }
+  #stage { margin: 0 auto; height: calc(100vh - 96px); overflow: auto; }
+  #stage.phone { max-width: 375px; border-inline: 1px dashed hsl(var(--border)); }
+
+  /* ── NEW markup only. Everything else on the page is the captured real DOM. ───────── */
+  .f-list { margin-top: 6px; display: flex; flex-direction: column; gap: 6px; }
+  .f-file { display: flex; flex-direction: column; gap: 2px; }
+  .f-head { display: flex; align-items: baseline; gap: 6px; font-size: 11px; color: hsl(var(--foreground)); min-width: 0; }
+  .f-head .nm { min-width: 0; overflow-wrap: anywhere; flex: 1; }
+  .f-x { flex: none; font-size: 10.5px; color: hsl(var(--muted-foreground)); text-decoration: underline; text-underline-offset: 2px; background: none; border: 0; padding: 0; cursor: pointer; }
+  .f-x:hover { color: hsl(var(--foreground)); }
+  .f-read { padding-left: 18px; font-size: 10.5px; line-height: 1.35; color: hsl(var(--muted-foreground)); }
+  .f-read.warn { color: hsl(var(--foreground)); }
+  .f-fields { margin: 4px 0 0 18px; display: grid; grid-template-columns: minmax(0, max-content) max-content; justify-content: start; column-gap: 20px; row-gap: 2px; font-size: 10.5px; line-height: 1.35; }
+  .f-fields .k { color: hsl(var(--foreground)); overflow-wrap: anywhere; }
+  .f-fields .t { color: hsl(var(--muted-foreground)); white-space: nowrap; }
+  .f-tag { margin-left: 4px; font-size: 9.5px; padding: 0 4px; border: 1px solid hsl(var(--border)); border-radius: 3px; color: hsl(var(--muted-foreground)); }
+  .f-sub { margin-top: 8px; padding-top: 8px; border-top: 1px solid hsl(var(--border)); }
+  .f-count { font-size: 10.5px; color: hsl(var(--muted-foreground)); font-weight: 400; }
+  .f-role { display: inline-flex; flex: none; border: 1px solid hsl(var(--border)); border-radius: 4px; overflow: hidden; }
+  .f-role button { font-size: 10px; padding: 1px 6px; background: hsl(var(--card)); color: hsl(var(--muted-foreground)); border: 0; cursor: pointer; }
+  .f-role button.on { background: hsl(var(--primary) / 0.15); color: hsl(var(--foreground)); font-weight: 500; }
+  .f-tray-row { border: 1px solid hsl(var(--border)); border-radius: 4px; background: hsl(var(--card)); padding: 6px 8px; }
+  .f-tray-row.fill { border-color: hsl(var(--primary) / 0.5); }
+  .f-powers { margin-top: 8px; font-size: 10.5px; line-height: 1.35; color: hsl(var(--muted-foreground)); }
+  .f-picker-off { opacity: .5; pointer-events: none; }
+  /* D-26..D-28: where each answer goes (Word blanks → a fillable copy) */
+  .f-places { margin: 4px 0 0 18px; display: flex; flex-direction: column; gap: 3px; font-size: 10.5px; line-height: 1.4; }
+  .f-place { display: flex; align-items: baseline; gap: 6px; min-width: 0; }
+  .f-place input { flex: none; margin: 0; transform: translateY(1px); }
+  .f-place .ln { min-width: 0; flex: 1; color: hsl(var(--muted-foreground)); overflow-wrap: anywhere; }
+  .f-mark { color: hsl(var(--foreground)); background: hsl(var(--primary) / 0.14); border-bottom: 1px dashed hsl(var(--primary) / 0.6); border-radius: 2px; padding: 0 3px; }
+  .f-place .t { flex: none; color: hsl(var(--muted-foreground)); white-space: nowrap; }
+  .f-place.off .f-mark { background: none; border-bottom-color: hsl(var(--border)); color: hsl(var(--muted-foreground)); text-decoration: line-through; }
+  .f-place.off .ln::after { content: " · stays blank"; }
+  .f-place.gap .ln { color: hsl(var(--foreground)); }
+</style>
+</head>
+<body>
+<div id="nav">
+  <button data-v="a" class="on">A · One row, extended</button>
+  <button data-v="b">★ B · Two questions</button>
+  <button data-v="c">C · One tray with roles</button>
+  <span class="sep"></span>
+  <label>Form slot
+    <select id="slot">
+      <option value="pdf">PDF form · 7 fields</option>
+      <option value="word">Word with blanks · where each answer goes</option>
+      <option value="none">No fields found</option>
+      <option value="reading">Still reading</option>
+      <option value="empty">Nothing attached</option>
+    </select>
+  </label>
+  <label><input type="checkbox" id="third"> 3rd reference (cut short)</label>
+  <span class="sep"></span>
+  <button id="jump">↓ Jump to files</button>
+  <button id="dark">Dark</button>
+  <button id="phone">Phone 375</button>
+</div>
+<div id="note">Real door DOM captured from the running app (loose door). Only the attach block is new. Pick files in the sketch's pickers to add references (capped at 5).</div>
+<div id="stage"></div>
+
+<script>
+// ── Fixture: one fillable PDF form, two references (D-22). Realistic names, no lorem. ──
+const SLOTS = {
+  pdf: { name: "vendor-onboarding-form.pdf", how: "Read from the form's own fields.", ai: false,
+    back: "Answers go into this form's own fields. Each run hands back vendor-onboarding-form.pdf, filled in.", fields: [
+    ["Legal name", "text"], ["Trading name", "text"], ["VAT number", "text"],
+    ["Country", "choice of 5"], ["Payment terms", "choice of 3"], ["Start date", "date"], ["Signed NDA", "yes / no"] ] },
+  word: { name: "supplier-checklist.docx", how: "Suggested by AI from the blanks in this document. Untick any blank it shouldn't fill.", ai: true, fields: [
+    ["Supplier name", "text"], ["Contact email", "text"], ["Review date", "date"], ["Risk rating", "text"] ],
+    // D-26/D-27: the line around each blank, so the author sees where the answer is written.
+    places: [
+      ["Supplier name", "Supplier name: ", ""],
+      ["Contact email", "Main contact (email): ", ""],
+      ["Review date", "Next review due on ", " (dd/mm/yyyy)"],
+      ["Risk rating", "Table 2, row “Overall risk rating”: ", " (empty cell)"] ],
+    // D-28: a blank the server could not place exactly is said in words, never guessed.
+    unplaced: "Couldn't place “Signature”: that label appears twice in the document. It stays blank in the filled copy.",
+    back: "Answers are written into a copy of supplier-checklist.docx. Your original isn't changed." },
+  none: { name: "vendor-welcome-letter.pdf", fields: [] },
+  reading: { name: "vendor-onboarding-form.pdf", reading: true },
+  empty: null,
+}
+const BASE_REFS = [
+  { name: "master-services-agreement.docx", line: "Read in full · 18 pages" },
+  { name: "acme-signed-terms.pdf", line: "Couldn't read this scan. It stays attached, but the draft can't use what's in it.", warn: true },
+]
+const THIRD = { name: "procurement-policy-2026.pdf", line: "Only the first 40 of 112 pages were read.", warn: true }
+
+const COPY = {
+  prompt: "Have a document to fill in?",                                   // DESCRIBE_ATTACH_PROMPT (shipped)
+  note: "Attach the document this should fill in — the draft is built to its fields.", // ATTACH_NOTE (shipped)
+  label: "Attach a template or form",
+  types: "A form (PDF or Word) or a template (.docx, .pptx, .xlsx), up to 10 MB.",
+  fieldsHeading: "What this form asks for",
+  placesHeading: "Where each answer goes",
+  loading: "Reading this form…",
+  footLoading: "Reading the form — the draft will be built to whatever it asks for.",
+  none: (n) => `No fields found in ${n}, so it's used as reference only.`,
+  footNone: "No fields to fill, so your draft will be written from your description and your references.",
+  footFields: (c) => c === 1 ? "Your draft will be built to fill this 1 field." : `Your draft will be built to fill these ${c} fields.`, // footingFields (shipped)
+  drafting: "Drafting to",                                                  // SPEC_FILENAME_LEAD (shipped)
+  clear: "Remove this document",                                            // DESCRIBE_TEMPLATE_CLEAR_LABEL (shipped)
+  refsPrompt: "Anything it should read first?",
+  refsNote: "Up to 5 documents. The draft uses what's in them to write its steps. They stay with this workflow and are not added to your Library.",
+  refsLabel: "Add a reference",
+  refsTypes: "PDF, Word, PowerPoint, Excel or text, up to 10 MB each.",
+  refsFull: "5 of 5. Remove one to add another.",
+  powers: "Files can shape the steps. Only your description and the services you tick can add actions.",
+  trayPrompt: "Have documents for this?",
+  trayNote: "Add a form or template to fill in, and anything it should read first. Up to 6 files.",
+  trayLabel: "Add documents",
+}
+
+const st = { v: "a", slot: "pdf", refs: BASE_REFS.slice(), fillIdx: 0, off: new Set() }
+const esc = (s) => String(s).replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]))
+const NOTE = "mt-1.5 text-[10.5px] leading-snug text-muted-foreground"
+const FOOT = "mt-1.5 text-[11px] leading-snug text-foreground"
+const LBL = "mt-2 block text-[11px] font-medium text-foreground"
+const INPUT = "mt-1 w-full text-[11px] text-muted-foreground file:mr-2 file:rounded file:border file:border-border file:bg-card file:px-2 file:py-1 file:text-[11px] file:text-foreground hover:file:bg-accent/40"
+const ROW = "mt-3 w-full rounded border border-border bg-muted/40 px-2.5 py-2 text-left"
+const CLEAR = "mt-1.5 text-[10.5px] text-muted-foreground underline underline-offset-2 hover:text-foreground"
+
+function fieldsGrid(s) {
+  return `<div class="f-fields" role="list">${s.fields.map(([k, t]) =>
+    `<span class="k" role="listitem">${esc(k)}${s.ai ? '<span class="f-tag">suggested</span>' : ""}</span><span class="t">${esc(t)}</span>`).join("")}</div>`
+}
+
+// D-26..D-28 — Word blanks: the field list IS the placement list. Each row is the document's own
+// line with the blank marked; unticking leaves that blank empty in the filled copy.
+function placesList(s) {
+  const type = Object.fromEntries(s.fields)
+  return `<div class="f-places" role="list">${s.places.map(([f, before, after]) => {
+    const off = st.off.has(f)
+    return `<label class="f-place ${off ? "off" : ""}" role="listitem"><input type="checkbox" data-place="${esc(f)}" ${off ? "" : "checked"}>
+      <span class="ln">${esc(before)}<span class="f-mark">${esc(f)}</span>${esc(after)}<span class="f-tag">suggested</span></span><span class="t">${esc(type[f])}</span></label>`
+  }).join("")}
+    ${s.unplaced ? `<p class="f-place gap"><span aria-hidden="true">·</span><span class="ln">${esc(s.unplaced)}</span></p>` : ""}</div>`
+}
+
+function fieldsBlock(s) {
+  return `${s.places ? placesList(s) : fieldsGrid(s)}${s.back ? `<p class="${NOTE}">${esc(s.back)}</p>` : ""}`
+}
+const placedCount = (s) => s.places ? s.places.filter(([f]) => !st.off.has(f)).length : s.fields.length
+
+// The slot's reading — the shipped row's arms, extended to forms (D-01, D-02, D-04).
+function slotReading(s) {
+  if (!s) return ""
+  if (s.reading) return `<div role="status"><p class="${NOTE}">${COPY.loading}</p><p class="${FOOT}">${COPY.footLoading}</p></div>`
+  if (s.fields.length === 0) return `<div role="status"><p class="${NOTE}">${esc(COPY.none(s.name))}</p><p class="${FOOT}">${COPY.footNone}</p></div>`
+  return `<div role="status">
+    <p class="mt-1.5 flex items-center gap-1.5 text-[11px] leading-snug text-foreground"><span aria-hidden="true">📄</span><span class="min-w-0 break-all">${COPY.drafting} ${esc(s.name)}</span></p>
+    <p class="${NOTE}">${s.places ? COPY.placesHeading : COPY.fieldsHeading} · ${esc(s.how)}</p>
+    ${fieldsBlock(s)}
+    <p class="${FOOT}">${COPY.footFields(placedCount(s))}</p></div>`
+}
+
+function refList() {
+  return `<div class="f-list">${st.refs.map((r, i) => `
+    <div class="f-file"><div class="f-head"><span aria-hidden="true">📎</span><span class="nm">${esc(r.name)}</span><button class="f-x" data-rm="${i}">Remove</button></div>
+    <p class="f-read ${r.warn ? "warn" : ""}">${esc(r.line)}</p></div>`).join("")}</div>`
+}
+
+function refPicker() {
+  const full = st.refs.length >= 5
+  return `<label class="${LBL}">${COPY.refsLabel} <span class="f-count">· ${st.refs.length} of 5</span></label>
+    <input type="file" multiple class="${INPUT} ${full ? "f-picker-off" : ""}" data-addref ${full ? "disabled" : ""}>
+    ${full ? `<p class="${NOTE}">${COPY.refsFull}</p>` : `<p class="${NOTE}">${COPY.refsTypes}</p>`}`
+}
+
+function slotBlock() {
+  const s = SLOTS[st.slot]
+  return `<p class="text-[11px] font-medium text-foreground">${COPY.prompt}</p>
+    <p class="${NOTE}">${COPY.note}</p>
+    <label class="${LBL}">${COPY.label}</label>
+    <input type="file" class="${INPUT}" accept=".docx,.pptx,.xlsx,.pdf">
+    ${s ? `<button class="${CLEAR}">${COPY.clear}</button>` : ""}
+    <p class="${NOTE}">${COPY.types}</p>
+    ${slotReading(s)}`
+}
+
+// A — the shipped row, extended in place. One box, the references are a sub-block of it.
+function variantA() {
+  return `<section data-testid="describe-template-row" class="${ROW}">
+    ${slotBlock()}
+    <div class="f-sub">
+      <p class="text-[11px] font-medium text-foreground">${COPY.refsPrompt}</p>
+      ${refList()}
+      ${refPicker()}
+    </div>
+    <p class="f-powers">${COPY.powers}</p>
+  </section>`
+}
+
+// B — two questions, one per section, split by the page's own rule (sketch 200's column).
+function variantB() {
+  return `<section data-testid="describe-template-row" class="${ROW}">${slotBlock()}</section>
+  <div aria-hidden="true" class="h-px w-full bg-border"></div>
+  <section data-testid="describe-reference-row" class="${ROW}">
+    <p class="text-[11px] font-medium text-foreground">${COPY.refsPrompt}</p>
+    <p class="${NOTE}">${COPY.refsNote}</p>
+    ${refList()}
+    ${refPicker()}
+    <p class="f-powers">${COPY.powers}</p>
+  </section>`
+}
+
+// C — one tray. Every file is a row with a role; one may be "Fill in", the rest are references.
+function variantC() {
+  const s = SLOTS[st.slot]
+  const files = []
+  if (s) files.push({ name: s.name, slot: s })
+  st.refs.forEach((r) => files.push({ name: r.name, ref: r }))
+  const fillIdx = s && s.fields && s.fields.length === 0 ? -1 : (s ? st.fillIdx : -1)
+  const rows = files.map((f, i) => {
+    const isFill = i === fillIdx
+    let body = ""
+    if (f.slot) {
+      if (f.slot.reading) body = `<p class="f-read">${COPY.loading}</p>`
+      else if (f.slot.fields.length === 0) body = `<p class="f-read warn">${esc(COPY.none(f.name))}</p>`
+      else if (isFill) body = `<p class="f-read">${f.slot.places ? COPY.placesHeading : `${esc(f.slot.fields.length)} fields`} · ${esc(f.slot.how)}</p>${fieldsBlock(f.slot)}`
+      else body = `<p class="f-read">Used as reference. Switch to Fill in to build the draft to its ${f.slot.fields.length} fields.</p>`
+    } else {
+      body = isFill ? `<p class="f-read warn">This file has no fields to fill.</p>` : `<p class="f-read ${f.ref.warn ? "warn" : ""}">${esc(f.ref.line)}</p>`
+    }
+    return `<div class="f-tray-row ${isFill ? "fill" : ""}"><div class="f-head"><span aria-hidden="true">${isFill ? "📄" : "📎"}</span><span class="nm">${esc(f.name)}</span>
+      <span class="f-role"><button class="${isFill ? "on" : ""}" data-role="${i}">Fill in</button><button class="${isFill ? "" : "on"}" data-ref-role="${i}">Reference</button></span>
+      <button class="f-x" data-rm-any="${i}">Remove</button></div>${body}</div>`
+  }).join("")
+  const fill = fillIdx >= 0 ? files[fillIdx] : null
+  const foot = fill && fill.slot && fill.slot.fields
+    ? COPY.footFields(placedCount(fill.slot)) + ` It also reads ${files.length - 1} reference${files.length - 1 === 1 ? "" : "s"}.`
+    : (s && s.reading ? COPY.footLoading : `No file to fill, so your draft will be written from your description and ${files.length} reference${files.length === 1 ? "" : "s"}.`)
+  const full = files.length >= 6
+  return `<section data-testid="describe-template-row" class="${ROW}">
+    <p class="text-[11px] font-medium text-foreground">${COPY.trayPrompt}</p>
+    <p class="${NOTE}">${COPY.trayNote}</p>
+    <div class="f-list">${rows}</div>
+    <label class="${LBL}">${COPY.trayLabel} <span class="f-count">· ${files.length} of 6</span></label>
+    <input type="file" multiple class="${INPUT} ${full ? "f-picker-off" : ""}" data-addref ${full ? "disabled" : ""}>
+    <p class="${NOTE}">To fill in: ${COPY.types.replace(/^A form/, "a form")} To read: PDF, Word, PowerPoint, Excel or text.</p>
+    ${files.length ? `<p class="${FOOT}">${esc(foot)}</p>` : ""}
+    <p class="f-powers">${COPY.powers}</p>
+  </section>`
+}
+
+const stage = document.getElementById("stage")
+function render() {
+  const scroll = stage.scrollTop
+  stage.innerHTML = window.DOOR_HTML
+  const ta = stage.querySelector("[data-testid=describe-box]")
+  if (ta) ta.value = "Every month, fill in the vendor onboarding form for each new supplier using our contracts, then list any payment terms that differ from our standard terms."
+  stage.querySelector("[data-testid=describe-draft]")?.removeAttribute("disabled") // captured with an empty box
+  const row = stage.querySelector("[data-testid=describe-template-row]")
+  row.outerHTML = { a: variantA, b: variantB, c: variantC }[st.v]()
+  stage.scrollTop = scroll
+}
+
+stage.addEventListener("click", (e) => {
+  const t = e.target.closest("button"); if (!t) return
+  if (t.dataset.rm !== undefined) { st.refs.splice(+t.dataset.rm, 1); render() }
+  else if (t.dataset.rmAny !== undefined) {
+    const i = +t.dataset.rmAny, hasSlot = !!SLOTS[st.slot]
+    if (hasSlot && i === 0) { st.slot = "empty"; document.getElementById("slot").value = "empty" } else st.refs.splice(i - (hasSlot ? 1 : 0), 1)
+    st.fillIdx = 0; render()
+  }
+  else if (t.dataset.role !== undefined) { st.fillIdx = +t.dataset.role; render() }
+  else if (t.dataset.refRole !== undefined) { if (st.fillIdx === +t.dataset.refRole) st.fillIdx = -1; render() }
+  else if (t.textContent === COPY.clear) { st.slot = "empty"; document.getElementById("slot").value = "empty"; render() }
+})
+stage.addEventListener("change", (e) => {
+  if (e.target.dataset.place !== undefined) {
+    const f = e.target.dataset.place; e.target.checked ? st.off.delete(f) : st.off.add(f); render(); return
+  }
+  if (!e.target.matches("[data-addref]")) return
+  const room = 5 - st.refs.length
+  ;[...e.target.files].slice(0, room).forEach((f) => {
+    const r = { name: f.name, line: "Reading…" }; st.refs.push(r)
+    setTimeout(() => { r.line = `Read in full · ${Math.max(1, Math.round(f.size / 3000))} pages`; render() }, 1200)
+  })
+  render()
+})
+document.querySelectorAll("#nav [data-v]").forEach((b) => b.onclick = () => {
+  document.querySelectorAll("#nav [data-v]").forEach((x) => x.classList.toggle("on", x === b)); st.v = b.dataset.v; render()
+})
+document.getElementById("slot").onchange = (e) => { st.slot = e.target.value; st.fillIdx = 0; render() }
+document.getElementById("third").onchange = (e) => {
+  st.refs = st.refs.filter((r) => r !== THIRD); if (e.target.checked) st.refs.push(THIRD); render()
+}
+function jump() {
+  const r = stage.querySelector("[data-testid=describe-template-row]"); let e = r.parentElement
+  while (e && !(e.scrollHeight > e.clientHeight + 4 && getComputedStyle(e).overflowY !== "visible")) e = e.parentElement
+  if (e) e.scrollTop += r.getBoundingClientRect().top - 150
+}
+document.getElementById("jump").onclick = jump
+document.getElementById("dark").onclick = (e) => { document.documentElement.classList.toggle("dark"); e.target.classList.toggle("on") }
+document.getElementById("phone").onclick = (e) => { stage.classList.toggle("phone"); e.target.classList.toggle("on") }
+render()
+</script>
+</body>
+</html>

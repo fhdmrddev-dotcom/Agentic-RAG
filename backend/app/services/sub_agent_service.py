@@ -8,6 +8,7 @@ from typing import TYPE_CHECKING, Generator
 from langsmith import traceable
 
 from app.config import settings, _SUB_AGENT_MODEL_DEFAULTS
+from app.services.rerank_engines.tracing import redact_inputs  # a traced call never records a key
 from app.services.openai_service import get_llm_client, _uses_max_completion_tokens, _MODEL_OUTPUT_DEFAULTS, _PROVIDER_DEFAULT_MAX_TOKENS, _FALLBACK_MAX_TOKENS
 
 if TYPE_CHECKING:
@@ -16,7 +17,7 @@ if TYPE_CHECKING:
 logger = logging.getLogger(__name__)
 
 
-@traceable(name="sub-agent", run_type="llm")
+@traceable(name="sub-agent", run_type="llm", process_inputs=redact_inputs)
 def run_sub_agent(
     document_content: str,
     document_filename: str,

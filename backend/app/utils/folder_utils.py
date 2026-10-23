@@ -264,8 +264,15 @@ async def fetch_visible_folders(
 
     Both sides are coerced to ``str`` so a ``UUID`` object and its string form compare equal —
     the restriction arrives from a DB read on one path and from a caller-built set on another.
+
+    295-10 (D-r1-04): a NON-EMPTY restriction narrows OWNED folders too — an owned folder must
+    carry an allowed ``org_id``, so a two-org owner's org-A run never sees its own org-B folders.
+    ``None`` and ``set()`` keep their readings above (``folders.org_id`` is NOT NULL since mig 105,
+    so ``set()`` filtering owned rows would leave nothing). Also passed by ``permitted_folder_options``
+    (295-09 WR-06) and ``threads._authorize_thread_folder``, which re-checks the row's org itself.
     """
     caller_org_ids = await _resolve_caller_org_ids(supabase, user_id)
+    allowed: set[str] = set()
     if restrict_org_ids is not None:
         allowed = {str(o) for o in restrict_org_ids}
         caller_org_ids = {o for o in caller_org_ids if str(o) in allowed}
@@ -274,7 +281,8 @@ async def fetch_visible_folders(
     cache: dict = {}
     return [
         f for f in all_folders
-        if f["user_id"] == user_id or is_in_global_subtree(f["id"], folder_map, cache, caller_org_ids)
+        if (f["user_id"] == user_id and (not allowed or str(f.get("org_id")) in allowed))
+        or is_in_global_subtree(f["id"], folder_map, cache, caller_org_ids)
     ]
 
 

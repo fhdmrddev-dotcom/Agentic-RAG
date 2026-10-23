@@ -1791,6 +1791,13 @@ async def _drive_golden_run(
             logger.warning(
                 "publish: producer-shell finalize failed for %s", _producer_id, exc_info=True
             )
+        # Phase 295 (D-20): the golden run's OWN row. ``find_resumable_runs`` excludes golden
+        # runs, so a golden run that raised or hit the publish budget used to stay ``active``
+        # forever. The helper ends it ``failed`` with words only if nothing else already ended
+        # it, and never raises (shell cleanup never masks the run's own outcome).
+        from app.services.harness.run_handoff import finish_golden_run  # noqa: PLC0415
+
+        await finish_golden_run(pool, run_id, user_id=user_id)
 
 
 async def _judge_golden_output(
@@ -1827,9 +1834,9 @@ async def _judge_golden_output(
     from app.config import get_model_capability
     from app.models.user_settings import load_app_settings_async  # function-local (Pitfall 4)
     from app.services.harness.validator_kinds import (  # function-local
-        JUDGE_RUBRIC_CORE,
         JudgeVerdict,
         _judge_graded_text,
+        judge_system_prompt,
         resolve_judge_model,
     )
 
@@ -1861,7 +1868,9 @@ async def _judge_golden_output(
     # The author's per-workflow criteria ride the llm_judge_rubric ValidatorSpec.config
     # if the definition declares one; else the standard core alone.
     author_criteria = _author_judge_criteria(definition) or "(none)"
-    system_prompt = JUDGE_RUBRIC_CORE.format(
+    # 295-REVIEW WR-05: the rubric, plus the design note (system-side) for a recorded action.
+    system_prompt = judge_system_prompt(
+        final_output,
         business_requirement=(definition.business_requirement or "(not declared)"),
         author_criteria=author_criteria,
     )

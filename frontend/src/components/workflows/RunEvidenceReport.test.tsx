@@ -320,6 +320,68 @@ describe("RunEvidenceReport: the step log's evidence line (D-10 / SC#4 receipt a
   })
 })
 
+// ── Phase 295-05 (RUN-01 / RUN-04 / D-04 / D-22) — asserted by the WORDS on the page ───────
+
+const UNSOURCED_NOTE_295 = "This output was kept without sources — it does not cite your documents."
+
+describe("RunEvidenceReport: the unsourced mark in the step log (295-05, D-04)", () => {
+  it("an unsourced step reads Unsourced, who continued, and the note; a sourced step reads none", async () => {
+    const p = ownerPayload()
+    p.phase_log[1] = {
+      ...p.phase_log[1],
+      unsourced: { continued_by: "Dana Whitfield (you)", at: "2026-10-19T09:14:00Z" },
+    }
+    renderReport(p)
+    await ready()
+    const marked = rows(2)[1].textContent ?? ""
+    expect(marked).toContain("Unsourced")
+    expect(marked).toContain("continued by Dana Whitfield (you)")
+    expect(marked).toContain(UNSOURCED_NOTE_295)
+    for (const i of [0, 2, 3]) {
+      const text = rows(2)[i].textContent ?? ""
+      expect(text).not.toContain("Unsourced")
+      expect(text).not.toContain("continued by")
+      expect(text).not.toContain(UNSOURCED_NOTE_295)
+    }
+  })
+})
+
+describe("RunEvidenceReport: why the run stopped, under the outcome (295-05, D-22)", () => {
+  it("a failed run with a recorded reason says Why it stopped: <reason>", async () => {
+    const p = failedPayload()
+    p.run.end_reason = "The knowledge base did not answer in time."
+    renderReport(p)
+    await ready()
+    expect(screen.getByTestId("run-end-reason").textContent).toBe(
+      "Why it stopped: The knowledge base did not answer in time.",
+    )
+  })
+
+  it("a failed run with nothing recorded says so, never a blank", async () => {
+    const p = failedPayload()
+    p.run.end_reason = null
+    renderReport(p)
+    await ready()
+    expect(screen.getByText("No reason was recorded when this run failed.")).toBeTruthy()
+  })
+
+  it("a cancelled run reads its recorded stop reason", async () => {
+    const p = ownerPayload()
+    p.run.status = "cancelled"
+    p.run.end_reason = "Stopped by Dana Whitfield."
+    renderReport(p)
+    await ready()
+    expect(screen.getByText("Why it stopped: Stopped by Dana Whitfield.")).toBeTruthy()
+  })
+
+  it("a completed run shows no end-reason line", async () => {
+    renderReport(ownerPayload())
+    await ready()
+    expect(screen.queryByText(/Why it stopped:/)).toBeNull()
+    expect(screen.queryByText("No reason was recorded when this run failed.")).toBeNull()
+  })
+})
+
 describe("RunEvidenceReport: the version banners (D-04)", () => {
   it("shows the changed banner only when the definition changed, naming both versions", async () => {
     renderReport(changedPayload())

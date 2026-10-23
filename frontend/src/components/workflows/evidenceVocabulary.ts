@@ -170,6 +170,25 @@ export function whyItStopped(reason: string): string {
   return `Why it stopped: ${reason}`
 }
 
+// ── Phase 295-05 (RUN-04 / D-22 / UI-SPEC C.1) — a failed run with nothing recorded says so.
+// One home: the run page's `RunEndReasonLine` and the evidence report's title block both read it.
+export const NO_REASON_RECORDED = "No reason was recorded when this run failed."
+
+// ── Phase 295-05 (RUN-01 / D-04 / UI-SPEC B.1) — the mark on a step kept without sources.
+//
+//     ◌ Unsourced · continued by Fahad Murad (you)
+//     This output was kept without sources — it does not cite your documents.
+//
+// ◌ (U+25CC, dotted circle) is NET-NEW to the icon convention and is recorded as a PROPOSAL in
+// `295-05-SUMMARY.md`, the way 289 recorded ○. It is deliberately not ○: ○ already means
+// "searched, nothing matched" on the same line, and in the 0-sources case both marks stack.
+// The name after "continued by" is server-built and viewer-aware; this file never composes one.
+export const UNSOURCED_GLYPH = "◌"
+export const UNSOURCED_WORD = "Unsourced"
+export const UNSOURCED_CONTINUED_BY = "continued by"
+export const UNSOURCED_NOTE =
+  "This output was kept without sources — it does not cite your documents."
+
 // The human-input lines (R-04: a colleague sees only that the step waited).
 export function quotedAnswer(answer: string): string {
   return `“${answer}”`

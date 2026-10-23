@@ -55,7 +55,11 @@ import { useStreamsStore } from "@/stores/streamsStore"
 // eight suites that mock `@/providers/StreamsProvider` with an allow-list are unaffected.
 import { useAskDraft, useAskDraftStore, useAskSettled, usePanelHomeMounted } from "@/stores/askDraftStore"
 import { answerAskUser, ApiError } from "@/lib/api"
+import { ASK_ANSWER_FAILED } from "@/lib/api/threads"
 import type { PendingAsk } from "@/types"
+// Phase 295-06 (D-32) — the found-nothing pause: ONE pure reading of `ask.engine_pause`, ONE leaf.
+import { answeredHeader, answeredReceipt, needsFolder, readEnginePause } from "./enginePause"
+import { AskFolderChoice } from "./AskFolderChoice"
 import {
   Dialog,
   DialogContent,
@@ -296,8 +300,8 @@ interface PendingAskCardProps {
    * PAUSED_WAITING_LINE where the clock was. Passed by `WorkflowRunPage`, which holds the run row.
    *
    * ⚠ OPTIONAL, defaulting to false, so every existing caller renders exactly the card it
-   * rendered before this prop existed. `PendingAskStack` cannot derive it (289-01-SUMMARY.md,
-   * "Named gap: PendingAskStack") and does not pass it.
+   * rendered before this prop existed. `PendingAskStack` passes it since 295-08 (SEED-361), from
+   * the run status its phase reconcile already reads (289-01's "Named gap: PendingAskStack").
    */
   paused?: boolean
 }
@@ -325,9 +329,15 @@ export function PendingAskCard({
   // It used to be two `useState`s here, so the chat card and the panel card for ONE pause held
   // two drafts that disagreed (BUG-260918-01 B). Now every rendering reads the one draft keyed by
   // `tool_call_id`; the two setters keep their old names so every downstream read is unchanged.
-  const { choiceIndex, freeText } = useAskDraft(tool_call_id)
+  const { choiceIndex, freeText, folderId } = useAskDraft(tool_call_id)
   const setChoice = useAskDraftStore((s) => s.setChoice)
   const setFreeTextAction = useAskDraftStore((s) => s.setFreeText)
+  const setFolder = useAskDraftStore((s) => s.setFolder)
+  // Phase 295-06 (D-02 / D-03 / D-32) — the ONE read of the new field. The server built the prompt
+  // and the choices; the card only learns whether the folder chooser is needed. No deadline logic
+  // here: an engine pause has `timeout_seconds: null`, which the shipped no-deadline arm handles.
+  const enginePause = readEnginePause(ask)
+  const wantsFolder = needsFolder(ask, choiceIndex)
   const markSettled = useAskDraftStore((s) => s.markSettled)
   const setChoiceIndex = (i: number | null) => setChoice(tool_call_id, i)
   const setFreeText = (t: string) => setFreeTextAction(tool_call_id, t)
@@ -406,7 +416,8 @@ export function PendingAskCard({
   const hasText = freeText.trim().length > 0
   const hasAnswer = hasChoice || hasText
   const runReady = run_id != null
-  const canSubmit = hasAnswer && runReady && !submitting && state === "pending"
+  // 295-06 (D-03): while "Search another folder" is selected, the answer needs a folder.
+  const canSubmit = hasAnswer && runReady && !submitting && state === "pending" && (!wantsFolder || !!folderId)
 
   const selectedValue = useMemo(() => {
     if (hasChoice && choiceIndex !== null) return options[choiceIndex]
@@ -417,7 +428,10 @@ export function PendingAskCard({
     if (!canSubmit || run_id == null) return
     setSubmitting(true)
     setSubmitError(null)
-    const valueForDisplay = selectedValue
+    // 295-06: a folder answer's receipt names the folder; resolved now, because a successful
+    // answer settles the draft and the chosen folder goes with it.
+    const valueForDisplay =
+      answeredReceipt(ask, selectedValue, wantsFolder ? folderId : undefined) ?? selectedValue
     try {
       await answerAskUser(run_id, {
         tool_call_id,
@@ -427,6 +441,8 @@ export function PendingAskCard({
         // this file). Sending "" for choices fed the model an empty answer.
         response_text: selectedValue,
         choice_index: hasChoice ? choiceIndex : null,
+        // 295-06 (D-03): only for the search choice; the server allow-lists it (295-03).
+        ...(wantsFolder && folderId ? { folder_id: folderId } : {}),
       })
       // Optimistic green answered state (D4). The ask_user_response SSE then
       // removes the prompt from the store, reactively unmounting this card.
@@ -481,19 +497,29 @@ export function PendingAskCard({
         // "Failed to submit ask_user answer", which is exactly the uninformative shape this
         // change exists to remove. Surfacing the real detail means teaching the client to
         // read the body; that is a separate change and is not pretended at here.
+        // ⚠ CORRECTED 295-08 (WR-04): `answerAskUser` now reads `detail`, so `err.message` IS the
+        // server's sentence when one was sent. This arm still retires with its own words.
         //
         // ⚠ It retires rather than erroring, because a dead run is not a failure the person
         // can act on — offering a retry on it is the defect this replaces.
-        setExpiredMessage("This run has already ended — your answer was not saved")
+        // 295-10 (D-r1-01): since CR-01 a 409 can also mean "a newer question is waiting", so
+        // the server's sentence wins; on a paused run the asks are re-read so that card appears.
+        const words = err instanceof Error && err.message !== ASK_ANSWER_FAILED ? err.message : ""
+        setExpiredMessage(
+          words ? `${words} Your answer was not saved.` : "This run has already ended — your answer was not saved",
+        )
         setState("expired")
         markSettled(tool_call_id)
+        if (paused) void reconcile()
       } else if (status !== null && status >= 500) {
         // ⚠ NAMED, NOT "try again". A 500 means the answer was NOT recorded, and clicking
         // the same button again will do the same thing. Saying which half failed is the
         // difference between a person retrying usefully and retrying blindly.
         setSubmitError("The server couldn't record your answer. It has not been saved.")
       } else if (status !== null) {
-        setSubmitError(`Your answer was refused (${status}). It has not been saved.`)
+        // 295-08 (WR-04): the server's own sentence when it sent one (answerAskUser reads `detail`).
+        const words = err instanceof Error && err.message !== ASK_ANSWER_FAILED ? err.message : ""
+        setSubmitError(`${words || `Your answer was refused (${status}).`} It has not been saved.`)
       } else {
         // No status at all — the request never reached the server (offline, dropped,
         // aborted). This is the ONE case where trying again is genuinely the right advice.
@@ -619,7 +645,9 @@ export function PendingAskCard({
       <div className="flex flex-col gap-2 rounded-md border border-[hsl(var(--success))] bg-[hsl(var(--success)/0.12)] p-3">
         <div className="flex items-center gap-1.5 font-mono text-[10px] uppercase tracking-wider text-[hsl(var(--success))]">
           <span className="h-[7px] w-[7px] flex-none rounded-full bg-[hsl(var(--success))]" aria-hidden="true" />
-          Answered · agent resumed
+          {/* 295-06: the shipped header for every answer except an engine-pause Stop, which says
+              the run stopped. Both words live in enginePause.ts. */}
+          {answeredHeader(ask, answeredValue)}
         </div>
         <p className="text-sm leading-relaxed text-foreground" id={labelId}>
           {prompt}
@@ -762,8 +790,21 @@ export function PendingAskCard({
         </div>
       )}
 
-      {/* "or" divider — only meaningful when both surfaces are present. */}
-      {options.length > 0 && (
+      {/* 295-06 (D-03 / UI-SPEC A.3): the server-bounded folder chooser, only while the search
+          choice is selected. Its selection lives in the one draft (askDraftStore). */}
+      {wantsFolder && enginePause && (
+        <AskFolderChoice
+          id={`ask-${tool_call_id}-folder`}
+          folders={enginePause.folders}
+          value={folderId}
+          onChange={(id) => setFolder(tool_call_id, id)}
+        />
+      )}
+
+      {/* "or" divider — only meaningful when both surfaces are present. 295-08 (WR-04): an engine
+          ask is answered by the server's choices only (a typed answer is always refused), so it
+          draws neither the divider nor the free-text box. */}
+      {options.length > 0 && !enginePause && (
         <div className="text-center font-mono text-[10px] uppercase tracking-wider text-[hsl(var(--muted-foreground-dim))]">
           or
         </div>
@@ -787,6 +828,7 @@ export function PendingAskCard({
 
               Still tied by `htmlFor`/`id`, so the accessible name is the visible text and
               the two cannot drift — which is exactly what an `sr-only` label risks. */}
+        {!enginePause && (<>
         <label
           htmlFor={`ask-${tool_call_id}-free`}
           data-testid="ask-free-label"
@@ -802,6 +844,7 @@ export function PendingAskCard({
           rows={2}
           className="resize-y rounded-md border border-border bg-background px-2.5 py-2 text-[13px] text-foreground focus:border-[hsl(var(--warning))] focus:outline-none"
         />
+        </>)}
         <button
           type="button"
           onClick={handleSubmit}
@@ -866,7 +909,14 @@ export function PendingAskStack({ home = "chat" }: { home?: "chat" | "panel" } =
   // new place.
   const workflowLock = useWorkflowLockForThread(threadId)
   const { data: phases } = usePhases(threadId)
-  const runIsOver = workflowLock == null && phases.length > 0
+  // 295-08 (SEED-361): a PAUSED run has no live producer, so the server reports its lock stale and
+  // `lock == null` holds while the run waits on the person. The run status from the phase
+  // reconcile's own read (store field, no fetch here) says so; a paused run is not over. D-r2-01:
+  // neither is an `active` one re-driven after an answer, so only a terminal or unknown status ends it.
+  const runStatus = useStreamsStore((s) => (threadId ? s.workflowRunStatusByThread.get(threadId) : null))
+  const paused = runStatus === "paused"
+  const runLive = runStatus != null && !["completed", "failed", "cancelled", "timed_out"].includes(runStatus)
+  const runIsOver = workflowLock == null && phases.length > 0 && !runLive
 
   // ── Phase 214-11 Task 2 (STEP-04 / D-214-16 / D-214-14) — THE STACK RESOLVES; THE CARD
   //    RENDERS.
@@ -959,6 +1009,7 @@ export function PendingAskStack({ home = "chat" }: { home?: "chat" | "panel" } =
               service={pausedStep?.serviceName ?? null}
               shape={stepMarkShape(pausedStep?.capability, pausedStep?.toolName)}
               home={home}
+              paused={paused}
             />
           )}
         </div>

@@ -325,3 +325,20 @@ export const APPLIED_READS_LABEL = "Reads from"
 
 /** The template pair's label. */
 export const APPLIED_FILLS_LABEL = "Fills in"
+
+/** 291-05 (D-15, sketch 291-draft-removed A) — the removed line's mark, `aria-hidden` on the
+ *  card. The line's words are the SERVER's (SEED-221); this module holds the glyph only. */
+export const REMOVED_GLYPH = "⊘"
+
+/**
+ * 291-05 (D-07 / D-32, UI-SPEC 3c) — the template row's references sub-line, the post-reload
+ * home for the files the draft was written from. The names are DATA; the words are here.
+ *
+ * ⚠ THE SECOND SENTENCE IS DELIBERATE AND IS A CONTRACT: steps do not read references while
+ * the workflow runs in 291 (D-32). The seed that adds run-time reading owns changing it, in the
+ * same commit as the capability. No names ⇒ the empty string, so the row draws no sub-line.
+ */
+export function templateRowReferencesLine(names: readonly string[]): string {
+  if (names.length === 0) return ""
+  return `Read first: ${names.join(", ")}. Used to write this draft; steps don't read them when the workflow runs.`
+}

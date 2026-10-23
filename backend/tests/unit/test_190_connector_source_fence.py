@@ -604,7 +604,12 @@ def test_no_vendor_module_enters_the_import_graph_until_a_send_happens():
     #   module-scope registry importer and closes no cycle: the list below still has ONE member
     #   and the subprocess import above still exits 0. Re-pinned at 289-05, where the phase-base
     #   set diff (`dcf6ba649` green, HEAD red) showed this was the phase's own line move.
-    assert module_scope_importers == ["app/services/harness/phase_types.py:119"], (
+    # ⚠ AND AGAIN, 119 -> 121, at Phase 295-03 (D-03): `phase_types` gained a module-top
+    #   `from app.services.harness.run_handoff import phase_scope_ids` (plus one comment line)
+    #   ABOVE the registry import. `run_handoff` is a pure leaf with NO app imports at all, so it
+    #   adds no module-scope registry importer and closes no cycle; the list still has ONE
+    #   member. Found by the full-gate failing-id set diff against base `ea1347c4d`.
+    assert module_scope_importers == ["app/services/harness/phase_types.py:121"], (
         f"the connector registry now has these MODULE-SCOPE importers: "
         f"{module_scope_importers!r}. It had exactly one, and that is the ONLY reason the "
         "measured import cycle (registry -> harness.grounding -> harness/__init__ -> "

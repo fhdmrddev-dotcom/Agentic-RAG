@@ -1,0 +1,543 @@
+{
+  "title": "295-r2b S2 drive 2",
+  "wf": "295-07 S2 continue without sources",
+  "label": "r2b_d2",
+  "net": [
+    {
+      "t": "2026-10-21T05:13:27.644Z",
+      "m": "REQ",
+      "u": "/src/providers/producerResubscribeSignal.ts"
+    },
+    {
+      "t": "2026-10-21T05:13:35.428Z",
+      "m": "GET",
+      "u": "/threads/391b9048-82f1-4cd7-b7d2-ea82d7f1a2df/workflow",
+      "s": 200,
+      "b": "{\"thread_id\":\"391b9048-82f1-4cd7-b7d2-ea82d7f1a2df\",\"mode\":\"deep\",\"locked\":false,\"active_workflow_run_id\":null,\"run_status\":null,\"definition_slug\":null,\"definition_name\":null,\"current_phase_slug\":null,\"current_phase_index\":null,\"total_phases\":null,\"lock_is_stale\":false,\"cap_paused\":false,\"continues_"
+    },
+    {
+      "t": "2026-10-21T05:13:35.649Z",
+      "m": "GET",
+      "u": "/threads/391b9048-82f1-4cd7-b7d2-ea82d7f1a2df/workflow",
+      "s": 200,
+      "b": "{\"thread_id\":\"391b9048-82f1-4cd7-b7d2-ea82d7f1a2df\",\"mode\":\"deep\",\"locked\":false,\"active_workflow_run_id\":null,\"run_status\":null,\"definition_slug\":null,\"definition_name\":null,\"current_phase_slug\":null,\"current_phase_index\":null,\"total_phases\":null,\"lock_is_stale\":false,\"cap_paused\":false,\"continues_"
+    },
+    {
+      "t": "2026-10-21T05:13:35.810Z",
+      "m": "GET",
+      "u": "/threads/391b9048-82f1-4cd7-b7d2-ea82d7f1a2df/workflow",
+      "s": 200,
+      "b": "{\"thread_id\":\"391b9048-82f1-4cd7-b7d2-ea82d7f1a2df\",\"mode\":\"deep\",\"locked\":false,\"active_workflow_run_id\":null,\"run_status\":null,\"definition_slug\":null,\"definition_name\":null,\"current_phase_slug\":null,\"current_phase_index\":null,\"total_phases\":null,\"lock_is_stale\":false,\"cap_paused\":false,\"continues_"
+    },
+    {
+      "t": "2026-10-21T05:13:35.864Z",
+      "m": "GET",
+      "u": "/threads/391b9048-82f1-4cd7-b7d2-ea82d7f1a2df/workflow",
+      "s": 200,
+      "b": "{\"thread_id\":\"391b9048-82f1-4cd7-b7d2-ea82d7f1a2df\",\"mode\":\"deep\",\"locked\":false,\"active_workflow_run_id\":null,\"run_status\":null,\"definition_slug\":null,\"definition_name\":null,\"current_phase_slug\":null,\"current_phase_index\":null,\"total_phases\":null,\"lock_is_stale\":false,\"cap_paused\":false,\"continues_"
+    },
+    {
+      "t": "2026-10-21T05:13:35.913Z",
+      "m": "GET",
+      "u": "/threads/391b9048-82f1-4cd7-b7d2-ea82d7f1a2df/workflow",
+      "s": 200,
+      "b": "{\"thread_id\":\"391b9048-82f1-4cd7-b7d2-ea82d7f1a2df\",\"mode\":\"deep\",\"locked\":false,\"active_workflow_run_id\":null,\"run_status\":null,\"definition_slug\":null,\"definition_name\":null,\"current_phase_slug\":null,\"current_phase_index\":null,\"total_phases\":null,\"lock_is_stale\":false,\"cap_paused\":false,\"continues_"
+    },
+    {
+      "t": "2026-10-21T05:13:43.234Z",
+      "m": "GET",
+      "u": "/threads/391b9048-82f1-4cd7-b7d2-ea82d7f1a2df/workflow",
+      "s": 200,
+      "b": "{\"thread_id\":\"391b9048-82f1-4cd7-b7d2-ea82d7f1a2df\",\"mode\":\"deep\",\"locked\":false,\"active_workflow_run_id\":null,\"run_status\":null,\"definition_slug\":null,\"definition_name\":null,\"current_phase_slug\":null,\"current_phase_index\":null,\"total_phases\":null,\"lock_is_stale\":false,\"cap_paused\":false,\"continues_"
+    },
+    {
+      "t": "2026-10-21T05:13:43.376Z",
+      "m": "POST",
+      "u": "/threads/391b9048-82f1-4cd7-b7d2-ea82d7f1a2df/messages",
+      "s": 201,
+      "b": "{\"message_id\":\"147cba8b-9fad-425c-8103-87204fbf70d8\",\"run_id\":\"d4cedc49-5884-4313-ae64-4c3467370719\",\"model\":\"deepseek-v4-flash\",\"provider\":\"deepseek\"}"
+    },
+    {
+      "t": "2026-10-21T05:13:43.389Z",
+      "m": "REQ",
+      "u": "/runs/d4cedc49-5884-4313-ae64-4c3467370719/stream?since=0"
+    },
+    {
+      "t": "2026-10-21T05:13:43.742Z",
+      "m": "GET",
+      "u": "/threads/391b9048-82f1-4cd7-b7d2-ea82d7f1a2df/workflow",
+      "s": 200,
+      "b": "{\"thread_id\":\"391b9048-82f1-4cd7-b7d2-ea82d7f1a2df\",\"mode\":\"harness\",\"locked\":true,\"active_workflow_run_id\":\"77c91d0b-cc67-4300-bbd3-f95c3ee836e4\",\"run_status\":\"active\",\"definition_slug\":\"p295-07-s2-continue\",\"definition_name\":\"295-07 S2 continue without sources\",\"current_phase_slug\":null,\"current_p"
+    },
+    {
+      "t": "2026-10-21T05:13:43.945Z",
+      "m": "GET",
+      "u": "/threads/391b9048-82f1-4cd7-b7d2-ea82d7f1a2df/workflow",
+      "s": 200,
+      "b": "{\"thread_id\":\"391b9048-82f1-4cd7-b7d2-ea82d7f1a2df\",\"mode\":\"harness\",\"locked\":true,\"active_workflow_run_id\":\"77c91d0b-cc67-4300-bbd3-f95c3ee836e4\",\"run_status\":\"active\",\"definition_slug\":\"p295-07-s2-continue\",\"definition_name\":\"295-07 S2 continue without sources\",\"current_phase_slug\":null,\"current_p"
+    },
+    {
+      "t": "2026-10-21T05:13:44.188Z",
+      "m": "GET",
+      "u": "/threads/391b9048-82f1-4cd7-b7d2-ea82d7f1a2df/workflow",
+      "s": 200,
+      "b": "{\"thread_id\":\"391b9048-82f1-4cd7-b7d2-ea82d7f1a2df\",\"mode\":\"harness\",\"locked\":true,\"active_workflow_run_id\":\"77c91d0b-cc67-4300-bbd3-f95c3ee836e4\",\"run_status\":\"active\",\"definition_slug\":\"p295-07-s2-continue\",\"definition_name\":\"295-07 S2 continue without sources\",\"current_phase_slug\":null,\"current_p"
+    },
+    {
+      "t": "2026-10-21T05:13:44.236Z",
+      "m": "GET",
+      "u": "/threads/391b9048-82f1-4cd7-b7d2-ea82d7f1a2df/workflow",
+      "s": 200,
+      "b": "{\"thread_id\":\"391b9048-82f1-4cd7-b7d2-ea82d7f1a2df\",\"mode\":\"harness\",\"locked\":true,\"active_workflow_run_id\":\"77c91d0b-cc67-4300-bbd3-f95c3ee836e4\",\"run_status\":\"active\",\"definition_slug\":\"p295-07-s2-continue\",\"definition_name\":\"295-07 S2 continue without sources\",\"current_phase_slug\":null,\"current_p"
+    },
+    {
+      "t": "2026-10-21T05:13:44.341Z",
+      "m": "GET",
+      "u": "/threads/391b9048-82f1-4cd7-b7d2-ea82d7f1a2df/workflow",
+      "s": 200,
+      "b": "{\"thread_id\":\"391b9048-82f1-4cd7-b7d2-ea82d7f1a2df\",\"mode\":\"harness\",\"locked\":true,\"active_workflow_run_id\":\"77c91d0b-cc67-4300-bbd3-f95c3ee836e4\",\"run_status\":\"active\",\"definition_slug\":\"p295-07-s2-continue\",\"definition_name\":\"295-07 S2 continue without sources\",\"current_phase_slug\":null,\"current_p"
+    },
+    {
+      "t": "2026-10-21T05:14:01.013Z",
+      "m": "GET",
+      "u": "/threads/391b9048-82f1-4cd7-b7d2-ea82d7f1a2df/workflow",
+      "s": 200,
+      "b": "{\"thread_id\":\"391b9048-82f1-4cd7-b7d2-ea82d7f1a2df\",\"mode\":\"harness\",\"locked\":true,\"active_workflow_run_id\":\"77c91d0b-cc67-4300-bbd3-f95c3ee836e4\",\"run_status\":\"active\",\"definition_slug\":\"p295-07-s2-continue\",\"definition_name\":\"295-07 S2 continue without sources\",\"current_phase_slug\":null,\"current_p"
+    },
+    {
+      "t": "2026-10-21T05:14:39.850Z",
+      "m": "GET",
+      "u": "/threads/391b9048-82f1-4cd7-b7d2-ea82d7f1a2df/workflow",
+      "s": 200,
+      "b": "{\"thread_id\":\"391b9048-82f1-4cd7-b7d2-ea82d7f1a2df\",\"mode\":\"harness\",\"locked\":true,\"active_workflow_run_id\":\"77c91d0b-cc67-4300-bbd3-f95c3ee836e4\",\"run_status\":\"paused\",\"definition_slug\":\"p295-07-s2-continue\",\"definition_name\":\"295-07 S2 continue without sources\",\"current_phase_slug\":null,\"current_p"
+    },
+    {
+      "t": "2026-10-21T05:14:40.062Z",
+      "m": "GET",
+      "u": "/threads/391b9048-82f1-4cd7-b7d2-ea82d7f1a2df/workflow",
+      "s": 200,
+      "b": "{\"thread_id\":\"391b9048-82f1-4cd7-b7d2-ea82d7f1a2df\",\"mode\":\"harness\",\"locked\":true,\"active_workflow_run_id\":\"77c91d0b-cc67-4300-bbd3-f95c3ee836e4\",\"run_status\":\"paused\",\"definition_slug\":\"p295-07-s2-continue\",\"definition_name\":\"295-07 S2 continue without sources\",\"current_phase_slug\":null,\"current_p"
+    },
+    {
+      "t": "2026-10-21T05:14:40.080Z",
+      "m": "GET",
+      "u": "/threads/391b9048-82f1-4cd7-b7d2-ea82d7f1a2df/workflow",
+      "s": 200,
+      "b": "{\"thread_id\":\"391b9048-82f1-4cd7-b7d2-ea82d7f1a2df\",\"mode\":\"harness\",\"locked\":true,\"active_workflow_run_id\":\"77c91d0b-cc67-4300-bbd3-f95c3ee836e4\",\"run_status\":\"paused\",\"definition_slug\":\"p295-07-s2-continue\",\"definition_name\":\"295-07 S2 continue without sources\",\"current_phase_slug\":null,\"current_p"
+    },
+    {
+      "t": "2026-10-21T05:14:40.179Z",
+      "m": "GET",
+      "u": "/threads/391b9048-82f1-4cd7-b7d2-ea82d7f1a2df/workflow",
+      "s": 200,
+      "b": "{\"thread_id\":\"391b9048-82f1-4cd7-b7d2-ea82d7f1a2df\",\"mode\":\"harness\",\"locked\":true,\"active_workflow_run_id\":\"77c91d0b-cc67-4300-bbd3-f95c3ee836e4\",\"run_status\":\"paused\",\"definition_slug\":\"p295-07-s2-continue\",\"definition_name\":\"295-07 S2 continue without sources\",\"current_phase_slug\":null,\"current_p"
+    },
+    {
+      "t": "2026-10-21T05:14:43.442Z",
+      "m": "POST",
+      "u": "/runs/77c91d0b-cc67-4300-bbd3-f95c3ee836e4/ask_user_response",
+      "s": 200,
+      "b": "{\"status\":\"ok\"}"
+    },
+    {
+      "t": "2026-10-21T05:14:43.596Z",
+      "m": "GET",
+      "u": "/threads/391b9048-82f1-4cd7-b7d2-ea82d7f1a2df/workflow",
+      "s": 200,
+      "b": "{\"thread_id\":\"391b9048-82f1-4cd7-b7d2-ea82d7f1a2df\",\"mode\":\"harness\",\"locked\":true,\"active_workflow_run_id\":\"77c91d0b-cc67-4300-bbd3-f95c3ee836e4\",\"run_status\":\"active\",\"definition_slug\":\"p295-07-s2-continue\",\"definition_name\":\"295-07 S2 continue without sources\",\"current_phase_slug\":\"approve\",\"curr"
+    },
+    {
+      "t": "2026-10-21T05:14:43.602Z",
+      "m": "REQ",
+      "u": "/runs/84035b81-d9a0-497b-918e-048e1dc0091d/stream?since=0"
+    },
+    {
+      "t": "2026-10-21T05:14:44.057Z",
+      "m": "GET",
+      "u": "/threads/391b9048-82f1-4cd7-b7d2-ea82d7f1a2df/workflow",
+      "s": 200,
+      "b": "{\"thread_id\":\"391b9048-82f1-4cd7-b7d2-ea82d7f1a2df\",\"mode\":\"harness\",\"locked\":true,\"active_workflow_run_id\":\"77c91d0b-cc67-4300-bbd3-f95c3ee836e4\",\"run_status\":\"active\",\"definition_slug\":\"p295-07-s2-continue\",\"definition_name\":\"295-07 S2 continue without sources\",\"current_phase_slug\":\"approve\",\"curr"
+    },
+    {
+      "t": "2026-10-21T05:14:44.156Z",
+      "m": "GET",
+      "u": "/threads/391b9048-82f1-4cd7-b7d2-ea82d7f1a2df/workflow",
+      "s": 200,
+      "b": "{\"thread_id\":\"391b9048-82f1-4cd7-b7d2-ea82d7f1a2df\",\"mode\":\"harness\",\"locked\":true,\"active_workflow_run_id\":\"77c91d0b-cc67-4300-bbd3-f95c3ee836e4\",\"run_status\":\"active\",\"definition_slug\":\"p295-07-s2-continue\",\"definition_name\":\"295-07 S2 continue without sources\",\"current_phase_slug\":\"approve\",\"curr"
+    },
+    {
+      "t": "2026-10-21T05:14:44.425Z",
+      "m": "GET",
+      "u": "/threads/391b9048-82f1-4cd7-b7d2-ea82d7f1a2df/workflow",
+      "s": 200,
+      "b": "{\"thread_id\":\"391b9048-82f1-4cd7-b7d2-ea82d7f1a2df\",\"mode\":\"harness\",\"locked\":true,\"active_workflow_run_id\":\"77c91d0b-cc67-4300-bbd3-f95c3ee836e4\",\"run_status\":\"active\",\"definition_slug\":\"p295-07-s2-continue\",\"definition_name\":\"295-07 S2 continue without sources\",\"current_phase_slug\":\"approve\",\"curr"
+    },
+    {
+      "t": "2026-10-21T05:15:08.979Z",
+      "m": "POST",
+      "u": "/runs/77c91d0b-cc67-4300-bbd3-f95c3ee836e4/ask_user_response",
+      "s": 200,
+      "b": "{\"status\":\"ok\"}"
+    },
+    {
+      "t": "2026-10-21T05:15:09.391Z",
+      "m": "GET",
+      "u": "/threads/391b9048-82f1-4cd7-b7d2-ea82d7f1a2df/workflow",
+      "s": 200,
+      "b": "{\"thread_id\":\"391b9048-82f1-4cd7-b7d2-ea82d7f1a2df\",\"mode\":\"harness\",\"locked\":true,\"active_workflow_run_id\":\"77c91d0b-cc67-4300-bbd3-f95c3ee836e4\",\"run_status\":\"active\",\"definition_slug\":\"p295-07-s2-continue\",\"definition_name\":\"295-07 S2 continue without sources\",\"current_phase_slug\":\"wrap\",\"current"
+    },
+    {
+      "t": "2026-10-21T05:15:11.581Z",
+      "m": "GET",
+      "u": "/threads/391b9048-82f1-4cd7-b7d2-ea82d7f1a2df/workflow",
+      "s": 200,
+      "b": "{\"thread_id\":\"391b9048-82f1-4cd7-b7d2-ea82d7f1a2df\",\"mode\":\"deep\",\"locked\":false,\"active_workflow_run_id\":null,\"run_status\":null,\"definition_slug\":null,\"definition_name\":null,\"current_phase_slug\":null,\"current_phase_index\":null,\"total_phases\":null,\"lock_is_stale\":false,\"cap_paused\":false,\"continues_"
+    }
+  ],
+  "changes": [
+    {
+      "t": "2026-10-21T05:13:44.235Z",
+      "tag": "wait-card-0",
+      "lines": [
+        "Approve the note",
+        "research — Running"
+      ],
+      "radios": []
+    },
+    {
+      "t": "2026-10-21T05:14:01.082Z",
+      "tag": "wait-card-0",
+      "lines": [
+        "Approve the note",
+        "research — Attempt"
+      ],
+      "radios": []
+    },
+    {
+      "t": "2026-10-21T05:14:39.421Z",
+      "tag": "wait-card-0",
+      "lines": [
+        "NEEDS YOU",
+        "Approve the note",
+        "research — Attempt"
+      ],
+      "radios": [
+        "Search another folder\nContinue without s",
+        "Search another folder\nContinue without s",
+        "Search another folder\nContinue without s"
+      ]
+    },
+    {
+      "t": "2026-10-21T05:14:43.218Z",
+      "tag": "wait-card-1",
+      "lines": [
+        "NEEDS YOU",
+        "Approve the note",
+        "research — Running",
+        "paused, waiting on a person"
+      ],
+      "radios": [
+        "Search another folder\nContinue without s",
+        "Search another folder\nContinue without s",
+        "Search another folder\nContinue without s"
+      ]
+    },
+    {
+      "t": "2026-10-21T05:14:44.267Z",
+      "tag": "wait-card-1",
+      "lines": [
+        "NEEDS YOU",
+        "Approve the note?",
+        "Approve the note",
+        "approve — Running",
+        "Unsourced · continued by fhdmrd@gmail.com (you)",
+        "· Needs you",
+        "Paused — waiting for your input."
+      ],
+      "radios": [
+        "Yes\nNo",
+        "Yes\nNo"
+      ]
+    },
+    {
+      "t": "2026-10-21T05:15:09.961Z",
+      "tag": "follow",
+      "lines": [
+        "Approve the note",
+        "approve — Complete",
+        "Unsourced · continued by fhdmrd@gmail.com (you)"
+      ],
+      "radios": []
+    },
+    {
+      "t": "2026-10-21T05:15:12.014Z",
+      "tag": "follow",
+      "lines": [
+        "Approve the note",
+        "wrap — Complete",
+        "Unsourced · continued by fhdmrd@gmail.com (you)"
+      ],
+      "radios": []
+    }
+  ],
+  "panel_open": true,
+  "kicked_at": "2026-10-21T05:13:43.167Z",
+  "answers": [
+    {
+      "i": 0,
+      "choice": "Continue without sources",
+      "card_seen_at": "2026-10-21T05:14:39.435Z",
+      "card_wait_s": 56,
+      "card_text": [
+        "NEEDS YOU",
+        "No deadline — the run is waiting for your answer and will not continue on its own",
+        "Searched 295-07 empty KB folder and found nothing for “Find the project status”. How should the run continue?",
+        "Report the project status and record the approver's answer.",
+        "Approve the note",
+        "approve"
+      ],
+      "sent_at": "2026-10-21T05:14:41.584Z"
+    },
+    {
+      "i": 1,
+      "choice": "Yes",
+      "card_seen_at": "2026-10-21T05:14:44.281Z",
+      "card_wait_s": 2,
+      "card_text": [
+        "NEEDS YOU",
+        "Approve the note?",
+        "Report the project status and record the approver's answer.",
+        "Approve the note",
+        "Phase 2 of 3, approve, started",
+        "approve — Running",
+        "· Needs you",
+        "approve"
+      ],
+      "dwell": [
+        {
+          "t": "2026-10-21T05:14:46.710Z",
+          "retired": false,
+          "stopped": false,
+          "windowPassed": false,
+          "expired": false,
+          "needsYou": true,
+          "radios": 2,
+          "sendDisabled": true
+        },
+        {
+          "t": "2026-10-21T05:14:47.788Z",
+          "retired": false,
+          "stopped": false,
+          "windowPassed": false,
+          "expired": false,
+          "needsYou": true,
+          "radios": 2,
+          "sendDisabled": true
+        },
+        {
+          "t": "2026-10-21T05:14:48.850Z",
+          "retired": false,
+          "stopped": false,
+          "windowPassed": false,
+          "expired": false,
+          "needsYou": true,
+          "radios": 2,
+          "sendDisabled": true
+        },
+        {
+          "t": "2026-10-21T05:14:49.910Z",
+          "retired": false,
+          "stopped": false,
+          "windowPassed": false,
+          "expired": false,
+          "needsYou": true,
+          "radios": 2,
+          "sendDisabled": true
+        },
+        {
+          "t": "2026-10-21T05:14:50.988Z",
+          "retired": false,
+          "stopped": false,
+          "windowPassed": false,
+          "expired": false,
+          "needsYou": true,
+          "radios": 2,
+          "sendDisabled": true
+        },
+        {
+          "t": "2026-10-21T05:14:52.069Z",
+          "retired": false,
+          "stopped": false,
+          "windowPassed": false,
+          "expired": false,
+          "needsYou": true,
+          "radios": 2,
+          "sendDisabled": true
+        },
+        {
+          "t": "2026-10-21T05:14:53.147Z",
+          "retired": false,
+          "stopped": false,
+          "windowPassed": false,
+          "expired": false,
+          "needsYou": true,
+          "radios": 2,
+          "sendDisabled": true
+        },
+        {
+          "t": "2026-10-21T05:14:54.267Z",
+          "retired": false,
+          "stopped": false,
+          "windowPassed": false,
+          "expired": false,
+          "needsYou": true,
+          "radios": 2,
+          "sendDisabled": true
+        },
+        {
+          "t": "2026-10-21T05:14:55.349Z",
+          "retired": false,
+          "stopped": false,
+          "windowPassed": false,
+          "expired": false,
+          "needsYou": true,
+          "radios": 2,
+          "sendDisabled": true
+        },
+        {
+          "t": "2026-10-21T05:14:56.410Z",
+          "retired": false,
+          "stopped": false,
+          "windowPassed": false,
+          "expired": false,
+          "needsYou": true,
+          "radios": 2,
+          "sendDisabled": true
+        },
+        {
+          "t": "2026-10-21T05:14:57.483Z",
+          "retired": false,
+          "stopped": false,
+          "windowPassed": false,
+          "expired": false,
+          "needsYou": true,
+          "radios": 2,
+          "sendDisabled": true
+        },
+        {
+          "t": "2026-10-21T05:14:58.559Z",
+          "retired": false,
+          "stopped": false,
+          "windowPassed": false,
+          "expired": false,
+          "needsYou": true,
+          "radios": 2,
+          "sendDisabled": true
+        },
+        {
+          "t": "2026-10-21T05:14:59.629Z",
+          "retired": false,
+          "stopped": false,
+          "windowPassed": false,
+          "expired": false,
+          "needsYou": true,
+          "radios": 2,
+          "sendDisabled": true
+        },
+        {
+          "t": "2026-10-21T05:15:00.693Z",
+          "retired": false,
+          "stopped": false,
+          "windowPassed": false,
+          "expired": false,
+          "needsYou": true,
+          "radios": 2,
+          "sendDisabled": true
+        },
+        {
+          "t": "2026-10-21T05:15:01.769Z",
+          "retired": false,
+          "stopped": false,
+          "windowPassed": false,
+          "expired": false,
+          "needsYou": true,
+          "radios": 2,
+          "sendDisabled": true
+        },
+        {
+          "t": "2026-10-21T05:15:02.845Z",
+          "retired": false,
+          "stopped": false,
+          "windowPassed": false,
+          "expired": false,
+          "needsYou": true,
+          "radios": 2,
+          "sendDisabled": true
+        },
+        {
+          "t": "2026-10-21T05:15:03.908Z",
+          "retired": false,
+          "stopped": false,
+          "windowPassed": false,
+          "expired": false,
+          "needsYou": true,
+          "radios": 2,
+          "sendDisabled": true
+        },
+        {
+          "t": "2026-10-21T05:15:04.978Z",
+          "retired": false,
+          "stopped": false,
+          "windowPassed": false,
+          "expired": false,
+          "needsYou": true,
+          "radios": 2,
+          "sendDisabled": true
+        },
+        {
+          "t": "2026-10-21T05:15:06.048Z",
+          "retired": false,
+          "stopped": false,
+          "windowPassed": false,
+          "expired": false,
+          "needsYou": true,
+          "radios": 2,
+          "sendDisabled": true
+        },
+        {
+          "t": "2026-10-21T05:15:07.136Z",
+          "retired": false,
+          "stopped": false,
+          "windowPassed": false,
+          "expired": false,
+          "needsYou": true,
+          "radios": 2,
+          "sendDisabled": true
+        }
+      ],
+      "card_text_after_dwell": [
+        "NEEDS YOU",
+        "Approve the note?",
+        "Report the project status and record the approver's answer.",
+        "Approve the note",
+        "Phase 2 of 3, approve, started",
+        "approve — Running",
+        "· Needs you",
+        "approve"
+      ],
+      "send_disabled_after_pick": false,
+      "sent_at": "2026-10-21T05:15:08.334Z"
+    }
+  ],
+  "store_probe": {
+    "urls": [
+      "http://localhost:5173/src/stores/streamsStore.ts?t=1792546825183"
+    ],
+    "tid": "391b9048-82f1-4cd7-b7d2-ea82d7f1a2df",
+    "lock": null,
+    "kickoff": false,
+    "runStatus": "active"
+  },
+  "end_aside": "Workspace\nTODOS\nFILES\n0\nUpload template\n\nNo files yet.\n\nVERSIONS\nTHIS WORKFLOW\n\nReport the project status and record the approver's answer.\n\nneeds kickoff_prompt\n\nFind the project status\n·\nApprove the note\n·\nWrap up\n○\nLOOSE\n\nproduces: answer in chat\n\nOpen the run\nWORKFLOW\n3\nPhase 3 of 3, wrap, complete\nWorkflow\nPhase 3 / 3\n3 agents\n\nwrap — Complete\n\nresearch\n◌\nUnsourced · continued by fhdmrd@gmail.com (you)\nThis output was kept without sources — it does not cite your documents.\n0s\n0 sources\n✓\nComplete\n▾\napprove\n25s\n✓\nComplete\n▾\nwrap\n2s\n✓\nComplete\n▸\nSUB-RESULTS\n3\nSub-task\nDone\n▾\nPhase: research Run 295-07 S2 continue without sources\nDone\n▾\nPhase: research Run 295-07 S2 continue without sources\nDone\n▾",
+  "end_main_tail": "295-r2b S2 drive 2\n\nRun 295-07 S2 continue without sources\n\nRun a workflow\nUSING:\nAll your documents\ndeepseek\ndeepseek-v4-flash\nGeneral\nEnter ↵ · Shift+Enter for newline\n\nAI can make mistakes. Verify important information."
+}

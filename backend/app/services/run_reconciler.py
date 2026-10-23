@@ -140,6 +140,8 @@ async def reconcile_orphaned_runs(
         grace_ms=grace_ms,
         include_cap_paused=include_cap_paused,
     )
+    # Phase 295 (D-21 / SEED-297 shape): workflow runs whose steps have all ended.
+    flipped += await _reconcile_workflow_runs(pool)
     if flipped:
         logger.info("Run reconciler terminalized %d orphaned run(s)", flipped)
     return flipped
@@ -249,6 +251,85 @@ async def _reconcile_chat_runs(pool, redis, *, stale_timeout_ms, grace_ms, inclu
             flipped += 1
         except Exception:
             logger.exception("reconcile: failed to terminalize chat run %s", run_id)
+    return flipped
+
+
+# ── Phase 295 (D-21 / D-22, SEED-297): a sweep, not a hide ──────────────────────────────────
+#
+# A ``workflow_runs`` row that reads ``active`` while EVERY one of its steps has ended has no
+# producer behind it and nothing left to run: before 295 nothing ever finalised it (this module
+# never touched ``workflow_runs``), so it read "Running" forever. Measured locally: 2 such rows,
+# both from ``_resume_run`` escapes (D-41).
+#
+# ⛔ THE GUARDS, each load-bearing:
+#   * ``status = 'active'`` only — ``paused`` waits for a person and ``cap_paused`` is a
+#     legitimate re-attachable pause; neither is ever touched here.
+#   * at least one step row, and NO step row outside the terminal set — a run with a pending or
+#     active step is not "ended", however quiet it is.
+#   * ``updated_at`` older than ``settings.harness_resume_lease_seconds`` — the same lease the
+#     resume claim uses, so a run between its last step write and its own ``finish_run`` (a
+#     live producer, milliseconds away from ending it) is never raced.
+#   * the terminal write goes through ``run_handoff.end_run``: a guarded ``UPDATE … WHERE status
+#     = ANY(['active'])`` then ``finish_run`` — first-terminal-wins, and NOTHING here writes or
+#     NULLs a usage / total column (SEED-297: ``finalize_run``'s unconditional SET is never used).
+# D-22: no reason is invented for a historical run beyond this sentence, which is TRUE of every
+# row it finalises; no audit is back-dated.
+_TERMINAL_PHASE_STATUSES = ["completed", "failed", "skipped", "cancelled", "recorded_not_sent"]
+#: The one sentence this sweep stores (the ``run_failed`` audit + the run's end reason).
+_REASON_WORKFLOW = "Finalised by the reconciler: its steps had ended."
+
+
+async def _reconcile_workflow_runs(db) -> int:
+    """Finalise ``active`` workflow runs whose every step has ended (D-21). Returns the count.
+
+    Its last step (by end time, then position) ``cancelled`` → the run ends ``cancelled`` (no
+    ``run_failed``); else ``failed`` with :data:`_REASON_WORKFLOW` and ONE ``run_failed``. Each finalised run's pending prompts are expired. Per-row
+    try/except: one bad row never aborts the sweep (the ``_reconcile_chat_runs`` idiom).
+    """
+    from app.services.harness.run_handoff import end_run  # noqa: PLC0415
+
+    try:
+        rows = await db.fetch(
+            """
+            SELECT wr.id, wr.thread_id, wr.user_id, wr.org_id,
+                   (SELECT wp.status FROM workflow_phases wp
+                     WHERE wp.workflow_run_id = wr.id
+                     ORDER BY wp.completed_at DESC NULLS LAST, wp.phase_index DESC
+                     LIMIT 1) AS last_phase_status
+            FROM workflow_runs wr
+            WHERE wr.status = ANY($1::text[])
+              AND wr.updated_at < now() - make_interval(secs => $2)
+              AND EXISTS (SELECT 1 FROM workflow_phases wp WHERE wp.workflow_run_id = wr.id)
+              AND NOT EXISTS (
+                  SELECT 1 FROM workflow_phases wp
+                   WHERE wp.workflow_run_id = wr.id
+                     AND NOT (wp.status = ANY($3::text[]))
+              )
+            """,
+            ["active"],
+            float(settings.harness_resume_lease_seconds),
+            _TERMINAL_PHASE_STATUSES,
+        )
+    except Exception:
+        logger.exception("reconcile: workflow_runs ended-steps query failed (app continues)")
+        return 0
+
+    flipped = 0
+    for row in rows:
+        run_id = row["id"]
+        try:
+            status = "cancelled" if row["last_phase_status"] == "cancelled" else "failed"
+            if not await end_run(db, run_id, status, from_statuses=("active",),
+                                 user_id=row["user_id"], reason=_REASON_WORKFLOW):
+                continue  # somebody else ended it first (first-terminal-wins)
+            from app.services.harness_engine import _expire_pending_ask_user  # noqa: PLC0415
+
+            await _expire_pending_ask_user(
+                db, row["thread_id"], run_id, org_id=row["org_id"],
+            )
+            flipped += 1
+        except Exception:
+            logger.exception("reconcile: failed to finalise workflow run %s", run_id)
     return flipped
 
 

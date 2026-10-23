@@ -364,6 +364,8 @@ interface RunLike {
     prompt_line?: string | null
     window_passed: boolean
   } | null
+  // Phase 295-05 (RUN-04 / D-22) - optional: the recorded reason a failed/cancelled run stopped.
+  end_reason?: string | null
 }
 
 const CLAIMED = "2026-08-05T14:03:11Z"
@@ -660,6 +662,8 @@ function evidenceFrom(run: RunLike, over: EvidenceOver = {}): RunEvidence {
       model: null,
       viewer_is_owner: owner,
       thread_id: owner ? run.thread_id : null,
+      // 295-05: the evidence read resolves the same recorded reason the owner read carries.
+      end_reason: run.end_reason ?? null,
     },
     definition: {
       recorded: true,
@@ -1218,6 +1222,38 @@ describe("WorkflowRunPage — the polite region carries the sentence, not the cl
     await findReport()
     expect(reportFact("Result")).toBe("✕ Failed")
     expect(screen.queryAllByTestId("run-alert")).toHaveLength(0)
+  })
+
+  // ── 295-05 (RUN-04 / D-22) — a failed run never shows a blank where its reason should be.
+  // Since 289-04 a finished run opened here IS the evidence report (one early return), so the
+  // reason line a person reads on this page is the report's, under its outcome — asserted by
+  // the WORDS on the page, never a testid alone.
+  it("295-05: a failed run with nothing recorded says so on the page", async () => {
+    getWorkflowRun.mockResolvedValue(mkRun({ status: "failed", end_reason: null }))
+    renderPage()
+    await findReport()
+    expect(screen.getByText("No reason was recorded when this run failed.")).toBeTruthy()
+    expect(screen.queryByText(/^Why it stopped:/)).toBeNull()
+  })
+
+  it("295-05: a failed run with a recorded reason reads Why it stopped: <reason>", async () => {
+    getWorkflowRun.mockResolvedValue(
+      mkRun({ status: "failed", end_reason: "Searched Q3 reports and found nothing. Stopped by Dana." }),
+    )
+    renderPage()
+    await findReport()
+    expect(
+      screen.getByText("Why it stopped: Searched Q3 reports and found nothing. Stopped by Dana."),
+    ).toBeTruthy()
+    expect(screen.queryByText("No reason was recorded when this run failed.")).toBeNull()
+  })
+
+  it("295-05: a live run shows no end-reason words at all", async () => {
+    getWorkflowRun.mockResolvedValue(mkRun({ status: "active", end_reason: "stale" }))
+    renderPage()
+    await screen.findByTestId("run-transcript")
+    expect(screen.queryByText(/Why it stopped:/)).toBeNull()
+    expect(screen.queryByText("No reason was recorded when this run failed.")).toBeNull()
   })
 
   it("a healthy run raises no assertive notice at all", async () => {

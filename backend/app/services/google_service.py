@@ -88,6 +88,8 @@ except ImportError:  # pragma: no cover — langsmith always installed in prod
             return fn
         return _wrap
 
+from app.services.rerank_engines.tracing import redact_inputs  # a traced call never records a key
+
 logger = logging.getLogger(__name__)
 
 
@@ -415,7 +417,7 @@ def _google_client(api_key: str, timeout_s: float | None) -> "genai.Client":
 # ── Main streaming entry point ───────────────────────────────────────────────
 
 
-@_ls_traceable(run_type="llm", name="google.genai.streaming_chat")
+@_ls_traceable(run_type="llm", name="google.genai.streaming_chat", process_inputs=redact_inputs)
 def stream_google(
     messages: list[dict],
     tools: list[dict],

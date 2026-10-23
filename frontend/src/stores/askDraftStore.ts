@@ -32,6 +32,11 @@ import { useStreamsStore } from "./streamsStore"
 export interface AskDraft {
   choiceIndex: number | null
   freeText: string
+  /**
+   * Phase 295-06 (D-03) — the folder chosen under the found-nothing pause's "Search another
+   * folder" choice. Absent until chosen; dropped with the rest of the draft on clear / settle.
+   */
+  folderId?: string
 }
 
 export const EMPTY_DRAFT: AskDraft = Object.freeze({ choiceIndex: null, freeText: "" }) as AskDraft
@@ -48,6 +53,7 @@ interface AskDraftState {
   panelHomes: Record<string, number>
   setChoice: (id: string, choiceIndex: number | null) => void
   setFreeText: (id: string, freeText: string) => void
+  setFolder: (id: string, folderId: string) => void
   clearDraft: (id: string) => void
   markSettled: (id: string) => void
   addPanelHome: (threadId: string) => void
@@ -69,6 +75,8 @@ export const useAskDraftStore = create<AskDraftState>()((set) => ({
     set((s) => ({ drafts: { ...s.drafts, [id]: { ...(s.drafts[id] ?? EMPTY_DRAFT), choiceIndex } } })),
   setFreeText: (id, freeText) =>
     set((s) => ({ drafts: { ...s.drafts, [id]: { ...(s.drafts[id] ?? EMPTY_DRAFT), freeText } } })),
+  setFolder: (id, folderId) =>
+    set((s) => ({ drafts: { ...s.drafts, [id]: { ...(s.drafts[id] ?? EMPTY_DRAFT), folderId } } })),
   clearDraft: (id) => set((s) => ({ drafts: without(s.drafts, id) })),
   // ONE write: the draft goes and the settle is recorded together, so no reader can see a
   // settled ask that still has a draft, or a cleared draft on an ask that reads as pending.

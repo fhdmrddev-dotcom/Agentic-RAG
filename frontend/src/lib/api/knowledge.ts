@@ -785,10 +785,38 @@ export type GenerateReadiness = {
     | { status: "missing"; message: string }
 }
 
+/** Phase 291-02 / 291-04 (D-14 / D-15) — one power the server took out of a draft written
+ *  from attached files, in the SERVER'S words (SEED-221): a bold lead and its reason. The
+ *  client renders both verbatim and maps no code to words. */
+export type GenerateRemoved = { lead: string; reason: string }
+
+/** Phase 291-02 / 291-04 (D-10) — one field of the attached form and what covers it in the
+ *  draft: an input the person is asked for, or a step that writes it. */
+export type GenerateField = {
+  key: string
+  label: string
+  type: string
+  enum_options: string[]
+  covered_by: "input" | "step"
+  /** 291 UAT S3-F1 — the input that fills this field; it may not be the field's own key.
+   *  Absent from servers older than the fix. */
+  input_key?: string | null
+}
+
 /** The structured result of POST /workflows/generate. The route returns HTTP 200
  *  even on a FAILED generation (`ok:false`) — read the body, never throw on it. */
 export type GenerateResult =
-  | { ok: true; definition: WorkflowDefinitionJSON; readiness?: GenerateReadiness }
+  | {
+      ok: true
+      definition: WorkflowDefinitionJSON
+      readiness?: GenerateReadiness
+      /** 291-02 — what the powers guard removed. ⚠ ABSENT MEANS THE SERVER SAID NOTHING
+       *  (it omits the key when nothing was removed); never default it to a list. */
+      removed?: GenerateRemoved[]
+      /** 291-02 — the form's fields and their cover. ⚠ ABSENT MEANS THE SERVER SAID NOTHING
+       *  (no form was attached, or it had no fields); never default it to a list. */
+      fields?: GenerateField[]
+    }
   | {
       ok: false
       error: string
@@ -831,6 +859,44 @@ export interface GenerateWorkflowBody {
    *
    *  ⚠ TYPE-ONLY — plan `214-13` supplies the values; no call site sends this yet. */
   allowed_connection_ids?: string[]
+  /** Phase 291-04 (D-04 / Pitfall 11) — the form slot's READ RESULT, sent instead of its
+   *  bytes. ABSENT ⇒ no form was attached or its read failed; it is never sent empty. */
+  form?: DescribeFormBody
+  /** Phase 291-04 (D-03) — the references' read text, at most five, in pick order. ABSENT ⇒
+   *  none was read; an empty list is never sent to stand for that. */
+  references?: DescribeReferenceBody[]
+}
+
+/** One form field as the generate body carries it (the server's `DescribeFormFieldIn`). */
+export interface DescribeFormFieldBody {
+  key: string
+  label: string
+  type: "text" | "number" | "date" | "enum"
+  enum_options: string[]
+  origin: "exact" | "ai_proposed"
+}
+
+/** The form slot's read result (`DescribeFormIn`). For Word blanks, `fields` holds only the
+ *  blanks the author left ticked (D-27). */
+export interface DescribeFormBody {
+  filename: string
+  arm:
+    | "template_fields"
+    | "form_fields"
+    | "suggested_fields"
+    | "blanks"
+    | "none"
+    | "not_word"
+    | "scan_unreadable"
+    | "copy_refused"
+  fields: DescribeFormFieldBody[]
+  text: string
+}
+
+/** One reference's read text (`DescribeReferenceIn`). */
+export interface DescribeReferenceBody {
+  filename: string
+  text: string
 }
 
 /** The 4 distinguished outcomes of POST /workflows/{id}/publish. A binary

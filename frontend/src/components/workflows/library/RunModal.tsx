@@ -320,7 +320,8 @@ export function RunModal({
       data-testid="run-modal"
       className="fixed inset-0 z-[9000] grid place-items-center bg-black/60 p-6 backdrop-blur-sm"
     >
-      <div className="w-[min(560px,92%)] overflow-hidden rounded-lg border border-border bg-card shadow-lg">
+      {/* 291 UAT S6: capped at the window; only the body scrolls (a 23-field form hid Run). */}
+      <div className="flex max-h-[calc(100dvh-3rem)] w-[min(560px,92%)] flex-col overflow-hidden rounded-lg border border-border bg-card shadow-lg">
         {/* ⚠ 199-10 (DES-01) — THE HEADER SPENDS NO MARK. It carried an `aria-hidden`
             page glyph beside the name; it is removed, and the removal is the whole of this
             plan's change to this file.
@@ -374,7 +375,7 @@ export function RunModal({
         {/* The sheet's body: `p-lg` with a `gap-lg` stack of field groups, each group a
             `gap-xs` label/control pair. The shipped body was `gap-3 px-4 py-4` with
             `gap-1.5` groups — the same composition drawn tighter than the sheet draws it. */}
-        <div className="flex flex-col gap-6 px-6 py-6">
+        <div data-testid="run-modal-body" className="flex min-h-0 flex-1 flex-col gap-6 overflow-y-auto px-6 py-6">
           {/* WFIN-02 (D-LOCK-01): the KB-scope <select> — native, byte-matching the
               ChatArea scope selector ("All documents / {folder}"). The author default
               is tagged "workflow default"; picking another = a per-run override. Hidden

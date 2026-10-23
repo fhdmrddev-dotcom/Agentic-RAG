@@ -125,6 +125,9 @@ def test_dunder_all_is_the_pinned_contract():
         "classify_rejection",
         "terminal_failure_value",
         "compose_emit_failure",
+        # Phase 295 (D-12): added deliberately — the ONE pre-run refusal sentence for a fill
+        # step with no template; lint, kickoff and the scheduler read it off the lint finding.
+        "no_template_bound_sentence",
     ]
     for name in ec.__all__:
         assert hasattr(ec, name), name
