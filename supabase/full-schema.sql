@@ -1290,6 +1290,7 @@ CREATE TABLE public.app_settings (
     custom_base_url text DEFAULT ''::text,
     custom_api_key text,
     document_download_url_ttl_seconds integer DEFAULT 60 NOT NULL,
+    harness_authoring_model text DEFAULT ''::text NOT NULL,
     CONSTRAINT app_settings_download_ttl_bounds CHECK (((document_download_url_ttl_seconds >= 10) AND (document_download_url_ttl_seconds <= 900))),
     CONSTRAINT app_settings_extraction_table_engine_pdf_check CHECK ((extraction_table_engine_pdf = ANY (ARRAY['camelot'::text, 'pdfplumber'::text]))),
     CONSTRAINT app_settings_hnsw_ef_search_bounds CHECK (((hnsw_ef_search IS NULL) OR ((hnsw_ef_search >= 10) AND (hnsw_ef_search <= 1000)))),
