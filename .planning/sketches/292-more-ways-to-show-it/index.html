@@ -1,0 +1,557 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>292 · More ways to show it</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Manrope:wght@600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+<style>
+/* Tokens + frame copied from sketch 273 (the shipped artifact card, winner 1B). */
+:root{
+  --bg:hsl(216 45% 4%);--elev:hsl(220 40% 5%);--card:hsl(220 30% 7%);--pop:hsl(220 30% 8%);
+  --muted:hsl(220 30% 11%);--accent:hsl(220 25% 14%);
+  --text:hsl(226 60% 97%);--text-m:hsl(220 16% 65%);--text-d:hsl(220 16% 52%);
+  --border:hsl(220 20% 16%);--border-s:hsl(220 20% 16% / .55);
+  --primary:hsl(239 100% 82%);--primary-dim:hsl(239 100% 82% / .15);
+  --green:hsl(142 71% 55%);--amber:hsl(38 92% 60%);--a-bg:hsl(38 92% 60% / .08);--a-bd:hsl(38 92% 60% / .28);
+  --rose:hsl(350 89% 72%);
+  --surface:#0d1017;
+  --s1:#3987e5;--s2:#d95926;--s3:#199e70;--s4:#c98500;
+  --sans:'Inter',system-ui,sans-serif;--head:'Manrope','Inter',sans-serif;--mono:'JetBrains Mono',monospace;
+}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--text);font:14px/1.5 var(--sans)}
+button{font:inherit;color:inherit;cursor:pointer;transition:all .15s ease}
+header.top{position:sticky;top:0;z-index:30;background:hsl(216 45% 4% / .94);backdrop-filter:blur(8px);border-bottom:1px solid var(--border);padding:10px 20px;display:flex;flex-wrap:wrap;gap:10px 18px;align-items:center}
+header.top h1{font:700 15px var(--head);margin:0}
+.grp{display:flex;gap:4px;align-items:center;flex-wrap:wrap}
+.grp .lbl{font-size:11px;color:var(--text-d);text-transform:uppercase;letter-spacing:.06em;margin-right:4px}
+.seg{background:var(--muted);border:1px solid var(--border);border-radius:7px;padding:4px 10px;font-size:12.5px;color:var(--text-m)}
+.seg:hover{color:var(--text);border-color:hsl(220 20% 24%)}
+.seg.on{background:var(--primary-dim);border-color:hsl(239 100% 82% / .45);color:var(--text)}
+.note{max-width:800px;margin:18px auto 0;padding:0 20px;color:var(--text-m);font-size:12.5px}
+.note b{color:var(--text)}
+#frame{margin:0 auto;max-width:800px;padding:8px 20px 120px;transition:max-width .2s ease}
+
+/* chat */
+.msg{margin:18px 0}
+.msg.u{margin-left:auto;max-width:78%;width:fit-content;background:var(--muted);border:1px solid var(--border);border-radius:14px 14px 4px 14px;padding:8px 13px}
+.msg.a .by{font-size:12px;color:var(--text-d);margin-bottom:6px;display:flex;gap:8px;align-items:center}
+.msg.a .by .av{width:20px;height:20px;border-radius:6px;background:linear-gradient(135deg,var(--primary),hsl(258 90% 66%));display:inline-block}
+.msg.a p{margin:6px 0 10px}
+.rail{border-left:1px solid var(--border);margin:4px 0 12px 9px;padding:2px 0 2px 14px;display:flex;flex-direction:column;gap:3px}
+.step{font-size:12.5px;color:var(--text-m);display:flex;gap:8px;align-items:baseline;position:relative}
+.step:before{content:"";position:absolute;left:-19px;top:7px;width:9px;height:9px;border-radius:50%;background:var(--green);box-shadow:0 0 0 2px var(--bg)}
+.step.warn:before{background:var(--amber)}
+.step .n{font:500 11px var(--mono);color:var(--text-d);width:12px}
+.step .t{font:500 12px var(--mono);color:var(--text)}
+.step.warn .ess{color:var(--amber)}
+
+/* the 273 card frame */
+.art{margin:14px 0 6px;position:relative;background:var(--surface);border:1px solid var(--border);border-radius:12px;overflow:hidden}
+.art .hd{display:flex;align-items:center;gap:8px;padding:10px 14px;border-bottom:1px solid var(--border-s)}
+.art .ttl{font:600 13.5px var(--head);color:var(--text);margin:0;flex:1}
+.chip{font:500 11px var(--sans);color:var(--text-m);background:var(--muted);border:1px solid var(--border);border-radius:999px;padding:1px 8px;white-space:nowrap}
+.chip.lbl{color:var(--text-d);background:none}
+.art .bd{padding:12px 14px 10px}
+.art .cap{font-size:11.5px;color:var(--text-d);padding:8px 14px 10px;border-top:1px solid var(--border-s);display:flex;gap:6px;align-items:center;flex-wrap:wrap}
+.art .cap .src{color:var(--text-m);flex:1 1 200px;min-width:0}
+.art .cap svg{flex:none}
+.dgwrap,.cmx{scrollbar-color:hsl(220 20% 24%) transparent;scrollbar-width:thin}
+.art .cap .who{color:var(--text-d);font-style:italic;flex-basis:100%;padding-left:18px}
+.ntc{margin:12px 0 4px;border:1px dashed hsl(220 20% 26%);border-radius:12px;padding:12px 14px;background:hsl(220 30% 6%)}
+.ntc .t{font-weight:600;font-size:13px;display:flex;gap:8px;align-items:center}
+.ntc .r{font-size:12.5px;color:var(--text-m);margin-top:3px}
+.ntc .s{font-size:11.5px;color:var(--text-d);margin-top:6px}
+
+/* tooltip (shared) */
+.tip{position:fixed;pointer-events:none;background:var(--pop);border:1px solid var(--border);border-radius:8px;padding:8px 10px;font-size:12px;max-width:300px;box-shadow:0 8px 24px hsl(0 0% 0% / .45);opacity:0;transition:opacity .1s;z-index:60}
+.tip .h{color:var(--text-d);font-size:11px;margin-bottom:3px;display:flex;gap:6px;align-items:center}
+.tip .q{color:var(--text);font-style:italic}
+.tip .q:before{content:"“"} .tip .q:after{content:"”"}
+
+/* ── DIAGRAM ── */
+.dgwrap{overflow-x:auto;overflow-y:hidden}
+.dg{position:relative}
+.dg svg{position:absolute;inset:0;overflow:visible}
+.dg .e{fill:none;stroke:hsl(220 16% 40%);stroke-width:1.5;transition:stroke .12s,opacity .12s}
+.dg .e.back{stroke-dasharray:4 4}
+.dg .e.hot{stroke:var(--primary);stroke-width:2}
+.dg.focus .e:not(.hot){opacity:.25}
+.dg .el{position:absolute;transform:translate(-50%,-50%);font:500 10.5px var(--sans);color:var(--text-m);background:var(--surface);padding:0 5px;border-radius:4px;white-space:nowrap;pointer-events:none;transition:opacity .12s}
+.dg.focus .el:not(.hot){opacity:.3}
+.dg .el.hot{color:var(--text)}
+.nd{position:absolute;display:flex;align-items:center;justify-content:center;text-align:center;padding:4px 10px;font:500 12px/1.3 var(--sans);color:var(--text);background:hsl(220 30% 10%);border:1px solid hsl(220 20% 24%);border-radius:8px;cursor:default;transition:border-color .12s,opacity .12s,background .12s;outline:none}
+.nd:hover,.nd:focus-visible,.nd.hot{border-color:var(--primary);background:hsl(239 40% 14%)}
+.dg.focus .nd:not(.hot):not(:hover):not(:focus-visible){opacity:.45}
+.nd.term{border-radius:999px}
+.nd.dec{background:none;border:none;padding:0}
+.nd.dec .dsh{position:absolute;inset:0;background:hsl(220 20% 24%);clip-path:polygon(14px 0,calc(100% - 14px) 0,100% 50%,calc(100% - 14px) 100%,14px 100%,0 50%)}
+.nd.dec .dsh:after{content:"";position:absolute;inset:1px;background:hsl(220 30% 10%);clip-path:polygon(13.5px 0,calc(100% - 13.5px) 0,100% 50%,calc(100% - 13.5px) 100%,13.5px 100%,0 50%)}
+.nd.dec:hover .dsh,.nd.dec.hot .dsh,.nd.dec:focus-visible .dsh{background:var(--primary)}
+.nd.dec span{position:relative;padding:0 18px}
+.nd .pg{display:none}
+.lane{position:absolute;left:0;right:0;border-top:1px solid var(--border-s)}
+.lane:first-child{border-top:none}
+.lane .ln{position:absolute;left:0;top:8px;width:88px;font:500 11px var(--sans);color:var(--text-d);text-transform:uppercase;letter-spacing:.05em;line-height:1.3}
+.dg.lr .nd{font-size:11.5px;padding:4px 8px}
+
+/* ── COMPARISON ── */
+.cmp-tools{display:flex;gap:10px;align-items:center;flex-wrap:wrap;margin-bottom:8px;font-size:12px;color:var(--text-m)}
+.tgl{display:inline-flex;gap:6px;align-items:center;background:none;border:1px solid var(--border);border-radius:6px;padding:2px 8px;font-size:12px;color:var(--text-m)}
+.tgl[aria-pressed="true"]{border-color:hsl(239 100% 82% / .45);color:var(--text);background:var(--primary-dim)}
+.key{display:flex;gap:10px;flex-wrap:wrap;font-size:11.5px;color:var(--text-d)}
+.g{display:inline-flex;width:16px;height:16px;border-radius:50%;align-items:center;justify-content:center;font:700 10px var(--sans);flex:none}
+.g.y{color:var(--green);background:hsl(142 71% 55% / .12);border:1px solid hsl(142 71% 55% / .35)}
+.g.n{color:var(--rose);background:hsl(350 89% 72% / .1);border:1px solid hsl(350 89% 72% / .35)}
+.g.m{color:var(--text-d);border:1px solid var(--border)}
+.g.q{color:var(--amber);border:1px dashed var(--a-bd)}
+.cmx{overflow-x:auto}
+.cmx table{border-collapse:collapse;width:100%;font-size:12.5px;min-width:540px}
+.cmx th{text-align:left;font-weight:600;color:var(--text);padding:7px 10px;border-bottom:1px solid var(--border);background:var(--pop);font-family:var(--head);font-size:12.5px}
+.cmx th:first-child{color:var(--text-m);font:500 12px var(--sans);width:24%}
+.cmx td{padding:7px 10px;border-bottom:1px solid var(--border-s);vertical-align:top}
+.cmx td:first-child{color:var(--text-m)}
+.cmx td.c{cursor:default}
+.cmx td.c:hover{background:hsl(220 30% 10%)}
+.cmx td .cv{display:flex;gap:7px;align-items:flex-start}
+.cmx td.miss .tx{color:var(--text-d);font-style:italic}
+.cmx tr.same td{color:var(--text-d)}
+.cmx tr.same td .tx{color:var(--text-d)}
+.cards3{display:grid;grid-template-columns:repeat(auto-fit,minmax(190px,1fr));gap:10px}
+.oc{border:1px solid var(--border-s);border-radius:10px;background:hsl(220 30% 8%);padding:10px 12px}
+.oc h4{margin:0;font:600 13px var(--head)}
+.oc .tally{font-size:11.5px;color:var(--text-d);margin:2px 0 8px;display:flex;gap:8px}
+.oc .row{display:flex;gap:8px;align-items:flex-start;padding:5px 0;border-top:1px solid var(--border-s);font-size:12px;cursor:default}
+.oc .row:hover{background:hsl(220 30% 10%)}
+.oc .row .k{color:var(--text-d);font-size:11px;display:block}
+.oc .row.miss .tx{color:var(--text-d);font-style:italic}
+
+/* ── TIMELINE ── */
+.tlv{position:relative;padding-left:0}
+.tr{display:grid;grid-template-columns:92px 22px 1fr;gap:0 10px;align-items:start;position:relative}
+.tr .dt{font:500 11.5px var(--mono);color:var(--text-m);padding-top:2px;text-align:right}
+.tr .rl{position:relative;align-self:stretch;display:flex;justify-content:center}
+.tr .rl:before{content:"";position:absolute;top:0;bottom:0;left:50%;width:1px;background:var(--border)}
+.tr:first-child .rl:before{top:9px}
+.tr:last-child .rl:before{bottom:calc(100% - 9px)}
+.tr .dot{position:relative;margin-top:4px;width:11px;height:11px;border-radius:50%;background:var(--text-m);box-shadow:0 0 0 3px var(--surface)}
+.tr.fut .dot{background:var(--surface);border:1.5px solid var(--text-m)}
+.tr.dl .dot{background:var(--surface);border:2px solid var(--amber)}
+.tr .ev{padding-bottom:14px}
+.tr .ev .h{font-weight:600;font-size:13px;display:flex;gap:8px;align-items:center;flex-wrap:wrap}
+.tr .ev .d{font-size:12.5px;color:var(--text-m)}
+.tr .ev .sr{font-size:11px;color:var(--text-d);margin-top:2px}
+.tr.fut .ev .h{color:var(--text-m)}
+.tr.dl .ev .h{color:var(--text)}
+.due{font:500 11px var(--sans);color:var(--amber);border:1px solid var(--a-bd);background:var(--a-bg);border-radius:999px;padding:0 7px}
+.tr.gap .dt{color:var(--text-d);font:400 11px var(--sans);font-style:italic}
+.tr.gap .rl:before{background:repeating-linear-gradient(var(--border) 0 3px,transparent 3px 6px)}
+.tr.gap .ev{padding-bottom:8px;min-height:18px}
+.tr.today .dt{color:var(--primary);font-family:var(--sans);font-weight:600}
+.tr.today .dot{width:9px;height:9px;margin-top:5px;background:var(--primary)}
+.tr.today .ev{font-size:12px;color:var(--primary);padding-bottom:12px;padding-top:1px}
+.tlh{position:relative}
+.tlh svg{display:block;width:100%;overflow:visible}
+.tlh .ax{stroke:var(--border);stroke-width:1.5}
+.tlh .tk{font:11px var(--sans);fill:var(--text-d)}
+.tlh .ld{stroke:hsl(220 16% 30%);stroke-width:1}
+.tlh .pt{cursor:pointer}
+.tlh .pt circle{transition:r .1s}
+.tlh .pt:hover circle.cc,.tlh .pt.sel circle.cc{r:7}
+.tlh .lb{font:500 11px var(--sans);fill:var(--text-m);cursor:pointer}
+.tlh .pt.sel .lb,.tlh .pt:hover .lb{fill:var(--text)}
+.tlh .td{stroke:var(--primary);stroke-dasharray:3 3}
+.tlh .tdl{font:600 10.5px var(--sans);fill:var(--primary)}
+.tdet{margin-top:6px;border:1px solid var(--border-s);border-radius:10px;padding:10px 12px;background:hsl(220 30% 8%)}
+.tdet .dt{font:500 11.5px var(--mono);color:var(--text-m)}
+.tdet .h{font-weight:600;font-size:13px;margin:2px 0;display:flex;gap:8px;align-items:center;flex-wrap:wrap}
+.tdet .d{font-size:12.5px;color:var(--text-m)}
+.tdet .sr{font-size:11px;color:var(--text-d);margin-top:4px}
+
+/* ── STEPS ── */
+.sts{list-style:none;margin:0;padding:0;counter-reset:s}
+.sts li{counter-increment:s;display:grid;grid-template-columns:26px 1fr;gap:10px;padding:7px 0;border-top:1px solid var(--border-s)}
+.sts li:first-child{border-top:none}
+.sts li:before{content:counter(s);width:24px;height:24px;border-radius:50%;border:1px solid hsl(220 20% 26%);display:flex;align-items:center;justify-content:center;font:600 12px var(--head);color:var(--text-m)}
+.sts .t{font-size:13px}
+.sts .sr{font-size:11px;color:var(--text-d)}
+.callout{margin-top:8px;font-size:12.5px;color:var(--text-m);border-left:2px solid var(--a-bd);padding:2px 10px}
+
+/* ── SCREEN 1: the set ── */
+.cand{margin:26px 0 0}
+.pick{display:flex;gap:10px;align-items:flex-start;padding:10px 12px;border:1px solid var(--border);border-radius:10px;background:var(--card)}
+.pick .sw{flex:none;margin-top:1px}
+.pick .why{font-size:12.5px;color:var(--text-m)}
+.pick .why b{color:var(--text);font-weight:600}
+.pick .spec{font:400 11.5px var(--mono);color:var(--text-d);margin-top:3px}
+.pick.off + .art,.pick.off ~ .art{opacity:.35;filter:grayscale(.6)}
+.inbtn{border:1px solid var(--border);background:var(--muted);border-radius:7px;padding:3px 10px;font-size:12px;color:var(--text-m);white-space:nowrap}
+.inbtn[aria-pressed="true"]{border-color:hsl(142 71% 55% / .45);background:hsl(142 71% 55% / .1);color:var(--text)}
+.sum{position:sticky;top:58px;z-index:20;margin:14px 0 0;padding:10px 12px;border:1px solid hsl(239 100% 82% / .35);border-radius:10px;background:hsl(239 40% 9% / .96);font-size:12.5px}
+.sum .reg{font:500 12px var(--mono);color:var(--text)}
+.sum .reg .new{color:var(--primary)}
+.sum .meta{color:var(--text-m);margin-top:3px}
+.rej{margin-top:30px;font-size:12.5px;color:var(--text-m)}
+.rej h3{font:600 13px var(--head);color:var(--text);margin:0 0 6px}
+.rej li{margin:3px 0}
+.rej li b{color:var(--text);font-weight:500}
+
+.sk-lbl{font-size:11px;color:var(--text-d);text-transform:uppercase;letter-spacing:.06em;margin:22px 0 4px}
+
+/* toolbar */
+#sketch-tools{position:fixed;bottom:12px;right:12px;z-index:9999;font:12px system-ui;background:rgba(0,0,0,.75);color:#fff;padding:8px 10px;border-radius:8px;opacity:.45;display:flex;gap:6px;align-items:center}
+#sketch-tools:hover{opacity:1}
+#sketch-tools button{background:#333;border:1px solid #555;border-radius:5px;color:#fff;padding:2px 8px}
+#sketch-tools button.on{background:#555}
+</style>
+</head>
+<body>
+<header class="top">
+  <h1>292 · More ways to show it</h1>
+  <div class="grp" id="g-screen"><span class="lbl">Screen</span></div>
+  <div class="grp" id="g-var"><span class="lbl">Variant</span></div>
+  <div class="grp" id="g-extra"></div>
+</header>
+<div class="note" id="note"></div>
+<main id="frame"></main>
+<div class="tip" id="tip"></div>
+<div id="sketch-tools">
+  <span>Viewport</span>
+  <button data-w="390">Phone</button><button data-w="768">Tablet</button><button data-w="800" class="on">Desktop</button>
+</div>
+
+<script>
+/* ═════════════ DATA — what the model would send, plus server-resolved sources ═════════════ */
+const DIAGRAM={
+  title:'Vendor onboarding — from request to first purchase order',
+  nodes:[
+    {id:'req',label:'Request submitted',kind:'start',lane:'Requester',src:['Procurement_Policy_v4.pdf','p.2','All new vendors must be requested through the Vendor Request form in the procurement portal.']},
+    {id:'rev',label:'Procurement review (2 business days)',kind:'step',lane:'Procurement',src:['Procurement_Policy_v4.pdf','p.3','Procurement reviews each request within two business days of submission.']},
+    {id:'tier',label:'Risk tier?',kind:'decision',lane:'Procurement',src:['Procurement_Policy_v4.pdf','p.4','Each vendor is assigned a risk tier from 1 (low) to 3 (high) based on data access and spend.']},
+    {id:'dd',label:'Standard due diligence',kind:'step',lane:'Procurement',src:['Procurement_Policy_v4.pdf','p.4','Tier 1 and 2 vendors complete the standard due-diligence questionnaire.']},
+    {id:'sec',label:'Security & legal review (up to 10 days)',kind:'step',lane:'Legal & Security',src:['Vendor_Security_Standard.pdf','p.2','Tier 3 vendors require a security assessment and legal review, completed within ten business days.']},
+    {id:'sign',label:'Contract signed',kind:'step',lane:'Legal & Security',src:['Procurement_Policy_v4.pdf','p.6','No services may begin before the contract is countersigned by Legal.']},
+    {id:'erp',label:'Vendor set up in ERP',kind:'step',lane:'Finance',src:['Finance_Ops_Handbook.pdf','p.11','Finance creates the vendor record and verifies bank details by call-back.']},
+    {id:'po',label:'First purchase order',kind:'end',lane:'Finance',src:['Finance_Ops_Handbook.pdf','p.12','A purchase order may be raised once the vendor record is active.']},
+  ],
+  edges:[
+    {from:'req',to:'rev'},{from:'rev',to:'tier'},
+    {from:'tier',to:'dd',label:'Tier 1–2'},{from:'tier',to:'sec',label:'Tier 3'},
+    {from:'dd',to:'sign'},{from:'sec',to:'sign'},
+    {from:'sec',to:'rev',label:'Changes requested'},
+    {from:'sign',to:'erp'},{from:'erp',to:'po'},
+  ]
+};
+const DIAGRAM_CAP='Data: search_documents · Procurement_Policy_v4.pdf, Vendor_Security_Standard.pdf, Finance_Ops_Handbook.pdf · 8 steps · 9 links';
+
+const CMP={
+  title:'Freight vendor contracts — key terms',
+  options:['Atlas Logistics','Northwind Freight','Kestrel Cargo'],
+  docs:['Atlas_MSA_2023.pdf','Northwind_MSA_2024.pdf','Kestrel_Proposal_2025.pdf'],
+  rows:[
+    ['Initial term',[['m','3 years','§2.1','The initial term of this Agreement is three (3) years.'],['m','2 years','§3.1','This Agreement commences on the Effective Date and continues for two (2) years.'],['m','3 years','p.9','Proposed term: 36 months.']]],
+    ['Auto-renewal',[['m','1 year, unless notice','§2.2','The Agreement renews for successive one-year periods unless either party gives notice.'],['y','None — must re-sign','§3.2','This Agreement does not renew automatically.'],['m','1 year, unless notice','p.9','Renews annually unless terminated in writing.']]],
+    ['Termination notice',[['n','90 days','§2.2','…by written notice at least ninety (90) days before the end of the then-current term.'],['y','30 days','§12.1','Either party may terminate for convenience on thirty (30) days’ written notice.'],['m','60 days','p.10','Sixty days’ written notice is required to terminate.']]],
+    ['Liability cap',[['y','12 months’ fees','§14.3','…shall not exceed the fees paid in the twelve (12) months preceding the claim.'],['n','6 months’ fees','§15.2','…limited to fees paid during the six (6) months before the event giving rise to liability.'],['y','12 months’ fees','p.14','Liability is capped at twelve months of fees.']]],
+    ['SLA credits',[['y','Up to 10% of monthly fee','Sch. 2','Service credits of up to ten percent (10%) of the monthly fee apply for missed delivery windows.'],['q','Not stated','—','No clause on service credits was found in this document.'],['m','Up to 5% of monthly fee','p.12','Credits up to 5% of monthly charges.']]],
+    ['EU data residency',[['y','Yes — Frankfurt','§9.4','Customer data is stored and processed only in the Frankfurt (EU) region.'],['y','Yes — Dublin','§10.1','All customer data remains within the Dublin data centre.'],['q','Not stated','—','No data-residency clause was found in this document.']]],
+    ['Price escalation',[['m','CPI, capped at 4%','§7.2','Fees adjust annually by CPI, not to exceed four percent (4%).'],['y','Fixed for 2 years','§6.1','Fees are fixed for the initial term.'],['n','CPI, no cap','p.11','Annual adjustment in line with CPI.']]],
+  ]
+};
+const CMP_CAP='Data: search_documents · Atlas_MSA_2023.pdf, Northwind_MSA_2024.pdf, Kestrel_Proposal_2025.pdf · 3 options × 7 terms';
+
+const TODAY=new Date('2026-10-24');
+const TL={
+  title:'Atlas Logistics contract — history and what’s next',
+  events:[
+    {d:'2023-03-14',t:'MSA signed',s:'MSA signed',x:'Three-year master services agreement for EU freight.',c:'Contract',src:'Atlas_MSA_2023.pdf · p.1'},
+    {d:'2023-04-01',t:'Services start',s:'Services start',x:'First shipments under the agreement.',c:'Contract',src:'Atlas_MSA_2023.pdf · §2.1'},
+    {d:'2024-02-09',t:'Amendment 1 — price +3.5%',s:'Amendment +3.5%',x:'Fuel surcharge folded into the base rate.',c:'Price',src:'Atlas_Amendment_1.pdf · p.1'},
+    {d:'2024-11-20',t:'SLA breach notice',s:'SLA breach',x:'Three missed delivery windows in October.',c:'SLA',src:'Incident_Log_2024.xlsx · row 41'},
+    {d:'2025-01-15',t:'Service credits applied — $18.4K',s:'Credits $18.4K',x:'Credited against the January invoice.',c:'SLA',src:'Atlas_Invoice_Jan25.pdf · p.2'},
+    {d:'2025-04-01',t:'Annual CPI uplift +2.9%',s:'CPI +2.9%',x:'Within the 4% cap.',c:'Price',src:'Atlas_MSA_2023.pdf · §7.2'},
+    {d:'2026-04-01',t:'Annual CPI uplift +3.1%',s:'CPI +3.1%',x:'Within the 4% cap.',c:'Price',src:'Atlas_MSA_2023.pdf · §7.2'},
+    {d:'2026-12-31',t:'Non-renewal notice deadline',s:'Notice deadline',x:'Last day to give 90 days’ notice before the term ends.',c:'Contract',src:'Atlas_MSA_2023.pdf · §2.2',deadline:true},
+    {d:'2027-03-31',t:'Initial term ends',s:'Term ends',x:'Renews for one year unless notice was given.',c:'Contract',src:'Atlas_MSA_2023.pdf · §2.2'},
+  ]
+};
+const TL_CAP='Data: search_documents, query_tables · 4 documents · 9 events';
+
+const STEPS={
+  title:'Submitting a travel expense',
+  steps:[
+    ['Keep itemised receipts for anything over $25.','Travel_Policy_2026.pdf · p.6'],
+    ['Submit the claim in Concur within 30 days of your return.','Travel_Policy_2026.pdf · p.8'],
+    ['Attach the trip-approval email if the trip cost more than $2,000.','Travel_Policy_2026.pdf · p.4'],
+    ['Your manager approves it (target: 2 business days).','Travel_Policy_2026.pdf · p.9'],
+    ['Finance reimburses you on the next payroll run.','Finance_Ops_Handbook.pdf · p.21'],
+  ],
+  note:'Claims submitted more than 60 days after travel need a VP sign-off.'
+};
+const STEPS_CAP='Data: search_documents · Travel_Policy_2026.pdf, Finance_Ops_Handbook.pdf · 5 steps';
+
+/* ═════════════ STATE ═════════════ */
+const S={screen:1,v:{2:'a',3:'a',4:'a'},state:'retry',w:800,
+  picks:{diagram:true,comparison:true,timeline:true,steps:false},
+  diffOnly:false,tlSel:7};
+
+/* ═════════════ helpers ═════════════ */
+const $=s=>document.querySelector(s);
+const esc=s=>String(s).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
+const DOC='<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><path d="M14 2v6h6"/></svg>';
+const tip=$('#tip');
+function showTip(ev,html){tip.innerHTML=html;tip.style.opacity=1;moveTip(ev)}
+function moveTip(ev){const r=tip.getBoundingClientRect();let x=ev.clientX+14,y=ev.clientY+14;if(x+r.width>innerWidth-8)x=ev.clientX-r.width-14;if(y+r.height>innerHeight-8)y=ev.clientY-r.height-14;tip.style.left=x+'px';tip.style.top=y+'px'}
+function hideTip(){tip.style.opacity=0}
+function tipAt(elm,html){const b=elm.getBoundingClientRect();showTip({clientX:b.right,clientY:b.top},html)}
+function card(kind,title,label,body,cap,who){
+  return `<div class="art"><div class="hd"><h3 class="ttl">${esc(title)}</h3><span class="chip lbl">${label}</span><span class="chip">${kind}</span></div>
+  <div class="bd">${body}</div>
+  <div class="cap">${DOC}<span class="src">${esc(cap)}</span>${who?`<span class="who">${who}</span>`:''}</div></div>`;
+}
+function user(t){return `<div class="msg u">${esc(t)}</div>`}
+function asst(rail,text,rest){return `<div class="msg a"><div class="by"><span class="av"></span>Syrel</div>
+  <div class="rail">${rail.map(s=>`<div class="step ${s[2]||''}"><span class="t">${s[0]}</span><span class="ess">${esc(s[1])}</span></div>`).join('')}</div>
+  ${text.map(p=>`<p>${p}</p>`).join('')}${rest||''}</div>`}
+const dt=s=>{const d=new Date(s);return d.toLocaleDateString('en-GB',{day:'numeric',month:'short',year:'numeric'})};
+
+/* ═════════════ DIAGRAM renderer — layout is OURS; the model never sends coordinates ═════════════ */
+function rankNodes(spec){
+  const ids=spec.nodes.map(n=>n.id),out={},indeg={},state={},back=new Set(),rank={};
+  ids.forEach(i=>{out[i]=[];indeg[i]=0;rank[i]=0});
+  spec.edges.forEach((e,k)=>{out[e.from].push(k);indeg[e.to]++});
+  const dfs=u=>{state[u]=1;for(const k of out[u]){const v=spec.edges[k].to;if(state[v]===1)back.add(k);else if(!state[v])dfs(v)}state[u]=2};
+  ids.filter(i=>indeg[i]===0).forEach(i=>{if(!state[i])dfs(i)});ids.forEach(i=>{if(!state[i])dfs(i)});
+  for(let it=0;it<ids.length;it++)spec.edges.forEach((e,k)=>{if(!back.has(k)&&rank[e.to]<rank[e.from]+1)rank[e.to]=rank[e.from]+1});
+  return{rank,back};
+}
+function drawDiagram(host,spec,mode){
+  const{rank,back}=rankNodes(spec);
+  const R=Math.max(...Object.values(rank))+1;
+  const W=host.clientWidth;
+  const pos={};let H,TW=W,lanesHTML='';
+  if(mode==='td'){
+    const nw=Math.min(190,Math.max(120,W*0.4)),nh=42,rowH=78;
+    for(let r=0;r<R;r++){const g=spec.nodes.filter(n=>rank[n.id]===r);
+      g.forEach((n,i)=>{const cx=W*(i+1)/(g.length+1);pos[n.id]={cx,cy:r*rowH+8+nh/2,w:n.kind==='decision'?Math.min(nw,140):nw,h:nh}})}
+    H=(R-1)*rowH+nh+16;
+  }else{
+    const lanes=[...new Set(spec.nodes.map(n=>n.lane))],laneH=92,lw=96,colW=140,nw=104,nh=54;
+    TW=Math.max(W,lw+R*colW);
+    spec.nodes.forEach(n=>{const r=rank[n.id],l=lanes.indexOf(n.lane);pos[n.id]={cx:lw+colW*(r+.5),cy:l*laneH+laneH/2,w:nw,h:nh}});
+    H=lanes.length*laneH;
+    lanesHTML=lanes.map((l,i)=>`<div class="lane" style="top:${i*laneH}px;height:${laneH}px"><span class="ln">${esc(l)}</span></div>`).join('');
+  }
+  let paths='',labels='';
+  spec.edges.forEach((e,k)=>{
+    const a=pos[e.from],b=pos[e.to];let d,lx,ly;
+    if(back.has(k)){
+      if(mode==='td'){const sx=a.cx+a.w/2,sy=a.cy,tx=b.cx+b.w/2,ty=b.cy,rx=Math.min(W-6,Math.max(sx,tx)+70);
+        d=`M${sx},${sy} C${rx},${sy} ${rx},${ty} ${tx+4},${ty}`;lx=rx-30;ly=(sy+ty)/2;}
+      else{const sx=a.cx,sy=a.cy-a.h/2,tx=b.cx,ty=b.cy+b.h/2+3,cy=ty+11;
+        d=`M${sx},${sy} V${cy} H${tx} V${ty}`;lx=(sx+tx)/2;ly=cy;}
+    }else if(mode==='td'){const sx=a.cx,sy=a.cy+a.h/2,tx=b.cx,ty=b.cy-b.h/2-3,my=(sy+ty)/2;
+      d=`M${sx},${sy} C${sx},${my} ${tx},${my} ${tx},${ty}`;lx=(sx+tx)/2;ly=my;}
+    else{const sx=a.cx+a.w/2,sy=a.cy,tx=b.cx-b.w/2-3,ty=b.cy,mx=(sx+tx)/2;
+      d=`M${sx},${sy} C${mx},${sy} ${mx},${ty} ${tx},${ty}`;lx=mx;ly=(sy+ty)/2-(sy===ty?10:0);}
+    paths+=`<path class="e${back.has(k)?' back':''}" data-k="${k}" d="${d}" marker-end="url(#ah)"/>`;
+    if(e.label)labels+=`<span class="el" data-k="${k}" style="left:${lx}px;top:${ly}px">${esc(e.label)}</span>`;
+  });
+  const nodes=spec.nodes.map(n=>{const p=pos[n.id];
+    const cls=n.kind==='decision'?'dec':(n.kind==='start'||n.kind==='end')?'term':'';
+    const inner=n.kind==='decision'?`<i class="dsh"></i><span>${esc(n.label)}</span>`:esc(n.label);
+    return `<div class="nd ${cls}" tabindex="0" data-id="${n.id}" style="left:${p.cx-p.w/2}px;top:${p.cy-p.h/2}px;width:${p.w}px;height:${p.h}px">${inner}</div>`}).join('');
+  host.innerHTML=`<div class="dgwrap"><div class="dg ${mode}" style="width:${TW}px;height:${H}px">${lanesHTML}
+    <svg width="${TW}" height="${H}"><defs><marker id="ah" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,1 L9,5 L0,9 z" fill="hsl(220 16% 50%)"/></marker></defs>${paths}</svg>${labels}${nodes}</div></div>`;
+  const dg=host.querySelector('.dg');
+  const on=(id,ev)=>{const n=spec.nodes.find(x=>x.id===id);dg.classList.add('focus');
+    spec.edges.forEach((e,k)=>{const hot=e.from===id||e.to===id;dg.querySelectorAll(`[data-k="${k}"]`).forEach(x=>x.classList.toggle('hot',hot));
+      if(hot){const o=e.from===id?e.to:e.from;dg.querySelector(`[data-id="${o}"]`).classList.add('hot')}});
+    const html=`<div class="h">${DOC}${esc(n.src[0])} · ${n.src[1]}</div><div class="q">${esc(n.src[2])}</div>`;
+    ev.clientX!==undefined?showTip(ev,html):tipAt(ev.target,html)};
+  const off=()=>{dg.classList.remove('focus');dg.querySelectorAll('.hot').forEach(x=>x.classList.remove('hot'));hideTip()};
+  dg.querySelectorAll('.nd').forEach(nd=>{
+    nd.addEventListener('mouseenter',ev=>on(nd.dataset.id,ev));nd.addEventListener('mousemove',moveTip);nd.addEventListener('mouseleave',off);
+    nd.addEventListener('focus',ev=>on(nd.dataset.id,{target:nd}));nd.addEventListener('blur',off)});
+}
+
+/* ═════════════ COMPARISON ═════════════ */
+const GL={y:['y','✓','favourable'],n:['n','✗','unfavourable'],m:['m','–','neutral'],q:['q','?','not stated in the document']};
+const g=v=>`<span class="g ${v}" aria-label="${GL[v][2]}">${GL[v][1]}</span>`;
+const KEY=`<div class="key">${['y','n','m','q'].map(v=>`<span style="display:inline-flex;gap:5px;align-items:center">${g(v)}${GL[v][2]}</span>`).join('')}</div>`;
+function cellTip(i,c){return `<div class="h">${DOC}${esc(CMP.docs[i])} · ${esc(c[2])}</div><div class="q">${esc(c[3])}</div>`}
+function cmpA(){
+  const same=r=>r[1].every(c=>c[1]===r[1][0][1]);
+  return `<div class="cmp-tools"><button class="tgl" id="diff" aria-pressed="${S.diffOnly}">Only terms that differ</button>${KEY}</div>
+  <div class="cmx"><table><thead><tr><th>Term</th>${CMP.options.map(o=>`<th>${o}</th>`).join('')}</tr></thead><tbody>
+  ${CMP.rows.filter(r=>!(S.diffOnly&&same(r))).map((r,ri)=>`<tr class="${same(r)?'same':''}"><td>${r[0]}</td>${r[1].map((c,i)=>`<td class="c ${c[0]==='q'?'miss':''}" data-r="${CMP.rows.indexOf(r)}" data-i="${i}"><span class="cv">${g(c[0])}<span class="tx">${esc(c[1])}</span></span></td>`).join('')}</tr>`).join('')}
+  </tbody></table></div>`;
+}
+function cmpB(){
+  return `<div class="cmp-tools">${KEY}</div><div class="cards3">${CMP.options.map((o,i)=>{
+    const t={y:0,n:0,q:0};CMP.rows.forEach(r=>{const v=r[1][i][0];if(t[v]!==undefined)t[v]++});
+    return `<div class="oc"><h4>${o}</h4><div class="tally">${g('y')}${t.y} ${g('n')}${t.n} ${g('q')}${t.q}</div>
+    ${CMP.rows.map((r,ri)=>{const c=r[1][i];return `<div class="row c ${c[0]==='q'?'miss':''}" data-r="${ri}" data-i="${i}">${g(c[0])}<span><span class="k">${r[0]}</span><span class="tx">${esc(c[1])}</span></span></div>`}).join('')}</div>`}).join('')}</div>`;
+}
+function wireCmp(root){
+  root.querySelectorAll('.c').forEach(c=>{const r=+c.dataset.r,i=+c.dataset.i,cell=CMP.rows[r][1][i];
+    c.addEventListener('mouseenter',ev=>showTip(ev,cellTip(i,cell)));c.addEventListener('mousemove',moveTip);c.addEventListener('mouseleave',hideTip)});
+  const d=root.querySelector('#diff');if(d)d.onclick=()=>{S.diffOnly=!S.diffOnly;render()};
+}
+
+/* ═════════════ TIMELINE ═════════════ */
+const days=(a,b)=>Math.round((b-a)/864e5);
+function monthsBetween(a,b){return (b.getFullYear()-a.getFullYear())*12+b.getMonth()-a.getMonth()}
+function tlA(){
+  let out='',prev=null,todayDone=false;
+  TL.events.forEach(e=>{const d=new Date(e.d);
+    if(prev){const m=monthsBetween(prev,d);if(m>=6&&!( !todayDone&&d>TODAY))out+=`<div class="tr gap"><div class="dt">${m} months</div><div class="rl"></div><div class="ev"></div></div>`}
+    if(!todayDone&&d>TODAY){todayDone=true;
+      out+=`<div class="tr today"><div class="dt">Today</div><div class="rl"><span class="dot"></span></div><div class="ev">${dt(TODAY)} — everything below hasn’t happened yet</div></div>`}
+    const fut=d>TODAY;
+    out+=`<div class="tr ${fut?'fut':''} ${e.deadline?'dl':''}"><div class="dt">${dt(e.d)}</div><div class="rl"><span class="dot"></span></div>
+      <div class="ev"><div class="h">${esc(e.t)} <span class="chip">${e.c}</span>${e.deadline?`<span class="due">in ${days(TODAY,d)} days</span>`:''}</div>
+      <div class="d">${esc(e.x)}</div><div class="sr">${esc(e.src)}</div></div></div>`;
+    prev=d});
+  return `<div class="tlv">${out}</div>`;
+}
+function tlB(host){
+  const W=host.clientWidth,pad=24,t0=new Date('2023-01-01'),t1=new Date('2027-07-01');
+  const X=d=>pad+(new Date(d)-t0)/(t1-t0)*(W-2*pad);
+  const AX=118,slots=[[-1,1],[1,1],[-1,2],[1,2],[-1,3],[1,3]],lastEnd={};
+  const pts=TL.events.map((e,i)=>{const x=X(e.d),w=e.s.length*6.1+8;
+    let sl=slots.find(s=>(lastEnd[s]??-1e9)<x-4)||slots[0];lastEnd[sl]=x+w;
+    const ly=AX+sl[0]*(sl[1]*26+6);return{e,i,x,w,ly,up:sl[0]<0}});
+  const years=[2023,2024,2025,2026,2027];
+  const tx=X(TODAY);
+  const svg=`<svg viewBox="0 0 ${W} 240" height="240">
+    <line class="ax" x1="${pad}" x2="${W-pad}" y1="${AX}" y2="${AX}"/>
+    ${years.map(y=>`<line class="ld" x1="${X(y+'-01-01')}" x2="${X(y+'-01-01')}" y1="${AX-4}" y2="${AX+4}"/><text class="tk" x="${X(y+'-01-01')}" y="${AX+100}" text-anchor="middle">${y}</text>`).join('')}
+    <line class="td" x1="${tx}" x2="${tx}" y1="14" y2="${AX+86}"/><text class="tdl" x="${tx+4}" y="${AX+84}">Today</text>
+    ${pts.map(p=>{const fut=new Date(p.e.d)>TODAY;const col=p.e.deadline?'var(--amber)':'var(--text-m)';
+      return `<g class="pt ${S.tlSel===p.i?'sel':''}" data-i="${p.i}" tabindex="0">
+      <line class="ld" x1="${p.x}" x2="${p.x}" y1="${AX}" y2="${p.ly+(p.up?4:-12)}"/>
+      <text class="lb" x="${p.x+3}" y="${p.ly}">${esc(p.e.s)}</text>
+      <circle class="cc" cx="${p.x}" cy="${AX}" r="5" fill="${fut?'var(--surface)':col}" stroke="${fut?col:'var(--surface)'}" stroke-width="${fut?2:2}"/></g>`}).join('')}
+  </svg>`;
+  const e=TL.events[S.tlSel],d=new Date(e.d);
+  host.innerHTML=`<div class="tlh">${svg}</div><div class="tdet"><div class="dt">${dt(e.d)}${d>TODAY?' · upcoming':''}</div>
+    <div class="h">${esc(e.t)} <span class="chip">${e.c}</span>${e.deadline?`<span class="due">in ${days(TODAY,d)} days</span>`:''}</div>
+    <div class="d">${esc(e.x)}</div><div class="sr">${esc(e.src)}</div></div>`;
+  host.querySelectorAll('.pt').forEach(p=>{const sel=()=>{S.tlSel=+p.dataset.i;tlB(host)};p.onclick=sel;p.onkeydown=k=>{if(k.key==='Enter'||k.key===' ')sel()}});
+}
+
+/* ═════════════ STEPS ═════════════ */
+function stepsBody(){return `<ol class="sts">${STEPS.steps.map(s=>`<li><span><div class="t">${esc(s[0])}</div><div class="sr">${esc(s[1])}</div></span></li>`).join('')}</ol><div class="callout">⚠ ${esc(STEPS.note)}</div>`}
+
+/* ═════════════ SCREENS ═════════════ */
+const CANDS=[
+  {k:'diagram',name:'Diagram',why:'<b>Explains how things connect.</b> Process and approval questions today get a wall of prose. Nothing in chart · table · metric can show a branch or a loop.',spec:'nodes[{id,label,kind:step|decision|start|end,lane?}] · edges[{from,to,label?}] · ≤ 25 nodes · ⛔ no coordinates, no SVG'},
+  {k:'comparison',name:'Comparison',why:'<b>“Compare A and B” is a core document question.</b> A table can hold the text but not a per-cell verdict, and “not stated” must be visible, not a blank.',spec:'options[2-5] · rows[{term, cells[{verdict:y|n|m|q, text, source_ref}]}] · ≤ 12 terms'},
+  {k:'timeline',name:'Timeline',why:'<b>Contracts, policies and incidents are full of dates.</b> A chart needs a number per date; these events don’t have one. Past vs upcoming matters.',spec:'events[{date, title, detail?, category?, source_ref}] · ≤ 40 events · deadline? flag'},
+  {k:'steps',name:'Steps',why:'<b>“How do I…” answers.</b> Adds a source per step and a warning callout — but a markdown numbered list already gets most of the way.',spec:'steps[{text, source_ref}] · note? · ≤ 15 steps'},
+];
+function screen1(){
+  const on=CANDS.filter(c=>S.picks[c.k]);
+  const bodies={
+    diagram:()=>card('Flow diagram',DIAGRAM.title,'diagram 1','<div id="dgh"></div>',DIAGRAM_CAP),
+    comparison:()=>card('Comparison',CMP.title,'comparison 1',cmpA(),CMP_CAP,'verdicts are the agent’s reading — hover a cell for the clause'),
+    timeline:()=>card('Timeline',TL.title,'timeline 1',tlA(),TL_CAP),
+    steps:()=>card('Steps',STEPS.title,'steps 1',stepsBody(),STEPS_CAP),
+  };
+  return `<div class="sum"><div class="reg">registry: chart · table · metric${on.map(c=>` · <span class="new">${c.k}</span>`).join('')}</div>
+    <div class="meta">${3+on.length} components · tool count stays <b>30</b> (show_artifact gains ${on.length} union arm${on.length===1?'':'s'}, no new tool)</div></div>
+  ${CANDS.map(c=>`<div class="cand"><div class="pick ${S.picks[c.k]?'':'off'}"><span class="sw"><button class="inbtn" data-k="${c.k}" aria-pressed="${S.picks[c.k]}">${S.picks[c.k]?'✓ In the set':'Not in the set'}</button></span>
+    <div><div class="why">${c.why}</div><div class="spec">${esc(c.spec)}</div></div></div>${bodies[c.k]()}</div>`).join('')}
+  <div class="rej"><h3>Not in the set — with the reason</h3><ul>
+    <li><b>Code block, rich document</b> — the answer text is already markdown with highlighted code; a component adds nothing.</li>
+    <li><b>Pie / donut</b> — rejected in 273 (D-05); part-of-whole is a stacked bar.</li>
+    <li><b>KPI grid</b> — 273 chose one metric per artifact; several metrics are several artifacts.</li>
+    <li><b>Image</b> — generation is SEED-194, its own phase.</li>
+    <li><b>Map</b> — no geo data in the knowledge base to draw.</li>
+    <li><b>Sandboxed HTML (direction B)</b> — needs its own operator decision; out of this phase.</li>
+  </ul></div>`;
+}
+function screen2(){
+  const v=S.v[2];
+  return user('How does vendor onboarding work, from request to the first PO?')+
+  asst([['search_documents','“vendor onboarding process” · 6 chunks from 3 documents'],['show_artifact',`Flow diagram · 8 steps, 9 links${v==='b'?', 4 lanes':''}`]],
+    ['Onboarding has one branch: the vendor’s <b>risk tier</b>. Tier 1–2 vendors go through standard due diligence; Tier 3 vendors need a security and legal review, which can send the request back to procurement.',
+     'Nothing can start before Legal countersigns the contract, and Finance only allows a PO once the vendor record is active.'],
+    card(v==='a'?'Flow diagram':'Swimlane diagram',DIAGRAM.title,'diagram 1','<div id="dgh"></div>',DIAGRAM_CAP));
+}
+function screen3(){
+  const v=S.v[3];
+  return user('Compare the Atlas, Northwind and Kestrel freight contracts on the terms that matter for renewal.')+
+  asst([['search_documents','“termination, renewal, liability, SLA” · 14 chunks from 3 documents'],['show_artifact','Comparison · 3 options × 7 terms']],
+    ['Northwind is the easiest to leave (30 days’ notice, no auto-renewal) but has the weakest liability cap. Atlas has the strongest SLA credits but needs 90 days’ notice.',
+     'Two terms aren’t in the documents at all: Northwind’s SLA credits and Kestrel’s data residency.'],
+    card('Comparison',CMP.title,'comparison 1',v==='a'?cmpA():cmpB(),CMP_CAP,'verdicts are the agent’s reading — hover a cell for the clause'));
+}
+function screen4(){
+  const v=S.v[4];
+  return user('What has happened with the Atlas contract so far, and what’s coming up?')+
+  asst([['search_documents','“Atlas Logistics contract amendments” · 9 chunks'],['query_tables','Incident_Log_2024.xlsx · vendor = Atlas · 1 row'],['show_artifact','Timeline · 9 events, 2 upcoming']],
+    ['The key date is <b>31 Dec 2026</b>: the last day to give notice if you don’t want the contract to roll over for another year.'],
+    card('Timeline',TL.title,'timeline 1',v==='a'?tlA():'<div id="tlh"></div>',TL_CAP));
+}
+const STATES={retry:'Unknown type → retried',notice:'Unknown type → notice',big:'Too many nodes → grouped',bad:'Bad saved data on reload',reload:'Reload, same artifact'};
+function screen5(){
+  const q=user('Can you map out how the vendor onboarding process works?');
+  const dcard=card('Flow diagram',DIAGRAM.title,'diagram 1','<div id="dgh"></div>',DIAGRAM_CAP);
+  switch(S.state){
+    case 'retry':return q+asst([['search_documents','“vendor onboarding process” · 6 chunks'],['show_artifact','refused · “mindmap” is not an artifact type — use one of: chart, table, metric, diagram, comparison, timeline','warn'],['show_artifact','Flow diagram · 8 steps, 9 links']],
+      ['Here’s the onboarding flow, with the one branch on risk tier.'],dcard);
+    case 'notice':return q+asst([['search_documents','“vendor onboarding process” · 6 chunks'],['show_artifact','refused · “mindmap” is not an artifact type','warn'],['show_artifact','refused · “mindmap” is not an artifact type','warn']],
+      ['Onboarding starts with a request in the procurement portal, goes through a procurement review, and then branches on the vendor’s risk tier…'],
+      `<div class="ntc"><div class="t">⊘ This artifact can’t be shown</div><div class="r">It asked for a mind map, which isn’t one of the artifact types we can show.</div><div class="s">The rest of the answer is unaffected.</div></div>`);
+    case 'big':return q+asst([['search_documents','“vendor onboarding process” · 11 chunks'],['show_artifact','refused · 40 steps (max 25); group related steps first','warn'],['show_artifact','Flow diagram · 8 steps, 9 links']],
+      ['The full procedure has 40 sub-steps, so I grouped them into the 8 stages below. Ask about any stage for its detail.'],dcard);
+    case 'bad':return q+asst([['search_documents','“vendor onboarding process” · 6 chunks'],['show_artifact','Flow diagram · 8 steps, 9 links']],
+      ['Here’s the onboarding flow, with the one branch on risk tier.'],
+      `<div class="ntc"><div class="t">⊘ This artifact can’t be shown</div><div class="r">Its saved data links to a step that isn’t in it (“Legal sign-off”).</div><div class="s">The rest of the answer is unaffected.</div></div>`);
+    case 'reload':return `<div class="sk-lbl">Thread reopened from history — same persisted spec, same component (I-2)</div>`+q+asst([['search_documents','“vendor onboarding process” · 6 chunks'],['show_artifact','Flow diagram · 8 steps, 9 links']],
+      ['Here’s the onboarding flow, with the one branch on risk tier.'],dcard);
+  }
+}
+
+const NOTES={
+  1:'<b>Screen 1 — pick the closed set.</b> Each candidate is drawn in the shipped 273 frame with the spec the model would fill. Toggle <b>In the set</b>; the bar at the top shows the resulting registry. Rejected types are listed at the bottom with the reason. <i>This screen is what SC#1 records in CONTEXT.</i>',
+  2:'<b>Screen 2 — diagram.</b> A: top-down flow (our layered layout, no lanes needed in the spec). B: swimlanes by owner (the spec gains a <code>lane</code> per node; wider than the chat column, so it scrolls sideways). Hover or Tab onto a node: its links light up and the source clause shows. The dashed edge is a loop back.',
+  3:'<b>Screen 3 — comparison.</b> A: matrix, options as columns, with “Only terms that differ”. B: one card per option, with a ✓ / ✗ / ? tally. Hover any cell for its clause. The glyph shape carries the verdict, not the colour. The caption says the verdicts are the agent’s reading.',
+  4:'<b>Screen 4 — timeline.</b> A: vertical rail — long gaps are compressed and labelled, a <b>Today</b> line splits past from upcoming, and the deadline carries “in N days”. B: horizontal axis on true time — overview on top, click a point for its detail.',
+  5:'<b>Screen 5 — refusals.</b> Same 273 rules: the model gets a worded refusal first (amber rail step) and usually retries; only if it can’t does the dashed notice show. Never JSON, never a spec key.',
+};
+
+/* ═════════════ RENDER ═════════════ */
+function render(){
+  hideTip();
+  const sg=$('#g-screen');sg.innerHTML='<span class="lbl">Screen</span>'+[1,2,3,4,5].map(n=>`<button class="seg ${S.screen===n?'on':''}" data-s="${n}">${n} ${['The set','Diagram','Comparison','Timeline','Refusals'][n-1]}</button>`).join('');
+  const vg=$('#g-var');
+  vg.style.display=[2,3,4].includes(S.screen)?'flex':'none';
+  const VN={2:['★ Top-down flow','Swimlanes'],3:['★ Matrix','Option cards'],4:['★ Vertical rail','Horizontal axis']}[S.screen];
+  if(VN)vg.innerHTML='<span class="lbl">Variant</span>'+['a','b'].map((v,i)=>`<button class="seg ${S.v[S.screen]===v?'on':''}" data-v="${v}">${v.toUpperCase()}: ${VN[i]}</button>`).join('');
+  const xg=$('#g-extra');
+  xg.innerHTML=S.screen===5?'<span class="lbl">State</span>'+Object.entries(STATES).map(([k,l])=>`<button class="seg ${S.state===k?'on':''}" data-st="${k}">${l}</button>`).join(''):'';
+  $('#note').innerHTML=NOTES[S.screen];
+  const f=$('#frame');
+  f.innerHTML=[0,screen1,screen2,screen3,screen4,screen5][S.screen]();
+  const dh=f.querySelector('#dgh');
+  if(dh)drawDiagram(dh,DIAGRAM,S.screen===2&&S.v[2]==='b'?'lr':'td');
+  const th=f.querySelector('#tlh');if(th)tlB(th);
+  wireCmp(f);
+  f.querySelectorAll('.inbtn').forEach(b=>b.onclick=()=>{S.picks[b.dataset.k]=!S.picks[b.dataset.k];const y=scrollY;render();scrollTo(0,y)});
+  sg.querySelectorAll('[data-s]').forEach(b=>b.onclick=()=>{S.screen=+b.dataset.s;render()});
+  vg.querySelectorAll('[data-v]').forEach(b=>b.onclick=()=>{S.v[S.screen]=b.dataset.v;render()});
+  xg.querySelectorAll('[data-st]').forEach(b=>b.onclick=()=>{S.state=b.dataset.st;render()});
+}
+document.querySelectorAll('#sketch-tools [data-w]').forEach(b=>b.onclick=()=>{
+  document.querySelectorAll('#sketch-tools [data-w]').forEach(x=>x.classList.toggle('on',x===b));
+  $('#frame').style.maxWidth=b.dataset.w+'px';setTimeout(render,220)});
+addEventListener('resize',()=>{clearTimeout(window._rz);window._rz=setTimeout(render,150)});
+render();
+</script>
+</body>
+</html>
