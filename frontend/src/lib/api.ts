@@ -172,6 +172,8 @@ export {
   updateSettings,
   getJudgeModel,
   setJudgeModel,
+  getAuthoringModel,
+  setAuthoringModel,
   getModelDefault,
   setModelDefault,
   getReembedProgress,

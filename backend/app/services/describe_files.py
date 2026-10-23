@@ -995,7 +995,9 @@ async def propose_fields_via_model(text: str, candidates: list[dict], *, user_id
         from app.services.forced_emit import forced_emit  # noqa: PLC0415
         from app.services.workflow_authoring import resolve_authoring_model  # noqa: PLC0415
 
-        model = resolve_authoring_model(settings)
+        owner = load_user_settings(user_id)
+        # Migration 212: the Settings control wins when set, as in generate_workflow_definition.
+        model = getattr(owner, "harness_authoring_model", "") or resolve_authoring_model(settings)
         if not model:
             return []
         provider = (get_model_capability(model) or {}).get("provider")
@@ -1007,7 +1009,7 @@ async def propose_fields_via_model(text: str, candidates: list[dict], *, user_id
             provider=provider,
             emitter="emit_proposed_fields",
             tools=[PROPOSE_TOOL],
-            user_settings=load_user_settings(user_id),
+            user_settings=owner,
             schema_model=ProposedFields,
             strict=False,
         )

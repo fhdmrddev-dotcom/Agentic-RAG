@@ -18685,6 +18685,30 @@
             ],
             "title": "Resolved Harness Judge Model"
           },
+          "harness_authoring_model": {
+            "type": "string",
+            "title": "Harness Authoring Model",
+            "default": ""
+          },
+          "resolved_harness_authoring_model": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Resolved Harness Authoring Model"
+          },
+          "authoring_model_options": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Authoring Model Options",
+            "default": []
+          },
           "verified_models": {
             "items": {
               "type": "string"
@@ -24928,6 +24952,17 @@
               }
             ],
             "title": "Harness Judge Model"
+          },
+          "harness_authoring_model": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Harness Authoring Model"
           }
         },
         "type": "object",

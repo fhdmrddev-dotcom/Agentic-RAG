@@ -428,3 +428,24 @@ async def test_R1_WR02_client_supplied_template_placeholders_keep_the_listed_gro
     h = Harness(monkeypatch, [_definition(inputs=[])])
     await generate(template_placeholders=["project_name"])
     assert h.assemble_kwargs[0]["placeholders_in_form_block"] is False
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("emitted, expected_order", [
+    ([1], ["gather"]),                              # live at 291 UAT S1: one step numbered 1
+    ([1, 2, 3], ["gather", "write", "send"]),       # numbered from 1
+    ([5, 0, 9], ["write", "gather", "send"]),       # gaps; order follows the model's numbers
+    ([0, 0, 1], ["gather", "write", "send"]),       # a tie keeps the emitted order
+])
+async def test_an_accepted_draft_is_renumbered_0_to_n(monkeypatch, emitted, expected_order):
+    # A draft whose phase_index is not 0..N-1 was saved as-is and could never publish
+    # ("phase_index must be contiguous 0..0, got [1]"). The server now renumbers it.
+    d = _definition(inputs=[], slugs=("gather", "write", "send")[: len(emitted)])
+    for p, idx in zip(d["phases"], emitted):
+        p["phase_index"] = idx
+    Harness(monkeypatch, [d])
+    result = await generate()
+    assert result["ok"] is True
+    phases = sorted(result["definition"]["phases"], key=lambda p: p["phase_index"])
+    assert [p["phase_index"] for p in phases] == list(range(len(emitted)))
+    assert [p["slug"] for p in phases] == expected_order

@@ -204,7 +204,9 @@ def resolve_authoring_model(settings) -> str | None:
     ``emit_workflow_definition`` shot is guaranteed forceable.
 
     Resolution order:
-      1. ``settings.harness_authoring_model`` if set.
+      1. ``settings.harness_authoring_model`` if set — the Settings control (migration 212) when
+         ``settings`` is the owner's effective settings, the env value when it is the app config.
+      1b. else ``HARNESS_AUTHORING_MODEL`` (the env override, kept so existing deploys don't move).
       2. else the first registry default in ``("claude-opus-4-8", "gpt-5.5")`` whose
          ``get_model_capability(candidate).get("forced_emission")`` is truthy.
       3. else ``None`` (the caller emits an honest "no authoring model resolved" failure).
@@ -214,6 +216,10 @@ def resolve_authoring_model(settings) -> str | None:
         return model
 
     from app.config import get_model_capability  # function-local (Pitfall 4 discipline)
+    from app.config import settings as env_settings  # function-local (Pitfall 4 discipline)
+
+    if env_settings.harness_authoring_model:
+        return env_settings.harness_authoring_model
 
     for candidate in ("claude-opus-4-8", "gpt-5.5"):
         cap = get_model_capability(candidate) or {}
@@ -714,7 +720,23 @@ async def generate_workflow_definition(
     from app.services import describe_draft_guards as ddg  # function-local (Pitfall 4)
     from app.services.forced_emit import forced_emit  # function-local
 
-    authoring_model = resolve_authoring_model(settings)
+    # The gateway resolves the provider key + active provider from a per-USER settings
+    # object (``UserEffectiveSettings.active_provider``) — NOT the app-level ``Settings``.
+    # The judge (publish_service) loads owner settings the same way. Passing the app
+    # ``Settings`` straight through made the forced shot raise
+    # ``AttributeError('active_provider')`` inside the gateway → the backstop reported a
+    # generic ``provider_error`` and NL authoring silently failed (UAT-103 live fix).
+    from app.models.user_settings import load_user_settings  # function-local (Pitfall 4)
+
+    try:
+        owner_settings = load_user_settings(user_id)
+    except Exception:  # noqa: BLE001 — reported below, after the model check, as before
+        owner_settings = None
+
+    # Migration 212: the Settings control wins when set; unset keeps the passed settings' value
+    # (HARNESS_AUTHORING_MODEL) and then the registry defaults, exactly as before.
+    chosen = getattr(owner_settings, "harness_authoring_model", "") if owner_settings is not None else ""
+    authoring_model = chosen if isinstance(chosen, str) and chosen else resolve_authoring_model(settings)
     if authoring_model is None:
         return {
             "ok": False,
@@ -729,17 +751,7 @@ async def generate_workflow_definition(
             "detail": f"no provider for authoring model {authoring_model!r}",
         }
 
-    # The gateway resolves the provider key + active provider from a per-USER settings
-    # object (``UserEffectiveSettings.active_provider``) — NOT the app-level ``Settings``.
-    # The judge (publish_service) loads owner settings the same way. Passing the app
-    # ``Settings`` straight through made the forced shot raise
-    # ``AttributeError('active_provider')`` inside the gateway → the backstop reported a
-    # generic ``provider_error`` and NL authoring silently failed (UAT-103 live fix).
-    from app.models.user_settings import load_user_settings  # function-local (Pitfall 4)
-
-    try:
-        owner_settings = load_user_settings(user_id)
-    except Exception:  # noqa: BLE001 — no resolvable user settings → honest fail, never a crash
+    if owner_settings is None:  # no resolvable user settings → honest fail, never a crash
         return {
             "ok": False,
             "error": "could_not_generate",
@@ -958,13 +970,19 @@ async def generate_workflow_definition(
     #
     # This sits on the SINGLE success path, so a first-emit result and a retry-emit
     # result are stamped identically.
+    #
+    # 291 UAT S1 (2026-10-23): the same rebuild renumbers phase_index 0..N-1. A model that
+    # numbered from 1 (or left gaps) produced a draft that saved but could never publish
+    # ("phase_index must be contiguous 0..0, got [1]"). Order follows the model's own numbers,
+    # ties keep the emitted order, and slugs (what every cross-step reference uses) are untouched.
+    ordered = sorted(enumerate(wd.phases), key=lambda ip: (ip[1].phase_index, ip[0]))
     wd = wd.model_copy(
         update={
             "phases": [
                 p.model_copy(
-                    update={"name_seeded_by_ai": bool(p.name and p.name.strip())}
+                    update={"name_seeded_by_ai": bool(p.name and p.name.strip()), "phase_index": i}
                 )
-                for p in wd.phases
+                for i, (_pos, p) in enumerate(ordered)
             ]
         }
     )
