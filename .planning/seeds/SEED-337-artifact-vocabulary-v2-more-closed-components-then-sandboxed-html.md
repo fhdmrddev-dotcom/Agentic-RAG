@@ -3,9 +3,9 @@ seed_id: SEED-337
 title: Artifact vocabulary v2 — grow the closed registry past chart/table/metric (A), then decide deliberately on sandboxed agent-authored HTML/React like Claude.ai (B)
 created: 2026-10-03
 surface: Agentic-RAG
-status: planted
-partial: false
-status_note:
+status: folded
+partial: true
+status_note: "Direction A folded into Phase 292 (diagram, comparison, timeline; discuss 2026-10-24). Direction B (sandboxed HTML) still open, needs its own operator decision."
 trigger_when: "The next phase after 273 closes that touches the artifact registry (frontend/src/components/chat/artifacts/**, backend/app/models/artifact.py, backend/app/services/show_artifact_tool.py) — OR the next /gsd:new-milestone sweep. Direction A is the default next step; direction B needs its own operator decision before any planning."
 trigger_paths: ["frontend/src/components/chat/artifacts/**", "backend/app/models/artifact.py", "backend/app/services/show_artifact_tool.py", "supabase/migrations/*message_artifacts*"]
 trigger_surfaces: ["chat", "sandbox"]
@@ -15,7 +15,7 @@ relates_to:
   - SEED-194 — image generation; an image is one natural v2 entry
   - SEED-185 — no URL router; richer artifacts raise the "can I link to it?" ask
   - Phase 273 — show_artifact, migration 202 message_artifacts, OV-273-02/03 still owed
-folded_into: null
+folded_into: "292"
 renumbered_from: null
 renumbered_because: null
 ---
