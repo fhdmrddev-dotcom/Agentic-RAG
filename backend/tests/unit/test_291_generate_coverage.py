@@ -541,3 +541,28 @@ async def test_S3_friendly_inputs_that_fill_every_field_get_NO_server_added_dupl
     keys = [i["key"] for i in result["definition"]["inputs"]]
     assert keys == ["classification", "legal_name"]
     assert all(f["covered_by"] == "input" for f in result["fields"])
+
+
+# ── 291 UAT S3-F4 (2026-10-23) — a draft never carries an asset the MODEL wrote ──────────
+#
+# Live, gpt-5.5 emitted ``{"asset_id": "vendor-onboarding.md", "kind": "reference"}``: the
+# filename used as an id. The Builder then appended the real bound reference beside it, so the
+# saved draft listed the file twice, once under an id naming no stored file (S1's
+# ``template/placeholders?asset_id=fw9.pdf`` 404 is the template-shaped twin). Assets are bound
+# by the author-time door only.
+
+MODEL_ASSETS = [
+    {"asset_id": "vendor-onboarding.md", "filename": "vendor-onboarding.md", "kind": "reference", "mime": "text/markdown"},
+    {"asset_id": "fw9.pdf", "filename": "fw9.pdf", "kind": "template", "mime": "application/pdf"},
+]
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("with_form", [True, False])
+async def test_S3F4_model_emitted_assets_never_reach_the_draft(monkeypatch, with_form):
+    d = _definition(inputs=ALL_COVERED)
+    d["assets"] = copy.deepcopy(MODEL_ASSETS)
+    Harness(monkeypatch, [d])
+    result = await generate(form=make_form()) if with_form else await generate()
+    assert result["ok"] is True
+    assert not result["definition"].get("assets")

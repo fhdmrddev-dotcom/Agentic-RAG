@@ -949,6 +949,11 @@ async def generate_workflow_definition(
     #
     # 291-02 D-12 — fields still uncovered become ask-the-person inputs; then origin/note are
     # stamped server-side on EVERY generation (never read off the payload, T-291-13).
+    # 291 UAT S3-F4 — assets are bound by the author-time door, never written by the model. A
+    # model-emitted ref names a file by its filename (``asset_id: "fw9.pdf"``), so it points at
+    # no stored file and sat beside the real bound one. Dropped here, on every generation.
+    if wd.assets is not None:
+        wd = wd.model_copy(update={"assets": None})
     wd, added_keys = ddg.server_add_missing(wd, fields)
     wd = ddg.stamp_input_origins(wd, fields, added_keys)
     wd = _declare_asked_arguments(wd)
