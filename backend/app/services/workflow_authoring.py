@@ -263,6 +263,7 @@ async def _assemble_grounding(
     template_asset_id: str | None = None,
     template_placeholders: list[str] | None = None,
     degraded_out: set[str] | None = None,  # 291-02 D-20: filled with bundle.degraded; arity stays 3
+    placeholders_in_form_block: bool = False,  # 291 R1-WR-02: names grounded by reference
 ) -> tuple[str, set[str], set[str]]:
     """Assemble the server-side grounding bundle and return ``(grounded_prompt,
     tool_names, skill_ids)``. All accessors are OWNER-scoped reads; the valid folder /
@@ -289,7 +290,9 @@ async def _assemble_grounding(
         template_asset_id=template_asset_id,
         template_placeholders=template_placeholders,
     )
-    grounded = render_grounding_prompt(bundle, project_folder_id)
+    grounded = render_grounding_prompt(
+        bundle, project_folder_id, placeholders_in_form_block=placeholders_in_form_block
+    )
     if degraded_out is not None:
         degraded_out.update(bundle.degraded)
     return grounded, bundle.tool_names, bundle.skill_ids
@@ -747,8 +750,12 @@ async def generate_workflow_definition(
     fields = list((form or {}).get("fields") or [])
     # A fillable arm's keys ARE the template's own fields (an exact read or a server-placed Word
     # copy), so they ground the deliverable exactly as a template's placeholders do.
+    # 291 R1-WR-02: those keys are file-derived, and they already sit escaped in the form's
+    # <form_fields> block, so the grounding refers to that block instead of relisting them.
+    placeholders_in_form_block = False
     if form is not None and form.get("arm") in ddg.FILLABLE_ARMS and fields and template_placeholders is None:
         template_placeholders = [str(f["key"]) for f in fields]
+        placeholders_in_form_block = True
 
     project_id_str = str(project_folder_id) if project_folder_id is not None else None
     degraded: set[str] = set()
@@ -760,6 +767,7 @@ async def generate_workflow_definition(
         template_asset_id=str(template_asset_id) if template_asset_id is not None else None,
         template_placeholders=template_placeholders,
         degraded_out=degraded,
+        placeholders_in_form_block=placeholders_in_form_block,
     )
     # D-20 / SEED-133 — a registry we could not read is refused in the gate's own words, never a
     # silent blind draft, and BEFORE any paid call.

@@ -412,3 +412,19 @@ async def test_a_model_claimed_server_added_origin_is_overwritten(monkeypatch):
     by = {i["key"]: i for i in result["definition"]["inputs"]}
     assert "origin" not in by["vendor_name"]
     assert by["start_date"]["origin"] == "ai_proposed"
+
+
+@pytest.mark.asyncio
+async def test_R1_WR02_form_derived_placeholders_are_grounded_by_reference(monkeypatch):
+    # The fillable form's keys already sit inside the escaped <form_fields> block, so the
+    # grounding section is told to refer to it instead of listing them again, raw.
+    h = Harness(monkeypatch, [_definition(inputs=ALL_COVERED)])
+    await generate(form=make_form())
+    assert h.assemble_kwargs[0]["placeholders_in_form_block"] is True
+
+
+@pytest.mark.asyncio
+async def test_R1_WR02_client_supplied_template_placeholders_keep_the_listed_grounding(monkeypatch):
+    h = Harness(monkeypatch, [_definition(inputs=[])])
+    await generate(template_placeholders=["project_name"])
+    assert h.assemble_kwargs[0]["placeholders_in_form_block"] is False

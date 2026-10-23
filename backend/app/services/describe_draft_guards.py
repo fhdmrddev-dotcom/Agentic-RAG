@@ -78,7 +78,8 @@ def _form_fields_lines(fields: list[dict]) -> str:
         shown = ", ".join(str(o).translate(_LABEL_ESCAPE) for o in opts[:PROMPT_ENUM_SHOWN])
         more = f"; and {len(opts) - PROMPT_ENUM_SHOWN} more" if len(opts) > PROMPT_ENUM_SHOWN else ""
         tail = f" (one of: {shown}{more})" if opts else ""
-        lines.append(f"- {_escape_fence(str(f.get('key') or ''))}: {_escape_fence(label)} [{ftype}]{tail}")
+        key = _escape_fence(str(f.get("key") or "")).translate(_LABEL_ESCAPE)  # R1-WR-02
+        lines.append(f"- {key}: {_escape_fence(label)} [{ftype}]{tail}")
     return "\n".join(lines)
 
 

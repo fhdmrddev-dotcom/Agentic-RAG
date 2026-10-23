@@ -919,12 +919,13 @@ PROPOSE_TOOL: dict = {
     },
 }
 
-_FENCE_RE = re.compile(r"</?\s*document_content\s*>", re.IGNORECASE)
-
 
 def _fence(text: str) -> str:
-    """Escape anything in the file that could close the fence (RESEARCH Pitfall 6)."""
-    return _FENCE_RE.sub(lambda m: m.group(0).replace("<", "&lt;").replace(">", "&gt;"), text)
+    """Escape anything in the file that could close the fence (RESEARCH Pitfall 6).
+
+    291 R1-WR-03: EVERY ``<`` / ``>`` is escaped, as ``_fence_value`` does. A tag-shaped
+    match missed ``< /document_content>`` and ``</document_content foo>``."""
+    return text.replace("<", "&lt;").replace(">", "&gt;")
 
 
 def _fence_value(value: Any) -> str:
