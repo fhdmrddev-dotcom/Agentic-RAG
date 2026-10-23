@@ -10,6 +10,11 @@ input whose ``source == "user"`` and whose key the template names, the launch va
 written into the legacy field map with a SERVER-MINTED ``input:<key>`` citation, and the
 minted ids are returned so the caller can admit them to BOTH citation gates.
 
+291 UAT S6: an input may name the ONE field it fills (``fills``) instead of using the field's
+own key. Its answer is written into that field and cited ``input:<input key>``. An input that
+names several fields is not overlaid: one answer cannot be spread over several fields without
+guessing, so the draft step keeps ``fills`` to one field.
+
 Trust boundary (T-291-20): an ``input:<key>`` id is minted ONLY here, ONLY for a declared
 ``user`` input that is a template placeholder. ``kb_auto`` and ``template_derived`` inputs are
 ignored, so a KB-filled key still needs a real retrieved citation. A minted id counts only on
@@ -53,16 +58,23 @@ def overlay_user_inputs(
     if not specs or not isinstance(run_inputs, dict) or not isinstance(legacy_map, dict):
         return legacy_map, set()
     wanted = set(placeholder_keys or [])
-    overlay: dict[str, str] = {}
+    overlay: dict[str, tuple[str, str]] = {}  # field key -> (answer, input key)
     for spec in specs:
         key = _get(spec, "key")
-        if not isinstance(key, str) or key not in wanted:
+        if not isinstance(key, str):
             continue
+        if key in wanted:
+            field = key
+        else:
+            named = [f for f in dict.fromkeys(_get(spec, "fills") or []) if f in wanted]
+            if len(named) != 1:
+                continue
+            field = named[0]
         if (_get(spec, "source", "user") or "user") != "user":
             continue
         answer = _answer(run_inputs.get(key))
         if answer is not None:
-            overlay[key] = answer
+            overlay[field] = (answer, key)
     if not overlay:
         return legacy_map, set()
 
@@ -80,9 +92,9 @@ def overlay_user_inputs(
         ):
             cited["source_chunk_id"] = None
     ids: set[str] = set()
-    for key, answer in overlay.items():
-        cid = f"{_INPUT_CITATION_PREFIX}{key}"
-        scalars[key] = {"value": answer, "source_chunk_id": cid, "source_doc": None, "source_page": None}
+    for field, (answer, input_key) in overlay.items():
+        cid = f"{_INPUT_CITATION_PREFIX}{input_key}"
+        scalars[field] = {"value": answer, "source_chunk_id": cid, "source_doc": None, "source_page": None}
         ids.add(cid)
     new_map["scalars"] = scalars
     if "collections" in legacy_map:

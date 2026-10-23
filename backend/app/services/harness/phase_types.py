@@ -1927,6 +1927,11 @@ async def _exec_llm_emit(phase, accumulated_outputs: dict, ctx) -> dict:
                 f"Produced the filled deliverable: {path}" if path
                 else "Produced the filled deliverable."
             )
+            # 291 UAT S6b: a fill limit the engine stated (an answer that was not one of the
+            # form's choices, left blank) is said where the person reads the step, not dropped.
+            _limit = (render_out.get("verdict") or {}).get("documented_limit")
+            if _limit:
+                base_text = f"{base_text}\n\n{_limit}"
             # D-01: a non-strict policy delivery carries its summary VISIBLY in the chat
             # message (the user always SEES the deliverable is marked/blanked/DRAFT —
             # never a silent pass-off, T-102-04-03).

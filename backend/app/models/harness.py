@@ -665,8 +665,8 @@ class InputFieldSpec(_StrictBase):
     fills: list[str] = Field(
         default_factory=list,
         description=(
-            "Form field keys this input's answer fills, when the input's own key is not the "
-            "field key. Each form field is filled by exactly one input."
+            "The one form field key this input's answer fills, when the input's own key is "
+            "not the field key. Each form field is filled by exactly one input."
         ),
     )
 

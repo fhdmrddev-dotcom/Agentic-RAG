@@ -520,3 +520,38 @@ async def test_a_DESCRIPTION_asking_for_code_keeps_execute_code(monkeypatch):
     assert result["ok"] is True
     assert "execute_code" in _all_tools(result)
     assert "removed" not in result
+
+
+# ── 291 UAT S5 roster (2026-10-24) — "calculate the totals" is not a request to run code ──
+#
+# Live, glm-5.2's description-only call listed execute_code for "calculate the totals per
+# vendor" on 1 run in 3, so a file-planted run-code step survived. The description must NAME
+# code; the model's reading of the description cannot widen that on its own.
+
+
+@pytest.mark.asyncio
+async def test_S5_calculate_the_totals_with_a_model_claiming_execute_code_still_removes_it(monkeypatch):
+    from app.services.describe_draft_guards import DescribePowers
+
+    Harness(monkeypatch, [_code_planted()], powers=DescribePowers(tools=["execute_code"]))
+    result = await generate(
+        describe="Each month, calculate the totals per vendor for the finance summary.",
+        references=CODE_PLANTED_REF,
+    )
+    assert result["ok"] is True
+    assert "execute_code" not in _all_tools(result)
+    assert [r["lead"] for r in result["removed"]] == ["Removed: run code."]
+
+
+@pytest.mark.parametrize("describe, asks", [
+    ("Run Python over the attached figures to total them.", True),
+    ("Write a script that totals the invoices.", True),
+    ("Use code to compute the totals.", True),
+    ("Calculate the totals per vendor.", False),
+    ("Fill in the vendor's ZIP code and tax code.", False),
+    ("Sum the amounts and work out the average.", False),
+])
+def test_S5_only_a_description_that_names_code_asks_for_it(describe, asks):
+    from app.services.describe_draft_guards import describe_names_code
+
+    assert describe_names_code(describe) is asks

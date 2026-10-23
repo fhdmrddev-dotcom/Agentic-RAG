@@ -924,6 +924,7 @@ async def generate_workflow_definition(
         except Exception:  # noqa: BLE001 — fail CLOSED: the allow-set is the ticks alone (D-31)
             logger.warning("291 D-31: description-only power call failed; ticks only", exc_info=True)
             powers = ddg.DescribePowers()
+        powers = ddg.narrow_to_description(powers, describe)  # 291 UAT S5: code must be named
         guarded = ddg.remove_unasked_powers(
             wd, powers, allowed_connection_ids, names_vocabulary, ddg.file_names(form, references)
         )

@@ -356,3 +356,90 @@ async def test_user_sourced_key_is_filled_and_never_rejected(_emit_bag):
     assert "input:name" in out["retrieved_ids"]
     # The PDF oracle told the forced shot the form's exact fields.
     assert "TEMPLATE PLACEHOLDERS" in bag["forced_calls"][0]["messages"][0]["content"]
+
+
+# ── 291 UAT S6 (2026-10-24) — an input that names its field with ``fills`` ────────────────
+#
+# Live, the re-driven W-9 draft kept model-named keys (``vendor_legal_name``) with
+# ``fills: [<raw field key>]``. The overlay matched only an EXACT key, so a real run with every
+# answer typed came back with all 23 fields blank. One input fills one field; an input naming
+# several fields cannot be mapped without guessing (one "tax classification" answer, seven
+# checkboxes) and is left to the model.
+
+
+def _fills_spec(key, fills, source="user"):
+    from app.models.harness import InputFieldSpec
+
+    return InputFieldSpec(key=key, label=key.title(), type="text", source=source, fills=fills)
+
+
+def test_an_input_that_fills_one_field_writes_its_answer_into_that_field():
+    from app.services.harness.form_inputs import overlay_user_inputs
+
+    d = _definition([_fills_spec("legal_name", ["name"])])
+    out, ids = overlay_user_inputs(_map(), d, {"legal_name": "Example Widgets LLC"}, ["name", "company"])
+    assert out["scalars"]["name"] == _leaf("Example Widgets LLC", "input:legal_name")
+    assert ids == {"input:legal_name"}
+    assert "legal_name" not in out["scalars"]
+
+
+def test_an_input_that_fills_SEVERAL_fields_is_not_guessed():
+    from app.services.harness.form_inputs import overlay_user_inputs
+
+    d = _definition([_fills_spec("classification", ["name", "company"])])
+    out, ids = overlay_user_inputs(_map(), d, {"classification": "S corporation"}, ["name", "company"])
+    assert ids == set()
+    assert out["scalars"]["name"] == _leaf(None, None)
+
+
+def test_a_kb_input_with_fills_still_mints_nothing():
+    from app.services.harness.form_inputs import overlay_user_inputs
+
+    d = _definition([_fills_spec("legal_name", ["name"], source="kb_auto")])
+    _out, ids = overlay_user_inputs(_map(), d, {"legal_name": "X"}, ["name"])
+    assert ids == set()
+
+
+# ── 291 UAT S6b (2026-10-24) — a refused choice is said, in the run's own words ───────────
+#
+# Live, "Spain" in a US/DE/FR/GB dropdown was left blank by the fill engine and its sentence
+# ("1 answer wasn't one of the form's choices and was left blank: …") was in the render
+# verdict, but the step's text said only "Produced the filled deliverable". The person saw a
+# blank field and no reason.
+
+
+@pytest.mark.asyncio
+async def test_S6b_a_refused_choice_reaches_the_step_text(_emit_bag, monkeypatch):
+    from app.models.harness import AssetRef
+    from app.services.harness import emitters
+    from app.services.harness.phase_types import _exec_llm_emit
+    from app.services.template_render_service import EmitFieldMap
+
+    limit = "1 answer wasn't one of the form's choices and was left blank: Country: Spain is not one of US, DE."
+
+    async def _render(validated_map, resolved_template, ctx):
+        return {"status": "ok", "path": "/vendor.pdf",
+                "output_file": {"path": "/vendor.pdf", "sha256": "abc", "bytes": 10},
+                "verdict": {"opened": True, "residual_clean": True, "documented_limit": limit}}
+
+    entry = emitters.EMITTER_REGISTRY["render_template"]
+    monkeypatch.setitem(
+        emitters.EMITTER_REGISTRY, "render_template",
+        emitters.EmitterEntry(schema_builder=entry.schema_builder, post_processor=_render),
+    )
+    from app.services.describe_files import acroform_oracle
+
+    keys = acroform_oracle(_acro_pdf())["scalars"]
+    _emit_bag["forced_result"] = {
+        "emitted": EmitFieldMap.model_validate({"scalars": [
+            {"key": k, "value": None, "source_chunk_id": None, "source_doc": None, "source_page": None}
+            for k in keys
+        ], "rows": []}),
+        "tier": "TIER-FORCE", "provider": "openai", "forced": True,
+        "recovered_from_narration": False, "truncated": False, "failure": None,
+    }
+    asset = AssetRef(asset_id="u/_library/d/vendor.pdf", filename="vendor.pdf", kind="template", mime="application/pdf")
+    specs = [_spec(k) for k in keys]
+    out = await _exec_llm_emit(_phase(), {}, _ctx(_definition(specs, assets=[asset]), {k: "x" for k in keys}))
+    assert out["text"].startswith("Produced the filled deliverable: /vendor.pdf")
+    assert limit in out["text"]

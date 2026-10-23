@@ -142,12 +142,21 @@ def _input_keys(wd) -> list[str]:
     return [str(getattr(i, "key", "") or "") for i in (wd.inputs or [])]
 
 
+def _fills_one(spec, field_keys: set[str]) -> list[str]:
+    """The real field an input's ``fills`` names, as a one-item list, or ``[]``. An input that
+    names several fields fills none: the run-time overlay (``harness.form_inputs``) writes one
+    answer into one field, and spreading it over several would be a guess (291 UAT S6)."""
+    named = [str(k) for k in dict.fromkeys(getattr(spec, "fills", None) or []) if str(k) in field_keys]
+    return named if len(named) == 1 else []
+
+
 def _fields_of(spec, field_keys: set[str]) -> set[str]:
-    """The form fields one input answers: its own key when that is a field, plus every real
-    field its ``fills`` names (291 UAT S3-F1). A key named twice counts once."""
+    """The form fields one input answers: its own key when that is a field, or else the one
+    field its ``fills`` names (291 UAT S3-F1 / S6)."""
     key = str(getattr(spec, "key", "") or "")
-    named = {key} | {str(k) for k in (getattr(spec, "fills", None) or [])}
-    return named & field_keys
+    if key in field_keys:
+        return {key}
+    return set(_fills_one(spec, field_keys))
 
 
 def _fillers(wd, fields: list[dict]) -> dict[str, list[str]]:
@@ -205,7 +214,8 @@ def coverage_score(wd, fields: list[dict]) -> tuple[int, int]:
 
 _COVERAGE_TAIL = (
     "Each form field is filled by exactly one input: either the input's key is the field key, "
-    "or the input lists the field key in its fills. Inputs that fill no form field must carry "
+    "or the input names that one field key in its fills (one field per input). Inputs that fill "
+    "no form field must carry "
     "a note saying why. Re-emit the COMPLETE WorkflowDefinition."
 )
 
@@ -276,8 +286,8 @@ def stamp_input_origins(wd, fields: list[dict], added_keys: list[str]):
 
     Whatever the model emitted for ``origin`` is overwritten: ``server_added`` for keys the
     server added, ``ai_proposed`` for keys whose form field was AI-proposed, ``None`` otherwise.
-    ``note`` survives only on inputs that are not form fields. ``fills`` keeps only real field
-    keys, once each, in the model's order (291 UAT S3-F1). With no fields, all three are cleared
+    ``note`` survives only on inputs that are not form fields. ``fills`` is kept only when it
+    names exactly one real field (291 UAT S3-F1 / S6). With no fields, all three are cleared
     on every input.
     """
     if wd.inputs is None:
@@ -301,7 +311,7 @@ def stamp_input_origins(wd, fields: list[dict], added_keys: list[str]):
         else:
             origin = None
         note = spec.note if (key not in origin_of and fields) else None
-        fills = list(dict.fromkeys(str(k) for k in spec.fills or [] if str(k) in origin_of))
+        fills = _fills_one(spec, set(origin_of))
         update = {"origin": origin, "note": note, "fills": fills}
         if key in options_of and spec.type == "enum":
             update["enum_options"] = options_of[key]
@@ -367,7 +377,8 @@ DESCRIBE_POWERS_TOOL: dict = {
 DESCRIBE_POWERS_INSTRUCTION = (
     "Read ONLY the author's description below. List what it explicitly asks the workflow to do "
     "outside the app: external_capabilities (send_email, create_ticket, post_message), tools "
-    "(web_search, execute_code (running code), save_skill, attach_skill_file, "
+    "(web_search, execute_code (running code; arithmetic such as totals or averages is not "
+    "running code), save_skill, attach_skill_file, "
     "remember), and services: the names of the "
     "author's connected services, from the list below, that the description names. List "
     "nothing the description does not ask for."
@@ -387,6 +398,30 @@ def describe_powers_messages(describe: str, connection_names: list[str]) -> list
             ),
         }
     ]
+
+
+# 291 UAT S5 roster: "calculate the totals" is arithmetic, not a request to run code, but one
+# model read it as one on 1 run in 3 and a file-planted run-code step survived. Run code is
+# admitted only when the description NAMES it; "ZIP code" and "tax code" do not.
+_NAMES_CODE_RE = re.compile(
+    r"\b(python|scripts?|scripting|programs?|programming|sandbox"
+    r"|(run|running|execute|executing|write|writing|use|using|with|in)\s+(the\s+|some\s+)?code"
+    r"|code\s+to)\b",
+    re.IGNORECASE,
+)
+
+
+def describe_names_code(describe: str) -> bool:
+    """True when the author's own description asks for code to be run or written."""
+    return bool(_NAMES_CODE_RE.search(describe or ""))
+
+
+def narrow_to_description(powers: DescribePowers, describe: str) -> DescribePowers:
+    """Drop ``execute_code`` from what the description-only call said, unless the description
+    names code itself. The model's reading can narrow the allow-set, never widen it here."""
+    if "execute_code" in powers.tools and not describe_names_code(describe):
+        return powers.model_copy(update={"tools": [t for t in powers.tools if t != "execute_code"]})
+    return powers
 
 
 def powers_from_emit(result: Any) -> DescribePowers:

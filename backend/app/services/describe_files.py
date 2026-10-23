@@ -66,6 +66,10 @@ MAX_REFERENCE_FILES = 6
 #: The longest label taken off the page next to a widget.
 LABEL_MAX_CHARS = 120
 
+#: The widest gap (PDF points) between a checkbox and its words, and between two words of the
+#: same right-hand label. Wider means the text belongs to something else (291 UAT S6).
+RIGHT_LABEL_GAP = 12.0
+
 #: The most document text handed to the read-time proposal.
 PROPOSAL_TEXT_MAX_CHARS = 30_000
 
@@ -431,10 +435,35 @@ def _page_labels(raw: bytes, fields: list[AcroField]) -> dict[str, str]:
                 top, bottom = height - y1, height - y0
                 fh = max(bottom - top, 1.0)
 
-                same = [
-                    w for w in words
-                    if w[2] <= x0 + 1 and top - 2 <= (w[1] + w[3]) / 2 <= bottom + 2
-                ]
+                band = lambda w: top - 2 <= (w[1] + w[3]) / 2 <= bottom + 2  # noqa: E731
+
+                # 291 UAT S6: a checkbox or radio button is labelled by the words to its RIGHT
+                # (the IRS W-9's classification row), so read those first, stopping where the
+                # next field on the row begins. Left-first gave each box the previous box's words.
+                if f.field_type in ("checkbox", "radio"):
+                    stop = min(
+                        (
+                            g.rect[0] for g in fields
+                            if g is not f and g.page_index == f.page_index and g.rect
+                            and g.rect[0] >= x1 and g.rect[1] <= y1 and g.rect[3] >= y0
+                        ),
+                        default=float("inf"),
+                    )
+                    right = sorted(
+                        (w for w in words if x1 - 1 <= w[0] < stop and band(w)), key=lambda w: w[0]
+                    )
+                    if right and right[0][0] - x1 <= RIGHT_LABEL_GAP:
+                        run = [right[0]]
+                        for w in right[1:]:
+                            if w[0] - run[-1][2] > RIGHT_LABEL_GAP:
+                                break
+                            run.append(w)
+                        label = _clean_label([w[4] for w in run])
+                        if label:
+                            out[f.name] = label
+                            continue
+
+                same = [w for w in words if w[2] <= x0 + 1 and band(w)]
                 if same:
                     near = max(same, key=lambda w: w[2])
                     line = sorted(

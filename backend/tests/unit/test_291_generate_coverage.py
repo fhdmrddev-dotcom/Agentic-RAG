@@ -479,12 +479,27 @@ def test_an_input_that_fills_a_field_covers_it_and_is_explained():
     from app.services.describe_draft_guards import covered_by, missing_fields, unexplained_inputs
 
     wd = _wd(_definition(inputs=[
-        _inp("classification", type="enum", enum_options=["Individual", "C corp"], fills=["c1[0]", "c1[1]"]),
+        _inp("first_box", type="enum", enum_options=["Off", "1"], fills=["c1[0]"]),
+        _inp("second_box", type="enum", enum_options=["Off", "2"], fills=["c1[1]"]),
         _inp("legal_name", fills=["f1_01"]),
     ]))
     assert covered_by(wd, FILLS_FIELDS) == {"c1[0]": "input", "c1[1]": "input", "f1_01": "input"}
     assert missing_fields(wd, FILLS_FIELDS) == []
     assert unexplained_inputs(wd, FILLS_FIELDS) == []
+
+
+def test_S6_an_input_that_fills_SEVERAL_fields_covers_none_and_its_fills_are_dropped():
+    # The run-time overlay can write one answer into one field only; one "classification"
+    # answer cannot be spread over seven checkboxes without guessing (291 UAT S6).
+    from app.services.describe_draft_guards import missing_fields, stamp_input_origins
+
+    wd = _wd(_definition(inputs=[
+        _inp("classification", type="enum", enum_options=["Individual", "C corp"], fills=["c1[0]", "c1[1]"]),
+        _inp("legal_name", fills=["f1_01"]),
+    ]))
+    assert missing_fields(wd, FILLS_FIELDS) == ["c1[0]", "c1[1]"]
+    stamped = {i.key: i.fills for i in stamp_input_origins(wd, FILLS_FIELDS, []).inputs}
+    assert stamped == {"classification": [], "legal_name": ["f1_01"]}
 
 
 def test_a_field_filled_by_TWO_inputs_is_missing_and_the_server_adds_no_third_ask():
@@ -531,7 +546,8 @@ def test_the_coverage_retry_tells_the_model_about_fills():
 @pytest.mark.asyncio
 async def test_S3_friendly_inputs_that_fill_every_field_get_NO_server_added_duplicates(monkeypatch):
     friendly = _definition(inputs=[
-        _inp("classification", type="enum", enum_options=["Individual", "C corp"], fills=["c1[0]", "c1[1]"]),
+        _inp("first_box", type="enum", enum_options=["Off", "1"], fills=["c1[0]"]),
+        _inp("second_box", type="enum", enum_options=["Off", "2"], fills=["c1[1]"]),
         _inp("legal_name", fills=["f1_01"]),
     ])
     h = Harness(monkeypatch, [friendly])
@@ -539,7 +555,7 @@ async def test_S3_friendly_inputs_that_fill_every_field_get_NO_server_added_dupl
     assert result["ok"] is True
     assert len(h.draft_calls) == 1  # fully covered: no coverage retry
     keys = [i["key"] for i in result["definition"]["inputs"]]
-    assert keys == ["classification", "legal_name"]
+    assert keys == ["first_box", "second_box", "legal_name"]
     assert all(f["covered_by"] == "input" for f in result["fields"])
 
 

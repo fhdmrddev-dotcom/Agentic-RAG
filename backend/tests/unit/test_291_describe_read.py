@@ -418,3 +418,38 @@ def test_unopenable_file_raises_never_arm_none():
         _read(b"%PDF-1.4 truncated", ".pdf", "broken.pdf")
     with pytest.raises(df.DescribeFileUnreadable):
         _read(b"PK\x03\x04 not really", ".docx", "broken.docx")
+
+
+# ── 291 UAT S6 (2026-10-24) — a checkbox's label is the text to its RIGHT ─────────────────
+#
+# On the IRS W-9 every classification box sits LEFT of its words, so the left-first rule
+# labelled each box with the previous box's words ("Individual/sole proprietor" on the C-corp
+# box). The drafter wired its inputs by those labels and a real run checked the wrong box.
+
+
+def _checkbox_row_pdf() -> bytes:
+    from reportlab.lib.pagesizes import letter
+    from reportlab.pdfgen import canvas
+
+    buf = io.BytesIO()
+    c = canvas.Canvas(buf, pagesize=letter)
+    c.drawString(20, 604, "3a")
+    for i, (x, words) in enumerate([(70, "Individual"), (180, "C corporation"), (300, "S corporation")]):
+        c.acroForm.checkbox(name=f"c1_1[{i}]", x=x, y=600, size=10)
+        c.drawString(x + 14, 602, words)
+    c.acroForm.checkbox(name="llc", x=70, y=570, size=10)
+    c.drawString(84, 572, "LLC. Enter the tax classification")
+    c.showPage()
+    c.save()
+    return buf.getvalue()
+
+
+def test_S6_a_checkbox_takes_the_words_to_its_right_up_to_the_next_box():
+    res = _read(_checkbox_row_pdf(), ".pdf", "w9-like.pdf", propose=_FakeProposer([]))
+    by = {f["key"]: f["label"] for f in res.fields}
+    assert by == {
+        "c1_1[0]": "Individual",
+        "c1_1[1]": "C corporation",
+        "c1_1[2]": "S corporation",
+        "llc": "LLC. Enter the tax classification",
+    }
