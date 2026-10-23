@@ -15561,7 +15561,7 @@
               "maxLength": 200
             },
             "type": "array",
-            "maxItems": 50,
+            "maxItems": 500,
             "title": "Enum Options"
           },
           "origin": {
@@ -15608,7 +15608,7 @@
               "$ref": "#/components/schemas/DescribeFormFieldIn"
             },
             "type": "array",
-            "maxItems": 200,
+            "maxItems": 1000,
             "title": "Fields"
           },
           "text": {

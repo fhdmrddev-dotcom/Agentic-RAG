@@ -63,13 +63,21 @@ def _recap(text: str, cap: int) -> tuple[str, str | None]:
     return text[:cap], cut_short_sentence("chars", cap, len(text))
 
 
+# 291-06 (CR-02): the PROMPT shows at most this many options per field, then says how many
+# more. This bounds the prompt ONLY: add_server_inputs and fields_report read the full list,
+# so the launch form keeps every real choice, and the AcroForm fill uses the PDF's own options.
+PROMPT_ENUM_SHOWN = 25
+
+
 def _form_fields_lines(fields: list[dict]) -> str:
     lines = []
     for f in fields or []:
         label = str(f.get("label") or "").translate(_LABEL_ESCAPE)
         ftype = str(f.get("type") or "text")
-        opts = f.get("enum_options") or []
-        tail = f" (one of: {', '.join(str(o).translate(_LABEL_ESCAPE) for o in opts)})" if opts else ""
+        opts = list(f.get("enum_options") or [])
+        shown = ", ".join(str(o).translate(_LABEL_ESCAPE) for o in opts[:PROMPT_ENUM_SHOWN])
+        more = f"; and {len(opts) - PROMPT_ENUM_SHOWN} more" if len(opts) > PROMPT_ENUM_SHOWN else ""
+        tail = f" (one of: {shown}{more})" if opts else ""
         lines.append(f"- {_escape_fence(str(f.get('key') or ''))}: {_escape_fence(label)} [{ftype}]{tail}")
     return "\n".join(lines)
 

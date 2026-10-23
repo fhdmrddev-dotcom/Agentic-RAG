@@ -51,7 +51,14 @@ from uuid import UUID, uuid4
 
 import anyio.from_thread
 from fastapi import Depends, File, Form, HTTPException, Query, UploadFile, status
-from pydantic import BaseModel, Field, StringConstraints, ValidationError, field_validator
+from pydantic import (
+    BaseModel,
+    Field,
+    StringConstraints,
+    ValidationError,
+    field_validator,
+    model_validator,
+)
 from starlette.concurrency import run_in_threadpool
 from supabase import Client
 
@@ -97,7 +104,16 @@ logger = logging.getLogger("app.api.workflows")
 # data (``describe_draft_guards``); nothing here can grant a tool, a connection or an action.
 # ``_GENERATE_TEXT_MAX`` bounds the body (T-291-14); the per-model re-cap is far below it.
 _GENERATE_TEXT_MAX = 250_000
-_FIELD_KEY_FORBIDDEN = re.compile(r"[\x00-\x1f\x7f{}%<>]")
+# 291-06 (CR-02): the key rule is split. ``{ } < >`` and control characters are refused on
+# EVERY arm. ``%`` is refused unless the arm is ``form_fields``: a fillable PDF's field name is
+# a pypdf dictionary key at fill time (render_template.fill_acroform) and never a Jinja token,
+# so "Rate %" is a real PDF name; on a Word arm the key IS template syntax.
+_FIELD_KEY_FORBIDDEN = re.compile(r"[\x00-\x1f\x7f{}<>]")
+_FIELD_KEY_JINJA = re.compile(r"%")
+# 291-06 (CR-02): the raised caps (1000 fields x 500 options x 200 chars) would otherwise
+# allow a ~100 MB body; this aggregate bounds it (T-291-14). The prompt shows a bounded option
+# list per field (describe_draft_guards.PROMPT_ENUM_SHOWN); the inputs keep every option.
+_FORM_OPTIONS_TOTAL_MAX = 20_000
 
 
 class DescribeFormFieldIn(BaseModel):
@@ -107,7 +123,7 @@ class DescribeFormFieldIn(BaseModel):
     label: str = Field("", max_length=200)
     type: Literal["text", "number", "date", "enum"]
     enum_options: list[Annotated[str, StringConstraints(max_length=200)]] = Field(
-        default_factory=list, max_length=50
+        default_factory=list, max_length=500
     )
     origin: Literal["exact", "ai_proposed"]
 
@@ -115,10 +131,12 @@ class DescribeFormFieldIn(BaseModel):
     @classmethod
     def _key_is_not_template_syntax(cls, value: str) -> str:
         if _FIELD_KEY_FORBIDDEN.search(value):
-            raise ValueError("a field name may not contain control characters or { } % < >")
+            raise ValueError("a field name may not contain control characters or { } < >")
         return value
 
 
+# ⚠ No docstring on this class or the one above: it would become an OpenAPI description and
+# move three pinned fixtures (test_286_workflows_seam_pins, the public OpenAPI snapshots).
 class DescribeFormIn(BaseModel):
     model_config = {"extra": "forbid"}
 
@@ -133,8 +151,18 @@ class DescribeFormIn(BaseModel):
         "scan_unreadable",
         "copy_refused",
     ]
-    fields: list[DescribeFormFieldIn] = Field(default_factory=list, max_length=200)
+    fields: list[DescribeFormFieldIn] = Field(default_factory=list, max_length=1000)
     text: str = Field("", max_length=_GENERATE_TEXT_MAX)
+
+    @model_validator(mode="after")
+    def _arm_aware_keys_and_bounded_options(self) -> "DescribeFormIn":
+        if self.arm != "form_fields" and any(_FIELD_KEY_JINJA.search(f.key) for f in self.fields):
+            raise ValueError("a field name may not contain % unless the form is a fillable PDF")
+        if sum(len(f.enum_options) for f in self.fields) > _FORM_OPTIONS_TOTAL_MAX:
+            raise ValueError(
+                f"a form may carry at most {_FORM_OPTIONS_TOTAL_MAX} options across its fields"
+            )
+        return self
 
 
 class DescribeReferenceIn(BaseModel):

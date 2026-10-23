@@ -66,6 +66,15 @@ door's files — ``GenerateRequest.form`` (``DescribeFormIn``) and ``GenerateReq
 unchanged); ``workflows_routes.json`` byte-unchanged (the capture rewrote only its line endings,
 restored). ``_MOVE_SET`` stays 25; the new request models are pinned in
 ``test_291_generate_degraded.py``.
+
+DELIBERATE RE-BASELINE (Phase 291-06, 2026-10-23): gap round 1, CR-02. A common fillable PDF
+(250 fields, a 195-country dropdown) was dropped from generation without a word, so the body
+caps were raised: ``DescribeFormFieldIn.enum_options`` 50 → 500 and ``DescribeFormIn.fields``
+200 → 1000 (an aggregate 20,000-option model validator bounds the body and is invisible to
+OpenAPI). ``PIN286_CAPTURE=1`` was run once and each fixture diff was read:
+``workflows_openapi.json`` +2 / −2 (exactly the two ``maxItems`` values);
+``workflows_moved_ast.json`` and ``workflows_routes.json`` showed no numstat (the capture
+rewrote only their line endings, restored).
 """
 
 from __future__ import annotations
