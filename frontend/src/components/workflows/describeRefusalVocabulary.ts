@@ -52,7 +52,7 @@
  */
 import { SERVICES_LABEL } from "@/components/workflows/doorVocabulary"
 
-/** Every key this table words: the four server codes, plus the three `reason_code` sub-reasons. */
+/** Every key this table words: the four server codes, plus their `reason_code` sub-reasons. */
 export type DescribeRefusalKey =
   | "connection_not_allowed"
   | "connection_not_allowed:no_service_chosen"
@@ -61,6 +61,7 @@ export type DescribeRefusalKey =
   | "no_authoring_model"
   | "could_not_generate"
   | "could_not_generate:grounding_unavailable"
+  | "could_not_generate:removed_powers_broke_draft"
   | "grounding_failed"
 
 /** One plain sentence and one next step — the whole of what an author reads (D-11). */
@@ -101,6 +102,16 @@ export const REFUSAL_FOR_KEY: Record<DescribeRefusalKey, RefusalWords> = {
     sentence: "We couldn't read your folders, skills or tools just now, so the draft wasn't written.",
     next: "Try again in a moment.",
   },
+  // 291-06 (WR-08) — the powers guard's own refusal: removing actions only the author's
+  // description could add left a draft that cannot run. The two halves are the server's words,
+  // backend/app/services/describe_draft_guards.py:_BROKE_DRAFT_DETAIL, split at its last
+  // sentence (UI-SPEC: render the server's sentence verbatim). Without this row the author
+  // read the generic sentence above, which blames the model for what the guard did.
+  "could_not_generate:removed_powers_broke_draft": {
+    sentence:
+      "Your attached files asked for actions only your description can add. Removing them left a workflow that cannot run, so no draft was made.",
+    next: "Describe the steps you want and try again.",
+  },
   grounding_failed: {
     sentence: "The draft pointed at a tool, skill or folder this workflow can't use.",
     next: "Try again, or describe the work in more detail.",
@@ -119,6 +130,19 @@ export const REQUEST_FAILED_KEY = "request_failed"
 /** 281-REVIEW WR-03: a CLIENT-ONLY key for a TYPED entitlement refusal
  *  (`EntitlementRefusalError`) — the one thrown message the server wrote for a person. */
 export const ENTITLEMENT_REFUSED_KEY = "entitlement_refused"
+
+/** 291-06 (CR-02): a CLIENT-ONLY key for an attached form the generate body cannot carry
+ *  (a cap the server would refuse). The hook stops the draft BEFORE any call, rather than
+ *  dropping the form and drafting blind. */
+export const FORM_NOT_SENDABLE_KEY = "form_not_sendable"
+
+/** Generic on purpose: true for every cap that can still trip (field count, option count,
+ *  total options, an option or key over 200 characters, `{ } < >` in a field name). The cap
+ *  itself is the hook's detail, shown only under the technical-names reveal. */
+export const FORM_NOT_SENDABLE_WORDS: RefusalWords = {
+  sentence: "This form can't be sent to the drafter as it is, so no draft was made.",
+  next: "Remove the form to draft from your description alone, or attach a different copy of the form.",
+}
 
 /** The key the hook stores: the server code, joined to its additive sub-reason when present. */
 export function refusalKey(code: string, reasonCode?: string | null): string {
@@ -155,6 +179,10 @@ export function describeRefusal(
     // 281-REVIEW WR-03: any OTHER thrown text (`Failed to fetch`, a status line) is not words
     // for a person — the table's sentence renders, and the raw text only under the reveal.
     return { ...REFUSAL_FALLBACK, technical: null, technicalDetail }
+  }
+  if (key === FORM_NOT_SENDABLE_KEY) {
+    // 291-06 (CR-02): the visible words stay true whichever cap tripped; the cap is reveal-only.
+    return { ...FORM_NOT_SENDABLE_WORDS, technical: null, technicalDetail }
   }
   if (isKnownKey(key)) {
     return { ...REFUSAL_FOR_KEY[key], technical: technicalOf(key), technicalDetail }

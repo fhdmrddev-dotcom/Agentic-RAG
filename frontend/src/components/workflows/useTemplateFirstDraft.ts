@@ -138,6 +138,8 @@ import type { BuilderPhase, BuilderStore, TemplateAssetDescriptor } from "./buil
 // only the door vocabulary, so no cycle back to the page or the door shell can form here.
 import { REQUEST_FAILED_KEY, refusalKey } from "./describeRefusalVocabulary"
 import { ENTITLEMENT_REFUSED_KEY } from "./describeRefusalVocabulary"
+// 291-06 (CR-02) — the client-only key for a form the drafter cannot be sent.
+import { FORM_NOT_SENDABLE_KEY } from "./describeRefusalVocabulary"
 // 291-04 — the references' notices are worded in the vocabulary leaf; this module passes DATA.
 import {
   REFS_REFUSED_FALLBACK,
@@ -529,52 +531,87 @@ export type DraftedExtras = {
   fields: GenerateField[] | undefined
 }
 
-// ── 291-04 — the generate body's caps, mirrored so a body the server would refuse is never
-//    built. The server's limits are authoritative; these only keep the draft from failing. ──
-const FORM_FIELDS_MAX = 200
+// ── 291-04 — the generate body's caps, mirrored from backend/app/api/workflow_authoring_doors.py
+//    (DescribeFormIn / DescribeFormFieldIn) so a body the server would refuse is never built.
+//    The server's limits are authoritative; these only keep the draft from failing.
+//    291-06 (CR-02): raised to real fillable-PDF shapes, plus the server's aggregate bound. ──
+const FORM_FIELDS_MAX = 1000
 const FORM_TEXT_MAX = 250_000
 const FORM_LABEL_MAX = 200
-const FORM_ENUM_MAX = 50
-// The server's own refusal for a field key: control characters or template syntax.
+const FORM_ENUM_MAX = 500
+const FORM_OPTIONS_TOTAL_MAX = 20_000
+// The server's own refusal for a field key on EVERY arm: control characters or { } < >.
 // eslint-disable-next-line no-control-regex
-const FIELD_KEY_FORBIDDEN = /[\x00-\x1f\x7f{}%<>]/
+const FIELD_KEY_FORBIDDEN = /[\x00-\x1f\x7f{}<>]/
+// …and `%`, refused on every arm except `form_fields`: a PDF field name never reaches Jinja.
+const FIELD_KEY_JINJA = /%/
 
 /**
  * The slot's read result as the generate body carries it (Pitfall 11: the RESULT travels, the
- * bytes are never read twice), or `null` when the server's caps would refuse it.
+ * bytes are never read twice).
+ *
+ * 291-06 (CR-02): `body` is `null` with `blocked: null` when there is nothing to send (a
+ * reference), and `null` with `blocked` set to a short technical sentence naming the FIRST cap
+ * hit when the server would refuse it — so the caller can say so instead of dropping the form.
  *
  * For Word blanks the fields are the TICKED placed blanks only (D-27): an unticked blank stays
  * empty in the copy, so the draft must not be built to fill it.
  */
-function formBodyFor(result: DescribeReadResult, unticked: readonly string[]): DescribeFormBody | null {
-  if (result.arm === "reference") return null
+function formBodyFor(
+  result: DescribeReadResult,
+  unticked: readonly string[],
+): { body: DescribeFormBody | null; blocked: string | null } {
+  if (result.arm === "reference") return { body: null, blocked: null }
   const fields =
     result.arm === "blanks" ? result.fields.filter((f) => !unticked.includes(f.key)) : result.fields
-  const sendable =
-    fields.length <= FORM_FIELDS_MAX &&
-    result.text.length <= FORM_TEXT_MAX &&
-    fields.every(
-      (f) =>
-        f.key.length > 0 &&
-        f.key.length <= FORM_LABEL_MAX &&
-        !FIELD_KEY_FORBIDDEN.test(f.key) &&
-        f.label.length <= FORM_LABEL_MAX &&
-        f.enum_options.length <= FORM_ENUM_MAX &&
-        f.enum_options.every((o) => o.length <= FORM_LABEL_MAX),
-    )
-  if (!sendable) return null
+  const blocked = formCapHit(result, fields)
+  if (blocked !== null) return { body: null, blocked }
   return {
-    filename: result.filename,
-    arm: result.arm,
-    fields: fields.map(({ key, label, type, enum_options, origin }) => ({
-      key,
-      label,
-      type,
-      enum_options,
-      origin,
-    })),
-    text: result.text,
+    body: {
+      filename: result.filename,
+      arm: result.arm,
+      fields: fields.map(({ key, label, type, enum_options, origin }) => ({
+        key,
+        label,
+        type,
+        enum_options,
+        origin,
+      })),
+      text: result.text,
+    },
+    blocked: null,
   }
+}
+
+/** The first mirrored server cap a form trips, as a short technical sentence, or `null`. */
+function formCapHit(result: DescribeReadResult, fields: readonly DescribeReadResult["fields"][number][]): string | null {
+  if (fields.length > FORM_FIELDS_MAX) {
+    return `${fields.length} fields; at most ${FORM_FIELDS_MAX} can be sent`
+  }
+  if (result.text.length > FORM_TEXT_MAX) {
+    return `the form's text is ${result.text.length} characters; at most ${FORM_TEXT_MAX} can be sent`
+  }
+  for (const f of fields) {
+    if (f.key.length === 0 || f.key.length > FORM_LABEL_MAX) {
+      return `a field name is empty or longer than ${FORM_LABEL_MAX} characters`
+    }
+    if (FIELD_KEY_FORBIDDEN.test(f.key)) return "a field name contains { } < > or a control character"
+    if (result.arm !== "form_fields" && FIELD_KEY_JINJA.test(f.key)) {
+      return "a field name contains %, which only a fillable PDF's field names may carry"
+    }
+    if (f.label.length > FORM_LABEL_MAX) return `a field label is longer than ${FORM_LABEL_MAX} characters`
+    if (f.enum_options.length > FORM_ENUM_MAX) {
+      return `a field has ${f.enum_options.length} options; at most ${FORM_ENUM_MAX} can be sent`
+    }
+    if (f.enum_options.some((o) => o.length > FORM_LABEL_MAX)) {
+      return `an option is longer than ${FORM_LABEL_MAX} characters`
+    }
+  }
+  const total = fields.reduce((n, f) => n + f.enum_options.length, 0)
+  if (total > FORM_OPTIONS_TOTAL_MAX) {
+    return `${total} options in all; at most ${FORM_OPTIONS_TOTAL_MAX} can be sent`
+  }
+  return null
 }
 
 /** The references' read text, in pick order — only those the server actually read. */
@@ -972,7 +1009,22 @@ export function useTemplateFirstDraft(args: TemplateFirstDraftArgs): TemplateFir
     // only on a `read` slot (a failed read is no document); `references` only when at least
     // one was read. With nothing attached neither key exists, so the body is byte-identical
     // to the shipped one — the suite snapshots it.
-    const formBody = templateRead.kind === "read" ? formBodyFor(templateRead.result, untickedKeys) : null
+    const formRead =
+      templateRead.kind === "read" ? formBodyFor(templateRead.result, untickedKeys) : null
+    const formBody = formRead?.body ?? null
+    // ── 291-06 (CR-02) — A FORM IS SENT WHOLE OR THE DRAFT IS STOPPED IN WORDS, NEVER DROPPED.
+    // The one exception is the shipped template_placeholders fallback below, which still
+    // carries a template's keys; everywhere else a blocked form would be drafted blind. The
+    // early return comes after setComposing() and onDraftStarted, so the screen takes the same
+    // path as any server refusal.
+    const placeholdersFallback =
+      templateRead.kind === "read" &&
+      templateRead.result.arm === "template_fields" &&
+      templateRead.result.fields.length > 0
+    if (formRead?.blocked != null && !placeholdersFallback) {
+      store.getState().setErrorState(FORM_NOT_SENDABLE_KEY, formRead.blocked)
+      return
+    }
     const referenceBodies = referenceBodiesFor(referencesRef.current)
     try {
       const result = await generateWorkflow({

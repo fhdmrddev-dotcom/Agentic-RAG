@@ -1108,7 +1108,11 @@ def _acro_to_fields(raw: bytes, acro: list[AcroField], text: str, propose: Calla
         if f.name in seen:
             continue
         seen.add(f.name)
-        label = f.tooltip or labels.get(f.name) or f.name
+        # 291-06 (W1 / CR-02): the label is DISPLAY text, so it is capped here at read time; the
+        # key (the AcroForm name) is never cut. A long /TU tooltip could otherwise trip the
+        # generate body's 200-character label cap and drop the whole form. AcroField.tooltip and
+        # read_acroform_fields stay uncut: the reader-parity test pins them against the sandbox.
+        label = (f.tooltip or labels.get(f.name) or f.name)[:LABEL_MAX_CHARS].strip() or f.name
         if f.field_type == "checkbox":
             out.append(_field(f.name, label, "enum", "exact", enum_options=["yes", "no"]))
         elif f.field_type == "radio":
