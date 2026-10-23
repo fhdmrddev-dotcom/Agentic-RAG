@@ -3,7 +3,7 @@ gsd_state_version: 1.0
 milestone: v4.7
 milestone_name: Workflows You Can See and Start Anywhere
 status: ready_to_execute
-last_updated: "2026-10-23T23:54:53.262Z"
+last_updated: "2026-10-23T23:55:36.501Z"
 progress:
   total_phases: 17
   completed_phases: 8
@@ -28,7 +28,7 @@ See: `.planning/PROJECT.md` (updated 2026-10-18)
 
 **Core value:** The agent acts as an AI colleague — it knows your knowledge base, can run code, and
 can be taught new behaviours (skills) that persist and can be shared.
-**Current focus:** Phase 291 — describe-it-from-your-own-files
+**Current focus:** Phase 292 — More Ways to Show It
 
 ---
 
@@ -41,14 +41,14 @@ reviewer exists, so a phase closes `verification_mode: self-verified`, never `re
 
 ## Current Position
 
-Phase: 291 (describe-it-from-your-own-files) — VERIFIED passed (2026-10-24). AUTH-02 complete.
+Phase: 292 (More Ways to Show It) — EXECUTING
   **DEPLOYED 2026-10-24: production 1db686141 (master 70bd2f043) carries 290 + 291 + 295.** Mig 212 applied to cloud first; security advisors 0 ERROR; deploy-drift PASS; 290 secure-phase 22/22 closed (5d5a44b8d).
   **Guardrail override (operator, 2026-10-24):** 290 and 295 went live with their operator G-4 sign-offs still owed (`290-HUMAN-UAT`/VALIDATION rows, `295-HUMAN-UAT.md` S1 first). 291 could not ship alone (it builds on both).
   Human items run: G-4 S1-S7 + AX rows, SC#4 roster (291-S5-ROSTER.md: 5/8 pass, 3 ⛔ with reasons), SC#5 live fill (W-9, dropdown PDF, Word blanks).
   UAT fixes on develop: 6f3311262, d01547f50, 183cac200, 34f643ce7, e03c3c88e, f8ee7d051. Open findings + triggers: 291 deferred-items.md; BUG-261024-01 (Moonshot schema).
   Mig 212 APPLIED to cloud Supabase 2026-10-24 (verified); full-schema.sql regenerated (251b44639). Anthropic key ROTATED by the operator 2026-10-24 (the key held in old LangSmith traces is revoked).
 Previous: Phase: 290 (the-card-and-the-team-picture) — EXECUTED, human_needed (2026-10-22)
-Plan: 6 of 6 (complete)
+Plan: 1 of 3
 
 ### Roadmap Evolution
 
