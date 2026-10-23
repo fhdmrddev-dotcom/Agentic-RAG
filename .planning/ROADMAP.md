@@ -252,7 +252,7 @@ Plans:
   5. A run hands back the author's own form filled in, without the author adding placeholders: a fillable PDF through its own fields, and a Word document's blanks through a copy the author confirmed while authoring (AUTH-02; added 2026-10-22, 291-CONTEXT D-25..D-29).
 
 **How we'd know this failed**: inputs are guessed from the prompt and ignore the form; the draft names a tool that does not exist; an uploaded document gains the power to grant a tool; only one provider was driven; the asset text is lost on reload; the form's questions are asked but the run hands back no filled form, or a half-filled one.
-**Plans**: 5 plans (4 waves)
+**Plans**: 6 plans (4 waves + 1 gap-closure round)
 
 Plans:
 **Wave 1**
@@ -271,6 +271,10 @@ Plans:
 **Wave 4** *(blocked on Wave 3 completion)*
 
 - [x] 291-05-PLAN.md — The arrival card (Removed line, inputs fold), kb_auto launch skip, post-reload homes, ledger/seeds close-out (W4)
+
+**Gap closure (round 1)**
+
+- [ ] 291-06-PLAN.md — Close SC#3 (execute_code is a power) and SC#1 (no silent form drop: real-form caps, a refusal in words); WR-08/09/10; defer the rest with triggers (W1)
 
 **UI hint**: yes
 **Flags**: **Provider-docs-first** (structured output per provider). **SC#10 four-axis UAT, full roster**. security_enforcement: asset content is untrusted. Closed core recount. Hot files: `workflow_authoring.py` (17/11/1025), `workflows.py`, `useTemplateFirstDraft.ts`. Seed `SEED-051`.
