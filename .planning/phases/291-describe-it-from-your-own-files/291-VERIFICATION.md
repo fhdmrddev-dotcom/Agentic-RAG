@@ -2,8 +2,9 @@
 phase: 291-describe-it-from-your-own-files
 verified: 2026-10-23T00:00:00Z
 verification_mode: self-verified   # OV-SOLO-01 - NEVER "reviewed". No independent reviewer exists.
-status: human_needed
-score: 3/5 code-verified (SC#1, SC#2, SC#3); SC#4 and SC#5 owed to human
+status: passed
+score: 5/5 (SC#1-SC#3 code-verified; SC#4 roster and SC#5 live fill run 2026-10-24)
+human_verified: 2026-10-24
 re_verification:
   previous_status: gaps_found
   previous_score: 2/5
@@ -12,7 +13,7 @@ re_verification:
     - "SC#1 oversize or % forms silently dropped (CR-02)"
   gaps_remaining: []
   regressions: []
-requirements: {AUTH-02: code-side satisfied; closure blocked on owed human items}
+requirements: {AUTH-02: satisfied 2026-10-24 (human items run; see 291-HUMAN-UAT.md)}
 human_verification:
   - test: "SC#4 - RUN_291_AUTHORING_ROSTER=1 pytest backend/tests/unit/test_291_authoring_roster.py across the full native roster plus OpenRouter. Include a 'calculate the totals -> no execute_code' row."
     expected: "Every provider row passes, or is recorded as blocked with a reason and issue id"
@@ -26,6 +27,18 @@ human_verification:
 ---
 
 # Phase 291 Verification (re-verification after gap-closure round 1)
+
+## Human items, run 2026-10-23 → 2026-10-24 (update)
+
+All owed items were run and are recorded in `291-HUMAN-UAT.md`, `291-VALIDATION.md` and
+`291-S5-ROSTER.md`. **Status is now `passed`.**
+
+- **G-4 S1-S7 + AX rows:** S1 ⚠ partial (label quality), S2-S7 ✅, AX-multi/long/parallel ✅.
+- **SC#4:** 5 of 8 providers pass both cases; Anthropic and OpenRouter ⛔ billing; Moonshot ⛔ BUG-261024-01 (pre-dates 291).
+- **SC#5:** the W-9, a dropdown/checkbox PDF and a Word blanks form all come back filled and read back correctly.
+- The UAT found and fixed real defects the unit suites had agreed with: answers never reached `fills` fields (a blank form), checkbox labels from the wrong side (a wrong box ticked), a launch dialog that could not reach Run, refusal words dropped, a refused choice keeping its default, and a model reading "calculate the totals" as a code request. Commits `6f3311262`, `d01547f50`, `183cac200`, `34f643ce7`, `e03c3c88e`, `f8ee7d051`.
+- G-7: these fixes were made inline during verification (G-3-sized each), not as a gap round. Open findings are routed with triggers in `deferred-items.md`.
+
 
 **Goal:** an author hands the describe door a template, form or reference docs and gets a draft whose inputs, phases and tools come from them.
 **Status:** human_needed. No code gaps remain against the five success criteria. The owed human items are all that stand between this phase and AUTH-02 being marked satisfied.

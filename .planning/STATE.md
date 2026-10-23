@@ -41,9 +41,12 @@ reviewer exists, so a phase closes `verification_mode: self-verified`, never `re
 
 ## Current Position
 
-Phase: 291 (describe-it-from-your-own-files) — EXECUTING
+Phase: 291 (describe-it-from-your-own-files) — VERIFIED passed (2026-10-24). AUTH-02 complete. Not pushed.
+  Human items run: G-4 S1-S7 + AX rows, SC#4 roster (291-S5-ROSTER.md: 5/8 pass, 3 ⛔ with reasons), SC#5 live fill (W-9, dropdown PDF, Word blanks).
+  UAT fixes on develop: 6f3311262, d01547f50, 183cac200, 34f643ce7, e03c3c88e, f8ee7d051. Open findings + triggers: 291 deferred-items.md; BUG-261024-01 (Moonshot schema).
+  Owed at the next deploy: paste mig 212 into cloud Supabase; regenerate-full-schema.sh (docker); rotate the Anthropic key.
 Previous: Phase: 290 (the-card-and-the-team-picture) — EXECUTED, human_needed (2026-10-22)
-Plan: 1 of 6
+Plan: 6 of 6 (complete)
 
 ### Roadmap Evolution
 

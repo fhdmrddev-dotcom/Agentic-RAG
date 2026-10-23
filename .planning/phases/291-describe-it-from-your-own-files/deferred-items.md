@@ -66,3 +66,25 @@ trigger or schedule. 291-06 closed CR-01, CR-02, WR-08, WR-09 and WR-10.
   **DONE 2026-10-23 (/gsd:fast):** `_fence` now escapes every `<`/`>`. Test: `test_a_lookalike_close_tag_in_the_body_cannot_close_the_fence` (3 cases).
 - **R1-IN-01..03: ACCEPTED as info.** The client mirrors of the caps and sentence have no test tying them to the server. The 255-character filename limit isn't mirrored on the client. `fetch_document_file` stays on a step after `execute_code` is stripped.
   Trigger: next phase touching `useTemplateFirstDraft.ts`.
+
+## Found by the G-4 / SC#4 / SC#5 UAT (2026-10-23 → 2026-10-24)
+
+The owed human items above are now RUN (see `291-HUMAN-UAT.md`, `291-S5-ROSTER.md`). Fixed during
+the UAT: S3-F1 `6f3311262`, S3-F4 `d01547f50`, the fill path `183cac200`, the Run dialogs
+`34f643ce7`, refused choices `e03c3c88e`. Still open, each with its trigger:
+
+- **S1 labels (text fields)** — page-text labels for text fields are still poor on a tooltip-less form ("3.", "�", instruction sentences). Checkboxes are fixed. The model writes good labels into its inputs, and the card shows those, but the door's grid shows the page guesses.
+  Trigger: the next phase touching `describe_files._page_labels` or the describe door grid.
+- **S1 copy** — "Nothing is saved or published yet" after Save; a billing failure reads as "describe the work in more detail"; a model-overridden enum can carry an empty option (seen again in a launch hint: "one of: C, S, P, ").
+  Trigger: the next phase touching `DraftArrivalCard.tsx` / `workflow_authoring` error copy.
+- **S2-F1 / S6-F8 (hollow steps)** — removing a power can leave a step that existed only to use it; and an AI-drafted LLM step that "validates the inputs" cannot see launch answers (an LLM step's user turn is the prior output or the kickoff only), so it says "None were included".
+  Trigger: the next phase touching `phase_types._first_phase_user_turn` or the authoring prompt.
+- **S2-F2** — file text reaches the restated requirement the judge grades against. **S2-F3** — "no Slack connection is configured" when it is connected but not ticked.
+  Trigger: the next phase touching `describe_draft_guards` or the describe services picker.
+- **S3-F2 / S3-F3** — the step panel lists raw AcroForm names; "Replace this template" under a bound PDF only accepts Office files.
+  Trigger: the next phase touching `PhaseFormPanel.tsx` / the template replace control.
+- **S6-F7 (publish gate)** — the golden run answers every launch input with "golden run placeholder for <key>", writes those into a form, and the grader passed it. Publish does not prove a real fill.
+  Trigger: the next phase touching `publish_service._run_golden` inputs; consider deriving golden inputs from the author's test instruction.
+- **S6-F9 / S7-F1 (minor)** — the run record squeezes the title into a one-word column at 1536px; a Word fill reports "2 fields" when 4 were filled.
+  Trigger: the next phase touching `WorkflowRunPage.tsx` / the render `_measure`.
+- **BUG-261024-01** — Moonshot rejects the emit schema; no workflow drafts on Kimi (pre-dates 291).

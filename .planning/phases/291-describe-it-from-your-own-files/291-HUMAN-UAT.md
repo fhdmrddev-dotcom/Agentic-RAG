@@ -1,9 +1,9 @@
 ---
-status: partial
+status: complete
 phase: 291-describe-it-from-your-own-files
 source: [291-VERIFICATION.md]
 started: 2026-10-23T00:00:00Z
-updated: 2026-10-23T00:00:00Z
+updated: 2026-10-24T00:00:00Z
 ---
 
 ## Current Test
@@ -61,22 +61,48 @@ result: S1 BLOCKED at the draft step (2026-10-23, Chrome, blank IRS W-9 `fw9.pdf
     - S3-F4 side check: one asset, real id, no duplicate. Consistent with the fix, but not proof: the generate response was not captured, so whether the model wrote an asset this time is unknown.
   - S4 VERDICT: ✅ PASS.
   - S2 VERDICT: ✅ PASS WITH FINDINGS. No planted power survived on either door, and the Removed line shows on both. Not observed: the send-email line. Not reachable: the service-naming variant.
+  - S6 RESULT 2026-10-24 (Chrome, door (a) drafted on gpt-5.5, runs on the account's workflow model deepseek-v4-flash; IRS W-9; made-up vendor "Example Widgets LLC", EIN 12-3456789).
+    - First real run (`f9f1c33a`, draft `69a65c2a`): every one of 23 fields came back BLANK although every answer was typed. Cause: the overlay that writes launch answers into form fields (`harness/form_inputs.py`) matched exact keys only, so the S3-F1 `fills` inputs were never written. The same cause blocked Publish ("Deliverable is filled with … None/UNCITED"). FIXED `183cac200`: a one-field `fills` input is written; one answer is never spread over several fields (coverage keeps `fills` to one field).
+    - Second run (`64e42765`): values arrived, but the LLC vendor got the INDIVIDUAL box ticked. Cause: checkbox labels were read from the text to the LEFT, so each W-9 box carried the previous box's words, and the drafter wired its inputs by those labels. FIXED `183cac200`: checkboxes and radios read the words to their RIGHT, up to the next field (re-read of the real W-9: all seven classification boxes correct).
+    - Also found and FIXED `34f643ce7`: the Test Run dialog (ChatLaunchForm, and RunModal likewise) was 1561px tall in a 639px window and did not scroll, so Run could not be reached with 23 questions. Re-checked live: body scrolls, Run in view.
+    - Final: re-drafted (`cf8c8ea8`, correct wiring c1_1[5] ← LLC), Test Run `264d6ff8`, downloaded `fw9.pdf`, pypdf read-back: f1_01 "Example Widgets LLC", c1_1[5] (LLC) `/6` and every other box `/Off`, f1_03 "S", f1_07 "100 Test Street, Suite 2", f1_08 "Springfield, IL 62701", f1_14 "12", f1_15 "3456789". Rendered page 1: `scratchpad/s6/fw9-filled-v2-p1.png`. Then **Published** v1 ("Published New Vendor IRS W-9 Form Fill v1", `screenshot-1792790939761-17.jpg`).
+    - The S6 "invalid choice" clause is covered by S6b (the W-9 has no choice field).
+    - FINDING S6-F7: the golden run fills each launch input with "golden run placeholder for <key>", writes those into the form, and the grader passed it. Publish does not prove a real fill works.
+    - FINDING S6-F8: an AI-drafted "validate the inputs" / "determine the rules" LLM step cannot see launch answers (an LLM step's user turn is the prior output or the kickoff only), so it reports "None were included". Same family as S2-F1 (a hollow step).
+    - FINDING S6-F9 (minor): the run record page squeezes the workflow title into a one-word column at 1536px.
+  - S6 VERDICT: ✅ PASS after three fixes found by this row.
+  - S6b RESULT 2026-10-24 (`s6b/vendor-registration.pdf`: text + dropdown US/DE/FR/GB with default US + checkbox, all with tooltips; draft on gpt-5.5, `Vendor Registration Form Fill`).
+    - Door: Vendor legal name text, Country of registration "choice of 4", Agrees to payment terms "yes / no". Launch form: "Country of registration (one of: US, DE, FR, GB)", "Agrees to payment terms (yes or no)" (`screenshot-1792791061521-18.jpg`).
+    - " de " and "Yes" → read-back country /V `DE`, checkbox /V `/Yes` and widget /AS `/Yes`. PASS.
+    - "Spain": first run completed but the step said nothing about the refusal (FIXED `183cac200`: the fill's own sentence now reaches the step text), and the PDF showed the form's default "US" under "left blank" (FIXED `e03c3c88e`: a refused field is cleared). Final run `844fe6e2`: step text "1 answer wasn't one of the form's choices and was left blank: The answer for “Country of registration” isn't one of this form's choices, so it was left blank."; read-back country /V `''`; run completed. PASS.
+  - S6b VERDICT: ✅ PASS after two fixes found by this row.
+  - S7 RESULT 2026-10-24 (`s7/vendor-intake.docx`: three `Label: ____` lines, a two-row table with empty cells, "Signed by: ____" twice; md5 before `99424cb7b49d3f277f183d20b8275068`).
+    - Door: "Where each answer goes" lists Company name, Contact email, Notes, Tax ID, Phone; `describe-form-unplaced` reads "Couldn't place “Signed by”: that label appears twice in the document. It stays blank in the filled copy." (`screenshot-1792791871700-20.jpg`). Notes unticked → "stays blank".
+    - Draft `Fill Vendor Intake Sheet`, 4 inputs; Test Run `20f97ee5` with test values. Output: Company name / Contact email / Tax ID cell / Phone cell filled; Notes keeps its underscores; both Signed by lines keep theirs; 6 paragraphs, same styles, same table. Original md5 after: `99424cb7b49d3f277f183d20b8275068` (unchanged). PASS.
+    - FINDING S7-F1 (minor): the run page says "2 fields" when 4 were filled.
+    - Ran with Test Run, not a published run (Publish was proven on S6).
+  - S7 VERDICT: ✅ PASS.
+  - AX-long 2026-10-24: `long-6kb.md` (6,036 chars) "Read in full."; `huge.md` "Only the first 60,000 of 846,015 characters were read." (`screenshot-1792792082582-21.jpg`). ✅
+  - AX-multi 2026-10-24: 1 form + 5 references; a 6th refused with "Only 5 references fit, so these weren't added: ref-4.md." and the picker disabled. Saved draft `ecbf6da0` holds 1 template + 5 references, each under its real Storage id (no model-written asset: S3-F4 holds live); its steps quote the insurance and region rules from the files. ✅
+  - AX-parallel 2026-10-24: two tabs drafting at once (registration PDF + ref-1 / intake docx + ref-2). `efb84648`: template vendor-registration.pdf + ref-1.md, inputs vendor_name/country/agrees_terms. `a6829c6c`: template vendor-intake.docx + ref-2.md, inputs company_name/contact_email/notes/tax_id/phone. No bleed. ✅
 
 ### 2. SC#4: authoring roster run (`RUN_291_AUTHORING_ROSTER=1 backend/tests/integration/test_291_authoring_roster.py`)
 expected: Every native provider row plus OpenRouter passes, or is recorded as blocked with a reason and an issue id. Include a "calculate the totals" description that does NOT grant execute_code.
-result: [pending]
+result: PASS 2026-10-24 — board in `291-S5-ROSTER.md`. 5 of 8 providers pass both cases (OpenAI, Google, DeepSeek, Zhipu, MiniMax; the last two needed a 600 s row timeout). Blocked with reasons: Anthropic (operator billing, skipped on the operator's word), OpenRouter (402, out of credits), Moonshot (400, Moonshot rejects the emit schema; pre-dates 291 — BUG-261024-01). The "calculate the totals" case FAILED once on glm-5.2 (the description-only check read arithmetic as a request to run code, 1 run in 3); fixed in `183cac200` and re-checked 3/3.
 
 ### 3. SC#5 live: run a workflow on an author's fillable PDF and on a confirmed Word copy
 expected: The author's own form comes back filled, with no placeholders the author added.
-result: [pending]
+result: PASS 2026-10-24 — the IRS W-9 comes back filled (pypdf read-back + rendered page; S6), a dropdown/checkbox vendor PDF fills and refuses in words (S6b), and a Word form with `____` blanks and empty cells fills a copy with the original md5 unchanged (S7). Getting there took five fixes found by these rows: `183cac200` (answers never reached `fills` fields; checkbox labels read from the wrong side; refusal words dropped; run-code rule), `34f643ce7` (Run unreachable in a long launch form), `e03c3c88e` (a refused choice kept the form's default), `f8ee7d051` (pins).
 
 ## Summary
 
 total: 3
-passed: 0
+passed: 3
 issues: 0
-pending: 3
+pending: 0
 skipped: 0
 blocked: 0
 
 ## Gaps
+
+None against a success criterion. Open findings, routed in `deferred-items.md`: S1 page-text labels for text fields and the "Nothing is saved" / billing copy; S2-F1/F2/F3; S3-F2/F3; S6-F7 (golden run passes with stand-in answers); S6-F8 (an LLM step cannot see launch answers, so a drafted "validate the inputs" step is hollow); S6-F9 and S7-F1 (run-page title column, field count); BUG-261024-01 (Moonshot).
