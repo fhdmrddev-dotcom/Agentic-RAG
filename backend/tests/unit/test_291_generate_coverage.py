@@ -449,3 +449,95 @@ async def test_an_accepted_draft_is_renumbered_0_to_n(monkeypatch, emitted, expe
     phases = sorted(result["definition"]["phases"], key=lambda p: p["phase_index"])
     assert [p["phase_index"] for p in phases] == list(range(len(emitted)))
     assert [p["slug"] for p in phases] == expected_order
+
+
+# ── 291 UAT S3-F1 (2026-10-23) — an input may NAME the form fields it fills ──────────────
+#
+# Live, with a reference attached, gpt-5.5 wrote 14 friendly W-9 inputs (one "tax
+# classification" choice for seven checkboxes, one TIN for five boxes) and a fill step whose
+# prompt mapped each to its fields. Coverage only counted an EXACT key, so the server added all
+# 23 raw fields as well: 37 questions, every one asked twice. ``fills`` lets the friendly input
+# say which fields it answers, and coverage counts it.
+
+FILLS_FIELDS = [
+    {"key": "c1[0]", "label": "on", "type": "enum", "enum_options": ["Off", "1"], "origin": "exact"},
+    {"key": "c1[1]", "label": ".", "type": "enum", "enum_options": ["Off", "2"], "origin": "exact"},
+    {"key": "f1_01", "label": "3.", "type": "text", "enum_options": [], "origin": "exact"},
+]
+
+
+def test_input_field_spec_accepts_fills_and_omits_it_when_empty():
+    from app.models.harness import InputFieldSpec
+
+    spec = InputFieldSpec(key="k", label="K", type="text", fills=["f1_01"])
+    assert spec.fills == ["f1_01"]
+    assert spec.model_dump(mode="json")["fills"] == ["f1_01"]
+    assert "fills" not in InputFieldSpec(key="k", label="K", type="text").model_dump(mode="json")
+
+
+def test_an_input_that_fills_a_field_covers_it_and_is_explained():
+    from app.services.describe_draft_guards import covered_by, missing_fields, unexplained_inputs
+
+    wd = _wd(_definition(inputs=[
+        _inp("classification", type="enum", enum_options=["Individual", "C corp"], fills=["c1[0]", "c1[1]"]),
+        _inp("legal_name", fills=["f1_01"]),
+    ]))
+    assert covered_by(wd, FILLS_FIELDS) == {"c1[0]": "input", "c1[1]": "input", "f1_01": "input"}
+    assert missing_fields(wd, FILLS_FIELDS) == []
+    assert unexplained_inputs(wd, FILLS_FIELDS) == []
+
+
+def test_a_field_filled_by_TWO_inputs_is_missing_and_the_server_adds_no_third_ask():
+    from app.services.describe_draft_guards import missing_fields, server_add_missing
+
+    wd = _wd(_definition(inputs=[_inp("legal_name", fills=["f1_01"]), _inp("f1_01")]))
+    assert "f1_01" in missing_fields(wd, FILLS_FIELDS)
+    out, added = server_add_missing(wd, FILLS_FIELDS)
+    assert "f1_01" not in added
+    assert [i.key for i in out.inputs].count("f1_01") == 1
+
+
+def test_fills_naming_no_real_field_does_not_cover_or_explain():
+    from app.services.describe_draft_guards import missing_fields, unexplained_inputs
+
+    wd = _wd(_definition(inputs=[_inp("legal_name", fills=["not_a_field"])]))
+    assert missing_fields(wd, FILLS_FIELDS) == ["c1[0]", "c1[1]", "f1_01"]
+    assert unexplained_inputs(wd, FILLS_FIELDS) == ["legal_name"]
+
+
+def test_stamps_keep_only_real_field_keys_in_fills_and_clear_them_with_no_fields():
+    from app.services.describe_draft_guards import stamp_input_origins
+
+    wd = _wd(_definition(inputs=[_inp("legal_name", fills=["f1_01", "invented", "f1_01"])]))
+    assert stamp_input_origins(wd, FILLS_FIELDS, []).inputs[0].fills == ["f1_01"]
+    assert stamp_input_origins(wd, [], []).inputs[0].fills == []
+
+
+def test_fields_report_names_the_input_that_fills_each_field():
+    from app.services.describe_draft_guards import fields_report
+
+    wd = _wd(_definition(inputs=[_inp("legal_name", fills=["f1_01"]), _inp("c1[0]")]))
+    got = {f["key"]: f.get("input_key") for f in fields_report(wd, FILLS_FIELDS)}
+    assert got == {"c1[0]": "c1[0]", "c1[1]": None, "f1_01": "legal_name"}
+
+
+def test_the_coverage_retry_tells_the_model_about_fills():
+    from app.services.describe_draft_guards import coverage_retry_messages
+
+    wd = _wd(_definition(inputs=[_inp("legal_name")]))
+    assert "fills" in coverage_retry_messages(wd, FILLS_FIELDS)[-1]["content"]
+
+
+@pytest.mark.asyncio
+async def test_S3_friendly_inputs_that_fill_every_field_get_NO_server_added_duplicates(monkeypatch):
+    friendly = _definition(inputs=[
+        _inp("classification", type="enum", enum_options=["Individual", "C corp"], fills=["c1[0]", "c1[1]"]),
+        _inp("legal_name", fills=["f1_01"]),
+    ])
+    h = Harness(monkeypatch, [friendly])
+    result = await generate(form=make_form(FILLS_FIELDS))
+    assert result["ok"] is True
+    assert len(h.draft_calls) == 1  # fully covered: no coverage retry
+    keys = [i["key"] for i in result["definition"]["inputs"]]
+    assert keys == ["classification", "legal_name"]
+    assert all(f["covered_by"] == "input" for f in result["fields"])

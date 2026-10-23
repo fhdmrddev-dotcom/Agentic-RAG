@@ -798,6 +798,9 @@ export type GenerateField = {
   type: string
   enum_options: string[]
   covered_by: "input" | "step"
+  /** 291 UAT S3-F1 — the input that fills this field; it may not be the field's own key.
+   *  Absent from servers older than the fix. */
+  input_key?: string | null
 }
 
 /** The structured result of POST /workflows/generate. The route returns HTTP 200

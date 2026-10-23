@@ -1989,6 +1989,14 @@
               }
             ],
             "title": "Note"
+          },
+          "fills": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Fills",
+            "description": "Form field keys this input's answer fills, when the input's own key is not the field key. Each form field is filled by exactly one input."
           }
         },
         "additionalProperties": false,

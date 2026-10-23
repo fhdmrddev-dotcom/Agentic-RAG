@@ -660,6 +660,15 @@ class InputFieldSpec(_StrictBase):
     folder_scope: list[UUID] | None = None  # if kb_auto: RESOLVED ids, not a path (open-Q iii)
     origin: Literal["ai_proposed", "server_added"] | None = None  # 291 D-12 — stamped server-side, never read off the payload
     note: str | None = None  # 291 D-10 — why an input that is not a form field exists
+    # 291 UAT S3-F1 — the attached form's field keys this input's answer goes into, when its own
+    # key is not one of them (one "tax classification" choice for seven checkboxes).
+    fills: list[str] = Field(
+        default_factory=list,
+        description=(
+            "Form field keys this input's answer fills, when the input's own key is not the "
+            "field key. Each form field is filled by exactly one input."
+        ),
+    )
 
     @model_serializer(mode="wrap")
     def _omit_absent_291_marks(self, handler):  # 291 W2: a no-file draft dumps byte-identical
@@ -667,6 +676,8 @@ class InputFieldSpec(_StrictBase):
         for name in ("origin", "note"):
             if isinstance(data, dict) and data.get(name, False) is None:
                 del data[name]
+        if isinstance(data, dict) and data.get("fills") == []:
+            del data["fills"]
         return data
 
 

@@ -142,41 +142,59 @@ def _input_keys(wd) -> list[str]:
     return [str(getattr(i, "key", "") or "") for i in (wd.inputs or [])]
 
 
+def _fields_of(spec, field_keys: set[str]) -> set[str]:
+    """The form fields one input answers: its own key when that is a field, plus every real
+    field its ``fills`` names (291 UAT S3-F1). A key named twice counts once."""
+    key = str(getattr(spec, "key", "") or "")
+    named = {key} | {str(k) for k in (getattr(spec, "fills", None) or [])}
+    return named & field_keys
+
+
+def _fillers(wd, fields: list[dict]) -> dict[str, list[str]]:
+    """``{field key: [input keys that fill it]}`` for every form field, in input order."""
+    field_keys = {str(f.get("key") or "") for f in fields or []}
+    out: dict[str, list[str]] = {k: [] for k in field_keys}
+    for spec in wd.inputs or []:
+        for k in _fields_of(spec, field_keys):
+            out[k].append(str(spec.key))
+    return out
+
+
 def covered_by(wd, fields: list[dict]) -> dict[str, str | None]:
-    """``{key: "input" | "step" | None}`` per form field. An input key matches EXACTLY; a phase
-    slug matches case-folded. Input wins (the shipped templateNameBuckets precedence)."""
-    keys = set(_input_keys(wd))
+    """``{key: "input" | "step" | None}`` per form field. An input covers a field when its key
+    matches EXACTLY or its ``fills`` names the field; a phase slug matches case-folded. Input
+    wins (the shipped templateNameBuckets precedence)."""
+    fillers = _fillers(wd, fields)
     slugs = {str(p.slug).casefold() for p in wd.phases}
     out: dict[str, str | None] = {}
     for f in fields or []:
         key = str(f.get("key") or "")
-        out[key] = "input" if key in keys else ("step" if key.casefold() in slugs else None)
+        out[key] = "input" if fillers.get(key) else ("step" if key.casefold() in slugs else None)
     return out
 
 
 def missing_fields(wd, fields: list[dict]) -> list[str]:
-    """Field keys not covered EXACTLY ONCE, in form order. An input key present twice is not
-    "exactly once" and is reported, even though ``covered_by`` reads it as an input."""
-    counts: dict[str, int] = {}
-    for key in _input_keys(wd):
-        counts[key] = counts.get(key, 0) + 1
+    """Field keys not covered EXACTLY ONCE, in form order. A field two inputs fill (by key or
+    by ``fills``) is not "exactly once" and is reported, even though ``covered_by`` reads it as
+    an input."""
+    fillers = _fillers(wd, fields)
     cover = covered_by(wd, fields)
     missing: list[str] = []
     for f in fields or []:
         key = str(f.get("key") or "")
-        if counts.get(key, 0) > 1 or cover.get(key) is None:
+        if len(fillers.get(key) or []) > 1 or cover.get(key) is None:
             if key not in missing:
                 missing.append(key)
     return missing
 
 
 def unexplained_inputs(wd, fields: list[dict]) -> list[str]:
-    """Input keys that are not form fields and carry no note saying why they exist (D-10)."""
+    """Input keys that fill no form field and carry no note saying why they exist (D-10)."""
     field_keys = {str(f.get("key") or "") for f in fields or []}
     return [
         str(i.key)
         for i in (wd.inputs or [])
-        if str(i.key) not in field_keys and not (getattr(i, "note", None) or "").strip()
+        if not _fields_of(i, field_keys) and not (getattr(i, "note", None) or "").strip()
     ]
 
 
@@ -186,8 +204,9 @@ def coverage_score(wd, fields: list[dict]) -> tuple[int, int]:
 
 
 _COVERAGE_TAIL = (
-    "Inputs that are not form fields must carry a note saying why. Re-emit the COMPLETE "
-    "WorkflowDefinition."
+    "Each form field is filled by exactly one input: either the input's key is the field key, "
+    "or the input lists the field key in its fills. Inputs that fill no form field must carry "
+    "a note saying why. Re-emit the COMPLETE WorkflowDefinition."
 )
 
 
@@ -219,10 +238,11 @@ def add_server_inputs(wd, fields: list[dict], keys: list[str]):
 
     by_key = {str(f.get("key") or ""): f for f in fields or []}
     already = set(_input_keys(wd))
+    filled = {k for k, who in _fillers(wd, fields).items() if who}  # 291 UAT S3-F1
     additions = []
     for key in keys:
         f = by_key.get(key)
-        if f is None or key in RESERVED_RUN_INPUT_KEYS or key in already:
+        if f is None or key in RESERVED_RUN_INPUT_KEYS or key in already or key in filled:
             continue
         already.add(key)
         ftype = _INPUT_TYPE.get(str(f.get("type") or "text"), "text")
@@ -256,7 +276,8 @@ def stamp_input_origins(wd, fields: list[dict], added_keys: list[str]):
 
     Whatever the model emitted for ``origin`` is overwritten: ``server_added`` for keys the
     server added, ``ai_proposed`` for keys whose form field was AI-proposed, ``None`` otherwise.
-    ``note`` survives only on inputs that are not form fields. With no fields, both are cleared
+    ``note`` survives only on inputs that are not form fields. ``fills`` keeps only real field
+    keys, once each, in the model's order (291 UAT S3-F1). With no fields, all three are cleared
     on every input.
     """
     if wd.inputs is None:
@@ -280,7 +301,8 @@ def stamp_input_origins(wd, fields: list[dict], added_keys: list[str]):
         else:
             origin = None
         note = spec.note if (key not in origin_of and fields) else None
-        update = {"origin": origin, "note": note}
+        fills = list(dict.fromkeys(str(k) for k in spec.fills or [] if str(k) in origin_of))
+        update = {"origin": origin, "note": note, "fills": fills}
         if key in options_of and spec.type == "enum":
             update["enum_options"] = options_of[key]
         stamped.append(spec.model_copy(update=update))
@@ -288,8 +310,10 @@ def stamp_input_origins(wd, fields: list[dict], added_keys: list[str]):
 
 
 def fields_report(wd, fields: list[dict]) -> list[dict]:
-    """The ``fields`` key of an ok result: every field in form order with what covers it."""
+    """The ``fields`` key of an ok result: every field in form order with what covers it, and
+    ``input_key``, the input that fills it (291 UAT S3-F1: it may not be the field's own key)."""
     cover = covered_by(wd, fields)
+    fillers = _fillers(wd, fields)
     return [
         {
             "key": str(f.get("key") or ""),
@@ -297,6 +321,7 @@ def fields_report(wd, fields: list[dict]) -> list[dict]:
             "type": str(f.get("type") or "text"),
             "enum_options": list(f.get("enum_options") or []),
             "covered_by": cover.get(str(f.get("key") or "")),
+            "input_key": (fillers.get(str(f.get("key") or "")) or [None])[0],
         }
         for f in fields or []
     ]

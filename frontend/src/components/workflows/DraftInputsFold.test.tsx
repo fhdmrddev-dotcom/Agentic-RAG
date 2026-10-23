@@ -427,3 +427,36 @@ describe("291-05 vocabulary — no banned word, no machine code", () => {
     }
   })
 })
+
+// ── 291 UAT S3-F1 — an input that fills several fields is ONE row, under its own label ────
+
+describe("an input that fills fields by name (291 UAT S3-F1)", () => {
+  const W9_FIELDS: GenerateField[] = [
+    { key: "c1_1[0]", label: "on", type: "enum", enum_options: ["Off", "1"], covered_by: "input", input_key: "classification" },
+    { key: "c1_1[1]", label: ".", type: "enum", enum_options: ["Off", "2"], covered_by: "input", input_key: "classification" },
+    { key: "f1_01[0]", label: "3.", type: "text", enum_options: [], covered_by: "input", input_key: "legal_name" },
+  ]
+  const W9_INPUTS: Input[] = [
+    { key: "classification", label: "Federal tax classification", type: "enum", source: "user", origin: null, note: null },
+    { key: "legal_name", label: "Vendor legal name", type: "text", source: "kb_auto", origin: null, note: null },
+  ]
+
+  it("shows one row per question, with the input's label, never the page-text guess", () => {
+    renderBody({ fields: W9_FIELDS, inputs: W9_INPUTS })
+    expect(rowLabels()).toEqual(["Federal tax classification", "Vendor legal name"])
+  })
+
+  it("counts the questions asked, not the form fields", () => {
+    renderTrigger({ fields: W9_FIELDS, inputs: W9_INPUTS })
+    expect(screen.getByTestId("draft-arrival-fold-inputs-summary").textContent).toBe(
+      inputsFoldSummary(2, FILENAME),
+    )
+  })
+
+  it("the switch flips the input that fills the field", async () => {
+    const { onSetSource } = renderBody({ fields: W9_FIELDS, inputs: W9_INPUTS })
+    const row = screen.getAllByTestId("draft-arrival-input-row")[1]
+    await userEvent.click(within(row).getByText(INPUT_SOURCE_ASK))
+    expect(onSetSource).toHaveBeenCalledWith("legal_name", "user")
+  })
+})

@@ -86,6 +86,7 @@ export interface DraftInputsFoldProps {
 /** The trigger: one more muted line in the card's footer strip. */
 export function DraftInputsFoldTrigger({
   fields,
+  inputs,
   filename,
   bodyId,
   open,
@@ -104,7 +105,7 @@ export function DraftInputsFoldTrigger({
         {FOLD_GLYPH}
       </span>
       <span data-testid="draft-arrival-fold-inputs-summary" className="min-w-0 flex-1 truncate">
-        {inputsFoldSummary(fields.length, filename)}
+        {inputsFoldSummary(foldRows(fields, inputs, filename).filter((row) => row.fromForm).length, filename)}
       </span>
       <span className={FOLD_ACTION_CLASS}>{INPUTS_FOLD_ACTION}</span>
     </button>
@@ -120,36 +121,44 @@ interface Row {
   /** `null` ⇒ a step writes this field, so there is no switch. */
   source: InputSource | null
   serverAdded: boolean
+  /** From a form field (counted in the summary), not an extra input the AI added. */
+  fromForm: boolean
 }
 
 function liveSource(input: DraftInputLike | undefined): InputSource {
   return input?.source === "kb_auto" ? "kb_auto" : "user"
 }
 
-/** The body: the heading, the explanation, then one row per field and per explained extra. */
-export function DraftInputsFoldBody({
-  fields,
-  inputs,
-  filename,
-  bodyId,
-  onSetSource,
-}: DraftInputsFoldProps) {
-  const groupBase = useId()
+/** One row per question the person is asked, then one per field a step writes, then one per
+ *  explained extra input. 291 UAT S3-F1: a field names the input that fills it (`input_key`),
+ *  which may not be the field's own key, and several fields can share one input (one "tax
+ *  classification" choice fills seven checkboxes), so that input gets ONE row and its own label. */
+function foldRows(
+  fields: readonly GenerateField[],
+  inputs: readonly DraftInputLike[],
+  filename: string,
+): Row[] {
   const byKey = new Map(inputs.map((input) => [input.key, input]))
-  const fieldKeys = new Set(fields.map((field) => field.key))
-
-  const rows: Row[] = fields.map((field) => {
-    const input = byKey.get(field.key)
-    return {
-      key: field.key,
-      label: field.label !== "" ? field.label : field.key,
+  const shown = new Set<string>()
+  const rows: Row[] = []
+  for (const field of fields) {
+    const input = byKey.get(field.input_key ?? field.key)
+    if (input !== undefined && field.covered_by !== "step") {
+      if (shown.has(input.key)) continue
+      shown.add(input.key)
+    }
+    const inputLabel = typeof input?.label === "string" ? input.label : ""
+    rows.push({
+      key: input?.key ?? field.key,
+      label: inputLabel !== "" ? inputLabel : field.label !== "" ? field.label : field.key,
       detail: fieldTypeWord(field),
       source: field.covered_by === "step" ? null : liveSource(input),
       serverAdded: input?.origin === "server_added",
-    }
-  })
+      fromForm: true,
+    })
+  }
   for (const input of inputs) {
-    if (fieldKeys.has(input.key)) continue
+    if (shown.has(input.key) || fields.some((field) => field.key === input.key)) continue
     const note = typeof input.note === "string" ? input.note.trim() : ""
     if (note === "") continue
     rows.push({
@@ -158,8 +167,22 @@ export function DraftInputsFoldBody({
       detail: inputExtraNote(filename, note),
       source: liveSource(input),
       serverAdded: input.origin === "server_added",
+      fromForm: false,
     })
   }
+  return rows
+}
+
+/** The body: the heading, the explanation, then one row per question and per explained extra. */
+export function DraftInputsFoldBody({
+  fields,
+  inputs,
+  filename,
+  bodyId,
+  onSetSource,
+}: DraftInputsFoldProps) {
+  const groupBase = useId()
+  const rows = foldRows(fields, inputs, filename)
 
   const segments: { value: InputSource; label: string }[] = [
     { value: "user", label: INPUT_SOURCE_ASK },
