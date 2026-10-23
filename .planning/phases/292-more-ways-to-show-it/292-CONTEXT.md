@@ -57,8 +57,11 @@ decision), `steps` (rejected at the sketch), and any change to chart/table/metri
     grouped").
 - **D-05: comparison:** `options[]` (column headers) and `terms[{name, cells[{verdict, text?}]}]`,
   one cell per option, in option order.
-  - `verdict` is the closed enum `y | n | m | q` (yes / no / partly / not stated). ✓ ✗ – ? glyphs;
-    the glyph SHAPE carries the verdict, not colour alone.
+  - `verdict` is the closed enum `y | n | m | q`: **favourable / unfavourable / neutral / not
+    stated in the document**, the approved sketch's key (`index.html` `GL` table). ✓ ✗ – ? glyphs;
+    the glyph SHAPE carries the verdict, not colour alone. The `show_artifact` description defines
+    the four the same way. (Corrected at UI-SPEC, 2026-10-24: the first draft of this line said
+    "yes / no / partly", which contradicted the sketch.)
   - `q` renders as italic "Not stated", never a blank cell.
   - Caps: **2-5 options**, **1-20 terms**, cell text at most the existing `MAX_CELL_CHARS` (200).
   - A term whose cell count differs from the option count is a worded refusal.
