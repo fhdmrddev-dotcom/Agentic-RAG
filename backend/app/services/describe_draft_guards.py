@@ -261,6 +261,13 @@ def stamp_input_origins(wd, fields: list[dict], added_keys: list[str]):
     if wd.inputs is None:
         return wd
     origin_of = {str(f.get("key") or ""): f.get("origin") for f in fields or []}
+    # 291-REVIEW-R1 CR-01: the prompt shows PROMPT_ENUM_SHOWN options, so a model-declared enum
+    # input carries the cut list. The read result is the source of truth for the options.
+    options_of = {
+        str(f.get("key") or ""): [str(o) for o in f.get("enum_options") or []]
+        for f in fields or []
+        if _INPUT_TYPE.get(str(f.get("type") or "text")) == "enum" and f.get("enum_options")
+    }
     added = set(added_keys or [])
     stamped = []
     for spec in wd.inputs:
@@ -272,7 +279,10 @@ def stamp_input_origins(wd, fields: list[dict], added_keys: list[str]):
         else:
             origin = None
         note = spec.note if (key not in origin_of and fields) else None
-        stamped.append(spec.model_copy(update={"origin": origin, "note": note}))
+        update = {"origin": origin, "note": note}
+        if key in options_of and spec.type == "enum":
+            update["enum_options"] = options_of[key]
+        stamped.append(spec.model_copy(update=update))
     return wd.model_copy(update={"inputs": stamped})
 
 
@@ -331,7 +341,7 @@ DESCRIBE_POWERS_TOOL: dict = {
 DESCRIBE_POWERS_INSTRUCTION = (
     "Read ONLY the author's description below. List what it explicitly asks the workflow to do "
     "outside the app: external_capabilities (send_email, create_ticket, post_message), tools "
-    "(web_search, execute_code (running code or calculations), save_skill, attach_skill_file, "
+    "(web_search, execute_code (running code), save_skill, attach_skill_file, "
     "remember), and services: the names of the "
     "author's connected services, from the list below, that the description names. List "
     "nothing the description does not ask for."

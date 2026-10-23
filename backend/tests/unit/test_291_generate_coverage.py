@@ -302,6 +302,19 @@ async def test_a_big_pdf_form_keeps_EVERY_option_on_the_server_added_input(monke
 
 
 @pytest.mark.asyncio
+async def test_a_MODEL_declared_enum_input_gets_the_full_read_list_back(monkeypatch):
+    # 291-REVIEW-R1 CR-01: the model saw 25 options and declared the input with those 25.
+    # The launch form must still offer every option the form carries.
+    declared = _inp("Country", type="enum", enum_options=COUNTRIES[:25])
+    Harness(monkeypatch, [_definition(inputs=[declared, _inp("Rate %")])])
+    result = await generate(form=make_form(fields=BIG_PDF_FIELDS))
+    assert result["ok"] is True
+    by_key = {i["key"]: i for i in result["definition"]["inputs"]}
+    assert by_key["Country"]["enum_options"] == COUNTRIES
+    assert by_key["Country"].get("origin") is None  # model-declared, not server_added
+
+
+@pytest.mark.asyncio
 async def test_no_files_prompt_is_byte_identical_and_result_has_no_new_keys(monkeypatch):
     h = Harness(monkeypatch, [_definition(inputs=[_inp("budget", note="n", origin="server_added")])])
     result = await generate()
