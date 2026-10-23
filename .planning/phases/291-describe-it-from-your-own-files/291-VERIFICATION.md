@@ -1,61 +1,82 @@
 ---
 phase: 291-describe-it-from-your-own-files
 verified: 2026-10-23T00:00:00Z
-status: gaps_found
-score: 2/5 must-haves verified (SC#2, SC#5 code-side; SC#1 partial, SC#3 failed, SC#4 operator-owed)
-requirements: {AUTH-02: partially satisfied}
-gaps:
-  - truth: "SC#3 - Instructions hidden inside an uploaded asset do not change the draft's tools or grants"
-    status: failed
-    reason: "POWER_TOOLS in describe_draft_guards.py:280 = {web_search, save_skill, attach_skill_file, remember}. execute_code is absent, but the draft tool registry (harness/grounding.py get_tools(None) - CHAT_ONLY_TOOLS; tool_dispatcher.py:115,202 gated only by sandbox_enabled) includes it. draft_powers() reports nothing for an execute_code step, so the guard never strips a file-planted one. The sandbox is created with no network restriction (per review), so it is a stronger egress channel than web_search, which IS in the set. Verified by reading the code; not driven live."
-    artifacts:
-      - path: "backend/app/services/describe_draft_guards.py"
-        issue: "POWER_TOOLS, DescribePowers.tools Literal and _TOOL_LEAD omit execute_code"
-    missing:
-      - "Add execute_code to POWER_TOOLS, the DescribePowers.tools Literal, the powers instruction and _TOOL_LEAD; add a planted-injection test that uses execute_code"
-  - truth: "SC#1 - declared inputs match the fields found in the uploaded form"
-    status: partial
-    reason: "formBodyFor (useTemplateFirstDraft.ts:549-565) returns null when any field has >50 enum options (FORM_ENUM_MAX), >200 fields, or a key containing %. The PDF is still bound as template, and the template_placeholders fallback (lines 995-1000) only applies to arm template_fields, not an AcroForm. So for a common class of PDF (state or country dropdown) no fields reach the generator, with no notice. Confirmed by reading code."
-    artifacts:
-      - path: "frontend/src/components/workflows/useTemplateFirstDraft.ts"
-        issue: "silent null from formBodyFor for oversize or % forms while the PDF stays bound"
-    missing:
-      - "Truncate or relax caps (client and server in workflow_authoring_doors.py) or surface a visible refusal and unbind"
+verification_mode: self-verified   # OV-SOLO-01 - NEVER "reviewed". No independent reviewer exists.
+status: human_needed
+score: 3/5 code-verified (SC#1, SC#2, SC#3); SC#4 and SC#5 owed to human
+re_verification:
+  previous_status: gaps_found
+  previous_score: 2/5
+  gaps_closed:
+    - "SC#3 execute_code missing from POWER_TOOLS (CR-01)"
+    - "SC#1 oversize or % forms silently dropped (CR-02)"
+  gaps_remaining: []
+  regressions: []
+requirements: {AUTH-02: code-side satisfied; closure blocked on owed human items}
 human_verification:
-  - test: "SC#4 - run RUN_291_AUTHORING_ROSTER=1 backend/tests/integration/test_291_authoring_roster.py across the full native roster plus OpenRouter; record blocked rows, never omit"
-    expected: "Every provider row passes or is recorded as blocked with a reason and issue id"
-    why_human: "Paid, opt-in; not run. Not evidenced."
-  - test: "G-4 Chrome UAT rows S1-S7 in 291-VALIDATION.md (lines ~73-80)"
-    expected: "Lived-experience scenarios pass: template, form, reference upload; arrival card; launch; fillable-PDF and Word fill"
-    why_human: "Visual and real-run behaviour; owed and not run"
-  - test: "SC#5 live: run a workflow on an author's fillable PDF and a confirmed Word copy"
-    expected: "Author's own form comes back filled, with no author-added placeholders"
-    why_human: "Unit suites (pdf_fill_driver 33 cases, word_copy) pass per the review, but no end-to-end run was driven"
+  - test: "SC#4 - RUN_291_AUTHORING_ROSTER=1 pytest backend/tests/unit/test_291_authoring_roster.py across the full native roster plus OpenRouter. Include a 'calculate the totals -> no execute_code' row."
+    expected: "Every provider row passes, or is recorded as blocked with a reason and issue id"
+    why_human: "Paid and opt-in; not run"
+  - test: "G-4 Chrome UAT rows S1-S7 in 291-VALIDATION.md (run S1 first)"
+    expected: "Template, form and reference upload; arrival card; launch; fillable-PDF and Word fill all behave as specified"
+    why_human: "Lived-experience and visual behaviour"
+  - test: "SC#5 live: run a workflow on an author's fillable PDF and on a confirmed Word copy"
+    expected: "The author's own form comes back filled, with no author-added placeholders"
+    why_human: "No end-to-end run has been driven; only unit suites"
 ---
 
-# Phase 291 Verification
+# Phase 291 Verification (re-verification after gap-closure round 1)
 
 **Goal:** an author hands the describe door a template, form or reference docs and gets a draft whose inputs, phases and tools come from them.
-**Status:** gaps_found. This is not a goal-achieved phase: one success criterion fails on a security-relevant hole, and one is only partial.
+**Status:** human_needed. No code gaps remain against the five success criteria. The owed human items are all that stand between this phase and AUTH-02 being marked satisfied.
+
+**Re-verification note:** the previous status was `gaps_found` (SC#3 failed, SC#1 partial). Both are closed in the working tree, and I read the code rather than the SUMMARY.
 
 ## Success criteria
 
 | # | Criterion | Status | Evidence |
 |---|---|---|---|
-| 1 | Declared inputs match uploaded form fields | PARTIAL | Read door, `form` body, and unit suites (`test_291_describe_read*`, `generate_coverage`, `acroform_reader_parity`) exist. CR-02 confirmed: oversize or `%` forms silently send nothing while the PDF stays bound. |
-| 2 | Tools and phase types from the closed set; unknown tool refused | VERIFIED (code-level) | `test_291_generate_closed_set.py` exists; the registry is the closed set built in `grounding.py`. I did not re-run it. |
-| 3 | Hidden instructions do not change tools or grants | FAILED (BLOCKER) | `execute_code` is not in `POWER_TOOLS` (CR-01 confirmed at line 280). The guard otherwise works for external_action steps and the four listed tools: the description-only powers call never sees file text, and fencing is in place (`test_291_fence`, `test_291_powers_guard`). |
-| 4 | Full roster plus OpenRouter, blocked rows recorded | UNCERTAIN (owed) | `test_291_authoring_roster.py` exists; it has not been run. No evidence. |
-| 5 | Run returns the author's own form filled | VERIFIED at unit level, UNCERTAIN end-to-end | `test_291_pdf_fill_driver.py`, `test_291_word_copy.py`, `test_291_form_inputs_overlay.py` exist and pass in the unit gate. No live run was driven. CR-02 also weakens the PDF path for large forms. |
+| 1 | Declared inputs match uploaded form fields | VERIFIED (code) | `useTemplateFirstDraft.ts:1012-1027`: a blocked form now stops the draft with `FORM_NOT_SENDABLE_KEY` set through `setErrorState`. It is no longer dropped silently, and the only exception is the `template_fields` placeholders fallback. The `FORM_ENUM_MAX` cap is now 500 and the client caps mirror the server. `stamp_input_origins` (`describe_draft_guards.py:253-286`) restores the FULL option list from the read for model-declared enum inputs (R1-CR-01 fix is present in the working tree). The server-added path keeps full options too. |
+| 2 | Tools and phase types come from the closed set; unknown tool refused | VERIFIED (code) | `test_291_generate_closed_set.py` passes. No change this round. |
+| 3 | Hidden instructions in an asset do not change tools or grants | VERIFIED (code) | `POWER_TOOLS` at `describe_draft_guards.py:313` now contains `execute_code`. The `DescribePowers.tools` Literal (line 322) and the powers instruction (line 344) carry it, and `_TOOL_LEAD` has an entry (line 426), so no KeyError. "or calculations" is gone from the instruction (R1-WR-01 partial fix). `test_291_powers_guard.py` passes. |
+| 4 | Full roster plus OpenRouter, blocked rows recorded | UNCERTAIN (owed) | The roster test exists but has not been run. |
+| 5 | Run returns the author's own form filled | VERIFIED at unit level, UNCERTAIN end-to-end | `test_291_pdf_fill_driver`, `test_291_word_copy` and `test_291_form_inputs_overlay` pass. No live run. |
+
+## Behavioural spot-checks
+
+| Check | Result |
+|---|---|
+| Backend targeted: powers_guard, generate_coverage, generate_degraded, untrusted_names_fence, describe_read, generate_closed_set, pdf_fill_driver, word_copy, form_inputs_overlay | 207 passed |
+| Frontend: `useTemplateFirstDraft.test.tsx` and `describeRefusalVocabulary.test.ts` | 138 passed |
+
+I did not run the full backend unit suite or the vitest count gate (the orchestrator does).
 
 ## Requirements
-AUTH-02 (REQUIREMENTS.md:21, mapped to Phase 291, still "Pending"): the only ID declared for this phase and the only one mapped to it, so none is orphaned. It is **not yet satisfied**, because SC#3 fails and SC#4 is unevidenced.
 
-## Gates (as reported by the orchestrator, not re-run)
-Vitest count gate OK; tsc file set identical to base; backend unit 70 failed against ceiling 71 (all inherited); no migrations. `test_214_argument_seams.py::test_S7` is red, an integration-only pin (4 `"reason_code":` against an expected 3). It is a stale pin from 291-02 and I found no behavioural cause. It should be updated.
+AUTH-02 (REQUIREMENTS.md:21, mapped to Phase 291 at line 83, still "Pending"). It is the only ID declared and the only one mapped, so none is orphaned. The code-side capability is delivered. REQUIREMENTS.md should flip only after the human items are run, as the deferred-items file already says.
 
-## Other review findings
-The 10 warnings and 8 info items in 291-REVIEW.md (file editing during composition, references listed as "used" though unread, chat-path output filename regression, an unkept trust claim in `form_inputs.py`, `removed_powers_broke_draft` falling back to the generic refusal) were not individually re-verified here. Triage them under G-7 / G-3 rules.
+## Residual non-blocking findings (warnings, not gaps)
+
+None of these makes a success criterion false, and all are triaged in `deferred-items.md`.
+- **R1-WR-01 (residual):** once the description itself asks to run code, every `execute_code` step in the draft is kept, including one planted by a file. The author's own `execute_code` also runs with default-bridge egress. Trigger: the sandbox `network_mode` decision.
+- **R1-WR-02:** a fillable PDF's field names reach the generate prompt raw through `grounding.py`. The powers guard re-checks tools after drafting, so SC#3 holds.
+- **R1-WR-03:** `describe_files._fence` can be bypassed with `< /document_content>`. This is pre-existing and affects only the read-time proposal.
+- Also deferred: WR-05 (security: a minted `input:<key>` id is a valid citation for any leaf), plus WR-01 through WR-07 and IN-01 through IN-08. WR-03 and WR-05 are scheduled for `/gsd:fast`. WR-05 is flagged as a security item in the deferred-items file. It should be done before AUTH-02 is closed or any prod push.
+- IN-01 through IN-03 from the R1 review (client cap mirrors unpinned, 255-character filename, `fetch_document_file` left on a step) are accepted as info.
+
+## Anti-patterns
+
+I did not run a debt-marker scan. The anti-pattern scan was limited to what the two reviews already cover, and they report no TBD, FIXME or XXX.
+
+## Gates (reported by the orchestrator, not re-run here)
+
+Per the previous report: backend unit 70 failed against the ceiling of 71 (inherited), no migrations. The `test_S7` pin was fixed by value in 291-06.
 
 ## Routing
-Both gaps are small: CR-01 is a one-line set addition plus a Literal and a test. Under G-3 and G-7, `/gsd:fast` or a single closure round is appropriate rather than a new capability. Check `node scripts/check-gap-closure-rounds.cjs 291` first. The human items (roster, S1-S7) remain owed regardless.
+
+G-7: two gap-closure rounds are not yet used up (this was round 1), but no success criterion is unmet in code, so do not open another round. Run the owed items: S1 first, then S2 to S7, the SC#5 live fill, then the SC#4 roster. Do the scheduled `/gsd:fast` (WR-03, WR-05, R1-WR-02, R1-WR-03) before promoting anywhere.
+
+---
+
+_Verified: 2026-10-23_
+_Verifier: Claude (gsd-verifier)_

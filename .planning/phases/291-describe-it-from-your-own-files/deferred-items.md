@@ -54,3 +54,15 @@ trigger or schedule. 291-06 closed CR-01, CR-02, WR-08, WR-09 and WR-10.
     Trigger: owed before AUTH-02 can be marked satisfied; run at 291 verify-work.
   - **SC#5** — the live fill run on a fillable PDF and on a confirmed Word copy.
     Trigger: owed before AUTH-02 can be marked satisfied; run at 291 verify-work, after S1.
+
+## Found by 291-REVIEW-R1 (review of gap round 1)
+
+- **R1-CR-01: FIXED inline (G-3).** A model-declared enum input kept only the 25 options the prompt showed. `stamp_input_origins` now restores the full option list from the read result. Test: `test_a_MODEL_declared_enum_input_gets_the_full_read_list_back`.
+- **R1-WR-01: FIXED inline (G-3), partly.** The powers instruction no longer says "or calculations", so "calculate the totals" should not grant `execute_code`. Still true: once the description itself asks for running code, every `execute_code` step in the draft is kept, including one planted by a file.
+  Trigger: the sandbox `network_mode` decision above (that is where egress is actually closed). Add a "calculate the totals → no execute_code" row to the SC#4 roster run.
+- **R1-WR-02: DEFERRED.** For a fillable PDF, its field names reach the generate prompt raw, as `template_placeholders`, in `grounding.py`'s "fills EXACTLY the fields named on the next line". The fix changes the shared grounding section that every template draft uses (pinned by `test_193_1_grounding_wire.py` and `test_182_extraction_parity.py`), so it needs its own cross-provider check. SC#3 holds regardless, because the powers guard re-checks tools after drafting. The risk is limited to how steps are shaped.
+  Scheduled: /gsd:fast after 291 round 1, together with WR-03/WR-05. Fence the names in an escaped `<template_fields>` block, or point the line at the already-fenced `<document_fields>` block.
+- **R1-WR-03: DEFERRED (existing before 291-06).** `describe_files._fence` lets `< /document_content>` and `</document_content foo>` through. The generate-path escaper catches both.
+  Scheduled: same /gsd:fast. Have `_fence` escape every `<`/`>` the way `_fence_value` does.
+- **R1-IN-01..03: ACCEPTED as info.** The client mirrors of the caps and sentence have no test tying them to the server. The 255-character filename limit isn't mirrored on the client. `fetch_document_file` stays on a step after `execute_code` is stripped.
+  Trigger: next phase touching `useTemplateFirstDraft.ts`.
