@@ -12,8 +12,8 @@ minted ids are returned so the caller can admit them to BOTH citation gates.
 
 Trust boundary (T-291-20): an ``input:<key>`` id is minted ONLY here, ONLY for a declared
 ``user`` input that is a template placeholder. ``kb_auto`` and ``template_derived`` inputs are
-ignored, so a KB-filled key still needs a real retrieved citation and the overlay can never
-weaken it. Enum validity is not checked here: the fill engine checks every answer against
+ignored, so a KB-filled key still needs a real retrieved citation. A minted id counts only on
+its own overlaid scalar: any other leaf citing an ``input:`` id is stripped to uncited (WR-05). Enum validity is not checked here: the fill engine checks every answer against
 the form's own choices and refuses, in words, what does not match.
 """
 
@@ -68,10 +68,23 @@ def overlay_user_inputs(
 
     new_map = dict(legacy_map)
     scalars = copy.deepcopy(legacy_map.get("scalars") or {})
+    collections = copy.deepcopy(legacy_map.get("collections") or {})
+    # WR-05: a minted id is valid ONLY on its own overlaid scalar. Any other leaf citing an
+    # input: id (a KB scalar, a collection cell) loses the citation, so the gate counts it
+    # as uncited and takes the normal reject/retry path.
+    for cited in list(scalars.values()) + [
+        cell for rows in collections.values() for row in (rows or []) for cell in (row or {}).values()
+    ]:
+        if isinstance(cited, dict) and str(cited.get("source_chunk_id") or "").startswith(
+            _INPUT_CITATION_PREFIX
+        ):
+            cited["source_chunk_id"] = None
     ids: set[str] = set()
     for key, answer in overlay.items():
         cid = f"{_INPUT_CITATION_PREFIX}{key}"
         scalars[key] = {"value": answer, "source_chunk_id": cid, "source_doc": None, "source_page": None}
         ids.add(cid)
     new_map["scalars"] = scalars
+    if "collections" in legacy_map:
+        new_map["collections"] = collections
     return new_map, ids

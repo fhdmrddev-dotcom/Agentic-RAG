@@ -83,6 +83,25 @@ def test_both_gates_accept_it_and_a_kb_invented_citation_is_still_rejected():
     assert gate["invented_citation_count"] == 1  # the overlay never weakens KB citations
 
 
+def test_a_minted_id_cited_by_any_other_leaf_counts_as_uncited():
+    # WR-05: an emitter (or an injected passage naming the predictable id) must not be able
+    # to pass an invented KB value, or a collection cell, by citing someone else's input:<key>.
+    from app.services.harness.form_inputs import overlay_user_inputs
+    from app.services.template_render_service import check_coverage
+
+    d = _definition([_spec("name"), _spec("company", source="kb_auto", type_="kb_auto")])
+    emitted = _map()
+    emitted["scalars"]["company"] = _leaf("Invented Ltd", "input:name")
+    emitted["collections"] = {"rows": [{"item": _leaf("Fake", "input:name")}]}
+    new_map, ids = overlay_user_inputs(emitted, d, {"name": "Ann"}, ["name", "company", "rows"])
+    assert new_map["scalars"]["name"]["source_chunk_id"] == "input:name"
+    assert new_map["scalars"]["company"]["source_chunk_id"] is None
+    assert new_map["collections"]["rows"][0]["item"]["source_chunk_id"] is None
+    assert emitted["scalars"]["company"]["source_chunk_id"] == "input:name"  # input untouched
+    gate = check_coverage(new_map, {"chunk-1"} | ids, ["name", "company", "rows"])
+    assert gate["uncited_value_count"] == 2
+
+
 def test_a_user_key_cannot_mint_a_citation_for_a_kb_key():
     from app.services.harness.form_inputs import overlay_user_inputs
 

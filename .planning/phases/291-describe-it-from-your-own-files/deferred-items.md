@@ -20,17 +20,17 @@ trigger or schedule. 291-06 closed CR-01, CR-02, WR-08, WR-09 and WR-10.
 - **WR-02** — references that were never read are bound and listed as "Used to write this draft". Deferred: not an SC gap.
   Trigger: the next phase whose `files_modified` names `useTemplateFirstDraft.ts`, `WorkflowBuilderPage.tsx` or `decisionsVocabulary.ts`.
 - **WR-03** — chat `render_template` with a Word template and a model-chosen `.pdf` out_filename fails integrity instead of delivering. Deferred: a chat-path defect outside AUTH-02's SCs; not folded into this plan.
-  Scheduled: /gsd:fast immediately after 291 round 1 (fix spec: 291-REVIEW WR-03).
+  **DONE 2026-10-23 (/gsd:fast):** `_safe_out_filename` keeps the model's stem and always uses the template's extension ("report.pdf" on a Word template → "report.docx"). Pinned in `test_291_pdf_fill_driver.py::test_safe_out_filename_accepts_pdf`.
 - **WR-04** — a button `/V` is written as a text string, and the read-back cannot see it. Deferred: not an SC gap.
   Trigger: the next phase touching `render_template.py`'s acroform engine, or a viewer report of an unset checkbox or radio.
 - **WR-05 — ⚠ SECURITY** — a minted `input:<key>` id is a valid citation for ANY leaf, so the overlay's "can never weaken it" claim does not hold. Deferred by orchestrator decision; not folded into this plan.
-  Scheduled: /gsd:fast immediately after 291 round 1 (fix spec: 291-REVIEW WR-05).
+  **DONE 2026-10-23 (/gsd:fast):** `overlay_user_inputs` strips any `input:` citation from every leaf except the overlaid scalar for that same key (KB scalars and collection cells), so the gate counts it as uncited and takes the normal reject/retry path. Pinned in `test_291_form_inputs_overlay.py::test_a_minted_id_cited_by_any_other_leaf_counts_as_uncited` (RED first). IN-01 and IN-06 were NOT done here; their trigger moves to the next touch of `form_inputs.py`.
 - **WR-06** — "Look it up" (`source: "kb_auto"`) has no engine-side lookup. Deferred: building it is a new capability, not a closure fix.
   Trigger: the next phase touching `declaredInputsVocabulary.ts`, `soulData.ts` kb_auto or `form_inputs.py`, or a G-4 S-row showing a kb_auto field come back blank.
 - **WR-07** — untrusted PDFs are fully text-extracted twice in the API process, with no page or decompression bound. Deferred: not an SC gap; the describe door is author-only today.
   Trigger: the next phase touching `describe_files.py`'s PDF read, or before the describe door is reachable by any non-author or public-API caller.
 - **IN-01** — the citation-gate retry fires with no KB evidence, and its feedback names `<doc>` blocks that do not exist.
-  Trigger: with WR-05's scheduled /gsd:fast.
+  Trigger: the next touch of `form_inputs.py` or the emit citation gate (WR-05 fast batch shipped without it, 2026-10-23).
 - **IN-02** — the reference door has no server-side count cap (judged not a defect for model input).
   Trigger: storage-quota work.
 - **IN-03** — a partial Word-copy placement at bind time returns 201 and drops the unplaced sentences.
@@ -40,7 +40,7 @@ trigger or schedule. 291-06 closed CR-01, CR-02, WR-08, WR-09 and WR-10.
 - **IN-05** — `fields_report` can return `covered_by: null`, which the client type forbids, and the fold then shows a dead switch.
   Trigger: the next touch of `DraftInputsFold.tsx` or `frontend/src/lib/api/knowledge.ts`.
 - **IN-06** — unanswered optional user inputs are not overlaid as explicit nulls.
-  Trigger: with WR-05's scheduled /gsd:fast.
+  Trigger: the next touch of `form_inputs.py` or the emit citation gate (WR-05 fast batch shipped without it, 2026-10-23).
 - **IN-07** — `grounding_unavailable` on every generate; transient DB errors are now hard refusals (judged safe).
   Trigger: the next touch of `workflow_authoring.py` grounding (`_assemble_grounding`).
 - **IN-08** — `bindFailed` reports only the last failed file, and the inputs fold's filename reads the live template file.

@@ -679,14 +679,18 @@ def _safe_out_filename(raw: str | None, template_ext: str) -> str:
 
     Accepts a single basename matching ``^[A-Za-z0-9._ -]+\\.(docx|pptx|xlsx|pdf)$`` (no
     ``/`` ``\\`` ``..`` and no shell metacharacters ``; | & $ ( ) ` < > * ? '"``).
+    The returned extension is ALWAYS the template's (291 WR-03); the model picks only the stem.
     On reject, falls back to ``deliverable.<ext>`` using the TEMPLATE's extension
     (one of docx/pptx/xlsx/pdf; defaults to docx) so the happy path keeps working
     rather than failing the whole render on a cosmetic filename.
     """
+    ext = template_ext if template_ext in ("docx", "pptx", "xlsx", "pdf") else "docx"
     candidate = (raw or "").strip()
     if candidate and _SAFE_OUT_FILENAME_RE.match(candidate):
-        return candidate
-    ext = template_ext if template_ext in ("docx", "pptx", "xlsx", "pdf") else "docx"
+        # 291 WR-03: the output kind is the template's kind, whatever name the model asked
+        # for. A Word template named "report.pdf" would render docx bytes into a .pdf and fail
+        # integrity, so the model's stem is kept and the extension follows the template.
+        return f"{candidate.rsplit('.', 1)[0]}.{ext}"
     return f"deliverable.{ext}"
 
 
@@ -868,11 +872,10 @@ async def _handle_render_template(args: dict, ctx: ToolContext) -> ToolResult:
 
     # Phase 291 (D-25): a fillable PDF is filled through its OWN fields. The engine follows the
     # template's extension here; select_engine stays the docx provenance boundary, unchanged.
-    # The output of a PDF form is always a .pdf, whatever name the model asked for.
+    # The output of a PDF form is always a .pdf (_safe_out_filename ties every output's
+    # extension to the template's — 291 WR-03).
     if template_ext == "pdf":
         engine = "acroform"
-        if not out_filename.lower().endswith(".pdf"):
-            out_filename = _os_local.path.splitext(out_filename)[0] + ".pdf"
 
     # ── 4. Render in the SEALED sandbox (Pitfall 4 / D-12 / D-13) ────────────────
     # No local-venv fallback — that would breach TMPL-03 (render MUST be sandboxed).

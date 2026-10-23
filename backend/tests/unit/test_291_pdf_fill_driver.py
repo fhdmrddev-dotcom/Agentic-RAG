@@ -351,6 +351,13 @@ def test_safe_out_filename_accepts_pdf():
     assert _safe_out_filename("r.xlsx", "xlsx") == "r.xlsx"
     assert _safe_out_filename(None, "docx") == "deliverable.docx"
     assert _safe_out_filename("../a.pptx", "pptx") == "deliverable.pptx"
+    # WR-03: the output extension always follows the TEMPLATE. A Word template asked for
+    # "report.pdf" used to render docx bytes into a .pdf and fail integrity (no deliverable).
+    assert _safe_out_filename("report.pdf", "docx") == "report.docx"
+    assert _safe_out_filename("Deck.pdf", "pptx") == "Deck.pptx"
+    assert _safe_out_filename("sheet.docx", "xlsx") == "sheet.xlsx"
+    assert _safe_out_filename("form.docx", "pdf") == "form.pdf"
+    assert _safe_out_filename("a.b.pdf", "docx") == "a.b.docx"
 
 
 async def _noop_emit(*a, **k):
