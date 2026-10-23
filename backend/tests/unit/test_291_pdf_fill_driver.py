@@ -203,8 +203,11 @@ def test_invalid_choice_and_radio_are_refused_in_words_and_left_blank(driver, tm
         assert key in sentence
         assert "isn't one of this form's choices, so it was left blank" in sentence
     f = _fields_by_name(out)
-    assert f["country"].get("/V") == before["country"].get("/V")  # untouched (UK default)
-    assert f["country"].get("/V") != "FR"
+    # 291 UAT S6b (2026-10-24): this used to assert the form's default ("UK") was kept, under a
+    # sentence saying "left blank". Live, a vendor PDF showed its default "US" for a refused
+    # "Spain". Left blank now means blank.
+    assert before["country"].get("/V") == "UK"
+    assert f["country"].get("/V") in (None, "")
     assert f["payment"].get("/V") in (None, "/Off")
     assert all(s == "/Off" for s in _widget_states(out, "payment"))
     assert f["name"].get("/V") == "Ann"

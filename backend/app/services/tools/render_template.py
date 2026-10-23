@@ -378,6 +378,10 @@ def fill_acroform(template_path, flat_values, out_path):
     by_name = {f["name"]: f for f in fields}
     values = {}
     refused = []
+    # 291 UAT S6b: a refused answer is LEFT BLANK, as its sentence says. A form that already
+    # carried a value there (a dropdown's default) would otherwise show that default under
+    # "left blank". Cleared fields are written empty (a choice) or Off (a box) and read back.
+    cleared = {}
     for key, raw in (flat_values or {}).items():
         field = by_name.get(key)
         if field is None:
@@ -400,6 +404,7 @@ def fill_acroform(template_path, flat_values, out_path):
                 matched = on
             if matched is None:
                 refused.append({"field": key, "sentence": _refused_sentence(field)})
+                cleared[key] = "/Off"
                 continue
             values[key] = matched
             continue
@@ -409,12 +414,13 @@ def fill_acroform(template_path, flat_values, out_path):
         matched = _match_choice(text, field)
         if matched is None:
             refused.append({"field": key, "sentence": _refused_sentence(field)})
+            cleared[key] = "/Off" if ftype == "radio" else ""
             continue
         values[key] = matched
 
     writer = PdfWriter(clone_from=PdfReader(template_path))
-    if values:
-        _write_values(writer, values)
+    if values or cleared:
+        _write_values(writer, {**cleared, **values})
     writer.set_need_appearances_writer(True)
     acro = writer._root_object.get("/AcroForm")
     if acro is not None:
@@ -440,6 +446,16 @@ def fill_acroform(template_path, flat_values, out_path):
                 ok = got["value"] == want and want in ases
         else:
             ok = got["value"] == want
+        if not ok:
+            mismatch.append(key)
+    for key, want in cleared.items():
+        got = back.get(key)
+        if got is None:
+            continue
+        if want == "/Off":
+            ok = (got["value"] in (None, "/Off")) and all(a == "/Off" for a in got["widget_as"])
+        else:
+            ok = got["value"] in (None, "")
         if not ok:
             mismatch.append(key)
 
