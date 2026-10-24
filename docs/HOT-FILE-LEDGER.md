@@ -12003,7 +12003,7 @@ cells rot within days.
 | [`frontend/src/components/workflows/DescribeReferencesSection.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentsworkflowsdescribereferencessectiontsx) | 1 / 1 / 216 (was `0 / 0 / 0`) | no (young) | young (created 291-04). Peer references section beside `DescribeTemplateRow` (sketch B). ⛔ classes from `surfaceClasses.ts` only |
 | [`frontend/src/components/workflows/surfaceClasses.ts`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentsworkflowssurfaceclassests) | 2 / 1 / 67 (was `0 / 0 / 0`) | no (1 phase) | young (created 291-04). Door row consts + the arrival card's fold consts (moved 291-05) + `FOLD_BODY_CLASS`. ⛔ a `.ts` leaf (react-refresh rule) |
 | [`frontend/src/components/workflows/DraftInputsFold.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentsworkflowsdraftinputsfoldtsx) | 1 / 1 / 240 (was `0 / 0 / 0`) | no (young) | young (created 291-05). Trigger + body leaf: rows in the form's order, native radio Ask / Look it up, `Added by Syrel` from `origin` only. ⛔ fold classes imported; components-only exports |
-| [`backend/app/services/text_tool_calls.py`](docs/HOT-FILE-LEDGER.md#backendappservicestext_tool_callspy) | 3 / 1 / 519 (was `1 / 1 / 402`) | no (young) | 292.1-REVIEW WR-01/WR-06: non-DSML openers need their family's call shape; text after a parsed block is kept. ⛔ no I/O; offered names passed in; no provider branch |
+| [`backend/app/services/text_tool_calls.py`](docs/HOT-FILE-LEDGER.md#backendappservicestext_tool_callspy) | 4 / 1 / 667 (was `3 / 1 / 519`) | no (young) | 292.1 UAT: F7 OpenAI harmony `to=functions.X {json}` parsed/refused/stripped (+148). ⛔ no I/O; offered names passed in; no provider branch |
 | [`backend/app/services/typed_continue.py`](docs/HOT-FILE-LEDGER.md#backendappservicestyped_continuepy) | 1 / 1 / 33 (was `0 / 0 / 0`) | no (young) | young (created 292.1-03) · CONTINUE_WORDS + is_continue_word (D-13). ⛔ pure, no I/O, no model call; lockstep with continueWords.ts |
 | [`frontend/src/components/settings/AgentRoundLimits.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentssettingsagentroundlimitstsx) | 3 / 1 / 220 (was `2 / 1 / 243`) | no (young) | 292.1 UAT: no own Save; exposes `changes()` / `adopt()` via ref; still owns its read (WR-05 lock kept). ⛔ never sends 0 |
 | [`frontend/src/lib/continueWords.ts`](docs/HOT-FILE-LEDGER.md#frontendsrclibcontinuewordsts) | 1 / 1 / 46 (was `0 / 0 / 0`) | no (young) | young (created 292.1-03) · client hint mirror of the backend continue words + shouldTryTypedContinue. ⛔ the server decides; ?raw lockstep fence |
@@ -24580,3 +24580,12 @@ Operator-reported in UAT and fixed TDD: (1) Deep Continue showed no live progres
 - `backend/app/api/runs.py`: `52 / 22 / 2003` (was `51 / 22 / 1981`). Previous CLAUDE.md cell kept verbatim: 292.1-REVIEW: 409 asks run_is_cap_paused; Continue claim is compare-and-set
 - `backend/app/api/threads.py`: `278 / 93 / 2684` (was `277 / 93 / 2682`). Previous CLAUDE.md cell kept verbatim: 292.1 G4-1: thread state asks run_is_cap_paused too (first-turn)
 - `backend/app/services/agent_loop.py`: `76 / 35 / 3766` (was `75 / 35 / 3759`). Previous CLAUDE.md cell kept verbatim: 292.1 D-UAT-1: carrier + resume echo thought_signature · seam OWED · ⛔
+
+### `backend/app/services/text_tool_calls.py` — Phase 292.1 forced-pending board (F7)
+
+**Triple:** `4 / 1 / 667` (was `3 / 1 / 519`). **Change:** a new measured family, F7, covers OpenAI harmony-style text calls (`to=functions.NAME` + an optional content-type slot + one JSON object). `parse_harmony` returns the same `Parsed` type as `parse_dsml`, refuses the whole block if any name is outside the offered set or has no namespace, and reuses the existing detect, strip and holdback paths. RED `57d8d68d5`, GREEN `3d86a05a1`, merged as `ef2388ec8`.
+
+**Why:** on the forced-pending board (operator: "force it"), openai `gpt-5.6-luna` reached the final round, where the adapter sends no tools. It wrote its pending calls as harmony text, which was saved and shown in 4 of 4 runs and counted as 0 hits. That broke D-10 and SC#2. **The earlier "0 markup hits" on the main board was a detector blind to this format.**
+
+⚠ **Open:** a few junk characters after a final call are still saved (` jingï`), because the WR-06 rule keeps text after a block visible. Literal `<|channel|>` tokens before the recipient are not absorbed (none measured).
+
