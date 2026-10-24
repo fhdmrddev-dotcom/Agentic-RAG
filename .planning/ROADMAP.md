@@ -90,7 +90,7 @@ Requirements: [`REQUIREMENTS.md`](REQUIREMENTS.md). **21 v4.7 requirements, 21 m
 - [x] **Phase 291: Describe It From Your Own Files**: describe-it authoring from uploaded template, form and reference documents (AUTH-02) — verified passed 2026-10-24 (G-4 + SC#4 roster + SC#5 live fill run; findings routed in deferred-items.md)
 - [x] **Phase 292: More Ways to Show It** (closed 2026-10-24, operator signed G-4; mig 213 in cloud, code not deployed): new artifact types from a closed registry, set chosen at sketch time (VIS-02)
 - [ ] **Phase 293: Start From Outside, and Close Out**: authenticated inbound run start with read-back, trigger provenance and last/next run, seed statuses reconciled (START-02, START-04, REG-06)
-- [ ] **Phase 294: Decision Engine: Rerank and Citation Check**: a Settings switch picks Jev, OpenAI Decisions or a local model to rerank and prune search candidates, and a citation check labels each cited sentence (DEC-01, DEC-02, DEC-03)
+- [x] **Phase 294: Decision Engine: Rerank and Citation Check** (complete 2026-10-20, live c94e1bed9): a Settings switch picks Jev, OpenAI Decisions or a local model to rerank and prune search candidates, and a citation check labels each cited sentence (DEC-01, DEC-02, DEC-03)
 - [x] **Phase 295: Runs That Don't Dead-End** (closed 2026-10-24, operator signed): an empty or uncited KB step pauses and asks instead of failing; misconfigurations refused before a run; the judge stops failing recorded-not-sent actions; every run ends truthfully with a reason (RUN-01..04)
 
 ### Phase Details
