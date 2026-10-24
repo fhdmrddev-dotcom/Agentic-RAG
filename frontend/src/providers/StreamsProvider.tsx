@@ -3059,7 +3059,18 @@ export function StreamsProvider({ children }: PropsWithChildren) {
               // cap_paused is NON-terminal and is delivered via onCapPaused, NOT
               // onTerminal — so the lock survives a pause and only clears here on
               // a real terminal (done / error / timed_out / cancelled / reader_done).
-              useStreamsStore.getState().actions.clearWorkflowLockForThread(threadId)
+              // ⚠ 292.1 G-4 (lived UAT 2026-10-24): EXCEPT a `done` for the run this thread's lock
+              // holds as cap-paused. A first-turn pause finalizes the run `completed` BY DESIGN (the
+              // pause lives in the carrier row) and ends this stream with `done` — clearing here
+              // removed the Continue card a reload then brought back. Ask the server instead
+              // (D-v2.5-03) through the shipped settle read: it keeps the lock while the server
+              // reports `cap_paused`, and clears exactly as below when it does not.
+              const terminalLock = useStreamsStore.getState().workflowLockByThread.get(threadId)
+              if (kind === "done" && terminalLock?.capPaused && terminalLock.runId === registeredRunId) {
+                useStreamsStore.getState().actions.releaseSettledWorkflowLock(threadId, { reattach: false })
+              } else {
+                useStreamsStore.getState().actions.clearWorkflowLockForThread(threadId)
+              }
               // Pitfall 8: TTL-expired buffer fallback.
               if (errorPayload === "buffer_expired") {
                 useStreamsStore
@@ -3737,7 +3748,7 @@ export function StreamsProvider({ children }: PropsWithChildren) {
         // `ThreadRunLine.tsx`'s D-11 rule binds: WorkflowRunPage already owns the polling
         // concern. Fenced (with the no-seventh-writer rule) by
         // `__tests__/providers/streamsProvider_244_settle_ask.test.tsx` Test 8.
-        releaseSettledWorkflowLock: (threadId) => {
+        releaseSettledWorkflowLock: (threadId, opts) => {
           if (!threadId) return
           // ── WR-01 (gap-closure round 2): THIS PATH OWNS ONE FACT AND TOUCHES NOTHING ELSE ──
           //
@@ -3801,7 +3812,9 @@ export function StreamsProvider({ children }: PropsWithChildren) {
               // `subscribeProducerStream`'s docblock.
               // This is what lets the SHIPPED terminal handler clear the lock when the run
               // really ends, instead of this path inventing a second terminal route.
-              if (wf.latest_producer_run_id) {
+              // 292.1 G-4: not for the sendMessage terminal's caller — its run just ENDED its own
+              // stream, and re-attaching that finished run would open a stream for nothing.
+              if (wf.latest_producer_run_id && opts?.reattach !== false) {
                 subscribeProducerStreamRef.current?.(threadId, wf.latest_producer_run_id)
               }
               return
