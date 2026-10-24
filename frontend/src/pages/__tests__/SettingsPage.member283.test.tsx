@@ -335,6 +335,8 @@ describe("SettingsPage — the features-loading window decides nothing (WR-02)",
     // ⚠ 2, not 1, since 292.1 (D-20): the page's own hydrate PLUS the AgentRoundLimits leaf on the
     //   AI Model tab, which owns its fetch by design (SettingsPage's state split is owed). A page
     //   double-fetch — the defect this pin exists for — still reads 3 and reds here.
+    //   (292.1 UAT one-save reshape: the leaf lost its own Save button and PUT — Save AI Model now
+    //   carries the caps — but it still owns its READ, so the count stays 2, not 1.)
     await waitFor(() => expect(gated.getSettings).toHaveBeenCalledTimes(2))
     // Landing is derived, never persisted — only a click writes the key.
     expect(localStorage.getItem("settings_active_tab")).toBeNull()

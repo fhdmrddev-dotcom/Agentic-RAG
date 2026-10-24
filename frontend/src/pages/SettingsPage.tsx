@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react"
+import { useEffect, useRef, useState } from "react"
 import { flushSync } from "react-dom"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
@@ -34,7 +34,7 @@ import {
 } from "@/components/settings/settingsTabs"
 import { ModelPillRow } from "@/components/settings/ModelPillRow"
 import { RerankEngineBlock } from "@/components/settings/RerankEngineBlock"
-import { AgentRoundLimits } from "@/components/settings/AgentRoundLimits"
+import { AgentRoundLimits, type AgentRoundLimitsHandle } from "@/components/settings/AgentRoundLimits"
 import { unverifiedDescription } from "@/lib/unverifiedModelCopy"
 import {
   ProviderPicker,
@@ -693,6 +693,8 @@ export function SettingsPage() {
       .finally(() => setLoading(false))
   }, [canManageModels, featuresLoading])
 
+  const roundLimitsRef = useRef<AgentRoundLimitsHandle>(null)
+
   const handleSaveAIModel = async () => {
     // Plan 075.4-04 Task 1 (D-075.4-F3) — flushSync commits pending onChange
     // before snapshot; closes 2-click bug. See 075.4-04-DIAGNOSIS-settings-2click.md
@@ -713,9 +715,12 @@ export function SettingsPage() {
         skill_builder_model: skillBuilderModel,
         llm_max_output_tokens: llmMaxOutputTokens,
         openrouter_tool_strategy: openrouterToolStrategy,
+        // 292.1 UAT: ONE save per section — the round limits ride this PUT ({} until their read answers).
+        ...roundLimitsRef.current?.changes(),
       }
       const updated = await updateSettings(body)
       hydrate(updated)
+      roundLimitsRef.current?.adopt(updated)
       setSavedAI(true)
       setTimeout(() => setSavedAI(false), 2500)
     } catch (e: unknown) {
@@ -1127,8 +1132,8 @@ export function SettingsPage() {
                     />
                   </FieldRow>
                 )}
-                {/* 292.1 (D-17/D-18): ONE mount — the leaf owns its state, fetch and save. */}
-                <AgentRoundLimits />
+                {/* 292.1 (D-17/D-18): ONE mount — the leaf owns its state and fetch; Save AI Model saves it. */}
+                <AgentRoundLimits ref={roundLimitsRef} />
                 <FieldRow label="Sub-agent model">
                   <select
                     value={subAgentModel}
