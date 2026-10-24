@@ -4,9 +4,9 @@ title: At the 15-round cap, a tool call the model writes as text (DeepSeek DSML)
 reported: 2026-10-24
 surface: Agentic-RAG
 severity: major
-status: open
+status: folded
 affected_areas: [backend/agent-loop, provider-routing/openrouter, frontend/streaming]
-folded_into: null
+folded_into: "292.1"
 verified_closed_by: null
 related_seeds: []
 re_open_trigger: null

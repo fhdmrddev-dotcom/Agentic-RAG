@@ -4,12 +4,12 @@ title: Every follow-up turn re-shows all files the agent ever made, and intermed
 reported: 2026-10-24
 surface: Agentic-RAG
 severity: major
-status: open
+status: deferred
 affected_areas: [frontend/output-files, backend/agent-loop, workspace-panel]
 folded_into: null
 verified_closed_by: null
 related_seeds: [SEED-054, SEED-148]
-re_open_trigger: null
+re_open_trigger: "Deferred at 292.1 discuss (2026-10-24) to its own phase; plan it as the next chat-surface phase after 292.1 ships (output-file cards, not the cap path)."
 reproduces_on:
   branch: production
   commit: 6db8cf40a
