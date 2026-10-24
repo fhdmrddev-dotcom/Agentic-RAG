@@ -3747,7 +3747,7 @@ const BASELINE = {
   // threw `ReferenceError`. A fence on the SHAPE of a call cannot see whether the call resolves;
   // only rendering the card and clicking the button can, which is what this suite does. Driven
   // RED against the unfixed component first.
-  "MessageItem.continueButton.test.tsx": 2,
+  "MessageItem.continueButton.test.tsx": 6, // RAISED 2 → 6 at 292.1-04 (292.1-03: the tool-use-limit sentence, Continuing…, disabled while continuing)
   // ── Phase 227 (227-01 / SC#5) — Chat run frame & message decomposition suites ──
   "MessageItem.cancelledRun.test.tsx": 8,
   "MessageItem.blockedNotice.test.tsx": 4,
@@ -3953,7 +3953,7 @@ const BASELINE = {
   // itself cap-paused stays locked. D6 asserts BOTH of SHELL-02's halves in ONE tree, which
   // is what the browser measured contradicting each other; cases 1 and 3 assert them in
   // separate trees and are therefore consistent with a product that never shows them together.
-  "ChatArea.capPausedComposer.test.tsx": 8,
+  "ChatArea.capPausedComposer.test.tsx": 9, // RAISED 8 → 9 at 292.1-04 (292.1-03: the typed-continue composer case)
   // ── Phase 244-13 (UAT gap G-1) — the run line a DEEP cap-pause must NOT draw ─────────
   // ⚠⚠ ADOPTED, NOT RE-BASELINED. This suite shipped at Phase 194.1 and has been in NEITHER
   // knob ever since: `grep -n "ThreadRunLineKickoff" scripts/vitest-count-gate.cjs` returned
@@ -4385,6 +4385,12 @@ const BASELINE = {
   "WorkflowCanvas.team.test.tsx": 7, // 290-03: Steps | Team switch only with the team prop; keyboard reorder gated (F-6); run page passes none
   "stepLine.test.ts": 25, // 290-02 (VIS-04 / D-01, D-04): type-sentence chips in run order, first 3 + more, null at 0 steps
   "StepChipLine.test.tsx": 11, // 290-02 (VIS-04 / D-03): row-steps block, +N more / Show less, no title attribute
+  // ── Phase 292.1 — adopted, both knobs, same commit ── (292.1-04, 2026-10-24). Pinned at the measured
+  // passing counts (33 cases, 0 failing). FILE-LEVEL in TARGETS: none of `src/components/settings`,
+  // `src/lib` or `src/providers` has a bare-directory entry.
+  "AgentRoundLimits.test.tsx": 10, // 292.1-02 — the 2..50 round-cap leaf: own fetch/save, clamp on Save/blur, never sends 0
+  "continueWords.lockstep.test.ts": 17, // 292.1-03 — ?raw lockstep vs typed_continue.py + the shared continue-words fixture
+  "StreamsProvider.typedContinue.test.tsx": 6, // 292.1-03 — typed continue holds the optimistic turn; Continuing… set and cleared
 }
 
 // Still COMPUTED, never hand-written — the reduce is the single source, so the
@@ -6399,6 +6405,11 @@ const TARGETS = [
   // 289-REVIEW WR-05 — FILE-LEVEL (no `src/components/layout` directory entry), in the SAME
   // commit as its BASELINE pin.
   "src/components/layout/__tests__/ChatLayout.runDeepLink.test.tsx",
+  // ── Phase 292.1 — adopted, both knobs, same commit ── FILE-LEVEL (no `src/components/settings`,
+  // `src/lib` or `src/providers` directory entry), SAME commit as their BASELINE pins.
+  "src/components/settings/__tests__/AgentRoundLimits.test.tsx",
+  "src/lib/__tests__/continueWords.lockstep.test.ts",
+  "src/providers/__tests__/StreamsProvider.typedContinue.test.tsx",
 ]
 
 const REPO_ROOT = path.resolve(__dirname, "..")
