@@ -2219,6 +2219,7 @@ async def run_agent_loop(
                 dead_gap_tokens_in_run=_dead_gap_tokens_in_run,  # 142 — run-scoped repeat-guard (by-reference)
                 empty_filter_fields_in_run=_empty_filter_fields_in_run,  # 272 (D-09) — retry lock (by-reference)
                 turn_tool_calls=persisted_tool_calls,  # 273 (D-04) — caption source (by-reference)
+                turn_citations=retrieved_citations,  # 292 (D-07) — source handles resolve against the manifest the model saw (by reference)
                 iteration=0,
                 parent_run_id=None,
                 per_run_task_semaphore=_per_run_task_semaphore,
@@ -3134,6 +3135,7 @@ async def run_agent_loop(
                 dead_gap_tokens_in_run=_dead_gap_tokens_in_run,  # 142 — run-scoped repeat-guard (by-reference)
                 empty_filter_fields_in_run=_empty_filter_fields_in_run,  # 272 (D-09) — retry lock (by-reference)
                 turn_tool_calls=persisted_tool_calls,  # 273 (D-04) — caption source (by-reference)
+                turn_citations=retrieved_citations,  # 292 (D-07) — source handles resolve against the manifest the model saw (by reference)
                 iteration=iteration,
                 # Phase 085 additions —
                 # parent_run_id is None at the top-level run; task_service

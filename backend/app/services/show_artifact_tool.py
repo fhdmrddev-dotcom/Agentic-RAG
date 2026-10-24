@@ -49,19 +49,25 @@ from pydantic import ValidationError
 
 from app.db.artifacts import get_artifact_by_ref, insert_artifact, list_thread_labels
 from app.models.artifact import (
+    _SPEC_RESERVE_BYTES,
     ARTIFACT_ID_RE,
     ARTIFACT_LABEL_RE,
+    MAX_SPEC_BYTES,
     RESULT_ID_KEY,
+    STORED_ENCODED_SPECS,
+    TABULAR_COMPONENTS,
     ArtifactRefusal,
     StoredArtifactSpec,
     _coerce_number,
     _coerce_text,
     _refusal,
     _safe,
+    event_sort_key,
     refusal_payload,
     validate_args,
     validate_dataset,
 )
+from app.services.artifact_sources import resolve_sources
 
 if TYPE_CHECKING:  # pragma: no cover
     from app.services.tool_dispatcher import ToolContext, ToolResult
@@ -535,6 +541,179 @@ def _stored_spec(title: str, columns: list[dict], rows: list[list], chart: dict 
     return StoredArtifactSpec.model_validate(spec).model_dump()
 
 
+# ── The three typed-encoding arms (Phase 292, D-07 / D-08 / D-14) ───────────────────────────────
+
+
+def _reference_refusal(parent: dict, target: str) -> ArtifactRefusal:
+    """D-08: diagram / comparison / timeline are never built or redrawn by reference."""
+    p_comp = parent.get("component")
+    p_label = _safe(parent.get("label")) or "that artifact"
+    if p_comp in TABULAR_COMPONENTS and target not in TABULAR_COMPONENTS:
+        return _refusal(
+            "reference_into_new_type",
+            f"{p_label} is a {p_comp}; a {target} is never built from another artifact by reference. Call "
+            f"show_artifact again with the full `{target}` data and no from_artifact.",
+            source_noun=p_comp, target_noun=target,
+        )
+    return _refusal(
+        "reference_new_type",
+        f"{p_label} is a {p_comp}, which cannot be filtered, re-encoded or redrawn with from_artifact. Call "
+        f"show_artifact again with the full data and no from_artifact.",
+        label=p_label,
+    )
+
+
+def _element_sources(component: str, enc: Any) -> tuple[list[int | None], list[str]]:
+    """Every element's ``source`` handle and its own text (which steers the excerpt), in spec order."""
+    if component == "diagram":
+        return [n.source for n in enc.nodes], [n.label for n in enc.nodes]
+    if component == "comparison":
+        handles: list[int | None] = []
+        texts: list[str] = []
+        for t in enc.terms:
+            for c in t.cells:
+                handles.append(c.source)
+                texts.append(f"{t.name} {c.text}" if c.text else t.name)
+        return handles, texts
+    return ([e.source for e in enc.events],
+            [f"{e.title} {e.detail}" if e.detail else e.title for e in enc.events])
+
+
+def _stored_encoded_spec(component: str, title: str, enc: Any, sources: list[dict | None]) -> dict:
+    """The persisted spec of a new type, validated by its Stored model (D-14). Edge key "from"."""
+    if component == "diagram":
+        body: dict = {
+            "nodes": [{"id": n.id, "label": n.label, "kind": n.kind, "source": s}
+                      for n, s in zip(enc.nodes, sources)],
+            "edges": [{"from": e.from_, "to": e.to, "label": e.label} for e in enc.edges],
+        }
+    elif component == "comparison":
+        it = iter(sources)
+        body = {
+            "options": list(enc.options),
+            "terms": [{"name": t.name, "cells": [{"verdict": c.verdict, "text": c.text, "source": next(it)}
+                                                 for c in t.cells]} for t in enc.terms],
+        }
+    else:
+        events = [{"date": e.date, "title": e.title, "detail": e.detail, "category": e.category,
+                   "deadline": e.deadline, "source": s} for e, s in zip(enc.events, sources)]
+        # D-06: our code orders the events, (year, month, day or 0), stable on input order.
+        events.sort(key=lambda ev: event_sort_key(ev["date"]))
+        body = {"events": events}
+    spec = {"title": title, component: body}
+    return STORED_ENCODED_SPECS[component].model_validate(spec).model_dump(by_alias=True)
+
+
+def _encoded_note(label: str) -> str:
+    return (
+        f"Shown to the user below your answer as {label}. Now write one or two sentences about what it "
+        "shows; do not repeat it as a table. To change it, call show_artifact again with the full data."
+    )
+
+
+def build_encoded_result(row: dict) -> str:
+    """The success result of a new type: ``artifact_id`` FIRST, keys in RESULT_KEY_ORDER, < 2000."""
+    spec = row.get("spec") or {}
+    component = row.get("component")
+    label = str(row.get("label"))
+    obj: dict = {
+        RESULT_ID_KEY: str(row.get("id")),
+        "label": label,
+        "component": component,
+        "row_count": row.get("row_count"),
+    }
+    if component == "diagram":
+        obj["edge_count"] = len((spec.get("diagram") or {}).get("edges") or [])
+    if component == "comparison":
+        obj["option_count"] = len((spec.get("comparison") or {}).get("options") or [])
+    obj["note"] = _encoded_note(label)
+    return json.dumps(obj, ensure_ascii=False)
+
+
+async def _load_parent(ctx: Any, ref: str, thread_id: UUID, user_id: UUID,
+                       fresh_hint: str) -> tuple[dict | None, dict | None]:
+    """``(parent, None)`` or ``(None, refusal payload)``. Bound to this thread AND this caller."""
+    try:
+        parent = await get_artifact_by_ref(ctx.pool, ref=ref, thread_id=thread_id, user_id=user_id)
+    except Exception:  # noqa: BLE001 — a store outage is a worded refusal, never a crash
+        logger.exception("show_artifact: get_artifact_by_ref failed")
+        return None, _refused(_HR["read_failed"], "the stored artifact could not be read; try again.")
+    if parent is not None:
+        return parent, None
+    try:
+        labels = await list_thread_labels(ctx.pool, thread_id=thread_id, user_id=user_id)
+    except Exception:  # noqa: BLE001
+        logger.exception("show_artifact: list_thread_labels failed")
+        labels = []
+    if labels:
+        detail = ("Artifacts in this thread: " + _labels_phrase(labels) + ". Use one of these labels "
+                  "or an artifact_id from an earlier show_artifact result.")
+    else:
+        detail = "No artifact has been shown in this thread yet. " + fresh_hint
+    safe_ref = _echoable_ref(ref)
+    reason = _HR["unknown_ref"].format(ref=safe_ref) if safe_ref else _HR["unknown_ref_unnamed"]
+    return None, _refused(reason, detail)
+
+
+async def _show_encoded(parsed: Any, ctx: Any, thread_id: UUID, user_id: UUID, user: dict, out: Any,
+                        tool_result: Any) -> Any:
+    """A diagram / comparison / timeline call: resolve sources, store one typed spec, answer id-first."""
+    component = parsed.component
+    if parsed.from_artifact is not None:  # D-08: never by reference — word it from the parent's type
+        parent, refused = await _load_parent(ctx, parsed.from_artifact, thread_id, user_id,
+                                             f"Send the full `{component}` data instead of from_artifact.")
+        if refused is not None:
+            return out(refused)
+        return out(refusal_payload(_reference_refusal(parent, component)))
+
+    enc = getattr(parsed, component)
+    handles, texts = _element_sources(component, enc)
+    resolved = resolve_sources(handles, getattr(ctx, "turn_citations", None), texts)
+    if isinstance(resolved, ArtifactRefusal):
+        return out(refusal_payload(resolved))
+    try:
+        spec = _stored_encoded_spec(component, parsed.title, enc, resolved)
+    except (ValidationError, ValueError):
+        logger.exception("show_artifact: stored %s spec failed its own model", component)
+        return out(refusal_payload(_refusal("fallback", "the artifact could not be assembled; check the encoding.")))
+    size = len(json.dumps(spec, ensure_ascii=False).encode("utf-8"))
+    if size > MAX_SPEC_BYTES - _SPEC_RESERVE_BYTES:
+        return out(refusal_payload(_refusal(
+            "too_large",
+            f"the {component} is {size:,} bytes; the cap is {MAX_SPEC_BYTES - _SPEC_RESERVE_BYTES:,}. Shorten "
+            "its text or show fewer items.",
+            kib=f"{-(-size // 1024):,}",
+        )))
+    n_items = len(spec[component][{"diagram": "nodes", "comparison": "terms", "timeline": "events"}[component]])
+    caption = build_caption(getattr(ctx, "turn_tool_calls", None), n_items)
+
+    try:
+        row = await insert_artifact(
+            ctx.pool,
+            thread_id=thread_id,
+            user_id=user_id,
+            org_id=user.get("org_id"),
+            run_id=getattr(ctx, "run_id", None),
+            tool_call_id=getattr(ctx, "tool_call_id", None) or None,
+            parent_id=None,
+            component=component,
+            spec=spec,
+            caption=caption,
+            row_count=n_items,
+        )
+    except Exception:  # noqa: BLE001 — never surface a DB message to people or the model
+        logger.exception("show_artifact: insert_artifact failed")
+        return out(_refused(_HR["save_failed"], "the artifact could not be stored; try the call again."))
+
+    emit = getattr(ctx, "emit", None)
+    if emit is not None:
+        try:
+            await emit(ctx.redis, ctx.run_id, "artifact", artifact=row)
+        except Exception:  # noqa: BLE001 — the row is stored; a reload shows it
+            logger.exception("show_artifact: artifact event emit failed (row %s stored)", row.get("id"))
+    return tool_result(result=build_encoded_result(row))
+
+
 # ── The handler ─────────────────────────────────────────────────────────────────────────────────
 
 
@@ -571,6 +750,10 @@ async def handle_show_artifact(args: dict, ctx: "ToolContext") -> "ToolResult":
     if isinstance(parsed, ArtifactRefusal):
         return _out(refusal_payload(parsed))
 
+    # 292: the three typed-encoding arms take their own path BEFORE any columns / rows access.
+    if parsed.component not in TABULAR_COMPONENTS:
+        return await _show_encoded(parsed, ctx, thread_id, user_id, user, _out, ToolResult)
+
     component = parsed.component
     chart_args = parsed.chart.model_dump() if parsed.chart is not None else None
     metric_args = parsed.metric.model_dump() if parsed.metric is not None else None
@@ -586,27 +769,13 @@ async def handle_show_artifact(args: dict, ctx: "ToolContext") -> "ToolResult":
         slots = list(range(len(y)))
         caption = build_caption(getattr(ctx, "turn_tool_calls", None), len(rows))
     else:
-        ref = parsed.from_artifact
-        try:
-            parent = await get_artifact_by_ref(ctx.pool, ref=ref, thread_id=thread_id, user_id=user_id)
-        except Exception:  # noqa: BLE001 — a store outage is a worded refusal, never a crash
-            logger.exception("show_artifact: get_artifact_by_ref failed")
-            return _out(_refused(_HR["read_failed"], "the stored artifact could not be read; try again."))
-        if parent is None:
-            try:
-                labels = await list_thread_labels(ctx.pool, thread_id=thread_id, user_id=user_id)
-            except Exception:  # noqa: BLE001
-                logger.exception("show_artifact: list_thread_labels failed")
-                labels = []
-            if labels:
-                detail = ("Artifacts in this thread: " + _labels_phrase(labels) + ". Use one of these labels "
-                          "or an artifact_id from an earlier show_artifact result.")
-            else:
-                detail = ("No artifact has been shown in this thread yet. Send columns and rows "
-                          "instead of from_artifact.")
-            safe_ref = _echoable_ref(ref)
-            reason = _HR["unknown_ref"].format(ref=safe_ref) if safe_ref else _HR["unknown_ref_unnamed"]
-            return _out(_refused(reason, detail))
+        parent, refused = await _load_parent(ctx, parsed.from_artifact, thread_id, user_id,
+                                             "Send columns and rows instead of from_artifact.")
+        if refused is not None:
+            return _out(refused)
+        # 292 (D-08): a diagram / comparison / timeline parent has no rows to transform.
+        if parent.get("component") not in TABULAR_COMPONENTS:
+            return _out(refusal_payload(_reference_refusal(parent, component)))
 
         p_spec = parent.get("spec") or {}
         try:
