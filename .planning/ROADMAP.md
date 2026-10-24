@@ -307,6 +307,23 @@ Plans:
 **UI hint**: yes
 **Flags**: **G-2 sketch**. Closed registry only; sandboxed HTML needs its own operator decision and is out of this phase. Files: `frontend/src/components/chat/artifacts/**`, `backend/app/models/artifact.py`, `backend/app/services/show_artifact_tool.py`. Migration only if the `message_artifacts` constraint needs a new literal. Seed `SEED-337`.
 
+#### Phase 292.1: Tool-limit Continue that always fires (INSERTED)
+
+**Goal**: When the agent reaches its tool-round limit with work still pending, the turn always ends the Claude.ai way, with a worded limit line and a Continue that resumes the same run, on every provider; tool-call markup never appears as an answer.
+**Depends on**: Phase 292 (no file overlap with 293).
+**Requirements**: BUG-261024-03 (reported 2026-10-24, production evidence)
+**Success Criteria** (what must be TRUE):
+
+  1. A turn that hits the 15-round cap with a pending tool call shows the limit line and a Continue button, whether the model sent the call structured or as text (DeepSeek DSML / OpenRouter XML); Continue resumes the same run with a fresh budget and `continues_used` counts it.
+  2. No assistant message is ever saved or shown with raw tool-call markup (`<｜DSML｜`, XML tool tags); a planted markup-only final turn is caught and worded.
+  3. Typing "continue" in a thread whose last run is `cap_paused` resumes that run rather than starting a new one (or the decision to keep them separate is recorded with a reason).
+  4. The cap path is proven live on the full native roster + OpenRouter with a forced low cap (CLAUDE.md SC#10).
+
+**How we'd know this failed**: a model that writes its tool call as text still ends the turn with markup and no Continue; Continue starts a new run or loses the queued call; the cap is lowered or raised instead of fixed; only the provider that showed the bug is tested.
+**Plans**: TBD (target 2-3)
+**UI hint**: yes (the limit line + Continue card already exist from Phase 092 — reuse, do not rebuild)
+**Flags**: G-5: `backend/app/services/agent_loop.py` FIRES (read its ledger section first). Provider-docs-first for DeepSeek / OpenRouter tool formats. Reuse `cap_paused` (`agent_loop.py:~2850`, `config.max_continues_per_run`) and the existing DSML/XML parsers. Cross-check reported bugs at discuss: BUG-261024-04 (output files repeated / intermediate files shown) touches the same chat surface.
+
 #### Phase 293: Start From Outside, and Close Out
 
 **Goal**: An external system can start a workflow and read its result, every run shows how it was started, and the seed register matches what shipped.
