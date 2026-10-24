@@ -108,6 +108,21 @@ describe("DiagramArtifact — structure", () => {
     for (const l of labels) expect(l).toHaveAttribute("aria-hidden", "true")
   })
 
+  it("292-REVIEW WR-04: edge labels are bounded, truncated with a title, and painted after the nodes", () => {
+    const { container } = render(<DiagramArtifact record={rec(diagramInvoice)} />)
+    const labels = screen.getAllByTestId("diagram-edge-label")
+    for (const l of labels) {
+      expect(l.className).toContain("truncate")
+      expect(l.getAttribute("title")).toBe(l.textContent)
+      expect(Number.parseFloat(l.style.maxWidth)).toBeGreaterThan(0)
+    }
+    // Painted after every node, so a back-edge label crossing the node area stays readable.
+    const all = Array.from(container.querySelectorAll('[data-testid="diagram-node"], [data-testid="diagram-edge-label"]'))
+    const lastNode = Math.max(...all.map((el, i) => (el.getAttribute("data-testid") === "diagram-node" ? i : -1)))
+    const firstLabel = all.findIndex((el) => el.getAttribute("data-testid") === "diagram-edge-label")
+    expect(firstLabel).toBeGreaterThan(lastNode)
+  })
+
   it("marker ids come from useId and differ between two diagrams on one page; no fixed id", () => {
     const { container } = render(
       <>

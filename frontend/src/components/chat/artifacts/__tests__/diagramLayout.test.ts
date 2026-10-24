@@ -8,7 +8,7 @@
  * presence of fields.
  */
 import { describe, expect, it } from "vitest"
-import { layoutDiagram, type DiagramLayout } from "../diagramLayout"
+import { CHAR_WIDTH, LABEL_PAD_X, layoutDiagram, type DiagramLayout } from "../diagramLayout"
 import { parseArtifactRecord, type DiagramEncoding, type DiagramNode } from "../artifactSpec"
 import { diagramInvoice } from "./fixtures"
 
@@ -205,5 +205,39 @@ describe("layoutDiagram — edge cases", () => {
     expect(loop.path.startsWith(`M${a.x + a.width},${a.cy - 8}`)).toBe(true)
     expect(loop.labelAlign).toBe("start")
     expect(loop.labelX).toBeGreaterThan(a.x + a.width)
+  })
+
+  it("292-REVIEW WR-04: every edge label's drawn extent stays inside [0, width]", () => {
+    const est = (label: string) => label.length * CHAR_WIDTH + LABEL_PAD_X
+    const check = (l: DiagramLayout, labels: Array<string | null>, width: number) => {
+      l.edges.forEach((e, k) => {
+        const label = labels[k]
+        if (!label) return
+        const drawn = Math.min(est(label), e.labelMaxWidth)
+        expect(e.labelMaxWidth, `edge ${k} max width`).toBeGreaterThan(0)
+        const [lo, hi] =
+          e.labelAlign === "start" ? [e.labelX, e.labelX + drawn]
+          : e.labelAlign === "end" ? [e.labelX - drawn, e.labelX]
+          : [e.labelX - drawn / 2, e.labelX + drawn / 2]
+        expect(lo, `edge ${k} left`).toBeGreaterThanOrEqual(0)
+        expect(hi, `edge ${k} right`).toBeLessThanOrEqual(width)
+      })
+    }
+    // The review's case: one self-looped node per row at 311px with a 24-character loop label.
+    const loopLabel = "Reminder after five days"
+    expect(loopLabel).toHaveLength(24)
+    const lonely = { nodes: [node("a"), node("b")], edges: [edge("a", "b"), edge("b", "b", loopLabel)] }
+    const l311 = layoutDiagram(lonely, 311)
+    check(l311, lonely.edges.map((e) => e.label), 311)
+    expect(l311.edges[1].labelMaxWidth).toBeLessThan(est(loopLabel)) // it is truncated, not clipped
+    // Long back-edge and forward labels, and the invoice flow, at both widths.
+    const busy = {
+      nodes: [node("a"), node("b"), node("c")],
+      edges: [edge("a", "b", "Approved by the budget"), edge("b", "c", "x".repeat(24)), edge("c", "a", "Sent back for correction")],
+    }
+    for (const width of [311, 862]) {
+      check(layoutDiagram(busy, width), busy.edges.map((e) => e.label), width)
+      check(layoutDiagram(invoice(), width), invoice().edges.map((e) => e.label), width)
+    }
   })
 })

@@ -183,30 +183,6 @@ export function DiagramArtifact({ record }: ArtifactBodyProps) {
         })}
       </svg>
 
-      {layout.edges.map((e, k) => {
-        const label = spec.edges[k].label
-        if (!label) return null
-        const hot = hotEdge(k)
-        return (
-          <span
-            key={k}
-            data-testid="diagram-edge-label"
-            aria-hidden="true"
-            className={cn(
-              "absolute -translate-y-1/2 whitespace-nowrap rounded-sm bg-card px-1 text-xs leading-[1.4]",
-              e.labelAlign === "center" && "-translate-x-1/2",
-              e.labelAlign === "end" && "-translate-x-full",
-              TRANSITION,
-              hot ? "text-foreground" : "text-muted-foreground",
-              active !== null && !hot && "opacity-30",
-            )}
-            style={{ left: e.labelX, top: e.labelY }}
-          >
-            {label}
-          </span>
-        )
-      })}
-
       {layout.nodes.map((p, i) => {
         const node = spec.nodes[i]
         const hot = hotNodes.has(i)
@@ -264,6 +240,33 @@ export function DiagramArtifact({ record }: ArtifactBodyProps) {
             )}
             <span className="relative line-clamp-4 break-words text-xs leading-[1.4] text-foreground">{node.label}</span>
           </div>
+        )
+      })}
+
+      {/* 292-REVIEW WR-04: labels paint AFTER the nodes, so a back-edge label crossing the node area
+          stays readable; each is bounded by its layout max width and truncated, full text in title. */}
+      {layout.edges.map((e, k) => {
+        const label = spec.edges[k].label
+        if (!label) return null
+        const hot = hotEdge(k)
+        return (
+          <span
+            key={k}
+            data-testid="diagram-edge-label"
+            aria-hidden="true"
+            className={cn(
+              "absolute -translate-y-1/2 truncate rounded-sm bg-card px-1 text-xs leading-[1.4]",
+              e.labelAlign === "center" && "-translate-x-1/2",
+              e.labelAlign === "end" && "-translate-x-full",
+              TRANSITION,
+              hot ? "text-foreground" : "text-muted-foreground",
+              active !== null && !hot && "opacity-30",
+            )}
+            style={{ left: e.labelX, top: e.labelY, maxWidth: e.labelMaxWidth }}
+            title={label}
+          >
+            {label}
+          </span>
         )
       })}
 

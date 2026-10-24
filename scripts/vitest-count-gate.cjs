@@ -4263,8 +4263,8 @@ const BASELINE = {
   "ChartArtifact.test.tsx": 18, // 273-02 — legend toggles, hide, slots, no animation, tooltip; RAISED 15 → 18 at 273-REVIEW WR-05 (stackOffset=sign)
   // ── Phase 292-02 (VIS-02 · D-16 · D-07) — THREE NEW suites, BOTH KNOBS, SAME COMMIT as their RED
   // tests. FILE-LEVEL, like the 273-02 seven: `src/components/chat` has no bare-directory entry. ──
-  "diagramLayout.test.ts": 20, // 292-02 — pure layout: no overlap at 311 / 862, back edges, ranks, wrap, sizes
-  "DiagramArtifact.test.tsx": 17, // 292-02 — text-only labels, dashed back edges, hover == focus highlight, roving, aria, markers
+  "diagramLayout.test.ts": 21, // 292-02 — pure layout: no overlap at 311 / 862, back edges, ranks, wrap, sizes; RAISED 20 → 21 at 292-REVIEW WR-04 (every label inside [0, width])
+  "DiagramArtifact.test.tsx": 18, // 292-02 — text-only labels, dashed back edges, hover == focus highlight, roving, aria, markers; RAISED 17 → 18 at 292-REVIEW WR-04 (bounded, titled labels painted after nodes)
   "ArtifactTooltip.test.tsx": 9, // 292-02 — portalled role=tooltip, header / 280-char excerpt, Escape, anchored placement
   // ── Phase 292-02 Task 3 — FIVE more NEW suites, BOTH KNOBS, SAME COMMIT as their RED tests. ──
   "comparisonModel.test.ts": 8, // 292-02 — identical-term rule (verdict + folded text, q = Not stated), glyph table via own()

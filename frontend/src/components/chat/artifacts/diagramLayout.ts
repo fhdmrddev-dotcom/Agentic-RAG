@@ -36,6 +36,8 @@ export const LINE_HEIGHT = 16
 export const MAX_LINES = 4
 /** The per-character width estimate for 12px Inter (so the layout needs no measuring pass). */
 export const CHAR_WIDTH = 6.6
+/** An edge label's horizontal padding (`px-1` each side), for its width estimate (292-REVIEW WR-04). */
+export const LABEL_PAD_X = 8
 /** Horizontal label padding: `px-3` each side for step / start / end, `px-5` for a decision. */
 const PAD_X: Record<NodeKind, number> = { step: 24, start: 24, end: 24, decision: 40 }
 
@@ -70,6 +72,12 @@ export interface PlacedEdge {
   labelAlign: "center" | "end" | "start"
   /** The gutter x a back edge bends through; null for a forward edge or a self-loop. */
   gutterX: number | null
+  /**
+   * The widest the label may be drawn from its anchor without leaving `[0, width]` (292-REVIEW
+   * WR-04). The renderer truncates past it (with the full text in `title`), so a label never runs
+   * off the body, where the frame's overflow-hidden would cut it mid-word.
+   */
+  labelMaxWidth: number
 }
 
 export interface DiagramLayout {
@@ -216,7 +224,7 @@ export function layoutDiagram(spec: DiagramEncoding, width: number): DiagramLayo
 
   // Steps 9-12: edges.
   let backIndex = 0
-  const edges: PlacedEdge[] = spec.edges.map((_edge, k) => {
+  const placedEdges: Array<Omit<PlacedEdge, "labelMaxWidth">> = spec.edges.map((_edge, k) => {
     const a = placed[from[k]]
     const b = placed[to[k]]
     const selfLoop = from[k] === to[k]
@@ -277,6 +285,17 @@ export function layoutDiagram(spec: DiagramEncoding, width: number): DiagramLayo
       labelAlign: "center",
       gutterX: null,
     }
+  })
+
+  // 292-REVIEW WR-04: bound every label to the body. A centred label slides inward to fit; a label
+  // that starts (self-loop) or ends (back edge) at its anchor may be at most the room on that side.
+  const edges: PlacedEdge[] = placedEdges.map((e, k) => {
+    const label = spec.edges[k].label
+    const est = label ? label.length * CHAR_WIDTH + LABEL_PAD_X : 0
+    if (e.labelAlign === "start") return { ...e, labelMaxWidth: Math.max(0, width - e.labelX) }
+    if (e.labelAlign === "end") return { ...e, labelMaxWidth: Math.max(0, e.labelX) }
+    const drawn = Math.min(est, width)
+    return { ...e, labelX: clamp(e.labelX, drawn / 2, width - drawn / 2), labelMaxWidth: width }
   })
 
   const order = rows.flat()
