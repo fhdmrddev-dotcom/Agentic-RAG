@@ -319,10 +319,10 @@ describe("the ROADMAP's named ANTI-FIX — MessageItem.tsx:576's sentence surviv
     ).toBeInTheDocument()
   })
 
-  it("3b — capPaused with continues left still reads the iteration-limit sentence, verbatim", () => {
+  it("3b — capPaused with continues left reads the tool-use-limit sentence, verbatim (292.1 D-07 copy)", () => {
     renderPausedItem(2)
     expect(
-      screen.getByText("Reached the iteration limit — some tools haven't run yet."),
+      screen.getByText("Reached the tool-use limit for this turn."),
     ).toBeInTheDocument()
   })
 })
