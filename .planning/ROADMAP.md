@@ -330,7 +330,7 @@ Plans:
 
 **Wave 2** *(blocked on Wave 1 completion)*
 
-- [ ] 292.1-04-PLAN.md — merged-tree gates, count-gate adoption, ledger close, SEED-372/373, 8-row SC#10 board with a forced low cap, G-4 in Chrome, BUG-261024-03 record
+- [x] 292.1-04-PLAN.md — merged-tree gates, count-gate adoption, ledger close, SEED-372/373, 8-row SC#10 board with a forced low cap, G-4 in Chrome, BUG-261024-03 record
 
 **UI hint**: yes (the limit line + Continue card already exist from Phase 092 — reuse, do not rebuild)
 **Flags**: G-5: `backend/app/services/agent_loop.py` FIRES (read its ledger section first). Provider-docs-first for DeepSeek / OpenRouter tool formats. Reuse `cap_paused` (`agent_loop.py:~2850`, `config.max_continues_per_run`) and the existing DSML/XML parsers. Cross-check reported bugs at discuss: BUG-261024-04 (output files repeated / intermediate files shown) touches the same chat surface.
