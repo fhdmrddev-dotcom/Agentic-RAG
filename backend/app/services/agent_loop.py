@@ -68,6 +68,11 @@ from app.services.structured_text_holdback import (  # 273 (SC#2, Pitfall 2, OV-
     failed_tool_call,
     replace_failed_call,
 )
+from app.services.text_tool_calls import (  # 292.1 (BUG-261024-03) — text-form tool calls, provider-blind
+    TagHoldback,
+    resolve_round_cap,
+    settle,
+)
 from app.services.citation_markers import (
     apply_citation_instruction,
     normalize_citation_markers,
@@ -140,17 +145,6 @@ class _NoConnectorScope(Exception):
     is already logged, in words, at the raise site.
     """
 
-
-
-# XPROV-02b (Phase 175 / D-02b): fixed honest-incomplete copy for a detected DeepSeek
-# DSML leak (the model wrote a tool call as visible text, so it never ran). Emitted via
-# the EXISTING 'error' SSE event from the post-drain hook. Deliberately a FIXED string —
-# it MUST NOT interpolate the model's raw (attacker-controllable) leaked markup, so it
-# cannot break the SSE contract or echo injected content (T-175-02-02).
-DSML_LEAK_ERROR_MESSAGE = (
-    "The model tried to call a tool but wrote it as text, so it didn't run. "
-    "Please retry."
-)
 
 
 # ---------------------------------------------------------------------------
@@ -1521,11 +1515,11 @@ async def run_agent_loop(
     if body.agent_mode == "explorer":
         active_system_prompt = EXPLORER_SYSTEM_PROMPT
         active_tools = get_explorer_tools()
-        max_iterations = 8   # GEN-04: was 6
     else:
         active_system_prompt = SYSTEM_PROMPT
         active_tools = None  # None = use default get_tools() in create_streaming_chat
-        max_iterations = 15  # GEN-04: was 8
+    # 292.1 (D-17 / D-18): the round caps are operator settings, read once per run (GEN-04 defaults 15 / 8).
+    max_iterations = resolve_round_cap(user_settings, body.agent_mode)
     active_system_prompt += today_line()  # Phase 272 (D-07) — today's date + the month rule, both modes
 
     # Augment system prompt with folder scope context so LLM generates scoped queries
@@ -2323,6 +2317,7 @@ async def run_agent_loop(
             # On the final iteration force a text response to avoid an infinite loop
             force_no_tools = (iteration == max_iterations - 1)
             tool_choice = "none" if force_no_tools else "auto"
+            _cap_markup_seen = False  # 292.1 (D-07): unparseable call markup on the forced-final round
             _provider_retries = 0
             _MAX_PROVIDER_RETRIES = 2
             _retry_delays = [0.5, 1.5]
@@ -2387,6 +2382,9 @@ async def run_agent_loop(
                     _build_from_progress: bool = False
                     # 273 (SC#2, Pitfall 2, OV-273-04): set per provider call on the STRUCTURED path only.
                     _structured_holdback: StructuredTextHoldback | None = None
+                    # 292.1 (D-11): one tag holdback per provider call on EVERY path — tool-call
+                    # markup written as text never streams; text_tool_calls.settle decides post-drain.
+                    _tag_holdback = TagHoldback()
 
                     async def _on_chunk(_event):
                         """ONE provider-agnostic consumer handler (D-02 / D-04) for
@@ -2434,9 +2432,12 @@ async def run_agent_loop(
                             _text = _event.get("content", "")
                             if _text:
                                 full_content += _text
+                                # 292.1 (D-11): the tag holdback gates first, on every path.
+                                _text = _tag_holdback.feed(_text)
                                 if _structured_holdback is None:
-                                    await _emit(redis, run_id, 'delta', content=_text)
-                                else:
+                                    if _text:
+                                        await _emit(redis, run_id, 'delta', content=_text)
+                                elif _text:
                                     # 273 (SC#2, Pitfall 2, OV-273-04): only EMISSION is gated — a
                                     # tool-call block is never streamed as answer text.
                                     _released = _structured_holdback.feed(_text)
@@ -2598,12 +2599,18 @@ async def run_agent_loop(
                         # agent_runner's `except asyncio.TimeoutError` catches the
                         # propagated TimeoutError and sets _terminal_status='timed_out'
                         # (Phase 066 D-066-06/07).
-                        await _drain_stream_with_close_on_cancel(
-                            _stream,
-                            per_call_budget,
-                            _on_chunk,
-                            close_fn=_stream.close,
-                        )
+                        try:
+                            await _drain_stream_with_close_on_cancel(
+                                _stream,
+                                per_call_budget,
+                                _on_chunk,
+                                close_fn=_stream.close,
+                            )
+                        except BaseException:
+                            # 292.1 (D-11, 273-REVIEW WR-06(b) parity): held text was never shown,
+                            # so the producer's sink must not persist it either (I-2).
+                            full_content = drop_held(full_content, _tag_holdback.finish())
+                            raise
                         break  # stream completed
 
                     else:
@@ -2714,36 +2721,12 @@ async def run_agent_loop(
                             # 273-REVIEW WR-06(b): the stream aborted (timeout, provider error,
                             # cancel) while text was held. It was never emitted, so it must not
                             # persist either — live and reload stay identical (I-2).
+                            # 292.1 (D-11): text the tag holdback held was never shown either (it
+                            # sits AFTER anything the structured holdback held, so drop it first).
+                            full_content = drop_held(full_content, _tag_holdback.finish())
                             if _structured_holdback is not None:
                                 full_content = drop_held(full_content, _structured_holdback.finish(False))
                             raise
-
-                        # XPROV-02b (Phase 175, Option B — post-drain, deepseek-leak-only).
-                        # If the sanitizer detected a DSML leak (DeepSeek wrote a tool call
-                        # as visible text, so the tool never ran), end the turn HONESTLY via
-                        # the EXISTING 'error' SSE event — no new event type, no per-chunk
-                        # edit. The getattr default keeps every non-deepseek / non-leak
-                        # stream byte-identical (anthropic/google streams lack the attr).
-                        if getattr(stream, "dsml_leaked", False):
-                            # XPROV-02b fix (Phase 175 code-review CR-01): a DSML leak is
-                            # NOT a provider crash — the stream completed; DeepSeek merely
-                            # wrote a tool call as visible text (the tool never ran). Surface
-                            # the honest notice the SAME way the provider-error path does
-                            # (~L2800 below): append it to `full_content` so it PERSISTS in the
-                            # finalized assistant message, and emit it as a `delta` so the live
-                            # view shows it inline. Do NOT emit the terminal `error` SSE event:
-                            # api.ts (frontend/src/lib/api.ts:838) treats `error` as terminal
-                            # (onTerminal + return) while THIS path keeps streaming and
-                            # finalizes the run as `completed` — that mismatch showed a phantom
-                            # terminal error over a silently-empty persisted turn, the exact
-                            # "silently incomplete" outcome XPROV-02b set out to fix.
-                            _leak_notice = (
-                                f"\n\n{DSML_LEAK_ERROR_MESSAGE}"
-                                if full_content
-                                else DSML_LEAK_ERROR_MESSAGE
-                            )
-                            full_content += _leak_notice
-                            await _emit(redis, run_id, 'delta', content=_leak_notice)
 
                         # Parse tool calls based on calling mode
                         if calling_mode == CallingMode.STRUCTURED:
@@ -2830,6 +2813,43 @@ async def run_agent_loop(
                         continue
                     raise  # non-retryable or retries exhausted → caught by outer except APIError
 
+            # 292.1 (BUG-261024-03, D-04 / D-05 / D-07 / D-09) — the ONE post-drain site for tool
+            # calls written as TEXT, for every provider. Every rule lives in text_tool_calls.
+            _tag_held = _tag_holdback.finish()
+            if _tag_held and not full_content.endswith(_tag_held):
+                full_content = drop_held(full_content, _tag_held)  # never shown → never persisted (I-2)
+                _tag_held = ""
+            _shown = full_content[: len(full_content) - len(_tag_held)]
+            _settled = settle(
+                full_content,
+                {t["function"]["name"] for t in (active_tools or get_tools(user_settings))},
+                buffer_has_calls=bool(tool_calls_buffer),
+            )
+            if _settled.markup_len:
+                logger.warning(
+                    "text_tool_markup run=%s iteration=%d kind=%s len=%d sha256=%s preview=%r",
+                    run_id, iteration, _settled.kind, _settled.markup_len,
+                    _settled.markup_sha256, _settled.markup_preview,
+                )
+            if _settled.kind == "parsed":
+                # Queued at the cap (D-05) or dispatched like any call (D-09). The preamble stays as
+                # the tool turn's content; the native buffer path below emits its turn_boundary.
+                for _pi, _pc in enumerate(_settled.calls):
+                    tool_calls_buffer[_pi] = _pc
+                    await _emit(redis, run_id, 'tool_preparing', name=_pc["name"], index=_pi)
+                await asyncio.sleep(0)
+                finish_reason = "tool_calls"
+                full_content = _settled.visible
+            elif _settled.kind == "unparseable" and force_no_tools:
+                full_content = _settled.visible
+                _cap_markup_seen = True  # D-07: pause with nothing queued
+            elif _settled.kind == "unparseable":
+                full_content, _ = replace_failed_call(_settled.visible, "")  # D-09: worded, never raw
+            elif _settled.kind == "stripped":
+                full_content = _settled.visible
+            if full_content.startswith(_shown) and len(full_content) > len(_shown):
+                await _emit(redis, run_id, 'delta', content=full_content[len(_shown):])
+
             logger.debug(
                 "Iteration %d finish_reason=%r tool_calls_buffered=%d",
                 iteration, finish_reason, len(tool_calls_buffer),
@@ -2846,7 +2866,7 @@ async def run_agent_loop(
             # `if not tool_calls_buffer:` short-circuit fires and the
             # tool execution round is skipped (avoids billing for
             # tool runs whose output never influences the answer).
-            if force_no_tools and tool_calls_buffer:
+            if force_no_tools and (tool_calls_buffer or _cap_markup_seen):
                 _dropped_count = len(tool_calls_buffer)
                 _tool_names = [tc.get("name", "?") for tc in tool_calls_buffer.values()]
                 logger.warning(
