@@ -20808,7 +20808,8 @@
                   "completed",
                   "failed",
                   "cancelled",
-                  "timed_out"
+                  "timed_out",
+                  "cap_paused"
                 ]
               },
               {

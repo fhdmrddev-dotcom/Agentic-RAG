@@ -11612,7 +11612,7 @@ cells rot within days.
 | [`frontend/src/components/settings/AvailabilityLine.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentssettingsavailabilitylinetsx) | 0 / 0 / 74 | no (new) | young (221-02) — a `ready` application renders `null`, never an empty element |
 | [`frontend/src/components/settings/grantsVocabulary.ts`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentssettingsgrantsvocabularyts) | 3 / 2 / 115 | no (2 phases) | ⚠ absent for its entire life — row added 221-02. There is deliberately NO `READY` string in it |
 | [`backend/app/services/connector_service.py`](docs/HOT-FILE-LEDGER.md#backendappservicesconnector_servicepy) | 28 / 11 / 1858 | ⚠ **FIRES** | ⚠ row STALE (`25/9/1772`) — 248 and 252 touched it. NOT modified by 253; re-derived under CR-08. honoured by construction (**239-06**) |
-| [`backend/app/models/message.py`](docs/HOT-FILE-LEDGER.md#backendappmodelsmessagepy) | 23 / 15 / 285 (was `22 / 14 / 285`) | ⚠ **FIRES** | **279-01**: one comment repoint (no code). ⛔ deleting `artifacts` makes reload render no artifacts, silently |
+| [`backend/app/models/message.py`](docs/HOT-FILE-LEDGER.md#backendappmodelsmessagepy) | 24 / 16 / 287 (was `23 / 15 / 285`) | ⚠ **FIRES** | **292.1 D-UAT-2**: `run_status` Literal gains `cap_paused` (+2). ⛔ deleting `artifacts` makes reload render no artifacts, silently |
 | [`backend/app/models/user_settings.py`](docs/HOT-FILE-LEDGER.md#backendappmodelsuser_settingspy) | 60 / 36 / 1769 (was `57 / 35 / 1742`) | ⚠ **FIRES** | 292.1-02: two fields + two _val fallbacks (chat 15 / explorer 8), additive (+7 −0); quick-261024 (later): picker warms hot + tombstone caches. ⛔ seam OWED; unreachable-DB arm byte-identical |
 | [`backend/app/api/setup.py`](docs/HOT-FILE-LEDGER.md#backendappapisetuppy) | 7 / 2 / 490 | no (1 phase) | ⚠ **absent for its ENTIRE LIFE — row added 249-03**. ⛔ it deliberately does NOT catch `SettingsWriteRefused`: a refused `setup_complete` reported as success is the bug one layer up |
 | [`backend/app/services/setup_service.py`](docs/HOT-FILE-LEDGER.md#backendappservicessetup_servicepy) | 4 / 2 / 514 | no (1 phase) | ⚠ **absent for its ENTIRE LIFE — row added 249-03**. Same deliberate non-catch as `api/setup.py`; its bool cannot express *the database refused the value* |
@@ -24521,3 +24521,14 @@ CLAUDE.md FIRING cell before the review fixes (replaced): 292.1-03: typed contin
 ⛔ **Invariants:** never presents the defaults 15 / 8 as live values; sends only changed fields; never saves 0; 2..50 clamp; server 400 text verbatim.
 
 Scan-list disposition cell before the review fixes (replaced): young (created 292.1-02) · owns its fetch/save; clamps on Save/blur; never sends 0. ⛔ SettingsPage gains one mount, no state
+
+### `backend/app/models/message.py` — Phase 292.1 close (D-UAT-2)
+
+**CLAUDE.md verdict cell as of 2026-10-24 (replaced by 292.1):** last touch 279-01 (comment repoint only)
+
+**Triple:** `24 / 16 / 287` (was `23 / 15 / 285`). **Change:** `MessageResponse.run_status` gains `"cap_paused"` (+2 lines incl. comment).
+
+**Why:** measured on the 292.1 live board, 2026-10-24. Once a Continue re-paused at the tool-round cap, `runs.status` read `cap_paused` (in the DB CHECK since migration 063), and `GET /threads/{id}/messages` + `/snapshot` returned **HTTP 500** (`ValidationError ... input_value='cap_paused'`). Threads `e901e539` and `a6d673d1` could not be opened. The defect predates 292.1; 292.1 made it reachable by making Continue work. Pinned by `test_2921_message_run_status_cap_paused.py`.
+
+⛔ **Invariant:** this Literal MUST mirror every value of `public.runs.status`'s CHECK. A narrower Literal 500s the WHOLE thread on one row (the BUG-260528-01 class, same as `role` above).
+

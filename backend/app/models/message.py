@@ -129,7 +129,9 @@ class MessageResponse(BaseModel):
     # producer's TimeoutError handler (threads.py:agent_runner) when the
     # per-LLM-call asyncio.timeout fires. NEVER written by runs.py:cancel_run
     # (partition guard per D-066-05).
-    run_status: Literal["streaming", "completed", "failed", "cancelled", "timed_out"] | None = None
+    # Phase 292.1 D-UAT-2: 'cap_paused' (allowed by the CHECK since migration 063) was missing,
+    # so a thread whose latest run re-paused at the tool-round cap returned 500 on reload.
+    run_status: Literal["streaming", "completed", "failed", "cancelled", "timed_out", "cap_paused"] | None = None
     # Phase 076.2 D-01: DeepSeek thinking mode reasoning_content. Nullable --
     # only present on assistant messages from thinking-enabled providers.
     reasoning_content: str | None = None
