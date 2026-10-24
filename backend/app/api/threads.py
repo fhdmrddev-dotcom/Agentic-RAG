@@ -87,6 +87,7 @@ from app.services.thread_handoff import (
     write_handoff,
 )
 from app.services.audit_service import write_audit_entry
+from app.services.typed_continue import is_continue_word  # 292.1 D-13 — pure word match, no model call
 from app.services.thread_workspace_cleanup import collect_thread_workspace_paths, remove_workspace_paths  # 274 D-08
 from app.services.artifact_history import attach_artifacts  # 273 (I-2 / ART-05) — reload attach
 from app.utils.db import aexec
@@ -794,6 +795,77 @@ def _require_thread_org(thread_row: dict | None, active_org_id: str | None, *, e
         return
     if str(thread_row.get("org_id") or "") != str(active_org_id or ""):
         raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail=detail)
+
+
+async def _typed_continue_or_none(
+    *, request, body: MessageCreate, thread_row: dict, current_user: dict, supabase, service_supabase, redis,
+) -> JSONResponse | None:
+    """292.1 (BUG-261024-03, D-12 / D-14 / D-15 / D-16): a typed continue word resumes the paused run.
+
+    Returns the reply for a typed Continue, or ``None`` for an ordinary send. The send door calls
+    this once and adds ONE ``if`` (D-20, pinned by test_279 / test_2921); every decision lives here.
+
+    Cheapest first, so a message that is not a continue word never touches the DB:
+      (a) a workflow kickoff or a harness thread is never a typed Continue (harness anchors keep
+          their own Continue);
+      (b) the text must be one of the fixed continue words (D-13, no model call);
+      (c) the thread's LATEST run, read with the same no-status-predicate SQL the workflow
+          reconcile uses (the 244 rule: the pause belongs to the latest run or to nobody);
+      (d) it must be ``cap_paused`` with Continues left (D-16), read off the real setting;
+      (e) the run is handed to ``continue_run`` — the SAME code the button calls (D-14), so the
+          resumed history is the button's history.
+    A refused ``continue_run`` (a race to the last Continue) falls through to a normal send (D-16),
+    and a failed read fails OPEN to a normal send: a read never blocks a message.
+
+    ⛔ Binding: this DELEGATES. It writes nothing, and above all never ``runs.status`` —
+    ``continue_run`` stays the only ``cap_paused → streaming`` writer, and the rejected arm recorded
+    in ``get_thread_workflow_state`` (a second ``runs.status`` writer) still stands."""
+    if body.workflow_definition_id is not None or thread_row.get("active_workflow_run_id") is not None:
+        return None
+    if not is_continue_word(body.content):
+        return None
+    _thread_id = thread_row.get("id")
+    try:
+        async with get_user_pg_connection(request, current_user) as _conn:
+            row = await _conn.fetchrow(
+                """
+                SELECT run_id, status, continues_used
+                FROM runs
+                WHERE thread_id = $1
+                ORDER BY started_at DESC
+                LIMIT 1
+                """,
+                UUID(_thread_id) if isinstance(_thread_id, str) else _thread_id,
+            )
+    except Exception:  # noqa: BLE001 — fail open: a read failure never blocks a message
+        logger.warning("typed continue: latest-run read failed for thread %s; sending as a new message",
+                       _thread_id, exc_info=True)
+        return None
+    if row is None or row["status"] != "cap_paused":
+        return None
+    if (row["continues_used"] or 0) >= settings.max_continues_per_run:
+        return None
+    from app.api.runs import continue_run  # noqa: PLC0415 — runs.py imports this module lazily; a top-level import cycles
+
+    res = await continue_run(
+        run_id=UUID(str(row["run_id"])),
+        current_user=current_user,
+        supabase=supabase,
+        service_supabase=service_supabase,
+        redis=redis,
+    )
+    if isinstance(res, JSONResponse) or not isinstance(res, dict) or res.get("status") == "refused":
+        return None
+    return JSONResponse(
+        status_code=200,
+        content={
+            "continued": True,
+            "run_id": str(row["run_id"]),
+            "message_id": None,
+            "continues_used": res["continues_used"],
+            "continues_remaining": res["continues_remaining"],
+        },
+    )
 
 
 @router.post("", response_model=ThreadResponse, status_code=status.HTTP_201_CREATED)
@@ -1685,6 +1757,10 @@ async def send_message(
     # no orphan message is left behind. No active org on an Expert thread is refused too (fail closed).
     _require_thread_org(thread_resp.data, active_org_id, expert_id=thread_resp.data.get("active_expert_id"),
                         detail="Switch to this chat's organization to keep chatting with its Expert.")
+    # 292.1 (D-12): a typed continue word on a paused Deep thread resumes THAT run via continue_run,
+    # exactly like the button. The one delegating branch (D-20); the decisions live in the helper.
+    if (_continued := await _typed_continue_or_none(request=request, body=body, thread_row=thread_resp.data, current_user=current_user, supabase=supabase, service_supabase=service_supabase, redis=redis)) is not None:
+        return _continued
 
     # ── Phase 092 MODE-01 / MODE-02 — server-side lock + workflow kickoff ──────
     # This is the AUTHORITATIVE workflow lock (the grayed client toggle is courtesy

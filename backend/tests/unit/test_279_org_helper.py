@@ -50,7 +50,9 @@ import app.api.threads as threads_mod
 import app.services.run_producer as rp
 from app.models.message import MessageCreate
 
-PHASE_BASE = "a5a94ba676a63a595f0c2408c7ce17b2ddfe5ada"
+# Re-based 2026-10-24 by 292.1-03 (D-12 / D-20) from a5a94ba676a63a595f0c2408c7ce17b2ddfe5ada onto
+# the 292.1 plan base; see test_send_message_gains_no_branch_relative_to_the_phase_base.
+PHASE_BASE = "9d3b77c88b2e2b175c76a069dd2aa4896d73b6b8"
 
 REPO_ROOT = Path(__file__).resolve().parents[3]
 THREADS_PATH = REPO_ROOT / "backend" / "app" / "api" / "threads.py"
@@ -192,7 +194,10 @@ def _ifs(src: str, fn_name: str) -> int:
 
 
 def test_send_message_gains_no_branch_relative_to_the_phase_base():
-    """D-05 (G-5): `threads.py` is FIRING — the send door gets one CALL, zero new `if`s."""
+    """D-05 (G-5): `threads.py` is FIRING — the send door gets one CALL, zero new `if`s.
+
+    Re-based 2026-10-24 by 292.1-03 (D-12/D-20): the typed-continue gate adds exactly ONE delegating
+    `if`; its logic lives in `_typed_continue_or_none`. The fence still forbids any further branch."""
     try:
         base_src = subprocess.run(
             ["git", "show", f"{PHASE_BASE}:backend/app/api/threads.py"],
@@ -203,7 +208,7 @@ def test_send_message_gains_no_branch_relative_to_the_phase_base():
     head_src = THREADS_PATH.read_text(encoding="utf-8")
     base_count = _ifs(base_src, "send_message")
     assert base_count > 0  # non-vacuity: the walker found the real function
-    assert _ifs(head_src, "send_message") == base_count
+    assert _ifs(head_src, "send_message") == base_count + 1
 
 
 # ── the helper and its four call sites (279-02 Commit A removed the strict-xfail markers) ────
