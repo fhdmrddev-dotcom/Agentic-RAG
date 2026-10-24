@@ -1,0 +1,1548 @@
+{
+  "provider": "google",
+  "model": "gemini-3.8-flash",
+  "thread_id": "8e68079c-12b5-41bd-b4c5-a96750a90fe7",
+  "prompt_bytes": 227,
+  "prompt": "Using our documents: show how invoice approval works as a flow diagram; compare the Atlas and Borealis contracts on termination, liability and renewal; and show the Atlas contract's history and upcoming deadlines as a timeline.",
+  "calling_mode_predicted": "NATIVE (native SDK adapter)",
+  "score": {
+    "per_type": {
+      "diagram": {
+        "v1": "PASS",
+        "v2_backend": "PASS",
+        "artifact_ids": [
+          "a_b6mpgz39ve"
+        ],
+        "labels": [
+          "diagram 1"
+        ],
+        "sourced_elements": [
+          "0/10"
+        ]
+      },
+      "comparison": {
+        "v1": "PASS",
+        "v2_backend": "PASS",
+        "artifact_ids": [
+          "a_rxwgu7n6ec"
+        ],
+        "labels": [
+          "comparison 1"
+        ],
+        "sourced_elements": [
+          "0/10"
+        ]
+      },
+      "timeline": {
+        "v1": "PASS",
+        "v2_backend": "PASS",
+        "artifact_ids": [
+          "a_wwmzkl0dyu"
+        ],
+        "labels": [
+          "timeline 1"
+        ],
+        "sourced_elements": [
+          "0/8"
+        ]
+      }
+    },
+    "tool_call_names": [
+      "write_todos",
+      "query_documents",
+      "query_documents",
+      "read_document",
+      "read_document",
+      "read_document",
+      "write_todos",
+      "show_artifact",
+      "show_artifact",
+      "show_artifact",
+      "write_todos"
+    ],
+    "search_documents_calls": 0,
+    "show_artifact_calls": 3,
+    "refusals": [],
+    "artifact_rows": 3,
+    "reload_records": 3,
+    "reload_missing": 0,
+    "other_components": []
+  },
+  "turn_data": {
+    "run_id": "620b2edf-8871-4f3c-83ac-06bbf8cda63b",
+    "run_status": "completed",
+    "run": {
+      "status": "completed",
+      "model": "gemini-3.8-flash",
+      "provider": "google",
+      "error": null,
+      "started_at": "2026-10-24 01:27:52.644964+00:00",
+      "completed_at": "2026-10-24 01:29:19.342122+00:00"
+    },
+    "assistant_messages": [
+      {
+        "id": "19e9aca5-5d39-453c-bb06-53daf94bc23d",
+        "content": "Here is the breakdown based on your documents, along with the interactive visual artifacts rendered below:\n\n---\n\n### 1. Invoice Approval Workflow\n**[292-invoice-approval-policy.md]** \u2014 *The approval process, step by step & The approver chain*\n\nThe invoice approval workflow follows a structured progression:\n- **Receipt & Three-Way Match:** Accounts Payable logs invoices on the day of receipt and verifies them against the Purchase Order (PO) and Goods Receipt Note (GRN). Mismatched invoices are rejected back to the supplier for correction and resubmission.\n- **Approvals & Sign-Off:** Matched invoices require cost centre budget holder approval within 5 working days (with reminder and escalation to the Head of Finance if delayed). Invoices exceeding **\u20ac10,000** require secondary sign-off from the Finance Controller.\n- **Payment & Retention:** Accounts Payable schedules approved invoices for Treasury release during the Thursday weekly payment run, followed by a 7-year audit archive retention.\n\n*The flow diagram below (**diagram 1**) maps each step, decision gate, rejection loop, and threshold in the approval pipeline.*\n\n---\n\n### 2. Contract Comparison: Atlas Logistics vs. Borealis Freight\n**[292-atlas-msa.md]** & **[292-borealis-msa.md]** \u2014 *Termination, Liability, Renewal & Term*\n\n| Provision | Atlas Logistics MSA | Borealis Freight MSA |\n| :--- | :--- | :--- |\n| **Termination for Convenience** | Requires **90 days'** written notice. | Requires **30 days'** written notice. |\n| **Termination for Cause** | Either party may terminate immediately for a material breach uncured within **30 days** of written notice. | The Company may terminate immediately if Borealis becomes **insolvent** (no general breach cure period stated). |\n| **Liability Cap** | Capped at the aggregate fees paid in the **12 months preceding the claim** (mutual). | Asymmetric: Borealis capped at **\u20ac250,000/year**; Company capped at **fees payable in the same year**. |\n| **Liability Exclusions** | Uncapped for death, personal injury, fraud, or **breach of confidentiality**. | Uncapped for **fraud only**. |\n| **Term & Renewal** | Initial 3-year term (to 15 March 2027) with **automatic 1-year renewals** unless 90 days' non-renewal notice is given. | **Fixed 2-year term** (1 June 2024 to 31 May 2026); contains no automatic renewal provision. |\n\n*The comparison matrix below (**comparison 1**) provides an interactive side-by-side view highlighting flexibility, protections, and renewal obligations between the two providers.*\n\n---\n\n### 3. Atlas Contract Milestones & Deadlines\n**[292-atlas-msa.md]** \u2014 *Contract history & Upcoming deadlines and milestones*\n\n- **14 March 2023:** 3-year Master Services Agreement signed.\n- **1 April 2023:** Operational service commencement and first shipments.\n- **9 February 2024:** Amendment 1 executed (3.5% price increase; fuel surcharge folded into base rate).\n- **November 2024:** Formal SLA breach notice issued following three missed delivery windows in October 2024.\n- **15 January 2025:** \u20ac18,400 in service credits applied to the January invoice.\n- **1 April 2026:** Annual price uplift of 3.1% applied (within the 4% ceiling).\n- **15 December 2026 (Upcoming Deadline):** Final date to serve written notice of non-renewal (at least 90 days prior to term end).\n- **15 March 2027 (Upcoming Milestone):** Current 3-year term concludes; automatically extends for 1 additional year if non-renewal notice was not served.\n\n*The timeline below (**timeline 1**) chronologically displays the full lifecycle of the Atlas contract, distinguishing historical amendments and performance events from upcoming decision deadlines.*",
+        "tool_calls": [
+          {
+            "args": {
+              "todos": [
+                {
+                  "id": "t1",
+                  "status": "in_progress",
+                  "content": "Find documents and details on invoice approval process",
+                  "parent_id": null,
+                  "order_index": 0
+                },
+                {
+                  "id": "t2",
+                  "status": "pending",
+                  "content": "Find and analyze Atlas and Borealis contracts for termination, liability, and renewal",
+                  "parent_id": null,
+                  "order_index": 1
+                },
+                {
+                  "id": "t3",
+                  "status": "pending",
+                  "content": "Gather Atlas contract history and upcoming deadlines",
+                  "parent_id": null,
+                  "order_index": 2
+                },
+                {
+                  "id": "t4",
+                  "status": "pending",
+                  "content": "Generate invoice approval flow diagram, contract comparison, and Atlas contract timeline artifacts",
+                  "parent_id": null,
+                  "order_index": 3
+                }
+              ]
+            },
+            "name": "write_todos",
+            "result": "{\"accepted\": 4, \"version\": 1792805280896}",
+            "status": "done",
+            "tool_call_id": "call_251964",
+            "thought_signature": "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"
+          },
+          {
+            "args": {
+              "query": "SELECT filename, metadata->>'title' AS title, metadata->>'document_type' AS doc_type FROM documents WHERE filename ILIKE '%invoice%' OR filename ILIKE '%approval%' OR filename ILIKE '%atlas%' OR filename ILIKE '%borealis%'"
+            },
+            "name": "query_documents",
+            "result": "title | doc_type | filename\n--- | --- | ---\n245 UAT Fixture - Finance folder file (M-9, manual-import door) | manual | 245-UAT-finance-invoice.txt\nInvoice Approval Policy | policy | 292-invoice-approval-policy.md\nINVOICE 1092 | invoice | invoice1092.txt\nBorealis Freight Master Services Agreement | master services agreement | 292-borealis-msa.md\nAtlas Logistics Master Services Agreement | master services agreement | 292-atlas-msa.md",
+            "status": "done",
+            "tool_call_id": "call_251967"
+          },
+          {
+            "args": {
+              "query": "SELECT id, filename, metadata FROM documents WHERE filename IN ('292-invoice-approval-policy.md', '292-borealis-msa.md', '292-atlas-msa.md')"
+            },
+            "name": "query_documents",
+            "result": "id | filename | metadata\n--- | --- | ---\n5b94562c-4bb9-431c-a12b-59e99f46cca1 | 292-invoice-approval-policy.md | {'title': 'Invoice Approval Policy', 'author': 'Finance Operations', 'topics': ['invoice approval', 'accounts payable', 'three-way match', 'payment processing', 'audit retention', 'escalation'], 'summary': 'Policy describing the process for supplier invoice receipt, three-way match checking, approvals, rejection handling, payment scheduling, and audit filing. Invoices follow a fixed workflow from receipt through payment, with escalation if approval is delayed.', 'language': 'en', '_confidence': {'date': 0.2, 'title': 0.99, 'author': 0.97, 'topics': 0.94, 'summary': 0.95, 'language': 0.98, 'contract_end': 0.05, 'legal_entity': 0.05, 'document_type': 0.96}, 'document_type': 'policy'}\nd4eb5c9d-e039-4b9c-a874-ef8593de3062 | 292-borealis-msa.md | {'date': '2024-06-01', 'title': 'Borealis Freight Master Services Agreement', 'topics': ['term', 'termination', 'liability', 'payment'], 'summary': \"Fixture generated Master Services Agreement for Borealis Freight and the Company. It includes a fixed two-year term starting 1 June 2024, termination for convenience on 30 days' notice, immediate termination for insolvency, liability caps, and payment terms of 45 days with statutory late interest.\", 'language': 'en', '_confidence': {'date': 0.96, 'title': 0.99, 'author': 0.1, 'topics': 0.95, 'summary': 0.95, 'language': 0.99, 'contract_end': 0.94, 'legal_entity': 0.18, 'document_type': 0.96}, 'contract_end': '2026-05-31', 'legal_entity': 'Beta Ltd', 'document_type': 'master services agreement'}\n325e6ca5-7982-47f5-af18-ad64b4802e85 | 292-atlas-msa.md | {'date': '2023-03-14', 'title': 'Atlas Logistics Master Services Agreement', 'topics': ['termination', 'liability', 'renewal', 'contract history', 'service credits', 'price uplift'], 'summary': 'Fixture-generated master services agreement for Atlas Logistics and the Company. Includes termination for convenience and breach, l",
+            "status": "done",
+            "tool_call_id": "call_411289",
+            "thought_signature": "EqkHCqYHAWkUfRMtLnAg+vjfGWf92M0ggaa91XT5wSLtCguyge/AO4qyyI7hn2mTRf8H1WSRIB1atwdGB0Zp5gDLBs3TQth9jhETZBphxvkP1HbxnlOjroL0J5Go3nFVNDwfFhonuBRvfexuB/1nevrqBdFNtMJt5YSa/p2X/X48jKuHJCvu22ynhG3PxcgfYRdB4AcFVoCmK1iWUv8oy5MSkoi/BrtkjG6a8Mdb8eftvcoNUAA6b7P/5K3/V/XTD/gNs5Kd8Hg3k86SxI0uSiT42je6Vs/YWsxQMJTX6zOc8bYCIp+PqUUhJlMUpLlyFDE7AqnSFVdQAOnRJnfjikNCdhsdqBJ56CgZ93yE8hBhzpYGdMK3kJwy2TeO+t3x1dwiEHdN0VaTFShs767FHluBFVcuOv8turNzKbA/OE9Erc3nMdCiFB/tCOLP8wagn2q1D7WB+Q1iclLHlvV9+2dmBkAxLfEVD3KDV3p33ySmyDF1QyE9HGxcetsbW+JYxHMqxx+eJoYiPB4DkUmXO8CkiuCQhEa+6ldgpNqDZAqVPErP3sk6YMQ96x/RNWEZM9KCVAH0jP/uAYmEiEKNBXyE43Ztt7AMmkA5D8er/HyFlzudtPnRC21NaSifmLGPAsXQ3Pux0bjxnuDJpYKsCmt+G0DLUws/7ZEn1jv0tyqY16LaupEjwpYOMnRt6+BwLMqMr+PgroJHdx/D4i9uuSiubWkzghsU7PtrJLYuMRN8qimMM6YXmCfwlRhCra0Cgu+Z3t5rAlGalkXhIFvIfY7Qlc9yjCdZmNl4E1J9kKRbTJwIXJexUXXagHY0RoZDfmnyDIeBy7vCOj+agPFa2u9OrOP/HeecND62J5DzUN9UKDmiGkCsYjlWgdky/OqoAa0r3C9TPbGpv5s2ip+1QVzzKth4903T92T8Qk2nm0KeL/do2kz0caMbJG7KwEeL3bcC9EUi2ZZ13GslvdhVrHvqt/WLqXmkHAD+CIfX94tHhFPnfF7qwMxpL3bZENZsSZ3zUH2Jdalv7x1jCxeFuUtCUdLqXpa7b/j/D1yR4pc2n+2GgxvCjWuSCGcfW1sljvnMuzY1RP1GJpmDtVfN5OiIFIWKL8ll7AvoWQ9eYVPbf1cGv7snjpkjsnHo0GKsUrjNTzCGZAtV3vANFRbqFCyw41kKUwW8ayYj2wNxrSsp6LiIhIDyW3hi0q+iKTohg3yvY9ONJ3oRWDsXRTMtQqZAff22gZWUK84b9A=="
+          },
+          {
+            "args": {
+              "document_id": "5b94562c-4bb9-431c-a12b-59e99f46cca1"
+            },
+            "name": "read_document",
+            "result": "{\"document_id\": \"5b94562c-4bb9-431c-a12b-59e99f46cca1\", \"filename\": \"292-invoice-approval-policy.md\", \"total_lines\": 41, \"content\": \"# Invoice Approval Policy (fixture, generated for Phase 292 UAT)\\n\\nDocument owner: Finance Operations. Applies to every supplier invoice received by the company.\\nThis is a generated test document; it contains no real supplier, person or amount.\\n\\n## Purpose\\n\\nThis policy describes how a supplier invoice moves from receipt to payment, who approves it, and\\nwhat happens when an invoice is wrong. Every invoice follows the same steps in the same order.\\n\\n## The approval process, step by step\\n\\n1. **Invoice received.** The accounts payable inbox receives the supplier invoice and logs it in the\\n   payables register on the same working day.\\n2. **Three-way match check.** Accounts payable checks that the invoice matches the purchase order and\\n   the goods receipt note: same supplier, same quantities, same unit prices.\\n3. **Decision: does the invoice match the purchase order?** If it matches, the invoice goes to the\\n   budget holder for approval. If it does not match, the invoice is rejected and returned to the\\n   supplier.\\n4. **Rejected: return to the supplier.** Accounts payable emails the supplier the reason for the\\n   rejection. The supplier corrects the invoice and resubmits it, and the resubmitted invoice goes\\n   back to the three-way match check. A rejected invoice is never paid.\\n5. **Budget holder approval.** The budget holder for the cost centre approves the invoice within five\\n   working days.\\n6. **Finance controller sign-off.** Any invoice above 10,000 euros also needs the finance controller's\\n   sign-off after the budget holder has approved it.\\n7. **Payment scheduled.** Accounts payable schedules the approved invoice for the next weekly\\n   payment run.\\n8. **Paid.** Treasury releases the payment on the Thursday payment run.\\n9. **Filed for audit.** The paid invoice, its purchase order and its approvals are filed ",
+            "status": "done",
+            "tool_call_id": "call_282514",
+            "thought_signature": "EqgBCqUBAWkUfRNhG5WsT1/6n5hkSf6liH7/KbHLb3s6eQrxAzhDz86ILqqrqhJuCQAuaQmUH77lLqyMYh5vX9yp0S9YGhpijtZ3kbt4HHJpYweu8/FaUOEZrrw4igGAeKEJSPXBIuW3OJ9+dzSfctz0tyg9Oytk1nZjbC0JTVv1YpfRF+9DlxJFdgL0e3VRMPgJzm/zPGAeGoE8QQwBj+I5SbGOoU2WFbfX"
+          },
+          {
+            "args": {
+              "document_id": "325e6ca5-7982-47f5-af18-ad64b4802e85"
+            },
+            "name": "read_document",
+            "result": "{\"document_id\": \"325e6ca5-7982-47f5-af18-ad64b4802e85\", \"filename\": \"292-atlas-msa.md\", \"total_lines\": 36, \"content\": \"# Atlas Logistics Master Services Agreement (fixture, generated for Phase 292 UAT)\\n\\nParties: the Company and Atlas Logistics. Generated test document; no real party or amount.\\n\\n## Termination\\n\\nEither party may terminate this agreement for convenience on 90 days' written notice. Either party\\nmay terminate immediately for a material breach that is not cured within 30 days of written notice.\\n\\n## Liability\\n\\nEach party's total liability under this agreement is capped at the fees paid in the 12 months before\\nthe claim. The cap does not apply to death, personal injury, fraud or breach of confidentiality.\\n\\n## Renewal\\n\\nThe agreement renews automatically for successive one-year terms unless either party gives written\\nnotice of non-renewal at least 90 days before the end of the current term. The current term ends on\\n15 March 2027, so the renewal notice deadline is 15 December 2026.\\n\\n## Contract history\\n\\n- **14 March 2023 - MSA signed.** The three-year master services agreement was signed.\\n- **1 April 2023 - Services start.** The first shipments under the agreement.\\n- **9 February 2024 - Amendment 1.** Prices rose by 3.5 percent and the fuel surcharge was folded into\\n  the base rate.\\n- **November 2024 - SLA breach notice.** Atlas missed three delivery windows in October 2024.\\n- **15 January 2025 - Service credits applied.** Credits of 18,400 euros were applied to the January\\n  invoice.\\n- **1 April 2026 - Annual price uplift.** Prices rose by 3.1 percent, within the 4 percent cap.\\n\\n## Upcoming deadlines and milestones\\n\\n- **15 December 2026 - Renewal notice deadline.** Last day to give notice of non-renewal.\\n- **15 March 2027 - End of the current term.** The agreement renews for one year unless notice was\\n  given.\\n\"}",
+            "status": "done",
+            "tool_call_id": "call_356809",
+            "thought_signature": "EocCCoQCAWkUfRMIsi7i3zcpb+InxfPXZdlJlfINuY/u4IWAjgvwSkM/YMxbsC971Q+vnQjNdJtlvIF6Ahz7hyNwz+7WExe3ghCTKiV72kIoR8GCpGSpLQevbkJnyzrZUjChqXmk4koz8W5gl2SIojHcSwWZrYzi9ubFwc27+dbyVRlr6/UK4qrxI5b4aFL08pv61BeK0XEqXlDGg6I1TRFRRVSTnfCGju0iio47drJH8QqCzK7KypuuUZI+b7tchSLuLLMfXRCsQMTMWS0t2x7tvuTva55aKsuzN3gvC43O0vo7Y6/nAxRVzQFcaGrG08vio2HjCTyf33BtycqA90sBCAp/YZrKEzM="
+          },
+          {
+            "args": {
+              "document_id": "d4eb5c9d-e039-4b9c-a874-ef8593de3062"
+            },
+            "name": "read_document",
+            "result": "{\"document_id\": \"d4eb5c9d-e039-4b9c-a874-ef8593de3062\", \"filename\": \"292-borealis-msa.md\", \"total_lines\": 21, \"content\": \"# Borealis Freight Master Services Agreement (fixture, generated for Phase 292 UAT)\\n\\nParties: the Company and Borealis Freight. Generated test document; no real party or amount.\\n\\n## Term\\n\\nThe agreement starts on 1 June 2024 and runs for a fixed term of two years.\\n\\n## Termination\\n\\nEither party may terminate this agreement for convenience on 30 days' written notice. The Company may\\nterminate immediately if Borealis becomes insolvent.\\n\\n## Liability\\n\\nBorealis's total liability under this agreement is capped at 250,000 euros per year. The Company's\\nliability is capped at the fees payable in the same year. Neither cap applies to fraud.\\n\\n## Payment\\n\\nInvoices are payable within 45 days of receipt. Late payment carries interest at the statutory rate.\\n\"}",
+            "status": "done",
+            "tool_call_id": "call_361131",
+            "thought_signature": "EqABCp0BAWkUfRPhxFDqAhyfl67IoJiYAWtkIgUG9MzYO/tX6BXwV1o4ZBQ8kprPYMRJTQ2Ktx8bo3GGuyDQFwY8mrgSiJ45Jnz/fsei82kKYobBGxu3i56lvIZInnnjWesr0zCdyFjg6PzjEs4XXobUN5J76UjAedDY9wD5BNk6mUVynVPR0H380MWnAothwZiFto9n58eufvWO1et8a1ViDA=="
+          },
+          {
+            "args": {
+              "todos": [
+                {
+                  "id": "t1",
+                  "status": "completed",
+                  "content": "Find documents and details on invoice approval process",
+                  "parent_id": null,
+                  "order_index": 0
+                },
+                {
+                  "id": "t2",
+                  "status": "completed",
+                  "content": "Find and analyze Atlas and Borealis contracts for termination, liability, and renewal",
+                  "parent_id": null,
+                  "order_index": 1
+                },
+                {
+                  "id": "t3",
+                  "status": "completed",
+                  "content": "Gather Atlas contract history and upcoming deadlines",
+                  "parent_id": null,
+                  "order_index": 2
+                },
+                {
+                  "id": "t4",
+                  "status": "in_progress",
+                  "content": "Generate invoice approval flow diagram, contract comparison, and Atlas contract timeline artifacts",
+                  "parent_id": null,
+                  "order_index": 3
+                }
+              ]
+            },
+            "name": "write_todos",
+            "result": "{\"accepted\": 4, \"version\": 1792805333898}",
+            "status": "done",
+            "tool_call_id": "call_416104",
+            "thought_signature": "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"
+          },
+          {
+            "args": {
+              "title": "Invoice Approval Process Flow",
+              "diagram": "<stored in artifact a_b6mpgz39ve, diagram of 10 steps>",
+              "component": "diagram"
+            },
+            "name": "show_artifact",
+            "result": "{\"artifact_id\": \"a_b6mpgz39ve\", \"label\": \"diagram 1\", \"component\": \"diagram\", \"row_count\": 10, \"edge_count\": 11, \"note\": \"Shown to the user below your answer as diagram 1. Now write one or two sentences about what it shows; do not repeat it as a table. To change it, call show_artifact again with the full data.\"}",
+            "status": "done",
+            "tool_call_id": "call_416140"
+          },
+          {
+            "args": {
+              "title": "Atlas Logistics vs. Borealis Freight Contract Comparison",
+              "component": "comparison",
+              "comparison": "<stored in artifact a_rxwgu7n6ec, comparison of 5 terms>"
+            },
+            "name": "show_artifact",
+            "result": "{\"artifact_id\": \"a_rxwgu7n6ec\", \"label\": \"comparison 1\", \"component\": \"comparison\", \"row_count\": 5, \"option_count\": 2, \"note\": \"Shown to the user below your answer as comparison 1. Now write one or two sentences about what it shows; do not repeat it as a table. To change it, call show_artifact again with the full data.\"}",
+            "status": "done",
+            "tool_call_id": "call_416176"
+          },
+          {
+            "args": {
+              "title": "Atlas Logistics Contract Milestones & Deadlines",
+              "timeline": "<stored in artifact a_wwmzkl0dyu, timeline of 8 events>",
+              "component": "timeline"
+            },
+            "name": "show_artifact",
+            "result": "{\"artifact_id\": \"a_wwmzkl0dyu\", \"label\": \"timeline 1\", \"component\": \"timeline\", \"row_count\": 8, \"note\": \"Shown to the user below your answer as timeline 1. Now write one or two sentences about what it shows; do not repeat it as a table. To change it, call show_artifact again with the full data.\"}",
+            "status": "done",
+            "tool_call_id": "call_416214"
+          },
+          {
+            "args": {
+              "todos": [
+                {
+                  "id": "t1",
+                  "status": "completed",
+                  "content": "Find documents and details on invoice approval process",
+                  "parent_id": null,
+                  "order_index": 0
+                },
+                {
+                  "id": "t2",
+                  "status": "completed",
+                  "content": "Find and analyze Atlas and Borealis contracts for termination, liability, and renewal",
+                  "parent_id": null,
+                  "order_index": 1
+                },
+                {
+                  "id": "t3",
+                  "status": "completed",
+                  "content": "Gather Atlas contract history and upcoming deadlines",
+                  "parent_id": null,
+                  "order_index": 2
+                },
+                {
+                  "id": "t4",
+                  "status": "completed",
+                  "content": "Generate invoice approval flow diagram, contract comparison, and Atlas contract timeline artifacts",
+                  "parent_id": null,
+                  "order_index": 3
+                }
+              ]
+            },
+            "name": "write_todos",
+            "result": "{\"accepted\": 4, \"version\": 1792805339621}",
+            "status": "done",
+            "tool_call_id": "call_214100",
+            "thought_signature": "EtABCs0BAWkUfRN4rWyNagbWGRu+PT9Ly9goRLj5WbziEBg3czqmM75yjqsObMVJt5PLg1yiKz4z/u/pDktv0rolXBOgMmEcK3vWCJ/pWzAOj4UDpsE0CKWhZxKDMuHYH9kYLj81qQrw8/Fjz5uK9o53opaT9BSXJ2WkrbFi5ErKtapmE+a82rHgw5KSlnvK58naz+6iQ5dwITtXhOywyaf/szTZl0TqIC09NNPHJT+LrN6xpv/bmqa+yCUJxNeHh2u+55/pWlhFRIpQh0f3FtJXbQ=="
+          }
+        ]
+      }
+    ],
+    "tool_call_names": [
+      "write_todos",
+      "query_documents",
+      "query_documents",
+      "read_document",
+      "read_document",
+      "read_document",
+      "write_todos",
+      "show_artifact",
+      "show_artifact",
+      "show_artifact",
+      "write_todos"
+    ],
+    "show_artifact_calls": 3,
+    "refused_calls": 0,
+    "artifact_ids_from_results": [
+      "a_b6mpgz39ve",
+      "a_rxwgu7n6ec",
+      "a_wwmzkl0dyu"
+    ],
+    "final_answer_empty": false,
+    "final_answer_is_fallback": false,
+    "persisted_json_fence": false,
+    "redis": {
+      "present": true,
+      "ttl": 599,
+      "event_types": {
+        "iteration_start": 8,
+        "tool_preparing": 11,
+        "tool_args_progress": 6,
+        "tool_start": 11,
+        "todo_updated": 3,
+        "tool_end": 11,
+        "planning": 7,
+        "artifact": 3,
+        "delta": 36,
+        "suggestions": 1,
+        "stream_end": 1,
+        "done": 1
+      },
+      "delta_count": 36,
+      "delta_text": "Here is the breakdown based on your documents, along with the interactive visual artifacts rendered below:\n\n---\n\n### 1. Invoice Approval Workflow\n**[292-invoice-approval-policy.md]** \u2014 *The approval process, step by step & The approver chain*\n\nThe invoice approval workflow follows a structured progression:\n- **Receipt & Three-Way Match:** Accounts Payable logs invoices on the day of receipt and verifies them against the Purchase Order (PO) and Goods Receipt Note (GRN). Mismatched invoices are rejected back to the supplier for correction and resubmission.\n- **Approvals & Sign-Off:** Matched invoices require cost centre budget holder approval within 5 working days (with reminder and escalation to the Head of Finance if delayed). Invoices exceeding **\u20ac10,000** require secondary sign-off from the Finance Controller.\n- **Payment & Retention:** Accounts Payable schedules approved invoices for Treasury release during the Thursday weekly payment run, followed by a 7-year audit archive retention.\n\n*The flow diagram below (**diagram 1**) maps each step, decision gate, rejection loop, and threshold in the approval pipeline.*\n\n---\n\n### 2. Contract Comparison: Atlas Logistics vs. Borealis Freight\n**[292-atlas-msa.md]** & **[292-borealis-msa.md]** \u2014 *Termination, Liability, Renewal & Term*\n\n| Provision | Atlas Logistics MSA | Borealis Freight MSA |\n| :--- | :--- | :--- |\n| **Termination for Convenience** | Requires **90 days'** written notice. | Requires **30 days'** written notice. |\n| **Termination for Cause** | Either party may terminate immediately for a material breach uncured within **30 days** of written notice. | The Company may terminate immediately if Borealis becomes **insolvent** (no general breach cure period stated). |\n| **Liability Cap** | Capped at the aggregate fees paid in the **12 months preceding the claim** (mutual). | Asymmetric: Borealis capped at **\u20ac250,000/year**; Company capped at **fees payable in the same year**. |\n| **Liability Exclusions** | Uncapped for death, personal injury, fraud, or **breach of confidentiality**. | Uncapped for **fraud only**. |\n| **Term & Renewal** | Initial 3-year term (to 15 March 2027) with **automatic 1-year renewals** unless 90 days' non-renewal notice is given. | **Fixed 2-year term** (1 June 2024 to 31 May 2026); contains no automatic renewal provision. |\n\n*The comparison matrix below (**comparison 1**) provides an interactive side-by-side view highlighting flexibility, protections, and renewal obligations between the two providers.*\n\n---\n\n### 3. Atlas Contract Milestones & Deadlines\n**[292-atlas-msa.md]** \u2014 *Contract history & Upcoming deadlines and milestones*\n\n- **14 March 2023:** 3-year Master Services Agreement signed.\n- **1 April 2023:** Operational service commencement and first shipments.\n- **9 February 2024:** Amendment 1 executed (3.5% price increase; fuel surcharge folded into base rate).\n- **November 2024:** Formal SLA breach notice issued following three missed delivery windows in October 2024.\n- **15 January 2025:** \u20ac18,400 in service credits applied to the January invoice.\n- **1 April 2026:** Annual price uplift of 3.1% applied (within the 4% ceiling).\n- **15 December 2026 (Upcoming Deadline):** Final date to serve written notice of non-renewal (at least 90 days prior to term end).\n- **15 March 2027 (Upcoming Milestone):** Current 3-year term concludes; automatically extends for 1 additional year if non-renewal notice was not served.\n\n*The timeline below (**timeline 1**) chronologically displays the full lifecycle of the Atlas contract, distinguishing historical amendments and performance events from upcoming decision deadlines.*",
+      "artifact_events": 3
+    }
+  },
+  "message_artifacts": [
+    {
+      "id": "a_b6mpgz39ve",
+      "label": "diagram 1",
+      "component": "diagram",
+      "parent_id": null,
+      "run_id": "620b2edf-8871-4f3c-83ac-06bbf8cda63b",
+      "tool_call_id": "call_416140",
+      "row_count": 10,
+      "spec": {
+        "title": "Invoice Approval Process Flow",
+        "diagram": {
+          "edges": [
+            {
+              "to": "n2",
+              "from": "n1",
+              "label": null
+            },
+            {
+              "to": "n3",
+              "from": "n2",
+              "label": null
+            },
+            {
+              "to": "n4",
+              "from": "n3",
+              "label": "No (Mismatch)"
+            },
+            {
+              "to": "n2",
+              "from": "n4",
+              "label": "Supplier Resubmits"
+            },
+            {
+              "to": "n5",
+              "from": "n3",
+              "label": "Yes (Match)"
+            },
+            {
+              "to": "n6",
+              "from": "n5",
+              "label": null
+            },
+            {
+              "to": "n7",
+              "from": "n6",
+              "label": "Yes (> \u20ac10k)"
+            },
+            {
+              "to": "n8",
+              "from": "n6",
+              "label": "No (\u2264 \u20ac10k)"
+            },
+            {
+              "to": "n8",
+              "from": "n7",
+              "label": null
+            },
+            {
+              "to": "n9",
+              "from": "n8",
+              "label": null
+            },
+            {
+              "to": "n10",
+              "from": "n9",
+              "label": null
+            }
+          ],
+          "nodes": [
+            {
+              "id": "n1",
+              "kind": "start",
+              "label": "Invoice Received & Logged in AP Register",
+              "source": null
+            },
+            {
+              "id": "n2",
+              "kind": "step",
+              "label": "Three-Way Match Check (PO, GRN, Invoice)",
+              "source": null
+            },
+            {
+              "id": "n3",
+              "kind": "decision",
+              "label": "Matches Purchase Order & Goods Receipt?",
+              "source": null
+            },
+            {
+              "id": "n4",
+              "kind": "step",
+              "label": "Rejected: Returned to Supplier for Correction",
+              "source": null
+            },
+            {
+              "id": "n5",
+              "kind": "step",
+              "label": "Budget Holder Approval (within 5 working days)",
+              "source": null
+            },
+            {
+              "id": "n6",
+              "kind": "decision",
+              "label": "Invoice Amount > \u20ac10,000?",
+              "source": null
+            },
+            {
+              "id": "n7",
+              "kind": "step",
+              "label": "Finance Controller Sign-Off",
+              "source": null
+            },
+            {
+              "id": "n8",
+              "kind": "step",
+              "label": "Payment Scheduled for Weekly Payment Run",
+              "source": null
+            },
+            {
+              "id": "n9",
+              "kind": "step",
+              "label": "Paid: Treasury Releases Funds (Thursday Run)",
+              "source": null
+            },
+            {
+              "id": "n10",
+              "kind": "end",
+              "label": "Filed in Audit Archive (Retained 7 Years)",
+              "source": null
+            }
+          ]
+        }
+      },
+      "caption": {
+        "lineage": null,
+        "sources": [
+          {
+            "page": null,
+            "tool": "query_documents",
+            "document": null
+          },
+          {
+            "page": null,
+            "tool": "read_document",
+            "document": null
+          }
+        ],
+        "row_count": 10,
+        "source_count": 2
+      },
+      "thread_id": "8e68079c-12b5-41bd-b4c5-a96750a90fe7",
+      "at": "2026-10-24 01:28:53.905879+00"
+    },
+    {
+      "id": "a_rxwgu7n6ec",
+      "label": "comparison 1",
+      "component": "comparison",
+      "parent_id": null,
+      "run_id": "620b2edf-8871-4f3c-83ac-06bbf8cda63b",
+      "tool_call_id": "call_416176",
+      "row_count": 5,
+      "spec": {
+        "title": "Atlas Logistics vs. Borealis Freight Contract Comparison",
+        "comparison": {
+          "terms": [
+            {
+              "name": "Termination for Convenience",
+              "cells": [
+                {
+                  "text": "90 days' written notice",
+                  "source": null,
+                  "verdict": "m"
+                },
+                {
+                  "text": "30 days' written notice (faster exit)",
+                  "source": null,
+                  "verdict": "y"
+                }
+              ]
+            },
+            {
+              "name": "Termination for Cause",
+              "cells": [
+                {
+                  "text": "Immediate termination upon uncured material breach (30-day cure period)",
+                  "source": null,
+                  "verdict": "y"
+                },
+                {
+                  "text": "Immediate termination if Borealis becomes insolvent; no general breach cure clause stated",
+                  "source": null,
+                  "verdict": "m"
+                }
+              ]
+            },
+            {
+              "name": "Liability Cap",
+              "cells": [
+                {
+                  "text": "Mutual cap equal to fees paid in the preceding 12 months",
+                  "source": null,
+                  "verdict": "m"
+                },
+                {
+                  "text": "Asymmetric: Borealis capped at \u20ac250,000/year; Company capped at fees payable in that year",
+                  "source": null,
+                  "verdict": "m"
+                }
+              ]
+            },
+            {
+              "name": "Liability Carve-Outs / Exclusions",
+              "cells": [
+                {
+                  "text": "Cap does not apply to death, personal injury, fraud, or breach of confidentiality",
+                  "source": null,
+                  "verdict": "y"
+                },
+                {
+                  "text": "Cap does not apply to fraud only",
+                  "source": null,
+                  "verdict": "m"
+                }
+              ]
+            },
+            {
+              "name": "Renewal & Term Structure",
+              "cells": [
+                {
+                  "text": "Automatic 1-year renewals unless non-renewal notice is served 90 days prior",
+                  "source": null,
+                  "verdict": "y"
+                },
+                {
+                  "text": "Fixed 2-year term (1 June 2024 \u2013 31 May 2026); no auto-renewal clause",
+                  "source": null,
+                  "verdict": "n"
+                }
+              ]
+            }
+          ],
+          "options": [
+            "Atlas Logistics MSA",
+            "Borealis Freight MSA"
+          ]
+        }
+      },
+      "caption": {
+        "lineage": null,
+        "sources": [
+          {
+            "page": null,
+            "tool": "query_documents",
+            "document": null
+          },
+          {
+            "page": null,
+            "tool": "read_document",
+            "document": null
+          }
+        ],
+        "row_count": 5,
+        "source_count": 2
+      },
+      "thread_id": "8e68079c-12b5-41bd-b4c5-a96750a90fe7",
+      "at": "2026-10-24 01:28:53.919034+00"
+    },
+    {
+      "id": "a_wwmzkl0dyu",
+      "label": "timeline 1",
+      "component": "timeline",
+      "parent_id": null,
+      "run_id": "620b2edf-8871-4f3c-83ac-06bbf8cda63b",
+      "tool_call_id": "call_416214",
+      "row_count": 8,
+      "spec": {
+        "title": "Atlas Logistics Contract Milestones & Deadlines",
+        "timeline": {
+          "events": [
+            {
+              "date": "2023-03-14",
+              "title": "MSA Signed",
+              "detail": "Three-year master services agreement signed by the Company and Atlas Logistics.",
+              "source": null,
+              "category": "Contract History",
+              "deadline": false
+            },
+            {
+              "date": "2023-04-01",
+              "title": "Services Start",
+              "detail": "First operational shipments commenced under the agreement.",
+              "source": null,
+              "category": "Contract History",
+              "deadline": false
+            },
+            {
+              "date": "2024-02-09",
+              "title": "Amendment 1",
+              "detail": "Prices rose by 3.5% and fuel surcharge was folded into base rate.",
+              "source": null,
+              "category": "Contract History",
+              "deadline": false
+            },
+            {
+              "date": "2024-11",
+              "title": "SLA Breach Notice",
+              "detail": "Notice issued after Atlas missed three delivery windows in October 2024.",
+              "source": null,
+              "category": "Contract History",
+              "deadline": false
+            },
+            {
+              "date": "2025-01-15",
+              "title": "Service Credits Applied",
+              "detail": "Credits of \u20ac18,400 applied against the January invoice.",
+              "source": null,
+              "category": "Contract History",
+              "deadline": false
+            },
+            {
+              "date": "2026-04-01",
+              "title": "Annual Price Uplift",
+              "detail": "Annual rate increase of 3.1%, staying within the contractual 4% cap.",
+              "source": null,
+              "category": "Contract History",
+              "deadline": false
+            },
+            {
+              "date": "2026-12-15",
+              "title": "Renewal Notice Deadline",
+              "detail": "Final date to serve written non-renewal notice (90 days prior to term expiration).",
+              "source": null,
+              "category": "Upcoming Deadlines",
+              "deadline": true
+            },
+            {
+              "date": "2027-03-15",
+              "title": "Current Term Expiration / Renewal",
+              "detail": "Initial 3-year term ends; agreement automatically renews for 1 year if notice was not given.",
+              "source": null,
+              "category": "Upcoming Deadlines",
+              "deadline": true
+            }
+          ]
+        }
+      },
+      "caption": {
+        "lineage": null,
+        "sources": [
+          {
+            "page": null,
+            "tool": "query_documents",
+            "document": null
+          },
+          {
+            "page": null,
+            "tool": "read_document",
+            "document": null
+          }
+        ],
+        "row_count": 8,
+        "source_count": 2
+      },
+      "thread_id": "8e68079c-12b5-41bd-b4c5-a96750a90fe7",
+      "at": "2026-10-24 01:28:53.929353+00"
+    }
+  ],
+  "reload_http": 200,
+  "reload_artifacts": [
+    {
+      "id": "a_b6mpgz39ve",
+      "thread_id": "8e68079c-12b5-41bd-b4c5-a96750a90fe7",
+      "user_id": "d8a54002-6a29-4b88-b918-cff2aa4a06d5",
+      "org_id": "22f9c615-0eec-440a-8804-ed4784d6f57f",
+      "run_id": "620b2edf-8871-4f3c-83ac-06bbf8cda63b",
+      "tool_call_id": "call_416140",
+      "parent_id": null,
+      "label": "diagram 1",
+      "component": "diagram",
+      "spec": {
+        "title": "Invoice Approval Process Flow",
+        "diagram": {
+          "edges": [
+            {
+              "to": "n2",
+              "from": "n1",
+              "label": null
+            },
+            {
+              "to": "n3",
+              "from": "n2",
+              "label": null
+            },
+            {
+              "to": "n4",
+              "from": "n3",
+              "label": "No (Mismatch)"
+            },
+            {
+              "to": "n2",
+              "from": "n4",
+              "label": "Supplier Resubmits"
+            },
+            {
+              "to": "n5",
+              "from": "n3",
+              "label": "Yes (Match)"
+            },
+            {
+              "to": "n6",
+              "from": "n5",
+              "label": null
+            },
+            {
+              "to": "n7",
+              "from": "n6",
+              "label": "Yes (> \u20ac10k)"
+            },
+            {
+              "to": "n8",
+              "from": "n6",
+              "label": "No (\u2264 \u20ac10k)"
+            },
+            {
+              "to": "n8",
+              "from": "n7",
+              "label": null
+            },
+            {
+              "to": "n9",
+              "from": "n8",
+              "label": null
+            },
+            {
+              "to": "n10",
+              "from": "n9",
+              "label": null
+            }
+          ],
+          "nodes": [
+            {
+              "id": "n1",
+              "kind": "start",
+              "label": "Invoice Received & Logged in AP Register",
+              "source": null
+            },
+            {
+              "id": "n2",
+              "kind": "step",
+              "label": "Three-Way Match Check (PO, GRN, Invoice)",
+              "source": null
+            },
+            {
+              "id": "n3",
+              "kind": "decision",
+              "label": "Matches Purchase Order & Goods Receipt?",
+              "source": null
+            },
+            {
+              "id": "n4",
+              "kind": "step",
+              "label": "Rejected: Returned to Supplier for Correction",
+              "source": null
+            },
+            {
+              "id": "n5",
+              "kind": "step",
+              "label": "Budget Holder Approval (within 5 working days)",
+              "source": null
+            },
+            {
+              "id": "n6",
+              "kind": "decision",
+              "label": "Invoice Amount > \u20ac10,000?",
+              "source": null
+            },
+            {
+              "id": "n7",
+              "kind": "step",
+              "label": "Finance Controller Sign-Off",
+              "source": null
+            },
+            {
+              "id": "n8",
+              "kind": "step",
+              "label": "Payment Scheduled for Weekly Payment Run",
+              "source": null
+            },
+            {
+              "id": "n9",
+              "kind": "step",
+              "label": "Paid: Treasury Releases Funds (Thursday Run)",
+              "source": null
+            },
+            {
+              "id": "n10",
+              "kind": "end",
+              "label": "Filed in Audit Archive (Retained 7 Years)",
+              "source": null
+            }
+          ]
+        }
+      },
+      "caption": {
+        "lineage": null,
+        "sources": [
+          {
+            "page": null,
+            "tool": "query_documents",
+            "document": null
+          },
+          {
+            "page": null,
+            "tool": "read_document",
+            "document": null
+          }
+        ],
+        "row_count": 10,
+        "source_count": 2
+      },
+      "row_count": 10,
+      "spec_version": 1,
+      "created_at": "2026-10-24T01:28:53.905879+00:00"
+    },
+    {
+      "id": "a_rxwgu7n6ec",
+      "thread_id": "8e68079c-12b5-41bd-b4c5-a96750a90fe7",
+      "user_id": "d8a54002-6a29-4b88-b918-cff2aa4a06d5",
+      "org_id": "22f9c615-0eec-440a-8804-ed4784d6f57f",
+      "run_id": "620b2edf-8871-4f3c-83ac-06bbf8cda63b",
+      "tool_call_id": "call_416176",
+      "parent_id": null,
+      "label": "comparison 1",
+      "component": "comparison",
+      "spec": {
+        "title": "Atlas Logistics vs. Borealis Freight Contract Comparison",
+        "comparison": {
+          "terms": [
+            {
+              "name": "Termination for Convenience",
+              "cells": [
+                {
+                  "text": "90 days' written notice",
+                  "source": null,
+                  "verdict": "m"
+                },
+                {
+                  "text": "30 days' written notice (faster exit)",
+                  "source": null,
+                  "verdict": "y"
+                }
+              ]
+            },
+            {
+              "name": "Termination for Cause",
+              "cells": [
+                {
+                  "text": "Immediate termination upon uncured material breach (30-day cure period)",
+                  "source": null,
+                  "verdict": "y"
+                },
+                {
+                  "text": "Immediate termination if Borealis becomes insolvent; no general breach cure clause stated",
+                  "source": null,
+                  "verdict": "m"
+                }
+              ]
+            },
+            {
+              "name": "Liability Cap",
+              "cells": [
+                {
+                  "text": "Mutual cap equal to fees paid in the preceding 12 months",
+                  "source": null,
+                  "verdict": "m"
+                },
+                {
+                  "text": "Asymmetric: Borealis capped at \u20ac250,000/year; Company capped at fees payable in that year",
+                  "source": null,
+                  "verdict": "m"
+                }
+              ]
+            },
+            {
+              "name": "Liability Carve-Outs / Exclusions",
+              "cells": [
+                {
+                  "text": "Cap does not apply to death, personal injury, fraud, or breach of confidentiality",
+                  "source": null,
+                  "verdict": "y"
+                },
+                {
+                  "text": "Cap does not apply to fraud only",
+                  "source": null,
+                  "verdict": "m"
+                }
+              ]
+            },
+            {
+              "name": "Renewal & Term Structure",
+              "cells": [
+                {
+                  "text": "Automatic 1-year renewals unless non-renewal notice is served 90 days prior",
+                  "source": null,
+                  "verdict": "y"
+                },
+                {
+                  "text": "Fixed 2-year term (1 June 2024 \u2013 31 May 2026); no auto-renewal clause",
+                  "source": null,
+                  "verdict": "n"
+                }
+              ]
+            }
+          ],
+          "options": [
+            "Atlas Logistics MSA",
+            "Borealis Freight MSA"
+          ]
+        }
+      },
+      "caption": {
+        "lineage": null,
+        "sources": [
+          {
+            "page": null,
+            "tool": "query_documents",
+            "document": null
+          },
+          {
+            "page": null,
+            "tool": "read_document",
+            "document": null
+          }
+        ],
+        "row_count": 5,
+        "source_count": 2
+      },
+      "row_count": 5,
+      "spec_version": 1,
+      "created_at": "2026-10-24T01:28:53.919034+00:00"
+    },
+    {
+      "id": "a_wwmzkl0dyu",
+      "thread_id": "8e68079c-12b5-41bd-b4c5-a96750a90fe7",
+      "user_id": "d8a54002-6a29-4b88-b918-cff2aa4a06d5",
+      "org_id": "22f9c615-0eec-440a-8804-ed4784d6f57f",
+      "run_id": "620b2edf-8871-4f3c-83ac-06bbf8cda63b",
+      "tool_call_id": "call_416214",
+      "parent_id": null,
+      "label": "timeline 1",
+      "component": "timeline",
+      "spec": {
+        "title": "Atlas Logistics Contract Milestones & Deadlines",
+        "timeline": {
+          "events": [
+            {
+              "date": "2023-03-14",
+              "title": "MSA Signed",
+              "detail": "Three-year master services agreement signed by the Company and Atlas Logistics.",
+              "source": null,
+              "category": "Contract History",
+              "deadline": false
+            },
+            {
+              "date": "2023-04-01",
+              "title": "Services Start",
+              "detail": "First operational shipments commenced under the agreement.",
+              "source": null,
+              "category": "Contract History",
+              "deadline": false
+            },
+            {
+              "date": "2024-02-09",
+              "title": "Amendment 1",
+              "detail": "Prices rose by 3.5% and fuel surcharge was folded into base rate.",
+              "source": null,
+              "category": "Contract History",
+              "deadline": false
+            },
+            {
+              "date": "2024-11",
+              "title": "SLA Breach Notice",
+              "detail": "Notice issued after Atlas missed three delivery windows in October 2024.",
+              "source": null,
+              "category": "Contract History",
+              "deadline": false
+            },
+            {
+              "date": "2025-01-15",
+              "title": "Service Credits Applied",
+              "detail": "Credits of \u20ac18,400 applied against the January invoice.",
+              "source": null,
+              "category": "Contract History",
+              "deadline": false
+            },
+            {
+              "date": "2026-04-01",
+              "title": "Annual Price Uplift",
+              "detail": "Annual rate increase of 3.1%, staying within the contractual 4% cap.",
+              "source": null,
+              "category": "Contract History",
+              "deadline": false
+            },
+            {
+              "date": "2026-12-15",
+              "title": "Renewal Notice Deadline",
+              "detail": "Final date to serve written non-renewal notice (90 days prior to term expiration).",
+              "source": null,
+              "category": "Upcoming Deadlines",
+              "deadline": true
+            },
+            {
+              "date": "2027-03-15",
+              "title": "Current Term Expiration / Renewal",
+              "detail": "Initial 3-year term ends; agreement automatically renews for 1 year if notice was not given.",
+              "source": null,
+              "category": "Upcoming Deadlines",
+              "deadline": true
+            }
+          ]
+        }
+      },
+      "caption": {
+        "lineage": null,
+        "sources": [
+          {
+            "page": null,
+            "tool": "query_documents",
+            "document": null
+          },
+          {
+            "page": null,
+            "tool": "read_document",
+            "document": null
+          }
+        ],
+        "row_count": 8,
+        "source_count": 2
+      },
+      "row_count": 8,
+      "spec_version": 1,
+      "created_at": "2026-10-24T01:28:53.929353+00:00"
+    }
+  ],
+  "reload_by_message": [
+    {
+      "message_id": "19e9aca5-5d39-453c-bb06-53daf94bc23d",
+      "artifacts": [
+        {
+          "id": "a_b6mpgz39ve",
+          "thread_id": "8e68079c-12b5-41bd-b4c5-a96750a90fe7",
+          "user_id": "d8a54002-6a29-4b88-b918-cff2aa4a06d5",
+          "org_id": "22f9c615-0eec-440a-8804-ed4784d6f57f",
+          "run_id": "620b2edf-8871-4f3c-83ac-06bbf8cda63b",
+          "tool_call_id": "call_416140",
+          "parent_id": null,
+          "label": "diagram 1",
+          "component": "diagram",
+          "spec": {
+            "title": "Invoice Approval Process Flow",
+            "diagram": {
+              "edges": [
+                {
+                  "to": "n2",
+                  "from": "n1",
+                  "label": null
+                },
+                {
+                  "to": "n3",
+                  "from": "n2",
+                  "label": null
+                },
+                {
+                  "to": "n4",
+                  "from": "n3",
+                  "label": "No (Mismatch)"
+                },
+                {
+                  "to": "n2",
+                  "from": "n4",
+                  "label": "Supplier Resubmits"
+                },
+                {
+                  "to": "n5",
+                  "from": "n3",
+                  "label": "Yes (Match)"
+                },
+                {
+                  "to": "n6",
+                  "from": "n5",
+                  "label": null
+                },
+                {
+                  "to": "n7",
+                  "from": "n6",
+                  "label": "Yes (> \u20ac10k)"
+                },
+                {
+                  "to": "n8",
+                  "from": "n6",
+                  "label": "No (\u2264 \u20ac10k)"
+                },
+                {
+                  "to": "n8",
+                  "from": "n7",
+                  "label": null
+                },
+                {
+                  "to": "n9",
+                  "from": "n8",
+                  "label": null
+                },
+                {
+                  "to": "n10",
+                  "from": "n9",
+                  "label": null
+                }
+              ],
+              "nodes": [
+                {
+                  "id": "n1",
+                  "kind": "start",
+                  "label": "Invoice Received & Logged in AP Register",
+                  "source": null
+                },
+                {
+                  "id": "n2",
+                  "kind": "step",
+                  "label": "Three-Way Match Check (PO, GRN, Invoice)",
+                  "source": null
+                },
+                {
+                  "id": "n3",
+                  "kind": "decision",
+                  "label": "Matches Purchase Order & Goods Receipt?",
+                  "source": null
+                },
+                {
+                  "id": "n4",
+                  "kind": "step",
+                  "label": "Rejected: Returned to Supplier for Correction",
+                  "source": null
+                },
+                {
+                  "id": "n5",
+                  "kind": "step",
+                  "label": "Budget Holder Approval (within 5 working days)",
+                  "source": null
+                },
+                {
+                  "id": "n6",
+                  "kind": "decision",
+                  "label": "Invoice Amount > \u20ac10,000?",
+                  "source": null
+                },
+                {
+                  "id": "n7",
+                  "kind": "step",
+                  "label": "Finance Controller Sign-Off",
+                  "source": null
+                },
+                {
+                  "id": "n8",
+                  "kind": "step",
+                  "label": "Payment Scheduled for Weekly Payment Run",
+                  "source": null
+                },
+                {
+                  "id": "n9",
+                  "kind": "step",
+                  "label": "Paid: Treasury Releases Funds (Thursday Run)",
+                  "source": null
+                },
+                {
+                  "id": "n10",
+                  "kind": "end",
+                  "label": "Filed in Audit Archive (Retained 7 Years)",
+                  "source": null
+                }
+              ]
+            }
+          },
+          "caption": {
+            "lineage": null,
+            "sources": [
+              {
+                "page": null,
+                "tool": "query_documents",
+                "document": null
+              },
+              {
+                "page": null,
+                "tool": "read_document",
+                "document": null
+              }
+            ],
+            "row_count": 10,
+            "source_count": 2
+          },
+          "row_count": 10,
+          "spec_version": 1,
+          "created_at": "2026-10-24T01:28:53.905879+00:00"
+        },
+        {
+          "id": "a_rxwgu7n6ec",
+          "thread_id": "8e68079c-12b5-41bd-b4c5-a96750a90fe7",
+          "user_id": "d8a54002-6a29-4b88-b918-cff2aa4a06d5",
+          "org_id": "22f9c615-0eec-440a-8804-ed4784d6f57f",
+          "run_id": "620b2edf-8871-4f3c-83ac-06bbf8cda63b",
+          "tool_call_id": "call_416176",
+          "parent_id": null,
+          "label": "comparison 1",
+          "component": "comparison",
+          "spec": {
+            "title": "Atlas Logistics vs. Borealis Freight Contract Comparison",
+            "comparison": {
+              "terms": [
+                {
+                  "name": "Termination for Convenience",
+                  "cells": [
+                    {
+                      "text": "90 days' written notice",
+                      "source": null,
+                      "verdict": "m"
+                    },
+                    {
+                      "text": "30 days' written notice (faster exit)",
+                      "source": null,
+                      "verdict": "y"
+                    }
+                  ]
+                },
+                {
+                  "name": "Termination for Cause",
+                  "cells": [
+                    {
+                      "text": "Immediate termination upon uncured material breach (30-day cure period)",
+                      "source": null,
+                      "verdict": "y"
+                    },
+                    {
+                      "text": "Immediate termination if Borealis becomes insolvent; no general breach cure clause stated",
+                      "source": null,
+                      "verdict": "m"
+                    }
+                  ]
+                },
+                {
+                  "name": "Liability Cap",
+                  "cells": [
+                    {
+                      "text": "Mutual cap equal to fees paid in the preceding 12 months",
+                      "source": null,
+                      "verdict": "m"
+                    },
+                    {
+                      "text": "Asymmetric: Borealis capped at \u20ac250,000/year; Company capped at fees payable in that year",
+                      "source": null,
+                      "verdict": "m"
+                    }
+                  ]
+                },
+                {
+                  "name": "Liability Carve-Outs / Exclusions",
+                  "cells": [
+                    {
+                      "text": "Cap does not apply to death, personal injury, fraud, or breach of confidentiality",
+                      "source": null,
+                      "verdict": "y"
+                    },
+                    {
+                      "text": "Cap does not apply to fraud only",
+                      "source": null,
+                      "verdict": "m"
+                    }
+                  ]
+                },
+                {
+                  "name": "Renewal & Term Structure",
+                  "cells": [
+                    {
+                      "text": "Automatic 1-year renewals unless non-renewal notice is served 90 days prior",
+                      "source": null,
+                      "verdict": "y"
+                    },
+                    {
+                      "text": "Fixed 2-year term (1 June 2024 \u2013 31 May 2026); no auto-renewal clause",
+                      "source": null,
+                      "verdict": "n"
+                    }
+                  ]
+                }
+              ],
+              "options": [
+                "Atlas Logistics MSA",
+                "Borealis Freight MSA"
+              ]
+            }
+          },
+          "caption": {
+            "lineage": null,
+            "sources": [
+              {
+                "page": null,
+                "tool": "query_documents",
+                "document": null
+              },
+              {
+                "page": null,
+                "tool": "read_document",
+                "document": null
+              }
+            ],
+            "row_count": 5,
+            "source_count": 2
+          },
+          "row_count": 5,
+          "spec_version": 1,
+          "created_at": "2026-10-24T01:28:53.919034+00:00"
+        },
+        {
+          "id": "a_wwmzkl0dyu",
+          "thread_id": "8e68079c-12b5-41bd-b4c5-a96750a90fe7",
+          "user_id": "d8a54002-6a29-4b88-b918-cff2aa4a06d5",
+          "org_id": "22f9c615-0eec-440a-8804-ed4784d6f57f",
+          "run_id": "620b2edf-8871-4f3c-83ac-06bbf8cda63b",
+          "tool_call_id": "call_416214",
+          "parent_id": null,
+          "label": "timeline 1",
+          "component": "timeline",
+          "spec": {
+            "title": "Atlas Logistics Contract Milestones & Deadlines",
+            "timeline": {
+              "events": [
+                {
+                  "date": "2023-03-14",
+                  "title": "MSA Signed",
+                  "detail": "Three-year master services agreement signed by the Company and Atlas Logistics.",
+                  "source": null,
+                  "category": "Contract History",
+                  "deadline": false
+                },
+                {
+                  "date": "2023-04-01",
+                  "title": "Services Start",
+                  "detail": "First operational shipments commenced under the agreement.",
+                  "source": null,
+                  "category": "Contract History",
+                  "deadline": false
+                },
+                {
+                  "date": "2024-02-09",
+                  "title": "Amendment 1",
+                  "detail": "Prices rose by 3.5% and fuel surcharge was folded into base rate.",
+                  "source": null,
+                  "category": "Contract History",
+                  "deadline": false
+                },
+                {
+                  "date": "2024-11",
+                  "title": "SLA Breach Notice",
+                  "detail": "Notice issued after Atlas missed three delivery windows in October 2024.",
+                  "source": null,
+                  "category": "Contract History",
+                  "deadline": false
+                },
+                {
+                  "date": "2025-01-15",
+                  "title": "Service Credits Applied",
+                  "detail": "Credits of \u20ac18,400 applied against the January invoice.",
+                  "source": null,
+                  "category": "Contract History",
+                  "deadline": false
+                },
+                {
+                  "date": "2026-04-01",
+                  "title": "Annual Price Uplift",
+                  "detail": "Annual rate increase of 3.1%, staying within the contractual 4% cap.",
+                  "source": null,
+                  "category": "Contract History",
+                  "deadline": false
+                },
+                {
+                  "date": "2026-12-15",
+                  "title": "Renewal Notice Deadline",
+                  "detail": "Final date to serve written non-renewal notice (90 days prior to term expiration).",
+                  "source": null,
+                  "category": "Upcoming Deadlines",
+                  "deadline": true
+                },
+                {
+                  "date": "2027-03-15",
+                  "title": "Current Term Expiration / Renewal",
+                  "detail": "Initial 3-year term ends; agreement automatically renews for 1 year if notice was not given.",
+                  "source": null,
+                  "category": "Upcoming Deadlines",
+                  "deadline": true
+                }
+              ]
+            }
+          },
+          "caption": {
+            "lineage": null,
+            "sources": [
+              {
+                "page": null,
+                "tool": "query_documents",
+                "document": null
+              },
+              {
+                "page": null,
+                "tool": "read_document",
+                "document": null
+              }
+            ],
+            "row_count": 8,
+            "source_count": 2
+          },
+          "row_count": 8,
+          "spec_version": 1,
+          "created_at": "2026-10-24T01:28:53.929353+00:00"
+        }
+      ]
+    }
+  ],
+  "expected_observables": [
+    {
+      "artifact": "a_b6mpgz39ve",
+      "label": "diagram 1",
+      "caption_count_segment": "\u00b7 10 steps \u00b7 11 links",
+      "node_labels": [
+        "Invoice Received & Logged in AP Register",
+        "Three-Way Match Check (PO, GRN, Invoice)",
+        "Matches Purchase Order & Goods Receipt?",
+        "Rejected: Returned to Supplier for Correction",
+        "Budget Holder Approval (within 5 working days)",
+        "Invoice Amount > \u20ac10,000?",
+        "Finance Controller Sign-Off",
+        "Payment Scheduled for Weekly Payment Run",
+        "Paid: Treasury Releases Funds (Thursday Run)",
+        "Filed in Audit Archive (Retained 7 Years)"
+      ],
+      "label_word_coverage_in_kb_document": {
+        "Invoice Received & Logged in AP Register": 0.75,
+        "Three-Way Match Check (PO, GRN, Invoice)": 0.83,
+        "Matches Purchase Order & Goods Receipt?": 1.0,
+        "Rejected: Returned to Supplier for Correction": 0.8,
+        "Budget Holder Approval (within 5 working days)": 1.0,
+        "Invoice Amount > \u20ac10,000?": 1.0,
+        "Finance Controller Sign-Off": 1.0,
+        "Payment Scheduled for Weekly Payment Run": 1.0,
+        "Paid: Treasury Releases Funds (Thursday Run)": 0.83,
+        "Filed in Audit Archive (Retained 7 Years)": 0.8
+      },
+      "degree_per_node": {
+        "Invoice Received & Logged in AP Register": 1,
+        "Three-Way Match Check (PO, GRN, Invoice)": 3,
+        "Matches Purchase Order & Goods Receipt?": 3,
+        "Rejected: Returned to Supplier for Correction": 2,
+        "Budget Holder Approval (within 5 working days)": 2,
+        "Invoice Amount > \u20ac10,000?": 3,
+        "Finance Controller Sign-Off": 2,
+        "Payment Scheduled for Weekly Payment Run": 3,
+        "Paid: Treasury Releases Funds (Thursday Run)": 2,
+        "Filed in Audit Archive (Retained 7 Years)": 1
+      },
+      "back_edges_dfs_excluding_self_loops": [
+        "n4->n2"
+      ],
+      "self_loops": [],
+      "sourced_nodes": []
+    },
+    {
+      "artifact": "a_rxwgu7n6ec",
+      "label": "comparison 1",
+      "options": [
+        "Atlas Logistics MSA",
+        "Borealis Freight MSA"
+      ],
+      "terms": [
+        "Termination for Convenience",
+        "Termination for Cause",
+        "Liability Cap",
+        "Liability Carve-Outs / Exclusions",
+        "Renewal & Term Structure"
+      ],
+      "cells_total": 10,
+      "not_stated_cells": 0,
+      "identical_terms_N": 0,
+      "identical_terms": [],
+      "second_caption_line": "Verdicts are the agent's reading. Hover or focus a cell for its clause.",
+      "sourced_cells": []
+    },
+    {
+      "artifact": "a_wwmzkl0dyu",
+      "label": "timeline 1",
+      "today_row_text_date": "24 Oct 2026",
+      "rail_rows_expected": [
+        "FILLED 14 Mar 2023 \u00b7 MSA Signed",
+        "FILLED 1 Apr 2023 \u00b7 Services Start",
+        "GAP 10 months",
+        "FILLED 9 Feb 2024 \u00b7 Amendment 1",
+        "GAP 9 months",
+        "FILLED Nov 2024 \u00b7 SLA Breach Notice",
+        "FILLED 15 Jan 2025 \u00b7 Service Credits Applied",
+        "GAP 15 months",
+        "FILLED 1 Apr 2026 \u00b7 Annual Price Uplift",
+        "TODAY",
+        "HOLLOW 15 Dec 2026 \u00b7 Renewal Notice Deadline \u00b7 deadline pill: in 52 days",
+        "HOLLOW 15 Mar 2027 \u00b7 Current Term Expiration / Renewal \u00b7 deadline pill: in 142 days"
+      ],
+      "events": 8
+    }
+  ]
+}

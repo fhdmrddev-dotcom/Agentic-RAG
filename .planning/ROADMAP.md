@@ -88,7 +88,7 @@ Requirements: [`REQUIREMENTS.md`](REQUIREMENTS.md). **21 v4.7 requirements, 21 m
 - [x] **Phase 289: The Run Page and Its Evidence** (closed 2026-10-20, operator-approved; Anthropic row blocked on billing; BUG-261020-01/02 filed): one read-only finished-run page with export; confidence on KB-derived phase outputs (VIS-03, TRUST-01)
 - [ ] **Phase 290: The Card and the Team Picture**: card matches its approved sketch; truthful orchestrator / workers / judge view (VIS-04, VIS-01)
 - [x] **Phase 291: Describe It From Your Own Files**: describe-it authoring from uploaded template, form and reference documents (AUTH-02) — verified passed 2026-10-24 (G-4 + SC#4 roster + SC#5 live fill run; findings routed in deferred-items.md)
-- [ ] **Phase 292: More Ways to Show It**: new artifact types from a closed registry, set chosen at sketch time (VIS-02)
+- [x] **Phase 292: More Ways to Show It** (closed 2026-10-24, operator signed G-4; mig 213 in cloud, code not deployed): new artifact types from a closed registry, set chosen at sketch time (VIS-02)
 - [ ] **Phase 293: Start From Outside, and Close Out**: authenticated inbound run start with read-back, trigger provenance and last/next run, seed statuses reconciled (START-02, START-04, REG-06)
 - [ ] **Phase 294: Decision Engine: Rerank and Citation Check**: a Settings switch picks Jev, OpenAI Decisions or a local model to rerank and prune search candidates, and a citation check labels each cited sentence (DEC-01, DEC-02, DEC-03)
 - [ ] **Phase 295: Runs That Don't Dead-End**: an empty or uncited KB step pauses and asks instead of failing; misconfigurations refused before a run; the judge stops failing recorded-not-sent actions; every run ends truthfully with a reason (RUN-01..04)
@@ -292,7 +292,18 @@ Plans:
   4. The tool count stays 30; `show_artifact` is extended by registry entries only (VIS-02).
 
 **How we'd know this failed**: a component is added without a schema guard so model-supplied props render raw; the set grows because it was easy rather than chosen at sketch; artifacts vanish on reload; the tool count moves; sandboxed HTML (direction B in the seed) creeps in without its own operator decision.
-**Plans**: TBD (target 3-4)
+**Plans**: 3 plans (2 waves)
+
+Plans:
+**Wave 1**
+
+- [x] 292-01-PLAN.md — backend: six-name vocabulary, three arms, per-element sources, history rewrite, widened show_artifact schema, migration 213 applied locally, live Gemini probe (wave 1)
+- [x] 292-02-PLAN.md — frontend: guard arms, copy and captions, 2A diagram, 3A comparison, 4A timeline, shared tooltip, six-entry registry (wave 1, parallel)
+
+**Wave 2** *(blocked on Wave 1 completion)*
+
+- [x] 292-03-PLAN.md — cross-stack fence, merged-tree gates, ledger close, SEED-337, 8-row SC#10 board, G4-1..G4-5 in Chrome (wave 2)
+
 **UI hint**: yes
 **Flags**: **G-2 sketch**. Closed registry only; sandboxed HTML needs its own operator decision and is out of this phase. Files: `frontend/src/components/chat/artifacts/**`, `backend/app/models/artifact.py`, `backend/app/services/show_artifact_tool.py`. Migration only if the `message_artifacts` constraint needs a new literal. Seed `SEED-337`.
 
@@ -400,7 +411,7 @@ Plans:
 | 289. The Run Page and Its Evidence | 5/5 | Complete (2026-10-20) | Operator approved G-4; Anthropic row blocked on billing; BUG-261020-01 (human answer not passed on) and BUG-261020-02 (CR-01 residual) open |
 | 290. The Card and the Team Picture | 0/TBD | Not started | - |
 | 291. Describe It From Your Own Files | 0/TBD | Not started | - |
-| 292. More Ways to Show It | 0/TBD | Not started | - |
+| 292. More Ways to Show It | 3/3 | Complete (2026-10-24) | 4/4 SC; 8/8 board rows; review fixes; operator signed G-4; mig 213 applied to cloud |
 | 293. Start From Outside, and Close Out | 0/TBD | Not started | - |
 | 294. Decision Engine: Rerank and Citation Check | 5/5 | complete (2026-10-20) | 6/6 SC met in code; 294-HUMAN-UAT 9/9 passed live; roster R2 ⛔ Anthropic billing, glm-5.3 ⛔ BUG-261020-06; not pushed; cloud mig 211 owed before deploy |
 | 295. Runs That Don't Dead-End | 7/7 (+3 gap fixes) | human_needed (2026-10-21) | 5/5 SC + RUN-01..04 verified (295-VERIFICATION.md); 2 gap rounds (G-7 cap reached); G-4 sign-off owed, run S1 first (295-HUMAN-UAT.md); Anthropic row blocked on billing; deferred BUG-261021-02/03/04, SEED-366/367; count gate OK post-close; not pushed |

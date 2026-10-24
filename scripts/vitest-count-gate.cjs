@@ -4254,22 +4254,34 @@ const BASELINE = {
   // ── Phase 273-02 (ART-01/02/04/05) — SEVEN NEW suites for the agent-authored artifact surface,
   // BOTH KNOBS, SAME COMMIT. `src/components/chat` has NO bare-directory TARGETS entry, so each is
   // adopted by FILE path below. Pinned at the measured passing counts (94 cases, 0 failing). ──
-  "artifactSpec.test.ts": 28, // 273-02 (2026-10-03) — guard + closed catalogue + seeded never-throws
-  "captionModel.test.ts": 12, // 273-02 — server-fact caption wording
+  "artifactSpec.test.ts": 65, // 273-02 (2026-10-03) — guard + closed catalogue + seeded never-throws; RAISED 28 → 64 at 292-02 (the three encoded arms, six names, alias sentences); 64 → 65 at 292-REVIEW WR-02 (a q cell's source is dropped)
+  "captionModel.test.ts": 22, // 273-02 — server-fact caption wording; RAISED 12 → 21 at 292-02 (per-component count segments + the comparison note line); 21 → 22 at 292-REVIEW WR-02 (q-cell sources earn no hover note)
   "chartModel.test.ts": 20, // 273-02 — slots, visible domain, tooltip rows, a11y names; RAISED 19 → 20 at 273-REVIEW WR-04
   "TableArtifact.test.tsx": 7, // 273-02 — aria-sort, empties last, sticky + 512px; RAISED 6 → 7 at 273-REVIEW WR-04
   "MetricArtifact.test.tsx": 7, // 273-02 — glyph + percent delta, zero comparison; RAISED 6 → 7 at 273-REVIEW WR-04
-  "ArtifactBlock.test.tsx": 8, // 273-02 — registry closed to 3, notices, boundary, busy frame
+  "ArtifactBlock.test.tsx": 13, // 273-02 — registry closed to 3, notices, boundary, busy frame; RAISED 8 → 13 at 292-02 (registry closed to six, the three encoded types in the frame, the bad-diagram notice, alias sentences)
   "ChartArtifact.test.tsx": 18, // 273-02 — legend toggles, hide, slots, no animation, tooltip; RAISED 15 → 18 at 273-REVIEW WR-05 (stackOffset=sign)
+  // ── Phase 292-02 (VIS-02 · D-16 · D-07) — THREE NEW suites, BOTH KNOBS, SAME COMMIT as their RED
+  // tests. FILE-LEVEL, like the 273-02 seven: `src/components/chat` has no bare-directory entry. ──
+  "diagramLayout.test.ts": 21, // 292-02 — pure layout: no overlap at 311 / 862, back edges, ranks, wrap, sizes; RAISED 20 → 21 at 292-REVIEW WR-04 (every label inside [0, width])
+  "DiagramArtifact.test.tsx": 18, // 292-02 — text-only labels, dashed back edges, hover == focus highlight, roving, aria, markers; RAISED 17 → 18 at 292-REVIEW WR-04 (bounded, titled labels painted after nodes)
+  "ArtifactTooltip.test.tsx": 9, // 292-02 — portalled role=tooltip, header / 280-char excerpt, Escape, anchored placement
+  // ── Phase 292-02 Task 3 — FIVE more NEW suites, BOTH KNOBS, SAME COMMIT as their RED tests. ──
+  "comparisonModel.test.ts": 8, // 292-02 — identical-term rule (verdict + folded text, q = Not stated), glyph table via own()
+  "ComparisonArtifact.test.tsx": 14, // 292-02 — real <table>, one glyph badge per cell, italic Not stated, differ toggle, roving, tooltip
+  "timelineModel.test.ts": 17, // 292-02 — integer-part dates, stable sort, Today placement, same-side gaps, UTC-noon pills, month table; RAISED 16 → 17 at 292-REVIEW WR-05 (years 1-99 read literally)
+  "TimelineArtifact.test.tsx": 11, // 292-02 — 13-row rail, filled / hollow dots, amber deadline, sr-only state words, sources, the clock
+  "artifactRenderers.fence.test.ts": 12, // 292-02 — ?raw fence: no HTML sink / layout library / clock or Date-from-string (I-3, D-18)
   // ── Phase 273-05 (D-16 · I-1 · I-2 · SC#2) — SIX NEW suites, BOTH KNOBS, SAME COMMIT. None of
   // their directories has a bare TARGETS entry (`src/components/chat`, `src/lib/api`,
   // `src/providers` — the last sits in NEITHER knob), so each is adopted by FILE path below.
   // Pinned at the measured passing counts (56 cases, 0 failing). ──
   "threads.artifact.test.ts": 6, // 273-05 (2026-10-03) — artifact SSE branch + reload mapper
   "streamsProviderArtifact.test.tsx": 5, // 273-05 — the ONE handler: append + replace-by-id
-  "MessageItem.artifacts.test.tsx": 5, // 273-05 — the ONE mount: placement + live == reload DOM
+  "MessageItem.artifacts.test.tsx": 8, // 273-05 — the ONE mount: placement + live == reload DOM; RAISED 5 → 8 at 292-02 (+1 live == reload case per encoded type)
   "artifactParity.fence.test.ts": 10, // 273-05 — backend Literals/fixture vs frontend registry (I-1); RAISED 7 → 10 at 273-REVIEW CR-01 (+3: the shared bad-spec parity fixture)
-  "ShowArtifactBody.test.tsx": 17, // 273-05 — rail essence + body, never the spec or model text
+  "artifactParity292.fence.test.ts": 16, // 292-03 — 292 Literals/caps/shared fixtures (artifact_record_292 + artifact_bad_specs_292) vs the frontend guard (I-1); RAISED 13 → 15 at 292-REVIEW CR-01 (stored_sources + document_names sections); 15 → 16 at WR-02 (refused_then_tolerated)
+  "ShowArtifactBody.test.tsx": 26, // 273-05 — rail essence + body, never the spec or model text; RAISED 17 → 26 at 292-02 (Flow diagram / Comparison / Timeline rail lines)
   "ToolCallPanel.showArtifact.test.tsx": 16, // 273-05 — L-1..L-4, refused node, phrases
   // ── Phase 274-03 (D-05 · D-10 · D-12..D-15 · D-27 · SC#1) — FIVE NEW suites, BOTH KNOBS, SAME
   // COMMIT. `src/components/attachments` is a NEW directory and is adopted as a directory entry;
@@ -6321,12 +6333,23 @@ const TARGETS = [
   "src/components/chat/artifacts/__tests__/MetricArtifact.test.tsx",
   "src/components/chat/artifacts/__tests__/ArtifactBlock.test.tsx",
   "src/components/chat/artifacts/__tests__/ChartArtifact.test.tsx",
+  // Phase 292-02 — the three diagram / tooltip suites (Task 2). FILE-LEVEL, same reason as above.
+  "src/components/chat/artifacts/__tests__/diagramLayout.test.ts",
+  "src/components/chat/artifacts/__tests__/DiagramArtifact.test.tsx",
+  "src/components/chat/artifacts/__tests__/ArtifactTooltip.test.tsx",
+  // Phase 292-02 — the comparison / timeline / renderer-fence suites (Task 3). FILE-LEVEL.
+  "src/components/chat/artifacts/__tests__/comparisonModel.test.ts",
+  "src/components/chat/artifacts/__tests__/ComparisonArtifact.test.tsx",
+  "src/components/chat/artifacts/__tests__/timelineModel.test.ts",
+  "src/components/chat/artifacts/__tests__/TimelineArtifact.test.tsx",
+  "src/components/chat/artifacts/__tests__/artifactRenderers.fence.test.ts",
   // Phase 273-05 — six new suites. FILE-LEVEL: none of `src/components/chat`, `src/lib/api` or
   // `src/providers` has a bare-directory entry (`src/providers` is in NEITHER knob).
   "src/lib/api/__tests__/threads.artifact.test.ts",
   "src/providers/__tests__/streamsProviderArtifact.test.tsx",
   "src/components/chat/__tests__/MessageItem.artifacts.test.tsx",
   "src/components/chat/__tests__/artifactParity.fence.test.ts",
+  "src/components/chat/__tests__/artifactParity292.fence.test.ts",
   "src/components/chat/tool-bodies/ShowArtifactBody.test.tsx",
   "src/components/chat/__tests__/ToolCallPanel.showArtifact.test.tsx",
   // Phase 274-03 — `src/components/attachments` is new and adopted as a DIRECTORY (its three suites

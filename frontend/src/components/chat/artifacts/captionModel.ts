@@ -9,8 +9,14 @@
  *
  * Grammar (UI-SPEC §Caption): `[lineage segments…] [source segment] [N rows]`, joined with ` · `.
  * A metric omits the trailing row count.
+ *
+ * 292-02 (D-15 · UI-D-292-20): the trailing count segment is phrased PER COMPONENT from the VALIDATED
+ * spec arrays (lengths the guard already checked against row_count, never model text):
+ * `8 steps · 9 links`, `3 options × 7 terms`, `9 events`. Comparison alone adds an optional `note`
+ * (the second caption line), chosen by one fact: whether any cell carries a source. ⛔ No count here
+ * may depend on the viewer's clock — the caption must stay byte-identical on reload (D-18).
  */
-import type { ArtifactRecord, LineageOperation } from "./artifactSpec"
+import { isResolvedSource, type ArtifactRecord, type LineageOperation } from "./artifactSpec"
 import {
   CAPTION_DATA_PREFIX,
   CAPTION_MAX_SOURCES,
@@ -21,16 +27,25 @@ import {
   captionLineageFrom,
   captionLineageSame,
   captionOfRows,
+  COMPARISON_NOTE,
+  COMPARISON_NOTE_SOURCED,
+  CAPTION_SEGMENT_JOIN,
   captionSource,
+  eventsPhrase,
+  linksPhrase,
   moreSuffix,
   operationPhrase,
+  optionsTermsPhrase,
   rowsPhrase,
+  stepsPhrase,
 } from "./artifactCopy"
 
 export interface CaptionSegments {
   /** `file` when a data-bearing tool ran this turn; `info` when the agent provided the values. */
   icon: "file" | "info"
   parts: string[]
+  /** 292: the comparison's second caption line; absent for every other component. */
+  note?: string
 }
 
 function orderedOperations(ops: LineageOperation[]): LineageOperation[] {
@@ -67,7 +82,19 @@ export function captionSegments(record: ArtifactRecord): CaptionSegments {
     parts.push(CAPTION_NO_SOURCE, CAPTION_NO_SOURCE_DOC)
   }
 
-  if (record.component !== "metric") parts.push(rowsPhrase(caption.row_count))
+  const { diagram, comparison, timeline } = record.spec
+  if (diagram) {
+    parts.push(`${stepsPhrase(diagram.nodes.length)}${CAPTION_SEGMENT_JOIN}${linksPhrase(diagram.edges.length)}`)
+  } else if (comparison) {
+    parts.push(optionsTermsPhrase(comparison.options.length, comparison.terms.length))
+    // 292-REVIEW WR-02: only a verdict cell's source is a clause to hover; a q cell states nothing.
+    const sourced = comparison.terms.some((t) => t.cells.some((c) => c.verdict !== "q" && isResolvedSource(c.source)))
+    return { icon, parts, note: sourced ? COMPARISON_NOTE_SOURCED : COMPARISON_NOTE }
+  } else if (timeline) {
+    parts.push(eventsPhrase(timeline.events.length))
+  } else if (record.component !== "metric") {
+    parts.push(rowsPhrase(caption.row_count))
+  }
 
   return { icon, parts }
 }

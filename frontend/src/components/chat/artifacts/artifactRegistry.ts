@@ -1,7 +1,11 @@
 /**
- * Phase 273-02 (I-1 · SC#4 · T-273-10) — THE CLOSED ARTIFACT REGISTRY: exactly three components.
+ * Phase 273-02 (I-1 · SC#4 · T-273-10) — THE CLOSED ARTIFACT REGISTRY: exactly six components
+ * (three at 273; Phase 292-02, D-01 / D-02, adds the three encoded types).
  *
- * `chart` → the lazy ChartArtifact chunk · `table` → TableArtifact · `metric` → MetricArtifact.
+ * `chart` → the lazy ChartArtifact chunk · `table` → TableArtifact · `metric` → MetricArtifact ·
+ * `diagram` → DiagramArtifact · `comparison` → ComparisonArtifact · `timeline` → TimelineArtifact.
+ * The three 292 renderers are EAGER (UI-D-292-26): plain DOM + SVG with no library, so a lazy chunk
+ * would only buy a reload flash.
  *
  * ⛔ I-1: this is CLOSED CODE. Adding a component is a code change here, in `artifactSpec.ts` and in
  * the backend's `ComponentName` Literal (fenced together by 273-05's `?raw` parity test) — never a
@@ -21,8 +25,11 @@
 import { lazy, type ComponentType } from "react"
 import { own } from "@/components/workflows/ownProperty"
 import { ARTIFACT_COMPONENT_NAMES, ArtifactNoticeError, type ArtifactBodyProps } from "./artifactSpec"
+import { ComparisonArtifact } from "./ComparisonArtifact"
+import { DiagramArtifact } from "./DiagramArtifact"
 import { MetricArtifact } from "./MetricArtifact"
 import { TableArtifact } from "./TableArtifact"
+import { TimelineArtifact } from "./TimelineArtifact"
 
 export type ArtifactRenderer = ComponentType<ArtifactBodyProps>
 
@@ -43,12 +50,15 @@ const REGISTRY: Record<string, ArtifactRenderer> = {
   chart: ChartArtifactLazy,
   table: TableArtifact,
   metric: MetricArtifact,
+  diagram: DiagramArtifact,
+  comparison: ComparisonArtifact,
+  timeline: TimelineArtifact,
 }
 
 /** The closed component list — fenced against the backend Literal in 273-05. */
 export const ARTIFACT_COMPONENTS = ARTIFACT_COMPONENT_NAMES
 
-/** The renderer for a component name, or null for anything outside the three. */
+/** The renderer for a component name, or null for anything outside the six. */
 export function rendererFor(component: unknown): ArtifactRenderer | null {
   if (typeof component !== "string") return null
   return own(REGISTRY, component) ?? null

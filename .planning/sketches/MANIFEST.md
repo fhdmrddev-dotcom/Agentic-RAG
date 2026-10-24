@@ -2998,3 +2998,9 @@ reuses 267-B's event-card shape.
 |---|------|----------------|--------|------|
 | 291 | describe-files | How the describe door's one-file row holds 1 template or form + up to 5 references, each with its reading (one row extended / two questions / one tray with roles) | ★ B two questions (operator, 2026-10-22) | phase-291, auth-02, seed-155, real-door-dom |
 | 291 | draft-removed | Where "Removed: …" and the fields→inputs mapping show when the draft lands (line on the card / third fold / ghost step in the list) | ★ A line on the card face (operator, 2026-10-22) | phase-291, auth-02, d-15, draft-arrival |
+
+## Sketch 292 — More Ways to Show It (Phase 292, G-2 gate, VIS-02 SC#1)
+
+| # | Name | Design Question | Winner | Tags |
+|---|------|----------------|--------|------|
+| 292 | more-ways-to-show-it | Which new artifact types earn a place in the closed registry (diagram / comparison / timeline / steps?) and how each looks in the 273 card (diagram top-down vs lanes · comparison matrix vs cards · timeline vertical vs horizontal) | ★ set = diagram · comparison · timeline (steps out) · 2A top-down · 3A matrix · 4A vertical rail (operator, 2026-10-24) | phase-292, vis-02, seed-337, artifacts |

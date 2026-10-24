@@ -13,7 +13,17 @@ import { fireEvent, render, screen, within } from "@testing-library/react"
 import { ArtifactBlock } from "../ArtifactBlock"
 import { ARTIFACT_COMPONENTS, lazyChartFrom, rendererFor } from "../artifactRegistry"
 import { ArtifactErrorBoundary } from "../ArtifactErrorBoundary"
-import { chartBar, table16, metricWithDelta, missing, mutable, clone } from "./fixtures"
+import {
+  chartBar,
+  table16,
+  metricWithDelta,
+  missing,
+  mutable,
+  clone,
+  diagramInvoice,
+  comparisonContracts,
+  timelineAtlas,
+} from "./fixtures"
 
 const flags = vi.hoisted(() => ({ throwTable: false }))
 
@@ -44,15 +54,80 @@ function assertNoSpecLeak(text: string) {
   for (const t of SPEC_KEY_LEAKS) expect(text, `leaked ${t}`).not.toContain(t)
 }
 
-describe("artifactRegistry — closed to exactly three", () => {
-  it("rendererFor resolves the three components and nothing else", () => {
-    expect(rendererFor("chart")).not.toBeNull()
-    expect(rendererFor("table")).not.toBeNull()
-    expect(rendererFor("metric")).not.toBeNull()
-    for (const k of ["pie", "__proto__", "constructor", "toString", "", undefined, null, 1, {}]) {
+describe("artifactRegistry — closed to exactly six (292-02 · I-1)", () => {
+  it("rendererFor resolves the six components and nothing else", () => {
+    for (const k of ["chart", "table", "metric", "diagram", "comparison", "timeline"]) {
+      expect(rendererFor(k), k).not.toBeNull()
+    }
+    for (const k of ["steps", "mindmap", "pie", "flowchart", "__proto__", "constructor", "toString", "", undefined, null, 1, {}]) {
       expect(rendererFor(k)).toBeNull()
     }
-    expect([...ARTIFACT_COMPONENTS]).toEqual(["chart", "table", "metric"])
+    expect([...ARTIFACT_COMPONENTS]).toEqual(["chart", "table", "metric", "diagram", "comparison", "timeline"])
+  })
+
+  it("each new name resolves to its own renderer, never a shared fallback", () => {
+    const renderers = ["diagram", "comparison", "timeline"].map((k) => rendererFor(k))
+    expect(new Set(renderers).size).toBe(3)
+    expect(renderers).not.toContain(rendererFor("table"))
+  })
+})
+
+describe("ArtifactBlock — the three encoded types (292-02 · D-15)", () => {
+  it("renders each in the unchanged frame, with its kind chip, label chip and caption", () => {
+    render(<ArtifactBlock artifacts={[diagramInvoice, comparisonContracts, timelineAtlas]} />)
+    const figures = screen.getAllByTestId("artifact-block")
+    expect(figures.map((f) => f.getAttribute("data-component"))).toEqual(["diagram", "comparison", "timeline"])
+    expect(figures.map((f) => within(f).getByTestId("artifact-kind-chip").textContent)).toEqual([
+      "Flow diagram",
+      "Comparison",
+      "Timeline",
+    ])
+    expect(figures.map((f) => within(f).getByTestId("artifact-label-chip").textContent)).toEqual([
+      "diagram 1",
+      "comparison 1",
+      "timeline 1",
+    ])
+    expect(within(figures[0]).getByTestId("artifact-caption")).toHaveTextContent(
+      "diagram 1Data: search_documents · Invoice_Policy.pdf p.3 · 8 steps · 9 links",
+    )
+    expect(within(figures[1]).getByTestId("artifact-caption")).toHaveTextContent(
+      "comparison 1Data: search_documents · Atlas_MSA_2023.pdf p.14 → query_documents · 3 options × 7 terms" +
+        "Verdicts are the agent's reading. Hover or focus a cell for its clause.",
+    )
+    expect(within(figures[2]).getByTestId("artifact-caption")).toHaveTextContent(
+      "timeline 1Values provided by the agent · no source document in this turn · 9 events",
+    )
+    expect(within(figures[0]).getByTestId("artifact-diagram")).toBeInTheDocument()
+    expect(within(figures[1]).getByRole("table")).toBeInTheDocument()
+    expect(within(figures[2]).getByTestId("artifact-timeline")).toBeInTheDocument()
+  })
+
+  it("a bad stored diagram (an edge to a missing step) renders only the worded notice", () => {
+    const bad = mutable(diagramInvoice)
+    bad.spec.diagram.edges[2].to = "zz"
+    const { container } = render(<ArtifactBlock artifacts={[bad]} />)
+    const notice = screen.getByTestId("artifact-notice")
+    expect(notice).toHaveTextContent(
+      "its saved data links to a step that isn't in it (zz). Ask the agent to draw it again.",
+    )
+    expect(screen.queryByTestId("artifact-block")).toBeNull()
+    const text = container.textContent ?? ""
+    for (const t of ["{", "}", "nodes", "edges", "verdict", '"events"', "component"]) expect(text, t).not.toContain(t)
+  })
+
+  it("a mind map request reads the alias sentence; a flowchart the generic one", () => {
+    const mindmap = mutable(diagramInvoice)
+    mindmap.component = "mindmap"
+    const flow = mutable(diagramInvoice)
+    flow.id = "a_ffffffffff"
+    flow.component = "flowchart"
+    render(<ArtifactBlock artifacts={[mindmap, flow]} />)
+    const notices = screen.getAllByTestId("artifact-notice")
+    expect(notices[0]).toHaveTextContent("it asked for a mind map, which isn't one of the artifact types we can show.")
+    expect(notices[1]).toHaveTextContent(
+      "it asked for something other than a chart, table, metric, diagram, comparison or timeline.",
+    )
+    expect(notices[1].textContent).not.toContain("flowchart")
   })
 })
 
@@ -140,7 +215,9 @@ describe("ArtifactBlock", () => {
     const slots = Array.from(list.children).map((el) => el.getAttribute("data-testid"))
     expect(slots).toEqual(["artifact-notice", "artifact-notice", "artifact-block"])
     const notices = screen.getAllByTestId("artifact-notice")
-    expect(notices[0]).toHaveTextContent("it asked for something other than a chart, table or metric.")
+    expect(notices[0]).toHaveTextContent(
+      "it asked for something other than a chart, table, metric, diagram, comparison or timeline.",
+    )
     expect(notices[1]).toHaveTextContent(
       "it asked for a pie chart, which isn't one of the chart kinds we can draw.",
     )

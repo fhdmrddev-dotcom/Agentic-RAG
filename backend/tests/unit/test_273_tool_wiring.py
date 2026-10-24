@@ -160,12 +160,14 @@ def test_schema_converts_for_gemini_with_no_type_arrays():
 
 
 def test_schema_converts_for_anthropic():
+    from app.models.artifact import ARTIFACT_COMPONENTS
     from app.services.anthropic_service import _convert_tools_to_anthropic
     from app.services.openai_service import SHOW_ARTIFACT_TOOL
 
     (tool,) = _convert_tools_to_anthropic([SHOW_ARTIFACT_TOOL])
     assert tool["name"] == "show_artifact"
-    assert tool["input_schema"]["properties"]["component"]["enum"] == ["chart", "table", "metric"]
+    # Phase 292: derived from the Literal (six names), never re-typed.
+    assert tool["input_schema"]["properties"]["component"]["enum"] == list(ARTIFACT_COMPONENTS)
 
 
 # ── Description (D-11) + SYSTEM_PROMPT unchanged (D-15) ────────────────────────────────────────

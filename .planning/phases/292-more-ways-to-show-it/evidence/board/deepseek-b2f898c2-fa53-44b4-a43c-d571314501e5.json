@@ -1,0 +1,1895 @@
+{
+  "provider": "deepseek",
+  "model": "deepseek-v4-pro",
+  "thread_id": "4a7c5232-25f9-4ef0-bec0-ffd1a8f78424",
+  "prompt_bytes": 227,
+  "prompt": "Using our documents: show how invoice approval works as a flow diagram; compare the Atlas and Borealis contracts on termination, liability and renewal; and show the Atlas contract's history and upcoming deadlines as a timeline.",
+  "calling_mode_predicted": "NATIVE",
+  "score": {
+    "per_type": {
+      "diagram": {
+        "v1": "PASS",
+        "v2_backend": "PASS",
+        "artifact_ids": [
+          "a_bjaf7cvdxj"
+        ],
+        "labels": [
+          "diagram 1"
+        ],
+        "sourced_elements": [
+          "11/11"
+        ]
+      },
+      "comparison": {
+        "v1": "PASS",
+        "v2_backend": "PASS",
+        "artifact_ids": [
+          "a_lor17s3qth"
+        ],
+        "labels": [
+          "comparison 1"
+        ],
+        "sourced_elements": [
+          "8/8"
+        ]
+      },
+      "timeline": {
+        "v1": "PASS",
+        "v2_backend": "PASS",
+        "artifact_ids": [
+          "a_mww1xlu412"
+        ],
+        "labels": [
+          "timeline 1"
+        ],
+        "sourced_elements": [
+          "8/8"
+        ]
+      }
+    },
+    "tool_call_names": [
+      "search_documents",
+      "search_documents",
+      "search_documents",
+      "query_documents",
+      "read_document",
+      "show_artifact",
+      "show_artifact",
+      "show_artifact"
+    ],
+    "search_documents_calls": 3,
+    "show_artifact_calls": 3,
+    "refusals": [],
+    "artifact_rows": 3,
+    "reload_records": 3,
+    "reload_missing": 0,
+    "other_components": []
+  },
+  "turn_data": {
+    "run_id": "b2f898c2-fa53-44b4-a43c-d571314501e5",
+    "run_status": "completed",
+    "run": {
+      "status": "completed",
+      "model": "deepseek-v4-pro",
+      "provider": "deepseek",
+      "error": null,
+      "started_at": "2026-10-24 01:26:44.170534+00:00",
+      "completed_at": "2026-10-24 01:27:51.008924+00:00"
+    },
+    "assistant_messages": [
+      {
+        "id": "1954b2af-ffe0-4cd4-a2f9-0ac1409bc51f",
+        "content": "Here's a quick read on all three.\n\n**Invoice approval flow** \u2014 Every supplier invoice moves from receipt through a three-way match (against the PO and goods receipt) before anyone approves it; a mismatch bounces it back to the supplier rather than paying it [3]. The approver chain is accounts payable clerk \u2192 budget holder \u2192 finance controller (only above \u20ac10,000) \u2192 treasury for release, and nobody may approve an invoice they raised [4]. If a budget holder sits past five working days, AP sends a reminder and then escalates to the head of finance [4].\n\n**Atlas vs Borealis** \u2014 The two agreements diverge on every dimension you asked about. Atlas is far more forgiving on convenience exit (90 days vs 30 days) but has a breach-based immediate termination that Borealis lacks (Borealis instead allows immediate exit only on insolvency) [6][11]. Liability caps differ in structure \u2014 Atlas caps *both* parties at trailing-12-month fees with broad exclusions, while Borealis uses an asymmetric \u20ac250k/yr cap with only fraud excluded [6][11]. Most importantly for planning: **Atlas auto-renews** and its non-renewal notice is due **15 December 2026**, whereas **Borealis simply expires** at the end of its fixed two-year term on 31 May 2026 [6][11].\n\n**Atlas history & deadlines** \u2014 The contract has been running since 2023 and is now a \"keep or exit\" decision, not a renegotiation. The two live dates to watch are the **15 December 2026 renewal-notice deadline** and the **15 March 2027 term end**; if no notice is given by mid-December, it auto-renews for another year [7].",
+        "tool_calls": [
+          {
+            "args": {
+              "query": "invoice approval process workflow steps",
+              "instruction": "prefer a step-by-step description of the invoice approval process and who approves at each stage"
+            },
+            "name": "search_documents",
+            "result": "[{\"content\": \"s the purchase order and\\n   the goods receipt note: same supplier, same quantities, same unit prices.\\n3. **Decision: does the invoice match the purchase order?** If it matches, the invoice goes to the\\n   budget holder for approval. If it does not match, the invoice is rejected and returned to the\\n   supplier.\\n4. **Rejected: return to the supplier.** Accounts payable emails the supplier the reason for the\\n   rejection. The supplier corrects the invoice and resubmits it, and the resubmitted invoice goes\\n   back to the three-way match check. A rejected invoice is never paid.\\n5. **Budget holder approval.** The budget holder for the cost centre approves the invoice within five\\n   working days.\\n6. **Finance controller sign-off.** Any invoice above 10,000 euros also needs the finance controller's\\n   sign-off after the budget holder has approved it.\\n7. **Payment scheduled.** Accounts payable schedules the approved invoice for the next weekly\\n   payment run.\", \"document_id\": \"5b94562c-4bb9-431c-a12b-59e99f46cca1\", \"filename\": \"292-invoice-approval-policy.md\", \"chunk_index\": 1, \"similarity\": 0.6074077054593119, \"version_number\": 1, \"folder_id\": null, \"source_connection_id\": null, \"source_connection_name\": null, \"metadata\": {\"title\": \"Invoice Approval Policy\", \"author\": \"Finance Operations\", \"topics\": [\"invoice approval\", \"accounts payable\", \"three-way match\", \"payment processing\", \"audit retention\", \"escalation\"], \"summary\": \"Policy describing the process for supplier invoice receipt, three-way match checking, approvals, rejection handling, payment scheduling, and audit filing. Invoices follow a fixed workflow from receipt through payment, with escalation if approval is delayed.\", \"language\": \"en\", \"_confidence\": {\"date\": 0.2, \"title\": 0.99, \"author\": 0.97, \"topics\": 0.94, \"summary\": 0.95, \"language\": 0.98, \"contract_end\": 0.05, \"legal_entity\": 0.05, \"document_type\": 0.96}, \"document_type\": \"policy\"}}, {\"content\": \"## The approver chain\\n\\nThe appro",
+            "status": "done",
+            "tool_call_id": "call_00_NRrZGGMbMW4WnSkElJdF2563"
+          },
+          {
+            "args": {
+              "query": "Atlas contract termination liability renewal",
+              "instruction": "prefer the specific clause values for termination, liability, and renewal terms in the Atlas agreement"
+            },
+            "name": "search_documents",
+            "result": "[{\"content\": \"# Atlas Logistics Master Services Agreement (fixture, generated for Phase 292 UAT)\\n\\nParties: the Company and Atlas Logistics. Generated test document; no real party or amount.\\n\\n## Termination\\n\\nEither party may terminate this agreement for convenience on 90 days' written notice. Either party\\nmay terminate immediately for a material breach that is not cured within 30 days of written notice.\\n\\n## Liability\\n\\nEach party's total liability under this agreement is capped at the fees paid in the 12 months before\\nthe claim. The cap does not apply to death, personal injury, fraud or breach of confidentiality.\\n\\n## Renewal\\n\\nThe agreement renews automatically for successive one-year terms unless either party gives written\\nnotice of non-renewal at least 90 days before the end of the current term. The current term ends on\\n15 March 2027, so the renewal notice deadline is 15 December 2026.\", \"document_id\": \"325e6ca5-7982-47f5-af18-ad64b4802e85\", \"filename\": \"292-atlas-msa.md\", \"chunk_index\": 0, \"similarity\": 0.5973808157276065, \"version_number\": 1, \"folder_id\": null, \"source_connection_id\": null, \"source_connection_name\": null, \"metadata\": {\"date\": \"2023-03-14\", \"title\": \"Atlas Logistics Master Services Agreement\", \"topics\": [\"termination\", \"liability\", \"renewal\", \"contract history\", \"service credits\", \"price uplift\"], \"summary\": \"Fixture-generated master services agreement for Atlas Logistics and the Company. Includes termination for convenience and breach, liability cap with standard exclusions, automatic annual renewal unless notice of non-renewal is given by 15 December 2026, and a contract history covering signature, service start, amendment, SLA breach notice, service credits, and annual price uplift.\", \"language\": \"en\", \"_confidence\": {\"date\": 0.96, \"title\": 0.98, \"author\": 0.1, \"topics\": 0.93, \"summary\": 0.94, \"language\": 0.99, \"contract_end\": 0.98, \"legal_entity\": 0.05, \"document_type\": 0.95}, \"contract_end\": \"2027-03-15\", \"document_type\": \"mas",
+            "status": "done",
+            "tool_call_id": "call_01_3vzafhZFzElqtDTOx8Zl1418"
+          },
+          {
+            "args": {
+              "query": "Borealis contract termination liability renewal",
+              "instruction": "prefer the specific clause values for termination, liability, and renewal terms in the Borealis agreement"
+            },
+            "name": "search_documents",
+            "result": "[{\"content\": \"# Borealis Freight Master Services Agreement (fixture, generated for Phase 292 UAT)\\n\\nParties: the Company and Borealis Freight. Generated test document; no real party or amount.\\n\\n## Term\\n\\nThe agreement starts on 1 June 2024 and runs for a fixed term of two years.\\n\\n## Termination\\n\\nEither party may terminate this agreement for convenience on 30 days' written notice. The Company may\\nterminate immediately if Borealis becomes insolvent.\\n\\n## Liability\\n\\nBorealis's total liability under this agreement is capped at 250,000 euros per year. The Company's\\nliability is capped at the fees payable in the same year. Neither cap applies to fraud.\\n\\n## Payment\\n\\nInvoices are payable within 45 days of receipt. Late payment carries interest at the statutory rate.\", \"document_id\": \"d4eb5c9d-e039-4b9c-a874-ef8593de3062\", \"filename\": \"292-borealis-msa.md\", \"chunk_index\": 0, \"similarity\": 0.6433458135263969, \"version_number\": 1, \"folder_id\": null, \"source_connection_id\": null, \"source_connection_name\": null, \"metadata\": {\"date\": \"2024-06-01\", \"title\": \"Borealis Freight Master Services Agreement\", \"topics\": [\"term\", \"termination\", \"liability\", \"payment\"], \"summary\": \"Fixture generated Master Services Agreement for Borealis Freight and the Company. It includes a fixed two-year term starting 1 June 2024, termination for convenience on 30 days' notice, immediate termination for insolvency, liability caps, and payment terms of 45 days with statutory late interest.\", \"language\": \"en\", \"_confidence\": {\"date\": 0.96, \"title\": 0.99, \"author\": 0.1, \"topics\": 0.95, \"summary\": 0.95, \"language\": 0.99, \"contract_end\": 0.94, \"legal_entity\": 0.18, \"document_type\": 0.96}, \"contract_end\": \"2026-05-31\", \"legal_entity\": \"Beta Ltd\", \"document_type\": \"master services agreement\"}}, {\"content\": \"d Termination Schedule 2026\\n\\nThis schedule is maintained by ACME Legal Operations and lists the active commercial agreements that renew or expire during calendar year 2026 and the first ha",
+            "status": "done",
+            "tool_call_id": "call_02_vAtzlV13azbe5YMqYaS09656"
+          },
+          {
+            "args": {
+              "query": "SELECT filename, metadata->>'title' AS title, metadata->>'document_type' AS doc_type, metadata->>'date' AS date, metadata->>'legal_entity' AS entity FROM documents d ORDER BY created_at DESC LIMIT 50"
+            },
+            "name": "query_documents",
+            "result": "[\n  {\n    \"date\": \"2024-06-01\",\n    \"title\": \"Borealis Freight Master Services Agreement\",\n    \"entity\": \"Beta Ltd\",\n    \"doc_type\": \"master services agreement\",\n    \"filename\": \"292-borealis-msa.md\"\n  },\n  {\n    \"date\": \"2023-03-14\",\n    \"title\": \"Atlas Logistics Master Services Agreement\",\n    \"entity\": null,\n    \"doc_type\": \"master services agreement\",\n    \"filename\": \"292-atlas-msa.md\"\n  },\n  {\n    \"date\": null,\n    \"title\": \"Invoice Approval Policy\",\n    \"entity\": null,\n    \"doc_type\": \"policy\",\n    \"filename\": \"292-invoice-approval-policy.md\"\n  },\n  {\n    \"date\": null,\n    \"title\": \"Northwind Logistics \\u2014 Office Facilities Notes\",\n    \"entity\": null,\n    \"doc_type\": \"office facilities notes\",\n    \"filename\": \"Northwind_Office_Facilities_Notes.md\"\n  },\n  {\n    \"date\": \"2026-06-30\",\n    \"title\": \"Northwind Logistics \\u2014 SOC 2 Type II Access-Control Testing Results (FY2026)\",\n    \"entity\": \"Acme GmbH\",\n    \"doc_type\": \"soc 2 type ii testing results\",\n    \"filename\": \"Northwind_SOC2_Access_Control_Testing_2026.md\"\n  },\n  {\n    \"date\": \"2026-10-14\",\n    \"title\": \"team-note-058\",\n    \"entity\": null,\n    \"doc_type\": \"team note\",\n    \"filename\": \"team-note-058.txt\"\n  },\n  {\n    \"date\": \"2026-10-14\",\n    \"title\": \"Q3 Plan 10\",\n    \"entity\": null,\n    \"doc_type\": \"plan\",\n    \"filename\": \"q3-plan-10.txt\"\n  },\n  {\n    \"date\": \"2026-10-14\",\n    \"title\": \"Team Docs/Q3 Plans/q3-plan-09.txt\",\n    \"entity\": null,\n    \"doc_type\": \"plan document\",\n    \"filename\": \"q3-plan-09.txt\"\n  },\n  {\n    \"date\": \"2026-10-14\",\n    \"title\": \"Q3 Plan 08\",\n    \"entity\": null,\n    \"doc_type\": \"plan\",\n    \"filename\": \"q3-plan-08.txt\"\n  },\n  {\n    \"date\": \"2026-10-14\",\n    \"title\": \"Q3 Plan 07\",\n    \"entity\": null,\n    \"doc_type\": \"plan\",\n    \"filename\": \"q3-plan-07.txt\"\n  },\n  {\n    \"date\": \"2026-10-14\",\n    \"title\": \"Q3 Plan - Phase 280 Plan 04\",\n    \"entity\": null,\n    \"doc_type\": \"plan\",\n    \"filename\": \"q3-plan-06.txt\"\n  },\n  {\n    \"date\": \"2026-10-14T13:43:25+00:00\",\n    \"title\": \"Q3 ",
+            "status": "done",
+            "tool_call_id": "call_03_mLTcD2tVf1tGWza69PGJ1422"
+          },
+          {
+            "args": {
+              "document_id": "325e6ca5-7982-47f5-af18-ad64b4802e85"
+            },
+            "name": "read_document",
+            "result": "{\"document_id\": \"325e6ca5-7982-47f5-af18-ad64b4802e85\", \"filename\": \"292-atlas-msa.md\", \"total_lines\": 36, \"content\": \"# Atlas Logistics Master Services Agreement (fixture, generated for Phase 292 UAT)\\n\\nParties: the Company and Atlas Logistics. Generated test document; no real party or amount.\\n\\n## Termination\\n\\nEither party may terminate this agreement for convenience on 90 days' written notice. Either party\\nmay terminate immediately for a material breach that is not cured within 30 days of written notice.\\n\\n## Liability\\n\\nEach party's total liability under this agreement is capped at the fees paid in the 12 months before\\nthe claim. The cap does not apply to death, personal injury, fraud or breach of confidentiality.\\n\\n## Renewal\\n\\nThe agreement renews automatically for successive one-year terms unless either party gives written\\nnotice of non-renewal at least 90 days before the end of the current term. The current term ends on\\n15 March 2027, so the renewal notice deadline is 15 December 2026.\\n\\n## Contract history\\n\\n- **14 March 2023 - MSA signed.** The three-year master services agreement was signed.\\n- **1 April 2023 - Services start.** The first shipments under the agreement.\\n- **9 February 2024 - Amendment 1.** Prices rose by 3.5 percent and the fuel surcharge was folded into\\n  the base rate.\\n- **November 2024 - SLA breach notice.** Atlas missed three delivery windows in October 2024.\\n- **15 January 2025 - Service credits applied.** Credits of 18,400 euros were applied to the January\\n  invoice.\\n- **1 April 2026 - Annual price uplift.** Prices rose by 3.1 percent, within the 4 percent cap.\\n\\n## Upcoming deadlines and milestones\\n\\n- **15 December 2026 - Renewal notice deadline.** Last day to give notice of non-renewal.\\n- **15 March 2027 - End of the current term.** The agreement renews for one year unless notice was\\n  given.\\n\"}",
+            "status": "done",
+            "tool_call_id": "call_00_PbtvyGrZCDlNdeHb7iFP5762"
+          },
+          {
+            "args": {
+              "title": "Invoice approval flow",
+              "diagram": "<stored in artifact a_bjaf7cvdxj, diagram of 11 steps>",
+              "component": "diagram"
+            },
+            "name": "show_artifact",
+            "result": "{\"artifact_id\": \"a_bjaf7cvdxj\", \"label\": \"diagram 1\", \"component\": \"diagram\", \"row_count\": 11, \"edge_count\": 12, \"note\": \"Shown to the user below your answer as diagram 1. Now write one or two sentences about what it shows; do not repeat it as a table. To change it, call show_artifact again with the full data.\"}",
+            "status": "done",
+            "tool_call_id": "call_00_RRKzNNsIq1S0k0ilAMzX6730"
+          },
+          {
+            "args": {
+              "title": "Atlas vs Borealis \u2014 termination, liability, renewal",
+              "component": "comparison",
+              "comparison": "<stored in artifact a_lor17s3qth, comparison of 4 terms>"
+            },
+            "name": "show_artifact",
+            "result": "{\"artifact_id\": \"a_lor17s3qth\", \"label\": \"comparison 1\", \"component\": \"comparison\", \"row_count\": 4, \"option_count\": 2, \"note\": \"Shown to the user below your answer as comparison 1. Now write one or two sentences about what it shows; do not repeat it as a table. To change it, call show_artifact again with the full data.\"}",
+            "status": "done",
+            "tool_call_id": "call_01_wyp1r9KEv23rQ2XRQdMV1611"
+          },
+          {
+            "args": {
+              "title": "Atlas Logistics MSA \u2014 history & upcoming deadlines",
+              "timeline": "<stored in artifact a_mww1xlu412, timeline of 8 events>",
+              "component": "timeline"
+            },
+            "name": "show_artifact",
+            "result": "{\"artifact_id\": \"a_mww1xlu412\", \"label\": \"timeline 1\", \"component\": \"timeline\", \"row_count\": 8, \"note\": \"Shown to the user below your answer as timeline 1. Now write one or two sentences about what it shows; do not repeat it as a table. To change it, call show_artifact again with the full data.\"}",
+            "status": "done",
+            "tool_call_id": "call_02_AOQp843Ddm8llkxU54Hf9348"
+          }
+        ]
+      }
+    ],
+    "tool_call_names": [
+      "search_documents",
+      "search_documents",
+      "search_documents",
+      "query_documents",
+      "read_document",
+      "show_artifact",
+      "show_artifact",
+      "show_artifact"
+    ],
+    "show_artifact_calls": 3,
+    "refused_calls": 0,
+    "artifact_ids_from_results": [
+      "a_bjaf7cvdxj",
+      "a_lor17s3qth",
+      "a_mww1xlu412"
+    ],
+    "final_answer_empty": false,
+    "final_answer_is_fallback": false,
+    "persisted_json_fence": false,
+    "redis": {
+      "present": true,
+      "ttl": 599,
+      "event_types": {
+        "iteration_start": 4,
+        "reasoning_delta": 4705,
+        "delta": 464,
+        "tool_preparing": 8,
+        "turn_boundary": 3,
+        "tool_start": 8,
+        "tool_end": 8,
+        "planning": 3,
+        "tool_args_progress": 15,
+        "artifact": 3,
+        "sources": 1,
+        "citations": 1,
+        "confidence": 1,
+        "suggestions": 1,
+        "stream_end": 1,
+        "done": 1
+      },
+      "delta_count": 464,
+      "delta_text": "I'll start by exploring what's in the knowledge base and searching for the relevant content in parallel.I have the invoice flow and both contracts' key terms. I need the full Atlas contract history section (the beginning was cut off). Let me read the full Atlas MSA.I have everything I need from three documents: the **Invoice Approval Policy**, the **Atlas Logistics MSA**, and the **Borealis Freight MSA**. Here are the three views.Here's a quick read on all three.\n\n**Invoice approval flow** \u2014 Every supplier invoice moves from receipt through a three-way match (against the PO and goods receipt) before anyone approves it; a mismatch bounces it back to the supplier rather than paying it [3]. The approver chain is accounts payable clerk \u2192 budget holder \u2192 finance controller (only above \u20ac10,000) \u2192 treasury for release, and nobody may approve an invoice they raised [4]. If a budget holder sits past five working days, AP sends a reminder and then escalates to the head of finance [4].\n\n**Atlas vs Borealis** \u2014 The two agreements diverge on every dimension you asked about. Atlas is far more forgiving on convenience exit (90 days vs 30 days) but has a breach-based immediate termination that Borealis lacks (Borealis instead allows immediate exit only on insolvency) [6][11]. Liability caps differ in structure \u2014 Atlas caps *both* parties at trailing-12-month fees with broad exclusions, while Borealis uses an asymmetric \u20ac250k/yr cap with only fraud excluded [6][11]. Most importantly for planning: **Atlas auto-renews** and its non-renewal notice is due **15 December 2026**, whereas **Borealis simply expires** at the end of its fixed two-year term on 31 May 2026 [6][11].\n\n**Atlas history & deadlines** \u2014 The contract has been running since 2023 and is now a \"keep or exit\" decision, not a renegotiation. The two live dates to watch are the **15 December 2026 renewal-notice deadline** and the **15 March 2027 term end**; if no notice is given by mid-December, it auto-renews for another year [7].",
+      "artifact_events": 3
+    }
+  },
+  "message_artifacts": [
+    {
+      "id": "a_bjaf7cvdxj",
+      "label": "diagram 1",
+      "component": "diagram",
+      "parent_id": null,
+      "run_id": "b2f898c2-fa53-44b4-a43c-d571314501e5",
+      "tool_call_id": "call_00_RRKzNNsIq1S0k0ilAMzX6730",
+      "row_count": 11,
+      "spec": {
+        "title": "Invoice approval flow",
+        "diagram": {
+          "edges": [
+            {
+              "to": "match",
+              "from": "receive",
+              "label": null
+            },
+            {
+              "to": "match_decision",
+              "from": "match",
+              "label": null
+            },
+            {
+              "to": "budget",
+              "from": "match_decision",
+              "label": "Yes"
+            },
+            {
+              "to": "reject",
+              "from": "match_decision",
+              "label": "No"
+            },
+            {
+              "to": "resubmit",
+              "from": "reject",
+              "label": null
+            },
+            {
+              "to": "match",
+              "from": "resubmit",
+              "label": "back to match"
+            },
+            {
+              "to": "amount_decision",
+              "from": "budget",
+              "label": null
+            },
+            {
+              "to": "controller",
+              "from": "amount_decision",
+              "label": "Yes"
+            },
+            {
+              "to": "schedule",
+              "from": "amount_decision",
+              "label": "No"
+            },
+            {
+              "to": "schedule",
+              "from": "controller",
+              "label": null
+            },
+            {
+              "to": "paid",
+              "from": "schedule",
+              "label": null
+            },
+            {
+              "to": "file",
+              "from": "paid",
+              "label": null
+            }
+          ],
+          "nodes": [
+            {
+              "id": "receive",
+              "kind": "start",
+              "label": "Invoice received \u2014 AP logs it same day",
+              "source": {
+                "page": null,
+                "excerpt": "Every invoice follows the same steps in the same order. ## The approval process, step by step 1. **Invoice received.** The accounts payable inbox receives the supplier invoice and logs it in the payables register on the same working day. 2.",
+                "document": "292-invoice-approval-policy.md"
+              }
+            },
+            {
+              "id": "match",
+              "kind": "step",
+              "label": "Three-way match vs PO + goods receipt",
+              "source": {
+                "page": null,
+                "excerpt": "2. **Three-way match check.** Accounts payable checks that the invoice matches the purchase order and the goods receipt note: same supplier, same quantities, same unit prices. 3. **Decision: does the invoice match the purchase order?** If it matches, the invoice goes to the",
+                "document": "292-invoice-approval-policy.md"
+              }
+            },
+            {
+              "id": "match_decision",
+              "kind": "decision",
+              "label": "Matches PO?",
+              "source": {
+                "page": null,
+                "excerpt": "2. **Three-way match check.** Accounts payable checks that the invoice matches the purchase order and the goods receipt note: same supplier, same quantities, same unit prices. 3. **Decision: does the invoice match the purchase order?** If it matches, the invoice goes to the",
+                "document": "292-invoice-approval-policy.md"
+              }
+            },
+            {
+              "id": "reject",
+              "kind": "step",
+              "label": "Rejected \u2192 returned to supplier",
+              "source": {
+                "page": null,
+                "excerpt": "# Invoice Approval Policy (fixture, generated for Phase 292 UAT) Document owner: Finance Operations. Applies to every supplier invoice received by the company. This is a generated test document; it contains no real supplier, person or amount.",
+                "document": "292-invoice-approval-policy.md"
+              }
+            },
+            {
+              "id": "resubmit",
+              "kind": "step",
+              "label": "Supplier corrects & resubmits",
+              "source": {
+                "page": null,
+                "excerpt": "# Invoice Approval Policy (fixture, generated for Phase 292 UAT) Document owner: Finance Operations. Applies to every supplier invoice received by the company. This is a generated test document; it contains no real supplier, person or amount.",
+                "document": "292-invoice-approval-policy.md"
+              }
+            },
+            {
+              "id": "budget",
+              "kind": "step",
+              "label": "Budget holder approval (\u22645 working days)",
+              "source": {
+                "page": null,
+                "excerpt": "# Invoice Approval Policy (fixture, generated for Phase 292 UAT) Document owner: Finance Operations. Applies to every supplier invoice received by the company. This is a generated test document; it contains no real supplier, person or amount.",
+                "document": "292-invoice-approval-policy.md"
+              }
+            },
+            {
+              "id": "amount_decision",
+              "kind": "decision",
+              "label": "Above \u20ac10,000?",
+              "source": {
+                "page": null,
+                "excerpt": "6. **Finance controller sign-off.** Any invoice above 10,000 euros also needs the finance controller's sign-off after the budget holder has approved it. 7. **Payment scheduled.** Accounts payable schedules the approved invoice for the next weekly payment run.",
+                "document": "292-invoice-approval-policy.md"
+              }
+            },
+            {
+              "id": "controller",
+              "kind": "step",
+              "label": "Finance controller sign-off",
+              "source": {
+                "page": null,
+                "excerpt": "6. **Finance controller sign-off.** Any invoice above 10,000 euros also needs the finance controller's sign-off after the budget holder has approved it. 7. **Payment scheduled.** Accounts payable schedules the approved invoice for the next weekly payment run.",
+                "document": "292-invoice-approval-policy.md"
+              }
+            },
+            {
+              "id": "schedule",
+              "kind": "step",
+              "label": "Payment scheduled (next weekly run)",
+              "source": {
+                "page": null,
+                "excerpt": "6. **Finance controller sign-off.** Any invoice above 10,000 euros also needs the finance controller's sign-off after the budget holder has approved it. 7. **Payment scheduled.** Accounts payable schedules the approved invoice for the next weekly payment run.",
+                "document": "292-invoice-approval-policy.md"
+              }
+            },
+            {
+              "id": "paid",
+              "kind": "step",
+              "label": "Paid \u2014 Treasury releases (Thursday run)",
+              "source": {
+                "page": null,
+                "excerpt": "The supplier corrects the invoice and resubmits it, and the resubmitted invoice goes back to the three-way match check. A rejected invoice is never paid. 5. **Budget holder approval.** The budget holder for the cost centre approves the invoice within five working days. 6.",
+                "document": "292-invoice-approval-policy.md"
+              }
+            },
+            {
+              "id": "file",
+              "kind": "end",
+              "label": "Filed for audit (7 years)",
+              "source": {
+                "page": null,
+                "excerpt": "3. **Decision: does the invoice match the purchase order?** If it matches, the invoice goes to the budget holder for approval. If it does not match, the invoice is rejected and returned to the supplier. 4.",
+                "document": "292-invoice-approval-policy.md"
+              }
+            }
+          ]
+        }
+      },
+      "caption": {
+        "lineage": null,
+        "sources": [
+          {
+            "page": null,
+            "tool": "search_documents",
+            "document": null
+          },
+          {
+            "page": null,
+            "tool": "query_documents",
+            "document": null
+          },
+          {
+            "page": null,
+            "tool": "read_document",
+            "document": null
+          }
+        ],
+        "row_count": 11,
+        "source_count": 3
+      },
+      "thread_id": "4a7c5232-25f9-4ef0-bec0-ffd1a8f78424",
+      "at": "2026-10-24 01:27:41.606209+00"
+    },
+    {
+      "id": "a_lor17s3qth",
+      "label": "comparison 1",
+      "component": "comparison",
+      "parent_id": null,
+      "run_id": "b2f898c2-fa53-44b4-a43c-d571314501e5",
+      "tool_call_id": "call_01_wyp1r9KEv23rQ2XRQdMV1611",
+      "row_count": 4,
+      "spec": {
+        "title": "Atlas vs Borealis \u2014 termination, liability, renewal",
+        "comparison": {
+          "terms": [
+            {
+              "name": "Termination \u2014 convenience",
+              "cells": [
+                {
+                  "text": "90 days' written notice (either party)",
+                  "source": {
+                    "page": null,
+                    "excerpt": "Generated test document; no real party or amount. ## Termination Either party may terminate this agreement for convenience on 90 days' written notice. Either party may terminate immediately for a material breach that is not cured within 30 days of written notice.",
+                    "document": "292-atlas-msa.md"
+                  },
+                  "verdict": "m"
+                },
+                {
+                  "text": "30 days' written notice (either party)",
+                  "source": {
+                    "page": null,
+                    "excerpt": "## Term The agreement starts on 1 June 2024 and runs for a fixed term of two years. ## Termination Either party may terminate this agreement for convenience on 30 days' written notice. The Company may terminate immediately if Borealis becomes insolvent.",
+                    "document": "292-borealis-msa.md"
+                  },
+                  "verdict": "m"
+                }
+              ]
+            },
+            {
+              "name": "Termination \u2014 for cause",
+              "cells": [
+                {
+                  "text": "Immediate for material breach uncured after 30 days' notice",
+                  "source": {
+                    "page": null,
+                    "excerpt": "Either party may terminate immediately for a material breach that is not cured within 30 days of written notice. ## Liability Each party's total liability under this agreement is capped at the fees paid in the 12 months before the claim.",
+                    "document": "292-atlas-msa.md"
+                  },
+                  "verdict": "m"
+                },
+                {
+                  "text": "Company may terminate immediately if Borealis becomes insolvent",
+                  "source": {
+                    "page": null,
+                    "excerpt": "## Termination Either party may terminate this agreement for convenience on 30 days' written notice. The Company may terminate immediately if Borealis becomes insolvent. ## Liability Borealis's total liability under this agreement is capped at 250,000 euros per year.",
+                    "document": "292-borealis-msa.md"
+                  },
+                  "verdict": "m"
+                }
+              ]
+            },
+            {
+              "name": "Liability cap",
+              "cells": [
+                {
+                  "text": "Each party capped at fees paid in prior 12 months; cap does not apply to death, personal injury, fraud or confidentiality breach",
+                  "source": {
+                    "page": null,
+                    "excerpt": "The cap does not apply to death, personal injury, fraud or breach of confidentiality. ## Renewal The agreement renews automatically for successive one-year terms unless either party gives written notice of non-renewal at least 90 days before the end of the current term.",
+                    "document": "292-atlas-msa.md"
+                  },
+                  "verdict": "m"
+                },
+                {
+                  "text": "Borealis capped at \u20ac250,000/yr; Company capped at fees payable same year; neither cap applies to fraud",
+                  "source": {
+                    "page": null,
+                    "excerpt": "## Liability Borealis's total liability under this agreement is capped at 250,000 euros per year. The Company's liability is capped at the fees payable in the same year. Neither cap applies to fraud. ## Payment Invoices are payable within 45 days of receipt.",
+                    "document": "292-borealis-msa.md"
+                  },
+                  "verdict": "m"
+                }
+              ]
+            },
+            {
+              "name": "Renewal",
+              "cells": [
+                {
+                  "text": "Auto-renews for successive 1-year terms unless 90 days' non-renewal notice; current term ends 15 Mar 2027",
+                  "source": {
+                    "page": null,
+                    "excerpt": "## Renewal The agreement renews automatically for successive one-year terms unless either party gives written notice of non-renewal at least 90 days before the end of the current term. The current term ends on 15 March 2027, so the renewal notice deadline is 15 December 2026.",
+                    "document": "292-atlas-msa.md"
+                  },
+                  "verdict": "m"
+                },
+                {
+                  "text": "No renewal \u2014 fixed two-year term (1 Jun 2024 \u2013 31 May 2026)",
+                  "source": {
+                    "page": null,
+                    "excerpt": "Generated test document; no real party or amount. ## Term The agreement starts on 1 June 2024 and runs for a fixed term of two years. ## Termination Either party may terminate this agreement for convenience on 30 days' written notice.",
+                    "document": "292-borealis-msa.md"
+                  },
+                  "verdict": "m"
+                }
+              ]
+            }
+          ],
+          "options": [
+            "Atlas Logistics MSA",
+            "Borealis Freight MSA"
+          ]
+        }
+      },
+      "caption": {
+        "lineage": null,
+        "sources": [
+          {
+            "page": null,
+            "tool": "search_documents",
+            "document": null
+          },
+          {
+            "page": null,
+            "tool": "query_documents",
+            "document": null
+          },
+          {
+            "page": null,
+            "tool": "read_document",
+            "document": null
+          }
+        ],
+        "row_count": 4,
+        "source_count": 3
+      },
+      "thread_id": "4a7c5232-25f9-4ef0-bec0-ffd1a8f78424",
+      "at": "2026-10-24 01:27:41.668826+00"
+    },
+    {
+      "id": "a_mww1xlu412",
+      "label": "timeline 1",
+      "component": "timeline",
+      "parent_id": null,
+      "run_id": "b2f898c2-fa53-44b4-a43c-d571314501e5",
+      "tool_call_id": "call_02_AOQp843Ddm8llkxU54Hf9348",
+      "row_count": 8,
+      "spec": {
+        "title": "Atlas Logistics MSA \u2014 history & upcoming deadlines",
+        "timeline": {
+          "events": [
+            {
+              "date": "2023-03-14",
+              "title": "MSA signed",
+              "detail": "Three-year master services agreement signed",
+              "source": {
+                "page": null,
+                "excerpt": "## Upcoming deadlines and milestones - **15 December 2026 - Renewal notice deadline.** Last day to give notice of non-renewal. - **15 March 2027 - End of the current term.** The agreement renews for one year unless notice was given.",
+                "document": "292-atlas-msa.md"
+              },
+              "category": null,
+              "deadline": false
+            },
+            {
+              "date": "2023-04-01",
+              "title": "Services start",
+              "detail": "First shipments under the agreement",
+              "source": {
+                "page": null,
+                "excerpt": "## Upcoming deadlines and milestones - **15 December 2026 - Renewal notice deadline.** Last day to give notice of non-renewal. - **15 March 2027 - End of the current term.** The agreement renews for one year unless notice was given.",
+                "document": "292-atlas-msa.md"
+              },
+              "category": null,
+              "deadline": false
+            },
+            {
+              "date": "2024-02-09",
+              "title": "Amendment 1",
+              "detail": "Prices +3.5%; fuel surcharge folded into base rate",
+              "source": {
+                "page": null,
+                "excerpt": "- **1 April 2026 - Annual price uplift.** Prices rose by 3.1 percent, within the 4 percent cap. ## Upcoming deadlines and milestones - **15 December 2026 - Renewal notice deadline.** Last day to give notice of non-renewal.",
+                "document": "292-atlas-msa.md"
+              },
+              "category": null,
+              "deadline": false
+            },
+            {
+              "date": "2024-11",
+              "title": "SLA breach notice",
+              "detail": "Atlas missed three delivery windows in Oct 2024",
+              "source": {
+                "page": null,
+                "excerpt": "## Upcoming deadlines and milestones - **15 December 2026 - Renewal notice deadline.** Last day to give notice of non-renewal. - **15 March 2027 - End of the current term.** The agreement renews for one year unless notice was given.",
+                "document": "292-atlas-msa.md"
+              },
+              "category": null,
+              "deadline": false
+            },
+            {
+              "date": "2025-01-15",
+              "title": "Service credits applied",
+              "detail": "\u20ac18,400 credited to the January invoice",
+              "source": {
+                "page": null,
+                "excerpt": "anuary 2025 - Service credits applied.** Credits of 18,400 euros were applied to the January invoice. - **1 April 2026 - Annual price uplift.** Prices rose by 3.1 percent, within the 4 percent cap.",
+                "document": "292-atlas-msa.md"
+              },
+              "category": null,
+              "deadline": false
+            },
+            {
+              "date": "2026-04-01",
+              "title": "Annual price uplift",
+              "detail": "Prices +3.1%, within the 4% cap",
+              "source": {
+                "page": null,
+                "excerpt": "- **1 April 2026 - Annual price uplift.** Prices rose by 3.1 percent, within the 4 percent cap. ## Upcoming deadlines and milestones - **15 December 2026 - Renewal notice deadline.** Last day to give notice of non-renewal.",
+                "document": "292-atlas-msa.md"
+              },
+              "category": null,
+              "deadline": false
+            },
+            {
+              "date": "2026-12-15",
+              "title": "Renewal notice deadline",
+              "detail": "Last day to give notice of non-renewal",
+              "source": {
+                "page": null,
+                "excerpt": "## Upcoming deadlines and milestones - **15 December 2026 - Renewal notice deadline.** Last day to give notice of non-renewal. - **15 March 2027 - End of the current term.** The agreement renews for one year unless notice was given.",
+                "document": "292-atlas-msa.md"
+              },
+              "category": null,
+              "deadline": true
+            },
+            {
+              "date": "2027-03-15",
+              "title": "End of current term",
+              "detail": "Renews for one year unless notice was given",
+              "source": {
+                "page": null,
+                "excerpt": "## Upcoming deadlines and milestones - **15 December 2026 - Renewal notice deadline.** Last day to give notice of non-renewal. - **15 March 2027 - End of the current term.** The agreement renews for one year unless notice was given.",
+                "document": "292-atlas-msa.md"
+              },
+              "category": null,
+              "deadline": true
+            }
+          ]
+        }
+      },
+      "caption": {
+        "lineage": null,
+        "sources": [
+          {
+            "page": null,
+            "tool": "search_documents",
+            "document": null
+          },
+          {
+            "page": null,
+            "tool": "query_documents",
+            "document": null
+          },
+          {
+            "page": null,
+            "tool": "read_document",
+            "document": null
+          }
+        ],
+        "row_count": 8,
+        "source_count": 3
+      },
+      "thread_id": "4a7c5232-25f9-4ef0-bec0-ffd1a8f78424",
+      "at": "2026-10-24 01:27:41.685936+00"
+    }
+  ],
+  "reload_http": 200,
+  "reload_artifacts": [
+    {
+      "id": "a_bjaf7cvdxj",
+      "thread_id": "4a7c5232-25f9-4ef0-bec0-ffd1a8f78424",
+      "user_id": "d8a54002-6a29-4b88-b918-cff2aa4a06d5",
+      "org_id": "22f9c615-0eec-440a-8804-ed4784d6f57f",
+      "run_id": "b2f898c2-fa53-44b4-a43c-d571314501e5",
+      "tool_call_id": "call_00_RRKzNNsIq1S0k0ilAMzX6730",
+      "parent_id": null,
+      "label": "diagram 1",
+      "component": "diagram",
+      "spec": {
+        "title": "Invoice approval flow",
+        "diagram": {
+          "edges": [
+            {
+              "to": "match",
+              "from": "receive",
+              "label": null
+            },
+            {
+              "to": "match_decision",
+              "from": "match",
+              "label": null
+            },
+            {
+              "to": "budget",
+              "from": "match_decision",
+              "label": "Yes"
+            },
+            {
+              "to": "reject",
+              "from": "match_decision",
+              "label": "No"
+            },
+            {
+              "to": "resubmit",
+              "from": "reject",
+              "label": null
+            },
+            {
+              "to": "match",
+              "from": "resubmit",
+              "label": "back to match"
+            },
+            {
+              "to": "amount_decision",
+              "from": "budget",
+              "label": null
+            },
+            {
+              "to": "controller",
+              "from": "amount_decision",
+              "label": "Yes"
+            },
+            {
+              "to": "schedule",
+              "from": "amount_decision",
+              "label": "No"
+            },
+            {
+              "to": "schedule",
+              "from": "controller",
+              "label": null
+            },
+            {
+              "to": "paid",
+              "from": "schedule",
+              "label": null
+            },
+            {
+              "to": "file",
+              "from": "paid",
+              "label": null
+            }
+          ],
+          "nodes": [
+            {
+              "id": "receive",
+              "kind": "start",
+              "label": "Invoice received \u2014 AP logs it same day",
+              "source": {
+                "page": null,
+                "excerpt": "Every invoice follows the same steps in the same order. ## The approval process, step by step 1. **Invoice received.** The accounts payable inbox receives the supplier invoice and logs it in the payables register on the same working day. 2.",
+                "document": "292-invoice-approval-policy.md"
+              }
+            },
+            {
+              "id": "match",
+              "kind": "step",
+              "label": "Three-way match vs PO + goods receipt",
+              "source": {
+                "page": null,
+                "excerpt": "2. **Three-way match check.** Accounts payable checks that the invoice matches the purchase order and the goods receipt note: same supplier, same quantities, same unit prices. 3. **Decision: does the invoice match the purchase order?** If it matches, the invoice goes to the",
+                "document": "292-invoice-approval-policy.md"
+              }
+            },
+            {
+              "id": "match_decision",
+              "kind": "decision",
+              "label": "Matches PO?",
+              "source": {
+                "page": null,
+                "excerpt": "2. **Three-way match check.** Accounts payable checks that the invoice matches the purchase order and the goods receipt note: same supplier, same quantities, same unit prices. 3. **Decision: does the invoice match the purchase order?** If it matches, the invoice goes to the",
+                "document": "292-invoice-approval-policy.md"
+              }
+            },
+            {
+              "id": "reject",
+              "kind": "step",
+              "label": "Rejected \u2192 returned to supplier",
+              "source": {
+                "page": null,
+                "excerpt": "# Invoice Approval Policy (fixture, generated for Phase 292 UAT) Document owner: Finance Operations. Applies to every supplier invoice received by the company. This is a generated test document; it contains no real supplier, person or amount.",
+                "document": "292-invoice-approval-policy.md"
+              }
+            },
+            {
+              "id": "resubmit",
+              "kind": "step",
+              "label": "Supplier corrects & resubmits",
+              "source": {
+                "page": null,
+                "excerpt": "# Invoice Approval Policy (fixture, generated for Phase 292 UAT) Document owner: Finance Operations. Applies to every supplier invoice received by the company. This is a generated test document; it contains no real supplier, person or amount.",
+                "document": "292-invoice-approval-policy.md"
+              }
+            },
+            {
+              "id": "budget",
+              "kind": "step",
+              "label": "Budget holder approval (\u22645 working days)",
+              "source": {
+                "page": null,
+                "excerpt": "# Invoice Approval Policy (fixture, generated for Phase 292 UAT) Document owner: Finance Operations. Applies to every supplier invoice received by the company. This is a generated test document; it contains no real supplier, person or amount.",
+                "document": "292-invoice-approval-policy.md"
+              }
+            },
+            {
+              "id": "amount_decision",
+              "kind": "decision",
+              "label": "Above \u20ac10,000?",
+              "source": {
+                "page": null,
+                "excerpt": "6. **Finance controller sign-off.** Any invoice above 10,000 euros also needs the finance controller's sign-off after the budget holder has approved it. 7. **Payment scheduled.** Accounts payable schedules the approved invoice for the next weekly payment run.",
+                "document": "292-invoice-approval-policy.md"
+              }
+            },
+            {
+              "id": "controller",
+              "kind": "step",
+              "label": "Finance controller sign-off",
+              "source": {
+                "page": null,
+                "excerpt": "6. **Finance controller sign-off.** Any invoice above 10,000 euros also needs the finance controller's sign-off after the budget holder has approved it. 7. **Payment scheduled.** Accounts payable schedules the approved invoice for the next weekly payment run.",
+                "document": "292-invoice-approval-policy.md"
+              }
+            },
+            {
+              "id": "schedule",
+              "kind": "step",
+              "label": "Payment scheduled (next weekly run)",
+              "source": {
+                "page": null,
+                "excerpt": "6. **Finance controller sign-off.** Any invoice above 10,000 euros also needs the finance controller's sign-off after the budget holder has approved it. 7. **Payment scheduled.** Accounts payable schedules the approved invoice for the next weekly payment run.",
+                "document": "292-invoice-approval-policy.md"
+              }
+            },
+            {
+              "id": "paid",
+              "kind": "step",
+              "label": "Paid \u2014 Treasury releases (Thursday run)",
+              "source": {
+                "page": null,
+                "excerpt": "The supplier corrects the invoice and resubmits it, and the resubmitted invoice goes back to the three-way match check. A rejected invoice is never paid. 5. **Budget holder approval.** The budget holder for the cost centre approves the invoice within five working days. 6.",
+                "document": "292-invoice-approval-policy.md"
+              }
+            },
+            {
+              "id": "file",
+              "kind": "end",
+              "label": "Filed for audit (7 years)",
+              "source": {
+                "page": null,
+                "excerpt": "3. **Decision: does the invoice match the purchase order?** If it matches, the invoice goes to the budget holder for approval. If it does not match, the invoice is rejected and returned to the supplier. 4.",
+                "document": "292-invoice-approval-policy.md"
+              }
+            }
+          ]
+        }
+      },
+      "caption": {
+        "lineage": null,
+        "sources": [
+          {
+            "page": null,
+            "tool": "search_documents",
+            "document": null
+          },
+          {
+            "page": null,
+            "tool": "query_documents",
+            "document": null
+          },
+          {
+            "page": null,
+            "tool": "read_document",
+            "document": null
+          }
+        ],
+        "row_count": 11,
+        "source_count": 3
+      },
+      "row_count": 11,
+      "spec_version": 1,
+      "created_at": "2026-10-24T01:27:41.606209+00:00"
+    },
+    {
+      "id": "a_lor17s3qth",
+      "thread_id": "4a7c5232-25f9-4ef0-bec0-ffd1a8f78424",
+      "user_id": "d8a54002-6a29-4b88-b918-cff2aa4a06d5",
+      "org_id": "22f9c615-0eec-440a-8804-ed4784d6f57f",
+      "run_id": "b2f898c2-fa53-44b4-a43c-d571314501e5",
+      "tool_call_id": "call_01_wyp1r9KEv23rQ2XRQdMV1611",
+      "parent_id": null,
+      "label": "comparison 1",
+      "component": "comparison",
+      "spec": {
+        "title": "Atlas vs Borealis \u2014 termination, liability, renewal",
+        "comparison": {
+          "terms": [
+            {
+              "name": "Termination \u2014 convenience",
+              "cells": [
+                {
+                  "text": "90 days' written notice (either party)",
+                  "source": {
+                    "page": null,
+                    "excerpt": "Generated test document; no real party or amount. ## Termination Either party may terminate this agreement for convenience on 90 days' written notice. Either party may terminate immediately for a material breach that is not cured within 30 days of written notice.",
+                    "document": "292-atlas-msa.md"
+                  },
+                  "verdict": "m"
+                },
+                {
+                  "text": "30 days' written notice (either party)",
+                  "source": {
+                    "page": null,
+                    "excerpt": "## Term The agreement starts on 1 June 2024 and runs for a fixed term of two years. ## Termination Either party may terminate this agreement for convenience on 30 days' written notice. The Company may terminate immediately if Borealis becomes insolvent.",
+                    "document": "292-borealis-msa.md"
+                  },
+                  "verdict": "m"
+                }
+              ]
+            },
+            {
+              "name": "Termination \u2014 for cause",
+              "cells": [
+                {
+                  "text": "Immediate for material breach uncured after 30 days' notice",
+                  "source": {
+                    "page": null,
+                    "excerpt": "Either party may terminate immediately for a material breach that is not cured within 30 days of written notice. ## Liability Each party's total liability under this agreement is capped at the fees paid in the 12 months before the claim.",
+                    "document": "292-atlas-msa.md"
+                  },
+                  "verdict": "m"
+                },
+                {
+                  "text": "Company may terminate immediately if Borealis becomes insolvent",
+                  "source": {
+                    "page": null,
+                    "excerpt": "## Termination Either party may terminate this agreement for convenience on 30 days' written notice. The Company may terminate immediately if Borealis becomes insolvent. ## Liability Borealis's total liability under this agreement is capped at 250,000 euros per year.",
+                    "document": "292-borealis-msa.md"
+                  },
+                  "verdict": "m"
+                }
+              ]
+            },
+            {
+              "name": "Liability cap",
+              "cells": [
+                {
+                  "text": "Each party capped at fees paid in prior 12 months; cap does not apply to death, personal injury, fraud or confidentiality breach",
+                  "source": {
+                    "page": null,
+                    "excerpt": "The cap does not apply to death, personal injury, fraud or breach of confidentiality. ## Renewal The agreement renews automatically for successive one-year terms unless either party gives written notice of non-renewal at least 90 days before the end of the current term.",
+                    "document": "292-atlas-msa.md"
+                  },
+                  "verdict": "m"
+                },
+                {
+                  "text": "Borealis capped at \u20ac250,000/yr; Company capped at fees payable same year; neither cap applies to fraud",
+                  "source": {
+                    "page": null,
+                    "excerpt": "## Liability Borealis's total liability under this agreement is capped at 250,000 euros per year. The Company's liability is capped at the fees payable in the same year. Neither cap applies to fraud. ## Payment Invoices are payable within 45 days of receipt.",
+                    "document": "292-borealis-msa.md"
+                  },
+                  "verdict": "m"
+                }
+              ]
+            },
+            {
+              "name": "Renewal",
+              "cells": [
+                {
+                  "text": "Auto-renews for successive 1-year terms unless 90 days' non-renewal notice; current term ends 15 Mar 2027",
+                  "source": {
+                    "page": null,
+                    "excerpt": "## Renewal The agreement renews automatically for successive one-year terms unless either party gives written notice of non-renewal at least 90 days before the end of the current term. The current term ends on 15 March 2027, so the renewal notice deadline is 15 December 2026.",
+                    "document": "292-atlas-msa.md"
+                  },
+                  "verdict": "m"
+                },
+                {
+                  "text": "No renewal \u2014 fixed two-year term (1 Jun 2024 \u2013 31 May 2026)",
+                  "source": {
+                    "page": null,
+                    "excerpt": "Generated test document; no real party or amount. ## Term The agreement starts on 1 June 2024 and runs for a fixed term of two years. ## Termination Either party may terminate this agreement for convenience on 30 days' written notice.",
+                    "document": "292-borealis-msa.md"
+                  },
+                  "verdict": "m"
+                }
+              ]
+            }
+          ],
+          "options": [
+            "Atlas Logistics MSA",
+            "Borealis Freight MSA"
+          ]
+        }
+      },
+      "caption": {
+        "lineage": null,
+        "sources": [
+          {
+            "page": null,
+            "tool": "search_documents",
+            "document": null
+          },
+          {
+            "page": null,
+            "tool": "query_documents",
+            "document": null
+          },
+          {
+            "page": null,
+            "tool": "read_document",
+            "document": null
+          }
+        ],
+        "row_count": 4,
+        "source_count": 3
+      },
+      "row_count": 4,
+      "spec_version": 1,
+      "created_at": "2026-10-24T01:27:41.668826+00:00"
+    },
+    {
+      "id": "a_mww1xlu412",
+      "thread_id": "4a7c5232-25f9-4ef0-bec0-ffd1a8f78424",
+      "user_id": "d8a54002-6a29-4b88-b918-cff2aa4a06d5",
+      "org_id": "22f9c615-0eec-440a-8804-ed4784d6f57f",
+      "run_id": "b2f898c2-fa53-44b4-a43c-d571314501e5",
+      "tool_call_id": "call_02_AOQp843Ddm8llkxU54Hf9348",
+      "parent_id": null,
+      "label": "timeline 1",
+      "component": "timeline",
+      "spec": {
+        "title": "Atlas Logistics MSA \u2014 history & upcoming deadlines",
+        "timeline": {
+          "events": [
+            {
+              "date": "2023-03-14",
+              "title": "MSA signed",
+              "detail": "Three-year master services agreement signed",
+              "source": {
+                "page": null,
+                "excerpt": "## Upcoming deadlines and milestones - **15 December 2026 - Renewal notice deadline.** Last day to give notice of non-renewal. - **15 March 2027 - End of the current term.** The agreement renews for one year unless notice was given.",
+                "document": "292-atlas-msa.md"
+              },
+              "category": null,
+              "deadline": false
+            },
+            {
+              "date": "2023-04-01",
+              "title": "Services start",
+              "detail": "First shipments under the agreement",
+              "source": {
+                "page": null,
+                "excerpt": "## Upcoming deadlines and milestones - **15 December 2026 - Renewal notice deadline.** Last day to give notice of non-renewal. - **15 March 2027 - End of the current term.** The agreement renews for one year unless notice was given.",
+                "document": "292-atlas-msa.md"
+              },
+              "category": null,
+              "deadline": false
+            },
+            {
+              "date": "2024-02-09",
+              "title": "Amendment 1",
+              "detail": "Prices +3.5%; fuel surcharge folded into base rate",
+              "source": {
+                "page": null,
+                "excerpt": "- **1 April 2026 - Annual price uplift.** Prices rose by 3.1 percent, within the 4 percent cap. ## Upcoming deadlines and milestones - **15 December 2026 - Renewal notice deadline.** Last day to give notice of non-renewal.",
+                "document": "292-atlas-msa.md"
+              },
+              "category": null,
+              "deadline": false
+            },
+            {
+              "date": "2024-11",
+              "title": "SLA breach notice",
+              "detail": "Atlas missed three delivery windows in Oct 2024",
+              "source": {
+                "page": null,
+                "excerpt": "## Upcoming deadlines and milestones - **15 December 2026 - Renewal notice deadline.** Last day to give notice of non-renewal. - **15 March 2027 - End of the current term.** The agreement renews for one year unless notice was given.",
+                "document": "292-atlas-msa.md"
+              },
+              "category": null,
+              "deadline": false
+            },
+            {
+              "date": "2025-01-15",
+              "title": "Service credits applied",
+              "detail": "\u20ac18,400 credited to the January invoice",
+              "source": {
+                "page": null,
+                "excerpt": "anuary 2025 - Service credits applied.** Credits of 18,400 euros were applied to the January invoice. - **1 April 2026 - Annual price uplift.** Prices rose by 3.1 percent, within the 4 percent cap.",
+                "document": "292-atlas-msa.md"
+              },
+              "category": null,
+              "deadline": false
+            },
+            {
+              "date": "2026-04-01",
+              "title": "Annual price uplift",
+              "detail": "Prices +3.1%, within the 4% cap",
+              "source": {
+                "page": null,
+                "excerpt": "- **1 April 2026 - Annual price uplift.** Prices rose by 3.1 percent, within the 4 percent cap. ## Upcoming deadlines and milestones - **15 December 2026 - Renewal notice deadline.** Last day to give notice of non-renewal.",
+                "document": "292-atlas-msa.md"
+              },
+              "category": null,
+              "deadline": false
+            },
+            {
+              "date": "2026-12-15",
+              "title": "Renewal notice deadline",
+              "detail": "Last day to give notice of non-renewal",
+              "source": {
+                "page": null,
+                "excerpt": "## Upcoming deadlines and milestones - **15 December 2026 - Renewal notice deadline.** Last day to give notice of non-renewal. - **15 March 2027 - End of the current term.** The agreement renews for one year unless notice was given.",
+                "document": "292-atlas-msa.md"
+              },
+              "category": null,
+              "deadline": true
+            },
+            {
+              "date": "2027-03-15",
+              "title": "End of current term",
+              "detail": "Renews for one year unless notice was given",
+              "source": {
+                "page": null,
+                "excerpt": "## Upcoming deadlines and milestones - **15 December 2026 - Renewal notice deadline.** Last day to give notice of non-renewal. - **15 March 2027 - End of the current term.** The agreement renews for one year unless notice was given.",
+                "document": "292-atlas-msa.md"
+              },
+              "category": null,
+              "deadline": true
+            }
+          ]
+        }
+      },
+      "caption": {
+        "lineage": null,
+        "sources": [
+          {
+            "page": null,
+            "tool": "search_documents",
+            "document": null
+          },
+          {
+            "page": null,
+            "tool": "query_documents",
+            "document": null
+          },
+          {
+            "page": null,
+            "tool": "read_document",
+            "document": null
+          }
+        ],
+        "row_count": 8,
+        "source_count": 3
+      },
+      "row_count": 8,
+      "spec_version": 1,
+      "created_at": "2026-10-24T01:27:41.685936+00:00"
+    }
+  ],
+  "reload_by_message": [
+    {
+      "message_id": "1954b2af-ffe0-4cd4-a2f9-0ac1409bc51f",
+      "artifacts": [
+        {
+          "id": "a_bjaf7cvdxj",
+          "thread_id": "4a7c5232-25f9-4ef0-bec0-ffd1a8f78424",
+          "user_id": "d8a54002-6a29-4b88-b918-cff2aa4a06d5",
+          "org_id": "22f9c615-0eec-440a-8804-ed4784d6f57f",
+          "run_id": "b2f898c2-fa53-44b4-a43c-d571314501e5",
+          "tool_call_id": "call_00_RRKzNNsIq1S0k0ilAMzX6730",
+          "parent_id": null,
+          "label": "diagram 1",
+          "component": "diagram",
+          "spec": {
+            "title": "Invoice approval flow",
+            "diagram": {
+              "edges": [
+                {
+                  "to": "match",
+                  "from": "receive",
+                  "label": null
+                },
+                {
+                  "to": "match_decision",
+                  "from": "match",
+                  "label": null
+                },
+                {
+                  "to": "budget",
+                  "from": "match_decision",
+                  "label": "Yes"
+                },
+                {
+                  "to": "reject",
+                  "from": "match_decision",
+                  "label": "No"
+                },
+                {
+                  "to": "resubmit",
+                  "from": "reject",
+                  "label": null
+                },
+                {
+                  "to": "match",
+                  "from": "resubmit",
+                  "label": "back to match"
+                },
+                {
+                  "to": "amount_decision",
+                  "from": "budget",
+                  "label": null
+                },
+                {
+                  "to": "controller",
+                  "from": "amount_decision",
+                  "label": "Yes"
+                },
+                {
+                  "to": "schedule",
+                  "from": "amount_decision",
+                  "label": "No"
+                },
+                {
+                  "to": "schedule",
+                  "from": "controller",
+                  "label": null
+                },
+                {
+                  "to": "paid",
+                  "from": "schedule",
+                  "label": null
+                },
+                {
+                  "to": "file",
+                  "from": "paid",
+                  "label": null
+                }
+              ],
+              "nodes": [
+                {
+                  "id": "receive",
+                  "kind": "start",
+                  "label": "Invoice received \u2014 AP logs it same day",
+                  "source": {
+                    "page": null,
+                    "excerpt": "Every invoice follows the same steps in the same order. ## The approval process, step by step 1. **Invoice received.** The accounts payable inbox receives the supplier invoice and logs it in the payables register on the same working day. 2.",
+                    "document": "292-invoice-approval-policy.md"
+                  }
+                },
+                {
+                  "id": "match",
+                  "kind": "step",
+                  "label": "Three-way match vs PO + goods receipt",
+                  "source": {
+                    "page": null,
+                    "excerpt": "2. **Three-way match check.** Accounts payable checks that the invoice matches the purchase order and the goods receipt note: same supplier, same quantities, same unit prices. 3. **Decision: does the invoice match the purchase order?** If it matches, the invoice goes to the",
+                    "document": "292-invoice-approval-policy.md"
+                  }
+                },
+                {
+                  "id": "match_decision",
+                  "kind": "decision",
+                  "label": "Matches PO?",
+                  "source": {
+                    "page": null,
+                    "excerpt": "2. **Three-way match check.** Accounts payable checks that the invoice matches the purchase order and the goods receipt note: same supplier, same quantities, same unit prices. 3. **Decision: does the invoice match the purchase order?** If it matches, the invoice goes to the",
+                    "document": "292-invoice-approval-policy.md"
+                  }
+                },
+                {
+                  "id": "reject",
+                  "kind": "step",
+                  "label": "Rejected \u2192 returned to supplier",
+                  "source": {
+                    "page": null,
+                    "excerpt": "# Invoice Approval Policy (fixture, generated for Phase 292 UAT) Document owner: Finance Operations. Applies to every supplier invoice received by the company. This is a generated test document; it contains no real supplier, person or amount.",
+                    "document": "292-invoice-approval-policy.md"
+                  }
+                },
+                {
+                  "id": "resubmit",
+                  "kind": "step",
+                  "label": "Supplier corrects & resubmits",
+                  "source": {
+                    "page": null,
+                    "excerpt": "# Invoice Approval Policy (fixture, generated for Phase 292 UAT) Document owner: Finance Operations. Applies to every supplier invoice received by the company. This is a generated test document; it contains no real supplier, person or amount.",
+                    "document": "292-invoice-approval-policy.md"
+                  }
+                },
+                {
+                  "id": "budget",
+                  "kind": "step",
+                  "label": "Budget holder approval (\u22645 working days)",
+                  "source": {
+                    "page": null,
+                    "excerpt": "# Invoice Approval Policy (fixture, generated for Phase 292 UAT) Document owner: Finance Operations. Applies to every supplier invoice received by the company. This is a generated test document; it contains no real supplier, person or amount.",
+                    "document": "292-invoice-approval-policy.md"
+                  }
+                },
+                {
+                  "id": "amount_decision",
+                  "kind": "decision",
+                  "label": "Above \u20ac10,000?",
+                  "source": {
+                    "page": null,
+                    "excerpt": "6. **Finance controller sign-off.** Any invoice above 10,000 euros also needs the finance controller's sign-off after the budget holder has approved it. 7. **Payment scheduled.** Accounts payable schedules the approved invoice for the next weekly payment run.",
+                    "document": "292-invoice-approval-policy.md"
+                  }
+                },
+                {
+                  "id": "controller",
+                  "kind": "step",
+                  "label": "Finance controller sign-off",
+                  "source": {
+                    "page": null,
+                    "excerpt": "6. **Finance controller sign-off.** Any invoice above 10,000 euros also needs the finance controller's sign-off after the budget holder has approved it. 7. **Payment scheduled.** Accounts payable schedules the approved invoice for the next weekly payment run.",
+                    "document": "292-invoice-approval-policy.md"
+                  }
+                },
+                {
+                  "id": "schedule",
+                  "kind": "step",
+                  "label": "Payment scheduled (next weekly run)",
+                  "source": {
+                    "page": null,
+                    "excerpt": "6. **Finance controller sign-off.** Any invoice above 10,000 euros also needs the finance controller's sign-off after the budget holder has approved it. 7. **Payment scheduled.** Accounts payable schedules the approved invoice for the next weekly payment run.",
+                    "document": "292-invoice-approval-policy.md"
+                  }
+                },
+                {
+                  "id": "paid",
+                  "kind": "step",
+                  "label": "Paid \u2014 Treasury releases (Thursday run)",
+                  "source": {
+                    "page": null,
+                    "excerpt": "The supplier corrects the invoice and resubmits it, and the resubmitted invoice goes back to the three-way match check. A rejected invoice is never paid. 5. **Budget holder approval.** The budget holder for the cost centre approves the invoice within five working days. 6.",
+                    "document": "292-invoice-approval-policy.md"
+                  }
+                },
+                {
+                  "id": "file",
+                  "kind": "end",
+                  "label": "Filed for audit (7 years)",
+                  "source": {
+                    "page": null,
+                    "excerpt": "3. **Decision: does the invoice match the purchase order?** If it matches, the invoice goes to the budget holder for approval. If it does not match, the invoice is rejected and returned to the supplier. 4.",
+                    "document": "292-invoice-approval-policy.md"
+                  }
+                }
+              ]
+            }
+          },
+          "caption": {
+            "lineage": null,
+            "sources": [
+              {
+                "page": null,
+                "tool": "search_documents",
+                "document": null
+              },
+              {
+                "page": null,
+                "tool": "query_documents",
+                "document": null
+              },
+              {
+                "page": null,
+                "tool": "read_document",
+                "document": null
+              }
+            ],
+            "row_count": 11,
+            "source_count": 3
+          },
+          "row_count": 11,
+          "spec_version": 1,
+          "created_at": "2026-10-24T01:27:41.606209+00:00"
+        },
+        {
+          "id": "a_lor17s3qth",
+          "thread_id": "4a7c5232-25f9-4ef0-bec0-ffd1a8f78424",
+          "user_id": "d8a54002-6a29-4b88-b918-cff2aa4a06d5",
+          "org_id": "22f9c615-0eec-440a-8804-ed4784d6f57f",
+          "run_id": "b2f898c2-fa53-44b4-a43c-d571314501e5",
+          "tool_call_id": "call_01_wyp1r9KEv23rQ2XRQdMV1611",
+          "parent_id": null,
+          "label": "comparison 1",
+          "component": "comparison",
+          "spec": {
+            "title": "Atlas vs Borealis \u2014 termination, liability, renewal",
+            "comparison": {
+              "terms": [
+                {
+                  "name": "Termination \u2014 convenience",
+                  "cells": [
+                    {
+                      "text": "90 days' written notice (either party)",
+                      "source": {
+                        "page": null,
+                        "excerpt": "Generated test document; no real party or amount. ## Termination Either party may terminate this agreement for convenience on 90 days' written notice. Either party may terminate immediately for a material breach that is not cured within 30 days of written notice.",
+                        "document": "292-atlas-msa.md"
+                      },
+                      "verdict": "m"
+                    },
+                    {
+                      "text": "30 days' written notice (either party)",
+                      "source": {
+                        "page": null,
+                        "excerpt": "## Term The agreement starts on 1 June 2024 and runs for a fixed term of two years. ## Termination Either party may terminate this agreement for convenience on 30 days' written notice. The Company may terminate immediately if Borealis becomes insolvent.",
+                        "document": "292-borealis-msa.md"
+                      },
+                      "verdict": "m"
+                    }
+                  ]
+                },
+                {
+                  "name": "Termination \u2014 for cause",
+                  "cells": [
+                    {
+                      "text": "Immediate for material breach uncured after 30 days' notice",
+                      "source": {
+                        "page": null,
+                        "excerpt": "Either party may terminate immediately for a material breach that is not cured within 30 days of written notice. ## Liability Each party's total liability under this agreement is capped at the fees paid in the 12 months before the claim.",
+                        "document": "292-atlas-msa.md"
+                      },
+                      "verdict": "m"
+                    },
+                    {
+                      "text": "Company may terminate immediately if Borealis becomes insolvent",
+                      "source": {
+                        "page": null,
+                        "excerpt": "## Termination Either party may terminate this agreement for convenience on 30 days' written notice. The Company may terminate immediately if Borealis becomes insolvent. ## Liability Borealis's total liability under this agreement is capped at 250,000 euros per year.",
+                        "document": "292-borealis-msa.md"
+                      },
+                      "verdict": "m"
+                    }
+                  ]
+                },
+                {
+                  "name": "Liability cap",
+                  "cells": [
+                    {
+                      "text": "Each party capped at fees paid in prior 12 months; cap does not apply to death, personal injury, fraud or confidentiality breach",
+                      "source": {
+                        "page": null,
+                        "excerpt": "The cap does not apply to death, personal injury, fraud or breach of confidentiality. ## Renewal The agreement renews automatically for successive one-year terms unless either party gives written notice of non-renewal at least 90 days before the end of the current term.",
+                        "document": "292-atlas-msa.md"
+                      },
+                      "verdict": "m"
+                    },
+                    {
+                      "text": "Borealis capped at \u20ac250,000/yr; Company capped at fees payable same year; neither cap applies to fraud",
+                      "source": {
+                        "page": null,
+                        "excerpt": "## Liability Borealis's total liability under this agreement is capped at 250,000 euros per year. The Company's liability is capped at the fees payable in the same year. Neither cap applies to fraud. ## Payment Invoices are payable within 45 days of receipt.",
+                        "document": "292-borealis-msa.md"
+                      },
+                      "verdict": "m"
+                    }
+                  ]
+                },
+                {
+                  "name": "Renewal",
+                  "cells": [
+                    {
+                      "text": "Auto-renews for successive 1-year terms unless 90 days' non-renewal notice; current term ends 15 Mar 2027",
+                      "source": {
+                        "page": null,
+                        "excerpt": "## Renewal The agreement renews automatically for successive one-year terms unless either party gives written notice of non-renewal at least 90 days before the end of the current term. The current term ends on 15 March 2027, so the renewal notice deadline is 15 December 2026.",
+                        "document": "292-atlas-msa.md"
+                      },
+                      "verdict": "m"
+                    },
+                    {
+                      "text": "No renewal \u2014 fixed two-year term (1 Jun 2024 \u2013 31 May 2026)",
+                      "source": {
+                        "page": null,
+                        "excerpt": "Generated test document; no real party or amount. ## Term The agreement starts on 1 June 2024 and runs for a fixed term of two years. ## Termination Either party may terminate this agreement for convenience on 30 days' written notice.",
+                        "document": "292-borealis-msa.md"
+                      },
+                      "verdict": "m"
+                    }
+                  ]
+                }
+              ],
+              "options": [
+                "Atlas Logistics MSA",
+                "Borealis Freight MSA"
+              ]
+            }
+          },
+          "caption": {
+            "lineage": null,
+            "sources": [
+              {
+                "page": null,
+                "tool": "search_documents",
+                "document": null
+              },
+              {
+                "page": null,
+                "tool": "query_documents",
+                "document": null
+              },
+              {
+                "page": null,
+                "tool": "read_document",
+                "document": null
+              }
+            ],
+            "row_count": 4,
+            "source_count": 3
+          },
+          "row_count": 4,
+          "spec_version": 1,
+          "created_at": "2026-10-24T01:27:41.668826+00:00"
+        },
+        {
+          "id": "a_mww1xlu412",
+          "thread_id": "4a7c5232-25f9-4ef0-bec0-ffd1a8f78424",
+          "user_id": "d8a54002-6a29-4b88-b918-cff2aa4a06d5",
+          "org_id": "22f9c615-0eec-440a-8804-ed4784d6f57f",
+          "run_id": "b2f898c2-fa53-44b4-a43c-d571314501e5",
+          "tool_call_id": "call_02_AOQp843Ddm8llkxU54Hf9348",
+          "parent_id": null,
+          "label": "timeline 1",
+          "component": "timeline",
+          "spec": {
+            "title": "Atlas Logistics MSA \u2014 history & upcoming deadlines",
+            "timeline": {
+              "events": [
+                {
+                  "date": "2023-03-14",
+                  "title": "MSA signed",
+                  "detail": "Three-year master services agreement signed",
+                  "source": {
+                    "page": null,
+                    "excerpt": "## Upcoming deadlines and milestones - **15 December 2026 - Renewal notice deadline.** Last day to give notice of non-renewal. - **15 March 2027 - End of the current term.** The agreement renews for one year unless notice was given.",
+                    "document": "292-atlas-msa.md"
+                  },
+                  "category": null,
+                  "deadline": false
+                },
+                {
+                  "date": "2023-04-01",
+                  "title": "Services start",
+                  "detail": "First shipments under the agreement",
+                  "source": {
+                    "page": null,
+                    "excerpt": "## Upcoming deadlines and milestones - **15 December 2026 - Renewal notice deadline.** Last day to give notice of non-renewal. - **15 March 2027 - End of the current term.** The agreement renews for one year unless notice was given.",
+                    "document": "292-atlas-msa.md"
+                  },
+                  "category": null,
+                  "deadline": false
+                },
+                {
+                  "date": "2024-02-09",
+                  "title": "Amendment 1",
+                  "detail": "Prices +3.5%; fuel surcharge folded into base rate",
+                  "source": {
+                    "page": null,
+                    "excerpt": "- **1 April 2026 - Annual price uplift.** Prices rose by 3.1 percent, within the 4 percent cap. ## Upcoming deadlines and milestones - **15 December 2026 - Renewal notice deadline.** Last day to give notice of non-renewal.",
+                    "document": "292-atlas-msa.md"
+                  },
+                  "category": null,
+                  "deadline": false
+                },
+                {
+                  "date": "2024-11",
+                  "title": "SLA breach notice",
+                  "detail": "Atlas missed three delivery windows in Oct 2024",
+                  "source": {
+                    "page": null,
+                    "excerpt": "## Upcoming deadlines and milestones - **15 December 2026 - Renewal notice deadline.** Last day to give notice of non-renewal. - **15 March 2027 - End of the current term.** The agreement renews for one year unless notice was given.",
+                    "document": "292-atlas-msa.md"
+                  },
+                  "category": null,
+                  "deadline": false
+                },
+                {
+                  "date": "2025-01-15",
+                  "title": "Service credits applied",
+                  "detail": "\u20ac18,400 credited to the January invoice",
+                  "source": {
+                    "page": null,
+                    "excerpt": "anuary 2025 - Service credits applied.** Credits of 18,400 euros were applied to the January invoice. - **1 April 2026 - Annual price uplift.** Prices rose by 3.1 percent, within the 4 percent cap.",
+                    "document": "292-atlas-msa.md"
+                  },
+                  "category": null,
+                  "deadline": false
+                },
+                {
+                  "date": "2026-04-01",
+                  "title": "Annual price uplift",
+                  "detail": "Prices +3.1%, within the 4% cap",
+                  "source": {
+                    "page": null,
+                    "excerpt": "- **1 April 2026 - Annual price uplift.** Prices rose by 3.1 percent, within the 4 percent cap. ## Upcoming deadlines and milestones - **15 December 2026 - Renewal notice deadline.** Last day to give notice of non-renewal.",
+                    "document": "292-atlas-msa.md"
+                  },
+                  "category": null,
+                  "deadline": false
+                },
+                {
+                  "date": "2026-12-15",
+                  "title": "Renewal notice deadline",
+                  "detail": "Last day to give notice of non-renewal",
+                  "source": {
+                    "page": null,
+                    "excerpt": "## Upcoming deadlines and milestones - **15 December 2026 - Renewal notice deadline.** Last day to give notice of non-renewal. - **15 March 2027 - End of the current term.** The agreement renews for one year unless notice was given.",
+                    "document": "292-atlas-msa.md"
+                  },
+                  "category": null,
+                  "deadline": true
+                },
+                {
+                  "date": "2027-03-15",
+                  "title": "End of current term",
+                  "detail": "Renews for one year unless notice was given",
+                  "source": {
+                    "page": null,
+                    "excerpt": "## Upcoming deadlines and milestones - **15 December 2026 - Renewal notice deadline.** Last day to give notice of non-renewal. - **15 March 2027 - End of the current term.** The agreement renews for one year unless notice was given.",
+                    "document": "292-atlas-msa.md"
+                  },
+                  "category": null,
+                  "deadline": true
+                }
+              ]
+            }
+          },
+          "caption": {
+            "lineage": null,
+            "sources": [
+              {
+                "page": null,
+                "tool": "search_documents",
+                "document": null
+              },
+              {
+                "page": null,
+                "tool": "query_documents",
+                "document": null
+              },
+              {
+                "page": null,
+                "tool": "read_document",
+                "document": null
+              }
+            ],
+            "row_count": 8,
+            "source_count": 3
+          },
+          "row_count": 8,
+          "spec_version": 1,
+          "created_at": "2026-10-24T01:27:41.685936+00:00"
+        }
+      ]
+    }
+  ],
+  "expected_observables": [
+    {
+      "artifact": "a_bjaf7cvdxj",
+      "label": "diagram 1",
+      "caption_count_segment": "\u00b7 11 steps \u00b7 12 links",
+      "node_labels": [
+        "Invoice received \u2014 AP logs it same day",
+        "Three-way match vs PO + goods receipt",
+        "Matches PO?",
+        "Rejected \u2192 returned to supplier",
+        "Supplier corrects & resubmits",
+        "Budget holder approval (\u22645 working days)",
+        "Above \u20ac10,000?",
+        "Finance controller sign-off",
+        "Payment scheduled (next weekly run)",
+        "Paid \u2014 Treasury releases (Thursday run)",
+        "Filed for audit (7 years)"
+      ],
+      "label_word_coverage_in_kb_document": {
+        "Invoice received \u2014 AP logs it same day": 1.0,
+        "Three-way match vs PO + goods receipt": 1.0,
+        "Matches PO?": 1.0,
+        "Rejected \u2192 returned to supplier": 1.0,
+        "Supplier corrects & resubmits": 1.0,
+        "Budget holder approval (\u22645 working days)": 1.0,
+        "Above \u20ac10,000?": 1.0,
+        "Finance controller sign-off": 1.0,
+        "Payment scheduled (next weekly run)": 1.0,
+        "Paid \u2014 Treasury releases (Thursday run)": 1.0,
+        "Filed for audit (7 years)": 1.0
+      },
+      "degree_per_node": {
+        "Invoice received \u2014 AP logs it same day": 1,
+        "Three-way match vs PO + goods receipt": 3,
+        "Matches PO?": 3,
+        "Rejected \u2192 returned to supplier": 2,
+        "Supplier corrects & resubmits": 2,
+        "Budget holder approval (\u22645 working days)": 2,
+        "Above \u20ac10,000?": 3,
+        "Finance controller sign-off": 2,
+        "Payment scheduled (next weekly run)": 3,
+        "Paid \u2014 Treasury releases (Thursday run)": 2,
+        "Filed for audit (7 years)": 1
+      },
+      "back_edges_dfs_excluding_self_loops": [
+        "resubmit->match"
+      ],
+      "self_loops": [],
+      "sourced_nodes": [
+        {
+          "node": "receive",
+          "document": "292-invoice-approval-policy.md",
+          "excerpt_in_retrieved_text": false,
+          "excerpt_in_kb_document": true
+        },
+        {
+          "node": "match",
+          "document": "292-invoice-approval-policy.md",
+          "excerpt_in_retrieved_text": false,
+          "excerpt_in_kb_document": true
+        },
+        {
+          "node": "match_decision",
+          "document": "292-invoice-approval-policy.md",
+          "excerpt_in_retrieved_text": false,
+          "excerpt_in_kb_document": true
+        },
+        {
+          "node": "reject",
+          "document": "292-invoice-approval-policy.md",
+          "excerpt_in_retrieved_text": false,
+          "excerpt_in_kb_document": true
+        },
+        {
+          "node": "resubmit",
+          "document": "292-invoice-approval-policy.md",
+          "excerpt_in_retrieved_text": false,
+          "excerpt_in_kb_document": true
+        },
+        {
+          "node": "budget",
+          "document": "292-invoice-approval-policy.md",
+          "excerpt_in_retrieved_text": false,
+          "excerpt_in_kb_document": true
+        },
+        {
+          "node": "amount_decision",
+          "document": "292-invoice-approval-policy.md",
+          "excerpt_in_retrieved_text": false,
+          "excerpt_in_kb_document": true
+        },
+        {
+          "node": "controller",
+          "document": "292-invoice-approval-policy.md",
+          "excerpt_in_retrieved_text": false,
+          "excerpt_in_kb_document": true
+        },
+        {
+          "node": "schedule",
+          "document": "292-invoice-approval-policy.md",
+          "excerpt_in_retrieved_text": false,
+          "excerpt_in_kb_document": true
+        },
+        {
+          "node": "paid",
+          "document": "292-invoice-approval-policy.md",
+          "excerpt_in_retrieved_text": false,
+          "excerpt_in_kb_document": true
+        },
+        {
+          "node": "file",
+          "document": "292-invoice-approval-policy.md",
+          "excerpt_in_retrieved_text": false,
+          "excerpt_in_kb_document": true
+        }
+      ]
+    },
+    {
+      "artifact": "a_lor17s3qth",
+      "label": "comparison 1",
+      "options": [
+        "Atlas Logistics MSA",
+        "Borealis Freight MSA"
+      ],
+      "terms": [
+        "Termination \u2014 convenience",
+        "Termination \u2014 for cause",
+        "Liability cap",
+        "Renewal"
+      ],
+      "cells_total": 8,
+      "not_stated_cells": 0,
+      "identical_terms_N": 0,
+      "identical_terms": [],
+      "second_caption_line": "Verdicts are the agent's reading. Hover or focus a cell for its clause.",
+      "sourced_cells": [
+        {
+          "document": "292-atlas-msa.md",
+          "excerpt_in_retrieved_text": false,
+          "excerpt_in_kb_document": true
+        },
+        {
+          "document": "292-borealis-msa.md",
+          "excerpt_in_retrieved_text": false,
+          "excerpt_in_kb_document": true
+        },
+        {
+          "document": "292-atlas-msa.md",
+          "excerpt_in_retrieved_text": false,
+          "excerpt_in_kb_document": true
+        },
+        {
+          "document": "292-borealis-msa.md",
+          "excerpt_in_retrieved_text": false,
+          "excerpt_in_kb_document": true
+        },
+        {
+          "document": "292-atlas-msa.md",
+          "excerpt_in_retrieved_text": false,
+          "excerpt_in_kb_document": true
+        },
+        {
+          "document": "292-borealis-msa.md",
+          "excerpt_in_retrieved_text": false,
+          "excerpt_in_kb_document": true
+        },
+        {
+          "document": "292-atlas-msa.md",
+          "excerpt_in_retrieved_text": false,
+          "excerpt_in_kb_document": true
+        },
+        {
+          "document": "292-borealis-msa.md",
+          "excerpt_in_retrieved_text": false,
+          "excerpt_in_kb_document": true
+        }
+      ]
+    },
+    {
+      "artifact": "a_mww1xlu412",
+      "label": "timeline 1",
+      "today_row_text_date": "24 Oct 2026",
+      "rail_rows_expected": [
+        "FILLED 14 Mar 2023 \u00b7 MSA signed",
+        "FILLED 1 Apr 2023 \u00b7 Services start",
+        "GAP 10 months",
+        "FILLED 9 Feb 2024 \u00b7 Amendment 1",
+        "GAP 9 months",
+        "FILLED Nov 2024 \u00b7 SLA breach notice",
+        "FILLED 15 Jan 2025 \u00b7 Service credits applied",
+        "GAP 15 months",
+        "FILLED 1 Apr 2026 \u00b7 Annual price uplift",
+        "TODAY",
+        "HOLLOW 15 Dec 2026 \u00b7 Renewal notice deadline \u00b7 deadline pill: in 52 days",
+        "HOLLOW 15 Mar 2027 \u00b7 End of current term \u00b7 deadline pill: in 142 days"
+      ],
+      "events": 8
+    }
+  ]
+}

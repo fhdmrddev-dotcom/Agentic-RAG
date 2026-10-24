@@ -29,6 +29,7 @@ Two pure-ish helpers, and the only two places the chat history touches artifacts
 """
 from __future__ import annotations
 
+import json
 import logging
 import re
 from typing import Any
@@ -72,25 +73,70 @@ def _placeholder(rows: Any, result: Any) -> str:
     return f"{ROWS_PLACEHOLDER_NOT_STORED}, {n} rows>"
 
 
+# Phase 292 (D-11, Pitfall 2): the three typed encodings are redacted the same way. Beyond size, a
+# replayed encoding would carry `source` numbers that mean nothing against a later turn's manifest.
+# Each maps to (the list it counts, the closed item word the placeholder names).
+_ENCODED_KEYS: dict[str, tuple[str, str]] = {
+    "diagram": ("nodes", "steps"),
+    "comparison": ("terms", "terms"),
+    "timeline": ("events", "events"),
+}
+
+
+def _item_count(value: Any, list_key: str) -> int | None:
+    if isinstance(value, str):  # a coerce-tier model may have stringified the whole object
+        try:
+            value = json.loads(value)
+        except (ValueError, TypeError):
+            return None
+    items = value.get(list_key) if isinstance(value, dict) else None
+    if isinstance(items, str):
+        try:
+            items = json.loads(items)
+        except (ValueError, TypeError):
+            return None
+    return len(items) if isinstance(items, list) else None
+
+
+def _encoded_placeholder(key: str, value: Any, result: Any) -> str:
+    """``<stored in artifact a_x, diagram of 8 steps>`` / ``<not stored: refused, …>`` (273 constants)."""
+    list_key, word = _ENCODED_KEYS[key]
+    n = _item_count(value, list_key)
+    what = f"{key} of {n} {word}" if n is not None else key
+    art_id = _artifact_id(result)
+    if art_id:
+        return f"{ROWS_PLACEHOLDER_STORED}{art_id}, {what}>"
+    if is_refusal_result(result):
+        return f"{ROWS_PLACEHOLDER_NOT_STORED}: refused, {what}>"
+    return f"{ROWS_PLACEHOLDER_NOT_STORED}, {what}>"
+
+
 def redact_artifact_args(tool_calls: list[dict]) -> list[dict]:
     """Return ``tool_calls`` with every ``show_artifact`` call's ``args.rows`` replaced.
 
+    Phase 292: ``args.diagram`` / ``args.comparison`` / ``args.timeline`` are replaced too.
+
     Pure: the input list and its dicts are never mutated. A non-``show_artifact`` entry, or a
-    by-reference call whose ``rows`` is absent or None, is returned as the SAME object. Every
-    other key — the other args, ``result``, ``thought_signature`` — is carried through untouched.
+    by-reference call whose ``rows`` and encodings are absent or None, is returned as the SAME
+    object. Every other key — the other args, ``result``, ``thought_signature`` — is carried
+    through untouched.
     """
     out: list[dict] = []
     for tc in tool_calls:
         args = tc.get("args") if isinstance(tc, dict) else None
-        if (
-            not isinstance(tc, dict)
-            or tc.get("name") != TOOL_NAME
-            or not isinstance(args, dict)
-            or args.get("rows") is None
-        ):
+        if not isinstance(tc, dict) or tc.get("name") != TOOL_NAME or not isinstance(args, dict):
             out.append(tc)
             continue
-        out.append({**tc, "args": {**args, "rows": _placeholder(args["rows"], tc.get("result"))}})
+        new = dict(args)
+        changed = False
+        if args.get("rows") is not None:
+            new["rows"] = _placeholder(args["rows"], tc.get("result"))
+            changed = True
+        for key in _ENCODED_KEYS:
+            if args.get(key) is not None:
+                new[key] = _encoded_placeholder(key, args[key], tc.get("result"))
+                changed = True
+        out.append({**tc, "args": new} if changed else tc)
     return out
 
 

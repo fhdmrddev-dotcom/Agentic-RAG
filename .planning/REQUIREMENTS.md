@@ -24,7 +24,7 @@ Seeds folded at intake: SEED-232, SEED-195, SEED-014, SEED-084, SEED-164, SEED-0
 ### See (VIS)
 
 - [ ] **VIS-01**: A multi-agent workflow can be viewed as a truthful picture of orchestrator, workers and judge, with no edges the schema does not have. Sketch first (G-2). — `SEED-086`
-- [ ] **VIS-02**: The agent can show more artifact types beyond chart, table and metric; the new set is chosen at sketch time from a closed registry only. — `SEED-337`
+- [x] **VIS-02**: The agent can show more artifact types beyond chart, table and metric; the new set is chosen at sketch time from a closed registry only. — `SEED-337`
 - [x] **VIS-03**: A finished run has one read-only page, with export, showing what it did and on what evidence (definition version, phase log, verdicts, cited sources). — `SEED-348`
 - [ ] **VIS-04**: The workflow library card matches its approved sketch: labelled phase chips, and the description no longer dominates. — `SEED-155`
 
@@ -81,7 +81,7 @@ Seeds folded at intake: SEED-232, SEED-195, SEED-014, SEED-084, SEED-164, SEED-0
 | VIS-04 | Phase 290 | Pending |
 | VIS-01 | Phase 290 | Pending |
 | AUTH-02 | Phase 291 | Complete (2026-10-24) |
-| VIS-02 | Phase 292 | Pending |
+| VIS-02 | Phase 292 | Complete |
 | START-02 | Phase 293 | Pending |
 | START-04 | Phase 293 | Pending |
 | REG-06 | Phase 293 | Pending |

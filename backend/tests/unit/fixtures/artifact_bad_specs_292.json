@@ -1,0 +1,3174 @@
+{
+  "about": "Phase 292 parity fixture (292-01 writes it; 292-03's artifactParity292.fence.test.ts reads it). Every `bad` case must be REFUSED by BOTH the backend validate_args (test_292_artifact_parity.py) AND the frontend guard parseArtifactRecord after the lift below; every `good` case must be ACCEPTED by both. Rules only the backend refuses (a 1-step or 0-link diagram, from_artifact, a history placeholder echo, a null-filled call, a source number < 1) are tested in test_292_artifact_models.py and are never fixture cases. Each case is written the way the model sends it to show_artifact. THE LIFT (args -> stored ArtifactRecord) that the frontend test applies, mirroring the server: `kind` and `verdict` lower-cased; `kind` absent -> \"step\"; an optional string (edge label, cell text, event detail, event category) absent or blank after trimming -> null; `deadline` absent -> false; an integer `source` n -> {\"document\": \"fixture.pdf\", \"page\": null, \"excerpt\": \"Fixture excerpt.\"}, absent -> null, any other value copied as-is; timeline events are copied in the order given (good cases are written already sorted; the server sorts, the guard does not); row_count = the item count (nodes / terms / events); caption = {row_count, sources: [], source_count: 0, lineage: null}; label = \"<component> 1\"; spec = {title, <component>: <the lifted encoding>}. A JSON object {\"$repeat\": s, \"times\": n} anywhere inside a case stands for s repeated n times (the v1 convention); this file does not use it. TWO MORE SECTIONS (292-REVIEW CR-01): `stored_sources` holds stored per-element source objects ({document, page, excerpt}); each must be accepted by the backend StoredSource model and by the frontend guard (on a diagram node) exactly when its `ok` is true. `document_names` holds a raw citation filename and the `document` the server stores for it (clean_document_name: NUL stripped, trimmed, cut to 200 UTF-16 units without splitting a surrogate pair); the backend asserts the cleaning and the frontend asserts the stored value passes its guard. ONE MORE SECTION (292-REVIEW WR-02, revised at the G4 live re-check): `refused_then_tolerated` (name kept for history) holds cases BOTH stacks ACCEPT and NEUTRALISE: the backend validate_args drops a q (not stated) cell's source before storing, and the frontend guard drops it from a stored row; every other cell keeps its source. A refusal was tried first and made gpt-5.4-mini abandon the comparison instead of retrying.",
+  "bad": [
+    {
+      "name": "diagram with 26 steps",
+      "component": "diagram",
+      "title": "Invoice approval",
+      "diagram": {
+        "nodes": [
+          {
+            "id": "s1",
+            "label": "Step 1"
+          },
+          {
+            "id": "s2",
+            "label": "Step 2"
+          },
+          {
+            "id": "s3",
+            "label": "Step 3"
+          },
+          {
+            "id": "s4",
+            "label": "Step 4"
+          },
+          {
+            "id": "s5",
+            "label": "Step 5"
+          },
+          {
+            "id": "s6",
+            "label": "Step 6"
+          },
+          {
+            "id": "s7",
+            "label": "Step 7"
+          },
+          {
+            "id": "s8",
+            "label": "Step 8"
+          },
+          {
+            "id": "s9",
+            "label": "Step 9"
+          },
+          {
+            "id": "s10",
+            "label": "Step 10"
+          },
+          {
+            "id": "s11",
+            "label": "Step 11"
+          },
+          {
+            "id": "s12",
+            "label": "Step 12"
+          },
+          {
+            "id": "s13",
+            "label": "Step 13"
+          },
+          {
+            "id": "s14",
+            "label": "Step 14"
+          },
+          {
+            "id": "s15",
+            "label": "Step 15"
+          },
+          {
+            "id": "s16",
+            "label": "Step 16"
+          },
+          {
+            "id": "s17",
+            "label": "Step 17"
+          },
+          {
+            "id": "s18",
+            "label": "Step 18"
+          },
+          {
+            "id": "s19",
+            "label": "Step 19"
+          },
+          {
+            "id": "s20",
+            "label": "Step 20"
+          },
+          {
+            "id": "s21",
+            "label": "Step 21"
+          },
+          {
+            "id": "s22",
+            "label": "Step 22"
+          },
+          {
+            "id": "s23",
+            "label": "Step 23"
+          },
+          {
+            "id": "s24",
+            "label": "Step 24"
+          },
+          {
+            "id": "s25",
+            "label": "Step 25"
+          },
+          {
+            "id": "s26",
+            "label": "Step 26"
+          }
+        ],
+        "edges": [
+          {
+            "from": "s1",
+            "to": "s2"
+          },
+          {
+            "from": "s2",
+            "to": "s3"
+          },
+          {
+            "from": "s3",
+            "to": "s4"
+          },
+          {
+            "from": "s4",
+            "to": "s5"
+          },
+          {
+            "from": "s5",
+            "to": "s6"
+          },
+          {
+            "from": "s6",
+            "to": "s7"
+          },
+          {
+            "from": "s7",
+            "to": "s8"
+          },
+          {
+            "from": "s8",
+            "to": "s9"
+          },
+          {
+            "from": "s9",
+            "to": "s10"
+          },
+          {
+            "from": "s10",
+            "to": "s11"
+          },
+          {
+            "from": "s11",
+            "to": "s12"
+          },
+          {
+            "from": "s12",
+            "to": "s13"
+          },
+          {
+            "from": "s13",
+            "to": "s14"
+          },
+          {
+            "from": "s14",
+            "to": "s15"
+          },
+          {
+            "from": "s15",
+            "to": "s16"
+          },
+          {
+            "from": "s16",
+            "to": "s17"
+          },
+          {
+            "from": "s17",
+            "to": "s18"
+          },
+          {
+            "from": "s18",
+            "to": "s19"
+          },
+          {
+            "from": "s19",
+            "to": "s20"
+          },
+          {
+            "from": "s20",
+            "to": "s21"
+          },
+          {
+            "from": "s21",
+            "to": "s22"
+          },
+          {
+            "from": "s22",
+            "to": "s23"
+          },
+          {
+            "from": "s23",
+            "to": "s24"
+          },
+          {
+            "from": "s24",
+            "to": "s25"
+          },
+          {
+            "from": "s25",
+            "to": "s26"
+          }
+        ]
+      }
+    },
+    {
+      "name": "diagram with 41 links",
+      "component": "diagram",
+      "title": "Invoice approval",
+      "diagram": {
+        "nodes": [
+          {
+            "id": "n0",
+            "label": "Step 0"
+          },
+          {
+            "id": "n1",
+            "label": "Step 1"
+          },
+          {
+            "id": "n2",
+            "label": "Step 2"
+          },
+          {
+            "id": "n3",
+            "label": "Step 3"
+          },
+          {
+            "id": "n4",
+            "label": "Step 4"
+          },
+          {
+            "id": "n5",
+            "label": "Step 5"
+          },
+          {
+            "id": "n6",
+            "label": "Step 6"
+          },
+          {
+            "id": "n7",
+            "label": "Step 7"
+          },
+          {
+            "id": "n8",
+            "label": "Step 8"
+          },
+          {
+            "id": "n9",
+            "label": "Step 9"
+          }
+        ],
+        "edges": [
+          {
+            "from": "n0",
+            "to": "n1"
+          },
+          {
+            "from": "n0",
+            "to": "n2"
+          },
+          {
+            "from": "n0",
+            "to": "n3"
+          },
+          {
+            "from": "n0",
+            "to": "n4"
+          },
+          {
+            "from": "n0",
+            "to": "n5"
+          },
+          {
+            "from": "n0",
+            "to": "n6"
+          },
+          {
+            "from": "n0",
+            "to": "n7"
+          },
+          {
+            "from": "n0",
+            "to": "n8"
+          },
+          {
+            "from": "n0",
+            "to": "n9"
+          },
+          {
+            "from": "n1",
+            "to": "n2"
+          },
+          {
+            "from": "n1",
+            "to": "n3"
+          },
+          {
+            "from": "n1",
+            "to": "n4"
+          },
+          {
+            "from": "n1",
+            "to": "n5"
+          },
+          {
+            "from": "n1",
+            "to": "n6"
+          },
+          {
+            "from": "n1",
+            "to": "n7"
+          },
+          {
+            "from": "n1",
+            "to": "n8"
+          },
+          {
+            "from": "n1",
+            "to": "n9"
+          },
+          {
+            "from": "n2",
+            "to": "n3"
+          },
+          {
+            "from": "n2",
+            "to": "n4"
+          },
+          {
+            "from": "n2",
+            "to": "n5"
+          },
+          {
+            "from": "n2",
+            "to": "n6"
+          },
+          {
+            "from": "n2",
+            "to": "n7"
+          },
+          {
+            "from": "n2",
+            "to": "n8"
+          },
+          {
+            "from": "n2",
+            "to": "n9"
+          },
+          {
+            "from": "n3",
+            "to": "n4"
+          },
+          {
+            "from": "n3",
+            "to": "n5"
+          },
+          {
+            "from": "n3",
+            "to": "n6"
+          },
+          {
+            "from": "n3",
+            "to": "n7"
+          },
+          {
+            "from": "n3",
+            "to": "n8"
+          },
+          {
+            "from": "n3",
+            "to": "n9"
+          },
+          {
+            "from": "n4",
+            "to": "n5"
+          },
+          {
+            "from": "n4",
+            "to": "n6"
+          },
+          {
+            "from": "n4",
+            "to": "n7"
+          },
+          {
+            "from": "n4",
+            "to": "n8"
+          },
+          {
+            "from": "n4",
+            "to": "n9"
+          },
+          {
+            "from": "n5",
+            "to": "n6"
+          },
+          {
+            "from": "n5",
+            "to": "n7"
+          },
+          {
+            "from": "n5",
+            "to": "n8"
+          },
+          {
+            "from": "n5",
+            "to": "n9"
+          },
+          {
+            "from": "n6",
+            "to": "n7"
+          },
+          {
+            "from": "n6",
+            "to": "n8"
+          }
+        ]
+      }
+    },
+    {
+      "name": "link to a step that is not in it",
+      "component": "diagram",
+      "title": "Invoice approval",
+      "diagram": {
+        "nodes": [
+          {
+            "id": "a",
+            "label": "Request"
+          },
+          {
+            "id": "b",
+            "label": "Approve"
+          }
+        ],
+        "edges": [
+          {
+            "from": "a",
+            "to": "zz"
+          }
+        ]
+      }
+    },
+    {
+      "name": "two steps share an id",
+      "component": "diagram",
+      "title": "Invoice approval",
+      "diagram": {
+        "nodes": [
+          {
+            "id": "a",
+            "label": "Request"
+          },
+          {
+            "id": "a",
+            "label": "Approve"
+          }
+        ],
+        "edges": [
+          {
+            "from": "a",
+            "to": "a",
+            "label": "loop"
+          }
+        ]
+      }
+    },
+    {
+      "name": "two links join the same two steps",
+      "component": "diagram",
+      "title": "Invoice approval",
+      "diagram": {
+        "nodes": [
+          {
+            "id": "a",
+            "label": "Request"
+          },
+          {
+            "id": "b",
+            "label": "Approve"
+          }
+        ],
+        "edges": [
+          {
+            "from": "a",
+            "to": "b",
+            "label": "first"
+          },
+          {
+            "from": "a",
+            "to": "b",
+            "label": "second"
+          }
+        ]
+      }
+    },
+    {
+      "name": "unlabelled self-loop",
+      "component": "diagram",
+      "title": "Invoice approval",
+      "diagram": {
+        "nodes": [
+          {
+            "id": "a",
+            "label": "Request"
+          },
+          {
+            "id": "b",
+            "label": "Approve"
+          }
+        ],
+        "edges": [
+          {
+            "from": "a",
+            "to": "b"
+          },
+          {
+            "from": "b",
+            "to": "b"
+          }
+        ]
+      }
+    },
+    {
+      "name": "node kind actor",
+      "component": "diagram",
+      "title": "Invoice approval",
+      "diagram": {
+        "nodes": [
+          {
+            "id": "a",
+            "label": "Requester",
+            "kind": "actor"
+          },
+          {
+            "id": "b",
+            "label": "Approve"
+          }
+        ],
+        "edges": [
+          {
+            "from": "a",
+            "to": "b"
+          }
+        ]
+      }
+    },
+    {
+      "name": "node id with a space",
+      "component": "diagram",
+      "title": "Invoice approval",
+      "diagram": {
+        "nodes": [
+          {
+            "id": "a b",
+            "label": "Request"
+          },
+          {
+            "id": "c",
+            "label": "Approve"
+          }
+        ],
+        "edges": [
+          {
+            "from": "a b",
+            "to": "c"
+          }
+        ]
+      }
+    },
+    {
+      "name": "step name of 49 UTF-16 units (emoji at the boundary)",
+      "component": "diagram",
+      "title": "Invoice approval",
+      "diagram": {
+        "nodes": [
+          {
+            "id": "a",
+            "label": "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA😀"
+          },
+          {
+            "id": "b",
+            "label": "Approve"
+          }
+        ],
+        "edges": [
+          {
+            "from": "a",
+            "to": "b"
+          }
+        ]
+      }
+    },
+    {
+      "name": "link label over 24 characters",
+      "component": "diagram",
+      "title": "Invoice approval",
+      "diagram": {
+        "nodes": [
+          {
+            "id": "a",
+            "label": "Request"
+          },
+          {
+            "id": "b",
+            "label": "Approve"
+          }
+        ],
+        "edges": [
+          {
+            "from": "a",
+            "to": "b",
+            "label": "LLLLLLLLLLLLLLLLLLLLLLLLL"
+          }
+        ]
+      }
+    },
+    {
+      "name": "node source is a boolean",
+      "component": "diagram",
+      "title": "Invoice approval",
+      "diagram": {
+        "nodes": [
+          {
+            "id": "a",
+            "label": "Request",
+            "source": true
+          },
+          {
+            "id": "b",
+            "label": "Approve"
+          }
+        ],
+        "edges": [
+          {
+            "from": "a",
+            "to": "b"
+          }
+        ]
+      }
+    },
+    {
+      "name": "node source is free text",
+      "component": "diagram",
+      "title": "Invoice approval",
+      "diagram": {
+        "nodes": [
+          {
+            "id": "a",
+            "label": "Request",
+            "source": "Policy.pdf"
+          },
+          {
+            "id": "b",
+            "label": "Approve"
+          }
+        ],
+        "edges": [
+          {
+            "from": "a",
+            "to": "b"
+          }
+        ]
+      }
+    },
+    {
+      "name": "comparison with 1 option",
+      "component": "comparison",
+      "title": "Freight contracts, key terms",
+      "comparison": {
+        "options": [
+          "Atlas"
+        ],
+        "terms": [
+          {
+            "name": "Term",
+            "cells": [
+              {
+                "verdict": "y"
+              }
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "name": "comparison with 6 options",
+      "component": "comparison",
+      "title": "Freight contracts, key terms",
+      "comparison": {
+        "options": [
+          "Option 1",
+          "Option 2",
+          "Option 3",
+          "Option 4",
+          "Option 5",
+          "Option 6"
+        ],
+        "terms": [
+          {
+            "name": "Term",
+            "cells": [
+              {
+                "verdict": "y"
+              },
+              {
+                "verdict": "y"
+              },
+              {
+                "verdict": "y"
+              },
+              {
+                "verdict": "y"
+              },
+              {
+                "verdict": "y"
+              },
+              {
+                "verdict": "y"
+              }
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "name": "two options share a name",
+      "component": "comparison",
+      "title": "Freight contracts, key terms",
+      "comparison": {
+        "options": [
+          "Atlas",
+          "Atlas"
+        ],
+        "terms": [
+          {
+            "name": "Term",
+            "cells": [
+              {
+                "verdict": "y"
+              },
+              {
+                "verdict": "n"
+              }
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "name": "comparison with 21 terms",
+      "component": "comparison",
+      "title": "Freight contracts, key terms",
+      "comparison": {
+        "options": [
+          "Atlas",
+          "Northwind"
+        ],
+        "terms": [
+          {
+            "name": "Term 1",
+            "cells": [
+              {
+                "verdict": "y"
+              },
+              {
+                "verdict": "y"
+              }
+            ]
+          },
+          {
+            "name": "Term 2",
+            "cells": [
+              {
+                "verdict": "y"
+              },
+              {
+                "verdict": "y"
+              }
+            ]
+          },
+          {
+            "name": "Term 3",
+            "cells": [
+              {
+                "verdict": "y"
+              },
+              {
+                "verdict": "y"
+              }
+            ]
+          },
+          {
+            "name": "Term 4",
+            "cells": [
+              {
+                "verdict": "y"
+              },
+              {
+                "verdict": "y"
+              }
+            ]
+          },
+          {
+            "name": "Term 5",
+            "cells": [
+              {
+                "verdict": "y"
+              },
+              {
+                "verdict": "y"
+              }
+            ]
+          },
+          {
+            "name": "Term 6",
+            "cells": [
+              {
+                "verdict": "y"
+              },
+              {
+                "verdict": "y"
+              }
+            ]
+          },
+          {
+            "name": "Term 7",
+            "cells": [
+              {
+                "verdict": "y"
+              },
+              {
+                "verdict": "y"
+              }
+            ]
+          },
+          {
+            "name": "Term 8",
+            "cells": [
+              {
+                "verdict": "y"
+              },
+              {
+                "verdict": "y"
+              }
+            ]
+          },
+          {
+            "name": "Term 9",
+            "cells": [
+              {
+                "verdict": "y"
+              },
+              {
+                "verdict": "y"
+              }
+            ]
+          },
+          {
+            "name": "Term 10",
+            "cells": [
+              {
+                "verdict": "y"
+              },
+              {
+                "verdict": "y"
+              }
+            ]
+          },
+          {
+            "name": "Term 11",
+            "cells": [
+              {
+                "verdict": "y"
+              },
+              {
+                "verdict": "y"
+              }
+            ]
+          },
+          {
+            "name": "Term 12",
+            "cells": [
+              {
+                "verdict": "y"
+              },
+              {
+                "verdict": "y"
+              }
+            ]
+          },
+          {
+            "name": "Term 13",
+            "cells": [
+              {
+                "verdict": "y"
+              },
+              {
+                "verdict": "y"
+              }
+            ]
+          },
+          {
+            "name": "Term 14",
+            "cells": [
+              {
+                "verdict": "y"
+              },
+              {
+                "verdict": "y"
+              }
+            ]
+          },
+          {
+            "name": "Term 15",
+            "cells": [
+              {
+                "verdict": "y"
+              },
+              {
+                "verdict": "y"
+              }
+            ]
+          },
+          {
+            "name": "Term 16",
+            "cells": [
+              {
+                "verdict": "y"
+              },
+              {
+                "verdict": "y"
+              }
+            ]
+          },
+          {
+            "name": "Term 17",
+            "cells": [
+              {
+                "verdict": "y"
+              },
+              {
+                "verdict": "y"
+              }
+            ]
+          },
+          {
+            "name": "Term 18",
+            "cells": [
+              {
+                "verdict": "y"
+              },
+              {
+                "verdict": "y"
+              }
+            ]
+          },
+          {
+            "name": "Term 19",
+            "cells": [
+              {
+                "verdict": "y"
+              },
+              {
+                "verdict": "y"
+              }
+            ]
+          },
+          {
+            "name": "Term 20",
+            "cells": [
+              {
+                "verdict": "y"
+              },
+              {
+                "verdict": "y"
+              }
+            ]
+          },
+          {
+            "name": "Term 21",
+            "cells": [
+              {
+                "verdict": "y"
+              },
+              {
+                "verdict": "y"
+              }
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "name": "comparison with no terms",
+      "component": "comparison",
+      "title": "Freight contracts, key terms",
+      "comparison": {
+        "options": [
+          "Atlas",
+          "Northwind"
+        ],
+        "terms": []
+      }
+    },
+    {
+      "name": "term with 3 cells for 2 options",
+      "component": "comparison",
+      "title": "Freight contracts, key terms",
+      "comparison": {
+        "options": [
+          "Atlas",
+          "Northwind"
+        ],
+        "terms": [
+          {
+            "name": "Term 1",
+            "cells": [
+              {
+                "verdict": "y"
+              },
+              {
+                "verdict": "n"
+              }
+            ]
+          },
+          {
+            "name": "Term 2",
+            "cells": [
+              {
+                "verdict": "y"
+              },
+              {
+                "verdict": "n"
+              },
+              {
+                "verdict": "m"
+              }
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "name": "verdict outside y n m q",
+      "component": "comparison",
+      "title": "Freight contracts, key terms",
+      "comparison": {
+        "options": [
+          "Atlas",
+          "Northwind"
+        ],
+        "terms": [
+          {
+            "name": "Term",
+            "cells": [
+              {
+                "verdict": "x"
+              },
+              {
+                "verdict": "n"
+              }
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "name": "cell text over 200 characters",
+      "component": "comparison",
+      "title": "Freight contracts, key terms",
+      "comparison": {
+        "options": [
+          "Atlas",
+          "Northwind"
+        ],
+        "terms": [
+          {
+            "name": "Term",
+            "cells": [
+              {
+                "verdict": "y",
+                "text": "ttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttt"
+              },
+              {
+                "verdict": "n"
+              }
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "name": "option name over 40 characters",
+      "component": "comparison",
+      "title": "Freight contracts, key terms",
+      "comparison": {
+        "options": [
+          "OOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOO",
+          "Northwind"
+        ],
+        "terms": [
+          {
+            "name": "Term",
+            "cells": [
+              {
+                "verdict": "y"
+              },
+              {
+                "verdict": "n"
+              }
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "name": "term name over 60 characters",
+      "component": "comparison",
+      "title": "Freight contracts, key terms",
+      "comparison": {
+        "options": [
+          "Atlas",
+          "Northwind"
+        ],
+        "terms": [
+          {
+            "name": "TTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTT",
+            "cells": [
+              {
+                "verdict": "y"
+              },
+              {
+                "verdict": "n"
+              }
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "name": "cell source is a boolean",
+      "component": "comparison",
+      "title": "Freight contracts, key terms",
+      "comparison": {
+        "options": [
+          "Atlas",
+          "Northwind"
+        ],
+        "terms": [
+          {
+            "name": "Term",
+            "cells": [
+              {
+                "verdict": "y",
+                "source": true
+              },
+              {
+                "verdict": "n"
+              }
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "name": "timeline with 41 events",
+      "component": "timeline",
+      "title": "Atlas contract history",
+      "timeline": {
+        "events": [
+          {
+            "date": "2020-01-01",
+            "title": "Event 1"
+          },
+          {
+            "date": "2020-02-01",
+            "title": "Event 2"
+          },
+          {
+            "date": "2020-03-01",
+            "title": "Event 3"
+          },
+          {
+            "date": "2020-04-01",
+            "title": "Event 4"
+          },
+          {
+            "date": "2020-05-01",
+            "title": "Event 5"
+          },
+          {
+            "date": "2020-06-01",
+            "title": "Event 6"
+          },
+          {
+            "date": "2020-07-01",
+            "title": "Event 7"
+          },
+          {
+            "date": "2020-08-01",
+            "title": "Event 8"
+          },
+          {
+            "date": "2020-09-01",
+            "title": "Event 9"
+          },
+          {
+            "date": "2020-10-01",
+            "title": "Event 10"
+          },
+          {
+            "date": "2020-11-01",
+            "title": "Event 11"
+          },
+          {
+            "date": "2020-12-01",
+            "title": "Event 12"
+          },
+          {
+            "date": "2021-01-01",
+            "title": "Event 13"
+          },
+          {
+            "date": "2021-02-01",
+            "title": "Event 14"
+          },
+          {
+            "date": "2021-03-01",
+            "title": "Event 15"
+          },
+          {
+            "date": "2021-04-01",
+            "title": "Event 16"
+          },
+          {
+            "date": "2021-05-01",
+            "title": "Event 17"
+          },
+          {
+            "date": "2021-06-01",
+            "title": "Event 18"
+          },
+          {
+            "date": "2021-07-01",
+            "title": "Event 19"
+          },
+          {
+            "date": "2021-08-01",
+            "title": "Event 20"
+          },
+          {
+            "date": "2021-09-01",
+            "title": "Event 21"
+          },
+          {
+            "date": "2021-10-01",
+            "title": "Event 22"
+          },
+          {
+            "date": "2021-11-01",
+            "title": "Event 23"
+          },
+          {
+            "date": "2021-12-01",
+            "title": "Event 24"
+          },
+          {
+            "date": "2022-01-01",
+            "title": "Event 25"
+          },
+          {
+            "date": "2022-02-01",
+            "title": "Event 26"
+          },
+          {
+            "date": "2022-03-01",
+            "title": "Event 27"
+          },
+          {
+            "date": "2022-04-01",
+            "title": "Event 28"
+          },
+          {
+            "date": "2022-05-01",
+            "title": "Event 29"
+          },
+          {
+            "date": "2022-06-01",
+            "title": "Event 30"
+          },
+          {
+            "date": "2022-07-01",
+            "title": "Event 31"
+          },
+          {
+            "date": "2022-08-01",
+            "title": "Event 32"
+          },
+          {
+            "date": "2022-09-01",
+            "title": "Event 33"
+          },
+          {
+            "date": "2022-10-01",
+            "title": "Event 34"
+          },
+          {
+            "date": "2022-11-01",
+            "title": "Event 35"
+          },
+          {
+            "date": "2022-12-01",
+            "title": "Event 36"
+          },
+          {
+            "date": "2023-01-01",
+            "title": "Event 37"
+          },
+          {
+            "date": "2023-02-01",
+            "title": "Event 38"
+          },
+          {
+            "date": "2023-03-01",
+            "title": "Event 39"
+          },
+          {
+            "date": "2023-04-01",
+            "title": "Event 40"
+          },
+          {
+            "date": "2023-05-01",
+            "title": "Event 41"
+          }
+        ]
+      }
+    },
+    {
+      "name": "timeline with no events",
+      "component": "timeline",
+      "title": "Atlas contract history",
+      "timeline": {
+        "events": []
+      }
+    },
+    {
+      "name": "event date month 13",
+      "component": "timeline",
+      "title": "Atlas contract history",
+      "timeline": {
+        "events": [
+          {
+            "date": "2026-01-01",
+            "title": "One"
+          },
+          {
+            "date": "2026-02-01",
+            "title": "Two"
+          },
+          {
+            "date": "2026-13-01",
+            "title": "Three"
+          }
+        ]
+      }
+    },
+    {
+      "name": "event date 30 February",
+      "component": "timeline",
+      "title": "Atlas contract history",
+      "timeline": {
+        "events": [
+          {
+            "date": "2026-01-01",
+            "title": "One"
+          },
+          {
+            "date": "2026-02-01",
+            "title": "Two"
+          },
+          {
+            "date": "2026-02-30",
+            "title": "Three"
+          }
+        ]
+      }
+    },
+    {
+      "name": "event date in words",
+      "component": "timeline",
+      "title": "Atlas contract history",
+      "timeline": {
+        "events": [
+          {
+            "date": "2026-01-01",
+            "title": "One"
+          },
+          {
+            "date": "2026-02-01",
+            "title": "Two"
+          },
+          {
+            "date": "24 Oct 2026",
+            "title": "Three"
+          }
+        ]
+      }
+    },
+    {
+      "name": "event title over 80 characters",
+      "component": "timeline",
+      "title": "Atlas contract history",
+      "timeline": {
+        "events": [
+          {
+            "date": "2026-01-01",
+            "title": "TTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTT"
+          }
+        ]
+      }
+    },
+    {
+      "name": "event detail over 200 characters",
+      "component": "timeline",
+      "title": "Atlas contract history",
+      "timeline": {
+        "events": [
+          {
+            "date": "2026-01-01",
+            "title": "One",
+            "detail": "ddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd"
+          }
+        ]
+      }
+    },
+    {
+      "name": "category over 24 characters",
+      "component": "timeline",
+      "title": "Atlas contract history",
+      "timeline": {
+        "events": [
+          {
+            "date": "2026-01-01",
+            "title": "One",
+            "category": "ccccccccccccccccccccccccc"
+          }
+        ]
+      }
+    },
+    {
+      "name": "deadline is not a boolean",
+      "component": "timeline",
+      "title": "Atlas contract history",
+      "timeline": {
+        "events": [
+          {
+            "date": "2026-01-01",
+            "title": "One",
+            "deadline": "yes"
+          }
+        ]
+      }
+    },
+    {
+      "name": "event source is a boolean",
+      "component": "timeline",
+      "title": "Atlas contract history",
+      "timeline": {
+        "events": [
+          {
+            "date": "2026-01-01",
+            "title": "One",
+            "source": true
+          }
+        ]
+      }
+    },
+    {
+      "name": "component mindmap",
+      "component": "mindmap",
+      "title": "Ideas",
+      "diagram": {
+        "nodes": [
+          {
+            "id": "a",
+            "label": "Request"
+          },
+          {
+            "id": "b",
+            "label": "Approve"
+          }
+        ],
+        "edges": [
+          {
+            "from": "a",
+            "to": "b"
+          }
+        ]
+      }
+    },
+    {
+      "name": "component steps",
+      "component": "steps",
+      "title": "Steps",
+      "diagram": {
+        "nodes": [
+          {
+            "id": "a",
+            "label": "Request"
+          },
+          {
+            "id": "b",
+            "label": "Approve"
+          }
+        ],
+        "edges": [
+          {
+            "from": "a",
+            "to": "b"
+          }
+        ]
+      }
+    },
+    {
+      "name": "event date with Arabic-Indic digits (CR-01)",
+      "component": "timeline",
+      "title": "Contract history",
+      "timeline": {
+        "events": [
+          {
+            "date": "\u0662\u0660\u0662\u0664-01-15",
+            "title": "Signed"
+          }
+        ]
+      }
+    },
+    {
+      "name": "event date with fullwidth digits, month precision (CR-01)",
+      "component": "timeline",
+      "title": "Contract history",
+      "timeline": {
+        "events": [
+          {
+            "date": "\uff12\uff10\uff12\uff14-01",
+            "title": "Signed"
+          }
+        ]
+      }
+    },
+    {
+      "name": "event date with fullwidth day digits (CR-01)",
+      "component": "timeline",
+      "title": "Contract history",
+      "timeline": {
+        "events": [
+          {
+            "date": "2024-01-\uff11\uff15",
+            "title": "Signed"
+          }
+        ]
+      }
+    },
+    {
+      "name": "step name is only U+FEFF (CR-01)",
+      "component": "diagram",
+      "title": "Invoice approval",
+      "diagram": {
+        "nodes": [
+          {
+            "id": "a",
+            "label": "\ufeff"
+          },
+          {
+            "id": "b",
+            "label": "Step b"
+          }
+        ],
+        "edges": [
+          {
+            "from": "a",
+            "to": "b"
+          }
+        ]
+      }
+    },
+    {
+      "name": "self-loop labelled only with U+FEFF (CR-01)",
+      "component": "diagram",
+      "title": "Invoice approval",
+      "diagram": {
+        "nodes": [
+          {
+            "id": "a",
+            "label": "Step a"
+          },
+          {
+            "id": "b",
+            "label": "Step b"
+          }
+        ],
+        "edges": [
+          {
+            "from": "a",
+            "to": "b"
+          },
+          {
+            "from": "a",
+            "to": "a",
+            "label": "\ufeff"
+          }
+        ]
+      }
+    },
+    {
+      "name": "option is only U+FEFF (CR-01)",
+      "component": "comparison",
+      "title": "Contracts",
+      "comparison": {
+        "options": [
+          "\ufeff",
+          "Borealis"
+        ],
+        "terms": [
+          {
+            "name": "Termination",
+            "cells": [
+              {
+                "verdict": "y"
+              },
+              {
+                "verdict": "n"
+              }
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "name": "term name is only U+FEFF (CR-01)",
+      "component": "comparison",
+      "title": "Contracts",
+      "comparison": {
+        "options": [
+          "Atlas",
+          "Borealis"
+        ],
+        "terms": [
+          {
+            "name": "\ufeff",
+            "cells": [
+              {
+                "verdict": "y"
+              },
+              {
+                "verdict": "n"
+              }
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "name": "event title is only U+FEFF (CR-01)",
+      "component": "timeline",
+      "title": "Contract history",
+      "timeline": {
+        "events": [
+          {
+            "date": "2024-01-15",
+            "title": "\ufeff"
+          }
+        ]
+      }
+    }
+  ],
+  "good": [
+    {
+      "name": "invoice approval flow (back edge + labelled self-loop)",
+      "component": "diagram",
+      "title": "Invoice approval",
+      "diagram": {
+        "nodes": [
+          {
+            "id": "recv",
+            "label": "Invoice received",
+            "kind": "start"
+          },
+          {
+            "id": "ok",
+            "label": "Matches the purchase order?",
+            "kind": "decision",
+            "source": 1
+          },
+          {
+            "id": "chase",
+            "label": "Query the supplier",
+            "kind": "step"
+          },
+          {
+            "id": "appr",
+            "label": "Budget holder approves",
+            "kind": "step"
+          },
+          {
+            "id": "ctrl",
+            "label": "Finance controller sign-off",
+            "kind": "step"
+          },
+          {
+            "id": "sched",
+            "label": "Payment scheduled",
+            "kind": "step"
+          },
+          {
+            "id": "paid",
+            "label": "Paid on the next payment run",
+            "kind": "step"
+          },
+          {
+            "id": "filed",
+            "label": "Filed for audit",
+            "kind": "end"
+          }
+        ],
+        "edges": [
+          {
+            "from": "recv",
+            "to": "ok"
+          },
+          {
+            "from": "ok",
+            "to": "appr",
+            "label": "Yes"
+          },
+          {
+            "from": "ok",
+            "to": "chase",
+            "label": "No"
+          },
+          {
+            "from": "chase",
+            "to": "ok",
+            "label": "Corrected invoice"
+          },
+          {
+            "from": "chase",
+            "to": "chase",
+            "label": "Reminder after 5 days"
+          },
+          {
+            "from": "appr",
+            "to": "ctrl"
+          },
+          {
+            "from": "ctrl",
+            "to": "sched"
+          },
+          {
+            "from": "sched",
+            "to": "paid"
+          },
+          {
+            "from": "paid",
+            "to": "filed"
+          }
+        ]
+      }
+    },
+    {
+      "name": "smallest diagram: 2 steps, 1 link",
+      "component": "diagram",
+      "title": "Request flow",
+      "diagram": {
+        "nodes": [
+          {
+            "id": "a",
+            "label": "Request"
+          },
+          {
+            "id": "b",
+            "label": "Approve"
+          }
+        ],
+        "edges": [
+          {
+            "from": "a",
+            "to": "b"
+          }
+        ]
+      }
+    },
+    {
+      "name": "kind absent and mixed case",
+      "component": "diagram",
+      "title": "Invoice approval",
+      "diagram": {
+        "nodes": [
+          {
+            "id": "a",
+            "label": "Start",
+            "kind": "Start"
+          },
+          {
+            "id": "b",
+            "label": "Check",
+            "kind": "DECISION"
+          },
+          {
+            "id": "c",
+            "label": "Do it"
+          }
+        ],
+        "edges": [
+          {
+            "from": "a",
+            "to": "b"
+          },
+          {
+            "from": "b",
+            "to": "c",
+            "label": ""
+          }
+        ]
+      }
+    },
+    {
+      "name": "diagram at the caps: 25 steps, step name 48 units",
+      "component": "diagram",
+      "title": "Invoice approval",
+      "diagram": {
+        "nodes": [
+          {
+            "id": "s1",
+            "label": "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA😀"
+          },
+          {
+            "id": "s2",
+            "label": "Step 2"
+          },
+          {
+            "id": "s3",
+            "label": "Step 3"
+          },
+          {
+            "id": "s4",
+            "label": "Step 4"
+          },
+          {
+            "id": "s5",
+            "label": "Step 5"
+          },
+          {
+            "id": "s6",
+            "label": "Step 6"
+          },
+          {
+            "id": "s7",
+            "label": "Step 7"
+          },
+          {
+            "id": "s8",
+            "label": "Step 8"
+          },
+          {
+            "id": "s9",
+            "label": "Step 9"
+          },
+          {
+            "id": "s10",
+            "label": "Step 10"
+          },
+          {
+            "id": "s11",
+            "label": "Step 11"
+          },
+          {
+            "id": "s12",
+            "label": "Step 12"
+          },
+          {
+            "id": "s13",
+            "label": "Step 13"
+          },
+          {
+            "id": "s14",
+            "label": "Step 14"
+          },
+          {
+            "id": "s15",
+            "label": "Step 15"
+          },
+          {
+            "id": "s16",
+            "label": "Step 16"
+          },
+          {
+            "id": "s17",
+            "label": "Step 17"
+          },
+          {
+            "id": "s18",
+            "label": "Step 18"
+          },
+          {
+            "id": "s19",
+            "label": "Step 19"
+          },
+          {
+            "id": "s20",
+            "label": "Step 20"
+          },
+          {
+            "id": "s21",
+            "label": "Step 21"
+          },
+          {
+            "id": "s22",
+            "label": "Step 22"
+          },
+          {
+            "id": "s23",
+            "label": "Step 23"
+          },
+          {
+            "id": "s24",
+            "label": "Step 24"
+          },
+          {
+            "id": "s25",
+            "label": "Step 25"
+          }
+        ],
+        "edges": [
+          {
+            "from": "s1",
+            "to": "s2"
+          },
+          {
+            "from": "s2",
+            "to": "s3"
+          },
+          {
+            "from": "s3",
+            "to": "s4"
+          },
+          {
+            "from": "s4",
+            "to": "s5"
+          },
+          {
+            "from": "s5",
+            "to": "s6"
+          },
+          {
+            "from": "s6",
+            "to": "s7"
+          },
+          {
+            "from": "s7",
+            "to": "s8"
+          },
+          {
+            "from": "s8",
+            "to": "s9"
+          },
+          {
+            "from": "s9",
+            "to": "s10"
+          },
+          {
+            "from": "s10",
+            "to": "s11"
+          },
+          {
+            "from": "s11",
+            "to": "s12"
+          },
+          {
+            "from": "s12",
+            "to": "s13"
+          },
+          {
+            "from": "s13",
+            "to": "s14"
+          },
+          {
+            "from": "s14",
+            "to": "s15"
+          },
+          {
+            "from": "s15",
+            "to": "s16"
+          },
+          {
+            "from": "s16",
+            "to": "s17"
+          },
+          {
+            "from": "s17",
+            "to": "s18"
+          },
+          {
+            "from": "s18",
+            "to": "s19"
+          },
+          {
+            "from": "s19",
+            "to": "s20"
+          },
+          {
+            "from": "s20",
+            "to": "s21"
+          },
+          {
+            "from": "s21",
+            "to": "s22"
+          },
+          {
+            "from": "s22",
+            "to": "s23"
+          },
+          {
+            "from": "s23",
+            "to": "s24"
+          },
+          {
+            "from": "s24",
+            "to": "s25"
+          }
+        ]
+      }
+    },
+    {
+      "name": "diagram with 40 links",
+      "component": "diagram",
+      "title": "Invoice approval",
+      "diagram": {
+        "nodes": [
+          {
+            "id": "n0",
+            "label": "Step 0"
+          },
+          {
+            "id": "n1",
+            "label": "Step 1"
+          },
+          {
+            "id": "n2",
+            "label": "Step 2"
+          },
+          {
+            "id": "n3",
+            "label": "Step 3"
+          },
+          {
+            "id": "n4",
+            "label": "Step 4"
+          },
+          {
+            "id": "n5",
+            "label": "Step 5"
+          },
+          {
+            "id": "n6",
+            "label": "Step 6"
+          },
+          {
+            "id": "n7",
+            "label": "Step 7"
+          },
+          {
+            "id": "n8",
+            "label": "Step 8"
+          },
+          {
+            "id": "n9",
+            "label": "Step 9"
+          }
+        ],
+        "edges": [
+          {
+            "from": "n0",
+            "to": "n1"
+          },
+          {
+            "from": "n0",
+            "to": "n2"
+          },
+          {
+            "from": "n0",
+            "to": "n3"
+          },
+          {
+            "from": "n0",
+            "to": "n4"
+          },
+          {
+            "from": "n0",
+            "to": "n5"
+          },
+          {
+            "from": "n0",
+            "to": "n6"
+          },
+          {
+            "from": "n0",
+            "to": "n7"
+          },
+          {
+            "from": "n0",
+            "to": "n8"
+          },
+          {
+            "from": "n0",
+            "to": "n9"
+          },
+          {
+            "from": "n1",
+            "to": "n2"
+          },
+          {
+            "from": "n1",
+            "to": "n3"
+          },
+          {
+            "from": "n1",
+            "to": "n4"
+          },
+          {
+            "from": "n1",
+            "to": "n5"
+          },
+          {
+            "from": "n1",
+            "to": "n6"
+          },
+          {
+            "from": "n1",
+            "to": "n7"
+          },
+          {
+            "from": "n1",
+            "to": "n8"
+          },
+          {
+            "from": "n1",
+            "to": "n9"
+          },
+          {
+            "from": "n2",
+            "to": "n3"
+          },
+          {
+            "from": "n2",
+            "to": "n4"
+          },
+          {
+            "from": "n2",
+            "to": "n5"
+          },
+          {
+            "from": "n2",
+            "to": "n6"
+          },
+          {
+            "from": "n2",
+            "to": "n7"
+          },
+          {
+            "from": "n2",
+            "to": "n8"
+          },
+          {
+            "from": "n2",
+            "to": "n9"
+          },
+          {
+            "from": "n3",
+            "to": "n4"
+          },
+          {
+            "from": "n3",
+            "to": "n5"
+          },
+          {
+            "from": "n3",
+            "to": "n6"
+          },
+          {
+            "from": "n3",
+            "to": "n7"
+          },
+          {
+            "from": "n3",
+            "to": "n8"
+          },
+          {
+            "from": "n3",
+            "to": "n9"
+          },
+          {
+            "from": "n4",
+            "to": "n5"
+          },
+          {
+            "from": "n4",
+            "to": "n6"
+          },
+          {
+            "from": "n4",
+            "to": "n7"
+          },
+          {
+            "from": "n4",
+            "to": "n8"
+          },
+          {
+            "from": "n4",
+            "to": "n9"
+          },
+          {
+            "from": "n5",
+            "to": "n6"
+          },
+          {
+            "from": "n5",
+            "to": "n7"
+          },
+          {
+            "from": "n5",
+            "to": "n8"
+          },
+          {
+            "from": "n5",
+            "to": "n9"
+          },
+          {
+            "from": "n6",
+            "to": "n7"
+          }
+        ]
+      }
+    },
+    {
+      "name": "3 options x 7 terms with not-stated cells",
+      "component": "comparison",
+      "title": "Freight contracts, key terms",
+      "comparison": {
+        "options": [
+          "Atlas Logistics",
+          "Northwind Freight",
+          "Kestrel Cargo"
+        ],
+        "terms": [
+          {
+            "name": "Initial term",
+            "cells": [
+              {
+                "verdict": "m",
+                "text": "3 years"
+              },
+              {
+                "verdict": "m",
+                "text": "2 years"
+              },
+              {
+                "verdict": "m",
+                "text": "3 years"
+              }
+            ]
+          },
+          {
+            "name": "Auto-renewal",
+            "cells": [
+              {
+                "verdict": "m",
+                "text": "1 year, unless notice"
+              },
+              {
+                "verdict": "y",
+                "text": "None, must re-sign"
+              },
+              {
+                "verdict": "m",
+                "text": "1 year, unless notice"
+              }
+            ]
+          },
+          {
+            "name": "Termination notice",
+            "cells": [
+              {
+                "verdict": "n",
+                "text": "90 days"
+              },
+              {
+                "verdict": "y",
+                "text": "30 days"
+              },
+              {
+                "verdict": "m",
+                "text": "60 days"
+              }
+            ]
+          },
+          {
+            "name": "Liability cap",
+            "cells": [
+              {
+                "verdict": "y",
+                "text": "12 months' fees"
+              },
+              {
+                "verdict": "n",
+                "text": "6 months' fees"
+              },
+              {
+                "verdict": "y",
+                "text": "12 months' fees"
+              }
+            ]
+          },
+          {
+            "name": "SLA credits",
+            "cells": [
+              {
+                "verdict": "y",
+                "text": "Up to 10% of monthly fee"
+              },
+              {
+                "verdict": "q"
+              },
+              {
+                "verdict": "m",
+                "text": "Up to 5% of monthly fee"
+              }
+            ]
+          },
+          {
+            "name": "EU data residency",
+            "cells": [
+              {
+                "verdict": "y",
+                "text": "Yes, Frankfurt"
+              },
+              {
+                "verdict": "y",
+                "text": "Yes, Dublin"
+              },
+              {
+                "verdict": "q"
+              }
+            ]
+          },
+          {
+            "name": "Price escalation",
+            "cells": [
+              {
+                "verdict": "m",
+                "text": "CPI, capped at 4%"
+              },
+              {
+                "verdict": "y",
+                "text": "Fixed for 2 years"
+              },
+              {
+                "verdict": "n",
+                "text": "CPI, no cap"
+              }
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "name": "comparison at the caps: 5 options, 20 terms",
+      "component": "comparison",
+      "title": "Freight contracts, key terms",
+      "comparison": {
+        "options": [
+          "Option 1",
+          "Option 2",
+          "Option 3",
+          "Option 4",
+          "Option 5"
+        ],
+        "terms": [
+          {
+            "name": "Term 1",
+            "cells": [
+              {
+                "verdict": "y"
+              },
+              {
+                "verdict": "y"
+              },
+              {
+                "verdict": "y"
+              },
+              {
+                "verdict": "y"
+              },
+              {
+                "verdict": "y"
+              }
+            ]
+          },
+          {
+            "name": "Term 2",
+            "cells": [
+              {
+                "verdict": "y"
+              },
+              {
+                "verdict": "y"
+              },
+              {
+                "verdict": "y"
+              },
+              {
+                "verdict": "y"
+              },
+              {
+                "verdict": "y"
+              }
+            ]
+          },
+          {
+            "name": "Term 3",
+            "cells": [
+              {
+                "verdict": "y"
+              },
+              {
+                "verdict": "y"
+              },
+              {
+                "verdict": "y"
+              },
+              {
+                "verdict": "y"
+              },
+              {
+                "verdict": "y"
+              }
+            ]
+          },
+          {
+            "name": "Term 4",
+            "cells": [
+              {
+                "verdict": "y"
+              },
+              {
+                "verdict": "y"
+              },
+              {
+                "verdict": "y"
+              },
+              {
+                "verdict": "y"
+              },
+              {
+                "verdict": "y"
+              }
+            ]
+          },
+          {
+            "name": "Term 5",
+            "cells": [
+              {
+                "verdict": "y"
+              },
+              {
+                "verdict": "y"
+              },
+              {
+                "verdict": "y"
+              },
+              {
+                "verdict": "y"
+              },
+              {
+                "verdict": "y"
+              }
+            ]
+          },
+          {
+            "name": "Term 6",
+            "cells": [
+              {
+                "verdict": "y"
+              },
+              {
+                "verdict": "y"
+              },
+              {
+                "verdict": "y"
+              },
+              {
+                "verdict": "y"
+              },
+              {
+                "verdict": "y"
+              }
+            ]
+          },
+          {
+            "name": "Term 7",
+            "cells": [
+              {
+                "verdict": "y"
+              },
+              {
+                "verdict": "y"
+              },
+              {
+                "verdict": "y"
+              },
+              {
+                "verdict": "y"
+              },
+              {
+                "verdict": "y"
+              }
+            ]
+          },
+          {
+            "name": "Term 8",
+            "cells": [
+              {
+                "verdict": "y"
+              },
+              {
+                "verdict": "y"
+              },
+              {
+                "verdict": "y"
+              },
+              {
+                "verdict": "y"
+              },
+              {
+                "verdict": "y"
+              }
+            ]
+          },
+          {
+            "name": "Term 9",
+            "cells": [
+              {
+                "verdict": "y"
+              },
+              {
+                "verdict": "y"
+              },
+              {
+                "verdict": "y"
+              },
+              {
+                "verdict": "y"
+              },
+              {
+                "verdict": "y"
+              }
+            ]
+          },
+          {
+            "name": "Term 10",
+            "cells": [
+              {
+                "verdict": "y"
+              },
+              {
+                "verdict": "y"
+              },
+              {
+                "verdict": "y"
+              },
+              {
+                "verdict": "y"
+              },
+              {
+                "verdict": "y"
+              }
+            ]
+          },
+          {
+            "name": "Term 11",
+            "cells": [
+              {
+                "verdict": "y"
+              },
+              {
+                "verdict": "y"
+              },
+              {
+                "verdict": "y"
+              },
+              {
+                "verdict": "y"
+              },
+              {
+                "verdict": "y"
+              }
+            ]
+          },
+          {
+            "name": "Term 12",
+            "cells": [
+              {
+                "verdict": "y"
+              },
+              {
+                "verdict": "y"
+              },
+              {
+                "verdict": "y"
+              },
+              {
+                "verdict": "y"
+              },
+              {
+                "verdict": "y"
+              }
+            ]
+          },
+          {
+            "name": "Term 13",
+            "cells": [
+              {
+                "verdict": "y"
+              },
+              {
+                "verdict": "y"
+              },
+              {
+                "verdict": "y"
+              },
+              {
+                "verdict": "y"
+              },
+              {
+                "verdict": "y"
+              }
+            ]
+          },
+          {
+            "name": "Term 14",
+            "cells": [
+              {
+                "verdict": "y"
+              },
+              {
+                "verdict": "y"
+              },
+              {
+                "verdict": "y"
+              },
+              {
+                "verdict": "y"
+              },
+              {
+                "verdict": "y"
+              }
+            ]
+          },
+          {
+            "name": "Term 15",
+            "cells": [
+              {
+                "verdict": "y"
+              },
+              {
+                "verdict": "y"
+              },
+              {
+                "verdict": "y"
+              },
+              {
+                "verdict": "y"
+              },
+              {
+                "verdict": "y"
+              }
+            ]
+          },
+          {
+            "name": "Term 16",
+            "cells": [
+              {
+                "verdict": "y"
+              },
+              {
+                "verdict": "y"
+              },
+              {
+                "verdict": "y"
+              },
+              {
+                "verdict": "y"
+              },
+              {
+                "verdict": "y"
+              }
+            ]
+          },
+          {
+            "name": "Term 17",
+            "cells": [
+              {
+                "verdict": "y"
+              },
+              {
+                "verdict": "y"
+              },
+              {
+                "verdict": "y"
+              },
+              {
+                "verdict": "y"
+              },
+              {
+                "verdict": "y"
+              }
+            ]
+          },
+          {
+            "name": "Term 18",
+            "cells": [
+              {
+                "verdict": "y"
+              },
+              {
+                "verdict": "y"
+              },
+              {
+                "verdict": "y"
+              },
+              {
+                "verdict": "y"
+              },
+              {
+                "verdict": "y"
+              }
+            ]
+          },
+          {
+            "name": "Term 19",
+            "cells": [
+              {
+                "verdict": "y"
+              },
+              {
+                "verdict": "y"
+              },
+              {
+                "verdict": "y"
+              },
+              {
+                "verdict": "y"
+              },
+              {
+                "verdict": "y"
+              }
+            ]
+          },
+          {
+            "name": "Term 20",
+            "cells": [
+              {
+                "verdict": "y"
+              },
+              {
+                "verdict": "y"
+              },
+              {
+                "verdict": "y"
+              },
+              {
+                "verdict": "y"
+              },
+              {
+                "verdict": "y"
+              }
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "name": "comparison verdict upper case and cell source",
+      "component": "comparison",
+      "title": "Freight contracts, key terms",
+      "comparison": {
+        "options": [
+          "Atlas",
+          "Northwind"
+        ],
+        "terms": [
+          {
+            "name": "Liability cap",
+            "cells": [
+              {
+                "verdict": "Y",
+                "text": "12 months",
+                "source": 2
+              },
+              {
+                "verdict": "n",
+                "text": "  "
+              }
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "name": "9 events, mixed precision, one deadline",
+      "component": "timeline",
+      "title": "Atlas contract history",
+      "timeline": {
+        "events": [
+          {
+            "date": "2023-03-14",
+            "title": "MSA signed",
+            "detail": "Three-year master services agreement for EU freight.",
+            "category": "Contract"
+          },
+          {
+            "date": "2023-04-01",
+            "title": "Services start",
+            "detail": "First shipments under the agreement.",
+            "category": "Contract"
+          },
+          {
+            "date": "2024-02-09",
+            "title": "Amendment 1, price +3.5%",
+            "detail": "Fuel surcharge folded into the base rate.",
+            "category": "Price"
+          },
+          {
+            "date": "2024-11",
+            "title": "SLA breach notice",
+            "detail": "Three missed delivery windows in October.",
+            "category": "SLA"
+          },
+          {
+            "date": "2025-01-15",
+            "title": "Service credits applied, $18.4K",
+            "detail": "Credited against the January invoice.",
+            "category": "SLA"
+          },
+          {
+            "date": "2025-04",
+            "title": "Annual CPI uplift +2.9%",
+            "detail": "Within the 4% cap.",
+            "category": "Price"
+          },
+          {
+            "date": "2026-04-01",
+            "title": "Annual CPI uplift +3.1%",
+            "detail": "Within the 4% cap.",
+            "category": "Price"
+          },
+          {
+            "date": "2026-12-31",
+            "title": "Non-renewal notice deadline",
+            "detail": "Last day to give 90 days' notice before the term ends.",
+            "category": "Contract",
+            "deadline": true
+          },
+          {
+            "date": "2027-03-31",
+            "title": "Initial term ends",
+            "detail": "Renews for one year unless notice was given.",
+            "category": "Contract"
+          }
+        ]
+      }
+    },
+    {
+      "name": "month and day precision together",
+      "component": "timeline",
+      "title": "Atlas contract history",
+      "timeline": {
+        "events": [
+          {
+            "date": "2026-03",
+            "title": "Review month"
+          },
+          {
+            "date": "2026-03-14",
+            "title": "Review held",
+            "deadline": true,
+            "source": 1
+          }
+        ]
+      }
+    },
+    {
+      "name": "timeline at the cap: 40 events",
+      "component": "timeline",
+      "title": "Atlas contract history",
+      "timeline": {
+        "events": [
+          {
+            "date": "2020-01-01",
+            "title": "Event 1"
+          },
+          {
+            "date": "2020-02-01",
+            "title": "Event 2"
+          },
+          {
+            "date": "2020-03-01",
+            "title": "Event 3"
+          },
+          {
+            "date": "2020-04-01",
+            "title": "Event 4"
+          },
+          {
+            "date": "2020-05-01",
+            "title": "Event 5"
+          },
+          {
+            "date": "2020-06-01",
+            "title": "Event 6"
+          },
+          {
+            "date": "2020-07-01",
+            "title": "Event 7"
+          },
+          {
+            "date": "2020-08-01",
+            "title": "Event 8"
+          },
+          {
+            "date": "2020-09-01",
+            "title": "Event 9"
+          },
+          {
+            "date": "2020-10-01",
+            "title": "Event 10"
+          },
+          {
+            "date": "2020-11-01",
+            "title": "Event 11"
+          },
+          {
+            "date": "2020-12-01",
+            "title": "Event 12"
+          },
+          {
+            "date": "2021-01-01",
+            "title": "Event 13"
+          },
+          {
+            "date": "2021-02-01",
+            "title": "Event 14"
+          },
+          {
+            "date": "2021-03-01",
+            "title": "Event 15"
+          },
+          {
+            "date": "2021-04-01",
+            "title": "Event 16"
+          },
+          {
+            "date": "2021-05-01",
+            "title": "Event 17"
+          },
+          {
+            "date": "2021-06-01",
+            "title": "Event 18"
+          },
+          {
+            "date": "2021-07-01",
+            "title": "Event 19"
+          },
+          {
+            "date": "2021-08-01",
+            "title": "Event 20"
+          },
+          {
+            "date": "2021-09-01",
+            "title": "Event 21"
+          },
+          {
+            "date": "2021-10-01",
+            "title": "Event 22"
+          },
+          {
+            "date": "2021-11-01",
+            "title": "Event 23"
+          },
+          {
+            "date": "2021-12-01",
+            "title": "Event 24"
+          },
+          {
+            "date": "2022-01-01",
+            "title": "Event 25"
+          },
+          {
+            "date": "2022-02-01",
+            "title": "Event 26"
+          },
+          {
+            "date": "2022-03-01",
+            "title": "Event 27"
+          },
+          {
+            "date": "2022-04-01",
+            "title": "Event 28"
+          },
+          {
+            "date": "2022-05-01",
+            "title": "Event 29"
+          },
+          {
+            "date": "2022-06-01",
+            "title": "Event 30"
+          },
+          {
+            "date": "2022-07-01",
+            "title": "Event 31"
+          },
+          {
+            "date": "2022-08-01",
+            "title": "Event 32"
+          },
+          {
+            "date": "2022-09-01",
+            "title": "Event 33"
+          },
+          {
+            "date": "2022-10-01",
+            "title": "Event 34"
+          },
+          {
+            "date": "2022-11-01",
+            "title": "Event 35"
+          },
+          {
+            "date": "2022-12-01",
+            "title": "Event 36"
+          },
+          {
+            "date": "2023-01-01",
+            "title": "Event 37"
+          },
+          {
+            "date": "2023-02-01",
+            "title": "Event 38"
+          },
+          {
+            "date": "2023-03-01",
+            "title": "Event 39"
+          },
+          {
+            "date": "2023-04-01",
+            "title": "Event 40"
+          }
+        ]
+      }
+    }
+  ],
+  "stored_sources": [
+    {
+      "name": "document of 101 emoji = 202 UTF-16 units, 101 code points (CR-01)",
+      "ok": false,
+      "source": {
+        "document": "\ud83d\udcc4\ud83d\udcc4\ud83d\udcc4\ud83d\udcc4\ud83d\udcc4\ud83d\udcc4\ud83d\udcc4\ud83d\udcc4\ud83d\udcc4\ud83d\udcc4\ud83d\udcc4\ud83d\udcc4\ud83d\udcc4\ud83d\udcc4\ud83d\udcc4\ud83d\udcc4\ud83d\udcc4\ud83d\udcc4\ud83d\udcc4\ud83d\udcc4\ud83d\udcc4\ud83d\udcc4\ud83d\udcc4\ud83d\udcc4\ud83d\udcc4\ud83d\udcc4\ud83d\udcc4\ud83d\udcc4\ud83d\udcc4\ud83d\udcc4\ud83d\udcc4\ud83d\udcc4\ud83d\udcc4\ud83d\udcc4\ud83d\udcc4\ud83d\udcc4\ud83d\udcc4\ud83d\udcc4\ud83d\udcc4\ud83d\udcc4\ud83d\udcc4\ud83d\udcc4\ud83d\udcc4\ud83d\udcc4\ud83d\udcc4\ud83d\udcc4\ud83d\udcc4\ud83d\udcc4\ud83d\udcc4\ud83d\udcc4\ud83d\udcc4\ud83d\udcc4\ud83d\udcc4\ud83d\udcc4\ud83d\udcc4\ud83d\udcc4\ud83d\udcc4\ud83d\udcc4\ud83d\udcc4\ud83d\udcc4\ud83d\udcc4\ud83d\udcc4\ud83d\udcc4\ud83d\udcc4\ud83d\udcc4\ud83d\udcc4\ud83d\udcc4\ud83d\udcc4\ud83d\udcc4\ud83d\udcc4\ud83d\udcc4\ud83d\udcc4\ud83d\udcc4\ud83d\udcc4\ud83d\udcc4\ud83d\udcc4\ud83d\udcc4\ud83d\udcc4\ud83d\udcc4\ud83d\udcc4\ud83d\udcc4\ud83d\udcc4\ud83d\udcc4\ud83d\udcc4\ud83d\udcc4\ud83d\udcc4\ud83d\udcc4\ud83d\udcc4\ud83d\udcc4\ud83d\udcc4\ud83d\udcc4\ud83d\udcc4\ud83d\udcc4\ud83d\udcc4\ud83d\udcc4\ud83d\udcc4\ud83d\udcc4\ud83d\udcc4\ud83d\udcc4\ud83d\udcc4\ud83d\udcc4",
+        "page": null,
+        "excerpt": null
+      }
+    },
+    {
+      "name": "document of 100 emoji = 200 UTF-16 units",
+      "ok": true,
+      "source": {
+        "document": "\ud83d\udcc4\ud83d\udcc4\ud83d\udcc4\ud83d\udcc4\ud83d\udcc4\ud83d\udcc4\ud83d\udcc4\ud83d\udcc4\ud83d\udcc4\ud83d\udcc4\ud83d\udcc4\ud83d\udcc4\ud83d\udcc4\ud83d\udcc4\ud83d\udcc4\ud83d\udcc4\ud83d\udcc4\ud83d\udcc4\ud83d\udcc4\ud83d\udcc4\ud83d\udcc4\ud83d\udcc4\ud83d\udcc4\ud83d\udcc4\ud83d\udcc4\ud83d\udcc4\ud83d\udcc4\ud83d\udcc4\ud83d\udcc4\ud83d\udcc4\ud83d\udcc4\ud83d\udcc4\ud83d\udcc4\ud83d\udcc4\ud83d\udcc4\ud83d\udcc4\ud83d\udcc4\ud83d\udcc4\ud83d\udcc4\ud83d\udcc4\ud83d\udcc4\ud83d\udcc4\ud83d\udcc4\ud83d\udcc4\ud83d\udcc4\ud83d\udcc4\ud83d\udcc4\ud83d\udcc4\ud83d\udcc4\ud83d\udcc4\ud83d\udcc4\ud83d\udcc4\ud83d\udcc4\ud83d\udcc4\ud83d\udcc4\ud83d\udcc4\ud83d\udcc4\ud83d\udcc4\ud83d\udcc4\ud83d\udcc4\ud83d\udcc4\ud83d\udcc4\ud83d\udcc4\ud83d\udcc4\ud83d\udcc4\ud83d\udcc4\ud83d\udcc4\ud83d\udcc4\ud83d\udcc4\ud83d\udcc4\ud83d\udcc4\ud83d\udcc4\ud83d\udcc4\ud83d\udcc4\ud83d\udcc4\ud83d\udcc4\ud83d\udcc4\ud83d\udcc4\ud83d\udcc4\ud83d\udcc4\ud83d\udcc4\ud83d\udcc4\ud83d\udcc4\ud83d\udcc4\ud83d\udcc4\ud83d\udcc4\ud83d\udcc4\ud83d\udcc4\ud83d\udcc4\ud83d\udcc4\ud83d\udcc4\ud83d\udcc4\ud83d\udcc4\ud83d\udcc4\ud83d\udcc4\ud83d\udcc4\ud83d\udcc4\ud83d\udcc4\ud83d\udcc4\ud83d\udcc4",
+        "page": null,
+        "excerpt": null
+      }
+    },
+    {
+      "name": "document of 200 ASCII characters",
+      "ok": true,
+      "source": {
+        "document": "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA",
+        "page": null,
+        "excerpt": "Fixture excerpt."
+      }
+    },
+    {
+      "name": "document of 201 ASCII characters",
+      "ok": false,
+      "source": {
+        "document": "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA",
+        "page": null,
+        "excerpt": null
+      }
+    }
+  ],
+  "document_names": [
+    {
+      "name": "150 emoji + .pdf (304 UTF-16 units) is cut to 200 units (CR-01)",
+      "filename": "\ud83d\udcc4\ud83d\udcc4\ud83d\udcc4\ud83d\udcc4\ud83d\udcc4\ud83d\udcc4\ud83d\udcc4\ud83d\udcc4\ud83d\udcc4\ud83d\udcc4\ud83d\udcc4\ud83d\udcc4\ud83d\udcc4\ud83d\udcc4\ud83d\udcc4\ud83d\udcc4\ud83d\udcc4\ud83d\udcc4\ud83d\udcc4\ud83d\udcc4\ud83d\udcc4\ud83d\udcc4\ud83d\udcc4\ud83d\udcc4\ud83d\udcc4\ud83d\udcc4\ud83d\udcc4\ud83d\udcc4\ud83d\udcc4\ud83d\udcc4\ud83d\udcc4\ud83d\udcc4\ud83d\udcc4\ud83d\udcc4\ud83d\udcc4\ud83d\udcc4\ud83d\udcc4\ud83d\udcc4\ud83d\udcc4\ud83d\udcc4\ud83d\udcc4\ud83d\udcc4\ud83d\udcc4\ud83d\udcc4\ud83d\udcc4\ud83d\udcc4\ud83d\udcc4\ud83d\udcc4\ud83d\udcc4\ud83d\udcc4\ud83d\udcc4\ud83d\udcc4\ud83d\udcc4\ud83d\udcc4\ud83d\udcc4\ud83d\udcc4\ud83d\udcc4\ud83d\udcc4\ud83d\udcc4\ud83d\udcc4\ud83d\udcc4\ud83d\udcc4\ud83d\udcc4\ud83d\udcc4\ud83d\udcc4\ud83d\udcc4\ud83d\udcc4\ud83d\udcc4\ud83d\udcc4\ud83d\udcc4\ud83d\udcc4\ud83d\udcc4\ud83d\udcc4\ud83d\udcc4\ud83d\udcc4\ud83d\udcc4\ud83d\udcc4\ud83d\udcc4\ud83d\udcc4\ud83d\udcc4\ud83d\udcc4\ud83d\udcc4\ud83d\udcc4\ud83d\udcc4\ud83d\udcc4\ud83d\udcc4\ud83d\udcc4\ud83d\udcc4\ud83d\udcc4\ud83d\udcc4\ud83d\udcc4\ud83d\udcc4\ud83d\udcc4\ud83d\udcc4\ud83d\udcc4\ud83d\udcc4\ud83d\udcc4\ud83d\udcc4\ud83d\udcc4\ud83d\udcc4\ud83d\udcc4\ud83d\udcc4\ud83d\udcc4\ud83d\udcc4\ud83d\udcc4\ud83d\udcc4\ud83d\udcc4\ud83d\udcc4\ud83d\udcc4\ud83d\udcc4\ud83d\udcc4\ud83d\udcc4\ud83d\udcc4\ud83d\udcc4\ud83d\udcc4\ud83d\udcc4\ud83d\udcc4\ud83d\udcc4\ud83d\udcc4\ud83d\udcc4\ud83d\udcc4\ud83d\udcc4\ud83d\udcc4\ud83d\udcc4\ud83d\udcc4\ud83d\udcc4\ud83d\udcc4\ud83d\udcc4\ud83d\udcc4\ud83d\udcc4\ud83d\udcc4\ud83d\udcc4\ud83d\udcc4\ud83d\udcc4\ud83d\udcc4\ud83d\udcc4\ud83d\udcc4\ud83d\udcc4\ud83d\udcc4\ud83d\udcc4\ud83d\udcc4\ud83d\udcc4\ud83d\udcc4\ud83d\udcc4\ud83d\udcc4\ud83d\udcc4\ud83d\udcc4\ud83d\udcc4\ud83d\udcc4\ud83d\udcc4.pdf",
+      "document": "\ud83d\udcc4\ud83d\udcc4\ud83d\udcc4\ud83d\udcc4\ud83d\udcc4\ud83d\udcc4\ud83d\udcc4\ud83d\udcc4\ud83d\udcc4\ud83d\udcc4\ud83d\udcc4\ud83d\udcc4\ud83d\udcc4\ud83d\udcc4\ud83d\udcc4\ud83d\udcc4\ud83d\udcc4\ud83d\udcc4\ud83d\udcc4\ud83d\udcc4\ud83d\udcc4\ud83d\udcc4\ud83d\udcc4\ud83d\udcc4\ud83d\udcc4\ud83d\udcc4\ud83d\udcc4\ud83d\udcc4\ud83d\udcc4\ud83d\udcc4\ud83d\udcc4\ud83d\udcc4\ud83d\udcc4\ud83d\udcc4\ud83d\udcc4\ud83d\udcc4\ud83d\udcc4\ud83d\udcc4\ud83d\udcc4\ud83d\udcc4\ud83d\udcc4\ud83d\udcc4\ud83d\udcc4\ud83d\udcc4\ud83d\udcc4\ud83d\udcc4\ud83d\udcc4\ud83d\udcc4\ud83d\udcc4\ud83d\udcc4\ud83d\udcc4\ud83d\udcc4\ud83d\udcc4\ud83d\udcc4\ud83d\udcc4\ud83d\udcc4\ud83d\udcc4\ud83d\udcc4\ud83d\udcc4\ud83d\udcc4\ud83d\udcc4\ud83d\udcc4\ud83d\udcc4\ud83d\udcc4\ud83d\udcc4\ud83d\udcc4\ud83d\udcc4\ud83d\udcc4\ud83d\udcc4\ud83d\udcc4\ud83d\udcc4\ud83d\udcc4\ud83d\udcc4\ud83d\udcc4\ud83d\udcc4\ud83d\udcc4\ud83d\udcc4\ud83d\udcc4\ud83d\udcc4\ud83d\udcc4\ud83d\udcc4\ud83d\udcc4\ud83d\udcc4\ud83d\udcc4\ud83d\udcc4\ud83d\udcc4\ud83d\udcc4\ud83d\udcc4\ud83d\udcc4\ud83d\udcc4\ud83d\udcc4\ud83d\udcc4\ud83d\udcc4\ud83d\udcc4\ud83d\udcc4\ud83d\udcc4\ud83d\udcc4\ud83d\udcc4\ud83d\udcc4\ud83d\udcc4"
+    },
+    {
+      "name": "a + 150 emoji: the cut never splits a surrogate pair (199 units)",
+      "filename": "a\ud83d\udcc4\ud83d\udcc4\ud83d\udcc4\ud83d\udcc4\ud83d\udcc4\ud83d\udcc4\ud83d\udcc4\ud83d\udcc4\ud83d\udcc4\ud83d\udcc4\ud83d\udcc4\ud83d\udcc4\ud83d\udcc4\ud83d\udcc4\ud83d\udcc4\ud83d\udcc4\ud83d\udcc4\ud83d\udcc4\ud83d\udcc4\ud83d\udcc4\ud83d\udcc4\ud83d\udcc4\ud83d\udcc4\ud83d\udcc4\ud83d\udcc4\ud83d\udcc4\ud83d\udcc4\ud83d\udcc4\ud83d\udcc4\ud83d\udcc4\ud83d\udcc4\ud83d\udcc4\ud83d\udcc4\ud83d\udcc4\ud83d\udcc4\ud83d\udcc4\ud83d\udcc4\ud83d\udcc4\ud83d\udcc4\ud83d\udcc4\ud83d\udcc4\ud83d\udcc4\ud83d\udcc4\ud83d\udcc4\ud83d\udcc4\ud83d\udcc4\ud83d\udcc4\ud83d\udcc4\ud83d\udcc4\ud83d\udcc4\ud83d\udcc4\ud83d\udcc4\ud83d\udcc4\ud83d\udcc4\ud83d\udcc4\ud83d\udcc4\ud83d\udcc4\ud83d\udcc4\ud83d\udcc4\ud83d\udcc4\ud83d\udcc4\ud83d\udcc4\ud83d\udcc4\ud83d\udcc4\ud83d\udcc4\ud83d\udcc4\ud83d\udcc4\ud83d\udcc4\ud83d\udcc4\ud83d\udcc4\ud83d\udcc4\ud83d\udcc4\ud83d\udcc4\ud83d\udcc4\ud83d\udcc4\ud83d\udcc4\ud83d\udcc4\ud83d\udcc4\ud83d\udcc4\ud83d\udcc4\ud83d\udcc4\ud83d\udcc4\ud83d\udcc4\ud83d\udcc4\ud83d\udcc4\ud83d\udcc4\ud83d\udcc4\ud83d\udcc4\ud83d\udcc4\ud83d\udcc4\ud83d\udcc4\ud83d\udcc4\ud83d\udcc4\ud83d\udcc4\ud83d\udcc4\ud83d\udcc4\ud83d\udcc4\ud83d\udcc4\ud83d\udcc4\ud83d\udcc4\ud83d\udcc4\ud83d\udcc4\ud83d\udcc4\ud83d\udcc4\ud83d\udcc4\ud83d\udcc4\ud83d\udcc4\ud83d\udcc4\ud83d\udcc4\ud83d\udcc4\ud83d\udcc4\ud83d\udcc4\ud83d\udcc4\ud83d\udcc4\ud83d\udcc4\ud83d\udcc4\ud83d\udcc4\ud83d\udcc4\ud83d\udcc4\ud83d\udcc4\ud83d\udcc4\ud83d\udcc4\ud83d\udcc4\ud83d\udcc4\ud83d\udcc4\ud83d\udcc4\ud83d\udcc4\ud83d\udcc4\ud83d\udcc4\ud83d\udcc4\ud83d\udcc4\ud83d\udcc4\ud83d\udcc4\ud83d\udcc4\ud83d\udcc4\ud83d\udcc4\ud83d\udcc4\ud83d\udcc4\ud83d\udcc4\ud83d\udcc4\ud83d\udcc4\ud83d\udcc4\ud83d\udcc4\ud83d\udcc4\ud83d\udcc4\ud83d\udcc4\ud83d\udcc4\ud83d\udcc4\ud83d\udcc4\ud83d\udcc4",
+      "document": "a\ud83d\udcc4\ud83d\udcc4\ud83d\udcc4\ud83d\udcc4\ud83d\udcc4\ud83d\udcc4\ud83d\udcc4\ud83d\udcc4\ud83d\udcc4\ud83d\udcc4\ud83d\udcc4\ud83d\udcc4\ud83d\udcc4\ud83d\udcc4\ud83d\udcc4\ud83d\udcc4\ud83d\udcc4\ud83d\udcc4\ud83d\udcc4\ud83d\udcc4\ud83d\udcc4\ud83d\udcc4\ud83d\udcc4\ud83d\udcc4\ud83d\udcc4\ud83d\udcc4\ud83d\udcc4\ud83d\udcc4\ud83d\udcc4\ud83d\udcc4\ud83d\udcc4\ud83d\udcc4\ud83d\udcc4\ud83d\udcc4\ud83d\udcc4\ud83d\udcc4\ud83d\udcc4\ud83d\udcc4\ud83d\udcc4\ud83d\udcc4\ud83d\udcc4\ud83d\udcc4\ud83d\udcc4\ud83d\udcc4\ud83d\udcc4\ud83d\udcc4\ud83d\udcc4\ud83d\udcc4\ud83d\udcc4\ud83d\udcc4\ud83d\udcc4\ud83d\udcc4\ud83d\udcc4\ud83d\udcc4\ud83d\udcc4\ud83d\udcc4\ud83d\udcc4\ud83d\udcc4\ud83d\udcc4\ud83d\udcc4\ud83d\udcc4\ud83d\udcc4\ud83d\udcc4\ud83d\udcc4\ud83d\udcc4\ud83d\udcc4\ud83d\udcc4\ud83d\udcc4\ud83d\udcc4\ud83d\udcc4\ud83d\udcc4\ud83d\udcc4\ud83d\udcc4\ud83d\udcc4\ud83d\udcc4\ud83d\udcc4\ud83d\udcc4\ud83d\udcc4\ud83d\udcc4\ud83d\udcc4\ud83d\udcc4\ud83d\udcc4\ud83d\udcc4\ud83d\udcc4\ud83d\udcc4\ud83d\udcc4\ud83d\udcc4\ud83d\udcc4\ud83d\udcc4\ud83d\udcc4\ud83d\udcc4\ud83d\udcc4\ud83d\udcc4\ud83d\udcc4\ud83d\udcc4\ud83d\udcc4\ud83d\udcc4\ud83d\udcc4\ud83d\udcc4"
+    },
+    {
+      "name": "NUL stripped, then trimmed",
+      "filename": "  Kestrel_Proposal.pdf\u0000 ",
+      "document": "Kestrel_Proposal.pdf"
+    },
+    {
+      "name": "a short name is unchanged",
+      "filename": "Invoice_Policy.pdf",
+      "document": "Invoice_Policy.pdf"
+    }
+  ],
+  "refused_then_tolerated": [
+    {
+      "name": "not-stated (q) cell carries a source (WR-02)",
+      "component": "comparison",
+      "title": "Contracts",
+      "comparison": {
+        "options": [
+          "Atlas",
+          "Borealis"
+        ],
+        "terms": [
+          {
+            "name": "Termination",
+            "cells": [
+              {
+                "verdict": "q",
+                "source": 1
+              },
+              {
+                "verdict": "n",
+                "text": "90 days",
+                "source": 2
+              }
+            ]
+          }
+        ]
+      }
+    }
+  ]
+}

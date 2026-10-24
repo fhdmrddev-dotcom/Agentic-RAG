@@ -1,0 +1,430 @@
+{
+  "id": "a_d7k2m9q4xw",
+  "thread_id": "5b1f6c2e-8a47-4d3b-9e0f-2c7a1d9b4e63",
+  "user_id": "0f3a9c71-2b6e-4f18-a5d4-7e8b9c0d1a2f",
+  "org_id": "c4e2a817-6d09-4b5f-8a3e-91f0b7d2c654",
+  "run_id": "9d7e3b21-4c58-4a6f-b0e2-1f8c6a3d5b79",
+  "tool_call_id": "call_Dg4mQ8vT2nLp6Rzx",
+  "parent_id": null,
+  "label": "diagram 1",
+  "component": "diagram",
+  "spec": {
+    "title": "Invoice approval",
+    "diagram": {
+      "nodes": [
+        {
+          "id": "recv",
+          "label": "Invoice received",
+          "kind": "start",
+          "source": null
+        },
+        {
+          "id": "ok",
+          "label": "Matches the purchase order?",
+          "kind": "decision",
+          "source": {
+            "document": "Invoice_Approval_Policy.pdf",
+            "page": null,
+            "excerpt": "Any invoice that does not match its purchase order is returned to the supplier for correction before approval."
+          }
+        },
+        {
+          "id": "chase",
+          "label": "Query the supplier",
+          "kind": "step",
+          "source": null
+        },
+        {
+          "id": "appr",
+          "label": "Budget holder approves",
+          "kind": "step",
+          "source": null
+        },
+        {
+          "id": "ctrl",
+          "label": "Finance controller sign-off",
+          "kind": "step",
+          "source": null
+        },
+        {
+          "id": "sched",
+          "label": "Payment scheduled",
+          "kind": "step",
+          "source": null
+        },
+        {
+          "id": "paid",
+          "label": "Paid on the next payment run",
+          "kind": "step",
+          "source": null
+        },
+        {
+          "id": "filed",
+          "label": "Filed for audit",
+          "kind": "end",
+          "source": null
+        }
+      ],
+      "edges": [
+        {
+          "from": "recv",
+          "to": "ok",
+          "label": null
+        },
+        {
+          "from": "ok",
+          "to": "appr",
+          "label": "Yes"
+        },
+        {
+          "from": "ok",
+          "to": "chase",
+          "label": "No"
+        },
+        {
+          "from": "chase",
+          "to": "ok",
+          "label": "Corrected invoice"
+        },
+        {
+          "from": "chase",
+          "to": "chase",
+          "label": "Reminder after 5 days"
+        },
+        {
+          "from": "appr",
+          "to": "ctrl",
+          "label": null
+        },
+        {
+          "from": "ctrl",
+          "to": "sched",
+          "label": null
+        },
+        {
+          "from": "sched",
+          "to": "paid",
+          "label": null
+        },
+        {
+          "from": "paid",
+          "to": "filed",
+          "label": null
+        }
+      ]
+    }
+  },
+  "caption": {
+    "row_count": 8,
+    "sources": [
+      {
+        "tool": "search_documents",
+        "document": null,
+        "page": null
+      }
+    ],
+    "source_count": 1,
+    "lineage": null
+  },
+  "row_count": 8,
+  "spec_version": 1,
+  "created_at": "2026-10-24T09:12:31.204118+00:00",
+  "examples": [
+    {
+      "id": "a_c3n8w1t6ry",
+      "thread_id": "5b1f6c2e-8a47-4d3b-9e0f-2c7a1d9b4e63",
+      "user_id": "0f3a9c71-2b6e-4f18-a5d4-7e8b9c0d1a2f",
+      "org_id": "c4e2a817-6d09-4b5f-8a3e-91f0b7d2c654",
+      "run_id": "9d7e3b21-4c58-4a6f-b0e2-1f8c6a3d5b79",
+      "tool_call_id": "call_Cm7Vx2Qp9Lk4Tz1s",
+      "parent_id": null,
+      "label": "comparison 1",
+      "component": "comparison",
+      "spec": {
+        "title": "Freight contracts, key terms",
+        "comparison": {
+          "options": [
+            "Atlas Logistics",
+            "Northwind Freight",
+            "Kestrel Cargo"
+          ],
+          "terms": [
+            {
+              "name": "Initial term",
+              "cells": [
+                {
+                  "verdict": "m",
+                  "text": "3 years",
+                  "source": null
+                },
+                {
+                  "verdict": "m",
+                  "text": "2 years",
+                  "source": null
+                },
+                {
+                  "verdict": "m",
+                  "text": "3 years",
+                  "source": null
+                }
+              ]
+            },
+            {
+              "name": "Auto-renewal",
+              "cells": [
+                {
+                  "verdict": "m",
+                  "text": "1 year, unless notice",
+                  "source": null
+                },
+                {
+                  "verdict": "y",
+                  "text": "None, must re-sign",
+                  "source": null
+                },
+                {
+                  "verdict": "m",
+                  "text": "1 year, unless notice",
+                  "source": null
+                }
+              ]
+            },
+            {
+              "name": "Termination notice",
+              "cells": [
+                {
+                  "verdict": "n",
+                  "text": "90 days",
+                  "source": null
+                },
+                {
+                  "verdict": "y",
+                  "text": "30 days",
+                  "source": null
+                },
+                {
+                  "verdict": "m",
+                  "text": "60 days",
+                  "source": {
+                    "document": "Kestrel_Proposal_2025.pdf",
+                    "page": null,
+                    "excerpt": "Sixty days' written notice is required to terminate."
+                  }
+                }
+              ]
+            },
+            {
+              "name": "Liability cap",
+              "cells": [
+                {
+                  "verdict": "y",
+                  "text": "12 months' fees",
+                  "source": null
+                },
+                {
+                  "verdict": "n",
+                  "text": "6 months' fees",
+                  "source": null
+                },
+                {
+                  "verdict": "y",
+                  "text": "12 months' fees",
+                  "source": null
+                }
+              ]
+            },
+            {
+              "name": "SLA credits",
+              "cells": [
+                {
+                  "verdict": "y",
+                  "text": "Up to 10% of monthly fee",
+                  "source": null
+                },
+                {
+                  "verdict": "q",
+                  "text": null,
+                  "source": null
+                },
+                {
+                  "verdict": "m",
+                  "text": "Up to 5% of monthly fee",
+                  "source": null
+                }
+              ]
+            },
+            {
+              "name": "EU data residency",
+              "cells": [
+                {
+                  "verdict": "y",
+                  "text": "Yes, Frankfurt",
+                  "source": null
+                },
+                {
+                  "verdict": "y",
+                  "text": "Yes, Dublin",
+                  "source": null
+                },
+                {
+                  "verdict": "q",
+                  "text": null,
+                  "source": null
+                }
+              ]
+            },
+            {
+              "name": "Price escalation",
+              "cells": [
+                {
+                  "verdict": "m",
+                  "text": "CPI, capped at 4%",
+                  "source": null
+                },
+                {
+                  "verdict": "y",
+                  "text": "Fixed for 2 years",
+                  "source": null
+                },
+                {
+                  "verdict": "n",
+                  "text": "CPI, no cap",
+                  "source": null
+                }
+              ]
+            }
+          ]
+        }
+      },
+      "caption": {
+        "row_count": 7,
+        "sources": [
+          {
+            "tool": "search_documents",
+            "document": null,
+            "page": null
+          }
+        ],
+        "source_count": 1,
+        "lineage": null
+      },
+      "row_count": 7,
+      "spec_version": 1,
+      "created_at": "2026-10-24T09:14:02.917450+00:00"
+    },
+    {
+      "id": "a_t5p0h8v2ks",
+      "thread_id": "5b1f6c2e-8a47-4d3b-9e0f-2c7a1d9b4e63",
+      "user_id": "0f3a9c71-2b6e-4f18-a5d4-7e8b9c0d1a2f",
+      "org_id": "c4e2a817-6d09-4b5f-8a3e-91f0b7d2c654",
+      "run_id": "9d7e3b21-4c58-4a6f-b0e2-1f8c6a3d5b79",
+      "tool_call_id": "call_Tl3Hs8Wq1Np5Yc6d",
+      "parent_id": null,
+      "label": "timeline 1",
+      "component": "timeline",
+      "spec": {
+        "title": "Atlas contract history",
+        "timeline": {
+          "events": [
+            {
+              "date": "2023-03-14",
+              "title": "MSA signed",
+              "detail": "Three-year master services agreement for EU freight.",
+              "category": "Contract",
+              "deadline": false,
+              "source": null
+            },
+            {
+              "date": "2023-04-01",
+              "title": "Services start",
+              "detail": "First shipments under the agreement.",
+              "category": "Contract",
+              "deadline": false,
+              "source": null
+            },
+            {
+              "date": "2024-02-09",
+              "title": "Amendment 1, price +3.5%",
+              "detail": "Fuel surcharge folded into the base rate.",
+              "category": "Price",
+              "deadline": false,
+              "source": null
+            },
+            {
+              "date": "2024-11",
+              "title": "SLA breach notice",
+              "detail": "Three missed delivery windows in October.",
+              "category": "SLA",
+              "deadline": false,
+              "source": null
+            },
+            {
+              "date": "2025-01-15",
+              "title": "Service credits applied, $18.4K",
+              "detail": "Credited against the January invoice.",
+              "category": "SLA",
+              "deadline": false,
+              "source": null
+            },
+            {
+              "date": "2025-04",
+              "title": "Annual CPI uplift +2.9%",
+              "detail": "Within the 4% cap.",
+              "category": "Price",
+              "deadline": false,
+              "source": null
+            },
+            {
+              "date": "2026-04-01",
+              "title": "Annual CPI uplift +3.1%",
+              "detail": "Within the 4% cap.",
+              "category": "Price",
+              "deadline": false,
+              "source": null
+            },
+            {
+              "date": "2026-12-31",
+              "title": "Non-renewal notice deadline",
+              "detail": "Last day to give 90 days' notice before the term ends.",
+              "category": "Contract",
+              "deadline": true,
+              "source": {
+                "document": "Atlas_MSA_2023.pdf",
+                "page": null,
+                "excerpt": "Either party may give notice of non-renewal at least ninety (90) days before the end of the term."
+              }
+            },
+            {
+              "date": "2027-03-31",
+              "title": "Initial term ends",
+              "detail": "Renews for one year unless notice was given.",
+              "category": "Contract",
+              "deadline": false,
+              "source": null
+            }
+          ]
+        }
+      },
+      "caption": {
+        "row_count": 9,
+        "sources": [
+          {
+            "tool": "search_documents",
+            "document": null,
+            "page": null
+          },
+          {
+            "tool": "query_tables",
+            "document": "Incident_Log_2024.xlsx",
+            "page": null
+          }
+        ],
+        "source_count": 2,
+        "lineage": null
+      },
+      "row_count": 9,
+      "spec_version": 1,
+      "created_at": "2026-10-24T09:16:45.033871+00:00"
+    }
+  ]
+}

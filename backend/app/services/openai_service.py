@@ -15,7 +15,7 @@ from app.config import (
 )
 # Phase 273 (I-1) — the show_artifact enums are derived from the closed Literals (pydantic +
 # stdlib only; no cycle).
-from app.models.artifact import ARTIFACT_COMPONENTS, CHART_KINDS
+from app.models.artifact import ARTIFACT_COMPONENTS, CHART_KINDS, NODE_KINDS, VERDICTS
 
 logger = logging.getLogger(__name__)
 
@@ -1172,13 +1172,22 @@ ASK_USER_TOOL = {
 # "in-chat visual vs a FILE" guidance and one compact example call live in the DESCRIPTION (a
 # STRUCTURED-mode model sees only top-level names, so the example is load-bearing); SYSTEM_PROMPT
 # is untouched.
+#
+# Phase 292 (D-09 / D-10): three more components — diagram, comparison, timeline — as REGISTRY
+# ENTRIES only: the enum widens (derived), three nullable nested objects join, and the description
+# says when to pick each. No new tool (the count stays 30). Enums stay non-nullable (a null enum
+# value is invalid under JSON Schema); the nested objects are plain properties so the Gemini
+# sanitizer converts them (measured in 292-01, and one live Gemini request is recorded there).
 _ARTIFACT_CELL = {"type": ["string", "number", "null"]}
+_ARTIFACT_SOURCE = {"type": ["integer", "null"],
+                    "description": "The [n] number of a source retrieved this turn. Omit if none."}
 SHOW_ARTIFACT_TOOL = {
     "type": "function",
     "function": {
         "name": "show_artifact",
         "description": (
-            "Show the user an interactive chart, table or single metric, rendered below your answer. "
+            "Show the user an interactive chart, table, metric, diagram, comparison or timeline, rendered "
+            "below your answer. "
             "Use when: you have numbers worth seeing in the chat (a trend, a comparison, a breakdown, "
             "one headline figure) — call this instead of drawing a chart with code. "
             "Do not use for: a FILE the user asked for (a PNG, an image, a chart 'for the deck' or "
@@ -1195,6 +1204,20 @@ SHOW_ARTIFACT_TOOL = {
             "\"chart 1\"> and NO columns or rows; add transform {filter: [{column, op: eq|in|range, "
             "value|values|min|max}], sort: {column, direction}, top_n, select: [columns]} to narrow it. "
             "The stored values are reused exactly; nothing is re-fetched. "
+            "diagram: how steps connect (a process, an approval chain): diagram {nodes: [{id, label, "
+            "kind?: start|step|decision|end, source?}], edges: [{from, to, label?}]}; 2-25 nodes, 1-40 "
+            "edges, no coordinates. "
+            "comparison: options side by side on named terms. When the user asks to compare two or more "
+            "named options (contracts, vendors, plans, policies) on several terms, call this with "
+            "component comparison instead of writing a markdown table, even if they never say 'side by "
+            "side' or 'table': comparison {options: [2-5 names], terms: "
+            "[{name, cells: [{verdict, text?, source?}], one cell per option in option order}]}, max 20 "
+            "terms; verdict y = favourable for (or meets) what the user asked, n = unfavourable (or does "
+            "not meet it), m = neutral or partly, q = not stated in what was retrieved. "
+            "timeline: dated events with no number to chart: timeline {events: [{date: YYYY-MM-DD or "
+            "YYYY-MM, title, detail?, category?, deadline?: true|false, source?}]}, max 40. "
+            "source = the [n] of a source retrieved this turn; omit it otherwise. These three are never "
+            "redrawn with from_artifact: send the data again. Use a table for anything else. "
             "After the call, write one or two sentences about what it shows. "
             "Example: {\"component\":\"chart\",\"title\":\"Revenue by quarter\",\"columns\":"
             "[{\"name\":\"quarter\",\"type\":\"string\"},{\"name\":\"revenue\",\"type\":\"number\","
@@ -1205,7 +1228,8 @@ SHOW_ARTIFACT_TOOL = {
             "type": "object",
             "properties": {
                 "component": {"type": "string", "enum": list(ARTIFACT_COMPONENTS),
-                              "description": "Which artifact: chart, table or metric."},
+                              "description": "Which artifact: chart, table, metric, diagram, comparison "
+                                             "or timeline."},
                 "title": {"type": "string", "description": "A short title (max 120 characters)."},
                 "from_artifact": {"type": ["string", "null"],
                                   "description": "The artifact_id or label (e.g. 'chart 1') of an artifact "
@@ -1272,6 +1296,87 @@ SHOW_ARTIFACT_TOOL = {
                         },
                         "top_n": {"type": ["integer", "null"]},
                     },
+                },
+                "diagram": {
+                    "type": ["object", "null"],
+                    "properties": {
+                        "nodes": {
+                            "type": "array",
+                            "items": {
+                                "type": "object",
+                                "properties": {
+                                    "id": {"type": "string"},
+                                    "label": {"type": "string"},
+                                    "kind": {"type": "string", "enum": list(NODE_KINDS)},
+                                    "source": _ARTIFACT_SOURCE,
+                                },
+                                "required": ["id", "label"],
+                            },
+                        },
+                        "edges": {
+                            "type": "array",
+                            "items": {
+                                "type": "object",
+                                "properties": {
+                                    "from": {"type": "string"},
+                                    "to": {"type": "string"},
+                                    "label": {"type": ["string", "null"]},
+                                },
+                                "required": ["from", "to"],
+                            },
+                        },
+                    },
+                    "required": ["nodes", "edges"],
+                },
+                "comparison": {
+                    "type": ["object", "null"],
+                    "properties": {
+                        "options": {"type": "array", "items": {"type": "string"}},
+                        "terms": {
+                            "type": "array",
+                            "items": {
+                                "type": "object",
+                                "properties": {
+                                    "name": {"type": "string"},
+                                    "cells": {
+                                        "type": "array",
+                                        "items": {
+                                            "type": "object",
+                                            "properties": {
+                                                "verdict": {"type": "string", "enum": list(VERDICTS)},
+                                                "text": {"type": ["string", "null"]},
+                                                "source": _ARTIFACT_SOURCE,
+                                            },
+                                            "required": ["verdict"],
+                                        },
+                                    },
+                                },
+                                "required": ["name", "cells"],
+                            },
+                        },
+                    },
+                    "required": ["options", "terms"],
+                },
+                "timeline": {
+                    "type": ["object", "null"],
+                    "properties": {
+                        "events": {
+                            "type": "array",
+                            "items": {
+                                "type": "object",
+                                "properties": {
+                                    "date": {"type": "string", "description": "YYYY-MM-DD or YYYY-MM"},
+                                    "title": {"type": "string"},
+                                    "detail": {"type": ["string", "null"]},
+                                    "category": {"type": ["string", "null"]},
+                                    "deadline": {"type": ["boolean", "null"]},
+                                    "source": _ARTIFACT_SOURCE,
+                                },
+                                "required": ["date", "title"],
+                            },
+                        },
+                    },
+                    "required": ["events"],
                 },
             },
             "required": ["component", "title"],
