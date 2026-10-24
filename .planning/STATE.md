@@ -41,7 +41,8 @@ reviewer exists, so a phase closes `verification_mode: self-verified`, never `re
 
 ## Current Position
 
-Phase: 293 (Start From Outside, and Close Out) — NEXT (discuss-phase not started)
+Phase: 293 (Start From Outside, and Close Out) — CONTEXT GATHERED 2026-10-24 (`60dd886c6`, D-01..D-33). Next: `/gsd:sketch` of the API keys tab (D-21, G-2), then `/gsd:plan-phase 293`.
+  Key facts: no API keys exist today (first non-login credential); a key = one person in one org, lists its workflows, expiry 30/90/365/never; start + poll; origin app/schedule/key on 4 surfaces; card shows next run time. Migration 215.
 Previous: Phase: 292.1 (Tool-limit Continue that always fires) — CLOSED BY DECISION 2026-10-24, operator signed G-4. NOT deployed.
   4 plans + review fixes + 7 live-found fixes on develop (last 90f485dd2). Verifier human_needed (no code gaps). Gates: backend 70 failed / 9595 (<=71), vitest count gate OK 11936.
   OWED: OpenRouter DeepSeek board row (402 out of credits) — BUG-261024-03 stays `folded` until `scripts/run-2921-board.py --run --providers openrouter` passes after a top-up. Moonshot ⛔ (account suspended).
