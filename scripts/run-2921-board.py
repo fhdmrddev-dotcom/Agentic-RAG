@@ -35,6 +35,13 @@ Every mode runs against the LOCAL stack only: ``conc_probe.assert_localhost_only
   --reload-check    For every board thread in the evidence: GET /threads/{id}/messages again; content
                     must equal the DB and ``detect_markup`` must be None on every assistant message.
   --reverdict       Re-apply the verdict rule to every row from its own evidence JSON (offline).
+  --force-pending   Operator "force it" (2026-10-24): per row, up to 3 attempts walking FORCE_PROMPTS
+                    (six dependent sequential calls, prose forbidden; then parallel rounds) so a call is
+                    PENDING when the cap lands. Pauses are continued exactly as --run does; no-pause rows
+                    record what the forced-final round produced (prose / markup / empty / provider error).
+                    Verdicts PASS / NO-PAUSE / FAIL / ⛔; evidence under evidence/force-pending/.
+  --force-reclassify  Re-read each forced-pending attempt's final message from the DB and re-apply the
+                    final-output reading (adds harmony-syntax and app-fallback kinds) — read-only.
 
 A pause is read with the SHIPPED predicate ``app.db.runs.run_is_cap_paused`` (292.1-REVIEW CR-01):
 a first-turn pause finalizes ``completed`` + a carrier row, so ``runs.status`` alone is not the
@@ -50,6 +57,7 @@ Usage (backend venv, repo root):
     backend/venv/Scripts/python.exe scripts/run-2921-board.py --long --providers deepseek
     backend/venv/Scripts/python.exe scripts/run-2921-board.py --parallel --providers google
     backend/venv/Scripts/python.exe scripts/run-2921-board.py --reload-check
+    backend/venv/Scripts/python.exe scripts/run-2921-board.py --force-pending --providers openai,anthropic,zhipu,moonshot
   Optional ``--log PATH``: the uvicorn log, so a ``text_tool_markup run=<id>`` WARNING confirms a
   text-pause instead of the id-shape heuristic.
 """
@@ -103,6 +111,39 @@ BOARD_PROMPT = (
     "skip a step and do not combine steps."
 )
 PARALLEL_B_PROMPT = "In one sentence: what is a project milestone?"
+
+# --force-pending (operator "force it", 2026-10-24): prompts built to leave a tool call PENDING when
+# the cap (2) lands — six dependent sequential calls with prose forbidden until all are done, and a
+# parallel-calls variant. Attempts walk FORCE_PROMPTS in order (V1, V2, V1) and stop at the first pause.
+FORCE_SEQ_PROMPT = (
+    "You must complete ALL SIX of the following tool calls, strictly one at a time, each as its own "
+    "separate tool call, and each one depends on the result of the previous one, so you must wait for "
+    "each result before making the next call:\n"
+    "1) search_documents for 'project plan';\n"
+    "2) search_documents for the milestones named in result 1;\n"
+    "3) search_documents for the owners of those milestones;\n"
+    "4) search_documents for the risks attached to those milestones;\n"
+    "5) execute_code: compute the number of milestones per quarter from results 2-4;\n"
+    "6) execute_code: draw a bar chart of the counts computed in step 5.\n"
+    "Do NOT write any prose, summary, explanation or partial answer until all six calls have returned. "
+    "If any search returns nothing, still make the next call with your best query. Never skip, merge or "
+    "reorder a step."
+)
+FORCE_PARALLEL_PROMPT = (
+    "Work in rounds of PARALLEL tool calls and do not write any prose until every round is done.\n"
+    "Round A — in ONE turn, call search_documents four times in parallel: 'project plan', 'milestones', "
+    "'owners', 'risks'.\n"
+    "Round B — after those return, in ONE turn, call search_documents four more times in parallel for "
+    "the details of each milestone you found (use your best query if nothing was found).\n"
+    "Round C — after those return, in ONE turn, call execute_code twice in parallel: one to count "
+    "milestones per quarter, one to draw a bar chart of them.\n"
+    "Only after Round C has returned may you write your answer. Never skip or merge a round."
+)
+FORCE_PROMPTS = [("V1-sequential-6", FORCE_SEQ_PROMPT), ("V2-parallel-rounds", FORCE_PARALLEL_PROMPT),
+                 ("V1-sequential-6", FORCE_SEQ_PROMPT)]
+_FORCE_DIR = _EVIDENCE / "force-pending"
+_HARMONY = re.compile(r"\bto=functions\.[A-Za-z_][A-Za-z0-9_]*")
+_APP_FALLBACK = "*The model produced"
 
 
 # ── lock + knob ─────────────────────────────────────────────────────────────────────────────────
@@ -339,6 +380,38 @@ def _markup_scan(conn, thread_ids: list[str]) -> list[dict]:
     return hits
 
 
+def _final_output(conn, att: dict) -> dict:
+    """What the run's LAST assistant turn produced (for a no-pause row, that is the forced-final
+    round): ``prose`` / ``markup`` (shipped ``detect_markup`` hit) / ``empty``, or the provider error."""
+    from app.services.text_tool_calls import detect_markup  # noqa: PLC0415
+    run = att.get("run") or {}
+    if not att.get("run_id"):
+        return {"kind": "no-send", "error": att.get("error")}
+    if run.get("status") == "failed":
+        return {"kind": "provider-error", "error": run.get("error")}
+    m = kit._fetchone(conn, "SELECT id::text AS id, content, tool_calls FROM messages WHERE thread_id = %s "
+                            "AND role = 'assistant' ORDER BY created_at DESC LIMIT 1", (att["thread_id"],))
+    text = (m or {}).get("content") or ""
+    at = detect_markup(text)
+    # Two board-local readings the SHIPPED detector does not make (recorded as such, never as a
+    # detect_markup hit): OpenAI harmony call syntax written as text (`to=functions.<tool> ...`,
+    # measured on gpt-5.6-luna 2026-10-24), and the agent loop's own "never wrote an answer"
+    # fallback (agent_loop.py), which means the model's final round was EMPTY, not prose.
+    harmony = _HARMONY.search(text)
+    if not text.strip():
+        kind = "empty"
+    elif at is not None:
+        kind = "markup"
+    elif harmony:
+        kind = "harmony-markup (not in detect_markup)"
+    elif text.startswith(_APP_FALLBACK):
+        kind = "empty (app fallback note)"
+    else:
+        kind = "prose"
+    return {"kind": kind, "message_id": (m or {}).get("id"), "chars": len(text), "markup_at": at,
+            "harmony_at": harmony.start() if harmony else None, "preview": text[:300]}
+
+
 def _reload_equal(conn, base, h, thread_id) -> dict:
     r = kit._requests().get(f"{base}/threads/{thread_id}/messages", headers=h, timeout=30)
     if r.status_code != 200:
@@ -412,11 +485,19 @@ def _continue(conn, base, h, att: dict, timeout) -> dict:
 
 
 def _drive_row(conn, base, h, entry, prompt, args, title) -> dict:
+    """``prompt`` is one string (every attempt) or a list of ``(variant, prompt)`` pairs (one per
+    attempt, in order — the --force-pending walk)."""
+    plan = [(None, prompt)] * ATTEMPTS if isinstance(prompt, str) else list(prompt)[:ATTEMPTS]
     attempts = []
-    for i in range(1, ATTEMPTS + 1):
-        att = _attempt(conn, base, h, entry, prompt, args.timeout, f"{title} #{i}", args.log)
+    for i, (variant, text) in enumerate(plan, start=1):
+        att = _attempt(conn, base, h, entry, text, args.timeout, f"{title} #{i}", args.log)
+        if variant:
+            att["variant"] = variant
+            att["final_output"] = _final_output(conn, att)
         attempts.append(att)
-        print(f"  attempt {i}: run={att.get('run_id')} status={att.get('status')} paused={att.get('paused')} "
+        print(f"  attempt {i}{' [' + variant + ']' if variant else ''}: run={att.get('run_id')} "
+              f"status={att.get('status')} paused={att.get('paused')} "
+              f"final={(att.get('final_output') or {}).get('kind')} "
               f"class={att.get('classification')} tools={att.get('tool_starts')} {att.get('error') or ''}")
         if att.get("paused"):
             break
@@ -468,9 +549,9 @@ def _verdict(res: dict) -> str:
     return "PASS"
 
 
-def _write(name: str, payload: dict) -> str:
-    _BOARD.mkdir(parents=True, exist_ok=True)
-    p = _BOARD / name
+def _write(name: str, payload: dict, folder: Path = _BOARD) -> str:
+    folder.mkdir(parents=True, exist_ok=True)
+    p = folder / name
     p.write_text(json.dumps(payload, indent=2, default=str), encoding="utf-8")
     return str(p.relative_to(_REPO)).replace("\\", "/")
 
@@ -529,6 +610,93 @@ def run_board(token, org_id, conn, args) -> int:
                                if (r["provider"], r["model"]) != (row["provider"], row["model"])] + [row]
             _save_summary(summary)
     _print_table(summary)
+    return 0
+
+
+def _force_verdict(res: dict) -> str:
+    """The operator's four verdicts for the forced-pending board: PASS / NO-PAUSE / FAIL / ⛔.
+    ``_verdict`` stays the judge of every failure arm; only its OBSERVATION arms are renamed."""
+    v = _verdict(res)
+    if v == "PASS" or v.startswith("FAIL") or v.startswith("⛔"):
+        return v
+    kinds = [(a.get("final_output") or {}).get("kind") for a in res["attempts"]]
+    if all(k in ("provider-error", "no-send") for k in kinds):
+        return "⛔ every attempt ended with a provider error"
+    return f"NO-PAUSE (final round: {', '.join(str(k) for k in kinds)})"
+
+
+def force_reclassify(conn) -> int:
+    """Re-read every attempt's final assistant message from the DB and re-apply ``_final_output`` +
+    ``_force_verdict`` to evidence/force-pending/summary.json (no model call, no settings write)."""
+    p = _FORCE_DIR / "summary.json"
+    summary = json.loads(p.read_text(encoding="utf-8"))
+    for row in summary["rows"]:
+        if row.get("blocked"):
+            continue
+        for a in row["attempts"]:
+            a["final_output"] = _final_output(conn, {**a, "run": _run_row(conn, a["run_id"]) if a.get("run_id") else {}})
+        res = {"attempts": row["attempts"], "paused": row["paused"], "continue": row["continue"],
+               "markup_hits": row["markup_hits"], "reload": {t: {"http": 200, "equal": row["reload_equal"]}
+                                                             for t in row["threads"]}}
+        new = _force_verdict(res)
+        print(f"RECLASS {row['provider']}: {row['verdict']} -> {new}")
+        row["verdict"] = new
+    summary["reclassified_at"] = time.strftime("%Y-%m-%dT%H:%M:%S")
+    p.write_text(json.dumps(summary, indent=2, default=str), encoding="utf-8")
+    return 0
+
+
+def run_force_pending(token, org_id, conn, args) -> int:
+    base, h = kit.base_url(), b273._headers(token, org_id)
+    roster, probe, _ = derive(conn, quiet=True)
+    wanted = set(filter(None, args.providers.split(","))) if args.providers else None
+    summary = {"at": time.strftime("%Y-%m-%dT%H:%M:%S"), "cap": LOW_CAP,
+               "prompts": dict(FORCE_PROMPTS), "rows": []}
+    with _db_lock("board --force-pending"), _low_cap(base, h, "board --force-pending") as knob:
+        summary["knob_set"] = knob
+        for entry, reason in _selected(roster, probe, wanted):
+            if entry.get("extra"):
+                continue
+            row = {"provider": entry["provider"], "model": entry["model"], "calling_mode": entry.get("calling_mode")}
+            if reason:
+                row.update({"blocked": reason, "verdict": "⛔"})
+                print(f"FORCE {entry['provider']} ⛔ {reason}")
+            else:
+                print(f"FORCE {entry['provider']} {entry['model']}")
+                res = _drive_row(conn, base, h, entry, FORCE_PROMPTS, args, f"292.1 force {entry['provider']}")
+                first = next((a for a in res["attempts"] if a.get("paused")), res["attempts"][-1])
+                row.update({
+                    "verdict": _force_verdict(res), "paused": res["paused"],
+                    "classification": first.get("classification"), "paused_variant": first.get("variant") if res["paused"] else None,
+                    "attempts": [{k: a.get(k) for k in ("variant", "run_id", "thread_id", "status", "paused",
+                                                        "classification", "tool_starts", "final_output")}
+                                 | {"error": (a.get("run") or {}).get("error") or a.get("error")}
+                                 for a in res["attempts"]],
+                    "continue": res["continue"], "markup_hits": res["markup_hits"],
+                    "threads": [a["thread_id"] for a in res["attempts"] if a.get("thread_id")],
+                    "reload_equal": all(v["equal"] for v in res["reload"].values()),
+                })
+                row["evidence"] = _write(f"{entry['provider']}-{first.get('run_id') or 'nosend'}.json",
+                                         {"entry": {k: entry.get(k) for k in ("provider", "model", "calling_mode")},
+                                          "prompts": dict(FORCE_PROMPTS), **res}, _FORCE_DIR)
+                print(f"FORCE {entry['provider']} -> {row['verdict']} evidence={row['evidence']}")
+            summary["rows"].append(row)
+            _FORCE_DIR.mkdir(parents=True, exist_ok=True)
+            (_FORCE_DIR / "summary.json").write_text(json.dumps(summary, indent=2, default=str), encoding="utf-8")
+    summary["knob_after"] = _get_cap(base, h)
+    summary["markup_hits"] = sum(len(r.get("markup_hits") or []) for r in summary["rows"])
+    (_FORCE_DIR / "summary.json").write_text(json.dumps(summary, indent=2, default=str), encoding="utf-8")
+    print(f"\nFORCE knob after restore: GET /settings chat_max_tool_rounds={summary['knob_after']['chat_max_tool_rounds']}"
+          f" (http {summary['knob_after']['http']}, {summary['knob_after']['at']})")
+    print("| Provider | Model | Paused? | Class | Continue | Run ids | Markup | Verdict |")
+    for r in summary["rows"]:
+        c = r.get("continue") or {}
+        cc = (f"http {c.get('http')} same_run={c.get('same_run_id')} used {c.get('continues_used_before')}→"
+              f"{c.get('continues_used_after')} queued_first={c.get('queued_call_ran_first')} end={c.get('status_after')}"
+              if c else "—")
+        ids = ", ".join(f"{a.get('variant')}:{a.get('run_id')}" for a in r.get("attempts") or [])
+        print(f"| {r['provider']} | {r['model']} | {r.get('paused')} | {r.get('classification')} | {cc} | {ids} | "
+              f"{len(r.get('markup_hits') or [])} | {r['verdict']} |")
     return 0
 
 
@@ -723,7 +891,7 @@ def reload_check(token, org_id, conn, args) -> int:
 def main() -> int:
     ap = argparse.ArgumentParser()
     g = ap.add_mutually_exclusive_group(required=True)
-    for m in ("roster", "run", "typed-continue", "long", "parallel", "reload-check", "reverdict"):
+    for m in ("roster", "run", "typed-continue", "long", "parallel", "reload-check", "reverdict", "force-pending", "force-reclassify"):
         g.add_argument(f"--{m}", action="store_true")
     ap.add_argument("--providers", default="")
     ap.add_argument("--timeout", type=int, default=420)
@@ -736,6 +904,8 @@ def main() -> int:
     b273._assert_local_db()
     conn = kit.connect_db()
     conn.autocommit = True
+    if args.force_reclassify:
+        return force_reclassify(conn)
     if args.roster:
         _, _, text = derive(conn)
         _EVIDENCE.mkdir(parents=True, exist_ok=True)
@@ -754,6 +924,8 @@ def main() -> int:
         return run_parallel(token, org_id, conn, args)
     if args.reload_check:
         return reload_check(token, org_id, conn, args)
+    if args.force_pending:
+        return run_force_pending(token, org_id, conn, args)
     return run_board(token, org_id, conn, args)
 
 
