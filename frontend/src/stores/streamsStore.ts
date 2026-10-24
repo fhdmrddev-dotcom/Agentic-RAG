@@ -429,8 +429,11 @@ export interface StreamsState {
      * ⚠ `void`, NOT `Promise<void>`: it is fire-and-forget from a click handler (a rejected
      * background read must never reach a card with no error boundary), and a `void` return is
      * what lets the no-op stub below stay a bare arrow.
+     *
+     * 292.1 G-4: `reattach: false` keeps a kept lock WITHOUT re-attaching — the sendMessage
+     * terminal's caller, whose run just ended its own stream with `done` after a cap pause.
      */
-    releaseSettledWorkflowLock: (threadId: string) => void
+    releaseSettledWorkflowLock: (threadId: string, opts?: { reattach?: boolean }) => void
     // ──────────────────────────────────────────────────────────────────────────
     // Phase 094 Plan 02 (PANEL-08 / PANEL-09) — panel-only phase-timeline
     // mutators. Each copy-then-mutates the phasesByThread Map (new Map → set),
