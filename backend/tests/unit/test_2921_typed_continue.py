@@ -3,7 +3,9 @@
 Production evidence: after a tool-limit pause the user typed "continue" and got a NEW run on a
 different capacity path, while the paused run sat unresumed. The send door now carries ONE
 delegating branch: when the text is one of a short fixed list of continue words (D-13, no model
-call), the thread is Deep, and the thread's LATEST run is ``cap_paused`` with Continues left, the
+call), the thread is Deep, and the thread's LATEST root run is PAUSED with Continues left — per
+``app.db.runs.run_is_cap_paused``, because a first-turn pause reads ``completed`` (292.1-REVIEW
+CR-02) — the
 door hands the run to ``runs.continue_run`` — the same code the Continue button calls, and still the
 ONLY writer of ``runs.status`` (D-12; threads.py's recorded rejected arm stands).
 
@@ -73,7 +75,7 @@ def test_anything_else_is_a_new_request(text):
 
 class _SendHarness:
     def __init__(self, *, thread_row=None, latest_run=None, read_exc=None, continue_result=None,
-                 preflight_exc=None):
+                 preflight_exc=None, paused=None):
         self.thread_row = thread_row or {"id": THREAD_ID, "active_workflow_run_id": None}
         self.inserted_rows: list[dict] = []
         self.register = AsyncMock(return_value=None)
@@ -81,8 +83,14 @@ class _SendHarness:
         self.resolve = AsyncMock(return_value=rp.ThreadScoping(None, None, None, None, None))
         self.preflight = AsyncMock(side_effect=preflight_exc, return_value=(None, None))
         self.latest_run = latest_run
+        # What the ONE pause predicate (app.db.runs.run_is_cap_paused) answers. Default: the
+        # status alone (a re-pause writes cap_paused); a first-turn pause passes paused=True on a
+        # `completed` row — the real producer shape (292.1-REVIEW CR-02).
+        self.paused = paused if paused is not None else bool(
+            latest_run and latest_run.get("status") == "cap_paused")
         self.read_exc = read_exc
         self.sqls: list[str] = []
+        self.paused_args: list[tuple] = []
         self.continue_run = AsyncMock(return_value=continue_result if continue_result is not None else {
             "status": "ok", "run_id": RUN_ID, "continues_used": 2, "continues_remaining": 1,
         })
@@ -122,9 +130,13 @@ class _SendHarness:
 
         class _Conn:
             async def fetchrow(self, sql, *args):
-                harness.sqls.append(" ".join(sql.split()))
+                flat = " ".join(sql.split())
+                harness.sqls.append(flat)
                 if harness.read_exc is not None:
                     raise harness.read_exc
+                if "AS paused" in flat:
+                    harness.paused_args.append(args)
+                    return {"paused": harness.paused}
                 return harness.latest_run
 
         @asynccontextmanager
@@ -134,7 +146,11 @@ class _SendHarness:
         return _cm
 
     def runs_reads(self) -> list[str]:
-        return [s for s in self.sqls if "FROM runs" in s]
+        """The latest-run reads (the pause predicate's own read is counted separately)."""
+        return [s for s in self.sqls if "FROM runs" in s and "AS paused" not in s]
+
+    def paused_reads(self) -> list[str]:
+        return [s for s in self.sqls if "AS paused" in s]
 
     def patches(self):
         settings = SimpleNamespace(active_provider="openai", llm_model="gpt-4o")
@@ -280,11 +296,48 @@ async def test_a_refused_continue_dict_falls_through_to_a_new_message():
 
 
 @pytest.mark.asyncio
-async def test_a_completed_latest_run_is_a_normal_send():
-    h = _SendHarness(latest_run=_paused(0, status="completed"))
+async def test_a_completed_latest_run_with_no_pause_is_a_normal_send():
+    # A run that FINISHED: no carrier during it (or only an older one) → the predicate says no.
+    h = _SendHarness(latest_run=_paused(0, status="completed"), paused=False)
     resp, *_ = await _send(h, "continue")
     h.continue_run.assert_not_awaited()
+    assert len(h.paused_reads()) == 1, "completed asks the carrier-aware predicate"
     _assert_normal_send(h, resp)
+
+
+# ── 292.1-REVIEW CR-02: a FIRST-turn pause reads `completed` (the real producer shape) ──────
+
+
+@pytest.mark.asyncio
+async def test_a_typed_continue_resumes_a_first_turn_pause_finalized_completed():
+    h = _SendHarness(latest_run=_paused(0, status="completed"), paused=True)
+    resp, *_ = await _send(h, "continue")
+    h.continue_run.assert_awaited_once()
+    assert str(h.continue_run.await_args.kwargs["run_id"]) == RUN_ID
+    assert resp.status_code == 200 and json.loads(resp.body)["continued"] is True
+    assert h.inserted_rows == [] and h.register.await_count == 0
+    # the predicate is asked about THIS run, on the same per-request connection
+    assert len(h.paused_args) == 1 and str(h.paused_args[0][0]) == RUN_ID
+
+
+@pytest.mark.parametrize("status", ["failed", "cancelled", "timed_out", "streaming"])
+@pytest.mark.asyncio
+async def test_a_run_that_is_neither_paused_nor_completed_never_asks_the_predicate(status):
+    h = _SendHarness(latest_run=_paused(0, status=status), paused=True)
+    resp, *_ = await _send(h, "continue")
+    h.continue_run.assert_not_awaited()
+    assert h.paused_reads() == []
+    _assert_normal_send(h, resp)
+
+
+@pytest.mark.asyncio
+async def test_the_latest_run_read_skips_sub_agent_rows():
+    # A sub-agent row shares the thread and starts AFTER its parent; it must never be "the latest
+    # run" the pause is attributed to.
+    h = _SendHarness(latest_run=_paused(1))
+    await _send(h, "continue")
+    reads = h.runs_reads()
+    assert len(reads) == 1 and "parent_run_id IS NULL" in reads[0]
 
 
 @pytest.mark.asyncio

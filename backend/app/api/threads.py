@@ -92,7 +92,7 @@ from app.services.thread_workspace_cleanup import collect_thread_workspace_paths
 from app.services.artifact_history import attach_artifacts  # 273 (I-2 / ART-05) — reload attach
 from app.utils.db import aexec
 from app.dependencies import get_pg_pool
-from app.db.runs import finalize_run, insert_assistant_message
+from app.db.runs import finalize_run, insert_assistant_message, run_is_cap_paused
 # 257.1 (SC#4) — cost is READ through the one conversion home and the one rate resolver,
 # never re-derived here. See `_enrich_messages_with_runs` for why the lookup is batched.
 from app.db import rates
@@ -809,9 +809,11 @@ async def _typed_continue_or_none(
       (a) a workflow kickoff or a harness thread is never a typed Continue (harness anchors keep
           their own Continue);
       (b) the text must be one of the fixed continue words (D-13, no model call);
-      (c) the thread's LATEST run, read with the same no-status-predicate SQL the workflow
-          reconcile uses (the 244 rule: the pause belongs to the latest run or to nobody);
-      (d) it must be ``cap_paused`` with Continues left (D-16), read off the real setting;
+      (c) the thread's LATEST root run (never a sub-agent row), read with no status predicate —
+          the 244 rule: the pause belongs to the latest run or to nobody;
+      (d) it must be PAUSED per ``app.db.runs.run_is_cap_paused`` — the one carrier-aware
+          predicate (292.1-REVIEW CR-02: a FIRST-turn pause finalizes as ``completed`` by design,
+          so ``status == 'cap_paused'`` alone never fired on one) — with Continues left (D-16);
       (e) the run is handed to ``continue_run`` — the SAME code the button calls (D-14), so the
           resumed history is the button's history.
     A refused ``continue_run`` (a race to the last Continue) falls through to a normal send (D-16),
@@ -832,16 +834,20 @@ async def _typed_continue_or_none(
                 SELECT run_id, status, continues_used
                 FROM runs
                 WHERE thread_id = $1
+                  AND parent_run_id IS NULL
                 ORDER BY started_at DESC
                 LIMIT 1
                 """,
                 UUID(_thread_id) if isinstance(_thread_id, str) else _thread_id,
             )
+            # Only these two statuses can be a pause; anything else never costs the second read.
+            _paused = row is not None and row["status"] in ("cap_paused", "completed") and (
+                await run_is_cap_paused(_conn, UUID(str(row["run_id"]))))
     except Exception:  # noqa: BLE001 — fail open: a read failure never blocks a message
         logger.warning("typed continue: latest-run read failed for thread %s; sending as a new message",
                        _thread_id, exc_info=True)
         return None
-    if row is None or row["status"] != "cap_paused":
+    if not _paused:
         return None
     if (row["continues_used"] or 0) >= settings.max_continues_per_run:
         return None
