@@ -843,11 +843,11 @@ class ComparisonCell(_Strict):
     @model_validator(mode="after")
     def _not_stated_cites_nothing(self) -> "ComparisonCell":
         # 292-REVIEW WR-02: q means "not stated in what was retrieved"; a quoted clause under it would
-        # contradict the verdict it decorates.
+        # contradict the verdict it decorates. DROPPED, not refused: at the G4 live re-check a refusal
+        # here made gpt-5.4-mini abandon the whole comparison instead of retrying. The frontend guard
+        # neutralises a stored one the same way, so the two stacks agree.
         if self.verdict == "q" and self.source is not None:
-            _raise("not_stated_with_source",
-                   "a cell with verdict q (not stated in what was retrieved) carries no `source`; omit it, or "
-                   "use y / n / m with the source if the document does state the term.")
+            self.source = None
         return self
 
 
@@ -1224,8 +1224,8 @@ class StoredComparisonCell(_Strict):
 
     @model_validator(mode="after")
     def _not_stated_cites_nothing(self) -> "StoredComparisonCell":
-        if self.verdict == "q" and self.source is not None:  # 292-REVIEW WR-02
-            raise ValueError("a q (not stated) cell carries no source")
+        if self.verdict == "q" and self.source is not None:  # 292-REVIEW WR-02: dropped, as on the way in
+            self.source = None
         return self
 
 

@@ -292,7 +292,7 @@ function withNodeSource(source: unknown): Record<string, unknown> {
 
 const TOLERATED = (parity292 as unknown as { refused_then_tolerated: FixtureCase[] }).refused_then_tolerated ?? []
 
-describe("WR-02 (292-REVIEW) — refused by the backend, tolerated and neutralised by the guard", () => {
+describe("WR-02 (292-REVIEW, revised) — dropped by the backend, tolerated and neutralised by the guard", () => {
   it("every refused_then_tolerated case parses, and no q (not stated) cell keeps a source", () => {
     expect(TOLERATED.length).toBeGreaterThanOrEqual(1)
     for (const c of TOLERATED) {
