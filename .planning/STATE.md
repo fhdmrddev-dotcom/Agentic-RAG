@@ -43,7 +43,7 @@ reviewer exists, so a phase closes `verification_mode: self-verified`, never `re
 
 Phase: 292 (More Ways to Show It) — EXECUTED, human_needed (2026-10-24)
   3/3 plans + review fixes on develop (last 2b4ee5998). 4/4 SC verified in code; registry 3 → 6, tool count 30. Gates: backend 70 failed (= base), vitest count gate OK 11878, tsc 63 == base.
-  Mig 213 applied LOCAL only — cloud must get 213 BEFORE the backend deploys, then get_advisors(security). Not pushed.
+  Mig 213 APPLIED to cloud Supabase 2026-10-24 (operator-requested; apply_migration 213_message_artifacts_more_components): VERIFY 8/8 PASS, get_advisors(security) 0 ERROR, nothing on message_artifacts (pre-existing WARN/INFO only). Cloud had 8 rows (7 chart, 1 table), all pass. Backend code not pushed yet.
   Live re-checks PASSED after the operator restarted the backend: F-1 (plain compare → comparison, both providers; WR-02 revised refuse→drop 637a1f3cf), G4-1 diagrams, G-4 reloads 6/6, browser parallel thread. OWED: operator G-4 sign-off only (292-HUMAN-UAT test 5). 375px + LA timezone ⛔ (Chrome MCP).
   Merged branches worktree-agent-af54ab2c26652a3a5 / worktree-agent-a5f37f2864f70e1bf undeleted (omc guardrail blocks git branch -D).
 Previous: Phase: 292 — EXECUTING
