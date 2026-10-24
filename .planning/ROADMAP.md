@@ -320,7 +320,18 @@ Plans:
   4. The cap path is proven live on the full native roster + OpenRouter with a forced low cap (CLAUDE.md SC#10).
 
 **How we'd know this failed**: a model that writes its tool call as text still ends the turn with markup and no Continue; Continue starts a new run or loses the queued call; the cap is lowered or raised instead of fixed; only the provider that showed the bug is tested.
-**Plans**: TBD (target 2-3)
+**Plans**: 4 plans (G-8: one over D-21's target of 3; the knob plan is the only DB-mutating plan, so it stays separate from typed-continue)
+
+**Wave 1** *(parallel; 02 is the only plan that mutates the local DB)*
+
+- [ ] 292.1-01-PLAN.md — backend: provider-blind DSML parser + markup detector/holdback (`text_tool_calls.py`), cap pause on text calls, empty-queue marker, save-point sanitiser, round-cap read, SEED-323 reasoning replay, deepseek-only strip retired (TDD)
+- [ ] 292.1-02-PLAN.md — round-cap knobs: migration 214 (applied locally), settings plumbing, `AgentRoundLimits` leaf with one mount in Settings
+- [ ] 292.1-03-PLAN.md — typed continue (one delegating branch in send), Continue on the run's own model, SEED-324 terminal refusal, "Continuing…" + limit-line copy on the card (TDD)
+
+**Wave 2** *(blocked on Wave 1 completion)*
+
+- [ ] 292.1-04-PLAN.md — merged-tree gates, count-gate adoption, ledger close, SEED-372/373, 8-row SC#10 board with a forced low cap, G-4 in Chrome, BUG-261024-03 record
+
 **UI hint**: yes (the limit line + Continue card already exist from Phase 092 — reuse, do not rebuild)
 **Flags**: G-5: `backend/app/services/agent_loop.py` FIRES (read its ledger section first). Provider-docs-first for DeepSeek / OpenRouter tool formats. Reuse `cap_paused` (`agent_loop.py:~2850`, `config.max_continues_per_run`) and the existing DSML/XML parsers. Cross-check reported bugs at discuss: BUG-261024-04 (output files repeated / intermediate files shown) touches the same chat surface.
 

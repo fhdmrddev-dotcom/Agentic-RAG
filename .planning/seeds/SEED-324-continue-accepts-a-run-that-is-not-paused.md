@@ -3,7 +3,7 @@ seed_id: SEED-324
 title: POST /runs/{id}/continue accepts a run that is not cap_paused and re-runs it
 created: 2026-09-29
 surface: Agentic-RAG
-status: planted
+status: folded
 partial: false
 status_note:
 trigger_when: Any phase touching backend/app/api/runs.py continue_run or the run status lifecycle
@@ -11,7 +11,7 @@ trigger_paths: ["backend/app/api/runs.py", "backend/app/services/run_producer.py
 trigger_surfaces: ["chat"]
 migration_note:
 relates_to: ["268", "268-UAT-LOG.md D-3", "SEED-323"]
-folded_into: null
+folded_into: "292.1"
 renumbered_from: null
 renumbered_because: null
 ---

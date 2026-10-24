@@ -12003,6 +12003,10 @@ cells rot within days.
 | [`frontend/src/components/workflows/DescribeReferencesSection.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentsworkflowsdescribereferencessectiontsx) | 1 / 1 / 216 (was `0 / 0 / 0`) | no (young) | young (created 291-04). Peer references section beside `DescribeTemplateRow` (sketch B). ⛔ classes from `surfaceClasses.ts` only |
 | [`frontend/src/components/workflows/surfaceClasses.ts`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentsworkflowssurfaceclassests) | 2 / 1 / 67 (was `0 / 0 / 0`) | no (1 phase) | young (created 291-04). Door row consts + the arrival card's fold consts (moved 291-05) + `FOLD_BODY_CLASS`. ⛔ a `.ts` leaf (react-refresh rule) |
 | [`frontend/src/components/workflows/DraftInputsFold.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentsworkflowsdraftinputsfoldtsx) | 1 / 1 / 240 (was `0 / 0 / 0`) | no (young) | young (created 291-05). Trigger + body leaf: rows in the form's order, native radio Ask / Look it up, `Added by Syrel` from `origin` only. ⛔ fold classes imported; components-only exports |
+| [`backend/app/services/text_tool_calls.py`](docs/HOT-FILE-LEDGER.md#backendappservicestext_tool_callspy) | 0 / 0 / 0 | no (young) | young (planned 292.1-01). Pure DSML parser, F1-F6 markup detector/stripper, tag holdback, round-cap resolver. ⛔ no I/O; offered names passed in; no provider branch |
+| [`backend/app/services/typed_continue.py`](docs/HOT-FILE-LEDGER.md#backendappservicestyped_continuepy) | 0 / 0 / 0 | no (young) | young (planned 292.1-03). `CONTINUE_WORDS` + `is_continue_word` (D-13). ⛔ pure, no I/O, no model call; lockstep with `continueWords.ts` |
+| [`frontend/src/components/settings/AgentRoundLimits.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentssettingsagentroundlimitstsx) | 0 / 0 / 0 | no (young) | young (planned 292.1-02). Leaf: two bounded round-cap inputs, owns its fetch/save. ⛔ SettingsPage gains one mount, no state |
+| [`frontend/src/lib/continueWords.ts`](docs/HOT-FILE-LEDGER.md#frontendsrclibcontinuewordsts) | 0 / 0 / 0 | no (young) | young (planned 292.1-03). Client hint mirror of the backend continue words. ⛔ the server decides; `?raw` lockstep fence |
 
 
 
@@ -24209,3 +24213,19 @@ Every non-test source file in `git diff --name-only ba8e38c05..HEAD -- backend/a
 ### `scripts/vitest-count-gate.cjs` — Phase 292 close
 
 **`339 / 77 / 6681`** at 292 close (was `335 / 76 / 6658`). G-5: ⚠ **FIRES**. 292: nine suites adopted in the creating commits (eight in 292-02, `artifactParity292.fence.test.ts` in 292-03); five 273 pins raised in 292-02; none lowered.
+
+### `backend/app/services/text_tool_calls.py`
+
+**`0 / 0 / 0`** at 292.1 planning (2026-10-24). Young; row added AT PLANNING (the 273 / 290 precedent), so `check-hot-file-ledger.cjs 292.1` binds before the file exists. Created by **292.1-01** (TDD). The provider-blind home for everything the agent loop needs about tool calls written as TEXT (D-20: `agent_loop.py` gains call sites only): `parse_dsml` (DeepSeek DSML in every measured spelling: one or two fullwidth bars, optional space, block name ending in `calls`), a detector/stripper over the six measured families F1-F6 (D-06), the `TagHoldback` live-view gate (D-11, the 273 `feed`/`finish` contract), the post-drain `settle`, and `resolve_round_cap` (D-17/D-18). ⛔ **Inherited invariants:** pure, no I/O and no logging; the parser takes the run's OFFERED tool names as an argument and refuses the whole block on any name outside it (never `_get_known_tools()`); `string="false"` values are `json.loads` or the block is refused, never repaired (the MiniMax no-repair stance); ASCII `|DSML|` never matches; text inside code fences and inline code is never stripped; no provider-name branch anywhere (D-10). Self-hosted F4-F6 forms are detected and worded, never parsed (SEED-372). Does not fire.
+
+### `backend/app/services/typed_continue.py`
+
+**`0 / 0 / 0`** at 292.1 planning (2026-10-24). Young; row added AT PLANNING. Created by **292.1-03** (TDD). `CONTINUE_WORDS` (the six D-13 words) and `is_continue_word(text)`: casefold, trim whitespace, strip trailing `.!?…`, exact set membership. ⛔ **Inherited invariants:** pure, no I/O, no model call (D-13 rejected model-decided intent); the frontend mirror `frontend/src/lib/continueWords.ts` is held in lockstep by a `?raw` fence and a shared case fixture; the gate that USES it lives in `threads.py` (`_typed_continue_or_none`), which delegates to `runs.continue_run`, never writing `runs.status` itself (D-12). Does not fire.
+
+### `frontend/src/components/settings/AgentRoundLimits.tsx`
+
+**`0 / 0 / 0`** at 292.1 planning (2026-10-24). Young; row added AT PLANNING. Created by **292.1-02**. The two operator round-cap knobs (`chat_max_tool_rounds` default 15, `explorer_max_tool_rounds` default 8, bounded 2-50; D-17/D-18) as one self-fetching leaf, mounted with ONE line in `SettingsPage.tsx` (the 294-04 `RerankEngineBlock` precedent), because `SettingsPage.tsx` is G-5 FIRING with its state split OWED. ⛔ **Inherited invariants:** owns its own `getSettings` / `updateSettings` through the `@/lib/api` barrel; sends only changed fields; a cleared field never saves `0`; the server's 400 refusal text renders verbatim; `SettingsPage.tsx` gains no `useState`, no hydrate entry, no payload entry. Does not fire.
+
+### `frontend/src/lib/continueWords.ts`
+
+**`0 / 0 / 0`** at 292.1 planning (2026-10-24). Young; row added AT PLANNING. Created by **292.1-03**. The client RENDERING HINT for a typed continue (D-14): the same six words and normalisation as `backend/app/services/typed_continue.py`, plus the pure lock predicate `shouldTryTypedContinue`. ⛔ **Inherited invariants:** the server decides (D-12); the client only skips the optimistic bubbles when the hint matches and still handles a `continued: true` reply it did not predict; the word list is compared to the backend frozenset by a `?raw` lockstep test with a non-vacuity guard. Does not fire.

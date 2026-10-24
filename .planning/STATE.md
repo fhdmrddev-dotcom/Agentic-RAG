@@ -3,14 +3,13 @@ gsd_state_version: 1.0
 milestone: v4.7
 milestone_name: Workflows You Can See and Start Anywhere
 status: milestone_complete
-last_updated: "2026-10-24T06:06:15.071Z"
+last_updated: "2026-10-24T07:02:48.542Z"
 progress:
   total_phases: 18
   completed_phases: 9
-  total_plans: 44
+  total_plans: 48
   completed_plans: 47
   percent: 50
-stopped_at: Phase 292.1 context gathered (24 decisions) — next: /gsd:plan-phase 292.1, then 293
 ---
 
 # Project State

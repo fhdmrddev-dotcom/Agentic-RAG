@@ -3,7 +3,7 @@ seed_id: SEED-323
 title: A Continue that replays dropped tool calls fails 400 on DeepSeek thinking mode (reasoning_content not passed back)
 created: 2026-09-29
 surface: Agentic-RAG
-status: planted
+status: folded
 partial: false
 status_note:
 trigger_when: Any phase touching the Continue path (agent_loop.py's dropped-tool-call replay, runs.py continue_run, run_producer.spawn_continuation_run) or DeepSeek reasoning handling
@@ -11,7 +11,7 @@ trigger_paths: ["**/agent_loop.py", "backend/app/api/runs.py", "backend/app/serv
 trigger_surfaces: ["chat", "provider"]
 migration_note:
 relates_to: ["268", "268-UAT-LOG.md D-1", "SEED-324"]
-folded_into: null
+folded_into: "292.1"
 renumbered_from: null
 renumbered_because: null
 ---
