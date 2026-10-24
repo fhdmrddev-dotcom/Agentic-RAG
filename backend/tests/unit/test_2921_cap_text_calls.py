@@ -531,3 +531,44 @@ async def test_k_a_clean_answer_persists_byte_identical_through_the_save_point()
     with patch.object(_loop_mod, "settle", _bypass_settle):
         run = await _drive([_deltas([CLEAN])])
     assert _persisted_field(run["persisted"], "content") == CLEAN
+
+
+# ── Loop test L (292.1 D-UAT-1): Gemini's thought_signature rides the carrier and the replay ────
+# Measured on the live board (run 578f2f1e, gemini-3.8-flash): Continue replayed the paused call
+# without its thought_signature and Gemini 400'd "Function call is missing a thought_signature",
+# ending the continuation `failed`. Same class as SEED-323 (DeepSeek reasoning_content).
+
+
+def _signed_call(name: str, args: dict, sig: str) -> list[dict]:
+    chunks = _call(name, args)
+    chunks[-1] = {"type": "finish", "finish_reason": "tool_calls",
+                  "tool_calls": [{"id": "call_struct0", "thought_signature": sig}]}
+    return chunks
+
+
+@pytest.mark.asyncio
+async def test_l_thought_signature_is_stored_on_the_carrier_and_replayed_on_continue():
+    run = await _drive([SEARCH, _signed_call("search_documents", {"query": "more"}, "c2lnLWJ5dGVz")],
+                       user_settings=CAP2)
+    carrier = _carriers(run)[0]["tool_calls"]
+    assert carrier[0]["name"] == "search_documents"
+    assert carrier[0]["thought_signature"] == "c2lnLWJ5dGVz"
+
+    resumed = await _drive([_deltas([ANSWER])], ctx_extra={
+        "resume_dropped_tool_calls": True, "dropped_tool_calls": tuple(carrier)})
+    sent = resumed["requests"][0].messages
+    turn = next(m for m in sent if m.get("role") == "assistant" and m.get("tool_calls")
+                and m["tool_calls"][0]["id"] == carrier[0]["tool_call_id"])
+    assert turn["tool_calls"][0]["thought_signature"] == "c2lnLWJ5dGVz"
+
+
+@pytest.mark.asyncio
+async def test_l_an_unsigned_carrier_replays_without_a_signature_key():
+    carrier = ({"kind": "iteration_cap_paused", "tool_call_id": "call_abc",
+                "name": "search_documents", "arguments": '{"query": "x"}'},)
+    resumed = await _drive([_deltas([ANSWER])], ctx_extra={
+        "resume_dropped_tool_calls": True, "dropped_tool_calls": carrier})
+    sent = resumed["requests"][0].messages
+    turn = next(m for m in sent if m.get("role") == "assistant" and m.get("tool_calls")
+                and m["tool_calls"][0]["id"] == "call_abc")
+    assert set(turn["tool_calls"][0]) == {"id", "type", "function"}
