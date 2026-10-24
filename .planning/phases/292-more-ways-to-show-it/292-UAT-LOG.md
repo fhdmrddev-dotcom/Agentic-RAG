@@ -155,3 +155,140 @@ All 8 required rows derived (7 native providers + OpenRouter); one extra self-ho
 (`lmstudio`), recorded ⛔ as not required. ⚠ `kimi-k3` derives from a DB-only overlay row with
 `emit_tier=None`, so the "Moonshot is `emit_tier: coerce`" expectation in D-26 does not describe the
 row this board actually drove.
+
+## Environment (Task 3, pre-satisfied by the orchestrator; re-probed here)
+
+- Merge commits: `7904e0345` (292-01) at 2026-10-24 05:05:50 +0400, `e2c1e8b2e` (292-02); HEAD `develop`.
+- uvicorn runs with `--reload`: reloader PID 70864 (started 2026-10-23 13:18:46); its serving worker
+  PID 88204 started **2026-10-24 05:06:51**, after the merge, so it serves the merged code. Re-probed
+  by this executor before the live board: `curl http://localhost:8000/health` returned `200`, and the
+  same process tree was listening on :8000. No backend application file changed after the merge (this
+  plan touched tests, scripts and docs only), so the reloader had nothing to reload.
+- `scripts/apply_migration_213.py --verify-only` returned `VERIFY: 8/8 PASS`; the live CHECKs list all
+  six components and the six-name label regex (orchestrator's run).
+- Vite dev server listening on :5173 (orchestrator).
+
+## Board method
+
+`scripts/run-292-board.py` loads `scripts/run-273-board.py` with importlib and reuses its
+`derive_roster`, `_assert_local_db`, `_headers`, `_single_org`, `_user_id`, `_wait_run`, `_send`,
+`_drive_turn` and `_reload`. Every mode runs `conc_probe.assert_localhost_only` and asserts a
+127.0.0.1 / localhost DSN and Redis before any request or DB write. Turns use a per-request
+`model` + `provider` on `POST /threads/{id}/messages`; no `app_settings` / `user_settings` write.
+The dev user `d8a54002-…` is in exactly ONE org (`22f9c615-…`, asserted from `org_members`) before
+`X-Org-Id` is sent. Verdicts are read from `message_artifacts`, `messages.tool_calls` and `runs`.
+
+Order of runs: `--seed`, `--run` (all rows), `--g4 --providers anthropic`, `--g4 --providers openai`,
+two extra G-4 comparison runs (F-1), `--long --providers openai`, `--parallel --providers deepseek`,
+`--reload-check --out board` and `--out g4`, `--g4-recompute` (offline), then the uat runner.
+
+### Seed
+
+First `--seed` run: the invoice policy and Borealis ingested; the Atlas MSA **failed ingestion with
+`[Errno 11001] getaddrinfo failed`** (a transient DNS failure on the embedding call), and the search
+step then crashed on a second `asyncio.run` (the pg pool singleton is bound to its first loop). Both
+fixed in the script (Rule 1/3): a failed fixture is re-queued through `POST /documents/{id}/reingest`,
+and the three searches run in one event loop. Second run (verbatim, `evidence/seed.txt`):
+
+```
+SEED reingest 292-atlas-msa.md HTTP 200
+SEED 292-atlas-msa.md status=completed chunks=3
+SEED search_documents('invoice approval three-way match budget holder finance controller') -> 5 chunks · top files ['292-invoice-approval-policy.md', ...] · finds 292-invoice-approval-policy.md: True
+SEED search_documents('Atlas Logistics termination liability renewal notice deadline') -> 5 chunks · top files ['292-atlas-msa.md', ...] · finds 292-atlas-msa.md: True
+SEED search_documents('Borealis Freight termination liability cap') -> 5 chunks · top files ['292-borealis-msa.md', ...] · finds 292-borealis-msa.md: True
+SEED verdict: OK
+```
+
+### Board table (printed by `--run`, verbatim)
+
+```
+| anthropic | claude-opus-5-5 | NATIVE (native SDK adapter) | PASS/PASS | PASS/PASS | PASS/PASS | 12/12,10/10,8/8 | 3 | 1: diagram: a step name is over 48 characters |
+| deepseek | deepseek-v4-pro | NATIVE | PASS/PASS | PASS/PASS | PASS/PASS | 11/11,8/8,8/8 | 3 | 0:  |
+| google | gemini-3.8-flash | NATIVE (native SDK adapter) | PASS/PASS | PASS/PASS | PASS/PASS | 0/10,0/10,0/8 | 0 | 0:  |
+| lmstudio | qwen-agentworld-35b-a3b | NATIVE | ⛔ | ⛔ | ⛔ | — | — | extra (self-hosted) group — not one of the required 8; not driven unless named in --providers |
+| minimax | MiniMax-M3 | NATIVE | PASS/PASS | PASS/PASS | PASS/PASS | 12/12,24/24,9/9 | 0 | 2: diagram: its settings weren't valid; diagram: a step name is over 48 characters |
+| moonshot | kimi-k3 | NATIVE | PASS/PASS | PASS/PASS | PASS/PASS | 0/11,0/14,0/8 | 3 | 2: diagram: a step name is over 48 characters; comparison: a comparison was sent another artifact type's fields |
+| openai | gpt-5.6-luna | NATIVE | PASS/PASS | PASS/PASS | PASS/PASS | 11/11,10/10,8/8 | 4 | 3: diagram: a step name is over 48 characters; diagram: a link label is over 24 characters; diagram: two links join the same two steps |
+| openrouter | z-ai/glm-5.3-flash | NATIVE | PASS/PASS | PASS/PASS | PASS/PASS | 12/12,6/12,8/8 | 4 | 3: diagram: a step name is over 48 characters; comparison: its settings weren't valid; diagram: a link label is over 24 characters |
+| zhipu | glm-5.3-flash | NATIVE | PASS/PASS | PASS/PASS | PASS/PASS | 11/11,12/12,8/8 | 4 | 2: diagram: a step name is over 48 characters; diagram: a link label is over 24 characters |
+```
+
+The "search calls" column counts `search_documents` only; Google and MiniMax retrieved with other
+tools. Every refused call was followed by a successful retry in the same turn; refusal reasons are
+quoted verbatim in each evidence file's `score.refusals`.
+
+### Guard half of V2 (uat runner)
+
+`cd frontend && ARTIFACT_BOARD_EVIDENCE_292="../.planning/phases/292-more-ways-to-show-it/evidence/board" GSD_VITEST_MAX_WORKERS=2 npx vitest run uat/292-board-render.test.ts`
+(verbatim): `Test Files 1 passed (1) · Tests 11 passed (11)`. That is non-vacuity, 9 evidence files (8 rows
+plus the long run), and the crafted row refused with `broken-link`. The same runner over
+`evidence/g4`: `Tests 11 passed (11)`. `ls evidence/board/*.json | wc -l` = 9 = 8 non-⛔ rows + 1 long run.
+
+### Probes (verbatim, `evidence/probes/`)
+
+```
+PROBE stored table: table 1 in thread 563886b2-d2e1-41ae-bb8c-a96c20658f12
+PROBE mindmap: keys=['detail', 'reason', 'status'] keys_exact=True
+PROBE mindmap: payload={"status": "refused", "reason": "\"mindmap\" is not an artifact type", "detail": "`component` must be one of chart, table, metric, diagram, comparison, timeline. Use a table for anything else."}
+PROBE flowchart: payload={"status": "refused", "reason": "something other than a chart, table, metric, diagram, comparison or timeline", "detail": "`component` must be one of chart, table, metric, diagram, comparison, timeline. Use a table for anything else."}
+PROBE diagram from a stored table: payload={"status": "refused", "reason": "a table can't be turned into a diagram; send the data again", "detail": "table 1 is a table; a diagram is never built from another artifact by reference. Call show_artifact again with the full `diagram` data and no from_artifact."}
+PROBE emitted events on refusal paths: 0 (must be 0)
+PROBE message_artifacts rows before=22 after=22 (no DB write on refusal: True)
+```
+
+The probe ran the real handler against the real local pool (the stored-table read is real);
+`insert_artifact` was patched to raise, so a refusal path that tried to store would have failed loudly.
+
+Crafted bad row (under the local-DB lock, local DSN only):
+
+```
+CRAFT thread=8ef83b95-201c-4219-8e2a-188533fd192c assistant_message=ce0f4811-6087-4ce6-aaf4-9f597b5adf32 artifact=a_rvhc2e8nbd tool_call=call_292crafted7401b003
+CRAFT persisted args (redacted): {"component": "diagram", "title": "Invoice approval", "diagram": "<stored in artifact a_rvhc2e8nbd, diagram of 3 steps>"}
+CRAFT reload HTTP 200 items=[{"id": "a_rvhc2e8nbd", ... "label": "diagram 1", "component": "diagram", ...
+```
+
+The row satisfies migration 213's CHECKs (component, id pattern, label regex, row_count 3, spec size).
+The tool call's args went through the real `redact_artifact_args` and its result through the real
+`build_encoded_result`, so the thread looks exactly like a live one.
+
+### Parallel-thread (verbatim)
+
+```
+PARALLEL A run=9d14c67a-6880-42a3-ba20-0e00bd6e254e  · A status when B was sent: streaming · B run=9a88498e-1e0b-4b66-8089-69480bd887b9
+PARALLEL artifact a_71l0vjmekm timeline 1 thread=938bfa44-15de-419c-9543-1c04f05c3d8c run=9a88498e-1e0b-4b66-8089-69480bd887b9
+PARALLEL artifact a_bmdx11tz1s diagram 1 thread=838fdecf-eafb-4ac4-96f8-e96202a06a2a run=9d14c67a-6880-42a3-ba20-0e00bd6e254e
+PARALLEL artifact a_zjf7qohyo1 comparison 1 thread=838fdecf-eafb-4ac4-96f8-e96202a06a2a run=9d14c67a-6880-42a3-ba20-0e00bd6e254e
+PARALLEL artifact a_8lmetdadsx timeline 1 thread=838fdecf-eafb-4ac4-96f8-e96202a06a2a run=9d14c67a-6880-42a3-ba20-0e00bd6e254e
+PARALLEL verdict PASS (A completed, B completed)
+```
+
+### Long-message (verbatim)
+
+```
+LONG prompt = 5195 bytes (long-message axis needs >= 5120)
+BOARD openai gpt-5.6-luna run=completed diagram=V1:PASS/V2:PASS/src:['0/9'] comparison=V1:PASS/V2:PASS/src:['0/10'] timeline=V1:PASS/V2:PASS/src:['0/8'] ...
+```
+
+### Reload check (API half of G4-5)
+
+Every board file and every G-4 file with an artifact: `identical_to_first_reload_and_db=True`
+(`evidence/board-reload-check.json`, `evidence/g4-reload-check.json`). The three F-1 files read
+`records=0` by construction (no artifact was shown).
+
+## Deploy-parity note (D-12)
+
+**Cloud must receive migration 213 BEFORE the backend that emits a diagram deploys.** Until then the
+cloud `message_artifacts` CHECKs refuse `diagram` / `comparison` / `timeline` rows, and every new-type
+`show_artifact` call fails its insert (a worded refusal, not a crash). **Run `get_advisors(security)`
+at that deploy**, after 213 is pasted into the cloud SQL editor. 292-01 recorded why the local advisor
+run was replaced by the deploy-time one: the Supabase MCP reaches production only, and 213 adds no
+table, function, grant or policy. This plan ran no cloud or MCP write.
+
+## OWED
+
+1. Chrome drive of G4-1..G4-5 and the parallel-thread axis, in the order listed in
+   `292-VALIDATION.md` §5 (this executor had no Chrome MCP tools).
+2. Operator sign-off of the G4 rows.
+3. F-1 product decision: should a plain "compare these two contracts…" produce the comparison matrix
+   (tool-description steering), or is the markdown table acceptable for that phrasing?
+4. At deploy: migration 213 to cloud first, then `get_advisors(security)`.

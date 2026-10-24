@@ -1,0 +1,42 @@
+{
+  "provider": "deepseek",
+  "model": "deepseek-v4-pro",
+  "thread_a": "838fdecf-eafb-4ac4-96f8-e96202a06a2a",
+  "thread_b": "938bfa44-15de-419c-9543-1c04f05c3d8c",
+  "run_a": "9d14c67a-6880-42a3-ba20-0e00bd6e254e",
+  "run_b": "9a88498e-1e0b-4b66-8089-69480bd887b9",
+  "a_status_when_b_sent": "streaming",
+  "status_a": "completed",
+  "status_b": "completed",
+  "artifacts": [
+    {
+      "id": "a_71l0vjmekm",
+      "label": "timeline 1",
+      "component": "timeline",
+      "thread_id": "938bfa44-15de-419c-9543-1c04f05c3d8c",
+      "run_id": "9a88498e-1e0b-4b66-8089-69480bd887b9"
+    },
+    {
+      "id": "a_bmdx11tz1s",
+      "label": "diagram 1",
+      "component": "diagram",
+      "thread_id": "838fdecf-eafb-4ac4-96f8-e96202a06a2a",
+      "run_id": "9d14c67a-6880-42a3-ba20-0e00bd6e254e"
+    },
+    {
+      "id": "a_zjf7qohyo1",
+      "label": "comparison 1",
+      "component": "comparison",
+      "thread_id": "838fdecf-eafb-4ac4-96f8-e96202a06a2a",
+      "run_id": "9d14c67a-6880-42a3-ba20-0e00bd6e254e"
+    },
+    {
+      "id": "a_8lmetdadsx",
+      "label": "timeline 1",
+      "component": "timeline",
+      "thread_id": "838fdecf-eafb-4ac4-96f8-e96202a06a2a",
+      "run_id": "9d14c67a-6880-42a3-ba20-0e00bd6e254e"
+    }
+  ],
+  "verdict": "PASS"
+}

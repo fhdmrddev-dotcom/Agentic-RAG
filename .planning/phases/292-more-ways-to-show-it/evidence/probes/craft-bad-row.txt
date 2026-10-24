@@ -1,0 +1,4 @@
+dev user d8a54002-6a29-4b88-b918-cff2aa4a06d5 · single org 22f9c615-0eec-440a-8804-ed4784d6f57f (asserted from org_members)
+CRAFT thread=8ef83b95-201c-4219-8e2a-188533fd192c assistant_message=ce0f4811-6087-4ce6-aaf4-9f597b5adf32 artifact=a_rvhc2e8nbd tool_call=call_292crafted7401b003
+CRAFT persisted args (redacted): {"component": "diagram", "title": "Invoice approval", "diagram": "<stored in artifact a_rvhc2e8nbd, diagram of 3 steps>"}
+CRAFT reload HTTP 200 items=[{"id": "a_rvhc2e8nbd", "thread_id": "8ef83b95-201c-4219-8e2a-188533fd192c", "user_id": "d8a54002-6a29-4b88-b918-cff2aa4a06d5", "org_id": "22f9c615-0eec-440a-8804-ed4784d6f57f", "run_id": null, "tool_call_id": "call_292crafted7401b003", "parent_id": null, "label": "diagram 1", "component": "diagram", "spec": {"title": "Invoice approval", "diagram": {"edges": [{"to": "ok", "from": "recv", "label": 

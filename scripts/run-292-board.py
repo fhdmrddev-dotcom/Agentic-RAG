@@ -24,6 +24,8 @@ The operator runs uvicorn; this script never starts or stops it.
   --long           The same turn on ONE row with a >= 5 KB prompt (the three fixtures inlined).
   --parallel       Thread A's board turn and thread B's timeline turn sent back to back (B while A
                    streams); each run's artifacts must land in its own thread.
+  --g4             The D-21..D-23 prompts, one thread each on ONE row, with the G-4 observables
+                   computed independently from the stored spec (degree, back edges, N identical, days).
   --reload-check   For every board evidence file: GET the thread's messages again and compare each
                    artifact's spec + caption + label byte-for-byte with the first reload and the DB.
   --refusal-probe  Call ``handle_show_artifact`` directly (real local pool, insert patched to raise):
@@ -128,6 +130,10 @@ def seed(token: str, org_id: str, user_id: str, conn) -> int:
         if row:
             doc_id = row["id"]
             print(f"SEED {name} exists id={doc_id} status={row['status']}")
+            if row["status"] == "failed":  # a transient ingest failure: re-queue the SAME document
+                r = requests.post(f"{base}/documents/{doc_id}/reingest", headers=h, timeout=60)
+                print(f"SEED reingest {name} HTTP {r.status_code}")
+                r.raise_for_status()
         else:
             r = requests.post(f"{base}/documents/upload", headers=h, timeout=60,
                               files={"file": (name, _fixture_text(name).encode("utf-8"), "text/markdown")})
@@ -150,8 +156,11 @@ def seed(token: str, org_id: str, user_id: str, conn) -> int:
     from app.services.retrieval_service import search_documents  # noqa: PLC0415
     sb = get_supabase()
     us = load_user_settings(user_id, sb)
-    for name, query in SEED_QUERIES.items():
-        rows, avg = asyncio.run(search_documents(query, user_id, sb, user_settings=us))
+
+    async def _all():  # ONE event loop: the pg pool singleton is bound to the loop that made it
+        return [(n, q, await search_documents(q, user_id, sb, user_settings=us)) for n, q in SEED_QUERIES.items()]
+
+    for name, query, (rows, _avg) in asyncio.run(_all()):
         names = [str(r.get("filename") or r.get("document_name") or "") for r in rows]
         found = name in names
         print(f"SEED search_documents({query!r}) -> {len(rows)} chunks · top files {names[:4]} · finds {name}: {found}")
@@ -405,6 +414,220 @@ def reload_check(token, org_id, conn, args) -> int:
     return 0
 
 
+# ── --g4: the three D-21..D-23 lived prompts, one thread each, with independently computed expectations ──
+
+G4_PROMPTS = {
+    "G4-1-diagram": "How does our invoice approval work? Show it as a flow diagram.",
+    "G4-2-comparison": "Compare these two contracts on termination, liability and renewal: the Atlas Logistics MSA and the Borealis Freight MSA.",
+    "G4-3-timeline": "Show the history and upcoming deadlines of the Atlas Logistics contract as a timeline.",
+    # Added at 292-03 after the verbatim D-22 prompt produced a markdown table (no show_artifact) on BOTH
+    # anthropic and openai: the same ask, naming the presentation the way a user would.
+    "G4-2b-sidebyside-comparison": "Compare the Atlas Logistics and Borealis Freight contracts on termination, liability and renewal. Show it side by side.",
+}
+_MONTHS = ("Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec")
+_VERDICT_WORD = {"y": "Favourable", "n": "Unfavourable", "m": "Neutral"}
+
+
+def _retrieved_text(turn: dict) -> str:
+    """Every retrieval tool's result this turn (search_documents, query_documents, analyze_document, ...)."""
+    out = []
+    for m in turn.get("assistant_messages", []):
+        for tc in m.get("tool_calls") or []:
+            if tc.get("name") != "show_artifact":
+                out.append(str(tc.get("result") or ""))
+    return "\n".join(out)
+
+
+def _kb_text() -> str:
+    """The seeded documents' own text: every retrieved chunk is a slice of it."""
+    return "\n".join(_fixture_text(n) for n in FIXTURES)
+
+
+_WORD = re.compile(r"[a-z0-9]{3,}")
+
+
+def _word_coverage(label: str, text_norm: str) -> float:
+    words = _WORD.findall(_norm(label))
+    return round(sum(1 for w in words if w in text_norm) / len(words), 2) if words else 0.0
+
+
+def _norm(s: str) -> str:
+    return re.sub(r"\s+", " ", str(s)).strip().lower()
+
+
+def _expect_diagram(spec: dict, retrieved: str) -> dict:
+    d = spec["diagram"]
+    nodes, edges = d["nodes"], d["edges"]
+    ids = [n["id"] for n in nodes]
+    degree = {i: sum(1 for e in edges if e["from"] == i or e["to"] == i) for i in ids}
+    indeg = {i: sum(1 for e in edges if e["to"] == i and e["from"] != i) for i in ids}
+    adj = {i: [e for e in edges if e["from"] == i] for i in ids}
+    state, back = {}, []
+
+    def dfs(root):  # iterative, spec order; an edge into a node on the stack is a back edge
+        stack = [(root, iter(adj[root]))]
+        state[root] = "open"
+        while stack:
+            node, it = stack[-1]
+            e = next(it, None)
+            if e is None:
+                state[node] = "done"
+                stack.pop()
+                continue
+            t = e["to"]
+            if t == node:
+                continue  # self-loop: arcs off its own node, not a gutter back edge
+            if state.get(t) == "open":
+                back.append(f"{e['from']}->{t}")
+            elif t not in state:
+                state[t] = "open"
+                stack.append((t, iter(adj[t])))
+
+    for i in [i for i in ids if indeg[i] == 0] + ids:
+        if i not in state:
+            dfs(i)
+    rnorm = _norm(retrieved)
+    knorm = _norm(_kb_text())
+    sourced = [{"node": n["id"], "document": n["source"]["document"],
+                "excerpt_in_retrieved_text": _norm(n["source"]["excerpt"]) in rnorm,
+                "excerpt_in_kb_document": _norm(n["source"]["excerpt"]) in knorm}
+               for n in nodes if n.get("source")]
+    n, m = len(nodes), len(edges)
+    return {
+        "caption_count_segment": f"· {n} step{'s' if n != 1 else ''} · {m} link{'s' if m != 1 else ''}"
+                                 if m else f"· {n} step{'s' if n != 1 else ''}",
+        "node_labels": [x["label"] for x in nodes],
+        "label_word_coverage_in_kb_document": {x["label"]: _word_coverage(x["label"], knorm) for x in nodes},
+        "degree_per_node": {x["label"]: degree[x["id"]] for x in nodes},
+        "back_edges_dfs_excluding_self_loops": back,
+        "self_loops": [f"{e['from']}->{e['to']}" for e in edges if e["from"] == e["to"]],
+        "sourced_nodes": sourced,
+    }
+
+
+def _cell_text(c: dict) -> str:
+    if c["verdict"] == "q":
+        return "Not stated"
+    return c.get("text") or _VERDICT_WORD.get(c["verdict"], "")
+
+
+def _expect_comparison(spec: dict, retrieved: str) -> dict:
+    cmp_ = spec["comparison"]
+    identical = []
+    for t in cmp_["terms"]:
+        keys = {(c["verdict"], _cell_text(c).strip().lower()) for c in t["cells"]}
+        if t["cells"] and len(keys) == 1:
+            identical.append(t["name"])
+    rnorm = _norm(retrieved)
+    knorm = _norm(_kb_text())
+    cells = [c for t in cmp_["terms"] for c in t["cells"]]
+    return {
+        "options": cmp_["options"], "terms": [t["name"] for t in cmp_["terms"]],
+        "cells_total": len(cells), "not_stated_cells": sum(1 for c in cells if c["verdict"] == "q"),
+        "identical_terms_N": len(identical), "identical_terms": identical,
+        "second_caption_line": "Verdicts are the agent's reading. Hover or focus a cell for its clause.",
+        "sourced_cells": [{"document": c["source"]["document"],
+                           "excerpt_in_retrieved_text": _norm(c["source"]["excerpt"]) in rnorm,
+                           "excerpt_in_kb_document": _norm(c["source"]["excerpt"]) in knorm}
+                          for c in cells if c.get("source")],
+    }
+
+
+def _expect_timeline(spec: dict, today: tuple[int, int, int]) -> dict:
+    import datetime as dt  # noqa: PLC0415
+    evs = spec["timeline"]["events"]
+
+    def parts(s):
+        y, m, *d = [int(x) for x in s.split("-")]
+        return y, m, (d[0] if d else None)
+
+    keyed = sorted(((parts(e["date"]), i, e) for i, e in enumerate(evs)), key=lambda x: (x[0][0], x[0][1], x[0][2] or 0, x[1]))
+    tkey = today[0] * 10000 + today[1] * 100 + today[2]
+    rows, prev, placed = [], None, False
+    for (y, m, d), _i, e in keyed:
+        past = y * 10000 + m * 100 + (d or 0) <= tkey
+        if not past and not placed:
+            rows.append("TODAY")
+            placed = True
+        elif prev is not None and prev[0] == past:
+            gap = (y - prev[1]) * 12 + (m - prev[2])
+            if gap >= 6:
+                rows.append(f"GAP {gap} months")
+        label = f"{d} {_MONTHS[m - 1]} {y}" if d else f"{_MONTHS[m - 1]} {y}"
+        pill = None
+        if e.get("deadline"):
+            if d is None:
+                mo = (y - today[0]) * 12 + (m - today[1])
+                pill = f"in {mo} months" if mo > 0 else ("this month" if mo == 0 else f"passed {-mo} months ago")
+            else:
+                days = (dt.date(y, m, d) - dt.date(*today)).days
+                pill = f"in {days} days" if days > 0 else ("due today" if days == 0 else f"{-days} days ago")
+        rows.append(f"{'FILLED' if past else 'HOLLOW'} {label} · {e['title']}" + (f" · deadline pill: {pill}" if pill else ""))
+        prev = (past, y, m)
+    if not placed:
+        rows.append("TODAY")
+    return {"today_row_text_date": f"{today[2]} {_MONTHS[today[1] - 1]} {today[0]}", "rail_rows_expected": rows,
+            "events": len(evs)}
+
+
+def _expect_for(arts: list[dict], retrieved: str, today: tuple[int, int, int]) -> list[dict]:
+    out = []
+    for a in arts:
+        fn = {"diagram": lambda sp: _expect_diagram(sp, retrieved),
+              "comparison": lambda sp: _expect_comparison(sp, retrieved),
+              "timeline": lambda sp: _expect_timeline(sp, today)}.get(a["component"])
+        if fn:
+            out.append({"artifact": a["id"], "label": a["label"], **fn(a["spec"])})
+    return out
+
+
+def g4_recompute(args) -> int:
+    """Recompute expected_observables over saved evidence (no request, no DB)."""
+    import datetime as dt  # noqa: PLC0415
+    t = dt.date.today()
+    for f in sorted((_EVIDENCE / args.out).glob("*.json")):
+        doc = json.loads(f.read_text(encoding="utf-8"))
+        doc["expected_observables"] = _expect_for(doc.get("message_artifacts", []), _retrieved_text(doc["turn_data"]),
+                                                  (t.year, t.month, t.day))
+        f.write_text(json.dumps(doc, indent=2, default=str), encoding="utf-8")
+        print(f"RECOMPUTE {f.name}: {len(doc['expected_observables'])} artifact(s)")
+    return 0
+
+
+def run_g4(token, org_id, conn, args) -> int:
+    import datetime as dt  # noqa: PLC0415
+    base = kit.base_url()
+    h = b273._headers(token, org_id)
+    roster, probe, wanted = _roster_rows(conn, args)
+    target = (args.providers or "openai").split(",")[0]
+    entry = next((r for r in roster if r["provider"] == target), None)
+    if not entry or _blocked_reason(entry, probe, {target}):
+        raise SystemExit(f"--g4: no drivable row for {target}")
+    t = dt.date.today()
+    today = (t.year, t.month, t.day)
+    out = _EVIDENCE / "g4"
+    for key, prompt in G4_PROMPTS.items():
+        if args.scenario and args.scenario not in key:
+            continue
+        res = _drive_row(conn, base, h, entry, prompt, args.timeout, f"292 {key} {target}")
+        comp = key.split("-")[-1]
+        expect = _expect_for(res["arts"], _retrieved_text(res["turn"]), today)
+        rid = res["turn"].get("run_id") or "nosend"
+        p = _write_evidence(out, f"{target}-{key}-{rid}.json", entry, prompt, res)
+        doc = json.loads(p.read_text(encoding="utf-8"))
+        doc["expected_observables"] = expect
+        doc["scenario"] = key
+        p.write_text(json.dumps(doc, indent=2, default=str), encoding="utf-8")
+        s = res["score"]
+        got = [a["component"] for a in res["arts"]]
+        print(f"G4 {key} {target} thread={res['thread_id']} run={rid} status={res['turn'].get('run_status')} "
+              f"artifacts={[(a['id'], a['label']) for a in res['arts']]} wanted={comp} present={comp in got} "
+              f"search_documents={s.get('search_documents_calls')} refusals={s.get('refusals')}")
+        for e in expect:
+            print("G4   expect " + json.dumps(e, ensure_ascii=False))
+    return 0
+
+
 # ── --refusal-probe ─────────────────────────────────────────────────────────────────────────────
 
 async def _probe_async(user_id: str, org_id: str, conn) -> int:
@@ -529,9 +752,10 @@ def craft_bad_row(token, org_id, user_id, conn) -> int:
 def main() -> int:
     ap = argparse.ArgumentParser()
     g = ap.add_mutually_exclusive_group(required=True)
-    for m in ("roster", "seed", "run", "long", "parallel", "reload-check", "refusal-probe", "craft-bad-row"):
+    for m in ("roster", "seed", "run", "long", "parallel", "g4", "g4-recompute", "reload-check", "refusal-probe", "craft-bad-row"):
         g.add_argument(f"--{m}", action="store_true")
     ap.add_argument("--providers", default="")
+    ap.add_argument("--scenario", default="", help="--g4 only: run the scenarios whose key contains this text")
     ap.add_argument("--timeout", type=int, default=420)
     ap.add_argument("--out", default="board", help="evidence subdirectory under evidence/ (default 'board')")
     args = ap.parse_args()
@@ -544,6 +768,8 @@ def main() -> int:
     if args.roster:
         b273.derive_roster(conn)
         return 0
+    if args.g4_recompute:
+        return g4_recompute(args)
     token = kit.get_bearer_token()
     user_id = b273._user_id(token)
     org_id = b273._single_org(conn, user_id)
@@ -554,6 +780,8 @@ def main() -> int:
         return run_long(token, org_id, conn, args)
     if args.parallel:
         return run_parallel(token, org_id, conn, args)
+    if args.g4:
+        return run_g4(token, org_id, conn, args)
     if args.reload_check:
         return reload_check(token, org_id, conn, args)
     if args.refusal_probe:

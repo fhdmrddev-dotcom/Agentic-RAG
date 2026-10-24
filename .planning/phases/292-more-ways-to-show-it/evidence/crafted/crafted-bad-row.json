@@ -1,0 +1,126 @@
+{
+  "thread_id": "8ef83b95-201c-4219-8e2a-188533fd192c",
+  "assistant_message_id": "ce0f4811-6087-4ce6-aaf4-9f597b5adf32",
+  "artifact_id": "a_rvhc2e8nbd",
+  "tool_call_id": "call_292crafted7401b003",
+  "spec": {
+    "title": "Invoice approval",
+    "diagram": {
+      "nodes": [
+        {
+          "id": "recv",
+          "label": "Invoice received",
+          "kind": "start",
+          "source": null
+        },
+        {
+          "id": "ok",
+          "label": "Matches the purchase order?",
+          "kind": "decision",
+          "source": null
+        },
+        {
+          "id": "paid",
+          "label": "Paid",
+          "kind": "end",
+          "source": null
+        }
+      ],
+      "edges": [
+        {
+          "from": "recv",
+          "to": "ok",
+          "label": null
+        },
+        {
+          "from": "ok",
+          "to": "paid",
+          "label": "Yes"
+        },
+        {
+          "from": "ok",
+          "to": "zz",
+          "label": "No"
+        }
+      ]
+    }
+  },
+  "persisted_tool_calls": [
+    {
+      "tool_call_id": "call_292crafted7401b003",
+      "name": "show_artifact",
+      "args": {
+        "component": "diagram",
+        "title": "Invoice approval",
+        "diagram": "<stored in artifact a_rvhc2e8nbd, diagram of 3 steps>"
+      },
+      "result": "{\"artifact_id\": \"a_rvhc2e8nbd\", \"label\": \"diagram 1\", \"component\": \"diagram\", \"row_count\": 3, \"edge_count\": 3, \"note\": \"Shown to the user below your answer as diagram 1. Now write one or two sentences about what it shows; do not repeat it as a table. To change it, call show_artifact again with the full data.\"}",
+      "status": "done"
+    }
+  ],
+  "reload_http": 200,
+  "reload_artifacts": [
+    {
+      "id": "a_rvhc2e8nbd",
+      "thread_id": "8ef83b95-201c-4219-8e2a-188533fd192c",
+      "user_id": "d8a54002-6a29-4b88-b918-cff2aa4a06d5",
+      "org_id": "22f9c615-0eec-440a-8804-ed4784d6f57f",
+      "run_id": null,
+      "tool_call_id": "call_292crafted7401b003",
+      "parent_id": null,
+      "label": "diagram 1",
+      "component": "diagram",
+      "spec": {
+        "title": "Invoice approval",
+        "diagram": {
+          "edges": [
+            {
+              "to": "ok",
+              "from": "recv",
+              "label": null
+            },
+            {
+              "to": "paid",
+              "from": "ok",
+              "label": "Yes"
+            },
+            {
+              "to": "zz",
+              "from": "ok",
+              "label": "No"
+            }
+          ],
+          "nodes": [
+            {
+              "id": "recv",
+              "kind": "start",
+              "label": "Invoice received",
+              "source": null
+            },
+            {
+              "id": "ok",
+              "kind": "decision",
+              "label": "Matches the purchase order?",
+              "source": null
+            },
+            {
+              "id": "paid",
+              "kind": "end",
+              "label": "Paid",
+              "source": null
+            }
+          ]
+        }
+      },
+      "caption": {
+        "lineage": null,
+        "sources": [],
+        "row_count": 3,
+        "source_count": 0
+      },
+      "row_count": 3,
+      "spec_version": 1,
+      "created_at": "2026-10-24T01:25:53.951176+00:00"
+    }
+  ]
+}
