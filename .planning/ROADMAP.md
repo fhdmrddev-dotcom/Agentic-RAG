@@ -297,8 +297,8 @@ Plans:
 Plans:
 **Wave 1**
 
-- [ ] 292-01-PLAN.md — backend: six-name vocabulary, three arms, per-element sources, history rewrite, widened show_artifact schema, migration 213 applied locally, live Gemini probe (wave 1)
-- [ ] 292-02-PLAN.md — frontend: guard arms, copy and captions, 2A diagram, 3A comparison, 4A timeline, shared tooltip, six-entry registry (wave 1, parallel)
+- [x] 292-01-PLAN.md — backend: six-name vocabulary, three arms, per-element sources, history rewrite, widened show_artifact schema, migration 213 applied locally, live Gemini probe (wave 1)
+- [x] 292-02-PLAN.md — frontend: guard arms, copy and captions, 2A diagram, 3A comparison, 4A timeline, shared tooltip, six-entry registry (wave 1, parallel)
 
 **Wave 2** *(blocked on Wave 1 completion)*
 
