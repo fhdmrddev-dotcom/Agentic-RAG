@@ -24,6 +24,8 @@ import { getSettings, updateSettings, type SettingsUpdate } from "@/lib/api"
  *    (the 294-REVIEW WR-04 defect). It is simply left out.
  *  - A refusal renders the server's sentence VERBATIM; "✓ Saved" appears only after a resolved PUT.
  *  - The bounds below mirror the server's; the server stays the boundary.
+ *  - (292.1-REVIEW WR-05) Nothing is shown as live, or saved, before the read answers: the fields
+ *    are empty and locked while loading, and a failed read says so (with Retry) — never 15 / 8.
  */
 
 const ROUNDS_MIN = 2
@@ -49,6 +51,7 @@ function RoundRow({
   label,
   hint,
   value,
+  disabled,
   onChange,
   onBlur,
 }: {
@@ -56,6 +59,7 @@ function RoundRow({
   label: string
   hint: string
   value: string
+  disabled: boolean
   onChange: (raw: string) => void
   onBlur: () => void
 }) {
@@ -73,6 +77,7 @@ function RoundRow({
             value={value}
             min={ROUNDS_MIN}
             max={ROUNDS_MAX}
+            disabled={disabled}
             onChange={(e) => onChange(e.target.value)}
             onBlur={onBlur}
             className="h-8 w-20 bg-muted/30 font-mono text-sm ghost-border"
@@ -86,33 +91,45 @@ function RoundRow({
 
 export function AgentRoundLimits() {
   const [loaded, setLoaded] = useState<Caps>({ chat: CHAT_DEFAULT, explorer: EXPLORER_DEFAULT })
-  const [chatDraft, setChatDraft] = useState(String(CHAT_DEFAULT))
-  const [explorerDraft, setExplorerDraft] = useState(String(EXPLORER_DEFAULT))
+  // 292.1-REVIEW WR-05: the fields are empty and locked until the server has answered. A failed read
+  // used to leave 15 / 8 on screen AS IF loaded — with the server holding 3 the operator saw 15,
+  // typing 15 was "not dirty", and the cap silently stayed at 3. Nothing is saved against a value
+  // this leaf never read.
+  const [loadState, setLoadState] = useState<"loading" | "loaded" | "failed">("loading")
+  const [loadError, setLoadError] = useState<string | null>(null)
+  const [chatDraft, setChatDraft] = useState("")
+  const [explorerDraft, setExplorerDraft] = useState("")
   const [saving, setSaving] = useState(false)
   const [saved, setSaved] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const alive = useRef(true)
-  // An edit made before the fetch resolves must not be overwritten by it.
-  const touched = useRef(false)
 
-  useEffect(() => {
-    alive.current = true
+  function load() {
+    setLoadState("loading")
+    setLoadError(null)
     getSettings()
       .then((s) => {
         if (!alive.current) return
         const caps = {
+          // An older backend that omits the fields runs on the same 15 / 8 fallback.
           chat: s.chat_max_tool_rounds ?? CHAT_DEFAULT,
           explorer: s.explorer_max_tool_rounds ?? EXPLORER_DEFAULT,
         }
         setLoaded(caps)
-        if (!touched.current) {
-          setChatDraft(String(caps.chat))
-          setExplorerDraft(String(caps.explorer))
-        }
+        setChatDraft(String(caps.chat))
+        setExplorerDraft(String(caps.explorer))
+        setLoadState("loaded")
       })
-      .catch(() => {
-        // The defaults stay on screen; the server's own fallback is the same 15 / 8.
+      .catch((e: unknown) => {
+        if (!alive.current) return
+        setLoadError(e instanceof Error ? e.message : null)
+        setLoadState("failed")
       })
+  }
+
+  useEffect(() => {
+    alive.current = true
+    load()
     return () => {
       alive.current = false
     }
@@ -129,7 +146,6 @@ export function AgentRoundLimits() {
 
   function edit(set: (v: string) => void) {
     return (raw: string) => {
-      touched.current = true
       setSaved(false)
       setError(null)
       set(raw)
@@ -145,6 +161,7 @@ export function AgentRoundLimits() {
   }
 
   async function save() {
+    if (loadState !== "loaded") return
     const body = changes()
     if (Object.keys(body).length === 0) return
     setSaving(true)
@@ -169,7 +186,8 @@ export function AgentRoundLimits() {
     }
   }
 
-  const dirty = Object.keys(changes()).length > 0
+  const ready = loadState === "loaded"
+  const dirty = ready && Object.keys(changes()).length > 0
 
   return (
     <div data-agent-round-limits>
@@ -178,6 +196,7 @@ export function AgentRoundLimits() {
         label="Tool rounds per chat turn"
         hint="When a turn reaches this many tool rounds it stops with a Continue button. Default 15."
         value={chatDraft}
+        disabled={!ready}
         onChange={edit(setChatDraft)}
         onBlur={settle(chatDraft, loaded.chat, setChatDraft)}
       />
@@ -186,9 +205,21 @@ export function AgentRoundLimits() {
         label="Tool rounds per explorer turn"
         hint="Default 8."
         value={explorerDraft}
+        disabled={!ready}
         onChange={edit(setExplorerDraft)}
         onBlur={settle(explorerDraft, loaded.explorer, setExplorerDraft)}
       />
+      {loadState === "failed" && (
+        <div role="alert" className="flex flex-wrap items-center gap-3 rounded-lg border border-destructive/40 bg-destructive/15 px-3 py-2 text-sm text-[hsl(0_80%_80%)]">
+          <span>
+            Couldn't load the current tool-round limits, so they can't be changed here right now.
+            {loadError ? ` ${loadError}` : ""}
+          </span>
+          <Button type="button" size="sm" variant="outline" onClick={load}>
+            Retry
+          </Button>
+        </div>
+      )}
       <div className="flex flex-wrap items-center gap-3 py-2">
         <Button type="button" size="sm" variant="outline" disabled={!dirty || saving} onClick={() => void save()}>
           {saving ? "Saving…" : "Save tool rounds"}
