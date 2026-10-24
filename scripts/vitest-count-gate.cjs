@@ -4261,6 +4261,11 @@ const BASELINE = {
   "MetricArtifact.test.tsx": 7, // 273-02 — glyph + percent delta, zero comparison; RAISED 6 → 7 at 273-REVIEW WR-04
   "ArtifactBlock.test.tsx": 8, // 273-02 — registry closed to 3, notices, boundary, busy frame
   "ChartArtifact.test.tsx": 18, // 273-02 — legend toggles, hide, slots, no animation, tooltip; RAISED 15 → 18 at 273-REVIEW WR-05 (stackOffset=sign)
+  // ── Phase 292-02 (VIS-02 · D-16 · D-07) — THREE NEW suites, BOTH KNOBS, SAME COMMIT as their RED
+  // tests. FILE-LEVEL, like the 273-02 seven: `src/components/chat` has no bare-directory entry. ──
+  "diagramLayout.test.ts": 20, // 292-02 — pure layout: no overlap at 311 / 862, back edges, ranks, wrap, sizes
+  "DiagramArtifact.test.tsx": 17, // 292-02 — text-only labels, dashed back edges, hover == focus highlight, roving, aria, markers
+  "ArtifactTooltip.test.tsx": 9, // 292-02 — portalled role=tooltip, header / 280-char excerpt, Escape, anchored placement
   // ── Phase 273-05 (D-16 · I-1 · I-2 · SC#2) — SIX NEW suites, BOTH KNOBS, SAME COMMIT. None of
   // their directories has a bare TARGETS entry (`src/components/chat`, `src/lib/api`,
   // `src/providers` — the last sits in NEITHER knob), so each is adopted by FILE path below.
@@ -6321,6 +6326,10 @@ const TARGETS = [
   "src/components/chat/artifacts/__tests__/MetricArtifact.test.tsx",
   "src/components/chat/artifacts/__tests__/ArtifactBlock.test.tsx",
   "src/components/chat/artifacts/__tests__/ChartArtifact.test.tsx",
+  // Phase 292-02 — the three diagram / tooltip suites (Task 2). FILE-LEVEL, same reason as above.
+  "src/components/chat/artifacts/__tests__/diagramLayout.test.ts",
+  "src/components/chat/artifacts/__tests__/DiagramArtifact.test.tsx",
+  "src/components/chat/artifacts/__tests__/ArtifactTooltip.test.tsx",
   // Phase 273-05 — six new suites. FILE-LEVEL: none of `src/components/chat`, `src/lib/api` or
   // `src/providers` has a bare-directory entry (`src/providers` is in NEITHER knob).
   "src/lib/api/__tests__/threads.artifact.test.ts",
