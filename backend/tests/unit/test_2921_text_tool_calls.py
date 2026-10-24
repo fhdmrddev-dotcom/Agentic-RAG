@@ -410,3 +410,198 @@ def test_round_cap_clamps_and_reads_the_named_attributes():
 def test_no_failed_call_notice_text_is_interpolated_here():
     # the notice is one sentence and never carries markup
     assert "<" not in FAILED_CALL_NOTICE
+
+
+# ── F7 (292.1 SC#2): harmony-style calls written as TEXT, measured on the forced-pending board ───
+# An openai gpt-5.6-luna run reached the forced-final round (no tools sent) and wrote its pending
+# calls as harmony text with the special tokens decoded away. detect_markup counted 0 hits, so the
+# text was saved and served on reload in 3/3 runs (+ the main board's 34748d7c). The four rows are
+# verbatim in ``harmony_measured``. Grammar (harmony docs/format.md §"Receiving tool calls"):
+# ``<|channel|>commentary to=functions.NAME <|constrain|>json<|message|>{...}<|call|>``.
+
+from tests.unit.harmony_measured import H1_ed030690, H2_2b7c16a0, H3_f1c46597, H4_34748d7c  # noqa: E402
+
+OFFERED = {"search_documents", "execute_code"}
+MEASURED_HARMONY = [H1_ed030690, H2_2b7c16a0, H3_f1c46597, H4_34748d7c]
+MEASURED_IDS = ["H1-ed030690", "H2-2b7c16a0", "H3-f1c46597", "H4-34748d7c"]
+H1_TAIL = ("I’m unable to complete the requested tool-call sequence because the document tools "
+           "stopped responding after the first call.")
+H2_TAIL = H2_2b7c16a0[H2_2b7c16a0.index("}amen") + 1:]
+H2_NAMES = ["search_documents"] * 8 + ["execute_code"] * 2
+H3_NAMES = ["search_documents"] * 10 + ["execute_code"] + ["search_documents"] * 2 + ["execute_code"] * 2
+HARMONY_ONE = ' to=functions.search_documents  code:\n{"query":"project plan"}'   # H4 without the tail
+
+
+def test_f7_is_unreachable_for_every_pre_f7_fixture():
+    """Every other family stays byte-identical: F7's opener matches none of their fixtures, so the
+    new branch never runs for them and the tests above keep pinning their exact outputs."""
+    pre_f7 = [F1, F2, F3, F4, F5, F6, F1_TRUNCATED, F3_TWO_INVOKES, *PROSE_MENTIONS,
+              *(PREAMBLE + b for b in (F1, F2, F3, F4, F5, F6))]
+    for text in pre_f7:
+        assert ttc.HARMONY_OPENER_RE.search(text) is None, text[:60]
+        hit = ttc._first_markup(text)
+        assert hit is None or hit[1] != "harmony"
+
+
+@pytest.mark.parametrize("text", MEASURED_HARMONY, ids=MEASURED_IDS)
+def test_f7_every_measured_row_is_markup_from_its_first_character(text):
+    assert ttc.detect_markup(text) == 0
+    assert "to=functions" not in ttc.strip_markup(text)
+
+
+@pytest.mark.parametrize(
+    "text,names,rest",
+    [(H2_2b7c16a0, H2_NAMES, H2_TAIL), (H3_f1c46597, H3_NAMES, ""), (H4_34748d7c, ["search_documents"], " jing\xef")],
+    ids=["H2-2b7c16a0", "H3-f1c46597", "H4-34748d7c"],
+)
+def test_f7_parse_queues_every_call_in_order(text, names, rest):
+    r = ttc.parse_harmony(text, OFFERED)
+    assert r.found and r.ok
+    assert r.preamble == ""
+    assert [c["name"] for c in r.calls] == names
+    assert all(set(c) == {"id", "name", "arguments"} and _ID.match(c["id"]) for c in r.calls)
+    assert len({c["id"] for c in r.calls}) == len(names)
+    assert all(isinstance(json.loads(c["arguments"]), dict) for c in r.calls)
+    assert r.rest == rest
+
+
+def test_f7_arguments_are_the_models_json_verbatim():
+    r = ttc.parse_harmony(H4_34748d7c, OFFERED)
+    assert r.calls[0]["arguments"] == '{"query":"project plan"}'
+    h2 = ttc.parse_harmony(H2_2b7c16a0, OFFERED)
+    assert json.loads(h2.calls[0]["arguments"]) == {"query": "milestones"}
+    assert json.loads(h2.calls[-1]["arguments"])["description"] == "Drawing milestone count bar chart"
+
+
+@pytest.mark.parametrize(
+    "text",
+    [
+        # the recipient-first form of the docs example (special tokens leaked literally)
+        'to=functions.get_weather <|constrain|>json<|message|>{"location":"San Francisco"}<|call|>',
+        # the docs' generate_file example: no space before <|constrain|>
+        'to=functions.get_weather<|constrain|>json<|message|>{"location":"San Francisco"}<|call|>',
+        # recipient in the role section, channel after it
+        'to=functions.get_weather<|channel|>commentary <|constrain|>json<|message|>{"location":"SF"}<|call|>',
+    ],
+    ids=["channel-section", "no-space", "role-section"],
+)
+def test_f7_the_documented_grammar_parses_and_leaves_nothing_visible(text):
+    s = ttc.settle(text, {"get_weather"}, buffer_has_calls=False)
+    assert s.kind == "parsed"
+    assert [c["name"] for c in s.calls] == ["get_weather"]
+    assert s.visible == ""
+
+
+def test_f7_a_name_outside_the_offered_tools_refuses_the_whole_block():
+    r = ttc.parse_harmony(H2_2b7c16a0, {"search_documents"})   # execute_code not offered
+    assert r.found is True and r.ok is False and r.calls == []
+    s = ttc.settle(H2_2b7c16a0, {"search_documents"}, buffer_has_calls=False)
+    assert s.kind == "unparseable" and s.calls == []
+    assert s.visible == H2_TAIL
+    assert "to=functions" not in s.visible
+
+
+def test_f7_a_recipient_with_no_namespace_refuses_the_block_but_is_still_stripped():
+    """H1: ``to=search_documents`` (namespace dropped) is not the documented grammar — never repaired
+    into a call — yet it is markup, so it is never shown; the trailing prose stays."""
+    r = ttc.parse_harmony(H1_ed030690, OFFERED)
+    assert r.found is True and r.ok is False and r.calls == []
+    s = ttc.settle(H1_ed030690, OFFERED, buffer_has_calls=False)
+    assert s.kind == "unparseable"
+    assert s.visible == H1_TAIL
+
+
+def test_f7_a_truncated_block_is_refused_and_stripped_to_the_end():
+    text = "Searching now.\n" + HARMONY_ONE.lstrip()[:-6]
+    s = ttc.settle(text, OFFERED, buffer_has_calls=False)
+    assert s.kind == "unparseable" and s.calls == []
+    assert s.visible == "Searching now.\n"
+
+
+@pytest.mark.parametrize("text,visible", [(H2_2b7c16a0, H2_TAIL), (H3_f1c46597, ""), (H4_34748d7c, " jing\xef")],
+                         ids=["H2-2b7c16a0", "H3-f1c46597", "H4-34748d7c"])
+def test_f7_settle_parses_the_measured_rows_and_shows_no_recipient(text, visible):
+    s = ttc.settle(text, OFFERED, buffer_has_calls=False)
+    assert s.kind == "parsed"
+    assert s.visible == visible
+    assert s.markup_len > 0 and len(s.markup_preview) <= 200
+
+
+def test_f7_with_structured_calls_already_queued_it_only_strips():
+    s = ttc.settle("Pre\n" + HARMONY_ONE.lstrip(), OFFERED, buffer_has_calls=True)
+    assert s.kind == "stripped" and s.calls == [] and s.visible == "Pre\n"
+
+
+def test_f7_a_harmony_block_after_a_dsml_block_is_parsed_too_in_order():
+    s = ttc.settle(F2 + "\n" + HARMONY_ONE, {"grep", "search_documents"}, buffer_has_calls=False)
+    assert s.kind == "parsed"
+    assert [c["name"] for c in s.calls] == ["grep", "search_documents"]
+    assert "to=functions" not in s.visible and "DSML" not in s.visible
+
+
+# WR-01 for F7: a recipient counts only with the family's call shape — a content-type lead
+# (``code`` / ``json`` / ``(…)`` / ``<|…|>``, at most three header tokens) and then ``{``.
+PROSE_HARMONY = [
+    "The model writes to=functions.search_documents and then its arguments.",
+    "Harmony routes a call with to=functions.search_documents (json) and nothing else.",
+    "goto=functions.search_documents code\n{\"a\": 1}",
+    "Example:\n```\n to=functions.search_documents code\n{\"query\":\"x\"}\n```\nThat is the format.",
+    "Use `to=functions.search_documents code:` and then send the JSON.",
+    "It ends with to=functions.search_documents",
+]
+PROSE_HARMONY_IDS = ["sentence", "json-lead-then-words", "glued-to-a-word", "fenced", "inline-code", "at-end"]
+
+
+@pytest.mark.parametrize("text", PROSE_HARMONY, ids=PROSE_HARMONY_IDS)
+def test_f7_prose_that_mentions_a_recipient_is_byte_identical(text):
+    assert ttc.detect_markup(text) is None
+    assert ttc.strip_markup(text) is text
+    s = ttc.settle(text, OFFERED, buffer_has_calls=False)
+    assert s.kind == "none" and s.visible is text and s.calls == []
+
+
+@pytest.mark.parametrize("n", [1, 2, 5, 50])
+@pytest.mark.parametrize("text", PROSE_HARMONY[:3], ids=PROSE_HARMONY_IDS[:3])
+def test_f7_the_holdback_releases_prose_that_mentions_a_recipient_live(text, n):
+    hb = ttc.TagHoldback()
+    released = "".join(hb.feed(c) for c in _split(text, n))
+    assert released == text
+    assert hb.finish() == ""
+
+
+@pytest.mark.parametrize("n", [1, 2, 3, 7, 50])
+@pytest.mark.parametrize("text", MEASURED_HARMONY, ids=MEASURED_IDS)
+def test_f7_the_holdback_releases_nothing_of_a_measured_row(text, n):
+    hb = ttc.TagHoldback()
+    released = "".join(hb.feed(c) for c in _split(text, n))
+    assert released == ""
+    assert hb.finish() == text
+
+
+@pytest.mark.parametrize("n", [1, 2, 3, 7])
+def test_f7_the_holdback_releases_only_the_preamble(n):
+    text = "Let me search." + H4_34748d7c
+    hb = ttc.TagHoldback()
+    released = "".join(hb.feed(c) for c in _split(text, n))
+    assert released in ("Let me search.", "Let me search. ")
+    assert released + hb.finish() == text
+
+
+def test_f7_a_split_recipient_is_held_across_chunks():
+    # Mid-text, the blank before the recipient is the preamble's (only start-of-text blanks belong
+    # to the block), so it streams; the recipient itself is held from its first character.
+    hb = ttc.TagHoldback()
+    out = "".join(hb.feed(c) for c in ["Hi.", " ", "t", "o", "=func", "tions.search_documents", " code:\n",
+                                       '{"query":"x"}'])
+    assert out == "Hi. "
+    start = ttc.TagHoldback()
+    out = "".join(start.feed(c) for c in [" ", "t", "o=functions.", "search_documents", "  code:\n{}"])
+    assert out == ""   # at the start of the text the blank belongs to the block
+
+
+def test_f7_holdback_and_settle_agree_on_where_the_block_starts():
+    for text in ("Pre " + HARMONY_ONE.lstrip(), "Pre\n" + HARMONY_ONE, HARMONY_ONE, "(" + HARMONY_ONE.lstrip()):
+        for n in (1, 2, 3, 5):
+            hb = ttc.TagHoldback()
+            released = "".join(hb.feed(c) for c in _split(text, n))
+            assert released == ttc.settle(text, OFFERED, buffer_has_calls=False).visible, (text, n)

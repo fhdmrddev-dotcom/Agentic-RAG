@@ -19,9 +19,13 @@ THE RULES.
   fullwidth bars, an optional space, any block name ending in ``calls``. Tolerant on the opener,
   STRICT on the body: a truncated block, a name outside the run's OFFERED tools, or a
   ``string="false"`` value that is not JSON refuses the WHOLE block (D-07). Nothing is repaired.
-* ``detect_markup`` / ``strip_markup`` know the six measured families (F1-F6) and never look inside
+* ``detect_markup`` / ``strip_markup`` know the seven measured families (F1-F7) and never look inside
   fenced code or inline code (Pitfall 6): an answer that EXPLAINS a tool-call format is content.
   A clean answer comes back as the same object, byte-identical (D-10).
+* ``parse_harmony`` reads F7 — the harmony response format's recipient, written as text with its
+  special tokens decoded away (``to=functions.NAME code\\n{...}``). Same rules as DSML: tolerant on
+  the content-type tokens between name and arguments, STRICT on the call: every recipient must be
+  ``to=functions.<offered name>`` followed by ONE JSON object, or the whole block is refused.
 * ``TagHoldback`` decides what may be EMITTED live; it never changes what is accumulated. It holds
   from a tag opener to the end of the provider call, and holds a suffix that could still become one
   (the 1-char split). It only delays: ``finish`` returns the held text byte-for-byte (D-11, I-2).
@@ -53,12 +57,14 @@ from app.services.structured_text_holdback import (  # noqa: F401  (re-exported 
 
 __all__ = [
     "DSML_OPENER_RE",
+    "HARMONY_OPENER_RE",
     "MARKUP_OPENERS",
     "DsmlResult",
     "Settled",
     "TagHoldback",
     "detect_markup",
     "parse_dsml",
+    "parse_harmony",
     "resolve_round_cap",
     "settle",
     "strip_markup",
@@ -84,10 +90,94 @@ _PARAM_RE = re.compile(
     re.DOTALL,
 )
 
+# ── F7 harmony grammar (harmony response format docs/format.md §"Receiving tool calls") ─────────
+#   <|start|>assistant<|channel|>commentary to=functions.NAME <|constrain|>json<|message|>{…}<|call|>
+# The recipient may also sit in the role section. MEASURED (292.1 forced-pending board, 4 runs, 3/3
+# + the main board): the special tokens are decoded away and the content-type slot carries garbage —
+# `` to=functions.search_documents code_WORDRY <noise>\n{"query":"milestones"}``, ``  (analysis
+# code)``, ``  (json) code:``, a stuttered recipient ``code to=functions.X  (json)``, ``}, `` between
+# calls, and one recipient with NO namespace (``to=search_documents``). The block has no closer: it
+# ends where its last JSON object ends. Blanks at the START OF THE TEXT before a recipient belong to
+# the block (the decoded `` to=`` opens the whole message in every measured row); elsewhere a blank
+# before ``to=`` is the preamble's, so the live holdback and this scan agree on where a block starts.
+_HNAME = r"[A-Za-z_][\w\-]*"
+HARMONY_OPENER_RE = re.compile(rf"(?:^[ \t]+|(?<![\w=.\-]))to=functions\.({_HNAME})")
+# A later recipient in the same block: after `}` / `,` / blanks; namespace optional (refused if absent).
+_HARMONY_NEXT_RE = re.compile(rf"[\s,]*to=(functions\.)?({_HNAME})")
+# A recipient repeated inside the content-type slot (the stutter).
+_HARMONY_INNER_RE = re.compile(rf"to=(functions\.)?({_HNAME})")
+# The decoded stop token, when it survives as text.
+_HARMONY_STOP_RE = re.compile(r"[ \t]*<\|(?:call|end|return)\|>")
+# WR-01 call shape: the slot between name and ``{`` starts with a content-type token and is short.
+_HARMONY_LEAD_RE = re.compile(r"(?:<\|\w+\|>|code|json|to=|\((?:analysis|commentary|code|json)\b)")
+_HARMONY_LEADS = ("code", "json", "to=", "(analysis", "(commentary", "(code", "(json")
+_HARMONY_SLOT_MAX = 96      # measured max 45 (the stutter)
+_HARMONY_SLOT_TOKENS = 3    # measured max 3 (the stutter); every documented form has <= 2
+_JSON = json.JSONDecoder()
+
+
+def _harmony_brace(text: str, at: int) -> int | None:
+    """Index of the ``{`` opening the arguments of a recipient whose name ends at ``at``; ``-1`` when
+    the text proves this is prose; ``None`` when it ran out before telling (WR-01)."""
+    n = len(text)
+    i = at
+    while i < n and text[i] not in "\n{}" and i - at <= _HARMONY_SLOT_MAX:
+        i += 1
+    slot = text[at:i].strip()
+    if i - at > _HARMONY_SLOT_MAX or len(slot.split()) > _HARMONY_SLOT_TOKENS:
+        return -1
+    if slot and not _HARMONY_LEAD_RE.match(slot):
+        could_lead = any(t.startswith(slot) for t in _HARMONY_LEADS) or re.fullmatch(r"<\|\w*\|?", slot)
+        return None if i == n and could_lead else -1
+    if i == n:
+        return None
+    if text[i] == "\n":
+        i += 1
+        while i < n and text[i] in " \t":
+            i += 1
+        if i == n:
+            return None
+    return i if text[i] == "{" else -1
+
+
+def _harmony_scan(text: str, m: re.Match[str]) -> tuple[int, list[tuple[str, str]] | None]:
+    """``(end, calls)`` of the harmony block whose first recipient is ``m``. ``calls`` is the
+    ``(name, raw JSON arguments)`` list, or ``None`` when any recipient is not exactly
+    ``to=functions.NAME`` + one JSON object (D-07). A cut-off block runs to the end of the text."""
+    calls: list[tuple[str, str]] | None = []
+    name, name_end, namespaced = m.group(1), m.end(), True
+    while True:
+        brace = _harmony_brace(text, name_end)
+        if brace is None or brace < 0:
+            return len(text), None
+        for inner in _HARMONY_INNER_RE.finditer(text, name_end, brace):
+            if inner.group(2) != name or not inner.group(1):
+                calls = None  # a stutter naming another tool: whose arguments these are is unknown
+        try:
+            _, end = _JSON.raw_decode(text, brace)
+        except ValueError:
+            return len(text), None
+        if calls is not None and namespaced:
+            calls.append((name, text[brace:end]))
+        else:
+            calls = None
+        stop = _HARMONY_STOP_RE.match(text, end)
+        end = stop.end() if stop else end
+        nxt = _HARMONY_NEXT_RE.match(text, end)
+        if nxt is None:
+            return end, calls
+        after = _harmony_brace(text, nxt.end())
+        if after is None:
+            return len(text), None
+        if after < 0:
+            return end, calls
+        name, name_end, namespaced = nxt.group(2), nxt.end(), bool(nxt.group(1))
+
+
 # ── The measured markup families (D-06). ONE data tuple of (family, opener, closer) ───────────────
 # ``opener`` is a regex; ``closer`` is a regex or None. Vendor forms with ZERO measured hits
 # (``<function_calls>``, ``<minimax:tool_call>``, ``[TOOL_CALLS]``, ``<|python_tag|>``) are NOT here.
-MARKUP_OPENERS: tuple[tuple[str, re.Pattern[str], re.Pattern[str]], ...] = (
+MARKUP_OPENERS: tuple[tuple[str, re.Pattern[str], re.Pattern[str] | None], ...] = (
     # F1 / F2 / F3 — DeepSeek DSML, every measured spelling (prod msg 4226d237; local 3d043068,
     # aeddd9f8 / 5bf39685 / dcf1b29e).
     ("dsml", DSML_OPENER_RE, _DSML_CLOSER_RE),
@@ -97,7 +187,11 @@ MARKUP_OPENERS: tuple[tuple[str, re.Pattern[str], re.Pattern[str]], ...] = (
     ("gemma_tool_call", re.compile(r"<\|tool_call>"), re.compile(r"<tool_call\|>")),
     # F4's inner form, seen bare: `<function=NAME>…</function>`.
     ("xml_function", re.compile(r"<function="), re.compile(r"</function>")),
+    # F7 — harmony recipient as text (292.1 SC#2; runs ed030690 / 2b7c16a0 / f1c46597 / 34748d7c).
+    # No closer: the block ends where its last JSON object does (``_harmony_scan``).
+    ("harmony", HARMONY_OPENER_RE, None),
 )
+_CLOSERS: dict[str, re.Pattern[str]] = {f: c for f, _o, c in MARKUP_OPENERS if c is not None}
 
 # Literal openers the holdback can prefix-match while text is still arriving (the DSML opener is a
 # pattern and gets its own prefix test, ``_could_become_dsml``), each with its MARKUP_OPENERS family.
@@ -133,6 +227,9 @@ def _call_shape(family: str, rest: str, *, line_start: bool) -> bool | None:
     at the end of a whole text an undecided block counts only when it starts a line)."""
     if family == "dsml":
         return True
+    if family == "harmony":  # F7: a content-type slot, then `{` (``_harmony_brace``)
+        brace = _harmony_brace(rest, 0)
+        return None if brace is None else brace >= 0
     if family == "xml_function":
         if not line_start:
             return False
@@ -212,13 +309,13 @@ def _is_call_at(family: str, text: str, m: re.Match[str]) -> bool:
     return line_start if verdict is None else verdict
 
 
-def _first_markup(text: str) -> tuple[int, re.Pattern[str]] | None:
-    """(index, closer) of the first CALL-SHAPED opener OUTSIDE code, else None."""
-    if "<" not in text:
+def _first_markup(text: str) -> tuple[int, str, re.Match[str]] | None:
+    """(index, family, opener match) of the first CALL-SHAPED opener OUTSIDE code, else None."""
+    if "<" not in text and "to=" not in text:
         return None
     ranges: list[tuple[int, int]] | None = None
-    best: tuple[int, re.Pattern[str]] | None = None
-    for family, opener, closer in MARKUP_OPENERS:
+    best: tuple[int, str, re.Match[str]] | None = None
+    for family, opener, _closer in MARKUP_OPENERS:
         for m in opener.finditer(text):
             if best is not None and m.start() >= best[0]:
                 break
@@ -228,9 +325,17 @@ def _first_markup(text: str) -> tuple[int, re.Pattern[str]] | None:
                 continue
             if not _is_call_at(family, text, m):  # WR-01: prose that mentions the tag
                 continue
-            best = (m.start(), closer)
+            best = (m.start(), family, m)
             break
     return best
+
+
+def _markup_end(text: str, family: str, m: re.Match[str]) -> int:
+    """End of the block opened at ``m``: its closer, or the end of the text when it was cut off."""
+    if family == "harmony":
+        return _harmony_scan(text, m)[0]
+    c = _CLOSERS[family].search(text, m.start() + 1)
+    return len(text) if c is None else c.end()
 
 
 def detect_markup(text: str) -> int | None:
@@ -248,10 +353,8 @@ def strip_markup(text: str) -> str:
         hit = _first_markup(out)
         if hit is None:
             return out
-        start, closer = hit
-        c = closer.search(out, start + 1)
-        end = len(out) if c is None else c.end()
-        out = out[:start] + out[end:]
+        start, family, m = hit
+        out = out[:start] + out[_markup_end(out, family, m):]
 
 
 # ── DSML parser ──────────────────────────────────────────────────────────────────────────────────
@@ -323,6 +426,28 @@ def parse_dsml(text: str, offered: frozenset[str] | set[str]) -> DsmlResult:
     return DsmlResult(ok=True, calls=calls, preamble=preamble, found=True, rest=text[close.end():])
 
 
+def parse_harmony(text: str, offered: frozenset[str] | set[str]) -> DsmlResult:
+    """Parse the first call-shaped F7 block outside code — the same contract as ``parse_dsml``.
+
+    Every recipient must be ``to=functions.<offered name>`` + ONE JSON object, or the WHOLE block
+    is refused (D-07): a cut-off object, a recipient with no namespace, a stutter naming another
+    tool, a name the run did not offer. The arguments are the model's JSON verbatim — never
+    re-serialised, never repaired.
+    """
+    ranges = _code_ranges(text) if "to=" in text else []
+    for m in HARMONY_OPENER_RE.finditer(text):
+        if any(a <= m.start() < b for a, b in ranges) or not _is_call_at("harmony", text, m):
+            continue
+        preamble = text[: m.start()]
+        end, found = _harmony_scan(text, m)
+        if found is None or not found or any(name not in offered for name, _ in found):
+            return DsmlResult(ok=False, calls=[], preamble=preamble, found=True)
+        calls = [{"id": f"call_{uuid.uuid4().hex[:24]}", "name": name, "arguments": args}
+                 for name, args in found]
+        return DsmlResult(ok=True, calls=calls, preamble=preamble, found=True, rest=text[end:])
+    return DsmlResult(ok=False, calls=[], preamble=text, found=False)
+
+
 # ── Live holdback ────────────────────────────────────────────────────────────────────────────────
 
 # How far back from the end a partial opener is looked for (the Phase 273 ``_PARTIAL_WINDOW``).
@@ -368,8 +493,22 @@ def _could_become_opener(s: str) -> bool:
     return _could_become_dsml(s)
 
 
-def _first_complete_opener(buf: str) -> tuple[int, int, str] | None:
-    """(start, end, family) of the earliest complete opener in ``buf``, else None."""
+_HARMONY_PREFIX = "to=functions."
+
+
+def _could_become_harmony(buf: str, p: int, ctx: str) -> bool:
+    """True when ``buf[p:]`` could still become an F7 recipient (``ctx`` as in ``TagHoldback``)."""
+    s = buf[p:]
+    if p == 0 and ctx == "" and s[:1] in (" ", "\t"):  # blanks at the start of the text
+        return _HARMONY_PREFIX.startswith(s.lstrip(" \t"))
+    before = buf[p - 1] if p else ctx[-1:]
+    return s[:1] == "t" and not re.match(r"[\w=.\-]", before) and _HARMONY_PREFIX.startswith(s)
+
+
+def _first_complete_opener(buf: str, ctx: str = "") -> tuple[int, int, str] | None:
+    """(start, end, family) of the earliest complete opener in ``buf``, else None. ``ctx`` is ""
+    at the start of the text, else a sentinel + the last released char, so the F7 lookbehind and
+    its start-of-text blanks read exactly as the whole-text scan reads them."""
     best: tuple[int, int, str] | None = None
     for lit, family in _LITERAL_FAMILY.items():
         i = buf.find(lit)
@@ -378,12 +517,17 @@ def _first_complete_opener(buf: str) -> tuple[int, int, str] | None:
     m = DSML_OPENER_RE.search(buf)
     if m and (best is None or m.start() < best[0]):
         best = (m.start(), m.end(), "dsml")
+    h = HARMONY_OPENER_RE.search(ctx + buf, len(ctx))
+    if h and (best is None or h.start() - len(ctx) < best[0]):
+        best = (h.start() - len(ctx), h.end() - len(ctx), "harmony")
     return best
 
 
-def _partial_tail_start(buf: str) -> int:
+def _partial_tail_start(buf: str, ctx: str = "") -> int:
     for p in range(max(0, len(buf) - _PARTIAL_WINDOW), len(buf)):
         if buf[p] == "<" and _could_become_opener(buf[p:]):
+            return p
+        if buf[p] in "t \t" and _could_become_harmony(buf, p, ctx):
             return p
     return len(buf)
 
@@ -414,9 +558,11 @@ class TagHoldback:
         parts: list[str] = []
         while True:
             buf = self._pending
-            hit = _first_complete_opener(buf)
+            last = next((p[-1] for p in reversed(parts) if p), self.released[-1:])
+            ctx = "\x00" + last if last else ""  # F7 context: "" only at the start of the text
+            hit = _first_complete_opener(buf, ctx)
             if hit is None:
-                at = _partial_tail_start(buf)
+                at = _partial_tail_start(buf, ctx)
                 parts.append(buf[:at])
                 self._pending = buf[at:]
                 break
@@ -461,7 +607,7 @@ def settle(full_content: str, offered: frozenset[str] | set[str], *, buffer_has_
 
     * ``none`` — no markup outside code: ``visible`` is ``full_content`` itself.
     * ``stripped`` — structured calls are already queued: remove the markup, parse nothing.
-    * ``parsed`` — the first markup is a DSML block that parsed exactly: queue its calls.
+    * ``parsed`` — the first markup is a DSML or F7 block that parsed exactly: queue its calls.
     * ``unparseable`` — markup that could not be parsed exactly (D-07): remove it, queue nothing.
 
     ``markup_*`` describe the removed text for ONE bounded log line (D-08); the caller logs.
@@ -471,9 +617,10 @@ def settle(full_content: str, offered: frozenset[str] | set[str], *, buffer_has_
     further block that cannot be parsed is removed and worded (``FAILED_CALL_NOTICE``) while the
     first block's calls still run — each block stands or falls whole (D-07), not the message.
     """
-    idx = detect_markup(full_content)
-    if idx is None:
+    hit = _first_markup(full_content)
+    if hit is None:
         return Settled(kind="none", calls=[], visible=full_content)
+    idx = hit[0]
     markup = full_content[idx:]
     meta = {
         "markup_len": len(markup),
@@ -482,7 +629,8 @@ def settle(full_content: str, offered: frozenset[str] | set[str], *, buffer_has_
     }
     if buffer_has_calls:
         return Settled(kind="stripped", calls=[], visible=strip_markup(full_content), **meta)
-    parsed = parse_dsml(full_content, offered)
+    parser = parse_harmony if hit[1] == "harmony" else parse_dsml
+    parsed = parser(full_content, offered)
     if parsed.found and parsed.ok and len(parsed.preamble) == idx:
         calls, visible = list(parsed.calls), parsed.preamble
         if parsed.rest:
