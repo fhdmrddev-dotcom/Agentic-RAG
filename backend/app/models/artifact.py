@@ -446,12 +446,37 @@ class Transform(_Strict):
         return not self.filter and not self.select and self.sort is None and self.top_n is None
 
 
+def _is_empty_filler(val: Any) -> bool:
+    """A value a model sends to fill an advertised property it has no data for: not data."""
+    if val == [] or val == {}:
+        return True
+    return isinstance(val, str) and val.strip() in ("", "null", "{}", "[]")
+
+
+# The three encodings 292 added to the schema. A model that fills every advertised property sends them
+# on chart / table / metric calls too; those arms read an empty filler as absent (292-REVIEW WR-03).
+_NEW_ENCODING_KEYS: tuple[str, ...] = ENCODED_COMPONENTS
+
+
 class _ArgsBase(_Strict):
     title: str = Field(min_length=1)
     from_artifact: str | None = Field(default=None, max_length=64)
     columns: list[Column] | None = None
     rows: list[list[Cell]] | None = None
     transform: Transform | None = None
+
+    @model_validator(mode="before")
+    @classmethod
+    def _new_encoding_fillers_are_absent(cls, data: Any) -> Any:
+        # 292-REVIEW WR-03: before 292 these keys were not in the schema, so no model sent them; a
+        # chart call carrying "diagram": {} must not start failing because the schema grew.
+        if not isinstance(data, dict) or not any(_is_empty_filler(data.get(k)) for k in _NEW_ENCODING_KEYS):
+            return data
+        data = dict(data)  # never mutate the caller's args
+        for key in _NEW_ENCODING_KEYS:
+            if _is_empty_filler(data.get(key)):
+                data[key] = None
+        return data
 
     @field_validator("title", mode="before")
     @classmethod
@@ -1001,8 +1026,8 @@ class _Encoded(_Strict):
             val = data.get(key)
             if val is None:
                 continue
-            if val == [] or val == {} or (isinstance(val, str) and val.strip() in ("", "null")):
-                data[key] = None  # an empty filler is not data
+            if _is_empty_filler(val):
+                data[key] = None  # an empty filler is not data (the tabular arms share the rule, WR-03)
                 continue
             _raise("foreign_fields",
                    f"a {enc} call sends `{enc}` only; `{key}` belongs to another artifact type. Remove `{key}`.",

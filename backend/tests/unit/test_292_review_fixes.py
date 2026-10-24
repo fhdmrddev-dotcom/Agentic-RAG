@@ -119,6 +119,47 @@ def test_the_caption_document_is_cut_the_same_way():
     assert sat._source_of(call)["document"] == PAGE * 100
 
 
+# ── WR-03: a tabular call tolerates empty fillers in the three new encodings ─────────────────────
+
+
+def _chart(**extra):
+    base = {"component": "chart", "title": "Revenue", "chart": {"kind": "bar", "x": "q", "y": ["rev"]},
+            "columns": [{"name": "q", "type": "string"}, {"name": "rev", "type": "number"}],
+            "rows": [["Q1", 10], ["Q2", 12]]}
+    base.update(extra)
+    return base
+
+
+@pytest.mark.parametrize("key", ["diagram", "comparison", "timeline"])
+@pytest.mark.parametrize("filler", [{}, [], "", "  ", "null", "{}", "[]", None])
+def test_a_chart_with_an_empty_new_encoding_is_still_shown(key, filler):
+    out = validate_args(_chart(**{key: filler}))
+    assert isinstance(out, am.ChartArgs), out
+    assert getattr(out, key) is None
+
+
+@pytest.mark.parametrize("component", ["table", "metric"])
+def test_table_and_metric_tolerate_the_same_fillers(component):
+    args = _chart(component=component, diagram={}, comparison=[], timeline="null")
+    args.pop("chart")
+    if component == "metric":
+        args["metric"] = {"value_column": "rev"}
+        args["rows"] = [["Q1", 10]]
+    out = validate_args(args)
+    assert not isinstance(out, ArtifactRefusal), out
+
+
+def test_a_real_new_encoding_on_a_chart_is_still_refused():
+    out = validate_args(_chart(diagram={"nodes": [{"id": "a", "label": "A"}], "edges": []}))
+    assert isinstance(out, ArtifactRefusal)
+
+
+def test_the_filler_normalisation_never_mutates_the_callers_args():
+    args = _chart(diagram={})
+    validate_args(args)
+    assert args["diagram"] == {}
+
+
 # ── WR-02: a "not stated" (q) cell carries no source ─────────────────────────────────────────────
 
 
