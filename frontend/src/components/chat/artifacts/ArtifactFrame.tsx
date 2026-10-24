@@ -55,6 +55,12 @@ export function ArtifactFrame({ record, children }: ArtifactFrameProps) {
         </span>
         <Icon className="size-3 shrink-0" aria-hidden="true" data-icon={caption.icon} />
         <span>{caption.parts.join(CAPTION_SEGMENT_JOIN)}</span>
+        {/* 292 (D-17 · UI-D-292-01): the comparison's second line — the only additive slot. */}
+        {caption.note && (
+          <span data-testid="artifact-caption-note" className="basis-full italic text-muted-foreground">
+            {caption.note}
+          </span>
+        )}
       </figcaption>
     </figure>
   )

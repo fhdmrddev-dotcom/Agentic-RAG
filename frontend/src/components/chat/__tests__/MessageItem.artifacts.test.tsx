@@ -41,7 +41,13 @@ vi.mock("@/lib/supabase", () => ({
 import { MessageItem } from "@/components/chat/MessageItem"
 import { makeStreamCallbacks } from "@/providers/StreamsProvider"
 import { getMessages } from "@/lib/api/threads"
-import { chartBar, table16 } from "@/components/chat/artifacts/__tests__/fixtures"
+import {
+  chartBar,
+  table16,
+  diagramInvoice,
+  comparisonContracts,
+  timelineAtlas,
+} from "@/components/chat/artifacts/__tests__/fixtures"
 
 const NOW = "2026-10-03T09:41:12.512Z"
 const ANSWER = "Revenue grew every quarter, led by the Americas."
@@ -145,4 +151,46 @@ describe("I-2 — live and reload render IDENTICAL DOM through the same mount", 
     expect(liveHtml).toContain("table 1")
     expect(reloadHtml).toBe(liveHtml)
   })
+})
+
+/**
+ * Phase 292-02 (D-14 · I-2) — one live == reload case per encoded type. The same persisted record
+ * reaches the same component by both paths, so the markup is identical. (The timeline reads the
+ * viewer's clock; both renders run on the same day, which is the documented D-18 exception.)
+ */
+/**
+ * ⚠ The diagram's two `<marker>` ids embed a `useId()` fragment (T-292-13: two diagrams on one page
+ * must never share a marker). React's client id counter is page-global, so a SECOND mount gets a
+ * different fragment — a render-order artifact, not content. Only that fragment is normalised; every
+ * other byte is compared as-is.
+ */
+function stableHtml(html: string): string {
+  return html.replace(/(a_[0-9a-z]{10})-[A-Za-z0-9_]+-(ah(?:-hot)?)/g, "$1-ID-$2")
+}
+
+describe("I-2 — the three encoded types render identically live and on reload", () => {
+  for (const [name, record, marker] of [
+    ["diagram", diagramInvoice, "Invoice logged in the AP inbox"],
+    ["comparison", comparisonContracts, "Northwind Freight"],
+    ["timeline", timelineAtlas, "Non-renewal notice deadline"],
+  ] as const) {
+    it(`${name}: live artifact-list innerHTML === reload artifact-list innerHTML`, async () => {
+      const live = liveMessage([record])
+      const reload = await reloadMessage([record])
+      expect(reload.artifacts).toEqual(live.artifacts)
+
+      const a = renderItem(<MessageItem message={live} isStreaming={false} />)
+      const liveHtml = screen.getByTestId("artifact-list").innerHTML
+      a.unmount()
+
+      renderItem(<MessageItem message={reload} isStreaming={false} />)
+      await act(async () => {})
+      const reloadHtml = screen.getByTestId("artifact-list").innerHTML
+
+      expect(liveHtml).toContain(marker) // non-vacuity: the real renderer drew it
+      expect(liveHtml).toContain(`data-component="${name}"`)
+      expect(liveHtml).not.toContain("artifact-notice")
+      expect(stableHtml(reloadHtml)).toBe(stableHtml(liveHtml))
+    })
+  }
 })

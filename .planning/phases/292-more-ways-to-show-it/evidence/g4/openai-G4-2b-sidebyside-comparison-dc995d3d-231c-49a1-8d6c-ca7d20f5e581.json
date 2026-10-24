@@ -1,0 +1,898 @@
+{
+  "provider": "openai",
+  "model": "gpt-5.6-luna",
+  "thread_id": "3e0c408c-97e6-4ec3-950c-af74ce1cfa20",
+  "prompt_bytes": 119,
+  "prompt": "Compare the Atlas Logistics and Borealis Freight contracts on termination, liability and renewal. Show it side by side.",
+  "calling_mode_predicted": "NATIVE",
+  "score": {
+    "per_type": {
+      "diagram": {
+        "v1": "FAIL",
+        "v2_backend": "FAIL",
+        "artifact_ids": [],
+        "labels": [],
+        "sourced_elements": []
+      },
+      "comparison": {
+        "v1": "PASS",
+        "v2_backend": "PASS",
+        "artifact_ids": [
+          "a_91uke5giiv"
+        ],
+        "labels": [
+          "comparison 1"
+        ],
+        "sourced_elements": [
+          "14/14"
+        ]
+      },
+      "timeline": {
+        "v1": "FAIL",
+        "v2_backend": "FAIL",
+        "artifact_ids": [],
+        "labels": [],
+        "sourced_elements": []
+      }
+    },
+    "tool_call_names": [
+      "query_documents",
+      "analyze_document",
+      "analyze_document",
+      "show_artifact"
+    ],
+    "search_documents_calls": 0,
+    "show_artifact_calls": 1,
+    "refusals": [],
+    "artifact_rows": 1,
+    "reload_records": 1,
+    "reload_missing": 0,
+    "other_components": []
+  },
+  "turn_data": {
+    "run_id": "dc995d3d-231c-49a1-8d6c-ca7d20f5e581",
+    "run_status": "completed",
+    "run": {
+      "status": "completed",
+      "model": "gpt-5.6-luna",
+      "provider": "openai",
+      "error": null,
+      "started_at": "2026-10-24 01:33:04.489215+00:00",
+      "completed_at": "2026-10-24 01:33:34.027066+00:00"
+    },
+    "assistant_messages": [
+      {
+        "id": "d43a3fc2-f7d8-4bc7-b146-3d2e28b65a47",
+        "content": "The side-by-side comparison shows that **Borealis is easier to terminate for convenience**, while **Atlas has broader liability carve-outs and a more explicit auto-renewal mechanism**.\n\n- **Termination:** Atlas requires 90 days\u2019 notice for convenience and provides a mutual material-breach termination right after a 30-day cure period. Borealis requires only 30 days\u2019 notice, but its insolvency termination right is one-sided in favor of the Company.\n- **Liability:** Atlas uses a mutual cap based on fees paid during the prior 12 months. Borealis uses asymmetric caps: \u20ac250,000 per year for Borealis and same-year fees payable for the Company.\n- **Renewal:** Atlas automatically renews annually unless either party gives 90 days\u2019 non-renewal notice. Borealis has a fixed two-year term beginning 1 June 2024, with no automatic renewal language identified.\n\nThe comparison artifact above presents the full clause-by-clause breakdown.",
+        "tool_calls": [
+          {
+            "args": {
+              "query": "SELECT id, filename, metadata->>'title' AS title, metadata->>'document_type' AS document_type FROM documents WHERE (filename ILIKE '%Atlas%Logistics%' OR metadata->>'title' ILIKE '%Atlas%Logistics%' OR filename ILIKE '%Borealis%Freight%' OR metadata->>'title' ILIKE '%Borealis%Freight%') ORDER BY filename"
+            },
+            "name": "query_documents",
+            "result": "id | title | filename | document_type\n--- | --- | --- | ---\n325e6ca5-7982-47f5-af18-ad64b4802e85 | Atlas Logistics Master Services Agreement | 292-atlas-msa.md | master services agreement\nd4eb5c9d-e039-4b9c-a874-ef8593de3062 | Borealis Freight Master Services Agreement | 292-borealis-msa.md | master services agreement",
+            "status": "done",
+            "tool_call_id": "call_z4SflbwhS5zp9HkZvMfmyLg3"
+          },
+          {
+            "args": {
+              "task": "Extract and summarize the contract provisions on termination, liability, and renewal, including notice periods, triggers, caps, exclusions, indemnities, and any important distinctions. Cite section numbers or headings.",
+              "filename": "292-atlas-msa.md"
+            },
+            "name": "analyze_document",
+            "result": "Here\u2019s a concise extraction of the key provisions from the document, with citations to the relevant headings.\n\n## 1) Termination\n**Heading: \u201cTermination\u201d**\n\n- **Termination for convenience:** Either party may terminate the agreement **for convenience on 90 days\u2019 written notice**.\n- **Termination for material breach:** Either party may terminate **immediately** if there is a **material breach** that is **not cured within 30 days of written notice**.\n\n**Important distinction:**  \nThe agreement uses two different triggers and notice periods:\n- Convenience termination: **90 days\u2019 written notice**\n- Breach termination: **written notice + 30-day cure period**, then immediate termination if uncured\n\n## 2) Liability\n**Heading: \u201cLiability\u201d**\n\n- **Liability cap:** Each party\u2019s total liability under the agreement is capped at **the fees paid in the 12 months before the claim**.\n- **Exclusions from cap:** The cap does **not** apply to:\n  - **death**\n  - **personal injury**\n  - **fraud**\n  - **breach of confidentiality**\n\n**Important distinction:**  \nThe cap is tied to **fees paid in the prior 12 months**, not a fixed dollar/euro amount. The document does **not** mention any indemnity provision in the liability section or elsewhere.\n\n## 3) Renewal\n**Heading: \u201cRenewal\u201d**\n\n- **Automatic renewal:** The agreement renews automatically for **successive one-year terms** unless either party gives **written notice of non-renewal at least 90 days before the end of the current term**.\n- **Current term end date:** The current term ends on **15 March 2027**.\n- **Renewal notice deadline:** Therefore, the notice deadline is **15 December 2026**.\n\n**Important distinction:**  \nThis is an **auto-renewal** structure, but it can be stopped by timely non-renewal notice. The document expressly states the deadline rather than requiring calculation.\n\n## Notes on omitted items\n- **Indemnities:** No indemnity clause is included in the provided text.\n- **Other liability carve-outs:** Only the listed exclu",
+            "status": "done",
+            "sub_agent": {
+              "task": "Extract and summarize the contract provisions on termination, liability, and renewal, including notice periods, triggers, caps, exclusions, indemnities, and any important distinctions. Cite section numbers or headings.",
+              "content": "Here\u2019s a concise extraction of the key provisions from the document, with citations to the relevant headings.\n\n## 1) Termination\n**Heading: \u201cTermination\u201d**\n\n- **Termination for convenience:** Either party may terminate the agreement **for convenience on 90 days\u2019 written notice**.\n- **Termination for material breach:** Either party may terminate **immediately** if there is a **material breach** that is **not cured within 30 days of written notice**.\n\n**Important distinction:**  \nThe agreement uses two different triggers and notice periods:\n- Convenience termination: **90 days\u2019 written notice**\n- Breach termination: **written notice + 30-day cure period**, then immediate termination if uncured\n\n## 2) Liability\n**Heading: \u201cLiability\u201d**\n\n- **Liability cap:** Each party\u2019s total liability under the agreement is capped at **the fees paid in the 12 months before the claim**.\n- **Exclusions from cap:** The cap does **not** apply to:\n  - **death**\n  - **personal injury**\n  - **fraud**\n  - **breach of confidentiality**\n\n**Important distinction:**  \nThe cap is tied to **fees paid in the prior 12 months**, not a fixed dollar/euro amount. The document does **not** mention any indemnity provision in the liability section or elsewhere.\n\n## 3) Renewal\n**Heading: \u201cRenewal\u201d**\n\n- **Automatic renewal:** The agreement renews automatically for **successive one-year terms** unless either party gives **written notice of non-renewal at least 90 days before the end of the current term**.\n- **Current term end date:** The current term ends on **15 March 2027**.\n- **Renewal notice deadline:** Therefore, the notice deadline is **15 December 2026**.\n\n**Important distinction:**  \nThis is an **auto-renewal** structure, but it can be stopped by timely non-renewal notice. The document expressly states the deadline rather than requiring calculation.\n\n## Notes on omitted items\n- **Indemnities:** No indemnity clause is included in the provided text.\n- **Other liability carve-outs:** Only the listed exclusions are stated; no additional exclusions are mentioned.\n\nIf you want, I can also convert this into a table with columns for clause, trigger, notice, cure period, cap, and exclusions.",
+              "filename": "292-atlas-msa.md",
+              "effective_model": "gpt-5.4-mini"
+            },
+            "tool_call_id": "call_Kq1bzK43COumj3kpsrLuEZoO",
+            "sub_agent_model": "gpt-5.4-mini"
+          },
+          {
+            "args": {
+              "task": "Extract and summarize the contract provisions on termination, liability, and renewal, including notice periods, triggers, caps, exclusions, indemnities, and any important distinctions. Cite section numbers or headings.",
+              "filename": "292-borealis-msa.md"
+            },
+            "name": "analyze_document",
+            "result": "Here\u2019s a focused summary of the requested provisions from the agreement.\n\n## Termination\n**Heading: Termination**\n\n- **Convenience termination:** Either party may terminate the agreement **for convenience** on **30 days\u2019 written notice**.  \n  - Quote: \u201c**Either party may terminate this agreement for convenience on 30 days' written notice.**\u201d\n- **Immediate termination trigger:** The **Company** may terminate **immediately** if **Borealis becomes insolvent**.  \n  - Quote: \u201c**The Company may terminate immediately if Borealis becomes insolvent.**\u201d\n\n### Key distinctions\n- The **30-day notice** applies to **ordinary convenience termination** by either party.\n- The **immediate termination right** is **one-sided** and available only to the **Company**, and only upon **Borealis\u2019s insolvency**.\n\n## Liability\n**Heading: Liability**\n\n- **Borealis liability cap:** Borealis\u2019s total liability is capped at **\u20ac250,000 per year**.  \n  - Quote: \u201c**Borealis's total liability under this agreement is capped at 250,000 euros per year.**\u201d\n- **Company liability cap:** The Company\u2019s liability is capped at **the fees payable in the same year**.  \n  - Quote: \u201c**The Company's liability is capped at the fees payable in the same year.**\u201d\n- **Fraud carve-out:** **Neither cap applies to fraud.**  \n  - Quote: \u201c**Neither cap applies to fraud.**\u201d\n\n### Key distinctions\n- The cap is **asymmetric**:\n  - Borealis: a fixed monetary cap of **\u20ac250,000/year**\n  - Company: a cap tied to **annual fees payable**\n- The only express exclusion from the caps is **fraud**.\n- No indemnity provisions are stated in the provided text.\n\n## Renewal\n**Heading: Term**\n\n- The agreement begins on **1 June 2024** and continues for a **fixed term of two years**.  \n  - Quote: \u201c**The agreement starts on 1 June 2024 and runs for a fixed term of two years.**\u201d\n\n### Renewal note\n- **No automatic renewal or extension language** is included in the provided document text.\n- Because the term is described as a **fixed term of two years**, ",
+            "status": "done",
+            "sub_agent": {
+              "task": "Extract and summarize the contract provisions on termination, liability, and renewal, including notice periods, triggers, caps, exclusions, indemnities, and any important distinctions. Cite section numbers or headings.",
+              "content": "Here\u2019s a focused summary of the requested provisions from the agreement.\n\n## Termination\n**Heading: Termination**\n\n- **Convenience termination:** Either party may terminate the agreement **for convenience** on **30 days\u2019 written notice**.  \n  - Quote: \u201c**Either party may terminate this agreement for convenience on 30 days' written notice.**\u201d\n- **Immediate termination trigger:** The **Company** may terminate **immediately** if **Borealis becomes insolvent**.  \n  - Quote: \u201c**The Company may terminate immediately if Borealis becomes insolvent.**\u201d\n\n### Key distinctions\n- The **30-day notice** applies to **ordinary convenience termination** by either party.\n- The **immediate termination right** is **one-sided** and available only to the **Company**, and only upon **Borealis\u2019s insolvency**.\n\n## Liability\n**Heading: Liability**\n\n- **Borealis liability cap:** Borealis\u2019s total liability is capped at **\u20ac250,000 per year**.  \n  - Quote: \u201c**Borealis's total liability under this agreement is capped at 250,000 euros per year.**\u201d\n- **Company liability cap:** The Company\u2019s liability is capped at **the fees payable in the same year**.  \n  - Quote: \u201c**The Company's liability is capped at the fees payable in the same year.**\u201d\n- **Fraud carve-out:** **Neither cap applies to fraud.**  \n  - Quote: \u201c**Neither cap applies to fraud.**\u201d\n\n### Key distinctions\n- The cap is **asymmetric**:\n  - Borealis: a fixed monetary cap of **\u20ac250,000/year**\n  - Company: a cap tied to **annual fees payable**\n- The only express exclusion from the caps is **fraud**.\n- No indemnity provisions are stated in the provided text.\n\n## Renewal\n**Heading: Term**\n\n- The agreement begins on **1 June 2024** and continues for a **fixed term of two years**.  \n  - Quote: \u201c**The agreement starts on 1 June 2024 and runs for a fixed term of two years.**\u201d\n\n### Renewal note\n- **No automatic renewal or extension language** is included in the provided document text.\n- Because the term is described as a **fixed term of two years**, the agreement appears to end at the end of that term unless the parties agree otherwise.\n\n## Additional note\n- The document does **not** include any express **indemnity** provisions in the text provided.\n- **Payment** terms exist, but you did not ask for them; if useful, I can also summarize those.\n\nIf you want, I can turn this into a more formal contract-extraction table with columns for **clause, trigger, notice, cap, and carve-outs**.",
+              "filename": "292-borealis-msa.md",
+              "effective_model": "gpt-5.4-mini"
+            },
+            "tool_call_id": "call_1H4FAQ4RX2TS1uUgUbvStHOB",
+            "sub_agent_model": "gpt-5.4-mini"
+          },
+          {
+            "args": {
+              "title": "Atlas Logistics vs Borealis Freight contracts",
+              "component": "comparison",
+              "comparison": "<stored in artifact a_91uke5giiv, comparison of 7 terms>"
+            },
+            "name": "show_artifact",
+            "result": "{\"artifact_id\": \"a_91uke5giiv\", \"label\": \"comparison 1\", \"component\": \"comparison\", \"row_count\": 7, \"option_count\": 2, \"note\": \"Shown to the user below your answer as comparison 1. Now write one or two sentences about what it shows; do not repeat it as a table. To change it, call show_artifact again with the full data.\"}",
+            "status": "done",
+            "tool_call_id": "call_RXHTqBtV5u1P713kn1ZTZFTj"
+          }
+        ]
+      }
+    ],
+    "tool_call_names": [
+      "query_documents",
+      "analyze_document",
+      "analyze_document",
+      "show_artifact"
+    ],
+    "show_artifact_calls": 1,
+    "refused_calls": 0,
+    "artifact_ids_from_results": [
+      "a_91uke5giiv"
+    ],
+    "final_answer_empty": false,
+    "final_answer_is_fallback": false,
+    "persisted_json_fence": false,
+    "redis": {
+      "present": true,
+      "ttl": 599,
+      "event_types": {
+        "iteration_start": 5,
+        "reasoning_delta": 155,
+        "tool_preparing": 4,
+        "tool_args_progress": 10,
+        "tool_start": 4,
+        "tool_end": 4,
+        "planning": 4,
+        "sub_agent_start": 2,
+        "sub_agent_delta": 1065,
+        "sub_agent_done": 2,
+        "artifact": 1,
+        "delta": 197,
+        "sources": 1,
+        "citations": 1,
+        "suggestions": 1,
+        "stream_end": 1,
+        "done": 1
+      },
+      "delta_count": 197,
+      "delta_text": "The side-by-side comparison shows that **Borealis is easier to terminate for convenience**, while **Atlas has broader liability carve-outs and a more explicit auto-renewal mechanism**.\n\n- **Termination:** Atlas requires 90 days\u2019 notice for convenience and provides a mutual material-breach termination right after a 30-day cure period. Borealis requires only 30 days\u2019 notice, but its insolvency termination right is one-sided in favor of the Company.\n- **Liability:** Atlas uses a mutual cap based on fees paid during the prior 12 months. Borealis uses asymmetric caps: \u20ac250,000 per year for Borealis and same-year fees payable for the Company.\n- **Renewal:** Atlas automatically renews annually unless either party gives 90 days\u2019 non-renewal notice. Borealis has a fixed two-year term beginning 1 June 2024, with no automatic renewal language identified.\n\nThe comparison artifact above presents the full clause-by-clause breakdown.",
+      "artifact_events": 1
+    }
+  },
+  "message_artifacts": [
+    {
+      "id": "a_91uke5giiv",
+      "label": "comparison 1",
+      "component": "comparison",
+      "parent_id": null,
+      "run_id": "dc995d3d-231c-49a1-8d6c-ca7d20f5e581",
+      "tool_call_id": "call_RXHTqBtV5u1P713kn1ZTZFTj",
+      "row_count": 7,
+      "spec": {
+        "title": "Atlas Logistics vs Borealis Freight contracts",
+        "comparison": {
+          "terms": [
+            {
+              "name": "Termination for convenience",
+              "cells": [
+                {
+                  "text": "Either party; 90 days\u2019 written notice.",
+                  "source": {
+                    "page": null,
+                    "excerpt": null,
+                    "document": "292-atlas-msa.md"
+                  },
+                  "verdict": "m"
+                },
+                {
+                  "text": "Either party; 30 days\u2019 written notice.",
+                  "source": {
+                    "page": null,
+                    "excerpt": null,
+                    "document": "292-borealis-msa.md"
+                  },
+                  "verdict": "m"
+                }
+              ]
+            },
+            {
+              "name": "Termination for breach / insolvency",
+              "cells": [
+                {
+                  "text": "Either party may terminate immediately for material breach if not cured within 30 days after written notice.",
+                  "source": {
+                    "page": null,
+                    "excerpt": null,
+                    "document": "292-atlas-msa.md"
+                  },
+                  "verdict": "m"
+                },
+                {
+                  "text": "Company may terminate immediately if Borealis becomes insolvent; one-sided right.",
+                  "source": {
+                    "page": null,
+                    "excerpt": null,
+                    "document": "292-borealis-msa.md"
+                  },
+                  "verdict": "m"
+                }
+              ]
+            },
+            {
+              "name": "Liability cap",
+              "cells": [
+                {
+                  "text": "Each party: fees paid in the 12 months before the claim.",
+                  "source": {
+                    "page": null,
+                    "excerpt": null,
+                    "document": "292-atlas-msa.md"
+                  },
+                  "verdict": "m"
+                },
+                {
+                  "text": "Borealis: \u20ac250,000 per year. Company: fees payable in the same year.",
+                  "source": {
+                    "page": null,
+                    "excerpt": null,
+                    "document": "292-borealis-msa.md"
+                  },
+                  "verdict": "m"
+                }
+              ]
+            },
+            {
+              "name": "Liability carve-outs",
+              "cells": [
+                {
+                  "text": "Cap excludes death, personal injury, fraud, and breach of confidentiality.",
+                  "source": {
+                    "page": null,
+                    "excerpt": null,
+                    "document": "292-atlas-msa.md"
+                  },
+                  "verdict": "m"
+                },
+                {
+                  "text": "Neither cap applies to fraud.",
+                  "source": {
+                    "page": null,
+                    "excerpt": null,
+                    "document": "292-borealis-msa.md"
+                  },
+                  "verdict": "m"
+                }
+              ]
+            },
+            {
+              "name": "Renewal structure",
+              "cells": [
+                {
+                  "text": "Automatic successive one-year renewals unless stopped by timely non-renewal notice.",
+                  "source": {
+                    "page": null,
+                    "excerpt": null,
+                    "document": "292-atlas-msa.md"
+                  },
+                  "verdict": "m"
+                },
+                {
+                  "text": "Fixed two-year term; no automatic renewal or extension language identified.",
+                  "source": {
+                    "page": null,
+                    "excerpt": null,
+                    "document": "292-borealis-msa.md"
+                  },
+                  "verdict": "m"
+                }
+              ]
+            },
+            {
+              "name": "Renewal notice / term dates",
+              "cells": [
+                {
+                  "text": "90 days before term end; current term ends 15 March 2027, so deadline is 15 December 2026.",
+                  "source": {
+                    "page": null,
+                    "excerpt": null,
+                    "document": "292-atlas-msa.md"
+                  },
+                  "verdict": "m"
+                },
+                {
+                  "text": "Starts 1 June 2024 and runs for two years; no renewal notice deadline stated.",
+                  "source": {
+                    "page": null,
+                    "excerpt": null,
+                    "document": "292-borealis-msa.md"
+                  },
+                  "verdict": "m"
+                }
+              ]
+            },
+            {
+              "name": "Indemnities",
+              "cells": [
+                {
+                  "text": "No indemnity provision identified in the provided text.",
+                  "source": {
+                    "page": null,
+                    "excerpt": null,
+                    "document": "292-atlas-msa.md"
+                  },
+                  "verdict": "q"
+                },
+                {
+                  "text": "No indemnity provision identified in the provided text.",
+                  "source": {
+                    "page": null,
+                    "excerpt": null,
+                    "document": "292-borealis-msa.md"
+                  },
+                  "verdict": "q"
+                }
+              ]
+            }
+          ],
+          "options": [
+            "Atlas Logistics",
+            "Borealis Freight"
+          ]
+        }
+      },
+      "caption": {
+        "lineage": null,
+        "sources": [
+          {
+            "page": null,
+            "tool": "query_documents",
+            "document": null
+          },
+          {
+            "page": null,
+            "tool": "analyze_document",
+            "document": "292-atlas-msa.md"
+          },
+          {
+            "page": null,
+            "tool": "analyze_document",
+            "document": "292-borealis-msa.md"
+          }
+        ],
+        "row_count": 7,
+        "source_count": 3
+      },
+      "thread_id": "3e0c408c-97e6-4ec3-950c-af74ce1cfa20",
+      "at": "2026-10-24 01:33:28.228076+00"
+    }
+  ],
+  "reload_http": 200,
+  "reload_artifacts": [
+    {
+      "id": "a_91uke5giiv",
+      "thread_id": "3e0c408c-97e6-4ec3-950c-af74ce1cfa20",
+      "user_id": "d8a54002-6a29-4b88-b918-cff2aa4a06d5",
+      "org_id": "22f9c615-0eec-440a-8804-ed4784d6f57f",
+      "run_id": "dc995d3d-231c-49a1-8d6c-ca7d20f5e581",
+      "tool_call_id": "call_RXHTqBtV5u1P713kn1ZTZFTj",
+      "parent_id": null,
+      "label": "comparison 1",
+      "component": "comparison",
+      "spec": {
+        "title": "Atlas Logistics vs Borealis Freight contracts",
+        "comparison": {
+          "terms": [
+            {
+              "name": "Termination for convenience",
+              "cells": [
+                {
+                  "text": "Either party; 90 days\u2019 written notice.",
+                  "source": {
+                    "page": null,
+                    "excerpt": null,
+                    "document": "292-atlas-msa.md"
+                  },
+                  "verdict": "m"
+                },
+                {
+                  "text": "Either party; 30 days\u2019 written notice.",
+                  "source": {
+                    "page": null,
+                    "excerpt": null,
+                    "document": "292-borealis-msa.md"
+                  },
+                  "verdict": "m"
+                }
+              ]
+            },
+            {
+              "name": "Termination for breach / insolvency",
+              "cells": [
+                {
+                  "text": "Either party may terminate immediately for material breach if not cured within 30 days after written notice.",
+                  "source": {
+                    "page": null,
+                    "excerpt": null,
+                    "document": "292-atlas-msa.md"
+                  },
+                  "verdict": "m"
+                },
+                {
+                  "text": "Company may terminate immediately if Borealis becomes insolvent; one-sided right.",
+                  "source": {
+                    "page": null,
+                    "excerpt": null,
+                    "document": "292-borealis-msa.md"
+                  },
+                  "verdict": "m"
+                }
+              ]
+            },
+            {
+              "name": "Liability cap",
+              "cells": [
+                {
+                  "text": "Each party: fees paid in the 12 months before the claim.",
+                  "source": {
+                    "page": null,
+                    "excerpt": null,
+                    "document": "292-atlas-msa.md"
+                  },
+                  "verdict": "m"
+                },
+                {
+                  "text": "Borealis: \u20ac250,000 per year. Company: fees payable in the same year.",
+                  "source": {
+                    "page": null,
+                    "excerpt": null,
+                    "document": "292-borealis-msa.md"
+                  },
+                  "verdict": "m"
+                }
+              ]
+            },
+            {
+              "name": "Liability carve-outs",
+              "cells": [
+                {
+                  "text": "Cap excludes death, personal injury, fraud, and breach of confidentiality.",
+                  "source": {
+                    "page": null,
+                    "excerpt": null,
+                    "document": "292-atlas-msa.md"
+                  },
+                  "verdict": "m"
+                },
+                {
+                  "text": "Neither cap applies to fraud.",
+                  "source": {
+                    "page": null,
+                    "excerpt": null,
+                    "document": "292-borealis-msa.md"
+                  },
+                  "verdict": "m"
+                }
+              ]
+            },
+            {
+              "name": "Renewal structure",
+              "cells": [
+                {
+                  "text": "Automatic successive one-year renewals unless stopped by timely non-renewal notice.",
+                  "source": {
+                    "page": null,
+                    "excerpt": null,
+                    "document": "292-atlas-msa.md"
+                  },
+                  "verdict": "m"
+                },
+                {
+                  "text": "Fixed two-year term; no automatic renewal or extension language identified.",
+                  "source": {
+                    "page": null,
+                    "excerpt": null,
+                    "document": "292-borealis-msa.md"
+                  },
+                  "verdict": "m"
+                }
+              ]
+            },
+            {
+              "name": "Renewal notice / term dates",
+              "cells": [
+                {
+                  "text": "90 days before term end; current term ends 15 March 2027, so deadline is 15 December 2026.",
+                  "source": {
+                    "page": null,
+                    "excerpt": null,
+                    "document": "292-atlas-msa.md"
+                  },
+                  "verdict": "m"
+                },
+                {
+                  "text": "Starts 1 June 2024 and runs for two years; no renewal notice deadline stated.",
+                  "source": {
+                    "page": null,
+                    "excerpt": null,
+                    "document": "292-borealis-msa.md"
+                  },
+                  "verdict": "m"
+                }
+              ]
+            },
+            {
+              "name": "Indemnities",
+              "cells": [
+                {
+                  "text": "No indemnity provision identified in the provided text.",
+                  "source": {
+                    "page": null,
+                    "excerpt": null,
+                    "document": "292-atlas-msa.md"
+                  },
+                  "verdict": "q"
+                },
+                {
+                  "text": "No indemnity provision identified in the provided text.",
+                  "source": {
+                    "page": null,
+                    "excerpt": null,
+                    "document": "292-borealis-msa.md"
+                  },
+                  "verdict": "q"
+                }
+              ]
+            }
+          ],
+          "options": [
+            "Atlas Logistics",
+            "Borealis Freight"
+          ]
+        }
+      },
+      "caption": {
+        "lineage": null,
+        "sources": [
+          {
+            "page": null,
+            "tool": "query_documents",
+            "document": null
+          },
+          {
+            "page": null,
+            "tool": "analyze_document",
+            "document": "292-atlas-msa.md"
+          },
+          {
+            "page": null,
+            "tool": "analyze_document",
+            "document": "292-borealis-msa.md"
+          }
+        ],
+        "row_count": 7,
+        "source_count": 3
+      },
+      "row_count": 7,
+      "spec_version": 1,
+      "created_at": "2026-10-24T01:33:28.228076+00:00"
+    }
+  ],
+  "reload_by_message": [
+    {
+      "message_id": "d43a3fc2-f7d8-4bc7-b146-3d2e28b65a47",
+      "artifacts": [
+        {
+          "id": "a_91uke5giiv",
+          "thread_id": "3e0c408c-97e6-4ec3-950c-af74ce1cfa20",
+          "user_id": "d8a54002-6a29-4b88-b918-cff2aa4a06d5",
+          "org_id": "22f9c615-0eec-440a-8804-ed4784d6f57f",
+          "run_id": "dc995d3d-231c-49a1-8d6c-ca7d20f5e581",
+          "tool_call_id": "call_RXHTqBtV5u1P713kn1ZTZFTj",
+          "parent_id": null,
+          "label": "comparison 1",
+          "component": "comparison",
+          "spec": {
+            "title": "Atlas Logistics vs Borealis Freight contracts",
+            "comparison": {
+              "terms": [
+                {
+                  "name": "Termination for convenience",
+                  "cells": [
+                    {
+                      "text": "Either party; 90 days\u2019 written notice.",
+                      "source": {
+                        "page": null,
+                        "excerpt": null,
+                        "document": "292-atlas-msa.md"
+                      },
+                      "verdict": "m"
+                    },
+                    {
+                      "text": "Either party; 30 days\u2019 written notice.",
+                      "source": {
+                        "page": null,
+                        "excerpt": null,
+                        "document": "292-borealis-msa.md"
+                      },
+                      "verdict": "m"
+                    }
+                  ]
+                },
+                {
+                  "name": "Termination for breach / insolvency",
+                  "cells": [
+                    {
+                      "text": "Either party may terminate immediately for material breach if not cured within 30 days after written notice.",
+                      "source": {
+                        "page": null,
+                        "excerpt": null,
+                        "document": "292-atlas-msa.md"
+                      },
+                      "verdict": "m"
+                    },
+                    {
+                      "text": "Company may terminate immediately if Borealis becomes insolvent; one-sided right.",
+                      "source": {
+                        "page": null,
+                        "excerpt": null,
+                        "document": "292-borealis-msa.md"
+                      },
+                      "verdict": "m"
+                    }
+                  ]
+                },
+                {
+                  "name": "Liability cap",
+                  "cells": [
+                    {
+                      "text": "Each party: fees paid in the 12 months before the claim.",
+                      "source": {
+                        "page": null,
+                        "excerpt": null,
+                        "document": "292-atlas-msa.md"
+                      },
+                      "verdict": "m"
+                    },
+                    {
+                      "text": "Borealis: \u20ac250,000 per year. Company: fees payable in the same year.",
+                      "source": {
+                        "page": null,
+                        "excerpt": null,
+                        "document": "292-borealis-msa.md"
+                      },
+                      "verdict": "m"
+                    }
+                  ]
+                },
+                {
+                  "name": "Liability carve-outs",
+                  "cells": [
+                    {
+                      "text": "Cap excludes death, personal injury, fraud, and breach of confidentiality.",
+                      "source": {
+                        "page": null,
+                        "excerpt": null,
+                        "document": "292-atlas-msa.md"
+                      },
+                      "verdict": "m"
+                    },
+                    {
+                      "text": "Neither cap applies to fraud.",
+                      "source": {
+                        "page": null,
+                        "excerpt": null,
+                        "document": "292-borealis-msa.md"
+                      },
+                      "verdict": "m"
+                    }
+                  ]
+                },
+                {
+                  "name": "Renewal structure",
+                  "cells": [
+                    {
+                      "text": "Automatic successive one-year renewals unless stopped by timely non-renewal notice.",
+                      "source": {
+                        "page": null,
+                        "excerpt": null,
+                        "document": "292-atlas-msa.md"
+                      },
+                      "verdict": "m"
+                    },
+                    {
+                      "text": "Fixed two-year term; no automatic renewal or extension language identified.",
+                      "source": {
+                        "page": null,
+                        "excerpt": null,
+                        "document": "292-borealis-msa.md"
+                      },
+                      "verdict": "m"
+                    }
+                  ]
+                },
+                {
+                  "name": "Renewal notice / term dates",
+                  "cells": [
+                    {
+                      "text": "90 days before term end; current term ends 15 March 2027, so deadline is 15 December 2026.",
+                      "source": {
+                        "page": null,
+                        "excerpt": null,
+                        "document": "292-atlas-msa.md"
+                      },
+                      "verdict": "m"
+                    },
+                    {
+                      "text": "Starts 1 June 2024 and runs for two years; no renewal notice deadline stated.",
+                      "source": {
+                        "page": null,
+                        "excerpt": null,
+                        "document": "292-borealis-msa.md"
+                      },
+                      "verdict": "m"
+                    }
+                  ]
+                },
+                {
+                  "name": "Indemnities",
+                  "cells": [
+                    {
+                      "text": "No indemnity provision identified in the provided text.",
+                      "source": {
+                        "page": null,
+                        "excerpt": null,
+                        "document": "292-atlas-msa.md"
+                      },
+                      "verdict": "q"
+                    },
+                    {
+                      "text": "No indemnity provision identified in the provided text.",
+                      "source": {
+                        "page": null,
+                        "excerpt": null,
+                        "document": "292-borealis-msa.md"
+                      },
+                      "verdict": "q"
+                    }
+                  ]
+                }
+              ],
+              "options": [
+                "Atlas Logistics",
+                "Borealis Freight"
+              ]
+            }
+          },
+          "caption": {
+            "lineage": null,
+            "sources": [
+              {
+                "page": null,
+                "tool": "query_documents",
+                "document": null
+              },
+              {
+                "page": null,
+                "tool": "analyze_document",
+                "document": "292-atlas-msa.md"
+              },
+              {
+                "page": null,
+                "tool": "analyze_document",
+                "document": "292-borealis-msa.md"
+              }
+            ],
+            "row_count": 7,
+            "source_count": 3
+          },
+          "row_count": 7,
+          "spec_version": 1,
+          "created_at": "2026-10-24T01:33:28.228076+00:00"
+        }
+      ]
+    }
+  ],
+  "expected_observables": [
+    {
+      "artifact": "a_91uke5giiv",
+      "label": "comparison 1",
+      "options": [
+        "Atlas Logistics",
+        "Borealis Freight"
+      ],
+      "terms": [
+        "Termination for convenience",
+        "Termination for breach / insolvency",
+        "Liability cap",
+        "Liability carve-outs",
+        "Renewal structure",
+        "Renewal notice / term dates",
+        "Indemnities"
+      ],
+      "cells_total": 14,
+      "not_stated_cells": 2,
+      "identical_terms_N": 1,
+      "identical_terms": [
+        "Indemnities"
+      ],
+      "second_caption_line": "Verdicts are the agent's reading. Hover or focus a cell for its clause.",
+      "sourced_cells": [
+        {
+          "document": "292-atlas-msa.md",
+          "excerpt_in_retrieved_text": false,
+          "excerpt_in_kb_document": false
+        },
+        {
+          "document": "292-borealis-msa.md",
+          "excerpt_in_retrieved_text": false,
+          "excerpt_in_kb_document": false
+        },
+        {
+          "document": "292-atlas-msa.md",
+          "excerpt_in_retrieved_text": false,
+          "excerpt_in_kb_document": false
+        },
+        {
+          "document": "292-borealis-msa.md",
+          "excerpt_in_retrieved_text": false,
+          "excerpt_in_kb_document": false
+        },
+        {
+          "document": "292-atlas-msa.md",
+          "excerpt_in_retrieved_text": false,
+          "excerpt_in_kb_document": false
+        },
+        {
+          "document": "292-borealis-msa.md",
+          "excerpt_in_retrieved_text": false,
+          "excerpt_in_kb_document": false
+        },
+        {
+          "document": "292-atlas-msa.md",
+          "excerpt_in_retrieved_text": false,
+          "excerpt_in_kb_document": false
+        },
+        {
+          "document": "292-borealis-msa.md",
+          "excerpt_in_retrieved_text": false,
+          "excerpt_in_kb_document": false
+        },
+        {
+          "document": "292-atlas-msa.md",
+          "excerpt_in_retrieved_text": false,
+          "excerpt_in_kb_document": false
+        },
+        {
+          "document": "292-borealis-msa.md",
+          "excerpt_in_retrieved_text": false,
+          "excerpt_in_kb_document": false
+        },
+        {
+          "document": "292-atlas-msa.md",
+          "excerpt_in_retrieved_text": false,
+          "excerpt_in_kb_document": false
+        },
+        {
+          "document": "292-borealis-msa.md",
+          "excerpt_in_retrieved_text": false,
+          "excerpt_in_kb_document": false
+        },
+        {
+          "document": "292-atlas-msa.md",
+          "excerpt_in_retrieved_text": false,
+          "excerpt_in_kb_document": false
+        },
+        {
+          "document": "292-borealis-msa.md",
+          "excerpt_in_retrieved_text": false,
+          "excerpt_in_kb_document": false
+        }
+      ]
+    }
+  ],
+  "scenario": "G4-2b-sidebyside-comparison"
+}

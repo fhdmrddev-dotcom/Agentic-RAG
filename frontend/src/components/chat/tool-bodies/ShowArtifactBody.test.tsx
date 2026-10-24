@@ -52,7 +52,7 @@ afterEach(() => cleanup())
 
 describe("the result keys are the handler's (non-vacuity)", () => {
   it("every success key this file reads is emitted by build_result", () => {
-    for (const key of ["label", "component", "kind", "stacked", "series_count", "row_count", "from_label", "same_rows", "operations"]) {
+    for (const key of ["label", "component", "kind", "stacked", "series_count", "row_count", "edge_count", "option_count", "from_label", "same_rows", "operations"]) {
       expect(handlerSource, key).toContain(`"${key}"`)
     }
   })
@@ -159,5 +159,86 @@ describe("ShowArtifactBody — the expanded body", () => {
   it("an unreadable result → the neutral line", () => {
     const { container } = render(<ShowArtifactBody parsed={null} />)
     expect(container.textContent).toBe("Show an artifact")
+  })
+})
+
+// ══ Phase 292-02 (UI-D-292-19 · L-3 · L-4) — the rail lines for the three encoded types ════════
+// The rail reads only `row_count`, `edge_count`, `option_count`, `label`, `component` (and on a
+// refusal `reason`). `edge_count` / `option_count` are emitted by plan 292-01's build_result; the
+// `?raw` non-vacuity list above was widened to them at 292-03 on the merged tree (292-02's
+// worktree had no backend that emitted them, so the widening waited for the merge).
+
+function encoded(component: string, extra: Record<string, unknown>): Record<string, unknown> {
+  return {
+    artifact_id: "a_dg1nv0c3x8",
+    component,
+    kind: null,
+    stacked: null,
+    series_count: null,
+    from_label: null,
+    same_rows: null,
+    operations: null,
+    columns: [],
+    values: {},
+    note: "Shown as diagram 1. To change it, call show_artifact again with the full data.",
+    ...extra,
+  }
+}
+
+const DIAGRAM_RESULT = encoded("diagram", { label: "diagram 1", row_count: 8, edge_count: 9 })
+const COMPARISON_RESULT = encoded("comparison", { label: "comparison 1", row_count: 7, option_count: 3 })
+const TIMELINE_RESULT = encoded("timeline", { label: "timeline 1", row_count: 9 })
+
+describe("292 — summarize, the three new essences", () => {
+  it("diagram → `Flow diagram · 8 steps, 9 links`", () => {
+    expect(summarize(tc(DIAGRAM_RESULT))).toBe("Flow diagram · 8 steps, 9 links")
+    expect(summarize(tc({ ...DIAGRAM_RESULT, row_count: 1, edge_count: 0 }))).toBe("Flow diagram · 1 step, no links")
+  })
+
+  it("comparison → `Comparison · 3 options × 7 terms`", () => {
+    expect(summarize(tc(COMPARISON_RESULT))).toBe("Comparison · 3 options × 7 terms")
+  })
+
+  it("timeline → `Timeline · 9 events` (no upcoming count: that depends on the clock)", () => {
+    expect(summarize(tc(TIMELINE_RESULT))).toBe("Timeline · 9 events")
+    expect(summarize(tc({ ...TIMELINE_RESULT, row_count: 1 }))).toBe("Timeline · 1 event")
+  })
+
+  it("a new-type refusal still reads `refused · {reason}`, never the detail", () => {
+    const refused = { status: "refused", reason: "26 steps (max 25); group related steps first", detail: "`nodes` has 26 items" }
+    expect(summarize(tc(refused))).toBe("refused · 26 steps (max 25); group related steps first")
+  })
+
+  it("missing counts degrade to the chip, never to a raw value", () => {
+    expect(summarize(tc(encoded("diagram", { label: "diagram 2", row_count: "8", edge_count: -1 })))).toBe("Flow diagram")
+  })
+})
+
+describe("292 — ShowArtifactBody, the three new expanded bodies", () => {
+  it("diagram → `Flow diagram · 8 steps · 9 links · diagram 1. Shown below the answer.`", () => {
+    const { container } = render(<ShowArtifactBody parsed={DIAGRAM_RESULT} />)
+    expect(container.textContent).toBe("Flow diagram · 8 steps · 9 links · diagram 1. Shown below the answer.")
+  })
+
+  it("comparison → `Comparison · 3 options × 7 terms · comparison 1. Shown below the answer.`", () => {
+    const { container } = render(<ShowArtifactBody parsed={COMPARISON_RESULT} />)
+    expect(container.textContent).toBe("Comparison · 3 options × 7 terms · comparison 1. Shown below the answer.")
+  })
+
+  it("timeline → `Timeline · 9 events · timeline 1. Shown below the answer.`", () => {
+    const { container } = render(<ShowArtifactBody parsed={TIMELINE_RESULT} />)
+    expect(container.textContent).toBe("Timeline · 9 events · timeline 1. Shown below the answer.")
+  })
+
+  it("the body never shows the note, a spec key or the refusal detail", () => {
+    const refused = { status: "refused", reason: "a link names a step that isn't in it (zz)", detail: "edges[2].to = zz; nodes = [...]" }
+    for (const parsed of [DIAGRAM_RESULT, COMPARISON_RESULT, TIMELINE_RESULT, refused]) {
+      const { container, unmount } = render(<ShowArtifactBody parsed={parsed} />)
+      const text = container.textContent ?? ""
+      for (const banned of ["{", "}", "nodes", "edges", "verdict", "events:", "component", "detail", "full data"]) {
+        expect(text, banned).not.toContain(banned)
+      }
+      unmount()
+    }
   })
 })

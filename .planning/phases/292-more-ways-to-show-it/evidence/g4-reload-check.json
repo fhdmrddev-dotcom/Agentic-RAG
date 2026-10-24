@@ -1,0 +1,65 @@
+[
+  {
+    "file": "anthropic-G4-1-diagram-cc178bcb-0a8f-4783-8cf2-64c8124f7513.json",
+    "provider": "anthropic",
+    "thread_id": "937db3b1-00ed-413b-a883-4f39d9a0c784",
+    "records": 1,
+    "identical": true
+  },
+  {
+    "file": "anthropic-G4-2-comparison-42a7fdd4-49e7-4690-b1ad-dbb90a09c238.json",
+    "provider": "anthropic",
+    "thread_id": "c4c6bd2d-f05a-46f6-9933-69cf3f1683b2",
+    "records": 0,
+    "identical": false
+  },
+  {
+    "file": "anthropic-G4-2-comparison-c1b032a0-84c3-4fda-98d8-fc1bdc978a3f.json",
+    "provider": "anthropic",
+    "thread_id": "b589517c-84d5-45b2-934d-db9fa139e4dc",
+    "records": 0,
+    "identical": false
+  },
+  {
+    "file": "anthropic-G4-2b-sidebyside-comparison-5a199d8c-2cf7-4caa-ba7e-73e4eaad2573.json",
+    "provider": "anthropic",
+    "thread_id": "a3e4c7e3-cc78-4002-951f-a0347ad101c8",
+    "records": 1,
+    "identical": true
+  },
+  {
+    "file": "anthropic-G4-3-timeline-1296357f-faab-4d6b-a0d2-ef659e7de9dc.json",
+    "provider": "anthropic",
+    "thread_id": "3f591838-f667-4a2e-8c2f-6672c52c5238",
+    "records": 1,
+    "identical": true
+  },
+  {
+    "file": "openai-G4-1-diagram-5863e692-b33e-4aa9-ad7b-a6cac260cc36.json",
+    "provider": "openai",
+    "thread_id": "4f2e3c27-39ea-44bb-bec7-6fbdfc5a1b2f",
+    "records": 1,
+    "identical": true
+  },
+  {
+    "file": "openai-G4-2-comparison-e5e5b0dd-e367-4d01-bd6a-22bb4d12aae8.json",
+    "provider": "openai",
+    "thread_id": "49bbac20-1b04-4a8e-8002-da3fc71142e2",
+    "records": 0,
+    "identical": false
+  },
+  {
+    "file": "openai-G4-2b-sidebyside-comparison-dc995d3d-231c-49a1-8d6c-ca7d20f5e581.json",
+    "provider": "openai",
+    "thread_id": "3e0c408c-97e6-4ec3-950c-af74ce1cfa20",
+    "records": 1,
+    "identical": true
+  },
+  {
+    "file": "openai-G4-3-timeline-55dd2376-b59e-4bf6-98ab-f7418a306a21.json",
+    "provider": "openai",
+    "thread_id": "48c78b9e-e978-4131-ae74-5d4dd9244913",
+    "records": 1,
+    "identical": true
+  }
+]

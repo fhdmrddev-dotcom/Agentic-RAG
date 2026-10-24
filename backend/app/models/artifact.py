@@ -1,14 +1,18 @@
-"""The closed vocabulary of agent-authored artifacts (Phase 273 — ART-01..05, D-02/D-05/D-07/D-09).
+"""The closed vocabulary of agent-authored artifacts (Phase 273 — ART-01..05, D-02/D-05/D-07/D-09;
+Phase 292 — VIS-02, D-01..D-08, D-14, D-20).
 
-``show_artifact`` lets the agent put an interactive chart, table or single metric under its answer.
-Everything the model may say to that tool is declared HERE, and nothing outside it renders.
+``show_artifact`` lets the agent put an interactive chart, table, single metric, flow diagram,
+comparison or timeline under its answer. Everything the model may say to that tool is declared HERE,
+and nothing outside it renders.
 
-I-1 — THE COMPONENT SET IS EXACTLY THREE AND IT IS FROZEN. Unlike ``harness.py``'s Literals, which
-grow additively, ``ComponentName`` is a product boundary: ``chart | table | metric``. It is fenced
-three ways, and all three must move together or not at all:
+I-1 — THE COMPONENT SET IS CLOSED. Unlike ``harness.py``'s Literals, which grow additively,
+``ComponentName`` is a product boundary: ``chart | table | metric`` (273) plus ``diagram |
+comparison | timeline`` (292, chosen at the sketch; ``steps``, mind maps, images, maps and HTML were
+rejected there). It is fenced three ways, and all three must move together or not at all:
 
-  * ``supabase/migrations/202_message_artifacts.sql`` — the ``component IN (…)`` CHECK
-    (``test_273_migration_202_shape`` asserts literal-set equality with ``ARTIFACT_COMPONENTS``);
+  * ``supabase/migrations/213_message_artifacts_more_components.sql`` — the ``component IN (…)``
+    CHECK (``test_292_migration_213_shape`` asserts literal-set equality with ``ARTIFACT_COMPONENTS``;
+    202 created it with the first three);
   * the frontend registry (``components/chat/artifacts``, fenced by 273-02 against this file);
   * this Literal, from which ``ARTIFACT_COMPONENTS`` is DERIVED with ``get_args`` — never retyped.
 
@@ -30,11 +34,12 @@ This module imports pydantic and the standard library only — no DB, no provide
 
 from __future__ import annotations
 
+import datetime
 import json
 import math
 import re
 from dataclasses import dataclass
-from typing import Annotated, Any, Literal, Union, get_args
+from typing import Annotated, Any, ClassVar, Literal, Union, get_args
 
 from pydantic import (
     BaseModel,
@@ -49,16 +54,29 @@ from pydantic_core import PydanticCustomError
 
 # ── The closed vocabulary (I-1) ─────────────────────────────────────────────────────────────────
 
-ComponentName = Literal["chart", "table", "metric"]
+# ⛔ Every Literal below stays ONE FLAT Literal: the frontend parity fence reads them from this source
+# with /^Name\s*=\s*Literal\[([^\]]*)\]/ — a Union of Literals would read as zero names.
+ComponentName = Literal["chart", "table", "metric", "diagram", "comparison", "timeline"]
+# D-08: the by-reference set. Only these are re-encoded with from_artifact / transform.
+TabularComponent = Literal["chart", "table", "metric"]
 ChartKind = Literal["line", "bar", "area", "scatter"]
 ColumnType = Literal["number", "string"]
 FilterOpName = Literal["eq", "in", "range"]
 SortDirection = Literal["asc", "desc"]
+# UI-D-292-04: the four shapes the approved sketch draws. No ``actor`` (lanes lost at 2B).
+NodeKind = Literal["start", "step", "decision", "end"]
+# D-05 / UI-D-292-10: favourable / unfavourable / neutral or partly / not stated in what was retrieved.
+Verdict = Literal["y", "n", "m", "q"]
 
 ARTIFACT_COMPONENTS: tuple[str, ...] = get_args(ComponentName)
+TABULAR_COMPONENTS: tuple[str, ...] = get_args(TabularComponent)
 CHART_KINDS: tuple[str, ...] = get_args(ChartKind)
 COLUMN_TYPES: tuple[str, ...] = get_args(ColumnType)
 FILTER_OPS: tuple[str, ...] = get_args(FilterOpName)
+NODE_KINDS: tuple[str, ...] = get_args(NodeKind)
+VERDICTS: tuple[str, ...] = get_args(Verdict)
+# The three typed-encoding arms (D-03), in vocabulary order — derived, never retyped.
+ENCODED_COMPONENTS: tuple[str, ...] = tuple(c for c in ARTIFACT_COMPONENTS if c not in TABULAR_COMPONENTS)
 
 # ── Caps (D-05 / D-09 / UI-D-01). Each is refused above, never truncated. ──────────────────────
 
@@ -76,10 +94,43 @@ MAX_REASON_CHARS = 120
 # with json.dumps' default ", " / ": " separators, which is how jsonb::text prints.
 _SPEC_RESERVE_BYTES = 4096
 
+# Phase 292 caps (D-04..D-06, UI-D-292-24). Module-level ints with these exact names: 292-03's
+# cross-stack fence reads them from this source and compares them with the frontend guard's.
+# Every string cap counts UTF-16 units (``_js_len``), as the browser does.
+MIN_NODES = 2
+MAX_NODES = 25
+MIN_EDGES = 1
+MAX_EDGES = 40
+MIN_OPTIONS = 2
+MAX_OPTIONS = 5
+MAX_TERMS = 20
+MAX_EVENTS = 40
+MAX_NODE_LABEL_CHARS = 48
+MAX_EDGE_LABEL_CHARS = 24
+MAX_OPTION_CHARS = 40
+MAX_TERM_CHARS = 60
+MAX_EVENT_TITLE_CHARS = 80
+MAX_EVENT_DETAIL_CHARS = 200
+MAX_CATEGORY_CHARS = 24
+MAX_EXCERPT_CHARS = 280
+MAX_SOURCE_DOCUMENT_CHARS = 200  # UTF-16 units; clean_document_name applies it to the caption AND to every source
+
+NODE_ID_RE = re.compile(r"^[A-Za-z0-9_.-]{1,40}$")
+
 # Kinds people ask for that we cannot draw. Only these may be NAMED in a reason (UI-SPEC).
 KIND_ALIASES: tuple[str, ...] = (
     "pie", "donut", "radar", "heatmap", "histogram", "treemap", "funnel", "gauge",
 )
+
+# UI-D-292-21: component words people ask for that are not one of the six. Matched trimmed and
+# case-insensitive; the VALUE (a closed key, never the model's raw string) is what a reason names.
+# ⛔ flowchart, graph and gantt_chart are deliberately NOT here: "a flowchart isn't a type we can
+# show" would be false while we draw flow diagrams, so they fall to the generic sentence.
+COMPONENT_ALIASES: dict[str, str] = {
+    "mindmap": "mindmap", "mind_map": "mind_map", "gantt": "gantt", "sankey": "sankey", "map": "map",
+    "image": "image", "html": "html", "code": "code", "kanban": "kanban", "steps": "steps",
+    "pie": "pie", "donut": "donut",
+}
 
 # ── Result contract (I-3) ───────────────────────────────────────────────────────────────────────
 
@@ -88,6 +139,9 @@ REFUSED_STATUS = "refused"
 # The success result's key order (273-03 builds it; FIRST key is the id so a 2000-char cut keeps it).
 RESULT_KEY_ORDER: tuple[str, ...] = (
     "artifact_id", "label", "component", "kind", "stacked", "series_count", "row_count",
+    # 292: edge_count (diagram only) and option_count (comparison only); row_count is then the
+    # nodes / terms / events count (UI-D-292-19: the rail reads these plain result facts).
+    "edge_count", "option_count",
     "from_label", "same_rows", "operations", "columns", "values", "note",
 )
 # History placeholders (I-4). 273-04's redact_artifact_args builds its strings from THESE constants,
@@ -96,7 +150,8 @@ ROWS_PLACEHOLDER_STORED = "<stored in artifact "
 ROWS_PLACEHOLDER_NOT_STORED = "<not stored"
 
 ARTIFACT_ID_RE = re.compile(r"^a_[0-9a-z]{10}$")
-ARTIFACT_LABEL_RE = re.compile(r"^(chart|table|metric) [1-9][0-9]*$")
+# D-13: derived from the six, so `diagram 3` / `comparison 1` / `timeline 2` are labels too.
+ARTIFACT_LABEL_RE = re.compile(r"^(" + "|".join(ARTIFACT_COMPONENTS) + r") [1-9][0-9]*$")
 _SAFE_NAME = re.compile(r"^[\w .-]{1,64}$")
 _STRICT_NUMBER = re.compile(r"^-?(?:\d{1,3}(?:,\d{3})+|\d+)(?:\.\d+)?$")
 _STORED_ID = re.compile(r"^<stored in artifact (a_[0-9a-z]{10})(?=[,> ])")
@@ -110,7 +165,39 @@ ARTIFACT_RECORD_KEYS: frozenset[str] = frozenset({
 # ── The refusal catalogue (people-safe short forms; the rail renders them verbatim) ─────────────
 
 _R = {
-    "unknown_component": "something other than a chart, table or metric",
+    "unknown_component": "something other than a chart, table, metric, diagram, comparison or timeline",
+    # ── Phase 292 (UI-SPEC "Rail refusal reasons, additions"; exact wording) ──
+    "component_alias": '"{alias}" is not an artifact type',
+    "too_many_nodes": "{n} steps (max 25); group related steps first",
+    "too_few_nodes": "a diagram needs at least 2 steps",
+    "too_many_edges": "{n} links (max 40); group related steps first",
+    "no_edges": "a diagram needs at least 1 link",
+    "unknown_node": "a link names a step that isn't in it ({id})",
+    "duplicate_node": "two steps share an id",
+    "duplicate_edge": "two links join the same two steps",
+    "self_loop_unlabelled": "a step links to itself without a label",
+    "node_label_too_long": "a step name is over 48 characters",
+    "edge_label_too_long": "a link label is over 24 characters",
+    "option_count": "{n} options (2 to 5)",
+    "too_many_terms": "{n} terms (max 20)",
+    "ragged_term": "term {i} has {got} cells for {n} options",
+    "option_too_long": "an option name is over 40 characters",
+    "term_too_long": "a term name is over 60 characters",
+    "too_many_events": "{n} events (max 40)",
+    "bad_date": "event {i} has a date that isn't YYYY-MM-DD or YYYY-MM",
+    "event_text_too_long": "{what} is over {cap} characters",  # {what}: "an event title" | "an event detail" | "a category"
+    "unresolved_source": "a source it cites wasn't retrieved in this turn",
+    "reference_new_type": "{label} can't be redrawn by reference; send the data again",
+    "reference_into_new_type": "a {source_noun} can't be turned into a {target_noun}; send the data again",
+    # Discretion additions (292-01, same tone): counts, closed nouns and closed item words only.
+    "no_items": "it has no {items} to show",
+    "duplicate_option": "two options share a name",
+    "cell_text_too_long": "a cell's text is over 200 characters",
+    "not_stated_with_source": "a cell marked not stated cites a source",  # 292-REVIEW WR-02
+    "placeholder_encoded_stored": "it sent a reference to a shown artifact, not its data",
+    "placeholder_encoded_not_stored": "it sent a placeholder from a refused call, not data",
+    "foreign_fields": "a {noun} was sent another artifact type's fields",
+    # ── Phase 273 ──
     "kind_alias": '"{alias}" is not a chart kind',
     "kind_unknown": "a chart kind we can't draw",
     "too_many_rows": "{n} rows (max 500); aggregate first",
@@ -186,6 +273,45 @@ def _js_len(s: str) -> int:
     keeps a lone surrogate countable instead of raising.
     """
     return len(s.encode("utf-16-le", "surrogatepass")) // 2
+
+
+# JavaScript's String.prototype.trim set (ECMA-262 WhiteSpace + LineTerminator): TAB, VT, FF, SP,
+# NBSP, U+FEFF, every Zs, LF, CR, LS, PS. Python's str.strip() does NOT remove U+FEFF, so a "﻿"
+# label passed here while the guard's isText refused it (292-REVIEW CR-01).
+_JS_TRIM = (
+    "\t\n\v\f\r              "
+    "    　﻿"
+)
+
+
+def _is_blank(v: str) -> bool:
+    """Blank by EITHER rule (Python's strip and the browser's trim), so neither side keeps it."""
+    return not v.strip() or not v.strip(_JS_TRIM)
+
+
+def clean_document_name(v: Any) -> str | None:
+    """A citation's document name as it is stored (292-REVIEW CR-01 / IN-04 — the ONE home).
+
+    NUL stripped, trimmed, then cut to ``MAX_SOURCE_DOCUMENT_CHARS`` UTF-16 units (the browser's
+    count), never between the two halves of a surrogate pair, with no ellipsis. Both the caption
+    (``show_artifact_tool``) and the per-element source (``artifact_sources``) call this.
+    """
+    if not isinstance(v, str):
+        return None
+    v = v.replace("\x00", "").strip()
+    if not v:
+        return None
+    if _js_len(v) <= MAX_SOURCE_DOCUMENT_CHARS:
+        return v
+    out: list[str] = []
+    units = 0
+    for ch in v:
+        u = _js_len(ch)
+        if units + u > MAX_SOURCE_DOCUMENT_CHARS:
+            break
+        out.append(ch)
+        units += u
+    return "".join(out).rstrip() or None
 
 
 def _check_js_len(v: Any, cap: int, field_name: str) -> Any:
@@ -320,12 +446,37 @@ class Transform(_Strict):
         return not self.filter and not self.select and self.sort is None and self.top_n is None
 
 
+def _is_empty_filler(val: Any) -> bool:
+    """A value a model sends to fill an advertised property it has no data for: not data."""
+    if val == [] or val == {}:
+        return True
+    return isinstance(val, str) and val.strip() in ("", "null", "{}", "[]")
+
+
+# The three encodings 292 added to the schema. A model that fills every advertised property sends them
+# on chart / table / metric calls too; those arms read an empty filler as absent (292-REVIEW WR-03).
+_NEW_ENCODING_KEYS: tuple[str, ...] = ENCODED_COMPONENTS
+
+
 class _ArgsBase(_Strict):
     title: str = Field(min_length=1)
     from_artifact: str | None = Field(default=None, max_length=64)
     columns: list[Column] | None = None
     rows: list[list[Cell]] | None = None
     transform: Transform | None = None
+
+    @model_validator(mode="before")
+    @classmethod
+    def _new_encoding_fillers_are_absent(cls, data: Any) -> Any:
+        # 292-REVIEW WR-03: before 292 these keys were not in the schema, so no model sent them; a
+        # chart call carrying "diagram": {} must not start failing because the schema grew.
+        if not isinstance(data, dict) or not any(_is_empty_filler(data.get(k)) for k in _NEW_ENCODING_KEYS):
+            return data
+        data = dict(data)  # never mutate the caller's args
+        for key in _NEW_ENCODING_KEYS:
+            if _is_empty_filler(data.get(key)):
+                data[key] = None
+        return data
 
     @field_validator("title", mode="before")
     @classmethod
@@ -366,7 +517,8 @@ class _ArgsBase(_Strict):
                            column=_col_word(cname))
         return v
 
-    @field_validator("columns", "transform", "chart", "metric", mode="before", check_fields=False)
+    @field_validator("columns", "transform", "chart", "metric", "diagram", "comparison", "timeline",
+                     mode="before", check_fields=False)
     @classmethod
     def _decode_nested(cls, v: Any, info) -> Any:
         return _decode_once(v, info.field_name)
@@ -411,25 +563,517 @@ class _ArgsBase(_Strict):
         return self
 
 
+# 292 Pitfall 1: OpenAI Responses null-fills every optional key, so a chart call arrives carrying
+# "diagram": null, "comparison": null, "timeline": null. The tabular arms accept exactly that (null)
+# and nothing else; a non-null new encoding on a tabular call is refused.
+
+
 class ChartArgs(_ArgsBase):
     component: Literal["chart"]
     chart: ChartEnc
     metric: None = None
+    diagram: None = None
+    comparison: None = None
+    timeline: None = None
 
 
 class TableArgs(_ArgsBase):
     component: Literal["table"]
     chart: None = None
     metric: None = None
+    diagram: None = None
+    comparison: None = None
+    timeline: None = None
 
 
 class MetricArgs(_ArgsBase):
     component: Literal["metric"]
     metric: MetricEnc
     chart: None = None
+    diagram: None = None
+    comparison: None = None
+    timeline: None = None
 
 
-ShowArtifactArgs = Annotated[Union[ChartArgs, TableArgs, MetricArgs], Field(discriminator="component")]
+# ── The three typed-encoding arms (Phase 292, D-03..D-08) ───────────────────────────────────────
+#
+# Each new type carries its OWN nested encoding, never the columns/rows dataset (D-03): node kinds
+# and cell verdicts would not survive tabular rows. Every model is extra="forbid"; there is no
+# coordinate, SVG, Mermaid, "today", document, page or excerpt field anywhere (D-04, D-06, D-07).
+# A `source` is only the [n] number of a citation retrieved this turn; the handler resolves it.
+
+_ITEM_WORD: dict[str, str] = {"diagram": "steps", "comparison": "terms", "timeline": "events"}
+# ⚠ [0-9], never \d: in a Python str pattern \d matches EVERY Unicode decimal digit and int() parses
+# them, while JavaScript's \d is ASCII only — "٢٠٢٤-01-15" passed here and failed the guard
+# (292-REVIEW CR-01).
+_DATE_RE = re.compile(r"^([0-9]{4})-(0[1-9]|1[0-2])(?:-([0-9]{2}))?$")
+_SOURCE_STR = re.compile(r"^(?:\[\s*([0-9]{1,9})\s*\]|([0-9]{1,9}))$")
+_SOURCE_DETAIL = (
+    "must be the [n] number of a source retrieved in this turn (e.g. 3 or \"[3]\"), or omitted. "
+    "Never true/false, 0, a document name or text."
+)
+
+
+def parse_source_handle(v: Any) -> int | None:
+    """A ``source`` handle as the citation number it names, or None. Raises ``ValueError``.
+
+    Accepts an int >= 1, an integral float (Gemini sends JSON integers as floats), a digit string or
+    ``"[n]"``. ⛔ A bool is refused FIRST: pydantic's lax int turns ``True`` into ``1``, which would
+    silently cite source 1 (RESEARCH Pitfall 3).
+    """
+    if v is None:
+        return None
+    if isinstance(v, bool):
+        raise ValueError("a source handle is a citation number, not true/false")
+    if isinstance(v, int):
+        n = v
+    elif isinstance(v, float) and math.isfinite(v) and v.is_integer():
+        n = int(v)
+    elif isinstance(v, str):
+        m = _SOURCE_STR.fullmatch(v.strip())
+        if m is None:
+            raise ValueError("a source handle is a citation number")
+        n = int(m.group(1) or m.group(2))
+    else:
+        raise ValueError("a source handle is a citation number")
+    if n < 1:
+        raise ValueError("a source handle is 1 or more")
+    return n
+
+
+def _source_rule(v: Any, where: str) -> int | None:
+    try:
+        return parse_source_handle(v)
+    except ValueError:
+        _raise("fallback", f"`{where}.source` {_SOURCE_DETAIL}")
+    return None  # unreachable; _raise always raises
+
+
+def _req_text(v: Any, limit: int, key: str, where: str, **fmt: Any) -> str:
+    if not isinstance(v, str) or _is_blank(v):
+        _raise("fallback", f"`{where}` must be non-empty text.")
+    if _js_len(v) > limit:
+        _raise(key, f"`{where}` must be at most {limit} characters (an emoji counts as 2).", **fmt)
+    return v
+
+
+def _opt_text(v: Any, limit: int, key: str, where: str, **fmt: Any) -> str | None:
+    """An optional string: absent or blank → None; over its cap → the worded refusal ``key``."""
+    if v is None:
+        return None
+    if not isinstance(v, str):
+        _raise("fallback", f"`{where}` must be text or null.")
+    if _is_blank(v):
+        return None
+    if _js_len(v) > limit:
+        _raise(key, f"`{where}` must be at most {limit} characters (an emoji counts as 2).", **fmt)
+    return v
+
+
+def _decode_list(v: Any, where: str) -> Any:
+    """Decode a stringified list ONCE (Pitfall 5: coerce-tier models stringify inner levels too)."""
+    v = _decode_once(v, where)
+    if v is not None and not isinstance(v, list):
+        _raise("fallback", f"`{where}` must be an array.")
+    return v
+
+
+def is_event_date(v: Any) -> bool:
+    """True for ``YYYY-MM`` or ``YYYY-MM-DD`` naming a real calendar day (D-06)."""
+    if not isinstance(v, str):
+        return False
+    m = _DATE_RE.fullmatch(v)
+    if m is None:
+        return False
+    if m.group(3) is None:
+        return True
+    try:
+        datetime.date(int(m.group(1)), int(m.group(2)), int(m.group(3)))
+    except ValueError:
+        return False
+    return True
+
+
+def event_sort_key(date: str) -> tuple[int, int, int]:
+    """(year, month, day or 0): ``2024-02`` sorts before ``2024-02-09`` (D-06, RESEARCH Pattern 4)."""
+    m = _DATE_RE.fullmatch(date)
+    if m is None:  # only ever called on validated dates
+        raise ValueError(f"not an event date: {date!r}")
+    return int(m.group(1)), int(m.group(2)), int(m.group(3) or 0)
+
+
+class DiagramNode(_Strict):
+    id: str
+    label: str
+    kind: NodeKind = "step"
+    source: int | None = None
+
+    @field_validator("id", mode="before")
+    @classmethod
+    def _id_rule(cls, v: Any) -> Any:
+        if not isinstance(v, str) or not NODE_ID_RE.fullmatch(v):
+            _raise("fallback", "each `diagram.nodes[].id` must be 1-40 letters, digits, `_`, `.` or `-` (no "
+                               "spaces), unique within the diagram.")
+        return v
+
+    @field_validator("label", mode="before")
+    @classmethod
+    def _label_rule(cls, v: Any) -> Any:
+        return _req_text(v, MAX_NODE_LABEL_CHARS, "node_label_too_long", "diagram.nodes[].label")
+
+    @field_validator("kind", mode="before")
+    @classmethod
+    def _kind_rule(cls, v: Any) -> Any:
+        if v is None:
+            return "step"
+        word = v.strip().lower() if isinstance(v, str) else None
+        if word not in NODE_KINDS:
+            _raise("fallback", "`diagram.nodes[].kind` must be one of " + ", ".join(NODE_KINDS)
+                   + " (omit it for a plain step).")
+        return word
+
+    @field_validator("source", mode="before")
+    @classmethod
+    def _source(cls, v: Any) -> Any:
+        return _source_rule(v, "diagram.nodes[]")
+
+
+class DiagramEdge(_Strict):
+    # The model's key is "from". ⛔ No populate_by_name: it would accept "from_" as input too.
+    from_: str = Field(alias="from")
+    to: str
+    label: str | None = None
+
+    @field_validator("from_", "to", mode="before")
+    @classmethod
+    def _end_rule(cls, v: Any) -> Any:
+        if not isinstance(v, str) or not v:
+            _raise("fallback", "each `diagram.edges[]` needs `from` and `to`, each a node id.")
+        return v
+
+    @field_validator("label", mode="before")
+    @classmethod
+    def _label_rule(cls, v: Any) -> Any:
+        return _opt_text(v, MAX_EDGE_LABEL_CHARS, "edge_label_too_long", "diagram.edges[].label")
+
+
+class DiagramEnc(_Strict):
+    nodes: list[DiagramNode]
+    edges: list[DiagramEdge]
+
+    @model_validator(mode="before")
+    @classmethod
+    def _decode_and_count(cls, data: Any) -> Any:
+        if not isinstance(data, dict):
+            return data
+        data = dict(data)
+        for key in ("nodes", "edges"):
+            if key in data:
+                data[key] = _decode_list(data[key], f"diagram.{key}")
+        nodes = data.get("nodes") or []
+        edges = data.get("edges") or []
+        if len(nodes) > MAX_NODES:
+            _raise("too_many_nodes",
+                   f"a diagram shows at most {MAX_NODES} steps and this has {len(nodes):,}. Group related "
+                   "steps into one node (e.g. 'Legal review') and send at most 25.", n=f"{len(nodes):,}")
+        if len(nodes) < MIN_NODES:
+            _raise("too_few_nodes", "send at least 2 nodes in `diagram.nodes`; for a single fact use a metric "
+                                    "or plain text.")
+        if len(edges) > MAX_EDGES:
+            _raise("too_many_edges",
+                   f"a diagram shows at most {MAX_EDGES} links and this has {len(edges):,}. Group related steps "
+                   "so fewer links are needed.", n=f"{len(edges):,}")
+        if len(edges) < MIN_EDGES:
+            _raise("no_edges", "send at least 1 link in `diagram.edges`: [{from, to, label?}] naming node ids.")
+        return data
+
+    @model_validator(mode="after")
+    def _graph_rules(self) -> "DiagramEnc":
+        ids = [n.id for n in self.nodes]
+        if len(set(ids)) != len(ids):
+            _raise("duplicate_node", "every `diagram.nodes[].id` must be unique.")
+        known = set(ids)
+        for i, e in enumerate(self.edges):
+            for end in (e.from_, e.to):
+                if end not in known:
+                    detail = (f"diagram.edges[{i}] names a node id that is not in `diagram.nodes`. Node ids: "
+                              + ", ".join(ids) + ".")
+                    safe = _safe(end)
+                    if safe:
+                        _raise("unknown_node", detail, id=safe)
+                    _raise("fallback", detail)
+        seen: set[tuple[str, str]] = set()
+        for i, e in enumerate(self.edges):
+            pair = (e.from_, e.to)
+            if pair in seen:
+                _raise("duplicate_edge", f"diagram.edges[{i}] repeats a from→to pair; send each link once (put "
+                                         "both conditions in one label).")
+            seen.add(pair)
+        for i, e in enumerate(self.edges):
+            if e.from_ == e.to and e.label is None:
+                _raise("self_loop_unlabelled", f"diagram.edges[{i}] links a node to itself; give it a `label` "
+                                               "saying why (e.g. 'retry'), or remove it.")
+        return self
+
+
+class ComparisonCell(_Strict):
+    verdict: Verdict
+    text: str | None = None
+    source: int | None = None
+
+    @field_validator("verdict", mode="before")
+    @classmethod
+    def _verdict_rule(cls, v: Any) -> Any:
+        word = v.strip().lower() if isinstance(v, str) else None
+        if word not in VERDICTS:
+            _raise("fallback", "each cell `verdict` must be one of " + ", ".join(VERDICTS) + ": y favourable, n "
+                               "unfavourable, m neutral or partly, q not stated in what was retrieved.")
+        return word
+
+    @field_validator("text", mode="before")
+    @classmethod
+    def _text_rule(cls, v: Any) -> Any:
+        return _opt_text(v, MAX_CELL_CHARS, "cell_text_too_long", "comparison.terms[].cells[].text")
+
+    @field_validator("source", mode="before")
+    @classmethod
+    def _source(cls, v: Any) -> Any:
+        return _source_rule(v, "comparison.terms[].cells[]")
+
+    @model_validator(mode="after")
+    def _not_stated_cites_nothing(self) -> "ComparisonCell":
+        # 292-REVIEW WR-02: q means "not stated in what was retrieved"; a quoted clause under it would
+        # contradict the verdict it decorates. DROPPED, not refused: at the G4 live re-check a refusal
+        # here made gpt-5.4-mini abandon the whole comparison instead of retrying. The frontend guard
+        # neutralises a stored one the same way, so the two stacks agree.
+        if self.verdict == "q" and self.source is not None:
+            self.source = None
+        return self
+
+
+class ComparisonTerm(_Strict):
+    name: str
+    cells: list[ComparisonCell]
+
+    @field_validator("name", mode="before")
+    @classmethod
+    def _name_rule(cls, v: Any) -> Any:
+        return _req_text(v, MAX_TERM_CHARS, "term_too_long", "comparison.terms[].name")
+
+    @field_validator("cells", mode="before")
+    @classmethod
+    def _cells_decode(cls, v: Any) -> Any:
+        return _decode_list(v, "comparison.terms[].cells")
+
+
+class ComparisonEnc(_Strict):
+    options: list[str]
+    terms: list[ComparisonTerm]
+
+    @model_validator(mode="before")
+    @classmethod
+    def _decode_and_count(cls, data: Any) -> Any:
+        if not isinstance(data, dict):
+            return data
+        data = dict(data)
+        for key in ("options", "terms"):
+            if key in data:
+                data[key] = _decode_list(data[key], f"comparison.{key}")
+        options = data.get("options") or []
+        if not MIN_OPTIONS <= len(options) <= MAX_OPTIONS:
+            _raise("option_count", f"a comparison shows {MIN_OPTIONS} to {MAX_OPTIONS} options (the things being "
+                                   f"compared) and this has {len(options):,}.", n=f"{len(options):,}")
+        for o in options:
+            _req_text(o, MAX_OPTION_CHARS, "option_too_long", "comparison.options[]")
+        terms = data.get("terms") or []
+        if not terms:
+            _raise("no_items", "send at least one term: comparison.terms = [{name, cells}].", items="terms")
+        if len(terms) > MAX_TERMS:
+            _raise("too_many_terms", f"a comparison shows at most {MAX_TERMS} terms; keep the ones that matter.",
+                   n=f"{len(terms):,}")
+        return data
+
+    @model_validator(mode="after")
+    def _matrix_rules(self) -> "ComparisonEnc":
+        n = len(self.options)
+        for i, t in enumerate(self.terms):
+            if len(t.cells) != n:
+                _raise("ragged_term", f"comparison.terms[{i}] has {len(t.cells)} cells but there are {n} options; "
+                                      "send one cell per option, in option order (verdict q when not stated).",
+                       i=i + 1, got=len(t.cells), n=n)
+        if len(set(self.options)) != n:
+            _raise("duplicate_option", "every `comparison.options[]` name must be unique.")
+        return self
+
+
+class TimelineEvent(_Strict):
+    date: str
+    title: str
+    detail: str | None = None
+    category: str | None = None
+    deadline: bool = False
+    source: int | None = None
+
+    @field_validator("date", mode="before")
+    @classmethod
+    def _date_rule(cls, v: Any) -> Any:
+        if not is_event_date(v):  # belt: TimelineEnc words it with the event number first
+            _raise("fallback", "`timeline.events[].date` must be YYYY-MM-DD (a real day) or YYYY-MM.")
+        return v
+
+    @field_validator("title", mode="before")
+    @classmethod
+    def _title_rule(cls, v: Any) -> Any:
+        return _req_text(v, MAX_EVENT_TITLE_CHARS, "event_text_too_long", "timeline.events[].title",
+                         what="an event title", cap=MAX_EVENT_TITLE_CHARS)
+
+    @field_validator("detail", mode="before")
+    @classmethod
+    def _detail_rule(cls, v: Any) -> Any:
+        return _opt_text(v, MAX_EVENT_DETAIL_CHARS, "event_text_too_long", "timeline.events[].detail",
+                         what="an event detail", cap=MAX_EVENT_DETAIL_CHARS)
+
+    @field_validator("category", mode="before")
+    @classmethod
+    def _category_rule(cls, v: Any) -> Any:
+        return _opt_text(v, MAX_CATEGORY_CHARS, "event_text_too_long", "timeline.events[].category",
+                         what="a category", cap=MAX_CATEGORY_CHARS)
+
+    @field_validator("deadline", mode="before")
+    @classmethod
+    def _deadline_rule(cls, v: Any) -> Any:
+        if v is None:
+            return False
+        if not isinstance(v, bool):  # pydantic's lax bool would read "yes" as True
+            _raise("fallback", "`timeline.events[].deadline` must be true or false (or omitted).")
+        return v
+
+    @field_validator("source", mode="before")
+    @classmethod
+    def _source(cls, v: Any) -> Any:
+        return _source_rule(v, "timeline.events[]")
+
+
+class TimelineEnc(_Strict):
+    events: list[TimelineEvent]
+
+    @model_validator(mode="before")
+    @classmethod
+    def _decode_and_count(cls, data: Any) -> Any:
+        if not isinstance(data, dict):
+            return data
+        data = dict(data)
+        if "events" in data:
+            data["events"] = _decode_list(data["events"], "timeline.events")
+        events = data.get("events") or []
+        if not events:
+            _raise("no_items", "send at least one event: timeline.events = [{date, title}].", items="events")
+        if len(events) > MAX_EVENTS:
+            _raise("too_many_events", f"a timeline shows at most {MAX_EVENTS} events; keep the ones that matter.",
+                   n=f"{len(events):,}")
+        for i, ev in enumerate(events):
+            if isinstance(ev, dict) and not is_event_date(ev.get("date")):
+                _raise("bad_date", f"timeline.events[{i}].date must be YYYY-MM-DD (a real calendar day) or "
+                                   "YYYY-MM; never words or another format.", i=i + 1)
+        return data
+
+
+class _Encoded(_Strict):
+    """Base of the three typed-encoding arms. ``encoding_key`` names the arm's own encoding field."""
+
+    encoding_key: ClassVar[str] = ""
+    title: str = Field(min_length=1)
+    # D-08: accepted here so the HANDLER can word the refusal (it needs the parent's type).
+    from_artifact: str | None = Field(default=None, max_length=64)
+    columns: None = None
+    rows: None = None
+    transform: None = None
+    chart: None = None
+    metric: None = None
+
+    @field_validator("title", mode="before")
+    @classmethod
+    def _title_len(cls, v: Any) -> Any:
+        if isinstance(v, str) and _js_len(v.strip()) > MAX_TITLE_CHARS:  # UTF-16, as the browser counts
+            _raise("title_too_long", f"`title` must be at most {MAX_TITLE_CHARS} characters.")
+        return v.strip() if isinstance(v, str) else v
+
+    @field_validator("from_artifact", mode="before")
+    @classmethod
+    def _blank_reference_is_none(cls, v: Any) -> Any:
+        return None if isinstance(v, str) and not v.strip() else (v.strip() if isinstance(v, str) else v)
+
+    @model_validator(mode="before")
+    @classmethod
+    def _own_data_only(cls, data: Any) -> Any:
+        if not isinstance(data, dict):
+            return data
+        data = dict(data)
+        enc = cls.encoding_key
+        own = data.get(enc)
+        if isinstance(own, str):  # BEFORE any decode: a placeholder is never JSON
+            if own.startswith(ROWS_PLACEHOLDER_STORED):
+                _raise("placeholder_encoded_stored",
+                       f"`{enc}` was the history placeholder of an artifact already shown, not its data. A "
+                       f"{enc} is never redrawn by reference: send the data again as a full `{enc}` object.")
+            if own.startswith(ROWS_PLACEHOLDER_NOT_STORED):
+                _raise("placeholder_encoded_not_stored",
+                       f"`{enc}` was the history placeholder of an earlier call that was refused, so nothing "
+                       f"was stored. Send the data again as a full `{enc}` object.")
+        foreign = ("columns", "rows", "transform", "chart", "metric") + tuple(
+            c for c in ENCODED_COMPONENTS if c != enc)
+        for key in foreign:
+            val = data.get(key)
+            if val is None:
+                continue
+            if _is_empty_filler(val):
+                data[key] = None  # an empty filler is not data (the tabular arms share the rule, WR-03)
+                continue
+            _raise("foreign_fields",
+                   f"a {enc} call sends `{enc}` only; `{key}` belongs to another artifact type. Remove `{key}`.",
+                   noun=enc)
+        return data
+
+    @field_validator(*ENCODED_COMPONENTS, mode="before", check_fields=False)
+    @classmethod
+    def _decode_encoding(cls, v: Any, info) -> Any:
+        return _decode_once(v, info.field_name)
+
+    @model_validator(mode="after")
+    def _needs_its_data(self) -> "_Encoded":
+        enc = self.encoding_key
+        if self.from_artifact is None and getattr(self, enc) is None:
+            _raise("no_items", f"send `{enc}` with its data (see the show_artifact description).",
+                   items=_ITEM_WORD[enc])
+        return self
+
+
+class DiagramArgs(_Encoded):
+    encoding_key: ClassVar[str] = "diagram"
+    component: Literal["diagram"]
+    diagram: DiagramEnc | None = None
+    comparison: None = None
+    timeline: None = None
+
+
+class ComparisonArgs(_Encoded):
+    encoding_key: ClassVar[str] = "comparison"
+    component: Literal["comparison"]
+    comparison: ComparisonEnc | None = None
+    diagram: None = None
+    timeline: None = None
+
+
+class TimelineArgs(_Encoded):
+    encoding_key: ClassVar[str] = "timeline"
+    component: Literal["timeline"]
+    timeline: TimelineEnc | None = None
+    diagram: None = None
+    comparison: None = None
+
+
+ArtifactArgs = Union[ChartArgs, TableArgs, MetricArgs, DiagramArgs, ComparisonArgs, TimelineArgs]
+ShowArtifactArgs = Annotated[ArtifactArgs, Field(discriminator="component")]
 _ADAPTER: TypeAdapter = TypeAdapter(ShowArtifactArgs)
 
 
@@ -471,6 +1115,206 @@ class StoredArtifactSpec(_Strict):
     rows: list[list[Cell]] = Field(min_length=1, max_length=MAX_ROWS)
     chart: StoredChartEnc | None = None
     metric: StoredMetricEnc | None = None
+
+
+# ── The persisted spec of the three typed-encoding arms (Phase 292, D-14) ───────────────────────
+#
+# One model per new type; ``StoredArtifactSpec`` (tabular) above is unchanged. Every key is
+# present in storage (no defaults), so the frontend guard reads one exact shape. Dump with
+# ``model_dump(by_alias=True)`` so the edge key is "from". A ``source`` here is the SERVER-resolved
+# citation (document / page / excerpt), never model text (D-07).
+
+
+def _stored_js_cap(v: Any, cap: int, what: str) -> Any:
+    if isinstance(v, str) and _js_len(v) > cap:
+        raise ValueError(f"{what} must be at most {cap} UTF-16 units")
+    return v
+
+
+def _stored_text(v: Any, cap: int, what: str) -> Any:
+    """A required stored string: not blank by either rule (292-REVIEW CR-01), within its UTF-16 cap."""
+    if isinstance(v, str) and _is_blank(v):
+        raise ValueError(f"{what} must not be blank")
+    return _stored_js_cap(v, cap, what)
+
+
+def _no_bool(v: Any, what: str) -> Any:
+    if isinstance(v, bool):
+        raise ValueError(f"{what} must not be a boolean")
+    return v
+
+
+class StoredSource(_Strict):
+    # 292-REVIEW CR-01: capped in UTF-16 units (the guard's count), never pydantic's code points.
+    document: str | None
+    page: int | None = Field(ge=1)  # always null today: document_chunks carries no page
+    excerpt: str | None
+
+    @field_validator("document")
+    @classmethod
+    def _document_cap(cls, v: str | None) -> str | None:
+        return _stored_js_cap(v, MAX_SOURCE_DOCUMENT_CHARS, "source.document")
+
+    @field_validator("page", mode="before")
+    @classmethod
+    def _page_not_bool(cls, v: Any) -> Any:
+        return _no_bool(v, "source.page")
+
+    @field_validator("excerpt")
+    @classmethod
+    def _excerpt_cap(cls, v: str | None) -> str | None:
+        return _stored_js_cap(v, MAX_EXCERPT_CHARS, "source.excerpt")
+
+
+class StoredDiagramNode(_Strict):
+    id: str = Field(pattern=NODE_ID_RE.pattern)
+    label: str = Field(min_length=1)
+    kind: NodeKind
+    source: StoredSource | None
+
+    @field_validator("label")
+    @classmethod
+    def _label_cap(cls, v: str) -> str:
+        return _stored_text(v, MAX_NODE_LABEL_CHARS, "node label")
+
+
+class StoredDiagramEdge(_Strict):
+    from_: str = Field(alias="from")
+    to: str
+    label: str | None
+
+    @field_validator("label")
+    @classmethod
+    def _label_cap(cls, v: str | None) -> str | None:
+        return _stored_js_cap(v, MAX_EDGE_LABEL_CHARS, "edge label")
+
+
+class StoredDiagramEnc(_Strict):
+    nodes: list[StoredDiagramNode] = Field(min_length=MIN_NODES, max_length=MAX_NODES)
+    edges: list[StoredDiagramEdge] = Field(min_length=MIN_EDGES, max_length=MAX_EDGES)
+
+    @model_validator(mode="after")
+    def _edges_name_nodes(self) -> "StoredDiagramEnc":
+        ids = [n.id for n in self.nodes]
+        if len(set(ids)) != len(ids):
+            raise ValueError("diagram node ids must be unique")
+        known = set(ids)
+        pairs = [(e.from_, e.to) for e in self.edges]
+        if any(a not in known or b not in known for a, b in pairs) or len(set(pairs)) != len(pairs):
+            raise ValueError("diagram edges must name known nodes, each from→to pair once")
+        if any(e.from_ == e.to and e.label is None for e in self.edges):
+            raise ValueError("a diagram self-loop needs a label")
+        return self
+
+
+class StoredDiagramSpec(_Strict):
+    title: str = Field(min_length=1, max_length=MAX_TITLE_CHARS)
+    diagram: StoredDiagramEnc
+
+
+class StoredComparisonCell(_Strict):
+    verdict: Verdict
+    text: str | None
+    source: StoredSource | None
+
+    @field_validator("text")
+    @classmethod
+    def _text_cap(cls, v: str | None) -> str | None:
+        return _stored_js_cap(v, MAX_CELL_CHARS, "cell text")
+
+    @model_validator(mode="after")
+    def _not_stated_cites_nothing(self) -> "StoredComparisonCell":
+        if self.verdict == "q" and self.source is not None:  # 292-REVIEW WR-02: dropped, as on the way in
+            self.source = None
+        return self
+
+
+class StoredComparisonTerm(_Strict):
+    name: str = Field(min_length=1)
+    cells: list[StoredComparisonCell]
+
+    @field_validator("name")
+    @classmethod
+    def _name_cap(cls, v: str) -> str:
+        return _stored_text(v, MAX_TERM_CHARS, "term name")
+
+
+class StoredComparisonEnc(_Strict):
+    options: list[str] = Field(min_length=MIN_OPTIONS, max_length=MAX_OPTIONS)
+    terms: list[StoredComparisonTerm] = Field(min_length=1, max_length=MAX_TERMS)
+
+    @field_validator("options")
+    @classmethod
+    def _options_rule(cls, v: list[str]) -> list[str]:
+        if len(set(v)) != len(v) or any(not o for o in v):
+            raise ValueError("comparison options must be unique, non-empty names")
+        for o in v:
+            _stored_text(o, MAX_OPTION_CHARS, "option name")
+        return v
+
+    @model_validator(mode="after")
+    def _cells_parallel_options(self) -> "StoredComparisonEnc":
+        if any(len(t.cells) != len(self.options) for t in self.terms):
+            raise ValueError("comparison terms must hold one cell per option")
+        return self
+
+
+class StoredComparisonSpec(_Strict):
+    title: str = Field(min_length=1, max_length=MAX_TITLE_CHARS)
+    comparison: StoredComparisonEnc
+
+
+class StoredTimelineEvent(_Strict):
+    date: str
+    title: str = Field(min_length=1)
+    detail: str | None
+    category: str | None
+    deadline: bool
+    source: StoredSource | None
+
+    @field_validator("date")
+    @classmethod
+    def _date_rule(cls, v: str) -> str:
+        if not is_event_date(v):
+            raise ValueError("event date must be YYYY-MM-DD or YYYY-MM")
+        return v
+
+    @field_validator("deadline", mode="before")
+    @classmethod
+    def _deadline_strict(cls, v: Any) -> Any:
+        if not isinstance(v, bool):
+            raise ValueError("deadline must be a boolean")
+        return v
+
+    @model_validator(mode="after")
+    def _caps(self) -> "StoredTimelineEvent":
+        _stored_text(self.title, MAX_EVENT_TITLE_CHARS, "event title")
+        _stored_js_cap(self.detail, MAX_EVENT_DETAIL_CHARS, "event detail")
+        _stored_js_cap(self.category, MAX_CATEGORY_CHARS, "event category")
+        return self
+
+
+class StoredTimelineEnc(_Strict):
+    events: list[StoredTimelineEvent] = Field(min_length=1, max_length=MAX_EVENTS)
+
+    @model_validator(mode="after")
+    def _sorted(self) -> "StoredTimelineEnc":
+        keys = [event_sort_key(e.date) for e in self.events]
+        if keys != sorted(keys):
+            raise ValueError("stored timeline events must be sorted by date")
+        return self
+
+
+class StoredTimelineSpec(_Strict):
+    title: str = Field(min_length=1, max_length=MAX_TITLE_CHARS)
+    timeline: StoredTimelineEnc
+
+
+STORED_ENCODED_SPECS: dict[str, type[_Strict]] = {
+    "diagram": StoredDiagramSpec,
+    "comparison": StoredComparisonSpec,
+    "timeline": StoredTimelineSpec,
+}
 
 
 # ── Dataset validation (first emission AND, in 273-03, after by-reference transforms) ───────────
@@ -708,17 +1552,19 @@ def _loc_path(loc: tuple) -> str:
     return "".join(parts) or "arguments"
 
 
-def _from_errors(errors: list[dict]) -> ArtifactRefusal:
+def _from_errors(errors: list[dict], component: Any = None) -> ArtifactRefusal:
     for e in errors:  # a refusal a validator already worded wins
         if e.get("type") == "artifact_refusal":
             ctx = e.get("ctx") or {}
             return ArtifactRefusal(reason=str(ctx.get("reason")), detail=str(ctx.get("detail")))
     for e in errors:
         if e.get("type") in ("union_tag_invalid", "union_tag_not_found"):
-            return _refusal(
-                "unknown_component",
-                "`component` must be one of chart, table, metric. Use a table for anything else.",
-            )
+            detail = "`component` must be one of " + ", ".join(ARTIFACT_COMPONENTS) + ". Use a table for anything else."
+            # UI-D-292-21 / T-273-07: only a CLOSED alias key is ever named; the model's raw word is not.
+            alias = COMPONENT_ALIASES.get(component) if isinstance(component, str) else None
+            if alias is not None:
+                return _refusal("component_alias", detail, alias=alias)
+            return _refusal("unknown_component", detail)
     for e in errors:
         loc = tuple(e.get("loc") or ())
         if loc and loc[-1] == "kind" and "chart" in loc[1:]:
@@ -759,7 +1605,9 @@ def _strip_nul_deep(v: Any) -> Any:
     return v
 
 
-def validate_args(raw: Any) -> ChartArgs | TableArgs | MetricArgs | ArtifactRefusal:
+def validate_args(
+    raw: Any,
+) -> ChartArgs | TableArgs | MetricArgs | DiagramArgs | ComparisonArgs | TimelineArgs | ArtifactRefusal:
     """Validate ``show_artifact`` arguments. Never raises; never mutates ``raw``."""
     if isinstance(raw, str):
         try:
@@ -776,7 +1624,7 @@ def validate_args(raw: Any) -> ChartArgs | TableArgs | MetricArgs | ArtifactRefu
     try:
         return _ADAPTER.validate_python(data)
     except ValidationError as exc:
-        return _from_errors(exc.errors())
+        return _from_errors(exc.errors(), component=data.get("component"))
 
 
 # ── Reading a persisted tool result (reload attach, history redaction) ──────────────────────────

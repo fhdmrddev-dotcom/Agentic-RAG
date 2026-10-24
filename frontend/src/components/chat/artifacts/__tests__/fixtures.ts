@@ -21,7 +21,7 @@ type Cell = string | number | null
 function base(
   id: string,
   label: string,
-  component: "chart" | "table" | "metric",
+  component: "chart" | "table" | "metric" | "diagram" | "comparison" | "timeline",
   spec: Record<string, unknown>,
   caption: Record<string, unknown>,
   rowCount: number,
@@ -335,6 +335,150 @@ export const noSource = base(
 /** The reload placeholder for a referenced id with no stored row. */
 export const missing = { id: "a_q9w8e7r6t5", missing: true as const }
 
+// ── Phase 292-02 — the three encoded types, in the STORED shape (292-01 <interfaces>) ─────────
+// A stored new-type spec carries `title` plus its ONE encoding key and nothing else: no columns,
+// rows, chart or metric. Every optional field is present and explicit (`null` / `false`), exactly as
+// the server dumps it. Sources are server-resolved {document, page, excerpt}; the model never wrote
+// them.
+
+const INVOICE_POLICY = "Invoice_Policy.pdf"
+
+function src(excerpt: string, page: number | null = 3, document: string | null = INVOICE_POLICY) {
+  return { document, page, excerpt }
+}
+
+/**
+ * Invoice approval, 8 steps · 9 links: one back edge (a corrected invoice goes back to the inbox)
+ * and one labelled self-loop (the approval reminder). Kinds start / step / decision / end.
+ */
+export const diagramInvoice = base(
+  "a_dg1nv0c3x8",
+  "diagram 1",
+  "diagram",
+  {
+    title: "How an invoice gets approved",
+    diagram: {
+      nodes: [
+        { id: "log", label: "Invoice logged in the AP inbox", kind: "start", source: src("Every supplier invoice is logged in the AP inbox on the day it arrives.") },
+        { id: "match", label: "Matches the purchase order?", kind: "decision", source: src("Accounts Payable matches each invoice to its purchase order and goods receipt.") },
+        { id: "query", label: "Query the supplier", kind: "step", source: null },
+        { id: "reject", label: "Invoice rejected", kind: "end", source: null },
+        { id: "approve", label: "Budget holder approves", kind: "step", source: src("The budget holder approves the invoice within three business days.", 4) },
+        { id: "pay", label: "Schedule payment", kind: "step", source: null },
+        { id: "post", label: "Post to the ledger", kind: "step", source: null },
+        { id: "paid", label: "Invoice paid", kind: "end", source: null },
+      ],
+      edges: [
+        { from: "log", to: "match", label: null },
+        { from: "match", to: "approve", label: "Matches" },
+        { from: "match", to: "query", label: "Doesn't match" },
+        { from: "query", to: "log", label: "Corrected invoice" },
+        { from: "query", to: "reject", label: "Supplier disputes" },
+        { from: "approve", to: "approve", label: "Reminder after 3 days" },
+        { from: "approve", to: "pay", label: null },
+        { from: "pay", to: "post", label: null },
+        { from: "post", to: "paid", label: null },
+      ],
+    },
+  },
+  {
+    row_count: 8,
+    sources: [{ tool: "search_documents", document: INVOICE_POLICY, page: 3 }],
+    source_count: 1,
+    lineage: null,
+  },
+  8,
+)
+
+type Verdict = "y" | "n" | "m" | "q"
+
+function cell(verdict: Verdict, text: string | null, excerpt: string | null = null, document: string | null = null) {
+  return { verdict, text, source: excerpt ? { document, page: null, excerpt } : null }
+}
+
+const ATLAS = "Atlas_MSA_2023.pdf"
+const NORTHWIND = "Northwind_MSA_2024.pdf"
+const KESTREL = "Kestrel_Proposal_2025.pdf"
+
+/** Freight vendor contracts, 3 options × 7 terms, two `q` cells (sketch 3A data). */
+export const comparisonContracts = base(
+  "a_cmp7x2k9q1",
+  "comparison 1",
+  "comparison",
+  {
+    title: "Freight vendor contracts — key terms",
+    comparison: {
+      options: ["Atlas Logistics", "Northwind Freight", "Kestrel Cargo"],
+      terms: [
+        { name: "Initial term", cells: [cell("m", "3 years", "The initial term of this Agreement is three (3) years.", ATLAS), cell("m", "2 years"), cell("m", "3 years")] },
+        { name: "Auto-renewal", cells: [cell("m", "1 year, unless notice"), cell("y", "None — must re-sign"), cell("m", "1 year, unless notice")] },
+        { name: "Termination notice", cells: [cell("n", "90 days", "…by written notice at least ninety (90) days before the end of the then-current term.", ATLAS), cell("y", "30 days", "Either party may terminate for convenience on thirty (30) days’ written notice.", NORTHWIND), cell("m", "60 days")] },
+        { name: "Liability cap", cells: [cell("y", "12 months’ fees"), cell("n", "6 months’ fees"), cell("y", "12 months’ fees")] },
+        { name: "SLA credits", cells: [cell("y", "Up to 10% of monthly fee"), cell("q", "Not stated"), cell("m", "Up to 5% of monthly fee")] },
+        { name: "EU data residency", cells: [cell("y", "Yes — Frankfurt"), cell("y", "Yes — Dublin"), cell("q", null)] },
+        { name: "Price escalation", cells: [cell("m", "CPI, capped at 4%"), cell("y", "Fixed for 2 years"), cell("n", "CPI, no cap", "Annual adjustment in line with CPI.", KESTREL)] },
+      ],
+    },
+  },
+  {
+    row_count: 7,
+    sources: [
+      { tool: "search_documents", document: ATLAS, page: 14 },
+      { tool: "query_documents", document: null, page: null },
+    ],
+    source_count: 2,
+    lineage: null,
+  },
+  7,
+)
+
+function event(
+  date: string,
+  title: string,
+  detail: string | null,
+  category: string | null,
+  deadline = false,
+  source: { document: string | null; page: number | null; excerpt: string | null } | null = null,
+) {
+  return { date, title, detail, category, deadline, source }
+}
+
+/** Atlas contract history and what's next: 9 events, server-sorted, one deadline (sketch 4A). */
+export const timelineAtlas = base(
+  "a_tl9e4v2n6b",
+  "timeline 1",
+  "timeline",
+  {
+    title: "Atlas Logistics contract — history and what’s next",
+    timeline: {
+      events: [
+        event("2023-03-14", "MSA signed", "Three-year master services agreement for EU freight.", "Contract", false, {
+          document: ATLAS,
+          page: 1,
+          excerpt: "This Master Services Agreement is entered into on 14 March 2023.",
+        }),
+        event("2023-04-01", "Services start", "First shipments under the agreement.", "Contract"),
+        event("2024-02-09", "Amendment 1 — price +3.5%", "Fuel surcharge folded into the base rate.", "Price"),
+        event("2024-11-20", "SLA breach notice", "Three missed delivery windows in October.", "SLA"),
+        event("2025-01-15", "Service credits applied — $18.4K", "Credited against the January invoice.", "SLA"),
+        event("2025-04-01", "Annual CPI uplift +2.9%", "Within the 4% cap.", "Price"),
+        event("2026-04-01", "Annual CPI uplift +3.1%", "Within the 4% cap.", "Price"),
+        event("2026-12-31", "Non-renewal notice deadline", "Last day to give 90 days’ notice before the term ends.", "Contract", true, {
+          document: ATLAS,
+          page: null,
+          excerpt: "Either party may give notice of non-renewal at least ninety (90) days before the end of the term.",
+        }),
+        event("2027-03-31", "Initial term ends", "Renews for one year unless notice was given.", "Contract"),
+      ],
+    },
+  },
+  { row_count: 9, sources: [], source_count: 0, lineage: null },
+  9,
+)
+
+/** The three encoded types, for suites that sweep every new renderer. */
+export const ENCODED_VALID = [diagramInvoice, comparisonContracts, timelineAtlas] as const
+
 export const ALL_VALID = [
   chartBar,
   chartLine,
@@ -346,6 +490,10 @@ export const ALL_VALID = [
   chartFromFilter,
   chartRedrawn,
   noSource,
+  // 292-02 — the three encoded types join once their renderers exist (Task 3).
+  diagramInvoice,
+  comparisonContracts,
+  timelineAtlas,
 ] as const
 
 /** A deep, JSON-safe clone so a test may mutate a fixture freely. */

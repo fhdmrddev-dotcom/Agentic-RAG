@@ -1,0 +1,665 @@
+[
+  {
+    "provider": "anthropic",
+    "model": "claude-opus-5-5",
+    "required": true,
+    "calling_mode": "NATIVE (native SDK adapter)",
+    "thread_id": "1b65b231-ee3e-448f-b832-02c60677e355",
+    "run_id": "f430de8c-14c4-4201-8052-0064eabac869",
+    "run_status": "completed",
+    "score": {
+      "per_type": {
+        "diagram": {
+          "v1": "PASS",
+          "v2_backend": "PASS",
+          "artifact_ids": [
+            "a_3bpc5rorlm"
+          ],
+          "labels": [
+            "diagram 1"
+          ],
+          "sourced_elements": [
+            "12/12"
+          ]
+        },
+        "comparison": {
+          "v1": "PASS",
+          "v2_backend": "PASS",
+          "artifact_ids": [
+            "a_n5du0ny8ft"
+          ],
+          "labels": [
+            "comparison 1"
+          ],
+          "sourced_elements": [
+            "10/10"
+          ]
+        },
+        "timeline": {
+          "v1": "PASS",
+          "v2_backend": "PASS",
+          "artifact_ids": [
+            "a_71cw8u90aw"
+          ],
+          "labels": [
+            "timeline 1"
+          ],
+          "sourced_elements": [
+            "8/8"
+          ]
+        }
+      },
+      "tool_call_names": [
+        "write_todos",
+        "search_documents",
+        "search_documents",
+        "search_documents",
+        "read_document",
+        "show_artifact",
+        "show_artifact",
+        "show_artifact",
+        "write_todos",
+        "show_artifact"
+      ],
+      "search_documents_calls": 3,
+      "show_artifact_calls": 4,
+      "refusals": [
+        {
+          "component": "diagram",
+          "reason": "a step name is over 48 characters",
+          "detail": "`diagram.nodes[].label` must be at most 48 characters (an emoji counts as 2)."
+        }
+      ],
+      "artifact_rows": 3,
+      "reload_records": 3,
+      "reload_missing": 0,
+      "other_components": []
+    },
+    "evidence": ".planning\\phases\\292-more-ways-to-show-it\\evidence\\board\\anthropic-f430de8c-14c4-4201-8052-0064eabac869.json"
+  },
+  {
+    "provider": "deepseek",
+    "model": "deepseek-v4-pro",
+    "required": true,
+    "calling_mode": "NATIVE",
+    "thread_id": "4a7c5232-25f9-4ef0-bec0-ffd1a8f78424",
+    "run_id": "b2f898c2-fa53-44b4-a43c-d571314501e5",
+    "run_status": "completed",
+    "score": {
+      "per_type": {
+        "diagram": {
+          "v1": "PASS",
+          "v2_backend": "PASS",
+          "artifact_ids": [
+            "a_bjaf7cvdxj"
+          ],
+          "labels": [
+            "diagram 1"
+          ],
+          "sourced_elements": [
+            "11/11"
+          ]
+        },
+        "comparison": {
+          "v1": "PASS",
+          "v2_backend": "PASS",
+          "artifact_ids": [
+            "a_lor17s3qth"
+          ],
+          "labels": [
+            "comparison 1"
+          ],
+          "sourced_elements": [
+            "8/8"
+          ]
+        },
+        "timeline": {
+          "v1": "PASS",
+          "v2_backend": "PASS",
+          "artifact_ids": [
+            "a_mww1xlu412"
+          ],
+          "labels": [
+            "timeline 1"
+          ],
+          "sourced_elements": [
+            "8/8"
+          ]
+        }
+      },
+      "tool_call_names": [
+        "search_documents",
+        "search_documents",
+        "search_documents",
+        "query_documents",
+        "read_document",
+        "show_artifact",
+        "show_artifact",
+        "show_artifact"
+      ],
+      "search_documents_calls": 3,
+      "show_artifact_calls": 3,
+      "refusals": [],
+      "artifact_rows": 3,
+      "reload_records": 3,
+      "reload_missing": 0,
+      "other_components": []
+    },
+    "evidence": ".planning\\phases\\292-more-ways-to-show-it\\evidence\\board\\deepseek-b2f898c2-fa53-44b4-a43c-d571314501e5.json"
+  },
+  {
+    "provider": "google",
+    "model": "gemini-3.8-flash",
+    "required": true,
+    "calling_mode": "NATIVE (native SDK adapter)",
+    "thread_id": "8e68079c-12b5-41bd-b4c5-a96750a90fe7",
+    "run_id": "620b2edf-8871-4f3c-83ac-06bbf8cda63b",
+    "run_status": "completed",
+    "score": {
+      "per_type": {
+        "diagram": {
+          "v1": "PASS",
+          "v2_backend": "PASS",
+          "artifact_ids": [
+            "a_b6mpgz39ve"
+          ],
+          "labels": [
+            "diagram 1"
+          ],
+          "sourced_elements": [
+            "0/10"
+          ]
+        },
+        "comparison": {
+          "v1": "PASS",
+          "v2_backend": "PASS",
+          "artifact_ids": [
+            "a_rxwgu7n6ec"
+          ],
+          "labels": [
+            "comparison 1"
+          ],
+          "sourced_elements": [
+            "0/10"
+          ]
+        },
+        "timeline": {
+          "v1": "PASS",
+          "v2_backend": "PASS",
+          "artifact_ids": [
+            "a_wwmzkl0dyu"
+          ],
+          "labels": [
+            "timeline 1"
+          ],
+          "sourced_elements": [
+            "0/8"
+          ]
+        }
+      },
+      "tool_call_names": [
+        "write_todos",
+        "query_documents",
+        "query_documents",
+        "read_document",
+        "read_document",
+        "read_document",
+        "write_todos",
+        "show_artifact",
+        "show_artifact",
+        "show_artifact",
+        "write_todos"
+      ],
+      "search_documents_calls": 0,
+      "show_artifact_calls": 3,
+      "refusals": [],
+      "artifact_rows": 3,
+      "reload_records": 3,
+      "reload_missing": 0,
+      "other_components": []
+    },
+    "evidence": ".planning\\phases\\292-more-ways-to-show-it\\evidence\\board\\google-620b2edf-8871-4f3c-83ac-06bbf8cda63b.json"
+  },
+  {
+    "provider": "lmstudio",
+    "model": "qwen-agentworld-35b-a3b",
+    "required": false,
+    "calling_mode": "NATIVE",
+    "blocked": "extra (self-hosted) group \u2014 not one of the required 8; not driven unless named in --providers"
+  },
+  {
+    "provider": "minimax",
+    "model": "MiniMax-M3",
+    "required": true,
+    "calling_mode": "NATIVE",
+    "thread_id": "a3cd6b54-748a-4f01-8cf3-aa624854bd27",
+    "run_id": "dcfee604-288a-4513-b4d2-6038972dbfbf",
+    "run_status": "completed",
+    "score": {
+      "per_type": {
+        "diagram": {
+          "v1": "PASS",
+          "v2_backend": "PASS",
+          "artifact_ids": [
+            "a_9be85vl5go"
+          ],
+          "labels": [
+            "diagram 1"
+          ],
+          "sourced_elements": [
+            "12/12"
+          ]
+        },
+        "comparison": {
+          "v1": "PASS",
+          "v2_backend": "PASS",
+          "artifact_ids": [
+            "a_slv5cxmj30"
+          ],
+          "labels": [
+            "comparison 1"
+          ],
+          "sourced_elements": [
+            "24/24"
+          ]
+        },
+        "timeline": {
+          "v1": "PASS",
+          "v2_backend": "PASS",
+          "artifact_ids": [
+            "a_w4qy4pii8i"
+          ],
+          "labels": [
+            "timeline 1"
+          ],
+          "sourced_elements": [
+            "9/9"
+          ]
+        }
+      },
+      "tool_call_names": [
+        "query_documents",
+        "grep",
+        "analyze_document",
+        "analyze_document",
+        "analyze_document",
+        "get_related_documents",
+        "get_related_documents",
+        "show_artifact",
+        "show_artifact",
+        "show_artifact",
+        "show_artifact",
+        "show_artifact"
+      ],
+      "search_documents_calls": 0,
+      "show_artifact_calls": 5,
+      "refusals": [
+        {
+          "component": "diagram",
+          "reason": "its settings weren't valid",
+          "detail": "`nodes` is not a show_artifact field. Use only the documented fields."
+        },
+        {
+          "component": "diagram",
+          "reason": "a step name is over 48 characters",
+          "detail": "`diagram.nodes[].label` must be at most 48 characters (an emoji counts as 2)."
+        }
+      ],
+      "artifact_rows": 3,
+      "reload_records": 3,
+      "reload_missing": 0,
+      "other_components": []
+    },
+    "evidence": ".planning\\phases\\292-more-ways-to-show-it\\evidence\\board\\minimax-dcfee604-288a-4513-b4d2-6038972dbfbf.json"
+  },
+  {
+    "provider": "moonshot",
+    "model": "kimi-k3",
+    "required": true,
+    "calling_mode": "NATIVE",
+    "thread_id": "da6a928b-e498-420e-adbd-99928da4ebaf",
+    "run_id": "fadb07de-7026-420b-a3c6-a3b2b7f12a5b",
+    "run_status": "completed",
+    "score": {
+      "per_type": {
+        "diagram": {
+          "v1": "PASS",
+          "v2_backend": "PASS",
+          "artifact_ids": [
+            "a_rdiqro1r5q"
+          ],
+          "labels": [
+            "diagram 1"
+          ],
+          "sourced_elements": [
+            "0/11"
+          ]
+        },
+        "comparison": {
+          "v1": "PASS",
+          "v2_backend": "PASS",
+          "artifact_ids": [
+            "a_xvpegaxg83"
+          ],
+          "labels": [
+            "comparison 1"
+          ],
+          "sourced_elements": [
+            "0/14"
+          ]
+        },
+        "timeline": {
+          "v1": "PASS",
+          "v2_backend": "PASS",
+          "artifact_ids": [
+            "a_o3qyina6h0"
+          ],
+          "labels": [
+            "timeline 1"
+          ],
+          "sourced_elements": [
+            "0/8"
+          ]
+        }
+      },
+      "tool_call_names": [
+        "write_todos",
+        "search_documents",
+        "search_documents",
+        "search_documents",
+        "read_document",
+        "show_artifact",
+        "show_artifact",
+        "show_artifact",
+        "show_artifact",
+        "show_artifact",
+        "write_todos"
+      ],
+      "search_documents_calls": 3,
+      "show_artifact_calls": 5,
+      "refusals": [
+        {
+          "component": "diagram",
+          "reason": "a step name is over 48 characters",
+          "detail": "`diagram.nodes[].label` must be at most 48 characters (an emoji counts as 2)."
+        },
+        {
+          "component": "comparison",
+          "reason": "a comparison was sent another artifact type's fields",
+          "detail": "a comparison call sends `comparison` only; `transform` belongs to another artifact type. Remove `transform`."
+        }
+      ],
+      "artifact_rows": 3,
+      "reload_records": 3,
+      "reload_missing": 0,
+      "other_components": []
+    },
+    "evidence": ".planning\\phases\\292-more-ways-to-show-it\\evidence\\board\\moonshot-fadb07de-7026-420b-a3c6-a3b2b7f12a5b.json"
+  },
+  {
+    "provider": "openai",
+    "model": "gpt-5.6-luna",
+    "required": true,
+    "calling_mode": "NATIVE",
+    "thread_id": "249ca06b-4fb3-46eb-ad1c-f417972117f7",
+    "run_id": "3452108c-a4f5-4ca2-8557-2b1c2a8e464c",
+    "run_status": "completed",
+    "score": {
+      "per_type": {
+        "diagram": {
+          "v1": "PASS",
+          "v2_backend": "PASS",
+          "artifact_ids": [
+            "a_52598spn4t"
+          ],
+          "labels": [
+            "diagram 1"
+          ],
+          "sourced_elements": [
+            "11/11"
+          ]
+        },
+        "comparison": {
+          "v1": "PASS",
+          "v2_backend": "PASS",
+          "artifact_ids": [
+            "a_d9gad5mrif"
+          ],
+          "labels": [
+            "comparison 1"
+          ],
+          "sourced_elements": [
+            "10/10"
+          ]
+        },
+        "timeline": {
+          "v1": "PASS",
+          "v2_backend": "PASS",
+          "artifact_ids": [
+            "a_rxxongaav7"
+          ],
+          "labels": [
+            "timeline 1"
+          ],
+          "sourced_elements": [
+            "8/8"
+          ]
+        }
+      },
+      "tool_call_names": [
+        "write_todos",
+        "search_documents",
+        "search_documents",
+        "search_documents",
+        "search_documents",
+        "write_todos",
+        "show_artifact",
+        "show_artifact",
+        "show_artifact",
+        "show_artifact",
+        "show_artifact",
+        "show_artifact",
+        "write_todos"
+      ],
+      "search_documents_calls": 4,
+      "show_artifact_calls": 6,
+      "refusals": [
+        {
+          "component": "diagram",
+          "reason": "a step name is over 48 characters",
+          "detail": "`diagram.nodes[].label` must be at most 48 characters (an emoji counts as 2)."
+        },
+        {
+          "component": "diagram",
+          "reason": "a link label is over 24 characters",
+          "detail": "`diagram.edges[].label` must be at most 24 characters (an emoji counts as 2)."
+        },
+        {
+          "component": "diagram",
+          "reason": "two links join the same two steps",
+          "detail": "diagram.edges[9] repeats a from\u2192to pair; send each link once (put both conditions in one label)."
+        }
+      ],
+      "artifact_rows": 3,
+      "reload_records": 3,
+      "reload_missing": 0,
+      "other_components": []
+    },
+    "evidence": ".planning\\phases\\292-more-ways-to-show-it\\evidence\\board\\openai-3452108c-a4f5-4ca2-8557-2b1c2a8e464c.json"
+  },
+  {
+    "provider": "openrouter",
+    "model": "z-ai/glm-5.3-flash",
+    "required": true,
+    "calling_mode": "NATIVE",
+    "thread_id": "31c9b505-f1e5-462c-8993-8bf2155df8a6",
+    "run_id": "839fc4a8-6440-4217-ade9-8b55e4f3bd52",
+    "run_status": "completed",
+    "score": {
+      "per_type": {
+        "diagram": {
+          "v1": "PASS",
+          "v2_backend": "PASS",
+          "artifact_ids": [
+            "a_2shkm2n80v"
+          ],
+          "labels": [
+            "diagram 1"
+          ],
+          "sourced_elements": [
+            "12/12"
+          ]
+        },
+        "comparison": {
+          "v1": "PASS",
+          "v2_backend": "PASS",
+          "artifact_ids": [
+            "a_oempi4pv5y"
+          ],
+          "labels": [
+            "comparison 1"
+          ],
+          "sourced_elements": [
+            "6/12"
+          ]
+        },
+        "timeline": {
+          "v1": "PASS",
+          "v2_backend": "PASS",
+          "artifact_ids": [
+            "a_7fjixditdg"
+          ],
+          "labels": [
+            "timeline 1"
+          ],
+          "sourced_elements": [
+            "8/8"
+          ]
+        }
+      },
+      "tool_call_names": [
+        "write_todos",
+        "search_documents",
+        "search_documents",
+        "search_documents",
+        "write_todos",
+        "search_documents",
+        "show_artifact",
+        "show_artifact",
+        "show_artifact",
+        "write_todos",
+        "show_artifact",
+        "show_artifact",
+        "show_artifact"
+      ],
+      "search_documents_calls": 4,
+      "show_artifact_calls": 6,
+      "refusals": [
+        {
+          "component": "diagram",
+          "reason": "a step name is over 48 characters",
+          "detail": "`diagram.nodes[].label` must be at most 48 characters (an emoji counts as 2)."
+        },
+        {
+          "component": "comparison",
+          "reason": "its settings weren't valid",
+          "detail": "`options` is not a show_artifact field. Use only the documented fields."
+        },
+        {
+          "component": "diagram",
+          "reason": "a link label is over 24 characters",
+          "detail": "`diagram.edges[].label` must be at most 24 characters (an emoji counts as 2)."
+        }
+      ],
+      "artifact_rows": 3,
+      "reload_records": 3,
+      "reload_missing": 0,
+      "other_components": []
+    },
+    "evidence": ".planning\\phases\\292-more-ways-to-show-it\\evidence\\board\\openrouter-839fc4a8-6440-4217-ade9-8b55e4f3bd52.json"
+  },
+  {
+    "provider": "zhipu",
+    "model": "glm-5.3-flash",
+    "required": true,
+    "calling_mode": "NATIVE",
+    "thread_id": "8732c1c2-dbc9-4f41-a57b-efc0e580bac8",
+    "run_id": "6f228661-14f8-41d9-80cf-2c9652b1242d",
+    "run_status": "completed",
+    "score": {
+      "per_type": {
+        "diagram": {
+          "v1": "PASS",
+          "v2_backend": "PASS",
+          "artifact_ids": [
+            "a_ac8v7jtme9"
+          ],
+          "labels": [
+            "diagram 1"
+          ],
+          "sourced_elements": [
+            "11/11"
+          ]
+        },
+        "comparison": {
+          "v1": "PASS",
+          "v2_backend": "PASS",
+          "artifact_ids": [
+            "a_7eoncze2xl"
+          ],
+          "labels": [
+            "comparison 1"
+          ],
+          "sourced_elements": [
+            "12/12"
+          ]
+        },
+        "timeline": {
+          "v1": "PASS",
+          "v2_backend": "PASS",
+          "artifact_ids": [
+            "a_vb8djpfl0g"
+          ],
+          "labels": [
+            "timeline 1"
+          ],
+          "sourced_elements": [
+            "8/8"
+          ]
+        }
+      },
+      "tool_call_names": [
+        "write_todos",
+        "search_documents",
+        "search_documents",
+        "search_documents",
+        "search_documents",
+        "write_todos",
+        "show_artifact",
+        "show_artifact",
+        "show_artifact",
+        "show_artifact",
+        "show_artifact"
+      ],
+      "search_documents_calls": 4,
+      "show_artifact_calls": 5,
+      "refusals": [
+        {
+          "component": "diagram",
+          "reason": "a step name is over 48 characters",
+          "detail": "`diagram.nodes[].label` must be at most 48 characters (an emoji counts as 2)."
+        },
+        {
+          "component": "diagram",
+          "reason": "a link label is over 24 characters",
+          "detail": "`diagram.edges[].label` must be at most 24 characters (an emoji counts as 2)."
+        }
+      ],
+      "artifact_rows": 3,
+      "reload_records": 3,
+      "reload_missing": 0,
+      "other_components": []
+    },
+    "evidence": ".planning\\phases\\292-more-ways-to-show-it\\evidence\\board\\zhipu-6f228661-14f8-41d9-80cf-2c9652b1242d.json"
+  }
+]

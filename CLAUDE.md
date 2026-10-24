@@ -484,7 +484,7 @@ node scripts/check-hot-file-ledger.cjs <phase-dir>   # 0 clear · 1 missing rows
 | `backend/app/api/settings.py` | 44 / 23 / 1159 (was `41 / 21 / 1048`) | honoured by construction (294-04: ONE rerank_provider refusal) · ⛔ |
 | `backend/app/services/multimodal_service.py` | 14 / 7 / 984 | ⚠ absent from BOTH for its ENTIRE LIFE at **7 phases** |
 | `backend/app/api/documents.py` | 99 / 39 / 2698 (was `97 / 38 / 2653`) | honoured by construction (285-03: enqueue-fail → doc failed, 201) · ⛔ |
-| `scripts/vitest-count-gate.cjs` | 335 / 76 / 6658 (was `327 / 74 / 6623`) | 291: 2 suites adopted, no pin moved |
+| `scripts/vitest-count-gate.cjs` | 339 / 77 / 6681 (was `335 / 76 / 6658`) | 292: 9 suites adopted, 5 pins raised (292-02 + the 292-03 fence) |
 | `scripts/check-deploy-drift.sh` | 5 / 4 / 267 | ⚠ absent its ENTIRE LIFE — row added 294-05 · fault var omitted |
 | `scripts/build-public-openapi.cjs` | 7 / 3 / 468 | ⚠ now FIRES (294) · 294-03: citation_checks tag (one line) |
 | `backend/app/services/eval_runner_service.py` | 13 / 8 / 1040 | ⚠ STALE · last touch 256-03 |
@@ -549,7 +549,7 @@ node scripts/check-hot-file-ledger.cjs <phase-dir>   # 0 clear · 1 missing rows
 | `frontend/src/hooks/useDocuments.ts` | 10 / 5 / 164 (was `8 / 3 / 120`) | 284-03: no list of its own; Realtime only asks for a refetch · ⛔ |
 | `frontend/src/pages/KnowledgeHealthPage.tsx` | 12 / 6 / **DELETED** | **RETIRED (217.1-14)** |
 | `backend/app/api/knowledge_health.py` | 11 / 6 / 737 | honoured by construction (**217.1-11**) |
-| `backend/app/services/agent_loop.py` | 69 / 33 / 3682 (was `68 / 33 / 3682`) | honoured by construction (282-04: provider kwarg ×2) · seam OWED · ⛔ |
+| `backend/app/services/agent_loop.py` | 72 / 34 / 3699 (was `69 / 33 / 3682`) | honoured by construction (292: citation kwargs + shown count) · seam OWED · ⛔ |
 | `backend/app/services/tool_dispatcher.py` | 99 / 44 / 274 (was `98 / 43 / 5068`) | ✅ G-5 DISCHARGED (278-03): registry only; handlers in services/tools/ · ⛔ |
 | `backend/app/services/search_documents_tool.py` | 11 / 3 / 1544 | ⚠ now FIRES (294) · 294-01: instruction clamp (+25 −3) · extraction FIRST |
 | `backend/app/api/document_governance.py` | 5 / 3 / 416 | ⚠ absent at 3 phases. ⚠ Its low-confidence cutoff is the ConfidenceChi |
@@ -600,7 +600,7 @@ node scripts/check-hot-file-ledger.cjs <phase-dir>   # 0 clear · 1 missing rows
 | `frontend/src/components/skills/SkillFormDialog.tsx` | 13 / 9 / 657 | ⚠ row STALE · honoured by construction (263-04) · ⛔ |
 | `backend/app/api/skills.py` | 20 / 10 / 859 (was `19 / 10 / 858`) | ⛔ FIRES · last touch 280-01 (6 maybe_row guards) |
 | `frontend/src/lib/api/skills.ts` | 6 / 4 / 748 | ⛔ NOW FIRES at 4 phases · re-derived 263 planning |
-| `backend/app/services/openai_service.py` | 81 / 41 / 2623 (was `79 / 40 / 2602`) | 294-01: ONE optional instruction property on the search tool · ⛔ |
+| `backend/app/services/openai_service.py` | 84 / 42 / 2731 (was `81 / 41 / 2623`) | 292: SHOW_ARTIFACT_TOOL schema + description only (30 tools) · ⛔ |
 | `backend/app/services/provider_gateway/openai_compat.py` | 7 / 5 / 537 (was `6 / 4 / 525`) | honoured by construction (282-01: budget forwarded only when set) · ⛔ |
 | `backend/app/services/provider_gateway/dispatcher.py` | 10 / 4 / 260 (was `6 / 2 / 153`) | ⚠ FIRES (row was stale) · 282-01: off-loop open, shared deadline · ⛔ |
 | `backend/app/services/provider_gateway/openai_responses.py` | 2 / 2 / 573 (was `0 / 0 / 563`) | young · 282-01: budget + retries reach the client when set · ⛔ |

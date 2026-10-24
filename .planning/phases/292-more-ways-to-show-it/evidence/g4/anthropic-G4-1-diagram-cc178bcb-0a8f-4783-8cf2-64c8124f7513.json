@@ -1,0 +1,833 @@
+{
+  "provider": "anthropic",
+  "model": "claude-opus-5-5",
+  "thread_id": "937db3b1-00ed-413b-a883-4f39d9a0c784",
+  "prompt_bytes": 62,
+  "prompt": "How does our invoice approval work? Show it as a flow diagram.",
+  "calling_mode_predicted": "NATIVE (native SDK adapter)",
+  "score": {
+    "per_type": {
+      "diagram": {
+        "v1": "PASS",
+        "v2_backend": "PASS",
+        "artifact_ids": [
+          "a_6zmv3disqf"
+        ],
+        "labels": [
+          "diagram 1"
+        ],
+        "sourced_elements": [
+          "10/10"
+        ]
+      },
+      "comparison": {
+        "v1": "FAIL",
+        "v2_backend": "FAIL",
+        "artifact_ids": [],
+        "labels": [],
+        "sourced_elements": []
+      },
+      "timeline": {
+        "v1": "FAIL",
+        "v2_backend": "FAIL",
+        "artifact_ids": [],
+        "labels": [],
+        "sourced_elements": []
+      }
+    },
+    "tool_call_names": [
+      "search_documents",
+      "show_artifact",
+      "show_artifact"
+    ],
+    "search_documents_calls": 1,
+    "show_artifact_calls": 2,
+    "refusals": [
+      {
+        "component": "diagram",
+        "reason": "a step name is over 48 characters",
+        "detail": "`diagram.nodes[].label` must be at most 48 characters (an emoji counts as 2)."
+      }
+    ],
+    "artifact_rows": 1,
+    "reload_records": 1,
+    "reload_missing": 0,
+    "other_components": []
+  },
+  "turn_data": {
+    "run_id": "cc178bcb-0a8f-4783-8cf2-64c8124f7513",
+    "run_status": "completed",
+    "run": {
+      "status": "completed",
+      "model": "claude-opus-5-5",
+      "provider": "anthropic",
+      "error": null,
+      "started_at": "2026-10-24 01:27:22.590086+00:00",
+      "completed_at": "2026-10-24 01:27:55.926482+00:00"
+    },
+    "assistant_messages": [
+      {
+        "id": "9720ae27-9f9a-42c2-beee-ea11717859c4",
+        "content": "The diagram below shows how a supplier invoice moves from receipt to payment, based on your **Invoice Approval Policy** from Finance Operations. Every invoice follows the same steps in the same order. Note that this file calls itself a generated test document with no real suppliers, people or amounts [2], so check that it matches your live policy.\n\n**The main steps:**\n- **Matching check:** Accounts payable logs the invoice on the day it arrives. It then checks the invoice against the purchase order and the goods receipt note: same supplier, same quantities, same unit prices [2].\n- **If it doesn't match:** The invoice is sent back to the supplier with the reason. The supplier fixes it and sends it again, and it goes through the matching check once more. A rejected invoice is never paid [1].\n- **Approvals:** The budget holder for the cost centre has five working days to approve. Invoices over \u20ac10,000 also need the finance controller's sign-off after that [1].\n- **Payment and filing:** Payments go out in the weekly run on Thursdays [3]. The paid invoice, its purchase order and its approvals are then kept in the audit archive for seven years [3].\n\n**Other rules not shown in the diagram:**\n- **Order of approvers:** Accounts payable clerk, then budget holder, then finance controller (only over \u20ac10,000), then treasury, which releases the payment [4].\n- **No self-approval:** Nobody may approve an invoice they raised [4].\n- **Late approvals:** If the budget holder hasn't approved within five working days, accounts payable sends a reminder. After a second reminder, the invoice goes to the head of finance [4].",
+        "tool_calls": [
+          {
+            "args": {
+              "query": "invoice approval process steps"
+            },
+            "name": "search_documents",
+            "result": "[{\"content\": \"s the purchase order and\\n   the goods receipt note: same supplier, same quantities, same unit prices.\\n3. **Decision: does the invoice match the purchase order?** If it matches, the invoice goes to the\\n   budget holder for approval. If it does not match, the invoice is rejected and returned to the\\n   supplier.\\n4. **Rejected: return to the supplier.** Accounts payable emails the supplier the reason for the\\n   rejection. The supplier corrects the invoice and resubmits it, and the resubmitted invoice goes\\n   back to the three-way match check. A rejected invoice is never paid.\\n5. **Budget holder approval.** The budget holder for the cost centre approves the invoice within five\\n   working days.\\n6. **Finance controller sign-off.** Any invoice above 10,000 euros also needs the finance controller's\\n   sign-off after the budget holder has approved it.\\n7. **Payment scheduled.** Accounts payable schedules the approved invoice for the next weekly\\n   payment run.\", \"document_id\": \"5b94562c-4bb9-431c-a12b-59e99f46cca1\", \"filename\": \"292-invoice-approval-policy.md\", \"chunk_index\": 1, \"similarity\": 0.6294503131915757, \"version_number\": 1, \"folder_id\": null, \"source_connection_id\": null, \"source_connection_name\": null, \"metadata\": {\"title\": \"Invoice Approval Policy\", \"author\": \"Finance Operations\", \"topics\": [\"invoice approval\", \"accounts payable\", \"three-way match\", \"payment processing\", \"audit retention\", \"escalation\"], \"summary\": \"Policy describing the process for supplier invoice receipt, three-way match checking, approvals, rejection handling, payment scheduling, and audit filing. Invoices follow a fixed workflow from receipt through payment, with escalation if approval is delayed.\", \"language\": \"en\", \"_confidence\": {\"date\": 0.2, \"title\": 0.99, \"author\": 0.97, \"topics\": 0.94, \"summary\": 0.95, \"language\": 0.98, \"contract_end\": 0.05, \"legal_entity\": 0.05, \"document_type\": 0.96}, \"document_type\": \"policy\"}}, {\"content\": \"# Invoice Approval Policy (fixture",
+            "status": "done",
+            "tool_call_id": "toolu_01HqABNxzEnpnUnV3f1UkjtX"
+          },
+          {
+            "args": {
+              "title": "Supplier invoice approval process",
+              "diagram": "<not stored: refused, diagram of 10 steps>",
+              "component": "diagram"
+            },
+            "name": "show_artifact",
+            "result": "{\"status\": \"refused\", \"reason\": \"a step name is over 48 characters\", \"detail\": \"`diagram.nodes[].label` must be at most 48 characters (an emoji counts as 2).\"}",
+            "status": "done",
+            "tool_call_id": "toolu_01HaKDxK3ALnjet6ida5wSDG"
+          },
+          {
+            "args": {
+              "title": "Supplier invoice approval process",
+              "diagram": "<stored in artifact a_6zmv3disqf, diagram of 10 steps>",
+              "component": "diagram"
+            },
+            "name": "show_artifact",
+            "result": "{\"artifact_id\": \"a_6zmv3disqf\", \"label\": \"diagram 1\", \"component\": \"diagram\", \"row_count\": 10, \"edge_count\": 11, \"note\": \"Shown to the user below your answer as diagram 1. Now write one or two sentences about what it shows; do not repeat it as a table. To change it, call show_artifact again with the full data.\"}",
+            "status": "done",
+            "tool_call_id": "toolu_014bY4fQWPHiWsUabVBDrsf2"
+          }
+        ]
+      }
+    ],
+    "tool_call_names": [
+      "search_documents",
+      "show_artifact",
+      "show_artifact"
+    ],
+    "show_artifact_calls": 2,
+    "refused_calls": 1,
+    "artifact_ids_from_results": [
+      "a_6zmv3disqf"
+    ],
+    "final_answer_empty": false,
+    "final_answer_is_fallback": false,
+    "persisted_json_fence": false,
+    "redis": {
+      "present": true,
+      "ttl": 599,
+      "event_types": {
+        "iteration_start": 4,
+        "tool_preparing": 3,
+        "tool_start": 3,
+        "tool_end": 3,
+        "planning": 3,
+        "tool_args_progress": 10,
+        "artifact": 1,
+        "delta": 91,
+        "sources": 1,
+        "citations": 1,
+        "confidence": 1,
+        "suggestions": 1,
+        "stream_end": 1,
+        "done": 1
+      },
+      "delta_count": 91,
+      "delta_text": "The diagram below shows how a supplier invoice moves from receipt to payment, based on your **Invoice Approval Policy** from Finance Operations. Every invoice follows the same steps in the same order. Note that this file calls itself a generated test document with no real suppliers, people or amounts [2], so check that it matches your live policy.\n\n**The main steps:**\n- **Matching check:** Accounts payable logs the invoice on the day it arrives. It then checks the invoice against the purchase order and the goods receipt note: same supplier, same quantities, same unit prices [2].\n- **If it doesn't match:** The invoice is sent back to the supplier with the reason. The supplier fixes it and sends it again, and it goes through the matching check once more. A rejected invoice is never paid [1].\n- **Approvals:** The budget holder for the cost centre has five working days to approve. Invoices over \u20ac10,000 also need the finance controller's sign-off after that [1].\n- **Payment and filing:** Payments go out in the weekly run on Thursdays [3]. The paid invoice, its purchase order and its approvals are then kept in the audit archive for seven years [3].\n\n**Other rules not shown in the diagram:**\n- **Order of approvers:** Accounts payable clerk, then budget holder, then finance controller (only over \u20ac10,000), then treasury, which releases the payment [4].\n- **No self-approval:** Nobody may approve an invoice they raised [4].\n- **Late approvals:** If the budget holder hasn't approved within five working days, accounts payable sends a reminder. After a second reminder, the invoice goes to the head of finance [4].",
+      "artifact_events": 1
+    }
+  },
+  "message_artifacts": [
+    {
+      "id": "a_6zmv3disqf",
+      "label": "diagram 1",
+      "component": "diagram",
+      "parent_id": null,
+      "run_id": "cc178bcb-0a8f-4783-8cf2-64c8124f7513",
+      "tool_call_id": "toolu_014bY4fQWPHiWsUabVBDrsf2",
+      "row_count": 10,
+      "spec": {
+        "title": "Supplier invoice approval process",
+        "diagram": {
+          "edges": [
+            {
+              "to": "match",
+              "from": "recv",
+              "label": null
+            },
+            {
+              "to": "dec",
+              "from": "match",
+              "label": null
+            },
+            {
+              "to": "bh",
+              "from": "dec",
+              "label": "Yes"
+            },
+            {
+              "to": "rej",
+              "from": "dec",
+              "label": "No"
+            },
+            {
+              "to": "match",
+              "from": "rej",
+              "label": "Corrected & resubmitted"
+            },
+            {
+              "to": "amt",
+              "from": "bh",
+              "label": null
+            },
+            {
+              "to": "fc",
+              "from": "amt",
+              "label": "Yes"
+            },
+            {
+              "to": "sched",
+              "from": "amt",
+              "label": "No"
+            },
+            {
+              "to": "sched",
+              "from": "fc",
+              "label": null
+            },
+            {
+              "to": "paid",
+              "from": "sched",
+              "label": null
+            },
+            {
+              "to": "file",
+              "from": "paid",
+              "label": null
+            }
+          ],
+          "nodes": [
+            {
+              "id": "recv",
+              "kind": "start",
+              "label": "Invoice received & logged (same day)",
+              "source": {
+                "page": null,
+                "excerpt": "Every invoice follows the same steps in the same order. ## The approval process, step by step 1. **Invoice received.** The accounts payable inbox receives the supplier invoice and logs it in the payables register on the same working day. 2.",
+                "document": "292-invoice-approval-policy.md"
+              }
+            },
+            {
+              "id": "match",
+              "kind": "step",
+              "label": "Three-way match: invoice, PO, goods receipt",
+              "source": {
+                "page": null,
+                "excerpt": "2. **Three-way match check.** Accounts payable checks that the invoice matches the purchase order and the goods receipt note: same supplier, same quantities, same unit prices. 3. **Decision: does the invoice match the purchase order?** If it matches, the invoice goes to the",
+                "document": "292-invoice-approval-policy.md"
+              }
+            },
+            {
+              "id": "dec",
+              "kind": "decision",
+              "label": "Does the invoice match the PO?",
+              "source": {
+                "page": null,
+                "excerpt": "3. **Decision: does the invoice match the purchase order?** If it matches, the invoice goes to the budget holder for approval. If it does not match, the invoice is rejected and returned to the supplier. 4.",
+                "document": "292-invoice-approval-policy.md"
+              }
+            },
+            {
+              "id": "rej",
+              "kind": "step",
+              "label": "Rejected: returned to supplier with reason",
+              "source": {
+                "page": null,
+                "excerpt": "3. **Decision: does the invoice match the purchase order?** If it matches, the invoice goes to the budget holder for approval. If it does not match, the invoice is rejected and returned to the supplier. 4.",
+                "document": "292-invoice-approval-policy.md"
+              }
+            },
+            {
+              "id": "bh",
+              "kind": "step",
+              "label": "Budget holder approves (5 working days)",
+              "source": {
+                "page": null,
+                "excerpt": "5. **Budget holder approval.** The budget holder for the cost centre approves the invoice within five working days. 6. **Finance controller sign-off.** Any invoice above 10,000 euros also needs the finance controller's sign-off after the budget holder has approved it. 7.",
+                "document": "292-invoice-approval-policy.md"
+              }
+            },
+            {
+              "id": "amt",
+              "kind": "decision",
+              "label": "Invoice above \u20ac10,000?",
+              "source": {
+                "page": null,
+                "excerpt": "6. **Finance controller sign-off.** Any invoice above 10,000 euros also needs the finance controller's sign-off after the budget holder has approved it. 7. **Payment scheduled.** Accounts payable schedules the approved invoice for the next weekly payment run.",
+                "document": "292-invoice-approval-policy.md"
+              }
+            },
+            {
+              "id": "fc",
+              "kind": "step",
+              "label": "Finance controller sign-off",
+              "source": {
+                "page": null,
+                "excerpt": "6. **Finance controller sign-off.** Any invoice above 10,000 euros also needs the finance controller's sign-off after the budget holder has approved it. 7. **Payment scheduled.** Accounts payable schedules the approved invoice for the next weekly payment run.",
+                "document": "292-invoice-approval-policy.md"
+              }
+            },
+            {
+              "id": "sched",
+              "kind": "step",
+              "label": "Scheduled for next weekly payment run",
+              "source": {
+                "page": null,
+                "excerpt": "6. **Finance controller sign-off.** Any invoice above 10,000 euros also needs the finance controller's sign-off after the budget holder has approved it. 7. **Payment scheduled.** Accounts payable schedules the approved invoice for the next weekly payment run.",
+                "document": "292-invoice-approval-policy.md"
+              }
+            },
+            {
+              "id": "paid",
+              "kind": "step",
+              "label": "Paid: treasury releases on Thursday",
+              "source": {
+                "page": null,
+                "excerpt": "8. **Paid.** Treasury releases the payment on the Thursday payment run. 9. **Filed for audit.** The paid invoice, its purchase order and its approvals are filed in the audit archive for seven years.",
+                "document": "292-invoice-approval-policy.md"
+              }
+            },
+            {
+              "id": "file",
+              "kind": "end",
+              "label": "Filed in audit archive for 7 years",
+              "source": {
+                "page": null,
+                "excerpt": "8. **Paid.** Treasury releases the payment on the Thursday payment run. 9. **Filed for audit.** The paid invoice, its purchase order and its approvals are filed in the audit archive for seven years.",
+                "document": "292-invoice-approval-policy.md"
+              }
+            }
+          ]
+        }
+      },
+      "caption": {
+        "lineage": null,
+        "sources": [
+          {
+            "page": null,
+            "tool": "search_documents",
+            "document": null
+          }
+        ],
+        "row_count": 10,
+        "source_count": 1
+      },
+      "thread_id": "937db3b1-00ed-413b-a883-4f39d9a0c784",
+      "at": "2026-10-24 01:27:45.908486+00"
+    }
+  ],
+  "reload_http": 200,
+  "reload_artifacts": [
+    {
+      "id": "a_6zmv3disqf",
+      "thread_id": "937db3b1-00ed-413b-a883-4f39d9a0c784",
+      "user_id": "d8a54002-6a29-4b88-b918-cff2aa4a06d5",
+      "org_id": "22f9c615-0eec-440a-8804-ed4784d6f57f",
+      "run_id": "cc178bcb-0a8f-4783-8cf2-64c8124f7513",
+      "tool_call_id": "toolu_014bY4fQWPHiWsUabVBDrsf2",
+      "parent_id": null,
+      "label": "diagram 1",
+      "component": "diagram",
+      "spec": {
+        "title": "Supplier invoice approval process",
+        "diagram": {
+          "edges": [
+            {
+              "to": "match",
+              "from": "recv",
+              "label": null
+            },
+            {
+              "to": "dec",
+              "from": "match",
+              "label": null
+            },
+            {
+              "to": "bh",
+              "from": "dec",
+              "label": "Yes"
+            },
+            {
+              "to": "rej",
+              "from": "dec",
+              "label": "No"
+            },
+            {
+              "to": "match",
+              "from": "rej",
+              "label": "Corrected & resubmitted"
+            },
+            {
+              "to": "amt",
+              "from": "bh",
+              "label": null
+            },
+            {
+              "to": "fc",
+              "from": "amt",
+              "label": "Yes"
+            },
+            {
+              "to": "sched",
+              "from": "amt",
+              "label": "No"
+            },
+            {
+              "to": "sched",
+              "from": "fc",
+              "label": null
+            },
+            {
+              "to": "paid",
+              "from": "sched",
+              "label": null
+            },
+            {
+              "to": "file",
+              "from": "paid",
+              "label": null
+            }
+          ],
+          "nodes": [
+            {
+              "id": "recv",
+              "kind": "start",
+              "label": "Invoice received & logged (same day)",
+              "source": {
+                "page": null,
+                "excerpt": "Every invoice follows the same steps in the same order. ## The approval process, step by step 1. **Invoice received.** The accounts payable inbox receives the supplier invoice and logs it in the payables register on the same working day. 2.",
+                "document": "292-invoice-approval-policy.md"
+              }
+            },
+            {
+              "id": "match",
+              "kind": "step",
+              "label": "Three-way match: invoice, PO, goods receipt",
+              "source": {
+                "page": null,
+                "excerpt": "2. **Three-way match check.** Accounts payable checks that the invoice matches the purchase order and the goods receipt note: same supplier, same quantities, same unit prices. 3. **Decision: does the invoice match the purchase order?** If it matches, the invoice goes to the",
+                "document": "292-invoice-approval-policy.md"
+              }
+            },
+            {
+              "id": "dec",
+              "kind": "decision",
+              "label": "Does the invoice match the PO?",
+              "source": {
+                "page": null,
+                "excerpt": "3. **Decision: does the invoice match the purchase order?** If it matches, the invoice goes to the budget holder for approval. If it does not match, the invoice is rejected and returned to the supplier. 4.",
+                "document": "292-invoice-approval-policy.md"
+              }
+            },
+            {
+              "id": "rej",
+              "kind": "step",
+              "label": "Rejected: returned to supplier with reason",
+              "source": {
+                "page": null,
+                "excerpt": "3. **Decision: does the invoice match the purchase order?** If it matches, the invoice goes to the budget holder for approval. If it does not match, the invoice is rejected and returned to the supplier. 4.",
+                "document": "292-invoice-approval-policy.md"
+              }
+            },
+            {
+              "id": "bh",
+              "kind": "step",
+              "label": "Budget holder approves (5 working days)",
+              "source": {
+                "page": null,
+                "excerpt": "5. **Budget holder approval.** The budget holder for the cost centre approves the invoice within five working days. 6. **Finance controller sign-off.** Any invoice above 10,000 euros also needs the finance controller's sign-off after the budget holder has approved it. 7.",
+                "document": "292-invoice-approval-policy.md"
+              }
+            },
+            {
+              "id": "amt",
+              "kind": "decision",
+              "label": "Invoice above \u20ac10,000?",
+              "source": {
+                "page": null,
+                "excerpt": "6. **Finance controller sign-off.** Any invoice above 10,000 euros also needs the finance controller's sign-off after the budget holder has approved it. 7. **Payment scheduled.** Accounts payable schedules the approved invoice for the next weekly payment run.",
+                "document": "292-invoice-approval-policy.md"
+              }
+            },
+            {
+              "id": "fc",
+              "kind": "step",
+              "label": "Finance controller sign-off",
+              "source": {
+                "page": null,
+                "excerpt": "6. **Finance controller sign-off.** Any invoice above 10,000 euros also needs the finance controller's sign-off after the budget holder has approved it. 7. **Payment scheduled.** Accounts payable schedules the approved invoice for the next weekly payment run.",
+                "document": "292-invoice-approval-policy.md"
+              }
+            },
+            {
+              "id": "sched",
+              "kind": "step",
+              "label": "Scheduled for next weekly payment run",
+              "source": {
+                "page": null,
+                "excerpt": "6. **Finance controller sign-off.** Any invoice above 10,000 euros also needs the finance controller's sign-off after the budget holder has approved it. 7. **Payment scheduled.** Accounts payable schedules the approved invoice for the next weekly payment run.",
+                "document": "292-invoice-approval-policy.md"
+              }
+            },
+            {
+              "id": "paid",
+              "kind": "step",
+              "label": "Paid: treasury releases on Thursday",
+              "source": {
+                "page": null,
+                "excerpt": "8. **Paid.** Treasury releases the payment on the Thursday payment run. 9. **Filed for audit.** The paid invoice, its purchase order and its approvals are filed in the audit archive for seven years.",
+                "document": "292-invoice-approval-policy.md"
+              }
+            },
+            {
+              "id": "file",
+              "kind": "end",
+              "label": "Filed in audit archive for 7 years",
+              "source": {
+                "page": null,
+                "excerpt": "8. **Paid.** Treasury releases the payment on the Thursday payment run. 9. **Filed for audit.** The paid invoice, its purchase order and its approvals are filed in the audit archive for seven years.",
+                "document": "292-invoice-approval-policy.md"
+              }
+            }
+          ]
+        }
+      },
+      "caption": {
+        "lineage": null,
+        "sources": [
+          {
+            "page": null,
+            "tool": "search_documents",
+            "document": null
+          }
+        ],
+        "row_count": 10,
+        "source_count": 1
+      },
+      "row_count": 10,
+      "spec_version": 1,
+      "created_at": "2026-10-24T01:27:45.908486+00:00"
+    }
+  ],
+  "reload_by_message": [
+    {
+      "message_id": "9720ae27-9f9a-42c2-beee-ea11717859c4",
+      "artifacts": [
+        {
+          "id": "a_6zmv3disqf",
+          "thread_id": "937db3b1-00ed-413b-a883-4f39d9a0c784",
+          "user_id": "d8a54002-6a29-4b88-b918-cff2aa4a06d5",
+          "org_id": "22f9c615-0eec-440a-8804-ed4784d6f57f",
+          "run_id": "cc178bcb-0a8f-4783-8cf2-64c8124f7513",
+          "tool_call_id": "toolu_014bY4fQWPHiWsUabVBDrsf2",
+          "parent_id": null,
+          "label": "diagram 1",
+          "component": "diagram",
+          "spec": {
+            "title": "Supplier invoice approval process",
+            "diagram": {
+              "edges": [
+                {
+                  "to": "match",
+                  "from": "recv",
+                  "label": null
+                },
+                {
+                  "to": "dec",
+                  "from": "match",
+                  "label": null
+                },
+                {
+                  "to": "bh",
+                  "from": "dec",
+                  "label": "Yes"
+                },
+                {
+                  "to": "rej",
+                  "from": "dec",
+                  "label": "No"
+                },
+                {
+                  "to": "match",
+                  "from": "rej",
+                  "label": "Corrected & resubmitted"
+                },
+                {
+                  "to": "amt",
+                  "from": "bh",
+                  "label": null
+                },
+                {
+                  "to": "fc",
+                  "from": "amt",
+                  "label": "Yes"
+                },
+                {
+                  "to": "sched",
+                  "from": "amt",
+                  "label": "No"
+                },
+                {
+                  "to": "sched",
+                  "from": "fc",
+                  "label": null
+                },
+                {
+                  "to": "paid",
+                  "from": "sched",
+                  "label": null
+                },
+                {
+                  "to": "file",
+                  "from": "paid",
+                  "label": null
+                }
+              ],
+              "nodes": [
+                {
+                  "id": "recv",
+                  "kind": "start",
+                  "label": "Invoice received & logged (same day)",
+                  "source": {
+                    "page": null,
+                    "excerpt": "Every invoice follows the same steps in the same order. ## The approval process, step by step 1. **Invoice received.** The accounts payable inbox receives the supplier invoice and logs it in the payables register on the same working day. 2.",
+                    "document": "292-invoice-approval-policy.md"
+                  }
+                },
+                {
+                  "id": "match",
+                  "kind": "step",
+                  "label": "Three-way match: invoice, PO, goods receipt",
+                  "source": {
+                    "page": null,
+                    "excerpt": "2. **Three-way match check.** Accounts payable checks that the invoice matches the purchase order and the goods receipt note: same supplier, same quantities, same unit prices. 3. **Decision: does the invoice match the purchase order?** If it matches, the invoice goes to the",
+                    "document": "292-invoice-approval-policy.md"
+                  }
+                },
+                {
+                  "id": "dec",
+                  "kind": "decision",
+                  "label": "Does the invoice match the PO?",
+                  "source": {
+                    "page": null,
+                    "excerpt": "3. **Decision: does the invoice match the purchase order?** If it matches, the invoice goes to the budget holder for approval. If it does not match, the invoice is rejected and returned to the supplier. 4.",
+                    "document": "292-invoice-approval-policy.md"
+                  }
+                },
+                {
+                  "id": "rej",
+                  "kind": "step",
+                  "label": "Rejected: returned to supplier with reason",
+                  "source": {
+                    "page": null,
+                    "excerpt": "3. **Decision: does the invoice match the purchase order?** If it matches, the invoice goes to the budget holder for approval. If it does not match, the invoice is rejected and returned to the supplier. 4.",
+                    "document": "292-invoice-approval-policy.md"
+                  }
+                },
+                {
+                  "id": "bh",
+                  "kind": "step",
+                  "label": "Budget holder approves (5 working days)",
+                  "source": {
+                    "page": null,
+                    "excerpt": "5. **Budget holder approval.** The budget holder for the cost centre approves the invoice within five working days. 6. **Finance controller sign-off.** Any invoice above 10,000 euros also needs the finance controller's sign-off after the budget holder has approved it. 7.",
+                    "document": "292-invoice-approval-policy.md"
+                  }
+                },
+                {
+                  "id": "amt",
+                  "kind": "decision",
+                  "label": "Invoice above \u20ac10,000?",
+                  "source": {
+                    "page": null,
+                    "excerpt": "6. **Finance controller sign-off.** Any invoice above 10,000 euros also needs the finance controller's sign-off after the budget holder has approved it. 7. **Payment scheduled.** Accounts payable schedules the approved invoice for the next weekly payment run.",
+                    "document": "292-invoice-approval-policy.md"
+                  }
+                },
+                {
+                  "id": "fc",
+                  "kind": "step",
+                  "label": "Finance controller sign-off",
+                  "source": {
+                    "page": null,
+                    "excerpt": "6. **Finance controller sign-off.** Any invoice above 10,000 euros also needs the finance controller's sign-off after the budget holder has approved it. 7. **Payment scheduled.** Accounts payable schedules the approved invoice for the next weekly payment run.",
+                    "document": "292-invoice-approval-policy.md"
+                  }
+                },
+                {
+                  "id": "sched",
+                  "kind": "step",
+                  "label": "Scheduled for next weekly payment run",
+                  "source": {
+                    "page": null,
+                    "excerpt": "6. **Finance controller sign-off.** Any invoice above 10,000 euros also needs the finance controller's sign-off after the budget holder has approved it. 7. **Payment scheduled.** Accounts payable schedules the approved invoice for the next weekly payment run.",
+                    "document": "292-invoice-approval-policy.md"
+                  }
+                },
+                {
+                  "id": "paid",
+                  "kind": "step",
+                  "label": "Paid: treasury releases on Thursday",
+                  "source": {
+                    "page": null,
+                    "excerpt": "8. **Paid.** Treasury releases the payment on the Thursday payment run. 9. **Filed for audit.** The paid invoice, its purchase order and its approvals are filed in the audit archive for seven years.",
+                    "document": "292-invoice-approval-policy.md"
+                  }
+                },
+                {
+                  "id": "file",
+                  "kind": "end",
+                  "label": "Filed in audit archive for 7 years",
+                  "source": {
+                    "page": null,
+                    "excerpt": "8. **Paid.** Treasury releases the payment on the Thursday payment run. 9. **Filed for audit.** The paid invoice, its purchase order and its approvals are filed in the audit archive for seven years.",
+                    "document": "292-invoice-approval-policy.md"
+                  }
+                }
+              ]
+            }
+          },
+          "caption": {
+            "lineage": null,
+            "sources": [
+              {
+                "page": null,
+                "tool": "search_documents",
+                "document": null
+              }
+            ],
+            "row_count": 10,
+            "source_count": 1
+          },
+          "row_count": 10,
+          "spec_version": 1,
+          "created_at": "2026-10-24T01:27:45.908486+00:00"
+        }
+      ]
+    }
+  ],
+  "expected_observables": [
+    {
+      "artifact": "a_6zmv3disqf",
+      "label": "diagram 1",
+      "caption_count_segment": "\u00b7 10 steps \u00b7 11 links",
+      "node_labels": [
+        "Invoice received & logged (same day)",
+        "Three-way match: invoice, PO, goods receipt",
+        "Does the invoice match the PO?",
+        "Rejected: returned to supplier with reason",
+        "Budget holder approves (5 working days)",
+        "Invoice above \u20ac10,000?",
+        "Finance controller sign-off",
+        "Scheduled for next weekly payment run",
+        "Paid: treasury releases on Thursday",
+        "Filed in audit archive for 7 years"
+      ],
+      "label_word_coverage_in_kb_document": {
+        "Invoice received & logged (same day)": 0.8,
+        "Three-way match: invoice, PO, goods receipt": 1.0,
+        "Does the invoice match the PO?": 1.0,
+        "Rejected: returned to supplier with reason": 1.0,
+        "Budget holder approves (5 working days)": 1.0,
+        "Invoice above \u20ac10,000?": 1.0,
+        "Finance controller sign-off": 1.0,
+        "Scheduled for next weekly payment run": 1.0,
+        "Paid: treasury releases on Thursday": 1.0,
+        "Filed in audit archive for 7 years": 1.0
+      },
+      "degree_per_node": {
+        "Invoice received & logged (same day)": 1,
+        "Three-way match: invoice, PO, goods receipt": 3,
+        "Does the invoice match the PO?": 3,
+        "Rejected: returned to supplier with reason": 2,
+        "Budget holder approves (5 working days)": 2,
+        "Invoice above \u20ac10,000?": 3,
+        "Finance controller sign-off": 2,
+        "Scheduled for next weekly payment run": 3,
+        "Paid: treasury releases on Thursday": 2,
+        "Filed in audit archive for 7 years": 1
+      },
+      "back_edges_dfs_excluding_self_loops": [
+        "rej->match"
+      ],
+      "self_loops": [],
+      "sourced_nodes": [
+        {
+          "node": "recv",
+          "document": "292-invoice-approval-policy.md",
+          "excerpt_in_retrieved_text": false,
+          "excerpt_in_kb_document": true
+        },
+        {
+          "node": "match",
+          "document": "292-invoice-approval-policy.md",
+          "excerpt_in_retrieved_text": false,
+          "excerpt_in_kb_document": true
+        },
+        {
+          "node": "dec",
+          "document": "292-invoice-approval-policy.md",
+          "excerpt_in_retrieved_text": false,
+          "excerpt_in_kb_document": true
+        },
+        {
+          "node": "rej",
+          "document": "292-invoice-approval-policy.md",
+          "excerpt_in_retrieved_text": false,
+          "excerpt_in_kb_document": true
+        },
+        {
+          "node": "bh",
+          "document": "292-invoice-approval-policy.md",
+          "excerpt_in_retrieved_text": false,
+          "excerpt_in_kb_document": true
+        },
+        {
+          "node": "amt",
+          "document": "292-invoice-approval-policy.md",
+          "excerpt_in_retrieved_text": false,
+          "excerpt_in_kb_document": true
+        },
+        {
+          "node": "fc",
+          "document": "292-invoice-approval-policy.md",
+          "excerpt_in_retrieved_text": false,
+          "excerpt_in_kb_document": true
+        },
+        {
+          "node": "sched",
+          "document": "292-invoice-approval-policy.md",
+          "excerpt_in_retrieved_text": false,
+          "excerpt_in_kb_document": true
+        },
+        {
+          "node": "paid",
+          "document": "292-invoice-approval-policy.md",
+          "excerpt_in_retrieved_text": false,
+          "excerpt_in_kb_document": true
+        },
+        {
+          "node": "file",
+          "document": "292-invoice-approval-policy.md",
+          "excerpt_in_retrieved_text": false,
+          "excerpt_in_kb_document": true
+        }
+      ]
+    }
+  ],
+  "scenario": "G4-1-diagram"
+}

@@ -1490,3 +1490,5 @@ This document evolves at phase transitions and milestone boundaries.
 *Last updated: 2026-10-18 — **milestone v4.6 Pay It Down CLOSED** (tag `v4.6`, 24/24, deployed `4e767a3a2`). Previously: 2026-10-15 — Phase 281 closed.*
 
 *Last updated: 2026-10-18 — **milestone v4.7 Workflows You Can See and Start Anywhere STARTED** (phases from 286, migrations from 210).*
+
+*Last updated: 2026-10-24 — **Phase 292 More Ways to Show It complete** (VIS-02 validated: diagram / comparison / timeline from a closed registry of six; tool count 30; migration 213 applied to cloud, code not yet deployed).*

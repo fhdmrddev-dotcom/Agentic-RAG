@@ -129,7 +129,7 @@ async def insert_artifact(
     ``spec`` / ``caption`` are passed as dicts — the pool's jsonb codec encodes them.
     """
     if component not in ARTIFACT_COMPONENTS:
-        raise ValueError("component must be one of chart, table, metric")
+        raise ValueError("component must be one of " + ", ".join(ARTIFACT_COMPONENTS))
     t_id = _uuid(thread_id)
     u_id = _uuid(user_id)
     o_id = _uuid(org_id)

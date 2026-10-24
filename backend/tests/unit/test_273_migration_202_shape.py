@@ -107,7 +107,11 @@ def test_table_and_rls():
 def test_component_check_equals_the_models_literal():
     m = re.search(r"component text NOT NULL CHECK \(component IN \(([^)]*)\)\)", _norm(_code()))
     assert m, "component CHECK missing"
-    assert set(re.findall(r"'([^']*)'", m.group(1))) == set(ARTIFACT_COMPONENTS)
+    # Phase 292: 202 is history — it created the CHECK with the first three names, frozen here. The
+    # live-equality assertion (the CHECK == ARTIFACT_COMPONENTS) moved to test_292_migration_213_shape.py,
+    # because migration 213 is what widens it to six.
+    assert set(re.findall(r"'([^']*)'", m.group(1))) == {"chart", "table", "metric"}
+    assert {"chart", "table", "metric"} <= set(ARTIFACT_COMPONENTS)
 
 
 def test_row_count_and_byte_caps_equal_the_model_constants():

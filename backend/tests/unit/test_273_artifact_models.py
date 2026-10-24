@@ -117,7 +117,8 @@ def _ok(raw):
 
 
 def test_components_and_kinds_are_derived_and_exact():
-    assert ARTIFACT_COMPONENTS == ("chart", "table", "metric")
+    # Phase 292 (D-01): the closed set widened to six, deliberately (I-1).
+    assert ARTIFACT_COMPONENTS == ("chart", "table", "metric", "diagram", "comparison", "timeline")
     assert CHART_KINDS == ("line", "bar", "area", "scatter")
     assert MAX_ROWS == 500
     assert MAX_SERIES == {"line": 4, "bar": 4, "area": 4, "scatter": 3}
@@ -134,10 +135,10 @@ def test_three_components_validate():
 
 def test_unknown_component_is_refused_with_the_catalogue_reason():
     r = _refused(_chart(component="pie_chart"))
-    assert r.reason == "something other than a chart, table or metric"
+    assert r.reason == "something other than a chart, table, metric, diagram, comparison or timeline"  # 292 widened
     assert "pie_chart" not in r.reason
     r2 = _refused({k: v for k, v in _chart().items() if k != "component"})
-    assert r2.reason == "something other than a chart, table or metric"
+    assert r2.reason == "something other than a chart, table, metric, diagram, comparison or timeline"
 
 
 def test_pie_is_named_because_it_is_in_the_alias_table():

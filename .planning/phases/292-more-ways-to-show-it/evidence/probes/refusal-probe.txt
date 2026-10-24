@@ -1,0 +1,10 @@
+dev user d8a54002-6a29-4b88-b918-cff2aa4a06d5 · single org 22f9c615-0eec-440a-8804-ed4784d6f57f (asserted from org_members)
+PROBE stored table: table 1 in thread 563886b2-d2e1-41ae-bb8c-a96c20658f12
+PROBE mindmap: keys=['detail', 'reason', 'status'] keys_exact=True
+PROBE mindmap: payload={"status": "refused", "reason": "\"mindmap\" is not an artifact type", "detail": "`component` must be one of chart, table, metric, diagram, comparison, timeline. Use a table for anything else."}
+PROBE flowchart: keys=['detail', 'reason', 'status'] keys_exact=True
+PROBE flowchart: payload={"status": "refused", "reason": "something other than a chart, table, metric, diagram, comparison or timeline", "detail": "`component` must be one of chart, table, metric, diagram, comparison, timeline. Use a table for anything else."}
+PROBE diagram from a stored table: keys=['detail', 'reason', 'status'] keys_exact=True
+PROBE diagram from a stored table: payload={"status": "refused", "reason": "a table can't be turned into a diagram; send the data again", "detail": "table 1 is a table; a diagram is never built from another artifact by reference. Call show_artifact again with the full `diagram` data and no from_artifact."}
+PROBE emitted events on refusal paths: 0 (must be 0)
+PROBE message_artifacts rows before=22 after=22 (no DB write on refusal: True)

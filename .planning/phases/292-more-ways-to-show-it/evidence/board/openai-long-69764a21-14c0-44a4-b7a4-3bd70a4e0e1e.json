@@ -1,0 +1,1487 @@
+{
+  "provider": "openai",
+  "model": "gpt-5.6-luna",
+  "thread_id": "1fd310c2-5cc0-4124-bf0a-66373482333e",
+  "prompt_bytes": 5195,
+  "prompt": "Here are three of our documents, inlined in full.\n\n----- 292-invoice-approval-policy.md -----\n# Invoice Approval Policy (fixture, generated for Phase 292 UAT)\n\nDocument owner: Finance Operations. Applies to every supplier invoice received by the company.\nThis is a generated test document; it contains no real supplier, person or amount.\n\n## Purpose\n\nThis policy describes how a supplier invoice moves from receipt to payment, who approves it, and\nwhat happens when an invoice is wrong. Every invoice follows the same steps in the same order.\n\n## The approval process, step by step\n\n1. **Invoice rece\u2026",
+  "calling_mode_predicted": "NATIVE",
+  "score": {
+    "per_type": {
+      "diagram": {
+        "v1": "PASS",
+        "v2_backend": "PASS",
+        "artifact_ids": [
+          "a_3p239nmdy2"
+        ],
+        "labels": [
+          "diagram 1"
+        ],
+        "sourced_elements": [
+          "0/9"
+        ]
+      },
+      "comparison": {
+        "v1": "PASS",
+        "v2_backend": "PASS",
+        "artifact_ids": [
+          "a_mf3t5nndba"
+        ],
+        "labels": [
+          "comparison 1"
+        ],
+        "sourced_elements": [
+          "0/10"
+        ]
+      },
+      "timeline": {
+        "v1": "PASS",
+        "v2_backend": "PASS",
+        "artifact_ids": [
+          "a_4ewfbskoo9"
+        ],
+        "labels": [
+          "timeline 1"
+        ],
+        "sourced_elements": [
+          "0/8"
+        ]
+      }
+    },
+    "tool_call_names": [
+      "write_todos",
+      "show_artifact",
+      "show_artifact",
+      "show_artifact",
+      "write_todos",
+      "show_artifact",
+      "write_todos",
+      "show_artifact",
+      "write_todos"
+    ],
+    "search_documents_calls": 0,
+    "show_artifact_calls": 5,
+    "refusals": [
+      {
+        "component": "diagram",
+        "reason": "its settings weren't valid",
+        "detail": "`nodes` is not a show_artifact field. Use only the documented fields."
+      },
+      {
+        "component": "diagram",
+        "reason": "a step name is over 48 characters",
+        "detail": "`diagram.nodes[].label` must be at most 48 characters (an emoji counts as 2)."
+      }
+    ],
+    "artifact_rows": 3,
+    "reload_records": 3,
+    "reload_missing": 0,
+    "other_components": []
+  },
+  "turn_data": {
+    "run_id": "69764a21-14c0-44a4-b7a4-3bd70a4e0e1e",
+    "run_status": "completed",
+    "run": {
+      "status": "completed",
+      "model": "gpt-5.6-luna",
+      "provider": "openai",
+      "error": null,
+      "started_at": "2026-10-24 01:46:59.462378+00:00",
+      "completed_at": "2026-10-24 01:47:41.437681+00:00"
+    },
+    "assistant_messages": [
+      {
+        "id": "b549db98-3ace-4be0-a366-11734e02f326",
+        "content": "### Invoice approval flow\nThe flow diagram shows the required sequence from receipt and three-way matching through approval, payment, and seven-year audit filing. It also shows the rejection-and-resubmission loop and the additional finance-controller sign-off required for invoices above \u20ac10,000.\n\nSource: **292-invoice-approval-policy.md**\n\n### Atlas vs Borealis contracts\nThe comparison shows that:\n\n- **Termination for convenience:** Atlas requires 90 days\u2019 notice; Borealis requires 30 days.\n- **Termination rights:** Atlas includes termination for an uncured material breach after 30 days\u2019 notice. Borealis gives the Company an immediate termination right upon Borealis\u2019s insolvency.\n- **Liability:** Atlas uses a mutual cap based on fees paid in the previous 12 months. Borealis has a \u20ac250,000 annual cap for Borealis and caps the Company\u2019s liability at fees payable in the same year.\n- **Carve-outs:** Atlas excludes death, personal injury, fraud, and confidentiality breaches from the cap. Borealis excludes fraud only.\n- **Renewal:** Atlas automatically renews for one-year terms unless 90 days\u2019 non-renewal notice is given. No renewal provision is stated for Borealis.\n\nSources: **292-atlas-msa.md** and **292-borealis-msa.md**\n\n### Atlas contract timeline\nThe timeline covers the Atlas agreement from signing in March 2023 through the April 2026 price uplift, followed by the two key upcoming dates:\n\n- **15 December 2026:** Renewal notice deadline\n- **15 March 2027:** Current term ends; renewal occurs unless notice was given\n\nSource: **292-atlas-msa.md**",
+        "tool_calls": [
+          {
+            "args": {
+              "todos": [
+                {
+                  "id": "t1",
+                  "status": "in_progress",
+                  "content": "Create the invoice approval flow diagram from the provided policy.",
+                  "parent_id": null,
+                  "order_index": 0
+                },
+                {
+                  "id": "t2",
+                  "status": "pending",
+                  "content": "Compare Atlas and Borealis contracts on termination, liability, and renewal.",
+                  "parent_id": null,
+                  "order_index": 1
+                },
+                {
+                  "id": "t3",
+                  "status": "pending",
+                  "content": "Create the Atlas contract history and upcoming deadlines timeline.",
+                  "parent_id": null,
+                  "order_index": 2
+                }
+              ]
+            },
+            "name": "write_todos",
+            "result": "{\"accepted\": 3, \"version\": 1792806424140}",
+            "status": "done",
+            "tool_call_id": "call_JcXTm1sIhC1X8qcugPODtEKu"
+          },
+          {
+            "args": {
+              "edges": [
+                {
+                  "to": "match",
+                  "from": "received"
+                },
+                {
+                  "to": "decision",
+                  "from": "match"
+                },
+                {
+                  "to": "budget",
+                  "from": "decision",
+                  "label": "Yes / matches"
+                },
+                {
+                  "to": "reject",
+                  "from": "decision",
+                  "label": "No / does not match"
+                },
+                {
+                  "to": "match",
+                  "from": "reject",
+                  "label": "Corrected invoice resubmitted"
+                },
+                {
+                  "to": "controller",
+                  "from": "budget"
+                },
+                {
+                  "to": "schedule",
+                  "from": "controller",
+                  "label": "\u2264 \u20ac10,000 or sign-off complete"
+                },
+                {
+                  "to": "schedule",
+                  "from": "controller",
+                  "label": "> \u20ac10,000 and approved"
+                },
+                {
+                  "to": "treasury",
+                  "from": "schedule"
+                },
+                {
+                  "to": "archive",
+                  "from": "treasury"
+                }
+              ],
+              "nodes": [
+                {
+                  "id": "received",
+                  "kind": "start",
+                  "label": "Invoice received and logged same working day"
+                },
+                {
+                  "id": "match",
+                  "kind": "step",
+                  "label": "Three-way match: invoice, PO, and goods receipt note"
+                },
+                {
+                  "id": "decision",
+                  "kind": "decision",
+                  "label": "Does the invoice match the purchase order?"
+                },
+                {
+                  "id": "reject",
+                  "kind": "step",
+                  "label": "Reject and return to supplier; supplier corrects and resubmits"
+                },
+                {
+                  "id": "budget",
+                  "kind": "step",
+                  "label": "Budget holder approval within 5 working days"
+                },
+                {
+                  "id": "controller",
+                  "kind": "decision",
+                  "label": "Finance controller sign-off if invoice exceeds \u20ac10,000"
+                },
+                {
+                  "id": "schedule",
+                  "kind": "step",
+                  "label": "Accounts payable schedules next weekly payment run"
+                },
+                {
+                  "id": "treasury",
+                  "kind": "end",
+                  "label": "Treasury releases payment on Thursday"
+                },
+                {
+                  "id": "archive",
+                  "kind": "end",
+                  "label": "File paid invoice, PO, and approvals for 7 years"
+                }
+              ],
+              "title": "Invoice approval process",
+              "component": "diagram"
+            },
+            "name": "show_artifact",
+            "result": "{\"status\": \"refused\", \"reason\": \"its settings weren't valid\", \"detail\": \"`nodes` is not a show_artifact field. Use only the documented fields.\"}",
+            "status": "done",
+            "tool_call_id": "call_YZMWNKiaffVHifCrpXxJ8vj1"
+          },
+          {
+            "args": {
+              "rows": null,
+              "title": "Invoice approval process",
+              "columns": null,
+              "diagram": "<not stored: refused, diagram of 9 steps>",
+              "component": "diagram"
+            },
+            "name": "show_artifact",
+            "result": "{\"status\": \"refused\", \"reason\": \"a step name is over 48 characters\", \"detail\": \"`diagram.nodes[].label` must be at most 48 characters (an emoji counts as 2).\"}",
+            "status": "done",
+            "tool_call_id": "call_F85ZaKqaJaUN0Wsudof0UnxP"
+          },
+          {
+            "args": {
+              "rows": null,
+              "title": "Invoice approval process",
+              "columns": null,
+              "diagram": "<stored in artifact a_3p239nmdy2, diagram of 9 steps>",
+              "component": "diagram"
+            },
+            "name": "show_artifact",
+            "result": "{\"artifact_id\": \"a_3p239nmdy2\", \"label\": \"diagram 1\", \"component\": \"diagram\", \"row_count\": 9, \"edge_count\": 9, \"note\": \"Shown to the user below your answer as diagram 1. Now write one or two sentences about what it shows; do not repeat it as a table. To change it, call show_artifact again with the full data.\"}",
+            "status": "done",
+            "tool_call_id": "call_tYvbO5fNJ5ynqGc5oeDvK96Q"
+          },
+          {
+            "args": {
+              "todos": [
+                {
+                  "id": "t1",
+                  "status": "completed",
+                  "content": "Create the invoice approval flow diagram from the provided policy.",
+                  "parent_id": null,
+                  "order_index": 0
+                },
+                {
+                  "id": "t2",
+                  "status": "in_progress",
+                  "content": "Compare Atlas and Borealis contracts on termination, liability, and renewal.",
+                  "parent_id": null,
+                  "order_index": 1
+                },
+                {
+                  "id": "t3",
+                  "status": "pending",
+                  "content": "Create the Atlas contract history and upcoming deadlines timeline.",
+                  "parent_id": null,
+                  "order_index": 2
+                }
+              ]
+            },
+            "name": "write_todos",
+            "result": "{\"accepted\": 3, \"version\": 1792806441988}",
+            "status": "done",
+            "tool_call_id": "call_hP8giGm0iEEDHlhOFC3dl0PY"
+          },
+          {
+            "args": {
+              "rows": null,
+              "title": "Atlas vs Borealis contract comparison",
+              "columns": null,
+              "component": "comparison",
+              "comparison": "<stored in artifact a_mf3t5nndba, comparison of 5 terms>"
+            },
+            "name": "show_artifact",
+            "result": "{\"artifact_id\": \"a_mf3t5nndba\", \"label\": \"comparison 1\", \"component\": \"comparison\", \"row_count\": 5, \"option_count\": 2, \"note\": \"Shown to the user below your answer as comparison 1. Now write one or two sentences about what it shows; do not repeat it as a table. To change it, call show_artifact again with the full data.\"}",
+            "status": "done",
+            "tool_call_id": "call_ttGXjDIabwxHa03WaclQs6Y5"
+          },
+          {
+            "args": {
+              "todos": [
+                {
+                  "id": "t1",
+                  "status": "completed",
+                  "content": "Create the invoice approval flow diagram from the provided policy.",
+                  "parent_id": null,
+                  "order_index": 0
+                },
+                {
+                  "id": "t2",
+                  "status": "completed",
+                  "content": "Compare Atlas and Borealis contracts on termination, liability, and renewal.",
+                  "parent_id": null,
+                  "order_index": 1
+                },
+                {
+                  "id": "t3",
+                  "status": "in_progress",
+                  "content": "Create the Atlas contract history and upcoming deadlines timeline.",
+                  "parent_id": null,
+                  "order_index": 2
+                }
+              ]
+            },
+            "name": "write_todos",
+            "result": "{\"accepted\": 3, \"version\": 1792806448949}",
+            "status": "done",
+            "tool_call_id": "call_fZmJPj5aAZiq4UnewPvCcCbb"
+          },
+          {
+            "args": {
+              "rows": null,
+              "title": "Atlas contract history and upcoming deadlines",
+              "columns": null,
+              "timeline": "<stored in artifact a_4ewfbskoo9, timeline of 8 events>",
+              "component": "timeline"
+            },
+            "name": "show_artifact",
+            "result": "{\"artifact_id\": \"a_4ewfbskoo9\", \"label\": \"timeline 1\", \"component\": \"timeline\", \"row_count\": 8, \"note\": \"Shown to the user below your answer as timeline 1. Now write one or two sentences about what it shows; do not repeat it as a table. To change it, call show_artifact again with the full data.\"}",
+            "status": "done",
+            "tool_call_id": "call_P6BJHPzfgdB7nmL1hZgslvQ8"
+          },
+          {
+            "args": {
+              "todos": [
+                {
+                  "id": "t1",
+                  "status": "completed",
+                  "content": "Create the invoice approval flow diagram from the provided policy.",
+                  "parent_id": null,
+                  "order_index": 0
+                },
+                {
+                  "id": "t2",
+                  "status": "completed",
+                  "content": "Compare Atlas and Borealis contracts on termination, liability, and renewal.",
+                  "parent_id": null,
+                  "order_index": 1
+                },
+                {
+                  "id": "t3",
+                  "status": "completed",
+                  "content": "Create the Atlas contract history and upcoming deadlines timeline.",
+                  "parent_id": null,
+                  "order_index": 2
+                }
+              ]
+            },
+            "name": "write_todos",
+            "result": "{\"accepted\": 3, \"version\": 1792806455109}",
+            "status": "done",
+            "tool_call_id": "call_1sULQ1CCcrzHoI60UTIbe9Tx"
+          }
+        ]
+      }
+    ],
+    "tool_call_names": [
+      "write_todos",
+      "show_artifact",
+      "show_artifact",
+      "show_artifact",
+      "write_todos",
+      "show_artifact",
+      "write_todos",
+      "show_artifact",
+      "write_todos"
+    ],
+    "show_artifact_calls": 5,
+    "refused_calls": 2,
+    "artifact_ids_from_results": [
+      "a_3p239nmdy2",
+      "a_mf3t5nndba",
+      "a_4ewfbskoo9"
+    ],
+    "final_answer_empty": false,
+    "final_answer_is_fallback": false,
+    "persisted_json_fence": false,
+    "redis": {
+      "present": true,
+      "ttl": 600,
+      "event_types": {
+        "iteration_start": 10,
+        "reasoning_delta": 316,
+        "tool_preparing": 9,
+        "tool_args_progress": 26,
+        "tool_start": 9,
+        "todo_updated": 4,
+        "tool_end": 9,
+        "planning": 9,
+        "artifact": 3,
+        "delta": 343,
+        "suggestions": 1,
+        "stream_end": 1,
+        "done": 1
+      },
+      "delta_count": 343,
+      "delta_text": "### Invoice approval flow\nThe flow diagram shows the required sequence from receipt and three-way matching through approval, payment, and seven-year audit filing. It also shows the rejection-and-resubmission loop and the additional finance-controller sign-off required for invoices above \u20ac10,000.\n\nSource: **292-invoice-approval-policy.md**\n\n### Atlas vs Borealis contracts\nThe comparison shows that:\n\n- **Termination for convenience:** Atlas requires 90 days\u2019 notice; Borealis requires 30 days.\n- **Termination rights:** Atlas includes termination for an uncured material breach after 30 days\u2019 notice. Borealis gives the Company an immediate termination right upon Borealis\u2019s insolvency.\n- **Liability:** Atlas uses a mutual cap based on fees paid in the previous 12 months. Borealis has a \u20ac250,000 annual cap for Borealis and caps the Company\u2019s liability at fees payable in the same year.\n- **Carve-outs:** Atlas excludes death, personal injury, fraud, and confidentiality breaches from the cap. Borealis excludes fraud only.\n- **Renewal:** Atlas automatically renews for one-year terms unless 90 days\u2019 non-renewal notice is given. No renewal provision is stated for Borealis.\n\nSources: **292-atlas-msa.md** and **292-borealis-msa.md**\n\n### Atlas contract timeline\nThe timeline covers the Atlas agreement from signing in March 2023 through the April 2026 price uplift, followed by the two key upcoming dates:\n\n- **15 December 2026:** Renewal notice deadline\n- **15 March 2027:** Current term ends; renewal occurs unless notice was given\n\nSource: **292-atlas-msa.md**",
+      "artifact_events": 3
+    }
+  },
+  "message_artifacts": [
+    {
+      "id": "a_3p239nmdy2",
+      "label": "diagram 1",
+      "component": "diagram",
+      "parent_id": null,
+      "run_id": "69764a21-14c0-44a4-b7a4-3bd70a4e0e1e",
+      "tool_call_id": "call_tYvbO5fNJ5ynqGc5oeDvK96Q",
+      "row_count": 9,
+      "spec": {
+        "title": "Invoice approval process",
+        "diagram": {
+          "edges": [
+            {
+              "to": "match",
+              "from": "received",
+              "label": null
+            },
+            {
+              "to": "decision",
+              "from": "match",
+              "label": null
+            },
+            {
+              "to": "budget",
+              "from": "decision",
+              "label": "Yes"
+            },
+            {
+              "to": "reject",
+              "from": "decision",
+              "label": "No"
+            },
+            {
+              "to": "match",
+              "from": "reject",
+              "label": "Resubmitted"
+            },
+            {
+              "to": "controller",
+              "from": "budget",
+              "label": null
+            },
+            {
+              "to": "schedule",
+              "from": "controller",
+              "label": "Approved / threshold met"
+            },
+            {
+              "to": "treasury",
+              "from": "schedule",
+              "label": null
+            },
+            {
+              "to": "archive",
+              "from": "treasury",
+              "label": null
+            }
+          ],
+          "nodes": [
+            {
+              "id": "received",
+              "kind": "start",
+              "label": "Receive and log same working day",
+              "source": null
+            },
+            {
+              "id": "match",
+              "kind": "step",
+              "label": "Three-way match: invoice, PO, GRN",
+              "source": null
+            },
+            {
+              "id": "decision",
+              "kind": "decision",
+              "label": "Invoice matches purchase order?",
+              "source": null
+            },
+            {
+              "id": "reject",
+              "kind": "step",
+              "label": "Reject; supplier corrects and resubmits",
+              "source": null
+            },
+            {
+              "id": "budget",
+              "kind": "step",
+              "label": "Budget holder approves within 5 days",
+              "source": null
+            },
+            {
+              "id": "controller",
+              "kind": "decision",
+              "label": "Controller sign-off if over \u20ac10,000",
+              "source": null
+            },
+            {
+              "id": "schedule",
+              "kind": "step",
+              "label": "Schedule next weekly payment run",
+              "source": null
+            },
+            {
+              "id": "treasury",
+              "kind": "end",
+              "label": "Treasury releases payment Thursday",
+              "source": null
+            },
+            {
+              "id": "archive",
+              "kind": "end",
+              "label": "Archive invoice, PO, approvals for 7 years",
+              "source": null
+            }
+          ]
+        }
+      },
+      "caption": {
+        "lineage": null,
+        "sources": [],
+        "row_count": 9,
+        "source_count": 0
+      },
+      "thread_id": "1fd310c2-5cc0-4124-bf0a-66373482333e",
+      "at": "2026-10-24 01:47:18.107471+00"
+    },
+    {
+      "id": "a_mf3t5nndba",
+      "label": "comparison 1",
+      "component": "comparison",
+      "parent_id": null,
+      "run_id": "69764a21-14c0-44a4-b7a4-3bd70a4e0e1e",
+      "tool_call_id": "call_ttGXjDIabwxHa03WaclQs6Y5",
+      "row_count": 5,
+      "spec": {
+        "title": "Atlas vs Borealis contract comparison",
+        "comparison": {
+          "terms": [
+            {
+              "name": "Termination for convenience",
+              "cells": [
+                {
+                  "text": "Either party: 90 days' written notice.",
+                  "source": null,
+                  "verdict": "y"
+                },
+                {
+                  "text": "Either party: 30 days' written notice.",
+                  "source": null,
+                  "verdict": "y"
+                }
+              ]
+            },
+            {
+              "name": "Termination for breach / insolvency",
+              "cells": [
+                {
+                  "text": "Either party may terminate immediately for material breach not cured within 30 days of notice.",
+                  "source": null,
+                  "verdict": "m"
+                },
+                {
+                  "text": "Company may terminate immediately if Borealis becomes insolvent; no breach-cure provision stated.",
+                  "source": null,
+                  "verdict": "m"
+                }
+              ]
+            },
+            {
+              "name": "Liability cap",
+              "cells": [
+                {
+                  "text": "Each party capped at fees paid in prior 12 months.",
+                  "source": null,
+                  "verdict": "m"
+                },
+                {
+                  "text": "Borealis: \u20ac250,000/year; Company: fees payable in same year.",
+                  "source": null,
+                  "verdict": "m"
+                }
+              ]
+            },
+            {
+              "name": "Liability carve-outs",
+              "cells": [
+                {
+                  "text": "Cap excludes death, personal injury, fraud, and confidentiality breach.",
+                  "source": null,
+                  "verdict": "m"
+                },
+                {
+                  "text": "Cap excludes fraud only.",
+                  "source": null,
+                  "verdict": "m"
+                }
+              ]
+            },
+            {
+              "name": "Renewal",
+              "cells": [
+                {
+                  "text": "Automatic one-year renewal unless 90 days' notice before term end.",
+                  "source": null,
+                  "verdict": "y"
+                },
+                {
+                  "text": "No renewal provision stated.",
+                  "source": null,
+                  "verdict": "q"
+                }
+              ]
+            }
+          ],
+          "options": [
+            "Atlas Logistics MSA",
+            "Borealis Freight MSA"
+          ]
+        }
+      },
+      "caption": {
+        "lineage": null,
+        "sources": [],
+        "row_count": 5,
+        "source_count": 0
+      },
+      "thread_id": "1fd310c2-5cc0-4124-bf0a-66373482333e",
+      "at": "2026-10-24 01:47:26.112789+00"
+    },
+    {
+      "id": "a_4ewfbskoo9",
+      "label": "timeline 1",
+      "component": "timeline",
+      "parent_id": null,
+      "run_id": "69764a21-14c0-44a4-b7a4-3bd70a4e0e1e",
+      "tool_call_id": "call_P6BJHPzfgdB7nmL1hZgslvQ8",
+      "row_count": 8,
+      "spec": {
+        "title": "Atlas contract history and upcoming deadlines",
+        "timeline": {
+          "events": [
+            {
+              "date": "2023-03-14",
+              "title": "MSA signed",
+              "detail": "Three-year master services agreement signed.",
+              "source": null,
+              "category": "History",
+              "deadline": false
+            },
+            {
+              "date": "2023-04-01",
+              "title": "Services start",
+              "detail": "First shipments under the agreement.",
+              "source": null,
+              "category": "History",
+              "deadline": false
+            },
+            {
+              "date": "2024-02-09",
+              "title": "Amendment 1",
+              "detail": "Prices increased 3.5%; fuel surcharge folded into base rate.",
+              "source": null,
+              "category": "History",
+              "deadline": false
+            },
+            {
+              "date": "2024-11",
+              "title": "SLA breach notice",
+              "detail": "Atlas missed three delivery windows in October 2024.",
+              "source": null,
+              "category": "History",
+              "deadline": false
+            },
+            {
+              "date": "2025-01-15",
+              "title": "Service credits applied",
+              "detail": "\u20ac18,400 credits applied to the January invoice.",
+              "source": null,
+              "category": "History",
+              "deadline": false
+            },
+            {
+              "date": "2026-04-01",
+              "title": "Annual price uplift",
+              "detail": "Prices increased 3.1%, within the 4% cap.",
+              "source": null,
+              "category": "History",
+              "deadline": false
+            },
+            {
+              "date": "2026-12-15",
+              "title": "Renewal notice deadline",
+              "detail": "Last day to give notice of non-renewal.",
+              "source": null,
+              "category": "Deadline",
+              "deadline": true
+            },
+            {
+              "date": "2027-03-15",
+              "title": "Current term ends",
+              "detail": "Agreement renews for one year unless notice was given.",
+              "source": null,
+              "category": "Deadline",
+              "deadline": true
+            }
+          ]
+        }
+      },
+      "caption": {
+        "lineage": null,
+        "sources": [],
+        "row_count": 8,
+        "source_count": 0
+      },
+      "thread_id": "1fd310c2-5cc0-4124-bf0a-66373482333e",
+      "at": "2026-10-24 01:47:32.387987+00"
+    }
+  ],
+  "reload_http": 200,
+  "reload_artifacts": [
+    {
+      "id": "a_3p239nmdy2",
+      "thread_id": "1fd310c2-5cc0-4124-bf0a-66373482333e",
+      "user_id": "d8a54002-6a29-4b88-b918-cff2aa4a06d5",
+      "org_id": "22f9c615-0eec-440a-8804-ed4784d6f57f",
+      "run_id": "69764a21-14c0-44a4-b7a4-3bd70a4e0e1e",
+      "tool_call_id": "call_tYvbO5fNJ5ynqGc5oeDvK96Q",
+      "parent_id": null,
+      "label": "diagram 1",
+      "component": "diagram",
+      "spec": {
+        "title": "Invoice approval process",
+        "diagram": {
+          "edges": [
+            {
+              "to": "match",
+              "from": "received",
+              "label": null
+            },
+            {
+              "to": "decision",
+              "from": "match",
+              "label": null
+            },
+            {
+              "to": "budget",
+              "from": "decision",
+              "label": "Yes"
+            },
+            {
+              "to": "reject",
+              "from": "decision",
+              "label": "No"
+            },
+            {
+              "to": "match",
+              "from": "reject",
+              "label": "Resubmitted"
+            },
+            {
+              "to": "controller",
+              "from": "budget",
+              "label": null
+            },
+            {
+              "to": "schedule",
+              "from": "controller",
+              "label": "Approved / threshold met"
+            },
+            {
+              "to": "treasury",
+              "from": "schedule",
+              "label": null
+            },
+            {
+              "to": "archive",
+              "from": "treasury",
+              "label": null
+            }
+          ],
+          "nodes": [
+            {
+              "id": "received",
+              "kind": "start",
+              "label": "Receive and log same working day",
+              "source": null
+            },
+            {
+              "id": "match",
+              "kind": "step",
+              "label": "Three-way match: invoice, PO, GRN",
+              "source": null
+            },
+            {
+              "id": "decision",
+              "kind": "decision",
+              "label": "Invoice matches purchase order?",
+              "source": null
+            },
+            {
+              "id": "reject",
+              "kind": "step",
+              "label": "Reject; supplier corrects and resubmits",
+              "source": null
+            },
+            {
+              "id": "budget",
+              "kind": "step",
+              "label": "Budget holder approves within 5 days",
+              "source": null
+            },
+            {
+              "id": "controller",
+              "kind": "decision",
+              "label": "Controller sign-off if over \u20ac10,000",
+              "source": null
+            },
+            {
+              "id": "schedule",
+              "kind": "step",
+              "label": "Schedule next weekly payment run",
+              "source": null
+            },
+            {
+              "id": "treasury",
+              "kind": "end",
+              "label": "Treasury releases payment Thursday",
+              "source": null
+            },
+            {
+              "id": "archive",
+              "kind": "end",
+              "label": "Archive invoice, PO, approvals for 7 years",
+              "source": null
+            }
+          ]
+        }
+      },
+      "caption": {
+        "lineage": null,
+        "sources": [],
+        "row_count": 9,
+        "source_count": 0
+      },
+      "row_count": 9,
+      "spec_version": 1,
+      "created_at": "2026-10-24T01:47:18.107471+00:00"
+    },
+    {
+      "id": "a_mf3t5nndba",
+      "thread_id": "1fd310c2-5cc0-4124-bf0a-66373482333e",
+      "user_id": "d8a54002-6a29-4b88-b918-cff2aa4a06d5",
+      "org_id": "22f9c615-0eec-440a-8804-ed4784d6f57f",
+      "run_id": "69764a21-14c0-44a4-b7a4-3bd70a4e0e1e",
+      "tool_call_id": "call_ttGXjDIabwxHa03WaclQs6Y5",
+      "parent_id": null,
+      "label": "comparison 1",
+      "component": "comparison",
+      "spec": {
+        "title": "Atlas vs Borealis contract comparison",
+        "comparison": {
+          "terms": [
+            {
+              "name": "Termination for convenience",
+              "cells": [
+                {
+                  "text": "Either party: 90 days' written notice.",
+                  "source": null,
+                  "verdict": "y"
+                },
+                {
+                  "text": "Either party: 30 days' written notice.",
+                  "source": null,
+                  "verdict": "y"
+                }
+              ]
+            },
+            {
+              "name": "Termination for breach / insolvency",
+              "cells": [
+                {
+                  "text": "Either party may terminate immediately for material breach not cured within 30 days of notice.",
+                  "source": null,
+                  "verdict": "m"
+                },
+                {
+                  "text": "Company may terminate immediately if Borealis becomes insolvent; no breach-cure provision stated.",
+                  "source": null,
+                  "verdict": "m"
+                }
+              ]
+            },
+            {
+              "name": "Liability cap",
+              "cells": [
+                {
+                  "text": "Each party capped at fees paid in prior 12 months.",
+                  "source": null,
+                  "verdict": "m"
+                },
+                {
+                  "text": "Borealis: \u20ac250,000/year; Company: fees payable in same year.",
+                  "source": null,
+                  "verdict": "m"
+                }
+              ]
+            },
+            {
+              "name": "Liability carve-outs",
+              "cells": [
+                {
+                  "text": "Cap excludes death, personal injury, fraud, and confidentiality breach.",
+                  "source": null,
+                  "verdict": "m"
+                },
+                {
+                  "text": "Cap excludes fraud only.",
+                  "source": null,
+                  "verdict": "m"
+                }
+              ]
+            },
+            {
+              "name": "Renewal",
+              "cells": [
+                {
+                  "text": "Automatic one-year renewal unless 90 days' notice before term end.",
+                  "source": null,
+                  "verdict": "y"
+                },
+                {
+                  "text": "No renewal provision stated.",
+                  "source": null,
+                  "verdict": "q"
+                }
+              ]
+            }
+          ],
+          "options": [
+            "Atlas Logistics MSA",
+            "Borealis Freight MSA"
+          ]
+        }
+      },
+      "caption": {
+        "lineage": null,
+        "sources": [],
+        "row_count": 5,
+        "source_count": 0
+      },
+      "row_count": 5,
+      "spec_version": 1,
+      "created_at": "2026-10-24T01:47:26.112789+00:00"
+    },
+    {
+      "id": "a_4ewfbskoo9",
+      "thread_id": "1fd310c2-5cc0-4124-bf0a-66373482333e",
+      "user_id": "d8a54002-6a29-4b88-b918-cff2aa4a06d5",
+      "org_id": "22f9c615-0eec-440a-8804-ed4784d6f57f",
+      "run_id": "69764a21-14c0-44a4-b7a4-3bd70a4e0e1e",
+      "tool_call_id": "call_P6BJHPzfgdB7nmL1hZgslvQ8",
+      "parent_id": null,
+      "label": "timeline 1",
+      "component": "timeline",
+      "spec": {
+        "title": "Atlas contract history and upcoming deadlines",
+        "timeline": {
+          "events": [
+            {
+              "date": "2023-03-14",
+              "title": "MSA signed",
+              "detail": "Three-year master services agreement signed.",
+              "source": null,
+              "category": "History",
+              "deadline": false
+            },
+            {
+              "date": "2023-04-01",
+              "title": "Services start",
+              "detail": "First shipments under the agreement.",
+              "source": null,
+              "category": "History",
+              "deadline": false
+            },
+            {
+              "date": "2024-02-09",
+              "title": "Amendment 1",
+              "detail": "Prices increased 3.5%; fuel surcharge folded into base rate.",
+              "source": null,
+              "category": "History",
+              "deadline": false
+            },
+            {
+              "date": "2024-11",
+              "title": "SLA breach notice",
+              "detail": "Atlas missed three delivery windows in October 2024.",
+              "source": null,
+              "category": "History",
+              "deadline": false
+            },
+            {
+              "date": "2025-01-15",
+              "title": "Service credits applied",
+              "detail": "\u20ac18,400 credits applied to the January invoice.",
+              "source": null,
+              "category": "History",
+              "deadline": false
+            },
+            {
+              "date": "2026-04-01",
+              "title": "Annual price uplift",
+              "detail": "Prices increased 3.1%, within the 4% cap.",
+              "source": null,
+              "category": "History",
+              "deadline": false
+            },
+            {
+              "date": "2026-12-15",
+              "title": "Renewal notice deadline",
+              "detail": "Last day to give notice of non-renewal.",
+              "source": null,
+              "category": "Deadline",
+              "deadline": true
+            },
+            {
+              "date": "2027-03-15",
+              "title": "Current term ends",
+              "detail": "Agreement renews for one year unless notice was given.",
+              "source": null,
+              "category": "Deadline",
+              "deadline": true
+            }
+          ]
+        }
+      },
+      "caption": {
+        "lineage": null,
+        "sources": [],
+        "row_count": 8,
+        "source_count": 0
+      },
+      "row_count": 8,
+      "spec_version": 1,
+      "created_at": "2026-10-24T01:47:32.387987+00:00"
+    }
+  ],
+  "reload_by_message": [
+    {
+      "message_id": "b549db98-3ace-4be0-a366-11734e02f326",
+      "artifacts": [
+        {
+          "id": "a_3p239nmdy2",
+          "thread_id": "1fd310c2-5cc0-4124-bf0a-66373482333e",
+          "user_id": "d8a54002-6a29-4b88-b918-cff2aa4a06d5",
+          "org_id": "22f9c615-0eec-440a-8804-ed4784d6f57f",
+          "run_id": "69764a21-14c0-44a4-b7a4-3bd70a4e0e1e",
+          "tool_call_id": "call_tYvbO5fNJ5ynqGc5oeDvK96Q",
+          "parent_id": null,
+          "label": "diagram 1",
+          "component": "diagram",
+          "spec": {
+            "title": "Invoice approval process",
+            "diagram": {
+              "edges": [
+                {
+                  "to": "match",
+                  "from": "received",
+                  "label": null
+                },
+                {
+                  "to": "decision",
+                  "from": "match",
+                  "label": null
+                },
+                {
+                  "to": "budget",
+                  "from": "decision",
+                  "label": "Yes"
+                },
+                {
+                  "to": "reject",
+                  "from": "decision",
+                  "label": "No"
+                },
+                {
+                  "to": "match",
+                  "from": "reject",
+                  "label": "Resubmitted"
+                },
+                {
+                  "to": "controller",
+                  "from": "budget",
+                  "label": null
+                },
+                {
+                  "to": "schedule",
+                  "from": "controller",
+                  "label": "Approved / threshold met"
+                },
+                {
+                  "to": "treasury",
+                  "from": "schedule",
+                  "label": null
+                },
+                {
+                  "to": "archive",
+                  "from": "treasury",
+                  "label": null
+                }
+              ],
+              "nodes": [
+                {
+                  "id": "received",
+                  "kind": "start",
+                  "label": "Receive and log same working day",
+                  "source": null
+                },
+                {
+                  "id": "match",
+                  "kind": "step",
+                  "label": "Three-way match: invoice, PO, GRN",
+                  "source": null
+                },
+                {
+                  "id": "decision",
+                  "kind": "decision",
+                  "label": "Invoice matches purchase order?",
+                  "source": null
+                },
+                {
+                  "id": "reject",
+                  "kind": "step",
+                  "label": "Reject; supplier corrects and resubmits",
+                  "source": null
+                },
+                {
+                  "id": "budget",
+                  "kind": "step",
+                  "label": "Budget holder approves within 5 days",
+                  "source": null
+                },
+                {
+                  "id": "controller",
+                  "kind": "decision",
+                  "label": "Controller sign-off if over \u20ac10,000",
+                  "source": null
+                },
+                {
+                  "id": "schedule",
+                  "kind": "step",
+                  "label": "Schedule next weekly payment run",
+                  "source": null
+                },
+                {
+                  "id": "treasury",
+                  "kind": "end",
+                  "label": "Treasury releases payment Thursday",
+                  "source": null
+                },
+                {
+                  "id": "archive",
+                  "kind": "end",
+                  "label": "Archive invoice, PO, approvals for 7 years",
+                  "source": null
+                }
+              ]
+            }
+          },
+          "caption": {
+            "lineage": null,
+            "sources": [],
+            "row_count": 9,
+            "source_count": 0
+          },
+          "row_count": 9,
+          "spec_version": 1,
+          "created_at": "2026-10-24T01:47:18.107471+00:00"
+        },
+        {
+          "id": "a_mf3t5nndba",
+          "thread_id": "1fd310c2-5cc0-4124-bf0a-66373482333e",
+          "user_id": "d8a54002-6a29-4b88-b918-cff2aa4a06d5",
+          "org_id": "22f9c615-0eec-440a-8804-ed4784d6f57f",
+          "run_id": "69764a21-14c0-44a4-b7a4-3bd70a4e0e1e",
+          "tool_call_id": "call_ttGXjDIabwxHa03WaclQs6Y5",
+          "parent_id": null,
+          "label": "comparison 1",
+          "component": "comparison",
+          "spec": {
+            "title": "Atlas vs Borealis contract comparison",
+            "comparison": {
+              "terms": [
+                {
+                  "name": "Termination for convenience",
+                  "cells": [
+                    {
+                      "text": "Either party: 90 days' written notice.",
+                      "source": null,
+                      "verdict": "y"
+                    },
+                    {
+                      "text": "Either party: 30 days' written notice.",
+                      "source": null,
+                      "verdict": "y"
+                    }
+                  ]
+                },
+                {
+                  "name": "Termination for breach / insolvency",
+                  "cells": [
+                    {
+                      "text": "Either party may terminate immediately for material breach not cured within 30 days of notice.",
+                      "source": null,
+                      "verdict": "m"
+                    },
+                    {
+                      "text": "Company may terminate immediately if Borealis becomes insolvent; no breach-cure provision stated.",
+                      "source": null,
+                      "verdict": "m"
+                    }
+                  ]
+                },
+                {
+                  "name": "Liability cap",
+                  "cells": [
+                    {
+                      "text": "Each party capped at fees paid in prior 12 months.",
+                      "source": null,
+                      "verdict": "m"
+                    },
+                    {
+                      "text": "Borealis: \u20ac250,000/year; Company: fees payable in same year.",
+                      "source": null,
+                      "verdict": "m"
+                    }
+                  ]
+                },
+                {
+                  "name": "Liability carve-outs",
+                  "cells": [
+                    {
+                      "text": "Cap excludes death, personal injury, fraud, and confidentiality breach.",
+                      "source": null,
+                      "verdict": "m"
+                    },
+                    {
+                      "text": "Cap excludes fraud only.",
+                      "source": null,
+                      "verdict": "m"
+                    }
+                  ]
+                },
+                {
+                  "name": "Renewal",
+                  "cells": [
+                    {
+                      "text": "Automatic one-year renewal unless 90 days' notice before term end.",
+                      "source": null,
+                      "verdict": "y"
+                    },
+                    {
+                      "text": "No renewal provision stated.",
+                      "source": null,
+                      "verdict": "q"
+                    }
+                  ]
+                }
+              ],
+              "options": [
+                "Atlas Logistics MSA",
+                "Borealis Freight MSA"
+              ]
+            }
+          },
+          "caption": {
+            "lineage": null,
+            "sources": [],
+            "row_count": 5,
+            "source_count": 0
+          },
+          "row_count": 5,
+          "spec_version": 1,
+          "created_at": "2026-10-24T01:47:26.112789+00:00"
+        },
+        {
+          "id": "a_4ewfbskoo9",
+          "thread_id": "1fd310c2-5cc0-4124-bf0a-66373482333e",
+          "user_id": "d8a54002-6a29-4b88-b918-cff2aa4a06d5",
+          "org_id": "22f9c615-0eec-440a-8804-ed4784d6f57f",
+          "run_id": "69764a21-14c0-44a4-b7a4-3bd70a4e0e1e",
+          "tool_call_id": "call_P6BJHPzfgdB7nmL1hZgslvQ8",
+          "parent_id": null,
+          "label": "timeline 1",
+          "component": "timeline",
+          "spec": {
+            "title": "Atlas contract history and upcoming deadlines",
+            "timeline": {
+              "events": [
+                {
+                  "date": "2023-03-14",
+                  "title": "MSA signed",
+                  "detail": "Three-year master services agreement signed.",
+                  "source": null,
+                  "category": "History",
+                  "deadline": false
+                },
+                {
+                  "date": "2023-04-01",
+                  "title": "Services start",
+                  "detail": "First shipments under the agreement.",
+                  "source": null,
+                  "category": "History",
+                  "deadline": false
+                },
+                {
+                  "date": "2024-02-09",
+                  "title": "Amendment 1",
+                  "detail": "Prices increased 3.5%; fuel surcharge folded into base rate.",
+                  "source": null,
+                  "category": "History",
+                  "deadline": false
+                },
+                {
+                  "date": "2024-11",
+                  "title": "SLA breach notice",
+                  "detail": "Atlas missed three delivery windows in October 2024.",
+                  "source": null,
+                  "category": "History",
+                  "deadline": false
+                },
+                {
+                  "date": "2025-01-15",
+                  "title": "Service credits applied",
+                  "detail": "\u20ac18,400 credits applied to the January invoice.",
+                  "source": null,
+                  "category": "History",
+                  "deadline": false
+                },
+                {
+                  "date": "2026-04-01",
+                  "title": "Annual price uplift",
+                  "detail": "Prices increased 3.1%, within the 4% cap.",
+                  "source": null,
+                  "category": "History",
+                  "deadline": false
+                },
+                {
+                  "date": "2026-12-15",
+                  "title": "Renewal notice deadline",
+                  "detail": "Last day to give notice of non-renewal.",
+                  "source": null,
+                  "category": "Deadline",
+                  "deadline": true
+                },
+                {
+                  "date": "2027-03-15",
+                  "title": "Current term ends",
+                  "detail": "Agreement renews for one year unless notice was given.",
+                  "source": null,
+                  "category": "Deadline",
+                  "deadline": true
+                }
+              ]
+            }
+          },
+          "caption": {
+            "lineage": null,
+            "sources": [],
+            "row_count": 8,
+            "source_count": 0
+          },
+          "row_count": 8,
+          "spec_version": 1,
+          "created_at": "2026-10-24T01:47:32.387987+00:00"
+        }
+      ]
+    }
+  ],
+  "expected_observables": [
+    {
+      "artifact": "a_3p239nmdy2",
+      "label": "diagram 1",
+      "caption_count_segment": "\u00b7 9 steps \u00b7 9 links",
+      "node_labels": [
+        "Receive and log same working day",
+        "Three-way match: invoice, PO, GRN",
+        "Invoice matches purchase order?",
+        "Reject; supplier corrects and resubmits",
+        "Budget holder approves within 5 days",
+        "Controller sign-off if over \u20ac10,000",
+        "Schedule next weekly payment run",
+        "Treasury releases payment Thursday",
+        "Archive invoice, PO, approvals for 7 years"
+      ],
+      "label_word_coverage_in_kb_document": {
+        "Receive and log same working day": 1.0,
+        "Three-way match: invoice, PO, GRN": 0.8,
+        "Invoice matches purchase order?": 1.0,
+        "Reject; supplier corrects and resubmits": 1.0,
+        "Budget holder approves within 5 days": 1.0,
+        "Controller sign-off if over \u20ac10,000": 1.0,
+        "Schedule next weekly payment run": 1.0,
+        "Treasury releases payment Thursday": 1.0,
+        "Archive invoice, PO, approvals for 7 years": 1.0
+      },
+      "degree_per_node": {
+        "Receive and log same working day": 1,
+        "Three-way match: invoice, PO, GRN": 3,
+        "Invoice matches purchase order?": 3,
+        "Reject; supplier corrects and resubmits": 2,
+        "Budget holder approves within 5 days": 2,
+        "Controller sign-off if over \u20ac10,000": 2,
+        "Schedule next weekly payment run": 2,
+        "Treasury releases payment Thursday": 2,
+        "Archive invoice, PO, approvals for 7 years": 1
+      },
+      "back_edges_dfs_excluding_self_loops": [
+        "reject->match"
+      ],
+      "self_loops": [],
+      "sourced_nodes": []
+    },
+    {
+      "artifact": "a_mf3t5nndba",
+      "label": "comparison 1",
+      "options": [
+        "Atlas Logistics MSA",
+        "Borealis Freight MSA"
+      ],
+      "terms": [
+        "Termination for convenience",
+        "Termination for breach / insolvency",
+        "Liability cap",
+        "Liability carve-outs",
+        "Renewal"
+      ],
+      "cells_total": 10,
+      "not_stated_cells": 1,
+      "identical_terms_N": 0,
+      "identical_terms": [],
+      "second_caption_line": "Verdicts are the agent's reading. Hover or focus a cell for its clause.",
+      "sourced_cells": []
+    },
+    {
+      "artifact": "a_4ewfbskoo9",
+      "label": "timeline 1",
+      "today_row_text_date": "24 Oct 2026",
+      "rail_rows_expected": [
+        "FILLED 14 Mar 2023 \u00b7 MSA signed",
+        "FILLED 1 Apr 2023 \u00b7 Services start",
+        "GAP 10 months",
+        "FILLED 9 Feb 2024 \u00b7 Amendment 1",
+        "GAP 9 months",
+        "FILLED Nov 2024 \u00b7 SLA breach notice",
+        "FILLED 15 Jan 2025 \u00b7 Service credits applied",
+        "GAP 15 months",
+        "FILLED 1 Apr 2026 \u00b7 Annual price uplift",
+        "TODAY",
+        "HOLLOW 15 Dec 2026 \u00b7 Renewal notice deadline \u00b7 deadline pill: in 52 days",
+        "HOLLOW 15 Mar 2027 \u00b7 Current term ends \u00b7 deadline pill: in 142 days"
+      ],
+      "events": 8
+    }
+  ]
+}

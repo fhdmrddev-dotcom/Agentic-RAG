@@ -1,0 +1,12 @@
+dev user d8a54002-6a29-4b88-b918-cff2aa4a06d5 · single org 22f9c615-0eec-440a-8804-ed4784d6f57f (asserted from org_members)
+SEED 292-invoice-approval-policy.md exists id=5b94562c-4bb9-431c-a12b-59e99f46cca1 status=completed
+SEED 292-invoice-approval-policy.md status=completed chunks=4
+SEED 292-atlas-msa.md exists id=325e6ca5-7982-47f5-af18-ad64b4802e85 status=failed
+SEED reingest 292-atlas-msa.md HTTP 200
+SEED 292-atlas-msa.md status=completed chunks=3
+SEED 292-borealis-msa.md exists id=d4eb5c9d-e039-4b9c-a874-ef8593de3062 status=completed
+SEED 292-borealis-msa.md status=completed chunks=1
+SEED search_documents('invoice approval three-way match budget holder finance controller') -> 5 chunks · top files ['292-invoice-approval-policy.md', '292-invoice-approval-policy.md', '292-invoice-approval-policy.md', '292-invoice-approval-policy.md'] · finds 292-invoice-approval-policy.md: True
+SEED search_documents('Atlas Logistics termination liability renewal notice deadline') -> 5 chunks · top files ['292-atlas-msa.md', '292-atlas-msa.md', '292-atlas-msa.md', 'acme_contract_renewal_schedule_2026.md'] · finds 292-atlas-msa.md: True
+SEED search_documents('Borealis Freight termination liability cap') -> 5 chunks · top files ['292-borealis-msa.md', 'acme_msa_kestrel_freight_2026.md', 'acme_msa_kestrel_freight_2026.md', '292-atlas-msa.md'] · finds 292-borealis-msa.md: True
+SEED verdict: OK
