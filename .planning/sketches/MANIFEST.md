@@ -3004,3 +3004,9 @@ reuses 267-B's event-card shape.
 | # | Name | Design Question | Winner | Tags |
 |---|------|----------------|--------|------|
 | 292 | more-ways-to-show-it | Which new artifact types earn a place in the closed registry (diagram / comparison / timeline / steps?) and how each looks in the 273 card (diagram top-down vs lanes · comparison matrix vs cards · timeline vertical vs horizontal) | ★ set = diagram · comparison · timeline (steps out) · 2A top-down · 3A matrix · 4A vertical rail (operator, 2026-10-24) | phase-292, vis-02, seed-337, artifacts |
+
+## Sketch 293 — Start From Outside: the API keys tab (Phase 293, G-2 gate, D-21)
+
+| # | Name | Design Question | Winner | Tags |
+|---|------|----------------|--------|------|
+| 293 | api-keys-tab | How the API keys tab lays out create, the show-once secret + curl, the list with last-used and activity, revoke, and the admin's org-wide list (one card / list + side panel / a card per key) | ★ C a card per key, draft becomes the key, call strip (operator, 2026-10-24) | phase-293, start-02, seed-195, settings, api-keys |
