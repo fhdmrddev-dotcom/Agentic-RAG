@@ -3,13 +3,13 @@ gsd_state_version: 1.0
 milestone: v4.7
 milestone_name: Workflows You Can See and Start Anywhere
 status: ready_to_execute
-last_updated: "2026-10-23T23:55:36.501Z"
+last_updated: "2026-10-24T02:59:19.504Z"
 progress:
   total_phases: 17
-  completed_phases: 8
+  completed_phases: 9
   total_plans: 44
-  completed_plans: 44
-  percent: 47
+  completed_plans: 47
+  percent: 53
 ---
 
 # Project State
@@ -41,7 +41,12 @@ reviewer exists, so a phase closes `verification_mode: self-verified`, never `re
 
 ## Current Position
 
-Phase: 292 (More Ways to Show It) — EXECUTING
+Phase: 292 (More Ways to Show It) — EXECUTED, human_needed (2026-10-24)
+  3/3 plans + review fixes on develop (last 2b4ee5998). 4/4 SC verified in code; registry 3 → 6, tool count 30. Gates: backend 70 failed (= base), vitest count gate OK 11878, tsc 63 == base.
+  Mig 213 applied LOCAL only — cloud must get 213 BEFORE the backend deploys, then get_advisors(security). Not pushed.
+  OWED (292-HUMAN-UAT.md): operator restarts the hung uvicorn --reload, then F-1 live re-check, G4-1 diagrams, two diagram reloads, browser parallel-thread, operator G-4 sign-off.
+  Merged branches worktree-agent-af54ab2c26652a3a5 / worktree-agent-a5f37f2864f70e1bf undeleted (omc guardrail blocks git branch -D).
+Previous: Phase: 292 — EXECUTING
   **DEPLOYED 2026-10-24: production 1db686141 (master 70bd2f043) carries 290 + 291 + 295.** Mig 212 applied to cloud first; security advisors 0 ERROR; deploy-drift PASS; 290 secure-phase 22/22 closed (5d5a44b8d).
   **Guardrail override (operator, 2026-10-24):** 290 and 295 went live with their operator G-4 sign-offs still owed (`290-HUMAN-UAT`/VALIDATION rows, `295-HUMAN-UAT.md` S1 first). 291 could not ship alone (it builds on both).
   Human items run: G-4 S1-S7 + AX rows, SC#4 roster (291-S5-ROSTER.md: 5/8 pass, 3 ⛔ with reasons), SC#5 live fill (W-9, dropdown PDF, Word blanks).
