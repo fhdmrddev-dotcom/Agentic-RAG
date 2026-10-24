@@ -1,5 +1,5 @@
 {
-  "at": "2026-10-24T17:11:04",
+  "at": "2026-10-24T17:29:19",
   "cap": 2,
   "prompts": {
     "V1-sequential-6": "You must complete ALL SIX of the following tool calls, strictly one at a time, each as its own separate tool call, and each one depends on the result of the previous one, so you must wait for each result before making the next call:\n1) search_documents for 'project plan';\n2) search_documents for the milestones named in result 1;\n3) search_documents for the owners of those milestones;\n4) search_documents for the risks attached to those milestones;\n5) execute_code: compute the number of milestones per quarter from results 2-4;\n6) execute_code: draw a bar chart of the counts computed in step 5.\nDo NOT write any prose, summary, explanation or partial answer until all six calls have returned. If any search returns nothing, still make the next call with your best query. Never skip, merge or reorder a step.",
@@ -7,51 +7,31 @@
   },
   "rows": [
     {
-      "provider": "openai",
-      "model": "gpt-5.6-luna",
-      "calling_mode": "NATIVE",
+      "provider": "anthropic",
+      "model": "claude-opus-5-5",
+      "calling_mode": "NATIVE (native SDK adapter)",
       "verdict": "PASS",
       "paused": true,
-      "classification": "text-pause",
-      "paused_variant": "V2-parallel-rounds",
+      "classification": "empty-pause",
+      "paused_variant": "V1-sequential-6",
       "attempts": [
         {
           "variant": "V1-sequential-6",
-          "run_id": "7c9a4a3f-2620-40de-b593-f5b7370c3615",
-          "thread_id": "735afe93-407e-4470-b84e-9d4455611439",
-          "status": "completed",
-          "paused": false,
-          "classification": "prose-final",
-          "tool_starts": [
-            "search_documents"
-          ],
-          "final_output": {
-            "kind": "empty (app fallback note)",
-            "message_id": "525c1847-52d3-4fdb-bce1-de49f9c2275b",
-            "chars": 189,
-            "markup_at": null,
-            "harmony_at": null,
-            "preview": "*The model produced 467 characters of reasoning and 1 tool call(s) over 2 step(s) and never wrote an answer. Try breaking the request into smaller steps, or switching to a different model.*"
-          },
-          "error": null
-        },
-        {
-          "variant": "V2-parallel-rounds",
-          "run_id": "b99c3ef6-7502-4158-8388-2aa5b1e0cf62",
-          "thread_id": "95b352db-710b-4985-9d9d-916e99b59a80",
+          "run_id": "89f31bd9-827d-43f7-9870-12d67301a3b9",
+          "thread_id": "f897a877-bf81-4fa2-9231-d659efdfd43c",
           "status": "completed",
           "paused": true,
-          "classification": "text-pause",
+          "classification": "empty-pause",
           "tool_starts": [
             "search_documents"
           ],
           "final_output": {
-            "kind": "prose",
-            "message_id": "164e7d06-a0fe-43ba-8149-fef42c138478",
-            "chars": 494,
+            "kind": "empty",
+            "message_id": "24866b99-5b7e-4a82-972a-b3b36cc06c06",
+            "chars": 0,
             "markup_at": null,
             "harmony_at": null,
-            "preview": "## Milestones per quarter\n\nThe project roadmap was grouped into four implementation milestones:\n\n| Quarter | Milestones | Count |\n|---|---|---:|\n| Q1 | Preparation & authorization; governance framework setup | 2 |\n| Q2 | Pilot & operationalization | 1 |\n| Q3 | Scale & embed governance | 1 |\n\nThe roa"
+            "preview": ""
           },
           "error": null
         }
@@ -60,73 +40,59 @@
         "http": 200,
         "body": {
           "status": "ok",
-          "run_id": "b99c3ef6-7502-4158-8388-2aa5b1e0cf62",
+          "run_id": "89f31bd9-827d-43f7-9870-12d67301a3b9",
           "continues_used": 1,
           "continues_remaining": 2,
-          "stream_since": "1792847501107-0"
+          "stream_since": "1792848572361-0"
         },
-        "status_after": "completed",
+        "status_after": "cap_paused",
         "same_run_id": true,
         "continues_used_before": 0,
         "continues_used_after": 1,
         "continues_used_plus_1": true,
         "model_provider_unchanged": true,
         "model_provider": [
-          "gpt-5.6-luna",
-          "openai"
+          "claude-opus-5-5",
+          "anthropic"
         ],
         "tool_starts_after_resume": [
-          "search_documents",
-          "search_documents",
-          "search_documents",
-          "search_documents",
-          "search_documents",
-          "search_documents",
-          "search_documents",
-          "execute_code",
-          "execute_code"
+          "search_documents"
         ],
-        "carrier_first_call": "search_documents",
-        "queued_call_ran_first": true,
+        "carrier_first_call": null,
+        "queued_call_ran_first": null,
         "events_after_resume": [
+          "cap_paused",
           "citations",
-          "code_executing",
-          "code_execution_complete",
-          "code_execution_start",
-          "code_stdout",
           "confidence",
-          "delta",
-          "done",
-          "final_output_files",
           "iteration_start",
-          "reasoning_delta",
+          "planning",
           "sources",
           "stream_end",
           "suggestions",
           "tool_end",
+          "tool_preparing",
           "tool_start"
         ]
       },
       "markup_hits": [],
       "threads": [
-        "735afe93-407e-4470-b84e-9d4455611439",
-        "95b352db-710b-4985-9d9d-916e99b59a80"
+        "f897a877-bf81-4fa2-9231-d659efdfd43c"
       ],
       "reload_equal": true,
-      "evidence": ".planning/phases/292.1-tool-limit-continue-that-always-fires-bug-261024-03/evidence/force-pending/openai-b99c3ef6-7502-4158-8388-2aa5b1e0cf62.json"
+      "evidence": ".planning/phases/292.1-tool-limit-continue-that-always-fires-bug-261024-03/evidence/force-pending/anthropic-89f31bd9-827d-43f7-9870-12d67301a3b9.json"
     }
   ],
   "knob_set": {
     "http": 200,
     "chat_max_tool_rounds": 2,
     "explorer_max_tool_rounds": 8,
-    "at": "2026-10-24T17:11:04"
+    "at": "2026-10-24T17:29:20"
   },
   "knob_after": {
     "http": 200,
     "chat_max_tool_rounds": 15,
     "explorer_max_tool_rounds": 8,
-    "at": "2026-10-24T17:12:26"
+    "at": "2026-10-24T17:29:42"
   },
   "markup_hits": 0
 }
