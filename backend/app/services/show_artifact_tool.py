@@ -61,6 +61,7 @@ from app.models.artifact import (
     _coerce_number,
     _coerce_text,
     _refusal,
+    clean_document_name,
     _safe,
     event_sort_key,
     refusal_payload,
@@ -91,7 +92,8 @@ DATA_BEARING_TOOLS: frozenset[str] = frozenset({
 })
 _PAGE_ARG: dict[str, str] = {"query_tables": "page"}
 MAX_CAPTION_SOURCES = 10
-_MAX_DOCUMENT_CHARS = 200
+# The document-name rule (NUL stripped, trimmed, ≤ 200 UTF-16 units) is ``clean_document_name`` in
+# app.models.artifact, shared with the per-element source (292-REVIEW IN-04).
 # Single-quoted on purpose: these READ another tool's result. This module never WRITES a top-level
 # error key (the plan's grep for the double-quoted literal stays at 0).
 _FAILED_STATUSES = frozenset({'error', 'refused', 'failed', 'timeout', 'cancelled'})
@@ -210,13 +212,6 @@ def _page_int(v: Any) -> int | None:
     return None
 
 
-def _clean_document(v: Any) -> str | None:
-    if not isinstance(v, str):
-        return None
-    v = v.replace("\x00", "").strip()
-    return v[:_MAX_DOCUMENT_CHARS] if v else None
-
-
 def _query_tables_facts(result: Any, page_filter: int | None) -> tuple[str | None, int | None]:
     """(document, page) from a query_tables RESULT — the resolved filename the tool reported."""
     try:
@@ -226,14 +221,14 @@ def _query_tables_facts(result: Any, page_filter: int | None) -> tuple[str | Non
     if isinstance(tables, list) and tables and all(isinstance(t, dict) for t in tables):
         docs = {t.get("document") for t in tables}
         pages = {t.get("page") for t in tables}
-        document = _clean_document(next(iter(docs))) if len(docs) == 1 else None
+        document = clean_document_name(next(iter(docs))) if len(docs) == 1 else None
         page = _page_int(next(iter(pages))) if len(pages) == 1 else None
         return document, page
     m = _QT_HEAD.match(result) if isinstance(result, str) else None
     if m is None:
         return None, None
     try:
-        document = _clean_document(json.loads(m.group(1)))
+        document = clean_document_name(json.loads(m.group(1)))
     except (ValueError, TypeError):
         document = None
     first_page = None if m.group(2) == "null" else int(m.group(2))
@@ -256,7 +251,7 @@ def _source_of(call: dict) -> dict:
         document, page = _query_tables_facts(call.get("result"), _page_int(args.get(_PAGE_ARG["query_tables"])))
     elif name == "analyze_document":
         sub = call.get("sub_agent")
-        document = _clean_document(sub.get("filename")) if isinstance(sub, dict) else None
+        document = clean_document_name(sub.get("filename")) if isinstance(sub, dict) else None
     return {"tool": name, "document": document, "page": page}
 
 

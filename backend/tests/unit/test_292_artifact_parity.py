@@ -12,15 +12,20 @@ import json
 from pathlib import Path
 
 import pytest
+from pydantic import ValidationError
 
 from app.models.artifact import (
     ARTIFACT_COMPONENTS,
     ARTIFACT_LABEL_RE,
     ARTIFACT_RECORD_KEYS,
+    MAX_SOURCE_DOCUMENT_CHARS,
     ArtifactRefusal,
     StoredComparisonSpec,
     StoredDiagramSpec,
+    StoredSource,
     StoredTimelineSpec,
+    _js_len,
+    clean_document_name,
     refusal_payload,
     validate_args,
 )
@@ -52,7 +57,7 @@ def _args(case: dict) -> dict:
 
 def test_parity_fixture_is_not_vacuous():
     raw = json.loads(PARITY_FIXTURE.read_text(encoding="utf-8"))
-    assert set(raw) == {"about", "bad", "good"}
+    assert set(raw) == {"about", "bad", "good", "stored_sources", "document_names"}
     assert len(raw["bad"]) >= 20
     assert len(raw["good"]) >= 6
     comps = {c["component"] for c in raw["bad"]} | {c["component"] for c in raw["good"]}
@@ -76,6 +81,34 @@ def test_every_bad_case_is_refused_by_the_backend(case):
 def test_every_good_case_is_accepted_by_the_backend(case):
     out = validate_args(_args(case))
     assert not isinstance(out, ArtifactRefusal), f"{case['name']}: {out}"
+
+
+# ── 292-REVIEW CR-01: the stored source and its document name, in the browser's units ───────────
+
+
+def test_source_sections_are_not_vacuous():
+    raw = json.loads(PARITY_FIXTURE.read_text(encoding="utf-8"))
+    assert {c["ok"] for c in raw["stored_sources"]} == {True, False}
+    assert len(raw["document_names"]) >= 3
+    assert "stored_sources" in raw["about"] and "document_names" in raw["about"]
+
+
+@pytest.mark.parametrize("case", _cases("stored_sources"), ids=lambda c: c["name"])
+def test_every_stored_source_case_matches_its_ok(case):
+    try:
+        StoredSource.model_validate(case["source"])
+        accepted = True
+    except ValidationError:
+        accepted = False
+    assert accepted is case["ok"], case["name"]
+
+
+@pytest.mark.parametrize("case", _cases("document_names"), ids=lambda c: c["name"])
+def test_every_document_name_is_cleaned_to_its_stored_value(case):
+    doc = clean_document_name(case["filename"])
+    assert doc == case["document"], case["name"]
+    assert _js_len(doc) <= MAX_SOURCE_DOCUMENT_CHARS
+    StoredSource.model_validate({"document": doc, "page": None, "excerpt": None})
 
 
 # ── The stored wire contract (D-14) ──────────────────────────────────────────────────────────────

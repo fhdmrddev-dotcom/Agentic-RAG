@@ -269,3 +269,40 @@ describe("CR-01 (292) — the shared bad-spec fixture: the frontend guard refuse
     }
   })
 })
+
+// ── 292-REVIEW CR-01: a stored source and its document name, in UTF-16 units on both sides ──────
+
+type StoredSourceCase = { name: string; ok: boolean; source: unknown }
+type DocumentNameCase = { name: string; filename: string; document: string }
+const STORED_SOURCES = (parity292 as unknown as { stored_sources: StoredSourceCase[] }).stored_sources ?? []
+const DOCUMENT_NAMES = (parity292 as unknown as { document_names: DocumentNameCase[] }).document_names ?? []
+
+/** A two-step diagram record whose first node carries `source` exactly as stored. */
+function withNodeSource(source: unknown): Record<string, unknown> {
+  const r = asRecord({
+    name: "source carrier",
+    component: "diagram",
+    title: "Invoice approval",
+    diagram: { nodes: [{ id: "a", label: "Step a" }, { id: "b", label: "Step b" }], edges: [{ from: "a", to: "b" }] },
+  })
+  const spec = r.spec as { diagram: { nodes: Array<Record<string, unknown>> } }
+  spec.diagram.nodes[0].source = source
+  return r
+}
+
+describe("CR-01 (292-REVIEW) — stored sources and document names agree with the backend", () => {
+  it("every stored_sources case is accepted by the guard exactly when the backend accepts it (ok)", () => {
+    expect(STORED_SOURCES.some((c) => c.ok)).toBe(true)
+    expect(STORED_SOURCES.some((c) => !c.ok)).toBe(true)
+    for (const c of STORED_SOURCES) expect(parseArtifactRecord(withNodeSource(c.source)).ok, c.name).toBe(c.ok)
+  })
+
+  it("every document the server stores for a raw filename passes the guard (<= 200 UTF-16 units)", () => {
+    expect(DOCUMENT_NAMES.length).toBeGreaterThanOrEqual(3)
+    for (const c of DOCUMENT_NAMES) {
+      expect(c.document.length, c.name).toBeLessThanOrEqual(200)
+      const r = parseArtifactRecord(withNodeSource({ document: c.document, page: null, excerpt: null }))
+      expect(r.ok, `${c.name}: ${r.ok ? "" : r.reason}`).toBe(true)
+    }
+  })
+})

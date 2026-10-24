@@ -7,7 +7,8 @@ The handler passes ``ctx.turn_citations`` (agent_loop's ``retrieved_citations``,
 this module numbers them with the SAME dedup, never a second numbering.
 
 The resolved value is ``{document, page, excerpt}``:
-  * ``document`` — the citation's filename, with the caption's hygiene (NUL stripped, trimmed, ≤ 200);
+  * ``document`` — the citation's filename, through ``clean_document_name`` (NUL stripped, trimmed,
+    ≤ 200 UTF-16 units; one home in ``app.models.artifact``, shared with the caption — 292-REVIEW IN-04);
   * ``page`` — always null today: ``document_chunks`` carries no page column;
   * ``excerpt`` — up to 280 UTF-16 units of the cited passage, chosen by OUR code: the passage
     sentence sharing the most words (≥ 3 letters) with the element's own text, widened to its
@@ -29,10 +30,10 @@ from typing import Any
 
 from app.models.artifact import (
     MAX_EXCERPT_CHARS,
-    MAX_SOURCE_DOCUMENT_CHARS,
     ArtifactRefusal,
     _js_len,
     _refusal,
+    clean_document_name,
     parse_source_handle,
 )
 from app.services.citation_markers import _deduplicate_citations
@@ -44,14 +45,6 @@ _WHITESPACE = re.compile(r"\s+")
 _SENTENCE_END = re.compile(r"(?<=[.!?])\s+")
 _WORD = re.compile(r"[^\W\d_]{3,}")
 _ELLIPSIS = "…"
-
-
-def _clean_document(v: Any) -> str | None:
-    """The same rule as ``show_artifact_tool._clean_document`` (the caption's document hygiene)."""
-    if not isinstance(v, str):
-        return None
-    v = v.replace("\x00", "").strip()
-    return v[:MAX_SOURCE_DOCUMENT_CHARS] if v else None
 
 
 def _words(s: str) -> set[str]:
@@ -144,7 +137,7 @@ def resolve_sources(
             )
         c = unique[h - 1]
         out.append({
-            "document": _clean_document(c.get("filename")),
+            "document": clean_document_name(c.get("filename")),
             "page": None,
             "excerpt": excerpt_for(c.get("passage"), text),
         })

@@ -113,7 +113,7 @@ MAX_EVENT_TITLE_CHARS = 80
 MAX_EVENT_DETAIL_CHARS = 200
 MAX_CATEGORY_CHARS = 24
 MAX_EXCERPT_CHARS = 280
-MAX_SOURCE_DOCUMENT_CHARS = 200  # == show_artifact_tool._MAX_DOCUMENT_CHARS (the caption's rule)
+MAX_SOURCE_DOCUMENT_CHARS = 200  # UTF-16 units; clean_document_name applies it to the caption AND to every source
 
 NODE_ID_RE = re.compile(r"^[A-Za-z0-9_.-]{1,40}$")
 
@@ -272,6 +272,45 @@ def _js_len(s: str) -> int:
     keeps a lone surrogate countable instead of raising.
     """
     return len(s.encode("utf-16-le", "surrogatepass")) // 2
+
+
+# JavaScript's String.prototype.trim set (ECMA-262 WhiteSpace + LineTerminator): TAB, VT, FF, SP,
+# NBSP, U+FEFF, every Zs, LF, CR, LS, PS. Python's str.strip() does NOT remove U+FEFF, so a "﻿"
+# label passed here while the guard's isText refused it (292-REVIEW CR-01).
+_JS_TRIM = (
+    "\t\n\v\f\r              "
+    "    　﻿"
+)
+
+
+def _is_blank(v: str) -> bool:
+    """Blank by EITHER rule (Python's strip and the browser's trim), so neither side keeps it."""
+    return not v.strip() or not v.strip(_JS_TRIM)
+
+
+def clean_document_name(v: Any) -> str | None:
+    """A citation's document name as it is stored (292-REVIEW CR-01 / IN-04 — the ONE home).
+
+    NUL stripped, trimmed, then cut to ``MAX_SOURCE_DOCUMENT_CHARS`` UTF-16 units (the browser's
+    count), never between the two halves of a surrogate pair, with no ellipsis. Both the caption
+    (``show_artifact_tool``) and the per-element source (``artifact_sources``) call this.
+    """
+    if not isinstance(v, str):
+        return None
+    v = v.replace("\x00", "").strip()
+    if not v:
+        return None
+    if _js_len(v) <= MAX_SOURCE_DOCUMENT_CHARS:
+        return v
+    out: list[str] = []
+    units = 0
+    for ch in v:
+        u = _js_len(ch)
+        if units + u > MAX_SOURCE_DOCUMENT_CHARS:
+            break
+        out.append(ch)
+        units += u
+    return "".join(out).rstrip() or None
 
 
 def _check_js_len(v: Any, cap: int, field_name: str) -> Any:
@@ -538,8 +577,11 @@ class MetricArgs(_ArgsBase):
 # A `source` is only the [n] number of a citation retrieved this turn; the handler resolves it.
 
 _ITEM_WORD: dict[str, str] = {"diagram": "steps", "comparison": "terms", "timeline": "events"}
-_DATE_RE = re.compile(r"^(\d{4})-(0[1-9]|1[0-2])(?:-(\d{2}))?$")
-_SOURCE_STR = re.compile(r"^(?:\[\s*(\d{1,9})\s*\]|(\d{1,9}))$")
+# ⚠ [0-9], never \d: in a Python str pattern \d matches EVERY Unicode decimal digit and int() parses
+# them, while JavaScript's \d is ASCII only — "٢٠٢٤-01-15" passed here and failed the guard
+# (292-REVIEW CR-01).
+_DATE_RE = re.compile(r"^([0-9]{4})-(0[1-9]|1[0-2])(?:-([0-9]{2}))?$")
+_SOURCE_STR = re.compile(r"^(?:\[\s*([0-9]{1,9})\s*\]|([0-9]{1,9}))$")
 _SOURCE_DETAIL = (
     "must be the [n] number of a source retrieved in this turn (e.g. 3 or \"[3]\"), or omitted. "
     "Never true/false, 0, a document name or text."
@@ -582,7 +624,7 @@ def _source_rule(v: Any, where: str) -> int | None:
 
 
 def _req_text(v: Any, limit: int, key: str, where: str, **fmt: Any) -> str:
-    if not isinstance(v, str) or not v.strip():
+    if not isinstance(v, str) or _is_blank(v):
         _raise("fallback", f"`{where}` must be non-empty text.")
     if _js_len(v) > limit:
         _raise(key, f"`{where}` must be at most {limit} characters (an emoji counts as 2).", **fmt)
@@ -595,7 +637,7 @@ def _opt_text(v: Any, limit: int, key: str, where: str, **fmt: Any) -> str | Non
         return None
     if not isinstance(v, str):
         _raise("fallback", f"`{where}` must be text or null.")
-    if not v.strip():
+    if _is_blank(v):
         return None
     if _js_len(v) > limit:
         _raise(key, f"`{where}` must be at most {limit} characters (an emoji counts as 2).", **fmt)
@@ -1053,6 +1095,13 @@ def _stored_js_cap(v: Any, cap: int, what: str) -> Any:
     return v
 
 
+def _stored_text(v: Any, cap: int, what: str) -> Any:
+    """A required stored string: not blank by either rule (292-REVIEW CR-01), within its UTF-16 cap."""
+    if isinstance(v, str) and _is_blank(v):
+        raise ValueError(f"{what} must not be blank")
+    return _stored_js_cap(v, cap, what)
+
+
 def _no_bool(v: Any, what: str) -> Any:
     if isinstance(v, bool):
         raise ValueError(f"{what} must not be a boolean")
@@ -1060,9 +1109,15 @@ def _no_bool(v: Any, what: str) -> Any:
 
 
 class StoredSource(_Strict):
-    document: str | None = Field(max_length=MAX_SOURCE_DOCUMENT_CHARS)
+    # 292-REVIEW CR-01: capped in UTF-16 units (the guard's count), never pydantic's code points.
+    document: str | None
     page: int | None = Field(ge=1)  # always null today: document_chunks carries no page
     excerpt: str | None
+
+    @field_validator("document")
+    @classmethod
+    def _document_cap(cls, v: str | None) -> str | None:
+        return _stored_js_cap(v, MAX_SOURCE_DOCUMENT_CHARS, "source.document")
 
     @field_validator("page", mode="before")
     @classmethod
@@ -1084,7 +1139,7 @@ class StoredDiagramNode(_Strict):
     @field_validator("label")
     @classmethod
     def _label_cap(cls, v: str) -> str:
-        return _stored_js_cap(v, MAX_NODE_LABEL_CHARS, "node label")
+        return _stored_text(v, MAX_NODE_LABEL_CHARS, "node label")
 
 
 class StoredDiagramEdge(_Strict):
@@ -1139,7 +1194,7 @@ class StoredComparisonTerm(_Strict):
     @field_validator("name")
     @classmethod
     def _name_cap(cls, v: str) -> str:
-        return _stored_js_cap(v, MAX_TERM_CHARS, "term name")
+        return _stored_text(v, MAX_TERM_CHARS, "term name")
 
 
 class StoredComparisonEnc(_Strict):
@@ -1152,7 +1207,7 @@ class StoredComparisonEnc(_Strict):
         if len(set(v)) != len(v) or any(not o for o in v):
             raise ValueError("comparison options must be unique, non-empty names")
         for o in v:
-            _stored_js_cap(o, MAX_OPTION_CHARS, "option name")
+            _stored_text(o, MAX_OPTION_CHARS, "option name")
         return v
 
     @model_validator(mode="after")
@@ -1191,7 +1246,7 @@ class StoredTimelineEvent(_Strict):
 
     @model_validator(mode="after")
     def _caps(self) -> "StoredTimelineEvent":
-        _stored_js_cap(self.title, MAX_EVENT_TITLE_CHARS, "event title")
+        _stored_text(self.title, MAX_EVENT_TITLE_CHARS, "event title")
         _stored_js_cap(self.detail, MAX_EVENT_DETAIL_CHARS, "event detail")
         _stored_js_cap(self.category, MAX_CATEGORY_CHARS, "event category")
         return self
