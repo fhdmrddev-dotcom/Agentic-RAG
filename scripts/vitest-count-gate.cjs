@@ -4280,6 +4280,7 @@ const BASELINE = {
   "streamsProviderArtifact.test.tsx": 5, // 273-05 — the ONE handler: append + replace-by-id
   "MessageItem.artifacts.test.tsx": 8, // 273-05 — the ONE mount: placement + live == reload DOM; RAISED 5 → 8 at 292-02 (+1 live == reload case per encoded type)
   "artifactParity.fence.test.ts": 10, // 273-05 — backend Literals/fixture vs frontend registry (I-1); RAISED 7 → 10 at 273-REVIEW CR-01 (+3: the shared bad-spec parity fixture)
+  "artifactParity292.fence.test.ts": 13, // 292-03 — 292 Literals/caps/shared fixtures (artifact_record_292 + artifact_bad_specs_292) vs the frontend guard (I-1)
   "ShowArtifactBody.test.tsx": 26, // 273-05 — rail essence + body, never the spec or model text; RAISED 17 → 26 at 292-02 (Flow diagram / Comparison / Timeline rail lines)
   "ToolCallPanel.showArtifact.test.tsx": 16, // 273-05 — L-1..L-4, refused node, phrases
   // ── Phase 274-03 (D-05 · D-10 · D-12..D-15 · D-27 · SC#1) — FIVE NEW suites, BOTH KNOBS, SAME
@@ -6348,6 +6349,7 @@ const TARGETS = [
   "src/providers/__tests__/streamsProviderArtifact.test.tsx",
   "src/components/chat/__tests__/MessageItem.artifacts.test.tsx",
   "src/components/chat/__tests__/artifactParity.fence.test.ts",
+  "src/components/chat/__tests__/artifactParity292.fence.test.ts",
   "src/components/chat/tool-bodies/ShowArtifactBody.test.tsx",
   "src/components/chat/__tests__/ToolCallPanel.showArtifact.test.tsx",
   // Phase 274-03 — `src/components/attachments` is new and adopted as a DIRECTORY (its three suites

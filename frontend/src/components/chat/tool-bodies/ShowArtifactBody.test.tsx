@@ -52,7 +52,7 @@ afterEach(() => cleanup())
 
 describe("the result keys are the handler's (non-vacuity)", () => {
   it("every success key this file reads is emitted by build_result", () => {
-    for (const key of ["label", "component", "kind", "stacked", "series_count", "row_count", "from_label", "same_rows", "operations"]) {
+    for (const key of ["label", "component", "kind", "stacked", "series_count", "row_count", "edge_count", "option_count", "from_label", "same_rows", "operations"]) {
       expect(handlerSource, key).toContain(`"${key}"`)
     }
   })
@@ -164,9 +164,9 @@ describe("ShowArtifactBody — the expanded body", () => {
 
 // ══ Phase 292-02 (UI-D-292-19 · L-3 · L-4) — the rail lines for the three encoded types ════════
 // The rail reads only `row_count`, `edge_count`, `option_count`, `label`, `component` (and on a
-// refusal `reason`). ⚠ `edge_count` / `option_count` are emitted by plan 292-01's build_result; the
-// `?raw` non-vacuity list above is the 273 key set and is not widened here, because inside this
-// plan's worktree the backend does not emit them yet — plan 292-03 proves them on the merged tree.
+// refusal `reason`). `edge_count` / `option_count` are emitted by plan 292-01's build_result; the
+// `?raw` non-vacuity list above was widened to them at 292-03 on the merged tree (292-02's
+// worktree had no backend that emitted them, so the widening waited for the merge).
 
 function encoded(component: string, extra: Record<string, unknown>): Record<string, unknown> {
   return {
