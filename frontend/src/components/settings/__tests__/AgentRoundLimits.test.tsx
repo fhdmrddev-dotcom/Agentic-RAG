@@ -63,12 +63,40 @@ describe("loading", () => {
     expect(explorerInput().value).toBe("8")
   })
 
-  it("keeps 15 / 8 and does not crash when the fetch fails", async () => {
+  // 292.1-REVIEW WR-05: a failed read used to leave 15 / 8 on screen AS IF loaded. With the server
+  // holding 3, the operator saw 15, typing 15 was "not dirty", and the cap silently stayed at 3.
+  it("says it could not load, never presents 15 / 8 as live, and cannot save when the fetch fails", async () => {
     getSettings.mockRejectedValue(new Error("Failed to get settings"))
     render(<AgentRoundLimits />)
+    const alert = await screen.findByRole("alert")
+    expect(alert).toHaveTextContent("Couldn't load the current tool-round limits")
+    expect(alert).toHaveTextContent("Failed to get settings")
+    expect(chatInput().value).toBe("")
+    expect(explorerInput().value).toBe("")
+    expect(chatInput()).toBeDisabled()
+    expect(explorerInput()).toBeDisabled()
+    expect(saveButton()).toBeDisabled()
+  })
+
+  it("Retry loads the real caps after a failed read", async () => {
+    getSettings.mockRejectedValueOnce(new Error("Failed to get settings"))
+    getSettings.mockResolvedValueOnce(settingsWith({ chat_max_tool_rounds: 3, explorer_max_tool_rounds: 6 }))
+    render(<AgentRoundLimits />)
+    fireEvent.click(await screen.findByRole("button", { name: /retry/i }))
+    await waitFor(() => expect(chatInput().value).toBe("3"))
+    expect(explorerInput().value).toBe("6")
+    expect(chatInput()).not.toBeDisabled()
+    expect(screen.queryByRole("alert")).not.toBeInTheDocument()
+    expect(getSettings).toHaveBeenCalledTimes(2)
+  })
+
+  it("nothing can be saved before the read answers", async () => {
+    getSettings.mockReturnValue(new Promise(() => {}))
+    render(<AgentRoundLimits />)
     await waitFor(() => expect(getSettings).toHaveBeenCalledTimes(1))
-    expect(chatInput().value).toBe("15")
-    expect(explorerInput().value).toBe("8")
+    expect(chatInput()).toBeDisabled()
+    expect(saveButton()).toBeDisabled()
+    expect(chatInput().value).toBe("")
   })
 
   it("states each cap's meaning and default in words", async () => {

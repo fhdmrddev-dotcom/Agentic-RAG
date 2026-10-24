@@ -15,9 +15,13 @@ SEED-324: ``POST /runs/{id}/continue`` on a Deep run already in a terminal statu
 spawns nothing and counts nothing. ``cap_paused`` AND ``streaming`` are still accepted — the
 cap_paused SSE event precedes the finalizer's status write, so a fast press legitimately sees
 ``streaming``.
+
+292.1-REVIEW CR-01: a FIRST-turn pause finalizes as ``completed`` by design, so ``completed`` is a
+409 only when the carrier-aware predicate (``app.db.runs.run_is_cap_paused``) says it is not paused.
 """
 from __future__ import annotations
 
+import asyncio
 import logging
 from types import SimpleNamespace
 from unittest.mock import AsyncMock, MagicMock, patch
@@ -176,7 +180,8 @@ class _Builder:
         self.update_payload = payload
         return self
 
-    def eq(self, *_a, **_k):
+    def eq(self, col=None, val=None, *_a, **_k):
+        self.filters = {**getattr(self, "filters", {}), col: val}
         return self
 
     def maybe_single(self):
@@ -199,23 +204,36 @@ class _Db:
         return c
 
     async def aexec(self, builder):
+        await asyncio.sleep(0)  # a real round trip yields: lets two requests interleave
         if builder.update_payload is not None:
+            stored = self.data.get(builder.table)
+            filters = getattr(builder, "filters", {})
+            # A filter on a column the stored row carries must match it (the CAS on the counter).
+            if isinstance(stored, dict) and any(
+                    k in stored and stored[k] != v for k, v in filters.items() if k == "continues_used"):
+                return SimpleNamespace(data=[])
             self.updates.append((builder.table, builder.update_payload))
+            if isinstance(stored, dict):
+                stored.update(builder.update_payload)
             return SimpleNamespace(data=[{}])
-        return SimpleNamespace(data=self.data.get(builder.table))
+        stored = self.data.get(builder.table)
+        return SimpleNamespace(data=dict(stored) if isinstance(stored, dict) else stored)
 
 
-async def _continue(run_row: dict) -> tuple[AsyncMock, _Db, object]:
+async def _continue(run_row: dict, *, paused: bool = False,
+                    paused_mock: AsyncMock | None = None, presses: int = 1):
+    """``paused`` is what the ONE pause predicate (``app.db.runs.run_is_cap_paused``) answers for
+    the row — the carrier-aware read a first-turn ``completed`` pause needs (292.1-REVIEW CR-01).
+    ``presses`` > 1 drives that many Continues for the SAME run CONCURRENTLY (292.1-REVIEW WR-03);
+    ``res`` is then the list of results."""
     db = _Db({"runs": run_row, "threads": {"active_workflow_run_id": None}})
     spawn = AsyncMock(return_value=None)
     sb = db.client()
-    with patch.object(runs_mod, "aexec", db.aexec), \
-            patch.object(runs_mod.settings, "max_continues_per_run", 3), \
-            patch("app.services.run_producer.spawn_continuation_run", spawn), \
-            patch("app.db.runs.load_cap_paused_tool_calls", AsyncMock(return_value=[])), \
-            patch("app.dependencies.get_pg_pool", AsyncMock(return_value=MagicMock())):
+    pred = paused_mock if paused_mock is not None else AsyncMock(return_value=paused)
+
+    async def _one():
         try:
-            res = await runs_mod.continue_run(
+            return await runs_mod.continue_run(
                 run_id=UUID(run_row["run_id"]),
                 current_user={"id": USER_ID},
                 supabase=sb,
@@ -223,7 +241,18 @@ async def _continue(run_row: dict) -> tuple[AsyncMock, _Db, object]:
                 redis=MagicMock(),
             )
         except HTTPException as exc:
-            res = exc
+            return exc
+
+    with patch.object(runs_mod, "aexec", db.aexec), \
+            patch("app.db.runs.run_is_cap_paused", pred), \
+            patch.object(runs_mod.settings, "max_continues_per_run", 3), \
+            patch("app.services.run_producer.spawn_continuation_run", spawn), \
+            patch("app.db.runs.load_cap_paused_tool_calls", AsyncMock(return_value=[])), \
+            patch("app.dependencies.get_pg_pool", AsyncMock(return_value=MagicMock())):
+        if presses == 1:
+            res = await _one()
+        else:
+            res = list(await asyncio.gather(*(_one() for _ in range(presses))))
     return spawn, db, res
 
 
@@ -251,10 +280,49 @@ async def test_a_row_without_model_passes_none():
 @pytest.mark.parametrize("status", ["failed", "completed", "cancelled", "timed_out"])
 @pytest.mark.asyncio
 async def test_a_finished_deep_run_is_refused_with_409_and_spawns_nothing(status):
-    spawn, db, res = await _continue(_row(status=status))
+    # ``completed`` here is a run that FINISHED: no cap carrier was written during it.
+    spawn, db, res = await _continue(_row(status=status), paused=False)
     assert isinstance(res, HTTPException) and res.status_code == 409
     spawn.assert_not_awaited()
     assert db.updates == [], "a refused Continue must not count"
+
+
+# ── 292.1-REVIEW CR-01: a FIRST-turn pause finalizes as ``completed`` BY DESIGN ───────────────
+# (run_producer: the pause fact lives in result_sink["cap_disposition"] + the carrier row; Phase
+# 250 LOCK-2 pins that). Measured locally: 0 rows ever read ``cap_paused``; every carrier-bearing
+# first-turn run reads ``completed``. So the 409 must ask the carrier-aware predicate.
+
+
+@pytest.mark.asyncio
+async def test_a_first_turn_pause_finalized_completed_with_its_carrier_is_accepted():
+    row = _row(status="completed", org_id="77777777-7777-7777-7777-777777777777")
+    pred = AsyncMock(return_value=True)
+    spawn, db, res = await _continue(row, paused_mock=pred)
+    spawn.assert_awaited_once()
+    assert res["status"] == "ok"
+    assert db.updates and db.updates[0][1]["continues_used"] == 1
+    pred.assert_awaited_once()
+    args, kwargs = pred.await_args
+    assert str(args[1]) == row["run_id"]
+    assert str(kwargs["org_id"]) == row["org_id"], "the carrier read is org-scoped like the consume"
+
+
+@pytest.mark.asyncio
+async def test_a_completed_run_with_no_carrier_or_an_older_one_is_still_refused():
+    spawn, db, res = await _continue(_row(status="completed"), paused=False)
+    assert isinstance(res, HTTPException) and res.status_code == 409
+    spawn.assert_not_awaited()
+    assert db.updates == []
+
+
+@pytest.mark.parametrize("status", ["failed", "cancelled", "timed_out"])
+@pytest.mark.asyncio
+async def test_a_failed_or_stopped_run_is_refused_without_asking_the_predicate(status):
+    pred = AsyncMock(return_value=True)
+    spawn, db, res = await _continue(_row(status=status), paused_mock=pred)
+    assert isinstance(res, HTTPException) and res.status_code == 409
+    pred.assert_not_awaited()
+    spawn.assert_not_awaited()
 
 
 @pytest.mark.parametrize("status", ["cap_paused", "streaming"])
@@ -264,3 +332,29 @@ async def test_a_paused_or_still_finalizing_run_is_accepted(status):
     spawn.assert_awaited_once()
     assert res["status"] == "ok"
     assert db.updates and db.updates[0][1]["continues_used"] == 1
+
+
+# ── 292.1-REVIEW WR-03: the Continue claim is a compare-and-set ───────────────────────────────
+
+
+@pytest.mark.parametrize("status", ["cap_paused", "streaming"])
+@pytest.mark.asyncio
+async def test_two_concurrent_continues_on_one_pause_spawn_exactly_one_continuation(status):
+    """The button and a typed "continue" (or a double press) for the SAME pause both read
+    ``continues_used = 0``. Before: both UPDATEs matched, both spawned a loop on one run_id (the
+    queued calls ran twice) and the counter advanced by 1, not 2."""
+    row = _row(status=status)
+    spawn, db, results = await _continue(row, presses=2)
+    spawn.assert_awaited_once()
+    oks = [r for r in results if isinstance(r, dict) and r.get("status") == "ok"]
+    lost = [r for r in results if isinstance(r, HTTPException)]
+    assert len(oks) == 1 and len(lost) == 1
+    assert lost[0].status_code == 409 and lost[0].detail == runs_mod.CONTINUE_ALREADY_CLAIMED
+    assert [u[1]["continues_used"] for u in db.updates] == [1], "ONE counted claim"
+
+
+@pytest.mark.asyncio
+async def test_the_counter_write_is_conditioned_on_the_value_it_read():
+    import inspect
+    src = inspect.getsource(runs_mod.continue_run)
+    assert '.eq("continues_used", continues_used)' in src

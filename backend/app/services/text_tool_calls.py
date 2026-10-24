@@ -100,8 +100,78 @@ MARKUP_OPENERS: tuple[tuple[str, re.Pattern[str], re.Pattern[str]], ...] = (
 )
 
 # Literal openers the holdback can prefix-match while text is still arriving (the DSML opener is a
-# pattern and gets its own prefix test, ``_could_become_dsml``).
-_LITERAL_OPENERS = ("<tool_call>", "<|tool_call>", "<function=")
+# pattern and gets its own prefix test, ``_could_become_dsml``), each with its MARKUP_OPENERS family.
+_LITERAL_FAMILY: dict[str, str] = {
+    "<tool_call>": "xml_tool_call",
+    "<|tool_call>": "gemma_tool_call",
+    "<function=": "xml_function",
+}
+_LITERAL_OPENERS = tuple(_LITERAL_FAMILY)
+
+# ── Call shape (292.1-REVIEW WR-01): a bare opener in PROSE is not a call ──────────────────────────
+# "Qwen-style models wrap each call in <tool_call> tags" used to be cut at the tag (and, on the
+# forced-final round, paused a run that had answered). A non-DSML opener now counts only when what
+# follows it has the family's measured call shape:
+#   * xml_tool_call  — ``{`` (JSON body), ``<function=`` (F4), or ``NAME`` then ``<arg_key>`` /
+#                      ``</tool_call>`` (F5 GLM);
+#   * gemma_tool_call — ``{``, or ``[call:]NAME`` then ``{`` (F6);
+#   * xml_function   — at the START OF A LINE and ``NAME>`` (the bare F4 inner form).
+# DSML is unchanged: its fullwidth-bar spellings never occur in prose, so its opener alone counts.
+_NAME_RE = re.compile(r"[A-Za-z_][\w.\-]*")
+_GLM_AFTER_NAME = ("<arg_key>", "</tool_call>")
+
+
+def _is_line_start(prefix: str) -> bool:
+    """True when the text before an opener is empty or ends a line (trailing spaces/tabs allowed)."""
+    p = prefix.rstrip(" \t")
+    return p == "" or p.endswith("\n")
+
+
+def _call_shape(family: str, rest: str, *, line_start: bool) -> bool | None:
+    """Does the text after an opener make it a CALL? ``True`` a call, ``False`` proof of prose,
+    ``None`` undecided — the text ran out before the shape could be told (a later chunk decides;
+    at the end of a whole text an undecided block counts only when it starts a line)."""
+    if family == "dsml":
+        return True
+    if family == "xml_function":
+        if not line_start:
+            return False
+        m = _NAME_RE.match(rest)
+        if m is None:
+            return None if rest == "" else False
+        tail = rest[m.end():]
+        return None if tail == "" else tail[0] == ">"
+    body = rest.lstrip()
+    if body == "":
+        return None
+    if body[0] == "{":
+        return True
+    if family == "xml_tool_call":
+        if body.startswith("<function="):
+            return True
+        if "<function=".startswith(body):
+            return None
+        m = _NAME_RE.match(body)
+        if m is None:
+            return False
+        after = body[m.end():].lstrip()
+        if after == "":
+            return None
+        if after.startswith(_GLM_AFTER_NAME):
+            return True
+        return None if any(o.startswith(after) for o in _GLM_AFTER_NAME) else False
+    # gemma_tool_call
+    if len(body) < len("call:") and "call:".startswith(body):
+        return None
+    if body.startswith("call:"):
+        body = body[len("call:"):]
+    m = _NAME_RE.match(body)
+    if m is None:
+        return None if body == "" else False
+    after = body[m.end():].lstrip()
+    if after == "":
+        return None
+    return after[0] == "{"
 
 # ── Code spans: an opener inside fenced code or inline code is content, not a call (Pitfall 6) ─────
 _FENCE_LINE = re.compile(r"(?m)^[ \t]*(`{3,}|~{3,})")
@@ -134,13 +204,21 @@ def _code_ranges(text: str) -> list[tuple[int, int]]:
     return ranges
 
 
+def _is_call_at(family: str, text: str, m: re.Match[str]) -> bool:
+    """A whole-text verdict for one opener: its call shape, and — when the text ends before the shape
+    is told (a cut-off block) — whether it starts a line (WR-01)."""
+    line_start = _is_line_start(text[: m.start()])
+    verdict = _call_shape(family, text[m.end():], line_start=line_start)
+    return line_start if verdict is None else verdict
+
+
 def _first_markup(text: str) -> tuple[int, re.Pattern[str]] | None:
-    """(index, closer) of the first opener OUTSIDE code, else None."""
+    """(index, closer) of the first CALL-SHAPED opener OUTSIDE code, else None."""
     if "<" not in text:
         return None
     ranges: list[tuple[int, int]] | None = None
     best: tuple[int, re.Pattern[str]] | None = None
-    for _family, opener, closer in MARKUP_OPENERS:
+    for family, opener, closer in MARKUP_OPENERS:
         for m in opener.finditer(text):
             if best is not None and m.start() >= best[0]:
                 break
@@ -148,13 +226,15 @@ def _first_markup(text: str) -> tuple[int, re.Pattern[str]] | None:
                 ranges = _code_ranges(text)
             if any(a <= m.start() < b for a, b in ranges):
                 continue
+            if not _is_call_at(family, text, m):  # WR-01: prose that mentions the tag
+                continue
             best = (m.start(), closer)
             break
     return best
 
 
 def detect_markup(text: str) -> int | None:
-    """Index of the first tool-call opener outside fenced / inline code, else None."""
+    """Index of the first call-shaped tool-call opener outside fenced / inline code, else None."""
     hit = _first_markup(text)
     return None if hit is None else hit[0]
 
@@ -183,6 +263,8 @@ class DsmlResult:
     calls: list[dict] = field(default_factory=list)
     preamble: str = ""
     found: bool = False
+    #: The text AFTER the parsed block's closer (WR-06) — ``settle`` keeps it, never drops it.
+    rest: str = ""
 
 
 def _first_dsml_outside_code(text: str) -> re.Match[str] | None:
@@ -238,7 +320,7 @@ def parse_dsml(text: str, offered: frozenset[str] | set[str]) -> DsmlResult:
     # Anything between invokes that is not an invoke (e.g. an invoke missing its closer) refuses.
     if not calls or _INVOKE_RE.sub("", body).strip():
         return refused
-    return DsmlResult(ok=True, calls=calls, preamble=preamble, found=True)
+    return DsmlResult(ok=True, calls=calls, preamble=preamble, found=True, rest=text[close.end():])
 
 
 # ── Live holdback ────────────────────────────────────────────────────────────────────────────────
@@ -286,12 +368,17 @@ def _could_become_opener(s: str) -> bool:
     return _could_become_dsml(s)
 
 
-def _first_complete_opener(buf: str) -> int | None:
-    hits = [i for i in (buf.find(o) for o in _LITERAL_OPENERS) if i >= 0]
+def _first_complete_opener(buf: str) -> tuple[int, int, str] | None:
+    """(start, end, family) of the earliest complete opener in ``buf``, else None."""
+    best: tuple[int, int, str] | None = None
+    for lit, family in _LITERAL_FAMILY.items():
+        i = buf.find(lit)
+        if i >= 0 and (best is None or i < best[0]):
+            best = (i, i + len(lit), family)
     m = DSML_OPENER_RE.search(buf)
-    if m:
-        hits.append(m.start())
-    return min(hits) if hits else None
+    if m and (best is None or m.start() < best[0]):
+        best = (m.start(), m.end(), "dsml")
+    return best
 
 
 def _partial_tail_start(buf: str) -> int:
@@ -305,9 +392,12 @@ class TagHoldback:
     """Gate the live ``delta`` emit for one provider call, on EVERY calling path.
 
     ``feed`` returns what may be emitted now; ``released`` is the concatenation of everything it
-    returned. From a complete opener everything is held until ``finish`` (the Phase 273 sticky
-    rule). The holdback does not skip code: it only delays, and ``finish`` hands back the held text
-    byte-for-byte for the caller to settle.
+    returned. From a complete opener with the family's CALL SHAPE everything is held until
+    ``finish`` (the Phase 273 sticky rule; a DSML opener is call-shaped by itself). A non-DSML
+    opener whose shape is not yet told is held without sticking, and is RELEASED the moment the
+    following text proves it is prose (292.1-REVIEW WR-01) — so an answer that mentions a tag
+    streams live instead of waiting for the end of the call. The holdback does not skip code: it
+    only delays, and ``finish`` hands back the held text byte-for-byte for the caller to settle.
     """
 
     def __init__(self) -> None:
@@ -321,13 +411,27 @@ class TagHoldback:
         self._pending += chunk
         if self._holding:
             return ""
-        buf = self._pending
-        at = _first_complete_opener(buf)
-        if at is not None:
-            self._holding = True
-        else:
-            at = _partial_tail_start(buf)
-        out, self._pending = buf[:at], buf[at:]
+        parts: list[str] = []
+        while True:
+            buf = self._pending
+            hit = _first_complete_opener(buf)
+            if hit is None:
+                at = _partial_tail_start(buf)
+                parts.append(buf[:at])
+                self._pending = buf[at:]
+                break
+            start, end, family = hit
+            before = self.released[-_PARTIAL_WINDOW:] + "".join(parts) + buf[:start]
+            verdict = _call_shape(family, buf[end:], line_start=_is_line_start(before))
+            if verdict is False:  # proof of prose: release through the opener, keep scanning
+                parts.append(buf[:end])
+                self._pending = buf[end:]
+                continue
+            parts.append(buf[:start])
+            self._pending = buf[start:]
+            self._holding = verdict is True  # undecided: hold, re-judge on the next chunk
+            break
+        out = "".join(parts)
         self.released += out
         return out
 
@@ -361,6 +465,11 @@ def settle(full_content: str, offered: frozenset[str] | set[str], *, buffer_has_
     * ``unparseable`` — markup that could not be parsed exactly (D-07): remove it, queue nothing.
 
     ``markup_*`` describe the removed text for ONE bounded log line (D-08); the caller logs.
+
+    292.1-REVIEW WR-06: the text after a parsed block is settled too, never dropped. Trailing prose
+    stays visible; a further DSML block's calls are queued after the first block's, in order; a
+    further block that cannot be parsed is removed and worded (``FAILED_CALL_NOTICE``) while the
+    first block's calls still run — each block stands or falls whole (D-07), not the message.
     """
     idx = detect_markup(full_content)
     if idx is None:
@@ -375,7 +484,15 @@ def settle(full_content: str, offered: frozenset[str] | set[str], *, buffer_has_
         return Settled(kind="stripped", calls=[], visible=strip_markup(full_content), **meta)
     parsed = parse_dsml(full_content, offered)
     if parsed.found and parsed.ok and len(parsed.preamble) == idx:
-        return Settled(kind="parsed", calls=parsed.calls, visible=parsed.preamble, **meta)
+        calls, visible = list(parsed.calls), parsed.preamble
+        if parsed.rest:
+            after = settle(parsed.rest, offered, buffer_has_calls=False)
+            visible += after.visible
+            if after.kind == "parsed":
+                calls.extend(after.calls)
+            elif after.kind == "unparseable":
+                visible, _ = replace_failed_call(visible, "")
+        return Settled(kind="parsed", calls=calls, visible=visible, **meta)
     return Settled(kind="unparseable", calls=[], visible=strip_markup(full_content), **meta)
 
 

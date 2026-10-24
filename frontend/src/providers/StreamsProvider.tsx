@@ -2753,6 +2753,13 @@ export function StreamsProvider({ children }: PropsWithChildren) {
             }))
           }
           if (!typedContinue) insertOptimisticTurn()
+          // 292.1-REVIEW WR-03: a hinted typed continue reads Continuing… from the moment it is sent,
+          // so the card's Continue button is not live during the POST (a press there would claim the
+          // same pause twice; the server's compare-and-set refuses the loser either way). Released
+          // below on a 201 or an error — and only if THIS send set it.
+          const continuingMarkedHere =
+            typedContinue && !useStreamsStore.getState().continuingThreads.has(threadId)
+          if (continuingMarkedHere) markContinuing(threadId)
           // Phase 145-05 (D-145-05): seed the watchdog activity clock at send.
           lastEventAtRef.current.set(threadId, Date.now())
 
@@ -2796,6 +2803,7 @@ export function StreamsProvider({ children }: PropsWithChildren) {
               return
             }
             // 292.1 (D-15 / D-16): a hinted word the server sent as a NEW message — the turn, late.
+            if (continuingMarkedHere) clearContinuing(threadId)
             if (!optimisticInserted) insertOptimisticTurn()
             // Only the continued arm carries a null id; a 201 always names the user row.
             const message_id = postedMessageId ?? userMsg.id
@@ -3078,6 +3086,7 @@ export function StreamsProvider({ children }: PropsWithChildren) {
           } catch (err) {
             // 292.1: a held-back typed continue that FAILED is put back first, so every arm below
             // (rollback + draft restore, failure receipt) sees exactly the turn it always saw.
+            if (continuingMarkedHere) clearContinuing(threadId)
             if (!optimisticInserted) insertOptimisticTurn()
             if (err instanceof Error && err.name === "AbortError") {
               // Caller-initiated abort.

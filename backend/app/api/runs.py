@@ -1151,6 +1151,29 @@ def resolve_phase_available_tools(definition, active_slug: str) -> list:
     return []
 
 
+#: 292.1-REVIEW WR-03: the 409 a Continue gets when another Continue already claimed this pause
+#: (the counter compare-and-set matched no row). The typed-continue gate keys on this exact detail.
+CONTINUE_ALREADY_CLAIMED = "This Continue is already under way."
+
+
+async def _deep_run_is_paused(row: dict, run_id: UUID) -> bool:
+    """292.1-REVIEW CR-01: is this terminal-looking Deep run actually a tool-limit pause?
+
+    Only ``completed`` can be (a first-turn pause finalizes ``completed`` by design — run_producer);
+    ``failed`` / ``cancelled`` / ``timed_out`` never are, and never cost a read. The decision itself
+    lives in ONE place, ``app.db.runs.run_is_cap_paused``, org-scoped by the run's own org exactly
+    as the Deep consume's carrier read below is."""
+    if row.get("status") != "completed":
+        return False
+    from app.db.runs import run_is_cap_paused  # noqa: PLC0415
+    from app.dependencies import get_pg_pool  # noqa: PLC0415
+
+    _org = row.get("org_id")
+    return await run_is_cap_paused(
+        await get_pg_pool(), run_id, org_id=UUID(_org) if isinstance(_org, str) else _org
+    )
+
+
 @router.post("/{run_id}/continue", status_code=200)
 async def continue_run(
     run_id: UUID,
@@ -1248,13 +1271,15 @@ async def continue_run(
         wf_row = wf_resp.data if wf_resp is not None else None
         if wf_row is not None:
             continues_used = wf_row.get("continues_used") or 0
-    elif row.get("status") in _TERMINAL_RUN_STATUSES:
+    elif row.get("status") in _TERMINAL_RUN_STATUSES and not await _deep_run_is_paused(row, run_id):
         # ── SEED-324 (folded into 292.1): a Deep run that already FINISHED has nothing to
         # continue. Refused before the counter write and the spawn, so a stale card or a replayed
         # request cannot re-drive a completed / failed run. A 409, not the `refused` payload: the
         # Continue card reads `refused` as "Continue limit reached". `streaming` is deliberately
         # NOT refused — the cap_paused SSE event precedes the finalizer's status write, so a fast
         # press legitimately sees `streaming`. Harness anchors keep their own rule (branch above).
+        # ⚠ 292.1-REVIEW CR-01: "terminal" alone is NOT "finished" — a FIRST-turn pause finalizes
+        # as `completed` by design, so `completed` asks the carrier-aware predicate first.
         raise HTTPException(
             status_code=status.HTTP_409_CONFLICT,
             detail="This run has already finished, so there is nothing to continue. Start a new message to keep going.",
@@ -1278,6 +1303,7 @@ async def continue_run(
 
     # ── Step 4: transactionally increment continues_used on the carrying row ──
     _new_used = continues_used + 1
+    _claimed = True
     try:
         if active_workflow_run_id is not None:
             await aexec(
@@ -1290,18 +1316,28 @@ async def continue_run(
             # the user-JWT client matched 0 rows in silence and the Continue cap never counted.
             # Ownership was proven by the RLS read above; the service client writes, and the
             # UPDATE keeps its own user_id scope because that client bypasses RLS.
-            await aexec(
+            # 292.1-REVIEW WR-03: a COMPARE-AND-SET on the counter this request read. Two Continues
+            # for one pause (the button + a typed "continue", or a double press) both read N; only
+            # one UPDATE still matches `continues_used = N`, so only one spawns a continuation. The
+            # loser matched 0 rows and is refused below — never a second loop on the same run_id.
+            _claim = await aexec(
                 service_supabase.table("runs")
                 .update({"continues_used": _new_used, "status": "streaming"})
                 .eq("run_id", str(run_id))
                 .eq("user_id", current_user["id"])
+                .eq("continues_used", continues_used)
             )
+            _claimed = bool(_claim is not None and _claim.data)
     except Exception:
         logger.exception("continue: continues_used increment failed for run %s", run_id)
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail="Failed to record continue",
         )
+    if not _claimed:
+        logger.info("continue: run %s was already claimed by another Continue (counter moved past %d)",
+                    run_id, continues_used)
+        raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail=CONTINUE_ALREADY_CLAIMED)
 
     # ── Step 5: branch — Harness re-drive vs Deep consume ──
     if active_workflow_run_id is not None:

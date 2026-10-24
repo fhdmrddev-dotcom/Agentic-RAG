@@ -287,6 +287,19 @@ async def test_e_a_not_offered_name_is_never_dispatched_and_is_worded():
     assert live == persisted
 
 
+@pytest.mark.asyncio
+async def test_e_text_after_a_mid_run_block_is_shown_and_a_second_block_runs_too():
+    """292.1-REVIEW WR-06: before, everything after the first block's closer vanished — trailing
+    prose and a second block's calls alike, with no log line."""
+    text = "Pre " + F3 + " and then " + F2 + " done."
+    run = await _drive([_deltas(_split(text, 6)), _deltas([ANSWER])],
+                       user_settings=_settings(chat_max_tool_rounds=3))
+    assert run["dispatched"] == [("execute_code", F3_ARGS), ("grep", {"pattern": "probation"})]
+    live = "".join(_delta_texts(run["emits"]))
+    assert live == "Pre  and then  done." + ANSWER
+    assert "DSML" not in live
+
+
 # ── Loop test E2 (D-07 wiring): unparseable at the cap still pauses, nothing queued ─────────────
 
 
@@ -314,6 +327,38 @@ async def test_f_a_clean_answer_with_tags_streams_and_persists_byte_identical(n)
     assert "".join(_delta_texts(run["emits"])) == CLEAN
     assert _persisted_field(run["persisted"], "content") == CLEAN
     assert run["dispatched"] == [] and run["cap_calls"] == []
+
+
+# ── Loop test F2 (292.1-REVIEW WR-01): an answer that MENTIONS a tag is an answer ──────────────
+# Before: cut at the tag and worded as a failed call on a middle round; on the forced-final round
+# `_cap_markup_seen` paused a run that had actually answered, with a limit line and a Continue.
+
+PROSE_QWEN = ("Qwen-style models wrap each call in <tool_call> tags, and the server parses them out. "
+              "That is why you never see them.")
+PROSE_GEMMA = "In Gemma the marker is <|tool_call> and it closes with <tool_call|>; the server strips both."
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("prose", [PROSE_QWEN, PROSE_GEMMA], ids=["qwen", "gemma"])
+@pytest.mark.parametrize("n", [1, 7, 50])
+async def test_f2_prose_mentioning_a_tag_on_a_middle_round_is_byte_identical(prose, n):
+    run = await _drive([SEARCH, _deltas(_split(prose, n))], user_settings=_settings(chat_max_tool_rounds=5))
+    assert "".join(_delta_texts(run["emits"])) == prose
+    assert _persisted_field(run["persisted"], "content") == prose
+    assert run["cap_calls"] == [] and "cap_paused" not in _types(run["emits"])
+    assert FAILED_CALL_NOTICE not in _persisted_field(run["persisted"], "content")
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("prose", [PROSE_QWEN, PROSE_GEMMA], ids=["qwen", "gemma"])
+@pytest.mark.parametrize("n", [1, 7, 50])
+async def test_f2_prose_mentioning_a_tag_on_the_forced_final_round_is_no_false_pause(prose, n):
+    run = await _drive([SEARCH, _deltas(_split(prose, n))], user_settings=CAP2)
+    assert _forced(run) == [False, True], "the prose IS the forced-final round"
+    assert run["cap_calls"] == [] and _carriers(run) == []
+    assert "cap_paused" not in _types(run["emits"])
+    assert "".join(_delta_texts(run["emits"])) == prose
+    assert _persisted_field(run["persisted"], "content") == prose
 
 
 # ── Loop test G (D-11, I-2): live == persisted on every 1-char split ────────────────────────────

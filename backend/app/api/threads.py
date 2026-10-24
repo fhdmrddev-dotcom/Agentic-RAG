@@ -92,7 +92,7 @@ from app.services.thread_workspace_cleanup import collect_thread_workspace_paths
 from app.services.artifact_history import attach_artifacts  # 273 (I-2 / ART-05) — reload attach
 from app.utils.db import aexec
 from app.dependencies import get_pg_pool
-from app.db.runs import finalize_run, insert_assistant_message
+from app.db.runs import finalize_run, insert_assistant_message, run_is_cap_paused
 # 257.1 (SC#4) — cost is READ through the one conversion home and the one rate resolver,
 # never re-derived here. See `_enrich_messages_with_runs` for why the lookup is batched.
 from app.db import rates
@@ -809,13 +809,17 @@ async def _typed_continue_or_none(
       (a) a workflow kickoff or a harness thread is never a typed Continue (harness anchors keep
           their own Continue);
       (b) the text must be one of the fixed continue words (D-13, no model call);
-      (c) the thread's LATEST run, read with the same no-status-predicate SQL the workflow
-          reconcile uses (the 244 rule: the pause belongs to the latest run or to nobody);
-      (d) it must be ``cap_paused`` with Continues left (D-16), read off the real setting;
+      (c) the thread's LATEST root run (never a sub-agent row), read with no status predicate —
+          the 244 rule: the pause belongs to the latest run or to nobody;
+      (d) it must be PAUSED per ``app.db.runs.run_is_cap_paused`` — the one carrier-aware
+          predicate (292.1-REVIEW CR-02: a FIRST-turn pause finalizes as ``completed`` by design,
+          so ``status == 'cap_paused'`` alone never fired on one) — with Continues left (D-16);
       (e) the run is handed to ``continue_run`` — the SAME code the button calls (D-14), so the
           resumed history is the button's history.
     A refused ``continue_run`` (a race to the last Continue) falls through to a normal send (D-16),
-    and a failed read fails OPEN to a normal send: a read never blocks a message.
+    and a failed read fails OPEN to a normal send: a read never blocks a message. So does ANY error
+    ``continue_run`` raises (WR-04) — except the one that means another Continue already claimed
+    this pause (WR-03), which reports ``continued`` rather than starting a second run beside it.
 
     ⛔ Binding: this DELEGATES. It writes nothing, and above all never ``runs.status`` —
     ``continue_run`` stays the only ``cap_paused → streaming`` writer, and the rejected arm recorded
@@ -832,28 +836,52 @@ async def _typed_continue_or_none(
                 SELECT run_id, status, continues_used
                 FROM runs
                 WHERE thread_id = $1
+                  AND parent_run_id IS NULL
                 ORDER BY started_at DESC
                 LIMIT 1
                 """,
                 UUID(_thread_id) if isinstance(_thread_id, str) else _thread_id,
             )
+            # Only these two statuses can be a pause; anything else never costs the second read.
+            _paused = row is not None and row["status"] in ("cap_paused", "completed") and (
+                await run_is_cap_paused(_conn, UUID(str(row["run_id"]))))
     except Exception:  # noqa: BLE001 — fail open: a read failure never blocks a message
         logger.warning("typed continue: latest-run read failed for thread %s; sending as a new message",
                        _thread_id, exc_info=True)
         return None
-    if row is None or row["status"] != "cap_paused":
+    if not _paused:
         return None
     if (row["continues_used"] or 0) >= settings.max_continues_per_run:
         return None
-    from app.api.runs import continue_run  # noqa: PLC0415 — runs.py imports this module lazily; a top-level import cycles
+    from app.api.runs import CONTINUE_ALREADY_CLAIMED, continue_run  # noqa: PLC0415 — runs.py imports this module lazily; a top-level import cycles
 
-    res = await continue_run(
-        run_id=UUID(str(row["run_id"])),
-        current_user=current_user,
-        supabase=supabase,
-        service_supabase=service_supabase,
-        redis=redis,
-    )
+    try:
+        res = await continue_run(
+            run_id=UUID(str(row["run_id"])),
+            current_user=current_user,
+            supabase=supabase,
+            service_supabase=service_supabase,
+            redis=redis,
+        )
+    except HTTPException as exc:
+        if exc.status_code == status.HTTP_409_CONFLICT and exc.detail == CONTINUE_ALREADY_CLAIMED:
+            # 292.1-REVIEW WR-03: another Continue (the button) won THIS pause's compare-and-set, so
+            # the run is already resuming. Report that — a normal send would start a second run.
+            _used = (row["continues_used"] or 0) + 1
+            return JSONResponse(status_code=200, content={
+                "continued": True, "run_id": str(row["run_id"]), "message_id": None,
+                "continues_used": _used,
+                "continues_remaining": max(0, settings.max_continues_per_run - _used),
+            })
+        # 292.1-REVIEW WR-04: every other refusal (404, a status that moved, a failed counter
+        # write) falls back to a normal send, as promised above — never rejects the message.
+        logger.warning("typed continue: continue_run refused run %s (%s %s); sending as a new message",
+                       row["run_id"], exc.status_code, exc.detail)
+        return None
+    except Exception:  # noqa: BLE001 — WR-04: an unexpected failure never blocks the person's message
+        logger.warning("typed continue: continue_run failed for run %s; sending as a new message",
+                       row["run_id"], exc_info=True)
+        return None
     if isinstance(res, JSONResponse) or not isinstance(res, dict) or res.get("status") == "refused":
         return None
     return JSONResponse(
