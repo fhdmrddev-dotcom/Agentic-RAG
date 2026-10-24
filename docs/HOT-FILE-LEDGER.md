@@ -11392,6 +11392,14 @@ cells rot within days.
 | [`frontend/src/components/chat/artifacts/artifactSpec.ts`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentschatartifactsartifactspects) | 2 / 1 / 469 (was `0 / 0 / 0`) | no (young) | young (273-02). `parseArtifactRecord` → ok or a closed NoticeReason. ⛔ hand-rolled (no zod); never throws; never surfaces the raw value |
 | [`frontend/src/components/chat/artifacts/captionModel.ts`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentschatartifactscaptionmodelts) | 1 / 1 / 73 (was `0 / 0 / 0`) | no (young) | young (273-02). Phrases the SERVER's caption facts (sources, lineage, counts) — never model text (D-04). Pure |
 | [`frontend/src/components/chat/artifacts/chartModel.ts`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentschatartifactschartmodelts) | 1 / 1 / 275 (was `0 / 0 / 0`) | no (young) | young (273-02). Pure chart derivations: slots, visible domain, tooltip rows, ticks, aria text. No React, no recharts |
+| [`backend/app/services/artifact_sources.py`](docs/HOT-FILE-LEDGER.md#backendappservicesartifact_sourcespy) | 0 / 0 / 0 | no (young) | young (planned 292-01). Pure `resolve_sources` / `excerpt_for`: a source handle is this turn's citation number. ⛔ imports citation_markers + artifact models only; no DB, no provider |
+| [`frontend/src/components/chat/artifacts/diagramLayout.ts`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentschatartifactsdiagramlayoutts) | 0 / 0 / 0 | no (young) | young (planned 292-02). Pure top-down layout (ranks, back edges, row wrap). ⛔ no DOM, no React, no layout dependency; same spec + width = same layout (I-2) |
+| [`frontend/src/components/chat/artifacts/DiagramArtifact.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentschatartifactsdiagramartifacttsx) | 0 / 0 / 0 | no (young) | young (planned 292-02). Flow diagram body: HTML nodes over one SVG edge layer. ⛔ React text only, no dangerouslySetInnerHTML; reads only a guarded spec |
+| [`frontend/src/components/chat/artifacts/ArtifactTooltip.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentschatartifactsartifacttooltiptsx) | 0 / 0 / 0 | no (young) | young (planned 292-02). The ONE shared source-excerpt tooltip (hover + focus, Escape, portalled). ⛔ React text only, no dangerouslySetInnerHTML |
+| [`frontend/src/components/chat/artifacts/comparisonModel.ts`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentschatartifactscomparisonmodelts) | 0 / 0 / 0 | no (young) | young (planned 292-02). Pure comparison derivations (identical terms, glyph table). ⛔ no DOM, no React; a `q` cell is always our `Not stated` |
+| [`frontend/src/components/chat/artifacts/ComparisonArtifact.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentschatartifactscomparisonartifacttsx) | 0 / 0 / 0 | no (young) | young (planned 292-02). Comparison matrix body + `Only terms that differ` toggle. ⛔ React text only, no dangerouslySetInnerHTML; glyph shape carries the verdict |
+| [`frontend/src/components/chat/artifacts/timelineModel.ts`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentschatartifactstimelinemodelts) | 0 / 0 / 0 | no (young) | young (planned 292-02). Pure timeline derivations (date parts, gaps, Today, days-until). ⛔ no DOM; `today` injected, never `new Date(iso)` |
+| [`frontend/src/components/chat/artifacts/TimelineArtifact.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentschatartifactstimelineartifacttsx) | 0 / 0 / 0 | no (young) | young (planned 292-02). Vertical-rail timeline body. ⛔ React text only, no dangerouslySetInnerHTML; Today computed by our code, never the model |
 | [`frontend/src/components/chat/tool-bodies/ShowArtifactBody.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentschattoolbodiesshowartifactbodytsx) | 1 / 1 / 192 (was `0 / 0 / 0`) | no (young) | young (273-05). Rail essence + expanded line for show_artifact. ⛔ reads `reason`, never `detail` or `values` (L-3/L-4) |
 | [`backend/app/services/document_search_service.py`](docs/HOT-FILE-LEDGER.md#backendappservicesdocument_search_servicepy) | 8 / 4 / 505 (was `5 / 3 / 584`) | ⚠ **FIRES** | **284-04**: Find = ONE ranged `count=exact` read of `library_documents`; the "two legs, never one `or_`" invariant RETIRED deliberately (the view holds the union). ⛔ short page → 503 |
 | [`backend/app/models/document_search.py`](docs/HOT-FILE-LEDGER.md#backendappmodelsdocument_searchpy) | 3 / 3 / 174 (was `2 / 2 / 171`) | ⚠ **FIRES** | ⚠ now FIRES (3 phases). **275-03**: `include_archived: bool = False`; ⛔ `extra="forbid"` kept, so backend ships before frontend |
@@ -24073,3 +24081,35 @@ CLAUDE.md verdict cell as of 2026-10-23 (replaced by 291-06):
 Scan-list disposition cell as of 2026-10-23 (replaced by 291-06):
 
 > 291-05: one row (`could_not_generate:grounding_unavailable`) → a sentence and a next step, never the code (SEED-221). ⛔ imports door words, never retypes; joins `SWEPT_SOURCES`
+
+### `backend/app/services/artifact_sources.py`
+
+**`0 / 0 / 0`** at 292 planning (2026-10-24). Young; row added by 292-01 STEP 0. Created by **292-01** (TDD). Resolves a `show_artifact` element's `source` handle, the citation number `n` the model saw in this turn's `[n] file · chunk k` manifest, against `citation_markers._deduplicate_citations(ctx.turn_citations)`, and picks a ≤ 280 UTF-16-unit excerpt from the cited passage. ⛔ **Binding invariants:** pure, no I/O; imports the standard library, `app.services.citation_markers` and `app.models.artifact` only (no DB pool, no supabase client, no provider SDK); never re-implements the numbering; the model never supplies a document name, page or excerpt (D-07); a bool handle is refused before pydantic; `page` is always null today (chunks carry no page). Does not fire.
+
+### `frontend/src/components/chat/artifacts/diagramLayout.ts`
+
+**`0 / 0 / 0`** at 292 planning (2026-10-24). Young; row added by 292-01 STEP 0. Planned for **292-02**. The pure top-down layout behind the flow diagram (sketch 2A): DFS back edges, longest-path ranks, spec order within a rank, row wrap at the minimum node width, a back-edge gutter. ⛔ **Binding invariants:** no DOM, no React, no layout dependency (no dagre / elkjs / Mermaid, D-16 / D-19); a pure function of (spec, width), so live and reload lay out identically (I-2). Does not fire.
+
+### `frontend/src/components/chat/artifacts/DiagramArtifact.tsx`
+
+**`0 / 0 / 0`** at 292 planning (2026-10-24). Young; row added by 292-01 STEP 0. Planned for **292-02**. The diagram body inside the unchanged 273 frame: positioned HTML nodes over one SVG edge layer (UI-D-292-07), hover / focus lights a node's edges. ⛔ **Binding invariants:** model strings render as React text only, never `dangerouslySetInnerHTML` (I-3); it receives only a spec the guard accepted; marker ids are per artifact (UI-D-292-27). Does not fire.
+
+### `frontend/src/components/chat/artifacts/ArtifactTooltip.tsx`
+
+**`0 / 0 / 0`** at 292 planning (2026-10-24). Young; row added by 292-01 STEP 0. Planned for **292-02**. The ONE shared tooltip for server-resolved source excerpts (UI-D-292-09): anchored, hover and focus, Escape dismisses, portalled so the card's overflow does not clip it. ⛔ **Binding invariants:** excerpt and document name render as React text only, never `dangerouslySetInnerHTML` (I-3). Does not fire.
+
+### `frontend/src/components/chat/artifacts/comparisonModel.ts`
+
+**`0 / 0 / 0`** at 292 planning (2026-10-24). Young; row added by 292-01 STEP 0. Planned for **292-02**. Pure comparison derivations: identical-term detection for the `Only terms that differ` toggle (UI-D-292-13), the verdict glyph table. ⛔ **Binding invariants:** no DOM, no React; a `q` cell always reads our `Not stated`, never model text (UI-D-292-12). Does not fire.
+
+### `frontend/src/components/chat/artifacts/ComparisonArtifact.tsx`
+
+**`0 / 0 / 0`** at 292 planning (2026-10-24). Young; row added by 292-01 STEP 0. Planned for **292-02**. The comparison matrix body (sketch 3A): options as columns, terms as rows, sticky term column, the toggle. ⛔ **Binding invariants:** React text only, never `dangerouslySetInnerHTML` (I-3); the glyph shape carries the verdict, not colour alone. Does not fire.
+
+### `frontend/src/components/chat/artifacts/timelineModel.ts`
+
+**`0 / 0 / 0`** at 292 planning (2026-10-24). Young; row added by 292-01 STEP 0. Planned for **292-02**. Pure timeline derivations: integer-part date parsing, the sorted-order check, ≥ 6-month gaps, the Today split and days-until (UI-D-292-15..18). ⛔ **Binding invariants:** no DOM; `today` is injected, never read inside; no `new Date(iso)` and no `Intl` for dates (the timezone off-by-one trap). Does not fire.
+
+### `frontend/src/components/chat/artifacts/TimelineArtifact.tsx`
+
+**`0 / 0 / 0`** at 292 planning (2026-10-24). Young; row added by 292-01 STEP 0. Planned for **292-02**. The vertical-rail timeline body (sketch 4A): filled past dots, hollow upcoming dots, the Today row, deadline ring and `in N days` pill. ⛔ **Binding invariants:** React text only, never `dangerouslySetInnerHTML` (I-3); Today comes from the viewer's clock through our code, never the model (D-06). Does not fire.
