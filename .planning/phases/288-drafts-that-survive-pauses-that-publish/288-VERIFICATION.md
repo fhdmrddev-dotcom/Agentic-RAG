@@ -2,7 +2,7 @@
 phase: 288-drafts-that-survive-pauses-that-publish
 verified: 2026-10-19
 verification_mode: self-verified   # OV-SOLO-01 - never "reviewed"
-status: gaps_found
+status: passed
 score: 3/4 success criteria met, 1 met-with-defect (SC#4 line present; its paused-state wording untrue)
 re_verification: false
 gaps:
@@ -74,3 +74,5 @@ _Verifier: Claude (gsd-verifier)_
 - **SC#4 gap (paused-state sentence):** closed by Phase 295 — a paused human-input step now resumes on answer and the run completes (295 S2 run `74493c29`, S6 `6b4afbc0`), so `Still waiting on {who}; the run continues as soon as they answer.` is true. No 288 code change needed.
 - **S1 generate arm:** PASS (288-UAT.md row 1). **Roster row 2 (Anthropic):** PASS (`f23299748`).
 - **Owed:** operator visual sign-off of the Draft settings row and the waiting-on line; non-owner view stays unit-tested only (no second account driven).
+
+**Operator signed 2026-10-24** ("signed 288 and 295"): Draft settings row and waiting-on line accepted visually; non-owner view accepted on unit tests; the untouched-generated-draft finding tracked as BUG-261024-02. **Status: passed.**

@@ -17,9 +17,9 @@ Seeds folded at intake: SEED-232, SEED-195, SEED-014, SEED-084, SEED-164, SEED-0
 
 ### Author (AUTH)
 
-- [ ] **AUTH-01**: A workflow that pauses for a person can be published, and the run surface shows who it is waiting on. — `SEED-164`
+- [x] **AUTH-01**: A workflow that pauses for a person can be published, and the run surface shows who it is waiting on. — `SEED-164`
 - [x] **AUTH-02**: Describe-it authoring can take uploaded assets (template, form, reference docs) and derive the inputs, phases and tools from them. — `SEED-051`
-- [ ] **AUTH-03**: A draft's configuration does not vanish when the author navigates away. — `SEED-183`
+- [x] **AUTH-03**: A draft's configuration does not vanish when the author navigates away. — `SEED-183`
 
 ### See (VIS)
 
@@ -74,8 +74,8 @@ Seeds folded at intake: SEED-232, SEED-195, SEED-014, SEED-084, SEED-164, SEED-0
 | REG-07 | Phase 286 | Complete |
 | START-01 | Phase 287 | Complete |
 | START-03 | Phase 287 | Complete |
-| AUTH-03 | Phase 288 | Pending |
-| AUTH-01 | Phase 288 | Pending |
+| AUTH-03 | Phase 288 | Complete |
+| AUTH-01 | Phase 288 | Complete |
 | VIS-03 | Phase 289 | Complete |
 | TRUST-01 | Phase 289 | Complete |
 | VIS-04 | Phase 290 | Complete |
