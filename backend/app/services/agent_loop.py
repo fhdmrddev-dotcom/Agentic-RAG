@@ -1070,7 +1070,9 @@ def _reconstruct_history(
     # Phase 268 (D-268-26 / SEED-319): a scope change is TOLD to the model — one note, prepended to the
     # NEXT user message (never a mid-history system row). The words and the fold live in scope_note.py.
     _scope_fold = ScopeNoteFold()
-    for msg in history_rows:
+    # 292.1 UAT (run 238b0589): rows after the last user row are the CURRENT turn — only a Continue has any.
+    _turn_start = max((i for i, r in enumerate(history_rows) if r.get("role") == "user"), default=-1)
+    for _row_i, msg in enumerate(history_rows):
         # Phase 267 (D-267-10) — transcript-only: rendered to people, never sent to a model.
         # One kind check against the one-home allowlist; every other system kind is untouched.
         _first_call = msg.get("tool_calls")
@@ -1119,6 +1121,11 @@ def _reconstruct_history(
                         }
                         for tc in tool_calls_data
                     ],
+                    # DeepSeek thinking mode 400s a replayed tool-call turn of the current chain without
+                    # reasoning_content (https://api-docs.deepseek.com/guides/thinking_mode). The row keeps
+                    # only its last round's; only when present, so every other row stays byte-identical.
+                    **({"reasoning_content": msg["reasoning_content"]}
+                       if _row_i > _turn_start and msg.get("reasoning_content") else {}),
                 })
                 # 2. Tool result messages (one per tool call)
                 for tc in tool_calls_data:
