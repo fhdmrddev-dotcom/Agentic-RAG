@@ -490,6 +490,10 @@ export const ALL_VALID = [
   chartFromFilter,
   chartRedrawn,
   noSource,
+  // 292-02 — the three encoded types join once their renderers exist (Task 3).
+  diagramInvoice,
+  comparisonContracts,
+  timelineAtlas,
 ] as const
 
 /** A deep, JSON-safe clone so a test may mutate a fixture freely. */
