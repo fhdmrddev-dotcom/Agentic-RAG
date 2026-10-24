@@ -817,7 +817,9 @@ async def _typed_continue_or_none(
       (e) the run is handed to ``continue_run`` — the SAME code the button calls (D-14), so the
           resumed history is the button's history.
     A refused ``continue_run`` (a race to the last Continue) falls through to a normal send (D-16),
-    and a failed read fails OPEN to a normal send: a read never blocks a message.
+    and a failed read fails OPEN to a normal send: a read never blocks a message. So does ANY error
+    ``continue_run`` raises (WR-04) — except the one that means another Continue already claimed
+    this pause (WR-03), which reports ``continued`` rather than starting a second run beside it.
 
     ⛔ Binding: this DELEGATES. It writes nothing, and above all never ``runs.status`` —
     ``continue_run`` stays the only ``cap_paused → streaming`` writer, and the rejected arm recorded
@@ -851,15 +853,35 @@ async def _typed_continue_or_none(
         return None
     if (row["continues_used"] or 0) >= settings.max_continues_per_run:
         return None
-    from app.api.runs import continue_run  # noqa: PLC0415 — runs.py imports this module lazily; a top-level import cycles
+    from app.api.runs import CONTINUE_ALREADY_CLAIMED, continue_run  # noqa: PLC0415 — runs.py imports this module lazily; a top-level import cycles
 
-    res = await continue_run(
-        run_id=UUID(str(row["run_id"])),
-        current_user=current_user,
-        supabase=supabase,
-        service_supabase=service_supabase,
-        redis=redis,
-    )
+    try:
+        res = await continue_run(
+            run_id=UUID(str(row["run_id"])),
+            current_user=current_user,
+            supabase=supabase,
+            service_supabase=service_supabase,
+            redis=redis,
+        )
+    except HTTPException as exc:
+        if exc.status_code == status.HTTP_409_CONFLICT and exc.detail == CONTINUE_ALREADY_CLAIMED:
+            # 292.1-REVIEW WR-03: another Continue (the button) won THIS pause's compare-and-set, so
+            # the run is already resuming. Report that — a normal send would start a second run.
+            _used = (row["continues_used"] or 0) + 1
+            return JSONResponse(status_code=200, content={
+                "continued": True, "run_id": str(row["run_id"]), "message_id": None,
+                "continues_used": _used,
+                "continues_remaining": max(0, settings.max_continues_per_run - _used),
+            })
+        # 292.1-REVIEW WR-04: every other refusal (404, a status that moved, a failed counter
+        # write) falls back to a normal send, as promised above — never rejects the message.
+        logger.warning("typed continue: continue_run refused run %s (%s %s); sending as a new message",
+                       row["run_id"], exc.status_code, exc.detail)
+        return None
+    except Exception:  # noqa: BLE001 — WR-04: an unexpected failure never blocks the person's message
+        logger.warning("typed continue: continue_run failed for run %s; sending as a new message",
+                       row["run_id"], exc_info=True)
+        return None
     if isinstance(res, JSONResponse) or not isinstance(res, dict) or res.get("status") == "refused":
         return None
     return JSONResponse(

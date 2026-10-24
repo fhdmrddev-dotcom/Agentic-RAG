@@ -283,6 +283,45 @@ async def test_a_refused_continue_response_falls_through_to_a_new_message():
     _assert_normal_send(h, resp)
 
 
+@pytest.mark.parametrize(
+    "exc",
+    [
+        HTTPException(status_code=404, detail="Run not found"),
+        HTTPException(status_code=409, detail="This run has already finished, so there is nothing to continue."),
+        HTTPException(status_code=500, detail="Failed to record continue"),
+        RuntimeError("spawn blew up"),
+    ],
+    ids=["404", "409-finished", "500", "unexpected"],
+)
+@pytest.mark.asyncio
+async def test_a_continue_run_error_falls_back_to_a_normal_send(exc, caplog):
+    """292.1-REVIEW WR-04: the docstring promised a fall-back; only `refused` got one. Any error
+    from continue_run used to escape send_message and reject the person's message."""
+    h = _SendHarness(latest_run=_paused(1))
+    h.continue_run = AsyncMock(side_effect=exc)
+    with caplog.at_level("WARNING"):
+        resp, *_ = await _send(h, "continue")
+    h.continue_run.assert_awaited_once()
+    _assert_normal_send(h, resp)
+    assert any("typed continue" in r.getMessage() and r.levelname == "WARNING" for r in caplog.records)
+
+
+@pytest.mark.asyncio
+async def test_a_continue_already_claimed_by_the_button_reports_continued_not_a_second_run():
+    """292.1-REVIEW WR-03 × WR-04: the button won the compare-and-set for THIS pause, so the run is
+    already resuming. A normal send here would start a second run beside the continuation."""
+    from app.api.runs import CONTINUE_ALREADY_CLAIMED
+
+    h = _SendHarness(latest_run=_paused(1))
+    h.continue_run = AsyncMock(side_effect=HTTPException(status_code=409, detail=CONTINUE_ALREADY_CLAIMED))
+    resp, *_ = await _send(h, "continue")
+    assert resp.status_code == 200
+    payload = json.loads(resp.body)
+    assert payload["continued"] is True and payload["run_id"] == RUN_ID
+    assert payload["continues_used"] == 2 and payload["continues_remaining"] == 1
+    assert h.inserted_rows == [] and h.register.await_count == 0
+
+
 @pytest.mark.asyncio
 async def test_a_refused_continue_dict_falls_through_to_a_new_message():
     h = _SendHarness(latest_run=_paused(2), continue_result={"status": "refused", "continues_used": 3,
