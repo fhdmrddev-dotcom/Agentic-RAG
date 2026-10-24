@@ -20,6 +20,7 @@ per-provider round-trip invariant is preserved byte-identically.
 from __future__ import annotations
 
 import asyncio
+import hashlib
 import json
 import logging
 import re
@@ -63,6 +64,7 @@ from app.services.google_service import stream_google
 from app.services.tool_parser import parse_structured_tool_calls
 from app.services.artifact_history import redact_artifact_args  # 273 (I-4) — the one persist hook
 from app.services.structured_text_holdback import (  # 273 (SC#2, Pitfall 2, OV-273-04)
+    FAILED_CALL_NOTICE,
     StructuredTextHoldback,
     drop_held,
     failed_tool_call,
@@ -72,6 +74,7 @@ from app.services.text_tool_calls import (  # 292.1 (BUG-261024-03) — text-for
     TagHoldback,
     resolve_round_cap,
     settle,
+    strip_markup,
 )
 from app.services.citation_markers import (
     apply_citation_instruction,
@@ -379,8 +382,18 @@ async def persist_cap_paused(
     continues_used: int,
     emit: Callable[..., Awaitable[Any]],
     org_id: str | None = None,
+    reasoning_content: str | None = None,
 ) -> str:
     """Persist the dropped tool calls + emit the NON-terminal cap_paused event.
+
+    Phase 292.1 (D-07): an EMPTY buffer (the forced-final round wrote tool-call markup that could
+    not be parsed) still pauses. Its carrier holds ONE marker entry — kind set, name None — so the
+    Continue read's ``@>`` filter still matches THIS pause (an empty array would fall through to an
+    older pause's calls); ``load_cap_paused_tool_calls`` drops name-less entries, so nothing runs.
+
+    SEED-323: ``reasoning_content`` (the paused round's thinking) rides the FIRST carrier entry so
+    the Continue replay can pass it back — DeepSeek thinking mode 400s a replayed tool-call turn
+    without it (https://api-docs.deepseek.com/guides/thinking_mode). Absent → byte-identical.
 
     Phase 268 (D-268-22 / Pitfall 3): ``org_id`` is the turn's validated active org. The Continue
     endpoint looks the carrier up ``AND org_id = <the run's org>``; the run now carries the active
@@ -396,6 +409,10 @@ async def persist_cap_paused(
     """
     tool_names = [tc.get("name", "?") for tc in tool_calls_buffer.values()]
     carrier = build_cap_paused_carrier_tool_calls(tool_calls_buffer)
+    if not carrier:  # 292.1 (D-07): the empty-queue marker
+        carrier = [{"kind": "iteration_cap_paused", "tool_call_id": None, "name": None, "arguments": None}]
+    elif reasoning_content:  # SEED-323
+        carrier[0]["reasoning_content"] = reasoning_content
 
     # (1) DURABLE persist FIRST (the Continue endpoint reads this row).
     try:
@@ -407,7 +424,7 @@ async def persist_cap_paused(
                 "content": (
                     f"⏸ Reached the iteration limit with {len(tool_names)} "
                     f"tool(s) still queued. Continue to run them."
-                ),
+                ) if tool_names else "⏸ Reached the tool-use limit for this turn. Continue to keep going.",
                 "tool_calls": carrier,
                 **({"org_id": org_id} if org_id else {}),
             })
@@ -427,7 +444,7 @@ async def persist_cap_paused(
         message=(
             f"⏸ Reached the iteration limit — {len(tool_names)} tool(s) "
             f"weren't run yet. Continue to run them."
-        ),
+        ) if tool_names else "⏸ Reached the tool-use limit for this turn. Continue to keep going.",
         tool_names=tool_names,
         continues_used=continues_used,
         continues_remaining=continues_remaining,
@@ -1998,11 +2015,22 @@ async def run_agent_loop(
                 "Agent loop produced no content for thread %s — persisting empty assistant message",
                 thread_id,
             )
+        # 292.1 (D-10 / D-24): the provider-blind save point — tool-call markup is never persisted,
+        # by any route; markup-only becomes the one worded sentence, never an empty answer.
+        _saved_content = strip_markup(full_content)
+        if _saved_content is not full_content:
+            logger.warning(
+                "text_tool_markup_at_save run=%s len=%d sha256=%s preview=%r",
+                run_id, len(full_content) - len(_saved_content),
+                hashlib.sha256(full_content.encode("utf-8")).hexdigest(), full_content[:200],
+            )
+            if not _saved_content.strip():
+                _saved_content = FAILED_CALL_NOTICE
         row: dict = {
             "thread_id": thread_id,
             "user_id": current_user["id"],
             "role": "assistant",
-            "content": _strip_nul(full_content),
+            "content": _strip_nul(_saved_content),
         }
         if persisted_tool_calls:
             completed_tools = [tc for tc in persisted_tool_calls if tc.get("status") == "done"]
@@ -2030,7 +2058,7 @@ async def run_agent_loop(
                 await get_pg_pool(),
                 thread_id=UUID(thread_id) if isinstance(thread_id, str) else thread_id,
                 user_id=UUID(current_user["id"]) if isinstance(current_user["id"], str) else current_user["id"],
-                content=_strip_nul(full_content),
+                content=_strip_nul(_saved_content),
                 tool_calls=row.get("tool_calls"),
                 source_refs=row.get("source_refs"),
                 confidence_level=row.get("confidence_level"),
@@ -2185,6 +2213,10 @@ async def run_agent_loop(
                 }
                 for dc in ctx.dropped_tool_calls
             ]
+            # SEED-323 (292.1): the paused round's reasoning rides the first carrier entry; DeepSeek
+            # thinking mode 400s a replayed tool-call turn without it
+            # (https://api-docs.deepseek.com/guides/thinking_mode). Provider-blind: only when present.
+            _resume_rc = (ctx.dropped_tool_calls[0] or {}).get("reasoning_content")
             messages.append({
                 "role": "assistant",
                 "tool_calls": [
@@ -2195,6 +2227,7 @@ async def run_agent_loop(
                     }
                     for rc in _resume_calls
                 ],
+                **({"reasoning_content": _resume_rc} if _resume_rc else {}),
             })
             _resume_ctx = ToolContext(
                 redis=redis,
@@ -2904,6 +2937,7 @@ async def run_agent_loop(
                     continues_used=_continues_used,
                     emit=_emit,
                     org_id=current_user.get("org_id"),  # Phase 268 (D-268-22 / Pitfall 3)
+                    reasoning_content=full_reasoning_content or None,  # SEED-323 (292.1)
                 )
                 tool_calls_buffer = {}   # persisted above — now skip the tool execution round
 

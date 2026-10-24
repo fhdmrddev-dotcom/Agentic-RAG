@@ -399,8 +399,11 @@ async def test_d_qwen_xml_at_the_cap_pauses_with_the_marker(prefix):
     run = await _drive([SEARCH, _deltas(_split(prefix + F4, 6))], user_settings=CAP2)
     assert _carriers(run)[0]["tool_calls"] == [MARKER]
     persisted = _persisted_field(run["persisted"], "content")
-    assert "<tool_call>" not in persisted
-    assert persisted == prefix
+    assert "<tool_call>" not in persisted and "search_documents" not in persisted
+    if prefix:
+        assert persisted == prefix
+    # (markup-only: the run ends with no text, so the loop's existing empty-answer sentence is what
+    # persists — exactly as for a structured cap call with no preamble; never the markup.)
     assert "".join(_delta_texts(run["emits"])) == persisted
 
 

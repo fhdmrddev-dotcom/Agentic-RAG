@@ -227,7 +227,10 @@ async def load_cap_paused_tool_calls(
         )
     if row is None:
         return []
-    return list(row["tool_calls"] or [])
+    # Phase 292.1 (D-07, Pitfall 2): an empty-queue pause writes ONE name-less marker entry so the
+    # filter above still matches THAT pause (an empty array would fall through to an older pause and
+    # re-run its stale calls). The marker is not a call: drop it, so Continue dispatches nothing.
+    return [tc for tc in (row["tool_calls"] or []) if isinstance(tc, dict) and tc.get("name")]
 
 
 async def insert_assistant_message(
