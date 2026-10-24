@@ -432,6 +432,17 @@ H3_NAMES = ["search_documents"] * 10 + ["execute_code"] + ["search_documents"] *
 HARMONY_ONE = ' to=functions.search_documents  code:\n{"query":"project plan"}'   # H4 without the tail
 
 
+def test_f7_is_unreachable_for_every_pre_f7_fixture():
+    """Every other family stays byte-identical: F7's opener matches none of their fixtures, so the
+    new branch never runs for them and the tests above keep pinning their exact outputs."""
+    pre_f7 = [F1, F2, F3, F4, F5, F6, F1_TRUNCATED, F3_TWO_INVOKES, *PROSE_MENTIONS,
+              *(PREAMBLE + b for b in (F1, F2, F3, F4, F5, F6))]
+    for text in pre_f7:
+        assert ttc.HARMONY_OPENER_RE.search(text) is None, text[:60]
+        hit = ttc._first_markup(text)
+        assert hit is None or hit[1] != "harmony"
+
+
 @pytest.mark.parametrize("text", MEASURED_HARMONY, ids=MEASURED_IDS)
 def test_f7_every_measured_row_is_markup_from_its_first_character(text):
     assert ttc.detect_markup(text) == 0
@@ -501,7 +512,7 @@ def test_f7_a_recipient_with_no_namespace_refuses_the_block_but_is_still_strippe
 
 
 def test_f7_a_truncated_block_is_refused_and_stripped_to_the_end():
-    text = "Searching now.\n" + HARMONY_ONE[:-6]
+    text = "Searching now.\n" + HARMONY_ONE.lstrip()[:-6]
     s = ttc.settle(text, OFFERED, buffer_has_calls=False)
     assert s.kind == "unparseable" and s.calls == []
     assert s.visible == "Searching now.\n"
@@ -517,7 +528,7 @@ def test_f7_settle_parses_the_measured_rows_and_shows_no_recipient(text, visible
 
 
 def test_f7_with_structured_calls_already_queued_it_only_strips():
-    s = ttc.settle("Pre\n" + HARMONY_ONE, OFFERED, buffer_has_calls=True)
+    s = ttc.settle("Pre\n" + HARMONY_ONE.lstrip(), OFFERED, buffer_has_calls=True)
     assert s.kind == "stripped" and s.calls == [] and s.visible == "Pre\n"
 
 
@@ -577,7 +588,20 @@ def test_f7_the_holdback_releases_only_the_preamble(n):
 
 
 def test_f7_a_split_recipient_is_held_across_chunks():
+    # Mid-text, the blank before the recipient is the preamble's (only start-of-text blanks belong
+    # to the block), so it streams; the recipient itself is held from its first character.
     hb = ttc.TagHoldback()
-    out = "".join(hb.feed(c) for c in ["Hi.", " ", "to", "=func", "tions.search_documents", " code:\n",
+    out = "".join(hb.feed(c) for c in ["Hi.", " ", "t", "o", "=func", "tions.search_documents", " code:\n",
                                        '{"query":"x"}'])
-    assert out == "Hi."
+    assert out == "Hi. "
+    start = ttc.TagHoldback()
+    out = "".join(start.feed(c) for c in [" ", "t", "o=functions.", "search_documents", "  code:\n{}"])
+    assert out == ""   # at the start of the text the blank belongs to the block
+
+
+def test_f7_holdback_and_settle_agree_on_where_the_block_starts():
+    for text in ("Pre " + HARMONY_ONE.lstrip(), "Pre\n" + HARMONY_ONE, HARMONY_ONE, "(" + HARMONY_ONE.lstrip()):
+        for n in (1, 2, 3, 5):
+            hb = ttc.TagHoldback()
+            released = "".join(hb.feed(c) for c in _split(text, n))
+            assert released == ttc.settle(text, OFFERED, buffer_has_calls=False).visible, (text, n)
