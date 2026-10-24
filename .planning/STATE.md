@@ -3,7 +3,7 @@ gsd_state_version: 1.0
 milestone: v4.7
 milestone_name: Workflows You Can See and Start Anywhere
 status: milestone_complete
-last_updated: "2026-10-24T07:02:48.542Z"
+last_updated: "2026-10-24T07:03:10.922Z"
 progress:
   total_phases: 18
   completed_phases: 9
@@ -28,7 +28,7 @@ See: `.planning/PROJECT.md` (updated 2026-10-18)
 
 **Core value:** The agent acts as an AI colleague — it knows your knowledge base, can run code, and
 can be taught new behaviours (skills) that persist and can be shared.
-**Current focus:** Phase 292.1 — Tool-limit Continue that always fires (then 293)
+**Current focus:** Phase 292.1 — Tool-limit Continue that always fires
 
 ---
 
@@ -41,7 +41,7 @@ reviewer exists, so a phase closes `verification_mode: self-verified`, never `re
 
 ## Current Position
 
-Phase: 292.1 (Tool-limit Continue that always fires) — inserted 2026-10-24, not started; then 293 (Start From Outside, and Close Out). 288 + 295 CLOSED 2026-10-24 (operator signed; their guardrail overrides discharged). (SDK phase.complete mis-set the focus again; corrected by hand.)
+Phase: 292.1 (Tool-limit Continue that always fires) — EXECUTING
 Previous: Phase: 292 (More Ways to Show It) — COMPLETE 2026-10-24, operator signed G-4
   **DEPLOYED 2026-10-24: production 6db8cf40a (master e10fca283) carries 292.** Mig 213 applied to cloud first (VERIFY 8/8, advisors 0 ERROR); pre-promotion gates: deploy-drift PASS, greenfield privileges OK, schema ACL parity OK; prod /health 200, /docs 401. Operator smoke test (a diagram/comparison/timeline chat on the live domain) recommended.
   3/3 plans + review fixes on develop (last 2b4ee5998). 4/4 SC verified in code; registry 3 → 6, tool count 30. Gates: backend 70 failed (= base), vitest count gate OK 11878, tsc 63 == base.
@@ -55,7 +55,7 @@ Previous: Phase: 292 — EXECUTING
   UAT fixes on develop: 6f3311262, d01547f50, 183cac200, 34f643ce7, e03c3c88e, f8ee7d051. Open findings + triggers: 291 deferred-items.md; BUG-261024-01 (Moonshot schema).
   Mig 212 APPLIED to cloud Supabase 2026-10-24 (verified); full-schema.sql regenerated (251b44639). Anthropic key ROTATED by the operator 2026-10-24 (the key held in old LangSmith traces is revoked).
 Previous: Phase: 290 (the-card-and-the-team-picture) — EXECUTED, human_needed (2026-10-22)
-Plan: Not started
+Plan: 1 of 4
 
 ### Roadmap Evolution
 

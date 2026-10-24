@@ -324,9 +324,9 @@ Plans:
 
 **Wave 1** *(parallel; 02 is the only plan that mutates the local DB)*
 
-- [ ] 292.1-01-PLAN.md — backend: provider-blind DSML parser + markup detector/holdback (`text_tool_calls.py`), cap pause on text calls, empty-queue marker, save-point sanitiser, round-cap read, SEED-323 reasoning replay, deepseek-only strip retired (TDD)
-- [ ] 292.1-02-PLAN.md — round-cap knobs: migration 214 (applied locally), settings plumbing, `AgentRoundLimits` leaf with one mount in Settings
-- [ ] 292.1-03-PLAN.md — typed continue (one delegating branch in send), Continue on the run's own model, SEED-324 terminal refusal, "Continuing…" + limit-line copy on the card (TDD)
+- [x] 292.1-01-PLAN.md — backend: provider-blind DSML parser + markup detector/holdback (`text_tool_calls.py`), cap pause on text calls, empty-queue marker, save-point sanitiser, round-cap read, SEED-323 reasoning replay, deepseek-only strip retired (TDD)
+- [x] 292.1-02-PLAN.md — round-cap knobs: migration 214 (applied locally), settings plumbing, `AgentRoundLimits` leaf with one mount in Settings
+- [x] 292.1-03-PLAN.md — typed continue (one delegating branch in send), Continue on the run's own model, SEED-324 terminal refusal, "Continuing…" + limit-line copy on the card (TDD)
 
 **Wave 2** *(blocked on Wave 1 completion)*
 
