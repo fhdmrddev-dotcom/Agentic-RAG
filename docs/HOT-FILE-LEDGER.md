@@ -11658,7 +11658,7 @@ cells rot within days.
 | [`frontend/src/hooks/useDocuments.ts`](docs/HOT-FILE-LEDGER.md#frontendsrchooksusedocumentsts) | 10 / 5 / 164 (was `8 / 3 / 120`) | ⚠ **FIRES** | **284-03**: never fetches a list of its own (D-24); INSERT / DELETE call `onChange` (one debounced refetch), on-page UPDATE merges. ⛔ the spread-merge keeps `*_stage_applies` |
 | [`frontend/src/pages/KnowledgeHealthPage.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrcpagesknowledgehealthpagetsx) | 12 / 6 / **DELETED** | ⚠ **FIRES** | **RETIRED (217.1-14)** — the Library's Health tab absorbed it; `ChatLayout`'s fallback replaced by `UnknownViewFallback` (`:871`). ⚠ absent for its ENTIRE LIFE |
 | [`backend/app/api/knowledge_health.py`](docs/HOT-FILE-LEDGER.md#backendappapiknowledgehealthpy) | 14 / 7 / 991 (was `11 / 6 / 737`) | ⚠ **FIRES** | ⚠ STALE (`11/6/737`). **272-04**: the trend skips `invalid_filter` / `refused_retry` rows (4 lines, D-24); kind 2 still counts |
-| [`backend/app/services/agent_loop.py`](docs/HOT-FILE-LEDGER.md#backendappservicesagent_looppy) | 74 / 35 / 3753 (was `72 / 34 / 3699`) | ⚠ **FIRES** | 292.1-01: call sites only — tag holdback feed, ONE post-drain settle, round-cap knob read; the rules live in text_tool_calls.py. ⛔ prompt-assembly seam OWED (OV-273-03) |
+| [`backend/app/services/agent_loop.py`](docs/HOT-FILE-LEDGER.md#backendappservicesagent_looppy) | 75 / 35 / 3759 (was `74 / 35 / 3753`) | ⚠ **FIRES** | 292.1 D-UAT-1: cap carrier + Continue replay carry Gemini's thought_signature (+6, no new branch). ⛔ prompt-assembly seam OWED (OV-273-03) |
 | [`backend/app/services/context_window.py`](docs/HOT-FILE-LEDGER.md#backendappservicescontext_windowpy) | 10 / 5 / 602 | ⚠ **FIRES** | ⚠ absent for its ENTIRE LIFE at 5 phases — row added 250-01. honoured by construction: ONE removal-ORDER rule inside one private helper. ⛔ `_build_candidate` byte-unchanged |
 | [`backend/app/services/run_producer.py`](docs/HOT-FILE-LEDGER.md#backendappservicesrun_producerpy) | 25 / 13 / 1212 (was `24 / 12 / 1150`) | ⚠ **FIRES** | 292.1-03: spawn_continuation_run(model, provider) resumes on the run's own pair, byte-identical when None; one-WARNING fallback in _resolve_continuation_model. Honoured by construction |
 | [`backend/app/services/todos_service.py`](docs/HOT-FILE-LEDGER.md#backendappservicestodos_servicepy) | 4 / 3 / 187 | ⚠ **FIRES** | ⚠ absent for its ENTIRE LIFE at 3 phases — row added 250-02, which leaves the file BYTE-UNCHANGED. ⛔ `_RUN_ENDED_MARKER` is now bound by a frontend `?raw` fence |
@@ -24531,4 +24531,14 @@ Scan-list disposition cell before the review fixes (replaced): young (created 29
 **Why:** measured on the 292.1 live board, 2026-10-24. Once a Continue re-paused at the tool-round cap, `runs.status` read `cap_paused` (in the DB CHECK since migration 063), and `GET /threads/{id}/messages` + `/snapshot` returned **HTTP 500** (`ValidationError ... input_value='cap_paused'`). Threads `e901e539` and `a6d673d1` could not be opened. The defect predates 292.1; 292.1 made it reachable by making Continue work. Pinned by `test_2921_message_run_status_cap_paused.py`.
 
 ⛔ **Invariant:** this Literal MUST mirror every value of `public.runs.status`'s CHECK. A narrower Literal 500s the WHOLE thread on one row (the BUG-260528-01 class, same as `role` above).
+
+### `backend/app/services/agent_loop.py` — Phase 292.1 D-UAT-1 (live-board fix)
+
+**CLAUDE.md verdict cell as of 2026-10-24 (replaced):** 292.1-01: call sites only; rules live in text_tool_calls.py · seam OWED · ⛔
+
+**Triple:** `75 / 35 / 3759` (was `74 / 35 / 3753`). **Change:** `build_cap_paused_carrier_tool_calls` keeps `thought_signature` when the buffered call has one, and the Continue resume turn echoes it on each tool_call, using the D-075.5-01 shape the main dispatch already uses (~3113). Both changes are conditional spreads: no new `if` statement, and unsigned carriers stay byte-identical (`test_l_an_unsigned_carrier_replays_without_a_signature_key`, `test_i_*`, `test_268_*`).
+
+**Why:** measured on the 292.1 live board, 2026-10-24. Gemini `gemini-3.8-flash` paused at cap=2 with a structured call, and Continue then replayed it without a signature. Gemini answered 400 "Function call is missing a thought_signature", and the continuation ended `failed` (run `578f2f1e`). Same class as SEED-323, which 292.1-01 fixed for DeepSeek `reasoning_content`.
+
+⛔ **Invariant:** anything a provider requires to be round-tripped on an assistant tool-call turn must ride the cap carrier as well. Otherwise Continue is the one replay path that drops it.
 

@@ -367,6 +367,9 @@ def build_cap_paused_carrier_tool_calls(tool_calls_buffer: dict) -> list[dict]:
             "tool_call_id": tc.get("id"),
             "name": tc.get("name", "?"),
             "arguments": tc.get("arguments"),
+            # 292.1 D-UAT-1: Gemini 400s a replayed call without its thought_signature
+            # (D-075.5-01). Only when present, so every other carrier stays byte-identical.
+            **({"thought_signature": tc["thought_signature"]} if tc.get("thought_signature") else {}),
         })
     return carrier
 
@@ -2210,6 +2213,7 @@ async def run_agent_loop(
                     "id": dc.get("tool_call_id") or "",
                     "name": dc.get("name", "?"),
                     "arguments": dc.get("arguments") or "{}",
+                    "thought_signature": dc.get("thought_signature"),
                 }
                 for dc in ctx.dropped_tool_calls
             ]
@@ -2224,6 +2228,8 @@ async def run_agent_loop(
                         "id": rc["id"],
                         "type": "function",
                         "function": {"name": rc["name"], "arguments": rc["arguments"]},
+                        # 292.1 D-UAT-1: echo Gemini's signature the D-075.5-01 way (main path ~3113).
+                        **({"thought_signature": rc["thought_signature"]} if rc["thought_signature"] else {}),
                     }
                     for rc in _resume_calls
                 ],
