@@ -109,8 +109,11 @@ def _settings(**over) -> SimpleNamespace:
 
 async def _drive(streams: list, *, user_settings=None, agent_mode=None,
                  calling_mode=CallingMode.NATIVE, tool_result: str = "[]",
-                 ctx_extra: dict | None = None, history: list | None = None) -> dict:
+                 ctx_extra: dict | None = None, history: list | None = None,
+                 continues_used: int | None = None) -> dict:
     tables = {"threads": {"folder_id": None}, "messages": list(history or []), "skills": [], "user_memory": []}
+    if continues_used is not None:  # the cap block's one `runs` read (durable continues_used)
+        tables["runs"] = {"continues_used": continues_used}
     inserts: list = []
 
     async def _fake_aexec(q):
@@ -809,3 +812,176 @@ async def test_n_prose_mentioning_a_recipient_is_byte_identical_and_never_pauses
 async def test_n_live_deltas_equal_the_persisted_content(n):
     run = await _drive([SEARCH, _deltas(_split("Let me search." + H4_34748d7c, n))], user_settings=CAP2)
     assert "".join(_delta_texts(run["emits"])) == _persisted_field(run["persisted"], "content")
+
+
+# ── Loop test O (292.1 operator option A, 2026-10-24): an EMPTY forced-final round pauses ──────────
+# Measured on the forced-pending board: anthropic claude-opus-5-5 (3 of 3 runs) and once openai
+# gpt-5.6-luna (run 7c9a4a3f) reached the round cap mid-plan, and the forced-final round (no tools
+# sent) came back with NO text and NO call. The run ended `completed`, saved the loop's fallback
+# sentence ("…never wrote an answer…") and offered no Continue, though the plan was unfinished.
+# Option A: that round pauses `cap_paused` exactly like D-07's empty queue — the name-less MARKER
+# carrier, the same non-terminal event, the limit line + Continue — and the sentence is not saved.
+
+NEVER_ANSWERED = "never wrote an answer"
+THOUGHT = "Next I should chart the remaining quarters."
+
+
+def _assert_marker_pause(run, *, marker: dict) -> None:
+    assert run["dispatched"] == [("search_documents", {"query": "revenue"})]
+    assert len(run["cap_calls"]) == 1
+    assert run["cap_calls"][0]["tool_calls_buffer"] == {}
+    carriers = _carriers(run)
+    assert len(carriers) == 1
+    assert carriers[0]["tool_calls"] == [marker]
+    assert carriers[0]["content"] == "⏸ " + LIMIT_LINE + " Continue to keep going."
+    events = _cap_events(run)
+    assert len(events) == 1
+    assert events[0]["message"] == "⏸ " + LIMIT_LINE + " Continue to keep going."
+    assert events[0]["tool_names"] == []
+    assert run["result"].cap_disposition == "cap_paused"
+    persisted = _persisted_field(run["persisted"], "content")
+    assert NEVER_ANSWERED not in persisted
+    assert NEVER_ANSWERED not in "".join(_delta_texts(run["emits"]))
+    assert persisted == ""
+
+
+@pytest.mark.asyncio
+async def test_o_a_an_empty_forced_final_round_pauses_with_the_marker():
+    run = await _drive([SEARCH, _deltas([])], user_settings=CAP2)
+    assert _forced(run) == [False, True]
+    _assert_marker_pause(run, marker=MARKER)
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("blank", [" ", "\n\n"], ids=["space", "newlines"])
+async def test_o_a_a_whitespace_only_forced_final_round_is_no_answer_either(blank):
+    run = await _drive([SEARCH, _deltas([blank])], user_settings=CAP2)
+    assert len(_cap_events(run)) == 1
+    assert _carriers(run)[0]["tool_calls"] == [MARKER]
+    assert NEVER_ANSWERED not in _persisted_field(run["persisted"], "content")
+
+
+@pytest.mark.asyncio
+async def test_o_b_a_reasoning_only_forced_final_round_pauses_with_reasoning_on_the_marker():
+    run = await _drive([SEARCH, _thinking(THOUGHT) + _deltas([])], user_settings=CAP2)
+    _assert_marker_pause(run, marker={**MARKER, "reasoning_content": THOUGHT})
+
+
+@pytest.mark.asyncio
+async def test_o_b_the_marker_still_yields_nothing_to_continue_with_reasoning_on_it():
+    """Reasoning on the marker is a record, not a call: the Continue read still drops it (D-07)."""
+    from app.db import runs as runs_db
+
+    run = await _drive([SEARCH, _thinking(THOUGHT) + _deltas([])], user_settings=CAP2)
+
+    class _Pool:
+        async def fetchrow(self, _sql, *_args):
+            return {"tool_calls": _carriers(run)[0]["tool_calls"]}
+
+    assert await runs_db.load_cap_paused_tool_calls(_Pool(), uuid4()) == []
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("n", [1, 7])
+async def test_o_c_a_forced_final_round_that_wrote_prose_completes_byte_identically(n):
+    run = await _drive([SEARCH, _deltas(_split(ANSWER, n))], user_settings=CAP2)
+    assert _forced(run) == [False, True]
+    assert run["cap_calls"] == [] and _carriers(run) == []
+    assert "cap_paused" not in _types(run["emits"])
+    assert run["result"].cap_disposition is None
+    assert "".join(_delta_texts(run["emits"])) == ANSWER
+    assert _persisted_field(run["persisted"], "content") == ANSWER
+
+
+@pytest.mark.asyncio
+async def test_o_d_an_empty_answer_before_the_cap_keeps_todays_fallback_byte_identically():
+    # Default cap 15: round 2 is empty, the one empty-retry runs round 3, also empty → the loop's
+    # fallback. The cap is never reached, so option A does not apply.
+    run = await _drive([SEARCH, _deltas([]), _deltas([])])
+    assert _forced(run) == [False, False, False]
+    assert run["cap_calls"] == [] and _carriers(run) == []
+    assert "cap_paused" not in _types(run["emits"])
+    assert run["result"].cap_disposition is None
+    expected = ("*The model produced 1 tool call(s) over 3 step(s) and never wrote an answer. "
+                "Try breaking the request into smaller steps, or switching to a different model.*")
+    assert _delta_texts(run["emits"]) == [expected]
+    assert _persisted_field(run["persisted"], "content") == expected
+
+
+@pytest.mark.asyncio
+async def test_o_e_continue_from_the_empty_pause_dispatches_nothing_and_the_model_resumes():
+    user = [{"role": "user", "content": "chart my revenue", "tool_calls": None, "reasoning_content": None}]
+    first = await _drive([SEARCH, _deltas([])], user_settings=CAP2, history=user)
+    assert first["result"].cap_disposition == "cap_paused"
+
+    # Production: runs.py reads the carrier through load_cap_paused_tool_calls, which drops the
+    # name-less marker, so the Continue carries an EMPTY queue.
+    from app.db import runs as runs_db
+
+    class _Pool:
+        async def fetchrow(self, _sql, *_args):
+            return {"tool_calls": _carriers(first)[0]["tool_calls"]}
+
+    queued = await runs_db.load_cap_paused_tool_calls(_Pool(), uuid4())
+    assert queued == []
+
+    cont = await _drive([_deltas([ANSWER])], user_settings=CAP2, history=user + _rows_written(first),
+                        ctx_extra={"resume_dropped_tool_calls": True, "dropped_tool_calls": tuple(queued)})
+    assert cont["dispatched"] == []
+    assert _forced(cont) == [False], "a fresh budget: the resumed round is offered tools"
+    sent = cont["requests"][0].messages
+    # The model resumes from its OWN history: the paused turn's search and its result are there.
+    assert any(m.get("role") == "assistant" and m.get("tool_calls")
+               and m["tool_calls"][0]["id"] == "call_struct0" for m in sent)
+    assert any(m.get("role") == "tool" and m.get("tool_call_id") == "call_struct0" for m in sent)
+    assert cont["cap_calls"] == [] and "cap_paused" not in _types(cont["emits"])
+    assert _persisted_field(cont["persisted"], "content") == ANSWER
+
+
+@pytest.mark.asyncio
+async def test_o_exhausted_continues_still_pause_the_way_the_existing_cap_path_does():
+    """Mirrors the structured / D-07 cap: the loop always pauses and reports 0 remaining; the
+    Continue endpoint refuses the (max_continues_per_run)-th Continue (runs.py)."""
+    from app.config import settings
+
+    used = settings.max_continues_per_run
+    empty = await _drive([SEARCH, _deltas([])], user_settings=CAP2, continues_used=used)
+    structured = await _drive([SEARCH, _call("search_documents", {"query": "more"})],
+                              user_settings=CAP2, continues_used=used)
+    for run in (empty, structured):
+        (event,) = _cap_events(run)
+        assert event["continues_used"] == used
+        assert event["continues_remaining"] == 0
+        assert run["result"].cap_disposition == "cap_paused"
+
+
+def test_o_the_carrier_is_what_run_is_cap_paused_keys_on():
+    """``run_is_cap_paused`` reads a role='system' carrier whose tool_calls CONTAIN
+    {"kind": "iteration_cap_paused"} — the same predicate a D-07 marker satisfies."""
+    import inspect
+
+    from app.db import runs as runs_db
+
+    src = inspect.getsource(runs_db.run_is_cap_paused)
+    assert "m.role = 'system'" in src
+    assert """m.tool_calls @> '[{"kind": "iteration_cap_paused"}]'::jsonb""" in src
+    assert MARKER["kind"] == "iteration_cap_paused"
+
+
+@pytest.mark.asyncio
+async def test_o_the_empty_pause_carrier_row_satisfies_that_predicate():
+    run = await _drive([SEARCH, _deltas([])], user_settings=CAP2)
+    (row,) = _carriers(run)
+    assert row["role"] == "system"
+    assert any(isinstance(e, dict) and e.get("kind") == "iteration_cap_paused" for e in row["tool_calls"])
+
+
+def test_o_the_rule_is_one_pure_helper():
+    from app.services.text_tool_calls import cap_round_unanswered as f
+
+    assert f(force_no_tools=True, buffer_has_calls=False, markup_seen=False, visible="") is True
+    assert f(force_no_tools=True, buffer_has_calls=False, markup_seen=False, visible=" \n") is True
+    assert f(force_no_tools=False, buffer_has_calls=False, markup_seen=False, visible="") is False
+    assert f(force_no_tools=True, buffer_has_calls=True, markup_seen=False, visible="") is False
+    assert f(force_no_tools=True, buffer_has_calls=False, markup_seen=True, visible="") is False
+    assert f(force_no_tools=True, buffer_has_calls=False, markup_seen=False, visible=ANSWER) is False
