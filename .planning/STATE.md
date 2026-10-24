@@ -41,7 +41,11 @@ reviewer exists, so a phase closes `verification_mode: self-verified`, never `re
 
 ## Current Position
 
-Phase: 292.1 (Tool-limit Continue that always fires) — EXECUTING
+Phase: 293 (Start From Outside, and Close Out) — NEXT (discuss-phase not started)
+Previous: Phase: 292.1 (Tool-limit Continue that always fires) — CLOSED BY DECISION 2026-10-24, operator signed G-4. NOT deployed.
+  4 plans + review fixes + 7 live-found fixes on develop (last 90f485dd2). Verifier human_needed (no code gaps). Gates: backend 70 failed / 9595 (<=71), vitest count gate OK 11936.
+  OWED: OpenRouter DeepSeek board row (402 out of credits) — BUG-261024-03 stays `folded` until `scripts/run-2921-board.py --run --providers openrouter` passes after a top-up. Moonshot ⛔ (account suspended).
+  Deploy order: migration 214 to cloud FIRST, then backend; get_advisors(security) at that deploy.
 Previous: Phase: 292 (More Ways to Show It) — COMPLETE 2026-10-24, operator signed G-4
   **DEPLOYED 2026-10-24: production 6db8cf40a (master e10fca283) carries 292.** Mig 213 applied to cloud first (VERIFY 8/8, advisors 0 ERROR); pre-promotion gates: deploy-drift PASS, greenfield privileges OK, schema ACL parity OK; prod /health 200, /docs 401. Operator smoke test (a diagram/comparison/timeline chat on the live domain) recommended.
   3/3 plans + review fixes on develop (last 2b4ee5998). 4/4 SC verified in code; registry 3 → 6, tool count 30. Gates: backend 70 failed (= base), vitest count gate OK 11878, tsc 63 == base.
@@ -85,6 +89,8 @@ MILESTONE-AUDIT, STATE-at-close, phases/), tag `v4.6` (local, not pushed), 24/24
 Live at `4e767a3a2` (2026-10-16): phases 280-285, migrations 207-209 in cloud. Branch `develop`.
 
 ## Owed (operator)
+
+- 292.1: top up OpenRouter, then run the OpenRouter board row to close BUG-261024-03; merged worktree branches undeleted (omc guardrail blocks `git branch -D`).
 
 - Confirm the Coolify rebuild from outside; run a logged-in production smoke test.
 - 282: G4-4, G4-6 (needs an approved write), A1 LangSmith nesting, Add-form click-through.
