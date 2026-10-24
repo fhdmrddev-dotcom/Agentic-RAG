@@ -123,16 +123,16 @@ result: [pending — agent drive 2026-10-21 PASSED on content (`6b4afbc0`: "The 
 ### 8. Anthropic roster row (D-33)
 expected: Re-run the S1 roster row on Anthropic once billing is restored. On 2026-10-21 every KB sub-run failed with "Your credit balance is too low to access the Anthropic API".
 
-result: [blocked: billing — still out of credit at 2026-10-21 02:46Z (run `f0d5d678`). That run now fails with the outage sentence instead of offering the found-nothing choices (WR-01)]
+result: passed — re-run 2026-10-24 after billing was restored, run `02122650` (thread `769ec167`, requested `claude-opus-5-5`). All 3 KB sub-runs `completed` on `claude-haiku-4-5-20251001` with no error. Paused after about 30 s with the three choices; `Continue without sources` answered 200; the run ended `completed` with `unsourced` on `research`. (Was: blocked on billing at 2026-10-21 02:46Z, run `f0d5d678`.)
 
 ## Summary
 
 total: 8
-passed: 0
+passed: 1
 issues: 1
 pending: 6
 skipped: 0
-blocked: 1
+blocked: 0
 
 ## Gaps
 

@@ -365,6 +365,8 @@ The chat home's lived experience is still owed two fixes:
 
 The Anthropic roster row stays ⛔ (billing). The credit was still out at 02:46Z (`f0d5d678`'s sub-runs).
 
+**2026-10-24: the Anthropic roster row was re-run after billing was restored, and it PASSES.** Same method as the other seven rows: the S1 plant (`3b6794c0`), thread `769ec167`, per-request `claude-opus-5-5` / `anthropic`. Workflow run `02122650` went `paused` after about 30 s, with an `engine_pause` prompt row and three choices. `harness_audit` shows 3 × `gate_failed` (`citations_required: nothing was retrieved (0 sources)`) and then `engine_ask_pause` (`no_sources`). All 3 KB sub-runs (`58fcd702`, `eaf12cff`, `d6aaeef7`) `completed` on `claude-haiku-4-5-20251001` with no error, and the step text is the model's own found-nothing answer, not a provider error. `Continue without sources` through `POST /runs/{id}/ask_user_response` answered 200. `validator_ask_user_approved` (`unsourced: true`) was logged, both steps completed, and the run ended `completed` with `unsourced` set on `research`. No global setting was touched.
+
 ### Plants, cleanup and the id-snapshot diff
 
 **Plants made through the app:**
@@ -498,7 +500,7 @@ Row method: drive the S1 plant (KB step over an empty folder) as a real run with
 | # | Provider | Requested (= `workflow_runs.model`) | KB step ran on (sub-runs) | Paused with choices | Continue → completed + unsourced | Verdict |
 |---|---|---|---|---|---|---|
 | 1 | OpenAI | `gpt-5.6-sol` | `gpt-5.4-mini` | yes, 18 s, 3 choices | yes (`7a58cce3`) | **PASS** |
-| 2 | Anthropic | `claude-opus-5-5` | `claude-haiku-4-5-20251001`, **all 3 sub-runs `failed`**: `Your credit balance is too low to access the Anthropic API` | yes, 6 s | yes (`b87cb924`) | ⛔ **BLOCKED (billing), re-tested, not assumed.** The pause and continue mechanics did run, but the KB step never searched. See the finding below. |
+| 2 | Anthropic | `claude-opus-5-5` | `claude-haiku-4-5-20251001`, all 3 sub-runs `completed`, no error (re-run 2026-10-24) | yes, 30 s, 3 choices | yes (`02122650`) | **PASS** (re-run 2026-10-24 after billing was restored; thread `769ec167`). On 2026-10-21 this row was ⛔ BLOCKED (billing): all 3 sub-runs `failed` with `Your credit balance is too low to access the Anthropic API` (run `b87cb924`). See the finding below. |
 | 3 | Google | `gemini-3.8-flash` | `gemini-3.5-flash` | yes, 104 s | yes (`31270f19`) | **PASS** |
 | 4 | DeepSeek | `deepseek-v4-pro` | `deepseek-v4-flash` | yes, 49 s | yes (`dc41bf73`) | **PASS** |
 | 5 | Zhipu / GLM | `glm-5.3` | `glm-5-turbo` | yes, 97 s | yes (`c56ce422`) | **PASS** |
