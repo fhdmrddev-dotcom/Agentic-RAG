@@ -227,15 +227,28 @@ def test_nothing_mutates_the_registry():
 #   (False, True, False): "902f6fc516476bb5793f78f2281deb1eb3cbd61794b221ad389ccf90fe5aea62",
 #   (False, False, True): "f5d6a04cb15e8efb2934401eeecb614ec4c594d9f9310523e2d3f2c061e08d1a",
 #   (False, False, False): "0c3cfde3c637e4a345192cf76ad0ec20acec3e522e29347c65404ccbf5d73623",
+# ⚠ RE-CAPTURED 2026-10-24 (292-REVIEW F-1), outside 278, deliberately: the show_artifact description's
+# comparison clause now tells the model to call component comparison, not write a markdown table, when the
+# user asks to compare named options on several terms (the 292-03 board's F-1). Proven the ONLY byte change:
+# with the old description restored in memory, all 8 combos hashed to the 292-01 digests below.
+# RENDER_TEMPLATE_TOOL is unchanged. The 292-01 digests, kept for the record:
+#   (True, True, True): "8d495767f10eadf10cb933d9ceff3efe66e0cfe04c54502de4e7e84bb0fd43df",
+#   (True, True, False): "14631717d92d5cb7d8564150f66e711a9ccf169f25fd3ae45bea07e023aa4e24",
+#   (True, False, True): "44647b34c433a6d7afa0761b844107b28508fc284693a882ab7b965c50d53045",
+#   (True, False, False): "6b6164ff689a4c799799dccf8df9e4e96c49ac755d04bc8e51e901fefd1774e3",
+#   (False, True, True): "327542867324d49627cd342ec0901c1481365840e8d75cdbf4eb6b427d9ffd31",
+#   (False, True, False): "6b67006d3daa66b5b4b82191cc5cd2e85193661575721cd1f4d90a88fa59bb88",
+#   (False, False, True): "dafdf8bc9723b1160ddbb32b84e865087eb85396b70b95376865588c9a7803d0",
+#   (False, False, False): "fea12fe8e501847101a413eb67d6884c5aaab22a755203db1b3b172d1b1c6f2d",
 SCHEMA_SHA256: dict = {
-    (True, True, True): "8d495767f10eadf10cb933d9ceff3efe66e0cfe04c54502de4e7e84bb0fd43df",
-    (True, True, False): "14631717d92d5cb7d8564150f66e711a9ccf169f25fd3ae45bea07e023aa4e24",
-    (True, False, True): "44647b34c433a6d7afa0761b844107b28508fc284693a882ab7b965c50d53045",
-    (True, False, False): "6b6164ff689a4c799799dccf8df9e4e96c49ac755d04bc8e51e901fefd1774e3",
-    (False, True, True): "327542867324d49627cd342ec0901c1481365840e8d75cdbf4eb6b427d9ffd31",
-    (False, True, False): "6b67006d3daa66b5b4b82191cc5cd2e85193661575721cd1f4d90a88fa59bb88",
-    (False, False, True): "dafdf8bc9723b1160ddbb32b84e865087eb85396b70b95376865588c9a7803d0",
-    (False, False, False): "fea12fe8e501847101a413eb67d6884c5aaab22a755203db1b3b172d1b1c6f2d",
+    (True, True, True): "045e9180f6737f4bfeb05a67477913445a04260a6db93a597d7714f137305ef8",
+    (True, True, False): "5f95f0b03b23c9886ee415b72b137b84d132396420d8fce5a1a2d85b8b7af3a5",
+    (True, False, True): "4279ea2e675d8c9a960291e4bea009783dc24706a2bcdda41809333a11cb8b73",
+    (True, False, False): "8c6c3772c319b1f2c50a79c0c2dc88cf7807a1fd372d0db09efdcca34ed39194",
+    (False, True, True): "e0c43fa42018cefbcc1e91a76a299523f62dbb6691b5f7e3eddc6bcc2ae8256c",
+    (False, True, False): "195faf54a192ce71c81558051780bb55176e2ff5faa4d1397cc09dbb74e40402",
+    (False, False, True): "e76214a34131b03b7bea477760a12d8165f3ae95e3c40e46a94487b7646f425d",
+    (False, False, False): "27ac4814449886fedd1ba748466a61272b7b126c39e747e3cbc136d630011c21",
     "RENDER_TEMPLATE_TOOL": "aa76bc5f0db6a685ab22e9b1bbfa1d2c628f14e9a2ccee08cfb474f048e13b0f",
 }
 

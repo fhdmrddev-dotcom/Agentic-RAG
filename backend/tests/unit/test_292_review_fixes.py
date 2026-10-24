@@ -324,3 +324,20 @@ def test_an_unnumberable_citation_set_is_not_called_empty():
     assert isinstance(out, ArtifactRefusal)
     assert "nothing was retrieved" not in out.detail
     assert "could not be numbered" in out.detail
+
+
+# ── F-1 (292-03 live board): a plain "compare A and B on X, Y, Z" prefers the comparison matrix ──
+
+
+def test_the_description_steers_a_plain_compare_to_the_comparison_component():
+    from app.services.openai_service import SHOW_ARTIFACT_TOOL
+
+    desc = SHOW_ARTIFACT_TOOL["function"]["description"]
+    assert len(desc) <= 3000, len(desc)
+    i = desc.index("comparison: options side by side")
+    clause = desc[i:i + 400]
+    for needle in ("compare two or more", "named options", "instead of writing a markdown table",
+                   "even if they never say"):
+        assert needle in clause, needle
+    # the chart example is still the FIRST example (D-10 / 273 D-11)
+    assert desc.index('{"component"') == desc.index('{"component":"chart"')
