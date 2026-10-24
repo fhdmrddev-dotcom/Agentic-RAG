@@ -411,7 +411,7 @@ node scripts/check-hot-file-ledger.cjs <phase-dir>   # 0 clear · 1 missing rows
 | `frontend/src/components/chat/ToolCallPanel.tsx` | 51 / 23 / 351 | ✅ **G-5 DISCHARGED (227-02)** |
 | `frontend/src/components/chat/MessageItem.tsx` | 83 / 42 / 1050 (was `82 / 38 / 1040`) | 292.1-03: tool-use-limit sentence + Continuing… (1 store selector) |
 | `frontend/src/components/chat/CitationList.tsx` | 5 / 5 / 91 | 294-05: ONE CitationCheckAction beside the trigger · extraction FIRST |
-| `backend/app/api/threads.py` | 276 / 93 / 2671 (was `274 / 95 / 2643`) | 292.1-REVIEW CR-02/WR-04: gate asks run_is_cap_paused; errors fall back |
+| `backend/app/api/threads.py` | 277 / 93 / 2682 (was `276 / 93 / 2671`) | 292.1 G4-1: thread state asks run_is_cap_paused too (first-turn) |
 | `frontend/src/providers/StreamsProvider.tsx` | 114 / 44 / 5074 (was `113 / 45 / 5065`) | 292.1-REVIEW WR-03: typed continue marks Continuing… before the POST · ⛔ |
 | `frontend/src/hooks/useMessages.ts` | 74 / 27 / 127 | extraction due |
 | `backend/app/services/anthropic_service.py` | 12 / 11 / 373 (was `11 / 10 / 354`) | honoured by construction (282-01: constructor kwargs) · adapter audit due |

@@ -2189,6 +2189,10 @@ async def get_thread_workflow(
         async with get_user_pg_connection(request, current_user) as _conn:
             return await _conn.fetch(sql, *args)
 
+    async def _rls_run_is_cap_paused(run_id):
+        async with get_user_pg_connection(request, current_user) as _conn:
+            return await run_is_cap_paused(_conn, run_id)
+
     # 2. Workflow-run state (joined: run -> definition -> current phase + total).
     run_status = None
     definition_slug = None
@@ -2320,7 +2324,14 @@ async def get_thread_workflow(
             """,
             UUID(thread_id) if isinstance(thread_id, str) else thread_id,
         )
-        if deep_row is not None and deep_row["status"] == "cap_paused":
+        # 292.1 G-4 (G4-1, run 1e5b86bc): a FIRST-turn pause finalizes `completed` by design, so
+        # status alone hid the Continue card live and on reload. Ask the one carrier-aware
+        # predicate (CR-01/CR-02's home); only these two statuses can be a pause.
+        if deep_row is not None and (
+            deep_row["status"] == "cap_paused"
+            or (deep_row["status"] == "completed"
+                and await _rls_run_is_cap_paused(UUID(str(deep_row["run_id"]))))
+        ):
             cap_paused = True
             continues_used = deep_row["continues_used"] or 0
             if latest_producer_run_id is None and deep_row["run_id"] is not None:

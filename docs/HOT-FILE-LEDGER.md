@@ -11448,7 +11448,7 @@ cells rot within days.
 | [`frontend/src/components/chat/ToolCallPanel.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentschattoolcallpaneltsx) | 55 / 23 / 409 (was `54 / 22 / 407`) | ⚠ **FIRES** | ✅ G-5 DISCHARGED (227-02). **273-05**: `stepLabel` + `ARGS_HIDDEN.livePanel` replace one name check; no new branch |
 | [`frontend/src/components/chat/tool-bodies/SearchDocumentsBody.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentschattool-bodiessearchdocumentsbodytsx) | 3 / 3 / 71 | ⚠ **FIRES** (crossed in 272) | ⚠ absent its ENTIRE LIFE — row added 272-05. **F-3**: `summarize` names refused / invalid / empty / not-searchable / unavailable |
 | [`frontend/src/components/chat/MessageItem.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentschatmessageitemtsx) | 83 / 42 / 1050 (was `82 / 38 / 1040`) | ⚠ **FIRES** | 292.1-03: tool-use-limit sentence + Continuing… state via ONE store selector (+15 −5); hooks 8→9 (fence re-based with reason), useState 3, useEffect 0 |
-| [`backend/app/api/threads.py`](docs/HOT-FILE-LEDGER.md#backendappapithreadspy) | 276 / 93 / 2671 (was `274 / 95 / 2643`; 95 counted two six-digit buckets) | ⚠ **FIRES** | 292.1-REVIEW CR-02/WR-04: the gate asks `run_is_cap_paused`; continue_run errors fall back to a send. send_message If unchanged. ⛔ SSE discharge unchanged |
+| [`backend/app/api/threads.py`](docs/HOT-FILE-LEDGER.md#backendappapithreadspy) | 277 / 93 / 2682 (was `276 / 93 / 2671`) | ⚠ **FIRES** | 292.1 G4-1: `GET /workflow` also asks `run_is_cap_paused` for a latest `completed` row (+11, one helper). send_message If unchanged. ⛔ SSE discharge unchanged |
 | [`frontend/src/providers/StreamsProvider.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrcprovidersstreamsprovidertsx) | 114 / 44 / 5074 (was `113 / 45 / 5065`; 45 counted a six-digit bucket) | ⚠ **FIRES** | 292.1-REVIEW WR-03: a hinted typed continue marks Continuing… before the POST, cleared on 201/error if this send set it (+9). 0 lock writers · ⛔ |
 | [`frontend/src/hooks/useMessages.ts`](docs/HOT-FILE-LEDGER.md#frontendsrchooksusemessagests) | 74 / 27 / 127 | ⚠ **FIRES** | extraction due |
 | [`backend/app/services/anthropic_service.py`](docs/HOT-FILE-LEDGER.md#backendappservicesanthropic_servicepy) | 12 / 11 / 373 (was `11 / 10 / 354`) | ⚠ **FIRES** | **282-01**: ONE `_anthropic_client` builder (budget in the constructor, connect 5 s, cloud retries 2) + trailing `timeout_s` on `stream_anthropic`. honoured by construction; adapter-pattern audit due |
@@ -24541,4 +24541,14 @@ Scan-list disposition cell before the review fixes (replaced): young (created 29
 **Why:** measured on the 292.1 live board, 2026-10-24. Gemini `gemini-3.8-flash` paused at cap=2 with a structured call, and Continue then replayed it without a signature. Gemini answered 400 "Function call is missing a thought_signature", and the continuation ended `failed` (run `578f2f1e`). Same class as SEED-323, which 292.1-01 fixed for DeepSeek `reasoning_content`.
 
 ⛔ **Invariant:** anything a provider requires to be round-tripped on an assistant tool-call turn must ride the cap carrier as well. Otherwise Continue is the one replay path that drops it.
+
+### `backend/app/api/threads.py` — Phase 292.1 G4-1 (lived-UAT fix)
+
+**CLAUDE.md verdict cell as of 2026-10-24 (replaced):** 292.1-REVIEW CR-02/WR-04: gate asks run_is_cap_paused; errors fall back
+
+**Triple:** `277 / 93 / 2682` (was `276 / 93 / 2671`). **Change:** the Deep `cap_paused` probe in `GET /threads/{id}/workflow` still reads the thread's latest `runs` row, with no status predicate (the test_244 bound). It now also reports a pause when that row is `completed` AND `run_is_cap_paused` says it is one. A local `_rls_run_is_cap_paused` asks under the user's RLS connection. No new writer of `runs.status`.
+
+**Why:** driven in Chrome, 2026-10-24 (G4-1, gemini-3.8-flash, run `1e5b86bc`). The run paused and the carrier held the queued call, yet the chat showed no limit line and no Continue, live or after reload. A first-turn pause finalizes `completed` by design, so this reader, like CR-01/CR-02 before it, answered `cap_paused: false`, and the stream-end reconcile cleared the card the SSE event had just set. **The API board passed this row while the product was broken: presence on the wire is not presence on screen** (CLAUDE.md G-4).
+
+⛔ **Invariant:** every reader that asks "is this run paused?" goes through `app.db.runs.run_is_cap_paused`. `status == 'cap_paused'` alone misses every first-turn pause.
 
