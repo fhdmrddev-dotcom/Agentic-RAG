@@ -8,7 +8,7 @@ status: folded
 affected_areas: [backend/agent-loop, provider-routing/openrouter, frontend/streaming]
 folded_into: "292.1"
 verified_closed_by: null
-related_seeds: []
+related_seeds: [SEED-372, SEED-373, SEED-323, SEED-324]
 re_open_trigger: null
 reproduces_on:
   branch: production
@@ -47,3 +47,26 @@ When the tool-round ceiling is reached with work still pending, the turn ends wi
 ## Routing
 
 Operator to decide: a small inserted phase before/after 293, or the first phase of the next milestone. Not foldable into 293 (inbound-start scope).
+
+## 2026-10-24 — Phase 292.1 close-out: stays `folded` (one mandatory row unmet)
+
+The close rule (plan 292.1-04 Task 3 step 6) is *every mandatory board row AND every G-4 row PASS in
+a browser*. It is **not met**, so the status stays `folded`:
+
+- ⛔ **Unmet row: the MANDATORY OpenRouter DeepSeek board row** (`deepseek/deepseek-v4-pro`, the
+  path this bug was reported on). All 3 attempts ended `failed` before any tool round with OpenRouter
+  **402** (account out of credits); the extra `deepseek/deepseek-v4.1-flash` row hit the same 402.
+  Cause **D-01** (the OpenRouter provider-name gate) is therefore covered by unit tests only.
+- G4-2 (text-form DSML at the cap) **PASSED in Chrome on native DeepSeek** instead (thread
+  `9f2fd306`, run `5c95a0d4`), so the OpenRouter variant of G4-2 is also owed.
+
+What did pass (evidence: `.planning/phases/292.1-tool-limit-continue-that-always-fires-bug-261024-03/292.1-VALIDATION.md`,
+`evidence/board-summary.json`, `evidence/reload-check.json`, `evidence/g4-orchestrator-notes.md`):
+native DeepSeek text-pause → Continue → `completed` (board, long, parallel, typed continue); Google and
+MiniMax structured pauses → Continue → `completed`; 0 markup hits over every board thread; reload
+25/25 equal; G4-1, G4-2 (native) and G4-3 PASS in Chrome. Operator sign-off on G-4 is OWED.
+
+**Re-open action:** top up the OpenRouter account, then run
+`backend/venv/Scripts/python.exe scripts/run-2921-board.py --run --providers openrouter` and drive G4-2
+on OpenRouter DeepSeek in Chrome. When both PASS and the operator signs G-4, set `status: closed`,
+`verified_closed_by: "292.1"`.
