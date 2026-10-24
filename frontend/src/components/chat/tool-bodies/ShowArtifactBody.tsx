@@ -9,7 +9,10 @@
  * `series_count`, `row_count`, `from_label`, `same_rows`, `operations`. From a refusal
  * (`models/artifact.py`, marker `status: "refused"`): `reason`, the plain sentence for people.
  * The result's model-facing explanation, its `columns` and its sampled `values` are NEVER read, so
- * no path here can print them. Every string that reaches the page is either one of our own phrases
+ * no path here can print them.
+ * 292-02 (UI-D-292-19) widens the success list by EXACTLY two plain counts: `edge_count` (diagram)
+ * and `option_count` (comparison). The three encoded types read `component`, `label`, `row_count`
+ * (nodes / terms / events) and those two counts — never the spec, never the per-type `note`. Every string that reaches the page is either one of our own phrases
  * (artifactCopy, toolNames) or a server-built fact rendered as React text.
  *
  * Shaped like `SearchDocumentsBody.tsx`: a named `summarize(tc)` for `TOOL_SUMMARIES` and a default
@@ -22,8 +25,14 @@ import {
   OPERATION_ORDER,
   cellPhrase,
   kindChipLabel,
+  eventsPhrase,
+  linksPhrase,
   operationPhrase,
+  optionsPhrase,
+  optionsTermsPhrase,
   rowsPhrase,
+  stepsPhrase,
+  termsPhrase,
   truncateValue,
 } from "../artifacts/artifactCopy"
 import type { Cell, LineageOperation } from "../artifacts/artifactSpec"
@@ -36,10 +45,27 @@ const SENT_BACK = "Sent back to the agent to fix."
 /** A people-facing reason longer than this is cut (a belt: the server's reasons are short). */
 const REASON_MAX_CHARS = 160
 
-const COMPONENTS: Record<string, true> = { chart: true, table: true, metric: true }
+const COMPONENTS: Record<string, true> = {
+  chart: true,
+  table: true,
+  metric: true,
+  diagram: true,
+  comparison: true,
+  timeline: true,
+}
 
 type Described =
-  | { kind: "done"; chip: string; component: string; series: number | null; rows: number | null; label: string | null; essence: string }
+  | {
+      kind: "done"
+      chip: string
+      component: string
+      series: number | null
+      rows: number | null
+      label: string | null
+      essence: string
+      /** 292: the expanded body's count segments for an encoded type (null for tabular). */
+      counts: string[] | null
+    }
   | { kind: "refused"; reason: string }
   | { kind: "unreadable" }
 
@@ -129,6 +155,12 @@ function describeResult(parsed: unknown): Described {
   const label = text(parsed.label)
   const from = text(parsed.from_label)
 
+  // 292 (UI-D-292-19): the encoded types' plain counts — never the spec, never a clock-dependent count.
+  const encoded = encodedCounts(component, rows, count(parsed.edge_count), count(parsed.option_count))
+  if (encoded) {
+    return { kind: "done", chip, component, series: null, rows, label, essence: encoded.essence, counts: encoded.parts }
+  }
+
   const narrowed = narrowing(parsed.operations)
   let essence: string
   if (component === "metric" || rows === null) essence = chip
@@ -137,7 +169,39 @@ function describeResult(parsed: unknown): Described {
   else if (from) essence = `${chip} · ${rowsPhrase(rows)} from ${from}`
   else essence = `${chip} · ${rowsPhrase(rows)}`
 
-  return { kind: "done", chip, component, series, rows, label, essence }
+  return { kind: "done", chip, component, series, rows, label, essence, counts: null }
+}
+
+/**
+ * The essence (`Flow diagram · 8 steps, 9 links`) and the expanded body's segments
+ * (`8 steps`, `9 links`) for an encoded type, or null for a tabular one. A missing count drops its
+ * own segment; the chip alone is the floor.
+ */
+function encodedCounts(
+  component: string,
+  rows: number | null,
+  edges: number | null,
+  options: number | null,
+): { essence: string; parts: string[] } | null {
+  const chip = kindChipLabel(component, null, false, 0)
+  if (component === "diagram") {
+    const parts: string[] = []
+    if (rows !== null) parts.push(stepsPhrase(rows))
+    if (edges !== null) parts.push(linksPhrase(edges))
+    return { essence: parts.length ? `${chip} · ${parts.join(", ")}` : chip, parts }
+  }
+  if (component === "comparison") {
+    let segment: string | null = null
+    if (rows !== null && options !== null) segment = optionsTermsPhrase(options, rows)
+    else if (rows !== null) segment = termsPhrase(rows)
+    else if (options !== null) segment = optionsPhrase(options)
+    return { essence: segment ? `${chip} · ${segment}` : chip, parts: segment ? [segment] : [] }
+  }
+  if (component === "timeline") {
+    const segment = rows !== null ? eventsPhrase(rows) : null
+    return { essence: segment ? `${chip} · ${segment}` : chip, parts: segment ? [segment] : [] }
+  }
+  return null
 }
 
 function parseResult(result: string | undefined): unknown {
@@ -181,8 +245,12 @@ export default function ShowArtifactBody({ parsed }: ShowArtifactBodyProps) {
     )
   }
   const parts = [d.chip]
-  if (d.component === "chart" && d.series !== null) parts.push(`${d.series} series`)
-  if (d.rows !== null && d.component !== "metric") parts.push(rowsPhrase(d.rows))
+  if (d.counts) {
+    parts.push(...d.counts)
+  } else {
+    if (d.component === "chart" && d.series !== null) parts.push(`${d.series} series`)
+    if (d.rows !== null && d.component !== "metric") parts.push(rowsPhrase(d.rows))
+  }
   if (d.label) parts.push(d.label)
   return (
     <div className="text-xs text-muted-foreground" data-testid="show-artifact-body">
