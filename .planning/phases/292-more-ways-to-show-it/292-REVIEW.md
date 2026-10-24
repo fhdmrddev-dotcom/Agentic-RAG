@@ -34,7 +34,12 @@ findings:
   warning: 5
   info: 4
   total: 10
-status: issues_found
+status: fixed
+fix_round: 1
+fixed_at: 2026-10-24
+fixed: [CR-01, WR-01, WR-02, WR-03, WR-04, WR-05, IN-02, IN-04, F-1]
+deferred: [IN-01, IN-03]
+needs_live_verification: [F-1]
 ---
 
 # Phase 292: Code Review Report
@@ -268,6 +273,33 @@ implies.
 fix has to land in both.
 **Fix:** move the function into `app.models.artifact` (already imported by both) and import it from
 there.
+
+## Fix log
+
+Fixed 2026-10-24 by the gsd-code-fixer, on `develop`, one commit per finding, each with a failing test
+first. Cross-stack cases sit in the shared fixture `backend/tests/unit/fixtures/artifact_bad_specs_292.json`,
+which both `test_292_artifact_parity.py` and `artifactParity292.fence.test.ts` read. The backend-only halves
+are in `backend/tests/unit/test_292_review_fixes.py`.
+
+| Finding | Commit | What changed |
+|---|---|---|
+| CR-01 + IN-04 | `8738d5d85` | Dates and source handles match `[0-9]` only. Required text is blank by Python `strip` OR JS `trim` (U+FEFF), and blank optional text is stored as null. `clean_document_name` now lives in `app.models.artifact`: it cuts at 200 UTF-16 units and never splits a pair. The caption and the per-element source both import it, so the old duplicate is gone (IN-04). `StoredSource.document` and the stored required strings check the same rules. The fixture gains 8 bad cases, plus `stored_sources` and `document_names` sections. |
+| WR-02 | `fdf2ed22c` | The backend refuses a sourced `q` cell in words (new `_R` key `not_stated_with_source`: "a cell marked not stated cites a source"), and `StoredComparisonCell` mirrors it. **Deviation, on purpose:** the frontend guard does not refuse such a cell. It validates the source, then drops it. A measured 3 of the 12 local comparison rows already carry sourced `q` cells, including the G4-2 openai record `a_91uke5giiv` and board openai `a_d9gad5mrif`. A guard refusal would have turned those owed G-4 threads into notices. The fixture pins this with a new `refused_then_tolerated` section: the backend refuses, and the guard parses with every `q` source null. That is the safe direction of asymmetry, not the CR-01 one. The caption's hover note and the cell tooltip count only cells with a verdict. |
+| WR-03 | `876845f5a` | `_ArgsBase` reads `{}` / `[]` / `""` / `"null"` / `"{}"` / `"[]"` in `diagram` / `comparison` / `timeline` as absent on chart, table and metric calls, without mutating the caller's args. `_Encoded`'s foreign-field rule uses the same `_is_empty_filler`. |
+| WR-01 | `96d3137d2` | `agent_loop` sets `citations_shown` where it injects the manifest and passes `ToolContext.turn_citations_seen`. The resume build passes 0, and so does any unwired caller. `resolve_sources(seen=)` refuses a handle above that count ("search first, then call show_artifact in a later step"). |
+| IN-02 | `b5eb78177` | A citation with no `document_id` key is skipped instead of collapsing every source to `[]`. An unhashable id gets its own detail. |
+| WR-05 | `43a1f6974` | Day counts are integer day numbers, computed with days-from-civil arithmetic. No `Date.UTC`, so years 1-99 are read literally. The test cross-checks every month's first and last day against `Date.UTC` for years ≥ 100. |
+| WR-04 | `cbdf05af9` | The layout gives every edge a `labelMaxWidth`, the room from its anchor to the body edge. Centred labels slide inward to fit. The renderer truncates past that width, puts the full text in `title`, and paints labels after the nodes. **Partial:** a back-edge label can still overlap a node in the gutter-side area. It now paints on top and stays readable, but hovering it leaves the node's hover state. The review's "place the self-loop label above the loop" option was not taken, because above the node it would collide with incoming arrows and their labels. |
+| F-1 | `a127c2462` | The `show_artifact` description's comparison clause now tells the model to call `component comparison` instead of writing a markdown table when the user asks to compare named options on several terms (2,526 → 2,761 chars; the chart example is still first; SYSTEM_PROMPT is untouched). For `test_278_registry_pin`, the old description, restored in memory, hashed to all 8 pinned 292-01 digests, so the description is the only byte change. The digests were then re-captured, with the old ones kept in a comment. **Needs live verification:** re-run the verbatim D-22 prompt on anthropic and openai. |
+
+**Deferred (Info, documented, not fixed):**
+- **IN-01** (the tooltip detaches on scroll or resize). Re-open with the next phase that touches `ArtifactTooltip.tsx`, or if a G-4 drive shows it.
+- **IN-03** (long node labels clamped at narrow widths; the full text is only in `aria-label`). Re-open alongside IN-01, or when the WR-04 label work is next revisited.
+
+**Measured after the fixes:**
+- Backend `pytest tests/unit -k "273 or 292 or 278 or closed_core"`: 598 passed (522 before).
+- Frontend targeted vitest (artifacts, both parity fences, tool-bodies): 20 files, 327 passed (319 before).
+- Count-gate pins raised in the same commits: artifactParity292 13 → 16, artifactSpec 64 → 65, captionModel 21 → 22, timelineModel 16 → 17, diagramLayout 20 → 21, DiagramArtifact 17 → 18.
 
 ---
 
