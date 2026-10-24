@@ -149,6 +149,28 @@ describe("292.1 D-14 — a typed continue that resumes shows no bubbles and read
     expect(bucket()).toHaveLength(0)
   })
 
+  it("A3 (292.1-REVIEW WR-03): the card reads Continuing… while the typed continue is in flight", async () => {
+    // Before: `continuingThreads` was set only after the POST resolved, so the Continue button
+    // stayed live for the whole round trip and a press there claimed the same pause twice.
+    await mountProvider()
+    seedPause()
+    await act(async () => {
+      void actions!.sendMessage(THREAD, "continue")
+    })
+    expect(mockPostMessage).toHaveBeenCalledTimes(1)
+    expect(useStreamsStore.getState().continuingThreads.has(THREAD)).toBe(true)
+  })
+
+  it("A4 (292.1-REVIEW WR-03): a typed continue whose POST fails drops the Continuing… mark", async () => {
+    await mountProvider()
+    seedPause()
+    mockPostMessage.mockRejectedValue(new Error("network down"))
+    await act(async () => {
+      await actions!.sendMessage(THREAD, "continue")
+    })
+    expect(useStreamsStore.getState().continuingThreads.has(THREAD)).toBe(false)
+  })
+
   it("B: the same word answered with a normal 201 runs the ordinary path (D-15/D-16)", async () => {
     await mountProvider()
     await viewThread()
