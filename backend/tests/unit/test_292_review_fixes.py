@@ -168,11 +168,12 @@ def _cmp(cells):
             "comparison": {"options": ["Atlas", "Borealis"], "terms": [{"name": "Termination", "cells": cells}]}}
 
 
-def test_a_q_cell_with_a_source_is_refused_in_words():
+def test_a_q_cell_with_a_source_has_the_source_dropped_not_refused():
+    # 292 G4 live re-check: refusing made gpt-5.4-mini abandon the comparison (no retry), so a sourced
+    # q cell is accepted with its source DROPPED, the same neutralisation the frontend guard applies.
     out = validate_args(_cmp([{"verdict": "q", "source": 1}, {"verdict": "n"}]))
-    assert isinstance(out, ArtifactRefusal)
-    assert out.reason == "a cell marked not stated cites a source"
-    assert "omit" in out.detail and "q" in out.detail
+    assert isinstance(out, ComparisonArgs), out
+    assert out.comparison.terms[0].cells[0].source is None
 
 
 def test_a_q_cell_without_a_source_and_a_sourced_verdict_cell_are_accepted():
@@ -180,11 +181,10 @@ def test_a_q_cell_without_a_source_and_a_sourced_verdict_cell_are_accepted():
     assert isinstance(out, ComparisonArgs), out
 
 
-def test_the_stored_cell_refuses_a_sourced_q_too():
+def test_the_stored_cell_drops_a_sourced_q_too():
     src = {"document": "a.pdf", "page": None, "excerpt": "x"}
-    with pytest.raises(ValueError):
-        am.StoredComparisonCell.model_validate({"verdict": "q", "text": None, "source": src})
-    am.StoredComparisonCell.model_validate({"verdict": "m", "text": None, "source": src})
+    assert am.StoredComparisonCell.model_validate({"verdict": "q", "text": None, "source": src}).source is None
+    assert am.StoredComparisonCell.model_validate({"verdict": "m", "text": None, "source": src}).source is not None
 
 
 # ── WR-01: a handle resolves only against the manifest the model was SHOWN ──────────────────────

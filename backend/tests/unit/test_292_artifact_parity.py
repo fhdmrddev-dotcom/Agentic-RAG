@@ -104,11 +104,14 @@ def test_every_stored_source_case_matches_its_ok(case):
 
 
 @pytest.mark.parametrize("case", _cases("refused_then_tolerated"), ids=lambda c: c["name"])
-def test_every_refused_then_tolerated_case_is_refused_by_the_backend(case):
-    # 292-REVIEW WR-02: the backend is the stricter side; the frontend fence asserts the tolerance.
+def test_every_refused_then_tolerated_case_is_neutralised_by_the_backend(case):
+    # 292-REVIEW WR-02, revised at the G4 live re-check: both stacks ACCEPT and drop a q cell's source.
     out = validate_args(_args(case))
-    assert isinstance(out, ArtifactRefusal), case["name"]
-    assert 0 < len(out.reason) <= 120
+    assert not isinstance(out, ArtifactRefusal), case["name"]
+    for term in out.comparison.terms:
+        for cell in term.cells:
+            if cell.verdict == "q":
+                assert cell.source is None, case["name"]
 
 
 @pytest.mark.parametrize("case", _cases("document_names"), ids=lambda c: c["name"])
