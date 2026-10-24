@@ -409,10 +409,10 @@ node scripts/check-hot-file-ledger.cjs <phase-dir>   # 0 clear · 1 missing rows
 | Hot file (FIRING) | commits / phases / lines | Verdict (abridged) |
 |---|---|---|
 | `frontend/src/components/chat/ToolCallPanel.tsx` | 51 / 23 / 351 | ✅ **G-5 DISCHARGED (227-02)** |
-| `frontend/src/components/chat/MessageItem.tsx` | 82 / 38 / 1040 (was `81 / 38 / 1037`) | BUG-261020-04: +1 hook feeds both citation mounts (+5 −2) |
+| `frontend/src/components/chat/MessageItem.tsx` | 83 / 42 / 1050 (was `82 / 38 / 1040`) | 292.1-03: tool-use-limit sentence + Continuing… (1 store selector) |
 | `frontend/src/components/chat/CitationList.tsx` | 5 / 5 / 91 | 294-05: ONE CitationCheckAction beside the trigger · extraction FIRST |
-| `backend/app/api/threads.py` | 273 / 92 / 2567 (was `271 / 91 / 2544`) | 295-05: unsourced kwarg + lazy name lookup (+1 If) · ⛔ |
-| `frontend/src/providers/StreamsProvider.tsx` | 112 / 43 / 5016 (was `111 / 43 / 5009`) | 295-10: settle follows a paused run; stream end re-reads · ⛔ |
+| `backend/app/api/threads.py` | 274 / 95 / 2643 (was `273 / 92 / 2567`) | 292.1-03: ONE delegating if → _typed_continue_or_none; no status writer |
+| `frontend/src/providers/StreamsProvider.tsx` | 113 / 45 / 5065 (was `112 / 43 / 5016`) | 292.1-03: typed continue holds the optimistic turn; Continuing… cleared · ⛔ |
 | `frontend/src/hooks/useMessages.ts` | 74 / 27 / 127 | extraction due |
 | `backend/app/services/anthropic_service.py` | 12 / 11 / 373 (was `11 / 10 / 354`) | honoured by construction (282-01: constructor kwargs) · adapter audit due |
 | `backend/app/services/embedding_service.py` | 9 / 5 / 354 | ⚠ absent for its entire life at 5 phases — row added 236 (SC#2) |
@@ -449,13 +449,13 @@ node scripts/check-hot-file-ledger.cjs <phase-dir>   # 0 clear · 1 missing rows
 | `frontend/src/components/workflows/builderStore.ts` | 16 / 9 / 1039 (was `14 / 8 / 968`) | 291: two actions (refs, input source), no state field |
 | `frontend/src/components/panel/WorkspacePanel.tsx` | 17 / 11 / 646 (was `16 / 10 / 646`) | honoured by construction (194 / 194.1 / 282-02: one prop) |
 | `backend/app/services/run_lifecycle.py` | 10 / 6 / 776 (was `9 / 5 / 756`) | 295-04: stopped_by → record_stop (If 11→11) |
-| `backend/app/db/runs.py` | 9 / 8 / 266 | ⚠ absent its ENTIRE LIFE — row added 268 · ⛔ |
+| `backend/app/db/runs.py` | 11 / 9 / 289 (was `9 / 8 / 266`) | 292.1-01: carrier loader drops name-less marker entries; SQL unchanged |
 | `frontend/src/pages/admin/AdminSpendPage.tsx` | 9 / 3 / 974 | ⚠ NOW FIRES (crossed in 268) · extraction FIRST next · ⛔ |
-| `backend/app/services/run_producer.py` | 24 / 12 / 1150 (was `23 / 11 / 1145`) | 295-04: F2 record_failed_end first (If 22→22) |
+| `backend/app/services/run_producer.py` | 25 / 13 / 1212 (was `24 / 12 / 1150`) | 292.1-03: continuation runs on the run's own model; one-warning fallback |
 | `backend/app/services/task_service.py` | 27 / 14 / 1023 (was `26 / 14 / 1018`) | 289-REVIEW WR-04: refused searches no longer count as KB searches |
 | `backend/app/services/run_reconciler.py` | 5 / 3 / 406 (was `3 / 2 / 325`) | 295-04: ONE workflow-run sweep · live-proven 295-07 · ⚠ now FIRES |
 | `backend/app/services/circuit_breaker.py` | 1 / 1 / 331 | ⚠ absent its ENTIRE LIFE — row added 256-02 · ⛔ |
-| `backend/app/api/runs.py` | 48 / 21 / 1929 (was `47 / 21 / 1907`) | 295-09 CR-01: 409 unless the answer is for the current question |
+| `backend/app/api/runs.py` | 49 / 22 / 1945 (was `48 / 21 / 1929`) | 292.1-03: select model/provider + carry; SEED-324 terminal 409 (+1 If) |
 | `backend/app/api/panel.py` | 6 / 5 / 285 | 295-03: ONE engine_pause key on /pending · honoured by construction |
 | `backend/app/utils/folder_utils.py` | 9 / 5 / 302 | ⚠ absent its ENTIRE LIFE — row added 295-10 · ⛔ |
 | `backend/app/services/harness/human_input.py` | 6 / 3 / 375 (was `5 / 3 / 355`) | 295-09 CR-01: consumes only its own question's answer · ⛔ |
@@ -467,7 +467,7 @@ node scripts/check-hot-file-ledger.cjs <phase-dir>   # 0 clear · 1 missing rows
 | `frontend/src/components/chat/ActiveConnectorChips.tsx` | 2 / 2 / 82 | ⚠ absent its ENTIRE LIFE — row added 244-05 |
 | `frontend/src/components/chat/MessageList.tsx` | 24 / 11 / 376 | ⚠ STALE · last touch 267-04 |
 | `frontend/src/components/chat/ChatArea.tsx` | 94 / 44 / 1189 (was `93 / 43 / 1186`) | honoured by construction (287-03: ONE mount, 0 hooks) · ⛔ |
-| `frontend/src/stores/streamsStore.ts` | 25 / 17 / 626 (was `24 / 16 / 607`) | 295-08: ONE field + its one writer, no action · ⛔ |
+| `frontend/src/stores/streamsStore.ts` | 26 / 18 / 657 (was `25 / 17 / 626`) | 292.1-03: continuingThreads slice + 2 writers; WorkflowLock untouched · ⛔ |
 | `frontend/src/components/chat/ThreadWorkflowPicker.tsx` | 1 / 1 / 91 | young (created 287-03) · reads no conversation · ⛔ |
 | `frontend/src/components/chat/useStartWorkflowInThread.ts` | 1 / 1 / 85 | young (created 287-03) · no createThread · ⛔ |
 | `frontend/src/lib/toolMeta.ts` | 10 / 6 / 218 | ⚠ absent its ENTIRE LIFE — row added 244-13 · ⛔ |
@@ -481,10 +481,10 @@ node scripts/check-hot-file-ledger.cjs <phase-dir>   # 0 clear · 1 missing rows
 | `backend/app/main.py` | 92 / 67 / 979 (was `91 / 66 / 978`) | 294-03: ONE include_router (+2 −1) · ⛔ |
 | `backend/app/config.py` | 93 / 54 / 1809 (was `92 / 54 / 1790`) | honoured by construction (282-04: self-hosted default 900) · seam OWED · ⛔ |
 | `backend/app/api/admin.py` | 44 / 17 / 2054 (was `43 / 17 / 2051`) | quick-261024: discover summary gains a `returned` count (+3) · ⛔ |
-| `backend/app/api/settings.py` | 44 / 23 / 1159 (was `41 / 21 / 1048`) | honoured by construction (294-04: ONE rerank_provider refusal) · ⛔ |
+| `backend/app/api/settings.py` | 46 / 24 / 1250 (was `44 / 23 / 1159`) | 292.1-02: two bounded writes via _range_refusal_detail; allow-list +2 |
 | `backend/app/services/multimodal_service.py` | 14 / 7 / 984 | ⚠ absent from BOTH for its ENTIRE LIFE at **7 phases** |
 | `backend/app/api/documents.py` | 99 / 39 / 2698 (was `97 / 38 / 2653`) | honoured by construction (285-03: enqueue-fail → doc failed, 201) · ⛔ |
-| `scripts/vitest-count-gate.cjs` | 339 / 77 / 6681 (was `335 / 76 / 6658`) | 292: 9 suites adopted, 5 pins raised (292-02 + the 292-03 fence) |
+| `scripts/vitest-count-gate.cjs` | 344 / 81 / 6692 (was `339 / 77 / 6681`) | 292.1-04: 3 suites adopted (both knobs), 2 pins raised, none lowered |
 | `scripts/check-deploy-drift.sh` | 5 / 4 / 267 | ⚠ absent its ENTIRE LIFE — row added 294-05 · fault var omitted |
 | `scripts/build-public-openapi.cjs` | 7 / 3 / 468 | ⚠ now FIRES (294) · 294-03: citation_checks tag (one line) |
 | `backend/app/services/eval_runner_service.py` | 13 / 8 / 1040 | ⚠ STALE · last touch 256-03 |
@@ -512,7 +512,7 @@ node scripts/check-hot-file-ledger.cjs <phase-dir>   # 0 clear · 1 missing rows
 | `frontend/src/lib/api/org.ts` | 11 / 8 / 629 | ⚠ absent its ENTIRE LIFE · THIRD wire-type drift (239) |
 | `frontend/src/components/settings/connectionsCopy.ts` | 16 / 9 / 804 | ⚠ row STALE · honoured by construction (BUG-260912-01) |
 | `frontend/src/components/settings/connectionFormCopy.ts` | 19 / 8 / 1631 | seam named (239-05), RODE it (239-07) · ⛔ |
-| `frontend/src/pages/SettingsPage.tsx` | 57 / 28 / 1662 (was `53 / 27 / 1658`) | 294-04: ONE RerankEngineBlock mount · state split OWED (D-15) · ⛔ |
+| `frontend/src/pages/SettingsPage.tsx` | 59 / 29 / 1669 (was `57 / 28 / 1662`) | 292.1-02: ONE AgentRoundLimits mount, 0 state · state split OWED · ⛔ |
 | `frontend/src/pages/settingsSearchPayload.ts` | 2 / 2 / 116 | young (created 242) |
 | `frontend/src/components/settings/ModelPillRow.tsx` | 5 / 4 / 151 | ⚠ FIRES · honoured by construction (249-02) · ⛔ |
 | `frontend/src/components/workflows/phaseVocabulary.ts` | 16 / 6 / 990 | honoured by construction (206.2) |
@@ -529,12 +529,12 @@ node scripts/check-hot-file-ledger.cjs <phase-dir>   # 0 clear · 1 missing rows
 | `backend/app/services/sources/__init__.py` | 5 / 3 / 40 | ⚠ absent while FIRING — row added 239-03 |
 | `backend/app/services/mcp_client.py` | 9 / 6 / 526 | ⚠ row STALE TWICE (SEED-258) |
 | `backend/app/models/message.py` | 23 / 15 / 285 (was `21 / 13 / 278`) | last touch 279-01 (comment repoint only) |
-| `backend/app/models/user_settings.py` | 60 / 36 / 1769 (was `57 / 35 / 1742`) | quick-261024: picker warms hot + tombstone caches · ⛔ |
+| `backend/app/models/user_settings.py` | 60 / 36 / 1769 (was `57 / 35 / 1742`) | 292.1-02: two fields + _val 15/8; quick-261024: picker cache warm · ⛔ |
 | `backend/app/services/harness/reachability.py` | 5 / 5 / 498 (was `4 / 4 / 463`) | 295-02: one pure lint check (no_template_bound) |
 | `backend/app/services/workflow_kickoff.py` | 11 / 8 / 596 (was `10 / 8 / 585`) | 295-10: paused-run 409 says where it waits (If 15→16) |
 | `frontend/src/components/workflows/WorkflowScheduleModal.tsx` | 3 / 3 / 601 | ⚠ absent for its entire life; it crossed the threshold in 214-09 on a  |
 | `frontend/src/components/workflows/nodePresentation.ts` | 8 / 7 / 221 | ⚠ absent from BOTH for its ENTIRE LIFE at **7 phases** |
-| `frontend/src/lib/api/threads.ts` | 21 / 12 / 1979 (was `20 / 12 / 1975`) | 295-08: answerAskUser keeps the server's refusal words |
+| `frontend/src/lib/api/threads.ts` | 22 / 13 / 1985 (was `21 / 12 / 1979`) | 292.1-03: message_id nullable + continued / continues_* (additive) |
 | `frontend/src/lib/api/connectors.ts` | 17 / 11 / 740 | honoured by construction (244-06) · ⛔ |
 | `frontend/src/lib/api/workflows.ts` | 12 / 12 / 1285 (was `11 / 11 / 1141`) | 291-04: describe read + reference upload clients (+144) |
 | `frontend/src/lib/connectionMark.tsx` | 7 / 4 / 313 | ✅ **the move IS the seam, and it was TAKEN (214-08)** |
@@ -549,7 +549,7 @@ node scripts/check-hot-file-ledger.cjs <phase-dir>   # 0 clear · 1 missing rows
 | `frontend/src/hooks/useDocuments.ts` | 10 / 5 / 164 (was `8 / 3 / 120`) | 284-03: no list of its own; Realtime only asks for a refetch · ⛔ |
 | `frontend/src/pages/KnowledgeHealthPage.tsx` | 12 / 6 / **DELETED** | **RETIRED (217.1-14)** |
 | `backend/app/api/knowledge_health.py` | 11 / 6 / 737 | honoured by construction (**217.1-11**) |
-| `backend/app/services/agent_loop.py` | 72 / 34 / 3699 (was `69 / 33 / 3682`) | honoured by construction (292: citation kwargs + shown count) · seam OWED · ⛔ |
+| `backend/app/services/agent_loop.py` | 74 / 35 / 3753 (was `72 / 34 / 3699`) | 292.1-01: call sites only; rules live in text_tool_calls.py · seam OWED · ⛔ |
 | `backend/app/services/tool_dispatcher.py` | 99 / 44 / 274 (was `98 / 43 / 5068`) | ✅ G-5 DISCHARGED (278-03): registry only; handlers in services/tools/ · ⛔ |
 | `backend/app/services/search_documents_tool.py` | 11 / 3 / 1544 | ⚠ now FIRES (294) · 294-01: instruction clamp (+25 −3) · extraction FIRST |
 | `backend/app/api/document_governance.py` | 5 / 3 / 416 | ⚠ absent at 3 phases. ⚠ Its low-confidence cutoff is the ConfidenceChi |
@@ -599,9 +599,9 @@ node scripts/check-hot-file-ledger.cjs <phase-dir>   # 0 clear · 1 missing rows
 | `frontend/src/components/chat/InviteExpertDialog.tsx` | 10 / 5 / 648 (was `4 / 4 / 614`) | honoured by construction (279-03: ONE field + prop) · seam TAKEN |
 | `frontend/src/components/skills/SkillFormDialog.tsx` | 13 / 9 / 657 | ⚠ row STALE · honoured by construction (263-04) · ⛔ |
 | `backend/app/api/skills.py` | 20 / 10 / 859 (was `19 / 10 / 858`) | ⛔ FIRES · last touch 280-01 (6 maybe_row guards) |
-| `frontend/src/lib/api/skills.ts` | 6 / 4 / 748 | ⛔ NOW FIRES at 4 phases · re-derived 263 planning |
+| `frontend/src/lib/api/skills.ts` | 8 / 5 / 761 (was `6 / 4 / 748`) | 292.1-02: two optional fields on FullAppSettings + SettingsUpdate |
 | `backend/app/services/openai_service.py` | 84 / 42 / 2731 (was `81 / 41 / 2623`) | 292: SHOW_ARTIFACT_TOOL schema + description only (30 tools) · ⛔ |
-| `backend/app/services/provider_gateway/openai_compat.py` | 7 / 5 / 537 (was `6 / 4 / 525`) | honoured by construction (282-01: budget forwarded only when set) · ⛔ |
+| `backend/app/services/provider_gateway/openai_compat.py` | 9 / 6 / 466 (was `7 / 5 / 537`) | 292.1-01: deepseek-only DSML strip deleted (D-01/D-02); a pure deletion |
 | `backend/app/services/provider_gateway/dispatcher.py` | 10 / 4 / 260 (was `6 / 2 / 153`) | ⚠ FIRES (row was stale) · 282-01: off-loop open, shared deadline · ⛔ |
 | `backend/app/services/provider_gateway/openai_responses.py` | 2 / 2 / 573 (was `0 / 0 / 563`) | young · 282-01: budget + retries reach the client when set · ⛔ |
 | `frontend/src/lib/api/admin.ts` | 10 / 5 / 1125 (was `9 / 5 / 1122`) | ⚠ FIRES · quick-261024: optional `returned` on discovery outcome · ⛔ |
