@@ -412,7 +412,7 @@ node scripts/check-hot-file-ledger.cjs <phase-dir>   # 0 clear · 1 missing rows
 | `frontend/src/components/chat/MessageItem.tsx` | 83 / 42 / 1050 (was `82 / 38 / 1040`) | 292.1-03: tool-use-limit sentence + Continuing… (1 store selector) |
 | `frontend/src/components/chat/CitationList.tsx` | 5 / 5 / 91 | 294-05: ONE CitationCheckAction beside the trigger · extraction FIRST |
 | `backend/app/api/threads.py` | 277 / 93 / 2682 (was `276 / 93 / 2671`) | 292.1 G4-1: thread state asks run_is_cap_paused too (first-turn) |
-| `frontend/src/providers/StreamsProvider.tsx` | 114 / 44 / 5074 (was `113 / 45 / 5065`) | 292.1-REVIEW WR-03: typed continue marks Continuing… before the POST · ⛔ |
+| `frontend/src/providers/StreamsProvider.tsx` | 115 / 44 / 5087 (was `114 / 44 / 5074`) | 292.1 G4-2: done after a live cap pause asks the server first · ⛔ |
 | `frontend/src/hooks/useMessages.ts` | 74 / 27 / 127 | extraction due |
 | `backend/app/services/anthropic_service.py` | 12 / 11 / 373 (was `11 / 10 / 354`) | honoured by construction (282-01: constructor kwargs) · adapter audit due |
 | `backend/app/services/embedding_service.py` | 9 / 5 / 354 | ⚠ absent for its entire life at 5 phases — row added 236 (SC#2) |
@@ -467,7 +467,7 @@ node scripts/check-hot-file-ledger.cjs <phase-dir>   # 0 clear · 1 missing rows
 | `frontend/src/components/chat/ActiveConnectorChips.tsx` | 2 / 2 / 82 | ⚠ absent its ENTIRE LIFE — row added 244-05 |
 | `frontend/src/components/chat/MessageList.tsx` | 24 / 11 / 376 | ⚠ STALE · last touch 267-04 |
 | `frontend/src/components/chat/ChatArea.tsx` | 94 / 44 / 1189 (was `93 / 43 / 1186`) | honoured by construction (287-03: ONE mount, 0 hooks) · ⛔ |
-| `frontend/src/stores/streamsStore.ts` | 26 / 18 / 657 (was `25 / 17 / 626`) | 292.1-03: continuingThreads slice + 2 writers; WorkflowLock untouched · ⛔ |
+| `frontend/src/stores/streamsStore.ts` | 27 / 18 / 660 (was `26 / 18 / 657`) | 292.1 G4-2: settle action type gains optional reattach · ⛔ |
 | `frontend/src/components/chat/ThreadWorkflowPicker.tsx` | 1 / 1 / 91 | young (created 287-03) · reads no conversation · ⛔ |
 | `frontend/src/components/chat/useStartWorkflowInThread.ts` | 1 / 1 / 85 | young (created 287-03) · no createThread · ⛔ |
 | `frontend/src/lib/toolMeta.ts` | 10 / 6 / 218 | ⚠ absent its ENTIRE LIFE — row added 244-13 · ⛔ |
