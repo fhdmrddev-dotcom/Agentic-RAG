@@ -1151,6 +1151,24 @@ def resolve_phase_available_tools(definition, active_slug: str) -> list:
     return []
 
 
+async def _deep_run_is_paused(row: dict, run_id: UUID) -> bool:
+    """292.1-REVIEW CR-01: is this terminal-looking Deep run actually a tool-limit pause?
+
+    Only ``completed`` can be (a first-turn pause finalizes ``completed`` by design — run_producer);
+    ``failed`` / ``cancelled`` / ``timed_out`` never are, and never cost a read. The decision itself
+    lives in ONE place, ``app.db.runs.run_is_cap_paused``, org-scoped by the run's own org exactly
+    as the Deep consume's carrier read below is."""
+    if row.get("status") != "completed":
+        return False
+    from app.db.runs import run_is_cap_paused  # noqa: PLC0415
+    from app.dependencies import get_pg_pool  # noqa: PLC0415
+
+    _org = row.get("org_id")
+    return await run_is_cap_paused(
+        await get_pg_pool(), run_id, org_id=UUID(_org) if isinstance(_org, str) else _org
+    )
+
+
 @router.post("/{run_id}/continue", status_code=200)
 async def continue_run(
     run_id: UUID,
@@ -1248,13 +1266,15 @@ async def continue_run(
         wf_row = wf_resp.data if wf_resp is not None else None
         if wf_row is not None:
             continues_used = wf_row.get("continues_used") or 0
-    elif row.get("status") in _TERMINAL_RUN_STATUSES:
+    elif row.get("status") in _TERMINAL_RUN_STATUSES and not await _deep_run_is_paused(row, run_id):
         # ── SEED-324 (folded into 292.1): a Deep run that already FINISHED has nothing to
         # continue. Refused before the counter write and the spawn, so a stale card or a replayed
         # request cannot re-drive a completed / failed run. A 409, not the `refused` payload: the
         # Continue card reads `refused` as "Continue limit reached". `streaming` is deliberately
         # NOT refused — the cap_paused SSE event precedes the finalizer's status write, so a fast
         # press legitimately sees `streaming`. Harness anchors keep their own rule (branch above).
+        # ⚠ 292.1-REVIEW CR-01: "terminal" alone is NOT "finished" — a FIRST-turn pause finalizes
+        # as `completed` by design, so `completed` asks the carrier-aware predicate first.
         raise HTTPException(
             status_code=status.HTTP_409_CONFLICT,
             detail="This run has already finished, so there is nothing to continue. Start a new message to keep going.",

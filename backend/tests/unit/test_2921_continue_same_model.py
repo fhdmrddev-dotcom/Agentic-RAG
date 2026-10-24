@@ -15,6 +15,9 @@ SEED-324: ``POST /runs/{id}/continue`` on a Deep run already in a terminal statu
 spawns nothing and counts nothing. ``cap_paused`` AND ``streaming`` are still accepted — the
 cap_paused SSE event precedes the finalizer's status write, so a fast press legitimately sees
 ``streaming``.
+
+292.1-REVIEW CR-01: a FIRST-turn pause finalizes as ``completed`` by design, so ``completed`` is a
+409 only when the carrier-aware predicate (``app.db.runs.run_is_cap_paused``) says it is not paused.
 """
 from __future__ import annotations
 
@@ -205,11 +208,16 @@ class _Db:
         return SimpleNamespace(data=self.data.get(builder.table))
 
 
-async def _continue(run_row: dict) -> tuple[AsyncMock, _Db, object]:
+async def _continue(run_row: dict, *, paused: bool = False,
+                    paused_mock: AsyncMock | None = None) -> tuple[AsyncMock, _Db, object]:
+    """``paused`` is what the ONE pause predicate (``app.db.runs.run_is_cap_paused``) answers for
+    the row — the carrier-aware read a first-turn ``completed`` pause needs (292.1-REVIEW CR-01)."""
     db = _Db({"runs": run_row, "threads": {"active_workflow_run_id": None}})
     spawn = AsyncMock(return_value=None)
     sb = db.client()
+    pred = paused_mock if paused_mock is not None else AsyncMock(return_value=paused)
     with patch.object(runs_mod, "aexec", db.aexec), \
+            patch("app.db.runs.run_is_cap_paused", pred), \
             patch.object(runs_mod.settings, "max_continues_per_run", 3), \
             patch("app.services.run_producer.spawn_continuation_run", spawn), \
             patch("app.db.runs.load_cap_paused_tool_calls", AsyncMock(return_value=[])), \
@@ -251,10 +259,49 @@ async def test_a_row_without_model_passes_none():
 @pytest.mark.parametrize("status", ["failed", "completed", "cancelled", "timed_out"])
 @pytest.mark.asyncio
 async def test_a_finished_deep_run_is_refused_with_409_and_spawns_nothing(status):
-    spawn, db, res = await _continue(_row(status=status))
+    # ``completed`` here is a run that FINISHED: no cap carrier was written during it.
+    spawn, db, res = await _continue(_row(status=status), paused=False)
     assert isinstance(res, HTTPException) and res.status_code == 409
     spawn.assert_not_awaited()
     assert db.updates == [], "a refused Continue must not count"
+
+
+# ── 292.1-REVIEW CR-01: a FIRST-turn pause finalizes as ``completed`` BY DESIGN ───────────────
+# (run_producer: the pause fact lives in result_sink["cap_disposition"] + the carrier row; Phase
+# 250 LOCK-2 pins that). Measured locally: 0 rows ever read ``cap_paused``; every carrier-bearing
+# first-turn run reads ``completed``. So the 409 must ask the carrier-aware predicate.
+
+
+@pytest.mark.asyncio
+async def test_a_first_turn_pause_finalized_completed_with_its_carrier_is_accepted():
+    row = _row(status="completed", org_id="77777777-7777-7777-7777-777777777777")
+    pred = AsyncMock(return_value=True)
+    spawn, db, res = await _continue(row, paused_mock=pred)
+    spawn.assert_awaited_once()
+    assert res["status"] == "ok"
+    assert db.updates and db.updates[0][1]["continues_used"] == 1
+    pred.assert_awaited_once()
+    args, kwargs = pred.await_args
+    assert str(args[1]) == row["run_id"]
+    assert str(kwargs["org_id"]) == row["org_id"], "the carrier read is org-scoped like the consume"
+
+
+@pytest.mark.asyncio
+async def test_a_completed_run_with_no_carrier_or_an_older_one_is_still_refused():
+    spawn, db, res = await _continue(_row(status="completed"), paused=False)
+    assert isinstance(res, HTTPException) and res.status_code == 409
+    spawn.assert_not_awaited()
+    assert db.updates == []
+
+
+@pytest.mark.parametrize("status", ["failed", "cancelled", "timed_out"])
+@pytest.mark.asyncio
+async def test_a_failed_or_stopped_run_is_refused_without_asking_the_predicate(status):
+    pred = AsyncMock(return_value=True)
+    spawn, db, res = await _continue(_row(status=status), paused_mock=pred)
+    assert isinstance(res, HTTPException) and res.status_code == 409
+    pred.assert_not_awaited()
+    spawn.assert_not_awaited()
 
 
 @pytest.mark.parametrize("status", ["cap_paused", "streaming"])
