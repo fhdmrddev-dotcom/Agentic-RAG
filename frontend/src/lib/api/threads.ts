@@ -433,6 +433,9 @@ export interface PostMessageResponse {
   run_id: string
   /** 292.1 (D-12): true when the server resumed the paused run instead of starting a new one. */
   continued?: boolean
+  /** 292.1 UAT: on the continued arm, the run buffer's tail before the continuation spawned —
+   *  the offset the browser follows the SAME run from. Absent → follow nothing. */
+  stream_since?: string
   continues_used?: number
   continues_remaining?: number
   // Phase 095.1-07 (GAP-2): the already-resolved model/provider the backend
@@ -1957,6 +1960,10 @@ export interface ContinueRunResult {
    *  frontend re-subscribes GET /runs/{producer_run_id}/stream. Absent on the Deep
    *  consume path (same run_id) and on a `refused` response. */
   producer_run_id?: string
+  /** 292.1 UAT — Deep only: the SAME run's buffer tail read before the continuation spawned
+   *  (`"0"` when it had expired). Follow `run_id` from here, never from 0: the buffer still holds
+   *  the paused segment and its `done`. Absent when Redis could not be read. */
+  stream_since?: string
   message?: string
   continues_used: number
   continues_remaining: number

@@ -20,6 +20,9 @@
 export interface ProducerResubscribe {
   threadId: string
   producerRunId: string
+  /** 292.1 UAT — a DEEP Continue: follow the SAME run (`producerRunId` is the paused run id)
+   *  from this buffer offset, into the assistant turn it continues. Absent on the Harness path. */
+  since?: string
 }
 
 type Listener = (payload: ProducerResubscribe) => void
