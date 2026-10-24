@@ -1,7 +1,8 @@
 ---
 phase: 293
 slug: start-from-outside-and-close-out
-status: draft
+status: approved
+reviewed_at: 2026-10-24
 shadcn_initialized: true
 preset: "style default · baseColor slate · cssVariables · iconLibrary lucide (frontend/components.json)"
 created: 2026-10-24
@@ -20,8 +21,9 @@ sources:
 > checker validates it.
 
 **What is locked and what this file decides.** The API keys tab's layout, states and copy are the
-approved sketch (variant C). This file transcribes them, and only normalises pixel values to the
-4px grid (listed in §Sketch-to-build normalisations). The origin line, the next-run text, the rate
+approved sketch (variant C). This file transcribes them, normalises pixel values to the 4px grid,
+and changes one button word ("Cancel" → "Discard draft"); all are listed in §Sketch-to-build
+normalisations. The origin line, the next-run text, the rate
 limit control, the admin tab placement, the ⋯ menu item and every state the sketch did not draw
 (loading, failures, no published workflows) are decided here, because D-21 sent them to UI-SPEC
 rather than to the sketch.
@@ -77,10 +79,12 @@ New surfaces in this phase use exactly these four sizes and two weights.
 | Heading | 16px (`text-base`, Manrope) | 600 | 1.2 | "API keys" card title, key label on each key card, draft card title |
 | Display | 20px (`text-xl`, Manrope) | 600 | 1.2 | revoke sheet title "Revoke {label}?" |
 
-Host-inherited exception: a line added inside an existing row adopts that row's shipped detail
-class instead of a new size. This applies to two places only: the origin line in `RunLogPanel`
-rows (the row detail is 11px muted) and the next-run fragment on the workflow card (it sits in the
-card's shipped 12px automation line).
+No other size is introduced. Two additions sit inside text that already exists and add no size:
+- The workflow card's next-run fragment is a span inside the card's shipped 12px automation line,
+  so it is the Meta role (12px/400).
+- The `RunLogPanel` origin text is not a new line. It is appended as the last atom of the row's
+  existing detail string (`runLogRow.ts` joins atoms with `ATOM_SEPARATOR`), so it renders in that
+  line's shipped style. `RunLogPanel.tsx` itself is not edited and no new text element exists.
 
 ---
 
@@ -124,13 +128,14 @@ with the caption legend and the tap detail spelling each call out.
 |---|---|---|
 | `frontend/src/pages/SettingsPage.tsx` | (a) one literal `<TabsTrigger value="7">API keys</TabsTrigger>` after Audit Log and one `<TabsContent value="7"><ApiKeysTab …/></TabsContent>`; (b) one `<ApiKeyLimits ref={…}/>` card in the Integrations tab with its `changes()` spread into the existing Save Integrations PUT and `adopt()` called on its response (the `AgentRoundLimits` handle pattern); (c) one optional prop `onOpenRun?: (runId: string) => void` threaded only to `ApiKeysTab` | no new `useState` beyond the one ref, no fetch, no copy strings |
 | `frontend/src/components/settings/settingsTabs.ts` (registry, not a hot row) | one entry `{ id: "7", audience: "everyone", name: "API keys" }` appended last | "7" is new; never reuse retired "5" |
-| `frontend/src/components/org/OrgAdminShell.tsx` | one `TABS` entry `{ id: "api-keys", label: "API keys", locked: false }` (last, after Retention), one union member, one render branch `activeTab === "api-keys" ? <OrgApiKeysTab onRecorded={pulse} /> :` | ⛔ ledger: "the next phase that touches this file proposes an extraction FIRST". Proposed seam for the planner to put to the operator: move `OrgAdminTab`, `TabDef` and `TABS` into `components/org/orgAdminTabs.ts` (the `settingsTabs.ts` precedent) in the same plan, before the tab is added |
+| `frontend/src/components/org/OrgAdminShell.tsx` | one `TABS` entry `{ id: "api-keys", label: "API keys", locked: false }` (last, after Retention), one union member, one render branch `activeTab === "api-keys" ? <OrgApiKeysTab onRecorded={pulse} /> :` | ⛔ ledger: "the next phase that touches this file proposes an extraction FIRST". **Operator decision 2026-10-24: EXTRACT FIRST.** Move `OrgAdminTab`, `TabDef` and `TABS` into `components/org/orgAdminTabs.ts` (the `settingsTabs.ts` precedent), move-only, in the same plan, before the tab is added |
 | `frontend/src/components/workflows/library/WorkflowCard.tsx` | (a) one optional prop `onApiKey` passed straight through to `WorkflowCardMenu`; (b) one `<span data-testid="row-automation-next">` rendered inside the existing automation block when `automation.next !== null` | `useState` count stays 0; the cadence words are not edited |
 | `frontend/src/components/workflows/library/WorkflowCardMenu.tsx` | one `DropdownMenuItem` "New API key…" | not hot; the ⋯ seam taken in 286 |
 | `frontend/src/pages/WorkflowsPage.tsx` | one optional prop `onOpenApiKeys` threaded to the card | wired in `ChatLayout.tsx` beside `onOpenConnections` |
 | `frontend/src/pages/WorkflowRunPage.tsx` | one `<RunOriginLine origin={run?.origin} />` in the status row, right after `<WaitingOnLine>` | no hook, state or effect |
 | `frontend/src/components/workflows/RunEvidenceReport.tsx` | one `<RunOriginLine origin={view.origin} />` directly under `evidence-sub`, above `RunEndReasonLine` | the export is `exportPayload(payload)` unchanged, so it carries `origin` because the payload does |
-| `frontend/src/components/workflows/history/RunLogPanel.tsx` | one `<RunOriginLine … variant="row" />` as a third line in the row column, under `run-log-row-detail` | outcome, duration and button shape unchanged |
+| `frontend/src/components/workflows/history/RunLogPanel.tsx` | **no change**: the origin reaches the row through its existing `row.detail` string | outcome, duration, detail element and button shape unchanged |
+| `frontend/src/components/workflows/history/runLogRow.ts` (pure leaf, not hot) | when `row.origin` resolves to a sentence via `originSentence()`, push it as the LAST atom of `atoms`, after the measured duration | the not-recorded duration slot and every other atom unchanged |
 | `frontend/src/components/chat/RunCard.tsx` | one `<RunOriginLine origin={message.run_origin} />` directly under the model subline | props stay `{ message, isStreaming }`; `message.run_origin` arrives through the existing message enrich |
 
 ### New leaf components (all new UI lives here)
@@ -139,7 +144,7 @@ with the caption legend and the tap detail spelling each call out.
 |---|---|---|
 | `frontend/src/components/settings/apiKeys/ApiKeysTab.tsx` | component | the tab body for a member: own fetch of the caller's keys + effective limits, the header card, the draft card, the show-once card, the card list, the empty state, the revoke sheet mount. Holds the just-created secret in memory only |
 | `frontend/src/components/settings/apiKeys/ApiKeyCard.tsx` | component | one key card in every state (active, refused-for-some, expired, revoked, fresh); `showOwner` for the admin view |
-| `frontend/src/components/settings/apiKeys/ApiKeyDraftCard.tsx` | component | the create form inside the draft card (label, workflow picker, expiry, runs-as note, Create/Cancel) |
+| `frontend/src/components/settings/apiKeys/ApiKeyDraftCard.tsx` | component | the create form inside the draft card (label, workflow picker, expiry, runs-as note, Create key / Discard draft) |
 | `frontend/src/components/settings/apiKeys/ApiKeySecretOnce.tsx` | component | the secret, the two `curl` blocks, the status-read sample, Copy buttons, "I've saved the secret" |
 | `frontend/src/components/settings/apiKeys/ApiKeyCallStrip.tsx` | component | the bar strip, its caption, the tapped-call detail, roving-tabindex keyboard handling |
 | `frontend/src/components/settings/apiKeys/ApiKeyActivity.tsx` | component | the recent-calls table and its header |
@@ -221,13 +226,13 @@ Border `--primary` with a 1px `--primary/15` ring. Top row: `KeyRound` · the la
 | Expires | segmented control: 30 days · 90 days · 365 days · Never | default **90 days** (D-04) |
 
 Below the rows: the **Runs as you** note (left 3px primary rule, `bg-muted/40`), then actions:
-**Create key** (primary, disabled until label and one workflow are present), **Cancel** (ghost),
+**Create key** (primary, disabled until label and one workflow are present), **Discard draft** (ghost),
 and the reason the button is disabled, in 12px dim text beside it.
 
 Opened from a workflow's ⋯ menu: that workflow is already ticked, the "From the ⋯ menu of …"
 hint sits above the first row, and focus goes to the Label input. Opened from **New key**: nothing
 is ticked and focus goes to the Label input. Esc inside the draft card does nothing destructive;
-only Cancel discards it.
+only **Discard draft** discards it.
 
 ### Show-once card (`ApiKeySecretOnce`)
 
@@ -282,19 +287,19 @@ place of the button (re-fetch, not optimistic). On failure: the sheet stays open
 
 ### Every state of the tab
 
-| State | What renders |
-|---|---|
-| Loading | the header card with its description; in the stack, one muted line "Loading your keys…" (`role="status"`). No limits line, no New key button until the read answers |
-| Load failed | the header card, then a `role="alert"` destructive-tinted line with the error copy and a **Retry** button |
-| Empty | one card with the empty state: `KeyRound` 28px muted, the empty sentence, **New key** |
-| No published workflows (draft open) | the checklist area shows the no-workflows sentence instead of rows; Create key stays disabled with "Pick at least one workflow." |
-| Has keys | header card + limits line + key cards |
-| Creating | draft card at the top of the stack; New key hidden |
-| Create failed | the draft card stays, values kept; a `role="alert"` line under the actions with the server's sentence |
-| Just created | show-once card at the top; New key hidden |
-| Copy failed | the Copy button reads "Copy failed" for 2s and a 12px line under the block says to copy by hand |
-| Revoke | the sheet over the tab |
-| Revoked | dimmed card, `revoked` tag, receipt line |
+| State | What renders | Focal point |
+|---|---|---|
+| Loading | the header card with its description; in the stack, one muted line "Loading your keys…" (`role="status"`). No limits line, no New key button until the read answers | The eye lands on the "Loading your keys…" line; nothing actionable competes with it. |
+| Load failed | the header card, then a `role="alert"` destructive-tinted line with the error copy and a **Retry** button | The eye lands on the red alert line and its **Retry** button, the only thing to do. |
+| Empty | one card with the empty state: `KeyRound` 28px muted, the empty sentence, **New key** | The eye lands on the centred **New key** button, under the one sentence that says what a key is for. |
+| No published workflows (draft open) | the checklist area shows the no-workflows sentence instead of rows; Create key stays disabled with "Pick at least one workflow." | The eye lands on the no-workflows sentence inside the checklist box, which names where to go next. |
+| Has keys | header card + limits line + key cards | The eye lands on the first key card's state tag (`● active` or `⚠ … refused`), the at-a-glance answer to "is it working". |
+| Creating | draft card at the top of the stack; New key hidden | The eye lands on the primary-bordered draft card, with focus already in its Label input. |
+| Create failed | the draft card stays, values kept; a `role="alert"` line under the actions with the server's sentence | The eye lands on the red alert line under **Create key**, beside the values still filled in. |
+| Just created | show-once card at the top; New key hidden | The eye lands on the amber show-once card's warning and the secret box with its **Copy** button. |
+| Copy failed | the Copy button reads "Copy failed" for 2s and a 12px line under the block says to copy by hand | The eye lands on the "Copy failed" button state and the copy-by-hand line under that block. |
+| Revoke | the sheet over the tab | The eye lands on the sheet's title "Revoke {label}?" and its red top border; focus sits on **Keep it**. |
+| Revoked | dimmed card, `revoked` tag, receipt line | The eye lands on the receipt line "✎ Revoked by … · recorded" where the Revoke button was. |
 
 ---
 
@@ -356,7 +361,7 @@ colleague on the evidence report.
 |---|---|---|
 | `WorkflowRunPage` header (live run) | status row, after `WaitingOnLine`, before the elapsed time | live and paused runs |
 | `RunEvidenceReport` (finished run) | its own line directly under the "Completed in … · started … by …" sub line, above the end-reason line | finished runs; the JSON export carries the raw `origin` object, the printed report shows the sentence |
-| `RunLogPanel` row | third line of the row's text column, under the detail line, 11px muted (host detail class) | every row with a recorded origin |
+| `RunLogPanel` row | the last atom of the row's existing detail line, e.g. `v3 · 4 steps · 2m 10s · Started by key n8n-prod`; same sentence from `originSentence()`, no icon (it is text inside a string), the line's shipped style | every row with a recorded origin; rows without one compose byte-identically to today. The detail line truncates from the end, so the origin is the atom that gives way first on a narrow row; the run page it opens shows the full line |
 | Chat `RunCard` | under the model subline, `mt-0.5` | the run's assistant turn, when the message carries `run_origin` |
 
 ⛔ D-23: no surface may print "manual", "app" or any other default for a run whose origin was not
@@ -373,7 +378,7 @@ The workflow card's existing automation line (`CalendarClock` + cadence words, `
 
 - The cadence words are the shipped `AUTOMATION_CADENCE` / `AUTOMATION_RUNS_ITSELF` strings,
   unchanged (D-25's "Every Monday" is the shape; the card keeps its shipped wording so existing
-  pins hold). A custom cron reads `runs on its own · next Mon 27 Oct, 09:00`.
+  pins hold; **operator confirmed 2026-10-24: keep the shipped words**). A custom cron reads `runs on its own · next Mon 27 Oct, 09:00`.
 - The instant is the server's `next_run_at` (the soonest active schedule, the same field
   `automationFacts` already receives). The browser only formats it, never computes it.
 - Format: viewer's local time zone, `en-GB` parts: short weekday, day, short month, 24-hour
@@ -449,7 +454,7 @@ no jargon, no roadmap numbers.
 | Expires hint | You can revoke it any time before then. (Never: It works until you revoke it.) |
 | Runs-as note | Runs started with this key **run as you**: they search the folders you can search and appear in your chat history, one thread per run. Anyone holding the key can start the workflows above. |
 | Disabled reasons | Add a label. / Pick at least one workflow. |
-| Buttons | Create key · Cancel |
+| Buttons | Create key · Discard draft |
 | Created tag | ● created |
 | Show-once warning | ⚠ Copy the secret now. It is not stored and can't be shown again; if you lose it, revoke the key and make a new one. |
 | Copy button states | Copy → ✓ Copied (2s) · Copy failed (2s) |
@@ -598,7 +603,7 @@ D-20 did not name). Replacement for the ApiReference callout:
 
 ---
 
-## Sketch-to-build normalisations (pixel only; layout, states and copy unchanged)
+## Sketch-to-build normalisations (pixel values plus one button word; layout and states unchanged)
 
 | Sketch | Build | Why |
 |---|---|---|
@@ -609,6 +614,7 @@ D-20 did not name). Replacement for the ApiReference callout:
 | tick 7px wide, 3px gap, 18/11px tall | 8px bar in a 12×24px button, 4px apart, 16/12px tall | 4px grid and a touchable hit area |
 | label column 130px, list max-height 210px | 128px, 208px | 4px grid |
 | card radius `--radius-lg` 14px | `rounded-[14px]` | unchanged value, the 095 outer-card radius |
+| draft card button "Cancel" | **Discard draft** | the one WORD-ONLY deviation from sketch C's copy: a generic label failed the UI checker (Dimension 1). Same button, same place, same ghost style, same behaviour; layout and states unchanged |
 
 ---
 
