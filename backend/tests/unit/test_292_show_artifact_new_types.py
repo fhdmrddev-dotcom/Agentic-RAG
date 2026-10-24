@@ -43,6 +43,8 @@ def _ctx(**over):
         redis=object(), run_id=RUN, thread_id=T, pool=object(), current_user={"id": U, "org_id": O},
         emit=AsyncMock(), tool_call_id="call_0", parent_run_id=None, phase_whitelist=None,
         turn_tool_calls=[], turn_citations=list(CITATIONS),
+        # 292-REVIEW WR-01: the manifest the model was shown numbered both sources.
+        turn_citations_seen=2,
     )
     base.update(over)
     return SimpleNamespace(**base)

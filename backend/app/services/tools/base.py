@@ -77,6 +77,11 @@ class ToolContext:
     # names the same source the model saw as `[n]` this turn. None on every unwired
     # harness/eval/test caller => any handle is refused as "nothing retrieved this turn".
     turn_citations: list[dict] | None = None
+    # 292-REVIEW WR-01 — how many deduplicated sources the manifest the model was SHOWN numbered,
+    # frozen where agent_loop injects it. `turn_citations` keeps growing as this response's tools run,
+    # so a handle above this count names a source the model never saw as [n]. 0 on the resume build
+    # and on every unwired caller => any handle is refused.
+    turn_citations_seen: int = 0
     tool_index: int = 0  # current index in the tool_calls list (used by execute_code heartbeat)
     iteration: int = 0  # current agent loop iteration (used by harvest_output_files)
     # Phase 085 — D-085-09 / D-085-12 / D-085-15 / D-085-01

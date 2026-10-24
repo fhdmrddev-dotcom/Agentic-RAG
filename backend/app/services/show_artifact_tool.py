@@ -663,7 +663,9 @@ async def _show_encoded(parsed: Any, ctx: Any, thread_id: UUID, user_id: UUID, u
 
     enc = getattr(parsed, component)
     handles, texts = _element_sources(component, enc)
-    resolved = resolve_sources(handles, getattr(ctx, "turn_citations", None), texts)
+    # 292-REVIEW WR-01: only the sources the model's manifest numbered (unwired => none).
+    resolved = resolve_sources(handles, getattr(ctx, "turn_citations", None), texts,
+                               seen=getattr(ctx, "turn_citations_seen", 0))
     if isinstance(resolved, ArtifactRefusal):
         return out(refusal_payload(resolved))
     try:

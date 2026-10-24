@@ -223,7 +223,8 @@ RETIRED: dict[str, str] = {
         "Phase 292 (292-01, D-07, 2026-10-24): deliberate post-move edit. ToolContext gains "
         "turn_citations (by reference to agent_loop's retrieved_citations) so show_artifact source "
         "handles resolve against the manifest the model saw. Pinned by test_292_artifact_sources.py "
-        "and test_292_show_artifact_new_types.py."
+        "and test_292_show_artifact_new_types.py. 292-REVIEW WR-01 (2026-10-24) adds "
+        "turn_citations_seen (the manifest size frozen at injection); pinned by test_292_review_fixes.py."
     ),
 }
 

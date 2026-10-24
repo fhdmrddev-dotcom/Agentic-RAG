@@ -1965,6 +1965,7 @@ async def run_agent_loop(
     source_refs: list[dict] = []  # {"document_id": str, "filename": str}
     unique_sources: list[dict] = []
     retrieved_citations: list[dict] = []    # Full citation objects per D-04
+    citations_shown = 0  # 292-REVIEW WR-01: sources the model's last manifest numbered (show_artifact)
     similarity_scores: list[float] = []     # Per-call avg cosine values for confidence
     unique_citations: list[dict] = []       # Deduplicated citations (closure-accessible)
     _confidence_slot: list[dict] = []       # Confidence result (closure-accessible for persist)
@@ -2220,6 +2221,7 @@ async def run_agent_loop(
                 empty_filter_fields_in_run=_empty_filter_fields_in_run,  # 272 (D-09) — retry lock (by-reference)
                 turn_tool_calls=persisted_tool_calls,  # 273 (D-04) — caption source (by-reference)
                 turn_citations=retrieved_citations,  # 292 (D-07) — source handles resolve against the manifest the model saw (by reference)
+                turn_citations_seen=0,  # 292-REVIEW WR-01 — the paused batch saw another run's manifest
                 iteration=0,
                 parent_run_id=None,
                 per_run_task_semaphore=_per_run_task_semaphore,
@@ -2352,6 +2354,7 @@ async def run_agent_loop(
                 active_system_prompt = apply_citation_instruction(
                     active_system_prompt, messages, retrieved_citations
                 )
+                citations_shown = len(_deduplicate_citations(retrieved_citations))
 
             while True:
                 try:
@@ -3136,6 +3139,7 @@ async def run_agent_loop(
                 empty_filter_fields_in_run=_empty_filter_fields_in_run,  # 272 (D-09) — retry lock (by-reference)
                 turn_tool_calls=persisted_tool_calls,  # 273 (D-04) — caption source (by-reference)
                 turn_citations=retrieved_citations,  # 292 (D-07) — source handles resolve against the manifest the model saw (by reference)
+                turn_citations_seen=citations_shown,  # 292-REVIEW WR-01 — frozen at manifest injection
                 iteration=iteration,
                 # Phase 085 additions —
                 # parent_run_id is None at the top-level run; task_service

@@ -105,11 +105,19 @@ def resolve_sources(
     handles: list[int | None],
     citations: list[dict] | None,
     texts: list[str],
+    *,
+    seen: int | None = None,
 ) -> list[dict | None] | ArtifactRefusal:
     """Resolve each handle (in order) against this turn's deduplicated citations.
 
     ``handles[i]`` is a validated ``int >= 1`` or None; ``texts[i]`` is that element's own text,
     which steers the excerpt. Returns one resolved source (or None) per handle, or a refusal.
+
+    ``seen`` (292-REVIEW WR-01) is how many of those sources the manifest the model was SHOWN
+    numbered. ``citations`` keeps growing while one response's tools run, so a handle above ``seen``
+    names a source the model never saw as ``[n]`` (a search in the same batch, or a resumed batch
+    written against another run's manifest) and is refused. The handler always passes it; ``None``
+    (no cap) is for direct callers of this pure function only.
     """
     if all(h is None for h in handles):
         return [None] * len(handles)
@@ -124,6 +132,7 @@ def resolve_sources(
             "Omit `source` (the caption will say the values came from you), or search first.",
         )
     k = len(unique)
+    shown = k if seen is None else max(0, min(k, seen))
     out: list[dict | None] = []
     for h, text in zip(handles, texts):
         if h is None:
@@ -135,6 +144,16 @@ def resolve_sources(
                 f"source {h} is not one of this turn's sources (1-{k}). Use the [n] shown beside a source "
                 "retrieved in this turn, or omit `source`.",
             )
+        if h > shown:
+            if shown == 0:
+                detail = (f"source {h} was retrieved in this same step, so it had no [n] in the list you were "
+                          "shown. Search first, then call show_artifact in a later step using the [n] you see "
+                          "then, or omit `source`.")
+            else:
+                detail = (f"source {h} wasn't in the list you were shown (1-{shown}); it was retrieved in this "
+                          "same step. Search first, then call show_artifact in a later step, or use a number "
+                          f"from 1-{shown}, or omit `source`.")
+            return _refusal("unresolved_source", detail)
         c = unique[h - 1]
         out.append({
             "document": clean_document_name(c.get("filename")),
