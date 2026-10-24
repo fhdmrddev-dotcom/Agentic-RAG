@@ -306,3 +306,7 @@ are in `backend/tests/unit/test_292_review_fixes.py`.
 _Reviewed: 2026-10-24_
 _Reviewer: Claude (gsd-code-reviewer)_
 _Depth: standard_
+
+### WR-02 revised at the G4 live re-check (2026-10-24, orchestrator)
+
+The refusal made gpt-5.4-mini abandon the comparison instead of retrying (thread `757df2e2`). Changed to **drop**: a q cell's source is set to None by `ComparisonCell` and `StoredComparisonCell`, matching the frontend guard. `65e48efd7` (RED) → `637a1f3cf` (GREEN). Re-run: openai `a_v0ku01ley6`, 0 refusals. The `_R` key `not_stated_with_source` is now unused and kept for history.
