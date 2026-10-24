@@ -40,6 +40,8 @@ vi.mock("@/lib/api", async (importOriginal) => {
   const actual = await importOriginal<Record<string, unknown>>()
   return { ...actual, continueRun }
 })
+const { requestProducerResubscribe } = vi.hoisted(() => ({ requestProducerResubscribe: vi.fn() }))
+vi.mock("@/providers/producerResubscribeSignal", () => ({ requestProducerResubscribe }))
 
 let lock: { runId: string; mode?: "harness" | "cap_paused"; capPaused: boolean; continuesRemaining: number } = {
   runId: "run-cap-1",
@@ -64,6 +66,7 @@ afterEach(() => {
   cleanup()
   continueRun.mockClear()
   continueRun.mockResolvedValue({ status: "ok" })
+  requestProducerResubscribe.mockClear()
   lock = { runId: "run-cap-1", capPaused: true, continuesRemaining: 2 }
   useStreamsStore.setState({ continuingThreads: new Set() })
 })
@@ -152,5 +155,49 @@ describe("292.1 — the Continue card's Continuing… state", () => {
         "Reached the Continue limit — this run is stopped. Cancel the workflow to start something new.",
       ),
     ).toBeInTheDocument()
+  })
+})
+
+// ── 292.1 UAT (run 5549031c): a Deep Continue re-attaches the SAME run's stream ──────────────
+// A Deep Continue keeps its run id and returns no producer_run_id, and the first segment's stream
+// already ended with `done` — so nothing listened to the continuation. The 200 now carries
+// `stream_since` (the buffer's tail before the continuation spawned); the card hands it to the
+// provider through the same per-thread signal the Harness re-drive uses.
+describe("292.1 UAT — a Deep Continue asks to follow the same run from stream_since", () => {
+  it("4: a Deep 200 with stream_since requests the SAME run id from that offset", async () => {
+    lock = { runId: "run-cap-1", mode: "cap_paused", capPaused: true, continuesRemaining: 2 }
+    continueRun.mockResolvedValue({
+      status: "ok", run_id: "run-cap-1", continues_used: 1, continues_remaining: 2,
+      stream_since: "1729765841000-7",
+    })
+    renderItem(<MessageItem message={makeMessage()} isLastAssistant />)
+    fireEvent.click(screen.getByTestId("continue-run"))
+    await waitFor(() => expect(requestProducerResubscribe).toHaveBeenCalledTimes(1))
+    expect(requestProducerResubscribe).toHaveBeenCalledWith({
+      threadId: "t-1",
+      producerRunId: "run-cap-1",
+      since: "1729765841000-7",
+    })
+  })
+
+  it("5: the Harness re-drive still follows its fresh producer, with no offset", async () => {
+    lock = { runId: "wf-1", mode: "harness", capPaused: true, continuesRemaining: 2 }
+    continueRun.mockResolvedValue({
+      status: "ok", run_id: "wf-1", continues_used: 1, continues_remaining: 2, producer_run_id: "prod-9",
+    })
+    renderItem(<MessageItem message={makeMessage()} isLastAssistant />)
+    fireEvent.click(screen.getByTestId("continue-run"))
+    await waitFor(() => expect(requestProducerResubscribe).toHaveBeenCalledTimes(1))
+    expect(requestProducerResubscribe).toHaveBeenCalledWith({ threadId: "t-1", producerRunId: "prod-9" })
+  })
+
+  it("6: a Deep 200 with no stream_since (an older backend) requests nothing", async () => {
+    lock = { runId: "run-cap-1", mode: "cap_paused", capPaused: true, continuesRemaining: 2 }
+    continueRun.mockResolvedValue({ status: "ok", run_id: "run-cap-1", continues_used: 1, continues_remaining: 2 })
+    renderItem(<MessageItem message={makeMessage()} isLastAssistant />)
+    fireEvent.click(screen.getByTestId("continue-run"))
+    await waitFor(() => expect(continueRun).toHaveBeenCalledTimes(1))
+    await Promise.resolve()
+    expect(requestProducerResubscribe).not.toHaveBeenCalled()
   })
 })
