@@ -4391,6 +4391,7 @@ const BASELINE = {
   "AgentRoundLimits.test.tsx": 10, // 292.1-02 — the 2..50 round-cap leaf: own fetch/save, clamp on Save/blur, never sends 0
   "continueWords.lockstep.test.ts": 17, // 292.1-03 — ?raw lockstep vs typed_continue.py + the shared continue-words fixture
   "StreamsProvider.typedContinue.test.tsx": 6, // 292.1-03 — typed continue holds the optimistic turn; Continuing… set and cleared
+  "StreamsProvider.capPausedDone.test.tsx": 4, // 292.1 G-4 live fix (RED 97a50019f / GREEN 1397edfbb): a `done` after a live cap pause asks the server before clearing the Continue card
 }
 
 // Still COMPUTED, never hand-written — the reduce is the single source, so the
@@ -6410,6 +6411,8 @@ const TARGETS = [
   "src/components/settings/__tests__/AgentRoundLimits.test.tsx",
   "src/lib/__tests__/continueWords.lockstep.test.ts",
   "src/providers/__tests__/StreamsProvider.typedContinue.test.tsx",
+  // 292.1 G-4 live fix — FILE-LEVEL, SAME commit as its BASELINE pin (292.1-04 close-out).
+  "src/providers/__tests__/StreamsProvider.capPausedDone.test.tsx",
 ]
 
 const REPO_ROOT = path.resolve(__dirname, "..")
