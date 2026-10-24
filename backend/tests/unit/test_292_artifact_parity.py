@@ -57,7 +57,7 @@ def _args(case: dict) -> dict:
 
 def test_parity_fixture_is_not_vacuous():
     raw = json.loads(PARITY_FIXTURE.read_text(encoding="utf-8"))
-    assert set(raw) == {"about", "bad", "good", "stored_sources", "document_names"}
+    assert set(raw) == {"about", "bad", "good", "stored_sources", "document_names", "refused_then_tolerated"}
     assert len(raw["bad"]) >= 20
     assert len(raw["good"]) >= 6
     comps = {c["component"] for c in raw["bad"]} | {c["component"] for c in raw["good"]}
@@ -101,6 +101,14 @@ def test_every_stored_source_case_matches_its_ok(case):
     except ValidationError:
         accepted = False
     assert accepted is case["ok"], case["name"]
+
+
+@pytest.mark.parametrize("case", _cases("refused_then_tolerated"), ids=lambda c: c["name"])
+def test_every_refused_then_tolerated_case_is_refused_by_the_backend(case):
+    # 292-REVIEW WR-02: the backend is the stricter side; the frontend fence asserts the tolerance.
+    out = validate_args(_args(case))
+    assert isinstance(out, ArtifactRefusal), case["name"]
+    assert 0 < len(out.reason) <= 120
 
 
 @pytest.mark.parametrize("case", _cases("document_names"), ids=lambda c: c["name"])

@@ -290,6 +290,25 @@ function withNodeSource(source: unknown): Record<string, unknown> {
   return r
 }
 
+const TOLERATED = (parity292 as unknown as { refused_then_tolerated: FixtureCase[] }).refused_then_tolerated ?? []
+
+describe("WR-02 (292-REVIEW) — refused by the backend, tolerated and neutralised by the guard", () => {
+  it("every refused_then_tolerated case parses, and no q (not stated) cell keeps a source", () => {
+    expect(TOLERATED.length).toBeGreaterThanOrEqual(1)
+    for (const c of TOLERATED) {
+      const r = parseArtifactRecord(asRecord(c))
+      expect(r.ok, `${c.name}: ${r.ok ? "" : r.reason}`).toBe(true)
+      if (!r.ok) continue
+      const cells = r.record.spec.comparison?.terms.flatMap((t) => t.cells) ?? []
+      expect(cells.some((x) => x.verdict === "q"), c.name).toBe(true)
+      for (const x of cells) {
+        if (x.verdict === "q") expect(x.source, c.name).toBeNull()
+        else expect(x.source, c.name).not.toBeNull()
+      }
+    }
+  })
+})
+
 describe("CR-01 (292-REVIEW) — stored sources and document names agree with the backend", () => {
   it("every stored_sources case is accepted by the guard exactly when the backend accepts it (ok)", () => {
     expect(STORED_SOURCES.some((c) => c.ok)).toBe(true)

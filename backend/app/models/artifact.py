@@ -193,6 +193,7 @@ _R = {
     "no_items": "it has no {items} to show",
     "duplicate_option": "two options share a name",
     "cell_text_too_long": "a cell's text is over 200 characters",
+    "not_stated_with_source": "a cell marked not stated cites a source",  # 292-REVIEW WR-02
     "placeholder_encoded_stored": "it sent a reference to a shown artifact, not its data",
     "placeholder_encoded_not_stored": "it sent a placeholder from a refused call, not data",
     "foreign_fields": "a {noun} was sent another artifact type's fields",
@@ -814,6 +815,16 @@ class ComparisonCell(_Strict):
     def _source(cls, v: Any) -> Any:
         return _source_rule(v, "comparison.terms[].cells[]")
 
+    @model_validator(mode="after")
+    def _not_stated_cites_nothing(self) -> "ComparisonCell":
+        # 292-REVIEW WR-02: q means "not stated in what was retrieved"; a quoted clause under it would
+        # contradict the verdict it decorates.
+        if self.verdict == "q" and self.source is not None:
+            _raise("not_stated_with_source",
+                   "a cell with verdict q (not stated in what was retrieved) carries no `source`; omit it, or "
+                   "use y / n / m with the source if the document does state the term.")
+        return self
+
 
 class ComparisonTerm(_Strict):
     name: str
@@ -1185,6 +1196,12 @@ class StoredComparisonCell(_Strict):
     @classmethod
     def _text_cap(cls, v: str | None) -> str | None:
         return _stored_js_cap(v, MAX_CELL_CHARS, "cell text")
+
+    @model_validator(mode="after")
+    def _not_stated_cites_nothing(self) -> "StoredComparisonCell":
+        if self.verdict == "q" and self.source is not None:  # 292-REVIEW WR-02
+            raise ValueError("a q (not stated) cell carries no source")
+        return self
 
 
 class StoredComparisonTerm(_Strict):

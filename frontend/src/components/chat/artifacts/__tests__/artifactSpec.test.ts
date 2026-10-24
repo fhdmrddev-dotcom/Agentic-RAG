@@ -438,6 +438,20 @@ describe("292 — the encoded arms accept the stored shapes", () => {
     expect(r.spec.rows).toEqual([])
   })
 
+  it("292-REVIEW WR-02: a stored q (not stated) cell's source is dropped; a verdict cell keeps its own", () => {
+    const src = { document: "Atlas_MSA_2023.pdf", page: 14, excerpt: "Either party may terminate." }
+    const rec = mutable(comparisonContracts)
+    rec.spec.comparison.terms[4].cells[1].source = src
+    rec.spec.comparison.terms[0].cells[0].source = src
+    const r = okRecord(rec)
+    expect(r.spec.comparison?.terms[4].cells[1]).toEqual({ verdict: "q", text: "Not stated", source: null })
+    expect(r.spec.comparison?.terms[0].cells[0].source).toEqual(src)
+    // A malformed source is still refused, even on a q cell.
+    const bad = mutable(comparisonContracts)
+    bad.spec.comparison.terms[4].cells[1].source = { document: 7, page: null, excerpt: null }
+    expect(parseArtifactRecord(bad).ok).toBe(false)
+  })
+
   it("the 9-event timeline parses, in the stored order (the guard never re-sorts)", () => {
     const shuffled = mutable(timelineAtlas)
     shuffled.spec.timeline.events.reverse()

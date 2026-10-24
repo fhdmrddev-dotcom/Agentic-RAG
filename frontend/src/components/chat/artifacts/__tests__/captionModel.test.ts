@@ -189,6 +189,19 @@ describe("292 — the count segment is phrased per component, from the validated
     expect(captionSegments(rec(r)).note).toBe("Verdicts are the agent's reading.")
   })
 
+  it("292-REVIEW WR-02: a source on a q (not stated) cell does not earn the hover note", () => {
+    // Built past the guard (which drops it) so the caption's own rule is what is tested.
+    const parsed = rec(comparisonContracts)
+    const src = { document: "Atlas_MSA_2023.pdf", page: 14, excerpt: "Either party may terminate." }
+    const terms = parsed.spec.comparison!.terms.map((t) => ({
+      ...t,
+      cells: t.cells.map((c) => ({ ...c, source: c.verdict === "q" ? src : null })),
+    }))
+    expect(terms.some((t) => t.cells.some((c) => c.verdict === "q"))).toBe(true)
+    const r = { ...parsed, spec: { ...parsed.spec, comparison: { ...parsed.spec.comparison!, terms } } }
+    expect(captionSegments(r).note).toBe("Verdicts are the agent's reading.")
+  })
+
   it("timeline → `9 events` / `1 event`, with the no-source wording and no note", () => {
     const c = captionSegments(rec(timelineAtlas))
     expect(c.icon).toBe("info")

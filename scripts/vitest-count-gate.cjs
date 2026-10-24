@@ -4254,8 +4254,8 @@ const BASELINE = {
   // ── Phase 273-02 (ART-01/02/04/05) — SEVEN NEW suites for the agent-authored artifact surface,
   // BOTH KNOBS, SAME COMMIT. `src/components/chat` has NO bare-directory TARGETS entry, so each is
   // adopted by FILE path below. Pinned at the measured passing counts (94 cases, 0 failing). ──
-  "artifactSpec.test.ts": 64, // 273-02 (2026-10-03) — guard + closed catalogue + seeded never-throws; RAISED 28 → 64 at 292-02 (the three encoded arms, six names, alias sentences)
-  "captionModel.test.ts": 21, // 273-02 — server-fact caption wording; RAISED 12 → 21 at 292-02 (per-component count segments + the comparison note line)
+  "artifactSpec.test.ts": 65, // 273-02 (2026-10-03) — guard + closed catalogue + seeded never-throws; RAISED 28 → 64 at 292-02 (the three encoded arms, six names, alias sentences); 64 → 65 at 292-REVIEW WR-02 (a q cell's source is dropped)
+  "captionModel.test.ts": 22, // 273-02 — server-fact caption wording; RAISED 12 → 21 at 292-02 (per-component count segments + the comparison note line); 21 → 22 at 292-REVIEW WR-02 (q-cell sources earn no hover note)
   "chartModel.test.ts": 20, // 273-02 — slots, visible domain, tooltip rows, a11y names; RAISED 19 → 20 at 273-REVIEW WR-04
   "TableArtifact.test.tsx": 7, // 273-02 — aria-sort, empties last, sticky + 512px; RAISED 6 → 7 at 273-REVIEW WR-04
   "MetricArtifact.test.tsx": 7, // 273-02 — glyph + percent delta, zero comparison; RAISED 6 → 7 at 273-REVIEW WR-04
@@ -4280,7 +4280,7 @@ const BASELINE = {
   "streamsProviderArtifact.test.tsx": 5, // 273-05 — the ONE handler: append + replace-by-id
   "MessageItem.artifacts.test.tsx": 8, // 273-05 — the ONE mount: placement + live == reload DOM; RAISED 5 → 8 at 292-02 (+1 live == reload case per encoded type)
   "artifactParity.fence.test.ts": 10, // 273-05 — backend Literals/fixture vs frontend registry (I-1); RAISED 7 → 10 at 273-REVIEW CR-01 (+3: the shared bad-spec parity fixture)
-  "artifactParity292.fence.test.ts": 15, // 292-03 — 292 Literals/caps/shared fixtures (artifact_record_292 + artifact_bad_specs_292) vs the frontend guard (I-1); RAISED 13 → 15 at 292-REVIEW CR-01 (stored_sources + document_names sections)
+  "artifactParity292.fence.test.ts": 16, // 292-03 — 292 Literals/caps/shared fixtures (artifact_record_292 + artifact_bad_specs_292) vs the frontend guard (I-1); RAISED 13 → 15 at 292-REVIEW CR-01 (stored_sources + document_names sections); 15 → 16 at WR-02 (refused_then_tolerated)
   "ShowArtifactBody.test.tsx": 26, // 273-05 — rail essence + body, never the spec or model text; RAISED 17 → 26 at 292-02 (Flow diagram / Comparison / Timeline rail lines)
   "ToolCallPanel.showArtifact.test.tsx": 16, // 273-05 — L-1..L-4, refused node, phrases
   // ── Phase 274-03 (D-05 · D-10 · D-12..D-15 · D-27 · SC#1) — FIVE NEW suites, BOTH KNOBS, SAME

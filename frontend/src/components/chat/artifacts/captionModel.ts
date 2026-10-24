@@ -87,7 +87,8 @@ export function captionSegments(record: ArtifactRecord): CaptionSegments {
     parts.push(`${stepsPhrase(diagram.nodes.length)}${CAPTION_SEGMENT_JOIN}${linksPhrase(diagram.edges.length)}`)
   } else if (comparison) {
     parts.push(optionsTermsPhrase(comparison.options.length, comparison.terms.length))
-    const sourced = comparison.terms.some((t) => t.cells.some((c) => isResolvedSource(c.source)))
+    // 292-REVIEW WR-02: only a verdict cell's source is a clause to hover; a q cell states nothing.
+    const sourced = comparison.terms.some((t) => t.cells.some((c) => c.verdict !== "q" && isResolvedSource(c.source)))
     return { icon, parts, note: sourced ? COMPARISON_NOTE_SOURCED : COMPARISON_NOTE }
   } else if (timeline) {
     parts.push(eventsPhrase(timeline.events.length))

@@ -117,3 +117,30 @@ def test_a_long_emoji_filename_resolves_to_a_source_the_guard_accepts():
 def test_the_caption_document_is_cut_the_same_way():
     call = {"name": "analyze_document", "status": "done", "sub_agent": {"filename": PAGE * 150 + ".pdf"}}
     assert sat._source_of(call)["document"] == PAGE * 100
+
+
+# ── WR-02: a "not stated" (q) cell carries no source ─────────────────────────────────────────────
+
+
+def _cmp(cells):
+    return {"component": "comparison", "title": "Contracts",
+            "comparison": {"options": ["Atlas", "Borealis"], "terms": [{"name": "Termination", "cells": cells}]}}
+
+
+def test_a_q_cell_with_a_source_is_refused_in_words():
+    out = validate_args(_cmp([{"verdict": "q", "source": 1}, {"verdict": "n"}]))
+    assert isinstance(out, ArtifactRefusal)
+    assert out.reason == "a cell marked not stated cites a source"
+    assert "omit" in out.detail and "q" in out.detail
+
+
+def test_a_q_cell_without_a_source_and_a_sourced_verdict_cell_are_accepted():
+    out = validate_args(_cmp([{"verdict": "q"}, {"verdict": "n", "source": 2}]))
+    assert isinstance(out, ComparisonArgs), out
+
+
+def test_the_stored_cell_refuses_a_sourced_q_too():
+    src = {"document": "a.pdf", "page": None, "excerpt": "x"}
+    with pytest.raises(ValueError):
+        am.StoredComparisonCell.model_validate({"verdict": "q", "text": None, "source": src})
+    am.StoredComparisonCell.model_validate({"verdict": "m", "text": None, "source": src})

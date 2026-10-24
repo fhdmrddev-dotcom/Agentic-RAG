@@ -147,7 +147,9 @@ export function ComparisonArtifact({ record }: ArtifactBodyProps) {
   }
 
   const showTip = (term: number, col: number, el: HTMLElement) => {
-    const source = spec.terms[term]?.cells[col]?.source ?? null
+    const cell = spec.terms[term]?.cells[col]
+    // 292-REVIEW WR-02: a "Not stated" cell never shows a clause (the guard already drops its source).
+    const source = cell && cell.verdict !== "q" ? cell.source : null
     setTip(isResolvedSource(source) ? { term, col, el } : null)
   }
   const tipSource = tip ? spec.terms[tip.term]?.cells[tip.col]?.source ?? null : null

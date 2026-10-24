@@ -601,7 +601,11 @@ function parseComparison(raw: unknown): ComparisonEncoding {
       if (!isObj(c)) invalid(noun)
       const verdict = typeof c.verdict === "string" ? own(VERDICT_TABLE, c.verdict) : undefined
       if (!verdict) invalid(noun)
-      return { verdict, text: optText(c.text, MAX_CELL_CHARS, noun), source: parseSource(c.source, noun) }
+      // 292-REVIEW WR-02: "not stated" cites nothing. The backend refuses a sourced q cell; a row
+      // stored before that rule is still drawn, with the source dropped (validated first, so a
+      // malformed one still refuses) — a quoted clause under "Not stated" would contradict it.
+      const source = parseSource(c.source, noun)
+      return { verdict, text: optText(c.text, MAX_CELL_CHARS, noun), source: verdict === "q" ? null : source }
     })
     return { name: t.name as string, cells }
   })
