@@ -72,6 +72,11 @@ class ToolContext:
     # emission time. None on every unwired harness/eval/test caller => the caption reads "values
     # provided by the agent". NOT shared with task sub-agents (show_artifact is excluded from them).
     turn_tool_calls: list[dict] | None = None
+    # Phase 292 (D-07) — the citation manifest show_artifact `source` handles resolve against. Set
+    # BY REFERENCE to agent_loop's `retrieved_citations` in BOTH ToolContext builds, so a handle `n`
+    # names the same source the model saw as `[n]` this turn. None on every unwired
+    # harness/eval/test caller => any handle is refused as "nothing retrieved this turn".
+    turn_citations: list[dict] | None = None
     tool_index: int = 0  # current index in the tool_calls list (used by execute_code heartbeat)
     iteration: int = 0  # current agent loop iteration (used by harvest_output_files)
     # Phase 085 — D-085-09 / D-085-12 / D-085-15 / D-085-01

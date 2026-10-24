@@ -2969,9 +2969,9 @@ CREATE TABLE public.message_artifacts (
     row_count integer NOT NULL,
     spec_version smallint DEFAULT 1 NOT NULL,
     created_at timestamp with time zone DEFAULT now() NOT NULL,
-    CONSTRAINT message_artifacts_component_check CHECK ((component = ANY (ARRAY['chart'::text, 'table'::text, 'metric'::text]))),
+    CONSTRAINT message_artifacts_component_check CHECK ((component = ANY (ARRAY['chart'::text, 'table'::text, 'metric'::text, 'diagram'::text, 'comparison'::text, 'timeline'::text]))),
     CONSTRAINT message_artifacts_id_check CHECK ((id ~ '^a_[0-9a-z]{10}$'::text)),
-    CONSTRAINT message_artifacts_label_check CHECK ((label ~ '^(chart|table|metric) [1-9][0-9]*$'::text)),
+    CONSTRAINT message_artifacts_label_check CHECK ((label ~ '^(chart|table|metric|diagram|comparison|timeline) [1-9][0-9]*$'::text)),
     CONSTRAINT message_artifacts_row_count_check CHECK (((row_count >= 1) AND (row_count <= 500))),
     CONSTRAINT message_artifacts_spec_size CHECK ((octet_length((spec)::text) <= 262144))
 );
@@ -2981,7 +2981,7 @@ CREATE TABLE public.message_artifacts (
 -- Name: TABLE message_artifacts; Type: COMMENT; Schema: public; Owner: -
 --
 
-COMMENT ON TABLE public.message_artifacts IS 'Agent-authored artifacts (chart | table | metric) shown under an assistant answer (Phase 273, ART-01..05). One immutable row per show_artifact emission. Visibility mirrors public.messages; written only by the backend pool.';
+COMMENT ON TABLE public.message_artifacts IS 'Agent-authored artifacts (chart | table | metric | diagram | comparison | timeline) shown under an assistant answer (Phase 273, ART-01..05; Phase 292, VIS-02). One immutable row per show_artifact emission. Visibility mirrors public.messages; written only by the backend pool.';
 
 
 --
@@ -3037,21 +3037,21 @@ COMMENT ON COLUMN public.message_artifacts.parent_id IS 'The artifact a by-refer
 -- Name: COLUMN message_artifacts.label; Type: COMMENT; Schema: public; Owner: -
 --
 
-COMMENT ON COLUMN public.message_artifacts.label IS 'chart N / table N / metric N — assigned at INSERT per component per thread under an advisory lock, never recomputed (UI-D-03). A from_artifact alias.';
+COMMENT ON COLUMN public.message_artifacts.label IS 'chart N / table N / metric N / diagram N / comparison N / timeline N — assigned at INSERT per component per thread under an advisory lock, never recomputed (UI-D-03, 292 D-13). A from_artifact alias.';
 
 
 --
 -- Name: COLUMN message_artifacts.component; Type: COMMENT; Schema: public; Owner: -
 --
 
-COMMENT ON COLUMN public.message_artifacts.component IS 'The closed component set (I-1). Must equal ARTIFACT_COMPONENTS in backend/app/models/artifact.py.';
+COMMENT ON COLUMN public.message_artifacts.component IS 'The closed component set (I-1), six names since Phase 292. Must equal ARTIFACT_COMPONENTS in backend/app/models/artifact.py.';
 
 
 --
 -- Name: COLUMN message_artifacts.spec; Type: COMMENT; Schema: public; Owner: -
 --
 
-COMMENT ON COLUMN public.message_artifacts.spec IS 'The validated spec (spec_version 1): title, columns, rows, chart | metric encoding. Never a free props bag (D-02).';
+COMMENT ON COLUMN public.message_artifacts.spec IS 'The validated spec (spec_version 1). chart | table | metric: title, columns, rows, chart | metric encoding. diagram | comparison | timeline: title plus that type''s own encoding (nodes and edges / options and terms / sorted events) with server-resolved sources. Never a free props bag (D-02).';
 
 
 --
@@ -3065,7 +3065,7 @@ COMMENT ON COLUMN public.message_artifacts.caption IS 'Server-derived caption: r
 -- Name: COLUMN message_artifacts.row_count; Type: COMMENT; Schema: public; Owner: -
 --
 
-COMMENT ON COLUMN public.message_artifacts.row_count IS 'Rows in spec.rows. 1..500; above the cap the call is refused, never truncated (D-09).';
+COMMENT ON COLUMN public.message_artifacts.row_count IS 'Rows in spec.rows for chart | table | metric; nodes / terms / events for diagram | comparison | timeline. 1..500; above a cap the call is refused, never truncated (D-09).';
 
 
 --
