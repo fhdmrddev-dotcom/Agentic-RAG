@@ -1,0 +1,139 @@
+{
+  "entry": {
+    "provider": "moonshot",
+    "model": "kimi-k3.1-pro-highspeed",
+    "calling_mode": "NATIVE"
+  },
+  "prompts": {
+    "V1-sequential-6": "You must complete ALL SIX of the following tool calls, strictly one at a time, each as its own separate tool call, and each one depends on the result of the previous one, so you must wait for each result before making the next call:\n1) search_documents for 'project plan';\n2) search_documents for the milestones named in result 1;\n3) search_documents for the owners of those milestones;\n4) search_documents for the risks attached to those milestones;\n5) execute_code: compute the number of milestones per quarter from results 2-4;\n6) execute_code: draw a bar chart of the counts computed in step 5.\nDo NOT write any prose, summary, explanation or partial answer until all six calls have returned. If any search returns nothing, still make the next call with your best query. Never skip, merge or reorder a step.",
+    "V2-parallel-rounds": "Work in rounds of PARALLEL tool calls and do not write any prose until every round is done.\nRound A \u2014 in ONE turn, call search_documents four times in parallel: 'project plan', 'milestones', 'owners', 'risks'.\nRound B \u2014 after those return, in ONE turn, call search_documents four more times in parallel for the details of each milestone you found (use your best query if nothing was found).\nRound C \u2014 after those return, in ONE turn, call execute_code twice in parallel: one to count milestones per quarter, one to draw a bar chart of them.\nOnly after Round C has returned may you write your answer. Never skip or merge a round."
+  },
+  "attempts": [
+    {
+      "thread_id": "a6027dbd-4758-42ab-ab9e-3230bbcc3e06",
+      "run_id": "24a1bde7-44df-4cf9-990f-a8542641f2f5",
+      "status": "failed",
+      "paused": false,
+      "run": {
+        "run_id": "24a1bde7-44df-4cf9-990f-a8542641f2f5",
+        "thread_id": "a6027dbd-4758-42ab-ab9e-3230bbcc3e06",
+        "status": "failed",
+        "model": "kimi-k3.1-pro-highspeed",
+        "provider": "moonshot",
+        "continues_used": 0,
+        "started_at": "2026-10-24 12:39:23.768817+00:00",
+        "error": "failed: RateLimitError: Error code: 429 - {'error': {'message': 'Your account org-e5ea00cfd3e645119c06c2bb5f2dba04 <ak-factw7nr11ui11ephts1> is suspended due to insufficient balance, please recharge your account or check you"
+      },
+      "classification": "other (failed)",
+      "carrier": null,
+      "tool_starts": [],
+      "event_types": [
+        "delta",
+        "error",
+        "iteration_start"
+      ],
+      "cap_paused_event": null,
+      "live_markup_at": null,
+      "live_preview": "*Rate limited by the provider \u2014 please retry in a moment.*",
+      "redis_last_id": "1792845566378-0",
+      "variant": "V1-sequential-6",
+      "final_output": {
+        "kind": "provider-error",
+        "error": "failed: RateLimitError: Error code: 429 - {'error': {'message': 'Your account org-e5ea00cfd3e645119c06c2bb5f2dba04 <ak-factw7nr11ui11ephts1> is suspended due to insufficient balance, please recharge your account or check you"
+      }
+    },
+    {
+      "thread_id": "c778c503-9075-4250-a0aa-ed4e127a4d3a",
+      "run_id": "2c628519-123b-4eb6-8331-f4f8bf8d8617",
+      "status": "failed",
+      "paused": false,
+      "run": {
+        "run_id": "2c628519-123b-4eb6-8331-f4f8bf8d8617",
+        "thread_id": "c778c503-9075-4250-a0aa-ed4e127a4d3a",
+        "status": "failed",
+        "model": "kimi-k3.1-pro-highspeed",
+        "provider": "moonshot",
+        "continues_used": 0,
+        "started_at": "2026-10-24 12:39:27.917515+00:00",
+        "error": "failed: RateLimitError: Error code: 429 - {'error': {'message': 'Your account org-e5ea00cfd3e645119c06c2bb5f2dba04 <ak-factw7nr11ui11ephts1> is suspended due to insufficient balance, please recharge your account or check you"
+      },
+      "classification": "other (failed)",
+      "carrier": null,
+      "tool_starts": [],
+      "event_types": [
+        "delta",
+        "error",
+        "iteration_start"
+      ],
+      "cap_paused_event": null,
+      "live_markup_at": null,
+      "live_preview": "*Rate limited by the provider \u2014 please retry in a moment.*",
+      "redis_last_id": "1792845570477-0",
+      "variant": "V2-parallel-rounds",
+      "final_output": {
+        "kind": "provider-error",
+        "error": "failed: RateLimitError: Error code: 429 - {'error': {'message': 'Your account org-e5ea00cfd3e645119c06c2bb5f2dba04 <ak-factw7nr11ui11ephts1> is suspended due to insufficient balance, please recharge your account or check you"
+      }
+    },
+    {
+      "thread_id": "58ea2c00-4958-46f6-9e70-a9743fbc0b56",
+      "run_id": "8642cb32-a4aa-4df8-90e4-b25894cb56cb",
+      "status": "failed",
+      "paused": false,
+      "run": {
+        "run_id": "8642cb32-a4aa-4df8-90e4-b25894cb56cb",
+        "thread_id": "58ea2c00-4958-46f6-9e70-a9743fbc0b56",
+        "status": "failed",
+        "model": "kimi-k3.1-pro-highspeed",
+        "provider": "moonshot",
+        "continues_used": 0,
+        "started_at": "2026-10-24 12:39:32.029462+00:00",
+        "error": "failed: RateLimitError: Error code: 429 - {'error': {'message': 'Your account org-e5ea00cfd3e645119c06c2bb5f2dba04 <ak-factw7nr11ui11ephts1> is suspended due to insufficient balance, please recharge your account or check you"
+      },
+      "classification": "other (failed)",
+      "carrier": null,
+      "tool_starts": [],
+      "event_types": [
+        "delta",
+        "error",
+        "iteration_start"
+      ],
+      "cap_paused_event": null,
+      "live_markup_at": null,
+      "live_preview": "*Rate limited by the provider \u2014 please retry in a moment.*",
+      "redis_last_id": "1792845574747-0",
+      "variant": "V1-sequential-6",
+      "final_output": {
+        "kind": "provider-error",
+        "error": "failed: RateLimitError: Error code: 429 - {'error': {'message': 'Your account org-e5ea00cfd3e645119c06c2bb5f2dba04 <ak-factw7nr11ui11ephts1> is suspended due to insufficient balance, please recharge your account or check you"
+      }
+    }
+  ],
+  "paused": false,
+  "continue": null,
+  "markup_hits": [],
+  "reload": {
+    "a6027dbd-4758-42ab-ab9e-3230bbcc3e06": {
+      "http": 200,
+      "equal": true,
+      "compared": 1,
+      "diffs": [],
+      "db_rows_not_in_reload": []
+    },
+    "c778c503-9075-4250-a0aa-ed4e127a4d3a": {
+      "http": 200,
+      "equal": true,
+      "compared": 1,
+      "diffs": [],
+      "db_rows_not_in_reload": []
+    },
+    "58ea2c00-4958-46f6-9e70-a9743fbc0b56": {
+      "http": 200,
+      "equal": true,
+      "compared": 1,
+      "diffs": [],
+      "db_rows_not_in_reload": []
+    }
+  },
+  "tools_used": []
+}

@@ -1,0 +1,186 @@
+{
+  "entry": {
+    "provider": "anthropic",
+    "model": "claude-opus-5-5",
+    "calling_mode": "NATIVE (native SDK adapter)"
+  },
+  "prompts": {
+    "V1-sequential-6": "You must complete ALL SIX of the following tool calls, strictly one at a time, each as its own separate tool call, and each one depends on the result of the previous one, so you must wait for each result before making the next call:\n1) search_documents for 'project plan';\n2) search_documents for the milestones named in result 1;\n3) search_documents for the owners of those milestones;\n4) search_documents for the risks attached to those milestones;\n5) execute_code: compute the number of milestones per quarter from results 2-4;\n6) execute_code: draw a bar chart of the counts computed in step 5.\nDo NOT write any prose, summary, explanation or partial answer until all six calls have returned. If any search returns nothing, still make the next call with your best query. Never skip, merge or reorder a step.",
+    "V2-parallel-rounds": "Work in rounds of PARALLEL tool calls and do not write any prose until every round is done.\nRound A \u2014 in ONE turn, call search_documents four times in parallel: 'project plan', 'milestones', 'owners', 'risks'.\nRound B \u2014 after those return, in ONE turn, call search_documents four more times in parallel for the details of each milestone you found (use your best query if nothing was found).\nRound C \u2014 after those return, in ONE turn, call execute_code twice in parallel: one to count milestones per quarter, one to draw a bar chart of them.\nOnly after Round C has returned may you write your answer. Never skip or merge a round."
+  },
+  "attempts": [
+    {
+      "thread_id": "a7648e5f-df8a-4aaa-b4ee-8ca1ba74cab0",
+      "run_id": "d0c4a9b8-13eb-4b3c-a18c-5bfe7f82c8fe",
+      "status": "completed",
+      "paused": false,
+      "run": {
+        "run_id": "d0c4a9b8-13eb-4b3c-a18c-5bfe7f82c8fe",
+        "thread_id": "a7648e5f-df8a-4aaa-b4ee-8ca1ba74cab0",
+        "status": "completed",
+        "model": "claude-opus-5-5",
+        "provider": "anthropic",
+        "continues_used": 0,
+        "started_at": "2026-10-24 12:38:36.876769+00:00",
+        "error": null
+      },
+      "classification": "prose-final",
+      "carrier": null,
+      "tool_starts": [
+        "search_documents"
+      ],
+      "event_types": [
+        "citations",
+        "confidence",
+        "delta",
+        "done",
+        "iteration_start",
+        "planning",
+        "sources",
+        "stream_end",
+        "suggestions",
+        "tool_end",
+        "tool_preparing",
+        "tool_start"
+      ],
+      "cap_paused_event": null,
+      "live_markup_at": null,
+      "live_preview": "*The model produced 1 tool call(s) over 2 step(s) and never wrote an answer. Try breaking the request into smaller steps, or switching to a different model.*",
+      "redis_last_id": "1792845528812-0",
+      "variant": "V1-sequential-6",
+      "final_output": {
+        "kind": "prose",
+        "message_id": "1d021901-05a3-46e8-a45d-d1d6118dbf7f",
+        "chars": 157,
+        "markup_at": null,
+        "preview": "*The model produced 1 tool call(s) over 2 step(s) and never wrote an answer. Try breaking the request into smaller steps, or switching to a different model.*"
+      }
+    },
+    {
+      "thread_id": "ad46b494-6b67-486c-bccb-67db6823ca07",
+      "run_id": "2a9183f6-057d-4d48-8481-d5350f4638c9",
+      "status": "completed",
+      "paused": false,
+      "run": {
+        "run_id": "2a9183f6-057d-4d48-8481-d5350f4638c9",
+        "thread_id": "ad46b494-6b67-486c-bccb-67db6823ca07",
+        "status": "completed",
+        "model": "claude-opus-5-5",
+        "provider": "anthropic",
+        "continues_used": 0,
+        "started_at": "2026-10-24 12:38:51.099970+00:00",
+        "error": null
+      },
+      "classification": "prose-final",
+      "carrier": null,
+      "tool_starts": [
+        "search_documents",
+        "search_documents",
+        "search_documents",
+        "search_documents"
+      ],
+      "event_types": [
+        "citations",
+        "confidence",
+        "delta",
+        "done",
+        "iteration_start",
+        "planning",
+        "sources",
+        "stream_end",
+        "suggestions",
+        "tool_end",
+        "tool_preparing",
+        "tool_start"
+      ],
+      "cap_paused_event": null,
+      "live_markup_at": null,
+      "live_preview": "*The model produced 4 tool call(s) over 2 step(s) and never wrote an answer. Try breaking the request into smaller steps, or switching to a different model.*",
+      "redis_last_id": "1792845548032-0",
+      "variant": "V2-parallel-rounds",
+      "final_output": {
+        "kind": "prose",
+        "message_id": "18b703f9-4a6c-4af8-a943-b5831feb6062",
+        "chars": 157,
+        "markup_at": null,
+        "preview": "*The model produced 4 tool call(s) over 2 step(s) and never wrote an answer. Try breaking the request into smaller steps, or switching to a different model.*"
+      }
+    },
+    {
+      "thread_id": "bdcaf680-2902-4e45-b3aa-fced27bfdd02",
+      "run_id": "fba86a02-8d2a-4fcc-ae39-82881faead51",
+      "status": "completed",
+      "paused": false,
+      "run": {
+        "run_id": "fba86a02-8d2a-4fcc-ae39-82881faead51",
+        "thread_id": "bdcaf680-2902-4e45-b3aa-fced27bfdd02",
+        "status": "completed",
+        "model": "claude-opus-5-5",
+        "provider": "anthropic",
+        "continues_used": 0,
+        "started_at": "2026-10-24 12:39:11.351304+00:00",
+        "error": null
+      },
+      "classification": "prose-final",
+      "carrier": null,
+      "tool_starts": [
+        "search_documents"
+      ],
+      "event_types": [
+        "citations",
+        "confidence",
+        "delta",
+        "done",
+        "iteration_start",
+        "planning",
+        "sources",
+        "stream_end",
+        "suggestions",
+        "tool_end",
+        "tool_preparing",
+        "tool_start"
+      ],
+      "cap_paused_event": null,
+      "live_markup_at": null,
+      "live_preview": "*The model produced 1 tool call(s) over 2 step(s) and never wrote an answer. Try breaking the request into smaller steps, or switching to a different model.*",
+      "redis_last_id": "1792845560485-0",
+      "variant": "V1-sequential-6",
+      "final_output": {
+        "kind": "prose",
+        "message_id": "ffa355c5-3ca6-4489-ad56-2a80eeb32254",
+        "chars": 157,
+        "markup_at": null,
+        "preview": "*The model produced 1 tool call(s) over 2 step(s) and never wrote an answer. Try breaking the request into smaller steps, or switching to a different model.*"
+      }
+    }
+  ],
+  "paused": false,
+  "continue": null,
+  "markup_hits": [],
+  "reload": {
+    "a7648e5f-df8a-4aaa-b4ee-8ca1ba74cab0": {
+      "http": 200,
+      "equal": true,
+      "compared": 1,
+      "diffs": [],
+      "db_rows_not_in_reload": []
+    },
+    "ad46b494-6b67-486c-bccb-67db6823ca07": {
+      "http": 200,
+      "equal": true,
+      "compared": 1,
+      "diffs": [],
+      "db_rows_not_in_reload": []
+    },
+    "bdcaf680-2902-4e45-b3aa-fced27bfdd02": {
+      "http": 200,
+      "equal": true,
+      "compared": 1,
+      "diffs": [],
+      "db_rows_not_in_reload": []
+    }
+  },
+  "tools_used": [
+    "search_documents"
+  ]
+}

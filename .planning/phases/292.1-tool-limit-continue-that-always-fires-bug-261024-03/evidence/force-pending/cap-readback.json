@@ -1,0 +1,5 @@
+{
+  "note": "Independent GET /settings read after the forced-pending board (separate process from the board's own restore read).",
+  "board_restore_read": {"http": 200, "chat_max_tool_rounds": 15, "explorer_max_tool_rounds": 8, "at": "2026-10-24T16:43:36"},
+  "independent_read": {"http": 200, "chat_max_tool_rounds": 15, "explorer_max_tool_rounds": 8, "at": "2026-10-24T16:45:31"}
+}
