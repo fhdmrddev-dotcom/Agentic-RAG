@@ -302,7 +302,7 @@ Plans:
 
 **Wave 2** *(blocked on Wave 1 completion)*
 
-- [ ] 292-03-PLAN.md — cross-stack fence, merged-tree gates, ledger close, SEED-337, 8-row SC#10 board, G4-1..G4-5 in Chrome (wave 2)
+- [x] 292-03-PLAN.md — cross-stack fence, merged-tree gates, ledger close, SEED-337, 8-row SC#10 board, G4-1..G4-5 in Chrome (wave 2)
 
 **UI hint**: yes
 **Flags**: **G-2 sketch**. Closed registry only; sandboxed HTML needs its own operator decision and is out of this phase. Files: `frontend/src/components/chat/artifacts/**`, `backend/app/models/artifact.py`, `backend/app/services/show_artifact_tool.py`. Migration only if the `message_artifacts` constraint needs a new literal. Seed `SEED-337`.
