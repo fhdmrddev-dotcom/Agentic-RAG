@@ -41,7 +41,7 @@ vi.mock("@/lib/api", async (importOriginal) => {
   return { ...actual, continueRun }
 })
 
-const lock = {
+let lock: { runId: string; mode?: "harness" | "cap_paused"; capPaused: boolean; continuesRemaining: number } = {
   runId: "run-cap-1",
   capPaused: true,
   continuesRemaining: 2,
@@ -58,10 +58,14 @@ vi.mock("@/providers/StreamsProvider", () => ({
 import { MessageItem } from "../MessageItem"
 import { TooltipProvider } from "@/components/ui/tooltip"
 import type { Message } from "@/types"
+import { useStreamsStore, markContinuing } from "@/stores/streamsStore"
 
 afterEach(() => {
   cleanup()
   continueRun.mockClear()
+  continueRun.mockResolvedValue({ status: "ok" })
+  lock = { runId: "run-cap-1", capPaused: true, continuesRemaining: 2 }
+  useStreamsStore.setState({ continuingThreads: new Set() })
 })
 
 function makeMessage(overrides: Partial<Message> = {}): Message {
@@ -91,8 +95,62 @@ describe("BUG-260904-01 — the Continue button calls continueRun", () => {
     expect(continueRun).toHaveBeenCalledWith("run-cap-1")
   })
 
-  it("the iteration-limit sentence renders with the card (the card is reachable at all)", () => {
+  it("the tool-use-limit sentence renders with the card (the card is reachable at all)", () => {
     renderItem(<MessageItem message={makeMessage()} isLastAssistant />)
-    expect(screen.getByText(/Reached the iteration limit/i)).toBeInTheDocument()
+    expect(screen.getByText("Reached the tool-use limit for this turn.")).toBeInTheDocument()
+  })
+})
+
+// ── 292.1 (D-14 / D-07 copy): the Continue card reads Continuing… once a Continue is under way ──
+
+describe("292.1 — the Continue card's Continuing… state", () => {
+  it("1: a Deep pause reads the tool-use-limit sentence; a press calls continueRun once, then Continuing…", async () => {
+    lock = { runId: "run-cap-1", mode: "cap_paused", capPaused: true, continuesRemaining: 2 }
+    renderItem(<MessageItem message={makeMessage()} isLastAssistant />)
+    expect(screen.getByText("Reached the tool-use limit for this turn.")).toBeInTheDocument()
+    const btn = screen.getByTestId("continue-run")
+    expect(btn).toHaveTextContent("Continue (2 left)")
+
+    fireEvent.click(btn)
+
+    await waitFor(() => expect(continueRun).toHaveBeenCalledTimes(1))
+    await waitFor(() => expect(screen.getByTestId("continue-run")).toHaveTextContent("Continuing…"))
+    expect(screen.getByTestId("continue-run")).toBeDisabled()
+    expect(useStreamsStore.getState().continuingThreads.has("t-1")).toBe(true)
+    fireEvent.click(screen.getByTestId("continue-run"))
+    expect(continueRun).toHaveBeenCalledTimes(1)
+  })
+
+  it("2: a thread already continuing (typed continue) shows Continuing… and no clickable Continue", () => {
+    lock = { runId: "run-cap-1", mode: "cap_paused", capPaused: true, continuesRemaining: 2 }
+    markContinuing("t-1")
+    renderItem(<MessageItem message={makeMessage()} isLastAssistant />)
+    const btn = screen.getByTestId("continue-run")
+    expect(btn).toHaveTextContent("Continuing…")
+    expect(btn).toBeDisabled()
+    expect(screen.queryByText(/Continue \(2 left\)/)).not.toBeInTheDocument()
+  })
+
+  it("3: a refused continueRun still shows the exhausted sentence and marks nothing", async () => {
+    lock = { runId: "run-cap-1", mode: "cap_paused", capPaused: true, continuesRemaining: 1 }
+    continueRun.mockResolvedValue({ status: "refused" })
+    renderItem(<MessageItem message={makeMessage()} isLastAssistant />)
+    fireEvent.click(screen.getByTestId("continue-run"))
+    await waitFor(() =>
+      expect(
+        screen.getByText("Reached the Continue limit — this run is stopped. Start a new message to keep going."),
+      ).toBeInTheDocument(),
+    )
+    expect(useStreamsStore.getState().continuingThreads.has("t-1")).toBe(false)
+  })
+
+  it("3b: the harness exhausted sentence is unchanged", () => {
+    lock = { runId: "run-cap-1", mode: "harness", capPaused: true, continuesRemaining: 0 }
+    renderItem(<MessageItem message={makeMessage()} isLastAssistant />)
+    expect(
+      screen.getByText(
+        "Reached the Continue limit — this run is stopped. Cancel the workflow to start something new.",
+      ),
+    ).toBeInTheDocument()
   })
 })

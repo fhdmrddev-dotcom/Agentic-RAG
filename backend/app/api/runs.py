@@ -1171,7 +1171,8 @@ async def continue_run(
         # Phase 163 (D-05): pull org_id off the RLS-verified run row so the Deep
         # continuation's cap-paused read (load_cap_paused_tool_calls) can carry an
         # org-scoping predicate on the service-role pool (belt-and-suspenders).
-        .select("run_id, status, thread_id, continues_used, org_id")
+        # 292.1 (orchestrator ruling 4): model + provider too — a Continue resumes on the run's own.
+        .select("run_id, status, thread_id, continues_used, org_id, model, provider")
         .eq("run_id", str(run_id))
         .eq("user_id", current_user["id"])
         .maybe_single()
@@ -1247,6 +1248,17 @@ async def continue_run(
         wf_row = wf_resp.data if wf_resp is not None else None
         if wf_row is not None:
             continues_used = wf_row.get("continues_used") or 0
+    elif row.get("status") in _TERMINAL_RUN_STATUSES:
+        # ── SEED-324 (folded into 292.1): a Deep run that already FINISHED has nothing to
+        # continue. Refused before the counter write and the spawn, so a stale card or a replayed
+        # request cannot re-drive a completed / failed run. A 409, not the `refused` payload: the
+        # Continue card reads `refused` as "Continue limit reached". `streaming` is deliberately
+        # NOT refused — the cap_paused SSE event precedes the finalizer's status write, so a fast
+        # press legitimately sees `streaming`. Harness anchors keep their own rule (branch above).
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail="This run has already finished, so there is nothing to continue. Start a new message to keep going.",
+        )
 
     # ── Step 3: refuse the 4th Continue server-side (D-06 / T-092-10) ──
     # Durable counter — never an in-memory count (WORKER_COUNT=2). No spawn.
@@ -1600,6 +1612,10 @@ async def continue_run(
             # Phase 163 (D-05/D-09): the Deep continuation producer is service-role.
             supabase=service_supabase,
             dropped_tool_calls=dropped,
+            # 292.1 (orchestrator ruling 4): resume on the run's OWN model/provider, never the
+            # operator default. None-safe: a row without them continues exactly as before.
+            model=row.get("model"),
+            provider=row.get("provider"),
         )
 
     _resp = {

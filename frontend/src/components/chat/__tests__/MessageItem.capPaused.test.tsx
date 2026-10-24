@@ -73,7 +73,7 @@ describe("BUG-260818-03 — Durable cap_paused Continue affordance across reload
 
     renderItem(<MessageItem message={makeMessage()} isLastAssistant />)
 
-    expect(screen.getByText(/Reached the iteration limit/i)).toBeInTheDocument()
+    expect(screen.getByText(/Reached the tool-use limit for this turn/i)).toBeInTheDocument()
     const continueBtn = screen.getByTestId("continue-run")
     expect(continueBtn).toBeInTheDocument()
   })
@@ -122,7 +122,7 @@ describe("BUG-260818-03 — Durable cap_paused Continue affordance across reload
     renderItem(<MessageItem message={makeMessage()} isLastAssistant={false} />)
 
     expect(screen.queryByTestId("continue-run")).not.toBeInTheDocument()
-    expect(screen.queryByText(/Reached the iteration limit/i)).not.toBeInTheDocument()
+    expect(screen.queryByText(/Reached the tool-use limit for this turn/i)).not.toBeInTheDocument()
   })
 
   it("does not render Continue card when lock is cleared (normal unpaused state)", () => {

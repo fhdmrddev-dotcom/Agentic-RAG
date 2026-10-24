@@ -209,6 +209,13 @@ export interface StreamsState {
    *  Disjoint from `stoppingThreads` by construction — the expiry clears one and
    *  raises the other in the same write. */
   stopNotConfirmed: Set<string>
+  /** 292.1 (D-14) — Threads whose Continue is UNDER WAY: the Continue card reads `Continuing…`.
+   *  Written by `markContinuing` from BOTH the button (a non-refused `continueRun`) and the typed
+   *  path (a `continued: true` send reply), so a typed continue and a press cannot fire two
+   *  Continues for one pause. Cleared by a re-pause (`onCapPaused`) and by every terminal (the
+   *  `clearWorkflowLockForThread` action). ⛔ NOT a `WorkflowLock` field — that shape has six
+   *  deriving writers fenced by `workflowLockWriters.lockstep.test.ts`. */
+  continuingThreads: Set<string>
   /** Threads whose HARNESS kickoff is in flight (R5's synchronous liveness
    *  mark). Added in the same tick as the user-message insert, so a harness run's
    *  presence is readable with ZERO round trips once the optimistic assistant
@@ -503,6 +510,8 @@ export const useStreamsStore = create<StreamsState>()(subscribeWithSelector(() =
   stoppingThreads: new Set<string>(),
   // Type: stopNotConfirmed: Set<string>
   stopNotConfirmed: new Set<string>(),
+  // Type: continuingThreads: Set<string> (292.1 D-14)
+  continuingThreads: new Set<string>(),
   // Type: harnessKickoffThreads: Set<string>
   harnessKickoffThreads: new Set<string>(),
   // Type: fallbackNotices: Map<string, string>
@@ -610,6 +619,28 @@ export function recordExpertReading(threadId: string, expertId: string | null, r
     return {
       expertReadingsByThread: new Map(s.expertReadingsByThread).set(threadId, { expertId, requestedAt }),
     }
+  })
+}
+
+/**
+ * 292.1 (D-14) — mark a thread's Continue as under way (the card reads `Continuing…`). Module-level,
+ * not a provider-installed action, so a component rendered without the provider still gets a real
+ * body. A thread already marked writes nothing.
+ */
+export function markContinuing(threadId: string): void {
+  useStreamsStore.setState((s) => {
+    if (s.continuingThreads.has(threadId)) return {}
+    return { continuingThreads: new Set(s.continuingThreads).add(threadId) }
+  })
+}
+
+/** 292.1 (D-14) — the Continue is over: the run re-paused or ended. An unmarked thread writes nothing. */
+export function clearContinuing(threadId: string): void {
+  useStreamsStore.setState((s) => {
+    if (!s.continuingThreads.has(threadId)) return {}
+    const next = new Set(s.continuingThreads)
+    next.delete(threadId)
+    return { continuingThreads: next }
   })
 }
 
