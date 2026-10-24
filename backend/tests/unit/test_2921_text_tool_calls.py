@@ -325,6 +325,42 @@ def test_settle_none_returns_the_content_untouched():
     assert s.kind == "none" and s.calls == [] and s.visible is text and s.markup_len == 0
 
 
+# ── 292.1-REVIEW WR-06: text AFTER a parsed DSML block is never silently dropped ────────────────
+
+
+def test_trailing_prose_after_a_parsed_block_stays_visible():
+    text = "Pre " + F1 + " trailing prose here"
+    s = ttc.settle(text, {"execute_code"}, buffer_has_calls=False)
+    assert s.kind == "parsed"
+    assert [c["name"] for c in s.calls] == ["execute_code"]
+    assert s.visible == "Pre  trailing prose here"
+
+
+def test_a_second_block_after_the_first_is_parsed_too_in_order():
+    text = F3 + "\nand also\n" + F2
+    s = ttc.settle(text, {"execute_code", "grep"}, buffer_has_calls=False)
+    assert s.kind == "parsed"
+    assert [c["name"] for c in s.calls] == ["execute_code", "grep"]
+    assert json.loads(s.calls[1]["arguments"]) == {"pattern": "probation"}
+    assert s.visible == "\nand also\n"
+    assert len({c["id"] for c in s.calls}) == 2
+
+
+def test_an_unparseable_second_block_keeps_the_first_calls_and_is_worded_not_raw():
+    text = "Pre " + F1 + " then " + F1_TRUNCATED
+    s = ttc.settle(text, {"execute_code"}, buffer_has_calls=False)
+    assert s.kind == "parsed"
+    assert [c["name"] for c in s.calls] == ["execute_code"]
+    assert "DSML" not in s.visible
+    assert s.visible.startswith("Pre  then ")
+    assert s.visible.endswith(FAILED_CALL_NOTICE)
+
+
+def test_a_parsed_block_with_nothing_after_it_is_unchanged():
+    s = ttc.settle(PREAMBLE + F2, {"grep"}, buffer_has_calls=False)
+    assert s.kind == "parsed" and s.visible == PREAMBLE
+
+
 def test_settle_with_structured_calls_only_strips_never_double_dispatches():
     s = ttc.settle(PREAMBLE + F1, {"execute_code"}, buffer_has_calls=True)
     assert s.kind == "stripped"

@@ -287,6 +287,19 @@ async def test_e_a_not_offered_name_is_never_dispatched_and_is_worded():
     assert live == persisted
 
 
+@pytest.mark.asyncio
+async def test_e_text_after_a_mid_run_block_is_shown_and_a_second_block_runs_too():
+    """292.1-REVIEW WR-06: before, everything after the first block's closer vanished — trailing
+    prose and a second block's calls alike, with no log line."""
+    text = "Pre " + F3 + " and then " + F2 + " done."
+    run = await _drive([_deltas(_split(text, 6)), _deltas([ANSWER])],
+                       user_settings=_settings(chat_max_tool_rounds=3))
+    assert run["dispatched"] == [("execute_code", F3_ARGS), ("grep", {"pattern": "probation"})]
+    live = "".join(_delta_texts(run["emits"]))
+    assert live == "Pre  and then  done." + ANSWER
+    assert "DSML" not in live
+
+
 # ── Loop test E2 (D-07 wiring): unparseable at the cap still pauses, nothing queued ─────────────
 
 

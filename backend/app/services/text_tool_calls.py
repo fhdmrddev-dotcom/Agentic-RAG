@@ -263,6 +263,8 @@ class DsmlResult:
     calls: list[dict] = field(default_factory=list)
     preamble: str = ""
     found: bool = False
+    #: The text AFTER the parsed block's closer (WR-06) — ``settle`` keeps it, never drops it.
+    rest: str = ""
 
 
 def _first_dsml_outside_code(text: str) -> re.Match[str] | None:
@@ -318,7 +320,7 @@ def parse_dsml(text: str, offered: frozenset[str] | set[str]) -> DsmlResult:
     # Anything between invokes that is not an invoke (e.g. an invoke missing its closer) refuses.
     if not calls or _INVOKE_RE.sub("", body).strip():
         return refused
-    return DsmlResult(ok=True, calls=calls, preamble=preamble, found=True)
+    return DsmlResult(ok=True, calls=calls, preamble=preamble, found=True, rest=text[close.end():])
 
 
 # ── Live holdback ────────────────────────────────────────────────────────────────────────────────
@@ -463,6 +465,11 @@ def settle(full_content: str, offered: frozenset[str] | set[str], *, buffer_has_
     * ``unparseable`` — markup that could not be parsed exactly (D-07): remove it, queue nothing.
 
     ``markup_*`` describe the removed text for ONE bounded log line (D-08); the caller logs.
+
+    292.1-REVIEW WR-06: the text after a parsed block is settled too, never dropped. Trailing prose
+    stays visible; a further DSML block's calls are queued after the first block's, in order; a
+    further block that cannot be parsed is removed and worded (``FAILED_CALL_NOTICE``) while the
+    first block's calls still run — each block stands or falls whole (D-07), not the message.
     """
     idx = detect_markup(full_content)
     if idx is None:
@@ -477,7 +484,15 @@ def settle(full_content: str, offered: frozenset[str] | set[str], *, buffer_has_
         return Settled(kind="stripped", calls=[], visible=strip_markup(full_content), **meta)
     parsed = parse_dsml(full_content, offered)
     if parsed.found and parsed.ok and len(parsed.preamble) == idx:
-        return Settled(kind="parsed", calls=parsed.calls, visible=parsed.preamble, **meta)
+        calls, visible = list(parsed.calls), parsed.preamble
+        if parsed.rest:
+            after = settle(parsed.rest, offered, buffer_has_calls=False)
+            visible += after.visible
+            if after.kind == "parsed":
+                calls.extend(after.calls)
+            elif after.kind == "unparseable":
+                visible, _ = replace_failed_call(visible, "")
+        return Settled(kind="parsed", calls=calls, visible=visible, **meta)
     return Settled(kind="unparseable", calls=[], visible=strip_markup(full_content), **meta)
 
 
