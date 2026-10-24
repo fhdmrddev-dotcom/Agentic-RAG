@@ -692,3 +692,118 @@ def test_m_a_row_with_no_reasoning_in_the_current_turn_stays_byte_identical():
             "function": {"name": "search_documents", "arguments": "{}"}}]},
         {"role": "tool", "tool_call_id": "call_h", "content": "ok"},
     ]
+
+
+# ── Loop test N (292.1 SC#2, F7): harmony-style text calls, measured on the forced-pending board ─
+# openai gpt-5.6-luna, forced-final round (no tools sent): the pending calls were written as harmony
+# text and saved verbatim in 3/3 runs + the main board's 34748d7c. Rows: ``harmony_measured``.
+
+from tests.unit.harmony_measured import H1_ed030690, H2_2b7c16a0, H3_f1c46597, H4_34748d7c  # noqa: E402
+
+H2_NAMES = ["search_documents"] * 8 + ["execute_code"] * 2
+H3_NAMES = ["search_documents"] * 10 + ["execute_code"] + ["search_documents"] * 2 + ["execute_code"] * 2
+H1_TAIL = ("I’m unable to complete the requested tool-call sequence because the document tools "
+           "stopped responding after the first call.")
+HARMONY_ONE = ' to=functions.search_documents  code:\n{"query":"project plan"}'
+
+
+def _no_recipient(*texts: str) -> None:
+    for t in texts:
+        assert "to=functions" not in t and "to=search_documents" not in t, t[:200]
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("n", [1, 5, 50])
+async def test_n_the_measured_34748d7c_row_at_the_cap_pauses_with_its_call_queued(n):
+    run = await _drive([SEARCH, _deltas(_split(H4_34748d7c, n))], user_settings=CAP2)
+    assert _forced(run) == [False, True]
+    assert run["dispatched"] == [("search_documents", {"query": "revenue"})]
+    assert len(run["cap_calls"]) == 1
+    buf = run["cap_calls"][0]["tool_calls_buffer"]
+    assert [tc["name"] for tc in buf.values()] == ["search_documents"]
+    assert json.loads(next(iter(buf.values()))["arguments"]) == {"query": "project plan"}
+    assert "cap_paused" in _types(run["emits"])
+    carrier = _carriers(run)[0]["tool_calls"]
+    assert [(c["name"], json.loads(c["arguments"])) for c in carrier] == [
+        ("search_documents", {"query": "project plan"})]
+    live = "".join(_delta_texts(run["emits"]))
+    persisted = _persisted_field(run["persisted"], "content")
+    _no_recipient(live, persisted)
+    assert live == persisted
+
+
+@pytest.mark.asyncio
+async def test_n_the_measured_2b7c16a0_row_at_the_cap_queues_all_ten_calls_in_order():
+    run = await _drive([SEARCH, _deltas(_split(H2_2b7c16a0, 9))], user_settings=CAP2)
+    buf = run["cap_calls"][0]["tool_calls_buffer"]
+    assert [tc["name"] for tc in buf.values()] == H2_NAMES
+    assert [c["name"] for c in _carriers(run)[0]["tool_calls"]] == H2_NAMES
+    _no_recipient("".join(_delta_texts(run["emits"])), _persisted_field(run["persisted"], "content"))
+
+
+@pytest.mark.asyncio
+async def test_n_a_mid_run_harmony_round_is_dispatched_through_the_dispatcher():
+    run = await _drive([_deltas(_split(H3_f1c46597, 11)), _deltas([ANSWER])],
+                       user_settings=_settings(chat_max_tool_rounds=20))
+    assert [name for name, _ in run["dispatched"]] == H3_NAMES
+    assert run["dispatched"][4] == ("search_documents", {"query": "milestones"})
+    assert "tool_preparing" in _types(run["emits"])
+    assert run["cap_calls"] == []
+    live = "".join(_delta_texts(run["emits"]))
+    _no_recipient(live)
+    assert _persisted_field(run["persisted"], "content") == ANSWER
+
+
+@pytest.mark.asyncio
+async def test_n_a_not_offered_name_is_never_dispatched_and_is_worded():
+    # sandbox off: execute_code is not offered, so the whole 2b7c16a0 block is refused (D-07).
+    run = await _drive([_deltas(_split(H2_2b7c16a0, 6))],
+                       user_settings=_settings(sandbox_enabled=False, chat_max_tool_rounds=3))
+    assert run["dispatched"] == []
+    live = "".join(_delta_texts(run["emits"]))
+    persisted = _persisted_field(run["persisted"], "content")
+    for seen in (live, persisted):
+        assert FAILED_CALL_NOTICE in seen
+    _no_recipient(live, persisted)
+    assert live == persisted
+
+
+@pytest.mark.asyncio
+async def test_n_a_not_offered_name_at_the_cap_pauses_with_an_empty_queue():
+    run = await _drive([SEARCH, _deltas(_split(HARMONY_ONE.replace("search_documents", "rm_rf"), 7))],
+                       user_settings=CAP2)
+    assert run["dispatched"] == [("search_documents", {"query": "revenue"})]
+    assert _carriers(run)[0]["tool_calls"] == [MARKER]
+    _no_recipient(_persisted_field(run["persisted"], "content"))
+    assert "rm_rf" not in _persisted_field(run["persisted"], "content")
+
+
+@pytest.mark.asyncio
+async def test_n_the_measured_ed030690_row_at_the_cap_pauses_and_keeps_only_its_prose():
+    """A namespace-less recipient (``to=search_documents``) is refused, never repaired into a call."""
+    run = await _drive([SEARCH, _deltas(_split(H1_ed030690, 13))], user_settings=CAP2)
+    assert _carriers(run)[0]["tool_calls"] == [MARKER]
+    persisted = _persisted_field(run["persisted"], "content")
+    assert persisted == H1_TAIL
+    assert "".join(_delta_texts(run["emits"])) == persisted
+
+
+PROSE_HARMONY = "The model writes to=functions.search_documents and then its arguments, as JSON."
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("n", [1, 7, 50])
+async def test_n_prose_mentioning_a_recipient_is_byte_identical_and_never_pauses(n):
+    mid = await _drive([SEARCH, _deltas(_split(PROSE_HARMONY, n))], user_settings=_settings(chat_max_tool_rounds=5))
+    final = await _drive([SEARCH, _deltas(_split(PROSE_HARMONY, n))], user_settings=CAP2)
+    for run in (mid, final):
+        assert "".join(_delta_texts(run["emits"])) == PROSE_HARMONY
+        assert _persisted_field(run["persisted"], "content") == PROSE_HARMONY
+        assert run["cap_calls"] == [] and "cap_paused" not in _types(run["emits"])
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("n", [1, 2, 3, 11])
+async def test_n_live_deltas_equal_the_persisted_content(n):
+    run = await _drive([SEARCH, _deltas(_split("Let me search." + H4_34748d7c, n))], user_settings=CAP2)
+    assert "".join(_delta_texts(run["emits"])) == _persisted_field(run["persisted"], "content")
