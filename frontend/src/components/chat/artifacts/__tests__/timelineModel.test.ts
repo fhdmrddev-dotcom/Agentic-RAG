@@ -131,6 +131,29 @@ describe("deadlinePill", () => {
     expect(deadlinePill(parseEventDate("2026-04-01")!, { y: 2026, m: 3, d: 1 }).text).toBe("in 31 days")
   })
 
+  it("292-REVIEW WR-05: years 1-99 are never read as 1901-1999 (Date.UTC's two-digit rule)", () => {
+    // 31 Dec 0099 is the day before 1 Jan 0100: one day, not ~694,000.
+    expect(deadlinePill(parseEventDate("0099-12-31")!, { y: 100, m: 1, d: 1 }).text).toBe("passed 1 day ago")
+    expect(deadlinePill(parseEventDate("0100-01-01")!, { y: 99, m: 12, d: 31 }).text).toBe("in 1 day")
+    // 0024 is a leap year (Julian/proleptic Gregorian alike): 10 May 0024 is 70 days before 19 Jul.
+    expect(deadlinePill(parseEventDate("0024-05-10")!, { y: 24, m: 7, d: 19 }).text).toBe("passed 70 days ago")
+    // For years >= 100 the arithmetic agrees with Date.UTC on every month's first and last day.
+    const today = { y: 2026, m: 10, d: 24 }
+    const ref = (y: number, m: number, d: number) =>
+      Math.round((Date.UTC(y, m - 1, d, 12) - Date.UTC(2026, 9, 24, 12)) / 86_400_000)
+    for (const y of [1600, 1899, 1900, 1969, 1970, 2000, 2024, 2026, 2100, 2400]) {
+      for (let m = 1; m <= 12; m++) {
+        for (const d of [1, new Date(Date.UTC(y, m, 0)).getUTCDate()]) {
+          const iso = `${y}-${String(m).padStart(2, "0")}-${String(d).padStart(2, "0")}`
+          const n = ref(y, m, d)
+          const want = n === 0 ? "due today" : n > 0 ? (n === 1 ? "in 1 day" : `in ${n.toLocaleString("en-US")} days`)
+            : n === -1 ? "passed 1 day ago" : `passed ${(-n).toLocaleString("en-US")} days ago`
+          expect(deadlinePill(parseEventDate(iso)!, today).text, iso).toBe(want)
+        }
+      }
+    }
+  })
+
   it("counts of 1,000 and more are grouped en-US", () => {
     expect(deadlinePill(parseEventDate("2030-01-01")!, TODAY).text).toBe("in 1,165 days")
   })

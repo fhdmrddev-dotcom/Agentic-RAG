@@ -4269,7 +4269,7 @@ const BASELINE = {
   // ── Phase 292-02 Task 3 — FIVE more NEW suites, BOTH KNOBS, SAME COMMIT as their RED tests. ──
   "comparisonModel.test.ts": 8, // 292-02 — identical-term rule (verdict + folded text, q = Not stated), glyph table via own()
   "ComparisonArtifact.test.tsx": 14, // 292-02 — real <table>, one glyph badge per cell, italic Not stated, differ toggle, roving, tooltip
-  "timelineModel.test.ts": 16, // 292-02 — integer-part dates, stable sort, Today placement, same-side gaps, UTC-noon pills, month table
+  "timelineModel.test.ts": 17, // 292-02 — integer-part dates, stable sort, Today placement, same-side gaps, UTC-noon pills, month table; RAISED 16 → 17 at 292-REVIEW WR-05 (years 1-99 read literally)
   "TimelineArtifact.test.tsx": 11, // 292-02 — 13-row rail, filled / hollow dots, amber deadline, sr-only state words, sources, the clock
   "artifactRenderers.fence.test.ts": 12, // 292-02 — ?raw fence: no HTML sink / layout library / clock or Date-from-string (I-3, D-18)
   // ── Phase 273-05 (D-16 · I-1 · I-2 · SC#2) — SIX NEW suites, BOTH KNOBS, SAME COMMIT. None of

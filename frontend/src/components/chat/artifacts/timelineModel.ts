@@ -7,9 +7,9 @@
  *
  * Dates are calendar dates parsed from INTEGER PARTS (`parseCalendarDate`, the guard's own parser) —
  * never a `Date` built from the ISO string, which is UTC midnight and so shows the PREVIOUS day west of
- * Greenwich. Day counts use `Date.UTC(y, m - 1, d, 12)` on BOTH sides, so a daylight-saving change can
- * never shift one. Month names come from a fixed English table, so the text is byte-identical on every
- * machine and every locale build.
+ * Greenwich. Day counts are integer day numbers (`dayNumber`, pure arithmetic, so years 1-99 are not
+ * read as 1901-1999 and no daylight-saving change can shift one). Month names come from a fixed English
+ * table, so the text is byte-identical on every machine and every locale build.
  *
  * The rail:
  *   · events sorted ascending by (year, month, day ?? 0), STABLE on the stored order;
@@ -41,8 +41,6 @@ export interface CalendarDay {
 /** A gap needs at least this many calendar months between neighbours (UI-D-292-17). */
 export const GAP_MONTHS = 6
 
-const DAY_MS = 86_400_000
-
 /** `YYYY-MM-DD` / `YYYY-MM` → integer parts, or null. One parser for the guard and the rail. */
 export function parseEventDate(s: string): CalendarDate | null {
   return parseCalendarDate(s)
@@ -61,9 +59,24 @@ function todayKey(t: CalendarDay): number {
   return t.y * 10_000 + t.m * 100 + t.d
 }
 
+/**
+ * The proleptic-Gregorian day number of a calendar day (days since 1970-01-01), by integer
+ * arithmetic (Hinnant's days-from-civil). ⚠ Never `Date.UTC(y, …)`: for 0 ≤ y ≤ 99 it adds 1900, so
+ * `0099-12-31` was read as 1999 while the month path stayed literal (292-REVIEW WR-05). No `Date`, no
+ * clock, no time zone — so no daylight-saving change can shift a count either.
+ */
+function dayNumber(y: number, m: number, d: number): number {
+  const yy = m <= 2 ? y - 1 : y
+  const era = Math.floor(yy / 400)
+  const yoe = yy - era * 400
+  const doy = Math.floor((153 * (m + (m > 2 ? -3 : 9)) + 2) / 5) + d - 1
+  const doe = yoe * 365 + Math.floor(yoe / 4) - Math.floor(yoe / 100) + doy
+  return era * 146097 + doe - 719468
+}
+
 /** Whole calendar days from `a` to `b` (UTC noon on both sides). */
 function daysBetween(a: CalendarDay, b: { y: number; m: number; d: number }): number {
-  return Math.round((Date.UTC(b.y, b.m - 1, b.d, 12) - Date.UTC(a.y, a.m - 1, a.d, 12)) / DAY_MS)
+  return dayNumber(b.y, b.m, b.d) - dayNumber(a.y, a.m, a.d)
 }
 
 function monthsBetween(a: { y: number; m: number }, b: { y: number; m: number }): number {
