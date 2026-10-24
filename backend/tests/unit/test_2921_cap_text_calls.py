@@ -109,8 +109,8 @@ def _settings(**over) -> SimpleNamespace:
 
 async def _drive(streams: list, *, user_settings=None, agent_mode=None,
                  calling_mode=CallingMode.NATIVE, tool_result: str = "[]",
-                 ctx_extra: dict | None = None) -> dict:
-    tables = {"threads": {"folder_id": None}, "messages": [], "skills": [], "user_memory": []}
+                 ctx_extra: dict | None = None, history: list | None = None) -> dict:
+    tables = {"threads": {"folder_id": None}, "messages": list(history or []), "skills": [], "user_memory": []}
     inserts: list = []
 
     async def _fake_aexec(q):
@@ -572,3 +572,123 @@ async def test_l_an_unsigned_carrier_replays_without_a_signature_key():
     turn = next(m for m in sent if m.get("role") == "assistant" and m.get("tool_calls")
                 and m["tool_calls"][0]["id"] == "call_abc")
     assert set(turn["tool_calls"][0]) == {"id", "type", "function"}
+
+
+# ── Loop test M (292.1 UAT, run 238b0589): a SECOND Continue replays every chain turn's reasoning ─
+# Measured live (deepseek-v4-flash, cap 2): pause → Continue #1 re-paused → Continue #2 400'd
+# "The reasoning_content in the thinking mode must be passed back to the API". The carriers were
+# fine; the assistant tool-call turns REBUILT from the DB rows of this same chain went out with no
+# reasoning_content, though each row stores one. DeepSeek: with tools, reasoning "must be fully
+# passed back" (https://api-docs.deepseek.com/guides/thinking_mode).
+
+
+def _call_as(cid: str, name: str, args: dict) -> list[dict]:
+    chunks = _call(name, args)
+    chunks[0] = {**chunks[0], "id": cid}
+    return chunks
+
+
+def _thinking(text: str) -> list[dict]:
+    return [{"type": "reasoning_delta", "content": text}] if text else []
+
+
+def _rows_written(run) -> list[dict]:
+    """The rows a drive wrote, in the order the next run's history query reads them back."""
+    rows = [{"role": "system", "content": p["content"], "tool_calls": p["tool_calls"], "reasoning_content": None}
+            for t, p in run["inserts"] if t == "messages" and p.get("role") == "system"]
+    kw = run["persisted"].kwargs
+    rows.append({"role": "assistant", "content": kw["content"], "tool_calls": kw.get("tool_calls"),
+                 "reasoning_content": kw.get("reasoning_content")})
+    return rows
+
+
+async def _pause_continue_continue(r: tuple[str, str, str, str]) -> tuple[dict, dict, dict]:
+    """First turn pauses, Continue #1 re-pauses, Continue #2 answers — each reads the rows before it."""
+    user = [{"role": "user", "content": "chart my revenue", "tool_calls": None, "reasoning_content": None}]
+    first = await _drive([_thinking(r[0]) + _call_as("call_a", "search_documents", {"query": "a"}),
+                          _thinking(r[1]) + _call_as("call_b", "search_documents", {"query": "b"})],
+                         user_settings=CAP2, history=user)
+    hist1 = user + _rows_written(first)
+    cont1 = await _drive([_thinking(r[2]) + _call_as("call_c", "search_documents", {"query": "c"}),
+                          _thinking(r[3]) + _call_as("call_d", "search_documents", {"query": "d"})],
+                         user_settings=CAP2, history=hist1, ctx_extra={
+                             "resume_dropped_tool_calls": True,
+                             "dropped_tool_calls": tuple(_carriers(first)[0]["tool_calls"])})
+    cont2 = await _drive([_deltas([ANSWER])], user_settings=CAP2, history=hist1 + _rows_written(cont1),
+                         ctx_extra={"resume_dropped_tool_calls": True,
+                                    "dropped_tool_calls": tuple(_carriers(cont1)[0]["tool_calls"])})
+    return first, cont1, cont2
+
+
+def _tool_turns(run) -> dict[str, dict]:
+    """A run's first request: each assistant tool-call turn, keyed by its first call id."""
+    return {m["tool_calls"][0]["id"]: m for m in run["requests"][0].messages
+            if m.get("role") == "assistant" and m.get("tool_calls")}
+
+
+@pytest.mark.asyncio
+async def test_m_a_second_continue_replays_reasoning_on_every_tool_call_turn_of_the_chain():
+    _first, cont1, cont2 = await _pause_continue_continue(("R0", "R1", "R2", "R3"))
+    assert _carriers(cont1), "Continue #1 must re-pause for the drive to reach Continue #2"
+    # call_a: the first turn's row (stores R1, the paused round's thinking); call_b: Continue #1's
+    # row (stores R3); call_d: Continue #1's carrier, replayed (R3, SEED-323).
+    assert {k: t.get("reasoning_content") for k, t in _tool_turns(cont2).items()} == {
+        "call_a": "R1", "call_b": "R3", "call_d": "R3"}
+
+
+@pytest.mark.asyncio
+async def test_m_continue_one_replays_the_first_rows_reasoning_too():
+    _first, cont1, _cont2 = await _pause_continue_continue(("R0", "R1", "R2", "R3"))
+    # The request's list is the loop's own (appended in place), so call_c — Continue #1's in-loop
+    # round, which always carried its reasoning (Phase 076.2 D-03) — shows here too.
+    assert {k: t.get("reasoning_content") for k, t in _tool_turns(cont1).items()} == {
+        "call_a": "R1", "call_b": "R1", "call_c": "R2"}
+
+
+@pytest.mark.asyncio
+async def test_m_a_chain_with_no_reasoning_replays_byte_identically():
+    _first, _cont1, cont2 = await _pause_continue_continue(("", "", "", ""))
+    turns = _tool_turns(cont2)
+    assert set(turns) == {"call_a", "call_b", "call_d"}
+    assert set(turns["call_a"]) == {"role", "content", "tool_calls"}
+    assert set(turns["call_b"]) == {"role", "content", "tool_calls"}
+    assert set(turns["call_d"]) == {"role", "tool_calls"}
+
+
+def test_m_an_earlier_turns_tool_calls_stay_byte_identical_on_a_new_send():
+    """Only the CURRENT turn (rows after the last user row) changes; a fresh send has none."""
+    from app.services.agent_loop import _reconstruct_history
+
+    signed = {"tool_call_id": "call_g", "name": "search_documents", "args": {"query": "x"},
+              "result": "[]", "thought_signature": "c2ln"}
+    rows = [
+        {"role": "user", "content": "q1"},
+        {"role": "assistant", "content": "a1", "tool_calls": [signed], "reasoning_content": "R"},
+        {"role": "user", "content": "q2"},
+    ]
+    assert _reconstruct_history(rows) == [
+        {"role": "user", "content": "q1"},
+        {"role": "assistant", "content": None, "tool_calls": [{
+            "id": "call_g", "type": "function",
+            "function": {"name": "search_documents", "arguments": '{"query": "x"}'},
+            "thought_signature": "c2ln"}]},
+        {"role": "tool", "tool_call_id": "call_g", "content": "[]"},
+        {"role": "assistant", "content": "a1", "reasoning_content": "R"},
+        {"role": "user", "content": "q2"},
+    ]
+
+
+def test_m_a_row_with_no_reasoning_in_the_current_turn_stays_byte_identical():
+    """Anthropic / Gemini / OpenAI chat rows never store reasoning: a Continue's rebuild is unchanged."""
+    from app.services.agent_loop import _reconstruct_history
+
+    call = {"tool_call_id": "call_h", "name": "search_documents", "args": {}, "result": "ok"}
+    rows = [{"role": "user", "content": "q"},
+            {"role": "assistant", "content": "", "tool_calls": [call], "reasoning_content": None}]
+    assert _reconstruct_history(rows, resuming=True) == [
+        {"role": "user", "content": "q"},
+        {"role": "assistant", "content": None, "tool_calls": [{
+            "id": "call_h", "type": "function",
+            "function": {"name": "search_documents", "arguments": "{}"}}]},
+        {"role": "tool", "tool_call_id": "call_h", "content": "ok"},
+    ]
