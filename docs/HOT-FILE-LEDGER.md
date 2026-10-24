@@ -11364,7 +11364,7 @@ cells rot within days.
 | [`frontend/src/components/panel/AskFolderChoice.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentspanelaskfolderchoicetsx) | 1 / 1 / 70 | no (young) | young (295-06). Leaf on the shadcn Select: rows only from `engine_pause.folders`, visible label `Folder to search`. ⛔ no API import, no folder picker |
 | [`frontend/src/components/panel/enginePause.ts`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentspanelenginepausets) | 1 / 1 / 102 | no (young) | young (295-06). Pure helper: readEnginePause, needsFolder, answeredHeader, answeredReceipt + the three choice labels. ⛔ no React, no API import |
 | [`frontend/src/components/workflows/RunEndReasonLine.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentsworkflowsrunendreasonlinetsx) | 1 / 1 / 36 | no (young) | young (295-05). Leaf rendering UI-SPEC C.1: `Why it stopped: …` / `No reason was recorded…` / nothing for a cancelled run with no reason |
-| [`backend/app/services/openai_service.py`](docs/HOT-FILE-LEDGER.md#backendappservicesopenai_servicepy) | 83 / 42 / 2728 (was `81 / 41 / 2623`) | ⚠ **FIRES** | honoured by construction (292-01: SHOW_ARTIFACT_TOOL schema + description only, tool count 30). ⛔ no anyOf/oneOf/type arrays (Gemini accepted, probed live) |
+| [`backend/app/services/openai_service.py`](docs/HOT-FILE-LEDGER.md#backendappservicesopenai_servicepy) | 84 / 42 / 2731 (was `81 / 41 / 2623`) | ⚠ **FIRES** | honoured by construction (292-01 schema + description; 292 F-1 description line; 30 tools). ⛔ no anyOf/oneOf/type arrays (Gemini probed live) |
 | [`backend/app/services/retrieval_rpc.py`](docs/HOT-FILE-LEDGER.md#backendappservicesretrieval_rpcpy) | 3 / 1 / 232 (was `0 / 0 / 0`) | no (young) | young. 272-03 `document_ids`; **272-05** constants MEASURED (T=2000, relaxed_order). ⛔ unfiltered SQL byte-identical; both RPCs pin custom plans (mig 201) |
 | [`backend/app/services/retrieval_rank.py`](docs/HOT-FILE-LEDGER.md#backendappservicesretrieval_rankpy) | 4 / 1 / 161 (was `3 / 1 / 151`) | no (young) | young. **272-05 D-27**: best row per matched doc (marked); coverage cut; filtered dedup same-document only. ⛔ no I/O |
 | [`backend/app/services/retrieval_documents.py`](docs/HOT-FILE-LEDGER.md#backendappservicesretrieval_documentspy) | 3 / 3 / 206 (was `1 / 1 / 174`) | ⚠ **FIRES** | ⚠ now FIRES (3 phases). **275-02**: `.eq(RETRIEVABLE_COLUMN, True)` on resolve_document_id / resolve_document / fetch_full_document; 272 pins retired by name |
@@ -11658,7 +11658,7 @@ cells rot within days.
 | [`frontend/src/hooks/useDocuments.ts`](docs/HOT-FILE-LEDGER.md#frontendsrchooksusedocumentsts) | 10 / 5 / 164 (was `8 / 3 / 120`) | ⚠ **FIRES** | **284-03**: never fetches a list of its own (D-24); INSERT / DELETE call `onChange` (one debounced refetch), on-page UPDATE merges. ⛔ the spread-merge keeps `*_stage_applies` |
 | [`frontend/src/pages/KnowledgeHealthPage.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrcpagesknowledgehealthpagetsx) | 12 / 6 / **DELETED** | ⚠ **FIRES** | **RETIRED (217.1-14)** — the Library's Health tab absorbed it; `ChatLayout`'s fallback replaced by `UnknownViewFallback` (`:871`). ⚠ absent for its ENTIRE LIFE |
 | [`backend/app/api/knowledge_health.py`](docs/HOT-FILE-LEDGER.md#backendappapiknowledgehealthpy) | 14 / 7 / 991 (was `11 / 6 / 737`) | ⚠ **FIRES** | ⚠ STALE (`11/6/737`). **272-04**: the trend skips `invalid_filter` / `refused_retry` rows (4 lines, D-24); kind 2 still counts |
-| [`backend/app/services/agent_loop.py`](docs/HOT-FILE-LEDGER.md#backendappservicesagent_looppy) | 71 / 34 / 3695 (was `69 / 33 / 3682`) | ⚠ **FIRES** | honoured by construction (292-01: `turn_citations=retrieved_citations` ×2, by reference, +2 −0). ⛔ prompt-assembly seam OWED (OV-273-03) |
+| [`backend/app/services/agent_loop.py`](docs/HOT-FILE-LEDGER.md#backendappservicesagent_looppy) | 72 / 34 / 3699 (was `69 / 33 / 3682`) | ⚠ **FIRES** | honoured by construction (292-01 citation kwargs ×2; 292 WR-01 shown-count kwarg, +6 total). ⛔ prompt-assembly seam OWED (OV-273-03) |
 | [`backend/app/services/context_window.py`](docs/HOT-FILE-LEDGER.md#backendappservicescontext_windowpy) | 10 / 5 / 602 | ⚠ **FIRES** | ⚠ absent for its ENTIRE LIFE at 5 phases — row added 250-01. honoured by construction: ONE removal-ORDER rule inside one private helper. ⛔ `_build_candidate` byte-unchanged |
 | [`backend/app/services/run_producer.py`](docs/HOT-FILE-LEDGER.md#backendappservicesrun_producerpy) | 24 / 12 / 1150 (was `23 / 11 / 1145`) | ⚠ **FIRES** | 295-04: F2 calls `record_failed_end` BEFORE its unchanged finish_run, so only the winner writes ONE run_failed (If 22→22). Honoured by construction |
 | [`backend/app/services/todos_service.py`](docs/HOT-FILE-LEDGER.md#backendappservicestodos_servicepy) | 4 / 3 / 187 | ⚠ **FIRES** | ⚠ absent for its ENTIRE LIFE at 3 phases — row added 250-02, which leaves the file BYTE-UNCHANGED. ⛔ `_RUN_ENDED_MARKER` is now bound by a frontend `?raw` fence |
@@ -24130,6 +24130,8 @@ Every non-test source file in `git diff --name-only ba8e38c05..HEAD -- backend/a
 
 **`71 / 34 / 3695`** at 292 close (was `69 / 33 / 3682`). G-5: ⚠ **FIRES**. honoured by construction (292-01: `turn_citations=retrieved_citations` ×2, by reference, +2 −0). ⛔ prompt-assembly seam OWED (OV-273-03).
 
+**292 review fix (WR-01, `96d3137d2`): `72 / 34 / 3699`.** One more kwarg, `turn_citations_seen`: the count of numbered sources the model was shown when the manifest was injected, so a `source` number above it is refused. Still honoured by construction (no new branch in the loop).
+
 ### `backend/app/services/artifact_history.py` — Phase 292 close
 
 **`2 / 2 / 201`** at 292 close (was `1 / 1 / 155`). G-5: no (2 phases). 292-01: diagram / comparison / timeline args redacted to placeholders like rows (+55 −9). ⛔ the ONE persist hook; attach keyed by parsed artifact id.
@@ -24141,6 +24143,8 @@ Every non-test source file in `git diff --name-only ba8e38c05..HEAD -- backend/a
 ### `backend/app/services/openai_service.py` — Phase 292 close
 
 **`83 / 42 / 2728`** at 292 close (was `81 / 41 / 2623`). G-5: ⚠ **FIRES**. honoured by construction (292-01: SHOW_ARTIFACT_TOOL schema + description only, tool count 30). ⛔ no anyOf/oneOf/type arrays (Gemini accepted, probed live).
+
+**292 review fix (F-1, `a127c2462`): `84 / 42 / 2731`.** One description clause: a request to compare two or more named options on several terms uses `component comparison`, not a markdown table. 2,761 chars (cap 3,000); chart example still first; `SYSTEM_PROMPT` untouched.
 
 ### `backend/app/services/show_artifact_tool.py` — Phase 292 close
 
