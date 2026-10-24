@@ -1,5 +1,6 @@
 /**
- * Phase 273-02 (I-1 · SC#4 · T-273-10) — THE CLOSED ARTIFACT REGISTRY: exactly three components.
+ * Phase 273-02 (I-1 · SC#4 · T-273-10) — THE CLOSED ARTIFACT REGISTRY: exactly three components
+ * at 273; Phase 292-02 adds `diagram` → DiagramArtifact (eager: plain DOM + SVG, no library).
  *
  * `chart` → the lazy ChartArtifact chunk · `table` → TableArtifact · `metric` → MetricArtifact.
  *
@@ -21,6 +22,7 @@
 import { lazy, type ComponentType } from "react"
 import { own } from "@/components/workflows/ownProperty"
 import { ARTIFACT_COMPONENT_NAMES, ArtifactNoticeError, type ArtifactBodyProps } from "./artifactSpec"
+import { DiagramArtifact } from "./DiagramArtifact"
 import { MetricArtifact } from "./MetricArtifact"
 import { TableArtifact } from "./TableArtifact"
 
@@ -43,6 +45,7 @@ const REGISTRY: Record<string, ArtifactRenderer> = {
   chart: ChartArtifactLazy,
   table: TableArtifact,
   metric: MetricArtifact,
+  diagram: DiagramArtifact,
 }
 
 /** The closed component list — fenced against the backend Literal in 273-05. */

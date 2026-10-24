@@ -93,12 +93,17 @@ describe("layoutDiagram — back edges", () => {
     for (const n of loop.nodes) expect(n.x + n.width).toBeLessThanOrEqual(311 - 48)
   })
 
-  it("a back edge bends through the gutter at rx = width − 8 − 8·(j mod 4)", () => {
-    const l = layoutDiagram(invoice(), 862)
-    const [first, second] = l.edges.filter((e) => e.back)
-    expect(first.gutterX).toBe(862 - 8)
-    expect(second.gutterX).toBe(862 - 16)
-    expect(first.path).toContain(`${862 - 8}`)
+  it("a back edge bends through the gutter at rx = width − 8 − 8·(j mod 4); a self-loop takes no lane", () => {
+    const l = layoutDiagram(
+      { nodes: [node("a"), node("b"), node("c")], edges: [edge("a", "b"), edge("b", "c"), edge("c", "a"), edge("c", "c", "Retry"), edge("c", "b")] },
+      862,
+    )
+    expect(l.edges.map((e) => e.back)).toEqual([false, false, true, true, true])
+    expect(l.edges[2].gutterX).toBe(862 - 8)
+    expect(l.edges[3].gutterX).toBeNull()
+    expect(l.edges[4].gutterX).toBe(862 - 16)
+    expect(l.edges[2].path).toContain(`${862 - 8}`)
+    expect(l.edges[2].labelAlign).toBe("end")
   })
 })
 
