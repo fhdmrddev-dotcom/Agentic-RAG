@@ -46,7 +46,7 @@ Verdict vocabulary: `PASS`, `FAIL` (with what was seen), `BLOCKED` (with the rea
 | SC#3 (VIS-01) | No edge the schema lacks | covered by S2; record the DOM count of `[data-line-kind="jump"]` per workflow (expected 0, 0, 1) | PASS — `[data-line-kind="jump"]` count: two-step 0, single 0, Vendor risk review 1 |
 | SC#4 (VIS-01) | Single-agent honesty | covered by S3 | PASS — covered by S3 |
 | D-17 / D-18 | The engine-added check is drawn only where it runs | Team on the grounded three-step: step 1 carries a Check reading `Must prove it` and `If it fails: redo the step (up to 2 times), then ask you`; an escalated non-KB step carries no check (the seal drift is the filed BUG, D-20) | PASS — grounded three-step: step 1 Check `Must prove it`, `If it fails: redo the step (up to 2 times), then ask you`; no check on steps 2-3 |
-| D-20 observation | How `Nothing checks this work.` reads on a writing (`llm_emit`) step | operator present, on the real 2-3 step emit workflow; record the operator's reading verbatim; if it reads as false, raise a follow-up rather than changing 290 | |
+| D-20 observation | How `Nothing checks this work.` reads on a writing (`llm_emit`) step | operator present, on the real 2-3 step emit workflow; record the operator's reading verbatim; if it reads as false, raise a follow-up rather than changing 290 | Operator, 2026-10-24: "D-20 reads fine" — no follow-up raised |
 | Run page | No switch on the run page (D-06) | open a run of any workflow; the canvas header shows no `Steps | Team` tablist | PASS — run page (`?run=d5641b27…`) has no `Steps | Team` tablist |
 | Read-only builder | The switch works on a starter and on another person's published workflow (D-07) | open a starter in the builder read-only; Team renders | ⛔ not drivable — the library offers starters only `Run` / `Make my own copy`, no read-only builder open; covered by unit tests |
 | Return to Steps | Selection and unsaved edits survive; the plane re-fits | select a step, edit its name without saving, switch Team → Steps; the selection and the edit are still there. The plane re-fits on return (accepted, RESEARCH A4; UI-SPEC §2's "scroll position is not lost" is corrected to this) | PASS — selected `Write it up`, typed an unsaved edit, Team → Steps: selection and edit both kept |
@@ -55,3 +55,7 @@ Verdict vocabulary: `PASS`, `FAIL` (with what was seen), `BLOCKED` (with the rea
 ## Claude's Chrome drive (2026-10-24)
 
 Driven on local (develop, 290 code) in Chrome MCP. Fixtures planted through `POST /workflows` (Vendor risk review, Two-step no gates, Grounded three-step, Single step; placeholder prompts added so the drafts validate) and deleted afterwards with `DELETE /workflows/{id}` (4 × 204; draft list 92 → 92, identical set). Owed to the operator: sign-off, the **D-20 observation** (how `Nothing checks this work.` reads on a writing step) and the **WR-02 decision** (290-HUMAN-UAT test 7).
+
+## Operator sign-off
+
+**Signed by the operator on 2026-10-24** ("signed, D-20 reads fine, WR-02 a"). WR-02 decision: **(a) accept as known**, fixed when `WorkflowCanvas.tsx` gets its G-5 refactor (re-open trigger unchanged in 290-REVIEW.md). Accepted ⛔: real 375 px viewport, read-only starter open (not reachable from the library).

@@ -3,14 +3,14 @@ gsd_state_version: 1.0
 milestone: v4.7
 milestone_name: Workflows You Can See and Start Anywhere
 status: ready_to_plan
-last_updated: 2026-10-24T04:54:30.202Z
+last_updated: 2026-10-24T05:29:46.986Z
 progress:
   total_phases: 17
   completed_phases: 9
   total_plans: 44
   completed_plans: 47
   percent: 53
-stopped_at: Phase 292 complete (3/3) — next open phase is 293
+stopped_at: Phase 290 closed (operator signed G-4) — next open phase is 293
 ---
 
 # Project State
@@ -42,7 +42,7 @@ reviewer exists, so a phase closes `verification_mode: self-verified`, never `re
 
 ## Current Position
 
-Phase: 293 (Start From Outside, and Close Out) — not started. (The SDK's phase.complete pointed at 294, which is already complete and live; corrected by hand.)
+Phase: 293 (Start From Outside, and Close Out) — not started. Phase 290 CLOSED 2026-10-24 (Claude drove G-4, operator signed, WR-02 accepted (a)); its guardrail override is discharged. (SDK phase.complete pointed at 291, already live; corrected by hand.)
 Previous: Phase: 292 (More Ways to Show It) — COMPLETE 2026-10-24, operator signed G-4
   **DEPLOYED 2026-10-24: production 6db8cf40a (master e10fca283) carries 292.** Mig 213 applied to cloud first (VERIFY 8/8, advisors 0 ERROR); pre-promotion gates: deploy-drift PASS, greenfield privileges OK, schema ACL parity OK; prod /health 200, /docs 401. Operator smoke test (a diagram/comparison/timeline chat on the live domain) recommended.
   3/3 plans + review fixes on develop (last 2b4ee5998). 4/4 SC verified in code; registry 3 → 6, tool count 30. Gates: backend 70 failed (= base), vitest count gate OK 11878, tsc 63 == base.

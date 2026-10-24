@@ -1,7 +1,7 @@
 ---
 phase: 290-the-card-and-the-team-picture
 verified: 2026-10-22T00:00:00Z
-status: human_needed
+status: passed
 score: 4/4 roadmap SCs verified in code (SC#1 screenshot half owed to human)
 overrides_applied: 0
 gaps: []
@@ -52,3 +52,7 @@ No TBD/FIXME/XXX/TODO in the 290 source files. Open review items IN-01..IN-05 ar
 
 ## Gaps
 None blocking. Items for human: SC#1 screenshot, G-4 rows S1-S5 (not run by me), WR-02 choice.
+
+## Re-verification (2026-10-24)
+
+The owed G-4 rows were driven in Chrome by Claude (290-VALIDATION.md, all PASS except the read-only starter, not reachable) and signed by the operator; WR-02 accepted as known (a). **Status: passed.**
