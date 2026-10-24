@@ -1,5 +1,5 @@
 ---
-status: partial
+status: complete
 phase: 292-more-ways-to-show-it
 source: [292-VERIFICATION.md, 292-VALIDATION.md]
 started: 2026-10-24T03:10:00Z
@@ -8,7 +8,7 @@ updated: 2026-10-24T04:45:00Z
 
 ## Current Test
 
-Tests 1-3 PASSED by Claude after the operator restarted the backend (VALIDATION §6b). Only test 5, the operator's G-4 sign-off, remains.
+All done. Tests 1-3 passed (Claude, VALIDATION §6b); test 5 signed by the operator 2026-10-24; test 4 blocked by tool limits and accepted.
 
 ## Tests
 
@@ -30,14 +30,14 @@ result: [blocked] Chrome MCP cannot resize the maximized window or emulate a tim
 
 ### 5. Operator sign-off on G4-1..G4-5
 expected: the operator reviews VALIDATION §4/§6 and signs each row
-result: [pending]
+result: passed — operator signed 2026-10-24
 
 ## Summary
 
 total: 5
-passed: 3
+passed: 4
 issues: 0
-pending: 1
+pending: 0
 skipped: 0
 blocked: 1
 

@@ -2,14 +2,15 @@
 gsd_state_version: 1.0
 milestone: v4.7
 milestone_name: Workflows You Can See and Start Anywhere
-status: ready_to_execute
-last_updated: "2026-10-24T02:59:19.504Z"
+status: ready_to_plan
+last_updated: 2026-10-24T04:54:30.202Z
 progress:
   total_phases: 17
   completed_phases: 9
   total_plans: 44
   completed_plans: 47
   percent: 53
+stopped_at: Phase 292 complete (3/3) — next open phase is 293
 ---
 
 # Project State
@@ -28,7 +29,7 @@ See: `.planning/PROJECT.md` (updated 2026-10-18)
 
 **Core value:** The agent acts as an AI colleague — it knows your knowledge base, can run code, and
 can be taught new behaviours (skills) that persist and can be shared.
-**Current focus:** Phase 292 — More Ways to Show It
+**Current focus:** Phase 293 — Start From Outside, and Close Out
 
 ---
 
@@ -41,7 +42,8 @@ reviewer exists, so a phase closes `verification_mode: self-verified`, never `re
 
 ## Current Position
 
-Phase: 292 (More Ways to Show It) — EXECUTED, human_needed (2026-10-24)
+Phase: 293 (Start From Outside, and Close Out) — not started. (The SDK's phase.complete pointed at 294, which is already complete and live; corrected by hand.)
+Previous: Phase: 292 (More Ways to Show It) — COMPLETE 2026-10-24, operator signed G-4
   3/3 plans + review fixes on develop (last 2b4ee5998). 4/4 SC verified in code; registry 3 → 6, tool count 30. Gates: backend 70 failed (= base), vitest count gate OK 11878, tsc 63 == base.
   Mig 213 APPLIED to cloud Supabase 2026-10-24 (operator-requested; apply_migration 213_message_artifacts_more_components): VERIFY 8/8 PASS, get_advisors(security) 0 ERROR, nothing on message_artifacts (pre-existing WARN/INFO only). Cloud had 8 rows (7 chart, 1 table), all pass. Backend code not pushed yet.
   Live re-checks PASSED after the operator restarted the backend: F-1 (plain compare → comparison, both providers; WR-02 revised refuse→drop 637a1f3cf), G4-1 diagrams, G-4 reloads 6/6, browser parallel thread. OWED: operator G-4 sign-off only (292-HUMAN-UAT test 5). 375px + LA timezone ⛔ (Chrome MCP).
@@ -53,7 +55,7 @@ Previous: Phase: 292 — EXECUTING
   UAT fixes on develop: 6f3311262, d01547f50, 183cac200, 34f643ce7, e03c3c88e, f8ee7d051. Open findings + triggers: 291 deferred-items.md; BUG-261024-01 (Moonshot schema).
   Mig 212 APPLIED to cloud Supabase 2026-10-24 (verified); full-schema.sql regenerated (251b44639). Anthropic key ROTATED by the operator 2026-10-24 (the key held in old LangSmith traces is revoked).
 Previous: Phase: 290 (the-card-and-the-team-picture) — EXECUTED, human_needed (2026-10-22)
-Plan: 1 of 3
+Plan: Not started
 
 ### Roadmap Evolution
 

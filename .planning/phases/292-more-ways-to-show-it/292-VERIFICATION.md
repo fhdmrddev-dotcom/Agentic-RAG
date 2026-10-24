@@ -1,7 +1,7 @@
 ---
 phase: 292-more-ways-to-show-it
 verified: 2026-10-24T00:00:00Z
-status: human_needed
+status: passed
 score: 4/4 success criteria verified in code; live browser items owed
 overrides_applied: 0
 re_verification: false
@@ -78,3 +78,7 @@ No success criterion is unmet by code. Remaining work is live observation that w
 
 _Verified: 2026-10-24_
 _Verifier: Claude (gsd-verifier)_
+
+## Re-verification (2026-10-24, orchestrator)
+
+Every human_needed item is now resolved: F-1 live re-check, G4-1 diagrams, G-4 reloads 6/6 and the browser parallel-thread row passed (VALIDATION §6b); the operator signed G4-1..G4-5 (§6c). A WR-02 revision (refuse → drop, `637a1f3cf`) came out of the live re-check and is covered by RED/GREEN tests. The 375px viewport and the negative-UTC run stay ⛔ (Chrome MCP limits) and are accepted. Migration 213 is also applied to cloud (VERIFY 8/8, advisors 0 ERROR). **Status: passed.**
