@@ -75,6 +75,9 @@ async def test_happy_path_returns_diff_and_stamps(monkeypatch):
     by_provider = {p["provider"]: p for p in out["providers"]}
     assert by_provider["anthropic"]["status"] == "no_key"
     assert by_provider["openai"]["ok"] is True
+    # The returned count covers every id /models gave, not only the new ones.
+    assert by_provider["openai"]["returned"] == 1
+    assert by_provider["anthropic"]["returned"] == 0
     # The run is a recorded operator action.
     assert req.state.audit_action == "model.discover"
 

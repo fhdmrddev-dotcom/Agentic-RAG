@@ -480,7 +480,7 @@ node scripts/check-hot-file-ledger.cjs <phase-dir>   # 0 clear · 1 missing rows
 | `frontend/src/types/index.ts` | 101 / 80 / 1674 (was `100 / 79 / 1656`) | 295-05: three additive fields · seam OWED |
 | `backend/app/main.py` | 92 / 67 / 979 (was `91 / 66 / 978`) | 294-03: ONE include_router (+2 −1) · ⛔ |
 | `backend/app/config.py` | 93 / 54 / 1809 (was `92 / 54 / 1790`) | honoured by construction (282-04: self-hosted default 900) · seam OWED · ⛔ |
-| `backend/app/api/admin.py` | 43 / 17 / 2051 (was `42 / 17 / 2024`) | honoured by construction (282-04: one refusal helper, add timeout) · ⛔ |
+| `backend/app/api/admin.py` | 44 / 17 / 2054 (was `43 / 17 / 2051`) | quick-261024: discover summary gains a `returned` count (+3) · ⛔ |
 | `backend/app/api/settings.py` | 44 / 23 / 1159 (was `41 / 21 / 1048`) | honoured by construction (294-04: ONE rerank_provider refusal) · ⛔ |
 | `backend/app/services/multimodal_service.py` | 14 / 7 / 984 | ⚠ absent from BOTH for its ENTIRE LIFE at **7 phases** |
 | `backend/app/api/documents.py` | 99 / 39 / 2698 (was `97 / 38 / 2653`) | honoured by construction (285-03: enqueue-fail → doc failed, 201) · ⛔ |
@@ -529,7 +529,7 @@ node scripts/check-hot-file-ledger.cjs <phase-dir>   # 0 clear · 1 missing rows
 | `backend/app/services/sources/__init__.py` | 5 / 3 / 40 | ⚠ absent while FIRING — row added 239-03 |
 | `backend/app/services/mcp_client.py` | 9 / 6 / 526 | ⚠ row STALE TWICE (SEED-258) |
 | `backend/app/models/message.py` | 23 / 15 / 285 (was `21 / 13 / 278`) | last touch 279-01 (comment repoint only) |
-| `backend/app/models/user_settings.py` | 57 / 35 / 1742 (was `55 / 34 / 1723`) | ⚠ STALE · last touch 270-02 · ⛔ |
+| `backend/app/models/user_settings.py` | 60 / 36 / 1769 (was `57 / 35 / 1742`) | quick-261024: picker warms hot + tombstone caches · ⛔ |
 | `backend/app/services/harness/reachability.py` | 5 / 5 / 498 (was `4 / 4 / 463`) | 295-02: one pure lint check (no_template_bound) |
 | `backend/app/services/workflow_kickoff.py` | 11 / 8 / 596 (was `10 / 8 / 585`) | 295-10: paused-run 409 says where it waits (If 15→16) |
 | `frontend/src/components/workflows/WorkflowScheduleModal.tsx` | 3 / 3 / 601 | ⚠ absent for its entire life; it crossed the threshold in 214-09 on a  |
@@ -604,7 +604,7 @@ node scripts/check-hot-file-ledger.cjs <phase-dir>   # 0 clear · 1 missing rows
 | `backend/app/services/provider_gateway/openai_compat.py` | 7 / 5 / 537 (was `6 / 4 / 525`) | honoured by construction (282-01: budget forwarded only when set) · ⛔ |
 | `backend/app/services/provider_gateway/dispatcher.py` | 10 / 4 / 260 (was `6 / 2 / 153`) | ⚠ FIRES (row was stale) · 282-01: off-loop open, shared deadline · ⛔ |
 | `backend/app/services/provider_gateway/openai_responses.py` | 2 / 2 / 573 (was `0 / 0 / 563`) | young · 282-01: budget + retries reach the client when set · ⛔ |
-| `frontend/src/lib/api/admin.ts` | 9 / 5 / 1122 (was `8 / 5 / 1113`) | ⚠ FIRES · 282-04: default mirrors + AddModelBody timeout · ⛔ |
+| `frontend/src/lib/api/admin.ts` | 10 / 5 / 1125 (was `9 / 5 / 1122`) | ⚠ FIRES · quick-261024: optional `returned` on discovery outcome · ⛔ |
 | `frontend/src/components/admin/CapabilityGrid.tsx` | 3 / 3 / 264 | ⚠ FIRES at 3 phases · row added 263-REVIEW WR-07 · ⛔ |
 | `frontend/src/components/admin/ModelAdvancedCapabilities.tsx` | 0 / 0 / 290 | young (created 262) · ⛔ |
 | `frontend/src/lib/activeViewReachability.ts` | 1 / 1 / 159 | ⚠ row read 0/0/0 AT PLANNING · measured 262-01 · ⛔ |

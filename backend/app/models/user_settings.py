@@ -993,6 +993,12 @@ def _build_providers(row: dict) -> list[LLMProvider]:
         if disabled_ids:
             models = [m for m in models if m not in disabled_ids]
 
+        # The registry wins over the Settings list: a model REMOVED in the registry (mig 179
+        # tombstone) is hidden even when provider_model_lists still names it — Settings writes
+        # the whole picker list back on every save, so it routinely holds removed ids.
+        if _removed_model_ids_cache:
+            models = [m for m in models if m not in _removed_model_ids_cache]
+
         # SEED-173 — a self-hosted provider's endpoint comes from the operator's settings
         # column, not from the static registry (whose entry for it is ""). Table-driven so
         # that ollama, lmstudio and custom are handled IDENTICALLY; the only per-provider
@@ -1269,6 +1275,13 @@ async def load_app_settings_async() -> UserEffectiveSettings:
     # _build_providers runs so it can see disabled rows and hide them from the picker
     # (Pitfall 1 — the enabled-only hot cache cannot surface a disabled model). Non-raising.
     await load_all_model_overrides()
+    # _build_providers ALSO reads the enabled-only hot cache to append DB-registered models.
+    # Warm it here too: on a cold worker (or after an invalidation that zeroed only its TTL) it
+    # was empty or stale, and every registry-added model was missing from the chat picker until
+    # an unrelated path (a chat send) happened to reload it. Non-raising.
+    await _load_model_overrides()
+    # And the tombstone set, so a model removed in the registry is hidden by _build_providers.
+    await load_removed_model_ids()
     return _build_settings_from_row(row)
 
 

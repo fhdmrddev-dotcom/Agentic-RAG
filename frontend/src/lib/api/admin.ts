@@ -704,6 +704,9 @@ export interface DiscoveryProviderOutcome {
   provider: string
   status: string
   ok: boolean
+  /** How many ids the provider's /models returned — known AND new. Optional: an older
+   *  backend omits it, and the card then shows only the new count. */
+  returned?: number
 }
 
 /** The full ephemeral diff returned by `runModelDiscovery` — never persisted; the
