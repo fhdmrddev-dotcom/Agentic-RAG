@@ -119,3 +119,31 @@ here. G4-2's browser drive uses the G4-2b threads.
    new thread B while A streams; each artifact must land in its own thread (`message_artifacts.thread_id`).
 
 Then the operator signs the G4 rows.
+
+## 6. Orchestrator — final gates after the review fixes, and the Chrome drives (2026-10-24)
+
+**Final gates on develop @ b76727282 (all review fixes in):**
+- Backend unit gate: `70 failed, 9246 passed, 1 skipped, 2 xfailed, 2 xpassed` — ceiling 71; 0 phase-292/artifact tests among the 70.
+- Vitest count gate (quiet machine, `GSD_VITEST_MAX_WORKERS=2`): `total 11878 · failed 0 · count gate OK — 504/504 pinned files present, no per-file decrease`. The plan-03 red (`WorkflowBuilderPage.canvas.test.tsx` 6.3 s timeout under board load) did not recur: confirmed a load flake, not a regression.
+- Frontend typecheck `tsc -p tsconfig.app.json`: 63 errors at HEAD == 63 at base; 0 in phase-292 files.
+
+**Chrome drives (Chrome MCP, dev operator account):**
+
+## G4-4 PASS
+- Crafted thread 8ef83b95 (a_rvhc2e8nbd): only artifact-notice "This artifact can't be shown / its saved data links to a step that isn't in it (zz). Ask the agent to draw it again. / The rest of the answer is unaffected."; answer text present; leak tokens {" nodes edges verdict events component: none in main innerText, also with the rail expanded. Rail line "Flow diagram · 3 steps, 3 links". Screenshot: C:\Users\fhdmr\AppData\Local\Temp\claude-chrome-screenshots-kYzCgb\screenshot-1792807446010-25.jpg
+- Live refusal steps, board openai 249ca06b: three amber (text-amber-700, rgb(180,83,9)) rail lines "refused · a step name is over 48 characters", "refused · a link label is over 24 characters", "refused · two links join the same two steps", then Flow diagram · 11 steps, 11 links / Comparison · 2 options × 5 terms / Timeline · 8 events rendered. No leak tokens. Screenshot: ...screenshot-1792807496031-26.jpg
+## G4-3 anthropic 3f591838 (a_cnsv8wlx9b) PASS
+- chips Timeline + timeline 1; caption "Data: search_documents · 8 events"; 12 rows in order: 14 Mar 2023, 1 Apr 2023, "10 months later", 9 Feb 2024, "9 months later", Nov 2024, 15 Jan 2025, "15 months later", 1 Apr 2026, Today "Today, 24 Oct 2026 … everything below hasn't happened yet", 15 Dec 2026 Deadline "in 52 days", 15 Mar 2027 Deadline "in 142 days". Matches expectations exactly.
+- dots: past bg rgb(107,114,128) filled; Today rgb(79,70,229) (indigo-600, UI-D-292-23 light theme); upcoming bg white (hollow) border amber rgb(217,119,6) class border-2 (computed 1.6px = 2px snapped at DPR 1.25); pills rgb(180,83,9) amber.
+- screenshots ...-27.jpg (top) ...-28.jpg (Today + deadlines)
+- 375px: Chrome MCP resize_window is a no-op here (innerWidth stays 1536, window maximized) → viewport 375 ⛔ not emulable. Container emulation: artifact host max-width 343px (375 − 2×16) → fig 343, scrollWidth==clientWidth (341), 0 elements outside the frame; only sr-only spans clip (by design). Screenshot ...-30.jpg. Media-query (sm:) behaviour NOT covered by this emulation.
+- America/Los_Angeles run ⛔: Chrome MCP has no timezone emulation (no CDP Emulation.setTimezoneOverride); covered only by unit tests (timelineModel parses integer parts, no new Date(iso)).
+## G4-3 openai 48c78b9e (a_tw7gmutb35) PASS — identical 12-row order, Today 24 Oct 2026, deadlines, caption "Data: search_documents · 8 events".
+## G4-2 anthropic a3e4c7e3 (a_gdk3d2vnw4) PASS
+- chip Comparison / comparison 1; headers Term | Atlas Logistics MSA | Borealis Freight MSA; 9 rows, 18 cells, 0 blank td; sr-only words {Favourable, Unfavourable, Neutral, Not stated}; 4 visible italic "Not stated" (== 4 q expected); caption 2nd line verbatim "Verdicts are the agent's reading. Hover or focus a cell for its clause."
+- toggle: aria-pressed false→true, rows 9→8, "1 identical term hidden" (Indemnities) == N=1.
+- null-excerpt tooltip: shows the document name only ("292-borealis-msa.md"). Screenshot ...-31.jpg
+## G4-2 openai 3e0c408c (a_91uke5giiv) PASS — 7 rows, 14 cells, 0 blank, 2 italic Not stated (== 2), toggle 7→6 "1 identical term hidden", aria-pressed true.
+## G4-5 reload (browser) — timeline + comparison threads, anthropic + openai (two native providers): every <figure>'s textContent captured, full page reload, thread reopened, compared: IDENTICAL on all 4 (timeline anthropic 1099 chars, timeline openai 1292, comparison anthropic 1466, comparison openai 1450). (First post-reload read of 2 threads raced the initial load and read 0 chars; re-read with a poll → identical.) Diagram threads: pending (after the review fixes).
+
+**Blocked at the time of writing:** the backend (uvicorn --reload, reloader PID 70864) hung after the fixer's edits — its worker (PID 81012, started 06:19:42) predates the last fix commits and `/health` does not answer. Standing rule: Claude never kills or starts the operator's backend. Owed after the operator restarts it: F-1 live re-check, G4-1 diagrams, the two diagram reloads (G4-5), the browser parallel-thread row.
