@@ -887,6 +887,15 @@ export const MessageItem = memo(function MessageItem({ message, isStreaming, onS
                               threadId: message.thread_id,
                               producerRunId: res.producer_run_id,
                             })
+                          } else if (res.status !== "refused" && res.stream_since != null && message.thread_id) {
+                            // 292.1 UAT (run 5549031c): a Deep Continue keeps its run id and the
+                            // first segment's stream already ended — follow the SAME run from the
+                            // server's offset, so its steps render live in this turn.
+                            requestProducerResubscribe({
+                              threadId: message.thread_id,
+                              producerRunId: workflowLock.runId,
+                              since: res.stream_since,
+                            })
                           }
                         } catch (err) {
                           console.error("continueRun failed:", err)

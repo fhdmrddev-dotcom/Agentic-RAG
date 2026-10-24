@@ -1609,6 +1609,10 @@ export function StreamsProvider({ children }: PropsWithChildren) {
   const subscribeProducerStreamRef = useRef<
     ((threadId: string, producerRunId: string) => void) | null
   >(null)
+  // 292.1 UAT: the Deep-Continue sibling of the closure above (installed beside it).
+  const subscribeContinuationStreamRef = useRef<
+    ((threadId: string, runId: string, since: string) => void) | null
+  >(null)
 
   // ── Phase 194.1 Plan 03 (R1 + R2 — D-05 / D-06 / D-07) — the two stop helpers ──
   //
@@ -1914,6 +1918,115 @@ export function StreamsProvider({ children }: PropsWithChildren) {
     }
     // expose to the reconcile action + the producer-resubscribe signal listener.
     subscribeProducerStreamRef.current = subscribeProducerStream
+
+    // 292.1 UAT (run 5549031c) — follow a DEEP Continue: the SAME run id, from the server's
+    // `stream_since`, into the assistant turn it continues. Without it nothing listened (the first
+    // segment's stream had ended with `done`) and the answer arrived all at once.
+    // ⚠ Never from "0": `run:{id}` still holds the first segment and its `done`, and the wire
+    // carries no ids, so a replay would re-render that segment and stop at its old terminal.
+    // ⚠ Same per-thread, idempotent, pool-gated shape as `subscribeProducerStream` above.
+    const subscribeContinuationStream = (threadId: string, runId: string, since: string) => {
+      if (!threadId || !runId) return
+      if (subscriptionsRef.current.has(runId)) return
+      if (!isThreadInStreamPool(threadId)) return
+      const surfaceId: SurfaceId = "chat"
+      const setMessages = setMessagesForBucketBound(surfaceId, threadId)
+      const turns = (useStreamsStore.getState().bucketsBySurface.get(surfaceId)?.get(threadId) ?? [])
+        .filter((m) => m.role === "assistant")
+      const turn = [...turns].reverse().find((m) => m.runId === runId) ?? turns[turns.length - 1]
+      const assistantId = turn?.id ?? runId
+      // The continuation numbers its iterations from 0 again; offset them past the turn's own, or
+      // onToolStart's replay guard (same name + same iteration) swallows a call the first segment
+      // also made. The resumed calls arrive before any iteration_start, so they take the base.
+      const iterationBase = Math.max(-1, ...(turn?.tool_calls ?? []).map((tc) => tc.iteration ?? -1)) + 1
+      const controller = new AbortController()
+      subscriptionsRef.current.set(runId, controller)
+      lastSeenOffsetRef.current.set(runId, since)
+      lastEventAtRef.current.set(threadId, Date.now())
+      useStreamsStore.setState((s) => ({
+        subscriptionsByThread: _addRunToThread(s.subscriptionsByThread, threadId, runId),
+        streamingThreads: new Set(s.streamingThreads).add(threadId),
+      }))
+      const setTurn = (patch: Partial<Message>) =>
+        setMessages((prev) => prev.map((m) => (m.id === assistantId ? { ...m, ...patch } : m)))
+      setTurn({ runStatus: "streaming" })
+      const callbacks = makeStreamCallbacks({ assistantId, threadId, setMessages })
+      const onIterationStart = callbacks.onIterationStart
+      onIterationStart?.(iterationBase)
+      callbacks.onIterationStart = (i) => onIterationStart?.(iterationBase + 1 + i)
+      // The first segment's text becomes narration once the continuation writes text: the move a
+      // turn boundary makes (BUG-260912-01), so `content` ends as the final answer, shown once.
+      let folded = false
+      const onDelta = callbacks.onDelta
+      callbacks.onDelta = (delta) => {
+        if (!folded) callbacks.onTurnBoundary?.()
+        folded = true
+        onDelta(delta)
+      }
+      callbacks.onCursor = (msId: string) => {
+        lastSeenOffsetRef.current.set(runId, msId)
+        lastEventAtRef.current.set(threadId, Date.now())
+      }
+      const endSegment = (patch: Partial<Message>) => {
+        callbacks.flushDeltas()
+        setTurn(patch)
+        subscriptionsRef.current.delete(runId)
+        lastEventAtRef.current.delete(threadId)
+        useStreamsStore.setState((s) => {
+          const streaming = new Set(s.streamingThreads)
+          streaming.delete(threadId)
+          return {
+            subscriptionsByThread: _removeRunFromThread(s.subscriptionsByThread, threadId, runId),
+            streamingThreads: streaming,
+          }
+        })
+      }
+      // A re-pause writes no terminal sentinel (the buffer just EXPIREs): the cap_paused event
+      // ends this segment. The shipped handler clears Continuing… and re-pauses the lock.
+      const onCapPaused = callbacks.onCapPaused
+      callbacks.onCapPaused = (info) => {
+        onCapPaused?.(info)
+        endSegment({ runStatus: "completed" })
+        controller.abort()
+      }
+      const originalOnTerminal = callbacks.onTerminal
+      callbacks.onTerminal = (kind, errorPayload) => {
+        endSegment(
+          kind === "done" || kind === "reader_done"
+            ? { runStatus: "completed" }
+            : kind === "error"
+              ? { runStatus: "failed", runError: errorPayload ?? undefined }
+              : { runStatus: kind, stopped: true, runError: errorPayload ?? undefined },
+        )
+        // The sendMessage terminal's rule: a `done` for the paused run asks the server (keep the
+        // card if it re-paused, clear it if it completed); any other end clears the lock.
+        // Continuing… ends with the segment either way (D-14), even where the lock is kept.
+        clearContinuing(threadId)
+        const lock = useStreamsStore.getState().workflowLockByThread.get(threadId)
+        if ((kind === "done" || kind === "reader_done") && lock?.capPaused && lock.runId === runId) {
+          useStreamsStore.getState().actions.releaseSettledWorkflowLock(threadId, { reattach: false })
+        } else {
+          useStreamsStore.getState().actions.clearWorkflowLockForThread(threadId)
+        }
+        // BUG-260707-03's settle, scoped to THIS turn's id: the persisted (clean) final answer.
+        if (kind === "done") {
+          getMessages(threadId)
+            .then((persisted) => {
+              const answer = persisted.find((m) => m.runId === runId && m.role === "assistant")
+              if (answer?.content) setTurn({ content: answer.content })
+            })
+            .catch(() => {})
+        }
+        originalOnTerminal(kind, errorPayload)
+      }
+      subscribeToRun(runId, since, callbacks, controller.signal).catch((err) => {
+        if (!(err instanceof Error && err.name === "AbortError")) {
+          console.error("continuation re-subscribe failed:", err)
+        }
+        subscriptionsRef.current.delete(runId)
+      })
+    }
+    subscribeContinuationStreamRef.current = subscribeContinuationStream
 
     useStreamsStore.setState({
       actions: {
@@ -2781,6 +2894,7 @@ export function StreamsProvider({ children }: PropsWithChildren) {
               model: resolvedModel,
               provider: resolvedProvider,
               continued,
+              stream_since,
             } = await postMessage(threadId, content, {
               model: opts?.model,
               provider: opts?.provider,
@@ -2792,14 +2906,21 @@ export function StreamsProvider({ children }: PropsWithChildren) {
               activeConnectorIds: opts?.activeConnectorIds,
             })
             // 292.1 (D-12 / D-14): the server RESUMED the paused run — exactly what the Continue
-            // button does. No user row, no new run, and the open stream of that run carries on, so:
-            // mark Continuing…, drop any optimistic turn this call made (un-hinted text the server
-            // read as a continue word: no ghost bubble), and leave through the `finally`.
+            // button does. No user row and no new run, so: mark Continuing…, drop any optimistic turn
+            // this call made (un-hinted text the server read as a continue word: no ghost bubble),
+            // and leave through the `finally`.
+            // ⚠ 292.1 UAT (run 5549031c): this used to say "the open stream of that run carries on".
+            // It does not — the first segment's stream ended with `done`. Follow the SAME run from
+            // `stream_since`, as the button does; queued so the `finally` below runs first and
+            // cannot clear the streaming mark the follow sets.
             if (continued === true) {
               markContinuing(threadId)
               useStreamsStore.getState().actions.setMessagesForBucket(surfaceId, threadId, (prev) =>
                 prev.filter((m) => m.id !== assistantId && m.id !== userMsg.id),
               )
+              if (stream_since != null) {
+                queueMicrotask(() => subscribeContinuationStream(threadId, run_id, stream_since))
+              }
               return
             }
             // 292.1 (D-15 / D-16): a hinted word the server sent as a NEW message — the turn, late.
@@ -4221,7 +4342,9 @@ export function StreamsProvider({ children }: PropsWithChildren) {
   // Point the per-thread lock at the fresh id AND re-subscribe its live stream
   // (per-thread keyed; idempotent — won't double-subscribe).
   useEffect(() => {
-    const unsubscribe = subscribeProducerResubscribe(({ threadId, producerRunId }) => {
+    const unsubscribe = subscribeProducerResubscribe(({ threadId, producerRunId, since }) => {
+      // 292.1 UAT: a Deep Continue keeps its run id, so there is nothing to re-key.
+      if (since !== undefined) return subscribeContinuationStreamRef.current?.(threadId, producerRunId, since)
       const actions = useStreamsStore.getState().actions
       const existing = useStreamsStore.getState().workflowLockByThread.get(threadId)
       if (existing) {
