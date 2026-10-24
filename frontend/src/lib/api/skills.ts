@@ -577,6 +577,9 @@ export interface FullAppSettings {
   /** SEED-226. Empty means "use the active chat model" — never a pinned name. */
   vision_model: string
   vision_max_pages: number
+  /** 292.1 (D-17) — tool rounds per turn before the limit line + Continue. Optional: an older backend omits them. */
+  chat_max_tool_rounds?: number
+  explorer_max_tool_rounds?: number
   /**
    * SEED-258 — the largest file ANY connected source (Google Drive, Microsoft Graph, any
    * MCP file surface) will import, in MB. ONE knob: the MCP JSON-RPC envelope cap is
@@ -718,6 +721,9 @@ export interface SettingsUpdate {
   multimodal_max_vision_calls?: number
   vision_model?: string
   vision_max_pages?: number
+  /** 292.1 (D-18) — bounded 2..50 by the server; a refusal is a 400 sentence. */
+  chat_max_tool_rounds?: number
+  explorer_max_tool_rounds?: number
   /**
    * SEED-258. ⛔ There is no `_floor` / `_ceiling` here and there must never be: the bounds
    * are the SERVER's, read-only on the response. An out-of-range value is refused with a

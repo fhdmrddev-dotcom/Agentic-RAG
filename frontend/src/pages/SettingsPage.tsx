@@ -34,6 +34,7 @@ import {
 } from "@/components/settings/settingsTabs"
 import { ModelPillRow } from "@/components/settings/ModelPillRow"
 import { RerankEngineBlock } from "@/components/settings/RerankEngineBlock"
+import { AgentRoundLimits } from "@/components/settings/AgentRoundLimits"
 import { unverifiedDescription } from "@/lib/unverifiedModelCopy"
 import {
   ProviderPicker,
@@ -1126,6 +1127,8 @@ export function SettingsPage() {
                     />
                   </FieldRow>
                 )}
+                {/* 292.1 (D-17/D-18): ONE mount — the leaf owns its state, fetch and save. */}
+                <AgentRoundLimits />
                 <FieldRow label="Sub-agent model">
                   <select
                     value={subAgentModel}

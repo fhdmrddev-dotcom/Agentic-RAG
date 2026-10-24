@@ -47,6 +47,9 @@ _BOUNDED_SETTINGS_FIELDS = frozenset(
         "vision_max_pages",
         "source_max_file_size_mb",
         "hnsw_ef_search",
+        # 292.1 (D-18) — the tool-round caps, bounded 2..50 (migration 214 CHECKs agree).
+        "chat_max_tool_rounds",
+        "explorer_max_tool_rounds",
     }
 )
 
@@ -105,6 +108,9 @@ class FullSettingsResponse(BaseModel):
     # supposed to reach the active chat model was dead code. Empty => active chat model.
     vision_model: str
     vision_max_pages: int
+    # 292.1 (D-17) — tool rounds per turn before the limit line + Continue. App-wide.
+    chat_max_tool_rounds: int
+    explorer_max_tool_rounds: int
     # SEED-258 — the source file ceiling, plus the bounds the UI must state rather than
     # re-type. ⛔ The bounds are SERVED, never hardcoded in the form: a form carrying its own
     # copy of `50` is a fourth private constant, which is the defect this replaced.
@@ -340,6 +346,8 @@ class SettingsUpdate(BaseModel):
     multimodal_max_vision_calls: int | None = None
     vision_model: str | None = None          # SEED-226; "" clears it back to the chat model
     vision_max_pages: int | None = None
+    chat_max_tool_rounds: int | None = None      # 292.1 (D-18) — bounded 2..50
+    explorer_max_tool_rounds: int | None = None  # 292.1 (D-18) — bounded 2..50
     # SEED-258 — the source file ceiling. ONE knob; the MCP envelope cap is DERIVED from it
     # server-side and is deliberately NOT a field here.
     source_max_file_size_mb: int | None = None
@@ -437,6 +445,8 @@ async def _build_response(s=None) -> FullSettingsResponse:
         multimodal_max_vision_calls=s.multimodal_max_vision_calls,
         vision_model=s.vision_model,
         vision_max_pages=s.vision_max_pages,
+        chat_max_tool_rounds=s.chat_max_tool_rounds,
+        explorer_max_tool_rounds=s.explorer_max_tool_rounds,
         # SEED-258. The bounds ride along so the form can state them without owning them.
         source_max_file_size_mb=s.source_max_file_size_mb,
         source_max_file_size_mb_floor=SOURCE_MAX_FILE_SIZE_MB_FLOOR,
@@ -764,6 +774,47 @@ async def update_settings(
                 ),
             )
         updates["vision_max_pages"] = body.vision_max_pages
+
+    # 292.1 (BUG-261024-03, D-18) — the tool-round caps. ⚠ BOUNDED ON WRITE, and the CHECK in
+    #   migration 214 is the backstop, not the load-bearing arm (BUG-260909-01: a swallowed CHECK
+    #   violation reads as success). At 1 the limit line would arrive before any tool ran; an
+    #   unbounded value lets one turn run tool after tool for a very long time.
+    if body.chat_max_tool_rounds is not None:
+        if not 2 <= body.chat_max_tool_rounds <= 50:
+            raise HTTPException(
+                status_code=400,
+                detail=await _range_refusal_detail(
+                    field="chat_max_tool_rounds",
+                    label="Tool rounds per chat turn",
+                    submitted=body.chat_max_tool_rounds,
+                    lo=2,
+                    hi=50,
+                    typed_detail=(
+                        "Tool rounds per chat turn must be between 2 and 50. At 1 no tool could "
+                        "ever run; above 50 a single turn can run for a very long time."
+                    ),
+                ),
+            )
+        updates["chat_max_tool_rounds"] = body.chat_max_tool_rounds
+
+    if body.explorer_max_tool_rounds is not None:
+        if not 2 <= body.explorer_max_tool_rounds <= 50:
+            raise HTTPException(
+                status_code=400,
+                detail=await _range_refusal_detail(
+                    field="explorer_max_tool_rounds",
+                    label="Tool rounds per explorer turn",
+                    submitted=body.explorer_max_tool_rounds,
+                    lo=2,
+                    hi=50,
+                    typed_detail=(
+                        "Tool rounds per explorer turn must be between 2 and 50. At 1 no tool "
+                        "could ever run; above 50 a single explorer turn can run for a very long "
+                        "time."
+                    ),
+                ),
+            )
+        updates["explorer_max_tool_rounds"] = body.explorer_max_tool_rounds
 
     # SEED-258 — the file ceiling every connected source refuses at.
     #
