@@ -214,6 +214,7 @@ export function DiagramArtifact({ record }: ArtifactBodyProps) {
         const decision = node.kind === "decision"
         const showsTip = tipAnchor !== null && active === i
         return (
+          // eslint-disable-next-line jsx-a11y/no-noninteractive-element-interactions -- UI-D-292-08: a node is role=img (the UI-SPEC's screen-reader contract) AND the roving focus target; focus/hover only reveal its edges and source, so the keyboard reaches what the pointer does (WCAG 2.1.1)
           <div
             key={i}
             ref={(el) => {

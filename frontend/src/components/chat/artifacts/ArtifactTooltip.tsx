@@ -31,6 +31,7 @@ export interface AnchorRect {
 }
 
 /** Pure placement: above + left-aligned, flip below under 8px, clamp 8px inside horizontally. */
+// eslint-disable-next-line react-refresh/only-export-components -- the pure placement rule lives beside the one component that uses it, so its unit test pins the same function the tooltip calls
 export function tooltipPosition(
   anchor: AnchorRect,
   tip: { width: number; height: number },

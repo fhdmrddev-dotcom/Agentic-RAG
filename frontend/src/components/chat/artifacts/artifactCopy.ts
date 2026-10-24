@@ -510,10 +510,11 @@ export function gapLabel(months: number): string {
 }
 export const GAP_SR_SUFFIX = " later"
 
-// Deadline pill (UI-D-292-16).
+// Deadline pill (UI-D-292-16). ⚠ A month-precision deadline IN the current month reads `this month`
+// (amber, the month analogue of `due today`): UI-D-292-15 puts the current month on the past side, so
+// the UI-SPEC's `passed this month` and `this month` would otherwise name the same case twice.
 export const DUE_TODAY = "due today"
 export const DUE_THIS_MONTH = "this month"
-export const PASSED_THIS_MONTH = "passed this month"
 
 export function inDaysPhrase(n: number): string {
   return `in ${plural(n, "day", "days")}`

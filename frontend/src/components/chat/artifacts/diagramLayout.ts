@@ -216,7 +216,7 @@ export function layoutDiagram(spec: DiagramEncoding, width: number): DiagramLayo
 
   // Steps 9-12: edges.
   let backIndex = 0
-  const edges: PlacedEdge[] = spec.edges.map((e, k) => {
+  const edges: PlacedEdge[] = spec.edges.map((_edge, k) => {
     const a = placed[from[k]]
     const b = placed[to[k]]
     const selfLoop = from[k] === to[k]
