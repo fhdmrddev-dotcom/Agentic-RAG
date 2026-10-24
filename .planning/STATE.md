@@ -44,6 +44,7 @@ reviewer exists, so a phase closes `verification_mode: self-verified`, never `re
 
 Phase: 293 (Start From Outside, and Close Out) — not started. (The SDK's phase.complete pointed at 294, which is already complete and live; corrected by hand.)
 Previous: Phase: 292 (More Ways to Show It) — COMPLETE 2026-10-24, operator signed G-4
+  **DEPLOYED 2026-10-24: production 6db8cf40a (master e10fca283) carries 292.** Mig 213 applied to cloud first (VERIFY 8/8, advisors 0 ERROR); pre-promotion gates: deploy-drift PASS, greenfield privileges OK, schema ACL parity OK; prod /health 200, /docs 401. Operator smoke test (a diagram/comparison/timeline chat on the live domain) recommended.
   3/3 plans + review fixes on develop (last 2b4ee5998). 4/4 SC verified in code; registry 3 → 6, tool count 30. Gates: backend 70 failed (= base), vitest count gate OK 11878, tsc 63 == base.
   Mig 213 APPLIED to cloud Supabase 2026-10-24 (operator-requested; apply_migration 213_message_artifacts_more_components): VERIFY 8/8 PASS, get_advisors(security) 0 ERROR, nothing on message_artifacts (pre-existing WARN/INFO only). Cloud had 8 rows (7 chart, 1 table), all pass. Backend code not pushed yet.
   Live re-checks PASSED after the operator restarted the backend: F-1 (plain compare → comparison, both providers; WR-02 revised refuse→drop 637a1f3cf), G4-1 diagrams, G-4 reloads 6/6, browser parallel thread. OWED: operator G-4 sign-off only (292-HUMAN-UAT test 5). 375px + LA timezone ⛔ (Chrome MCP).
