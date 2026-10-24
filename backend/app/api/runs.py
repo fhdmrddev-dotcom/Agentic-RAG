@@ -1174,6 +1174,21 @@ async def _deep_run_is_paused(row: dict, run_id: UUID) -> bool:
     )
 
 
+async def _stream_tail_id(redis, run_id: UUID) -> str | None:
+    """292.1 UAT — the last entry id of ``run:{run_id}``: ``"0"`` when the buffer is gone (the
+    continuation re-creates it), ``None`` when Redis cannot be read (the Continue still proceeds;
+    the browser then follows nothing, as before)."""
+    try:
+        entries = await redis.xrevrange(f"run:{run_id}", count=1)
+    except Exception:  # noqa: BLE001 — a read never fails the Continue
+        logger.warning("continue: tail read of run:%s failed; no stream_since", run_id, exc_info=True)
+        return None
+    if not entries:
+        return "0"
+    entry_id = entries[0][0]
+    return entry_id.decode() if isinstance(entry_id, (bytes, bytearray)) else str(entry_id)
+
+
 @router.post("/{run_id}/continue", status_code=200)
 async def continue_run(
     run_id: UUID,
@@ -1340,6 +1355,7 @@ async def continue_run(
         raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail=CONTINUE_ALREADY_CLAIMED)
 
     # ── Step 5: branch — Harness re-drive vs Deep consume ──
+    _stream_since: str | None = None  # Deep only (292.1 UAT); set just before the spawn below
     if active_workflow_run_id is not None:
         # Harness: re-read available_tools from the definition (D-08) + re-drive.
         from app.services.harness_engine import (  # noqa: PLC0415
@@ -1633,6 +1649,10 @@ async def continue_run(
         dropped = await load_cap_paused_tool_calls(
             pool, thread_uuid, org_id=_cont_org_uuid
         )
+        # 292.1 UAT (run 5549031c): the continuation XADDs to this SAME run:{id}, which still holds
+        # the paused segment's events and its `done` (the wire carries no ids). The tail read
+        # BEFORE the spawn is the offset the browser follows from; read after, events could be lost.
+        _stream_since = await _stream_tail_id(redis, run_id)
         await spawn_continuation_run(
             run_id=run_id,
             thread_id=thread_id,
@@ -1665,6 +1685,8 @@ async def continue_run(
     # the Harness re-drive mints one; the Deep consume path keeps the same run_id.
     if active_workflow_run_id is not None:
         _resp["producer_run_id"] = str(_producer_id)
+    elif _stream_since is not None:
+        _resp["stream_since"] = _stream_since
     return _resp
 
 

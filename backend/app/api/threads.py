@@ -892,6 +892,8 @@ async def _typed_continue_or_none(
             "message_id": None,
             "continues_used": res["continues_used"],
             "continues_remaining": res["continues_remaining"],
+            # 292.1 UAT: where the browser follows the resumed run from (absent → it follows nothing).
+            **({"stream_since": res["stream_since"]} if res.get("stream_since") is not None else {}),
         },
     )
 
