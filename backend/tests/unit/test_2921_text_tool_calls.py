@@ -189,6 +189,61 @@ def test_truncated_markup_strips_to_end_of_text():
     assert ttc.strip_markup(PREAMBLE + F4[:30]) == PREAMBLE
 
 
+# ── 292.1-REVIEW WR-01: prose that MENTIONS a tag is content, not a call ────────────────────────
+# The XML / Gemma / bare-function families used to strip from the bare opener to the end of the
+# text. Only a block with the family's CALL SHAPE counts now; DSML is unchanged (its fullwidth-bar
+# spellings never occur in prose).
+
+PROSE_MENTIONS = [
+    # the reviewer's two driven sentences, verbatim
+    "Qwen-style models wrap each call in <tool_call> tags, and the server parses them out. "
+    "That is why you never see them.",
+    "In Gemma the marker is <|tool_call> and it closes with <tool_call|>; the server strips both.",
+    # the third family named by the finding
+    "Some self-hosted models write <function= followed by the tool name instead.",
+    "Older templates used <function=NAME> blocks; this one does not.",
+    "A <tool_call>\nblock opens the call, and the model writes it on its own line.",
+    "It ends with <tool_call>",
+]
+
+
+@pytest.mark.parametrize("text", PROSE_MENTIONS, ids=["qwen", "gemma", "function-bare", "function-named",
+                                                      "tool-call-newline", "tool-call-at-end"])
+def test_prose_that_mentions_a_tag_is_byte_identical(text):
+    assert ttc.detect_markup(text) is None
+    assert ttc.strip_markup(text) is text
+    s = ttc.settle(text, {"search_documents", "execute_code"}, buffer_has_calls=False)
+    assert s.kind == "none" and s.visible is text and s.calls == []
+
+
+@pytest.mark.parametrize("n", [1, 2, 5, 50])
+@pytest.mark.parametrize("text", PROSE_MENTIONS[:5], ids=["qwen", "gemma", "function-bare", "function-named",
+                                                          "tool-call-newline"])
+def test_the_holdback_releases_prose_that_mentions_a_tag_live(text, n):
+    """Release on PROOF of prose: by the last chunk everything has streamed — nothing waits for the
+    end of the provider call."""
+    hb = ttc.TagHoldback()
+    released = "".join(hb.feed(c) for c in _split(text, n))
+    assert released == text
+    assert hb.finish() == ""
+
+
+@pytest.mark.parametrize("block", [F4, F5, F6], ids=["F4", "F5", "F6"])
+def test_the_measured_call_shapes_still_count_mid_sentence_too(block):
+    lead = "Let me look that up."
+    assert ttc.detect_markup(lead + block) == len(lead)
+    assert ttc.strip_markup(lead + block) == lead
+    hb = ttc.TagHoldback()
+    released = "".join(hb.feed(c) for c in _split(lead + block, 1))
+    assert released == lead
+
+
+def test_a_qwen_json_call_counts():
+    block = '<tool_call>\n{"name": "search_documents", "arguments": {"query": "x"}}\n</tool_call>'
+    assert ttc.detect_markup(PREAMBLE + block) == len(PREAMBLE)
+    assert ttc.strip_markup(PREAMBLE + block) == PREAMBLE
+
+
 def test_markup_opener_data_is_one_tuple_of_the_measured_set():
     assert isinstance(ttc.MARKUP_OPENERS, tuple)
     for vendor_form_with_zero_hits in ("<function_calls>", "<minimax:tool_call>", "[TOOL_CALLS]", "<|python_tag|>"):
