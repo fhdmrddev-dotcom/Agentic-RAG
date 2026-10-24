@@ -409,10 +409,10 @@ node scripts/check-hot-file-ledger.cjs <phase-dir>   # 0 clear · 1 missing rows
 | Hot file (FIRING) | commits / phases / lines | Verdict (abridged) |
 |---|---|---|
 | `frontend/src/components/chat/ToolCallPanel.tsx` | 51 / 23 / 351 | ✅ **G-5 DISCHARGED (227-02)** |
-| `frontend/src/components/chat/MessageItem.tsx` | 83 / 42 / 1050 (was `82 / 38 / 1040`) | 292.1-03: tool-use-limit sentence + Continuing… (1 store selector) |
+| `frontend/src/components/chat/MessageItem.tsx` | 84 / 39 / 1059 (was `83 / 42 / 1050`) | 292.1 UAT: Deep Continue re-attaches the run's stream (+1 else-if) · ⛔ |
 | `frontend/src/components/chat/CitationList.tsx` | 5 / 5 / 91 | 294-05: ONE CitationCheckAction beside the trigger · extraction FIRST |
-| `backend/app/api/threads.py` | 277 / 93 / 2682 (was `276 / 93 / 2671`) | 292.1 G4-1: thread state asks run_is_cap_paused too (first-turn) |
-| `frontend/src/providers/StreamsProvider.tsx` | 115 / 44 / 5087 (was `114 / 44 / 5074`) | 292.1 G4-2: done after a live cap pause asks the server first · ⛔ |
+| `backend/app/api/threads.py` | 278 / 93 / 2684 (was `277 / 93 / 2682`) | 292.1 UAT: typed continue passes stream_since through · ⛔ |
+| `frontend/src/providers/StreamsProvider.tsx` | 116 / 44 / 5210 (was `115 / 44 / 5087`) | 292.1 UAT: Deep Continue follows the same run live (stream_since) · ⛔ |
 | `frontend/src/hooks/useMessages.ts` | 74 / 27 / 127 | extraction due |
 | `backend/app/services/anthropic_service.py` | 12 / 11 / 373 (was `11 / 10 / 354`) | honoured by construction (282-01: constructor kwargs) · adapter audit due |
 | `backend/app/services/embedding_service.py` | 9 / 5 / 354 | ⚠ absent for its entire life at 5 phases — row added 236 (SC#2) |
@@ -455,7 +455,7 @@ node scripts/check-hot-file-ledger.cjs <phase-dir>   # 0 clear · 1 missing rows
 | `backend/app/services/task_service.py` | 28 / 15 / 1038 (was `27 / 14 / 1023`) | 292.1-REVIEW WR-02: provider-blind strip_markup on phase output (+15) |
 | `backend/app/services/run_reconciler.py` | 5 / 3 / 406 (was `3 / 2 / 325`) | 295-04: ONE workflow-run sweep · live-proven 295-07 · ⚠ now FIRES |
 | `backend/app/services/circuit_breaker.py` | 1 / 1 / 331 | ⚠ absent its ENTIRE LIFE — row added 256-02 · ⛔ |
-| `backend/app/api/runs.py` | 51 / 22 / 1981 (was `49 / 22 / 1945`) | 292.1-REVIEW: 409 asks run_is_cap_paused; Continue claim is compare-and-set |
+| `backend/app/api/runs.py` | 52 / 22 / 2003 (was `51 / 22 / 1981`) | 292.1 UAT: Deep continue returns stream_since (XREVRANGE tail) · ⛔ |
 | `backend/app/api/panel.py` | 6 / 5 / 285 | 295-03: ONE engine_pause key on /pending · honoured by construction |
 | `backend/app/utils/folder_utils.py` | 9 / 5 / 302 | ⚠ absent its ENTIRE LIFE — row added 295-10 · ⛔ |
 | `backend/app/services/harness/human_input.py` | 6 / 3 / 375 (was `5 / 3 / 355`) | 295-09 CR-01: consumes only its own question's answer · ⛔ |
@@ -534,7 +534,7 @@ node scripts/check-hot-file-ledger.cjs <phase-dir>   # 0 clear · 1 missing rows
 | `backend/app/services/workflow_kickoff.py` | 11 / 8 / 596 (was `10 / 8 / 585`) | 295-10: paused-run 409 says where it waits (If 15→16) |
 | `frontend/src/components/workflows/WorkflowScheduleModal.tsx` | 3 / 3 / 601 | ⚠ absent for its entire life; it crossed the threshold in 214-09 on a  |
 | `frontend/src/components/workflows/nodePresentation.ts` | 8 / 7 / 221 | ⚠ absent from BOTH for its ENTIRE LIFE at **7 phases** |
-| `frontend/src/lib/api/threads.ts` | 22 / 13 / 1985 (was `21 / 12 / 1979`) | 292.1-03: message_id nullable + continued / continues_* (additive) |
+| `frontend/src/lib/api/threads.ts` | 23 / 13 / 1992 (was `22 / 13 / 1985`) | 292.1 UAT: optional stream_since on continue replies (types only) · ⛔ |
 | `frontend/src/lib/api/connectors.ts` | 17 / 11 / 740 | honoured by construction (244-06) · ⛔ |
 | `frontend/src/lib/api/workflows.ts` | 12 / 12 / 1285 (was `11 / 11 / 1141`) | 291-04: describe read + reference upload clients (+144) |
 | `frontend/src/lib/connectionMark.tsx` | 7 / 4 / 313 | ✅ **the move IS the seam, and it was TAKEN (214-08)** |
@@ -549,7 +549,7 @@ node scripts/check-hot-file-ledger.cjs <phase-dir>   # 0 clear · 1 missing rows
 | `frontend/src/hooks/useDocuments.ts` | 10 / 5 / 164 (was `8 / 3 / 120`) | 284-03: no list of its own; Realtime only asks for a refetch · ⛔ |
 | `frontend/src/pages/KnowledgeHealthPage.tsx` | 12 / 6 / **DELETED** | **RETIRED (217.1-14)** |
 | `backend/app/api/knowledge_health.py` | 11 / 6 / 737 | honoured by construction (**217.1-11**) |
-| `backend/app/services/agent_loop.py` | 75 / 35 / 3759 (was `74 / 35 / 3753`) | 292.1 D-UAT-1: carrier + resume echo thought_signature · seam OWED · ⛔ |
+| `backend/app/services/agent_loop.py` | 76 / 35 / 3766 (was `75 / 35 / 3759`) | 292.1 UAT: history replay keeps reasoning on tool-call turns · ⛔ |
 | `backend/app/services/tool_dispatcher.py` | 99 / 44 / 274 (was `98 / 43 / 5068`) | ✅ G-5 DISCHARGED (278-03): registry only; handlers in services/tools/ · ⛔ |
 | `backend/app/services/search_documents_tool.py` | 11 / 3 / 1544 | ⚠ now FIRES (294) · 294-01: instruction clamp (+25 −3) · extraction FIRST |
 | `backend/app/api/document_governance.py` | 5 / 3 / 416 | ⚠ absent at 3 phases. ⚠ Its low-confidence cutoff is the ConfidenceChi |
