@@ -3,10 +3,10 @@ seed_id: SEED-337
 title: Artifact vocabulary v2 — grow the closed registry past chart/table/metric (A), then decide deliberately on sandboxed agent-authored HTML/React like Claude.ai (B)
 created: 2026-10-03
 surface: Agentic-RAG
-status: folded
+status: partially-answered
 partial: true
-status_note: "Direction A folded into Phase 292 (diagram, comparison, timeline; discuss 2026-10-24). Direction B (sandboxed HTML) still open, needs its own operator decision."
-trigger_when: "The next phase after 273 closes that touches the artifact registry (frontend/src/components/chat/artifacts/**, backend/app/models/artifact.py, backend/app/services/show_artifact_tool.py) — OR the next /gsd:new-milestone sweep. Direction A is the default next step; direction B needs its own operator decision before any planning."
+status_note: "Direction A shipped in Phase 292 (diagram, comparison, timeline; registry 3 -> 6, tool count 30). Direction B (sandboxed agent-authored HTML/React) still open: needs its own operator decision (origin isolation, CSP, postMessage contract)."
+trigger_when: "Direction B only (A answered by Phase 292): an operator decision to let the agent author sandboxed HTML/React artifacts — origin isolation, CSP and the postMessage contract settled first — OR the next /gsd:new-milestone sweep, which re-asks that decision. No planning before the decision."
 trigger_paths: ["frontend/src/components/chat/artifacts/**", "backend/app/models/artifact.py", "backend/app/services/show_artifact_tool.py", "supabase/migrations/*message_artifacts*"]
 trigger_surfaces: ["chat", "sandbox"]
 migration_note:

@@ -11364,7 +11364,7 @@ cells rot within days.
 | [`frontend/src/components/panel/AskFolderChoice.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentspanelaskfolderchoicetsx) | 1 / 1 / 70 | no (young) | young (295-06). Leaf on the shadcn Select: rows only from `engine_pause.folders`, visible label `Folder to search`. ⛔ no API import, no folder picker |
 | [`frontend/src/components/panel/enginePause.ts`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentspanelenginepausets) | 1 / 1 / 102 | no (young) | young (295-06). Pure helper: readEnginePause, needsFolder, answeredHeader, answeredReceipt + the three choice labels. ⛔ no React, no API import |
 | [`frontend/src/components/workflows/RunEndReasonLine.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentsworkflowsrunendreasonlinetsx) | 1 / 1 / 36 | no (young) | young (295-05). Leaf rendering UI-SPEC C.1: `Why it stopped: …` / `No reason was recorded…` / nothing for a cancelled run with no reason |
-| [`backend/app/services/openai_service.py`](docs/HOT-FILE-LEDGER.md#backendappservicesopenai_servicepy) | 81 / 41 / 2623 (was `79 / 40 / 2602`) | ⚠ **FIRES** | 294-01: ONE optional `instruction` string on SEARCH_DOCUMENTS_TOOL (+12; provider-safe: no anyOf, no type array). Honoured by construction |
+| [`backend/app/services/openai_service.py`](docs/HOT-FILE-LEDGER.md#backendappservicesopenai_servicepy) | 83 / 42 / 2728 (was `81 / 41 / 2623`) | ⚠ **FIRES** | honoured by construction (292-01: SHOW_ARTIFACT_TOOL schema + description only, tool count 30). ⛔ no anyOf/oneOf/type arrays (Gemini accepted, probed live) |
 | [`backend/app/services/retrieval_rpc.py`](docs/HOT-FILE-LEDGER.md#backendappservicesretrieval_rpcpy) | 3 / 1 / 232 (was `0 / 0 / 0`) | no (young) | young. 272-03 `document_ids`; **272-05** constants MEASURED (T=2000, relaxed_order). ⛔ unfiltered SQL byte-identical; both RPCs pin custom plans (mig 201) |
 | [`backend/app/services/retrieval_rank.py`](docs/HOT-FILE-LEDGER.md#backendappservicesretrieval_rankpy) | 4 / 1 / 161 (was `3 / 1 / 151`) | no (young) | young. **272-05 D-27**: best row per matched doc (marked); coverage cut; filtered dedup same-document only. ⛔ no I/O |
 | [`backend/app/services/retrieval_documents.py`](docs/HOT-FILE-LEDGER.md#backendappservicesretrieval_documentspy) | 3 / 3 / 206 (was `1 / 1 / 174`) | ⚠ **FIRES** | ⚠ now FIRES (3 phases). **275-02**: `.eq(RETRIEVABLE_COLUMN, True)` on resolve_document_id / resolve_document / fetch_full_document; 272 pins retired by name |
@@ -11375,32 +11375,32 @@ cells rot within days.
 | [`frontend/src/components/chat/tool-bodies/index.ts`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentschattoolbodiesindexts) | 2 / 2 / 79 (was `1 / 1 / 59`) | no (2 phases) | 273-05: ShowArtifactBody + `ARGS_HIDDEN`, the ONE home both rail readers import. ⛔ do not widen livePanel beyond execute_code + show_artifact |
 | [`frontend/src/components/chat/toolStepDerivation.ts`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentschattoolstepderivationts) | 2 / 2 / 94 (was `1 / 1 / 74`) | no (2 phases) | 273-05: `nodeStateOf` → `refused` for a done result whose JSON `status` is `refused` (marker-derived). Every other tool unchanged |
 | [`frontend/src/lib/toolNames.ts`](docs/HOT-FILE-LEDGER.md#frontendsrclibtoolnamests) | 3 / 2 / 131 (was `2 / 1 / 128`) | no (2 phases) | 273-05: `show_artifact: "Show an artifact"`. ⛔ keys == harness offer ∪ CHAT_ONLY_TOOLS, fenced by `?raw` in workflows/toolNames.test.ts |
-| [`backend/app/models/artifact.py`](docs/HOT-FILE-LEDGER.md#backendappmodelsartifactpy) | 1 / 1 / 696 (was `0 / 0 / 0`) | no (young) | young (273-01). Closed show_artifact vocabulary, caps, refusal catalogue, result contract. ⛔ extra=forbid; ARTIFACT_COMPONENTS == mig 202 CHECK |
-| [`backend/app/db/artifacts.py`](docs/HOT-FILE-LEDGER.md#backendappdbartifactspy) | 1 / 1 / 195 (was `0 / 0 / 0`) | no (young) | young (273-01). insert (RETURNING row, server label) + keyed reads. ⛔ pool BYPASSES RLS: every read binds thread_id AND user_id; no UPDATE (D-08) |
-| [`backend/app/services/show_artifact_tool.py`](docs/HOT-FILE-LEDGER.md#backendappservicesshowartifacttoolpy) | 1 / 1 / 607 (was `0 / 0 / 0`) | no (young) | young (273-03). validate, by-ref transforms, server caption, store, emit the RETURNING row, id-first result. ⛔ no `error` key; no retrieval import |
-| [`backend/app/services/artifact_history.py`](docs/HOT-FILE-LEDGER.md#backendappservicesartifacthistorypy) | 1 / 1 / 155 (was `0 / 0 / 0`) | no (young) | young (273-04). `redact_artifact_args` (the ONE persist hook) + `attach_artifacts` (keyed by parsed artifact id, never tool_call_id) |
+| [`backend/app/models/artifact.py`](docs/HOT-FILE-LEDGER.md#backendappmodelsartifactpy) | 4 / 2 / 1560 (was `1 / 1 / 696`) | no (2 phases) | 292-01: six-name vocabulary, three typed arms + stored specs, caps, worded refusals (+772). ⛔ extra=forbid; ComponentName == mig 213 CHECK; fenced == frontend (292-03) |
+| [`backend/app/db/artifacts.py`](docs/HOT-FILE-LEDGER.md#backendappdbartifactspy) | 2 / 2 / 195 (was `1 / 1 / 195`) | no (2 phases) | 292-01: the insert's ValueError names ARTIFACT_COMPONENTS (one line, no SQL change). ⛔ every read binds thread_id AND user_id; no UPDATE (D-08) |
+| [`backend/app/services/show_artifact_tool.py`](docs/HOT-FILE-LEDGER.md#backendappservicesshowartifacttoolpy) | 4 / 2 / 858 (was `1 / 1 / 607`) | no (2 phases) | 292-01: `_show_encoded` branch before any rows access; D-08 by-ref refusals (+190 −21). ⛔ no `error` key; insert never runs on a refusal (probed 292-03) |
+| [`backend/app/services/artifact_history.py`](docs/HOT-FILE-LEDGER.md#backendappservicesartifacthistorypy) | 2 / 2 / 201 (was `1 / 1 / 155`) | no (2 phases) | 292-01: diagram / comparison / timeline args redacted to placeholders like rows (+55 −9). ⛔ the ONE persist hook; attach keyed by parsed artifact id |
 | [`backend/app/services/structured_text_holdback.py`](docs/HOT-FILE-LEDGER.md#backendappservicesstructuredtextholdbackpy) | 1 / 1 / 100 (was `0 / 0 / 0`) | no (young) | young (273-04). Gates STRUCTURED `delta` emission so a tool-call block never streams. ⛔ full_content accumulation unchanged; native untouched |
 | [`frontend/src/components/chat/artifacts/ArtifactBlock.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentschatartifactsartifactblocktsx) | 2 / 1 / 76 (was `0 / 0 / 0`) | no (young) | young (273-02). Body of the ONE MessageItem mount: guard → registry → per-artifact boundary → component or notice. ⛔ never throws; keyed by id |
 | [`frontend/src/components/chat/artifacts/ArtifactErrorBoundary.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentschatartifactsartifacterrorboundarytsx) | 1 / 1 / 36 (was `0 / 0 / 0`) | no (young) | young (273-02). The tree's FIRST React error boundary; fallback = the render-failed notice so one artifact cannot blank the message |
-| [`frontend/src/components/chat/artifacts/ArtifactFrame.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentschatartifactsartifactframetsx) | 1 / 1 / 66 (was `0 / 0 / 0`) | no (young) | young (273-02). The ONE home of the framed-card markup (sketch 1B): header, body slot, caption footer. ⛔ no animation (UI-D-09) |
+| [`frontend/src/components/chat/artifacts/ArtifactFrame.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentschatartifactsartifactframetsx) | 2 / 2 / 72 (was `1 / 1 / 66`) | no (2 phases) | 292-02: one optional full-width italic note line (comparison only), +6. ⛔ the ONE framed-card markup; no animation (UI-D-09) |
 | [`frontend/src/components/chat/artifacts/ArtifactNotice.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentschatartifactsartifactnoticetsx) | 1 / 1 / 34 (was `0 / 0 / 0`) | no (young) | young (273-02). "This artifact can't be shown" + one catalogue reason. ⛔ never JSON, a spec key, a validation path or an exception message |
 | [`frontend/src/components/chat/artifacts/ChartArtifact.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentschatartifactschartartifacttsx) | 2 / 1 / 456 (was `0 / 0 / 0`) | no (young) | young (273-02). Lazy chunk; the ONLY recharts importer. Legend = aria-pressed buttons. ⛔ colour from spec.chart.slots (UI-D-07); no animation |
 | [`frontend/src/components/chat/artifacts/MetricArtifact.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentschatartifactsmetricartifacttsx) | 1 / 1 / 92 (was `0 / 0 / 0`) | no (young) | young (273-02). One value per artifact (sketch 2A): label, value + unit, optional delta. ⛔ no inner tile (UI-D-04) |
 | [`frontend/src/components/chat/artifacts/TableArtifact.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentschatartifactstableartifacttsx) | 2 / 1 / 127 (was `0 / 0 / 0`) | no (young) | young (273-02). Click-to-sort (aria-sort), sticky header, 512px scroll (D-13). ⛔ cells are React text only |
-| [`frontend/src/components/chat/artifacts/artifactCopy.ts`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentschatartifactsartifactcopyts) | 3 / 1 / 266 (was `0 / 0 / 0`) | no (young) | young (273-02). The ONE home of every artifact string (copy + notice catalogue + operation phrases); the rail body imports it too |
-| [`frontend/src/components/chat/artifacts/artifactRegistry.ts`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentschatartifactsartifactregistryts) | 1 / 1 / 55 (was `0 / 0 / 0`) | no (young) | young (273-02). The CLOSED three-entry registry read via `own()` (I-1). ⛔ adding a component is a code change; fenced == backend Literal |
-| [`frontend/src/components/chat/artifacts/artifactSpec.ts`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentschatartifactsartifactspects) | 2 / 1 / 469 (was `0 / 0 / 0`) | no (young) | young (273-02). `parseArtifactRecord` → ok or a closed NoticeReason. ⛔ hand-rolled (no zod); never throws; never surfaces the raw value |
-| [`frontend/src/components/chat/artifacts/captionModel.ts`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentschatartifactscaptionmodelts) | 1 / 1 / 73 (was `0 / 0 / 0`) | no (young) | young (273-02). Phrases the SERVER's caption facts (sources, lineage, counts) — never model text (D-04). Pure |
+| [`frontend/src/components/chat/artifacts/artifactCopy.ts`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentschatartifactsartifactcopyts) | 6 / 2 / 533 (was `3 / 1 / 266`) | no (2 phases) | 292-02: alias table, six notice sentences, count / verdict / Today / pill copy (+260). ⛔ the ONE home of every artifact string |
+| [`frontend/src/components/chat/artifacts/artifactRegistry.ts`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentschatartifactsartifactregistryts) | 3 / 2 / 65 (was `1 / 1 / 55`) | no (2 phases) | 292-02: registry is six (three lazy entries added). ⛔ adding a component is a code change; fenced == backend Literal (273 + 292 fences) |
+| [`frontend/src/components/chat/artifacts/artifactSpec.ts`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentschatartifactsartifactspects) | 3 / 2 / 870 (was `2 / 1 / 469`) | no (2 phases) | 292-02: three guard arms mirroring 292-01's stored contract (+432 −31). ⛔ hand-rolled; never throws; refuses all 35 shared bad cases (292-03 fence) |
+| [`frontend/src/components/chat/artifacts/captionModel.ts`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentschatartifactscaptionmodelts) | 2 / 2 / 99 (was `1 / 1 / 73`) | no (2 phases) | 292-02: per-component count segment + comparison note (+28 −2). ⛔ phrases SERVER facts only, never model text (D-04). Pure |
 | [`frontend/src/components/chat/artifacts/chartModel.ts`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentschatartifactschartmodelts) | 1 / 1 / 275 (was `0 / 0 / 0`) | no (young) | young (273-02). Pure chart derivations: slots, visible domain, tooltip rows, ticks, aria text. No React, no recharts |
-| [`backend/app/services/artifact_sources.py`](docs/HOT-FILE-LEDGER.md#backendappservicesartifact_sourcespy) | 0 / 0 / 0 | no (young) | young (planned 292-01). Pure `resolve_sources` / `excerpt_for`: a source handle is this turn's citation number. ⛔ imports citation_markers + artifact models only; no DB, no provider |
-| [`frontend/src/components/chat/artifacts/diagramLayout.ts`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentschatartifactsdiagramlayoutts) | 0 / 0 / 0 | no (young) | young (planned 292-02). Pure top-down layout (ranks, back edges, row wrap). ⛔ no DOM, no React, no layout dependency; same spec + width = same layout (I-2) |
-| [`frontend/src/components/chat/artifacts/DiagramArtifact.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentschatartifactsdiagramartifacttsx) | 0 / 0 / 0 | no (young) | young (planned 292-02). Flow diagram body: HTML nodes over one SVG edge layer. ⛔ React text only, no dangerouslySetInnerHTML; reads only a guarded spec |
-| [`frontend/src/components/chat/artifacts/ArtifactTooltip.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentschatartifactsartifacttooltiptsx) | 0 / 0 / 0 | no (young) | young (planned 292-02). The ONE shared source-excerpt tooltip (hover + focus, Escape, portalled). ⛔ React text only, no dangerouslySetInnerHTML |
-| [`frontend/src/components/chat/artifacts/comparisonModel.ts`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentschatartifactscomparisonmodelts) | 0 / 0 / 0 | no (young) | young (planned 292-02). Pure comparison derivations (identical terms, glyph table). ⛔ no DOM, no React; a `q` cell is always our `Not stated` |
-| [`frontend/src/components/chat/artifacts/ComparisonArtifact.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentschatartifactscomparisonartifacttsx) | 0 / 0 / 0 | no (young) | young (planned 292-02). Comparison matrix body + `Only terms that differ` toggle. ⛔ React text only, no dangerouslySetInnerHTML; glyph shape carries the verdict |
-| [`frontend/src/components/chat/artifacts/timelineModel.ts`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentschatartifactstimelinemodelts) | 0 / 0 / 0 | no (young) | young (planned 292-02). Pure timeline derivations (date parts, gaps, Today, days-until). ⛔ no DOM; `today` injected, never `new Date(iso)` |
-| [`frontend/src/components/chat/artifacts/TimelineArtifact.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentschatartifactstimelineartifacttsx) | 0 / 0 / 0 | no (young) | young (planned 292-02). Vertical-rail timeline body. ⛔ React text only, no dangerouslySetInnerHTML; Today computed by our code, never the model |
-| [`frontend/src/components/chat/tool-bodies/ShowArtifactBody.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentschattoolbodiesshowartifactbodytsx) | 1 / 1 / 192 (was `0 / 0 / 0`) | no (young) | young (273-05). Rail essence + expanded line for show_artifact. ⛔ reads `reason`, never `detail` or `values` (L-3/L-4) |
+| [`backend/app/services/artifact_sources.py`](docs/HOT-FILE-LEDGER.md#backendappservicesartifact_sourcespy) | 1 / 1 / 151 (was `0 / 0 / 0`) | no (young) | young (created 292-01). Pure `resolve_sources` / `excerpt_for`: a source handle is this turn's citation number. ⛔ imports citation_markers + artifact models only; no DB, no provider |
+| [`frontend/src/components/chat/artifacts/diagramLayout.ts`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentschatartifactsdiagramlayoutts) | 2 / 1 / 284 (was `0 / 0 / 0`) | no (young) | young (created 292-02). Pure top-down layout (ranks, back edges, row wrap). ⛔ no DOM, no React, no layout dependency; same spec + width = same layout (I-2) |
+| [`frontend/src/components/chat/artifacts/DiagramArtifact.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentschatartifactsdiagramartifacttsx) | 2 / 1 / 275 (was `0 / 0 / 0`) | no (young) | young (created 292-02). Flow diagram body: HTML nodes over one SVG edge layer. ⛔ React text only, no dangerouslySetInnerHTML; marker ids from useId() |
+| [`frontend/src/components/chat/artifacts/ArtifactTooltip.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentschatartifactsartifacttooltiptsx) | 2 / 1 / 107 (was `0 / 0 / 0`) | no (young) | young (created 292-02). The ONE shared source-excerpt tooltip (hover + focus, Escape, portalled). ⛔ React text only, no dangerouslySetInnerHTML |
+| [`frontend/src/components/chat/artifacts/comparisonModel.ts`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentschatartifactscomparisonmodelts) | 1 / 1 / 46 (was `0 / 0 / 0`) | no (young) | young (created 292-02). Pure comparison derivations (identical terms, glyph table). ⛔ no DOM, no React; a `q` cell is always our `Not stated` |
+| [`frontend/src/components/chat/artifacts/ComparisonArtifact.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentschatartifactscomparisonartifacttsx) | 1 / 1 / 275 (was `0 / 0 / 0`) | no (young) | young (created 292-02). Comparison matrix body + `Only terms that differ` toggle. ⛔ React text only, no dangerouslySetInnerHTML; glyph shape carries the verdict |
+| [`frontend/src/components/chat/artifacts/timelineModel.ts`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentschatartifactstimelinemodelts) | 1 / 1 / 165 (was `0 / 0 / 0`) | no (young) | young (created 292-02). Pure timeline derivations (date parts, gaps, Today, days-until). ⛔ no DOM; `today` injected, never `new Date(iso)` |
+| [`frontend/src/components/chat/artifacts/TimelineArtifact.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentschatartifactstimelineartifacttsx) | 1 / 1 / 194 (was `0 / 0 / 0`) | no (young) | young (created 292-02). Vertical-rail timeline body. ⛔ React text only, no dangerouslySetInnerHTML; Today from the viewer's clock, never the model |
+| [`frontend/src/components/chat/tool-bodies/ShowArtifactBody.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentschattoolbodiesshowartifactbodytsx) | 2 / 2 / 260 (was `1 / 1 / 192`) | no (2 phases) | 292-02: rail lines for the three encoded types from row_count / edge_count / option_count (+74 −6). ⛔ reads `reason`, never `detail` or `values` |
 | [`backend/app/services/document_search_service.py`](docs/HOT-FILE-LEDGER.md#backendappservicesdocument_search_servicepy) | 8 / 4 / 505 (was `5 / 3 / 584`) | ⚠ **FIRES** | **284-04**: Find = ONE ranged `count=exact` read of `library_documents`; the "two legs, never one `or_`" invariant RETIRED deliberately (the view holds the union). ⛔ short page → 503 |
 | [`backend/app/models/document_search.py`](docs/HOT-FILE-LEDGER.md#backendappmodelsdocument_searchpy) | 3 / 3 / 174 (was `2 / 2 / 171`) | ⚠ **FIRES** | ⚠ now FIRES (3 phases). **275-03**: `include_archived: bool = False`; ⛔ `extra="forbid"` kept, so backend ships before frontend |
 | [`backend/app/api/document_search.py`](docs/HOT-FILE-LEDGER.md#backendappapidocument_searchpy) | 1 / 1 / 48 (was `0 / 0 / 0`) | no (1 phase) | young (271-01). ⛔ user-JWT client only; remaps `ResolveError`; no write. **271-05**: the fence calls THIS coroutine with a GoTrue token (P-04) |
@@ -11520,7 +11520,7 @@ cells rot within days.
 | [`backend/app/api/settings.py`](docs/HOT-FILE-LEDGER.md#backendappapisettingspy) | 44 / 23 / 1159 (was `41 / 21 / 1048`) | ⚠ **FIRES** | honoured by construction (**294-04**): ONE refusal arm, rerank_provider vs registry `ACCEPTED_PROVIDER_IDS` → 400. ⛔ never a retyped id list; GET never echoes a key |
 | [`backend/app/services/multimodal_service.py`](docs/HOT-FILE-LEDGER.md#backendappservicesmultimodal_servicepy) | 14 / 7 / 984 | ⚠ **FIRES** | ⚠ absent from BOTH for its ENTIRE LIFE at **7 phases** — row added SEED-227, which is also where its silent truncation was found |
 | [`backend/app/api/documents.py`](docs/HOT-FILE-LEDGER.md#backendappapidocumentspy) | 99 / 39 / 2698 (was `97 / 38 / 2653`) | ⚠ **FIRES** | Honoured by construction. **285-03** (D-12): both enqueue paths failed → the doc is marked `failed` (guard `status='pending'`) and 201 `failed` returned, like the storage-fail arm. Minter untouched |
-| [`scripts/vitest-count-gate.cjs`](docs/HOT-FILE-LEDGER.md#scriptsvitest-count-gatecjs) | 335 / 76 / 6658 (was `327 / 74 / 6623`) | ⚠ **FIRES** | 291: two suites adopted in the plans that create them (`DescribeReferencesSection.test.tsx` 291-04, `DraftInputsFold.test.tsx` 291-05); no pin raised or lowered |
+| [`scripts/vitest-count-gate.cjs`](docs/HOT-FILE-LEDGER.md#scriptsvitest-count-gatecjs) | 339 / 77 / 6681 (was `335 / 76 / 6658`) | ⚠ **FIRES** | 292: nine suites adopted in the creating commits (eight in 292-02, `artifactParity292.fence.test.ts` in 292-03); five 273 pins raised in 292-02; none lowered |
 | [`scripts/check-deploy-drift.sh`](docs/HOT-FILE-LEDGER.md#scriptscheck-deploy-driftsh) | 5 / 4 / 267 | ⚠ **FIRES** | ⚠ absent its ENTIRE LIFE — row added 294-05. 294-01: DECISION_ENGINE_FAULT_BASE_URL registered as intentionally omitted (+2) |
 | [`scripts/build-public-openapi.cjs`](docs/HOT-FILE-LEDGER.md#scriptsbuild-public-openapicjs) | 7 / 3 / 468 (was `5 / 2 / 465`) | ⚠ **FIRES** | ⚠ now FIRES (294). 294-03: the citation_checks tag (one line). ⛔ scripts/ is gate-exempt |
 | [`backend/app/services/eval_runner_service.py`](docs/HOT-FILE-LEDGER.md#backendappserviceseval_runner_servicepy) | 13 / 8 / 1040 | ⚠ **FIRES** | ⚠ STALE at `12/7/959`, and absent until 196 at 7 phases. **256-03**: its finalize stopped passing `input_tokens=None`. Re-derived by 256-04 |
@@ -11658,7 +11658,7 @@ cells rot within days.
 | [`frontend/src/hooks/useDocuments.ts`](docs/HOT-FILE-LEDGER.md#frontendsrchooksusedocumentsts) | 10 / 5 / 164 (was `8 / 3 / 120`) | ⚠ **FIRES** | **284-03**: never fetches a list of its own (D-24); INSERT / DELETE call `onChange` (one debounced refetch), on-page UPDATE merges. ⛔ the spread-merge keeps `*_stage_applies` |
 | [`frontend/src/pages/KnowledgeHealthPage.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrcpagesknowledgehealthpagetsx) | 12 / 6 / **DELETED** | ⚠ **FIRES** | **RETIRED (217.1-14)** — the Library's Health tab absorbed it; `ChatLayout`'s fallback replaced by `UnknownViewFallback` (`:871`). ⚠ absent for its ENTIRE LIFE |
 | [`backend/app/api/knowledge_health.py`](docs/HOT-FILE-LEDGER.md#backendappapiknowledgehealthpy) | 14 / 7 / 991 (was `11 / 6 / 737`) | ⚠ **FIRES** | ⚠ STALE (`11/6/737`). **272-04**: the trend skips `invalid_filter` / `refused_retry` rows (4 lines, D-24); kind 2 still counts |
-| [`backend/app/services/agent_loop.py`](docs/HOT-FILE-LEDGER.md#backendappservicesagent_looppy) | 69 / 33 / 3682 (was `68 / 33 / 3682`) | ⚠ **FIRES** | honoured by construction (**282-01** kwargs + drain deadline; **282-04** `provider=active_provider_name` on the 2 budget lookups, 0 new branches). ⛔ prompt-assembly seam OWED (OV-273-03) |
+| [`backend/app/services/agent_loop.py`](docs/HOT-FILE-LEDGER.md#backendappservicesagent_looppy) | 71 / 34 / 3695 (was `69 / 33 / 3682`) | ⚠ **FIRES** | honoured by construction (292-01: `turn_citations=retrieved_citations` ×2, by reference, +2 −0). ⛔ prompt-assembly seam OWED (OV-273-03) |
 | [`backend/app/services/context_window.py`](docs/HOT-FILE-LEDGER.md#backendappservicescontext_windowpy) | 10 / 5 / 602 | ⚠ **FIRES** | ⚠ absent for its ENTIRE LIFE at 5 phases — row added 250-01. honoured by construction: ONE removal-ORDER rule inside one private helper. ⛔ `_build_candidate` byte-unchanged |
 | [`backend/app/services/run_producer.py`](docs/HOT-FILE-LEDGER.md#backendappservicesrun_producerpy) | 24 / 12 / 1150 (was `23 / 11 / 1145`) | ⚠ **FIRES** | 295-04: F2 calls `record_failed_end` BEFORE its unchanged finish_run, so only the winner writes ONE run_failed (If 22→22). Honoured by construction |
 | [`backend/app/services/todos_service.py`](docs/HOT-FILE-LEDGER.md#backendappservicestodos_servicepy) | 4 / 3 / 187 | ⚠ **FIRES** | ⚠ absent for its ENTIRE LIFE at 3 phases — row added 250-02, which leaves the file BYTE-UNCHANGED. ⛔ `_RUN_ENDED_MARKER` is now bound by a frontend `?raw` fence |
@@ -11904,7 +11904,7 @@ cells rot within days.
 | [`frontend/src/components/admin/CapabilityGrid.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentsadmincapabilitygridtsx) | 3 / 3 / 264 | ⚠ **FIRES** | ⚠ FIRES at 3 phases · row added 263-REVIEW WR-07 |
 | [`frontend/src/components/admin/ModelAdvancedCapabilities.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentsadminmodeladvancedcapabilitiestsx) | 1 / 1 / 290 | no (1 phase) | young (created 262) |
 | [`backend/app/services/tools/__init__.py`](docs/HOT-FILE-LEDGER.md#backendappservicestools__init__py) | 1 / 1 / 20 (was `0 / 0 / 0`) | no (young) | young (created 278-03). Package marker: docstring ONLY. ⛔ no imports, no re-exports, no side effects, so import order can never matter |
-| [`backend/app/services/tools/base.py`](docs/HOT-FILE-LEDGER.md#backendappservicestoolsbasepy) | 1 / 1 / 149 (was `0 / 0 / 0`) | no (young) | young (created 278-03). `ToolContext` + `ToolResult` moved verbatim (AST-pinned). ⛔ leaf: stdlib + TYPE_CHECKING only; re-exported from tool_dispatcher.py (D-04) |
+| [`backend/app/services/tools/base.py`](docs/HOT-FILE-LEDGER.md#backendappservicestoolsbasepy) | 2 / 2 / 154 (was `1 / 1 / 149`) | no (2 phases) | 292-01: ONE field `ToolContext.turn_citations` (+5). ⛔ leaf: stdlib + TYPE_CHECKING only; re-exported from tool_dispatcher.py (D-04) |
 | [`backend/app/services/tools/documents.py`](docs/HOT-FILE-LEDGER.md#backendappservicestoolsdocumentspy) | 2 / 2 / 767 (was `1 / 1 / 762`) | no (2 phases) | **284-04**: `query_documents_by_view` passes `via_view=False` + `limit`; output byte-identical ≤ 50 rows (7 fixtures), total now exact past 1,000. ⛔ walls AST-pinned |
 | [`backend/app/services/tools/skills.py`](docs/HOT-FILE-LEDGER.md#backendappservicestoolsskillspy) | 1 / 1 / 759 (was `0 / 0 / 0`) | no (young) | young (created 278-03). load/save/read_skill_file/attach + `_resolve_skill_visibility_or` (SEED-125 org gate). ⛔ one resolver; patch where used |
 | [`backend/app/services/tools/sandbox.py`](docs/HOT-FILE-LEDGER.md#backendappservicestoolssandboxpy) | 1 / 1 / 1218 (was `0 / 0 / 0`) | no (young) | young (created 278-03). execute_code, bounded sandbox, hydration, autoheal. ⛔ largest family; no module-level tool_dispatcher import |
@@ -24113,3 +24113,95 @@ Scan-list disposition cell as of 2026-10-23 (replaced by 291-06):
 ### `frontend/src/components/chat/artifacts/TimelineArtifact.tsx`
 
 **`0 / 0 / 0`** at 292 planning (2026-10-24). Young; row added by 292-01 STEP 0. Planned for **292-02**. The vertical-rail timeline body (sketch 4A): filled past dots, hollow upcoming dots, the Today row, deadline ring and `in N days` pill. ⛔ **Binding invariants:** React text only, never `dangerouslySetInnerHTML` (I-3); Today comes from the viewer's clock through our code, never the model (D-06). Does not fire.
+
+## Phase 292 — close (2026-10-24)
+
+Every non-test source file in `git diff --name-only ba8e38c05..HEAD -- backend/app frontend/src` re-derived on the merged tree (292-03) with the CLAUDE.md recipe; no six-digit quick-task bucket touches any of them. Scan-list rows refreshed in place, old triple kept as `(was …)`.
+
+### `backend/app/db/artifacts.py` — Phase 292 close
+
+**`2 / 2 / 195`** at 292 close (was `1 / 1 / 195`). G-5: no (2 phases). 292-01: the insert's ValueError names ARTIFACT_COMPONENTS (one line, no SQL change). ⛔ every read binds thread_id AND user_id; no UPDATE (D-08).
+
+### `backend/app/models/artifact.py` — Phase 292 close
+
+**`4 / 2 / 1560`** at 292 close (was `1 / 1 / 696`). G-5: no (2 phases). 292-01: six-name vocabulary, three typed arms + stored specs, caps, worded refusals (+772). ⛔ extra=forbid; ComponentName == mig 213 CHECK; fenced == frontend (292-03).
+
+### `backend/app/services/agent_loop.py` — Phase 292 close
+
+**`71 / 34 / 3695`** at 292 close (was `69 / 33 / 3682`). G-5: ⚠ **FIRES**. honoured by construction (292-01: `turn_citations=retrieved_citations` ×2, by reference, +2 −0). ⛔ prompt-assembly seam OWED (OV-273-03).
+
+### `backend/app/services/artifact_history.py` — Phase 292 close
+
+**`2 / 2 / 201`** at 292 close (was `1 / 1 / 155`). G-5: no (2 phases). 292-01: diagram / comparison / timeline args redacted to placeholders like rows (+55 −9). ⛔ the ONE persist hook; attach keyed by parsed artifact id.
+
+### `backend/app/services/artifact_sources.py` — Phase 292 close
+
+**`1 / 1 / 151`** at 292 close (was `0 / 0 / 0`). G-5: no (young). young (created 292-01). Pure `resolve_sources` / `excerpt_for`: a source handle is this turn's citation number. ⛔ imports citation_markers + artifact models only; no DB, no provider.
+
+### `backend/app/services/openai_service.py` — Phase 292 close
+
+**`83 / 42 / 2728`** at 292 close (was `81 / 41 / 2623`). G-5: ⚠ **FIRES**. honoured by construction (292-01: SHOW_ARTIFACT_TOOL schema + description only, tool count 30). ⛔ no anyOf/oneOf/type arrays (Gemini accepted, probed live).
+
+### `backend/app/services/show_artifact_tool.py` — Phase 292 close
+
+**`4 / 2 / 858`** at 292 close (was `1 / 1 / 607`). G-5: no (2 phases). 292-01: `_show_encoded` branch before any rows access; D-08 by-ref refusals (+190 −21). ⛔ no `error` key; insert never runs on a refusal (probed 292-03).
+
+### `backend/app/services/tools/base.py` — Phase 292 close
+
+**`2 / 2 / 154`** at 292 close (was `1 / 1 / 149`). G-5: no (2 phases). 292-01: ONE field `ToolContext.turn_citations` (+5). ⛔ leaf: stdlib + TYPE_CHECKING only; re-exported from tool_dispatcher.py (D-04).
+
+### `frontend/src/components/chat/artifacts/ArtifactFrame.tsx` — Phase 292 close
+
+**`2 / 2 / 72`** at 292 close (was `1 / 1 / 66`). G-5: no (2 phases). 292-02: one optional full-width italic note line (comparison only), +6. ⛔ the ONE framed-card markup; no animation (UI-D-09).
+
+### `frontend/src/components/chat/artifacts/ArtifactTooltip.tsx` — Phase 292 close
+
+**`2 / 1 / 107`** at 292 close (was `0 / 0 / 0`). G-5: no (young). young (created 292-02). The ONE shared source-excerpt tooltip (hover + focus, Escape, portalled). ⛔ React text only, no dangerouslySetInnerHTML.
+
+### `frontend/src/components/chat/artifacts/ComparisonArtifact.tsx` — Phase 292 close
+
+**`1 / 1 / 275`** at 292 close (was `0 / 0 / 0`). G-5: no (young). young (created 292-02). Comparison matrix body + `Only terms that differ` toggle. ⛔ React text only, no dangerouslySetInnerHTML; glyph shape carries the verdict.
+
+### `frontend/src/components/chat/artifacts/DiagramArtifact.tsx` — Phase 292 close
+
+**`2 / 1 / 275`** at 292 close (was `0 / 0 / 0`). G-5: no (young). young (created 292-02). Flow diagram body: HTML nodes over one SVG edge layer. ⛔ React text only, no dangerouslySetInnerHTML; marker ids from useId().
+
+### `frontend/src/components/chat/artifacts/TimelineArtifact.tsx` — Phase 292 close
+
+**`1 / 1 / 194`** at 292 close (was `0 / 0 / 0`). G-5: no (young). young (created 292-02). Vertical-rail timeline body. ⛔ React text only, no dangerouslySetInnerHTML; Today from the viewer's clock, never the model.
+
+### `frontend/src/components/chat/artifacts/artifactCopy.ts` — Phase 292 close
+
+**`6 / 2 / 533`** at 292 close (was `3 / 1 / 266`). G-5: no (2 phases). 292-02: alias table, six notice sentences, count / verdict / Today / pill copy (+260). ⛔ the ONE home of every artifact string.
+
+### `frontend/src/components/chat/artifacts/artifactRegistry.ts` — Phase 292 close
+
+**`3 / 2 / 65`** at 292 close (was `1 / 1 / 55`). G-5: no (2 phases). 292-02: registry is six (three lazy entries added). ⛔ adding a component is a code change; fenced == backend Literal (273 + 292 fences).
+
+### `frontend/src/components/chat/artifacts/artifactSpec.ts` — Phase 292 close
+
+**`3 / 2 / 870`** at 292 close (was `2 / 1 / 469`). G-5: no (2 phases). 292-02: three guard arms mirroring 292-01's stored contract (+432 −31). ⛔ hand-rolled; never throws; refuses all 35 shared bad cases (292-03 fence).
+
+### `frontend/src/components/chat/artifacts/captionModel.ts` — Phase 292 close
+
+**`2 / 2 / 99`** at 292 close (was `1 / 1 / 73`). G-5: no (2 phases). 292-02: per-component count segment + comparison note (+28 −2). ⛔ phrases SERVER facts only, never model text (D-04). Pure.
+
+### `frontend/src/components/chat/artifacts/comparisonModel.ts` — Phase 292 close
+
+**`1 / 1 / 46`** at 292 close (was `0 / 0 / 0`). G-5: no (young). young (created 292-02). Pure comparison derivations (identical terms, glyph table). ⛔ no DOM, no React; a `q` cell is always our `Not stated`.
+
+### `frontend/src/components/chat/artifacts/diagramLayout.ts` — Phase 292 close
+
+**`2 / 1 / 284`** at 292 close (was `0 / 0 / 0`). G-5: no (young). young (created 292-02). Pure top-down layout (ranks, back edges, row wrap). ⛔ no DOM, no React, no layout dependency; same spec + width = same layout (I-2).
+
+### `frontend/src/components/chat/artifacts/timelineModel.ts` — Phase 292 close
+
+**`1 / 1 / 165`** at 292 close (was `0 / 0 / 0`). G-5: no (young). young (created 292-02). Pure timeline derivations (date parts, gaps, Today, days-until). ⛔ no DOM; `today` injected, never `new Date(iso)`.
+
+### `frontend/src/components/chat/tool-bodies/ShowArtifactBody.tsx` — Phase 292 close
+
+**`2 / 2 / 260`** at 292 close (was `1 / 1 / 192`). G-5: no (2 phases). 292-02: rail lines for the three encoded types from row_count / edge_count / option_count (+74 −6). ⛔ reads `reason`, never `detail` or `values`.
+
+### `scripts/vitest-count-gate.cjs` — Phase 292 close
+
+**`339 / 77 / 6681`** at 292 close (was `335 / 76 / 6658`). G-5: ⚠ **FIRES**. 292: nine suites adopted in the creating commits (eight in 292-02, `artifactParity292.fence.test.ts` in 292-03); five 273 pins raised in 292-02; none lowered.
