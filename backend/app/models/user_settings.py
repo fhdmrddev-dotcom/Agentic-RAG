@@ -296,6 +296,10 @@ class UserEffectiveSettings(BaseModel):
     vision_model: str = ""
     #: Hard ceiling on pages transcribed per document. Exceeding it is RECORDED, never silent.
     vision_max_pages: int = 50
+    # 292.1 D-17 (migration 214): tool rounds per turn before the limit line + Continue; read once
+    #   per run by `resolve_round_cap`. App-wide, bounded 2..50 (API + CHECK + UI clamp).
+    chat_max_tool_rounds: int = 15
+    explorer_max_tool_rounds: int = 8
 
     # Phase 075.10 (migration 049): tool_args_progress SSE emission cadence.
     chat_tool_args_progress_emit_boundary_bytes: int = 256
@@ -1187,6 +1191,9 @@ def _build_settings_from_row(row: dict) -> UserEffectiveSettings:
         # "" so the chain really does reach `llm_model`. DB > env > active chat model.
         vision_model=str(_val(row, "vision_model", "vision_model", "")),
         vision_max_pages=int(_val(row, "vision_max_pages", None, 50)),
+        # 292.1 D-17 — a database without migration 214 still reads 15 / 8.
+        chat_max_tool_rounds=int(_val(row, "chat_max_tool_rounds", None, 15)),
+        explorer_max_tool_rounds=int(_val(row, "explorer_max_tool_rounds", None, 8)),
 
         chat_tool_args_progress_emit_boundary_bytes=int(
             _val(row, "chat_tool_args_progress_emit_boundary_bytes", None, 256)

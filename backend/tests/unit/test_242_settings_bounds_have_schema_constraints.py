@@ -68,6 +68,9 @@ EXPECTED_BOUNDED_FIELDS = {
     "vision_max_pages",
     "source_max_file_size_mb",
     "hnsw_ef_search",
+    # 292.1 (D-18) — CHECKs in migration 214 (app_settings_*_tool_rounds_bound).
+    "chat_max_tool_rounds",
+    "explorer_max_tool_rounds",
 }
 
 
