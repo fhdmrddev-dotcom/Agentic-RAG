@@ -108,7 +108,8 @@ def _settings(**over) -> SimpleNamespace:
 
 
 async def _drive(streams: list, *, user_settings=None, agent_mode=None,
-                 calling_mode=CallingMode.NATIVE, tool_result: str = "[]") -> dict:
+                 calling_mode=CallingMode.NATIVE, tool_result: str = "[]",
+                 ctx_extra: dict | None = None) -> dict:
     tables = {"threads": {"folder_id": None}, "messages": [], "skills": [], "user_memory": []}
     inserts: list = []
 
@@ -155,6 +156,7 @@ async def _drive(streams: list, *, user_settings=None, agent_mode=None,
         supabase=supabase,
         resolved_model="test/model",
         resolved_provider="openrouter",
+        **(ctx_extra or {}),
     )
 
     def _no_embed(*_a, **_k):
@@ -355,3 +357,129 @@ async def test_h_explorer_default_forces_no_tools_on_call_8():
 async def test_h_a_cap_of_2_forces_no_tools_on_call_2():
     run = await _drive([SEARCH, SEARCH], user_settings=CAP2)
     assert _forced(run) == [False, True]
+
+
+# ── Task 2b: the carrier, the reasoning carry and the save point ────────────────────────────────
+
+LIMIT_LINE = "Reached the tool-use limit for this turn."
+MARKER = {"kind": "iteration_cap_paused", "tool_call_id": None, "name": None, "arguments": None}
+
+
+def _carriers(run) -> list[dict]:
+    return [p for t, p in run["inserts"] if t == "messages" and p.get("role") == "system"]
+
+
+def _cap_events(run) -> list[dict]:
+    return [kw for t, kw in run["emits"] if t == "cap_paused"]
+
+
+# ── Loop test C (D-07): unparseable at the cap writes the empty-queue MARKER ────────────────────
+
+
+@pytest.mark.asyncio
+async def test_c_truncated_markup_at_the_cap_writes_the_marker_carrier():
+    run = await _drive([SEARCH, _deltas(_split(F1_TRUNCATED, 8))], user_settings=CAP2)
+    assert run["dispatched"] == [("search_documents", {"query": "revenue"})]
+    carriers = _carriers(run)
+    assert len(carriers) == 1
+    assert carriers[0]["tool_calls"] == [MARKER]
+    assert LIMIT_LINE in carriers[0]["content"]
+    events = _cap_events(run)
+    assert len(events) == 1
+    assert LIMIT_LINE in events[0]["message"]
+    assert events[0]["tool_names"] == []
+
+
+# ── Loop test D (D-07, XML): F4 at the cap pauses with the marker, never persists the tag ───────
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("prefix", ["", PREAMBLE], ids=["markup-only", "with-preamble"])
+async def test_d_qwen_xml_at_the_cap_pauses_with_the_marker(prefix):
+    run = await _drive([SEARCH, _deltas(_split(prefix + F4, 6))], user_settings=CAP2)
+    assert _carriers(run)[0]["tool_calls"] == [MARKER]
+    persisted = _persisted_field(run["persisted"], "content")
+    assert "<tool_call>" not in persisted
+    assert persisted == prefix
+    assert "".join(_delta_texts(run["emits"])) == persisted
+
+
+# ── Loop test I (D-05): a STRUCTURED cap call's copy is byte-identical to before ────────────────
+
+
+@pytest.mark.asyncio
+async def test_i_a_structured_cap_call_keeps_todays_copy_byte_for_byte():
+    run = await _drive([SEARCH, _call("search_documents", {"query": "more"})], user_settings=CAP2)
+    carrier = _carriers(run)[0]
+    assert carrier["content"] == "⏸ Reached the iteration limit with 1 tool(s) still queued. Continue to run them."
+    assert carrier["tool_calls"] == [{
+        "kind": "iteration_cap_paused", "tool_call_id": "call_struct0",
+        "name": "search_documents", "arguments": json.dumps({"query": "more"}),
+    }]
+    assert _cap_events(run)[0]["message"] == (
+        "⏸ Reached the iteration limit — 1 tool(s) weren't run yet. Continue to run them."
+    )
+
+
+# ── Loop test J (SEED-323): the paused round's reasoning rides the carrier and the replay ───────
+
+
+@pytest.mark.asyncio
+async def test_j_reasoning_is_stored_on_the_carrier_and_replayed_on_continue():
+    reasoning = [{"type": "reasoning_delta", "content": "I should render the PDF next."}]
+    run = await _drive([SEARCH, reasoning + _deltas(_split(F3, 7))], user_settings=CAP2)
+    carrier = _carriers(run)[0]["tool_calls"]
+    assert carrier[0]["name"] == "execute_code"
+    assert carrier[0]["reasoning_content"] == "I should render the PDF next."
+
+    resumed = await _drive([_deltas([ANSWER])], ctx_extra={
+        "resume_dropped_tool_calls": True, "dropped_tool_calls": tuple(carrier)})
+    assert resumed["dispatched"][0] == ("execute_code", F3_ARGS)
+    sent = resumed["requests"][0].messages
+    turn = next(m for m in sent if m.get("role") == "assistant" and m.get("tool_calls")
+                and m["tool_calls"][0]["id"] == carrier[0]["tool_call_id"])
+    assert turn["reasoning_content"] == "I should render the PDF next."
+
+
+@pytest.mark.asyncio
+async def test_j_a_carrier_without_reasoning_replays_byte_identically():
+    carrier = ({"kind": "iteration_cap_paused", "tool_call_id": "call_abc",
+                "name": "search_documents", "arguments": '{"query": "x"}'},)
+    resumed = await _drive([_deltas([ANSWER])], ctx_extra={
+        "resume_dropped_tool_calls": True, "dropped_tool_calls": carrier})
+    sent = resumed["requests"][0].messages
+    turn = next(m for m in sent if m.get("role") == "assistant" and m.get("tool_calls")
+                and m["tool_calls"][0]["id"] == "call_abc")
+    assert set(turn) == {"role", "tool_calls"}
+
+
+@pytest.mark.asyncio
+async def test_j_a_structured_cap_without_reasoning_writes_no_reasoning_key():
+    run = await _drive([SEARCH, _call("search_documents", {"query": "more"})], user_settings=CAP2)
+    assert "reasoning_content" not in _carriers(run)[0]["tool_calls"][0]
+
+
+# ── Loop test K (D-10, D-24): the save point strips markup for ANY route ────────────────────────
+
+
+def _bypass_settle(full_content, _offered, *, buffer_has_calls):
+    from app.services.text_tool_calls import Settled
+
+    return Settled(kind="none", calls=[], visible=full_content)
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("block", [F3, F4], ids=["F3", "F4"])
+async def test_k_markup_reaching_the_save_point_is_never_persisted(block):
+    with patch.object(_loop_mod, "settle", _bypass_settle):
+        only = await _drive([_deltas([block])])
+        with_pre = await _drive([_deltas([PREAMBLE + block])])
+    assert _persisted_field(only["persisted"], "content") == FAILED_CALL_NOTICE
+    assert _persisted_field(with_pre["persisted"], "content") == PREAMBLE
+
+
+@pytest.mark.asyncio
+async def test_k_a_clean_answer_persists_byte_identical_through_the_save_point():
+    with patch.object(_loop_mod, "settle", _bypass_settle):
+        run = await _drive([_deltas([CLEAN])])
+    assert _persisted_field(run["persisted"], "content") == CLEAN
