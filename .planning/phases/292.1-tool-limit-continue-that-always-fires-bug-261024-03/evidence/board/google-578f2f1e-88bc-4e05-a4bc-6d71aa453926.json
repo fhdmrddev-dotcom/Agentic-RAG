@@ -1,0 +1,113 @@
+{
+  "entry": {
+    "provider": "google",
+    "model": "gemini-3.8-flash",
+    "calling_mode": "NATIVE (native SDK adapter)",
+    "required": true,
+    "extra": null,
+    "forced_from": null
+  },
+  "prompt": "Do these three steps one at a time, each as its own tool call, and wait for each result before the next: 1) search our documents for the project plan; 2) search our documents again for its milestones; 3) use Python (execute_code) to draw a bar chart of milestones per quarter. Do not skip a step and do not combine steps.",
+  "attempts": [
+    {
+      "thread_id": "d5fa6cfd-afdc-401c-b69d-8624de678cf2",
+      "run_id": "578f2f1e-88bc-4e05-a4bc-6d71aa453926",
+      "status": "completed",
+      "paused": true,
+      "run": {
+        "run_id": "578f2f1e-88bc-4e05-a4bc-6d71aa453926",
+        "thread_id": "d5fa6cfd-afdc-401c-b69d-8624de678cf2",
+        "status": "completed",
+        "model": "gemini-3.8-flash",
+        "provider": "google",
+        "continues_used": 0,
+        "started_at": "2026-10-24 08:47:42.074795+00:00"
+      },
+      "classification": "structured-pause",
+      "carrier": [
+        {
+          "kind": "iteration_cap_paused",
+          "name": "search_documents",
+          "arguments": "{\"query\": \"milestones quarter schedule\"}",
+          "tool_call_id": "call_294798"
+        }
+      ],
+      "tool_starts": [
+        "search_documents"
+      ],
+      "event_types": [
+        "cap_paused",
+        "citations",
+        "confidence",
+        "delta",
+        "done",
+        "iteration_start",
+        "planning",
+        "sources",
+        "stream_end",
+        "suggestions",
+        "tool_end",
+        "tool_preparing",
+        "tool_start"
+      ],
+      "cap_paused_event": {
+        "type": "cap_paused",
+        "kind": "iteration_cap_paused",
+        "message": "\u23f8 Reached the iteration limit \u2014 1 tool(s) weren't run yet. Continue to run them.",
+        "tool_names": [
+          "search_documents"
+        ],
+        "continues_used": 0,
+        "continues_remaining": 3
+      },
+      "live_markup_at": null,
+      "live_preview": "*The model produced 1 tool call(s) over 2 step(s) and never wrote an answer. Try breaking the request into smaller steps, or switching to a different model.*",
+      "redis_last_id": "1792831686012-0"
+    }
+  ],
+  "paused": true,
+  "continue": {
+    "http": 200,
+    "body": {
+      "status": "ok",
+      "run_id": "578f2f1e-88bc-4e05-a4bc-6d71aa453926",
+      "continues_used": 1,
+      "continues_remaining": 2
+    },
+    "status_after": "failed",
+    "same_run_id": true,
+    "continues_used_before": 0,
+    "continues_used_after": 1,
+    "continues_used_plus_1": true,
+    "model_provider_unchanged": true,
+    "model_provider": [
+      "gemini-3.8-flash",
+      "google"
+    ],
+    "tool_starts_after_resume": [
+      "search_documents"
+    ],
+    "carrier_first_call": "search_documents",
+    "queued_call_ran_first": true,
+    "events_after_resume": [
+      "delta",
+      "error",
+      "iteration_start",
+      "tool_end",
+      "tool_start"
+    ]
+  },
+  "markup_hits": [],
+  "reload": {
+    "d5fa6cfd-afdc-401c-b69d-8624de678cf2": {
+      "http": 200,
+      "equal": true,
+      "compared": 2,
+      "diffs": [],
+      "db_rows_not_in_reload": []
+    }
+  },
+  "tools_used": [
+    "search_documents"
+  ]
+}

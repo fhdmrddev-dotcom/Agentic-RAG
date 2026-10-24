@@ -1,0 +1,20 @@
+{
+  "provider": "deepseek",
+  "model": "deepseek-v4-pro",
+  "thread_a": "7e4b0c64-6340-441c-876d-c47bb0e35ae9",
+  "run_a": "db1bf671-c4da-4613-b092-db4513f6754f",
+  "a_first_status": "completed",
+  "a_continue_http": 200,
+  "a_final": "completed",
+  "thread_b": "fe519331-fcc9-401b-a672-9790a0820f3a",
+  "run_b": "43cb6b97-c3ac-4d66-ac1c-404c1baa2571",
+  "b_final": "completed",
+  "a_in_own_thread": true,
+  "b_in_own_thread": true,
+  "threads": [
+    "7e4b0c64-6340-441c-876d-c47bb0e35ae9",
+    "fe519331-fcc9-401b-a672-9790a0820f3a"
+  ],
+  "markup_hits": [],
+  "verdict": "PASS"
+}

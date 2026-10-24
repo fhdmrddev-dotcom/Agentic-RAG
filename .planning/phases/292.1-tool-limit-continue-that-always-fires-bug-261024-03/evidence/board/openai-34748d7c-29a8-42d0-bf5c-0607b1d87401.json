@@ -1,0 +1,156 @@
+{
+  "entry": {
+    "provider": "openai",
+    "model": "gpt-5.6-luna",
+    "calling_mode": "NATIVE",
+    "required": true,
+    "extra": null,
+    "forced_from": null
+  },
+  "prompt": "Do these three steps one at a time, each as its own tool call, and wait for each result before the next: 1) search our documents for the project plan; 2) search our documents again for its milestones; 3) use Python (execute_code) to draw a bar chart of milestones per quarter. Do not skip a step and do not combine steps.",
+  "attempts": [
+    {
+      "thread_id": "8eac1b35-963c-49f1-8710-93765c88c33b",
+      "run_id": "11d42fab-3223-46a1-8d36-422372630f34",
+      "status": "completed",
+      "paused": false,
+      "run": {
+        "run_id": "11d42fab-3223-46a1-8d36-422372630f34",
+        "thread_id": "8eac1b35-963c-49f1-8710-93765c88c33b",
+        "status": "completed",
+        "model": "gpt-5.6-luna",
+        "provider": "openai",
+        "continues_used": 0,
+        "started_at": "2026-10-24 08:49:31.576959+00:00"
+      },
+      "classification": "prose-final",
+      "carrier": null,
+      "tool_starts": [
+        "write_todos"
+      ],
+      "event_types": [
+        "delta",
+        "done",
+        "iteration_start",
+        "planning",
+        "reasoning_delta",
+        "stream_end",
+        "suggestions",
+        "todo_updated",
+        "tool_args_progress",
+        "tool_end",
+        "tool_preparing",
+        "tool_start"
+      ],
+      "cap_paused_event": null,
+      "live_markup_at": null,
+      "live_preview": "n\n{\"query\":\"project plan\"} \u5927\u53d1\u5feb\u4e09\u7684 to=search_documents \u4ee3\u5224json\n{\"query\":\"project plan\"} to=functions.search_documents \u4ee3\u5224json\n{\"query\":\"project plan\",\"filters\":{}}I couldn\u2019t run step 1 because the document-search tool is unavailable in this session. I\u2019m stopping here and have not performed steps 2 or 3.",
+      "redis_last_id": "1792831788093-0"
+    },
+    {
+      "thread_id": "494afd11-b97e-4b93-9572-f5d2ad424384",
+      "run_id": "903934e9-2e8b-4423-b94c-cc5805e6396e",
+      "status": "completed",
+      "paused": false,
+      "run": {
+        "run_id": "903934e9-2e8b-4423-b94c-cc5805e6396e",
+        "thread_id": "494afd11-b97e-4b93-9572-f5d2ad424384",
+        "status": "completed",
+        "model": "gpt-5.6-luna",
+        "provider": "openai",
+        "continues_used": 0,
+        "started_at": "2026-10-24 08:49:51.833191+00:00"
+      },
+      "classification": "prose-final",
+      "carrier": null,
+      "tool_starts": [
+        "write_todos"
+      ],
+      "event_types": [
+        "delta",
+        "done",
+        "iteration_start",
+        "planning",
+        "reasoning_delta",
+        "stream_end",
+        "suggestions",
+        "todo_updated",
+        "tool_args_progress",
+        "tool_end",
+        "tool_preparing",
+        "tool_start"
+      ],
+      "cap_paused_event": null,
+      "live_markup_at": null,
+      "live_preview": "ommentary)  code:\n{\"query\":\"project plan\",\"filters\":{}} to=functions.search_documents  (commentary)  code:\n{\"query\":\"project plan\",\"filters\":null,\"top_k\":10}I started step 1, but the document-search tool did not return a result, so I\u2019m stopping here as requested and will not proceed to steps 2 or 3.",
+      "redis_last_id": "1792831806987-0"
+    },
+    {
+      "thread_id": "3eb22e66-0d2a-4d60-b19f-1ef6276f296c",
+      "run_id": "34748d7c-29a8-42d0-bf5c-0607b1d87401",
+      "status": "completed",
+      "paused": false,
+      "run": {
+        "run_id": "34748d7c-29a8-42d0-bf5c-0607b1d87401",
+        "thread_id": "3eb22e66-0d2a-4d60-b19f-1ef6276f296c",
+        "status": "completed",
+        "model": "gpt-5.6-luna",
+        "provider": "openai",
+        "continues_used": 0,
+        "started_at": "2026-10-24 08:50:10.029891+00:00"
+      },
+      "classification": "prose-final",
+      "carrier": null,
+      "tool_starts": [
+        "write_todos"
+      ],
+      "event_types": [
+        "delta",
+        "done",
+        "iteration_start",
+        "planning",
+        "reasoning_delta",
+        "stream_end",
+        "suggestions",
+        "todo_updated",
+        "tool_args_progress",
+        "tool_end",
+        "tool_preparing",
+        "tool_start"
+      ],
+      "cap_paused_event": null,
+      "live_markup_at": null,
+      "live_preview": " to=functions.search_documents  code:\n{\"query\":\"project plan\"} jing\u00ef",
+      "redis_last_id": "1792831820321-0"
+    }
+  ],
+  "paused": false,
+  "continue": null,
+  "markup_hits": [],
+  "reload": {
+    "8eac1b35-963c-49f1-8710-93765c88c33b": {
+      "http": 200,
+      "equal": true,
+      "compared": 1,
+      "diffs": [],
+      "db_rows_not_in_reload": []
+    },
+    "494afd11-b97e-4b93-9572-f5d2ad424384": {
+      "http": 200,
+      "equal": true,
+      "compared": 1,
+      "diffs": [],
+      "db_rows_not_in_reload": []
+    },
+    "3eb22e66-0d2a-4d60-b19f-1ef6276f296c": {
+      "http": 200,
+      "equal": true,
+      "compared": 1,
+      "diffs": [],
+      "db_rows_not_in_reload": []
+    }
+  },
+  "tools_used": [
+    "write_todos"
+  ]
+}

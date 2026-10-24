@@ -1,0 +1,121 @@
+{
+  "entry": {
+    "provider": "openrouter",
+    "model": "deepseek/deepseek-v4.1-flash",
+    "calling_mode": "NATIVE",
+    "required": false,
+    "extra": true,
+    "forced_from": null
+  },
+  "prompt": "Do these three steps one at a time, each as its own tool call, and wait for each result before the next: 1) search our documents for the project plan; 2) search our documents again for its milestones; 3) use Python (execute_code) to draw a bar chart of milestones per quarter. Do not skip a step and do not combine steps.",
+  "attempts": [
+    {
+      "thread_id": "f64e5935-86ff-4ca2-b389-abf8cb3c579f",
+      "run_id": "6ec69a1a-e4aa-484c-a37e-ec3bf9c4f30f",
+      "status": "failed",
+      "paused": false,
+      "run": {
+        "run_id": "6ec69a1a-e4aa-484c-a37e-ec3bf9c4f30f",
+        "thread_id": "f64e5935-86ff-4ca2-b389-abf8cb3c579f",
+        "status": "failed",
+        "model": "deepseek/deepseek-v4.1-flash",
+        "provider": "openrouter",
+        "continues_used": 0,
+        "started_at": "2026-10-24 08:52:46.132978+00:00"
+      },
+      "classification": "other (failed)",
+      "carrier": null,
+      "tool_starts": [],
+      "event_types": [
+        "delta",
+        "error",
+        "iteration_start"
+      ],
+      "cap_paused_event": null,
+      "live_markup_at": null,
+      "live_preview": "*Billing error: your account has insufficient credits. Please check your provider's billing dashboard.*",
+      "redis_last_id": "1792831967085-0"
+    },
+    {
+      "thread_id": "47c7178d-132b-4f24-9c5d-33c51f0de0bb",
+      "run_id": "2cec596e-c3df-47f4-8198-7489478fc332",
+      "status": "failed",
+      "paused": false,
+      "run": {
+        "run_id": "2cec596e-c3df-47f4-8198-7489478fc332",
+        "thread_id": "47c7178d-132b-4f24-9c5d-33c51f0de0bb",
+        "status": "failed",
+        "model": "deepseek/deepseek-v4.1-flash",
+        "provider": "openrouter",
+        "continues_used": 0,
+        "started_at": "2026-10-24 08:52:48.238674+00:00"
+      },
+      "classification": "other (failed)",
+      "carrier": null,
+      "tool_starts": [],
+      "event_types": [
+        "delta",
+        "error",
+        "iteration_start"
+      ],
+      "cap_paused_event": null,
+      "live_markup_at": null,
+      "live_preview": "*Billing error: your account has insufficient credits. Please check your provider's billing dashboard.*",
+      "redis_last_id": "1792831969067-0"
+    },
+    {
+      "thread_id": "c3bb7d86-5f62-4a77-a09a-afb8e0cbc7ae",
+      "run_id": "ced47148-56dc-42cf-a21f-ac6c9fde8be3",
+      "status": "failed",
+      "paused": false,
+      "run": {
+        "run_id": "ced47148-56dc-42cf-a21f-ac6c9fde8be3",
+        "thread_id": "c3bb7d86-5f62-4a77-a09a-afb8e0cbc7ae",
+        "status": "failed",
+        "model": "deepseek/deepseek-v4.1-flash",
+        "provider": "openrouter",
+        "continues_used": 0,
+        "started_at": "2026-10-24 08:52:50.424127+00:00"
+      },
+      "classification": "other (failed)",
+      "carrier": null,
+      "tool_starts": [],
+      "event_types": [
+        "delta",
+        "error",
+        "iteration_start"
+      ],
+      "cap_paused_event": null,
+      "live_markup_at": null,
+      "live_preview": "*Billing error: your account has insufficient credits. Please check your provider's billing dashboard.*",
+      "redis_last_id": "1792831971514-0"
+    }
+  ],
+  "paused": false,
+  "continue": null,
+  "markup_hits": [],
+  "reload": {
+    "f64e5935-86ff-4ca2-b389-abf8cb3c579f": {
+      "http": 200,
+      "equal": true,
+      "compared": 1,
+      "diffs": [],
+      "db_rows_not_in_reload": []
+    },
+    "47c7178d-132b-4f24-9c5d-33c51f0de0bb": {
+      "http": 200,
+      "equal": true,
+      "compared": 1,
+      "diffs": [],
+      "db_rows_not_in_reload": []
+    },
+    "c3bb7d86-5f62-4a77-a09a-afb8e0cbc7ae": {
+      "http": 200,
+      "equal": true,
+      "compared": 1,
+      "diffs": [],
+      "db_rows_not_in_reload": []
+    }
+  },
+  "tools_used": []
+}

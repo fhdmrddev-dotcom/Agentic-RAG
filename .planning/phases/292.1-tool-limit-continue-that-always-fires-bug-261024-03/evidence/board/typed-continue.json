@@ -1,0 +1,48 @@
+{
+  "attempts": [
+    {
+      "thread_id": "a6d673d1-6a9e-4d84-8766-76eaac5dd625",
+      "run_id": "9b9182dc-2a6f-4ec8-a7f9-440b5c684c3d",
+      "status": "completed",
+      "paused": true,
+      "classification": "text-pause",
+      "provider": "deepseek",
+      "model": "deepseek-v4-pro"
+    }
+  ],
+  "threads": [
+    "a6d673d1-6a9e-4d84-8766-76eaac5dd625"
+  ],
+  "probe": {
+    "provider": "deepseek",
+    "model": "deepseek-v4-pro",
+    "thread_id": "a6d673d1-6a9e-4d84-8766-76eaac5dd625",
+    "paused_run_id": "9b9182dc-2a6f-4ec8-a7f9-440b5c684c3d",
+    "http": 200,
+    "body": {
+      "continued": true,
+      "run_id": "9b9182dc-2a6f-4ec8-a7f9-440b5c684c3d",
+      "message_id": null,
+      "continues_used": 1,
+      "continues_remaining": 2
+    },
+    "continued": true,
+    "same_run_id": true,
+    "message_id_null": true,
+    "user_rows_before_after": [
+      1,
+      1
+    ],
+    "runs_rows_before_after": [
+      1,
+      1
+    ],
+    "continues_used_before_after": [
+      0,
+      1
+    ],
+    "status_after": "cap_paused",
+    "verdict": "PASS"
+  },
+  "markup_hits": []
+}

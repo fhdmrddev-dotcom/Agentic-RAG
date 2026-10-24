@@ -34,6 +34,11 @@ Every mode runs against the LOCAL stack only: ``conc_probe.assert_localhost_only
                     its own thread.
   --reload-check    For every board thread in the evidence: GET /threads/{id}/messages again; content
                     must equal the DB and ``detect_markup`` must be None on every assistant message.
+  --reverdict       Re-apply the verdict rule to every row from its own evidence JSON (offline).
+
+A pause is read with the SHIPPED predicate ``app.db.runs.run_is_cap_paused`` (292.1-REVIEW CR-01):
+a first-turn pause finalizes ``completed`` + a carrier row, so ``runs.status`` alone is not the
+answer. A Continue that resumes and then ENDS ``failed`` is a FAIL, never a PASS.
 
 Evidence (T-2921-19): run/thread ids, statuses, model ids and bounded previews only; the JWT and
 provider keys are never written.
@@ -252,8 +257,39 @@ def _redis_events(run_id: str, after: str = "-") -> tuple[list[dict], str]:
 
 def _run_row(conn, run_id) -> dict:
     row = kit._fetchone(conn, "SELECT run_id::text AS run_id, thread_id::text AS thread_id, status, model, provider, "
-                              "continues_used, started_at FROM runs WHERE run_id = %s", (run_id,)) or {}
+                              "continues_used, started_at, left(error, 300) AS error FROM runs WHERE run_id = %s", (run_id,)) or {}
     return {k: (str(v) if k == "started_at" and v is not None else v) for k, v in row.items()}
+
+
+class _SyncFetchrow:
+    """Adapts the board's psycopg2 connection to the ``fetchrow`` shape the shipped
+    ``app.db.runs.run_is_cap_paused`` expects, so the board asks the SAME predicate the Continue
+    endpoint and the typed-continue gate ask (292.1-REVIEW CR-01 / CR-02) instead of re-typing it.
+    ``$N`` placeholders become psycopg2 ``%(pN)s`` named params (``$2`` is used twice)."""
+
+    def __init__(self, conn):
+        self._conn = conn
+
+    async def fetchrow(self, sql: str, *args):
+        named = re.sub(r"\$(\d+)", lambda m: f"%(p{m.group(1)})s", sql)
+        params = {f"p{i}": (str(a) if a is not None else None) for i, a in enumerate(args, start=1)}
+        return kit._fetchone(self._conn, named, params)
+
+
+def _is_paused(conn, run_id: str) -> bool:
+    """The shipped pause predicate. A FIRST-turn pause finalizes ``completed`` + a carrier row
+    (Phase 250 LOCK-2); only a continuation that re-pauses writes ``cap_paused``. One short re-read
+    covers the carrier landing a beat after the status flip."""
+    import asyncio  # noqa: PLC0415
+    from uuid import UUID  # noqa: PLC0415
+    from app.db.runs import run_is_cap_paused  # noqa: PLC0415
+    org = (kit._fetchone(conn, "SELECT org_id::text AS org_id FROM runs WHERE run_id = %s", (run_id,)) or {}).get("org_id")
+    for i in range(2):
+        if asyncio.run(run_is_cap_paused(_SyncFetchrow(conn), UUID(run_id), org_id=UUID(org) if org else None)):
+            return True
+        if i == 0:
+            time.sleep(2)
+    return False
 
 
 def _carrier(conn, thread_id) -> list[dict] | None:
@@ -273,8 +309,8 @@ def _log_confirms_text(log_path: str | None, run_id: str) -> bool | None:
     return f"run={run_id}" in text and "text_tool_markup" in text
 
 
-def _classify(status: str, carrier: list[dict] | None, log_hit: bool | None) -> str:
-    if status != "cap_paused":
+def _classify(status: str, paused: bool, carrier: list[dict] | None, log_hit: bool | None) -> str:
+    if not paused:
         return "prose-final" if status == "completed" else f"other ({status})"
     if not carrier:
         return "paused-no-carrier"
@@ -335,13 +371,14 @@ def _attempt(conn, base, h, entry, prompt, timeout, title, log_path) -> dict:
         return {"thread_id": thread_id, "error": err}
     status = _wait(conn, run_id, timeout)
     events, last = _redis_events(run_id)
-    carrier = _carrier(conn, thread_id) if status == "cap_paused" else None
+    paused = status in ("cap_paused", "completed") and _is_paused(conn, run_id)
+    carrier = _carrier(conn, thread_id) if paused else None
     row = _run_row(conn, run_id)
     from app.services.text_tool_calls import detect_markup  # noqa: PLC0415
     live_text = "".join(e.get("content") or "" for e in events if e.get("type") == "delta")
     return {
-        "thread_id": thread_id, "run_id": run_id, "status": status, "run": row,
-        "classification": _classify(status, carrier, _log_confirms_text(log_path, run_id)),
+        "thread_id": thread_id, "run_id": run_id, "status": status, "paused": paused, "run": row,
+        "classification": _classify(status, paused, carrier, _log_confirms_text(log_path, run_id)),
         "carrier": carrier, "tool_starts": _tool_starts(events),
         "event_types": sorted({e.get("type") for e in events if e.get("type")}),
         "cap_paused_event": next((e for e in events if e.get("type") == "cap_paused"), None),
@@ -379,11 +416,11 @@ def _drive_row(conn, base, h, entry, prompt, args, title) -> dict:
     for i in range(1, ATTEMPTS + 1):
         att = _attempt(conn, base, h, entry, prompt, args.timeout, f"{title} #{i}", args.log)
         attempts.append(att)
-        print(f"  attempt {i}: run={att.get('run_id')} status={att.get('status')} "
+        print(f"  attempt {i}: run={att.get('run_id')} status={att.get('status')} paused={att.get('paused')} "
               f"class={att.get('classification')} tools={att.get('tool_starts')} {att.get('error') or ''}")
-        if att.get("status") == "cap_paused":
+        if att.get("paused"):
             break
-    paused = next((a for a in attempts if a.get("status") == "cap_paused"), None)
+    paused = next((a for a in attempts if a.get("paused")), None)
     cont = None
     if paused:
         cont = _continue(conn, base, h, paused, args.timeout)
@@ -403,14 +440,32 @@ def _drive_row(conn, base, h, entry, prompt, args, title) -> dict:
 def _verdict(res: dict) -> str:
     if res.get("blocked"):
         return "⛔"
-    if res["markup_hits"] or not all(v["equal"] for v in res["reload"].values()):
-        return "FAIL (SC#2)"
+    if res["markup_hits"]:
+        return "FAIL (SC#2: markup persisted)"
+    bad_http = sorted({v["http"] for v in res["reload"].values() if v["http"] != 200})
+    if bad_http:
+        return f"FAIL (thread reload: GET /threads/{{id}}/messages HTTP {bad_http})"
+    if not all(v["equal"] for v in res["reload"].values()):
+        return "FAIL (SC#2: reload content differs from the DB)"
     c = res.get("continue")
     if not res["paused"]:
+        sts = [a.get("status") for a in res["attempts"]]
+        failed = sum(1 for s in sts if s != "completed")
+        if failed == len(sts):
+            return f"⛔ every attempt ended {sorted(set(sts))} before the cap (provider error — runs.error)"
+        if failed:
+            return (f"OBSERVATION ({len(sts) - failed} prose-final; {failed} ended "
+                    f"{sorted(set(s for s in sts if s != 'completed'))} — provider error)")
         return "OBSERVATION (prose-final on every attempt)"
     ok = (c and c["http"] == 200 and c["same_run_id"] and c["continues_used_plus_1"]
           and c["model_provider_unchanged"] and c["queued_call_ran_first"] is not False)
-    return "PASS" if ok else "FAIL (SC#1)"
+    if not ok:
+        return "FAIL (SC#1)"
+    # A resume that then dies is not a working Continue: the continuation must END completed (or
+    # re-pause honestly). `failed` / `timed_out` after the resume is a FAIL with the run id.
+    if c.get("status_after") not in ("completed", "cap_paused"):
+        return f"FAIL (SC#1: continuation ended {c.get('status_after')})"
+    return "PASS"
 
 
 def _write(name: str, payload: dict) -> str:
@@ -455,7 +510,7 @@ def run_board(token, org_id, conn, args) -> int:
             else:
                 print(f"BOARD {label}")
                 res = _drive_row(conn, base, h, entry, BOARD_PROMPT, args, f"292.1 board {entry['provider']}")
-                first = next((a for a in res["attempts"] if a.get("status") == "cap_paused"), res["attempts"][-1])
+                first = next((a for a in res["attempts"] if a.get("paused")), res["attempts"][-1])
                 row.update({
                     "verdict": _verdict(res), "classification": first.get("classification"),
                     "run_id": first.get("run_id"), "thread_id": first.get("thread_id"),
@@ -512,11 +567,11 @@ def typed_continue(token, org_id, conn, args) -> int:
             for i in range(1, ATTEMPTS + 1):
                 att = _attempt(conn, base, h, entry, BOARD_PROMPT, args.timeout,
                                f"292.1 typed-continue {entry['provider']} #{i}", args.log)
-                result["attempts"].append({k: att.get(k) for k in ("thread_id", "run_id", "status", "classification")}
+                result["attempts"].append({k: att.get(k) for k in ("thread_id", "run_id", "status", "paused", "classification")}
                                           | {"provider": entry["provider"], "model": entry["model"]})
                 result["threads"].append(att["thread_id"])
                 print(f"TYPED {entry['provider']} attempt {i}: status={att.get('status')} class={att.get('classification')}")
-                if att.get("status") != "cap_paused":
+                if not att.get("paused"):
                     continue
                 tid, rid = att["thread_id"], att["run_id"]
                 n_user = kit._fetchone(conn, "SELECT count(*) AS n FROM messages WHERE thread_id = %s AND role = 'user'", (tid,))["n"]
@@ -571,7 +626,7 @@ def run_long(token, org_id, conn, args) -> int:
     summary = _load_summary()
     with _db_lock("board --long"), _low_cap(base, h, "board --long"):
         res = _drive_row(conn, base, h, entry, prompt, args, f"292.1 long {target}")
-    first = next((a for a in res["attempts"] if a.get("status") == "cap_paused"), res["attempts"][-1])
+    first = next((a for a in res["attempts"] if a.get("paused")), res["attempts"][-1])
     out = {"provider": target, "model": entry["model"], "prompt_bytes": len(prompt.encode("utf-8")),
            "verdict": _verdict(res), "classification": first.get("classification"), "run_id": first.get("run_id"),
            "continue": res["continue"], "markup_hits": res["markup_hits"],
@@ -595,7 +650,7 @@ def run_parallel(token, org_id, conn, args) -> int:
         a = _attempt(conn, base, h, entry, BOARD_PROMPT, args.timeout, f"292.1 parallel A {target}", args.log)
         tb = _new_thread(base, h, f"292.1 parallel B {target}")
         cont_http, b_run = None, None
-        if a.get("status") == "cap_paused":
+        if a.get("paused"):
             r = kit._requests().post(f"{base}/runs/{a['run_id']}/continue", headers=h, timeout=60)
             cont_http = r.status_code
         b_run, err = b273._send(base, h, tb, PARALLEL_B_PROMPT, entry["model"], entry["provider"])
@@ -609,13 +664,39 @@ def run_parallel(token, org_id, conn, args) -> int:
            "threads": [a["thread_id"], tb]}
     out["markup_hits"] = _markup_scan(conn, out["threads"])
     ok = out["a_in_own_thread"] and out["b_in_own_thread"] and b_run and not out["markup_hits"]
-    out["verdict"] = ("PASS" if ok and a.get("status") == "cap_paused" and cont_http == 200
+    out["verdict"] = ("PASS" if ok and a.get("paused") and cont_http == 200
                       else ("OBSERVATION (A did not pause; B still accepted)" if ok else "FAIL"))
     out["evidence"] = _write(f"parallel-{target}.json", out)
     summary["probes"]["parallel"] = out
     _save_summary(summary)
     print(f"PARALLEL {target}: A {a.get('status')}→continue {cont_http}→{a_final}; B {b_final}; "
           f"own threads A={out['a_in_own_thread']} B={out['b_in_own_thread']} -> {out['verdict']}")
+    return 0
+
+
+def reverdict() -> int:
+    """Re-apply ``_verdict`` to every driven row from its own evidence JSON (no network, no DB).
+    Used when the verdict rule tightens after a board ran (292.1-04: a continuation that ENDS
+    ``failed`` is a FAIL, not a PASS)."""
+    summary = _load_summary()
+    for row in summary["rows"]:
+        ev = row.get("evidence")
+        if row.get("blocked") or not ev:
+            continue
+        res = json.loads((_REPO / ev).read_text(encoding="utf-8"))
+        new = _verdict(res)
+        if new != row.get("verdict"):
+            print(f"REVERDICT {row['provider']} {row['model']}: {row.get('verdict')} -> {new}")
+            row["verdict"] = new
+    long_ = summary["probes"].get("long")
+    if long_ and long_.get("evidence"):
+        res = json.loads((_REPO / long_["evidence"]).read_text(encoding="utf-8"))
+        new = _verdict(res)
+        if new != long_.get("verdict"):
+            print(f"REVERDICT long: {long_.get('verdict')} -> {new}")
+            long_["verdict"] = new
+    _save_summary(summary)
+    _print_table(summary)
     return 0
 
 
@@ -642,12 +723,14 @@ def reload_check(token, org_id, conn, args) -> int:
 def main() -> int:
     ap = argparse.ArgumentParser()
     g = ap.add_mutually_exclusive_group(required=True)
-    for m in ("roster", "run", "typed-continue", "long", "parallel", "reload-check"):
+    for m in ("roster", "run", "typed-continue", "long", "parallel", "reload-check", "reverdict"):
         g.add_argument(f"--{m}", action="store_true")
     ap.add_argument("--providers", default="")
     ap.add_argument("--timeout", type=int, default=420)
     ap.add_argument("--log", default=None, help="uvicorn log path: confirms a text-pause by its WARNING line")
     args = ap.parse_args()
+    if args.reverdict:
+        return reverdict()
     kit.load_env()
     kit.assert_localhost_only()
     b273._assert_local_db()
