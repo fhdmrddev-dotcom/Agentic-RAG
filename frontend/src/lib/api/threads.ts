@@ -427,8 +427,14 @@ export interface HandoffMarker {
  * Redis Stream run identifier the frontend opens GET /runs/{rid}/stream against.
  */
 export interface PostMessageResponse {
-  message_id: string
+  // 292.1 (D-12): `null` on the CONTINUED arm — a typed continue word resumed the EXISTING paused
+  // run, so no user message row exists. `run_id` is then that paused run's id.
+  message_id: string | null
   run_id: string
+  /** 292.1 (D-12): true when the server resumed the paused run instead of starting a new one. */
+  continued?: boolean
+  continues_used?: number
+  continues_remaining?: number
   // Phase 095.1-07 (GAP-2): the already-resolved model/provider the backend
   // wrote to the runs row, surfaced ADDITIVELY on the dispatch response so the
   // live assistant placeholder shows `{provider} · {model}` in the LIVE moment

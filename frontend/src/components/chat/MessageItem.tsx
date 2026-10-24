@@ -49,6 +49,9 @@ import { UserBubble } from "./UserMessageBubble"
 // re-enabled, so the one affordance that lets a capped run keep going did nothing and said
 // nothing. `tsc` reported it as TS2304 the whole time, inside the accepted-error baseline.
 import { continueRun } from "@/lib/api"
+// 292.1 (D-14): the card's `Continuing…` state, read straight off the store (the ChatArea /
+// ThreadRunLine precedent) so no `@/providers/StreamsProvider` partial-mock factory needs a new key.
+import { useStreamsStore, markContinuing } from "@/stores/streamsStore"
 import { dedupParagraphs } from "./messageText"
 import { WorkingBadge } from "./WorkingBadge"
 import { MarkdownRenderer } from "./MarkdownRenderer"
@@ -282,6 +285,7 @@ export const MessageItem = memo(function MessageItem({ message, isStreaming, onS
   const workflowLock = useWorkflowLockForThread(message.thread_id ?? null)
   const [continuePending, setContinuePending] = useState(false)
   const [continueExhausted, setContinueExhausted] = useState(false)
+  const continuing = useStreamsStore((s) => !!message.thread_id && s.continuingThreads.has(message.thread_id))
   // Phase 153-05 (CITE-01): a callback-ref to the settled answer body so the
   // References footer's row→marker flash (flashCitationMarker) is scoped to THIS
   // message's marker host (the body contains both the cited markdown and the
@@ -854,13 +858,13 @@ export const MessageItem = memo(function MessageItem({ message, isStreaming, onS
                       ? workflowLock.mode === "harness"
                         ? "Reached the Continue limit — this run is stopped. Cancel the workflow to start something new."
                         : "Reached the Continue limit — this run is stopped. Start a new message to keep going."
-                      : "Reached the iteration limit — some tools haven't run yet."}
+                      : "Reached the tool-use limit for this turn."}
                   </span>
                   {!continueExhausted && workflowLock.continuesRemaining > 0 && (
                     <Button
                       variant="ghost"
                       size="sm"
-                      disabled={continuePending}
+                      disabled={continuePending || continuing}
                       onClick={async () => {
                         if (!workflowLock.runId) return
                         setContinuePending(true)
@@ -869,7 +873,11 @@ export const MessageItem = memo(function MessageItem({ message, isStreaming, onS
                           if (res.status === "refused") {
                             // D-06: the 3-cap was hit — show the stop message, no throw.
                             setContinueExhausted(true)
-                          } else if (res.producer_run_id && message.thread_id) {
+                          } else if (message.thread_id) {
+                            // 292.1 (D-14): the Continue is under way until the run re-pauses or ends.
+                            markContinuing(message.thread_id)
+                          }
+                          if (res.status !== "refused" && res.producer_run_id && message.thread_id) {
                             // Facet C (092-07): the Harness re-drive minted a FRESH
                             // producer runs row (the original stream EXPIREd) — the
                             // /continue 200 body carries its id. Re-subscribe its
@@ -890,12 +898,14 @@ export const MessageItem = memo(function MessageItem({ message, isStreaming, onS
                       aria-label="Continue run"
                       data-testid="continue-run"
                     >
-                      {continuePending ? (
+                      {continuePending || continuing ? (
                         <Loader2 className="w-3 h-3 mr-1.5 animate-spin" />
                       ) : (
                         <Play className="w-3 h-3 mr-1.5" />
                       )}
-                      Continue ({workflowLock.continuesRemaining} left)
+                      {continuePending || continuing
+                        ? "Continuing…"
+                        : `Continue (${workflowLock.continuesRemaining} left)`}
                     </Button>
                   )}
                 </div>

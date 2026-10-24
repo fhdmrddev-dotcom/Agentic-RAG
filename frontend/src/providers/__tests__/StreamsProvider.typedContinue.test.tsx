@@ -104,6 +104,19 @@ async function mountProvider() {
   await waitFor(() => expect(actions).not.toBeNull())
 }
 
+/** `sendMessage` only opens a stream for a thread in the stream pool, which only
+ *  `setViewingThread` writes (see ThreadRunLineKickoff.test.tsx's `sendThenCapPause`). */
+async function viewThread() {
+  mockGetSnapshot.mockResolvedValue({ messages: [], active_runs: [], since_cursors: {} })
+  await act(async () => {
+    actions!.setViewingThread(THREAD)
+  })
+  await waitFor(() => expect(mockGetThreadWorkflow).toHaveBeenCalled())
+  await act(async () => {
+    await Promise.resolve()
+  })
+}
+
 function seedPause() {
   useStreamsStore.setState({ workflowLockByThread: new Map([[THREAD, DEEP_PAUSE]]) })
 }
@@ -138,6 +151,7 @@ describe("292.1 D-14 — a typed continue that resumes shows no bubbles and read
 
   it("B: the same word answered with a normal 201 runs the ordinary path (D-15/D-16)", async () => {
     await mountProvider()
+    await viewThread()
     seedPause()
     mockPostMessage.mockResolvedValue({ message_id: "msg-1", run_id: "run-new" })
     await act(async () => {
@@ -181,6 +195,7 @@ describe("292.1 D-14 — Continuing… clears on a re-pause and on a terminal", 
 
   it("D2: a cap_paused SSE for the thread removes it from continuingThreads", async () => {
     await mountProvider()
+    await viewThread()
     mockPostMessage.mockResolvedValue({ message_id: "msg-1", run_id: "run-1" })
     let callbacks: { onCapPaused?: (info: unknown) => void } | null = null
     mockSubscribeToRun.mockImplementation(async (_rid: string, _since: string, cbs: typeof callbacks) => {
