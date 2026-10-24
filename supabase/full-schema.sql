@@ -1291,7 +1291,11 @@ CREATE TABLE public.app_settings (
     custom_api_key text,
     document_download_url_ttl_seconds integer DEFAULT 60 NOT NULL,
     harness_authoring_model text DEFAULT ''::text NOT NULL,
+    chat_max_tool_rounds integer DEFAULT 15 NOT NULL,
+    explorer_max_tool_rounds integer DEFAULT 8 NOT NULL,
+    CONSTRAINT app_settings_chat_max_tool_rounds_bound CHECK (((chat_max_tool_rounds >= 2) AND (chat_max_tool_rounds <= 50))),
     CONSTRAINT app_settings_download_ttl_bounds CHECK (((document_download_url_ttl_seconds >= 10) AND (document_download_url_ttl_seconds <= 900))),
+    CONSTRAINT app_settings_explorer_max_tool_rounds_bound CHECK (((explorer_max_tool_rounds >= 2) AND (explorer_max_tool_rounds <= 50))),
     CONSTRAINT app_settings_extraction_table_engine_pdf_check CHECK ((extraction_table_engine_pdf = ANY (ARRAY['camelot'::text, 'pdfplumber'::text]))),
     CONSTRAINT app_settings_hnsw_ef_search_bounds CHECK (((hnsw_ef_search IS NULL) OR ((hnsw_ef_search >= 10) AND (hnsw_ef_search <= 1000)))),
     CONSTRAINT app_settings_hnsw_iterative_scan_values CHECK (((hnsw_iterative_scan IS NULL) OR (hnsw_iterative_scan = ANY (ARRAY['off'::text, 'strict_order'::text, 'relaxed_order'::text])))),
@@ -1390,6 +1394,20 @@ COMMENT ON COLUMN public.app_settings.custom_api_key IS 'Bearer token for custom
 --
 
 COMMENT ON COLUMN public.app_settings.document_download_url_ttl_seconds IS 'Lifetime in seconds of a minted document download link. Default 60; bounded 10-900 by app_settings_download_ttl_bounds.';
+
+
+--
+-- Name: COLUMN app_settings.chat_max_tool_rounds; Type: COMMENT; Schema: public; Owner: -
+--
+
+COMMENT ON COLUMN public.app_settings.chat_max_tool_rounds IS 'Phase 292.1 (BUG-261024-03). Tool rounds a general chat turn may run before it stops with the limit line and a Continue button. Default 15. Bounded 2..50 by the API (app/api/settings.py) and by app_settings_chat_max_tool_rounds_bound. Read once per run.';
+
+
+--
+-- Name: COLUMN app_settings.explorer_max_tool_rounds; Type: COMMENT; Schema: public; Owner: -
+--
+
+COMMENT ON COLUMN public.app_settings.explorer_max_tool_rounds IS 'Phase 292.1 (BUG-261024-03). Tool rounds an explorer (sub-agent) turn may run before it stops with the limit line and a Continue button. Default 8. Bounded 2..50 by the API (app/api/settings.py) and by app_settings_explorer_max_tool_rounds_bound. Read once per run.';
 
 
 --
