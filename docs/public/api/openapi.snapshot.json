@@ -21280,6 +21280,14 @@
       "type": "integer",
       "title": "Vision Max Pages"
      },
+     "chat_max_tool_rounds": {
+      "type": "integer",
+      "title": "Chat Max Tool Rounds"
+     },
+     "explorer_max_tool_rounds": {
+      "type": "integer",
+      "title": "Explorer Max Tool Rounds"
+     },
      "source_max_file_size_mb": {
       "type": "integer",
       "title": "Source Max File Size Mb"
@@ -21502,6 +21510,8 @@
      "multimodal_max_vision_calls",
      "vision_model",
      "vision_max_pages",
+     "chat_max_tool_rounds",
+     "explorer_max_tool_rounds",
      "source_max_file_size_mb",
      "source_max_file_size_mb_floor",
      "source_max_file_size_mb_ceiling",
@@ -27657,6 +27667,28 @@
        }
       ],
       "title": "Vision Max Pages"
+     },
+     "chat_max_tool_rounds": {
+      "anyOf": [
+       {
+        "type": "integer"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Chat Max Tool Rounds"
+     },
+     "explorer_max_tool_rounds": {
+      "anyOf": [
+       {
+        "type": "integer"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Explorer Max Tool Rounds"
      },
      "source_max_file_size_mb": {
       "anyOf": [
