@@ -62,6 +62,7 @@ __all__ = [
     "DsmlResult",
     "Settled",
     "TagHoldback",
+    "cap_round_unanswered",
     "detect_markup",
     "parse_dsml",
     "parse_harmony",
@@ -642,6 +643,22 @@ def settle(full_content: str, offered: frozenset[str] | set[str], *, buffer_has_
                 visible, _ = replace_failed_call(visible, "")
         return Settled(kind="parsed", calls=calls, visible=visible, **meta)
     return Settled(kind="unparseable", calls=[], visible=strip_markup(full_content), **meta)
+
+
+def cap_round_unanswered(*, force_no_tools: bool, buffer_has_calls: bool, markup_seen: bool,
+                         visible: str) -> bool:
+    """The forced-final round at the cap queued nothing and wrote no answer (operator option A).
+
+    Measured on the forced-pending board (2026-10-24): anthropic claude-opus-5-5 (3 of 3 runs) and
+    openai gpt-5.6-luna (run 7c9a4a3f) reached the cap mid-plan and the forced-final round came back
+    with no text and no call, so the run completed on the loop's fallback sentence with no Continue.
+    Such a round pauses ``cap_paused`` with the empty-queue marker, exactly like D-07.
+
+    ``visible`` is the round's text AFTER ``settle``; whitespace is not an answer. Any round before
+    the cap, a cap round with calls queued (D-05) or markup seen (D-07), and a cap round that wrote
+    prose are all False, so every one of them keeps its existing behaviour.
+    """
+    return force_no_tools and not buffer_has_calls and not markup_seen and not visible.strip()
 
 
 # ── Round cap (D-17 / D-18) ──────────────────────────────────────────────────────────────────────

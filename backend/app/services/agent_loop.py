@@ -72,6 +72,7 @@ from app.services.structured_text_holdback import (  # 273 (SC#2, Pitfall 2, OV-
 )
 from app.services.text_tool_calls import (  # 292.1 (BUG-261024-03) — text-form tool calls, provider-blind
     TagHoldback,
+    cap_round_unanswered,
     resolve_round_cap,
     settle,
     strip_markup,
@@ -393,10 +394,12 @@ async def persist_cap_paused(
     not be parsed) still pauses. Its carrier holds ONE marker entry — kind set, name None — so the
     Continue read's ``@>`` filter still matches THIS pause (an empty array would fall through to an
     older pause's calls); ``load_cap_paused_tool_calls`` drops name-less entries, so nothing runs.
+    Operator option A (2026-10-24): a forced-final round that wrote no answer at all pauses the same way.
 
     SEED-323: ``reasoning_content`` (the paused round's thinking) rides the FIRST carrier entry so
     the Continue replay can pass it back — DeepSeek thinking mode 400s a replayed tool-call turn
-    without it (https://api-docs.deepseek.com/guides/thinking_mode). Absent → byte-identical.
+    without it (https://api-docs.deepseek.com/guides/thinking_mode). Absent → byte-identical. On the
+    marker it is a record only: the Continue read drops name-less entries, reasoning and all.
 
     Phase 268 (D-268-22 / Pitfall 3): ``org_id`` is the turn's validated active org. The Continue
     endpoint looks the carrier up ``AND org_id = <the run's org>``; the run now carries the active
@@ -412,9 +415,9 @@ async def persist_cap_paused(
     """
     tool_names = [tc.get("name", "?") for tc in tool_calls_buffer.values()]
     carrier = build_cap_paused_carrier_tool_calls(tool_calls_buffer)
-    if not carrier:  # 292.1 (D-07): the empty-queue marker
+    if not carrier:  # 292.1 (D-07 / option A): the empty-queue marker
         carrier = [{"kind": "iteration_cap_paused", "tool_call_id": None, "name": None, "arguments": None}]
-    elif reasoning_content:  # SEED-323
+    if reasoning_content:  # SEED-323 — on the marker too (a record only: the Continue read drops it)
         carrier[0]["reasoning_content"] = reasoning_content
 
     # (1) DURABLE persist FIRST (the Continue endpoint reads this row).
@@ -1977,6 +1980,7 @@ async def run_agent_loop(
     # WITH a non-empty buffer (Landmine 8). Surfaced via result_sink so the
     # producer's _shielded_finalize writes cap_paused instead of completed.
     _cap_disposition: str | None = None
+    _cap_unanswered = False  # 292.1 option A: the forced-final round paused with no answer → no fallback
     # Phase 073 TOKEN-COL-01 (D-073-07): per-run usage accumulators.
     # Both default to None — D-073-09 NULL sentinel if NO iteration produced
     # a usage payload. First successful usage event flips None to int; subsequent
@@ -2912,7 +2916,12 @@ async def run_agent_loop(
             # `if not tool_calls_buffer:` short-circuit fires and the
             # tool execution round is skipped (avoids billing for
             # tool runs whose output never influences the answer).
-            if force_no_tools and (tool_calls_buffer or _cap_markup_seen):
+            # 292.1 option A (operator, 2026-10-24): an EMPTY forced-final round pauses like D-07.
+            _cap_unanswered = cap_round_unanswered(
+                force_no_tools=force_no_tools, buffer_has_calls=bool(tool_calls_buffer),
+                markup_seen=_cap_markup_seen, visible=full_content,
+            )
+            if force_no_tools and (tool_calls_buffer or _cap_markup_seen or _cap_unanswered):
                 _dropped_count = len(tool_calls_buffer)
                 _tool_names = [tc.get("name", "?") for tc in tool_calls_buffer.values()]
                 logger.warning(
@@ -3417,8 +3426,9 @@ async def run_agent_loop(
                     ],
                 )
 
-        # Fallback: if the loop ended with no content produced, emit a safe message
-        if not full_content:
+        # Fallback: if the loop ended with no content produced, emit a safe message.
+        # 292.1 option A: not when the forced-final round paused — the limit line + Continue speak.
+        if not full_content and not _cap_unanswered:
             # GEN-07: two distinct messages — context overflow vs empty model response
             # Context overflow is caught earlier (finish_reason == "length").
             # This branch = model returned empty content after all iterations/retries.
