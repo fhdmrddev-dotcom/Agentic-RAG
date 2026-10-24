@@ -11448,8 +11448,8 @@ cells rot within days.
 | [`frontend/src/components/chat/ToolCallPanel.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentschattoolcallpaneltsx) | 55 / 23 / 409 (was `54 / 22 / 407`) | ⚠ **FIRES** | ✅ G-5 DISCHARGED (227-02). **273-05**: `stepLabel` + `ARGS_HIDDEN.livePanel` replace one name check; no new branch |
 | [`frontend/src/components/chat/tool-bodies/SearchDocumentsBody.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentschattool-bodiessearchdocumentsbodytsx) | 3 / 3 / 71 | ⚠ **FIRES** (crossed in 272) | ⚠ absent its ENTIRE LIFE — row added 272-05. **F-3**: `summarize` names refused / invalid / empty / not-searchable / unavailable |
 | [`frontend/src/components/chat/MessageItem.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentschatmessageitemtsx) | 83 / 42 / 1050 (was `82 / 38 / 1040`) | ⚠ **FIRES** | 292.1-03: tool-use-limit sentence + Continuing… state via ONE store selector (+15 −5); hooks 8→9 (fence re-based with reason), useState 3, useEffect 0 |
-| [`backend/app/api/threads.py`](docs/HOT-FILE-LEDGER.md#backendappapithreadspy) | 274 / 95 / 2643 (was `273 / 92 / 2567`) | ⚠ **FIRES** | 292.1-03: ONE delegating `if` in send_message → `_typed_continue_or_none`, which only delegates to runs.continue_run (no runs.status writer). ⛔ SSE transport discharge unchanged |
-| [`frontend/src/providers/StreamsProvider.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrcprovidersstreamsprovidertsx) | 113 / 45 / 5065 (was `112 / 43 / 5016`) | ⚠ **FIRES** | 292.1-03: typed continue holds the optimistic turn (one insertOptimisticTurn closure); Continuing… set on continued:true, cleared on cap_paused (+74 −25). 0 lock writers · ⛔ |
+| [`backend/app/api/threads.py`](docs/HOT-FILE-LEDGER.md#backendappapithreadspy) | 276 / 93 / 2671 (was `274 / 95 / 2643`; 95 counted two six-digit buckets) | ⚠ **FIRES** | 292.1-REVIEW CR-02/WR-04: the gate asks `run_is_cap_paused`; continue_run errors fall back to a send. send_message If unchanged. ⛔ SSE discharge unchanged |
+| [`frontend/src/providers/StreamsProvider.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrcprovidersstreamsprovidertsx) | 114 / 44 / 5074 (was `113 / 45 / 5065`; 45 counted a six-digit bucket) | ⚠ **FIRES** | 292.1-REVIEW WR-03: a hinted typed continue marks Continuing… before the POST, cleared on 201/error if this send set it (+9). 0 lock writers · ⛔ |
 | [`frontend/src/hooks/useMessages.ts`](docs/HOT-FILE-LEDGER.md#frontendsrchooksusemessagests) | 74 / 27 / 127 | ⚠ **FIRES** | extraction due |
 | [`backend/app/services/anthropic_service.py`](docs/HOT-FILE-LEDGER.md#backendappservicesanthropic_servicepy) | 12 / 11 / 373 (was `11 / 10 / 354`) | ⚠ **FIRES** | **282-01**: ONE `_anthropic_client` builder (budget in the constructor, connect 5 s, cloud retries 2) + trailing `timeout_s` on `stream_anthropic`. honoured by construction; adapter-pattern audit due |
 | [`frontend/src/components/workflows/WorkflowCanvas.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentsworkflowsworkflowcanvastsx) | 32 / 10 / 1744 (was `31 / 9 / 1708`) | **FIRES** | **290-03** Team view: 1 optional prop, 1 `useState` (8→9), 1 gated early return; the 286 forecast (separate read-only view) met. ⛔ the next concern proposes the extraction FIRST |
@@ -11487,7 +11487,7 @@ cells rot within days.
 | [`frontend/src/components/workflows/builderStore.ts`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentsworkflowsbuilderstorets) | 16 / 9 / 1039 (was `14 / 8 / 968`) | **FIRES** | 291: two actions (`addReferenceAssets` 291-04, `setInputSource` 291-05) and NO state field; the ≤ 1 store field forecast held. Honoured by construction (193.2 / 197 / 214.1 / 291) |
 | [`frontend/src/components/panel/WorkspacePanel.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentspanelworkspacepaneltsx) | 17 / 11 / 646 (was `16 / 10 / 646`) | **FIRES** | honoured by construction (194 / 194.1 / **282-02**: ONE `home="panel"` prop on the existing `PendingAskStack` mount; the `pendingAsks.length > 0 &&` condition byte-identical) |
 | [`backend/app/services/run_lifecycle.py`](docs/HOT-FILE-LEDGER.md#backendappservicesrun_lifecyclepy) | 10 / 6 / 776 (was `9 / 5 / 756`) | ⚠ **FIRES** | 295-04: `cancel_workflow_run_internals(..., stopped_by=...)` calls `record_stop` before its own finish_run (If 11→11). Honoured by construction |
-| [`backend/app/api/runs.py`](docs/HOT-FILE-LEDGER.md#backendappapirunspy) | 49 / 22 / 1945 (was `48 / 21 / 1929`) | ⚠ **FIRES** | 292.1-03: Step-1 select reads model/provider and carries them to the spawn; SEED-324 terminal Deep run → 409 (+1 elif). Kwarg-sized. ⛔ continue_run stays the single runs.status writer |
+| [`backend/app/api/runs.py`](docs/HOT-FILE-LEDGER.md#backendappapirunspy) | 51 / 22 / 1981 (was `49 / 22 / 1945`) | ⚠ **FIRES** | 292.1-REVIEW CR-01/WR-03: the SEED-324 409 asks `run_is_cap_paused`; the Deep claim is a compare-and-set (409 CONTINUE_ALREADY_CLAIMED). ⛔ continue_run stays the single runs.status writer |
 | [`backend/app/services/harness_engine.py`](docs/HOT-FILE-LEDGER.md#backendappservicesharness_enginepy) | 68 / 26 / 2961 (was `67 / 26 / 2957`) | ⚠ **FIRES** | 295-09 WR-07: the pause arm skips its `pause_run` when the engine ask already wrote it (ONE guarded line, If 86→87), so a re-driven run is never flipped back. Armed-block seam still OWED |
 | [`frontend/src/components/chat/RunCard.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentschatruncardtsx) | 31 / 16 / 729 (was `28 / 14 / 710`) | **FIRES** | ⭐ G-5 DISCHARGED (243-02). **276-06**: avatar pulse + header spinner removed (D-27: one live avatar); provider logo static. ⛔ Bot stays the unknown-provider fallback |
 | [`frontend/src/components/chat/WorkingBadge.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentschatworkingbadgetsx) | 3 / 2 / 50 (was `2 / 1 / 56`) | no (2 phases) | ⚠ absent its ENTIRE LIFE; row added at 276-06 planning. 276-06: the ✦ glyph and its pulse gone (the Iris avatar is the motion); the word stays. ⛔ memo equality unchanged |
@@ -11752,7 +11752,7 @@ cells rot within days.
 | [`.github/workflows/backend-tests.yml`](docs/HOT-FILE-LEDGER.md#githubworkflowsbackend-testsyml) | 4 / 2 / 84 | no (2 phases) | ⚠ absent for its ENTIRE LIFE — row added 253-03. `.github/` is EXEMPT. ⛔ its `paths:` decide which fences a change is measured by; two `scripts/` files were read by unit tests and matched by none |
 | [`.claude/settings.json`](docs/HOT-FILE-LEDGER.md#claudesettingsjson) | 9 / 4 / 202 | ⚠ **FIRES** | ⚠ **absent from BOTH registers its ENTIRE LIFE at 4 phases — rows added 253-03.** `.claude/` is EXEMPT: no gate could ask. The ONE hook dispatch table; a too-narrow `matcher` fires NEVER, in silence |
 | [`backend/app/services/circuit_breaker.py`](docs/HOT-FILE-LEDGER.md#backendappservicescircuit_breakerpy) | 1 / 1 / 331 | no (1 phase) | ⚠ absent its ENTIRE LIFE — row added 256-02 at 256-01's touch, BELOW threshold. ⛔ the `max(0,…)` clamp stays on the RETURNED delta, or a reset box hands the DB a negative and SUBTRACTS real spend |
-| [`backend/app/services/task_service.py`](docs/HOT-FILE-LEDGER.md#backendappservicestask_servicepy) | 27 / 14 / 1023 (was `26 / 14 / 1018`) | **FIRES** | **289-REVIEW WR-04**: `kb_search_calls` skips a refused search (`ran_retrieval`), so a step whose only searches were refused shows no 'nothing matched' line. +5 L |
+| [`backend/app/services/task_service.py`](docs/HOT-FILE-LEDGER.md#backendappservicestask_servicepy) | 28 / 15 / 1038 (was `27 / 14 / 1023`) | **FIRES** | **292.1-REVIEW WR-02**: `_stream_one_iteration` runs the provider-blind `strip_markup` after the structured post-parse; never parses or runs text calls. +15 L |
 | [`backend/app/services/run_reconciler.py`](docs/HOT-FILE-LEDGER.md#backendappservicesrun_reconcilerpy) | 5 / 3 / 406 (was `3 / 2 / 325`) | ⚠ **FIRES** | 295-04: ONE sweep `_reconcile_workflow_runs` (D-21, the `_reconcile_chat_runs` idiom). ⚠ now FIRES at 3 phases. Live: ended a planted stuck run in 23 s (295-07) |
 | [`backend/app/services/forced_emit.py`](docs/HOT-FILE-LEDGER.md#backendappservicesforced_emitpy) | 13 / 8 / 724 (was `12 / 8 / 724`) | ⚠ **FIRES** | honoured by construction (**282-01** budget per rung; **282-04** `provider=provider` on the one lookup). ⛔ accumulators init `None` never `0` |
 | [`backend/app/services/pricing_service.py`](docs/HOT-FILE-LEDGER.md#backendappservicespricing_servicepy) | 4 / 2 / 156 (was `2 / 1 / 103`) | no (2 phases) | 294-01: + compute_token_cost_usd_unquantized (a ~$0.00002 engine call quantised to 0.0000). ⛔ the single token × rate home (test_257) |
@@ -11789,7 +11789,7 @@ cells rot within days.
 | [`frontend/src/components/chat/HandoffCard.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentschathandoffcardtsx) | 1 / 1 / 40 (was `0 / 0 / 0`) | no (young) | young (created 267-04). Renders the handoff user row as a card, never a user bubble. Live G4-3: the new thread opens on it, naming the source thread's facts |
 | [`frontend/src/components/chat/expertEventCopy.ts`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentschatexperteventcopyts) | 5 / 3 / 315 (was `4 / 2 / 313`) | ⚠ **NOW FIRES — 3 phases** | ⚠ now FIRES (267, 268, 279). **279-03 A** (D-16): sub-line prefixed "Won't be searched:". ⛔ kind list cross-pinned to `TRANSCRIPT_EVENT_KINDS` by `?raw` |
 | [`frontend/src/components/chat/threadNavigation.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentschatthreadnavigationtsx) | 1 / 1 / 45 (was `0 / 0 / 0`) | no (young) | young (created 267-04). The pointer's `Open →` door; no router exists, so it selects the thread. Live G4-3: Open lands on the new thread |
-| [`backend/app/db/runs.py`](docs/HOT-FILE-LEDGER.md#backendappdbrunspy) | 11 / 9 / 289 (was `9 / 8 / 266`) | ⚠ **FIRES — 9 phases** | 292.1-01: load_cap_paused_tool_calls drops name-less marker entries (one comprehension filter); both SQL strings byte-unchanged. ⛔ finalize_run untouched (SEED-297) |
+| [`backend/app/db/runs.py`](docs/HOT-FILE-LEDGER.md#backendappdbrunspy) | 12 / 9 / 345 (was `11 / 9 / 289`) | ⚠ **FIRES — 9 phases** | 292.1-REVIEW CR-01: + `run_is_cap_paused`, the ONE pause predicate (one SQL, `$N` only; a first-turn pause reads `completed` + carrier). +56. ⛔ finalize_run untouched (SEED-297) |
 | [`frontend/src/components/admin/spend/ExpertFilterPills.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentsadminspendexpertfilterpillstsx) | 1 / 1 / 179 (was `0 / 0 / 0`) | no (new) | young (created 268-02). ⛔ ONE `expert` filter that every card follows (D-268-08); owns `filterPillClass` for all 3 ribbon groups |
 | [`frontend/src/components/admin/spend/ExpertSpendCard.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentsadminspendexpertspendcardtsx) | 1 / 1 / 316 (was `0 / 0 / 0`) | no (new) | young (created 268-02). Spend by Expert + recon footer + `LedgerExpertCell`. ⛔ the table never follows the filter; No Expert always shown |
 | [`frontend/src/components/admin/spend/AttributionDisclosures.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentsadminspendattributiondisclosurestsx) | 1 / 1 / 44 (was `0 / 0 / 0`) | no (new) | young (created 268-02). The two Blind Spots tiles (sub-agent tokens counted; handoff not metered). ⛔ no button — no filter lands on either population |
@@ -11899,7 +11899,7 @@ cells rot within days.
 | [`frontend/src/components/sources/SourceFolderPicker.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentssourcessourcefolderpickertsx) | 2 / 1 / 375 | no (1 phase) | ⚠ absent its entire life — row added BUG-260912-01 |
 | [`backend/app/services/provider_gateway/openai_compat.py`](docs/HOT-FILE-LEDGER.md#backendappservicesprovider_gatewayopenai_compatpy) | 9 / 6 / 466 (was `7 / 5 / 537`) | ⚠ **FIRES** | 292.1-01: the deepseek-only DSML strip deleted (D-01/D-02) — a pure deletion (+11 −81), one provider-name `if` removed. ⛔ D-14 RED LINE; no-budget callers byte-identical |
 | [`backend/app/services/provider_gateway/dispatcher.py`](docs/HOT-FILE-LEDGER.md#backendappservicesprovider_gatewaydispatcherpy) | 10 / 4 / 260 (was `8 / 3 / 196`) | ⚠ **FIRES** | ⚠ FIRES (4 phases). **282-01**: `GatewayRequest.timeout_s`; OpenAI-family open off the loop under one deadline + late-close (+3 defs, +3 conditionals, measured). ⛔ D-14: chunk/SSE path unbranched |
-| [`backend/app/services/provider_gateway/openai_responses.py`](docs/HOT-FILE-LEDGER.md#backendappservicesprovider_gatewayopenai_responsespy) | 2 / 2 / 573 (was `1 / 1 / 563`) | no (2 phases) | young (created 262). **282-01**: ONE if/else — budget + cloud retries reach `get_llm_client` only when `timeout_s` is set. honoured by construction |
+| [`backend/app/services/provider_gateway/openai_responses.py`](docs/HOT-FILE-LEDGER.md#backendappservicesprovider_gatewayopenai_responsespy) | 4 / 3 / 570 (was `2 / 2 / 573`) | ⚠ **now FIRES (3 phases)** | **292.1-REVIEW IN-03**: a deletion — the dead `dsml_leaked` flag (+2 −5). honoured by construction. ⛔ budget/retries reach the client only when `timeout_s` is set (282-01) |
 | [`frontend/src/lib/api/admin.ts`](docs/HOT-FILE-LEDGER.md#frontendsrclibapiadmints) | 10 / 5 / 1125 (was `9 / 5 / 1122`) | ⚠ **FIRES** | ⚠ FIRES. quick-261024: ONE optional field, `returned?: number`, on `DiscoveryProviderOutcome` (older backend omits it; the card then shows only the new count) |
 | [`frontend/src/components/admin/CapabilityGrid.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentsadmincapabilitygridtsx) | 3 / 3 / 264 | ⚠ **FIRES** | ⚠ FIRES at 3 phases · row added 263-REVIEW WR-07 |
 | [`frontend/src/components/admin/ModelAdvancedCapabilities.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentsadminmodeladvancedcapabilitiestsx) | 1 / 1 / 290 | no (1 phase) | young (created 262) |
@@ -12003,9 +12003,9 @@ cells rot within days.
 | [`frontend/src/components/workflows/DescribeReferencesSection.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentsworkflowsdescribereferencessectiontsx) | 1 / 1 / 216 (was `0 / 0 / 0`) | no (young) | young (created 291-04). Peer references section beside `DescribeTemplateRow` (sketch B). ⛔ classes from `surfaceClasses.ts` only |
 | [`frontend/src/components/workflows/surfaceClasses.ts`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentsworkflowssurfaceclassests) | 2 / 1 / 67 (was `0 / 0 / 0`) | no (1 phase) | young (created 291-04). Door row consts + the arrival card's fold consts (moved 291-05) + `FOLD_BODY_CLASS`. ⛔ a `.ts` leaf (react-refresh rule) |
 | [`frontend/src/components/workflows/DraftInputsFold.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentsworkflowsdraftinputsfoldtsx) | 1 / 1 / 240 (was `0 / 0 / 0`) | no (young) | young (created 291-05). Trigger + body leaf: rows in the form's order, native radio Ask / Look it up, `Added by Syrel` from `origin` only. ⛔ fold classes imported; components-only exports |
-| [`backend/app/services/text_tool_calls.py`](docs/HOT-FILE-LEDGER.md#backendappservicestext_tool_callspy) | 1 / 1 / 402 (was `0 / 0 / 0`) | no (young) | young (created 292.1-01) · pure, provider-blind: parse_dsml, detect/strip F1-F6, TagHoldback, settle, resolve_round_cap. ⛔ no I/O; offered names passed in; no provider branch |
+| [`backend/app/services/text_tool_calls.py`](docs/HOT-FILE-LEDGER.md#backendappservicestext_tool_callspy) | 3 / 1 / 519 (was `1 / 1 / 402`) | no (young) | 292.1-REVIEW WR-01/WR-06: non-DSML openers need their family's call shape; text after a parsed block is kept. ⛔ no I/O; offered names passed in; no provider branch |
 | [`backend/app/services/typed_continue.py`](docs/HOT-FILE-LEDGER.md#backendappservicestyped_continuepy) | 1 / 1 / 33 (was `0 / 0 / 0`) | no (young) | young (created 292.1-03) · CONTINUE_WORDS + is_continue_word (D-13). ⛔ pure, no I/O, no model call; lockstep with continueWords.ts |
-| [`frontend/src/components/settings/AgentRoundLimits.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentssettingsagentroundlimitstsx) | 1 / 1 / 212 (was `0 / 0 / 0`) | no (young) | young (created 292.1-02) · owns its fetch/save; clamps on Save/blur; never sends 0. ⛔ SettingsPage gains one mount, no state |
+| [`frontend/src/components/settings/AgentRoundLimits.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentssettingsagentroundlimitstsx) | 2 / 1 / 243 (was `1 / 1 / 212`) | no (young) | 292.1-REVIEW WR-05: empty + locked until the read answers; a failed read shows the error + Retry, Save disabled. ⛔ SettingsPage gains one mount, no state |
 | [`frontend/src/lib/continueWords.ts`](docs/HOT-FILE-LEDGER.md#frontendsrclibcontinuewordsts) | 1 / 1 / 46 (was `0 / 0 / 0`) | no (young) | young (created 292.1-03) · client hint mirror of the backend continue words + shouldTryTypedContinue. ⛔ the server decides; ?raw lockstep fence |
 
 
@@ -24439,3 +24439,85 @@ Scan-list disposition cell before 292.1 (replaced): young (planned 292.1-02). Le
 ⛔ **Invariants:** the server decides (D-12); a `continued: true` reply the hint did not predict is still handled; lockstep fence has a non-vacuity guard.
 
 Scan-list disposition cell before 292.1 (replaced): young (planned 292.1-03). Client hint mirror of the backend continue words. ⛔ the server decides; `?raw` lockstep fence
+
+## Phase 292.1 — review-fix refresh (2026-10-24)
+
+The code-review fix merge (`08fd59755`: CR-01, CR-02, WR-01..WR-06, IN-03) touched eight of the files the 292.1 close had just refreshed, so their triples went stale the same afternoon. Re-derived at HEAD `08fd59755` with the CLAUDE.md recipe, six-digit quick-task buckets subtracted, lines from `git show HEAD:<path>` (identical to the working tree). Scan-list rows refreshed in place, old triple kept as `(was …)`. G-5 honoured by construction on every firing file, NO override. `backend/app/services/typed_continue.py` was NOT touched by the fix merge (`1 / 1 / 33` unchanged; its row and section stand).
+
+⚠ **CORRECTION — two phase counts in the 292.1 close above were over-counted, and the originals are kept rather than overwritten.** The close wrote `backend/app/api/threads.py` as `274 / 95 / 2643` and `frontend/src/providers/StreamsProvider.tsx` as `113 / 45 / 5065`, and said *"No six-digit quick-task bucket touches any of them."* Measured: `threads.py` carries the buckets `260328` and `260405`, `StreamsProvider.tsx` carries `260529`. Subtracted per the recipe, the 292.1 close figures were **93** and **44**, each exactly one phase (292.1) above their pre-292.1 `92` and `43`. The review fixes add no phase, so the refreshed triples read 93 and 44. The phase count did not fall; the earlier figure was counted on a different convention.
+
+### `backend/app/db/runs.py` — Phase 292.1 review-fix refresh
+
+**`12 / 9 / 345`** (was `11 / 9 / 289`). G-5: ⚠ **FIRES — 9 phases**. Honoured by construction (292.1-REVIEW CR-01, `8d5ba6f1c`): one new async helper `run_is_cap_paused` beside `load_cap_paused_tool_calls`, the ONLY pause predicate (the Continue 409 and the typed-continue gate both call it). One SQL statement: `cap_paused`, OR `completed` + root run + `continues_used = 0` + the thread's latest carrier at/after `started_at` + no newer root run. +56 −0; no existing function edited.
+
+⛔ **Invariants:** `runs.status` alone cannot answer "paused" — a first-turn pause finalizes `completed` by design (Phase 250 LOCK-2); `finalize_run` untouched (SEED-297); `$N` placeholders only (T-073-02).
+
+Scan-list disposition cell before the review fixes (replaced): 292.1-01: load_cap_paused_tool_calls drops name-less marker entries (one comprehension filter); both SQL strings byte-unchanged. ⛔ finalize_run untouched (SEED-297)
+
+CLAUDE.md FIRING cell before the review fixes (replaced): 292.1-01: carrier loader drops name-less marker entries; SQL unchanged
+
+### `backend/app/api/runs.py` — Phase 292.1 review-fix refresh
+
+**`51 / 22 / 1981`** (was `49 / 22 / 1945`). G-5: ⚠ **FIRES**. Honoured by construction: CR-01 (`8d5ba6f1c`, +21 −1) — the SEED-324 409 now fires only when the run is terminal AND `run_is_cap_paused` says no (`failed` / `cancelled` / `timed_out` never cost the read); WR-03 (`4d18ad23c`, +17 −1) — the Deep counter write is a compare-and-set `.eq("continues_used", <read>)`, and a lost claim is 409 `CONTINUE_ALREADY_CLAIMED`, starting nothing. The test_244-pinned `.update({... "status": "streaming"}).eq("run_id", …)` shape is kept.
+
+⛔ **Invariants:** `continue_run` stays the single `runs.status` writer; ownership read stays RLS; the counter write stays service-client with its own `user_id` scope (268 D-2). Residual (recorded in 292.1-REVIEW-FIX): a replayed request after a finished claim is still accepted against the new counter.
+
+Scan-list disposition cell before the review fixes (replaced): 292.1-03: Step-1 select reads model/provider and carries them to the spawn; SEED-324 terminal Deep run → 409 (+1 elif). Kwarg-sized. ⛔ continue_run stays the single runs.status writer
+
+CLAUDE.md FIRING cell before the review fixes (replaced): 292.1-03: select model/provider + carry; SEED-324 terminal 409 (+1 If)
+
+### `backend/app/api/threads.py` — Phase 292.1 review-fix refresh
+
+**`276 / 93 / 2671`** (was `274 / 95 / 2643`, over-counted — see the correction above; on the recipe it was `274 / 93 / 2643`). G-5: ⚠ **FIRES**. Honoured by construction: CR-02 (`95779eba3`, +11 −5) — `_typed_continue_or_none` asks `run_is_cap_paused` on the same RLS connection, only for a latest run reading `cap_paused` or `completed`, and the latest-run read gains `parent_run_id IS NULL`; WR-04 (`5e1a2269d`, +31 −9) — the `continue_run` call is wrapped: any error logs one WARNING and falls back to a normal send, except 409 `CONTINUE_ALREADY_CLAIMED`, which reports `continued: true` (the button already resumed it). All inside the helper; `send_message` still has exactly ONE delegating `if` (test_279 / test_2921 if-count pin).
+
+⛔ **Invariants:** the helper never writes `runs.status`; the DB read happens only after the pure word match; SSE transport discharge unchanged.
+
+Scan-list disposition cell before the review fixes (replaced): 292.1-03: ONE delegating `if` in send_message → `_typed_continue_or_none`, which only delegates to runs.continue_run (no runs.status writer). ⛔ SSE transport discharge unchanged
+
+CLAUDE.md FIRING cell before the review fixes (replaced): 292.1-03: ONE delegating if → _typed_continue_or_none; no status writer
+
+### `backend/app/services/text_tool_calls.py` — Phase 292.1 review-fix refresh
+
+**`3 / 1 / 519`** (was `1 / 1 / 402`). G-5: no (young, one phase). WR-01 (`d7d50f16a`, +122 −20): a non-DSML opener (`<tool_call>`, `<|tool_call>`, `<function=`) counts as a call only when followed by its family's measured call shape; `TagHoldback` holds an undecided opener without sticking and releases it once the text proves prose. WR-06 (`3f59ecd48`, +17 −2): `parse_dsml` returns `rest`, and `settle` processes it — trailing prose stays visible, a further block's calls queue in order, an unparseable further block is removed and worded. DSML handling otherwise unchanged.
+
+⛔ **Invariants:** pure, no I/O, no logging; offered names passed in; each block stands or falls whole (D-07); `released + finish() == input` (fuzzed, 2,700 chunkings); no provider-name branch.
+
+Scan-list disposition cell before the review fixes (replaced): young (created 292.1-01) · pure, provider-blind: parse_dsml, detect/strip F1-F6, TagHoldback, settle, resolve_round_cap. ⛔ no I/O; offered names passed in; no provider branch
+
+### `backend/app/services/task_service.py` — Phase 292.1 review-fix refresh
+
+**`28 / 15 / 1038`** (was `27 / 14 / 1023`). G-5: **FIRES**. Honoured by construction (292.1-REVIEW WR-02, `498b8ad06`, +15 −0): `_stream_one_iteration` runs the provider-blind `strip_markup` on its output after the STRUCTURED post-parse. Markup with no structured call is worded with the shared `FAILED_CALL_NOTICE` (preamble kept, never empty); markup beside a structured call is only stripped; one bounded WARNING.
+
+⛔ **Invariants:** this path never parses or runs text-form calls; the strip rules live in `text_tool_calls.py`, not here.
+
+Scan-list disposition cell before the review fixes (replaced): **289-REVIEW WR-04**: `kb_search_calls` skips a refused search (`ran_retrieval`), so a step whose only searches were refused shows no 'nothing matched' line. +5 L
+
+CLAUDE.md FIRING cell before the review fixes (replaced): 289-REVIEW WR-04: refused searches no longer count as KB searches
+
+### `backend/app/services/provider_gateway/openai_responses.py` — Phase 292.1 review-fix refresh
+
+**`4 / 3 / 570`** (was `2 / 2 / 573`). G-5: ⚠ **now FIRES (3 phases: 262, 282, 292.1)**. Honoured by construction (292.1-REVIEW IN-03, `e1767efb1`, +2 −5): a deletion — the dead `dsml_leaked` attribute; its test asserts it is absent. Nothing else in the adapter moved.
+
+⛔ **Invariants:** budget + retries reach the client only when `timeout_s` is set (282-01, D-14 RED LINE); no provider-name branch re-added for text calls. ⚠ The next phase that names this file faces G-5 with no named seam yet.
+
+Scan-list disposition cell before the review fixes (replaced): young (created 262). **282-01**: ONE if/else — budget + cloud retries reach `get_llm_client` only when `timeout_s` is set. honoured by construction
+
+CLAUDE.md FIRING cell before the review fixes (replaced): young · 282-01: budget + retries reach the client when set · ⛔
+
+### `frontend/src/providers/StreamsProvider.tsx` — Phase 292.1 review-fix refresh
+
+**`114 / 44 / 5074`** (was `113 / 45 / 5065`, over-counted — see the correction above; on the recipe it was `113 / 44 / 5065`). G-5: ⚠ **FIRES**. Honoured by construction (292.1-REVIEW WR-03, `4d18ad23c`, +9 −0): a hinted typed continue marks the thread "Continuing…" before the POST and clears the mark on a 201 or an error, only if this send set it.
+
+⛔ **Invariants:** 0 `WorkflowLock` writers added; the server decides a typed continue (the client word list is a hint only).
+
+Scan-list disposition cell before the review fixes (replaced): 292.1-03: typed continue holds the optimistic turn (one insertOptimisticTurn closure); Continuing… set on continued:true, cleared on cap_paused (+74 −25). 0 lock writers · ⛔
+
+CLAUDE.md FIRING cell before the review fixes (replaced): 292.1-03: typed continue holds the optimistic turn; Continuing… cleared · ⛔
+
+### `frontend/src/components/settings/AgentRoundLimits.tsx` — Phase 292.1 review-fix refresh
+
+**`2 / 1 / 243`** (was `1 / 1 / 212`). G-5: no (young). WR-05 (`11ce36412`, +45 −14): fields are empty and locked until the read answers; a failed read shows "Couldn't load the current tool-round limits…" with the server's message and a Retry, Save disabled. A successful load behaves as before.
+
+⛔ **Invariants:** never presents the defaults 15 / 8 as live values; sends only changed fields; never saves 0; 2..50 clamp; server 400 text verbatim.
+
+Scan-list disposition cell before the review fixes (replaced): young (created 292.1-02) · owns its fetch/save; clamps on Save/blur; never sends 0. ⛔ SettingsPage gains one mount, no state

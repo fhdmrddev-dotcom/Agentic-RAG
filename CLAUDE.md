@@ -411,8 +411,8 @@ node scripts/check-hot-file-ledger.cjs <phase-dir>   # 0 clear · 1 missing rows
 | `frontend/src/components/chat/ToolCallPanel.tsx` | 51 / 23 / 351 | ✅ **G-5 DISCHARGED (227-02)** |
 | `frontend/src/components/chat/MessageItem.tsx` | 83 / 42 / 1050 (was `82 / 38 / 1040`) | 292.1-03: tool-use-limit sentence + Continuing… (1 store selector) |
 | `frontend/src/components/chat/CitationList.tsx` | 5 / 5 / 91 | 294-05: ONE CitationCheckAction beside the trigger · extraction FIRST |
-| `backend/app/api/threads.py` | 274 / 95 / 2643 (was `273 / 92 / 2567`) | 292.1-03: ONE delegating if → _typed_continue_or_none; no status writer |
-| `frontend/src/providers/StreamsProvider.tsx` | 113 / 45 / 5065 (was `112 / 43 / 5016`) | 292.1-03: typed continue holds the optimistic turn; Continuing… cleared · ⛔ |
+| `backend/app/api/threads.py` | 276 / 93 / 2671 (was `274 / 95 / 2643`) | 292.1-REVIEW CR-02/WR-04: gate asks run_is_cap_paused; errors fall back |
+| `frontend/src/providers/StreamsProvider.tsx` | 114 / 44 / 5074 (was `113 / 45 / 5065`) | 292.1-REVIEW WR-03: typed continue marks Continuing… before the POST · ⛔ |
 | `frontend/src/hooks/useMessages.ts` | 74 / 27 / 127 | extraction due |
 | `backend/app/services/anthropic_service.py` | 12 / 11 / 373 (was `11 / 10 / 354`) | honoured by construction (282-01: constructor kwargs) · adapter audit due |
 | `backend/app/services/embedding_service.py` | 9 / 5 / 354 | ⚠ absent for its entire life at 5 phases — row added 236 (SC#2) |
@@ -449,13 +449,13 @@ node scripts/check-hot-file-ledger.cjs <phase-dir>   # 0 clear · 1 missing rows
 | `frontend/src/components/workflows/builderStore.ts` | 16 / 9 / 1039 (was `14 / 8 / 968`) | 291: two actions (refs, input source), no state field |
 | `frontend/src/components/panel/WorkspacePanel.tsx` | 17 / 11 / 646 (was `16 / 10 / 646`) | honoured by construction (194 / 194.1 / 282-02: one prop) |
 | `backend/app/services/run_lifecycle.py` | 10 / 6 / 776 (was `9 / 5 / 756`) | 295-04: stopped_by → record_stop (If 11→11) |
-| `backend/app/db/runs.py` | 11 / 9 / 289 (was `9 / 8 / 266`) | 292.1-01: carrier loader drops name-less marker entries; SQL unchanged |
+| `backend/app/db/runs.py` | 12 / 9 / 345 (was `11 / 9 / 289`) | 292.1-REVIEW CR-01: run_is_cap_paused, the ONE pause predicate (+56) |
 | `frontend/src/pages/admin/AdminSpendPage.tsx` | 9 / 3 / 974 | ⚠ NOW FIRES (crossed in 268) · extraction FIRST next · ⛔ |
 | `backend/app/services/run_producer.py` | 25 / 13 / 1212 (was `24 / 12 / 1150`) | 292.1-03: continuation runs on the run's own model; one-warning fallback |
-| `backend/app/services/task_service.py` | 27 / 14 / 1023 (was `26 / 14 / 1018`) | 289-REVIEW WR-04: refused searches no longer count as KB searches |
+| `backend/app/services/task_service.py` | 28 / 15 / 1038 (was `27 / 14 / 1023`) | 292.1-REVIEW WR-02: provider-blind strip_markup on phase output (+15) |
 | `backend/app/services/run_reconciler.py` | 5 / 3 / 406 (was `3 / 2 / 325`) | 295-04: ONE workflow-run sweep · live-proven 295-07 · ⚠ now FIRES |
 | `backend/app/services/circuit_breaker.py` | 1 / 1 / 331 | ⚠ absent its ENTIRE LIFE — row added 256-02 · ⛔ |
-| `backend/app/api/runs.py` | 49 / 22 / 1945 (was `48 / 21 / 1929`) | 292.1-03: select model/provider + carry; SEED-324 terminal 409 (+1 If) |
+| `backend/app/api/runs.py` | 51 / 22 / 1981 (was `49 / 22 / 1945`) | 292.1-REVIEW: 409 asks run_is_cap_paused; Continue claim is compare-and-set |
 | `backend/app/api/panel.py` | 6 / 5 / 285 | 295-03: ONE engine_pause key on /pending · honoured by construction |
 | `backend/app/utils/folder_utils.py` | 9 / 5 / 302 | ⚠ absent its ENTIRE LIFE — row added 295-10 · ⛔ |
 | `backend/app/services/harness/human_input.py` | 6 / 3 / 375 (was `5 / 3 / 355`) | 295-09 CR-01: consumes only its own question's answer · ⛔ |
@@ -603,7 +603,7 @@ node scripts/check-hot-file-ledger.cjs <phase-dir>   # 0 clear · 1 missing rows
 | `backend/app/services/openai_service.py` | 84 / 42 / 2731 (was `81 / 41 / 2623`) | 292: SHOW_ARTIFACT_TOOL schema + description only (30 tools) · ⛔ |
 | `backend/app/services/provider_gateway/openai_compat.py` | 9 / 6 / 466 (was `7 / 5 / 537`) | 292.1-01: deepseek-only DSML strip deleted (D-01/D-02); a pure deletion |
 | `backend/app/services/provider_gateway/dispatcher.py` | 10 / 4 / 260 (was `6 / 2 / 153`) | ⚠ FIRES (row was stale) · 282-01: off-loop open, shared deadline · ⛔ |
-| `backend/app/services/provider_gateway/openai_responses.py` | 2 / 2 / 573 (was `0 / 0 / 563`) | young · 282-01: budget + retries reach the client when set · ⛔ |
+| `backend/app/services/provider_gateway/openai_responses.py` | 4 / 3 / 570 (was `2 / 2 / 573`) | ⚠ now FIRES · 292.1-REVIEW IN-03: dead dsml_leaked flag deleted · ⛔ |
 | `frontend/src/lib/api/admin.ts` | 10 / 5 / 1125 (was `9 / 5 / 1122`) | ⚠ FIRES · quick-261024: optional `returned` on discovery outcome · ⛔ |
 | `frontend/src/components/admin/CapabilityGrid.tsx` | 3 / 3 / 264 | ⚠ FIRES at 3 phases · row added 263-REVIEW WR-07 · ⛔ |
 | `frontend/src/components/admin/ModelAdvancedCapabilities.tsx` | 0 / 0 / 290 | young (created 262) · ⛔ |
