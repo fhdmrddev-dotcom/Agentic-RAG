@@ -306,3 +306,21 @@ def test_the_shown_count_is_frozen_where_the_manifest_is_injected():
     inject = code.index("apply_citation_instruction(\n")
     frozen = code.index("citations_shown = len(_deduplicate_citations(retrieved_citations))")
     assert 0 < frozen - inject < 400, "the count is taken next to the manifest it describes"
+
+
+# ── IN-02: one malformed citation does not make every source read "nothing was retrieved" ────────
+
+
+def test_a_citation_without_a_document_id_is_skipped_not_fatal():
+    cites = [{"chunk_index": 0, "filename": "Broken.pdf", "passage": "x"}, _CITES[0]]
+    out = artifact_sources.resolve_sources([1], cites, ["Invoices"])
+    assert isinstance(out, list), out
+    assert out[0]["document"] == "Invoice_Policy.pdf"
+
+
+def test_an_unnumberable_citation_set_is_not_called_empty():
+    cites = [{"document_id": {"not": "hashable"}, "chunk_index": 0, "filename": "a.pdf", "passage": "x"}]
+    out = artifact_sources.resolve_sources([1], cites, ["x"])
+    assert isinstance(out, ArtifactRefusal)
+    assert "nothing was retrieved" not in out.detail
+    assert "could not be numbered" in out.detail

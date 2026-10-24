@@ -121,10 +121,17 @@ def resolve_sources(
     """
     if all(h is None for h in handles):
         return [None] * len(handles)
+    # 292-REVIEW IN-02: a citation with no document_id key is one the manifest could not number, so it
+    # is skipped; it no longer turns every other source into "nothing was retrieved".
+    numberable = [c for c in citations or [] if isinstance(c, dict) and "document_id" in c]
     try:
-        unique = _deduplicate_citations([c for c in citations or [] if isinstance(c, dict)])
-    except (KeyError, TypeError):  # a citation with no document_id cannot be numbered
-        unique = []
+        unique = _deduplicate_citations(numberable)
+    except TypeError:  # an unhashable document_id: say so, never claim nothing was retrieved
+        return _refusal(
+            "unresolved_source",
+            "the sources retrieved in this turn could not be numbered, so a `source` cannot be resolved. "
+            "Omit `source` (the caption will say the values came from you).",
+        )
     if not unique:
         return _refusal(
             "unresolved_source",
