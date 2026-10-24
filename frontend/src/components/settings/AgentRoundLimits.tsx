@@ -1,9 +1,8 @@
-import { useEffect, useRef, useState } from "react"
+import { useEffect, useImperativeHandle, useRef, useState, type Ref } from "react"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
-import { cn } from "@/lib/utils"
-import { getSettings, updateSettings, type SettingsUpdate } from "@/lib/api"
+import { getSettings, type FullAppSettings, type SettingsUpdate } from "@/lib/api"
 
 /**
  * AgentRoundLimits — Phase 292.1 (BUG-261024-03, D-17 / D-18).
@@ -14,15 +13,23 @@ import { getSettings, updateSettings, type SettingsUpdate } from "@/lib/api"
  * that agree: the migration CHECK, the `PUT /settings` 400, and the clamp below.
  *
  * WHY A LEAF. `SettingsPage.tsx` is G-5 FIRING with its state split owed, so (the 294-04
- * RerankEngineBlock precedent, taken one step further) this component owns its own fetch and save
- * and the page gains exactly one import and one mount line — no state, no hydrate, no payload entry.
+ * RerankEngineBlock precedent) this component owns its own fetch and draft state, and the page holds
+ * only a ref to it — no state, no hydrate entry.
+ *
+ * ONE SAVE PER SECTION (292.1 UAT, operator 2026-10-24: "I set the limit of the rounds to 2 and hit
+ * save, but it is not saving"). This leaf used to carry its own "Save tool rounds" button beside the
+ * section's "Save AI Model"; the operator pressed "Save AI Model", whose body never carried the caps,
+ * so `updated_at` moved, the cap stayed 15, and nothing said so. Two buttons made the wrong save
+ * possible. Now there is no button here: the page's save merges `changes()` into its ONE PUT and
+ * hands the response back through `adopt()`. Its "Saved!" and its error banner are the feedback.
  *
  * ⛔ Invariants:
- *  - It owns its fetch and save; nothing here reaches into the page's state or its Save button.
- *  - CHANGED FIELDS ONLY: the PUT carries a cap only when its value differs from the loaded one.
+ *  - It owns its fetch and drafts; the page reaches it only through the handle below.
+ *  - CHANGED FIELDS ONLY: `changes()` carries a cap only when its value differs from the loaded one.
  *  - A cleared or non-numeric field is never sent — `Number("") === 0` must never reach the server
  *    (the 294-REVIEW WR-04 defect). It is simply left out.
- *  - A refusal renders the server's sentence VERBATIM; "✓ Saved" appears only after a resolved PUT.
+ *  - Until the read has answered, `changes()` is `{}` — the section still saves its model fields.
+ *  - After a save the fields show the SERVER's values, never the typed ones.
  *  - The bounds below mirror the server's; the server stays the boundary.
  *  - (292.1-REVIEW WR-05) Nothing is shown as live, or saved, before the read answers: the fields
  *    are empty and locked while loading, and a failed read says so (with Retry) — never 15 / 8.
@@ -33,9 +40,6 @@ const ROUNDS_MAX = 50
 const CHAT_DEFAULT = 15
 const EXPLORER_DEFAULT = 8
 
-// Panel AA token (index.css), the one RerankEngineBlock's saved flash uses.
-const GREEN = "text-[hsl(var(--panel-status-done))]"
-
 /** Empty or non-numeric reports nothing; anything else is clamped to 2..50. */
 function roundsFrom(raw: string): number | null {
   if (raw.trim() === "") return null
@@ -45,6 +49,14 @@ function roundsFrom(raw: string): number | null {
 }
 
 type Caps = { chat: number; explorer: number }
+
+/** What the section's save reads before its PUT, and hands the PUT's response back to. */
+export type AgentRoundLimitsHandle = {
+  /** The changed caps, ready to spread into the section's body; `{}` until the read has answered. */
+  changes: () => SettingsUpdate
+  /** Show the values the server now holds. */
+  adopt: (saved: Pick<FullAppSettings, "chat_max_tool_rounds" | "explorer_max_tool_rounds">) => void
+}
 
 function RoundRow({
   id,
@@ -89,7 +101,7 @@ function RoundRow({
   )
 }
 
-export function AgentRoundLimits() {
+export function AgentRoundLimits({ ref }: { ref?: Ref<AgentRoundLimitsHandle> }) {
   const [loaded, setLoaded] = useState<Caps>({ chat: CHAT_DEFAULT, explorer: EXPLORER_DEFAULT })
   // 292.1-REVIEW WR-05: the fields are empty and locked until the server has answered. A failed read
   // used to leave 15 / 8 on screen AS IF loaded — with the server holding 3 the operator saw 15,
@@ -99,9 +111,6 @@ export function AgentRoundLimits() {
   const [loadError, setLoadError] = useState<string | null>(null)
   const [chatDraft, setChatDraft] = useState("")
   const [explorerDraft, setExplorerDraft] = useState("")
-  const [saving, setSaving] = useState(false)
-  const [saved, setSaved] = useState(false)
-  const [error, setError] = useState<string | null>(null)
   const alive = useRef(true)
 
   function load() {
@@ -137,6 +146,8 @@ export function AgentRoundLimits() {
 
   function changes(): SettingsUpdate {
     const body: SettingsUpdate = {}
+    // WR-05: nothing is saved against a value this leaf never read.
+    if (loadState !== "loaded") return body
     const chat = roundsFrom(chatDraft)
     const explorer = roundsFrom(explorerDraft)
     if (chat !== null && chat !== loaded.chat) body.chat_max_tool_rounds = chat
@@ -144,13 +155,21 @@ export function AgentRoundLimits() {
     return body
   }
 
-  function edit(set: (v: string) => void) {
-    return (raw: string) => {
-      setSaved(false)
-      setError(null)
-      set(raw)
-    }
-  }
+  // No deps on purpose: the handle is rebuilt every render, so the page's save always reads the
+  // drafts as last committed.
+  useImperativeHandle(ref, () => ({
+    changes,
+    adopt(saved) {
+      if (loadState !== "loaded") return
+      const caps = {
+        chat: saved.chat_max_tool_rounds ?? loaded.chat,
+        explorer: saved.explorer_max_tool_rounds ?? loaded.explorer,
+      }
+      setLoaded(caps)
+      setChatDraft(String(caps.chat))
+      setExplorerDraft(String(caps.explorer))
+    },
+  }))
 
   /** On blur, show the value that would be sent (clamped) — or the loaded one for a cleared field. */
   function settle(draft: string, fallback: number, set: (v: string) => void) {
@@ -160,34 +179,7 @@ export function AgentRoundLimits() {
     }
   }
 
-  async function save() {
-    if (loadState !== "loaded") return
-    const body = changes()
-    if (Object.keys(body).length === 0) return
-    setSaving(true)
-    setSaved(false)
-    setError(null)
-    try {
-      const s = await updateSettings(body)
-      if (!alive.current) return
-      const caps = {
-        chat: s.chat_max_tool_rounds ?? body.chat_max_tool_rounds ?? loaded.chat,
-        explorer: s.explorer_max_tool_rounds ?? body.explorer_max_tool_rounds ?? loaded.explorer,
-      }
-      setLoaded(caps)
-      setChatDraft(String(caps.chat))
-      setExplorerDraft(String(caps.explorer))
-      setSaved(true)
-    } catch (e) {
-      if (!alive.current) return
-      setError(e instanceof Error ? e.message : "Failed to save settings")
-    } finally {
-      if (alive.current) setSaving(false)
-    }
-  }
-
   const ready = loadState === "loaded"
-  const dirty = ready && Object.keys(changes()).length > 0
 
   return (
     <div data-agent-round-limits>
@@ -197,7 +189,7 @@ export function AgentRoundLimits() {
         hint="When a turn reaches this many tool rounds it stops with a Continue button. Default 15."
         value={chatDraft}
         disabled={!ready}
-        onChange={edit(setChatDraft)}
+        onChange={setChatDraft}
         onBlur={settle(chatDraft, loaded.chat, setChatDraft)}
       />
       <RoundRow
@@ -206,7 +198,7 @@ export function AgentRoundLimits() {
         hint="Default 8."
         value={explorerDraft}
         disabled={!ready}
-        onChange={edit(setExplorerDraft)}
+        onChange={setExplorerDraft}
         onBlur={settle(explorerDraft, loaded.explorer, setExplorerDraft)}
       />
       {loadState === "failed" && (
@@ -220,24 +212,9 @@ export function AgentRoundLimits() {
           </Button>
         </div>
       )}
-      <div className="flex flex-wrap items-center gap-3 py-2">
-        <Button type="button" size="sm" variant="outline" disabled={!dirty || saving} onClick={() => void save()}>
-          {saving ? "Saving…" : "Save tool rounds"}
-        </Button>
-        {saved && (
-          <span role="status" className={cn("text-xs", GREEN)}>
-            ✓ Saved
-          </span>
-        )}
-        {!saved && !error && (
-          <span className="text-xs text-muted-foreground">Applies to every chat when you save.</span>
-        )}
-      </div>
-      {error && (
-        <p role="alert" className="rounded-lg border border-destructive/40 bg-destructive/15 px-3 py-2 text-sm text-[hsl(0_80%_80%)]">
-          {error}
-        </p>
-      )}
+      <p className="py-1 text-xs text-muted-foreground">
+        Applies to every chat once you click Save AI Model.
+      </p>
     </div>
   )
 }
