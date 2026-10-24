@@ -95,58 +95,6 @@
       "evidence": ".planning/phases/292.1-tool-limit-continue-that-always-fires-bug-261024-03/evidence/board/deepseek-18175e3e-bf41-42c2-a5ba-b5c17aa02e3e.json"
     },
     {
-      "provider": "google",
-      "model": "gemini-3.8-flash",
-      "required": true,
-      "extra": false,
-      "calling_mode": "NATIVE (native SDK adapter)",
-      "verdict": "FAIL (SC#1: continuation ended failed)",
-      "classification": "structured-pause",
-      "run_id": "578f2f1e-88bc-4e05-a4bc-6d71aa453926",
-      "thread_id": "d5fa6cfd-afdc-401c-b69d-8624de678cf2",
-      "attempts": 1,
-      "continue": {
-        "http": 200,
-        "body": {
-          "status": "ok",
-          "run_id": "578f2f1e-88bc-4e05-a4bc-6d71aa453926",
-          "continues_used": 1,
-          "continues_remaining": 2
-        },
-        "status_after": "failed",
-        "same_run_id": true,
-        "continues_used_before": 0,
-        "continues_used_after": 1,
-        "continues_used_plus_1": true,
-        "model_provider_unchanged": true,
-        "model_provider": [
-          "gemini-3.8-flash",
-          "google"
-        ],
-        "tool_starts_after_resume": [
-          "search_documents"
-        ],
-        "carrier_first_call": "search_documents",
-        "queued_call_ran_first": true,
-        "events_after_resume": [
-          "delta",
-          "error",
-          "iteration_start",
-          "tool_end",
-          "tool_start"
-        ]
-      },
-      "markup_hits": [],
-      "tools_used": [
-        "search_documents"
-      ],
-      "threads": [
-        "d5fa6cfd-afdc-401c-b69d-8624de678cf2"
-      ],
-      "reload_equal": true,
-      "evidence": ".planning/phases/292.1-tool-limit-continue-that-always-fires-bug-261024-03/evidence/board/google-578f2f1e-88bc-4e05-a4bc-6d71aa453926.json"
-    },
-    {
       "provider": "lmstudio",
       "model": "qwen-agentworld-35b-a3b",
       "required": false,
@@ -154,67 +102,6 @@
       "calling_mode": "NATIVE",
       "blocked": "extra (self-hosted) group \u2014 not one of the required 8; not driven unless named in --providers",
       "verdict": "\u26d4"
-    },
-    {
-      "provider": "minimax",
-      "model": "MiniMax-M3",
-      "required": true,
-      "extra": false,
-      "calling_mode": "NATIVE",
-      "verdict": "FAIL (thread reload: GET /threads/{id}/messages HTTP [500])",
-      "classification": "structured-pause",
-      "run_id": "c2ff84a0-04ac-4cd2-a5ba-46ba932bdf35",
-      "thread_id": "e901e539-9a29-4feb-bf1e-21735020836b",
-      "attempts": 1,
-      "continue": {
-        "http": 200,
-        "body": {
-          "status": "ok",
-          "run_id": "c2ff84a0-04ac-4cd2-a5ba-46ba932bdf35",
-          "continues_used": 1,
-          "continues_remaining": 2
-        },
-        "status_after": "cap_paused",
-        "same_run_id": true,
-        "continues_used_before": 0,
-        "continues_used_after": 1,
-        "continues_used_plus_1": true,
-        "model_provider_unchanged": true,
-        "model_provider": [
-          "MiniMax-M3",
-          "minimax"
-        ],
-        "tool_starts_after_resume": [
-          "search_documents",
-          "query_documents"
-        ],
-        "carrier_first_call": "search_documents",
-        "queued_call_ran_first": true,
-        "events_after_resume": [
-          "cap_paused",
-          "delta",
-          "iteration_start",
-          "planning",
-          "reasoning_delta",
-          "stream_end",
-          "suggestions",
-          "tool_args_progress",
-          "tool_end",
-          "tool_preparing",
-          "tool_start",
-          "turn_boundary"
-        ]
-      },
-      "markup_hits": [],
-      "tools_used": [
-        "query_documents",
-        "search_documents"
-      ],
-      "threads": [
-        "e901e539-9a29-4feb-bf1e-21735020836b"
-      ],
-      "reload_equal": false,
-      "evidence": ".planning/phases/292.1-tool-limit-continue-that-always-fires-bug-261024-03/evidence/board/minimax-c2ff84a0-04ac-4cd2-a5ba-46ba932bdf35.json"
     },
     {
       "provider": "moonshot",
@@ -331,6 +218,141 @@
       ],
       "reload_equal": true,
       "evidence": ".planning/phases/292.1-tool-limit-continue-that-always-fires-bug-261024-03/evidence/board/openrouter-extra-ced47148-56dc-42cf-a21f-ac6c9fde8be3.json"
+    },
+    {
+      "provider": "google",
+      "model": "gemini-3.8-flash",
+      "required": true,
+      "extra": false,
+      "calling_mode": "NATIVE (native SDK adapter)",
+      "verdict": "PASS",
+      "classification": "structured-pause",
+      "run_id": "fcdd3e75-29c4-43c6-a0b1-5a6163baf934",
+      "thread_id": "61f08251-0882-48bc-99f4-99f5d98ed80c",
+      "attempts": 1,
+      "continue": {
+        "http": 200,
+        "body": {
+          "status": "ok",
+          "run_id": "fcdd3e75-29c4-43c6-a0b1-5a6163baf934",
+          "continues_used": 1,
+          "continues_remaining": 2
+        },
+        "status_after": "completed",
+        "same_run_id": true,
+        "continues_used_before": 0,
+        "continues_used_after": 1,
+        "continues_used_plus_1": true,
+        "model_provider_unchanged": true,
+        "model_provider": [
+          "gemini-3.8-flash",
+          "google"
+        ],
+        "tool_starts_after_resume": [
+          "search_documents",
+          "execute_code"
+        ],
+        "carrier_first_call": "search_documents",
+        "queued_call_ran_first": true,
+        "events_after_resume": [
+          "citations",
+          "code_executing",
+          "code_execution_complete",
+          "code_execution_start",
+          "confidence",
+          "delta",
+          "done",
+          "final_output_files",
+          "iteration_start",
+          "planning",
+          "sources",
+          "stream_end",
+          "suggestions",
+          "tool_args_progress",
+          "tool_end",
+          "tool_preparing",
+          "tool_start"
+        ]
+      },
+      "markup_hits": [],
+      "tools_used": [
+        "execute_code",
+        "search_documents"
+      ],
+      "threads": [
+        "61f08251-0882-48bc-99f4-99f5d98ed80c"
+      ],
+      "reload_equal": true,
+      "evidence": ".planning/phases/292.1-tool-limit-continue-that-always-fires-bug-261024-03/evidence/board/google-fcdd3e75-29c4-43c6-a0b1-5a6163baf934.json"
+    },
+    {
+      "provider": "minimax",
+      "model": "MiniMax-M3",
+      "required": true,
+      "extra": false,
+      "calling_mode": "NATIVE",
+      "verdict": "PASS",
+      "classification": "structured-pause",
+      "run_id": "6983fd71-418c-4952-a4d3-bb56254bef44",
+      "thread_id": "39e39cea-a8f8-43fd-bd02-e583add910ed",
+      "attempts": 1,
+      "continue": {
+        "http": 200,
+        "body": {
+          "status": "ok",
+          "run_id": "6983fd71-418c-4952-a4d3-bb56254bef44",
+          "continues_used": 1,
+          "continues_remaining": 2
+        },
+        "status_after": "completed",
+        "same_run_id": true,
+        "continues_used_before": 0,
+        "continues_used_after": 1,
+        "continues_used_plus_1": true,
+        "model_provider_unchanged": true,
+        "model_provider": [
+          "MiniMax-M3",
+          "minimax"
+        ],
+        "tool_starts_after_resume": [
+          "search_documents",
+          "execute_code"
+        ],
+        "carrier_first_call": "search_documents",
+        "queued_call_ran_first": true,
+        "events_after_resume": [
+          "citations",
+          "code_executing",
+          "code_execution_complete",
+          "code_execution_start",
+          "code_stdout",
+          "confidence",
+          "delta",
+          "done",
+          "final_output_files",
+          "iteration_start",
+          "planning",
+          "reasoning_delta",
+          "sources",
+          "stream_end",
+          "suggestions",
+          "tool_args_progress",
+          "tool_end",
+          "tool_preparing",
+          "tool_start",
+          "turn_boundary"
+        ]
+      },
+      "markup_hits": [],
+      "tools_used": [
+        "execute_code",
+        "search_documents"
+      ],
+      "threads": [
+        "39e39cea-a8f8-43fd-bd02-e583add910ed"
+      ],
+      "reload_equal": true,
+      "evidence": ".planning/phases/292.1-tool-limit-continue-that-always-fires-bug-261024-03/evidence/board/minimax-6983fd71-418c-4952-a4d3-bb56254bef44.json"
     }
   ],
   "probes": {
@@ -469,12 +491,14 @@
   "threads_scanned": [
     "08ceb5e4-ed44-4314-af55-e31cbb91bf7b",
     "18177f97-0682-4ba9-b3ec-5106f4de1f7d",
+    "39e39cea-a8f8-43fd-bd02-e583add910ed",
     "3e1a999d-0fed-4c1a-8023-7ce5842db84d",
     "3eb22e66-0d2a-4d60-b19f-1ef6276f296c",
     "47c7178d-132b-4f24-9c5d-33c51f0de0bb",
     "494afd11-b97e-4b93-9572-f5d2ad424384",
     "54757112-ba0f-4ade-a549-42c2b8a9a0c6",
     "58d84c14-f89e-4cbf-878d-b216675eaf79",
+    "61f08251-0882-48bc-99f4-99f5d98ed80c",
     "66a381cd-7d79-4d12-b230-ef7b104c4c81",
     "699df254-756e-43c4-a133-f68b84c10691",
     "6ce1b3dc-877b-4ce7-a243-b3193c135093",
@@ -486,8 +510,6 @@
     "c1c91e35-be9a-41a8-9e20-9df66065bf5c",
     "c3bb7d86-5f62-4a77-a09a-afb8e0cbc7ae",
     "cb9e2975-0bba-45d8-b1d0-f2ba0caed7e7",
-    "d5fa6cfd-afdc-401c-b69d-8624de678cf2",
-    "e901e539-9a29-4feb-bf1e-21735020836b",
     "ecaa5e0d-8ebc-4012-9f99-1244e1768c58",
     "f64e5935-86ff-4ca2-b389-abf8cb3c579f",
     "f8a78671-4768-4752-90bd-73887225e516",

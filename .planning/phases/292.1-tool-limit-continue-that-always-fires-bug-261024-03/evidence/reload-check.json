@@ -1,5 +1,5 @@
 {
-  "at": "2026-10-24T13:00:24",
+  "at": "2026-10-24T13:08:40",
   "threads": [
     "08ceb5e4-ed44-4314-af55-e31cbb91bf7b",
     "18177f97-0682-4ba9-b3ec-5106f4de1f7d",
@@ -28,18 +28,5 @@
     "fe519331-fcc9-401b-a672-9790a0820f3a"
   ],
   "markup_hits": [],
-  "mismatches": {
-    "a6d673d1-6a9e-4d84-8766-76eaac5dd625": {
-      "http": 500,
-      "equal": false,
-      "compared": 0,
-      "diffs": []
-    },
-    "e901e539-9a29-4feb-bf1e-21735020836b": {
-      "http": 500,
-      "equal": false,
-      "compared": 0,
-      "diffs": []
-    }
-  }
+  "mismatches": {}
 }

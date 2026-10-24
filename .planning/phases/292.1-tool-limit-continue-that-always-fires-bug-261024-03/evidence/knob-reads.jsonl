@@ -6,3 +6,5 @@
 {"label": "board --long", "phase": "restore", "put_http": 200, "after": {"http": 200, "chat_max_tool_rounds": 15, "explorer_max_tool_rounds": 8, "at": "2026-10-24T12:59:07"}}
 {"label": "board --parallel", "phase": "set", "before": {"http": 200, "chat_max_tool_rounds": 15, "explorer_max_tool_rounds": 8, "at": "2026-10-24T12:59:16"}, "put_http": 200, "after": {"http": 200, "chat_max_tool_rounds": 2, "explorer_max_tool_rounds": 8, "at": "2026-10-24T12:59:16"}}
 {"label": "board --parallel", "phase": "restore", "put_http": 200, "after": {"http": 200, "chat_max_tool_rounds": 15, "explorer_max_tool_rounds": 8, "at": "2026-10-24T13:00:13"}}
+{"label": "board --run", "phase": "set", "before": {"http": 200, "chat_max_tool_rounds": 15, "explorer_max_tool_rounds": 8, "at": "2026-10-24T13:08:58"}, "put_http": 200, "after": {"http": 200, "chat_max_tool_rounds": 2, "explorer_max_tool_rounds": 8, "at": "2026-10-24T13:08:58"}}
+{"label": "board --run", "phase": "restore", "put_http": 200, "after": {"http": 200, "chat_max_tool_rounds": 15, "explorer_max_tool_rounds": 8, "at": "2026-10-24T13:11:35"}}

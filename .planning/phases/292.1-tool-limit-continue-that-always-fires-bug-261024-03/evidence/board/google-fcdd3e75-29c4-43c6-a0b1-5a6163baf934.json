@@ -1,0 +1,129 @@
+{
+  "entry": {
+    "provider": "google",
+    "model": "gemini-3.8-flash",
+    "calling_mode": "NATIVE (native SDK adapter)",
+    "required": true,
+    "extra": null,
+    "forced_from": null
+  },
+  "prompt": "Do these three steps one at a time, each as its own tool call, and wait for each result before the next: 1) search our documents for the project plan; 2) search our documents again for its milestones; 3) use Python (execute_code) to draw a bar chart of milestones per quarter. Do not skip a step and do not combine steps.",
+  "attempts": [
+    {
+      "thread_id": "61f08251-0882-48bc-99f4-99f5d98ed80c",
+      "run_id": "fcdd3e75-29c4-43c6-a0b1-5a6163baf934",
+      "status": "completed",
+      "paused": true,
+      "run": {
+        "run_id": "fcdd3e75-29c4-43c6-a0b1-5a6163baf934",
+        "thread_id": "61f08251-0882-48bc-99f4-99f5d98ed80c",
+        "status": "completed",
+        "model": "gemini-3.8-flash",
+        "provider": "google",
+        "continues_used": 0,
+        "started_at": "2026-10-24 09:08:59.094318+00:00",
+        "error": null
+      },
+      "classification": "structured-pause",
+      "carrier": [
+        {
+          "kind": "iteration_cap_paused",
+          "name": "search_documents",
+          "arguments": "{\"query\": \"milestones\"}",
+          "tool_call_id": "call_428544",
+          "thought_signature": "Eq4GCqsGAWkUfRM3GutnloenBpa0cFRzLQDVrlxStSvjXWU+zvmM6Yy+D0CqwhStzvlWxTDWCVF4FeNkjeWCCfhWNHFr0D8wDUxIZ/uwfPc5UPoJVnU4nBddvsJ8mQqG8ksTm1Z0G79YG0lT3LFwOMs/xJeQ0caz15uBA7MNpmd8GlvFTM2vSn+JQ9UQh0p7kbek3ERPLGsljGefHz9vX/O4xrigra8MwRel+HxdvD1A7R/4NKqYHJlUgR4IjQTv01k+Uya+siVqOZ+CYvZ/E42eedBU+WbGpssB0oUCYvYUKfzhjZ8tP4kD9gfnCekbMo2a0efObWAFItwZ4gvs4QD2m6IQf+f5JLq5ioyw7ZfE7OO9yeF8bQCUNwmDbCi7VK4t2OUoNwVurQu5I/IoQj4yDNRK+qQLpoAB0krZnNfbwnpNWLkD5lmvHttEfpVEwC/uMUJofspnG9ZiysuU8Du8NLqDdb39SSJJ2pAXzweI85BavOm/tFMpAbchA8s8vgB6IhOtJ9wJlVM1rrdlen/nYRxMmPst16KmOxIoG61nlOSRvs5IwyO04YJuG88eZQKpmJ7vkOQ7vf6pyXhaYcTPqIffMWI19RdhTyyKbMs7M1GrFJziOcCR1F+XMeXIiymoNfu2aTiPntPcVA/aNHSXuoWkiT9vAqbw4cfBxwzk3GJShPmwZpP6lCjU8kYfDeHBNyyt8qDfqGojtWBksarZ6KDXwRS/V8mXywqvXRYT/zBDCN2qAEfXM9/CyGljYe/gt87qKeXKOG9auSNTUx0GxnaP+rQtRLt961fkxq68pCF8gd4TBpjBuCDpcnvf0WvlT7tIXI/UEoEb924kLCeamKfnBkVMB2kwadsUAPPFWOHmJLMhXHY0nnwcuRTqiX2eH1CcZeMhfGyiBZFPmtfYMPWWpQPNIXiT8PWoNB2H0nzi4AvSplxAGirssRy/uyM7o/q/icg/OZapQpvHsIeU6Qeh6tCGPTamFJbUgngWkxjW72OckwYZnVVDm6AgAn3sCmHTFSzca6p9JvQEjHtJTyCiYn6jC3VoMn49HFibgzHymUOaDpo3KY/ew1OehQ=="
+        }
+      ],
+      "tool_starts": [
+        "search_documents"
+      ],
+      "event_types": [
+        "cap_paused",
+        "citations",
+        "confidence",
+        "delta",
+        "done",
+        "iteration_start",
+        "planning",
+        "sources",
+        "stream_end",
+        "suggestions",
+        "tool_end",
+        "tool_preparing",
+        "tool_start"
+      ],
+      "cap_paused_event": {
+        "type": "cap_paused",
+        "kind": "iteration_cap_paused",
+        "message": "\u23f8 Reached the iteration limit \u2014 1 tool(s) weren't run yet. Continue to run them.",
+        "tool_names": [
+          "search_documents"
+        ],
+        "continues_used": 0,
+        "continues_remaining": 3
+      },
+      "live_markup_at": null,
+      "live_preview": "*The model produced 1 tool call(s) over 2 step(s) and never wrote an answer. Try breaking the request into smaller steps, or switching to a different model.*",
+      "redis_last_id": "1792832964893-0"
+    }
+  ],
+  "paused": true,
+  "continue": {
+    "http": 200,
+    "body": {
+      "status": "ok",
+      "run_id": "fcdd3e75-29c4-43c6-a0b1-5a6163baf934",
+      "continues_used": 1,
+      "continues_remaining": 2
+    },
+    "status_after": "completed",
+    "same_run_id": true,
+    "continues_used_before": 0,
+    "continues_used_after": 1,
+    "continues_used_plus_1": true,
+    "model_provider_unchanged": true,
+    "model_provider": [
+      "gemini-3.8-flash",
+      "google"
+    ],
+    "tool_starts_after_resume": [
+      "search_documents",
+      "execute_code"
+    ],
+    "carrier_first_call": "search_documents",
+    "queued_call_ran_first": true,
+    "events_after_resume": [
+      "citations",
+      "code_executing",
+      "code_execution_complete",
+      "code_execution_start",
+      "confidence",
+      "delta",
+      "done",
+      "final_output_files",
+      "iteration_start",
+      "planning",
+      "sources",
+      "stream_end",
+      "suggestions",
+      "tool_args_progress",
+      "tool_end",
+      "tool_preparing",
+      "tool_start"
+    ]
+  },
+  "markup_hits": [],
+  "reload": {
+    "61f08251-0882-48bc-99f4-99f5d98ed80c": {
+      "http": 200,
+      "equal": true,
+      "compared": 2,
+      "diffs": [],
+      "db_rows_not_in_reload": []
+    }
+  },
+  "tools_used": [
+    "execute_code",
+    "search_documents"
+  ]
+}
