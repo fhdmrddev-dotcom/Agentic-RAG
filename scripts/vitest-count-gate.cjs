@@ -4392,6 +4392,14 @@ const BASELINE = {
   "continueWords.lockstep.test.ts": 17, // 292.1-03 — ?raw lockstep vs typed_continue.py + the shared continue-words fixture
   "StreamsProvider.typedContinue.test.tsx": 6, // 292.1-03 — typed continue holds the optimistic turn; Continuing… set and cleared
   "StreamsProvider.capPausedDone.test.tsx": 4, // 292.1 G-4 live fix (RED 97a50019f / GREEN 1397edfbb): a `done` after a live cap pause asks the server before clearing the Continue card
+  // ── Phase 293-04 (START-02) — adopted, both knobs, same commit. FILE-LEVEL in TARGETS for the
+  // `src/components/settings/apiKeys` suites (no `src/components/settings` directory entry);
+  // `launchFieldsTwin293.test.ts` sits under the `src/components/workflows` directory entry, pin only.
+  "apiKeyFacts.test.ts": 32, // 293-04 — wire → card facts: refused chips never read active, every reason code worded, raw code for an unknown one
+  "curlExamples.test.ts": 8, // 293-04 — the show-once curl: real base, bearer secret, declared fields in order, JSON + shell escaping
+  "apiKeyPrepick.test.ts": 6, // 293-04 — ⋯ menu pre-pick: sessionStorage read-once, only {workflowId, name}, never a secret
+  "apiKeysContract.test.ts": 3, // 293-04 — client wire types vs backend api_keys_contract.json, path by path
+  "launchFieldsTwin293.test.ts": 9, // 293-04 — launchInputFields vs launch_fields_cases.json (the server twin reads the same file)
 }
 
 // Still COMPUTED, never hand-written — the reduce is the single source, so the
@@ -6413,6 +6421,12 @@ const TARGETS = [
   "src/providers/__tests__/StreamsProvider.typedContinue.test.tsx",
   // 292.1 G-4 live fix — FILE-LEVEL, SAME commit as its BASELINE pin (292.1-04 close-out).
   "src/providers/__tests__/StreamsProvider.capPausedDone.test.tsx",
+  // ── Phase 293-04 — FILE-LEVEL (no `src/components/settings` directory entry), SAME commit as
+  // their BASELINE pins.
+  "src/components/settings/apiKeys/__tests__/apiKeyFacts.test.ts",
+  "src/components/settings/apiKeys/__tests__/curlExamples.test.ts",
+  "src/components/settings/apiKeys/__tests__/apiKeyPrepick.test.ts",
+  "src/components/settings/apiKeys/__tests__/apiKeysContract.test.ts",
 ]
 
 const REPO_ROOT = path.resolve(__dirname, "..")
