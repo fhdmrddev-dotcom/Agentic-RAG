@@ -771,6 +771,12 @@ REVOKE EXECUTE ON FUNCTION public.message_artifacts_immutable() FROM anon;
 REVOKE EXECUTE ON FUNCTION public.message_artifacts_immutable() FROM authenticated;
 GRANT EXECUTE ON FUNCTION public.message_artifacts_immutable() TO service_role;
 
+-- migration 215 — workflow_runs' origin freeze trigger function (Group A shape: trigger-only).
+REVOKE EXECUTE ON FUNCTION public.workflow_runs_origin_immutable() FROM PUBLIC;
+REVOKE EXECUTE ON FUNCTION public.workflow_runs_origin_immutable() FROM anon;
+REVOKE EXECUTE ON FUNCTION public.workflow_runs_origin_immutable() FROM authenticated;
+GRANT EXECUTE ON FUNCTION public.workflow_runs_origin_immutable() TO service_role;
+
 -- migration 204 — Phase 275: the hold predicates and the folder walk are service_role ONLY (W-5b);
 -- the trigger functions are trigger-only (Group A shape, no grant). Copied, not retyped.
 REVOKE EXECUTE ON FUNCTION public.retention_folder_ancestors(uuid) FROM PUBLIC;
@@ -846,3 +852,11 @@ REVOKE ALL ON TABLE public.message_citation_checks FROM authenticated;
 REVOKE ALL ON TABLE public.message_citation_checks FROM service_role;
 GRANT SELECT ON TABLE public.message_citation_checks TO authenticated;
 GRANT SELECT, INSERT, UPDATE, DELETE ON TABLE public.message_citation_checks TO service_role;
+
+-- migration 215 — api_keys: owners READ (column grant, key_hash never granted); only the backend writes.
+REVOKE ALL ON TABLE public.api_keys FROM PUBLIC;
+REVOKE ALL ON TABLE public.api_keys FROM anon;
+REVOKE ALL ON TABLE public.api_keys FROM authenticated;
+REVOKE ALL ON TABLE public.api_keys FROM service_role;
+GRANT SELECT (id, org_id, user_id, label, key_prefix, workflows, expires_at, revoked_at, revoked_by, last_used_at, created_at) ON TABLE public.api_keys TO authenticated;
+GRANT SELECT, INSERT, UPDATE, DELETE ON TABLE public.api_keys TO service_role;
