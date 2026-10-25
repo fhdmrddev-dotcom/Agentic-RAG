@@ -46,6 +46,8 @@ function rowOf(over: Partial<WorkflowRunListItem> = {}): WorkflowRunListItem {
     step_total: 5,
     started_at: null,
     completed_at: null,
+    // 293-03: every existing case reads an unrecorded origin, so it composes as it did at base.
+    origin: null,
     ...over,
   }
 }
@@ -216,5 +218,35 @@ describe("runLogRowFacts §5 — `now` is injected, so two rows in one render ag
     const near = runLogRowFacts(rowOf({ created_at: at }), NOW)
     const far = runLogRowFacts(rowOf({ created_at: at }), NOW + 3 * 24 * 60 * 60 * 1000)
     expect(near.fact.word).not.toBe(far.fact.word)
+  })
+})
+
+describe("runLogRowFacts §293 — how the run started is the LAST atom", () => {
+  it("a key-started run ends its detail with the origin sentence after the duration", () => {
+    const facts = runLogRowFacts(
+      rowOf({
+        started_at: "2026-08-20T10:00:00.000Z",
+        completed_at: "2026-08-20T10:02:10.000Z",
+        origin: { kind: "key", label: "n8n-prod", actor_name: null },
+      }),
+      NOW,
+    )
+    expect(facts.detail).toBe("v2 · 5 steps · 2m 10s · Started by key n8n-prod")
+  })
+
+  it("a run with no recorded origin composes exactly as before (no separator, no word)", () => {
+    const facts = runLogRowFacts(rowOf({ origin: null }), NOW)
+    expect(facts.detail).toBe("v2 · 5 steps")
+    const absent = rowOf()
+    delete (absent as { origin?: unknown }).origin
+    expect(runLogRowFacts(absent, NOW).detail).toBe("v2 · 5 steps")
+  })
+
+  it("an unknown kind is silent too", () => {
+    const facts = runLogRowFacts(
+      rowOf({ origin: { kind: "manual", label: null, actor_name: null } as never }),
+      NOW,
+    )
+    expect(facts.detail).toBe("v2 · 5 steps")
   })
 })

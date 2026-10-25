@@ -35,6 +35,8 @@ const SAMPLE = {
     thread_id: "bed19e8c-fc59-4598-ae05-2ec7604cf271",
     // 295-05 (D-22): why a failed or cancelled run stopped, server-resolved; null otherwise.
     end_reason: null,
+    // 293-03 (D-22): how the run started, as recorded; null when it was not.
+    origin: { kind: "key", label: "n8n-prod", actor_name: null },
   },
   definition: {
     recorded: true,
@@ -107,12 +109,13 @@ function samplePaths(): Record<string, string[]> {
 }
 
 describe("289 I1 — RunEvidence matches the shared contract fixture", () => {
-  it("the fixture names the thirteen object paths of the contract", () => {
+  it("the fixture names the fourteen object paths of the contract", () => {
     expect(Object.keys(contract.paths).sort()).toEqual(
       [
         "$",
         "run",
         "run.started_by",
+        "run.origin",
         "definition",
         "definition.phases[]",
         "definition_changed",

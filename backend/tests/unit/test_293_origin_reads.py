@@ -441,3 +441,76 @@ def test_message_response_declares_run_origin():
     )
     assert m.model_dump()["run_origin"] == {"kind": "key", "label": "n8n-prod",
                                             "actor_name": None}
+
+
+# ══ 5) the chat thread's run line — GET /threads/{id}/workflow (293-03 Task 2, branch B) ══
+#
+# Step 0 measured that a workflow run's turn carries no tool_calls, so RunCard never mounts for
+# it; ThreadRunLine is the chat surface a run renders, and it reads this frame.
+
+
+def _workflow_frame(client, mock_asyncpg_pool, mock_execute_result, latest_row, *,
+                    profile_row=None):
+    from unittest.mock import AsyncMock, patch
+
+    thread_id = uuid.uuid4()
+    mock_execute_result.data = {"id": str(thread_id), "active_workflow_run_id": None}
+    mock_asyncpg_pool.set_fetchrow_results(
+        [
+            None,  # the deep cap_paused probe
+            latest_row,  # the thread's latest workflow run (ARM B)
+            {"definition": DEFINITION},  # the definition join
+            profile_row,  # the caller's display name (only read for an app origin)
+        ]
+    )
+    mock_asyncpg_pool.set_fetch_results(
+        [[{"slug": "research", "phase_index": 0, "status": "cancelled", "started_at": None,
+           "completed_at": None, "output": {}}], []]
+    )
+    with patch("app.api.threads.get_pg_pool", AsyncMock(return_value=mock_asyncpg_pool)), patch(
+        "app.dependencies.get_pg_pool", AsyncMock(return_value=mock_asyncpg_pool)
+    ):
+        resp = client.get(f"/threads/{thread_id}/workflow")
+    assert resp.status_code == 200, resp.text
+    return resp.json()
+
+
+def _latest(**origin):
+    return {"id": uuid.uuid4(), "status": "cancelled", "created_at": None, "updated_at": None,
+            **origin}
+
+
+def test_thread_frame_carries_a_key_origin(client, mock_asyncpg_pool, mock_execute_result):
+    body = _workflow_frame(client, mock_asyncpg_pool, mock_execute_result,
+                           _latest(origin_kind="key", origin_label="n8n-prod"))
+    assert body["origin"] == {"kind": "key", "label": "n8n-prod", "actor_name": None}
+
+
+def test_thread_frame_app_origin_names_the_caller(client, mock_asyncpg_pool,
+                                                   mock_execute_result):
+    body = _workflow_frame(client, mock_asyncpg_pool, mock_execute_result,
+                           _latest(origin_kind="app", origin_label=None),
+                           profile_row={"display_name": OWNER_NAME})
+    assert body["origin"] == {"kind": "app", "label": None, "actor_name": OWNER_NAME}
+
+
+def test_thread_frame_unrecorded_origin_is_null(client, mock_asyncpg_pool, mock_execute_result):
+    body = _workflow_frame(client, mock_asyncpg_pool, mock_execute_result,
+                           _latest(origin_kind=None, origin_label=None))
+    assert body["origin"] is None
+
+
+def test_thread_frame_selects_the_origin_columns_on_both_arms():
+    from pathlib import Path
+
+    src = (Path(__file__).resolve().parents[2] / "app/api/threads.py").read_text(encoding="utf-8")
+    src = src.replace("\r\n", "\n")
+    assert '"SELECT id, status, created_at, updated_at, origin_kind, origin_label FROM workflow_runs' in src
+    assert "wr.origin_kind," in src and "wr.origin_label," in src
+
+
+def test_thread_workflow_state_declares_origin():
+    from app.models.thread import ThreadWorkflowState
+
+    assert "origin" in ThreadWorkflowState.model_fields
+    assert ThreadWorkflowState.model_fields["origin"].default is None
