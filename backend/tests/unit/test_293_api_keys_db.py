@@ -82,6 +82,9 @@ async def _drive_every_scoped_function() -> list[tuple[str, str, tuple]]:
     await db.touch_last_used(pool, KEY, org_id=ORG)
     await db.is_org_member(pool, org_id=ORG, user_id=USER)
     await db.list_key_calls(pool, org_id=ORG, key_ids=[str(KEY)], since=datetime.now(timezone.utc))
+    await db.get_key_workflows(pool, workflow_ids=[KEY], user_id=USER, org_id=ORG)
+    await db.list_startable_candidates(pool, user_id=USER, org_id=ORG)
+    await db.count_own_drafts(pool, user_id=USER, org_id=ORG)
     return pool.calls
 
 
@@ -227,3 +230,15 @@ async def test_list_for_org_names_the_owner_and_the_revoker():
     sql = pool.calls[0][1]
     assert "profiles" in sql
     assert "owner_name" in sql and "revoked_by_name" in sql
+
+
+async def test_a_workflow_the_caller_cannot_read_returns_no_content():
+    """Every content column is behind the readability predicate, so a foreign row's name or
+    definition never leaves this module."""
+    pool = _Pool(rows=[])
+    await db.get_key_workflows(pool, workflow_ids=[KEY], user_id=USER, org_id=ORG)
+    (_kind, sql, args), = pool.calls
+    for col in ("name", "status", "definition"):
+        assert f"THEN {col} END AS {col}" in sql
+    assert "created_by = $2 AND org_id = $3" in sql
+    assert args == ([KEY], USER, ORG)

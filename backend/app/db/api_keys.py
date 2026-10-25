@@ -91,12 +91,24 @@ async def create_api_key(
     return dict(row)
 
 
+def _named_columns() -> str:
+    cols = ", ".join(f"k.{c}" for c in _KEY_COLUMN_NAMES)
+    return f"{cols}, po.display_name AS owner_name, pr.display_name AS revoked_by_name"
+
+
+_NAME_JOINS = (
+    "LEFT JOIN profiles po ON po.id = k.user_id "
+    "LEFT JOIN profiles pr ON pr.id = k.revoked_by "
+)
+
+
 async def list_keys_for_owner(pool: asyncpg.Pool, *, org_id: UUID, user_id: UUID) -> list[dict]:
-    """Every key this member owns in this org, newest first (revoked and expired included)."""
+    """Every key this member owns in this org, newest first (revoked and expired included), with
+    the revoker's display name (an admin may have revoked it)."""
     rows = await pool.fetch(
-        f"SELECT {_KEY_COLUMNS} FROM api_keys "
-        f"WHERE org_id = $1 AND user_id = $2 "
-        f"ORDER BY created_at DESC",
+        f"SELECT {_named_columns()} FROM api_keys k {_NAME_JOINS}"
+        f"WHERE k.org_id = $1 AND k.user_id = $2 "
+        f"ORDER BY k.created_at DESC",
         org_id,
         user_id,
     )
@@ -105,12 +117,8 @@ async def list_keys_for_owner(pool: asyncpg.Pool, *, org_id: UUID, user_id: UUID
 
 async def list_keys_for_org(pool: asyncpg.Pool, *, org_id: UUID) -> list[dict]:
     """Every key in this org, with the owner's and the revoker's display names (D-03, admin)."""
-    cols = ", ".join(f"k.{c}" for c in _KEY_COLUMN_NAMES)
     rows = await pool.fetch(
-        f"SELECT {cols}, po.display_name AS owner_name, pr.display_name AS revoked_by_name "
-        f"FROM api_keys k "
-        f"LEFT JOIN profiles po ON po.id = k.user_id "
-        f"LEFT JOIN profiles pr ON pr.id = k.revoked_by "
+        f"SELECT {_named_columns()} FROM api_keys k {_NAME_JOINS}"
         f"WHERE k.org_id = $1 "
         f"ORDER BY k.created_at DESC",
         org_id,
@@ -148,21 +156,27 @@ async def revoke_key(
 
     An already-revoked key is returned UNCHANGED — the UPDATE matches live keys only, so a second
     revoke can never overwrite who revoked it first, or when.
+
+    Two statements, not a data-modifying CTE: an outer SELECT cannot see its own CTE's UPDATE of
+    the same table, and the read-back must carry the revoker's NEW name.
     """
     if owner_id is None:
         scope, args = "id = $1 AND org_id = $2", (key_id, org_id)
+        k_scope = "k.id = $1 AND k.org_id = $2"
     else:
         scope, args = "id = $1 AND org_id = $2 AND user_id = $3", (key_id, org_id, owner_id)
+        k_scope = "k.id = $1 AND k.org_id = $2 AND k.user_id = $3"
     by = f"${len(args) + 1}"
-    row = await pool.fetchrow(
+    await pool.execute(
         f"UPDATE api_keys SET revoked_at = now(), revoked_by = {by} "
-        f"WHERE {scope} AND revoked_at IS NULL "
-        f"RETURNING {_KEY_COLUMNS}",
+        f"WHERE {scope} AND revoked_at IS NULL",
         *args,
         revoked_by,
     )
-    if row is None:
-        row = await pool.fetchrow(f"SELECT {_KEY_COLUMNS} FROM api_keys WHERE {scope}", *args)
+    row = await pool.fetchrow(
+        f"SELECT {_named_columns()} FROM api_keys k {_NAME_JOINS}WHERE {k_scope}",
+        *args,
+    )
     return dict(row) if row is not None else None
 
 
@@ -212,3 +226,62 @@ async def list_key_calls(
         since,
     )
     return [dict(r) for r in rows]
+
+
+# ── the workflows a key names (read for create, list and the picker) ──────────────────────────
+#
+# ⚠ The readability predicate below is ``db/workflows.get_definition``'s, PLUS the org: a key
+#   belongs to one org (D-01), so the caller's own workflow counts only in the org they are acting
+#   in. A workflow outside it reads exactly like one that does not exist.
+_READABLE_SQL = (
+    "((created_by = $2 AND org_id = $3) OR (is_system_global = true AND status = 'published'))"
+)
+
+
+async def get_key_workflows(
+    pool: asyncpg.Pool, *, workflow_ids: list[UUID], user_id: UUID, org_id: UUID
+) -> list[dict]:
+    """One row per EXISTING id: ``{id, readable, name, status, definition}``.
+
+    A row the caller may not read comes back with ``readable = false`` and every content column
+    NULL, so a route can tell "deleted" (absent) from "you can no longer run it" without this
+    function ever returning someone else's workflow content.
+    """
+    if not workflow_ids:
+        return []
+    rows = await pool.fetch(
+        f"SELECT id, {_READABLE_SQL} AS readable, "
+        f"CASE WHEN {_READABLE_SQL} THEN name END AS name, "
+        f"CASE WHEN {_READABLE_SQL} THEN status END AS status, "
+        f"CASE WHEN {_READABLE_SQL} THEN definition END AS definition "
+        f"FROM workflow_definitions WHERE id = ANY($1::uuid[])",
+        workflow_ids,
+        user_id,
+        org_id,
+    )
+    return [dict(r) for r in rows]
+
+
+async def list_startable_candidates(
+    pool: asyncpg.Pool, *, user_id: UUID, org_id: UUID
+) -> list[dict]:
+    """The caller's OWN published workflows in this org — the key form's checklist."""
+    rows = await pool.fetch(
+        "SELECT id, name, definition FROM workflow_definitions "
+        "WHERE status = 'published' AND created_by = $1 AND org_id = $2 "
+        "ORDER BY name, version DESC",
+        user_id,
+        org_id,
+    )
+    return [dict(r) for r in rows]
+
+
+async def count_own_drafts(pool: asyncpg.Pool, *, user_id: UUID, org_id: UUID) -> int:
+    """How many of the caller's drafts the checklist hides ("N drafts are hidden")."""
+    value = await pool.fetchval(
+        "SELECT count(*) FROM workflow_definitions "
+        "WHERE status = 'draft' AND created_by = $1 AND org_id = $2",
+        user_id,
+        org_id,
+    )
+    return int(value or 0)

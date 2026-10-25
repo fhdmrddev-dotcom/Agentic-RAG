@@ -124,7 +124,7 @@ const TAG_GROUPS = [
   { name: "Experts", tags: ["experts"] },
   {
     name: "Account & org",
-    tags: ["org", "preferences", "features", "model-registry", "settings", "audit", "feedback"],
+    tags: ["org", "api-keys", "preferences", "features", "model-registry", "settings", "audit", "feedback"],
   },
   { name: "System", tags: [SYSTEM_TAG] },
 ]
