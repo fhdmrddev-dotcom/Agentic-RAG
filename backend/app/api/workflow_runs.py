@@ -100,8 +100,10 @@ from app.services.harness.phase_confidence import (
 # 295 (D-04 / D-22 / D-37) — the pure leaf every run read shares for these facts.
 from app.services.harness.run_read_wire import (
     END_REASON_AUDIT_KINDS,
+    RunOriginWire,
     UnsourcedMark,
     deadline_passed,
+    origin_for_wire,
     resolve_end_reason,
     unsourced_for_wire,
 )
@@ -443,6 +445,15 @@ class WorkflowRunRead(BaseModel):
             "says so; a reason is never composed here."
         ),
     )
+    # 293 (START-04 / D-22) — DECLARED here, SELECTED as `origin_kind, origin_label` in the
+    # ownership select, PRODUCED by `origin_for_wire` (the 214 lockstep).
+    origin: RunOriginWire | None = Field(
+        default=None,
+        description=(
+            "How this run was started, as recorded at start (Phase 293). Null when it was "
+            "not recorded."
+        ),
+    )
     phases: list[WorkflowRunPhaseRead] = Field(default_factory=list)
 
 
@@ -611,6 +622,14 @@ class WorkflowRunListItem(BaseModel):
             "the row was inserted, which is a different fact."
         ),
     )
+    # 293 (START-04 / D-22) — the run read's own field, off the same helper.
+    origin: RunOriginWire | None = Field(
+        default=None,
+        description=(
+            "How this run was started, as recorded at start (Phase 293). Null when it was "
+            "not recorded."
+        ),
+    )
     completed_at: datetime | None = Field(
         default=None,
         description=(
@@ -708,7 +727,7 @@ async def list_workflow_runs(
     runs_query = (
         supabase.table("workflow_runs")
         .select(
-            "id, thread_id, definition_id, status, created_at",
+            "id, thread_id, definition_id, status, created_at, origin_kind, origin_label",
             count="exact",
         )
         .eq("user_id", current_user["id"])
@@ -725,6 +744,14 @@ async def list_workflow_runs(
 
     if not run_rows:
         return WorkflowRunListRead(runs=[], total=total or 0, limit=limit, offset=offset)
+
+    # 293 (D-22): the list is owner-scoped, so an app start's actor is the caller. ONE name
+    # lookup per request, and only when a row on this page was started in the app.
+    actor_name = (
+        await _owner_display_name(supabase, current_user["id"])
+        if any(row.get("origin_kind") == "app" for row in run_rows)
+        else None
+    )
 
     # ── Step 3: the identity of the definitions on this page ──
     # One query for the page's distinct definition ids, never one per row.
@@ -801,6 +828,9 @@ async def list_workflow_runs(
                 step_total=span.get("steps", 0),
                 started_at=span.get("started_at"),
                 completed_at=span.get("completed_at"),
+                origin=origin_for_wire(
+                    row.get("origin_kind"), row.get("origin_label"), actor_name
+                ),
             )
         )
 
@@ -884,6 +914,23 @@ async def _read_waiting_on(
         logger.warning(
             "workflow_run waiting_on lookup failed for run %s", run.get("id"), exc_info=True
         )
+        return None
+
+
+async def _owner_display_name(supabase: Client, user_id: Any) -> str | None:
+    """293 (D-22): the owner's display name for an app-started run's origin line.
+
+    Both callers read owner-scoped rows, so this is the caller's own profile on the user-JWT
+    client. A failed read is ``None`` (the sentence then names nobody), never a 500.
+    """
+    try:
+        resp = await aexec(
+            supabase.table("profiles").select("display_name").eq("id", str(user_id)).maybe_single()
+        )
+        prof = resp.data if resp is not None else None
+        return prof.get("display_name") if isinstance(prof, dict) else None
+    except Exception:  # noqa: BLE001 — a name is an affordance on a pure read.
+        logger.warning("origin name lookup failed for user %s", user_id, exc_info=True)
         return None
 
 
@@ -1008,7 +1055,9 @@ async def read_workflow_run(
             # fence red. ⭐ A fence that counts occurrences is a fence a COMMENT can break,
             # which is the mirror image of this repo's other standing lesson that a text
             # fence cannot tell code from a comment. Say "star read" in prose; never type it.
-            "model, input_tokens, output_tokens, token_coverage, user_id, is_golden_run"
+            "model, input_tokens, output_tokens, token_coverage, user_id, is_golden_run, "
+            # 293 (D-22): the recorded start, stamped once by `create_workflow_run`.
+            "origin_kind, origin_label"
         )
         .eq("id", str(workflow_run_id))
         .eq("user_id", current_user["id"])
@@ -1277,6 +1326,15 @@ async def read_workflow_run(
 
     _coverage = run.get("token_coverage")
     waiting_on = await _read_waiting_on(run, phase_rows, definition, slug_to_type, current_user)
+    # 293 (D-22): the owner's name is read only for an app start (a key or a schedule names no
+    # person); `origin_for_wire` reads None for a NULL or unknown kind (D-23).
+    origin = origin_for_wire(
+        run.get("origin_kind"),
+        run.get("origin_label"),
+        await _owner_display_name(supabase, run["user_id"])
+        if run.get("origin_kind") == "app"
+        else None,
+    )
 
     return WorkflowRunRead(
         id=run["id"],
@@ -1301,6 +1359,7 @@ async def read_workflow_run(
         token_coverage=list(_coverage) if isinstance(_coverage, list) else None,
         waiting_on=waiting_on,
         end_reason=end_reason,
+        origin=origin,
         phases=phases,
     )
 

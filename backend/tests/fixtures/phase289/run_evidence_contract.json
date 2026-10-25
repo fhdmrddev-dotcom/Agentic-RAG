@@ -2,7 +2,8 @@
   "_comment": "Phase 289 I1: the RunEvidenceRead wire contract (289-03-PLAN.md <interfaces>), as sorted field-name lists per object path. Pinned by backend/tests/unit/test_289_evidence_contract.py (Pydantic models) and frontend/src/lib/api/__tests__/runEvidence.contract.test.ts (the RunEvidence TS type). A mismatch is fixed on the side that departed from the contract block, never here.",
   "paths": {
     "$": ["definition", "definition_changed", "deliverable", "kb_label", "phase_log", "run", "sources", "verdicts"],
-    "run": ["completed_at", "end_reason", "id", "model", "org_name", "started_at", "started_by", "status", "thread_id", "viewer_is_owner", "workflow_name"],
+    "run": ["completed_at", "end_reason", "id", "model", "org_name", "origin", "started_at", "started_by", "status", "thread_id", "viewer_is_owner", "workflow_name"],
+    "run.origin": ["actor_name", "kind", "label"],
     "run.started_by": ["email", "is_you", "name"],
     "definition": ["full", "phases", "recorded", "version"],
     "definition.phases[]": ["n", "name", "phase_type", "slug"],

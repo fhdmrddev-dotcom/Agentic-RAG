@@ -421,6 +421,7 @@ def test_chat_runs_select_text_is_unchanged():
     from pathlib import Path
 
     src = (Path(__file__).resolve().parents[2] / "app/api/threads.py").read_text(encoding="utf-8")
+    src = src.replace("\r\n", "\n")  # the checkout may be CRLF (autocrlf)
     assert (
         '"run_id, message_id, status, model, provider, started_at, completed_at, "\n'
         '            "org_id, input_tokens, output_tokens"'

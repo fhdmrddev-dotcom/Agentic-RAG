@@ -147,7 +147,7 @@ from app.models.thread import (
     step_identity,
 )
 # 295 (D-04): the unsourced mark — the pure leaf + the one name chain the run page also reads.
-from app.services.harness.run_read_wire import unsourced_for_wire
+from app.services.harness.run_read_wire import origin_for_wire, unsourced_for_wire
 from app.api.workflow_runs import panel_unsourced_who
 from app.models.user_settings import (
     load_all_model_overrides,
@@ -386,6 +386,45 @@ async def _enrich_messages_with_runs(
         m["provider"] = run["provider"] if run else None
         m["started_at"] = run["started_at"] if run else None
         m["completed_at"] = run["completed_at"] if run else None
+
+    # ── Phase 293 (D-22 / A8) — how the thread's workflow run started ─────────────────────
+    #
+    # ADDITIVE: one batched two-column read of this thread's own `workflow_runs` (owner-scoped,
+    # .eq thread_id + .eq user_id + the owner SELECT policy), never per message; the `runs`
+    # query above is untouched. Phase 293 (A8): fail silent, never guess — one-run threads (key,
+    # schedule) are unambiguous by construction; a later in-thread app start makes the thread
+    # ambiguous and the card goes quiet while the run page still shows the origin. A NULL
+    # origin on any run is ambiguity too. The app actor is the caller (the card is the owner's). A failed read
+    # degrades to no origin: this is the chat's primary read.
+    run_origin = None
+    try:
+        wr_resp = await aexec(
+            supabase.table("workflow_runs")
+            .select("origin_kind, origin_label")
+            .eq("thread_id", thread_id)
+            .eq("user_id", user_id)
+        )
+        starts = {
+            (r.get("origin_kind"), r.get("origin_label")) for r in (wr_resp.data or [])
+        }
+        if len(starts) == 1:
+            ((kind, label),) = starts
+            actor = None
+            if kind == "app":
+                prof = await aexec(
+                    supabase.table("profiles")
+                    .select("display_name")
+                    .eq("id", user_id)
+                    .maybe_single()
+                )
+                prof_row = prof.data if prof is not None else None
+                actor = prof_row.get("display_name") if isinstance(prof_row, dict) else None
+            run_origin = origin_for_wire(kind, label, actor)
+    except Exception:  # noqa: BLE001 — degrade to no origin, never 500 the message read.
+        logger.warning("thread %s: run origin read failed", thread_id, exc_info=True)
+        run_origin = None
+    for m in messages:
+        m["run_origin"] = run_origin
 
     # ── Phase 257.1 (ROADMAP SC#4) — cost, resolved in batch ────────────────────────────
     #

@@ -24579,6 +24579,18 @@
        }
       ],
       "title": "Artifacts"
+     },
+     "run_origin": {
+      "anyOf": [
+       {
+        "additionalProperties": true,
+        "type": "object"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Run Origin"
      }
     },
     "type": "object",
@@ -27928,6 +27940,17 @@
       ],
       "title": "End Reason",
       "description": "Why a failed or cancelled run stopped, as recorded; null when nothing was."
+     },
+     "origin": {
+      "anyOf": [
+       {
+        "$ref": "#/components/schemas/RunOriginWire"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "description": "How this run was started, as recorded at start (Phase 293). Null when it was not recorded."
      }
     },
     "type": "object",
@@ -28076,6 +28099,47 @@
      "result"
     ],
     "title": "RunEvidenceVerdict"
+   },
+   "RunOriginWire": {
+    "properties": {
+     "kind": {
+      "type": "string",
+      "enum": [
+       "app",
+       "schedule",
+       "key"
+      ],
+      "title": "Kind"
+     },
+     "label": {
+      "anyOf": [
+       {
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Label"
+     },
+     "actor_name": {
+      "anyOf": [
+       {
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Actor Name"
+     }
+    },
+    "type": "object",
+    "required": [
+     "kind"
+    ],
+    "title": "RunOriginWire",
+    "description": "Phase 293 \u2014 how a run started, as recorded at start. Every run read declares this."
    },
    "ScheduleTriggerResult": {
     "properties": {
@@ -32833,6 +32897,17 @@
       "title": "Started At",
       "description": "``min(started_at)`` across this run's phases \u2014 the run's ZERO. NULL means no phase of this run recorded a start: it was written before migration 121, or every step was routed around. \u26a0 NEVER substitute ``created_at``: that is when the row was inserted, which is a different fact."
      },
+     "origin": {
+      "anyOf": [
+       {
+        "$ref": "#/components/schemas/RunOriginWire"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "description": "How this run was started, as recorded at start (Phase 293). Null when it was not recorded."
+     },
      "completed_at": {
       "anyOf": [
        {
@@ -33223,6 +33298,17 @@
       ],
       "title": "End Reason",
       "description": "Why a failed or cancelled run stopped, as RECORDED: the failed step's reason, else the run's `run_failed` audit reason, else a cancelled run's cancel reason. `null` means nothing was recorded (or the run did not fail or stop) \u2014 the client says so; a reason is never composed here."
+     },
+     "origin": {
+      "anyOf": [
+       {
+        "$ref": "#/components/schemas/RunOriginWire"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "description": "How this run was started, as recorded at start (Phase 293). Null when it was not recorded."
      },
      "phases": {
       "items": {
