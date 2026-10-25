@@ -838,6 +838,30 @@ function runSelfTest() {
       record(5, 'an EMPTY register raises a harness error', raised instanceof HarnessError,
         raised ? `raised ${raised.constructor.name}` : 'NOTHING was raised — the gate would have reported a clean result over zero files');
     }
+
+    // ── ARMS 6 + 7 — `--require-settled` (293-05, D-28): a LISTED seed still planted, and a
+    //    listed seed settled with no destination, each FAIL; a settled seed with one, and an
+    //    UNLISTED planted seed, do not (the arm is scoped to the list on purpose: SEED-197 and
+    //    SEED-297 are deliberate partial folds that a register-wide rule would red).
+    {
+      const d = mkdir('arm67');
+      const base = { surface: 'Agentic-RAG', trigger_when: 'never', created: '2026-01-01' };
+      writeFixture(d, 'SEED-931-still-planted.md', seed({ seed_id: 'SEED-931', title: 'still planted', status: 'planted', ...base }));
+      writeFixture(d, 'SEED-932-no-destination.md', seed({ seed_id: 'SEED-932', title: 'no destination', status: 'shipped', ...base }));
+      writeFixture(d, 'SEED-933-settled.md', seed({ seed_id: 'SEED-933', title: 'settled', status: 'shipped', folded_into: '"293"', ...base }));
+      writeFixture(d, 'SEED-934-unlisted-planted.md', seed({ seed_id: 'SEED-934', title: 'unlisted', status: 'planted', ...base }));
+      const a = analyse({ dir: d });
+      const impl = typeof requireSettled === 'function';
+      const got = impl ? requireSettled(a.entries, ['SEED-931', 'SEED-932', 'SEED-933', 'SEED-935']) : [];
+      const codes = got.map((f) => `${f.code}:${f.id}`).sort().join(',');
+      record(6, 'a LISTED planted seed FAILS [still-planted]; an unknown id FAILS [unknown-seed]',
+        impl && codes.includes('still-planted:SEED-931') && codes.includes('unknown-seed:SEED-935')
+          && !codes.includes('SEED-934') && !codes.includes('SEED-933'),
+        impl ? `got [${codes || 'none'}]` : 'requireSettled is not implemented');
+      record(7, 'a LISTED seed settled with no folded_into and no status_note FAILS [no-destination]',
+        impl && codes.includes('no-destination:SEED-932'),
+        impl ? `got [${codes || 'none'}]` : 'requireSettled is not implemented');
+    }
   } finally {
     fs.rmSync(rootTmp, { recursive: true, force: true });
   }
