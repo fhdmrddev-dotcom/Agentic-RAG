@@ -364,7 +364,7 @@ Plans:
 
 **Wave 3** *(blocked on Wave 2 completion)*
 
-- [ ] 293-03-PLAN.md — origin on every run read + the origin line in four places, card next-run time, operator limit control (wave 3)
+- [x] 293-03-PLAN.md — origin on every run read + the origin line in four places, card next-run time, operator limit control (wave 3)
 
 **Wave 4** *(blocked on Wave 3 completion)*
 
