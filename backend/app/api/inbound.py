@@ -66,6 +66,7 @@ from app.security.api_key_auth import (
 from app.services.inbound_inputs import (
     UNTRUSTED_FLAG,
     InboundInputRefused,
+    inbound_kickoff,
     validate_inbound_inputs,
 )
 from app.services.rate_limit import enforce_key_limit
@@ -321,7 +322,8 @@ async def start_workflow_run(
         workflow_id=wid,
         definition=definition,
         # Validated declared fields, then the two server-set keys; nothing else reaches the run.
-        inputs={**values, "kickoff_prompt": f"Run {name}", UNTRUSTED_FLAG: True},
+        # 293-05 F-1: the kickoff carries the values, each in the untrusted envelope.
+        inputs={**values, "kickoff_prompt": inbound_kickoff(name, values), UNTRUSTED_FLAG: True},
         title=f"{name} · via key {key.label}",
         max_tokens=_DEFAULT_MAX_TOKENS,
         max_duration=_DEFAULT_MAX_DURATION,
