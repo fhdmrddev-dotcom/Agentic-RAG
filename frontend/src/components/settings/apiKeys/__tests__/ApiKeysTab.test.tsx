@@ -289,7 +289,8 @@ describe("293-04 ApiKeysTab — the ⋯ menu pre-pick", () => {
     m.listApiKeys.mockResolvedValue(EMPTY)
     render(<ApiKeysTab />)
     const draft = await screen.findByTestId("api-key-draft")
-    expect(within(draft).getByText("From the ⋯ menu of Contract review. It is already picked.")).toBeInTheDocument()
+    // The hint waits for the server's list, so it never says "already picked" about a row it can't tick.
+    expect(await within(draft).findByText("From the ⋯ menu of Contract review. It is already picked.")).toBeInTheDocument()
     expect(await within(draft).findByRole("checkbox", { name: /Contract review/ })).toBeChecked()
     expect(sessionStorage.getItem("api_keys_prepick")).toBeNull()
   })

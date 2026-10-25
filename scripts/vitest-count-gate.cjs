@@ -4400,6 +4400,10 @@ const BASELINE = {
   "apiKeyPrepick.test.ts": 6, // 293-04 — ⋯ menu pre-pick: sessionStorage read-once, only {workflowId, name}, never a secret
   "apiKeysContract.test.ts": 3, // 293-04 — client wire types vs backend api_keys_contract.json, path by path
   "launchFieldsTwin293.test.ts": 9, // 293-04 — launchInputFields vs launch_fields_cases.json (the server twin reads the same file)
+  "ApiKeysTab.test.tsx": 17, // 293-04 — member tab: load/fail/empty, draft rules, show-once secret never in storage/URL/DOM after save, pre-pick, re-fetched revoke
+  "ApiKeyCard.test.tsx": 8, // 293-04 — every state tag by rendered words, dashed refused chip + line, receipt, owner line, run links only with onOpenRun
+  "ApiKeyCallStrip.test.tsx": 5, // 293-04 — one tab stop, arrow keys, Enter/Space detail, bar name = detail sentence, read bars shorter
+  "RevokeApiKeySheet.test.tsx": 7, // 293-04 — focus on Keep it, Esc, Revoking… in flight, onDone only after the server, failure keeps it open, owner named
 }
 
 // Still COMPUTED, never hand-written — the reduce is the single source, so the
@@ -6427,6 +6431,10 @@ const TARGETS = [
   "src/components/settings/apiKeys/__tests__/curlExamples.test.ts",
   "src/components/settings/apiKeys/__tests__/apiKeyPrepick.test.ts",
   "src/components/settings/apiKeys/__tests__/apiKeysContract.test.ts",
+  "src/components/settings/apiKeys/__tests__/ApiKeysTab.test.tsx",
+  "src/components/settings/apiKeys/__tests__/ApiKeyCard.test.tsx",
+  "src/components/settings/apiKeys/__tests__/ApiKeyCallStrip.test.tsx",
+  "src/components/settings/apiKeys/__tests__/RevokeApiKeySheet.test.tsx",
 ]
 
 const REPO_ROOT = path.resolve(__dirname, "..")
