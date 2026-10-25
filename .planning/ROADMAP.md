@@ -355,7 +355,7 @@ Plans:
 Plans:
 **Wave 1**
 
-- [ ] 293-01-PLAN.md — migration 215 (api_keys, run origin + backfill + trigger, audit types, limits) + key core (digest, live resolver, Redis limiter) + /api-keys and /org/api-keys (wave 1, DB-mutating, operator applies 215)
+- [x] 293-01-PLAN.md — migration 215 (api_keys, run origin + backfill + trigger, audit types, limits) + key core (digest, live resolver, Redis limiter) + /api-keys and /org/api-keys (wave 1, DB-mutating, operator applies 215)
 
 **Wave 2** *(blocked on Wave 1 completion)*
 

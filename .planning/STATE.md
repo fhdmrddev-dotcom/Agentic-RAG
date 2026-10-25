@@ -3,7 +3,7 @@ gsd_state_version: 1.0
 milestone: v4.7
 milestone_name: Workflows You Can See and Start Anywhere
 status: milestone_complete
-last_updated: "2026-10-25T08:48:10.676Z"
+last_updated: "2026-10-25T09:03:13.011Z"
 progress:
   total_phases: 18
   completed_phases: 10
@@ -28,7 +28,7 @@ See: `.planning/PROJECT.md` (updated 2026-10-18)
 
 **Core value:** The agent acts as an AI colleague — it knows your knowledge base, can run code, and
 can be taught new behaviours (skills) that persist and can be shared.
-**Current focus:** Phase 292.1 — Tool-limit Continue that always fires
+**Current focus:** Phase 293 — start-from-outside-and-close-out
 
 ---
 
@@ -41,7 +41,7 @@ reviewer exists, so a phase closes `verification_mode: self-verified`, never `re
 
 ## Current Position
 
-Phase: 293 (Start From Outside, and Close Out) — CONTEXT GATHERED 2026-10-24 (`60dd886c6`, D-01..D-33). Next: `/gsd:sketch` of the API keys tab (D-21, G-2), then `/gsd:plan-phase 293`.
+Phase: 293 (start-from-outside-and-close-out) — EXECUTING
   Key facts: no API keys exist today (first non-login credential); a key = one person in one org, lists its workflows, expiry 30/90/365/never; start + poll; origin app/schedule/key on 4 surfaces; card shows next run time. Migration 215.
 Previous: Phase: 292.1 (Tool-limit Continue that always fires) — CLOSED BY DECISION 2026-10-24, operator signed G-4. NOT deployed.
   4 plans + review fixes + 7 live-found fixes on develop (last 90f485dd2). Verifier human_needed (no code gaps). Gates: backend 70 failed / 9595 (<=71), vitest count gate OK 11936.
@@ -60,7 +60,7 @@ Previous: Phase: 292 — EXECUTING
   UAT fixes on develop: 6f3311262, d01547f50, 183cac200, 34f643ce7, e03c3c88e, f8ee7d051. Open findings + triggers: 291 deferred-items.md; BUG-261024-01 (Moonshot schema).
   Mig 212 APPLIED to cloud Supabase 2026-10-24 (verified); full-schema.sql regenerated (251b44639). Anthropic key ROTATED by the operator 2026-10-24 (the key held in old LangSmith traces is revoked).
 Previous: Phase: 290 (the-card-and-the-team-picture) — EXECUTED, human_needed (2026-10-22)
-Plan: 1 of 4
+Plan: 1 of 5
 
 ### Roadmap Evolution
 
