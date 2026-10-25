@@ -11,7 +11,12 @@ shells threw it away.
   | 1 | ``api/runs.py`` ``_redrive_paused_workflow_run``  | ``finalize_run``       |
   | 2 | ``api/runs.py`` ``continue_run``                  | ``finalize_run``       |
   | 4 | ``publish_service._drive_golden_run``             | ``finalize_run``       |
-  | 5 | ``scheduler_service._drive_run``                  | ⚠ ``finalize_run_terminal`` |
+  | 5 | ``unattended_launch._drive_run``                  | ⚠ ``finalize_run_terminal`` |
+
+Phase 293: site 5 moved from ``scheduler_service._drive_run`` to ``unattended_launch._drive_run``
+(the ledger's named seam for the scheduler, "split cadence claiming from job execution"; schedules
+and API keys now share it). Every site-5 path, ``inspect.getsource`` target, warning-literal count
+and patch target below moved with the code ON PURPOSE; the properties are unchanged.
 
 Site 3 (``harness_engine``'s boot-sweep resume) was closed by plan 256-01 and is pinned
 by ``test_256_producer_shell_site3.py``; site 6 (the eval path) has a DIFFERENT shape and
@@ -70,7 +75,7 @@ _WARNING_FORMAT = "runs.usage missing for run=%s provider=%s model=%s"
 _SUBJECT_FILES = (
     "app/api/runs.py",
     "app/services/harness/publish_service.py",
-    "app/services/scheduler_service.py",
+    "app/services/unattended_launch.py",  # Phase 293: site 5 moved here from scheduler_service
 )
 
 
@@ -390,7 +395,10 @@ async def _drive_site4(box):
 
 
 async def _drive_site5(box, *, ctx_is_none: bool = False):
-    from app.services import scheduler_service as sched
+    # Phase 293: site 5 moved to unattended_launch (the scheduler passes record_schedule_outcome
+    # in as ``on_finish``); the drive below binds that callback exactly as the scheduler does.
+    from app.services import unattended_launch as sched
+    from app.db import schedules as _schedules_db
 
     seq = _Seq()
     finalize_terminal = seq.finalize()
@@ -416,9 +424,14 @@ async def _drive_site5(box, *, ctx_is_none: bool = False):
         patch("app.services.run_lifecycle.mirror_run_active", AsyncMock(return_value=None)),
         patch.object(sched.logger, "warning", seq.warning),
     ):
+        _schedule_id = uuid.uuid4()
+
+        async def _on_finish(status):
+            await _schedules_db.record_schedule_outcome(None, _schedule_id, status=status)
+
         await sched._drive_run(
             run_id=uuid.uuid4(),
-            schedule_id=uuid.uuid4(),
+            on_finish=_on_finish,
             thread_id=uuid.uuid4(),
             owner_id=uuid.uuid4(),
             org_id=None,
@@ -561,7 +574,7 @@ def test_site5_still_calls_finalize_run_terminal_not_finalize_run():
     """⛔ The DB-only writer would leave the run in ``runs:active`` as a GHOST."""
     import inspect
 
-    from app.services import scheduler_service as sched
+    from app.services import unattended_launch as sched  # Phase 293: site 5 moved here
 
     src = inspect.getsource(sched._drive_run)
     assert "finalize_run_terminal(" in src, (
@@ -635,7 +648,9 @@ def test_the_warning_literal_appears_once_per_shell():
     """One literal per site — two in runs.py (two shells), one in each other file."""
     assert _read("app/api/runs.py").count(_WARNING_FORMAT) == 2
     assert _read("app/services/harness/publish_service.py").count(_WARNING_FORMAT) == 1
-    assert _read("app/services/scheduler_service.py").count(_WARNING_FORMAT) == 1
+    # Phase 293: site 5's literal moved with ``_drive_run``; the scheduler now carries none.
+    assert _read("app/services/unattended_launch.py").count(_WARNING_FORMAT) == 1
+    assert _read("app/services/scheduler_service.py").count(_WARNING_FORMAT) == 0
 
 
 #: The SHELL functions this fence guards — the ``finally`` blocks that mint and
@@ -644,7 +659,7 @@ def test_the_warning_literal_appears_once_per_shell():
 _SHELL_FUNCTIONS = {
     "app/api/runs.py": ("_redrive_paused_workflow_run", "continue_run"),
     "app/services/harness/publish_service.py": ("_drive_golden_run",),
-    "app/services/scheduler_service.py": ("_drive_run",),
+    "app/services/unattended_launch.py": ("_drive_run",),  # Phase 293: moved with the code
 }
 
 

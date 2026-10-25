@@ -76,6 +76,9 @@
       "name": "workflow-runs"
     },
     {
+      "name": "inbound"
+    },
+    {
       "name": "skills"
     },
     {
@@ -161,6 +164,7 @@
         "workflows",
         "schedules",
         "workflow-runs",
+        "inbound",
         "skills",
         "skill-evals",
         "skill-test-cases",
@@ -13772,6 +13776,158 @@
           }
         }
       }
+    },
+    "/inbound/workflows/{workflow_id}/runs": {
+      "post": {
+        "tags": [
+          "inbound"
+        ],
+        "summary": "Start Workflow Run",
+        "description": "Start one listed, published workflow as the key's owner. The caller polls the run.",
+        "operationId": "start_workflow_run_inbound_workflows__workflow_id__runs_post",
+        "security": [
+          {
+            "ApiKey": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "workflow_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Workflow Id"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "anyOf": [
+                  {
+                    "$ref": "#/components/schemas/InboundStartBody"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "title": "Body"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/InboundStartResult"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/inbound/runs/{run_id}": {
+      "get": {
+        "tags": [
+          "inbound"
+        ],
+        "summary": "Read Inbound Run",
+        "description": "PURE READ of a run THIS key started.",
+        "operationId": "read_inbound_run_inbound_runs__run_id__get",
+        "security": [
+          {
+            "ApiKey": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "run_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Run Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/InboundRunRead"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/inbound/files/{token}": {
+      "get": {
+        "tags": [
+          "inbound"
+        ],
+        "summary": "Download Inbound File",
+        "description": "One file, once.",
+        "operationId": "download_inbound_file_inbound_files__token__get",
+        "parameters": [
+          {
+            "name": "token",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Token"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "The file's exact bytes, as an attachment.",
+            "content": {
+              "application/octet-stream": {}
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
     }
   },
   "components": {
@@ -20059,6 +20215,190 @@
         "additionalProperties": false,
         "type": "object",
         "title": "HoldRelease"
+      },
+      "InboundFile": {
+        "properties": {
+          "name": {
+            "type": "string",
+            "title": "Name"
+          },
+          "size_bytes": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Size Bytes"
+          },
+          "url": {
+            "type": "string",
+            "title": "Url"
+          },
+          "expires_in": {
+            "type": "integer",
+            "title": "Expires In"
+          }
+        },
+        "type": "object",
+        "required": [
+          "name",
+          "url",
+          "expires_in"
+        ],
+        "title": "InboundFile"
+      },
+      "InboundRunRead": {
+        "properties": {
+          "run_id": {
+            "type": "string",
+            "title": "Run Id"
+          },
+          "status": {
+            "type": "string",
+            "title": "Status"
+          },
+          "step_index": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Step Index"
+          },
+          "step_total": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Step Total"
+          },
+          "waiting_on": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/InboundWaitingOn"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "output_text": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Output Text"
+          },
+          "end_reason": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "End Reason"
+          },
+          "steps": {
+            "items": {
+              "$ref": "#/components/schemas/InboundStep"
+            },
+            "type": "array",
+            "title": "Steps"
+          },
+          "files": {
+            "items": {
+              "$ref": "#/components/schemas/InboundFile"
+            },
+            "type": "array",
+            "title": "Files"
+          }
+        },
+        "type": "object",
+        "required": [
+          "run_id",
+          "status"
+        ],
+        "title": "InboundRunRead"
+      },
+      "InboundStartBody": {
+        "properties": {
+          "inputs": {
+            "additionalProperties": {
+              "type": "string"
+            },
+            "type": "object",
+            "title": "Inputs"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "title": "InboundStartBody",
+        "description": "The declared launch fields, as text. Nothing else is accepted."
+      },
+      "InboundStartResult": {
+        "properties": {
+          "run_id": {
+            "type": "string",
+            "title": "Run Id"
+          },
+          "status": {
+            "type": "string",
+            "title": "Status"
+          }
+        },
+        "type": "object",
+        "required": [
+          "run_id",
+          "status"
+        ],
+        "title": "InboundStartResult"
+      },
+      "InboundStep": {
+        "properties": {
+          "name": {
+            "type": "string",
+            "title": "Name"
+          },
+          "state": {
+            "type": "string",
+            "title": "State"
+          }
+        },
+        "type": "object",
+        "required": [
+          "name",
+          "state"
+        ],
+        "title": "InboundStep"
+      },
+      "InboundWaitingOn": {
+        "properties": {
+          "who": {
+            "type": "string",
+            "title": "Who"
+          }
+        },
+        "type": "object",
+        "required": [
+          "who"
+        ],
+        "title": "InboundWaitingOn"
       },
       "IndexSummary": {
         "properties": {
@@ -30279,6 +30619,11 @@
     "securitySchemes": {
       "HTTPBearer": {
         "type": "http",
+        "scheme": "bearer"
+      },
+      "ApiKey": {
+        "type": "http",
+        "description": "An API key made in Settings → API keys (`srl_live_…`), sent as `Authorization: Bearer <key>`. Starts only the published workflows it lists; runs as the member who made it.",
         "scheme": "bearer"
       }
     },

@@ -118,7 +118,7 @@ const TAG_GROUPS = [
   },
   {
     name: "Automation",
-    tags: ["workflows", "schedules", "workflow-runs", "skills", "skill-evals", "skill-test-cases", "skill-tuner"],
+    tags: ["workflows", "schedules", "workflow-runs", "inbound", "skills", "skill-evals", "skill-test-cases", "skill-tuner"],
   },
   { name: "Connect", tags: ["connectors", "sources"] },
   { name: "Experts", tags: ["experts"] },
