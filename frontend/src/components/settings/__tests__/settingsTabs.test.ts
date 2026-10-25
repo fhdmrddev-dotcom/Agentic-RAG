@@ -39,7 +39,8 @@ import {
 
 describe("settingsTabs — the registry (D-14)", () => {
   it("declares every tab once, in strip order, with its audience", () => {
-    expect(SETTINGS_TABS.map((t) => t.id)).toEqual(["0", "1", "2", "6", "3", "4"])
+    // 293-04 (D-18): API keys is "7", everyone, LAST after Audit Log — never the retired "5".
+    expect(SETTINGS_TABS.map((t) => t.id)).toEqual(["0", "1", "2", "6", "3", "4", "7"])
     const audience = Object.fromEntries(SETTINGS_TABS.map((t) => [t.id, t.audience]))
     expect(audience).toEqual({
       "0": "model_management",
@@ -48,6 +49,7 @@ describe("settingsTabs — the registry (D-14)", () => {
       "6": "everyone",
       "3": "everyone",
       "4": "everyone",
+      "7": "everyone",
     })
   })
 
@@ -58,9 +60,9 @@ describe("settingsTabs — the registry (D-14)", () => {
 })
 
 describe("settingsTabs — visibility (fail-closed boolean)", () => {
-  it("shows an operator every tab and a member only Preferences, Memory and Audit Log", () => {
-    expect(visibleSettingsTabs(true).map((t) => t.id)).toEqual(["0", "1", "2", "6", "3", "4"])
-    expect(visibleSettingsTabs(false).map((t) => t.id)).toEqual(["6", "3", "4"])
+  it("shows an operator every tab and a member only Preferences, Memory, Audit Log and API keys", () => {
+    expect(visibleSettingsTabs(true).map((t) => t.id)).toEqual(["0", "1", "2", "6", "3", "4", "7"])
+    expect(visibleSettingsTabs(false).map((t) => t.id)).toEqual(["6", "3", "4", "7"])
   })
 
   it("never shows the retired \"5\" to anyone (D-03)", () => {
@@ -100,6 +102,9 @@ describe("settingsTabs — resolving a persisted choice (283-02 / D-05: first VI
     expect(resolveSettingsTab("4", false)).toBe("4")
     expect(resolveSettingsTab("6", false)).toBe("6")
     expect(resolveSettingsTab("6", true)).toBe("6")
+    // 293-04: the ⋯ menu writes "7" and both roles must land on it.
+    expect(resolveSettingsTab("7", false)).toBe("7")
+    expect(resolveSettingsTab("7", true)).toBe("7")
   })
 
   it("redirects an unknown id too (it used to pass through to an empty panel)", () => {
