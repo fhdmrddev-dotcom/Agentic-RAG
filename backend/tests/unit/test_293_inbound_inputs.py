@@ -150,3 +150,23 @@ def test_a_definition_that_declares_an_underscore_key_still_refuses_it():
     with pytest.raises(ii.InboundInputRefused) as exc:
         ii.validate_inbound_inputs(d, {"_budget": "9999"})
     assert exc.value.code == "unknown_input"
+
+
+# 293-05 (found driving the live app): 230 of 258 published rows store `definition` as a JSON
+# STRING scalar, which the pool's jsonb codec hands back as `str`. The key form read fields from
+# that str and got none, so the show-once curl sent `{"inputs": {}}` and the start was refused.
+def test_a_definition_stored_as_a_json_string_still_declares_its_fields():
+    definition = {
+        "inputs": [
+            {"key": "topic", "label": "Essay topic", "type": "text", "required": True},
+            {"key": "doc", "label": "Doc", "type": "file", "required": True},
+        ]
+    }
+    as_text = json.dumps(definition)
+    assert [f.key for f in ii.declared_fields(as_text)] == ["topic", "doc"]
+    assert ii.needs_file_upload(ii.declared_fields(as_text)) is True
+
+
+def test_a_string_that_is_not_a_json_object_declares_nothing():
+    assert ii.declared_fields("not json") == []
+    assert ii.declared_fields(json.dumps(["topic"])) == []
