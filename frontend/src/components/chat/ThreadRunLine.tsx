@@ -167,6 +167,8 @@ import { stepsFrom } from "@/lib/runStepCount"
 import { harnessBannerProgress, outerBannerLabel } from "@/lib/toolMeta"
 import { useHarnessLiveForThread } from "@/providers/StreamsProvider"
 import { useStreamsStore } from "@/stores/streamsStore"
+// 293-03 (D-24): how the run started, off the same persisted frame. A leaf, no hook.
+import { RunOriginLine } from "@/components/workflows/RunOriginLine"
 import type { Phase } from "@/types"
 
 /** Module-scope so the selector below returns a STABLE reference on the miss
@@ -270,6 +272,7 @@ export function ThreadRunLine({ threadId }: Props) {
         step={step}
         elapsed={elapsed}
         state="live"
+        origin={frame?.origin}
       />
     )
   }
@@ -290,6 +293,7 @@ export function ThreadRunLine({ threadId }: Props) {
       step={steps ? `${steps.done} of ${steps.total} steps` : null}
       elapsed={elapsed}
       state="stopped"
+      origin={frame.origin}
     />
   )
 }
@@ -316,12 +320,15 @@ function RunLine({
   step,
   elapsed,
   state,
+  origin,
 }: {
   glyph: string
   word: string
   step: string | null
   elapsed: string | null
   state: "live" | "stopped"
+  /** 293-03: the persisted frame's recorded origin; absent or unknown renders nothing. */
+  origin?: ThreadWorkflowState["origin"]
 }) {
   return (
     <div
@@ -352,6 +359,7 @@ function RunLine({
           </span>
         </>
       )}
+      <RunOriginLine origin={origin} />
     </div>
   )
 }

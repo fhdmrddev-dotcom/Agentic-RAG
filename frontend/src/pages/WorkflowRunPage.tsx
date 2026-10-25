@@ -97,6 +97,8 @@ import { RunCostBadge } from "@/components/workflow/RunCostBadge"
 // own dispatch and its own pressed state; this page hands it a thread id and nothing else.
 import { StopControl } from "@/components/chat/StopControl"
 import { WaitingOnLine } from "@/components/workflows/WaitingOnLine"
+// 293-03 (D-24): how the run started — a leaf with no hook, so this page gains none (G-5).
+import { RunOriginLine } from "@/components/workflows/RunOriginLine"
 // ── Phase 200 — the run surface's right-hand spine. Both are PANEL parts taken as
 //    props, not the panel SHELL: see the mount docblock at the canvas region below for
 //    why the shell itself cannot come here (a global chat singleton, and the previewer).
@@ -1300,6 +1302,7 @@ export function WorkflowRunPage({ runId, onBack, onOpenThread }: Props) {
         <div className="flex flex-wrap items-baseline gap-x-3 gap-y-1">
           <span className="text-xs font-semibold text-foreground">{band.sentence}</span>
           <WaitingOnLine waitingOn={run?.waiting_on} />
+          <RunOriginLine origin={run?.origin} />
           <span className="text-xs text-muted-foreground" data-testid="run-elapsed">
             {elapsed.number ? <span>{elapsed.number} </span> : null}
             {elapsed.text}

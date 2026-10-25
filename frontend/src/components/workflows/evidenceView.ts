@@ -24,6 +24,7 @@ import type {
   RunEvidenceVerdict,
 } from "@/lib/api/runEvidence"
 import type { RunPhaseConfidence } from "@/lib/api/workflows"
+import type { RunOrigin } from "@/types"
 import { own } from "@/components/workflows/ownProperty"
 import { PHASE_TYPE_LABELS } from "@/components/workflows/phaseVocabulary"
 import { declaredCount, phaseTiming, readInstant } from "@/components/workflows/phaseDuration"
@@ -123,6 +124,9 @@ export interface EvidenceView {
   outcome: string
   /** 295-05 (D-22 / UI-SPEC C.2): what `RunEndReasonLine` reads under the outcome. */
   endReason: { status: string; reason: string | null }
+  /** 293-03 (D-24): how the run started, as recorded; `RunOriginLine` reads it. Null when
+   *  none was recorded (the line then renders nothing). */
+  origin: RunOrigin | null
   startedBy: string
   /** Owner only. */
   email: string | null
@@ -302,6 +306,7 @@ export function toEvidenceView(p: RunEvidence): EvidenceView {
     title: p.run.workflow_name || UNTITLED_WORKFLOW,
     outcome: outcomeIn(p.run.status, runSpanText(p.run.started_at, p.run.completed_at)),
     endReason: { status: p.run.status, reason: p.run.end_reason ?? null },
+    origin: p.run.origin ?? null,
     startedBy: startedByLine(
       formatWhen(p.run.started_at),
       p.run.started_by.name,

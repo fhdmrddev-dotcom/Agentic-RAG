@@ -12,6 +12,7 @@
 
 import { API_BASE, ApiError, entitlementRefusalMessage, getAuthHeaders, getAuthToken } from "./_core"
 import { EntitlementRefusalError } from "./_core"
+import type { RunOrigin } from "@/types"
 import type { GenerateResult, GenerateWorkflowBody, PublishOutcome, PublishVerdict, WorkflowDefinitionJSON, WorkflowDraftRow, WorkflowDraftWriteResult } from "./knowledge"
 export class WorkflowConflictError extends Error {
   constructor(message = "workflow is published and cannot be modified") {
@@ -910,6 +911,8 @@ export interface WorkflowRunRead {
   /** Phase 295-05 (RUN-04 / D-22): why a failed or cancelled run stopped, as recorded;
    *  null when nothing was (the page then says so for a failed run). */
   end_reason?: string | null
+  /** Phase 293 (D-22): how this run started, as recorded at start; null when it was not. */
+  origin?: RunOrigin | null
 }
 
 /**
@@ -1033,6 +1036,8 @@ export interface WorkflowRunListItem {
   started_at: string | null
   /** `max(completed_at)` across the run's phases. NULL while a run is still going. */
   completed_at: string | null
+  /** Phase 293 (D-22): how this run started, as recorded at start; null when it was not. */
+  origin?: RunOrigin | null
 }
 
 /** One page of the run log (backend `WorkflowRunListRead`). `total` is the count UNDER THE

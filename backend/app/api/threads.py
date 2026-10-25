@@ -2251,12 +2251,16 @@ async def get_thread_workflow(
     last_run_status = None
     last_run_created_at = None
     last_run_updated_at = None
+    # 293 (D-24): the last run's recorded (origin_kind, origin_label), off the same two arms.
+    last_run_origin: tuple[Any, Any] = (None, None)
     if active_workflow_run_id is not None:
         wf_row = await _rls_fetchrow(
             """
             SELECT wr.status,
                    wr.created_at,
                    wr.updated_at,
+                   wr.origin_kind,
+                   wr.origin_label,
                    wr.continues_used,
                    wd.slug  AS definition_slug,
                    wd.name  AS definition_name,
@@ -2283,6 +2287,7 @@ async def get_thread_workflow(
             last_run_status = wf_row["status"]
             last_run_created_at = wf_row["created_at"]
             last_run_updated_at = wf_row["updated_at"]
+            last_run_origin = (wf_row.get("origin_kind"), wf_row.get("origin_label"))
 
     # mode / locked / lock_is_stale derive from the anchor + run terminality.
     mode = "harness" if active_workflow_run_id is not None else "deep"
@@ -2392,7 +2397,7 @@ async def get_thread_workflow(
     if phases_source_run_id is None:
         # D-09 (AMENDED): this widening is what makes the stopped receipt possible on an UNGATED route — the workflow_runs router that D-09 originally chose is canvas_gate'd (middleware/canvas_gate.py:85-93 + workflow_runs.py:169) and visual_workflow_canvas ships OFF (models/user_settings.py:1197-1203), so a chat receipt fed from it would be invisible at the shipped default.
         latest_wf = await _rls_fetchrow(
-            "SELECT id, status, created_at, updated_at FROM workflow_runs WHERE thread_id = $1 "
+            "SELECT id, status, created_at, updated_at, origin_kind, origin_label FROM workflow_runs WHERE thread_id = $1 "
             "ORDER BY created_at DESC LIMIT 1",
             UUID(thread_id) if isinstance(thread_id, str) else thread_id,
         )
@@ -2402,6 +2407,7 @@ async def get_thread_workflow(
             last_run_status = latest_wf["status"]
             last_run_created_at = latest_wf["created_at"]
             last_run_updated_at = latest_wf["updated_at"]
+            last_run_origin = (latest_wf.get("origin_kind"), latest_wf.get("origin_label"))
     if phases_source_run_id is not None:
         # 200 (DES-02 / D-05 / D-07) — widened in LOCKSTEP with `WorkflowPhaseState` and
         # with `api/workflow_runs.py`'s projection: the chat panel and the run page read
@@ -2538,6 +2544,18 @@ async def get_thread_workflow(
                     )
                 )
 
+    # 293 (D-24): the caller's own name, read only for an app start (this route is owner-scoped,
+    # so the starter of an app run is the caller); a failed read names nobody, never a 500.
+    origin_actor = None
+    if last_run_origin[0] == "app":
+        try:
+            prof = await _rls_fetchrow(
+                "SELECT display_name FROM profiles WHERE id = $1", UUID(str(current_user["id"]))
+            )
+            origin_actor = prof["display_name"] if prof is not None else None
+        except Exception:  # noqa: BLE001 — a name is an affordance on a pure read.
+            logger.warning("thread %s: origin name lookup failed", thread_id, exc_info=True)
+
     return ThreadWorkflowState(
         thread_id=UUID(thread_id) if isinstance(thread_id, str) else thread_id,
         mode=mode,
@@ -2580,6 +2598,7 @@ async def get_thread_workflow(
         last_run_status=last_run_status,
         last_run_created_at=last_run_created_at,
         last_run_updated_at=last_run_updated_at,
+        origin=origin_for_wire(*last_run_origin, origin_actor),
         phases=phases_list,
     )
 

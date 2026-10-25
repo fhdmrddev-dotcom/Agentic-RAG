@@ -3041,7 +3041,7 @@ const BASELINE = {
   //     CARD'S OWN SOURCE. This asserts the two agree entry for entry, with a positive control
   //     proving the parser really sees six entries per map and a driven falsification proving
   //     a single changed utility is caught.
-  "runLogRow.test.ts": 21,
+  "runLogRow.test.ts": 24, // 293-03: 21 -> 24 (the origin sentence is the last atom; unrecorded and unknown compose as before)
   "RunLogPanel.test.tsx": 20,
   "runLogTone.mirror.test.ts": 10,
   // ── THE LAST TWO OF PHASE 200'S UNPINNED SUITES, pinned at their measured actuals ───────
@@ -3968,7 +3968,7 @@ const BASELINE = {
   // D4 the genuine harness run unharmed (D3's positive control) · D5b(a)/(b) the cap_paused
   // SSE inheriting the lock's mode rather than hard-coding "harness".
   // ⭐ Driven RED first — D1, D3, D5b(b) and D6 all failed on the shipped tree.
-  "ThreadRunLineKickoff.test.tsx": 10,
+  "ThreadRunLineKickoff.test.tsx": 13, // 293-03: 10 -> 13 (the origin line in the live and stopped states, silent when unrecorded)
   // ── Phase 244-08 (T-244-05-05 / OPEN-2) — the expired attachment TOMBSTONE ──────────
   // 5 cases, measured on a green run of the suite alone. BOTH KNOBS, SAME COMMIT.
   // ⭐ Driven RED first — 3 of the 5 failed on the shipped tree: `expected undefined to be
@@ -4367,7 +4367,7 @@ const BASELINE = {
   "PendingAskStack.pausedRun.test.tsx": 15, // 295 D-r2-01 (2026-10-21): 14 -> 15 (a re-driven active run is live). 295-10 D-r1-01: 11 -> 14 (a 409 shows the server's words, re-reads on a paused run). 295-08 WR-04: 7 -> 11
   "PendingAskCard.paused.test.tsx": 6, // 289-REVIEW CR-02: 4 -> 6 (pending -> expired -> paused re-render, 404 stays terminal). 289-01 — the paused card keeps its answer control
   "StepEvidenceLine.test.tsx": 15, // 289-02 — the KB evidence line or nothing
-  "evidenceView.test.ts": 31, // 289-REVIEW WR-03: 29 -> 31 (final-attempt Checks fact, timed-out kind). 289-04 — payload to view-model, privacy applied twice
+  "evidenceView.test.ts": 34, // 293-03: 31 -> 34 (measured 33 at base; +1 the view carries the recorded origin). 289-REVIEW WR-03: 29 -> 31 (final-attempt Checks fact, timed-out kind). 289-04 — payload to view-model, privacy applied twice
   "RunEvidenceReport.test.tsx": 26, // 289-04 — the report by content, button sets, 404 screen
   "runDeepLink.test.ts": 12, // 289-04 — strict-UUID ?run= read/write/clear
   "runEvidence.test.ts": 3, // 289-04 — the client: encodeURIComponent, ApiError(status)
@@ -4397,6 +4397,8 @@ const BASELINE = {
   // `launchFieldsTwin293.test.ts` sits under the `src/components/workflows` directory entry, pin only.
   "apiKeyFacts.test.ts": 32, // 293-04 — wire → card facts: refused chips never read active, every reason code worded, raw code for an unknown one
   "curlExamples.test.ts": 8, // 293-04 — the show-once curl: real base, bearer secret, declared fields in order, JSON + shell escaping
+  "RunOriginLine.test.tsx": 6, // 293-03 — the origin leaf: nothing when absent/unknown, muted, hidden icon, one mount per run surface (src/components/workflows dir TARGET)
+  "runOriginVocabulary.test.ts": 11, // 293-03 — the six origin sentences, null for absent/unknown (D-23)
   "apiKeyPrepick.test.ts": 6, // 293-04 — ⋯ menu pre-pick: sessionStorage read-once, only {workflowId, name}, never a secret
   "apiKeysContract.test.ts": 3, // 293-04 — client wire types vs backend api_keys_contract.json, path by path
   "launchFieldsTwin293.test.ts": 9, // 293-04 — launchInputFields vs launch_fields_cases.json (the server twin reads the same file)

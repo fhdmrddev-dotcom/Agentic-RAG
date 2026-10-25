@@ -38,6 +38,7 @@ import type { RunLogTone } from "./runLogTone"
 import { runSpan } from "@/components/workflows/phaseDuration"
 import { TIME_NOT_RECORDED } from "@/components/workflows/receiptVocabulary"
 import { fmtElapsed } from "@/lib/fmtElapsed"
+import { originSentence } from "@/components/workflows/runOriginVocabulary"
 import {
   ATOM_SEPARATOR,
   WORKFLOW_DELETED,
@@ -124,6 +125,10 @@ export function runLogRowFacts(row: WorkflowRunListItem, now: number = Date.now(
   // sitting in a row of figures pretending to be one.
   const atoms = [versionAtom(row.workflow_version), stepsAtom(row.step_total)]
   if (durationMeasured) atoms.push(duration)
+  // 293-03 (D-24): how the run started is the LAST atom, so on a narrow row it is the one that
+  // gives way first. An unrecorded origin pushes nothing: the line composes as it did before.
+  const origin = originSentence(row.origin)
+  if (origin) atoms.push(origin)
 
   return {
     runId: row.id,

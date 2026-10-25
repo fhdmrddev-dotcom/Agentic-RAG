@@ -37,6 +37,7 @@ import { downloadWorkspaceFile } from "@/lib/api/documents"
 import { clearRunDeepLink, writeRunDeepLink } from "@/lib/runDeepLink"
 import { StepEvidenceLine } from "@/components/workflows/StepEvidenceLine"
 import { RunEndReasonLine } from "@/components/workflows/RunEndReasonLine"
+import { RunOriginLine } from "@/components/workflows/RunOriginLine"
 import { exportPayload, toEvidenceView, type EvidenceView, type FactTone } from "@/components/workflows/evidenceView"
 import {
   CHANGED_GLYPH,
@@ -189,6 +190,8 @@ function Report({
             {view.org !== null ? ` · ${view.org}` : null}
           </p>
           {/* 295-05 (D-22 / UI-SPEC C.2): why it stopped, directly under the outcome. */}
+          {/* 293-03 (D-24): how the run started, on its own line under the sub line. */}
+          <RunOriginLine origin={view.origin} />
           <RunEndReasonLine status={view.endReason.status} endReason={view.endReason.reason} />
         </div>
         <div className="flex flex-wrap items-center gap-1.5 print:hidden">

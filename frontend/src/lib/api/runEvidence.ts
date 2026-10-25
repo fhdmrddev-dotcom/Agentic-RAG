@@ -17,6 +17,7 @@
  */
 import { API_BASE, ApiError, getAuthHeaders } from "./_core"
 import type { RunPhaseConfidence } from "./workflows"
+import type { RunOrigin } from "@/types"
 
 export interface RunEvidenceRun {
   id: string
@@ -31,6 +32,8 @@ export interface RunEvidenceRun {
   thread_id: string | null
   /** 295-05 (D-22): why a failed or cancelled run stopped, as recorded; null when nothing was. */
   end_reason?: string | null
+  /** 293-03 (D-22): how the run started, as recorded; null when it was not. */
+  origin?: RunOrigin | null
 }
 
 /** 295-05 (D-04): the mark on a step kept without sources. `continued_by` is WORDS resolved

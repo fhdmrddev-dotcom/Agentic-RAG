@@ -10,7 +10,7 @@
  * count it is supposed to hold still (the 187-24 trap — measured here, not feared).
  */
 
-import type { AskUserAnswerBody, Citation, EmitFailure, EmitSubStep, Message, OutputFile, PendingAsk, SourceReference, TaskRunIndexItem, Thread, Todo, WorkspaceDiff, WorkspaceFile, WorkspaceFileContent, WorkspaceVersion } from "../../types"
+import type { AskUserAnswerBody, Citation, RunOrigin, EmitFailure, EmitSubStep, Message, OutputFile, PendingAsk, SourceReference, TaskRunIndexItem, Thread, Todo, WorkspaceDiff, WorkspaceFile, WorkspaceFileContent, WorkspaceVersion } from "../../types"
 import { API_BASE, ApiError, entitlementRefusalMessage, getAuthHeaders } from "./_core"
 import type { WorkflowDefinitionJSON } from "./knowledge"
 export async function listThreads(): Promise<Thread[]> {
@@ -1635,6 +1635,8 @@ export interface ThreadWorkflowState {
   last_run_status?: string | null
   last_run_created_at?: string | null
   last_run_updated_at?: string | null
+  /** Phase 293 (D-24): how the LAST run started, as recorded; null when it was not. */
+  origin?: RunOrigin | null
   /** Phase 098-UAT run-honesty fix (B) — the run's durable per-phase status array
    *  (ordered by phase_index) from workflow_phases, so the reconcile floor can
    *  rebuild an HONEST timeline for a TERMINAL run instead of returning [] (which
