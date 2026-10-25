@@ -81,9 +81,7 @@ def test_a_listed_published_workflow_starts_as_the_owner_with_default_caps(env):
     # kickoff, each inside the untrusted envelope; the bare "Run <name>" told it nothing.
     assert kw["inputs"] == {
         "topic": "EU energy prices",
-        "kickoff_prompt": "Run Weekly digest
-
-" + wrap_untrusted_input("topic", "EU energy prices"),
+        "kickoff_prompt": "Run Weekly digest\n\n" + wrap_untrusted_input("topic", "EU energy prices"),
         "_untrusted_inputs": True,
     }
     assert kw["title"] == "Weekly digest · via key n8n-prod"
@@ -98,9 +96,7 @@ def test_every_declared_value_reaches_the_kickoff_inside_its_own_envelope(env):
     r = env["client"].post(URL, json={"inputs": {"topic": hostile, "notes": "  "}})
     assert r.status_code == 201, r.text
     kickoff = env["launch"].await_args.kwargs["inputs"]["kickoff_prompt"]
-    assert kickoff.startswith("Run Weekly digest
-
-")
+    assert kickoff.startswith("Run Weekly digest\n\n")
     assert kickoff.count('<external_input source="api_key"') == 1  # blank `notes` adds nothing
     assert wrap_untrusted_input("topic", hostile) in kickoff
     assert "</external_input> now" not in kickoff  # the closing tag inside the value is neutralised
