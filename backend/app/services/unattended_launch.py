@@ -98,8 +98,14 @@ async def launch_unattended_run(
     on_finish: OnFinish | None = None,
     run_label: str = "scheduled",
     log_ref: Any = None,
+    origin_kind: str | None = None,
+    origin_label: str | None = None,
+    origin_ref: Any = None,
 ) -> UUID:
     """Start ONE unattended workflow run as ``owner_id``. Returns the ``workflow_runs`` id.
+
+    ``origin_*`` go straight to ``create_workflow_run``, the one writer (D-22): the scheduler
+    passes ``schedule`` + its name + id, the inbound door ``key`` + its label + id.
 
     The caller has already loaded, parsed, linted and entitlement-checked the definition.
 
@@ -145,6 +151,9 @@ async def launch_unattended_run(
         inputs=inputs,
         model=None,
         user_id=owner_id,
+        origin_kind=origin_kind,
+        origin_label=origin_label,
+        origin_ref=_as_uuid(origin_ref) if origin_ref is not None else None,
     )
 
     # ── ARM THE SPEND CAP, BEFORE A SINGLE PHASE RUNS ─────────────────────────────────

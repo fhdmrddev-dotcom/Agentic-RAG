@@ -1017,16 +1017,24 @@ async def _exec_llm_batch_agents(phase, accumulated_outputs: dict, ctx) -> dict:
     # (split_topic itself gets the kickoff via ctx.inputs from fix #1/#2; the batch
     # branches get it here). Empty when no kickoff was stored (behavior-preserving).
     overall_topic = _kickoff_prompt(ctx)
+    # 293 (D-13 / TRUST-03, A3): on a key-started run the sub-question is derived from text an
+    # outside system sent, so it reaches the model only inside the untrusted envelope. The
+    # flag must be literally True on a dict bag; anything else is byte-identical to before.
+    from app.services.inbound_inputs import UNTRUSTED_FLAG, wrap_untrusted_input  # noqa: PLC0415
+
+    _run_inputs = getattr(ctx, "inputs", None)
+    _untrusted = isinstance(_run_inputs, dict) and _run_inputs.get(UNTRUSTED_FLAG) is True
 
     async def _one(question: str) -> dict:
         async with sem:  # composes with the shipped per-run + Redis-Lua caps
             phase_ctx = _build_phase_tool_context(phase, ctx, model=model)
+            shown = wrap_untrusted_input("sub_question", question) if _untrusted else question
             # The sub-agent's USER turn (task_service.py:351) = the sub-question, the
             # actual substance to research — not the truncated slug label it was before.
             # Prefix the overall topic so the branch keeps the user's intent in view.
             description = (
-                f"Overall topic: {overall_topic}\n\nSub-question: {question}"
-                if overall_topic else question
+                f"Overall topic: {overall_topic}\n\nSub-question: {shown}"
+                if overall_topic else shown
             )
             return await run_task_sub_agent(
                 parent_ctx=phase_ctx,
@@ -1035,7 +1043,7 @@ async def _exec_llm_batch_agents(phase, accumulated_outputs: dict, ctx) -> dict:
                 allowed_tools=_effective_tools(phase),
                 instructions=None,
                 max_steps=max_steps,
-                system_prompt_override=f"{base_prompt}\n\nSub-question: {question}",
+                system_prompt_override=f"{base_prompt}\n\nSub-question: {shown}",
                 tools_override=tools_override,
             )
 
@@ -2107,7 +2115,8 @@ def _clip_for_body(value) -> str:
 # ``kickoff_prompt`` is the user's original chat question (SEED-047), present on every live
 # run; rendering it under "What this step would have done" asserts it is an input to the
 # send. Closed and named, for the reason spelled out in ``_external_action_inputs``.
-_NON_ACTION_RUN_INPUTS: frozenset[str] = frozenset({"kickoff_prompt"})
+# 293 (D-13): ``_untrusted_inputs`` is the key-started run's TRUST-03 flag, scaffolding by name.
+_NON_ACTION_RUN_INPUTS: frozenset[str] = frozenset({"kickoff_prompt", "_untrusted_inputs"})
 
 
 def _external_action_inputs(accumulated_outputs: dict, ctx) -> dict:

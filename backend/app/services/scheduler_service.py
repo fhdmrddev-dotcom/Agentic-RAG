@@ -183,6 +183,11 @@ async def launch_scheduled_run(
         on_finish=_record_outcome,
         run_label="scheduled",
         log_ref=f"schedule {schedule.get('id')}",
+        # 293 (D-22, A6): the tick AND "Run now" (api/schedules.py calls this function) read
+        # as schedule origin, labelled with the schedule's name at start.
+        origin_kind="schedule",
+        origin_label=schedule.get("name"),
+        origin_ref=schedule_id,
     )
 
 

@@ -393,6 +393,10 @@ _AUDIT_EVENT_TYPES = frozenset(
 
 
 # ── run creation (Phase 092 MODE-01 / Q5 — the net-new atomic transaction) ───
+# Phase 293 (D-22): the migration-215 CHECK's literals, mirrored for a refusal before the write.
+_RUN_ORIGIN_KINDS: frozenset[str] = frozenset({"app", "schedule", "key"})
+
+
 async def create_workflow_run(
     pool: asyncpg.Pool,
     *,
@@ -403,6 +407,9 @@ async def create_workflow_run(
     model: str | None,
     user_id: UUID,
     is_golden_run: bool = False,
+    origin_kind: str | None = None,
+    origin_label: str | None = None,
+    origin_ref: UUID | None = None,
 ) -> UUID:
     """Atomically create a workflow run + its phase rows + set the thread anchor.
 
@@ -439,6 +446,13 @@ async def create_workflow_run(
     final output the publish-path judge grades (no mocks, no opt-out); the flag
     only marks the row so the receipt VIEW (Phase 107) can distinguish "what good
     looked like at publish approval" from a normal run.
+
+    Phase 293 (D-22): ``origin_kind`` / ``origin_label`` / ``origin_ref`` (keyword-only, default
+    None — every existing caller stays byte-identical) record WHERE the run was started:
+    ``app`` (the kickoff in ``threads.py``), ``schedule`` (+ the schedule name and id), or
+    ``key`` (+ the key label and id). The origin is written ONCE here and the migration-215
+    trigger makes it immutable. Any other kind is refused before a write; the publish golden
+    run passes none, because it is a validation run, not a start (D-23).
 
     ── Migration 122 — THE DEFINITION SNAPSHOT, AND WHY IT IS WRITTEN *HERE* ────────────
 
@@ -516,12 +530,14 @@ async def create_workflow_run(
 
     Returns the new workflow_run id.
     """
+    if origin_kind is not None and origin_kind not in _RUN_ORIGIN_KINDS:
+        raise ValueError(f"unknown run origin kind {origin_kind!r}")
     async with pool.acquire() as con:
         async with con.transaction():
             run_id = await con.fetchval(
                 """
-                INSERT INTO workflow_runs (thread_id, definition_id, status, inputs, model, user_id, is_golden_run, definition_snapshot)
-                VALUES ($1, $2, 'active', $3::jsonb, $4, $5, $6, $7::jsonb)
+                INSERT INTO workflow_runs (thread_id, definition_id, status, inputs, model, user_id, is_golden_run, definition_snapshot, origin_kind, origin_label, origin_ref)
+                VALUES ($1, $2, 'active', $3::jsonb, $4, $5, $6, $7::jsonb, $8, $9, $10)
                 RETURNING id
                 """,
                 thread_id,
@@ -535,6 +551,9 @@ async def create_workflow_run(
                 # encodes it; handing over a string gets it encoded TWICE and stores a jsonb
                 # STRING SCALAR, which is what the first two real runs did.
                 definition.model_dump(mode="json"),
+                origin_kind,
+                origin_label,
+                origin_ref,
             )
             for ps in sorted(definition.phases, key=lambda p: p.phase_index):
                 await con.execute(
