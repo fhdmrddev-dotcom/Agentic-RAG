@@ -232,6 +232,21 @@ async def test_list_for_org_names_the_owner_and_the_revoker():
     assert "owner_name" in sql and "revoked_by_name" in sql
 
 
+# 293-05 D-4 (G-4 step 5): every key in Org admin -> API keys read "owner an unknown member (you)",
+# because the dev profiles carry no display_name and the name came from profiles alone. The owner
+# and the revoker now fall back to the member's sign-in email, as the org members roster shows it.
+async def test_the_owner_and_revoker_names_fall_back_to_the_member_email():
+    for fn, kw in ((db.list_keys_for_org, {"org_id": ORG}),
+                   (db.list_keys_for_owner, {"org_id": ORG, "user_id": USER})):
+        pool = _Pool(rows=[])
+        await fn(pool, **kw)
+        sql = " ".join(pool.calls[0][1].split())
+        assert "COALESCE(NULLIF(po.display_name, ''), uo.email) AS owner_name" in sql, fn.__name__
+        assert "COALESCE(NULLIF(pr.display_name, ''), ur.email) AS revoked_by_name" in sql, fn.__name__
+        assert "LEFT JOIN auth.users uo ON uo.id = k.user_id" in sql
+        assert "LEFT JOIN auth.users ur ON ur.id = k.revoked_by" in sql
+
+
 async def test_a_workflow_the_caller_cannot_read_returns_no_content():
     """Every content column is behind the readability predicate, so a foreign row's name or
     definition never leaves this module."""
