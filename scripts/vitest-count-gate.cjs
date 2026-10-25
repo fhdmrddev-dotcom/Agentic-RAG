@@ -4405,6 +4405,10 @@ const BASELINE = {
   "ApiKeyCallStrip.test.tsx": 5, // 293-04 — one tab stop, arrow keys, Enter/Space detail, bar name = detail sentence, read bars shorter
   "RevokeApiKeySheet.test.tsx": 7, // 293-04 — focus on Keep it, Esc, Revoking… in flight, onDone only after the server, failure keeps it open, owner named
   "OrgApiKeysTab.test.tsx": 7, // 293-04 — admin list: owner on every card, no New key, run links only on own keys, revoke names the owner then re-fetches and pulses
+  // 293-04 (SEED-287) — OrgAuditTab.test.tsx existed since 166 and was in NEITHER knob, so it ran
+  // nowhere the gate could see. Adopted at its measured count: 8 pre-existing + 1 unknown-code case
+  // + 7 api_key.* cases (5 labels, the API keys filter group, the ?raw lockstep with admin/AuditTab.tsx).
+  "OrgAuditTab.test.tsx": 16,
 }
 
 // Still COMPUTED, never hand-written — the reduce is the single source, so the
@@ -6438,6 +6442,8 @@ const TARGETS = [
   "src/components/settings/apiKeys/__tests__/RevokeApiKeySheet.test.tsx",
   // 293-04 — FILE-LEVEL (no `src/components/org` directory entry), SAME commit as its pin.
   "src/components/org/OrgApiKeysTab.test.tsx",
+  // 293-04 (SEED-287) — FILE-LEVEL, SAME commit as its first-ever BASELINE pin.
+  "src/components/org/OrgAuditTab.test.tsx",
 ]
 
 const REPO_ROOT = path.resolve(__dirname, "..")

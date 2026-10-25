@@ -58,8 +58,8 @@ const EMPTY_FILTERS: AuditFilters = {
 const OPERATOR_PAGE_SIZE = 25
 
 // ── Plain-first vocabularies (067-A) ─────────────────────────────────────────
-type ActionGroup = "Documents" | "Chat & agent" | "Organizing" | "Other"
-const GROUP_ORDER: readonly ActionGroup[] = ["Documents", "Chat & agent", "Organizing", "Other"]
+type ActionGroup = "Documents" | "Chat & agent" | "Organizing" | "API keys" | "Other"
+const GROUP_ORDER: readonly ActionGroup[] = ["Documents", "Chat & agent", "Organizing", "API keys", "Other"]
 
 /** The platform `audit_log` 19-action vocabulary (migs 030/071) → plain label + group.
  *  This is the ONLY place the raw code → plain-language mapping lives (067-A). */
@@ -83,6 +83,13 @@ const PLATFORM_ACTION_META: Record<string, { label: string; group: ActionGroup }
   "metadata.field.create": { label: "Added a metadata field", group: "Organizing" },
   "settings.update": { label: "Changed settings", group: "Other" },
   "feedback.submit": { label: "Sent feedback", group: "Other" },
+  // Phase 293-04 (D-17): the five api_key.* rows (migration 215), worded — never raw codes. The SAME
+  // five lines live in the other audit browser; OrgAuditTab.test.tsx fences the two as identical.
+  "api_key.create": { label: "Made an API key", group: "API keys" },
+  "api_key.revoke": { label: "Revoked an API key", group: "API keys" },
+  "api_key.start": { label: "Started a run with an API key", group: "API keys" },
+  "api_key.read": { label: "Read a run with an API key", group: "API keys" },
+  "api_key.refused": { label: "Refused an API key call", group: "API keys" },
 }
 
 /** Prettify a platform `action_type` code for a row label; unknown codes fall back
