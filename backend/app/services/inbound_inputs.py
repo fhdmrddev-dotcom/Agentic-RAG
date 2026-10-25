@@ -209,3 +209,29 @@ def inbound_kickoff(name: str, values: dict[str, str]) -> str:
             parts.append(wrap_untrusted_input(key, value))
     return "\n\n".join(parts)
 
+
+def launch_kickoff(content: str | None, definition: Any, values: dict | None) -> str:
+    """The kickoff of an IN-APP run (293-05 D-3): the typed task, or ``Run <name>`` when the box
+    is empty, then each non-blank DECLARED value as a plain ``key: value`` line.
+
+    The owner is the trusted author here, so there is no untrusted envelope (that stays on the key
+    path, ``inbound_kickoff``). With no values the typed text is returned unchanged. ⚠ Both kickoff
+    sites (``api/threads.py``'s persisted row and ``workflow_kickoff``'s live ctx) call this, so the
+    first live run and a resumed run read the same kickoff (the 214 MIRROR rule).
+    """
+    text = content or ""
+    raw = definition.model_dump(mode="json") if hasattr(definition, "model_dump") else definition
+    given = values if isinstance(values, dict) else {}
+    lines = []
+    for field in declared_fields(raw):
+        value = given.get(field.key)
+        if isinstance(value, (int, float)) and not isinstance(value, bool):
+            value = str(value)
+        if isinstance(value, str) and value.strip():
+            lines.append(f"{field.key}: {value}")
+    if not lines:
+        return text
+    name = (raw or {}).get("name") if isinstance(raw, dict) else None
+    head = text if text.strip() else f"Run {name or 'workflow'}"
+    return head + "\n\n" + "\n".join(lines)
+

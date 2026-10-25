@@ -132,6 +132,7 @@ from app.services import run_model_resolution as _run_model_resolution
 # patch (test_dual_mode_wiring) still intercept (D-A4). Behavior byte-identical.
 from app.services.workflow_kickoff import (
     _ensure_skill_snapshots,
+    launch_kickoff,
     preflight_workflow_kickoff,
 )
 # Phase 092 (MODE-01): the net-new run-creation + picker-feed helpers. db-layer
@@ -2081,7 +2082,7 @@ async def send_message(
             inputs={
                 **{k: v for k, v in (body.inputs or {}).items()
                    if k not in RESERVED_RUN_INPUT_KEYS},
-                "kickoff_prompt": body.content,
+                "kickoff_prompt": launch_kickoff(body.content, _kickoff_definition, body.inputs),  # 293-05 D-3
                 **({"folder_id": str(body.folder_id)} if body.folder_id else {}),
             },
             model=_resolved_model,                      # SEED-047

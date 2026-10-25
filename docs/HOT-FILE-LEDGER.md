@@ -11448,7 +11448,7 @@ cells rot within days.
 | [`frontend/src/components/chat/ToolCallPanel.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentschattoolcallpaneltsx) | 55 / 23 / 409 (was `54 / 22 / 407`) | ⚠ **FIRES** | ✅ G-5 DISCHARGED (227-02). **273-05**: `stepLabel` + `ARGS_HIDDEN.livePanel` replace one name check; no new branch |
 | [`frontend/src/components/chat/tool-bodies/SearchDocumentsBody.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentschattool-bodiessearchdocumentsbodytsx) | 3 / 3 / 71 | ⚠ **FIRES** (crossed in 272) | ⚠ absent its ENTIRE LIFE — row added 272-05. **F-3**: `summarize` names refused / invalid / empty / not-searchable / unavailable |
 | [`frontend/src/components/chat/MessageItem.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentschatmessageitemtsx) | 84 / 39 / 1059 (was `83 / 42 / 1050`) | ⚠ **FIRES** | 292.1 UAT: Deep Continue re-attaches the run's stream (+1 else-if) · ⛔ |
-| [`backend/app/api/threads.py`](docs/HOT-FILE-LEDGER.md#backendappapithreadspy) | 278 / 93 / 2684 (was `277 / 93 / 2682`) | ⚠ **FIRES** | 292.1 UAT: typed continue passes stream_since through · ⛔ |
+| [`backend/app/api/threads.py`](docs/HOT-FILE-LEDGER.md#backendappapithreadspy) | 282 / 94 / 2744 (was `278 / 93 / 2684`) | ⚠ **FIRES** | 293-05 D-3: the persisted kickoff is `launch_kickoff(body.content, def, inputs)`; one import name, one expression · ⛔ |
 | [`frontend/src/providers/StreamsProvider.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrcprovidersstreamsprovidertsx) | 116 / 44 / 5210 (was `115 / 44 / 5087`) | ⚠ **FIRES** | 292.1 UAT: Deep Continue follows the same run live (stream_since) · ⛔ |
 | [`frontend/src/hooks/useMessages.ts`](docs/HOT-FILE-LEDGER.md#frontendsrchooksusemessagests) | 74 / 27 / 127 | ⚠ **FIRES** | extraction due |
 | [`backend/app/services/anthropic_service.py`](docs/HOT-FILE-LEDGER.md#backendappservicesanthropic_servicepy) | 12 / 11 / 373 (was `11 / 10 / 354`) | ⚠ **FIRES** | **282-01**: ONE `_anthropic_client` builder (budget in the constructor, connect 5 s, cloud retries 2) + trailing `timeout_s` on `stream_anthropic`. honoured by construction; adapter-pattern audit due |
@@ -11620,7 +11620,7 @@ cells rot within days.
 | [`backend/app/services/settings_broadcast.py`](docs/HOT-FILE-LEDGER.md#backendappservicessettings_broadcastpy) | 1 / 1 / 228 | no (1 phase) | young (**BUG-260902-06**) — the cross-worker cache-invalidation leaf: one channel, one payload builder, one re-warm dispatcher, one subscriber |
 | [`backend/app/services/connectors/args.py`](docs/HOT-FILE-LEDGER.md#backendappservicesconnectorsargspy) | 2 / 1 / 474 | no (1 phase) | young (214-01) — the shared argument leaf: resolution, satisfiability, and ONE schema accessor |
 | [`backend/app/services/harness/reachability.py`](docs/HOT-FILE-LEDGER.md#backendappservicesharnessreachabilitypy) | 5 / 5 / 498 (was `4 / 4 / 463`) | ⚠ **FIRES** | 295-02: `no_template_bound` in LINT_CODES + pure `_check_template_bound` (+1 def, If 20→22). ⚠ now FIRES at 5 phases |
-| [`backend/app/services/workflow_kickoff.py`](docs/HOT-FILE-LEDGER.md#backendappservicesworkflow_kickoffpy) | 11 / 8 / 596 (was `10 / 8 / 585`) | ⚠ **FIRES** | 295-10 (D-r1-03): a send on a PAUSED anchor gets its own 409 sentence (where it waits, how to stop it); every other live status keeps the lock wording (If 15→16). Honoured by construction |
+| [`backend/app/services/workflow_kickoff.py`](docs/HOT-FILE-LEDGER.md#backendappservicesworkflow_kickoffpy) | 12 / 8 / 597 (was `11 / 8 / 596`) | ⚠ **FIRES** | 293-05 D-3: the live ctx kickoff calls the same `launch_kickoff` as the persisted row (214 MIRROR rule). Honoured by construction |
 | [`frontend/src/components/layout/ChatLaunchForm.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentslayoutchatlaunchformtsx) | 1 / 1 / 157 | no (1 phase) | young (214-12); does not fire (1 phase). **286**: 287 reuses it through `ChatLayout.doRun` — never a second launch form. Path is `components/layout/`, not `components/chat/` |
 | [`frontend/src/components/workflows/ArgumentEditor.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentsworkflowsargumenteditortsx) | 1 / 1 / 226 | no (1 phase) | young (214-07) — the argument form; the raw-JSON surface it replaced was DELETED, not hidden |
 | [`frontend/src/components/workflows/ArgumentRow.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentsworkflowsargumentrowtsx) | 1 / 1 / 362 | no (1 phase) | young (214-07) — one row, one three-arm source picker, one gutter that WIDENS rather than inserts |
@@ -24784,3 +24784,22 @@ Triples re-derived with the recipe at the 293-03 close (six-digit buckets exclud
 ### `frontend/src/components/org/OrgAuditTab.tsx`
 
 **`3 / 2 / 408`** at 293 planning revision (2026-10-25). Existing file with NO ledger row for its whole life; row added AT PLANNING because 293-04 names it in `files_modified` (D-17: the admin audit browsers must word the new `api_key.*` rows). The 293 touch is data only: five map entries and one group in the action vocabulary. Does not fire.
+
+### Phase 293-05 D-3 — the in-app kickoff carries the launch values (2026-10-25)
+
+Found by the orchestrator's G-4 drive: an in-app run with the "What should this run work on?" box
+empty persisted `kickoff_prompt: ""`, so the declared launch values never reached the first AI step
+(run `f4959321-81d0-49a7-8359-a54773cfadd0`). Inherited from 287. Fixed with ONE pure helper,
+`inbound_inputs.launch_kickoff(content, definition, values)`, called at BOTH kickoff sites so the
+persisted row and the live ctx stay equal (the 214 MIRROR rule). Triples re-derived after the commit.
+
+- `backend/app/api/threads.py`: `282 / 94 / 2744` (was `281 / 94 / 2743`). One name added to the
+  existing `workflow_kickoff` import block and one expression in the `create_workflow_run` inputs
+  literal. Nothing else in the file moved. Previous CLAUDE.md cell kept verbatim: 293-03: run_origin
+  stamp (A8) + frame origin; runs query unchanged · ⛔
+- `backend/app/services/workflow_kickoff.py`: `12 / 8 / 597` (was `11 / 8 / 596`). One import line and
+  one expression in the live ctx `inputs` literal (the twin). Previous CLAUDE.md cell kept verbatim:
+  295-10: paused-run 409 says where it waits (If 15→16)
+- `backend/tests/test_dual_mode_wiring.py::test_live_wf_ctx_sets_inputs_kickoff_prompt_in_source`
+  retargeted on purpose from `"kickoff_prompt": body.content` to `"kickoff_prompt": launch_kickoff(body.content`
+  (the same call at both sites is still asserted); its failing set is otherwise identical to base.

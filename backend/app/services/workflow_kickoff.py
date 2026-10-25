@@ -43,6 +43,7 @@ from fastapi import HTTPException, status
 
 from app.config import settings
 from app.models.message import RESERVED_RUN_INPUT_KEYS
+from app.services.inbound_inputs import launch_kickoff  # 293-05 D-3: one kickoff for both sites
 from app.utils.db import aexec
 from app.utils.folder_utils import fetch_visible_folders
 from app.services.harness.scope import (
@@ -566,7 +567,7 @@ async def build_harness_run_context(
         inputs={
             **{k: v for k, v in (body.inputs or {}).items()
                if k not in RESERVED_RUN_INPUT_KEYS},
-            "kickoff_prompt": body.content,
+            "kickoff_prompt": launch_kickoff(body.content, kickoff_definition, body.inputs),  # 293-05 D-3
             **({"folder_id": str(body.folder_id)} if body.folder_id else {}),
         },
         redis=redis,
