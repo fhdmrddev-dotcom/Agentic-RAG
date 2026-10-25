@@ -163,6 +163,21 @@ def test_a_run_waiting_on_a_person_names_the_owner_and_never_the_prompt(env):
     assert "pricing memo" not in json.dumps(body)
 
 
+# 293-05 (found driving the live app): a run waiting on a human-input STEP stays `active` in the
+# database while its question is open (only an engine pause flips it to `paused`). The run page
+# reads the open question for both statuses (`_read_waiting_on`); the key read must too, or a
+# caller polls "running" forever on a run that is waiting for a person.
+def test_an_active_run_with_an_open_question_reads_waiting_for_person(env):
+    env["pool"].run_row = _run(status="active")
+    env["pool"].phase_rows = [_phase("gather", 0, "completed"), _phase("write", 1, "active")]
+    env["unanswered"].return_value = {"prompt": "Approve the secret pricing memo?",
+                                      "timeout_seconds": 600, "created_at": None}
+    body = env["client"].get(URL).json()
+    assert body["status"] == "waiting_for_person"
+    assert body["waiting_on"] == {"who": "Sam Rivera"}
+    assert "pricing memo" not in json.dumps(body)
+
+
 @pytest.mark.parametrize("status", ["cap_paused", "paused"])
 def test_other_pauses_read_paused(env, status):
     env["pool"].run_row = _run(status=status)
