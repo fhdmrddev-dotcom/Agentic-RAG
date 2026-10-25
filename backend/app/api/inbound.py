@@ -429,7 +429,10 @@ async def read_inbound_run(
     waiting_on = None
     if db_status in ("paused", "cap_paused"):
         wire_status = "paused"
-    if db_status == "paused":
+    # 293-05: a human-input STEP keeps the run `active` while its question is open (only an
+    # engine pause flips it to `paused`), so the open question is read for both, exactly as the
+    # run page's `_read_waiting_on` does.
+    if db_status in ("active", "paused"):
         prompt = await _optional(
             "waiting", run["id"], workflows_db.get_unanswered_ask_user(pool, run["id"])
         )
