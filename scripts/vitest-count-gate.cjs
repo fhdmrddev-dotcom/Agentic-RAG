@@ -4356,7 +4356,7 @@ const BASELINE = {
   // row-identity order), and 286-04 moved 307 lines out of that file. The other three SEED-222
   // suites (`PromptVariableChips`, `RunHero`, `nodeEffectBanner`) read no 286 file: still unpinned.
   "toolReadOnlyMap.test.ts": 7,
-  "automationFacts.test.ts": 11,
+  "automationFacts.test.ts": 19, // 293-03: 11 -> 19 (the next run time off the server instant: future, year, past, 24h, silent arms, unreadable, the card span, no browser maths)
   // ── Phase 289-05 (2026-10-19) — the suites plans 289-01..05 created, adopted in BOTH knobs ──
   // in one commit. Counts are the per-file actuals from a focused `--reporter=json` run at
   // `GSD_VITEST_MAX_WORKERS=2`, never hand-counted. The three `src/components/workflows` suites
@@ -4397,6 +4397,7 @@ const BASELINE = {
   // `launchFieldsTwin293.test.ts` sits under the `src/components/workflows` directory entry, pin only.
   "apiKeyFacts.test.ts": 32, // 293-04 — wire → card facts: refused chips never read active, every reason code worded, raw code for an unknown one
   "curlExamples.test.ts": 8, // 293-04 — the show-once curl: real base, bearer secret, declared fields in order, JSON + shell escaping
+  "ApiKeyLimits.test.tsx": 10, // 293-03 — the operator's per-key limits: load lock + Retry, changed fields only, clamps 1..60 / 10..600, adopt, SettingsPage wiring
   "RunOriginLine.test.tsx": 6, // 293-03 — the origin leaf: nothing when absent/unknown, muted, hidden icon, one mount per run surface (src/components/workflows dir TARGET)
   "runOriginVocabulary.test.ts": 11, // 293-03 — the six origin sentences, null for absent/unknown (D-23)
   "apiKeyPrepick.test.ts": 6, // 293-04 — ⋯ menu pre-pick: sessionStorage read-once, only {workflowId, name}, never a secret
@@ -6437,6 +6438,8 @@ const TARGETS = [
   // ── Phase 293-04 — FILE-LEVEL (no `src/components/settings` directory entry), SAME commit as
   // their BASELINE pins.
   "src/components/settings/apiKeys/__tests__/apiKeyFacts.test.ts",
+  // 293-03 — FILE-LEVEL (no `src/components/settings` directory entry), SAME commit as its pin.
+  "src/components/settings/__tests__/ApiKeyLimits.test.tsx",
   "src/components/settings/apiKeys/__tests__/curlExamples.test.ts",
   "src/components/settings/apiKeys/__tests__/apiKeyPrepick.test.ts",
   "src/components/settings/apiKeys/__tests__/apiKeysContract.test.ts",

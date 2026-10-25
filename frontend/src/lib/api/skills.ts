@@ -580,6 +580,9 @@ export interface FullAppSettings {
   /** 292.1 (D-17) — tool rounds per turn before the limit line + Continue. Optional: an older backend omits them. */
   chat_max_tool_rounds?: number
   explorer_max_tool_rounds?: number
+  /** 293 (D-14) — per-key allowances for outside calls (1..60 starts, 10..600 reads a minute). */
+  api_key_starts_per_minute?: number
+  api_key_reads_per_minute?: number
   /**
    * SEED-258 — the largest file ANY connected source (Google Drive, Microsoft Graph, any
    * MCP file surface) will import, in MB. ONE knob: the MCP JSON-RPC envelope cap is
@@ -724,6 +727,9 @@ export interface SettingsUpdate {
   /** 292.1 (D-18) — bounded 2..50 by the server; a refusal is a 400 sentence. */
   chat_max_tool_rounds?: number
   explorer_max_tool_rounds?: number
+  /** 293 (D-14) — bounded 1..60 / 10..600 by the server (293-01); a refusal is a 400 sentence. */
+  api_key_starts_per_minute?: number
+  api_key_reads_per_minute?: number
   /**
    * SEED-258. ⛔ There is no `_floor` / `_ceiling` here and there must never be: the bounds
    * are the SERVER's, read-only on the response. An out-of-range value is refused with a

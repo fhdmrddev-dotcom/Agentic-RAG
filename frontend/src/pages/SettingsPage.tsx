@@ -48,6 +48,7 @@ import { ReembedStatusCard } from "@/components/settings/ReembedStatusCard"
 import { EngineHealthCard } from "@/components/settings/EngineHealthCard"
 // SEED-258 — the source file ceiling. The card owns the copy; this page owns the wire.
 import { SourceFileCeilingCard } from "@/components/settings/SourceFileCeilingCard"
+import { ApiKeyLimits, type ApiKeyLimitsHandle } from "@/components/settings/ApiKeyLimits"
 import { SOURCE_CEILING_RECOMMENDED_MB } from "@/components/settings/sourceCeilingCopy"
 import { JudgeModelPicker } from "@/components/settings/JudgeModelPicker"
 import { AuthoringModelPicker } from "@/components/settings/AuthoringModelPicker"
@@ -695,6 +696,8 @@ export function SettingsPage({ onOpenRun }: { onOpenRun?: (runId: string) => voi
   }, [canManageModels, featuresLoading])
 
   const roundLimitsRef = useRef<AgentRoundLimitsHandle>(null)
+  // 293-03 (D-14): the per-key limits ride Save Integrations, the AgentRoundLimits pattern.
+  const apiKeyLimitsRef = useRef<ApiKeyLimitsHandle>(null)
 
   const handleSaveAIModel = async () => {
     // Plan 075.4-04 Task 1 (D-075.4-F3) — flushSync commits pending onChange
@@ -825,9 +828,12 @@ export function SettingsPage({ onOpenRun }: { onOpenRun?: (runId: string) => voi
         // `updateSettings` rethrows that detail and the banner above renders it verbatim.
         // Silently fixing the number here would hide a refusal the operator should read.
         source_max_file_size_mb: sourceMaxFileSizeMb,
+        // 293-03 (D-14): ONE save per section — the per-key limits ride this PUT ({} until read).
+        ...apiKeyLimitsRef.current?.changes(),
       }
       const updated = await updateSettings(body)
       hydrate(updated)
+      apiKeyLimitsRef.current?.adopt(updated)
       setSavedIntegrations(true)
       setTimeout(() => setSavedIntegrations(false), 2500)
     } catch (e: unknown) {
@@ -1618,6 +1624,9 @@ export function SettingsPage({ onOpenRun }: { onOpenRun?: (runId: string) => voi
                   onChange={setSourceMaxFileSizeMb}
                 />
               )}
+
+              {/* 293-03 (D-14 / UI-SPEC Surface 6): the operator's per-key limits. */}
+              <ApiKeyLimits ref={apiKeyLimitsRef} />
 
               {/* Save Integrations button */}
               <div className="flex justify-end">

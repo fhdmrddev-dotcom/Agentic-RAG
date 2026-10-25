@@ -975,7 +975,7 @@ export function WorkflowCard({
    * does not admit composes byte-identically to the way it did before this phase.
    */
   // Phase 204.1 — resolved by the leaf, never decided here. See `automationFacts.ts`.
-  const automation = automationFacts(row)
+  const automation = automationFacts(row, now)
 
   const identityParts: string[] = [
     ...templateMark,
@@ -1179,6 +1179,12 @@ export function WorkflowCard({
                 <span data-testid="row-automation" className="text-primary">
                   {automation.phrase}
                 </span>
+                {/* 293-03 (D-25): the server's next run time, formatted only. */}
+                {automation.next !== null && (
+                  <span data-testid="row-automation-next" className="text-muted-foreground">
+                    <span aria-hidden="true" className="text-border">{ANSWER_SEPARATOR}</span> {automation.next}
+                  </span>
+                )}
                 {automation.more !== null && (
                   <span data-testid="row-automation-more" className="text-muted-foreground">
                     {automation.more}

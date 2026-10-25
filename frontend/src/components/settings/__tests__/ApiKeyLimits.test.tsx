@@ -164,12 +164,13 @@ describe("ApiKeyLimits — through the tab's one save (293-03)", () => {
 describe("SettingsPage wiring (293-03, G-5: one ref, one spread, one adopt)", () => {
   it("mounts the card once in Integrations and rides Save Integrations", () => {
     const src = settingsPageRaw.replace(/\r\n/g, "\n")
-    expect(src.split("<ApiKeyLimits").length - 1).toBe(1)
+    // `<ApiKeyLimits ` with the space: `useRef<ApiKeyLimitsHandle>` also starts with the bare name.
+    expect(src.split("<ApiKeyLimits ").length - 1).toBe(1)
     expect(src).toContain("useRef<ApiKeyLimitsHandle>(null)")
     expect(src).toContain("...apiKeyLimitsRef.current?.changes()")
     expect(src).toContain("apiKeyLimitsRef.current?.adopt(")
     expect(src.split("useState(").length - 1).toBe(49)
-    const card = src.indexOf("<ApiKeyLimits")
+    const card = src.indexOf("<ApiKeyLimits ")
     expect(card).toBeGreaterThan(src.indexOf("<SourceFileCeilingCard"))
     expect(card).toBeLessThan(src.indexOf("Save Integrations", card))
   })

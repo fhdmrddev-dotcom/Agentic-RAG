@@ -765,6 +765,17 @@ export function automationMoreCount(n: number): string {
   return `+${n} more`
 }
 
+/** Phase 293-03 (D-25): the card's next-run fragment, `next Mon 26 Oct, 09:00`. The time is the
+ *  SERVER's soonest active `next_run_at`, only formatted in the browser. */
+export const AUTOMATION_NEXT = "next"
+/** …and when that instant is already behind the viewer's clock: said, never hidden. */
+export const AUTOMATION_NEXT_PAST = "next was due"
+
+/** `next {when}` / `next was due {when}`. */
+export function automationNextAt(when: string, past: boolean): string {
+  return `${past ? AUTOMATION_NEXT_PAST : AUTOMATION_NEXT} ${when}`
+}
+
 /**
  * Phase 290-02 (2026-10-21, VIS-04 / D-01..D-05) — the card's STEP LINE words.
  *

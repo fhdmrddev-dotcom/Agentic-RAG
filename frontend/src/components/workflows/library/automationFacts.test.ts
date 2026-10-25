@@ -22,17 +22,12 @@ describe("automationFacts", () => {
   it("says nothing when the feed never mentioned schedules (undefined)", () => {
     // An older client, or a `response_model` that dropped the key. We know NOTHING.
     // 293-03: the silent arm also carries no next-run fragment.
-    expect(automationFacts({})).toEqual({ phrase: null, more: null, next: null, nextTitle: null })
+    expect(automationFacts({})).toEqual({ phrase: null, more: null, next: null })
   })
 
   it("says nothing when the feed answered that none is active (null)", () => {
     // A DIFFERENT fact from the one above — the answer arrived and it was "none".
-    expect(automationFacts({ nextScheduleAt: null })).toEqual({
-      phrase: null,
-      more: null,
-      next: null,
-      nextTitle: null,
-    })
+    expect(automationFacts({ nextScheduleAt: null })).toEqual({ phrase: null, more: null, next: null })
   })
 
   it("says nothing for a PAUSED schedule, because the lateral filters is_active", () => {
@@ -145,7 +140,6 @@ describe("automationFacts — the next run time (293-03)", () => {
     expect(f.phrase).toBe(AUTOMATION_CADENCE["0 8 * * 1"])
     expect(f.next).toBe(`${AUTOMATION_NEXT} Mon 26 Oct, 09:00`)
     expect(f.next).toBe("next Mon 26 Oct, 09:00")
-    expect(f.nextTitle).toBe("Monday 26 October 2026, 09:00")
   })
 
   it("adds the year when it differs from now's", () => {
@@ -174,7 +168,6 @@ describe("automationFacts — the next run time (293-03)", () => {
     const f = automationFacts({ nextScheduleAt: "not a date" }, NOW)
     expect(f.phrase).toBe(AUTOMATION_RUNS_ITSELF)
     expect(f.next).toBeNull()
-    expect(f.nextTitle).toBeNull()
   })
 
   it("the card renders ONE next span after the cadence and before +N more, with no state", async () => {
@@ -186,7 +179,8 @@ describe("automationFacts — the next run time (293-03)", () => {
     expect(nextIdx).toBeGreaterThan(automationIdx)
     expect(nextIdx).toBeLessThan(moreIdx)
     expect(src.slice(nextIdx - 400, nextIdx)).toContain("automation.next !== null")
-    expect(src).toContain("title={automation.nextTitle")
+    // ⚠ NO `title`: the library subtree's F1 fence (D-14 — touch has no hover) forbids it, so
+    // the fragment carries the whole fact in visible text (the year appears when it differs).
     expect(src.split("useState(").length - 1).toBe(0)
   })
 

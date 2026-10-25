@@ -246,6 +246,21 @@ export const API_KEYS_COPY = {
     overBare: "over the limit",
   },
 
+  /** 293-03 (D-14 / UI-SPEC Surface 6): the operator's per-key limits card in Settings →
+   *  Integrations, verbatim from §"Rate limit control (operator)". */
+  limits: {
+    title: "API keys",
+    description:
+      "Limits for calls from other systems. Each key gets its own allowance; a call over it is refused and told when to try again.",
+    startsLabel: "Starts per minute, per key",
+    startsHint: "Default 10.",
+    readsLabel: "Status reads per minute, per key",
+    readsHint: "Default 120.",
+    footer: "Applies to every key once you click Save Integrations.",
+    loadFailed: "Couldn't load the current API key limits, so they can't be changed here right now.",
+    retry: "Retry",
+  },
+
   /** Date words for the en-GB formatting in `apiKeyFacts.ts` (it spells no string itself). */
   dates: {
     weekdays: ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"],
