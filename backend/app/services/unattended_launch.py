@@ -122,11 +122,18 @@ async def launch_unattended_run(
     # and the panel are thread-anchored, so the run stays browsable exactly like a manual
     # one; and a single reused thread would serialise every start behind one
     # `active_workflow_run_id` anchor, so a long run would block the next launch.
+    #
+    # ⚠ Phase 293 (D-06): the org is stamped EXPLICITLY. Left out, `threads_autofill_org_id`
+    # files the thread (and the run, which inherits the thread's org) under the owner's
+    # arbitrary FIRST org, so a two-org owner's key or schedule would land in the wrong org.
     supabase = get_service_role_supabase(org_id)
+    thread_row: dict[str, Any] = {
+        "user_id": str(owner_id),
+        "title": title,
+        **({"org_id": str(org_id)} if org_id is not None else {}),
+    }
     thread_resp = await run_in_threadpool(
-        lambda: supabase.table("threads")
-        .insert({"user_id": str(owner_id), "title": title})
-        .execute()
+        lambda: supabase.table("threads").insert(thread_row).execute()
     )
     thread_id = _as_uuid(thread_resp.data[0]["id"])
 

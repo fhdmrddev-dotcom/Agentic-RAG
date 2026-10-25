@@ -15,6 +15,10 @@ from __future__ import annotations
 import ast
 import io
 from pathlib import Path
+from unittest.mock import AsyncMock, MagicMock, patch
+from uuid import uuid4
+
+import pytest
 
 REPO = Path(__file__).resolve().parents[2]
 SCHEDULER = REPO / "app" / "services" / "scheduler_service.py"
@@ -111,3 +115,38 @@ def test_the_wording_leaf_imports_nothing_from_app_api():
         if isinstance(node, ast.Import):
             for alias in node.names:
                 assert not alias.name.startswith("app.api"), alias.name
+
+
+# (e) Commit B — the unattended thread carries the run's org EXPLICITLY.
+# Without it ``threads_autofill_org_id`` files the thread, and therefore the run, under the
+# owner's arbitrary FIRST org: fatal for a two-org owner's key start (D-06) and a latent bug for
+# schedules (RESEARCH Pattern 2).
+@pytest.mark.asyncio
+async def test_the_unattended_thread_insert_stamps_the_org():
+    from app.services import unattended_launch
+
+    org_id = uuid4()
+    supabase = MagicMock()
+    supabase.table.return_value.insert.return_value.execute.return_value.data = [
+        {"id": str(uuid4())}
+    ]
+    with (
+        patch("app.dependencies.get_service_role_supabase", return_value=supabase),
+        patch("app.db.workflows.create_workflow_run", AsyncMock(return_value=uuid4())),
+        patch("app.db.workflows.arm_run_budget", AsyncMock()),
+        patch.object(unattended_launch, "_drive_run", AsyncMock()),
+    ):
+        await unattended_launch.launch_unattended_run(
+            owner_id=uuid4(),
+            org_id=org_id,
+            workflow_id=uuid4(),
+            definition=MagicMock(),
+            inputs={},
+            title="t",
+            max_tokens=500_000,
+            max_duration=1_800,
+            pool=MagicMock(),
+            redis=MagicMock(),
+        )
+    payload = supabase.table.return_value.insert.call_args.args[0]
+    assert payload["org_id"] == str(org_id), payload
