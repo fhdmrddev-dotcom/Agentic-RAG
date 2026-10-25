@@ -368,7 +368,7 @@ Plans:
 
 **Wave 4** *(blocked on Wave 3 completion)*
 
-- [ ] 293-05-PLAN.md — docs stop saying "no API keys" (D-20), live proof SC#1-5 + SC#10 board in 293-VALIDATION.md, operator G-4, REG-06 seed close-out with --require-settled gate, ledger re-derive (wave 4, DB-mutating, not autonomous)
+- [x] 293-05-PLAN.md — docs stop saying "no API keys" (D-20), live proof SC#1-5 + SC#10 board in 293-VALIDATION.md, operator G-4, REG-06 seed close-out with --require-settled gate, ledger re-derive (wave 4, DB-mutating, not autonomous)
 
 **UI hint**: yes
 **Flags**: ⛔ **security_enforcement**, opens an external door; read `docs/CONNECTOR-ARCHITECTURE.md` (MCP-first verdict; this is the inbound half, not Open Platform `SEED-013`), `app.security.egress`, and the TRUST-03 anti-injection discipline. Org-scoped, rate-limited, audited. Credentials stored hashed or encrypted per `secret_cipher.py`. Migration likely (next free after 209); apply by SQL editor, regenerate `full-schema.sql`, run `get_advisors(security)`; revoke from `PUBLIC` on any new function. **G-4**. SC#10 axes for the run-start path. Hot files: `workflow_runs.py`, `workflow_kickoff.py`, `scheduler_service.py`, `WorkflowRunPage.tsx`, `main.py`. Seeds `SEED-195`, `SEED-014`; REG-06 is the close-out step, by hand-editing seed frontmatter.
