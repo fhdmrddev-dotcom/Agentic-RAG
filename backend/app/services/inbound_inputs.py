@@ -21,6 +21,7 @@ Caps (assumption A4, adopted from RESEARCH): 8 000 characters per value, 50 keys
 """
 from __future__ import annotations
 
+import json
 import re
 from dataclasses import dataclass
 from typing import Any, Literal
@@ -61,8 +62,16 @@ def _label(raw: Any, key: str) -> str:
     return label or key
 
 
-def declared_fields(definition: dict | None) -> list[DeclaredField]:
-    """The fields a launcher asks for, in declared order (see the module docblock)."""
+def declared_fields(definition: dict | str | None) -> list[DeclaredField]:
+    """The fields a launcher asks for, in declared order (see the module docblock).
+
+    293-05: most stored rows hold ``definition`` as a JSON STRING scalar, which the pool's jsonb
+    codec returns as ``str``; it is decoded once here, so every caller reads the same fields."""
+    if isinstance(definition, str):
+        try:
+            definition = json.loads(definition)
+        except ValueError:
+            return []
     if not isinstance(definition, dict):
         return []
     legacy = definition.get("input_keys")
