@@ -13,32 +13,19 @@ scheme has a failure mode where the leader dies and nothing fires, and that fail
 The database is already the arbiter of which rows exist; making it the arbiter of which rows
 are claimed costs one transaction and removes a whole class of split-brain.
 
-⚠ **THE LAUNCH REUSES ``_build_resume_context`` RATHER THAN COMPOSING A SIXTH ctx BAG.** There
-are already three ctx builders in this tree (the live kickoff in ``threads.py``, the resume
-builder, the publish golden-run builder) and they have measurably drifted from one another —
-Phase 190's UAT found ``org_id`` missing from two of the three. A scheduled run is a run
-nobody is watching, so it is the *worst* place for a bespoke bag that silently lacks the
-folder scope, the service-role client or the producer shell. This module creates the run row
-and then asks the shipped builder for the substrate, exactly as the restart sweep does.
-
-⚠ **THE PRODUCER SHELL MUST BE TERMINALIZED ON EVERY EXIT PATH.** ``_build_resume_context``
-mints a ``runs`` row with ``status='streaming'``; a scheduled run that raises and leaves it
-stranded becomes the thread's latest ``runs`` row and re-wedges the F2 self-heal. The
-``finally`` block below is the same mandatory finalizer ``resume_stranded_workflows`` carries,
-and it is not optional here for the same reason.
-
-⚠ **CANCELLATION IS INHERITED, NOT REIMPLEMENTED.** A scheduled run is an ordinary unattended
-run, so Phase 204 plan 01's cross-worker brake (``run_lifecycle.broadcast_run_cancellation``
-and the engine's boundary/in-flight checks) applies to it unchanged. Nothing here needs to
-know about stopping; the Stop button, the admin kill and SCHED-02's circuit breaker all reach
-it through the one shipped path.
+⚠ **PHASE 293 — THE JOB-EXECUTION HALF MOVED TO ``services/unattended_launch.py``** (the ledger's
+named seam for this file, "split cadence claiming from job execution"). The thread insert, the run
+row, the cap arming and the background drive with its mandatory producer-shell finalizer live
+there now, shared with the API-key door (D-09, share not copy), and the three invariants that
+describe them moved with the code: the launch reuses ``_build_resume_context``; the producer
+shell is terminalized on every exit path; cancellation is inherited, not reimplemented. This
+module keeps the cadence (the poll loop) and the schedule-only facts: cap normalisation, the
+``_schedule_*`` input keys, ``ScheduledLaunchRefused`` and the outcome record.
 """
 from __future__ import annotations
 
 import asyncio
-import json
 import logging
-from datetime import datetime, timezone
 from typing import Any
 from uuid import UUID
 
@@ -100,10 +87,12 @@ async def launch_scheduled_run(
     owner's) — a fact the caller records as ``launch_failed`` rather than raising, because one
     broken schedule must never stop the tick.
     """
-    from fastapi.concurrency import run_in_threadpool  # D-v2.5-01
-
-    from app.db.workflows import arm_run_budget, create_workflow_run, get_definition
-    from app.models.harness import WorkflowDefinition
+    from app.db.workflows import get_definition
+    from app.services.unattended_launch import (
+        launch_unattended_run,
+        parse_definition_row,
+        template_refusal,
+    )
 
     owner_id = _as_uuid(schedule["user_id"])
     workflow_id = _as_uuid(schedule["workflow_id"])
@@ -116,30 +105,18 @@ async def launch_scheduled_run(
             workflow_id,
         )
         return None
-    raw_def = row["definition"]
-    if isinstance(raw_def, str):
-        try:
-            raw_def = json.loads(raw_def)
-        except Exception as exc:
-            logger.error(
-                "Failed to parse string definition for schedule %s: %s",
-                schedule.get("id"),
-                exc,
-            )
-            return None
-    definition = WorkflowDefinition.model_validate(raw_def)
+    definition = parse_definition_row(row, log_ref=schedule.get("id"))
+    if definition is None:
+        return None
 
     # ── Phase 295 (D-13) — a fill step with no template is refused BEFORE the thread insert ──
-    # On the definition asset ALONE: an unattended run has no launch upload and no thread yet,
-    # so nothing can be staged for it. Recorded on the schedule in the lint finding's own words
-    # (one sentence, one home: ``emit_cause``), then raised so neither caller rewrites it.
-    from app.services.harness.reachability import lint_workflow
-
-    _no_template = [e for e in lint_workflow(definition) if e.code == "no_template_bound"]
-    if _no_template:
+    # On the definition asset ALONE (``template_refusal``, moved to unattended_launch in 293).
+    # Recorded on the schedule in the lint finding's own words (one sentence, one home:
+    # ``emit_cause``), then raised so neither caller rewrites it.
+    sentence = template_refusal(definition)
+    if sentence is not None:
         from app.db.schedules import record_schedule_outcome
 
-        sentence = _no_template[0].message
         logger.warning(
             "schedule %s not launched: workflow %s has a fill step with no template",
             schedule.get("id"),
@@ -147,14 +124,6 @@ async def launch_scheduled_run(
         )
         await record_schedule_outcome(pool, _as_uuid(schedule["id"]), status=sentence)
         raise ScheduledLaunchRefused(sentence)
-
-    # ── the run's thread anchor ────────────────────────────────────────────────────────
-    # `create_workflow_run` requires a thread (it sets `threads.active_workflow_run_id`).
-    # A scheduled run gets its OWN thread, one per firing, for two reasons: the run surface
-    # and the panel are thread-anchored, so a scheduled run stays browsable exactly like a
-    # manual one; and a single reused thread would serialise every firing behind one
-    # `active_workflow_run_id` anchor, so a long run would block the next tick's launch.
-    from app.dependencies import get_service_role_supabase
 
     org_id = schedule.get("org_id") or row.get("org_id")
 
@@ -174,15 +143,6 @@ async def launch_scheduled_run(
         )
         return None
 
-    supabase = get_service_role_supabase(org_id)
-    title = f"[scheduled] {schedule.get('name') or definition.name}"
-    thread_resp = await run_in_threadpool(
-        lambda: supabase.table("threads")
-        .insert({"user_id": str(owner_id), "title": title})
-        .execute()
-    )
-    thread_id = _as_uuid(thread_resp.data[0]["id"])
-
     raw_inputs = schedule.get("inputs") or {}
     if not isinstance(raw_inputs, dict):
         raw_inputs = {}
@@ -201,175 +161,29 @@ async def launch_scheduled_run(
         "_schedule_max_duration_seconds": sched_max_duration,
     }
 
-    run_id = await create_workflow_run(
-        pool,
-        thread_id=thread_id,
-        definition_id=workflow_id,
+    schedule_id = _as_uuid(schedule["id"])
+
+    async def _record_outcome(status: str) -> None:
+        # Every exit path of the background drive reports here (see unattended_launch).
+        from app.db.schedules import record_schedule_outcome
+
+        await record_schedule_outcome(pool, schedule_id, status=status)
+
+    return await launch_unattended_run(
+        owner_id=owner_id,
+        org_id=org_id,
+        workflow_id=workflow_id,
         definition=definition,
         inputs=run_inputs,
-        model=None,
-        user_id=owner_id,
+        title=f"[scheduled] {schedule.get('name') or definition.name}",
+        max_tokens=sched_max_tokens,
+        max_duration=sched_max_duration,
+        pool=pool,
+        redis=redis,
+        on_finish=_record_outcome,
+        run_label="scheduled",
+        log_ref=f"schedule {schedule.get('id')}",
     )
-
-    # ── ARM THE SPEND CAP, BEFORE A SINGLE PHASE RUNS ─────────────────────────────────
-    # ⚠ THIS CALL IS THE WHOLE OF SCHED-02 ON THE SCHEDULED PATH, AND ITS ABSENCE WAS
-    # INVISIBLE TO 106 PASSING TESTS. The caps above land in `workflow_runs.inputs`;
-    # `db/workflows.load_run_budget` — the breaker's ONLY source — reads the TOP LEVEL of
-    # `workflow_runs.metadata`. Until this line existed the two never met, and because that
-    # read FAILS OPEN the breaker disarmed silently: a live scheduled run was measured at
-    # 3m20s against a 120-second cap (2026-08-24, run 27e00e7e).
-    #
-    # ⚠ IT MUST PRECEDE `_drive_run`. The breaker resolves its budget once, when the engine
-    # starts the run; arming afterwards is a race that the engine usually wins, which is the
-    # worst kind — it would pass a test and cap nothing in production.
-    #
-    # ⚠ IT IS BEST-EFFORT, DELIBERATELY, AND THE ASYMMETRY IS THE POINT. A failure here must
-    # not stop the run from launching (that would make an unapplied migration 125 an outage
-    # rather than a disarmed cap — the same fail-open argument `load_run_budget` makes). But
-    # it is logged at exception level, because a silently uncapped unattended run is exactly
-    # what this phase exists to prevent.
-    try:
-        await arm_run_budget(
-            pool,
-            run_id,
-            max_tokens_per_run=sched_max_tokens,
-            max_duration_seconds=sched_max_duration,
-        )
-    except Exception:
-        logger.exception(
-            "could not arm the circuit breaker for scheduled run %s (schedule %s) — the "
-            "run proceeds UNCAPPED. If migration 125 is unapplied, that is the cause.",
-            run_id,
-            schedule.get("id"),
-        )
-
-    # ── drive it, in the background, with the mandatory shell finalizer ────────────────
-    asyncio.create_task(
-        _drive_run(
-            run_id=run_id,
-            schedule_id=_as_uuid(schedule["id"]),
-            thread_id=thread_id,
-            owner_id=owner_id,
-            org_id=schedule.get("org_id"),
-            inputs=run_inputs,
-            definition=definition,
-            pool=pool,
-            redis=redis,
-        )
-    )
-    return run_id
-
-
-async def _drive_run(
-    *,
-    run_id: UUID,
-    schedule_id: UUID,
-    thread_id: UUID,
-    owner_id: UUID,
-    org_id: Any,
-    inputs: dict,
-    definition,
-    pool,
-    redis,
-) -> None:
-    """Build the ctx, run the workflow, terminalize the producer shell, record the outcome.
-
-    Every exit path finalizes the shell (see the module docblock) and every exit path writes a
-    ``last_status``. A scheduled run whose outcome nobody recorded is a run whose author has no
-    way to learn it failed, which is the specific way unattended automation goes bad quietly.
-    """
-    from app.db.schedules import record_schedule_outcome
-    from app.services.harness_engine import _build_resume_context, run_workflow
-    from app.services.run_lifecycle import finalize_run_terminal, mirror_run_active
-
-    ctx = None
-    failed = False
-    try:
-        ctx = await _build_resume_context(
-            {
-                "run_id": run_id,
-                "thread_id": thread_id,
-                "user_id": owner_id,
-                "org_id": org_id,
-                "inputs": inputs,
-            },
-            redis,
-            pool,
-        )
-        # ── MAKE THE RUN VISIBLE TO THE OPERATOR, BEFORE IT DOES ANY WORK ────────────
-        # ⚠ WITHOUT THIS THE CONTROL ROOM CANNOT SEE A SCHEDULED RUN AT ALL, AND THAT IS
-        # THE WORST CASE TO MISS. `/admin/runs` lists `runs:active` (ZRANGE) and enriches
-        # from the `runs` table; `register_run_start` — the only writer of that mirror —
-        # is called from exactly ONE place, `threads.py`, the CHAT path. `run_lifecycle`'s
-        # own header admits the invariant is "CHAT-SCOPED this phase" (D-145-12).
-        #
-        # A chat run has a person watching who can stop it. An unattended scheduled run is
-        # precisely the one an operator needs to SEE and KILL — and it was the invisible
-        # one. Measured 2026-08-24: run 27e00e7e sat `active` in Postgres while
-        # `runs:active` held ZERO entries.
-        #
-        # The `runs` row already exists — `_build_resume_context` mints the producer shell
-        # — so only the MIRROR half is owed here, which is why this is `mirror_run_active`
-        # and not `register_run_start` (calling that would insert a SECOND runs row).
-        #
-        # ⚠ BEST-EFFORT, NEVER FATAL. The mirror is a DERIVED index; `runs.status` is
-        # authoritative (D-145-01). A Redis blip must not turn into a failed scheduled run.
-        pid = getattr(ctx, "producer_run_id", None)
-        if pid is not None:
-            await mirror_run_active(redis, run_id=pid, thread_id=thread_id)
-
-        await run_workflow(run_id, definition, ctx, pool=pool, redis=redis)
-    except Exception:  # noqa: BLE001 — one run must never take down the loop
-        failed = True
-        logger.exception("scheduled run %s (schedule %s) failed", run_id, schedule_id)
-    finally:
-        pid = getattr(ctx, "producer_run_id", None) if ctx is not None else None
-        if pid is not None:
-            try:
-                # ⚠ `finalize_run_terminal`, NOT `finalize_run`. The DB-only writer leaves
-                # the run in `runs:active` forever, so the Control Room would show a
-                # finished scheduled run as permanently active with a live Kill button —
-                # a GHOST. Registering without finalizing through the co-writer would have
-                # made the visibility fix worse than the gap it closed.
-                #
-                # METER-05 site 5 (Phase 256 / D-256-08). An UNATTENDED run is exactly the
-                # one nobody notices is uncounted: this shell hardcoded a NULL usage, so
-                # every scheduled run's segment read as "never measured" while the box on
-                # `ctx` had been measuring it all along (harness_engine.py:1864).
-                # ⚠ This read sits INSIDE the existing `pid is not None` guard, which is
-                # itself inside `ctx is not None` — a failed ctx build still records the
-                # schedule outcome and still must not raise here.
-                # ⚠ GRAIN (D-256-03): segment box onto a per-segment `runs` row.
-                # ⛔ No default and no `or 0` (D-256-06).
-                # ⛔ The writer stays `finalize_run_terminal` — see the paragraph above.
-                _box = getattr(ctx, "run_usage_box", None) or {}
-                _in_tok = _box.get("input_tokens")
-                _out_tok = _box.get("output_tokens")
-                if _in_tok is None and _out_tok is None:
-                    # db/runs.py:93-99's contract. IDENTIFIERS ONLY (T-073-04).
-                    logger.warning(
-                        "runs.usage missing for run=%s provider=%s model=%s",
-                        pid,
-                        getattr(ctx, "provider", None),
-                        getattr(ctx, "model", None),
-                    )
-                await finalize_run_terminal(
-                    pool=pool,
-                    redis=redis,
-                    run_id=pid,
-                    thread_id=thread_id,
-                    status="failed" if failed else "completed",
-                    error="scheduled run failed" if failed else None,
-                    completed_at=datetime.now(timezone.utc),
-                    message_id=None,
-                    input_tokens=_in_tok,
-                    output_tokens=_out_tok,
-                )
-            except Exception:  # noqa: BLE001
-                logger.exception("scheduled-run producer-shell finalize failed for %s", pid)
-        await record_schedule_outcome(
-            pool, schedule_id, status="failed" if failed else "completed"
-        )
 
 
 class SchedulerService:
