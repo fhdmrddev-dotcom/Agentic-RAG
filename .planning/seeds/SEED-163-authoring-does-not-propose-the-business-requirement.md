@@ -1,11 +1,13 @@
 ---
 seed_id: SEED-163
 title: NL authoring writes the whole workflow but leaves the one field that blocks publish blank
-status: planted
+status: shipped
 status_note: |
+  Delivered in 193.2; the visible-mark sliver stays owed, as this seed's body records (293-05 REG-06, 2026-10-25). Earlier note, kept:
   Phase 251 frontmatter migration: this file had NO frontmatter block at all, so no status was
   ever recorded for it. `planted` here is a MIGRATION DEFAULT — it is a statement about the
   absence, never a claim about the seed. Read the body and set it deliberately.
+folded_into: "193.2"
 surface: Agentic-RAG
 trigger_when: unset
 ---

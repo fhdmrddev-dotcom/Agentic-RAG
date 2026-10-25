@@ -3,6 +3,7 @@ seed_id: SEED-232
 title: A workflow cannot be started from inside a thread — the launch form was built for it and nothing calls it
 status: shipped
 status_note: "Shipped by Phase 287 (2026-10-19): START-01 in-thread Run a workflow (ThreadWorkflowPicker, plan 287-03). Folded 2026-10-19 at discuss."
+folded_into: "287"
 planted: 2026-08-29
 planted_by: Claude, measuring SC#2's third door while closing Phase 214.1's verification
 surface: Agentic-RAG
