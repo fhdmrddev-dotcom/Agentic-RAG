@@ -875,7 +875,7 @@ async def list_models():
     return {"models": models, "default": settings.llm_model}
 
 
-from app.api import threads, runs, documents, settings as settings_api, folders, kb, skills, audit, knowledge_health, feedback, sandbox_outputs, workspace, workspace_promote, retention, admin, panel, workflows, workflow_runs, workflow_run_evidence,metadata_fields, document_views, document_search, document_relationships, classification_rules, document_governance, skill_tuner, skill_test_cases, evals, features, setup as setup_api, org, me_preferences, connectors, model_registry, schedules, document_queries, library, checked_queries, takeoff, sources, experts, api_docs, citation_checks, api_keys  # noqa: E402
+from app.api import threads, runs, documents, settings as settings_api, folders, kb, skills, audit, knowledge_health, feedback, sandbox_outputs, workspace, workspace_promote, retention, admin, panel, workflows, workflow_runs, workflow_run_evidence,metadata_fields, document_views, document_search, document_relationships, classification_rules, document_governance, skill_tuner, skill_test_cases, evals, features, setup as setup_api, org, me_preferences, connectors, model_registry, schedules, document_queries, library, checked_queries, takeoff, sources, experts, api_docs, citation_checks, api_keys, inbound  # noqa: E402
 
 app.include_router(threads.router)
 app.include_router(runs.router)
@@ -926,6 +926,7 @@ app.include_router(experts.router)  # Phase 259 (PACK-01 / PACK-06) — expert b
 app.include_router(api_docs.router)  # Phase 276 DOCS-04 — gated live API explorer
 app.include_router(api_keys.router)  # Phase 293 D-18 — /api-keys: a member's own API keys (create, list, revoke)
 app.include_router(api_keys.org_router)  # Phase 293 D-03 — /org/api-keys: org admins see and revoke every key
+app.include_router(inbound.router)  # Phase 293 START-02 — /inbound: outside systems start a published workflow and read it back with an API key (never canvas-gated)
 # Phase 182 (D-182-04): the TEMPORARY Phase-181 "/canvas/ping" canary router was RETIRED here.
 # The real require_canvas-gated routes (POST /workflows/validate + GET /workflows/grounding-bundle,
 # mounted on workflows.router above) now carry the byte-identical 404-when-off gate, so the

@@ -483,6 +483,13 @@ def compose_deliverable(rows: Iterable[dict], viewer_is_owner: bool, file_id: An
     return {"kind": "none", "name": None, "file_id": None}
 
 
+def final_output_text(rows: Iterable[dict]) -> str | None:
+    """293 (D-08): the LAST completed step's text, the same step ``compose_deliverable`` reads as
+    a text deliverable; ``None`` when no step completed or it wrote nothing."""
+    completed = _completed_objects(list(rows or []))
+    return _nonblank(completed[-1].get("text")) if completed else None
+
+
 # ── started by (A-06) ─────────────────────────────────────────────────────────────────────
 
 
@@ -512,6 +519,7 @@ __all__ = [
     "compose_verdicts",
     "definition_changed",
     "deliverable_path",
+    "final_output_text",
     "started_by",
     "step_numbers",
 ]
