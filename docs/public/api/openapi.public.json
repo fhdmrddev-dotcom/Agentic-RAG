@@ -27993,6 +27993,18 @@
             ],
             "title": "Last Run Updated At"
           },
+          "origin": {
+            "anyOf": [
+              {
+                "additionalProperties": true,
+                "type": "object"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Origin"
+          },
           "phases": {
             "anyOf": [
               {
