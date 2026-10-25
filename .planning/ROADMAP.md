@@ -359,8 +359,8 @@ Plans:
 
 **Wave 2** *(blocked on Wave 1 completion)*
 
-- [ ] 293-02-PLAN.md — seams first (unattended_launch, run_read_words), origin stamped at start, TRUST-03 fence, /inbound start + status + one-time file link (wave 2)
-- [ ] 293-04-PLAN.md — Settings → API keys tab (sketch C), org admin keys tab (registry extracted first), ⋯ menu entry (wave 2, frontend only)
+- [x] 293-02-PLAN.md — seams first (unattended_launch, run_read_words), origin stamped at start, TRUST-03 fence, /inbound start + status + one-time file link (wave 2)
+- [x] 293-04-PLAN.md — Settings → API keys tab (sketch C), org admin keys tab (registry extracted first), ⋯ menu entry (wave 2, frontend only)
 
 **Wave 3** *(blocked on Wave 2 completion)*
 
