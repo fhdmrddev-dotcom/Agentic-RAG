@@ -369,9 +369,20 @@ describe("RunEvidenceReport: why the run stopped, under the outcome (295-05, D-2
     const p = ownerPayload()
     p.run.status = "cancelled"
     p.run.end_reason = "Stopped by Dana Whitfield."
+    p.run.origin = { kind: "key", label: "293-A-brief", actor_name: null }
     renderReport(p)
     await ready()
     expect(screen.getByText("Why it stopped: Stopped by Dana Whitfield.")).toBeTruthy()
+    // 293-05 D-5 (G-4): the origin and the stop reason ran together on one line
+    // ("…293-A-briefWhy it stopped:"). They are now two rows of one column, each its own child.
+    const origin = screen.getByTestId("run-origin")
+    const reason = screen.getByTestId("run-end-reason")
+    const column = origin.parentElement as HTMLElement
+    expect(column.getAttribute("data-testid")).toBe("evidence-lines")
+    expect(column.className).toContain("flex-col")
+    expect(reason.parentElement).toBe(column)
+    expect(Array.from(column.children)).toEqual([origin, reason])
+    expect(origin.textContent).toBe("Started by key 293-A-brief")
   })
 
   it("a completed run shows no end-reason line", async () => {
