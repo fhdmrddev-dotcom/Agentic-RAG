@@ -4320,7 +4320,7 @@ const BASELINE = {
   "RetentionHistory.test.tsx": 21, // RE-PINNED 18 → 21 at 275 G-4 re-look (OBS-R2a drop reasons) · RE-PINNED 17 → 18 at 275-REVIEW frontend fix pass · RE-PINNED 16 → 17 at 275-05 (delete_refused sentence, G-4 FAIL-1) · 275-04 — S5 receipt sentences, ✎ only on writes, no links (D-12/D-13), Show older pages by 50
   // 275-04 — adopted by FILE path in TARGETS (no `src/components/org` entry): the retired
   // locked-Retention fence is REPLACED by unlocked-tab + band-pulse cases (D-01, SEED-177), 9 → 11.
-  "OrgAdminShell.test.tsx": 12, // RE-PINNED 11 → 12 at 275-REVIEW frontend fix pass
+  "OrgAdminShell.test.tsx": 14, // RE-PINNED 12 → 14 at 293-04 (API keys tab last + pulse/audit door) · RE-PINNED 11 → 12 at 275-REVIEW frontend fix pass
   // Phase 282-02 — the one ask-draft home (FIX-07 / D-12): one draft per ask, GC on the ask slice, panel-home refcount, the global reset
   "askDraftStore.test.ts": 7,
   // Phase 282-02 — the D-15 fences: one input per pause across both homes, the pointer, the rail handoff, BUG-260828-07 reachability
@@ -4392,6 +4392,25 @@ const BASELINE = {
   "continueWords.lockstep.test.ts": 17, // 292.1-03 — ?raw lockstep vs typed_continue.py + the shared continue-words fixture
   "StreamsProvider.typedContinue.test.tsx": 6, // 292.1-03 — typed continue holds the optimistic turn; Continuing… set and cleared
   "StreamsProvider.capPausedDone.test.tsx": 4, // 292.1 G-4 live fix (RED 97a50019f / GREEN 1397edfbb): a `done` after a live cap pause asks the server before clearing the Continue card
+  // ── Phase 293-04 (START-02) — adopted, both knobs, same commit. FILE-LEVEL in TARGETS for the
+  // `src/components/settings/apiKeys` suites (no `src/components/settings` directory entry);
+  // `launchFieldsTwin293.test.ts` sits under the `src/components/workflows` directory entry, pin only.
+  "apiKeyFacts.test.ts": 32, // 293-04 — wire → card facts: refused chips never read active, every reason code worded, raw code for an unknown one
+  "curlExamples.test.ts": 8, // 293-04 — the show-once curl: real base, bearer secret, declared fields in order, JSON + shell escaping
+  "apiKeyPrepick.test.ts": 6, // 293-04 — ⋯ menu pre-pick: sessionStorage read-once, only {workflowId, name}, never a secret
+  "apiKeysContract.test.ts": 3, // 293-04 — client wire types vs backend api_keys_contract.json, path by path
+  "launchFieldsTwin293.test.ts": 9, // 293-04 — launchInputFields vs launch_fields_cases.json (the server twin reads the same file)
+  "ApiKeysTab.test.tsx": 17, // 293-04 — member tab: load/fail/empty, draft rules, show-once secret never in storage/URL/DOM after save, pre-pick, re-fetched revoke
+  "ApiKeyCard.test.tsx": 8, // 293-04 — every state tag by rendered words, dashed refused chip + line, receipt, owner line, run links only with onOpenRun
+  "ApiKeyCallStrip.test.tsx": 5, // 293-04 — one tab stop, arrow keys, Enter/Space detail, bar name = detail sentence, read bars shorter
+  "RevokeApiKeySheet.test.tsx": 7, // 293-04 — focus on Keep it, Esc, Revoking… in flight, onDone only after the server, failure keeps it open, owner named
+  "OrgApiKeysTab.test.tsx": 7, // 293-04 — admin list: owner on every card, no New key, run links only on own keys, revoke names the owner then re-fetches and pulses
+  // 293-04 (SEED-287) — OrgAuditTab.test.tsx existed since 166 and was in NEITHER knob, so it ran
+  // nowhere the gate could see. Adopted at its measured count: 8 pre-existing + 1 unknown-code case
+  // + 7 api_key.* cases (5 labels, the API keys filter group, the ?raw lockstep with admin/AuditTab.tsx).
+  "OrgAuditTab.test.tsx": 16,
+  // 293-04 — under the `src/components/workflows` directory entry, so a pin only.
+  "WorkflowCardMenu.apiKey293.test.tsx": 4, // ⋯ New API key… under Schedules on owned published rows only, payload {id, name}; absent without onApiKey (seam286 pin unchanged)
 }
 
 // Still COMPUTED, never hand-written — the reduce is the single source, so the
@@ -6413,6 +6432,20 @@ const TARGETS = [
   "src/providers/__tests__/StreamsProvider.typedContinue.test.tsx",
   // 292.1 G-4 live fix — FILE-LEVEL, SAME commit as its BASELINE pin (292.1-04 close-out).
   "src/providers/__tests__/StreamsProvider.capPausedDone.test.tsx",
+  // ── Phase 293-04 — FILE-LEVEL (no `src/components/settings` directory entry), SAME commit as
+  // their BASELINE pins.
+  "src/components/settings/apiKeys/__tests__/apiKeyFacts.test.ts",
+  "src/components/settings/apiKeys/__tests__/curlExamples.test.ts",
+  "src/components/settings/apiKeys/__tests__/apiKeyPrepick.test.ts",
+  "src/components/settings/apiKeys/__tests__/apiKeysContract.test.ts",
+  "src/components/settings/apiKeys/__tests__/ApiKeysTab.test.tsx",
+  "src/components/settings/apiKeys/__tests__/ApiKeyCard.test.tsx",
+  "src/components/settings/apiKeys/__tests__/ApiKeyCallStrip.test.tsx",
+  "src/components/settings/apiKeys/__tests__/RevokeApiKeySheet.test.tsx",
+  // 293-04 — FILE-LEVEL (no `src/components/org` directory entry), SAME commit as its pin.
+  "src/components/org/OrgApiKeysTab.test.tsx",
+  // 293-04 (SEED-287) — FILE-LEVEL, SAME commit as its first-ever BASELINE pin.
+  "src/components/org/OrgAuditTab.test.tsx",
 ]
 
 const REPO_ROOT = path.resolve(__dirname, "..")

@@ -52,9 +52,9 @@ describe("Landing Page Facts (SEED-241 / D-226-04 / F-2)", () => {
     expect(BUILTIN_TOOL_COUNT).toBe(30) // 30 since 273 added show_artifact
     expect(CONNECTOR_CATALOG).toHaveLength(13)
     expect(SURFACE_TABS.library).toHaveLength(5)
-    expect(SURFACE_TABS.settings).toHaveLength(6) // 6 since 283 added the Preferences tab
+    expect(SURFACE_TABS.settings).toHaveLength(7) // 7 since 293-04 added API keys (6 since 283 added Preferences)
     expect(SURFACE_TABS.controlRoom).toHaveLength(5)
-    expect(SURFACE_TABS.orgAdmin).toHaveLength(8) // 8 since 261 added the Experts tab (synced at the v4.3 audit)
+    expect(SURFACE_TABS.orgAdmin).toHaveLength(9) // 9 since 293-04 added API keys (8 since 261 added Experts)
     expect(VERBATIM_QUOTES).toHaveLength(6)
   })
 

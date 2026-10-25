@@ -174,10 +174,10 @@ afterEach(() => {
 })
 
 describe("SettingsPage — a member reaches their own Settings (283-02 / FIX-01)", () => {
-  it("shows exactly Preferences · Memory · Audit Log and lands on Preferences (D-04)", async () => {
+  it("shows exactly Preferences · Memory · Audit Log · API keys and lands on Preferences (D-04; 293-04 adds API keys)", async () => {
     renderSettings(MEMBER)
     const prefs = await screen.findByRole("tab", { name: "Preferences" })
-    expect(tabNames()).toEqual(["Preferences", "Memory", "Audit Log"])
+    expect(tabNames()).toEqual(["Preferences", "Memory", "Audit Log", "API keys"])
     expect(prefs).toHaveAttribute("aria-selected", "true")
   })
 
@@ -236,11 +236,11 @@ describe("SettingsPage — a member reaches their own Settings (283-02 / FIX-01)
 })
 
 describe("SettingsPage — an operator's view is unchanged apart from the two moved blocks", () => {
-  it("shows six tabs in strip order and lands on AI Model (D-04)", async () => {
+  it("shows seven tabs in strip order and lands on AI Model (D-04; 293-04 adds API keys last)", async () => {
     renderSettings(OPERATOR)
     const ai = await screen.findByRole("tab", { name: "AI Model" })
     // "Search" is the plain default of the term-map relabel (reveal OFF).
-    expect(tabNames()).toEqual(["AI Model", "Search", "Integrations", "Preferences", "Memory", "Audit Log"])
+    expect(tabNames()).toEqual(["AI Model", "Search", "Integrations", "Preferences", "Memory", "Audit Log", "API keys"])
     expect(ai).toHaveAttribute("aria-selected", "true")
   })
 
@@ -330,7 +330,7 @@ describe("SettingsPage — the features-loading window decides nothing (WR-02)",
 
     rerender(settingsTree(OPERATOR, false))
     const ai = await screen.findByRole("tab", { name: "AI Model" })
-    expect(tabNames()).toEqual(["AI Model", "Search", "Integrations", "Preferences", "Memory", "Audit Log"])
+    expect(tabNames()).toEqual(["AI Model", "Search", "Integrations", "Preferences", "Memory", "Audit Log", "API keys"])
     expect(ai).toHaveAttribute("aria-selected", "true")
     // ⚠ 2, not 1, since 292.1 (D-20): the page's own hydrate PLUS the AgentRoundLimits leaf on the
     //   AI Model tab, which owns its fetch by design (SettingsPage's state split is owed). A page
@@ -348,7 +348,7 @@ describe("SettingsPage — the features-loading window decides nothing (WR-02)",
 
     rerender(settingsTree(MEMBER, false))
     const prefs = await screen.findByRole("tab", { name: "Preferences" })
-    expect(tabNames()).toEqual(["Preferences", "Memory", "Audit Log"])
+    expect(tabNames()).toEqual(["Preferences", "Memory", "Audit Log", "API keys"])
     expect(prefs).toHaveAttribute("aria-selected", "true")
     for (const [fn, spy] of Object.entries(gated)) {
       expect(spy, `${fn} must never be called for a member`).not.toHaveBeenCalled()

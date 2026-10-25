@@ -224,14 +224,15 @@ if (JSON.stringify(factsLibraryTabs) !== JSON.stringify(libraryTabsMatches)) {
   recordMismatch("SURFACE_TABS.library (LibraryPage.tsx)", libraryTabsMatches, factsLibraryTabs)
 }
 
-// 7b. Org Admin tabs (OrgAdminShell.tsx)
-const orgAdminShellTsx = readFileOrDie("frontend/src/components/org/OrgAdminShell.tsx")
+// 7b. Org Admin tabs (orgAdminTabs.ts)
+// Phase 293: TABS moved to orgAdminTabs.ts (the ledger's extract-FIRST seam); this scrape moved with it on purpose
+const orgAdminShellTsx = readFileOrDie("frontend/src/components/org/orgAdminTabs.ts")
 const orgTabsMatch = orgAdminShellTsx.match(/const TABS:\s*readonly\s*TabDef\[\]\s*=\s*\[([\s\S]*?)\n\]/)
 const extractedOrgTabs = orgTabsMatch
   ? Array.from(orgTabsMatch[1].matchAll(/label:\s*"([^"]+)"/g)).map(m => m[1])
   : []
 if (JSON.stringify(factsOrgAdminTabs) !== JSON.stringify(extractedOrgTabs)) {
-  recordMismatch("SURFACE_TABS.orgAdmin (OrgAdminShell.tsx)", extractedOrgTabs, factsOrgAdminTabs)
+  recordMismatch("SURFACE_TABS.orgAdmin (orgAdminTabs.ts)", extractedOrgTabs, factsOrgAdminTabs)
 }
 
 // 7c. Settings tabs (SettingsPage.tsx)

@@ -260,6 +260,11 @@ interface WorkflowsPageProps {
    * door gets `undefined` and its picker keeps rendering a plain span, not a dead control.
    */
   onOpenConnections?: () => void
+  /**
+   * Phase 293-04 (D-18) — a published card's ⋯ "New API key…": `ChatLayout` writes the pre-pick,
+   * selects Settings tab "7" and navigates. Threaded straight to the cards; ABSENT ⇒ no menu item.
+   */
+  onOpenApiKeys?: (scope: { id: string; name: string }) => void
 }
 
 /**
@@ -291,7 +296,7 @@ type PageView = "library" | "builder" | "run-log"
  */
 type SourceState = "pending" | "ok" | "failed"
 
-export function WorkflowsPage({ folders, onLaunch, onOpenRun, onOpenConnections }: WorkflowsPageProps) {
+export function WorkflowsPage({ folders, onLaunch, onOpenRun, onOpenConnections, onOpenApiKeys }: WorkflowsPageProps) {
   // Phase 184.1-01: does this page host the Builder's chrome, or has the Builder taken it?
   // Fail-closed and read through the shared rule — see `useCanvasGate`'s docblock for why
   // an ancestor has to ask at all (the three bands are contributed at three nesting levels).
@@ -1284,6 +1289,7 @@ export function WorkflowsPage({ folders, onLaunch, onOpenRun, onOpenConnections 
                    ONE definition version, which is the version that will run unattended. The
                    card explains the asymmetry with `onRunLog` in its own prop docblock. */
                 onSchedule={setScheduleFor}
+                onApiKey={onOpenApiKeys}
                 onOpen={handleOpen}
                 onForkNewVersion={onForkNewVersion}
                 onForkStarter={onForkStarter}
