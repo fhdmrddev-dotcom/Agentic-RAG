@@ -26,6 +26,7 @@
  *   node scripts/check-seeds-register.cjs --files a.md b.md     # per-file mode (no count floor)
  *   node scripts/check-seeds-register.cjs --phase <NNN>         # trigger sweep vs files_modified
  *   node scripts/check-seeds-register.cjs --self-test           # D-04's arms, temp fixture register
+ *   node scripts/check-seeds-register.cjs --require-settled SEED-163,SEED-195   # 293-05 close-out arm
  *
  * EXIT  0 = clear · 1 = violation · 2 = harness error
  *
@@ -688,6 +689,41 @@ function analyse({ dir, filesModified = [], surfaces = [], selectFiles = null, m
   };
 }
 
+/**
+ * `--require-settled <SEED-id,…>` (293-05, D-28) — a close-out proves its intake seeds are SETTLED.
+ *
+ * For each LISTED id: `[unknown-seed]` when no file carries it, `[still-planted]` when its status is
+ * one that means "not decided yet" (planted, dormant, open, folded), `[no-destination]` when it has
+ * neither `folded_into` nor a `status_note` saying where it went. ⚠ SCOPED TO THE LIST on purpose: a
+ * register-wide "folded but planted" rule would red SEED-197 and SEED-297, which are deliberate
+ * partial folds. ⚠ No `STATUS_ENUM` change, so the TEMPLATE / gate / plant-seed sync rule does not fire.
+ */
+const UNSETTLED = new Set(['planted', 'dormant', 'open', 'folded']);
+
+function requireSettled(entries, ids) {
+  const out = [];
+  for (const raw of ids) {
+    const id = String(raw).trim().toUpperCase();
+    const num = (id.match(/^SEED-(\d{3})$/) || [])[1];
+    const hits = num ? entries.filter((e) => e.id === num && statusToken(e) !== 'superseded-id') : [];
+    if (!hits.length) {
+      out.push({ code: 'unknown-seed', id, why: 'no register file carries this id' });
+      continue;
+    }
+    const e = hits[0];
+    const status = statusToken(e);
+    if (UNSETTLED.has(status)) {
+      out.push({ code: 'still-planted', id, why: `status is \`${status}\`, so the close-out never said what happened to it` });
+    }
+    const dest = keyValue(e.fm, 'folded_into');
+    const note = keyValue(e.fm, 'status_note') || statusNote(e);
+    if ((!dest || /^(null|~)$/i.test(dest)) && !note) {
+      out.push({ code: 'no-destination', id, why: 'neither `folded_into` nor `status_note` says where it went' });
+    }
+  }
+  return out;
+}
+
 // ─────────────────────────────────────────────────────────────────────────────────────────────
 // --self-test — D-04's four arms and the count assertion, made RE-RUNNABLE FOREVER
 //
@@ -914,6 +950,16 @@ function main() {
     mode = 'phase';
   }
 
+  // 293-05 (D-28): `--require-settled SEED-a,SEED-b` — an empty list is a harness error, never a
+  // pass over nothing.
+  let settleIds = null;
+  const settleIdx = argv.indexOf('--require-settled');
+  if (settleIdx !== -1) {
+    const v = argv[settleIdx + 1];
+    settleIds = v && !v.startsWith('--') ? v.split(',').map((s) => s.trim()).filter(Boolean) : [];
+    if (!settleIds.length) fail('--require-settled takes a comma-separated list of SEED ids, e.g. --require-settled SEED-163,SEED-195');
+  }
+
   // ⚠ The blast radius is resolved BEFORE the analysis, so the CLI is a printer over ONE pure call
   //   and `--self-test` drives that same call with a fixture radius.
   const blast = mode === 'phase' ? phaseBlastRadius(phaseArg) : { plans: [], files: [], surfaces: [] };
@@ -1016,6 +1062,21 @@ function main() {
     }
   }
 
+  let settled = [];
+  if (settleIds) {
+    settled = requireSettled(a.entries, settleIds);
+    console.log(`
+require-settled — ${settleIds.length} listed seed(s)`);
+    for (const f of settled) console.log(`  [${f.code}] ${f.id} — ${f.why}`);
+    if (!settled.length) console.log(`  ${GRN}all ${settleIds.length} settled${RST} — every listed seed has a real status and a destination.`);
+  }
+
+  if (settled.length && !(dups.length || violations.length)) {
+    console.log(`
+${RED}SEEDS REGISTER GATE FAILS${RST} — ${settled.length} listed seed(s) not settled.`);
+    return 1;
+  }
+
   if (dups.length || violations.length) {
     console.log(`
 ⛔ A register that answers an id lookup with two files, or a status scan with a token no scan knows,
@@ -1065,5 +1126,5 @@ module.exports = {
   frontmatter, readKey, keyValue, readList, stripComment,
   readRegister, assertAccounting, skippedTotal, analyse,
   STATUS_ENUM, REQUIRED_KEYS, HarnessError,
-  norm, unquote, seedDate, statusToken, statusNote,
+  norm, unquote, seedDate, statusToken, statusNote, requireSettled,
 };
