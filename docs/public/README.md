@@ -22,7 +22,7 @@ YAML and reports anything else as `[bad-frontmatter]` — it never guesses.
 | Form | Example |
 |---|---|
 | plain scalar | `title: Chatting with Syrel` |
-| quoted scalar (needed when the value contains `: ` or ` #`) | `title: "Coming: API keys, webhooks, MCP server"` |
+| quoted scalar (needed when the value contains `: ` or ` #`) | `title: "Coming: webhooks, service accounts, MCP server"` |
 | flow list of plain items, on one line | `covers: [A5, A9, nav:chat]` |
 | folded block, `summary` only, lines indented by at least one space | `summary: >-` then indented lines |
 
@@ -80,7 +80,7 @@ appears (UI-SPEC § Honesty badges):
 
 - Every `release: v4.5` page, first thing after the meta row: **"Not yet released. This is part of v4.5, which has not shipped. Nothing on this page is in Syrel today."**
 - Every page that mentions document outputs: **"Word and PDF files are downloaded, not previewed inside Syrel."** — no "(yet)".
-- Third-party API access (API keys, webhooks, rate limits), any page: **"Not available today."** + a link "See what's planned" → `/docs/api/roadmap-open-platform`.
+- Third-party API access that has not shipped (webhooks, personal access tokens, service accounts), any page: **"Not available today."** + a link "See what's planned" → `/docs/api/roadmap-open-platform`. API keys and their per-key rate limits HAVE shipped (Phase 293): describe them as they are ([Authentication](api/concepts/authentication.md)), never as unavailable.
 - Never "three deployment presets".
 
 Badge words: **Not yet released** (v4.5) · **Full guide coming** (stub) · **UI-internal: may change** · **Updated in v{X.Y}** · **For admins** / **For operators** / **For developers**.

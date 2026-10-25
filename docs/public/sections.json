@@ -267,6 +267,7 @@
       "api/concepts/webhooks",
       "api/concepts/feature-gates",
       "api/guides/chat-from-a-script",
+      "api/guides/start-a-workflow-from-outside",
       "api/guides/upload-and-search",
       "api/guides/navigate-the-knowledge-base",
       "api/guides/run-a-workflow",

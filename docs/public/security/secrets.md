@@ -9,10 +9,10 @@ covers: [A50, I12]
 summary: >-
   Provider keys saved in Syrel are encrypted at rest when SECRETS_ENCRYPTION_KEY is set, connection
   credentials are kept out of reach of app users, and a secret pasted into the wrong field is refused.
-reviewed: 2026-10-04
+reviewed: 2026-10-25
 ---
 
-Syrel holds two kinds of secret: the API keys operators save for model providers and services, and the credentials behind each connection to an outside service. This page explains how each is protected and what you, as an operator, have to set.
+Syrel holds two kinds of secret: the API keys operators save for model providers and services, and the credentials behind each connection to an outside service. It also issues one kind: the Syrel API keys members make so another system can start their workflows. This page explains how each is protected and what you, as an operator, have to set.
 
 ## Provider keys: encrypted at rest
 
@@ -37,6 +37,10 @@ The credentials behind a connection — tokens, OAuth secrets, static keys — a
 - They are **always** encrypted. Without `SECRETS_ENCRYPTION_KEY`, Syrel refuses to store a connection secret at all, and refuses to use one that is not encrypted.
 - The database columns that hold them cannot be read by signed-in app users.
 - OAuth tokens refresh on their own; a revoked connection says so plainly instead of failing silently.
+
+## Syrel API keys: stored as a digest, shown once
+
+The keys members make in **Settings → API keys** (`srl_live_…`) are not stored at all. Syrel stores a one-way SHA-256 digest of each one and compares against that digest on every call, so the secret is shown once, when the key is made, and nobody can read it back later, an operator included. They need no `SECRETS_ENCRYPTION_KEY`. A lost key is revoked and replaced, never recovered. See [Authentication](/docs/api/concepts/authentication).
 
 ## A secret in the wrong field is refused
 

@@ -9,8 +9,9 @@ covers: [H1, H2, H3, H4, H5, H6, H7, H8, H9, H10, H11, H12, H13, H14, H18, H19, 
 updated: v4.5
 summary: >-
   Everything the Syrel app does goes through its HTTP API, and the generated reference lists every
-  public endpoint, grouped by area. API keys are not available today, so a script signs in as a
-  user. Until the full guide is written, start with Authentication.
+  public endpoint, grouped by area. A script either signs in as a user or uses an API key, which
+  starts only the published workflows it lists. Until the full guide is written, start with
+  Authentication.
 nearest: api/concepts/authentication
 video: explainer.api
 ---
