@@ -17,6 +17,7 @@ export type OrgAdminTab =
   | "sso"
   | "subscription"
   | "retention"
+  | "api-keys"
 
 export interface TabDef {
   id: OrgAdminTab
@@ -52,4 +53,7 @@ export const TABS: readonly TabDef[] = [
   // (it owns its fetches, like OrgExpertsTab); the shell gains only this flip, one render branch
   // and the recording pulse.
   { id: "retention", label: "Retention", locked: false },
+  // Phase 293-04 (D-03, D-18): every member's API keys, LAST after Retention, live. Its leaf is
+  // self-contained (it owns its fetch); the shell gains this entry and one render branch.
+  { id: "api-keys", label: "API keys", locked: false },
 ]

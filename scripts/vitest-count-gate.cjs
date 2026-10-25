@@ -4320,7 +4320,7 @@ const BASELINE = {
   "RetentionHistory.test.tsx": 21, // RE-PINNED 18 → 21 at 275 G-4 re-look (OBS-R2a drop reasons) · RE-PINNED 17 → 18 at 275-REVIEW frontend fix pass · RE-PINNED 16 → 17 at 275-05 (delete_refused sentence, G-4 FAIL-1) · 275-04 — S5 receipt sentences, ✎ only on writes, no links (D-12/D-13), Show older pages by 50
   // 275-04 — adopted by FILE path in TARGETS (no `src/components/org` entry): the retired
   // locked-Retention fence is REPLACED by unlocked-tab + band-pulse cases (D-01, SEED-177), 9 → 11.
-  "OrgAdminShell.test.tsx": 12, // RE-PINNED 11 → 12 at 275-REVIEW frontend fix pass
+  "OrgAdminShell.test.tsx": 14, // RE-PINNED 12 → 14 at 293-04 (API keys tab last + pulse/audit door) · RE-PINNED 11 → 12 at 275-REVIEW frontend fix pass
   // Phase 282-02 — the one ask-draft home (FIX-07 / D-12): one draft per ask, GC on the ask slice, panel-home refcount, the global reset
   "askDraftStore.test.ts": 7,
   // Phase 282-02 — the D-15 fences: one input per pause across both homes, the pointer, the rail handoff, BUG-260828-07 reachability
@@ -4404,6 +4404,7 @@ const BASELINE = {
   "ApiKeyCard.test.tsx": 8, // 293-04 — every state tag by rendered words, dashed refused chip + line, receipt, owner line, run links only with onOpenRun
   "ApiKeyCallStrip.test.tsx": 5, // 293-04 — one tab stop, arrow keys, Enter/Space detail, bar name = detail sentence, read bars shorter
   "RevokeApiKeySheet.test.tsx": 7, // 293-04 — focus on Keep it, Esc, Revoking… in flight, onDone only after the server, failure keeps it open, owner named
+  "OrgApiKeysTab.test.tsx": 7, // 293-04 — admin list: owner on every card, no New key, run links only on own keys, revoke names the owner then re-fetches and pulses
 }
 
 // Still COMPUTED, never hand-written — the reduce is the single source, so the
@@ -6435,6 +6436,8 @@ const TARGETS = [
   "src/components/settings/apiKeys/__tests__/ApiKeyCard.test.tsx",
   "src/components/settings/apiKeys/__tests__/ApiKeyCallStrip.test.tsx",
   "src/components/settings/apiKeys/__tests__/RevokeApiKeySheet.test.tsx",
+  // 293-04 — FILE-LEVEL (no `src/components/org` directory entry), SAME commit as its pin.
+  "src/components/org/OrgApiKeysTab.test.tsx",
 ]
 
 const REPO_ROOT = path.resolve(__dirname, "..")

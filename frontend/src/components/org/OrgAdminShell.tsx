@@ -58,6 +58,7 @@ import { OrgExpertsTab } from "./OrgExpertsTab"
 import { RetentionTab } from "@/components/retention/RetentionTab"
 // Phase 293-04: the tab registry (OrgAdminTab / TabDef / TABS) moved verbatim to orgAdminTabs.ts.
 import { TABS, type OrgAdminTab } from "./orgAdminTabs"
+import { OrgApiKeysTab } from "./OrgApiKeysTab"
 
 interface OrgAdminShellProps {
   /** Return to the ordinary app surface (navigates to "chat"). */
@@ -393,6 +394,9 @@ export function OrgAdminShell({ onBack }: OrgAdminShellProps) {
           // 275-REVIEW F-WR-10: keyed on the active org, so a switch remounts it (fresh reads)
           // instead of showing the previous org's posture/policies/holds over writes sent as the new one.
           <RetentionTab key={activeOrgId ?? "none"} onRecorded={pulse} />
+        ) : activeTab === "api-keys" ? (
+          // Phase 293-04: keyed on the org for the same F-WR-10 reason — a switch re-reads.
+          <OrgApiKeysTab key={activeOrgId ?? "none"} orgName={orgName} onRecorded={pulse} onOpenAudit={() => setActiveTab("audit")} />
         ) : activeTab === "sso" ? (
           // Phase 168 (D-168-01 / SSO-01): the live SSO home. The shell owns the fetch +
           // create/remove; SsoTab is a pure leaf. canManageSso is the render-only gate
