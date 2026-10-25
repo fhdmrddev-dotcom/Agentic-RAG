@@ -46,6 +46,9 @@ def _fake_settings(**overrides):
         # 292.1 (D-17) — the response genuinely REQUIRES the round caps too.
         chat_max_tool_rounds=15,
         explorer_max_tool_rounds=8,
+        # 293 (D-14) — the per-key API limits; the response REQUIRES them as well.
+        api_key_starts_per_minute=10,
+        api_key_reads_per_minute=120,
         # SEED-258, present for the same reason the two above are: the response genuinely
         # REQUIRES it. The bounds beside it in the response are code constants, not settings,
         # so they are deliberately NOT stubbed here — a stubbable bound is a settable bound.

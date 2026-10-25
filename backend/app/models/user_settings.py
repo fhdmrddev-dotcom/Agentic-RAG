@@ -300,6 +300,10 @@ class UserEffectiveSettings(BaseModel):
     #   per run by `resolve_round_cap`. App-wide, bounded 2..50 (API + CHECK + UI clamp).
     chat_max_tool_rounds: int = 15
     explorer_max_tool_rounds: int = 8
+    # 293 D-14 (migration 215): per-key API limits, counted in Redis across every worker by
+    #   `services/rate_limit.py`. App-wide, bounded 1..60 and 10..600 (API + CHECK).
+    api_key_starts_per_minute: int = 10
+    api_key_reads_per_minute: int = 120
 
     # Phase 075.10 (migration 049): tool_args_progress SSE emission cadence.
     chat_tool_args_progress_emit_boundary_bytes: int = 256
@@ -1200,6 +1204,9 @@ def _build_settings_from_row(row: dict) -> UserEffectiveSettings:
         # 292.1 D-17 — a database without migration 214 still reads 15 / 8.
         chat_max_tool_rounds=int(_val(row, "chat_max_tool_rounds", None, 15)),
         explorer_max_tool_rounds=int(_val(row, "explorer_max_tool_rounds", None, 8)),
+        # 293 D-14 — a database without migration 215 still reads 10 / 120.
+        api_key_starts_per_minute=int(_val(row, "api_key_starts_per_minute", None, 10)),
+        api_key_reads_per_minute=int(_val(row, "api_key_reads_per_minute", None, 120)),
 
         chat_tool_args_progress_emit_boundary_bytes=int(
             _val(row, "chat_tool_args_progress_emit_boundary_bytes", None, 256)

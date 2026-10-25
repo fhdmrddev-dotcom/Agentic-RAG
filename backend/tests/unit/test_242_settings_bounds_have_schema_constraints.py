@@ -71,6 +71,9 @@ EXPECTED_BOUNDED_FIELDS = {
     # 292.1 (D-18) — CHECKs in migration 214 (app_settings_*_tool_rounds_bound).
     "chat_max_tool_rounds",
     "explorer_max_tool_rounds",
+    # 293 (D-14) — CHECKs in migration 215 (app_settings_api_key_*_per_minute_bound).
+    "api_key_starts_per_minute",
+    "api_key_reads_per_minute",
 }
 
 
