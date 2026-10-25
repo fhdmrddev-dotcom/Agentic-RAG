@@ -436,7 +436,7 @@ node scripts/check-hot-file-ledger.cjs <phase-dir>   # 0 clear · 1 missing rows
 | `backend/app/api/workflow_run_evidence.py` | 4 / 3 / 405 | ⚠ now FIRES (293) — row added 293-03 · origin beside end_reason |
 | `frontend/src/lib/api/runEvidence.ts` | 3 / 3 / 137 | ⚠ now FIRES (293) — row added 293-03 · one optional field |
 | `frontend/src/components/workflows/evidenceView.ts` | 4 / 3 / 387 | ⚠ now FIRES (293) — row added 293-03 · origin passed through |
-| `frontend/src/components/workflows/RunEvidenceReport.tsx` | 3 / 3 / 468 | ⚠ now FIRES (293) — row added 293-03 · ONE RunOriginLine mount |
+| `frontend/src/components/workflows/RunEvidenceReport.tsx` | 4 / 3 / 472 (was `3 / 3 / 468`) | 293-05 D-5: origin + stop reason share one column div · ⚠ FIRES |
 | `backend/app/models/thread.py` | 25 / 17 / 550 (was `24 / 16 / 545`) | 293-03: ONE field (origin) |
 | `frontend/src/components/workflows/canvasModel.ts` | 13 / 6 / 752 | ⚠ absent from BOTH at 6 phases (added 200) |
 | `frontend/src/components/layout/ChatLayout.tsx` | 64 / 33 / 1158 (was `63 / 32 / 1147`) | 293-04: onOpenApiKeys (pre-pick + tab 7) + SettingsPage onOpenRun |

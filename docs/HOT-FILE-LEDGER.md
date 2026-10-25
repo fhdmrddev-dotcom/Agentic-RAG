@@ -11506,7 +11506,7 @@ cells rot within days.
 | [`frontend/src/components/workflows/StepEvidenceLine.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentsworkflowsstepevidencelinetsx) | 2 / 2 / 145 (was `1 / 1 / 93`) | no (2 phases) | 295-05: the unsourced arm; the confidence arm is byte-unchanged (an innerHTML test pins it). Two phases; does not fire |
 | [`frontend/src/components/workflows/evidenceVocabulary.ts`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentsworkflowsevidencevocabularyts) | 4 / 2 / 254 (was `3 / 1 / 235`) | no (2 phases) | 295-05: the words' ONE home (`NO_REASON_RECORDED`, `UNSOURCED_*`). Two phases; does not fire |
 | [`frontend/src/components/workflows/evidenceView.ts`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentsworkflowsevidenceviewts) | 3 / 2 / 382 (was `2 / 1 / 374`) | no (2 phases) | 295-05: one view field `endReason`, computed once from the C.1 table. Two phases; does not fire |
-| [`frontend/src/components/workflows/RunEvidenceReport.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentsworkflowsrunevidencereporttsx) | 2 / 2 / 465 (was `1 / 1 / 462`) | no (2 phases) | 295-05: one prop + one `<RunEndReasonLine>` under the outcome (useState 4→4). Two phases; does not fire |
+| [`frontend/src/components/workflows/RunEvidenceReport.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentsworkflowsrunevidencereporttsx) | 4 / 3 / 472 (was `2 / 2 / 465`) | ⚠ **FIRES** | 293-03: one RunOriginLine mount; 293-05 D-5: the origin and stop-reason lines share one `flex-col` div (useState 2→2) |
 | [`frontend/src/lib/api/runEvidence.ts`](docs/HOT-FILE-LEDGER.md#frontendsrclibapirunevidencets) | 2 / 2 / 134 (was `1 / 1 / 123`) | no (2 phases) | 295-05: TS twins for `unsourced` and `end_reason`, widened in lockstep with the contract fixture. Two phases; does not fire |
 | [`frontend/src/lib/runDeepLink.ts`](docs/HOT-FILE-LEDGER.md#frontendsrclibrundeeplinkts) | 1 / 1 / 63 (was `0 / 0 / 0`) | no (young) | young (created 289-04). ?run=<uuid> read/write/clear. ⛔ strict UUID only; the boot read never strips the param |
 | [`frontend/src/index.css`](docs/HOT-FILE-LEDGER.md#frontendsrcindexcss) | 35 / 19 / 1239 (was `34 / 18 / 1196`) | ⚠ **FIRES** | 294-05: ONE verdict block keyed only on citation-marker--v-* and __verdict (+43). ⛔ no app-wide rule |
@@ -24803,3 +24803,8 @@ persisted row and the live ctx stay equal (the 214 MIRROR rule). Triples re-deri
 - `backend/tests/test_dual_mode_wiring.py::test_live_wf_ctx_sets_inputs_kickoff_prompt_in_source`
   retargeted on purpose from `"kickoff_prompt": body.content` to `"kickoff_prompt": launch_kickoff(body.content`
   (the same call at both sites is still asserted); its failing set is otherwise identical to base.
+- `frontend/src/components/workflows/RunEvidenceReport.tsx`: `4 / 3 / 472` (was `3 / 3 / 468`). 293-05 D-5
+  (G-4): a stopped run's report read "…293-A-briefWhy it stopped:" because the two inline spans sat
+  side by side. One wrapper `div` (`evidence-lines`, `flex flex-col`, `empty:hidden` so an old finished
+  run with neither line has no box). `useState(` / `useEffect(` unchanged. Previous CLAUDE.md cell kept
+  verbatim: ⚠ now FIRES (293) — row added 293-03 · ONE RunOriginLine mount

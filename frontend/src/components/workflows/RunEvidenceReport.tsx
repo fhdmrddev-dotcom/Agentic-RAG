@@ -191,8 +191,12 @@ function Report({
           </p>
           {/* 295-05 (D-22 / UI-SPEC C.2): why it stopped, directly under the outcome. */}
           {/* 293-03 (D-24): how the run started, on its own line under the sub line. */}
-          <RunOriginLine origin={view.origin} />
-          <RunEndReasonLine status={view.endReason.status} endReason={view.endReason.reason} />
+          {/* 293-05 D-5: one column, so the two never run together; `empty:hidden` keeps an
+              old, finished run with neither line free of any box. */}
+          <div data-testid="evidence-lines" className="mt-1 flex flex-col items-start gap-0.5 empty:hidden">
+            <RunOriginLine origin={view.origin} />
+            <RunEndReasonLine status={view.endReason.status} endReason={view.endReason.reason} />
+          </div>
         </div>
         <div className="flex flex-wrap items-center gap-1.5 print:hidden">
           <Button
