@@ -718,6 +718,8 @@ export interface WorkflowCardProps {
    * draft would be an affordance that exists only to be refused.
    */
   onSchedule?: (scope: { id: string; name: string }) => void
+  /** Phase 293-04 (D-18): the ⋯ menu's "New API key…", passed straight through to the menu. */
+  onApiKey?: (scope: { id: string; name: string }) => void
   /** Launch a runnable row (the Phase-121 one-click launch, unchanged). */
   onRun: (row: LibraryRow) => void
   /** Open a draft in the Builder (edit-in-place; saves PATCH the same row). */
@@ -833,6 +835,7 @@ export function WorkflowCard({
   onRun,
   onRunLog,
   onSchedule,
+  onApiKey,
   onOpen,
   onForkNewVersion,
   onForkStarter,
@@ -1294,6 +1297,7 @@ export function WorkflowCard({
               hasExistingFork={hasExistingFork}
               onRunLog={onRunLog}
               onSchedule={onSchedule}
+              onApiKey={onApiKey}
               onForkNewVersion={onForkNewVersion}
               onForkStarter={onForkStarter}
               deleteSheetRef={deleteSheetRef}

@@ -4409,6 +4409,8 @@ const BASELINE = {
   // nowhere the gate could see. Adopted at its measured count: 8 pre-existing + 1 unknown-code case
   // + 7 api_key.* cases (5 labels, the API keys filter group, the ?raw lockstep with admin/AuditTab.tsx).
   "OrgAuditTab.test.tsx": 16,
+  // 293-04 — under the `src/components/workflows` directory entry, so a pin only.
+  "WorkflowCardMenu.apiKey293.test.tsx": 4, // ⋯ New API key… under Schedules on owned published rows only, payload {id, name}; absent without onApiKey (seam286 pin unchanged)
 }
 
 // Still COMPUTED, never hand-written — the reduce is the single source, so the
