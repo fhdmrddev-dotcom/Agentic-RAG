@@ -350,7 +350,26 @@ Plans:
   6. `SEED-163` reads delivered, every seed folded at intake carries its real status and where it went, and `node scripts/check-seeds-register.cjs` reports no folded seed still `planted` (REG-06).
 
 **How we'd know this failed**: the endpoint trusts a guessable id; a credential works across organisations; no rate limit; inbound payload text reaches a prompt as instructions; the run page says "manual" for an inbound run; next-run is blank for a scheduled workflow; a seed that shipped still reads `planted`.
-**Plans**: TBD (target 4-5)
+**Plans:** 5 plans (4 waves)
+
+Plans:
+**Wave 1**
+
+- [ ] 293-01-PLAN.md — migration 215 (api_keys, run origin + backfill + trigger, audit types, limits) + key core (digest, live resolver, Redis limiter) + /api-keys and /org/api-keys (wave 1, DB-mutating, operator applies 215)
+
+**Wave 2** *(blocked on Wave 1 completion)*
+
+- [ ] 293-02-PLAN.md — seams first (unattended_launch, run_read_words), origin stamped at start, TRUST-03 fence, /inbound start + status + one-time file link (wave 2)
+- [ ] 293-04-PLAN.md — Settings → API keys tab (sketch C), org admin keys tab (registry extracted first), ⋯ menu entry (wave 2, frontend only)
+
+**Wave 3** *(blocked on Wave 2 completion)*
+
+- [ ] 293-03-PLAN.md — origin on every run read + the origin line in four places, card next-run time, operator limit control (wave 3)
+
+**Wave 4** *(blocked on Wave 3 completion)*
+
+- [ ] 293-05-PLAN.md — docs stop saying "no API keys" (D-20), live proof SC#1-5 + SC#10 board in 293-VALIDATION.md, operator G-4, REG-06 seed close-out with --require-settled gate, ledger re-derive (wave 4, DB-mutating, not autonomous)
+
 **UI hint**: yes
 **Flags**: ⛔ **security_enforcement**, opens an external door; read `docs/CONNECTOR-ARCHITECTURE.md` (MCP-first verdict; this is the inbound half, not Open Platform `SEED-013`), `app.security.egress`, and the TRUST-03 anti-injection discipline. Org-scoped, rate-limited, audited. Credentials stored hashed or encrypted per `secret_cipher.py`. Migration likely (next free after 209); apply by SQL editor, regenerate `full-schema.sql`, run `get_advisors(security)`; revoke from `PUBLIC` on any new function. **G-4**. SC#10 axes for the run-start path. Hot files: `workflow_runs.py`, `workflow_kickoff.py`, `scheduler_service.py`, `WorkflowRunPage.tsx`, `main.py`. Seeds `SEED-195`, `SEED-014`; REG-06 is the close-out step, by hand-editing seed frontmatter.
 

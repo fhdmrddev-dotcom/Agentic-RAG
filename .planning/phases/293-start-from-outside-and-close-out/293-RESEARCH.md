@@ -625,29 +625,33 @@ if row is None:
 
 ## Assumptions Log
 
-| # | Claim | Section | Risk if Wrong |
-|---|-------|---------|---------------|
-| A1 | Inbound runs get the scheduler's default caps (500k tokens / 1800 s) | Pattern 2 | uncapped unattended spend, or caps the operator does not want |
-| A2 | Download-link lifetime 300 s via a Redis one-time token | Pattern 4 | a link expiring too fast for slow pollers |
-| A3 | The TRUST-03 envelope site is `split_topic`/`topic` for key-origin runs | Pattern 6 | a missed LLM-visible path; SC#4 drive must probe |
-| A4 | Input size caps (8 000 chars per value) | Pattern 6 | rejecting a legit payload |
-| A5 | Key creation also requires the `workflows` capability | Key design | blocks unentitled members from creating useless keys (likely desired) |
-| A6 | "Run now" from the schedule modal is recorded as `schedule` origin | Pattern 1 | operator may want "app by Sam" for a click |
-| A7 | Publishing a new version creates a new definition row, so keys pin a version | Pitfall 5 | a key silently running an old version |
-| A8 | The chat card is silent on threads whose runs differ in origin | Origin table | a card without a line where the operator expects one |
+| # | Claim | Section | Risk if Wrong | Status (planning, 2026-10-25) |
+|---|-------|---------|---------------|------|
+| A1 | Inbound runs get the scheduler's default caps (500k tokens / 1800 s) | Pattern 2 | uncapped unattended spend, or caps the operator does not want | ADOPTED — 293-02 Task 3 (caps armed on the inbound start) |
+| A2 | Download-link lifetime 300 s via a Redis one-time token | Pattern 4 | a link expiring too fast for slow pollers | ADOPTED — 293-02 Task 3 (300 s one-time Redis token) |
+| A3 | The TRUST-03 envelope site is `split_topic`/`topic` for key-origin runs | Pattern 6 | a missed LLM-visible path; SC#4 drive must probe | ADOPTED — 293-02 Task 2 (batch sub-question envelope + input-site inventory), live-checked by 293-05 Task 2 SC#4 |
+| A4 | Input size caps (8 000 chars per value) | Pattern 6 | rejecting a legit payload | ADOPTED — 293-01 Task 4 (`MAX_VALUE_CHARS = 8000`, `MAX_FIELDS = 50` in `inbound_inputs.py`) |
+| A5 | Key creation also requires the `workflows` capability | Key design | blocks unentitled members from creating useless keys (likely desired) | ADOPTED — 293-01 Task 4 (`require_capability("workflows")` on POST /api-keys) |
+| A6 | "Run now" from the schedule modal is recorded as `schedule` origin | Pattern 1 | operator may want "app by Sam" for a click | ADOPTED — 293-02 Task 2 (scheduler stamps `schedule`; Run now shares that path) |
+| A7 | Publishing a new version creates a new definition row, so keys pin a version | Pitfall 5 | a key silently running an old version | ADOPTED — 293-01 Task 4 (key stores definition row ids) + 293-05 Task 1 (guide); orchestrator ruling 1 |
+| A8 | The chat card is silent on threads whose runs differ in origin | Origin table | a card without a line where the operator expects one | ADOPTED — 293-03 Task 1 (`run_origin` only when a thread's runs agree) |
 
-## Open Questions
+## Open Questions (RESOLVED)
 
 1. **Version pinning.** Does a key start "the workflow" (latest published version of the slug) or "this
    version"? Schedules pin the row. Recommend matching schedules, plus one sentence in the guide; ask the
    operator if it matters.
+   RESOLVED: a key pins the definition row (version) it was made for, as schedules do (orchestrator ruling 1). Carried by 293-01 Task 4 (create stores the row ids) and 293-05 Task 1 (the guide says so).
 2. **Does a workflow run's assistant turn render a `RunCard`?** Mount condition `MessageItem.tsx:568`. If
    not, the fourth placement needs a different home (e.g. the run receipt). Verify in plan 3 with one
    fixture read before building.
+   RESOLVED: 293-03 Task 2 Step 0 reads real workflow-run assistant messages for non-empty `tool_calls` before any chat mount. Branch A mounts the origin line in RunCard; branch B (expected: harness runs have no assistant node since 194.1-03) mounts it once in `ThreadRunLine.tsx`, fed by one optional `origin` field on `ThreadWorkflowState`. 293-05's G-4 checks the chosen placement.
 3. **Should `/inbound/*` be canvas-gated?** Recommend no (Pattern 3). The canvas flag is ON for everyone
    in prod (memory `reference_canvas_flag_is_on`).
+   RESOLVED: `/inbound/*` stays outside canvas_gate (orchestrator ruling 3). 293-01 Task 4 and 293-02 Task 3 grep that `CANVAS_GATED_PATHS` does not name it.
 4. **SEED-195 target status:** `shipped` vs `partially-answered`. Its body asks for folder-scope and
    tool-subset credentials (`:57-59`), and D-01 chose owner scope instead. Recommend `partially-answered`.
+   RESOLVED: SEED-195 becomes `partially-answered`, `folded_into: "293"` (orchestrator ruling 4). Carried by 293-05 Task 4.
 
 ## Environment Availability
 

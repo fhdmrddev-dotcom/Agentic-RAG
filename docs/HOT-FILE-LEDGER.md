@@ -12007,6 +12007,36 @@ cells rot within days.
 | [`backend/app/services/typed_continue.py`](docs/HOT-FILE-LEDGER.md#backendappservicestyped_continuepy) | 1 / 1 / 33 (was `0 / 0 / 0`) | no (young) | young (created 292.1-03) · CONTINUE_WORDS + is_continue_word (D-13). ⛔ pure, no I/O, no model call; lockstep with continueWords.ts |
 | [`frontend/src/components/settings/AgentRoundLimits.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentssettingsagentroundlimitstsx) | 3 / 1 / 220 (was `2 / 1 / 243`) | no (young) | 292.1 UAT: no own Save; exposes `changes()` / `adopt()` via ref; still owns its read (WR-05 lock kept). ⛔ never sends 0 |
 | [`frontend/src/lib/continueWords.ts`](docs/HOT-FILE-LEDGER.md#frontendsrclibcontinuewordsts) | 1 / 1 / 46 (was `0 / 0 / 0`) | no (young) | young (created 292.1-03) · client hint mirror of the backend continue words + shouldTryTypedContinue. ⛔ the server decides; ?raw lockstep fence |
+| [`backend/app/security/api_key_auth.py`](docs/HOT-FILE-LEDGER.md#backendappsecurityapi_key_authpy) | 0 / 0 / 0 | no (young) | young (planned 293-01). Key mint/digest + resolve_key dependency, live checks every call (D-05). ⛔ never via get_current_user; one 401 body; never logs the secret |
+| [`backend/app/services/rate_limit.py`](docs/HOT-FILE-LEDGER.md#backendappservicesrate_limitpy) | 0 / 0 / 0 | no (young) | young (planned 293-01). Redis fixed-window per-key limiter (D-15). ⛔ no process-local state; fails CLOSED (503) when Redis raises |
+| [`backend/app/db/api_keys.py`](docs/HOT-FILE-LEDGER.md#backendappdbapi_keyspy) | 0 / 0 / 0 | no (young) | young (planned 293-01). api_keys CRUD on the pool. ⛔ owner predicate in every statement; key_hash only in the auth projection; org_id bound |
+| [`backend/app/models/api_key.py`](docs/HOT-FILE-LEDGER.md#backendappmodelsapi_keypy) | 0 / 0 / 0 | no (young) | young (planned 293-01). Pydantic wire for keys, activity, limits. ⛔ no field carries the secret except the create response |
+| [`backend/app/services/inbound_inputs.py`](docs/HOT-FILE-LEDGER.md#backendappservicesinbound_inputspy) | 0 / 0 / 0 | no (young) | young (planned 293-01, fence 293-02). Declared launch-field twin of soulData + validation + TRUST-03 wrap. ⛔ pure; strips _-keys |
+| [`backend/app/api/api_keys.py`](docs/HOT-FILE-LEDGER.md#backendappapiapi_keyspy) | 0 / 0 / 0 | no (young) | young (planned 293-01). /api-keys (own) + /org/api-keys (admin). ⛔ 404 for miss AND foreign; secret only in the 201 body |
+| [`backend/app/services/unattended_launch.py`](docs/HOT-FILE-LEDGER.md#backendappservicesunattended_launchpy) | 0 / 0 / 0 | no (young) | young (planned 293-02). MOVED core of launch_scheduled_run + _drive_run (scheduler seam). ⛔ owner identity, explicit org_id, caps armed first |
+| [`backend/app/services/harness/run_read_words.py`](docs/HOT-FILE-LEDGER.md#backendappservicesharnessrun_read_wordspy) | 0 / 0 / 0 | no (young) | young (planned 293-02). MOVED waiting_who / unsourced_who / compose_waiting_on (workflow_runs seam). ⛔ pure leaf; re-exported |
+| [`backend/app/api/inbound.py`](docs/HOT-FILE-LEDGER.md#backendappapiinboundpy) | 0 / 0 / 0 | no (young) | young (planned 293-02). /inbound start + status + file link. ⛔ key dependency only; byte-identical 404; D-12 origin_ref predicate |
+| [`frontend/src/lib/api/apiKeys.ts`](docs/HOT-FILE-LEDGER.md#frontendsrclibapiapikeysts) | 0 / 0 / 0 | no (young) | young (planned 293-04). Client for /api-keys + /org/api-keys; owns its types. ⛔ not re-exported from the lib/api barrel |
+| [`frontend/src/components/settings/apiKeys/apiKeysCopy.ts`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentssettingsapikeysapikeyscopyts) | 0 / 0 / 0 | no (young) | young (planned 293-04). Every string of the keys tab + admin tab + limits card. ⛔ true leaf, imports nothing |
+| [`frontend/src/components/settings/apiKeys/apiKeyFacts.ts`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentssettingsapikeysapikeyfactsts) | 0 / 0 / 0 | no (young) | young (planned 293-04). Wire to card facts: state tag, refused chips, meta, bars. ⛔ pure, no React, spells no string |
+| [`frontend/src/components/settings/apiKeys/curlExamples.ts`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentssettingsapikeyscurlexamplests) | 0 / 0 / 0 | no (young) | young (planned 293-04). Start + status curl text from base URL, secret, id, declared fields. ⛔ pure; fields from the server list |
+| [`frontend/src/components/settings/apiKeys/apiKeyPrepick.ts`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentssettingsapikeysapikeyprepickts) | 0 / 0 / 0 | no (young) | young (planned 293-04). sessionStorage pre-pick from the card menu, read once then cleared. ⛔ never stores the secret |
+| [`frontend/src/components/settings/apiKeys/ApiKeysTab.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentssettingsapikeysapikeystabtsx) | 0 / 0 / 0 | no (young) | young (planned 293-04). Member tab body (sketch C): own fetch, draft, show-once, list. ⛔ secret in component state only |
+| [`frontend/src/components/settings/apiKeys/ApiKeyCard.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentssettingsapikeysapikeycardtsx) | 0 / 0 / 0 | no (young) | young (planned 293-04). One key card, every state; showOwner for admin. ⛔ presentational, no fetch |
+| [`frontend/src/components/settings/apiKeys/ApiKeyDraftCard.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentssettingsapikeysapikeydraftcardtsx) | 0 / 0 / 0 | no (young) | young (planned 293-04). Create form: label, published workflows, expiry 30/90/365/never. ⛔ Esc never discards |
+| [`frontend/src/components/settings/apiKeys/ApiKeySecretOnce.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentssettingsapikeysapikeysecretoncetsx) | 0 / 0 / 0 | no (young) | young (planned 293-04). Show-once secret + start/status curl + Copy. ⛔ never writes the secret to storage, URL or log |
+| [`frontend/src/components/settings/apiKeys/ApiKeyCallStrip.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentssettingsapikeysapikeycallstriptsx) | 0 / 0 / 0 | no (young) | young (planned 293-04). Last-20-calls bar strip, roving tabindex. ⛔ colour never the only signal |
+| [`frontend/src/components/settings/apiKeys/ApiKeyActivity.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentssettingsapikeysapikeyactivitytsx) | 0 / 0 / 0 | no (young) | young (planned 293-04). Recent-calls table inside a key card. ⛔ run link only when onOpenRun is given |
+| [`frontend/src/components/settings/apiKeys/RevokeApiKeySheet.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentssettingsapikeysrevokeapikeysheettsx) | 0 / 0 / 0 | no (young) | young (planned 293-04). Victim-naming revoke AlertDialog (ReleaseHoldDialog shape). ⛔ re-fetch, never optimistic |
+| [`frontend/src/components/settings/ApiKeyLimits.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentssettingsapikeylimitstsx) | 0 / 0 / 0 | no (young) | young (planned 293-03). Two per-key limits; changes()/adopt() handle, no own Save. ⛔ AgentRoundLimits pattern; never sends a cleared field |
+| [`frontend/src/components/org/orgAdminTabs.ts`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentsorgorgadmintabsts) | 0 / 0 / 0 | no (young) | young (planned 293-04). MOVED OrgAdminTab / TabDef / TABS out of OrgAdminShell (extract FIRST). ⛔ no React (react-refresh rule) |
+| [`frontend/src/components/org/OrgApiKeysTab.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentsorgorgapikeystabtsx) | 0 / 0 / 0 | no (young) | young (planned 293-04). Admin list of every member key + revoke. ⛔ own fetch; calls onRecorded after a revoke |
+| [`frontend/src/components/workflows/RunOriginLine.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentsworkflowsrunoriginlinetsx) | 0 / 0 / 0 | no (young) | young (planned 293-03). One origin sentence, null when absent (D-23). ⛔ leaf: no API import, no hook |
+| [`frontend/src/components/workflows/runOriginVocabulary.ts`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentsworkflowsrunoriginvocabularyts) | 0 / 0 / 0 | no (young) | young (planned 293-03). originSentence(): the only home of the six sentences. ⛔ never returns app/manual for NULL |
+| [`frontend/src/components/workflows/history/runLogRow.ts`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentsworkflowshistoryrunlogrowts) | 1 / 1 / 138 | no (young) | absent its ENTIRE LIFE (created 200) — row added 293. 293-03: origin as the LAST atom. ⛔ pure; unmeasured duration stays unsaid |
+| [`frontend/src/components/workflows/library/automationFacts.ts`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentsworkflowslibraryautomationfactsts) | 1 / 1 / 95 | no (young) | absent its ENTIRE LIFE (created 204.1) — row added 293. 293-03: next from server next_run_at. ⛔ spells no string; never computes |
+| [`frontend/src/components/admin/AuditTab.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentsadminaudittabtsx) | 6 / 3 / 763 | yes (3 phases) | absent its ENTIRE LIFE at 3 phases (146/148/155) — row added 293. 293-04: api_key.* entries + "API keys" group in PLATFORM_ACTION_META only. ⛔ unknown codes stay raw |
+| [`frontend/src/components/org/OrgAuditTab.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentsorgorgaudittabtsx) | 3 / 2 / 408 | no (2 phases) | absent its ENTIRE LIFE (166/167) — row added 293. 293-04: api_key.* labels + "API keys" group in ACTION_META only. ⛔ never invents a label |
 
 
 
@@ -24593,3 +24623,127 @@ Operator-reported in UAT and fixed TDD: (1) Deep Continue showed no live progres
 
 The forced-final cap round can come back EMPTY: no text, no call, no markup. Anthropic did this 3/3 times on the forced board, and openai run 7c9a4a3f did it once. That round now pauses `cap_paused` with the D-07 marker carrier, the same `cap_paused` event and Continue, instead of saving "never wrote an answer". Pure rule: `text_tool_calls.cap_round_unanswered`. Call sites only in agent_loop. RED `7c9df6f70`, GREEN `6552d33a2`, merged as `e9032c203`. `persist_cap_paused` `elif`→`if`, so a marker records the round's reasoning too; that is a record only, because `load_cap_paused_tool_calls` drops name-less entries. Live: anthropic run 89f31bd9 showed empty-pause → Continue → same run, `continues_used` 0→1.
 
+
+### Phase 293 — plan-time rows (2026-10-25)
+
+Twenty-eight rows added at planning: twenty-six files Phase 293 creates and two existing files (`runLogRow.ts`, `automationFacts.ts`) that never had a row. Named seams taken this phase: `scheduler_service.py` → `services/unattended_launch.py` ("split cadence claiming from job execution"), `api/workflow_runs.py` → `services/harness/run_read_words.py` ("move the viewer-aware wording beside run_read_wire.py"), `OrgAdminShell.tsx` → `components/org/orgAdminTabs.ts` (extract FIRST). Every FIRING hot file gets one mount, prop, field or kwarg group (293-UI-SPEC G-5 budget).
+
+### `backend/app/security/api_key_auth.py`
+
+**`0 / 0 / 0`** at 293 planning (2026-10-25). Young; row added AT PLANNING (the 273 / 290 / 292.1 precedent), so `check-hot-file-ledger.cjs 293` binds before the file exists. Key mint/digest + resolve_key dependency, live checks every call (D-05). ⛔ never via get_current_user; one 401 body; never logs the secret Does not fire. Re-derive the triple at the 293-05 close.
+
+### `backend/app/services/rate_limit.py`
+
+**`0 / 0 / 0`** at 293 planning (2026-10-25). Young; row added AT PLANNING (the 273 / 290 / 292.1 precedent), so `check-hot-file-ledger.cjs 293` binds before the file exists. Redis fixed-window per-key limiter (D-15). ⛔ no process-local state; fails CLOSED (503) when Redis raises Does not fire. Re-derive the triple at the 293-05 close.
+
+### `backend/app/db/api_keys.py`
+
+**`0 / 0 / 0`** at 293 planning (2026-10-25). Young; row added AT PLANNING (the 273 / 290 / 292.1 precedent), so `check-hot-file-ledger.cjs 293` binds before the file exists. api_keys CRUD on the pool. ⛔ owner predicate in every statement; key_hash only in the auth projection; org_id bound Does not fire. Re-derive the triple at the 293-05 close.
+
+### `backend/app/models/api_key.py`
+
+**`0 / 0 / 0`** at 293 planning (2026-10-25). Young; row added AT PLANNING (the 273 / 290 / 292.1 precedent), so `check-hot-file-ledger.cjs 293` binds before the file exists. Pydantic wire for keys, activity, limits. ⛔ no field carries the secret except the create response Does not fire. Re-derive the triple at the 293-05 close.
+
+### `backend/app/services/inbound_inputs.py`
+
+**`0 / 0 / 0`** at 293 planning (2026-10-25). Young; row added AT PLANNING (the 273 / 290 / 292.1 precedent), so `check-hot-file-ledger.cjs 293` binds before the file exists. Declared launch-field twin of soulData + validation + TRUST-03 wrap. ⛔ pure; strips _-keys Does not fire. Re-derive the triple at the 293-05 close.
+
+### `backend/app/api/api_keys.py`
+
+**`0 / 0 / 0`** at 293 planning (2026-10-25). Young; row added AT PLANNING (the 273 / 290 / 292.1 precedent), so `check-hot-file-ledger.cjs 293` binds before the file exists. /api-keys (own) + /org/api-keys (admin). ⛔ 404 for miss AND foreign; secret only in the 201 body Does not fire. Re-derive the triple at the 293-05 close.
+
+### `backend/app/services/unattended_launch.py`
+
+**`0 / 0 / 0`** at 293 planning (2026-10-25). Young; row added AT PLANNING (the 273 / 290 / 292.1 precedent), so `check-hot-file-ledger.cjs 293` binds before the file exists. MOVED core of launch_scheduled_run + _drive_run (scheduler seam). ⛔ owner identity, explicit org_id, caps armed first Does not fire. Re-derive the triple at the 293-05 close.
+
+### `backend/app/services/harness/run_read_words.py`
+
+**`0 / 0 / 0`** at 293 planning (2026-10-25). Young; row added AT PLANNING (the 273 / 290 / 292.1 precedent), so `check-hot-file-ledger.cjs 293` binds before the file exists. MOVED waiting_who / unsourced_who / compose_waiting_on (workflow_runs seam). ⛔ pure leaf; re-exported Does not fire. Re-derive the triple at the 293-05 close.
+
+### `backend/app/api/inbound.py`
+
+**`0 / 0 / 0`** at 293 planning (2026-10-25). Young; row added AT PLANNING (the 273 / 290 / 292.1 precedent), so `check-hot-file-ledger.cjs 293` binds before the file exists. /inbound start + status + file link. ⛔ key dependency only; byte-identical 404; D-12 origin_ref predicate Does not fire. Re-derive the triple at the 293-05 close.
+
+### `frontend/src/lib/api/apiKeys.ts`
+
+**`0 / 0 / 0`** at 293 planning (2026-10-25). Young; row added AT PLANNING (the 273 / 290 / 292.1 precedent), so `check-hot-file-ledger.cjs 293` binds before the file exists. Client for /api-keys + /org/api-keys; owns its types. ⛔ not re-exported from the lib/api barrel Does not fire. Re-derive the triple at the 293-05 close.
+
+### `frontend/src/components/settings/apiKeys/apiKeysCopy.ts`
+
+**`0 / 0 / 0`** at 293 planning (2026-10-25). Young; row added AT PLANNING (the 273 / 290 / 292.1 precedent), so `check-hot-file-ledger.cjs 293` binds before the file exists. Every string of the keys tab + admin tab + limits card. ⛔ true leaf, imports nothing Does not fire. Re-derive the triple at the 293-05 close.
+
+### `frontend/src/components/settings/apiKeys/apiKeyFacts.ts`
+
+**`0 / 0 / 0`** at 293 planning (2026-10-25). Young; row added AT PLANNING (the 273 / 290 / 292.1 precedent), so `check-hot-file-ledger.cjs 293` binds before the file exists. Wire to card facts: state tag, refused chips, meta, bars. ⛔ pure, no React, spells no string Does not fire. Re-derive the triple at the 293-05 close.
+
+### `frontend/src/components/settings/apiKeys/curlExamples.ts`
+
+**`0 / 0 / 0`** at 293 planning (2026-10-25). Young; row added AT PLANNING (the 273 / 290 / 292.1 precedent), so `check-hot-file-ledger.cjs 293` binds before the file exists. Start + status curl text from base URL, secret, id, declared fields. ⛔ pure; fields from the server list Does not fire. Re-derive the triple at the 293-05 close.
+
+### `frontend/src/components/settings/apiKeys/apiKeyPrepick.ts`
+
+**`0 / 0 / 0`** at 293 planning (2026-10-25). Young; row added AT PLANNING (the 273 / 290 / 292.1 precedent), so `check-hot-file-ledger.cjs 293` binds before the file exists. sessionStorage pre-pick from the card menu, read once then cleared. ⛔ never stores the secret Does not fire. Re-derive the triple at the 293-05 close.
+
+### `frontend/src/components/settings/apiKeys/ApiKeysTab.tsx`
+
+**`0 / 0 / 0`** at 293 planning (2026-10-25). Young; row added AT PLANNING (the 273 / 290 / 292.1 precedent), so `check-hot-file-ledger.cjs 293` binds before the file exists. Member tab body (sketch C): own fetch, draft, show-once, list. ⛔ secret in component state only Does not fire. Re-derive the triple at the 293-05 close.
+
+### `frontend/src/components/settings/apiKeys/ApiKeyCard.tsx`
+
+**`0 / 0 / 0`** at 293 planning (2026-10-25). Young; row added AT PLANNING (the 273 / 290 / 292.1 precedent), so `check-hot-file-ledger.cjs 293` binds before the file exists. One key card, every state; showOwner for admin. ⛔ presentational, no fetch Does not fire. Re-derive the triple at the 293-05 close.
+
+### `frontend/src/components/settings/apiKeys/ApiKeyDraftCard.tsx`
+
+**`0 / 0 / 0`** at 293 planning (2026-10-25). Young; row added AT PLANNING (the 273 / 290 / 292.1 precedent), so `check-hot-file-ledger.cjs 293` binds before the file exists. Create form: label, published workflows, expiry 30/90/365/never. ⛔ Esc never discards Does not fire. Re-derive the triple at the 293-05 close.
+
+### `frontend/src/components/settings/apiKeys/ApiKeySecretOnce.tsx`
+
+**`0 / 0 / 0`** at 293 planning (2026-10-25). Young; row added AT PLANNING (the 273 / 290 / 292.1 precedent), so `check-hot-file-ledger.cjs 293` binds before the file exists. Show-once secret + start/status curl + Copy. ⛔ never writes the secret to storage, URL or log Does not fire. Re-derive the triple at the 293-05 close.
+
+### `frontend/src/components/settings/apiKeys/ApiKeyCallStrip.tsx`
+
+**`0 / 0 / 0`** at 293 planning (2026-10-25). Young; row added AT PLANNING (the 273 / 290 / 292.1 precedent), so `check-hot-file-ledger.cjs 293` binds before the file exists. Last-20-calls bar strip, roving tabindex. ⛔ colour never the only signal Does not fire. Re-derive the triple at the 293-05 close.
+
+### `frontend/src/components/settings/apiKeys/ApiKeyActivity.tsx`
+
+**`0 / 0 / 0`** at 293 planning (2026-10-25). Young; row added AT PLANNING (the 273 / 290 / 292.1 precedent), so `check-hot-file-ledger.cjs 293` binds before the file exists. Recent-calls table inside a key card. ⛔ run link only when onOpenRun is given Does not fire. Re-derive the triple at the 293-05 close.
+
+### `frontend/src/components/settings/apiKeys/RevokeApiKeySheet.tsx`
+
+**`0 / 0 / 0`** at 293 planning (2026-10-25). Young; row added AT PLANNING (the 273 / 290 / 292.1 precedent), so `check-hot-file-ledger.cjs 293` binds before the file exists. Victim-naming revoke AlertDialog (ReleaseHoldDialog shape). ⛔ re-fetch, never optimistic Does not fire. Re-derive the triple at the 293-05 close.
+
+### `frontend/src/components/settings/ApiKeyLimits.tsx`
+
+**`0 / 0 / 0`** at 293 planning (2026-10-25). Young; row added AT PLANNING (the 273 / 290 / 292.1 precedent), so `check-hot-file-ledger.cjs 293` binds before the file exists. Two per-key limits; changes()/adopt() handle, no own Save. ⛔ AgentRoundLimits pattern; never sends a cleared field Does not fire. Re-derive the triple at the 293-05 close.
+
+### `frontend/src/components/org/orgAdminTabs.ts`
+
+**`0 / 0 / 0`** at 293 planning (2026-10-25). Young; row added AT PLANNING (the 273 / 290 / 292.1 precedent), so `check-hot-file-ledger.cjs 293` binds before the file exists. MOVED OrgAdminTab / TabDef / TABS out of OrgAdminShell (extract FIRST). ⛔ no React (react-refresh rule) Does not fire. Re-derive the triple at the 293-05 close.
+
+### `frontend/src/components/org/OrgApiKeysTab.tsx`
+
+**`0 / 0 / 0`** at 293 planning (2026-10-25). Young; row added AT PLANNING (the 273 / 290 / 292.1 precedent), so `check-hot-file-ledger.cjs 293` binds before the file exists. Admin list of every member key + revoke. ⛔ own fetch; calls onRecorded after a revoke Does not fire. Re-derive the triple at the 293-05 close.
+
+### `frontend/src/components/workflows/RunOriginLine.tsx`
+
+**`0 / 0 / 0`** at 293 planning (2026-10-25). Young; row added AT PLANNING (the 273 / 290 / 292.1 precedent), so `check-hot-file-ledger.cjs 293` binds before the file exists. One origin sentence, null when absent (D-23). ⛔ leaf: no API import, no hook Does not fire. Re-derive the triple at the 293-05 close.
+
+### `frontend/src/components/workflows/runOriginVocabulary.ts`
+
+**`0 / 0 / 0`** at 293 planning (2026-10-25). Young; row added AT PLANNING (the 273 / 290 / 292.1 precedent), so `check-hot-file-ledger.cjs 293` binds before the file exists. originSentence(): the only home of the six sentences. ⛔ never returns app/manual for NULL Does not fire. Re-derive the triple at the 293-05 close.
+
+### `frontend/src/components/workflows/history/runLogRow.ts`
+
+**`1 / 1 / 138`** at 293 planning (2026-10-25). Existing file with NO ledger row for its whole life; row added AT PLANNING because Phase 293 names it in `files_modified`. absent its ENTIRE LIFE (created 200) — row added 293. 293-03: origin as the LAST atom. ⛔ pure; unmeasured duration stays unsaid Does not fire. Re-derive the triple at the 293-05 close.
+
+### `frontend/src/components/workflows/library/automationFacts.ts`
+
+**`1 / 1 / 95`** at 293 planning (2026-10-25). Existing file with NO ledger row for its whole life; row added AT PLANNING because Phase 293 names it in `files_modified`. absent its ENTIRE LIFE (created 204.1) — row added 293. 293-03: next from server next_run_at. ⛔ spells no string; never computes Does not fire. Re-derive the triple at the 293-05 close.
+
+### `frontend/src/components/admin/AuditTab.tsx`
+
+**`6 / 3 / 763`** at 293 planning revision (2026-10-25). Existing file with NO ledger row for its whole life; row added AT PLANNING because 293-04 names it in `files_modified` (D-17: the admin audit browsers must word the new `api_key.*` rows). The 293 touch is data only: five map entries and one group in the action vocabulary. ⚠ G-5 FIRES at 3 phases; honoured by construction (map entries, no new state, hook or fetch). The duplicated vocabulary between this file and OrgAuditTab.tsx is the named seam for the next phase that touches either.
+
+### `frontend/src/components/org/OrgAuditTab.tsx`
+
+**`3 / 2 / 408`** at 293 planning revision (2026-10-25). Existing file with NO ledger row for its whole life; row added AT PLANNING because 293-04 names it in `files_modified` (D-17: the admin audit browsers must word the new `api_key.*` rows). The 293 touch is data only: five map entries and one group in the action vocabulary. Does not fire.
