@@ -93,12 +93,19 @@ async def create_api_key(
 
 def _named_columns() -> str:
     cols = ", ".join(f"k.{c}" for c in _KEY_COLUMN_NAMES)
-    return f"{cols}, po.display_name AS owner_name, pr.display_name AS revoked_by_name"
+    # 293-05 D-4: a member with no display name is named by their sign-in email (the org members
+    # roster does the same), never left null for the UI to call "an unknown member".
+    return (
+        f"{cols}, COALESCE(NULLIF(po.display_name, ''), uo.email) AS owner_name, "
+        "COALESCE(NULLIF(pr.display_name, ''), ur.email) AS revoked_by_name"
+    )
 
 
 _NAME_JOINS = (
     "LEFT JOIN profiles po ON po.id = k.user_id "
     "LEFT JOIN profiles pr ON pr.id = k.revoked_by "
+    "LEFT JOIN auth.users uo ON uo.id = k.user_id "
+    "LEFT JOIN auth.users ur ON ur.id = k.revoked_by "
 )
 
 
