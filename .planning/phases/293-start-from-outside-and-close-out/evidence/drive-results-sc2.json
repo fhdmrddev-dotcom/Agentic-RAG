@@ -1,0 +1,655 @@
+[
+ {
+  "row": "sc2",
+  "check": "no key → 401 NO_KEY",
+  "pass": true,
+  "start": {
+   "http": 401,
+   "body": {
+    "detail": "This call has no API key. Send one as `Authorization: Bearer <key>`."
+   }
+  },
+  "read": {
+   "http": 401,
+   "body": {
+    "detail": "This call has no API key. Send one as `Authorization: Bearer <key>`."
+   }
+  }
+ },
+ {
+  "row": "sc2",
+  "check": "garbage key → 401 INVALID",
+  "pass": true,
+  "http": 401,
+  "body": {
+   "detail": "This API key is not valid. It may have been revoked or have expired."
+  }
+ },
+ {
+  "row": "sc2",
+  "check": "key B (org 2) starts its own org-2 workflow → 201 (control)",
+  "pass": true,
+  "http": 201,
+  "body": {
+   "run_id": "27aed61b-cffe-474a-bd83-2758f90772ae",
+   "status": "running"
+  }
+ },
+ {
+  "row": "sc2",
+  "check": "key B (org 2) starting org 1's workflow → 404",
+  "pass": true,
+  "http": 404,
+  "body": {
+   "detail": "Not found."
+  }
+ },
+ {
+  "row": "sc2",
+  "check": "key B starting its own maker's org-1 workflow → 404",
+  "pass": true,
+  "http": 404,
+  "body": {
+   "detail": "Not found."
+  }
+ },
+ {
+  "row": "sc2",
+  "check": "key A starting a never-published draft id → 404",
+  "pass": true,
+  "http": 404,
+  "body": {
+   "detail": "Not found."
+  }
+ },
+ {
+  "row": "sc2",
+  "check": "key A reading an unknown run → 404",
+  "pass": true,
+  "http": 404,
+  "body": {
+   "detail": "Not found."
+  }
+ },
+ {
+  "row": "sc2",
+  "check": "key C (same owner) reading key A's run → 404",
+  "pass": true,
+  "http": 404,
+  "body": {
+   "detail": "Not found."
+  }
+ },
+ {
+  "row": "sc2",
+  "check": "key D after its workflow was cascade-deleted → 404",
+  "pass": true,
+  "http": 404,
+  "body": {
+   "detail": "Not found."
+  }
+ },
+ {
+  "row": "sc2",
+  "check": "key D's card names the deleted workflow (refused chip)",
+  "pass": true,
+  "card": {
+   "id": "cab3715a-0e69-4247-9bb0-cade62ac3084",
+   "label": "293-D-throwaway",
+   "key_prefix": "srl_live_kNwt……",
+   "workflows": [
+    {
+     "id": "69b1631f-d79c-41e4-9f52-2147b1960313",
+     "name": "293 inbound: throwaway",
+     "state": "deleted"
+    }
+   ],
+   "state": "active",
+   "expires_at": null,
+   "revoked_at": null,
+   "revoked_by_name": null,
+   "revoked_by_admin": false,
+   "last_used_at": "2026-10-25T12:04:11.510367Z",
+   "created_at": "2026-10-25T11:54:24.594179Z",
+   "owner_name": null,
+   "owner_is_you": true,
+   "calls": [
+    {
+     "at": "2026-10-25T12:04:13.013652Z",
+     "verb": "start",
+     "workflow_id": "69b1631f-d79c-41e4-9f52-2147b1960313",
+     "workflow_name": "293 inbound: throwaway",
+     "run_id": null,
+     "ok": false,
+     "outcome": "refused",
+     "reason": "not_on_key",
+     "detail": {
+      "deleted": true
+     }
+    }
+   ]
+  }
+ },
+ {
+  "row": "sc2",
+  "check": "every 404 body is byte-identical",
+  "pass": true,
+  "bodies": {
+   "keyB_starts_org1_workflow": "{\"detail\":\"Not found.\"}",
+   "keyB_starts_same_user_other_org": "{\"detail\":\"Not found.\"}",
+   "keyA_starts_draft": "{\"detail\":\"Not found.\"}",
+   "keyA_unknown_run": "{\"detail\":\"Not found.\"}",
+   "keyC_reads_keyA_run": "{\"detail\":\"Not found.\"}",
+   "keyD_after_cascade_delete": "{\"detail\":\"Not found.\"}"
+  },
+  "distinct": [
+   "{\"detail\":\"Not found.\"}"
+  ]
+ },
+ {
+  "row": "sc2",
+  "check": "key A revoked mid-test → next call 401 INVALID",
+  "pass": true,
+  "revoke": {
+   "http": 200,
+   "body": {
+    "id": "9cd31b7f-7274-4435-9428-d437be2a1edb",
+    "label": "293-A-brief",
+    "key_prefix": "srl_live_Tnvw……",
+    "workflows": [
+     {
+      "id": "51c82334-d1bf-46ef-985e-d496e6c1824c",
+      "name": "293 inbound: brief to file",
+      "state": "startable"
+     },
+     {
+      "id": "dfb4e0df-9754-46d4-b168-e14585519561",
+      "name": "295-07 S6 approve then wrap",
+      "state": "startable"
+     }
+    ],
+    "state": "revoked",
+    "expires_at": "2027-01-23T11:53:33.271134Z",
+    "revoked_at": "2026-10-25T12:04:17.342194Z",
+    "revoked_by_name": null,
+    "revoked_by_admin": false,
+    "last_used_at": "2026-10-25T12:03:55.356500Z",
+    "created_at": "2026-10-25T11:53:33.271107Z",
+    "owner_name": null,
+    "owner_is_you": true,
+    "calls": [
+     {
+      "at": "2026-10-25T12:03:59.993856Z",
+      "verb": "read",
+      "workflow_id": null,
+      "workflow_name": null,
+      "run_id": "00000000-0000-0000-0000-000000000000",
+      "ok": false,
+      "outcome": "refused",
+      "reason": "run_not_found",
+      "detail": null
+     },
+     {
+      "at": "2026-10-25T12:03:56.629867Z",
+      "verb": "start",
+      "workflow_id": "a6829c6c-0b91-45db-a470-5024ee1bdbec",
+      "workflow_name": null,
+      "run_id": null,
+      "ok": false,
+      "outcome": "refused",
+      "reason": "not_on_key",
+      "detail": null
+     },
+     {
+      "at": "2026-10-25T12:03:20.227487Z",
+      "verb": "read",
+      "workflow_id": null,
+      "workflow_name": null,
+      "run_id": "1e932094-5f46-4d55-95fb-786c92f63b0a",
+      "ok": true,
+      "outcome": "waiting_for_person",
+      "reason": null,
+      "detail": null
+     },
+     {
+      "at": "2026-10-25T12:03:08.841944Z",
+      "verb": "read",
+      "workflow_id": null,
+      "workflow_name": null,
+      "run_id": "1e932094-5f46-4d55-95fb-786c92f63b0a",
+      "ok": true,
+      "outcome": "running",
+      "reason": null,
+      "detail": null
+     },
+     {
+      "at": "2026-10-25T12:03:02.072521Z",
+      "verb": "read",
+      "workflow_id": null,
+      "workflow_name": null,
+      "run_id": "1e932094-5f46-4d55-95fb-786c92f63b0a",
+      "ok": true,
+      "outcome": "running",
+      "reason": null,
+      "detail": null
+     },
+     {
+      "at": "2026-10-25T12:02:55.390082Z",
+      "verb": "read",
+      "workflow_id": null,
+      "workflow_name": null,
+      "run_id": "1e932094-5f46-4d55-95fb-786c92f63b0a",
+      "ok": true,
+      "outcome": "running",
+      "reason": null,
+      "detail": null
+     },
+     {
+      "at": "2026-10-25T12:02:43.496904Z",
+      "verb": "read",
+      "workflow_id": null,
+      "workflow_name": null,
+      "run_id": "1e932094-5f46-4d55-95fb-786c92f63b0a",
+      "ok": true,
+      "outcome": "running",
+      "reason": null,
+      "detail": null
+     },
+     {
+      "at": "2026-10-25T12:02:36.898607Z",
+      "verb": "read",
+      "workflow_id": null,
+      "workflow_name": null,
+      "run_id": "1e932094-5f46-4d55-95fb-786c92f63b0a",
+      "ok": true,
+      "outcome": "running",
+      "reason": null,
+      "detail": null
+     },
+     {
+      "at": "2026-10-25T12:02:30.454200Z",
+      "verb": "read",
+      "workflow_id": null,
+      "workflow_name": null,
+      "run_id": "1e932094-5f46-4d55-95fb-786c92f63b0a",
+      "ok": true,
+      "outcome": "running",
+      "reason": null,
+      "detail": null
+     },
+     {
+      "at": "2026-10-25T12:02:23.845740Z",
+      "verb": "read",
+      "workflow_id": null,
+      "workflow_name": null,
+      "run_id": "1e932094-5f46-4d55-95fb-786c92f63b0a",
+      "ok": true,
+      "outcome": "running",
+      "reason": null,
+      "detail": null
+     },
+     {
+      "at": "2026-10-25T12:02:17.094490Z",
+      "verb": "read",
+      "workflow_id": null,
+      "workflow_name": null,
+      "run_id": "1e932094-5f46-4d55-95fb-786c92f63b0a",
+      "ok": true,
+      "outcome": "running",
+      "reason": null,
+      "detail": null
+     },
+     {
+      "at": "2026-10-25T12:02:10.459580Z",
+      "verb": "read",
+      "workflow_id": null,
+      "workflow_name": null,
+      "run_id": "1e932094-5f46-4d55-95fb-786c92f63b0a",
+      "ok": true,
+      "outcome": "running",
+      "reason": null,
+      "detail": null
+     },
+     {
+      "at": "2026-10-25T12:02:03.749985Z",
+      "verb": "read",
+      "workflow_id": null,
+      "workflow_name": null,
+      "run_id": "1e932094-5f46-4d55-95fb-786c92f63b0a",
+      "ok": true,
+      "outcome": "running",
+      "reason": null,
+      "detail": null
+     },
+     {
+      "at": "2026-10-25T12:01:57.132916Z",
+      "verb": "read",
+      "workflow_id": null,
+      "workflow_name": null,
+      "run_id": "1e932094-5f46-4d55-95fb-786c92f63b0a",
+      "ok": true,
+      "outcome": "running",
+      "reason": null,
+      "detail": null
+     },
+     {
+      "at": "2026-10-25T12:01:50.581641Z",
+      "verb": "read",
+      "workflow_id": null,
+      "workflow_name": null,
+      "run_id": "1e932094-5f46-4d55-95fb-786c92f63b0a",
+      "ok": true,
+      "outcome": "running",
+      "reason": null,
+      "detail": null
+     },
+     {
+      "at": "2026-10-25T12:01:44.025107Z",
+      "verb": "read",
+      "workflow_id": null,
+      "workflow_name": null,
+      "run_id": "1e932094-5f46-4d55-95fb-786c92f63b0a",
+      "ok": true,
+      "outcome": "running",
+      "reason": null,
+      "detail": null
+     },
+     {
+      "at": "2026-10-25T12:01:37.413661Z",
+      "verb": "read",
+      "workflow_id": null,
+      "workflow_name": null,
+      "run_id": "1e932094-5f46-4d55-95fb-786c92f63b0a",
+      "ok": true,
+      "outcome": "running",
+      "reason": null,
+      "detail": null
+     },
+     {
+      "at": "2026-10-25T12:01:30.808495Z",
+      "verb": "read",
+      "workflow_id": null,
+      "workflow_name": null,
+      "run_id": "1e932094-5f46-4d55-95fb-786c92f63b0a",
+      "ok": true,
+      "outcome": "running",
+      "reason": null,
+      "detail": null
+     },
+     {
+      "at": "2026-10-25T12:01:24.321910Z",
+      "verb": "read",
+      "workflow_id": null,
+      "workflow_name": null,
+      "run_id": "1e932094-5f46-4d55-95fb-786c92f63b0a",
+      "ok": true,
+      "outcome": "running",
+      "reason": null,
+      "detail": null
+     },
+     {
+      "at": "2026-10-25T12:01:17.580576Z",
+      "verb": "read",
+      "workflow_id": null,
+      "workflow_name": null,
+      "run_id": "1e932094-5f46-4d55-95fb-786c92f63b0a",
+      "ok": true,
+      "outcome": "running",
+      "reason": null,
+      "detail": null
+     },
+     {
+      "at": "2026-10-25T12:01:11.066671Z",
+      "verb": "read",
+      "workflow_id": null,
+      "workflow_name": null,
+      "run_id": "1e932094-5f46-4d55-95fb-786c92f63b0a",
+      "ok": true,
+      "outcome": "running",
+      "reason": null,
+      "detail": null
+     },
+     {
+      "at": "2026-10-25T12:01:04.704373Z",
+      "verb": "read",
+      "workflow_id": null,
+      "workflow_name": null,
+      "run_id": "1e932094-5f46-4d55-95fb-786c92f63b0a",
+      "ok": true,
+      "outcome": "running",
+      "reason": null,
+      "detail": null
+     },
+     {
+      "at": "2026-10-25T12:00:58.424330Z",
+      "verb": "read",
+      "workflow_id": null,
+      "workflow_name": null,
+      "run_id": "1e932094-5f46-4d55-95fb-786c92f63b0a",
+      "ok": true,
+      "outcome": "running",
+      "reason": null,
+      "detail": null
+     },
+     {
+      "at": "2026-10-25T12:00:51.985285Z",
+      "verb": "read",
+      "workflow_id": null,
+      "workflow_name": null,
+      "run_id": "1e932094-5f46-4d55-95fb-786c92f63b0a",
+      "ok": true,
+      "outcome": "running",
+      "reason": null,
+      "detail": null
+     },
+     {
+      "at": "2026-10-25T12:00:45.333680Z",
+      "verb": "read",
+      "workflow_id": null,
+      "workflow_name": null,
+      "run_id": "1e932094-5f46-4d55-95fb-786c92f63b0a",
+      "ok": true,
+      "outcome": "running",
+      "reason": null,
+      "detail": null
+     },
+     {
+      "at": "2026-10-25T12:00:38.972274Z",
+      "verb": "read",
+      "workflow_id": null,
+      "workflow_name": null,
+      "run_id": "1e932094-5f46-4d55-95fb-786c92f63b0a",
+      "ok": true,
+      "outcome": "running",
+      "reason": null,
+      "detail": null
+     },
+     {
+      "at": "2026-10-25T12:00:32.299718Z",
+      "verb": "read",
+      "workflow_id": null,
+      "workflow_name": null,
+      "run_id": "1e932094-5f46-4d55-95fb-786c92f63b0a",
+      "ok": true,
+      "outcome": "running",
+      "reason": null,
+      "detail": null
+     },
+     {
+      "at": "2026-10-25T12:00:25.654151Z",
+      "verb": "read",
+      "workflow_id": null,
+      "workflow_name": null,
+      "run_id": "1e932094-5f46-4d55-95fb-786c92f63b0a",
+      "ok": true,
+      "outcome": "running",
+      "reason": null,
+      "detail": null
+     },
+     {
+      "at": "2026-10-25T12:00:19.127422Z",
+      "verb": "read",
+      "workflow_id": null,
+      "workflow_name": null,
+      "run_id": "1e932094-5f46-4d55-95fb-786c92f63b0a",
+      "ok": true,
+      "outcome": "running",
+      "reason": null,
+      "detail": null
+     },
+     {
+      "at": "2026-10-25T12:00:12.875251Z",
+      "verb": "read",
+      "workflow_id": null,
+      "workflow_name": null,
+      "run_id": "1e932094-5f46-4d55-95fb-786c92f63b0a",
+      "ok": true,
+      "outcome": "running",
+      "reason": null,
+      "detail": null
+     },
+     {
+      "at": "2026-10-25T12:00:06.094108Z",
+      "verb": "read",
+      "workflow_id": null,
+      "workflow_name": null,
+      "run_id": "1e932094-5f46-4d55-95fb-786c92f63b0a",
+      "ok": true,
+      "outcome": "running",
+      "reason": null,
+      "detail": null
+     },
+     {
+      "at": "2026-10-25T11:59:59.770462Z",
+      "verb": "read",
+      "workflow_id": null,
+      "workflow_name": null,
+      "run_id": "1e932094-5f46-4d55-95fb-786c92f63b0a",
+      "ok": true,
+      "outcome": "running",
+      "reason": null,
+      "detail": null
+     },
+     {
+      "at": "2026-10-25T11:59:53.269180Z",
+      "verb": "read",
+      "workflow_id": null,
+      "workflow_name": null,
+      "run_id": "1e932094-5f46-4d55-95fb-786c92f63b0a",
+      "ok": true,
+      "outcome": "running",
+      "reason": null,
+      "detail": null
+     },
+     {
+      "at": "2026-10-25T11:59:46.986270Z",
+      "verb": "read",
+      "workflow_id": null,
+      "workflow_name": null,
+      "run_id": "1e932094-5f46-4d55-95fb-786c92f63b0a",
+      "ok": true,
+      "outcome": "running",
+      "reason": null,
+      "detail": null
+     },
+     {
+      "at": "2026-10-25T11:59:40.239696Z",
+      "verb": "read",
+      "workflow_id": null,
+      "workflow_name": null,
+      "run_id": "1e932094-5f46-4d55-95fb-786c92f63b0a",
+      "ok": true,
+      "outcome": "running",
+      "reason": null,
+      "detail": null
+     },
+     {
+      "at": "2026-10-25T11:59:33.456434Z",
+      "verb": "read",
+      "workflow_id": null,
+      "workflow_name": null,
+      "run_id": "1e932094-5f46-4d55-95fb-786c92f63b0a",
+      "ok": true,
+      "outcome": "running",
+      "reason": null,
+      "detail": null
+     },
+     {
+      "at": "2026-10-25T11:59:26.616654Z",
+      "verb": "read",
+      "workflow_id": null,
+      "workflow_name": null,
+      "run_id": "1e932094-5f46-4d55-95fb-786c92f63b0a",
+      "ok": true,
+      "outcome": "running",
+      "reason": null,
+      "detail": null
+     },
+     {
+      "at": "2026-10-25T11:59:24.480586Z",
+      "verb": "start",
+      "workflow_id": "dfb4e0df-9754-46d4-b168-e14585519561",
+      "workflow_name": "295-07 S6 approve then wrap",
+      "run_id": "1e932094-5f46-4d55-95fb-786c92f63b0a",
+      "ok": true,
+      "outcome": "ok",
+      "reason": null,
+      "detail": null
+     },
+     {
+      "at": "2026-10-25T11:59:18.276419Z",
+      "verb": "read",
+      "workflow_id": null,
+      "workflow_name": null,
+      "run_id": "4ab828a3-e5eb-46f0-84dc-431ed7c37673",
+      "ok": true,
+      "outcome": "ok",
+      "reason": null,
+      "detail": {
+       "file_id": "d781763b-f50e-4dbb-922d-16126bb8b2cd"
+      }
+     },
+     {
+      "at": "2026-10-25T11:59:15.083378Z",
+      "verb": "read",
+      "workflow_id": null,
+      "workflow_name": null,
+      "run_id": "4ab828a3-e5eb-46f0-84dc-431ed7c37673",
+      "ok": true,
+      "outcome": "completed",
+      "reason": null,
+      "detail": null
+     },
+     {
+      "at": "2026-10-25T11:59:08.440307Z",
+      "verb": "read",
+      "workflow_id": null,
+      "workflow_name": null,
+      "run_id": "4ab828a3-e5eb-46f0-84dc-431ed7c37673",
+      "ok": true,
+      "outcome": "running",
+      "reason": null,
+      "detail": null
+     },
+     {
+      "at": "2026-10-25T11:59:06.458053Z",
+      "verb": "start",
+      "workflow_id": "51c82334-d1bf-46ef-985e-d496e6c1824c",
+      "workflow_name": "293 inbound: brief to file",
+      "run_id": "4ab828a3-e5eb-46f0-84dc-431ed7c37673",
+      "ok": true,
+      "outcome": "ok",
+      "reason": null,
+      "detail": null
+     }
+    ]
+   }
+  },
+  "next_call": {
+   "http": 401,
+   "body": {
+    "detail": "This API key is not valid. It may have been revoked or have expired."
+   }
+  }
+ }
+]

@@ -1,0 +1,42 @@
+{
+ "run_id": "4ab828a3-e5eb-46f0-84dc-431ed7c37673",
+ "final": {
+  "run_id": "4ab828a3-e5eb-46f0-84dc-431ed7c37673",
+  "status": "completed",
+  "step_index": null,
+  "step_total": null,
+  "waiting_on": null,
+  "output_text": "I wrote `/brief.md`, but I have to flag a problem: the run input contained no `topic` value.\n\nThe run input arrived as \"Run 293 inbound: brief to file,\" but the `topic` field it refers to contained no actual value. As a result, there is no subject matter to summarize, so this brief records the gap rather than inventing content. Please resend Run 293 with a populated `topic` value and the brief will be written to this same file.",
+  "end_reason": null,
+  "steps": [
+   {
+    "name": "Write the brief and save it",
+    "state": "completed"
+   }
+  ],
+  "files": [
+   {
+    "name": "brief.md",
+    "size_bytes": 359,
+    "url": "/inbound/files/WQG7Or2MA49TypHeEkt3YUNgwMnRr-4s",
+    "expires_in": 300
+   }
+  ],
+  "_statuses_seen": [
+   "running",
+   "completed"
+  ]
+ },
+ "download": {
+  "file": "brief.md",
+  "expires_in": 300,
+  "first_http": 200,
+  "first_sha256": "74444d5eeec1ed4feef8e11d562cb09f49dce0d29b15638619054f4e3ece2dbd",
+  "db_sha256": "74444d5eeec1ed4feef8e11d562cb09f49dce0d29b15638619054f4e3ece2dbd",
+  "content_disposition": null,
+  "second_http": 404,
+  "second_body": {
+   "detail": "Not found."
+  }
+ }
+}

@@ -1,0 +1,51 @@
+[
+ {
+  "row": "sc1",
+  "check": "start → 201 + run_id",
+  "pass": true,
+  "http": 201,
+  "body": {
+   "run_id": "4ab828a3-e5eb-46f0-84dc-431ed7c37673",
+   "status": "running"
+  }
+ },
+ {
+  "row": "sc1",
+  "check": "poll → completed with output_text",
+  "pass": true,
+  "run_id": "4ab828a3-e5eb-46f0-84dc-431ed7c37673",
+  "statuses": [
+   "running",
+   "completed"
+  ],
+  "output_text_chars": 431
+ },
+ {
+  "row": "sc1",
+  "check": "file link downloads the exact bytes once, then 404",
+  "pass": true,
+  "file": "brief.md",
+  "expires_in": 300,
+  "first_http": 200,
+  "first_sha256": "74444d5eeec1ed4feef8e11d562cb09f49dce0d29b15638619054f4e3ece2dbd",
+  "db_sha256": "74444d5eeec1ed4feef8e11d562cb09f49dce0d29b15638619054f4e3ece2dbd",
+  "content_disposition": null,
+  "second_http": 404,
+  "second_body": {
+   "detail": "Not found."
+  }
+ },
+ {
+  "row": "sc1",
+  "check": "a run paused for a person reads waiting_for_person + who, no question",
+  "pass": true,
+  "run_id": "1e932094-5f46-4d55-95fb-786c92f63b0a",
+  "statuses": [
+   "running",
+   "waiting_for_person"
+  ],
+  "waiting_on": {
+   "who": "the person who started this run"
+  }
+ }
+]

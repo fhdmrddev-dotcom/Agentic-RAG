@@ -1,0 +1,252 @@
+{
+ "roster_derivation": [
+  "C:\\Vibe Apps\\Agentic RAG\\backend\\venv\\Lib\\site-packages\\requests\\__init__.py:113: RequestsDependencyWarning: urllib3 (2.6.3) or chardet (7.4.3)/charset_normalizer (3.4.6) doesn't match a supported version!",
+  "  warnings.warn(",
+  "model_capability_unknown model_id=glm-4.7-flash inferred_provider=lmstudio native_tools=False � TOOL CALLING IS DISABLED for this model: it will run in STRUCTURED mode, the tools param will NOT be sent, and any tool call it attempts will arrive as unparseable prose. Add a row for this model in the Model Registry (native_tools + the LOADED context_window_tokens) to fix it.",
+  "model_capability_unknown model_id=claude-sonnet-5-5 inferred_provider=anthropic native_tools=True",
+  "model_capability_unknown model_id=qwen-agentworld-35b-a3b inferred_provider=lmstudio native_tools=False � TOOL CALLING IS DISABLED for this model: it will run in STRUCTURED mode, the tools param will NOT be sent, and any tool call it attempts will arrive as unparseable prose. Add a row for this model in the Model Registry (native_tools + the LOADED context_window_tokens) to fix it.",
+  "model_capability_unknown model_id=claude-opus-5-5 inferred_provider=anthropic native_tools=True",
+  "model_capability_unknown model_id=qwen3.6-35b-a3b-mtp inferred_provider=lmstudio native_tools=False � TOOL CALLING IS DISABLED for this model: it will run in STRUCTURED mode, the tools param will NOT be sent, and any tool call it attempts will arrive as unparseable prose. Add a row for this model in the Model Registry (native_tools + the LOADED context_window_tokens) to fix it.",
+  "model_capability_unknown model_id=qwen3.5-9b-mtp inferred_provider=lmstudio native_tools=False � TOOL CALLING IS DISABLED for this model: it will run in STRUCTURED mode, the tools param will NOT be sent, and any tool call it attempts will arrive as unparseable prose. Add a row for this model in the Model Registry (native_tools + the LOADED context_window_tokens) to fix it.",
+  "model_capability_unknown model_id=deepseek/deepseek-v4.1-flash inferred_provider=openrouter native_tools=False � TOOL CALLING IS DISABLED for this model: it will run in STRUCTURED mode, the tools param will NOT be sent, and any tool call it attempts will arrive as unparseable prose. Add a row for this model in the Model Registry (native_tools + the LOADED context_window_tokens) to fix it.",
+  "model_capability_unknown model_id=claude-fable-5-1 inferred_provider=anthropic native_tools=True",
+  "model_capability_unknown model_id=stealth/ox-alpha inferred_provider=openrouter native_tools=False � TOOL CALLING IS DISABLED for this model: it will run in STRUCTURED mode, the tools param will NOT be sent, and any tool call it attempts will arrive as unparseable prose. Add a row for this model in the Model Registry (native_tools + the LOADED context_window_tokens) to fix it.",
+  "model_capability_unknown model_id=glm-5.3 inferred_provider=zhipu native_tools=True",
+  "model_capability_unknown model_id=kimi-k3.1-pro inferred_provider=moonshot native_tools=True",
+  "model_capability_unknown model_id=glm-5.3-flashx inferred_provider=zhipu native_tools=True",
+  "model_capability_unknown model_id=gemini-3.8-flash inferred_provider=google native_tools=True",
+  "model_capability_unknown model_id=gemini-3.6-flash inferred_provider=google native_tools=True",
+  "model_capability_unknown model_id=kimi-k3 inferred_provider=moonshot native_tools=True",
+  "model_capability_unknown model_id=qwen3-coder:30b inferred_provider=ollama native_tools=False � TOOL CALLING IS DISABLED for this model: it will run in STRUCTURED mode, the tools param will NOT be sent, and any tool call it attempts will arrive as unparseable prose. Add a row for this model in the Model Registry (native_tools + the LOADED context_window_tokens) to fix it.",
+  "model_capability_unknown model_id=meta/muse-spark-1.3 inferred_provider=openrouter native_tools=False � TOOL CALLING IS DISABLED for this model: it will run in STRUCTURED mode, the tools param will NOT be sent, and any tool call it attempts will arrive as unparseable prose. Add a row for this model in the Model Registry (native_tools + the LOADED context_window_tokens) to fix it.",
+  "model_capability_unknown model_id=glm-5.3-flash inferred_provider=zhipu native_tools=True",
+  "model_capability_unknown model_id=kimi-k3.1-pro-highspeed inferred_provider=moonshot native_tools=True",
+  "model_capability_unknown model_id=openai/gpt-oss-20b inferred_provider=lmstudio native_tools=False � TOOL CALLING IS DISABLED for this model: it will run in STRUCTURED mode, the tools param will NOT be sent, and any tool call it attempts will arrive as unparseable prose. Add a row for this model in the Model Registry (native_tools + the LOADED context_window_tokens) to fix it.",
+  "model_capability_unknown model_id=gemini-3.7-flash inferred_provider=google native_tools=True",
+  "model_capability_unknown model_id=qwen/qwen3.8-max inferred_provider=openrouter native_tools=False � TOOL CALLING IS DISABLED for this model: it will run in STRUCTURED mode, the tools param will NOT be sent, and any tool call it attempts will arrive as unparseable prose. Add a row for this model in the Model Registry (native_tools + the LOADED context_window_tokens) to fix it.",
+  "model_capability_unknown model_id=nvidia_nvidia-nemotron-nano-9b-v2 inferred_provider=lmstudio native_tools=False � TOOL CALLING IS DISABLED for this model: it will run in STRUCTURED mode, the tools param will NOT be sent, and any tool call it attempts will arrive as unparseable prose. Add a row for this model in the Model Registry (native_tools + the LOADED context_window_tokens) to fix it.",
+  "model_capability_unknown model_id=spark-x2.5-4b inferred_provider=lmstudio native_tools=False � TOOL CALLING IS DISABLED for this model: it will run in STRUCTURED mode, the tools param will NOT be sent, and any tool call it attempts will arrive as unparseable prose. Add a row for this model in the Model Registry (native_tools + the LOADED context_window_tokens) to fix it.",
+  "model_capability_unknown model_id=MiniMax-M3.1-Flash inferred_provider=minimax native_tools=True",
+  "model_capability_unknown model_id=qwen/qwen3.8-27b inferred_provider=openrouter native_tools=False � TOOL CALLING IS DISABLED for this model: it will run in STRUCTURED mode, the tools param will NOT be sent, and any tool call it attempts will arrive as unparseable prose. Add a row for this model in the Model Registry (native_tools + the LOADED context_window_tokens) to fix it.",
+  "sub_agent_model='deepseek-v4-flash' infers provider='deepseek' but active_provider='anthropic' (cross-provider mismatch); using per-provider default 'claude-haiku-4-5-20251001' to avoid a cross-provider call (folded inferred-provider gate � closes the empty-available_models blind spot list-membership missed).",
+  "sub_agent_model='deepseek-v4-flash' infers provider='deepseek' but active_provider='google' (cross-provider mismatch); using per-provider default 'gemini-3.5-flash' to avoid a cross-provider call (folded inferred-provider gate � closes the empty-available_models blind spot list-membership missed).",
+  "sub_agent_model='deepseek-v4-flash' is not in active provider='lmstudio''s model list (active_models=['gemma-4-26B-A4B-it-QAT-GGUF', 'qwen3.8-27b', 'glm-4.7-flash', 'nvidia_nvidia-nemotron-nano-9b-v2', 'openai/gpt-oss-20b', 'qwen-agentworld-35b-a3b', 'qwen3.5-9b-mtp', 'qwen3.6-35b-a3b-mtp', 'spark-x2.5-4b']); falling back to provider default '' to avoid cross-provider call.",
+  "No _SUB_AGENT_MODEL_DEFAULTS entry for provider='lmstudio'; returning candidate='deepseek-v4-flash' as best-effort.",
+  "sub_agent_model='deepseek-v4-flash' infers provider='deepseek' but active_provider='minimax' (cross-provider mismatch); using per-provider default 'MiniMax-M2.7-highspeed' to avoid a cross-provider call (folded inferred-provider gate � closes the empty-available_models blind spot list-membership missed).",
+  "sub_agent_model='deepseek-v4-flash' infers provider='deepseek' but active_provider='moonshot' (cross-provider mismatch); using per-provider default 'kimi-k2.6' to avoid a cross-provider call (folded inferred-provider gate � closes the empty-available_models blind spot list-membership missed).",
+  "sub_agent_model='deepseek-v4-flash' infers provider='deepseek' but active_provider='openai' (cross-provider mismatch); using per-provider default 'gpt-5.4-mini' to avoid a cross-provider call (folded inferred-provider gate � closes the empty-available_models blind spot list-membership missed).",
+  "sub_agent_model='deepseek-v4-flash' is not in active provider='openrouter''s model list (active_models=['nvidia/nemotron-3-ultra-550b-a55b', 'meta-llama/llama-3.3-70b-instruct', 'nvidia/nemotron-3-super-120b-a12b:free', 'google/gemma-4-26b-a4b-it', 'google/gemma-4-31b-it:free', 'qwen/qwen3.8-max', 'qwen/qwen3.8-27b', 'qwen/qwen3.8-flash', 'stealth/ox-alpha', 'meta/muse-spark-1.3', 'deepseek/deepseek-v4.1-flash', 'z-ai/glm-5.3-flash']); falling back to provider default '' to avoid cross-provider call.",
+  "No _SUB_AGENT_MODEL_DEFAULTS entry for provider='openrouter'; returning candidate='deepseek-v4-flash' as best-effort.",
+  "sub_agent_model='deepseek-v4-flash' infers provider='deepseek' but active_provider='zhipu' (cross-provider mismatch); using per-provider default 'glm-5-turbo' to avoid a cross-provider call (folded inferred-provider gate � closes the empty-available_models blind spot list-membership missed).",
+  "ROSTER overlay rows read by load_all_model_overrides: 31 · direct SQL (removed=false): 31",
+  "ROSTER seed ids (MODEL_CAPABILITIES): 61 · union rows: 44",
+  "ROSTER eligible (enabled, not deprecated, not removed): 41",
+  "ROSTER openrouter_tool_strategy (app settings) = <OpenRouterToolStrategy.QUALITY: 'quality'>",
+  "ROSTER groups=9 (required 8, extra 1)",
+  "ROSTER REQUIRED provider=anthropic  newest=claude-opus-5-5 source=overlay (DB-only row) native_tools=True emit_tier=None predicted_calling_mode=NATIVE (native SDK adapter) ids_in_group=4 tied_with=['claude-sonnet-5-5', 'claude-opus-5-5']",
+  "ROSTER REQUIRED provider=deepseek   newest=deepseek-v4-pro source=seed + overlay native_tools=True emit_tier=force predicted_calling_mode=NATIVE ids_in_group=2 tied_with=['deepseek-v4-flash', 'deepseek-v4-pro']",
+  "ROSTER REQUIRED provider=google     newest=gemini-3.8-flash source=overlay (DB-only row) native_tools=True emit_tier=None predicted_calling_mode=NATIVE (native SDK adapter) ids_in_group=5",
+  "ROSTER EXTRA    provider=lmstudio   newest=qwen-agentworld-35b-a3b source=overlay (DB-only row) native_tools=True emit_tier=None predicted_calling_mode=NATIVE ids_in_group=7",
+  "ROSTER REQUIRED provider=minimax    newest=MiniMax-M3 source=seed native_tools=True emit_tier=force predicted_calling_mode=NATIVE ids_in_group=1",
+  "ROSTER REQUIRED provider=moonshot   newest=kimi-k3.1-pro-highspeed source=overlay (DB-only row) native_tools=True emit_tier=None predicted_calling_mode=NATIVE ids_in_group=3",
+  "ROSTER REQUIRED provider=openai     newest=gpt-5.6-luna source=seed native_tools=True emit_tier=force_strict predicted_calling_mode=NATIVE ids_in_group=7 tied_with=['gpt-5.6-sol', 'gpt-5.6-terra', 'gpt-5.6-luna']",
+  "ROSTER REQUIRED provider=openrouter newest=deepseek/deepseek-v4.1-flash source=overlay (DB-only row) native_tools=True emit_tier=None predicted_calling_mode=NATIVE ids_in_group=5",
+  "ROSTER REQUIRED provider=zhipu      newest=glm-5.3-flash source=overlay (DB-only row) native_tools=True emit_tier=None predicted_calling_mode=NATIVE ids_in_group=7 tied_with=['glm-5.3', 'glm-5.3-flashx', 'glm-5.3-flash']",
+  "ROSTER rows predicted STRUCTURED: NONE",
+  "ROSTER ⚠ no derived row is predicted STRUCTURED — the live SC#2 holdback check needs a STRUCTURED row; see 273-UAT-LOG.md (the plan assumed OpenRouter is STRUCTURED).",
+  "ROSTER STRUCTURED-routing candidates (keyed, enabled, any group): ['lmstudio:nvidia_nvidia-nemotron-nano-9b-v2']",
+  "",
+  "SC10_KEY baseline active_provider=deepseek saved_llm_model='deepseek-v4-flash' (⚠ the saved llm_model — NOT any --model you pass — is what reaches a phase)",
+  "SC10_KEY provider=anthropic api_key=present request_model=claude-haiku-4-5-20251001 predicted_effective_model=claude-haiku-4-5-20251001",
+  "SC10_KEY provider=deepseek api_key=present request_model=deepseek-v4-flash predicted_effective_model=deepseek-v4-flash",
+  "SC10_KEY provider=google api_key=present request_model=gemini-3.5-flash predicted_effective_model=gemini-3.5-flash",
+  "SC10_KEY provider=lmstudio api_key=present request_model=qwen-agentworld-35b-a3b predicted_effective_model=deepseek-v4-flash ⚠ _SUB_AGENT_MODEL_DEFAULTS['lmstudio'] is empty and 'lmstudio' is a flexible provider — the saved llm_model passes through UNSLASHED (predicted 404); pin phase.config.model via --openrouter-definition-slug to drive it",
+  "SC10_KEY provider=minimax api_key=present request_model=MiniMax-M2.7-highspeed predicted_effective_model=MiniMax-M2.7-highspeed",
+  "SC10_KEY provider=moonshot api_key=present request_model=kimi-k2.6 predicted_effective_model=kimi-k2.6",
+  "SC10_KEY provider=openai api_key=present request_model=gpt-5.4-mini predicted_effective_model=gpt-5.4-mini",
+  "SC10_KEY provider=openrouter api_key=present request_model=deepseek/deepseek-v4.1-flash predicted_effective_model=deepseek-v4-flash ⚠ _SUB_AGENT_MODEL_DEFAULTS['openrouter'] is empty and 'openrouter' is a flexible provider — the saved llm_model passes through UNSLASHED (predicted 404); pin phase.config.model via --openrouter-definition-slug to drive it",
+  "SC10_KEY provider=zhipu api_key=present request_model=glm-5-turbo predicted_effective_model=glm-5-turbo",
+  "",
+  "PROBE {'anthropic': {'has_key': True, 'predicted_effective_model': 'claude-haiku-4-5-20251001', 'request_model': 'claude-haiku-4-5-20251001', 'provider_default_empty': False}, 'deepseek': {'has_key': True, 'predicted_effective_model': 'deepseek-v4-flash', 'request_model': 'deepseek-v4-flash', 'provider_default_empty': False}, 'google': {'has_key': True, 'predicted_effective_model': 'gemini-3.5-flash', 'request_model': 'gemini-3.5-flash', 'provider_default_empty': False}, 'lmstudio': {'has_key': True, 'predicted_effective_model': 'deepseek-v4-flash', 'request_model': 'qwen-agentworld-35b-a3b', 'provider_default_empty': True}, 'minimax': {'has_key': True, 'predicted_effective_model': 'MiniMax-M2.7-highspeed', 'request_model': 'MiniMax-M2.7-highspeed', 'provider_default_empty': False}, 'moonshot': {'has_key': True, 'predicted_effective_model': 'kimi-k2.6', 'request_model': 'kimi-k2.6', 'provider_default_empty': False}, 'openai': {'has_key': True, 'predicted_effective_model': 'gpt-5.4-mini', 'request_model': 'gpt-5.4-mini', 'provider_default_empty': False}, 'openrouter': {'has_key': True, 'predicted_effective_model': 'deepseek-v4-flash', 'request_model': 'deepseek/deepseek-v4.1-flash', 'provider_default_empty': True}, 'zhipu': {'has_key': True, 'predicted_effective_model': 'glm-5-turbo', 'request_model': 'glm-5-turbo', 'provider_default_empty': False}}",
+  "{\"provider\": \"anthropic\", \"model\": \"claude-opus-5-5\", \"required\": true, \"source\": \"overlay (DB-only row)\", \"native_tools\": true, \"emit_tier\": null, \"derive_blocked\": null}",
+  "{\"provider\": \"deepseek\", \"model\": \"deepseek-v4-pro\", \"required\": true, \"source\": \"seed + overlay\", \"native_tools\": true, \"emit_tier\": \"force\", \"derive_blocked\": null}",
+  "{\"provider\": \"google\", \"model\": \"gemini-3.8-flash\", \"required\": true, \"source\": \"overlay (DB-only row)\", \"native_tools\": true, \"emit_tier\": null, \"derive_blocked\": null}",
+  "{\"provider\": \"lmstudio\", \"model\": \"qwen-agentworld-35b-a3b\", \"required\": false, \"source\": \"overlay (DB-only row)\", \"native_tools\": true, \"emit_tier\": null, \"derive_blocked\": null}",
+  "{\"provider\": \"minimax\", \"model\": \"MiniMax-M3\", \"required\": true, \"source\": \"seed\", \"native_tools\": true, \"emit_tier\": \"force\", \"derive_blocked\": null}",
+  "{\"provider\": \"moonshot\", \"model\": \"kimi-k3.1-pro-highspeed\", \"required\": true, \"source\": \"overlay (DB-only row)\", \"native_tools\": true, \"emit_tier\": null, \"derive_blocked\": null}",
+  "{\"provider\": \"openai\", \"model\": \"gpt-5.6-luna\", \"required\": true, \"source\": \"seed\", \"native_tools\": true, \"emit_tier\": \"force_strict\", \"derive_blocked\": null}",
+  "{\"provider\": \"openrouter\", \"model\": \"deepseek/deepseek-v4.1-flash\", \"required\": true, \"source\": \"overlay (DB-only row)\", \"native_tools\": true, \"emit_tier\": null, \"derive_blocked\": null}",
+  "{\"provider\": \"zhipu\", \"model\": \"glm-5.3-flash\", \"required\": true, \"source\": \"overlay (DB-only row)\", \"native_tools\": true, \"emit_tier\": null, \"derive_blocked\": null}"
+ ],
+ "one_step_board_workflows_publish_attempts": {
+  "openai": {
+   "model": "gpt-5.6-luna",
+   "definition_id": "ad573c0b-92a4-46eb-a225-f53378edd0fd",
+   "published": false,
+   "publish_verdict": {
+    "published": false,
+    "version": null,
+    "golden_run_id": "4a91f5fb-8a90-454e-8b39-812d6c57e0f7",
+    "blocked_stage": "golden_run_error",
+    "named_failures": [
+     "golden run could not complete: BadRequestError: Error code: 400 - {'error': {'message': 'The supported API model names are deepseek-flash, deepseek-v4-pro, but you passed gpt-5.6-luna. (request_id: 00c66075-13af-445f-9eb7-dde1fe10b027)', 'type': 'invalid_request_error', 'param': None, 'code': 'invalid_request_error'}}"
+    ],
+    "blocked_step": {
+     "step_slug": "say",
+     "step_index": 0,
+     "step_name": "Explain backups",
+     "reason": "The trial run stopped because of an error (BadRequestError).",
+     "cause": "The trial run stopped because of an error (BadRequestError)."
+    },
+    "auto_answered": []
+   }
+  },
+  "anthropic": {
+   "model": "claude-opus-5-5",
+   "definition_id": "ac031680-1058-4daf-94cd-bb73e5ac93c7",
+   "published": false,
+   "publish_verdict": {
+    "published": false,
+    "version": null,
+    "golden_run_id": "6bdbd298-b62a-4e68-a9ac-de7ddc4bad13",
+    "blocked_stage": "golden_run_error",
+    "named_failures": [
+     "golden run could not complete: BadRequestError: Error code: 400 - {'error': {'message': 'The supported API model names are deepseek-flash, deepseek-v4-pro, but you passed claude-opus-5-5. (request_id: 86aab320-8f47-407f-b32e-dee220453d11)', 'type': 'invalid_request_error', 'param': None, 'code': 'invalid_request_error'}}"
+    ],
+    "blocked_step": {
+     "step_slug": "say",
+     "step_index": 0,
+     "step_name": "Explain backups",
+     "reason": "The trial run stopped because of an error (BadRequestError).",
+     "cause": "The trial run stopped because of an error (BadRequestError)."
+    },
+    "auto_answered": []
+   }
+  },
+  "google": {
+   "model": "gemini-3.8-flash",
+   "definition_id": "708021ed-b04b-4052-b418-a85b1e2d9184",
+   "published": false,
+   "publish_verdict": {
+    "published": false,
+    "version": null,
+    "golden_run_id": "c0c93975-b7c3-4d2f-8d3f-fbf13c13de4b",
+    "blocked_stage": "golden_run_error",
+    "named_failures": [
+     "golden run could not complete: BadRequestError: Error code: 400 - {'error': {'message': 'The supported API model names are deepseek-flash, deepseek-v4-pro, but you passed gemini-3.8-flash. (request_id: 1b1c3f03-7a34-4996-b712-a14052d89170)', 'type': 'invalid_request_error', 'param': None, 'code': 'invalid_request_error'}}"
+    ],
+    "blocked_step": {
+     "step_slug": "say",
+     "step_index": 0,
+     "step_name": "Explain backups",
+     "reason": "The trial run stopped because of an error (BadRequestError).",
+     "cause": "The trial run stopped because of an error (BadRequestError)."
+    },
+    "auto_answered": []
+   }
+  },
+  "deepseek": {
+   "model": "deepseek-v4-pro",
+   "definition_id": "50bdc91a-3536-46ca-9751-a1e2aaeb1bda",
+   "published": true,
+   "publish_verdict": {
+    "published": true,
+    "version": 1,
+    "golden_run_id": "886aaa1a-3b0c-4514-b4c7-41555426c97a",
+    "blocked_stage": null,
+    "named_failures": [],
+    "blocked_step": null,
+    "auto_answered": []
+   }
+  },
+  "zhipu": {
+   "model": "glm-5.3-flash",
+   "definition_id": "1c058f78-63c1-43a0-9bc5-1dd1bc617b47",
+   "published": false,
+   "publish_verdict": {
+    "published": false,
+    "version": null,
+    "golden_run_id": "29da8e4c-3666-4277-bbb8-e71d24a93d96",
+    "blocked_stage": "golden_run_error",
+    "named_failures": [
+     "golden run could not complete: BadRequestError: Error code: 400 - {'error': {'message': 'The supported API model names are deepseek-flash, deepseek-v4-pro, but you passed glm-5.3-flash. (request_id: 1911337c-822e-40da-9eb2-8c325136ce3e)', 'type': 'invalid_request_error', 'param': None, 'code': 'invalid_request_error'}}"
+    ],
+    "blocked_step": {
+     "step_slug": "say",
+     "step_index": 0,
+     "step_name": "Explain backups",
+     "reason": "The trial run stopped because of an error (BadRequestError).",
+     "cause": "The trial run stopped because of an error (BadRequestError)."
+    },
+    "auto_answered": []
+   }
+  },
+  "minimax": {
+   "model": "MiniMax-M3",
+   "definition_id": "ad518a6d-66b1-4579-89a5-b885265bc1c9",
+   "published": false,
+   "publish_verdict": {
+    "published": false,
+    "version": null,
+    "golden_run_id": "006be8c3-d18a-4650-a0dd-d1f1560c7eb9",
+    "blocked_stage": "golden_run_error",
+    "named_failures": [
+     "golden run could not complete: BadRequestError: Error code: 400 - {'error': {'message': 'The supported API model names are deepseek-flash, deepseek-v4-pro, but you passed MiniMax-M3. (request_id: 4cda0243-445c-4624-bb31-c27a732f2b44)', 'type': 'invalid_request_error', 'param': None, 'code': 'invalid_request_error'}}"
+    ],
+    "blocked_step": {
+     "step_slug": "say",
+     "step_index": 0,
+     "step_name": "Explain backups",
+     "reason": "The trial run stopped because of an error (BadRequestError).",
+     "cause": "The trial run stopped because of an error (BadRequestError)."
+    },
+    "auto_answered": []
+   }
+  },
+  "moonshot": {
+   "model": "kimi-k3.1-pro-highspeed",
+   "definition_id": "f44fb4c8-260a-4ffd-a322-c198e9584c5d",
+   "published": false,
+   "publish_verdict": {
+    "published": false,
+    "version": null,
+    "golden_run_id": "9065280e-9c52-4f84-8a81-c208c09c4f44",
+    "blocked_stage": "golden_run_error",
+    "named_failures": [
+     "golden run could not complete: BadRequestError: Error code: 400 - {'error': {'message': 'The supported API model names are deepseek-flash, deepseek-v4-pro, but you passed kimi-k3.1-pro-highspeed. (request_id: 1c951333-14ca-4096-8e4c-853ced3afc12)', 'type': 'invalid_request_error', 'param': None, 'code': 'invalid_request_error'}}"
+    ],
+    "blocked_step": {
+     "step_slug": "say",
+     "step_index": 0,
+     "step_name": "Explain backups",
+     "reason": "The trial run stopped because of an error (BadRequestError).",
+     "cause": "The trial run stopped because of an error (BadRequestError)."
+    },
+    "auto_answered": []
+   }
+  },
+  "openrouter": {
+   "model": "deepseek/deepseek-v4.1-flash",
+   "definition_id": "f1cbc441-2f22-424e-92d2-1495c4252cb2",
+   "published": false,
+   "publish_verdict": {
+    "published": false,
+    "version": null,
+    "golden_run_id": "8dee4e81-a2ec-428f-a778-a889edd58485",
+    "blocked_stage": "golden_run_error",
+    "named_failures": [
+     "golden run could not complete: BadRequestError: Error code: 400 - {'error': {'message': 'The supported API model names are deepseek-flash, deepseek-v4-pro, but you passed deepseek/deepseek-v4.1-flash. (request_id: c4589c50-e69c-4243-a320-15be5810e628)', 'type': 'invalid_request_error', 'param': None, 'code': 'invalid_request_error'}}"
+    ],
+    "blocked_step": {
+     "step_slug": "say",
+     "step_index": 0,
+     "step_name": "Explain backups",
+     "reason": "The trial run stopped because of an error (BadRequestError).",
+     "cause": "The trial run stopped because of an error (BadRequestError)."
+    },
+    "auto_answered": []
+   }
+  }
+ },
+ "note": "Each row's one-LLM-step workflow pinned the provider's newest registry id in phase.config.model. The publish golden run sent every non-deepseek id to the ACTIVE provider (deepseek) and got 400; only deepseek published. The 7 failed drafts were removed with the app's cascade route afterwards."
+}
