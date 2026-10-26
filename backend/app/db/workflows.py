@@ -1053,29 +1053,26 @@ async def create_workflow_definition(
     runs the EXISTING statement unchanged, so the mig-106 trigger still fills ``org_id``; a value
     is bound as ``$6`` and the trigger keeps it verbatim.
     """
-    if org_id is not None:
-        row = await pool.fetchrow(
-            f"INSERT INTO workflow_definitions (slug, version, name, status, definition, created_by, is_system_global, org_id) "
-            f"VALUES ($1, $2, $3, 'draft', $4::jsonb, $5, false, $6) "
-            f"RETURNING id, version, {CONCURRENCY_TOKEN_SQL} AS token",
-            definition.slug,
-            definition.version,
-            definition.name,
-            json.dumps(definition.model_dump(mode="json")),
-            user_id,
-            org_id,
-        )
-        return dict(row)
-    row = await pool.fetchrow(
+    sql = (
         f"INSERT INTO workflow_definitions (slug, version, name, status, definition, created_by, is_system_global) "
         f"VALUES ($1, $2, $3, 'draft', $4::jsonb, $5, false) "
-        f"RETURNING id, version, {CONCURRENCY_TOKEN_SQL} AS token",
+        f"RETURNING id, version, {CONCURRENCY_TOKEN_SQL} AS token"
+    )
+    args: list = [
         definition.slug,
         definition.version,
         definition.name,
         json.dumps(definition.model_dump(mode="json")),
         user_id,
-    )
+    ]
+    if org_id is not None:
+        sql = (
+            f"INSERT INTO workflow_definitions (slug, version, name, status, definition, created_by, is_system_global, org_id) "
+            f"VALUES ($1, $2, $3, 'draft', $4::jsonb, $5, false, $6) "
+            f"RETURNING id, version, {CONCURRENCY_TOKEN_SQL} AS token"
+        )
+        args.append(org_id)
+    row = await pool.fetchrow(sql, *args)
     return dict(row)
 
 

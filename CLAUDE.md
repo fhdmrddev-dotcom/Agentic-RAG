@@ -447,7 +447,7 @@ node scripts/check-hot-file-ledger.cjs <phase-dir>   # 0 clear · 1 missing rows
 | `frontend/src/hooks/useThreads.ts` | 5 / 3 / 65 | ⚠ now FIRES · last touch 267-04 · ⛔ |
 | `backend/app/services/harness/grounding.py` | 23 / 10 / 1437 (was `21 / 8 / 1414`) | 295-03: ONE pure predicate (is_engine_citation_gate) |
 | `frontend/src/components/workflows/PhaseFormPanel.tsx` | 30 / 14 / 1566 | honoured by construction ×6 (185 / 193 / 193.1 / 199 / 200 / **214**) |
-| `backend/app/db/workflows.py` | 60 / 31 / 2848 (was `59 / 30 / 2827`) | 296-01: create_workflow_definition org_id kwarg (keyword-only) |
+| `backend/app/db/workflows.py` | 61 / 31 / 2845 (was `59 / 30 / 2827`) | 296-01: create_workflow_definition org_id kwarg (keyword-only) |
 | `backend/app/services/harness/publish_service.py` | 34 / 15 / 2010 (was `33 / 15 / 2008`) | 295-09 WR-05: judge system prompt via one helper (If 70→70) |
 | `backend/app/services/workflow_authoring.py` | 18 / 12 / 1120 (was `17 / 11 / 1025`) | 291-02: files = one more untrusted grounding input (+98 −3) |
 | `backend/app/models/harness.py` | 22 / 20 / 776 (was `20 / 19 / 766`) | 291-02: InputFieldSpec origin + note, omitted when absent |
