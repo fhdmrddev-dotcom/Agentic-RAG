@@ -57,6 +57,16 @@ def _code216() -> str:
     return _strip_comments(_migration("216").read_text(encoding="utf-8"))
 
 
+def _function_body216() -> str:
+    """The comment-stripped handle_new_user body ($$ … $$), excluding the trailing VERIFY select,
+    which legitimately names ``new.email`` inside a NOT LIKE pattern."""
+    code = _code216()
+    start = code.find("$$")
+    end = code.find("$$", start + 2)
+    assert start != -1 and end != -1, "216 has no $$-quoted function body"
+    return code[start:end]
+
+
 def _supplement_handle_new_user() -> str:
     code = _strip_comments(SUPPLEMENT.read_text(encoding="utf-8"))
     start = code.lower().find("create or replace function public.handle_new_user()")
@@ -86,9 +96,16 @@ def test_216_replaces_handle_new_user() -> None:
 
 
 def test_216_org_name_has_no_email() -> None:
+    body = _function_body216()
+    assert "new.email" not in body.lower()
+    assert "email" not in _create_org_call(body).lower()
+
+
+def test_216_verify_select_checks_the_name() -> None:
     code = _code216()
-    assert "new.email" not in code.lower()
-    assert "email" not in _create_org_call(code).lower()
+    tail = code[code.rfind("$$;"):]
+    assert "pg_get_functiondef('public.handle_new_user()'::regprocedure)" in tail
+    assert "My organization" in tail and "'PASS'" in tail
 
 
 def test_216_uses_the_constant_name() -> None:

@@ -583,7 +583,7 @@ node scripts/check-hot-file-ledger.cjs <phase-dir>   # 0 clear · 1 missing rows
 | `frontend/src/components/sources/SourceFolderPicker.tsx` | 2 / 2 / 375 | ⚠ absent its entire life — row added BUG-260912-01 · ⛔ |
 | `frontend/src/components/sources/sourceHealthVocabulary.ts` | 8 / 4 / 645 | ⛔ row STALE · G-5 fires (252-03) · Seam OWED |
 | `backend/app/services/sources/failure_cause.py` | 3 / 2 / 227 | ⚠ absent its entire life — row added BUG-260912-01 · ⛔ |
-| `scripts/full-schema-supplement.sql` | 23 / 15 / 848 (was `21 / 14 / 838`) | 294-03: mig 211 citation-check grants mirrored (ACL parity) · ⛔ |
+| `scripts/full-schema-supplement.sql` | 25 / 17 / 863 (was `23 / 15 / 848`) | 296-01: mig 216 handle_new_user copy, one expression (no-email name) · ⛔ |
 | `.claude/settings.json` | 14 / 6 / 214 | ⚠ STALE · last touch 276 · ⛔ |
 | `backend/app/services/forced_emit.py` | 13 / 8 / 724 (was `12 / 8 / 724`) | honoured by construction (282-04: provider kwarg) · ⛔ |
 | `backend/app/services/template_asset_service.py` | 5 / 4 / 379 (was `4 / 3 / 344`) | 295-02: has_staged_template (Branch-2 WHERE shared) |

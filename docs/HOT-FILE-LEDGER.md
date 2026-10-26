@@ -11745,7 +11745,7 @@ cells rot within days.
 | [`frontend/src/components/chat/ActiveConnectorChips.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentschatactiveconnectorchipstsx) | 2 / 2 / 82 | no (2 phases) | ⚠ absent for its entire life — row added 244-05 at its SECOND phase. **244**: the row container HOISTED out; it is bare chips now, `null` on empty (D-244-26) |
 | [`frontend/src/stores/streamsStore.ts`](docs/HOT-FILE-LEDGER.md#frontendsrcstoresstreamsstorets) | 27 / 18 / 660 (was `26 / 18 / 657`) | ⚠ **FIRES** | 292.1 G4-2: `releaseSettledWorkflowLock` type gains optional `{reattach}` (+3, type only). WorkflowLock untouched · ⛔ |
 | [`frontend/src/lib/toolMeta.ts`](docs/HOT-FILE-LEDGER.md#frontendsrclibtoolmetats) | 12 / 8 / 367 (was `11 / 7 / 352`) | ⚠ **FIRES** | **273-05**: `stepLabel` (show_artifact phrase, every other tool byte-identical to `toolLabel`). ⛔ the ONE home of the activity string |
-| [`scripts/full-schema-supplement.sql`](docs/HOT-FILE-LEDGER.md#scriptsfull-schema-supplementsql) | 23 / 15 / 848 (was `21 / 14 / 838`) | ⚠ **FIRES** | 294-03: mig 211 message_citation_checks ACL block mirrored (+9). Honoured by construction |
+| [`scripts/full-schema-supplement.sql`](docs/HOT-FILE-LEDGER.md#scriptsfull-schema-supplementsql) | 25 / 17 / 863 (was `23 / 15 / 848`) | ⚠ **FIRES** | 296-01: mig 216 handle_new_user copy, one expression (no-email org name). Honoured by construction |
 | [`scripts/check-schema-acl-parity.cjs`](docs/HOT-FILE-LEDGER.md#scriptscheck-schema-acl-paritycjs) | 4 / 2 / 1156 | no (2 phases) | ⚠ row STALE at `3/2/883` ONE PLAN LATER, same day — lines rot faster than phases. **253-03**: it finally READS `full-schema.sql` (`assertTailIdentity`); 29 → 35 self-test arms |
 | [`scripts/check-greenfield-privileges.py`](docs/HOT-FILE-LEDGER.md#scriptscheck-greenfield-privilegespy) | 2 / 1 / 1312 | no (1 phase) | ⚠ row STALE at `1/1/1157` the same day it was written. **253-03**: `_statements` replaces `line.find("--")`; ⛔ a SKIP is exit 2, never 0 |
 | [`.claude/hooks/schema-acl-parity-guard.js`](docs/HOT-FILE-LEDGER.md#claudehooksschema-acl-parity-guardjs) | 2 / 1 / 145 | no (1 phase) | young (created 253-02). Row added AT CREATION — `.claude/` is EXEMPT, so no gate can ever demand it. ⛔ its SILENCE reads as "clear": every path a payload can carry must be extracted |
@@ -16158,6 +16158,8 @@ whose `files_modified` names a `scripts/` file.**
 ### CLAUDE.md verdict cell as of 2026-10-12 (moved by 277)
 
 ⚠ row STALE (`11/6/653`). **266-01**: mig 195's `expert_installs` ACL mirrored. ⛔ `scripts/` is gate-EXEMPT
+
+**2026-10-26 — 296-01: one expression in the handle_new_user copy (mig 216, SEED-364), same commit as 216.** Re-derived `25 / 17 / 863` (the row read `23 / 15 / 848`; Phase 293 touched it without re-deriving). The org name `coalesce(new.email, new.id::text) || '''s Organization'` became the constant `'My organization'`, plus a one-line `-- migration 216` comment. No grant changed: CREATE OR REPLACE keeps the mig-181 EXECUTE posture. Scan-list cell before 296-01 (moved verbatim): `23 / 15 / 848 (was 21 / 14 / 838) | ⚠ FIRES | 294-03: mig 211 message_citation_checks ACL block mirrored (+9). Honoured by construction`. CLAUDE.md cell before 296-01 (moved verbatim): `294-03: mig 211 citation-check grants mirrored (ACL parity) · ⛔`.
 
 ## scripts/check-schema-acl-parity.cjs
 
