@@ -67,7 +67,7 @@ export function statusSampleJson(): string {
       {
         name: "renewal-brief.docx",
         size_bytes: 48213,
-        url: "/inbound/files/one-time-link-token",
+        url: "https://syrel.example.com/api/inbound/files/one-time-link-token",
         expires_in: 300,
       },
     ],

@@ -72,7 +72,7 @@ curl "https://<your Syrel API>/inbound/runs/<run id>" \
     {"name": "Write the brief", "state": "completed"}
   ],
   "files": [
-    {"name": "renewal-brief.docx", "size_bytes": 48213, "url": "/inbound/files/<one-time token>", "expires_in": 300}
+    {"name": "renewal-brief.docx", "size_bytes": 48213, "url": "https://<your Syrel API>/inbound/files/<one-time token>", "expires_in": 300}
   ]
 }
 ```
@@ -89,7 +89,7 @@ Only the key that started a run can read it. Another key, even one made by the s
 
 ## 4. Download the files
 
-Each entry in `files` has a `url` relative to the API address. Fetch it with no header:
+Each entry in `files` has a `url`: a full link, ready to fetch as it is, with no header. It is built from the address the operator set as the API's public address (`BACKEND_PUBLIC_URL`), or from the address your call reached when that is not set:
 
 ```bash
 curl -o renewal-brief.docx "https://<your Syrel API>/inbound/files/<one-time token>"

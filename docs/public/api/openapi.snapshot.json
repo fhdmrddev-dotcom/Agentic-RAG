@@ -22966,7 +22966,8 @@
      },
      "url": {
       "type": "string",
-      "title": "Url"
+      "title": "Url",
+      "description": "An absolute, one-time link to the file. Fetch it with no header; it works once and for `expires_in` seconds."
      },
      "expires_in": {
       "type": "integer",

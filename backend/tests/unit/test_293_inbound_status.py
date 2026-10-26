@@ -132,7 +132,9 @@ def test_a_finished_run_reads_back_status_output_steps_and_files(env):
     [f] = body["files"]
     assert f["name"] == "digest.docx" and f["size_bytes"] == 2048 and f["expires_in"] == 300
     token = f["url"].rsplit("/", 1)[1]
-    assert f["url"] == f"/inbound/files/{token}"
+    # 293-REVIEW WR-01: an absolute link (its base is pinned in test_293_review_file_link.py).
+    assert f["url"].startswith(("http://", "https://"))
+    assert f["url"].endswith(f"/inbound/files/{token}")
     [(rkey, payload, ex)] = env["redis"].sets
     assert rkey == f"apikey:dl:{token}" and ex == 300
     assert json.loads(payload) == {"key_id": KEY_ID, "run_id": RUN_ID, "file_id": FILE_ID}

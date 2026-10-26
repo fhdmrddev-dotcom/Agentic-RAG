@@ -120,7 +120,10 @@ class InboundStep(BaseModel):
 class InboundFile(BaseModel):
     name: str
     size_bytes: int | None = None
-    url: str
+    url: str = Field(description=(
+        "An absolute, one-time link to the file. Fetch it with no header; it works once and "
+        "for `expires_in` seconds."
+    ))
     expires_in: int
 
 
@@ -397,7 +400,56 @@ def _step_position(phase_rows: list[dict]) -> int | None:
     return min(done + 1, len(phase_rows)) if phase_rows else None
 
 
-async def _file_links(pool, redis, *, key: ResolvedKey, run: dict) -> list[InboundFile]:
+_FWD_HOST_RE = re.compile(r"[A-Za-z0-9.-]+(:[0-9]{1,5})?|\[[0-9A-Fa-f:.]+\](:[0-9]{1,5})?")
+_FWD_PREFIX_RE = re.compile(r"(/[A-Za-z0-9._~-]+)+")
+_LOOPBACK_HOSTS = {"localhost", "127.0.0.1", "::1"}
+
+
+def _first(value: str | None) -> str:
+    return (value or "").split(",")[0].strip()
+
+
+def _is_loopback(base: str) -> bool:
+    from urllib.parse import urlsplit  # noqa: PLC0415
+
+    return (urlsplit(base).hostname or "").lower() in _LOOPBACK_HOSTS
+
+
+def _request_base(request: Request) -> str:
+    """The base this caller reached the API at: forwarded proto / host / prefix when present and
+    well-formed, else what the request itself says (the ASGI ``root_path`` is the prefix)."""
+    proto = _first(request.headers.get("x-forwarded-proto")).lower()
+    if proto not in ("http", "https"):
+        proto = request.url.scheme
+    host = _first(request.headers.get("x-forwarded-host"))
+    if not _FWD_HOST_RE.fullmatch(host):
+        host = request.headers.get("host") or request.url.netloc
+    prefix = _first(request.headers.get("x-forwarded-prefix")).rstrip("/")
+    if not _FWD_PREFIX_RE.fullmatch(prefix):
+        prefix = str(request.scope.get("root_path") or "").rstrip("/")
+    return f"{proto}://{host}{prefix}"
+
+
+def _public_api_base(request: Request) -> str:
+    """293-REVIEW WR-01 — the absolute base a file link is built on.
+
+    ``BACKEND_PUBLIC_URL`` (the app's one "where a third party reaches this API" setting, also the
+    OAuth redirect base), unless it is still a loopback address while this caller reached us
+    somewhere else: then the request's own base, so an unset setting never hands out a
+    ``localhost`` link. Behind the onebox nginx that is ``X-Forwarded-Prefix: /api``.
+    """
+    from app.config import settings  # noqa: PLC0415
+
+    configured = str(getattr(settings, "backend_public_url", "") or "").strip().rstrip("/")
+    seen = _request_base(request)
+    if configured and not (_is_loopback(configured) and not _is_loopback(seen)):
+        return configured
+    return seen
+
+
+async def _file_links(
+    pool, redis, *, key: ResolvedKey, run: dict, base: str
+) -> list[InboundFile]:
     rows = await pool.fetch(_FILES_SQL, run["thread_id"])
     files: list[InboundFile] = []
     for r in rows or []:
@@ -411,7 +463,7 @@ async def _file_links(pool, redis, *, key: ResolvedKey, run: dict) -> list[Inbou
         files.append(InboundFile(
             name=posixpath.basename(path.replace("\\", "/")) or "file",
             size_bytes=r.get("size_bytes"),
-            url=f"/inbound/files/{token}",
+            url=f"{base}/inbound/files/{token}",
             expires_in=_DOWNLOAD_TTL,
         ))
     return files
@@ -420,6 +472,7 @@ async def _file_links(pool, redis, *, key: ResolvedKey, run: dict) -> list[Inbou
 @router.get("/runs/{run_id}", response_model=InboundRunRead, dependencies=[Depends(_client_limit)])
 async def read_inbound_run(
     run_id: str,
+    request: Request,
     background_tasks: BackgroundTasks,
     key: ResolvedKey = Depends(resolve_api_key),
     pool: asyncpg.Pool = Depends(get_pg_pool),
@@ -498,7 +551,9 @@ async def read_inbound_run(
             db_status, failed_reasons, [dict(r) for r in (audit_rows or [])]
         )
 
-    files = await _optional("files", run["id"], _file_links(pool, redis, key=key, run=run))
+    files = await _optional("files", run["id"], _file_links(
+        pool, redis, key=key, run=run, base=_public_api_base(request),
+    ))
 
     audit_key_call(
         background_tasks, key, "api_key.read", call="read", run_id=str(run["id"]),
