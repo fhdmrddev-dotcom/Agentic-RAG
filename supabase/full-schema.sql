@@ -565,10 +565,11 @@ BEGIN
 
   -- NEW: defensive personal-org provisioning — identical logic to §A, wrapped in a swallow so a
   -- failure logs a WARNING and returns normally instead of aborting the signup INSERT.
+  -- 216 (SEED-364): the org name is a constant; it no longer embeds the signup email.
   BEGIN
     IF NOT EXISTS (SELECT 1 FROM public.org_members m WHERE m.user_id = new.id) THEN
       v_org_id := public.create_org_with_default_dept(
-                    COALESCE(new.email, new.id::text) || '''s Organization', NULL, 'General');
+                    'My organization', NULL, 'General');
       INSERT INTO public.org_members (org_id, user_id, role)
       VALUES (v_org_id, new.id, 'org-admin')
       ON CONFLICT (org_id, user_id) DO NOTHING;
@@ -10567,8 +10568,9 @@ begin
   -- logs a WARNING and returns normally instead of aborting the signup INSERT.
   begin
     if not exists (select 1 from public.org_members m where m.user_id = new.id) then
+      -- migration 216 (296 / SEED-364): a constant name; it never embeds the signup email.
       v_org_id := public.create_org_with_default_dept(
-                    coalesce(new.email, new.id::text) || '''s Organization', null, 'General');
+                    'My organization', null, 'General');
       insert into public.org_members (org_id, user_id, role)
       values (v_org_id, new.id, 'org-admin')
       on conflict (org_id, user_id) do nothing;

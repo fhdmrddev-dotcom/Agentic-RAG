@@ -132,7 +132,12 @@ _EXPECTED_CALL_SITES = {
     #   registration (12 lines) land above it; delete_workflow_cascade and the call are unchanged.
     #   Re-derived with `grep -n "await finish_run(" backend/app/api/workflows.py`.
     #   api/workflows.py:1556 → 1572
-    "api/workflows.py:1572",
+    # ⚠ RE-DERIVED at Phase 296 Plan 01: (a) the COUNTS stayed identical ("api/workflows.py": 1).
+    #   Only the position shifted (+8): create_draft gained one `request` param and the
+    #   active-org stamp (BUG-261021-02) above it; delete_workflow_cascade and the call are unchanged.
+    #   Re-derived with `grep -n "await finish_run(" backend/app/api/workflows.py`.
+    #   api/workflows.py:1572 → 1580
+    "api/workflows.py:1580",
     # ⚠ RE-DERIVED at Phase 256 round 1 (plan 256-05), and the originals are recorded
     # beside the new values rather than over them, because this fence's own docstring
     # asks for exactly that: check (a) — the per-file COUNTS — stayed identical, so no

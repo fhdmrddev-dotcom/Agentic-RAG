@@ -33,6 +33,7 @@ the human-input step reports only whether it was answered.
 from __future__ import annotations
 
 import posixpath
+import re
 from typing import Any, Iterable
 
 from app.api.workflow_runs import (
@@ -86,6 +87,27 @@ _HUMAN_INPUT = "llm_human_input"
 # place of its output. Same vocabulary as the masked source (``MASKED_SOURCE`` in
 # ``frontend/src/components/workflows/evidenceVocabulary.ts``).
 WITHHELD_OUTPUT_SENTENCE = "This step's output draws on a document you don't have access to."
+
+# 296-01 (BUG-261020-02 / D-05). A later step is built on the earlier steps' outputs, so once a
+# step is withheld for a citation, every LATER step can carry the withheld document's substance
+# even when it cites nothing itself. For a non-owner, every step after the first withheld one
+# gets this sentence (UI-SPEC A, exact words). Only a CITATION withhold starts the cascade: the
+# human-input null-out (the owner's question and answer) never does (Pitfall 9).
+WITHHELD_UPSTREAM_SENTENCE = (
+    "This step builds on an earlier step you don't have access to, so its output is withheld too."
+)
+
+# 296-01 (289-IN-04). The readability check casts the cited ids to ``uuid[]``; ONE malformed id
+# fails the whole cast and the fail-closed except then masks EVERY source. Only canonical UUIDs go
+# to the read; a dropped id is never readable, so its citation stays masked (fail closed).
+_CANONICAL_UUID = re.compile(
+    r"^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$"
+)
+
+
+def is_canonical_uuid(value: Any) -> bool:
+    """True for an 8-4-4-4-12 hex string — the only shape the ``uuid[]`` cast is given."""
+    return isinstance(value, str) and _CANONICAL_UUID.match(value) is not None
 
 
 def _phase_specs(definition: Any) -> list[dict]:
@@ -221,8 +243,9 @@ def compose_phase_log(
 
     ``readable_ids`` follows ``compose_sources``: ``None`` for the owner (nothing withheld);
     for anyone else, a step citing a document outside the set has its ``output_text``
-    replaced by ``WITHHELD_OUTPUT_SENTENCE`` (CR-01). An EMPTY set (the RLS check failed)
-    withholds every citing step's output: fail closed.
+    replaced by ``WITHHELD_OUTPUT_SENTENCE`` (CR-01), and every LATER step with an output gets
+    ``WITHHELD_UPSTREAM_SENTENCE`` (296-01, D-05). An EMPTY set (the RLS check failed) withholds
+    every citing step's output and everything after the first one: fail closed.
     """
     names = _name_by_slug(definition)
     types = _slug_to_phase_type(_coerce_definition(definition))
@@ -230,6 +253,7 @@ def compose_phase_log(
     # ``owner_name`` already went through it (``started_by``); a colleague gets no name.
     who = unsourced_who(is_owner=viewer_is_owner, display_name=owner_name, viewer_email=None)
     log: list[dict] = []
+    withheld_upstream = False  # 296-01 (D-05): set ONLY by a citation withhold below
     for n, row in enumerate(_ordered_rows(rows), start=1):
         slug = row.get("slug") if isinstance(row.get("slug"), str) else ""
         phase_type = types.get(slug)
@@ -260,13 +284,12 @@ def compose_phase_log(
                     "answered": answered, "question": None, "answer": None, "answered_by": None,
                 }
                 output_text = None
-        if (
-            not viewer_is_owner
-            and readable_ids is not None
-            and output_text is not None
-            and any(c["document_id"] not in readable_ids for c in _citations_of(row))
-        ):
-            output_text = WITHHELD_OUTPUT_SENTENCE
+        if not viewer_is_owner and readable_ids is not None and output_text is not None:
+            if any(c["document_id"] not in readable_ids for c in _citations_of(row)):
+                output_text = WITHHELD_OUTPUT_SENTENCE
+                withheld_upstream = True
+            elif withheld_upstream:
+                output_text = WITHHELD_UPSTREAM_SENTENCE
         log.append(
             {
                 "n": n,
@@ -363,12 +386,17 @@ def compose_verdicts(
 
 
 def cited_document_ids(rows: Iterable[dict]) -> list[str]:
-    """Every distinct cited document id, in first-cited order (the RLS check's input)."""
+    """Every distinct cited document id, in first-cited order (the RLS check's input).
+
+    296-01 (289-IN-04): canonical UUIDs only — a malformed id would fail the ``uuid[]`` cast and
+    mask every source. A dropped id is never readable, so its citation stays masked.
+    """
     seen: list[str] = []
     for row in _ordered_rows(rows):
         for entry in _citations_of(row):
-            if entry["document_id"] not in seen:
-                seen.append(entry["document_id"])
+            doc = entry["document_id"]
+            if is_canonical_uuid(doc) and doc not in seen:
+                seen.append(doc)
     return seen
 
 
@@ -511,6 +539,7 @@ def started_by(display_name: Any, owner_email: Any, viewer_is_owner: bool) -> di
 __all__ = [
     "VERDICT_KINDS",
     "WITHHELD_OUTPUT_SENTENCE",
+    "WITHHELD_UPSTREAM_SENTENCE",
     "cited_document_ids",
     "compose_definition",
     "compose_deliverable",
@@ -520,6 +549,7 @@ __all__ = [
     "definition_changed",
     "deliverable_path",
     "final_output_text",
+    "is_canonical_uuid",
     "started_by",
     "step_numbers",
 ]

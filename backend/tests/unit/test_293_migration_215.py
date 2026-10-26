@@ -157,7 +157,11 @@ def test_backfill_only_touches_uuid_schedule_rows():
     assert "public.workflow_schedules" in body
     assert "wr.origin_kind IS NULL" in body
     assert "wr.inputs ? '_schedule_id'" in body
-    assert "~* '^[0-9a-f-]{36}$'" in body
+    # ⚠ AMENDED DELIBERATELY by 296-01 (293-IN-05): the loose `'^[0-9a-f-]{36}$'` admitted 36
+    # dashes; the backfill now uses the canonical 8-4-4-4-12 pattern (also pinned by
+    # test_296_migration_shape.py).
+    assert "~* '^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$'" in body
+    assert "{36}" not in body
     # Exactly one UPDATE of workflow_runs: nothing else is backfilled.
     assert len(re.findall(r"UPDATE public\.workflow_runs\b", flat)) == 1
 

@@ -201,8 +201,9 @@ begin
   -- logs a WARNING and returns normally instead of aborting the signup INSERT.
   begin
     if not exists (select 1 from public.org_members m where m.user_id = new.id) then
+      -- migration 216 (296 / SEED-364): a constant name; it never embeds the signup email.
       v_org_id := public.create_org_with_default_dept(
-                    coalesce(new.email, new.id::text) || '''s Organization', null, 'General');
+                    'My organization', null, 'General');
       insert into public.org_members (org_id, user_id, role)
       values (v_org_id, new.id, 'org-admin')
       on conflict (org_id, user_id) do nothing;

@@ -128,7 +128,9 @@ UPDATE public.workflow_runs wr
                         WHERE s.id = (wr.inputs->>'_schedule_id')::uuid)
  WHERE wr.origin_kind IS NULL
    AND wr.inputs ? '_schedule_id'
-   AND wr.inputs->>'_schedule_id' ~* '^[0-9a-f-]{36}$';
+   -- 293-IN-05 (Phase 296): narrowed in place to the canonical 8-4-4-4-12 pattern. It ran locally
+   -- only; cloud holds 0 _schedule_id rows (D-17), so 215 is NOT re-applied anywhere.
+   AND wr.inputs->>'_schedule_id' ~* '^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$';
 
 -- ── 4. The freeze (T-293-03) — AFTER the backfill ───────────────────────────
 CREATE OR REPLACE FUNCTION public.workflow_runs_origin_immutable()
