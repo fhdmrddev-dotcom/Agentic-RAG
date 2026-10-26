@@ -140,7 +140,7 @@ export async function uploadWorkflowTemplate(
   // one and stores a fillable COPY instead of the original. ABSENT ⇒ no part is appended and
   // the request is byte-identical to the shipped one.
   anchors?: WordAnchor[],
-): Promise<WorkflowTemplateAsset> {
+): Promise<WorkflowTemplateBindResponse> {
   const token = await getAuthToken()
   const formData = new FormData()
   formData.append("file", file)
@@ -160,7 +160,30 @@ export async function uploadWorkflowTemplate(
     const detail = typeof body?.detail === "string" ? body.detail : null
     throw new WorkflowTemplateUploadError(res.status, detail)
   }
-  return (await res.json()) as WorkflowTemplateAsset
+  return (await res.json()) as WorkflowTemplateBindResponse
+}
+
+/**
+ * 296-07 (291-IN-03) — what `POST /workflows/{id}/template` returns: the asset descriptor PLUS
+ * the sentences a Word copy could not place a blank for (`[]` when every blank was placed;
+ * absent from a pre-296 server).
+ *
+ * ⚠ `unplaced_sentences` IS NOT PART OF THE ASSET. `definition.assets[]` is validated with
+ * `extra='forbid'`, so a caller must split it off before writing the descriptor — use
+ * `splitTemplateBind`, never spread the response into `assets[]`.
+ */
+export type WorkflowTemplateBindResponse = WorkflowTemplateAsset & { unplaced_sentences?: string[] }
+
+/** Split a bind response into the clean asset and its unplaced sentences (never undefined). */
+export function splitTemplateBind(response: WorkflowTemplateBindResponse): {
+  asset: WorkflowTemplateAsset
+  unplaced: string[]
+} {
+  const { unplaced_sentences, ...asset } = response
+  const unplaced = Array.isArray(unplaced_sentences)
+    ? unplaced_sentences.filter((s): s is string => typeof s === "string")
+    : []
+  return { asset, unplaced }
 }
 
 /**

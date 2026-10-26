@@ -263,7 +263,7 @@ import { Fragment, useRef } from "react"
 // into the label string, and it leads the `not-by-you` status line with `person`.
 import {
   // 204 (SCHED-01) — the schedules door's mark, from the SAME house chrome set as `History`
-  // beside it. Not `phaseGlyph()`: see `MARK_ICON`'s docblock.
+  // (which now sits in `WorkflowCardMenu.tsx`, 286-04). Not `phaseGlyph()`: see `MARK_ICON`'s docblock.
   CalendarClock,
   ExternalLink,
   FileText,
@@ -529,7 +529,9 @@ const ROOT_TESTID = {
  * is NOT TOUCHED by this plan.
  *
  * ⚠ **THEY BECOME `lucide-react` MARKS — THE HOUSE'S SHIPPED SET, NOT A SECOND ICON PATH.**
- * This file already draws `MoreHorizontal`, `Trash2` and `Loader2` from it; the convention's
+ * This file draws `CalendarClock`, `ExternalLink`, `Folder`, `Play`, `User` and `Wrench` from it
+ * (296-07, 286-S04-2: `MoreHorizontal`, `Trash2`, `Loader2` and `History` moved to
+ * `WorkflowCardMenu.tsx` at 286-04, which draws them from the same set); the convention's
  * single sources are `@lobehub/icons` for PROVIDERS and `PHASE_GLYPHS` for PHASE TYPES, and a
  * library row's provenance is neither. Adding a fourth path would be the drift; reusing the
  * chrome set the card is already made of is not.

@@ -112,8 +112,10 @@ export interface PublishGauntletProps {
    *  site) renders the soul's honest draft empty-states, never a crash. Threaded
    *  from the Builder's renderPublish(state.definition, draftId). */
   definition?: DefShape | null
-  /** Fired on a PASS so the parent (Plan 06) can auto-return to the Workflows page. */
-  onPublished?: (version: number) => void
+  /** Fired on a PASS so the parent (Plan 06) can auto-return to the Workflows page. 296-07
+   *  (288-F-4 / 291-S6-F7): `notes` are the verdict's `auto_answered` messages, verbatim and
+   *  in order (`[]` when none), so the page the author lands on can still show them. */
+  onPublished?: (version: number, notes: readonly string[]) => void
   /**
    * Phase 186-07 (D-186-12) — a BOOLEAN report of whether the gauntlet is running.
    *
@@ -703,7 +705,7 @@ function GauntletContent({
 }: {
   definitionId: string
   definition?: DefShape | null
-  onPublished?: (version: number) => void
+  onPublished?: (version: number, notes: readonly string[]) => void
   loading: boolean
   setLoading: (v: boolean) => void
   goldenInputRef: React.RefObject<HTMLTextAreaElement | null>
@@ -756,7 +758,10 @@ function GauntletContent({
       setOutcome(result)
       // VERBATIM: a PASS is ONLY published === true (never re-derived).
       if (result.kind === "verdict" && result.verdict.published === true) {
-        onPublished?.(result.verdict.version ?? 0)
+        onPublished?.(
+          result.verdict.version ?? 0,
+          (result.verdict.auto_answered ?? []).map((note) => note.message),
+        )
       }
     } catch (e) {
       setError(e instanceof Error ? e.message : "publish failed")

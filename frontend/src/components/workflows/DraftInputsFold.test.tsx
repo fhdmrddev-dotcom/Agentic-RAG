@@ -115,8 +115,10 @@ describe("declaredInputsVocabulary — the inputs fold words (UI-SPEC 3b, verbat
   it("the constants read exactly as the UI-SPEC locks them", () => {
     expect(INPUTS_FOLD_ACTION).toBe("review")
     expect(INPUTS_BODY_HEADING).toBe("Where each answer comes from")
+    // 296-07 (291-WR-06) — AMENDED DELIBERATELY: the engine has no look-up yet, so the second
+    // sentence no longer promises one (UI-SPEC E row 184).
     expect(INPUT_SOURCE_EXPLANATION).toBe(
-      "Ask the person: it's a box on the form that starts this workflow. Look it up: it's found in your documents when the workflow runs.",
+      "Ask the person: it's a box on the form that starts this workflow. Looking answers up in your documents isn't available yet.",
     )
     expect(INPUT_SOURCE_ASK).toBe("Ask the person")
     expect(INPUT_SOURCE_LOOKUP).toBe("Look it up")
@@ -242,16 +244,18 @@ describe("DraftInputsFoldBody — where each answer comes from", () => {
     expect(askLabel?.className).toContain("min-h-6")
   })
 
-  it("choosing Look it up writes kb_auto; choosing Ask the person writes user", async () => {
+  // 296-07 (291-WR-06) — AMENDED DELIBERATELY: `Look it up` is disabled until the engine can look
+  // answers up (SEED), so choosing it writes nothing; choosing Ask the person still writes user.
+  it("choosing Look it up writes nothing (not available yet); choosing Ask the person writes user", async () => {
     const user = userEvent.setup()
     const { onSetSource } = renderBody()
     const supplier = screen.getByRole("radiogroup", { name: inputSourceGroupLabel("Supplier name") })
     await user.click(within(supplier).getByText(INPUT_SOURCE_LOOKUP))
-    expect(onSetSource).toHaveBeenLastCalledWith("supplier_name", "kb_auto")
+    expect(onSetSource).not.toHaveBeenCalled()
     const country = screen.getByRole("radiogroup", { name: inputSourceGroupLabel("Country") })
     await user.click(within(country).getByText(INPUT_SOURCE_ASK))
     expect(onSetSource).toHaveBeenLastCalledWith("country", "user")
-    expect(onSetSource).toHaveBeenCalledTimes(2)
+    expect(onSetSource).toHaveBeenCalledTimes(1)
   })
 
   it("a field written by a step says so instead of offering the switch", () => {

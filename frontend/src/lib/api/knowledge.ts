@@ -797,7 +797,9 @@ export type GenerateField = {
   label: string
   type: string
   enum_options: string[]
-  covered_by: "input" | "step"
+  /** 296-07 (291-IN-05): `null` when nothing fills the field (`fields_report` can say so);
+   *  the fold reads it as staying blank, with no switch. */
+  covered_by: "input" | "step" | null
   /** 291 UAT S3-F1 — the input that fills this field; it may not be the field's own key.
    *  Absent from servers older than the fix. */
   input_key?: string | null

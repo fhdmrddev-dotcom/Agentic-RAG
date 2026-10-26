@@ -297,8 +297,9 @@ describe("WorkflowBuilderPage session — R6: exactly one POST, then PATCH", () 
     await user.click(screen.getByRole("button", { name: DESCRIBE_CTA }))
     await screen.findByTestId("spine-node-research")
 
-    // First explicit save → CREATE.
-    await user.click(screen.getByTestId("builder-save-draft"))
+    // 296-07 (BUG-261024-02) — AMENDED DELIBERATELY: the ARRIVAL is the create now (an
+    // untouched generated draft used to be lost), so the first explicit save is no longer
+    // needed to mint the row. The log this case pins is unchanged: one create, patches after.
     await waitFor(() => expect(mockCreate).toHaveBeenCalledTimes(1))
 
     // Edit, save again → PATCH the id the create returned.

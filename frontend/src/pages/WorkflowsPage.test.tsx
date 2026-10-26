@@ -2281,6 +2281,53 @@ describe("193.2 / D-19 — the post-publish Run CTA, its first automated coverag
     expect(within(banner).getByRole("button", { name: /run now/i })).toBeInTheDocument()
   })
 
+  // 296-07 (288-F-4 / 291-S6-F7) — the notes the practice run answered FOR the author used to
+  // live only in the gauntlet, which auto-returns on success, so nobody saw them. The strip
+  // now carries each one verbatim under the published line; none adds nothing.
+  it("296-07 — every auto-answered note shows verbatim under the published line", async () => {
+    const STAND_IN = "The practice run had no example for Topic, so it used a stand-in answer for it."
+    mockPublish.mockResolvedValue({
+      kind: "verdict",
+      verdict: {
+        published: true,
+        version: PUBLISHED_VERSION,
+        auto_answered: [
+          { phase: "approve", message: "A" },
+          { phase: null, message: STAND_IN },
+        ],
+      },
+    })
+    mockListPublished.mockReset()
+    mockListPublished
+      .mockResolvedValueOnce([strictPublished, loosePublished])
+      .mockResolvedValue([strictPublished, loosePublished, publishedContractClause])
+
+    render(<WorkflowsPage folders={folders} onLaunch={vi.fn()} />)
+    await screen.findByTestId("library-toolbar")
+    await publishTheOpenDraft()
+    const banner = await screen.findByTestId("run-cta")
+    const notes = within(banner).getAllByTestId("run-cta-note")
+    expect(notes.map((n) => n.textContent)).toEqual(["A", STAND_IN])
+    for (const n of notes) {
+      expect(n.className).toContain("text-[12px]")
+      expect(n.className).toContain("text-muted-foreground")
+    }
+    expect(banner.textContent).toContain("Ready to run it.")
+  })
+
+  it("296-07 — no auto-answered notes ⇒ the strip adds no note line", async () => {
+    seedPassingPublish()
+    mockListPublished.mockReset()
+    mockListPublished
+      .mockResolvedValueOnce([strictPublished, loosePublished])
+      .mockResolvedValue([strictPublished, loosePublished, publishedContractClause])
+    render(<WorkflowsPage folders={folders} onLaunch={vi.fn()} />)
+    await screen.findByTestId("library-toolbar")
+    await publishTheOpenDraft()
+    const banner = await screen.findByTestId("run-cta")
+    expect(within(banner).queryByTestId("run-cta-note")).toBeNull()
+  })
+
   it("POSITIVE CONTROL — a published list WITHOUT the slug keeps it absent; one WITH it makes it appear", async () => {
     // ⚠ THIS IS THE FOUR-PART TEMPLATE'S PART 2, AND IT IS WHY THE CASE ABOVE MEANS ANYTHING.
     // An absence assertion whose corpus can never contain the thing is the commonest way a

@@ -815,5 +815,6 @@ export function stepLineMoreLabel(n: number): string {
 /** The expanded toggle's text: fold the line back to its first steps. */
 export const STEP_LINE_LESS = "Show less"
 
-/** The floor for a step with no `phase_type`, so no chip is ever empty. */
-export const STEP_LINE_UNTYPED = "A step with no type"
+/** The floor for a step with no `phase_type`, so no chip is ever empty. 296-07 (290-IN-02):
+ *  re-exported under its shipped name from the ONE home in `phaseVocabulary.ts`. */
+export { STEP_UNTYPED as STEP_LINE_UNTYPED } from "@/components/workflows/phaseVocabulary"

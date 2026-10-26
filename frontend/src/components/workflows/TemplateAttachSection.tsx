@@ -55,6 +55,8 @@ import { FORM_FIELDS_HEADING } from "@/components/workflows/templateFirstVocabul
 import { useTemplatePlaceholders } from "@/hooks/useTemplatePlaceholders"
 import { uploadWorkflowTemplate, WorkflowTemplateUploadError } from "@/lib/api"
 import type { WorkflowTemplateAsset } from "@/lib/api"
+// Domain path, not the barrel: suites mock the barrel wholesale.
+import { splitTemplateBind } from "@/lib/api/workflows"
 
 /** The section heading. A module-scope const for the same reason `GovernanceSection`'s is:
  *  the `<h3>` text and anything that labels the group must be the same words. */
@@ -204,7 +206,34 @@ export interface TemplateAttachSectionProps {
    * (see the docblock: one writer on the JSONB).
    */
   onAttached: (asset: WorkflowTemplateAsset) => void
+  /**
+   * 296-07 (291-S3-F2) — the definition's declared inputs, read LOOSELY (definition JSONB), so a
+   * bound form's raw field name can be shown as the label of the input that fills it (`fills`,
+   * else an input keyed by the field name). Absent ⇒ the raw names, as before.
+   */
+  declaredInputs?: readonly { key?: unknown; label?: unknown; fills?: unknown }[]
 }
+
+const NO_INPUTS: readonly { key?: unknown; label?: unknown; fills?: unknown }[] = []
+
+/** 296-07 (291-S3-F2) — the label of the declared input that fills `field`, or `null`. */
+function labelFor(
+  field: string,
+  inputs: readonly { key?: unknown; label?: unknown; fills?: unknown }[],
+): string | null {
+  const labelOf = (i: { label?: unknown }) =>
+    typeof i.label === "string" && i.label.trim() !== "" ? i.label.trim() : null
+  const byFills = inputs.find((i) => Array.isArray(i.fills) && i.fills.includes(field))
+  if (byFills && labelOf(byFills)) return labelOf(byFills)
+  const byKey = inputs.find((i) => i.key === field)
+  return byKey ? labelOf(byKey) : null
+}
+
+/** 296-07 (291-S3-F3) — under a bound PDF the Replace control takes a fillable PDF too (the
+ *  server already accepts `.pdf` on the bound route), and the note says so. */
+export const TEMPLATE_ACCEPT_PDF = ".pdf,.docx,.pptx,.xlsx"
+export const TEMPLATE_TYPES_NOTE_PDF =
+  "A fillable PDF, or Word, PowerPoint or Excel — .pdf, .docx, .pptx or .xlsx, up to 10 MB."
 
 /**
  * ⚠ 200 (the step-panel port) — THE SHELL WEARS THE SHEET'S CARD SHAPE NOW. This section is
@@ -236,6 +265,7 @@ export function TemplateAttachSection({
   filename,
   assetId,
   onAttached,
+  declaredInputs = NO_INPUTS,
 }: TemplateAttachSectionProps) {
   const inputId = useId()
   const [busy, setBusy] = useState(false)
@@ -252,7 +282,9 @@ export function TemplateAttachSection({
       setError(null)
       setBusy(true)
       try {
-        const asset = await uploadWorkflowTemplate(definitionId, file)
+        // 296-07 (291-IN-03): the bind response now carries `unplaced_sentences`, which is NOT
+        // part of the asset — `assets[]` is extra='forbid', so it is split off before writing.
+        const { asset } = splitTemplateBind(await uploadWorkflowTemplate(definitionId, file))
         onAttached(asset)
       } catch (err) {
         setError(templateErrorSentence(err))
@@ -277,6 +309,8 @@ export function TemplateAttachSection({
   // can never become a stale second copy of the server's parser predicate.
   const notWord =
     fieldsState.kind === "none" && !(filename ?? "").toLowerCase().endsWith(".docx")
+  // 296-07 (291-S3-F3): a bound PDF is replaced by a PDF as readily as by a template.
+  const boundPdf = attached && (filename ?? "").toLowerCase().endsWith(".pdf")
 
   return (
     <section
@@ -325,11 +359,20 @@ export function TemplateAttachSection({
                   `dangerouslySetInnerHTML`. Rendered in the SERVER'S order, not re-sorted:
                   the order is part of the answer. */}
               <ul data-testid="template-fields" className={`${NOTE_CLASSES} list-disc pl-4`}>
-                {fieldsState.fields.map((name) => (
-                  <li key={name} className="break-all">
-                    {name}
-                  </li>
-                ))}
+                {/* 296-07 (291-S3-F2): a row reads as the label of the input that fills it;
+                    the raw field name stays reachable in `title` only. */}
+                {fieldsState.fields.map((name) => {
+                  const label = labelFor(name, declaredInputs)
+                  return label !== null ? (
+                    <li key={name} title={name} className="break-all">
+                      {label}
+                    </li>
+                  ) : (
+                    <li key={name} className="break-all">
+                      {name}
+                    </li>
+                  )
+                })}
               </ul>
             </>
           )}
@@ -376,7 +419,7 @@ export function TemplateAttachSection({
             id={inputId}
             type="file"
             data-testid="template-input"
-            accept={TEMPLATE_ACCEPT}
+            accept={boundPdf ? TEMPLATE_ACCEPT_PDF : TEMPLATE_ACCEPT}
             disabled={busy}
             onChange={(e) => void onPick(e)}
             className="mt-1 w-full text-[11px] text-muted-foreground file:mr-2 file:rounded file:border file:border-border file:bg-card file:px-2 file:py-1 file:text-[11px] file:text-foreground hover:file:bg-accent/40"
@@ -397,7 +440,7 @@ export function TemplateAttachSection({
       )}
 
       <p data-testid="template-types" className={NOTE_CLASSES}>
-        {TEMPLATE_TYPES_NOTE}
+        {boundPdf ? TEMPLATE_TYPES_NOTE_PDF : TEMPLATE_TYPES_NOTE}
       </p>
       </div>
     </section>

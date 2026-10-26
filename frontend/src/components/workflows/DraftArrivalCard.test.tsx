@@ -73,6 +73,7 @@ import { REMOVED_GLYPH } from "./decisionsVocabulary"
 import {
   INPUTS_FOLD_ACTION,
   INPUT_SOURCE_LOOKUP,
+  INPUT_SOURCE_ASK,
   inputSourceGroupLabel,
   inputsFoldSummary,
 } from "./declaredInputsVocabulary"
@@ -1608,14 +1609,21 @@ describe("DraftArrivalCard — 291-05: the inputs fold (D-09 / D-10 / D-12)", ()
     expect(screen.getAllByTestId("draft-arrival-input-row")).toHaveLength(FORM_FIELDS.length)
   })
 
-  it("flipping a switch reaches the caller's onSetSource with the key and kb_auto", async () => {
+  // 296-07 (291-WR-06) — AMENDED DELIBERATELY: `Look it up` is disabled (no engine look-up yet),
+  // so the flip that still reaches the caller is the other way, to Ask the person.
+  it("flipping a switch reaches the caller's onSetSource with the key and user", async () => {
     const user = userEvent.setup()
     const onSetSource = vi.fn()
-    renderCard({ inputsFold: inputsFoldProp(onSetSource) })
+    const fold = inputsFoldProp(onSetSource)
+    // A row an older draft already set to kb_auto, so Ask the person is a real flip.
+    const inputs = fold.inputs.map((i) => (i.key === "country" ? { ...i, source: "kb_auto" } : i))
+    renderCard({ inputsFold: { ...fold, inputs } })
     await user.click(screen.getByTestId("draft-arrival-fold-inputs"))
     const group = screen.getByRole("radiogroup", { name: inputSourceGroupLabel("Country") })
     await user.click(within(group).getByText(INPUT_SOURCE_LOOKUP))
-    expect(onSetSource).toHaveBeenCalledWith("country", "kb_auto")
+    expect(onSetSource).not.toHaveBeenCalled()
+    await user.click(within(group).getByText(INPUT_SOURCE_ASK))
+    expect(onSetSource).toHaveBeenCalledWith("country", "user")
   })
 
   it("opening the inputs fold leaves the other two folds closed", async () => {

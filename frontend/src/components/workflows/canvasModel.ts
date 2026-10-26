@@ -44,8 +44,9 @@ import type { Edge, Node } from "@xyflow/react"
 import type { ConnectionState } from "@/components/workflows/connectionState"
 import { effectBannerFor } from "@/components/workflows/nodeEffectBanner"
 import {
-  actionRiskArmed,
   branchConditionOf,
+  comparePhaseOrder,
+  engineArmed,
   groundingCauseOf,
   nodeTitle,
   notConnectedOf,
@@ -380,12 +381,19 @@ function ariaLabelFor(phase: PhaseSpecJSON, title: string): string {
  * same body. "Grounded" is simply "there is a cause".
  */
 function isGrounded(phase: PhaseSpecJSON, kbTools: readonly string[]): boolean {
-  return groundingCauseOf(phase, kbTools) !== null
+  // 296-07 (BUG-261021-05, D-04 amended b): every cause EXCEPT `escalated`. `detected` gets
+  // the engine's synthesized citations gate (`grounding.effective_phase`) and `already-set` is
+  // the deliverable's own strict `citation_policy`, which the engine enforces; an escalated
+  // step is checked by nothing, so it no longer carries the seal.
+  const cause = groundingCauseOf(phase, kbTools)
+  return cause !== null && cause !== "escalated"
 }
 
-/** GOVERN-03 — is a checkpoint armed on this step? Delegated for the same reason. */
+/** GOVERN-03 — is a checkpoint armed on this step? Delegated for the same reason.
+ *  296-07 (290-FU-canvas): the ENGINE's reading, so an `external_action` step is armed
+ *  whatever its stored flag says — the team picture already drew it that way. */
 function isArmed(phase: PhaseSpecJSON): boolean {
-  return actionRiskArmed(phase)
+  return engineArmed(phase)
 }
 
 /** D-12 / D-18 (189-13) — can this step reach anything yet? Delegated for the same
@@ -407,7 +415,7 @@ function isNotConnected(phase: PhaseSpecJSON): boolean {
  * and is drawn exactly as it was before Phase 185.
  */
 function checkpointOnTarget(phase: PhaseSpecJSON): boolean | undefined {
-  return actionRiskArmed(phase) ? true : undefined
+  return engineArmed(phase) ? true : undefined
 }
 
 /**
@@ -596,10 +604,9 @@ export function toCanvas(
 
   if (!phases || phases.length === 0) return { nodes, edges }
 
-  // Total, order-independent ordering: phase_index first, slug as the tiebreak.
-  const ordered = [...phases].sort(
-    (a, b) => a.phase_index - b.phase_index || (a.slug < b.slug ? -1 : a.slug > b.slug ? 1 : 0),
-  )
+  // Total, order-independent ordering: phase_index first, slug as the tiebreak. 296-07
+  // (290-IN-01): the ONE comparator the team picture also sorts with.
+  const ordered = [...phases].sort(comparePhaseOrder)
 
   const bySlug = new Map(ordered.map((p) => [p.slug, p]))
   const byIndexValue = new Map(ordered.map((p) => [p.phase_index, p]))

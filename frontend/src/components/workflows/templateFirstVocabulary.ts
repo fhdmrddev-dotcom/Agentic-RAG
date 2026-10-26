@@ -156,6 +156,29 @@ export function templateBindFailedMessage(filename: string): string {
   return `Your draft was written to fill “${filename}”, but the document could not be attached to it. The steps are saved — attach the document on the deliverable step to finish, or this workflow will stop when it runs.`
 }
 
+/** 296-07 (291-IN-08) — one bind failure: which kind of file, and its name (DATA only). */
+export type BindFailure = { kind: "template" | "reference"; filename: string }
+
+/**
+ * 296-07 (291-IN-08) — the ONE sentence for every reference the bind could not attach, each
+ * name quoted. Total: a single name is accepted as a one-item list.
+ */
+export function referencesBindFailedMessage(filenames: readonly string[] | string): string {
+  const names = (Array.isArray(filenames) ? filenames : [String(filenames)]).map((f) => `“${f}”`)
+  return `These files the draft was written from couldn't be attached to it: ${names.join(", ")}. The steps are saved and don't read these files when the workflow runs.`
+}
+
+/** 296-07 (291-WR-01) — why the file sections are disabled while the draft is being written. */
+export const FILES_LOCKED_WHILE_COMPOSING = "Files can't be changed while the draft is being written."
+
+/**
+ * 296-07 (291-IN-03) — the lead line over the sentences the template bind could not place. The
+ * UI-SPEC E template, with only `{n}` substituted (the `(s)` is kept verbatim).
+ */
+export function unplacedSentencesLead(n: number): string {
+  return `${n} sentence(s) weren't found in the document, so no blank was made for them:`
+}
+
 // ── 167-C · the three-bucket NAME check ──────────────────────────────────────────────────
 //
 // ⚠ THREE BUCKETS, NEVER TWO — D-10's red line, not a preference. A field supplied when the

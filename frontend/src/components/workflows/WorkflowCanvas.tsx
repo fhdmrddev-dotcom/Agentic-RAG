@@ -242,7 +242,7 @@ import type { NodeRunState } from "@/components/workflows/runVocabulary"
 import { StepTypePicker } from "@/components/workflows/StepTypePicker"
 // 290-03 (VIS-01 / D-06) — the read-only team picture and its header switch, in their own
 // file so this G-5 hot file spends one prop, one branch and one mount on them.
-import { TeamPicture, TeamViewSwitch } from "@/components/workflows/TeamPicture"
+import { TeamPicture, TeamViewSwitch, teamViewPanelProps, type TeamView } from "@/components/workflows/TeamPicture"
 import { TEAM_HEADER_HINT } from "@/components/workflows/teamVocabulary"
 import type { VerdictGroups } from "@/components/workflows/verdictModel"
 import { useTechnicalNamesOptional } from "@/providers/TechnicalNamesProvider"
@@ -666,6 +666,14 @@ export interface WorkflowCanvasProps {
    * existing suite) renders no switch and a byte-identical header.
    */
   team?: { workflowName: string }
+  /**
+   * 296-07 (290-WR-02 / D-09) — the Steps | Team view, CONTROLLED by the page when it passes
+   * this pair, on the `selectedSlug` / `onSelectNode` precedent: the page gates undo/redo and
+   * the side panel on it. Absent (the run page and the existing suites), the canvas keeps its
+   * own local state exactly as before.
+   */
+  view?: TeamView
+  onViewChange?: (next: TeamView) => void
 }
 
 export function WorkflowCanvas({
@@ -686,6 +694,8 @@ export function WorkflowCanvas({
   notice,
   session,
   team,
+  view: viewProp,
+  onViewChange,
 }: WorkflowCanvasProps) {
   // The app-wide reveal, READ (never owned) here. Null outside a provider.
   const technicalNames = useTechnicalNamesOptional()
@@ -1152,7 +1162,9 @@ export function WorkflowCanvas({
   const [announcement, setAnnouncement] = useState("")
 
   // 290-03 (VIS-01 / D-06) — which view the header switch shows. Local, never persisted.
-  const [view, setView] = useState<"steps" | "team">("steps")
+  const [ownView, setOwnView] = useState<"steps" | "team">("steps")
+  const view = viewProp ?? ownView
+  const setView = onViewChange ?? setOwnView
   const teamShown = team !== undefined && view === "team"
 
   useEffect(() => {
@@ -1437,6 +1449,7 @@ export function WorkflowCanvas({
         */}
         <div
           data-testid="canvas-empty"
+          {...(team ? teamViewPanelProps("steps") : {})}
           className="flex flex-1 flex-col items-center justify-center gap-2 px-6 text-center"
         >
           {editable ? (
@@ -1504,7 +1517,7 @@ export function WorkflowCanvas({
           a pointer across a module boundary rather than at a local const). It is named
           rather than bare so a future nested `group` cannot capture it by accident.
           `relative` anchors the floated notice below. */}
-      <div className="group/canvas relative h-full w-full min-w-0 flex-1">
+      <div {...(team ? teamViewPanelProps("steps") : {})} className="group/canvas relative h-full w-full min-w-0 flex-1">
         {/* FLOATED OVER THE PLANE, not stacked above it. The notice is TRANSIENT — it
             appears after a delete or an add and then goes — but as a layout band it spent
             its height permanently, on a surface where the chrome above the canvas already

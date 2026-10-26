@@ -115,6 +115,7 @@ import {
   formBackLinePdf,
   formBackLineWord,
   noFieldsLine,
+  unplacedSentencesLead,
   showAllLabel,
 } from "./templateFirstVocabulary"
 import {
@@ -152,6 +153,27 @@ export interface DescribeTemplateRowProps {
   untickedKeys?: readonly string[]
   /** 291-04 (D-27): a tick was pressed. The row keeps no tick state of its own. */
   onToggleBlank?: (key: string) => void
+  /** 296-07 (291-WR-01): a draft is being written — the picker, the clear and the ticks are
+   *  disabled, and say why through `disabledNoteId` (the page renders that hint once). */
+  disabled?: boolean
+  disabledNoteId?: string
+}
+
+/**
+ * 296-07 (291-IN-03) — the sentences the template bind could not place a blank for, under the
+ * blanks they belong to: the count line, then each sentence quoted on its own line. React text
+ * only (T-296-38). An empty list renders nothing.
+ */
+export function UnplacedSentencesNote({ sentences }: { sentences: readonly string[] }) {
+  if (sentences.length === 0) return null
+  return (
+    <div data-testid="describe-form-unplaced-sentences" className="text-xs text-[hsl(var(--warning))]">
+      <p>{unplacedSentencesLead(sentences.length)}</p>
+      {sentences.map((sentence, i) => (
+        <p key={i} className="[overflow-wrap:anywhere]">{`“${sentence}”`}</p>
+      ))}
+    </div>
+  )
 }
 
 /** How many PDF fields show before `showAllLabel` (UI-SPEC decision 7). Words are never capped. */
@@ -304,7 +326,10 @@ export function DescribeTemplateRow({
   onClear,
   untickedKeys = NO_UNTICKED,
   onToggleBlank,
+  disabled = false,
+  disabledNoteId,
 }: DescribeTemplateRowProps) {
+  const lockedBy = disabled && disabledNoteId ? { "aria-describedby": disabledNoteId } : {}
   const inputId = useId()
 
   const view = viewOf(state, filename ?? "")
@@ -334,6 +359,8 @@ export function DescribeTemplateRow({
         type="file"
         data-testid="describe-template-input"
         accept={DESCRIBE_FORM_ACCEPT}
+        disabled={disabled}
+        {...lockedBy}
         onChange={(event) => {
           const file = event.target.files?.[0]
           // Reset the control NOW rather than after: picking the same file twice in a row must
@@ -348,6 +375,8 @@ export function DescribeTemplateRow({
         <button
           type="button"
           data-testid="describe-template-clear"
+          disabled={disabled}
+          {...lockedBy}
           onClick={onClear}
           className="mt-1.5 text-[10.5px] text-muted-foreground underline underline-offset-2 hover:text-foreground"
         >
@@ -447,6 +476,7 @@ export function DescribeTemplateRow({
                         <input
                           type="checkbox"
                           checked={isTicked}
+                          disabled={disabled}
                           onChange={() => onToggleBlank?.(field.key)}
                           className="focus:outline-none focus:ring-1 focus:ring-primary"
                         />
