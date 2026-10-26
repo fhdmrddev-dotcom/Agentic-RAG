@@ -174,7 +174,7 @@ async def revoke_key(
         scope, args = "id = $1 AND org_id = $2 AND user_id = $3", (key_id, org_id, owner_id)
         k_scope = "k.id = $1 AND k.org_id = $2 AND k.user_id = $3"
     by = f"${len(args) + 1}"
-    await pool.execute(
+    status = await pool.execute(
         f"UPDATE api_keys SET revoked_at = now(), revoked_by = {by} "
         f"WHERE {scope} AND revoked_at IS NULL",
         *args,
@@ -184,7 +184,11 @@ async def revoke_key(
         f"SELECT {_named_columns()} FROM api_keys k {_NAME_JOINS}WHERE {k_scope}",
         *args,
     )
-    return dict(row) if row is not None else None
+    if row is None:
+        return None
+    # 296-06 (293-IN-08): whether THIS call set revoked_at (asyncpg's status tag "UPDATE 1"), so
+    # the route audits a revoke once and a repeat revoke stays quiet.
+    return {**dict(row), "revoked_now": str(status or "").strip() == "UPDATE 1"}
 
 
 async def touch_last_used(pool: asyncpg.Pool, key_id: UUID, *, org_id: UUID) -> None:

@@ -11528,7 +11528,7 @@ cells rot within days.
 | [`frontend/src/components/chat/ToolCallPanel.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentschattoolcallpaneltsx) | 55 / 23 / 409 (was `54 / 22 / 407`) | ⚠ **FIRES** | ✅ G-5 DISCHARGED (227-02). **273-05**: `stepLabel` + `ARGS_HIDDEN.livePanel` replace one name check; no new branch |
 | [`frontend/src/components/chat/tool-bodies/SearchDocumentsBody.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentschattool-bodiessearchdocumentsbodytsx) | 3 / 3 / 71 | ⚠ **FIRES** (crossed in 272) | ⚠ absent its ENTIRE LIFE — row added 272-05. **F-3**: `summarize` names refused / invalid / empty / not-searchable / unavailable |
 | [`frontend/src/components/chat/MessageItem.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentschatmessageitemtsx) | 84 / 39 / 1059 (was `83 / 42 / 1050`) | ⚠ **FIRES** | 292.1 UAT: Deep Continue re-attaches the run's stream (+1 else-if) · ⛔ |
-| [`backend/app/api/threads.py`](docs/HOT-FILE-LEDGER.md#backendappapithreadspy) | 282 / 94 / 2744 (was `278 / 93 / 2684`) | ⚠ **FIRES** | 293-05 D-3: the persisted kickoff is `launch_kickoff(body.content, def, inputs)`; one import name, one expression · ⛔ |
+| [`backend/app/api/threads.py`](docs/HOT-FILE-LEDGER.md#backendappapithreadspy) | 283 / 95 / 2745 (was `282 / 94 / 2744`) | ⚠ **FIRES** | 296-06 (SEED-362 kickoff half): ONE kwarg `provider=_resolved_provider` on the existing create_workflow_run call. The 287-T01 guard lives in preflight (workflow_kickoff.py), not here · ⛔ |
 | [`frontend/src/providers/StreamsProvider.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrcprovidersstreamsprovidertsx) | 117 / 45 / 5218 (was `116 / 44 / 5210`) | ⚠ **FIRES** | 296-04: ONE guarded reconcile (then one step re-read) in the follow onTerminal wrapper; useState 0→0, useEffect 9→9 · ⛔ |
 | [`frontend/src/hooks/useMessages.ts`](docs/HOT-FILE-LEDGER.md#frontendsrchooksusemessagests) | 74 / 27 / 127 | ⚠ **FIRES** | extraction due |
 | [`backend/app/services/anthropic_service.py`](docs/HOT-FILE-LEDGER.md#backendappservicesanthropic_servicepy) | 12 / 11 / 373 (was `11 / 10 / 354`) | ⚠ **FIRES** | **282-01**: ONE `_anthropic_client` builder (budget in the constructor, connect 5 s, cloud retries 2) + trailing `timeout_s` on `stream_anthropic`. honoured by construction; adapter-pattern audit due |
@@ -11700,7 +11700,7 @@ cells rot within days.
 | [`backend/app/services/settings_broadcast.py`](docs/HOT-FILE-LEDGER.md#backendappservicessettings_broadcastpy) | 1 / 1 / 228 | no (1 phase) | young (**BUG-260902-06**) — the cross-worker cache-invalidation leaf: one channel, one payload builder, one re-warm dispatcher, one subscriber |
 | [`backend/app/services/connectors/args.py`](docs/HOT-FILE-LEDGER.md#backendappservicesconnectorsargspy) | 2 / 1 / 474 | no (1 phase) | young (214-01) — the shared argument leaf: resolution, satisfiability, and ONE schema accessor |
 | [`backend/app/services/harness/reachability.py`](docs/HOT-FILE-LEDGER.md#backendappservicesharnessreachabilitypy) | 5 / 5 / 498 (was `4 / 4 / 463`) | ⚠ **FIRES** | 295-02: `no_template_bound` in LINT_CODES + pure `_check_template_bound` (+1 def, If 20→22). ⚠ now FIRES at 5 phases |
-| [`backend/app/services/workflow_kickoff.py`](docs/HOT-FILE-LEDGER.md#backendappservicesworkflow_kickoffpy) | 12 / 9 / 597 (was `12 / 8 / 597`) | ⚠ **FIRES** | 293-05 D-3: the live ctx kickoff calls the same `launch_kickoff` as the persisted row (214 MIRROR rule). Honoured by construction |
+| [`backend/app/services/workflow_kickoff.py`](docs/HOT-FILE-LEDGER.md#backendappservicesworkflow_kickoffpy) | 13 / 10 / 602 (was `12 / 9 / 597`) | ⚠ **FIRES** | 296-06 (287-T01): ONE guard in preflight_workflow_kickoff (missing_required → worded 422) before any write, + one import name. Honoured by construction |
 | [`frontend/src/components/layout/ChatLaunchForm.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentslayoutchatlaunchformtsx) | 5 / 4 / 183 (was `4 / 4 / 179`) | ⚠ **FIRES** (214, 287, 291, 296) | 296-04: the refusal clears on change; one optional `initialValues` seeds the state on a 422 Retry (the person's own typed values). Still the one chat launch form |
 | [`frontend/src/components/workflows/ArgumentEditor.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentsworkflowsargumenteditortsx) | 1 / 1 / 226 | no (1 phase) | young (214-07) — the argument form; the raw-JSON surface it replaced was DELETED, not hidden |
 | [`frontend/src/components/workflows/ArgumentRow.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentsworkflowsargumentrowtsx) | 1 / 1 / 362 | no (1 phase) | young (214-07) — one row, one three-arm source picker, one gutter that WIDENS rather than inserts |
@@ -12094,18 +12094,18 @@ cells rot within days.
 | [`frontend/src/lib/continueWords.ts`](docs/HOT-FILE-LEDGER.md#frontendsrclibcontinuewordsts) | 1 / 1 / 46 (was `0 / 0 / 0`) | no (young) | young (created 292.1-03) · client hint mirror of the backend continue words + shouldTryTypedContinue. ⛔ the server decides; ?raw lockstep fence |
 | [`backend/app/security/api_key_auth.py`](docs/HOT-FILE-LEDGER.md#backendappsecurityapi_key_authpy) | 3 / 1 / 328 (was `1 / 1 / 261`) | no (young) | young (planned 293-01). Key mint/digest + resolve_key, live checks every call (D-05); refusal-audit throttle (293-REVIEW CR-02). ⛔ never via get_current_user; one 401 body |
 | [`backend/app/services/rate_limit.py`](docs/HOT-FILE-LEDGER.md#backendappservicesrate_limitpy) | 4 / 2 / 138 (was `3 / 1 / 109`) | no (2 phases) | 296-01: per-user citation limit (10/min, [ASSUMED]) on `hit`. ⛔ no process-local state; no env var; fails CLOSED (503) |
-| [`backend/app/db/api_keys.py`](docs/HOT-FILE-LEDGER.md#backendappdbapi_keyspy) | 4 / 1 / 303 (was `3 / 1 / 294`) | no (young) | young (planned 293-01). api_keys CRUD on the pool; calls read per key (293-REVIEW WR-02). ⛔ owner predicate in every statement; key_hash only in auth |
-| [`backend/app/models/api_key.py`](docs/HOT-FILE-LEDGER.md#backendappmodelsapi_keypy) | 1 / 1 / 113 (was `0 / 0 / 0`) | no (young) | young (planned 293-01). Pydantic wire for keys, activity, limits. ⛔ no field carries the secret except the create response |
-| [`backend/app/services/inbound_inputs.py`](docs/HOT-FILE-LEDGER.md#backendappservicesinbound_inputspy) | 6 / 1 / 258 (was `5 / 1 / 237`) | no (young) | young (planned 293-01, fence 293-02). Launch-field twin + validation + TRUST-03 wrap and its reader (293-REVIEW WR-03). ⛔ pure; strips _-keys |
-| [`backend/app/api/api_keys.py`](docs/HOT-FILE-LEDGER.md#backendappapiapi_keyspy) | 2 / 1 / 392 (was `1 / 1 / 391`) | no (young) | young (planned 293-01). /api-keys (own) + /org/api-keys (admin). ⛔ 404 for miss AND foreign; secret only in the 201 body |
+| [`backend/app/db/api_keys.py`](docs/HOT-FILE-LEDGER.md#backendappdbapi_keyspy) | 5 / 2 / 307 (was `4 / 1 / 303`) | no (young) | young. 296-06 (293-IN-08): revoke_key returns `revoked_now` from the UPDATE status tag. ⛔ owner predicate in every statement; key_hash only in auth |
+| [`backend/app/models/api_key.py`](docs/HOT-FILE-LEDGER.md#backendappmodelsapi_keypy) | 2 / 2 / 117 (was `1 / 1 / 113`) | no (young) | young. 296-06 (293-IN-06): `needs_task` added to WorkflowRefState. ⛔ no field carries the secret except the create response |
+| [`backend/app/services/inbound_inputs.py`](docs/HOT-FILE-LEDGER.md#backendappservicesinbound_inputspy) | 7 / 2 / 306 (was `6 / 1 / 258`) | no (young) | young. 296-06: missing_required (287-T01, one predicate for kickoffs + key calls), needs_typed_task (293-IN-06), INBOUND_MAX_BODY_BYTES (293-IN-03). ⛔ pure; strips _-keys |
+| [`backend/app/api/api_keys.py`](docs/HOT-FILE-LEDGER.md#backendappapiapi_keyspy) | 3 / 2 / 421 (was `2 / 1 / 392`) | no (young) | young. 296-06: needs_task state + picker reason (293-IN-06); create_key names only what the picker offers; revoke audits only the call that revoked (293-IN-08). ⛔ 404 for miss AND foreign |
 | [`backend/app/services/unattended_launch.py`](docs/HOT-FILE-LEDGER.md#backendappservicesunattended_launchpy) | 6 / 2 / 361 (was `5 / 1 / 354`) | no (young) | young. 296-02 (293-IN-04): the _drive_run task is held in a module _BACKGROUND_TASKS set with add_done_callback(discard) (P9) until done |
 | [`backend/app/api/schedules.py`](docs/HOT-FILE-LEDGER.md#backendappapischedulespy) | 4 / 4 / 299 | ⚠ **FIRES** | ⚠ absent its ENTIRE LIFE — row added 296-02 (D-26). 296-02 (295-IN-05): Run now answers with `outcome` + a worded `detail`; ScheduledLaunchRefused caught first; raw exception logged only |
 | [`backend/app/models/schedule.py`](docs/HOT-FILE-LEDGER.md#backendappmodelsschedulepy) | 3 / 3 / 231 | ⚠ **FIRES** | ⚠ absent its ENTIRE LIFE — row added 296-02 (D-26). 296-02 (295-IN-05): ScheduleTriggerResult gains one additive `outcome` Literal (launched/refused/not_loaded/error) |
 | [`backend/app/services/harness/run_read_words.py`](docs/HOT-FILE-LEDGER.md#backendappservicesharnessrun_read_wordspy) | 1 / 1 / 99 (was `0 / 0 / 0`) | no (young) | young (planned 293-02). MOVED waiting_who / unsourced_who / compose_waiting_on (workflow_runs seam). ⛔ pure leaf; re-exported |
-| [`backend/app/api/inbound.py`](docs/HOT-FILE-LEDGER.md#backendappapiinboundpy) | 7 / 1 / 672 (was `3 / 1 / 577`) | no (young) | young (planned 293-02). /inbound start + status + file link (293-REVIEW fixes). ⛔ key dependency only; byte-identical 404; D-12 origin_ref predicate |
-| [`frontend/src/lib/api/apiKeys.ts`](docs/HOT-FILE-LEDGER.md#frontendsrclibapiapikeysts) | 1 / 1 / 174 (was `0 / 0 / 0`) | no (young) | young (planned 293-04). Client for /api-keys + /org/api-keys; owns its types. ⛔ not re-exported from the lib/api barrel |
-| [`frontend/src/components/settings/apiKeys/apiKeysCopy.ts`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentssettingsapikeysapikeyscopyts) | 2 / 1 / 270 (was `0 / 0 / 0`) | no (young) | young (planned 293-04). Every string of the keys tab + admin tab + limits card. ⛔ true leaf, imports nothing |
-| [`frontend/src/components/settings/apiKeys/apiKeyFacts.ts`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentssettingsapikeysapikeyfactsts) | 1 / 1 / 298 (was `0 / 0 / 0`) | no (young) | young (planned 293-04). Wire to card facts: state tag, refused chips, meta, bars. ⛔ pure, no React, spells no string |
+| [`backend/app/api/inbound.py`](docs/HOT-FILE-LEDGER.md#backendappapiinboundpy) | 8 / 2 / 701 (was `7 / 1 / 672`) | no (young) | young. 296-06: _BodyCapRoute (293-IN-03, 413 from Content-Length before the body is read); file link peeks, limits, then consumes (293-IN-01). ⛔ key dependency only; byte-identical 404 |
+| [`frontend/src/lib/api/apiKeys.ts`](docs/HOT-FILE-LEDGER.md#frontendsrclibapiapikeysts) | 2 / 2 / 174 (was `1 / 1 / 174`) | no (young) | young. 296-06 (293-IN-06): `needs_task` in the workflow-ref state union. ⛔ not re-exported from the lib/api barrel |
+| [`frontend/src/components/settings/apiKeys/apiKeysCopy.ts`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentssettingsapikeysapikeyscopyts) | 4 / 2 / 281 (was `2 / 1 / 270`) | no (young) | young. 296-06 (293-IN-06): the UI-SPEC F needs_task strings (picker row, chip, line, call reason). ⛔ true leaf, imports nothing |
+| [`frontend/src/components/settings/apiKeys/apiKeyFacts.ts`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentssettingsapikeysapikeyfactsts) | 3 / 2 / 308 (was `1 / 1 / 298`) | no (young) | young. 296-06 (293-IN-06): needs_task maps to its chip/line, call words and picker row. ⛔ pure, no React, spells no string |
 | [`frontend/src/components/settings/apiKeys/curlExamples.ts`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentssettingsapikeyscurlexamplests) | 3 / 2 / 77 (was `2 / 1 / 76`) | no (2 phases) | 296-04: the completed sample's step_index is null, as the server sends it. Data only |
 | [`frontend/nginx.conf`](docs/HOT-FILE-LEDGER.md#frontendnginxconf) | 3 / 3 / 76 (was absent) | ⚠ **FIRES** | ⚠ absent its ENTIRE LIFE — row added 293-REVIEW WR-01 (one `X-Forwarded-Prefix /api` header). Phases 157, 276, 293. ⛔ /api/ prefix strip |
 | [`frontend/src/components/settings/apiKeys/apiKeyPrepick.ts`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentssettingsapikeysapikeyprepickts) | 1 / 1 / 45 (was `0 / 0 / 0`) | no (young) | young (planned 293-04). sessionStorage pre-pick from the card menu, read once then cleared. ⛔ never stores the secret |
@@ -25282,3 +25282,71 @@ None needed: the next touch should only ask whether the `/api/` block's headers 
 **`2 / 2 / 77`** (derived 2026-10-26; phases 204, 296). The schedule wire types: `WorkflowSchedule`, the create/update bodies and `ScheduleTriggerResult`. ⚠ It had no ledger row before 296-04. Types only; `null` and absent stay different on `last_run_at` (see its own docblock).
 
 296-04 (BUG-261025-01): `ScheduleTriggerResult.outcome?: "launched" | "refused" | "not_loaded" | "error"`, the 296-02 trigger contract. `detail` is already worded for every non-launch outcome. Triple `2 / 2 / 77`.
+
+## Phase 296-06 touches (2026-10-26)
+
+One section per file per 296-06 commit that touched it. Triples re-derived from git in the same commit (six-digit buckets excluded); old cells kept verbatim.
+
+### `backend/app/services/inbound_inputs.py` — 296-06 (Task 1: 287-T01, SEED-362 kickoff, 293-IN-01/03/06/08)
+
+**`7 / 2 / 306 (was `6 / 1 / 258`)`.** 296-06 (287-T01): pure `missing_required(definition, inputs)`, the Python twin of `soulData.missingRequiredFields(launchInputFields(def), values)` and the ONE predicate for an in-app kickoff and a key call (`validate_inbound_inputs` now calls it). Pinned to the browser by the `expected_missing` cases in `launch_fields_cases.json`, read by both suites. 293-IN-06: `needs_typed_task(fields)` (no declared launch field) and a `needs_task` refusal code + `NEEDS_TASK_DETAIL`, raised after the unknown-key check. 293-IN-03: `INBOUND_MAX_BODY_BYTES = MAX_FIELDS * (MAX_VALUE_CHARS * 6 + 256) + 1024` (2,413,824 bytes; 2357 KB in the sentence) and `BODY_TOO_LARGE_DETAIL`. Still pure, no I/O.
+
+Scan-list cell before this 296-06 touch (moved verbatim): | [`backend/app/services/inbound_inputs.py`](docs/HOT-FILE-LEDGER.md#backendappservicesinbound_inputspy) | 6 / 1 / 258 (was `5 / 1 / 237`) | no (young) | young (planned 293-01, fence 293-02). Launch-field twin + validation + TRUST-03 wrap and its reader (293-REVIEW WR-03). ⛔ pure; strips _-keys |
+
+### `backend/app/api/threads.py` — 296-06 (Task 1: 287-T01, SEED-362 kickoff, 293-IN-01/03/06/08)
+
+**`283 / 95 / 2745 (was `282 / 94 / 2744`)`.** 296-06 (SEED-362, kickoff half): ONE kwarg, `provider=_resolved_provider`, on the existing `create_workflow_run` call, so `workflow_runs.metadata.provider` records the per-request provider and a resume continues on it (296-02 built the resume half). Deviation from the plan's forecast: the plan put the 287-T01 guard here too, but this call runs AFTER the user-message INSERT and the runs row, so a guard here would leave both behind; the guard went into `preflight_workflow_kickoff`, which `send_message` calls before any write. `grep -c missing_required` here is 0 by design. No branch added.
+
+Scan-list cell before this 296-06 touch (moved verbatim): | [`backend/app/api/threads.py`](docs/HOT-FILE-LEDGER.md#backendappapithreadspy) | 282 / 94 / 2744 (was `278 / 93 / 2684`) | ⚠ **FIRES** | 293-05 D-3: the persisted kickoff is `launch_kickoff(body.content, def, inputs)`; one import name, one expression · ⛔ |
+
+CLAUDE.md FIRING cell before this 296-06 touch (moved verbatim): | `backend/app/api/threads.py` | 282 / 94 / 2744 (was `281 / 94 / 2743`) | 293-05 D-3: kickoff via launch_kickoff (1 call, 1 import name) · ⛔ |
+
+### `backend/app/services/workflow_kickoff.py` — 296-06 (Task 1: 287-T01, SEED-362 kickoff, 293-IN-01/03/06/08)
+
+**`13 / 10 / 602 (was `12 / 9 / 597`)`.** 296-06 (287-T01): ONE guard in `preflight_workflow_kickoff`, right after the definition is parsed: `missing_required(_raw_def, body.inputs)` raises `422 Missing required input(s): recipient.` before the skill-snapshot materialise, the template pin, the user-message INSERT, the runs row and the workflow_runs row. One import name added. `getattr(body, "inputs", None)` keeps the older test bodies (no `inputs` attribute) working. If 1 added, nothing else touched.
+
+Scan-list cell before this 296-06 touch (moved verbatim): | [`backend/app/services/workflow_kickoff.py`](docs/HOT-FILE-LEDGER.md#backendappservicesworkflow_kickoffpy) | 12 / 9 / 597 (was `12 / 8 / 597`) | ⚠ **FIRES** | 293-05 D-3: the live ctx kickoff calls the same `launch_kickoff` as the persisted row (214 MIRROR rule). Honoured by construction |
+
+CLAUDE.md FIRING cell before this 296-06 touch (moved verbatim): | `backend/app/services/workflow_kickoff.py` | 12 / 9 / 597 (was `12 / 8 / 597`) | 293-05 D-3: kickoff via launch_kickoff (twin of threads.py) |
+
+### `backend/app/api/inbound.py` — 296-06 (Task 1: 287-T01, SEED-362 kickoff, 293-IN-01/03/06/08)
+
+**`8 / 2 / 701 (was `7 / 1 / 672`)`.** 296-06 (293-IN-03): the router's `route_class` is `_BodyCapRoute`, which answers `413 This request is too large: send at most 2357 KB of inputs.` from the `Content-Length` header before FastAPI reads or parses the body (a dependency or the handler would run after the read). GETs carry no length and pass. Residual: a chunked body with no length is not capped here (the onebox nginx caps it). 293-IN-01: the file route PEEKS at its token, runs the live checks and the per-key limiter, then consumes it with the same GET+DEL MULTI; a mismatch (another request won) is the same 404.
+
+Scan-list cell before this 296-06 touch (moved verbatim): | [`backend/app/api/inbound.py`](docs/HOT-FILE-LEDGER.md#backendappapiinboundpy) | 7 / 1 / 672 (was `3 / 1 / 577`) | no (young) | young (planned 293-02). /inbound start + status + file link (293-REVIEW fixes). ⛔ key dependency only; byte-identical 404; D-12 origin_ref predicate |
+
+### `backend/app/api/api_keys.py` — 296-06 (Task 1: 287-T01, SEED-362 kickoff, 293-IN-01/03/06/08)
+
+**`3 / 2 / 421 (was `2 / 1 / 392`)`.** 296-06 (293-IN-06): `_ref_state` and the startable list read `needs_task` for a workflow with no launch field; `create_key` refuses it (`{name} starts from a typed task, which a key can't send yet.`) and refuses any workflow `list_startable_candidates` (the picker's own query) does not offer, globals included (`{name} isn't one of your published workflows in this organization, so a key can't start it.`). Foreign/unknown keep their identical sentence. 293-IN-08: both revoke routes audit only when `revoke_key` reports `revoked_now`.
+
+Scan-list cell before this 296-06 touch (moved verbatim): | [`backend/app/api/api_keys.py`](docs/HOT-FILE-LEDGER.md#backendappapiapi_keyspy) | 2 / 1 / 392 (was `1 / 1 / 391`) | no (young) | young (planned 293-01). /api-keys (own) + /org/api-keys (admin). ⛔ 404 for miss AND foreign; secret only in the 201 body |
+
+### `backend/app/db/api_keys.py` — 296-06 (Task 1: 287-T01, SEED-362 kickoff, 293-IN-01/03/06/08)
+
+**`5 / 2 / 307 (was `4 / 1 / 303`)`.** 296-06 (293-IN-08): `revoke_key` keeps the UPDATE's status tag and returns `revoked_now = (status == "UPDATE 1")` beside the row, so the route can tell the call that revoked from a repeat. SQL text unchanged.
+
+Scan-list cell before this 296-06 touch (moved verbatim): | [`backend/app/db/api_keys.py`](docs/HOT-FILE-LEDGER.md#backendappdbapi_keyspy) | 4 / 1 / 303 (was `3 / 1 / 294`) | no (young) | young (planned 293-01). api_keys CRUD on the pool; calls read per key (293-REVIEW WR-02). ⛔ owner predicate in every statement; key_hash only in auth |
+
+### `backend/app/models/api_key.py` — 296-06 (Task 1: 287-T01, SEED-362 kickoff, 293-IN-01/03/06/08)
+
+**`2 / 2 / 117 (was `1 / 1 / 113`)`.** 296-06 (293-IN-06): one Literal value, `needs_task`, in `WorkflowRefState`. The public OpenAPI snapshots are regenerated in 296-06 Task 3 (wave-3 snapshot owner).
+
+Scan-list cell before this 296-06 touch (moved verbatim): | [`backend/app/models/api_key.py`](docs/HOT-FILE-LEDGER.md#backendappmodelsapi_keypy) | 1 / 1 / 113 (was `0 / 0 / 0`) | no (young) | young (planned 293-01). Pydantic wire for keys, activity, limits. ⛔ no field carries the secret except the create response |
+
+### `frontend/src/components/settings/apiKeys/apiKeysCopy.ts` — 296-06 (Task 1: 287-T01, SEED-362 kickoff, 293-IN-01/03/06/08)
+
+**`4 / 2 / 281 (was `2 / 1 / 270`)`.** 296-06 (293-IN-06): `draft.needsTask`, `card.chipNeedsTask`, `card.lineNeedsTask`, `calls.needsTask`, verbatim from UI-SPEC F. Still a true leaf.
+
+Scan-list cell before this 296-06 touch (moved verbatim): | [`frontend/src/components/settings/apiKeys/apiKeysCopy.ts`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentssettingsapikeysapikeyscopyts) | 2 / 1 / 270 (was `0 / 0 / 0`) | no (young) | young (planned 293-04). Every string of the keys tab + admin tab + limits card. ⛔ true leaf, imports nothing |
+
+### `frontend/src/components/settings/apiKeys/apiKeyFacts.ts` — 296-06 (Task 1: 287-T01, SEED-362 kickoff, 293-IN-01/03/06/08)
+
+**`3 / 2 / 308 (was `1 / 1 / 298`)`.** 296-06 (293-IN-06), outside the plan's files_modified (the copy needs a reader): one `REFUSED_WORDS` entry, one `case "needs_task"`, one picker-row arm. Spells no string.
+
+Scan-list cell before this 296-06 touch (moved verbatim): | [`frontend/src/components/settings/apiKeys/apiKeyFacts.ts`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentssettingsapikeysapikeyfactsts) | 1 / 1 / 298 (was `0 / 0 / 0`) | no (young) | young (planned 293-04). Wire to card facts: state tag, refused chips, meta, bars. ⛔ pure, no React, spells no string |
+
+### `frontend/src/lib/api/apiKeys.ts` — 296-06 (Task 1: 287-T01, SEED-362 kickoff, 293-IN-01/03/06/08)
+
+**`2 / 2 / 174 (was `1 / 1 / 174`)`.** 296-06 (293-IN-06), outside the plan's files_modified: one union member, `needs_task`, so the type matches the server Literal.
+
+Scan-list cell before this 296-06 touch (moved verbatim): | [`frontend/src/lib/api/apiKeys.ts`](docs/HOT-FILE-LEDGER.md#frontendsrclibapiapikeysts) | 1 / 1 / 174 (was `0 / 0 / 0`) | no (young) | young (planned 293-04). Client for /api-keys + /org/api-keys; owns its types. ⛔ not re-exported from the lib/api barrel |

@@ -43,7 +43,7 @@ from fastapi import HTTPException, status
 
 from app.config import settings
 from app.models.message import RESERVED_RUN_INPUT_KEYS
-from app.services.inbound_inputs import launch_kickoff  # 293-05 D-3: one kickoff for both sites
+from app.services.inbound_inputs import launch_kickoff, missing_required  # 293-05 D-3; 296-06
 from app.utils.db import aexec
 from app.utils.folder_utils import fetch_visible_folders
 from app.services.harness.scope import (
@@ -260,6 +260,11 @@ async def preflight_workflow_kickoff(*, request, body, thread_id, thread_row, su
             _raw_def = json.loads(_raw_def)
         _kickoff_definition = WorkflowDefinition.model_validate(_raw_def)
         _kickoff_definition_id = _def_row["id"]
+        # 296-06 (287-T01): a required launch input left blank is refused HERE, the server's
+        # copy of the launcher's own check, before the user-message INSERT, the runs row and the
+        # workflow_runs row (send_message calls this first). One predicate with key calls.
+        if _missing := missing_required(_raw_def, getattr(body, "inputs", None)):
+            raise HTTPException(status_code=422, detail=f"Missing required input(s): {', '.join(_missing)}.")
         # ── Phase 295 (D-13 / D-45) — a fill step with no template is refused BEFORE phase 1 ──
         # Only when NEITHER the definition carries a template asset (the lint finding says so)
         # NOR one is staged on this thread (the Run modal's launch upload, read through the

@@ -60,6 +60,8 @@ export const API_KEYS_COPY = {
     workflowsFailed: "Couldn't load your published workflows.",
     noInputs: "no inputs",
     fileUpload: "needs a file upload, not possible with a key yet",
+    /** 296-06 (293-IN-06, UI-SPEC F): a workflow with no launch field starts from a typed task. */
+    needsTask: "needs a typed task, not possible with a key yet",
     /** 293-04 authored: a non-file reason the server sent for a row that cannot be picked. */
     cannotPick: "can't be started with a key",
     noWorkflows: "You have no published workflows yet. Publish one on the Workflows page, then make a key for it.",
@@ -115,6 +117,9 @@ export const API_KEYS_COPY = {
     /** 293-04 authored: it gained a file input after the key was made (server state `file_upload`). */
     chipFileUpload: "⚠ {workflow} · needs a file upload",
     lineFileUpload: "{workflow} now needs a file upload, which a key can't send, so calls to it are refused. Make a key without it.",
+    /** 296-06 (293-IN-06, UI-SPEC F): server state `needs_task`. */
+    chipNeedsTask: "⚠ {workflow} · needs a typed task",
+    lineNeedsTask: "{workflow} starts from a typed task, which a key can't send, so calls to it are refused. Make a key without it.",
     metaOwner: "owner ",
     metaYou: " (you)",
     metaExpires: "expires ",
@@ -237,6 +242,8 @@ export const API_KEYS_COPY = {
     missingInput: "missing required input: {names}",
     missingInputBare: "missing required input",
     fileUpload: "needs a file upload, not possible with a key yet",
+    /** 296-06 (293-IN-06, UI-SPEC F): reason `needs_task`. */
+    needsTask: "needs a typed task, not possible with a key yet",
     /** 293-04 authored: the body was not a JSON object of text values (reason `invalid_body`). */
     invalidBody: "the inputs were not a JSON object of text values",
     /** 293-04 authored: the workflow's template is not bound yet (the scheduler's lint refusal). */
