@@ -27,7 +27,7 @@
  * resize. With no layout (jsdom) every path still renders, with a degenerate `d`, so the
  * line SET is always testable even where the geometry is not.
  */
-import { createElement, useLayoutEffect, useMemo, useRef, useState } from "react"
+import { createElement, useLayoutEffect, useMemo, useRef, useState, type KeyboardEvent } from "react"
 
 import { phaseGlyph } from "@/lib/phaseGlyph"
 import type { NameContext, PhaseSpecJSON } from "@/components/workflows/phaseVocabulary"
@@ -69,7 +69,22 @@ const SWITCH_TAB = "rounded-md px-3 py-1.5 text-[13px] transition-colors"
 const SWITCH_ON = "bg-primary/10 font-semibold text-primary"
 const SWITCH_OFF = "text-muted-foreground hover:bg-accent/40 hover:text-foreground"
 
-/** The house segmented control (`builder-view-toggle`), worded, no glyph. */
+/**
+ * 296-07 (290-IN-04) — the tablist's ids. Both tabs control ONE panel id: whichever view is
+ * showing carries it (`teamViewPanelProps`), labelled by the selected tab. A builder renders one
+ * canvas, so fixed ids are unique on the page.
+ */
+const TEAM_VIEW_PANEL_ID = "canvas-view-panel"
+const TAB_ORDER: readonly TeamView[] = ["steps", "team"]
+export const teamViewTabId = (view: TeamView): string => `canvas-view-tab-${view}`
+
+/** The `role="tabpanel"` attributes for the container of `view`. */
+export function teamViewPanelProps(view: TeamView) {
+  return { role: "tabpanel", id: TEAM_VIEW_PANEL_ID, "aria-labelledby": teamViewTabId(view) } as const
+}
+
+/** The house segmented control (`builder-view-toggle`), worded, no glyph. 296-07 (290-IN-04):
+ *  roving tabindex, ArrowLeft / ArrowRight (automatic activation), Home / End. */
 export function TeamViewSwitch({
   view,
   onChange,
@@ -77,14 +92,38 @@ export function TeamViewSwitch({
   view: TeamView
   onChange: (next: TeamView) => void
 }) {
+  const go = (next: TeamView) => {
+    onChange(next)
+    document.getElementById(teamViewTabId(next))?.focus()
+  }
+  const onKeyDown = (event: KeyboardEvent<HTMLButtonElement>, value: TeamView) => {
+    const at = TAB_ORDER.indexOf(value)
+    const last = TAB_ORDER.length - 1
+    let next: TeamView | null = null
+    if (event.key === "ArrowRight") next = TAB_ORDER[at === last ? 0 : at + 1]
+    else if (event.key === "ArrowLeft") next = TAB_ORDER[at === 0 ? last : at - 1]
+    else if (event.key === "Home") next = TAB_ORDER[0]
+    else if (event.key === "End") next = TAB_ORDER[last]
+    if (next === null) return
+    event.preventDefault()
+    go(next)
+  }
   const tab = (value: TeamView, label: string, testId: string) => (
     <button
       type="button"
       role="tab"
+      id={teamViewTabId(value)}
       aria-selected={view === value}
+      aria-controls={TEAM_VIEW_PANEL_ID}
+      tabIndex={view === value ? 0 : -1}
       data-testid={testId}
       onClick={() => onChange(value)}
-      className={[SWITCH_TAB, view === value ? SWITCH_ON : SWITCH_OFF].join(" ")}
+      onKeyDown={(event) => onKeyDown(event, value)}
+      className={[
+        SWITCH_TAB,
+        "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/30",
+        view === value ? SWITCH_ON : SWITCH_OFF,
+      ].join(" ")}
     >
       {label}
     </button>
@@ -421,13 +460,19 @@ export function TeamPicture({ phases, kbTools, nameContext, showTechnical, workf
   }, [model, showTechnical])
 
   const n = model.steps.length
-  const plane = "h-full min-w-0 overflow-x-auto bg-background px-6 pb-[72px] pt-6"
+  const plane =
+    "h-full min-w-0 overflow-x-auto bg-background px-6 pb-[72px] pt-6 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/30"
+  // 296-07 (290-IN-05) — a scroll REGION a keyboard can reach (Safari does not focus scroll
+  // containers by itself). It holds no interactive node (D-06); it is only something to scroll.
+  const region = { tabIndex: 0, role: "region", "aria-label": teamFigureLabel(workflowName) } as const
 
   if (n === 0) {
     return (
-      <div data-testid="team-plane" className={`${plane} flex flex-col items-center justify-center text-center`}>
-        <p className="text-[13px] font-semibold text-foreground">{TEAM_EMPTY_HEADING}</p>
-        <p className="mt-1 text-[12px] text-muted-foreground">{TEAM_EMPTY_BODY}</p>
+      <div {...teamViewPanelProps("team")} className="min-h-0 flex-1">
+        <div data-testid="team-plane" {...region} className={`${plane} flex flex-col items-center justify-center text-center`}>
+          <p className="text-[13px] font-semibold text-foreground">{TEAM_EMPTY_HEADING}</p>
+          <p className="mt-1 text-[12px] text-muted-foreground">{TEAM_EMPTY_BODY}</p>
+        </div>
       </div>
     )
   }
@@ -437,7 +482,8 @@ export function TeamPicture({ phases, kbTools, nameContext, showTechnical, workf
   const minWidth = Math.max(ORCHESTRATOR_WIDTH, n * STEP_MIN + (n - 1) * STEP_GAP)
 
   return (
-    <div data-testid="team-plane" className={plane}>
+    <div {...teamViewPanelProps("team")} className="min-h-0 flex-1">
+    <div data-testid="team-plane" {...region} className={plane}>
       <figure aria-label={teamFigureLabel(workflowName)} className="m-0">
         <div ref={innerRef} className="relative" style={{ minWidth }}>
           <svg aria-hidden="true" className="pointer-events-none absolute inset-0 h-full w-full overflow-visible">
@@ -533,6 +579,7 @@ export function TeamPicture({ phases, kbTools, nameContext, showTechnical, workf
         </figcaption>
       </figure>
       {showTechnical ? <Ledger model={model} /> : null}
+    </div>
     </div>
   )
 }

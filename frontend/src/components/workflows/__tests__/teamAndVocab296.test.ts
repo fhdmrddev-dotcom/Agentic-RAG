@@ -20,7 +20,7 @@ import { toCanvas } from "../canvasModel"
 import { deriveTeam } from "../teamModel"
 import * as phaseVocabulary from "../phaseVocabulary"
 import type { PhaseSpecJSON } from "../phaseVocabulary"
-import { TEAM_STEP_UNTYPED } from "../teamVocabulary"
+import * as teamVocabulary from "../teamVocabulary"
 import { STEP_LINE_UNTYPED } from "../library/libraryVocabulary"
 import { TeamPicture, TeamViewSwitch } from "../TeamPicture"
 import { teamFigureLabel } from "../teamVocabulary"
@@ -58,11 +58,16 @@ describe("290-IN-01 — the picture numbers steps the way the canvas lays them o
 // ── 290-IN-02 ─────────────────────────────────────────────────────────────────────────────
 
 describe("290-IN-02 — one home for the untyped-step words", () => {
-  it("phaseVocabulary exports STEP_UNTYPED and both vocabularies read it", () => {
+  it("phaseVocabulary exports STEP_UNTYPED and both surfaces read it", () => {
     const home = (phaseVocabulary as Record<string, unknown>).STEP_UNTYPED
     expect(home).toBe("A step with no type")
-    expect(TEAM_STEP_UNTYPED).toBe(home)
+    // The library re-exports it under its shipped name …
     expect(STEP_LINE_UNTYPED).toBe(home)
+    // … and the team vocabulary (a zero-import leaf) no longer holds a second copy; the
+    // team model reads the home directly, which a config-less step shows.
+    expect("TEAM_STEP_UNTYPED" in teamVocabulary).toBe(false)
+    const bare = { slug: "bare", phase_index: 0 } as unknown as PhaseSpecJSON
+    expect(deriveTeam([bare]).steps[0]?.role).toBe(home)
   })
 })
 

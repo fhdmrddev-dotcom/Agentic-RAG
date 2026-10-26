@@ -276,6 +276,8 @@ import type { GenerateReadiness, WorkflowDefinitionJSON } from "@/lib/api"
 // step itself: `soulDeliverable` answers *whether* a file is produced and this answers
 // *which step*, and re-implementing either here is the drift `soulData.ts` forbids.
 import { terminalEmitSlug } from "@/components/workflows/soulData"
+// 296-07 (290-IN-03) — the untitled-workflow words, imported from their one home.
+import { UNTITLED_WORKFLOW } from "@/components/workflows/evidenceVocabulary"
 
 /** The read-only canvas, code-split behind the toggle (see the docblock). The module
  *  also exports a `default`, so the `.then(...)` shim below is belt-and-braces — it
@@ -672,6 +674,9 @@ export function WorkflowBuilderPage({
   // Phase 183-07 (D-183-02): which graph the column shows. SESSION state only — it
   // cold-starts on "spine" on every mount and is persisted nowhere.
   const [graphView, setGraphView] = useState<"spine" | "canvas">("spine")
+  // 296-07 (290-WR-02 / D-09) — the canvas's Steps | Team view, lifted here (one controlled
+  // prop pair) so the page can make the Team view genuinely read-only. Session state only.
+  const [canvasView, setCanvasView] = useState<"steps" | "team">("steps")
   // Phase 286-02 (2026-10-18, D-10a) — TOMBSTONE. The six id→name lookup values (folder,
   // folder options, skill, connection, MCP server URL, per-tool read-only declaration), their
   // comments and their one mount read moved VERBATIM to
@@ -864,6 +869,10 @@ export function WorkflowBuilderPage({
       setReceiptPhases(def.phases)
       setReadiness(verdict)
       setArrivalExtras(extras)
+      // 296-07 (BUG-261024-02) — KEEP the generated draft. The write loop is dirty-gated and a
+      // generation is not an edit, so an untouched draft was never saved and was lost on leave.
+      // `saveNow` reads the store at fire time; reached through an arrow (declared below).
+      void persistence.saveNow()
     },
     // ⚠ 193.1-07 (D-06 / S-3) — THE SHIPPED ATTACH HANDLER, REACHED THROUGH AN ARROW, and
     // the arrow is load-bearing rather than stylistic. `onTemplateAttached` is declared far
@@ -914,6 +923,9 @@ export function WorkflowBuilderPage({
   // the user is on Canvas, the column falls back to the Spine rather than stranding
   // them on a surface that just vanished.
   const activeGraphView = canvasEnabled ? graphView : "spine"
+  // 296-07 (D-09) — the Team view is showing: undo/redo do nothing and the side panel is not
+  // rendered. The selection is kept, so Steps re-opens the panel on the same step.
+  const teamShown = activeGraphView === "canvas" && canvasView === "team"
 
   // D-183-05 — ONE selection contract, shared by BOTH views, owned by the page. Click
   // a node to anchor the `clamp(480px, 38%, 640px)` form panel; click the same node
@@ -1004,7 +1016,8 @@ export function WorkflowBuilderPage({
    * honest: the in-memory definition now differs from what was PATCHed.
    */
   useEffect(() => {
-    if (!canvasEnabled || activeGraphView !== "canvas") return
+    // 296-07 (D-09): `teamShown` — the Team view is read-only, and the notice is left alone.
+    if (!canvasEnabled || activeGraphView !== "canvas" || teamShown) return
 
     const onKeyDown = (event: KeyboardEvent) => {
       if (!event.metaKey && !event.ctrlKey) return
@@ -1033,7 +1046,7 @@ export function WorkflowBuilderPage({
 
     window.addEventListener("keydown", onKeyDown)
     return () => window.removeEventListener("keydown", onKeyDown)
-  }, [canvasEnabled, activeGraphView, store])
+  }, [canvasEnabled, activeGraphView, teamShown, store])
 
   // The current working definition (drafted state only). `selectDefinition` is the ONE
   // place the store's two halves recombine into a definition — fed here from the two
@@ -2160,7 +2173,11 @@ export function WorkflowBuilderPage({
           // findings, and the three callbacks. The canvas composes; it derives nothing.
           session={canvasSession}
           // 290-03 (VIS-01 / D-06, D-07) — the Steps | Team switch; the canvas reads the phases it already has, so the picture costs no request.
-          team={{ workflowName: typeof meta.name === "string" && meta.name.length > 0 ? meta.name : meta.slug ?? "Untitled workflow" }}
+          // 296-07 (290-IN-03): a blank name or slug never yields `Team picture for `.
+          team={{ workflowName: (typeof meta.name === "string" ? meta.name.trim() : "") || (typeof meta.slug === "string" ? meta.slug.trim() : "") || UNTITLED_WORKFLOW }}
+          // 296-07 (290-WR-02 / D-09) — the view, controlled here so `teamShown` gates the page.
+          view={canvasView}
+          onViewChange={setCanvasView}
         />
       </Suspense>
     ) : (
@@ -2784,10 +2801,11 @@ export function WorkflowBuilderPage({
       <div
         data-testid="builder-grid"
         className="grid min-h-0 min-w-0 flex-1 overflow-hidden motion-safe:transition-[grid-template-columns] motion-safe:duration-300"
-        style={{ gridTemplateColumns: "minmax(0,1fr) " + (panelOpen ? "clamp(480px, 38%, 640px)" : "44px") }}
+        style={{ gridTemplateColumns: "minmax(0,1fr) " + (teamShown ? "0px" : panelOpen ? "clamp(480px, 38%, 640px)" : "44px") }}
       >
         {graphColumn}
-        <PhaseFormPanel
+        {/* 296-07 (D-09): not rendered while the read-only Team view shows; its track is 0px. */}
+        {teamShown ? null : <PhaseFormPanel
           phase={selectedPhase}
           open={panelOpen}
           folderName={boundFolderName ?? undefined}
@@ -2886,7 +2904,7 @@ export function WorkflowBuilderPage({
               })}
           {...(canvasEnabled ? { rails, onGovernanceChange } : {})}
           isStateful={meta.is_stateful === true}
-        />
+        />}
       </div>
     </div>
     </SelectedPhaseSlugProvider>

@@ -32,7 +32,6 @@ import {
   TEAM_NO_GATES,
   TEAM_NO_JUDGE,
   TEAM_ONE_STEP,
-  TEAM_STEP_UNTYPED,
   TEAM_SWITCH_LABEL,
   TEAM_SWITCH_STEPS,
   TEAM_SWITCH_TEAM,
@@ -94,7 +93,9 @@ describe("teamVocabulary — the constants, character for character", () => {
   })
 
   it("the step, batch and absence strings (D-12, D-13, D-14)", () => {
-    expect(TEAM_STEP_UNTYPED).toBe("A step with no type")
+    // 296-07 (290-IN-02) — AMENDED DELIBERATELY: the untyped-step words moved to their ONE home,
+    // `phaseVocabulary.STEP_UNTYPED`, and this zero-import leaf no longer carries a copy.
+    expect("TEAM_STEP_UNTYPED" in teamVocabulary).toBe(false)
     expect(seatsLabel(20)).toBe("up to 20 at once")
     expect(seatsLabel(5)).toBe("up to 5 at once")
     expect(TEAM_ONE_STEP).toBe("One step, so there is no team to coordinate.")

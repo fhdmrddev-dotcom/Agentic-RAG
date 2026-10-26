@@ -867,9 +867,11 @@ describe("phaseVocabulary — the capability tier, tier (4) (D-13)", () => {
     // `ownProperty` helper would have made this change the file's first import ever. The
     // `runVocabulary.ts` inline precedent is copied instead.
     expect(phaseVocabularySource).not.toMatch(/^import\s/m)
-    expect(phaseVocabularySource).toMatch(
-      /Object\.prototype\.hasOwnProperty\.call\(EXTERNAL_CAPABILITY_SENTENCES,/,
-    )
+    // 296-07 (290-OBS-vocab) — AMENDED DELIBERATELY. The inline check on this one map became the
+    // module-local `own()` that EVERY lookup in the file now uses; the property this case pins
+    // (own-property guarded, still zero imports) is unchanged, so the pattern moved with it.
+    expect(phaseVocabularySource).toMatch(/own\(EXTERNAL_CAPABILITY_SENTENCES, /)
+    expect(phaseVocabularySource).toMatch(/Object\.prototype\.hasOwnProperty\.call\(table, key\)/)
     // Positive control: the zero-import regex really does match an import line.
     expect('import { own } from "./ownProperty"\n').toMatch(/^import\s/m)
   })

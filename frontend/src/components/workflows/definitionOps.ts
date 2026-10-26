@@ -837,10 +837,12 @@ export function seedReceiptStepReason(cause: GroundingCause, tool?: string | nul
   }
 }
 
-/** The close: everything else is the author's, and nothing has been committed. The
- *  draft is not saved and not published — sketch 150-B's fourth load-bearing property. */
+/** The close: everything else is the author's, and nothing is published — sketch 150-B's
+ *  fourth load-bearing property. 296-07 (BUG-261024-02 / 291-S1-copy a): the builder now
+ *  SAVES the generated draft on arrival, so "Nothing is saved" became false; the sentence
+ *  says what is true from generation onward. */
 export const SEED_RECEIPT_NOTHING_COMMITTED =
-  "Everything else is yours to change. Nothing is saved or published yet."
+  "Everything else is yours to change. It's saved as a draft and not published yet."
 
 /** The dismiss control's ACCESSIBLE label. Carries no glyph, for the same reason
  *  `GOVERNANCE_SEAL_LABEL` does not: the mark renders as an `aria-hidden` child and a
