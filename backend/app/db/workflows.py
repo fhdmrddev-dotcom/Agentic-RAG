@@ -1026,7 +1026,11 @@ async def publish_definition(
 # every VALUE below still travels as ``$N`` — including the token itself, which is bound
 # as ``$5`` in the guarded UPDATE. Nothing about the injection posture changed.
 async def create_workflow_definition(
-    pool: asyncpg.Pool, *, definition: WorkflowDefinition, user_id: UUID
+    pool: asyncpg.Pool,
+    *,
+    definition: WorkflowDefinition,
+    user_id: UUID,
+    org_id: UUID | None = None,
 ) -> dict:
     """INSERT a new DRAFT definition, RETURNING ``{id, version}`` (REQ-1 create).
 
@@ -1044,7 +1048,24 @@ async def create_workflow_definition(
     Returns ``{id, version, token}`` — ``token`` is the Phase 186 (D-186-07) opaque
     concurrency token of the row as just inserted, so the client can chain its first
     autosave PATCH without a re-read.
+
+    ``org_id`` (296-01, BUG-261021-02, keyword-only): the caller's VALIDATED active org. ``None``
+    runs the EXISTING statement unchanged, so the mig-106 trigger still fills ``org_id``; a value
+    is bound as ``$6`` and the trigger keeps it verbatim.
     """
+    if org_id is not None:
+        row = await pool.fetchrow(
+            f"INSERT INTO workflow_definitions (slug, version, name, status, definition, created_by, is_system_global, org_id) "
+            f"VALUES ($1, $2, $3, 'draft', $4::jsonb, $5, false, $6) "
+            f"RETURNING id, version, {CONCURRENCY_TOKEN_SQL} AS token",
+            definition.slug,
+            definition.version,
+            definition.name,
+            json.dumps(definition.model_dump(mode="json")),
+            user_id,
+            org_id,
+        )
+        return dict(row)
     row = await pool.fetchrow(
         f"INSERT INTO workflow_definitions (slug, version, name, status, definition, created_by, is_system_global) "
         f"VALUES ($1, $2, $3, 'draft', $4::jsonb, $5, false) "

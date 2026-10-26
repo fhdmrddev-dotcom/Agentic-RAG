@@ -12,7 +12,9 @@ What is driven, with nothing about the INSERT mocked:
   * ``create_folder`` and ``create_draft`` — the real route handlers, called with a request carrying
     ``X-Org-Id: B``, the REAL ``resolve_active_org_or_none`` (membership validated on an RLS
     connection as U) and the real writers (the folder through the service-role PostgREST client,
-    the draft through ``create_workflow_definition`` on the asyncpg pool). Both rows' ``org_id``
+    the draft through ``create_workflow_definition`` on the asyncpg pool). The service client is
+    built from ``backend/.env`` (``_271_gotrue_users._admin``) because ``tests/conftest.py`` pins a
+    placeholder ``SUPABASE_URL`` for the unit suite. Both rows' ``org_id``
     must read B.
   * The control: the same two creates WITHOUT a header land in A — the trigger still decides when
     no org was chosen, so the B rows above are the header's doing.
@@ -34,9 +36,9 @@ import pytest
 
 from app.api import folders as folders_mod
 from app.api import workflows as workflows_mod
-from app.dependencies import get_supabase
 from app.models.folder import FolderCreate
 from app.models.harness import WorkflowDefinition
+from tests.integration._271_gotrue_users import _admin, require_gotrue
 from tests.integration._rls_harness import requires_pg
 from tests.integration.test_163_rls_documents import _drop_user
 
@@ -66,6 +68,7 @@ def _definition(slug: str) -> WorkflowDefinition:
 @pytest.fixture
 async def two_org_subject(pg_pool):
     """U in orgs A (the trigger's LIMIT-1 pick) and B."""
+    require_gotrue()  # the folder insert goes through the local PostgREST
     uid = uuid4()
     created_orgs: list[UUID] = []
     try:
@@ -117,7 +120,7 @@ async def _create_folder(uid: UUID, org: UUID | None, name: str) -> UUID:
         body=FolderCreate(name=name),
         request=_request(org),
         current_user={"id": str(uid)},
-        supabase=get_supabase(),
+        supabase=_admin(),
     )
     return UUID(str(row["id"]))
 

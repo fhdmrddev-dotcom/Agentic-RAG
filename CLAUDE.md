@@ -430,7 +430,7 @@ node scripts/check-hot-file-ledger.cjs <phase-dir>   # 0 clear · 1 missing rows
 | `frontend/src/components/workflows/DraftArrivalCard.tsx` | 5 / 4 / 688 (was `4 / 3 / 625`) | 291-05: two optional props + one fold boolean; rows in a leaf · ⛔ |
 | `frontend/src/components/workflows/DecisionsList.tsx` | 5 / 3 / 429 | ⚠ now FIRES (291) · 291-05: one optional prop, one template-row sub-line |
 | `frontend/src/components/workflows/decisionsVocabulary.ts` | 6 / 4 / 344 (was `4 / 3 / 327`) | 291-05: one glyph + one formatter, still a zero-import leaf · ⛔ |
-| `backend/app/api/workflows.py` | 47 / 25 / 1681 (was `46 / 24 / 1653`) | 291-01: two route registrations, handlers in doors · split OWED |
+| `backend/app/api/workflows.py` | 48 / 26 / 1689 (was `47 / 25 / 1681`) | 296-01: create_draft stamps the active org (1 param, 1 stamp) · split OWED |
 | `backend/app/api/workflow_wire.py` | 3 / 3 / 517 | ⚠ now FIRES (291) · 291-01: describe read + reference wire models, additive |
 | `backend/app/api/workflow_runs.py` | 20 / 14 / 1444 (was `18 / 13 / 1455`) | 293-03: origin on 2 models + 2 selects, one name lookup · extraction FIRST |
 | `backend/app/api/workflow_run_evidence.py` | 4 / 3 / 405 | ⚠ now FIRES (293) — row added 293-03 · origin beside end_reason |
@@ -446,7 +446,7 @@ node scripts/check-hot-file-ledger.cjs <phase-dir>   # 0 clear · 1 missing rows
 | `frontend/src/hooks/useThreads.ts` | 5 / 3 / 65 | ⚠ now FIRES · last touch 267-04 · ⛔ |
 | `backend/app/services/harness/grounding.py` | 23 / 10 / 1437 (was `21 / 8 / 1414`) | 295-03: ONE pure predicate (is_engine_citation_gate) |
 | `frontend/src/components/workflows/PhaseFormPanel.tsx` | 30 / 14 / 1566 | honoured by construction ×6 (185 / 193 / 193.1 / 199 / 200 / **214**) |
-| `backend/app/db/workflows.py` | 59 / 30 / 2827 (was `58 / 29 / 2808`) | 293-02: create_workflow_run origin kwargs (keyword-only) |
+| `backend/app/db/workflows.py` | 60 / 31 / 2848 (was `59 / 30 / 2827`) | 296-01: create_workflow_definition org_id kwarg (keyword-only) |
 | `backend/app/services/harness/publish_service.py` | 34 / 15 / 2010 (was `33 / 15 / 2008`) | 295-09 WR-05: judge system prompt via one helper (If 70→70) |
 | `backend/app/services/workflow_authoring.py` | 18 / 12 / 1120 (was `17 / 11 / 1025`) | 291-02: files = one more untrusted grounding input (+98 −3) |
 | `backend/app/models/harness.py` | 22 / 20 / 776 (was `20 / 19 / 766`) | 291-02: InputFieldSpec origin + note, omitted when absent |
@@ -628,7 +628,7 @@ node scripts/check-hot-file-ledger.cjs <phase-dir>   # 0 clear · 1 missing rows
 | `frontend/src/components/admin/AuditTab.tsx` | 7 / 4 / 770 | ⚠ FIRES, absent here — row added 293-04 · 5 map entries only |
 | `frontend/src/components/org/OrgAuditTab.tsx` | 4 / 3 / 415 | ⚠ now FIRES (293) — row added · 5 map entries · shared vocab OWED |
 | `frontend/src/lib/api/documents.ts` | 10 / 9 / 595 (was `8 / 8 / 503`) | 284-05: five whole-list clients deleted (D-16) · ⛔ |
-| `backend/app/api/folders.py` | 14 / 9 / 277 (was `12 / 8 / 277`) | last touch 280-01 (2 maybe_row guards) |
+| `backend/app/api/folders.py` | 15 / 10 / 287 (was `14 / 9 / 277`) | 296-01: create_folder stamps the active org; cross-org parent 404 |
 | `backend/app/api/kb.py` | 14 / 9 / 515 (was `13 / 8 / 504`) | last touch 275-02 · ⛔ |
 | `backend/app/services/audit_service.py` | 9 / 9 / 98 (was `8 / 8 / 96`) | 293-01: five api_key.* action types · ⛔ |
 | `backend/app/services/expert_scope.py` | 8 / 4 / 159 (was `6 / 3 / 632`) | ✅ G-5 DISCHARGED (279-01): pure / statement / events |

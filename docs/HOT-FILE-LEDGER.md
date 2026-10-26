@@ -1158,6 +1158,15 @@ Scan-list cell as of 2026-10-21 (replaced by 295-07, moved verbatim): 45 / 23 / 
 
 CLAUDE.md verdict cell as of 2026-10-21 (replaced by 295-07, moved verbatim): | `backend/app/api/workflows.py` | 45 / 23 / 1647 (was `43 / 23 / 2261`) | seam TAKEN (286-01): wire + authoring doors out; split OWED (>1,500 L) |
 
+### `backend/app/api/workflows.py` — 296-01 (BUG-261021-02, 2026-10-26)
+
+**`48 / 26 / 1689` (was `47 / 25 / 1681`).** 296-01: `create_draft` gains one `request: Request = None` param (FastAPI injects it; the four suites that call the handler directly keep working) and one stamp — `resolve_active_org_or_none` → `create_workflow_definition(org_id=…)`. +8 lines, two import names. Nothing else touched: split still OWED (>1,500 L). Six-digit bucket `260814` excluded.
+
+Scan-list cell before 296-01 (moved verbatim): 47 / 25 / 1681 (was `46 / 24 / 1653`) | ⚠ **FIRES** | 291-01: two route registrations (`/describe/read`, `/{id}/reference`), handlers live in the doors module (+28). Honoured by construction; split still OWED (>1,500 L)
+
+CLAUDE.md FIRING cell before 296-01 (moved verbatim): 291-01: two route registrations, handlers in doors · split OWED
+
+
 ## `backend/app/services/harness/grounding.py`
 
 **Re-derived 2026-08-17 (extraction):** `18 commits / 5 phases / 1252 L` · quick-task buckets excluded: `260814` · **G-5 FIRES** (5 phases vs threshold 3) — honoured by construction (193.1).
@@ -1554,6 +1563,15 @@ CLAUDE.md verdict cell as of 2026-10-21 (replaced by 295-07, moved verbatim): | 
 Scan-list cell as of 2026-10-21 (replaced by 295-09, moved verbatim): 57 / 29 / 2802 (was `54 / 28 / 2767`) | ⚠ **FIRES** | 295-03: `stash_awaiting_answer` (+1 def), `pause_run` releases claimed_at, folder_id on the answer; 295-05: created_at + engine_pause on the unanswered read. If 32→32 |
 
 CLAUDE.md verdict cell as of 2026-10-21 (replaced by 295-09, moved verbatim): | `backend/app/db/workflows.py` | 57 / 29 / 2802 (was `54 / 28 / 2767`) | 295-03 stash writer + lease release · 295-05 two read keys |
+
+### `backend/app/db/workflows.py` — 296-01 (BUG-261021-02, 2026-10-26)
+
+**`60 / 31 / 2848` (was `59 / 30 / 2827`).** 296-01: `create_workflow_definition` gains keyword-only `org_id: UUID | None = None`. `None` runs the EXISTING INSERT text unchanged (pinned byte-for-byte by `test_296_create_org_stamp.py`), so the mig-106 trigger still fills `org_id`; a value is bound as `$6` in a second statement. The keyword-only kwarg shape of `create_workflow_run`'s origin kwargs (293-02).
+
+Scan-list cell before 296-01 (moved verbatim): 59 / 30 / 2827 (was `58 / 29 / 2808`) | ⚠ **FIRES** | 295-09 CR-01: `get_ask_user_response` also returns the joined prompt's words and whether it was an engine ask (one SELECT column, two additive keys). If 32→32 · 293 touch: see §Phase 293 close
+
+CLAUDE.md FIRING cell before 296-01 (moved verbatim): 293-02: create_workflow_run origin kwargs (keyword-only)
+
 
 ## `backend/app/services/harness/publish_service.py`
 
@@ -11463,7 +11481,7 @@ cells rot within days.
 | [`frontend/src/components/workflows/library/libraryRow.ts`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentsworkflowslibrarylibraryrowts) | 4 / 3 / 201 | ⚠ **FIRES — EXACTLY AT THRESHOLD** | ⚠ absent, on the boundary (added 192.2) |
 | [`frontend/src/components/workflows/WorkflowDoorSwitch.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentsworkflowsworkflowdoorswitchtsx) | 20 / 13 / 1104 (was `18 / 12 / 1075`) | **FIRES** | 291-04: one hook, one mount (the references section), one handoff spread (+33 −4). Honoured by construction (193 / 193.1 / 199 / 214 / 291) |
 | [`frontend/src/pages/WorkflowBuilderPage.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrcpagesworkflowbuilderpagetsx) | 62 / 26 / 2897 (was `60 / 25 / 2810`) | **FIRES** | 291-04: refs section mount + hook args. 291-05: `onDrafted` third parameter → ONE snapshot `useState`, two card props, `referenceNames` read off `meta.assets` (+88 −1) |
-| [`backend/app/api/workflows.py`](docs/HOT-FILE-LEDGER.md#backendappapiworkflowspy) | 47 / 25 / 1681 (was `46 / 24 / 1653`) | ⚠ **FIRES** | 291-01: two route registrations (`/describe/read`, `/{id}/reference`), handlers live in the doors module (+28). Honoured by construction; split still OWED (>1,500 L) |
+| [`backend/app/api/workflows.py`](docs/HOT-FILE-LEDGER.md#backendappapiworkflowspy) | 48 / 26 / 1689 (was `47 / 25 / 1681`) | ⚠ **FIRES** | 296-01: create_draft stamps the validated active org (one request param, one stamp, +8). Honoured by construction; split still OWED (>1,500 L) |
 | [`backend/app/api/workflow_runs.py`](docs/HOT-FILE-LEDGER.md#backendappapiworkflow_runspy) | 20 / 14 / 1444 (was `18 / 13 / 1455`) | ⚠ **FIRES** | 295-05 OVER budget: +5 defs (name chain `waiting_who`, unsourced words, end-reason read), If 31→36, +160 L. Extraction FIRST next: the wording helpers · 293 touch: see §Phase 293 close |
 | [`backend/app/services/harness/phase_confidence.py`](docs/HOT-FILE-LEDGER.md#backendappservicesharnessphase_confidencepy) | 1 / 1 / 153 (was `0 / 0 / 0`) | no (young) | young (created 289-02). Pure confidence helper + wire allow-list + KB label read (duck-typed, never raises). ⛔ no provider import; chat's _compute_confidence only |
 | [`backend/app/services/run_evidence.py`](docs/HOT-FILE-LEDGER.md#backendappservicesrun_evidencepy) | 5 / 3 / 525 (was `4 / 2 / 517`) | ⚠ **FIRES** | 295-05: one by-name read, one entry key, one `who` computation (If 32→32). Two phases; does not fire · 293 touch: see §Phase 293 close |
@@ -11480,7 +11498,7 @@ cells rot within days.
 | [`frontend/src/hooks/useThreads.ts`](docs/HOT-FILE-LEDGER.md#frontendsrchooksusethreadsts) | 5 / 3 / 65 (was `4 / 2 / 64`) | ⚠ **NOW FIRES — 3 phases** | ⚠ row STALE (`4/2/64`), now FIRES. **267-04**: `newThread` takes an optional Expert id, so an invite on a brand-new chat reaches the row (D-267-21; live G4-1). ⛔ `selectThread` stays a bare setState |
 | [`backend/app/services/harness/grounding.py`](docs/HOT-FILE-LEDGER.md#backendappservicesharnessgroundingpy) | 23 / 10 / 1437 (was `22 / 9 / 1417`) | ⚠ **FIRES** | 295-03: ONE pure predicate `is_engine_citation_gate` (+1 def, If 24→24); `on_failure="fail_run"` kept (D-51). Honoured by construction |
 | [`frontend/src/components/workflows/PhaseFormPanel.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentsworkflowsphaseformpaneltsx) | 30 / 14 / 1566 | **FIRES** | honoured by construction ×6 (185 / 193 / 193.1 / 199 / 200 / **214**) |
-| [`backend/app/db/workflows.py`](docs/HOT-FILE-LEDGER.md#backendappdbworkflowspy) | 59 / 30 / 2827 (was `58 / 29 / 2808`) | ⚠ **FIRES** | 295-09 CR-01: `get_ask_user_response` also returns the joined prompt's words and whether it was an engine ask (one SELECT column, two additive keys). If 32→32 · 293 touch: see §Phase 293 close |
+| [`backend/app/db/workflows.py`](docs/HOT-FILE-LEDGER.md#backendappdbworkflowspy) | 60 / 31 / 2848 (was `59 / 30 / 2827`) | ⚠ **FIRES** | 296-01: create_workflow_definition keyword-only `org_id` (None = the pre-296 INSERT text, byte-identical) |
 | [`backend/app/services/harness/publish_service.py`](docs/HOT-FILE-LEDGER.md#backendappservicesharnesspublish_servicepy) | 34 / 15 / 2010 (was `33 / 15 / 2008`) | ⚠ **FIRES** | 295-09 WR-05: the publish judge builds its system prompt through `judge_system_prompt` (one import swap, one expression; If 70→70). Honoured by construction |
 | [`backend/app/services/workflow_authoring.py`](docs/HOT-FILE-LEDGER.md#backendappservicesworkflow_authoringpy) | 18 / 12 / 1120 (was `17 / 11 / 1025`) | **FIRES** | 291-02: file text = ONE more untrusted grounding input (fenced user-turn documents), degraded-registry refusal, powers guard + coverage retry (+98 −3). 286 forecast honoured |
 | [`backend/app/models/harness.py`](docs/HOT-FILE-LEDGER.md#backendappmodelsharnesspy) | 22 / 20 / 776 (was `20 / 19 / 766`) | **FIRES** | 291-02: `InputFieldSpec.origin` + `.note`, omitted from the dump when absent so a no-file draft is byte-identical (+11 −1). Honoured by construction (193.2 / 214 / 291) |
@@ -11857,7 +11875,7 @@ cells rot within days.
 | [`frontend/src/lib/api/attachments.ts`](docs/HOT-FILE-LEDGER.md#frontendsrclibapiattachmentsts) | 1 / 1 / 129 (was `0 / 0 / 0`) | no (young) | 274-03. promote / preview / library-links clients + wire types. ⛔ getAuthHeaders (X-Org-Id); server sentence verbatim; field names fenced vs backend in 274-05 |
 | [`frontend/src/lib/attachmentLifetime.ts`](docs/HOT-FILE-LEDGER.md#frontendsrclibattachmentlifetimets) | 1 / 1 / 35 (was `0 / 0 / 0`) | no (young) | 274-03. ONE rule: thread-life (null expiry) + prefix-stripped display name. ⛔ its ^[0-9a-f]{8}- regex is lockstep with the backend's (fenced in 274-05) |
 | [`backend/app/services/template_asset_service.py`](docs/HOT-FILE-LEDGER.md#backendappservicestemplate_asset_servicepy) | 5 / 4 / 379 (was `4 / 3 / 344`) | ⚠ **FIRES** | 295-02: Branch 2's WHERE moved verbatim into `_STAGED_TEMPLATE_WHERE`; one `has_staged_template` probe (+1 def, If 12→12). Honoured by construction |
-| [`backend/app/api/folders.py`](docs/HOT-FILE-LEDGER.md#backendappapifolderspy) | 14 / 9 / 277 (was `12 / 8 / 277`) | ⚠ **FIRES** | Honoured by construction. **280-01**: 2 `maybe_row` guards (rename, toggle_global; the 403 kept). Line count unchanged |
+| [`backend/app/api/folders.py`](docs/HOT-FILE-LEDGER.md#backendappapifolderspy) | 15 / 10 / 287 (was `14 / 9 / 277`) | ⚠ **FIRES** | Honoured by construction. **296-01**: create_folder stamps the validated active org; a cross-org parent gets the existing 404 |
 | [`backend/app/api/kb.py`](docs/HOT-FILE-LEDGER.md#backendappapikbpy) | 14 / 9 / 515 (was `13 / 8 / 504`) | ⚠ **FIRES** | **275-02**: ls/tree/glob's 7 document reads gain `.eq(RETRIEVABLE_COLUMN, True)`. ⛔ `read_path` untouched (Library GET content shares it) |
 | [`backend/app/services/audit_service.py`](docs/HOT-FILE-LEDGER.md#backendappservicesaudit_servicepy) | 9 / 9 / 98 (was `8 / 8 / 96`) | ⚠ **FIRES** | ⚠ absent its ENTIRE LIFE — row added 275-01. **275-01**: +3 connector.watch.*, +10 retention/folder types (mig 204). ⛔ ⊆ the live CHECK (boot) · 293 touch: see §Phase 293 close |
 | [`backend/app/services/document_relationship_service.py`](docs/HOT-FILE-LEDGER.md#backendappservicesdocument_relationship_servicepy) | 6 / 4 / 465 (was `5 / 3 / 457`) | ⚠ **FIRES** | honoured by construction — one default-False kwarg + one `.eq` per read leg, Library callers unchanged, source fence (row column, not a 2nd query) |
@@ -20931,6 +20949,15 @@ Scan-list disposition cell before 280-04 (replaced):
 CLAUDE.md verdict cell as of 2026-10-14 (replaced by 280-04):
 
 > last touch 275-02
+
+### `backend/app/api/folders.py` — 296-01 (BUG-261021-02, 2026-10-26)
+
+**`15 / 10 / 287` (was `14 / 9 / 277`).** 296-01: `create_folder` stamps the validated active org (one `request` param, one `resolve_active_org_or_none` call, one `org_id` key) and refuses a parent in another org with the existing 404. No header → no key → byte-identical; the parent check reuses `fetch_visible_folders`' rows (`fields="*"` carries `org_id`), no new read. Six-digit buckets `260328`, `260405` excluded.
+
+Scan-list cell before 296-01 (moved verbatim): 14 / 9 / 277 (was `12 / 8 / 277`) | ⚠ **FIRES** | Honoured by construction. **280-01**: 2 `maybe_row` guards (rename, toggle_global; the 403 kept). Line count unchanged
+
+CLAUDE.md FIRING cell before 296-01 (moved verbatim): last touch 280-01 (2 maybe_row guards)
+
 
 ### `backend/app/api/skills.py` — Phase 280 close
 
