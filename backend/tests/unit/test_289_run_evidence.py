@@ -285,6 +285,106 @@ def test_an_owner_with_no_name_reads_the_fallback_words_without_you():
     assert log[0]["unsourced"]["continued_by"] == "the person who started this run"
 
 
+# ── 296-01 (BUG-261020-02 / D-05): the withheld cascade ─────────────────────────────────────
+# A later step's output is built on the earlier steps' outputs. Once a step is withheld from a
+# colleague for citing a document they cannot read, every LATER step can carry that document's
+# substance even though it cites nothing itself — so, for a non-owner, every later step is
+# withheld too, with words that say why. The owner path (readable_ids None) never changes.
+
+_SECRET = "Per the Q4 Layoff Plan, the Leeds office closes in March."
+
+
+def _three_step_definition() -> dict:
+    return {
+        "slug": "cascade", "version": 1, "name": "Cascade", "status": "published",
+        "phases": [
+            {"slug": f"s{i}", "phase_index": i - 1, "name": f"Step {i}",
+             "config": {"phase_type": "llm_single", "prompt": "Go."}, "validators": []}
+            for i in (1, 2, 3)
+        ],
+    }
+
+
+def _three_step_rows() -> list[dict]:
+    return [
+        {"slug": "s1", "phase_index": 0, "status": "completed",
+         "started_at": "2026-10-26T10:00:00+00:00", "completed_at": "2026-10-26T10:01:00+00:00",
+         "output": json.dumps({"text": _SECRET, "confidence": _CONF, "citations": [
+             {"document_id": DOC_HIDDEN, "filename": "layoffs.docx", "chunk_index": 0}]})},
+        {"slug": "s2", "phase_index": 1, "status": "completed",
+         "started_at": "2026-10-26T10:01:00+00:00", "completed_at": "2026-10-26T10:02:00+00:00",
+         "output": json.dumps({"text": "Summary: Leeds closes in March."})},
+        {"slug": "s3", "phase_index": 2, "status": "completed",
+         "started_at": "2026-10-26T10:02:00+00:00", "completed_at": "2026-10-26T10:03:00+00:00",
+         "output": json.dumps({"text": "Memo: plan for the Leeds closure."})},
+    ]
+
+
+def test_upstream_sentence_is_the_ui_spec_words():
+    assert ev.WITHHELD_UPSTREAM_SENTENCE == (
+        "This step builds on an earlier step you don't have access to, so its output is "
+        "withheld too."
+    )
+
+
+def test_a_colleague_gets_every_later_step_withheld_once_one_is():
+    log = ev.compose_phase_log(_three_step_rows(), _three_step_definition(), False, "Dana",
+                               "kb", {DOC_A})
+    assert log[0]["output_text"] == ev.WITHHELD_OUTPUT_SENTENCE
+    assert log[1]["output_text"] == ev.WITHHELD_UPSTREAM_SENTENCE
+    assert log[2]["output_text"] == ev.WITHHELD_UPSTREAM_SENTENCE
+    blob = json.dumps(log)
+    assert "Leeds" not in blob
+    # the record still shows that the steps ran: status, time and confidence render
+    assert [e["status"] for e in log] == ["completed"] * 3
+    assert all(e["started_at"] and e["completed_at"] for e in log)
+    assert log[0]["confidence"] is not None
+
+
+def test_the_owner_reads_every_step_unchanged():
+    log = ev.compose_phase_log(_three_step_rows(), _three_step_definition(), True, "Dana",
+                               "kb", None)
+    assert [e["output_text"] for e in log] == [
+        _SECRET, "Summary: Leeds closes in March.", "Memo: plan for the Leeds closure.",
+    ]
+
+
+def test_a_colleague_who_can_read_the_cited_document_sees_every_step():
+    """Non-vacuity: the cascade starts only from a withheld citation."""
+    log = ev.compose_phase_log(_three_step_rows(), _three_step_definition(), False, "Dana",
+                               "kb", {DOC_HIDDEN})
+    assert log[0]["output_text"] == _SECRET
+    assert log[2]["output_text"] == "Memo: plan for the Leeds closure."
+
+
+def test_an_empty_readable_set_withholds_every_step_after_the_first_citing_one():
+    """Fail closed: the RLS check failed, so nothing cited is readable."""
+    log = ev.compose_phase_log(_three_step_rows(), _three_step_definition(), False, "Dana",
+                               "kb", set())
+    assert [e["output_text"] for e in log] == [
+        ev.WITHHELD_OUTPUT_SENTENCE, ev.WITHHELD_UPSTREAM_SENTENCE, ev.WITHHELD_UPSTREAM_SENTENCE,
+    ]
+
+
+def test_a_human_input_step_never_starts_the_cascade():
+    """Pitfall 9: the human step's output is nulled for a colleague (the owner's question and
+    answer), which is not a withheld citation, so the step after it keeps its output."""
+    log = ev.compose_phase_log(_phase_rows(), _definition(), False, "Dana", "kb",
+                               {DOC_A, DOC_B, DOC_HIDDEN})
+    assert log[0]["output_text"] == "Three vendors meet the bar."
+    assert log[1]["output_text"] is None
+    assert log[2]["output_text"] == "Memo written."
+
+
+# ── 296-01 (289-IN-04): a malformed cited id never masks every source ───────────────────────
+
+
+def test_cited_document_ids_drops_non_uuid_ids():
+    rows = [{"slug": "s1", "phase_index": 0, "status": "completed", "output": json.dumps(
+        {"text": "x", "citations": [{"document_id": "not-a-uuid"}, {"document_id": DOC_A}]})}]
+    assert ev.cited_document_ids(rows) == [DOC_A]
+
+
 # ── compose_verdicts (R-03) ─────────────────────────────────────────────────────────────
 
 
@@ -668,11 +768,33 @@ async def test_a_masked_documents_content_never_reaches_the_colleague_through_ou
     colleague_text = json.dumps(colleague)
     assert secret_title not in colleague_text
     assert colleague["phase_log"][0]["output_text"] == ev.WITHHELD_OUTPUT_SENTENCE
-    # a step with no masked citation keeps its output
-    assert colleague["phase_log"][2]["output_text"] == "Memo written."
+    # ⚠ AMENDED DELIBERATELY by 296-01 (D-05, BUG-261020-02). This line used to assert that step 3
+    # keeps "Memo written." because its own citations are readable. But step 3 is built on step
+    # 1's output, so it can carry the withheld document's substance; after a withheld step every
+    # later step is withheld for a colleague too. (Step 2, the human step, is nulled separately.)
+    assert colleague["phase_log"][2]["output_text"] == ev.WITHHELD_UPSTREAM_SENTENCE
 
     owner = json.loads((await _read(RUN_DONE, OWNER, OWNER_EMAIL)).model_dump_json())
     assert owner["phase_log"][0]["output_text"] == f"Per {secret_title}, three vendors meet the bar."
+
+
+class _StrictUuidConn(_FakeConn):
+    """Postgres' ``$1::uuid[]`` cast: one malformed element fails the whole statement."""
+
+    async def fetch(self, sql, *args):
+        for value in args[0]:
+            uuid.UUID(value)  # raises ValueError, as the cast raises DataError
+        return await super().fetch(sql, *args)
+
+
+@pytest.mark.asyncio
+async def test_a_malformed_cited_id_does_not_mask_the_readable_ones(wire):
+    """289-IN-04: before 296 one non-UUID id failed the cast, the except masked EVERY source."""
+    from app.api.workflow_run_evidence import _viewer_reads
+
+    wire["conn"] = _StrictUuidConn({DOC_A}, None)
+    readable, _label = await _viewer_reads(COLLEAGUE, ["not-a-uuid", DOC_A], _definition())
+    assert readable == {DOC_A}
 
 
 @pytest.mark.asyncio
