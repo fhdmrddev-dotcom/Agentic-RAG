@@ -112,12 +112,9 @@
  * never by its words.
  */
 import { useCallback, useEffect, useMemo, useRef, useState } from "react"
-import {
-  generateWorkflow,
-  readDescribeFile,
-  uploadWorkflowReference,
-  uploadWorkflowTemplate,
-} from "@/lib/api"
+import { generateWorkflow, readDescribeFile } from "@/lib/api"
+// 296-07 (step 0) — the post-draft bind, moved to its own leaf.
+import { bindDraftFiles } from "./templateDraftBind"
 // 197-06 (D-13) — the response type's new arm, imported as a TYPE. The client half of this
 // concern already lives in that module; declaring a structurally-similar shape here would be
 // the `TemplateReadAnswer` mistake in a second place — two homes for one server answer.
@@ -131,7 +128,6 @@ import type {
   GenerateField,
   GenerateRemoved,
   ReferenceAssetDescriptor,
-  WordAnchor,
 } from "@/lib/api"
 import type { BuilderPhase, BuilderStore, TemplateAssetDescriptor } from "./builderStore"
 // Phase 281 (FIX-10) — the describe refusal table's KEY builders. A leaf module: it imports
@@ -623,46 +619,8 @@ function referenceBodiesFor(references: readonly HeldReference[]): DescribeRefer
   )
 }
 
-/**
- * 291-04 (D-07) — WHICH DOOR the slot's file is stored through at the first save.
- *
- *  · a template, a fillable PDF form, or a deck → the TEMPLATE door, the shipped way;
- *  · Word blanks → the template door WITH the ticked anchors, which stores the fillable copy;
- *    with every blank unticked there is nothing to fill, so it is kept as a reference;
- *  · a file with no fields, a flat or scanned PDF, or a Word file a copy cannot be made of →
- *    the REFERENCE door: it is used as a reference, so it is kept as one;
- *  · a read that never answered → the shipped template upload, except a PDF, which the
- *    template door can only fill when it has fields, so it is kept as a reference.
- *
- * ⚠ A deck stays a TEMPLATE: the reference door does not take decks, and a deck template is
- * filled at run time by the shipped engine.
- */
-function bindPlanFor(
-  file: File,
-  answer: TemplateReadAnswer | null,
-): { door: "template"; anchors?: WordAnchor[] } | { door: "reference" } {
-  if (!answer) return { door: "template" }
-  if (answer.state.kind === "unavailable") {
-    return file.name.toLowerCase().endsWith(".pdf") ? { door: "reference" } : { door: "template" }
-  }
-  const result = answer.state.result
-  switch (result.arm) {
-    case "template_fields":
-    case "form_fields":
-    case "not_word":
-      return { door: "template" }
-    case "blanks": {
-      const anchors = result.fields.flatMap((f) =>
-        !answer.unticked.includes(f.key) && f.anchor_kind !== null && f.anchor_label !== null
-          ? [{ key: f.key, anchor_kind: f.anchor_kind, anchor_label: f.anchor_label }]
-          : [],
-      )
-      return anchors.length > 0 ? { door: "template", anchors } : { door: "reference" }
-    }
-    default:
-      return { door: "reference" }
-  }
-}
+// 296-07 Task 2 (step 0, "extraction FIRST") — `bindPlanFor` and the bind loop MOVED, unchanged,
+// to `templateDraftBind.ts`. This hook keeps the state the bind reports into.
 
 export interface TemplateFirstDraftArgs {
   /** The Builder's store instance. The ONLY thing this hook reaches into directly, and it
@@ -948,47 +906,26 @@ export function useTemplateFirstDraft(args: TemplateFirstDraftArgs): TemplateFir
 
   const [bindFailed, setBindFailed] = useState<{ filename: string } | null>(null)
 
-  const bindHeldTemplate = useCallback(async (definitionId: string) => {
-    const file = templateFileRef.current
-    const references = referencesRef.current
-    // NO DOCUMENT, NO ACT. SC#4's fast path is untouched by construction rather than by a
-    // flag: a session that supplied nothing performs no upload and can raise no failure.
-    if (!file && references.length === 0) return
-    const referenceAssets: ReferenceAssetDescriptor[] = []
-    if (file) {
-      try {
-        const plan = bindPlanFor(file, templateAnswerRef.current)
-        if (plan.door === "reference") {
-          referenceAssets.push(await uploadWorkflowReference(definitionId, file))
-        } else {
-          // ⚠ Without anchors the call is the shipped one, argument for argument.
-          const asset =
-            plan.anchors !== undefined
-              ? await uploadWorkflowTemplate(definitionId, file, plan.anchors)
-              : await uploadWorkflowTemplate(definitionId, file)
-          setBindFailed(null)
-          // The host's single writer. This module appends nothing to `assets[]` itself.
-          onTemplateBoundRef.current(asset)
-        }
-      } catch (err) {
-        // The developer's evidence, at the boundary, in full.
-        console.error(err)
-        // …and the person's, which cannot carry any of it.
-        setBindFailed({ filename: file.name })
-      }
-    }
-    // 291-04 (D-07) — every held reference, kept with the draft. One failure names its file
-    // and does not stop the others.
-    for (const reference of references) {
-      try {
-        referenceAssets.push(await uploadWorkflowReference(definitionId, reference.file))
-      } catch (err) {
-        console.error(err)
-        setBindFailed({ filename: reference.file.name })
-      }
-    }
-    if (referenceAssets.length > 0) onReferencesBoundRef.current(referenceAssets)
-  }, [])
+  // 296-07 (step 0) — the bind loop lives in `templateDraftBind.ts`; this wrapper hands it the
+  // refs it reads at fire time and the setters it reports into. Behaviour unchanged.
+  const bindHeldTemplate = useCallback(
+    (definitionId: string) =>
+      bindDraftFiles(
+        definitionId,
+        {
+          file: templateFileRef.current,
+          answer: templateAnswerRef.current,
+          references: referencesRef.current,
+        },
+        {
+          onTemplateBound: (asset) => onTemplateBoundRef.current(asset),
+          onReferencesBound: (assets) => onReferencesBoundRef.current(assets),
+          onTemplateOk: () => setBindFailed(null),
+          onFailed: (filename) => setBindFailed({ filename }),
+        },
+      ),
+    [],
+  )
 
   const onDraft = useCallback(async () => {
     const text = describe.trim()
