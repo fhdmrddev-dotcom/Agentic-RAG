@@ -73,3 +73,92 @@ async def enforce_key_limit(redis, *, key_id: str, kind: Kind) -> None:
             f"Try again in {retry} seconds."
         )
     raise HTTPException(status_code=429, detail=detail, headers={"Retry-After": str(retry)})
+
+
+# ── 293-REVIEW CR-02 (a) — the per-client limit, BEFORE key resolution ──────────────────────
+# A coarse bound on every ``/inbound/*`` call from one client address, keys or no keys, so an
+# unknown-key or revoked-key flood costs one counter, not a digest lookup and an audit row per call.
+# A constant, not a setting: it only has to sit far above any honest integration (a key's own
+# limits stay the real, configurable ones).
+#
+# ⚠ The address is ``request.client.host``. The app has no proxy-aware client-IP derivation (the
+#   setup door uses the same), and uvicorn trusts forwarded headers only from 127.0.0.1, so behind
+#   a proxy on another host (the onebox nginx, Coolify's Traefik) every caller shares the proxy's
+#   address and this works as one door-wide ceiling. That is why it is set this high.
+IP_CALLS_PER_MINUTE = 1_200
+
+IP_LIMIT_DETAIL = (
+    "Too many calls from this address: at most {limit} a minute. Try again in {retry} seconds."
+)
+
+
+async def enforce_ip_limit(redis, *, client: str) -> None:
+    """Refuse with 429 + ``Retry-After`` when ``client`` is over the per-address limit, and with
+    503 when the limiter cannot count (fail closed, exactly like the per-key limiter)."""
+    limit = int(IP_CALLS_PER_MINUTE)
+    try:
+        retry = await hit(redis, key_id=client, kind="ip", limit=limit)  # type: ignore[arg-type]
+    except Exception:  # noqa: BLE001 — any Redis failure refuses; see the module docblock
+        logger.warning("inbound per-address limiter unavailable; refusing the call", exc_info=True)
+        raise HTTPException(status_code=503, detail=UNAVAILABLE_DETAIL)
+    if retry is not None:
+        raise HTTPException(
+            status_code=429,
+            detail=IP_LIMIT_DETAIL.format(limit=limit, retry=retry),
+            headers={"Retry-After": str(retry)},
+        )
+
+
+# ── 293-REVIEW CR-02 (b) — refusal audits are counted, then written at most once a minute ────
+# Every refusal by a known key used to await one ``audit_log`` insert, so a replayed revoked key
+# (refused before the limiter) or an over-limit flood turned the limiter into a write amplifier.
+# Now the FIRST refusal of a (key, reason) in a minute writes its row; the rest are counted in
+# ``apikey:refaudit:sup:{key}:{reason}`` and the next written row carries that count as
+# ``detail.suppressed``, so the ledger stays honest about how many there were.
+#
+# Fail-safe: with Redis down it falls back to an in-process window, so each worker still writes at
+# most one row per (key, reason, minute) — a CAP, never unbounded and never silent. The fallback
+# map is bounded; overflowing it clears it, which can cost one extra row per pair, never a flood.
+_REFUSAL_WINDOW_PREFIX = "apikey:refaudit:"
+_SUPPRESSED_PREFIX = "apikey:refaudit:sup:"
+_SUPPRESSED_TTL = 30 * 24 * 3600  # the activity window (D-17)
+_LOCAL_MAX = 4_096
+_local_windows: dict[tuple[str, str], list[int]] = {}
+
+
+def _local_slot(key_id: str, reason: str, minute: int) -> int | None:
+    if len(_local_windows) >= _LOCAL_MAX:
+        _local_windows.clear()
+    entry = _local_windows.get((key_id, reason))
+    if entry is not None and entry[0] == minute:
+        entry[1] += 1
+        return None
+    _local_windows[(key_id, reason)] = [minute, 0]
+    return entry[1] if entry is not None else 0
+
+
+async def refusal_audit_slot(redis, *, key_id: str, reason: str) -> int | None:
+    """May this refusal write its audit row? ``None``: no, it was counted. An int: yes, and the
+    int is how many refusals of this (key, reason) were suppressed since the last written row."""
+    minute = int(time.time()) // 60
+    window = f"{_REFUSAL_WINDOW_PREFIX}{key_id}:{reason}:{minute}"
+    pending = f"{_SUPPRESSED_PREFIX}{key_id}:{reason}"
+    try:
+        async with redis.pipeline(transaction=True) as pipe:
+            pipe.incr(window)
+            pipe.expire(window, 120)
+            count, _ = await pipe.execute()
+        if count > 1:
+            async with redis.pipeline(transaction=True) as pipe:
+                pipe.incr(pending)
+                pipe.expire(pending, _SUPPRESSED_TTL)
+                await pipe.execute()
+            return None
+        async with redis.pipeline(transaction=True) as pipe:  # GET + DEL in one MULTI (Redis 5+)
+            pipe.get(pending)
+            pipe.delete(pending)
+            suppressed, _ = await pipe.execute()
+        return int(suppressed or 0)
+    except Exception:  # noqa: BLE001 — Redis down: the per-worker window still caps the writes
+        logger.warning("refusal-audit throttle fell back to the in-process window", exc_info=True)
+        return _local_slot(key_id, reason, minute)

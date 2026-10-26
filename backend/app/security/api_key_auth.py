@@ -40,8 +40,9 @@ from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 
 from app import dependencies as deps
 from app.db import api_keys as api_keys_db
-from app.dependencies import get_pg_pool, get_service_role_supabase
+from app.dependencies import get_pg_pool, get_redis, get_service_role_supabase
 from app.services.audit_service import write_audit_entry
+from app.services.rate_limit import refusal_audit_slot
 
 logger = logging.getLogger(__name__)
 
@@ -205,8 +206,15 @@ async def audit_key_call_now(
     )
 
 
-async def _refuse(row: dict, *, call: str, reason: str) -> HTTPException:
-    await audit_key_call_now(row, "api_key.refused", call=call, reason=reason)
+async def _refuse(row: dict, *, call: str, reason: str, redis) -> HTTPException:
+    """Audit one refusal (at most one row per key, reason and minute; 293-REVIEW CR-02), then
+    return the one 401. A suppressed refusal is counted and named on the next row it writes."""
+    suppressed = await refusal_audit_slot(redis, key_id=str(row.get("id")), reason=reason)
+    if suppressed is not None:
+        await audit_key_call_now(
+            row, "api_key.refused", call=call, reason=reason,
+            detail={"suppressed": suppressed} if suppressed else None,
+        )
     return _invalid()
 
 
@@ -214,6 +222,7 @@ async def resolve_api_key(
     request: Request,
     credentials: HTTPAuthorizationCredentials | None = Depends(_key_bearer_scheme),
     pool: asyncpg.Pool = Depends(get_pg_pool),
+    redis=Depends(get_redis),
 ) -> ResolvedKey:
     """Authenticate one inbound call by its API key. Re-checks live state every call (D-05)."""
     if credentials is None or not credentials.credentials:
@@ -237,14 +246,14 @@ async def resolve_api_key(
 
     call = _call_kind(request)
     if row.get("revoked_at") is not None:
-        raise await _refuse(row, call=call, reason="revoked")
+        raise await _refuse(row, call=call, reason="revoked", redis=redis)
     expires_at = row.get("expires_at")
     if expires_at is not None and expires_at <= datetime.now(timezone.utc):
-        raise await _refuse(row, call=call, reason="expired")
+        raise await _refuse(row, call=call, reason="expired", redis=redis)
     if not await api_keys_db.is_org_member(pool, org_id=row["org_id"], user_id=row["user_id"]):
-        raise await _refuse(row, call=call, reason="not_member")
+        raise await _refuse(row, call=call, reason="not_member", redis=redis)
     if await deps._is_banned(str(row["user_id"])):
-        raise await _refuse(row, call=call, reason="banned")
+        raise await _refuse(row, call=call, reason="banned", redis=redis)
 
     try:
         await api_keys_db.touch_last_used(pool, row["id"], org_id=row["org_id"])

@@ -52,7 +52,7 @@ from typing import Annotated, Any
 from uuid import UUID
 
 import asyncpg
-from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, Response, status
+from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, Request, Response, status
 from pydantic import BaseModel, ConfigDict, Field, WithJsonSchema
 
 from app.db import api_keys as api_keys_db
@@ -69,7 +69,7 @@ from app.services.inbound_inputs import (
     inbound_kickoff,
     validate_inbound_inputs,
 )
-from app.services.rate_limit import enforce_key_limit
+from app.services.rate_limit import enforce_ip_limit, enforce_key_limit, refusal_audit_slot
 
 logger = logging.getLogger(__name__)
 
@@ -200,15 +200,30 @@ def _as_uuid(value: Any) -> UUID | None:
 
 
 async def _refused(
-    key: ResolvedKey | dict, *, call: str, reason: str, exc: HTTPException,
+    key: ResolvedKey | dict, *, call: str, reason: str, exc: HTTPException, redis,
     workflow_id: str | None = None, run_id: str | None = None, detail: dict | None = None,
 ) -> HTTPException:
-    """Audit one refusal NOW (an error response discards background tasks), return ``exc``."""
+    """Audit one refusal NOW (an error response discards background tasks), return ``exc``.
+
+    293-REVIEW CR-02: at most one row per key, reason and minute (``refusal_audit_slot``); the
+    rest are counted and the next written row names how many as ``detail.suppressed``.
+    """
+    key_id = key.id if isinstance(key, ResolvedKey) else key.get("id")
+    suppressed = await refusal_audit_slot(redis, key_id=str(key_id), reason=reason)
+    if suppressed is None:
+        return exc
+    if suppressed:
+        detail = {**(detail or {}), "suppressed": suppressed}
     await audit_key_call_now(
         key, "api_key.refused", call=call, workflow_id=workflow_id, run_id=run_id,
         outcome="refused", reason=reason, detail=detail,
     )
     return exc
+
+
+async def _client_limit(request: Request, redis=Depends(get_redis)) -> None:
+    """293-REVIEW CR-02: the per-client limit, on every /inbound route, BEFORE the key is read."""
+    await enforce_ip_limit(redis, client=(request.client.host if request.client else "unknown"))
 
 
 async def _limit(redis, key: ResolvedKey, kind: str, *, workflow_id: str | None = None,
@@ -218,7 +233,7 @@ async def _limit(redis, key: ResolvedKey, kind: str, *, workflow_id: str | None 
         await enforce_key_limit(redis, key_id=key.id, kind=kind)
     except HTTPException as exc:
         reason = "over_limit" if exc.status_code == 429 else "limiter_unavailable"
-        raise await _refused(key, call=kind, reason=reason, exc=exc,
+        raise await _refused(key, redis=redis, call=kind, reason=reason, exc=exc,
                              workflow_id=workflow_id, run_id=run_id)
 
 
@@ -238,6 +253,7 @@ def _raw_definition(value: Any) -> dict | None:
     "/workflows/{workflow_id}/runs",
     status_code=status.HTTP_201_CREATED,
     response_model=InboundStartResult,
+    dependencies=[Depends(_client_limit)],
 )
 async def start_workflow_run(
     workflow_id: str,
@@ -256,7 +272,7 @@ async def start_workflow_run(
     # other read, in the in-app kickoff's own 403 sentence.
     if unattended_launch.workflows_disabled():
         raise await _refused(
-            key, call="start", reason="workflows_disabled", workflow_id=workflow_id,
+            key, redis=redis, call="start", reason="workflows_disabled", workflow_id=workflow_id,
             exc=HTTPException(status_code=status.HTTP_403_FORBIDDEN,
                               detail=unattended_launch.WORKFLOWS_DISABLED_DETAIL),
         )
@@ -264,12 +280,12 @@ async def start_workflow_run(
     listed ={str(w.get("id")) for w in key.workflows if isinstance(w, dict)}
     wid = _as_uuid(workflow_id)
     if wid is None or str(wid) not in listed:
-        raise await _refused(key, call="start", reason="not_on_key", exc=_not_found(),
+        raise await _refused(key, redis=redis, call="start", reason="not_on_key", exc=_not_found(),
                              workflow_id=workflow_id)
 
     org_id, owner_id = UUID(key.org_id), UUID(key.user_id)
     if await pool.fetchrow(_SCOPE_SQL, wid, org_id) is None:
-        raise await _refused(key, call="start", reason="not_on_key", exc=_not_found(),
+        raise await _refused(key, redis=redis, call="start", reason="not_on_key", exc=_not_found(),
                              workflow_id=str(wid), detail={"deleted": True})
 
     rows = await api_keys_db.get_key_workflows(
@@ -278,12 +294,12 @@ async def start_workflow_run(
     row = next((r for r in rows if str(r.get("id")) == str(wid)), None)
     if row is None or not row.get("readable"):
         raise await _refused(
-            key, call="start", reason="cannot_run", workflow_id=str(wid),
+            key, redis=redis, call="start", reason="cannot_run", workflow_id=str(wid),
             exc=HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail=CANNOT_RUN_DETAIL),
         )
     if row.get("status") != "published":
         raise await _refused(
-            key, call="start", reason="unpublished", workflow_id=str(wid),
+            key, redis=redis, call="start", reason="unpublished", workflow_id=str(wid),
             exc=HTTPException(status_code=status.HTTP_409_CONFLICT, detail=UNPUBLISHED_DETAIL),
         )
 
@@ -292,7 +308,7 @@ async def start_workflow_run(
     try:
         await entitlement_service.enforce_entitlement(pool, org_id, "workflows")
     except HTTPException as exc:
-        raise await _refused(key, call="start", reason="entitlement", exc=exc,
+        raise await _refused(key, redis=redis, call="start", reason="entitlement", exc=exc,
                              workflow_id=str(wid))
 
     raw = _raw_definition(row.get("definition"))
@@ -302,14 +318,14 @@ async def start_workflow_run(
     )
     if definition is None:
         raise await _refused(
-            key, call="start", reason="cannot_run", workflow_id=str(wid),
+            key, redis=redis, call="start", reason="cannot_run", workflow_id=str(wid),
             exc=HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail=CANNOT_RUN_DETAIL),
         )
 
     sentence = unattended_launch.template_refusal(definition)
     if sentence is not None:
         raise await _refused(
-            key, call="start", reason="no_template", workflow_id=str(wid),
+            key, redis=redis, call="start", reason="no_template", workflow_id=str(wid),
             exc=HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, detail=sentence),
         )
 
@@ -317,7 +333,7 @@ async def start_workflow_run(
         values = validate_inbound_inputs(raw, (body.inputs if body is not None else {}))
     except InboundInputRefused as refusal:
         raise await _refused(
-            key, call="start", reason=refusal.code, workflow_id=str(wid),
+            key, redis=redis, call="start", reason=refusal.code, workflow_id=str(wid),
             detail={"names": refusal.names} if refusal.names else None,
             exc=HTTPException(
                 status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, detail=refusal.detail
@@ -333,7 +349,10 @@ async def start_workflow_run(
             definition=definition,
             # Validated declared fields, then the two server-set keys; nothing else reaches the run.
             # 293-05 F-1: the kickoff carries the values, each in the untrusted envelope.
-            inputs={**values, "kickoff_prompt": inbound_kickoff(name, values), UNTRUSTED_FLAG: True},
+            inputs={
+                **values, "kickoff_prompt": inbound_kickoff(name, values),
+                UNTRUSTED_FLAG: True,
+            },
             title=f"{name} · via key {key.label}",
             max_tokens=_DEFAULT_MAX_TOKENS,
             max_duration=_DEFAULT_MAX_DURATION,
@@ -347,7 +366,7 @@ async def start_workflow_run(
         )
     except unattended_launch.UnattendedLaunchDisabled as off:  # flipped off mid-request
         raise await _refused(
-            key, call="start", reason="workflows_disabled", workflow_id=str(wid),
+            key, redis=redis, call="start", reason="workflows_disabled", workflow_id=str(wid),
             exc=HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail=str(off)),
         )
     audit_key_call(
@@ -398,7 +417,7 @@ async def _file_links(pool, redis, *, key: ResolvedKey, run: dict) -> list[Inbou
     return files
 
 
-@router.get("/runs/{run_id}", response_model=InboundRunRead)
+@router.get("/runs/{run_id}", response_model=InboundRunRead, dependencies=[Depends(_client_limit)])
 async def read_inbound_run(
     run_id: str,
     background_tasks: BackgroundTasks,
@@ -415,8 +434,9 @@ async def read_inbound_run(
         if rid is not None else None
     )
     if run is None:
-        raise await _refused(key, call="read", reason="run_not_found", exc=_not_found(),
-                             run_id=run_id)
+        raise await _refused(
+            key, redis=redis, call="read", reason="run_not_found", exc=_not_found(),
+            run_id=run_id)
     run = dict(run)
 
     from app.db import workflows as workflows_db  # noqa: PLC0415
@@ -503,6 +523,7 @@ async def read_inbound_run(
 @router.get(
     "/files/{token}",
     response_class=Response,
+    dependencies=[Depends(_client_limit)],
     responses={200: {"content": {"application/octet-stream": {}},
                      "description": "The file's exact bytes, as an attachment."}},
 )
@@ -537,7 +558,7 @@ async def download_inbound_file(
     if key_row.get("revoked_at") is not None or (
         expires_at is not None and expires_at <= datetime.now(timezone.utc)
     ):
-        raise await _refused(key_row, call="read", reason=(
+        raise await _refused(key_row, redis=redis, call="read", reason=(
             "revoked" if key_row.get("revoked_at") is not None else "expired"
         ), exc=_not_found(), run_id=str(run_id), detail={"file": True})
 
@@ -546,8 +567,9 @@ async def download_inbound_file(
     if not await api_keys_db.is_org_member(
         pool, org_id=key_row["org_id"], user_id=key_row["user_id"]
     ) or await deps._is_banned(str(key_row["user_id"])):
-        raise await _refused(key_row, call="read", reason="not_member", exc=_not_found(),
-                             run_id=str(run_id), detail={"file": True})
+        raise await _refused(
+            key_row, redis=redis, call="read", reason="not_member", exc=_not_found(),
+            run_id=str(run_id), detail={"file": True})
 
     key = ResolvedKey(
         id=str(key_row["id"]), org_id=str(key_row["org_id"]), user_id=str(key_row["user_id"]),
@@ -566,8 +588,9 @@ async def download_inbound_file(
         or file_row.get("is_expired")
         or file_row.get("kind") == "template_input"
     ):
-        raise await _refused(key, call="read", reason="run_not_found", exc=_not_found(),
-                             run_id=str(run_id), detail={"file": True})
+        raise await _refused(
+            key, redis=redis, call="read", reason="run_not_found", exc=_not_found(),
+            run_id=str(run_id), detail={"file": True})
 
     from app.api.workspace import _safe_download_filename  # noqa: PLC0415
     from app.services.workspace_service import WorkspaceError, _get_file_content  # noqa: PLC0415
@@ -577,8 +600,9 @@ async def download_inbound_file(
             pool, deps.get_service_role_supabase(key.org_id), file_row
         )
     except WorkspaceError:
-        raise await _refused(key, call="read", reason="run_not_found", exc=_not_found(),
-                             run_id=str(run_id), detail={"file": True}) from None
+        raise await _refused(
+            key, redis=redis, call="read", reason="run_not_found", exc=_not_found(),
+            run_id=str(run_id), detail={"file": True}) from None
 
     audit_key_call(
         background_tasks, key, "api_key.read", call="file", run_id=str(run_id), outcome="ok",

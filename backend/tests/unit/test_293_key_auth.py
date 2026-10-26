@@ -27,6 +27,7 @@ from fastapi.testclient import TestClient
 
 from app import dependencies as deps
 from app.security import api_key_auth as auth
+from tests.unit.phase293_inbound_fakes import FakeRedis
 
 KEY_ID = "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa"
 ORG_ID = "44444444-4444-4444-8444-444444444444"
@@ -142,6 +143,8 @@ def client(world):
         return _Pool()
 
     app.dependency_overrides[deps.get_pg_pool] = _pool
+    redis = FakeRedis()  # 293-REVIEW CR-02: the refusal-audit throttle counts here, per test
+    app.dependency_overrides[deps.get_redis] = lambda: redis
 
     @app.post("/probe")
     async def probe(key: auth.ResolvedKey = Depends(auth.resolve_api_key)):
@@ -219,6 +222,8 @@ def test_every_bad_key_answers_with_one_byte_identical_401(world):
             return _Pool()
 
         app.dependency_overrides[deps.get_pg_pool] = _pool
+        redis = FakeRedis()  # 293-REVIEW CR-02: the refusal-audit throttle counts here
+        app.dependency_overrides[deps.get_redis] = lambda: redis
 
         @app.post("/probe")
         async def probe(key: auth.ResolvedKey = Depends(auth.resolve_api_key)):

@@ -144,7 +144,8 @@ def test_not_on_key_unknown_and_foreign_org_are_byte_identical_404s(env, monkeyp
     assert not_on_key == malformed == foreign == json.dumps(NOT_FOUND, separators=(",", ":")).encode()
     assert env["launch"].await_count == 0
     reasons = [a[1]["reason"] for a in _refusals(env)]
-    assert reasons == ["not_on_key", "not_on_key", "not_on_key"]
+    # 293-REVIEW CR-02: one refusal row per key, reason and minute; the other two are counted.
+    assert reasons == ["not_on_key"]
     # the scoped read binds the key's org
     scope = [c for c in env["pool"].calls if "FROM workflow_definitions" in c[0]]
     assert scope and "org_id = $2" in scope[-1][0] and str(scope[-1][1][1]) == ORG_ID

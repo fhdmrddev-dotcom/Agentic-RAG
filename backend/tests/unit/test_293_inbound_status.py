@@ -91,7 +91,8 @@ def test_every_run_this_key_did_not_start_is_the_same_404(env):
               env["client"].get("/inbound/runs/99999999-9999-4999-8999-999999999999").content]
     assert bodies[0] == bodies[1] == bodies[2] == b'{"detail":"Not found."}'
     reasons = [a[1]["reason"] for a in all_audits(env["now"], env["later"])]
-    assert reasons == ["run_not_found"] * 3
+    # 293-REVIEW CR-02: one refusal row per key, reason and minute; the other two are counted.
+    assert reasons == ["run_not_found"]
 
 
 def test_the_same_owners_other_key_cannot_read_the_run(monkeypatch):
@@ -233,7 +234,8 @@ def test_a_valid_link_streams_the_exact_bytes_once(env, monkeypatch):
     assert r.status_code == 200, r.text
     assert r.content == b"PK\x03\x04exact-bytes\x00\xff"
     assert 'filename="digest.docx"' in r.headers["content-disposition"]
-    assert env["redis"].pipelines == [{"transaction": True}]
+    # One MULTI for the per-client count (293-REVIEW CR-02), one for the token's GET + DEL.
+    assert env["redis"].pipelines == [{"transaction": True}] * 2
     second = env["client"].get(url)
     assert second.status_code == 404 and second.content == b'{"detail":"Not found."}'
     run_sql = next(c for c in env["pool"].calls if "FROM workflow_runs" in c[0])[0]

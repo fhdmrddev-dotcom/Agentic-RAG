@@ -114,13 +114,14 @@ A link works **once** and for **300 seconds**. After one download, or after five
 | `422` | "This workflow needs a file upload, which a key can't send yet. Start it in the app." | The workflow takes a file at launch. |
 | `429` | "Too many starts: this key may start 10 runs a minute. Try again in … seconds." | Over the start limit. Wait for the `Retry-After` seconds. |
 | `429` | "Too many status reads: this key may read 120 times a minute. Try again in … seconds." | Over the read limit. Wait for the `Retry-After` seconds. |
+| `429` | "Too many calls from this address: at most 1200 a minute. Try again in … seconds." | Over the per-address limit, which applies to every call to `/inbound`, with or without a valid key. Wait for the `Retry-After` seconds. |
 | `503` | "Rate limiting is unavailable right now, so this call was refused. Try again in a minute." | Syrel could not count calls, so it refused rather than let calls through. |
 
 The numbers in the `429` sentences are the limits in force. 10 starts and 120 reads a minute per key are the defaults; an operator can change them.
 
 ## Where it shows in Syrel
 
-A run started with a key says **Started by key** and the key's label on its run page, its evidence report and the run log. Each key's card in **Settings → API keys** lists its recent calls, refusals included, with the reason. Every call is also in the audit log, under **API keys**.
+A run started with a key says **Started by key** and the key's label on its run page, its evidence report and the run log. Each key's card in **Settings → API keys** lists its recent calls, refusals included, with the reason. The same refusal repeated within a minute is recorded once, and the next record says how many repeats it stood for. Every call is also in the audit log, under **API keys**.
 
 ## Related
 
