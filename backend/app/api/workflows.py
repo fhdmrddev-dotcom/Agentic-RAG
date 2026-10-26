@@ -1431,8 +1431,8 @@ async def delete_draft(
         raise HTTPException(
             status_code=status.HTTP_409_CONFLICT,
             detail=(
-                "This workflow can't be deleted yet: a run record from an earlier publish "
-                "attempt still points to it. Nothing was deleted."
+                "This workflow can't be deleted yet: "
+                "a run record from an earlier publish attempt still points to it. Nothing was deleted."
             ),
         )
     if not deleted:

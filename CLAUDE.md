@@ -431,7 +431,7 @@ node scripts/check-hot-file-ledger.cjs <phase-dir>   # 0 clear · 1 missing rows
 | `frontend/src/components/workflows/DraftArrivalCard.tsx` | 5 / 4 / 688 (was `4 / 3 / 625`) | 291-05: two optional props + one fold boolean; rows in a leaf · ⛔ |
 | `frontend/src/components/workflows/DecisionsList.tsx` | 5 / 3 / 429 | ⚠ now FIRES (291) · 291-05: one optional prop, one template-row sub-line |
 | `frontend/src/components/workflows/decisionsVocabulary.ts` | 6 / 4 / 344 (was `4 / 3 / 327`) | 291-05: one glyph + one formatter, still a zero-import leaf · ⛔ |
-| `backend/app/api/workflows.py` | 49 / 26 / 1699 (was `48 / 26 / 1689`) | 296-06: delete_draft FK arm → worded 409 · split OWED |
+| `backend/app/api/workflows.py` | 50 / 26 / 1699 (was `49 / 26 / 1699`) | 296-06: delete_draft FK arm → worded 409 · split OWED |
 | `backend/app/api/workflow_wire.py` | 4 / 4 / 532 (was `3 / 3 / 517`) | 296-06: AutoAnsweredNote + unplaced_sentences, additive |
 | `backend/app/api/workflow_authoring_doors.py` | 5 / 3 / 797 (was `4 / 2 / 793`) | ⚠ now FIRES (296) · 296-06: bind returns unplaced_sentences |
 | `backend/app/api/workflow_runs.py` | 21 / 15 / 1445 (was `20 / 14 / 1444`) | 296-06: confidence typed (1 import name, 1 annotation) · extraction FIRST |
