@@ -28,7 +28,7 @@ See: `.planning/PROJECT.md` (updated 2026-10-18)
 
 **Core value:** The agent acts as an AI colleague — it knows your knowledge base, can run code, and
 can be taught new behaviours (skills) that persist and can be shared.
-**Current focus:** v4.7 milestone close — every phase 286-295 is closed; next is `/gsd:audit-milestone`
+**Current focus:** Phase 296 — close-v4-7-debt (added after the v4.7 audit, 2026-10-26)
 
 ---
 
@@ -41,7 +41,7 @@ reviewer exists, so a phase closes `verification_mode: self-verified`, never `re
 
 ## Current Position
 
-Phase: none active. v4.7's last phase (293) closed 2026-10-26; next is `/gsd:audit-milestone`, then `/gsd:complete-milestone`.
+Phase: 296 (close-v4-7-debt) — DISCUSSING. Added 2026-10-26 by the operator after the v4.7 audit (`v4.7-MILESTONE-AUDIT.md`, tech_debt, 21/21): fix every open defect; feature-shaped items → v4.8 seeds; then ONE deploy of 292.1 + 293 + 296 (cloud migs 214, 215 first, each shown before it runs).
 Previous: Phase: 293 (Start From Outside, and Close Out) — CLOSED 2026-10-26. NOT deployed.
   What shipped: API keys (one person, one org, chosen workflows, expiry 30/90/365/never); `/inbound` start + status + one-time file link; run origin (app / schedule / key) on 4 surfaces; the card shows the next run time; per-key limits in Settings; seed close-out (REG-06). Migration 215.
   Verification passed 6/6 (`afdd5e4d1`). Operator signed G-4 2026-10-25. SECURITY 36/36 closed, 0 open (`e6026c21f`); accepted AR-05 (key lists show member/revoker emails) and AR-06 (per-IP limit sees the proxy IP behind nginx/Traefik; re-open when a proxy-aware client-IP helper lands or `/inbound` gets real outside traffic).
@@ -70,6 +70,7 @@ Plan: 1 of 5
 
 ### Roadmap Evolution
 
+- Phase 296 added (2026-10-26, operator): Close v4.7 Debt. Scope chosen: all defects in one phase (~60 items), features to v4.8; deploy after the fixes.
 - Phase 291 planned (2026-10-22, autonomous run): 5 plans in 4 waves (W1: 01 read the files · W2: 02 draft from the files ‖ 03 fill the form back · W3: 04 the describe door · W4: 05 arrival card + close-out). Research, PATTERNS, UI-SPEC (approved rev 1). Planning-time decisions D-31..D-35 added to CONTEXT; D-32 narrows D-05 (references not read at run time) and D-33 narrows D-07 (reload counted from first autosave) — owed: operator ack. Plan check passed in round 2 (2 blockers + 4 warnings fixed in round 1; W2 null-keys closed by hand). Decisions 35/35 cited in must_haves (gate parses 21; rest checked by hand). Filed BUG-261022-01. Next: `/gsd:execute-phase 291`.
 - Phase 294 added (2026-10-20, operator): Decision Engine: Rerank and Citation Check (DEC-01..03). It is outside the workflow theme, independent of 290-293, and can run any time after 289. Intake research: `phases/294-decision-engine-rerank-and-citation-check/294-INTAKE-RESEARCH.md`. `gsd-sdk query phase.add` wrote the entry under the v3.0 section; it was moved by hand into v4.7.
 - Phase 294 context gathered (2026-10-20): `phases/294-decision-engine-rerank-and-citation-check/294-CONTEXT.md` (D-01..D-24). DEC-01 amended: Jev via OpenRouter only. Next for 294: `/gsd:sketch` (D-20, G-2) before `/gsd:plan-phase 294`. Phase 290 is still the current position.

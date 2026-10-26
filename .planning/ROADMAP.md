@@ -92,6 +92,7 @@ Requirements: [`REQUIREMENTS.md`](REQUIREMENTS.md). **21 v4.7 requirements, 21 m
 - [x] **Phase 293: Start From Outside, and Close Out** (closed 2026-10-26: verified 6/6, operator signed G-4 2026-10-25, secured 36/36, UAT 12/12 after fast fix `048dec8e9`; mig 215 in cloud owed before deploy): authenticated inbound run start with read-back, trigger provenance and last/next run, seed statuses reconciled (START-02, START-04, REG-06)
 - [x] **Phase 294: Decision Engine: Rerank and Citation Check** (complete 2026-10-20, live c94e1bed9): a Settings switch picks Jev, OpenAI Decisions or a local model to rerank and prune search candidates, and a citation check labels each cited sentence (DEC-01, DEC-02, DEC-03)
 - [x] **Phase 295: Runs That Don't Dead-End** (closed 2026-10-24, operator signed): an empty or uncited KB step pauses and asks instead of failing; misconfigurations refused before a run; the judge stops failing recorded-not-sent actions; every run ends truthfully with a reason (RUN-01..04)
+- [ ] **Phase 296: Close v4.7 Debt** (added 2026-10-26, operator, from the v4.7 audit): fix every open defect the milestone found (bugs, review findings, UAT findings); feature-shaped items move to v4.8 as seeds; one deploy of 292.1 + 293 + these fixes afterwards
 
 ### Phase Details
 
@@ -448,6 +449,25 @@ Plans:
 **UI hint**: yes
 **Flags**: **Evidence**: `BUG-261020-07`..`12` (folded here) and memory `project_workflow_blocking_measured_20261020`. **Route at discuss**: `BUG-261020-01` (a human step's answer never reaches the next step) belongs to the same "doesn't run as intended" family and is the first candidate to fold. **Not in scope**: branching or loops (`SEED-295` stays parked; the 2026-10-20 measure found no failure caused by a route the engine cannot express). `ValidatorSpec.on_failure` already accepts `ask_user` (D-11), so RUN-01 may be mostly a default and a worded pause; verify before adding engine code. **G-2 sketch** for the found-nothing pause. **G-4**. Hot files: `harness_engine.py`, `phase_types.py`, `validator_kinds.py`, `publish_service.py`, `run_reconciler.py`, `PendingAskCard.tsx`; read their ledger sections.
 
+#### Phase 296: Close v4.7 Debt
+
+**Goal**: Every defect v4.7 found and deferred is fixed or explicitly accepted with a reason, so the milestone closes with no open bug carried silently. No new capability.
+**Depends on**: Phases 286-295 (all closed).
+**Requirements**: none new (debt close-out). Source list: `.planning/v4.7-MILESTONE-AUDIT.md` `tech_debt`, each phase's REVIEW / deferred-items / UAT findings, and open `surface: Agentic-RAG` bugs filed 2026-10-18..26.
+**Success Criteria** (what must be TRUE):
+
+  1. Every item in the 296 inventory (CONTEXT) reads fixed, accepted-with-reason, or moved-to-v4.8-as-a-seed; none is silently dropped.
+  2. Each fixed bug has a test that was driven RED before the fix, and each closed bug report reads `status: closed` with the fixing commit.
+  3. The security items are closed: provider keys no longer reach LangSmith traces (BUG-261020-03), and folder/workflow create honours `X-Org-Id` (BUG-261021-02).
+  4. Gates hold: backend unit failures <= 71, vitest count gate OK, `tsc -p tsconfig.app.json` no new errors, ledger / seeds / CLAUDE.md-size gates clear.
+  5. User-visible fixes are driven live in Chrome (G-4) before close.
+
+**How we'd know this failed**: an inventory item has no disposition; a "fixed" bug still reproduces live; a fix adds a capability (that is a v4.8 phase); a gate is weakened to pass.
+**Plans:** 0 plans
+
+**UI hint**: yes
+**Flags**: G-8: target 4-5 plans. G-5: many touched files FIRE (`WorkflowRunPage.tsx`, `harness_engine.py`, `threads.py`, `runs.py`, `StreamsProvider.tsx`): one-touch fixes only, honoured by construction, or defer. Security review (`/gsd:secure-phase`) owed for the LangSmith and tenancy fixes. Migrations resume at `216` if one is needed.
+
 ### Progress
 
 | Phase | Plans Complete | Status | Completed |
@@ -462,6 +482,7 @@ Plans:
 | 293. Start From Outside, and Close Out | 5/5 | Complete (2026-10-26) | 6/6 SC; operator signed G-4; SECURITY 36/36 closed (AR-05/06 accepted); UAT 12/12; not deployed, cloud mig 215 owed first |
 | 294. Decision Engine: Rerank and Citation Check | 5/5 | complete (2026-10-20) | 6/6 SC met in code; 294-HUMAN-UAT 9/9 passed live; roster R2 ⛔ Anthropic billing, glm-5.3 ⛔ BUG-261020-06; not pushed; cloud mig 211 owed before deploy |
 | 295. Runs That Don't Dead-End | 7/7 (+3 gap fixes) | Complete (2026-10-24) | S1-S7 PASS; Anthropic row re-run PASS; operator signed |
+| 296. Close v4.7 Debt | 0/TBD | Not started | - |
 
 ---
 
