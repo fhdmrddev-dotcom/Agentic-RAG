@@ -213,9 +213,11 @@ async def test_list_key_calls_reads_the_call_audit_rows_only():
     assert "audit_log" in sql
     assert "action_type LIKE 'api_key.%'" in sql
     assert "NOT IN ('api_key.create','api_key.revoke')" in sql
-    assert "metadata->>'api_key_id' = ANY($2)" in sql
-    assert "LIMIT 600" in sql
-    assert args == (ORG, [str(KEY)], since)
+    # 293-REVIEW WR-02: one LATERAL read per key id, each with its own limit (never a shared 600).
+    assert "unnest($2::text[])" in sql and "LATERAL" in sql
+    assert "metadata->>'api_key_id' = k.api_key_id" in sql
+    assert "LIMIT $4" in sql and "LIMIT 600" not in sql
+    assert args == (ORG, [str(KEY)], since, 50)
 
 
 async def test_list_key_calls_with_no_keys_reads_nothing():

@@ -149,7 +149,8 @@ async def _serialize_keys(
 
     calls_by_key: dict[str, list[dict]] = {}
     audit_rows = await api_keys_db.list_key_calls(
-        pool, org_id=org_id, key_ids=[str(r["id"]) for r in rows], since=now - _CALL_WINDOW
+        pool, org_id=org_id, key_ids=[str(r["id"]) for r in rows], since=now - _CALL_WINDOW,
+        per_key=_CALLS_PER_KEY,
     )
     for a in audit_rows:
         kid = str((a.get("metadata") or {}).get("api_key_id"))

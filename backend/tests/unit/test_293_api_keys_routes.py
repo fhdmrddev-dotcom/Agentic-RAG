@@ -125,7 +125,7 @@ def store(monkeypatch):
             return s.project(k)
         return None
 
-    async def list_key_calls(pool, *, org_id, key_ids, since):
+    async def list_key_calls(pool, *, org_id, key_ids, since, per_key=50):
         return [c for c in s.calls if c["metadata"].get("api_key_id") in key_ids]
 
     async def get_key_workflows(pool, *, workflow_ids, user_id, org_id):

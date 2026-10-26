@@ -212,25 +212,34 @@ async def is_org_member(pool: asyncpg.Pool, *, org_id: UUID, user_id: UUID) -> b
 
 
 async def list_key_calls(
-    pool: asyncpg.Pool, *, org_id: UUID, key_ids: list[str], since: datetime
+    pool: asyncpg.Pool, *, org_id: UUID, key_ids: list[str], since: datetime, per_key: int = 50
 ) -> list[dict]:
     """The recent CALLS made with these keys (start / read / refused), newest first (D-17).
 
     Read from ``audit_log`` — the activity record is the audit record, so there is no second
     table to drift. Management rows (create / revoke) are not calls and are left out. The
     expression index ``audit_log_api_key_id_idx`` (migration 215) serves the ``api_key_id`` match.
+
+    293-REVIEW WR-02: the limit is PER KEY (one ``LATERAL ... LIMIT`` per id), never shared, so
+    one busy key can no longer push every other key's calls out of the answer.
     """
     if not key_ids:
         return []
     rows = await pool.fetch(
+        "SELECT c.action_type, c.metadata, c.created_at "
+        "FROM unnest($2::text[]) AS k(api_key_id) "
+        "CROSS JOIN LATERAL ("
         "SELECT action_type, metadata, created_at FROM audit_log "
         "WHERE org_id = $1 AND action_type LIKE 'api_key.%' "
         "AND action_type NOT IN ('api_key.create','api_key.revoke') "
-        "AND metadata->>'api_key_id' = ANY($2) AND created_at > $3 "
-        "ORDER BY created_at DESC LIMIT 600",
+        "AND metadata->>'api_key_id' = k.api_key_id AND created_at > $3 "
+        "ORDER BY created_at DESC LIMIT $4"
+        ") AS c "
+        "ORDER BY c.created_at DESC",
         org_id,
         key_ids,
         since,
+        per_key,
     )
     return [dict(r) for r in rows]
 
