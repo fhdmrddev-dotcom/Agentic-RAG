@@ -24,11 +24,11 @@ not built. The production deploy of 292.1 + 293 + 296 follows the phase as a sep
 - **D-03:** No gap round may add capability (G-7). A fix that turns out to need a new capability stops and becomes a seed.
 
 ### Rulings auto-picked in --auto (the operator may reverse any of them)
-- **D-04 (BUG-261021-05):** The **engine enforces** the citations check on escalated steps (`grounding.effective_phase` covers `escalated` as well as `detected`). The seal stays. Reason: the seal is a governance promise, and since 295 an uncited step pauses and asks instead of failing, so enforcement is no longer harsh. The alternative was to change the seal copy.
+- **D-04 (BUG-261021-05) — AMENDED 2026-10-26 after research (original auto-pick was "the engine enforces the check").** Research measured that enforcement is impossible as written: a step reads `escalated` only when it has NO knowledge-base tool (`grounding.py:1203-1209`), `retrieved_and_cited` fails at once on empty `citations` (`validator_kinds.py:413-418`), and an escalated step is locked so "continue without sources" is gone (`engine_ask.py:787`) — every escalated step would fail every run and every publish trial. **Ruling now: option (b)** — the builder seal and gate row stop claiming a check for `escalated` (W3, frontend: `gatesFor`, `NodeCornerMarks.tsx`, `GovernanceSection.tsx`). Giving an escalated step a real search tool is a new capability → **SEED** (v4.8). Local DB has 0 escalated steps, so no saved workflow changes.
 - **D-05 (BUG-261020-02):** For a **non-owner** viewer of the evidence page, once an upstream step's output is withheld, every later step's output is withheld too, with the same worded reason. Owners are unchanged. Reason: the only reliable bound; per-step citation tracing cannot see substance restated without a citation.
 - **D-06 (SEED-364):** **New** orgs get a neutral default name (no email). Existing org names are not renamed: no migration touches user data, and the owner can rename.
 - **D-07 (295-IN-08):** The judge's "not sending is by design" note applies only when the step's send grant was present and recording was the designed path. A missing grant reads as a missing grant.
-- **D-08 (291-S6-F7):** The golden run derives launch inputs from the author's test instruction and the field examples or defaults. It may use placeholders only for fields with neither, and the gauntlet says so in words.
+- **D-08 (291-S6-F7) — AMENDED after research** (`InputFieldSpec` has no example/default field): the golden run uses **typed stand-in values** (a date for a date field, a number for a number, an enum's first option, a short realistic string for text) instead of "golden run placeholder for <key>", and the gauntlet says in words that the values were stand-ins. Deriving inputs from the author's test instruction → **SEED** (v4.8).
 - **D-09 (290-WR-02):** Include it, reversing the 2026-10-24 "accept until refactor". Lift `view` into the builder and gate undo/redo and the side panel while the Team view shows. One prop and one condition (G-5 one-touch); the full WorkflowCanvas refactor stays out.
 - **D-10 (BUG-261024-04):** Split it. The **defect** (a follow-up turn re-shows every prior-turn file) is fixed in 296: a turn shows only files produced in that turn. The **policy** (intermediate PNGs beside the final document) becomes a seed.
 - **D-11 (291 network_mode):** Seed it, as a security capability decision for v4.8, with the trigger "before any non-author or API caller can reach a workflow with `execute_code`". Not changed in 296, because changing sandbox egress breaks workflows that fetch at run time.
@@ -61,12 +61,18 @@ not built. The production deploy of 292.1 + 293 + 296 follows the phase as a sep
   7. The evidence report title reads normally at 1536px with four buttons.
   8. Follow-up chat turns show only that turn's files.
 - **D-21:** **Cross-provider (SC#10 rule):** W2's provider-touching fixes need the full native roster plus OpenRouter. These are BUG-261024-01, 292.1-IN-01/02, the 291-S6-F8 first-step turn and 293-F-4. Rows blocked by billing or account state are recorded ⛔ with the reason (OpenRouter 402; Moonshot suspended), never dropped.
-- **D-22:** Gates at close: backend unit failures ≤ 71 (expect lower: 288-T-2, 289-T-1 and 292.1-test_075_4 are in the inherited set), vitest count gate OK with `GSD_VITEST_MAX_WORKERS=2`, `tsc -p tsconfig.app.json` set-diff no new errors, ledger / seeds / CLAUDE.md-size gates clear.
+- **D-22:** Gates at close: backend unit failures ≤ 71 (only `test_075_4` is inside `tests/unit`, so expect ≤ 70; 288-T-2 and 289-T-1 live outside the gated set and are fixed on their own), vitest count gate OK with `GSD_VITEST_MAX_WORKERS=2`, `tsc -p tsconfig.app.json` set-diff no new errors, ledger / seeds / CLAUDE.md-size gates clear.
 
 ### Claude's Discretion
 - Exact wording of every new user-visible sentence, following each surface's vocabulary file.
 - Whether a given S row is folded into the plan whose files it shares.
 - Ordering inside a plan.
+
+### Research corrections (2026-10-26, `296-RESEARCH.md`)
+- **D-23:** DEBT-3 most likely does not reproduce (nothing writes `workflow_runs.status='cap_paused'`; `run_is_cap_paused` reads `runs`, the wrong table for this guard). RED-drive it; close as "did not reproduce" under D-02 if it stays green.
+- **D-24:** BUG-261025-03's measured cause is the boot resume sweep re-driving a waiting human-input step (each start inserts a new prompt row). The fix copies 295's engine-ask arm 2a, in W2 (backend). The panel half stays in W4.
+- **D-25:** SEED-364 needs migration **216** (default org name) plus the matching `scripts/full-schema-supplement.sql:205` edit in the same commit, applied by SQL editor, then `regenerate-full-schema.sh`.
+- **D-26:** Six touched files have no ledger row (`api/schedules.py`, `tools/render_template.py`, `sub_agent_models.py`, `definitionOps.ts`, `GovernanceSection.tsx`, `NodeCornerMarks.tsx`). The plan that first touches each adds its row + section in the same commit.
 
 </decisions>
 
@@ -115,7 +121,7 @@ not built. The production deploy of 292.1 + 293 + 296 follows the phase as a sep
 ### Established Patterns
 - One refusal = one worded sentence from a vocabulary file; raw codes never render (293 UAT lesson; `apiKeyFacts.test.ts` reads backend reasons).
 - Bug reports are closed by editing frontmatter (`status: closed`, the fixing commit); seeds by editing `status` + `status_note`.
-- `-p no_run_sweeps` for TestClient tests (SEED-363 until its guard lands).
+- ⚠ `-p no_run_sweeps` does NOT exist in the repo (research, 2026-10-26); SEED-363's guard is the fix, and it is what BUG-261025-03's repeat prompts come from.
 
 ### Integration Points
 - Run lifecycle: `api/runs.py` (re-drive), `run_lifecycle.py`, `run_reconciler.py`, `run_handoff.py`, `harness_engine.py`.
