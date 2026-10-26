@@ -449,8 +449,8 @@ node scripts/check-hot-file-ledger.cjs <phase-dir>   # 0 clear · 1 missing rows
 | `backend/app/services/harness/grounding.py` | 23 / 10 / 1437 (was `21 / 8 / 1414`) | 295-03: ONE pure predicate (is_engine_citation_gate) |
 | `frontend/src/components/workflows/PhaseFormPanel.tsx` | 30 / 14 / 1566 | honoured by construction ×6 (185 / 193 / 193.1 / 199 / 200 / **214**) |
 | `backend/app/db/workflows.py` | 59 / 30 / 2827 (was `58 / 29 / 2808`) | 293-02: create_workflow_run origin kwargs (keyword-only) |
-| `backend/app/services/harness/publish_service.py` | 34 / 15 / 2010 (was `33 / 15 / 2008`) | 295-09 WR-05: judge system prompt via one helper (If 70→70) |
-| `backend/app/services/workflow_authoring.py` | 18 / 12 / 1120 (was `17 / 11 / 1025`) | 291-02: files = one more untrusted grounding input (+98 −3) |
+| `backend/app/services/harness/publish_service.py` | 35 / 16 / 2057 (was `34 / 15 / 2010`) | 296-03: typed golden stand-ins + note (pure helper); ceiling in seconds |
+| `backend/app/services/workflow_authoring.py` | 23 / 13 / 1269 (was `18 / 12 / 1120`) | 296-03: unticked told; provider_error; file-free requirement · seam OWED |
 | `backend/app/models/harness.py` | 22 / 20 / 776 (was `20 / 19 / 766`) | 291-02: InputFieldSpec origin + note, omitted when absent |
 | `frontend/src/components/workflows/builderStore.ts` | 16 / 9 / 1039 (was `14 / 8 / 968`) | 291: two actions (refs, input source), no state field |
 | `frontend/src/components/panel/WorkspacePanel.tsx` | 17 / 11 / 646 (was `16 / 10 / 646`) | honoured by construction (194 / 194.1 / 282-02: one prop) |
