@@ -1117,13 +1117,17 @@ export function WorkflowRunPage({ runId, onBack, onOpenThread }: Props) {
    */
   const [alertText, setAlertText] = useState<string | null>(null)
   const alertedForRef = useRef<string | null>(null)
+  // 296-04 (289-F-A): which run this page has SEEN live. A run that then reads `failed` swaps to
+  // the report, which would drop the alert below; the report announces it instead (one prop).
+  const seenLiveRef = useRef<string | null>(null)
   useEffect(() => {
     if (loadPhase !== "ready" || !run) return
+    if (!isTerminal) seenLiveRef.current = run.id
     if (!ALERTING_STATUSES.has(run.status)) return
     if (alertedForRef.current === run.id) return
     alertedForRef.current = run.id
     setAlertText(band.sentence)
-  }, [loadPhase, run, band.sentence])
+  }, [loadPhase, run, band.sentence, isTerminal])
 
   // ── The three states that are not a run ─────────────────────────────────────
 
@@ -1149,6 +1153,9 @@ export function WorkflowRunPage({ runId, onBack, onOpenThread }: Props) {
         runId={runId}
         onBack={onBack}
         onOpenThread={loadPhase === "ready" ? onOpenThread : undefined}
+        watchedFailure={
+          run?.status === "failed" && seenLiveRef.current === run.id ? band.sentence : undefined
+        }
       />
     )
   }

@@ -240,4 +240,35 @@ describe("layoutDiagram — edge cases", () => {
       check(layoutDiagram(invoice(), width), invoice().edges.map((e) => e.label), width)
     }
   })
+
+  it("296-04 (292-WR-04-res): no back-edge label box intersects any node box at 311px or 640px", () => {
+    // A label is text-xs at line-height 1.4 (16.8px), centred on labelY; its drawn width is the
+    // estimate, truncated at labelMaxWidth. Measured as boxes, never as a field's presence.
+    const LABEL_H = 17
+    const est = (label: string) => label.length * CHAR_WIDTH + LABEL_PAD_X
+    const busy = {
+      nodes: [node("a"), node("b"), node("c")],
+      edges: [edge("a", "b", "Approved by the budget"), edge("b", "c", "x".repeat(24)), edge("c", "a", "Sent back for correction")],
+    }
+    const specs: DiagramEncoding[] = [invoice(), busy]
+    for (const spec of specs) {
+      for (const width of [311, 640]) {
+        const l = layoutDiagram(spec, width)
+        let backLabels = 0
+        l.edges.forEach((e, k) => {
+          const label = spec.edges[k].label
+          if (!label || !e.back || e.selfLoop) return
+          backLabels++
+          const drawn = Math.min(est(label), e.labelMaxWidth)
+          expect(drawn, `edge ${k} at ${width}px has no room to draw`).toBeGreaterThan(0)
+          const box = { x: e.labelX - drawn, y: e.labelY - LABEL_H / 2, width: drawn, height: LABEL_H }
+          for (const n of l.nodes) {
+            const hit = box.x < n.x + n.width && n.x < box.x + box.width && box.y < n.y + n.height && n.y < box.y + box.height
+            expect(hit, `back-edge label ${k} ("${label}") sits on node ${n.index} at ${width}px`).toBe(false)
+          }
+        })
+        expect(backLabels, "the fixture must carry a labelled back edge").toBeGreaterThan(0)
+      }
+    }
+  })
 })

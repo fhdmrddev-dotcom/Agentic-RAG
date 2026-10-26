@@ -53,7 +53,8 @@ export function statusSampleJson(): string {
   const sample = {
     run_id: "7f3a91c2-5b1e-4d0a-9c8f-2e6b1a0d4f13",
     status: "completed",
-    step_index: 3,
+    // 296-04 (293-IN-02): a finished run has no current step; the server sends null here.
+    step_index: null,
     step_total: 3,
     waiting_on: null,
     output_text: "Renewal brief for Acme Logistics: the contract renews on 1 Dec 2026 …",

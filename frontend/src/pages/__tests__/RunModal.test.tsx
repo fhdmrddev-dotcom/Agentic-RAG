@@ -459,6 +459,18 @@ describe("RunModal 214-09 — declared inputs become real fields (STEP-02 / D-21
     expect(onLaunch).not.toHaveBeenCalled()
   })
 
+  // 296-04 (287-IN-01): the refusal sits directly under the fields it names, and the next
+  // change in any field clears it.
+  it("the refusal renders directly under the input fields and clears on the next change", async () => {
+    mockListPublished.mockResolvedValue([declaredInputsPublished])
+    const { modal } = await openModal(folders)
+    fireEvent.click(within(modal).getByTestId("run-confirm"))
+    const refusal = await within(modal).findByTestId("run-required-refusal")
+    expect(refusal.previousElementSibling?.getAttribute("data-testid")).toBe("run-inputs")
+    fireEvent.change(within(modal).getByTestId("run-input-to"), { target: { value: "a" } })
+    expect(within(modal).queryByTestId("run-required-refusal")).toBeNull()
+  })
+
   it("a `required: false` field left empty is sent as an EMPTY STRING, key present", async () => {
     mockListPublished.mockResolvedValue([
       {

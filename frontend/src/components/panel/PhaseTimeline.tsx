@@ -248,6 +248,9 @@ export function PhaseTimeline({ threadId }: PhaseTimelineProps) {
   if (displayedCurrent > counterFloorRef.current) counterFloorRef.current = displayedCurrent
 
   const runTerminal = frame?.run_status != null && TERMINAL_RUN_STATUSES.has(frame.run_status)
+  // 296-04 (295-D-uat-02): a run paused on a person, read off the same fetched frame and passed
+  // to each card (the `runLive` shape), so its running step reads Waiting. No new announcement.
+  const runPaused = frame?.run_status === "paused" || frame?.run_status === "cap_paused"
   const anyRunning = phases.some((p) => p.status === "running" || p.status === "retrying")
   const isBusy = !runTerminal && anyRunning
 
@@ -392,6 +395,7 @@ export function PhaseTimeline({ threadId }: PhaseTimelineProps) {
                 position={i}
                 timing={factsOf(phase.slug)}
                 runLive={!runTerminal}
+                runPaused={runPaused}
               />
             </li>
           ))}

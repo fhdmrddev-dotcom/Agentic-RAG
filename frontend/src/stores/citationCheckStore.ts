@@ -26,7 +26,11 @@
  * outlives `cleanup()`.
  */
 import { create } from "zustand"
-import type { CitationCheckAvailability, CitationCheckResult } from "@/lib/api/citationChecks"
+import type {
+  CitationCheckAvailability,
+  CitationCheckResult,
+  UnavailableReason,
+} from "@/lib/api/citationChecks"
 
 /** The server's per-GET cap (`api/citation_checks.py` MAX_IDS_PER_GET). */
 const MAX_IDS_PER_GET = 100
@@ -60,9 +64,14 @@ function without<T>(record: Record<string, T>, id: string): Record<string, T> {
 }
 
 /** A fixed code for a failed POST: the server's 409 reason when it gave one, else by status. */
+/** 296-04 (294-IN-06): the 409 reasons that say the check cannot run for anyone here. */
+const UNAVAILABLE_REASONS: readonly UnavailableReason[] = ["off", "key_missing", "engine_reorders_only"]
+
 function errorCodeOf(e: unknown): string {
   const err = e as { status?: unknown; reason?: unknown } | null
   if (err && typeof err.reason === "string" && err.reason) return err.reason
+  // 296-04 (SEED-365): a 429 is the rate limit even when its detail could not be read.
+  if (err?.status === 429) return "rate_limited"
   if (err?.status === 404) return "not_found"
   if (err?.status === 422) return "rejected"
   return "failed"
@@ -83,13 +92,16 @@ export const useCitationCheckStore = create<CitationCheckState>()((set) => {
       ({ getCitationChecks }) => {
         for (let i = 0; i < ids.length; i += MAX_IDS_PER_GET) {
           const chunk = ids.slice(i, i + MAX_IDS_PER_GET)
-          getCitationChecks(chunk).then(
-            (resp) => {
-              if (gen !== generation) return
-              set((s) => ({ byMessage: { ...s.byMessage, ...resp.checks }, availability: resp.availability }))
-            },
-            () => forget(chunk),
-          )
+          // 296-04 (294-IN-06): a failed availability read is retried ONCE, then forgotten.
+          getCitationChecks(chunk)
+            .catch(() => getCitationChecks(chunk))
+            .then(
+              (resp) => {
+                if (gen !== generation) return
+                set((s) => ({ byMessage: { ...s.byMessage, ...resp.checks }, availability: resp.availability }))
+              },
+              () => forget(chunk),
+            )
         }
       },
       () => forget(ids),
@@ -121,7 +133,15 @@ export const useCitationCheckStore = create<CitationCheckState>()((set) => {
         set((s) => ({ byMessage: { ...s.byMessage, [id]: result } }))
       } catch (e) {
         if (gen !== generation) return
-        set((s) => ({ errors: { ...s.errors, [id]: errorCodeOf(e) } }))
+        const code = errorCodeOf(e)
+        // 296-04 (294-IN-06): a 409 saying the check cannot run here (off, no key, a reorder-only
+        // engine) is a fact about the whole workspace, so it updates the SHARED availability and
+        // every message shows the reason line, not only the one that asked.
+        const reason = UNAVAILABLE_REASONS.find((r) => r === code)
+        set((s) => ({
+          errors: { ...s.errors, [id]: code },
+          ...(reason ? { availability: { available: false, engine: s.availability?.engine ?? null, reason } } : {}),
+        }))
       } finally {
         if (gen === generation) set((s) => ({ inFlight: without(s.inFlight, id) }))
       }

@@ -97,7 +97,7 @@ describe("StepEvidenceLine — the sketch-B words, exactly", () => {
     )
     expect(screen.getByTestId("step-evidence-note").textContent).toBe(NO_MATCH_EXPLANATION)
     expect(NO_MATCH_EXPLANATION).toBe(
-      "The knowledge base returned nothing for this step — its output is not drawn from your documents.",
+      "The knowledge base returned nothing for this step — its output is not drawn from the knowledge base.",
     )
   })
 
@@ -123,7 +123,7 @@ describe("StepEvidenceLine — the sketch-B words, exactly", () => {
 
 // ── Phase 295-05 (RUN-01 / D-04 / UI-SPEC B.1) — the unsourced arm, asserted by its WORDS ──
 
-const NOTE = "This output was kept without sources — it does not cite your documents."
+const NOTE = "This output was kept without sources — it does not cite any document."
 const mark = (continued_by = "Fahad Murad (you)") => ({ continued_by, at: "2026-10-20T12:30:00Z" })
 
 describe("StepEvidenceLine — the unsourced mark (295-05, D-04)", () => {

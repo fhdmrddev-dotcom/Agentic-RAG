@@ -106,6 +106,17 @@ const shared = {
    * nothing to attach TO — and this sentence says exactly that, in the person's terms.
    */
   refuseNoThread: "Send a message first — a file belongs to a conversation.",
+  /**
+   * 296-04 (287-WR-02 / 287-IN-03, UI-SPEC D) — a workflow started from inside a thread that the
+   * server refused. The hook words it under the picker; the composer is never pre-filled with the
+   * kickoff text. One sentence per cause: the thread already runs a workflow (409, no Retry), the
+   * inputs were not accepted (422), and anything else.
+   */
+  startLocked: (name: string): string => `A workflow is already running in this thread, so ${name} didn't start.`,
+  startInputsRefused: (name: string): string => `${name} didn't start because some of its inputs weren't accepted.`,
+  startFailed: (name: string): string => `${name} didn't start. Nothing ran.`,
+  startRetry: "Retry start",
+  startDismiss: "Dismiss message",
 } as const
 
 export const COPY = { engine, a, shared } as const

@@ -59,12 +59,16 @@ export function ChatLaunchForm({
   fields,
   onConfirm,
   onCancel,
+  initialValues,
 }: {
   workflowName: string
   /** `launchInputFields(def)` — the declared inputs, already minus the reserved keys. */
   fields: EntryInputField[]
   onConfirm: (values: Record<string, string>) => void
   onCancel: () => void
+  /** 296-04 (287-IN-03): on a Retry after the server refused the inputs (422), the values THIS
+   *  person typed into this form a moment ago. Never a default and never the conversation. */
+  initialValues?: Record<string, string>
 }) {
   /**
    * The collected values, keyed by the DECLARED key.
@@ -72,7 +76,7 @@ export function ChatLaunchForm({
    * ⚠ SEEDED FROM NOTHING — not from a prior launch, not from a default, not from the thread.
    * An empty box is an honest empty box. See the ⛔ block above.
    */
-  const [values, setValues] = useState<Record<string, string>>({})
+  const [values, setValues] = useState<Record<string, string>>(() => ({ ...(initialValues ?? {}) }))
   const [refusal, setRefusal] = useState<string | null>(null)
 
   // Escape dismisses, exactly as the library modal's does — the two doors behave the same way.
@@ -142,7 +146,11 @@ export function ChatLaunchForm({
           <LaunchInputFields
             fields={fields}
             values={values}
-            onChange={(key, value) => setValues((prev) => ({ ...prev, [key]: value }))}
+            onChange={(key, value) => {
+              // 296-04 (287-IN-01): the refusal answered the last press; the next keystroke clears it.
+              setRefusal(null)
+              setValues((prev) => ({ ...prev, [key]: value }))
+            }}
           />
           {refusal && (
             <p data-testid="chat-launch-required-refusal" role="alert" className="text-[12px] text-destructive">

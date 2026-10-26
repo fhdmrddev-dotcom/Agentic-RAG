@@ -275,6 +275,17 @@ const INTERRUPTED_META: StatusMeta = {
  *  can falsify. Every other member describes an outcome the run ending cannot revise. */
 const LIVE_CLAIMING_STATUSES: ReadonlySet<string> = new Set(["running", "retrying"])
 
+// Phase 296-04 (295-D-uat-02, UI-SPEC B) — THE RUN IS PAUSED ON A PERSON, SO ITS RUNNING STEP
+// WAITS. Like `INTERRUPTED_META` this is a presentation override, never a wire status: the step
+// row still says `running`, and the run row says `paused` / `cap_paused`. `!` is the spine's
+// shipped waiting-for-you mark, and amber is the waiting-on-a-person tier (sketch 129-C). The
+// glyph and the word both render, so the colour is never the only signal.
+const WAITING_META: StatusMeta = {
+  glyph: "!",
+  text: "Waiting",
+  textClass: "text-[hsl(var(--warning))]",
+}
+
 /**
  * The status reading for a phase, given what the CALLER knows about the run.
  *
@@ -285,7 +296,13 @@ const LIVE_CLAIMING_STATUSES: ReadonlySet<string> = new Set(["running", "retryin
  *
  * ⚠ It is a strict `=== false` rather than a falsy test for that exact reason.
  */
-export function statusMetaForRun(status: Phase["status"], runLive?: boolean): StatusMeta {
+export function statusMetaForRun(
+  status: Phase["status"],
+  runLive?: boolean,
+  runPaused?: boolean,
+): StatusMeta {
   if (runLive === false && LIVE_CLAIMING_STATUSES.has(status)) return INTERRUPTED_META
+  if (runPaused === true && status === "running") return WAITING_META
   return statusMeta(status)
 }
+

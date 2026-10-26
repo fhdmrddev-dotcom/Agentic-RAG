@@ -38,12 +38,14 @@ import { clearRunDeepLink, writeRunDeepLink } from "@/lib/runDeepLink"
 import { StepEvidenceLine } from "@/components/workflows/StepEvidenceLine"
 import { RunEndReasonLine } from "@/components/workflows/RunEndReasonLine"
 import { RunOriginLine } from "@/components/workflows/RunOriginLine"
+import { MarkdownRenderer } from "@/components/chat/MarkdownRenderer"
 import { exportPayload, toEvidenceView, type EvidenceView, type FactTone } from "@/components/workflows/evidenceView"
 import {
   CHANGED_GLYPH,
   DOWNLOAD_DELIVERABLE,
   DOWNLOAD_DELIVERABLE_FAILED,
   DOWNLOAD_GLYPH,
+  DOWNLOAD_UNAVAILABLE,
   DOWNLOAD_JSON,
   FULL_DEFINITION_NOT_RECORDED,
   LOG_COL_N,
@@ -82,6 +84,9 @@ interface Props {
   onBack: () => void
   /** Owner only, and only when the page can open a thread. Absent → no thread link. */
   onOpenThread?: (threadId: string) => void
+  /** 296-04 (289-F-A): the band sentence, passed only when the page WATCHED the run go from
+   *  live to failed. Announced once (sr-only alert); absent for a run opened already finished. */
+  watchedFailure?: string
 }
 
 type ReadState =
@@ -147,15 +152,19 @@ function Report({
   view,
   payload,
   onOpenThread,
+  watchedFailure,
 }: {
   view: EvidenceView
   payload: RunEvidence
   onOpenThread?: (threadId: string) => void
+  watchedFailure?: string
 }) {
   const [downloadFailed, setDownloadFailed] = useState(false)
   const links = view.ownerLinks
   const threadId = links?.threadId ?? null
   const deliverable = links?.deliverable ?? null
+  // 296-04 (289-F-C): the owner's file deliverable with no link gets a sentence, not silence.
+  const unlinkedFile = links !== null && deliverable === null && payload.deliverable.kind === "file"
 
   const onDownloadDeliverable = () => {
     if (!deliverable || !threadId) return
@@ -169,9 +178,17 @@ function Report({
       data-testid="run-evidence-report"
       className="mx-auto w-full max-w-[860px] px-8 pb-12 pt-7 text-foreground"
     >
-      {/* Title block: the read-only mark, the name, the sub line, the actions. */}
+      {/* 296-04 (289-F-A): one assertive announcement for a run watched into failed. */}
+      {watchedFailure ? (
+        <p role="alert" className="sr-only">
+          {watchedFailure}
+        </p>
+      ) : null}
+      {/* Title block: the read-only mark, the name, the sub line, the actions.
+          296-04 (BUG-261025-02 / 291-S6-F9): the title keeps a 320px basis, so four buttons
+          wrap to their own row below it instead of crushing it to one word per line. */}
       <div className="flex flex-wrap items-start gap-4">
-        <div className="min-w-0 flex-1">
+        <div className="min-w-0 basis-80 grow">
           <span className={cn(PILL, "border-border text-muted-foreground")}>
             <span aria-hidden="true">{READ_ONLY_GLYPH}</span>
             {READ_ONLY_MARK}
@@ -198,7 +215,7 @@ function Report({
             <RunEndReasonLine status={view.endReason.status} endReason={view.endReason.reason} />
           </div>
         </div>
-        <div className="flex flex-wrap items-center gap-1.5 print:hidden">
+        <div className="flex flex-wrap items-center gap-1.5 grow-0 shrink print:hidden">
           <Button
             variant="outline"
             size="sm"
@@ -220,6 +237,8 @@ function Report({
             <Button variant="ghost" size="sm" onClick={onDownloadDeliverable}>
               {DOWNLOAD_DELIVERABLE}
             </Button>
+          ) : unlinkedFile ? (
+            <span className="text-xs text-muted-foreground">{DOWNLOAD_UNAVAILABLE}</span>
           ) : null}
         </div>
       </div>
@@ -318,7 +337,8 @@ function Report({
                   <div className="font-semibold text-foreground">{r.title}</div>
                   <div className="font-mono text-[10px] text-muted-foreground">{r.typeLine}</div>
                   {r.output !== null ? (
-                    <div className="mt-0.5 whitespace-pre-wrap break-words text-xs text-muted-foreground">{r.output}</div>
+                    // 296-04 (289-F-B): the shared sanitised renderer (marked + DOMPurify), no second one.
+                    <MarkdownRenderer content={r.output} className="mt-0.5 text-xs text-muted-foreground" />
                   ) : null}
                   {r.count !== null ? <div className="mt-0.5 text-xs text-muted-foreground">{r.count}</div> : null}
                   <StepEvidenceLine confidence={r.confidence} unsourced={r.unsourced} />
@@ -398,7 +418,7 @@ function Report({
   )
 }
 
-export function RunEvidenceReport({ runId, onBack, onOpenThread }: Props) {
+export function RunEvidenceReport({ runId, onBack, onOpenThread, watchedFailure }: Props) {
   const [state, setState] = useState<ReadState>({ kind: "loading" })
   const [attempt, setAttempt] = useState(0)
 
@@ -466,7 +486,9 @@ export function RunEvidenceReport({ runId, onBack, onOpenThread }: Props) {
           {REPORT_BACK}
         </button>
       </div>
-      {view !== null ? <Report view={view} payload={state.payload} onOpenThread={onOpenThread} /> : null}
+      {view !== null ? (
+        <Report view={view} payload={state.payload} onOpenThread={onOpenThread} watchedFailure={watchedFailure} />
+      ) : null}
     </div>
   )
 }

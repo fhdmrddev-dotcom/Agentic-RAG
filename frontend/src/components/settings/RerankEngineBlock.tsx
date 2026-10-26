@@ -141,7 +141,9 @@ export function RerankEngineBlock({
   }
 
   const selected = engineFor(provider)
-  const selectedHasKey = hasKeyFor(selected, hasKey)
+  const selectedHasKey = selected ? hasKeyFor(selected, hasKey) : false
+  // 296-04 (294-IN-05): a stored id that names no engine selects no card and says so.
+  const unknownId = selected === null && typeof provider === "string" && provider.trim() ? provider : null
 
   function choose(facts: RerankEngineFacts) {
     onProviderChange(facts.id)
@@ -161,7 +163,9 @@ export function RerankEngineBlock({
     <div className="space-y-3 pb-1">
       <div role="radiogroup" aria-label="Reranking engine" className="grid grid-cols-1 gap-2.5 sm:grid-cols-2">
         {RERANK_ENGINES.map((facts, index) => {
-          const isSel = facts.id === selected.id
+          const isSel = facts.id === selected?.id
+          // With no card selected, the first card keeps the radio group reachable by Tab.
+          const tabbable = isSel || (selected === null && index === 0)
           const titleId = `${idBase}-${facts.id}-title`
           return (
             <button
@@ -170,7 +174,7 @@ export function RerankEngineBlock({
               role="radio"
               aria-checked={isSel}
               aria-labelledby={titleId}
-              tabIndex={isSel ? 0 : -1}
+              tabIndex={tabbable ? 0 : -1}
               data-engine={facts.id}
               onClick={() => choose(facts)}
               onKeyDown={(e) => onCardKeyDown(e, index)}
@@ -200,6 +204,8 @@ export function RerankEngineBlock({
                 <span className="block">{facts.price}</span>
                 <span className="block">{capabilities(facts)}</span>
                 {facts.firstUseNote && <span className="mt-1 block italic">{facts.firstUseNote}</span>}
+                {/* 296-04 (294-LOCAL): how slow it is, beside the first-use note. */}
+                {facts.latencyNote && <span className="mt-1 block italic">{facts.latencyNote}</span>}
               </span>
             </button>
           )
@@ -249,14 +255,14 @@ export function RerankEngineBlock({
               type="text"
               value={model}
               onChange={(e) => onModelChange(e.target.value)}
-              placeholder={selected.defaultModel}
+              placeholder={selected?.defaultModel}
               aria-label="Model"
               className="h-8 max-w-xs flex-1 bg-muted/30 font-mono text-sm ghost-border"
             />
           </div>
           <p className="mt-1 text-xs">Empty, or a model this engine does not offer, uses the default shown on its card.</p>
         </div>
-        {selected.id === "cohere" && cohereKeySlot && (
+        {selected?.id === "cohere" && cohereKeySlot && (
           <div className="flex flex-wrap items-center gap-2">
             <span>Cohere rerank key</span>
             <div className="max-w-xs flex-1">{cohereKeySlot}</div>
@@ -270,13 +276,20 @@ export function RerankEngineBlock({
         </p>
       )}
 
-      {!selectedHasKey && selected.keyName !== null && (
+      {unknownId !== null && (
+        <p className="text-xs text-muted-foreground">
+          <span aria-hidden="true">ⓘ </span>
+          Unknown engine “{unknownId}”. Search ignores it and keeps today's order. Pick an engine to change that.
+        </p>
+      )}
+
+      {selected && !selectedHasKey && selected.keyName !== null && (
         <p role="status" className={cn("rounded-lg border border-destructive/40 bg-destructive/15 px-3 py-2 text-sm", RED)}>
           This engine can't run without your {selected.keyName}. Until you add it, search keeps today's order.
         </p>
       )}
 
-      {selected.where === "hosted" && (
+      {selected?.where === "hosted" && (
         <p
           data-egress
           className="rounded-lg border border-[hsl(var(--panel-status-active)/0.35)] border-l-[3px] border-l-[hsl(var(--panel-status-active))] bg-[hsl(var(--panel-status-active)/0.06)] px-3 py-2 text-sm text-muted-foreground"

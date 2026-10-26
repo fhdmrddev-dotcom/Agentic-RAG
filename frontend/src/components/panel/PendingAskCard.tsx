@@ -304,6 +304,13 @@ interface PendingAskCardProps {
    * the run status its phase reconcile already reads (289-01's "Named gap: PendingAskStack").
    */
   paused?: boolean
+  /**
+   * Phase 296-04 (BUG-261025-03, UI half) — the prompt belongs to a workflow run that is still
+   * live (not terminal). Once its clock passes, the card reads as `paused` above: the answer
+   * control stays and PAUSED_WAITING_LINE replaces the clock, never `agent stopped`. Optional;
+   * absent keeps every other caller's card unchanged.
+   */
+  runWaiting?: boolean
 }
 
 type CardState = "pending" | "answered" | "expired"
@@ -317,7 +324,8 @@ export function PendingAskCard({
   service = null,
   shape,
   home,
-  paused = false,
+  paused: pausedProp = false,
+  runWaiting = false,
 }: PendingAskCardProps) {
   const { tool_call_id, prompt, timeout_seconds, run_id, draft } = ask
   // ask_user with no choices → backend stores options=null (free-text path).
@@ -373,6 +381,8 @@ export function PendingAskCard({
         : timeout_seconds
       : 0
   const [remaining, setRemaining] = useState<number>(initialRemaining)
+  // 296-04 (BUG-261025-03): a live workflow run whose window has passed is still waiting.
+  const paused = pausedProp || (runWaiting && hasDeadline && remaining <= 0)
 
   useEffect(() => {
     // No deadline → no tick, and the `remaining <= 0 → expired` transition below
@@ -885,6 +895,20 @@ export function PendingAskCard({
  * one answer input. With no panel home it renders the full card, exactly as before (the
  * BUG-260828-07 reachability). Neither mount's CONDITION changes; only what the chat one renders.
  */
+/** 296-04 (BUG-261025-03): keep the newest ask per `run_id` (the later one wins on a tie or a
+ *  missing `created_at`). An ask with no `run_id` is kept as it is. */
+function newestAskPerRun(asks: PendingAsk[]): PendingAsk[] {
+  const newest = new Map<string, PendingAsk>()
+  for (const ask of asks) {
+    if (!ask.run_id) continue
+    const seen = newest.get(ask.run_id)
+    if (!seen || !seen.created_at || !ask.created_at || ask.created_at >= seen.created_at) {
+      newest.set(ask.run_id, ask)
+    }
+  }
+  return asks.filter((ask) => !ask.run_id || newest.get(ask.run_id) === ask)
+}
+
 export function PendingAskStack({ home = "chat" }: { home?: "chat" | "panel" } = {}) {
   const threadId = useViewingThread()
   const { data: asks, reconcile } = useAskUserPrompt(threadId)
@@ -917,6 +941,10 @@ export function PendingAskStack({ home = "chat" }: { home?: "chat" | "panel" } =
   const paused = runStatus === "paused"
   const runLive = runStatus != null && !["completed", "failed", "cancelled", "timed_out"].includes(runStatus)
   const runIsOver = workflowLock == null && phases.length > 0 && !runLive
+  // 296-04 (BUG-261025-03, UI half — D-24): a live WORKFLOW run waits on one question at a time,
+  // so only its newest unanswered ask is shown; a re-asked one is gone, not Expired. A Deep thread
+  // (no phases) passes through untouched: a Deep run may ask twice in parallel tool calls.
+  const workflowWaiting = phases.length > 0 && runLive
 
   // ── Phase 214-11 Task 2 (STEP-04 / D-214-16 / D-214-14) — THE STACK RESOLVES; THE CARD
   //    RENDERS.
@@ -985,7 +1013,7 @@ export function PendingAskStack({ home = "chat" }: { home?: "chat" | "panel" } =
 
   // Newest pinned on top (D-03). created_at is GET-only; fall back to the array
   // order (store insertion order) when it is absent on the SSE path.
-  const ordered = [...asks].sort((a, b) => {
+  const ordered = [...(workflowWaiting ? newestAskPerRun(asks) : asks)].sort((a, b) => {
     if (a.created_at && b.created_at) return b.created_at.localeCompare(a.created_at)
     return 0
   })
@@ -1010,6 +1038,7 @@ export function PendingAskStack({ home = "chat" }: { home?: "chat" | "panel" } =
               shape={stepMarkShape(pausedStep?.capability, pausedStep?.toolName)}
               home={home}
               paused={paused}
+              runWaiting={workflowWaiting}
             />
           )}
         </div>
