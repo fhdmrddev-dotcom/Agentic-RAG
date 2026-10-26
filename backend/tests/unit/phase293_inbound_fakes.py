@@ -112,11 +112,24 @@ class FakePipeline:
     def delete(self, k):
         self.ops.append(("delete", k))
 
+    # 293-REVIEW CR-02: the per-IP limiter and the refusal-audit throttle count with INCR+EXPIRE.
+    def incr(self, k):
+        self.ops.append(("incr", k))
+
+    def expire(self, k, seconds):
+        self.ops.append(("expire", k))
+
     async def execute(self):
         out = []
         for op, k in self.ops:
             if op == "get":
                 out.append(self.redis.store.get(k))
+            elif op == "incr":
+                value = int(self.redis.store.get(k) or 0) + 1
+                self.redis.store[k] = str(value)
+                out.append(value)
+            elif op == "expire":
+                out.append(True)
             else:
                 out.append(1 if self.redis.store.pop(k, None) is not None else 0)
         return out
