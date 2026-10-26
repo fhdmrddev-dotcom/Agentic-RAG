@@ -41,7 +41,7 @@ reviewer exists, so a phase closes `verification_mode: self-verified`, never `re
 
 ## Current Position
 
-Phase: 296 (close-v4-7-debt) — DISCUSSING. Added 2026-10-26 by the operator after the v4.7 audit (`v4.7-MILESTONE-AUDIT.md`, tech_debt, 21/21): fix every open defect; feature-shaped items → v4.8 seeds; then ONE deploy of 292.1 + 293 + 296 (cloud migs 214, 215 first, each shown before it runs).
+Phase: 296 (close-v4-7-debt) — CONTEXT GATHERED (`3df02bec1`: CONTEXT D-01..D-22 + `296-INVENTORY.md`). Next: plan-phase. Added 2026-10-26 by the operator after the v4.7 audit (`v4.7-MILESTONE-AUDIT.md`, tech_debt, 21/21): fix every open defect; feature-shaped items → v4.8 seeds; then ONE deploy of 292.1 + 293 + 296 (cloud migs 214, 215 first, each shown before it runs).
 Previous: Phase: 293 (Start From Outside, and Close Out) — CLOSED 2026-10-26. NOT deployed.
   What shipped: API keys (one person, one org, chosen workflows, expiry 30/90/365/never); `/inbound` start + status + one-time file link; run origin (app / schedule / key) on 4 surfaces; the card shows the next run time; per-key limits in Settings; seed close-out (REG-06). Migration 215.
   Verification passed 6/6 (`afdd5e4d1`). Operator signed G-4 2026-10-25. SECURITY 36/36 closed, 0 open (`e6026c21f`); accepted AR-05 (key lists show member/revoker emails) and AR-06 (per-IP limit sees the proxy IP behind nginx/Traefik; re-open when a proxy-aware client-IP helper lands or `/inbound` gets real outside traffic).
