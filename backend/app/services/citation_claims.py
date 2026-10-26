@@ -85,6 +85,23 @@ _QUOTE_PREFIX = re.compile(r"(?: {0,3}> ?)+")
 #: One bracket group (one level of nesting), the unit marked's reflink / nolink rules work on.
 _BRACKET = re.compile(r"!?\[((?:[^\[\]\n\\]|\\.|\[[^\[\]\n]*\])*)\]")
 
+# ── 296-03 (294-CR-02 residual) — setext headings and HTML, MEASURED against marked 17 ───────────
+# tests/fixtures/phase296/claim_ordinals_marked.json holds the measurement (marked -> DOMPurify ->
+# text nodes outside code/pre/a, the CitedMarkdown pipeline).
+#: A setext underline: after a paragraph line the paragraph becomes a heading, and (like an ATX
+#: heading) an indented code block or a link definition may follow it with no blank line.
+_SETEXT_UNDERLINE = re.compile(r"[ \t]{0,3}(?:=+|-+)[ \t]*$")
+#: A thematic break (outside a paragraph): a leaf block an indented code block may follow.
+_THEMATIC_BREAK = re.compile(r"[ \t]{0,3}([-*_])(?:[ \t]*\1){2,}[ \t]*$")
+#: HTML marked passes through that DOMPurify then drops: comments, processing instructions,
+#: declarations, CDATA. No marker inside one is ever rendered.
+_HTML_DROPPED = re.compile(r"<!--[\s\S]*?-->|<\?[\s\S]*?\?>|<![A-Za-z][^>]*>|<!\[CDATA\[[\s\S]*?\]\]>")
+#: Raw HTML elements whose text the chat never upgrades (it skips code / pre / a; DOMPurify drops
+#: script and style).
+_HTML_SKIPPED = re.compile(r"<(pre|code|a|script|style)\b[^>]*>[\s\S]*?</\1\s*>", re.IGNORECASE)
+#: Any other raw tag: rendered as an element, so its text is prose but the tag itself is not.
+_HTML_TAG = re.compile(r"</?[A-Za-z][A-Za-z0-9-]*(?:\s[^<>\n]*)?/?>")
+
 # ── cleaning ────────────────────────────────────────────────────────────────────────────────────
 _STRONG = re.compile(r"\*\*|__|~~")
 _EMPHASIS = re.compile(r"(?<!\w)[*_]+(?=\w)|(?<=\w)[*_]+(?!\w)")
@@ -92,6 +109,9 @@ _TABLE_EDGE = re.compile(r"^\s*\||\|\s*$")
 _LEAD_PUNCT = re.compile(r"^[\s,;:>\-–—]+")
 _TRAIL_PUNCT = re.compile(r"[\s,;:]+$")
 _WS = re.compile(r"\s+")
+#: 296-03 (294-IN-07): the space a stripped marker leaves before punctuation ("sharply [2]." ->
+#: "sharply .").
+_SPACE_BEFORE_PUNCT = re.compile(r"\s+(?=[.,;:!?])")
 
 
 @dataclass(frozen=True)
@@ -158,7 +178,7 @@ def _clean_prose(seg: str) -> str:
     seg = _LINK.sub(r"\1", seg)
     seg = _MARKER_RE.sub("", seg)
     seg = _STRONG.sub("", seg)
-    return _EMPHASIS.sub("", seg)
+    return _SPACE_BEFORE_PUNCT.sub("", _EMPHASIS.sub("", seg))
 
 
 def _clean(raw: str) -> str:
@@ -188,6 +208,14 @@ def _units(layout: str) -> list[tuple[int, int]]:
         pos = e + 1
         if not line.strip():
             close_para()
+            continue
+        # 296-03: a setext underline turns the open paragraph into ONE heading unit (never split,
+        # underline excluded); a thematic break outside a paragraph is no unit at all.
+        if para and _SETEXT_UNDERLINE.match(line):
+            units.append((para[0], para[1]))
+            para.clear()
+            continue
+        if not para and _THEMATIC_BREAK.match(line):
             continue
         m = _LIST_ITEM.match(line) or _HEADING.match(line)
         if m:
@@ -366,7 +394,11 @@ def _block_regions(text: str) -> tuple[list[tuple[int, int]], set[str]]:
                 prev, i = "def", end + 1
                 continue
 
-        if _HEADING.match(body):
+        # 296-03: a setext underline makes the paragraph above it a heading, and a thematic break
+        # is a leaf block; either lets an indented code block or a definition follow directly.
+        if _HEADING.match(body) or (prev == "para" and rel <= 3 and _SETEXT_UNDERLINE.match(body)):
+            prev = "heading"
+        elif _THEMATIC_BREAK.match(body):
             prev = "heading"
         elif _TABLE_ROW.match(body):
             prev = "table"
@@ -438,6 +470,13 @@ def extract_claims(content: str, source_refs: list) -> list[Claim]:
     for m in _CODE_RE.finditer("".join(masked)):
         _blank(masked, m.start(), m.end())
         if m.group(0).startswith(("```", "~~~")):
+            _blank(layout, m.start(), m.end())
+    # 296-03 (294-CR-02 residual): raw HTML, found OUTSIDE code. Dropped constructs and skipped
+    # elements vanish whole; any other tag is blanked so its text stays prose but the tag never
+    # reaches a sentence.
+    for rx in (_HTML_DROPPED, _HTML_SKIPPED, _HTML_TAG):
+        for m in list(rx.finditer("".join(masked))):
+            _blank(masked, m.start(), m.end())
             _blank(layout, m.start(), m.end())
     masked_s = "".join(masked)
     layout_s = "".join(layout)

@@ -419,7 +419,8 @@ node scripts/check-hot-file-ledger.cjs <phase-dir>   # 0 clear · 1 missing rows
 | `frontend/src/components/workflows/WorkflowCanvas.tsx` | 32 / 10 / 1744 (was `31 / 9 / 1708`) | 290-03: Team view = 1 prop, 1 state, 1 early return · extraction FIRST next · ⛔ |
 | `frontend/src/components/workflows/FlowEdge.tsx` | 3 / 3 / 462 | honoured by construction (200) |
 | `frontend/src/components/workflows/PhaseNodeCard.tsx` | 18 / 9 / 490 (was `17 / 8 / 489`) | 290: forecast unused — chips went on the library card, not here |
-| `backend/app/services/harness/phase_types.py` | 63 / 32 / 3081 (was `61 / 31 / 3067`) | 293-02: key-run sub-question in the untrusted envelope · G-5 OWED |
+| `backend/app/services/harness/phase_types.py` | 64 / 33 / 3095 (was `63 / 32 / 3081`) | 296-03: one helper + one call (filled_field_count, S7-F1) · G-5 OWED |
+| `backend/app/services/tools/render_template.py` | 6 / 3 / 1163 (was `3 / 2 / 1094`) | 296-03: button /V written as a name, read back typed · now FIRES · ⛔ |
 | `frontend/src/pages/WorkflowsPage.tsx` | 46 / 19 / 1453 (was `45 / 18 / 1447`) | 293-04: one optional onOpenApiKeys prop threaded to the cards |
 | `frontend/src/components/workflows/library/WorkflowCard.tsx` | 25 / 10 / 1371 (was `24 / 10 / 1365`) | 293-03: one next-run span, now handed to the leaf; still 0 useState |
 | `frontend/src/components/workflows/library/libraryVocabulary.ts` | 14 / 7 / 819 (was `12 / 6 / 802`) | 293-03: two next-run words + one builder (data) |
@@ -449,8 +450,8 @@ node scripts/check-hot-file-ledger.cjs <phase-dir>   # 0 clear · 1 missing rows
 | `backend/app/services/harness/grounding.py` | 23 / 10 / 1437 (was `21 / 8 / 1414`) | 295-03: ONE pure predicate (is_engine_citation_gate) |
 | `frontend/src/components/workflows/PhaseFormPanel.tsx` | 30 / 14 / 1566 | honoured by construction ×6 (185 / 193 / 193.1 / 199 / 200 / **214**) |
 | `backend/app/db/workflows.py` | 61 / 31 / 2845 (was `59 / 30 / 2827`) | 296-01: create_workflow_definition org_id kwarg (keyword-only) |
-| `backend/app/services/harness/publish_service.py` | 34 / 15 / 2010 (was `33 / 15 / 2008`) | 295-09 WR-05: judge system prompt via one helper (If 70→70) |
-| `backend/app/services/workflow_authoring.py` | 18 / 12 / 1120 (was `17 / 11 / 1025`) | 291-02: files = one more untrusted grounding input (+98 −3) |
+| `backend/app/services/harness/publish_service.py` | 35 / 16 / 2057 (was `34 / 15 / 2010`) | 296-03: typed golden stand-ins + note (pure helper); ceiling in seconds |
+| `backend/app/services/workflow_authoring.py` | 23 / 13 / 1269 (was `18 / 12 / 1120`) | 296-03: unticked told; provider_error; file-free requirement · seam OWED |
 | `backend/app/models/harness.py` | 22 / 20 / 776 (was `20 / 19 / 766`) | 291-02: InputFieldSpec origin + note, omitted when absent |
 | `frontend/src/components/workflows/builderStore.ts` | 16 / 9 / 1039 (was `14 / 8 / 968`) | 291: two actions (refs, input source), no state field |
 | `frontend/src/components/panel/WorkspacePanel.tsx` | 17 / 11 / 646 (was `16 / 10 / 646`) | honoured by construction (194 / 194.1 / 282-02: one prop) |

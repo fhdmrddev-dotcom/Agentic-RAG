@@ -723,6 +723,20 @@ def _measure(count: int, noun: str) -> dict:
     return {MEASURE_KEY: {"count": count, "noun": noun}}
 
 
+def filled_field_count(field_map: dict) -> int:
+    """296-03 (291-S7-F1): the fields a fill WROTE — each scalar with a value, plus each
+    collection with at least one row. Base used ``len(field_map)`` on the legacy envelope,
+    which is always its two buckets (``scalars`` + ``collections``): four filled fields read
+    "2 fields"."""
+    scalars = (field_map or {}).get("scalars") or {}
+    collections = (field_map or {}).get("collections") or {}
+    filled = sum(
+        1 for cited in scalars.values()
+        if (cited.get("value") if isinstance(cited, dict) else cited) not in (None, "")
+    )
+    return filled + sum(1 for rows in collections.values() if rows)
+
+
 # ── executors ──────────────────────────────────────────────────────────────
 async def _exec_programmatic(phase, accumulated_outputs: dict, ctx) -> dict:
     """Run a server-controlled pure-Python fn resolved against the closed registry.
@@ -1964,13 +1978,13 @@ async def _exec_llm_emit(phase, accumulated_outputs: dict, ctx) -> dict:
                 # in this executor (every other exit routes through _emit_failure_output /
                 # _emit_unexpected_failure, which declare nothing — a failed emit produced
                 # no deliverable and has no honest count to report).
-                # ⚠ WHAT THIS NUMBER MEANS, PRECISELY: ``len(field_map)`` is the count of
-                # TOP-LEVEL entries in the legacy field-map — each scalar key, plus each
-                # collection as ONE entry. It is deliberately NOT a leaf-cell count: the
+                # ⚠ WHAT THIS NUMBER MEANS, PRECISELY: ``filled_field_count`` (296-03; base
+                # used ``len(legacy_map)``, which counted the two envelope buckets) is each
+                # scalar the fill wrote a value into, plus each collection with rows as ONE entry. It is deliberately NOT a leaf-cell count: the
                 # map is the emitted deliverable's field structure, and that is the thing
                 # a person means by "how many fields did it fill". The noun is AUTHORED
                 # COPY (§5.1) and this is its ONE home.
-                **_measure(len(legacy_map), "fields"),
+                **_measure(filled_field_count(legacy_map), "fields"),
             }
 
         # A non-ok render: distinguish integrity failure (state d) from a render error (state c).
