@@ -3,10 +3,10 @@ gsd_state_version: 1.0
 milestone: v4.7
 milestone_name: Workflows You Can See and Start Anywhere
 status: milestone_complete
-last_updated: "2026-10-25T09:03:13.011Z"
+last_updated: "2026-10-26T16:00:00.000Z"
 progress:
   total_phases: 18
-  completed_phases: 10
+  completed_phases: 11
   total_plans: 53
   completed_plans: 51
   percent: 56
@@ -28,7 +28,7 @@ See: `.planning/PROJECT.md` (updated 2026-10-18)
 
 **Core value:** The agent acts as an AI colleague — it knows your knowledge base, can run code, and
 can be taught new behaviours (skills) that persist and can be shared.
-**Current focus:** Phase 293 — start-from-outside-and-close-out
+**Current focus:** v4.7 milestone close — every phase 286-295 is closed; next is `/gsd:audit-milestone`
 
 ---
 
@@ -41,8 +41,14 @@ reviewer exists, so a phase closes `verification_mode: self-verified`, never `re
 
 ## Current Position
 
-Phase: 293 (start-from-outside-and-close-out) — EXECUTING
-  Key facts: no API keys exist today (first non-login credential); a key = one person in one org, lists its workflows, expiry 30/90/365/never; start + poll; origin app/schedule/key on 4 surfaces; card shows next run time. Migration 215.
+Phase: none active. v4.7's last phase (293) closed 2026-10-26; next is `/gsd:audit-milestone`, then `/gsd:complete-milestone`.
+Previous: Phase: 293 (Start From Outside, and Close Out) — CLOSED 2026-10-26. NOT deployed.
+  What shipped: API keys (one person, one org, chosen workflows, expiry 30/90/365/never); `/inbound` start + status + one-time file link; run origin (app / schedule / key) on 4 surfaces; the card shows the next run time; per-key limits in Settings; seed close-out (REG-06). Migration 215.
+  Verification passed 6/6 (`afdd5e4d1`). Operator signed G-4 2026-10-25. SECURITY 36/36 closed, 0 open (`e6026c21f`); accepted AR-05 (key lists show member/revoker emails) and AR-06 (per-IP limit sees the proxy IP behind nginx/Traefik; re-open when a proxy-aware client-IP helper lands or `/inbound` gets real outside traffic).
+  UAT 12/12 (`24a2f5692`): 1 issue (a refusal showed the raw code `workflows_disabled`), fixed under G-3 by `048dec8e9` (three reasons worded + a test that reads every backend refusal reason), re-checked live (`761b10a02`). G-7 clear.
+  Gates (293-05): backend unit 70 failed / 9855 passed (<= 71); vitest count gate OK 12102.
+  Deploy order: migration 215 to cloud FIRST, then backend; `get_advisors(security)` at that deploy.
+  Local leftovers (dev DB only): keys A2, B, C, D, P and the active `293 weekly check` schedule from 293-05; UAT key `293-uat` revoked.
 Previous: Phase: 292.1 (Tool-limit Continue that always fires) — CLOSED BY DECISION 2026-10-24, operator signed G-4. NOT deployed.
   4 plans + review fixes + 7 live-found fixes on develop (last 90f485dd2). Verifier human_needed (no code gaps). Gates: backend 70 failed / 9595 (<=71), vitest count gate OK 11936.
   OWED: OpenRouter DeepSeek board row (402 out of credits) — BUG-261024-03 stays `folded` until `scripts/run-2921-board.py --run --providers openrouter` passes after a top-up. Moonshot ⛔ (account suspended).
@@ -91,6 +97,7 @@ Live at `4e767a3a2` (2026-10-16): phases 280-285, migrations 207-209 in cloud. B
 
 ## Owed (operator)
 
+- 293: before deploying, paste migration 215 into the cloud Supabase SQL editor, then deploy the backend, then run `get_advisors(security)`. Bugs logged and not fixed: BUG-261025-01, -02, -03; F-2 deferred.
 - 292.1: top up OpenRouter, then run the OpenRouter board row to close BUG-261024-03; merged worktree branches undeleted (omc guardrail blocks `git branch -D`).
 
 - Confirm the Coolify rebuild from outside; run a logged-in production smoke test.

@@ -11,9 +11,9 @@ Seeds folded at intake: SEED-232, SEED-195, SEED-014, SEED-084, SEED-164, SEED-0
 ### Start (START)
 
 - [x] **START-01**: From inside a thread, a user can start a workflow, fill its launch form, and see the run attached to that thread. — `SEED-232`
-- [ ] **START-02**: An external system can start a workflow run through an authenticated inbound call and read the result back. Org-scoped, rate-limited, audited. — `SEED-195`
+- [x] **START-02**: An external system can start a workflow run through an authenticated inbound call and read the result back. Org-scoped, rate-limited, audited. — `SEED-195`
 - [x] **START-03**: A user can fork a starter workflow into their own draft in one click; at least 5 curated starters ship, each passing the publish gauntlet. — `SEED-084` (287: fork is menu + name dialog, not literal one click; operator to rule)
-- [ ] **START-04**: A run started by a schedule or an inbound call shows how it was started, and its last and next run are visible. — `SEED-014`
+- [x] **START-04**: A run started by a schedule or an inbound call shows how it was started, and its last and next run are visible. — `SEED-014`
 
 ### Author (AUTH)
 
@@ -34,7 +34,7 @@ Seeds folded at intake: SEED-232, SEED-195, SEED-014, SEED-084, SEED-164, SEED-0
 
 ### Register hygiene (REG)
 
-- [ ] **REG-06**: Seed statuses match reality: SEED-163 flipped, and each seed this milestone folds is updated.
+- [x] **REG-06**: Seed statuses match reality: SEED-163 flipped, and each seed this milestone folds is updated.
 - [x] **REG-07**: Hot-file refactors that guardrail G-5 requires are done before the feature phases that touch those files.
 
 ### Decision engine (DEC) — added 2026-10-20 by the operator, outside the milestone's workflow theme
@@ -82,9 +82,9 @@ Seeds folded at intake: SEED-232, SEED-195, SEED-014, SEED-084, SEED-164, SEED-0
 | VIS-01 | Phase 290 | Complete |
 | AUTH-02 | Phase 291 | Complete (2026-10-24) |
 | VIS-02 | Phase 292 | Complete |
-| START-02 | Phase 293 | Pending |
-| START-04 | Phase 293 | Pending |
-| REG-06 | Phase 293 | Pending |
+| START-02 | Phase 293 | Complete |
+| START-04 | Phase 293 | Complete |
+| REG-06 | Phase 293 | Complete |
 | DEC-01 | Phase 294 | Pending |
 | DEC-02 | Phase 294 | Pending |
 | DEC-03 | Phase 294 | Pending |
