@@ -260,7 +260,10 @@ async def _viewer_reads(
     """A colleague's readable cited documents AND the KB label, on ONE RLS connection (W3a).
 
     Any failure masks every source and yields the default words: fail closed.
+    296-01 (289-IN-04): only canonical UUIDs reach the ``uuid[]`` cast, so one malformed id can
+    no longer fail the read and mask every source; a dropped id simply stays unreadable.
     """
+    document_ids = [d for d in document_ids if ev.is_canonical_uuid(d)]
     try:
         async with deps.get_user_pg_connection(None, {"id": viewer_id}) as conn:
             readable: set[str] = set()

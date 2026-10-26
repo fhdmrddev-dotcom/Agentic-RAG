@@ -725,10 +725,13 @@ async def test_a_colleague_reads_a_minimised_record(wire):
     assert "Yes, go ahead" not in text
     # 289-REVIEW CR-01 (T-289-31 now MITIGATED for masked citations): step 1 cites the
     # document the colleague cannot read, so its output is withheld behind the fixed sentence;
-    # step 3 cites only readable documents, so it keeps its output.
+    # step 3 cites only readable documents, so it ~~keeps its output~~ — ⚠ AMENDED DELIBERATELY by
+    # 296-01 (D-05, BUG-261020-02): step 3 is built on step 1's withheld output, so it is withheld
+    # too, with the upstream sentence.
     assert body["phase_log"][0]["output_text"] == ev.WITHHELD_OUTPUT_SENTENCE
     assert "Three vendors meet the bar." not in text
-    assert body["phase_log"][2]["output_text"] == "Memo written."
+    assert body["phase_log"][2]["output_text"] == ev.WITHHELD_UPSTREAM_SENTENCE
+    assert "Memo written." not in text
     # (confidence's own `avg_similarity` is the step's aggregate, not a citation's score)
     assert "SECRET PASSAGE" not in text and '"similarity"' not in text
     assert '"passage"' not in text

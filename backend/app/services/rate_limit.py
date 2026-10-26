@@ -26,7 +26,7 @@ from app.models.user_settings import load_app_settings_async
 
 logger = logging.getLogger(__name__)
 
-Kind = Literal["start", "read"]
+Kind = Literal["start", "read", "citation"]
 
 UNAVAILABLE_DETAIL = (
     "Rate limiting is unavailable right now, so this call was refused. Try again in a minute."
@@ -105,5 +105,34 @@ async def enforce_ip_limit(redis, *, client: str) -> None:
         raise HTTPException(
             status_code=429,
             detail=IP_LIMIT_DETAIL.format(limit=limit, retry=retry),
+            headers={"Retry-After": str(retry)},
+        )
+
+
+# ── 296-01 (SEED-365, rate-limit half; D-13) — the per-USER citation-check limit ────────────────
+# ``POST /citation-checks/{id}`` spends a paid engine call each time, and the per-message in-flight
+# claim only stops two checks of the SAME message at once. This bounds one user across all of them.
+# The same Redis fixed-window counter as the key limits (``hit``), so it holds across both uvicorn
+# workers. A module constant on the ``IP_CALLS_PER_MINUTE`` precedent: 10 a minute is far above a
+# person clicking "Check citations" and still caps a scripted loop. ⛔ No env var (deploy drift);
+# a Settings knob would need a migration and a control, which 296 does not take.
+CITATION_CHECKS_PER_MINUTE = 10
+
+
+async def enforce_user_citation_limit(redis, *, user_id: str) -> None:
+    """Refuse with 429 ``{"reason": "rate_limited"}`` + ``Retry-After`` when ``user_id`` is over
+    ``CITATION_CHECKS_PER_MINUTE``, and with 503 ``{"reason": "unavailable"}`` when the limiter
+    cannot count (fail closed). The dict details match the citation route's other refusals; the
+    user-facing sentence lives client-side."""
+    limit = int(CITATION_CHECKS_PER_MINUTE)
+    try:
+        retry = await hit(redis, key_id=user_id, kind="citation", limit=limit)
+    except Exception:  # noqa: BLE001 — any Redis failure refuses; see the module docblock
+        logger.warning("citation-check rate limiter unavailable; refusing the call", exc_info=True)
+        raise HTTPException(status_code=503, detail={"reason": "unavailable"})
+    if retry is not None:
+        raise HTTPException(
+            status_code=429,
+            detail={"reason": "rate_limited"},
             headers={"Retry-After": str(retry)},
         )

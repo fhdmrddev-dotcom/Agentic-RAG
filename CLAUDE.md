@@ -433,7 +433,8 @@ node scripts/check-hot-file-ledger.cjs <phase-dir>   # 0 clear · 1 missing rows
 | `backend/app/api/workflows.py` | 48 / 26 / 1689 (was `47 / 25 / 1681`) | 296-01: create_draft stamps the active org (1 param, 1 stamp) · split OWED |
 | `backend/app/api/workflow_wire.py` | 3 / 3 / 517 | ⚠ now FIRES (291) · 291-01: describe read + reference wire models, additive |
 | `backend/app/api/workflow_runs.py` | 20 / 14 / 1444 (was `18 / 13 / 1455`) | 293-03: origin on 2 models + 2 selects, one name lookup · extraction FIRST |
-| `backend/app/api/workflow_run_evidence.py` | 4 / 3 / 405 | ⚠ now FIRES (293) — row added 293-03 · origin beside end_reason |
+| `backend/app/api/workflow_run_evidence.py` | 5 / 4 / 408 (was `4 / 3 / 405`) | 296-01: non-UUID cited ids dropped before the uuid[] cast |
+| `backend/app/services/run_evidence.py` | 6 / 4 / 555 | ⚠ FIRES, absent here — row added 296-01 · D-05 withheld cascade · ⛔ |
 | `frontend/src/lib/api/runEvidence.ts` | 3 / 3 / 137 | ⚠ now FIRES (293) — row added 293-03 · one optional field |
 | `frontend/src/components/workflows/evidenceView.ts` | 4 / 3 / 387 | ⚠ now FIRES (293) — row added 293-03 · origin passed through |
 | `frontend/src/components/workflows/RunEvidenceReport.tsx` | 4 / 3 / 472 (was `3 / 3 / 468`) | 293-05 D-5: origin + stop reason share one column div · ⚠ FIRES |

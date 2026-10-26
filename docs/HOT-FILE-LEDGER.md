@@ -11484,8 +11484,8 @@ cells rot within days.
 | [`backend/app/api/workflows.py`](docs/HOT-FILE-LEDGER.md#backendappapiworkflowspy) | 48 / 26 / 1689 (was `47 / 25 / 1681`) | ⚠ **FIRES** | 296-01: create_draft stamps the validated active org (one request param, one stamp, +8). Honoured by construction; split still OWED (>1,500 L) |
 | [`backend/app/api/workflow_runs.py`](docs/HOT-FILE-LEDGER.md#backendappapiworkflow_runspy) | 20 / 14 / 1444 (was `18 / 13 / 1455`) | ⚠ **FIRES** | 295-05 OVER budget: +5 defs (name chain `waiting_who`, unsourced words, end-reason read), If 31→36, +160 L. Extraction FIRST next: the wording helpers · 293 touch: see §Phase 293 close |
 | [`backend/app/services/harness/phase_confidence.py`](docs/HOT-FILE-LEDGER.md#backendappservicesharnessphase_confidencepy) | 1 / 1 / 153 (was `0 / 0 / 0`) | no (young) | young (created 289-02). Pure confidence helper + wire allow-list + KB label read (duck-typed, never raises). ⛔ no provider import; chat's _compute_confidence only |
-| [`backend/app/services/run_evidence.py`](docs/HOT-FILE-LEDGER.md#backendappservicesrun_evidencepy) | 5 / 3 / 525 (was `4 / 2 / 517`) | ⚠ **FIRES** | 295-05: one by-name read, one entry key, one `who` computation (If 32→32). Two phases; does not fire · 293 touch: see §Phase 293 close |
-| [`backend/app/api/workflow_run_evidence.py`](docs/HOT-FILE-LEDGER.md#backendappapiworkflow_run_evidencepy) | 4 / 3 / 405 (was `3 / 2 / 391`) | ⚠ **FIRES** | 295-05: two fields (`unsourced`, `end_reason`) + one end-reason block reusing `_AUDIT_SQL` (If 7→8). Two phases; does not fire · 293 touch: see §Phase 293 close |
+| [`backend/app/services/run_evidence.py`](docs/HOT-FILE-LEDGER.md#backendappservicesrun_evidencepy) | 6 / 4 / 555 (was `5 / 3 / 525`) | ⚠ **FIRES** | 296-01: D-05 withheld cascade (one flag, one elif) + canonical-UUID filter on the cited ids. ⛔ no I/O; owner path untouched |
+| [`backend/app/api/workflow_run_evidence.py`](docs/HOT-FILE-LEDGER.md#backendappapiworkflow_run_evidencepy) | 5 / 4 / 408 (was `4 / 3 / 405`) | ⚠ **FIRES** | 296-01: `_viewer_reads` drops non-UUID ids before the `uuid[]` cast (289-IN-04). ⛔ ONE access query; 404 parity |
 | [`backend/app/middleware/canvas_gate.py`](docs/HOT-FILE-LEDGER.md#backendappmiddlewarecanvas_gatepy) | 9 / 6 / 396 (was `8 / 5 / 391`) | **FIRES** | **289-03**: ONE CANVAS_GATED_PATHS member (`…/evidence`) + comment, same commit as its include_router. ⛔ test_182 never imports the set |
 | [`backend/app/models/thread.py`](docs/HOT-FILE-LEDGER.md#backendappmodelsthreadpy) | 25 / 17 / 550 (was `24 / 16 / 545`) | ⚠ **FIRES** | 295-05: ONE field (`WorkflowPhaseState.unsourced`, a plain dict to avoid the harness import cycle). Honoured by construction · 293 touch: see §Phase 293 close |
 | [`frontend/src/components/workflows/canvasModel.ts`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentsworkflowscanvasmodelts) | 13 / 6 / 752 | ⚠ **FIRES** | ⚠ absent from BOTH at 6 phases (added 200) |
@@ -11993,7 +11993,7 @@ cells rot within days.
 | [`backend/app/services/citation_claims.py`](docs/HOT-FILE-LEDGER.md#backendappservicescitation_claimspy) | 1 / 1 / 279 (was `0 / 0 / 0`) | no (young) | young (created 294-03). Pure: dedup port + claim units + ordinals == the rendered markers (shared fixture). ⛔ no agent_loop import |
 | [`backend/app/services/citation_check_service.py`](docs/HOT-FILE-LEDGER.md#backendappservicescitation_check_servicepy) | 1 / 1 / 330 (was `0 / 0 / 0`) | no (young) | young (created 294-03). One choice per claim, grouped per source, canonical labels; pool upsert binds ids from the row. ⛔ never defaults to supported |
 | [`backend/app/models/citation_check.py`](docs/HOT-FILE-LEDGER.md#backendappmodelscitation_checkpy) | 1 / 1 / 74 (was `0 / 0 / 0`) | no (young) | young (created 294-03). Verdict / CheckEngineId / UnavailableReason Literals one per line (frontend ?raw parity) + strict CitationCheckResult v1. ⛔ extra=forbid |
-| [`backend/app/api/citation_checks.py`](docs/HOT-FILE-LEDGER.md#backendappapicitation_checkspy) | 1 / 1 / 175 (was `0 / 0 / 0`) | no (young) | young (created 294-03). GET availability + checks, POST run; one 404 body; 409 {reason}; ids from the message row. ⛔ an API route, never a tool (7 / 1 / 30) |
+| [`backend/app/api/citation_checks.py`](docs/HOT-FILE-LEDGER.md#backendappapicitation_checkspy) | 3 / 2 / 186 (was `1 / 1 / 175`) | no (2 phases) | 296-01: per-user limit (429 rate_limited / 503) BEFORE the in-flight claim. ⛔ an API route, never a tool |
 | [`frontend/src/components/settings/rerankEngines.ts`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentssettingsrerankenginests) | 1 / 1 / 123 (was `0 / 0 / 0`) | no (young) | young (created 294-04). THE engine-card fact table; engineFor is total (api / unknown → Cohere). ⛔ ids ?raw-pinned to registry.py |
 | [`frontend/src/components/settings/RerankEngineBlock.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentssettingsrerankengineblocktsx) | 1 / 1 / 283 (was `0 / 0 / 0`) | no (young) | young (created 294-04). Sketch 294 B engine cards; owns no fetch, no state. ⛔ facts from rerankEngines.ts only; never rewrites "api" on mount |
 | [`frontend/src/lib/api/citationChecks.ts`](docs/HOT-FILE-LEDGER.md#frontendsrclibapicitationchecksts) | 1 / 1 / 117 (was `0 / 0 / 0`) | no (young) | young (created 294-05). getCitationChecks / runCitationCheck + wire types verbatim; the 409 reason is kept. ⛔ not re-exported through lib/api.ts |
@@ -12026,7 +12026,7 @@ cells rot within days.
 | [`frontend/src/components/settings/AgentRoundLimits.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentssettingsagentroundlimitstsx) | 3 / 1 / 220 (was `2 / 1 / 243`) | no (young) | 292.1 UAT: no own Save; exposes `changes()` / `adopt()` via ref; still owns its read (WR-05 lock kept). ⛔ never sends 0 |
 | [`frontend/src/lib/continueWords.ts`](docs/HOT-FILE-LEDGER.md#frontendsrclibcontinuewordsts) | 1 / 1 / 46 (was `0 / 0 / 0`) | no (young) | young (created 292.1-03) · client hint mirror of the backend continue words + shouldTryTypedContinue. ⛔ the server decides; ?raw lockstep fence |
 | [`backend/app/security/api_key_auth.py`](docs/HOT-FILE-LEDGER.md#backendappsecurityapi_key_authpy) | 3 / 1 / 328 (was `1 / 1 / 261`) | no (young) | young (planned 293-01). Key mint/digest + resolve_key, live checks every call (D-05); refusal-audit throttle (293-REVIEW CR-02). ⛔ never via get_current_user; one 401 body |
-| [`backend/app/services/rate_limit.py`](docs/HOT-FILE-LEDGER.md#backendappservicesrate_limitpy) | 3 / 1 / 109 (was `1 / 1 / 75`) | no (young) | young (planned 293-01). Redis fixed-window per-key limiter (D-15) + per-client limit (293-REVIEW CR-02). ⛔ no process-local state; fails CLOSED (503) |
+| [`backend/app/services/rate_limit.py`](docs/HOT-FILE-LEDGER.md#backendappservicesrate_limitpy) | 4 / 2 / 138 (was `3 / 1 / 109`) | no (2 phases) | 296-01: per-user citation limit (10/min, [ASSUMED]) on `hit`. ⛔ no process-local state; no env var; fails CLOSED (503) |
 | [`backend/app/db/api_keys.py`](docs/HOT-FILE-LEDGER.md#backendappdbapi_keyspy) | 4 / 1 / 303 (was `3 / 1 / 294`) | no (young) | young (planned 293-01). api_keys CRUD on the pool; calls read per key (293-REVIEW WR-02). ⛔ owner predicate in every statement; key_hash only in auth |
 | [`backend/app/models/api_key.py`](docs/HOT-FILE-LEDGER.md#backendappmodelsapi_keypy) | 1 / 1 / 113 (was `0 / 0 / 0`) | no (young) | young (planned 293-01). Pydantic wire for keys, activity, limits. ⛔ no field carries the secret except the create response |
 | [`backend/app/services/inbound_inputs.py`](docs/HOT-FILE-LEDGER.md#backendappservicesinbound_inputspy) | 6 / 1 / 258 (was `5 / 1 / 237`) | no (young) | young (planned 293-01, fence 293-02). Launch-field twin + validation + TRUST-03 wrap and its reader (293-REVIEW WR-03). ⛔ pure; strips _-keys |
@@ -22939,6 +22939,13 @@ Scan-list cell as of 2026-10-20 (replaced by 289-REVIEW WR-03, moved verbatim): 
 
 Scan-list cell as of 2026-10-21 (replaced by 295-07, moved verbatim): 3 / 1 / 509 (was `2 / 1 / 492`) | no (young) | **289-REVIEW WR-03**: a wall-clock `gate_failed` composes as `gate_timed_out` (recorded, no `checked`); CR-01 output withholding kept. ⛔ no I/O; never ships passage/similarity
 
+### `backend/app/services/run_evidence.py` — 296-01 (BUG-261020-02 / D-05, 289-IN-04, 2026-10-26)
+
+**`6 / 4 / 555` (was `5 / 3 / 525`).** ⚠ Now FIRES at 4 phases (289, 293, 295, 296); a CLAUDE.md FIRING row is added in this commit. 296-01: `WITHHELD_UPSTREAM_SENTENCE` beside `WITHHELD_OUTPUT_SENTENCE`; `compose_phase_log` gains one `withheld_upstream` flag set ONLY by the citation withhold, and one `elif` that withholds every later non-owner step (the owner path, `readable_ids is None`, untouched by construction; a human-input null-out never starts it). 289-IN-04: one module regex + `is_canonical_uuid`, applied in `cited_document_ids` (a dropped id stays masked: fail closed). ⛔ no I/O; never ships passage/similarity (unchanged).
+
+Scan-list cell before 296-01 (moved verbatim): 5 / 3 / 525 (was `4 / 2 / 517`) | ⚠ **FIRES** | 295-05: one by-name read, one entry key, one `who` computation (If 32→32). Two phases; does not fire · 293 touch: see §Phase 293 close
+
+
 ## `backend/app/api/workflow_run_evidence.py`
 
 **`0 / 0 / 0` — planned (289-03); row and section added at planning.** `GET /workflow-runs/{id}/evidence`, the first org-shared read on the run tables (SECURITY-BEARING, beside the library feeds). ⛔ **Binding invariants:** ONE pool SELECT carries id + terminal status + owner-or-org-member before any other read; every refusal is the same 404 `Run not found`, never 403; `require_canvas()` alone; the path is in `CANVAS_GATED_PATHS`; email, thread_id and file_id only for the owner. RLS on the four run tables is NOT widened (no migration). Plan 05 re-derives the triple.
@@ -22960,6 +22967,15 @@ Scan-list cell as of 2026-10-19 (replaced by 289-REVIEW CR-01, moved verbatim): 
 **`3 / 2 / 391`** (the scan-list row read `2 / 1 / 366`). 295-05 declared `RunEvidenceLogEntry.unsourced` and `RunEvidenceRun.end_reason` and added one block that reads the end reason through the existing `_AUDIT_SQL` with the end-reason kinds (ast.If 7 → 8). Live: S2's downloaded JSON carried `unsourced.continued_by` and `unsourced.at`, with no stored user id.
 
 Scan-list cell as of 2026-10-21 (replaced by 295-07, moved verbatim): 2 / 1 / 366 (was `1 / 1 / 358`) | no (young) | **289-REVIEW CR-01**: passes the readable set to the phase log (one decision). ⛔ ONE access query; 404 parity; require_canvas alone
+
+### `backend/app/api/workflow_run_evidence.py` — 296-01 (289-IN-04, 2026-10-26)
+
+**`5 / 4 / 408` (was `4 / 3 / 405`).** 296-01: `_viewer_reads` drops non-canonical ids (`ev.is_canonical_uuid`) before the `uuid[]` cast, so one malformed cited id can no longer fail the read and mask every source. One list comprehension and a docstring line; no new query, no new branch. ⛔ ONE access query; 404 parity; require_canvas alone (unchanged).
+
+Scan-list cell before 296-01 (moved verbatim): 4 / 3 / 405 (was `3 / 2 / 391`) | ⚠ **FIRES** | 295-05: two fields (`unsourced`, `end_reason`) + one end-reason block reusing `_AUDIT_SQL` (If 7→8). Two phases; does not fire · 293 touch: see §Phase 293 close
+
+CLAUDE.md FIRING cell before 296-01 (moved verbatim): ⚠ now FIRES (293) — row added 293-03 · origin beside end_reason
+
 
 ## `backend/app/middleware/canvas_gate.py`
 
@@ -23247,6 +23263,13 @@ Scan-list cell as of 2026-10-20 (replaced by 294-05, moved verbatim): 0 / 0 / 0 
 Scan-list cell as of 2026-10-20 (replaced by 294-05, moved verbatim): 0 / 0 / 0 | no (young) | young (planned 294-03, row added at planning). GET availability+checks, POST run (404 same body, 422, 409 in flight). ⛔ a route, NOT a tool (30 stays); never returns a key
 
 **294-REVIEW CR-01 (`181` lines).** `CitationCheckFailed` maps to **503 `{"reason": "engine_failed"}`** and `upsert_check` is never reached, so a failed Re-check leaves the stored row byte-unchanged. The OpenAPI surface is unchanged (no `responses=` declared, like the 409s).
+
+### `backend/app/api/citation_checks.py` — 296-01 (SEED-365 rate half / D-13, 2026-10-26)
+
+**`3 / 2 / 186` (was `1 / 1 / 175`; the row was stale after 294-REVIEW).** 296-01: one import and one `await enforce_user_citation_limit(redis, user_id=…)` placed after the availability check and BEFORE the in-flight `nx` claim, so a limited or uncounted call never sets the claim and never reaches the paid engine. Refusals keep the dict shape: 429 `{"reason": "rate_limited"}` + `Retry-After`, 503 `{"reason": "unavailable"}`. Two phases; does not fire.
+
+Scan-list cell before 296-01 (moved verbatim): 1 / 1 / 175 (was `0 / 0 / 0`) | no (young) | young (created 294-03). GET availability + checks, POST run; one 404 body; 409 {reason}; ids from the message row. ⛔ an API route, never a tool (7 / 1 / 30)
+
 
 ## `frontend/src/components/settings/rerankEngines.ts`
 
@@ -24665,6 +24688,9 @@ Twenty-eight rows added at planning: twenty-six files Phase 293 creates and two 
 ### `backend/app/services/rate_limit.py`
 
 **`0 / 0 / 0`** at 293 planning (2026-10-25). Young; row added AT PLANNING (the 273 / 290 / 292.1 precedent), so `check-hot-file-ledger.cjs 293` binds before the file exists. Redis fixed-window per-key limiter (D-15). ⛔ no process-local state; fails CLOSED (503) when Redis raises Does not fire. Re-derive the triple at the 293-05 close.
+
+**2026-10-26 — 296-01 (SEED-365 rate half / D-13): `4 / 2 / 138` (was `3 / 1 / 109`).** `Kind` widened with `"citation"`; `CITATION_CHECKS_PER_MINUTE = 10` (a module constant on the `IP_CALLS_PER_MINUTE` precedent, an [ASSUMED] value — a Settings knob would need a migration and a control); `enforce_user_citation_limit` reuses `hit` and fails CLOSED (503 `{"reason": "unavailable"}`), 429 `{"reason": "rate_limited"}` + `Retry-After` over the limit. ⛔ no env var, no process-local state (unchanged). Two phases; does not fire. Scan-list cell before 296-01 (moved verbatim): `3 / 1 / 109 (was 1 / 1 / 75) | no (young) | young (planned 293-01). Redis fixed-window per-key limiter (D-15) + per-client limit (293-REVIEW CR-02). ⛔ no process-local state; fails CLOSED (503)`.
+
 
 ### `backend/app/db/api_keys.py`
 
