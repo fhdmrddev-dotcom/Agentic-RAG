@@ -5591,6 +5591,14 @@ refactor recommendation FIRST.
 
 ---
 
+### `backend/app/main.py` — 296-02 (SEED-363 / 289-IN-08, 2026-10-26)
+
+**`95 / 69 / 991`.** 296-02 (SEED-363 / 289-IN-08): one module constant `RUN_BOOT_SWEEPS = True` (no env var, no setting — a new env var owes the deploy artifacts) and `and RUN_BOOT_SWEEPS` on the three sweep conditions that claim runs: the boot resume sweep, the boot orphan reconciler and the periodic reconciler (the plan named two; the periodic one calls the same `reconcile_orphaned_runs` at t=0, so leaving it open would keep SEED-363's measured 295-04 failure). `tests/conftest.py` sets it False in a new `pytest_configure`. Plus 289-IN-08: the missing space after `workflow_run_evidence,` in the router import line. No route, no middleware, no other lifespan change.
+
+Scan-list cell before 296-02 (moved verbatim): | [`backend/app/main.py`](docs/HOT-FILE-LEDGER.md#backendappmainpy) | 94 / 68 / 982 (was `92 / 67 / 979`) | ⚠ **FIRES** | 294-03: ONE include_router (citation_checks) + one import token (+2 −1). Honoured by construction · 293 touch: see §Phase 293 close |
+
+CLAUDE.md FIRING cell before 296-02 (moved verbatim): | `backend/app/main.py` | 94 / 68 / 982 (was `92 / 67 / 979`) | 293: two include_router lines (api_keys, inbound) · ⛔ |
+
 ### `backend/app/config.py` — Phase 230, honoured by construction
 
 **Measured 2026-09-05: `78 commits / 37 phases / 1428 L`** (supersedes `73 / 43 / 1331`).
@@ -11550,7 +11558,7 @@ cells rot within days.
 | [`frontend/src/components/panel/FilesSection.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentspanelfilessectiontsx) | 12 / 8 / 354 (was `10 / 6 / 363`) | ⚠ **FIRES** | ⚠ STALE (`10/6/363`). **274-04**: 1 import, 1 trailing-slot line, 1 Shift+F10 arm, 2 signatures widened to `string \| null`; agent rows byte-identical |
 | [`frontend/src/lib/api.ts`](docs/HOT-FILE-LEDGER.md#frontendsrclibapits) | 211 / 126 / 546 (was `210 / 125 / 530`) | ⚠ **FIRES** | 291-04: barrel re-exports for the describe read / reference clients and their wire types (+16). 284-05's deleted whole-list re-exports stay deleted |
 | [`frontend/src/types/index.ts`](docs/HOT-FILE-LEDGER.md#frontendsrctypesindexts) | 102 / 81 / 1685 (was `101 / 80 / 1674`) | ⚠ **FIRES** | 295-05: THREE fields, not the planned two (`Phase.unsourced`, `PendingAsk.engine_pause` + `EnginePause`, `AskUserAnswerBody.folder_id`). Additive. Seam OWED · 293 touch: see §Phase 293 close |
-| [`backend/app/main.py`](docs/HOT-FILE-LEDGER.md#backendappmainpy) | 94 / 68 / 982 (was `92 / 67 / 979`) | ⚠ **FIRES** | 294-03: ONE include_router (citation_checks) + one import token (+2 −1). Honoured by construction · 293 touch: see §Phase 293 close |
+| [`backend/app/main.py`](docs/HOT-FILE-LEDGER.md#backendappmainpy) | 95 / 69 / 991 (was `94 / 68 / 982`) | ⚠ **FIRES** | 296-02 (SEED-363): one module flag, RUN_BOOT_SWEEPS, gates the three run-claiming sweeps (boot resume, boot + periodic reconciler); tests/conftest.py sets it False. No env var. 289-IN-08 import space |
 | [`backend/app/config.py`](docs/HOT-FILE-LEDGER.md#backendappconfigpy) | 93 / 54 / 1809 (was `92 / 54 / 1790`) | ⚠ **FIRES** | **282-01** ceiling 1800 + boot check + DB-tier clamp; **282-04** `DEFAULT_LLM_CALL_TIMEOUT_SECONDS_SELF_HOSTED` 900 via the mig 180 predicate. No env var. honoured by construction |
 | [`backend/app/api/admin.py`](docs/HOT-FILE-LEDGER.md#backendappapiadminpy) | 44 / 17 / 2054 (was `43 / 17 / 2051`) | ⚠ **FIRES** | honoured by construction (quick-261024): the discover providers summary gains `returned` = len(ids), so a mostly-known provider no longer reads as "found little". ⛔ add still lands disabled |
 | [`backend/app/api/settings.py`](docs/HOT-FILE-LEDGER.md#backendappapisettingspy) | 47 / 25 / 1301 (was `46 / 24 / 1250`) | ⚠ **FIRES** | 292.1-02: two bounded writes (2..50) via _range_refusal_detail + allow-list +2 (+51 −0). ⛔ never a retyped id list; GET never echoes a key · 293 touch: see §Phase 293 close |
