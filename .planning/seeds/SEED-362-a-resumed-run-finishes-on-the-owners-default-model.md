@@ -3,15 +3,15 @@ seed_id: SEED-362
 title: A paused workflow run that is answered finishes on the OWNER'S DEFAULT model, not the model it started on, and nothing on the run records the switch
 created: 2026-10-19
 surface: Agentic-RAG
-status: planted
+status: answered
 partial: false
-status_note:
+status_note: "ANSWERED by Phase 296: the kickoff records the run's provider in workflow_runs.metadata in the same INSERT (296-02 create_workflow_run(provider=) + 296-06 04618f10e passing it from the in-app kickoff), and a resumed / re-driven run continues on workflow_runs.model + that provider, never the owner's current default (296-02 RED 0d3d4d8d0, GREEN bf8a4467b). LIVE check owed after a backend restart: at 296-05 the running :8000 predated the 296-06 merge (its /openapi.json lacked 296-06's schemas), so no live run carried metadata.provider; scripts/run-296-board.py --resume-model is the re-run (it asserts the RECORD — model + metadata.provider — because the resume shell's runs row is the placeholder 'unknown' by design and nothing else names the model)."
 trigger_when: "The next phase touching harness_engine._build_resume_context or the resume sweep; or any per-run model guarantee (cost, compliance, 'this run used model X'); or a report that a resumed run's output reads in a different model's voice."
 trigger_paths: ["backend/app/services/harness_engine.py", "backend/app/services/sub_agent_models.py", "backend/app/api/runs.py"]
 trigger_surfaces: ["harness", "provider", "workflow"]
 migration_note:
 relates_to: ["SEED-360", ".planning/phases/289-the-run-page-and-its-evidence/289-VALIDATION.md (scoreboard row d)", ".planning/phases/289-the-run-page-and-its-evidence/289-RESEARCH.md (Not fixed)"]
-folded_into: null
+folded_into: "296"
 renumbered_from: null
 renumbered_because: null
 ---

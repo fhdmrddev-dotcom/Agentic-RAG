@@ -1,0 +1,23 @@
+{
+  "mode": "pinned-emit",
+  "provider": "deepseek",
+  "model": "deepseek-v4-pro",
+  "pinned_model": "gpt-5.6-luna",
+  "pinned_provider": "openai",
+  "definition_id": "e641546e-da4a-42b0-858c-a9aeecbd70b7",
+  "thread_id": "17144ce9-89e4-4db0-a03c-17f297c58e91",
+  "send_http": 201,
+  "send": "{\"message_id\": \"314108e7-2012-4425-b72f-429d8c087ec8\", \"run_id\": \"2e9f4821-fd32-4f40-810d-c55f44ea705b\", \"model\": \"deepseek-v4-pro\", \"provider\": \"deepseek\"}",
+  "workflow_run": {
+    "id": "3cdd441f-c59b-4003-abae-3e11ce373efc",
+    "status": "failed"
+  },
+  "emit_validated_providers": [],
+  "failures": [
+    "{\"definition_version\": 1, \"definition_id\": null, \"phase_slug\": \"render_vendor_intake_sheet\", \"emitter\": \"render_template\", \"tier\": \"force_strict\", \"provider\": \"openai\", \"model\": \"gpt-5.6-luna\", \"forced\": false, \"thinking\": false, \"recovered_from_narration\": false, \"truncated\": false, \"attempt\": 1}",
+    "{\"definition_version\": 1, \"definition_id\": null, \"phase_slug\": \"render_vendor_intake_sheet\", \"emitter\": \"render_template\", \"tier\": \"force_strict\", \"provider\": \"openai\", \"model\": \"gpt-5.6-luna\", \"forced\": false, \"thinking\": false, \"recovered_from_narration\": false, \"truncated\": false, \"attempt\": 1}",
+    "{\"reason\": \"Step \\\"Fill vendor intake sheet\\\" failed after 2 attempts:\\n\\u2022 2 attempts \\u2014 the model provider returned an error. Check that this step's model provider is reachable.\"}"
+  ],
+  "has_400": false,
+  "verdict": "FAIL"
+}

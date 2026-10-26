@@ -4,12 +4,13 @@ title: A validated emit failure writes N+1 chat messages that disagree on the at
 reported: 2026-10-15
 surface: Agentic-RAG
 severity: minor
-status: folded
+status: closed
 affected_areas: [backend/harness, chat]
 folded_into: "295"
-verified_closed_by: null
+verified_closed_by: "295"
 related_seeds: []
-re_open_trigger: "The next phase whose files_modified names backend/app/services/harness/phase_types.py or backend/app/services/harness_engine.py, OR any report of a workflow run's chat thread showing the same failure more than once."
+re_open_trigger: null
+fixed_by_commit: "b23554309 (fix(295-04): one failure, one message, D-23 claim_failure_message); 295-VERIFICATION RUN-04; closed by the 296-05 record flip"
 reproduces_on:
   branch: develop
   commit: bdb4247f5

@@ -4,12 +4,13 @@ title: Four LangSmith-traced functions still send a provider key (or user_settin
 reported: 2026-10-20
 surface: Agentic-RAG
 severity: major
-status: open
+status: closed
 affected_areas: [backend/observability, security]
-folded_into: null
-verified_closed_by: null
+folded_into: "296"
+verified_closed_by: "296"
 related_seeds: []
 re_open_trigger: null
+fixed_by_commit: "6d14ccf59 (fix(security), 2026-10-23): all four traced functions bind process_inputs=redact_inputs; the operator rotated the exposed Anthropic key 2026-10-24. Re-verified at 296-05: tests/unit/test_trace_key_redaction.py 3 passed (an AST sweep of every traced function under app/)."
 reproduces_on:
   branch: develop
   commit: 4e7e94a82

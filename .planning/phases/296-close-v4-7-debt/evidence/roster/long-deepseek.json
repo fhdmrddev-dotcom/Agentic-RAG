@@ -1,0 +1,10 @@
+{
+  "mode": "long",
+  "provider": "deepseek",
+  "model": "deepseek-v4-pro",
+  "thread_id": "01a1bb98-f488-47f1-b548-b60cc7191f02",
+  "prompt_bytes": 6606,
+  "status": "completed",
+  "final_preview": "Q1: 4629\nQ2: 4828\nQ3: 5080\nQ4: 5364",
+  "verdict": "PASS"
+}

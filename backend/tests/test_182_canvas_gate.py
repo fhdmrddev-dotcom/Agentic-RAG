@@ -117,6 +117,12 @@ _CANVAS_SCHEMAS = (
     # wire model is referenced only by the run read and the evidence read, so it leaves with
     # them (the chat panel's `WorkflowPhaseState.unsourced` is a plain dict, not this model).
     "UnsourcedMark",
+    # Phase 293 Plan 03 (`e84122d60`, "the recorded origin on every run read") — RE-PINNED at
+    # 296-05 (288-T-3), measured off the real filter under the local-DB lock: `RunOriginWire`
+    # is referenced only by the run read, the run log and the evidence read (all canvas-gated),
+    # so it leaves the published schema with them. This red was inherited from 293, not new:
+    # 296-06 recorded it at its base `4cfb79f87`. The PATH set did not move.
+    "RunOriginWire",
 )
 
 # CONTROLS — a schema and a path from NON-canvas routes on the same router. These are what

@@ -4,12 +4,13 @@ title: An escalated step is sealed 'Must prove it' in the builder and on the can
 reported: 2026-10-21
 surface: Agentic-RAG
 severity: major
-status: open
+status: folded
 affected_areas: [frontend/workflow-builder, frontend/workflow-canvas, backend/harness-grounding]
-folded_into: null
+folded_into: "296"
 verified_closed_by: null
 related_seeds: []
-re_open_trigger: "The next phase whose files_modified names frontend/src/pages/WorkflowBuilderPage.tsx (gatesFor), frontend/src/components/workflows/NodeCornerMarks.tsx, or backend/app/services/harness/grounding.py (effective_phase)."
+re_open_trigger: "CLOSE when 296-HUMAN-UAT optional row 9 (the escalated-step seal) reads PASS with evidence (set status closed, verified_closed_by \"296\", re_open_trigger null). A FAIL routes back to its owning 296 plan under G-7."
+fixed_by_commit: "296-07: RED e074515f5, GREEN ef2832f46 (D-04 amended option b: the seal, gate row and attached-gate line no longer claim a check for escalated; the step says nothing is checked). The engine half (a real search tool) is SEED-384"
 reproduces_on:
   branch: develop
   commit: ed9792704

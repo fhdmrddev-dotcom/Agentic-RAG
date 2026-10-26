@@ -4,12 +4,13 @@ title: Evidence page shows a colleague a later step's output that restates a wit
 reported: 2026-10-20
 surface: Agentic-RAG
 severity: major
-status: open
+status: folded
 affected_areas: [backend/run-evidence, privacy]
-folded_into: null
+folded_into: "296"
 verified_closed_by: null
 related_seeds: [SEED-364]
-re_open_trigger: "A phase that touches the run-evidence read (backend/app/api/workflow_runs.py evidence assembly) or ratifies sharing derived content of owner-private documents. Reviewed at 295 discuss (2026-10-20) and left: privacy/evidence-page, not run dead-ends."
+re_open_trigger: "CLOSE when 296-HUMAN-UAT G-4 scenario 2 reads PASS with evidence (set status closed, verified_closed_by \"296\", re_open_trigger null). A FAIL routes back to its owning 296 plan under G-7."
+fixed_by_commit: "296-01: RED 8939b5522, GREEN 70fefa6f4 (D-05: once an upstream step is withheld, every later step is withheld for a non-owner, WITHHELD_UPSTREAM_SENTENCE)"
 reproduces_on:
   branch: develop
   commit: 4b37c72aa

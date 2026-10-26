@@ -4,12 +4,13 @@ title: A run waiting on a person shows several EXPIRED ask cards while its heade
 reported: 2026-10-25
 surface: Agentic-RAG
 severity: major
-status: open
+status: folded
 affected_areas: [backend/harness, frontend/panel, human-input]
-folded_into: null
+folded_into: "296"
 verified_closed_by: null
 related_seeds: []
-re_open_trigger: the next phase whose files_modified names backend/app/services/harness/human_input.py or frontend/src/components/panel/PendingAskCard.tsx
+re_open_trigger: "CLOSE when 296-HUMAN-UAT G-4 scenario 4 reads PASS with evidence (set status closed, verified_closed_by \"296\", re_open_trigger null). A FAIL routes back to its owning 296 plan under G-7."
+fixed_by_commit: "296-02 backend: RED 0d3d4d8d0, GREEN bf8a4467b (a boot pauses a waiting run, never re-asks); 296-04 UI: RED e93dbecbb, GREEN fd59d0f19 (one ask per live workflow run; a passed clock on a live run reads paused)"
 reproduces_on:
   branch: develop
   commit: b8aed8884

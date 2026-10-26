@@ -155,9 +155,16 @@ async function main() {
   const options = parseArgs(process.argv.slice(2));
   const pytestBin = resolvePytestBinary();
 
+  // 296-05: extra args used to REPLACE the default path, so `-- -rf` ran the whole `tests/` tree,
+  // integration suites against the local DB included (296-02 measured it). A run with no
+  // `tests…` path argument now keeps `tests/unit`, said out loud.
   const pytestArgs = options.pytestArgs.length > 0
     ? options.pytestArgs
     : ['tests/unit', '-q', '--continue-on-collection-errors'];
+  if (!pytestArgs.some((a) => /^tests([\\/]|$)/.test(a))) {
+    pytestArgs.unshift('tests/unit');
+    console.error('[check-backend-unit-baseline] no tests path given: running tests/unit (the gated set).');
+  }
 
   if (!options.quiet && !options.json) {
     console.log(`[check-backend-unit-baseline] Running: ${pytestBin} ${pytestArgs.join(' ')}`);
@@ -194,8 +201,18 @@ async function main() {
     process.exit(2);
   });
 
-  child.on('close', (exitCode) => {
+  child.on('close', (exitCode, signal) => {
     const parsed = parsePytestSummary(fullOutput);
+
+    // 296-05: FAIL CLOSED when pytest never finished. A killed run printed
+    // `[GATE PASSED] … failed: 0` (296-02): no summary line parses as 0 failed. pytest exits 0/1
+    // on a completed run; null (a signal) or >= 2 (interrupted, internal, usage, nothing
+    // collected) means there is no verdict to read.
+    if (!parsed.summaryLine || exitCode === null || exitCode >= 2) {
+      console.error(`\n[GATE ERROR] pytest did not complete (exit ${exitCode}, signal ${signal || 'none'}, `
+        + `summary ${parsed.summaryLine ? 'present' : 'absent'}). No verdict: this is not a pass.`);
+      process.exit(2);
+    }
 
     const passedBaseline = parsed.failed <= options.maxFailed && parsed.errors === 0;
 

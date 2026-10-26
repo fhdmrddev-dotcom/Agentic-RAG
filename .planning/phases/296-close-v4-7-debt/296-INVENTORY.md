@@ -193,3 +193,166 @@ Dispositions:
 | 294-ENV | Remove the two dev `.env` lines (fault server) |
 | 286-V-2 | SEED-280 status note |
 | DEPLOY | After 296: cloud migrations 214, 215 (+216 if 296 adds one), backend, `get_advisors(security)`, each write shown first |
+
+---
+
+## Outcome (296-05)
+
+One line per inventory row ID above, in table order. Outcome words: **fixed** (commit; RED → GREEN),
+**did-not-reproduce** (the RED test), **accepted** (reason), **seeded** (SEED id), **operator** (owed
+action), **closed** (commit). ⏳ **G-4** = fixed and unit-proven, but the bug report closes only on the
+named live row in `296-HUMAN-UAT.md` (D-19 / SC#5; executors have no browser). ⚠ = a live finding the
+orchestrator must route under G-7.
+
+⚠ **The live backend at 296-05 time predates 296-06.** `GET :8000/openapi.json` carries 296-02's
+`ScheduleTriggerResult.outcome` but none of 296-06's `AutoAnsweredNote`, `needs_task` or
+`unplaced_sentences`, while the main checkout's source has them (`workflow_wire.py`). The `--reload`
+process did not pick up the 296-06 merge, and `workflow_runs.metadata.provider` is empty on every run
+it started (0 rows ever). Roster rows that exercise 296-06 code are marked "re-run after a backend
+restart"; the operator restarts uvicorn (memory: the user starts the backend).
+
+| ID | Outcome |
+|---|---|
+| BUG-261021-02 | fixed `cb13a74a7` (RED `20113ce24`; two-org integration test 13 passed) — ⏳ G-4 #1 closes the report |
+| BUG-261021-05 | fixed `ef2832f46` (296-07, D-04 amended option b; RED `e074515f5`) — ⏳ optional row 9 closes the report; the engine half seeded SEED-384 |
+| BUG-261020-02 (`evidence-page-later-step-carries-withheld-document-substance.md`) | fixed `70fefa6f4` (RED `8939b5522`, D-05 cascade) — ⏳ G-4 #2 closes the report |
+| SEED-364 | fixed `08c9a600e` (RED `67040639c`; migration 216, regen `006f0365c`) — SEED-364 answered; the cloud apply of 216 is the DEPLOY row |
+| SEED-365 (rate-limit half) | fixed `70fefa6f4` (RED `8939b5522`) + UI 429 sentence `b392ef6d1` — SEED-365 partially-answered |
+| 287-T01 | fixed `04618f10e` (296-06, RED `710cf99b4`; preflight 422 before any write) |
+| 289-IN-04 | fixed `70fefa6f4` (non-UUID cited ids dropped) |
+| 289-IN-06 | fixed `9c6b3403c` (296-04 copy; RED `c563f4ad0`) |
+| DEBT-3 | did-not-reproduce `backend/tests/unit/test_296_redrive_cap_paused.py` (3 passed at base, `d08c8a37e`; nothing writes `workflow_runs.status='cap_paused'`) — accepted with that RED evidence (D-02 / D-23) |
+| 295-IN-01 | fixed `ba6bc4f64` (RED `d08c8a37e`) |
+| 295-IN-02 | fixed `ba6bc4f64` (RED `d08c8a37e`) |
+| 295-IN-03 | fixed `ba6bc4f64` (RED `d08c8a37e`) |
+| 295-IN-05 | fixed `3a6d7aae8` (RED `665f290ed`; worded refusal + `outcome`) — the backoff half seeded SEED-382 |
+| 295-IN-07 | fixed `ba6bc4f64` (RED `d08c8a37e`) |
+| 295-IN-08 | fixed `3a6d7aae8` (RED `665f290ed`, D-07) |
+| 295-RES-a | fixed `bf8a4467b` (RED `0d3d4d8d0`; guard on `engine_ask_approved`) |
+| 295-RES-b | fixed `ba6bc4f64` (RED `d08c8a37e`; `run_cancelled_by` level key) |
+| 289-WR-06b | fixed `ba6bc4f64` (one held retry); live DB fault drive `21327fb9c` (`test_296_redrive_fault_injection.py`) |
+| 289-IN-05 | fixed `ba6bc4f64` (True only when spawned); live DB drive `21327fb9c` |
+| 289-IN-07 | fixed `0ad717a67` (296-06; typed `RunEvidenceConfidence`) |
+| 289-IN-08 | fixed `6d51f603b` (296-02) |
+| 289-F3 | fixed `bf8a4467b` (owner buckets) |
+| SEED-362 | fixed `bf8a4467b` (resume half) + `04618f10e` (kickoff records the provider) — live roster resume-model: re-run after a backend restart (the live backend predates 296-06, so no run carries `metadata.provider`); SEED-362 updated |
+| SEED-363 | fixed `6d51f603b` (RED `d267c6fff`) — SEED-363 answered |
+| 288-WR-02 | fixed `313d5f124` (296-03, RED `65120e770`) |
+| 288-IN-01 | fixed `0ad717a67` (typed `AutoAnsweredNote`) |
+| 293-IN-01 | fixed `04618f10e` (limit first, then consume) |
+| 293-IN-03 | fixed `04618f10e` (413 from Content-Length) — residual: a chunked body with no length is not capped by the app; accepted: the onebox nginx bounds every body (`frontend/nginx.conf` `client_max_body_size 100m`), re-open when a deploy target runs without that nginx |
+| 293-IN-04 | fixed `3a6d7aae8` (held task set) |
+| 293-IN-05 | fixed `08c9a600e` (canonical UUID regex in 215; cloud has 0 `_schedule_id` rows) |
+| 293-IN-06 | fixed `04618f10e` (`needs_task`, create_key scope) — the `task` field seeded SEED-380 |
+| 293-IN-08 | fixed `04618f10e` (audit only on a matched update) |
+| 293-DEL | fixed `0ad717a67` + `f318d2b69` (worded 409) |
+| 293-F-4 | ⚠ PARTLY fixed `c2a8f6ace` (emit pin routes to the pinned provider; unit-proven). LIVE board: a pin to a chat-completions model (`deepseek-v4-pro`) PASSES from 5 run providers; a pin to `gpt-5.6-luna` FAILS from all 5 non-OpenAI providers with OpenAI's 400 "Function tools with reasoning_effort are not supported for gpt-5.6-luna in /v1/chat/completions" — reproduced on 296-06 worktree code by one direct `forced_emit` shot (`evidence/roster/pinned-emit-diagnosis.json`): the API surface is resolved under the RUN provider's settings. NOT closed; a G-7 routing decision for the orchestrator. The agent-step half seeded SEED-386 |
+| 294-IN-01 | fixed `e9e8fdc9d` (296-03, RED `591353b60`) |
+| 294-IN-02 | fixed `e9e8fdc9d` |
+| 294-IN-07 | fixed `e9e8fdc9d` |
+| 294-CR-02-res | fixed `e9e8fdc9d` (marked-measured fixture) |
+| 292.1-IN-01 | fixed `0ad717a67` (RED `847a00dcc`) — live markup scan: re-run after a backend restart (296-06 code not loaded) |
+| 292.1-IN-02 | fixed `0ad717a67` (RED `847a00dcc`) — live re-run owed with 292.1-IN-01 |
+| 292.1-IN-04 | fixed `0ad717a67` (`EVAL_MAX_TOOL_ROUNDS = 15`) |
+| BUG-261024-01 | fixed `c2a8f6ace` (RED `fab31d6a8`; unit-proven `test_296_moonshot_schema.py`) — live row ⛔ Moonshot account suspended (429, probed 2026-10-27); report stays `folded` into 296 with the reinstatement trigger |
+| 291-WR-01 + IN-08 | fixed `cd1aaefff` (RED `a2568f789`; extraction `1a449d44c`) |
+| 291-WR-02 | fixed `cd1aaefff` |
+| 291-WR-04 | fixed `c496244c3` (296-03, RED `4a1f8b2d2`) |
+| 291-WR-06 (UI half) | fixed `cd1aaefff` (Look it up shown as not available yet) |
+| 291-WR-07 | fixed `c496244c3` (page + byte cap, one extraction) |
+| 291-IN-01 | fixed `c2a8f6ace` (retry needs KB evidence) |
+| 291-IN-03 | fixed `0ad717a67` (backend `unplaced_sentences`) + `cd1aaefff` (UI note) |
+| 291-IN-04 | fixed `c496244c3` |
+| 291-IN-05 | fixed `cd1aaefff` |
+| 291-IN-06 | fixed `c2a8f6ace` |
+| 291-S1-labels | fixed `c496244c3` |
+| 291-S1-copy a/b/c | fixed: a `02b5053ac` (receipt), b `313d5f124` + `cd1aaefff` (`provider_error` refusal), c `cd1aaefff` (no empty enum option) |
+| 291-S2-F1 | fixed `313d5f124` |
+| 291-S2-F2 | fixed `313d5f124` |
+| 291-S2-F3 | fixed `313d5f124` |
+| 291-S3-F2 / F3 | fixed `ef2832f46` (labels for fields an input fills; Replace under a PDF takes a PDF) — the page-text label for an UNFILLED field seeded SEED-387 |
+| 291-S6-F7 | fixed `313d5f124` (typed stand-ins + note) + `ef2832f46` (the note reaches the library line) — deriving inputs from the test instruction seeded SEED-385 (D-08 amended) |
+| 291-S6-F8 | in-app and key paths did-not-reproduce at 296-06's base (already fixed by 293-05; `test_296_step_inputs_and_routing.py`); schedule + golden fixed `c2a8f6ace`. LIVE board in-app: **6/6 PASS** (anthropic, deepseek, google, minimax, openai, zhipu named Lisbon), OpenRouter ⛔ 402, Moonshot ⛔ 429 |
+| 291-S6-F9 | fixed `9c6b3403c` (CSS) — ⏳ G-4 #7 |
+| 291-S7-F1 | fixed `c496244c3` (`filled_field_count`) |
+| BUG-261024-02 | fixed `02b5053ac` (RED `2548b6212`) — ⏳ optional row 10 closes the report |
+| 290-WR-02 | fixed `02b5053ac` (D-09) — ⏳ G-4 #6 |
+| 290-IN-01..05 | fixed `02b5053ac` |
+| 290-FU-canvas | fixed `02b5053ac` |
+| 290-OBS-vocab | fixed `02b5053ac` |
+| 288-F-4 | fixed `ef2832f46` (RED `e074515f5`) |
+| BUG-261021-04 + -03 | fixed `fd59d0f19` (RED `e93dbecbb`; -03 cause ii, cause i refuted) — ⏳ G-4 #3 closes both reports |
+| BUG-261025-03 | fixed `bf8a4467b` (backend, RED `0d3d4d8d0`) + `fd59d0f19` (UI) — ⏳ G-4 #4 |
+| BUG-261025-01 | fixed `9c6b3403c` (RED `c563f4ad0`) — ⏳ G-4 #5 |
+| BUG-261025-02 | fixed `9c6b3403c` (CSS) — ⏳ G-4 #7 |
+| 295-D-uat-02 | fixed `fd59d0f19` (`! Waiting`) — ⏳ G-4 #4 |
+| 289-F-A | fixed `9c6b3403c` (watched-failure alert) |
+| 289-F-B | fixed `9c6b3403c` (sanitised markdown) |
+| 289-F-C | fixed `9c6b3403c` (download unavailable sentence) |
+| 287-WR-02 + IN-03 | fixed `b392ef6d1` (RED `dda315a08`) |
+| 287-IN-01 / IN-02 / IN-04b | fixed: IN-01 `9c6b3403c`, IN-02 `ef2832f46`, IN-04b `b392ef6d1` |
+| 287-SCHED | fixed `9c6b3403c` |
+| 287-TSC | fixed `fd59d0f19` (tsc 63 → 62, TS2345 gone) |
+| 292-IN-01 / IN-03 | fixed `b392ef6d1` |
+| 292-WR-04-res | fixed `b392ef6d1` |
+| 293-IN-02 | fixed `b392ef6d1` |
+| 294-IN-05 / IN-06 / IN-08 | fixed `b392ef6d1` |
+| 294-LOCAL | fixed `e9e8fdc9d` (30 s inference timeout) + `b392ef6d1` (latency note), pinned equal by a parity test |
+| BUG-261024-04 (defect half) | fixed `0ad717a67` (lead 2, RED `847a00dcc`); lead 1 did-not-reproduce (`test_296_chat_and_wire.py`), lead 3 did-not-reproduce (`streamsProvider_296_followup_files.test.tsx`) — ⏳ G-4 #8 |
+| 286-S04-2 | fixed `ef2832f46` (MARK_ICON docblock) |
+| 286-IN-02 | fixed `19f54cf71` (keyed on the enclosing function) |
+| 286-S04-1 | fixed `439f8f86a` (eslint clean) |
+| 287-WR-03 | fixed `c12c758ac` (the attack attempted on both boundaries, positive controls) |
+| 288-T-2 | fixed `f617cc5b4` (8 → 11, 206.2-01 `7740e0106` named) |
+| 288-T-3 | fixed `40d2629ce` (run under the lock: red only on 293's `RunOriginWire`; re-pinned, path set unchanged) |
+| 289-T-1 | fixed `2cfefddbe` (24 → 25, `circuit_breaker_tripped` from 204-02 `daf6c123b`) |
+| 289-V-2 | fixed `21327fb9c` (fault injection at spawn / claim / definition against real Postgres) |
+| 291-R1-IN-01 | fixed `6a9fd0745` (7 caps + the key class, driven RED by a planted 201) |
+| 292.1-test_075_4 | fixed `7af00ac5d` (5 → 11 providers, each dated) |
+| 293-IN-07 | fixed `67cc8c701` (`\d{3,}`, driven RED in a scratch register copy) |
+| 294-IN-03 | fixed `ac7cd871f` (choice answers; RED at base) |
+| 293-INH / 295-TEST | ⏳ re-derived by the close gates — PENDING: the vitest count gate and the full backend gate wait on the hung pytest PID 94388 (see the 296-05 SUMMARY) |
+| CLOSE-ONLY | closed: BUG-261020-03 (`6d14ccf59` + the 2026-10-24 Anthropic key rotation; `test_trace_key_redaction.py` 3 passed today); BUG-261020-01 — its report file exists as `human-step-answer-never-reaches-the-next-step.md` (no `BUG-` prefix in the name) — closed `b23554309`; BUG-261015-01 `b23554309`; BUG-261020-07 `80fc12e76`/`5fea3cb72`/`b101092f3`; -08 `3f23f1d81`; -09 `0bee60c7a`; -10 `21078ca97`; -11 `bfe4e49ac`; -12 `80fc12e76` + `bfe4e49ac` (all 295, verified live by 295's signed G-4); SEED-361 answered (295-08 `a2866c3ea`); the 290–295 review items are closed by those phases' own REVIEW-FIX records |
+| 287-V-3 | ⏳ operator/orchestrator: the read-only cloud read in `296-HUMAN-UAT.md` (e) |
+| 288-F-1/2/3, 288-CR-01, 288-WR-01/03, 289-CR-01/02, 289-WR-01..06, 289-F1, 287-WR-01 | closed (records only): 288-F-1 `b3ef15a5f`, 288-F-3 `7c07523b3` (289-01), 288-F-2 `0bee60c7a` (295-02); 288-CR-01 + 288-WR-03 `fb42169f7`; 288-WR-01 folded into 289 D-11..D-13 (`7c07523b3`); 289-CR-01 `33f51fe01`, 289-CR-02 `467fe84ab`; 289-WR-01 `3ed3357f9`, -02 `ca1e54df7`, -03 `b7d7e2c3c`, -04 `30b6e6036`, -05 `925d1e76b`, -06 `16e648201`; 289-F1 `b3ef15a5f` (the paused card keeps its answer control); 287-WR-01 `a64a4b877` |
+| DEBT-1 / 293-F-2 | seeded SEED-367 (routed in its status_note; stays planted) |
+| 294-WR-02 | seeded SEED-365 (partially-answered: concurrency cap and spend ledger remain) |
+| 291-WR-06 (engine) | seeded SEED-375 |
+| 291-network_mode | seeded SEED-376 (D-11) |
+| 286-V-1 | seeded SEED-377 |
+| 287-V-6 | seeded SEED-378 |
+| 289-F-E | seeded SEED-379 |
+| 293-IN-06 (task field) | seeded SEED-380 |
+| 295-RES-c | seeded SEED-381 |
+| 295-IN-05 (backoff) | seeded SEED-382 |
+| BUG-261024-04 (intermediates) | seeded SEED-383 (D-10) |
+| SEED-366, 368-374 | verified still `planted` (untouched) |
+| 293-AR-05 / AR-06 | accepted: Operator-accepted 2026-10-26 (`293-SECURITY.md`) |
+| 294-WR-01 | accepted: Description corrected (`d413c5ae7`); behaviour intended |
+| 295-IN-04 | accepted: Name already visible to the colleague |
+| 295-IN-06 | accepted: Never skip an approval (deliberate) |
+| 295-D-r2-03 | accepted: 0.2 s flash, recorded |
+| 286-IN-01, 286-S02-1 | accepted: Type-only coupling; ordering only |
+| 287-IN-04a | accepted: Redundant with the exact count check |
+| 288-WR-04, 288-IN-02, 288-MIN, 288-V-1 | accepted: By design / not reproduced / operator accepted on unit tests |
+| 289-IN-01, 289-IN-02, 289-IN-03, 289-F-D, 289-V-3 | accepted: Already exposed / reworded / live-run use / cosmetic |
+| 291-IN-02, 291-IN-07, 291-R1-WR-01-res, 291-R1-IN-02, 291-R1-IN-03 | accepted: Judged safe in review; R1-WR-01 closes with the network_mode seed (SEED-376) |
+| 292-375px/TZ, 292-dead-key, 292.1-replay-409 | accepted: Chrome MCP limits; history; needs a state column (seed if it recurs) |
+| 294-JEV | accepted: Measured cost-gate result; a product fact, not a defect |
+| 287-V-1 | operator: ruled by D-12 (menu + name dialog = one action); written into `287-VERIFICATION.md` by 296-05 |
+| 287-V-2, 291-roster, 292.1-OpenRouter-row, BUG-261024-03 | operator: top up OpenRouter (live 402 today), then `scripts/run-2921-board.py --run --providers openrouter` and `scripts/run-296-board.py --first-step --providers openrouter`; flip BUG-261024-03 on PASS (its trigger is written) |
+| 292.1-Moonshot-row | operator: reinstate the Moonshot account (live 429 "suspended due to insufficient balance" today) or record it as permanently blocked |
+| 287-V-4, 287-V-5 | folded into `296-HUMAN-UAT.md` optional rows 11 and 12 |
+| 294-ENV | operator: remove the two dev `.env` lines (`DECISION_ENGINE_FAULT_BASE_URL` and its `ENVIRONMENT` partner); never edited by Claude |
+| 286-V-2 | operator: the SEED-280 status note |
+| DEPLOY | operator: cloud migrations 214 → 215 → 216 (each shown first, per-action approval), then the backend, then `get_advisors(security)` |
+
+**Additional 296-05 findings (not inventory rows):**
+
+| Item | Outcome |
+|---|---|
+| `check-backend-unit-baseline.cjs` false pass when killed; extra args replaced `tests/unit` (296-02 Deferred) | fixed `e7dbed0de` (fail closed on no summary / signal / exit ≥ 2; a `tests` path is kept) |
+| `test_200_1_phase_output_shape::test_this_plan_wrote_no_migration` (296-03 saw it) | in 296-01's and 296-02's recorded BASE failing sets (inherited); confirm in the close gate |
+| `tests/test_dual_mode_wiring.py` (21, stale fakes), outside `tests/unit` | inherited (296-02 and 296-06 measured the identical set at base); not gated; left |
+| 296-07 open: SeedReceipt lists a hand-escalated step with its shipped reason | a G-4 look, `296-HUMAN-UAT.md` optional row 9 |
+| The live backend predates 296-06 | operator: restart uvicorn, then re-run the 296-06-dependent board rows (`--resume-model`, `--multi-tool`, and `--pinned-emit --pin openai` for 293-F-4) |

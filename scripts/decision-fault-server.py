@@ -13,7 +13,9 @@ Modes: ``ok`` (a valid vendor-shaped answer: probabilities 0.9 / 0.05 alternatin
 runs), ``401``, ``slow`` (sleeps ``--slow-seconds``, default 12 s, past every engine timeout, then
 answers ok), ``429``, ``500``, ``malformed`` (a non-JSON 200), ``refusal`` (every answer a
 refusal) and ``missing`` (the first answer dropped). The vendor shape is chosen by the path suffix:
-``/api/alpha/decisions`` → Jev, ``/v1/decisions`` → OpenAI Decisions.
+``/api/alpha/decisions`` → Jev, ``/v1/decisions`` → OpenAI Decisions. In ``ok`` mode a ``choice``
+question (the citation check) gets a well-formed ``choice`` answer, its first offered option at
+confidence 0.9 (296-05 / 294-IN-03), so the check path has an ``ok`` baseline too.
 
 ⛔ Binds 127.0.0.1 ONLY (there is no host option). ``/_mode`` is served only to a loopback client.
 ⛔ It never logs or echoes request headers or bodies: the access log is method, path and status.
@@ -60,16 +62,41 @@ class FaultServer(ThreadingHTTPServer):
             self._mode = mode
 
 
+# 296-05 (294-REVIEW IN-03): a `choice` question (the citation check) gets a well-formed `choice`
+# answer, so the D-22 drive has an `ok` baseline for the check path. Before, every question got
+# `noul` / `predicate`, every claim failed validation, and a check through this server could only
+# ever read "couldn't check". The value is the question's FIRST offered option (`supported` in
+# CHOICE_LABELS order), never a label the question did not offer.
+FAULT_CHOICE_CONFIDENCE = 0.9
+
+
+def _first_choice(question: dict) -> str | None:
+    """The first option a `choice` question offers: OpenAI `choices[].value`, Jev `criteria` keys."""
+    choices = question.get("choices")
+    if isinstance(choices, list) and choices and isinstance(choices[0], dict):
+        return choices[0].get("value")
+    criteria = question.get("criteria")
+    if isinstance(criteria, dict) and criteria:
+        return next(iter(criteria))
+    return None
+
+
 def _answers(path: str, body: dict, mode: str) -> dict:
     """A vendor-shaped decision response for ``ok`` / ``refusal`` / ``missing``."""
     if path.endswith(JEV_PATH):
-        names = list((body.get("questions") or {}).keys())
+        qmap = body.get("questions") or {}
+        names = list(qmap.keys())
         answers: dict[str, Any] = {}
         for i, name in enumerate(names):
             if mode == "missing" and i == 0:
                 continue
+            q = qmap.get(name) if isinstance(qmap.get(name), dict) else {}
             if mode == "refusal":       # Jev has no refusal type: an invalid answer is its nearest
                 answers[name] = {"type": "refusal"}
+            elif q.get("type") == "choice":
+                pick = _first_choice(q)
+                answers[name] = {"type": "choice", "choice": pick, "confidence": FAULT_CHOICE_CONFIDENCE,
+                                 "probabilities": {pick: FAULT_CHOICE_CONFIDENCE} if pick else {}}
             else:
                 answers[name] = {"type": "noul", "noul": 0.9 if i % 2 == 0 else 0.05}
         return {"id": "fault-gen", "model": body.get("model"), "provider": "fault-server",
@@ -82,6 +109,11 @@ def _answers(path: str, body: dict, mode: str) -> dict:
             continue
         if mode == "refusal":
             out.append({"type": "refusal", "name": name})
+        elif isinstance(q, dict) and q.get("type") == "choice":
+            pick = _first_choice(q)
+            out.append({"type": "choice", "name": name, "choice": pick,
+                        "confidence": FAULT_CHOICE_CONFIDENCE,
+                        "probabilities": [{"value": pick, "probability": FAULT_CHOICE_CONFIDENCE}] if pick else []})
         else:
             out.append({"type": "predicate", "name": name, "probability": 0.9 if i % 2 == 0 else 0.05})
     return {"id": "fault-dec", "answers": out,

@@ -11603,6 +11603,9 @@ cells rot within days.
 | [`scripts/vitest-count-gate.cjs`](docs/HOT-FILE-LEDGER.md#scriptsvitest-count-gatecjs) | 344 / 81 / 6692 (was `339 / 77 / 6681`) | ⚠ **FIRES** | 292.1-04: 3 suites adopted in both knobs (AgentRoundLimits, continueWords.lockstep, StreamsProvider.typedContinue); 2 pins raised (continueButton 2→6, capPausedComposer 8→9); none lowered |
 | [`scripts/check-deploy-drift.sh`](docs/HOT-FILE-LEDGER.md#scriptscheck-deploy-driftsh) | 5 / 4 / 267 | ⚠ **FIRES** | ⚠ absent its ENTIRE LIFE — row added 294-05. 294-01: DECISION_ENGINE_FAULT_BASE_URL registered as intentionally omitted (+2) |
 | [`scripts/build-public-openapi.cjs`](docs/HOT-FILE-LEDGER.md#scriptsbuild-public-openapicjs) | 7 / 3 / 468 (was `5 / 2 / 465`) | ⚠ **FIRES** | ⚠ now FIRES (294). 294-03: the citation_checks tag (one line). ⛔ scripts/ is gate-exempt |
+| [`scripts/check-seeds-register.cjs`](docs/HOT-FILE-LEDGER.md#scriptscheck-seeds-registercjs) | 7 / 3 / 1132 | ⚠ **FIRES** | ⚠ absent its ENTIRE LIFE — row added 296-05, now FIRES (251 / 293 / 296). 296-05: three `\d{3}` → `\d{3,}` (293-IN-07). ⛔ the STATUS_ENUM triple |
+| [`scripts/decision-fault-server.py`](docs/HOT-FILE-LEDGER.md#scriptsdecision-fault-serverpy) | 2 / 2 / 216 | no (young) | young (294 / 296). 296-05: `ok` answers a `choice` question with its first offered option (294-IN-03). ⛔ loopback only, never logs a body |
+| [`scripts/check-backend-unit-baseline.cjs`](docs/HOT-FILE-LEDGER.md#scriptscheck-backend-unit-baselinecjs) | 2 / 2 / 268 | no (young) | young (228 / 296). 296-05: no summary / a signal / exit ≥ 2 is `[GATE ERROR]`; a run with no `tests` path keeps `tests/unit` |
 | [`backend/app/services/eval_runner_service.py`](docs/HOT-FILE-LEDGER.md#backendappserviceseval_runner_servicepy) | 14 / 9 / 1056 (was `13 / 8 / 1040`) | ⚠ **FIRES** | 296-06 (292.1-IN-04): EVAL_MAX_TOOL_ROUNDS (= today's general default, 15) set on a COPY of the eval ctx's settings; the chat knob no longer moves eval results |
 | [`frontend/src/components/panel/PhaseCard.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentspanelphasecardtsx) | 21 / 14 / 817 (was `20 / 13 / 811`) | ⚠ **FIRES** | 296-04: ONE optional prop (`runPaused`) passed to `statusMetaForRun` (useState 1→1, useEffect 1→1). Honoured by construction |
 | [`frontend/src/components/panel/PhaseTimeline.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentspanelphasetimelinetsx) | 11 / 9 / 408 (was `10 / 8 / 404`) | ⚠ **FIRES** | 296-04: one derived const (`runPaused`, from the fetched frame) and one prop to each card. Honoured by construction |
@@ -25486,3 +25489,25 @@ CLAUDE.md FIRING cell before this 296-06 touch (moved verbatim): | `backend/app/
 Scan-list cell before this 296-06 touch (moved verbatim): | [`backend/app/api/workflows.py`](docs/HOT-FILE-LEDGER.md#backendappapiworkflowspy) | 49 / 26 / 1699 (was `48 / 26 / 1689`) | ⚠ **FIRES** | 296-06 (293-DEL): delete_draft's one `except ForeignKeyViolationError` → worded 409 (UI-SPEC E), never the constraint text. Honoured by construction; split still OWED (>1,500 L) |
 
 CLAUDE.md FIRING cell before this 296-06 touch (moved verbatim): | `backend/app/api/workflows.py` | 49 / 26 / 1699 (was `48 / 26 / 1689`) | 296-06: delete_draft FK arm → worded 409 · split OWED |
+
+## Phase 296-05 touches (2026-10-27)
+
+Triples re-derived with the CLAUDE.md recipe (six-digit and non-numeric buckets dropped) at 296-05.
+
+### `scripts/check-seeds-register.cjs`
+
+- **Triple `7 / 3 / 1132`** — phases 251 (written), 293 (`--require-settled`), 296. ⚠ **It had no ledger row for its whole life** and crosses the G-5 threshold with this phase; the scan-list row and the CLAUDE.md FIRING row land in the same commit as this section.
+- **296-05 (293-IN-07):** the three seed-id patterns (`SEED_FILE_RE`, the heading id, `--require-settled`) read `\d{3,}`. Driven RED in a scratch COPY of the register (never the real one) with a planted `SEED-1000-x.md`: the unchanged script counted 381 files and reported `[unknown-seed] SEED-1000`; the fixed one counted 382 and settled it. `--self-test` 10/10 and the real scan (381/381) stayed green.
+- **Binding invariant:** the `status` enum is a TRIPLE with `.planning/seeds/TEMPLATE.md` and `plant-seed.md` — change all three or none (TEMPLATE.md).
+- **Named seam for the next touch:** none needed yet; the file is a CLI over one pure `analyse()` call.
+
+### `scripts/decision-fault-server.py`
+
+- **Triple `2 / 2 / 216`** (294, 296), young.
+- **296-05 (294-IN-03):** in `ok` mode a `choice` question gets `{type: choice, choice: <its first offered option>, confidence: 0.9}` in both vendor shapes, so the citation-check path has an `ok` baseline. Rerank (`noul` / `predicate`) answers are unchanged; `refusal` still refuses. Pinned by `test_294_fault_base_guard.py::test_ok_mode_answers_a_choice_question_with_a_clean_choice` (RED at base).
+- **Binding invariants:** binds 127.0.0.1 only; never logs a header or a body.
+
+### `scripts/check-backend-unit-baseline.cjs`
+
+- **Triple `2 / 2 / 268`** (228, 296), young.
+- **296-05:** two defects 296-02 recorded. (1) A killed run printed `[GATE PASSED] … failed: 0`: no summary line parsed as zero failures. It now FAILS CLOSED: no summary line, a signal, or a pytest exit code ≥ 2 prints `[GATE ERROR]` and exits 2. (2) Any argument after `--` replaced the default `tests/unit`, so `-- -rf` ran the whole `tests/` tree (integration suites against the local DB included); a run whose args carry no `tests…` path now keeps `tests/unit` and says so. Driven: one green file → PASSED; `-k` matching nothing → ERROR (exit 5); no path → `tests/unit` kept.

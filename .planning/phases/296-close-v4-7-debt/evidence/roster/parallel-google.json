@@ -1,0 +1,13 @@
+{
+  "mode": "parallel",
+  "provider": "google",
+  "model": "gemini-3.8-flash",
+  "thread_a": "5bc8fdb6-de3f-4b3d-9d30-2ff1f08a3a67",
+  "thread_b": "a5d06a92-114f-457e-b3c2-7777abf6286c",
+  "a_status_when_b_sent": "streaming",
+  "b_send_http": 201,
+  "a_final": "completed",
+  "b_final": "completed",
+  "each_in_own_thread": true,
+  "verdict": "PASS"
+}

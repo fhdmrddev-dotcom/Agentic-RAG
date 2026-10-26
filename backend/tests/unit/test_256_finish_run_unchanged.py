@@ -98,6 +98,14 @@ _EXPECTED_CALL_COUNTS = {
 # constant must NOT be re-baselined: that would be a contract change wearing a
 # bookkeeping costume. Re-derive with ``grep -rn "await finish_run(" backend/app/``
 # and confirm (a) is green BEFORE touching the set below.
+#
+# ⭐ RE-KEYED at Phase 296 Plan 05 (296-INVENTORY 286-IN-02): the positions are now keyed on
+# the ENCLOSING FUNCTION, found by `ast`, not on a line number. The line pins below were
+# re-derived NINETEEN times across 256 → 296 (every comment kept as the record), and every
+# re-derivation was the same bookkeeping: (a) green, only lines moved. A function key moves
+# only when a caller moves to another function or a new one appears — the property (b)
+# exists to catch. Each entry's last measured line is kept in its comment as `@<line>`
+# (measured 2026-10-27 at a3cac42da), so the history above stays readable.
 _EXPECTED_CALL_SITES = {
     # Phase 289 Plan 01: `_fail_redrive`'s one call (see the COUNTS note above).
     #   Re-derived with `grep -n "await finish_run(" backend/app/api/runs.py`.
@@ -118,7 +126,7 @@ _EXPECTED_CALL_SITES = {
     # ⚠ RE-DERIVED at 296-02: COUNTS identical ("api/runs.py": 1); +3 when the failed re-drive's
     #   reason constant gained its 3-line comment (295-IN-07) above `_fail_redrive`. The call is
     #   byte-unchanged. api/runs.py:667 → 670
-    "api/runs.py:670",
+    "api/runs.py::_fail_redrive",  # @670
     # ⚠ RE-DERIVED at Phase 258 Plan 03: +7 line shift in api/workflows.py (import + decorators)
     #   api/workflows.py:1802 → 1809 → 1812 (v4.3 audit: +3 lines, require_capability on authoring writes; the call itself unchanged)
     # ⚠ RE-DERIVED at Phase 286 Plan 01: check (a), the per-file COUNTS, stayed identical
@@ -145,7 +153,7 @@ _EXPECTED_CALL_SITES = {
     #   arm (293-DEL) above it; delete_workflow_cascade and the call are unchanged.
     #   Re-derived with `grep -n "await finish_run(" backend/app/api/workflows.py`.
     #   api/workflows.py:1580 → 1590
-    "api/workflows.py:1590",
+    "api/workflows.py::delete_workflow_cascade",  # @1590
     # ⚠ RE-DERIVED at Phase 256 round 1 (plan 256-05), and the originals are recorded
     # beside the new values rather than over them, because this fence's own docstring
     # asks for exactly that: check (a) — the per-file COUNTS — stayed identical, so no
@@ -184,9 +192,9 @@ _EXPECTED_CALL_SITES = {
     #   +3 for the armed `action_risk_pending` write's ONE guard and comment (295-RES-a); then +1
     #   more above the third (the finaliser passing `user_settings`). The calls are byte-unchanged.
     #   1965 → 1969 · 2006 → 2010 · 2309 → 2314
-    "services/harness_engine.py:1969",
-    "services/harness_engine.py:2010",
-    "services/harness_engine.py:2314",
+    "services/harness_engine.py::run_workflow#1",  # @1969 (the fail_run arm)
+    "services/harness_engine.py::run_workflow#2",  # @2010 (the dangling-skip-target guard)
+    "services/harness_engine.py::run_workflow#3",  # @2314 (the completed path)
     # ⚠ RE-DERIVED at Phase 268 Plan 01: +8 line shift in services/run_lifecycle.py —
     #   register_run_start gained `org_id` / `expert_id` kwargs, their forward to insert_run and
     #   a 4-line docstring note, all ABOVE this call. Check (a), the per-file COUNTS, stayed
@@ -201,17 +209,54 @@ _EXPECTED_CALL_SITES = {
     # ⚠ RE-DERIVED at 296-02: (a) the COUNTS stayed identical ("services/run_lifecycle.py": 1);
     #   +29 when `cancelled_by` and the `stopped_by` kwarg of `broadcast_run_cancellation`
     #   (295-RES-b) landed above it. The call is byte-unchanged. run_lifecycle.py:544 → 573
-    "services/run_lifecycle.py:573",
+    "services/run_lifecycle.py::cancel_workflow_run_internals",  # @573
     # Phase 295 Plan 04: the new caller's one site (see the COUNTS note above). Re-derived at
     #   Task 3 (+15: the F2 / reconciler reason constants and `_claim_terminal` above it):
     #   run_handoff.py:186 → 201, then -2 when the reconciler's sentence moved home to
     #   run_reconciler.py: 201 → 199
     # ⚠ RE-DERIVED at 295-09: +76 when the WR-01 sub-agent helpers and the WR-07 pause-write
     #   mark landed above it (the call is byte-unchanged; COUNTS identical): 199 → 275
-    "services/harness/run_handoff.py:275",
+    "services/harness/run_handoff.py::end_run",  # @275
 }
 
 _CALL_RE = re.compile(r"await\s+finish_run\s*\(")
+
+
+def _enclosing_function_keys(rel: str, src: str) -> list[str]:
+    """Each ``await finish_run(...)`` in ``src`` as ``<rel>::<enclosing function>``.
+
+    Found by ``ast`` (296-05 / 286-IN-02), so a line shift elsewhere in the file can
+    never move a key. Several calls in ONE function get ``#1``, ``#2`` … in source
+    order, so a third call appearing in ``run_workflow`` is still a new key.
+    """
+    hits: list[tuple[int, str]] = []
+
+    def walk(node: ast.AST, stack: list[str]) -> None:
+        for child in ast.iter_child_nodes(node):
+            if isinstance(child, (ast.FunctionDef, ast.AsyncFunctionDef, ast.ClassDef)):
+                walk(child, stack + [child.name])
+                continue
+            if isinstance(child, ast.Await) and isinstance(child.value, ast.Call):
+                func = child.value.func
+                name = (
+                    func.id if isinstance(func, ast.Name)
+                    else func.attr if isinstance(func, ast.Attribute) else None
+                )
+                if name == "finish_run":
+                    hits.append((child.lineno, ".".join(stack) or "<module>"))
+            walk(child, stack)
+
+    walk(ast.parse(src), [])
+    per_fn: dict[str, int] = {}
+    totals: dict[str, int] = {}
+    for _, fn in hits:
+        totals[fn] = totals.get(fn, 0) + 1
+    keys: list[str] = []
+    for _, fn in sorted(hits):
+        per_fn[fn] = per_fn.get(fn, 0) + 1
+        suffix = f"#{per_fn[fn]}" if totals[fn] > 1 else ""
+        keys.append(f"{rel}::{fn}{suffix}")
+    return keys
 
 
 def _finish_run_source() -> str:
@@ -258,21 +303,26 @@ def test_the_finish_run_call_site_set_is_unchanged():
     count would let one site move and another appear and still read green.
     """
     found: set[str] = set()
+    regex_counts: dict[str, int] = {}
     for path in sorted(_BACKEND_APP.rglob("*.py")):
         if "__pycache__" in path.parts:
             continue
         rel = path.relative_to(_BACKEND_APP).as_posix()
-        for lineno, line in enumerate(
-            path.read_text(encoding="utf-8").splitlines(), start=1
-        ):
-            if _CALL_RE.search(line):
-                found.add(f"{rel}:{lineno}")
+        src = path.read_text(encoding="utf-8")
+        n = sum(1 for line in src.splitlines() if _CALL_RE.search(line))
+        if n:
+            regex_counts[rel] = n
+            found.update(_enclosing_function_keys(rel, src))
 
     # (a) THE CONTRACT — which files call it, and how many times. A failure here
     #     is a real change: a new caller, or a terminal write removed.
     counts: dict[str, int] = {}
     for entry in found:
-        counts[entry.rsplit(":", 1)[0]] = counts.get(entry.rsplit(":", 1)[0], 0) + 1
+        counts[entry.split("::", 1)[0]] = counts.get(entry.split("::", 1)[0], 0) + 1
+    # The text scan and the AST walk must agree, or the walk missed a call shape.
+    assert counts == regex_counts, (
+        f"the AST walk ({counts}) and the text scan ({regex_counts}) disagree"
+    )
     assert counts == _EXPECTED_CALL_COUNTS, (
         "the set of FILES calling `await finish_run(` changed, or one of them "
         f"gained/lost a call.\n  measured: {counts}\n  expected: "
@@ -281,16 +331,15 @@ def test_the_finish_run_call_site_set_is_unchanged():
         "removed. Neither is a digest change, and neither may pass silently."
     )
 
-    # (b) THE POSITIONS. ⚠ If (a) passed and this fails, ONLY line numbers moved —
-    #     an edit elsewhere in one of those files. That is a bookkeeping update:
-    #     re-derive with `grep -rn "await finish_run(" backend/app/`, update
-    #     _EXPECTED_CALL_SITES, and say so in the commit.
+    # (b) THE POSITIONS, keyed on the enclosing function (296-05). A line shift can no
+    #     longer fail this. If (a) passed and this fails, a call moved to ANOTHER
+    #     function (or was renamed with it): re-read the caller before updating.
     assert found == _EXPECTED_CALL_SITES, (
-        "the `await finish_run(` call-site POSITIONS moved.\n"
+        "the `await finish_run(` calls moved between FUNCTIONS.\n"
         f"  appeared: {sorted(found - _EXPECTED_CALL_SITES)}\n"
         f"  vanished: {sorted(_EXPECTED_CALL_SITES - found)}\n"
-        "The per-file counts above are unchanged, so this is a line shift rather "
-        "than a contract change — but re-derive and confirm that before updating."
+        "The per-file counts above are unchanged, so no caller was added or removed — "
+        "but a call now lives in a different function. Read it before updating."
     )
 
 

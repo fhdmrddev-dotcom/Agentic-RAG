@@ -4,12 +4,13 @@ title: Evidence report header crushes the workflow title to one word per line wh
 reported: 2026-10-25
 surface: Agentic-RAG
 severity: minor
-status: open
+status: folded
 affected_areas: [frontend/workflows, run-evidence-report]
-folded_into: null
+folded_into: "296"
 verified_closed_by: null
 related_seeds: []
-re_open_trigger: the next phase whose files_modified names frontend/src/components/workflows/RunEvidenceReport.tsx
+re_open_trigger: "CLOSE when 296-HUMAN-UAT G-4 scenario 7 reads PASS with evidence (set status closed, verified_closed_by \"296\", re_open_trigger null). A FAIL routes back to its owning 296 plan under G-7."
+fixed_by_commit: "296-04: GREEN 9c6b3403c (header wraps: title column no longer flex-1-crushed, actions wrap to their own row) — CSS row, D-19: checked live only"
 reproduces_on:
   branch: develop
   commit: b8aed8884
