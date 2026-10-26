@@ -463,7 +463,16 @@ Plans:
   5. User-visible fixes are driven live in Chrome (G-4) before close.
 
 **How we'd know this failed**: an inventory item has no disposition; a "fixed" bug still reproduces live; a fix adds a capability (that is a v4.8 phase); a gate is weakened to pass.
-**Plans:** 0 plans
+**Plans:** 7 plans in 4 waves (G-8: W2 and W3 split on context cost, per D-14)
+
+Plans:
+- [ ] 296-01-PLAN.md — W1 tenancy + evidence privacy: X-Org-Id on folder/workflow create, D-05 withhold cascade, mig 216 neutral org name, 215 regex, citation-check rate limit (wave 1, DB)
+- [ ] 296-04-PLAN.md — W4 frontend run surfaces: followed-run reconcile, Waiting, evidence report wrap/markdown/alert, schedule Run now feedback, in-thread start failure, rerank/citation copy (wave 1)
+- [ ] 296-02-PLAN.md — W2a run lifecycle: SEED-363 guard, boot-sweep human ask pauses, truthful run ends, resume on the run model, worded schedule results (wave 2, DB)
+- [ ] 296-03-PLAN.md — W3a describe/publish backend: bounded PDF reads, hollow-step + unticked-service notes, typed golden stand-ins, rerank/citation backend (wave 2)
+- [ ] 296-06-PLAN.md — W2b inbound/providers/wire: server required inputs, key fixes, pinned-model routing, Moonshot schema inliner, chat markup, wire typing (wave 3)
+- [ ] 296-07-PLAN.md — W3b builder + describe UI: read-only Team view, draft persists, honest governance seal, describe-door UI, library note (wave 3)
+- [ ] 296-05-PLAN.md — W5 tests, gates, D-21 roster, G-4 drive, record flips, seeds, outcome table (wave 4, DB)
 
 **UI hint**: yes
 **Flags**: G-8: target 4-5 plans. G-5: many touched files FIRE (`WorkflowRunPage.tsx`, `harness_engine.py`, `threads.py`, `runs.py`, `StreamsProvider.tsx`): one-touch fixes only, honoured by construction, or defer. Security review (`/gsd:secure-phase`) owed for the LangSmith and tenancy fixes. Migrations resume at `216` if one is needed.
@@ -482,7 +491,7 @@ Plans:
 | 293. Start From Outside, and Close Out | 5/5 | Complete (2026-10-26) | 6/6 SC; operator signed G-4; SECURITY 36/36 closed (AR-05/06 accepted); UAT 12/12; not deployed, cloud mig 215 owed first |
 | 294. Decision Engine: Rerank and Citation Check | 5/5 | complete (2026-10-20) | 6/6 SC met in code; 294-HUMAN-UAT 9/9 passed live; roster R2 ⛔ Anthropic billing, glm-5.3 ⛔ BUG-261020-06; not pushed; cloud mig 211 owed before deploy |
 | 295. Runs That Don't Dead-End | 7/7 (+3 gap fixes) | Complete (2026-10-24) | S1-S7 PASS; Anthropic row re-run PASS; operator signed |
-| 296. Close v4.7 Debt | 0/TBD | Not started | - |
+| 296. Close v4.7 Debt | 0/7 | Planned | - |
 
 ---
 
