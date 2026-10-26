@@ -45,12 +45,25 @@ describe("rerankEngines.ts == registry.py EngineId", () => {
 })
 
 describe("engineFor", () => {
-  it("resolves the legacy 'api' id and unknown ids to the Cohere row", () => {
-    expect(engineFor("api").id).toBe("cohere")
-    expect(engineFor("nope").id).toBe("cohere")
-    expect(engineFor(undefined).id).toBe("cohere")
-    expect(engineFor(null).id).toBe("cohere")
-    expect(engineFor("constructor").id).toBe("cohere")
+  // 296-04 (294-IN-05) REWRITTEN IN PLACE. It asserted every unknown id read as Cohere:
+  //     expect(engineFor("nope").id).toBe("cohere")   (and undefined, null, "constructor")
+  // That selected the Cohere card for an engine the server ignores. Only the legacy "api" id
+  // means Cohere; anything else is no engine, so no card is selected.
+  it("resolves only the legacy 'api' id to Cohere; any other unknown id is no engine", () => {
+    expect(engineFor("api")?.id).toBe("cohere")
+    expect(engineFor("frobnicate")).toBeNull()
+    expect(engineFor("nope")).toBeNull()
+    expect(engineFor(undefined)).toBeNull()
+    expect(engineFor(null)).toBeNull()
+    expect(engineFor("constructor")).toBeNull()
+  })
+
+  it("296-04 (294-LOCAL): the local row carries the latency note, naming the 30-second timeout", () => {
+    const local = RERANK_ENGINES.find((e) => e.id === "local")!
+    expect(local.latencyNote).toBe(
+      "Slow on a CPU: about 18 seconds per search in our test. A search that runs past 30 seconds keeps today's order.",
+    )
+    for (const e of RERANK_ENGINES.filter((x) => x.id !== "local")) expect(e.latencyNote).toBeNull()
   })
 
   it("resolves each known id to its own row", () => {

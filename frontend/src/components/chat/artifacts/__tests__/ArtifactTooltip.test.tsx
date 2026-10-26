@@ -88,6 +88,76 @@ describe("ArtifactTooltip — content", () => {
   })
 })
 
+describe("ArtifactTooltip — 296-04 (292-IN-01): it follows its anchor while mounted", () => {
+  function rect(top: number, left = 100): DOMRect {
+    return { top, left, bottom: top + 40, right: left + 100, width: 100, height: 40, x: left, y: top, toJSON: () => ({}) } as DOMRect
+  }
+
+  it("a scroll re-places it at the anchor's new position, through one animation frame", () => {
+    const el = anchor()
+    let top = 400
+    vi.spyOn(el, "getBoundingClientRect").mockImplementation(() => rect(top))
+    const raf = vi.spyOn(window, "requestAnimationFrame").mockImplementation((cb) => {
+      cb(0)
+      return 1
+    })
+    render(<ArtifactTooltip id="t" anchor={el} source={{ document: "d.pdf", page: 1, excerpt: "x" }} onDismiss={() => {}} />)
+    const tip = screen.getByRole("tooltip")
+    const before = tip.style.top
+    top = 300
+    fireEvent.scroll(window)
+    expect(raf).toHaveBeenCalled()
+    expect(tip.style.top).not.toBe(before)
+    raf.mockRestore()
+  })
+
+  it("a resize re-places it too", () => {
+    const el = anchor()
+    let left = 100
+    vi.spyOn(el, "getBoundingClientRect").mockImplementation(() => rect(400, left))
+    const raf = vi.spyOn(window, "requestAnimationFrame").mockImplementation((cb) => {
+      cb(0)
+      return 1
+    })
+    render(<ArtifactTooltip id="t" anchor={el} source={{ document: "d.pdf", page: 1, excerpt: "x" }} onDismiss={() => {}} />)
+    const tip = screen.getByRole("tooltip")
+    const before = tip.style.left
+    left = 300
+    fireEvent(window, new Event("resize"))
+    expect(tip.style.left).not.toBe(before)
+    raf.mockRestore()
+  })
+
+  it("dismisses when the anchor scrolls out of the viewport", () => {
+    const el = anchor()
+    let top = 400
+    vi.spyOn(el, "getBoundingClientRect").mockImplementation(() => rect(top))
+    const raf = vi.spyOn(window, "requestAnimationFrame").mockImplementation((cb) => {
+      cb(0)
+      return 1
+    })
+    const onDismiss = vi.fn()
+    render(<ArtifactTooltip id="t" anchor={el} source={{ document: "d.pdf", page: 1, excerpt: "x" }} onDismiss={onDismiss} />)
+    top = -500
+    fireEvent.scroll(window)
+    expect(onDismiss).toHaveBeenCalledTimes(1)
+    raf.mockRestore()
+  })
+
+  it("removes its scroll and resize listeners on unmount (T-296-13)", () => {
+    const el = anchor()
+    const remove = vi.spyOn(window, "removeEventListener")
+    const { unmount } = render(
+      <ArtifactTooltip id="t" anchor={el} source={{ document: "d.pdf", page: 1, excerpt: "x" }} onDismiss={() => {}} />,
+    )
+    unmount()
+    const kinds = remove.mock.calls.map((c) => c[0])
+    expect(kinds).toContain("scroll")
+    expect(kinds).toContain("resize")
+    remove.mockRestore()
+  })
+})
+
 describe("tooltipPosition — anchored, deterministic placement", () => {
   const viewport = { width: 1000, height: 800 }
   const tip = { width: 200, height: 60 }

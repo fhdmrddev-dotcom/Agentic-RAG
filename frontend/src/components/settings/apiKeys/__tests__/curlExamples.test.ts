@@ -74,4 +74,11 @@ describe("293-04 statusCurl and the sample", () => {
     // 293-REVIEW WR-01: the server sends an ABSOLUTE link, so the sample does too.
     expect(files[0].url).toMatch(/^https:\/\//)
   })
+
+  it("296-04 (293-IN-02): the completed sample has no current step, as the server sends it", () => {
+    // `api/inbound.py` sets step_index only while the run is active; a finished run reads null.
+    const sample = JSON.parse(statusSampleJson()) as Record<string, unknown>
+    expect(sample.status).toBe("completed")
+    expect(sample.step_index).toBeNull()
+  })
 })

@@ -134,6 +134,36 @@ describe("engine cards", () => {
   })
 })
 
+describe("296-04 — unknown engine and local latency (294-IN-05 / 294-LOCAL)", () => {
+  it("an unknown stored id selects no card and says so", () => {
+    const { props } = setup({ provider: "frobnicate" })
+    for (const n of ["On this server", "Jev via OpenRouter", "OpenAI Decisions", "Cohere"]) {
+      expect(card(n)).toHaveAttribute("aria-checked", "false")
+    }
+    expect(
+      screen.getByText(
+        "Unknown engine “frobnicate”. Search ignores it and keeps today's order. Pick an engine to change that.",
+      ),
+    ).toBeInTheDocument()
+    // The cards stay reachable by keyboard even with none selected.
+    expect(card("On this server")).toHaveAttribute("tabindex", "0")
+    expect(props.onProviderChange).not.toHaveBeenCalled()
+  })
+
+  it("a known id shows no unknown-engine note", () => {
+    setup({ provider: "jev" })
+    expect(screen.queryByText(/Unknown engine/)).toBeNull()
+  })
+
+  it("the On this server card shows the latency note beside the first-use note", () => {
+    setup()
+    expect(card("On this server")).toHaveTextContent(
+      "Slow on a CPU: about 18 seconds per search in our test. A search that runs past 30 seconds keeps today's order.",
+    )
+    expect(card("Jev via OpenRouter")).not.toHaveTextContent("Slow on a CPU")
+  })
+})
+
 describe("missing key", () => {
   it("Jev without an OpenRouter key says it cannot run and search keeps today's order", () => {
     setup({ provider: "jev", hasKey: { openrouter: false, openai: true, cohere: true } })
