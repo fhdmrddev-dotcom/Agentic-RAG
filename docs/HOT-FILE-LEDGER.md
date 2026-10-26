@@ -11404,6 +11404,18 @@ Scan-list cell before this 296-02 touch (moved verbatim): | [`backend/app/servic
 
 CLAUDE.md FIRING cell before this 296-02 touch (moved verbatim): | `backend/app/services/harness/human_input.py` | 6 / 3 / 375 (was `5 / 3 / 355`) | 295-09 CR-01: consumes only its own question's answer · ⛔ |
 
+## `backend/app/api/schedules.py`
+
+### `backend/app/api/schedules.py` — 296-02 (295-IN-05, 2026-10-26)
+
+**`4 / 4 / 299`.** Absent from BOTH the scan list and this table for its ENTIRE LIFE at 4 phases (204, 210, 258, 296) — row added by 296-02 under D-26. 296-02 (295-IN-05, UI-SPEC C): the trigger route gains `except ScheduledLaunchRefused` BEFORE the generic arm (`str(exc)` is already the author-facing sentence, verbatim on the wire, `outcome="refused"`); the generic arm logs the exception and returns the fixed sentence `It didn't start because of a problem on our side. Nothing ran — try again in a moment.` (`outcome="error"`); the no-run arm returns `It didn't start: the workflow could not be loaded (it was deleted, or is no longer yours).` (`outcome="not_loaded"`); success sets `outcome="launched"`. Sentences are module constants. The raw exception never reaches the wire (T-296-17). The backoff half of 295-IN-05 is a seed (296-05), not built. The public OpenAPI snapshot + filtered spec were regenerated for the additive `outcome` field (test_276 freshness pin).
+
+## `backend/app/models/schedule.py`
+
+### `backend/app/models/schedule.py` — 296-02 (295-IN-05, 2026-10-26)
+
+**`3 / 3 / 231`.** Absent from BOTH for its ENTIRE LIFE at 3 phases (204, 210, 296) — row added by 296-02 (D-26). Touched OUTSIDE the plan's files_modified because `ScheduleTriggerResult` lives here, not in `api/schedules.py` (recorded as a deviation). 296-02 (295-IN-05): ONE additive field, `outcome: Literal["launched", "refused", "not_loaded", "error"] | None = None` (None on an older backend; 296-04's panel already reads it), plus `Literal` in the typing import. No validator, no other model touched.
+
 ## Scan list — THE AUTHORITATIVE ROW SET
 
 > **Moved here from `CLAUDE.md` on 2026-09-06.** That file now carries the G-5 rule, the re-derive
@@ -11589,7 +11601,7 @@ cells rot within days.
 | [`frontend/src/components/panel/PhaseCard.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentspanelphasecardtsx) | 21 / 14 / 817 (was `20 / 13 / 811`) | ⚠ **FIRES** | 296-04: ONE optional prop (`runPaused`) passed to `statusMetaForRun` (useState 1→1, useEffect 1→1). Honoured by construction |
 | [`frontend/src/components/panel/PhaseTimeline.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentspanelphasetimelinetsx) | 11 / 9 / 408 (was `10 / 8 / 404`) | ⚠ **FIRES** | 296-04: one derived const (`runPaused`, from the fetched frame) and one prop to each card. Honoured by construction |
 | [`frontend/src/components/panel/phaseStatusMeta.ts`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentspanelphasestatusmetats) | 5 / 5 / 308 (was `4 / 4 / 291`) | ⚠ **FIRES** | 296-04: one derived `WAITING_META` row (`!` · Waiting · warning) and one optional `runPaused` arg on `statusMetaForRun`; not a wire status |
-| [`backend/app/services/harness/validator_kinds.py`](docs/HOT-FILE-LEDGER.md#backendappservicesharnessvalidator_kindspy) | 18 / 8 / 899 (was `17 / 8 / 853`) | ⚠ **FIRES** | 295-09: WR-01 outage `if`; WR-05 the judge note moved to the system prompt (`judge_system_prompt`), graded data fenced by a data-keyed line (+4 defs, If 57→57). Rubric byte-unchanged |
+| [`backend/app/services/harness/validator_kinds.py`](docs/HOT-FILE-LEDGER.md#backendappservicesharnessvalidator_kindspy) | 19 / 9 / 918 (was `18 / 8 / 899`) | ⚠ **FIRES** | 296-02 (295-IN-08 / D-07): judge_system_prompt gains by_design (one condition); the in-run judge passes recording_by_design(ctx) — golden run or live_connectors off; a missing grant gets no note |
 | [`frontend/src/components/admin/ModelRegistryTab.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentsadminmodelregistrytabtsx) | 19 / 7 / 1705 (was `17 / 7 / 1679`) | ⚠ **FIRES** | honoured by construction (**282-01** help line; **282-04** ONE Timeout field in `AddModelForm`, placeholder = provider default, blank sends no key). `AddModelForm` seam OWED |
 | [`frontend/src/components/workflows/soulData.ts`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentsworkflowssouldatats) | 14 / 12 / 554 (was `12 / 10 / 499`) | ⚠ **FIRES** | 291-05: `launchInputFields` skips `kb_auto`; enum labels carry `inputOptionsHint`; `DefShape.inputs` widened (source/type/enum_options). `LaunchInputFields.tsx` untouched |
 | [`frontend/src/components/workflows/PublishGauntlet.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentsworkflowspublishgauntlettsx) | 21 / 11 / 1385 (was `20 / 10 / 1372`) | ⚠ **FIRES** | 288-02: ONE `auto-answered` block, server words verbatim; Pause stage copy corrected. honoured by construction |
@@ -12076,7 +12088,9 @@ cells rot within days.
 | [`backend/app/models/api_key.py`](docs/HOT-FILE-LEDGER.md#backendappmodelsapi_keypy) | 1 / 1 / 113 (was `0 / 0 / 0`) | no (young) | young (planned 293-01). Pydantic wire for keys, activity, limits. ⛔ no field carries the secret except the create response |
 | [`backend/app/services/inbound_inputs.py`](docs/HOT-FILE-LEDGER.md#backendappservicesinbound_inputspy) | 6 / 1 / 258 (was `5 / 1 / 237`) | no (young) | young (planned 293-01, fence 293-02). Launch-field twin + validation + TRUST-03 wrap and its reader (293-REVIEW WR-03). ⛔ pure; strips _-keys |
 | [`backend/app/api/api_keys.py`](docs/HOT-FILE-LEDGER.md#backendappapiapi_keyspy) | 2 / 1 / 392 (was `1 / 1 / 391`) | no (young) | young (planned 293-01). /api-keys (own) + /org/api-keys (admin). ⛔ 404 for miss AND foreign; secret only in the 201 body |
-| [`backend/app/services/unattended_launch.py`](docs/HOT-FILE-LEDGER.md#backendappservicesunattended_launchpy) | 5 / 1 / 354 (was `3 / 1 / 324`) | no (young) | young (planned 293-02). Shared unattended core + the kill-switch gate (293-REVIEW CR-01). ⛔ owner identity, explicit org_id, caps armed first |
+| [`backend/app/services/unattended_launch.py`](docs/HOT-FILE-LEDGER.md#backendappservicesunattended_launchpy) | 6 / 2 / 361 (was `5 / 1 / 354`) | no (young) | young. 296-02 (293-IN-04): the _drive_run task is held in a module _BACKGROUND_TASKS set with add_done_callback(discard) (P9) until done |
+| [`backend/app/api/schedules.py`](docs/HOT-FILE-LEDGER.md#backendappapischedulespy) | 4 / 4 / 299 | ⚠ **FIRES** | ⚠ absent its ENTIRE LIFE — row added 296-02 (D-26). 296-02 (295-IN-05): Run now answers with `outcome` + a worded `detail`; ScheduledLaunchRefused caught first; raw exception logged only |
+| [`backend/app/models/schedule.py`](docs/HOT-FILE-LEDGER.md#backendappmodelsschedulepy) | 3 / 3 / 231 | ⚠ **FIRES** | ⚠ absent its ENTIRE LIFE — row added 296-02 (D-26). 296-02 (295-IN-05): ScheduleTriggerResult gains one additive `outcome` Literal (launched/refused/not_loaded/error) |
 | [`backend/app/services/harness/run_read_words.py`](docs/HOT-FILE-LEDGER.md#backendappservicesharnessrun_read_wordspy) | 1 / 1 / 99 (was `0 / 0 / 0`) | no (young) | young (planned 293-02). MOVED waiting_who / unsourced_who / compose_waiting_on (workflow_runs seam). ⛔ pure leaf; re-exported |
 | [`backend/app/api/inbound.py`](docs/HOT-FILE-LEDGER.md#backendappapiinboundpy) | 7 / 1 / 672 (was `3 / 1 / 577`) | no (young) | young (planned 293-02). /inbound start + status + file link (293-REVIEW fixes). ⛔ key dependency only; byte-identical 404; D-12 origin_ref predicate |
 | [`frontend/src/lib/api/apiKeys.ts`](docs/HOT-FILE-LEDGER.md#frontendsrclibapiapikeysts) | 1 / 1 / 174 (was `0 / 0 / 0`) | no (young) | young (planned 293-04). Client for /api-keys + /org/api-keys; owns its types. ⛔ not re-exported from the lib/api barrel |
@@ -23574,6 +23588,14 @@ Scan-list cell as of 2026-10-21 (replaced by 295-09, moved verbatim): 17 / 8 / 8
 
 CLAUDE.md verdict cell as of 2026-10-21 (replaced by 295-09, moved verbatim): | `backend/app/services/harness/validator_kinds.py` | 17 / 8 / 853 (was `16 / 8 / 845`) | 295-09 WR-01: errored step = outage sentence (one if) |
 
+### `backend/app/services/harness/validator_kinds.py` — 296-02 (295-IN-08 / D-07, 2026-10-26)
+
+**`19 / 9 / 918`.** 296-02 (295-IN-08 / D-07): `recording_by_design(ctx)` reads the external-action executor's OWN by-design recording gates — a golden run (D-16) or `live_connectors` not fully on (D-26); a live run with the switch on recorded only because its send grant was missing. `judge_system_prompt(..., by_design=True)` gains ONE condition (the note loop runs only when `by_design`); the in-run `llm_judge_rubric` passes `by_design=recording_by_design(ctx)`; the publish judge (always a golden run) keeps the default. Byte-identical for every output without a design-noted key, and for a by-design recording. The fenced data block in the graded content is unchanged.
+
+Scan-list cell before this 296-02 touch (moved verbatim): | [`backend/app/services/harness/validator_kinds.py`](docs/HOT-FILE-LEDGER.md#backendappservicesharnessvalidator_kindspy) | 18 / 8 / 899 (was `17 / 8 / 853`) | ⚠ **FIRES** | 295-09: WR-01 outage `if`; WR-05 the judge note moved to the system prompt (`judge_system_prompt`), graded data fenced by a data-keyed line (+4 defs, If 57→57). Rubric byte-unchanged |
+
+CLAUDE.md FIRING cell before this 296-02 touch (moved verbatim): | `backend/app/services/harness/validator_kinds.py` | 18 / 8 / 899 (was `17 / 8 / 853`) | 295-09 WR-05: judge note in system prompt, data fenced |
+
 ## `backend/app/services/run_producer.py`
 
 ### `backend/app/services/run_producer.py` — Phase 295 (re-derived 2026-10-21 by 295-07)
@@ -24840,6 +24862,12 @@ Twenty-eight rows added at planning: twenty-six files Phase 293 creates and two 
 ### `backend/app/services/unattended_launch.py`
 
 **`0 / 0 / 0`** at 293 planning (2026-10-25). Young; row added AT PLANNING (the 273 / 290 / 292.1 precedent), so `check-hot-file-ledger.cjs 293` binds before the file exists. MOVED core of launch_scheduled_run + _drive_run (scheduler seam). ⛔ owner identity, explicit org_id, caps armed first Does not fire. Re-derive the triple at the 293-05 close.
+
+### `backend/app/services/unattended_launch.py` — 296-02 (293-IN-04, 2026-10-26)
+
+**`6 / 2 / 361`.** 296-02 (293-IN-04): `asyncio.create_task(_drive_run(...))` is bound to `_task`, added to a module `_BACKGROUND_TASKS: set[asyncio.Task]`, and discarded by `add_done_callback` — run_transport's P9 shape — so an unattended run's drive cannot be garbage-collected mid-run (the loop keeps only a weak reference).
+
+Scan-list cell before this 296-02 touch (moved verbatim): | [`backend/app/services/unattended_launch.py`](docs/HOT-FILE-LEDGER.md#backendappservicesunattended_launchpy) | 5 / 1 / 354 (was `3 / 1 / 324`) | no (young) | young (planned 293-02). Shared unattended core + the kill-switch gate (293-REVIEW CR-01). ⛔ owner identity, explicit org_id, caps armed first |
 
 ### `backend/app/services/harness/run_read_words.py`
 

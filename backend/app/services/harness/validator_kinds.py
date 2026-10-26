@@ -247,15 +247,33 @@ def _design_keys(output) -> list[tuple[str, str]]:
     return [(key, note) for key, note in _DESIGN_NOTES if output.get(key)]
 
 
-def judge_system_prompt(output, *, business_requirement: str, author_criteria: str) -> str:
+def recording_by_design(ctx) -> bool:
+    """296-02 (295-IN-08 / D-07): was a recorded-not-sent step recorded BY DESIGN on this run?
+
+    Read the way the external-action executor itself decides: its only by-design recording
+    gates are a publish golden run (D-16) and the operator's ``live_connectors`` switch not
+    fully on (D-26). On a live run with the switch on, a recorded step was recorded because its
+    send grant was MISSING (no connection, disabled, wrong capability ...), which the judge
+    must read as missing — never as "not sending is correct"."""
+    if getattr(ctx, "is_golden_run", False):
+        return True
+    from app.models.user_settings import feature_audience  # noqa: PLC0415 — function-local
+
+    return feature_audience("live_connectors") != "everyone"
+
+
+def judge_system_prompt(output, *, business_requirement: str, author_criteria: str,
+                        by_design: bool = True) -> str:
     """The judge's system prompt: the fixed rubric, plus (only when the graded output carries a
     design-noted key) the server's note naming the fence its data sits in. Shared by the in-run
     ``llm_judge_rubric`` validator and the publish judge. Byte-identical to
-    ``JUDGE_RUBRIC_CORE.format(...)`` for every other output."""
+    ``JUDGE_RUBRIC_CORE.format(...)`` for every other output.
+
+    296-02 (D-07): ``by_design=False`` (a recording caused by a missing grant) drops the note."""
     prompt = JUDGE_RUBRIC_CORE.format(
         business_requirement=business_requirement, author_criteria=author_criteria,
     )
-    for key, note in _design_keys(output):
+    for key, note in (_design_keys(output) if by_design else ()):
         begin, end = _design_fence(output, key)
         prompt += note.format(begin=begin, end=end)
     return prompt
@@ -679,6 +697,7 @@ async def _validate_llm_judge_rubric(output: dict, config: dict, ctx) -> GateRes
         output,
         business_requirement=business_requirement or "(not declared)",
         author_criteria=author_criteria,
+        by_design=recording_by_design(ctx),  # 296-02 (295-IN-08 / D-07)
     )
     messages = [{"role": "user", "content": graded}]
     # The verdict tool schema is built from JudgeVerdict (Pitfall-4-safe — pure
