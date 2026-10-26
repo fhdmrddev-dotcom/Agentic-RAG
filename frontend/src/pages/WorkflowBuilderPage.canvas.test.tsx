@@ -4352,3 +4352,146 @@ describe("WorkflowBuilderPage 197-09 — the arrival card is mounted, and the tw
     expect((within(group).getByLabelText("Ask the person") as HTMLInputElement).checked).toBe(false)
   })
 })
+
+// ══════════════════════════════════════════════════════════════════════════════════
+// Phase 296-07 Task 1 — the Team view is read-only (290-WR-02 / D-09), a generated draft is
+// kept without an edit (BUG-261024-02 + 291-S1-copy a), and the figure label never ends on
+// an empty name (290-IN-03). Each case was driven RED before the fix.
+// ══════════════════════════════════════════════════════════════════════════════════
+
+describe("WorkflowBuilderPage 296-07 — the Team view cannot edit (290-WR-02 / D-09)", () => {
+  const ON_296 = { features: { visual_workflow_canvas: true }, loading: false }
+  let seen296: BuilderDefinition[]
+
+  function renderTeamBuilder(def: BuilderDefinition = { ...definition, phases: evalCoverage }) {
+    seen296 = []
+    return render(
+      <EffectiveFeaturesProvider value={{ ...ON_296, refetch: vi.fn() }}>
+        <div style={{ width: 1200, height: 800 }}>
+          <WorkflowBuilderPage
+            initial={{ definition: def, draftId: "draft-1" }}
+            renderPublish={(d) => {
+              seen296.push(d as BuilderDefinition)
+              return null
+            }}
+          />
+        </div>
+      </EffectiveFeaturesProvider>,
+    )
+  }
+  const latest296 = () => seen296[seen296.length - 1].phases
+
+  async function openCanvas296(firstNode = "canvas-node-split") {
+    await screen.findByTestId("builder-view-toggle")
+    fireEvent.click(screen.getByTestId("builder-view-canvas"))
+    await waitFor(() => expect(screen.getByTestId(firstNode)).toBeInTheDocument(), LAZY)
+  }
+
+  async function showTeam() {
+    fireEvent.click(screen.getByTestId("canvas-view-team"))
+    await screen.findByTestId("team-plane")
+  }
+
+  /** Let any queued store update land before reading the definition again. */
+  const settle = () => new Promise((r) => setTimeout(r, 30))
+
+  it("Ctrl+Z does nothing while Team shows, and the notice is still there on return", async () => {
+    renderTeamBuilder()
+    await openCanvas296()
+    fireEvent.click(screen.getByTestId("canvas-remove-deep_dive"))
+    await waitFor(() => expect(latest296()).toHaveLength(4))
+    expect(screen.getByTestId("canvas-notice-action")).toBeInTheDocument()
+
+    await showTeam()
+    fireEvent.keyDown(window, { key: "z", ctrlKey: true })
+    fireEvent.keyDown(window, { key: "z", metaKey: true })
+    await settle()
+    expect(latest296()).toHaveLength(4)
+    expect(screen.getByText("👁 View only")).toBeInTheDocument()
+
+    fireEvent.click(screen.getByTestId("canvas-view-steps"))
+    expect(await screen.findByTestId("canvas-notice-action")).toBeInTheDocument()
+    expect(latest296()).toHaveLength(4)
+  })
+
+  it("Ctrl+Y and ⌘⇧Z do nothing while Team shows", async () => {
+    renderTeamBuilder()
+    await openCanvas296()
+    fireEvent.click(screen.getByTestId("canvas-remove-deep_dive"))
+    await waitFor(() => expect(latest296()).toHaveLength(4))
+    fireEvent.keyDown(window, { key: "z", ctrlKey: true })
+    await waitFor(() => expect(latest296()).toHaveLength(5))
+
+    await showTeam()
+    fireEvent.keyDown(window, { key: "y", ctrlKey: true })
+    fireEvent.keyDown(window, { key: "Z", metaKey: true, shiftKey: true })
+    await settle()
+    expect(latest296()).toHaveLength(5)
+  })
+
+  it("the side panel is not rendered under Team, and Steps re-opens it on the same step", async () => {
+    renderTeamBuilder()
+    await openCanvas296()
+    fireEvent.click(screen.getByTestId("canvas-node-split"))
+    await waitFor(() => expect(screen.getByTestId("phase-form-close")).toBeInTheDocument(), LAZY)
+    const label = screen.getByTestId("phase-form-close").closest("aside")?.getAttribute("aria-label")
+
+    await showTeam()
+    expect(screen.queryByTestId("phase-form-close")).toBeNull()
+    expect(screen.queryByTestId("phase-form-rail")).toBeNull()
+
+    fireEvent.click(screen.getByTestId("canvas-view-steps"))
+    await waitFor(() => expect(screen.getByTestId("phase-form-close")).toBeInTheDocument(), LAZY)
+    expect(screen.getByTestId("phase-form-close").closest("aside")?.getAttribute("aria-label")).toBe(label)
+  })
+
+  it("290-IN-03 — an empty name and slug read `Team picture for Untitled workflow`", async () => {
+    renderTeamBuilder({
+      ...definition,
+      name: "   ",
+      slug: "",
+      phases: researchSummarize,
+    } as BuilderDefinition)
+    await openCanvas296("canvas-node-research")
+    await showTeam()
+    expect(screen.getByRole("figure").getAttribute("aria-label")).toBe("Team picture for Untitled workflow")
+  })
+})
+
+describe("WorkflowBuilderPage 296-07 — a generated draft is kept without an edit (BUG-261024-02)", () => {
+  const ON_296 = { features: { visual_workflow_canvas: true }, loading: false }
+
+  it("generation success saves the draft exactly once, with no further edit", async () => {
+    mockGenerate.mockResolvedValue({
+      ok: true,
+      definition: {
+        ...definition,
+        phases: [{ slug: "brief", phase_index: 0, config: { phase_type: "llm_emit" } }],
+      },
+    })
+    render(
+      <EffectiveFeaturesProvider value={{ ...ON_296, refetch: vi.fn() }}>
+        <div style={{ width: 1200, height: 800 }}>
+          <WorkflowBuilderPage />
+        </div>
+      </EffectiveFeaturesProvider>,
+    )
+    await screen.findByTestId("describe-hint")
+    fireEvent.change(screen.getByLabelText("business requirement"), {
+      target: { value: "summarise the supplier renewals every week" },
+    })
+    fireEvent.click(screen.getByRole("button", { name: DESCRIBE_CTA }))
+    await screen.findByTestId("draft-arrival-card")
+    await waitFor(() => expect(mockCreate).toHaveBeenCalledTimes(1))
+    await new Promise((r) => setTimeout(r, 50))
+    expect(mockCreate).toHaveBeenCalledTimes(1)
+    expect(mockUpdate).not.toHaveBeenCalled()
+  })
+
+  it("the receipt says the draft is saved and not published (291-S1-copy a)", async () => {
+    const { SEED_RECEIPT_NOTHING_COMMITTED } = await import("@/components/workflows/definitionOps")
+    expect(SEED_RECEIPT_NOTHING_COMMITTED).toBe(
+      "Everything else is yours to change. It's saved as a draft and not published yet.",
+    )
+  })
+})
