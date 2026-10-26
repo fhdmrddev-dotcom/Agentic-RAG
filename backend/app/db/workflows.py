@@ -410,6 +410,7 @@ async def create_workflow_run(
     origin_kind: str | None = None,
     origin_label: str | None = None,
     origin_ref: UUID | None = None,
+    provider: str | None = None,
 ) -> UUID:
     """Atomically create a workflow run + its phase rows + set the thread anchor.
 
@@ -528,18 +529,28 @@ async def create_workflow_run(
     ``backend/tests/test_migration_122.py`` asserts ``jsonb_typeof`` on every stored value; it
     went RED on the first two real runs, which is the pin working exactly as written.
 
+    296-02 (SEED-362): ``provider`` (keyword-only, default None) records the run's provider in
+    ``metadata`` in the SAME INSERT, so a resumed run continues on it. ``None`` runs the INSERT
+    text unchanged, byte for byte (``test_296_engine_touches.py`` pins it).
+
     Returns the new workflow_run id.
     """
     if origin_kind is not None and origin_kind not in _RUN_ORIGIN_KINDS:
         raise ValueError(f"unknown run origin kind {origin_kind!r}")
     async with pool.acquire() as con:
         async with con.transaction():
-            run_id = await con.fetchval(
-                """
+            _insert = """
                 INSERT INTO workflow_runs (thread_id, definition_id, status, inputs, model, user_id, is_golden_run, definition_snapshot, origin_kind, origin_label, origin_ref)
                 VALUES ($1, $2, 'active', $3::jsonb, $4, $5, $6, $7::jsonb, $8, $9, $10)
                 RETURNING id
-                """,
+                """
+            _extra: tuple = ()
+            if provider is not None:  # SEED-362: the plain dict; the pool's codec encodes it
+                _insert = _insert.replace(", origin_ref)", ", origin_ref, metadata)").replace(
+                    "$10)", "$10, $11::jsonb)")
+                _extra = ({"provider": provider},)
+            run_id = await con.fetchval(
+                _insert,
                 thread_id,
                 definition_id,
                 json.dumps(inputs),
@@ -554,6 +565,7 @@ async def create_workflow_run(
                 origin_kind,
                 origin_label,
                 origin_ref,
+                *_extra,
             )
             for ps in sorted(definition.phases, key=lambda p: p.phase_index):
                 await con.execute(
@@ -1678,7 +1690,7 @@ async def find_resumable_runs(pool: asyncpg.Pool) -> list[dict]:
     rows = await pool.fetch(
         """
         SELECT wr.id AS run_id, wr.thread_id, wr.current_phase_id, wr.inputs,
-               wr.org_id, wr.is_golden_run, t.user_id
+               wr.org_id, wr.is_golden_run, t.user_id, wr.model, wr.metadata
         FROM workflow_runs wr
         JOIN threads t ON t.id = wr.thread_id
         WHERE wr.status IN ('active', 'paused')

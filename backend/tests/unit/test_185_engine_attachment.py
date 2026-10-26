@@ -970,7 +970,16 @@ def test_an_llm_human_input_resume_still_uses_its_original_timeout():
 
     resume_prompt = _drive_resume_sweep(human_row, _definition_with(armed), pending)
 
-    assert resume_prompt.await_count == 1, "the armed branch stole an llm_human_input resume"
-    args, _kwargs = resume_prompt.await_args
-    assert args[2] == "tc-human-1"
-    assert args[5] == 300, f"the shipped resume timeout became {args[5]!r}"
+    # ⚠ RECONCILED DELIBERATELY BY 296-02 (BUG-261025-03), the D-206-07 precedent: the
+    # "ORIGINAL step-2 branch" this test pinned was DEAD in production. It keyed on
+    # ``active["config"]`` and ``output.tool_call_id``, which the real ``get_active_phase``
+    # row never carries (this fake hand-builds both), so every boot fell through and re-asked
+    # a waiting person with a fresh prompt (three unanswered rows measured on run 1e932094).
+    # The branch is deleted; an unanswered human step now PAUSES and re-subscribes nothing
+    # (``tests/test_296_boot_sweep_human_ask.py``, built from the real row). Retired, quoted:
+    #     assert resume_prompt.await_count == 1, "the armed branch stole an llm_human_input resume"
+    #     assert args[2] == "tc-human-1"
+    #     assert args[5] == 300, f"the shipped resume timeout became {args[5]!r}"
+    # The half that still holds is the GUARD ORDER: a row whose stored type is llm_human_input
+    # is never captured by the armed branch, so the armed re-subscribe never fires for it.
+    assert resume_prompt.await_count == 0, "the armed branch stole an llm_human_input resume"

@@ -2062,6 +2062,14 @@ Scan-list cell as of 2026-10-21 (replaced by 295-09, moved verbatim): 67 / 26 / 
 
 CLAUDE.md verdict cell as of 2026-10-21 (replaced by 295-09, moved verbatim): | `backend/app/services/harness_engine.py` | 67 / 26 / 2957 (was `62 / 25 / 3396`) | 295-01: seam TAKEN (−499 L) · armed-block seam still OWED · ⛔ |
 
+### `backend/app/services/harness_engine.py` — 296-02 (BUG-261025-03 / 295-RES-a / 289-F3 / SEED-362, 2026-10-26)
+
+**`69 / 27 / 2992`.** 296-02, the FOUR audited one-statement touches (STATE.md → Guardrail overrides, recorded before any edit). (1) BUG-261025-03: the dead step-2 human-input branch (keyed on `active['config']` / `output.tool_call_id`, which the real `get_active_phase` row never selects) is deleted with its only helper `_active_tool_call_id`; ONE arm, 2c, sits after `_load_run_definition` and its None guard and classifies by the definition through `_active_spec` (extracted from `_is_armed_action_risk`, which now calls it — no second classifier). Latest prompt unanswered → `pause_run` + continue; answered → `ctx.resume_answered_tool_call_id` + `resume_run` before `_resume_run`. (2) 295-RES-a: the armed `action_risk_pending` audit + emit are skipped when `ctx.engine_ask_approved` holds this slug. ⚠ The plan named `resume_answered_tool_call_id`; measured, `consume_engine_answer` CLEARS that flag before the checkpoint runs, so that guard would never fire — the test drives the real consume. (3) 289-F3: `_finalize_run_grounding` gains `user_settings=None`, the run finaliser passes `ctx.user_settings`, `_compute_confidence(final_avg, user_settings)` (three lines, one value). (4) SEED-362: `_build_resume_context` reads `run['model']` and `metadata.provider` (a recorded provider is used as recorded; no provider → `resolve_sub_agent_model_safely`; no model → the owner default) and sets `ctx.provider`. Branch counts (If/IfExp/Except, AST): resume_stranded_workflows 13/2/3 → 12/2/3; _run_phase_with_gates 15/8/6 → 16/8/6; _build_resume_context 8/5/5 → 9/8/6; _finalize_run_grounding 3/2/0 → 3/2/0. The named armed-block seam is NOT taken; it stays OWED.
+
+Scan-list cell before this 296-02 touch (moved verbatim): | [`backend/app/services/harness_engine.py`](docs/HOT-FILE-LEDGER.md#backendappservicesharness_enginepy) | 68 / 26 / 2961 (was `67 / 26 / 2957`) | ⚠ **FIRES** | 295-09 WR-07: the pause arm skips its `pause_run` when the engine ask already wrote it (ONE guarded line, If 86→87), so a re-driven run is never flipped back. Armed-block seam still OWED |
+
+CLAUDE.md FIRING cell before this 296-02 touch (moved verbatim): | `backend/app/services/harness_engine.py` | 68 / 26 / 2961 (was `67 / 26 / 2957`) | 295-09 WR-07: one pause write per engine ask · armed seam OWED · ⛔ |
+
 ## `frontend/src/components/chat/ThinkingBlock.tsx`
 
 **Created 2026-09-11 (Phase 243, plan `243-02`):** `1 commit / 1 phase / 117 L` · **G-5 does NOT fire** (1 phase against a threshold of 3).
@@ -5621,6 +5629,14 @@ Hot service-role database module shared across routes and background engines.
 - Zero mutation of existing query shapes or security predicates. Preserves all immutability triggers and draft concurrency guards.
 
 ---
+
+### `backend/app/db/workflows.py` — 296-02 (SEED-362, 2026-10-26)
+
+**`62 / 31 / 2857`.** 296-02 (SEED-362): `find_resumable_runs` selects `wr.model, wr.metadata` (two columns, predicate unchanged). `create_workflow_run` gains keyword-only `provider: str | None = None`; a value adds `metadata` / `$11::jsonb` to the SAME INSERT as a plain dict (the pool's jsonb codec encodes it — the mig-122 lesson); `None` runs the INSERT text unchanged byte for byte, pinned against base by `test_296_engine_touches.py`. The kickoff callers pass `provider=` in 296-06.
+
+Scan-list cell before this 296-02 touch (moved verbatim): | [`backend/app/db/workflows.py`](docs/HOT-FILE-LEDGER.md#backendappdbworkflowspy) | 61 / 31 / 2845 (was `59 / 30 / 2827`) | ⚠ **FIRES** | 296-01: create_workflow_definition keyword-only `org_id` (None = the pre-296 INSERT text, byte-identical) |
+
+CLAUDE.md FIRING cell before this 296-02 touch (moved verbatim): | `backend/app/db/workflows.py` | 61 / 31 / 2845 (was `59 / 30 / 2827`) | 296-01: create_workflow_definition org_id kwarg (keyword-only) |
 
 ### `frontend/src/lib/api.ts` — Phase 206, ESCALATED DECISION (Operator Override)
 
@@ -11386,6 +11402,16 @@ of something larger.
 
 ---
 
+## `backend/app/services/harness/human_input.py`
+
+### `backend/app/services/harness/human_input.py` — 296-02 (BUG-261025-03, comment only, 2026-10-26)
+
+**`7 / 4 / 376`.** 296-02 (BUG-261025-03): COMMENT ONLY, outside the plan's files_modified (recorded as a deviation). The block above the resume-flag consume said *the boot sweep does not set it*; from 296-02 the sweep sets it for an answered human step, so the sentence is struck through and corrected in place. No code changed.
+
+Scan-list cell before this 296-02 touch (moved verbatim): | [`backend/app/services/harness/human_input.py`](docs/HOT-FILE-LEDGER.md#backendappservicesharnesshuman_inputpy) | 6 / 3 / 375 (was `5 / 3 / 355`) | ⚠ **FIRES** | 295-09 CR-01: ONE guard (+1 def `_answers_this_step`, If 15→17): a re-drive consumes only an answer to THIS step's question, never an engine ask's or another step's. Honoured by construction |
+
+CLAUDE.md FIRING cell before this 296-02 touch (moved verbatim): | `backend/app/services/harness/human_input.py` | 6 / 3 / 375 (was `5 / 3 / 355`) | 295-09 CR-01: consumes only its own question's answer · ⛔ |
+
 ## Scan list — THE AUTHORITATIVE ROW SET
 
 > **Moved here from `CLAUDE.md` on 2026-09-06.** That file now carries the G-5 rule, the re-derive
@@ -11401,7 +11427,7 @@ cells rot within days.
 |---|---|---|---|
 | [`backend/app/api/panel.py`](docs/HOT-FILE-LEDGER.md#backendappapipanelpy) | 6 / 5 / 285 | ⚠ **FIRES** | 295-03: ONE additive `engine_pause` key on /pending beside `draft`. Honoured by construction. 295-07: triple re-derived, unchanged since 295-03 |
 | [`backend/app/utils/folder_utils.py`](docs/HOT-FILE-LEDGER.md#backendapputilsfolder_utilspy) | 9 / 5 / 302 | ⚠ **FIRES** | ⚠ absent its ENTIRE LIFE — row added 295-10. D-r1-04: a non-empty org restriction narrows OWNED folders too; `None` and `set()` unchanged · ⛔ |
-| [`backend/app/services/harness/human_input.py`](docs/HOT-FILE-LEDGER.md#backendappservicesharnesshuman_inputpy) | 6 / 3 / 375 (was `5 / 3 / 355`) | ⚠ **FIRES** | 295-09 CR-01: ONE guard (+1 def `_answers_this_step`, If 15→17): a re-drive consumes only an answer to THIS step's question, never an engine ask's or another step's. Honoured by construction |
+| [`backend/app/services/harness/human_input.py`](docs/HOT-FILE-LEDGER.md#backendappservicesharnesshuman_inputpy) | 7 / 4 / 376 (was `6 / 3 / 375`) | ⚠ **FIRES** | 295-09 CR-01: ONE guard (+1 def `_answers_this_step`, If 15→17): a re-drive consumes only an answer to THIS step's question, never an engine ask's or another step's. Honoured by construction |
 | [`backend/app/services/harness/engine_ask.py`](docs/HOT-FILE-LEDGER.md#backendappservicesharnessengine_askpy) | 9 / 1 / 1361 (was `8 / 1 / 1358`) | no (young) | young. 295-09: WR-01 outage, WR-02 searched set, WR-06 org-narrowed folders, WR-07 marks its own pause write (If 79→79). ⛔ one allow-list shared with the route's 422 |
 | [`backend/app/services/harness/run_handoff.py`](docs/HOT-FILE-LEDGER.md#backendappservicesharnessrun_handoffpy) | 8 / 1 / 431 (was `7 / 1 / 401`) | no (young) | young. 295-09: WR-01 sub-agent helpers, WR-03 surface-after-silence, WR-07 `mark_pause_written` / `take_pause_written` (+2 defs, If 22→23). ⛔ no app import; one guarded terminal write |
 | [`backend/app/services/harness/run_read_wire.py`](docs/HOT-FILE-LEDGER.md#backendappservicesharnessrun_read_wirepy) | 2 / 2 / 183 (was `1 / 1 / 150`) | no (young) | young (295-05). Pure leaf: unsourced_for_wire, end_reason_for_wire, resolve_end_reason, deadline_passed. ⛔ no app imports; a stored user id is REPLACED by words · 293 touch: see §Phase 293 close |
@@ -11524,7 +11550,7 @@ cells rot within days.
 | [`frontend/src/hooks/useThreads.ts`](docs/HOT-FILE-LEDGER.md#frontendsrchooksusethreadsts) | 5 / 3 / 65 (was `4 / 2 / 64`) | ⚠ **NOW FIRES — 3 phases** | ⚠ row STALE (`4/2/64`), now FIRES. **267-04**: `newThread` takes an optional Expert id, so an invite on a brand-new chat reaches the row (D-267-21; live G4-1). ⛔ `selectThread` stays a bare setState |
 | [`backend/app/services/harness/grounding.py`](docs/HOT-FILE-LEDGER.md#backendappservicesharnessgroundingpy) | 23 / 10 / 1437 (was `22 / 9 / 1417`) | ⚠ **FIRES** | 295-03: ONE pure predicate `is_engine_citation_gate` (+1 def, If 24→24); `on_failure="fail_run"` kept (D-51). Honoured by construction |
 | [`frontend/src/components/workflows/PhaseFormPanel.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentsworkflowsphaseformpaneltsx) | 30 / 14 / 1566 | **FIRES** | honoured by construction ×6 (185 / 193 / 193.1 / 199 / 200 / **214**) |
-| [`backend/app/db/workflows.py`](docs/HOT-FILE-LEDGER.md#backendappdbworkflowspy) | 61 / 31 / 2845 (was `59 / 30 / 2827`) | ⚠ **FIRES** | 296-01: create_workflow_definition keyword-only `org_id` (None = the pre-296 INSERT text, byte-identical) |
+| [`backend/app/db/workflows.py`](docs/HOT-FILE-LEDGER.md#backendappdbworkflowspy) | 62 / 31 / 2857 (was `61 / 31 / 2845`) | ⚠ **FIRES** | 296-02 (SEED-362): find_resumable_runs selects wr.model + wr.metadata; create_workflow_run keyword-only provider merges metadata.provider in the same INSERT (None = byte-identical SQL) |
 | [`backend/app/services/harness/publish_service.py`](docs/HOT-FILE-LEDGER.md#backendappservicesharnesspublish_servicepy) | 34 / 15 / 2010 (was `33 / 15 / 2008`) | ⚠ **FIRES** | 295-09 WR-05: the publish judge builds its system prompt through `judge_system_prompt` (one import swap, one expression; If 70→70). Honoured by construction |
 | [`backend/app/services/workflow_authoring.py`](docs/HOT-FILE-LEDGER.md#backendappservicesworkflow_authoringpy) | 18 / 12 / 1120 (was `17 / 11 / 1025`) | **FIRES** | 291-02: file text = ONE more untrusted grounding input (fenced user-turn documents), degraded-registry refusal, powers guard + coverage retry (+98 −3). 286 forecast honoured |
 | [`backend/app/models/harness.py`](docs/HOT-FILE-LEDGER.md#backendappmodelsharnesspy) | 22 / 20 / 776 (was `20 / 19 / 766`) | **FIRES** | 291-02: `InputFieldSpec.origin` + `.note`, omitted from the dump when absent so a no-file draft is byte-identical (+11 −1). Honoured by construction (193.2 / 214 / 291) |
@@ -11532,7 +11558,7 @@ cells rot within days.
 | [`frontend/src/components/panel/WorkspacePanel.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentspanelworkspacepaneltsx) | 17 / 11 / 646 (was `16 / 10 / 646`) | **FIRES** | honoured by construction (194 / 194.1 / **282-02**: ONE `home="panel"` prop on the existing `PendingAskStack` mount; the `pendingAsks.length > 0 &&` condition byte-identical) |
 | [`backend/app/services/run_lifecycle.py`](docs/HOT-FILE-LEDGER.md#backendappservicesrun_lifecyclepy) | 10 / 6 / 776 (was `9 / 5 / 756`) | ⚠ **FIRES** | 295-04: `cancel_workflow_run_internals(..., stopped_by=...)` calls `record_stop` before its own finish_run (If 11→11). Honoured by construction |
 | [`backend/app/api/runs.py`](docs/HOT-FILE-LEDGER.md#backendappapirunspy) | 52 / 22 / 2003 (was `51 / 22 / 1981`) | ⚠ **FIRES** | 292.1 UAT: Deep continue returns stream_since (XREVRANGE tail) · ⛔ |
-| [`backend/app/services/harness_engine.py`](docs/HOT-FILE-LEDGER.md#backendappservicesharness_enginepy) | 68 / 26 / 2961 (was `67 / 26 / 2957`) | ⚠ **FIRES** | 295-09 WR-07: the pause arm skips its `pause_run` when the engine ask already wrote it (ONE guarded line, If 86→87), so a re-driven run is never flipped back. Armed-block seam still OWED |
+| [`backend/app/services/harness_engine.py`](docs/HOT-FILE-LEDGER.md#backendappservicesharness_enginepy) | 69 / 27 / 2992 (was `68 / 26 / 2961`) | ⚠ **FIRES** | 296-02: the FOUR audited one-touches — boot-sweep human-input arm by the definition (BUG-261025-03), RES-a guard, owner buckets (289-F3), run model on resume (SEED-362). Armed seam still OWED |
 | [`frontend/src/components/chat/RunCard.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentschatruncardtsx) | 31 / 16 / 729 (was `28 / 14 / 710`) | **FIRES** | ⭐ G-5 DISCHARGED (243-02). **276-06**: avatar pulse + header spinner removed (D-27: one live avatar); provider logo static. ⛔ Bot stays the unknown-provider fallback |
 | [`frontend/src/components/chat/WorkingBadge.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentschatworkingbadgetsx) | 3 / 2 / 50 (was `2 / 1 / 56`) | no (2 phases) | ⚠ absent its ENTIRE LIFE; row added at 276-06 planning. 276-06: the ✦ glyph and its pulse gone (the Iris avatar is the motion); the word stays. ⛔ memo equality unchanged |
 | [`frontend/src/components/chat/irisState.ts`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentschatirisstatets) | 1 / 1 / 44 (was `0 / 0 / 0`) | no (new) | young (created 276-06). Row added AT PLANNING. ⛔ the ONE home of the avatar precedence (error > cancelled > waiting > tool > thinking > streaming > idle); pure, no store reads |

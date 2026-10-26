@@ -176,8 +176,9 @@ async def _exec_llm_human_input(phase, accumulated_outputs: dict, ctx) -> dict:
     # instead of inheriting the first one's answer — the silent auto-approval this whole
     # plan exists to remove, re-introduced by a convenience lookup.
     #
-    # ⚠ THE BOOT SWEEP DOES NOT SET IT, so the 096-09 restart contract is untouched:
-    # ``resume_pending_prompt`` still re-subscribes and re-emits the SAME prompt there.
+    # ~~THE BOOT SWEEP DOES NOT SET IT, so the 096-09 restart contract is untouched~~
+    # CORRECTED 296-02 (BUG-261025-03): the boot sweep now sets it for an ANSWERED human
+    # step (and pauses an unanswered one), because the 096-09 re-subscribe branch was dead.
     _resume_tcid = getattr(ctx, "resume_answered_tool_call_id", None)
     if _resume_tcid:
         try:
