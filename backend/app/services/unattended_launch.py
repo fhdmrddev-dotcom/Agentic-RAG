@@ -46,6 +46,11 @@ logger = logging.getLogger(__name__)
 
 OnFinish = Callable[[str], Awaitable[Any]]
 
+#: 293-IN-04 (296-02): strong references to the drive tasks until they finish (run_transport's
+#: P9 shape). The event loop keeps only a weak reference to a task, so a bare ``create_task``
+#: can be garbage-collected mid-run.
+_BACKGROUND_TASKS: set[asyncio.Task] = set()
+
 # 293-REVIEW CR-01 — the in-app kickoff's own refusal sentence (workflow_kickoff.py), so the
 # operator's "workflows" kill switch reads the same on every door.
 WORKFLOWS_DISABLED_DETAIL = "Workflows are currently disabled by the administrator"
@@ -220,7 +225,7 @@ async def launch_unattended_run(
         )
 
     # ── drive it, in the background, with the mandatory shell finalizer ────────────────
-    asyncio.create_task(
+    _task = asyncio.create_task(
         _drive_run(
             run_id=run_id,
             thread_id=thread_id,
@@ -235,6 +240,8 @@ async def launch_unattended_run(
             log_ref=log_ref,
         )
     )
+    _BACKGROUND_TASKS.add(_task)
+    _task.add_done_callback(_BACKGROUND_TASKS.discard)
     return run_id
 
 

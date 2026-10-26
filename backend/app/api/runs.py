@@ -610,7 +610,10 @@ async def _is_current_question(run_id: UUID, tool_call_id: str) -> bool:
     return bool(pending) and str(pending.get("tool_call_id")) == str(tool_call_id)
 
 
-_REDRIVE_FAILED_REASON = "Your answer was saved, but the run could not continue."
+#: 295-IN-07 (296-02): the ONE sentence a failed answer re-drive ends with. The failed phase, the
+#: ``run_failed`` audit (which the run page reads as "Why it stopped"), the emit and the producer
+#: shell's error all carry it, so no code-like string can surface as a reason.
+REDRIVE_FAILED_REASON = "The run couldn't continue after the answer was given."
 # 289-REVIEW WR-06: the paused run's definition could not be loaded, so it was never re-driven.
 _REDRIVE_NO_DEFINITION_REASON = "Your answer was saved, but the workflow could not be loaded."
 
@@ -623,7 +626,7 @@ async def _fail_redrive(
     redis=None,
     stream_run_id=None,
     from_statuses: tuple[str, ...] = ("active",),
-    reason: str = _REDRIVE_FAILED_REASON,
+    reason: str = REDRIVE_FAILED_REASON,
 ) -> None:
     """End a paused run whose re-drive could not continue: `failed`, with words (D-12 / SEED-360).
 
@@ -667,7 +670,7 @@ async def _fail_redrive(
         await finish_run(pool, run_id, "failed")
         await write_audit(
             pool, run_id, user_id=owner_user_id, event_type="run_failed",
-            metadata={"reason": "ask_user re-drive failed"},
+            metadata={"reason": reason},  # 295-IN-07: the worded sentence, never a code
         )
     except Exception:
         logger.exception("ask_user_response: could not end failed re-drive for run %s", run_id)
@@ -681,7 +684,30 @@ async def _fail_redrive(
             logger.warning("ask_user_response: run_failed emit failed for run %s", run_id)
 
 
-async def _redrive_paused_workflow_run(run_id: UUID, tool_call_id: str, redis) -> bool:
+#: 289-WR-06b (296-02): held references for the one delayed re-drive retry (run_transport's P9
+#: shape) — a bare ``create_task`` can be garbage-collected mid-sleep.
+_BACKGROUND_TASKS: set[asyncio.Task] = set()
+
+
+def _spawn(coro) -> asyncio.Task:
+    """Schedule a fire-and-forget coroutine and retain a strong reference until it is done."""
+    t = asyncio.create_task(coro)
+    _BACKGROUND_TASKS.add(t)
+    t.add_done_callback(_BACKGROUND_TASKS.discard)
+    return t
+
+
+async def _redrive_after_lease(run_id: UUID, tool_call_id: str, redis) -> None:
+    """289-WR-06b: ONE retry once the claim lease has expired. A second lost claim logs and
+    stops (``_retry=False``) — never a loop. A run that is no longer ``paused`` by then (the
+    claimant re-drove it) is simply not found."""
+    await asyncio.sleep(settings.harness_resume_lease_seconds + 1)
+    await _redrive_paused_workflow_run(run_id, tool_call_id, redis, _retry=False)
+
+
+async def _redrive_paused_workflow_run(
+    run_id: UUID, tool_call_id: str, redis, *, _retry: bool = True
+) -> bool:
     """Wake a `paused` workflow run in-process after its human gate has been answered.
 
     ⚠ **WITHOUT THIS, D-10's OWN SENTENCE IS FALSE.** *"Answering later still resumes;
@@ -692,7 +718,8 @@ async def _redrive_paused_workflow_run(run_id: UUID, tool_call_id: str, redis) -
     resumes *only when the server next restarts* — and the UI would have to SAY so, which
     is a wording nobody should ship. RESEARCH's option (b), taken.
 
-    Returns True if a re-drive was spawned. Every other path returns False, and **no path
+    Returns True if a re-drive was spawned — and ONLY then (289-IN-05, 296-02). Every other
+    path returns False, including a context build that failed and ended the run, and **no path
     raises**: the caller's persist has already succeeded and the answer is durable, so a
     failure here must never turn a recorded answer into a non-200 (the same posture
     Step 4's PUBLISH already takes, for the same reason).
@@ -739,7 +766,7 @@ async def _redrive_paused_workflow_run(run_id: UUID, tool_call_id: str, redis) -
     row = await pool.fetchrow(
         """
         SELECT wr.id AS run_id, wr.thread_id, wr.current_phase_id, wr.inputs,
-               wr.org_id, wr.is_golden_run, t.user_id
+               wr.org_id, wr.is_golden_run, t.user_id, wr.model, wr.metadata
         FROM workflow_runs wr
         JOIN threads t ON t.id = wr.thread_id
         WHERE wr.id = $1
@@ -754,6 +781,8 @@ async def _redrive_paused_workflow_run(run_id: UUID, tool_call_id: str, redis) -
     if not await claim_run(pool, run_id, settings.harness_resume_lease_seconds):
         # Somebody else (the boot sweep, or a racing second answer) owns this run.
         logger.info("ask_user_response: re-drive skipped, run %s already claimed", run_id)
+        if _retry:  # 289-WR-06b: one held retry after the lease, so the answer is not stranded
+            _spawn(_redrive_after_lease(run_id, tool_call_id, redis))
         return False
 
     definition = await _load_run_definition(pool, run_id)
@@ -782,11 +811,12 @@ async def _redrive_paused_workflow_run(run_id: UUID, tool_call_id: str, redis) -
         ctx.resume_answered_tool_call_id = tool_call_id
     except Exception:
         # The run is already `active` here, so a raise must not reach the route's belt and
-        # leave it stranded (D-12). The answer stays recorded; the run ends truthfully, and
-        # True is returned because the only caller ignores the value.
+        # leave it stranded (D-12). The answer stays recorded; the run ends truthfully.
+        # ~~True is returned because the only caller ignores the value~~ 289-IN-05: nothing
+        # was spawned, so False.
         logger.exception("ask_user_response: re-drive context failed for run %s", run_id)
         await _fail_redrive(pool, run_id, row["user_id"], redis=redis)
-        return True
+        return False
 
     async def _wake():
         _failed = False
@@ -844,7 +874,7 @@ async def _redrive_paused_workflow_run(run_id: UUID, tool_call_id: str, redis) -
                         pool,
                         run_id=_pid,
                         status=resume_shell_status(_escape),
-                        error="ask_user re-drive failed" if _failed else None,
+                        error=REDRIVE_FAILED_REASON if _failed else None,
                         completed_at=_dt.now(_tz.utc),
                         message_id=None,
                         input_tokens=_in_tok,

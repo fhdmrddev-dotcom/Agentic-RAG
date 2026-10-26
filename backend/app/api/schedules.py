@@ -68,6 +68,13 @@ router = APIRouter(prefix="/schedules", tags=["schedules"])
 workflow_router = APIRouter(prefix="/workflows", tags=["schedules"])
 
 _NOT_FOUND = "schedule not found"
+# 296-02 (295-IN-05, UI-SPEC C): the Run-now sentences. A refusal carries its own sentence.
+_TRIGGER_NOT_LOADED = (
+    "It didn't start: the workflow could not be loaded (it was deleted, or is no longer yours)."
+)
+_TRIGGER_ERROR = (
+    "It didn't start because of a problem on our side. Nothing ran — try again in a moment."
+)
 
 
 def _coerce_user_id(current_user: dict) -> UUID:
@@ -264,23 +271,24 @@ async def trigger_schedule(
     if launch_row is None:  # deleted between the two reads
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=_NOT_FOUND)
 
-    from app.services.scheduler_service import launch_scheduled_run
+    from app.services.scheduler_service import ScheduledLaunchRefused, launch_scheduled_run
 
     try:
         run_id = await launch_scheduled_run(launch_row, pool=pool, redis=get_redis())
+    except ScheduledLaunchRefused as exc:
+        # 296-02 (295-IN-05): a worded refusal (``str(exc)`` IS the author-facing sentence,
+        # already recorded) is not a launch failure — it reaches the wire verbatim.
+        return ScheduleTriggerResult(launched=False, outcome="refused", detail=str(exc))
     except Exception as exc:
+        # The raw exception is logged ONLY; the wire carries the fixed sentence (T-296-17).
         logger.error("Failed to manually trigger schedule %s: %s", schedule_id, exc)
-        return ScheduleTriggerResult(
-            launched=False,
-            detail=f"Failed to launch schedule: {exc}",
-        )
+        return ScheduleTriggerResult(launched=False, outcome="error", detail=_TRIGGER_ERROR)
 
     if run_id is None:
         return ScheduleTriggerResult(
-            launched=False,
-            detail="the scheduled workflow could not be loaded (deleted, or no longer yours)",
+            launched=False, outcome="not_loaded", detail=_TRIGGER_NOT_LOADED,
         )
-    return ScheduleTriggerResult(launched=True, workflow_run_id=run_id)
+    return ScheduleTriggerResult(launched=True, workflow_run_id=run_id, outcome="launched")
 
 
 # ⚠ `claim_due_schedules` is DELIBERATELY NOT IMPORTED HERE AND HAS NO ROUTE, and the absence

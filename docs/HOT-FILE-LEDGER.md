@@ -5620,6 +5620,22 @@ Hot service-role database module shared across routes and background engines.
 
 ---
 
+### `backend/app/db/workflows.py` — 296-02 (SEED-362, 2026-10-26)
+
+**`62 / 31 / 2857`.** 296-02 (SEED-362): `find_resumable_runs` selects `wr.model, wr.metadata` (two columns, predicate unchanged). `create_workflow_run` gains keyword-only `provider: str | None = None`; a value adds `metadata` / `$11::jsonb` to the SAME INSERT as a plain dict (the pool's jsonb codec encodes it — the mig-122 lesson); `None` runs the INSERT text unchanged byte for byte, pinned against base by `test_296_engine_touches.py`. The kickoff callers pass `provider=` in 296-06.
+
+Scan-list cell before this 296-02 touch (moved verbatim): | [`backend/app/db/workflows.py`](docs/HOT-FILE-LEDGER.md#backendappdbworkflowspy) | 61 / 31 / 2845 (was `59 / 30 / 2827`) | ⚠ **FIRES** | 296-01: create_workflow_definition keyword-only `org_id` (None = the pre-296 INSERT text, byte-identical) |
+
+CLAUDE.md FIRING cell before this 296-02 touch (moved verbatim): | `backend/app/db/workflows.py` | 61 / 31 / 2845 (was `59 / 30 / 2827`) | 296-01: create_workflow_definition org_id kwarg (keyword-only) |
+
+### `backend/app/db/workflows.py` — 296-02 (295-IN-03, 2026-10-26)
+
+**`63 / 31 / 2862`.** 296-02 (295-IN-03): `cancel_active_phases` (the zombie / no-producer arm) adds `output = CASE WHEN jsonb_typeof(output) = 'object' THEN output - '_awaiting_answer' ELSE output END` to its ONE-LINE UPDATE (predicate unchanged, still one source line — the 193.2-08 rule). A stopped engine ask keeps no unaccepted draft or folder names. The CASE (not the plan's `COALESCE(output, '{}')`) leaves a NULL or scalar output exactly as it was: `-` on a jsonb scalar raises, and NULL→{} would change readers.
+
+Scan-list cell before this 296-02 touch (moved verbatim): | [`backend/app/db/workflows.py`](docs/HOT-FILE-LEDGER.md#backendappdbworkflowspy) | 62 / 31 / 2857 (was `61 / 31 / 2845`) | ⚠ **FIRES** | 296-02 (SEED-362): find_resumable_runs selects wr.model + wr.metadata; create_workflow_run keyword-only provider merges metadata.provider in the same INSERT (None = byte-identical SQL) |
+
+CLAUDE.md FIRING cell before this 296-02 touch (moved verbatim): | `backend/app/db/workflows.py` | 62 / 31 / 2857 (was `61 / 31 / 2845`) | 296-02: resume selects model+metadata; create_workflow_run provider kwarg |
+
 ### `frontend/src/lib/api.ts` — Phase 206, ESCALATED DECISION (Operator Override)
 
 **Measured 2026-08-25: `172 commits / 98 phases / 6200+ L`** — **G-5 FIRES** (Operator Decision: Escalate & Defer).
@@ -11384,6 +11400,28 @@ of something larger.
 
 ---
 
+## `backend/app/services/harness/human_input.py`
+
+### `backend/app/services/harness/human_input.py` — 296-02 (BUG-261025-03, comment only, 2026-10-26)
+
+**`7 / 4 / 376`.** 296-02 (BUG-261025-03): COMMENT ONLY, outside the plan's files_modified (recorded as a deviation). The block above the resume-flag consume said *the boot sweep does not set it*; from 296-02 the sweep sets it for an answered human step, so the sentence is struck through and corrected in place. No code changed.
+
+Scan-list cell before this 296-02 touch (moved verbatim): | [`backend/app/services/harness/human_input.py`](docs/HOT-FILE-LEDGER.md#backendappservicesharnesshuman_inputpy) | 6 / 3 / 375 (was `5 / 3 / 355`) | ⚠ **FIRES** | 295-09 CR-01: ONE guard (+1 def `_answers_this_step`, If 15→17): a re-drive consumes only an answer to THIS step's question, never an engine ask's or another step's. Honoured by construction |
+
+CLAUDE.md FIRING cell before this 296-02 touch (moved verbatim): | `backend/app/services/harness/human_input.py` | 6 / 3 / 375 (was `5 / 3 / 355`) | 295-09 CR-01: consumes only its own question's answer · ⛔ |
+
+## `backend/app/api/schedules.py`
+
+### `backend/app/api/schedules.py` — 296-02 (295-IN-05, 2026-10-26)
+
+**`4 / 4 / 299`.** Absent from BOTH the scan list and this table for its ENTIRE LIFE at 4 phases (204, 210, 258, 296) — row added by 296-02 under D-26. 296-02 (295-IN-05, UI-SPEC C): the trigger route gains `except ScheduledLaunchRefused` BEFORE the generic arm (`str(exc)` is already the author-facing sentence, verbatim on the wire, `outcome="refused"`); the generic arm logs the exception and returns the fixed sentence `It didn't start because of a problem on our side. Nothing ran — try again in a moment.` (`outcome="error"`); the no-run arm returns `It didn't start: the workflow could not be loaded (it was deleted, or is no longer yours).` (`outcome="not_loaded"`); success sets `outcome="launched"`. Sentences are module constants. The raw exception never reaches the wire (T-296-17). The backoff half of 295-IN-05 is a seed (296-05), not built. The public OpenAPI snapshot + filtered spec were regenerated for the additive `outcome` field (test_276 freshness pin).
+
+## `backend/app/models/schedule.py`
+
+### `backend/app/models/schedule.py` — 296-02 (295-IN-05, 2026-10-26)
+
+**`3 / 3 / 231`.** Absent from BOTH for its ENTIRE LIFE at 3 phases (204, 210, 296) — row added by 296-02 (D-26). Touched OUTSIDE the plan's files_modified because `ScheduleTriggerResult` lives here, not in `api/schedules.py` (recorded as a deviation). 296-02 (295-IN-05): ONE additive field, `outcome: Literal["launched", "refused", "not_loaded", "error"] | None = None` (None on an older backend; 296-04's panel already reads it), plus `Literal` in the typing import. No validator, no other model touched.
+
 ## Scan list — THE AUTHORITATIVE ROW SET
 
 > **Moved here from `CLAUDE.md` on 2026-09-06.** That file now carries the G-5 rule, the re-derive
@@ -11399,9 +11437,9 @@ cells rot within days.
 |---|---|---|---|
 | [`backend/app/api/panel.py`](docs/HOT-FILE-LEDGER.md#backendappapipanelpy) | 6 / 5 / 285 | ⚠ **FIRES** | 295-03: ONE additive `engine_pause` key on /pending beside `draft`. Honoured by construction. 295-07: triple re-derived, unchanged since 295-03 |
 | [`backend/app/utils/folder_utils.py`](docs/HOT-FILE-LEDGER.md#backendapputilsfolder_utilspy) | 9 / 5 / 302 | ⚠ **FIRES** | ⚠ absent its ENTIRE LIFE — row added 295-10. D-r1-04: a non-empty org restriction narrows OWNED folders too; `None` and `set()` unchanged · ⛔ |
-| [`backend/app/services/harness/human_input.py`](docs/HOT-FILE-LEDGER.md#backendappservicesharnesshuman_inputpy) | 6 / 3 / 375 (was `5 / 3 / 355`) | ⚠ **FIRES** | 295-09 CR-01: ONE guard (+1 def `_answers_this_step`, If 15→17): a re-drive consumes only an answer to THIS step's question, never an engine ask's or another step's. Honoured by construction |
+| [`backend/app/services/harness/human_input.py`](docs/HOT-FILE-LEDGER.md#backendappservicesharnesshuman_inputpy) | 7 / 4 / 376 (was `6 / 3 / 375`) | ⚠ **FIRES** | 295-09 CR-01: ONE guard (+1 def `_answers_this_step`, If 15→17): a re-drive consumes only an answer to THIS step's question, never an engine ask's or another step's. Honoured by construction |
 | [`backend/app/services/harness/engine_ask.py`](docs/HOT-FILE-LEDGER.md#backendappservicesharnessengine_askpy) | 9 / 1 / 1361 (was `8 / 1 / 1358`) | no (young) | young. 295-09: WR-01 outage, WR-02 searched set, WR-06 org-narrowed folders, WR-07 marks its own pause write (If 79→79). ⛔ one allow-list shared with the route's 422 |
-| [`backend/app/services/harness/run_handoff.py`](docs/HOT-FILE-LEDGER.md#backendappservicesharnessrun_handoffpy) | 8 / 1 / 431 (was `7 / 1 / 401`) | no (young) | young. 295-09: WR-01 sub-agent helpers, WR-03 surface-after-silence, WR-07 `mark_pause_written` / `take_pause_written` (+2 defs, If 22→23). ⛔ no app import; one guarded terminal write |
+| [`backend/app/services/harness/run_handoff.py`](docs/HOT-FILE-LEDGER.md#backendappservicesharnessrun_handoffpy) | 9 / 2 / 444 (was `8 / 1 / 431`) | no (young) | young. 296-02 (295-IN-01): fail_unloadable_definition's winner expires the run's pending prompt (thread/org read by run id), as the reconciler does. A loser expires nothing |
 | [`backend/app/services/harness/run_read_wire.py`](docs/HOT-FILE-LEDGER.md#backendappservicesharnessrun_read_wirepy) | 2 / 2 / 183 (was `1 / 1 / 150`) | no (young) | young (295-05). Pure leaf: unsourced_for_wire, end_reason_for_wire, resolve_end_reason, deadline_passed. ⛔ no app imports; a stored user id is REPLACED by words · 293 touch: see §Phase 293 close |
 | [`frontend/src/components/panel/AskFolderChoice.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentspanelaskfolderchoicetsx) | 1 / 1 / 70 | no (young) | young (295-06). Leaf on the shadcn Select: rows only from `engine_pause.folders`, visible label `Folder to search`. ⛔ no API import, no folder picker |
 | [`frontend/src/components/panel/enginePause.ts`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentspanelenginepausets) | 1 / 1 / 102 | no (young) | young (295-06). Pure helper: readEnginePause, needsFolder, answeredHeader, answeredReceipt + the three choice labels. ⛔ no React, no API import |
@@ -11522,15 +11560,15 @@ cells rot within days.
 | [`frontend/src/hooks/useThreads.ts`](docs/HOT-FILE-LEDGER.md#frontendsrchooksusethreadsts) | 5 / 3 / 65 (was `4 / 2 / 64`) | ⚠ **NOW FIRES — 3 phases** | ⚠ row STALE (`4/2/64`), now FIRES. **267-04**: `newThread` takes an optional Expert id, so an invite on a brand-new chat reaches the row (D-267-21; live G4-1). ⛔ `selectThread` stays a bare setState |
 | [`backend/app/services/harness/grounding.py`](docs/HOT-FILE-LEDGER.md#backendappservicesharnessgroundingpy) | 23 / 10 / 1437 (was `22 / 9 / 1417`) | ⚠ **FIRES** | 295-03: ONE pure predicate `is_engine_citation_gate` (+1 def, If 24→24); `on_failure="fail_run"` kept (D-51). Honoured by construction |
 | [`frontend/src/components/workflows/PhaseFormPanel.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentsworkflowsphaseformpaneltsx) | 30 / 14 / 1566 | **FIRES** | honoured by construction ×6 (185 / 193 / 193.1 / 199 / 200 / **214**) |
-| [`backend/app/db/workflows.py`](docs/HOT-FILE-LEDGER.md#backendappdbworkflowspy) | 61 / 31 / 2845 (was `59 / 30 / 2827`) | ⚠ **FIRES** | 296-01: create_workflow_definition keyword-only `org_id` (None = the pre-296 INSERT text, byte-identical) |
+| [`backend/app/db/workflows.py`](docs/HOT-FILE-LEDGER.md#backendappdbworkflowspy) | 63 / 31 / 2862 (was `59 / 30 / 2827`) | ⚠ **FIRES** | 296-01: create_workflow_definition keyword-only `org_id`; 296-02: resumable runs select model+metadata, create_workflow_run `provider` kwarg, cancel strips `_awaiting_answer` |
 | [`backend/app/services/harness/publish_service.py`](docs/HOT-FILE-LEDGER.md#backendappservicesharnesspublish_servicepy) | 35 / 16 / 2057 (was `34 / 15 / 2010`) | ⚠ **FIRES** | 296-03: golden inputs typed via one pure helper (`golden_run_inputs`) + `stand_in_note` in auto_answered; 288-WR-02 seconds vs minutes. Honoured by construction |
 | [`backend/app/services/workflow_authoring.py`](docs/HOT-FILE-LEDGER.md#backendappservicesworkflow_authoringpy) | 23 / 13 / 1269 (was `18 / 12 / 1120`) | **FIRES** | 296-03: unticked-named services told (resolver + block), provider_error refused with no strict retry, requirement = describe when files attached. Extraction OWED |
 | [`backend/app/models/harness.py`](docs/HOT-FILE-LEDGER.md#backendappmodelsharnesspy) | 22 / 20 / 776 (was `20 / 19 / 766`) | **FIRES** | 291-02: `InputFieldSpec.origin` + `.note`, omitted from the dump when absent so a no-file draft is byte-identical (+11 −1). Honoured by construction (193.2 / 214 / 291) |
 | [`frontend/src/components/workflows/builderStore.ts`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentsworkflowsbuilderstorets) | 16 / 9 / 1039 (was `14 / 8 / 968`) | **FIRES** | 291: two actions (`addReferenceAssets` 291-04, `setInputSource` 291-05) and NO state field; the ≤ 1 store field forecast held. Honoured by construction (193.2 / 197 / 214.1 / 291) |
 | [`frontend/src/components/panel/WorkspacePanel.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentspanelworkspacepaneltsx) | 17 / 11 / 646 (was `16 / 10 / 646`) | **FIRES** | honoured by construction (194 / 194.1 / **282-02**: ONE `home="panel"` prop on the existing `PendingAskStack` mount; the `pendingAsks.length > 0 &&` condition byte-identical) |
-| [`backend/app/services/run_lifecycle.py`](docs/HOT-FILE-LEDGER.md#backendappservicesrun_lifecyclepy) | 10 / 6 / 776 (was `9 / 5 / 756`) | ⚠ **FIRES** | 295-04: `cancel_workflow_run_internals(..., stopped_by=...)` calls `record_stop` before its own finish_run (If 11→11). Honoured by construction |
-| [`backend/app/api/runs.py`](docs/HOT-FILE-LEDGER.md#backendappapirunspy) | 52 / 22 / 2003 (was `51 / 22 / 1981`) | ⚠ **FIRES** | 292.1 UAT: Deep continue returns stream_since (XREVRANGE tail) · ⛔ |
-| [`backend/app/services/harness_engine.py`](docs/HOT-FILE-LEDGER.md#backendappservicesharness_enginepy) | 68 / 26 / 2961 (was `67 / 26 / 2957`) | ⚠ **FIRES** | 295-09 WR-07: the pause arm skips its `pause_run` when the engine ask already wrote it (ONE guarded line, If 86→87), so a re-driven run is never flipped back. Armed-block seam still OWED |
+| [`backend/app/services/run_lifecycle.py`](docs/HOT-FILE-LEDGER.md#backendappservicesrun_lifecyclepy) | 11 / 7 / 827 (was `10 / 6 / 776`) | ⚠ **FIRES** | 296-02 (295-RES-b): broadcast_run_cancellation gains stopped_by (sibling run_cancelled_by key, same TTL) + cancelled_by reader; Step 3a broadcasts the stopper BEFORE task.cancel() |
+| [`backend/app/api/runs.py`](docs/HOT-FILE-LEDGER.md#backendappapirunspy) | 53 / 23 / 2033 (was `52 / 22 / 2003`) | ⚠ **FIRES** | 296-02: four small touches — worded REDRIVE_FAILED_REASON (295-IN-07), True only when spawned (289-IN-05), one held lease retry (289-WR-06b), wr.model/metadata select (SEED-362). DEBT-3 no change |
+| [`backend/app/services/harness_engine.py`](docs/HOT-FILE-LEDGER.md#backendappservicesharness_enginepy) | 69 / 27 / 2992 (was `68 / 26 / 2961`) | ⚠ **FIRES** | 296-02: the FOUR audited one-touches — boot-sweep human-input arm by the definition (BUG-261025-03), RES-a guard, owner buckets (289-F3), run model on resume (SEED-362). Armed seam still OWED |
 | [`frontend/src/components/chat/RunCard.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentschatruncardtsx) | 31 / 16 / 729 (was `28 / 14 / 710`) | **FIRES** | ⭐ G-5 DISCHARGED (243-02). **276-06**: avatar pulse + header spinner removed (D-27: one live avatar); provider logo static. ⛔ Bot stays the unknown-provider fallback |
 | [`frontend/src/components/chat/WorkingBadge.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentschatworkingbadgetsx) | 3 / 2 / 50 (was `2 / 1 / 56`) | no (2 phases) | ⚠ absent its ENTIRE LIFE; row added at 276-06 planning. 276-06: the ✦ glyph and its pulse gone (the Iris avatar is the motion); the word stays. ⛔ memo equality unchanged |
 | [`frontend/src/components/chat/irisState.ts`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentschatirisstatets) | 1 / 1 / 44 (was `0 / 0 / 0`) | no (new) | young (created 276-06). Row added AT PLANNING. ⛔ the ONE home of the avatar precedence (error > cancelled > waiting > tool > thinking > streaming > idle); pure, no store reads |
@@ -11556,7 +11594,7 @@ cells rot within days.
 | [`frontend/src/components/panel/FilesSection.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentspanelfilessectiontsx) | 12 / 8 / 354 (was `10 / 6 / 363`) | ⚠ **FIRES** | ⚠ STALE (`10/6/363`). **274-04**: 1 import, 1 trailing-slot line, 1 Shift+F10 arm, 2 signatures widened to `string \| null`; agent rows byte-identical |
 | [`frontend/src/lib/api.ts`](docs/HOT-FILE-LEDGER.md#frontendsrclibapits) | 211 / 126 / 546 (was `210 / 125 / 530`) | ⚠ **FIRES** | 291-04: barrel re-exports for the describe read / reference clients and their wire types (+16). 284-05's deleted whole-list re-exports stay deleted |
 | [`frontend/src/types/index.ts`](docs/HOT-FILE-LEDGER.md#frontendsrctypesindexts) | 102 / 81 / 1685 (was `101 / 80 / 1674`) | ⚠ **FIRES** | 295-05: THREE fields, not the planned two (`Phase.unsourced`, `PendingAsk.engine_pause` + `EnginePause`, `AskUserAnswerBody.folder_id`). Additive. Seam OWED · 293 touch: see §Phase 293 close |
-| [`backend/app/main.py`](docs/HOT-FILE-LEDGER.md#backendappmainpy) | 94 / 68 / 982 (was `92 / 67 / 979`) | ⚠ **FIRES** | 294-03: ONE include_router (citation_checks) + one import token (+2 −1). Honoured by construction · 293 touch: see §Phase 293 close |
+| [`backend/app/main.py`](docs/HOT-FILE-LEDGER.md#backendappmainpy) | 95 / 69 / 991 (was `94 / 68 / 982`) | ⚠ **FIRES** | 296-02 (SEED-363): one module flag, RUN_BOOT_SWEEPS, gates the three run-claiming sweeps (boot resume, boot + periodic reconciler); tests/conftest.py sets it False. No env var. 289-IN-08 import space |
 | [`backend/app/config.py`](docs/HOT-FILE-LEDGER.md#backendappconfigpy) | 93 / 54 / 1809 (was `92 / 54 / 1790`) | ⚠ **FIRES** | **282-01** ceiling 1800 + boot check + DB-tier clamp; **282-04** `DEFAULT_LLM_CALL_TIMEOUT_SECONDS_SELF_HOSTED` 900 via the mig 180 predicate. No env var. honoured by construction |
 | [`backend/app/api/admin.py`](docs/HOT-FILE-LEDGER.md#backendappapiadminpy) | 44 / 17 / 2054 (was `43 / 17 / 2051`) | ⚠ **FIRES** | honoured by construction (quick-261024): the discover providers summary gains `returned` = len(ids), so a mostly-known provider no longer reads as "found little". ⛔ add still lands disabled |
 | [`backend/app/api/settings.py`](docs/HOT-FILE-LEDGER.md#backendappapisettingspy) | 47 / 25 / 1301 (was `46 / 24 / 1250`) | ⚠ **FIRES** | 292.1-02: two bounded writes (2..50) via _range_refusal_detail + allow-list +2 (+51 −0). ⛔ never a retyped id list; GET never echoes a key · 293 touch: see §Phase 293 close |
@@ -11569,7 +11607,7 @@ cells rot within days.
 | [`frontend/src/components/panel/PhaseCard.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentspanelphasecardtsx) | 21 / 14 / 817 (was `20 / 13 / 811`) | ⚠ **FIRES** | 296-04: ONE optional prop (`runPaused`) passed to `statusMetaForRun` (useState 1→1, useEffect 1→1). Honoured by construction |
 | [`frontend/src/components/panel/PhaseTimeline.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentspanelphasetimelinetsx) | 11 / 9 / 408 (was `10 / 8 / 404`) | ⚠ **FIRES** | 296-04: one derived const (`runPaused`, from the fetched frame) and one prop to each card. Honoured by construction |
 | [`frontend/src/components/panel/phaseStatusMeta.ts`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentspanelphasestatusmetats) | 5 / 5 / 308 (was `4 / 4 / 291`) | ⚠ **FIRES** | 296-04: one derived `WAITING_META` row (`!` · Waiting · warning) and one optional `runPaused` arg on `statusMetaForRun`; not a wire status |
-| [`backend/app/services/harness/validator_kinds.py`](docs/HOT-FILE-LEDGER.md#backendappservicesharnessvalidator_kindspy) | 18 / 8 / 899 (was `17 / 8 / 853`) | ⚠ **FIRES** | 295-09: WR-01 outage `if`; WR-05 the judge note moved to the system prompt (`judge_system_prompt`), graded data fenced by a data-keyed line (+4 defs, If 57→57). Rubric byte-unchanged |
+| [`backend/app/services/harness/validator_kinds.py`](docs/HOT-FILE-LEDGER.md#backendappservicesharnessvalidator_kindspy) | 19 / 9 / 918 (was `18 / 8 / 899`) | ⚠ **FIRES** | 296-02 (295-IN-08 / D-07): judge_system_prompt gains by_design (one condition); the in-run judge passes recording_by_design(ctx) — golden run or live_connectors off; a missing grant gets no note |
 | [`frontend/src/components/admin/ModelRegistryTab.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentsadminmodelregistrytabtsx) | 19 / 7 / 1705 (was `17 / 7 / 1679`) | ⚠ **FIRES** | honoured by construction (**282-01** help line; **282-04** ONE Timeout field in `AddModelForm`, placeholder = provider default, blank sends no key). `AddModelForm` seam OWED |
 | [`frontend/src/components/workflows/soulData.ts`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentsworkflowssouldatats) | 14 / 12 / 554 (was `12 / 10 / 499`) | ⚠ **FIRES** | 291-05: `launchInputFields` skips `kb_auto`; enum labels carry `inputOptionsHint`; `DefShape.inputs` widened (source/type/enum_options). `LaunchInputFields.tsx` untouched |
 | [`frontend/src/components/workflows/PublishGauntlet.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentsworkflowspublishgauntlettsx) | 21 / 11 / 1385 (was `20 / 10 / 1372`) | ⚠ **FIRES** | 288-02: ONE `auto-answered` block, server words verbatim; Pause stage copy corrected. honoured by construction |
@@ -11703,7 +11741,7 @@ cells rot within days.
 | [`backend/app/api/knowledge_health.py`](docs/HOT-FILE-LEDGER.md#backendappapiknowledgehealthpy) | 14 / 7 / 991 (was `11 / 6 / 737`) | ⚠ **FIRES** | ⚠ STALE (`11/6/737`). **272-04**: the trend skips `invalid_filter` / `refused_retry` rows (4 lines, D-24); kind 2 still counts |
 | [`backend/app/services/agent_loop.py`](docs/HOT-FILE-LEDGER.md#backendappservicesagent_looppy) | 78 / 35 / 3776 (was `76 / 35 / 3766`) | ⚠ **FIRES** | 292.1 option A: `_cap_unanswered` joins the cap condition; fallback skipped (+10, 0 new if) · ⛔ |
 | [`backend/app/services/context_window.py`](docs/HOT-FILE-LEDGER.md#backendappservicescontext_windowpy) | 10 / 5 / 602 | ⚠ **FIRES** | ⚠ absent for its ENTIRE LIFE at 5 phases — row added 250-01. honoured by construction: ONE removal-ORDER rule inside one private helper. ⛔ `_build_candidate` byte-unchanged |
-| [`backend/app/services/run_producer.py`](docs/HOT-FILE-LEDGER.md#backendappservicesrun_producerpy) | 25 / 13 / 1212 (was `24 / 12 / 1150`) | ⚠ **FIRES** | 292.1-03: spawn_continuation_run(model, provider) resumes on the run's own pair, byte-identical when None; one-WARNING fallback in _resolve_continuation_model. Honoured by construction |
+| [`backend/app/services/run_producer.py`](docs/HOT-FILE-LEDGER.md#backendappservicesrun_producerpy) | 26 / 14 / 1220 (was `25 / 13 / 1212`) | ⚠ **FIRES** | 292.1-03: spawn_continuation_run(model, provider) resumes on the run's own pair, byte-identical when None; one-WARNING fallback in _resolve_continuation_model. Honoured by construction |
 | [`backend/app/services/todos_service.py`](docs/HOT-FILE-LEDGER.md#backendappservicestodos_servicepy) | 4 / 3 / 187 | ⚠ **FIRES** | ⚠ absent for its ENTIRE LIFE at 3 phases — row added 250-02, which leaves the file BYTE-UNCHANGED. ⛔ `_RUN_ENDED_MARKER` is now bound by a frontend `?raw` fence |
 | [`frontend/src/components/panel/TodosSection.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentspaneltodossectiontsx) | 11 / 6 / 337 | ⚠ **FIRES** | ⚠ row STALE (`6/4/210`) — 250 and 252 touched it, +127 L. NOT modified by 253; re-derived under CR-08. Absent for its entire life until 250-03 |
 | [`frontend/src/components/panel/todoRunHonesty.ts`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentspaneltodorunhonestyts) | 1 / 1 / 104 | new | young (created 250-03). Row added AT CREATION. ⛔ the ONE home of *is this row still honest?*; its marker copy is `?raw`-fenced to `todos_service.py` or the strip silently no-ops |
@@ -11796,7 +11834,7 @@ cells rot within days.
 | [`.claude/settings.json`](docs/HOT-FILE-LEDGER.md#claudesettingsjson) | 9 / 4 / 202 | ⚠ **FIRES** | ⚠ **absent from BOTH registers its ENTIRE LIFE at 4 phases — rows added 253-03.** `.claude/` is EXEMPT: no gate could ask. The ONE hook dispatch table; a too-narrow `matcher` fires NEVER, in silence |
 | [`backend/app/services/circuit_breaker.py`](docs/HOT-FILE-LEDGER.md#backendappservicescircuit_breakerpy) | 1 / 1 / 331 | no (1 phase) | ⚠ absent its ENTIRE LIFE — row added 256-02 at 256-01's touch, BELOW threshold. ⛔ the `max(0,…)` clamp stays on the RETURNED delta, or a reset box hands the DB a negative and SUBTRACTS real spend |
 | [`backend/app/services/task_service.py`](docs/HOT-FILE-LEDGER.md#backendappservicestask_servicepy) | 28 / 15 / 1038 (was `27 / 14 / 1023`) | **FIRES** | **292.1-REVIEW WR-02**: `_stream_one_iteration` runs the provider-blind `strip_markup` after the structured post-parse; never parses or runs text calls. +15 L |
-| [`backend/app/services/run_reconciler.py`](docs/HOT-FILE-LEDGER.md#backendappservicesrun_reconcilerpy) | 5 / 3 / 406 (was `3 / 2 / 325`) | ⚠ **FIRES** | 295-04: ONE sweep `_reconcile_workflow_runs` (D-21, the `_reconcile_chat_runs` idiom). ⚠ now FIRES at 3 phases. Live: ended a planted stuck run in 23 s (295-07) |
+| [`backend/app/services/run_reconciler.py`](docs/HOT-FILE-LEDGER.md#backendappservicesrun_reconcilerpy) | 6 / 4 / 415 (was `5 / 3 / 406`) | ⚠ **FIRES** | 296-02 (295-IN-02): the ended-steps query gains ONE boolean (all_completed: every step completed/recorded_not_sent) and the run then ends completed; cancelled/failed otherwise as before |
 | [`backend/app/services/forced_emit.py`](docs/HOT-FILE-LEDGER.md#backendappservicesforced_emitpy) | 13 / 8 / 724 (was `12 / 8 / 724`) | ⚠ **FIRES** | honoured by construction (**282-01** budget per rung; **282-04** `provider=provider` on the one lookup). ⛔ accumulators init `None` never `0` |
 | [`backend/app/services/pricing_service.py`](docs/HOT-FILE-LEDGER.md#backendappservicespricing_servicepy) | 4 / 2 / 156 (was `2 / 1 / 103`) | no (2 phases) | 294-01: + compute_token_cost_usd_unquantized (a ~$0.00002 engine call quantised to 0.0000). ⛔ the single token × rate home (test_257) |
 | [`backend/app/db/rates.py`](docs/HOT-FILE-LEDGER.md#backendappdbratespy) | 9 / 2 / 898 (was `2 / 1 / 507`) | no (2 phases) | **268-02**: ONE `per_root` CTE feeds every spend query; root-only predicate appears ONCE. ⛔ never register a rate for model `unknown` (shell USD would double-count) |
@@ -12056,7 +12094,9 @@ cells rot within days.
 | [`backend/app/models/api_key.py`](docs/HOT-FILE-LEDGER.md#backendappmodelsapi_keypy) | 1 / 1 / 113 (was `0 / 0 / 0`) | no (young) | young (planned 293-01). Pydantic wire for keys, activity, limits. ⛔ no field carries the secret except the create response |
 | [`backend/app/services/inbound_inputs.py`](docs/HOT-FILE-LEDGER.md#backendappservicesinbound_inputspy) | 6 / 1 / 258 (was `5 / 1 / 237`) | no (young) | young (planned 293-01, fence 293-02). Launch-field twin + validation + TRUST-03 wrap and its reader (293-REVIEW WR-03). ⛔ pure; strips _-keys |
 | [`backend/app/api/api_keys.py`](docs/HOT-FILE-LEDGER.md#backendappapiapi_keyspy) | 2 / 1 / 392 (was `1 / 1 / 391`) | no (young) | young (planned 293-01). /api-keys (own) + /org/api-keys (admin). ⛔ 404 for miss AND foreign; secret only in the 201 body |
-| [`backend/app/services/unattended_launch.py`](docs/HOT-FILE-LEDGER.md#backendappservicesunattended_launchpy) | 5 / 1 / 354 (was `3 / 1 / 324`) | no (young) | young (planned 293-02). Shared unattended core + the kill-switch gate (293-REVIEW CR-01). ⛔ owner identity, explicit org_id, caps armed first |
+| [`backend/app/services/unattended_launch.py`](docs/HOT-FILE-LEDGER.md#backendappservicesunattended_launchpy) | 6 / 2 / 361 (was `5 / 1 / 354`) | no (young) | young. 296-02 (293-IN-04): the _drive_run task is held in a module _BACKGROUND_TASKS set with add_done_callback(discard) (P9) until done |
+| [`backend/app/api/schedules.py`](docs/HOT-FILE-LEDGER.md#backendappapischedulespy) | 4 / 4 / 299 | ⚠ **FIRES** | ⚠ absent its ENTIRE LIFE — row added 296-02 (D-26). 296-02 (295-IN-05): Run now answers with `outcome` + a worded `detail`; ScheduledLaunchRefused caught first; raw exception logged only |
+| [`backend/app/models/schedule.py`](docs/HOT-FILE-LEDGER.md#backendappmodelsschedulepy) | 3 / 3 / 231 | ⚠ **FIRES** | ⚠ absent its ENTIRE LIFE — row added 296-02 (D-26). 296-02 (295-IN-05): ScheduleTriggerResult gains one additive `outcome` Literal (launched/refused/not_loaded/error) |
 | [`backend/app/services/harness/run_read_words.py`](docs/HOT-FILE-LEDGER.md#backendappservicesharnessrun_read_wordspy) | 1 / 1 / 99 (was `0 / 0 / 0`) | no (young) | young (planned 293-02). MOVED waiting_who / unsourced_who / compose_waiting_on (workflow_runs seam). ⛔ pure leaf; re-exported |
 | [`backend/app/api/inbound.py`](docs/HOT-FILE-LEDGER.md#backendappapiinboundpy) | 7 / 1 / 672 (was `3 / 1 / 577`) | no (young) | young (planned 293-02). /inbound start + status + file link (293-REVIEW fixes). ⛔ key dependency only; byte-identical 404; D-12 origin_ref predicate |
 | [`frontend/src/lib/api/apiKeys.ts`](docs/HOT-FILE-LEDGER.md#frontendsrclibapiapikeysts) | 1 / 1 / 174 (was `0 / 0 / 0`) | no (young) | young (planned 293-04). Client for /api-keys + /org/api-keys; owns its types. ⛔ not re-exported from the lib/api barrel |
@@ -16745,6 +16785,14 @@ Scan-list cell as of 2026-10-21 (replaced by 295-07, moved verbatim): 3 / 2 / 32
 
 CLAUDE.md verdict cell as of 2026-10-21 (replaced by 295-07, moved verbatim): | `backend/app/services/run_reconciler.py` | 3 / 2 / 325 | ⚠ absent its ENTIRE LIFE — row added 256-02 (SEED-297) · ⛔ |
 
+### `backend/app/services/run_reconciler.py` — 296-02 (295-IN-02, 2026-10-26)
+
+**`6 / 4 / 415`.** 296-02 (295-IN-02): `_reconcile_workflow_runs`' ended-steps query gains ONE column, `all_completed` (NOT EXISTS a step outside `completed` / `recorded_not_sent`), and the status choice gains one condition: all completed → `completed` (no `run_failed`), else the shipped cancelled/failed rule. Read with `row.get`, so an older fake row with no key keeps the D-21 answer.
+
+Scan-list cell before this 296-02 touch (moved verbatim): | [`backend/app/services/run_reconciler.py`](docs/HOT-FILE-LEDGER.md#backendappservicesrun_reconcilerpy) | 5 / 3 / 406 (was `3 / 2 / 325`) | ⚠ **FIRES** | 295-04: ONE sweep `_reconcile_workflow_runs` (D-21, the `_reconcile_chat_runs` idiom). ⚠ now FIRES at 3 phases. Live: ended a planted stuck run in 23 s (295-07) |
+
+CLAUDE.md FIRING cell before this 296-02 touch (moved verbatim): | `backend/app/services/run_reconciler.py` | 5 / 3 / 406 (was `3 / 2 / 325`) | 295-04: ONE workflow-run sweep · live-proven 295-07 · ⚠ now FIRES |
+
 ## `backend/app/services/forced_emit.py` — row added 2026-09-19 (Phase 256, plan `256-04`)
 
 **Re-derived 2026-09-19 at the plan's own edit, with CLAUDE.md's recipe rather than by copying a
@@ -18684,6 +18732,14 @@ Re-derived at `268-04` (after waves 1-2 merged) with the CLAUDE.md recipe (6-dig
 ### `backend/app/services/run_lifecycle.py` — Phase 268
 
 **`9 / 5 / 756`** (was `8 / 4 / 748`). `register_run_start` gained `org_id` / `expert_id` keyword arguments forwarded to `insert_run`; nothing else moved except the `finish_run` call line (521 → 529), which the 256 fence re-pinned beside its old value.
+
+### `backend/app/services/run_lifecycle.py` — 296-02 (295-RES-b, 2026-10-26)
+
+**`11 / 7 / 827`.** 296-02 (295-RES-b): `broadcast_run_cancellation(..., *, stopped_by=None)` writes a sibling level key `run_cancelled_by:{id}` (same 24h TTL, its own try, BEFORE the flag) and `cancelled_by(redis, id)` reads it (never raises). `_cancel_run_internals` Step 3a (a LIVE producer in `RUN_TASKS`), only when `stopped_by` is given, calls the new `_broadcast_stopper` — reads the thread anchor (the Step 3b read, null-guarded) and broadcasts the workflow run's cancel WITH the stopper — before `task.cancel()`, so the producer's escape can name the person. The circuit breaker passes nothing and names nobody. A Deep run has no anchor and is untouched. The literal `stopped_by=stopped_by` count stays 1 (the 295 pin).
+
+Scan-list cell before this 296-02 touch (moved verbatim): | [`backend/app/services/run_lifecycle.py`](docs/HOT-FILE-LEDGER.md#backendappservicesrun_lifecyclepy) | 10 / 6 / 776 (was `9 / 5 / 756`) | ⚠ **FIRES** | 295-04: `cancel_workflow_run_internals(..., stopped_by=...)` calls `record_stop` before its own finish_run (If 11→11). Honoured by construction |
+
+CLAUDE.md FIRING cell before this 296-02 touch (moved verbatim): | `backend/app/services/run_lifecycle.py` | 10 / 6 / 776 (was `9 / 5 / 756`) | 295-04: stopped_by → record_stop (If 11→11) |
 
 ### `backend/app/services/run_producer.py` — Phase 268
 
@@ -21040,6 +21096,14 @@ Scan-list cell as of 2026-10-20 (replaced by 294-05, moved verbatim): 91 / 66 / 
 
 CLAUDE.md FIRING cell as of 2026-10-20 (replaced by 294-05, moved verbatim): 91 / 66 / 978 (was `90 / 65 / 977`) | 289-03: ONE include_router (+2 −1) · ⛔
 
+### `backend/app/main.py` — 296-02 (SEED-363 / 289-IN-08, 2026-10-26)
+
+**`95 / 69 / 991`.** 296-02 (SEED-363 / 289-IN-08): one module constant `RUN_BOOT_SWEEPS = True` (no env var, no setting — a new env var owes the deploy artifacts) and `and RUN_BOOT_SWEEPS` on the three sweep conditions that claim runs: the boot resume sweep, the boot orphan reconciler and the periodic reconciler (the plan named two; the periodic one calls the same `reconcile_orphaned_runs` at t=0, so leaving it open would keep SEED-363's measured 295-04 failure). `tests/conftest.py` sets it False in a new `pytest_configure`. Plus 289-IN-08: the missing space after `workflow_run_evidence,` in the router import line. No route, no middleware, no other lifespan change.
+
+Scan-list cell before 296-02 (moved verbatim): | [`backend/app/main.py`](docs/HOT-FILE-LEDGER.md#backendappmainpy) | 94 / 68 / 982 (was `92 / 67 / 979`) | ⚠ **FIRES** | 294-03: ONE include_router (citation_checks) + one import token (+2 −1). Honoured by construction · 293 touch: see §Phase 293 close |
+
+CLAUDE.md FIRING cell before 296-02 (moved verbatim): | `backend/app/main.py` | 94 / 68 / 982 (was `92 / 67 / 979`) | 293: two include_router lines (api_keys, inbound) · ⛔ |
+
 ### `backend/app/utils/db.py` — Phase 280 close
 
 **`4 / 2 / 76` (was `2 / 2 / 59`).** **280-01** (`51a9e7962`, `6ef890118`): `maybe_row(resp)` added; the docstring now describes `aexec` alone. `test_280_maybe_row_fence.py` scans every `maybe_single()` in `backend/app` (100 sites, 0 unguarded). Phases are `058` and `280`: below threshold, so no CLAUDE.md FIRING row.
@@ -22701,6 +22765,14 @@ CLAUDE.md verdict cell as of 2026-10-18 (replaced by 286-05):
 
 > last touch 281-01 · OV-281-01 (5 new conditionals vs a cap of 4)
 
+### `backend/app/services/harness_engine.py` — 296-02 (BUG-261025-03 / 295-RES-a / 289-F3 / SEED-362, 2026-10-26)
+
+**`69 / 27 / 2992`.** 296-02, the FOUR audited one-statement touches (STATE.md → Guardrail overrides, recorded before any edit). (1) BUG-261025-03: the dead step-2 human-input branch (keyed on `active['config']` / `output.tool_call_id`, which the real `get_active_phase` row never selects) is deleted with its only helper `_active_tool_call_id`; ONE arm, 2c, sits after `_load_run_definition` and its None guard and classifies by the definition through `_active_spec` (extracted from `_is_armed_action_risk`, which now calls it — no second classifier). Latest prompt unanswered → `pause_run` + continue; answered → `ctx.resume_answered_tool_call_id` + `resume_run` before `_resume_run`. (2) 295-RES-a: the armed `action_risk_pending` audit + emit are skipped when `ctx.engine_ask_approved` holds this slug. ⚠ The plan named `resume_answered_tool_call_id`; measured, `consume_engine_answer` CLEARS that flag before the checkpoint runs, so that guard would never fire — the test drives the real consume. (3) 289-F3: `_finalize_run_grounding` gains `user_settings=None`, the run finaliser passes `ctx.user_settings`, `_compute_confidence(final_avg, user_settings)` (three lines, one value). (4) SEED-362: `_build_resume_context` reads `run['model']` and `metadata.provider` (a recorded provider is used as recorded; no provider → `resolve_sub_agent_model_safely`; no model → the owner default) and sets `ctx.provider`. Branch counts (If/IfExp/Except, AST): resume_stranded_workflows 13/2/3 → 12/2/3; _run_phase_with_gates 15/8/6 → 16/8/6; _build_resume_context 8/5/5 → 9/8/6; _finalize_run_grounding 3/2/0 → 3/2/0. The named armed-block seam is NOT taken; it stays OWED.
+
+Scan-list cell before this 296-02 touch (moved verbatim): | [`backend/app/services/harness_engine.py`](docs/HOT-FILE-LEDGER.md#backendappservicesharness_enginepy) | 68 / 26 / 2961 (was `67 / 26 / 2957`) | ⚠ **FIRES** | 295-09 WR-07: the pause arm skips its `pause_run` when the engine ask already wrote it (ONE guarded line, If 86→87), so a re-driven run is never flipped back. Armed-block seam still OWED |
+
+CLAUDE.md FIRING cell before this 296-02 touch (moved verbatim): | `backend/app/services/harness_engine.py` | 68 / 26 / 2961 (was `67 / 26 / 2957`) | 295-09 WR-07: one pause write per engine ask · armed seam OWED · ⛔ |
+
 ### `backend/app/services/harness/phase_types.py` — Phase 286 forecast (SC#1)
 
 **`56 / 28 / 3027` (was `55 / 28 / 3014`).** Not edited by Phase 286 (D-01: only the four roadmap candidates were cut). **Expected change in Phase 289, honoured by construction:** one optional output field on the KB-reading types; no new phase type (closed core stays 7). A change larger than that — a new branch, a new hook, a second concern — is the signal to propose this file's extraction FIRST, not to absorb it.
@@ -23530,6 +23602,14 @@ Scan-list cell as of 2026-10-21 (replaced by 295-09, moved verbatim): 17 / 8 / 8
 
 CLAUDE.md verdict cell as of 2026-10-21 (replaced by 295-09, moved verbatim): | `backend/app/services/harness/validator_kinds.py` | 17 / 8 / 853 (was `16 / 8 / 845`) | 295-09 WR-01: errored step = outage sentence (one if) |
 
+### `backend/app/services/harness/validator_kinds.py` — 296-02 (295-IN-08 / D-07, 2026-10-26)
+
+**`19 / 9 / 918`.** 296-02 (295-IN-08 / D-07): `recording_by_design(ctx)` reads the external-action executor's OWN by-design recording gates — a golden run (D-16) or `live_connectors` not fully on (D-26); a live run with the switch on recorded only because its send grant was missing. `judge_system_prompt(..., by_design=True)` gains ONE condition (the note loop runs only when `by_design`); the in-run `llm_judge_rubric` passes `by_design=recording_by_design(ctx)`; the publish judge (always a golden run) keeps the default. Byte-identical for every output without a design-noted key, and for a by-design recording. The fenced data block in the graded content is unchanged.
+
+Scan-list cell before this 296-02 touch (moved verbatim): | [`backend/app/services/harness/validator_kinds.py`](docs/HOT-FILE-LEDGER.md#backendappservicesharnessvalidator_kindspy) | 18 / 8 / 899 (was `17 / 8 / 853`) | ⚠ **FIRES** | 295-09: WR-01 outage `if`; WR-05 the judge note moved to the system prompt (`judge_system_prompt`), graded data fenced by a data-keyed line (+4 defs, If 57→57). Rubric byte-unchanged |
+
+CLAUDE.md FIRING cell before this 296-02 touch (moved verbatim): | `backend/app/services/harness/validator_kinds.py` | 18 / 8 / 899 (was `17 / 8 / 853`) | 295-09 WR-05: judge note in system prompt, data fenced |
+
 ## `backend/app/services/run_producer.py`
 
 ### `backend/app/services/run_producer.py` — Phase 295 (re-derived 2026-10-21 by 295-07)
@@ -23678,6 +23758,12 @@ Scan-list cell as of 2026-10-21 (replaced by 295-09, moved verbatim): 6 / 1 / 38
 **`8 / 1 / 431`** (the row read `7 / 1 / 401`). 295-REVIEW WR-07: `mark_pause_written(ctx)` (set by `engine_pause`) and `take_pause_written(ctx)` (single-use, read by the engine's pause arm), so an engine ask's pause is written exactly once. defs 19 → 21, If 22 → 23. Still no module-level `app` import.
 
 Scan-list cell as of 2026-10-21 (replaced by 295-09, moved verbatim): 7 / 1 / 401 (was `6 / 1 / 386`) | no (young) | young. 295-09: WR-01 sub-agent helpers (+2 defs); WR-03 the engine surfaces only after the executor was silenced (If 22→22). ⛔ no app import; one guarded terminal write |
+
+### `backend/app/services/harness/run_handoff.py` — 296-02 (295-IN-01, 2026-10-26)
+
+**`9 / 2 / 444`.** 296-02 (295-IN-01): `fail_unloadable_definition` keeps `end_run`'s bool and, only when it WON, reads `thread_id, org_id` by run id and calls `_expire_pending_ask_user` (lazy import, the reconciler's shape), so `/pending` stops serving a card for an ended run. Still never raises.
+
+Scan-list cell before this 296-02 touch (moved verbatim): | [`backend/app/services/harness/run_handoff.py`](docs/HOT-FILE-LEDGER.md#backendappservicesharnessrun_handoffpy) | 8 / 1 / 431 (was `7 / 1 / 401`) | no (young) | young. 295-09: WR-01 sub-agent helpers, WR-03 surface-after-silence, WR-07 `mark_pause_written` / `take_pause_written` (+2 defs, If 22→23). ⛔ no app import; one guarded terminal write |
 
 ## `backend/app/services/harness/run_read_wire.py`
 
@@ -24450,6 +24536,14 @@ Scan-list disposition cell before 292.1 (replaced): 295-04: F2 calls `record_fai
 
 CLAUDE.md FIRING cell before 292.1 (replaced): 295-04: F2 record_failed_end first (If 22→22)
 
+### `backend/app/services/run_producer.py` — 296-02 (295-RES-b, 2026-10-26)
+
+**`26 / 14 / 1220`.** 296-02 (295-RES-b): in `_finalize_producer_run`'s F2 block, a `cancelled` end reads `run_lifecycle.cancelled_by` for the workflow run and, when a person is named, calls `run_handoff.record_stop(..., policy='run_cancelled')` before `record_failed_end` / `finish_run` — so a Stop that reached a live producer renders "Stopped by {display name}.". `record_stop` writes only when it wins; `record_failed_end(` still appears once (the 295 pin).
+
+Scan-list cell before this 296-02 touch (moved verbatim): | [`backend/app/services/run_producer.py`](docs/HOT-FILE-LEDGER.md#backendappservicesrun_producerpy) | 25 / 13 / 1212 (was `24 / 12 / 1150`) | ⚠ **FIRES** | 292.1-03: spawn_continuation_run(model, provider) resumes on the run's own pair, byte-identical when None; one-WARNING fallback in _resolve_continuation_model. Honoured by construction |
+
+CLAUDE.md FIRING cell before this 296-02 touch (moved verbatim): | `backend/app/services/run_producer.py` | 25 / 13 / 1212 (was `24 / 12 / 1150`) | 292.1-03: continuation runs on the run's own model; one-warning fallback |
+
 ### `backend/app/db/runs.py` — Phase 292.1 close
 
 **`11 / 9 / 289`** at 292.1 close (was `9 / 8 / 266`). G-5: ⚠ **FIRES — 9 phases**. Honoured by construction (292.1-01): one comprehension filter so the empty-queue marker carrier (name None) never replays an older pause's calls. +4 −1, no new branch, both SQL strings byte-unchanged (`$N` placeholders only).
@@ -24618,6 +24712,14 @@ Scan-list disposition cell before the review fixes (replaced): 292.1-03: Step-1 
 
 CLAUDE.md FIRING cell before the review fixes (replaced): 292.1-03: select model/provider + carry; SEED-324 terminal 409 (+1 If)
 
+### `backend/app/api/runs.py` — 296-02 (295-IN-07 / 289-IN-05 / 289-WR-06b / SEED-362, 2026-10-26)
+
+**`53 / 23 / 2033`.** 296-02, the audited small touches (STATE.md → Guardrail overrides). (1) 295-IN-07: `REDRIVE_FAILED_REASON = "The run couldn't continue after the answer was given."` replaces the old `_REDRIVE_FAILED_REASON` sentence; `_fail_redrive`'s `run_failed` audit writes its `reason` argument (never `ask_user re-drive failed`), and the producer shell's error uses the constant. (2) 289-IN-05: the context-build failure arm returns False — True means a re-drive was SPAWNED. (3) 289-WR-06b: `_BACKGROUND_TASKS` + `_spawn` (run_transport's P9 shape) and `_redrive_after_lease`: a lost `claim_run` schedules ONE retry after `harness_resume_lease_seconds + 1`, which calls the re-drive with `_retry=False` (a second loss logs and stops; never a loop). (4) SEED-362: the re-drive's row SELECT adds `wr.model, wr.metadata`. (5) DEBT-3: NO change — `test_296_redrive_cap_paused.py` stayed GREEN (`engine_pause` writes `pause_run` first; nothing writes `workflow_runs.status='cap_paused'`). `run_is_cap_paused` is not used (it reads `runs`). Branch counts `_redrive_paused_workflow_run` (If/IfExp/Except): 5/1/4 → 6/1/4.
+
+Scan-list cell before this 296-02 touch (moved verbatim): | [`backend/app/api/runs.py`](docs/HOT-FILE-LEDGER.md#backendappapirunspy) | 52 / 22 / 2003 (was `51 / 22 / 1981`) | ⚠ **FIRES** | 292.1 UAT: Deep continue returns stream_since (XREVRANGE tail) · ⛔ |
+
+CLAUDE.md FIRING cell before this 296-02 touch (moved verbatim): | `backend/app/api/runs.py` | 52 / 22 / 2003 (was `51 / 22 / 1981`) | 292.1 UAT: Deep continue returns stream_since (XREVRANGE tail) · ⛔ |
+
 ### `backend/app/api/threads.py` — Phase 292.1 review-fix refresh
 
 **`276 / 93 / 2671`** (was `274 / 95 / 2643`, over-counted — see the correction above; on the recipe it was `274 / 93 / 2643`). G-5: ⚠ **FIRES**. Honoured by construction: CR-02 (`95779eba3`, +11 −5) — `_typed_continue_or_none` asks `run_is_cap_paused` on the same RLS connection, only for a latest run reading `cap_paused` or `completed`, and the latest-run read gains `parent_run_id IS NULL`; WR-04 (`5e1a2269d`, +31 −9) — the `continue_run` call is wrapped: any error logs one WARNING and falls back to a normal send, except 409 `CONTINUE_ALREADY_CLAIMED`, which reports `continued: true` (the button already resumed it). All inside the helper; `send_message` still has exactly ONE delegating `if` (test_279 / test_2921 if-count pin).
@@ -24780,6 +24882,12 @@ Twenty-eight rows added at planning: twenty-six files Phase 293 creates and two 
 ### `backend/app/services/unattended_launch.py`
 
 **`0 / 0 / 0`** at 293 planning (2026-10-25). Young; row added AT PLANNING (the 273 / 290 / 292.1 precedent), so `check-hot-file-ledger.cjs 293` binds before the file exists. MOVED core of launch_scheduled_run + _drive_run (scheduler seam). ⛔ owner identity, explicit org_id, caps armed first Does not fire. Re-derive the triple at the 293-05 close.
+
+### `backend/app/services/unattended_launch.py` — 296-02 (293-IN-04, 2026-10-26)
+
+**`6 / 2 / 361`.** 296-02 (293-IN-04): `asyncio.create_task(_drive_run(...))` is bound to `_task`, added to a module `_BACKGROUND_TASKS: set[asyncio.Task]`, and discarded by `add_done_callback` — run_transport's P9 shape — so an unattended run's drive cannot be garbage-collected mid-run (the loop keeps only a weak reference).
+
+Scan-list cell before this 296-02 touch (moved verbatim): | [`backend/app/services/unattended_launch.py`](docs/HOT-FILE-LEDGER.md#backendappservicesunattended_launchpy) | 5 / 1 / 354 (was `3 / 1 / 324`) | no (young) | young (planned 293-02). Shared unattended core + the kill-switch gate (293-REVIEW CR-01). ⛔ owner identity, explicit org_id, caps armed first |
 
 ### `backend/app/services/harness/run_read_words.py`
 

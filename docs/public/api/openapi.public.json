@@ -25268,6 +25268,23 @@
               }
             ],
             "title": "Detail"
+          },
+          "outcome": {
+            "anyOf": [
+              {
+                "type": "string",
+                "enum": [
+                  "launched",
+                  "refused",
+                  "not_loaded",
+                  "error"
+                ]
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Outcome"
           }
         },
         "type": "object",

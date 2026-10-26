@@ -617,9 +617,12 @@ async def test_the_executor_consumes_the_durable_answer_instead_of_re_asking():
 async def test_without_the_flag_the_executor_takes_the_shipped_ask_path():
     """No flag ⇒ no consume ⇒ the shipped ask path, unchanged.
 
-    The boot sweep does NOT set the flag, so this is also the proof that the 096-09
+    ~~The boot sweep does NOT set the flag, so this is also the proof that the 096-09
     restart contract is untouched: `resume_pending_prompt` still re-subscribes and
-    re-emits the SAME prompt there, exactly as it did.
+    re-emits the SAME prompt there, exactly as it did.~~ CORRECTED 296-02 (BUG-261025-03):
+    that sweep branch was dead (the real row carries no type), so every boot re-asked. The
+    sweep now pauses an unanswered human step and SETS this flag for an answered one. What
+    this test still proves is unchanged: no flag means the shipped ask path.
     """
     from unittest.mock import AsyncMock, patch
 

@@ -27,7 +27,10 @@ from types import SimpleNamespace
 
 import pytest
 
-REASON = "Your answer was saved, but the run could not continue."
+# ⚠ RECONCILED DELIBERATELY BY 296-02 (295-IN-07, UI-SPEC C): the failed re-drive now ends with ONE
+# worded sentence, carried by the phase failure AND the run_failed audit (which the run page reads
+# as "Why it stopped"). Retired, quoted: REASON = "Your answer was saved, but the run could not continue."
+REASON = "The run couldn't continue after the answer was given."
 
 
 class _NoopRedis:
@@ -182,7 +185,9 @@ def _assert_the_three_writes(pool, row):
     assert run_id == row["run_id"]
     assert user_id == row["user_id"], "the audit row is written as the run's owner"
     assert event_type == "run_failed"
-    assert json.loads(metadata) == {"reason": "ask_user re-drive failed"}
+    # 296-02 (295-IN-07): was {"reason": "ask_user re-drive failed"} — a code-like string that
+    # rendered as "Why it stopped". The audit now carries the same worded sentence.
+    assert json.loads(metadata) == {"reason": REASON}
 
 
 @pytest.mark.asyncio
@@ -203,7 +208,10 @@ async def test_a_raising_build_context_ends_the_run_failed_and_still_returns(mon
     pool = _RedriveFakePool(row)
     ok = await _run_redrive(monkeypatch, pool=pool, build_raises=True)
 
-    assert ok is True, "the answer is recorded and the run is ended truthfully; nothing escapes"
+    # 296-02 (289-IN-05): was `assert ok is True` — True meant "nothing escaped", but the
+    # docstring promised True only when a re-drive was SPAWNED, and none is here. Nothing still
+    # escapes (the call returned); the value now tells the truth.
+    assert ok is False, "the answer is recorded and the run is ended truthfully; nothing escapes"
     resumes = [s for s, _a in pool.calls if "UPDATE workflow_runs SET status = 'active'" in s]
     assert len(resumes) == 1, "precondition: the run had already been flipped off paused"
     _assert_the_three_writes(pool, row)
@@ -228,7 +236,7 @@ async def test_a_failing_failure_arm_is_logged_and_swallowed(monkeypatch, caplog
     row = _paused_row()
     pool = _RedriveFakePool(row, fail_phase_raises=True)
     ok = await _run_redrive(monkeypatch, pool=pool, build_raises=True)
-    assert ok is True
+    assert ok is False  # 296-02 (289-IN-05): no re-drive was spawned; nothing escaped either
 
     row2 = _paused_row()
     pool2 = _RedriveFakePool(row2, fail_phase_raises=True)

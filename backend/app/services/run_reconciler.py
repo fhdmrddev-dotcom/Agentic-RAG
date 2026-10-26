@@ -282,7 +282,9 @@ _REASON_WORKFLOW = "Finalised by the reconciler: its steps had ended."
 async def _reconcile_workflow_runs(db) -> int:
     """Finalise ``active`` workflow runs whose every step has ended (D-21). Returns the count.
 
-    Its last step (by end time, then position) ``cancelled`` → the run ends ``cancelled`` (no
+    Every step ``completed`` / ``recorded_not_sent`` → the run ends ``completed`` (295-IN-02,
+    296-02: a crash between the last step and ``finish_run`` is not a failure). Else its last
+    step (by end time, then position) ``cancelled`` → the run ends ``cancelled`` (no
     ``run_failed``); else ``failed`` with :data:`_REASON_WORKFLOW` and ONE ``run_failed``. Each finalised run's pending prompts are expired. Per-row
     try/except: one bad row never aborts the sweep (the ``_reconcile_chat_runs`` idiom).
     """
@@ -295,7 +297,11 @@ async def _reconcile_workflow_runs(db) -> int:
                    (SELECT wp.status FROM workflow_phases wp
                      WHERE wp.workflow_run_id = wr.id
                      ORDER BY wp.completed_at DESC NULLS LAST, wp.phase_index DESC
-                     LIMIT 1) AS last_phase_status
+                     LIMIT 1) AS last_phase_status,
+                   NOT EXISTS (SELECT 1 FROM workflow_phases wp
+                                WHERE wp.workflow_run_id = wr.id
+                                  AND wp.status NOT IN ('completed', 'recorded_not_sent'))
+                     AS all_completed
             FROM workflow_runs wr
             WHERE wr.status = ANY($1::text[])
               AND wr.updated_at < now() - make_interval(secs => $2)
@@ -318,7 +324,10 @@ async def _reconcile_workflow_runs(db) -> int:
     for row in rows:
         run_id = row["id"]
         try:
-            status = "cancelled" if row["last_phase_status"] == "cancelled" else "failed"
+            # 295-IN-02 (296-02): every step completed (or recorded) → the deliverable exists,
+            # so the run reads ``completed``; a crash before ``finish_run`` is not a failure.
+            status = ("completed" if row.get("all_completed")
+                      else "cancelled" if row["last_phase_status"] == "cancelled" else "failed")
             if not await end_run(db, run_id, status, from_statuses=("active",),
                                  user_id=row["user_id"], reason=_REASON_WORKFLOW):
                 continue  # somebody else ended it first (first-terminal-wins)

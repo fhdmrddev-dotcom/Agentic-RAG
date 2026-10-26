@@ -46,6 +46,20 @@ os.environ["SETUP_STORE_PATH"] = str(_FINALIZED_STORE)
 from unittest.mock import MagicMock  # noqa: E402
 
 import pytest  # noqa: E402
+
+
+def pytest_configure(config):
+    """SEED-363 (Phase 296): a test lifespan never claims a live run.
+
+    Every ``TestClient(app)`` enters the real lifespan, whose boot sweeps
+    (``resume_stranded_workflows`` + the orphan reconciler) ran against the SHARED
+    local DB and claimed, re-drove or terminalized a developer's live run (measured
+    3x in 289, 2x in 295). Tests that exercise a sweep call it directly, so turning
+    the lifespan's copies off loses no coverage.
+    """
+    import app.main
+
+    app.main.RUN_BOOT_SWEEPS = False
 from fastapi.testclient import TestClient  # noqa: E402
 
 
