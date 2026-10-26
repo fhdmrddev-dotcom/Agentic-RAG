@@ -5,7 +5,7 @@ created: 2026-10-21
 surface: Agentic-RAG
 status: planted
 partial: false
-status_note:
+status_note: "ROUTED by Phase 296 (2026-10-27): inventory row DEBT-1 / 293-F-2 (an unattended run that pauses never expires and can only be answered in the app; no ThreadRunLine for a live key or schedule run) was routed HERE rather than fixed, because it is a capability (Realtime or polling for runs), and 296 D-03 forbids capability in a debt close-out. Stays planted for v4.8."
 trigger_when: "A phase adds Realtime or polling for runs or asks; or a phase whose files_modified names frontend/src/providers/StreamsProvider.tsx and touches how a thread attaches to a run; or a report that a paused run's card did not appear in an open thread."
 trigger_paths: ["frontend/src/providers/StreamsProvider.tsx", "frontend/src/stores/streamsStore.ts", "frontend/src/components/panel/PendingAskCard.tsx"]
 trigger_surfaces: ["panel", "workflow"]

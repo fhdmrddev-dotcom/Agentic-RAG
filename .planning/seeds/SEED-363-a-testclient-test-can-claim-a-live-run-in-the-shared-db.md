@@ -3,15 +3,15 @@ seed_id: SEED-363
 title: Any TestClient test that enters the real app lifespan runs the boot resume sweep against the shared local DB and can claim a live or stranded run
 created: 2026-10-19
 surface: Agentic-RAG
-status: planted
+status: answered
 partial: false
-status_note: "Measured twice more in Phase 295 (295-07, 2026-10-21). (1) The two historical stuck runs 51924c91 / a77ed2c0 were ended cancelled at 2026-10-20 23:22:22Z, before the 295-04 merge, with the signature of 295-04's new reconciler sweep and no line in the :8000 log: a test process in the 295-04 worktree booted the lifespan against the local DB. (2) 295-07's own tests/unit gate, started ~00:38:40Z, re-drove a live run (6ec2f298) at 00:40:08Z: a second phase_started and a model=unknown resume shell. Any worktree run of tests/unit while live runs exist can terminalize or re-drive them. 295-VALIDATION.md S7."
+status_note: "ANSWERED by Phase 296 (296-02, 2026-10-26): app.main.RUN_BOOT_SWEEPS gates the boot resume sweep AND the periodic reconciler; tests/conftest.py sets it False for every test lifespan. RED test_296_lifespan_no_sweeps.py (4 red) then GREEN 6d51f603b. Earlier note, kept: Measured twice more in Phase 295 (295-07, 2026-10-21). (1) The two historical stuck runs 51924c91 / a77ed2c0 were ended cancelled at 2026-10-20 23:22:22Z, before the 295-04 merge, with the signature of 295-04's new reconciler sweep and no line in the :8000 log: a test process in the 295-04 worktree booted the lifespan against the local DB. (2) 295-07's own tests/unit gate, started ~00:38:40Z, re-drove a live run (6ec2f298) at 00:40:08Z: a second phase_started and a model=unknown resume shell. Any worktree run of tests/unit while live runs exist can terminalize or re-drive them. 295-VALIDATION.md S7."
 trigger_when: "The next phase touching backend/app/main.py's lifespan, the resume sweep (resume_stranded_workflows) or the run reconciler; or the next time a live drive and a backend test suite share the local DB."
 trigger_paths: ["backend/app/main.py", "backend/tests/conftest.py", "backend/app/services/run_reconciler.py"]
 trigger_surfaces: ["harness", "workflow"]
 migration_note:
 relates_to: [".planning/phases/289-the-run-page-and-its-evidence/289-01-SUMMARY.md", ".planning/phases/289-the-run-page-and-its-evidence/289-03-SUMMARY.md", ".planning/phases/289-the-run-page-and-its-evidence/289-VALIDATION.md (Shared-DB hazard)"]
-folded_into: null
+folded_into: "296"
 renumbered_from: null
 renumbered_because: null
 ---
