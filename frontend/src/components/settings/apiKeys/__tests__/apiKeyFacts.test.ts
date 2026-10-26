@@ -121,6 +121,20 @@ describe("293-04 keyCardFacts — tags, chips, lines", () => {
     expect(f.refusalLines).toHaveLength(2)
   })
 
+  // 296-06 (293-IN-06): a workflow that declares no launch field starts from a typed task,
+  // which a key can't send. The card says so in the UI-SPEC F words, never as `cannot_run`.
+  it("needs_task reads its own chip and line", () => {
+    const f = keyCardFacts(
+      key({ workflows: [{ id: "w6", name: "Literature review", state: "needs_task" }] }),
+      NOW,
+    )
+    expect(f.tag.kind).toBe("refused")
+    expect(f.chips[0].text).toBe("⚠ Literature review · needs a typed task")
+    expect(f.refusalLines[0]).toBe(
+      "Literature review starts from a typed task, which a key can't send, so calls to it are refused. Make a key without it.",
+    )
+  })
+
   it("expired and revoked keys carry their tag and are dead", () => {
     const exp = keyCardFacts(key({ state: "expired", expires_at: iso(2026, 9, 22) }), NOW)
     expect(exp.tag).toEqual({ kind: "expired", text: "expired" })
@@ -223,6 +237,7 @@ describe("293-04 callWords — every reason has words", () => {
     ["unknown_input", { names: ["colour", "size"] }, "✕ refused: unknown input: colour, size"],
     ["missing_input", { names: ["customer"] }, "✕ refused: missing required input: customer"],
     ["file_upload", {}, "✕ refused: needs a file upload, not possible with a key yet"],
+    ["needs_task", {}, "✕ refused: needs a typed task, not possible with a key yet"],
     ["over_limit", {}, "✕ refused: over the limit: 10 starts a minute"],
   ] as const)("%s", (reason, detail, text) => {
     expect(callWords(call({ ok: false, outcome: null, run_id: null, reason, detail: { ...detail } }), ctx)).toEqual({
@@ -335,6 +350,11 @@ describe("293-04 callBars, times, rows", () => {
     expect(startableRowFacts(w({ startable: false, reason: "file_upload" }))).toEqual({
       disabled: true,
       right: "needs a file upload, not possible with a key yet",
+    })
+    // 296-06 (293-IN-06)
+    expect(startableRowFacts(w({ startable: false, reason: "needs_task" }))).toEqual({
+      disabled: true,
+      right: "needs a typed task, not possible with a key yet",
     })
   })
 })

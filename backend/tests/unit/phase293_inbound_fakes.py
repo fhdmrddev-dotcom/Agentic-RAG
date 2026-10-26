@@ -145,6 +145,11 @@ class FakeRedis:
         self.sets.append((k, v, ex))
         self.store[k] = v
 
+    # 296-06 (293-IN-01): the file route PEEKS at its token (a plain GET, no consume) before the
+    # per-key limiter, and consumes it (GET + DEL in one MULTI) only after the limit passed.
+    async def get(self, k):
+        return self.store.get(k)
+
     def pipeline(self, transaction=True):
         self.pipelines.append({"transaction": transaction})
         return FakePipeline(self)
