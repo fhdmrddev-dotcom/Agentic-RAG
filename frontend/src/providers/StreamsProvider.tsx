@@ -1903,6 +1903,14 @@ export function StreamsProvider({ children }: PropsWithChildren) {
         // 295-10 (D-r1-02): the segment ended (done, failed, or paused again). One read so the
         // panel and the recorded run status match the server (D-v2.5-03), not the stream alone.
         refreshPhaseSpineAfterStop(threadId)
+        // 296-04 (BUG-261021-04 / -03): the harness answer is a persisted row this subscription
+        // never rendered, so re-read the viewed thread as a switch does; then read the steps once
+        // more, since a step mark (Unsourced) written just after the end missed the read above.
+        if (useStreamsStore.getState().viewedThreadId === threadId) {
+          void useStreamsStore.getState().actions.reconcile(threadId)
+            .then(() => refreshPhaseSpineAfterStop(threadId))
+            .catch((err) => console.warn("[StreamsProvider] follow terminal reconcile failed", err))
+        }
       }
       subscribeToRun(
         producerRunId,

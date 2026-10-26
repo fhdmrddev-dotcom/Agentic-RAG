@@ -412,7 +412,7 @@ node scripts/check-hot-file-ledger.cjs <phase-dir>   # 0 clear · 1 missing rows
 | `frontend/src/components/chat/MessageItem.tsx` | 84 / 39 / 1059 (was `83 / 42 / 1050`) | 292.1 UAT: Deep Continue re-attaches the run's stream (+1 else-if) · ⛔ |
 | `frontend/src/components/chat/CitationList.tsx` | 5 / 5 / 91 | 294-05: ONE CitationCheckAction beside the trigger · extraction FIRST |
 | `backend/app/api/threads.py` | 282 / 94 / 2744 (was `281 / 94 / 2743`) | 293-05 D-3: kickoff via launch_kickoff (1 call, 1 import name) · ⛔ |
-| `frontend/src/providers/StreamsProvider.tsx` | 116 / 44 / 5210 (was `115 / 44 / 5087`) | 292.1 UAT: Deep Continue follows the same run live (stream_since) · ⛔ |
+| `frontend/src/providers/StreamsProvider.tsx` | 117 / 45 / 5218 (was `116 / 44 / 5210`) | 296-04: one guarded reconcile in the follow terminal · ⛔ |
 | `frontend/src/hooks/useMessages.ts` | 74 / 27 / 127 | extraction due |
 | `backend/app/services/anthropic_service.py` | 12 / 11 / 373 (was `11 / 10 / 354`) | honoured by construction (282-01: constructor kwargs) · adapter audit due |
 | `backend/app/services/embedding_service.py` | 9 / 5 / 354 | ⚠ absent for its entire life at 5 phases — row added 236 (SC#2) |
@@ -471,11 +471,11 @@ node scripts/check-hot-file-ledger.cjs <phase-dir>   # 0 clear · 1 missing rows
 | `frontend/src/components/chat/ActiveConnectorChips.tsx` | 2 / 2 / 82 | ⚠ absent its ENTIRE LIFE — row added 244-05 |
 | `frontend/src/components/chat/MessageList.tsx` | 24 / 11 / 376 | ⚠ STALE · last touch 267-04 |
 | `frontend/src/components/chat/ChatArea.tsx` | 94 / 44 / 1189 (was `93 / 43 / 1186`) | honoured by construction (287-03: ONE mount, 0 hooks) · ⛔ |
-| `frontend/src/stores/streamsStore.ts` | 27 / 18 / 660 (was `26 / 18 / 657`) | 292.1 G4-2: settle action type gains optional reattach · ⛔ |
+| `frontend/src/stores/streamsStore.ts` | 28 / 19 / 662 (was `27 / 18 / 660`) | 296-04: initializer typed StreamsState (TS2345 gone) · ⛔ |
 | `frontend/src/components/chat/ThreadWorkflowPicker.tsx` | 1 / 1 / 91 | young (created 287-03) · reads no conversation · ⛔ |
 | `frontend/src/components/chat/useStartWorkflowInThread.ts` | 1 / 1 / 85 | young (created 287-03) · no createThread · ⛔ |
 | `frontend/src/lib/toolMeta.ts` | 10 / 6 / 218 | ⚠ absent its ENTIRE LIFE — row added 244-13 · ⛔ |
-| `frontend/src/components/panel/PendingAskCard.tsx` | 24 / 11 / 1103 (was `23 / 11 / 1101`) | D-r2-01: any non-terminal run status is live; not retired |
+| `frontend/src/components/panel/PendingAskCard.tsx` | 25 / 12 / 1132 (was `24 / 11 / 1103`) | 296-04: one ask per live workflow run; passed clock waits |
 | `frontend/src/pages/WorkflowRunPage.tsx` | 34 / 14 / 1597 (was `33 / 13 / 1594`) | 293-03: ONE RunOriginLine mount; useState 1, useEffect 4 unchanged · ⛔ |
 | `frontend/src/components/workflows/WaitingOnLine.tsx` | 1 / 1 / 26 | young (created 288-03) · leaf, no hook · ⛔ |
 | `frontend/src/components/chat/OutputFileCard.tsx` | 8 / 7 / 219 | honoured by construction (195) |
@@ -493,9 +493,9 @@ node scripts/check-hot-file-ledger.cjs <phase-dir>   # 0 clear · 1 missing rows
 | `scripts/build-public-openapi.cjs` | 7 / 3 / 468 | ⚠ now FIRES (294) · 294-03: citation_checks tag (one line) |
 | `backend/app/services/eval_runner_service.py` | 13 / 8 / 1040 | ⚠ STALE · last touch 256-03 |
 | `backend/app/services/scheduler_service.py` | 11 / 6 / 308 (was `10 / 6 / 290`) | 293-REVIEW CR-01: one kill-switch check + one refusal helper |
-| `frontend/src/components/panel/PhaseCard.tsx` | 20 / 13 / 811 (was `18 / 12 / 796`) | 295-05: ONE mount in the identity column |
-| `frontend/src/components/panel/PhaseTimeline.tsx` | 10 / 8 / 404 | ⚠ row STALE · honoured by construction (214) |
-| `frontend/src/components/panel/phaseStatusMeta.ts` | 4 / 4 / 291 | ⚠ row STALE · crossed the threshold (200) |
+| `frontend/src/components/panel/PhaseCard.tsx` | 21 / 14 / 817 (was `20 / 13 / 811`) | 296-04: ONE prop (runPaused) → Waiting reading |
+| `frontend/src/components/panel/PhaseTimeline.tsx` | 11 / 9 / 408 (was `10 / 8 / 404`) | 296-04: derives runPaused from its frame, passes it |
+| `frontend/src/components/panel/phaseStatusMeta.ts` | 5 / 5 / 308 (was `4 / 4 / 291`) | 296-04: derived Waiting row (not a wire status) |
 | `backend/app/services/harness/validator_kinds.py` | 18 / 8 / 899 (was `17 / 8 / 853`) | 295-09 WR-05: judge note in system prompt, data fenced |
 | `backend/app/services/harness/programmatic.py` | 4 / 4 / 142 (was `3 / 3 / 137`) | 293-REVIEW WR-03: split_topic splits envelope values; still pure · ⛔ |
 | `backend/app/services/harness/emitters.py` | 4 / 2 / 188 | ⚠ absent its ENTIRE LIFE — row added 255 · ⛔ |

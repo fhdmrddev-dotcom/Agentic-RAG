@@ -296,7 +296,12 @@ describe("295-10 / D-r1-02 — after an answer, the open tab follows the re-driv
     })
     await waitFor(() => expect(phaseStatuses()).toEqual(["research:done", "wrap:done"]))
     expect(useStreamsStore.getState().workflowRunStatusByThread.get(THREAD_ID)).toBe("completed")
-    expect(mockGetThreadWorkflow.mock.calls.length - before).toBe(1)
+    // 296-04 (BUG-261021-04 / -03) widened this from 1, deliberately: the terminal's phase read,
+    // then the thread reconcile's own lock read, then one more step read after that reconcile.
+    // Still bounded: a fixed three per end, never a loop.
+    await waitFor(() => expect(mockGetThreadWorkflow.mock.calls.length - before).toBe(3))
+    await drain()
+    expect(mockGetThreadWorkflow.mock.calls.length - before).toBe(3)
   })
 
   it("a pause that lands during the re-attached stream shows its card, answerable", async () => {

@@ -489,7 +489,9 @@ const notMounted = async (): Promise<never> => {
   )
 }
 
-export const useStreamsStore = create<StreamsState>()(subscribeWithSelector(() => ({
+// 296-04 (287-TSC): the initializer is annotated as StreamsState so `viewedThreadId: null` is not
+// inferred as the literal `null` type (TS2345). Type-only; no value changes.
+export const useStreamsStore = create<StreamsState>()(subscribeWithSelector((): StreamsState => ({
   // Phase 068.5 (D-068.5-01..04 + Pitfall 1/8): hydrate from localStorage
   // synchronously so the first render of any subscriber sees cached content,
   // not the empty Map. L-068.5-03 shape preserved:

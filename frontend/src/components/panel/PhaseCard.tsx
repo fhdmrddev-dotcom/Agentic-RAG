@@ -439,14 +439,20 @@ export interface PhaseCardProps {
    * the same counting reason).
    */
   runLive?: boolean
+  /**
+   * Phase 296-04 (295-D-uat-02) — the run is `paused` / `cap_paused`, waiting on a person.
+   * Derived by `PhaseTimeline` from the frame it already fetched (the `runLive` shape); a
+   * running step then reads `! Waiting` through `statusMetaForRun`. Absent = today's reading.
+   */
+  runPaused?: boolean
 }
 
-export function PhaseCard({ phase, position, timing, runLive }: PhaseCardProps) {
+export function PhaseCard({ phase, position, timing, runLive, runPaused }: PhaseCardProps) {
   const meta = phaseTypeMeta(phase.phaseType)
   // Phase 252-04 (D-26): the not-live reading is a ROW reached through a function, never
   // an `if` at this call site — `sourceHealthVocabulary.ts:49`'s project rule, *a new cause
   // adds a ROW*. `runLive === undefined` returns `statusMeta(phase.status)` unchanged.
-  const status = statusMetaForRun(phase.status, runLive)
+  const status = statusMetaForRun(phase.status, runLive, runPaused)
   // ⛔ `runLive !== false`, never a truthiness coercion — see the prop's docblock. Every consumer of
   // `isRunning` (the spinner, `aria-busy`, the forced-open row, the BLOOM frame) falls out
   // of this one line with no further edit.
