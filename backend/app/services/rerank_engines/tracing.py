@@ -67,12 +67,18 @@ def capture_engine_calls() -> Iterator[list[EngineCall]]:
 
 def span_outputs(*, latency_ms: float, input_tokens: int | None = None, output_tokens: int | None = None,
                  cost_usd: Decimal | None = None, **extra: Any) -> dict:
-    """The outputs dict an ``llm`` span returns so LangSmith can read usage and cost (D-19)."""
-    usage = {
-        "input_tokens": input_tokens or 0,
-        "output_tokens": output_tokens or 0,
-        "total_tokens": (input_tokens or 0) + (output_tokens or 0),
-    }
+    """The outputs dict an ``llm`` span returns so LangSmith can read usage and cost (D-19).
+
+    296-03 (294-IN-02): a token count the engine did not report is OMITTED, never written as 0
+    (the METER-01 rule ``EngineCall`` already kept); ``total_tokens`` only when both are known.
+    """
+    usage: dict[str, Any] = {}
+    if input_tokens is not None:
+        usage["input_tokens"] = input_tokens
+    if output_tokens is not None:
+        usage["output_tokens"] = output_tokens
+    if input_tokens is not None and output_tokens is not None:
+        usage["total_tokens"] = input_tokens + output_tokens
     if cost_usd is not None:
         usage["total_cost"] = float(cost_usd)
     return {
