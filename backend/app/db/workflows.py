@@ -2186,9 +2186,14 @@ async def cancel_active_phases(pool: asyncpg.Pool, workflow_run_id: UUID) -> Non
 
     ⚠ The predicate below is written on ONE source line ON PURPOSE (193.2-08: a rule
     written WRAPPED failed its own literal ``grep -q`` and read as "already fixed").
+
+    295-IN-03 (296-02): the same UPDATE drops ``output._awaiting_answer`` (an engine ask's
+    stash: the unaccepted draft and folder names), so a Stopped step keeps nothing a raw-output
+    reader or export could ship. Only an object output can carry the stash (``stash_awaiting_answer``
+    writes one); any other output is left exactly as it is.
     """
     await pool.execute(
-        "UPDATE workflow_phases SET status='cancelled', updated_at=now(), completed_at = now() WHERE workflow_run_id = $1 AND status = 'active'",
+        "UPDATE workflow_phases SET status='cancelled', updated_at=now(), completed_at = now(), output = CASE WHEN jsonb_typeof(output) = 'object' THEN output - '_awaiting_answer' ELSE output END WHERE workflow_run_id = $1 AND status = 'active'",
         workflow_run_id,
     )
 

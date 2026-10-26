@@ -380,6 +380,14 @@ async def _finalize_producer_run(
             # the unconditional finish below (and its anchor clear) is byte-for-byte the same.
             from app.services.harness.run_handoff import record_failed_end  # noqa: PLC0415
 
+            if _f2_status == "cancelled":  # 295-RES-b (296-02): a Stop names who pressed it
+                from app.services.harness.run_handoff import record_stop  # noqa: PLC0415
+                from app.services.run_lifecycle import cancelled_by  # noqa: PLC0415
+
+                _by = await cancelled_by(redis, active_workflow_run_id)
+                if _by is not None:
+                    await record_stop(await get_pg_pool(), active_workflow_run_id, _by,
+                                      policy="run_cancelled")
             await record_failed_end(await get_pg_pool(), active_workflow_run_id, _f2_status)
             await _finish_wf(await get_pg_pool(), active_workflow_run_id, _f2_status)
         except BaseException:

@@ -115,7 +115,10 @@ _EXPECTED_CALL_SITES = {
     #   api/runs.py:618 → 653
     # ⚠ RE-DERIVED at 295-09 (CR-01): COUNTS identical; +14 when `_is_current_question` landed
     #   above `_fail_redrive`. The call is byte-unchanged. api/runs.py:653 → 667
-    "api/runs.py:667",
+    # ⚠ RE-DERIVED at 296-02: COUNTS identical ("api/runs.py": 1); +3 when the failed re-drive's
+    #   reason constant gained its 3-line comment (295-IN-07) above `_fail_redrive`. The call is
+    #   byte-unchanged. api/runs.py:667 → 670
+    "api/runs.py:670",
     # ⚠ RE-DERIVED at Phase 258 Plan 03: +7 line shift in api/workflows.py (import + decorators)
     #   api/workflows.py:1802 → 1809 → 1812 (v4.3 audit: +3 lines, require_capability on authoring writes; the call itself unchanged)
     # ⚠ RE-DERIVED at Phase 286 Plan 01: check (a), the per-file COUNTS, stayed identical
@@ -171,9 +174,14 @@ _EXPECTED_CALL_SITES = {
     # ⚠ RE-DERIVED at 295-09 (WR-07): (a) the COUNTS stayed identical; +3 when the pause arm
     #   above all three gained its ONE guarded `take_pause_written(ctx)` line + comment.
     #   The calls are byte-unchanged. 1962 → 1965 · 2003 → 2006 · 2306 → 2309
-    "services/harness_engine.py:1965",
-    "services/harness_engine.py:2006",
-    "services/harness_engine.py:2309",
+    # ⚠ RE-DERIVED at 296-02: (a) the COUNTS stayed identical ("services/harness_engine.py": 3);
+    #   +4 above the first two: +1 for `_finalize_run_grounding`'s `user_settings` param (289-F3) and
+    #   +3 for the armed `action_risk_pending` write's ONE guard and comment (295-RES-a); then +1
+    #   more above the third (the finaliser passing `user_settings`). The calls are byte-unchanged.
+    #   1965 → 1969 · 2006 → 2010 · 2309 → 2314
+    "services/harness_engine.py:1969",
+    "services/harness_engine.py:2010",
+    "services/harness_engine.py:2314",
     # ⚠ RE-DERIVED at Phase 268 Plan 01: +8 line shift in services/run_lifecycle.py —
     #   register_run_start gained `org_id` / `expert_id` kwargs, their forward to insert_run and
     #   a 4-line docstring note, all ABOVE this call. Check (a), the per-file COUNTS, stayed
@@ -185,7 +193,10 @@ _EXPECTED_CALL_SITES = {
     #   `stopped_by` kwarg, its D-19 docstring paragraph and the ONE `record_stop(...)` call (with
     #   its lazy import) just above this call. The call itself is byte-unchanged.
     #   run_lifecycle.py:529 → 544
-    "services/run_lifecycle.py:544",
+    # ⚠ RE-DERIVED at 296-02: (a) the COUNTS stayed identical ("services/run_lifecycle.py": 1);
+    #   +29 when `cancelled_by` and the `stopped_by` kwarg of `broadcast_run_cancellation`
+    #   (295-RES-b) landed above it. The call is byte-unchanged. run_lifecycle.py:544 → 573
+    "services/run_lifecycle.py:573",
     # Phase 295 Plan 04: the new caller's one site (see the COUNTS note above). Re-derived at
     #   Task 3 (+15: the F2 / reconciler reason constants and `_claim_terminal` above it):
     #   run_handoff.py:186 → 201, then -2 when the reconciler's sentence moved home to

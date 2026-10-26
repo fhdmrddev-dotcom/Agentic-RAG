@@ -370,10 +370,23 @@ async def resume_with_terminalize(coro, *, run_id, pool, user_id=None):
 async def fail_unloadable_definition(pool, run_id, *, user_id=None,
                                      reason: str = SWEEP_NO_DEFINITION_REASON) -> bool:
     """D-20: the sweep's definition-won't-load arm ends the run ``failed`` with words and one
-    ``run_failed`` instead of a bare skip. Never raises (the sweep must reach the next run)."""
+    ``run_failed`` instead of a bare skip. Never raises (the sweep must reach the next run).
+
+    295-IN-01 (296-02): the WINNER also expires the run's pending prompt, as the reconciler
+    sweep does, so ``/pending`` stops serving a card for a run that has ended."""
     try:
-        return await end_run(pool, run_id, "failed", user_id=user_id, reason=reason,
-                             fail_active_phase=True)
+        won = await end_run(pool, run_id, "failed", user_id=user_id, reason=reason,
+                            fail_active_phase=True)
+        if won:
+            from app.services.harness_engine import _expire_pending_ask_user  # noqa: PLC0415
+
+            _row = await pool.fetchrow(
+                "SELECT thread_id, org_id FROM workflow_runs WHERE id = $1", run_id
+            ) or {}
+            await _expire_pending_ask_user(
+                pool, _row.get("thread_id"), run_id, org_id=_row.get("org_id")
+            )
+        return won
     except Exception:  # noqa: BLE001
         logger.exception("resume sweep: could not end unloadable run %s", run_id)
         return False
