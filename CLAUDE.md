@@ -419,7 +419,8 @@ node scripts/check-hot-file-ledger.cjs <phase-dir>   # 0 clear · 1 missing rows
 | `frontend/src/components/workflows/WorkflowCanvas.tsx` | 32 / 10 / 1744 (was `31 / 9 / 1708`) | 290-03: Team view = 1 prop, 1 state, 1 early return · extraction FIRST next · ⛔ |
 | `frontend/src/components/workflows/FlowEdge.tsx` | 3 / 3 / 462 | honoured by construction (200) |
 | `frontend/src/components/workflows/PhaseNodeCard.tsx` | 18 / 9 / 490 (was `17 / 8 / 489`) | 290: forecast unused — chips went on the library card, not here |
-| `backend/app/services/harness/phase_types.py` | 63 / 32 / 3081 (was `61 / 31 / 3067`) | 293-02: key-run sub-question in the untrusted envelope · G-5 OWED |
+| `backend/app/services/harness/phase_types.py` | 64 / 33 / 3095 (was `63 / 32 / 3081`) | 296-03: one helper + one call (filled_field_count, S7-F1) · G-5 OWED |
+| `backend/app/services/tools/render_template.py` | 6 / 3 / 1163 (was `3 / 2 / 1094`) | 296-03: button /V written as a name, read back typed · now FIRES · ⛔ |
 | `frontend/src/pages/WorkflowsPage.tsx` | 46 / 19 / 1453 (was `45 / 18 / 1447`) | 293-04: one optional onOpenApiKeys prop threaded to the cards |
 | `frontend/src/components/workflows/library/WorkflowCard.tsx` | 25 / 10 / 1371 (was `24 / 10 / 1365`) | 293-03: one next-run span, now handed to the leaf; still 0 useState |
 | `frontend/src/components/workflows/library/libraryVocabulary.ts` | 14 / 7 / 819 (was `12 / 6 / 802`) | 293-03: two next-run words + one builder (data) |
