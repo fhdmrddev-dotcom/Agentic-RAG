@@ -40,8 +40,10 @@ async def test_a_value_carrying_fake_envelope_text_stays_data():
     out = await _split(inbound_kickoff("W", {"subject": hostile}))
     assert out[-1] == "b"
     assert not any(q.startswith("[SYSTEM NOTICE") or q == "Run W" for q in out)
-    # the value's own closing tag was neutralised by the envelope, so it is still text in a fragment
-    assert any("&lt;/external_input" in q for q in out)
+    # Every fragment is a piece of the value as the envelope carries it (its own closing tag
+    # neutralised), so the fake tag text stays the caller's data and ends nothing.
+    carried = hostile.replace("</external_input", "&lt;/external_input")
+    assert all(q in carried for q in out), out
 
 
 @pytest.mark.asyncio
