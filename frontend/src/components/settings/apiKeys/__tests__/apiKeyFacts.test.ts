@@ -11,6 +11,9 @@
 import { describe, expect, it } from "vitest"
 import apiKeysCopyRaw from "../apiKeysCopy.ts?raw"
 import apiKeyFactsRaw from "../apiKeyFacts.ts?raw"
+import inboundPy from "../../../../../../backend/app/api/inbound.py?raw"
+import apiKeyAuthPy from "../../../../../../backend/app/security/api_key_auth.py?raw"
+import inboundInputsPy from "../../../../../../backend/app/services/inbound_inputs.py?raw"
 import type { ApiKeyCall, ApiKeyRead, StartableWorkflow } from "@/lib/api/apiKeys"
 import {
   callBars,
@@ -239,6 +242,31 @@ describe("293-04 callWords — every reason has words", () => {
       const t = callWords(call({ ok: false, reason }), ctx).text
       expect(t.startsWith("✕ refused: ")).toBe(true)
       expect(t).not.toContain(reason)
+    }
+  })
+
+  // 293 UAT: CR-01 added `workflows_disabled` after this map was written, and the activity row
+  // showed the raw code. Read every reason the backend audits, so a new one cannot fall through.
+  it("every refusal reason the backend audits has words, never the raw code", () => {
+    const literal = /reason\s*=\s*\(?\s*"([a-z_]+)"(?:[ \t]+if[^\n]*?else[ \t]+"([a-z_]+)")?/g
+    const emitted = new Set<string>()
+    for (const src of [inboundPy, apiKeyAuthPy]) {
+      for (const m of src.matchAll(literal)) {
+        emitted.add(m[1])
+        if (m[2]) emitted.add(m[2])
+      }
+    }
+    const codes = inboundInputsPy.match(/RefusalCode = Literal\[([^\]]+)\]/)?.[1] ?? ""
+    for (const m of codes.matchAll(/"([a-z_]+)"/g)) emitted.add(m[1])
+    // Guard the extraction itself: an empty or shrunken set would pass vacuously.
+    expect(emitted.size).toBeGreaterThanOrEqual(15)
+    for (const known of ["revoked", "over_limit", "workflows_disabled", "no_template", "unknown_input"]) {
+      expect(emitted.has(known)).toBe(true)
+    }
+    for (const reason of emitted) {
+      const t = callWords(call({ ok: false, reason }), ctx).text
+      expect(t.startsWith("✕ refused: "), reason).toBe(true)
+      expect(t, reason).not.toBe(`✕ refused: ${reason}`)
     }
   })
 

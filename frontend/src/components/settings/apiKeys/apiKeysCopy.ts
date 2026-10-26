@@ -241,6 +241,10 @@ export const API_KEYS_COPY = {
     invalidBody: "the inputs were not a JSON object of text values",
     /** 293-04 authored: the workflow's template is not bound yet (the scheduler's lint refusal). */
     noTemplate: "the workflow has no template set up yet",
+    /** 293 UAT: the operator's Workflows kill switch is off (reason `workflows_disabled`, CR-01). */
+    workflowsDisabled: "workflows are turned off by the administrator",
+    /** 293 UAT: the limiter could not be reached, so the call was refused (reason `limiter_unavailable`). */
+    limiterUnavailable: "the limit check was unavailable; try again shortly",
     overStarts: "over the limit: {N} starts a minute",
     overReads: "over the limit: {N} reads a minute",
     overBare: "over the limit",

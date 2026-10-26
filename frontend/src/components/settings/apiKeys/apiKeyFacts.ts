@@ -236,8 +236,13 @@ function refusedWords(call: ApiKeyCall, ctx: CallContext): string | null {
       return C.calls.fileUpload
     case "invalid_body":
       return C.calls.invalidBody
+    case "no_template":
     case "no_template_bound":
       return C.calls.noTemplate
+    case "workflows_disabled":
+      return C.calls.workflowsDisabled
+    case "limiter_unavailable":
+      return C.calls.limiterUnavailable
     case "over_limit": {
       const fromDetail = detailNumber(call, "limit")
       const fromLimits = call.verb === "read" ? ctx.limits?.reads_per_minute : ctx.limits?.starts_per_minute
