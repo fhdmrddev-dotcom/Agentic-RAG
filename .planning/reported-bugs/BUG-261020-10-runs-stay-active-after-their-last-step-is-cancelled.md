@@ -4,12 +4,13 @@ title: Runs read active for a month after their last step was cancelled
 reported: 2026-10-20
 surface: Agentic-RAG
 severity: minor
-status: folded
+status: closed
 affected_areas: [backend/harness, backend/run-reconciler]
 folded_into: "295"
-verified_closed_by: null
+verified_closed_by: "295"
 related_seeds: [SEED-295, SEED-152]
 re_open_trigger: null
+fixed_by_commit: "21078ca97 (fix(295-04): cancel reads cancelled with a recorded reason, RUN-04) and the D-21 reconciler sweep; closed by the 296-05 record flip"
 reproduces_on:
   branch: develop
   commit: 46c23fe00

@@ -4,12 +4,13 @@ title: In the tab that followed a "Continue without sources" run to its end, the
 reported: 2026-10-21
 surface: Agentic-RAG
 severity: minor
-status: deferred
+status: folded
 affected_areas: [frontend/streaming, frontend/panel, workflow/runs]
-folded_into: null
+folded_into: "296"
 verified_closed_by: null
 related_seeds: []
-re_open_trigger: "The next phase whose files_modified names frontend/src/providers/StreamsProvider.tsx or frontend/src/components/panel/PhaseCard.tsx; or any report of a missing Unsourced mark."
+re_open_trigger: "CLOSE when 296-HUMAN-UAT G-4 scenario 3 reads PASS with evidence (set status closed, verified_closed_by \"296\", re_open_trigger null). A FAIL routes back to its owning 296 plan under G-7."
+fixed_by_commit: "296-04: RED e93dbecbb, GREEN fd59d0f19 (cause ii, the race: one more step read chained after the end-of-follow reconcile; cause i refuted)"
 reproduces_on:
   branch: develop
   commit: 9f11f3b21

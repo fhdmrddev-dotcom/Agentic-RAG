@@ -4,12 +4,13 @@ title: Every follow-up turn re-shows all files the agent ever made, and intermed
 reported: 2026-10-24
 surface: Agentic-RAG
 severity: major
-status: deferred
+status: folded
 affected_areas: [frontend/output-files, backend/agent-loop, workspace-panel]
-folded_into: null
+folded_into: "296"
 verified_closed_by: null
 related_seeds: [SEED-054, SEED-148]
-re_open_trigger: "Deferred at 292.1 discuss (2026-10-24) to its own phase; plan it as the next chat-surface phase after 292.1 ships (output-file cards, not the cap path)."
+re_open_trigger: "CLOSE when 296-HUMAN-UAT G-4 scenario 8 reads PASS with evidence (set status closed, verified_closed_by \"296\", re_open_trigger null). A FAIL routes back to its owning 296 plan under G-7."
+fixed_by_commit: "DEFECT half: 296-06 RED 847a00dcc, GREEN 0ad717a67 (lead 2 reproduced: the baseline re-seed never overwrites a hash this run recorded, tools/sandbox.py). Lead 1 DID NOT REPRODUCE (backend/tests/unit/test_296_chat_and_wire.py, green at base) and lead 3 DID NOT REPRODUCE (frontend/src/__tests__/providers/streamsProvider_296_followup_files.test.tsx, green at base). The INTERMEDIATES half (chart PNGs beside the document) is SEED-383 (D-10)"
 reproduces_on:
   branch: production
   commit: 6db8cf40a

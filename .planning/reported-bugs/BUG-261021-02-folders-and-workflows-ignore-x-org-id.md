@@ -4,12 +4,13 @@ title: For a two-org account, creating a folder or a workflow ignores the chosen
 reported: 2026-10-21
 surface: Agentic-RAG
 severity: major
-status: deferred
+status: folded
 affected_areas: [backend/folders, backend/workflows, backend/org-scoping]
-folded_into: null
+folded_into: "296"
 verified_closed_by: null
 related_seeds: []
-re_open_trigger: "The next phase whose files_modified names backend/app/api/folders.py or backend/app/api/workflows.py, or that touches X-Org-Id handling; or any report of a folder or workflow created in the wrong org."
+re_open_trigger: "CLOSE when 296-HUMAN-UAT G-4 scenario 1 reads PASS with evidence (set status closed, verified_closed_by \"296\", re_open_trigger null). A FAIL routes back to its owning 296 plan under G-7."
+fixed_by_commit: "296-01: RED 20113ce24, GREEN cb13a74a7 (create_folder / create_draft stamp the validated X-Org-Id); two-org integration test backend/tests/integration/test_296_two_org_create.py (13 passed)"
 reproduces_on:
   branch: develop
   commit: 128266ef6

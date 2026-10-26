@@ -4,12 +4,13 @@ title: The schedules window's Run now starts the run but shows no visible feedba
 reported: 2026-10-25
 surface: Agentic-RAG
 severity: minor
-status: open
+status: folded
 affected_areas: [frontend/workflows, schedules]
-folded_into: null
+folded_into: "296"
 verified_closed_by: null
 related_seeds: []
-re_open_trigger: the next phase whose files_modified names frontend/src/components/workflows/WorkflowScheduleModal.tsx
+re_open_trigger: "CLOSE when 296-HUMAN-UAT G-4 scenario 5 reads PASS with evidence (set status closed, verified_closed_by \"296\", re_open_trigger null). A FAIL routes back to its owning 296 plan under G-7."
+fixed_by_commit: "296-04: RED c563f4ad0, GREEN 9c6b3403c (row-local spinner + result line); 296-02 3a6d7aae8 (ScheduleTriggerResult.outcome)"
 reproduces_on:
   branch: develop
   commit: b8aed8884

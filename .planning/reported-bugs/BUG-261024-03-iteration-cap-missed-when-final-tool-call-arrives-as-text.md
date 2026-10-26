@@ -9,7 +9,7 @@ affected_areas: [backend/agent-loop, provider-routing/openrouter, frontend/strea
 folded_into: "292.1"
 verified_closed_by: null
 related_seeds: [SEED-372, SEED-373, SEED-323, SEED-324]
-re_open_trigger: null
+re_open_trigger: "OpenRouter topped up (today: HTTP 402 insufficient credit, probed live 2026-10-27) -> run backend/venv/Scripts/python.exe scripts/run-2921-board.py --run --providers openrouter; close on its PASS. Every native row passed in 292.1."
 reproduces_on:
   branch: production
   commit: 6db8cf40a

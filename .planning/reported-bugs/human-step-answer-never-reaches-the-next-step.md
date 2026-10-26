@@ -4,12 +4,13 @@ title: A person's answer to a human-input step never reaches the next step
 reported: 2026-10-20
 surface: Agentic-RAG
 severity: major
-status: folded
+status: closed
 affected_areas: [backend/harness, workflows/human-input]
 folded_into: "295"
-verified_closed_by: null
+verified_closed_by: "295"
 related_seeds: [SEED-360]
 re_open_trigger: null
+fixed_by_commit: "b23554309 (fix(295-04): the answer reaches the next step, D-10/D-11/D-46); live 295 S6 PASS (295-VERIFICATION RUN-04); closed by the 296-05 record flip"
 reproduces_on:
   branch: develop
   commit: 4b37c72aa

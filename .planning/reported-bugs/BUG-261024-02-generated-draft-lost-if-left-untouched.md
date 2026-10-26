@@ -4,12 +4,13 @@ title: A draft the describe door generates is lost if the author leaves without 
 reported: 2026-10-24
 surface: Agentic-RAG
 severity: minor
-status: open
+status: folded
 affected_areas: [frontend/workflow-builder, workflows/drafts]
-folded_into: null
+folded_into: "296"
 verified_closed_by: null
 related_seeds: []
-re_open_trigger: null
+re_open_trigger: "CLOSE when 296-HUMAN-UAT optional row 10 (a generated draft survives leaving untouched) reads PASS with evidence (set status closed, verified_closed_by \"296\", re_open_trigger null). A FAIL routes back to its owning 296 plan under G-7."
+fixed_by_commit: "296-07: RED 2548b6212, GREEN 02b5053ac (onDrafted calls persistence.saveNow(); mockCreate 0 -> 1)"
 reproduces_on:
   branch: develop
   commit: ebad6afee
