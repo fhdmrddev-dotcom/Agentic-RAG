@@ -470,7 +470,7 @@ Plans:
 - [x] 296-04-PLAN.md — W4 frontend run surfaces: followed-run reconcile, Waiting, evidence report wrap/markdown/alert, schedule Run now feedback, in-thread start failure, rerank/citation copy (wave 1)
 - [x] 296-02-PLAN.md — W2a run lifecycle: SEED-363 guard, boot-sweep human ask pauses, truthful run ends, resume on the run model, worded schedule results (wave 2, DB)
 - [x] 296-03-PLAN.md — W3a describe/publish backend: bounded PDF reads, hollow-step + unticked-service notes, typed golden stand-ins, rerank/citation backend (wave 2)
-- [ ] 296-06-PLAN.md — W2b inbound/providers/wire: server required inputs, key fixes, pinned-model routing, Moonshot schema inliner, chat markup, wire typing (wave 3)
+- [x] 296-06-PLAN.md — W2b inbound/providers/wire: server required inputs, key fixes, pinned-model routing, Moonshot schema inliner, chat markup, wire typing (wave 3)
 - [x] 296-07-PLAN.md — W3b builder + describe UI: read-only Team view, draft persists, honest governance seal, describe-door UI, library note (wave 3)
 - [ ] 296-05-PLAN.md — W5 tests, gates, D-21 roster, G-4 drive, record flips, seeds, outcome table (wave 4, DB)
 
@@ -491,7 +491,7 @@ Plans:
 | 293. Start From Outside, and Close Out | 5/5 | Complete (2026-10-26) | 6/6 SC; operator signed G-4; SECURITY 36/36 closed (AR-05/06 accepted); UAT 12/12; not deployed, cloud mig 215 owed first |
 | 294. Decision Engine: Rerank and Citation Check | 5/5 | complete (2026-10-20) | 6/6 SC met in code; 294-HUMAN-UAT 9/9 passed live; roster R2 ⛔ Anthropic billing, glm-5.3 ⛔ BUG-261020-06; not pushed; cloud mig 211 owed before deploy |
 | 295. Runs That Don't Dead-End | 7/7 (+3 gap fixes) | Complete (2026-10-24) | S1-S7 PASS; Anthropic row re-run PASS; operator signed |
-| 296. Close v4.7 Debt | 5/7 | In Progress | - |
+| 296. Close v4.7 Debt | 6/7 | In Progress | - |
 
 ---
 
