@@ -657,6 +657,7 @@ node scripts/check-hot-file-ledger.cjs <phase-dir>   # 0 clear · 1 missing rows
 | `backend/app/services/watch_service.py` | 8 / 6 / 769 | ⚠ FIRES, absent here — row added 285-03 · honoured by construction (285-01) |
 | `backend/app/db/watches.py` | 6 / 4 / 828 | ⚠ FIRES, absent here — row added 285-03 · honoured by construction (285-02) |
 | `frontend/src/components/sources/RunHistoryList.tsx` | 5 / 3 / 275 | ⚠ now FIRES (285) — row added 285-03 · comment-only change (285-01) |
+| `frontend/nginx.conf` | 3 / 3 / 76 | ⚠ now FIRES — row added 293-REVIEW WR-01 · one proxy header · ⛔ |
 
 
 When a new phase enters discuss-phase, the orchestrator must scan PLAN.md `files_modified` against this ledger. Any match against a G-5-firing row means the discuss-phase produces a refactor recommendation as the first option, not the planned feature — and the phase reads that file's section in `docs/HOT-FILE-LEDGER.md` before planning, because that is where the named seam and the binding invariants live.
