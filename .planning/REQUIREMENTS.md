@@ -39,9 +39,9 @@ Seeds folded at intake: SEED-232, SEED-195, SEED-014, SEED-084, SEED-164, SEED-0
 
 ### Decision engine (DEC) — added 2026-10-20 by the operator, outside the milestone's workflow theme
 
-- [ ] **DEC-01**: A Settings switch turns the decision engine on or off and picks the engine: Jev (TypeSafe, ~~direct or~~ via OpenRouter), OpenAI Decisions (`gpt-6-luna`), or a local model. Off is the default and leaves retrieval exactly as it is today. *Amended 2026-10-20 (294-CONTEXT D-03, operator): Jev ships via OpenRouter only; TypeSafe direct is deferred.*
-- [ ] **DEC-02**: When on, knowledge-base search reranks its candidates with the chosen engine, accepts an optional steering instruction from the agent, and drops only candidates below a conservative threshold. Any engine failure falls back to the current order.
-- [ ] **DEC-03**: A user can check an answer's citations and see, for each cited sentence, whether its source supports it fully, partly, not at all, or contradicts it, with a confidence.
+- [x] **DEC-01**: A Settings switch turns the decision engine on or off and picks the engine: Jev (TypeSafe, ~~direct or~~ via OpenRouter), OpenAI Decisions (`gpt-6-luna`), or a local model. Off is the default and leaves retrieval exactly as it is today. *Amended 2026-10-20 (294-CONTEXT D-03, operator): Jev ships via OpenRouter only; TypeSafe direct is deferred.*
+- [x] **DEC-02**: When on, knowledge-base search reranks its candidates with the chosen engine, accepts an optional steering instruction from the agent, and drops only candidates below a conservative threshold. Any engine failure falls back to the current order.
+- [x] **DEC-03**: A user can check an answer's citations and see, for each cited sentence, whether its source supports it fully, partly, not at all, or contradicts it, with a confidence.
 
 ### Runs (RUN) — added 2026-10-20 by the operator, from measured run failures
 
@@ -85,13 +85,13 @@ Seeds folded at intake: SEED-232, SEED-195, SEED-014, SEED-084, SEED-164, SEED-0
 | START-02 | Phase 293 | Complete |
 | START-04 | Phase 293 | Complete |
 | REG-06 | Phase 293 | Complete |
-| DEC-01 | Phase 294 | Pending |
-| DEC-02 | Phase 294 | Pending |
-| DEC-03 | Phase 294 | Pending |
-| RUN-01 | Phase 295 | Verified (2026-10-21; G-4 sign-off owed) |
-| RUN-02 | Phase 295 | Verified (2026-10-21; G-4 sign-off owed) |
-| RUN-03 | Phase 295 | Verified (2026-10-21; G-4 sign-off owed) |
-| RUN-04 | Phase 295 | Verified (2026-10-21; G-4 sign-off owed) |
+| DEC-01 | Phase 294 | Complete (live 2026-10-20) |
+| DEC-02 | Phase 294 | Complete (live 2026-10-20) |
+| DEC-03 | Phase 294 | Complete (live 2026-10-20) |
+| RUN-01 | Phase 295 | Complete (operator signed 2026-10-24) |
+| RUN-02 | Phase 295 | Complete (operator signed 2026-10-24) |
+| RUN-03 | Phase 295 | Complete (operator signed 2026-10-24) |
+| RUN-04 | Phase 295 | Complete (operator signed 2026-10-24) |
 
 Mapped: 21/21, no orphans, no duplicates.
 

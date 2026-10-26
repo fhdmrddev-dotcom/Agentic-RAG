@@ -452,12 +452,12 @@ Plans:
 
 | Phase | Plans Complete | Status | Completed |
 |-------|----------------|--------|-----------|
-| 286. Seams Before Features | 0/TBD | Not started | - |
-| 287. Start From a Thread, Fork a Starter | 0/TBD | Not started | - |
+| 286. Seams Before Features | 5/5 | Complete (2026-10-18) | 4/4 SC verified |
+| 287. Start From a Thread, Fork a Starter | 5/5 | Complete (2026-10-19, human_needed) | SC#4 one-click ruling + Anthropic/OpenRouter rows owed |
 | 288. Drafts That Survive, Pauses That Publish | 4/4 | Complete (2026-10-24) | Anthropic row + S1 generate arm re-run PASS; SC#4 gap closed by 295; operator signed; BUG-261024-02 follow-up |
 | 289. The Run Page and Its Evidence | 5/5 | Complete (2026-10-20) | Operator approved G-4; Anthropic row blocked on billing; BUG-261020-01 (human answer not passed on) and BUG-261020-02 (CR-01 residual) open |
 | 290. The Card and the Team Picture | 4/4 | Complete (2026-10-24) | G-4 driven by Claude + operator signed; WR-02 accepted (a) |
-| 291. Describe It From Your Own Files | 0/TBD | Not started | - |
+| 291. Describe It From Your Own Files | 6/6 | Complete (2026-10-24) | verified passed; findings in deferred-items.md |
 | 292. More Ways to Show It | 3/3 | Complete (2026-10-24) | 4/4 SC; 8/8 board rows; review fixes; operator signed G-4; mig 213 applied to cloud |
 | 293. Start From Outside, and Close Out | 5/5 | Complete (2026-10-26) | 6/6 SC; operator signed G-4; SECURITY 36/36 closed (AR-05/06 accepted); UAT 12/12; not deployed, cloud mig 215 owed first |
 | 294. Decision Engine: Rerank and Citation Check | 5/5 | complete (2026-10-20) | 6/6 SC met in code; 294-HUMAN-UAT 9/9 passed live; roster R2 ⛔ Anthropic billing, glm-5.3 ⛔ BUG-261020-06; not pushed; cloud mig 211 owed before deploy |
