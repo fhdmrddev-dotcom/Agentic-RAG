@@ -381,7 +381,12 @@ function ariaLabelFor(phase: PhaseSpecJSON, title: string): string {
  * same body. "Grounded" is simply "there is a cause".
  */
 function isGrounded(phase: PhaseSpecJSON, kbTools: readonly string[]): boolean {
-  return groundingCauseOf(phase, kbTools) !== null
+  // 296-07 (BUG-261021-05, D-04 amended b): every cause EXCEPT `escalated`. `detected` gets
+  // the engine's synthesized citations gate (`grounding.effective_phase`) and `already-set` is
+  // the deliverable's own strict `citation_policy`, which the engine enforces; an escalated
+  // step is checked by nothing, so it no longer carries the seal.
+  const cause = groundingCauseOf(phase, kbTools)
+  return cause !== null && cause !== "escalated"
 }
 
 /** GOVERN-03 — is a checkpoint armed on this step? Delegated for the same reason.

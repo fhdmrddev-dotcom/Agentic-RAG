@@ -446,7 +446,10 @@ function gatesFor(phase: PhaseSpecJSON | null, kbTools: readonly string[]): Phas
   // `already-set` deliberately produces NO row. Its gate is owned by the Sourcing-
   // strictness control a few rows above, and 185-07's section says so in words; a second
   // claim here would be two surfaces one scroll apart describing one stored field.
-  return cause === "detected" || cause === "escalated"
+  // 296-07 (BUG-261021-05, D-04 amended to option b): `detected` ONLY. The engine's
+  // `grounding.effective_phase` attaches the citations gate for that cause and no other, so a
+  // locked gate row on an escalated step promised a check that never runs.
+  return cause === "detected"
     ? [{ label: GOVERNANCE_GATE_ROW_LABEL, locked: true }]
     : []
 }
@@ -2864,6 +2867,8 @@ export function WorkflowBuilderPage({
             filename: templateAsset?.filename,
             assetId: templateAsset?.assetId,
             onAttached: onTemplateAttached,
+            // 296-07 (291-S3-F2): the declared inputs, so a bound form's rows read as labels.
+            declaredInputs: Array.isArray(meta.inputs) ? (meta.inputs as Array<Record<string, unknown>>) : undefined,
           }}
           // 193.1-09 (SC#3) — SPREAD-CONDITIONAL, the `rails` shape below rather than the
           // `template` shape above, and the difference is deliberate: `template` is a control

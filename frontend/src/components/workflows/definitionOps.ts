@@ -540,6 +540,17 @@ export const GROUNDING_PUBLISH_CONSEQUENCE =
 /** Why the step is locked, when the cause is `escalated` — the one authored cause. */
 export const GROUNDING_WHY_ESCALATED = "Because you turned this on by hand."
 
+/**
+ * 296-07 (BUG-261021-05, D-04 amended to option b) — what an ESCALATED step is told instead of
+ * the attached-gate line. The engine attaches a citations check only for `detected`
+ * (`grounding.effective_phase`), so a step marked by hand that cannot search the documents is
+ * checked by nothing. Wording follows `GovernanceSection.tsx`'s llm_single trap note
+ * (Claude's discretion, recorded in 296-07-SUMMARY.md). The stored bit keeps its other
+ * meaning: it still removes Continue if a document tool is added later.
+ */
+export const GOVERNANCE_ESCALATED_UNCHECKED =
+  "Marked to prove its sources, but this step can't search your documents, so nothing is checked when it runs."
+
 /** The `already-set` reading: the strictness is the citation policy's, not this dial's. */
 export const GROUNDING_ALREADY_SET_NOTE =
   "This step already has to cite its sources — that comes from its citation policy above, not from this dial."

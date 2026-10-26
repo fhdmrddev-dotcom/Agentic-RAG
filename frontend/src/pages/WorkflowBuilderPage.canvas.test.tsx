@@ -1704,11 +1704,14 @@ describe("WorkflowBuilderPage 185-08 — the client-synthesized locked gate row"
     expect(latest().phases).toHaveLength(2)
     expect(latest().phases.map((p) => p.phase_index)).toEqual([0, 1])
 
-    // …and the synthesized row follows the new cause, with no reload and no server ask.
+    // …and the panel follows the new cause, with no reload and no server ask.
     await waitFor(() => expect(section.getAttribute("data-cause")).toBe("escalated"))
-    const rows = await screen.findAllByTestId("gate-row")
-    expect(rows).toHaveLength(1)
-    expect(rows[0].textContent).toContain(GOVERNANCE_GATE_ROW_LABEL)
+    // 296-07 (BUG-261021-05) — D-04 amended (b), 296: AMENDED DELIBERATELY. The engine attaches
+    // the citations gate for `detected` only, so an escalated step synthesizes NO locked gate
+    // row (it promised a check that never runs); the panel says nothing is checked instead.
+    expect(screen.queryAllByTestId("gate-row")).toHaveLength(0)
+    expect(screen.getByTestId("governance-escalated-no-check")).toBeInTheDocument()
+    expect(GOVERNANCE_GATE_ROW_LABEL.length).toBeGreaterThan(0)
   })
 
   it("the arming switch writes action_risk_armed and changes no step count or index", async () => {
@@ -2850,15 +2853,19 @@ describe("WorkflowBuilderPage 187-22 — CR-04: nothing the author does afterwar
     expect(strict).toHaveAttribute("aria-pressed", "false")
     fireEvent.click(strict)
 
-    // POSITIVE CONTROL — the author's escalation landed, and the canvas seal followed.
+    // POSITIVE CONTROL — the author's escalation landed.
     await waitFor(() =>
       expect(screen.getByTestId("governance-dial-strict")).toHaveAttribute("aria-pressed", "true"),
     )
+    // 296-07 (BUG-261021-05) — D-04 amended (b), 296: AMENDED DELIBERATELY. The canvas seal no
+    // longer follows an escalation (the engine checks nothing for that cause), so the control
+    // reads the panel's own cause instead of the seal.
     await waitFor(() =>
-      expect(
-        within(screen.getByTestId("canvas-node-judge")).getByTestId("canvas-node-seal"),
-      ).toBeInTheDocument(),
+      expect(screen.getByTestId("rail-governance")).toHaveAttribute("data-cause", "escalated"),
     )
+    expect(
+      within(screen.getByTestId("canvas-node-judge")).queryByTestId("canvas-node-seal"),
+    ).toBeNull()
 
     // The carried paragraph stays ABSENT and its count stays at its arrival value: the
     // author turned this on, and the card must not say "was already set to".

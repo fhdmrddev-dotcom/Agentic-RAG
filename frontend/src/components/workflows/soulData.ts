@@ -230,7 +230,9 @@ export function missingRequiredFields(
  * else the bare key — never a fabricated friendly name. Empty string when nothing is missing.
  */
 export function requiredFieldsMessage(missing: EntryInputField[]): string {
-  const names = missing.map((f) => f.label ?? f.key)
+  // 296-07 (287-IN-02): an empty or blank label falls back to the key, so a message never
+  // starts ` is required`.
+  const names = missing.map((f) => f.label?.trim() || f.key)
   if (names.length === 0) return ""
   if (names.length === 1) return `${names[0]} is required`
   return `${names.slice(0, -1).join(", ")} and ${names[names.length - 1]} are required`

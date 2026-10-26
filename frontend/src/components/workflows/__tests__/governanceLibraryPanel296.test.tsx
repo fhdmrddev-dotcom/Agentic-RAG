@@ -67,6 +67,13 @@ describe("BUG-261021-05 (D-04 amended b) — only `detected` claims a check", ()
   it("an escalated step is not grounded on the canvas; a detected one still is", () => {
     expect(groundedOf(escalated)).toBe(false)
     expect(groundedOf(detected)).toBe(true)
+    // `already-set` (a deliverable's own strict citation policy) is enforced by the engine too.
+    const strictEmit = {
+      slug: "brief",
+      phase_index: 0,
+      config: { phase_type: "llm_emit", citation_policy: "strict" },
+    } as PhaseSpecJSON
+    expect(groundedOf(strictEmit)).toBe(true)
   })
 
   it("so the corner seal does not render for it", () => {
@@ -92,7 +99,7 @@ describe("BUG-261021-05 (D-04 amended b) — only `detected` claims a check", ()
       />,
     )
     expect(screen.queryByTestId("governance-attached")).toBeNull()
-    expect(screen.getByTestId("governance-escalated-unchecked").textContent).toBe(sentence)
+    expect(screen.getByTestId("governance-escalated-no-check").textContent).toBe(sentence)
   })
 
   it("detected is unchanged: the attached gate still renders", () => {
@@ -106,7 +113,7 @@ describe("BUG-261021-05 (D-04 amended b) — only `detected` claims a check", ()
       />,
     )
     expect(screen.getByTestId("governance-attached")).toBeInTheDocument()
-    expect(screen.queryByTestId("governance-escalated-unchecked")).toBeNull()
+    expect(screen.queryByTestId("governance-escalated-no-check")).toBeNull()
   })
 
   it("the builder's gate rows claim `detected` only", () => {
