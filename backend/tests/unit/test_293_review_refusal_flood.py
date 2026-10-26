@@ -58,7 +58,9 @@ class _BrokenRedis(FakeRedis):
 @pytest.fixture
 def clock(monkeypatch):
     now = {"t": MINUTE + 5}
-    monkeypatch.setattr(rate_limit, "time", SimpleNamespace(time=lambda: now["t"]))
+    clock_ns = SimpleNamespace(time=lambda: now["t"])
+    monkeypatch.setattr(rate_limit, "time", clock_ns)  # the per-client limiter's window
+    monkeypatch.setattr(auth, "time", clock_ns)  # the refusal-audit window
     return now
 
 

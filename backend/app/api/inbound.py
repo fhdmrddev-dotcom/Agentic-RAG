@@ -61,6 +61,7 @@ from app.security.api_key_auth import (
     ResolvedKey,
     audit_key_call,
     audit_key_call_now,
+    refusal_audit_slot,
     resolve_api_key,
 )
 from app.services.inbound_inputs import (
@@ -69,7 +70,7 @@ from app.services.inbound_inputs import (
     inbound_kickoff,
     validate_inbound_inputs,
 )
-from app.services.rate_limit import enforce_ip_limit, enforce_key_limit, refusal_audit_slot
+from app.services.rate_limit import enforce_ip_limit, enforce_key_limit
 
 logger = logging.getLogger(__name__)
 

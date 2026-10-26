@@ -30,6 +30,7 @@ import hmac
 import logging
 import re
 import secrets
+import time
 from dataclasses import dataclass
 from datetime import datetime, timezone
 from typing import Any, Literal
@@ -42,7 +43,6 @@ from app import dependencies as deps
 from app.db import api_keys as api_keys_db
 from app.dependencies import get_pg_pool, get_redis, get_service_role_supabase
 from app.services.audit_service import write_audit_entry
-from app.services.rate_limit import refusal_audit_slot
 
 logger = logging.getLogger(__name__)
 
@@ -204,6 +204,64 @@ async def audit_key_call_now(
     await write_audit_entry(
         user_id, action_type, metadata, get_service_role_supabase(org), org_id=org
     )
+
+
+# ── 293-REVIEW CR-02 — refusal audits are counted, then written at most once a minute ───────
+# Every refusal by a known key used to await one ``audit_log`` insert, so a replayed revoked key
+# (refused before the limiter) or an over-limit flood turned the limiter into a write amplifier.
+# Now the FIRST refusal of a (key, reason) in a minute writes its row; the rest are counted in
+# ``apikey:refaudit:sup:{key}:{reason}`` and the next written row carries that count as
+# ``detail.suppressed``, so the ledger stays honest about how many there were.
+#
+# Fail-safe: with Redis down it falls back to an in-process window, so each worker still writes at
+# most one row per (key, reason, minute) — a CAP, never unbounded and never silent. The fallback
+# map is bounded; overflowing it clears it, which can cost one extra row per pair, never a flood.
+# It lives HERE, beside the audit writers, and not in ``services/rate_limit.py``: the limiter's
+# counts must never be process-local (two workers would admit twice the limit), while this window
+# can only ever WITHHOLD an audit row, never admit a call.
+_REFUSAL_WINDOW_PREFIX = "apikey:refaudit:"
+_SUPPRESSED_PREFIX = "apikey:refaudit:sup:"
+_SUPPRESSED_TTL = 30 * 24 * 3600  # the activity window (D-17)
+_LOCAL_MAX = 4_096
+_local_windows: dict[tuple[str, str], list[int]] = {}
+
+
+def _local_slot(key_id: str, reason: str, minute: int) -> int | None:
+    if len(_local_windows) >= _LOCAL_MAX:
+        _local_windows.clear()
+    entry = _local_windows.get((key_id, reason))
+    if entry is not None and entry[0] == minute:
+        entry[1] += 1
+        return None
+    _local_windows[(key_id, reason)] = [minute, 0]
+    return entry[1] if entry is not None else 0
+
+
+async def refusal_audit_slot(redis, *, key_id: str, reason: str) -> int | None:
+    """May this refusal write its audit row? ``None``: no, it was counted. An int: yes, and the
+    int is how many refusals of this (key, reason) were suppressed since the last written row."""
+    minute = int(time.time()) // 60
+    window = f"{_REFUSAL_WINDOW_PREFIX}{key_id}:{reason}:{minute}"
+    pending = f"{_SUPPRESSED_PREFIX}{key_id}:{reason}"
+    try:
+        async with redis.pipeline(transaction=True) as pipe:
+            pipe.incr(window)
+            pipe.expire(window, 120)
+            count, _ = await pipe.execute()
+        if count > 1:
+            async with redis.pipeline(transaction=True) as pipe:
+                pipe.incr(pending)
+                pipe.expire(pending, _SUPPRESSED_TTL)
+                await pipe.execute()
+            return None
+        async with redis.pipeline(transaction=True) as pipe:  # GET + DEL in one MULTI (Redis 5+)
+            pipe.get(pending)
+            pipe.delete(pending)
+            suppressed, _ = await pipe.execute()
+        return int(suppressed or 0)
+    except Exception:  # noqa: BLE001 — Redis down: the per-worker window still caps the writes
+        logger.warning("refusal-audit throttle fell back to the in-process window", exc_info=True)
+        return _local_slot(key_id, reason, minute)
 
 
 async def _refuse(row: dict, *, call: str, reason: str, redis) -> HTTPException:
