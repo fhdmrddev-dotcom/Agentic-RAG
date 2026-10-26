@@ -710,6 +710,17 @@ describe("ChatLayout — chat collects declared inputs BEFORE anything is create
     expect(mockPostMessage).not.toHaveBeenCalled()
   })
 
+  // 296-04 (287-IN-01): the refusal is about the PRESS; the next keystroke clears it.
+  it("the refusal clears on the next change in any field", async () => {
+    renderLayout()
+    fireEvent.click(screen.getByTestId("drive-launch-declared"))
+    await screen.findByTestId("chat-launch-form")
+    fireEvent.click(screen.getByTestId("chat-launch-confirm"))
+    await screen.findByTestId("chat-launch-required-refusal")
+    fireEvent.change(screen.getByTestId("run-input-to"), { target: { value: "a" } })
+    expect(screen.queryByTestId("chat-launch-required-refusal")).toBeNull()
+  })
+
   it("a `required: false` field left empty still sends an empty string — the key is PRESENT", async () => {
     renderLayout()
     fireEvent.click(screen.getByTestId("drive-launch-optional"))

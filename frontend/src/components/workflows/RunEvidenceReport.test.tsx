@@ -322,7 +322,8 @@ describe("RunEvidenceReport: the step log's evidence line (D-10 / SC#4 receipt a
 
 // ── Phase 295-05 (RUN-01 / RUN-04 / D-04 / D-22) — asserted by the WORDS on the page ───────
 
-const UNSOURCED_NOTE_295 = "This output was kept without sources — it does not cite your documents."
+// 296-04 (289-IN-06): neutral to a colleague — "any document", never "your documents".
+const UNSOURCED_NOTE_295 = "This output was kept without sources — it does not cite any document."
 
 describe("RunEvidenceReport: the unsourced mark in the step log (295-05, D-04)", () => {
   it("an unsourced step reads Unsourced, who continued, and the note; a sourced step reads none", async () => {
@@ -432,10 +433,118 @@ describe("RunEvidenceReport: hostile strings are text (T-289-20)", () => {
     p.phase_log[0].output_text = hostile
     const { container } = renderReport(p)
     await ready()
-    expect(container.querySelector("img")).toBeNull()
+    // 296-04 (289-F-B): a step output now goes through the shared MarkdownRenderer (marked +
+    // DOMPurify), so the output's markup is SANITISED rather than escaped: no handler survives
+    // anywhere. The name and the filename are still React text, never elements.
+    expect(container.querySelector("[onerror]")).toBeNull()
+    expect(screen.getByRole("heading", { level: 1 }).querySelector("img")).toBeNull()
     expect(screen.getByRole("heading", { level: 1 }).textContent).toBe(hostile)
+    expect(rows(4)[0].querySelector("img")).toBeNull()
     expect(rows(4)[0].textContent).toContain(hostile)
     await act(async () => {})
+  })
+})
+
+// ── Phase 296-04 (289-F-A / 289-F-B / 289-F-C / 289-IN-06 / BUG-261025-02) ──────────────────
+
+describe("RunEvidenceReport 296-04: step output renders as sanitised markdown (289-F-B)", () => {
+  it("a bold word and a list render as elements, not literal asterisks", async () => {
+    const p = ownerPayload()
+    p.phase_log[0].output_text = "**Bold** and a list\n\n- one\n- two"
+    renderReport(p)
+    await ready()
+    const row = rows(2)[0]
+    expect(row.querySelector("strong")?.textContent).toBe("Bold")
+    expect(row.querySelectorAll("li")).toHaveLength(2)
+    expect(row.textContent ?? "").not.toContain("**")
+  })
+
+  it("script content is sanitised away (T-296-10)", async () => {
+    const p = ownerPayload()
+    p.phase_log[0].output_text = "safe text<script>window.__pwned = 1</script>"
+    const { container } = renderReport(p)
+    await ready()
+    expect(container.querySelector("script")).toBeNull()
+    expect(rows(2)[0].textContent ?? "").toContain("safe text")
+    expect(rows(2)[0].textContent ?? "").not.toContain("__pwned")
+  })
+
+  it("the withheld sentence passes through as plain text", async () => {
+    const withheld = "This step builds on an earlier step you don't have access to, so its output is withheld too."
+    const p = colleaguePayload()
+    p.phase_log[1] = { ...p.phase_log[1], output_text: withheld }
+    renderReport(p)
+    await ready()
+    expect(rows(2)[1].textContent ?? "").toContain(withheld)
+  })
+})
+
+describe("RunEvidenceReport 296-04: a run watched into failed announces once (289-F-A)", () => {
+  it("with the prop, exactly one sr-only alert carries the band sentence", async () => {
+    getRunEvidence.mockResolvedValue(failedPayload())
+    const { container } = render(
+      <RunEvidenceReport runId={RUN_ID} onBack={vi.fn()} watchedFailure={'✕ Failed at "Draft"'} />,
+    )
+    await ready()
+    const alerts = Array.from(container.querySelectorAll('p[role="alert"].sr-only'))
+    expect(alerts).toHaveLength(1)
+    expect(alerts[0].textContent).toBe('✕ Failed at "Draft"')
+  })
+
+  it("without the prop (opened on a finished run), no alert renders", async () => {
+    const { container } = renderReport(failedPayload())
+    await ready()
+    expect(container.querySelectorAll('p[role="alert"].sr-only')).toHaveLength(0)
+  })
+})
+
+describe("RunEvidenceReport 296-04: an unlinked deliverable says why (289-F-C)", () => {
+  it("owner, file deliverable, no file id: a muted sentence replaces the download button", async () => {
+    const p = ownerPayload()
+    p.deliverable = { kind: "file", name: "committee_brief.docx", file_id: null }
+    renderReport(p)
+    await ready()
+    const note = screen.getByText("Download unavailable — this file has no link.")
+    expect(note.tagName).toBe("SPAN")
+    expect(note.className).toContain("text-muted-foreground")
+    expect(screen.queryByRole("button", { name: "Download the deliverable" })).toBeNull()
+  })
+
+  it("a colleague sees neither the button nor the sentence", async () => {
+    renderReport(colleaguePayload())
+    await ready()
+    expect(screen.queryByText("Download unavailable — this file has no link.")).toBeNull()
+    expect(screen.queryByRole("button", { name: "Download the deliverable" })).toBeNull()
+  })
+
+  it("a linked file keeps its download button and no sentence", async () => {
+    renderReport(ownerPayload())
+    await ready()
+    expect(screen.getByRole("button", { name: "Download the deliverable" })).toBeTruthy()
+    expect(screen.queryByText("Download unavailable — this file has no link.")).toBeNull()
+  })
+})
+
+describe("RunEvidenceReport 296-04: neutral wording to a colleague (289-IN-06)", () => {
+  it("the constants read the UI-SPEC A sentences exactly", async () => {
+    const vocab: Record<string, unknown> = await import("./evidenceVocabulary")
+    expect(vocab.NO_MATCH_EXPLANATION).toBe(
+      "The knowledge base returned nothing for this step — its output is not drawn from the knowledge base.",
+    )
+    expect(vocab.UNSOURCED_NOTE).toBe("This output was kept without sources — it does not cite any document.")
+    expect(vocab.DOWNLOAD_UNAVAILABLE).toBe("Download unavailable — this file has no link.")
+  })
+})
+
+describe("RunEvidenceReport 296-04: the header wraps instead of crushing the title (BUG-261025-02)", () => {
+  it("the title column keeps a 320px basis and the action group wraps to its own row", async () => {
+    renderReport(ownerPayload())
+    await ready()
+    const titleCol = screen.getByRole("heading", { level: 1 }).parentElement as HTMLElement
+    for (const c of ["min-w-0", "basis-80", "grow"]) expect(titleCol.classList.contains(c), c).toBe(true)
+    expect(titleCol.classList.contains("flex-1")).toBe(false)
+    const actions = screen.getByRole("button", { name: /Download JSON/ }).parentElement as HTMLElement
+    for (const c of ["flex", "flex-wrap", "grow-0", "shrink"]) expect(actions.classList.contains(c), c).toBe(true)
   })
 })
 
