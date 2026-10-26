@@ -30,11 +30,27 @@ from app.models.message import RESERVED_RUN_INPUT_KEYS
 
 MAX_VALUE_CHARS = 8000
 MAX_FIELDS = 50
+# 296-06 (293-IN-03): the whole-body cap on ``POST /inbound/.../runs``, checked from the
+# ``Content-Length`` header before FastAPI reads or parses the body. Derived from the two caps
+# above: every field at its full length, each character at JSON's worst case (a ``\uXXXX``
+# escape is 6 bytes), 256 bytes of key and quoting per field, and 1 KB for the envelope.
+INBOUND_MAX_BODY_BYTES = MAX_FIELDS * (MAX_VALUE_CHARS * 6 + 256) + 1024
+BODY_TOO_LARGE_DETAIL = (
+    f"This request is too large: send at most {INBOUND_MAX_BODY_BYTES // 1024} KB of inputs."
+)
 
-RefusalCode = Literal["unknown_input", "missing_input", "file_upload", "invalid_body"]
+RefusalCode = Literal[
+    "unknown_input", "missing_input", "file_upload", "needs_task", "invalid_body"
+]
 
 FILE_UPLOAD_DETAIL = (
     "This workflow needs a file upload, which a key can't send yet. Start it in the app."
+)
+# 296-06 (293-IN-06): a workflow that declares no launch field starts from the typed task (its
+# kickoff), and a key call has no task field to send one with (the inbound ``task`` field is a
+# v4.8 seed). Such a start would run on a bare ``Run <name>`` and tell the first step nothing.
+NEEDS_TASK_DETAIL = (
+    "This workflow starts from a typed task, which a key can't send yet. Start it in the app."
 )
 
 
@@ -111,6 +127,39 @@ def needs_file_upload(fields: list[DeclaredField]) -> bool:
     return any(f.type == "file" for f in fields)
 
 
+def needs_typed_task(fields: list[DeclaredField]) -> bool:
+    """296-06 (293-IN-06): True when the workflow declares no launch field at all, so it starts
+    from the typed task — the browser's ``entryInputFields`` falls back to ``kickoff_prompt`` for
+    exactly this shape. A key cannot send a typed task yet, so the picker greys it, ``create_key``
+    refuses it and an inbound start refuses it (``needs_task``)."""
+    return not fields
+
+
+def missing_required(definition: Any, inputs: Any) -> list[str]:
+    """296-06 (287-T01): the declared REQUIRED launch fields left blank, in declared order.
+
+    The ONE predicate for an in-app kickoff (``workflow_kickoff.preflight_workflow_kickoff``) and
+    a key call (``validate_inbound_inputs``). It is the Python twin of the browser's
+    ``soulData.missingRequiredFields(launchInputFields(def), values)``: the same declared fields
+    (``declared_fields``: reserved run keys and ``kb_auto`` inputs are never asked for, so never
+    missing; ``required`` reads True unless explicitly false), and blank means absent, ``None``
+    or whitespace-only. A number counts as given, as ``launch_kickoff`` writes it. Pinned to the
+    browser by the ``expected_missing`` cases in ``launch_fields_cases.json``.
+    """
+    raw = definition.model_dump(mode="json") if hasattr(definition, "model_dump") else definition
+    given = inputs if isinstance(inputs, dict) else {}
+    missing: list[str] = []
+    for field in declared_fields(raw):
+        if not field.required:
+            continue
+        value = given.get(field.key)
+        if isinstance(value, (int, float)) and not isinstance(value, bool):
+            continue
+        if not isinstance(value, str) or value.strip() == "":
+            missing.append(field.key)
+    return missing
+
+
 def _is_fenced(key: str) -> bool:
     return key.startswith("_") or key in RESERVED_RUN_INPUT_KEYS
 
@@ -142,6 +191,8 @@ def validate_inbound_inputs(definition: dict | None, inputs: Any) -> dict[str, s
             f"Unknown input field(s): {', '.join(names)}. This workflow accepts: {accepts}.",
             names,
         )
+    if needs_typed_task(fields):
+        raise InboundInputRefused("needs_task", NEEDS_TASK_DETAIL)
 
     out: dict[str, str] = {}
     for key, value in inputs.items():
@@ -157,10 +208,7 @@ def validate_inbound_inputs(definition: dict | None, inputs: Any) -> dict[str, s
             )
         out[key] = value
 
-    missing = [
-        f.key for f in declared.values()
-        if f.required and out.get(f.key, "").strip() == ""
-    ]
+    missing = [k for k in missing_required(definition, out) if k in declared]
     if missing:
         raise InboundInputRefused(
             "missing_input", f"Missing required input(s): {', '.join(missing)}.", missing

@@ -14,7 +14,11 @@ from uuid import UUID
 
 from pydantic import BaseModel, ConfigDict, Field, field_validator
 
-WorkflowRefState = Literal["startable", "unpublished", "deleted", "file_upload", "cannot_run"]
+# 296-06 (293-IN-06): ``needs_task`` — the workflow declares no launch field, so it starts from a
+# typed task a key cannot send.
+WorkflowRefState = Literal[
+    "startable", "unpublished", "deleted", "file_upload", "needs_task", "cannot_run"
+]
 KeyState = Literal["active", "expired", "revoked"]
 
 

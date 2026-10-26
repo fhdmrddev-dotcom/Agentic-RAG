@@ -160,8 +160,14 @@ async def launch_scheduled_run(
     if sched_max_duration == 600:
         sched_max_duration = 1_800
 
+    from app.services.inbound_inputs import launch_kickoff  # noqa: PLC0415
+
+    # 296-06 (291-S6-F8): the first step reads the kickoff, so the declared answers ride it as
+    # `key: value` lines, exactly as an in-app start (293-05 D-3). No answers: byte-identical.
+    _kickoff = launch_kickoff(raw_inputs.get("kickoff_prompt"), definition, raw_inputs)
     run_inputs = {
         **raw_inputs,
+        **({"kickoff_prompt": _kickoff} if _kickoff else {}),
         "_schedule_id": str(schedule["id"]),
         "_schedule_max_tokens_per_run": sched_max_tokens,
         "_schedule_max_duration_seconds": sched_max_duration,

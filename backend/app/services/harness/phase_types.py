@@ -597,6 +597,41 @@ async def _effective_model_checked(phase, ctx) -> str:
     return resolved
 
 
+async def _note_pinned_model_not_run(phase, ctx, model: str) -> None:
+    """296-06 (293-F-4) — an agent step that PINS a model runs through the sub-agent resolver
+    (``task_service._resolve_sub_agent_effective_model``), which keeps the run on the owner's
+    provider and swaps a model from another provider for that provider's model. Real
+    cross-provider sub-agent routing is a capability (D-03, seeded in 296-05); this only stops the
+    swap being SILENT, through the ``_effective_model_checked`` precedent: ONE ``model_fallback``
+    sub-step plus ONE ``policy_applied`` receipt with the sentence. No pin, or a pin that runs as
+    asked, says nothing. The resolver call is the same one the sub-agent makes, on the same
+    settings object and model, so the sentence names the model that actually runs."""
+    if not isinstance(getattr(phase.config, "model", None), str) or not isinstance(model, str):
+        return
+    from app.services.task_service import _resolve_sub_agent_effective_model  # noqa: PLC0415
+
+    settings_ = getattr(ctx, "user_settings", None)
+    try:
+        used = _resolve_sub_agent_effective_model(settings_, ctx_model=model)
+    except Exception:  # noqa: BLE001 — informational only; a notice must never sink a step
+        logger.warning("293-F-4: could not resolve the agent step's model for the notice", exc_info=True)
+        return
+    if not isinstance(used, str) or not used or used == model:
+        return
+    active = getattr(settings_, "active_provider", None) if settings_ is not None else None
+    pinned_provider = _provider_for_model(model, ctx)
+    message = (
+        f"This step asked for {model}, which runs on another provider, so it ran on {used} instead."
+        if pinned_provider and active and pinned_provider != active
+        else f"This step asked for {model}, but it ran on {used}."
+    )
+    await _emit_phase_substep(ctx, phase, status="model_fallback")
+    await _emit_audit(ctx, event_type="policy_applied", metadata={
+        "policy": "step_model_not_run", "phase": getattr(phase, "slug", None),
+        "requested_model": model, "used_model": used, "message": message,
+    })
+
+
 def _build_phase_tool_context(phase, ctx, *, model: str | None = None) -> ToolContext:
     """Build the ToolContext the sub-agent runs under for an LLM-agent phase.
 
@@ -922,6 +957,7 @@ async def _exec_llm_agent(phase, accumulated_outputs: dict, ctx) -> dict:
     description = (
         f"Phase: {phase.slug}\n\n{user_turn}" if user_turn else f"Phase: {phase.slug}"
     )
+    await _note_pinned_model_not_run(phase, ctx, model)  # 296-06 (293-F-4): never a silent swap
     result = await run_task_sub_agent(
         parent_ctx=phase_ctx,
         description=description,
@@ -1667,7 +1703,9 @@ async def _exec_llm_emit(phase, accumulated_outputs: dict, ctx) -> dict:
             result = await forced_emit(
                 messages=messages,
                 model=model,
-                provider=getattr(ctx, "provider", None) or _provider_for_model(model, ctx),
+                # 296-06 (293-F-4): a step that PINS a model goes to that model's provider.
+                provider=(getattr(phase.config, "model", None) and _provider_for_model(model, ctx))
+                or getattr(ctx, "provider", None) or _provider_for_model(model, ctx),
                 emitter=emitter,
                 tools=_emit_forced_tool(emitter),
                 user_settings=getattr(ctx, "user_settings", None),
@@ -1782,7 +1820,9 @@ async def _exec_llm_emit(phase, accumulated_outputs: dict, ctx) -> dict:
                 invented=gate["invented_citation_count"],
             ))
 
-            if retrieved_ids and attempt < _EMIT_MAX_ATTEMPTS:
+            # 296-06 (291-IN-01): the person's own input: ids are not evidence; with no KB source
+            # a retry can only name <doc> blocks that do not exist, so the first reject is final.
+            if (retrieved_ids - input_ids) and attempt < _EMIT_MAX_ATTEMPTS:
                 offenders = ", ".join(
                     (gate.get("uncited_leaves") or []) + (gate.get("invented_leaves") or [])
                 ) or "none"

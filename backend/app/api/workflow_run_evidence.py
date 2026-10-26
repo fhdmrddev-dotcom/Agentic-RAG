@@ -126,12 +126,9 @@ class RunEvidenceDeliverable(BaseModel):
     file_id: str | None = Field(default=None, description="Workspace file id; owner only.")
 
 
-class RunEvidenceConfidence(BaseModel):
-    level: str
-    avg_similarity: float | None = None
-    disclaimer: str | None = None
-    passages: int = 0
-    kb_label: str
+# 296-06 (289-IN-07): moved verbatim to the builder's module so the run read types the same
+# field from the same class; re-exported here under its old import path.
+from app.services.harness.phase_confidence import RunEvidenceConfidence  # noqa: E402
 
 
 class RunEvidenceHumanInput(BaseModel):

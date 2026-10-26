@@ -140,7 +140,12 @@ _EXPECTED_CALL_SITES = {
     #   active-org stamp (BUG-261021-02) above it; delete_workflow_cascade and the call are unchanged.
     #   Re-derived with `grep -n "await finish_run(" backend/app/api/workflows.py`.
     #   api/workflows.py:1572 → 1580
-    "api/workflows.py:1580",
+    # ⚠ RE-DERIVED at Phase 296 Plan 06: (a) the COUNTS stayed identical ("api/workflows.py": 1).
+    #   Only the position shifted (+10): delete_draft gained one `except ForeignKeyViolationError`
+    #   arm (293-DEL) above it; delete_workflow_cascade and the call are unchanged.
+    #   Re-derived with `grep -n "await finish_run(" backend/app/api/workflows.py`.
+    #   api/workflows.py:1580 → 1590
+    "api/workflows.py:1590",
     # ⚠ RE-DERIVED at Phase 256 round 1 (plan 256-05), and the originals are recorded
     # beside the new values rather than over them, because this fence's own docstring
     # asks for exactly that: check (a) — the per-file COUNTS — stayed identical, so no

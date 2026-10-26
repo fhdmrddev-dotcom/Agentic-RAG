@@ -273,6 +273,8 @@ def _call_shape(family: str, rest: str, *, line_start: bool) -> bool | None:
 
 # ── Code spans: an opener inside fenced code or inline code is content, not a call (Pitfall 6) ─────
 _FENCE_LINE = re.compile(r"(?m)^[ \t]*(`{3,}|~{3,})")
+# 296-06 (292.1-IN-01): a DSML opener starting a line ends an UNCLOSED fence (see _code_ranges).
+_LINE_START_DSML = re.compile(r"(?m)^[ \t]*" + DSML_OPENER_RE.pattern)
 _INLINE_CODE = re.compile(r"(`+)(?:(?!\1).)+?\1")
 
 
@@ -290,7 +292,14 @@ def _code_ranges(text: str) -> list[tuple[int, int]]:
             ranges.append((m.start(), len(text)))
             break
         c = close_re.search(text, eol + 1)
-        end = len(text) if c is None else c.end()
+        if c is None:
+            # 296-06 (292.1-IN-01): an unclosed fence is code only up to the next DSML opener that
+            # starts a line — else a model that opened a fence and then called a tool had its
+            # markup shown and saved raw. A CLOSED fence is unchanged (an example stays content).
+            d = _LINE_START_DSML.search(text, eol + 1)
+            end = len(text) if d is None else d.start()
+        else:
+            end = c.end()
         ranges.append((m.start(), end))
         pos = end
     # inline code, outside fences

@@ -78,6 +78,67 @@
       },
       "expected_keys": ["amount"],
       "expected_required": [true]
+    },
+    {
+      "name": "missing (296-06, 287-T01): a blank required value is missing, a blank optional one is not",
+      "definition": {
+        "inputs": [
+          {"key": "customer", "label": "Customer", "type": "text"},
+          {"key": "notes", "label": "Notes", "type": "text", "required": false}
+        ]
+      },
+      "expected_keys": ["customer", "notes"],
+      "expected_required": [true, false],
+      "inputs": {"customer": "   ", "notes": ""},
+      "expected_missing": ["customer"]
+    },
+    {
+      "name": "missing (296-06, 287-T01): a kb_auto and a reserved key are never missing",
+      "definition": {
+        "inputs": [
+          {"key": "policy", "label": "Policy", "type": "kb_auto", "source": "kb_auto"},
+          {"key": "kickoff_prompt", "label": "Kickoff", "type": "text"},
+          {"key": "topic", "label": "Topic", "type": "text"}
+        ]
+      },
+      "expected_keys": ["topic"],
+      "expected_required": [true],
+      "inputs": {},
+      "expected_missing": ["topic"]
+    },
+    {
+      "name": "missing (296-06, 287-T01): a file field the launcher shows is missing like any other",
+      "definition": {
+        "inputs": [
+          {"key": "contract", "label": "Contract", "type": "file"},
+          {"key": "customer", "label": "Customer", "type": "text"}
+        ]
+      },
+      "expected_keys": ["contract", "customer"],
+      "expected_required": [true, true],
+      "needs_file_upload": true,
+      "inputs": {"customer": "Acme"},
+      "expected_missing": ["contract"]
+    },
+    {
+      "name": "missing (296-06, 287-T01): legacy input_keys are all required, in declared order",
+      "definition": {"input_keys": ["customer", "contract_text", "region"]},
+      "expected_keys": ["customer", "contract_text", "region"],
+      "expected_required": [true, true, true],
+      "inputs": {"contract_text": "x"},
+      "expected_missing": ["customer", "region"]
+    },
+    {
+      "name": "missing (296-06, 287-T01): a filled required value misses nothing",
+      "definition": {
+        "inputs": [
+          {"key": "amount", "label": "Amount", "type": "number", "required": null}
+        ]
+      },
+      "expected_keys": ["amount"],
+      "expected_required": [true],
+      "inputs": {"amount": "12"},
+      "expected_missing": []
     }
   ]
 }

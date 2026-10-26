@@ -78,6 +78,7 @@ const REFUSED_WORDS: Record<Exclude<ApiKeyWorkflowRef["state"], "startable">, { 
   deleted: { chip: C.card.chipDeleted, line: C.card.lineDeleted },
   cannot_run: { chip: C.card.chipCannotRun, line: C.card.lineCannotRun },
   file_upload: { chip: C.card.chipFileUpload, line: C.card.lineFileUpload },
+  needs_task: { chip: C.card.chipNeedsTask, line: C.card.lineNeedsTask },
 }
 
 function chipFacts(w: ApiKeyWorkflowRef): { chip: KeyChipFacts; line: string | null } {
@@ -234,6 +235,8 @@ function refusedWords(call: ApiKeyCall, ctx: CallContext): string | null {
     }
     case "file_upload":
       return C.calls.fileUpload
+    case "needs_task":
+      return C.calls.needsTask
     case "invalid_body":
       return C.calls.invalidBody
     case "no_template":
@@ -297,7 +300,9 @@ export function callDetailLine(call: ApiKeyCall, ctx: CallContext, now: Date): s
 /** A picker row: its declared keys on the right (or "no inputs"), or why it can't be picked. */
 export function startableRowFacts(w: StartableWorkflow): { disabled: boolean; right: string } {
   if (!w.startable) {
-    return { disabled: true, right: w.reason === "file_upload" ? C.draft.fileUpload : C.draft.cannotPick }
+    const right =
+      w.reason === "file_upload" ? C.draft.fileUpload : w.reason === "needs_task" ? C.draft.needsTask : C.draft.cannotPick
+    return { disabled: true, right }
   }
   return { disabled: false, right: w.fields.length ? w.fields.map((f) => f.key).join(", ") : C.draft.noInputs }
 }

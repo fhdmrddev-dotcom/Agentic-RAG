@@ -411,7 +411,7 @@ node scripts/check-hot-file-ledger.cjs <phase-dir>   # 0 clear · 1 missing rows
 | `frontend/src/components/chat/ToolCallPanel.tsx` | 51 / 23 / 351 | ✅ **G-5 DISCHARGED (227-02)** |
 | `frontend/src/components/chat/MessageItem.tsx` | 84 / 39 / 1059 (was `83 / 42 / 1050`) | 292.1 UAT: Deep Continue re-attaches the run's stream (+1 else-if) · ⛔ |
 | `frontend/src/components/chat/CitationList.tsx` | 5 / 5 / 91 | 294-05: ONE CitationCheckAction beside the trigger · extraction FIRST |
-| `backend/app/api/threads.py` | 282 / 94 / 2744 (was `281 / 94 / 2743`) | 293-05 D-3: kickoff via launch_kickoff (1 call, 1 import name) · ⛔ |
+| `backend/app/api/threads.py` | 283 / 95 / 2745 (was `282 / 94 / 2744`) | 296-06: one provider= kwarg at the kickoff create_workflow_run · ⛔ |
 | `frontend/src/providers/StreamsProvider.tsx` | 117 / 45 / 5218 (was `116 / 44 / 5210`) | 296-04: one guarded reconcile in the follow terminal · ⛔ |
 | `frontend/src/hooks/useMessages.ts` | 74 / 27 / 127 | extraction due |
 | `backend/app/services/anthropic_service.py` | 12 / 11 / 373 (was `11 / 10 / 354`) | honoured by construction (282-01: constructor kwargs) · adapter audit due |
@@ -419,7 +419,7 @@ node scripts/check-hot-file-ledger.cjs <phase-dir>   # 0 clear · 1 missing rows
 | `frontend/src/components/workflows/WorkflowCanvas.tsx` | 33 / 11 / 1757 (was `32 / 10 / 1744`) | 296-07: D-09 one controlled view pair; extraction FIRST next · ⛔ |
 | `frontend/src/components/workflows/FlowEdge.tsx` | 3 / 3 / 462 | honoured by construction (200) |
 | `frontend/src/components/workflows/PhaseNodeCard.tsx` | 18 / 9 / 490 (was `17 / 8 / 489`) | 290: forecast unused — chips went on the library card, not here |
-| `backend/app/services/harness/phase_types.py` | 64 / 33 / 3095 (was `63 / 32 / 3081`) | 296-03: one helper + one call (filled_field_count, S7-F1) · G-5 OWED |
+| `backend/app/services/harness/phase_types.py` | 66 / 33 / 3135 (was `65 / 33 / 3131`) | 296-06: emit pin precedence, retry guard, 1 notice helper · G-5 OWED |
 | `backend/app/services/tools/render_template.py` | 6 / 3 / 1163 (was `3 / 2 / 1094`) | 296-03: button /V written as a name, read back typed · now FIRES · ⛔ |
 | `frontend/src/pages/WorkflowsPage.tsx` | 47 / 20 / 1462 (was `46 / 19 / 1453`) | 296-07: publish notes carried + shown under the run-CTA line |
 | `frontend/src/components/workflows/library/WorkflowCard.tsx` | 26 / 11 / 1373 (was `25 / 10 / 1371`) | 296-07: comment-only (MARK_ICON docblock, 286-S04-2) |
@@ -431,10 +431,11 @@ node scripts/check-hot-file-ledger.cjs <phase-dir>   # 0 clear · 1 missing rows
 | `frontend/src/components/workflows/DraftArrivalCard.tsx` | 5 / 4 / 688 (was `4 / 3 / 625`) | 291-05: two optional props + one fold boolean; rows in a leaf · ⛔ |
 | `frontend/src/components/workflows/DecisionsList.tsx` | 5 / 3 / 429 | ⚠ now FIRES (291) · 291-05: one optional prop, one template-row sub-line |
 | `frontend/src/components/workflows/decisionsVocabulary.ts` | 6 / 4 / 344 (was `4 / 3 / 327`) | 291-05: one glyph + one formatter, still a zero-import leaf · ⛔ |
-| `backend/app/api/workflows.py` | 48 / 26 / 1689 (was `47 / 25 / 1681`) | 296-01: create_draft stamps the active org (1 param, 1 stamp) · split OWED |
-| `backend/app/api/workflow_wire.py` | 3 / 3 / 517 | ⚠ now FIRES (291) · 291-01: describe read + reference wire models, additive |
-| `backend/app/api/workflow_runs.py` | 20 / 14 / 1444 (was `18 / 13 / 1455`) | 293-03: origin on 2 models + 2 selects, one name lookup · extraction FIRST |
-| `backend/app/api/workflow_run_evidence.py` | 5 / 4 / 408 (was `4 / 3 / 405`) | 296-01: non-UUID cited ids dropped before the uuid[] cast |
+| `backend/app/api/workflows.py` | 50 / 26 / 1699 (was `49 / 26 / 1699`) | 296-06: delete_draft FK arm → worded 409 · split OWED |
+| `backend/app/api/workflow_wire.py` | 4 / 4 / 532 (was `3 / 3 / 517`) | 296-06: AutoAnsweredNote + unplaced_sentences, additive |
+| `backend/app/api/workflow_authoring_doors.py` | 5 / 3 / 797 (was `4 / 2 / 793`) | ⚠ now FIRES (296) · 296-06: bind returns unplaced_sentences |
+| `backend/app/api/workflow_runs.py` | 21 / 15 / 1445 (was `20 / 14 / 1444`) | 296-06: confidence typed (1 import name, 1 annotation) · extraction FIRST |
+| `backend/app/api/workflow_run_evidence.py` | 6 / 4 / 405 (was `5 / 4 / 408`) | 296-06: RunEvidenceConfidence re-exported (move only) |
 | `backend/app/services/run_evidence.py` | 6 / 4 / 555 | ⚠ FIRES, absent here — row added 296-01 · D-05 withheld cascade · ⛔ |
 | `frontend/src/lib/api/runEvidence.ts` | 3 / 3 / 137 | ⚠ now FIRES (293) — row added 293-03 · one optional field |
 | `frontend/src/components/workflows/evidenceView.ts` | 4 / 3 / 387 | ⚠ now FIRES (293) — row added 293-03 · origin passed through |
@@ -450,7 +451,7 @@ node scripts/check-hot-file-ledger.cjs <phase-dir>   # 0 clear · 1 missing rows
 | `backend/app/services/harness/grounding.py` | 23 / 10 / 1437 (was `21 / 8 / 1414`) | 295-03: ONE pure predicate (is_engine_citation_gate) |
 | `frontend/src/components/workflows/PhaseFormPanel.tsx` | 30 / 14 / 1566 | honoured by construction ×6 (185 / 193 / 193.1 / 199 / 200 / **214**) |
 | `backend/app/db/workflows.py` | 63 / 31 / 2862 (was `59 / 30 / 2827`) | 296-01 org_id kwarg; 296-02 resume provider + _awaiting_answer strip |
-| `backend/app/services/harness/publish_service.py` | 35 / 16 / 2057 (was `34 / 15 / 2010`) | 296-03: typed golden stand-ins + note (pure helper); ceiling in seconds |
+| `backend/app/services/harness/publish_service.py` | 36 / 16 / 2061 (was `35 / 16 / 2057`) | 296-06: golden kickoff via launch_kickoff (S6-F8), one statement |
 | `backend/app/services/workflow_authoring.py` | 23 / 13 / 1269 (was `18 / 12 / 1120`) | 296-03: unticked told; provider_error; file-free requirement · seam OWED |
 | `backend/app/models/harness.py` | 22 / 20 / 776 (was `20 / 19 / 766`) | 291-02: InputFieldSpec origin + note, omitted when absent |
 | `frontend/src/components/workflows/builderStore.ts` | 16 / 9 / 1039 (was `14 / 8 / 968`) | 291: two actions (refs, input source), no state field |
@@ -460,6 +461,7 @@ node scripts/check-hot-file-ledger.cjs <phase-dir>   # 0 clear · 1 missing rows
 | `frontend/src/pages/admin/AdminSpendPage.tsx` | 9 / 3 / 974 | ⚠ NOW FIRES (crossed in 268) · extraction FIRST next · ⛔ |
 | `backend/app/services/run_producer.py` | 26 / 14 / 1220 (was `25 / 13 / 1212`) | 296-02: F2 cancelled escape records the stopper (one read, one call) |
 | `backend/app/services/task_service.py` | 28 / 15 / 1038 (was `27 / 14 / 1023`) | 292.1-REVIEW WR-02: provider-blind strip_markup on phase output (+15) |
+| `backend/app/services/sub_agent_models.py` | 5 / 3 / 263 (was absent) | ⚠ absent its ENTIRE LIFE — row added 296-06; not touched |
 | `backend/app/services/run_reconciler.py` | 6 / 4 / 415 (was `5 / 3 / 406`) | 296-02: all steps completed → completed (one column, one condition) |
 | `backend/app/services/circuit_breaker.py` | 1 / 1 / 331 | ⚠ absent its ENTIRE LIFE — row added 256-02 · ⛔ |
 | `backend/app/api/runs.py` | 53 / 23 / 2033 (was `52 / 22 / 2003`) | 296-02: 4 small touches (worded reason, return, held retry, select) · ⛔ |
@@ -494,8 +496,8 @@ node scripts/check-hot-file-ledger.cjs <phase-dir>   # 0 clear · 1 missing rows
 | `scripts/vitest-count-gate.cjs` | 352 / 79 / 6733 (was `350 / 79 / 6728`) | 293-03: 3 pins added (1 FILE-LEVEL), 4 raised, none lowered |
 | `scripts/check-deploy-drift.sh` | 5 / 4 / 267 | ⚠ absent its ENTIRE LIFE — row added 294-05 · fault var omitted |
 | `scripts/build-public-openapi.cjs` | 7 / 3 / 468 | ⚠ now FIRES (294) · 294-03: citation_checks tag (one line) |
-| `backend/app/services/eval_runner_service.py` | 13 / 8 / 1040 | ⚠ STALE · last touch 256-03 |
-| `backend/app/services/scheduler_service.py` | 11 / 6 / 308 (was `10 / 6 / 290`) | 293-REVIEW CR-01: one kill-switch check + one refusal helper |
+| `backend/app/services/eval_runner_service.py` | 14 / 9 / 1056 (was `13 / 8 / 1040`) | 296-06: eval arm on a fixed EVAL_MAX_TOOL_ROUNDS (copy of settings) |
+| `backend/app/services/scheduler_service.py` | 12 / 7 / 314 (was `11 / 6 / 308`) | 296-06: scheduled kickoff via launch_kickoff (S6-F8), else byte-identical |
 | `backend/app/api/schedules.py` | 4 / 4 / 299 | ⚠ FIRES, absent here — row added 296-02 · worded Run now (outcome) |
 | `backend/app/models/schedule.py` | 3 / 3 / 231 | ⚠ FIRES, absent here — row added 296-02 · one additive field (outcome) |
 | `frontend/src/components/panel/PhaseCard.tsx` | 21 / 14 / 817 (was `20 / 13 / 811`) | 296-04: ONE prop (runPaused) → Waiting reading |
@@ -540,7 +542,7 @@ node scripts/check-hot-file-ledger.cjs <phase-dir>   # 0 clear · 1 missing rows
 | `backend/app/models/message.py` | 25 / 17 / 292 (was `24 / 16 / 287`) | 293-03: ONE field (run_origin, a dict: a harness import is circular) |
 | `backend/app/models/user_settings.py` | 61 / 37 / 1776 (was `60 / 36 / 1769`) | 293-01: two per-key limit fields + _val · ⛔ |
 | `backend/app/services/harness/reachability.py` | 5 / 5 / 498 (was `4 / 4 / 463`) | 295-02: one pure lint check (no_template_bound) |
-| `backend/app/services/workflow_kickoff.py` | 12 / 9 / 597 (was `12 / 8 / 597`) | 293-05 D-3: kickoff via launch_kickoff (twin of threads.py) |
+| `backend/app/services/workflow_kickoff.py` | 13 / 10 / 602 (was `12 / 9 / 597`) | 296-06: one missing_required guard in preflight (422, before any write) |
 | `frontend/src/components/workflows/WorkflowScheduleModal.tsx` | 5 / 4 / 723 (was `3 / 3 / 601`) | 296-04: row-local Run now result + required refusal |
 | `frontend/src/components/workflows/nodePresentation.ts` | 8 / 7 / 221 | ⚠ absent from BOTH for its ENTIRE LIFE at **7 phases** |
 | `frontend/src/lib/api/threads.ts` | 24 / 14 / 1994 (was `23 / 13 / 1992`) | 293-03: origin on ThreadWorkflowState (types only) · ⛔ |
@@ -558,7 +560,7 @@ node scripts/check-hot-file-ledger.cjs <phase-dir>   # 0 clear · 1 missing rows
 | `frontend/src/hooks/useDocuments.ts` | 10 / 5 / 164 (was `8 / 3 / 120`) | 284-03: no list of its own; Realtime only asks for a refetch · ⛔ |
 | `frontend/src/pages/KnowledgeHealthPage.tsx` | 12 / 6 / **DELETED** | **RETIRED (217.1-14)** |
 | `backend/app/api/knowledge_health.py` | 11 / 6 / 737 | honoured by construction (**217.1-11**) |
-| `backend/app/services/agent_loop.py` | 78 / 35 / 3776 (was `76 / 35 / 3766`) | 292.1 option A: empty cap round pauses with Continue · ⛔ |
+| `backend/app/services/agent_loop.py` | 78 / 36 / 3782 (was `78 / 35 / 3776`) | 296-06: save-point log w/o preview; substituted notice streamed · ⛔ |
 | `backend/app/services/tool_dispatcher.py` | 99 / 44 / 274 (was `98 / 43 / 5068`) | ✅ G-5 DISCHARGED (278-03): registry only; handlers in services/tools/ · ⛔ |
 | `backend/app/services/search_documents_tool.py` | 11 / 3 / 1544 | ⚠ now FIRES (294) · 294-01: instruction clamp (+25 −3) · extraction FIRST |
 | `backend/app/api/document_governance.py` | 5 / 3 / 416 | ⚠ absent at 3 phases. ⚠ Its low-confidence cutoff is the ConfidenceChi |
@@ -610,7 +612,7 @@ node scripts/check-hot-file-ledger.cjs <phase-dir>   # 0 clear · 1 missing rows
 | `backend/app/api/skills.py` | 20 / 10 / 859 (was `19 / 10 / 858`) | ⛔ FIRES · last touch 280-01 (6 maybe_row guards) |
 | `frontend/src/lib/api/skills.ts` | 9 / 6 / 767 (was `8 / 5 / 761`) | 293-03: two optional limit fields on FullAppSettings + SettingsUpdate |
 | `backend/app/services/openai_service.py` | 84 / 42 / 2731 (was `81 / 41 / 2623`) | 292: SHOW_ARTIFACT_TOOL schema + description only (30 tools) · ⛔ |
-| `backend/app/services/provider_gateway/openai_compat.py` | 9 / 6 / 466 (was `7 / 5 / 537`) | 292.1-01: deepseek-only DSML strip deleted (D-01/D-02); a pure deletion |
+| `backend/app/services/provider_gateway/openai_compat.py` | 10 / 7 / 468 (was `9 / 6 / 466`) | 296-06: one moonshot_tools conditional keyed on the endpoint provider |
 | `backend/app/services/provider_gateway/dispatcher.py` | 10 / 4 / 260 (was `6 / 2 / 153`) | ⚠ FIRES (row was stale) · 282-01: off-loop open, shared deadline · ⛔ |
 | `backend/app/services/provider_gateway/openai_responses.py` | 4 / 3 / 570 (was `2 / 2 / 573`) | ⚠ now FIRES · 292.1-REVIEW IN-03: dead dsml_leaked flag deleted · ⛔ |
 | `frontend/src/lib/api/admin.ts` | 10 / 5 / 1125 (was `9 / 5 / 1122`) | ⚠ FIRES · quick-261024: optional `returned` on discovery outcome · ⛔ |

@@ -119,10 +119,12 @@ def store(monkeypatch):
                 continue
             if owner_id is not None and str(k["user_id"]) != str(owner_id):
                 continue
-            if k["revoked_at"] is None:
+            revoked_now = k["revoked_at"] is None
+            if revoked_now:
                 k["revoked_at"] = datetime.now(timezone.utc)
                 k["revoked_by"] = uuid.UUID(str(revoked_by))
-            return s.project(k)
+            # 296-06 (293-IN-08): the db reports whether THIS call set revoked_at ("UPDATE 1").
+            return {**s.project(k), "revoked_now": revoked_now}
         return None
 
     async def list_key_calls(pool, *, org_id, key_ids, since, per_key=50):
@@ -281,11 +283,18 @@ def test_create_with_an_unlisted_expiry_is_refused(client, store):
     assert _create(client, expires_in_days=7).status_code == 422
 
 
+WF_PUB2 = "55555555-5555-4555-8555-000000000006"
+
+
 def test_create_pins_the_definition_row_id_and_snapshots_its_name(client, store):
-    _create(client, workflow_ids=[WF_PUB, WF_GLOBAL])
+    # 296-06 (293-IN-06): reconciled on purpose. This used WF_GLOBAL, but create_key now refuses
+    # any workflow the picker hides (a published global is not on the picker), so the second
+    # workflow is another of the caller's own published ones. The pin/snapshot rule is unchanged.
+    store.workflows[WF_PUB2] = _wf(WF_PUB2, "Supplier intake")
+    _create(client, workflow_ids=[WF_PUB, WF_PUB2])
     assert store.keys[0]["workflows"] == [
         {"id": WF_PUB, "name": "Contract review"},
-        {"id": WF_GLOBAL, "name": "Starter summary"},
+        {"id": WF_PUB2, "name": "Supplier intake"},
     ]
 
 
@@ -392,11 +401,13 @@ def test_list_shows_only_the_callers_keys(client, store):
 
 
 def test_list_computes_each_workflow_state_live(client, store):
-    _create(client, workflow_ids=[WF_PUB, WF_GLOBAL])
+    # 296-06 (293-IN-06): reconciled on purpose (WF_GLOBAL is no longer key-creatable; see above).
+    store.workflows[WF_PUB2] = _wf(WF_PUB2, "Supplier intake")
+    _create(client, workflow_ids=[WF_PUB, WF_PUB2])
     store.workflows[WF_PUB]["status"] = "draft"   # unpublished after the key was made
-    del store.workflows[WF_GLOBAL]                 # deleted
+    del store.workflows[WF_PUB2]                   # deleted
     refs = client.get("/api-keys").json()["keys"][0]["workflows"]
-    assert [(w["id"], w["state"]) for w in refs] == [(WF_PUB, "unpublished"), (WF_GLOBAL, "deleted")]
+    assert [(w["id"], w["state"]) for w in refs] == [(WF_PUB, "unpublished"), (WF_PUB2, "deleted")]
 
 
 def test_a_revoked_and_an_expired_key_read_as_such(client, store):

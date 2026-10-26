@@ -53,6 +53,8 @@ from uuid import UUID
 
 import asyncpg
 from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, Request, Response, status
+from fastapi.responses import JSONResponse
+from fastapi.routing import APIRoute
 from pydantic import BaseModel, ConfigDict, Field, WithJsonSchema
 
 from app.db import api_keys as api_keys_db
@@ -65,6 +67,8 @@ from app.security.api_key_auth import (
     resolve_api_key,
 )
 from app.services.inbound_inputs import (
+    BODY_TOO_LARGE_DETAIL,
+    INBOUND_MAX_BODY_BYTES,
     UNTRUSTED_FLAG,
     InboundInputRefused,
     inbound_kickoff,
@@ -74,7 +78,27 @@ from app.services.rate_limit import enforce_ip_limit, enforce_key_limit
 
 logger = logging.getLogger(__name__)
 
-router = APIRouter(prefix="/inbound", tags=["inbound"])
+
+
+class _BodyCapRoute(APIRoute):
+    """296-06 (293-IN-03): refuse an oversize body with 413 from its ``Content-Length`` header,
+    BEFORE FastAPI reads and parses it (a dependency or the handler would run after the read).
+    The cap is ``INBOUND_MAX_BODY_BYTES``, derived from the per-field caps. A request with no
+    body (every GET here) carries no length and passes untouched."""
+
+    def get_route_handler(self):
+        handler = super().get_route_handler()
+
+        async def capped(request: Request):
+            size = request.headers.get("content-length", "")
+            if size.isdigit() and int(size) > INBOUND_MAX_BODY_BYTES:
+                return JSONResponse(status_code=413, content={"detail": BODY_TOO_LARGE_DETAIL})
+            return await handler(request)
+
+        return capped
+
+
+router = APIRouter(prefix="/inbound", tags=["inbound"], route_class=_BodyCapRoute)
 
 # A1 — the scheduler's defaults: an inbound run is equally unattended.
 _DEFAULT_MAX_TOKENS = 500_000
@@ -594,10 +618,9 @@ async def download_inbound_file(
     that run's own (T-293-16)."""
     if not _TOKEN_RE.fullmatch(token or ""):
         raise _not_found()
-    async with redis.pipeline(transaction=True) as pipe:  # GET + DEL in one MULTI: one use
-        pipe.get(f"{_DOWNLOAD_PREFIX}{token}")
-        pipe.delete(f"{_DOWNLOAD_PREFIX}{token}")
-        raw, _deleted = await pipe.execute()
+    # 296-06 (293-IN-01): PEEK at the token here; it is consumed only after the per-key limiter
+    # passed, so a 429/503 (or a live-check refusal) never burns a valid link.
+    raw = await redis.get(f"{_DOWNLOAD_PREFIX}{token}")
     if not raw:
         raise _not_found()
     try:
@@ -632,6 +655,12 @@ async def download_inbound_file(
         label=key_row["label"], workflows=[], expires_at=expires_at,
     )
     await _limit(redis, key, "read", run_id=str(run_id))
+    async with redis.pipeline(transaction=True) as pipe:  # GET + DEL in one MULTI: one use
+        pipe.get(f"{_DOWNLOAD_PREFIX}{token}")
+        pipe.delete(f"{_DOWNLOAD_PREFIX}{token}")
+        consumed, _deleted = await pipe.execute()
+    if consumed != raw:  # another request used it between the peek and here
+        raise _not_found()
 
     run = await pool.fetchrow(_RUN_THREAD_SQL, run_id, key_id, UUID(key.user_id))
     from app.db import workspace as workspace_db  # noqa: PLC0415

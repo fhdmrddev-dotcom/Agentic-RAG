@@ -2086,6 +2086,7 @@ async def send_message(
                 **({"folder_id": str(body.folder_id)} if body.folder_id else {}),
             },
             model=_resolved_model,                      # SEED-047
+            provider=_resolved_provider,  # 296-06 (SEED-362): a resume continues on this provider
             # Phase 092-05 F1: persist the run-owner so harness_audit writes
             # (NOT NULL user_id) and the resume path resolve a real user.
             user_id=UUID(current_user["id"]) if isinstance(current_user["id"], str) else current_user["id"],

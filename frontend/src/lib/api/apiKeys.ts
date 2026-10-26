@@ -19,7 +19,7 @@ import { API_BASE, ApiError, entitlementRefusalMessage, getAuthHeaders } from ".
 export interface ApiKeyWorkflowRef {
   id: string
   name: string
-  state: "startable" | "unpublished" | "deleted" | "file_upload" | "cannot_run"
+  state: "startable" | "unpublished" | "deleted" | "file_upload" | "needs_task" | "cannot_run"
 }
 
 /** One call made with a key, read from the audit log (D-17). */

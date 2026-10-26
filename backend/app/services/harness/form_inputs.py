@@ -75,6 +75,10 @@ def overlay_user_inputs(
         answer = _answer(run_inputs.get(key))
         if answer is not None:
             overlay[field] = (answer, key)
+        elif _get(spec, "required", True) is False:
+            # 296-06 (291-IN-06): an optional input the person left blank is an explicit null,
+            # so the model cannot fill the field from somewhere else. No id is minted for it.
+            overlay[field] = (None, key)
     if not overlay:
         return legacy_map, set()
 
@@ -93,6 +97,9 @@ def overlay_user_inputs(
             cited["source_chunk_id"] = None
     ids: set[str] = set()
     for field, (answer, input_key) in overlay.items():
+        if answer is None:  # 296-06 (291-IN-06): left blank on purpose; nothing to cite
+            scalars[field] = {"value": None, "source_chunk_id": None, "source_doc": None, "source_page": None}
+            continue
         cid = f"{_INPUT_CITATION_PREFIX}{input_key}"
         scalars[field] = {"value": answer, "source_chunk_id": cid, "source_doc": None, "source_page": None}
         ids.add(cid)

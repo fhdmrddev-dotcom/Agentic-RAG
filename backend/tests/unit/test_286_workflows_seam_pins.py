@@ -75,6 +75,18 @@ OpenAPI). ``PIN286_CAPTURE=1`` was run once and each fixture diff was read:
 ``workflows_openapi.json`` +2 / −2 (exactly the two ``maxItems`` values);
 ``workflows_moved_ast.json`` and ``workflows_routes.json`` showed no numstat (the capture
 rewrote only their line endings, restored).
+
+DELIBERATE RE-BASELINE (Phase 296-06, 2026-10-26): three wire-typing rows. 288-IN-01 typed
+``PublishVerdict.auto_answered`` as ``list[AutoAnsweredNote]`` (``{phase: str | None, message:
+str}``); 291-IN-03 added ``TemplateAssetRef.unplaced_sentences: list[str]`` (default ``[]``) and
+``upload_workflow_template`` now fills it from the partial placement. ``PIN286_CAPTURE=1`` was run
+and each fixture diff was read: ``workflows_openapi.json`` +35 / −1 (the new ``AutoAnsweredNote``
+schema, the ``auto_answered`` items ``$ref`` replacing ``{}``, and the ``unplaced_sentences``
+property); ``workflows_moved_ast.json`` +3 / −3 (the ``body_sha256`` of ``PublishVerdict``,
+``TemplateAssetRef`` and ``upload_workflow_template``; decorator digests unchanged);
+``workflows_routes.json`` showed no numstat (line endings only, restored). A first capture was
+discarded because ``AutoAnsweredNote``'s docstring carried plan ids into the public schema
+description; the docstring was reworded and the capture run again.
 """
 
 from __future__ import annotations

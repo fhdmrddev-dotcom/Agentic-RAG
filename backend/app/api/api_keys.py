@@ -56,7 +56,7 @@ from app.models.api_key import (
 from app.models.user_settings import load_app_settings_async
 from app.security.api_key_auth import audit_key_call, mint_key
 from app.services.entitlement_service import require_capability
-from app.services.inbound_inputs import declared_fields, needs_file_upload
+from app.services.inbound_inputs import declared_fields, needs_file_upload, needs_typed_task
 
 logger = logging.getLogger(__name__)
 
@@ -97,8 +97,11 @@ def _ref_state(found: dict | None) -> str:
         return "cannot_run"
     if found.get("status") != "published":
         return "unpublished"
-    if needs_file_upload(declared_fields(found.get("definition") or {})):
+    fields = declared_fields(found.get("definition") or {})
+    if needs_file_upload(fields):
         return "file_upload"
+    if needs_typed_task(fields):  # 296-06 (293-IN-06)
+        return "needs_task"
     return "startable"
 
 
@@ -229,14 +232,17 @@ async def list_startable_workflows(
     workflows = []
     for w in rows:
         fields = declared_fields(w.get("definition") or {})
-        file_upload = needs_file_upload(fields)
+        # 296-06 (293-IN-06): the same classification a key's card reads (``_ref_state``).
+        reason = "file_upload" if needs_file_upload(fields) else (
+            "needs_task" if needs_typed_task(fields) else None
+        )
         workflows.append(
             StartableWorkflow(
                 id=str(w["id"]),
                 name=w["name"],
                 fields=[StartableField(key=f.key, label=f.label, required=f.required) for f in fields],
-                startable=not file_upload,
-                reason="file_upload" if file_upload else None,
+                startable=reason is None,
+                reason=reason,
             )
         )
     drafts = await api_keys_db.count_own_drafts(pool, user_id=caller, org_id=org)
@@ -264,6 +270,13 @@ async def create_key(
         pool, workflow_ids=list(body.workflow_ids), user_id=caller, org_id=org
     )
     by_id = {str(r["id"]): r for r in rows}
+    # 296-06 (293-IN-06): a key may name only what the picker offers — the caller's own published
+    # workflows in this org (``list_startable_candidates``, the picker's own query). A published
+    # global is readable but never offered, so it is refused here too.
+    offered = {
+        str(w["id"])
+        for w in await api_keys_db.list_startable_candidates(pool, user_id=caller, org_id=org)
+    }
     snapshot: list[dict] = []
     for wid in body.workflow_ids:
         row = by_id.get(str(wid))
@@ -284,10 +297,24 @@ async def create_key(
                     "publish it first."
                 ),
             )
-        if needs_file_upload(declared_fields(row.get("definition") or {})):
+        fields = declared_fields(row.get("definition") or {})
+        if needs_file_upload(fields):
             raise HTTPException(
                 status_code=422,
                 detail=f"{name} needs a file upload, which a key can't send yet.",
+            )
+        if str(wid) not in offered:
+            raise HTTPException(
+                status_code=422,
+                detail=(
+                    f"{name} isn't one of your published workflows in this organization, "
+                    "so a key can't start it."
+                ),
+            )
+        if needs_typed_task(fields):
+            raise HTTPException(
+                status_code=422,
+                detail=f"{name} starts from a typed task, which a key can't send yet.",
             )
         snapshot.append({"id": str(wid), "name": name})
 
@@ -339,12 +366,13 @@ async def revoke_my_key(
     )
     if row is None:
         raise HTTPException(status_code=404, detail=_NOT_FOUND)
-    audit_key_call(
-        background_tasks,
-        {"id": row["id"], "label": row["label"], "user_id": caller, "org_id": org},
-        "api_key.revoke",
-        call="manage",
-    )
+    if row.get("revoked_now"):  # 296-06 (293-IN-08): a repeat revoke writes no second row
+        audit_key_call(
+            background_tasks,
+            {"id": row["id"], "label": row["label"], "user_id": caller, "org_id": org},
+            "api_key.revoke",
+            call="manage",
+        )
     (key,) = await _serialize_keys(pool, [row], caller=caller, org_id=org)
     return key
 
@@ -381,12 +409,13 @@ async def revoke_org_key(
     )
     if row is None:
         raise HTTPException(status_code=404, detail=_NOT_FOUND)
-    audit_key_call(
-        background_tasks,
-        {"id": row["id"], "label": row["label"], "user_id": caller, "org_id": org},
-        "api_key.revoke",
-        call="manage",
-        detail={"by_admin": True, "owner_id": str(row["user_id"])},
-    )
+    if row.get("revoked_now"):  # 296-06 (293-IN-08): a repeat revoke writes no second row
+        audit_key_call(
+            background_tasks,
+            {"id": row["id"], "label": row["label"], "user_id": caller, "org_id": org},
+            "api_key.revoke",
+            call="manage",
+            detail={"by_admin": True, "owner_id": str(row["user_id"])},
+        )
     (key,) = await _serialize_keys(pool, [row], caller=caller, org_id=org)
     return key

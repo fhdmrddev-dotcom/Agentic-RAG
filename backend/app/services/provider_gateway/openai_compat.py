@@ -79,6 +79,7 @@ from app.services.openai_service import (
 # Narrow runtime import (mirrors agent_loop.py:1637) — avoids module-load-time
 # cycle; the boundary-bytes config read MOVES IN with the boundary dicts.
 from app.models.user_settings import tool_args_progress_emit_boundary_bytes
+from app.services.provider_gateway.schema_moonshot import moonshot_tools  # 296-06 (BUG-261024-01)
 
 if TYPE_CHECKING:  # pragma: no cover
     from .dispatcher import GatewayRequest
@@ -451,7 +452,8 @@ def open_openai_compat_stream(
         model=request.model,
         user_settings=request.user_settings,
         tool_choice=request.tool_choice,
-        tools_override=request.tools,
+        # 296-06 (BUG-261024-01): a Moonshot ENDPOINT gets ref-free schemas (logic in the leaf).
+        tools_override=moonshot_tools(request.tools) if _retries_provider == "moonshot" else request.tools,
         force_tool_name=request.force_tool_name,
         strict_response_format=request.strict_schema,
         **(
