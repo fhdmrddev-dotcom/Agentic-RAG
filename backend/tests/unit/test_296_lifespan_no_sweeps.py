@@ -60,6 +60,12 @@ async def _enter_lifespan_and_settle():
     finally:
         for p in reversed(patches):
             p.stop()
+        # The lifespan's shutdown sets the process-wide "app shutting down" flag; leaving it set
+        # makes every later test's producer escape skip its F2 terminalize (order-dependent reds
+        # measured in the 296-02 gate run). Restore it.
+        from app.services.harness_engine import set_app_shutting_down
+
+        set_app_shutting_down(False)
     return resume, reconcile
 
 

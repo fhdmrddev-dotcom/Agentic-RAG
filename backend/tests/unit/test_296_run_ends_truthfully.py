@@ -259,7 +259,14 @@ def test_the_producer_escape_records_the_stopper():
                 active_workflow_run_id=wf, resolved_provider="openai", resolved_model="m",
             )
 
-    asyncio.run(_go())
+    from app.services.harness_engine import is_app_shutting_down, set_app_shutting_down
+
+    prev = is_app_shutting_down()
+    set_app_shutting_down(False)  # any earlier lifespan exit leaves it set; F2 then skips
+    try:
+        asyncio.run(_go())
+    finally:
+        set_app_shutting_down(prev)
     record.assert_awaited_once()
     args, kwargs = record.await_args
     assert args[1] == wf and args[2] == "user-u" and kwargs["policy"] == "run_cancelled"
