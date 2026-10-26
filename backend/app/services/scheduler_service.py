@@ -92,7 +92,13 @@ async def launch_scheduled_run(
         launch_unattended_run,
         parse_definition_row,
         template_refusal,
+        workflows_disabled,
     )
+
+    # 293-REVIEW CR-01 — the operator's workflows kill switch, before anything is read or
+    # written. Recorded on the schedule in the in-app sentence, then raised (never launch_failed).
+    if workflows_disabled():
+        await _refuse_disabled(pool, schedule)
 
     owner_id = _as_uuid(schedule["user_id"])
     workflow_id = _as_uuid(schedule["workflow_id"])
@@ -189,6 +195,18 @@ async def launch_scheduled_run(
         origin_label=schedule.get("name"),
         origin_ref=schedule_id,
     )
+
+
+async def _refuse_disabled(pool, schedule: dict) -> None:
+    """293-REVIEW CR-01: record the kill-switch sentence on the schedule, then refuse with it."""
+    from app.db.schedules import record_schedule_outcome
+    from app.services.unattended_launch import WORKFLOWS_DISABLED_DETAIL
+
+    logger.warning("schedule %s not launched: workflows are disabled", schedule.get("id"))
+    await record_schedule_outcome(
+        pool, _as_uuid(schedule["id"]), status=WORKFLOWS_DISABLED_DETAIL
+    )
+    raise ScheduledLaunchRefused(WORKFLOWS_DISABLED_DETAIL)
 
 
 class SchedulerService:

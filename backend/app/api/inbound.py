@@ -250,7 +250,18 @@ async def start_workflow_run(
     """Start one listed, published workflow as the key's owner. The caller polls the run."""
     await _limit(redis, key, "start", workflow_id=workflow_id)
 
-    listed = {str(w.get("id")) for w in key.workflows if isinstance(w, dict)}
+    from app.services import unattended_launch  # noqa: PLC0415
+
+    # 293-REVIEW CR-01: the operator's workflows kill switch stops this door too, before any
+    # other read, in the in-app kickoff's own 403 sentence.
+    if unattended_launch.workflows_disabled():
+        raise await _refused(
+            key, call="start", reason="workflows_disabled", workflow_id=workflow_id,
+            exc=HTTPException(status_code=status.HTTP_403_FORBIDDEN,
+                              detail=unattended_launch.WORKFLOWS_DISABLED_DETAIL),
+        )
+
+    listed ={str(w.get("id")) for w in key.workflows if isinstance(w, dict)}
     wid = _as_uuid(workflow_id)
     if wid is None or str(wid) not in listed:
         raise await _refused(key, call="start", reason="not_on_key", exc=_not_found(),
@@ -284,8 +295,6 @@ async def start_workflow_run(
         raise await _refused(key, call="start", reason="entitlement", exc=exc,
                              workflow_id=str(wid))
 
-    from app.services import unattended_launch  # noqa: PLC0415
-
     raw = _raw_definition(row.get("definition"))
     definition = (
         unattended_launch.parse_definition_row({"definition": raw}, log_ref=f"key {key.id}")
@@ -316,25 +325,31 @@ async def start_workflow_run(
         )
 
     name = definition.name or row.get("name") or "workflow"
-    run_id = await unattended_launch.launch_unattended_run(
-        owner_id=owner_id,
-        org_id=org_id,
-        workflow_id=wid,
-        definition=definition,
-        # Validated declared fields, then the two server-set keys; nothing else reaches the run.
-        # 293-05 F-1: the kickoff carries the values, each in the untrusted envelope.
-        inputs={**values, "kickoff_prompt": inbound_kickoff(name, values), UNTRUSTED_FLAG: True},
-        title=f"{name} · via key {key.label}",
-        max_tokens=_DEFAULT_MAX_TOKENS,
-        max_duration=_DEFAULT_MAX_DURATION,
-        pool=pool,
-        redis=redis,
-        run_label="key-started",
-        log_ref=f"key {key.id}",
-        origin_kind="key",
-        origin_label=key.label,
-        origin_ref=UUID(key.id),
-    )
+    try:
+        run_id = await unattended_launch.launch_unattended_run(
+            owner_id=owner_id,
+            org_id=org_id,
+            workflow_id=wid,
+            definition=definition,
+            # Validated declared fields, then the two server-set keys; nothing else reaches the run.
+            # 293-05 F-1: the kickoff carries the values, each in the untrusted envelope.
+            inputs={**values, "kickoff_prompt": inbound_kickoff(name, values), UNTRUSTED_FLAG: True},
+            title=f"{name} · via key {key.label}",
+            max_tokens=_DEFAULT_MAX_TOKENS,
+            max_duration=_DEFAULT_MAX_DURATION,
+            pool=pool,
+            redis=redis,
+            run_label="key-started",
+            log_ref=f"key {key.id}",
+            origin_kind="key",
+            origin_label=key.label,
+            origin_ref=UUID(key.id),
+        )
+    except unattended_launch.UnattendedLaunchDisabled as off:  # flipped off mid-request
+        raise await _refused(
+            key, call="start", reason="workflows_disabled", workflow_id=str(wid),
+            exc=HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail=str(off)),
+        )
     audit_key_call(
         background_tasks, key, "api_key.start", call="start", workflow_id=str(wid),
         run_id=str(run_id), outcome="ok",

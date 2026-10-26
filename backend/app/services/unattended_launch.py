@@ -46,6 +46,27 @@ logger = logging.getLogger(__name__)
 
 OnFinish = Callable[[str], Awaitable[Any]]
 
+# 293-REVIEW CR-01 — the in-app kickoff's own refusal sentence (workflow_kickoff.py), so the
+# operator's "workflows" kill switch reads the same on every door.
+WORKFLOWS_DISABLED_DETAIL = "Workflows are currently disabled by the administrator"
+
+
+class UnattendedLaunchDisabled(Exception):
+    """The operator's workflows kill switch is off: no new unattended run. ``str(exc)`` is the
+    sentence. Raised BEFORE anything is written."""
+
+
+def workflows_disabled() -> bool:
+    """Is the operator's workflows kill switch (FLAG-01, ``workflows_enabled``) OFF?
+
+    Resolved LATE off ``app.api.threads``, exactly as the in-app kickoff resolves it, so the one
+    ``patch("app.api.threads.workflows_enabled")`` seam (test_147) covers every launch door.
+    Default-ON on a settings blip (D-Q4), like the in-app seam.
+    """
+    from app.api.threads import workflows_enabled  # noqa: PLC0415
+
+    return not workflows_enabled()
+
 
 def parse_definition_row(row: dict[str, Any], *, log_ref: Any = None):
     """The stored definition as a ``WorkflowDefinition``, or ``None`` when it cannot be parsed.
@@ -117,6 +138,11 @@ async def launch_unattended_run(
     ``on_finish`` is awaited with the terminal status (``"completed"`` / ``"failed"``) on every
     exit path of the background drive; the scheduler passes its outcome record.
     """
+    # 293-REVIEW CR-01: the kill switch, BEFORE the thread insert, so any unattended door that
+    # forgets its own check still writes nothing. Each caller also checks first, with its words.
+    if workflows_disabled():
+        raise UnattendedLaunchDisabled(WORKFLOWS_DISABLED_DETAIL)
+
     from fastapi.concurrency import run_in_threadpool  # D-v2.5-01
 
     from app.db.workflows import arm_run_budget, create_workflow_run

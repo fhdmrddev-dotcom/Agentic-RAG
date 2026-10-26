@@ -492,7 +492,7 @@ node scripts/check-hot-file-ledger.cjs <phase-dir>   # 0 clear · 1 missing rows
 | `scripts/check-deploy-drift.sh` | 5 / 4 / 267 | ⚠ absent its ENTIRE LIFE — row added 294-05 · fault var omitted |
 | `scripts/build-public-openapi.cjs` | 7 / 3 / 468 | ⚠ now FIRES (294) · 294-03: citation_checks tag (one line) |
 | `backend/app/services/eval_runner_service.py` | 13 / 8 / 1040 | ⚠ STALE · last touch 256-03 |
-| `backend/app/services/scheduler_service.py` | 10 / 6 / 290 (was `8 / 5 / 471`) | 293-02: launch core moved to unattended_launch (471→290) |
+| `backend/app/services/scheduler_service.py` | 11 / 6 / 308 (was `10 / 6 / 290`) | 293-REVIEW CR-01: one kill-switch check + one refusal helper |
 | `frontend/src/components/panel/PhaseCard.tsx` | 20 / 13 / 811 (was `18 / 12 / 796`) | 295-05: ONE mount in the identity column |
 | `frontend/src/components/panel/PhaseTimeline.tsx` | 10 / 8 / 404 | ⚠ row STALE · honoured by construction (214) |
 | `frontend/src/components/panel/phaseStatusMeta.ts` | 4 / 4 / 291 | ⚠ row STALE · crossed the threshold (200) |
