@@ -11839,7 +11839,7 @@ cells rot within days.
 | [`backend/app/services/task_service.py`](docs/HOT-FILE-LEDGER.md#backendappservicestask_servicepy) | 28 / 15 / 1038 (was `27 / 14 / 1023`) | **FIRES** | **292.1-REVIEW WR-02**: `_stream_one_iteration` runs the provider-blind `strip_markup` after the structured post-parse; never parses or runs text calls. +15 L |
 | [`backend/app/services/sub_agent_models.py`](docs/HOT-FILE-LEDGER.md#backendappservicessub_agent_modelspy) | 5 / 3 / 263 (was absent) | ⚠ **FIRES** | ⚠ absent its ENTIRE LIFE — row added 296-06 (D-26). NOT touched by 296-06: the pinned-model swap is measured and told in phase_types. ⛔ resolve-never-mutate |
 | [`backend/app/services/run_reconciler.py`](docs/HOT-FILE-LEDGER.md#backendappservicesrun_reconcilerpy) | 6 / 4 / 415 (was `5 / 3 / 406`) | ⚠ **FIRES** | 296-02 (295-IN-02): the ended-steps query gains ONE boolean (all_completed: every step completed/recorded_not_sent) and the run then ends completed; cancelled/failed otherwise as before |
-| [`backend/app/services/forced_emit.py`](docs/HOT-FILE-LEDGER.md#backendappservicesforced_emitpy) | 13 / 8 / 724 (was `12 / 8 / 724`) | ⚠ **FIRES** | honoured by construction (**282-01** budget per rung; **282-04** `provider=provider` on the one lookup). ⛔ accumulators init `None` never `0` |
+| [`backend/app/services/forced_emit.py`](docs/HOT-FILE-LEDGER.md#backendappservicesforced_emitpy) | 15 / 9 / 749 (was `13 / 8 / 724`) | ⚠ **FIRES** | 296 fast-fix (293-F-4): the cross-provider settings copy also sets `active_provider` to the target (one dict key). Honoured by construction |
 | [`backend/app/services/pricing_service.py`](docs/HOT-FILE-LEDGER.md#backendappservicespricing_servicepy) | 4 / 2 / 156 (was `2 / 1 / 103`) | no (2 phases) | 294-01: + compute_token_cost_usd_unquantized (a ~$0.00002 engine call quantised to 0.0000). ⛔ the single token × rate home (test_257) |
 | [`backend/app/db/rates.py`](docs/HOT-FILE-LEDGER.md#backendappdbratespy) | 9 / 2 / 898 (was `2 / 1 / 507`) | no (2 phases) | **268-02**: ONE `per_root` CTE feeds every spend query; root-only predicate appears ONCE. ⛔ never register a rate for model `unknown` (shell USD would double-count) |
 | [`backend/app/api/admin_spend.py`](docs/HOT-FILE-LEDGER.md#backendappapiadmin_spendpy) | 4 / 2 / 247 (was `1 / 1 / 202`) | no (2 phases) | honoured by construction (**268-02**): ONE validated `expert` Query on both routes (422 before the rates layer); 4 additive summary keys, every 257 key unchanged |
@@ -25511,3 +25511,16 @@ Triples re-derived with the CLAUDE.md recipe (six-digit and non-numeric buckets 
 
 - **Triple `2 / 2 / 268`** (228, 296), young.
 - **296-05:** two defects 296-02 recorded. (1) A killed run printed `[GATE PASSED] … failed: 0`: no summary line parsed as zero failures. It now FAILS CLOSED: no summary line, a signal, or a pytest exit code ≥ 2 prints `[GATE ERROR]` and exits 2. (2) Any argument after `--` replaced the default `tests/unit`, so `-- -rf` ran the whole `tests/` tree (integration suites against the local DB included); a run whose args carry no `tests…` path now keeps `tests/unit` and says so. Driven: one green file → PASSED; `-k` matching nothing → ERROR (exit 5); no path → `tests/unit` kept.
+
+### `backend/app/services/forced_emit.py` — 296 fast-fix (293-F-4, 2026-10-27)
+
+Re-derived: `15 / 9 / 749` (was `13 / 8 / 724`; the 13 was already stale by one 296-06 commit).
+
+Found live by 296-05's roster (`evidence/roster/pinned-emit-diagnosis.json`): an emit step pinned to
+`gpt-5.6-luna` from a run on any non-OpenAI provider got OpenAI's key and endpoint, but
+`resolve_api_surface` read the RUN's `active_provider` and sent it to chat.completions — OpenAI 400.
+The cloud branch of the cross-provider copy now adds `"active_provider": provider` to the same
+`_updates` dict. One key, no new branch; the same-provider path still passes the caller's object
+uncopied, and the local (lmstudio/ollama) branch is unchanged. ⛔ invariants (accumulators `None`,
+above the rung loop, one `_failure` call site, run-local) untouched. Pinned by
+`tests/unit/test_296_pinned_emit_surface.py` (RED `1f5fa6283`).
