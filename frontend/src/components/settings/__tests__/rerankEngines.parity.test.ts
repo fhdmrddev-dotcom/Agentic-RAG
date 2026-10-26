@@ -67,10 +67,10 @@ describe("engineFor", () => {
   })
 
   it("resolves each known id to its own row", () => {
-    expect(engineFor("jev").name).toBe("Jev via OpenRouter")
-    expect(engineFor("openai_decisions").name).toBe("OpenAI Decisions")
-    expect(engineFor("local").name).toBe("On this server")
-    expect(engineFor("cohere").name).toBe("Cohere")
+    expect(engineFor("jev")?.name).toBe("Jev via OpenRouter")
+    expect(engineFor("openai_decisions")?.name).toBe("OpenAI Decisions")
+    expect(engineFor("local")?.name).toBe("On this server")
+    expect(engineFor("cohere")?.name).toBe("Cohere")
   })
 
   it("keeps sketch 294 B's card order", () => {

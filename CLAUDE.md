@@ -441,7 +441,7 @@ node scripts/check-hot-file-ledger.cjs <phase-dir>   # 0 clear · 1 missing rows
 | `backend/app/models/thread.py` | 25 / 17 / 550 (was `24 / 16 / 545`) | 293-03: ONE field (origin) |
 | `frontend/src/components/workflows/canvasModel.ts` | 13 / 6 / 752 | ⚠ absent from BOTH at 6 phases (added 200) |
 | `frontend/src/components/layout/ChatLayout.tsx` | 64 / 33 / 1158 (was `63 / 32 / 1147`) | 293-04: onOpenApiKeys (pre-pick + tab 7) + SettingsPage onOpenRun |
-| `frontend/src/components/layout/ChatLaunchForm.tsx` | 4 / 4 / 179 (was `2 / 2 / 172`) | 296-04: refusal clears on the next change; still the one form |
+| `frontend/src/components/layout/ChatLaunchForm.tsx` | 5 / 4 / 183 (was `4 / 4 / 179`) | 296-04: refusal clears on change; optional initialValues (Retry) |
 | `frontend/src/components/workflows/LaunchInputFields.tsx` | 3 / 3 / 145 | 287-01: leaf stays non-blocking; docblock only · 214.1-01 trigger TAKEN |
 | `frontend/src/components/layout/ChatHistoryColumn.tsx` | 7 / 2 / 513 | ⚠ absent its ENTIRE LIFE — row added 244-01 |
 | `frontend/src/hooks/useThreads.ts` | 5 / 3 / 65 | ⚠ now FIRES · last touch 267-04 · ⛔ |
@@ -473,8 +473,8 @@ node scripts/check-hot-file-ledger.cjs <phase-dir>   # 0 clear · 1 missing rows
 | `frontend/src/components/chat/MessageList.tsx` | 24 / 11 / 376 | ⚠ STALE · last touch 267-04 |
 | `frontend/src/components/chat/ChatArea.tsx` | 94 / 44 / 1189 (was `93 / 43 / 1186`) | honoured by construction (287-03: ONE mount, 0 hooks) · ⛔ |
 | `frontend/src/stores/streamsStore.ts` | 28 / 19 / 662 (was `27 / 18 / 660`) | 296-04: initializer typed StreamsState (TS2345 gone) · ⛔ |
-| `frontend/src/components/chat/ThreadWorkflowPicker.tsx` | 1 / 1 / 91 | young (created 287-03) · reads no conversation · ⛔ |
-| `frontend/src/components/chat/useStartWorkflowInThread.ts` | 1 / 1 / 85 | young (created 287-03) · no createThread · ⛔ |
+| `frontend/src/components/chat/ThreadWorkflowPicker.tsx` | 3 / 2 / 144 (was `1 / 1 / 91`) | 296-04: failure line + Escape/outside dismissal · ⛔ |
+| `frontend/src/components/chat/useStartWorkflowInThread.ts` | 2 / 2 / 173 (was `1 / 1 / 85`) | 296-04: owns a refused start (worded, Retry, no prefill) · ⛔ |
 | `frontend/src/lib/toolMeta.ts` | 10 / 6 / 218 | ⚠ absent its ENTIRE LIFE — row added 244-13 · ⛔ |
 | `frontend/src/components/panel/PendingAskCard.tsx` | 25 / 12 / 1132 (was `24 / 11 / 1103`) | 296-04: one ask per live workflow run; passed clock waits |
 | `frontend/src/pages/WorkflowRunPage.tsx` | 35 / 15 / 1604 (was `34 / 14 / 1597`) | 296-04: one ref + one prop (watchedFailure); useState 4, useEffect 4 · ⛔ |
@@ -577,7 +577,7 @@ node scripts/check-hot-file-ledger.cjs <phase-dir>   # 0 clear · 1 missing rows
 | `frontend/src/lib/stripComments.testutil.ts` | 1 / 1 / 28 | young (created 244-14 / IN-02) · ⛔ |
 | `frontend/src/lib/workspaceAllowedExt.ts` | 1 / 1 / 54 | young (created 244-02) |
 | `frontend/src/components/chat/ChatAttachmentChip.tsx` | 1 / 1 / 144 | young (created 244-05) |
-| `frontend/src/components/chat/composerCopy.ts` | 2 / 1 / 103 | young (created 244-05) · last touch 244-06 · ⛔ |
+| `frontend/src/components/chat/composerCopy.ts` | 5 / 3 / 122 (was `2 / 1 / 103`) | ⚠ now FIRES (296) · 296-04: three start-failure sentences · ⛔ |
 | `frontend/src/components/chat/ConnectedFilePickerModal.tsx` | 3 / 2 / 336 | ⚠ absent its ENTIRE LIFE — row added 244-06 |
 | `frontend/src/components/chat/useComposerAttachments.ts` | 1 / 1 / 158 | young (created 244-06) · the seam 244-05 named |
 | `backend/app/services/oauth_refresh_service.py` | 5 / 3 / 362 | ⚠ absent its ENTIRE LIFE — row added BUG-260912-01 |

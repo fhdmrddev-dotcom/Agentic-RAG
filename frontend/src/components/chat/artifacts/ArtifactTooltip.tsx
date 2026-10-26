@@ -13,7 +13,7 @@
  * hover that opened it. Escape anywhere dismisses it (WCAG 1.4.13); the owner also hides it on
  * pointerleave and blur, and links it with `aria-describedby` while it shows.
  */
-import { useEffect, useLayoutEffect, useRef, useState } from "react"
+import { useCallback, useEffect, useLayoutEffect, useRef, useState } from "react"
 import * as ReactDOM from "react-dom"
 import { FileText } from "lucide-react"
 import { excerptText, sourceHeader } from "./artifactCopy"
@@ -56,22 +56,52 @@ export function ArtifactTooltip({ id, anchor, source, onDismiss }: ArtifactToolt
   const ref = useRef<HTMLDivElement>(null)
   const [pos, setPos] = useState<{ left: number; top: number } | null>(null)
 
-  useLayoutEffect(() => {
-    const tip = ref.current
-    if (!tip) return
-    const a = anchor.getBoundingClientRect()
-    const t = tip.getBoundingClientRect()
-    const view = tip.ownerDocument.defaultView
-    const viewport = { width: view?.innerWidth ?? 0, height: view?.innerHeight ?? 0 }
-    const next = tooltipPosition(a, { width: t.width, height: t.height }, viewport)
-    setPos((prev) => (prev && prev.left === next.left && prev.top === next.top ? prev : next))
-  }, [anchor, source])
-
   // Keep the latest callback without re-binding the listener on every render.
   const dismiss = useRef(onDismiss)
   useEffect(() => {
     dismiss.current = onDismiss
   }, [onDismiss])
+
+  /** Place the tooltip at the anchor's CURRENT rect. Returns false when the anchor has left the
+   *  viewport (296-04, 292-IN-01): the tooltip is then dismissed rather than left floating. */
+  const place = useCallback((): boolean => {
+    const tip = ref.current
+    if (!tip) return true
+    const a = anchor.getBoundingClientRect()
+    const view = tip.ownerDocument.defaultView
+    const viewport = { width: view?.innerWidth ?? 0, height: view?.innerHeight ?? 0 }
+    if (a.bottom < 0 || a.right < 0 || a.top > viewport.height || a.left > viewport.width) return false
+    const t = tip.getBoundingClientRect()
+    const next = tooltipPosition(a, { width: t.width, height: t.height }, viewport)
+    setPos((prev) => (prev && prev.left === next.left && prev.top === next.top ? prev : next))
+    return true
+  }, [anchor])
+
+  useLayoutEffect(() => {
+    place()
+  }, [place, source])
+
+  // 296-04 (292-IN-01): follow the anchor while mounted. Any scroll (capture, so an ancestor's
+  // scroll counts) or resize re-places it, at most once per animation frame (T-296-13).
+  useEffect(() => {
+    const view = anchor.ownerDocument.defaultView
+    if (!view) return
+    let frame: number | null = null
+    const onMove = () => {
+      if (frame !== null) return
+      frame = view.requestAnimationFrame(() => {
+        frame = null
+        if (!place()) dismiss.current()
+      })
+    }
+    view.addEventListener("scroll", onMove, true)
+    view.addEventListener("resize", onMove)
+    return () => {
+      view.removeEventListener("scroll", onMove, true)
+      view.removeEventListener("resize", onMove)
+      if (frame !== null) view.cancelAnimationFrame(frame)
+    }
+  }, [anchor, place])
 
   useEffect(() => {
     const doc = anchor.ownerDocument

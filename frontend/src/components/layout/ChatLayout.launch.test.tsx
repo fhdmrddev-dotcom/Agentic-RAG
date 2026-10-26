@@ -873,7 +873,12 @@ describe("ChatLaunchForm — the agent fills NOTHING (T-214-12-01)", () => {
   it("its ONLY value source is the `values` state it holds for the person", () => {
     // The component is handed a name and a field list, and hands back a dict. That is the
     // whole of its access — no hook into the thread, no client read.
-    expect(FORM_CODE).toContain("useState<Record<string, string>>({})")
+    // 296-04 (287-IN-03) REWRITTEN IN PLACE. It read:
+    //     expect(FORM_CODE).toContain("useState<Record<string, string>>({})")
+    // A Retry after a 422 re-opens the form with the values THIS person typed into it a moment
+    // ago (`initialValues`, which the in-thread picker takes from this form's own onConfirm). The
+    // state is still the only value source; its seed is that optional prop or nothing.
+    expect(FORM_CODE).toContain("useState<Record<string, string>>(() => ({ ...(initialValues ?? {}) }))")
     const THREADS_HOOK = ["use", "Threads"].join("")
     const API_MODULE = ["@/lib", "/api"].join("")
     for (const forbidden of [THREADS_HOOK, API_MODULE]) {
