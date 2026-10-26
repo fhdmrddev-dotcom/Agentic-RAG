@@ -1701,6 +1701,10 @@ async def _drive_golden_run(
     # so a credential cannot be scoped; this is a THIRD independent reason a publish-time
     # send cannot deliver. Do not replace it with a real-looking address.
     golden_inputs, _stood_in = golden_run_inputs(definition, golden_input)
+    # 296-06 (291-S6-F8): the first step reads the kickoff, so the stand-in answers ride it as
+    # `key: value` lines, exactly as an in-app start does (one composer, `launch_kickoff`).
+    from app.services.inbound_inputs import launch_kickoff  # noqa: PLC0415
+    golden_inputs["kickoff_prompt"] = launch_kickoff(golden_input, definition, golden_inputs)
 
     # ── 3. create the golden run (is_golden_run=True — the REAL run on the KB) ────
     run_id = await create_workflow_run(
