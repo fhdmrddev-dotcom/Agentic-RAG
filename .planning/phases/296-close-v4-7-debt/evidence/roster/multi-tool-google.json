@@ -1,0 +1,15 @@
+{
+  "mode": "multi-tool",
+  "provider": "google",
+  "model": "gemini-3.8-flash",
+  "thread_id": "73e7ade7-43cd-4075-9eb8-c5effc4316cf",
+  "run_id": "7de48eed-3d13-4f87-aabc-612b3db0c706",
+  "status": "completed",
+  "tools": [
+    "search_documents",
+    "execute_code"
+  ],
+  "markup_hits": [],
+  "final_preview": "The document search found regional revenue figures listing 120 for EMEA and 98 for APAC, as well as several inventory records for financial reports covering revenue analysis [1]. The calculation of 17 * 23 yielded 391.",
+  "verdict": "PASS"
+}

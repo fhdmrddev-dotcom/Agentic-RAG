@@ -1,0 +1,22 @@
+{
+  "results": {
+    "moonshot": {
+      "model": "kimi-k3.1-pro-highspeed",
+      "thread_id": "ce4dc0ec-9fa3-411a-ae46-0a56ad93c2a8",
+      "run_id": "04096c24-51e6-4d9c-8dce-0172b96ff7ee",
+      "status": "failed",
+      "error": "failed: RateLimitError: Error code: 429 - {'error': {'message': 'Your account org-<redacted> <ak-<redacted>> is suspended due to insufficient balance, please recharge your account or check you",
+      "answer_preview": "*Rate limited by the provider \u2014 please retry in a moment.*",
+      "verdict": "\u26d4"
+    },
+    "openrouter": {
+      "model": "deepseek/deepseek-v4-pro",
+      "thread_id": "5189b45b-d1a5-4290-8d33-61aecb8e6a5e",
+      "run_id": "88635812-ca61-4b1e-ab54-831735d14a1d",
+      "status": "failed",
+      "error": "failed: APIStatusError: Error code: 402 - {'error': {'message': 'This request requires more credits, or fewer max_tokens. You requested up to 32768 tokens, but can only afford 1195. To increase, visit https://openrouter.ai/s",
+      "answer_preview": "*Billing error: your account has insufficient credits. Please check your provider's billing dashboard.*",
+      "verdict": "\u26d4"
+    }
+  }
+}

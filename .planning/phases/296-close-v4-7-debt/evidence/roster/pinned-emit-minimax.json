@@ -1,0 +1,23 @@
+{
+  "mode": "pinned-emit",
+  "provider": "minimax",
+  "model": "MiniMax-M3",
+  "pinned_model": "gpt-5.6-luna",
+  "pinned_provider": "openai",
+  "definition_id": "19d268d9-2544-49d5-9b71-b3194ba6404b",
+  "thread_id": "aa52af8d-e41b-4aba-8db0-6c41e0a21d63",
+  "send_http": 201,
+  "send": "{\"message_id\": \"831f1513-e6ef-4d38-9ac3-4d88869361c6\", \"run_id\": \"a53136f3-0de1-4715-8880-8e2186284239\", \"model\": \"MiniMax-M3\", \"provider\": \"minimax\"}",
+  "workflow_run": {
+    "id": "4922e798-78bb-4d28-bea0-0c0bf0e48f8e",
+    "status": "failed"
+  },
+  "emit_validated_providers": [],
+  "failures": [
+    "{\"definition_version\": 1, \"definition_id\": null, \"phase_slug\": \"render_vendor_intake_sheet\", \"emitter\": \"render_template\", \"tier\": \"force_strict\", \"provider\": \"openai\", \"model\": \"gpt-5.6-luna\", \"forced\": false, \"thinking\": false, \"recovered_from_narration\": false, \"truncated\": false, \"attempt\": 1}",
+    "{\"definition_version\": 1, \"definition_id\": null, \"phase_slug\": \"render_vendor_intake_sheet\", \"emitter\": \"render_template\", \"tier\": \"force_strict\", \"provider\": \"openai\", \"model\": \"gpt-5.6-luna\", \"forced\": false, \"thinking\": false, \"recovered_from_narration\": false, \"truncated\": false, \"attempt\": 1}",
+    "{\"reason\": \"Step \\\"Fill vendor intake sheet\\\" failed after 2 attempts:\\n\\u2022 2 attempts \\u2014 the model wrote prose instead of filling the template. Check which model this step uses.\"}"
+  ],
+  "has_400": false,
+  "verdict": "FAIL"
+}

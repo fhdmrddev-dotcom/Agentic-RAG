@@ -1,0 +1,22 @@
+{
+  "mode": "pinned-emit",
+  "provider": "deepseek",
+  "model": "deepseek-v4-pro",
+  "pinned_model": null,
+  "pinned_provider": "deepseek",
+  "definition_id": "724fe18a-ee1f-4dc1-a527-9467ffda4cce",
+  "thread_id": "07214977-2b9a-4c75-bef8-454d7b215a35",
+  "send_http": 201,
+  "send": "{\"message_id\": \"e109e342-4210-47c4-a2e0-f5fa8447d4ed\", \"run_id\": \"081749bf-944c-4b5c-80e8-215ffe12f276\", \"model\": \"deepseek-v4-pro\", \"provider\": \"deepseek\"}",
+  "workflow_run": {
+    "id": "abccf725-7154-4196-b077-d3ddcf3b7396",
+    "status": "completed"
+  },
+  "emit_validated_providers": [
+    "deepseek"
+  ],
+  "emit_failed_on": [],
+  "failures": [],
+  "has_400": false,
+  "verdict": "PASS"
+}

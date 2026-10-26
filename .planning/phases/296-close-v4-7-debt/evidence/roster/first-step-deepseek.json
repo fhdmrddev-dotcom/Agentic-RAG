@@ -1,0 +1,18 @@
+{
+  "mode": "first-step",
+  "provider": "deepseek",
+  "model": "deepseek-v4-pro",
+  "definition_id": "74e2f71e-ddae-4de0-b6de-a595cec809b8",
+  "thread_id": "4db68ffa-dd83-4e4d-bd68-b1381aec75ef",
+  "send_http": 201,
+  "send": "{\"message_id\": \"5f4819bb-8ff1-4733-b8ea-09f63ae94985\", \"run_id\": \"36029344-ccc4-44a4-86a2-694e38bcd01d\", \"model\": \"deepseek-v4-pro\", \"provider\": \"deepseek\"}",
+  "workflow_run": {
+    "id": "69723bd1-ff26-4598-8427-6d882535a98c",
+    "status": "completed",
+    "model": "deepseek-v4-pro"
+  },
+  "first_step_status": "completed",
+  "first_step_output_preview": "{\"text\": \"Lisbon is a sunlit coastal capital known for its steep hills, historic trams, and pastel architecture.\"}",
+  "names_lisbon": true,
+  "verdict": "PASS"
+}

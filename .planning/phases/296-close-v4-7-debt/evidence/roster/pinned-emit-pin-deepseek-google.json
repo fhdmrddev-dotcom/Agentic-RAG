@@ -1,0 +1,22 @@
+{
+  "mode": "pinned-emit",
+  "provider": "google",
+  "model": "gemini-3.8-flash",
+  "pinned_model": "deepseek-v4-pro",
+  "pinned_provider": "deepseek",
+  "definition_id": "e3a4a237-293d-4727-9e77-d5476b106ef7",
+  "thread_id": "3c8c69a7-4780-4b1e-b760-2350cb94579a",
+  "send_http": 201,
+  "send": "{\"message_id\": \"d29cb9cd-b0f9-44a6-9e73-dc001a8bfbc2\", \"run_id\": \"f10a8b2b-a9c3-4d16-b7d9-c6ff598a3ea1\", \"model\": \"gemini-3.8-flash\", \"provider\": \"google\"}",
+  "workflow_run": {
+    "id": "98435703-94b4-4fbc-bd77-f1b373f49269",
+    "status": "completed"
+  },
+  "emit_validated_providers": [
+    "deepseek"
+  ],
+  "emit_failed_on": [],
+  "failures": [],
+  "has_400": false,
+  "verdict": "PASS"
+}
