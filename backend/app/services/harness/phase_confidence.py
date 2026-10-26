@@ -36,6 +36,8 @@ import unicodedata
 from typing import Any
 from uuid import UUID
 
+from pydantic import BaseModel
+
 logger = logging.getLogger(__name__)
 
 KB_LABEL_DEFAULT = "the knowledge base"
@@ -89,6 +91,18 @@ def phase_confidence(
         "disclaimer": CONFIDENCE_DISCLAIMER if level == "low" else None,
         "passages": _passage_count(citations),
     }
+
+
+# 296-06 (289-IN-07): the wire shape `confidence_for_wire` builds, moved VERBATIM (no docstring,
+# so its OpenAPI component is byte-identical) from api/workflow_run_evidence.py, which re-exports
+# it. It lives beside its builder so both run reads (the run page and the evidence report) type
+# the field from ONE home.
+class RunEvidenceConfidence(BaseModel):
+    level: str
+    avg_similarity: float | None = None
+    disclaimer: str | None = None
+    passages: int = 0
+    kb_label: str
 
 
 def confidence_for_wire(raw: Any, kb_label: str) -> dict | None:

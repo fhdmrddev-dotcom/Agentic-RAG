@@ -292,6 +292,16 @@ class BlockedStep(BaseModel):
     cause: str | None = None
 
 
+# 296-06 (288-IN-01): the typed item of `PublishVerdict.auto_answered`. `phase` is the slug of a
+# pause step the golden run answered, or None on a run-level note (296-03's stand-in answers).
+class AutoAnsweredNote(BaseModel):
+    """One note on a successful publish: a step the validation run answered automatically, or
+    a note about the whole run (``phase`` is null). ``message`` is the sentence to show."""
+
+    phase: str | None = None
+    message: str
+
+
 class PublishVerdict(BaseModel):
     """The D-08 structured verdict. A block names the stage + the failures + the
     golden run id (a real, browsable run); a success carries the published version.
@@ -316,7 +326,8 @@ class PublishVerdict(BaseModel):
     # ── 288-02 (D-07 / A-04) — pauses the golden run answered FOR the author ─────────────
     # Success-only; ``{phase, message}`` entries (same shape as ``named_failures``) whose
     # words come from the server. Empty for every workflow without a pause.
-    auto_answered: list = Field(default_factory=list)
+    # 296-06 (288-IN-01): typed; `phase` is None on a run-level note (296-03's stand-in note).
+    auto_answered: list[AutoAnsweredNote] = Field(default_factory=list)
 
 
 def _coerce_user_id(current_user: dict) -> UUID:
@@ -392,6 +403,10 @@ class TemplateAssetRef(BaseModel):
     asset_id: str
     filename: str
     mime: str
+    # 296-06 (291-IN-03): the sentences for the ticked Word blanks a partial placement could not
+    # place; ``[]`` when every blank was placed. NOT an AssetRef field: the Builder splits it off
+    # before writing ``definition.assets[]`` (``splitTemplateBind``, 296-07).
+    unplaced_sentences: list[str] = Field(default_factory=list)
 
 
 class TemplatePlaceholdersResponse(BaseModel):

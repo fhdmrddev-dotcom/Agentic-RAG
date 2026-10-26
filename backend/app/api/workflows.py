@@ -1425,6 +1425,16 @@ async def delete_draft(
             status_code=status.HTTP_409_CONFLICT,
             detail="workflow is published and cannot be modified",
         )
+    except asyncpg.exceptions.ForeignKeyViolationError:
+        # 296-06 (293-DEL): a publish trial run still points at the draft. A worded 409, never
+        # a raw 500 and never the constraint text (UI-SPEC E).
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail=(
+                "This workflow can't be deleted yet: a run record from an earlier publish "
+                "attempt still points to it. Nothing was deleted."
+            ),
+        )
     if not deleted:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="draft not found")
     return None

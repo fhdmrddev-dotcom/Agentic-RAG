@@ -419,7 +419,7 @@ node scripts/check-hot-file-ledger.cjs <phase-dir>   # 0 clear · 1 missing rows
 | `frontend/src/components/workflows/WorkflowCanvas.tsx` | 33 / 11 / 1757 (was `32 / 10 / 1744`) | 296-07: D-09 one controlled view pair; extraction FIRST next · ⛔ |
 | `frontend/src/components/workflows/FlowEdge.tsx` | 3 / 3 / 462 | honoured by construction (200) |
 | `frontend/src/components/workflows/PhaseNodeCard.tsx` | 18 / 9 / 490 (was `17 / 8 / 489`) | 290: forecast unused — chips went on the library card, not here |
-| `backend/app/services/harness/phase_types.py` | 65 / 33 / 3131 (was `64 / 33 / 3095`) | 296-06: emit pin precedence, retry guard, 1 notice helper · G-5 OWED |
+| `backend/app/services/harness/phase_types.py` | 66 / 33 / 3135 (was `65 / 33 / 3131`) | 296-06: emit pin precedence, retry guard, 1 notice helper · G-5 OWED |
 | `backend/app/services/tools/render_template.py` | 6 / 3 / 1163 (was `3 / 2 / 1094`) | 296-03: button /V written as a name, read back typed · now FIRES · ⛔ |
 | `frontend/src/pages/WorkflowsPage.tsx` | 47 / 20 / 1462 (was `46 / 19 / 1453`) | 296-07: publish notes carried + shown under the run-CTA line |
 | `frontend/src/components/workflows/library/WorkflowCard.tsx` | 26 / 11 / 1373 (was `25 / 10 / 1371`) | 296-07: comment-only (MARK_ICON docblock, 286-S04-2) |
@@ -431,10 +431,11 @@ node scripts/check-hot-file-ledger.cjs <phase-dir>   # 0 clear · 1 missing rows
 | `frontend/src/components/workflows/DraftArrivalCard.tsx` | 5 / 4 / 688 (was `4 / 3 / 625`) | 291-05: two optional props + one fold boolean; rows in a leaf · ⛔ |
 | `frontend/src/components/workflows/DecisionsList.tsx` | 5 / 3 / 429 | ⚠ now FIRES (291) · 291-05: one optional prop, one template-row sub-line |
 | `frontend/src/components/workflows/decisionsVocabulary.ts` | 6 / 4 / 344 (was `4 / 3 / 327`) | 291-05: one glyph + one formatter, still a zero-import leaf · ⛔ |
-| `backend/app/api/workflows.py` | 48 / 26 / 1689 (was `47 / 25 / 1681`) | 296-01: create_draft stamps the active org (1 param, 1 stamp) · split OWED |
-| `backend/app/api/workflow_wire.py` | 3 / 3 / 517 | ⚠ now FIRES (291) · 291-01: describe read + reference wire models, additive |
-| `backend/app/api/workflow_runs.py` | 20 / 14 / 1444 (was `18 / 13 / 1455`) | 293-03: origin on 2 models + 2 selects, one name lookup · extraction FIRST |
-| `backend/app/api/workflow_run_evidence.py` | 5 / 4 / 408 (was `4 / 3 / 405`) | 296-01: non-UUID cited ids dropped before the uuid[] cast |
+| `backend/app/api/workflows.py` | 49 / 26 / 1699 (was `48 / 26 / 1689`) | 296-06: delete_draft FK arm → worded 409 · split OWED |
+| `backend/app/api/workflow_wire.py` | 4 / 4 / 532 (was `3 / 3 / 517`) | 296-06: AutoAnsweredNote + unplaced_sentences, additive |
+| `backend/app/api/workflow_authoring_doors.py` | 5 / 3 / 797 (was `4 / 2 / 793`) | ⚠ now FIRES (296) · 296-06: bind returns unplaced_sentences |
+| `backend/app/api/workflow_runs.py` | 21 / 15 / 1445 (was `20 / 14 / 1444`) | 296-06: confidence typed (1 import name, 1 annotation) · extraction FIRST |
+| `backend/app/api/workflow_run_evidence.py` | 6 / 4 / 405 (was `5 / 4 / 408`) | 296-06: RunEvidenceConfidence re-exported (move only) |
 | `backend/app/services/run_evidence.py` | 6 / 4 / 555 | ⚠ FIRES, absent here — row added 296-01 · D-05 withheld cascade · ⛔ |
 | `frontend/src/lib/api/runEvidence.ts` | 3 / 3 / 137 | ⚠ now FIRES (293) — row added 293-03 · one optional field |
 | `frontend/src/components/workflows/evidenceView.ts` | 4 / 3 / 387 | ⚠ now FIRES (293) — row added 293-03 · origin passed through |
@@ -495,7 +496,7 @@ node scripts/check-hot-file-ledger.cjs <phase-dir>   # 0 clear · 1 missing rows
 | `scripts/vitest-count-gate.cjs` | 352 / 79 / 6733 (was `350 / 79 / 6728`) | 293-03: 3 pins added (1 FILE-LEVEL), 4 raised, none lowered |
 | `scripts/check-deploy-drift.sh` | 5 / 4 / 267 | ⚠ absent its ENTIRE LIFE — row added 294-05 · fault var omitted |
 | `scripts/build-public-openapi.cjs` | 7 / 3 / 468 | ⚠ now FIRES (294) · 294-03: citation_checks tag (one line) |
-| `backend/app/services/eval_runner_service.py` | 13 / 8 / 1040 | ⚠ STALE · last touch 256-03 |
+| `backend/app/services/eval_runner_service.py` | 14 / 9 / 1056 (was `13 / 8 / 1040`) | 296-06: eval arm on a fixed EVAL_MAX_TOOL_ROUNDS (copy of settings) |
 | `backend/app/services/scheduler_service.py` | 12 / 7 / 314 (was `11 / 6 / 308`) | 296-06: scheduled kickoff via launch_kickoff (S6-F8), else byte-identical |
 | `backend/app/api/schedules.py` | 4 / 4 / 299 | ⚠ FIRES, absent here — row added 296-02 · worded Run now (outcome) |
 | `backend/app/models/schedule.py` | 3 / 3 / 231 | ⚠ FIRES, absent here — row added 296-02 · one additive field (outcome) |
@@ -559,7 +560,7 @@ node scripts/check-hot-file-ledger.cjs <phase-dir>   # 0 clear · 1 missing rows
 | `frontend/src/hooks/useDocuments.ts` | 10 / 5 / 164 (was `8 / 3 / 120`) | 284-03: no list of its own; Realtime only asks for a refetch · ⛔ |
 | `frontend/src/pages/KnowledgeHealthPage.tsx` | 12 / 6 / **DELETED** | **RETIRED (217.1-14)** |
 | `backend/app/api/knowledge_health.py` | 11 / 6 / 737 | honoured by construction (**217.1-11**) |
-| `backend/app/services/agent_loop.py` | 78 / 35 / 3776 (was `76 / 35 / 3766`) | 292.1 option A: empty cap round pauses with Continue · ⛔ |
+| `backend/app/services/agent_loop.py` | 78 / 36 / 3782 (was `78 / 35 / 3776`) | 296-06: save-point log w/o preview; substituted notice streamed · ⛔ |
 | `backend/app/services/tool_dispatcher.py` | 99 / 44 / 274 (was `98 / 43 / 5068`) | ✅ G-5 DISCHARGED (278-03): registry only; handlers in services/tools/ · ⛔ |
 | `backend/app/services/search_documents_tool.py` | 11 / 3 / 1544 | ⚠ now FIRES (294) · 294-01: instruction clamp (+25 −3) · extraction FIRST |
 | `backend/app/api/document_governance.py` | 5 / 3 / 416 | ⚠ absent at 3 phases. ⚠ Its low-confidence cutoff is the ConfidenceChi |

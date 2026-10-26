@@ -566,7 +566,12 @@ async def _handle_execute_code(args: dict, ctx: ToolContext) -> ToolResult:
         # serves BOTH Deep and Harness, so this one seed site covers both.
         if not getattr(ctx, "_output_baseline_seeded", False):
             _baseline = await run_in_threadpool(snapshot_output_baseline, session)
-            _previous_files_in_run.update(_baseline)
+            # 296-06 (BUG-261024-04 lead 2): `ctx` is rebuilt every agent-loop iteration, so this
+            # re-seeds per iteration; a file THIS run already recorded keeps its meta (url,
+            # iteration) instead of being overwritten as a pre-run `iteration: -1, url: None`.
+            _previous_files_in_run.update(
+                {h: m for h, m in _baseline.items() if h not in _previous_files_in_run}
+            )
             ctx._output_baseline_seeded = True
 
         loop = asyncio.get_running_loop()

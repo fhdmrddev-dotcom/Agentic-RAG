@@ -56,7 +56,7 @@
   },
   "PublishVerdict": {
     "kind": "class",
-    "body_sha256": "9b05abf0fcdf23b47652545cad1ec846025c3578747cb396d0c93e26a4c7a31a",
+    "body_sha256": "40c3be7f8b30c339b9f37a190d1646fa322c1afeb463b98780e9e2f7dc1fdb1a",
     "decorator_sha256": null
   },
   "_coerce_user_id": {
@@ -86,7 +86,7 @@
   },
   "TemplateAssetRef": {
     "kind": "class",
-    "body_sha256": "0297c62bb641b1b1d693c825f62445d33ac2249a4f6018cd4805fa408d7e6555",
+    "body_sha256": "e1358ee28a666784f4405ce57f9ba9224b6dfccfc18850f7bb6b85f2a49b11e4",
     "decorator_sha256": null
   },
   "TemplatePlaceholdersResponse": {
@@ -116,7 +116,7 @@
   },
   "upload_workflow_template": {
     "kind": "async_function",
-    "body_sha256": "1774905c99bf88ee950a0ba2aa60d0722af02e1033a9d79f6f2ff6db34e70e30",
+    "body_sha256": "8374530dfef34ede7a350719c7e534c9adf762b46a29febf3690624fbf0f41e7",
     "decorator_sha256": "5321252cb017515a631be2ef54959f621c6658f7528ab7995d439c95b0beca9a"
   },
   "get_workflow_template_placeholders": {

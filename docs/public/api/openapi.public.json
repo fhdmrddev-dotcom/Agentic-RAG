@@ -14352,6 +14352,7 @@
               "unpublished",
               "deleted",
               "file_upload",
+              "needs_task",
               "cannot_run"
             ],
             "title": "State"
@@ -14639,6 +14640,31 @@
         ],
         "title": "AuthoredSkillBody",
         "description": "The builder model's ONE authored skill body."
+      },
+      "AutoAnsweredNote": {
+        "properties": {
+          "phase": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Phase"
+          },
+          "message": {
+            "type": "string",
+            "title": "Message"
+          }
+        },
+        "type": "object",
+        "required": [
+          "message"
+        ],
+        "title": "AutoAnsweredNote",
+        "description": "One note on a successful publish: a step the validation run answered automatically, or a note about the whole run (``phase`` is null). ``message`` is the sentence to show."
       },
       "BlockedStep": {
         "properties": {
@@ -23574,7 +23600,9 @@
             ]
           },
           "auto_answered": {
-            "items": {},
+            "items": {
+              "$ref": "#/components/schemas/AutoAnsweredNote"
+            },
             "type": "array",
             "title": "Auto Answered"
           }
@@ -27422,6 +27450,13 @@
           "mime": {
             "type": "string",
             "title": "Mime"
+          },
+          "unplaced_sentences": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Unplaced Sentences"
           }
         },
         "type": "object",
@@ -30128,14 +30163,12 @@
           "confidence": {
             "anyOf": [
               {
-                "additionalProperties": true,
-                "type": "object"
+                "$ref": "#/components/schemas/RunEvidenceConfidence"
               },
               {
                 "type": "null"
               }
             ],
-            "title": "Confidence",
             "description": "This step's retrieval confidence, computed ONCE at write time by chat's own `_compute_confidence` over the similarity of this step's own `search_documents` calls: `{level, avg_similarity, disclaimer, passages, kb_label}`. `level` is high | medium | low | none, where `none` means the step searched and matched nothing. ⚠ `null` MEANS THE STEP MADE NO KNOWLEDGE-BASE SEARCH (or its search failed, or the run predates this field) — render nothing, never a low chip. `kb_label` is the bound project folder's name, else `the knowledge base`, resolved server-side once per read."
           },
           "unsourced": {

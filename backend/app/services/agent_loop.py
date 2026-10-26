@@ -2033,13 +2033,19 @@ async def run_agent_loop(
         # by any route; markup-only becomes the one worded sentence, never an empty answer.
         _saved_content = strip_markup(full_content)
         if _saved_content is not full_content:
+            # 296-06 (292.1-IN-02): length + sha256 only — never a preview of the answer text.
             logger.warning(
-                "text_tool_markup_at_save run=%s len=%d sha256=%s preview=%r",
+                "text_tool_markup_at_save run=%s len=%d sha256=%s",
                 run_id, len(full_content) - len(_saved_content),
-                hashlib.sha256(full_content.encode("utf-8")).hexdigest(), full_content[:200],
+                hashlib.sha256(full_content.encode("utf-8")).hexdigest(),
             )
             if not _saved_content.strip():
                 _saved_content = FAILED_CALL_NOTICE
+                # 296-06 (292.1-IN-02): stream the substituted sentence, so live == reloaded.
+                try:
+                    await _emit(redis, run_id, 'delta', content=FAILED_CALL_NOTICE)
+                except Exception:  # noqa: BLE001 — informational; the save must still happen
+                    logger.warning("save-point notice delta failed for run %s", run_id, exc_info=True)
         row: dict = {
             "thread_id": thread_id,
             "user_id": current_user["id"],

@@ -556,6 +556,7 @@ async def upload_workflow_template(
         raise HTTPException(422, "File too large. Maximum size is 10 MB.")
     validate_upload(original, raw)  # magic-byte / OOXML-container gate -> 422
 
+    unplaced: list[str] = []  # 296-06 (291-IN-03)
     if word_anchors is not None:
         # The copy maker opens the container, so the zip-bomb cap applies here too.
         try:
@@ -582,6 +583,7 @@ async def upload_workflow_template(
                 ),
             )
         raw = made.copy  # the COPY is stored; the original is never written
+        unplaced = [sentence for _, sentence in made.unplaced]  # 296-06 (291-IN-03)
 
     # WR-05 (100-REVIEW) sanitisation, same shape as workspace.py:265 — ordinary names
     # ("Q3 Report (final).docx", "P&L 2026.xlsx") must not 422 at a user who never typed
@@ -611,7 +613,9 @@ async def upload_workflow_template(
         )
         raise HTTPException(502, "The template could not be stored. Please try again.")
 
-    return TemplateAssetRef(asset_id=asset_id, filename=safe_name, mime=mime)
+    return TemplateAssetRef(
+        asset_id=asset_id, filename=safe_name, mime=mime, unplaced_sentences=unplaced
+    )
 
 
 async def upload_workflow_reference(

@@ -94,6 +94,7 @@ from app.services.pricing_service import compute_token_cost_usd
 # Safe at module top: the helper lazy-imports `agent_loop` inside its bodies.
 from app.services.harness.phase_confidence import (
     KB_LABEL_DEFAULT,
+    RunEvidenceConfidence,  # 296-06 (289-IN-07): the typed wire shape
     confidence_for_wire,
     resolve_kb_label,
 )
@@ -278,7 +279,7 @@ class WorkflowRunPhaseRead(BaseModel):
     # ⚠ JOINS THE LOCKSTEP: declared here, read BY NAME off the same single parse in the
     # serializer, populated in the same construction, fenced by `test_200_1`'s set equality.
     # Does NOT join the two-wire-model rule — see D-289-02-A below the class.
-    confidence: dict | None = Field(
+    confidence: RunEvidenceConfidence | None = Field(
         default=None,
         description=(
             "This step's retrieval confidence, computed ONCE at write time by chat's own "

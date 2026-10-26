@@ -606,13 +606,17 @@ async def _note_pinned_model_not_run(phase, ctx, model: str) -> None:
     sub-step plus ONE ``policy_applied`` receipt with the sentence. No pin, or a pin that runs as
     asked, says nothing. The resolver call is the same one the sub-agent makes, on the same
     settings object and model, so the sentence names the model that actually runs."""
-    if not getattr(phase.config, "model", None) or not model:
+    if not isinstance(getattr(phase.config, "model", None), str) or not isinstance(model, str):
         return
     from app.services.task_service import _resolve_sub_agent_effective_model  # noqa: PLC0415
 
     settings_ = getattr(ctx, "user_settings", None)
-    used = _resolve_sub_agent_effective_model(settings_, ctx_model=model)
-    if not used or used == model:
+    try:
+        used = _resolve_sub_agent_effective_model(settings_, ctx_model=model)
+    except Exception:  # noqa: BLE001 — informational only; a notice must never sink a step
+        logger.warning("293-F-4: could not resolve the agent step's model for the notice", exc_info=True)
+        return
+    if not isinstance(used, str) or not used or used == model:
         return
     active = getattr(settings_, "active_provider", None) if settings_ is not None else None
     pinned_provider = _provider_for_model(model, ctx)
