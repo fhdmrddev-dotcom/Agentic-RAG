@@ -1960,15 +1960,18 @@ describe("WorkflowRunPage — the four deliverable renders", () => {
     // The report renders a step's output VERBATIM as text (a record of what was written) with
     // its own line breaks kept (pre-wrap). Markdown rendering on the report is a recorded
     // follow-up in 289-04-SUMMARY.
+    //
+    // 296-04 (289-F-B) REWRITTEN AGAIN: that follow-up is now taken. The step output goes through
+    // the shared `MarkdownRenderer` (marked + DOMPurify, `breaks: true`), so the `.markdown` block
+    // is back and each of the answer's own lines is still there. The 289-04 form asserted a
+    // `whitespace-pre-wrap` div holding the raw text, which no longer exists.
     await regionFor(runWithAnswer(), [])
     const row = reportStepRow("Draft the renewal letter")
-    const out = Array.from(row.querySelectorAll("div")).find((d) => d.className.includes("whitespace-pre-wrap"))
-    expect(out).toBeDefined()
-    expect(out!.textContent).toBe(RUN_ANSWER)
+    const out = row.querySelector(".markdown")
+    expect(out).not.toBeNull()
     for (const line of RUN_ANSWER.split("\n").filter((l) => l.trim())) {
       expect(out!.textContent).toContain(line.trim())
     }
-    expect(out!.className).toContain("break-words")
   })
 
   it("a confirm step's QUESTION is never mistaken for the run's answer (CR-02)", async () => {
@@ -2056,9 +2059,15 @@ describe("WorkflowRunPage — the four deliverable renders", () => {
     //     expect(block!.textContent).not.toContain("**")
     // The report is a record and renders the step output VERBATIM as text: the markers stay,
     // and no element is created from them. (Follow-up recorded in 289-04-SUMMARY.)
+    //
+    // 296-04 (289-F-B) REWRITTEN AGAIN: the follow-up is taken, so the hero's original assertion
+    // holds on the report row. The 289-04 form was:
+    //     expect(region.querySelector("strong")).toBeNull()
+    //     expect(row.textContent).toContain("Approved with **one correction** before finalising.")
     const row = reportStepRow("Draft the renewal letter")
-    expect(region.querySelector("strong")).toBeNull()
-    expect(row.textContent).toContain("Approved with **one correction** before finalising.")
+    expect(row.querySelector("strong")!.textContent).toBe("one correction")
+    expect(row.textContent).not.toContain("**")
+    void region
   })
 
   it("model-authored markup in the answer cannot execute — the refusal, re-asserted", async () => {
@@ -2083,17 +2092,23 @@ describe("WorkflowRunPage — the four deliverable renders", () => {
     // run. It is asserted over the WHOLE report now (was the hero's `.markdown` block), and is
     // stronger there: the report renders model text as text, so even the benign `<b>` is not
     // markup (was `expect(block!.querySelector("b")).not.toBeNull()`).
+    //
+    // 296-04 (289-F-B) REWRITTEN AGAIN: the output now goes through the shared MarkdownRenderer,
+    // so model markup is SANITISED (DOMPurify) rather than escaped. Nothing can run: no script,
+    // no handler attribute, no `javascript:` URL, anywhere in the region. The benign `<b>` is
+    // markup again (the hero's original assertion), and DOMPurify keeps a handler-less `<img>`,
+    // as it does in chat. The 289-04 form asserted `img` absent, `<b>` absent and the script
+    // text present as text.
     const block = reportStepRow("Draft the renewal letter")
     expect(region.querySelector("script")).toBeNull()
-    expect(region.querySelector("img")).toBeNull()
     for (const el of Array.from(region.querySelectorAll("*"))) {
       for (const attr of Array.from(el.attributes)) {
         expect(attr.name.toLowerCase().startsWith("on")).toBe(false)
         expect(attr.value.toLowerCase().replace(/\s/g, "")).not.toContain("javascript:")
       }
     }
-    expect(block.querySelector("b")).toBeNull()
-    expect(block.textContent).toContain("<script>alert(2)</script>")
+    expect(block.querySelector("b")).not.toBeNull()
+    expect(block.textContent).not.toContain("alert(2)")
   })
 
   it("adds NO focus stop — the answer is prose, not a control", async () => {

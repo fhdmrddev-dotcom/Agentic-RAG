@@ -2413,6 +2413,8 @@ Scan-list cell as of 2026-10-19 (replaced by 289-05, moved verbatim): 31 / 12 / 
 
 CLAUDE.md verdict cell as of 2026-10-19 (replaced by 289-05, moved verbatim): | `frontend/src/pages/WorkflowRunPage.tsx` | 31 / 12 / 1580 (was `30 / 11 / 1578`) | 288-03: ONE WaitingOnLine render, no hook · seam286 snaps same · ⛔ |
 
+296-04 (289-F-A): one `useRef` (`seenLiveRef`, written inside the existing alert effect when the run is non-terminal) and one prop at the existing `RunEvidenceReport` mount, `watchedFailure`, passed only when the run was seen live and now reads `failed`. `useState[<(]` 4→4, `useEffect(` 4→4. 291-S6-F9: the run page has no separate record header (a finished run IS the report), so no class change here. Triple `35 / 15 / 1604` (was `34 / 14 / 1597`). Previous CLAUDE.md cell kept verbatim: 293-03: ONE RunOriginLine mount; useState 1, useEffect 4 unchanged · ⛔. Previous scan-list cell kept verbatim: 34 / 14 / 1597 (was `33 / 13 / 1594`) | **FIRES** | 293 touch: see §Phase 293 close (previous cell moved there verbatim).
+
 ## `frontend/src/components/chat/OutputFileCard.tsx`
 
 **ADDED 2026-08-17 by plan `195-08`. Re-derived at `945b8b61`:** `8 commits / 7 phases / 219 L` · **G-5 FIRES** (7 phases vs threshold 3) — honoured by construction (**195**).
@@ -6507,6 +6509,8 @@ carries the verdict — **⚠ absent, on the boundary (added 199)** — and this
 
 **⚠ RE-DERIVED AT PHASE 214's CLOSE (2026-08-28, plan `214-15`) — recorded BESIDE the previous value, never over it: `4 / 3 / 526` → `8 / 5 / 713`.** 214-09 built the fields here and 214-12 took the deferred seam: `LaunchInputFields.tsx` is now the single renderer three doors mount. Phase buckets gain `214`.
 
+296-04 (287-IN-01): the `run-required-refusal` line moved from the template block to directly under `LaunchInputFields` (still outside any gate, so the 287-05 template-less refusal holds), and `setRequiredRefusal(null)` runs in the fields' onChange. useState unchanged. Triple `12 / 8 / 740` (was `8 / 5 / 713`). Previous CLAUDE.md cell kept verbatim: 287-01: handleRun refuses empty required field; 214-12 discharge stands. Previous scan-list cell kept verbatim: 8 / 5 / 713 | ⚠ **FIRES — EXACTLY AT THRESHOLD** | ✅ **deferred extraction DISCHARGED (214-12)** — one declared-input renderer, shared with chat and the schedule door.
+
 ### `frontend/src/components/panel/PanelEmpty.tsx`
 
 `4 / 4 / 52` · G-5 ⚠ **FIRES**
@@ -7942,6 +7946,8 @@ Mounts `LaunchInputFields`, the one renderer three doors share.
 
 **Phase 286 note (2026-10-18, 286-05).** Re-derived `1 / 1 / 157` (unchanged; does not fire at 1 phase). Scan-list disposition cell before 286-05 (replaced): *"young (214-12) — chat collects declared inputs BEFORE it creates anything"*. ⚠ **Path correction:** it lives under `components/layout/`, NOT `components/chat/` (286-CONTEXT named the wrong directory). ⚠ **The CLAUDE.md FIRING table had no row for it**, so a phase reading only that shortlist could not see the one launch form 287 must reuse; 286-05 ADDED the row (D-15) although the file does not fire, because the table is the collision shortlist for 287-293. **Expected change (287):** the in-thread workflow entry reuses this form through `ChatLayout.doRun` (its one caller today, mounted at `ChatLayout.tsx` `<ChatLaunchForm`); a second launch form anywhere is the failure. Its source stays fenced by `ChatLayout.launch.test.tsx` (`?raw`, T-214-12-01: the agent fills nothing).
 
+296-04 (287-IN-01): `setRefusal(null)` in the `LaunchInputFields` onChange, so the refusal answers only the last press. ⚠ The scan-list row read `1 / 1 / 157` (no fire); measured 3 commits / 3 phases before this touch, so it already fired. Triple `4 / 4 / 179` (was `1 / 1 / 157`). Previous CLAUDE.md cell kept verbatim: 287-01: required block, 1 helper import; reuse stays, no 2nd form. Previous scan-list cell kept verbatim: 1 / 1 / 157 | no (1 phase) | young (214-12); does not fire (1 phase). **286**: 287 reuses it through `ChatLayout.doRun` — never a second launch form. Path is `components/layout/`, not `components/chat/`.
+
 ### `frontend/src/components/workflows/ArgumentEditor.tsx`
 
 **Triple at Phase 214's close (2026-08-28): `1 / 1 / 226` — G-5: no (1 phase).** young (214-07) — the argument form; the raw-JSON surface it replaced was DELETED, not hidden
@@ -7993,6 +7999,8 @@ Five sentences, not one; the headline names the author's step name and the missi
 **Triple at Phase 214's close (2026-08-28): `3 / 3 / 601` — G-5: ⚠ **FIRES — EXACTLY AT THRESHOLD**.** ⚠ absent for its entire life; it crossed the threshold in 214-09 on a LAUNCH-CRITICAL path — row and BASELINE pin both added at this close
 
 ⚠ **Its suite was in `BASELINE` and, it was believed, in neither knob.** Measured at this close: it DOES run — the gate's `src/components/workflows` directory entry recurses into `__tests__/` — but it was unpinned, so it was executed and guarded by nothing. Pinned at 9 here.
+
+296-04 (BUG-261025-01 / 295-IN-05 / 287-SCHED): three useState (`runningId`, `runResult`, `requiredRefusal`) replace one (`notice`); a pure `runNowResult` reads `outcome` (old backend: launched → success, else error tone) and the server `detail` verbatim; the result line renders inside the pressed row; Add schedule refuses through the imported `missingRequiredFields` / `requiredFieldsMessage` (296-07 owns `soulData.ts`). Triple `5 / 4 / 723` (was `3 / 3 / 601`). Previous CLAUDE.md cell kept verbatim: ⚠ absent for its entire life; it crossed the threshold in 214-09 on a. Previous scan-list cell kept verbatim: 3 / 3 / 601 | ⚠ **FIRES — EXACTLY AT THRESHOLD** | ⚠ absent for its entire life; it crossed the threshold in 214-09 on a LAUNCH-CRITICAL path — row and BASELINE pin both added at this close.
 
 ### `frontend/src/components/workflows/argumentModel.ts`
 
@@ -11509,12 +11517,12 @@ cells rot within days.
 | [`frontend/src/lib/throttle.ts`](docs/HOT-FILE-LEDGER.md#frontendsrclibthrottlets) | 2 / 2 / 108 | does not fire | ⛔ **NO ROW FOR ITS ENTIRE LIFE — added 243-03.** TWO opposite primitives on purpose; ⛔ never unify them — one of the two call sites breaks silently |
 | [`frontend/src/components/chat/ChatArea.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentschatchatareatsx) | 94 / 44 / 1189 (was `93 / 43 / 1186`) | **FIRES** | honoured by construction (**287-03**): ONE mount of ThreadWorkflowPicker, zero new hooks, no logic. ⛔ no scope branch in send |
 | [`frontend/src/components/panel/PendingAskCard.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentspanelpendingaskcardtsx) | 25 / 12 / 1132 (was `24 / 11 / 1103`) | ⚠ **FIRES** | 296-04: stack keeps the newest ask per live workflow run (pure helper); card reads a passed clock on a live run as paused (one prop). useState 7→7, useEffect 3→3 |
-| [`frontend/src/pages/WorkflowRunPage.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrcpagesworkflowrunpagetsx) | 34 / 14 / 1597 (was `33 / 13 / 1594`) | **FIRES** | 293 touch: see §Phase 293 close (previous cell moved there verbatim) |
+| [`frontend/src/pages/WorkflowRunPage.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrcpagesworkflowrunpagetsx) | 35 / 15 / 1604 (was `34 / 14 / 1597`) | **FIRES** | 296-04: one ref (`seenLiveRef`) set in the existing alert effect, one prop at the report mount (`watchedFailure`). useState 4→4, useEffect 4→4 · ⛔ |
 | [`frontend/src/components/workflows/WaitingOnLine.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentsworkflowswaitingonlinetsx) | 1 / 1 / 26 | does not fire | young (created **288-03**): leaf that renders the server-composed waiting-on sentence verbatim; no hook, no API import |
 | [`frontend/src/components/workflows/StepEvidenceLine.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentsworkflowsstepevidencelinetsx) | 2 / 2 / 145 (was `1 / 1 / 93`) | no (2 phases) | 295-05: the unsourced arm; the confidence arm is byte-unchanged (an innerHTML test pins it). Two phases; does not fire |
-| [`frontend/src/components/workflows/evidenceVocabulary.ts`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentsworkflowsevidencevocabularyts) | 4 / 2 / 254 (was `3 / 1 / 235`) | no (2 phases) | 295-05: the words' ONE home (`NO_REASON_RECORDED`, `UNSOURCED_*`). Two phases; does not fire |
+| [`frontend/src/components/workflows/evidenceVocabulary.ts`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentsworkflowsevidencevocabularyts) | 5 / 3 / 261 (was `4 / 2 / 254`) | ⚠ **FIRES** (3 phases, crossed in 296) | 296-04: neutral `NO_MATCH_EXPLANATION` / `UNSOURCED_NOTE` (no "your documents") + `DOWNLOAD_UNAVAILABLE`. Words only; now FIRES (289, 295, 296) |
 | [`frontend/src/components/workflows/evidenceView.ts`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentsworkflowsevidenceviewts) | 4 / 3 / 387 (was `3 / 2 / 382`) | ⚠ **FIRES** | 295-05: one view field `endReason`, computed once from the C.1 table. Two phases; does not fire · 293 touch: see §Phase 293 close |
-| [`frontend/src/components/workflows/RunEvidenceReport.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentsworkflowsrunevidencereporttsx) | 4 / 3 / 472 (was `2 / 2 / 465`) | ⚠ **FIRES** | 293-03: one RunOriginLine mount; 293-05 D-5: the origin and stop-reason lines share one `flex-col` div (useState 2→2) |
+| [`frontend/src/components/workflows/RunEvidenceReport.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentsworkflowsrunevidencereporttsx) | 5 / 4 / 494 (was `4 / 3 / 472`) | ⚠ **FIRES** | 296-04: step output through MarkdownRenderer; one optional `watchedFailure` prop (sr-only alert); unlinked-file sentence; title `basis-80 grow`, actions wrap (useState 3→3) |
 | [`frontend/src/lib/api/runEvidence.ts`](docs/HOT-FILE-LEDGER.md#frontendsrclibapirunevidencets) | 3 / 3 / 137 (was `2 / 2 / 134`) | ⚠ **FIRES** | 295-05: TS twins for `unsourced` and `end_reason`, widened in lockstep with the contract fixture. Two phases; does not fire · 293 touch: see §Phase 293 close |
 | [`frontend/src/lib/runDeepLink.ts`](docs/HOT-FILE-LEDGER.md#frontendsrclibrundeeplinkts) | 1 / 1 / 63 (was `0 / 0 / 0`) | no (young) | young (created 289-04). ?run=<uuid> read/write/clear. ⛔ strict UUID only; the boot read never strips the param |
 | [`frontend/src/index.css`](docs/HOT-FILE-LEDGER.md#frontendsrcindexcss) | 35 / 19 / 1239 (was `34 / 18 / 1196`) | ⚠ **FIRES** | 294-05: ONE verdict block keyed only on citation-marker--v-* and __verdict (+43). ⛔ no app-wide rule |
@@ -11545,7 +11553,7 @@ cells rot within days.
 | [`frontend/src/components/workflows/RunReceipt.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentsworkflowsrunreceipttsx) | 3 / 1 / 241 | no (young) | young (200); does not fire (1 phase). **Phase 289 NOT EDITED**: the 286 forecast's chip went to StepEvidenceLine; the report never imports this file |
 | [`frontend/src/components/workflows/doorVocabulary.ts`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentsworkflowsdoorvocabularyts) | 6 / 4 / 540 | ⚠ **FIRES** | no seam proposed — a vocabulary doing one thing many times is the right shape (214); ⚠ absent until 199, and it is no longer at threshold |
 | [`frontend/src/components/workflows/StepTypePicker.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentsworkflowssteptypepickertsx) | 7 / 3 / 522 | ⚠ **FIRES — EXACTLY AT THRESHOLD** | honoured by construction (199) — ⚠ absent, on the boundary |
-| [`frontend/src/components/workflows/library/RunModal.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentsworkflowslibraryrunmodaltsx) | 8 / 5 / 713 | ⚠ **FIRES — EXACTLY AT THRESHOLD** | ✅ **deferred extraction DISCHARGED (214-12)** — one declared-input renderer, shared with chat and the schedule door |
+| [`frontend/src/components/workflows/library/RunModal.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentsworkflowslibraryrunmodaltsx) | 12 / 8 / 740 (was `8 / 5 / 713`) | ⚠ **FIRES** | 296-04: the required-field refusal moved directly under `LaunchInputFields` and clears in its onChange; template block gate back to showTemplate or launchError |
 | [`frontend/src/components/panel/PanelEmpty.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentspanelpanelemptytsx) | 4 / 4 / 52 | ⚠ **FIRES** | ⚠ absent at 4 phases — invisible to G-5 for its entire life (199) |
 | [`frontend/src/components/chat/StopControl.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentschatstopcontroltsx) | 3 / 1 / 315 | no (1 phase) | young — owes a detail section at its 3rd phase |
 | [`frontend/src/components/chat/ThreadRunLine.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentschatthreadrunlinetsx) | 2 / 2 / 365 (was `1 / 1 / 357`) | no (1 phase) | ⚠ re-derived at 244-13 and UNMOVED — `244` FIXED G-1 in its INPUT, not here, so it is still at phase 1 and NOT one away. Detail section owed at its 3rd phase · 293 touch: see §Phase 293 close |
@@ -11629,7 +11637,7 @@ cells rot within days.
 | [`backend/app/services/connectors/args.py`](docs/HOT-FILE-LEDGER.md#backendappservicesconnectorsargspy) | 2 / 1 / 474 | no (1 phase) | young (214-01) — the shared argument leaf: resolution, satisfiability, and ONE schema accessor |
 | [`backend/app/services/harness/reachability.py`](docs/HOT-FILE-LEDGER.md#backendappservicesharnessreachabilitypy) | 5 / 5 / 498 (was `4 / 4 / 463`) | ⚠ **FIRES** | 295-02: `no_template_bound` in LINT_CODES + pure `_check_template_bound` (+1 def, If 20→22). ⚠ now FIRES at 5 phases |
 | [`backend/app/services/workflow_kickoff.py`](docs/HOT-FILE-LEDGER.md#backendappservicesworkflow_kickoffpy) | 12 / 9 / 597 (was `12 / 8 / 597`) | ⚠ **FIRES** | 293-05 D-3: the live ctx kickoff calls the same `launch_kickoff` as the persisted row (214 MIRROR rule). Honoured by construction |
-| [`frontend/src/components/layout/ChatLaunchForm.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentslayoutchatlaunchformtsx) | 1 / 1 / 157 | no (1 phase) | young (214-12); does not fire (1 phase). **286**: 287 reuses it through `ChatLayout.doRun` — never a second launch form. Path is `components/layout/`, not `components/chat/` |
+| [`frontend/src/components/layout/ChatLaunchForm.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentslayoutchatlaunchformtsx) | 4 / 4 / 179 (was `1 / 1 / 157`) | ⚠ **FIRES** (214, 287, 291, 296) | 296-04: the refusal clears in the fields' onChange (+4). Still the one chat launch form. ⚠ row was stale (`1/1/157`); now FIRES |
 | [`frontend/src/components/workflows/ArgumentEditor.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentsworkflowsargumenteditortsx) | 1 / 1 / 226 | no (1 phase) | young (214-07) — the argument form; the raw-JSON surface it replaced was DELETED, not hidden |
 | [`frontend/src/components/workflows/ArgumentRow.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentsworkflowsargumentrowtsx) | 1 / 1 / 362 | no (1 phase) | young (214-07) — one row, one three-arm source picker, one gutter that WIDENS rather than inserts |
 | [`frontend/src/components/workflows/DescribeServicePicker.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentsworkflowsdescribeservicepickertsx) | 2 / 1 / 464 | no (1 phase) | young (214-13) — the describe door at the GRANT grain |
@@ -11639,7 +11647,8 @@ cells rot within days.
 | [`frontend/src/components/workflows/DeclaredInputsEditor.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentsworkflowsdeclaredinputseditortsx) | 1 / 1 / 333 | no (1 phase) | young (214.1-01) — the authoring surface `BUG-260828-02` says did not exist. ⚠ G-2 OVERRIDDEN, not satisfied |
 | [`frontend/src/components/workflows/PublishRefusalList.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentsworkflowspublishrefusallisttsx) | 2 / 1 / 178 | no (1 phase) | young (214-10) — the refusal renders as a CAUSE, not a status |
 | [`frontend/src/components/workflows/StepIdentity.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentsworkflowsstepidentitytsx) | 1 / 1 / 161 | no (1 phase) | young (214-08) — ONE element, four sizes, both names as props; it resolves nothing |
-| [`frontend/src/components/workflows/WorkflowScheduleModal.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentsworkflowsworkflowschedulemodaltsx) | 3 / 3 / 601 | ⚠ **FIRES — EXACTLY AT THRESHOLD** | ⚠ absent for its entire life; it crossed the threshold in 214-09 on a LAUNCH-CRITICAL path — row and BASELINE pin both added at this close |
+| [`frontend/src/components/workflows/WorkflowScheduleModal.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentsworkflowsworkflowschedulemodaltsx) | 5 / 4 / 723 (was `3 / 3 / 601`) | ⚠ **FIRES** | 296-04: Run now spins on its row (aria-busy, Starting…) and its worded result sits under Last ran; Add schedule refuses an empty required input by name. Bottom notice removed |
+| [`frontend/src/types/schedule.ts`](docs/HOT-FILE-LEDGER.md#frontendsrctypesschedulets) | 2 / 2 / 77 | no (2 phases) | row added 296-04: one optional `outcome` on `ScheduleTriggerResult` (the 296-02 trigger contract). Types only; does not fire |
 | [`frontend/src/components/workflows/argumentModel.ts`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentsworkflowsargumentmodelts) | 1 / 1 / 313 | no (1 phase) | young (214-07) — the three argument sources as data |
 | [`frontend/src/components/workflows/argumentVocabulary.ts`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentsworkflowsargumentvocabularyts) | 1 / 1 / 254 | no (1 phase) | young (214-07) — every sentence the argument form says |
 | [`frontend/src/components/workflows/describeServiceMatch.ts`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentsworkflowsdescribeservicematchts) | 1 / 1 / 188 | no (1 phase) | young (214-13) — the match rule the describe door refuses on |
@@ -22993,6 +23002,8 @@ Scan-list cell as of 2026-10-19 (replaced by 289-REVIEW WR-03, moved verbatim): 
 
 Scan-list cell as of 2026-10-21 (replaced by 295-07, moved verbatim): 3 / 1 / 235 (was `2 / 1 / 233`) | no (young) | **289-REVIEW WR-03**: one `VERDICT_SENTENCE` entry, `gate_timed_out` → "The step timed out before its checks ran". Strings only
 
+296-04 (289-IN-06 / 289-F-C): `NO_MATCH_EXPLANATION` and `UNSOURCED_NOTE` name no owner ("the knowledge base", "any document"), and `DOWNLOAD_UNAVAILABLE` is added. Words only, still the one home. Now FIRES: 289, 295, 296. Triple `5 / 3 / 261` (was `4 / 2 / 254`). Previous scan-list cell kept verbatim: 4 / 2 / 254 (was `3 / 1 / 235`) | no (2 phases) | 295-05: the words' ONE home (`NO_REASON_RECORDED`, `UNSOURCED_*`). Two phases; does not fire.
+
 ## `frontend/src/components/workflows/evidenceView.ts`
 
 **`0 / 0 / 0` — planned (289-04); row and section added at planning.** Pure payload → view-model for the report; `sectionStrings` is what the D-03 content test compares the DOM against and `exportPayload` returns the fetched payload unchanged, which is why the JSON matches the page by construction. ⛔ no React import. Plan 05 re-derives the triple.
@@ -23031,6 +23042,8 @@ Scan-list cell as of 2026-10-19 (replaced by 289-05, moved verbatim): 0 / 0 / 0 
 **`2 / 2 / 465`** (the scan-list row read `1 / 1 / 462`). 295-05 added one prop to the step log and one `<RunEndReasonLine>` under the outcome. useState 4 → 4, useEffect 3 → 3. Since 289-04 a terminal run renders this report, so this is where the run page shows why a run stopped.
 
 Scan-list cell as of 2026-10-21 (replaced by 295-07, moved verbatim): 1 / 1 / 462 (was `0 / 0 / 0`) | no (young) | young (created 289-04). The finished-run report; S1-S4 driven live. ⛔ no write control; never imports RunReceipt. Follow-ups F-A..F-E open
+
+296-04 (289-F-A / F-B / F-C, BUG-261025-02, 291-S6-F9): the step output renders through the shared `MarkdownRenderer` (no second renderer); one optional prop `watchedFailure`, rendered once as `<p role="alert" class="sr-only">`; an owner's unlinked file deliverable shows `DOWNLOAD_UNAVAILABLE` in place of the button; the title column is `min-w-0 basis-80 grow` and the action group `flex flex-wrap … grow-0 shrink`. useState 3→3, useEffect 2→2. Triple `5 / 4 / 494` (was `4 / 3 / 472`). Previous CLAUDE.md cell kept verbatim: 293-05 D-5: origin + stop reason share one column div · ⚠ FIRES. Previous scan-list cell kept verbatim: 4 / 3 / 472 (was `2 / 2 / 465`) | ⚠ **FIRES** | 293-03: one RunOriginLine mount; 293-05 D-5: the origin and stop-reason lines share one `flex-col` div (useState 2→2).
 
 ## `frontend/src/lib/api/runEvidence.ts`
 
@@ -24927,3 +24940,10 @@ Re-derived with the CLAUDE.md recipe at each fix commit. The 293-REVIEW fixes la
 ### The named seam, when it comes
 
 None needed: the next touch should only ask whether the `/api/` block's headers belong in one shared `proxy_params` include.
+
+
+## `frontend/src/types/schedule.ts`
+
+**`2 / 2 / 77`** (derived 2026-10-26; phases 204, 296). The schedule wire types: `WorkflowSchedule`, the create/update bodies and `ScheduleTriggerResult`. ⚠ It had no ledger row before 296-04. Types only; `null` and absent stay different on `last_run_at` (see its own docblock).
+
+296-04 (BUG-261025-01): `ScheduleTriggerResult.outcome?: "launched" | "refused" | "not_loaded" | "error"`, the 296-02 trigger contract. `detail` is already worded for every non-launch outcome. Triple `2 / 2 / 77`.

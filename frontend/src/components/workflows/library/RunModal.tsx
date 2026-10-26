@@ -469,7 +469,7 @@ export function RunModal({
               substring match, so prose that merely SPELLS the sentence trips it; this paragraph
               deliberately does not (the same discipline `librarySubtree.fences.test.ts`'s
               T-192-04 note keeps about the prop IT forbids). Please do not tidy the indentation. */}
-          {(showTemplate || launchError || requiredRefusal) && (
+          {(showTemplate || launchError) && (
           <div className="flex flex-col gap-1.5">
             {showTemplate && (
             <>
@@ -530,11 +530,6 @@ export function RunModal({
               </button>
             )}
             </>
-            )}
-            {requiredRefusal && (
-              <p data-testid="run-required-refusal" role="alert" className="px-0.5 text-[11px] text-destructive">
-                {requiredRefusal}
-              </p>
             )}
             {launchError && (
               <p data-testid="run-upload-error" role="alert" className="px-0.5 text-[11px] text-destructive">
@@ -654,8 +649,20 @@ export function RunModal({
           <LaunchInputFields
             fields={launchFields}
             values={inputValues}
-            onChange={(key, value) => setInputValues((prev) => ({ ...prev, [key]: value }))}
+            onChange={(key, value) => {
+              // 296-04 (287-IN-01): the refusal answered the last press; the next change clears it.
+              setRequiredRefusal(null)
+              setInputValues((prev) => ({ ...prev, [key]: value }))
+            }}
           />
+          {/* 296-04 (287-IN-01): the refusal sits directly under the fields it names (it used to
+              render in the template block above, away from them). Still outside that block's
+              gate, so a template-less workflow refuses with words too (the 287-05 regression). */}
+          {requiredRefusal && (
+            <p data-testid="run-required-refusal" role="alert" className="px-0.5 text-[11px] text-destructive">
+              {requiredRefusal}
+            </p>
+          )}
           <div className="flex flex-col gap-2">
             {/* F4 (UAT 2026-08-05) — this line promised a destination the launch had stopped
                 going to. 188-09 retargeted `doRun` to the run surface, and the modal still

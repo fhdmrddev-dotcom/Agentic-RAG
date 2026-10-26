@@ -142,7 +142,11 @@ export function ChatLaunchForm({
           <LaunchInputFields
             fields={fields}
             values={values}
-            onChange={(key, value) => setValues((prev) => ({ ...prev, [key]: value }))}
+            onChange={(key, value) => {
+              // 296-04 (287-IN-01): the refusal answered the last press; the next keystroke clears it.
+              setRefusal(null)
+              setValues((prev) => ({ ...prev, [key]: value }))
+            }}
           />
           {refusal && (
             <p data-testid="chat-launch-required-refusal" role="alert" className="text-[12px] text-destructive">
