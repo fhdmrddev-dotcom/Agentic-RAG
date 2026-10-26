@@ -88,7 +88,11 @@ def parse_definition_row(row: dict[str, Any], *, log_ref: Any = None):
                 exc,
             )
             return None
-    return WorkflowDefinition.model_validate(raw_def)
+    try:
+        return WorkflowDefinition.model_validate(raw_def)
+    except Exception as exc:  # noqa: BLE001 — 293-REVIEW WR-04: a broken row refuses, never raises
+        logger.error("definition for %s does not validate: %s", log_ref, exc)
+        return None
 
 
 def template_refusal(definition) -> str | None:
