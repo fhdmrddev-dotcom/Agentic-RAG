@@ -278,3 +278,30 @@ def test_every_fault_mode_returns_the_off_output(guard, fault_server, fast_engin
     assert seen, "the request reached the fault server"
     for key in PLANTED_KEYS:
         assert key not in caplog.text
+
+
+# ── 296-05 (294-REVIEW IN-03): an `ok` baseline for the citation-check path ─────────────────────
+
+@pytest.mark.parametrize("engine,path", [("jev", "/api/alpha/decisions"), ("openai_decisions", "/v1/decisions")])
+def test_ok_mode_answers_a_choice_question_with_a_clean_choice(engine, path):
+    """Before 296 every question got `noul` / `predicate`, so a citation check through the fault
+    server could only read couldn't check. Each claim must now map to a real verdict, and every
+    other question type must keep its old answer."""
+    from app.services.citation_check_service import CHOICE_LABELS, build_check_request, map_answer
+
+    mod = _load_script()
+    body = build_check_request(engine, "Revenue grew 12%.", {"C000": "Revenue grew.", "C001": "Costs fell."})
+    out = mod._answers(path, body, "ok")["answers"]
+    answers = list(out.values()) if isinstance(out, dict) else out
+    assert len(answers) == 2
+    for answer in answers:
+        assert map_answer(answer) == (CHOICE_LABELS[0], mod.FAULT_CHOICE_CONFIDENCE)
+    # the rerank path is unchanged: a noul / predicate question still gets its probability
+    rerank = {"questions": {"p0": {"type": "noul"}}} if engine == "jev" else {"questions": [{"type": "predicate", "name": "p0"}]}
+    first = mod._answers(path, rerank, "ok")["answers"]
+    first = list(first.values())[0] if isinstance(first, dict) else first[0]
+    assert first["type"] in ("noul", "predicate")
+    # refusal mode still refuses a choice question
+    refused = mod._answers(path, body, "refusal")["answers"]
+    refused = list(refused.values()) if isinstance(refused, dict) else refused
+    assert all(map_answer(a) == ("couldnt_check", None) for a in refused)
