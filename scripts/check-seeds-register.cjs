@@ -62,7 +62,9 @@ const root = path.resolve(__dirname, '..');
 const SEEDS_DIR = path.join(root, '.planning', 'seeds');
 
 /** A register entry. The filename is the authority for the id — frontmatter disagrees on 1+ file. */
-const SEED_FILE_RE = /^SEED-(\d{3})-.*\.md$/;
+// 296-05 (293-IN-07): `\d{3,}`, not `\d{3}` — a SEED-1000 file was invisible to every mode (driven
+// RED in a scratch copy of the register: `[unknown-seed] SEED-1000`, the file not even counted).
+const SEED_FILE_RE = /^SEED-(\d{3,})-.*\.md$/;
 
 const RED = '\x1b[31m';
 const YEL = '\x1b[33m';
@@ -485,7 +487,7 @@ function headingId(entry) {
   const body = entry.text.slice(entry.fmEnd);
   const m = body.match(/^#[ \t]+(.*)$/m);
   if (!m) return null;
-  const h = m[1].match(/SEED-(\d{3})/);
+  const h = m[1].match(/SEED-(\d{3,})/);
   return h ? h[1] : null;
 }
 
@@ -704,7 +706,7 @@ function requireSettled(entries, ids) {
   const out = [];
   for (const raw of ids) {
     const id = String(raw).trim().toUpperCase();
-    const num = (id.match(/^SEED-(\d{3})$/) || [])[1];
+    const num = (id.match(/^SEED-(\d{3,})$/) || [])[1];
     const hits = num ? entries.filter((e) => e.id === num && statusToken(e) !== 'superseded-id') : [];
     if (!hits.length) {
       out.push({ code: 'unknown-seed', id, why: 'no register file carries this id' });
