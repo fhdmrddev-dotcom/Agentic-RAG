@@ -169,11 +169,12 @@ import type { TemplateReadAnswer } from "@/components/workflows/useTemplateFirst
 import type { DraftedExtras } from "@/components/workflows/useTemplateFirstDraft"
 // 193.1-07 (D-06 rule 2) — the bind's own sentence. Authored in its module, never here: an
 // interpolating string is a function in a `.ts` vocabulary file, and the filename is DATA.
-import { templateBindFailedMessage } from "@/components/workflows/templateFirstVocabulary"
+import { FILES_LOCKED_WHILE_COMPOSING } from "@/components/workflows/templateFirstVocabulary"
+import { bindFailureLines } from "@/components/workflows/templateDraftBind"
 // 193.1-08 (D-24) — the pre-draft attach row, mounted on THIS screen and on the loose door's.
 // ONE component, two mounts: the marginal cost of the second is a mount and a prop, and the
 // alternative is two surfaces that drift. See the mount below for WHERE it lands and why.
-import { DescribeTemplateRow } from "@/components/workflows/DescribeTemplateRow"
+import { DescribeTemplateRow, UnplacedSentencesNote } from "@/components/workflows/DescribeTemplateRow"
 // 291-04 (sketch 291-describe-files winner B) — the template row's PEER, mounted beside it on
 // this screen and on the loose door's, for the same one-component-two-mounts reason.
 import { DescribeReferencesSection } from "@/components/workflows/DescribeReferencesSection"
@@ -821,7 +822,10 @@ export function WorkflowBuilderPage({
     onPickTemplateFile,
     onClearTemplateFile,
     bindHeldTemplate,
-    bindFailed,
+    // 296-07 (291-IN-08 / IN-03 / WR-01) — every failure, the unplaced sentences, the lock.
+    bindFailures,
+    bindUnplaced,
+    composing,
     // 291-04 — the ticks and the references, forwarded to the two door sections as they are.
     untickedKeys,
     onToggleBlank,
@@ -2040,6 +2044,12 @@ export function WorkflowBuilderPage({
               document held the row's reading is `idle`, so it renders its control and NOTHING
               else new, and the CTA is enabled exactly when it is today (D-08, by construction
               — no document ⇒ nothing to wait for ⇒ no gate, and no second conditional). */}
+          {/* 296-07 (291-WR-01): said once, above the two locked sections. */}
+          {composing && (
+            <p id="describe-files-locked" data-testid="describe-files-locked" role="status" className="text-xs text-muted-foreground">
+              {FILES_LOCKED_WHILE_COMPOSING}
+            </p>
+          )}
           <DescribeTemplateRow
             state={templateRead}
             filename={templateFile?.name}
@@ -2047,6 +2057,8 @@ export function WorkflowBuilderPage({
             onClear={onClearTemplateFile}
             untickedKeys={untickedKeys}
             onToggleBlank={onToggleBlank}
+            disabled={composing}
+            disabledNoteId="describe-files-locked"
           />
 
           {/* 291-04 — the references section, the template row's peer (sketch B): rule, then
@@ -2060,6 +2072,8 @@ export function WorkflowBuilderPage({
             anyReading={anyReading}
             onAddFiles={onAddReferenceFiles}
             onRemove={onRemoveReference}
+            disabled={composing}
+            disabledNoteId="describe-files-locked"
           />
 
           <div className="flex flex-col items-center gap-3">
@@ -2752,14 +2766,20 @@ export function WorkflowBuilderPage({
           "attaching failed" would leave the author with a workflow that dies at the worst
           possible moment. The wording lives in `templateFirstVocabulary.ts` and names the one
           place the fix lives; this page authors none of it. */}
-      {bindFailed && (
-        <p
+      {/* 296-07 (291-IN-08 / 291-IN-03): ONE block, ONE map — every bind failure (the template's
+          own sentence, then one sentence naming every reference), and the sentences the template
+          bind could not place. */}
+      {(bindFailures.length > 0 || bindUnplaced.length > 0) && (
+        <div
           data-testid="template-bind-failed"
           role="status"
           className="border-b border-warning/30 bg-warning/5 px-4 py-2 text-[12.5px] text-muted-foreground"
         >
-          {templateBindFailedMessage(bindFailed.filename)}
-        </p>
+          {bindFailureLines(bindFailures).map((line) => (
+            <p key={line}>{line}</p>
+          ))}
+          <UnplacedSentencesNote sentences={bindUnplaced} />
+        </div>
       )}
 
       {/* ── Phase 200 (FE-WIRING) — THE GRAPH TRACK IS NOT DIMMED WHILE THE PANEL IS OPEN,

@@ -4322,9 +4322,13 @@ describe("WorkflowBuilderPage 197-09 — the arrival card is mounted, and the tw
   })
 
   it("291-05 — the form's fields open the inputs fold, and a flip writes the LIVE definition", async () => {
+    // 296-07 (291-WR-06) — AMENDED DELIBERATELY: `Look it up` is disabled until the engine can
+    // look answers up, so the flip this case drives is the way OUT of it — a row an older draft
+    // set to kb_auto, switched to Ask the person. (A click on a disabled radio still flips its
+    // DOM `checked` in jsdom without any store write, so the old direction would pass vacuously.)
     const withInputs = {
       ...structuredClone(arrivalDef),
-      inputs: [{ key: "supplier_name", label: "Supplier name", type: "text", required: true, source: "user" }],
+      inputs: [{ key: "supplier_name", label: "Supplier name", type: "text", required: true, source: "kb_auto" }],
     }
     mockGenerate.mockResolvedValue({
       ok: true,
@@ -4345,11 +4349,12 @@ describe("WorkflowBuilderPage 197-09 — the arrival card is mounted, and the tw
     })
     const look = within(group).getByLabelText("Look it up") as HTMLInputElement
     const ask = within(group).getByLabelText("Ask the person") as HTMLInputElement
-    expect(ask.checked).toBe(true)
-    fireEvent.click(look)
+    expect(look.checked).toBe(true)
+    expect(look.disabled).toBe(true)
+    fireEvent.click(ask)
     // The switch is CONTROLLED by the live definition, so it moving IS the store write.
-    await waitFor(() => expect((within(group).getByLabelText("Look it up") as HTMLInputElement).checked).toBe(true))
-    expect((within(group).getByLabelText("Ask the person") as HTMLInputElement).checked).toBe(false)
+    await waitFor(() => expect((within(group).getByLabelText("Ask the person") as HTMLInputElement).checked).toBe(true))
+    expect((within(group).getByLabelText("Look it up") as HTMLInputElement).checked).toBe(false)
   })
 })
 

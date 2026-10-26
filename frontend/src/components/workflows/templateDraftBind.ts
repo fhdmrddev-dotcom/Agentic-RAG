@@ -16,7 +16,11 @@
  */
 import { uploadWorkflowReference, uploadWorkflowTemplate } from "@/lib/api"
 import type { ReferenceAssetDescriptor, WordAnchor } from "@/lib/api"
+// 296-07 (291-IN-03) — the domain path, not the barrel: suites mock the barrel wholesale.
+import { splitTemplateBind } from "@/lib/api/workflows"
 import type { TemplateAssetDescriptor } from "./builderStore"
+import { referencesBindFailedMessage, templateBindFailedMessage } from "./templateFirstVocabulary"
+import type { BindFailure } from "./templateFirstVocabulary"
 import type { TemplateReadAnswer } from "./useTemplateFirstDraft"
 
 /**
@@ -73,10 +77,11 @@ export interface BindSinks {
   onTemplateBound: (asset: TemplateAssetDescriptor) => void
   /** The host's writer for the references of ONE bind, never called with an empty list. */
   onReferencesBound: (assets: ReferenceAssetDescriptor[]) => void
-  /** The template bound: clear any earlier failure. */
-  onTemplateOk: () => void
-  /** One file could not be attached. */
-  onFailed: (filename: string) => void
+  /** One file could not be attached. 296-07 (291-IN-08): EVERY failure is reported, with its
+   *  kind — the slot file stored through the reference door counts as a reference. */
+  onFailed: (failure: BindFailure) => void
+  /** 296-07 (291-IN-03): the sentences the template bind could not place a blank for. */
+  onUnplaced: (sentences: string[]) => void
 }
 
 /**
@@ -96,17 +101,19 @@ export async function bindDraftFiles(
   if (!file && references.length === 0) return
   const referenceAssets: ReferenceAssetDescriptor[] = []
   if (file) {
+    const plan = bindPlanFor(file, answer)
     try {
-      const plan = bindPlanFor(file, answer)
       if (plan.door === "reference") {
         referenceAssets.push(await uploadWorkflowReference(definitionId, file))
       } else {
         // ⚠ Without anchors the call is the shipped one, argument for argument.
-        const asset =
+        const response =
           plan.anchors !== undefined
             ? await uploadWorkflowTemplate(definitionId, file, plan.anchors)
             : await uploadWorkflowTemplate(definitionId, file)
-        sinks.onTemplateOk()
+        // 296-07 (291-IN-03): the unplaced sentences are split OFF — `assets[]` is extra='forbid'.
+        const { asset, unplaced } = splitTemplateBind(response)
+        if (unplaced.length > 0) sinks.onUnplaced(unplaced)
         // The host's single writer. This module appends nothing to `assets[]` itself.
         sinks.onTemplateBound(asset)
       }
@@ -114,7 +121,7 @@ export async function bindDraftFiles(
       // The developer's evidence, at the boundary, in full.
       console.error(err)
       // …and the person's, which cannot carry any of it.
-      sinks.onFailed(file.name)
+      sinks.onFailed({ kind: plan.door, filename: file.name })
     }
   }
   // 291-04 (D-07) — every held reference, kept with the draft. One failure names its file
@@ -124,8 +131,22 @@ export async function bindDraftFiles(
       referenceAssets.push(await uploadWorkflowReference(definitionId, reference.file))
     } catch (err) {
       console.error(err)
-      sinks.onFailed(reference.file.name)
+      sinks.onFailed({ kind: "reference", filename: reference.file.name })
     }
   }
   if (referenceAssets.length > 0) sinks.onReferencesBound(referenceAssets)
+}
+
+/**
+ * 296-07 (291-IN-08) — EVERY bind failure as the lines the page renders (one block, one map).
+ * A template keeps its shipped sentence (one per template); the references share ONE sentence
+ * naming each file. No failures ⇒ `[]`. The words are the vocabulary's; this only composes.
+ */
+export function bindFailureLines(failures: readonly BindFailure[]): string[] {
+  const lines = failures
+    .filter((f) => f.kind === "template")
+    .map((f) => templateBindFailedMessage(f.filename))
+  const refs = failures.filter((f) => f.kind === "reference").map((f) => f.filename)
+  if (refs.length > 0) lines.push(referencesBindFailedMessage(refs))
+  return lines
 }

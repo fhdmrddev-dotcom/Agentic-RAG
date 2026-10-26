@@ -436,12 +436,41 @@ describe("WorkflowBuilderPage 193.1-01 — the pre-draft describe screen, byte f
     expect(Object.keys(ROWS).sort()).toEqual(Object.keys(BASELINE).sort())
   })
 
+  /**
+   * ⚠ 296-07 (291-WR-01) — AMENDED DELIBERATELY, and NOT by re-capturing. While the draft is
+   * being written the two file sections are now LOCKED, so the two `:composing` rows differ from
+   * the 193.1-01 capture by exactly the lock and nothing else: the one hint line above the
+   * template row, and `disabled` + `aria-describedby` on the two pickers (the references picker
+   * also takes its shipped dim-when-disabled classes). The CAPTURED strings above stay
+   * byte-for-byte as recorded; this function applies only that delta, so any OTHER drift in a
+   * composing row still reds here.
+   */
+  const LOCK_296 = "describe-files-locked"
+  const withLock296 = (html: string) =>
+    html
+      .replace(
+        '<section data-testid="describe-template-row"',
+        `<p id="${LOCK_296}" data-testid="${LOCK_296}" role="status" class="text-xs text-muted-foreground">Files can't be changed while the draft is being written.</p><section data-testid="describe-template-row"`,
+      )
+      // The pickers mounted unlocked and were locked by the press, so React APPENDS the two
+      // attributes after the existing ones — hence after `type="file"`.
+      .replace(
+        /(data-testid="describe-template-input" accept="[^"]*" class="[^"]*" type="file")/,
+        `$1 disabled="" aria-describedby="${LOCK_296}"`,
+      )
+      .replace(
+        /(data-testid="describe-reference-input" accept="[^"]*" class="[^"]*)(" type="file")/,
+        `$1 pointer-events-none opacity-50$2 disabled="" aria-describedby="${LOCK_296}"`,
+      )
+
   for (const row of Object.keys(ROWS)) {
     it(`${row} reproduces the DOM CAPTURED from the unmoved tree, byte for byte`, async () => {
       // NON-VACUITY, first: a `toBe` against an empty string would pass forever if the row ever
       // stopped rendering and the baseline were ever re-captured from that silence.
       expect(BASELINE[row].length).toBeGreaterThan(0)
-      expect(await capture(ROWS[row])).toBe(BASELINE[row])
+      const expected = row.endsWith(":composing") ? withLock296(BASELINE[row]) : BASELINE[row]
+      if (row.endsWith(":composing")) expect(expected).not.toBe(BASELINE[row]) // the delta applied
+      expect(await capture(ROWS[row])).toBe(expected)
     })
   }
 
@@ -690,7 +719,9 @@ describe("WorkflowBuilderPage 193.1-07 — the bind's honest line", () => {
     const pageSource = (await import("./WorkflowBuilderPage?raw")).default as string
     expect(pageSource.length).toBeGreaterThan(500)
     // Gated on the failure state, so the node cannot exist without one.
-    expect(pageSource).toMatch(/\{bindFailed && \(/)
+    // 296-07 (291-IN-08 / IN-03) — AMENDED DELIBERATELY: the gate is now EVERY failure (and the
+    // bind's unplaced sentences), not only the last failure. Still nothing renders without one.
+    expect(pageSource).toMatch(/\{\(bindFailures\.length > 0 \|\| bindUnplaced\.length > 0\) && \(/)
   })
 
   it("is EXACTLY ONE NODE, and it is NOT routed through the save's reading (D-06 rule 2)", async () => {
@@ -704,10 +735,13 @@ describe("WorkflowBuilderPage 193.1-07 — the bind's honest line", () => {
     )
     // The forbidden homes, asserted as ABSENT from the block itself rather than from the file
     // (both identifiers legitimately exist elsewhere on this page).
+    // 296-07 — AMENDED DELIBERATELY: the block's gate and its words moved to one map over
+    // `bindFailureLines` (the template's sentence is still `templateBindFailedMessage`, reached
+    // through that function); the forbidden homes are asserted exactly as before.
     const block =
-      pageSource.match(/\{bindFailed && \([\s\S]*?\n {6}\)\}/)?.[0] ?? ""
+      pageSource.match(/\{\(bindFailures\.length > 0[\s\S]*?\n {6}\)\}/)?.[0] ?? ""
     expect(block.length).toBeGreaterThan(80) // the extractor really extracted
-    expect(block).toContain("templateBindFailedMessage")
+    expect(block).toContain("bindFailureLines")
     expect(block).not.toContain("saveRefusalSentence")
     expect(block).not.toContain("canvasNotice")
     // POSITIVE CONTROLS — both needles really would fire inside a block of this shape.

@@ -14,6 +14,7 @@ import { describe, it, expect, vi, beforeEach, afterEach } from "vitest"
 import { act, cleanup, render, renderHook, screen, waitFor, within } from "@testing-library/react"
 
 import { useTemplateFirstDraft } from "../useTemplateFirstDraft"
+import { bindFailureLines } from "../templateDraftBind"
 import { createBuilderStore, type BuilderPhase } from "../builderStore"
 import { DescribeTemplateRow, UnplacedSentencesNote } from "../DescribeTemplateRow"
 import { DescribeReferencesSection } from "../DescribeReferencesSection"
@@ -251,11 +252,9 @@ describe("291-IN-08 — every bind failure is listed", () => {
   })
 
   it("the words: one references sentence, and the template keeps its own", () => {
-    const lines = (
-      templateFirstVocabulary as unknown as {
-        bindFailureLines: (f: { kind: string; filename: string }[]) => string[]
-      }
-    ).bindFailureLines
+    // The composition lives in the bind leaf (the vocabulary table holds strings and string
+    // functions only, which its own suite fences); the words are the vocabulary's.
+    const lines = bindFailureLines
     expect(
       lines([
         { kind: "reference", filename: "a.pdf" },

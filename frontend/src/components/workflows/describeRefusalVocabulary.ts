@@ -62,6 +62,7 @@ export type DescribeRefusalKey =
   | "could_not_generate"
   | "could_not_generate:grounding_unavailable"
   | "could_not_generate:removed_powers_broke_draft"
+  | "could_not_generate:provider_error"
   | "grounding_failed"
 
 /** One plain sentence and one next step — the whole of what an author reads (D-11). */
@@ -111,6 +112,12 @@ export const REFUSAL_FOR_KEY: Record<DescribeRefusalKey, RefusalWords> = {
     sentence:
       "Your attached files asked for actions only your description can add. Removing them left a workflow that cannot run, so no draft was made.",
     next: "Describe the steps you want and try again.",
+  },
+  // 296-07 (291-S1-copy b) — 296-03's `provider_error` sub-reason: the provider refused the
+  // call (billing, quota, a key), so the draft is not the model's fault and rewording won't help.
+  "could_not_generate:provider_error": {
+    sentence: "The drafting model's provider turned the request down, so no draft was written.",
+    next: "Rewording won't help. Ask whoever runs this workspace to check the provider account, then try again.",
   },
   grounding_failed: {
     sentence: "The draft pointed at a tool, skill or folder this workflow can't use.",

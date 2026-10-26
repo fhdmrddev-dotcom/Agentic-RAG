@@ -55,6 +55,8 @@ import { FORM_FIELDS_HEADING } from "@/components/workflows/templateFirstVocabul
 import { useTemplatePlaceholders } from "@/hooks/useTemplatePlaceholders"
 import { uploadWorkflowTemplate, WorkflowTemplateUploadError } from "@/lib/api"
 import type { WorkflowTemplateAsset } from "@/lib/api"
+// Domain path, not the barrel: suites mock the barrel wholesale.
+import { splitTemplateBind } from "@/lib/api/workflows"
 
 /** The section heading. A module-scope const for the same reason `GovernanceSection`'s is:
  *  the `<h3>` text and anything that labels the group must be the same words. */
@@ -252,7 +254,9 @@ export function TemplateAttachSection({
       setError(null)
       setBusy(true)
       try {
-        const asset = await uploadWorkflowTemplate(definitionId, file)
+        // 296-07 (291-IN-03): the bind response now carries `unplaced_sentences`, which is NOT
+        // part of the asset — `assets[]` is extra='forbid', so it is split off before writing.
+        const { asset } = splitTemplateBind(await uploadWorkflowTemplate(definitionId, file))
         onAttached(asset)
       } catch (err) {
         setError(templateErrorSentence(err))

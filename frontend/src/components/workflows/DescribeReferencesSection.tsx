@@ -65,6 +65,10 @@ export interface DescribeReferencesSectionProps {
   onAddFiles: (files: File[]) => void
   /** The author removed the reference at this index. No confirmation: nothing was stored. */
   onRemove: (index: number) => void
+  /** 296-07 (291-WR-01): a draft is being written — the picker and every Remove are disabled,
+   *  and say why through `disabledNoteId` (the page renders that hint once). */
+  disabled?: boolean
+  disabledNoteId?: string
 }
 
 /** One reading line: its words and whether they are a FACT (foreground) or an explanation. */
@@ -99,11 +103,16 @@ export function DescribeReferencesSection({
   anyReading,
   onAddFiles,
   onRemove,
+  disabled = false,
+  disabledNoteId,
 }: DescribeReferencesSectionProps) {
   const inputId = useId()
   const fullId = useId()
   const count = references.length
   const full = count >= REFERENCE_LIMIT
+  // 296-07 (291-WR-01): locked while the draft is written; the full-picker reason still wins.
+  const locked = disabled || full
+  const describedBy = full ? fullId : disabled ? disabledNoteId : undefined
 
   return (
     <section data-testid="describe-reference-row" className={ROW_CLASSES}>
@@ -128,6 +137,8 @@ export function DescribeReferencesSection({
                   <button
                     type="button"
                     aria-label={refsRemoveLabel(file.name)}
+                    disabled={disabled}
+                    {...(disabled && disabledNoteId ? { "aria-describedby": disabledNoteId } : {})}
                     onClick={() => onRemove(index)}
                     className={REMOVE_CLASSES}
                   >
@@ -164,15 +175,15 @@ export function DescribeReferencesSection({
         multiple
         data-testid="describe-reference-input"
         accept={REFS_ACCEPT}
-        disabled={full}
-        {...(full ? { "aria-describedby": fullId } : {})}
+        disabled={locked}
+        {...(describedBy ? { "aria-describedby": describedBy } : {})}
         onChange={(event) => {
           const files = Array.from(event.target.files ?? [])
           // Reset NOW, before the callback, so re-picking the same file re-fires `change`.
           event.target.value = ""
           if (files.length > 0) onAddFiles(files)
         }}
-        className={full ? `${INPUT_CLASSES} pointer-events-none opacity-50` : INPUT_CLASSES}
+        className={locked ? `${INPUT_CLASSES} pointer-events-none opacity-50` : INPUT_CLASSES}
       />
 
       {full ? (

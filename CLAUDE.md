@@ -427,7 +427,7 @@ node scripts/check-hot-file-ledger.cjs <phase-dir>   # 0 clear · 1 missing rows
 | `frontend/src/components/workflows/library/libraryFilter.ts` | 6 / 4 / 435 | ⚠ absent at 4 phases and NO PLAN NAMED IT (192.2) |
 | `frontend/src/components/workflows/library/libraryRow.ts` | 4 / 3 / 201 | ⚠ absent, on the boundary (added 192.2) |
 | `frontend/src/components/workflows/WorkflowDoorSwitch.tsx` | 20 / 13 / 1104 (was `18 / 12 / 1075`) | 291-04: one hook, one mount, one handoff spread (+33 −4) |
-| `frontend/src/pages/WorkflowBuilderPage.tsx` | 63 / 27 / 2915 (was `62 / 26 / 2897`) | 296-07: D-09 view pair + teamShown gates; saveNow on generation · ⛔ |
+| `frontend/src/pages/WorkflowBuilderPage.tsx` | 64 / 27 / 2935 (was `63 / 27 / 2915`) | 296-07: D-09 pair, saveNow on generation, bind block one map · ⛔ |
 | `frontend/src/components/workflows/DraftArrivalCard.tsx` | 5 / 4 / 688 (was `4 / 3 / 625`) | 291-05: two optional props + one fold boolean; rows in a leaf · ⛔ |
 | `frontend/src/components/workflows/DecisionsList.tsx` | 5 / 3 / 429 | ⚠ now FIRES (291) · 291-05: one optional prop, one template-row sub-line |
 | `frontend/src/components/workflows/decisionsVocabulary.ts` | 6 / 4 / 344 (was `4 / 3 / 327`) | 291-05: one glyph + one formatter, still a zero-import leaf · ⛔ |
@@ -511,7 +511,7 @@ node scripts/check-hot-file-ledger.cjs <phase-dir>   # 0 clear · 1 missing rows
 | `frontend/src/components/workflows/StepTypePicker.tsx` | 7 / 3 / 522 | honoured by construction (199) |
 | `frontend/src/components/workflows/library/RunModal.tsx` | 12 / 8 / 740 (was `9 / 6 / 732`) | 296-04: refusal under the fields, clears on change |
 | `frontend/src/components/panel/PanelEmpty.tsx` | 4 / 4 / 52 | ⚠ absent at 4 phases |
-| `frontend/src/components/workflows/useTemplateFirstDraft.ts` | 13 / 6 / 1092 (was `12 / 5 / 1155`) | 296-07: extraction TAKEN (bind → templateDraftBind.ts, move-only) |
+| `frontend/src/components/workflows/useTemplateFirstDraft.ts` | 14 / 6 / 1160 (was `13 / 6 / 1092`) | 296-07: lock + bind snapshot + every failure; extraction FIRST next |
 | `frontend/src/components/workflows/RunSpine.tsx` | 7 / 5 / 441 (was `6 / 4 / 433`) | 295-05: ONE prop (unsourced) |
 | `frontend/src/components/workflows/RunTranscript.tsx` | 7 / 3 / 652 | ⚠ **FIRES on a component with NO MOUNT in the product** |
 | `frontend/src/components/settings/ConnectionsTab.tsx` | 25 / 9 / 1635 | ⚠ the row was STALE at `17 / 7 / 1477`. honoured by construction (**22 |
@@ -543,7 +543,7 @@ node scripts/check-hot-file-ledger.cjs <phase-dir>   # 0 clear · 1 missing rows
 | `frontend/src/components/workflows/nodePresentation.ts` | 8 / 7 / 221 | ⚠ absent from BOTH for its ENTIRE LIFE at **7 phases** |
 | `frontend/src/lib/api/threads.ts` | 24 / 14 / 1994 (was `23 / 13 / 1992`) | 293-03: origin on ThreadWorkflowState (types only) · ⛔ |
 | `frontend/src/lib/api/connectors.ts` | 17 / 11 / 740 | honoured by construction (244-06) · ⛔ |
-| `frontend/src/lib/api/workflows.ts` | 13 / 13 / 1290 (was `12 / 12 / 1285`) | 293-03: origin on the two run read types (types only) |
+| `frontend/src/lib/api/workflows.ts` | 14 / 14 / 1313 (was `13 / 13 / 1290`) | 296-07: bind response type + splitTemplateBind (keeps assets[] clean) |
 | `frontend/src/lib/connectionMark.tsx` | 7 / 4 / 313 | ✅ **the move IS the seam, and it was TAKEN (214-08)** |
 | `frontend/src/components/ingestion/DocumentList.tsx` | 31 / 15 / 372 (was `31 / 16 / 372`) | last touch 275-02/04 |
 | `frontend/src/pages/LibraryPage.tsx` | 63 / 20 / 1344 (was `57 / 19 / 1297`) | seam TAKEN (284-01 hook); lines rose → G-5 NOT discharged · ⛔ |
@@ -646,7 +646,12 @@ node scripts/check-hot-file-ledger.cjs <phase-dir>   # 0 clear · 1 missing rows
 | `backend/app/services/sources/adapters/microsoft_graph.py` | 8 / 5 / 507 (was `3 / 2 / 376`) | ⚠ now FIRES (5 phases) — row added 280-04 · honoured by construction |
 | `frontend/src/components/workflows/runVocabulary.ts` | 10 / 5 / 662 | ⚠ FIRES, absent here — row added 281-04 · honoured by construction |
 | `frontend/src/components/workflows/definitionOps.ts` | 15 / 5 / 1129 | ⚠ absent its entire life — row added 296-07 (D-26) |
-| `frontend/src/lib/api/knowledge.ts` | 8 / 7 / 910 (was `7 / 6 / 847`) | 291-04: generate body + result extras, additive · ⛔ |
+| `frontend/src/components/workflows/templateFirstVocabulary.ts` | 4 / 3 / 453 | ⚠ now FIRES (296) · 296-07: three describe-door strings (data) |
+| `frontend/src/components/workflows/declaredInputsVocabulary.ts` | 4 / 3 / 172 | ⚠ now FIRES (296) · 296-07: look-up not wired (words); blank options |
+| `frontend/src/components/workflows/describeRefusalVocabulary.ts` | 5 / 3 / 203 | ⚠ now FIRES (296) · 296-07: one refusal row (provider_error) |
+| `frontend/src/components/workflows/DescribeTemplateRow.tsx` | 3 / 3 / 581 | ⚠ now FIRES (296) · 296-07: disabled prop + UnplacedSentencesNote |
+| `frontend/src/components/workflows/TemplateAttachSection.tsx` | 5 / 3 / 411 | ⚠ now FIRES (296) · 296-07: bind response split before assets[] |
+| `frontend/src/lib/api/knowledge.ts` | 10 / 8 / 915 (was `8 / 7 / 910`) | 296-07: covered_by may be null (types only) · ⛔ |
 | `backend/app/services/google_service.py` | 12 / 8 / 661 | ⚠ absent its ENTIRE LIFE — row added 282 · 282-01: ONE builder · ⛔ |
 | `backend/app/services/provider_gateway/anthropic.py` | 5 / 5 / 125 | ⚠ absent its ENTIRE LIFE — row added 282 · 282-01: ONE kwarg · ⛔ |
 | `backend/app/services/provider_gateway/google.py` | 4 / 4 / 107 | ⚠ absent its ENTIRE LIFE — row added 282 · 282-01: ONE kwarg · ⛔ |
