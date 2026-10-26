@@ -71,5 +71,7 @@ describe("293-04 statusCurl and the sample", () => {
     const files = sample.files as { url: string; expires_in: number }[]
     expect(files[0].expires_in).toBe(300)
     expect(files[0].url).toContain("/inbound/files/")
+    // 293-REVIEW WR-01: the server sends an ABSOLUTE link, so the sample does too.
+    expect(files[0].url).toMatch(/^https:\/\//)
   })
 })
