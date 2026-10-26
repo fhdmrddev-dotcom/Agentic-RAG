@@ -186,6 +186,14 @@ PER_MODULE: frozenset[str] = frozenset({"logger"})
 
 # name → the reason it is no longer compared. EMPTY in 278 — a pure move changes nothing on purpose.
 RETIRED: dict[str, str] = {
+    "_handle_execute_code": (
+        "Phase 296 (296-06, BUG-261024-04 lead 2, 2026-10-26): deliberate post-move edit. The "
+        "per-run output baseline is re-seeded on every agent-loop iteration (the ToolContext is "
+        "rebuilt), and it overwrote an earlier iteration's file meta with `iteration: -1, url: "
+        "None`; the seed now adds only hashes the run has not recorded (one condition). Pinned by "
+        "test_296_chat_and_wire.py::test_bug_261024_04_lead2_a_later_iteration_never_overwrites_"
+        "an_earlier_files_meta."
+    ),
     "_handle_ask_user": (
         "BUG-261015-03 (2026-10-15): deliberate post-move edit. The wait clamp moved into "
         "_resolve_ask_timeout with a 300 s floor; pinned by test_bug_261015_03_ask_user_floor.py."

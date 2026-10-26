@@ -144,6 +144,10 @@ async def test_docx_returns_four_key_descriptor_and_persists_to_storage(valid_do
 
     # The wire shape ``resolve_template_source`` Branch 1 consumes (AssetRef).
     payload = result.model_dump() if hasattr(result, "model_dump") else dict(result)
+    # 296-06 (291-IN-03): reconciled on purpose. The bind response now also carries
+    # `unplaced_sentences` (`[]` here: no Word blanks were ticked). It is NOT an AssetRef key;
+    # the Builder splits it off before writing `assets[]` (`splitTemplateBind`, 296-07).
+    assert payload.pop("unplaced_sentences") == []
     assert set(payload) == {"kind", "asset_id", "filename", "mime"}
     assert payload["kind"] == "template"
     # ORDINARY NAMES DO NOT 422 — that is the WR-05 contract, and it is NOT the same as
@@ -193,6 +197,9 @@ async def test_descriptor_round_trips_into_a_workflow_definition(valid_docx_byte
 
     coro, _pool, _sb, _ = _run(_StubUpload("brief.docx", valid_docx_bytes))
     payload = (await coro).model_dump()
+    # 296-06 (291-IN-03): reconciled on purpose — the Builder splits `unplaced_sentences` off
+    # the bind response (`splitTemplateBind`) and writes the rest; this does the same.
+    payload.pop("unplaced_sentences")
 
     AssetRef.model_validate(payload)  # the exact shape Branch 1 reads
     wf = WorkflowDefinition.model_validate(
