@@ -4414,6 +4414,8 @@ const BASELINE = {
   "OrgAuditTab.test.tsx": 16,
   // 293-04 — under the `src/components/workflows` directory entry, so a pin only.
   "WorkflowCardMenu.apiKey293.test.tsx": 4, // ⋯ New API key… under Schedules on owned published rows only, payload {id, name}; absent without onApiKey (seam286 pin unchanged)
+  // ── Phase 297-01 (REG-09 / D-01, D-03) — adopted, both knobs, same commit (2026-10-27).
+  "useAppNavigation.test.tsx": 13, // 297-01 — characterization of App's moved view/tab state: boot initializer (4 shapes + home), studio navigators, one-shot Library hand-off, bounceHome, no router import
 }
 
 // Still COMPUTED, never hand-written — the reduce is the single source, so the
@@ -6451,6 +6453,8 @@ const TARGETS = [
   "src/components/org/OrgApiKeysTab.test.tsx",
   // 293-04 (SEED-287) — FILE-LEVEL, SAME commit as its first-ever BASELINE pin.
   "src/components/org/OrgAuditTab.test.tsx",
+  // Phase 297-01 — FILE-LEVEL (no directory entry), in the SAME commit as its BASELINE pin.
+  "src/hooks/__tests__/useAppNavigation.test.tsx",
 ]
 
 const REPO_ROOT = path.resolve(__dirname, "..")
