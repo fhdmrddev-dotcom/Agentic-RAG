@@ -103,10 +103,19 @@ Requirements: [`REQUIREMENTS.md`](REQUIREMENTS.md). **28 v4.8 requirements, 28 m
 **Plans**: 4 plans in 3 waves (01 → 02 → {03, 04})
 
 Plans:
+**Wave 1**
+
 - [ ] 297-01-PLAN.md — behaviour-neutral G-5 extraction: `useAppNavigation` + `AppViewSwitch`, 8 fences re-targeted (REG-09)
+
+**Wave 2** *(blocked on Wave 1 completion)*
+
 - [ ] 297-02-PLAN.md — router core: react-router 8.5 + React 19.2.9 + CI Node 22, `appRoutes.ts`, URL-derived views, legacy aliases, `/app/runs/<id>`, `?run=` writers retired, not-found + holding states, stream-survival proof (LINK-01)
+
+**Wave 3** *(blocked on Wave 2 completion)*
+
 - [ ] 297-03-PLAN.md — unsaved-edit guard: one app-level `useBlocker` + leave-guard registry, Workflow Builder tenant with one-shot latch (LINK-07)
 - [ ] 297-04-PLAN.md — three-layer routing parity suite (dev / Vercel / nginx), driven RED per layer (LINK-08)
+
 **UI hint**: yes
 **Flags**: ⛔ **G-5 extraction FIRST** — `frontend/src/App.tsx` (`37 / 28 / 422`) and `frontend/src/components/layout/ChatLayout.tsx` (`64 / 33 / 1158`) both FIRE; read both sections of `docs/HOT-FILE-LEDGER.md` before planning (the 187-24 "a grep proving absence must not be answerable by a comment" rule, the positional-fallback mount switch, `?run=` handling from 289-04 / 289-REVIEW WR-05, the `setLibraryTab` two-writer pin, the `NO TWELFTH` non-vacuity control). Also hot: `NavPanel.tsx` (14 phases), `nav-items.ts` (9), `WorkflowBuilderPage.tsx` (27, for the unsaved-edit guard), `RunEvidenceReport.tsx` (a `?run=` writer), `frontend/nginx.conf` (FIRES; research expects no change). ⛔ `StreamsProvider.tsx` (45 phases) is NOT edited: the router sits above the providers, no keyed remounts. **Research flags**: confirm `react-router@8.5` (data mode, routing only) against hand-rolled at discuss, with its costs — React 19.2.4 → 19.2.9, CI Node 20 → 22, Vercel's project Node version checked, +~18 KB gzipped in the app chunk; inventory the ~19 source-reading / "no router" fences before planning. `activeViewReachability.ts` gains a route leg. **Four-axis UAT** (UI state): the parallel-thread axis is load-bearing (a live stream in thread A survives navigation). **G-2**: not triggered by addresses alone; the unsaved-edit prompt reuses the existing confirm pattern — sketch if it is new UI. **G-4** for back/forward and refresh. Pre-existing defect (REG-08 files it): `*.vercel.app` previews cannot open `/app` (the apex redirect regex matches `vercel.app`); LINK-08 does not cover previews.
 

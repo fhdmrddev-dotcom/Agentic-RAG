@@ -2,13 +2,13 @@
 gsd_state_version: 1.0
 milestone: v4.8
 milestone_name: Every Page Has a Link
-status: Roadmap created — ready to discuss Phase 297
-last_updated: "2026-10-27T16:46:16.288Z"
-last_activity: 2026-10-27 — Milestone v4.8 Every Page Has a Link started (phases from 297, migrations from 217)
+status: executing
+last_updated: "2026-10-27T17:49:43.793Z"
+last_activity: 2026-10-27 -- Phase 297 planning complete
 progress:
   total_phases: 13
   completed_phases: 0
-  total_plans: 0
+  total_plans: 4
   completed_plans: 0
   percent: 0
 ---
@@ -45,8 +45,8 @@ reviewer exists, so a phase closes `verification_mode: self-verified`, never `re
 
 Phase: 297 (not started)
 Plan: —
-Status: Roadmap created — ready to discuss Phase 297
-Last activity: 2026-10-27 — Milestone v4.8 Every Page Has a Link started (phases from 297, migrations from 217)
+Status: Ready to execute
+Last activity: 2026-10-27 -- Phase 297 planning complete
 
 Scope set at intake: per-view URLs (SEED-185/015/178), run-waiting notifications in-app + email
 (SEED-281), lists follow the active org — decided per-org (SEED-389), v4.7 close-out
