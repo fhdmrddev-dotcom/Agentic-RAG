@@ -439,11 +439,11 @@ node scripts/check-hot-file-ledger.cjs <phase-dir>   # 0 clear · 1 missing rows
 | `backend/app/services/run_evidence.py` | 6 / 4 / 555 | ⚠ FIRES, absent here — row added 296-01 · D-05 withheld cascade · ⛔ |
 | `frontend/src/lib/api/runEvidence.ts` | 3 / 3 / 137 | ⚠ now FIRES (293) — row added 293-03 · one optional field |
 | `frontend/src/components/workflows/evidenceView.ts` | 4 / 3 / 387 | ⚠ now FIRES (293) — row added 293-03 · origin passed through |
-| `frontend/src/components/workflows/RunEvidenceReport.tsx` | 6 / 4 / 495 (was `5 / 4 / 494`) | 296 review FE-WR-02: output renders with noRemoteMedia · ⚠ FIRES |
+| `frontend/src/components/workflows/RunEvidenceReport.tsx` | 7 / 5 / 492 (was `6 / 4 / 495`) | 297-02: ?run= writer effect deleted (D-18) · ⚠ FIRES |
 | `frontend/src/components/workflows/evidenceVocabulary.ts` | 5 / 3 / 261 | ⚠ now FIRES (296) · 296-04: neutral NO_MATCH/UNSOURCED + DOWNLOAD_UNAVAILABLE |
 | `backend/app/models/thread.py` | 25 / 17 / 550 (was `24 / 16 / 545`) | 293-03: ONE field (origin) |
 | `frontend/src/components/workflows/canvasModel.ts` | 16 / 8 / 836 (was `15 / 8 / 831`) | 296-07: comparePhaseOrder, engineArmed; isGrounded drops escalated |
-| `frontend/src/components/layout/ChatLayout.tsx` | 65 / 34 / 882 (was `64 / 33 / 1158`) | 297-01: G-5 seam TAKEN — mount switch → AppViewSwitch, move only |
+| `frontend/src/components/layout/ChatLayout.tsx` | 67 / 34 / 897 (was `65 / 34 / 882`) | 297-02: run id → route; 4 optional props; history column hidden on S1 |
 | `frontend/src/components/layout/ChatLaunchForm.tsx` | 6 / 4 / 191 (was `5 / 4 / 183`) | 296 G-4 row 11: refused Run scrolls the refusal into view |
 | `frontend/src/components/workflows/LaunchInputFields.tsx` | 3 / 3 / 145 | 287-01: leaf stays non-blocking; docblock only · 214.1-01 trigger TAKEN |
 | `frontend/src/components/layout/ChatHistoryColumn.tsx` | 7 / 2 / 513 | ⚠ absent its ENTIRE LIFE — row added 244-01 |
@@ -481,7 +481,7 @@ node scripts/check-hot-file-ledger.cjs <phase-dir>   # 0 clear · 1 missing rows
 | `frontend/src/components/chat/useStartWorkflowInThread.ts` | 3 / 2 / 174 (was `2 / 2 / 173`) | 296 review FE-CR-01: refusal read by status (400/409/422), not by draft · ⛔ |
 | `frontend/src/lib/toolMeta.ts` | 10 / 6 / 218 | ⚠ absent its ENTIRE LIFE — row added 244-13 · ⛔ |
 | `frontend/src/components/panel/PendingAskCard.tsx` | 25 / 12 / 1132 (was `24 / 11 / 1103`) | 296-04: one ask per live workflow run; passed clock waits |
-| `frontend/src/pages/WorkflowRunPage.tsx` | 35 / 15 / 1604 (was `34 / 14 / 1597`) | 296-04: one ref + one prop (watchedFailure); useState 4, useEffect 4 · ⛔ |
+| `frontend/src/pages/WorkflowRunPage.tsx` | 36 / 16 / 1605 (was `35 / 15 / 1604`) | 297-02: COPY_LOADING exported, one keyword · ⛔ |
 | `frontend/src/components/workflows/WaitingOnLine.tsx` | 1 / 1 / 26 | young (created 288-03) · leaf, no hook · ⛔ |
 | `frontend/src/components/chat/OutputFileCard.tsx` | 8 / 7 / 219 | honoured by construction (195) |
 | `frontend/src/components/panel/FilesSection.tsx` | 12 / 8 / 354 (was `10 / 6 / 363`) | ⚠ STALE · last touch 274-04 |
@@ -519,7 +519,7 @@ node scripts/check-hot-file-ledger.cjs <phase-dir>   # 0 clear · 1 missing rows
 | `frontend/src/components/workflows/useTemplateFirstDraft.ts` | 14 / 6 / 1160 (was `13 / 6 / 1092`) | 296-07: lock + bind snapshot + every failure; extraction FIRST next |
 | `frontend/src/components/workflows/RunSpine.tsx` | 7 / 5 / 441 (was `6 / 4 / 433`) | 295-05: ONE prop (unsourced) |
 | `frontend/src/components/workflows/RunTranscript.tsx` | 7 / 3 / 652 | ⚠ **FIRES on a component with NO MOUNT in the product** |
-| `frontend/src/components/settings/ConnectionsTab.tsx` | 25 / 9 / 1635 | ⚠ the row was STALE at `17 / 7 / 1477`. honoured by construction (**22 |
+| `frontend/src/components/settings/ConnectionsTab.tsx` | 26 / 10 / 1634 (was `25 / 9 / 1635`) | 297-02: dead #chat hash write deleted (D-37) · item inert → SEED-392 |
 | `frontend/src/components/settings/ConnectionFormPanel.tsx` | 28 / 10 / 2477 | ⭐ NAMED SEAM TAKEN (239-08) · wider seam OWED · ⛔ |
 | `frontend/src/lib/api/org.ts` | 11 / 8 / 629 | ⚠ absent its ENTIRE LIFE · THIRD wire-type drift (239) |
 | `frontend/src/components/settings/connectionsCopy.ts` | 16 / 9 / 804 | ⚠ row STALE · honoured by construction (BUG-260912-01) |
@@ -572,7 +572,8 @@ node scripts/check-hot-file-ledger.cjs <phase-dir>   # 0 clear · 1 missing rows
 | `frontend/src/components/library/IngestionTab.tsx` | 20 / 7 / 706 (was `17 / 6 / 512`) | 284-03: summary + three paged status lists; layout unchanged · ⛔ |
 | `frontend/src/components/ingestion/__tests__/IngestionStrip.test.tsx` | 3 / 3 / 516 | ⚠ absent; row added 233, which repaired the INHERITED red `229-03` cau |
 | `frontend/src/components/layout/NavPanel.tsx` | 26 / 14 / 420 (was `25 / 14 / 416`) | last touch 276-01 / 276-06 (D-27) |
-| `frontend/src/App.tsx` | 39 / 29 / 340 (was `37 / 28 / 422`) | 297-01: G-5 seam TAKEN — view/tab state → useAppNavigation, move only |
+| `frontend/src/App.tsx` | 41 / 29 / 348 (was `39 / 29 / 340`) | 297-02: nav props threaded; router correction beside the 188-09 docblock |
+| `frontend/src/main.tsx` | 5 / 3 / 32 (was `3 / 1 / 10`) | ⚠ now FIRES (297) · one '*' route, no children, no key · ⛔ |
 | `frontend/src/index.css` | 35 / 19 / 1239 (was `34 / 18 / 1196`) | 294-05: ONE verdict block keyed on citation-marker--v-* (+43) |
 | `frontend/src/components/library/LibraryCloudImport.tsx` | 1 / 1 / 194 | young (created 244-06) · ⛔ |
 | `frontend/src/components/library/LibraryHeaderBar.tsx` | 5 / 4 / 262 (was `4 / 3 / 249`) | 284-03: optional `totalState`; never 0 before an answer |
@@ -619,7 +620,7 @@ node scripts/check-hot-file-ledger.cjs <phase-dir>   # 0 clear · 1 missing rows
 | `frontend/src/lib/api/admin.ts` | 10 / 5 / 1125 (was `9 / 5 / 1122`) | ⚠ FIRES · quick-261024: optional `returned` on discovery outcome · ⛔ |
 | `frontend/src/components/admin/CapabilityGrid.tsx` | 3 / 3 / 264 | ⚠ FIRES at 3 phases · row added 263-REVIEW WR-07 · ⛔ |
 | `frontend/src/components/admin/ModelAdvancedCapabilities.tsx` | 0 / 0 / 290 | young (created 262) · ⛔ |
-| `frontend/src/lib/activeViewReachability.ts` | 1 / 1 / 159 | ⚠ row read 0/0/0 AT PLANNING · measured 262-01 · ⛔ |
+| `frontend/src/lib/activeViewReachability.ts` | 2 / 2 / 205 (was `1 / 1 / 159`) | 297-02: route leg added (D-25) · AST; throws on a vacuous parse · ⛔ |
 | `frontend/src/components/experts/expertIcon.tsx` | 1 / 1 / 72 | ⚠ 0/0/0 AT PLANNING · measured 1/1/72 at 262-02 · ⛔ |
 | `frontend/src/components/experts/catalog/expertCatalog.ts` | 15 / 5 / 508 (was `13 / 4 / 489`) | honoured by construction (279-03: ONE `onThread` option) |
 | `frontend/src/components/experts/catalog/ExpertCard.tsx` | 5 / 4 / 296 | ⚠ STALE (`3/3/295`). **276-07**: category text via `decodeEntities` |
