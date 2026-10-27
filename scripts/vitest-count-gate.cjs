@@ -4423,6 +4423,7 @@ const BASELINE = {
   "appRoutes.test.ts": 111, // 297-02 — route table: 12-member round-trip, D-11 table, strict ids, legacy ?run= / ?connections=1 / /admin/spend, bare prefixes, pre-auth untouched, hostile inputs never throw or leave the origin
   // ── Phase 297-03 (LINK-07 / D-21, D-24, D-32, D-42) — adopted, both knobs, same commit (2026-10-27).
   "useAppNavigation.leaveGuard.test.tsx": 23, // 297-03 — one app blocker: dirty asks EXACTLY once under StrictMode (Back/Forward/rail), clean 0, no-op default, forced bounce 0, one-shot latch, reverted POP 1/2/3, registry unit
+  "WorkflowsPage.leaveGuard.test.tsx": 12, // 297-03 — the Builder tenant: connect control + golden-run link asked EXACTLY once (latch), Test Run 0 and no armed latch, dirty Back/rail 1, clean / no Builder 0
 }
 
 // Still COMPUTED, never hand-written — the reduce is the single source, so the
@@ -6471,6 +6472,7 @@ const TARGETS = [
   "src/components/layout/__tests__/AppViewSwitch.addressStates.test.tsx",
   // ── Phase 297-03 — FILE-LEVEL (no src/hooks/__tests__ directory entry), SAME commit as its BASELINE pin.
   "src/hooks/__tests__/useAppNavigation.leaveGuard.test.tsx",
+  "src/pages/__tests__/WorkflowsPage.leaveGuard.test.tsx",
 ]
 
 const REPO_ROOT = path.resolve(__dirname, "..")
