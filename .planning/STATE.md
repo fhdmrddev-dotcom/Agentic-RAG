@@ -2,15 +2,16 @@
 gsd_state_version: 1.0
 milestone: v4.8
 milestone_name: Every Page Has a Link
-status: executing
-last_updated: "2026-10-27T19:48:13.609Z"
+status: ready_to_plan
+last_updated: 2026-10-27T21:45:44.691Z
 last_activity: 2026-10-27 -- Phase 297 execution started
 progress:
   total_phases: 13
   completed_phases: 0
   total_plans: 4
-  completed_plans: 2
+  completed_plans: 4
   percent: 0
+stopped_at: Phase 297 complete (4/4) — ready to discuss Phase 298
 ---
 
 # Project State
@@ -30,7 +31,7 @@ See: `.planning/PROJECT.md` (updated 2026-10-27)
 
 **Core value:** The agent acts as an AI colleague — it knows your knowledge base, can run code, and
 can be taught new behaviours (skills) that persist and can be shared.
-**Current focus:** Phase 297 — Every View Has an Address
+**Current focus:** Phase 298 — lists follow the active org
 
 ---
 
@@ -43,10 +44,10 @@ reviewer exists, so a phase closes `verification_mode: self-verified`, never `re
 
 ## Current Position
 
-Phase: 297 (Every View Has an Address) — EXECUTING
-Plan: 1 of 4
-Status: Executing Phase 297
-Last activity: 2026-10-27 -- Phase 297 execution started
+Phase: 298
+Plan: Not started
+Status: Ready to plan
+Last activity: 2026-10-27
 
 Scope set at intake: per-view URLs (SEED-185/015/178), run-waiting notifications in-app + email
 (SEED-281), lists follow the active org — decided per-org (SEED-389), v4.7 close-out

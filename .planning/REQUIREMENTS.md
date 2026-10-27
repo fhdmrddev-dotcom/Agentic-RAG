@@ -17,14 +17,14 @@ Decided at intake (operator, 2026-10-27):
 
 ### Links (LINK)
 
-- [ ] **LINK-01**: Every top-level view has its own `/app/...` address. Opening it directly, refreshing, or pressing Back/Forward lands on that view. — `SEED-185`
+- [x] **LINK-01**: Every top-level view has its own `/app/...` address. Opening it directly, refreshing, or pressing Back/Forward lands on that view. — `SEED-185`
 - [ ] **LINK-02**: A chat thread, a workflow, a workflow run and an Expert each have their own address, and a refresh returns to the same item. — `SEED-178`, `SEED-015`
 - [ ] **LINK-03**: A user can copy a link to what they are looking at, and opening it in a new tab or on another signed-in machine opens the same item. Existing links keep working: `?run=`, `?connections=1`, `/admin/spend`, `/setup` and `/invite`.
 - [ ] **LINK-04**: A link to something that does not exist, or that the user may not open, shows one plain "can't be opened" page. The page is the same in both cases and never silently falls back to chat.
 - [ ] **LINK-05**: A link to an item in another org the user belongs to asks "This is in <org> — switch?" before switching. Nothing is saved under the wrong org.
 - [ ] **LINK-06**: After signing in by password, SSO or sign-up, the user lands on the link they first opened. The boot screen cannot hang forever. — `SEED-312`
-- [ ] **LINK-07**: Leaving a page with unsaved edits by Back/Forward asks before discarding them.
-- [ ] **LINK-08**: Every address works in local dev, on the cloud app domain and on the self-hosted one-box. An automated check fails if the routing layers disagree.
+- [x] **LINK-07**: Leaving a page with unsaved edits by Back/Forward asks before discarding them.
+- [x] **LINK-08**: Every address works in local dev, on the cloud app domain and on the self-hosted one-box. An automated check fails if the routing layers disagree.
 
 ### Active org (ORG)
 
@@ -60,7 +60,7 @@ Decided at intake (operator, 2026-10-27):
   - SEED-281's stale premises are corrected;
   - the excluded pause kinds (the tool-round cap, chat `ask_user`) are recorded;
   - the two pre-existing defects found by research are filed as bug reports. These are built images being unable to send invite email, and `*.vercel.app` previews being unable to open the app.
-- [ ] **REG-09**: The G-5 extractions on `App.tsx` and `ChatLayout.tsx` ship behaviour-neutral before the router lands, and their guard tests are re-targeted, not deleted.
+- [x] **REG-09**: The G-5 extractions on `App.tsx` and `ChatLayout.tsx` ship behaviour-neutral before the router lands, and their guard tests are re-targeted, not deleted.
 
 ## Future Requirements (deferred)
 
@@ -89,14 +89,14 @@ Decided at intake (operator, 2026-10-27):
 
 | Requirement | Phase | Status |
 |-------------|-------|--------|
-| LINK-01 | Phase 297 | Pending |
+| LINK-01 | Phase 297 | Complete |
 | LINK-02 | Phase 299 | Pending |
 | LINK-03 | Phase 299 | Pending |
 | LINK-04 | Phase 299 | Pending |
 | LINK-05 | Phase 299 | Pending |
 | LINK-06 | Phase 299 | Pending |
-| LINK-07 | Phase 297 | Pending |
-| LINK-08 | Phase 297 | Pending |
+| LINK-07 | Phase 297 | Complete |
+| LINK-08 | Phase 297 | Complete |
 | ORG-01 | Phase 298 | Pending |
 | ORG-02 | Phase 298 | Pending |
 | ORG-03 | Phase 298 | Pending |
@@ -116,4 +116,4 @@ Decided at intake (operator, 2026-10-27):
 | FIX-05 | Phase 300 | Pending |
 | FIX-06 | Phase 302 | Pending |
 | REG-08 | Phase 302 | Pending |
-| REG-09 | Phase 297 | Pending |
+| REG-09 | Phase 297 | Complete |

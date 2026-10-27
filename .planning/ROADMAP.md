@@ -77,7 +77,7 @@ Requirements: [`REQUIREMENTS.md`](REQUIREMENTS.md). **28 v4.8 requirements, 28 m
 
 ### Phase Checklist
 
-- [ ] **Phase 297: Every View Has an Address**: split `App.tsx` / `ChatLayout.tsx` behaviour-neutral, then give every top-level view an `/app/...` address with refresh, Back/Forward, unsaved-edit guard and a cross-host parity check (REG-09, LINK-01, LINK-07, LINK-08)
+- [x] **Phase 297: Every View Has an Address**: split `App.tsx` / `ChatLayout.tsx` behaviour-neutral, then give every top-level view an `/app/...` address with refresh, Back/Forward, unsaved-edit guard and a cross-host parity check (REG-09, LINK-01, LINK-07, LINK-08)
 - [ ] **Phase 298: Lists Follow the Active Org**: Library, Workflows, threads and run history narrowed to the active org; foreign-org folders refused with a reason; out-of-org items counted and movable one at a time, audited (ORG-01..06)
 - [ ] **Phase 299: Links to the Thing Itself**: thread, workflow, run and Expert addresses; copy link; one "can't be opened" page; the "switch org?" prompt; sign-in returns to the link; chat list loading state (LINK-02..06, FIX-02)
 - [ ] **Phase 300: Told When a Run Waits (Backend and Mailer)**: scheduled-run input refusal and resume-on-provider fixed first; notices written by triggers; one content-free email per waiting run after the delay; per-user opt-out; Resend + SMTP from a built image (NOTE-02, NOTE-03, NOTE-04, NOTE-06, FIX-04, FIX-05)
@@ -210,7 +210,7 @@ Plans:
 
 | Phase | Plans Complete | Status | Completed |
 |-------|----------------|--------|-----------|
-| 297. Every View Has an Address | 0/TBD | Not started | - |
+| 297. Every View Has an Address | 4/4 | Complete (2026-10-28) | verified passed 5/5; security 19/19; review 4 WR fixed; UAT 15 PASS + P7 Moonshot ⛔ (live 429, BUG-261024-01); not deployed |
 | 298. Lists Follow the Active Org | 0/TBD | Not started | - |
 | 299. Links to the Thing Itself | 0/TBD | Not started | - |
 | 300. Told When a Run Waits (Backend and Mailer) | 0/TBD | Not started | - |
