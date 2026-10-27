@@ -84,9 +84,16 @@ import { UNSAVED_LEAVE_PROMPT } from "@/components/workflows/builderCopy"
 
 const RUN_ID = "5d3f1a2b-7c4e-4f6a-9a8b-1c2d3e4f5a97"
 
-const box: { nav: AppNavigation | null; launchNavigates: boolean } = {
+const box: {
+  nav: AppNavigation | null
+  launchNavigates: boolean
+  launches: number
+  gate: Promise<void> | null
+} = {
   nav: null,
   launchNavigates: true,
+  launches: 0,
+  gate: null,
 }
 
 function Shell() {
@@ -102,8 +109,15 @@ function Shell() {
           folders={[]}
           onOpenConnections={() => nav.onNavigate("connections")}
           onOpenRun={nav.openRun}
-          onLaunch={async () => {
-            if (box.launchNavigates) nav.openRun(RUN_ID)
+          // ChatLayout's `doRun` shape: (optionally) wait on the launch form, then arm the
+          // caller's `beforeNavigate` immediately before its own navigation (297-REVIEW WR-02).
+          onLaunch={async (_def, _kickoff, opts) => {
+            box.launches += 1
+            if (box.gate) await box.gate
+            if (box.launchNavigates) {
+              opts?.beforeNavigate?.()
+              nav.openRun(RUN_ID)
+            }
           }}
         />
       ) : (
@@ -166,6 +180,8 @@ beforeEach(() => {
   seen.door = null
   seen.gauntlet = null
   box.launchNavigates = true
+  box.launches = 0
+  box.gate = null
   confirmSpy = vi.spyOn(window, "confirm").mockReturnValue(false)
 })
 
@@ -218,30 +234,92 @@ describe("WorkflowsPage 297-03 — the in-page controls that already ask are ask
   })
 })
 
-describe("WorkflowsPage 297-03 — Test Run never asks, and leaves no armed latch (D-32)", () => {
-  it("Test Run while dirty: 0 confirm calls, the launch's navigation to /app/runs/<id> completes", async () => {
+describe("WorkflowsPage 297-03 — Test Run never asks a CLEAN Builder, and leaves no armed latch (D-32)", () => {
+  // ⚠ 297-REVIEW WR-02 (2026-10-28) — CORRECTED BESIDE THE ORIGINAL, never through it. This block
+  // used to pin "Test Run while dirty: 0 confirm calls". In this harness "dirty at Test Run" can
+  // only mean the Builder's save was REFUSED (the real Builder saves first, and a saved Builder's
+  // predicate answers true without asking), so that pin encoded the defect: a refused save, then a
+  // launch that silently discarded the edit. Test Run now passes the same guard the connect control
+  // passes first, so a refused save is asked about and Cancel launches nothing; a CLEAN Builder is
+  // still never asked (D-32). The latch is armed only at the launch's own navigation.
+  it("Test Run on a CLEAN Builder: 0 confirm calls, the launch's navigation to /app/runs/<id> completes", async () => {
     const router = mount()
     await openBuilder()
-    makeDirty()
     expect(typeof door().onTestRun).toBe("function")
     await act(async () => {
       await door().onTestRun?.({ slug: "contract-clause", name: "Contract clause", version: 1 }, "draft-297")
     })
     await waitFor(() => expect(where(router)).toBe(`/app/runs/${RUN_ID}`))
     expect(confirmSpy).toHaveBeenCalledTimes(0)
+    expect(box.launches).toBe(1)
   })
 
-  it("a Test Run whose launch does NOT navigate clears the latch: the next dirty Back asks exactly once", async () => {
-    box.launchNavigates = false
+  it("WR-02: Test Run while dirty (the save was refused) + Cancel: 1 confirm, NOTHING is launched, the Builder stays", async () => {
     const router = mount()
     await openBuilder()
     makeDirty()
     await act(async () => {
       await door().onTestRun?.({ slug: "contract-clause", name: "Contract clause", version: 1 }, "draft-297")
     })
+    expect(confirmSpy).toHaveBeenCalledTimes(1)
+    expect(confirmSpy).toHaveBeenCalledWith(UNSAVED_LEAVE_PROMPT)
+    expect(box.launches).toBe(0)
+    expect(where(router)).toBe("/app/workflows")
+    expect(screen.getByTestId("door-stub")).toBeTruthy()
+  })
+
+  it("WR-02: Test Run while dirty + OK: asked exactly ONCE (the app blocker does not ask again), lands on the run", async () => {
+    const router = mount()
+    await openBuilder()
+    makeDirty()
+    confirmSpy.mockReturnValue(true)
+    await act(async () => {
+      await door().onTestRun?.({ slug: "contract-clause", name: "Contract clause", version: 1 }, "draft-297")
+    })
+    await waitFor(() => expect(where(router)).toBe(`/app/runs/${RUN_ID}`))
+    expect(confirmSpy).toHaveBeenCalledTimes(1)
+    expect(box.launches).toBe(1)
+  })
+
+  it("WR-02: the latch is NOT armed across the launch's await — a dirty Back while the launch form is open asks, and Cancel keeps the Builder", async () => {
+    const router = mount()
+    await openBuilder()
+    let release: () => void = () => {}
+    box.gate = new Promise<void>((resolve) => {
+      release = resolve
+    })
+    // Clean at the click (the save went through), dirty again while the launch form is open.
+    let pending: Promise<void> | undefined
+    act(() => {
+      pending = door().onTestRun?.({ slug: "contract-clause", name: "Contract clause", version: 1 }, "draft-297")
+    })
+    makeDirty()
+    await back(router)
+    expect(confirmSpy).toHaveBeenCalledTimes(1)
+    expect(where(router)).toBe("/app/workflows")
+    expect(screen.getByTestId("door-stub")).toBeTruthy()
+    // The person cancels the launch form: nothing navigates, and nothing is left armed.
+    box.launchNavigates = false
+    await act(async () => {
+      release()
+      await pending
+    })
+    await back(router)
+    expect(confirmSpy).toHaveBeenCalledTimes(2)
+    expect(where(router)).toBe("/app/workflows")
+  })
+
+  it("a Test Run whose launch does NOT navigate leaves no armed latch: the next dirty Back asks exactly once", async () => {
+    box.launchNavigates = false
+    const router = mount()
+    await openBuilder()
+    await act(async () => {
+      await door().onTestRun?.({ slug: "contract-clause", name: "Contract clause", version: 1 }, "draft-297")
+    })
     expect(where(router)).toBe("/app/workflows")
     expect(confirmSpy).toHaveBeenCalledTimes(0)
 
+    makeDirty()
     await back(router)
     expect(confirmSpy).toHaveBeenCalledTimes(1)
     expect(where(router)).toBe("/app/workflows")

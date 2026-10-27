@@ -4423,7 +4423,7 @@ const BASELINE = {
   "appRoutes.test.ts": 111, // 297-02 — route table: 12-member round-trip, D-11 table, strict ids, legacy ?run= / ?connections=1 / /admin/spend, bare prefixes, pre-auth untouched, hostile inputs never throw or leave the origin
   // ── Phase 297-03 (LINK-07 / D-21, D-24, D-32, D-42) — adopted, both knobs, same commit (2026-10-27).
   "useAppNavigation.leaveGuard.test.tsx": 24, // 297-03 — one app blocker: dirty asks EXACTLY once under StrictMode (Back/Forward/rail), clean 0, no-op default, forced bounce 0, one-shot latch, reverted POP 1/2/3, registry unit. 2026-10-28 297-REVIEW WR-01: 23 -> 24, browser router over a raw hash-write entry (Cancel keeps the Builder)
-  "WorkflowsPage.leaveGuard.test.tsx": 12, // 297-03 — the Builder tenant: connect control + golden-run link asked EXACTLY once (latch), Test Run 0 and no armed latch, dirty Back/rail 1, clean / no Builder 0
+  "WorkflowsPage.leaveGuard.test.tsx": 15, // 297-03 — the Builder tenant: connect control + golden-run link asked EXACTLY once (latch), Test Run 0 and no armed latch, dirty Back/rail 1, clean / no Builder 0. 2026-10-28 297-REVIEW WR-02: 12 -> 15, a refused-save Test Run asks once (Cancel launches nothing, OK asks once), latch not armed across the launch await
   // ── Phase 297-04 (LINK-08 / D-26, D-41) — adopted, both knobs, same commit (2026-10-27). Self-contained block.
   "appRouteParity.test.ts": 78, // 297-04 — 17 addresses (12 from formatAppRoute + 3 legacy + 2 pre-auth) x 4 layers (dev, Vercel app host, apex redirect, nginx) = 68, + 2 input/shape, 2 middleware, 1 known-fact, 5 negative controls
 }

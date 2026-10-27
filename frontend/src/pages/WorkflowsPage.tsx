@@ -241,6 +241,9 @@ interface WorkflowsPageProps {
       templateFile?: File | null
       folderId?: string | null
       inputs?: Record<string, string>
+      /** 297-REVIEW WR-02: called immediately before the launch's OWN navigation (never
+       *  before an await), so the Test Run's one-shot leave latch is armed only for it. */
+      beforeNavigate?: () => void
     },
   ) => Promise<void>
   /**
@@ -963,9 +966,17 @@ export function WorkflowsPage({ folders, onLaunch, onOpenRun, onOpenConnections,
             // Phase 297-03 (D-32): Test Run never asks — its run has started before the route
             // changes — so the latch covers that change, and the `finally` disarms it when the
             // launch does not navigate, so it cannot skip a later prompt.
+            // ⚠ 297-REVIEW WR-02 (2026-10-28), beside the paragraph above rather than through it:
+            // (1) the Builder saves BEFORE it calls this, so a Builder still dirty here is one
+            // whose save was REFUSED. It passes the same guard the connect control passes first,
+            // and that guard's refusal is total: Cancel launches nothing. A clean Builder's guard
+            // answers true without asking, so D-32 holds for every Test Run whose save went
+            // through. (2) The latch is armed by the launch at its OWN navigation
+            // (`beforeNavigate`), never before the await: the launch form and the network calls
+            // are person- and network-paced, and a Back during them must still be asked.
             onTestRun={async (_def, draftId) => {
               if (onLaunch && _def) {
-                leaveGuards.approveNextLeave()
+                if (canLeaveBuilderRef.current !== null && !canLeaveBuilderRef.current()) return
                 try {
                   await onLaunch(
                     {
@@ -979,6 +990,7 @@ export function WorkflowsPage({ folders, onLaunch, onOpenRun, onOpenConnections,
                       updated_at: new Date().toISOString(),
                     } as PublishedWorkflow,
                     "",
+                    { beforeNavigate: () => leaveGuards.approveNextLeave() },
                   )
                 } finally {
                   leaveGuards.clearLeaveApproval()

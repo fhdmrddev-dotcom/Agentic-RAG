@@ -355,6 +355,9 @@ export function ChatLayout({ onSignOut, activeView, onNavigate, navItems, isOper
         folderId?: string | null
         /** Phase 214-12 — the DECLARED launch inputs, when the caller already collected them. */
         inputs?: Record<string, string>
+        /** 297-REVIEW WR-02 — called immediately before this launch's own navigation, after
+         *  every await, so a caller's one-shot leave latch never sits armed across them. */
+        beforeNavigate?: () => void
       },
     ) => {
       const templateFile = opts?.templateFile ?? null
@@ -482,10 +485,12 @@ export function ChatLayout({ onSignOut, activeView, onNavigate, navItems, isOper
         : null
       if (workflowRunId) {
         // Phase 297-02 (D-15): the run opens on its own address, by the `workflow_runs.id`.
+        opts?.beforeNavigate?.()
         openRun?.(workflowRunId)
         return
       }
       selectThread(thread)
+      opts?.beforeNavigate?.()
       onNavigate("chat")
     },
     [loadThreads, selectThread, onNavigate, openRun, canvasEnabled],
