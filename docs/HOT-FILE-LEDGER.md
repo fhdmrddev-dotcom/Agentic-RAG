@@ -6875,6 +6875,16 @@ carries the verdict — **young (192.2)** — and this is the cell it carried be
 
 ---
 
+### `frontend/src/main.tsx` — Phase 297 (297-02)
+
+**`5 / 3 / 32`** (was `3 / 1 / 10`)
+
+⚠ **Now FIRES: 3 phases (192.2, 200, 297).** `createBrowserRouter([{ path: '*', Component: App }])` at module scope and `<RouterProvider router={router} />` (from `react-router/dom`) inside `<StrictMode><ThemeProvider>`. The 200-06 ThemeProvider docblock is kept verbatim.
+
+⛔ **ONE route, no children, no key, never created in render or held in state (D-07).** Every address matches the same route, so `<App />` and the provider stack under it never remount; `navigationKeepsStreams.test.tsx` proves a live stream survives six navigations and fences this file's shape as source.
+
+Scan-list cell as of 2026-10-27 (replaced by 297-02, moved verbatim): 3 / 1 / 10 | no (1 phase) | young (192.2)
+
 ## Phase 211 · 2026-08-27 — FIVE connector-surface files reach the G-5 threshold in ONE phase, and four had no row at all
 
 ⚠ **Every triple below was RE-DERIVED FROM GIT in the worktree at Phase 211's wave 4**, using
@@ -7479,6 +7489,16 @@ Phases touched: 190, 206.1, 212.
 
 
 **⚠ RE-DERIVED AT PHASE 214's CLOSE (2026-08-28, plan `214-15`) — recorded BESIDE the previous value, never over it: `13 / 5 / 1414` → `17 / 7 / 1477`.** 214-08 moved `connectionMark` out from under `settings/`; this tab now imports the shared `lib/` map like every other surface. Phase buckets gain `214`.
+
+### `frontend/src/components/settings/ConnectionsTab.tsx` — Phase 297 (297-02)
+
+**`26 / 10 / 1634`** (was `25 / 9 / 1635`)
+
+One statement: the "Try in Chat" item's `onSelect` assigned `#chat` to the URL hash, which nothing ever read, and with the router it would also erase the History entry index (D-33). Deleted (D-20 resolved to DELETE by D-37). The item renders as before and still does nothing, because no navigator reaches this tab — recorded as `SEED-392`, with `trigger_paths` on this file and `ConnectionsPage.tsx`.
+
+Scan-list cell as of 2026-10-27 (replaced by 297-02, moved verbatim): 25 / 9 / 1635 | ⚠ **FIRES** | ⚠ row STALE TWICE (`17 / 7 / 1477`, then `23 / 8 / 1578`). honoured by construction (221-02 / **239-03**) — one prop through three mount sites, twice over. See §239-03
+
+CLAUDE.md verdict cell as of 2026-10-27 (replaced by 297-02, moved verbatim): | `frontend/src/components/settings/ConnectionsTab.tsx` | 25 / 9 / 1635 | ⚠ the row was STALE at `17 / 7 / 1477`. honoured by construction (**22 |
 
 ## `frontend/src/components/settings/ConnectionFormPanel.tsx`
 
@@ -11602,7 +11622,7 @@ cells rot within days.
 | [`backend/app/middleware/canvas_gate.py`](docs/HOT-FILE-LEDGER.md#backendappmiddlewarecanvas_gatepy) | 9 / 6 / 396 (was `8 / 5 / 391`) | **FIRES** | **289-03**: ONE CANVAS_GATED_PATHS member (`…/evidence`) + comment, same commit as its include_router. ⛔ test_182 never imports the set |
 | [`backend/app/models/thread.py`](docs/HOT-FILE-LEDGER.md#backendappmodelsthreadpy) | 25 / 17 / 550 (was `24 / 16 / 545`) | ⚠ **FIRES** | 295-05: ONE field (`WorkflowPhaseState.unsourced`, a plain dict to avoid the harness import cycle). Honoured by construction · 293 touch: see §Phase 293 close |
 | [`frontend/src/components/workflows/canvasModel.ts`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentsworkflowscanvasmodelts) | 16 / 8 / 836 (was `15 / 8 / 831`) | ⚠ **FIRES** | 296-07: comparePhaseOrder + engineArmed delegations (290-IN-01/FU); isGrounded is every cause except escalated (BUG-261021-05 b) |
-| [`frontend/src/components/layout/ChatLayout.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentslayoutchatlayouttsx) | 65 / 34 / 882 (was `64 / 33 / 1158`) | **FIRES** | 297-01: G-5 seam TAKEN — mount switch → AppViewSwitch, move only (−276 L). See §Phase 297 (297-01) |
+| [`frontend/src/components/layout/ChatLayout.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentslayoutchatlayouttsx) | 67 / 34 / 897 (was `65 / 34 / 882`) | **FIRES** | 297-02: run id moved to the route (useState + WR-05 clear effect deleted); 4 optional props; openRun?.( ×2; history column hidden on S1. See §Phase 297 (297-02) |
 | [`frontend/src/components/library/LibraryCloudImport.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentslibrarylibrarycloudimporttsx) | 1 / 1 / 194 | no (new) | young (created 244-06). Row added AT CREATION. The Library's single-file cloud door — ⛔ it renders a REASON in every unavailable state; a silent grey-out is the same failure as a silent root write |
 | [`frontend/src/components/library/LibraryHeaderBar.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentslibrarylibraryheaderbartsx--row-added-244-04) | 5 / 4 / 262 (was `4 / 3 / 249`) | ⚠ **FIRES** | **284-03**: optional `totalState`: "Counting…" while loading, "Count not known yet" on failure, never "0 documents" before an answer; numbers grouped |
 | [`frontend/src/components/layout/ChatHistoryColumn.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentslayoutchathistorycolumntsx) | 7 / 2 / 513 | below threshold | ⚠ **ABSENT from BOTH for its ENTIRE LIFE — row added 244-01 at its SECOND phase** (`settingsSearchPayload.ts` precedent). D-244-20 claimed a row existed; the gate refuted it |
@@ -11632,14 +11652,14 @@ cells rot within days.
 | [`frontend/src/lib/throttle.ts`](docs/HOT-FILE-LEDGER.md#frontendsrclibthrottlets) | 2 / 2 / 108 | does not fire | ⛔ **NO ROW FOR ITS ENTIRE LIFE — added 243-03.** TWO opposite primitives on purpose; ⛔ never unify them — one of the two call sites breaks silently |
 | [`frontend/src/components/chat/ChatArea.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentschatchatareatsx) | 94 / 44 / 1189 (was `93 / 43 / 1186`) | **FIRES** | honoured by construction (**287-03**): ONE mount of ThreadWorkflowPicker, zero new hooks, no logic. ⛔ no scope branch in send |
 | [`frontend/src/components/panel/PendingAskCard.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentspanelpendingaskcardtsx) | 25 / 12 / 1132 (was `24 / 11 / 1103`) | ⚠ **FIRES** | 296-04: stack keeps the newest ask per live workflow run (pure helper); card reads a passed clock on a live run as paused (one prop). useState 7→7, useEffect 3→3 |
-| [`frontend/src/pages/WorkflowRunPage.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrcpagesworkflowrunpagetsx) | 35 / 15 / 1604 (was `34 / 14 / 1597`) | **FIRES** | 296-04: one ref (`seenLiveRef`) set in the existing alert effect, one prop at the report mount (`watchedFailure`). useState 4→4, useEffect 4→4 · ⛔ |
+| [`frontend/src/pages/WorkflowRunPage.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrcpagesworkflowrunpagetsx) | 36 / 16 / 1605 (was `35 / 15 / 1604`) | **FIRES** | 297-02: COPY_LOADING exported, one keyword |
 | [`frontend/src/components/workflows/WaitingOnLine.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentsworkflowswaitingonlinetsx) | 1 / 1 / 26 | does not fire | young (created **288-03**): leaf that renders the server-composed waiting-on sentence verbatim; no hook, no API import |
 | [`frontend/src/components/workflows/StepEvidenceLine.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentsworkflowsstepevidencelinetsx) | 2 / 2 / 145 (was `1 / 1 / 93`) | no (2 phases) | 295-05: the unsourced arm; the confidence arm is byte-unchanged (an innerHTML test pins it). Two phases; does not fire |
 | [`frontend/src/components/workflows/evidenceVocabulary.ts`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentsworkflowsevidencevocabularyts) | 5 / 3 / 261 (was `4 / 2 / 254`) | ⚠ **FIRES** (3 phases, crossed in 296) | 296-04: neutral `NO_MATCH_EXPLANATION` / `UNSOURCED_NOTE` (no "your documents") + `DOWNLOAD_UNAVAILABLE`. Words only; now FIRES (289, 295, 296) |
 | [`frontend/src/components/workflows/evidenceView.ts`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentsworkflowsevidenceviewts) | 4 / 3 / 387 (was `3 / 2 / 382`) | ⚠ **FIRES** | 295-05: one view field `endReason`, computed once from the C.1 table. Two phases; does not fire · 293 touch: see §Phase 293 close |
-| [`frontend/src/components/workflows/RunEvidenceReport.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentsworkflowsrunevidencereporttsx) | 6 / 4 / 495 (was `5 / 4 / 494`) | ⚠ **FIRES** | 296 review FE-WR-02: the step output's MarkdownRenderer gets `noRemoteMedia` (an allow-list with no image/media/style/src), so a colleague's browser fetches nothing at render. One prop |
+| [`frontend/src/components/workflows/RunEvidenceReport.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentsworkflowsrunevidencereporttsx) | 7 / 5 / 492 (was `6 / 4 / 495`) | ⚠ **FIRES** | 297-02: ?run= writer effect deleted (D-18) |
 | [`frontend/src/lib/api/runEvidence.ts`](docs/HOT-FILE-LEDGER.md#frontendsrclibapirunevidencets) | 3 / 3 / 137 (was `2 / 2 / 134`) | ⚠ **FIRES** | 295-05: TS twins for `unsourced` and `end_reason`, widened in lockstep with the contract fixture. Two phases; does not fire · 293 touch: see §Phase 293 close |
-| [`frontend/src/lib/runDeepLink.ts`](docs/HOT-FILE-LEDGER.md#frontendsrclibrundeeplinkts) | 1 / 1 / 63 (was `0 / 0 / 0`) | no (young) | young (created 289-04). ?run=<uuid> read/write/clear. ⛔ strict UUID only; the boot read never strips the param |
+| [`frontend/src/lib/runDeepLink.ts`](docs/HOT-FILE-LEDGER.md#frontendsrclibrundeeplinkts) | 3 / 2 / 41 (was `1 / 1 / 63`) | no (2 phases) | 297-02: write/clear helpers and the window reader deleted (D-18, D-33); isStrictUuid + readRunParam (pure) remain for the route table. ⛔ strict UUID only |
 | [`frontend/src/index.css`](docs/HOT-FILE-LEDGER.md#frontendsrcindexcss) | 35 / 19 / 1239 (was `34 / 18 / 1196`) | ⚠ **FIRES** | 294-05: ONE verdict block keyed only on citation-marker--v-* and __verdict (+43). ⛔ no app-wide rule |
 | [`frontend/src/components/chat/OutputFileCard.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentschatoutputfilecardtsx) | 8 / 7 / 219 | **FIRES** | honoured by construction (195) |
 | [`frontend/src/components/panel/FilesSection.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentspanelfilessectiontsx) | 12 / 8 / 354 (was `10 / 6 / 363`) | ⚠ **FIRES** | ⚠ STALE (`10/6/363`). **274-04**: 1 import, 1 trailing-slot line, 1 Shift+F10 arm, 2 signatures widened to `string \| null`; agent rows byte-identical |
@@ -11710,8 +11730,8 @@ cells rot within days.
 | [`frontend/src/components/workflows/library/gutterTokens.fences.test.ts`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentsworkflowslibraryguttertokensfencestestts) | 2 / 1 / 663 | no (1 phase) | young (192.2 gap round 1) |
 | [`frontend/src/components/workflows/library/runFacts.ts`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentsworkflowslibraryrunfactsts) | 4 / 1 / 260 | no (1 phase) | young (192.2) |
 | [`frontend/src/components/workflows/library/relativeChanged.ts`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentsworkflowslibraryrelativechangedts) | 2 / 2 / 137 | no (2 phases) | young (192.1, 192.2) |
-| [`frontend/src/main.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrcmaintsx) | 3 / 1 / 10 | no (1 phase) | young (192.2) |
-| [`frontend/src/components/settings/ConnectionsTab.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentssettingsconnectionstabtsx) | 25 / 9 / 1635 | ⚠ **FIRES** | ⚠ row STALE TWICE (`17 / 7 / 1477`, then `23 / 8 / 1578`). honoured by construction (221-02 / **239-03**) — one prop through three mount sites, twice over. See §239-03 |
+| [`frontend/src/main.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrcmaintsx) | 5 / 3 / 32 (was `3 / 1 / 10`) | ⚠ **FIRES** | ⚠ now FIRES (297). 297-02: one module-scope createBrowserRouter, one path '*' route, RouterProvider inside ThemeProvider. ⛔ no children, no key, never in React state (D-07) |
+| [`frontend/src/components/settings/ConnectionsTab.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentssettingsconnectionstabtsx) | 26 / 10 / 1634 (was `25 / 9 / 1635`) | ⚠ **FIRES** | 297-02: dead #chat hash write deleted (D-37), honoured by construction. The item still does nothing → SEED-392 |
 | [`frontend/src/components/settings/ConnectionFormPanel.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentssettingsconnectionformpaneltsx) | 28 / 10 / 2477 | ⚠ **FIRES** | ⭐ **NAMED SEAM TAKEN (239-08)** — `SourceToolsCard.tsx` extracted, `2807 → 2477`, a pure move. ⛔ the WIDER `ConnectionShapeFields.tsx` seam stays OWED. See §239-08 |
 | [`frontend/src/components/settings/SourceToolsCard.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentssettingssourcetoolscardtsx) | 1 / 1 / 403 | no (1 phase) | young — created by the 239-08 extraction. Carries the `mcp` fence as a guard clause, and inherits the panel's copy / zero-`title=` fences. See §239-08 |
 | [`frontend/src/components/settings/ConnectionGrantsList.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentssettingsconnectiongrantslisttsx) | 5 / 2 / 259 | no (2 phases) | 344 → 222 (221-01) → **259**. The availability slot is a CHILD it forwards, not markup it owns |
@@ -11828,7 +11848,7 @@ cells rot within days.
 | [`frontend/src/components/sources/watchProductMark.ts`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentssourceswatchproductmarkts) | 0 / 0 / 38 | no (new) | young (240) — which PRODUCT a watched folder came from, read from its ADDRESS. ⛔ Never from `service_id`: Gmail and Drive share one connection |
 | [`frontend/src/components/sources/CreateWatchModal.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentssourcescreatewatchmodaltsx) | 4 / 1 / 283 | no (1 phase) | honoured by construction (**240**): byte-unchanged. ⛔ Its auto-select of `capable[0]` is why BUG-260908-02 mattered most here |
 | [`frontend/src/components/layout/NavPanel.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentslayoutnavpaneltsx) | 26 / 14 / 420 (was `25 / 14 / 416`) | ⚠ **FIRES** | **276-01** (D-14): Iris mark `<img>`; **276-06** (D-27): on the dark `#0A0E18` chip, classes only. 244-14's `overflow-x-hidden` stands |
-| [`frontend/src/App.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrcapptsx) | 39 / 29 / 340 (was `37 / 28 / 422`) | **FIRES** | 297-01: G-5 seam TAKEN — view/tab state → useAppNavigation, move only (−82 L). See §Phase 297 (297-01) |
+| [`frontend/src/App.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrcapptsx) | 41 / 29 / 348 (was `39 / 29 / 340`) | **FIRES** | 297-02: nav props threaded (runId, openRun, addressNotFound, operatorLoading); dated router correction beside 188-09. See §Phase 297 (297-02) |
 | [`frontend/src/lib/nav-items.ts`](docs/HOT-FILE-LEDGER.md#frontendsrclibnav-itemsts) | 13 / 9 / 173 (was `12 / 8 / 153`) | ⚠ **FIRES** | **283-02** (FIX-01): the Settings entry UNGOVERNED (no `feature` key); per-tab gate in the page, per-route `require_visible` at the API. `visibleNavItems` unchanged |
 | [`frontend/src/components/library/HealthTab.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentslibraryhealthtabtsx) | 9 / 2 / 199 | no (2 phases) | row added 235 BELOW threshold on purpose. One import, one optional prop, one mount, ZERO branches; the handler lives at the page boundary |
 | [`frontend/src/pages/librarySelection.ts`](docs/HOT-FILE-LEDGER.md#frontendsrcpageslibraryselectionts) | 2 / 2 / 312 | no (2 phases) | ⚠ absent for its entire life — row added 235, which did NOT modify it but made `App.tsx` import `LibraryTab` from it rather than re-declare it |
@@ -11904,7 +11924,7 @@ cells rot within days.
 | [`frontend/src/lib/api/spend.ts`](docs/HOT-FILE-LEDGER.md#frontendsrclibapispendts) | 3 / 2 / 226 (was `1 / 1 / 184`) | no (2 phases) | **268-02**: `expert` sent only when given; maps the 4 new summary keys. ⛔ the one spend client (the 257 review moved a second home here) |
 | [`frontend/src/components/skills/SkillFormDialog.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentsskillsskillformdialogtsx) | 13 / 9 / 657 | ⚠ **FIRES** | ⚠ row STALE at `12/8/635` one plan later. honoured by construction (**263-04**): ONE optional prop + three `??` + one dep-array entry. ⛔ callers pass a STABLE reference or the reset wipes typing. |
 | [`backend/app/api/skills.py`](docs/HOT-FILE-LEDGER.md#backendappapiskillspy) | 20 / 10 / 859 (was `19 / 10 / 858`) | ⚠ **FIRES** | **280-01**: 6 `maybe_row` guards, 0 `status_code` lines changed. ⛔ `is_org_shared` HARD-SET False; D-263-06 routes around it by provenance, never through the gate. |
-| [`frontend/src/lib/activeViewReachability.ts`](docs/HOT-FILE-LEDGER.md#frontendsrclibactiveviewreachabilityts) | 1 / 1 / 159 | no (created 262-01) | ⚠ the AT-PLANNING row read `0/0/0`; measured in its own creating commit. ⛔ The ONE ActiveView↔ChatLayout-branch fence — AST, never grep; it THROWS on a vacuous parse |
+| [`frontend/src/lib/activeViewReachability.ts`](docs/HOT-FILE-LEDGER.md#frontendsrclibactiveviewreachabilityts) | 2 / 2 / 205 (was `1 / 1 / 159`) | no (2 phases) | 297-02: activeViewRouteLeg (D-25) — every member round-trips the route table, functions passed in. ⛔ AST, never grep; THROWS on a vacuous parse |
 | [`frontend/src/components/experts/expertIcon.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentsexpertsexperticontsx) | 1 / 1 / 72 | no (new) | ⚠ `0/0/0` AT PLANNING; **measured `1/1/72` at 262-02**. ⛔ The ONE home of expert-icon resolution — a CLOSED 11-key lucide map. Reads `icon`, never `slug`/`name`: that match IS the retired artefact |
 | [`frontend/src/components/experts/catalog/expertCatalog.ts`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentsexpertscatalogexpertcatalogts) | 15 / 5 / 508 (was `13 / 4 / 489`) | ⚠ **FIRES — 5 phases** | honoured by construction (**279-03 A/B**): `wontUse` → `wontSearch` + ONE `{ onThread }` option on `previewLedgerColumns`. ⛔ words only from here |
 | [`frontend/src/components/experts/catalog/ExpertCard.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentsexpertscatalogexpertcardtsx) | 5 / 4 / 296 (was `3 / 3 / 295`) | ⚠ **FIRES — 4 phases** | **276-07**: honoured by construction, the category text wrapped in `decodeEntities`. ⛔ words only from `expertCatalog.ts` |
@@ -12181,10 +12201,10 @@ cells rot within days.
 | [`frontend/src/components/workflows/library/automationFacts.ts`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentsworkflowslibraryautomationfactsts) | 2 / 2 / 132 (was `1 / 1 / 95`) | no (young) | absent its ENTIRE LIFE (created 204.1) — row added 293. 293-03: next from server next_run_at. ⛔ spells no string; never computes |
 | [`frontend/src/components/admin/AuditTab.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentsadminaudittabtsx) | 7 / 4 / 770 (was `6 / 3 / 763`) | ⚠ **FIRES** | absent its ENTIRE LIFE at 3 phases (146/148/155) — row added 293. 293-04: api_key.* entries + "API keys" group in PLATFORM_ACTION_META only. ⛔ unknown codes stay raw |
 | [`frontend/src/components/org/OrgAuditTab.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentsorgorgaudittabtsx) | 4 / 3 / 415 (was `3 / 2 / 408`) | ⚠ **FIRES** | absent its ENTIRE LIFE (166/167) — row added 293. 293-04: api_key.* labels + "API keys" group in ACTION_META only. ⛔ never invents a label |
-| [`frontend/src/hooks/useAppNavigation.ts`](docs/HOT-FILE-LEDGER.md#frontendsrchooksuseappnavigationts) | 1 / 1 / 160 (was `0 / 0 / 0`) | no (young) | young (created 297-01). App view/tab state moved verbatim (D-01). ⛔ setLibraryTab( exactly 2; NO TWELFTH block travels with libraryTab; router hooks only here (D-08) |
-| [`frontend/src/components/layout/AppViewSwitch.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentslayoutappviewswitchtsx) | 1 / 1 / 473 (was `0 / 0 / 0`) | no (young) | young (created 297-01). ChatLayout's mount switch moved verbatim (D-01). ⛔ no hooks; fallback LAST; one stripped workflow-run test; canvasEnabled passed in |
-| [`frontend/src/lib/appRoutes.ts`](docs/HOT-FILE-LEDGER.md#frontendsrclibapproutests) | 0 / 0 / 0 | no (planned 297-02) | young (planned 297-02). STRICT LEAF (no React): parseAppLocation / formatAppRoute, the one home of path vocabulary (D-11). Strict UUID, never throws. Measured in its creating commit |
-| [`frontend/src/components/layout/AddressNotFound.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentslayoutaddressnotfoundtsx) | 0 / 0 / 0 | no (planned 297-02) | young (planned 297-02). S1 "This address doesn't open anything" + S2 holding state (D-14/D-19/D-35). Never renders the trailing fallback tag. Measured in its creating commit |
+| [`frontend/src/hooks/useAppNavigation.ts`](docs/HOT-FILE-LEDGER.md#frontendsrchooksuseappnavigationts) | 3 / 1 / 240 (was `1 / 1 / 160`) | no (young) | 297-02: view/runId/studioSkillId derived from the location; one canonical REPLACE effect. ⛔ the ONLY router-hook caller (D-08); setLibraryTab( exactly 2 |
+| [`frontend/src/components/layout/AppViewSwitch.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentslayoutappviewswitchtsx) | 2 / 1 / 523 (was `1 / 1 / 473`) | no (young) | 297-02: S1 first non-chat arm; run hold inside the one run arm; admin arms gated on the operator probe. ⛔ one run comparison; fallback last; every hold lives here, never at App |
+| [`frontend/src/lib/appRoutes.ts`](docs/HOT-FILE-LEDGER.md#frontendsrclibapproutests) | 1 / 1 / 198 (was `0 / 0 / 0`) | no (young) | young (created 297-02). STRICT LEAF: one home of /app path vocabulary (D-11). ⛔ never throws; strict UUID; no host in any output |
+| [`frontend/src/components/layout/AddressNotFound.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentslayoutaddressnotfoundtsx) | 1 / 1 / 51 (was `0 / 0 / 0`) | no (young) | young (created 297-02). S1 + S2 and their copy, one home. ⛔ no path prop, no icon; never renders the trailing fallback tag |
 | [`frontend/src/lib/leaveGuard.ts`](docs/HOT-FILE-LEDGER.md#frontendsrclibleaveguardts) | 0 / 0 / 0 | no (planned 297-03) | young (planned 297-03). Leave-guard registry context, safe no-op default (D-21); one-shot latch (D-32/D-42). No component. Measured in its creating commit |
 
 
@@ -18426,6 +18446,16 @@ A guard nobody has seen fire is not a guard.
 
 ---
 
+### `frontend/src/lib/activeViewReachability.ts` — Phase 297 (297-02)
+
+**`2 / 2 / 205`** (was `1 / 1 / 159`)
+
+`activeViewRouteLeg(appSource, { parseAppLocation, formatAppRoute })` reuses `readMembers` (so it inherits the vacuity throw), formats a sample route per member (a fixture UUID for the two id-bearing members), parses it back and reports members whose round-trip does not return the same view. The route functions are passed IN, so this module keeps no runtime import of `appRoutes.ts`. Docblock corrected beside the original. New cases (7a)-(7d) under **D-297-14**; the eleven stay (11 → 15).
+
+Scan-list cell as of 2026-10-27 (replaced by 297-02, moved verbatim): 1 / 1 / 159 | no (created 262-01) | ⚠ the AT-PLANNING row read `0/0/0`; measured in its own creating commit. ⛔ The ONE ActiveView↔ChatLayout-branch fence — AST, never grep; it THROWS on a vacuous parse
+
+CLAUDE.md verdict cell as of 2026-10-27 (replaced by 297-02, moved verbatim): | `frontend/src/lib/activeViewReachability.ts` | 1 / 1 / 159 | ⚠ row read 0/0/0 AT PLANNING · measured 262-01 · ⛔ |
+
 ### ⚠ Phase 262 plan `262-01` — EIGHT triples re-derived, SEVEN were stale
 
 Re-derived 2026-09-22 at `e996d3248` with the CLAUDE.md three-command recipe (six-digit dated-quick-task buckets subtracted). **Every original figure is kept beside its correction in both registers**; none was overwritten.
@@ -19129,6 +19159,18 @@ Every triple below was re-derived AFTER the phase's last source edit (`565b05c41
 ### `frontend/src/App.tsx` — Phase 276
 
 **`36 / 27 / 418`** at 276-06 (was `35 / 26 / 412`). G-5: ⚠ **FIRES**, honoured by construction: the `loading || setupStatus === null` return's spin ring became `<div role="status" aria-label="Loading Syrel"><IrisAvatar state="thinking" size={56} /></div>`; hook call sites 9 → 9. Under reduced motion it is the static mark with a lit core.
+
+### `frontend/src/App.tsx` — Phase 297 (297-02)
+
+**`41 / 29 / 348`** (was `39 / 29 / 340`)
+
+Four new ChatLayout props read off the hook (`activeRunId={nav.runId}`, `openRun`, `addressNotFound`) plus `operatorLoading` destructured from the existing `useOperatorProbe` call (D-35). The 403 listener still calls `bounceHome()`, which is now a REPLACE to `/app` (D-15). The `/setup` and `/invite` gates, the splash and AuthPage are byte-identical (D-17); `useEffectiveFeatures(` is still ONE call; `ActiveView` is still ONE line (D-38). A dated three-line correction sits BESIDE the 188-09 union docblock (its "NO ROUTER" clause is historical), never through the three-homes needle.
+
+⛔ **D-07: no `key=` on any provider in this file** — `navigationKeepsStreams.test.tsx` fences it as source, and RED-drove it: a planted `key={location.pathname}` on the streams provider read `mounts 7 / unmounts 6 / aborted true` over six navigations, then the restore was proven with `git diff --quiet` and an identical md5.
+
+Scan-list cell as of 2026-10-27 (replaced by 297-02, moved verbatim): 39 / 29 / 340 (was `37 / 28 / 422`) | **FIRES** | 297-01: G-5 seam TAKEN — view/tab state → useAppNavigation, move only (−82 L). See §Phase 297 (297-01)
+
+CLAUDE.md verdict cell as of 2026-10-27 (replaced by 297-02, moved verbatim): | `frontend/src/App.tsx` | 39 / 29 / 340 (was `37 / 28 / 422`) | 297-01: G-5 seam TAKEN — view/tab state → useAppNavigation, move only |
 
 ### `frontend/src/components/classification/ClassificationRulesPage.tsx` — Phase 271
 
@@ -22765,6 +22807,16 @@ CLAUDE.md verdict cell as of 2026-10-18 (replaced by 286-05):
 
 > honoured by construction (200 / 200.1 / 200.2 / **214**)
 
+### `frontend/src/pages/WorkflowRunPage.tsx` — Phase 297 (297-02)
+
+**`36 / 16 / 1605`** (was `35 / 15 / 1604`)
+
+One keyword: `export const COPY_LOADING`, so the switch's cold-link hold says the same sentence in the same markup (D-297-17: one spelling of "Opening the run…"). No hook, state or effect changed.
+
+Scan-list cell as of 2026-10-27 (replaced by 297-02, moved verbatim): 35 / 15 / 1604 (was `34 / 14 / 1597`) | **FIRES** | 296-04: one ref (`seenLiveRef`) set in the existing alert effect, one prop at the report mount (`watchedFailure`). useState 4→4, useEffect 4→4 · ⛔
+
+CLAUDE.md verdict cell as of 2026-10-27 (replaced by 297-02, moved verbatim): | `frontend/src/pages/WorkflowRunPage.tsx` | 35 / 15 / 1604 (was `34 / 14 / 1597`) | 296-04: one ref + one prop (watchedFailure); useState 4, useEffect 4 · ⛔ |
+
 ### `frontend/src/components/workflows/library/WorkflowCard.tsx` — Phase 286 (286-04) — seam taken
 
 **`22 / 8 / 1354` (was `19 / 6 / 1616`).**
@@ -23102,6 +23154,18 @@ CLAUDE.md verdict cell as of 2026-10-18 (replaced by 286-05):
 
 > honoured by construction (281-03: ONE prop, 0 hooks)
 
+### `frontend/src/components/layout/ChatLayout.tsx` — Phase 297 (297-02)
+
+**`67 / 34 / 897`** (was `65 / 34 / 882`)
+
+The run id is the route's now: the `activeRunId` useState seeded from `?run=`, the 289-REVIEW WR-05 clear effect and the `runDeepLink` import are deleted (D-18). `doRun`'s anchor tail and `openRunSurface` call `openRun?.(workflowRunId)` (the `workflow_runs.id`, never the producer id — the comment stays). Four OPTIONAL props (`activeRunId`, `openRun`, `addressNotFound`, `operatorLoading`) under the 235-08 optional-prop precedent, so suites that mount `<ChatLayout {...baseProps} />` stay green. Passed down to AppViewSwitch: `addressNotFound`, `featuresLoading={featuresCtx?.loading ?? false}` (the ONE existing context read, never re-read in the switch), `isOperator`, `operatorLoading`. The history column's guard gains `!addressNotFound`.
+
+Fences re-targeted: **D-297-09** `ChatLayout.launch.test.tsx` and `ChatLayoutLaunch.test.tsx` (the `openRun` prop is called with the ANCHOR id, `onNavigate` never with "chat"); **D-297-10** `ChatLayout.runDeepLink.test.tsx` (route form through the hook).
+
+Scan-list cell as of 2026-10-27 (replaced by 297-02, moved verbatim): 65 / 34 / 882 (was `64 / 33 / 1158`) | **FIRES** | 297-01: G-5 seam TAKEN — mount switch → AppViewSwitch, move only (−276 L). See §Phase 297 (297-01)
+
+CLAUDE.md verdict cell as of 2026-10-27 (replaced by 297-02, moved verbatim): | `frontend/src/components/layout/ChatLayout.tsx` | 65 / 34 / 882 (was `64 / 33 / 1158`) | 297-01: G-5 seam TAKEN — mount switch → AppViewSwitch, move only |
+
 ### `frontend/src/pages/WorkflowsPage.tsx` — Phase 286 forecast (SC#1)
 
 **`45 / 18 / 1447` (unchanged since its last row).** Not edited by Phase 286 (D-01: only the four roadmap candidates were cut). **Expected change in Phase 287, honoured by construction:** starters are data; fork reuses the existing fork hook; one prop. A change larger than that — a new branch, a new hook, a second concern — is the signal to propose this file's extraction FIRST, not to absorb it.
@@ -23361,6 +23425,16 @@ Scan-list cell as of 2026-10-21 (replaced by 295-07, moved verbatim): 1 / 1 / 46
 
 296-04 (289-F-A / F-B / F-C, BUG-261025-02, 291-S6-F9): the step output renders through the shared `MarkdownRenderer` (no second renderer); one optional prop `watchedFailure`, rendered once as `<p role="alert" class="sr-only">`; an owner's unlinked file deliverable shows `DOWNLOAD_UNAVAILABLE` in place of the button; the title column is `min-w-0 basis-80 grow` and the action group `flex flex-wrap … grow-0 shrink`. useState 3→3, useEffect 2→2. Triple `5 / 4 / 494` (was `4 / 3 / 472`). Previous CLAUDE.md cell kept verbatim: 293-05 D-5: origin + stop reason share one column div · ⚠ FIRES. Previous scan-list cell kept verbatim: 4 / 3 / 472 (was `2 / 2 / 465`) | ⚠ **FIRES** | 293-03: one RunOriginLine mount; 293-05 D-5: the origin and stop-reason lines share one `flex-col` div (useState 2→2).
 
+### `frontend/src/components/workflows/RunEvidenceReport.tsx` — Phase 297 (297-02)
+
+**`7 / 5 / 492`** (was `6 / 4 / 495`)
+
+The effect that wrote `?run=<id>` while the report was shown, and cleared it on unmount, is deleted with its import (D-18 / D-33): the run's address is `/app/runs/<id>`, owned by the route. **D-297-12**: the suite's case now asserts mount + unmount leave the address unchanged (count unchanged).
+
+Scan-list cell as of 2026-10-27 (replaced by 297-02, moved verbatim): 6 / 4 / 495 (was `5 / 4 / 494`) | ⚠ **FIRES** | 296 review FE-WR-02: the step output's MarkdownRenderer gets `noRemoteMedia` (an allow-list with no image/media/style/src), so a colleague's browser fetches nothing at render. One prop
+
+CLAUDE.md verdict cell as of 2026-10-27 (replaced by 297-02, moved verbatim): | `frontend/src/components/workflows/RunEvidenceReport.tsx` | 6 / 4 / 495 (was `5 / 4 / 494`) | 296 review FE-WR-02: output renders with noRemoteMedia · ⚠ FIRES |
+
 ## `frontend/src/lib/api/runEvidence.ts`
 
 **`0 / 0 / 0` — planned (289-04); row and section added at planning.** `getRunEvidence(runId, signal)` and the `RunEvidence` types (the plan 03 contract). ⛔ imported by its own specifier; NOT re-exported through `lib/api.ts`. Plan 05 re-derives the triple.
@@ -23387,6 +23461,14 @@ Scan-list cell as of 2026-10-21 (replaced by 295-07, moved verbatim): 1 / 1 / 12
 
 Scan-list cell as of 2026-10-19 (replaced by 289-05, moved verbatim): 0 / 0 / 0 | no (young) | young (planned 289-04, row added at planning). ?run=<uuid> read/write/clear. ⛔ strict UUID only
 
+
+### `frontend/src/lib/runDeepLink.ts` — Phase 297 (297-02)
+
+**`3 / 2 / 41`** (was `1 / 1 / 63`)
+
+The write and clear helpers and the browser-address reader are deleted: the router is the only History writer (D-33). What remains is the one strict-UUID rule (`isStrictUuid`) and a pure `readRunParam(search)`, which `appRoutes.ts` uses for the legacy `?run=` alias (D-18). The 289 docblock is kept; a dated correction sits beside it. `runDeepLink.test.ts` re-targeted under **D-297-11** (12 → 13).
+
+Scan-list cell as of 2026-10-27 (replaced by 297-02, moved verbatim): 1 / 1 / 63 (was `0 / 0 / 0`) | no (young) | young (created 289-04). ?run=<uuid> read/write/clear. ⛔ strict UUID only; the boot read never strips the param
 
 ## `frontend/src/index.css`
 
@@ -25732,6 +25814,16 @@ App's 403 listener used to call — it does NOT spend the hand-off, exactly as b
   and its descendants keep receiving navigator callbacks as props.
 - `ActiveView` stays exported from `App.tsx` on ONE line (D-38); this file imports it type-only.
 
+### `frontend/src/hooks/useAppNavigation.ts` — Phase 297 (297-02)
+
+**`3 / 1 / 240`** (was `1 / 1 / 160`)
+
+`useLocation` + `useNavigate` are called here and nowhere else in product code (D-08). The view, `runId` and `studioSkillId` are derived from `parseAppLocation(location.pathname, location.search)` in one memo; the boot initializer and its raw `replaceState` are deleted. ONE effect replaces a legacy or bare address with `canonicalAddress(...)` and carries the hash across untouched (Pitfall 10). A private `go(route, { replace })` is a no-op when the target equals the address on screen (D-15). `onNavigate` and `openRun` push; `bounceHome` replaces. The Library hand-off is spent on the render where the derived view changes (`libraryTabAfterNavigate`, unchanged), so a POP spends it too (Pitfall 5) — `setLibraryTab(` is still exactly 2.
+
+⚠ One 297-01 characterization case was REVISED on purpose (not weakened): `bounceHome` now SPENDS the hand-off; the dated reason is written in the case body (`useAppNavigation.test.tsx`, 13 → 30 cases).
+
+Scan-list cell as of 2026-10-27 (replaced by 297-02, moved verbatim): 1 / 1 / 160 (was `0 / 0 / 0`) | no (young) | young (created 297-01). App view/tab state moved verbatim (D-01). ⛔ setLibraryTab( exactly 2; NO TWELFTH block travels with libraryTab; router hooks only here (D-08)
+
 ### `frontend/src/components/layout/AppViewSwitch.tsx`
 
 **Added AT PLANNING (Phase 297, 2026-10-27) with `0 / 0 / 0`** — the file does not exist yet; plan
@@ -25759,21 +25851,55 @@ every regex fence over it still matches. The page imports used only inside the s
   scroll chain (`ChatLayout.scrollFrame.test.tsx`, D-297-04).
 - Fences re-targeted here: D-297-01..06 and the second half of D-297-08 (see 297-01-SUMMARY).
 
+### `frontend/src/components/layout/AppViewSwitch.tsx` — Phase 297 (297-02)
+
+**`2 / 1 / 523`** (was `1 / 1 / 473`)
+
+Four optional props (`addressNotFound`, `featuresLoading`, `isOperator`, `operatorLoading`). The chat condition is `activeView === "chat" && !addressNotFound`; S1 (`<AddressNotFound>`) is the FIRST arm inside `<main className="flex-1 overflow-hidden">`, so the launch suite's split point is unmoved (Pitfall 6). The run arm is `activeView === "workflow-run" && (canvasEnabled || featuresLoading)` and renders the page or `<AddressHolding sentence={COPY_LOADING} />` — still ONE stripped comparison (D-19). The Control Room and Spend arms render a hold while the probe loads, the page for an operator, and S1 for anyone else (D-35). A dated correction in the docblock records that the "no router" comments below it are historical.
+
+Pinned by `components/layout/__tests__/AppViewSwitch.addressStates.test.tsx` (16, rendered words) and the existing launch / reachability fences.
+
+Scan-list cell as of 2026-10-27 (replaced by 297-02, moved verbatim): 1 / 1 / 473 (was `0 / 0 / 0`) | no (young) | young (created 297-01). ChatLayout's mount switch moved verbatim (D-01). ⛔ no hooks; fallback LAST; one stripped workflow-run test; canvasEnabled passed in
+
 ### `frontend/src/lib/appRoutes.ts`
 
-**Added AT PLANNING (Phase 297, 2026-10-27) with `0 / 0 / 0`** — the file does not exist yet; plan
-`297-02` creates it and re-derives the triple in its creating commit (the `activeViewReachability.ts`
-262-01 precedent). STRICT LEAF (no React): parseAppLocation / formatAppRoute, the one home of path vocabulary (D-11). Strict UUID, never throws.
+**Added AT PLANNING (Phase 297, 2026-10-27) with `0 / 0 / 0`** — the file did not exist yet; plan
+`297-02` created it. **Measured in its creating commit: `1 / 1 / 198`.**
 
-Binding invariants and the build detail are written by `297-02` in the same commit that creates the file.
+#### — Phase 297 (297-02)
+
+- ⛔ **STRICT LEAF.** No React and no browser globals: pathname and search arrive as arguments. Its only
+  imports are the `ActiveView` type (erased) and `isStrictUuid` / `readRunParam` from `runDeepLink.ts`.
+- ⛔ **The one home of path vocabulary (D-11).** `VIEW_PATHS` is keyed by the whole `ActiveView`
+  union, so a member without an address is TS2741 here; `activeViewRouteLeg` catches it at test time.
+- ⛔ **Never throws.** `parseAppLocation` and `canonicalAddress` wrap their bodies; anything
+  unrecognised is `not-found` / `null`.
+- ⛔ **No host in any output (T-297-05).** `canonicalAddress` builds only from `formatAppRoute` plus
+  unowned params; a path starting `//`, or with a backslash, `%`, an empty or a dotted segment, is
+  `not-found` before lookup. Unknown params alone never rewrite (`/app?code=x` → `null`, Pitfall 10).
+- Legacy aliases: `?run=<uuid>` and `?connections=1` apply only where the path says chat;
+  `/admin/spend[/…]` and bare known prefixes (D-13). `/setup`, `/invite` and bare `/` are never rewritten.
+- Pinned by `src/lib/__tests__/appRoutes.test.ts` (111) and the route leg in `activeViewReachability.test.ts`.
 
 ### `frontend/src/components/layout/AddressNotFound.tsx`
 
-**Added AT PLANNING (Phase 297, 2026-10-27) with `0 / 0 / 0`** — the file does not exist yet; plan
-`297-02` creates it and re-derives the triple in its creating commit (the `activeViewReachability.ts`
-262-01 precedent). S1 "This address doesn't open anything" + S2 holding state (D-14/D-19/D-35). Never renders the trailing fallback tag.
+**Added AT PLANNING (Phase 297, 2026-10-27) with `0 / 0 / 0`** — the file did not exist yet; plan
+`297-02` created it. **Measured in its creating commit: `1 / 1 / 51`.**
 
-Binding invariants and the build detail are written by `297-02` in the same commit that creates the file.
+#### Created — Phase 297 (297-02), measured `1 / 1 / 51`
+
+S1 `AddressNotFound({ onGoHome })` (h1 + body + an outline "Go to Chat" button, the
+`UnknownViewFallback` container classes plus `gap-3 text-center`) and S2 `AddressHolding({ sentence })`
+(`role="status"`, `WorkflowRunPage`'s loading markup), with `ADDRESS_NOT_FOUND_COPY` and
+`ADMIN_HOLD_COPY`. Pinned by `AppViewSwitch.addressStates.test.tsx` (rendered words).
+
+**Binding invariants:**
+- ⛔ **No path prop and no icon** — the requested address is never echoed (T-297-09).
+- ⛔ **Never renders the trailing fallback tag**; that element keeps one home, AppViewSwitch's last arm.
+- ⛔ **One home for the copy.** The admin refusal and an unknown address render the SAME words (T-297-07).
+- Holds render in AppViewSwitch only, never at App level (D-34: it would unmount the streams provider).
+
+Scan-list cell as of 2026-10-27 (replaced by 297-02, moved verbatim): 0 / 0 / 0 | no (planned 297-02) | young (planned 297-02). S1 "This address doesn't open anything" + S2 holding state (D-14/D-19/D-35). Never renders the trailing fallback tag. Measured in its creating commit
 
 ### `frontend/src/lib/leaveGuard.ts`
 

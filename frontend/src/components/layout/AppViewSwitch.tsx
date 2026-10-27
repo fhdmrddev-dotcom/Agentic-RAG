@@ -21,7 +21,9 @@ import { ControlRoomPage } from "@/components/admin/ControlRoomPage"
 import { OrgAdminShell } from "@/components/org/OrgAdminShell"
 // Phase 188 Plan 09 (RUNVIZ-03): the run's own room mounts here as a full-surface
 // branch (the SkillStudioPage precedent — entered WITH an id, returned via callbacks).
-import { WorkflowRunPage } from "@/pages/WorkflowRunPage"
+import { WorkflowRunPage, COPY_LOADING } from "@/pages/WorkflowRunPage"
+// Phase 297-02 (D-14 / D-19 / D-35): the not-found and holding states, as arms of this switch.
+import { AddressNotFound, AddressHolding, ADMIN_HOLD_COPY } from "./AddressNotFound"
 // Phase 257 (METER-07): Operator Spend & Metering cockpit
 import { AdminSpendPage } from "@/pages/admin/AdminSpendPage"
 // Phase 262 plan 05 (PACK-11 / PACK-13 / D-262-03): the Expert catalog, and the ordered
@@ -114,6 +116,13 @@ export interface AppViewSwitchProps {
   onStudioTabChange: (tab: StudioTab) => void
   /** The operator probe identity for the Control Room band. */
   operatorIdentity: OperatorIdentity | null
+  /** Phase 297-02 (D-14): the address names nothing — S1 renders instead of any view. */
+  addressNotFound?: boolean
+  /** Phase 297-02 (D-19): the features read is still loading (ChatLayout's ONE context read). */
+  featuresLoading?: boolean
+  /** Phase 297-02 (D-35): the operator probe's answer, and whether it is still loading. */
+  isOperator?: boolean
+  operatorLoading?: boolean
   /** The app-wide thread list (Phase 156's Wave-1 bootstrap). */
   threads: Threads["threads"]
   /** Select a thread. */
@@ -138,6 +147,17 @@ export interface AppViewSwitchProps {
  * ⛔ Binding invariants (fenced, see the ledger section): the trailing fallback stays the LAST
  * arm; exactly one comment-stripped `workflow-run` comparison; `canvasEnabled` is passed in,
  * never re-read here; the chat branch's grid and `<main>` class strings are pinned.
+ *
+ * Phase 297-02 (D-14 / D-19 / D-34 / D-35): the address states are arms of this switch. S1
+ * (`AddressNotFound`) is the FIRST arm of the non-chat side and the chat condition excludes it;
+ * the run hold sits inside the existing run arm; the admin arms hold on the operator probe, then
+ * show S1 to a non-operator. Every hold lives HERE, never at App level (it would unmount streams).
+ *
+ * ⚠ CORRECTED 2026-10-27 (Phase 297-02) — KEPT RATHER THAN OVERWRITTEN: several comments below
+ * say this app has "no router". Since 297-02 it has one: a single catch-all route, with the view
+ * derived from the address (`lib/appRoutes.ts`). Those comments are true of the code they were
+ * written beside on their own dates; the navigators they describe are unchanged, and tab
+ * addresses (Settings, Library, Studio) are Phase 299.
  */
 export function AppViewSwitch({
   activeView,
@@ -177,9 +197,13 @@ export function AppViewSwitch({
   selectThread,
   loadThreads,
   deleteThread,
+  addressNotFound = false,
+  featuresLoading = false,
+  isOperator = false,
+  operatorLoading = false,
 }: AppViewSwitchProps) {
   return (
-      activeView === "chat" ? (
+      activeView === "chat" && !addressNotFound ? (
         // Phase 087-06: App-level chat|panel CSS grid (panel-shell.md D1). The
         // panel column resolves against the REAL row width (not the panel's own
         // indefinite flex width), so 1fr + clamp(...) always sums to the row —
@@ -268,7 +292,9 @@ export function AppViewSwitch({
               with whatever the comment was saying. Phase 235-08: `libraryTab` is
               `undefined` on every ordinary entry, so the Library keeps its own default; it
               is set only by App's `handleOpenLibraryHealth`. */}
-          {activeView === "documents" ? (
+          {addressNotFound ? (
+            <AddressNotFound onGoHome={() => onNavigate("chat")} />
+          ) : activeView === "documents" ? (
             <LibraryPage onNavigate={onNavigate} initialTab={libraryTab} attentionConditions={attentionConditions} onAskInChat={handleAskInChat} />
           ) : activeView === "skills" ? (
             <SkillsPage
@@ -343,7 +369,15 @@ export function AppViewSwitch({
             // feeds the band, onBack returns to chat. The reachability triad (App union
             // + this mount + the shield action) is owned in-phase (the built-but-
             // unreachable lesson).
-            <ControlRoomPage identity={operatorIdentity} onBack={() => onNavigate("chat")} />
+            // Phase 297-02 (D-35): reachable by ADDRESS now, so the probe gates the render — a
+            // hold while it loads, then S1 (the unknown-address words) for a non-operator.
+            operatorLoading ? (
+              <AddressHolding sentence={ADMIN_HOLD_COPY} />
+            ) : isOperator ? (
+              <ControlRoomPage identity={operatorIdentity} onBack={() => onNavigate("chat")} />
+            ) : (
+              <AddressNotFound onGoHome={() => onNavigate("chat")} />
+            )
           ) : activeView === "org-admin" ? (
             // Phase 166 Plan 05 (ADMIN-01 / D-166-05): the org-admin shell full-surface
             // mounts here (additive branch BEFORE the trailing KnowledgeHealthPage else —
@@ -353,7 +387,7 @@ export function AppViewSwitch({
             // closes the reachability triad (App union [Plan 02] + this mount + the NavPanel
             // entry — all owned in-phase; the Phase-118 built-but-unreachable lesson).
             <OrgAdminShell onBack={() => onNavigate("chat")} />
-          ) : activeView === "workflow-run" && canvasEnabled ? (
+          ) : activeView === "workflow-run" && (canvasEnabled || featuresLoading) ? (
             // Phase 188 Plan 09 (RUNVIZ-03 / SPEC Req 6 / D-188-10): the run's own room
             // mounts here as the FOURTH home — additive branch placed IMMEDIATELY BEFORE
             // the trailing KnowledgeHealthPage (the governance/skill-studio/control-room
@@ -391,17 +425,33 @@ export function AppViewSwitch({
             // fence in ChatLayout.launch.test.tsx measures that their tags appear ONLY
             // before the split point, and prose spelling a tag would break a real
             // measurement (the 187-24 lesson, met three times in this phase alone).
-            <WorkflowRunPage
-              runId={activeRunId}
-              onBack={() => onNavigate("workflows")}
-              onOpenThread={(tid) => {
-                const t = threads.find((x) => x.id === tid)
-                if (t) selectThread(t)
-                onNavigate("chat")
-              }}
-            />
+            //
+            // Phase 297-02 (D-19 / D-34): a COLD run address arrives before the features read
+            // answers, when the canvas flag still reads off. Hold here, in this same arm (so the
+            // comparison count stays one), with the page's own loading sentence; once the read
+            // answers, the flag decides between the page and the trailing fallback as before.
+            canvasEnabled ? (
+              <WorkflowRunPage
+                runId={activeRunId}
+                onBack={() => onNavigate("workflows")}
+                onOpenThread={(tid) => {
+                  const t = threads.find((x) => x.id === tid)
+                  if (t) selectThread(t)
+                  onNavigate("chat")
+                }}
+              />
+            ) : (
+              <AddressHolding sentence={COPY_LOADING} />
+            )
           ) : activeView === "admin-spend" ? (
-            <AdminSpendPage onBack={() => onNavigate("control-room")} />
+            // Phase 297-02 (D-35): the same probe gate as the Control Room above.
+            operatorLoading ? (
+              <AddressHolding sentence={ADMIN_HOLD_COPY} />
+            ) : isOperator ? (
+              <AdminSpendPage onBack={() => onNavigate("control-room")} />
+            ) : (
+              <AddressNotFound onGoHome={() => onNavigate("chat")} />
+            )
           ) : activeView === "experts" ? (
             // Phase 262 plan 05 (PACK-11 / PACK-13 / D-262-03): the Expert catalog — the
             // LAST-BUT-ONE arm, deliberately, so the trailing positional fallback stays last.

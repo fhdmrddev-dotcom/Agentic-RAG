@@ -19,7 +19,6 @@ import { askInChat } from "@/components/library/find/askInChat"
 // Phase 235-08 — the tab union from the page's own leaf, the `type StudioTab` idiom below.
 import type { LibraryTab } from "@/pages/librarySelection"
 import type { StudioTab } from "@/pages/SkillStudioPage"
-import { clearRunDeepLink, readRunDeepLink } from "@/lib/runDeepLink"
 // Phase 214-12 (STEP-02 / D-214-04): chat's launch moment. The form resolves BEFORE
 // createThread, and the shared field renderer keeps the two-arm label rule in one place.
 // `launchInputFields` — never `entryInputFields`, whose fallback arm draws a box for a key
@@ -111,9 +110,26 @@ interface Props {
   // the drawer-opening control — three renderers, one read.
   libraryTab?: LibraryTab
   onOpenLibraryHealth?: () => void
+  /**
+   * Phase 297-02 (LINK-01 / D-15 / D-18) — the run's address and the route navigator.
+   *
+   * `activeRunId` is the `workflow_runs.id` the address `/app/runs/<id>` names (App reads it off
+   * the route), and `openRun` pushes that address. ChatLayout used to hold the run id as its own
+   * state seeded from a `?run=` link; the route holds it now, so a refresh and Back/Forward keep it.
+   * `addressNotFound` is true when the address names nothing (D-14); `operatorLoading` is the
+   * operator probe still resolving, so a typed admin address holds rather than refusing (D-35).
+   *
+   * ⚠ ALL FOUR ARE OPTIONAL ON PURPOSE — the 235-08 precedent above: shipped suites mount
+   * `<ChatLayout {...baseProps} />` from their own prop objects, and a REQUIRED prop would redden
+   * `tsc` in files this plan does not own. App always passes them.
+   */
+  activeRunId?: string | null
+  openRun?: (workflowRunId: string) => void
+  addressNotFound?: boolean
+  operatorLoading?: boolean
 }
 
-export function ChatLayout({ onSignOut, activeView, onNavigate, navItems, isOperator, operatorIdentity, prefillMessage, onSetPrefillMessage, studioSkillId, studioTab, onOpenStudio, onReviewEvals, onStudioTabChange, onTuneSkill, libraryTab, onOpenLibraryHealth }: Props) {
+export function ChatLayout({ onSignOut, activeView, onNavigate, navItems, isOperator, operatorIdentity, prefillMessage, onSetPrefillMessage, studioSkillId, studioTab, onOpenStudio, onReviewEvals, onStudioTabChange, onTuneSkill, libraryTab, onOpenLibraryHealth, activeRunId, openRun, addressNotFound = false, operatorLoading = false }: Props) {
   const {
     threads,
     selectedThread,
@@ -279,14 +295,10 @@ export function ChatLayout({ onSignOut, activeView, onNavigate, navItems, isOper
   //    from the thread's run anchor — see the tail of doRun for the id trap. ──
   //    Phase 289-04 (SC#3): seeded once from `/app?run=<uuid>` so a shared or reloaded run
   //    address opens that run (App's view initializer reads the same link).
-  const [activeRunId, setActiveRunId] = useState<string | null>(() => readRunDeepLink())
-
-  // 289-REVIEW WR-05: `?run=` names the record on screen, so it is cleared wherever the run view
-  // is LEFT. The evidence report clears it on unmount, but a LIVE (active/paused) run never mounts
-  // the report, so a deep link to one survived "Back to Workflows" and the next reload re-opened it.
-  useEffect(() => {
-    if (activeView !== "workflow-run") clearRunDeepLink()
-  }, [activeView])
+  //    ⚠ CORRECTED 2026-10-27 (Phase 297-02, D-18) — KEPT RATHER THAN OVERWRITTEN: the id is no
+  //    longer local state. It is the route's (`/app/runs/<id>`, the `activeRunId` prop), and
+  //    `openRun` pushes that address. The 289-REVIEW WR-05 clear that lived here is gone with the
+  //    query it cleared: leaving the run view changes the address, so it cannot outlive the page.
 
   // ── CR-05 (Phase 188 review): the run home is CANVAS-ERA SURFACE, so the operator's
   //    kill switch owns it exactly as it owns the Builder's canvas
@@ -469,14 +481,14 @@ export function ChatLayout({ onSignOut, activeView, onNavigate, navItems, isOper
             .catch(() => null)
         : null
       if (workflowRunId) {
-        setActiveRunId(workflowRunId)
-        onNavigate("workflow-run")
+        // Phase 297-02 (D-15): the run opens on its own address, by the `workflow_runs.id`.
+        openRun?.(workflowRunId)
         return
       }
       selectThread(thread)
       onNavigate("chat")
     },
-    [loadThreads, selectThread, onNavigate, canvasEnabled],
+    [loadThreads, selectThread, onNavigate, openRun, canvasEnabled],
   )
 
   // ── Phase 188 Plan 10 (RUNVIZ-03 / D-188-13): the thread → run direction of the
@@ -487,10 +499,9 @@ export function ChatLayout({ onSignOut, activeView, onNavigate, navItems, isOper
   //    keys on the callback itself. ──
   const openRunSurface = useCallback(
     (runId: string) => {
-      setActiveRunId(runId)
-      onNavigate("workflow-run")
+      openRun?.(runId)
     },
-    [onNavigate],
+    [openRun],
   )
 
   // ── Plan 06: lifted panel state machine (panel-shell.md D1). The chat|panel
@@ -603,7 +614,7 @@ export function ChatLayout({ onSignOut, activeView, onNavigate, navItems, isOper
       {/* Phase 156 REFINEMENT: mounted only when NOT collapsed — folding it away frees
           its ~300px to the conversation (the chat grid below is flex-1, so it reflows to
           full-width). The ▷ reopen handle lives in the chat top-bar (ChatArea). */}
-      {activeView === "chat" && !historyCollapsed && (
+      {activeView === "chat" && !addressNotFound && !historyCollapsed && (
         <ChatHistoryColumn
           threads={threads}
           selectedThread={selectedThread}
@@ -833,7 +844,11 @@ export function ChatLayout({ onSignOut, activeView, onNavigate, navItems, isOper
         setHistoryCollapsedPersisted={setHistoryCollapsedPersisted}
         canvasEnabled={canvasEnabled}
         openRunSurface={openRunSurface}
-        activeRunId={activeRunId}
+        activeRunId={activeRunId ?? null}
+        addressNotFound={addressNotFound}
+        featuresLoading={featuresCtx?.loading ?? false}
+        isOperator={isOperator}
+        operatorLoading={operatorLoading}
         doRun={doRun}
         libraryTab={libraryTab}
         attentionConditions={attentionConditions}

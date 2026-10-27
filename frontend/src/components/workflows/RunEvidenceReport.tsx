@@ -34,7 +34,6 @@ import { Button } from "@/components/ui/button"
 import { cn } from "@/lib/utils"
 import { getRunEvidence, type RunEvidence } from "@/lib/api/runEvidence"
 import { downloadWorkspaceFile } from "@/lib/api/documents"
-import { clearRunDeepLink, writeRunDeepLink } from "@/lib/runDeepLink"
 import { StepEvidenceLine } from "@/components/workflows/StepEvidenceLine"
 import { RunEndReasonLine } from "@/components/workflows/RunEndReasonLine"
 import { RunOriginLine } from "@/components/workflows/RunOriginLine"
@@ -438,11 +437,9 @@ export function RunEvidenceReport({ runId, onBack, onOpenThread, watchedFailure 
     return () => ctl.abort()
   }, [runId, attempt])
 
-  // The shareable address (SC#3): `?run=<id>` while this record is on screen.
-  useEffect(() => {
-    writeRunDeepLink(runId)
-    return () => clearRunDeepLink()
-  }, [runId])
+  // The shareable address (SC#3) is the route's since Phase 297-02 (D-18): `/app/runs/<id>`. The
+  // `?run=` writer effect that stood here is deleted; a second History writer beside the router
+  // erases its entry index (D-33).
 
   const view = useMemo(() => (state.kind === "ready" ? toEvidenceView(state.payload) : null), [state])
 

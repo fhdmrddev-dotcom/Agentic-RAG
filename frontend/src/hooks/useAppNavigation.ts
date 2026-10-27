@@ -1,4 +1,7 @@
-import { useCallback, useState } from "react"
+import { useCallback, useEffect, useMemo, useRef, useState } from "react"
+// Phase 297-02 (D-04 / D-08): the ONLY module in the tree that calls the router hooks. Every
+// page and leaf keeps receiving navigators as props, so none of them needs a router to render.
+import { useLocation, useNavigate } from "react-router"
 // Type-only: `ActiveView` stays exported from App.tsx on ONE line (D-38 — the docs-coverage gate
 // and the renameFence needle read it there). Erased under `verbatimModuleSyntax`, so this is
 // not a runtime cycle (the ChatLayout precedent).
@@ -9,19 +12,27 @@ import type { StudioTab } from "@/pages/SkillStudioPage"
 import type { LibraryTab } from "@/pages/librarySelection"
 // Phase 235 plan 15 (gap-closure round 1): the hand-off's LIFETIME rule, as a strict leaf.
 import { libraryTabAfterNavigate } from "@/lib/libraryTabHandoff"
-import { readRunDeepLink } from "@/lib/runDeepLink"
+// Phase 297-02 (D-11): the route table — the one home of the app's path vocabulary.
+import { canonicalAddress, formatAppRoute, parseAppLocation, type AppRoute } from "@/lib/appRoutes"
 
 export interface AppNavigation {
   /** The view on screen — one `ActiveView` member. */
   activeView: ActiveView
-  /** The app's navigator: sets the view AND spends a pending Library hand-off (the
-   *  `libraryTabAfterNavigate` rule). Every `onNavigate("…")` call site in the tree reads this. */
+  /** The app's navigator: PUSHES the view's address (D-15). The view already on screen is a
+   *  no-op (no duplicate history entry). Every `onNavigate("…")` call site in the tree reads this. */
   onNavigate: (next: ActiveView) => void
-  /** The 403 visibility bounce home. Sets the view only — it does NOT spend the Library
-   *  hand-off, exactly like the bare setter App's listener called before this hook existed.
-   *  Stable identity, so App's listener effect does not re-subscribe on every render. */
+  /** The 403 visibility bounce home: REPLACES the current entry with `/app` (D-15), so Back does
+   *  not return to the refused surface. Stable identity, so App's listener effect does not
+   *  re-subscribe on every render. Since 297-02 it spends the Library hand-off like any other move
+   *  to chat — the clear is keyed on the derived view so that a POP spends it too (Pitfall 5). */
   bounceHome: () => void
-  /** The skill the Skill Studio is open on, or `null` before any studio entry. */
+  /** The run on screen (`/app/runs/<id>`), or `null`. A `workflow_runs.id`, lowercased. */
+  runId: string | null
+  /** True when the address names nothing the app opens (D-14). The view then reads "chat". */
+  addressNotFound: boolean
+  /** Open a run's page by its `workflow_runs.id` — pushes `/app/runs/<id>`. */
+  openRun: (runId: string) => void
+  /** The skill the Skill Studio is open on (from `/app/skills/<id>`), or `null` off the studio. */
   studioSkillId: string | null
   /** The Skill Studio's active tab. */
   studioTab: StudioTab
@@ -50,28 +61,68 @@ export interface AppNavigation {
  * navigator call site changes. Plan 297-02 derives `activeView` from the address here; router
  * hooks are called in this module and nowhere below it (D-08).
  *
+ * ⚠ CORRECTED 2026-10-27 (Phase 297-02) — THE PARAGRAPH ABOVE IS KEPT RATHER THAN OVERWRITTEN;
+ * its first two sentences described 297-01 and are no longer true. The view, the run id and the
+ * studio skill id are now DERIVED from the router's location through `parseAppLocation` (one
+ * memo, no view state); the boot initializer is gone; one effect normalises a legacy or bare
+ * address with a REPLACE (D-15, D-16). Navigators push, `bounceHome` replaces. The studio tab and
+ * the Library tab stay component state — tab addresses are Phase 299.
+ *
  * ⚠ `setLibraryTab(` has EXACTLY two writers, both in this module, counted over comment-stripped
  * code by `LibraryPage.tabAttention.test.tsx` (D-297-08). The Library hand-off comment block
  * below travelled WITH the state it describes, unedited: `LibraryPage.initialTab.test.tsx` uses a
  * phrase inside it as its stripper non-vacuity control (D-297-07).
  */
 export function useAppNavigation(): AppNavigation {
-  const [activeView, setActiveView] = useState<ActiveView>(() => {
-    // Phase 257 (METER-07): /admin/spend route
-    if (typeof window !== "undefined" && (window.location.pathname === "/admin/spend" || window.location.pathname.startsWith("/admin/spend"))) {
-      return "admin-spend"
-    }
-    // Phase 289-04 (SC#3): `/app?run=<uuid>` opens that run's page on boot. The query is KEPT
-    // (no replaceState) so a reload stays on the run; the reader accepts a strict UUID only.
-    if (readRunDeepLink()) return "workflow-run"
-    // BUG-260903-01 / SEED-185: both OAuth callbacks land on `/app?connections=1&…`, and until
-    // 2026-09-03 nothing read it — the person arrived on Chat with their result in the URL.
-    // Read once, land on Connections, and drop the query so a reload does not re-route.
-    const q = new URLSearchParams(window.location.search)
-    if (q.get("connections") !== "1") return "chat"
-    window.history.replaceState(null, "", window.location.pathname)
-    return "connections"
-  })
+  const location = useLocation()
+  const navigate = useNavigate()
+  // The address IS the view (D-07 / D-11). Total: an unknown address parses to not-found.
+  const parsed = useMemo(
+    () => parseAppLocation(location.pathname, location.search),
+    [location.pathname, location.search],
+  )
+  const addressNotFound = parsed.view === "not-found"
+  const activeView: ActiveView =
+    parsed.view === "not-found" || parsed.view === "pre-auth" ? "chat" : parsed.view
+  const runId = parsed.view === "workflow-run" ? parsed.runId : null
+  const studioSkillId = parsed.view === "skill-studio" ? parsed.skillId : null
+
+  // The latest address, read by the navigators so they keep ONE identity across renders (App's
+  // 403 listener depends on `bounceHome`). Synced after commit; every caller is an event handler.
+  const here = useRef("")
+  const lastRunId = useRef<string | null>(null)
+  const lastSkillId = useRef<string | null>(null)
+  useEffect(() => {
+    here.current = `${location.pathname}${location.search}`
+    if (runId) lastRunId.current = runId
+    if (studioSkillId) lastSkillId.current = studioSkillId
+  }, [location.pathname, location.search, runId, studioSkillId])
+
+  // ONE normalising effect (D-13 / D-15 / D-16): a legacy alias or a bare prefix is REPLACED by
+  // its canonical address, so Back never returns to the old shape. `canonicalAddress` answers
+  // null for every address it must not touch (pre-auth, bare `/`, unknown, already canonical,
+  // unknown params only), and the hash is carried across untouched (Pitfall 10: auth callbacks).
+  useEffect(() => {
+    const canonical = canonicalAddress(location.pathname, location.search)
+    if (canonical === null) return
+    const q = canonical.indexOf("?")
+    const pathname = q < 0 ? canonical : canonical.slice(0, q)
+    const search = q < 0 ? "" : canonical.slice(q)
+    here.current = canonical
+    void navigate({ pathname, search, hash: location.hash }, { replace: true })
+  }, [location.pathname, location.search, location.hash, navigate])
+
+  /** Navigate to a route; a no-op when it is the address already on screen (D-15). */
+  const go = useCallback(
+    (route: AppRoute, opts: { replace?: boolean } = {}) => {
+      const target = formatAppRoute(route)
+      if (target === here.current) return
+      here.current = target
+      void navigate(target, { replace: opts.replace === true })
+    },
+    [navigate],
+  )
+
   // Phase 137-06 (PANEL-01 / D-01 / sketch 057-A): the unified Skill Studio is a
   // focused full-surface entered WITH a skillId + a tab (mirroring the shipped Tuner
   // ActiveView precedent — no router). App holds the selected-skill + active-tab state
@@ -82,12 +133,11 @@ export function useAppNavigation(): AppNavigation {
   // navigators. The legacy Trigger Tuner is ABSORBED as the Studio's Triggering tab:
   // the "Tune triggers" / lint "Tune this →" handoff (handleTuneSkill) REDIRECTS to
   // Studio · Triggering (D-01 no orphan Tuner surface / D-06 lint re-point).
-  const [studioSkillId, setStudioSkillId] = useState<string | null>(null)
+  // Phase 297-02: the selected skill is now the address (`/app/skills/<id>`); the tab stays state.
   const [studioTab, setStudioTab] = useState<StudioTab>("evals")
   const handleOpenStudio = (skillId: string, tab: StudioTab = "evals") => {
-    setStudioSkillId(skillId)
     setStudioTab(tab)
-    setActiveView("skill-studio")
+    go({ view: "skill-studio", skillId })
   }
   const handleReviewEvals = (skillId: string) => handleOpenStudio(skillId, "evals")
   const handleStudioTabChange = (tab: StudioTab) => setStudioTab(tab)
@@ -121,10 +171,15 @@ export function useAppNavigation(): AppNavigation {
   // it, and prose that names it would make a code measurement satisfiable by a comment (the
   // 187-24 lesson, which `App.tsx:91-101` above already records once). `undefined` means
   // "the page decides", so the Library keeps its own default on every other entry into it.
+  //
+  // ⚠ CORRECTED 2026-10-27 (Phase 297-02), beside the paragraph above rather than through it: the
+  // app now HAS a router, and the Library's address is `/app/library`. The rule about the full
+  // page reload still holds — a router navigation is not a reload — and the TAB still has no
+  // address of its own (Phase 299), so the hand-off below is still component state.
   const [libraryTab, setLibraryTab] = useState<LibraryTab | undefined>(undefined)
   const handleOpenLibraryHealth = () => {
     setLibraryTab("health")
-    setActiveView("documents")
+    go({ view: "documents" })
   }
   // ⛔ Phase 235 plan 15 (gap-closure round 1 · verification G5) — AND IT IS ONE-SHOT.
   //
@@ -136,18 +191,43 @@ export function useAppNavigation(): AppNavigation {
   // code beneath it. The clear belongs to the NAVIGATOR, not to a second writer: the hand-off
   // survives the trip INTO the Library and is spent by the next navigation anywhere else
   // (`libraryTabAfterNavigate` owns that rule and is tested without mounting anything).
-  const handleNavigate = (next: ActiveView) => {
-    setActiveView(next)
-    setLibraryTab((pending) => libraryTabAfterNavigate(pending, next))
+  //
+  // ⚠ Phase 297-02 (Pitfall 5): the clear now runs on the DERIVED view rather than inside the
+  // navigator. Back and Forward change the view without calling any navigator, so a clear that
+  // lived in `handleNavigate` would let Back into the Library re-open the Health tab the person
+  // had already left. The rule itself is unchanged and still owned by `libraryTabAfterNavigate`.
+  // It runs while rendering, on the render where the view changes (React's "adjust state when
+  // an input changes" pattern), so no frame ever shows a spent hand-off — an effect would paint
+  // one frame with the stale tab first.
+  const [viewSeen, setViewSeen] = useState<ActiveView>(activeView)
+  if (viewSeen !== activeView) {
+    setViewSeen(activeView)
+    setLibraryTab((pending) => libraryTabAfterNavigate(pending, activeView))
   }
-  // Phase 297-01: the 403 visibility bounce's setter, kept exactly as App's listener called it —
-  // the view only, never the hand-off (it bypassed `handleNavigate` before the move, too).
-  const bounceHome = useCallback(() => setActiveView("chat"), [])
+  const handleNavigate = (next: ActiveView) => {
+    if (next === "workflow-run") {
+      // A run view needs a run: return to the last one opened, or stay put.
+      if (lastRunId.current) go({ view: "workflow-run", runId: lastRunId.current })
+      return
+    }
+    if (next === "skill-studio") {
+      if (lastSkillId.current) go({ view: "skill-studio", skillId: lastSkillId.current })
+      return
+    }
+    go({ view: next })
+  }
+  const openRun = useCallback((id: string) => go({ view: "workflow-run", runId: id }), [go])
+  // Phase 297-01 kept the 403 bounce as the bare view setter. Phase 297-02: a REPLACE to the
+  // home address (D-15) — Back must not lead back to the surface the server just refused.
+  const bounceHome = useCallback(() => go({ view: "chat" }, { replace: true }), [go])
 
   return {
     activeView,
     onNavigate: handleNavigate,
     bounceHome,
+    runId,
+    addressNotFound,
+    openRun,
     studioSkillId,
     studioTab,
     handleOpenStudio,

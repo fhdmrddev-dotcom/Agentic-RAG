@@ -289,11 +289,15 @@ function withCanvas(on: boolean, node: React.ReactElement) {
   )
 }
 
-function baseProps(activeView: ActiveView, onNavigate = vi.fn()) {
+// D-297-09 (Phase 297-02, D-15 / D-18): the run surface is a ROUTE now. ChatLayout no longer holds
+// the run id or navigates by view name for a run: doRun and the panel hand the `workflow_runs.id`
+// to the `openRun` prop (App wires it to the router), and the id comes back down as `activeRunId`.
+function baseProps(activeView: ActiveView, onNavigate = vi.fn(), openRun = vi.fn()) {
   return {
     onSignOut: vi.fn(),
     activeView,
     onNavigate,
+    openRun,
     navItems: [],
     isOperator: false,
     operatorIdentity: null,
@@ -310,12 +314,13 @@ function baseProps(activeView: ActiveView, onNavigate = vi.fn()) {
 
 function renderLayout(activeView: ActiveView = "workflows", canvasOn = true) {
   const onNavigate = vi.fn()
-  const props = baseProps(activeView, onNavigate)
+  const openRun = vi.fn()
+  const props = baseProps(activeView, onNavigate, openRun)
   const utils = render(withCanvas(canvasOn, <ChatLayout {...props} />))
-  /** Re-render the SAME instance on another view (ChatLayout's activeRunId survives). */
-  const showView = (view: ActiveView) =>
-    utils.rerender(withCanvas(canvasOn, <ChatLayout {...props} activeView={view} />))
-  return { ...utils, onNavigate, showView }
+  /** Re-render the SAME instance on another view, holding the run id the route would hold. */
+  const showView = (view: ActiveView, activeRunId: string | null = null) =>
+    utils.rerender(withCanvas(canvasOn, <ChatLayout {...props} activeView={view} activeRunId={activeRunId} />))
+  return { ...utils, onNavigate, openRun, showView }
 }
 
 beforeEach(() => {
@@ -339,14 +344,16 @@ beforeEach(() => {
 
 describe("ChatLayout launch — the run gets its own room (SPEC Req 6 / D-188-12)", () => {
   it("navigates to the run surface and NEVER to the chat view", async () => {
-    const { onNavigate } = renderLayout()
+    const { onNavigate, openRun } = renderLayout()
 
     fireEvent.click(screen.getByTestId("drive-launch"))
 
-    await waitFor(() => expect(onNavigate).toHaveBeenCalledWith("workflow-run"))
+    // D-297-09: the run is opened by its id through the route navigator.
+    await waitFor(() => expect(openRun).toHaveBeenCalledWith(ANCHOR_RUN_ID))
     expect(onNavigate).not.toHaveBeenCalledWith("chat")
     // Exactly one navigation for one launch — no intermediate hop through chat.
-    expect(onNavigate).toHaveBeenCalledTimes(1)
+    expect(openRun).toHaveBeenCalledTimes(1)
+    expect(onNavigate).not.toHaveBeenCalled()
   })
 
   // ── 2. The surviving half — the guard against over-deleting ────────────────
@@ -372,13 +379,15 @@ describe("ChatLayout launch — the run gets its own room (SPEC Req 6 / D-188-12
 
   // ── 3. The id trap (T-188-09-01) ───────────────────────────────────────────
   it("hands the run surface the ANCHOR id, never the producer id from the POST response", async () => {
-    const { showView } = renderLayout()
+    const { showView, openRun } = renderLayout()
     fireEvent.click(screen.getByTestId("drive-launch"))
-    await waitFor(() => expect(mockGetThreadWorkflow).toHaveBeenCalled())
+    await waitFor(() => expect(openRun).toHaveBeenCalled())
+    // D-297-09: the id handed to the route navigator is the anchor, never the producer row.
+    expect(openRun).toHaveBeenCalledWith(ANCHOR_RUN_ID)
+    expect(openRun).not.toHaveBeenCalledWith(PRODUCER_RUN_ID)
 
-    // App would flip activeView in response to onNavigate; ChatLayout's activeRunId
-    // is its own state and survives the re-render.
-    showView("workflow-run")
+    // App routes to /app/runs/<id> in response; the route hands the same id back down.
+    showView("workflow-run", openRun.mock.calls[0][0] as string)
 
     const page = await screen.findByTestId("run-page-stub")
     expect(page).toHaveTextContent(ANCHOR_RUN_ID)
@@ -392,7 +401,7 @@ describe("ChatLayout launch — the run gets its own room (SPEC Req 6 / D-188-12
   it("WR-04: a failed launch cleans up the thread, re-throws, and navigates NOWHERE", async () => {
     const boom = new Error("template failed validation (422)")
     mockPostMessage.mockRejectedValue(boom)
-    const { onNavigate } = renderLayout()
+    const { onNavigate, openRun } = renderLayout()
 
     fireEvent.click(screen.getByTestId("drive-launch"))
 
@@ -404,6 +413,7 @@ describe("ChatLayout launch — the run gets its own room (SPEC Req 6 / D-188-12
     expect(launchOutcome.resolved).toBe(false)
     // And nothing navigated: a failed launch has no room to land in.
     expect(onNavigate).not.toHaveBeenCalled()
+    expect(openRun).not.toHaveBeenCalled()
     expect(mockGetThreadWorkflow).not.toHaveBeenCalled()
   })
 
@@ -414,7 +424,7 @@ describe("ChatLayout launch — the run gets its own room (SPEC Req 6 / D-188-12
       mode: "deep",
       active_workflow_run_id: null,
     })
-    const { onNavigate } = renderLayout()
+    const { onNavigate, openRun } = renderLayout()
 
     fireEvent.click(screen.getByTestId("drive-launch"))
 
@@ -423,6 +433,7 @@ describe("ChatLayout launch — the run gets its own room (SPEC Req 6 / D-188-12
       expect.objectContaining({ id: THREAD_ID }),
     )
     expect(onNavigate).not.toHaveBeenCalledWith("workflow-run")
+    expect(openRun).not.toHaveBeenCalled()
   })
 
   it("a FAILED anchor read also degrades to the shipped behaviour — the launch already succeeded", async () => {
@@ -463,12 +474,13 @@ describe("ChatLayout launch — the run gets its own room (SPEC Req 6 / D-188-12
 
 describe("ChatLayout — the run home is gated on visual_workflow_canvas (CR-05)", () => {
   it("a flag-off launch restores the shipped behaviour: select the thread, land in chat", async () => {
-    const { onNavigate } = renderLayout("workflows", false)
+    const { onNavigate, openRun } = renderLayout("workflows", false)
 
     fireEvent.click(screen.getByTestId("drive-launch"))
 
     await waitFor(() => expect(onNavigate).toHaveBeenCalledWith("chat"))
     expect(onNavigate).not.toHaveBeenCalledWith("workflow-run")
+    expect(openRun).not.toHaveBeenCalled()
     // The thread is SELECTED — this is the half that made the flag-off launch a dead end.
     expect(mockSelectThread).toHaveBeenCalledWith(expect.objectContaining({ id: THREAD_ID }))
     // The launch itself is untouched: still created, still kicked off, still not deleted.
