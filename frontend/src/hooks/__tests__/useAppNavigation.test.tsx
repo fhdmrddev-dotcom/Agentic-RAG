@@ -269,6 +269,18 @@ describe("useAppNavigation — the address is the view (D-07, D-15)", () => {
     expect(nav().leaveGuards.canLeaveAll()).toBe(false) // a stale armed latch would answer true
   })
 
+  // 297-REVIEW IN-01 (2026-10-28): the formatter's guarantee is two-sided now — a navigator never
+  // pushes an id the parser would refuse, which would land the person on S1.
+  it("IN-01: openRun / handleOpenStudio with a non-UUID id push nothing", async () => {
+    const router = mount("/app/workflows")
+    const key = router.state.location.key
+    act(() => nav().openRun("not-a-uuid"))
+    act(() => nav().handleOpenStudio("../settings"))
+    await act(async () => {})
+    expect(router.state.location.key).toBe(key)
+    expect(where(router)).toBe("/app/workflows")
+  })
+
   it("openRun(id) pushes /app/runs/<id>", async () => {
     const router = mount("/app/workflows")
     act(() => nav().openRun(RUN_ID))

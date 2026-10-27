@@ -14,6 +14,7 @@ import type { LibraryTab } from "@/pages/librarySelection"
 import { libraryTabAfterNavigate } from "@/lib/libraryTabHandoff"
 // Phase 297-02 (D-11): the route table — the one home of the app's path vocabulary.
 import { canonicalAddress, formatAppRoute, parseAppLocation, type AppRoute } from "@/lib/appRoutes"
+import { isStrictUuid } from "@/lib/runDeepLink"
 // Phase 297-03 (D-21): the leave-guard registry the ONE blocker below consults.
 import { createLeaveGuardRegistry, type LeaveGuardRegistry } from "@/lib/leaveGuard"
 
@@ -176,6 +177,10 @@ export function useAppNavigation(): AppNavigation {
   /** Navigate to a route; a no-op when it is the address already on screen (D-15). */
   const go = useCallback(
     (route: AppRoute, opts: { replace?: boolean } = {}) => {
+      // 297-REVIEW IN-01 (2026-10-28): the parser takes strict UUIDs only (D-12), so an id it would
+      // refuse is never pushed — the address would open S1 instead of the run or skill asked for.
+      if (route.view === "workflow-run" && !isStrictUuid(route.runId)) return
+      if (route.view === "skill-studio" && !isStrictUuid(route.skillId)) return
       const target = formatAppRoute(route)
       if (isOnScreen(target)) return
       ensureEntryIdx(here.current.split("?")[0])
