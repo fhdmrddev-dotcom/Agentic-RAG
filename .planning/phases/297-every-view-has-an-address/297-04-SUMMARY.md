@@ -89,7 +89,24 @@ How to read the vercel row: when the catch-all is gone, the canonical `/app/*` r
 
 ## Post-merge wave-3 count gate
 
-**OWED.** The orchestrator runs this after BOTH 297-03 and 297-04 merge. 297-03 also appends to `scripts/vitest-count-gate.cjs`, so neither branch's green proves the merged file. Run once from the repo root: `GSD_VITEST_MAX_WORKERS=2 node scripts/vitest-count-gate.cjs`. Record the verdict line exactly as printed, plus the per-file deltas for every suite either plan added or grew. 297-04's suite is `appRouteParity.test.ts`, which must read 78. If the gate goes red, capture the failing filenames from the gate's own persisted JSON report BEFORE any re-run, then check each one against `git diff --numstat <wave-3 base> HEAD`. This plan is not complete until that section is filled in.
+**RUN 2026-10-28 by the orchestrator on develop after merge `9245f31ae` (297-03 merged at `d7701a606` first; the count-gate conflict was resolved as a pure union, +4 lines, 0 removed).** Verdict as printed:
+
+```
+count gate OK — 531/531 pinned files present, no per-file decrease, 0 failing.
+total 12519  ·  failed 0  ·  pinned total 11346
+```
+
+Per-file deltas for the wave-3 suites (pinned → measured → delta):
+
+| Suite | Pinned | Measured | Delta |
+|---|---|---|---|
+| `appRouteParity.test.ts` (297-04) | 78 | 78 | 0 |
+| `useAppNavigation.leaveGuard.test.tsx` (297-03) | 23 | 23 | 0 |
+| `WorkflowsPage.leaveGuard.test.tsx` (297-03) | 12 | 12 | 0 |
+
+Typecheck set diff after the merge: 0 new versus the 62-line base. The one changed line is the inherited `ChatLayoutLaunch.test.tsx` TS2740, whose message now also lists `openRun`.
+
+Original instruction, kept: The orchestrator runs this after BOTH 297-03 and 297-04 merge. 297-03 also appends to `scripts/vitest-count-gate.cjs`, so neither branch's green proves the merged file. Run once from the repo root: `GSD_VITEST_MAX_WORKERS=2 node scripts/vitest-count-gate.cjs`. Record the verdict line exactly as printed, plus the per-file deltas for every suite either plan added or grew. 297-04's suite is `appRouteParity.test.ts`, which must read 78. If the gate goes red, capture the failing filenames from the gate's own persisted JSON report BEFORE any re-run, then check each one against `git diff --numstat <wave-3 base> HEAD`. This plan is not complete until that section is filled in.
 
 297-04's count-gate additions form one self-contained block in each knob. Keep both plans' lines when resolving the merge:
 - BASELINE, right after the `"appRoutes.test.ts": 111` line: a dated `297-04` comment + `"appRouteParity.test.ts": 78`
