@@ -95,8 +95,9 @@ def test_the_run_finaliser_passes_the_owners_settings():
 
 # ── SEED-362 ───────────────────────────────────────────────────────────────────────────
 def _owner(provider="openai", model="gpt-5.5"):
-    return SimpleNamespace(active_provider=provider, llm_model=model, available_models=[],
-                           confidence_bucket_high=0.54, confidence_bucket_medium=0.38)
+    # A configured owner: the run's provider has a key (CR-01's switch needs one).
+    return _OwnerSettings(active_provider=provider, llm_model=model,
+                          providers=[_p("openai", "sk-openai"), _p("zhipu", "sk-zhipu")])
 
 
 def _build(run, owner):

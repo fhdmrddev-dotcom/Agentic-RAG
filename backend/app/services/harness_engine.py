@@ -2560,7 +2560,7 @@ async def _build_resume_context(run, redis, pool):
     # precedence is unchanged downstream: phase.config.model or ctx.model. If loading
     # fails for any reason, fall back to None settings + "" model (the resolver
     # returns "" for None) so phase.config.model still applies — never block resume.
-    from app.models.user_settings import load_user_settings
+    from app.models.user_settings import load_user_settings, override_provider
     from app.services.sub_agent_models import (
         resolve_sub_agent_model_safely,
         resolve_workflow_ctx_model,
@@ -2587,6 +2587,13 @@ async def _build_resume_context(run, redis, pool):
         except (ValueError, TypeError):
             _run_meta = {}
     _run_provider = _run_meta.get("provider") if isinstance(_run_meta, dict) else None
+    # 296 review CR-01: the settings must name that provider too (its key, base URL and
+    # active_provider), the way kickoff's override_provider does; no key → the safe path.
+    if _run_provider and _owner_settings is not None and _run_provider != getattr(
+            _owner_settings, "active_provider", None):
+        _switched = override_provider(_owner_settings, _run_provider)
+        _run_provider, _owner_settings = (
+            (_run_provider, _switched) if _switched is not _owner_settings else (None, _owner_settings))
     _ctx_model = (
         run["model"] if run.get("model") and _run_provider
         else resolve_sub_agent_model_safely(_owner_settings, override_model=run["model"])
