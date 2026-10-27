@@ -196,9 +196,14 @@ export function useAppNavigation(): AppNavigation {
   // navigator. Back and Forward change the view without calling any navigator, so a clear that
   // lived in `handleNavigate` would let Back into the Library re-open the Health tab the person
   // had already left. The rule itself is unchanged and still owned by `libraryTabAfterNavigate`.
-  useEffect(() => {
+  // It runs while rendering, on the render where the view changes (React's "adjust state when
+  // an input changes" pattern), so no frame ever shows a spent hand-off — an effect would paint
+  // one frame with the stale tab first.
+  const [viewSeen, setViewSeen] = useState<ActiveView>(activeView)
+  if (viewSeen !== activeView) {
+    setViewSeen(activeView)
     setLibraryTab((pending) => libraryTabAfterNavigate(pending, activeView))
-  }, [activeView])
+  }
   const handleNavigate = (next: ActiveView) => {
     if (next === "workflow-run") {
       // A run view needs a run: return to the last one opened, or stay put.
