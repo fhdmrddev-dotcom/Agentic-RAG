@@ -4,20 +4,19 @@
   "model": "gemini-3.8-flash",
   "pinned_model": "gpt-5.6-luna",
   "pinned_provider": "openai",
-  "definition_id": "280f0fd7-781e-4d93-abaf-86da81771913",
-  "thread_id": "3b5ad708-34d0-4c5d-8576-7b132aea98b3",
+  "definition_id": "1fd55d35-01e3-4e24-b2b5-8249744e7b84",
+  "thread_id": "74b9c107-59a7-4ec2-8689-a7c982573a44",
   "send_http": 201,
-  "send": "{\"message_id\": \"930bd4fa-ecc1-44ee-9685-c401bb0f72d1\", \"run_id\": \"11435867-b3ee-4d1d-9e70-3b2ab9e73cd6\", \"model\": \"gemini-3.8-flash\", \"provider\": \"google\"}",
+  "send": "{\"message_id\": \"c33d4ee1-5ced-453e-b523-b8f67e8524fb\", \"run_id\": \"1443d45d-2ac2-48fe-be69-a468ae42c198\", \"model\": \"gemini-3.8-flash\", \"provider\": \"google\"}",
   "workflow_run": {
-    "id": "c1055985-b0f9-4d11-b822-c79f5df9ccc4",
-    "status": "failed"
+    "id": "bf4f0920-26be-4f28-a735-cd049d9545a8",
+    "status": "completed"
   },
-  "emit_validated_providers": [],
-  "failures": [
-    "{\"definition_version\": 1, \"definition_id\": null, \"phase_slug\": \"render_vendor_intake_sheet\", \"emitter\": \"render_template\", \"tier\": \"force_strict\", \"provider\": \"openai\", \"model\": \"gpt-5.6-luna\", \"forced\": false, \"thinking\": false, \"recovered_from_narration\": false, \"truncated\": false, \"attempt\": 1}",
-    "{\"definition_version\": 1, \"definition_id\": null, \"phase_slug\": \"render_vendor_intake_sheet\", \"emitter\": \"render_template\", \"tier\": \"force_strict\", \"provider\": \"openai\", \"model\": \"gpt-5.6-luna\", \"forced\": false, \"thinking\": false, \"recovered_from_narration\": false, \"truncated\": false, \"attempt\": 1}",
-    "{\"reason\": \"Step \\\"Fill vendor intake sheet\\\" failed after 2 attempts:\\n\\u2022 2 attempts \\u2014 the model wrote prose instead of filling the template. Check which model this step uses.\"}"
+  "emit_validated_providers": [
+    "openai"
   ],
+  "emit_failed_on": [],
+  "failures": [],
   "has_400": false,
-  "verdict": "FAIL"
+  "verdict": "PASS"
 }

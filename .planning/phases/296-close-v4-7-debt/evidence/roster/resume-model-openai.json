@@ -1,0 +1,54 @@
+{
+  "mode": "resume-model",
+  "provider": "openai",
+  "model": "gpt-5.6-luna",
+  "owner_default": {
+    "provider": "deepseek",
+    "model": "deepseek-v4-flash"
+  },
+  "non_default": true,
+  "definition_id": "d67bd427-f394-4492-b96e-45fa8261ceb9",
+  "thread_id": "cb9520b0-f684-4531-85ea-8766a66d7005",
+  "send_http": 201,
+  "status_before_answer": "paused",
+  "answer_http": 200,
+  "answer_body": "{\"status\":\"ok\"}",
+  "workflow_run_after": {
+    "status": "completed",
+    "model": "gpt-5.6-luna",
+    "metadata_provider": "openai"
+  },
+  "first_segment_runs": [
+    {
+      "run_id": "f0f129f1-3124-4ad1-aec2-0ffe85eb81ed",
+      "status": "completed",
+      "model": "gpt-5.6-luna",
+      "provider": "openai"
+    }
+  ],
+  "resumed_segment_runs": [
+    {
+      "run_id": "7da0d110-4ceb-461a-a45e-8e0b5d1183b2",
+      "status": "completed",
+      "model": "unknown",
+      "provider": "unknown"
+    }
+  ],
+  "phases": [
+    {
+      "slug": "pick",
+      "status": "completed",
+      "output_preview": "{\"text\": \"Pick a colour.\", \"answer\": \"Blue\", \"tool_call_id\": \"949791875346404e8be15bdd686b8e8d\"}"
+    },
+    {
+      "slug": "say",
+      "status": "completed",
+      "output_preview": "{\"text\": \"Blue\"}"
+    }
+  ],
+  "recorded_for_resume": {
+    "model": "gpt-5.6-luna",
+    "provider": "openai"
+  },
+  "verdict": "PASS"
+}

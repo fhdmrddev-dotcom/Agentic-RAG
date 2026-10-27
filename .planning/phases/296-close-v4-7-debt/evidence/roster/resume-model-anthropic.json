@@ -1,0 +1,54 @@
+{
+  "mode": "resume-model",
+  "provider": "anthropic",
+  "model": "claude-opus-5-5",
+  "owner_default": {
+    "provider": "deepseek",
+    "model": "deepseek-v4-flash"
+  },
+  "non_default": true,
+  "definition_id": "9dbe885a-7b78-4fe7-8b55-9f24d1296aba",
+  "thread_id": "f76a6f8e-8e3a-4ccf-b7e0-656c6686cd1f",
+  "send_http": 201,
+  "status_before_answer": "paused",
+  "answer_http": 200,
+  "answer_body": "{\"status\":\"ok\"}",
+  "workflow_run_after": {
+    "status": "completed",
+    "model": "claude-opus-5-5",
+    "metadata_provider": "anthropic"
+  },
+  "first_segment_runs": [
+    {
+      "run_id": "9bab6299-034b-4f93-add0-3fc20b087afb",
+      "status": "completed",
+      "model": "claude-opus-5-5",
+      "provider": "anthropic"
+    }
+  ],
+  "resumed_segment_runs": [
+    {
+      "run_id": "2b2ab7ea-51b2-4468-bda4-e073b14c74af",
+      "status": "completed",
+      "model": "unknown",
+      "provider": "unknown"
+    }
+  ],
+  "phases": [
+    {
+      "slug": "pick",
+      "status": "completed",
+      "output_preview": "{\"text\": \"Pick a colour.\", \"answer\": \"Blue\", \"tool_call_id\": \"13f73ea4eef54d25a390cdad2b9dcf5f\"}"
+    },
+    {
+      "slug": "say",
+      "status": "completed",
+      "output_preview": "{\"text\": \"The colour picked was blue.\"}"
+    }
+  ],
+  "recorded_for_resume": {
+    "model": "claude-opus-5-5",
+    "provider": "anthropic"
+  },
+  "verdict": "PASS"
+}

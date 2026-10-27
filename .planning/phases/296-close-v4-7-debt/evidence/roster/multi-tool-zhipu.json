@@ -2,14 +2,14 @@
   "mode": "multi-tool",
   "provider": "zhipu",
   "model": "glm-5.3-flash",
-  "thread_id": "06848956-9b86-42f8-998f-d2e66fa31a55",
-  "run_id": "dab602e3-ed86-4339-a0f9-582236e52346",
+  "thread_id": "624963bd-6a82-4a02-888a-6be26e6d9d86",
+  "run_id": "b56fd6a2-2649-450d-af08-2e6c6f764245",
   "status": "completed",
   "tools": [
     "search_documents",
     "execute_code"
   ],
   "markup_hits": [],
-  "final_preview": "The search for \"revenue\" found regional revenue figures in two data files \u2014 EMEA at 120 and APAC at 98 in both **sample.csv** [1] and **sample.xlsx** [2] \u2014 plus a document inventory (**rag_corpus_documents.csv**) whose financial-report entries carry \"revenue\" as a top keyword in titles like \"Revenue",
+  "final_preview": "The search found revenue figures in two data files \u2014 **sample.csv** and **sample.xlsx** \u2014 both showing a small regional revenue table with EMEA at 120 and APAC at 98 [1][2], plus a large document-inventory file (rag_corpus_documents.csv) that references many financial reports tagged with \"revenue\" k",
   "verdict": "PASS"
 }

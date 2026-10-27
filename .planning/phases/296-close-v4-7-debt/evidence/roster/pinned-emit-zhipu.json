@@ -4,23 +4,19 @@
   "model": "glm-5.3-flash",
   "pinned_model": "gpt-5.6-luna",
   "pinned_provider": "openai",
-  "definition_id": "29d80e47-cfeb-4b54-be51-0a8b06137ace",
-  "thread_id": "7093b099-da71-4b3c-b077-2d2d37073c69",
+  "definition_id": "3aa67e12-9fa2-402f-8d10-abd82750f426",
+  "thread_id": "03417538-f943-45b4-bc92-8b5387edd501",
   "send_http": 201,
-  "send": "{\"message_id\": \"ff1be5ef-ebe6-45ff-966c-5b82a4071cd3\", \"run_id\": \"22704a3c-cc72-4089-93fd-694fad7a6579\", \"model\": \"glm-5.3-flash\", \"provider\": \"zhipu\"}",
+  "send": "{\"message_id\": \"ff421d9a-52bc-4a73-9667-59bdd4009df6\", \"run_id\": \"e88380f0-c705-429d-87ea-4390d77f252c\", \"model\": \"glm-5.3-flash\", \"provider\": \"zhipu\"}",
   "workflow_run": {
-    "id": "c804e3f8-10ae-4829-96fe-fc2a8c0c013a",
-    "status": "failed"
+    "id": "48909509-7d0c-4028-a81f-97e9e130be05",
+    "status": "completed"
   },
-  "emit_validated_providers": [],
-  "emit_failed_on": [
-    "openai:gpt-5.6-luna"
+  "emit_validated_providers": [
+    "openai"
   ],
-  "failures": [
-    "{\"definition_version\": 1, \"definition_id\": null, \"phase_slug\": \"render_vendor_intake_sheet\", \"emitter\": \"render_template\", \"tier\": \"force_strict\", \"provider\": \"openai\", \"model\": \"gpt-5.6-luna\", \"forced\": false, \"thinking\": false, \"recovered_from_narration\": false, \"truncated\": false, \"attempt\": 1}",
-    "{\"definition_version\": 1, \"definition_id\": null, \"phase_slug\": \"render_vendor_intake_sheet\", \"emitter\": \"render_template\", \"tier\": \"force_strict\", \"provider\": \"openai\", \"model\": \"gpt-5.6-luna\", \"forced\": false, \"thinking\": false, \"recovered_from_narration\": false, \"truncated\": false, \"attempt\": 1}",
-    "{\"reason\": \"Step \\\"Fill vendor intake sheet\\\" failed after 2 attempts:\\n\\u2022 2 attempts \\u2014 the model wrote prose instead of filling the template. Check which model this step uses.\"}"
-  ],
+  "emit_failed_on": [],
+  "failures": [],
   "has_400": false,
-  "verdict": "FAIL"
+  "verdict": "PASS"
 }

@@ -1,0 +1,54 @@
+{
+  "mode": "resume-model",
+  "provider": "zhipu",
+  "model": "glm-5.3-flash",
+  "owner_default": {
+    "provider": "deepseek",
+    "model": "deepseek-v4-flash"
+  },
+  "non_default": true,
+  "definition_id": "15596f3f-eb0a-4baf-92db-34ed881a7df6",
+  "thread_id": "cae6bf56-a327-42e1-99d6-3465285137b6",
+  "send_http": 201,
+  "status_before_answer": "paused",
+  "answer_http": 200,
+  "answer_body": "{\"status\":\"ok\"}",
+  "workflow_run_after": {
+    "status": "completed",
+    "model": "glm-5.3-flash",
+    "metadata_provider": "zhipu"
+  },
+  "first_segment_runs": [
+    {
+      "run_id": "1ea25aa4-0777-4cd7-973b-3e93a865fa17",
+      "status": "completed",
+      "model": "glm-5.3-flash",
+      "provider": "zhipu"
+    }
+  ],
+  "resumed_segment_runs": [
+    {
+      "run_id": "03cf3d74-d1cc-4176-aea9-cb22390d6b2c",
+      "status": "completed",
+      "model": "unknown",
+      "provider": "unknown"
+    }
+  ],
+  "phases": [
+    {
+      "slug": "pick",
+      "status": "completed",
+      "output_preview": "{\"text\": \"Pick a colour.\", \"answer\": \"Blue\", \"tool_call_id\": \"338f243bec264e3a9e0eb87b32541051\"}"
+    },
+    {
+      "slug": "say",
+      "status": "completed",
+      "output_preview": "{\"text\": \"The colour picked was blue.\"}"
+    }
+  ],
+  "recorded_for_resume": {
+    "model": "glm-5.3-flash",
+    "provider": "zhipu"
+  },
+  "verdict": "PASS"
+}

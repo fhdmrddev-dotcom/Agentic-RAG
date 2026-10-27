@@ -7,8 +7,8 @@
     "model": "deepseek-v4-flash"
   },
   "non_default": true,
-  "definition_id": "67901f04-3c72-43b8-86c4-61339c656f7d",
-  "thread_id": "f88863d6-d5e3-41d5-a04c-930f0f885ba6",
+  "definition_id": "cb5ee454-9827-46d2-935c-e675861a92ef",
+  "thread_id": "e1a204a7-aae6-40d4-b9da-f081713d4e7a",
   "send_http": 201,
   "status_before_answer": "paused",
   "answer_http": 200,
@@ -16,11 +16,11 @@
   "workflow_run_after": {
     "status": "completed",
     "model": "gemini-3.8-flash",
-    "metadata_provider": null
+    "metadata_provider": "google"
   },
   "first_segment_runs": [
     {
-      "run_id": "54b9fb91-7ce2-4f94-8e5c-1273e86977a9",
+      "run_id": "26cc26dc-2fda-4ed3-a9de-562274488ba1",
       "status": "completed",
       "model": "gemini-3.8-flash",
       "provider": "google"
@@ -28,7 +28,7 @@
   ],
   "resumed_segment_runs": [
     {
-      "run_id": "99609d99-67cb-4522-b4fe-7b069f74e776",
+      "run_id": "e2a21391-5a99-49aa-ab71-7c65e3f74d7a",
       "status": "completed",
       "model": "unknown",
       "provider": "unknown"
@@ -38,7 +38,7 @@
     {
       "slug": "pick",
       "status": "completed",
-      "output_preview": "{\"text\": \"Pick a colour.\", \"answer\": \"Blue\", \"tool_call_id\": \"3156bd5dee094f649f7a36985e8d79c8\"}"
+      "output_preview": "{\"text\": \"Pick a colour.\", \"answer\": \"Blue\", \"tool_call_id\": \"cc4235489fce4a799ec1a94a73d8a4d6\"}"
     },
     {
       "slug": "say",
@@ -46,5 +46,9 @@
       "output_preview": "{\"text\": \"The colour picked was blue.\"}"
     }
   ],
-  "verdict": "FAIL"
+  "recorded_for_resume": {
+    "model": "gemini-3.8-flash",
+    "provider": "google"
+  },
+  "verdict": "PASS"
 }

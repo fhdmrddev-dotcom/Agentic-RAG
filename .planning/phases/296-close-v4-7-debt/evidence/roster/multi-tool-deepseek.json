@@ -2,14 +2,14 @@
   "mode": "multi-tool",
   "provider": "deepseek",
   "model": "deepseek-v4-pro",
-  "thread_id": "726026ea-e980-47b2-bd59-c22d7547095b",
-  "run_id": "2b159581-e57e-4bd1-b3c5-3bb4c1e1081d",
+  "thread_id": "f72062b9-db02-4689-8935-394bc86a0fb0",
+  "run_id": "03674dad-2ec6-4087-83c4-5f70844e13f2",
   "status": "completed",
   "tools": [
     "search_documents",
     "execute_code"
   ],
   "markup_hits": [],
-  "final_preview": "The revenue search found a table in **sample.xlsx** / **sample.csv** listing regional revenue figures (EMEA: 120, APAC: 98) [1][2], plus a document-inventory CSV that indexes many financial reports whose titles and keywords mention \"revenue\" [3]. The computation of 17 \u00d7 23 returned **391**.",
+  "final_preview": "The revenue search found a revenue table showing regional sales \u2014 EMEA at 120 and APAC at 98 [1][2] \u2014 plus a large corpus inventory listing many financial-report titles related to revenue and margin. The number is 391.",
   "verdict": "PASS"
 }
