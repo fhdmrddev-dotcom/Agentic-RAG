@@ -4418,6 +4418,8 @@ const BASELINE = {
   "useAppNavigation.test.tsx": 30, // 297-01 characterization (13), re-targeted to the URL by 297-02: refresh, push/replace, Back/Forward, same-address no-op, legacy + bare + pre-auth + unknown addresses, POP spends the hand-off (13 -> 30)
   // ── Phase 297-02 (LINK-01 / D-11, D-12, D-25) — adopted, both knobs, same commit (2026-10-27).
   "noRawHistoryWrites.test.ts": 3, // 297-02 (D-297-15 / D-33) — tree-wide: no raw History write in stripped product code; planted fixture caught; > 200 files swept
+  "AppViewSwitch.addressStates.test.tsx": 16, // 297-02 (D-14, D-19, D-34, D-35) — S1 words + Go to Chat, history column hidden, run hold vs fallback vs page, admin hold / S1 / console, one run comparison, fallback last
+  "navigationKeepsStreams.test.tsx": 3, // 297-02 (D-10 / D-07) — real App + OrgProvider + StreamsProvider: six navigations, one subscription, signal not aborted, probe mounted once; main.tsx one route, no provider key
   "appRoutes.test.ts": 111, // 297-02 — route table: 12-member round-trip, D-11 table, strict ids, legacy ?run= / ?connections=1 / /admin/spend, bare prefixes, pre-auth untouched, hostile inputs never throw or leave the origin
 }
 
@@ -6462,6 +6464,9 @@ const TARGETS = [
   "src/lib/__tests__/appRoutes.test.ts",
   // Phase 297-02 — FILE-LEVEL (no src/__tests__/routing directory entry), SAME commit as its pin.
   "src/__tests__/routing/noRawHistoryWrites.test.ts",
+  // Phase 297-02 — FILE-LEVEL, SAME commit as their pins.
+  "src/__tests__/routing/navigationKeepsStreams.test.tsx",
+  "src/components/layout/__tests__/AppViewSwitch.addressStates.test.tsx",
 ]
 
 const REPO_ROOT = path.resolve(__dirname, "..")
