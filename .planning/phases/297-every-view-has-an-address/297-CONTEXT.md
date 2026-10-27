@@ -62,6 +62,8 @@ Requirements: REG-09, LINK-01, LINK-07, LINK-08.
   `react-router-dom` (removed in v8).
 - **D-06:** Vercel's project Node version is checked (read-only) during research. If it is below 22,
   that is an operator setting change recorded on the deploy parity checklist — never a silent change.
+  **RESOLVED 2026-10-27 at plan-phase:** the Vercel project `agentic-rag` reads `nodeVersion: "24.x"`
+  (Vercel MCP `get_project`, read-only) — above the 22.22 floor, no operator action needed.
 
 ### Tree shape — streams survive navigation
 - **D-07:** `RouterProvider` mounts in `main.tsx` above `<App/>` (inside `ThemeProvider`), with ONE
@@ -171,6 +173,40 @@ Requirements: REG-09, LINK-01, LINK-07, LINK-08.
   React/Node bumps, `appRoutes.ts`, hook derives from URL, legacy aliases, `?run=` retirement,
   `/app/runs/:id`, unknown-path state, reachability route leg [wave 2]; (3) leave guard [wave 3];
   (4) parity suite [wave 3, parallel with 3]. Targeted suites per task, full gates once per wave.
+
+### Amendments from research (2026-10-27, `--auto`, recommended option each time)
+- **D-30:** The Workflow Builder is the ONLY leave-guard tenant in 297. `SettingsPage.tsx` has no
+  readable dirty value (`:851` confirms unconditionally), so Settings is deferred under D-23. SC#4's
+  "or another editor" is met by the registry accepting further tenants; none exists yet.
+- **D-31:** Wiring (A): the registry reuses the Builder's existing prompting `canLeave()` check
+  (`window.confirm(UNSAVED_LEAVE_PROMPT)` inside it), so `WorkflowBuilderPage.tsx` stays untouched.
+  The blocker calls the guard; true → `proceed()`, false → `reset()`.
+- **D-32:** A one-shot "already confirmed" latch: an in-page caller that has already run the guard
+  (`WorkflowsPage.tsx:944`, `:991`) sets it before it navigates, so the app-level blocker does not ask
+  a second time. Test Run never prompts after a run has started: it keeps today's behaviour and the
+  latch covers its route change.
+- **D-33:** Every raw History write outside `useAppNavigation` is removed when the router mounts
+  (`App.tsx:169`, `RunEvidenceReport.tsx:443-444`, `ChatLayout.tsx:315`), because they erase React
+  Router's per-entry index and make Back-blocking fail silently. A tree-wide fence pins it (only
+  `useAppNavigation` / the router, and the separate `docs/` app, may touch `history`).
+- **D-34:** The cold `/app/runs/<id>` wait for `featuresLoading === false` lives INSIDE
+  `AppViewSwitch`, never in App's boot splash: `refetch()` flips loading back to true, and holding at
+  App level would unmount `StreamsProvider` on every 403 re-sync.
+- **D-35:** `/app/admin` and `/app/admin/spend` typed by a non-operator show the D-14 not-found state
+  once the operator probe resolves (holding state until then). Never the console, never chat.
+- **D-36:** Unknown paths — under `/app/` or bare, with no known prefix — show the D-14 not-found
+  state. Only bare `/` is chat.
+- **D-37:** D-20 resolves to DELETE: the `#chat` hash write goes, and the "Try in Chat" item's
+  missing behaviour (it does nothing today) is filed as a seed, not built here.
+- **D-38:** `ActiveView` stays exported from `App.tsx` on ONE line (the docs-coverage gate regex at
+  `scripts/lib/docs-content.cjs:701`, the `renameFence` needle and 7 `@/App` importers depend on it).
+- **D-39:** Before `npm install react-router@8.5.0`, an automated provenance check
+  (`npm view react-router@8.5.0 repository.url maintainers dist.integrity`, expect `remix-run`) stands
+  in for the slopcheck the researcher could not run. The install runs once, serialized — worktree
+  `node_modules` is a junction to the operator's real tree.
+- **D-40:** The IA skill's "wired with NO router" line is amended (corrected beside the original,
+  never deleted) in the router plan.
+- **D-41:** The parity suite reuses the Vercel evaluator already in `docsVercelRouting.test.ts`.
 
 ### Claude's Discretion
 - No `ScrollRestoration`: views scroll inside fixed layout containers, so window scroll restoration
