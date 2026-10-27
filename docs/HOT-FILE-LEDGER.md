@@ -11838,7 +11838,7 @@ cells rot within days.
 | [`backend/app/services/circuit_breaker.py`](docs/HOT-FILE-LEDGER.md#backendappservicescircuit_breakerpy) | 1 / 1 / 331 | no (1 phase) | ⚠ absent its ENTIRE LIFE — row added 256-02 at 256-01's touch, BELOW threshold. ⛔ the `max(0,…)` clamp stays on the RETURNED delta, or a reset box hands the DB a negative and SUBTRACTS real spend |
 | [`backend/app/services/task_service.py`](docs/HOT-FILE-LEDGER.md#backendappservicestask_servicepy) | 28 / 15 / 1038 (was `27 / 14 / 1023`) | **FIRES** | **292.1-REVIEW WR-02**: `_stream_one_iteration` runs the provider-blind `strip_markup` after the structured post-parse; never parses or runs text calls. +15 L |
 | [`backend/app/services/sub_agent_models.py`](docs/HOT-FILE-LEDGER.md#backendappservicessub_agent_modelspy) | 5 / 3 / 263 (was absent) | ⚠ **FIRES** | ⚠ absent its ENTIRE LIFE — row added 296-06 (D-26). NOT touched by 296-06: the pinned-model swap is measured and told in phase_types. ⛔ resolve-never-mutate |
-| [`backend/app/services/run_reconciler.py`](docs/HOT-FILE-LEDGER.md#backendappservicesrun_reconcilerpy) | 6 / 4 / 415 (was `5 / 3 / 406`) | ⚠ **FIRES** | 296-02 (295-IN-02): the ended-steps query gains ONE boolean (all_completed: every step completed/recorded_not_sent) and the run then ends completed; cancelled/failed otherwise as before |
+| [`backend/app/services/run_reconciler.py`](docs/HOT-FILE-LEDGER.md#backendappservicesrun_reconcilerpy) | 7 / 4 / 419 (was `6 / 4 / 415`) | ⚠ **FIRES** | 296 review BE-WR-04: all_completed counts `skipped` as finished and needs one completed/recorded step; failed/cancelled still unfinished. Same one column |
 | [`backend/app/services/forced_emit.py`](docs/HOT-FILE-LEDGER.md#backendappservicesforced_emitpy) | 15 / 9 / 749 (was `13 / 8 / 724`) | ⚠ **FIRES** | 296 fast-fix (293-F-4): the cross-provider settings copy also sets `active_provider` to the target (one dict key). Honoured by construction |
 | [`backend/app/services/pricing_service.py`](docs/HOT-FILE-LEDGER.md#backendappservicespricing_servicepy) | 4 / 2 / 156 (was `2 / 1 / 103`) | no (2 phases) | 294-01: + compute_token_cost_usd_unquantized (a ~$0.00002 engine call quantised to 0.0000). ⛔ the single token × rate home (test_257) |
 | [`backend/app/db/rates.py`](docs/HOT-FILE-LEDGER.md#backendappdbratespy) | 9 / 2 / 898 (was `2 / 1 / 507`) | no (2 phases) | **268-02**: ONE `per_root` CTE feeds every spend query; root-only predicate appears ONCE. ⛔ never register a rate for model `unknown` (shell USD would double-count) |
@@ -22781,6 +22781,14 @@ CLAUDE.md verdict cell as of 2026-10-18 (replaced by 286-05):
 Scan-list cell before this 296-02 touch (moved verbatim): | [`backend/app/services/harness_engine.py`](docs/HOT-FILE-LEDGER.md#backendappservicesharness_enginepy) | 68 / 26 / 2961 (was `67 / 26 / 2957`) | ⚠ **FIRES** | 295-09 WR-07: the pause arm skips its `pause_run` when the engine ask already wrote it (ONE guarded line, If 86→87), so a re-driven run is never flipped back. Armed-block seam still OWED |
 
 CLAUDE.md FIRING cell before this 296-02 touch (moved verbatim): | `backend/app/services/harness_engine.py` | 68 / 26 / 2961 (was `67 / 26 / 2957`) | 295-09 WR-07: one pause write per engine ask · armed seam OWED · ⛔ |
+
+### `backend/app/services/run_reconciler.py` — 296 review BE-WR-04 (2026-10-27)
+
+**`7 / 4 / 419` (was `6 / 4 / 415`).** 296 review BE-WR-04: the `all_completed` column counted only `completed` / `recorded_not_sent`, so a branched run (one step `skipped` by a `skip_to_phase` route, which the engine treats as done) whose worker died before `finish_run` still ended `failed` with a `run_failed` audit. The column now treats `skipped` as finished and also requires at least one `completed` / `recorded_not_sent` step, so an all-skipped run is not called completed. `failed` and `cancelled` stay unfinished. Same one column, no new Python branch. RED `d651790d2` (`tests/unit/test_296_review_reconciler_skipped.py` cuts the real expression out of the sent SQL and evaluates it in sqlite).
+
+Scan-list cell before this touch (moved verbatim): | [`backend/app/services/run_reconciler.py`](docs/HOT-FILE-LEDGER.md#backendappservicesrun_reconcilerpy) | 6 / 4 / 415 (was `5 / 3 / 406`) | ⚠ **FIRES** | 296-02 (295-IN-02): the ended-steps query gains ONE boolean (all_completed: every step completed/recorded_not_sent) and the run then ends completed; cancelled/failed otherwise as before |
+
+CLAUDE.md FIRING cell before this touch (moved verbatim): | `backend/app/services/run_reconciler.py` | 6 / 4 / 415 (was `5 / 3 / 406`) | 296-02: all steps completed → completed (one column, one condition) |
 
 ### `backend/app/api/folders.py` — 296 review BE-WR-06 (2026-10-27)
 
