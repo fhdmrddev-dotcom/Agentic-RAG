@@ -5,7 +5,7 @@ milestone_name: Every Page Has a Link
 status: planning
 last_updated: "2026-10-27T18:00:00.000Z"
 progress:
-  total_phases: 0
+  total_phases: 6
   completed_phases: 0
   total_plans: 0
   completed_plans: 0
@@ -29,7 +29,7 @@ See: `.planning/PROJECT.md` (updated 2026-10-27)
 
 **Core value:** The agent acts as an AI colleague — it knows your knowledge base, can run code, and
 can be taught new behaviours (skills) that persist and can be shared.
-**Current focus:** v4.8 Every Page Has a Link — defining requirements (started 2026-10-27).
+**Current focus:** v4.8 Every Page Has a Link — roadmap created (phases 297-302); next is discuss Phase 297.
 
 ---
 
@@ -42,9 +42,9 @@ reviewer exists, so a phase closes `verification_mode: self-verified`, never `re
 
 ## Current Position
 
-Phase: Not started (defining requirements)
+Phase: 297 (not started)
 Plan: —
-Status: Defining requirements
+Status: Roadmap created — ready to discuss Phase 297
 Last activity: 2026-10-27 — Milestone v4.8 Every Page Has a Link started (phases from 297, migrations from 217)
 
 Scope set at intake: per-view URLs (SEED-185/015/178), run-waiting notifications in-app + email

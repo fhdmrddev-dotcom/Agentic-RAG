@@ -89,3 +89,31 @@ Decided at intake (operator, 2026-10-27):
 
 | Requirement | Phase | Status |
 |-------------|-------|--------|
+| LINK-01 | Phase 297 | Pending |
+| LINK-02 | Phase 299 | Pending |
+| LINK-03 | Phase 299 | Pending |
+| LINK-04 | Phase 299 | Pending |
+| LINK-05 | Phase 299 | Pending |
+| LINK-06 | Phase 299 | Pending |
+| LINK-07 | Phase 297 | Pending |
+| LINK-08 | Phase 297 | Pending |
+| ORG-01 | Phase 298 | Pending |
+| ORG-02 | Phase 298 | Pending |
+| ORG-03 | Phase 298 | Pending |
+| ORG-04 | Phase 298 | Pending |
+| ORG-05 | Phase 298 | Pending |
+| ORG-06 | Phase 298 | Pending |
+| NOTE-01 | Phase 301 | Pending |
+| NOTE-02 | Phase 300 | Pending |
+| NOTE-03 | Phase 300 | Pending |
+| NOTE-04 | Phase 300 | Pending |
+| NOTE-05 | Phase 301 | Pending |
+| NOTE-06 | Phase 300 | Pending |
+| FIX-01 | Phase 302 | Pending |
+| FIX-02 | Phase 299 | Pending |
+| FIX-03 | Phase 302 | Pending |
+| FIX-04 | Phase 300 | Pending |
+| FIX-05 | Phase 300 | Pending |
+| FIX-06 | Phase 302 | Pending |
+| REG-08 | Phase 302 | Pending |
+| REG-09 | Phase 297 | Pending |
