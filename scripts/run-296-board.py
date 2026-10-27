@@ -639,6 +639,7 @@ def main() -> int:
         return table()
     kit.load_env()
     kit.assert_localhost_only()
+    kit.assert_local_base_url()  # 296 review BE-WR-05: the API host the writes go to
     b273._assert_local_db()
     conn = kit.connect_db()
     conn.autocommit = True

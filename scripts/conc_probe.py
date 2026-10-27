@@ -52,7 +52,6 @@ from __future__ import annotations
 
 import argparse
 import os
-import re
 import sys
 import threading
 import time
@@ -112,7 +111,20 @@ DEFAULT_RUN_TIMEOUT_S = 900        # fan-out wall-clock bound (override: CONC_RU
 # workflow_runs_status_check CHECK constraint).
 _TERMINAL_WORKFLOW_STATES = frozenset({"completed", "failed", "cancelled"})
 
-LOCALHOST_RE = re.compile(r"(localhost|127\.0\.0\.1)")
+# 296 review BE-WR-05: the PARSED host must be exactly one of these. A substring search for
+# ``localhost|127.0.0.1`` passed ``https://<prod>.supabase.co/?x=localhost``.
+_LOCAL_HOSTS = frozenset({"localhost", "127.0.0.1", "::1"})
+
+
+def is_local_url(url: str) -> bool:
+    """True only when ``url``'s parsed hostname is localhost / 127.0.0.1 / ::1."""
+    from urllib.parse import urlparse  # noqa: PLC0415
+
+    try:
+        host = urlparse(url).hostname
+    except ValueError:
+        return False
+    return host in _LOCAL_HOSTS
 
 # ─────────────────────────────────────────────────────────────────────────────
 # Allowlisted constant SQL (T-096-07-04): FULL constant query strings — nothing is
@@ -194,10 +206,10 @@ def assert_localhost_only() -> None:
     messages/workflow_runs against production data. Fail closed (T-096-07-01).
     """
     url = os.getenv("SUPABASE_URL", "")
-    if not LOCALHOST_RE.search(url):
+    if not is_local_url(url):
         shown = (url[:40] + "...") if url else "(unset)"
         print(
-            "REFUSING TO RUN: SUPABASE_URL must contain 'localhost' or '127.0.0.1'.\n"
+            "REFUSING TO RUN: SUPABASE_URL's host must be localhost, 127.0.0.1 or ::1.\n"
             f"  Got: {shown}\n"
             "  This guard prevents the concurrency probe from driving a live N=10 "
             "fan-out (which WRITES messages/workflow_runs/runs) against a "
@@ -240,6 +252,20 @@ def _requests():
 
 def base_url() -> str:
     return os.getenv("EVAL_BASE_URL", DEFAULT_BASE_URL).rstrip("/")
+
+
+def assert_local_base_url() -> None:
+    """Refuse to run unless ``base_url()``'s parsed host is localhost / 127.0.0.1 / ::1.
+
+    296 review BE-WR-05: a write mode POSTs threads, definitions and live provider runs to
+    ``EVAL_BASE_URL``, carrying a token minted for the LOCAL test user. Fail closed.
+    """
+    if not is_local_url(base_url()):
+        print(
+            "REFUSING TO RUN: EVAL_BASE_URL's host must be localhost, 127.0.0.1 or ::1.\n"
+            "  This guard keeps the board's writes off a staging or production backend."
+        )
+        sys.exit(1)
 
 
 def get_bearer_token() -> str:
