@@ -4,12 +4,12 @@ title: Every follow-up turn re-shows all files the agent ever made, and intermed
 reported: 2026-10-24
 surface: Agentic-RAG
 severity: major
-status: folded
+status: closed
 affected_areas: [frontend/output-files, backend/agent-loop, workspace-panel]
 folded_into: "296"
-verified_closed_by: null
+verified_closed_by: "296"
 related_seeds: [SEED-054, SEED-148]
-re_open_trigger: "CLOSE when 296-HUMAN-UAT G-4 scenario 8 reads PASS with evidence (set status closed, verified_closed_by \"296\", re_open_trigger null). A FAIL routes back to its owning 296 plan under G-7."
+re_open_trigger: null
 fixed_by_commit: "DEFECT half: 296-06 RED 847a00dcc, GREEN 0ad717a67 (lead 2 reproduced: the baseline re-seed never overwrites a hash this run recorded, tools/sandbox.py). Lead 1 DID NOT REPRODUCE (backend/tests/unit/test_296_chat_and_wire.py, green at base) and lead 3 DID NOT REPRODUCE (frontend/src/__tests__/providers/streamsProvider_296_followup_files.test.tsx, green at base). The INTERMEDIATES half (chart PNGs beside the document) is SEED-383 (D-10)"
 reproduces_on:
   branch: production
@@ -45,3 +45,7 @@ The person cannot tell which file is the answer. It's confusing, and it hides th
 - How a deliverable is identified: requested extension, last file written, or a model-declared hero, and with what fallback.
 - Whether the fix lives in the agent loop (stamping), in the output-files render, or both.
 - Measure first: reproduce with a "PDF with 3 charts" prompt and read which files each turn emits.
+
+## Closed 2026-10-27 (296)
+
+Verified closed by G-4 scenario 8 in `.planning/phases/296-close-v4-7-debt/296-HUMAN-UAT.md` (PASS with evidence under `evidence/g4/`). Status was `folded`.

@@ -4,12 +4,12 @@ title: In the tab that followed a run to its end after an answer, the run's fina
 reported: 2026-10-21
 surface: Agentic-RAG
 severity: major
-status: folded
+status: closed
 affected_areas: [frontend/streaming, frontend/chat, workflow/runs]
 folded_into: "296"
-verified_closed_by: null
+verified_closed_by: "296"
 related_seeds: [SEED-367]
-re_open_trigger: "CLOSE when 296-HUMAN-UAT G-4 scenario 3 reads PASS with evidence (set status closed, verified_closed_by \"296\", re_open_trigger null). A FAIL routes back to its owning 296 plan under G-7."
+re_open_trigger: null
 fixed_by_commit: "296-04: RED e93dbecbb, GREEN fd59d0f19 (one guarded actions.reconcile(threadId) in subscribeProducerStream's onTerminal)"
 reproduces_on:
   branch: develop
@@ -51,3 +51,7 @@ Agentic-RAG.
 ## Workarounds (prompt-side, code-side, or UI-side)
 
 Switch to another thread and back, or open the run page.
+
+## Closed 2026-10-27 (296)
+
+Verified closed by G-4 scenario 3 (after the re-drive sentinel fix) in `.planning/phases/296-close-v4-7-debt/296-HUMAN-UAT.md` (PASS with evidence under `evidence/g4/`). Status was `folded`.

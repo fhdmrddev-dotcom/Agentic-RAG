@@ -4,12 +4,12 @@ title: The schedules window's Run now starts the run but shows no visible feedba
 reported: 2026-10-25
 surface: Agentic-RAG
 severity: minor
-status: folded
+status: closed
 affected_areas: [frontend/workflows, schedules]
 folded_into: "296"
-verified_closed_by: null
+verified_closed_by: "296"
 related_seeds: []
-re_open_trigger: "CLOSE when 296-HUMAN-UAT G-4 scenario 5 reads PASS with evidence (set status closed, verified_closed_by \"296\", re_open_trigger null). A FAIL routes back to its owning 296 plan under G-7."
+re_open_trigger: null
 fixed_by_commit: "296-04: RED c563f4ad0, GREEN 9c6b3403c (row-local spinner + result line); 296-02 3a6d7aae8 (ScheduleTriggerResult.outcome)"
 reproduces_on:
   branch: develop
@@ -56,3 +56,7 @@ Open the workflow's run log after pressing Run now.
 ## Reference / evidence links
 
 - `.planning/phases/293-start-from-outside-and-close-out/293-VALIDATION.md` §3 (G4-4) and §"Logged bugs"
+
+## Closed 2026-10-27 (296)
+
+Verified closed by G-4 scenario 5 in `.planning/phases/296-close-v4-7-debt/296-HUMAN-UAT.md` (PASS with evidence under `evidence/g4/`). Status was `folded`.

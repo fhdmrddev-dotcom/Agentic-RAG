@@ -4,12 +4,12 @@ title: An escalated step is sealed 'Must prove it' in the builder and on the can
 reported: 2026-10-21
 surface: Agentic-RAG
 severity: major
-status: folded
+status: closed
 affected_areas: [frontend/workflow-builder, frontend/workflow-canvas, backend/harness-grounding]
 folded_into: "296"
-verified_closed_by: null
+verified_closed_by: "296"
 related_seeds: []
-re_open_trigger: "CLOSE when 296-HUMAN-UAT optional row 9 (the escalated-step seal) reads PASS with evidence (set status closed, verified_closed_by \"296\", re_open_trigger null). A FAIL routes back to its owning 296 plan under G-7."
+re_open_trigger: null
 fixed_by_commit: "296-07: RED e074515f5, GREEN ef2832f46 (D-04 amended option b: the seal, gate row and attached-gate line no longer claim a check for escalated; the step says nothing is checked). The engine half (a real search tool) is SEED-384"
 reproduces_on:
   branch: develop
@@ -79,3 +79,7 @@ If a step must be held to citations, give it a knowledge-base tool (`search_docu
 - `.planning/phases/290-the-card-and-the-team-picture/290-RESEARCH.md`: F-2 and Open Question 2
 - `.planning/phases/290-the-card-and-the-team-picture/290-CONTEXT.md`: D-18 and D-20
 - Phase 185 graded governance: D-185-01/04/05/08/19
+
+## Closed 2026-10-27 (296)
+
+Verified closed by G-4 optional row 9 in `.planning/phases/296-close-v4-7-debt/296-HUMAN-UAT.md` (PASS with evidence under `evidence/g4/`). Status was `folded`.

@@ -4,12 +4,12 @@ title: A run waiting on a person shows several EXPIRED ask cards while its heade
 reported: 2026-10-25
 surface: Agentic-RAG
 severity: major
-status: folded
+status: closed
 affected_areas: [backend/harness, frontend/panel, human-input]
 folded_into: "296"
-verified_closed_by: null
+verified_closed_by: "296"
 related_seeds: []
-re_open_trigger: "CLOSE when 296-HUMAN-UAT G-4 scenario 4 reads PASS with evidence (set status closed, verified_closed_by \"296\", re_open_trigger null). A FAIL routes back to its owning 296 plan under G-7."
+re_open_trigger: null
 fixed_by_commit: "296-02 backend: RED 0d3d4d8d0, GREEN bf8a4467b (a boot pauses a waiting run, never re-asks); 296-04 UI: RED e93dbecbb, GREEN fd59d0f19 (one ask per live workflow run; a passed clock on a live run reads paused)"
 reproduces_on:
   branch: develop
@@ -59,3 +59,7 @@ Answer within the timeout, or press Stop on the run page.
 
 - `.planning/phases/293-start-from-outside-and-close-out/293-VALIDATION.md` §"Logged bugs"
 - `.planning/phases/293-start-from-outside-and-close-out/evidence/ui/ui-keyRunWaiting.png`
+
+## Closed 2026-10-27 (296)
+
+Verified closed by G-4 scenario 4 in `.planning/phases/296-close-v4-7-debt/296-HUMAN-UAT.md` (PASS with evidence under `evidence/g4/`). Status was `folded`.

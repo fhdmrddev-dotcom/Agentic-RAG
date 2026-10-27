@@ -4,12 +4,12 @@ title: A draft the describe door generates is lost if the author leaves without 
 reported: 2026-10-24
 surface: Agentic-RAG
 severity: minor
-status: folded
+status: closed
 affected_areas: [frontend/workflow-builder, workflows/drafts]
 folded_into: "296"
-verified_closed_by: null
+verified_closed_by: "296"
 related_seeds: []
-re_open_trigger: "CLOSE when 296-HUMAN-UAT optional row 10 (a generated draft survives leaving untouched) reads PASS with evidence (set status closed, verified_closed_by \"296\", re_open_trigger null). A FAIL routes back to its owning 296 plan under G-7."
+re_open_trigger: null
 fixed_by_commit: "296-07: RED 2548b6212, GREEN 02b5053ac (onDrafted calls persistence.saveNow(); mockCreate 0 -> 1)"
 reproduces_on:
   branch: develop
@@ -39,3 +39,7 @@ The author paid a model call and waited for a draft; leaving loses it silently. 
 ## Likely fix
 
 Persist the draft when generation succeeds (or on dismiss), or warn on navigate-away while an unsaved generated draft is open.
+
+## Closed 2026-10-27 (296)
+
+Verified closed by G-4 optional row 10 in `.planning/phases/296-close-v4-7-debt/296-HUMAN-UAT.md` (PASS with evidence under `evidence/g4/`). Status was `folded`.
