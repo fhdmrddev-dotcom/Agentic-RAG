@@ -459,6 +459,30 @@ describe("RunModal 214-09 — declared inputs become real fields (STEP-02 / D-21
     expect(onLaunch).not.toHaveBeenCalled()
   })
 
+  // 296 G-4 row 11: with many fields the refusal sits far down the scroller, so a refused Run
+  // looked like nothing happened. The refusal is scrolled into view on each refused press.
+  it("a refused Run scrolls the refusal into view (block: nearest), again on a repeat press", async () => {
+    const original = Element.prototype.scrollIntoView
+    const scrolled: Array<[Element, unknown[]]> = []
+    Element.prototype.scrollIntoView = function (this: Element, ...args: unknown[]) {
+      scrolled.push([this, args])
+    } as typeof Element.prototype.scrollIntoView
+    try {
+      mockListPublished.mockResolvedValue([declaredInputsPublished])
+      const { modal, onLaunch } = await openModal(folders)
+      fireEvent.click(within(modal).getByTestId("run-confirm"))
+      const refusal = await within(modal).findByTestId("run-required-refusal")
+      await waitFor(() => expect(scrolled.some(([el]) => el === refusal)).toBe(true))
+      expect(scrolled.find(([el]) => el === refusal)?.[1]).toEqual([{ block: "nearest" }])
+      const before = scrolled.filter(([el]) => el === refusal).length
+      fireEvent.click(within(modal).getByTestId("run-confirm"))
+      await waitFor(() => expect(scrolled.filter(([el]) => el === refusal).length).toBeGreaterThan(before))
+      expect(onLaunch).not.toHaveBeenCalled()
+    } finally {
+      Element.prototype.scrollIntoView = original
+    }
+  })
+
   // 296-04 (287-IN-01): the refusal sits directly under the fields it names, and the next
   // change in any field clears it.
   it("the refusal renders directly under the input fields and clears on the next change", async () => {

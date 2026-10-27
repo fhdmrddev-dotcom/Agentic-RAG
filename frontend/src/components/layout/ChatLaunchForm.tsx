@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react"
+import { useEffect, useRef, useState } from "react"
 import { X } from "lucide-react"
 import { LaunchInputFields } from "@/components/workflows/LaunchInputFields"
 import {
@@ -78,6 +78,13 @@ export function ChatLaunchForm({
    */
   const [values, setValues] = useState<Record<string, string>>(() => ({ ...(initialValues ?? {}) }))
   const [refusal, setRefusal] = useState<string | null>(null)
+  // 296 G-4 row 11: under 13 fields the refusal sat ~2,000 px down the scroller, so a refused
+  // Run looked like nothing happened. It is brought into view when it appears (the effect) and
+  // on a repeat press with the same words (which renders nothing new, so `submit` scrolls).
+  const refusalRef = useRef<HTMLParagraphElement>(null)
+  useEffect(() => {
+    if (refusal) refusalRef.current?.scrollIntoView?.({ block: "nearest" })
+  }, [refusal])
 
   // Escape dismisses, exactly as the library modal's does — the two doors behave the same way.
   useEffect(() => {
@@ -101,6 +108,7 @@ export function ChatLaunchForm({
     const missing = missingRequiredFields(fields, values)
     if (missing.length > 0) {
       setRefusal(requiredFieldsMessage(missing))
+      refusalRef.current?.scrollIntoView?.({ block: "nearest" })
       return
     }
     setRefusal(null)
@@ -153,7 +161,7 @@ export function ChatLaunchForm({
             }}
           />
           {refusal && (
-            <p data-testid="chat-launch-required-refusal" role="alert" className="text-[12px] text-destructive">
+            <p ref={refusalRef} data-testid="chat-launch-required-refusal" role="alert" className="text-[12px] text-destructive">
               {refusal}
             </p>
           )}

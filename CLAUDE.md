@@ -439,12 +439,12 @@ node scripts/check-hot-file-ledger.cjs <phase-dir>   # 0 clear · 1 missing rows
 | `backend/app/services/run_evidence.py` | 6 / 4 / 555 | ⚠ FIRES, absent here — row added 296-01 · D-05 withheld cascade · ⛔ |
 | `frontend/src/lib/api/runEvidence.ts` | 3 / 3 / 137 | ⚠ now FIRES (293) — row added 293-03 · one optional field |
 | `frontend/src/components/workflows/evidenceView.ts` | 4 / 3 / 387 | ⚠ now FIRES (293) — row added 293-03 · origin passed through |
-| `frontend/src/components/workflows/RunEvidenceReport.tsx` | 5 / 4 / 494 (was `4 / 3 / 472`) | 296-04: wraps, markdown output, watched-failure alert · ⚠ FIRES |
+| `frontend/src/components/workflows/RunEvidenceReport.tsx` | 6 / 4 / 495 (was `5 / 4 / 494`) | 296 review FE-WR-02: output renders with noRemoteMedia · ⚠ FIRES |
 | `frontend/src/components/workflows/evidenceVocabulary.ts` | 5 / 3 / 261 | ⚠ now FIRES (296) · 296-04: neutral NO_MATCH/UNSOURCED + DOWNLOAD_UNAVAILABLE |
 | `backend/app/models/thread.py` | 25 / 17 / 550 (was `24 / 16 / 545`) | 293-03: ONE field (origin) |
 | `frontend/src/components/workflows/canvasModel.ts` | 16 / 8 / 836 (was `15 / 8 / 831`) | 296-07: comparePhaseOrder, engineArmed; isGrounded drops escalated |
 | `frontend/src/components/layout/ChatLayout.tsx` | 64 / 33 / 1158 (was `63 / 32 / 1147`) | 293-04: onOpenApiKeys (pre-pick + tab 7) + SettingsPage onOpenRun |
-| `frontend/src/components/layout/ChatLaunchForm.tsx` | 5 / 4 / 183 (was `4 / 4 / 179`) | 296-04: refusal clears on change; optional initialValues (Retry) |
+| `frontend/src/components/layout/ChatLaunchForm.tsx` | 6 / 4 / 191 (was `5 / 4 / 183`) | 296 G-4 row 11: refused Run scrolls the refusal into view |
 | `frontend/src/components/workflows/LaunchInputFields.tsx` | 3 / 3 / 145 | 287-01: leaf stays non-blocking; docblock only · 214.1-01 trigger TAKEN |
 | `frontend/src/components/layout/ChatHistoryColumn.tsx` | 7 / 2 / 513 | ⚠ absent its ENTIRE LIFE — row added 244-01 |
 | `frontend/src/hooks/useThreads.ts` | 5 / 3 / 65 | ⚠ now FIRES · last touch 267-04 · ⛔ |
@@ -462,7 +462,7 @@ node scripts/check-hot-file-ledger.cjs <phase-dir>   # 0 clear · 1 missing rows
 | `backend/app/services/run_producer.py` | 26 / 14 / 1220 (was `25 / 13 / 1212`) | 296-02: F2 cancelled escape records the stopper (one read, one call) |
 | `backend/app/services/task_service.py` | 28 / 15 / 1038 (was `27 / 14 / 1023`) | 292.1-REVIEW WR-02: provider-blind strip_markup on phase output (+15) |
 | `backend/app/services/sub_agent_models.py` | 5 / 3 / 263 (was absent) | ⚠ absent its ENTIRE LIFE — row added 296-06; not touched |
-| `backend/app/services/run_reconciler.py` | 6 / 4 / 415 (was `5 / 3 / 406`) | 296-02: all steps completed → completed (one column, one condition) |
+| `backend/app/services/run_reconciler.py` | 7 / 4 / 419 (was `6 / 4 / 415`) | 296 review BE-WR-04: skipped counts as finished (one column) |
 | `backend/app/services/circuit_breaker.py` | 1 / 1 / 331 | ⚠ absent its ENTIRE LIFE — row added 256-02 · ⛔ |
 | `backend/app/api/runs.py` | 54 / 23 / 2050 (was `53 / 23 / 2033`) | 296 G-4 S3: re-drive shell ends its stream (sentinel + EXPIRE) · ⛔ |
 | `backend/app/api/panel.py` | 6 / 5 / 285 | 295-03: ONE engine_pause key on /pending · honoured by construction |
@@ -501,7 +501,7 @@ node scripts/check-hot-file-ledger.cjs <phase-dir>   # 0 clear · 1 missing rows
 | `backend/app/services/scheduler_service.py` | 12 / 7 / 314 (was `11 / 6 / 308`) | 296-06: scheduled kickoff via launch_kickoff (S6-F8), else byte-identical |
 | `backend/app/api/schedules.py` | 4 / 4 / 299 | ⚠ FIRES, absent here — row added 296-02 · worded Run now (outcome) |
 | `backend/app/models/schedule.py` | 3 / 3 / 231 | ⚠ FIRES, absent here — row added 296-02 · one additive field (outcome) |
-| `frontend/src/components/panel/PhaseCard.tsx` | 21 / 14 / 817 (was `20 / 13 / 811`) | 296-04: ONE prop (runPaused) → Waiting reading |
+| `frontend/src/components/panel/PhaseCard.tsx` | 22 / 14 / 821 (was `21 / 14 / 817`) | 296 review FE-WR-01: paused step drops running instruments |
 | `frontend/src/components/panel/PhaseTimeline.tsx` | 11 / 9 / 408 (was `10 / 8 / 404`) | 296-04: derives runPaused from its frame, passes it |
 | `frontend/src/components/panel/phaseStatusMeta.ts` | 5 / 5 / 308 (was `4 / 4 / 291`) | 296-04: derived Waiting row (not a wire status) |
 | `backend/app/services/harness/validator_kinds.py` | 19 / 9 / 918 (was `18 / 8 / 899`) | 296-02: design note only when recording was by design (D-07) |
@@ -514,7 +514,7 @@ node scripts/check-hot-file-ledger.cjs <phase-dir>   # 0 clear · 1 missing rows
 | `frontend/src/components/workflows/PhaseSpineGraph.tsx` | 8 / 6 / 723 (was `5 / 5 / 473`) | 290: forecast unused — chips went on the library card, not here |
 | `frontend/src/components/workflows/doorVocabulary.ts` | 6 / 4 / 540 | no seam proposed |
 | `frontend/src/components/workflows/StepTypePicker.tsx` | 7 / 3 / 522 | honoured by construction (199) |
-| `frontend/src/components/workflows/library/RunModal.tsx` | 12 / 8 / 740 (was `9 / 6 / 732`) | 296-04: refusal under the fields, clears on change |
+| `frontend/src/components/workflows/library/RunModal.tsx` | 13 / 8 / 748 (was `12 / 8 / 740`) | 296 G-4 row 11: refused Run scrolls the refusal into view |
 | `frontend/src/components/panel/PanelEmpty.tsx` | 4 / 4 / 52 | ⚠ absent at 4 phases |
 | `frontend/src/components/workflows/useTemplateFirstDraft.ts` | 14 / 6 / 1160 (was `13 / 6 / 1092`) | 296-07: lock + bind snapshot + every failure; extraction FIRST next |
 | `frontend/src/components/workflows/RunSpine.tsx` | 7 / 5 / 441 (was `6 / 4 / 433`) | 295-05: ONE prop (unsourced) |
@@ -636,7 +636,7 @@ node scripts/check-hot-file-ledger.cjs <phase-dir>   # 0 clear · 1 missing rows
 | `frontend/src/components/admin/AuditTab.tsx` | 7 / 4 / 770 | ⚠ FIRES, absent here — row added 293-04 · 5 map entries only |
 | `frontend/src/components/org/OrgAuditTab.tsx` | 4 / 3 / 415 | ⚠ now FIRES (293) — row added · 5 map entries · shared vocab OWED |
 | `frontend/src/lib/api/documents.ts` | 10 / 9 / 595 (was `8 / 8 / 503`) | 284-05: five whole-list clients deleted (D-16) · ⛔ |
-| `backend/app/api/folders.py` | 15 / 10 / 287 (was `14 / 9 / 277`) | 296-01: create_folder stamps the active org; cross-org parent 404 |
+| `backend/app/api/folders.py` | 16 / 10 / 288 (was `15 / 10 / 287`) | 296 review BE-WR-06: name check + insert via aexec (off-loop) |
 | `backend/app/api/kb.py` | 14 / 9 / 515 (was `13 / 8 / 504`) | last touch 275-02 · ⛔ |
 | `backend/app/services/audit_service.py` | 9 / 9 / 98 (was `8 / 8 / 96`) | 293-01: five api_key.* action types · ⛔ |
 | `backend/app/services/expert_scope.py` | 8 / 4 / 159 (was `6 / 3 / 632`) | ✅ G-5 DISCHARGED (279-01): pure / statement / events |

@@ -282,8 +282,9 @@ _REASON_WORKFLOW = "Finalised by the reconciler: its steps had ended."
 async def _reconcile_workflow_runs(db) -> int:
     """Finalise ``active`` workflow runs whose every step has ended (D-21). Returns the count.
 
-    Every step ``completed`` / ``recorded_not_sent`` → the run ends ``completed`` (295-IN-02,
-    296-02: a crash between the last step and ``finish_run`` is not a failure). Else its last
+    Every step ``completed`` / ``recorded_not_sent`` / ``skipped`` (a branch not taken), with at
+    least one of the first two → the run ends ``completed`` (295-IN-02, 296-02, 296 review
+    BE-WR-04: a crash between the last step and ``finish_run`` is not a failure). Else its last
     step (by end time, then position) ``cancelled`` → the run ends ``cancelled`` (no
     ``run_failed``); else ``failed`` with :data:`_REASON_WORKFLOW` and ONE ``run_failed``. Each finalised run's pending prompts are expired. Per-row
     try/except: one bad row never aborts the sweep (the ``_reconcile_chat_runs`` idiom).
@@ -298,9 +299,12 @@ async def _reconcile_workflow_runs(db) -> int:
                      WHERE wp.workflow_run_id = wr.id
                      ORDER BY wp.completed_at DESC NULLS LAST, wp.phase_index DESC
                      LIMIT 1) AS last_phase_status,
-                   NOT EXISTS (SELECT 1 FROM workflow_phases wp
-                                WHERE wp.workflow_run_id = wr.id
-                                  AND wp.status NOT IN ('completed', 'recorded_not_sent'))
+                   (NOT EXISTS (SELECT 1 FROM workflow_phases wp
+                                 WHERE wp.workflow_run_id = wr.id
+                                   AND wp.status NOT IN ('completed', 'recorded_not_sent', 'skipped'))
+                    AND EXISTS (SELECT 1 FROM workflow_phases wp
+                                 WHERE wp.workflow_run_id = wr.id
+                                   AND wp.status IN ('completed', 'recorded_not_sent')))
                      AS all_completed
             FROM workflow_runs wr
             WHERE wr.status = ANY($1::text[])

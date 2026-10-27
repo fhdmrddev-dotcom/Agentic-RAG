@@ -77,7 +77,8 @@ async def create_folder(
         name_check_query = name_check_query.eq("parent_id", str(body.parent_id))
     else:
         name_check_query = name_check_query.is_("parent_id", "null")
-    name_check = name_check_query.maybe_single().execute()
+    # 296 review BE-WR-06 (D-v2.5-01): both supabase-py calls here run off the event loop.
+    name_check = await aexec(name_check_query.maybe_single())
     if name_check and name_check.data:
         raise HTTPException(
             status_code=409,
@@ -92,7 +93,7 @@ async def create_folder(
     }
     if _active_org:
         row["org_id"] = _active_org
-    result = supabase.table("folders").insert(row).execute()
+    result = await aexec(supabase.table("folders").insert(row))
     return result.data[0]
 
 
