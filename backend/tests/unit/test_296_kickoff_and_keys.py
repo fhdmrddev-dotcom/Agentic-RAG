@@ -298,6 +298,53 @@ def test_an_oversize_inbound_body_is_413_before_it_is_parsed(monkeypatch):
     limiter.assert_not_called()
 
 
+def test_an_oversize_CHUNKED_inbound_body_is_413_with_no_length_header(monkeypatch):
+    """296 SECURITY AR-05: production's API has no proxy body cap, so a chunked body (no
+    Content-Length) must be counted as it streams and refused at the cap, not read whole."""
+    from app.api import inbound
+    from tests.unit.phase293_inbound_fakes import (
+        WF_ID, FakePool, FakeRedis, audit_spies, build_app, make_key,
+    )
+
+    audit_spies(monkeypatch)
+    limiter = AsyncMock()
+    monkeypatch.setattr(inbound, "_limit", limiter)
+    client = TestClient(build_app(key=make_key(), pool=FakePool(), redis=FakeRedis()))
+    n = ii.INBOUND_MAX_BODY_BYTES
+
+    def _chunks():
+        for _ in range(n // 4096 + 2):
+            yield b"x" * 4096
+
+    r = client.post(f"/inbound/workflows/{WF_ID}/runs", content=_chunks(),
+                    headers={"Content-Type": "application/json"})
+    assert r.status_code == 413
+    limiter.assert_not_called()
+
+
+def test_a_small_CHUNKED_inbound_body_still_reaches_the_handler(monkeypatch):
+    from app.api import inbound
+    from tests.unit.phase293_inbound_fakes import (
+        WF_ID, FakePool, FakeRedis, audit_spies, build_app, make_key,
+    )
+
+    audit_spies(monkeypatch)
+    limiter = AsyncMock()
+    monkeypatch.setattr(inbound, "_limit", limiter)
+    # Past the cap the handler hits the fake pool's unscripted reads; only the cap is under test.
+    client = TestClient(build_app(key=make_key(), pool=FakePool(), redis=FakeRedis()),
+                        raise_server_exceptions=False)
+
+    def _chunks():
+        yield b'{"inputs": '
+        yield b"{}}"
+
+    r = client.post(f"/inbound/workflows/{WF_ID}/runs", content=_chunks(),
+                    headers={"Content-Type": "application/json"})
+    assert r.status_code != 413
+    limiter.assert_called()
+
+
 def test_a_normal_inbound_body_passes_the_cap(monkeypatch):
     from tests.unit.test_293_inbound_start import URL
 
