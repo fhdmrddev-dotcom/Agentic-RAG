@@ -13,47 +13,13 @@
 // adds nothing to the app typecheck's error set (tsconfig.app.json carries no node types).
 import { describe, expect, it } from "vitest"
 import vercelRaw from "../../../vercel.json?raw"
-
-type HostHas = { type: string; value: string }
-type Rule = { source: string; destination: string; has?: HostHas[]; permanent?: boolean }
-type VercelConfig = { redirects?: Rule[]; rewrites?: Rule[]; cleanUrls?: boolean }
+// Phase 297-04 (D-41): the evaluator moved to the shared routing-layer util, verbatim, so the parity
+// suite (src/__tests__/routing/appRouteParity.test.ts) and this one run ONE evaluator, not two copies.
+import { resolveVercel, sourceRegex, type VercelConfig, type VercelOutcome } from "../../__tests__/routing/routingLayers.testutil"
 
 const config = JSON.parse(vercelRaw) as VercelConfig
 
-// The static output a `vite build` produces (the three entries + emitted docs assets).
-const FILESYSTEM = new Set([
-  "/index.html",
-  "/app.html",
-  "/docs.html",
-  "/docs-assets/search-index.json",
-  "/docs-assets/openapi.public.json",
-  "/vo/clip-chat.wav",
-  "/assets/index-abc.js",
-])
-
-// Vercel sources here use only literal segments and `(.*)` groups.
-function sourceRegex(source: string): RegExp {
-  return new RegExp("^" + source + "$")
-}
-
-function hostMatches(rule: Rule, host: string): boolean {
-  if (!rule.has) return true
-  return rule.has.every((h) => h.type !== "host" || new RegExp("^(?:" + h.value + ")$").test(host))
-}
-
-type Outcome = { kind: "redirect"; to: string } | { kind: "file"; path: string } | { kind: "rewrite"; to: string } | { kind: "404" }
-
-function resolve(host: string, pathname: string): Outcome {
-  for (const r of config.redirects ?? []) {
-    if (sourceRegex(r.source).test(pathname) && hostMatches(r, host)) return { kind: "redirect", to: r.destination }
-  }
-  const filePath = pathname === "/" ? "/index.html" : pathname
-  if (FILESYSTEM.has(filePath)) return { kind: "file", path: filePath }
-  for (const r of config.rewrites ?? []) {
-    if (sourceRegex(r.source).test(pathname) && hostMatches(r, host)) return { kind: "rewrite", to: r.destination }
-  }
-  return { kind: "404" }
-}
+const resolve = (host: string, pathname: string): VercelOutcome => resolveVercel(config, host, pathname)
 
 const LANDING = "syrel.example"
 const APP = "app.syrel.example"

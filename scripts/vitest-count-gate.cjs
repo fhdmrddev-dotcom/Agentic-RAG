@@ -4424,6 +4424,8 @@ const BASELINE = {
   // ── Phase 297-03 (LINK-07 / D-21, D-24, D-32, D-42) — adopted, both knobs, same commit (2026-10-27).
   "useAppNavigation.leaveGuard.test.tsx": 23, // 297-03 — one app blocker: dirty asks EXACTLY once under StrictMode (Back/Forward/rail), clean 0, no-op default, forced bounce 0, one-shot latch, reverted POP 1/2/3, registry unit
   "WorkflowsPage.leaveGuard.test.tsx": 12, // 297-03 — the Builder tenant: connect control + golden-run link asked EXACTLY once (latch), Test Run 0 and no armed latch, dirty Back/rail 1, clean / no Builder 0
+  // ── Phase 297-04 (LINK-08 / D-26, D-41) — adopted, both knobs, same commit (2026-10-27). Self-contained block.
+  "appRouteParity.test.ts": 78, // 297-04 — 17 addresses (12 from formatAppRoute + 3 legacy + 2 pre-auth) x 4 layers (dev, Vercel app host, apex redirect, nginx) = 68, + 2 input/shape, 2 middleware, 1 known-fact, 5 negative controls
 }
 
 // Still COMPUTED, never hand-written — the reduce is the single source, so the
@@ -6473,6 +6475,8 @@ const TARGETS = [
   // ── Phase 297-03 — FILE-LEVEL (no src/hooks/__tests__ directory entry), SAME commit as its BASELINE pin.
   "src/hooks/__tests__/useAppNavigation.leaveGuard.test.tsx",
   "src/pages/__tests__/WorkflowsPage.leaveGuard.test.tsx",
+  // Phase 297-04 — FILE-LEVEL (no src/__tests__/routing directory entry), SAME commit as its pin. Self-contained block.
+  "src/__tests__/routing/appRouteParity.test.ts",
 ]
 
 const REPO_ROOT = path.resolve(__dirname, "..")
