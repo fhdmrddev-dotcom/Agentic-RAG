@@ -41,6 +41,10 @@ import { installFakeLibraryApi } from "@/test-utils/fakeLibraryApi"
 import { libraryTabAfterNavigate, LIBRARY_VIEW } from "@/lib/libraryTabHandoff"
 import type { LibraryTab } from "@/pages/librarySelection"
 import appSource from "@/App.tsx?raw"
+// D-297-07 (Phase 297-01, REG-09): the clearing rule's writers, the hand-off state and the
+// NO-TWELFTH comment block moved VERBATIM from App.tsx into this hook. The wiring fence below
+// reads the hook as its source; App keeps the arms that are still about App.
+import navSource from "@/hooks/useAppNavigation.ts?raw"
 
 const {
   mockUseDocuments,
@@ -503,23 +507,35 @@ describe("LibraryPage — the hand-off survives ONE entry and no more", () => {
 // ══════════════════════════════════════════════════════════════════════════════════════════
 // THE APP-LEVEL WIRING — pinned as TEXT, because the rule existing is not the rule being USED
 // ══════════════════════════════════════════════════════════════════════════════════════════
+// D-297-07 (Phase 297-01): RE-TARGETED, not retired. The clearing rule's writers moved from
+// `App.tsx` into `hooks/useAppNavigation.ts` verbatim, so every arm about the WRITERS reads the
+// hook; the arms about the ChatLayout MOUNT still read App, which is where that mount lives.
+// No expect value changed. The 4000 floor still applies to the hook as written: measured at
+// 297-01, the hook is 9,866 chars raw (2,633 after stripping), so the floor stands unlowered.
 describe("App.tsx — the clearing rule is wired, not merely available", () => {
   const APP = appSource.replace(/\r\n/g, "\n")
+  const NAV = navSource.replace(/\r\n/g, "\n")
   /** The LINE-ANCHORED comment stripper (`renameFence.test.ts:89`). ⚠ The `^\s*` is
    *  load-bearing: the unanchored variant eats live code and turns every absence arm green. */
   const APP_CODE = APP.replace(/\/\*[\s\S]*?\*\//g, "").replace(/^\s*\/\/.*$/gm, "")
+  const NAV_CODE = NAV.replace(/\/\*[\s\S]*?\*\//g, "").replace(/^\s*\/\/.*$/gm, "")
 
   it("self-guard: the ?raw import is the real file AND the stripper did not eat it", () => {
-    expect(APP.length).toBeGreaterThan(4000)
-    expect(APP_CODE).toContain("handleOpenLibraryHealth")
+    // D-297-07: the hook's identity anchor, then the same floor and pair, read from the hook.
+    expect(NAV_CODE).toContain("export function useAppNavigation")
+    expect(NAV.length).toBeGreaterThan(4000)
+    expect(NAV_CODE).toContain("handleOpenLibraryHealth")
     // The stripper non-vacuity pair: a token that exists ONLY in prose. A `codeOf` returning
     // "" would make every `not.toContain` below pass; this pair is what reds when it does.
-    expect(APP).toContain("NO TWELFTH")
-    expect(APP_CODE).not.toContain("NO TWELFTH")
+    expect(NAV).toContain("NO TWELFTH")
+    expect(NAV_CODE).not.toContain("NO TWELFTH")
+    // D-297-07 App arm: App is still the real file and its own floor still holds.
+    expect(APP.length).toBeGreaterThan(4000)
+    expect(APP_CODE).toContain("useAppNavigation()")
   })
 
   it("imports and USES the clearing rule", () => {
-    expect(APP_CODE).toContain("libraryTabAfterNavigate")
+    expect(NAV_CODE).toContain("libraryTabAfterNavigate")
   })
 
   it("⛔ the ChatLayout mount no longer hands over the RAW view setter as its navigator", () => {
@@ -527,7 +543,7 @@ describe("App.tsx — the clearing rule is wired, not merely available", () => {
   })
 
   it("has TWO real `setLibraryTab` calls — the write, and the clear", () => {
-    const writes = APP_CODE.match(/setLibraryTab\s*\(/g) ?? []
+    const writes = NAV_CODE.match(/setLibraryTab\s*\(/g) ?? []
     expect(writes.length).toBeGreaterThanOrEqual(2)
   })
 })

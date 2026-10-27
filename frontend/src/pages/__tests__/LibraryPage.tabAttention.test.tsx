@@ -54,6 +54,8 @@ import type { AttentionCondition } from "@/components/layout/attentionConditions
 // ⚠ `?raw` is TEXT — importing these evaluates no module, so this suite's mocks do not have to
 // cover `App.tsx`'s or `ChatLayout.tsx`'s own import graphs. It is the shipped idiom here.
 import appSource from "@/App.tsx?raw"
+// D-297-08 (Phase 297-01): the `libraryTab` writers' home since the verbatim move out of App.
+import navSource from "@/hooks/useAppNavigation.ts?raw"
 import layoutSource from "@/components/layout/ChatLayout.tsx?raw"
 import pageSource from "@/pages/LibraryPage.tsx?raw"
 
@@ -429,13 +431,23 @@ describe("Library tab attention — the hand-off is still spent on navigate", ()
     // ⚠ Counted in CODE, not in raw text: `App.tsx` carries a long comment block about this very
     // hand-off, and a measurement a comment can satisfy is the 187-24 lesson this repository has
     // now paid for four times.
-    const code = appSource
-      .replace(/\/\*[\s\S]*?\*\//g, "")
-      .replace(/^\s*\/\/.*$/gm, "")
-    expect((code.match(/setLibraryTab\s*\(/g) ?? []).length).toBe(2)
-    // Non-vacuity: the stripper did not return "" and this really is App.
+    //
+    // D-297-08 (Phase 297-01): RE-TARGETED, not retired — the pin moved WITH its writer. Both
+    // `setLibraryTab(` calls now live in `hooks/useAppNavigation.ts` (moved verbatim from App),
+    // so the exact count is taken there, and App must carry ZERO: moved, not duplicated.
+    const strip = (s: string) =>
+      s
+        .replace(/\r\n/g, "\n")
+        .replace(/\/\*[\s\S]*?\*\//g, "")
+        .replace(/^\s*\/\/.*$/gm, "")
+    const navCode = strip(navSource)
+    const code = strip(appSource)
+    expect((navCode.match(/setLibraryTab\s*\(/g) ?? []).length).toBe(2)
+    expect((code.match(/setLibraryTab\s*\(/g) ?? []).length).toBe(0)
+    // Non-vacuity: the stripper did not return "" and these really are the hook and App.
+    expect(navCode).toContain("export function useAppNavigation")
+    expect(navCode).toContain("libraryTabAfterNavigate")
     expect(code).toContain("export type ActiveView")
-    expect(code).toContain("libraryTabAfterNavigate")
   })
 })
 

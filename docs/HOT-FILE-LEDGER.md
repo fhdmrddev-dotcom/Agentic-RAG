@@ -12130,7 +12130,7 @@ cells rot within days.
 | [`frontend/src/components/workflows/library/automationFacts.ts`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentsworkflowslibraryautomationfactsts) | 2 / 2 / 132 (was `1 / 1 / 95`) | no (young) | absent its ENTIRE LIFE (created 204.1) — row added 293. 293-03: next from server next_run_at. ⛔ spells no string; never computes |
 | [`frontend/src/components/admin/AuditTab.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentsadminaudittabtsx) | 7 / 4 / 770 (was `6 / 3 / 763`) | ⚠ **FIRES** | absent its ENTIRE LIFE at 3 phases (146/148/155) — row added 293. 293-04: api_key.* entries + "API keys" group in PLATFORM_ACTION_META only. ⛔ unknown codes stay raw |
 | [`frontend/src/components/org/OrgAuditTab.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentsorgorgaudittabtsx) | 4 / 3 / 415 (was `3 / 2 / 408`) | ⚠ **FIRES** | absent its ENTIRE LIFE (166/167) — row added 293. 293-04: api_key.* labels + "API keys" group in ACTION_META only. ⛔ never invents a label |
-| [`frontend/src/hooks/useAppNavigation.ts`](docs/HOT-FILE-LEDGER.md#frontendsrchooksuseappnavigationts) | 0 / 0 / 0 | no (planned 297-01) | young (planned 297-01). App's view/tab state + navigators, moved verbatim (D-01); 297-02 derives the view from the address; 297-03 adds the one blocker. Measured in its creating commit |
+| [`frontend/src/hooks/useAppNavigation.ts`](docs/HOT-FILE-LEDGER.md#frontendsrchooksuseappnavigationts) | 1 / 1 / 160 (was `0 / 0 / 0`) | no (young) | young (created 297-01). App view/tab state moved verbatim (D-01). ⛔ setLibraryTab( exactly 2; NO TWELFTH block travels with libraryTab; router hooks only here (D-08) |
 | [`frontend/src/components/layout/AppViewSwitch.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentslayoutappviewswitchtsx) | 0 / 0 / 0 | no (planned 297-01) | young (planned 297-01). ChatLayout's ActiveView mount switch, moved verbatim (D-01). Pure, no hooks. 297-02 adds the not-found + holding arms. Measured in its creating commit |
 | [`frontend/src/lib/appRoutes.ts`](docs/HOT-FILE-LEDGER.md#frontendsrclibapproutests) | 0 / 0 / 0 | no (planned 297-02) | young (planned 297-02). STRICT LEAF (no React): parseAppLocation / formatAppRoute, the one home of path vocabulary (D-11). Strict UUID, never throws. Measured in its creating commit |
 | [`frontend/src/components/layout/AddressNotFound.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentslayoutaddressnotfoundtsx) | 0 / 0 / 0 | no (planned 297-02) | young (planned 297-02). S1 "This address doesn't open anything" + S2 holding state (D-14/D-19/D-35). Never renders the trailing fallback tag. Measured in its creating commit |
@@ -25660,7 +25660,26 @@ above the rung loop, one `_failure` call site, run-local) untouched. Pinned by
 `297-01` creates it and re-derives the triple in its creating commit (the `activeViewReachability.ts`
 262-01 precedent). App's view/tab state + navigators, moved verbatim (D-01); 297-02 derives the view from the address; 297-03 adds the one blocker.
 
-Binding invariants and the build detail are written by `297-01` in the same commit that creates the file.
+#### Created — Phase 297 (297-01), measured `1 / 1 / 160`
+
+Measured in its creating commit (`refactor(297-01): move App view/tab state into useAppNavigation`):
+1 commit, 1 phase, 160 lines. It holds, moved byte-for-byte from `App.tsx` (its old `:156-171`,
+`:173-194`, `:196-240`): the boot initializer (`/admin/spend`, `?run=`, `?connections=1` with its
+`replaceState` — 297-02 deletes that write, not 297-01), the studio state + four navigators, the
+Library hand-off comment block + `libraryTab` + `handleOpenLibraryHealth`, and `handleNavigate`
+(returned as `onNavigate`). One addition: `bounceHome`, a `useCallback` around the bare view setter
+App's 403 listener used to call — it does NOT spend the hand-off, exactly as before. Characterized by
+`src/hooks/__tests__/useAppNavigation.test.tsx` (13 cases, RED-first).
+
+**Binding invariants:**
+- ⛔ `setLibraryTab(` has **exactly 2** calls in this file's comment-stripped code, and App has **0**
+  (`LibraryPage.tabAttention.test.tsx`, D-297-08). A third is a second author of the hand-off.
+- ⛔ The Library hand-off comment block travels WITH `libraryTab`, unedited. Its refusal phrase is
+  `LibraryPage.initialTab.test.tsx`'s stripper non-vacuity control (D-297-07), and the block never
+  spells the refused member or the browser location API (the 187-24 rule). Do not tidy it.
+- ⛔ From 297-02 on, router hooks are called in this module and nowhere below it (D-08): ChatLayout
+  and its descendants keep receiving navigator callbacks as props.
+- `ActiveView` stays exported from `App.tsx` on ONE line (D-38); this file imports it type-only.
 
 ### `frontend/src/components/layout/AppViewSwitch.tsx`
 

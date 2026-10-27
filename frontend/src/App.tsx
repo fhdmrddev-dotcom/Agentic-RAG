@@ -7,13 +7,9 @@ import { useAuth } from "./hooks/useAuth"
 import { AuthPage } from "./pages/AuthPage"
 import { AcceptInvitePage } from "./pages/AcceptInvitePage"
 import { ChatLayout } from "./components/layout/ChatLayout"
-import type { StudioTab } from "./pages/SkillStudioPage"
-// Phase 235-08 (SURF-03): the Library's own tab union, so the payload below is typed by the
-// SAME source the page reads rather than by a second string literal beside it.
-import type { LibraryTab } from "./pages/librarySelection"
-// Phase 235 plan 15 (gap-closure round 1): the hand-off's LIFETIME rule, as a strict leaf.
-import { libraryTabAfterNavigate } from "@/lib/libraryTabHandoff"
-import { readRunDeepLink } from "@/lib/runDeepLink"
+// Phase 297-01 (REG-09 / D-01): the view/tab state, the studio + Library navigators and the
+// boot initializer moved into this hook verbatim, with their own imports.
+import { useAppNavigation } from "@/hooks/useAppNavigation"
 import { TooltipProvider } from "@/components/ui/tooltip"
 import { StreamsProvider } from "@/providers/StreamsProvider"
 // Phase 166 (D-166-07): the org-context spine mounts OUTSIDE StreamsProvider so an
@@ -153,91 +149,12 @@ function App() {
       alive = false
     }
   }, [])
-  const [activeView, setActiveView] = useState<ActiveView>(() => {
-    // Phase 257 (METER-07): /admin/spend route
-    if (typeof window !== "undefined" && (window.location.pathname === "/admin/spend" || window.location.pathname.startsWith("/admin/spend"))) {
-      return "admin-spend"
-    }
-    // Phase 289-04 (SC#3): `/app?run=<uuid>` opens that run's page on boot. The query is KEPT
-    // (no replaceState) so a reload stays on the run; the reader accepts a strict UUID only.
-    if (readRunDeepLink()) return "workflow-run"
-    // BUG-260903-01 / SEED-185: both OAuth callbacks land on `/app?connections=1&…`, and until
-    // 2026-09-03 nothing read it — the person arrived on Chat with their result in the URL.
-    // Read once, land on Connections, and drop the query so a reload does not re-route.
-    const q = new URLSearchParams(window.location.search)
-    if (q.get("connections") !== "1") return "chat"
-    window.history.replaceState(null, "", window.location.pathname)
-    return "connections"
-  })
+  // Phase 297-01 (REG-09 / D-01): the view/tab state and its navigators live in
+  // `useAppNavigation`, moved there verbatim. Called HERE — the position the view state held —
+  // so it runs before every early return below (rules of hooks).
+  const nav = useAppNavigation()
+  const { bounceHome } = nav
   const [prefillMessage, setPrefillMessage] = useState<string | null>(null)
-  // Phase 137-06 (PANEL-01 / D-01 / sketch 057-A): the unified Skill Studio is a
-  // focused full-surface entered WITH a skillId + a tab (mirroring the shipped Tuner
-  // ActiveView precedent — no router). App holds the selected-skill + active-tab state
-  // and the navigators; all thread to ChatLayout so the reachability triad (ActiveView
-  // union + the ChatLayout mount branch + the SkillsPage entry action) is owned
-  // in-phase (the Phase-118 built-but-unreachable lesson). The single "Open studio"
-  // button lives in the slim detail panel (Plan 07); this plan defines + threads the
-  // navigators. The legacy Trigger Tuner is ABSORBED as the Studio's Triggering tab:
-  // the "Tune triggers" / lint "Tune this →" handoff (handleTuneSkill) REDIRECTS to
-  // Studio · Triggering (D-01 no orphan Tuner surface / D-06 lint re-point).
-  const [studioSkillId, setStudioSkillId] = useState<string | null>(null)
-  const [studioTab, setStudioTab] = useState<StudioTab>("evals")
-  const handleOpenStudio = (skillId: string, tab: StudioTab = "evals") => {
-    setStudioSkillId(skillId)
-    setStudioTab(tab)
-    setActiveView("skill-studio")
-  }
-  const handleReviewEvals = (skillId: string) => handleOpenStudio(skillId, "evals")
-  const handleStudioTabChange = (tab: StudioTab) => setStudioTab(tab)
-  // Legacy redirect (D-01 / D-06): the shipped "Tune triggers" + lint "Tune this →"
-  // callers land in Studio · Triggering — no standalone Tuner surface remains.
-  const handleTuneSkill = (skillId: string) => handleOpenStudio(skillId, "triggering")
-
-  // Phase 235-08 (SURF-03 / D-235-04 / T-235-27): the Library's tab, held HERE beside
-  // `activeView` and set by ONE navigator — the exact shape of `handleOpenStudio` above.
-  //
-  // ⛔ NO TWELFTH `ActiveView` MEMBER. The Library already has one, and the comment above
-  // the union records that a member is not reachability. What was missing was never a view:
-  // `LibraryPage`'s only prop was `onNavigate`, so the Health TAB had no external door at
-  // all, and SURF-03's route (rail badge → popover → Health → source card) was impossible.
-  //
-  // ⚠ THIS REFUSAL IS PLAN-SCOPED AND STANDS UNCHANGED; Phase 262's member is NOT the thing
-  // it refuses. 235-08 was refused a member because the surface it wanted ALREADY HAD ONE and
-  // only lacked a door into one of its tabs. Phase 262's is a net-new top-level home with no
-  // existing surface to enter — the `skill-studio` / `control-room` case, not this one — and
-  // it ships with its ChatLayout branch and its rail entry in the same commit. ⛔ ITS LITERAL
-  // IS DELIBERATELY NOT SPELLED HERE (D-262-04), for the identical reason the line below gives
-  // about the URL API: an acceptance fence counts occurrences in this file, so prose naming it
-  // would make a code measurement satisfiable by a comment (the 187-24 lesson). ⛔ AND DO NOT
-  // DELETE THIS BLOCK TO "TIDY" IT: `LibraryPage.initialTab.test.tsx:502-503` uses the phrase
-  // three lines up as its comment-stripper NON-VACUITY CONTROL — the pair that reds when the
-  // stripper starts returning "" and silently turns every absence assertion in that suite green.
-  //
-  // ⛔ AND NO URL. This app has no router (`SEED-185`), so assigning the browser's location
-  // here would be a full page reload onto a path that renders the chat home. ⚠ THAT API IS
-  // DELIBERATELY NOT SPELLED IN THIS COMMENT: the acceptance criterion greps this file for
-  // it, and prose that names it would make a code measurement satisfiable by a comment (the
-  // 187-24 lesson, which `App.tsx:91-101` above already records once). `undefined` means
-  // "the page decides", so the Library keeps its own default on every other entry into it.
-  const [libraryTab, setLibraryTab] = useState<LibraryTab | undefined>(undefined)
-  const handleOpenLibraryHealth = () => {
-    setLibraryTab("health")
-    setActiveView("documents")
-  }
-  // ⛔ Phase 235 plan 15 (gap-closure round 1 · verification G5) — AND IT IS ONE-SHOT.
-  //
-  // The line above was the ONLY write to `libraryTab` when 235-08 shipped, and the comment
-  // above it claimed a behaviour nothing enforced: `LibraryPage` is mounted inside a ternary
-  // in `ChatLayout`, so it UNMOUNTS on navigation away and re-seeds its reducer from
-  // `initialTab` at every mount. After ONE click on the attention popover, every subsequent
-  // entry into the Library opened on Health — the claim two paragraphs up, falsified by the
-  // code beneath it. The clear belongs to the NAVIGATOR, not to a second writer: the hand-off
-  // survives the trip INTO the Library and is spent by the next navigation anywhere else
-  // (`libraryTabAfterNavigate` owns that rule and is tested without mounting anything).
-  const handleNavigate = (next: ActiveView) => {
-    setActiveView(next)
-    setLibraryTab((pending) => libraryTabAfterNavigate(pending, next))
-  }
 
   // Phase 146 (ADMIN-01 / D-07): one probe per authenticated session, keyed to
   // the signed-in user id (WR-01 — NOT App mount). isOperator gates the shield
@@ -283,12 +200,12 @@ function App() {
       // dispatch guard, and this listener all agree on that one string.
       if (detail?.status !== 403 || detail?.message !== VISIBILITY_REFUSAL) return
       setFeatureRefusal(VISIBILITY_REFUSAL)
-      setActiveView("chat")
+      bounceHome()
       refetchFeatures()
     }
     window.addEventListener(FEATURE_FORBIDDEN_EVENT, onForbidden)
     return () => window.removeEventListener(FEATURE_FORBIDDEN_EVENT, onForbidden)
-  }, [refetchFeatures])
+  }, [refetchFeatures, bounceHome])
   // Auto-dismiss the plain refusal after a few seconds — it is a transient product
   // message (the user is already routed home), not a blocking modal.
   useEffect(() => {
@@ -391,24 +308,24 @@ function App() {
               Library view, which is the one destination the rule KEEPS the hand-off for — so
               this changes no behaviour now and clears correctly if a citation ever leads
               somewhere else. */}
-          <CitationNavProvider navigate={handleNavigate}>
+          <CitationNavProvider navigate={nav.onNavigate}>
             <ChatLayout
               onSignOut={signOut}
-              activeView={activeView}
-              onNavigate={handleNavigate}
+              activeView={nav.activeView}
+              onNavigate={nav.onNavigate}
               navItems={navItems}
               isOperator={isOperator}
               operatorIdentity={operatorIdentity}
               prefillMessage={prefillMessage}
               onSetPrefillMessage={setPrefillMessage}
-              studioSkillId={studioSkillId}
-              studioTab={studioTab}
-              onOpenStudio={handleOpenStudio}
-              onReviewEvals={handleReviewEvals}
-              onStudioTabChange={handleStudioTabChange}
-              onTuneSkill={handleTuneSkill}
-              libraryTab={libraryTab}
-              onOpenLibraryHealth={handleOpenLibraryHealth}
+              studioSkillId={nav.studioSkillId}
+              studioTab={nav.studioTab}
+              onOpenStudio={nav.handleOpenStudio}
+              onReviewEvals={nav.handleReviewEvals}
+              onStudioTabChange={nav.handleStudioTabChange}
+              onTuneSkill={nav.handleTuneSkill}
+              libraryTab={nav.libraryTab}
+              onOpenLibraryHealth={nav.handleOpenLibraryHealth}
             />
           </CitationNavProvider>
           </EffectiveFeaturesProvider>
