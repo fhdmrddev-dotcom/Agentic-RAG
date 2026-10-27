@@ -12130,6 +12130,11 @@ cells rot within days.
 | [`frontend/src/components/workflows/library/automationFacts.ts`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentsworkflowslibraryautomationfactsts) | 2 / 2 / 132 (was `1 / 1 / 95`) | no (young) | absent its ENTIRE LIFE (created 204.1) — row added 293. 293-03: next from server next_run_at. ⛔ spells no string; never computes |
 | [`frontend/src/components/admin/AuditTab.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentsadminaudittabtsx) | 7 / 4 / 770 (was `6 / 3 / 763`) | ⚠ **FIRES** | absent its ENTIRE LIFE at 3 phases (146/148/155) — row added 293. 293-04: api_key.* entries + "API keys" group in PLATFORM_ACTION_META only. ⛔ unknown codes stay raw |
 | [`frontend/src/components/org/OrgAuditTab.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentsorgorgaudittabtsx) | 4 / 3 / 415 (was `3 / 2 / 408`) | ⚠ **FIRES** | absent its ENTIRE LIFE (166/167) — row added 293. 293-04: api_key.* labels + "API keys" group in ACTION_META only. ⛔ never invents a label |
+| [`frontend/src/hooks/useAppNavigation.ts`](docs/HOT-FILE-LEDGER.md#frontendsrchooksuseappnavigationts) | 0 / 0 / 0 | no (planned 297-01) | young (planned 297-01). App's view/tab state + navigators, moved verbatim (D-01); 297-02 derives the view from the address; 297-03 adds the one blocker. Measured in its creating commit |
+| [`frontend/src/components/layout/AppViewSwitch.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentslayoutappviewswitchtsx) | 0 / 0 / 0 | no (planned 297-01) | young (planned 297-01). ChatLayout's ActiveView mount switch, moved verbatim (D-01). Pure, no hooks. 297-02 adds the not-found + holding arms. Measured in its creating commit |
+| [`frontend/src/lib/appRoutes.ts`](docs/HOT-FILE-LEDGER.md#frontendsrclibapproutests) | 0 / 0 / 0 | no (planned 297-02) | young (planned 297-02). STRICT LEAF (no React): parseAppLocation / formatAppRoute, the one home of path vocabulary (D-11). Strict UUID, never throws. Measured in its creating commit |
+| [`frontend/src/components/layout/AddressNotFound.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentslayoutaddressnotfoundtsx) | 0 / 0 / 0 | no (planned 297-02) | young (planned 297-02). S1 "This address doesn't open anything" + S2 holding state (D-14/D-19/D-35). Never renders the trailing fallback tag. Measured in its creating commit |
+| [`frontend/src/lib/leaveGuard.ts`](docs/HOT-FILE-LEDGER.md#frontendsrclibleaveguardts) | 0 / 0 / 0 | no (planned 297-03) | young (planned 297-03). Leave-guard registry context, safe no-op default (D-21); one-shot latch (D-32/D-42). No component. Measured in its creating commit |
 
 
 
@@ -25644,3 +25649,47 @@ The cloud branch of the cross-provider copy now adds `"active_provider": provide
 uncopied, and the local (lmstudio/ollama) branch is unchanged. ⛔ invariants (accumulators `None`,
 above the rung loop, one `_failure` call site, run-local) untouched. Pinned by
 `tests/unit/test_296_pinned_emit_surface.py` (RED `1f5fa6283`).
+
+---
+
+## Phase 297 — files added AT PLANNING
+
+### `frontend/src/hooks/useAppNavigation.ts`
+
+**Added AT PLANNING (Phase 297, 2026-10-27) with `0 / 0 / 0`** — the file does not exist yet; plan
+`297-01` creates it and re-derives the triple in its creating commit (the `activeViewReachability.ts`
+262-01 precedent). App's view/tab state + navigators, moved verbatim (D-01); 297-02 derives the view from the address; 297-03 adds the one blocker.
+
+Binding invariants and the build detail are written by `297-01` in the same commit that creates the file.
+
+### `frontend/src/components/layout/AppViewSwitch.tsx`
+
+**Added AT PLANNING (Phase 297, 2026-10-27) with `0 / 0 / 0`** — the file does not exist yet; plan
+`297-01` creates it and re-derives the triple in its creating commit (the `activeViewReachability.ts`
+262-01 precedent). ChatLayout's ActiveView mount switch, moved verbatim (D-01). Pure, no hooks. 297-02 adds the not-found + holding arms.
+
+Binding invariants and the build detail are written by `297-01` in the same commit that creates the file.
+
+### `frontend/src/lib/appRoutes.ts`
+
+**Added AT PLANNING (Phase 297, 2026-10-27) with `0 / 0 / 0`** — the file does not exist yet; plan
+`297-02` creates it and re-derives the triple in its creating commit (the `activeViewReachability.ts`
+262-01 precedent). STRICT LEAF (no React): parseAppLocation / formatAppRoute, the one home of path vocabulary (D-11). Strict UUID, never throws.
+
+Binding invariants and the build detail are written by `297-02` in the same commit that creates the file.
+
+### `frontend/src/components/layout/AddressNotFound.tsx`
+
+**Added AT PLANNING (Phase 297, 2026-10-27) with `0 / 0 / 0`** — the file does not exist yet; plan
+`297-02` creates it and re-derives the triple in its creating commit (the `activeViewReachability.ts`
+262-01 precedent). S1 "This address doesn't open anything" + S2 holding state (D-14/D-19/D-35). Never renders the trailing fallback tag.
+
+Binding invariants and the build detail are written by `297-02` in the same commit that creates the file.
+
+### `frontend/src/lib/leaveGuard.ts`
+
+**Added AT PLANNING (Phase 297, 2026-10-27) with `0 / 0 / 0`** — the file does not exist yet; plan
+`297-03` creates it and re-derives the triple in its creating commit (the `activeViewReachability.ts`
+262-01 precedent). Leave-guard registry context, safe no-op default (D-21); one-shot latch (D-32/D-42). No component.
+
+Binding invariants and the build detail are written by `297-03` in the same commit that creates the file.
