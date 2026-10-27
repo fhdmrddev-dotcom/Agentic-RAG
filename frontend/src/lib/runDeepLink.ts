@@ -20,6 +20,23 @@ function hasWindow(): boolean {
   return typeof window !== "undefined" && window !== null && typeof window.location !== "undefined"
 }
 
+/** Phase 297-02 (D-12): THE one strict-UUID rule, shared with the route table (`appRoutes.ts`). */
+export function isStrictUuid(value: string): boolean {
+  return typeof value === "string" && UUID_RE.test(value)
+}
+
+/** Phase 297-02 (D-18): the `?run=` value from a search STRING (no window read) — a strict
+ *  UUID lowercased, else `null`. The route table parses the legacy alias through this. */
+export function readRunParam(search: string): string | null {
+  try {
+    const raw = new URLSearchParams(search).get(PARAM)
+    if (raw === null || !UUID_RE.test(raw)) return null
+    return raw.toLowerCase()
+  } catch {
+    return null
+  }
+}
+
 /** The `?run=` value when it is a valid UUID (lowercased), else `null`. */
 export function readRunDeepLink(): string | null {
   try {

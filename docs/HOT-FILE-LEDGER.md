@@ -12183,7 +12183,7 @@ cells rot within days.
 | [`frontend/src/components/org/OrgAuditTab.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentsorgorgaudittabtsx) | 4 / 3 / 415 (was `3 / 2 / 408`) | ⚠ **FIRES** | absent its ENTIRE LIFE (166/167) — row added 293. 293-04: api_key.* labels + "API keys" group in ACTION_META only. ⛔ never invents a label |
 | [`frontend/src/hooks/useAppNavigation.ts`](docs/HOT-FILE-LEDGER.md#frontendsrchooksuseappnavigationts) | 1 / 1 / 160 (was `0 / 0 / 0`) | no (young) | young (created 297-01). App view/tab state moved verbatim (D-01). ⛔ setLibraryTab( exactly 2; NO TWELFTH block travels with libraryTab; router hooks only here (D-08) |
 | [`frontend/src/components/layout/AppViewSwitch.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentslayoutappviewswitchtsx) | 1 / 1 / 473 (was `0 / 0 / 0`) | no (young) | young (created 297-01). ChatLayout's mount switch moved verbatim (D-01). ⛔ no hooks; fallback LAST; one stripped workflow-run test; canvasEnabled passed in |
-| [`frontend/src/lib/appRoutes.ts`](docs/HOT-FILE-LEDGER.md#frontendsrclibapproutests) | 0 / 0 / 0 | no (planned 297-02) | young (planned 297-02). STRICT LEAF (no React): parseAppLocation / formatAppRoute, the one home of path vocabulary (D-11). Strict UUID, never throws. Measured in its creating commit |
+| [`frontend/src/lib/appRoutes.ts`](docs/HOT-FILE-LEDGER.md#frontendsrclibapproutests) | 1 / 1 / 198 (was `0 / 0 / 0`) | no (young) | young (created 297-02). STRICT LEAF: one home of /app path vocabulary (D-11). ⛔ never throws; strict UUID; no host in any output |
 | [`frontend/src/components/layout/AddressNotFound.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentslayoutaddressnotfoundtsx) | 0 / 0 / 0 | no (planned 297-02) | young (planned 297-02). S1 "This address doesn't open anything" + S2 holding state (D-14/D-19/D-35). Never renders the trailing fallback tag. Measured in its creating commit |
 | [`frontend/src/lib/leaveGuard.ts`](docs/HOT-FILE-LEDGER.md#frontendsrclibleaveguardts) | 0 / 0 / 0 | no (planned 297-03) | young (planned 297-03). Leave-guard registry context, safe no-op default (D-21); one-shot latch (D-32/D-42). No component. Measured in its creating commit |
 
@@ -25761,11 +25761,23 @@ every regex fence over it still matches. The page imports used only inside the s
 
 ### `frontend/src/lib/appRoutes.ts`
 
-**Added AT PLANNING (Phase 297, 2026-10-27) with `0 / 0 / 0`** — the file does not exist yet; plan
-`297-02` creates it and re-derives the triple in its creating commit (the `activeViewReachability.ts`
-262-01 precedent). STRICT LEAF (no React): parseAppLocation / formatAppRoute, the one home of path vocabulary (D-11). Strict UUID, never throws.
+**Added AT PLANNING (Phase 297, 2026-10-27) with `0 / 0 / 0`** — the file did not exist yet; plan
+`297-02` created it. **Measured in its creating commit: `1 / 1 / 198`.**
 
-Binding invariants and the build detail are written by `297-02` in the same commit that creates the file.
+#### — Phase 297 (297-02)
+
+- ⛔ **STRICT LEAF.** No React and no browser globals: pathname and search arrive as arguments. Its only
+  imports are the `ActiveView` type (erased) and `isStrictUuid` / `readRunParam` from `runDeepLink.ts`.
+- ⛔ **The one home of path vocabulary (D-11).** `VIEW_PATHS` is keyed by the whole `ActiveView`
+  union, so a member without an address is TS2741 here; `activeViewRouteLeg` catches it at test time.
+- ⛔ **Never throws.** `parseAppLocation` and `canonicalAddress` wrap their bodies; anything
+  unrecognised is `not-found` / `null`.
+- ⛔ **No host in any output (T-297-05).** `canonicalAddress` builds only from `formatAppRoute` plus
+  unowned params; a path starting `//`, or with a backslash, `%`, an empty or a dotted segment, is
+  `not-found` before lookup. Unknown params alone never rewrite (`/app?code=x` → `null`, Pitfall 10).
+- Legacy aliases: `?run=<uuid>` and `?connections=1` apply only where the path says chat;
+  `/admin/spend[/…]` and bare known prefixes (D-13). `/setup`, `/invite` and bare `/` are never rewritten.
+- Pinned by `src/lib/__tests__/appRoutes.test.ts` (111) and the route leg in `activeViewReachability.test.ts`.
 
 ### `frontend/src/components/layout/AddressNotFound.tsx`
 
