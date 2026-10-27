@@ -2,10 +2,11 @@
 gsd_state_version: 1.0
 milestone: v4.8
 milestone_name: Every Page Has a Link
-status: planning
-last_updated: "2026-10-27T18:00:00.000Z"
+status: Roadmap created — ready to discuss Phase 297
+last_updated: "2026-10-27T16:46:16.288Z"
+last_activity: 2026-10-27 — Milestone v4.8 Every Page Has a Link started (phases from 297, migrations from 217)
 progress:
-  total_phases: 6
+  total_phases: 13
   completed_phases: 0
   total_plans: 0
   completed_plans: 0
@@ -74,6 +75,7 @@ applied; `get_advisors(security)` 0 ERROR. Branch `develop`.
 - OpenRouter credit top-up (402) → re-run the 292.1 / 291 / 287 OpenRouter roster rows
   (`scripts/run-2921-board.py --run --providers openrouter`, `scripts/run-296-board.py --first-step --providers openrouter`);
   flip BUG-261024-03 on PASS.
+
 - Moonshot account reinstatement (429 suspended) → re-run its rows; BUG-261024-01 stays `folded` until then.
 - 294-ENV: remove the two dev-only lines from `backend/.env` (`DECISION_ENGINE_FAULT_BASE_URL` and its `ENVIRONMENT` partner).
 - Optional: restore Supabase MCP `read_only=true` (the write-needing deploy is done).
@@ -85,6 +87,7 @@ applied; `get_advisors(security)` 0 ERROR. Branch `develop`.
 
 - v4.7 `human_needed` verifications, each with its reason in the audit: 287 (Anthropic/OpenRouter rows), 289 (Anthropic row, billing),
   292.1 (OpenRouter row, 402), 294 (UAT 9/9 passed live; file not re-stamped). UAT files 287-UAT, 292-UAT-LOG, 292.1-HUMAN-UAT (1 pending: OpenRouter), 292.1-UAT-LOG.
+
 - 31 pre-v4.7 quick tasks with no SUMMARY (2026-03 to 2026-10-16).
 - 4 dormant seeds: SEED-041, SEED-043, SEED-046, SEED-127.
 
