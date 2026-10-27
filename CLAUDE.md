@@ -443,7 +443,7 @@ node scripts/check-hot-file-ledger.cjs <phase-dir>   # 0 clear · 1 missing rows
 | `frontend/src/components/workflows/evidenceVocabulary.ts` | 5 / 3 / 261 | ⚠ now FIRES (296) · 296-04: neutral NO_MATCH/UNSOURCED + DOWNLOAD_UNAVAILABLE |
 | `backend/app/models/thread.py` | 25 / 17 / 550 (was `24 / 16 / 545`) | 293-03: ONE field (origin) |
 | `frontend/src/components/workflows/canvasModel.ts` | 16 / 8 / 836 (was `15 / 8 / 831`) | 296-07: comparePhaseOrder, engineArmed; isGrounded drops escalated |
-| `frontend/src/components/layout/ChatLayout.tsx` | 64 / 33 / 1158 (was `63 / 32 / 1147`) | 293-04: onOpenApiKeys (pre-pick + tab 7) + SettingsPage onOpenRun |
+| `frontend/src/components/layout/ChatLayout.tsx` | 65 / 34 / 882 (was `64 / 33 / 1158`) | 297-01: G-5 seam TAKEN — mount switch → AppViewSwitch, move only |
 | `frontend/src/components/layout/ChatLaunchForm.tsx` | 6 / 4 / 191 (was `5 / 4 / 183`) | 296 G-4 row 11: refused Run scrolls the refusal into view |
 | `frontend/src/components/workflows/LaunchInputFields.tsx` | 3 / 3 / 145 | 287-01: leaf stays non-blocking; docblock only · 214.1-01 trigger TAKEN |
 | `frontend/src/components/layout/ChatHistoryColumn.tsx` | 7 / 2 / 513 | ⚠ absent its ENTIRE LIFE — row added 244-01 |
@@ -572,7 +572,7 @@ node scripts/check-hot-file-ledger.cjs <phase-dir>   # 0 clear · 1 missing rows
 | `frontend/src/components/library/IngestionTab.tsx` | 20 / 7 / 706 (was `17 / 6 / 512`) | 284-03: summary + three paged status lists; layout unchanged · ⛔ |
 | `frontend/src/components/ingestion/__tests__/IngestionStrip.test.tsx` | 3 / 3 / 516 | ⚠ absent; row added 233, which repaired the INHERITED red `229-03` cau |
 | `frontend/src/components/layout/NavPanel.tsx` | 26 / 14 / 420 (was `25 / 14 / 416`) | last touch 276-01 / 276-06 (D-27) |
-| `frontend/src/App.tsx` | 37 / 28 / 422 (was `36 / 27 / 418`) | 289-04: deep-link seed in the existing initializer (+4 L) |
+| `frontend/src/App.tsx` | 39 / 29 / 340 (was `37 / 28 / 422`) | 297-01: G-5 seam TAKEN — view/tab state → useAppNavigation, move only |
 | `frontend/src/index.css` | 35 / 19 / 1239 (was `34 / 18 / 1196`) | 294-05: ONE verdict block keyed on citation-marker--v-* (+43) |
 | `frontend/src/components/library/LibraryCloudImport.tsx` | 1 / 1 / 194 | young (created 244-06) · ⛔ |
 | `frontend/src/components/library/LibraryHeaderBar.tsx` | 5 / 4 / 262 (was `4 / 3 / 249`) | 284-03: optional `totalState`; never 0 before an answer |
