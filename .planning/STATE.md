@@ -44,7 +44,7 @@ reviewer exists, so a phase closes `verification_mode: self-verified`, never `re
 
 Milestone: none active. **v4.7 Workflows You Can See and Start Anywhere COMPLETED 2026-10-27 by hand:**
 archives in `.planning/milestones/v4.7-*` (ROADMAP, REQUIREMENTS, MILESTONE-AUDIT + the 2026-10-26
-reading as `-261026`, STATE-at-close), tag `v4.7` (local, not pushed), 21/21 requirements, audit
+reading as `-261026`, STATE-at-close, and `v4.7-phases/` with all 12 phase folders), tag `v4.7` (local, not pushed), 21/21 requirements, audit
 `tech_debt` with a 296 addendum, no blockers. Closed core 7 phase types / 1 emitter / **30 tools**.
 Phases resume at **297**; migrations at **217**.
 
