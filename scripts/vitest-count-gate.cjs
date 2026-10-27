@@ -3256,7 +3256,7 @@ const BASELINE = {
   //   eighth-entry count). ⛔ An EXTENSION, never a lowering — the D-07 pair above is intact.
   "nav-items.test.ts": 6, // 283-02: +1 (the Settings door stands for a member, FIX-01)
   "navItemsConnections.test.ts": 6,
-  "activeViewReachability.test.ts": 11,
+  "activeViewReachability.test.ts": 15, // 297-02 (D-297-14) — +4 route-leg cases (7a-7d), the eleven stay
 
   // ── Phase 243 (243-01 / CHAT-01 / CHAT-04 / D-243-16) — the thinking block's
   // ── PRE-EXTRACTION characterization net. Pinned in the SAME COMMIT that creates the file
@@ -4416,6 +4416,8 @@ const BASELINE = {
   "WorkflowCardMenu.apiKey293.test.tsx": 4, // ⋯ New API key… under Schedules on owned published rows only, payload {id, name}; absent without onApiKey (seam286 pin unchanged)
   // ── Phase 297-01 (REG-09 / D-01, D-03) — adopted, both knobs, same commit (2026-10-27).
   "useAppNavigation.test.tsx": 13, // 297-01 — characterization of App's moved view/tab state: boot initializer (4 shapes + home), studio navigators, one-shot Library hand-off, bounceHome, no router import
+  // ── Phase 297-02 (LINK-01 / D-11, D-12, D-25) — adopted, both knobs, same commit (2026-10-27).
+  "appRoutes.test.ts": 111, // 297-02 — route table: 12-member round-trip, D-11 table, strict ids, legacy ?run= / ?connections=1 / /admin/spend, bare prefixes, pre-auth untouched, hostile inputs never throw or leave the origin
 }
 
 // Still COMPUTED, never hand-written — the reduce is the single source, so the
@@ -6455,6 +6457,8 @@ const TARGETS = [
   "src/components/org/OrgAuditTab.test.tsx",
   // Phase 297-01 — FILE-LEVEL (no directory entry), in the SAME commit as its BASELINE pin.
   "src/hooks/__tests__/useAppNavigation.test.tsx",
+  // Phase 297-02 — FILE-LEVEL (no src/lib/__tests__ directory entry), SAME commit as its BASELINE pin.
+  "src/lib/__tests__/appRoutes.test.ts",
 ]
 
 const REPO_ROOT = path.resolve(__dirname, "..")
