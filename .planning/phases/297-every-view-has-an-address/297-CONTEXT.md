@@ -207,6 +207,15 @@ Requirements: REG-09, LINK-01, LINK-07, LINK-08.
 - **D-40:** The IA skill's "wired with NO router" line is amended (corrected beside the original,
   never deleted) in the router plan.
 - **D-41:** The parity suite reuses the Vercel evaluator already in `docsVercelRouting.test.ts`.
+- **D-42:** The forced exit when access is withdrawn mid-edit (the 403 visibility bounce, D-15) does
+  NOT prompt: it is not the person leaving, and the edit cannot be kept on a view they may no longer
+  open. It navigates with the D-32 latch set. Every other leave of a dirty Builder asks.
+- **D-43:** While the not-found state (UI-SPEC S1, `AddressNotFound`) shows, the rail highlights Chat —
+  accepted, because `NavPanel.tsx` (hot) is not edited in 297; Phase 299's `LinkNotFound` corrects it.
+  S1 is a new sibling component and never renders `<UnknownViewFallback`, which two tests locate by
+  position.
+- **D-44:** G-4 gains a fifth row (from UI-SPEC): paste `/app/nonsense` → S1 shows inside the layout;
+  "Go to Chat" opens chat; Back returns to S1.
 
 ### Claude's Discretion
 - No `ScrollRestoration`: views scroll inside fixed layout containers, so window scroll restoration
