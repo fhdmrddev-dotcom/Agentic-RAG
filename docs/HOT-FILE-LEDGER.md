@@ -12065,7 +12065,7 @@ cells rot within days.
 | [`frontend/src/components/settings/rerankEngines.ts`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentssettingsrerankenginests) | 2 / 2 / 138 (was `1 / 1 / 123`) | no (2 phases) | 296-04: engineFor maps only legacy api to Cohere, else null; latencyNote on the local row (the 30 is the backend timeout, pinned by 296-03) |
 | [`frontend/src/components/settings/RerankEngineBlock.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentssettingsrerankengineblocktsx) | 3 / 2 / 315 (was `1 / 1 / 283`) | no (2 phases) | 296-04: an unknown stored id selects no card and shows the unknown-engine note; first card stays tabbable; latency note beside the first-use note |
 | [`frontend/src/lib/api/citationChecks.ts`](docs/HOT-FILE-LEDGER.md#frontendsrclibapicitationchecksts) | 1 / 1 / 117 (was `0 / 0 / 0`) | no (young) | young (created 294-05). getCitationChecks / runCitationCheck + wire types verbatim; the 409 reason is kept. ⛔ not re-exported through lib/api.ts |
-| [`frontend/src/stores/citationCheckStore.ts`](docs/HOT-FILE-LEDGER.md#frontendsrcstorescitationcheckstorets) | 4 / 2 / 172 (was `3 / 1 / 152`) | no (2 phases) | 296-04: a 429 maps to rate_limited; a 409 off/key_missing/reorders-only updates the shared availability; a failed availability GET retries once |
+| [`frontend/src/stores/citationCheckStore.ts`](docs/HOT-FILE-LEDGER.md#frontendsrcstorescitationcheckstorets) | 5 / 2 / 174 (was `4 / 2 / 172`) | no (2 phases) | 296 review FE-WR-03: a 409 off/key_missing/reorders-only sets ONLY the shared availability (no per-message error), so the asking message shows the sentence once |
 | [`frontend/src/components/chat/citationVerdicts.ts`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentschatcitationverdictsts) | 4 / 2 / 149 (was `2 / 1 / 142`) | no (2 phases) | 296-04: the rate_limited reason and its sentence (SEED-365); keyMissingLine null-safe |
 | [`frontend/src/components/chat/CitationCheckAction.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentschatcitationcheckactiontsx) | 2 / 2 / 124 (was `1 / 1 / 123`) | no (2 phases) | 296-04: Checking N source(s)… (the count is citations.length); engineFor null-safe |
 | [`frontend/src/components/chat/CitedMarkdown.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentschatcitedmarkdowntsx) | 3 / 2 / 387 (was `2 / 1 / 294`) | no (2 phases) | 294-05: data-citation-ordinal + decorateMarkers (n must match); decorates in place on arrival. ⛔ the layout effect still owns innerHTML; verdicts via a ref |
@@ -22781,6 +22781,12 @@ CLAUDE.md verdict cell as of 2026-10-18 (replaced by 286-05):
 Scan-list cell before this 296-02 touch (moved verbatim): | [`backend/app/services/harness_engine.py`](docs/HOT-FILE-LEDGER.md#backendappservicesharness_enginepy) | 68 / 26 / 2961 (was `67 / 26 / 2957`) | ⚠ **FIRES** | 295-09 WR-07: the pause arm skips its `pause_run` when the engine ask already wrote it (ONE guarded line, If 86→87), so a re-driven run is never flipped back. Armed-block seam still OWED |
 
 CLAUDE.md FIRING cell before this 296-02 touch (moved verbatim): | `backend/app/services/harness_engine.py` | 68 / 26 / 2961 (was `67 / 26 / 2957`) | 295-09 WR-07: one pause write per engine ask · armed seam OWED · ⛔ |
+
+### `frontend/src/stores/citationCheckStore.ts` — 296 review FE-WR-03 (2026-10-27)
+
+**`5 / 2 / 174` (was `4 / 2 / 172`).** 296 review FE-WR-03: a 409 `off` / `key_missing` / `engine_reorders_only` set both the shared `availability` and `errors[id]`, and `checkErrorLine` maps those codes to the same words `availabilityReason` prints, so the asking message showed one sentence twice (ⓘ muted and red `role="status"`). `run()`'s catch now writes the shared availability ALONE for those reasons, and a per-message error only for every other code. One `set` call reshaped, no new branch. RED `e73e6337d`. No CLAUDE.md FIRING row (2 phases).
+
+Scan-list cell before this touch (moved verbatim): | [`frontend/src/stores/citationCheckStore.ts`](docs/HOT-FILE-LEDGER.md#frontendsrcstorescitationcheckstorets) | 4 / 2 / 172 (was `3 / 1 / 152`) | no (2 phases) | 296-04: a 429 maps to rate_limited; a 409 off/key_missing/reorders-only updates the shared availability; a failed availability GET retries once |
 
 ### `frontend/src/components/panel/PhaseCard.tsx` — 296 review FE-WR-01 (2026-10-27)
 

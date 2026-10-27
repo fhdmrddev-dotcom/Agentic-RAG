@@ -136,12 +136,14 @@ export const useCitationCheckStore = create<CitationCheckState>()((set) => {
         const code = errorCodeOf(e)
         // 296-04 (294-IN-06): a 409 saying the check cannot run here (off, no key, a reorder-only
         // engine) is a fact about the whole workspace, so it updates the SHARED availability and
-        // every message shows the reason line, not only the one that asked.
+        // every message shows the reason line, not only the one that asked. 296 review FE-WR-03:
+        // and NO per-message error then — that printed the same sentence twice on the asker.
         const reason = UNAVAILABLE_REASONS.find((r) => r === code)
-        set((s) => ({
-          errors: { ...s.errors, [id]: code },
-          ...(reason ? { availability: { available: false, engine: s.availability?.engine ?? null, reason } } : {}),
-        }))
+        set((s) =>
+          reason
+            ? { availability: { available: false, engine: s.availability?.engine ?? null, reason } }
+            : { errors: { ...s.errors, [id]: code } },
+        )
       } finally {
         if (gen === generation) set((s) => ({ inFlight: without(s.inFlight, id) }))
       }
