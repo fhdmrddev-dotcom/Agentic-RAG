@@ -6,27 +6,30 @@
  * boot, and the evidence report writes it while it is shown (and clears it when it leaves),
  * so the address bar always names the record on screen and a reload keeps it.
  *
+ * ⚠ CORRECTED 2026-10-27 (Phase 297-02, D-18 / D-33) — THE PARAGRAPH ABOVE IS KEPT RATHER THAN
+ * OVERWRITTEN. The app has a router now and the run page has its own address, `/app/runs/<id>`.
+ * The router is the only History writer, so the write and clear helpers are deleted, and so is
+ * the reader of the browser address. What survives is the strict rule and a pure reader over a
+ * search STRING, which the route table (`appRoutes.ts`) uses to keep old `?run=` links working
+ * as a legacy alias (they are replaced by the run's own address on arrival).
+ *
  * ⚠ THE VALUE IS ATTACKER-CONTROLLABLE — it arrives in a shared link. The reader accepts a
  * strict UUID and nothing else; any other value is `null`, never a partial match. Access is
  * still decided by the server (a 404 for every refusal), so this guard keeps junk out of a
  * request path rather than standing in for authorisation.
  *
- * Pure DOM-API helpers: no React, never throws (no window → null / no-op).
+ * Pure helpers: no React, no browser globals, never throws.
  */
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
 const PARAM = "run"
-
-function hasWindow(): boolean {
-  return typeof window !== "undefined" && window !== null && typeof window.location !== "undefined"
-}
 
 /** Phase 297-02 (D-12): THE one strict-UUID rule, shared with the route table (`appRoutes.ts`). */
 export function isStrictUuid(value: string): boolean {
   return typeof value === "string" && UUID_RE.test(value)
 }
 
-/** Phase 297-02 (D-18): the `?run=` value from a search STRING (no window read) — a strict
- *  UUID lowercased, else `null`. The route table parses the legacy alias through this. */
+/** Phase 297-02 (D-18): the `?run=` value from a search STRING — a strict UUID lowercased,
+ *  else `null`. The route table parses the legacy alias through this. */
 export function readRunParam(search: string): string | null {
   try {
     const raw = new URLSearchParams(search).get(PARAM)
@@ -34,47 +37,5 @@ export function readRunParam(search: string): string | null {
     return raw.toLowerCase()
   } catch {
     return null
-  }
-}
-
-/** The `?run=` value when it is a valid UUID (lowercased), else `null`. */
-export function readRunDeepLink(): string | null {
-  try {
-    if (!hasWindow()) return null
-    const raw = new URLSearchParams(window.location.search).get(PARAM)
-    if (raw === null || !UUID_RE.test(raw)) return null
-    return raw.toLowerCase()
-  } catch {
-    return null
-  }
-}
-
-function replaceWith(url: URL): void {
-  window.history.replaceState(window.history.state, "", `${url.pathname}${url.search}${url.hash}`)
-}
-
-/** Put `?run=<id>` in the address bar without a history entry. A non-UUID id writes nothing. */
-export function writeRunDeepLink(runId: string): void {
-  try {
-    if (!hasWindow() || !UUID_RE.test(runId)) return
-    const url = new URL(window.location.href)
-    if (url.searchParams.get(PARAM) === runId.toLowerCase()) return
-    url.searchParams.set(PARAM, runId.toLowerCase())
-    replaceWith(url)
-  } catch {
-    /* never throws */
-  }
-}
-
-/** Remove `run` from the address bar, leaving every other param. */
-export function clearRunDeepLink(): void {
-  try {
-    if (!hasWindow()) return
-    const url = new URL(window.location.href)
-    if (!url.searchParams.has(PARAM)) return
-    url.searchParams.delete(PARAM)
-    replaceWith(url)
-  } catch {
-    /* never throws */
   }
 }

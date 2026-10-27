@@ -163,7 +163,8 @@ function App() {
   // re-probes after a fresh SPA sign-in and clears operator state on sign-out /
   // user switch. A non-operator's probe yields null → isOperator false → the nav
   // stays byte-identical to today.
-  const { isOperator, identity: operatorIdentity } = useOperatorProbe(user?.id ?? null)
+  // Phase 297-02 (D-35): `loading` too, so a typed /app/admin holds instead of refusing early.
+  const { isOperator, identity: operatorIdentity, loading: operatorLoading } = useOperatorProbe(user?.id ?? null)
 
   // Phase 148 (VIS-01 / D-04): the per-session effective-features map, keyed to the
   // same user id (WR-01). It filters the nav so a governed feature the caller cannot
@@ -327,6 +328,10 @@ function App() {
               onTuneSkill={nav.handleTuneSkill}
               libraryTab={nav.libraryTab}
               onOpenLibraryHealth={nav.handleOpenLibraryHealth}
+              activeRunId={nav.runId}
+              openRun={nav.openRun}
+              addressNotFound={nav.addressNotFound}
+              operatorLoading={operatorLoading}
             />
           </CitationNavProvider>
           </EffectiveFeaturesProvider>
