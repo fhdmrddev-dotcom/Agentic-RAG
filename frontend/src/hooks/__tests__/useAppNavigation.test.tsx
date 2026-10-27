@@ -248,6 +248,27 @@ describe("useAppNavigation — the address is the view (D-07, D-15)", () => {
     expect(router.state.historyAction).toBe("POP")
   })
 
+  // 297-REVIEW IN-02 (2026-10-28): `/` and `/app?code=…` are chat without being spelled `/app`.
+  it.each(["/", "/app?code=x"])("onNavigate('chat') at %s adds NO history entry — chat is already on screen", async (entry) => {
+    const router = mount(entry)
+    await act(async () => {})
+    const key = router.state.location.key
+    act(() => nav().onNavigate("chat"))
+    await act(async () => {})
+    expect(router.state.location.key).toBe(key)
+    expect(where(router)).toBe(entry)
+  })
+
+  it("IN-02: bounceHome at bare / leaves the clean root alone and arms no leave latch", async () => {
+    const router = mount("/")
+    await act(async () => {})
+    nav().leaveGuards.register(() => false)
+    act(() => nav().bounceHome())
+    await act(async () => {})
+    expect(where(router)).toBe("/")
+    expect(nav().leaveGuards.canLeaveAll()).toBe(false) // a stale armed latch would answer true
+  })
+
   it("openRun(id) pushes /app/runs/<id>", async () => {
     const router = mount("/app/workflows")
     act(() => nav().openRun(RUN_ID))

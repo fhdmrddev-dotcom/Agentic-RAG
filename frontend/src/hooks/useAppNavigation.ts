@@ -159,16 +159,30 @@ export function useAppNavigation(): AppNavigation {
     void navigate({ pathname, search, hash: location.hash }, { replace: true })
   }, [location.pathname, location.search, location.hash, navigate, ensureEntryIdx])
 
+  /** Is `target` (a formatted route) what is on screen? True for the exact address, and — 297-REVIEW
+   *  IN-02 (2026-10-28) — for an address that PARSES to the same route without being spelled like
+   *  it: bare `/` (D-13 keeps it) and `/app?code=…` are both chat, so a Chat click there must not
+   *  push a duplicate entry (D-15), and the 403 bounce must not rewrite the clean root. */
+  const isOnScreen = useCallback((target: string) => {
+    if (target === here.current) return true
+    const q = here.current.indexOf("?")
+    const parsed = parseAppLocation(
+      q < 0 ? here.current : here.current.slice(0, q),
+      q < 0 ? "" : here.current.slice(q),
+    )
+    return parsed.view !== "not-found" && parsed.view !== "pre-auth" && formatAppRoute(parsed) === target
+  }, [])
+
   /** Navigate to a route; a no-op when it is the address already on screen (D-15). */
   const go = useCallback(
     (route: AppRoute, opts: { replace?: boolean } = {}) => {
       const target = formatAppRoute(route)
-      if (target === here.current) return
+      if (isOnScreen(target)) return
       ensureEntryIdx(here.current.split("?")[0])
       here.current = target
       void navigate(target, { replace: opts.replace === true })
     },
-    [navigate, ensureEntryIdx],
+    [navigate, ensureEntryIdx, isOnScreen],
   )
 
   // ── Phase 297-03 (LINK-07 / D-21, D-22, D-24, D-31) — the ONE leave guard. ──
@@ -320,9 +334,10 @@ export function useAppNavigation(): AppNavigation {
   const bounceHome = useCallback(() => {
     const home: AppRoute = { view: "chat" }
     const herePath = here.current.split("?")[0]
-    if (formatAppRoute(home) !== herePath) registry.approveNextLeave()
+    // IN-02: already home by parse (`/`, `/app?code=…`) → `go` is a no-op, so nothing is armed.
+    if (!isOnScreen(formatAppRoute(home)) && formatAppRoute(home) !== herePath) registry.approveNextLeave()
     go(home, { replace: true })
-  }, [go, registry])
+  }, [go, registry, isOnScreen])
 
   return {
     activeView,
