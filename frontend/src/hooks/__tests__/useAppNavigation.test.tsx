@@ -304,6 +304,16 @@ describe("useAppNavigation — addresses the router must never touch (D-13, D-17
     expect(router.state.historyAction).toBe("POP")
   })
 
+  // 297-REVIEW IN-03 (2026-10-28): the POSITIVE CONTROL for the single flush above. The same
+  // one `await act(async () => {})` is enough for a replace that SHOULD land to land, so the
+  // "left exactly as it is" cases cannot pass merely because the router had not run yet.
+  it("control: a bare /workflows IS replaced within that same single flush", async () => {
+    const router = mount("/workflows")
+    await act(async () => {})
+    expect(where(router)).toBe("/app/workflows")
+    expect(router.state.historyAction).toBe("REPLACE")
+  })
+
   it("/ is chat", () => {
     mount("/")
     expect(nav().activeView).toBe("chat")
