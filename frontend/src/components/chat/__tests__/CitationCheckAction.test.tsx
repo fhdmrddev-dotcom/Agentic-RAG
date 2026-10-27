@@ -12,6 +12,7 @@ const api = vi.hoisted(() => ({ getCitationChecks: vi.fn(), runCitationCheck: vi
 vi.mock("@/lib/api/citationChecks", () => api)
 
 import { CitationCheckAction } from "../CitationCheckAction"
+import { useCitationCheckStore } from "@/stores/citationCheckStore"
 import type { CitationCheckResult, CitationCheckAvailability } from "@/lib/api/citationChecks"
 
 const RESULT: CitationCheckResult = {
@@ -199,6 +200,31 @@ describe("CitationCheckAction — 296-04 (294-IN-06 / 294-IN-08 / SEED-365)", ()
     fireEvent.click(buttons[0])
     await waitFor(() => expect(screen.getAllByText(line).length).toBeGreaterThanOrEqual(2))
     expect(screen.queryByRole("button", { name: "Check citations · Jev" })).toBeNull()
+  })
+
+  // 296 review FE-WR-03: the asking message showed the reason TWICE — once as the shared ⓘ line
+  // and once as its own red error line (`checkErrorLine` maps the same codes to the same words).
+  it.each([
+    ["off", "Citation check is off while reranking is off."],
+    ["key_missing", "Citation check can't run: no saved OpenRouter key (Settings → Reranking)."],
+    ["engine_reorders_only", "Citation check needs Jev or OpenAI Decisions (Settings → Reranking)."],
+  ])("a 409 %s shows the reason ONCE per message, the asking one included", async (reason, line) => {
+    serve({ available: true, engine: "jev", reason: null })
+    api.runCitationCheck.mockRejectedValue(Object.assign(new Error("409"), { status: 409, reason }))
+    render(
+      <>
+        <CitationCheckAction messageId="m1" citationCount={3} />
+        <CitationCheckAction messageId="m2" citationCount={2} />
+      </>,
+    )
+    const buttons = await screen.findAllByRole("button", { name: "Check citations · Jev" })
+    fireEvent.click(buttons[0])
+    await waitFor(() => expect(screen.queryByRole("button", { name: "Check citations · Jev" })).toBeNull())
+    await act(async () => {
+      for (let i = 0; i < 5; i++) await new Promise((r) => setTimeout(r, 0))
+    })
+    expect(screen.getAllByText(line)).toHaveLength(2)
+    expect(useCitationCheckStore.getState().errors.m1).toBeUndefined()
   })
 
   it("a failed availability read is retried once", async () => {
