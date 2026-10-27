@@ -11607,7 +11607,7 @@ cells rot within days.
 | [`scripts/decision-fault-server.py`](docs/HOT-FILE-LEDGER.md#scriptsdecision-fault-serverpy) | 2 / 2 / 216 | no (young) | young (294 / 296). 296-05: `ok` answers a `choice` question with its first offered option (294-IN-03). ⛔ loopback only, never logs a body |
 | [`scripts/check-backend-unit-baseline.cjs`](docs/HOT-FILE-LEDGER.md#scriptscheck-backend-unit-baselinecjs) | 2 / 2 / 268 | no (young) | young (228 / 296). 296-05: no summary / a signal / exit ≥ 2 is `[GATE ERROR]`; a run with no `tests` path keeps `tests/unit` |
 | [`backend/app/services/eval_runner_service.py`](docs/HOT-FILE-LEDGER.md#backendappserviceseval_runner_servicepy) | 14 / 9 / 1056 (was `13 / 8 / 1040`) | ⚠ **FIRES** | 296-06 (292.1-IN-04): EVAL_MAX_TOOL_ROUNDS (= today's general default, 15) set on a COPY of the eval ctx's settings; the chat knob no longer moves eval results |
-| [`frontend/src/components/panel/PhaseCard.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentspanelphasecardtsx) | 21 / 14 / 817 (was `20 / 13 / 811`) | ⚠ **FIRES** | 296-04: ONE optional prop (`runPaused`) passed to `statusMetaForRun` (useState 1→1, useEffect 1→1). Honoured by construction |
+| [`frontend/src/components/panel/PhaseCard.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentspanelphasecardtsx) | 22 / 14 / 821 (was `21 / 14 / 817`) | ⚠ **FIRES** | 296 review FE-WR-01: one derived `isWorking` (running and not paused) gates the progressbar, Working line and aria-busy. useState 1→1, useEffect 1→1 |
 | [`frontend/src/components/panel/PhaseTimeline.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentspanelphasetimelinetsx) | 11 / 9 / 408 (was `10 / 8 / 404`) | ⚠ **FIRES** | 296-04: one derived const (`runPaused`, from the fetched frame) and one prop to each card. Honoured by construction |
 | [`frontend/src/components/panel/phaseStatusMeta.ts`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentspanelphasestatusmetats) | 5 / 5 / 308 (was `4 / 4 / 291`) | ⚠ **FIRES** | 296-04: one derived `WAITING_META` row (`!` · Waiting · warning) and one optional `runPaused` arg on `statusMetaForRun`; not a wire status |
 | [`backend/app/services/harness/validator_kinds.py`](docs/HOT-FILE-LEDGER.md#backendappservicesharnessvalidator_kindspy) | 19 / 9 / 918 (was `18 / 8 / 899`) | ⚠ **FIRES** | 296-02 (295-IN-08 / D-07): judge_system_prompt gains by_design (one condition); the in-run judge passes recording_by_design(ctx) — golden run or live_connectors off; a missing grant gets no note |
@@ -22781,6 +22781,14 @@ CLAUDE.md verdict cell as of 2026-10-18 (replaced by 286-05):
 Scan-list cell before this 296-02 touch (moved verbatim): | [`backend/app/services/harness_engine.py`](docs/HOT-FILE-LEDGER.md#backendappservicesharness_enginepy) | 68 / 26 / 2961 (was `67 / 26 / 2957`) | ⚠ **FIRES** | 295-09 WR-07: the pause arm skips its `pause_run` when the engine ask already wrote it (ONE guarded line, If 86→87), so a re-driven run is never flipped back. Armed-block seam still OWED |
 
 CLAUDE.md FIRING cell before this 296-02 touch (moved verbatim): | `backend/app/services/harness_engine.py` | 68 / 26 / 2961 (was `67 / 26 / 2957`) | 295-09 WR-07: one pause write per engine ask · armed seam OWED · ⛔ |
+
+### `frontend/src/components/panel/PhaseCard.tsx` — 296 review FE-WR-01 (2026-10-27)
+
+**`22 / 14 / 821` (was `21 / 14 / 817`).** 296 review FE-WR-01: 296-04's `runPaused` moved only the status word, so a paused run's step read `! Waiting` beside an indeterminate progressbar named `<slug> running`, a pulsing `● Working` line and `aria-busy="true"` (UI-SPEC row 4 says the step reads `! Waiting`, with no per-step announcement). One derived constant, `isWorking = isRunning && runPaused !== true`, now gates those three instruments. The BLOOM frame, the forced-open row and the type one-liner still key on `isRunning`, because the paused step is still the current step and stays expanded. useState 1→1, useEffect 1→1. RED `c1f0f3f54`.
+
+Scan-list cell before this touch (moved verbatim): | [`frontend/src/components/panel/PhaseCard.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentspanelphasecardtsx) | 21 / 14 / 817 (was `20 / 13 / 811`) | ⚠ **FIRES** | 296-04: ONE optional prop (`runPaused`) passed to `statusMetaForRun` (useState 1→1, useEffect 1→1). Honoured by construction |
+
+CLAUDE.md FIRING cell before this touch (moved verbatim): | `frontend/src/components/panel/PhaseCard.tsx` | 21 / 14 / 817 (was `20 / 13 / 811`) | 296-04: ONE prop (runPaused) → Waiting reading |
 
 ### `frontend/src/components/workflows/RunEvidenceReport.tsx` — 296 review FE-WR-02 (2026-10-27)
 
