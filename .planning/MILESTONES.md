@@ -1,5 +1,27 @@
 # Milestones
 
+## v4.7 Workflows You Can See and Start Anywhere (Shipped: 2026-10-27)
+
+**Phases:** 12 (286-296; 292.1 inserted; 294, 295, 296 added in-milestone) · **Plans:** 60 (+3 gap fixes in 295) · **Commits:** 885 since `v4.6` ·
+**Files:** 1,352 (+250,057 / −16,796; backend 62.0k, frontend 39.7k, planning 119.7k) · **Migrations:** 210-216 · **Timeline:** 2026-10-18 → 2026-10-27 (10 days)
+**Audit:** [`v4.7-MILESTONE-AUDIT.md`](milestones/v4.7-MILESTONE-AUDIT.md) — `tech_debt`, no blockers ·
+**21 / 21** satisfied · integration **23/23** (14 + 9 added by 296) · flows **9/9**. Deployed to production 2026-10-27 (`3ec36f998`).
+
+Workflows became easier to start, finish authoring and understand at a glance, with visuals that show what a run did.
+
+**Key accomplishments:**
+
+- **Start anywhere** (287, 293). From a thread, by forking a starter, on a schedule, or from outside with an org-scoped, rate-limited, audited API key (`/inbound`); every run shows how it was started, and the card shows the next run.
+- **Authoring that finishes the job** (288, 291). Drafts survive navigation; a workflow that pauses for a person can be published; describe-it authoring derives inputs, steps and the filled form from your own template, form and reference files.
+- **See what a run did** (289, 290, 292). A read-only run page with export, evidence and per-step confidence; library cards with phase chips; a truthful team picture; diagram, comparison and timeline artifacts (registry 3 → 6).
+- **Runs that do not dead-end** (295, 292.1). A step that finds nothing pauses durably and asks; every run ends in a true state with a reason; the tool-limit Continue always fires.
+- **Decision engine** (294). Rerank and a per-sentence citation check behind a Settings switch, off by default and off in cloud.
+- **The debt closed before the close** (296). 133 inventory rows ended fixed, accepted, seeded or operator-owed; provider keys out of LangSmith traces; folder and workflow create honour the active org.
+
+Known deferred items at close: 43 from the artifact audit — 8 in v4.7 (4 `human_needed` verifications 287 / 289 / 292.1 / 294 and 4 UAT files, each with a named reason in the audit), 31 pre-v4.7 quick tasks, 4 dormant seeds. Re-run `gsd-sdk query audit-open`.
+
+---
+
 ## v4.6 Pay It Down (Shipped: 2026-10-16)
 
 **Phases:** 9 (277-285) · **Plans:** 34 · **Migrations:** 207-209 · **Timeline:** 2026-10-12 → 2026-10-16 (5 days)
