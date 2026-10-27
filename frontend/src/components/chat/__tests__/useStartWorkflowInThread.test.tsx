@@ -149,6 +149,30 @@ describe("useStartWorkflowInThread — 296-04: a refused start is worded, never 
     expect(result.current.starting).toBe(false)
   })
 
+  it("296 review FE-CR-01: the provider's kickoff refusal (error, no draft) is worded by the hook", async () => {
+    mockSend.mockImplementation(async (threadId: string) => {
+      useStreamsStore.setState((s) => ({
+        reconcileErrors: new Map(s.reconcileErrors).set(threadId, new FakeApiError("refused", 422)),
+      }))
+    })
+    const { result } = renderHook(() => useStartWorkflowInThread("t-1"))
+    await startPlain(result)
+    await waitFor(() => expect(result.current.failure?.kind).toBe("inputs"))
+    expect(useStreamsStore.getState().reconcileErrors.has("t-1")).toBe(false)
+  })
+
+  it("a new reconcile failure (500) during the start is not mistaken for a refusal", async () => {
+    mockSend.mockImplementation(async (threadId: string) => {
+      useStreamsStore.setState((s) => ({
+        reconcileErrors: new Map(s.reconcileErrors).set(threadId, new FakeApiError("snapshot", 500)),
+      }))
+    })
+    const { result } = renderHook(() => useStartWorkflowInThread("t-1"))
+    await startPlain(result)
+    await waitFor(() => expect(result.current.starting).toBe(false))
+    expect(result.current.failure).toBeNull()
+  })
+
   it("the provider's own failure shape: the hook words it and the composer is NOT pre-filled", async () => {
     mockSend.mockImplementation(async (threadId: string, content: string) => {
       useStreamsStore.setState((s) => ({
