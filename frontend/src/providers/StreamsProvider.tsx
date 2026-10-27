@@ -2876,9 +2876,17 @@ export function StreamsProvider({ children }: PropsWithChildren) {
               // kickoff RTT, and the shipped lock seed cannot serve here because it
               // needs `run_id` back from the POST. Cleared by the SAME
               // slice-transition subscription that clears the stopping slice.
-              useStreamsStore.setState((s) => ({
-                harnessKickoffThreads: new Set(s.harnessKickoffThreads).add(threadId),
-              }))
+              // 296 G-4 #12 (d): the step slice belongs to the run being started, not the thread's
+              // previous run (whose `done` rows would read as this run's progress, and whose slugs
+              // make this run's phase_started a no-op in appendPhaseForThread).
+              useStreamsStore.setState((s) => {
+                const phases = new Map(s.phasesByThread)
+                phases.delete(threadId)
+                return {
+                  harnessKickoffThreads: new Set(s.harnessKickoffThreads).add(threadId),
+                  phasesByThread: phases,
+                }
+              })
             }
             // Plan 075.4-01 D-075.4-A1: per-thread streamingThreads.
             useStreamsStore.setState((s) => ({
@@ -3220,6 +3228,14 @@ export function StreamsProvider({ children }: PropsWithChildren) {
                   .catch(console.error)
               }
               originalOnTerminal(kind, errorPayload)
+              // 296 G-4 #12: a harness kickoff has no assistant node (R5 above), so its answer is a
+              // persisted row this follow never rendered. Re-read the viewed thread, as the
+              // subscribeProducerStream terminal does (296-04).
+              if (opts?.workflowDefinitionId && useStreamsStore.getState().viewedThreadId === threadId) {
+                void useStreamsStore.getState().actions.reconcile(threadId, surfaceId)
+                  .then(() => refreshPhaseSpineAfterStop(threadId))
+                  .catch((err) => console.warn("[StreamsProvider] kickoff terminal reconcile failed", err))
+              }
             }
 
             // Phase 063.1 (D-063.1-01/02 / Gap-004): cursor advancement.

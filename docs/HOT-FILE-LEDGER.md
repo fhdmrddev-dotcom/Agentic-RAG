@@ -11529,7 +11529,7 @@ cells rot within days.
 | [`frontend/src/components/chat/tool-bodies/SearchDocumentsBody.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentschattool-bodiessearchdocumentsbodytsx) | 3 / 3 / 71 | ⚠ **FIRES** (crossed in 272) | ⚠ absent its ENTIRE LIFE — row added 272-05. **F-3**: `summarize` names refused / invalid / empty / not-searchable / unavailable |
 | [`frontend/src/components/chat/MessageItem.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentschatmessageitemtsx) | 84 / 39 / 1059 (was `83 / 42 / 1050`) | ⚠ **FIRES** | 292.1 UAT: Deep Continue re-attaches the run's stream (+1 else-if) · ⛔ |
 | [`backend/app/api/threads.py`](docs/HOT-FILE-LEDGER.md#backendappapithreadspy) | 283 / 95 / 2745 (was `282 / 94 / 2744`) | ⚠ **FIRES** | 296-06 (SEED-362 kickoff half): ONE kwarg `provider=_resolved_provider` on the existing create_workflow_run call. The 287-T01 guard lives in preflight (workflow_kickoff.py), not here · ⛔ |
-| [`frontend/src/providers/StreamsProvider.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrcprovidersstreamsprovidertsx) | 119 / 45 / 5234 (was `118 / 45 / 5222`) | ⚠ **FIRES** | 296 G-4 S3: subscribeProducerStream ends its segment on `run_completed` (once-only onTerminal + abort), as cap_paused does for a continuation, so the 296-04 reconcile runs. |
+| [`frontend/src/providers/StreamsProvider.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrcprovidersstreamsprovidertsx) | 120 / 45 / 5250 (was `119 / 45 / 5234`) | ⚠ **FIRES** | 296 G-4 row 12: sendMessage's kickoff follow now reconciles the viewed thread at its terminal (the R5 kickoff has no assistant node) and clears the previous run's step slice at kickoff. |
 | [`frontend/src/hooks/useMessages.ts`](docs/HOT-FILE-LEDGER.md#frontendsrchooksusemessagests) | 74 / 27 / 127 | ⚠ **FIRES** | extraction due |
 | [`backend/app/services/anthropic_service.py`](docs/HOT-FILE-LEDGER.md#backendappservicesanthropic_servicepy) | 12 / 11 / 373 (was `11 / 10 / 354`) | ⚠ **FIRES** | **282-01**: ONE `_anthropic_client` builder (budget in the constructor, connect 5 s, cloud retries 2) + trailing `timeout_s` on `stream_anthropic`. honoured by construction; adapter-pattern audit due |
 | [`frontend/src/components/workflows/WorkflowCanvas.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentsworkflowsworkflowcanvastsx) | 33 / 11 / 1757 (was `32 / 10 / 1744`) | **FIRES** | 296-07 (D-09, operator decision): ONE controlled prop pair (view / onViewChange) + tabpanel attrs on 2 bodies; useState 8→8. ⛔ extraction still FIRST next |
@@ -11623,7 +11623,7 @@ cells rot within days.
 | [`frontend/src/components/workflows/library/RunModal.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentsworkflowslibraryrunmodaltsx) | 13 / 8 / 748 (was `12 / 8 / 740`) | ⚠ **FIRES** | 296 G-4 row 11: a refused Run scrolls the required refusal into view (`block: nearest`): one ref, one effect, one call in handleRun. useState unchanged |
 | [`frontend/src/components/panel/PanelEmpty.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentspanelpanelemptytsx) | 4 / 4 / 52 | ⚠ **FIRES** | ⚠ absent at 4 phases — invisible to G-5 for its entire life (199) |
 | [`frontend/src/components/chat/StopControl.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentschatstopcontroltsx) | 3 / 1 / 315 | no (1 phase) | young — owes a detail section at its 3rd phase |
-| [`frontend/src/components/chat/ThreadRunLine.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentschatthreadrunlinetsx) | 2 / 2 / 365 (was `1 / 1 / 357`) | no (1 phase) | ⚠ re-derived at 244-13 and UNMOVED — `244` FIXED G-1 in its INPUT, not here, so it is still at phase 1 and NOT one away. Detail section owed at its 3rd phase · 293 touch: see §Phase 293 close |
+| [`frontend/src/components/chat/ThreadRunLine.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentschatthreadrunlinetsx) | 3 / 2 / 376 (was `2 / 2 / 365`) | no (1 phase) | 296 G-4 row 12: re-reads the frame when the kickoff's run id arrives; a FINISHED frame (the previous run's) never supplies elapsed or origin. |
 | [`frontend/src/components/chat/ActiveRunsTray.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentschatactiverunstraytsx) | 2 / 1 / 164 | no (1 phase) | young — owes a detail section at its 3rd phase |
 | [`frontend/src/components/files/FileRow.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentsfilesfilerowtsx) | 1 / 1 / 275 | no (1 phase) | young (195) |
 | [`frontend/src/components/files/fileRowUtils.ts`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentsfilesfilerowutilsts) | 1 / 1 / 133 | no (1 phase) | young (195) |
@@ -22835,6 +22835,20 @@ CLAUDE.md FIRING cell before this touch (moved verbatim): | `backend/app/service
 Scan-list cell before this touch (moved verbatim): | [`backend/app/api/folders.py`](docs/HOT-FILE-LEDGER.md#backendappapifolderspy) | 15 / 10 / 287 (was `14 / 9 / 277`) | ⚠ **FIRES** | Honoured by construction. **296-01**: create_folder stamps the validated active org; a cross-org parent gets the existing 404 |
 
 CLAUDE.md FIRING cell before this touch (moved verbatim): | `backend/app/api/folders.py` | 15 / 10 / 287 (was `14 / 9 / 277`) | 296-01: create_folder stamps the active org; cross-org parent 404 |
+
+### `frontend/src/providers/StreamsProvider.tsx` — 296 G-4 row 12 (2026-10-27)
+
+**`120 / 45 / 5250` (was `119 / 45 / 5234`).** 296 G-4 row 12: sendMessage's kickoff follow now reconciles the viewed thread at its terminal (the R5 kickoff has no assistant node) and clears the previous run's step slice at kickoff. Found live: a fresh in-thread start showed no answer until re-entry, and a stale `1 phase done… · 1m 57s` (the previous run's); bisected pre-existing (`07e2e4ba8`). Diagnosis `.planning/phases/296-close-v4-7-debt/evidence/g4/12-diagnosis.md`, RED `6a6791309`.
+
+Scan-list cell before this touch (moved verbatim): | [`frontend/src/providers/StreamsProvider.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrcprovidersstreamsprovidertsx) | 119 / 45 / 5234 (was `118 / 45 / 5222`) | ⚠ **FIRES** | 296 G-4 S3: subscribeProducerStream ends its segment on `run_completed` (once-only onTerminal + abort), as cap_paused does for a continuation, so the 296-04 reconcile runs. |
+
+CLAUDE.md FIRING cell before this touch (moved verbatim): | `frontend/src/providers/StreamsProvider.tsx` | 119 / 45 / 5234 (was `118 / 45 / 5222`) | 296 G-4 S3: the follow ends its segment on run_completed · ⛔ |
+
+### `frontend/src/components/chat/ThreadRunLine.tsx` — 296 G-4 row 12 (2026-10-27)
+
+**`3 / 2 / 376` (was `2 / 2 / 365`).** 296 G-4 row 12: re-reads the frame when the kickoff's run id arrives; a FINISHED frame (the previous run's) never supplies elapsed or origin. Found live: a fresh in-thread start showed no answer until re-entry, and a stale `1 phase done… · 1m 57s` (the previous run's); bisected pre-existing (`07e2e4ba8`). Diagnosis `.planning/phases/296-close-v4-7-debt/evidence/g4/12-diagnosis.md`, RED `6a6791309`.
+
+Scan-list cell before this touch (moved verbatim): | [`frontend/src/components/chat/ThreadRunLine.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentschatthreadrunlinetsx) | 2 / 2 / 365 (was `1 / 1 / 357`) | no (1 phase) | ⚠ re-derived at 244-13 and UNMOVED — `244` FIXED G-1 in its INPUT, not here, so it is still at phase 1 and NOT one away. Detail section owed at its 3rd phase · 293 touch: see §Phase 293 close |
 
 ### `backend/app/api/inbound.py` — 296 SECURITY AR-05 (2026-10-27)
 
