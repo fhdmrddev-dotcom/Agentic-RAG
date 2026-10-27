@@ -82,6 +82,25 @@ describe("296-04 / 295-D-uat-02 — a running step on a paused run reads Waiting
     expect(word?.closest(".text-\\[hsl\\(var\\(--warning\\)\\)\\]")).not.toBeNull()
   })
 
+  // 296 review FE-WR-01: the instruments follow the reading. A paused run's step shows ONLY the
+  // Waiting reading — no "<slug> running" progressbar, no pulsing "Working" line, no aria-busy.
+  it("run paused: no running progressbar, no Working line, no aria-busy (296 review FE-WR-01)", () => {
+    const { container } = render(<PhaseCard phase={runningStep()} position={0} runPaused />)
+    expect(container.querySelector('[role="progressbar"]')).toBeNull()
+    expect(screen.queryByLabelText("approve-send running")).toBeNull()
+    expect(container.querySelector("[data-activity-line]")).toBeNull()
+    expect(container.textContent ?? "").not.toContain("Working")
+    expect(container.querySelector('[aria-busy="true"]')).toBeNull()
+    expect(header(container).textContent ?? "").toContain("Waiting")
+  })
+
+  it("run active: the running step keeps its progressbar, Working line and aria-busy", () => {
+    const { container } = render(<PhaseCard phase={runningStep()} position={0} runPaused={false} />)
+    expect(screen.getByLabelText("approve-send running")).not.toBeNull()
+    expect(container.querySelector("[data-activity-line]")?.textContent ?? "").toContain("Working")
+    expect(container.querySelector('[aria-busy="true"]')).not.toBeNull()
+  })
+
   it("an active run: the same step still reads Running", () => {
     const { container } = render(<PhaseCard phase={runningStep()} position={0} runPaused={false} />)
     expect(header(container).textContent ?? "").toContain("Running")
