@@ -151,6 +151,8 @@ afterEach(() => {
   vi.unstubAllGlobals()
 })
 
+const SETUP = { timeout: 5000 }
+
 const nav = (view: string) =>
   act(async () => {
     h.probe.props!.onNavigate(view)
@@ -163,15 +165,17 @@ describe("D-10 — a live stream in thread A survives six navigations", () => {
 
     // Start a Deep turn in thread A through the real stream actions (only a viewed thread opens
     // a stream — the StreamsProvider.capPausedDone harness).
-    await waitFor(() => expect(h.probe.actions).not.toBeNull())
+    // Setup waits get a load-tolerant timeout: App boots through the setup probe and the providers
+    // first, and a cold transform under a parallel run can exceed waitFor's 1 s default.
+    await waitFor(() => expect(h.probe.actions).not.toBeNull(), SETUP)
     await act(async () => {
       h.probe.actions!.setViewingThread(THREAD_A)
     })
-    await waitFor(() => expect(h.mockGetThreadWorkflow).toHaveBeenCalled())
+    await waitFor(() => expect(h.mockGetThreadWorkflow).toHaveBeenCalled(), SETUP)
     await act(async () => {
       void h.probe.actions!.sendMessage(THREAD_A, "research this thoroughly")
     })
-    await waitFor(() => expect(h.mockSubscribeToRun).toHaveBeenCalledTimes(1))
+    await waitFor(() => expect(h.mockSubscribeToRun).toHaveBeenCalledTimes(1), SETUP)
     const signal = h.mockSubscribeToRun.mock.calls[0][3] as AbortSignal
     expect(signal).toBeInstanceOf(AbortSignal)
     const subsBefore = useStreamsStore.getState().subscriptionsByThread.get(THREAD_A)?.size

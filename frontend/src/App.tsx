@@ -126,6 +126,9 @@ import { visibleNavItems } from "@/lib/nav-items"
 // Phase 271 (D-09): the rules-authoring home left this union, its ChatLayout branch and the rail in ONE
 // commit — it now opens inside the Library as "Filing rules", a Library-local sub-view, not a view.
 // Phase 297-01 (REG-09, D-38): the view state described above now lives in hooks/useAppNavigation.ts and the render branches in components/layout/AppViewSwitch.tsx; this union stays here.
+// ⚠ CORRECTED 2026-10-27 (Phase 297-02, LINK-01) — beside the 188-09 paragraph, not through it: its "NO ROUTER" clause is now
+// historical. main.tsx mounts ONE catch-all route, useAppNavigation derives the view from the address, and every member has an
+// /app address in lib/appRoutes.ts (the reachability route leg pins it). The three-homes sentence still names the workflow triad.
 export type ActiveView = "chat" | "documents" | "skills" | "settings" | "workflows" | "connections" | "skill-studio" | "control-room" | "org-admin" | "workflow-run" | "admin-spend" | "experts"
 
 function App() {

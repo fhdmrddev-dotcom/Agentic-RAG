@@ -129,7 +129,7 @@ interface Props {
   operatorLoading?: boolean
 }
 
-export function ChatLayout({ onSignOut, activeView, onNavigate, navItems, isOperator, operatorIdentity, prefillMessage, onSetPrefillMessage, studioSkillId, studioTab, onOpenStudio, onReviewEvals, onStudioTabChange, onTuneSkill, libraryTab, onOpenLibraryHealth, activeRunId, openRun }: Props) {
+export function ChatLayout({ onSignOut, activeView, onNavigate, navItems, isOperator, operatorIdentity, prefillMessage, onSetPrefillMessage, studioSkillId, studioTab, onOpenStudio, onReviewEvals, onStudioTabChange, onTuneSkill, libraryTab, onOpenLibraryHealth, activeRunId, openRun, addressNotFound = false, operatorLoading = false }: Props) {
   const {
     threads,
     selectedThread,
@@ -614,7 +614,7 @@ export function ChatLayout({ onSignOut, activeView, onNavigate, navItems, isOper
       {/* Phase 156 REFINEMENT: mounted only when NOT collapsed — folding it away frees
           its ~300px to the conversation (the chat grid below is flex-1, so it reflows to
           full-width). The ▷ reopen handle lives in the chat top-bar (ChatArea). */}
-      {activeView === "chat" && !historyCollapsed && (
+      {activeView === "chat" && !addressNotFound && !historyCollapsed && (
         <ChatHistoryColumn
           threads={threads}
           selectedThread={selectedThread}
@@ -845,6 +845,10 @@ export function ChatLayout({ onSignOut, activeView, onNavigate, navItems, isOper
         canvasEnabled={canvasEnabled}
         openRunSurface={openRunSurface}
         activeRunId={activeRunId ?? null}
+        addressNotFound={addressNotFound}
+        featuresLoading={featuresCtx?.loading ?? false}
+        isOperator={isOperator}
+        operatorLoading={operatorLoading}
         doRun={doRun}
         libraryTab={libraryTab}
         attentionConditions={attentionConditions}
