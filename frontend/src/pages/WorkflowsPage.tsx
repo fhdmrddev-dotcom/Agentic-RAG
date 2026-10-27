@@ -85,6 +85,8 @@ import {
 // re-derived — three components now need the answer and a hand-copied three-part
 // predicate is exactly the drift this project keeps getting bitten by.
 import { type BuilderInitial, useCanvasGate } from "@/pages/WorkflowBuilderPage"
+// Phase 297-03 (D-21 / D-31 / D-32): this page is the app leave guard's one tenant.
+import { useLeaveGuard, useLeaveGuardRegistry } from "@/lib/leaveGuard"
 import { PublishGauntlet } from "@/components/workflows/PublishGauntlet"
 // Phase 124-02 Task 1 (WUX-01): the soul atoms (tier + glyph + needs) now come from
 // the ONE shared soulData module (Plan 01 extracted them VERBATIM from this page —
@@ -798,11 +800,21 @@ export function WorkflowsPage({ folders, onLaunch, onOpenRun, onOpenConnections,
    * When no Builder is mounted — the fresh-build chooser, the describe door, the library
    * itself — the ref is null and `backToLibrary` behaves exactly as it did before this
    * plan.
+   *
+   * ⚠ CORRECTED 2026-10-27 (Phase 297-03), beside the paragraph above rather than through it:
+   * the app now HAS a router (297-02), so "THERE IS NO ROUTER HERE" is historical. The
+   * breadcrumb is still an in-page view change and still asks through this ref. Route changes
+   * — Back, Forward, a rail click — are guarded by the app's ONE blocker in
+   * `useAppNavigation`, which this page feeds by forwarding the SAME predicate below (D-31: no
+   * second dirty source, and `WorkflowBuilderPage.tsx` is not edited). The two outbound
+   * controls that already ask set the one-shot latch so the blocker does not ask twice (D-32).
    */
   const canLeaveBuilderRef = useRef<(() => boolean) | null>(null)
   const registerCanLeave = useCallback((canLeave: (() => boolean) | null) => {
     canLeaveBuilderRef.current = canLeave
   }, [])
+  useLeaveGuard(useCallback(() => canLeaveBuilderRef.current?.() ?? true, []))
+  const leaveGuards = useLeaveGuardRegistry()
 
   // ── Back to the library: refresh both shelves so a newly-created/edited draft
   //    (or a tweaked fork) appears WITHOUT a manual browser refresh. ──
@@ -942,26 +954,35 @@ export function WorkflowsPage({ folders, onLaunch, onOpenRun, onOpenConnections,
               onOpenConnections
                 ? () => {
                     if (canLeaveBuilderRef.current !== null && !canLeaveBuilderRef.current()) return
+                    leaveGuards.approveNextLeave() // 297-03 (D-32): asked above; the blocker must not ask again
                     onOpenConnections()
                   }
                 : undefined
             }
             // Phase 200.3 (SEED-164 / D-03): Test Run from builder header
+            // Phase 297-03 (D-32): Test Run never asks — its run has started before the route
+            // changes — so the latch covers that change, and the `finally` disarms it when the
+            // launch does not navigate, so it cannot skip a later prompt.
             onTestRun={async (_def, draftId) => {
               if (onLaunch && _def) {
-                await onLaunch(
-                  {
-                    id: draftId ?? "",
-                    slug: (typeof _def.slug === "string" ? _def.slug : "") || "workflow",
-                    version: typeof _def.version === "number" ? _def.version : 1,
-                    name: (typeof _def.name === "string" ? _def.name : "") || "Draft Workflow",
-                    status: "draft",
-                    definition: _def as DefShape,
-                    created_at: new Date().toISOString(),
-                    updated_at: new Date().toISOString(),
-                  } as PublishedWorkflow,
-                  "",
-                )
+                leaveGuards.approveNextLeave()
+                try {
+                  await onLaunch(
+                    {
+                      id: draftId ?? "",
+                      slug: (typeof _def.slug === "string" ? _def.slug : "") || "workflow",
+                      version: typeof _def.version === "number" ? _def.version : 1,
+                      name: (typeof _def.name === "string" ? _def.name : "") || "Draft Workflow",
+                      status: "draft",
+                      definition: _def as DefShape,
+                      created_at: new Date().toISOString(),
+                      updated_at: new Date().toISOString(),
+                    } as PublishedWorkflow,
+                    "",
+                  )
+                } finally {
+                  leaveGuards.clearLeaveApproval()
+                }
               }
             }}
             renderPublish={(_def, draftId, blockedReason, onPublishRunning) =>
@@ -989,6 +1010,7 @@ export function WorkflowsPage({ folders, onLaunch, onOpenRun, onOpenConnections,
                     onOpenRun
                       ? (id: string) => {
                           if (canLeaveBuilderRef.current !== null && !canLeaveBuilderRef.current()) return
+                          leaveGuards.approveNextLeave() // 297-03 (D-32): asked above; not again
                           onOpenRun(id)
                         }
                       : undefined

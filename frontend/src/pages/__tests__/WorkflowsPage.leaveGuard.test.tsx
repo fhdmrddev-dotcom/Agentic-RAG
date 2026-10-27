@@ -17,7 +17,7 @@
  * navigators (`onLaunch` stands in for ChatLayout's `doRun`, which ends in `openRun`).
  * `window.confirm` is spied and every case asserts its call count EXACTLY.
  */
-import { StrictMode, type ReactNode } from "react"
+import { StrictMode, useEffect, type ReactNode } from "react"
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest"
 import { act, cleanup, configure, fireEvent, render, screen, waitFor } from "@testing-library/react"
 import { createMemoryRouter } from "react-router"
@@ -91,7 +91,10 @@ const box: { nav: AppNavigation | null; launchNavigates: boolean } = {
 
 function Shell() {
   const nav = useAppNavigation()
-  box.nav = nav
+  // Parked after commit (an effect), never written during render.
+  useEffect(() => {
+    box.nav = nav
+  })
   return (
     <LeaveGuardContext.Provider value={nav.leaveGuards}>
       {nav.activeView === "workflows" ? (

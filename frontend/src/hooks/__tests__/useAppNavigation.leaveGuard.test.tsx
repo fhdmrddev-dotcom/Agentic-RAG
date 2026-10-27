@@ -18,7 +18,7 @@
  * `main.tsx` mounts. `Shell` calls the hook and provides its registry; `Tenant` registers the
  * prompting predicate through `useLeaveGuard`, reading the test's `box.dirty` at call time.
  */
-import { StrictMode } from "react"
+import { StrictMode, useEffect } from "react"
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest"
 import { act, cleanup, render, waitFor } from "@testing-library/react"
 import { createMemoryRouter } from "react-router"
@@ -47,7 +47,10 @@ function Tenant() {
 
 function Shell() {
   const nav = useAppNavigation()
-  box.nav = nav
+  // Parked after commit (an effect), never written during render.
+  useEffect(() => {
+    box.nav = nav
+  })
   const child = box.tenant ? <Tenant /> : null
   return box.provide ? (
     <LeaveGuardContext.Provider value={nav.leaveGuards}>{child}</LeaveGuardContext.Provider>
@@ -358,14 +361,17 @@ describe("leave-guard registry — unit", () => {
   })
 
   it("outside any provider useLeaveGuardRegistry() is the no-op default (never throws)", () => {
-    let seen: ReturnType<typeof useLeaveGuardRegistry> | null = null
+    const holder: { seen: ReturnType<typeof useLeaveGuardRegistry> | null } = { seen: null }
     function Probe() {
-      seen = useLeaveGuardRegistry()
+      const registry = useLeaveGuardRegistry()
+      useEffect(() => {
+        holder.seen = registry
+      })
       return null
     }
     render(<Probe />)
-    expect(seen).not.toBeNull()
-    const r = seen!
+    expect(holder.seen).not.toBeNull()
+    const r = holder.seen!
     const off = r.register(() => false)
     expect(r.hasTenants()).toBe(false)
     expect(r.canLeaveAll()).toBe(true)
