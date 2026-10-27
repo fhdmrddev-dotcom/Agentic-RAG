@@ -12205,7 +12205,7 @@ cells rot within days.
 | [`frontend/src/components/layout/AppViewSwitch.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentslayoutappviewswitchtsx) | 2 / 1 / 523 (was `1 / 1 / 473`) | no (young) | 297-02: S1 first non-chat arm; run hold inside the one run arm; admin arms gated on the operator probe. ⛔ one run comparison; fallback last; every hold lives here, never at App |
 | [`frontend/src/lib/appRoutes.ts`](docs/HOT-FILE-LEDGER.md#frontendsrclibapproutests) | 1 / 1 / 198 (was `0 / 0 / 0`) | no (young) | young (created 297-02). STRICT LEAF: one home of /app path vocabulary (D-11). ⛔ never throws; strict UUID; no host in any output |
 | [`frontend/src/components/layout/AddressNotFound.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentslayoutaddressnotfoundtsx) | 1 / 1 / 51 (was `0 / 0 / 0`) | no (young) | young (created 297-02). S1 + S2 and their copy, one home. ⛔ no path prop, no icon; never renders the trailing fallback tag |
-| [`frontend/src/lib/leaveGuard.ts`](docs/HOT-FILE-LEDGER.md#frontendsrclibleaveguardts) | 0 / 0 / 0 | no (planned 297-03) | young (planned 297-03). Leave-guard registry context, safe no-op default (D-21); one-shot latch (D-32/D-42). No component. Measured in its creating commit |
+| [`frontend/src/lib/leaveGuard.ts`](docs/HOT-FILE-LEDGER.md#frontendsrclibleaveguardts) | 1 / 1 / 97 (was `0 / 0 / 0`) | no (young) | young (created 297-03). Leave-guard registry, no-op default (D-21); one-shot latch (D-32/D-42). ⛔ no component; react-only imports; never throws |
 
 
 
@@ -25907,4 +25907,23 @@ Scan-list cell as of 2026-10-27 (replaced by 297-02, moved verbatim): 0 / 0 / 0 
 `297-03` creates it and re-derives the triple in its creating commit (the `activeViewReachability.ts`
 262-01 precedent). Leave-guard registry context, safe no-op default (D-21); one-shot latch (D-32/D-42). No component.
 
-Binding invariants and the build detail are written by `297-03` in the same commit that creates the file.
+#### Created — Phase 297 (297-03), measured `1 / 1 / 97`
+
+Measured in its creating commit (`feat(297-03): one app-level blocker over a leave-guard registry`):
+1 commit, 1 phase, 97 lines. `createLeaveGuardRegistry()` is a plain object of closures over a `Set` of
+entries and one boolean latch; `LeaveGuardContext` defaults to a frozen NO-OP registry; `useLeaveGuardRegistry()`
+reads it without throwing (the `fieldGuidanceContext.ts` idiom); `useLeaveGuard(predicate)` registers on mount
+and unregisters in the effect cleanup. Pinned by `src/hooks/__tests__/useAppNavigation.leaveGuard.test.tsx` (23).
+
+**Binding invariants:**
+- ⛔ **The default is a no-op, never `null`.** Outside a provider a tenant registers into nothing and every leave
+  is allowed, so pages and their suites need no provider and no router (D-08, D-21).
+- ⛔ **One blocker reads it.** The only `useBlocker(` in product code is in `hooks/useAppNavigation.ts`; a second
+  blocker is a router warning and a silently ignored guard. A new editor joins as a tenant, never a blocker.
+- ⛔ **The latch is one-shot.** `canLeaveAll()` consumes it on its first evaluation; the hook also clears it on
+  every committed location change, and Test Run clears it in a `finally` (T-297-13). Arm it only immediately
+  before a navigation that changes the pathname.
+- ⛔ **No component in this module** (a `.ts` file, react-refresh rule) and it imports only from `react`. App uses
+  `LeaveGuardContext.Provider` directly, with no `key` and the hook's one-identity registry as its value.
+
+Scan-list cell as of 2026-10-27 (replaced by 297-03, moved verbatim): 0 / 0 / 0 | no (planned 297-03) | young (planned 297-03). Leave-guard registry context, safe no-op default (D-21); one-shot latch (D-32/D-42). No component. Measured in its creating commit

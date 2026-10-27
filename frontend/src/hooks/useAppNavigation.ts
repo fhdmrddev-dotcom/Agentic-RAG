@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react"
 // Phase 297-02 (D-04 / D-08): the ONLY module in the tree that calls the router hooks. Every
 // page and leaf keeps receiving navigators as props, so none of them needs a router to render.
-import { useLocation, useNavigate } from "react-router"
+import { useBlocker, useLocation, useNavigate } from "react-router"
 // Type-only: `ActiveView` stays exported from App.tsx on ONE line (D-38 — the docs-coverage gate
 // and the renameFence needle read it there). Erased under `verbatimModuleSyntax`, so this is
 // not a runtime cycle (the ChatLayout precedent).
@@ -14,6 +14,8 @@ import type { LibraryTab } from "@/pages/librarySelection"
 import { libraryTabAfterNavigate } from "@/lib/libraryTabHandoff"
 // Phase 297-02 (D-11): the route table — the one home of the app's path vocabulary.
 import { canonicalAddress, formatAppRoute, parseAppLocation, type AppRoute } from "@/lib/appRoutes"
+// Phase 297-03 (D-21): the leave-guard registry the ONE blocker below consults.
+import { createLeaveGuardRegistry, type LeaveGuardRegistry } from "@/lib/leaveGuard"
 
 export interface AppNavigation {
   /** The view on screen — one `ActiveView` member. */
@@ -48,6 +50,9 @@ export interface AppNavigation {
   libraryTab: LibraryTab | undefined
   /** The attention route: hand the Library its Health tab and open it. */
   handleOpenLibraryHealth: () => void
+  /** Phase 297-03 (D-21): the leave-guard registry the app's ONE blocker consults. One identity
+   *  for the hook's lifetime, so App's `LeaveGuardContext.Provider` value never changes. */
+  leaveGuards: LeaveGuardRegistry
 }
 
 /**
@@ -122,6 +127,41 @@ export function useAppNavigation(): AppNavigation {
     },
     [navigate],
   )
+
+  // ── Phase 297-03 (LINK-07 / D-21, D-22, D-24, D-31) — the ONE leave guard. ──
+  //
+  // ONE `useBlocker` in the whole tree (a router supports one blocker; `D-21`), over a registry
+  // held for the hook's lifetime. It is consulted only when the PATHNAME changes (a search-only
+  // move never leaves the editor) and only when a tenant is registered (D-24: a clean or absent
+  // editor is never asked). Wiring (A), D-31: the tenant's predicate itself shows
+  // `window.confirm(UNSAVED_LEAVE_PROMPT)`, so OK answers "not blocked" and the navigation just
+  // proceeds — `proceed()` is never needed — and Cancel answers "blocked", which the effect below
+  // turns into `reset()`: the edits stay and, for Back/Forward, the router has already put the
+  // address back. The router calls this once per attempt (POP revert popstates are swallowed by
+  // the router itself), so the person is asked exactly once; the leave-guard suite pins that
+  // count under StrictMode.
+  // A lazy `useState` initializer rather than a ref read in render: the same one-identity
+  // guarantee, without reading `.current` while rendering.
+  const [registry] = useState<LeaveGuardRegistry>(createLeaveGuardRegistry)
+  const shouldBlock = useCallback(
+    ({ currentLocation, nextLocation }: { currentLocation: { pathname: string }; nextLocation: { pathname: string } }) =>
+      currentLocation.pathname !== nextLocation.pathname && registry.hasTenants() && !registry.canLeaveAll(),
+    [registry],
+  )
+  const blocker = useBlocker(shouldBlock)
+  useEffect(() => {
+    if (blocker.state !== "blocked") return
+    // A cancelled push never committed: `go` had already recorded its target as `here`, so put
+    // the address on screen back, or the same rail click would read as a no-op next time.
+    here.current = `${location.pathname}${location.search}`
+    blocker.reset()
+  }, [blocker, location.pathname, location.search])
+  // The latch never outlives a committed navigation (D-32 / T-297-13): whatever armed it, the
+  // next location change disarms it, so a navigation that did not consult the tenant (a
+  // search-only move, no tenant mounted) cannot leave it set to skip a later prompt.
+  useEffect(() => {
+    registry.clearLeaveApproval()
+  }, [registry, location.key])
 
   // Phase 137-06 (PANEL-01 / D-01 / sketch 057-A): the unified Skill Studio is a
   // focused full-surface entered WITH a skillId + a tab (mirroring the shipped Tuner
@@ -219,7 +259,16 @@ export function useAppNavigation(): AppNavigation {
   const openRun = useCallback((id: string) => go({ view: "workflow-run", runId: id }), [go])
   // Phase 297-01 kept the 403 bounce as the bare view setter. Phase 297-02: a REPLACE to the
   // home address (D-15) — Back must not lead back to the surface the server just refused.
-  const bounceHome = useCallback(() => go({ view: "chat" }, { replace: true }), [go])
+  // Phase 297-03 (D-42): a forced exit does NOT ask. The server withdrew access, so the edit cannot
+  // be kept on a view the person may no longer open — the one-shot latch lets this one leave
+  // through. It is armed ONLY when the bounce really changes the pathname, so a bounce while
+  // already home leaves nothing armed (the location-key clear above is the second net).
+  const bounceHome = useCallback(() => {
+    const home: AppRoute = { view: "chat" }
+    const herePath = here.current.split("?")[0]
+    if (formatAppRoute(home) !== herePath) registry.approveNextLeave()
+    go(home, { replace: true })
+  }, [go, registry])
 
   return {
     activeView,
@@ -236,5 +285,6 @@ export function useAppNavigation(): AppNavigation {
     handleTuneSkill,
     libraryTab,
     handleOpenLibraryHealth,
+    leaveGuards: registry,
   }
 }

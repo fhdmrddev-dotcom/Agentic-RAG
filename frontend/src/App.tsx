@@ -17,6 +17,8 @@ import { StreamsProvider } from "@/providers/StreamsProvider"
 // memberships + role + can_manage/can_audit_view + switchOrg via useOrg/useOrgOptional.
 import { OrgProvider } from "@/providers/OrgProvider"
 import { CitationNavProvider } from "@/lib/citationNav"
+// Phase 297-03 (D-21): the leave-guard registry's context; App provides the hook's ONE registry.
+import { LeaveGuardContext } from "@/lib/leaveGuard"
 import { TechnicalNamesProvider } from "@/providers/TechnicalNamesProvider"
 // Phase 183 (CANVAS-01 / OP-2): broadcasts the ONE effective-features map below the
 // nav so a page can gate on a governed feature without a second GET /features.
@@ -313,6 +315,10 @@ function App() {
               Library view, which is the one destination the rule KEEPS the hand-off for — so
               this changes no behaviour now and clears correctly if a citation ever leads
               somewhere else. */}
+          {/* Phase 297-03 (D-21 / D-07 / D-10): the leave-guard registry for every page below.
+              No key and a value with ONE identity (the hook holds it for its lifetime), so this
+              wrapper never remounts anything — StreamsProvider and the chat tree are above it. */}
+          <LeaveGuardContext.Provider value={nav.leaveGuards}>
           <CitationNavProvider navigate={nav.onNavigate}>
             <ChatLayout
               onSignOut={signOut}
@@ -337,6 +343,7 @@ function App() {
               operatorLoading={operatorLoading}
             />
           </CitationNavProvider>
+          </LeaveGuardContext.Provider>
           </EffectiveFeaturesProvider>
         </TechnicalNamesProvider>
         </TooltipProvider>
