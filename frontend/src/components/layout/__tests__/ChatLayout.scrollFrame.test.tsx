@@ -70,7 +70,10 @@
 
 import { describe, it, expect } from "vitest"
 
-import chatLayoutSource from "@/components/layout/ChatLayout.tsx?raw"
+// D-297-04 (Phase 297-01, REG-09): links 2-3 RE-TARGETED, not retired. The chat grid track and its
+// <main> cell moved VERBATIM out of ChatLayout into AppViewSwitch with the mount switch, so they
+// are read from there. Same regexes, same counts.
+import switchSource from "@/components/layout/AppViewSwitch.tsx?raw"
 import chatAreaSource from "@/components/chat/ChatArea.tsx?raw"
 import messageListSource from "@/components/chat/MessageList.tsx?raw"
 import navPanelSource from "@/components/layout/NavPanel.tsx?raw"
@@ -79,7 +82,7 @@ import { stripComments } from "@/lib/stripComments.testutil"
 /** The house normaliser — CRLF checkouts must not change what a fence sees. */
 const lf = (s: string) => s.replace(/\r\n/g, "\n")
 
-const CHAT_LAYOUT = lf(chatLayoutSource)
+const SWITCH = lf(switchSource)
 const CHAT_AREA = lf(chatAreaSource)
 const MESSAGE_LIST = lf(messageListSource)
 const NAV_PANEL = lf(navPanelSource)
@@ -98,17 +101,19 @@ const scrollAreaOpenings = (src: string): string[] =>
   Array.from(stripComments(src).matchAll(/<ScrollArea(?![A-Za-z])([^>]*)>/g)).map((m) => m[1])
 
 describe("SHELL-01 · the chat frame is bounded — the four-link min-h-0 chain", () => {
-  it("link 2: ChatLayout's grid track carries min-h-0 alongside flex-1", () => {
+  it("link 2: AppViewSwitch's grid track carries min-h-0 alongside flex-1", () => {
+    // D-297-04: identity anchor — the switch, not an empty or wrong file.
+    expect(SWITCH).toContain("export function AppViewSwitch")
     // The grid track div — the one whose class list carries `grid min-w-0 flex-1 overflow-hidden`.
-    const track = CHAT_LAYOUT.match(/className="(grid min-w-0[^"]*)"/)
+    const track = SWITCH.match(/className="(grid min-w-0[^"]*)"/)
     expect(track, "the grid-track className was not found — did the class list change?").not.toBeNull()
     expect(track![1]).toContain("flex-1")
     expect(track![1]).toContain("min-h-0")
   })
 
-  it("link 3: ChatLayout's <main> cell carries min-h-0", () => {
-    const main = CHAT_LAYOUT.match(/<main className="([^"]*)"/)
-    expect(main, "<main className=…> was not found in ChatLayout").not.toBeNull()
+  it("link 3: AppViewSwitch's <main> cell carries min-h-0", () => {
+    const main = SWITCH.match(/<main className="([^"]*)"/)
+    expect(main, "<main className=…> was not found in AppViewSwitch").not.toBeNull()
     expect(main![1]).toContain("min-w-0")
     expect(main![1]).toContain("min-h-0")
     expect(main![1]).toContain("overflow-hidden")

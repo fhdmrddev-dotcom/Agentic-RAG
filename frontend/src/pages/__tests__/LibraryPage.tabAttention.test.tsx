@@ -57,6 +57,8 @@ import appSource from "@/App.tsx?raw"
 // D-297-08 (Phase 297-01): the `libraryTab` writers' home since the verbatim move out of App.
 import navSource from "@/hooks/useAppNavigation.ts?raw"
 import layoutSource from "@/components/layout/ChatLayout.tsx?raw"
+// D-297-08 (Phase 297-01): the Library mount's home since the verbatim switch move.
+import switchSource from "@/components/layout/AppViewSwitch.tsx?raw"
 import pageSource from "@/pages/LibraryPage.tsx?raw"
 
 const {
@@ -457,8 +459,18 @@ describe("Library tab attention — the shell threads conditions DOWN, it does n
     // The 120-character proximity window `renameFence.test.ts` guards is deliberately NOT
     // re-asserted here — that fence is about the Documents→Library rename. This one is about
     // the data reaching the page at all, which is the link the attribution rides.
+    //
+    // D-297-08 (Phase 297-01): the Library mount moved VERBATIM into AppViewSwitch, so the mount arm
+    // reads the switch; ChatLayout's hand-off INTO the switch is asserted beside it, and the ONE
+    // registry read stays a ChatLayout assertion (it never moved).
+    expect(switchSource).toContain("export function AppViewSwitch")
     expect(
-      /<LibraryPage[\s\S]{0,200}attentionConditions=\{attentionConditions\}/.test(layoutSource),
+      /<LibraryPage[\s\S]{0,200}attentionConditions=\{attentionConditions\}/.test(switchSource),
+    ).toBe(true)
+    expect(layoutSource).toContain("attentionConditions={attentionConditions}")
+    // …and specifically into the switch's mount, not only into the rail's.
+    expect(
+      /<AppViewSwitch[^/]*attentionConditions=\{attentionConditions\}/.test(layoutSource),
     ).toBe(true)
     // …and it still resolves the registry exactly ONCE.
     expect((layoutSource.match(/ATTENTION_PRODUCERS\.flatMap/g) ?? []).length).toBe(1)

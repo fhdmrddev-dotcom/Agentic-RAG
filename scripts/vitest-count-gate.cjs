@@ -3697,7 +3697,7 @@ const BASELINE = {
   "HealthTiles.test.tsx": 6,
   "HealthSignalChips.test.tsx": 14, // +1 BUG-260923-02 stale paging
   "CheckedQueriesSection.test.tsx": 12, // +1 BUG-260923-02 paging
-  "ChatLayout.fallback.test.tsx": 4,
+  "ChatLayout.fallback.test.tsx": 5, // 297-01 (D-297-03): 4 -> 5, re-targeted to AppViewSwitch + the one-home arm (ChatLayout code mounts no fallback)
   "DocumentQueriesSection.test.tsx": 8,
   "FilterBar.test.tsx": 10,
   "DocumentStatusBadge.test.tsx": 19,

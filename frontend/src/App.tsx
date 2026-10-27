@@ -125,6 +125,7 @@ import { visibleNavItems } from "@/lib/nav-items"
 //      claim provable for the member below rather than merely intended.
 // Phase 271 (D-09): the rules-authoring home left this union, its ChatLayout branch and the rail in ONE
 // commit — it now opens inside the Library as "Filing rules", a Library-local sub-view, not a view.
+// Phase 297-01 (REG-09, D-38): the view state described above now lives in hooks/useAppNavigation.ts and the render branches in components/layout/AppViewSwitch.tsx; this union stays here.
 export type ActiveView = "chat" | "documents" | "skills" | "settings" | "workflows" | "connections" | "skill-studio" | "control-room" | "org-admin" | "workflow-run" | "admin-spend" | "experts"
 
 function App() {

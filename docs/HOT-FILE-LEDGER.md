@@ -12131,7 +12131,7 @@ cells rot within days.
 | [`frontend/src/components/admin/AuditTab.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentsadminaudittabtsx) | 7 / 4 / 770 (was `6 / 3 / 763`) | ⚠ **FIRES** | absent its ENTIRE LIFE at 3 phases (146/148/155) — row added 293. 293-04: api_key.* entries + "API keys" group in PLATFORM_ACTION_META only. ⛔ unknown codes stay raw |
 | [`frontend/src/components/org/OrgAuditTab.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentsorgorgaudittabtsx) | 4 / 3 / 415 (was `3 / 2 / 408`) | ⚠ **FIRES** | absent its ENTIRE LIFE (166/167) — row added 293. 293-04: api_key.* labels + "API keys" group in ACTION_META only. ⛔ never invents a label |
 | [`frontend/src/hooks/useAppNavigation.ts`](docs/HOT-FILE-LEDGER.md#frontendsrchooksuseappnavigationts) | 1 / 1 / 160 (was `0 / 0 / 0`) | no (young) | young (created 297-01). App view/tab state moved verbatim (D-01). ⛔ setLibraryTab( exactly 2; NO TWELFTH block travels with libraryTab; router hooks only here (D-08) |
-| [`frontend/src/components/layout/AppViewSwitch.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentslayoutappviewswitchtsx) | 0 / 0 / 0 | no (planned 297-01) | young (planned 297-01). ChatLayout's ActiveView mount switch, moved verbatim (D-01). Pure, no hooks. 297-02 adds the not-found + holding arms. Measured in its creating commit |
+| [`frontend/src/components/layout/AppViewSwitch.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentslayoutappviewswitchtsx) | 1 / 1 / 473 (was `0 / 0 / 0`) | no (young) | young (created 297-01). ChatLayout's mount switch moved verbatim (D-01). ⛔ no hooks; fallback LAST; one stripped workflow-run test; canvasEnabled passed in |
 | [`frontend/src/lib/appRoutes.ts`](docs/HOT-FILE-LEDGER.md#frontendsrclibapproutests) | 0 / 0 / 0 | no (planned 297-02) | young (planned 297-02). STRICT LEAF (no React): parseAppLocation / formatAppRoute, the one home of path vocabulary (D-11). Strict UUID, never throws. Measured in its creating commit |
 | [`frontend/src/components/layout/AddressNotFound.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentslayoutaddressnotfoundtsx) | 0 / 0 / 0 | no (planned 297-02) | young (planned 297-02). S1 "This address doesn't open anything" + S2 holding state (D-14/D-19/D-35). Never renders the trailing fallback tag. Measured in its creating commit |
 | [`frontend/src/lib/leaveGuard.ts`](docs/HOT-FILE-LEDGER.md#frontendsrclibleaveguardts) | 0 / 0 / 0 | no (planned 297-03) | young (planned 297-03). Leave-guard registry context, safe no-op default (D-21); one-shot latch (D-32/D-42). No component. Measured in its creating commit |
@@ -25687,7 +25687,26 @@ App's 403 listener used to call — it does NOT spend the hand-off, exactly as b
 `297-01` creates it and re-derives the triple in its creating commit (the `activeViewReachability.ts`
 262-01 precedent). ChatLayout's ActiveView mount switch, moved verbatim (D-01). Pure, no hooks. 297-02 adds the not-found + holding arms.
 
-Binding invariants and the build detail are written by `297-01` in the same commit that creates the file.
+#### Created — Phase 297 (297-01), measured `1 / 1 / 473`
+
+Measured in its creating commit (`refactor(297-01): move the ActiveView mount switch into AppViewSwitch`):
+1 commit, 1 phase, 473 lines. Its `return` is ChatLayout's old `{activeView === "chat" ? (…) : (…)}`
+expression (290 lines at the time), and `diff -w` of the old expression against the new body shows
+ONLY the two enclosing-brace lines. Its 37 props are the identifiers that body reads, same-named, so
+every regex fence over it still matches. The page imports used only inside the switch moved with it.
+
+**Binding invariants:**
+- ⛔ **No hooks.** ChatLayout keeps the state, the ONE attention-registry read
+  (`ATTENTION_PRODUCERS.flatMap`, fenced `=== 1` there), `doRun`, the drawer and the history column.
+- ⛔ **`canvasEnabled` is passed in, never re-read here** — ChatLayout's strict `=== true` read of
+  `useEffectiveFeaturesOptional()` stays the only one (CR-05). The run-receipt gate
+  `onOpenRun={canvasEnabled ? openRunSurface : undefined}` lives in this file's chat branch.
+- ⛔ The trailing fallback stays the **LAST** arm (`activeViewReachability.test.ts`, D-297-01), and
+  there is exactly **one** comment-stripped `workflow-run` comparison (`ChatLayout.launch.test.tsx`,
+  D-297-05). 297-02's not-found arm goes INSIDE the non-chat ternary as its first arm (Pitfall 6).
+- The chat branch's grid `flex-1 min-h-0` and first `<main>` class string are links 2-3 of the
+  scroll chain (`ChatLayout.scrollFrame.test.tsx`, D-297-04).
+- Fences re-targeted here: D-297-01..06 and the second half of D-297-08 (see 297-01-SUMMARY).
 
 ### `frontend/src/lib/appRoutes.ts`
 

@@ -258,6 +258,11 @@ vi.mock("@/pages/WorkflowsPage", () => ({
 
 import { ChatLayout } from "./ChatLayout"
 import chatLayoutSource from "./ChatLayout?raw"
+// D-297-05 (Phase 297-01, REG-09): the mount switch moved VERBATIM out of ChatLayout into
+// AppViewSwitch, so the four switch-SHAPE cases (stripper needle, branch-before-fallback, the
+// chat-only split point, the run-receipt gate) read the switch. The doRun cases stay on ChatLayout,
+// which still owns doRun. RE-TARGETED, not retired; no expect value changed.
+import switchSource from "./AppViewSwitch?raw"
 // 214-12: the launch form's own source, fenced below — D-214-04's rejected arm is enforced by
 // a measurement over this file, not by the paragraph inside it.
 import chatLaunchFormSource from "./ChatLaunchForm?raw"
@@ -496,7 +501,8 @@ describe("ChatLayout — the run home is gated on visual_workflow_canvas (CR-05)
     // The receipt is the OTHER door into this home. It renders nothing without the
     // callback (its own suite fences that), so withholding the callback is what removes
     // the affordance rather than leaving a control that opens a fallback page.
-    const code = codeOf(chatLayoutSource)
+    // D-297-05: the receipt gate is in the switch's chat branch since the move.
+    const code = codeOf(switchSource)
     expect(code).toMatch(/onOpenRun=\{canvasEnabled \? openRunSurface : undefined\}/)
   })
 })
@@ -545,14 +551,19 @@ function codeOf(source: string): string {
 }
 
 const CHAT_LAYOUT_CODE = codeOf(chatLayoutSource)
+/** D-297-05: the mount switch's code — where the branch-order facts below now live. */
+const SWITCH_CODE = codeOf(switchSource)
 
 describe("ChatLayout — source fence: branch order and the chat-only chrome", () => {
   it("the comment stripper works — and this file really does carry the tokens in prose", () => {
+    // D-297-05: identity anchors — the switch is the real file, and ChatLayout renders it.
+    expect(SWITCH_CODE).toContain("export function AppViewSwitch")
+    expect(CHAT_LAYOUT_CODE).toContain("<AppViewSwitch")
     // The precondition that makes stripping necessary: the raw source carries the branch
     // condition MORE times than the code does.
     const NEEDLE = `activeView === "workflow-run"`
-    const raw = chatLayoutSource.split(NEEDLE).length - 1
-    const stripped = CHAT_LAYOUT_CODE.split(NEEDLE).length - 1
+    const raw = switchSource.split(NEEDLE).length - 1
+    const stripped = SWITCH_CODE.split(NEEDLE).length - 1
     expect(raw).toBeGreaterThan(stripped)
     expect(stripped).toBe(1)
 
@@ -565,11 +576,11 @@ describe("ChatLayout — source fence: branch order and the chat-only chrome", (
   })
 
   it("places the run-surface branch BEFORE the trailing UnknownViewFallback", () => {
-    const branch = CHAT_LAYOUT_CODE.indexOf(`activeView === "workflow-run"`)
+    const branch = SWITCH_CODE.indexOf(`activeView === "workflow-run"`)
     // ⚠ Match the JSX TAG (with the `<`), not the bare identifier — the module's IMPORT
     // also spells `UnknownViewFallback`, and indexOf would otherwise resolve to line 13's
     // import rather than the trailing element this ordering assertion is about.
-    const fallback = CHAT_LAYOUT_CODE.indexOf("<UnknownViewFallback")
+    const fallback = SWITCH_CODE.indexOf("<UnknownViewFallback")
     expect(branch).toBeGreaterThan(-1)
     expect(fallback).toBeGreaterThan(-1)
     expect(branch).toBeLessThan(fallback)
@@ -578,21 +589,21 @@ describe("ChatLayout — source fence: branch order and the chat-only chrome", (
   it("mounts ChatArea and WorkspacePanel ONLY inside the chat branch", () => {
     // The else branch opens with the non-chat <main>. Everything after that index is on
     // the side of the split the run surface lives on.
-    const elseBranch = CHAT_LAYOUT_CODE.indexOf(`<main className="flex-1 overflow-hidden">`)
+    const elseBranch = SWITCH_CODE.indexOf(`<main className="flex-1 overflow-hidden">`)
     expect(elseBranch).toBeGreaterThan(-1)
 
     for (const tag of ["<ChatArea", "<WorkspacePanel"]) {
-      const first = CHAT_LAYOUT_CODE.indexOf(tag)
+      const first = SWITCH_CODE.indexOf(tag)
       expect(first).toBeGreaterThan(-1)
       // Mounted before the split point…
       expect(first).toBeLessThan(elseBranch)
       // …and never again after it.
-      expect(CHAT_LAYOUT_CODE.indexOf(tag, elseBranch)).toBe(-1)
+      expect(SWITCH_CODE.indexOf(tag, elseBranch)).toBe(-1)
     }
 
     // POSITIVE CONTROL — the "never again after it" probe really does find a tag that IS
     // present after the split point, so the -1 above is a measurement, not a tautology.
-    expect(CHAT_LAYOUT_CODE.indexOf("UnknownViewFallback", elseBranch)).toBeGreaterThan(-1)
+    expect(SWITCH_CODE.indexOf("UnknownViewFallback", elseBranch)).toBeGreaterThan(-1)
   })
 
   it("resolves the run id from the thread anchor, and names neither of the wrong-id tokens", () => {
@@ -603,6 +614,9 @@ describe("ChatLayout — source fence: branch order and the chat-only chrome", (
     const WRONG_FIELD = ["res", ".run_id"].join("")
     expect(chatLayoutSource).not.toMatch(new RegExp(WRONG_TYPE))
     expect(chatLayoutSource).not.toMatch(new RegExp(WRONG_FIELD))
+    // D-297-05: the run room's mount moved into the switch — it must not name them either.
+    expect(switchSource).not.toMatch(new RegExp(WRONG_TYPE))
+    expect(switchSource).not.toMatch(new RegExp(WRONG_FIELD))
     // POSITIVE CONTROL — both assembled needles really do match the shapes they forbid.
     expect("import type { PostMessageResponse } from '@/lib/api'").toMatch(new RegExp(WRONG_TYPE))
     expect("setActiveRunId(res.run_id)").toMatch(new RegExp(WRONG_FIELD))

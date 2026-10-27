@@ -484,9 +484,15 @@ describe("(D) CR-01 — the list holds the server's Expert after a change", () =
   })
 
   it("(10) ChatLayout hands ChatArea the list's own updater", async () => {
+    // D-297-06 (Phase 297-01, REG-09): RE-TARGETED, not retired. ChatArea's mount moved VERBATIM
+    // into AppViewSwitch with the mount switch, so the link is now two-ended: ChatLayout hands its
+    // `useThreads().patchThread` to the switch, and the switch hands that same name to ChatArea.
     const layout = (await import("../../layout/ChatLayout.tsx?raw")).default as string
+    const viewSwitch = (await import("../../layout/AppViewSwitch.tsx?raw")).default as string
     expect(layout.length).toBeGreaterThan(1000)
-    expect(layout).toMatch(/onThreadUpdated=\{patchThread\}/)
+    expect(viewSwitch.length).toBeGreaterThan(1000)
+    expect(layout).toMatch(/patchThread=\{patchThread\}/)
+    expect(viewSwitch).toMatch(/onThreadUpdated=\{patchThread\}/)
   })
 })
 
