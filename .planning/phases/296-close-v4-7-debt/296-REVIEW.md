@@ -4,7 +4,8 @@ reviewed: 2026-10-27
 depth: standard
 diff_base: 27f1cdf9b33b1f6f76e1963fd746e84bbff2840e
 files_reviewed: 111
-status: issues_found
+status: resolved
+resolution: "2/2 critical and 9/9 warnings resolved (10 fixed, BE-WR-01 seeded SEED-388); info: 4 accepted, 6 open → v4.8"
 independent_review: self
 findings:
   critical: 2
@@ -24,8 +25,28 @@ Two fresh-context `gsd-code-reviewer` passes over the 111 non-test source files 
 
 | ID | Severity | Disposition |
 |---|---|---|
-| BE-CR-01 | critical | **CONFIRMED LIVE** (board `--resume-model`: 5 FAIL, only the owner's default provider passed) → fixed `d34d1b115` (RED) + the following fix commit; board re-run owed |
-| FE-CR-01 | critical | pending — drive G-4 row 11 first (a review is a claim about code) |
+| BE-CR-01 | critical | **fixed** — confirmed live first (board `--resume-model`: 5 FAIL, only the owner's default provider passed), then `d34d1b115` (RED) → `51ec89cfc`; live re-run **PASS 6/6**, recorded provider matching |
+| FE-CR-01 | critical | **fixed** `0429bc53c` (RED) → `492c7ddb0`; driven live before (composer pre-filled) and after (not) |
+| BE-WR-01 | warning | **seeded** SEED-388 (boot-sweep answer keyed to the step) |
+| BE-WR-02 | warning | **fixed in-phase** as AR-05: `c8b5427c1` (RED) → `dbc43dbc1` (chunked body counted as it streams, refused at the cap) |
+| BE-WR-03 | warning | **fixed** `3116847ce` (RED) → `4bd5e640f` |
+| BE-WR-04 | warning | **fixed** in the review-warnings merge `3e5a84819` (`d651790d2` → `9373cea60`) |
+| BE-WR-05 | warning | **fixed** in `3e5a84819` (`e8bebb9d2` → `d4011165c`) |
+| BE-WR-06 | warning | **fixed** in `3e5a84819` (`1e6e17adc` → `f22ec08bd`) |
+| FE-WR-01 | warning | **fixed** in `3e5a84819` (`c1f0f3f54` → `6f2693788`) |
+| FE-WR-02 | warning | **fixed** in `3e5a84819` (`59adda0e4` → `d3cc34ddb`) |
+| FE-WR-03 | warning | **fixed** in `3e5a84819` (`e73e6337d` → `1d9a1b8c6`) |
+| BE-IN-01 | info | **open → v4.8**: the judge's "recorded by design" note reads `live_connectors` without `ensure_settings_fresh()`, so within the cache TTL it can contradict the executor; wording only, no execution impact |
+| BE-IN-02 | info | **accept** (fails safe: a missed path spelling runs MORE tests; the error branch still exits 2) — re-open when a `--json` consumer exists |
+| BE-IN-03 | info | **open → v4.8**: the publish note says the practice run had no example for a Look-it-up or file input, which is never asked for (misleading copy) |
+| BE-IN-04 | info | **open → v4.8**: on a Moonshot endpoint, one recursive connector/MCP `$ref` raises a bare `ValueError` and fails the whole request; the live row is ⛔ until the Moonshot account is reinstated |
+| FE-IN-01 | info | **open → v4.8**: every 409 on an in-thread start reads "already running"; the paused-run 409 loses its next step and the org-mismatch 409 is false (rare: the picker is disabled while locked) |
+| FE-IN-02 | info | **accept** (one immediate extra GET on an error; no user-visible effect) |
+| FE-IN-03 | info | **accept** (two misplaced doc comments; no behaviour) — fix on the next touch of either file |
+| FE-IN-04 | info | **open → v4.8** (a11y): the disabled Word-blank checkboxes do not say why, unlike their sibling controls (UI-SPEC 291-FE-WR-01) |
+| FE-IN-05 | info | **accept** (cosmetic: the note shows when no row has a switch) — fix on the next touch of `DraftInputsFold.tsx` |
+| FE-IN-06 | info | **open → v4.8** (a11y, with FE-IN-04): the Team view's region and figure share one accessible name, read twice |
+| G-4 row 11 | (live) | **fixed** in `3e5a84819` (`c5fde1d87` → `a04c6d759`); row 11 PASS after fix |
 
 
 # Part 1 — backend, scripts, migrations

@@ -92,7 +92,7 @@ Requirements: [`REQUIREMENTS.md`](REQUIREMENTS.md). **21 v4.7 requirements, 21 m
 - [x] **Phase 293: Start From Outside, and Close Out** (closed 2026-10-26: verified 6/6, operator signed G-4 2026-10-25, secured 36/36, UAT 12/12 after fast fix `048dec8e9`; mig 215 in cloud owed before deploy): authenticated inbound run start with read-back, trigger provenance and last/next run, seed statuses reconciled (START-02, START-04, REG-06)
 - [x] **Phase 294: Decision Engine: Rerank and Citation Check** (complete 2026-10-20, live c94e1bed9): a Settings switch picks Jev, OpenAI Decisions or a local model to rerank and prune search candidates, and a citation check labels each cited sentence (DEC-01, DEC-02, DEC-03)
 - [x] **Phase 295: Runs That Don't Dead-End** (closed 2026-10-24, operator signed): an empty or uncited KB step pauses and asks instead of failing; misconfigurations refused before a run; the judge stops failing recorded-not-sent actions; every run ends truthfully with a reason (RUN-01..04)
-- [ ] **Phase 296: Close v4.7 Debt** (added 2026-10-26, operator, from the v4.7 audit): fix every open defect the milestone found (bugs, review findings, UAT findings); feature-shaped items move to v4.8 as seeds; one deploy of 292.1 + 293 + these fixes afterwards
+- [x] **Phase 296: Close v4.7 Debt** (added 2026-10-26, operator, from the v4.7 audit): fix every open defect the milestone found (bugs, review findings, UAT findings); feature-shaped items move to v4.8 as seeds; one deploy of 292.1 + 293 + these fixes afterwards
 
 ### Phase Details
 
@@ -472,7 +472,7 @@ Plans:
 - [x] 296-03-PLAN.md — W3a describe/publish backend: bounded PDF reads, hollow-step + unticked-service notes, typed golden stand-ins, rerank/citation backend (wave 2)
 - [x] 296-06-PLAN.md — W2b inbound/providers/wire: server required inputs, key fixes, pinned-model routing, Moonshot schema inliner, chat markup, wire typing (wave 3)
 - [x] 296-07-PLAN.md — W3b builder + describe UI: read-only Team view, draft persists, honest governance seal, describe-door UI, library note (wave 3)
-- [ ] 296-05-PLAN.md — W5 tests, gates, D-21 roster, G-4 drive, record flips, seeds, outcome table (wave 4, DB)
+- [x] 296-05-PLAN.md — W5 tests, gates, D-21 roster, G-4 drive, record flips, seeds, outcome table (wave 4, DB)
 
 **UI hint**: yes
 **Flags**: G-8: target 4-5 plans. G-5: many touched files FIRE (`WorkflowRunPage.tsx`, `harness_engine.py`, `threads.py`, `runs.py`, `StreamsProvider.tsx`): one-touch fixes only, honoured by construction, or defer. Security review (`/gsd:secure-phase`) owed for the LangSmith and tenancy fixes. Migrations resume at `216` if one is needed.
@@ -491,7 +491,7 @@ Plans:
 | 293. Start From Outside, and Close Out | 5/5 | Complete (2026-10-26) | 6/6 SC; operator signed G-4; SECURITY 36/36 closed (AR-05/06 accepted); UAT 12/12; not deployed, cloud mig 215 owed first |
 | 294. Decision Engine: Rerank and Citation Check | 5/5 | complete (2026-10-20) | 6/6 SC met in code; 294-HUMAN-UAT 9/9 passed live; roster R2 ⛔ Anthropic billing, glm-5.3 ⛔ BUG-261020-06; not pushed; cloud mig 211 owed before deploy |
 | 295. Runs That Don't Dead-End | 7/7 (+3 gap fixes) | Complete (2026-10-24) | S1-S7 PASS; Anthropic row re-run PASS; operator signed |
-| 296. Close v4.7 Debt | 6/7 | In Progress | - |
+| 296. Close v4.7 Debt | 7/7 | Complete (verified passed; G-4 8/8 + rows 9-12; SECURITY 44/44; not yet deployed) | 2026-10-27 |
 
 ---
 

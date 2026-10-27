@@ -204,7 +204,13 @@ action), **closed** (commit). ⏳ **G-4** = fixed and unit-proven, but the bug r
 named live row in `296-HUMAN-UAT.md` (D-19 / SC#5; executors have no browser). ⚠ = a live finding the
 orchestrator must route under G-7.
 
-⚠ **The live backend at 296-05 time predates 296-06.** `GET :8000/openapi.json` carries 296-02's
+✅ **SUPERSEDED 2026-10-27 (post-execution):** every G-4 scenario 1-8 PASSES (scenario 3 after its
+fix) and optional rows 9-12 PASS (11 and 12 after their fixes), per `296-HUMAN-UAT.md`; the bug reports
+those rows close were closed in `01546a07d`. The backend was restarted and the 296-06-dependent board
+rows re-run (pinned emit 6/6, resume-model 6/6 after BE-CR-01, multi-tool 6/6). The paragraph below is
+kept as the 296-05-time record.
+
+~~⚠ **The live backend at 296-05 time predates 296-06.**~~ (superseded) `GET :8000/openapi.json` carries 296-02's
 `ScheduleTriggerResult.outcome` but none of 296-06's `AutoAnsweredNote`, `needs_task` or
 `unplaced_sentences`, while the main checkout's source has them (`workflow_wire.py`). The `--reload`
 process did not pick up the 296-06 merge, and `workflow_runs.metadata.provider` is empty on every run
@@ -213,9 +219,9 @@ restart"; the operator restarts uvicorn (memory: the user starts the backend).
 
 | ID | Outcome |
 |---|---|
-| BUG-261021-02 | fixed `cb13a74a7` (RED `20113ce24`; two-org integration test 13 passed) — ⏳ G-4 #1 closes the report |
-| BUG-261021-05 | fixed `ef2832f46` (296-07, D-04 amended option b; RED `e074515f5`) — ⏳ optional row 9 closes the report; the engine half seeded SEED-384 |
-| BUG-261020-02 (`evidence-page-later-step-carries-withheld-document-substance.md`) | fixed `70fefa6f4` (RED `8939b5522`, D-05 cascade) — ⏳ G-4 #2 closes the report |
+| BUG-261021-02 | fixed `cb13a74a7` (RED `20113ce24`; two-org integration test 13 passed) — G-4 #1 **PASS**; report closed `01546a07d` |
+| BUG-261021-05 | fixed `ef2832f46` (296-07, D-04 amended option b; RED `e074515f5`) — optional row 9 **PASS**; report closed `01546a07d`; the engine half seeded SEED-384 |
+| BUG-261020-02 (`evidence-page-later-step-carries-withheld-document-substance.md`) | fixed `70fefa6f4` (RED `8939b5522`, D-05 cascade) — G-4 #2 **PASS**; report closed `01546a07d` |
 | SEED-364 | fixed `08c9a600e` (RED `67040639c`; migration 216, regen `006f0365c`) — SEED-364 answered; the cloud apply of 216 is the DEPLOY row |
 | SEED-365 (rate-limit half) | fixed `70fefa6f4` (RED `8939b5522`) + UI 429 sentence `b392ef6d1` — SEED-365 partially-answered |
 | 287-T01 | fixed `04618f10e` (296-06, RED `710cf99b4`; preflight 422 before any write) |
@@ -235,24 +241,24 @@ restart"; the operator restarts uvicorn (memory: the user starts the backend).
 | 289-IN-07 | fixed `0ad717a67` (296-06; typed `RunEvidenceConfidence`) |
 | 289-IN-08 | fixed `6d51f603b` (296-02) |
 | 289-F3 | fixed `bf8a4467b` (owner buckets) |
-| SEED-362 | fixed `bf8a4467b` (resume half) + `04618f10e` (kickoff records the provider) — live roster resume-model: re-run after a backend restart (the live backend predates 296-06, so no run carries `metadata.provider`); SEED-362 updated |
+| SEED-362 | fixed `bf8a4467b` (resume half) + `04618f10e` (kickoff records the provider) + BE-CR-01 fix (`d34d1b115` RED → `51ec89cfc`, the resumed ctx's settings name the recorded provider) — live roster resume-model: first post-restart re-run FAILED 5 non-default providers (proved BE-CR-01); after the fix **PASS 6/6**, `metadata.provider` = the starting provider on every row (`evidence/roster/resume-model-*.json`); SEED-362 updated |
 | SEED-363 | fixed `6d51f603b` (RED `d267c6fff`) — SEED-363 answered |
 | 288-WR-02 | fixed `313d5f124` (296-03, RED `65120e770`) |
 | 288-IN-01 | fixed `0ad717a67` (typed `AutoAnsweredNote`) |
 | 293-IN-01 | fixed `04618f10e` (limit first, then consume) |
-| 293-IN-03 | fixed `04618f10e` (413 from Content-Length) — residual: a chunked body with no length is not capped by the app; accepted: the onebox nginx bounds every body (`frontend/nginx.conf` `client_max_body_size 100m`), re-open when a deploy target runs without that nginx |
+| 293-IN-03 | fixed for both bodies: header bodies `04618f10e` (413 from Content-Length); chunked bodies `dbc43dbc1` (RED `c8b5427c1`, the 296 SECURITY AR-05 fix: counted as it streams, refused at the cap). ~~accepted: the onebox nginx bounds every body~~ — that nginx acceptance is superseded |
 | 293-IN-04 | fixed `3a6d7aae8` (held task set) |
 | 293-IN-05 | fixed `08c9a600e` (canonical UUID regex in 215; cloud has 0 `_schedule_id` rows) |
 | 293-IN-06 | fixed `04618f10e` (`needs_task`, create_key scope) — the `task` field seeded SEED-380 |
 | 293-IN-08 | fixed `04618f10e` (audit only on a matched update) |
 | 293-DEL | fixed `0ad717a67` + `f318d2b69` (worded 409) |
-| 293-F-4 | ⚠ PARTLY fixed `c2a8f6ace` (emit pin routes to the pinned provider; unit-proven). LIVE board: a pin to a chat-completions model (`deepseek-v4-pro`) PASSES from 5 run providers; a pin to `gpt-5.6-luna` FAILS from all 5 non-OpenAI providers with OpenAI's 400 "Function tools with reasoning_effort are not supported for gpt-5.6-luna in /v1/chat/completions" — reproduced on 296-06 worktree code by one direct `forced_emit` shot (`evidence/roster/pinned-emit-diagnosis.json`): the API surface is resolved under the RUN provider's settings. NOT closed; a G-7 routing decision for the orchestrator. The agent-step half seeded SEED-386 |
+| 293-F-4 | fixed `a7a09f269` (RED `1f5fa6283`: the pinned emit resolves its API surface under the pinned provider), on top of `c2a8f6ace` (the pin routes to the pinned provider). LIVE re-run: pinned-emit board **PASS 6/6** — the 5 non-OpenAI rows pinned to `gpt-5.6-luna` emit on openai, the openai row pinned to `claude-opus-5-5` emits on anthropic (`evidence/roster/pinned-emit-*.json`; the pre-fix 400 is kept in `pinned-emit-diagnosis.json`). The agent-step half seeded SEED-386 |
 | 294-IN-01 | fixed `e9e8fdc9d` (296-03, RED `591353b60`) |
 | 294-IN-02 | fixed `e9e8fdc9d` |
 | 294-IN-07 | fixed `e9e8fdc9d` |
 | 294-CR-02-res | fixed `e9e8fdc9d` (marked-measured fixture) |
-| 292.1-IN-01 | fixed `0ad717a67` (RED `847a00dcc`) — live markup scan: re-run after a backend restart (296-06 code not loaded) |
-| 292.1-IN-02 | fixed `0ad717a67` (RED `847a00dcc`) — live re-run owed with 292.1-IN-01 |
+| 292.1-IN-01 | fixed `0ad717a67` (RED `847a00dcc`) — live markup scan re-run on the restarted backend: multi-tool **PASS 6/6**, 0 markup hits (`evidence/roster/multi-tool-*.json`) |
+| 292.1-IN-02 | fixed `0ad717a67` (RED `847a00dcc`) — live re-run with 292.1-IN-01: **PASS 6/6** |
 | 292.1-IN-04 | fixed `0ad717a67` (`EVAL_MAX_TOOL_ROUNDS = 15`) |
 | BUG-261024-01 | fixed `c2a8f6ace` (RED `fab31d6a8`; unit-proven `test_296_moonshot_schema.py`) — live row ⛔ Moonshot account suspended (429, probed 2026-10-27); report stays `folded` into 296 with the reinstatement trigger |
 | 291-WR-01 + IN-08 | fixed `cd1aaefff` (RED `a2568f789`; extraction `1a449d44c`) |
@@ -273,19 +279,19 @@ restart"; the operator restarts uvicorn (memory: the user starts the backend).
 | 291-S3-F2 / F3 | fixed `ef2832f46` (labels for fields an input fills; Replace under a PDF takes a PDF) — the page-text label for an UNFILLED field seeded SEED-387 |
 | 291-S6-F7 | fixed `313d5f124` (typed stand-ins + note) + `ef2832f46` (the note reaches the library line) — deriving inputs from the test instruction seeded SEED-385 (D-08 amended) |
 | 291-S6-F8 | in-app and key paths did-not-reproduce at 296-06's base (already fixed by 293-05; `test_296_step_inputs_and_routing.py`); schedule + golden fixed `c2a8f6ace`. LIVE board in-app: **6/6 PASS** (anthropic, deepseek, google, minimax, openai, zhipu named Lisbon), OpenRouter ⛔ 402, Moonshot ⛔ 429 |
-| 291-S6-F9 | fixed `9c6b3403c` (CSS) — ⏳ G-4 #7 |
+| 291-S6-F9 | fixed `9c6b3403c` (CSS) — G-4 #7 **PASS** |
 | 291-S7-F1 | fixed `c496244c3` (`filled_field_count`) |
-| BUG-261024-02 | fixed `02b5053ac` (RED `2548b6212`) — ⏳ optional row 10 closes the report |
-| 290-WR-02 | fixed `02b5053ac` (D-09) — ⏳ G-4 #6 |
+| BUG-261024-02 | fixed `02b5053ac` (RED `2548b6212`) — optional row 10 **PASS**; report closed `01546a07d` |
+| 290-WR-02 | fixed `02b5053ac` (D-09) — G-4 #6 **PASS** |
 | 290-IN-01..05 | fixed `02b5053ac` |
 | 290-FU-canvas | fixed `02b5053ac` |
 | 290-OBS-vocab | fixed `02b5053ac` |
 | 288-F-4 | fixed `ef2832f46` (RED `e074515f5`) |
-| BUG-261021-04 + -03 | fixed `fd59d0f19` (RED `e93dbecbb`; -03 cause ii, cause i refuted) — ⏳ G-4 #3 closes both reports |
-| BUG-261025-03 | fixed `bf8a4467b` (backend, RED `0d3d4d8d0`) + `fd59d0f19` (UI) — ⏳ G-4 #4 |
-| BUG-261025-01 | fixed `9c6b3403c` (RED `c563f4ad0`) — ⏳ G-4 #5 |
-| BUG-261025-02 | fixed `9c6b3403c` (CSS) — ⏳ G-4 #7 |
-| 295-D-uat-02 | fixed `fd59d0f19` (`! Waiting`) — ⏳ G-4 #4 |
+| BUG-261021-04 + -03 | fixed `fd59d0f19` (RED `e93dbecbb`; -03 cause ii, cause i refuted) + the G-4 #3 fix `2846a572d` → `1129aaa5c` (a re-driven run's stream ends) — G-4 #3 **PASS after fix**; both reports closed `01546a07d` |
+| BUG-261025-03 | fixed `bf8a4467b` (backend, RED `0d3d4d8d0`) + `fd59d0f19` (UI) — G-4 #4 **PASS**; report closed `01546a07d` |
+| BUG-261025-01 | fixed `9c6b3403c` (RED `c563f4ad0`) — G-4 #5 **PASS** (with a note); report closed `01546a07d` |
+| BUG-261025-02 | fixed `9c6b3403c` (CSS) — G-4 #7 **PASS**; report closed `01546a07d` |
+| 295-D-uat-02 | fixed `fd59d0f19` (`! Waiting`) — G-4 #4 **PASS** |
 | 289-F-A | fixed `9c6b3403c` (watched-failure alert) |
 | 289-F-B | fixed `9c6b3403c` (sanitised markdown) |
 | 289-F-C | fixed `9c6b3403c` (download unavailable sentence) |
@@ -298,7 +304,7 @@ restart"; the operator restarts uvicorn (memory: the user starts the backend).
 | 293-IN-02 | fixed `b392ef6d1` |
 | 294-IN-05 / IN-06 / IN-08 | fixed `b392ef6d1` |
 | 294-LOCAL | fixed `e9e8fdc9d` (30 s inference timeout) + `b392ef6d1` (latency note), pinned equal by a parity test |
-| BUG-261024-04 (defect half) | fixed `0ad717a67` (lead 2, RED `847a00dcc`); lead 1 did-not-reproduce (`test_296_chat_and_wire.py`), lead 3 did-not-reproduce (`streamsProvider_296_followup_files.test.tsx`) — ⏳ G-4 #8 |
+| BUG-261024-04 (defect half) | fixed `0ad717a67` (lead 2, RED `847a00dcc`); lead 1 did-not-reproduce (`test_296_chat_and_wire.py`), lead 3 did-not-reproduce (`streamsProvider_296_followup_files.test.tsx`) — G-4 #8 **PASS**; report closed `01546a07d` |
 | 286-S04-2 | fixed `ef2832f46` (MARK_ICON docblock) |
 | 286-IN-02 | fixed `19f54cf71` (keyed on the enclosing function) |
 | 286-S04-1 | fixed `439f8f86a` (eslint clean) |
@@ -311,9 +317,9 @@ restart"; the operator restarts uvicorn (memory: the user starts the backend).
 | 292.1-test_075_4 | fixed `7af00ac5d` (5 → 11 providers, each dated) |
 | 293-IN-07 | fixed `67cc8c701` (`\d{3,}`, driven RED in a scratch register copy) |
 | 294-IN-03 | fixed `ac7cd871f` (choice answers; RED at base) |
-| 293-INH / 295-TEST | ⏳ re-derived by the close gates — PENDING: the vitest count gate and the full backend gate wait on the hung pytest PID 94388 (see the 296-05 SUMMARY) |
+| 293-INH / 295-TEST | CLOSED 2026-10-27: vitest count gate **OK** — 12236 tests, 0 failing, 523/523 pinned files, no per-file decrease (first OK since 295); backend gate 69 ≤ 71 twice, failing set = the 296-01 base set |
 | CLOSE-ONLY | closed: BUG-261020-03 (`6d14ccf59` + the 2026-10-24 Anthropic key rotation; `test_trace_key_redaction.py` 3 passed today); BUG-261020-01 — its report file exists as `human-step-answer-never-reaches-the-next-step.md` (no `BUG-` prefix in the name) — closed `b23554309`; BUG-261015-01 `b23554309`; BUG-261020-07 `80fc12e76`/`5fea3cb72`/`b101092f3`; -08 `3f23f1d81`; -09 `0bee60c7a`; -10 `21078ca97`; -11 `bfe4e49ac`; -12 `80fc12e76` + `bfe4e49ac` (all 295, verified live by 295's signed G-4); SEED-361 answered (295-08 `a2866c3ea`); the 290–295 review items are closed by those phases' own REVIEW-FIX records |
-| 287-V-3 | ⏳ operator/orchestrator: the read-only cloud read in `296-HUMAN-UAT.md` (e) |
+| 287-V-3 | **PASS by effect** (2026-10-27): the cloud read in `296-HUMAN-UAT.md` (e) found all 3 migration-210 starters `published`, `is_system_global = true` |
 | 288-F-1/2/3, 288-CR-01, 288-WR-01/03, 289-CR-01/02, 289-WR-01..06, 289-F1, 287-WR-01 | closed (records only): 288-F-1 `b3ef15a5f`, 288-F-3 `7c07523b3` (289-01), 288-F-2 `0bee60c7a` (295-02); 288-CR-01 + 288-WR-03 `fb42169f7`; 288-WR-01 folded into 289 D-11..D-13 (`7c07523b3`); 289-CR-01 `33f51fe01`, 289-CR-02 `467fe84ab`; 289-WR-01 `3ed3357f9`, -02 `ca1e54df7`, -03 `b7d7e2c3c`, -04 `30b6e6036`, -05 `925d1e76b`, -06 `16e648201`; 289-F1 `b3ef15a5f` (the paused card keeps its answer control); 287-WR-01 `a64a4b877` |
 | DEBT-1 / 293-F-2 | seeded SEED-367 (routed in its status_note; stays planted) |
 | 294-WR-02 | seeded SEED-365 (partially-answered: concurrency cap and spend ledger remain) |
@@ -342,7 +348,7 @@ restart"; the operator restarts uvicorn (memory: the user starts the backend).
 | 287-V-1 | operator: ruled by D-12 (menu + name dialog = one action); written into `287-VERIFICATION.md` by 296-05 |
 | 287-V-2, 291-roster, 292.1-OpenRouter-row, BUG-261024-03 | operator: top up OpenRouter (live 402 today), then `scripts/run-2921-board.py --run --providers openrouter` and `scripts/run-296-board.py --first-step --providers openrouter`; flip BUG-261024-03 on PASS (its trigger is written) |
 | 292.1-Moonshot-row | operator: reinstate the Moonshot account (live 429 "suspended due to insufficient balance" today) or record it as permanently blocked |
-| 287-V-4, 287-V-5 | folded into `296-HUMAN-UAT.md` optional rows 11 and 12 |
+| 287-V-4, 287-V-5 | folded into `296-HUMAN-UAT.md` optional rows 11 and 12 — both **PASS after fix** (row 11 `c5fde1d87` → `a04c6d759`; row 12 `6a6791309` → `aac1a6d5b`) |
 | 294-ENV | operator: remove the two dev `.env` lines (`DECISION_ENGINE_FAULT_BASE_URL` and its `ENVIRONMENT` partner); never edited by Claude |
 | 286-V-2 | operator: the SEED-280 status note |
 | DEPLOY | operator: cloud migrations 214 → 215 → 216 (each shown first, per-action approval), then the backend, then `get_advisors(security)` |
@@ -354,5 +360,18 @@ restart"; the operator restarts uvicorn (memory: the user starts the backend).
 | `check-backend-unit-baseline.cjs` false pass when killed; extra args replaced `tests/unit` (296-02 Deferred) | fixed `e7dbed0de` (fail closed on no summary / signal / exit ≥ 2; a `tests` path is kept) |
 | `test_200_1_phase_output_shape::test_this_plan_wrote_no_migration` (296-03 saw it) | in 296-01's and 296-02's recorded BASE failing sets (inherited); confirm in the close gate |
 | `tests/test_dual_mode_wiring.py` (21, stale fakes), outside `tests/unit` | inherited (296-02 and 296-06 measured the identical set at base); not gated; left |
-| 296-07 open: SeedReceipt lists a hand-escalated step with its shipped reason | a G-4 look, `296-HUMAN-UAT.md` optional row 9 |
-| The live backend predates 296-06 | operator: restart uvicorn, then re-run the 296-06-dependent board rows (`--resume-model`, `--multi-tool`, and `--pinned-emit --pin openai` for 293-F-4) |
+| 296-07 open: SeedReceipt lists a hand-escalated step with its shipped reason | optional row 9 **PASS** (SeedReceipt not applicable: the row used a hand-set step on an existing draft, not a freshly seeded one) |
+| The live backend predates 296-06 | superseded: backend restarted; `--resume-model`, `--multi-tool` and `--pinned-emit` re-run (6/6 each, resume after BE-CR-01) |
+
+**Fixed after execution (post-296-05 commits, `git log 07e2e4ba8..HEAD`):**
+
+| Item | Outcome |
+|---|---|
+| BE-CR-01 (review: a resumed run's model sent through the owner's default provider) | fixed `d34d1b115` (RED) → `51ec89cfc` (`harness_engine.py`); live resume-model **PASS 6/6** |
+| FE-CR-01 (review: a refused in-thread start pre-fills the composer) | fixed `0429bc53c` (RED) → `492c7ddb0`; driven live before and after |
+| G-4 scenario 3 (a re-driven run's stream never ends) | fixed `2846a572d` (RED) → `1129aaa5c`; scenario 3 **PASS after fix** |
+| G-4 row 12 (a fresh in-thread start's answer never renders) | fixed `6a6791309` (RED) → `aac1a6d5b`; row 12 **PASS after fix** |
+| The 7 review warnings (FE-WR-01/02/03, BE-WR-04/05/06, G-4 row 11) | fixed in `3e5a84819` (`chore: merge executor worktree 296 review warnings`), each RED → GREEN in its own pair |
+| BE-WR-03 (a Look-it-up-only workflow read as needing a typed task) | fixed `3116847ce` (RED) → `4bd5e640f` |
+| AR-05 / BE-WR-02 (a chunked inbound body bypasses the cap) | fixed in-phase `c8b5427c1` (RED) → `dbc43dbc1`; `296-SECURITY.md` SECURED 44/44 (`d9b08b06b`) |
+| The 214 fence test (`launchFieldsTwin293.test.ts` defaulted its case inputs) | fixed `5979d2fb8` (asserts the case inputs) |

@@ -10,7 +10,7 @@ updated: 2026-10-27
 
 ## Current state
 
-- **(a) G-4 scenarios 1-8: IN PROGRESS 2026-10-27** — ALL EIGHT PASS (3 after a fix) (2 and 4 need fixtures rebuilt: 289's run A/B, its `s289-ev-*` workflows and both 289 colleague accounts are GONE from the local DB). Optional: 9, 10 PASS; 11 and 12 PASS after fix.
+- **(a) G-4 scenarios 1-8: DONE 2026-10-27** — ALL EIGHT PASS (3 after a fix) (2 and 4 ran on rebuilt fixtures: 289's run A/B, its `s289-ev-*` workflows and both 289 colleague accounts are GONE from the local DB). Optional: 9, 10 PASS; 11 and 12 PASS after fix. Bug reports closed in `01546a07d`.
   A row is PASS only with a screenshot or DOM/DB evidence path written beside it. A FAIL goes back to
   its owning 296 plan under G-7; it is never closed in the records.
 - **(c) the D-21 roster board: DRIVEN by 296-05** (`scripts/run-296-board.py`). Verdicts and evidence
@@ -61,19 +61,20 @@ a registry-backed `deepseek/*` id) — 8 rows, 7 natives + OpenRouter
 (`evidence/roster/roster.txt`). Per-request `model` + `provider` on `POST /threads/{id}/messages`; no
 global setting was changed. OpenRouter and Moonshot were PROBED live first (`evidence/roster/probe.json`).
 
-⚠ **The live :8000 backend predates the 296-06 merge.** Its `/openapi.json` carries 296-02's
-`ScheduleTriggerResult.outcome` but none of 296-06's `AutoAnsweredNote` / `needs_task` /
-`unplaced_sentences`, which the main checkout's source has; no workflow run it started carries
-`metadata.provider` (0 rows ever). Rows that exercise 296-06 code are marked **re-run after restart**.
+✅ **SUPERSEDED 2026-10-27:** the backend was restarted and the 296-06-dependent columns were re-run
+(the pinned-emit `gpt-5.6-luna` column after the 293-F-4 fix `a7a09f269`; the resume column after the
+BE-CR-01 fix; multi-tool). The cells below carry the re-run verdicts, each read from the JSON's own
+`verdict` field. ~~⚠ The live :8000 backend predates the 296-06 merge … Rows that exercise 296-06 code
+are marked re-run after restart.~~
 
 | Provider (roster model) | 291-S6-F8 first step names `Lisbon` | 293-F-4 emit pinned to `gpt-5.6-luna` | 293-F-4 emit pinned to `deepseek-v4-pro` | SEED-362 resume on the starting model | multi-tool axis + 292.1 markup scan |
 |---|---|---|---|---|---|
-| openai `gpt-5.6-luna` | **PASS** `first-step-openai.json` | n/a (own provider; control unpinned **PASS** `pinned-emit-control-openai.json`) | **PASS** `pinned-emit-openai.json` | re-run after restart | **PASS** `multi-tool-openai.json` (markup 0) |
-| anthropic `claude-opus-5-5` | **PASS** `first-step-anthropic.json` | **FAIL** `pinned-emit-anthropic.json` (OpenAI 400, see below) | **PASS** `pinned-emit-pin-deepseek-anthropic.json` | re-run after restart | **PASS** `multi-tool-anthropic.json` |
-| google `gemini-3.8-flash` | **PASS** `first-step-google.json` | **FAIL** `pinned-emit-google.json` | **PASS** `pinned-emit-pin-deepseek-google.json` | mechanics PASS (pause → answer 200 → re-drive → completed) but **FAIL** on the record: `metadata.provider` null — the stale backend (`resume-model-google.json`); re-run after restart | **PASS** `multi-tool-google.json` |
-| deepseek `deepseek-v4-pro` | **PASS** `first-step-deepseek.json` | **FAIL** `pinned-emit-deepseek.json` | n/a (own provider; control unpinned **PASS** `pinned-emit-control-deepseek.json`) | re-run after restart | **PASS** `multi-tool-deepseek.json` (DeepSeek first, markup 0) |
-| zhipu `glm-5.3-flash` | **PASS** `first-step-zhipu.json` | **FAIL** `pinned-emit-zhipu.json` | **PASS** `pinned-emit-pin-deepseek-zhipu.json` | re-run after restart | **PASS** `multi-tool-zhipu.json` |
-| minimax `MiniMax-M3` | **PASS** `first-step-minimax.json` | **FAIL** `pinned-emit-minimax.json` | **PASS** `pinned-emit-pin-deepseek-minimax.json` | re-run after restart | **PASS** `multi-tool-minimax.json` |
+| openai `gpt-5.6-luna` | **PASS** `first-step-openai.json` | n/a (own provider; control unpinned **PASS** `pinned-emit-control-openai.json`). Re-run row pinned to `claude-opus-5-5`: **PASS**, emit on anthropic (`pinned-emit-openai.json`) | **PASS** (296-05 run; that file was overwritten by the re-run above) | **PASS** — recorded provider `openai` (`resume-model-openai.json`) | **PASS** `multi-tool-openai.json` (markup 0) |
+| anthropic `claude-opus-5-5` | **PASS** `first-step-anthropic.json` | **PASS** after the 293-F-4 fix, emit on openai (`pinned-emit-anthropic.json`; first run FAIL, OpenAI 400, see below) | **PASS** `pinned-emit-pin-deepseek-anthropic.json` | **PASS** — recorded provider `anthropic` (`resume-model-anthropic.json`) | **PASS** `multi-tool-anthropic.json` (markup 0) |
+| google `gemini-3.8-flash` | **PASS** `first-step-google.json` | **PASS** after the fix, emit on openai (`pinned-emit-google.json`) | **PASS** `pinned-emit-pin-deepseek-google.json` | **PASS** — recorded provider `google` (`resume-model-google.json`) | **PASS** `multi-tool-google.json` (markup 0) |
+| deepseek `deepseek-v4-pro` | **PASS** `first-step-deepseek.json` | **PASS** after the fix, emit on openai (`pinned-emit-deepseek.json`) | n/a (own provider; control unpinned **PASS** `pinned-emit-control-deepseek.json`) | **PASS** — recorded provider `deepseek` (the owner's default provider, so it passed before the fix too) (`resume-model-deepseek.json`) | **PASS** `multi-tool-deepseek.json` (DeepSeek first, markup 0) |
+| zhipu `glm-5.3-flash` | **PASS** `first-step-zhipu.json` | **PASS** after the fix, emit on openai (`pinned-emit-zhipu.json`) | **PASS** `pinned-emit-pin-deepseek-zhipu.json` | **PASS** — recorded provider `zhipu` (`resume-model-zhipu.json`) | **PASS** `multi-tool-zhipu.json` (markup 0) |
+| minimax `MiniMax-M3` | **PASS** `first-step-minimax.json` | **PASS** after the fix, emit on openai (`pinned-emit-minimax.json`) | **PASS** `pinned-emit-pin-deepseek-minimax.json` | **PASS** — recorded provider `minimax` (`resume-model-minimax.json`) | **PASS** `multi-tool-minimax.json` (markup 0) |
 | moonshot `kimi-k3.1-pro-highspeed` | ⛔ account suspended for insufficient balance — live 429 (`probe.json`), BUG-261024-01 | ⛔ same | ⛔ same | ⛔ same (`resume-model-moonshot.json`) | ⛔ same |
 | openrouter `deepseek/deepseek-v4-pro` | ⛔ 402 insufficient credit — live probe (`probe.json`), BUG-261024-03 | ⛔ same (`pinned-emit-openrouter.json`) | ⛔ same | ⛔ same (`resume-model-openrouter.json`) | ⛔ same |
 
@@ -83,7 +84,17 @@ OpenAI key injected). OpenAI then answers 400 `Function tools with reasoning_eff
 for gpt-5.6-luna in /v1/chat/completions` on all three rungs, because the API surface is resolved under
 the RUN provider's settings. Reproduced on 296-06 worktree code by one direct `forced_emit` shot (run
 settings on DeepSeek → 400; on OpenAI → emits). A pin to a chat-completions model passes from every
-run provider. **Not closed; a G-7 routing decision for the orchestrator.**
+run provider. ~~Not closed; a G-7 routing decision for the orchestrator.~~ **FIXED** `a7a09f269`
+(RED `1f5fa6283`): the pinned emit now resolves its API surface under the pinned provider. Re-run:
+pinned-emit **PASS 6/6** (`emit_validated_providers` = the pinned provider, `emit_failed_on` empty,
+`has_400` false on every row).
+
+**SEED-362 resume column (`resume-model-*.json`):** the first re-run on the restarted backend FAILED
+for all 5 non-default providers (only the owner's default, deepseek, passed). That proved review
+finding BE-CR-01: the resumed run kept the owner's default-provider settings. After the fix
+(`d34d1b115` RED → `51ec89cfc`): **PASS 6/6**. On every row, the paused run's answer returned 200, the
+run completed, and `workflow_runs.metadata.provider` is the starting provider (5 rows `non_default:
+true`).
 
 **BUG-261024-01 (Moonshot emit schema):** unit-proven (`test_296_moonshot_schema.py`); the live row is
 ⛔ until the account is reinstated.
@@ -96,7 +107,7 @@ provider error bodies have `org-…` / `ak-…` ids redacted.
 
 | Axis | Row | Verdict | Evidence |
 |---|---|---|---|
-| Cross-provider | the board above: 7 natives + OpenRouter, 6 reachable, 2 ⛔ with reasons | first-step 6/6 PASS · multi-tool 6/6 PASS · pinned emit: chat-completions pins 5/5 PASS, `gpt-5.6-luna` pins 5/5 FAIL (⚠ routed) · resume re-run owed | `evidence/roster/` |
+| Cross-provider | the board above: 7 natives + OpenRouter, 6 reachable, 2 ⛔ with reasons | first-step 6/6 PASS · multi-tool 6/6 PASS (re-run) · pinned emit: chat-completions pins 5/5 PASS, cross-provider pins 6/6 PASS after the 293-F-4 fix · resume 6/6 PASS after the BE-CR-01 fix (first re-run 5 FAIL) · Moonshot ⛔ 429, OpenRouter ⛔ 402 (unchanged) | `evidence/roster/` |
 | Multi-tool | `search_documents` then `execute_code` in one prompt, per provider | **PASS** 6/6 (both tools ran, 0 markup hits by the shipped `detect_markup`) | `multi-tool-*.json` |
 | Parallel-thread | thread A streaming (`runs.status = streaming` when B was sent) while thread B accepts a prompt, google | **PASS** (B 201; both completed, each in its own thread) | `parallel-google.json` |
 | Long-message | a 6,606-byte prompt (the 273 CSV with notes), deepseek | **PASS** (completed, answer non-empty) | `long-deepseek.json` |
