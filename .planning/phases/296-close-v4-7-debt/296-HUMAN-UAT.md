@@ -1,5 +1,5 @@
 ---
-status: pending
+status: complete
 phase: 296-close-v4-7-debt
 source: [296-UI-SPEC.md (G-4 lived scenarios), 296-CONTEXT.md D-20 / D-21, 296-05-PLAN.md Task 2-3]
 started: 2026-10-27
@@ -10,7 +10,7 @@ updated: 2026-10-27
 
 ## Current state
 
-- **(a) G-4 scenarios 1-8: IN PROGRESS 2026-10-27** — ALL EIGHT PASS (3 after a fix) (2 and 4 need fixtures rebuilt: 289's run A/B, its `s289-ev-*` workflows and both 289 colleague accounts are GONE from the local DB). Optional: 10 PASS, 11 PASS after fix.
+- **(a) G-4 scenarios 1-8: IN PROGRESS 2026-10-27** — ALL EIGHT PASS (3 after a fix) (2 and 4 need fixtures rebuilt: 289's run A/B, its `s289-ev-*` workflows and both 289 colleague accounts are GONE from the local DB). Optional: 9, 10 PASS; 11 and 12 PASS after fix.
   A row is PASS only with a screenshot or DOM/DB evidence path written beside it. A FAIL goes back to
   its owning 296 plan under G-7; it is never closed in the records.
 - **(c) the D-21 roster board: DRIVEN by 296-05** (`scripts/run-296-board.py`). Verdicts and evidence
@@ -51,7 +51,7 @@ its trigger, never closed blind.
 | 9 | BUG-261021-05 escalated seal | Builder: an `llm_agent` step with NO knowledge-base tool; set it to "must prove it" by hand. | **PASS** (2026-10-27) | Draft `copy 2 214.1`, step `survey-library` (llm_agent; tools: find files by name / list a folder's files / folder tree; NO `search_documents`) set to `⛨ Must prove it` by hand: the step reads `Marked to prove its sources, but this step can't search your documents, so nothing is checked when it runs.`; `Checks that run on this step: No checks apply to this step yet` (no locked citations gate); no corner seal on the node (zoomed). `evidence/g4/9-escalated-seal.jpg`. Set back to `Free to think` after. SeedReceipt not applicable (not a freshly seeded draft) |
 | 10 | BUG-261024-02 draft kept | Workflows → describe a workflow → let it generate → leave the builder WITHOUT touching anything → come back. | **PASS** (2026-10-27) | Draft `Cited Stakeholder Update` generated, builder left untouched, found in the library and reopened with its 2 steps: `evidence/g4/10-draft-kept-reopened.jpg` |
 | 11 | 287-V-4 (folded) | In a chat thread, press Run a workflow, pick one with a REQUIRED input, leave it empty, press Run. | **PASS after fix** (2026-10-27; first drive PARTIAL) | First drive: the refusal sat ~2,000 px below 13 fields (`evidence/g4/11-required-*.jpg`). Fixed by the review-warnings merge (`a04c6d759`: scroll the refusal into view on every refused press; RunModal too). Re-driven: pressed Run with all fields empty → the dialog scrolled (scrollTop 2057) and the sentence sat fully inside the scroller (419-545 of 86-546); typing one character cleared it |
-| 12 | 287-V-5 (folded, optional long-message) | A thread with ≥ 50 prior messages: start a workflow in-thread. | **FAIL** (2026-10-27) — new defect, not a regression | Thread `261d5f57…` (78 messages): `293 board: deepseek` started (run `d4a47302…` completed, answer row persisted 4 s later) but the open thread showed no card and no answer; the same in a SHORT thread (`14555c45…`), so it is not about length. The status line `1 phase done… · Step 1 of 1 · 1m 57s` shows at ~2 s, then vanishes; re-entering the thread renders the answer. BISECTED: same on the pre-session StreamsProvider (`07e2e4ba8`), so pre-existing. A FRESH in-thread kickoff's sibling of BUG-261021-04 (that report is the after-an-answer case). `evidence/g4/12-long-thread-no-card.jpg`; diagnosis → `evidence/g4/12-diagnosis.md` |
+| 12 | 287-V-5 (folded, optional long-message) | A thread with ≥ 50 prior messages: start a workflow in-thread. | **PASS after fix** (2026-10-27; first drive FAIL) | Thread `261d5f57…` (78 messages): `293 board: deepseek` started (run `d4a47302…` completed, answer row persisted 4 s later) but the open thread showed no card and no answer; the same in a SHORT thread (`14555c45…`), so it is not about length. The status line `1 phase done… · Step 1 of 1 · 1m 57s` shows at ~2 s, then vanishes; re-entering the thread renders the answer. BISECTED: same on the pre-session StreamsProvider (`07e2e4ba8`), so pre-existing. A FRESH in-thread kickoff's sibling of BUG-261021-04 (that report is the after-an-answer case). `evidence/g4/12-long-thread-no-card.jpg`; diagnosis → `evidence/g4/12-diagnosis.md`. FIXED (RED `6a6791309`, fix `aac1a6d5b`: the kickoff follow reconciles at its terminal; the kickoff clears the previous run's steps; ThreadRunLine re-reads on the run id). Re-driven in the 78-message thread: at 2 s `Starting workflow… · Step 1 of 1 · 3s`; by 12 s the answer rendered with no re-entry (`evidence/g4/12-PASS-after-fix.jpg`) |
 
 ## (c) D-21 cross-provider roster board
 
