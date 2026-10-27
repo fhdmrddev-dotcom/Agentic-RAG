@@ -17,6 +17,7 @@ from unittest.mock import AsyncMock, MagicMock, patch
 from uuid import uuid4
 
 import pytest
+from pydantic import BaseModel
 
 from tests.unit.test_185_engine_attachment import _armed_ctx, _armed_effective_phase
 
@@ -129,6 +130,46 @@ def test_a_resumed_run_continues_on_its_own_model_and_provider():
 def test_metadata_as_a_json_string_is_read_too():
     ctx = _build(_run_row(model="glm-5.2", metadata='{"provider": "zhipu"}'), _owner())
     assert (ctx.model, ctx.provider) == ("glm-5.2", "zhipu")
+
+
+class _OwnerSettings(BaseModel):
+    """The fields ``override_provider`` reads and writes, plus what the resolvers read."""
+    model_config = {"arbitrary_types_allowed": True}
+    active_provider: str = "deepseek"
+    llm_model: str = "deepseek-v4-flash"
+    llm_api_key: str = "sk-deepseek-owner"
+    llm_base_url: str = "https://api.deepseek.com"
+    available_models: list = []
+    providers: list = []
+    confidence_bucket_high: float = 0.54
+    confidence_bucket_medium: float = 0.38
+
+
+def _p(pid, key):
+    return SimpleNamespace(id=pid, api_key=key, base_url=f"https://{pid}.example", models=[])
+
+
+def test_a_resumed_runs_settings_carry_the_recorded_providers_credentials():
+    """296 review CR-01, measured live by the board's --resume-model rows (5 FAIL, 2026-10-27):
+    the ctx kept the run's model + provider but the OWNER's key and active_provider, so the next
+    llm_single step sent gpt-5.6-luna to DeepSeek with DeepSeek's key."""
+    owner = _OwnerSettings(providers=[_p("deepseek", "sk-deepseek-owner"), _p("openai", "sk-openai")])
+    ctx = _build(_run_row(model="gpt-5.6-luna", metadata={"provider": "openai"}), owner)
+    assert (ctx.model, ctx.provider) == ("gpt-5.6-luna", "openai")
+    assert ctx.user_settings.active_provider == "openai"
+    assert ctx.user_settings.llm_api_key == "sk-openai"
+
+
+def test_a_recorded_provider_with_no_key_falls_back_to_the_owner_safely():
+    """No key for the recorded provider → the pre-296 safe resolver on the owner's settings,
+    never the run's model on another provider's key."""
+    from app.services.sub_agent_models import resolve_sub_agent_model_safely
+
+    owner = _OwnerSettings(providers=[_p("deepseek", "sk-deepseek-owner"), _p("openai", "")])
+    ctx = _build(_run_row(model="gpt-5.6-luna", metadata={"provider": "openai"}), owner)
+    assert ctx.user_settings.active_provider == "deepseek"
+    assert ctx.provider is None
+    assert ctx.model == resolve_sub_agent_model_safely(owner, override_model="gpt-5.6-luna")
 
 
 def test_a_run_with_no_model_falls_back_to_the_owner_default():
