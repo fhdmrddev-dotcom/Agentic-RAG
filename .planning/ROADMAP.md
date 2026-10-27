@@ -113,7 +113,7 @@ Plans:
 
 **Wave 3** *(blocked on Wave 2 completion)*
 
-- [ ] 297-03-PLAN.md — unsaved-edit guard: one app-level `useBlocker` + leave-guard registry, Workflow Builder tenant with one-shot latch (LINK-07)
+- [x] 297-03-PLAN.md — unsaved-edit guard: one app-level `useBlocker` + leave-guard registry, Workflow Builder tenant with one-shot latch (LINK-07)
 - [ ] 297-04-PLAN.md — three-layer routing parity suite (dev / Vercel / nginx), driven RED per layer (LINK-08)
 
 **UI hint**: yes
