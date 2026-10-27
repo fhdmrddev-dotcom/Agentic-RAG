@@ -223,6 +223,11 @@ describe("D-07 — the tree shape that makes the above true, as source", () => {
     // Non-vacuity: the providers are really in this source.
     expect(code).toContain("<OrgProvider")
     expect(code).toContain("<StreamsProvider")
-    expect(code).not.toMatch(/<(OrgProvider|StreamsProvider|TooltipProvider|TechnicalNamesProvider|EffectiveFeaturesProvider|CitationNavProvider|ChatLayout)\b[^>]*\bkey=/)
+    // 297-REVIEW IN-04 (2026-10-28): the leave-guard provider (added 297-03, wraps ChatLayout) is
+    // in the alternation too, and a planted key on it is caught (the alternation's own control).
+    expect(code).toContain("<LeaveGuardContext.Provider")
+    const KEYED = /<(OrgProvider|StreamsProvider|TooltipProvider|TechnicalNamesProvider|EffectiveFeaturesProvider|CitationNavProvider|LeaveGuardContext\.Provider|ChatLayout)\b[^>]*\bkey=/
+    expect("<LeaveGuardContext.Provider key={pathname} value={nav.leaveGuards}>").toMatch(KEYED)
+    expect(code).not.toMatch(KEYED)
   })
 })
