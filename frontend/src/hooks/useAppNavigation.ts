@@ -78,6 +78,16 @@ export interface AppNavigation {
  * below travelled WITH the state it describes, unedited: `LibraryPage.initialTab.test.tsx` uses a
  * phrase inside it as its stripper non-vacuity control (D-297-07).
  */
+/** 297-REVIEW WR-01: the router's `idx` on the History entry on screen, or `null` when the entry
+ *  was not written by the router (a raw fragment navigation leaves `history.state` null). */
+function readEntryIdx(): number | null {
+  if (typeof window === "undefined") return null
+  const state: unknown = window.history.state
+  if (state === null || typeof state !== "object") return null
+  const idx = (state as { idx?: unknown }).idx
+  return typeof idx === "number" ? idx : null
+}
+
 export function useAppNavigation(): AppNavigation {
   const location = useLocation()
   const navigate = useNavigate()
@@ -103,6 +113,37 @@ export function useAppNavigation(): AppNavigation {
     if (studioSkillId) lastSkillId.current = studioSkillId
   }, [location.pathname, location.search, runId, studioSkillId])
 
+  // ── 297-REVIEW WR-01 (2026-10-28) — every entry the router writes FROM carries an `idx`. ──
+  // The router seeds an `idx` into each History entry it writes and, on Back/Forward, computes
+  // the distance moved from it; a blocker can only revert a POP whose distance it knows. One
+  // writer outside our code still makes entries without one: supabase-js's implicit-flow
+  // callback clears `#access_token=…` with a raw `location.hash = ''`, a fragment navigation that
+  // PUSHES an entry with null state. A router push FROM that entry then reads a null `idx` and a
+  // later Back onto it is unblockable: the person is asked, presses Cancel, and leaves anyway.
+  // The router's own `replace()` cannot repair it (it re-reads the null `idx`), so immediately
+  // before the router writes from such an entry we stamp it, in place and at the same URL, with
+  // the index after the last one the router wrote. Everything else in its state is kept. This
+  // is the ONE raw History write in product code; `noRawHistoryWrites.test.ts` pins it here.
+  const lastIdx = useRef<number>(readEntryIdx() ?? 0)
+  useEffect(() => {
+    const idx = readEntryIdx()
+    if (idx !== null) lastIdx.current = idx
+  })
+  const ensureEntryIdx = useCallback((routerPathname: string) => {
+    const idx = readEntryIdx()
+    if (idx !== null) {
+      lastIdx.current = idx
+      return
+    }
+    // Only the entry on screen, and only when it is the router's own (a memory router never
+    // shares `window.history`, so its address will not match the window's).
+    if (typeof window === "undefined" || window.location.pathname !== routerPathname) return
+    const state: unknown = window.history.state
+    const kept = state !== null && typeof state === "object" ? state : {}
+    window.history.replaceState({ ...kept, idx: lastIdx.current + 1 }, "")
+    lastIdx.current += 1
+  }, [])
+
   // ONE normalising effect (D-13 / D-15 / D-16): a legacy alias or a bare prefix is REPLACED by
   // its canonical address, so Back never returns to the old shape. `canonicalAddress` answers
   // null for every address it must not touch (pre-auth, bare `/`, unknown, already canonical,
@@ -113,19 +154,21 @@ export function useAppNavigation(): AppNavigation {
     const q = canonical.indexOf("?")
     const pathname = q < 0 ? canonical : canonical.slice(0, q)
     const search = q < 0 ? "" : canonical.slice(q)
+    ensureEntryIdx(location.pathname)
     here.current = canonical
     void navigate({ pathname, search, hash: location.hash }, { replace: true })
-  }, [location.pathname, location.search, location.hash, navigate])
+  }, [location.pathname, location.search, location.hash, navigate, ensureEntryIdx])
 
   /** Navigate to a route; a no-op when it is the address already on screen (D-15). */
   const go = useCallback(
     (route: AppRoute, opts: { replace?: boolean } = {}) => {
       const target = formatAppRoute(route)
       if (target === here.current) return
+      ensureEntryIdx(here.current.split("?")[0])
       here.current = target
       void navigate(target, { replace: opts.replace === true })
     },
-    [navigate],
+    [navigate, ensureEntryIdx],
   )
 
   // ── Phase 297-03 (LINK-07 / D-21, D-22, D-24, D-31) — the ONE leave guard. ──

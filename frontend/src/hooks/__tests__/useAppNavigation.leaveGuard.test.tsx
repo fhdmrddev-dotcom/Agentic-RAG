@@ -21,7 +21,7 @@
 import { StrictMode, useEffect } from "react"
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest"
 import { act, cleanup, render, waitFor } from "@testing-library/react"
-import { createMemoryRouter } from "react-router"
+import { createBrowserRouter, createMemoryRouter } from "react-router"
 import { RouterProvider } from "react-router/dom"
 
 import { useAppNavigation, type AppNavigation } from "../useAppNavigation"
@@ -378,5 +378,46 @@ describe("leave-guard registry — unit", () => {
     off()
     r.approveNextLeave()
     r.clearLeaveApproval()
+  })
+})
+
+// ── 297-REVIEW WR-01 (2026-10-28) — the History entry the auth library writes ──────────────
+// supabase-js's implicit flow lands on `#access_token=…` and then clears it with a raw
+// `window.location.hash = ''` (GoTrueClient). That is a fragment navigation: a NEW History entry
+// whose state carries no router `idx`. A POP back onto such an entry has no computable distance,
+// so the router asks the blocker, ignores a "blocked" answer, and leaves anyway — the prompt
+// appears, Cancel is pressed, and the edit is gone. A memory router cannot see this (it never
+// touches `window.history`), so this case runs the REAL browser router over jsdom's History,
+// with the raw hash writes planted exactly as the auth library makes them.
+describe("leave guard — a raw hash write leaves an entry with no router idx (WR-01)", () => {
+  it("Back onto that entry + Cancel: asked once, and the Builder's address STAYS", async () => {
+    window.history.replaceState(null, "", "/")
+    const router = createBrowserRouter([{ path: "*", Component: Shell }])
+    render(
+      <StrictMode>
+        <RouterProvider router={router} />
+      </StrictMode>,
+    )
+    await waitFor(() => expect(box.nav).not.toBeNull())
+    // The auth callback: tokens arrive in the hash, then the library clears it (two raw writes).
+    await act(async () => {
+      window.location.hash = "access_token=x"
+      await new Promise((r) => setTimeout(r, 20))
+      window.location.hash = ""
+      await new Promise((r) => setTimeout(r, 20))
+    })
+    expect(window.history.state?.idx ?? null).toBeNull() // non-vacuity: the planted entry has no idx
+    act(() => nav().onNavigate("workflows"))
+    await waitFor(() => expect(router.state.location.pathname).toBe("/app/workflows"))
+    box.dirty = true
+    await act(async () => {
+      window.history.back()
+      await new Promise((r) => setTimeout(r, 80))
+    })
+    expect(confirmSpy).toHaveBeenCalledTimes(1)
+    await waitFor(() => expect(window.location.pathname).toBe("/app/workflows"))
+    expect(router.state.location.pathname).toBe("/app/workflows")
+    expect(nav().activeView).toBe("workflows")
+    router.dispose()
   })
 })

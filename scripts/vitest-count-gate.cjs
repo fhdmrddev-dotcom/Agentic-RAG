@@ -4417,12 +4417,12 @@ const BASELINE = {
   // ── Phase 297-01 (REG-09 / D-01, D-03) — adopted, both knobs, same commit (2026-10-27).
   "useAppNavigation.test.tsx": 30, // 297-01 characterization (13), re-targeted to the URL by 297-02: refresh, push/replace, Back/Forward, same-address no-op, legacy + bare + pre-auth + unknown addresses, POP spends the hand-off (13 -> 30)
   // ── Phase 297-02 (LINK-01 / D-11, D-12, D-25) — adopted, both knobs, same commit (2026-10-27).
-  "noRawHistoryWrites.test.ts": 3, // 297-02 (D-297-15 / D-33) — tree-wide: no raw History write in stripped product code; planted fixture caught; > 200 files swept
+  "noRawHistoryWrites.test.ts": 4, // 297-02 (D-297-15 / D-33) — tree-wide: no raw History write in stripped product code; planted fixture caught; > 200 files swept. 2026-10-28 297-REVIEW WR-01: 3 -> 4, the one sanctioned idx stamp in useAppNavigation (exact text, counted once, nowhere else)
   "AppViewSwitch.addressStates.test.tsx": 16, // 297-02 (D-14, D-19, D-34, D-35) — S1 words + Go to Chat, history column hidden, run hold vs fallback vs page, admin hold / S1 / console, one run comparison, fallback last
   "navigationKeepsStreams.test.tsx": 3, // 297-02 (D-10 / D-07) — real App + OrgProvider + StreamsProvider: six navigations, one subscription, signal not aborted, probe mounted once; main.tsx one route, no provider key
   "appRoutes.test.ts": 111, // 297-02 — route table: 12-member round-trip, D-11 table, strict ids, legacy ?run= / ?connections=1 / /admin/spend, bare prefixes, pre-auth untouched, hostile inputs never throw or leave the origin
   // ── Phase 297-03 (LINK-07 / D-21, D-24, D-32, D-42) — adopted, both knobs, same commit (2026-10-27).
-  "useAppNavigation.leaveGuard.test.tsx": 23, // 297-03 — one app blocker: dirty asks EXACTLY once under StrictMode (Back/Forward/rail), clean 0, no-op default, forced bounce 0, one-shot latch, reverted POP 1/2/3, registry unit
+  "useAppNavigation.leaveGuard.test.tsx": 24, // 297-03 — one app blocker: dirty asks EXACTLY once under StrictMode (Back/Forward/rail), clean 0, no-op default, forced bounce 0, one-shot latch, reverted POP 1/2/3, registry unit. 2026-10-28 297-REVIEW WR-01: 23 -> 24, browser router over a raw hash-write entry (Cancel keeps the Builder)
   "WorkflowsPage.leaveGuard.test.tsx": 12, // 297-03 — the Builder tenant: connect control + golden-run link asked EXACTLY once (latch), Test Run 0 and no armed latch, dirty Back/rail 1, clean / no Builder 0
   // ── Phase 297-04 (LINK-08 / D-26, D-41) — adopted, both knobs, same commit (2026-10-27). Self-contained block.
   "appRouteParity.test.ts": 78, // 297-04 — 17 addresses (12 from formatAppRoute + 3 legacy + 2 pre-auth) x 4 layers (dev, Vercel app host, apex redirect, nginx) = 68, + 2 input/shape, 2 middleware, 1 known-fact, 5 negative controls

@@ -55,6 +55,13 @@ function hits(code: string): string[] {
   return NEEDLES.filter(([, re]) => re.test(code)).map(([name]) => name)
 }
 
+/** 297-REVIEW WR-01: the one write that ADDS the router's `idx` (see the last case below). */
+const SANCTIONED = {
+  path: "hooks/useAppNavigation.ts",
+  text: "window.history.replaceState({ ...kept, idx: lastIdx.current + 1 }, \"\")",
+}
+const withoutSanctioned = (src: string) => codeOf(src).split(SANCTIONED.text).join("")
+
 const PRODUCT = Object.entries(RAW)
   .map(([key, src]) => [rel(key), src] as const)
   .filter(([path]) => isProductFile(path))
@@ -81,7 +88,26 @@ describe("no raw History writes beside the router (D-33)", () => {
   })
 
   it("zero raw History writes in comment-stripped product code outside src/docs/", () => {
-    const offenders = PRODUCT.flatMap(([path, src]) => hits(codeOf(src)).map((h) => `${path}: ${h}`))
+    const offenders = PRODUCT.flatMap(([path, src]) =>
+      hits(codeOf(path === SANCTIONED.path ? withoutSanctioned(src) : src)).map((h) => `${path}: ${h}`),
+    )
     expect(offenders).toEqual([])
+  })
+
+  // ⚠ 297-REVIEW WR-01 (2026-10-28) — ONE SANCTIONED WRITE, and it ADDS the router's index rather
+  // than erasing it. supabase-js's implicit-flow callback clears `#access_token=…` with a raw hash
+  // write (outside our code, so this fence cannot see it), leaving an entry with no `idx`; a Back
+  // onto it is unblockable. `useAppNavigation` stamps that entry, in place at the same URL, just
+  // before the router writes from it. The exemption is by EXACT TEXT in that ONE file and counted:
+  // a second write there, a write of any other shape, or the same text anywhere else stays red.
+  it("the one sanctioned write: useAppNavigation stamps a missing idx, exactly once, nowhere else", () => {
+    const src = PRODUCT.find(([path]) => path === SANCTIONED.path)?.[1] ?? ""
+    const code = codeOf(src)
+    expect(code.split(SANCTIONED.text).length - 1).toBe(1)
+    expect(hits(codeOf(withoutSanctioned(src)))).toEqual([])
+    // Non-vacuity: without the exemption the sweep WOULD flag this file.
+    expect(hits(code)).toEqual(["history.replaceState("])
+    const elsewhere = PRODUCT.filter(([path, s]) => path !== SANCTIONED.path && codeOf(s).includes(SANCTIONED.text))
+    expect(elsewhere.map(([path]) => path)).toEqual([])
   })
 })
