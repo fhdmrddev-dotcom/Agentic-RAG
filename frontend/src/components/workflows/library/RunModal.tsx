@@ -128,6 +128,13 @@ export function RunModal({
   // 287-01: refusal sentence for an empty required field. Distinct from `launchError`
   // (the server's verbatim 422 path) so the two stay distinguishable.
   const [requiredRefusal, setRequiredRefusal] = useState<string | null>(null)
+  // 296 G-4 row 11: with many fields the refusal sits far down the body's scroller, so a refused
+  // Run looked like nothing happened. Scrolled into view when it appears (the effect) and on a
+  // repeat press with the same words (which renders nothing new, so `handleRun` scrolls).
+  const requiredRefusalRef = useRef<HTMLParagraphElement>(null)
+  useEffect(() => {
+    if (requiredRefusal) requiredRefusalRef.current?.scrollIntoView?.({ block: "nearest" })
+  }, [requiredRefusal])
   // ── Phase 193-07 (AUTH-03 / D-17 / D-20): does this workflow get the template control? ──
   //
   // HIDE ONLY ON A POSITIVE NO. `templateAdmission` is THREE-state and this comparison is
@@ -258,6 +265,7 @@ export function RunModal({
     const missing = missingRequiredFields(launchFields, inputValues)
     if (missing.length > 0) {
       setRequiredRefusal(requiredFieldsMessage(missing))
+      requiredRefusalRef.current?.scrollIntoView?.({ block: "nearest" })
       return
     }
     setRequiredRefusal(null)
@@ -659,7 +667,7 @@ export function RunModal({
               render in the template block above, away from them). Still outside that block's
               gate, so a template-less workflow refuses with words too (the 287-05 regression). */}
           {requiredRefusal && (
-            <p data-testid="run-required-refusal" role="alert" className="px-0.5 text-[11px] text-destructive">
+            <p ref={requiredRefusalRef} data-testid="run-required-refusal" role="alert" className="px-0.5 text-[11px] text-destructive">
               {requiredRefusal}
             </p>
           )}

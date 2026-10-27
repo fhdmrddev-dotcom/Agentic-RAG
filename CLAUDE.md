@@ -444,7 +444,7 @@ node scripts/check-hot-file-ledger.cjs <phase-dir>   # 0 clear · 1 missing rows
 | `backend/app/models/thread.py` | 25 / 17 / 550 (was `24 / 16 / 545`) | 293-03: ONE field (origin) |
 | `frontend/src/components/workflows/canvasModel.ts` | 16 / 8 / 836 (was `15 / 8 / 831`) | 296-07: comparePhaseOrder, engineArmed; isGrounded drops escalated |
 | `frontend/src/components/layout/ChatLayout.tsx` | 64 / 33 / 1158 (was `63 / 32 / 1147`) | 293-04: onOpenApiKeys (pre-pick + tab 7) + SettingsPage onOpenRun |
-| `frontend/src/components/layout/ChatLaunchForm.tsx` | 5 / 4 / 183 (was `4 / 4 / 179`) | 296-04: refusal clears on change; optional initialValues (Retry) |
+| `frontend/src/components/layout/ChatLaunchForm.tsx` | 6 / 4 / 191 (was `5 / 4 / 183`) | 296 G-4 row 11: refused Run scrolls the refusal into view |
 | `frontend/src/components/workflows/LaunchInputFields.tsx` | 3 / 3 / 145 | 287-01: leaf stays non-blocking; docblock only · 214.1-01 trigger TAKEN |
 | `frontend/src/components/layout/ChatHistoryColumn.tsx` | 7 / 2 / 513 | ⚠ absent its ENTIRE LIFE — row added 244-01 |
 | `frontend/src/hooks/useThreads.ts` | 5 / 3 / 65 | ⚠ now FIRES · last touch 267-04 · ⛔ |
@@ -514,7 +514,7 @@ node scripts/check-hot-file-ledger.cjs <phase-dir>   # 0 clear · 1 missing rows
 | `frontend/src/components/workflows/PhaseSpineGraph.tsx` | 8 / 6 / 723 (was `5 / 5 / 473`) | 290: forecast unused — chips went on the library card, not here |
 | `frontend/src/components/workflows/doorVocabulary.ts` | 6 / 4 / 540 | no seam proposed |
 | `frontend/src/components/workflows/StepTypePicker.tsx` | 7 / 3 / 522 | honoured by construction (199) |
-| `frontend/src/components/workflows/library/RunModal.tsx` | 12 / 8 / 740 (was `9 / 6 / 732`) | 296-04: refusal under the fields, clears on change |
+| `frontend/src/components/workflows/library/RunModal.tsx` | 13 / 8 / 748 (was `12 / 8 / 740`) | 296 G-4 row 11: refused Run scrolls the refusal into view |
 | `frontend/src/components/panel/PanelEmpty.tsx` | 4 / 4 / 52 | ⚠ absent at 4 phases |
 | `frontend/src/components/workflows/useTemplateFirstDraft.ts` | 14 / 6 / 1160 (was `13 / 6 / 1092`) | 296-07: lock + bind snapshot + every failure; extraction FIRST next |
 | `frontend/src/components/workflows/RunSpine.tsx` | 7 / 5 / 441 (was `6 / 4 / 433`) | 295-05: ONE prop (unsourced) |
