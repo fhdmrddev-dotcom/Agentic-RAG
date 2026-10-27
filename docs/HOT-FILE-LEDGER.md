@@ -11607,7 +11607,7 @@ cells rot within days.
 | [`frontend/src/components/workflows/FlowEdge.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentsworkflowsflowedgetsx) | 3 / 3 / 462 | ⚠ **FIRES — EXACTLY AT THRESHOLD** | honoured by construction (200) — ⚠ absent, and it crossed the threshold in the commit that added its row |
 | [`frontend/src/components/workflows/PhaseNodeCard.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentsworkflowsphasenodecardtsx) | 18 / 9 / 490 (was `17 / 8 / 489`) | **FIRES** | 290: the 286 forecast went UNUSED (the chips went on the library card, UI-SPEC §9); file untouched. honoured by construction (199) — ⚠ the 200 canvas port stays REVERTED |
 | [`backend/app/services/harness/phase_types.py`](docs/HOT-FILE-LEDGER.md#backendappservicesharnessphase_typespy) | 66 / 33 / 3135 (was `65 / 33 / 3131`) | ⚠ **FIRES** | 296-06: pinned-model provider arm (293-F-4); retry needs KB evidence (291-IN-01); one notice helper for a swapped agent pin, hardened (str-only, never raises). G-5 OWED |
-| [`frontend/src/pages/WorkflowsPage.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrcpagesworkflowspagetsx) | 47 / 20 / 1462 (was `46 / 19 / 1453`) | **FIRES** | 296-07 (288-F-4 / 291-S6-F7): runCta carries the publish notes; each renders verbatim under the published line. useState 16→16 |
+| [`frontend/src/pages/WorkflowsPage.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrcpagesworkflowspagetsx) | 48 / 21 / 1484 (was `47 / 20 / 1462`) | **FIRES** | 297-03: forwards the Builder predicate to the app blocker; one-shot latch at 3 sites. Dated router correction beside 184-11. useState 16→16. See §Phase 297 (297-03) |
 | [`frontend/src/components/workflows/library/WorkflowCard.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentsworkflowslibraryworkflowcardtsx) | 26 / 11 / 1373 (was `25 / 10 / 1371`) | **FIRES** | 296-07 (286-S04-2): comment-only — the MARK_ICON docblock and the CalendarClock comment name the icons this file draws today |
 | [`frontend/src/components/workflows/library/libraryVocabulary.ts`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentsworkflowslibrarylibraryvocabularyts) | 15 / 8 / 820 (was `14 / 7 / 819`) | ⚠ **FIRES** | 296-07 (290-IN-02): STEP_LINE_UNTYPED is a re-export of phaseVocabulary.STEP_UNTYPED (one home); no seam proposed |
 | [`frontend/src/components/workflows/library/libraryFilter.ts`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentsworkflowslibrarylibraryfilterts) | 6 / 4 / 435 | ⚠ **FIRES** | ⚠ absent at 4 phases and NO PLAN NAMED IT (192.2) |
@@ -11848,7 +11848,7 @@ cells rot within days.
 | [`frontend/src/components/sources/watchProductMark.ts`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentssourceswatchproductmarkts) | 0 / 0 / 38 | no (new) | young (240) — which PRODUCT a watched folder came from, read from its ADDRESS. ⛔ Never from `service_id`: Gmail and Drive share one connection |
 | [`frontend/src/components/sources/CreateWatchModal.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentssourcescreatewatchmodaltsx) | 4 / 1 / 283 | no (1 phase) | honoured by construction (**240**): byte-unchanged. ⛔ Its auto-select of `capable[0]` is why BUG-260908-02 mattered most here |
 | [`frontend/src/components/layout/NavPanel.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentslayoutnavpaneltsx) | 26 / 14 / 420 (was `25 / 14 / 416`) | ⚠ **FIRES** | **276-01** (D-14): Iris mark `<img>`; **276-06** (D-27): on the dark `#0A0E18` chip, classes only. 244-14's `overflow-x-hidden` stands |
-| [`frontend/src/App.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrcapptsx) | 41 / 29 / 348 (was `39 / 29 / 340`) | **FIRES** | 297-02: nav props threaded (runId, openRun, addressNotFound, operatorLoading); dated router correction beside 188-09. See §Phase 297 (297-02) |
+| [`frontend/src/App.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrcapptsx) | 42 / 29 / 355 (was `41 / 29 / 348`) | **FIRES** | 297-03: one LeaveGuardContext.Provider around CitationNavProvider (no key, one-identity value). See §Phase 297 (297-03) |
 | [`frontend/src/lib/nav-items.ts`](docs/HOT-FILE-LEDGER.md#frontendsrclibnav-itemsts) | 13 / 9 / 173 (was `12 / 8 / 153`) | ⚠ **FIRES** | **283-02** (FIX-01): the Settings entry UNGOVERNED (no `feature` key); per-tab gate in the page, per-route `require_visible` at the API. `visibleNavItems` unchanged |
 | [`frontend/src/components/library/HealthTab.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentslibraryhealthtabtsx) | 9 / 2 / 199 | no (2 phases) | row added 235 BELOW threshold on purpose. One import, one optional prop, one mount, ZERO branches; the handler lives at the page boundary |
 | [`frontend/src/pages/librarySelection.ts`](docs/HOT-FILE-LEDGER.md#frontendsrcpageslibraryselectionts) | 2 / 2 / 312 | no (2 phases) | ⚠ absent for its entire life — row added 235, which did NOT modify it but made `App.tsx` import `LibraryTab` from it rather than re-declare it |
@@ -12201,11 +12201,11 @@ cells rot within days.
 | [`frontend/src/components/workflows/library/automationFacts.ts`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentsworkflowslibraryautomationfactsts) | 2 / 2 / 132 (was `1 / 1 / 95`) | no (young) | absent its ENTIRE LIFE (created 204.1) — row added 293. 293-03: next from server next_run_at. ⛔ spells no string; never computes |
 | [`frontend/src/components/admin/AuditTab.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentsadminaudittabtsx) | 7 / 4 / 770 (was `6 / 3 / 763`) | ⚠ **FIRES** | absent its ENTIRE LIFE at 3 phases (146/148/155) — row added 293. 293-04: api_key.* entries + "API keys" group in PLATFORM_ACTION_META only. ⛔ unknown codes stay raw |
 | [`frontend/src/components/org/OrgAuditTab.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentsorgorgaudittabtsx) | 4 / 3 / 415 (was `3 / 2 / 408`) | ⚠ **FIRES** | absent its ENTIRE LIFE (166/167) — row added 293. 293-04: api_key.* labels + "API keys" group in ACTION_META only. ⛔ never invents a label |
-| [`frontend/src/hooks/useAppNavigation.ts`](docs/HOT-FILE-LEDGER.md#frontendsrchooksuseappnavigationts) | 3 / 1 / 240 (was `1 / 1 / 160`) | no (young) | 297-02: view/runId/studioSkillId derived from the location; one canonical REPLACE effect. ⛔ the ONLY router-hook caller (D-08); setLibraryTab( exactly 2 |
+| [`frontend/src/hooks/useAppNavigation.ts`](docs/HOT-FILE-LEDGER.md#frontendsrchooksuseappnavigationts) | 4 / 1 / 290 (was `3 / 1 / 240`) | no (young) | 297-03: the ONE useBlocker over the leave-guard registry; latch cleared per location key. ⛔ the ONLY router-hook caller (D-08); setLibraryTab( exactly 2 |
 | [`frontend/src/components/layout/AppViewSwitch.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentslayoutappviewswitchtsx) | 2 / 1 / 523 (was `1 / 1 / 473`) | no (young) | 297-02: S1 first non-chat arm; run hold inside the one run arm; admin arms gated on the operator probe. ⛔ one run comparison; fallback last; every hold lives here, never at App |
 | [`frontend/src/lib/appRoutes.ts`](docs/HOT-FILE-LEDGER.md#frontendsrclibapproutests) | 1 / 1 / 198 (was `0 / 0 / 0`) | no (young) | young (created 297-02). STRICT LEAF: one home of /app path vocabulary (D-11). ⛔ never throws; strict UUID; no host in any output |
 | [`frontend/src/components/layout/AddressNotFound.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentslayoutaddressnotfoundtsx) | 1 / 1 / 51 (was `0 / 0 / 0`) | no (young) | young (created 297-02). S1 + S2 and their copy, one home. ⛔ no path prop, no icon; never renders the trailing fallback tag |
-| [`frontend/src/lib/leaveGuard.ts`](docs/HOT-FILE-LEDGER.md#frontendsrclibleaveguardts) | 0 / 0 / 0 | no (planned 297-03) | young (planned 297-03). Leave-guard registry context, safe no-op default (D-21); one-shot latch (D-32/D-42). No component. Measured in its creating commit |
+| [`frontend/src/lib/leaveGuard.ts`](docs/HOT-FILE-LEDGER.md#frontendsrclibleaveguardts) | 1 / 1 / 97 (was `0 / 0 / 0`) | no (young) | young (created 297-03). Leave-guard registry, no-op default (D-21); one-shot latch (D-32/D-42). ⛔ no component; react-only imports; never throws |
 
 
 
@@ -19172,6 +19172,16 @@ Scan-list cell as of 2026-10-27 (replaced by 297-02, moved verbatim): 39 / 29 / 
 
 CLAUDE.md verdict cell as of 2026-10-27 (replaced by 297-02, moved verbatim): | `frontend/src/App.tsx` | 39 / 29 / 340 (was `37 / 28 / 422`) | 297-01: G-5 seam TAKEN — view/tab state → useAppNavigation, move only |
 
+### `frontend/src/App.tsx` — Phase 297 (297-03)
+
+**`42 / 29 / 355`** (was `41 / 29 / 348`)
+
+One import and one wrapper: `<LeaveGuardContext.Provider value={nav.leaveGuards}>` around `<CitationNavProvider>` (D-21). The value is the hook's one-identity registry (a lazy `useState`), and the wrapper carries no `key`, so nothing below it remounts and D-07 / D-10 hold — `navigationKeepsStreams.test.tsx` stays green. The 403 listener is unchanged; `bounceHome` now arms the one-shot latch itself (D-42).
+
+Scan-list cell as of 2026-10-27 (replaced by 297-03, moved verbatim): 41 / 29 / 348 (was `39 / 29 / 340`) | **FIRES** | 297-02: nav props threaded (runId, openRun, addressNotFound, operatorLoading); dated router correction beside 188-09. See §Phase 297 (297-02)
+
+CLAUDE.md verdict cell as of 2026-10-27 (replaced by 297-03, moved verbatim): | `frontend/src/App.tsx` | 41 / 29 / 348 (was `39 / 29 / 340`) | 297-02: nav props threaded; router correction beside the 188-09 docblock |
+
 ### `frontend/src/components/classification/ClassificationRulesPage.tsx` — Phase 271
 
 **`3 / 3 / 264`** at 271 close. **271-02 (P-07):** one shape, no `embedded` flag; the outer padding and old h1 dropped; the sub-view header renders Back ("Library"), "Filing rules", the shipped subtitle and New rule. Its only mount is now inside `LibraryPage`. Live (G4-3): the sub-view reads Filing rules, never Classification rules, and the seeded rule is listed. It measures 3 phases, so it FIRES.
@@ -24062,6 +24072,16 @@ Created by 296-07 Task 2 step 0 as a MOVE out of `useTemplateFirstDraft.ts` (its
 
 296-07 Task 3 (288-F-4 / 291-S6-F7): the `runCta` state gains `notes` (the verdict's `auto_answered` messages, handed up by the gauntlet), and the strip renders each verbatim as a `run-cta-note` line (`text-[12px] text-muted-foreground`) under `Published {name} v{N}. Ready to run it.`; none adds nothing. useState 16 → 16. Triple `47 / 20 / 1462` (was `46 / 19 / 1453`). Previous scan-list cell kept verbatim: 46 / 19 / 1453 (was `45 / 18 / 1447`) | **FIRES** | 286 forecast (287): starters are DATA; fork reuses the existing fork hook; ONE prop. The 192 / 192.1 extraction stays TAKEN · 293 touch: see §Phase 293 close. Previous CLAUDE.md cell kept verbatim: 293-04: one optional onOpenApiKeys prop threaded to the cards.
 
+### `frontend/src/pages/WorkflowsPage.tsx` — Phase 297 (297-03)
+
+**`48 / 21 / 1484`** (was `47 / 20 / 1462`)
+
+297-03 (LINK-07 / D-23, D-30, D-31, D-32): the page is the app leave guard's ONE tenant. `useLeaveGuard(useCallback(() => canLeaveBuilderRef.current?.() ?? true, []))` forwards the Builder's own prompting predicate (no second dirty source; `WorkflowBuilderPage.tsx` is not edited), and `useLeaveGuardRegistry()` is read once. The connect control (`onOpenSettings`) and the golden-run link (`onOpenRun`) call `leaveGuards.approveNextLeave()` between their passing in-page check and the outbound call, so the app blocker does not ask a second time; Test Run arms the latch before `await onLaunch(...)` and clears it in a `finally`. `backToLibrary` (the breadcrumb, an in-page view change) is untouched. A dated correction sits BESIDE the 184-11 "THERE IS NO ROUTER HERE" docblock, never through it. useState 16 → 16.
+
+⛔ **Exactly 1 `useLeaveGuard(`, 3 `approveNextLeave()`, 1 `clearLeaveApproval()`.** Pinned by `src/pages/__tests__/WorkflowsPage.leaveGuard.test.tsx` (12, exact confirm counts); RED-driven: deleting the two in-page latch calls and the `finally` clear reds 3 cases (2 confirms instead of 1; a stale latch skipping a later Back). `WorkflowsPage.navGuard.test.tsx` and `WorkflowBuilderPage.session.test.tsx` pass unmodified.
+
+Previous scan-list cell kept verbatim: 47 / 20 / 1462 (was `46 / 19 / 1453`) | **FIRES** | 296-07 (288-F-4 / 291-S6-F7): runCta carries the publish notes; each renders verbatim under the published line. useState 16→16. Previous CLAUDE.md cell kept verbatim: 296-07: publish notes carried + shown under the run-CTA line.
+
 ### `frontend/src/components/workflows/PublishGauntlet.tsx` — Phase 296 (296-07)
 
 296-07 Task 3 (288-F-4 / 291-S6-F7): `onPublished` gains a second argument, the verdict's `auto_answered` messages in order (`[]` when none), so the page the gauntlet auto-returns to can show them. The success block already renders `n.message` with no step prefix, so a `phase: null` stand-in note reads verbatim. Triple `22 / 12 / 1390` (was `21 / 11 / 1385`). Previous scan-list cell kept verbatim: 21 / 11 / 1385 (was `20 / 10 / 1372`) | ⚠ **FIRES** | 288-02: ONE `auto-answered` block, server words verbatim; Pause stage copy corrected. honoured by construction. Previous CLAUDE.md cell kept verbatim: 288-02: ONE auto_answered block, server words.
@@ -25824,6 +25844,16 @@ App's 403 listener used to call — it does NOT spend the hand-off, exactly as b
 
 Scan-list cell as of 2026-10-27 (replaced by 297-02, moved verbatim): 1 / 1 / 160 (was `0 / 0 / 0`) | no (young) | young (created 297-01). App view/tab state moved verbatim (D-01). ⛔ setLibraryTab( exactly 2; NO TWELFTH block travels with libraryTab; router hooks only here (D-08)
 
+### `frontend/src/hooks/useAppNavigation.ts` — Phase 297 (297-03)
+
+**`4 / 1 / 290`** (was `3 / 1 / 240`)
+
+The ONE `useBlocker` in product code (D-21). It holds one `LeaveGuardRegistry` for its lifetime (lazy `useState`) and returns it as `leaveGuards`. `shouldBlock` is `currentLocation.pathname !== nextLocation.pathname && registry.hasTenants() && !registry.canLeaveAll()`: a search-only move, or no tenant, never asks (D-24). Wiring (A), D-31: the tenant's predicate shows the confirm, so OK is "not blocked" and Cancel is "blocked" → an effect calls `reset()` and re-syncs `here` to the address on screen (a cancelled push had already recorded its target, which would turn the same rail click into a no-op). A second effect, keyed on `location.key`, clears the latch after every committed navigation. `bounceHome` arms the latch only when the home pathname differs from the current one, then REPLACEs (D-42).
+
+⛔ **One blocker.** A router supports one; a second is a warning and a silently ignored guard. Pinned by `src/hooks/__tests__/useAppNavigation.leaveGuard.test.tsx` (23): every dirty case asserts an EXACT confirm count under `<StrictMode>` (the reverted POP reads 1 / 2 / 3, never doubled, never wedged). RED-driven: removing the `here` re-sync and the latch clear reds 3 cases. The router evaluates the callback once per attempt (its POP revert popstate is swallowed by the router itself), so no per-attempt cache was needed.
+
+Scan-list cell as of 2026-10-27 (replaced by 297-03, moved verbatim): 3 / 1 / 240 (was `1 / 1 / 160`) | no (young) | 297-02: view/runId/studioSkillId derived from the location; one canonical REPLACE effect. ⛔ the ONLY router-hook caller (D-08); setLibraryTab( exactly 2
+
 ### `frontend/src/components/layout/AppViewSwitch.tsx`
 
 **Added AT PLANNING (Phase 297, 2026-10-27) with `0 / 0 / 0`** — the file does not exist yet; plan
@@ -25907,4 +25937,23 @@ Scan-list cell as of 2026-10-27 (replaced by 297-02, moved verbatim): 0 / 0 / 0 
 `297-03` creates it and re-derives the triple in its creating commit (the `activeViewReachability.ts`
 262-01 precedent). Leave-guard registry context, safe no-op default (D-21); one-shot latch (D-32/D-42). No component.
 
-Binding invariants and the build detail are written by `297-03` in the same commit that creates the file.
+#### Created — Phase 297 (297-03), measured `1 / 1 / 97`
+
+Measured in its creating commit (`feat(297-03): one app-level blocker over a leave-guard registry`):
+1 commit, 1 phase, 97 lines. `createLeaveGuardRegistry()` is a plain object of closures over a `Set` of
+entries and one boolean latch; `LeaveGuardContext` defaults to a frozen NO-OP registry; `useLeaveGuardRegistry()`
+reads it without throwing (the `fieldGuidanceContext.ts` idiom); `useLeaveGuard(predicate)` registers on mount
+and unregisters in the effect cleanup. Pinned by `src/hooks/__tests__/useAppNavigation.leaveGuard.test.tsx` (23).
+
+**Binding invariants:**
+- ⛔ **The default is a no-op, never `null`.** Outside a provider a tenant registers into nothing and every leave
+  is allowed, so pages and their suites need no provider and no router (D-08, D-21).
+- ⛔ **One blocker reads it.** The only `useBlocker(` in product code is in `hooks/useAppNavigation.ts`; a second
+  blocker is a router warning and a silently ignored guard. A new editor joins as a tenant, never a blocker.
+- ⛔ **The latch is one-shot.** `canLeaveAll()` consumes it on its first evaluation; the hook also clears it on
+  every committed location change, and Test Run clears it in a `finally` (T-297-13). Arm it only immediately
+  before a navigation that changes the pathname.
+- ⛔ **No component in this module** (a `.ts` file, react-refresh rule) and it imports only from `react`. App uses
+  `LeaveGuardContext.Provider` directly, with no `key` and the hook's one-identity registry as its value.
+
+Scan-list cell as of 2026-10-27 (replaced by 297-03, moved verbatim): 0 / 0 / 0 | no (planned 297-03) | young (planned 297-03). Leave-guard registry context, safe no-op default (D-21); one-shot latch (D-32/D-42). No component. Measured in its creating commit
