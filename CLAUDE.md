@@ -421,7 +421,7 @@ node scripts/check-hot-file-ledger.cjs <phase-dir>   # 0 clear · 1 missing rows
 | `frontend/src/components/workflows/PhaseNodeCard.tsx` | 18 / 9 / 490 (was `17 / 8 / 489`) | 290: forecast unused — chips went on the library card, not here |
 | `backend/app/services/harness/phase_types.py` | 66 / 33 / 3135 (was `65 / 33 / 3131`) | 296-06: emit pin precedence, retry guard, 1 notice helper · G-5 OWED |
 | `backend/app/services/tools/render_template.py` | 6 / 3 / 1163 (was `3 / 2 / 1094`) | 296-03: button /V written as a name, read back typed · now FIRES · ⛔ |
-| `frontend/src/pages/WorkflowsPage.tsx` | 48 / 21 / 1484 (was `47 / 20 / 1462`) | 297-03: forwards the Builder predicate to the app blocker; latch at 3 sites |
+| `frontend/src/pages/WorkflowsPage.tsx` | 49 / 21 / 1496 (was `48 / 21 / 1484`) | 297 review WR-02: Test Run arms the latch via beforeNavigate |
 | `frontend/src/components/workflows/library/WorkflowCard.tsx` | 26 / 11 / 1373 (was `25 / 10 / 1371`) | 296-07: comment-only (MARK_ICON docblock, 286-S04-2) |
 | `frontend/src/components/workflows/library/libraryVocabulary.ts` | 15 / 8 / 820 (was `14 / 7 / 819`) | 296-07: STEP_LINE_UNTYPED re-exports the one home (data) |
 | `frontend/src/components/workflows/library/libraryFilter.ts` | 6 / 4 / 435 | ⚠ absent at 4 phases and NO PLAN NAMED IT (192.2) |
@@ -443,7 +443,7 @@ node scripts/check-hot-file-ledger.cjs <phase-dir>   # 0 clear · 1 missing rows
 | `frontend/src/components/workflows/evidenceVocabulary.ts` | 5 / 3 / 261 | ⚠ now FIRES (296) · 296-04: neutral NO_MATCH/UNSOURCED + DOWNLOAD_UNAVAILABLE |
 | `backend/app/models/thread.py` | 25 / 17 / 550 (was `24 / 16 / 545`) | 293-03: ONE field (origin) |
 | `frontend/src/components/workflows/canvasModel.ts` | 16 / 8 / 836 (was `15 / 8 / 831`) | 296-07: comparePhaseOrder, engineArmed; isGrounded drops escalated |
-| `frontend/src/components/layout/ChatLayout.tsx` | 67 / 34 / 897 (was `65 / 34 / 882`) | 297-02: run id → route; 4 optional props; history column hidden on S1 |
+| `frontend/src/components/layout/ChatLayout.tsx` | 68 / 34 / 902 (was `67 / 34 / 897`) | 297 review WR-02: doRun takes an optional beforeNavigate hook |
 | `frontend/src/components/layout/ChatLaunchForm.tsx` | 6 / 4 / 191 (was `5 / 4 / 183`) | 296 G-4 row 11: refused Run scrolls the refusal into view |
 | `frontend/src/components/workflows/LaunchInputFields.tsx` | 3 / 3 / 145 | 287-01: leaf stays non-blocking; docblock only · 214.1-01 trigger TAKEN |
 | `frontend/src/components/layout/ChatHistoryColumn.tsx` | 7 / 2 / 513 | ⚠ absent its ENTIRE LIFE — row added 244-01 |

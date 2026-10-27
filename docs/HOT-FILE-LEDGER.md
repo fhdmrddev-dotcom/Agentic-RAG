@@ -23176,6 +23176,14 @@ Scan-list cell as of 2026-10-27 (replaced by 297-02, moved verbatim): 65 / 34 / 
 
 CLAUDE.md verdict cell as of 2026-10-27 (replaced by 297-02, moved verbatim): | `frontend/src/components/layout/ChatLayout.tsx` | 65 / 34 / 882 (was `64 / 33 / 1158`) | 297-01: G-5 seam TAKEN — mount switch → AppViewSwitch, move only |
 
+### `frontend/src/components/layout/ChatLayout.tsx` — 297-REVIEW WR-02
+
+**`68 / 34 / 902`** (was `67 / 34 / 897`)
+
+297-REVIEW WR-02 (`935aa2871`): `doRun` takes one optional `beforeNavigate` callback, called after every await and immediately before `openRun?.()` / `onNavigate("chat")`, so a caller can arm the leave-guard latch at the launch's own navigation instead of before the await. No new hook, no new state; the launch flow is otherwise unchanged.
+
+CLAUDE.md verdict cell as of 2026-10-28 (replaced by 297-REVIEW WR-02, moved verbatim): | `frontend/src/components/layout/ChatLayout.tsx` | 67 / 34 / 897 (was `65 / 34 / 882`) | 297-02: run id → route; 4 optional props; history column hidden on S1 |
+
 ### `frontend/src/pages/WorkflowsPage.tsx` — Phase 286 forecast (SC#1)
 
 **`45 / 18 / 1447` (unchanged since its last row).** Not edited by Phase 286 (D-01: only the four roadmap candidates were cut). **Expected change in Phase 287, honoured by construction:** starters are data; fork reuses the existing fork hook; one prop. A change larger than that — a new branch, a new hook, a second concern — is the signal to propose this file's extraction FIRST, not to absorb it.
@@ -24081,6 +24089,14 @@ Created by 296-07 Task 2 step 0 as a MOVE out of `useTemplateFirstDraft.ts` (its
 ⛔ **Exactly 1 `useLeaveGuard(`, 3 `approveNextLeave()`, 1 `clearLeaveApproval()`.** Pinned by `src/pages/__tests__/WorkflowsPage.leaveGuard.test.tsx` (12, exact confirm counts); RED-driven: deleting the two in-page latch calls and the `finally` clear reds 3 cases (2 confirms instead of 1; a stale latch skipping a later Back). `WorkflowsPage.navGuard.test.tsx` and `WorkflowBuilderPage.session.test.tsx` pass unmodified.
 
 Previous scan-list cell kept verbatim: 47 / 20 / 1462 (was `46 / 19 / 1453`) | **FIRES** | 296-07 (288-F-4 / 291-S6-F7): runCta carries the publish notes; each renders verbatim under the published line. useState 16→16. Previous CLAUDE.md cell kept verbatim: 296-07: publish notes carried + shown under the run-CTA line.
+
+### `frontend/src/pages/WorkflowsPage.tsx` — 297-REVIEW WR-02
+
+**`49 / 21 / 1496`** (was `48 / 21 / 1484`)
+
+297-REVIEW WR-02 (`935aa2871`): Test Run no longer arms `approveNextLeave()` before `await onLaunch`; it passes `{ beforeNavigate: () => leaveGuards.approveNextLeave() }` so the latch is armed at the launch's own navigation, and a Builder still dirty at Test Run goes through the same `canLeaveBuilderRef` guard as the other two sites (Cancel launches nothing). `clearLeaveApproval()` stays in the `finally`. Refines D-32 ("Test Run never prompts" now holds for a clean Builder only).
+
+CLAUDE.md verdict cell as of 2026-10-28 (replaced by 297-REVIEW WR-02, moved verbatim): | `frontend/src/pages/WorkflowsPage.tsx` | 48 / 21 / 1484 (was `47 / 20 / 1462`) | 297-03: forwards the Builder predicate to the app blocker; latch at 3 sites |
 
 ### `frontend/src/components/workflows/PublishGauntlet.tsx` — Phase 296 (296-07)
 
