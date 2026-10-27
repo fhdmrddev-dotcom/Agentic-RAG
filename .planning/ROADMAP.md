@@ -109,7 +109,7 @@ Plans:
 
 **Wave 2** *(blocked on Wave 1 completion)*
 
-- [ ] 297-02-PLAN.md — router core: react-router 8.5 + React 19.2.9 + CI Node 22, `appRoutes.ts`, URL-derived views, legacy aliases, `/app/runs/<id>`, `?run=` writers retired, not-found + holding states, stream-survival proof (LINK-01)
+- [x] 297-02-PLAN.md — router core: react-router 8.5 + React 19.2.9 + CI Node 22, `appRoutes.ts`, URL-derived views, legacy aliases, `/app/runs/<id>`, `?run=` writers retired, not-found + holding states, stream-survival proof (LINK-01)
 
 **Wave 3** *(blocked on Wave 2 completion)*
 
