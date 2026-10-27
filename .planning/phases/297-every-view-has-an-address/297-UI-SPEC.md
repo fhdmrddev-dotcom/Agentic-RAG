@@ -298,4 +298,4 @@ belongs to the router plan, not this contract.
 - [x] Dimension 5 Spacing: FLAG (non-blocking — 12px gap-3/px-3 are inherited exceptions from shipped markup)
 - [x] Dimension 6 Registry Safety: PASS
 
-**Approval:** pending
+**Approval:** approved 2026-10-27 (gsd-ui-checker, 4 PASS + 2 non-blocking FLAG)
