@@ -4421,6 +4421,8 @@ const BASELINE = {
   "AppViewSwitch.addressStates.test.tsx": 16, // 297-02 (D-14, D-19, D-34, D-35) — S1 words + Go to Chat, history column hidden, run hold vs fallback vs page, admin hold / S1 / console, one run comparison, fallback last
   "navigationKeepsStreams.test.tsx": 3, // 297-02 (D-10 / D-07) — real App + OrgProvider + StreamsProvider: six navigations, one subscription, signal not aborted, probe mounted once; main.tsx one route, no provider key
   "appRoutes.test.ts": 111, // 297-02 — route table: 12-member round-trip, D-11 table, strict ids, legacy ?run= / ?connections=1 / /admin/spend, bare prefixes, pre-auth untouched, hostile inputs never throw or leave the origin
+  // ── Phase 297-04 (LINK-08 / D-26, D-41) — adopted, both knobs, same commit (2026-10-27). Self-contained block.
+  "appRouteParity.test.ts": 78, // 297-04 — 17 addresses (12 from formatAppRoute + 3 legacy + 2 pre-auth) x 4 layers (dev, Vercel app host, apex redirect, nginx) = 68, + 2 input/shape, 2 middleware, 1 known-fact, 5 negative controls
 }
 
 // Still COMPUTED, never hand-written — the reduce is the single source, so the
@@ -6467,6 +6469,8 @@ const TARGETS = [
   // Phase 297-02 — FILE-LEVEL, SAME commit as their pins.
   "src/__tests__/routing/navigationKeepsStreams.test.tsx",
   "src/components/layout/__tests__/AppViewSwitch.addressStates.test.tsx",
+  // Phase 297-04 — FILE-LEVEL (no src/__tests__/routing directory entry), SAME commit as its pin. Self-contained block.
+  "src/__tests__/routing/appRouteParity.test.ts",
 ]
 
 const REPO_ROOT = path.resolve(__dirname, "..")
