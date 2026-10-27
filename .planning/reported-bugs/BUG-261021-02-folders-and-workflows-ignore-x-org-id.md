@@ -4,12 +4,13 @@ title: For a two-org account, creating a folder or a workflow ignores the chosen
 reported: 2026-10-21
 surface: Agentic-RAG
 severity: major
-status: deferred
+status: closed
 affected_areas: [backend/folders, backend/workflows, backend/org-scoping]
-folded_into: null
-verified_closed_by: null
+folded_into: "296"
+verified_closed_by: "296"
 related_seeds: []
-re_open_trigger: "The next phase whose files_modified names backend/app/api/folders.py or backend/app/api/workflows.py, or that touches X-Org-Id handling; or any report of a folder or workflow created in the wrong org."
+re_open_trigger: null
+fixed_by_commit: "296-01: RED 20113ce24, GREEN cb13a74a7 (create_folder / create_draft stamp the validated X-Org-Id); two-org integration test backend/tests/integration/test_296_two_org_create.py (13 passed)"
 reproduces_on:
   branch: develop
   commit: 128266ef6
@@ -57,3 +58,7 @@ Switching the app to the right org does not help, because the server appears not
 
 - `.planning/phases/295-runs-that-don-t-dead-end/295-VALIDATION.md`, section "Gap round 1 re-drive (2026-10-21)", the observation below "New defects", and "Plants, cleanup and the id-snapshot diff".
 - `backend/app/api/threads.py` `create_thread` (the route that honours the header).
+
+## Closed 2026-10-27 (296)
+
+Verified closed by G-4 scenario 1 in `.planning/phases/296-close-v4-7-debt/296-HUMAN-UAT.md` (PASS with evidence under `evidence/g4/`). Status was `folded`.

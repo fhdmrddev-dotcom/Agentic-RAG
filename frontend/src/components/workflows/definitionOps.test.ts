@@ -1098,8 +1098,10 @@ describe("definitionOps — the seed-receipt copy is a lock (sketch 150-B)", () 
   })
 
   it("closes by saying nothing is committed, and offers a dismiss", () => {
+    // 296-07 (BUG-261024-02 / 291-S1-copy a) — AMENDED DELIBERATELY: the generated draft is
+    // now saved on arrival, so the close says so rather than "Nothing is saved".
     expect(SEED_RECEIPT_NOTHING_COMMITTED).toBe(
-      "Everything else is yours to change. Nothing is saved or published yet.",
+      "Everything else is yours to change. It's saved as a draft and not published yet.",
     )
     expect(SEED_RECEIPT_DISMISS_LABEL).toBe("Dismiss")
     // The glyph is a separate export precisely so the ACCESSIBLE label carries none —

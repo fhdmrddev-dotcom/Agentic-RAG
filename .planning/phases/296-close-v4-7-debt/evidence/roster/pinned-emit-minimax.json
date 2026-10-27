@@ -1,0 +1,22 @@
+{
+  "mode": "pinned-emit",
+  "provider": "minimax",
+  "model": "MiniMax-M3",
+  "pinned_model": "gpt-5.6-luna",
+  "pinned_provider": "openai",
+  "definition_id": "585dcf37-ce68-4e63-93e3-3916c41c227c",
+  "thread_id": "00629425-71e6-4751-92a4-0a38a4a6d77c",
+  "send_http": 201,
+  "send": "{\"message_id\": \"440e68b3-a3cd-4bb4-8782-d91bd696506f\", \"run_id\": \"31118260-222b-4e89-90f6-333ef450cd5d\", \"model\": \"MiniMax-M3\", \"provider\": \"minimax\"}",
+  "workflow_run": {
+    "id": "d482240a-a1df-4c5d-8960-f099dd0fd6b4",
+    "status": "completed"
+  },
+  "emit_validated_providers": [
+    "openai"
+  ],
+  "emit_failed_on": [],
+  "failures": [],
+  "has_400": false,
+  "verdict": "PASS"
+}

@@ -84,14 +84,15 @@ Requirements: [`REQUIREMENTS.md`](REQUIREMENTS.md). **21 v4.7 requirements, 21 m
 
 - [x] **Phase 286: Seams Before Features**: take the named G-5 seams on the workflow files this milestone edits, behaviour unchanged (REG-07)
 - [x] **Phase 287: Start From a Thread, Fork a Starter** (closed 2026-10-19, `human_needed`: SC#4 one-click ruling, Anthropic/OpenRouter rows after credit, cloud mig 210 paste): launch a workflow from a thread with its form and run attached; fork one of 5+ curated, gauntlet-passing starters in one click (START-01, START-03)
-- [ ] **Phase 288: Drafts That Survive, Pauses That Publish**: draft configuration persists across navigation; a human-pause workflow publishes and the run shows who it waits on (AUTH-03, AUTH-01)
+- [x] **Phase 288: Drafts That Survive, Pauses That Publish** (closed 2026-10-24, operator signed): draft configuration persists across navigation; a human-pause workflow publishes and the run shows who it waits on (AUTH-03, AUTH-01)
 - [x] **Phase 289: The Run Page and Its Evidence** (closed 2026-10-20, operator-approved; Anthropic row blocked on billing; BUG-261020-01/02 filed): one read-only finished-run page with export; confidence on KB-derived phase outputs (VIS-03, TRUST-01)
-- [ ] **Phase 290: The Card and the Team Picture**: card matches its approved sketch; truthful orchestrator / workers / judge view (VIS-04, VIS-01)
+- [x] **Phase 290: The Card and the Team Picture** (closed 2026-10-24, operator signed G-4; WR-02 accepted): card matches its approved sketch; truthful orchestrator / workers / judge view (VIS-04, VIS-01)
 - [x] **Phase 291: Describe It From Your Own Files**: describe-it authoring from uploaded template, form and reference documents (AUTH-02) — verified passed 2026-10-24 (G-4 + SC#4 roster + SC#5 live fill run; findings routed in deferred-items.md)
 - [x] **Phase 292: More Ways to Show It** (closed 2026-10-24, operator signed G-4; mig 213 in cloud, code not deployed): new artifact types from a closed registry, set chosen at sketch time (VIS-02)
-- [ ] **Phase 293: Start From Outside, and Close Out**: authenticated inbound run start with read-back, trigger provenance and last/next run, seed statuses reconciled (START-02, START-04, REG-06)
-- [ ] **Phase 294: Decision Engine: Rerank and Citation Check**: a Settings switch picks Jev, OpenAI Decisions or a local model to rerank and prune search candidates, and a citation check labels each cited sentence (DEC-01, DEC-02, DEC-03)
-- [ ] **Phase 295: Runs That Don't Dead-End**: an empty or uncited KB step pauses and asks instead of failing; misconfigurations refused before a run; the judge stops failing recorded-not-sent actions; every run ends truthfully with a reason (RUN-01..04)
+- [x] **Phase 293: Start From Outside, and Close Out** (closed 2026-10-26: verified 6/6, operator signed G-4 2026-10-25, secured 36/36, UAT 12/12 after fast fix `048dec8e9`; mig 215 in cloud owed before deploy): authenticated inbound run start with read-back, trigger provenance and last/next run, seed statuses reconciled (START-02, START-04, REG-06)
+- [x] **Phase 294: Decision Engine: Rerank and Citation Check** (complete 2026-10-20, live c94e1bed9): a Settings switch picks Jev, OpenAI Decisions or a local model to rerank and prune search candidates, and a citation check labels each cited sentence (DEC-01, DEC-02, DEC-03)
+- [x] **Phase 295: Runs That Don't Dead-End** (closed 2026-10-24, operator signed): an empty or uncited KB step pauses and asks instead of failing; misconfigurations refused before a run; the judge stops failing recorded-not-sent actions; every run ends truthfully with a reason (RUN-01..04)
+- [x] **Phase 296: Close v4.7 Debt** (added 2026-10-26, operator, from the v4.7 audit): fix every open defect the milestone found (bugs, review findings, UAT findings); feature-shaped items move to v4.8 as seeds; one deploy of 292.1 + 293 + these fixes afterwards
 
 ### Phase Details
 
@@ -307,6 +308,34 @@ Plans:
 **UI hint**: yes
 **Flags**: **G-2 sketch**. Closed registry only; sandboxed HTML needs its own operator decision and is out of this phase. Files: `frontend/src/components/chat/artifacts/**`, `backend/app/models/artifact.py`, `backend/app/services/show_artifact_tool.py`. Migration only if the `message_artifacts` constraint needs a new literal. Seed `SEED-337`.
 
+#### Phase 292.1: Tool-limit Continue that always fires (INSERTED)
+
+**Goal**: When the agent reaches its tool-round limit with work still pending, the turn always ends the Claude.ai way, with a worded limit line and a Continue that resumes the same run, on every provider; tool-call markup never appears as an answer.
+**Depends on**: Phase 292 (no file overlap with 293).
+**Requirements**: BUG-261024-03 (reported 2026-10-24, production evidence)
+**Success Criteria** (what must be TRUE):
+
+  1. A turn that hits the 15-round cap with a pending tool call shows the limit line and a Continue button, whether the model sent the call structured or as text (DeepSeek DSML / OpenRouter XML); Continue resumes the same run with a fresh budget and `continues_used` counts it.
+  2. No assistant message is ever saved or shown with raw tool-call markup (`<｜DSML｜`, XML tool tags); a planted markup-only final turn is caught and worded.
+  3. Typing "continue" in a thread whose last run is `cap_paused` resumes that run rather than starting a new one (or the decision to keep them separate is recorded with a reason).
+  4. The cap path is proven live on the full native roster + OpenRouter with a forced low cap (CLAUDE.md SC#10).
+
+**How we'd know this failed**: a model that writes its tool call as text still ends the turn with markup and no Continue; Continue starts a new run or loses the queued call; the cap is lowered or raised instead of fixed; only the provider that showed the bug is tested.
+**Plans**: 4 plans (G-8: one over D-21's target of 3; the knob plan is the only DB-mutating plan, so it stays separate from typed-continue)
+
+**Wave 1** *(parallel; 02 is the only plan that mutates the local DB)*
+
+- [x] 292.1-01-PLAN.md — backend: provider-blind DSML parser + markup detector/holdback (`text_tool_calls.py`), cap pause on text calls, empty-queue marker, save-point sanitiser, round-cap read, SEED-323 reasoning replay, deepseek-only strip retired (TDD)
+- [x] 292.1-02-PLAN.md — round-cap knobs: migration 214 (applied locally), settings plumbing, `AgentRoundLimits` leaf with one mount in Settings
+- [x] 292.1-03-PLAN.md — typed continue (one delegating branch in send), Continue on the run's own model, SEED-324 terminal refusal, "Continuing…" + limit-line copy on the card (TDD)
+
+**Wave 2** *(blocked on Wave 1 completion)*
+
+- [x] 292.1-04-PLAN.md — merged-tree gates, count-gate adoption, ledger close, SEED-372/373, 8-row SC#10 board with a forced low cap, G-4 in Chrome, BUG-261024-03 record
+
+**UI hint**: yes (the limit line + Continue card already exist from Phase 092 — reuse, do not rebuild)
+**Flags**: G-5: `backend/app/services/agent_loop.py` FIRES (read its ledger section first). Provider-docs-first for DeepSeek / OpenRouter tool formats. Reuse `cap_paused` (`agent_loop.py:~2850`, `config.max_continues_per_run`) and the existing DSML/XML parsers. Cross-check reported bugs at discuss: BUG-261024-04 (output files repeated / intermediate files shown) touches the same chat surface.
+
 #### Phase 293: Start From Outside, and Close Out
 
 **Goal**: An external system can start a workflow and read its result, every run shows how it was started, and the seed register matches what shipped.
@@ -322,7 +351,26 @@ Plans:
   6. `SEED-163` reads delivered, every seed folded at intake carries its real status and where it went, and `node scripts/check-seeds-register.cjs` reports no folded seed still `planted` (REG-06).
 
 **How we'd know this failed**: the endpoint trusts a guessable id; a credential works across organisations; no rate limit; inbound payload text reaches a prompt as instructions; the run page says "manual" for an inbound run; next-run is blank for a scheduled workflow; a seed that shipped still reads `planted`.
-**Plans**: TBD (target 4-5)
+**Plans:** 5 plans (4 waves)
+
+Plans:
+**Wave 1**
+
+- [x] 293-01-PLAN.md — migration 215 (api_keys, run origin + backfill + trigger, audit types, limits) + key core (digest, live resolver, Redis limiter) + /api-keys and /org/api-keys (wave 1, DB-mutating, operator applies 215)
+
+**Wave 2** *(blocked on Wave 1 completion)*
+
+- [x] 293-02-PLAN.md — seams first (unattended_launch, run_read_words), origin stamped at start, TRUST-03 fence, /inbound start + status + one-time file link (wave 2)
+- [x] 293-04-PLAN.md — Settings → API keys tab (sketch C), org admin keys tab (registry extracted first), ⋯ menu entry (wave 2, frontend only)
+
+**Wave 3** *(blocked on Wave 2 completion)*
+
+- [x] 293-03-PLAN.md — origin on every run read + the origin line in four places, card next-run time, operator limit control (wave 3)
+
+**Wave 4** *(blocked on Wave 3 completion)*
+
+- [x] 293-05-PLAN.md — docs stop saying "no API keys" (D-20), live proof SC#1-5 + SC#10 board in 293-VALIDATION.md, operator G-4, REG-06 seed close-out with --require-settled gate, ledger re-derive (wave 4, DB-mutating, not autonomous)
+
 **UI hint**: yes
 **Flags**: ⛔ **security_enforcement**, opens an external door; read `docs/CONNECTOR-ARCHITECTURE.md` (MCP-first verdict; this is the inbound half, not Open Platform `SEED-013`), `app.security.egress`, and the TRUST-03 anti-injection discipline. Org-scoped, rate-limited, audited. Credentials stored hashed or encrypted per `secret_cipher.py`. Migration likely (next free after 209); apply by SQL editor, regenerate `full-schema.sql`, run `get_advisors(security)`; revoke from `PUBLIC` on any new function. **G-4**. SC#10 axes for the run-start path. Hot files: `workflow_runs.py`, `workflow_kickoff.py`, `scheduler_service.py`, `WorkflowRunPage.tsx`, `main.py`. Seeds `SEED-195`, `SEED-014`; REG-06 is the close-out step, by hand-editing seed frontmatter.
 
@@ -401,20 +449,49 @@ Plans:
 **UI hint**: yes
 **Flags**: **Evidence**: `BUG-261020-07`..`12` (folded here) and memory `project_workflow_blocking_measured_20261020`. **Route at discuss**: `BUG-261020-01` (a human step's answer never reaches the next step) belongs to the same "doesn't run as intended" family and is the first candidate to fold. **Not in scope**: branching or loops (`SEED-295` stays parked; the 2026-10-20 measure found no failure caused by a route the engine cannot express). `ValidatorSpec.on_failure` already accepts `ask_user` (D-11), so RUN-01 may be mostly a default and a worded pause; verify before adding engine code. **G-2 sketch** for the found-nothing pause. **G-4**. Hot files: `harness_engine.py`, `phase_types.py`, `validator_kinds.py`, `publish_service.py`, `run_reconciler.py`, `PendingAskCard.tsx`; read their ledger sections.
 
+#### Phase 296: Close v4.7 Debt
+
+**Goal**: Every defect v4.7 found and deferred is fixed or explicitly accepted with a reason, so the milestone closes with no open bug carried silently. No new capability.
+**Depends on**: Phases 286-295 (all closed).
+**Requirements**: none new (debt close-out). Source list: `.planning/v4.7-MILESTONE-AUDIT.md` `tech_debt`, each phase's REVIEW / deferred-items / UAT findings, and open `surface: Agentic-RAG` bugs filed 2026-10-18..26.
+**Success Criteria** (what must be TRUE):
+
+  1. Every item in the 296 inventory (CONTEXT) reads fixed, accepted-with-reason, or moved-to-v4.8-as-a-seed; none is silently dropped.
+  2. Each fixed bug has a test that was driven RED before the fix, and each closed bug report reads `status: closed` with the fixing commit.
+  3. The security items are closed: provider keys no longer reach LangSmith traces (BUG-261020-03), and folder/workflow create honours `X-Org-Id` (BUG-261021-02).
+  4. Gates hold: backend unit failures <= 71, vitest count gate OK, `tsc -p tsconfig.app.json` no new errors, ledger / seeds / CLAUDE.md-size gates clear.
+  5. User-visible fixes are driven live in Chrome (G-4) before close.
+
+**How we'd know this failed**: an inventory item has no disposition; a "fixed" bug still reproduces live; a fix adds a capability (that is a v4.8 phase); a gate is weakened to pass.
+**Plans:** 7 plans in 4 waves (G-8: W2 and W3 split on context cost, per D-14)
+
+Plans:
+- [x] 296-01-PLAN.md — W1 tenancy + evidence privacy: X-Org-Id on folder/workflow create, D-05 withhold cascade, mig 216 neutral org name, 215 regex, citation-check rate limit (wave 1, DB)
+- [x] 296-04-PLAN.md — W4 frontend run surfaces: followed-run reconcile, Waiting, evidence report wrap/markdown/alert, schedule Run now feedback, in-thread start failure, rerank/citation copy (wave 1)
+- [x] 296-02-PLAN.md — W2a run lifecycle: SEED-363 guard, boot-sweep human ask pauses, truthful run ends, resume on the run model, worded schedule results (wave 2, DB)
+- [x] 296-03-PLAN.md — W3a describe/publish backend: bounded PDF reads, hollow-step + unticked-service notes, typed golden stand-ins, rerank/citation backend (wave 2)
+- [x] 296-06-PLAN.md — W2b inbound/providers/wire: server required inputs, key fixes, pinned-model routing, Moonshot schema inliner, chat markup, wire typing (wave 3)
+- [x] 296-07-PLAN.md — W3b builder + describe UI: read-only Team view, draft persists, honest governance seal, describe-door UI, library note (wave 3)
+- [x] 296-05-PLAN.md — W5 tests, gates, D-21 roster, G-4 drive, record flips, seeds, outcome table (wave 4, DB)
+
+**UI hint**: yes
+**Flags**: G-8: target 4-5 plans. G-5: many touched files FIRE (`WorkflowRunPage.tsx`, `harness_engine.py`, `threads.py`, `runs.py`, `StreamsProvider.tsx`): one-touch fixes only, honoured by construction, or defer. Security review (`/gsd:secure-phase`) owed for the LangSmith and tenancy fixes. Migrations resume at `216` if one is needed.
+
 ### Progress
 
 | Phase | Plans Complete | Status | Completed |
 |-------|----------------|--------|-----------|
-| 286. Seams Before Features | 0/TBD | Not started | - |
-| 287. Start From a Thread, Fork a Starter | 0/TBD | Not started | - |
-| 288. Drafts That Survive, Pauses That Publish | 4/4 | human_needed (2026-10-19) | S1 generate arm and Anthropic row blocked on billing; late-answer resume and Expired card defects open (288-UAT.md) |
+| 286. Seams Before Features | 5/5 | Complete (2026-10-18) | 4/4 SC verified |
+| 287. Start From a Thread, Fork a Starter | 5/5 | Complete (2026-10-19, human_needed) | SC#4 one-click ruling + Anthropic/OpenRouter rows owed |
+| 288. Drafts That Survive, Pauses That Publish | 4/4 | Complete (2026-10-24) | Anthropic row + S1 generate arm re-run PASS; SC#4 gap closed by 295; operator signed; BUG-261024-02 follow-up |
 | 289. The Run Page and Its Evidence | 5/5 | Complete (2026-10-20) | Operator approved G-4; Anthropic row blocked on billing; BUG-261020-01 (human answer not passed on) and BUG-261020-02 (CR-01 residual) open |
-| 290. The Card and the Team Picture | 0/TBD | Not started | - |
-| 291. Describe It From Your Own Files | 0/TBD | Not started | - |
+| 290. The Card and the Team Picture | 4/4 | Complete (2026-10-24) | G-4 driven by Claude + operator signed; WR-02 accepted (a) |
+| 291. Describe It From Your Own Files | 6/6 | Complete (2026-10-24) | verified passed; findings in deferred-items.md |
 | 292. More Ways to Show It | 3/3 | Complete (2026-10-24) | 4/4 SC; 8/8 board rows; review fixes; operator signed G-4; mig 213 applied to cloud |
-| 293. Start From Outside, and Close Out | 0/TBD | Not started | - |
+| 293. Start From Outside, and Close Out | 5/5 | Complete (2026-10-26) | 6/6 SC; operator signed G-4; SECURITY 36/36 closed (AR-05/06 accepted); UAT 12/12; not deployed, cloud mig 215 owed first |
 | 294. Decision Engine: Rerank and Citation Check | 5/5 | complete (2026-10-20) | 6/6 SC met in code; 294-HUMAN-UAT 9/9 passed live; roster R2 ⛔ Anthropic billing, glm-5.3 ⛔ BUG-261020-06; not pushed; cloud mig 211 owed before deploy |
-| 295. Runs That Don't Dead-End | 7/7 (+3 gap fixes) | human_needed (2026-10-21) | 5/5 SC + RUN-01..04 verified (295-VERIFICATION.md); 2 gap rounds (G-7 cap reached); G-4 sign-off owed, run S1 first (295-HUMAN-UAT.md); Anthropic row blocked on billing; deferred BUG-261021-02/03/04, SEED-366/367; count gate OK post-close; not pushed |
+| 295. Runs That Don't Dead-End | 7/7 (+3 gap fixes) | Complete (2026-10-24) | S1-S7 PASS; Anthropic row re-run PASS; operator signed |
+| 296. Close v4.7 Debt | 7/7 | Complete (verified passed; G-4 8/8 + rows 9-12; SECURITY 44/44; not yet deployed) | 2026-10-27 |
 
 ---
 

@@ -1,6 +1,6 @@
 // Phase 276-03 (DOCS-03, D-16, T-276-13) — the public API reference: a lazy Scalar mount over the
 // static openapi.public.json with telemetry off, the AI agent disabled and the test-request /
-// client buttons hidden, under the exact "No API keys today." callout. The page never calls a
+// client buttons hidden, under the exact "Two ways in." callout. The page never calls a
 // live backend.
 import { render, screen } from "@testing-library/react"
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest"
@@ -32,7 +32,9 @@ describe("API reference page (P6)", () => {
     render(<ApiReference />)
     expect(screen.getByRole("status").textContent).toBe("Loading the API reference…")
     expect(screen.getByRole("heading", { level: 1, name: "Syrel API" })).toBeInTheDocument()
-    expect(screen.getByText("No API keys today.")).toBeInTheDocument()
+    // Phase 293 (D-20): API keys shipped; the old "no API keys" pin is retired on purpose
+    expect(screen.getByText("Two ways in.")).toBeInTheDocument()
+    expect(screen.getByText("API key")).toBeInTheDocument()
     expect(screen.getByRole("link", { name: "see what's planned" }).getAttribute("href")).toBe(
       "/docs/api/roadmap-open-platform",
     )

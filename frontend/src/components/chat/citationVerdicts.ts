@@ -109,7 +109,7 @@ const OFF_LINE = "Citation check is off while reranking is off."
 const REORDERS_ONLY_LINE = "Citation check needs Jev or OpenAI Decisions (Settings → Reranking)."
 
 function keyMissingLine(engine: string | null | undefined): string {
-  const keyName = engine ? engineFor(engine).keyName : null
+  const keyName = engine ? (engineFor(engine)?.keyName ?? null) : null
   return `Citation check can't run: no saved ${keyName ?? "engine key"} (Settings → Reranking).`
 }
 
@@ -140,6 +140,9 @@ export function checkErrorLine(code: string, a: CitationCheckAvailability | null
       // 294-REVIEW CR-01: the server's 503 — no engine call answered, so NOTHING was stored and
       // any saved verdicts are unchanged (the store keeps them; this line sits under them).
       return "The engine didn't answer, so nothing was saved. Try again in a moment."
+    // 296-04 (SEED-365): the per-person check limit (a 429 with reason `rate_limited`, 296-01).
+    case "rate_limited":
+      return "You've run a lot of checks just now. Try again in a minute."
     default:
       return "The check didn't finish. Try again."
   }

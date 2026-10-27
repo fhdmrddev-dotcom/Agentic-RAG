@@ -11,22 +11,22 @@ Seeds folded at intake: SEED-232, SEED-195, SEED-014, SEED-084, SEED-164, SEED-0
 ### Start (START)
 
 - [x] **START-01**: From inside a thread, a user can start a workflow, fill its launch form, and see the run attached to that thread. — `SEED-232`
-- [ ] **START-02**: An external system can start a workflow run through an authenticated inbound call and read the result back. Org-scoped, rate-limited, audited. — `SEED-195`
+- [x] **START-02**: An external system can start a workflow run through an authenticated inbound call and read the result back. Org-scoped, rate-limited, audited. — `SEED-195`
 - [x] **START-03**: A user can fork a starter workflow into their own draft in one click; at least 5 curated starters ship, each passing the publish gauntlet. — `SEED-084` (287: fork is menu + name dialog, not literal one click; operator to rule)
-- [ ] **START-04**: A run started by a schedule or an inbound call shows how it was started, and its last and next run are visible. — `SEED-014`
+- [x] **START-04**: A run started by a schedule or an inbound call shows how it was started, and its last and next run are visible. — `SEED-014`
 
 ### Author (AUTH)
 
-- [ ] **AUTH-01**: A workflow that pauses for a person can be published, and the run surface shows who it is waiting on. — `SEED-164`
+- [x] **AUTH-01**: A workflow that pauses for a person can be published, and the run surface shows who it is waiting on. — `SEED-164`
 - [x] **AUTH-02**: Describe-it authoring can take uploaded assets (template, form, reference docs) and derive the inputs, phases and tools from them. — `SEED-051`
-- [ ] **AUTH-03**: A draft's configuration does not vanish when the author navigates away. — `SEED-183`
+- [x] **AUTH-03**: A draft's configuration does not vanish when the author navigates away. — `SEED-183`
 
 ### See (VIS)
 
-- [ ] **VIS-01**: A multi-agent workflow can be viewed as a truthful picture of orchestrator, workers and judge, with no edges the schema does not have. Sketch first (G-2). — `SEED-086`
+- [x] **VIS-01**: A multi-agent workflow can be viewed as a truthful picture of orchestrator, workers and judge, with no edges the schema does not have. Sketch first (G-2). — `SEED-086`
 - [x] **VIS-02**: The agent can show more artifact types beyond chart, table and metric; the new set is chosen at sketch time from a closed registry only. — `SEED-337`
 - [x] **VIS-03**: A finished run has one read-only page, with export, showing what it did and on what evidence (definition version, phase log, verdicts, cited sources). — `SEED-348`
-- [ ] **VIS-04**: The workflow library card matches its approved sketch: labelled phase chips, and the description no longer dominates. — `SEED-155`
+- [x] **VIS-04**: The workflow library card matches its approved sketch: labelled phase chips, and the description no longer dominates. — `SEED-155`
 
 ### Trust (TRUST)
 
@@ -34,14 +34,14 @@ Seeds folded at intake: SEED-232, SEED-195, SEED-014, SEED-084, SEED-164, SEED-0
 
 ### Register hygiene (REG)
 
-- [ ] **REG-06**: Seed statuses match reality: SEED-163 flipped, and each seed this milestone folds is updated.
+- [x] **REG-06**: Seed statuses match reality: SEED-163 flipped, and each seed this milestone folds is updated.
 - [x] **REG-07**: Hot-file refactors that guardrail G-5 requires are done before the feature phases that touch those files.
 
 ### Decision engine (DEC) — added 2026-10-20 by the operator, outside the milestone's workflow theme
 
-- [ ] **DEC-01**: A Settings switch turns the decision engine on or off and picks the engine: Jev (TypeSafe, ~~direct or~~ via OpenRouter), OpenAI Decisions (`gpt-6-luna`), or a local model. Off is the default and leaves retrieval exactly as it is today. *Amended 2026-10-20 (294-CONTEXT D-03, operator): Jev ships via OpenRouter only; TypeSafe direct is deferred.*
-- [ ] **DEC-02**: When on, knowledge-base search reranks its candidates with the chosen engine, accepts an optional steering instruction from the agent, and drops only candidates below a conservative threshold. Any engine failure falls back to the current order.
-- [ ] **DEC-03**: A user can check an answer's citations and see, for each cited sentence, whether its source supports it fully, partly, not at all, or contradicts it, with a confidence.
+- [x] **DEC-01**: A Settings switch turns the decision engine on or off and picks the engine: Jev (TypeSafe, ~~direct or~~ via OpenRouter), OpenAI Decisions (`gpt-6-luna`), or a local model. Off is the default and leaves retrieval exactly as it is today. *Amended 2026-10-20 (294-CONTEXT D-03, operator): Jev ships via OpenRouter only; TypeSafe direct is deferred.*
+- [x] **DEC-02**: When on, knowledge-base search reranks its candidates with the chosen engine, accepts an optional steering instruction from the agent, and drops only candidates below a conservative threshold. Any engine failure falls back to the current order.
+- [x] **DEC-03**: A user can check an answer's citations and see, for each cited sentence, whether its source supports it fully, partly, not at all, or contradicts it, with a confidence.
 
 ### Runs (RUN) — added 2026-10-20 by the operator, from measured run failures
 
@@ -74,24 +74,24 @@ Seeds folded at intake: SEED-232, SEED-195, SEED-014, SEED-084, SEED-164, SEED-0
 | REG-07 | Phase 286 | Complete |
 | START-01 | Phase 287 | Complete |
 | START-03 | Phase 287 | Complete |
-| AUTH-03 | Phase 288 | Pending |
-| AUTH-01 | Phase 288 | Pending |
+| AUTH-03 | Phase 288 | Complete |
+| AUTH-01 | Phase 288 | Complete |
 | VIS-03 | Phase 289 | Complete |
 | TRUST-01 | Phase 289 | Complete |
-| VIS-04 | Phase 290 | Pending |
-| VIS-01 | Phase 290 | Pending |
+| VIS-04 | Phase 290 | Complete |
+| VIS-01 | Phase 290 | Complete |
 | AUTH-02 | Phase 291 | Complete (2026-10-24) |
 | VIS-02 | Phase 292 | Complete |
-| START-02 | Phase 293 | Pending |
-| START-04 | Phase 293 | Pending |
-| REG-06 | Phase 293 | Pending |
-| DEC-01 | Phase 294 | Pending |
-| DEC-02 | Phase 294 | Pending |
-| DEC-03 | Phase 294 | Pending |
-| RUN-01 | Phase 295 | Verified (2026-10-21; G-4 sign-off owed) |
-| RUN-02 | Phase 295 | Verified (2026-10-21; G-4 sign-off owed) |
-| RUN-03 | Phase 295 | Verified (2026-10-21; G-4 sign-off owed) |
-| RUN-04 | Phase 295 | Verified (2026-10-21; G-4 sign-off owed) |
+| START-02 | Phase 293 | Complete |
+| START-04 | Phase 293 | Complete |
+| REG-06 | Phase 293 | Complete |
+| DEC-01 | Phase 294 | Complete (live 2026-10-20) |
+| DEC-02 | Phase 294 | Complete (live 2026-10-20) |
+| DEC-03 | Phase 294 | Complete (live 2026-10-20) |
+| RUN-01 | Phase 295 | Complete (operator signed 2026-10-24) |
+| RUN-02 | Phase 295 | Complete (operator signed 2026-10-24) |
+| RUN-03 | Phase 295 | Complete (operator signed 2026-10-24) |
+| RUN-04 | Phase 295 | Complete (operator signed 2026-10-24) |
 
 Mapped: 21/21, no orphans, no duplicates.
 

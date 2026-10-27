@@ -102,6 +102,50 @@ function clamp(v: number, lo: number, hi: number): number {
 }
 
 /** Step 1: which edges are back edges (iterative DFS; deterministic for a given spec). */
+/** A label is text-xs at line-height 1.4 (16.8px), centred on its labelY. */
+export const LABEL_HEIGHT = 17
+
+/**
+ * 296-04 (292-WR-04-res) — where a back-edge label goes so it sits on NO node.
+ *
+ * The label ends at the gutter x and runs left, so it can cross the node area. Each candidate y
+ * (the edge's midpoint first, then the middle of every row gap between its two ends, which hold
+ * no node at all) is scored by the room left of the gutter before the nearest node whose box
+ * shares the label's band. The first candidate with room for the whole label wins; otherwise the
+ * roomiest one, and the label is truncated to that room (full text stays in `title`).
+ */
+function backLabelPlacement(
+  e: { from: number; to: number; labelX: number; labelY: number },
+  est: number,
+  placed: PlacedNode[],
+): { labelY: number; labelMaxWidth: number } {
+  const a = placed[e.from]
+  const b = placed[e.to]
+  const roomAt = (y: number): number => {
+    let blocked = 0
+    for (const n of placed) {
+      if (y - LABEL_HEIGHT / 2 < n.y + n.height && n.y < y + LABEL_HEIGHT / 2 && n.x < e.labelX) {
+        blocked = Math.max(blocked, n.x + n.width + 2)
+      }
+    }
+    return Math.max(0, e.labelX - blocked)
+  }
+  const candidates = [e.labelY]
+  const lo = Math.min(a.row, b.row)
+  const hi = Math.max(a.row, b.row)
+  for (const n of placed) {
+    // The gap above row r (r > lo) sits between the edge's two ends.
+    if (n.row > lo && n.row <= hi) candidates.push(n.rowTop - ROW_GAP / 2)
+  }
+  let best = { labelY: e.labelY, labelMaxWidth: roomAt(e.labelY) }
+  for (const y of candidates) {
+    const room = roomAt(y)
+    if (room >= est) return { labelY: y, labelMaxWidth: room }
+    if (room > best.labelMaxWidth) best = { labelY: y, labelMaxWidth: room }
+  }
+  return best
+}
+
 function findBackEdges(n: number, from: number[], to: number[], out: number[][]): boolean[] {
   const back = from.map(() => false)
   const state = new Array<number>(n).fill(0) // 0 unseen · 1 on the stack · 2 done
@@ -293,7 +337,7 @@ export function layoutDiagram(spec: DiagramEncoding, width: number): DiagramLayo
     const label = spec.edges[k].label
     const est = label ? label.length * CHAR_WIDTH + LABEL_PAD_X : 0
     if (e.labelAlign === "start") return { ...e, labelMaxWidth: Math.max(0, width - e.labelX) }
-    if (e.labelAlign === "end") return { ...e, labelMaxWidth: Math.max(0, e.labelX) }
+    if (e.labelAlign === "end") return { ...e, ...backLabelPlacement(e, est, placed) }
     const drawn = Math.min(est, width)
     return { ...e, labelX: clamp(e.labelX, drawn / 2, width - drawn / 2), labelMaxWidth: width }
   })

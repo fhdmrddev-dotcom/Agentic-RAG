@@ -1,0 +1,13 @@
+{
+ "run_id": "cbb9ca4a-9b72-462b-bfcb-1f9ee43db590",
+ "thread_id": "5cb5f320-2442-40b5-87b7-4856197ffad0",
+ "status": "completed",
+ "origin_kind": "app",
+ "inputs": {
+  "topic": "how a florist should price wedding bouquets",
+  "kickoff_prompt": "Run 293 inbound: brief to file\n\ntopic: how a florist should price wedding bouquets"
+ },
+ "answer": "Pricing wedding bouquets requires florists to consider several factors, including the cost of flowers, labor, and overheads. They should evaluate market rates and strive to offer competitive prices while ensuring profitability. Additionally, customizing pricing based on seasonal availability and client preferences can help in setting an attractive yet fair price point for wedding bouquets.",
+ "brief_md": "Pricing wedding bouquets requires florists to consider several factors, including the cost of flowers, labor, and overheads. They should evaluate market rates and strive to offer competitive prices while ensuring profitability. Additionally, customizing pricing based on seasonal availability and client preferences can help in setting an attractive yet fair price point for wedding bouquets.",
+ "answer_mentions_florist": true
+}

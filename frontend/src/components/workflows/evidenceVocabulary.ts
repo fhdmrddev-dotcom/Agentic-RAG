@@ -45,8 +45,10 @@ export const CONFIDENCE_FACE: Record<EvidenceLevel, ConfidenceFace> = {
   none: { glyph: "○", word: "No match found" },
 }
 
+// 296-04 (289-IN-06): the report is read by colleagues too, so the sentence names the knowledge
+// base rather than "your documents", which was untrue for anyone but the owner.
 export const NO_MATCH_EXPLANATION =
-  "The knowledge base returned nothing for this step — its output is not drawn from your documents."
+  "The knowledge base returned nothing for this step — its output is not drawn from the knowledge base."
 
 // ── Phase 289-04 (VIS-03 / D-14a) — THE EVIDENCE REPORT'S WORDS, appended ──────────────────
 //
@@ -65,6 +67,8 @@ export const PRINT_GLYPH = "⎙"
 export const OPEN_THREAD = "Open the chat thread"
 export const DOWNLOAD_DELIVERABLE = "Download the deliverable"
 export const DOWNLOAD_DELIVERABLE_FAILED = "Download failed — try again."
+// 296-04 (289-F-C): an owner's file deliverable with no file link says why there is no button.
+export const DOWNLOAD_UNAVAILABLE = "Download unavailable — this file has no link."
 export const UNTITLED_WORKFLOW = "Untitled workflow"
 export const YOU_MARK = "(you)"
 
@@ -177,7 +181,10 @@ export const NO_REASON_RECORDED = "No reason was recorded when this run failed."
 // ── Phase 295-05 (RUN-01 / D-04 / UI-SPEC B.1) — the mark on a step kept without sources.
 //
 //     ◌ Unsourced · continued by Fahad Murad (you)
-//     This output was kept without sources — it does not cite your documents.
+//     This output was kept without sources — it does not cite any document.
+//
+// 296-04 (289-IN-06): the note said "your documents", which a colleague reading the record took
+// as theirs. It now names no owner.
 //
 // ◌ (U+25CC, dotted circle) is NET-NEW to the icon convention and is recorded as a PROPOSAL in
 // `295-05-SUMMARY.md`, the way 289 recorded ○. It is deliberately not ○: ○ already means
@@ -187,7 +194,7 @@ export const UNSOURCED_GLYPH = "◌"
 export const UNSOURCED_WORD = "Unsourced"
 export const UNSOURCED_CONTINUED_BY = "continued by"
 export const UNSOURCED_NOTE =
-  "This output was kept without sources — it does not cite your documents."
+  "This output was kept without sources — it does not cite any document."
 
 // The human-input lines (R-04: a colleague sees only that the step waited).
 export function quotedAnswer(answer: string): string {

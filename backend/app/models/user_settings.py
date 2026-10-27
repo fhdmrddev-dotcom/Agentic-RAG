@@ -296,6 +296,14 @@ class UserEffectiveSettings(BaseModel):
     vision_model: str = ""
     #: Hard ceiling on pages transcribed per document. Exceeding it is RECORDED, never silent.
     vision_max_pages: int = 50
+    # 292.1 D-17 (migration 214): tool rounds per turn before the limit line + Continue; read once
+    #   per run by `resolve_round_cap`. App-wide, bounded 2..50 (API + CHECK + UI clamp).
+    chat_max_tool_rounds: int = 15
+    explorer_max_tool_rounds: int = 8
+    # 293 D-14 (migration 215): per-key API limits, counted in Redis across every worker by
+    #   `services/rate_limit.py`. App-wide, bounded 1..60 and 10..600 (API + CHECK).
+    api_key_starts_per_minute: int = 10
+    api_key_reads_per_minute: int = 120
 
     # Phase 075.10 (migration 049): tool_args_progress SSE emission cadence.
     chat_tool_args_progress_emit_boundary_bytes: int = 256
@@ -989,6 +997,12 @@ def _build_providers(row: dict) -> list[LLMProvider]:
         if disabled_ids:
             models = [m for m in models if m not in disabled_ids]
 
+        # The registry wins over the Settings list: a model REMOVED in the registry (mig 179
+        # tombstone) is hidden even when provider_model_lists still names it — Settings writes
+        # the whole picker list back on every save, so it routinely holds removed ids.
+        if _removed_model_ids_cache:
+            models = [m for m in models if m not in _removed_model_ids_cache]
+
         # SEED-173 — a self-hosted provider's endpoint comes from the operator's settings
         # column, not from the static registry (whose entry for it is ""). Table-driven so
         # that ollama, lmstudio and custom are handled IDENTICALLY; the only per-provider
@@ -1187,6 +1201,12 @@ def _build_settings_from_row(row: dict) -> UserEffectiveSettings:
         # "" so the chain really does reach `llm_model`. DB > env > active chat model.
         vision_model=str(_val(row, "vision_model", "vision_model", "")),
         vision_max_pages=int(_val(row, "vision_max_pages", None, 50)),
+        # 292.1 D-17 — a database without migration 214 still reads 15 / 8.
+        chat_max_tool_rounds=int(_val(row, "chat_max_tool_rounds", None, 15)),
+        explorer_max_tool_rounds=int(_val(row, "explorer_max_tool_rounds", None, 8)),
+        # 293 D-14 — a database without migration 215 still reads 10 / 120.
+        api_key_starts_per_minute=int(_val(row, "api_key_starts_per_minute", None, 10)),
+        api_key_reads_per_minute=int(_val(row, "api_key_reads_per_minute", None, 120)),
 
         chat_tool_args_progress_emit_boundary_bytes=int(
             _val(row, "chat_tool_args_progress_emit_boundary_bytes", None, 256)
@@ -1262,6 +1282,13 @@ async def load_app_settings_async() -> UserEffectiveSettings:
     # _build_providers runs so it can see disabled rows and hide them from the picker
     # (Pitfall 1 — the enabled-only hot cache cannot surface a disabled model). Non-raising.
     await load_all_model_overrides()
+    # _build_providers ALSO reads the enabled-only hot cache to append DB-registered models.
+    # Warm it here too: on a cold worker (or after an invalidation that zeroed only its TTL) it
+    # was empty or stale, and every registry-added model was missing from the chat picker until
+    # an unrelated path (a chat send) happened to reload it. Non-raising.
+    await _load_model_overrides()
+    # And the tombstone set, so a model removed in the registry is hidden by _build_providers.
+    await load_removed_model_ids()
     return _build_settings_from_row(row)
 
 

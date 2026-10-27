@@ -1,0 +1,142 @@
+{
+  "entry": {
+    "provider": "moonshot",
+    "model": "kimi-k3.1-pro-highspeed",
+    "calling_mode": "NATIVE",
+    "required": true,
+    "extra": null,
+    "forced_from": null
+  },
+  "prompt": "Do these three steps one at a time, each as its own tool call, and wait for each result before the next: 1) search our documents for the project plan; 2) search our documents again for its milestones; 3) use Python (execute_code) to draw a bar chart of milestones per quarter. Do not skip a step and do not combine steps.",
+  "attempts": [
+    {
+      "thread_id": "66a381cd-7d79-4d12-b230-ef7b104c4c81",
+      "run_id": "1a05357d-71ce-45df-918f-91c5592bb7e5",
+      "status": "completed",
+      "paused": false,
+      "run": {
+        "run_id": "1a05357d-71ce-45df-918f-91c5592bb7e5",
+        "thread_id": "66a381cd-7d79-4d12-b230-ef7b104c4c81",
+        "status": "completed",
+        "model": "kimi-k3.1-pro-highspeed",
+        "provider": "moonshot",
+        "continues_used": 0,
+        "started_at": "2026-10-24 08:48:38.809238+00:00"
+      },
+      "classification": "prose-final",
+      "carrier": null,
+      "tool_starts": [
+        "search_documents"
+      ],
+      "event_types": [
+        "citations",
+        "confidence",
+        "delta",
+        "done",
+        "iteration_start",
+        "planning",
+        "reasoning_delta",
+        "sources",
+        "stream_end",
+        "suggestions",
+        "tool_end",
+        "tool_preparing",
+        "tool_start"
+      ],
+      "cap_paused_event": null,
+      "live_markup_at": null,
+      "live_preview": "*The model produced 3,993 characters of reasoning and 1 tool call(s) over 2 step(s) and never wrote an answer. Try breaking the request into smaller steps, or switching to a different model.*",
+      "redis_last_id": "1792831750188-0"
+    },
+    {
+      "thread_id": "58d84c14-f89e-4cbf-878d-b216675eaf79",
+      "run_id": "dc3d5473-a032-4f16-8060-821850df252d",
+      "status": "failed",
+      "paused": false,
+      "run": {
+        "run_id": "dc3d5473-a032-4f16-8060-821850df252d",
+        "thread_id": "58d84c14-f89e-4cbf-878d-b216675eaf79",
+        "status": "failed",
+        "model": "kimi-k3.1-pro-highspeed",
+        "provider": "moonshot",
+        "continues_used": 0,
+        "started_at": "2026-10-24 08:49:13.073236+00:00"
+      },
+      "classification": "other (failed)",
+      "carrier": null,
+      "tool_starts": [
+        "search_documents"
+      ],
+      "event_types": [
+        "delta",
+        "error",
+        "iteration_start",
+        "planning",
+        "reasoning_delta",
+        "tool_end",
+        "tool_preparing",
+        "tool_start"
+      ],
+      "cap_paused_event": null,
+      "live_markup_at": null,
+      "live_preview": "*Rate limited by the provider \u2014 please retry in a moment.*",
+      "redis_last_id": "1792831767008-0"
+    },
+    {
+      "thread_id": "c1c91e35-be9a-41a8-9e20-9df66065bf5c",
+      "run_id": "fe4747b5-357d-42cb-902a-cdcabfdde5ab",
+      "status": "failed",
+      "paused": false,
+      "run": {
+        "run_id": "fe4747b5-357d-42cb-902a-cdcabfdde5ab",
+        "thread_id": "c1c91e35-be9a-41a8-9e20-9df66065bf5c",
+        "status": "failed",
+        "model": "kimi-k3.1-pro-highspeed",
+        "provider": "moonshot",
+        "continues_used": 0,
+        "started_at": "2026-10-24 08:49:27.224834+00:00"
+      },
+      "classification": "other (failed)",
+      "carrier": null,
+      "tool_starts": [],
+      "event_types": [
+        "delta",
+        "error",
+        "iteration_start"
+      ],
+      "cap_paused_event": null,
+      "live_markup_at": null,
+      "live_preview": "*Rate limited by the provider \u2014 please retry in a moment.*",
+      "redis_last_id": "1792831769878-0"
+    }
+  ],
+  "paused": false,
+  "continue": null,
+  "markup_hits": [],
+  "reload": {
+    "66a381cd-7d79-4d12-b230-ef7b104c4c81": {
+      "http": 200,
+      "equal": true,
+      "compared": 1,
+      "diffs": [],
+      "db_rows_not_in_reload": []
+    },
+    "58d84c14-f89e-4cbf-878d-b216675eaf79": {
+      "http": 200,
+      "equal": true,
+      "compared": 1,
+      "diffs": [],
+      "db_rows_not_in_reload": []
+    },
+    "c1c91e35-be9a-41a8-9e20-9df66065bf5c": {
+      "http": 200,
+      "equal": true,
+      "compared": 1,
+      "diffs": [],
+      "db_rows_not_in_reload": []
+    }
+  },
+  "tools_used": [
+    "search_documents"
+  ]
+}

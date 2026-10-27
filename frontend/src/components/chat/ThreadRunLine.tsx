@@ -167,12 +167,17 @@ import { stepsFrom } from "@/lib/runStepCount"
 import { harnessBannerProgress, outerBannerLabel } from "@/lib/toolMeta"
 import { useHarnessLiveForThread } from "@/providers/StreamsProvider"
 import { useStreamsStore } from "@/stores/streamsStore"
+// 293-03 (D-24): how the run started, off the same persisted frame. A leaf, no hook.
+import { RunOriginLine } from "@/components/workflows/RunOriginLine"
 import type { Phase } from "@/types"
 
 /** Module-scope so the selector below returns a STABLE reference on the miss
  *  path. A fresh `[]` per render would re-render this line on every unrelated
  *  store write — the churn hazard `StreamsProvider.tsx:3293` records by name. */
 const EMPTY_PHASES: Phase[] = []
+
+/** `workflow_runs` statuses a run is never live in. */
+const FINISHED = new Set(["completed", "failed", "cancelled"])
 
 /** The two words the two states lead with. Declared once so the suite can assert
  *  the rendered VALUE rather than a re-typed copy of it. */
@@ -205,6 +210,11 @@ interface Props {
 
 export function ThreadRunLine({ threadId }: Props) {
   const isLive = useHarnessLiveForThread(threadId)
+  // 296 G-4 #12 (d): the run id the kickoff POST returns. isLive is already true before the run
+  // row exists, so the frame is re-read once more when the id arrives.
+  const liveRunId = useStreamsStore((s) =>
+    threadId ? (s.workflowLockByThread.get(threadId)?.runId ?? null) : null,
+  )
   const [frame, setFrame] = useState<ThreadWorkflowState | null>(null)
   const [nowMs, setNowMs] = useState(() => Date.now())
 
@@ -238,7 +248,7 @@ export function ThreadRunLine({ threadId }: Props) {
       cancelled = true
       ctrl.abort()
     }
-  }, [threadId, isLive])
+  }, [threadId, isLive, liveRunId])
 
   // ── The live clock. One interval, ONLY while live, cleared on every exit. ──
   useEffect(() => {
@@ -262,7 +272,10 @@ export function ThreadRunLine({ threadId }: Props) {
       total > 0 && progress
         ? `Step ${progress.runningPhase ?? Math.min(progress.phasesDone + 1, total)} of ${total}`
         : null
-    const elapsed = startedMs == null ? null : fmtElapsed(nowMs - startedMs)
+    // 296 G-4 #12 (d): a frame of a FINISHED run is the previous run's (read before this run's row
+    // existed), so its anchor and origin are not this run's — omitted, never shown.
+    const frameIsThisRun = !FINISHED.has(frame?.last_run_status ?? "")
+    const elapsed = startedMs == null || !frameIsThisRun ? null : fmtElapsed(nowMs - startedMs)
     return (
       <RunLine
         glyph="◆"
@@ -270,6 +283,7 @@ export function ThreadRunLine({ threadId }: Props) {
         step={step}
         elapsed={elapsed}
         state="live"
+        origin={frameIsThisRun ? frame?.origin : undefined}
       />
     )
   }
@@ -290,6 +304,7 @@ export function ThreadRunLine({ threadId }: Props) {
       step={steps ? `${steps.done} of ${steps.total} steps` : null}
       elapsed={elapsed}
       state="stopped"
+      origin={frame.origin}
     />
   )
 }
@@ -316,12 +331,15 @@ function RunLine({
   step,
   elapsed,
   state,
+  origin,
 }: {
   glyph: string
   word: string
   step: string | null
   elapsed: string | null
   state: "live" | "stopped"
+  /** 293-03: the persisted frame's recorded origin; absent or unknown renders nothing. */
+  origin?: ThreadWorkflowState["origin"]
 }) {
   return (
     <div
@@ -352,6 +370,7 @@ function RunLine({
           </span>
         </>
       )}
+      <RunOriginLine origin={origin} />
     </div>
   )
 }

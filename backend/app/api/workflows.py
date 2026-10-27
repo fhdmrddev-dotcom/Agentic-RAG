@@ -41,7 +41,7 @@ from uuid import UUID, uuid4
 
 import asyncpg
 import redis.asyncio as aioredis
-from fastapi import APIRouter, Depends, File, Header, HTTPException, Query, UploadFile, status
+from fastapi import APIRouter, Depends, File, Header, HTTPException, Query, Request, UploadFile, status
 from pydantic import BaseModel, Field
 from starlette.concurrency import run_in_threadpool
 from supabase import Client
@@ -56,6 +56,7 @@ from app.dependencies import (
     get_user_supabase_client,
     require_canvas,
     require_visible,
+    resolve_active_org_or_none,
 )
 from app.db.workflows import (
     count_foreign_runs_on_global,
@@ -1192,6 +1193,7 @@ async def publish_workflow(
 )
 async def create_draft(
     body: WorkflowDefinition,
+    request: Request = None,  # FastAPI injects it; direct callers may omit it (no header -> None)
     current_user: dict = Depends(get_current_user),
 ) -> DraftCreateResponse:
     """Persist a NEW draft (REQ-1 create) — returns ``{id, version}``.
@@ -1209,8 +1211,14 @@ async def create_draft(
     # has no prior definition, so there is nothing to grandfather (D-08) and every
     # unregistered value is refused.
     await assert_phase_models_registered(body)
+    # 296-01 (BUG-261021-02): the draft belongs to the VALIDATED active org (create_thread's
+    # D-268-07 shape); None keeps the INSERT byte-identical and the mig-106 trigger decides.
+    _active_org = await resolve_active_org_or_none(request, current_user)
     try:
-        row = await create_workflow_definition(pool, definition=body, user_id=user_id)
+        row = await create_workflow_definition(
+            pool, definition=body, user_id=user_id,
+            org_id=UUID(_active_org) if _active_org else None,
+        )
     except asyncpg.exceptions.UniqueViolationError:
         # UNIQUE(slug, version) already taken (e.g. a re-fired save or a same-named
         # draft). An honest 409 — NEVER a raw 500 (UAT-103). The client treats a
@@ -1416,6 +1424,16 @@ async def delete_draft(
         raise HTTPException(
             status_code=status.HTTP_409_CONFLICT,
             detail="workflow is published and cannot be modified",
+        )
+    except asyncpg.exceptions.ForeignKeyViolationError:
+        # 296-06 (293-DEL): a publish trial run still points at the draft. A worded 409, never
+        # a raw 500 and never the constraint text (UI-SPEC E).
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail=(
+                "This workflow can't be deleted yet: "
+                "a run record from an earlier publish attempt still points to it. Nothing was deleted."
+            ),
         )
     if not deleted:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="draft not found")

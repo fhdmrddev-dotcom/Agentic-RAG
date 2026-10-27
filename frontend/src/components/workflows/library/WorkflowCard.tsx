@@ -263,7 +263,7 @@ import { Fragment, useRef } from "react"
 // into the label string, and it leads the `not-by-you` status line with `person`.
 import {
   // 204 (SCHED-01) — the schedules door's mark, from the SAME house chrome set as `History`
-  // beside it. Not `phaseGlyph()`: see `MARK_ICON`'s docblock.
+  // (which now sits in `WorkflowCardMenu.tsx`, 286-04). Not `phaseGlyph()`: see `MARK_ICON`'s docblock.
   CalendarClock,
   ExternalLink,
   FileText,
@@ -529,7 +529,9 @@ const ROOT_TESTID = {
  * is NOT TOUCHED by this plan.
  *
  * ⚠ **THEY BECOME `lucide-react` MARKS — THE HOUSE'S SHIPPED SET, NOT A SECOND ICON PATH.**
- * This file already draws `MoreHorizontal`, `Trash2` and `Loader2` from it; the convention's
+ * This file draws `CalendarClock`, `ExternalLink`, `Folder`, `Play`, `User` and `Wrench` from it
+ * (296-07, 286-S04-2: `MoreHorizontal`, `Trash2`, `Loader2` and `History` moved to
+ * `WorkflowCardMenu.tsx` at 286-04, which draws them from the same set); the convention's
  * single sources are `@lobehub/icons` for PROVIDERS and `PHASE_GLYPHS` for PHASE TYPES, and a
  * library row's provenance is neither. Adding a fourth path would be the drift; reusing the
  * chrome set the card is already made of is not.
@@ -718,6 +720,8 @@ export interface WorkflowCardProps {
    * draft would be an affordance that exists only to be refused.
    */
   onSchedule?: (scope: { id: string; name: string }) => void
+  /** Phase 293-04 (D-18): the ⋯ menu's "New API key…", passed straight through to the menu. */
+  onApiKey?: (scope: { id: string; name: string }) => void
   /** Launch a runnable row (the Phase-121 one-click launch, unchanged). */
   onRun: (row: LibraryRow) => void
   /** Open a draft in the Builder (edit-in-place; saves PATCH the same row). */
@@ -833,6 +837,7 @@ export function WorkflowCard({
   onRun,
   onRunLog,
   onSchedule,
+  onApiKey,
   onOpen,
   onForkNewVersion,
   onForkStarter,
@@ -972,7 +977,7 @@ export function WorkflowCard({
    * does not admit composes byte-identically to the way it did before this phase.
    */
   // Phase 204.1 — resolved by the leaf, never decided here. See `automationFacts.ts`.
-  const automation = automationFacts(row)
+  const automation = automationFacts(row, now)
 
   const identityParts: string[] = [
     ...templateMark,
@@ -1176,6 +1181,12 @@ export function WorkflowCard({
                 <span data-testid="row-automation" className="text-primary">
                   {automation.phrase}
                 </span>
+                {/* 293-03 (D-25): the server's next run time, formatted only. */}
+                {automation.next !== null && (
+                  <span data-testid="row-automation-next" className="text-muted-foreground">
+                    <span aria-hidden="true" className="text-border">{ANSWER_SEPARATOR}</span> {automation.next}
+                  </span>
+                )}
                 {automation.more !== null && (
                   <span data-testid="row-automation-more" className="text-muted-foreground">
                     {automation.more}
@@ -1294,6 +1305,7 @@ export function WorkflowCard({
               hasExistingFork={hasExistingFork}
               onRunLog={onRunLog}
               onSchedule={onSchedule}
+              onApiKey={onApiKey}
               onForkNewVersion={onForkNewVersion}
               onForkStarter={onForkStarter}
               deleteSheetRef={deleteSheetRef}

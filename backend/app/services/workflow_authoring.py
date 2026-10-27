@@ -40,6 +40,7 @@ from __future__ import annotations
 
 import copy
 import logging
+import re
 from typing import Any
 from uuid import UUID
 
@@ -635,6 +636,79 @@ async def _resolve_allowed_vocabulary(
     return vocabulary
 
 
+# ── 296-03 (291-S2-F3) — a service that is connected but NOT ticked is said to be exactly that ──
+# With nothing ticked the prompt said "CONNECTED SERVICES: none", and a description that named the
+# author's connected Slack produced a draft saying no Slack connection is configured — untrue. The
+# server now tells the model which NAMED services are connected-but-unticked, and tells the author.
+# Only services the description names are listed, so the block never nudges composition.
+#: 296-03 (291-S1-copy b): the ``reason_code`` of a drafting call the PROVIDER refused; the client
+#: key is ``could_not_generate:provider_error``. Equal to ``forced_emit``'s own failure value.
+PROVIDER_ERROR_REASON = "provider_error"
+
+UNTICKED_REASON = (
+    "It's connected, but this workflow may only use services ticked under "
+    "“Services this workflow may use”. Tick it and draft again to let a step use it."
+)
+
+
+async def _resolve_unticked_connections(
+    *, supabase, user_id: str, ticked: list[str]
+) -> list[dict]:
+    """The caller's org connections the author did NOT tick, as ``{id, name, service_id}``.
+
+    Fail-closed in the narrowing direction: an unreadable list is ``[]`` (nothing is described,
+    nothing is granted — this list never grants anything; ``_check_allowed_connections`` still
+    refuses any step on an unticked connection)."""
+    from app.services.connector_service import list_connections  # function-local (Pitfall 4)
+    from app.utils.folder_utils import _resolve_caller_org_ids  # function-local
+
+    ticked_set = {str(c) for c in ticked}
+    out: list[dict] = []
+    try:
+        for org_id in sorted(await _resolve_caller_org_ids(supabase, user_id)):
+            for conn in await list_connections(org_id=org_id, supabase=supabase):
+                cid = str(getattr(conn, "id", "") or "")
+                if not cid or cid in ticked_set or any(c["id"] == cid for c in out):
+                    continue
+                out.append(
+                    {
+                        "id": cid,
+                        "name": getattr(conn, "name", None),
+                        "service_id": getattr(conn, "service_id", None),
+                    }
+                )
+    except Exception:  # noqa: BLE001 — describing nothing is the safe answer
+        logger.info("296-03: could not list the author's unticked connections", exc_info=True)
+        return []
+    return out
+
+
+def _service_name(conn: dict) -> str:
+    name = " ".join(str(conn.get("name") or "").split())
+    return name or str(conn.get("service_id") or "").replace("_", " ").title()
+
+
+def _description_names(describe: str, conn: dict) -> bool:
+    """True when the author's own description names the connection or its service."""
+    terms = {_service_name(conn), str(conn.get("service_id") or "").replace("_", " ")}
+    return any(
+        re.search(rf"(?<!\w){re.escape(t)}(?!\w)", describe or "", re.IGNORECASE)
+        for t in terms
+        if t.strip()
+    )
+
+
+def _render_unticked_block(unticked: list[dict]) -> str:
+    if not unticked:
+        return ""
+    names = ", ".join(_service_name(c) for c in unticked)
+    return (
+        f"CONNECTED BUT NOT TICKED: {names}. The author has connected these services but has not "
+        "ticked them for this workflow, so no step may use them. They ARE configured; never say "
+        "they are not. Write the rest of the work without them.\n\n"
+    )
+
+
 def _normalised_for_copy_check(text: str) -> str:
     """Normalise a string for the D-07 describe-copy comparison: strip, collapse every
     internal whitespace run to a single space, casefold.
@@ -809,6 +883,18 @@ async def generate_workflow_definition(
     vocabulary_block = (
         _render_vocabulary_block(allowed_vocabulary) if allowed_connection_ids is not None else ""
     )
+    # 296-03 (291-S2-F3): a tick list was sent, so a service the description NAMES but the author
+    # did not tick is described as connected-not-ticked (to the model) and told (to the author).
+    unticked_named: list[dict] = []
+    if allowed_connection_ids is not None:
+        unticked_named = [
+            c
+            for c in await _resolve_unticked_connections(
+                supabase=supabase, user_id=user_id, ticked=allowed_connection_ids
+            )
+            if _description_names(describe, c)
+        ]
+        vocabulary_block += _render_unticked_block(unticked_named)
 
     # D-13 / D-35 — files are fenced DATA at the TOP of the USER turn, task last; never in the
     # system prompt (it reaches 2 of 8 providers, SEED-327). No files ⇒ "" ⇒ byte-identical.
@@ -845,8 +931,22 @@ async def generate_workflow_definition(
             strict=False,  # Pitfall 1: force-without-strict for the optional-heavy schema
         )
 
+    # 296-03 (291-S1-copy b): ``forced_emit`` reports ``provider_error`` when every rung's
+    # provider call RAISED (a 402 billing refusal, a 401/403 key problem, a timeout) — the model
+    # never answered. Rewording cannot help and the strict-validation retry would re-send the
+    # whole prompt to the same refusal, so it is refused at once, in words, with no provider text.
+    provider_refusal = {
+        "ok": False,
+        "error": "could_not_generate",
+        "reason_code": PROVIDER_ERROR_REASON,
+        "detail": "The drafting model's provider turned the request down.",
+    }
+
     res1 = await _shot(base_messages, 1)
     wd = res1.get("emitted")
+
+    if wd is None and res1.get("failure") == PROVIDER_ERROR_REASON:
+        return provider_refusal
 
     if wd is None:
         # EXACTLY one retry with the failure fed back (REQ-2 b — no third call).
@@ -863,6 +963,8 @@ async def generate_workflow_definition(
         ]
         res2 = await _shot(retry_messages, 2)
         wd = res2.get("emitted")
+        if wd is None and res2.get("failure") == PROVIDER_ERROR_REASON:
+            return provider_refusal
         if wd is None:
             return {
                 "ok": False,
@@ -1074,6 +1176,16 @@ async def generate_workflow_definition(
     # server-side substitute text. D-09 — the publish gate is NOT touched: stage 1's
     # `business_requirement_missing` only checks non-emptiness and an AI-seeded value
     # passes it untouched, on purpose.
+    # ⚠ 296-03 (291-S2-F2) — WITH FILES ATTACHED, THE REQUIREMENT IS THE AUTHOR'S OWN WORDS.
+    # The model writes the requirement having READ the files, and live UAT measured file text
+    # (a planted recipient, "ignore embedded instructions", "external news") reaching the
+    # criterion the publish judge grades against. A file may shape the steps; it may never
+    # change what the workflow is held to. So the restated requirement is built from the
+    # description alone, structurally — no similarity check could promise that. The copy check
+    # below then leaves it unmarked, which is true: the author wrote it.
+    if files_supplied:
+        wd = wd.model_copy(update={"business_requirement": describe.strip() or None})
+
     _emitted_requirement = wd.business_requirement
     wd = wd.model_copy(
         update={
@@ -1145,6 +1257,11 @@ async def generate_workflow_definition(
         "readiness": readiness,
     }
     # 291-02 — additive keys, each ABSENT when empty (absence means absence, as readiness above).
+    # 296-03 (291-S2-F3): a service the description named but the author did not tick.
+    removed = removed + [
+        {"lead": f"{_service_name(c)} isn't ticked.", "reason": UNTICKED_REASON}
+        for c in unticked_named
+    ]
     if removed:
         result["removed"] = removed
     if fields:

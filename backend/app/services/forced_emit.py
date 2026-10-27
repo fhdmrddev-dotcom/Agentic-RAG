@@ -467,7 +467,10 @@ async def forced_emit(
         else:
             _target_key = getattr(settings, f"{provider}_api_key", "")
             if _target_key:
-                _updates = {"llm_api_key": _target_key}
+                # 296 (293-F-4): the copy names the TARGET provider too, so the API surface
+                # resolves under it — a pinned Responses-API model was sent to
+                # chat.completions under the run provider's name (live 400).
+                _updates = {"llm_api_key": _target_key, "active_provider": provider}
                 # FINDING-05 (102-UAT): the openai-compat path (openai/openrouter/deepseek/
                 # moonshot/minimax/zhipu) resolves the ENDPOINT from ``llm_base_url`` — the
                 # active provider's by default. A cross-provider shot must ALSO carry the

@@ -1,0 +1,125 @@
+{
+  "entry": {
+    "provider": "minimax",
+    "model": "MiniMax-M3",
+    "calling_mode": "NATIVE",
+    "required": true,
+    "extra": null,
+    "forced_from": null
+  },
+  "prompt": "Do these three steps one at a time, each as its own tool call, and wait for each result before the next: 1) search our documents for the project plan; 2) search our documents again for its milestones; 3) use Python (execute_code) to draw a bar chart of milestones per quarter. Do not skip a step and do not combine steps.",
+  "attempts": [
+    {
+      "thread_id": "e901e539-9a29-4feb-bf1e-21735020836b",
+      "run_id": "c2ff84a0-04ac-4cd2-a5ba-46ba932bdf35",
+      "status": "completed",
+      "paused": true,
+      "run": {
+        "run_id": "c2ff84a0-04ac-4cd2-a5ba-46ba932bdf35",
+        "thread_id": "e901e539-9a29-4feb-bf1e-21735020836b",
+        "status": "completed",
+        "model": "MiniMax-M3",
+        "provider": "minimax",
+        "continues_used": 0,
+        "started_at": "2026-10-24 08:48:12.438277+00:00"
+      },
+      "classification": "structured-pause",
+      "carrier": [
+        {
+          "kind": "iteration_cap_paused",
+          "name": "search_documents",
+          "arguments": "{\"query\":\"milestones phase gates timeline Phase 0 Phase 1 Phase 2 Phase 3 days\",\"filters\":\"{\\\"document_id\\\": \\\"a0f7ad77-7c50-4a2c-895f-7b5c17ac3bcc\\\"}\",\"instruction\":\"Extract all milestones, phases, deliverables, and their timing (days/months) from the phased roadmap and implementation plan sections.\"}",
+          "tool_call_id": "call-fed60337-e05b-4325-a2ae-0011a4b22284",
+          "reasoning_content": "\nThe project plan appears to be \"Executive_Proposal_PMO_Governance.md.pdf\" with a phased roadmap (0-180 days). Now step 2: search for its milestones.\n"
+        }
+      ],
+      "tool_starts": [
+        "search_documents"
+      ],
+      "event_types": [
+        "cap_paused",
+        "citations",
+        "confidence",
+        "delta",
+        "done",
+        "iteration_start",
+        "planning",
+        "reasoning_delta",
+        "sources",
+        "stream_end",
+        "suggestions",
+        "tool_args_progress",
+        "tool_end",
+        "tool_preparing",
+        "tool_start",
+        "turn_boundary"
+      ],
+      "cap_paused_event": {
+        "type": "cap_paused",
+        "kind": "iteration_cap_paused",
+        "message": "\u23f8 Reached the iteration limit \u2014 1 tool(s) weren't run yet. Continue to run them.",
+        "tool_names": [
+          "search_documents"
+        ],
+        "continues_used": 0,
+        "continues_remaining": 3
+      },
+      "live_markup_at": null,
+      "live_preview": "I'll work through these one at a time. Starting with step 1: searching for the project plan.\n\nStep 1 found the project plan: **Executive_Proposal_PMO_Governance.md.pdf**, which contains a phased roadmap (0\u2013180 days). Now step 2: searching for its milestones.",
+      "redis_last_id": "1792831706074-0"
+    }
+  ],
+  "paused": true,
+  "continue": {
+    "http": 200,
+    "body": {
+      "status": "ok",
+      "run_id": "c2ff84a0-04ac-4cd2-a5ba-46ba932bdf35",
+      "continues_used": 1,
+      "continues_remaining": 2
+    },
+    "status_after": "cap_paused",
+    "same_run_id": true,
+    "continues_used_before": 0,
+    "continues_used_after": 1,
+    "continues_used_plus_1": true,
+    "model_provider_unchanged": true,
+    "model_provider": [
+      "MiniMax-M3",
+      "minimax"
+    ],
+    "tool_starts_after_resume": [
+      "search_documents",
+      "query_documents"
+    ],
+    "carrier_first_call": "search_documents",
+    "queued_call_ran_first": true,
+    "events_after_resume": [
+      "cap_paused",
+      "delta",
+      "iteration_start",
+      "planning",
+      "reasoning_delta",
+      "stream_end",
+      "suggestions",
+      "tool_args_progress",
+      "tool_end",
+      "tool_preparing",
+      "tool_start",
+      "turn_boundary"
+    ]
+  },
+  "markup_hits": [],
+  "reload": {
+    "e901e539-9a29-4feb-bf1e-21735020836b": {
+      "http": 500,
+      "equal": false,
+      "compared": 0,
+      "diffs": []
+    }
+  },
+  "tools_used": [
+    "query_documents",
+    "search_documents"
+  ]
+}

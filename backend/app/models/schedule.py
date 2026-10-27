@@ -30,7 +30,7 @@ the same commit.
 from __future__ import annotations
 
 from datetime import datetime, timedelta
-from typing import Any
+from typing import Any, Literal
 from uuid import UUID
 from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 
@@ -226,3 +226,6 @@ class ScheduleTriggerResult(BaseModel):
     launched: bool
     workflow_run_id: UUID | None = None
     detail: str | None = None
+    # 296-02 (295-IN-05): which arm answered, so the panel can tone the line. Additive (None on an
+    # older backend). ``detail`` is a worded sentence for every non-launched outcome.
+    outcome: Literal["launched", "refused", "not_loaded", "error"] | None = None

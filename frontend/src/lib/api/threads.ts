@@ -10,7 +10,7 @@
  * count it is supposed to hold still (the 187-24 trap — measured here, not feared).
  */
 
-import type { AskUserAnswerBody, Citation, EmitFailure, EmitSubStep, Message, OutputFile, PendingAsk, SourceReference, TaskRunIndexItem, Thread, Todo, WorkspaceDiff, WorkspaceFile, WorkspaceFileContent, WorkspaceVersion } from "../../types"
+import type { AskUserAnswerBody, Citation, RunOrigin, EmitFailure, EmitSubStep, Message, OutputFile, PendingAsk, SourceReference, TaskRunIndexItem, Thread, Todo, WorkspaceDiff, WorkspaceFile, WorkspaceFileContent, WorkspaceVersion } from "../../types"
 import { API_BASE, ApiError, entitlementRefusalMessage, getAuthHeaders } from "./_core"
 import type { WorkflowDefinitionJSON } from "./knowledge"
 export async function listThreads(): Promise<Thread[]> {
@@ -427,8 +427,17 @@ export interface HandoffMarker {
  * Redis Stream run identifier the frontend opens GET /runs/{rid}/stream against.
  */
 export interface PostMessageResponse {
-  message_id: string
+  // 292.1 (D-12): `null` on the CONTINUED arm — a typed continue word resumed the EXISTING paused
+  // run, so no user message row exists. `run_id` is then that paused run's id.
+  message_id: string | null
   run_id: string
+  /** 292.1 (D-12): true when the server resumed the paused run instead of starting a new one. */
+  continued?: boolean
+  /** 292.1 UAT: on the continued arm, the run buffer's tail before the continuation spawned —
+   *  the offset the browser follows the SAME run from. Absent → follow nothing. */
+  stream_since?: string
+  continues_used?: number
+  continues_remaining?: number
   // Phase 095.1-07 (GAP-2): the already-resolved model/provider the backend
   // wrote to the runs row, surfaced ADDITIVELY on the dispatch response so the
   // live assistant placeholder shows `{provider} · {model}` in the LIVE moment
@@ -1626,6 +1635,8 @@ export interface ThreadWorkflowState {
   last_run_status?: string | null
   last_run_created_at?: string | null
   last_run_updated_at?: string | null
+  /** Phase 293 (D-24): how the LAST run started, as recorded; null when it was not. */
+  origin?: RunOrigin | null
   /** Phase 098-UAT run-honesty fix (B) — the run's durable per-phase status array
    *  (ordered by phase_index) from workflow_phases, so the reconcile floor can
    *  rebuild an HONEST timeline for a TERMINAL run instead of returning [] (which
@@ -1951,6 +1962,10 @@ export interface ContinueRunResult {
    *  frontend re-subscribes GET /runs/{producer_run_id}/stream. Absent on the Deep
    *  consume path (same run_id) and on a `refused` response. */
   producer_run_id?: string
+  /** 292.1 UAT — Deep only: the SAME run's buffer tail read before the continuation spawned
+   *  (`"0"` when it had expired). Follow `run_id` from here, never from 0: the buffer still holds
+   *  the paused segment and its `done`. Absent when Redis could not be read. */
+  stream_since?: string
   message?: string
   continues_used: number
   continues_remaining: number

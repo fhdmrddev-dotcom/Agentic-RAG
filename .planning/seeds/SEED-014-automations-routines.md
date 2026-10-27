@@ -3,7 +3,10 @@ seed_id: SEED-014
 title: Automations & Routines — scheduled, triggered, and reactive agent runs
 created: 2026-05-09
 planted_during: v2.5 close-out
-status: planted
+status: partially-answered
+partial: true
+status_note: "Partially answered (293-05 REG-06, 2026-10-25): scheduled runs (204), inbound key-started runs (293), and last / next run on the card (293). Still open: event-triggered runs and monitors."
+folded_into: "204, 293"
 priority: high
 relates_to:
   - SEED-002 (Skill Studio Milestone Prep) — automations are scheduled or triggered SKILL runs; Skill Studio is the natural foundation. **Do not plan automations as a separate primitive — plan them as a runtime mode for skills.**

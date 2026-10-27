@@ -1,0 +1,146 @@
+[
+ {
+  "row": "sc3",
+  "check": "11th start in one minute → 429 + Retry-After + the starts sentence",
+  "pass": true,
+  "calls": [
+   {
+    "n": 1,
+    "http": 201,
+    "body": {
+     "run_id": "9ba9f29e-a99e-463c-8499-f49cd31f35b2",
+     "status": "running"
+    },
+    "retry_after": null,
+    "t": 1792929978.88
+   },
+   {
+    "n": 2,
+    "http": 201,
+    "body": {
+     "run_id": "00abd367-cd98-44ed-b320-614e286b0514",
+     "status": "running"
+    },
+    "retry_after": null,
+    "t": 1792929991.8
+   },
+   {
+    "n": 3,
+    "http": 201,
+    "body": {
+     "run_id": "233aed3b-3555-42c8-99db-e0d1304298b7",
+     "status": "running"
+    },
+    "retry_after": null,
+    "t": 1792929983.7
+   },
+   {
+    "n": 4,
+    "http": 201,
+    "body": {
+     "run_id": "1d55c9ad-a87c-4fe6-95c8-4017550d2f1f",
+     "status": "running"
+    },
+    "retry_after": null,
+    "t": 1792929972.12
+   },
+   {
+    "n": 5,
+    "http": 201,
+    "body": {
+     "run_id": "443b0771-711c-4f71-ad83-4081ed65541a",
+     "status": "running"
+    },
+    "retry_after": null,
+    "t": 1792929990.43
+   },
+   {
+    "n": 6,
+    "http": 429,
+    "body": {
+     "detail": "Too many starts: this key may start 10 runs a minute. Try again in 57 seconds."
+    },
+    "retry_after": "57",
+    "t": 1792929966.87
+   },
+   {
+    "n": 7,
+    "http": 201,
+    "body": {
+     "run_id": "43d660a9-407f-46bc-913a-1d62104f7446",
+     "status": "running"
+    },
+    "retry_after": null,
+    "t": 1792929985.88
+   },
+   {
+    "n": 8,
+    "http": 201,
+    "body": {
+     "run_id": "fd02a9eb-027d-4d16-a54c-bfcce2b9b224",
+     "status": "running"
+    },
+    "retry_after": null,
+    "t": 1792929976.55
+   },
+   {
+    "n": 9,
+    "http": 201,
+    "body": {
+     "run_id": "9207a7cd-8a0b-45ea-858a-86b983719f5b",
+     "status": "running"
+    },
+    "retry_after": null,
+    "t": 1792929981.25
+   },
+   {
+    "n": 10,
+    "http": 201,
+    "body": {
+     "run_id": "c1cdc1d1-75a9-4272-9a9a-3b01564c4c3f",
+     "status": "running"
+    },
+    "retry_after": null,
+    "t": 1792929994.65
+   },
+   {
+    "n": 11,
+    "http": 201,
+    "body": {
+     "run_id": "a35b0330-1953-418d-8ef3-ee4cc6ad0529",
+     "status": "running"
+    },
+    "retry_after": null,
+    "t": 1792929987.38
+   }
+  ],
+  "same_window": true
+ },
+ {
+  "row": "sc3",
+  "check": "the window counter lives in Redis (shared by every worker process)",
+  "pass": true,
+  "redis_key": "apikey:rl:start:<key P id>:29882166",
+  "value": "11"
+ },
+ {
+  "row": "sc3",
+  "check": "every call wrote one audit row with key id + label (+ run), no secret",
+  "pass": true,
+  "rows_per_key": {
+   "A": 45,
+   "B": 4,
+   "C": 2,
+   "D": 2,
+   "P": 23
+  },
+  "actions": [
+   "api_key.create",
+   "api_key.read",
+   "api_key.refused",
+   "api_key.revoke",
+   "api_key.start"
+  ],
+  "leaks": []
+ }
+]

@@ -264,10 +264,26 @@ describe("295-10 / D-r1-02 — after an answer, the open tab follows the re-driv
       cb.onPhaseCompleted?.("research", 0)
       cb.onPhaseStarted?.({ phase: "wrap", phaseIndex: 1, phaseType: "llm_single" })
       cb.onPhaseCompleted?.("wrap", 1)
+    })
+    // 296 G-4 S3: `run_completed` now ends the segment and re-reads the server, which wrote
+    // `finish_run` and every step before it emitted the event — so the frame says so too.
+    frame = {
+      ...PAUSED_FRAME,
+      active_workflow_run_id: null,
+      locked: false,
+      lock_is_stale: false,
+      mode: "deep",
+      run_status: "completed",
+      phases: [
+        { phase_index: 0, slug: "research", status: "completed", phase_type: "llm_agent" },
+        { phase_index: 1, slug: "wrap", status: "completed", phase_type: "llm_single" },
+      ],
+    }
+    await act(async () => {
       cb.onRunCompleted?.("completed")
     })
 
-    expect(phaseStatuses()).toEqual(["research:done", "wrap:done"])
+    await waitFor(() => expect(phaseStatuses()).toEqual(["research:done", "wrap:done"]))
     // And no second thread was opened to get there.
     expect(useStreamsStore.getState().viewedThreadId).toBe(THREAD_ID)
   })
@@ -296,7 +312,12 @@ describe("295-10 / D-r1-02 — after an answer, the open tab follows the re-driv
     })
     await waitFor(() => expect(phaseStatuses()).toEqual(["research:done", "wrap:done"]))
     expect(useStreamsStore.getState().workflowRunStatusByThread.get(THREAD_ID)).toBe("completed")
-    expect(mockGetThreadWorkflow.mock.calls.length - before).toBe(1)
+    // 296-04 (BUG-261021-04 / -03) widened this from 1, deliberately: the terminal's phase read,
+    // then the thread reconcile's own lock read, then one more step read after that reconcile.
+    // Still bounded: a fixed three per end, never a loop.
+    await waitFor(() => expect(mockGetThreadWorkflow.mock.calls.length - before).toBe(3))
+    await drain()
+    expect(mockGetThreadWorkflow.mock.calls.length - before).toBe(3)
   })
 
   it("a pause that lands during the re-attached stream shows its card, answerable", async () => {
@@ -317,6 +338,134 @@ describe("295-10 / D-r1-02 — after an answer, the open tab follows the re-driv
     await user.click(screen.getByRole("radio", { name: "Approve this step" }))
     const send = screen.getByRole("button", { name: "Send Answer" }) as HTMLButtonElement
     expect(send.disabled).toBe(false)
+  })
+})
+
+/**
+ * Phase 296-04 (BUG-261021-04 + BUG-261021-03) — when the followed run ENDS, the chat shows the
+ * run's persisted final answer, and the step keeps its Unsourced mark, with no thread switch.
+ *
+ * The harness writes its answer as a persisted `messages` row, never as deltas to a placeholder,
+ * and the follow subscription targets the producer run id, which matches no message. So only a
+ * re-read of the thread puts the answer in the chat (D-v2.5-03), and before this fix only a
+ * thread switch performed one.
+ */
+const HARNESS_ANSWER = {
+  id: "m-harness-answer",
+  thread_id: THREAD_ID,
+  user_id: "user-1",
+  role: "assistant",
+  content: "Here is the summary the run wrote.",
+  created_at: "2026-10-26T00:00:00Z",
+  updated_at: "2026-10-26T00:00:00Z",
+  tool_calls: [],
+}
+
+const UNSOURCED = { continued_by: "Dev Person", at: "2026-10-26T00:00:00Z" }
+
+const COMPLETED_FRAME = {
+  ...PAUSED_FRAME,
+  active_workflow_run_id: null,
+  locked: false,
+  lock_is_stale: false,
+  mode: "deep",
+  run_status: "completed",
+  phases: [
+    { phase_index: 0, slug: "research", status: "completed", phase_type: "llm_agent" },
+    { phase_index: 1, slug: "wrap", status: "completed", phase_type: "llm_single" },
+  ],
+}
+
+async function followToTheEnd() {
+  await openPausedThread()
+  await answer("Continue without sources")
+  await waitFor(() => expect(streams.has(NEW_PRODUCER)).toBe(true))
+}
+
+const chatBucketIds = () =>
+  (useStreamsStore.getState().bucketsBySurface.get("chat")?.get(THREAD_ID) ?? []).map((m) => m.id)
+
+describe("296-04 — a followed run's end shows its answer and its marks without a reload", () => {
+  it("BUG-261021-04 — the viewed thread re-reads once at the end, and the persisted answer appears", async () => {
+    await followToTheEnd()
+    frame = COMPLETED_FRAME
+    mockGetSnapshot.mockResolvedValue({
+      messages: [HARNESS_ANSWER],
+      active_runs: [],
+      since_cursors: {},
+    })
+    const before = mockGetSnapshot.mock.calls.length
+    await act(async () => {
+      streams.get(NEW_PRODUCER)!.onTerminal?.("done")
+    })
+    await waitFor(() =>
+      expect(
+        mockGetSnapshot.mock.calls.length - before,
+        "the run ended in the viewed thread, but nothing re-read the thread, so its persisted " +
+          "answer stays missing until a thread switch",
+      ).toBeGreaterThanOrEqual(1),
+    )
+    await waitFor(() => expect(chatBucketIds()).toContain(HARNESS_ANSWER.id))
+  })
+
+  it("BUG-261021-04 (control) — a thread that is not viewed issues no extra thread read", async () => {
+    await followToTheEnd()
+    frame = COMPLETED_FRAME
+    act(() => {
+      useStreamsStore.setState({ viewedThreadId: "some-other-thread" })
+    })
+    const before = mockGetSnapshot.mock.calls.length
+    await act(async () => {
+      streams.get(NEW_PRODUCER)!.onTerminal?.("done")
+    })
+    await drain()
+    expect(mockGetSnapshot.mock.calls.length - before).toBe(0)
+  })
+
+  it("BUG-261021-03 — a step mark written just after the end is still read, with no reopen", async () => {
+    await followToTheEnd()
+    // Cause (ii), the race: the terminal's own phase read lands before the step row carries the
+    // mark. Every later read carries it, as a reopen does.
+    let reads = 0
+    const withMark = {
+      ...COMPLETED_FRAME,
+      phases: [
+        { phase_index: 0, slug: "research", status: "completed", phase_type: "llm_agent", unsourced: UNSOURCED },
+        { phase_index: 1, slug: "wrap", status: "completed", phase_type: "llm_single" },
+      ],
+    }
+    mockGetThreadWorkflow.mockImplementation(async () => {
+      reads += 1
+      return reads === 1 ? COMPLETED_FRAME : withMark
+    })
+    await act(async () => {
+      streams.get(NEW_PRODUCER)!.onTerminal?.("done")
+    })
+    await waitFor(() =>
+      expect(
+        (useStreamsStore.getState().phasesByThread.get(THREAD_ID) ?? [])[0]?.unsourced,
+        "the step lost its Unsourced mark in the tab that followed the run",
+      ).toEqual(UNSOURCED),
+    )
+  })
+
+  it("BUG-261021-03 (cause i refuted) — the terminal's own read carries the mark when the row has it", async () => {
+    await followToTheEnd()
+    frame = {
+      ...COMPLETED_FRAME,
+      phases: [
+        { phase_index: 0, slug: "research", status: "completed", phase_type: "llm_agent", unsourced: UNSOURCED },
+        { phase_index: 1, slug: "wrap", status: "completed", phase_type: "llm_single" },
+      ],
+    }
+    await act(async () => {
+      streams.get(NEW_PRODUCER)!.onTerminal?.("done")
+    })
+    await waitFor(() =>
+      expect((useStreamsStore.getState().phasesByThread.get(THREAD_ID) ?? [])[0]?.unsourced).toEqual(
+        UNSOURCED,
+      ),
+    )
   })
 })
 

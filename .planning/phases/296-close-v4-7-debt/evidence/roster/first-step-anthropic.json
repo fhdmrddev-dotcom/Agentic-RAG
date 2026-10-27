@@ -1,0 +1,18 @@
+{
+  "mode": "first-step",
+  "provider": "anthropic",
+  "model": "claude-opus-5-5",
+  "definition_id": "4d1e1e69-5924-44ce-a763-5b38eec1e108",
+  "thread_id": "b5899582-9823-4bb0-be9d-05ccdd01943e",
+  "send_http": 201,
+  "send": "{\"message_id\": \"3da8eaea-cf94-4158-af26-76ad831b6adb\", \"run_id\": \"e8b8c3e9-516c-4df2-833f-fdcabf6ddbe8\", \"model\": \"claude-opus-5-5\", \"provider\": \"anthropic\"}",
+  "workflow_run": {
+    "id": "0810d125-5bb8-4a8c-a664-3188244698c6",
+    "status": "completed",
+    "model": "claude-opus-5-5"
+  },
+  "first_step_status": "completed",
+  "first_step_output_preview": "{\"text\": \"Lisbon, the picturesque capital of Portugal, captivates visitors with its historic neighborhoods, iconic yellow trams, and stunning views from hilltop viewpoints overlooking the Tagus River.\"}",
+  "names_lisbon": true,
+  "verdict": "PASS"
+}

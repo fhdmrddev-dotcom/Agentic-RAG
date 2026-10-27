@@ -3041,7 +3041,7 @@ const BASELINE = {
   //     CARD'S OWN SOURCE. This asserts the two agree entry for entry, with a positive control
   //     proving the parser really sees six entries per map and a driven falsification proving
   //     a single changed utility is caught.
-  "runLogRow.test.ts": 21,
+  "runLogRow.test.ts": 24, // 293-03: 21 -> 24 (the origin sentence is the last atom; unrecorded and unknown compose as before)
   "RunLogPanel.test.tsx": 20,
   "runLogTone.mirror.test.ts": 10,
   // ── THE LAST TWO OF PHASE 200'S UNPINNED SUITES, pinned at their measured actuals ───────
@@ -3747,7 +3747,7 @@ const BASELINE = {
   // threw `ReferenceError`. A fence on the SHAPE of a call cannot see whether the call resolves;
   // only rendering the card and clicking the button can, which is what this suite does. Driven
   // RED against the unfixed component first.
-  "MessageItem.continueButton.test.tsx": 2,
+  "MessageItem.continueButton.test.tsx": 6, // RAISED 2 → 6 at 292.1-04 (292.1-03: the tool-use-limit sentence, Continuing…, disabled while continuing)
   // ── Phase 227 (227-01 / SC#5) — Chat run frame & message decomposition suites ──
   "MessageItem.cancelledRun.test.tsx": 8,
   "MessageItem.blockedNotice.test.tsx": 4,
@@ -3953,7 +3953,7 @@ const BASELINE = {
   // itself cap-paused stays locked. D6 asserts BOTH of SHELL-02's halves in ONE tree, which
   // is what the browser measured contradicting each other; cases 1 and 3 assert them in
   // separate trees and are therefore consistent with a product that never shows them together.
-  "ChatArea.capPausedComposer.test.tsx": 8,
+  "ChatArea.capPausedComposer.test.tsx": 9, // RAISED 8 → 9 at 292.1-04 (292.1-03: the typed-continue composer case)
   // ── Phase 244-13 (UAT gap G-1) — the run line a DEEP cap-pause must NOT draw ─────────
   // ⚠⚠ ADOPTED, NOT RE-BASELINED. This suite shipped at Phase 194.1 and has been in NEITHER
   // knob ever since: `grep -n "ThreadRunLineKickoff" scripts/vitest-count-gate.cjs` returned
@@ -3968,7 +3968,7 @@ const BASELINE = {
   // D4 the genuine harness run unharmed (D3's positive control) · D5b(a)/(b) the cap_paused
   // SSE inheriting the lock's mode rather than hard-coding "harness".
   // ⭐ Driven RED first — D1, D3, D5b(b) and D6 all failed on the shipped tree.
-  "ThreadRunLineKickoff.test.tsx": 10,
+  "ThreadRunLineKickoff.test.tsx": 13, // 293-03: 10 -> 13 (the origin line in the live and stopped states, silent when unrecorded)
   // ── Phase 244-08 (T-244-05-05 / OPEN-2) — the expired attachment TOMBSTONE ──────────
   // 5 cases, measured on a green run of the suite alone. BOTH KNOBS, SAME COMMIT.
   // ⭐ Driven RED first — 3 of the 5 failed on the shipped tree: `expected undefined to be
@@ -4320,7 +4320,7 @@ const BASELINE = {
   "RetentionHistory.test.tsx": 21, // RE-PINNED 18 → 21 at 275 G-4 re-look (OBS-R2a drop reasons) · RE-PINNED 17 → 18 at 275-REVIEW frontend fix pass · RE-PINNED 16 → 17 at 275-05 (delete_refused sentence, G-4 FAIL-1) · 275-04 — S5 receipt sentences, ✎ only on writes, no links (D-12/D-13), Show older pages by 50
   // 275-04 — adopted by FILE path in TARGETS (no `src/components/org` entry): the retired
   // locked-Retention fence is REPLACED by unlocked-tab + band-pulse cases (D-01, SEED-177), 9 → 11.
-  "OrgAdminShell.test.tsx": 12, // RE-PINNED 11 → 12 at 275-REVIEW frontend fix pass
+  "OrgAdminShell.test.tsx": 14, // RE-PINNED 12 → 14 at 293-04 (API keys tab last + pulse/audit door) · RE-PINNED 11 → 12 at 275-REVIEW frontend fix pass
   // Phase 282-02 — the one ask-draft home (FIX-07 / D-12): one draft per ask, GC on the ask slice, panel-home refcount, the global reset
   "askDraftStore.test.ts": 7,
   // Phase 282-02 — the D-15 fences: one input per pause across both homes, the pointer, the rail handoff, BUG-260828-07 reachability
@@ -4356,7 +4356,7 @@ const BASELINE = {
   // row-identity order), and 286-04 moved 307 lines out of that file. The other three SEED-222
   // suites (`PromptVariableChips`, `RunHero`, `nodeEffectBanner`) read no 286 file: still unpinned.
   "toolReadOnlyMap.test.ts": 7,
-  "automationFacts.test.ts": 11,
+  "automationFacts.test.ts": 19, // 293-03: 11 -> 19 (the next run time off the server instant: future, year, past, 24h, silent arms, unreadable, the card span, no browser maths)
   // ── Phase 289-05 (2026-10-19) — the suites plans 289-01..05 created, adopted in BOTH knobs ──
   // in one commit. Counts are the per-file actuals from a focused `--reporter=json` run at
   // `GSD_VITEST_MAX_WORKERS=2`, never hand-counted. The three `src/components/workflows` suites
@@ -4367,7 +4367,7 @@ const BASELINE = {
   "PendingAskStack.pausedRun.test.tsx": 15, // 295 D-r2-01 (2026-10-21): 14 -> 15 (a re-driven active run is live). 295-10 D-r1-01: 11 -> 14 (a 409 shows the server's words, re-reads on a paused run). 295-08 WR-04: 7 -> 11
   "PendingAskCard.paused.test.tsx": 6, // 289-REVIEW CR-02: 4 -> 6 (pending -> expired -> paused re-render, 404 stays terminal). 289-01 — the paused card keeps its answer control
   "StepEvidenceLine.test.tsx": 15, // 289-02 — the KB evidence line or nothing
-  "evidenceView.test.ts": 31, // 289-REVIEW WR-03: 29 -> 31 (final-attempt Checks fact, timed-out kind). 289-04 — payload to view-model, privacy applied twice
+  "evidenceView.test.ts": 34, // 293-03: 31 -> 34 (measured 33 at base; +1 the view carries the recorded origin). 289-REVIEW WR-03: 29 -> 31 (final-attempt Checks fact, timed-out kind). 289-04 — payload to view-model, privacy applied twice
   "RunEvidenceReport.test.tsx": 26, // 289-04 — the report by content, button sets, 404 screen
   "runDeepLink.test.ts": 12, // 289-04 — strict-UUID ?run= read/write/clear
   "runEvidence.test.ts": 3, // 289-04 — the client: encodeURIComponent, ApiError(status)
@@ -4385,6 +4385,35 @@ const BASELINE = {
   "WorkflowCanvas.team.test.tsx": 7, // 290-03: Steps | Team switch only with the team prop; keyboard reorder gated (F-6); run page passes none
   "stepLine.test.ts": 25, // 290-02 (VIS-04 / D-01, D-04): type-sentence chips in run order, first 3 + more, null at 0 steps
   "StepChipLine.test.tsx": 11, // 290-02 (VIS-04 / D-03): row-steps block, +N more / Show less, no title attribute
+  // ── Phase 292.1 — adopted, both knobs, same commit ── (292.1-04, 2026-10-24). Pinned at the measured
+  // passing counts (33 cases, 0 failing). FILE-LEVEL in TARGETS: none of `src/components/settings`,
+  // `src/lib` or `src/providers` has a bare-directory entry.
+  "AgentRoundLimits.test.tsx": 10, // 292.1-02 — the 2..50 round-cap leaf: own fetch/save, clamp on Save/blur, never sends 0
+  "continueWords.lockstep.test.ts": 17, // 292.1-03 — ?raw lockstep vs typed_continue.py + the shared continue-words fixture
+  "StreamsProvider.typedContinue.test.tsx": 6, // 292.1-03 — typed continue holds the optimistic turn; Continuing… set and cleared
+  "StreamsProvider.capPausedDone.test.tsx": 4, // 292.1 G-4 live fix (RED 97a50019f / GREEN 1397edfbb): a `done` after a live cap pause asks the server before clearing the Continue card
+  // ── Phase 293-04 (START-02) — adopted, both knobs, same commit. FILE-LEVEL in TARGETS for the
+  // `src/components/settings/apiKeys` suites (no `src/components/settings` directory entry);
+  // `launchFieldsTwin293.test.ts` sits under the `src/components/workflows` directory entry, pin only.
+  "apiKeyFacts.test.ts": 32, // 293-04 — wire → card facts: refused chips never read active, every reason code worded, raw code for an unknown one
+  "curlExamples.test.ts": 8, // 293-04 — the show-once curl: real base, bearer secret, declared fields in order, JSON + shell escaping
+  "ApiKeyLimits.test.tsx": 10, // 293-03 — the operator's per-key limits: load lock + Retry, changed fields only, clamps 1..60 / 10..600, adopt, SettingsPage wiring
+  "RunOriginLine.test.tsx": 6, // 293-03 — the origin leaf: nothing when absent/unknown, muted, hidden icon, one mount per run surface (src/components/workflows dir TARGET)
+  "runOriginVocabulary.test.ts": 11, // 293-03 — the six origin sentences, null for absent/unknown (D-23)
+  "apiKeyPrepick.test.ts": 6, // 293-04 — ⋯ menu pre-pick: sessionStorage read-once, only {workflowId, name}, never a secret
+  "apiKeysContract.test.ts": 3, // 293-04 — client wire types vs backend api_keys_contract.json, path by path
+  "launchFieldsTwin293.test.ts": 9, // 293-04 — launchInputFields vs launch_fields_cases.json (the server twin reads the same file)
+  "ApiKeysTab.test.tsx": 17, // 293-04 — member tab: load/fail/empty, draft rules, show-once secret never in storage/URL/DOM after save, pre-pick, re-fetched revoke
+  "ApiKeyCard.test.tsx": 8, // 293-04 — every state tag by rendered words, dashed refused chip + line, receipt, owner line, run links only with onOpenRun
+  "ApiKeyCallStrip.test.tsx": 5, // 293-04 — one tab stop, arrow keys, Enter/Space detail, bar name = detail sentence, read bars shorter
+  "RevokeApiKeySheet.test.tsx": 7, // 293-04 — focus on Keep it, Esc, Revoking… in flight, onDone only after the server, failure keeps it open, owner named
+  "OrgApiKeysTab.test.tsx": 7, // 293-04 — admin list: owner on every card, no New key, run links only on own keys, revoke names the owner then re-fetches and pulses
+  // 293-04 (SEED-287) — OrgAuditTab.test.tsx existed since 166 and was in NEITHER knob, so it ran
+  // nowhere the gate could see. Adopted at its measured count: 8 pre-existing + 1 unknown-code case
+  // + 7 api_key.* cases (5 labels, the API keys filter group, the ?raw lockstep with admin/AuditTab.tsx).
+  "OrgAuditTab.test.tsx": 16,
+  // 293-04 — under the `src/components/workflows` directory entry, so a pin only.
+  "WorkflowCardMenu.apiKey293.test.tsx": 4, // ⋯ New API key… under Schedules on owned published rows only, payload {id, name}; absent without onApiKey (seam286 pin unchanged)
 }
 
 // Still COMPUTED, never hand-written — the reduce is the single source, so the
@@ -6399,6 +6428,29 @@ const TARGETS = [
   // 289-REVIEW WR-05 — FILE-LEVEL (no `src/components/layout` directory entry), in the SAME
   // commit as its BASELINE pin.
   "src/components/layout/__tests__/ChatLayout.runDeepLink.test.tsx",
+  // ── Phase 292.1 — adopted, both knobs, same commit ── FILE-LEVEL (no `src/components/settings`,
+  // `src/lib` or `src/providers` directory entry), SAME commit as their BASELINE pins.
+  "src/components/settings/__tests__/AgentRoundLimits.test.tsx",
+  "src/lib/__tests__/continueWords.lockstep.test.ts",
+  "src/providers/__tests__/StreamsProvider.typedContinue.test.tsx",
+  // 292.1 G-4 live fix — FILE-LEVEL, SAME commit as its BASELINE pin (292.1-04 close-out).
+  "src/providers/__tests__/StreamsProvider.capPausedDone.test.tsx",
+  // ── Phase 293-04 — FILE-LEVEL (no `src/components/settings` directory entry), SAME commit as
+  // their BASELINE pins.
+  "src/components/settings/apiKeys/__tests__/apiKeyFacts.test.ts",
+  // 293-03 — FILE-LEVEL (no `src/components/settings` directory entry), SAME commit as its pin.
+  "src/components/settings/__tests__/ApiKeyLimits.test.tsx",
+  "src/components/settings/apiKeys/__tests__/curlExamples.test.ts",
+  "src/components/settings/apiKeys/__tests__/apiKeyPrepick.test.ts",
+  "src/components/settings/apiKeys/__tests__/apiKeysContract.test.ts",
+  "src/components/settings/apiKeys/__tests__/ApiKeysTab.test.tsx",
+  "src/components/settings/apiKeys/__tests__/ApiKeyCard.test.tsx",
+  "src/components/settings/apiKeys/__tests__/ApiKeyCallStrip.test.tsx",
+  "src/components/settings/apiKeys/__tests__/RevokeApiKeySheet.test.tsx",
+  // 293-04 — FILE-LEVEL (no `src/components/org` directory entry), SAME commit as its pin.
+  "src/components/org/OrgApiKeysTab.test.tsx",
+  // 293-04 (SEED-287) — FILE-LEVEL, SAME commit as its first-ever BASELINE pin.
+  "src/components/org/OrgAuditTab.test.tsx",
 ]
 
 const REPO_ROOT = path.resolve(__dirname, "..")

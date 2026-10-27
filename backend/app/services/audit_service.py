@@ -32,6 +32,8 @@ VALID_ACTION_TYPES = frozenset({
     "retention.hold.create", "retention.hold.update", "retention.hold.release",
     "retention.disposition.confirm", "retention.document.unarchive", "retention.document.keep",
     "folder.delete",
+    # Phase 293 (D-16 / lockstep with migration 215 CHECK) — API keys:
+    "api_key.create", "api_key.revoke", "api_key.start", "api_key.read", "api_key.refused",
 })
 
 

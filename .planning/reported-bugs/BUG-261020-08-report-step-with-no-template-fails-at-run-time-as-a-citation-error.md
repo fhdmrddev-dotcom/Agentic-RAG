@@ -4,12 +4,13 @@ title: A report step with no template bound fails at run time, reported as a cit
 reported: 2026-10-20
 surface: Agentic-RAG
 severity: minor
-status: folded
+status: closed
 affected_areas: [backend/harness, workflows/emit, workflows/authoring]
 folded_into: "295"
-verified_closed_by: null
+verified_closed_by: "295"
 related_seeds: [SEED-295, SEED-152]
 re_open_trigger: null
+fixed_by_commit: "3f23f1d81 (feat(295-02): refuse a missing template at publish and run start, RUN-02); closed by the 296-05 record flip"
 reproduces_on:
   branch: develop
   commit: 46c23fe00

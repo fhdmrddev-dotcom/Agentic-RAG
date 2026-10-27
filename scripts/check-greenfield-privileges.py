@@ -1166,6 +1166,32 @@ async def assert_named_cases(conn, log) -> list[str]:
                 "that ran it, and the bootstrap artifact re-opens it."
             )
 
+    # Migration 215 (Phase 293, T-293-02) — public.api_keys: owners read through a COLUMN grant
+    # that leaves key_hash out. Positive control first, for the same reason as connector_tokens:
+    # a key_hash refusal on an unreadable table would be green while proving nothing.
+    ok, detail = await _read_as_authenticated(conn, "SELECT id, label, key_prefix FROM public.api_keys LIMIT 1")
+    log(f"  [control ] SELECT id, label, key_prefix FROM public.api_keys as authenticated -> {detail}")
+    if not ok:
+        violations.append(
+            "[215 control] `authenticated` cannot read even the GRANTED columns of "
+            f"public.api_keys ({detail}). The key_hash refusal below would then be green for the "
+            "wrong reason, and the keys list would answer 42501 for every member."
+        )
+    ok, detail = await _read_as_authenticated(conn, "SELECT key_hash FROM public.api_keys LIMIT 1")
+    log(f"  [215     ] SELECT key_hash FROM public.api_keys as authenticated -> {detail}")
+    if ok:
+        violations.append(
+            "[215] `authenticated` CAN read public.api_keys.key_hash on a database bootstrapped "
+            "from supabase/full-schema.sql alone. Migration 215 grants SELECT on a column list "
+            "that never names key_hash; pg_dump --no-privileges cannot carry that, so the "
+            "supplement's migration-215 block must."
+        )
+    for priv in ("SELECT", "INSERT", "UPDATE", "DELETE"):
+        held = await conn.fetchval("SELECT has_table_privilege('anon', 'public.api_keys', $1)", priv)
+        log(f"  [215     ] has_table_privilege('anon', 'public.api_keys', {priv!r}) = {bool(held)}")
+        if held:
+            violations.append(f"[215] `anon` holds {priv} on public.api_keys on a greenfield bootstrap.")
+
     # The corroborating catalog half (never information_schema.column_privileges).
     relacl = await conn.fetchval(
         "SELECT coalesce(c.relacl::text, '(none)') FROM pg_class c "

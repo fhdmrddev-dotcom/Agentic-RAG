@@ -96,10 +96,13 @@ import {
   useStreamsStore,
   recordExpertReading,
   recordWorkflowRunStatus,
+  markContinuing,
+  clearContinuing,
   type SurfaceId,
   type StreamsState,
   type WorkflowLock,
 } from "@/stores/streamsStore"
+import { shouldTryTypedContinue } from "@/lib/continueWords" // 292.1 D-12 — client hint only
 import { liveStreamingRunIds, withoutLiveTwins } from "@/lib/liveRunTwin"
 import { makeThrottle, makeAccumulatingCoalescer } from "@/lib/throttle"
 import { writeSnapshotToLocalStorage } from "@/lib/streamsCache"
@@ -1277,7 +1280,10 @@ export function makeStreamCallbacks(opts: {
     //    (`:2343`). Both are harness-only, so an existing `"harness"` is evidence.
     //    ⛔ And it is the reachable half of WR-07: keeping `"harness"` here is what stops
     //    a harness run that caps from UNLOCKING the composer mid-run (`ChatArea.tsx:140`).
-    onCapPaused: (info) =>
+    onCapPaused: (info) => {
+      // 292.1 (D-14): a re-pause ends the Continue that was under way — the card leaves
+      // `Continuing…` and offers the next Continue.
+      clearContinuing(threadId)
       useStreamsStore.getState().actions.setWorkflowLockForThread(threadId, {
         runId: info.runId,
         mode:
@@ -1286,7 +1292,8 @@ export function makeStreamCallbacks(opts: {
             : "cap_paused",
         capPaused: true,
         continuesRemaining: info.continuesRemaining,
-      }),
+      })
+    },
     // ────────────────────────────────────────────────────────────────────────
     // Phase 094 Plan 02 (PANEL-08 / PANEL-09) — harness phase-lifecycle demux.
     // Each closes over the factory's `threadId` (the OWNING thread, Pitfall 6),
@@ -1602,6 +1609,10 @@ export function StreamsProvider({ children }: PropsWithChildren) {
   const subscribeProducerStreamRef = useRef<
     ((threadId: string, producerRunId: string) => void) | null
   >(null)
+  // 292.1 UAT: the Deep-Continue sibling of the closure above (installed beside it).
+  const subscribeContinuationStreamRef = useRef<
+    ((threadId: string, runId: string, since: string) => void) | null
+  >(null)
 
   // ── Phase 194.1 Plan 03 (R1 + R2 — D-05 / D-06 / D-07) — the two stop helpers ──
   //
@@ -1875,7 +1886,10 @@ export function StreamsProvider({ children }: PropsWithChildren) {
         lastEventAtRef.current.set(threadId, Date.now())
       }
       const originalOnTerminal = callbacks.onTerminal
+      let segmentEnded = false
       callbacks.onTerminal = (kind, errorPayload) => {
+        if (segmentEnded) return
+        segmentEnded = true
         // ⛔ Phase 243 (CHAT-02): drain the coalesced delta buffer BEFORE this wrapper
         // body runs. It reconciles / snapshots the message, and a flush that landed
         // afterwards would append the buffered tail onto replaced content.
@@ -1892,6 +1906,23 @@ export function StreamsProvider({ children }: PropsWithChildren) {
         // 295-10 (D-r1-02): the segment ended (done, failed, or paused again). One read so the
         // panel and the recorded run status match the server (D-v2.5-03), not the stream alone.
         refreshPhaseSpineAfterStop(threadId)
+        // 296-04 (BUG-261021-04 / -03): the harness answer is a persisted row this subscription
+        // never rendered, so re-read the viewed thread as a switch does; then read the steps once
+        // more, since a step mark (Unsourced) written just after the end missed the read above.
+        if (useStreamsStore.getState().viewedThreadId === threadId) {
+          void useStreamsStore.getState().actions.reconcile(threadId)
+            .then(() => refreshPhaseSpineAfterStop(threadId))
+            .catch((err) => console.warn("[StreamsProvider] follow terminal reconcile failed", err))
+        }
+      }
+      // 296 G-4 S3: the run's own end event ends the segment (as cap_paused does for a Deep
+      // continuation) — a re-drive stream written before its sentinel landed would otherwise
+      // hold the follow, and its reconcile above, until the server's consumer timeout.
+      const onRunCompleted = callbacks.onRunCompleted
+      callbacks.onRunCompleted = (status) => {
+        onRunCompleted?.(status)
+        callbacks.onTerminal("done")
+        controller.abort()
       }
       subscribeToRun(
         producerRunId,
@@ -1907,6 +1938,115 @@ export function StreamsProvider({ children }: PropsWithChildren) {
     }
     // expose to the reconcile action + the producer-resubscribe signal listener.
     subscribeProducerStreamRef.current = subscribeProducerStream
+
+    // 292.1 UAT (run 5549031c) — follow a DEEP Continue: the SAME run id, from the server's
+    // `stream_since`, into the assistant turn it continues. Without it nothing listened (the first
+    // segment's stream had ended with `done`) and the answer arrived all at once.
+    // ⚠ Never from "0": `run:{id}` still holds the first segment and its `done`, and the wire
+    // carries no ids, so a replay would re-render that segment and stop at its old terminal.
+    // ⚠ Same per-thread, idempotent, pool-gated shape as `subscribeProducerStream` above.
+    const subscribeContinuationStream = (threadId: string, runId: string, since: string) => {
+      if (!threadId || !runId) return
+      if (subscriptionsRef.current.has(runId)) return
+      if (!isThreadInStreamPool(threadId)) return
+      const surfaceId: SurfaceId = "chat"
+      const setMessages = setMessagesForBucketBound(surfaceId, threadId)
+      const turns = (useStreamsStore.getState().bucketsBySurface.get(surfaceId)?.get(threadId) ?? [])
+        .filter((m) => m.role === "assistant")
+      const turn = [...turns].reverse().find((m) => m.runId === runId) ?? turns[turns.length - 1]
+      const assistantId = turn?.id ?? runId
+      // The continuation numbers its iterations from 0 again; offset them past the turn's own, or
+      // onToolStart's replay guard (same name + same iteration) swallows a call the first segment
+      // also made. The resumed calls arrive before any iteration_start, so they take the base.
+      const iterationBase = Math.max(-1, ...(turn?.tool_calls ?? []).map((tc) => tc.iteration ?? -1)) + 1
+      const controller = new AbortController()
+      subscriptionsRef.current.set(runId, controller)
+      lastSeenOffsetRef.current.set(runId, since)
+      lastEventAtRef.current.set(threadId, Date.now())
+      useStreamsStore.setState((s) => ({
+        subscriptionsByThread: _addRunToThread(s.subscriptionsByThread, threadId, runId),
+        streamingThreads: new Set(s.streamingThreads).add(threadId),
+      }))
+      const setTurn = (patch: Partial<Message>) =>
+        setMessages((prev) => prev.map((m) => (m.id === assistantId ? { ...m, ...patch } : m)))
+      setTurn({ runStatus: "streaming" })
+      const callbacks = makeStreamCallbacks({ assistantId, threadId, setMessages })
+      const onIterationStart = callbacks.onIterationStart
+      onIterationStart?.(iterationBase)
+      callbacks.onIterationStart = (i) => onIterationStart?.(iterationBase + 1 + i)
+      // The first segment's text becomes narration once the continuation writes text: the move a
+      // turn boundary makes (BUG-260912-01), so `content` ends as the final answer, shown once.
+      let folded = false
+      const onDelta = callbacks.onDelta
+      callbacks.onDelta = (delta) => {
+        if (!folded) callbacks.onTurnBoundary?.()
+        folded = true
+        onDelta(delta)
+      }
+      callbacks.onCursor = (msId: string) => {
+        lastSeenOffsetRef.current.set(runId, msId)
+        lastEventAtRef.current.set(threadId, Date.now())
+      }
+      const endSegment = (patch: Partial<Message>) => {
+        callbacks.flushDeltas()
+        setTurn(patch)
+        subscriptionsRef.current.delete(runId)
+        lastEventAtRef.current.delete(threadId)
+        useStreamsStore.setState((s) => {
+          const streaming = new Set(s.streamingThreads)
+          streaming.delete(threadId)
+          return {
+            subscriptionsByThread: _removeRunFromThread(s.subscriptionsByThread, threadId, runId),
+            streamingThreads: streaming,
+          }
+        })
+      }
+      // A re-pause writes no terminal sentinel (the buffer just EXPIREs): the cap_paused event
+      // ends this segment. The shipped handler clears Continuing… and re-pauses the lock.
+      const onCapPaused = callbacks.onCapPaused
+      callbacks.onCapPaused = (info) => {
+        onCapPaused?.(info)
+        endSegment({ runStatus: "completed" })
+        controller.abort()
+      }
+      const originalOnTerminal = callbacks.onTerminal
+      callbacks.onTerminal = (kind, errorPayload) => {
+        endSegment(
+          kind === "done" || kind === "reader_done"
+            ? { runStatus: "completed" }
+            : kind === "error"
+              ? { runStatus: "failed", runError: errorPayload ?? undefined }
+              : { runStatus: kind, stopped: true, runError: errorPayload ?? undefined },
+        )
+        // The sendMessage terminal's rule: a `done` for the paused run asks the server (keep the
+        // card if it re-paused, clear it if it completed); any other end clears the lock.
+        // Continuing… ends with the segment either way (D-14), even where the lock is kept.
+        clearContinuing(threadId)
+        const lock = useStreamsStore.getState().workflowLockByThread.get(threadId)
+        if ((kind === "done" || kind === "reader_done") && lock?.capPaused && lock.runId === runId) {
+          useStreamsStore.getState().actions.releaseSettledWorkflowLock(threadId, { reattach: false })
+        } else {
+          useStreamsStore.getState().actions.clearWorkflowLockForThread(threadId)
+        }
+        // BUG-260707-03's settle, scoped to THIS turn's id: the persisted (clean) final answer.
+        if (kind === "done") {
+          getMessages(threadId)
+            .then((persisted) => {
+              const answer = persisted.find((m) => m.runId === runId && m.role === "assistant")
+              if (answer?.content) setTurn({ content: answer.content })
+            })
+            .catch(() => {})
+        }
+        originalOnTerminal(kind, errorPayload)
+      }
+      subscribeToRun(runId, since, callbacks, controller.signal).catch((err) => {
+        if (!(err instanceof Error && err.name === "AbortError")) {
+          console.error("continuation re-subscribe failed:", err)
+        }
+        subscriptionsRef.current.delete(runId)
+      })
+    }
+    subscribeContinuationStreamRef.current = subscribeContinuationStream
 
     useStreamsStore.setState({
       actions: {
@@ -2655,6 +2795,13 @@ export function StreamsProvider({ children }: PropsWithChildren) {
           }
           sendingThreadsRef.current.add(threadId)
 
+          // 292.1 (D-12 / D-14): a continue word on a Deep cap-pause is expected to RESUME the paused
+          // run, which has no user message and no new run — so the optimistic turn below is held
+          // back. The server decides: a normal 201 makes the turn late, `continued: true` keeps it out.
+          const typedContinue =
+            !opts?.workflowDefinitionId &&
+            shouldTryTypedContinue(useStreamsStore.getState().workflowLockByThread.get(threadId), content)
+
           // Optimistic user message.
           const userMsg: Message = {
             id: makeTempId(),
@@ -2665,10 +2812,6 @@ export function StreamsProvider({ children }: PropsWithChildren) {
             created_at: new Date().toISOString(),
             updated_at: new Date().toISOString(),
           }
-          useStreamsStore.getState().actions.setMessagesForBucket(surfaceId, threadId, (prev) => [
-            ...prev,
-            userMsg,
-          ])
 
           // Optimistic assistant placeholder.
           const assistantId = makeTempId()
@@ -2709,27 +2852,55 @@ export function StreamsProvider({ children }: PropsWithChildren) {
           // arms that are NOT harmless over an absent id — the 403 kill-switch and
           // the network-failure flip — are repaired in their own place below
           // (CONTEXT D-23); this gate would ship a NEW SILENCE without them.
-          if (!opts?.workflowDefinitionId) {
+          //
+          // 292.1 (D-14): the three optimistic writes (user bubble, assistant placeholder or harness
+          // mark, streamingThreads) live in ONE closure so a typed continue can hold them back and a
+          // 201 for a hinted word can make them late. Order and content are unchanged.
+          let optimisticInserted = false
+          const insertOptimisticTurn = () => {
+            optimisticInserted = true
             useStreamsStore.getState().actions.setMessagesForBucket(surfaceId, threadId, (prev) => [
               ...prev,
-              assistantMsg,
+              userMsg,
             ])
-          } else {
-            // The run's liveness, marked SYNCHRONOUSLY — in the same tick as the
-            // user-message insert and the `streamingThreads` add below, with ZERO
-            // round trips. R5's acceptance is "no interval showing a prompt with no
-            // run instrument"; a fetch-driven liveness signal would fail it by one
-            // kickoff RTT, and the shipped lock seed cannot serve here because it
-            // needs `run_id` back from the POST. Cleared by the SAME
-            // slice-transition subscription that clears the stopping slice.
+            if (!opts?.workflowDefinitionId) {
+              useStreamsStore.getState().actions.setMessagesForBucket(surfaceId, threadId, (prev) => [
+                ...prev,
+                assistantMsg,
+              ])
+            } else {
+              // The run's liveness, marked SYNCHRONOUSLY — in the same tick as the
+              // user-message insert and the `streamingThreads` add below, with ZERO
+              // round trips. R5's acceptance is "no interval showing a prompt with no
+              // run instrument"; a fetch-driven liveness signal would fail it by one
+              // kickoff RTT, and the shipped lock seed cannot serve here because it
+              // needs `run_id` back from the POST. Cleared by the SAME
+              // slice-transition subscription that clears the stopping slice.
+              // 296 G-4 #12 (d): the step slice belongs to the run being started, not the thread's
+              // previous run (whose `done` rows would read as this run's progress, and whose slugs
+              // make this run's phase_started a no-op in appendPhaseForThread).
+              useStreamsStore.setState((s) => {
+                const phases = new Map(s.phasesByThread)
+                phases.delete(threadId)
+                return {
+                  harnessKickoffThreads: new Set(s.harnessKickoffThreads).add(threadId),
+                  phasesByThread: phases,
+                }
+              })
+            }
+            // Plan 075.4-01 D-075.4-A1: per-thread streamingThreads.
             useStreamsStore.setState((s) => ({
-              harnessKickoffThreads: new Set(s.harnessKickoffThreads).add(threadId),
+              streamingThreads: new Set(s.streamingThreads).add(threadId),
             }))
           }
-          // Plan 075.4-01 D-075.4-A1: per-thread streamingThreads.
-          useStreamsStore.setState((s) => ({
-            streamingThreads: new Set(s.streamingThreads).add(threadId),
-          }))
+          if (!typedContinue) insertOptimisticTurn()
+          // 292.1-REVIEW WR-03: a hinted typed continue reads Continuing… from the moment it is sent,
+          // so the card's Continue button is not live during the POST (a press there would claim the
+          // same pause twice; the server's compare-and-set refuses the loser either way). Released
+          // below on a 201 or an error — and only if THIS send set it.
+          const continuingMarkedHere =
+            typedContinue && !useStreamsStore.getState().continuingThreads.has(threadId)
+          if (continuingMarkedHere) markContinuing(threadId)
           // Phase 145-05 (D-145-05): seed the watchdog activity clock at send.
           lastEventAtRef.current.set(threadId, Date.now())
 
@@ -2746,10 +2917,12 @@ export function StreamsProvider({ children }: PropsWithChildren) {
             // placeholder below so attribution shows in the LIVE moment, not only
             // after a reload re-reads them via the Plan-03 enrich SELECT.
             const {
-              message_id,
+              message_id: postedMessageId,
               run_id,
               model: resolvedModel,
               provider: resolvedProvider,
+              continued,
+              stream_since,
             } = await postMessage(threadId, content, {
               model: opts?.model,
               provider: opts?.provider,
@@ -2760,6 +2933,29 @@ export function StreamsProvider({ children }: PropsWithChildren) {
               // Phase 216 (CHAT-05 / CHAT-06): active connector IDs for this turn.
               activeConnectorIds: opts?.activeConnectorIds,
             })
+            // 292.1 (D-12 / D-14): the server RESUMED the paused run — exactly what the Continue
+            // button does. No user row and no new run, so: mark Continuing…, drop any optimistic turn
+            // this call made (un-hinted text the server read as a continue word: no ghost bubble),
+            // and leave through the `finally`.
+            // ⚠ 292.1 UAT (run 5549031c): this used to say "the open stream of that run carries on".
+            // It does not — the first segment's stream ended with `done`. Follow the SAME run from
+            // `stream_since`, as the button does; queued so the `finally` below runs first and
+            // cannot clear the streaming mark the follow sets.
+            if (continued === true) {
+              markContinuing(threadId)
+              useStreamsStore.getState().actions.setMessagesForBucket(surfaceId, threadId, (prev) =>
+                prev.filter((m) => m.id !== assistantId && m.id !== userMsg.id),
+              )
+              if (stream_since != null) {
+                queueMicrotask(() => subscribeContinuationStream(threadId, run_id, stream_since))
+              }
+              return
+            }
+            // 292.1 (D-15 / D-16): a hinted word the server sent as a NEW message — the turn, late.
+            if (continuingMarkedHere) clearContinuing(threadId)
+            if (!optimisticInserted) insertOptimisticTurn()
+            // Only the continued arm carries a null id; a 201 always names the user row.
+            const message_id = postedMessageId ?? userMsg.id
             registeredRunId = run_id
 
             // Phase 092 (092-06 / F3 — SC#3): seed the per-thread workflow lock
@@ -3012,7 +3208,18 @@ export function StreamsProvider({ children }: PropsWithChildren) {
               // cap_paused is NON-terminal and is delivered via onCapPaused, NOT
               // onTerminal — so the lock survives a pause and only clears here on
               // a real terminal (done / error / timed_out / cancelled / reader_done).
-              useStreamsStore.getState().actions.clearWorkflowLockForThread(threadId)
+              // ⚠ 292.1 G-4 (lived UAT 2026-10-24): EXCEPT a `done` for the run this thread's lock
+              // holds as cap-paused. A first-turn pause finalizes the run `completed` BY DESIGN (the
+              // pause lives in the carrier row) and ends this stream with `done` — clearing here
+              // removed the Continue card a reload then brought back. Ask the server instead
+              // (D-v2.5-03) through the shipped settle read: it keeps the lock while the server
+              // reports `cap_paused`, and clears exactly as below when it does not.
+              const terminalLock = useStreamsStore.getState().workflowLockByThread.get(threadId)
+              if (kind === "done" && terminalLock?.capPaused && terminalLock.runId === registeredRunId) {
+                useStreamsStore.getState().actions.releaseSettledWorkflowLock(threadId, { reattach: false })
+              } else {
+                useStreamsStore.getState().actions.clearWorkflowLockForThread(threadId)
+              }
               // Pitfall 8: TTL-expired buffer fallback.
               if (errorPayload === "buffer_expired") {
                 useStreamsStore
@@ -3021,6 +3228,14 @@ export function StreamsProvider({ children }: PropsWithChildren) {
                   .catch(console.error)
               }
               originalOnTerminal(kind, errorPayload)
+              // 296 G-4 #12: a harness kickoff has no assistant node (R5 above), so its answer is a
+              // persisted row this follow never rendered. Re-read the viewed thread, as the
+              // subscribeProducerStream terminal does (296-04).
+              if (opts?.workflowDefinitionId && useStreamsStore.getState().viewedThreadId === threadId) {
+                void useStreamsStore.getState().actions.reconcile(threadId, surfaceId)
+                  .then(() => refreshPhaseSpineAfterStop(threadId))
+                  .catch((err) => console.warn("[StreamsProvider] kickoff terminal reconcile failed", err))
+              }
             }
 
             // Phase 063.1 (D-063.1-01/02 / Gap-004): cursor advancement.
@@ -3037,6 +3252,10 @@ export function StreamsProvider({ children }: PropsWithChildren) {
               await subscribeToRun(run_id, "0", callbacks, controller.signal)
             }
           } catch (err) {
+            // 292.1: a held-back typed continue that FAILED is put back first, so every arm below
+            // (rollback + draft restore, failure receipt) sees exactly the turn it always saw.
+            if (continuingMarkedHere) clearContinuing(threadId)
+            if (!optimisticInserted) insertOptimisticTurn()
             if (err instanceof Error && err.name === "AbortError") {
               // Caller-initiated abort.
             } else if (
@@ -3115,9 +3334,13 @@ export function StreamsProvider({ children }: PropsWithChildren) {
               useStreamsStore.getState().actions.setMessagesForBucket(surfaceId, threadId, (prev) =>
                 prev.filter((m) => m.id !== assistantId && m.id !== userMsg.id),
               )
+              // 296 review FE-CR-01: a workflow kickoff's text is not the person's — never stash it
+              // (the composer would show `Run <name>` before the starter hook could clear it).
               useStreamsStore.setState((s) => ({
                 reconcileErrors: new Map(s.reconcileErrors).set(threadId, err),
-                failedSendDrafts: new Map(s.failedSendDrafts).set(threadId, content),
+                ...(opts?.workflowDefinitionId
+                  ? {}
+                  : { failedSendDrafts: new Map(s.failedSendDrafts).set(threadId, content) }),
               }))
             } else {
               // genuine network / non-HTTP failure — unchanged swallow-to-failed-placeholder.
@@ -3646,9 +3869,16 @@ export function StreamsProvider({ children }: PropsWithChildren) {
             workflowLockByThread: _setWorkflowLock(s.workflowLockByThread, threadId, lock),
           })),
         clearWorkflowLockForThread: (threadId) =>
-          useStreamsStore.setState((s) => ({
-            workflowLockByThread: _clearWorkflowLock(s.workflowLockByThread, threadId),
-          })),
+          useStreamsStore.setState((s) => {
+            // 292.1 (D-14): every terminal site clears the lock through here, so the
+            // `Continuing…` mark ends with it — in the SAME write.
+            const continuing = new Set(s.continuingThreads)
+            continuing.delete(threadId)
+            return {
+              workflowLockByThread: _clearWorkflowLock(s.workflowLockByThread, threadId),
+              continuingThreads: continuing,
+            }
+          }),
         // ── Phase 244-15 (SHELL-03 / UAT gap G-8) — THE SETTLE PATH. IT RELEASES ONLY. ──
         //
         // ⛔ THIS IS DELIBERATELY NOT A SEVENTH `setWorkflowLockForThread` WRITER, and that
@@ -3679,7 +3909,7 @@ export function StreamsProvider({ children }: PropsWithChildren) {
         // `ThreadRunLine.tsx`'s D-11 rule binds: WorkflowRunPage already owns the polling
         // concern. Fenced (with the no-seventh-writer rule) by
         // `__tests__/providers/streamsProvider_244_settle_ask.test.tsx` Test 8.
-        releaseSettledWorkflowLock: (threadId) => {
+        releaseSettledWorkflowLock: (threadId, opts) => {
           if (!threadId) return
           // ── WR-01 (gap-closure round 2): THIS PATH OWNS ONE FACT AND TOUCHES NOTHING ELSE ──
           //
@@ -3743,7 +3973,9 @@ export function StreamsProvider({ children }: PropsWithChildren) {
               // `subscribeProducerStream`'s docblock.
               // This is what lets the SHIPPED terminal handler clear the lock when the run
               // really ends, instead of this path inventing a second terminal route.
-              if (wf.latest_producer_run_id) {
+              // 292.1 G-4: not for the sendMessage terminal's caller — its run just ENDED its own
+              // stream, and re-attaching that finished run would open a stream for nothing.
+              if (wf.latest_producer_run_id && opts?.reattach !== false) {
                 subscribeProducerStreamRef.current?.(threadId, wf.latest_producer_run_id)
               }
               return
@@ -4150,7 +4382,9 @@ export function StreamsProvider({ children }: PropsWithChildren) {
   // Point the per-thread lock at the fresh id AND re-subscribe its live stream
   // (per-thread keyed; idempotent — won't double-subscribe).
   useEffect(() => {
-    const unsubscribe = subscribeProducerResubscribe(({ threadId, producerRunId }) => {
+    const unsubscribe = subscribeProducerResubscribe(({ threadId, producerRunId, since }) => {
+      // 292.1 UAT: a Deep Continue keeps its run id, so there is nothing to re-key.
+      if (since !== undefined) return subscribeContinuationStreamRef.current?.(threadId, producerRunId, since)
       const actions = useStreamsStore.getState().actions
       const existing = useStreamsStore.getState().workflowLockByThread.get(threadId)
       if (existing) {

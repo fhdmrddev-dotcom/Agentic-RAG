@@ -108,6 +108,15 @@ describe("DiagramArtifact — structure", () => {
     for (const l of labels) expect(l).toHaveAttribute("aria-hidden", "true")
   })
 
+  it("296-04 (292-IN-03): a clamped node label carries its full text in title", () => {
+    render(<DiagramArtifact record={rec(diagramInvoice)} />)
+    for (const n of screen.getAllByTestId("diagram-node")) {
+      const label = n.querySelector("span.line-clamp-4") as HTMLElement
+      expect(label).not.toBeNull()
+      expect(label.getAttribute("title")).toBe(label.textContent)
+    }
+  })
+
   it("292-REVIEW WR-04: edge labels are bounded, truncated with a title, and painted after the nodes", () => {
     const { container } = render(<DiagramArtifact record={rec(diagramInvoice)} />)
     const labels = screen.getAllByTestId("diagram-edge-label")

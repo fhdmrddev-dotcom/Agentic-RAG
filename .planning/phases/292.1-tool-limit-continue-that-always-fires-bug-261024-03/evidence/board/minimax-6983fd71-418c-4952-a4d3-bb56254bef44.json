@@ -1,0 +1,134 @@
+{
+  "entry": {
+    "provider": "minimax",
+    "model": "MiniMax-M3",
+    "calling_mode": "NATIVE",
+    "required": true,
+    "extra": null,
+    "forced_from": null
+  },
+  "prompt": "Do these three steps one at a time, each as its own tool call, and wait for each result before the next: 1) search our documents for the project plan; 2) search our documents again for its milestones; 3) use Python (execute_code) to draw a bar chart of milestones per quarter. Do not skip a step and do not combine steps.",
+  "attempts": [
+    {
+      "thread_id": "39e39cea-a8f8-43fd-bd02-e583add910ed",
+      "run_id": "6983fd71-418c-4952-a4d3-bb56254bef44",
+      "status": "completed",
+      "paused": true,
+      "run": {
+        "run_id": "6983fd71-418c-4952-a4d3-bb56254bef44",
+        "thread_id": "39e39cea-a8f8-43fd-bd02-e583add910ed",
+        "status": "completed",
+        "model": "MiniMax-M3",
+        "provider": "minimax",
+        "continues_used": 0,
+        "started_at": "2026-10-24 09:10:09.487681+00:00",
+        "error": null
+      },
+      "classification": "structured-pause",
+      "carrier": [
+        {
+          "kind": "iteration_cap_paused",
+          "name": "search_documents",
+          "arguments": "{\"query\":\"milestones\"}",
+          "tool_call_id": "call-a94004ac-8f81-419a-812e-e25f8d9300b2",
+          "reasoning_content": "\nStep 1 done. Now step 2: search for milestones.\n"
+        }
+      ],
+      "tool_starts": [
+        "search_documents"
+      ],
+      "event_types": [
+        "cap_paused",
+        "citations",
+        "confidence",
+        "delta",
+        "done",
+        "iteration_start",
+        "planning",
+        "reasoning_delta",
+        "sources",
+        "stream_end",
+        "suggestions",
+        "tool_end",
+        "tool_preparing",
+        "tool_start",
+        "turn_boundary"
+      ],
+      "cap_paused_event": {
+        "type": "cap_paused",
+        "kind": "iteration_cap_paused",
+        "message": "\u23f8 Reached the iteration limit \u2014 1 tool(s) weren't run yet. Continue to run them.",
+        "tool_names": [
+          "search_documents"
+        ],
+        "continues_used": 0,
+        "continues_remaining": 3
+      },
+      "live_markup_at": null,
+      "live_preview": "I'll start with step 1 \u2014 searching the documents for the project plan.\n\nStep 1 found two candidate documents. Now step 2 \u2014 searching for milestones.",
+      "redis_last_id": "1792833022914-0"
+    }
+  ],
+  "paused": true,
+  "continue": {
+    "http": 200,
+    "body": {
+      "status": "ok",
+      "run_id": "6983fd71-418c-4952-a4d3-bb56254bef44",
+      "continues_used": 1,
+      "continues_remaining": 2
+    },
+    "status_after": "completed",
+    "same_run_id": true,
+    "continues_used_before": 0,
+    "continues_used_after": 1,
+    "continues_used_plus_1": true,
+    "model_provider_unchanged": true,
+    "model_provider": [
+      "MiniMax-M3",
+      "minimax"
+    ],
+    "tool_starts_after_resume": [
+      "search_documents",
+      "execute_code"
+    ],
+    "carrier_first_call": "search_documents",
+    "queued_call_ran_first": true,
+    "events_after_resume": [
+      "citations",
+      "code_executing",
+      "code_execution_complete",
+      "code_execution_start",
+      "code_stdout",
+      "confidence",
+      "delta",
+      "done",
+      "final_output_files",
+      "iteration_start",
+      "planning",
+      "reasoning_delta",
+      "sources",
+      "stream_end",
+      "suggestions",
+      "tool_args_progress",
+      "tool_end",
+      "tool_preparing",
+      "tool_start",
+      "turn_boundary"
+    ]
+  },
+  "markup_hits": [],
+  "reload": {
+    "39e39cea-a8f8-43fd-bd02-e583add910ed": {
+      "http": 200,
+      "equal": true,
+      "compared": 2,
+      "diffs": [],
+      "db_rows_not_in_reload": []
+    }
+  },
+  "tools_used": [
+    "execute_code",
+    "search_documents"
+  ]
+}

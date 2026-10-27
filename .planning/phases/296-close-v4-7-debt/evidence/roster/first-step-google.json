@@ -1,0 +1,18 @@
+{
+  "mode": "first-step",
+  "provider": "google",
+  "model": "gemini-3.8-flash",
+  "definition_id": "8fa5b3ad-f145-4856-aeba-e94371f98fa2",
+  "thread_id": "92e6e276-fdb6-46db-9a1c-068432693ab3",
+  "send_http": 201,
+  "send": "{\"message_id\": \"bd93cdf9-56ae-4f33-bd3f-5a2b933ce7dd\", \"run_id\": \"00944e05-c174-4b14-a9bd-735361dfc004\", \"model\": \"gemini-3.8-flash\", \"provider\": \"google\"}",
+  "workflow_run": {
+    "id": "c9b3a2c6-1e99-4b87-b5bd-fd2df7f020f5",
+    "status": "completed",
+    "model": "gemini-3.8-flash"
+  },
+  "first_step_status": "completed",
+  "first_step_output_preview": "{\"text\": \"As Portugal\\u2019s vibrant coastal capital, Lisbon enchants visitors with its hilly cobblestone streets, iconic yellow trams, and soulful Fado music echoing through historic neighborhoods.\"}",
+  "names_lisbon": true,
+  "verdict": "PASS"
+}

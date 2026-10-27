@@ -118,6 +118,13 @@ class _Pool:
 class _Redis:
     def __init__(self):
         self.kv: dict[str, str] = {}
+        self.store: dict[str, str] = {}  # 296-01: the per-user limiter's INCR counters
+
+    def pipeline(self, transaction=True):
+        # 296-01 (SEED-365): POST now counts the call first (rate_limit.hit, INCR + EXPIRE).
+        from tests.unit.phase293_inbound_fakes import FakePipeline
+
+        return FakePipeline(self)
 
     async def set(self, key, value, nx=False, ex=None):
         if nx and key in self.kv:

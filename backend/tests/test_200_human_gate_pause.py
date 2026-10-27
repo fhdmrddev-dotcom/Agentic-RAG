@@ -353,11 +353,20 @@ def test_no_twenty_fifth_audit_kind_was_added():
     Postgres 23514 mid-run, which is precisely what that set exists to prevent
     (BUG-260731-02). `policy_applied` is Phase 196's recorded precedent for this exact
     situation, and `metadata.policy` names the event so the ledger row is unambiguous.
+
+    ⚠ RE-DERIVED at 296-05 (289-T-1): 24 → 25. The 25th kind is ``circuit_breaker_tripped``,
+    added by Phase 204 Plan 02 (``daf6c123b``, 2026-08-24, migration 125 in the same commit),
+    five days after this pin was written (``613814426``, 2026-08-19). Found with
+    ``git log -S '"circuit_breaker_tripped",' -- backend/app/db/workflows.py``. It is the
+    spend-cap / wall-clock trip, a deliberate kind with its own migration — not a
+    ``run_paused`` kind, which is what this fence exists to stop — so the literal is bumped.
+    This file sits outside ``tests/unit``, which is why the red went unseen from 204 to 296.
     """
     from app.db.workflows import _AUDIT_EVENT_TYPES
 
     assert "run_paused" not in _AUDIT_EVENT_TYPES
-    assert len(_AUDIT_EVENT_TYPES) == 24
+    assert "circuit_breaker_tripped" in _AUDIT_EVENT_TYPES  # the 25th, named
+    assert len(_AUDIT_EVENT_TYPES) == 25
     assert "policy_applied" in _AUDIT_EVENT_TYPES
 
 
@@ -617,9 +626,12 @@ async def test_the_executor_consumes_the_durable_answer_instead_of_re_asking():
 async def test_without_the_flag_the_executor_takes_the_shipped_ask_path():
     """No flag ⇒ no consume ⇒ the shipped ask path, unchanged.
 
-    The boot sweep does NOT set the flag, so this is also the proof that the 096-09
+    ~~The boot sweep does NOT set the flag, so this is also the proof that the 096-09
     restart contract is untouched: `resume_pending_prompt` still re-subscribes and
-    re-emits the SAME prompt there, exactly as it did.
+    re-emits the SAME prompt there, exactly as it did.~~ CORRECTED 296-02 (BUG-261025-03):
+    that sweep branch was dead (the real row carries no type), so every boot re-asked. The
+    sweep now pauses an unanswered human step and SETS this flag for an answered one. What
+    this test still proves is unchanged: no flag means the shipped ask path.
     """
     from unittest.mock import AsyncMock, patch
 

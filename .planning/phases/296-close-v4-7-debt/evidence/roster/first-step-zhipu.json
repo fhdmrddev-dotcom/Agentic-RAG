@@ -1,0 +1,18 @@
+{
+  "mode": "first-step",
+  "provider": "zhipu",
+  "model": "glm-5.3-flash",
+  "definition_id": "c2569f9a-688b-4884-a507-f1cb4613101f",
+  "thread_id": "3a486526-fd24-4788-a3ec-59f39260f8f6",
+  "send_http": 201,
+  "send": "{\"message_id\": \"d2e9fdcf-35e1-42c2-980a-a250485441e8\", \"run_id\": \"40982142-49ef-4b3f-8323-717be3e25e05\", \"model\": \"glm-5.3-flash\", \"provider\": \"zhipu\"}",
+  "workflow_run": {
+    "id": "4ee13c2f-202d-4704-adc8-589077deec28",
+    "status": "completed",
+    "model": "glm-5.3-flash"
+  },
+  "first_step_status": "completed",
+  "first_step_output_preview": "{\"text\": \"Lisbon, the hilly coastal capital of Portugal, enchants visitors with its historic yellow trams, warm pastel de nata, and sweeping views of the Tagus River.\"}",
+  "names_lisbon": true,
+  "verdict": "PASS"
+}

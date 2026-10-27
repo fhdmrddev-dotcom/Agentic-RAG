@@ -4,12 +4,13 @@ title: Moonshot (kimi-k2.6) rejects the workflow-drafting tool schema, so no wor
 reported: 2026-10-24
 surface: Agentic-RAG
 severity: major
-status: open
+status: folded
 affected_areas: [backend/workflow-authoring, provider/moonshot]
-folded_into: null
+folded_into: "296"
 verified_closed_by: null
 related_seeds: [SEED-327]
-re_open_trigger: null
+re_open_trigger: "Moonshot account reinstated (today: HTTP 429 account suspended for insufficient balance, probed live 2026-10-27) -> run backend/venv/Scripts/python.exe scripts/run-296-board.py --pinned-emit --pin none --providers moonshot (and --first-step) and close on a PASS."
+fixed_by_commit: "296-06: RED fab31d6a8, GREEN c2a8f6ace (provider_gateway/schema_moonshot.py inline_refs + moonshot_tools, applied only on a moonshot ENDPOINT; identity for every other provider). Unit evidence: backend/tests/unit/test_296_moonshot_schema.py. Live row blocked."
 reproduces_on:
   branch: develop
   commit: e03c3c88e

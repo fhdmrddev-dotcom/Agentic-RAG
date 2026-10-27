@@ -12,6 +12,7 @@ const api = vi.hoisted(() => ({ getCitationChecks: vi.fn(), runCitationCheck: vi
 vi.mock("@/lib/api/citationChecks", () => api)
 
 import { CitationCheckAction } from "../CitationCheckAction"
+import { useCitationCheckStore } from "@/stores/citationCheckStore"
 import type { CitationCheckResult, CitationCheckAvailability } from "@/lib/api/citationChecks"
 
 const RESULT: CitationCheckResult = {
@@ -55,7 +56,9 @@ describe("CitationCheckAction", () => {
     expect(api.getCitationChecks.mock.calls[0][0]).toEqual(["m1"])
   })
 
-  it("available → 'Check citations · Jev'; click → 'Checking 3 citations…' disabled; never runs by itself", async () => {
+  // 296-04 (294-IN-08) REWRITTEN IN PLACE: the count is the answer's SOURCES (citations.length),
+  // so the word is "sources". It read `/Checking 3 citations…/`.
+  it("available → 'Check citations · Jev'; click → 'Checking 3 sources…' disabled; never runs by itself", async () => {
     serve({ available: true, engine: "jev", reason: null })
     let resolve: (r: CitationCheckResult) => void = () => {}
     api.runCitationCheck.mockReturnValue(new Promise<CitationCheckResult>((r) => (resolve = r)))
@@ -63,7 +66,7 @@ describe("CitationCheckAction", () => {
     const btn = await screen.findByRole("button", { name: "Check citations · Jev" })
     expect(api.runCitationCheck).not.toHaveBeenCalled()
     fireEvent.click(btn)
-    const busy = await screen.findByRole("button", { name: /Checking 3 citations…/ })
+    const busy = await screen.findByRole("button", { name: /Checking 3 sources…/ })
     expect(busy).toBeDisabled()
     expect(api.runCitationCheck).toHaveBeenCalledWith("m1")
     await act(async () => resolve(RESULT))
@@ -147,5 +150,99 @@ describe("CitationCheckAction", () => {
     expect(pills).toEqual(["✓ 1 supported", "✕ 1 contradicted", "? 1 couldn't check"])
     expect(screen.getByText(/checked by Jev · saved with this answer/)).toBeInTheDocument()
     expect(screen.queryByText("The check didn't finish. Try again.")).toBeNull()
+  })
+})
+
+describe("CitationCheckAction — 296-04 (294-IN-06 / 294-IN-08 / SEED-365)", () => {
+  it("one source reads 'Checking 1 source…' (singular)", async () => {
+    serve({ available: true, engine: "jev", reason: null })
+    api.runCitationCheck.mockReturnValue(new Promise(() => {}))
+    render(<CitationCheckAction messageId="m1" citationCount={1} />)
+    fireEvent.click(await screen.findByRole("button", { name: "Check citations · Jev" }))
+    expect(await screen.findByRole("button", { name: /Checking 1 source…/ })).toBeDisabled()
+  })
+
+  it("a 429 rate_limited reads the rate sentence in the message's error slot", async () => {
+    serve({ available: true, engine: "jev", reason: null })
+    api.runCitationCheck.mockRejectedValue(Object.assign(new Error("429"), { status: 429, reason: "rate_limited" }))
+    render(<CitationCheckAction messageId="m1" citationCount={3} />)
+    fireEvent.click(await screen.findByRole("button", { name: "Check citations · Jev" }))
+    expect(
+      await screen.findByText("You've run a lot of checks just now. Try again in a minute."),
+    ).toBeInTheDocument()
+  })
+
+  it("a 429 with no readable reason still reads the rate sentence (status alone)", async () => {
+    serve({ available: true, engine: "jev", reason: null })
+    api.runCitationCheck.mockRejectedValue(Object.assign(new Error("429"), { status: 429, reason: null }))
+    render(<CitationCheckAction messageId="m1" citationCount={3} />)
+    fireEvent.click(await screen.findByRole("button", { name: "Check citations · Jev" }))
+    expect(
+      await screen.findByText("You've run a lot of checks just now. Try again in a minute."),
+    ).toBeInTheDocument()
+  })
+
+  it.each([
+    ["off", "Citation check is off while reranking is off."],
+    ["key_missing", "Citation check can't run: no saved OpenRouter key (Settings → Reranking)."],
+    ["engine_reorders_only", "Citation check needs Jev or OpenAI Decisions (Settings → Reranking)."],
+  ])("a 409 %s updates the shared availability, so every message shows the reason line", async (reason, line) => {
+    serve({ available: true, engine: "jev", reason: null })
+    api.runCitationCheck.mockRejectedValue(Object.assign(new Error("409"), { status: 409, reason }))
+    render(
+      <>
+        <CitationCheckAction messageId="m1" citationCount={3} />
+        <CitationCheckAction messageId="m2" citationCount={2} />
+      </>,
+    )
+    const buttons = await screen.findAllByRole("button", { name: "Check citations · Jev" })
+    expect(buttons).toHaveLength(2)
+    fireEvent.click(buttons[0])
+    await waitFor(() => expect(screen.getAllByText(line).length).toBeGreaterThanOrEqual(2))
+    expect(screen.queryByRole("button", { name: "Check citations · Jev" })).toBeNull()
+  })
+
+  // 296 review FE-WR-03: the asking message showed the reason TWICE — once as the shared ⓘ line
+  // and once as its own red error line (`checkErrorLine` maps the same codes to the same words).
+  it.each([
+    ["off", "Citation check is off while reranking is off."],
+    ["key_missing", "Citation check can't run: no saved OpenRouter key (Settings → Reranking)."],
+    ["engine_reorders_only", "Citation check needs Jev or OpenAI Decisions (Settings → Reranking)."],
+  ])("a 409 %s shows the reason ONCE per message, the asking one included", async (reason, line) => {
+    serve({ available: true, engine: "jev", reason: null })
+    api.runCitationCheck.mockRejectedValue(Object.assign(new Error("409"), { status: 409, reason }))
+    render(
+      <>
+        <CitationCheckAction messageId="m1" citationCount={3} />
+        <CitationCheckAction messageId="m2" citationCount={2} />
+      </>,
+    )
+    const buttons = await screen.findAllByRole("button", { name: "Check citations · Jev" })
+    fireEvent.click(buttons[0])
+    await waitFor(() => expect(screen.queryByRole("button", { name: "Check citations · Jev" })).toBeNull())
+    await act(async () => {
+      for (let i = 0; i < 5; i++) await new Promise((r) => setTimeout(r, 0))
+    })
+    expect(screen.getAllByText(line)).toHaveLength(2)
+    expect(useCitationCheckStore.getState().errors.m1).toBeUndefined()
+  })
+
+  it("a failed availability read is retried once", async () => {
+    api.getCitationChecks
+      .mockRejectedValueOnce(new Error("503"))
+      .mockResolvedValueOnce({ availability: { available: true, engine: "jev", reason: null }, checks: {} })
+    render(<CitationCheckAction messageId="m1" citationCount={3} />)
+    expect(await screen.findByRole("button", { name: "Check citations · Jev" })).toBeInTheDocument()
+    expect(api.getCitationChecks).toHaveBeenCalledTimes(2)
+  })
+
+  it("a second failure gives up (one retry, never a loop)", async () => {
+    api.getCitationChecks.mockRejectedValue(new Error("503"))
+    const { container } = render(<CitationCheckAction messageId="m1" citationCount={3} />)
+    await act(async () => {
+      for (let i = 0; i < 10; i++) await new Promise((r) => setTimeout(r, 0))
+    })
+    expect(api.getCitationChecks).toHaveBeenCalledTimes(2)
+    expect(container.innerHTML).toBe("")
   })
 })

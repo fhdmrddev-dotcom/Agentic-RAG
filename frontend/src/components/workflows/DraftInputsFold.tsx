@@ -42,6 +42,8 @@ import {
   INPUT_SOURCE_ASK,
   INPUT_SOURCE_EXPLANATION,
   INPUT_SOURCE_LOOKUP,
+  INPUT_SOURCE_LOOKUP_SET_WARNING,
+  INPUT_SOURCE_LOOKUP_UNAVAILABLE,
   inputExtraNote,
   inputSourceGroupLabel,
   inputsFoldSummary,
@@ -52,7 +54,7 @@ import {
   FOLD_GLYPH,
   FOLD_LINE_CLASS,
 } from "@/components/workflows/surfaceClasses"
-import { fieldTypeWord } from "@/components/workflows/templateFirstVocabulary"
+import { PLACE_STAYS_BLANK, fieldTypeWord } from "@/components/workflows/templateFirstVocabulary"
 import { cn } from "@/lib/utils"
 
 /** One of the draft's declared inputs, as the saved definition holds it. Loose on purpose: the
@@ -118,8 +120,9 @@ interface Row {
   label: string
   /** The type word, or the extra input's note sentence. */
   detail: string
-  /** `null` ⇒ a step writes this field, so there is no switch. */
-  source: InputSource | null
+  /** `step` ⇒ a step writes this field; `blank` ⇒ nothing covers it (291-IN-05,
+   *  `covered_by: null`) so it stays blank. Neither has a switch. */
+  source: InputSource | "step" | "blank"
   serverAdded: boolean
   /** From a form field (counted in the summary), not an extra input the AI added. */
   fromForm: boolean
@@ -152,7 +155,10 @@ function foldRows(
       key: input?.key ?? field.key,
       label: inputLabel !== "" ? inputLabel : field.label !== "" ? field.label : field.key,
       detail: fieldTypeWord(field),
-      source: field.covered_by === "step" ? null : liveSource(input),
+      // 296-07 (291-IN-05): `covered_by: null` is a field nothing fills — no input to switch,
+      // so the dead switch is gone and the row says it stays blank.
+      source:
+        field.covered_by === "step" ? "step" : field.covered_by === null ? "blank" : liveSource(input),
       serverAdded: input?.origin === "server_added",
       fromForm: true,
     })
@@ -182,6 +188,7 @@ export function DraftInputsFoldBody({
   onSetSource,
 }: DraftInputsFoldProps) {
   const groupBase = useId()
+  const lookupNoteId = useId()
   const rows = foldRows(fields, inputs, filename)
 
   const segments: { value: InputSource; label: string }[] = [
@@ -195,6 +202,10 @@ export function DraftInputsFoldBody({
         {INPUTS_BODY_HEADING}
       </h3>
       <p className="text-[12.5px] leading-[1.5] text-muted-foreground">{INPUT_SOURCE_EXPLANATION}</p>
+      {/* 296-07 (291-WR-06): what every disabled `Look it up` segment points at. */}
+      <p id={lookupNoteId} className="text-xs text-muted-foreground">
+        {INPUT_SOURCE_LOOKUP_UNAVAILABLE}
+      </p>
       <ul className="flex flex-col gap-2">
         {rows.map((row, index) => {
           const groupName = `${groupBase}-source-${index}`
@@ -213,8 +224,10 @@ export function DraftInputsFoldBody({
               <span data-input-type="" className="text-[11px] text-muted-foreground">
                 {row.detail}
               </span>
-              {row.source === null ? (
+              {row.source === "step" ? (
                 <span className="text-[11px] text-muted-foreground">{INPUT_FROM_STEP}</span>
+              ) : row.source === "blank" ? (
+                <span className="text-[11px] text-muted-foreground">{PLACE_STAYS_BLANK}</span>
               ) : (
                 <div
                   role="radiogroup"
@@ -223,6 +236,9 @@ export function DraftInputsFoldBody({
                 >
                   {segments.map((segment) => {
                     const selected = row.source === segment.value
+                    // 296-07 (291-WR-06, UI half): the engine has no look-up yet, so the
+                    // segment stays visible but disabled, and says why.
+                    const unavailable = segment.value === "kb_auto"
                     return (
                       <label
                         key={segment.value}
@@ -230,6 +246,7 @@ export function DraftInputsFoldBody({
                           "inline-flex min-h-6 cursor-pointer items-center px-2 text-[11px] text-muted-foreground",
                           "focus-within:outline-none focus-within:ring-1 focus-within:ring-primary",
                           selected && "bg-primary/15 font-medium text-foreground",
+                          unavailable && "cursor-not-allowed opacity-60",
                         )}
                       >
                         <input
@@ -238,6 +255,8 @@ export function DraftInputsFoldBody({
                           name={groupName}
                           value={segment.value}
                           checked={selected}
+                          disabled={unavailable}
+                          {...(unavailable ? { "aria-describedby": lookupNoteId } : {})}
                           onChange={() => onSetSource(row.key, segment.value)}
                         />
                         {segment.label}
@@ -246,6 +265,11 @@ export function DraftInputsFoldBody({
                   })}
                 </div>
               )}
+              {row.source === "kb_auto" ? (
+                <span className="basis-full text-xs text-[hsl(var(--warning))]">
+                  {INPUT_SOURCE_LOOKUP_SET_WARNING}
+                </span>
+              ) : null}
               {row.serverAdded ? (
                 <span
                   data-testid="draft-arrival-input-added-by-syrel"

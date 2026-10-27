@@ -73,6 +73,19 @@ RIGHT_LABEL_GAP = 12.0
 #: The most document text handed to the read-time proposal.
 PROPOSAL_TEXT_MAX_CHARS = 30_000
 
+#: 296-03 (291-WR-07): an author's PDF is UNTRUSTED input parsed in the API process. Its text
+#: is read from at most this many pages, by ONE engine, once per read; a longer PDF says so.
+DESCRIBE_PDF_MAX_PAGES = 50
+
+#: 296-03 (291-WR-07): the largest PDF this leaf will open. It is the door's upload cap
+#: (``workspace_service.MAX_FILE_SIZE``), restated here because the leaf may not import a module
+#: that reaches the database; ``test_296_describe_files`` pins the two equal.
+DESCRIBE_PDF_MAX_BYTES = 10 * 1024 * 1024
+
+#: 296-03 (291-S1-labels): a page word that cannot be a label — no letters at all (``3.``,
+#: ``–``, ``�``), or a form-field id printed on the page (``f1_01[0]``, ``topmostSubform[0]``).
+_JUNK_FIELD_ID_RE = re.compile(r"\[\d+\]|^[A-Za-z]{1,3}\d+_\d+")
+
 Role = Literal["form", "reference"]
 Arm = Literal[
     "template_fields",
@@ -410,6 +423,25 @@ def _clean_label(words: list[str]) -> str:
     return text[:LABEL_MAX_CHARS]
 
 
+def _is_junk_word(text: str) -> bool:
+    """291-S1-labels: a token that is never part of a human label."""
+    t = (text or "").strip()
+    return not any(ch.isalpha() for ch in t) or bool(_JUNK_FIELD_ID_RE.search(t))
+
+
+def _adjacent_run(line: list, gap: float) -> list:
+    """The words of ``line`` (sorted left to right, junk already dropped) that run up to its
+    LAST word without a gap wider than ``gap``: the words next to the field, not the whole line."""
+    if not line:
+        return []
+    run = [line[-1]]
+    for w in reversed(line[:-1]):
+        if run[0][0] - w[2] > gap:
+            break
+        run.insert(0, w)
+    return run
+
+
 def _page_labels(raw: bytes, fields: list[AcroField]) -> dict[str, str]:
     """Nearest page text for each field without a tooltip: same line to the left first, then
     the line directly above. Fields with nothing near them are left out."""
@@ -463,13 +495,17 @@ def _page_labels(raw: bytes, fields: list[AcroField]) -> dict[str, str]:
                             out[f.name] = label
                             continue
 
-                same = [w for w in words if w[2] <= x0 + 1 and band(w)]
+                # 296-03 (291-S1-labels): junk words (``3.``, ``–``, a printed field id) are
+                # dropped, and only the words running up to the field are kept, so a numbered
+                # line or an instruction further left never becomes the label.
+                same = [w for w in words if w[2] <= x0 + 1 and band(w) and not _is_junk_word(w[4])]
                 if same:
                     near = max(same, key=lambda w: w[2])
                     line = sorted(
-                        (w for w in same if (w[5], w[6]) == (near[5], near[6])), key=lambda w: w[7]
+                        (w for w in same if (w[5], w[6]) == (near[5], near[6]) and w[2] <= near[2]),
+                        key=lambda w: w[0],
                     )
-                    label = _clean_label([w[4] for w in line])
+                    label = _clean_label([w[4] for w in _adjacent_run(line, RIGHT_LABEL_GAP)])
                     if label:
                         out[f.name] = label
                         continue
@@ -478,11 +514,16 @@ def _page_labels(raw: bytes, fields: list[AcroField]) -> dict[str, str]:
                 above = [
                     w for w in words
                     if top - reach <= w[3] <= top + 2 and w[2] > x0 and w[0] < x1
+                    and not _is_junk_word(w[4])
                 ]
                 if above:
                     near = max(above, key=lambda w: w[3])
                     line = sorted(
-                        (w for w in words if (w[5], w[6]) == (near[5], near[6])), key=lambda w: w[7]
+                        (
+                            w for w in words
+                            if (w[5], w[6]) == (near[5], near[6]) and not _is_junk_word(w[4])
+                        ),
+                        key=lambda w: w[7],
                     )
                     label = _clean_label([w[4] for w in line])
                     if label:
@@ -539,29 +580,59 @@ def _zip_opens(raw: bytes, required: str | None = None) -> bool:
         return False
 
 
-def _pdf_text_and_pages(raw: bytes) -> tuple[str, int]:
-    """(text layer, page count). Raises ``DescribeFileUnreadable`` when the PDF never opens."""
+def _pdf_text_and_pages(raw: bytes) -> tuple[str, int, str | None]:
+    """(text layer, page count, cut-short note). Raises ``DescribeFileUnreadable`` when the PDF
+    is over ``DESCRIBE_PDF_MAX_BYTES`` or never opens.
+
+    296-03 (291-WR-07): the text is read ONCE, from at most ``DESCRIBE_PDF_MAX_PAGES`` pages.
+    pdfplumber is the preferred layout read; pymupdf reads the same capped pages only when
+    pdfplumber returned nothing (a scan, or a file pdfplumber cannot parse). Base read every page
+    with BOTH engines on every call, unbounded.
+    """
+    if len(raw) > DESCRIBE_PDF_MAX_BYTES:
+        raise DescribeFileUnreadable("pdf is over the byte cap")
+    try:
+        import pymupdf  # noqa: PLC0415
+
+        doc = pymupdf.open(stream=raw, filetype="pdf")
+    except Exception as exc:  # noqa: BLE001
+        raise DescribeFileUnreadable("pdf did not open") from exc
+    with doc:
+        total = len(doc)
+        if total == 0:
+            raise DescribeFileUnreadable("pdf has no pages")
+        n = min(total, DESCRIBE_PDF_MAX_PAGES)
+        text = ""
+        try:
+            import pdfplumber  # noqa: PLC0415
+
+            with pdfplumber.open(io.BytesIO(raw)) as pdf:
+                text = "\n".join((p.extract_text() or "") for p in pdf.pages[:n])
+        except Exception:  # noqa: BLE001 — pdfplumber is the preferred layout read, not the only one
+            text = ""
+        if not text.strip():
+            try:
+                text = "\n".join(doc[i].get_text() for i in range(n))
+            except Exception:  # noqa: BLE001 — no text layer is an answer (the scan arm), not a crash
+                text = ""
+    note = cut_short_sentence("pages", n, total) if n < total else None
+    return text.strip(), total, note
+
+
+def _first_pages(raw: bytes, total: int) -> bytes:
+    """The PDF cut to ``DESCRIBE_PDF_MAX_PAGES`` pages, for the scan classifier (it walks every
+    page it is given). The bytes unchanged when they are already within the cap."""
+    if total <= DESCRIBE_PDF_MAX_PAGES:
+        return raw
     try:
         import pymupdf  # noqa: PLC0415
 
         with pymupdf.open(stream=raw, filetype="pdf") as doc:
-            total = len(doc)
-            fallback = "\n".join(p.get_text() for p in doc)
-    except Exception as exc:  # noqa: BLE001
-        raise DescribeFileUnreadable("pdf did not open") from exc
-    if total == 0:
-        raise DescribeFileUnreadable("pdf has no pages")
-    text = ""
-    try:
-        import pdfplumber  # noqa: PLC0415
-
-        with pdfplumber.open(io.BytesIO(raw)) as pdf:
-            text = "\n".join((p.extract_text() or "") for p in pdf.pages)
-    except Exception:  # noqa: BLE001 — pdfplumber is the preferred layout read, not the only one
-        text = ""
-    if not text.strip():
-        text = fallback
-    return text.strip(), total
+            doc.select(list(range(DESCRIBE_PDF_MAX_PAGES)))
+            return doc.tobytes()
+    except Exception:  # noqa: BLE001 — the classifier then sees the original, as before
+        log.info("describe_files: page cut for the scan check failed", exc_info=True)
+        return raw
 
 
 def _transcribe_scan(raw: bytes, deficit_kind: str, total: int, app_settings: Any) -> tuple[str, str | None]:
@@ -798,8 +869,10 @@ def _insert_into_cell(cell: Any, token: str) -> None:
 
 
 def _has_template_marks(docx_bytes: bytes) -> bool:
+    # 296-03 (291-IN-04): a Jinja comment ``{#`` is a template mark too; a copy made from a file
+    # carrying one would turn it live.
     text = _strip_tags_text(docx_bytes)
-    return "{{" in text or "{%" in text
+    return "{{" in text or "{%" in text or "{#" in text
 
 
 def count_token_occurrences(docx: bytes, key: str) -> int:
@@ -1181,8 +1254,8 @@ def _read_reference(raw: bytes, ext: str, filename: str, app_settings: Any) -> D
             raise DescribeFileUnreadable("docx did not open")
         text = _docx_text(raw)
     elif ext == ".pdf":
-        text, total = _pdf_text_and_pages(raw)
-        deficit = _pdf_scan_deficit(raw, text)
+        text, total, note = _pdf_text_and_pages(raw)
+        deficit = _pdf_scan_deficit(_first_pages(raw, total), text)
         if deficit is not None:
             text, note = _transcribe_scan(raw, deficit.kind, total, app_settings)
             if not text:
@@ -1193,7 +1266,8 @@ def _read_reference(raw: bytes, ext: str, filename: str, app_settings: Any) -> D
         raise DescribeFileUnreadable(f"{ext} is not a reference document")
     capped, chars_note = _cap_text(text, _reference_cap())
     return DescribeReadResult(
-        role="reference", arm="reference", filename=filename, text=capped, cut_short=note or chars_note
+        role="reference", arm="reference", filename=filename, text=capped,
+        cut_short=" ".join(s for s in (note, chars_note) if s) or None,
     )
 
 
@@ -1276,7 +1350,7 @@ def _read_docx_form(raw: bytes, filename: str, propose: Callable | None) -> Desc
 
 
 def _read_pdf_form(raw: bytes, filename: str, app_settings: Any, propose: Callable | None) -> DescribeReadResult:
-    text, total = _pdf_text_and_pages(raw)
+    text, total, pages_note = _pdf_text_and_pages(raw)
     acro = read_acroform_fields(raw)
     if acro:
         capped, note = _cap_text(text, _reference_cap())
@@ -1286,9 +1360,9 @@ def _read_pdf_form(raw: bytes, filename: str, app_settings: Any, propose: Callab
             filename=filename,
             fields=_acro_to_fields(raw, acro, text, propose),
             text=capped,
-            cut_short=note,
+            cut_short=" ".join(s for s in (pages_note, note) if s) or None,
         )
-    deficit = _pdf_scan_deficit(raw, text)
+    deficit = _pdf_scan_deficit(_first_pages(raw, total), text)
     if deficit is not None:
         scan_text, note = _transcribe_scan(raw, deficit.kind, total, app_settings)
         if not scan_text:
@@ -1313,7 +1387,7 @@ def _read_pdf_form(raw: bytes, filename: str, app_settings: Any, propose: Callab
         filename=filename,
         fields=fields,
         text=capped,
-        cut_short=note,
+        cut_short=" ".join(s for s in (pages_note, note) if s) or None,
     )
 
 

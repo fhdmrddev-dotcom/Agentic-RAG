@@ -395,6 +395,11 @@ async def test_ask_user_answered_not_reasked(monkeypatch, fake_redis, mock_async
     await harness_engine.resume_stranded_workflows(
         pool=mock_asyncpg_pool, redis=fake_redis
     )
+    # ⚠ 296-02 (BUG-261025-03): this fake's ``config`` / ``output.tool_call_id`` keys are
+    # NOT on the real ``get_active_phase`` row, which is why the branch it exercised was
+    # dead in production. That branch is deleted; this assertion still holds (nothing
+    # re-subscribes), and the real-row proof of "answered → consumed, never re-asked" is
+    # ``tests/test_296_boot_sweep_human_ask.py``.
     assert resume_called["n"] == 0, "answered prompt must NOT be re-asked"
 
 

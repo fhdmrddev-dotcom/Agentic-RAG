@@ -61,6 +61,9 @@ export interface ScheduleTriggerResult {
   launched: boolean
   workflow_run_id?: string | null
   detail?: string | null
+  /** 296-04 (BUG-261025-01, the 296-02 contract): how the press ended. `detail` is already a
+   *  worded sentence for refused / not_loaded / error. Absent on an older backend. */
+  outcome?: "launched" | "refused" | "not_loaded" | "error"
 }
 
 /**

@@ -143,8 +143,9 @@ export const JUMP_LINE_LABEL = "⤳ only if the check fails"
 
 // ── step and batch words (D-14) ───────────────────────────────────────────────────────────
 
-/** The floor for a step with no `phase_type` — never an empty node. */
-export const TEAM_STEP_UNTYPED = "A step with no type"
+// 296-07 (290-IN-02) — the floor for a step with no `phase_type` moved to ONE home,
+// `phaseVocabulary.STEP_UNTYPED`. It is not re-exported here because this leaf imports
+// nothing (its suite fences that); `teamModel.ts` reads the home directly.
 
 /** A batch step's capacity, never a headcount. */
 export function seatsLabel(n: number): string {

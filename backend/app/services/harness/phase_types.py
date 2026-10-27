@@ -597,6 +597,41 @@ async def _effective_model_checked(phase, ctx) -> str:
     return resolved
 
 
+async def _note_pinned_model_not_run(phase, ctx, model: str) -> None:
+    """296-06 (293-F-4) — an agent step that PINS a model runs through the sub-agent resolver
+    (``task_service._resolve_sub_agent_effective_model``), which keeps the run on the owner's
+    provider and swaps a model from another provider for that provider's model. Real
+    cross-provider sub-agent routing is a capability (D-03, seeded in 296-05); this only stops the
+    swap being SILENT, through the ``_effective_model_checked`` precedent: ONE ``model_fallback``
+    sub-step plus ONE ``policy_applied`` receipt with the sentence. No pin, or a pin that runs as
+    asked, says nothing. The resolver call is the same one the sub-agent makes, on the same
+    settings object and model, so the sentence names the model that actually runs."""
+    if not isinstance(getattr(phase.config, "model", None), str) or not isinstance(model, str):
+        return
+    from app.services.task_service import _resolve_sub_agent_effective_model  # noqa: PLC0415
+
+    settings_ = getattr(ctx, "user_settings", None)
+    try:
+        used = _resolve_sub_agent_effective_model(settings_, ctx_model=model)
+    except Exception:  # noqa: BLE001 — informational only; a notice must never sink a step
+        logger.warning("293-F-4: could not resolve the agent step's model for the notice", exc_info=True)
+        return
+    if not isinstance(used, str) or not used or used == model:
+        return
+    active = getattr(settings_, "active_provider", None) if settings_ is not None else None
+    pinned_provider = _provider_for_model(model, ctx)
+    message = (
+        f"This step asked for {model}, which runs on another provider, so it ran on {used} instead."
+        if pinned_provider and active and pinned_provider != active
+        else f"This step asked for {model}, but it ran on {used}."
+    )
+    await _emit_phase_substep(ctx, phase, status="model_fallback")
+    await _emit_audit(ctx, event_type="policy_applied", metadata={
+        "policy": "step_model_not_run", "phase": getattr(phase, "slug", None),
+        "requested_model": model, "used_model": used, "message": message,
+    })
+
+
 def _build_phase_tool_context(phase, ctx, *, model: str | None = None) -> ToolContext:
     """Build the ToolContext the sub-agent runs under for an LLM-agent phase.
 
@@ -721,6 +756,20 @@ def _measure(count: int, noun: str) -> dict:
     and a per-``fn`` declaration would be a FOURTH concern in this module, which G-5 fires on.
     """
     return {MEASURE_KEY: {"count": count, "noun": noun}}
+
+
+def filled_field_count(field_map: dict) -> int:
+    """296-03 (291-S7-F1): the fields a fill WROTE — each scalar with a value, plus each
+    collection with at least one row. Base used ``len(field_map)`` on the legacy envelope,
+    which is always its two buckets (``scalars`` + ``collections``): four filled fields read
+    "2 fields"."""
+    scalars = (field_map or {}).get("scalars") or {}
+    collections = (field_map or {}).get("collections") or {}
+    filled = sum(
+        1 for cited in scalars.values()
+        if (cited.get("value") if isinstance(cited, dict) else cited) not in (None, "")
+    )
+    return filled + sum(1 for rows in collections.values() if rows)
 
 
 # ── executors ──────────────────────────────────────────────────────────────
@@ -908,6 +957,7 @@ async def _exec_llm_agent(phase, accumulated_outputs: dict, ctx) -> dict:
     description = (
         f"Phase: {phase.slug}\n\n{user_turn}" if user_turn else f"Phase: {phase.slug}"
     )
+    await _note_pinned_model_not_run(phase, ctx, model)  # 296-06 (293-F-4): never a silent swap
     result = await run_task_sub_agent(
         parent_ctx=phase_ctx,
         description=description,
@@ -1017,16 +1067,24 @@ async def _exec_llm_batch_agents(phase, accumulated_outputs: dict, ctx) -> dict:
     # (split_topic itself gets the kickoff via ctx.inputs from fix #1/#2; the batch
     # branches get it here). Empty when no kickoff was stored (behavior-preserving).
     overall_topic = _kickoff_prompt(ctx)
+    # 293 (D-13 / TRUST-03, A3): on a key-started run the sub-question is derived from text an
+    # outside system sent, so it reaches the model only inside the untrusted envelope. The
+    # flag must be literally True on a dict bag; anything else is byte-identical to before.
+    from app.services.inbound_inputs import UNTRUSTED_FLAG, wrap_untrusted_input  # noqa: PLC0415
+
+    _run_inputs = getattr(ctx, "inputs", None)
+    _untrusted = isinstance(_run_inputs, dict) and _run_inputs.get(UNTRUSTED_FLAG) is True
 
     async def _one(question: str) -> dict:
         async with sem:  # composes with the shipped per-run + Redis-Lua caps
             phase_ctx = _build_phase_tool_context(phase, ctx, model=model)
+            shown = wrap_untrusted_input("sub_question", question) if _untrusted else question
             # The sub-agent's USER turn (task_service.py:351) = the sub-question, the
             # actual substance to research — not the truncated slug label it was before.
             # Prefix the overall topic so the branch keeps the user's intent in view.
             description = (
-                f"Overall topic: {overall_topic}\n\nSub-question: {question}"
-                if overall_topic else question
+                f"Overall topic: {overall_topic}\n\nSub-question: {shown}"
+                if overall_topic else shown
             )
             return await run_task_sub_agent(
                 parent_ctx=phase_ctx,
@@ -1035,7 +1093,7 @@ async def _exec_llm_batch_agents(phase, accumulated_outputs: dict, ctx) -> dict:
                 allowed_tools=_effective_tools(phase),
                 instructions=None,
                 max_steps=max_steps,
-                system_prompt_override=f"{base_prompt}\n\nSub-question: {question}",
+                system_prompt_override=f"{base_prompt}\n\nSub-question: {shown}",
                 tools_override=tools_override,
             )
 
@@ -1645,7 +1703,9 @@ async def _exec_llm_emit(phase, accumulated_outputs: dict, ctx) -> dict:
             result = await forced_emit(
                 messages=messages,
                 model=model,
-                provider=getattr(ctx, "provider", None) or _provider_for_model(model, ctx),
+                # 296-06 (293-F-4): a step that PINS a model goes to that model's provider.
+                provider=(getattr(phase.config, "model", None) and _provider_for_model(model, ctx))
+                or getattr(ctx, "provider", None) or _provider_for_model(model, ctx),
                 emitter=emitter,
                 tools=_emit_forced_tool(emitter),
                 user_settings=getattr(ctx, "user_settings", None),
@@ -1760,7 +1820,9 @@ async def _exec_llm_emit(phase, accumulated_outputs: dict, ctx) -> dict:
                 invented=gate["invented_citation_count"],
             ))
 
-            if retrieved_ids and attempt < _EMIT_MAX_ATTEMPTS:
+            # 296-06 (291-IN-01): the person's own input: ids are not evidence; with no KB source
+            # a retry can only name <doc> blocks that do not exist, so the first reject is final.
+            if (retrieved_ids - input_ids) and attempt < _EMIT_MAX_ATTEMPTS:
                 offenders = ", ".join(
                     (gate.get("uncited_leaves") or []) + (gate.get("invented_leaves") or [])
                 ) or "none"
@@ -1956,13 +2018,13 @@ async def _exec_llm_emit(phase, accumulated_outputs: dict, ctx) -> dict:
                 # in this executor (every other exit routes through _emit_failure_output /
                 # _emit_unexpected_failure, which declare nothing — a failed emit produced
                 # no deliverable and has no honest count to report).
-                # ⚠ WHAT THIS NUMBER MEANS, PRECISELY: ``len(field_map)`` is the count of
-                # TOP-LEVEL entries in the legacy field-map — each scalar key, plus each
-                # collection as ONE entry. It is deliberately NOT a leaf-cell count: the
+                # ⚠ WHAT THIS NUMBER MEANS, PRECISELY: ``filled_field_count`` (296-03; base
+                # used ``len(legacy_map)``, which counted the two envelope buckets) is each
+                # scalar the fill wrote a value into, plus each collection with rows as ONE entry. It is deliberately NOT a leaf-cell count: the
                 # map is the emitted deliverable's field structure, and that is the thing
                 # a person means by "how many fields did it fill". The noun is AUTHORED
                 # COPY (§5.1) and this is its ONE home.
-                **_measure(len(legacy_map), "fields"),
+                **_measure(filled_field_count(legacy_map), "fields"),
             }
 
         # A non-ok render: distinguish integrity failure (state d) from a render error (state c).
@@ -2107,7 +2169,8 @@ def _clip_for_body(value) -> str:
 # ``kickoff_prompt`` is the user's original chat question (SEED-047), present on every live
 # run; rendering it under "What this step would have done" asserts it is an input to the
 # send. Closed and named, for the reason spelled out in ``_external_action_inputs``.
-_NON_ACTION_RUN_INPUTS: frozenset[str] = frozenset({"kickoff_prompt"})
+# 293 (D-13): ``_untrusted_inputs`` is the key-started run's TRUST-03 flag, scaffolding by name.
+_NON_ACTION_RUN_INPUTS: frozenset[str] = frozenset({"kickoff_prompt", "_untrusted_inputs"})
 
 
 def _external_action_inputs(accumulated_outputs: dict, ctx) -> dict:

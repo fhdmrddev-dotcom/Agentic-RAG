@@ -1,9 +1,9 @@
 ---
 seed_id: SEED-155
 title: "The workflow card does not look like the sketch that was approved for it — and it structurally CANNOT, because the sketch drew atoms the card's own components hide. Four complaints, three phases, one visual pass."
-status: folded
+status: partially-answered
 partial: true
-status_note: "Folded into Phase 290 for the card half only (2026-10-21, D-01..D-05): one labelled chip line on the shipped 179 C card, sketched first. The LibraryToolbar rework and the counter pill stay open here."
+status_note: "Partially answered by Phase 290: the card chip line shipped; the toolbar and counter pill stay open (293-05 REG-06, 2026-10-25). Earlier: Folded into Phase 290 for the card half only (2026-10-21, D-01..D-05): one labelled chip line on the shipped 179 C card, sketched first. The LibraryToolbar rework and the counter pill stay open here."
 folded_into: "290"
 planted: 2026-08-13
 planted_by: Operator, driving UAT row U8 of Phase 192.1 with sketch 163 open beside the live library — recorded verdict "it does not read the same"

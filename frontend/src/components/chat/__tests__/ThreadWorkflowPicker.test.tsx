@@ -140,6 +140,87 @@ describe("ThreadWorkflowPicker", () => {
   })
 })
 
+describe("ThreadWorkflowPicker — 296-04 dismissal (287-IN-04b)", () => {
+  it("the trigger names the list it controls and says whether it is open", async () => {
+    render(<ThreadWorkflowPicker thread={THREAD} locked={false} />)
+    const trigger = screen.getByTestId("thread-workflow-trigger")
+    expect(trigger).toHaveAttribute("aria-controls", "thread-workflow-list")
+    expect(trigger).toHaveAttribute("aria-expanded", "false")
+    await openPicker()
+    expect(trigger).toHaveAttribute("aria-expanded", "true")
+    expect(screen.getByTestId("thread-workflow-list")).toHaveAttribute("id", "thread-workflow-list")
+  })
+
+  it("Escape closes the list and returns focus to Run a workflow", async () => {
+    render(<ThreadWorkflowPicker thread={THREAD} locked={false} />)
+    await openPicker()
+    fireEvent.keyDown(document, { key: "Escape" })
+    await waitFor(() => expect(screen.queryByTestId("thread-workflow-list")).toBeNull())
+    expect(document.activeElement).toBe(screen.getByTestId("thread-workflow-trigger"))
+  })
+
+  it("a pointer-down outside the picker closes the list; inside keeps it", async () => {
+    render(
+      <div>
+        <p data-testid="outside">elsewhere</p>
+        <ThreadWorkflowPicker thread={THREAD} locked={false} />
+      </div>,
+    )
+    await openPicker()
+    fireEvent.pointerDown(screen.getByTestId("thread-workflow-list"))
+    expect(screen.getByTestId("thread-workflow-list")).toBeInTheDocument()
+    fireEvent.pointerDown(screen.getByTestId("outside"))
+    await waitFor(() => expect(screen.queryByTestId("thread-workflow-list")).toBeNull())
+  })
+})
+
+describe("ThreadWorkflowPicker — 296-04 a refused start (287-WR-02 / 287-IN-03)", () => {
+  class FakeApiError extends Error {
+    status: number
+    constructor(message: string, status: number) {
+      super(message)
+      this.status = status
+    }
+  }
+
+  it("a failed start shows its sentence under the trigger, with Retry start and Dismiss message", async () => {
+    mockSend.mockRejectedValue(new FakeApiError("x", 500))
+    render(<ThreadWorkflowPicker thread={THREAD} locked={false} />)
+    await openPicker()
+    fireEvent.click(await screen.findByTestId("thread-workflow-item-wf-plain"))
+    const line = await screen.findByTestId("thread-workflow-start-failure")
+    expect(line).toHaveAttribute("role", "alert")
+    expect(line).toHaveTextContent("Plain flow didn't start. Nothing ran.")
+    expect(screen.getByRole("button", { name: "Retry start" })).toBeInTheDocument()
+    fireEvent.click(screen.getByRole("button", { name: "Dismiss message" }))
+    expect(screen.queryByTestId("thread-workflow-start-failure")).toBeNull()
+  })
+
+  it("locked (409): the sentence, and no Retry", async () => {
+    mockSend.mockRejectedValue(new FakeApiError("x", 409))
+    render(<ThreadWorkflowPicker thread={THREAD} locked={false} />)
+    await openPicker()
+    fireEvent.click(await screen.findByTestId("thread-workflow-item-wf-plain"))
+    expect(await screen.findByTestId("thread-workflow-start-failure")).toHaveTextContent(
+      "A workflow is already running in this thread, so Plain flow didn't start.",
+    )
+    expect(screen.queryByRole("button", { name: "Retry start" })).toBeNull()
+  })
+
+  it("422 then Retry start re-opens the form holding the typed value", async () => {
+    mockSend.mockRejectedValueOnce(new FakeApiError("x", 422))
+    render(<ThreadWorkflowPicker thread={THREAD} locked={false} />)
+    await openPicker()
+    fireEvent.click(await screen.findByTestId("thread-workflow-item-wf-decl"))
+    fireEvent.change(await screen.findByTestId("run-input-to"), { target: { value: "a@b.test" } })
+    fireEvent.click(screen.getByTestId("chat-launch-confirm"))
+    await screen.findByTestId("thread-workflow-start-failure")
+    fireEvent.click(screen.getByRole("button", { name: "Retry start" }))
+    expect(await screen.findByTestId("chat-launch-form")).toBeInTheDocument()
+    expect(screen.getByTestId("run-input-to")).toHaveValue("a@b.test")
+  })
+})
+
 describe("ThreadWorkflowPicker - the conversation is never read (D-07 / T-287-09)", () => {
   const CODE = stripComments(pickerSource) + "\n" + stripComments(hookSource)
 

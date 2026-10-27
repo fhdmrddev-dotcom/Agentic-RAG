@@ -128,6 +128,13 @@ export function RunModal({
   // 287-01: refusal sentence for an empty required field. Distinct from `launchError`
   // (the server's verbatim 422 path) so the two stay distinguishable.
   const [requiredRefusal, setRequiredRefusal] = useState<string | null>(null)
+  // 296 G-4 row 11: with many fields the refusal sits far down the body's scroller, so a refused
+  // Run looked like nothing happened. Scrolled into view when it appears (the effect) and on a
+  // repeat press with the same words (which renders nothing new, so `handleRun` scrolls).
+  const requiredRefusalRef = useRef<HTMLParagraphElement>(null)
+  useEffect(() => {
+    if (requiredRefusal) requiredRefusalRef.current?.scrollIntoView?.({ block: "nearest" })
+  }, [requiredRefusal])
   // ── Phase 193-07 (AUTH-03 / D-17 / D-20): does this workflow get the template control? ──
   //
   // HIDE ONLY ON A POSITIVE NO. `templateAdmission` is THREE-state and this comparison is
@@ -258,6 +265,7 @@ export function RunModal({
     const missing = missingRequiredFields(launchFields, inputValues)
     if (missing.length > 0) {
       setRequiredRefusal(requiredFieldsMessage(missing))
+      requiredRefusalRef.current?.scrollIntoView?.({ block: "nearest" })
       return
     }
     setRequiredRefusal(null)
@@ -469,7 +477,7 @@ export function RunModal({
               substring match, so prose that merely SPELLS the sentence trips it; this paragraph
               deliberately does not (the same discipline `librarySubtree.fences.test.ts`'s
               T-192-04 note keeps about the prop IT forbids). Please do not tidy the indentation. */}
-          {(showTemplate || launchError || requiredRefusal) && (
+          {(showTemplate || launchError) && (
           <div className="flex flex-col gap-1.5">
             {showTemplate && (
             <>
@@ -530,11 +538,6 @@ export function RunModal({
               </button>
             )}
             </>
-            )}
-            {requiredRefusal && (
-              <p data-testid="run-required-refusal" role="alert" className="px-0.5 text-[11px] text-destructive">
-                {requiredRefusal}
-              </p>
             )}
             {launchError && (
               <p data-testid="run-upload-error" role="alert" className="px-0.5 text-[11px] text-destructive">
@@ -654,8 +657,20 @@ export function RunModal({
           <LaunchInputFields
             fields={launchFields}
             values={inputValues}
-            onChange={(key, value) => setInputValues((prev) => ({ ...prev, [key]: value }))}
+            onChange={(key, value) => {
+              // 296-04 (287-IN-01): the refusal answered the last press; the next change clears it.
+              setRequiredRefusal(null)
+              setInputValues((prev) => ({ ...prev, [key]: value }))
+            }}
           />
+          {/* 296-04 (287-IN-01): the refusal sits directly under the fields it names (it used to
+              render in the template block above, away from them). Still outside that block's
+              gate, so a template-less workflow refuses with words too (the 287-05 regression). */}
+          {requiredRefusal && (
+            <p ref={requiredRefusalRef} data-testid="run-required-refusal" role="alert" className="px-0.5 text-[11px] text-destructive">
+              {requiredRefusal}
+            </p>
+          )}
           <div className="flex flex-col gap-2">
             {/* F4 (UAT 2026-08-05) — this line promised a destination the launch had stopped
                 going to. 188-09 retargeted `doRun` to the run surface, and the modal still

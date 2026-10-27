@@ -380,6 +380,14 @@ async def _finalize_producer_run(
             # the unconditional finish below (and its anchor clear) is byte-for-byte the same.
             from app.services.harness.run_handoff import record_failed_end  # noqa: PLC0415
 
+            if _f2_status == "cancelled":  # 295-RES-b (296-02): a Stop names who pressed it
+                from app.services.harness.run_handoff import record_stop  # noqa: PLC0415
+                from app.services.run_lifecycle import cancelled_by  # noqa: PLC0415
+
+                _by = await cancelled_by(redis, active_workflow_run_id)
+                if _by is not None:
+                    await record_stop(await get_pg_pool(), active_workflow_run_id, _by,
+                                      policy="run_cancelled")
             await record_failed_end(await get_pg_pool(), active_workflow_run_id, _f2_status)
             await _finish_wf(await get_pg_pool(), active_workflow_run_id, _f2_status)
         except BaseException:
@@ -987,6 +995,43 @@ def _accumulate_segment_tokens(
     return (prior_in or 0) + (seg_in or 0), (prior_out or 0) + (seg_out or 0)
 
 
+async def _resolve_continuation_model(
+    *, run_id, model, provider, user_settings, override_provider, get_model_capability_async,
+    load_all_model_overrides,
+):
+    """292.1 (orchestrator ruling 4): the (settings, model, provider) a Continue resumes on.
+
+    The run's stored pair wins. It falls back to the settings pair, with ONE warning, when:
+      · the stored provider no longer resolves — ``override_provider`` returns its input unchanged
+        when the provider is gone or has no key, so ``active_provider`` is not the stored one;
+      · the capability lookup for the stored model raises;
+      · the model registry row for the stored id is disabled (``enabled is False`` in
+        ``load_all_model_overrides`` — the only read that surfaces disabled rows; removed
+        tombstones are already absent from it and resolve by inference).
+    The three callables are passed in, resolved late off ``app.api.threads`` by the caller, so
+    ``patch("app.api.threads.*")`` still intercepts."""
+    effective = user_settings
+    resolvable = True
+    if provider and provider != user_settings.active_provider:
+        effective = override_provider(user_settings, provider)
+        resolvable = effective.active_provider == provider
+    if resolvable and model:
+        try:
+            await get_model_capability_async(model, provider or user_settings.active_provider)
+            _registry = await load_all_model_overrides()
+        except Exception:  # noqa: BLE001 — an unresolvable model falls back, never fails the Continue
+            resolvable = False
+        else:
+            resolvable = ((_registry or {}).get(model) or {}).get("enabled") is not False
+    if not resolvable:
+        logger.warning(
+            "continuation %s: stored model/provider %s/%s cannot be resolved; continuing on %s/%s",
+            run_id, model, provider, user_settings.llm_model, user_settings.active_provider,
+        )
+        return user_settings, user_settings.llm_model, user_settings.active_provider
+    return effective, model or user_settings.llm_model, provider or user_settings.active_provider
+
+
 async def spawn_continuation_run(
     *,
     run_id: _uuid_mod.UUID,
@@ -995,8 +1040,14 @@ async def spawn_continuation_run(
     redis,
     supabase,
     dropped_tool_calls: list[dict],
+    model: str | None = None,
+    provider: str | None = None,
 ) -> None:
-    """Re-drive ``run_id`` consuming the persisted dropped tool calls (SC#4)."""
+    """Re-drive ``run_id`` consuming the persisted dropped tool calls (SC#4).
+
+    292.1 (orchestrator ruling 4): ``model`` / ``provider`` are the run row's own pair, so a
+    Continue resumes the SAME run on the model it started on. None (the default) is byte-identical:
+    the operator default from ``user_settings``."""
     # Late import (D-A4): the shared RUN_TASKS registry FROM app.api.threads
     # (_continuation closes over it; registration below is synchronous so the
     # cancel verb can find the live task before /continue returns).
@@ -1014,6 +1065,9 @@ async def spawn_continuation_run(
             RunContext,
             load_user_settings,
             get_pg_pool,
+            override_provider,
+            get_model_capability_async,
+            load_all_model_overrides,
         )
 
         _terminal_status = "completed"
@@ -1051,6 +1105,22 @@ async def spawn_continuation_run(
             user_settings = load_user_settings(current_user["id"])
             resolved_model = user_settings.llm_model
             resolved_provider = user_settings.active_provider
+            # 292.1 (orchestrator ruling 4): a Continue resumes the same run on its OWN model and
+            # provider, not the operator default — which also stops a DeepSeek-parsed tool call being
+            # replayed to another provider (RESEARCH Pitfalls 5, 11). A stored pair that no longer
+            # resolves falls back to the settings pair with ONE warning; a Continue never fails
+            # mid-run for this reason. An inferred (non-registry) model that resolves is not a
+            # fallback case: it ran that way at the start.
+            if model or provider:
+                user_settings, resolved_model, resolved_provider = await _resolve_continuation_model(
+                    run_id=run_id,
+                    model=model,
+                    provider=provider,
+                    user_settings=user_settings,
+                    override_provider=override_provider,
+                    get_model_capability_async=get_model_capability_async,
+                    load_all_model_overrides=load_all_model_overrides,
+                )
             # Minimal MessageCreate carrier — the loop reads body.model/.provider/
             # .agent_mode/.content; a continuation carries no new user content.
             body = MessageCreate(content="", model=resolved_model, provider=resolved_provider)

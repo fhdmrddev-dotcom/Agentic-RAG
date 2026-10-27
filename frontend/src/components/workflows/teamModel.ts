@@ -35,6 +35,7 @@
  */
 import {
   actionRiskArmed,
+  comparePhaseOrder,
   groundingCauseOf,
   intersectingKbToolOf,
   nodeTitle,
@@ -42,6 +43,7 @@ import {
   PHASE_TYPE_LABELS,
   PHASE_TYPE_SENTENCES,
   PHASE_TYPE_SUBTITLES,
+  STEP_UNTYPED as TEAM_STEP_UNTYPED,
   type NameContext,
   type PhaseSpecJSON,
 } from "@/components/workflows/phaseVocabulary"
@@ -54,7 +56,6 @@ import {
   GATE_ARMED_WORDS,
   GATE_KIND_MISSING,
   GATE_KIND_WORDS,
-  TEAM_STEP_UNTYPED,
   failJump,
   failRedoThen,
 } from "./teamVocabulary"
@@ -169,7 +170,8 @@ interface OrderedPhase {
   index: number
 }
 
-/** Drop non-objects and order by `phase_index`, then slug — the canvasModel comparator. */
+/** Drop non-objects and order by `phase_index`, then slug — the canvasModel comparator,
+ *  which since 296-07 (290-IN-01) is literally the same function, `comparePhaseOrder`. */
 function orderSteps(phases: readonly unknown[]): OrderedPhase[] {
   const kept: OrderedPhase[] = []
   phases.forEach((entry, original) => {
@@ -184,9 +186,7 @@ function orderSteps(phases: readonly unknown[]): OrderedPhase[] {
         : 0,
     })
   })
-  return kept.sort(
-    (a, b) => a.index - b.index || (a.slug < b.slug ? -1 : a.slug > b.slug ? 1 : 0),
-  )
+  return kept.sort((a, b) => comparePhaseOrder(a.phase, b.phase))
 }
 
 /** The step's title: `nodeTitle` when it yields a non-empty string, else the raw floor. */

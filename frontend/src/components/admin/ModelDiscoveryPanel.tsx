@@ -153,6 +153,9 @@ export function ModelDiscoveryPanel({
   // model instead of scrolling ~400 rows. Display-only (like the utility filter) — it narrows what
   // "Select all (matches)" targets and what's rendered, never what's already ticked. Reset each run.
   const [newSearch, setNewSearch] = useState("")
+  // Per-provider filter: clicking a run card narrows new / changed / vanished to that provider.
+  // Display-only like the search — selections on hidden rows stay in the confirmable diff.
+  const [providerFilter, setProviderFilter] = useState<string | null>(null)
 
   // WR-02 (Phase 159 review): surface a persist failure on the filter toggle. The sibling add /
   // capability write paths all show refusals; a silently-reverting checkbox on a failed setFlag
@@ -352,15 +355,20 @@ export function ModelDiscoveryPanel({
   // nor dropped from the confirmable payload (149 red line: discovery proposes, humans confirm).
   const hidingUtility = filterEnabled && !showAllThisView
   const searchQuery = newSearch.trim().toLowerCase()
+  const inProvider = (m: { provider: string }) => providerFilter === null || m.provider === providerFilter
+  const visibleChanged = result ? result.changed.filter(inProvider) : []
+  const visibleVanished = result ? result.vanished.filter(inProvider) : []
   const visibleNew = result
     ? result.new.filter((m) => {
+        if (!inProvider(m)) return false
         if (hidingUtility && m.utility === true) return false
         if (searchQuery && !m.model_id.toLowerCase().includes(searchQuery)) return false
         return true
       })
     : []
   const hiddenNewCount =
-    result && hidingUtility ? result.new.filter((m) => m.utility === true).length : 0
+    result && hidingUtility ? result.new.filter((m) => inProvider(m) && m.utility === true).length : 0
+  const providerNewTotal = result ? result.new.filter(inProvider).length : 0
   const selectedNewCount = result
     ? result.new.filter((m) => accepted.has(m.model_id)).length
     : 0
@@ -444,18 +452,55 @@ export function ModelDiscoveryPanel({
             </div>
           </div>
 
-          {/* Per-provider run cards. */}
-          <div className="grid grid-cols-2 gap-2 sm:grid-cols-3 lg:grid-cols-4">
-            {result.providers.map((p) => (
-              <ProviderRunCard key={p.provider} provider={p.provider} status={p.status} ok={p.ok} />
-            ))}
+          {/* Per-provider run cards — each one is also the filter for the lists below. */}
+          <div className="space-y-1.5">
+            <div className="flex flex-wrap items-center gap-2 text-[11px] text-muted-foreground/80">
+              <span>
+                {providerFilter === null
+                  ? "Click a provider to show only its models."
+                  : `Showing ${providerFilter} only.`}
+              </span>
+              {providerFilter !== null && (
+                <button
+                  type="button"
+                  onClick={() => setProviderFilter(null)}
+                  className="rounded border border-border px-2 py-0.5 text-[11px] text-muted-foreground transition-colors hover:bg-accent hover:text-foreground"
+                >
+                  Show all providers
+                </button>
+              )}
+            </div>
+            <div className="grid grid-cols-2 gap-2 sm:grid-cols-3 lg:grid-cols-4">
+              {result.providers.map((p) => (
+                <ProviderRunCard
+                  key={p.provider}
+                  provider={p.provider}
+                  status={p.status}
+                  ok={p.ok}
+                  returned={p.returned}
+                  newCount={result.new.filter((m) => m.provider === p.provider).length}
+                  selected={providerFilter === p.provider}
+                  onSelect={() => setProviderFilter((cur) => (cur === p.provider ? null : p.provider))}
+                />
+              ))}
+            </div>
           </div>
+
+          {providerFilter !== null &&
+            result.providers.some((p) => p.provider === providerFilter && p.ok) &&
+            visibleNew.length + visibleChanged.length + visibleVanished.length === 0 &&
+            hiddenNewCount === 0 && (
+              <div data-testid="provider-filter-empty" className="text-xs text-muted-foreground">
+                Nothing new, changed or missing for {providerFilter} — every model it returned is already in
+                the registry.
+              </div>
+            )}
 
           {/* ✚ New models — with the D-159-04 suitability filter (default-on, persisted). The
               toggle persists the operator default (onSetFilter → app_settings); "Show all" is a
               per-view reveal. The filter is DISPLAY-only — a hidden utility row stays in the
               confirmable diff, it is simply not rendered. */}
-          {result.new.length > 0 && (
+          {providerNewTotal > 0 && (
             <div className="space-y-2">
               <div className="flex flex-wrap items-center gap-x-3 gap-y-1.5">
                 <label className="inline-flex cursor-pointer items-center gap-1.5 text-xs text-foreground">
@@ -504,7 +549,7 @@ export function ModelDiscoveryPanel({
                   Clear
                 </button>
                 <span className="text-[11px] text-muted-foreground/80" data-testid="new-selected-count">
-                  {selectedNewCount} selected · showing {visibleNew.length} of {result.new.length}
+                  {selectedNewCount} selected · showing {visibleNew.length} of {providerNewTotal}
                 </span>
               </div>
               <DiffGroup glyph="✚" tone="success" title="New models" note="not in the registry yet">
@@ -558,9 +603,9 @@ export function ModelDiscoveryPanel({
           )}
 
           {/* ± Changed. */}
-          {result.changed.length > 0 && (
+          {visibleChanged.length > 0 && (
             <DiffGroup glyph="±" tone="primary" title="Changed" note="capability differs from the registry">
-              {result.changed.map((m) => (
+              {visibleChanged.map((m) => (
                 <ChangedModelRow
                   key={m.model_id}
                   model={m}
@@ -572,9 +617,9 @@ export function ModelDiscoveryPanel({
           )}
 
           {/* ⊘ No longer offered (vanished — flagged, never auto-deleted). */}
-          {result.vanished.length > 0 && (
+          {visibleVanished.length > 0 && (
             <DiffGroup glyph="⊘" tone="warning" title="No longer offered" note="in the registry, not returned by /models">
-              {result.vanished.map((m) => (
+              {visibleVanished.map((m) => (
                 <VanishedRow
                   key={m.model_id}
                   provider={m.provider}
@@ -730,7 +775,23 @@ function RunTimer() {
 /** One per-provider run card. `ok` + status derive the honest badge: capabilities ✓ (a
  *  caps-returning provider) / IDs only (an ok provider without caps) / no key — skipped /
  *  the VERBATIM error status (excluded, not failed). */
-function ProviderRunCard({ provider, status, ok }: { provider: string; status: string; ok: boolean }) {
+function ProviderRunCard({
+  provider,
+  status,
+  ok,
+  returned,
+  newCount,
+  selected,
+  onSelect,
+}: {
+  provider: string
+  status: string
+  ok: boolean
+  returned?: number
+  newCount: number
+  selected: boolean
+  onSelect: () => void
+}) {
   const Logo = providerLogo(provider)
   const returnsCaps = ok && CAPS_PROVIDERS.has(provider)
   const errored = !ok && status !== "no_key"
@@ -742,11 +803,15 @@ function ProviderRunCard({ provider, status, ok }: { provider: string; status: s
   else badge = { text: status, className: "bg-destructive/15 text-destructive" }
 
   return (
-    <div
+    <button
+      type="button"
       data-provider={provider}
+      aria-pressed={selected}
+      onClick={onSelect}
       className={cn(
-        "rounded-md border bg-surface px-2.5 py-2 text-xs",
+        "rounded-md border bg-surface px-2.5 py-2 text-left text-xs transition-colors hover:bg-accent/40",
         errored ? "border-destructive/40" : returnsCaps ? "border-success/30" : "border-border/60",
+        selected && "ring-2 ring-primary",
       )}
     >
       <div className="mb-1 flex items-center gap-1.5">
@@ -759,7 +824,13 @@ function ProviderRunCard({ provider, status, ok }: { provider: string; status: s
         {errored && "verbatim error · "}
         {badge.text}
       </span>
-    </div>
+      {ok && (
+        <div className="mt-1 text-[10px] text-muted-foreground" data-testid="provider-counts">
+          {returned !== undefined && `${returned} returned · `}
+          {newCount} new
+        </div>
+      )}
+    </button>
   )
 }
 

@@ -2,7 +2,7 @@
 phase: 295-runs-that-don-t-dead-end
 verified: 2026-10-21T06:00:00Z
 verification_mode: self-verified   # OV-SOLO-01 - NEVER "reviewed". No independent reviewer exists.
-status: human_needed
+status: passed
 score: 5/5 success criteria verified in code and live (SC#4 and SC#5 with stated caveats); 4/4 requirements satisfied
 overrides_applied: 0
 re_verification:
@@ -126,3 +126,7 @@ No ROADMAP success criterion is unmet in code or live evidence. The only live-re
 
 _Verified: 2026-10-21_
 _Verifier: Claude (gsd-verifier)_
+
+## Re-verification (2026-10-24)
+
+S1-S7 driven PASS (2026-10-21, 295-VALIDATION.md); the Anthropic roster row re-run PASS 2026-10-24 (`84de63beb`); operator signed 2026-10-24 and accepted the known D-r2-02 same-tab display quirk. **Status: passed.**

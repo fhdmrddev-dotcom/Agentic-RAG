@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react"
+import { useEffect, useRef, useState } from "react"
 import { flushSync } from "react-dom"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
@@ -26,6 +26,7 @@ import { Check, Eye, EyeOff, Save, RotateCcw, Loader2 } from "lucide-react"
 import { cn } from "@/lib/utils"
 import { MemorySection } from "@/components/settings/MemorySection"
 import { AuditLogSection } from "@/components/settings/AuditLogSection"
+import { ApiKeysTab } from "@/components/settings/apiKeys/ApiKeysTab"
 import { PreferencesSection } from "@/components/settings/PreferencesSection"
 import {
   isSettingsTabVisible,
@@ -34,6 +35,7 @@ import {
 } from "@/components/settings/settingsTabs"
 import { ModelPillRow } from "@/components/settings/ModelPillRow"
 import { RerankEngineBlock } from "@/components/settings/RerankEngineBlock"
+import { AgentRoundLimits, type AgentRoundLimitsHandle } from "@/components/settings/AgentRoundLimits"
 import { unverifiedDescription } from "@/lib/unverifiedModelCopy"
 import {
   ProviderPicker,
@@ -46,6 +48,7 @@ import { ReembedStatusCard } from "@/components/settings/ReembedStatusCard"
 import { EngineHealthCard } from "@/components/settings/EngineHealthCard"
 // SEED-258 — the source file ceiling. The card owns the copy; this page owns the wire.
 import { SourceFileCeilingCard } from "@/components/settings/SourceFileCeilingCard"
+import { ApiKeyLimits, type ApiKeyLimitsHandle } from "@/components/settings/ApiKeyLimits"
 import { SOURCE_CEILING_RECOMMENDED_MB } from "@/components/settings/sourceCeilingCopy"
 import { JudgeModelPicker } from "@/components/settings/JudgeModelPicker"
 import { AuthoringModelPicker } from "@/components/settings/AuthoringModelPicker"
@@ -415,7 +418,7 @@ function ProviderCard({
  * page (`pages/ConnectionsPage.tsx`) and this page has one door again.
  */
 
-export function SettingsPage() {
+export function SettingsPage({ onOpenRun }: { onOpenRun?: (runId: string) => void } = {}) {
   const featuresCtx = useEffectiveFeaturesOptional()
   const canManageModels = featuresCtx?.features.model_management === true
   const featuresLoading = featuresCtx?.loading ?? false
@@ -692,6 +695,10 @@ export function SettingsPage() {
       .finally(() => setLoading(false))
   }, [canManageModels, featuresLoading])
 
+  const roundLimitsRef = useRef<AgentRoundLimitsHandle>(null)
+  // 293-03 (D-14): the per-key limits ride Save Integrations, the AgentRoundLimits pattern.
+  const apiKeyLimitsRef = useRef<ApiKeyLimitsHandle>(null)
+
   const handleSaveAIModel = async () => {
     // Plan 075.4-04 Task 1 (D-075.4-F3) — flushSync commits pending onChange
     // before snapshot; closes 2-click bug. See 075.4-04-DIAGNOSIS-settings-2click.md
@@ -712,9 +719,12 @@ export function SettingsPage() {
         skill_builder_model: skillBuilderModel,
         llm_max_output_tokens: llmMaxOutputTokens,
         openrouter_tool_strategy: openrouterToolStrategy,
+        // 292.1 UAT: ONE save per section — the round limits ride this PUT ({} until their read answers).
+        ...roundLimitsRef.current?.changes(),
       }
       const updated = await updateSettings(body)
       hydrate(updated)
+      roundLimitsRef.current?.adopt(updated)
       setSavedAI(true)
       setTimeout(() => setSavedAI(false), 2500)
     } catch (e: unknown) {
@@ -818,9 +828,12 @@ export function SettingsPage() {
         // `updateSettings` rethrows that detail and the banner above renders it verbatim.
         // Silently fixing the number here would hide a refusal the operator should read.
         source_max_file_size_mb: sourceMaxFileSizeMb,
+        // 293-03 (D-14): ONE save per section — the per-key limits ride this PUT ({} until read).
+        ...apiKeyLimitsRef.current?.changes(),
       }
       const updated = await updateSettings(body)
       hydrate(updated)
+      apiKeyLimitsRef.current?.adopt(updated)
       setSavedIntegrations(true)
       setTimeout(() => setSavedIntegrations(false), 2500)
     } catch (e: unknown) {
@@ -988,6 +1001,7 @@ export function SettingsPage() {
             {isSettingsTabVisible("6", canManageModels) && <TabsTrigger className={SETTINGS_TAB_CLASS} value="6">Preferences</TabsTrigger>}
             {isSettingsTabVisible("3", canManageModels) && <TabsTrigger className={SETTINGS_TAB_CLASS} value="3">Memory</TabsTrigger>}
             {isSettingsTabVisible("4", canManageModels) && <TabsTrigger className={SETTINGS_TAB_CLASS} value="4">Audit Log</TabsTrigger>}
+            {isSettingsTabVisible("7", canManageModels) && <TabsTrigger className={SETTINGS_TAB_CLASS} value="7">API keys</TabsTrigger>}
           </TabsList>
 
           {/* Tab 0: AI Model — operator-only, and NOT RENDERED for a member (Phase 283, D-07).
@@ -1126,6 +1140,8 @@ export function SettingsPage() {
                     />
                   </FieldRow>
                 )}
+                {/* 292.1 (D-17/D-18): ONE mount — the leaf owns its state and fetch; Save AI Model saves it. */}
+                <AgentRoundLimits ref={roundLimitsRef} />
                 <FieldRow label="Sub-agent model">
                   <select
                     value={subAgentModel}
@@ -1609,6 +1625,9 @@ export function SettingsPage() {
                 />
               )}
 
+              {/* 293-03 (D-14 / UI-SPEC Surface 6): the operator's per-key limits. */}
+              <ApiKeyLimits ref={apiKeyLimitsRef} />
+
               {/* Save Integrations button */}
               <div className="flex justify-end">
                 <Button
@@ -1645,6 +1664,11 @@ export function SettingsPage() {
             <div className="bg-card/50 ghost-border rounded-xl p-6">
               <AuditLogSection />
             </div>
+          </TabsContent>
+
+          {/* Tab 7: API keys (293-04, START-02) — everyone. A self-fetching leaf: no page state. */}
+          <TabsContent value="7">
+            <ApiKeysTab onOpenRun={onOpenRun} onOpenAudit={() => handleTabChange("4")} />
           </TabsContent>
 
           {/* Tab 5 (rendered fourth): Connections — Phase 190-16 (CONN-02 / D-25).

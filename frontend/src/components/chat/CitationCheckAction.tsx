@@ -31,7 +31,7 @@ import {
 
 interface Props {
   messageId: string
-  /** The answer's source count, for "Checking N citations…". */
+  /** The answer's source count (`citations.length`), for "Checking N sources…". */
   citationCount: number
 }
 
@@ -63,7 +63,8 @@ export function CitationCheckAction({ messageId, citationCount }: Props) {
           aria-hidden="true"
           className="inline-block h-2.5 w-2.5 animate-spin rounded-full border-2 border-border border-t-primary motion-reduce:animate-none"
         />
-        Checking {citationCount} citation{citationCount !== 1 ? "s" : ""}…
+        {/* 296-04 (294-IN-08): the count is the answer's sources, so the word is "source". */}
+        Checking {citationCount} source{citationCount !== 1 ? "s" : ""}…
       </button>
     )
   } else if (reasonLine) {
@@ -83,7 +84,7 @@ export function CitationCheckAction({ messageId, citationCount }: Props) {
     control = (
       <button type="button" className={BUTTON_CLASSES} onClick={() => void run(messageId)}>
         Check citations{" "}
-        <span className="text-muted-foreground">· {engineFor(availability.engine).shortName}</span>
+        <span className="text-muted-foreground">· {engineFor(availability.engine)?.shortName ?? availability.engine}</span>
       </button>
     )
   }
@@ -109,7 +110,7 @@ export function CitationCheckAction({ messageId, citationCount }: Props) {
       </div>
       {result && (
         <span className="font-mono text-[10px] text-muted-foreground">
-          checked by {engineFor(result.engine).shortName} · saved with this answer
+          checked by {engineFor(result.engine)?.shortName ?? result.engine} · saved with this answer
           {when ? ` · ${when}` : ""}
         </span>
       )}

@@ -588,11 +588,15 @@ describe("211-05 · SC#3 — no verb CATEGORY is offered anywhere (CONN-04 / CON
     // ⚠ REVIEWED 2026-10-21 (Phase 290-03): TeamPicture's `TeamViewSwitch` is a tablist of two
     // VIEWS of one workflow (Steps / Team), the house `builder-view-toggle` shape, not a verb
     // category. Exempted by path on the same terms.
+    // ⚠ REVIEWED 2026-10-25 (Phase 293-04): the API key draft card's Expires control is a
+    // radiogroup of DURATIONS (30 / 90 / 365 days / Never, 293-UI-SPEC §Interaction), not a verb
+    // category. Exempted by path on the same terms.
     const REVIEWED_RADIOGROUPS = [
       "/src/components/settings/RerankEngineBlock.tsx",
+      "/src/components/settings/apiKeys/ApiKeyDraftCard.tsx",
       "/src/components/workflows/TeamPicture.tsx",
     ]
-    expect(carriers.map(([path]) => path)).toEqual(REVIEWED_RADIOGROUPS)
+    expect(carriers.map(([path]) => path).sort()).toEqual([...REVIEWED_RADIOGROUPS].sort())
     // POSITIVE CONTROL — the pattern really matches.
     expect(/\brole=["'](?:radio|tab|option)["']/.test('<div role="radio">x</div>')).toBe(true)
   })

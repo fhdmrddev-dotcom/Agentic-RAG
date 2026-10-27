@@ -15925,6 +15925,382 @@
      }
     }
    }
+  },
+  "/api-keys": {
+   "get": {
+    "tags": [
+     "api-keys"
+    ],
+    "summary": "List My Keys",
+    "description": "The caller's keys in the active org, the effective per-key limits, and each key's calls\nin the last 30 days (D-17).",
+    "operationId": "list_my_keys_api_keys_get",
+    "responses": {
+     "200": {
+      "description": "Successful Response",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/ApiKeyList"
+        }
+       }
+      }
+     }
+    },
+    "security": [
+     {
+      "HTTPBearer": []
+     }
+    ]
+   },
+   "post": {
+    "tags": [
+     "api-keys"
+    ],
+    "summary": "Create Key",
+    "description": "Make a key for one or more of the caller's published workflows. The response is the ONLY\nplace the secret ever appears.",
+    "operationId": "create_key_api_keys_post",
+    "requestBody": {
+     "content": {
+      "application/json": {
+       "schema": {
+        "$ref": "#/components/schemas/ApiKeyCreateBody"
+       }
+      }
+     },
+     "required": true
+    },
+    "responses": {
+     "201": {
+      "description": "Successful Response",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/ApiKeyCreated"
+        }
+       }
+      }
+     },
+     "422": {
+      "description": "Validation Error",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      }
+     }
+    },
+    "security": [
+     {
+      "HTTPBearer": []
+     }
+    ]
+   }
+  },
+  "/api-keys/startable-workflows": {
+   "get": {
+    "tags": [
+     "api-keys"
+    ],
+    "summary": "List Startable Workflows",
+    "description": "The caller's published workflows in the active org, each with its declared launch fields.\nA workflow that needs a file upload is listed but not startable; drafts are counted, not\nlisted.",
+    "operationId": "list_startable_workflows_api_keys_startable_workflows_get",
+    "responses": {
+     "200": {
+      "description": "Successful Response",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/StartableWorkflowList"
+        }
+       }
+      }
+     }
+    },
+    "security": [
+     {
+      "HTTPBearer": []
+     }
+    ]
+   }
+  },
+  "/api-keys/{key_id}/revoke": {
+   "post": {
+    "tags": [
+     "api-keys"
+    ],
+    "summary": "Revoke My Key",
+    "description": "Revoke one of the caller's own keys. 404 for a miss AND for someone else's key.",
+    "operationId": "revoke_my_key_api_keys__key_id__revoke_post",
+    "security": [
+     {
+      "HTTPBearer": []
+     }
+    ],
+    "parameters": [
+     {
+      "name": "key_id",
+      "in": "path",
+      "required": true,
+      "schema": {
+       "type": "string",
+       "format": "uuid",
+       "title": "Key Id"
+      }
+     }
+    ],
+    "responses": {
+     "200": {
+      "description": "Successful Response",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/ApiKeyRead"
+        }
+       }
+      }
+     },
+     "422": {
+      "description": "Validation Error",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      }
+     }
+    }
+   }
+  },
+  "/org/api-keys": {
+   "get": {
+    "tags": [
+     "api-keys"
+    ],
+    "summary": "List Org Keys",
+    "description": "Every key in the active org, with its owner (D-03).",
+    "operationId": "list_org_keys_org_api_keys_get",
+    "responses": {
+     "200": {
+      "description": "Successful Response",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/ApiKeyList"
+        }
+       }
+      }
+     }
+    },
+    "security": [
+     {
+      "HTTPBearer": []
+     }
+    ]
+   }
+  },
+  "/org/api-keys/{key_id}/revoke": {
+   "post": {
+    "tags": [
+     "api-keys"
+    ],
+    "summary": "Revoke Org Key",
+    "description": "An admin revokes any key in the org. The audit row is the ADMIN's (who acted), and\nnames the key's owner.",
+    "operationId": "revoke_org_key_org_api_keys__key_id__revoke_post",
+    "security": [
+     {
+      "HTTPBearer": []
+     }
+    ],
+    "parameters": [
+     {
+      "name": "key_id",
+      "in": "path",
+      "required": true,
+      "schema": {
+       "type": "string",
+       "format": "uuid",
+       "title": "Key Id"
+      }
+     }
+    ],
+    "responses": {
+     "200": {
+      "description": "Successful Response",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/ApiKeyRead"
+        }
+       }
+      }
+     },
+     "422": {
+      "description": "Validation Error",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      }
+     }
+    }
+   }
+  },
+  "/inbound/workflows/{workflow_id}/runs": {
+   "post": {
+    "tags": [
+     "inbound"
+    ],
+    "summary": "Start Workflow Run",
+    "description": "Start one listed, published workflow as the key's owner. The caller polls the run.",
+    "operationId": "start_workflow_run_inbound_workflows__workflow_id__runs_post",
+    "security": [
+     {
+      "ApiKey": []
+     }
+    ],
+    "parameters": [
+     {
+      "name": "workflow_id",
+      "in": "path",
+      "required": true,
+      "schema": {
+       "type": "string",
+       "title": "Workflow Id"
+      }
+     }
+    ],
+    "requestBody": {
+     "content": {
+      "application/json": {
+       "schema": {
+        "anyOf": [
+         {
+          "$ref": "#/components/schemas/InboundStartBody"
+         },
+         {
+          "type": "null"
+         }
+        ],
+        "title": "Body"
+       }
+      }
+     }
+    },
+    "responses": {
+     "201": {
+      "description": "Successful Response",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/InboundStartResult"
+        }
+       }
+      }
+     },
+     "422": {
+      "description": "Validation Error",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      }
+     }
+    }
+   }
+  },
+  "/inbound/runs/{run_id}": {
+   "get": {
+    "tags": [
+     "inbound"
+    ],
+    "summary": "Read Inbound Run",
+    "description": "PURE READ of a run THIS key started. A paused run is answered in the app (D-10).",
+    "operationId": "read_inbound_run_inbound_runs__run_id__get",
+    "security": [
+     {
+      "ApiKey": []
+     }
+    ],
+    "parameters": [
+     {
+      "name": "run_id",
+      "in": "path",
+      "required": true,
+      "schema": {
+       "type": "string",
+       "title": "Run Id"
+      }
+     }
+    ],
+    "responses": {
+     "200": {
+      "description": "Successful Response",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/InboundRunRead"
+        }
+       }
+      }
+     },
+     "422": {
+      "description": "Validation Error",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      }
+     }
+    }
+   }
+  },
+  "/inbound/files/{token}": {
+   "get": {
+    "tags": [
+     "inbound"
+    ],
+    "summary": "Download Inbound File",
+    "description": "One file, once. The link is the credential, so it is re-checked against live state:\nthe key still live and its owner still a member, the run still this key's, the file still\nthat run's own (T-293-16).",
+    "operationId": "download_inbound_file_inbound_files__token__get",
+    "parameters": [
+     {
+      "name": "token",
+      "in": "path",
+      "required": true,
+      "schema": {
+       "type": "string",
+       "title": "Token"
+      }
+     }
+    ],
+    "responses": {
+     "200": {
+      "description": "The file's exact bytes, as an attachment.",
+      "content": {
+       "application/octet-stream": {}
+      }
+     },
+     "422": {
+      "description": "Validation Error",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      }
+     }
+    }
+   }
   }
  },
  "components": {
@@ -16095,6 +16471,352 @@
     ],
     "title": "AddModelRequest",
     "description": "Body for POST /admin/models \u2014 add ONE model by EXPLICIT id + provider (D-159-02).\n\nUnlike the capability PATCH (which INFERS provider from the id/registry), add-by-ID takes\nthe operator's EXPLICIT provider pick, validated against the ROUTING roster\n(``config.ROUTING_PROVIDERS`` \u2014 11 providers) before any DB touch. \u26a0 WR-08: this docstring\nsaid ``PROVIDER_ENDPOINTS`` (the 8-cloud SSRF DISCOVERY allowlist) and was left saying it by\nthe very phase that stopped reading it \u2014 the exact register rot this repo keeps paying for. There is deliberately NO ``enabled`` field:\nthe row is forced ``enabled=false`` server-side (the 149 opt-in-enable rule / SC#3 \u2014 an add\nnever auto-enables; the operator flips it on from the registry table afterward). The\ncapability fields are optional pre-fills (every column is null-safe on the table).\n``protected_namespaces=()`` silences Pydantic's ``model_``-prefix warning for ``model_id``."
+   },
+   "ApiKeyCall": {
+    "properties": {
+     "at": {
+      "type": "string",
+      "format": "date-time",
+      "title": "At"
+     },
+     "verb": {
+      "type": "string",
+      "enum": [
+       "start",
+       "read"
+      ],
+      "title": "Verb"
+     },
+     "workflow_id": {
+      "anyOf": [
+       {
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Workflow Id"
+     },
+     "workflow_name": {
+      "anyOf": [
+       {
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Workflow Name"
+     },
+     "run_id": {
+      "anyOf": [
+       {
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Run Id"
+     },
+     "ok": {
+      "type": "boolean",
+      "title": "Ok"
+     },
+     "outcome": {
+      "anyOf": [
+       {
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Outcome"
+     },
+     "reason": {
+      "anyOf": [
+       {
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Reason"
+     },
+     "detail": {
+      "anyOf": [
+       {
+        "additionalProperties": true,
+        "type": "object"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Detail"
+     }
+    },
+    "type": "object",
+    "required": [
+     "at",
+     "verb",
+     "ok"
+    ],
+    "title": "ApiKeyCall"
+   },
+   "ApiKeyCreateBody": {
+    "properties": {
+     "label": {
+      "type": "string",
+      "title": "Label"
+     },
+     "workflow_ids": {
+      "items": {
+       "type": "string",
+       "format": "uuid"
+      },
+      "type": "array",
+      "maxItems": 20,
+      "minItems": 1,
+      "title": "Workflow Ids"
+     },
+     "expires_in_days": {
+      "anyOf": [
+       {
+        "type": "integer",
+        "enum": [
+         30,
+         90,
+         365
+        ]
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Expires In Days",
+      "default": 90
+     }
+    },
+    "additionalProperties": false,
+    "type": "object",
+    "required": [
+     "label",
+     "workflow_ids"
+    ],
+    "title": "ApiKeyCreateBody",
+    "description": "D-04: label, one or more published workflows, and an expiry of 30 / 90 / 365 days or\nnever (``null``). The default is 90."
+   },
+   "ApiKeyCreated": {
+    "properties": {
+     "key": {
+      "$ref": "#/components/schemas/ApiKeyRead"
+     },
+     "secret": {
+      "type": "string",
+      "title": "Secret"
+     }
+    },
+    "type": "object",
+    "required": [
+     "key",
+     "secret"
+    ],
+    "title": "ApiKeyCreated"
+   },
+   "ApiKeyLimits": {
+    "properties": {
+     "starts_per_minute": {
+      "type": "integer",
+      "title": "Starts Per Minute"
+     },
+     "reads_per_minute": {
+      "type": "integer",
+      "title": "Reads Per Minute"
+     }
+    },
+    "type": "object",
+    "required": [
+     "starts_per_minute",
+     "reads_per_minute"
+    ],
+    "title": "ApiKeyLimits"
+   },
+   "ApiKeyList": {
+    "properties": {
+     "keys": {
+      "items": {
+       "$ref": "#/components/schemas/ApiKeyRead"
+      },
+      "type": "array",
+      "title": "Keys"
+     },
+     "limits": {
+      "$ref": "#/components/schemas/ApiKeyLimits"
+     }
+    },
+    "type": "object",
+    "required": [
+     "keys",
+     "limits"
+    ],
+    "title": "ApiKeyList"
+   },
+   "ApiKeyRead": {
+    "properties": {
+     "id": {
+      "type": "string",
+      "title": "Id"
+     },
+     "label": {
+      "type": "string",
+      "title": "Label"
+     },
+     "key_prefix": {
+      "type": "string",
+      "title": "Key Prefix"
+     },
+     "workflows": {
+      "items": {
+       "$ref": "#/components/schemas/ApiKeyWorkflowRef"
+      },
+      "type": "array",
+      "title": "Workflows"
+     },
+     "state": {
+      "type": "string",
+      "enum": [
+       "active",
+       "expired",
+       "revoked"
+      ],
+      "title": "State"
+     },
+     "expires_at": {
+      "anyOf": [
+       {
+        "type": "string",
+        "format": "date-time"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Expires At"
+     },
+     "revoked_at": {
+      "anyOf": [
+       {
+        "type": "string",
+        "format": "date-time"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Revoked At"
+     },
+     "revoked_by_name": {
+      "anyOf": [
+       {
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Revoked By Name"
+     },
+     "revoked_by_admin": {
+      "type": "boolean",
+      "title": "Revoked By Admin",
+      "default": false
+     },
+     "last_used_at": {
+      "anyOf": [
+       {
+        "type": "string",
+        "format": "date-time"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Last Used At"
+     },
+     "created_at": {
+      "type": "string",
+      "format": "date-time",
+      "title": "Created At"
+     },
+     "owner_name": {
+      "anyOf": [
+       {
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Owner Name"
+     },
+     "owner_is_you": {
+      "type": "boolean",
+      "title": "Owner Is You",
+      "default": true
+     },
+     "calls": {
+      "items": {
+       "$ref": "#/components/schemas/ApiKeyCall"
+      },
+      "type": "array",
+      "title": "Calls"
+     }
+    },
+    "type": "object",
+    "required": [
+     "id",
+     "label",
+     "key_prefix",
+     "workflows",
+     "state",
+     "created_at"
+    ],
+    "title": "ApiKeyRead"
+   },
+   "ApiKeyWorkflowRef": {
+    "properties": {
+     "id": {
+      "type": "string",
+      "title": "Id"
+     },
+     "name": {
+      "type": "string",
+      "title": "Name"
+     },
+     "state": {
+      "type": "string",
+      "enum": [
+       "startable",
+       "unpublished",
+       "deleted",
+       "file_upload",
+       "needs_task",
+       "cannot_run"
+      ],
+      "title": "State"
+     }
+    },
+    "type": "object",
+    "required": [
+     "id",
+     "name",
+     "state"
+    ],
+    "title": "ApiKeyWorkflowRef"
    },
    "ApplicationAvailability": {
     "properties": {
@@ -16370,6 +17092,31 @@
     ],
     "title": "AuthoredSkillBody",
     "description": "The builder model's ONE authored skill body."
+   },
+   "AutoAnsweredNote": {
+    "properties": {
+     "phase": {
+      "anyOf": [
+       {
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Phase"
+     },
+     "message": {
+      "type": "string",
+      "title": "Message"
+     }
+    },
+    "type": "object",
+    "required": [
+     "message"
+    ],
+    "title": "AutoAnsweredNote",
+    "description": "One note on a successful publish: a step the validation run answered automatically, or\na note about the whole run (``phase`` is null). ``message`` is the sentence to show."
    },
    "BindBody": {
     "properties": {
@@ -21280,6 +22027,22 @@
       "type": "integer",
       "title": "Vision Max Pages"
      },
+     "chat_max_tool_rounds": {
+      "type": "integer",
+      "title": "Chat Max Tool Rounds"
+     },
+     "explorer_max_tool_rounds": {
+      "type": "integer",
+      "title": "Explorer Max Tool Rounds"
+     },
+     "api_key_starts_per_minute": {
+      "type": "integer",
+      "title": "Api Key Starts Per Minute"
+     },
+     "api_key_reads_per_minute": {
+      "type": "integer",
+      "title": "Api Key Reads Per Minute"
+     },
      "source_max_file_size_mb": {
       "type": "integer",
       "title": "Source Max File Size Mb"
@@ -21502,6 +22265,10 @@
      "multimodal_max_vision_calls",
      "vision_model",
      "vision_max_pages",
+     "chat_max_tool_rounds",
+     "explorer_max_tool_rounds",
+     "api_key_starts_per_minute",
+     "api_key_reads_per_minute",
      "source_max_file_size_mb",
      "source_max_file_size_mb_floor",
      "source_max_file_size_mb_ceiling",
@@ -22205,6 +22972,191 @@
     "additionalProperties": false,
     "type": "object",
     "title": "HoldRelease"
+   },
+   "InboundFile": {
+    "properties": {
+     "name": {
+      "type": "string",
+      "title": "Name"
+     },
+     "size_bytes": {
+      "anyOf": [
+       {
+        "type": "integer"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Size Bytes"
+     },
+     "url": {
+      "type": "string",
+      "title": "Url",
+      "description": "An absolute, one-time link to the file. Fetch it with no header; it works once and for `expires_in` seconds."
+     },
+     "expires_in": {
+      "type": "integer",
+      "title": "Expires In"
+     }
+    },
+    "type": "object",
+    "required": [
+     "name",
+     "url",
+     "expires_in"
+    ],
+    "title": "InboundFile"
+   },
+   "InboundRunRead": {
+    "properties": {
+     "run_id": {
+      "type": "string",
+      "title": "Run Id"
+     },
+     "status": {
+      "type": "string",
+      "title": "Status"
+     },
+     "step_index": {
+      "anyOf": [
+       {
+        "type": "integer"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Step Index"
+     },
+     "step_total": {
+      "anyOf": [
+       {
+        "type": "integer"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Step Total"
+     },
+     "waiting_on": {
+      "anyOf": [
+       {
+        "$ref": "#/components/schemas/InboundWaitingOn"
+       },
+       {
+        "type": "null"
+       }
+      ]
+     },
+     "output_text": {
+      "anyOf": [
+       {
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Output Text"
+     },
+     "end_reason": {
+      "anyOf": [
+       {
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "End Reason"
+     },
+     "steps": {
+      "items": {
+       "$ref": "#/components/schemas/InboundStep"
+      },
+      "type": "array",
+      "title": "Steps"
+     },
+     "files": {
+      "items": {
+       "$ref": "#/components/schemas/InboundFile"
+      },
+      "type": "array",
+      "title": "Files"
+     }
+    },
+    "type": "object",
+    "required": [
+     "run_id",
+     "status"
+    ],
+    "title": "InboundRunRead"
+   },
+   "InboundStartBody": {
+    "properties": {
+     "inputs": {
+      "additionalProperties": {
+       "type": "string"
+      },
+      "type": "object",
+      "title": "Inputs"
+     }
+    },
+    "additionalProperties": false,
+    "type": "object",
+    "title": "InboundStartBody",
+    "description": "The declared launch fields, as text. Nothing else is accepted."
+   },
+   "InboundStartResult": {
+    "properties": {
+     "run_id": {
+      "type": "string",
+      "title": "Run Id"
+     },
+     "status": {
+      "type": "string",
+      "title": "Status"
+     }
+    },
+    "type": "object",
+    "required": [
+     "run_id",
+     "status"
+    ],
+    "title": "InboundStartResult"
+   },
+   "InboundStep": {
+    "properties": {
+     "name": {
+      "type": "string",
+      "title": "Name"
+     },
+     "state": {
+      "type": "string",
+      "title": "State"
+     }
+    },
+    "type": "object",
+    "required": [
+     "name",
+     "state"
+    ],
+    "title": "InboundStep"
+   },
+   "InboundWaitingOn": {
+    "properties": {
+     "who": {
+      "type": "string",
+      "title": "Who"
+     }
+    },
+    "type": "object",
+    "required": [
+     "who"
+    ],
+    "title": "InboundWaitingOn"
    },
    "IndexSummary": {
     "properties": {
@@ -23536,7 +24488,8 @@
          "completed",
          "failed",
          "cancelled",
-         "timed_out"
+         "timed_out",
+         "cap_paused"
         ]
        },
        {
@@ -23653,6 +24606,18 @@
        }
       ],
       "title": "Artifacts"
+     },
+     "run_origin": {
+      "anyOf": [
+       {
+        "additionalProperties": true,
+        "type": "object"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Run Origin"
      }
     },
     "type": "object",
@@ -25465,7 +26430,9 @@
       ]
      },
      "auto_answered": {
-      "items": {},
+      "items": {
+       "$ref": "#/components/schemas/AutoAnsweredNote"
+      },
       "type": "array",
       "title": "Auto Answered"
      }
@@ -27002,6 +27969,17 @@
       ],
       "title": "End Reason",
       "description": "Why a failed or cancelled run stopped, as recorded; null when nothing was."
+     },
+     "origin": {
+      "anyOf": [
+       {
+        "$ref": "#/components/schemas/RunOriginWire"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "description": "How this run was started, as recorded at start (Phase 293). Null when it was not recorded."
      }
     },
     "type": "object",
@@ -27151,6 +28129,47 @@
     ],
     "title": "RunEvidenceVerdict"
    },
+   "RunOriginWire": {
+    "properties": {
+     "kind": {
+      "type": "string",
+      "enum": [
+       "app",
+       "schedule",
+       "key"
+      ],
+      "title": "Kind"
+     },
+     "label": {
+      "anyOf": [
+       {
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Label"
+     },
+     "actor_name": {
+      "anyOf": [
+       {
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Actor Name"
+     }
+    },
+    "type": "object",
+    "required": [
+     "kind"
+    ],
+    "title": "RunOriginWire",
+    "description": "Phase 293 \u2014 how a run started, as recorded at start. Every run read declares this."
+   },
    "ScheduleTriggerResult": {
     "properties": {
      "launched": {
@@ -27179,6 +28198,23 @@
        }
       ],
       "title": "Detail"
+     },
+     "outcome": {
+      "anyOf": [
+       {
+        "type": "string",
+        "enum": [
+         "launched",
+         "refused",
+         "not_loaded",
+         "error"
+        ]
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Outcome"
      }
     },
     "type": "object",
@@ -27657,6 +28693,50 @@
        }
       ],
       "title": "Vision Max Pages"
+     },
+     "chat_max_tool_rounds": {
+      "anyOf": [
+       {
+        "type": "integer"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Chat Max Tool Rounds"
+     },
+     "explorer_max_tool_rounds": {
+      "anyOf": [
+       {
+        "type": "integer"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Explorer Max Tool Rounds"
+     },
+     "api_key_starts_per_minute": {
+      "anyOf": [
+       {
+        "type": "integer"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Api Key Starts Per Minute"
+     },
+     "api_key_reads_per_minute": {
+      "anyOf": [
+       {
+        "type": "integer"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Api Key Reads Per Minute"
      },
      "source_max_file_size_mb": {
       "anyOf": [
@@ -28946,6 +30026,92 @@
     "title": "StartTunerRunBody",
     "description": "POST body for a tuning run. All fields optional \u2014 defaults derive the configured\ntarget set + auto-seed cases server-side from the owner-scoped catalog (Plan 03)."
    },
+   "StartableField": {
+    "properties": {
+     "key": {
+      "type": "string",
+      "title": "Key"
+     },
+     "label": {
+      "type": "string",
+      "title": "Label"
+     },
+     "required": {
+      "type": "boolean",
+      "title": "Required"
+     }
+    },
+    "type": "object",
+    "required": [
+     "key",
+     "label",
+     "required"
+    ],
+    "title": "StartableField"
+   },
+   "StartableWorkflow": {
+    "properties": {
+     "id": {
+      "type": "string",
+      "title": "Id"
+     },
+     "name": {
+      "type": "string",
+      "title": "Name"
+     },
+     "fields": {
+      "items": {
+       "$ref": "#/components/schemas/StartableField"
+      },
+      "type": "array",
+      "title": "Fields"
+     },
+     "startable": {
+      "type": "boolean",
+      "title": "Startable"
+     },
+     "reason": {
+      "anyOf": [
+       {
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Reason"
+     }
+    },
+    "type": "object",
+    "required": [
+     "id",
+     "name",
+     "fields",
+     "startable"
+    ],
+    "title": "StartableWorkflow"
+   },
+   "StartableWorkflowList": {
+    "properties": {
+     "workflows": {
+      "items": {
+       "$ref": "#/components/schemas/StartableWorkflow"
+      },
+      "type": "array",
+      "title": "Workflows"
+     },
+     "drafts_hidden": {
+      "type": "integer",
+      "title": "Drafts Hidden"
+     }
+    },
+    "type": "object",
+    "required": [
+     "workflows",
+     "drafts_hidden"
+    ],
+    "title": "StartableWorkflowList"
+   },
    "StoppedSourceResponse": {
     "properties": {
      "watch_id": {
@@ -29262,6 +30428,13 @@
      "mime": {
       "type": "string",
       "title": "Mime"
+     },
+     "unplaced_sentences": {
+      "items": {
+       "type": "string"
+      },
+      "type": "array",
+      "title": "Unplaced Sentences"
      }
     },
     "type": "object",
@@ -29850,6 +31023,18 @@
        }
       ],
       "title": "Last Run Updated At"
+     },
+     "origin": {
+      "anyOf": [
+       {
+        "additionalProperties": true,
+        "type": "object"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Origin"
      },
      "phases": {
       "anyOf": [
@@ -31777,6 +32962,17 @@
       "title": "Started At",
       "description": "``min(started_at)`` across this run's phases \u2014 the run's ZERO. NULL means no phase of this run recorded a start: it was written before migration 121, or every step was routed around. \u26a0 NEVER substitute ``created_at``: that is when the row was inserted, which is a different fact."
      },
+     "origin": {
+      "anyOf": [
+       {
+        "$ref": "#/components/schemas/RunOriginWire"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "description": "How this run was started, as recorded at start (Phase 293). Null when it was not recorded."
+     },
      "completed_at": {
       "anyOf": [
        {
@@ -31972,14 +33168,12 @@
      "confidence": {
       "anyOf": [
        {
-        "additionalProperties": true,
-        "type": "object"
+        "$ref": "#/components/schemas/RunEvidenceConfidence"
        },
        {
         "type": "null"
        }
       ],
-      "title": "Confidence",
       "description": "This step's retrieval confidence, computed ONCE at write time by chat's own `_compute_confidence` over the similarity of this step's own `search_documents` calls: `{level, avg_similarity, disclaimer, passages, kb_label}`. `level` is high | medium | low | none, where `none` means the step searched and matched nothing. \u26a0 `null` MEANS THE STEP MADE NO KNOWLEDGE-BASE SEARCH (or its search failed, or the run predates this field) \u2014 render nothing, never a low chip. `kb_label` is the bound project folder's name, else `the knowledge base`, resolved server-side once per read."
      },
      "unsourced": {
@@ -32167,6 +33361,17 @@
       ],
       "title": "End Reason",
       "description": "Why a failed or cancelled run stopped, as RECORDED: the failed step's reason, else the run's `run_failed` audit reason, else a cancelled run's cancel reason. `null` means nothing was recorded (or the run did not fail or stop) \u2014 the client says so; a reason is never composed here."
+     },
+     "origin": {
+      "anyOf": [
+       {
+        "$ref": "#/components/schemas/RunOriginWire"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "description": "How this run was started, as recorded at start (Phase 293). Null when it was not recorded."
      },
      "phases": {
       "items": {
@@ -32568,6 +33773,11 @@
   "securitySchemes": {
    "HTTPBearer": {
     "type": "http",
+    "scheme": "bearer"
+   },
+   "ApiKey": {
+    "type": "http",
+    "description": "An API key made in Settings \u2192 API keys (`srl_live_\u2026`), sent as `Authorization: Bearer <key>`. Starts only the published workflows it lists; runs as the member who made it.",
     "scheme": "bearer"
    }
   }

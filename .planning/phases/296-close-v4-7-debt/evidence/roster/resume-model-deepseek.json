@@ -1,0 +1,54 @@
+{
+  "mode": "resume-model",
+  "provider": "deepseek",
+  "model": "deepseek-v4-pro",
+  "owner_default": {
+    "provider": "deepseek",
+    "model": "deepseek-v4-flash"
+  },
+  "non_default": false,
+  "definition_id": "6f8799d8-7281-4acf-9589-f70b8ab67f1e",
+  "thread_id": "39baf8bd-bf4c-4974-bb9a-2195256e1143",
+  "send_http": 201,
+  "status_before_answer": "paused",
+  "answer_http": 200,
+  "answer_body": "{\"status\":\"ok\"}",
+  "workflow_run_after": {
+    "status": "completed",
+    "model": "deepseek-v4-pro",
+    "metadata_provider": "deepseek"
+  },
+  "first_segment_runs": [
+    {
+      "run_id": "56605efb-69ea-4408-9da2-e0ad245badd0",
+      "status": "completed",
+      "model": "deepseek-v4-pro",
+      "provider": "deepseek"
+    }
+  ],
+  "resumed_segment_runs": [
+    {
+      "run_id": "8f58e57c-b1cb-420c-a095-7e16088de35b",
+      "status": "completed",
+      "model": "unknown",
+      "provider": "unknown"
+    }
+  ],
+  "phases": [
+    {
+      "slug": "pick",
+      "status": "completed",
+      "output_preview": "{\"text\": \"Pick a colour.\", \"answer\": \"Blue\", \"tool_call_id\": \"5e941712d78040c8ab0bc430f3f1dcef\"}"
+    },
+    {
+      "slug": "say",
+      "status": "completed",
+      "output_preview": "{\"text\": \"Blue was picked.\"}"
+    }
+  ],
+  "recorded_for_resume": {
+    "model": "deepseek-v4-pro",
+    "provider": "deepseek"
+  },
+  "verdict": "PASS"
+}

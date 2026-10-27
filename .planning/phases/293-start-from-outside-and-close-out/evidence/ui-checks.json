@@ -1,0 +1,47 @@
+{
+ "note": "headless Chromium through the real login form, DOM reads; screenshots under ui/",
+ "run_page_and_card": {
+  "keyRunCompleted": {
+   "id": "4ab828a3-e5eb-46f0-84dc-431ed7c37673",
+   "originLines": [
+    "Started by key 293-A-brief"
+   ]
+  },
+  "scheduleRun": {
+   "id": "83b3883c-7849-4b83-b315-d58e071b9145",
+   "originLines": [
+    "Started by schedule 293 weekly check"
+   ]
+  },
+  "oldRun": {
+   "id": "20f97ee5-8cbf-4719-9a66-60bff2e0eb61",
+   "originLines": []
+  },
+  "keyRunWaiting": {
+   "id": "1e932094-5f46-4d55-95fb-786c92f63b0a",
+   "originLines": [
+    "Started by key 293-A-brief"
+   ]
+  },
+  "cardNext": [
+   "| next Mon 26 Oct, 09:00"
+  ]
+ },
+ "chat_thread_of_key_runs": {
+  "waiting": {
+   "threadRunLine": [],
+   "originInChat": []
+  },
+  "completed": {
+   "threadRunLine": [],
+   "originInChat": []
+  }
+ },
+ "after_stop_attempt": {
+  "runPageOrigin": [
+   "Started by key 293-A-brief"
+  ],
+  "threadRunLine": [],
+  "originInChat": []
+ }
+}

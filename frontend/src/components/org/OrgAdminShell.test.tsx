@@ -73,6 +73,21 @@ vi.mock("@/components/retention/RetentionTab", async () => {
   }
 })
 
+// Phase 293-04: the API keys leaf owns its own fetches (its suite is OrgApiKeysTab.test.tsx); here
+// it is a stub that proves the shell mounts it, keys it on the org, and wires the pulse + audit door.
+vi.mock("./OrgApiKeysTab", () => ({
+  OrgApiKeysTab: ({ onRecorded, onOpenAudit, orgName }: { onRecorded?: () => void; onOpenAudit?: () => void; orgName?: string | null }) => (
+    <div data-testid="api-keys-tab-stub" data-org={orgName ?? ""}>
+      <button type="button" onClick={() => onRecorded?.()}>
+        record a key revoke
+      </button>
+      <button type="button" onClick={() => onOpenAudit?.()}>
+        open the org audit
+      </button>
+    </div>
+  ),
+}))
+
 const MEMBERS_PAGE: OrgMembersPage = {
   members: [
     { user_id: "u1", email: "alice@example.com", role: "org-admin", joined_at: "2026-01-01T00:00:00Z" },
@@ -277,6 +292,38 @@ describe("OrgAdminShell — Retention is LIVE (275-04 / D-01; replaces the retir
     } finally {
       vi.useRealTimers()
     }
+  })
+})
+
+describe("OrgAdminShell — API keys (293-04 / D-03, D-18)", () => {
+  it("API keys is the LAST tab, after Retention, unlocked, and mounts the keys leaf with the org name", async () => {
+    renderShell()
+    const names = screen.getAllByRole("tab").map((t) => t.textContent)
+    expect(names[names.length - 1]).toBe("API keys")
+    expect(names[names.length - 2]).toBe("Retention")
+    const tab = screen.getByRole("tab", { name: "API keys" })
+    expect(tab.querySelector("svg")).toBeNull() // no lock glyph
+    await userEvent.click(tab)
+    expect(await screen.findByTestId("api-keys-tab-stub")).toHaveAttribute("data-org", "Acme Inc")
+    expect(tab).toHaveAttribute("aria-selected", "true")
+  })
+
+  it("a recorded revoke pulses the band's marker (062-A); the audit link opens the Audit tab", async () => {
+    renderShell()
+    await userEvent.click(screen.getByRole("tab", { name: "API keys" }))
+    await screen.findByTestId("api-keys-tab-stub")
+    vi.useFakeTimers()
+    try {
+      fireEvent.click(screen.getByRole("button", { name: "record a key revoke" }))
+      expect(screen.getByText("every action recorded").className).toContain("bg-success/15")
+      act(() => {
+        vi.advanceTimersByTime(1600)
+      })
+    } finally {
+      vi.useRealTimers()
+    }
+    fireEvent.click(screen.getByRole("button", { name: "open the org audit" }))
+    expect(screen.getByRole("tab", { name: "Audit" })).toHaveAttribute("aria-selected", "true")
   })
 })
 

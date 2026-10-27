@@ -95,6 +95,11 @@ async def split_topic(input: dict, ctx: object) -> dict:
     topic = (input.get("topic") or input.get("kickoff_prompt") or "").strip()
     if not topic:
         return {"sub_questions": []}
+    # 293-REVIEW WR-03: a key-run kickoff splits on the enveloped VALUES only, never on its
+    # `Run <name>` line or the envelope scaffolding (each sub-question is re-enveloped downstream).
+    from app.services.inbound_inputs import envelope_values  # noqa: PLC0415
+
+    topic = "\n".join(envelope_values(topic) or [topic])
 
     raw_parts = _CLAUSE_SPLIT_RE.split(topic)
     sub_questions: list[str] = []

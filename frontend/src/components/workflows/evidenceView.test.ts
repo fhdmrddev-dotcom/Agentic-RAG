@@ -346,3 +346,17 @@ describe("sectionStrings and exportPayload (D-03)", () => {
     expect(toEvidenceView(p).title).toBe("Untitled workflow")
   })
 })
+
+describe("toEvidenceView: how the run started (293-03)", () => {
+  it("carries the recorded origin through, and null when none was recorded", () => {
+    const p = colleaguePayload()
+    p.run.origin = { kind: "key", label: "n8n-prod", actor_name: null }
+    expect(toEvidenceView(p).origin).toEqual({ kind: "key", label: "n8n-prod", actor_name: null })
+    const q = ownerPayload()
+    q.run.origin = null
+    expect(toEvidenceView(q).origin).toBeNull()
+    const r = ownerPayload()
+    delete r.run.origin
+    expect(toEvidenceView(r).origin).toBeNull()
+  })
+})

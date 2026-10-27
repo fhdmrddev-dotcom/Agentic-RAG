@@ -1,0 +1,22 @@
+{
+  "mode": "pinned-emit",
+  "provider": "openai",
+  "model": "gpt-5.6-luna",
+  "pinned_model": null,
+  "pinned_provider": "openai",
+  "definition_id": "1c8d6f55-393d-4d21-99a9-c58875a977ba",
+  "thread_id": "76ed5ec5-bf89-43bd-99c4-e0f125d052a5",
+  "send_http": 201,
+  "send": "{\"message_id\": \"be28757c-a751-49d1-8d08-dcf4d1edc452\", \"run_id\": \"1f6e6fc6-e01d-46bd-aca2-72b1003a47bd\", \"model\": \"gpt-5.6-luna\", \"provider\": \"openai\"}",
+  "workflow_run": {
+    "id": "a399f90f-7e43-492c-9281-60574e9af73f",
+    "status": "completed"
+  },
+  "emit_validated_providers": [
+    "openai"
+  ],
+  "emit_failed_on": [],
+  "failures": [],
+  "has_400": false,
+  "verdict": "PASS"
+}

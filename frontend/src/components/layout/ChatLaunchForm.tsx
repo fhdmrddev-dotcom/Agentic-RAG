@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react"
+import { useEffect, useRef, useState } from "react"
 import { X } from "lucide-react"
 import { LaunchInputFields } from "@/components/workflows/LaunchInputFields"
 import {
@@ -59,12 +59,16 @@ export function ChatLaunchForm({
   fields,
   onConfirm,
   onCancel,
+  initialValues,
 }: {
   workflowName: string
   /** `launchInputFields(def)` — the declared inputs, already minus the reserved keys. */
   fields: EntryInputField[]
   onConfirm: (values: Record<string, string>) => void
   onCancel: () => void
+  /** 296-04 (287-IN-03): on a Retry after the server refused the inputs (422), the values THIS
+   *  person typed into this form a moment ago. Never a default and never the conversation. */
+  initialValues?: Record<string, string>
 }) {
   /**
    * The collected values, keyed by the DECLARED key.
@@ -72,8 +76,15 @@ export function ChatLaunchForm({
    * ⚠ SEEDED FROM NOTHING — not from a prior launch, not from a default, not from the thread.
    * An empty box is an honest empty box. See the ⛔ block above.
    */
-  const [values, setValues] = useState<Record<string, string>>({})
+  const [values, setValues] = useState<Record<string, string>>(() => ({ ...(initialValues ?? {}) }))
   const [refusal, setRefusal] = useState<string | null>(null)
+  // 296 G-4 row 11: under 13 fields the refusal sat ~2,000 px down the scroller, so a refused
+  // Run looked like nothing happened. It is brought into view when it appears (the effect) and
+  // on a repeat press with the same words (which renders nothing new, so `submit` scrolls).
+  const refusalRef = useRef<HTMLParagraphElement>(null)
+  useEffect(() => {
+    if (refusal) refusalRef.current?.scrollIntoView?.({ block: "nearest" })
+  }, [refusal])
 
   // Escape dismisses, exactly as the library modal's does — the two doors behave the same way.
   useEffect(() => {
@@ -97,6 +108,7 @@ export function ChatLaunchForm({
     const missing = missingRequiredFields(fields, values)
     if (missing.length > 0) {
       setRefusal(requiredFieldsMessage(missing))
+      refusalRef.current?.scrollIntoView?.({ block: "nearest" })
       return
     }
     setRefusal(null)
@@ -142,10 +154,14 @@ export function ChatLaunchForm({
           <LaunchInputFields
             fields={fields}
             values={values}
-            onChange={(key, value) => setValues((prev) => ({ ...prev, [key]: value }))}
+            onChange={(key, value) => {
+              // 296-04 (287-IN-01): the refusal answered the last press; the next keystroke clears it.
+              setRefusal(null)
+              setValues((prev) => ({ ...prev, [key]: value }))
+            }}
           />
           {refusal && (
-            <p data-testid="chat-launch-required-refusal" role="alert" className="text-[12px] text-destructive">
+            <p ref={refusalRef} data-testid="chat-launch-required-refusal" role="alert" className="text-[12px] text-destructive">
               {refusal}
             </p>
           )}

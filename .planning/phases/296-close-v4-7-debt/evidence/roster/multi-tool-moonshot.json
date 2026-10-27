@@ -1,0 +1,7 @@
+{
+  "mode": "multi-tool",
+  "provider": "moonshot",
+  "model": "kimi-k3.1-pro-highspeed",
+  "verdict": "\u26d4",
+  "reason": "account suspended for insufficient balance (HTTP 429, BUG-261024-01) \u2014 the provider refuses every call; --probe saw: failed: RateLimitError: Error code: 429 - {'error': {'message': 'Your account org-<redacted> <ak-<redacted>> is suspended due to insufficient balance, please recharge your account or check you"
+}

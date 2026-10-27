@@ -175,6 +175,14 @@ export interface SkillActivation {
   description?: string
 }
 
+/** Phase 293 (START-04 / D-22): how a run was started, as recorded at start. Every run read
+ *  carries it or `null`; an unrecorded run is never given a default kind (D-23). */
+export interface RunOrigin {
+  kind: "app" | "schedule" | "key"
+  label: string | null
+  actor_name: string | null
+}
+
 export interface Message {
   id: string
   thread_id: string
@@ -264,6 +272,9 @@ export interface Message {
    * `parseArtifactRecord` guard, so nothing here is validated or narrowed. Absent when the
    * message showed none. */
   artifacts?: (ArtifactRecord | ArtifactMissing)[]
+  /** Phase 293 (A8): the thread's workflow-run origin, stamped only when every run of the
+   *  thread shares one recorded origin. Rides `_mapMessageResponse`'s `...rest` unchanged. */
+  run_origin?: RunOrigin | null
   /** Phase 076.2 D-01: DeepSeek reasoning/thinking content. Present on
    * assistant messages from thinking-enabled providers (DeepSeek V4).
    * Accumulated during streaming via reasoning_delta SSE events.

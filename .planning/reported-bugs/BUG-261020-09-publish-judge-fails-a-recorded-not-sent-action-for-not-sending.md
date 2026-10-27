@@ -4,12 +4,13 @@ title: The publish judge fails a workflow because its recorded-not-sent action d
 reported: 2026-10-20
 surface: Agentic-RAG
 severity: major
-status: folded
+status: closed
 affected_areas: [backend/publish-gauntlet, workflows/external-action]
 folded_into: "295"
-verified_closed_by: null
+verified_closed_by: "295"
 related_seeds: [SEED-295, SEED-152]
 re_open_trigger: null
+fixed_by_commit: "0bee60c7a (feat(295-02): tell the judge what a recorded-not-sent step produces, RUN-03); 296-02 3a6d7aae8 narrowed the note to by-design recording (D-07); closed by the 296-05 record flip"
 reproduces_on:
   branch: develop
   commit: 46c23fe00

@@ -20,11 +20,13 @@ import {
   GATE_ARMED_WORDS,
   GATE_KIND_MISSING,
   GATE_KIND_WORDS,
-  TEAM_STEP_UNTYPED,
   failJump,
   failRedoThen,
 } from "./teamVocabulary"
 import {
+  // 296-07 (290-IN-02) — AMENDED DELIBERATELY: the untyped-step words moved to ONE home in
+  // `phaseVocabulary.ts`; the shipped local name is kept so every assertion below is unchanged.
+  STEP_UNTYPED as TEAM_STEP_UNTYPED,
   PHASE_TYPE_LABELS,
   PHASE_TYPE_SENTENCES,
   PHASE_TYPE_SUBTITLES,

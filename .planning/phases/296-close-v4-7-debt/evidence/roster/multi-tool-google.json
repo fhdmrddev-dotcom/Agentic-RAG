@@ -1,0 +1,15 @@
+{
+  "mode": "multi-tool",
+  "provider": "google",
+  "model": "gemini-3.8-flash",
+  "thread_id": "00b09dd8-08f2-423c-9f1d-4e6c3be8bfed",
+  "run_id": "471321b5-e5ac-44b7-989d-95e10bcca867",
+  "status": "completed",
+  "tools": [
+    "search_documents",
+    "execute_code"
+  ],
+  "markup_hits": [],
+  "final_preview": "The search found regional revenue records showing 120 for EMEA and 98 for APAC, as well as catalog listings for several financial reports discussing revenue analysis [1]. \n\nThe Python computation of 17 multiplied by 23 resulted in 391.",
+  "verdict": "PASS"
+}

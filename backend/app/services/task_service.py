@@ -483,6 +483,21 @@ async def _stream_one_iteration(
             ]
             content = ""
 
+    # 292.1-REVIEW WR-02 — the provider-blind markup guard on THIS path. The retired adapter strip
+    # used to cover every open_stream consumer; 292.1 moved its replacement into agent_loop only,
+    # so two-bar DSML flowed raw into sub-agent results and harness phase outputs. Strip only: this
+    # path never parsed or ran text calls, and does not start to. Markup with no structured call
+    # is worded with the one shared sentence (never an empty answer); beside a call it is dropped.
+    from app.services.text_tool_calls import replace_failed_call, strip_markup
+
+    _stripped = strip_markup(content)
+    if _stripped is not content:
+        logger.warning(
+            "text_tool_markup sub-iteration provider=%s model=%s len=%d structured_calls=%d",
+            _provider, model, len(content) - len(_stripped), len(tool_calls),
+        )
+        content = _stripped if tool_calls else replace_failed_call(_stripped.rstrip(), "")[0]
+
     return content, tool_calls
 
 

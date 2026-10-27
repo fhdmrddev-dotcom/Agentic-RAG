@@ -1057,6 +1057,31 @@
         ],
         "title": "AssetRef"
       },
+      "AutoAnsweredNote": {
+        "properties": {
+          "phase": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Phase"
+          },
+          "message": {
+            "type": "string",
+            "title": "Message"
+          }
+        },
+        "type": "object",
+        "required": [
+          "message"
+        ],
+        "title": "AutoAnsweredNote",
+        "description": "One note on a successful publish: a step the validation run answered automatically, or\na note about the whole run (``phase`` is null). ``message`` is the sentence to show."
+      },
       "BlockedStep": {
         "properties": {
           "step_slug": {
@@ -2657,7 +2682,9 @@
             ]
           },
           "auto_answered": {
-            "items": {},
+            "items": {
+              "$ref": "#/components/schemas/AutoAnsweredNote"
+            },
             "type": "array",
             "title": "Auto Answered"
           }
@@ -2914,6 +2941,13 @@
           "mime": {
             "type": "string",
             "title": "Mime"
+          },
+          "unplaced_sentences": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Unplaced Sentences"
           }
         },
         "type": "object",

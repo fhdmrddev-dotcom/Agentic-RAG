@@ -113,13 +113,22 @@ export const INPUTS_FOLD_ACTION = "review"
 /** The fold body's heading. */
 export const INPUTS_BODY_HEADING = "Where each answer comes from"
 
-/** What the two sources mean, said once above the rows. */
+/** What the two sources mean, said once above the rows. 296-07 (291-WR-06): the engine has no
+ *  look-up yet (SEED), so the second sentence no longer promises one. */
 export const INPUT_SOURCE_EXPLANATION =
-  "Ask the person: it's a box on the form that starts this workflow. Look it up: it's found in your documents when the workflow runs."
+  "Ask the person: it's a box on the form that starts this workflow. Looking answers up in your documents isn't available yet."
 
 /** The switch's two segments: `source: "user"` and `source: "kb_auto"`. */
 export const INPUT_SOURCE_ASK = "Ask the person"
 export const INPUT_SOURCE_LOOKUP = "Look it up"
+
+/** 296-07 (291-WR-06) — why the `Look it up` segment is disabled (its `aria-describedby`). */
+export const INPUT_SOURCE_LOOKUP_UNAVAILABLE =
+  "Not available yet: a workflow can't look answers up in your documents when it runs."
+
+/** 296-07 (291-WR-06) — on a row ALREADY set to `kb_auto`: what will happen, and the way out. */
+export const INPUT_SOURCE_LOOKUP_SET_WARNING =
+  "This answer was set to be looked up, which isn't available yet, so it will be blank when the workflow runs. Switch it to Ask the person."
 
 /** The switch's accessible name, per row. */
 export function inputSourceGroupLabel(label: string): string {
@@ -151,7 +160,10 @@ const OPTIONS_HINT_CAP = 12
  * then `…`. No options ⇒ the empty string. The options are the server's read of the form,
  * returned as plain text; the launcher renders them as a text label.
  */
-export function inputOptionsHint(options: readonly string[]): string {
+export function inputOptionsHint(rawOptions: readonly string[]): string {
+  // 296-07 (291-S1-copy c) — a blank or whitespace option is not an answer; drop it before
+  // counting, so the hint never ends `(one of: C, S, P, )`.
+  const options = rawOptions.filter((o) => o.trim().length > 0)
   if (options.length === 0) return ""
   const lower = options.map((o) => o.toLowerCase())
   if (lower.length === 2 && lower.includes("yes") && lower.includes("no")) return "(yes or no)"

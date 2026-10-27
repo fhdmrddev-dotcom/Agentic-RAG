@@ -87,11 +87,12 @@ from app.services.thread_handoff import (
     write_handoff,
 )
 from app.services.audit_service import write_audit_entry
+from app.services.typed_continue import is_continue_word  # 292.1 D-13 — pure word match, no model call
 from app.services.thread_workspace_cleanup import collect_thread_workspace_paths, remove_workspace_paths  # 274 D-08
 from app.services.artifact_history import attach_artifacts  # 273 (I-2 / ART-05) — reload attach
 from app.utils.db import aexec
 from app.dependencies import get_pg_pool
-from app.db.runs import finalize_run, insert_assistant_message
+from app.db.runs import finalize_run, insert_assistant_message, run_is_cap_paused
 # 257.1 (SC#4) — cost is READ through the one conversion home and the one rate resolver,
 # never re-derived here. See `_enrich_messages_with_runs` for why the lookup is batched.
 from app.db import rates
@@ -131,6 +132,7 @@ from app.services import run_model_resolution as _run_model_resolution
 # patch (test_dual_mode_wiring) still intercept (D-A4). Behavior byte-identical.
 from app.services.workflow_kickoff import (
     _ensure_skill_snapshots,
+    launch_kickoff,
     preflight_workflow_kickoff,
 )
 # Phase 092 (MODE-01): the net-new run-creation + picker-feed helpers. db-layer
@@ -146,7 +148,7 @@ from app.models.thread import (
     step_identity,
 )
 # 295 (D-04): the unsourced mark — the pure leaf + the one name chain the run page also reads.
-from app.services.harness.run_read_wire import unsourced_for_wire
+from app.services.harness.run_read_wire import origin_for_wire, unsourced_for_wire
 from app.api.workflow_runs import panel_unsourced_who
 from app.models.user_settings import (
     load_all_model_overrides,
@@ -385,6 +387,45 @@ async def _enrich_messages_with_runs(
         m["provider"] = run["provider"] if run else None
         m["started_at"] = run["started_at"] if run else None
         m["completed_at"] = run["completed_at"] if run else None
+
+    # ── Phase 293 (D-22 / A8) — how the thread's workflow run started ─────────────────────
+    #
+    # ADDITIVE: one batched two-column read of this thread's own `workflow_runs` (owner-scoped,
+    # .eq thread_id + .eq user_id + the owner SELECT policy), never per message; the `runs`
+    # query above is untouched. Phase 293 (A8): fail silent, never guess — one-run threads (key,
+    # schedule) are unambiguous by construction; a later in-thread app start makes the thread
+    # ambiguous and the card goes quiet while the run page still shows the origin. A NULL
+    # origin on any run is ambiguity too. The app actor is the caller (the card is the owner's). A failed read
+    # degrades to no origin: this is the chat's primary read.
+    run_origin = None
+    try:
+        wr_resp = await aexec(
+            supabase.table("workflow_runs")
+            .select("origin_kind, origin_label")
+            .eq("thread_id", thread_id)
+            .eq("user_id", user_id)
+        )
+        starts = {
+            (r.get("origin_kind"), r.get("origin_label")) for r in (wr_resp.data or [])
+        }
+        if len(starts) == 1:
+            ((kind, label),) = starts
+            actor = None
+            if kind == "app":
+                prof = await aexec(
+                    supabase.table("profiles")
+                    .select("display_name")
+                    .eq("id", user_id)
+                    .maybe_single()
+                )
+                prof_row = prof.data if prof is not None else None
+                actor = prof_row.get("display_name") if isinstance(prof_row, dict) else None
+            run_origin = origin_for_wire(kind, label, actor)
+    except Exception:  # noqa: BLE001 — degrade to no origin, never 500 the message read.
+        logger.warning("thread %s: run origin read failed", thread_id, exc_info=True)
+        run_origin = None
+    for m in messages:
+        m["run_origin"] = run_origin
 
     # ── Phase 257.1 (ROADMAP SC#4) — cost, resolved in batch ────────────────────────────
     #
@@ -794,6 +835,107 @@ def _require_thread_org(thread_row: dict | None, active_org_id: str | None, *, e
         return
     if str(thread_row.get("org_id") or "") != str(active_org_id or ""):
         raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail=detail)
+
+
+async def _typed_continue_or_none(
+    *, request, body: MessageCreate, thread_row: dict, current_user: dict, supabase, service_supabase, redis,
+) -> JSONResponse | None:
+    """292.1 (BUG-261024-03, D-12 / D-14 / D-15 / D-16): a typed continue word resumes the paused run.
+
+    Returns the reply for a typed Continue, or ``None`` for an ordinary send. The send door calls
+    this once and adds ONE ``if`` (D-20, pinned by test_279 / test_2921); every decision lives here.
+
+    Cheapest first, so a message that is not a continue word never touches the DB:
+      (a) a workflow kickoff or a harness thread is never a typed Continue (harness anchors keep
+          their own Continue);
+      (b) the text must be one of the fixed continue words (D-13, no model call);
+      (c) the thread's LATEST root run (never a sub-agent row), read with no status predicate —
+          the 244 rule: the pause belongs to the latest run or to nobody;
+      (d) it must be PAUSED per ``app.db.runs.run_is_cap_paused`` — the one carrier-aware
+          predicate (292.1-REVIEW CR-02: a FIRST-turn pause finalizes as ``completed`` by design,
+          so ``status == 'cap_paused'`` alone never fired on one) — with Continues left (D-16);
+      (e) the run is handed to ``continue_run`` — the SAME code the button calls (D-14), so the
+          resumed history is the button's history.
+    A refused ``continue_run`` (a race to the last Continue) falls through to a normal send (D-16),
+    and a failed read fails OPEN to a normal send: a read never blocks a message. So does ANY error
+    ``continue_run`` raises (WR-04) — except the one that means another Continue already claimed
+    this pause (WR-03), which reports ``continued`` rather than starting a second run beside it.
+
+    ⛔ Binding: this DELEGATES. It writes nothing, and above all never ``runs.status`` —
+    ``continue_run`` stays the only ``cap_paused → streaming`` writer, and the rejected arm recorded
+    in ``get_thread_workflow_state`` (a second ``runs.status`` writer) still stands."""
+    if body.workflow_definition_id is not None or thread_row.get("active_workflow_run_id") is not None:
+        return None
+    if not is_continue_word(body.content):
+        return None
+    _thread_id = thread_row.get("id")
+    try:
+        async with get_user_pg_connection(request, current_user) as _conn:
+            row = await _conn.fetchrow(
+                """
+                SELECT run_id, status, continues_used
+                FROM runs
+                WHERE thread_id = $1
+                  AND parent_run_id IS NULL
+                ORDER BY started_at DESC
+                LIMIT 1
+                """,
+                UUID(_thread_id) if isinstance(_thread_id, str) else _thread_id,
+            )
+            # Only these two statuses can be a pause; anything else never costs the second read.
+            _paused = row is not None and row["status"] in ("cap_paused", "completed") and (
+                await run_is_cap_paused(_conn, UUID(str(row["run_id"]))))
+    except Exception:  # noqa: BLE001 — fail open: a read failure never blocks a message
+        logger.warning("typed continue: latest-run read failed for thread %s; sending as a new message",
+                       _thread_id, exc_info=True)
+        return None
+    if not _paused:
+        return None
+    if (row["continues_used"] or 0) >= settings.max_continues_per_run:
+        return None
+    from app.api.runs import CONTINUE_ALREADY_CLAIMED, continue_run  # noqa: PLC0415 — runs.py imports this module lazily; a top-level import cycles
+
+    try:
+        res = await continue_run(
+            run_id=UUID(str(row["run_id"])),
+            current_user=current_user,
+            supabase=supabase,
+            service_supabase=service_supabase,
+            redis=redis,
+        )
+    except HTTPException as exc:
+        if exc.status_code == status.HTTP_409_CONFLICT and exc.detail == CONTINUE_ALREADY_CLAIMED:
+            # 292.1-REVIEW WR-03: another Continue (the button) won THIS pause's compare-and-set, so
+            # the run is already resuming. Report that — a normal send would start a second run.
+            _used = (row["continues_used"] or 0) + 1
+            return JSONResponse(status_code=200, content={
+                "continued": True, "run_id": str(row["run_id"]), "message_id": None,
+                "continues_used": _used,
+                "continues_remaining": max(0, settings.max_continues_per_run - _used),
+            })
+        # 292.1-REVIEW WR-04: every other refusal (404, a status that moved, a failed counter
+        # write) falls back to a normal send, as promised above — never rejects the message.
+        logger.warning("typed continue: continue_run refused run %s (%s %s); sending as a new message",
+                       row["run_id"], exc.status_code, exc.detail)
+        return None
+    except Exception:  # noqa: BLE001 — WR-04: an unexpected failure never blocks the person's message
+        logger.warning("typed continue: continue_run failed for run %s; sending as a new message",
+                       row["run_id"], exc_info=True)
+        return None
+    if isinstance(res, JSONResponse) or not isinstance(res, dict) or res.get("status") == "refused":
+        return None
+    return JSONResponse(
+        status_code=200,
+        content={
+            "continued": True,
+            "run_id": str(row["run_id"]),
+            "message_id": None,
+            "continues_used": res["continues_used"],
+            "continues_remaining": res["continues_remaining"],
+            # 292.1 UAT: where the browser follows the resumed run from (absent → it follows nothing).
+            **({"stream_since": res["stream_since"]} if res.get("stream_since") is not None else {}),
+        },
+    )
 
 
 @router.post("", response_model=ThreadResponse, status_code=status.HTTP_201_CREATED)
@@ -1685,6 +1827,10 @@ async def send_message(
     # no orphan message is left behind. No active org on an Expert thread is refused too (fail closed).
     _require_thread_org(thread_resp.data, active_org_id, expert_id=thread_resp.data.get("active_expert_id"),
                         detail="Switch to this chat's organization to keep chatting with its Expert.")
+    # 292.1 (D-12): a typed continue word on a paused Deep thread resumes THAT run via continue_run,
+    # exactly like the button. The one delegating branch (D-20); the decisions live in the helper.
+    if (_continued := await _typed_continue_or_none(request=request, body=body, thread_row=thread_resp.data, current_user=current_user, supabase=supabase, service_supabase=service_supabase, redis=redis)) is not None:
+        return _continued
 
     # ── Phase 092 MODE-01 / MODE-02 — server-side lock + workflow kickoff ──────
     # This is the AUTHORITATIVE workflow lock (the grayed client toggle is courtesy
@@ -1936,13 +2082,15 @@ async def send_message(
             inputs={
                 **{k: v for k, v in (body.inputs or {}).items()
                    if k not in RESERVED_RUN_INPUT_KEYS},
-                "kickoff_prompt": body.content,
+                "kickoff_prompt": launch_kickoff(body.content, _kickoff_definition, body.inputs),  # 293-05 D-3
                 **({"folder_id": str(body.folder_id)} if body.folder_id else {}),
             },
             model=_resolved_model,                      # SEED-047
+            provider=_resolved_provider,  # 296-06 (SEED-362): a resume continues on this provider
             # Phase 092-05 F1: persist the run-owner so harness_audit writes
             # (NOT NULL user_id) and the resume path resolve a real user.
             user_id=UUID(current_user["id"]) if isinstance(current_user["id"], str) else current_user["id"],
+            origin_kind="app",  # 293 (D-22): RunModal, chat launch form, in-thread start, Test Run
         )
 
     # D-067.2-05: Auto-title fires AFTER the first-user-message INSERT but BEFORE the
@@ -2085,6 +2233,10 @@ async def get_thread_workflow(
         async with get_user_pg_connection(request, current_user) as _conn:
             return await _conn.fetch(sql, *args)
 
+    async def _rls_run_is_cap_paused(run_id):
+        async with get_user_pg_connection(request, current_user) as _conn:
+            return await run_is_cap_paused(_conn, run_id)
+
     # 2. Workflow-run state (joined: run -> definition -> current phase + total).
     run_status = None
     definition_slug = None
@@ -2101,12 +2253,16 @@ async def get_thread_workflow(
     last_run_status = None
     last_run_created_at = None
     last_run_updated_at = None
+    # 293 (D-24): the last run's recorded (origin_kind, origin_label), off the same two arms.
+    last_run_origin: tuple[Any, Any] = (None, None)
     if active_workflow_run_id is not None:
         wf_row = await _rls_fetchrow(
             """
             SELECT wr.status,
                    wr.created_at,
                    wr.updated_at,
+                   wr.origin_kind,
+                   wr.origin_label,
                    wr.continues_used,
                    wd.slug  AS definition_slug,
                    wd.name  AS definition_name,
@@ -2133,6 +2289,7 @@ async def get_thread_workflow(
             last_run_status = wf_row["status"]
             last_run_created_at = wf_row["created_at"]
             last_run_updated_at = wf_row["updated_at"]
+            last_run_origin = (wf_row.get("origin_kind"), wf_row.get("origin_label"))
 
     # mode / locked / lock_is_stale derive from the anchor + run terminality.
     mode = "harness" if active_workflow_run_id is not None else "deep"
@@ -2216,7 +2373,14 @@ async def get_thread_workflow(
             """,
             UUID(thread_id) if isinstance(thread_id, str) else thread_id,
         )
-        if deep_row is not None and deep_row["status"] == "cap_paused":
+        # 292.1 G-4 (G4-1, run 1e5b86bc): a FIRST-turn pause finalizes `completed` by design, so
+        # status alone hid the Continue card live and on reload. Ask the one carrier-aware
+        # predicate (CR-01/CR-02's home); only these two statuses can be a pause.
+        if deep_row is not None and (
+            deep_row["status"] == "cap_paused"
+            or (deep_row["status"] == "completed"
+                and await _rls_run_is_cap_paused(UUID(str(deep_row["run_id"]))))
+        ):
             cap_paused = True
             continues_used = deep_row["continues_used"] or 0
             if latest_producer_run_id is None and deep_row["run_id"] is not None:
@@ -2235,7 +2399,7 @@ async def get_thread_workflow(
     if phases_source_run_id is None:
         # D-09 (AMENDED): this widening is what makes the stopped receipt possible on an UNGATED route — the workflow_runs router that D-09 originally chose is canvas_gate'd (middleware/canvas_gate.py:85-93 + workflow_runs.py:169) and visual_workflow_canvas ships OFF (models/user_settings.py:1197-1203), so a chat receipt fed from it would be invisible at the shipped default.
         latest_wf = await _rls_fetchrow(
-            "SELECT id, status, created_at, updated_at FROM workflow_runs WHERE thread_id = $1 "
+            "SELECT id, status, created_at, updated_at, origin_kind, origin_label FROM workflow_runs WHERE thread_id = $1 "
             "ORDER BY created_at DESC LIMIT 1",
             UUID(thread_id) if isinstance(thread_id, str) else thread_id,
         )
@@ -2245,6 +2409,7 @@ async def get_thread_workflow(
             last_run_status = latest_wf["status"]
             last_run_created_at = latest_wf["created_at"]
             last_run_updated_at = latest_wf["updated_at"]
+            last_run_origin = (latest_wf.get("origin_kind"), latest_wf.get("origin_label"))
     if phases_source_run_id is not None:
         # 200 (DES-02 / D-05 / D-07) — widened in LOCKSTEP with `WorkflowPhaseState` and
         # with `api/workflow_runs.py`'s projection: the chat panel and the run page read
@@ -2381,6 +2546,18 @@ async def get_thread_workflow(
                     )
                 )
 
+    # 293 (D-24): the caller's own name, read only for an app start (this route is owner-scoped,
+    # so the starter of an app run is the caller); a failed read names nobody, never a 500.
+    origin_actor = None
+    if last_run_origin[0] == "app":
+        try:
+            prof = await _rls_fetchrow(
+                "SELECT display_name FROM profiles WHERE id = $1", UUID(str(current_user["id"]))
+            )
+            origin_actor = prof["display_name"] if prof is not None else None
+        except Exception:  # noqa: BLE001 — a name is an affordance on a pure read.
+            logger.warning("thread %s: origin name lookup failed", thread_id, exc_info=True)
+
     return ThreadWorkflowState(
         thread_id=UUID(thread_id) if isinstance(thread_id, str) else thread_id,
         mode=mode,
@@ -2423,6 +2600,7 @@ async def get_thread_workflow(
         last_run_status=last_run_status,
         last_run_created_at=last_run_created_at,
         last_run_updated_at=last_run_updated_at,
+        origin=origin_for_wire(*last_run_origin, origin_actor),
         phases=phases_list,
     )
 

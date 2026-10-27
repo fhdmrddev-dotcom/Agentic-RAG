@@ -84,15 +84,19 @@ describe("ensure — microtask-batched GET", () => {
     expect(api.getCitationChecks.mock.calls[1][0]).toHaveLength(50)
   })
 
-  it("a failed GET lets a later ensure() ask again", async () => {
+  // 296-04 (294-IN-06) REWRITTEN IN PLACE: a failed GET is now retried once before it is
+  // forgotten, so the "failed" read is two failures (it was one, and the second call answered).
+  it("a GET that fails twice (one retry) lets a later ensure() ask again", async () => {
     api.getCitationChecks.mockRejectedValueOnce(new Error("down"))
+    api.getCitationChecks.mockRejectedValueOnce(new Error("still down"))
     api.getCitationChecks.mockResolvedValueOnce({ availability: AVAILABLE, checks: {} })
     useCitationCheckStore.getState().ensure("a")
     await settle()
     expect(useCitationCheckStore.getState().availability).toBeNull()
+    expect(api.getCitationChecks).toHaveBeenCalledTimes(2)
     useCitationCheckStore.getState().ensure("a")
     await settle()
-    expect(api.getCitationChecks).toHaveBeenCalledTimes(2)
+    expect(api.getCitationChecks).toHaveBeenCalledTimes(3)
     expect(useCitationCheckStore.getState().availability).toEqual(AVAILABLE)
   })
 })

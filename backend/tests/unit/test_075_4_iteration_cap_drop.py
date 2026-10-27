@@ -42,8 +42,18 @@ def test_iteration_cap_guard_persists_then_pauses() -> None:
     )
 
     # The guard region invokes persist_cap_paused (the consume-not-drop entry).
+    # Phase 292.1 (D-04 / D-07): the condition was widened deliberately from
+    # `force_no_tools and tool_calls_buffer` to also pause when the forced-final round wrote
+    # tool-call markup as TEXT that could not be parsed (`_cap_markup_seen`). Reading only the
+    # structured buffer is how BUG-261024-03 ended a turn on raw markup with no Continue. The
+    # intent pinned here is unchanged: the cap guard persists, then pauses.
+    # Operator option A (2026-10-24): widened once more, deliberately, with `_cap_unanswered` — a
+    # forced-final round that wrote NO answer and queued nothing (claude-opus-5-5 3/3, gpt-5.6-luna
+    # run 7c9a4a3f) now pauses with the D-07 marker instead of completing on the fallback sentence.
     assert re.search(
-        r"if\s+force_no_tools\s+and\s+tool_calls_buffer:[\s\S]{0,2000}?persist_cap_paused\(",
+        r"if\s+force_no_tools\s+and\s+\(tool_calls_buffer\s+or\s+_cap_markup_seen"
+        r"\s+or\s+_cap_unanswered\):"
+        r"[\s\S]{0,2000}?persist_cap_paused\(",
         text,
     ), (
         "The force_no_tools + non-empty-buffer guard must call "

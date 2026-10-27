@@ -1,0 +1,162 @@
+{
+  "entry": {
+    "provider": "anthropic",
+    "model": "claude-opus-5-5",
+    "calling_mode": "NATIVE (native SDK adapter)",
+    "required": true,
+    "extra": null,
+    "forced_from": null
+  },
+  "prompt": "Do these three steps one at a time, each as its own tool call, and wait for each result before the next: 1) search our documents for the project plan; 2) search our documents again for its milestones; 3) use Python (execute_code) to draw a bar chart of milestones per quarter. Do not skip a step and do not combine steps.",
+  "attempts": [
+    {
+      "thread_id": "714eb1a3-3e2b-45b4-a2cf-063b00bb3026",
+      "run_id": "679bc10e-6b8d-41b0-88f7-6d937330730f",
+      "status": "completed",
+      "paused": false,
+      "run": {
+        "run_id": "679bc10e-6b8d-41b0-88f7-6d937330730f",
+        "thread_id": "714eb1a3-3e2b-45b4-a2cf-063b00bb3026",
+        "status": "completed",
+        "model": "claude-opus-5-5",
+        "provider": "anthropic",
+        "continues_used": 0,
+        "started_at": "2026-10-24 08:45:48.766643+00:00"
+      },
+      "classification": "prose-final",
+      "carrier": null,
+      "tool_starts": [
+        "write_todos",
+        "search_documents"
+      ],
+      "event_types": [
+        "citations",
+        "confidence",
+        "delta",
+        "done",
+        "iteration_start",
+        "planning",
+        "sources",
+        "stream_end",
+        "suggestions",
+        "todo_updated",
+        "tool_args_progress",
+        "tool_end",
+        "tool_preparing",
+        "tool_start"
+      ],
+      "cap_paused_event": null,
+      "live_markup_at": null,
+      "live_preview": "*The model produced 2 tool call(s) over 2 step(s) and never wrote an answer. Try breaking the request into smaller steps, or switching to a different model.*",
+      "redis_last_id": "1792831563936-0"
+    },
+    {
+      "thread_id": "699df254-756e-43c4-a133-f68b84c10691",
+      "run_id": "883490b8-c3fa-4da7-b270-05d64886f556",
+      "status": "completed",
+      "paused": false,
+      "run": {
+        "run_id": "883490b8-c3fa-4da7-b270-05d64886f556",
+        "thread_id": "699df254-756e-43c4-a133-f68b84c10691",
+        "status": "completed",
+        "model": "claude-opus-5-5",
+        "provider": "anthropic",
+        "continues_used": 0,
+        "started_at": "2026-10-24 08:46:06.975034+00:00"
+      },
+      "classification": "prose-final",
+      "carrier": null,
+      "tool_starts": [
+        "write_todos",
+        "search_documents"
+      ],
+      "event_types": [
+        "citations",
+        "confidence",
+        "delta",
+        "done",
+        "iteration_start",
+        "planning",
+        "sources",
+        "stream_end",
+        "suggestions",
+        "todo_updated",
+        "tool_args_progress",
+        "tool_end",
+        "tool_preparing",
+        "tool_start"
+      ],
+      "cap_paused_event": null,
+      "live_markup_at": null,
+      "live_preview": "Step 1 is done. The closest thing to a real project plan is the **Implementation Plan (Section 9, a phased roadmap from 0 to 180 days)** in the Executive Proposal for PMO Governance. The other results are a general project management lecture. Next, step 2.",
+      "redis_last_id": "1792831579621-0"
+    },
+    {
+      "thread_id": "b7f4d27b-15af-4e0c-8512-a795d770dfc8",
+      "run_id": "1673d166-8063-4dfc-b83f-fff1a0394123",
+      "status": "completed",
+      "paused": false,
+      "run": {
+        "run_id": "1673d166-8063-4dfc-b83f-fff1a0394123",
+        "thread_id": "b7f4d27b-15af-4e0c-8512-a795d770dfc8",
+        "status": "completed",
+        "model": "claude-opus-5-5",
+        "provider": "anthropic",
+        "continues_used": 0,
+        "started_at": "2026-10-24 08:46:23.195750+00:00"
+      },
+      "classification": "prose-final",
+      "carrier": null,
+      "tool_starts": [
+        "write_todos"
+      ],
+      "event_types": [
+        "delta",
+        "done",
+        "iteration_start",
+        "planning",
+        "stream_end",
+        "suggestions",
+        "todo_updated",
+        "tool_args_progress",
+        "tool_end",
+        "tool_preparing",
+        "tool_start"
+      ],
+      "cap_paused_event": null,
+      "live_markup_at": null,
+      "live_preview": "*The model produced 1 tool call(s) over 2 step(s) and never wrote an answer. Try breaking the request into smaller steps, or switching to a different model.*",
+      "redis_last_id": "1792831591955-0"
+    }
+  ],
+  "paused": false,
+  "continue": null,
+  "markup_hits": [],
+  "reload": {
+    "714eb1a3-3e2b-45b4-a2cf-063b00bb3026": {
+      "http": 200,
+      "equal": true,
+      "compared": 1,
+      "diffs": [],
+      "db_rows_not_in_reload": []
+    },
+    "699df254-756e-43c4-a133-f68b84c10691": {
+      "http": 200,
+      "equal": true,
+      "compared": 1,
+      "diffs": [],
+      "db_rows_not_in_reload": []
+    },
+    "b7f4d27b-15af-4e0c-8512-a795d770dfc8": {
+      "http": 200,
+      "equal": true,
+      "compared": 1,
+      "diffs": [],
+      "db_rows_not_in_reload": []
+    }
+  },
+  "tools_used": [
+    "search_documents",
+    "write_todos"
+  ]
+}

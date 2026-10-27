@@ -439,18 +439,28 @@ export interface PhaseCardProps {
    * the same counting reason).
    */
   runLive?: boolean
+  /**
+   * Phase 296-04 (295-D-uat-02) — the run is `paused` / `cap_paused`, waiting on a person.
+   * Derived by `PhaseTimeline` from the frame it already fetched (the `runLive` shape); a
+   * running step then reads `! Waiting` through `statusMetaForRun`. Absent = today's reading.
+   */
+  runPaused?: boolean
 }
 
-export function PhaseCard({ phase, position, timing, runLive }: PhaseCardProps) {
+export function PhaseCard({ phase, position, timing, runLive, runPaused }: PhaseCardProps) {
   const meta = phaseTypeMeta(phase.phaseType)
   // Phase 252-04 (D-26): the not-live reading is a ROW reached through a function, never
   // an `if` at this call site — `sourceHealthVocabulary.ts:49`'s project rule, *a new cause
   // adds a ROW*. `runLive === undefined` returns `statusMeta(phase.status)` unchanged.
-  const status = statusMetaForRun(phase.status, runLive)
+  const status = statusMetaForRun(phase.status, runLive, runPaused)
   // ⛔ `runLive !== false`, never a truthiness coercion — see the prop's docblock. Every consumer of
   // `isRunning` (the spinner, `aria-busy`, the forced-open row, the BLOOM frame) falls out
   // of this one line with no further edit.
   const isRunning = phase.status === "running" && runLive !== false
+  // 296 review FE-WR-01: the "running" INSTRUMENTS (progressbar, Working line, aria-busy) follow
+  // the reading. On a paused run the step reads `! Waiting`, so none of them may claim work.
+  // The frame and the forced-open row still key on `isRunning` (it is still the current step).
+  const isWorking = isRunning && runPaused !== true
   // The OTHER status that asserts liveness, and it has to move with `isRunning` or the
   // card would print "No outcome" (from the row above) beside a violet active frame.
   const isRetrying = phase.status === "retrying" && runLive !== false
@@ -673,7 +683,7 @@ export function PhaseCard({ phase, position, timing, runLive }: PhaseCardProps) 
           <span className={cn("ml-auto flex flex-none items-center gap-1.5 text-[12px] font-medium", status.textClass)}>
             <span aria-hidden="true">{status.glyph}</span>
             <span>{statusText}</span>
-            {isRunning && (
+            {isWorking && (
               // Indeterminate progressbar — NO aria-valuenow (would flood AT); NOT
               // a live region. aria-busy lives on the panel body below.
               <span
@@ -701,7 +711,7 @@ export function PhaseCard({ phase, position, timing, runLive }: PhaseCardProps) 
         role="region"
         aria-labelledby={headId}
         hidden={!open}
-        aria-busy={isRunning || undefined}
+        aria-busy={isWorking || undefined}
         className="flex flex-col gap-2 px-3 pb-3"
       >
         {/* ── Phase 214-11 (STEP-04 / D-214-16 · sketch 216 §3 surface 1) — THE IDENTITY LINE.
@@ -733,7 +743,7 @@ export function PhaseCard({ phase, position, timing, runLive }: PhaseCardProps) 
             progressbar carry "alive". The engine chip renders ONLY from a REAL sub-agent
             provider (honestly-ABSENT otherwise — never a Bot on the live card, T-127-08).
             The pulse is reduced-motion-gated via the motion-safe: variant. */}
-        {isRunning && (
+        {isWorking && (
           <div data-activity-line className="flex items-center gap-2">
             <span
               aria-hidden="true"

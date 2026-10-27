@@ -238,7 +238,10 @@ export function DiagramArtifact({ record }: ArtifactBodyProps) {
                 />
               </>
             )}
-            <span className="relative line-clamp-4 break-words text-xs leading-[1.4] text-foreground">{node.label}</span>
+            {/* 296-04 (292-IN-03): the clamp hides the tail; the full label is in title on hover. */}
+            <span className="relative line-clamp-4 break-words text-xs leading-[1.4] text-foreground" title={node.label}>
+              {node.label}
+            </span>
           </div>
         )
       })}

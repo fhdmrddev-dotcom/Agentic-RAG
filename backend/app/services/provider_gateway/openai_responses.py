@@ -270,11 +270,8 @@ class _ClosableResponsesStream:
     def __init__(self, raw_stream, active_provider_name: str):
         self._raw = raw_stream
         self._provider = active_provider_name
-        # Parity with the compat adapter's attribute so the consumer's getattr-defaulted
-        # post-drain read is uniform. A Responses stream has no DSML leak path (tool calls
-        # arrive as typed items, never as markup in the text channel) — so it stays False,
-        # which is the honest value here, not a stub.
-        self.dsml_leaked = False
+        # 292.1-REVIEW IN-03: the `dsml_leaked` parity flag is gone with its only reader (the
+        # deepseek-only strip 292.1 retired); markup is the loop's job now, provider-blind.
         self._gen = self._normalize()
 
     def __iter__(self):

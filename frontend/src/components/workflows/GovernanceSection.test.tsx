@@ -247,7 +247,10 @@ describe("GovernanceSection — the one-way lock", () => {
     expect(looseButton()).not.toBeDisabled()
   })
 
-  it("the attached-gate statement appears for BOTH lock causes and for neither free step", () => {
+  // 296-07 (BUG-261021-05) — D-04 amended (b), 296: AMENDED DELIBERATELY. The engine attaches
+  // the citations gate for `detected` only (`grounding.effective_phase`), so the attached-gate
+  // statement is now DETECTED ONLY; an escalated step says, in words, that nothing is checked.
+  it("the attached-gate statement appears for the detected cause only, and for neither free step", () => {
     const detected = renderSection(AGENT)
     expect(screen.getByTestId("governance-attached").textContent).toContain(GROUNDING_ATTACHED_GATE)
     detected.unmount()
@@ -257,7 +260,8 @@ describe("GovernanceSection — the one-way lock", () => {
       availableTools: [],
       groundingEscalated: true,
     })
-    expect(screen.getByTestId("governance-attached").textContent).toContain(GROUNDING_ATTACHED_GATE)
+    expect(screen.queryByTestId("governance-attached")).toBeNull()
+    expect(screen.getByTestId("governance-escalated-no-check")).toBeInTheDocument()
     escalated.unmount()
 
     renderSection({ phaseType: "llm_agent", availableTools: [] })

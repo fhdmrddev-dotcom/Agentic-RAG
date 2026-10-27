@@ -42,6 +42,12 @@ export interface RerankEngineFacts {
   citationCheck: boolean
   /** A one-time cost the operator should know before choosing; null when there is none. */
   firstUseNote: string | null
+  /**
+   * 296-04 (294-LOCAL): how slow it runs and what happens past the time limit; null when not
+   * worth saying. ⛔ The `30` in the local row's sentence is the backend's
+   * `LOCAL_INFERENCE_TIMEOUT_S`, pinned by a backend parity test (296-03): change both together.
+   */
+  latencyNote: string | null
 }
 
 /** Card order is the order here: On this server, Jev, OpenAI Decisions, Cohere (sketch 294 B). */
@@ -62,6 +68,8 @@ export const RERANK_ENGINES: readonly RerankEngineFacts[] = [
     // True by construction: plan 01's local engine loads the model on a background thread and
     // the search falls back to today's order until it is resident.
     firstUseNote: "First use downloads about 2.3 GB; until it has loaded, searches keep today's order.",
+    latencyNote:
+      "Slow on a CPU: about 18 seconds per search in our test. A search that runs past 30 seconds keeps today's order.",
   },
   {
     id: "jev",
@@ -77,6 +85,7 @@ export const RERANK_ENGINES: readonly RerankEngineFacts[] = [
     steering: true,
     citationCheck: true,
     firstUseNote: null,
+    latencyNote: null,
   },
   {
     id: "openai_decisions",
@@ -92,6 +101,7 @@ export const RERANK_ENGINES: readonly RerankEngineFacts[] = [
     steering: true,
     citationCheck: true,
     firstUseNote: null,
+    latencyNote: null,
   },
   {
     id: "cohere",
@@ -107,17 +117,22 @@ export const RERANK_ENGINES: readonly RerankEngineFacts[] = [
     steering: false,
     citationCheck: false,
     firstUseNote: null,
+    latencyNote: null,
   },
 ] as const
 
 const BY_ID: Record<string, RerankEngineFacts> = Object.fromEntries(RERANK_ENGINES.map((e) => [e.id, e]))
 
 /**
- * The row for a stored `rerank_provider`. Total: the legacy `"api"` (which meant Cohere before
- * 294) and any unknown id resolve to the Cohere row — the backend's own alias — never `undefined`.
- * Own-property guarded, so a prototype key such as `"constructor"` cannot resolve to anything else.
+ * The row for a stored `rerank_provider`, or `null` when it names no engine.
+ *
+ * 296-04 (294-IN-05): only the legacy `"api"` (which meant Cohere before 294) resolves to the
+ * Cohere row. It used to resolve EVERY unknown id to Cohere too, which selected the Cohere card
+ * for an engine the search ignores; an unknown id now selects no card, and the Settings block says
+ * so. Own-property guarded, so a prototype key such as `"constructor"` resolves to nothing.
  */
-export function engineFor(id: string | null | undefined): RerankEngineFacts {
-  if (typeof id === "string" && Object.prototype.hasOwnProperty.call(BY_ID, id)) return BY_ID[id]
-  return BY_ID.cohere
+export function engineFor(id: string | null | undefined): RerankEngineFacts | null {
+  if (typeof id !== "string") return null
+  if (Object.prototype.hasOwnProperty.call(BY_ID, id)) return BY_ID[id]
+  return id === "api" ? BY_ID.cohere : null
 }

@@ -100,8 +100,31 @@ def cancel_flag_key(run_id) -> str:
     return f"{_CANCEL_FLAG_PREFIX}{run_id}"
 
 
-async def broadcast_run_cancellation(redis, run_id, reason: str = "cancelled") -> bool:
+#: 295-RES-b (296-02): the sibling LEVEL key that carries WHO pressed Stop, same TTL as the flag.
+_CANCELLED_BY_PREFIX = "run_cancelled_by:"
+
+
+async def cancelled_by(redis, run_id) -> str | None:
+    """The id of the person whose Stop cancelled ``run_id``, or None (a cancel with no person
+    behind it — the circuit breaker — or a Redis fault). Never raises."""
+    try:
+        value = await redis.get(f"{_CANCELLED_BY_PREFIX}{run_id}")
+    except Exception:
+        logger.warning("cancelled_by: registry read failed for run %s", run_id)
+        return None
+    if isinstance(value, bytes):
+        value = value.decode()
+    return value or None
+
+
+async def broadcast_run_cancellation(
+    redis, run_id, reason: str = "cancelled", *, stopped_by=None
+) -> bool:
     """Announce a cancellation to every worker -- level first, then edge (D-204-01).
+
+    295-RES-b (296-02): ``stopped_by`` (the person who pressed Stop) rides a sibling level key,
+    so the producer that finalises the run can record "Stopped by <name>." even when the Stop
+    reached it as a bare ``task.cancel()``. Omitted (the circuit breaker), nothing names anyone.
 
     Returns ``True`` iff the LEVEL landed. The edge is advisory (a run with no live
     subscriber is cancelled just as effectively by the level at its next check), so a
@@ -114,6 +137,12 @@ async def broadcast_run_cancellation(redis, run_id, reason: str = "cancelled") -
     """
     _flag = cancel_flag_key(run_id)
     _level = False
+    if stopped_by is not None:  # BEFORE the flag: a reader that sees the flag sees who
+        try:
+            await redis.set(f"{_CANCELLED_BY_PREFIX}{run_id}", str(stopped_by),
+                            ex=_CANCEL_FLAG_TTL_SECONDS)
+        except Exception:
+            logger.exception("broadcast_run_cancellation: stopper SET failed for %s", run_id)
     try:
         await redis.set(_flag, reason, ex=_CANCEL_FLAG_TTL_SECONDS)
         _level = True
@@ -551,6 +580,25 @@ async def cancel_workflow_run_internals(
         return False
 
 
+async def _broadcast_stopper(redis, supabase, thread_id, by) -> None:
+    """295-RES-b (296-02): a Stop that reaches a LIVE producer (Step 3a) is finalised by the
+    producer's own escape, which cannot see who pressed Stop. Broadcast the thread's workflow
+    run cancel WITH the stopper first, so the escape reads it and records "Stopped by <name>.".
+    A Deep run has no anchor and is left untouched. Never raises: the cancel must still land."""
+    try:
+        from app.utils.db import aexec  # noqa: PLC0415
+
+        _resp = await aexec(
+            supabase.table("threads").select("active_workflow_run_id")
+            .eq("id", thread_id).maybe_single()
+        )
+        _wf = ((_resp.data if _resp is not None else None) or {}).get("active_workflow_run_id")
+        if _wf:
+            await broadcast_run_cancellation(redis, _wf, stopped_by=by)
+    except Exception:
+        logger.exception("Stop: the stopper could not be broadcast for thread %s", thread_id)
+
+
 async def _cancel_run_internals(
     *,
     run_id,
@@ -614,6 +662,8 @@ async def _cancel_run_internals(
             logger.exception(
                 "ask_user cancel sentinel broadcast failed for run %s", run_id
             )
+        if stopped_by is not None:  # 295-RES-b (296-02): name the stopper BEFORE the cancel
+            await _broadcast_stopper(redis, supabase, thread_id, stopped_by)
         task.cancel()
         return "task_cancelled"
 
@@ -769,6 +819,7 @@ __all__ = [
     "_cancel_run_internals",
     # Phase 204 (L-01) -- the cross-worker cancellation brake.
     "broadcast_run_cancellation",
+    "cancelled_by",  # 296-02 (295-RES-b)
     "is_run_cancelled",
     "cancellation_watch",
     "cancel_channel",

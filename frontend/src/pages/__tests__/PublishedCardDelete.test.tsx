@@ -955,7 +955,7 @@ const GUARD_ATOMS = {
    * same plant afterwards, it went red.
    */
   wearsDestructiveWeight: (html: string) =>
-    /(?:^|[\s"])bg-destructive(?=[\s"\/]|$)/.test(html),
+    /(?:^|[\s"])bg-destructive(?=[\s"/]|$)/.test(html),
   /** The audit receipt — the ✎ convention, consequence ≠ receipt (146-148). */
   carriesAnAuditReceipt: (html: string) => /✎/.test(html),
 } as const

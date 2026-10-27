@@ -61,9 +61,12 @@ function tmpDir(): string {
 }
 
 describe("public Syrel API spec (DOCS-03)", () => {
-  it("is titled Syrel API and states the no-API-keys truth", () => {
+  it("is titled Syrel API and states the two-ways-in truth", () => {
     expect(pub.info.title).toBe("Syrel API")
-    expect(pub.info.description).toContain("no API keys")
+    // Phase 293 (D-20): API keys shipped; the old "no API keys" pin is retired on purpose
+    expect(pub.info.description).not.toContain("no API keys")
+    expect(pub.info.description).toContain("API key made in Settings → API keys")
+    expect(pub.info.description).toContain("rate limited")
     expect(pub.info.description).toContain("SEED-013")
     // A-WR-07: the live explorer is bearer-only in production — never promised as a browser page
     expect(pub.info.description).not.toContain("signed-in API explorer")

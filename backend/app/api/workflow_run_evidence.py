@@ -55,7 +55,9 @@ from app.services import run_evidence as ev
 from app.services.harness.phase_confidence import KB_LABEL_DEFAULT, resolve_kb_label
 from app.services.harness.run_read_wire import (
     END_REASON_AUDIT_KINDS,
+    RunOriginWire,
     UnsourcedMark,
+    origin_for_wire,
     resolve_end_reason,
 )
 
@@ -89,6 +91,14 @@ class RunEvidenceRun(BaseModel):
         default=None,
         description="Why a failed or cancelled run stopped, as recorded; null when nothing was.",
     )
+    # 293 (START-04 / D-22) — the run read's rule, off the same helper (run_read_wire).
+    origin: RunOriginWire | None = Field(
+        default=None,
+        description=(
+            "How this run was started, as recorded at start (Phase 293). Null when it was "
+            "not recorded."
+        ),
+    )
 
 
 class RunEvidenceDefinitionPhase(BaseModel):
@@ -116,12 +126,9 @@ class RunEvidenceDeliverable(BaseModel):
     file_id: str | None = Field(default=None, description="Workspace file id; owner only.")
 
 
-class RunEvidenceConfidence(BaseModel):
-    level: str
-    avg_similarity: float | None = None
-    disclaimer: str | None = None
-    passages: int = 0
-    kb_label: str
+# 296-06 (289-IN-07): moved verbatim to the builder's module so the run read types the same
+# field from the same class; re-exported here under its old import path.
+from app.services.harness.phase_confidence import RunEvidenceConfidence  # noqa: E402
 
 
 class RunEvidenceHumanInput(BaseModel):
@@ -185,7 +192,8 @@ class RunEvidenceRead(BaseModel):
 # this statement: a removed member loses access on the next read, with no cache (T-289-16).
 _ACCESS_SQL = """
     SELECT wr.id, wr.thread_id, wr.definition_id, wr.status, wr.org_id, wr.user_id,
-           wr.created_at, wr.updated_at, wr.definition_snapshot, wr.model
+           wr.created_at, wr.updated_at, wr.definition_snapshot, wr.model,
+           wr.origin_kind, wr.origin_label
     FROM workflow_runs wr
     WHERE wr.id = $1
       AND wr.status IN ('completed', 'failed', 'cancelled')
@@ -249,7 +257,10 @@ async def _viewer_reads(
     """A colleague's readable cited documents AND the KB label, on ONE RLS connection (W3a).
 
     Any failure masks every source and yields the default words: fail closed.
+    296-01 (289-IN-04): only canonical UUIDs reach the ``uuid[]`` cast, so one malformed id can
+    no longer fail the read and mask every source; a dropped id simply stays unreadable.
     """
+    document_ids = [d for d in document_ids if ev.is_canonical_uuid(d)]
     try:
         async with deps.get_user_pg_connection(None, {"id": viewer_id}) as conn:
             readable: set[str] = set()
@@ -378,6 +389,9 @@ async def read_run_evidence(
             viewer_is_owner=viewer_is_owner,
             thread_id=str(run["thread_id"]) if viewer_is_owner and run.get("thread_id") else None,
             end_reason=end_reason,
+            # 293 (D-22): the starter's display name, the one the started-by line already
+            # read; a key or schedule start names no person (origin_for_wire drops it).
+            origin=origin_for_wire(run.get("origin_kind"), run.get("origin_label"), display_name),
         ),
         definition=RunEvidenceDefinition(**definition),
         definition_changed=RunEvidenceDefinitionChanged(**changed),

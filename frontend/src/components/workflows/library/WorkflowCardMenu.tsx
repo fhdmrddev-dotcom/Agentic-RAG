@@ -36,7 +36,8 @@
  * THAT CREATED IT — an unlisted module is swept by nothing at all.
  */
 import { useState, type RefObject } from "react"
-import { CalendarClock, History, Loader2, MoreHorizontal, Trash2 } from "lucide-react"
+import { CalendarClock, History, KeyRound, Loader2, MoreHorizontal, Trash2 } from "lucide-react"
+import { API_KEYS_COPY } from "@/components/settings/apiKeys/apiKeysCopy"
 
 import {
   DropdownMenu,
@@ -175,6 +176,8 @@ export interface WorkflowCardMenuProps {
   hasExistingFork: boolean
   onRunLog?: (scope: { slug: string; name: string }) => void
   onSchedule?: (scope: { id: string; name: string }) => void
+  /** Phase 293-04 (D-18): open Settings → API keys with this workflow pre-picked (row ID). */
+  onApiKey?: (scope: { id: string; name: string }) => void
   onForkNewVersion: (row: LibraryRow) => void
   onForkStarter: (row: LibraryRow) => void
   /** The card's handle on the victim-naming Sheet it mounts. The menu only asks it to open. */
@@ -190,6 +193,7 @@ export function WorkflowCardMenu({
   hasExistingFork,
   onRunLog,
   onSchedule,
+  onApiKey,
   onForkNewVersion,
   onForkStarter,
   deleteSheetRef,
@@ -266,6 +270,22 @@ export function WorkflowCardMenu({
                   >
                     <CalendarClock className="mr-2 h-3.5 w-3.5" aria-hidden="true" />
                     {SCHEDULE_LABEL}
+                  </DropdownMenuItem>
+                )}
+
+                {/* ── Phase 293-04 (D-18) — make an API key for THIS workflow ─────────
+                    Directly under Schedules: both start this workflow without a person
+                    pressing Run. ⚠ OWNED PUBLISHED ROWS ONLY, and `runnable`: the server's
+                    key form lists only the caller's own published workflows, so offering it
+                    elsewhere would be an affordance that exists only to land on a draft card
+                    that cannot tick it. ⚠ A `DropdownMenuItem`, which keeps WR-03 green. */}
+                {onApiKey && row.provenance === "published" && owned && runnable && (
+                  <DropdownMenuItem
+                    data-testid="workflow-api-key"
+                    onClick={() => onApiKey({ id: row.id, name: row.name })}
+                  >
+                    <KeyRound className="mr-2 h-3.5 w-3.5" aria-hidden="true" />
+                    {API_KEYS_COPY.menu.newApiKey}
                   </DropdownMenuItem>
                 )}
 

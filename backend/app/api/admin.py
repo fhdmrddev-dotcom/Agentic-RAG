@@ -2001,6 +2001,9 @@ async def run_model_discovery(
             "provider": d.get("provider"),
             "status": d.get("status"),
             "ok": d.get("status") == "ok",
+            # How many ids /models returned. `new` only carries the ones the registry lacks, so
+            # without this count a provider whose models are mostly known reads as "found little".
+            "returned": len(d.get("ids") or []),
         }
         for d in discovered
     ]

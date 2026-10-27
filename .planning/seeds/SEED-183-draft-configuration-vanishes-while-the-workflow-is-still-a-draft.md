@@ -6,6 +6,7 @@ planted_during: Phase 197 close — operator observation, independently confirme
 status: answered
 status_note: |
   Answered by Phase 288 plan 01 (2026-10-19): the arrival card keeps a collapsed "Draft settings" row (decisions + the working-name input) for the whole draft, driven live on a re-opened draft: decision-name-input count 0 -> 1 after a library round trip AND a hard reload, rename and node config persisted (288-VALIDATION.md S1/S2). OWED: the generate -> press-X-on-arrival -> reopen arm, which needs a real describe-door generation; that was blocked on 2026-10-19 because the authoring model (claude-opus-4-8) is billing-blocked.
+folded_into: "288"
 priority: high
 surface: Agentic-RAG
 relates_to:

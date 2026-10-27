@@ -48,8 +48,13 @@ import {
   triggerSchedule,
   updateSchedule,
 } from "@/lib/api"
-import type { ScheduleCadenceKind, WorkflowSchedule } from "@/types/schedule"
-import { launchInputFields, type DefShape } from "@/components/workflows/soulData"
+import type { ScheduleCadenceKind, ScheduleTriggerResult, WorkflowSchedule } from "@/types/schedule"
+import {
+  launchInputFields,
+  missingRequiredFields,
+  requiredFieldsMessage,
+  type DefShape,
+} from "@/components/workflows/soulData"
 
 export interface WorkflowScheduleModalProps {
   /** The workflow being scheduled. `id` is its definition id; `name` is what the header says. */
@@ -105,6 +110,29 @@ function whenText(iso: string | null | undefined): string | null {
   return Number.isNaN(d.getTime()) ? null : d.toLocaleString()
 }
 
+/** 296-04 (BUG-261025-01): the Run now result, shown on the row that was pressed. */
+const RUN_NOW_STARTED = "Started. It runs in the background — open the run log to watch it."
+type RunNowTone = "success" | "warning" | "error"
+interface RunNowResult {
+  scheduleId: string
+  tone: RunNowTone
+  text: string
+}
+const RUN_NOW_TONE: Record<RunNowTone, string> = {
+  success: "text-foreground",
+  warning: "text-[hsl(var(--warning))]",
+  error: "text-[hsl(0_80%_80%)]",
+}
+
+/** Read the trigger result into one row-local line. `detail` is the server's sentence, verbatim.
+ *  An older backend sends no `outcome`: launched reads success, anything else the error tone. */
+function runNowResult(scheduleId: string, r: ScheduleTriggerResult): RunNowResult {
+  const outcome = r.outcome ?? (r.launched ? "launched" : "error")
+  if (outcome === "launched") return { scheduleId, tone: "success", text: RUN_NOW_STARTED }
+  const text = r.detail || "It did not start."
+  return { scheduleId, tone: outcome === "error" ? "error" : "warning", text }
+}
+
 /** The cadence, in words. Reads the ROW, never a form value. */
 function cadenceText(s: WorkflowSchedule): string {
   if (s.cron_expression) return `${s.cron_expression} (${s.timezone})`
@@ -129,7 +157,11 @@ export function WorkflowScheduleModal({
   const [loadFailed, setLoadFailed] = useState(false)
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState<string | null>(null)
-  const [notice, setNotice] = useState<string | null>(null)
+  // 296-04 (BUG-261025-01): the row being started, and the one result line (per modal).
+  const [runningId, setRunningId] = useState<string | null>(null)
+  const [runResult, setRunResult] = useState<RunNowResult | null>(null)
+  // 296-04 (287-SCHED): the refusal for an empty required launch input, under the inputs.
+  const [requiredRefusal, setRequiredRefusal] = useState<string | null>(null)
   const [schedulerEnabled, setSchedulerEnabled] = useState<boolean | null>(null)
 
   const [name, setName] = useState("")
@@ -215,7 +247,7 @@ export function WorkflowScheduleModal({
     if (busy) return
     setBusy(true)
     setError(null)
-    setNotice(null)
+    setRunResult(null)
     try {
       await work()
     } catch (e) {
@@ -226,8 +258,15 @@ export function WorkflowScheduleModal({
     }
   }
 
-  const onCreate = () =>
-    withBusy(async () => {
+  const onCreate = () => {
+    // 296-04 (287-SCHED): refuse with words before anything is sent; the button stays enabled.
+    const missing = missingRequiredFields(launchFields, inputValues)
+    if (missing.length > 0) {
+      setRequiredRefusal(requiredFieldsMessage(missing))
+      return
+    }
+    setRequiredRefusal(null)
+    return withBusy(async () => {
       // ── 214-09 (STEP-02 / D-214-04): the schedule's `inputs` dict stops being kickoff-only ──
       //
       // ⭐ THIS SIDE OF THE PHASE IS COMPLETE END TO END, unlike the library door.
@@ -267,6 +306,7 @@ export function WorkflowScheduleModal({
       setInputValues({})
       await refresh()
     })
+  }
 
   const onToggle = (s: WorkflowSchedule) =>
     withBusy(async () => {
@@ -282,14 +322,16 @@ export function WorkflowScheduleModal({
 
   const onRunNow = (s: WorkflowSchedule) =>
     withBusy(async () => {
-      const result = await triggerSchedule(s.id)
-      // ⚠ `launched: false` is a real answer with a reason, not an error. Saying "failed"
-      // would hide the one fact that tells the person what to do next.
-      setNotice(
-        result.launched
-          ? "Started. It runs in the background — open the run log to watch it."
-          : result.detail || "It did not start.",
-      )
+      setRunningId(s.id)
+      try {
+        const result = await triggerSchedule(s.id)
+        // ⚠ `launched: false` is a real answer with a reason, not an error. Saying "failed"
+        // would hide the one fact that tells the person what to do next. 296-04: the line now
+        // sits on the pressed row, toned by `outcome`.
+        setRunResult(runNowResult(s.id, result))
+      } finally {
+        setRunningId(null)
+      }
       await refresh()
     })
 
@@ -380,18 +422,43 @@ export function WorkflowScheduleModal({
                         {!s.is_active ? (
                           <p className="text-[12px] text-muted-foreground">Paused — it will not run.</p>
                         ) : null}
+                        {/* 296-04 (BUG-261025-01): the Run now result, on THIS row, under Last ran.
+                            Polite for a start or a refusal; an alert only for a genuine error. */}
+                        {runResult?.scheduleId === s.id ? (
+                          <p
+                            data-testid="schedule-run-result"
+                            role={runResult.tone === "error" ? "alert" : "status"}
+                            className={`mt-1 text-[12px] ${RUN_NOW_TONE[runResult.tone]}`}
+                          >
+                            {runResult.tone === "success" ? <span aria-hidden="true" className="mr-1">✓</span> : null}
+                            {runResult.text}
+                          </p>
+                        ) : null}
                       </div>
                       <div className="flex shrink-0 items-center gap-1">
                         <button
                           type="button"
                           data-testid="schedule-run-now"
                           disabled={busy}
+                          aria-busy={runningId === s.id ? true : undefined}
                           onClick={() => void onRunNow(s)}
                           title="Run now (this does not change the cadence)"
                           className="rounded-md p-1.5 text-muted-foreground transition-colors hover:text-foreground disabled:opacity-50"
                         >
-                          <Play className="h-3.5 w-3.5" aria-hidden="true" />
-                          <span className="sr-only">Run now</span>
+                          {runningId === s.id ? (
+                            <>
+                              <Loader2
+                                className="h-3.5 w-3.5 animate-spin motion-reduce:animate-none"
+                                aria-hidden="true"
+                              />
+                              <span className="sr-only">Starting…</span>
+                            </>
+                          ) : (
+                            <>
+                              <Play className="h-3.5 w-3.5" aria-hidden="true" />
+                              <span className="sr-only">Run now</span>
+                            </>
+                          )}
                         </button>
                         <button
                           type="button"
@@ -466,15 +533,21 @@ export function WorkflowScheduleModal({
                       type="text"
                       data-testid={`schedule-input-${f.key}`}
                       value={inputValues[f.key] ?? ""}
-                      onChange={(e) =>
+                      onChange={(e) => {
+                        setRequiredRefusal(null)
                         setInputValues((prev) => ({ ...prev, [f.key]: e.target.value }))
-                      }
+                      }}
                       className="rounded-md border border-border bg-background px-2 py-1.5 text-[13px] text-foreground"
                     />
                   </label>
                 ))}
               </div>
             )}
+            {requiredRefusal ? (
+              <p data-testid="schedule-required-refusal" role="alert" className="text-[12px] text-destructive">
+                {requiredRefusal}
+              </p>
+            ) : null}
 
             <fieldset className="flex flex-col gap-2">
               <legend className="text-[12px] text-muted-foreground">How often</legend>
@@ -627,11 +700,6 @@ export function WorkflowScheduleModal({
             {error ? (
               <p data-testid="schedule-error" role="alert" className="text-[12px] text-destructive">
                 {error}
-              </p>
-            ) : null}
-            {notice ? (
-              <p data-testid="schedule-notice" className="text-[12px] text-muted-foreground">
-                {notice}
               </p>
             ) : null}
 

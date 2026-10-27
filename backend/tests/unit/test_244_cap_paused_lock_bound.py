@@ -102,6 +102,12 @@ class _FakeConn:
             return None
         if "FROM runs" not in flat:
             return None
+        # 292.1 G-4: the endpoint now asks `run_is_cap_paused` about a latest `completed` row
+        # (a first-turn pause finalizes `completed`). This fake models NO carrier rows, so the
+        # honest answer to that probe is "not paused"; the first-turn case is driven in
+        # test_2921_thread_state_first_turn_pause.py with the probe stubbed both ways.
+        if "AS paused" in flat:
+            return {"paused": False}
         rows = list(self.runs)
         # Honour a status predicate when the query carries one — this is the ONE
         # behaviour that separates the shipped query from the bounded one.

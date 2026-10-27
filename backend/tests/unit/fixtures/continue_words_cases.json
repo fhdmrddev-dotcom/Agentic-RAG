@@ -1,0 +1,5 @@
+{
+  "words": ["continue", "keep going", "go on", "carry on", "resume", "proceed"],
+  "match": ["continue", "Continue.", "  KEEP GOING!  ", "go on…", "Carry on?", "resume", "proceed!!"],
+  "no_match": ["please continue", "continue with the chart", "ok", "", "continued", "go"]
+}

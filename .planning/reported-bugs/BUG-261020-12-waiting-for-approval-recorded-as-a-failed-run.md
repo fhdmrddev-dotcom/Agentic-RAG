@@ -4,12 +4,13 @@ title: A run waiting for an action-risk approval is recorded as a failed run
 reported: 2026-10-20
 surface: Agentic-RAG
 severity: minor
-status: folded
+status: closed
 affected_areas: [backend/harness, workflows/action-risk]
 folded_into: "295"
-verified_closed_by: null
+verified_closed_by: "295"
 related_seeds: [SEED-295, SEED-152]
 re_open_trigger: null
+fixed_by_commit: "80fc12e76 (295-03: an armed approval pauses durably) and bfe4e49ac (295-04, RUN-04); closed by the 296-05 record flip"
 reproduces_on:
   branch: develop
   commit: 46c23fe00

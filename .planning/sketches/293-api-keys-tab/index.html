@@ -1,0 +1,546 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Sketch 293 — API Keys Tab</title>
+<link rel="stylesheet" href="../themes/default.css">
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+<style>
+*{box-sizing:border-box}
+body{margin:0;background:var(--color-bg);color:var(--color-text);font-family:var(--font-sans);font-size:var(--text-base)}
+#vnav,#states{display:flex;align-items:center;gap:8px;padding:10px 16px;border-bottom:1px solid var(--color-border);flex-wrap:wrap}
+.lbl{font-family:var(--font-mono);font-size:var(--text-xs);color:var(--color-text-dim);margin-right:6px}
+.vtab,.stab{background:transparent;border:1px solid var(--color-border);color:var(--color-text-muted);font-size:var(--text-xs);padding:6px 12px;border-radius:999px;cursor:pointer;font-family:inherit;transition:all .15s ease}
+.vtab:hover,.stab:hover{border-color:var(--color-primary)}
+.vtab.active{background:var(--color-primary-dim);border-color:var(--color-primary);color:var(--color-primary)}
+.stab.active{background:var(--color-accent);color:var(--color-text)}
+#note{padding:8px 16px;font-size:var(--text-sm);color:var(--color-text-muted);border-bottom:1px solid var(--color-border-soft)}
+#note b{color:var(--color-text)}
+
+/* page chrome: Settings header + tabs, or the org-admin indigo band */
+#page{max-width:1080px;margin:0 auto;padding:18px 16px 40px}
+.ph{display:flex;align-items:baseline;gap:10px;margin-bottom:10px}
+.ph h1{font-family:var(--font-headline);font-size:var(--text-xl);margin:0;font-weight:600}
+.ph .sub{font-size:var(--text-sm);color:var(--color-text-dim)}
+.tabs{display:flex;gap:2px;border-bottom:1px solid var(--color-border);margin-bottom:16px;overflow-x:auto}
+.tabs span{font-size:var(--text-sm);color:var(--color-text-muted);padding:8px 12px;border-bottom:2px solid transparent;white-space:nowrap}
+.tabs span.on{color:var(--color-text);border-bottom-color:var(--color-primary)}
+.band{display:flex;align-items:center;gap:10px;padding:10px 14px;border-radius:var(--radius-md);background:hsl(239 60% 50% / .14);border:1px solid hsl(239 100% 82% / .3);margin-bottom:10px}
+.band .sh{width:24px;height:24px;border-radius:6px;display:grid;place-items:center;background:hsl(239 100% 82% / .2);color:var(--color-primary);font-size:13px}
+.band b{font-size:var(--text-sm)}
+.band .s{font-size:var(--text-xs);color:var(--color-text-muted)}
+
+.card{border:1px solid var(--color-border);border-radius:var(--radius-lg);background:var(--color-surface);padding:18px 20px;margin-bottom:14px}
+.card h2{margin:0;font-size:var(--text-base);font-weight:600}
+.card .desc{margin:4px 0 14px;font-size:var(--text-sm);color:var(--color-text-muted);line-height:1.5}
+.hrow{display:flex;align-items:flex-start;justify-content:space-between;gap:12px}
+.mono{font-family:var(--font-mono)}
+.dim{color:var(--color-text-dim)}
+.muted{color:var(--color-text-muted)}
+.small{font-size:var(--text-xs)}
+.btn{background:var(--color-primary-strong);color:#fff;border:0;border-radius:8px;padding:7px 14px;font-size:var(--text-sm);cursor:pointer;font-family:inherit;transition:all .15s;white-space:nowrap}
+.btn:hover{filter:brightness(1.1)}
+.btn[disabled]{opacity:.45;cursor:not-allowed;filter:none}
+.btn.ghost{background:transparent;border:1px solid var(--color-border);color:var(--color-text-muted)}
+.btn.ghost:hover{border-color:var(--color-primary);color:var(--color-text)}
+.btn.danger{background:hsl(0 72% 45%)}
+.btn.dangerghost{background:transparent;border:1px solid hsl(0 72% 51% / .45);color:hsl(0 80% 80%)}
+.btn.dangerghost:hover{background:var(--color-danger-dim)}
+.btn.sm{padding:4px 10px;font-size:var(--text-xs)}
+.link{color:var(--color-primary);text-decoration:none;cursor:pointer;background:none;border:0;font:inherit;padding:0}
+.link:hover{text-decoration:underline}
+.tag{display:inline-flex;align-items:center;gap:4px;font-family:var(--font-mono);font-size:10px;border-radius:999px;padding:2px 8px;border:1px solid var(--color-border);color:var(--color-text-muted);white-space:nowrap}
+.tag.ok{color:var(--color-success);border-color:hsl(142 71% 45% / .4);background:var(--color-success-dim)}
+.tag.warn{color:var(--color-warning);border-color:hsl(38 92% 60% / .4);background:var(--color-warning-dim)}
+.tag.bad{color:hsl(0 80% 80%);border-color:hsl(0 72% 51% / .4);background:var(--color-danger-dim)}
+.tag.off{color:var(--color-text-dim);border-style:dashed}
+.wfchip{display:inline-flex;align-items:center;gap:5px;font-size:var(--text-xs);border-radius:6px;padding:2px 7px;background:var(--color-bg-elev1);border:1px solid var(--color-border-soft);color:var(--color-text-muted);margin:2px 4px 2px 0}
+.wfchip.gone{border-style:dashed;color:var(--color-warning)}
+.limits{font-size:var(--text-xs);color:var(--color-text-dim);margin-top:10px}
+
+/* create form */
+.form .row{display:grid;grid-template-columns:130px minmax(0,1fr);gap:12px;align-items:start;padding:8px 0}
+.form .row>label{font-size:var(--text-sm);color:var(--color-text-muted);padding-top:6px}
+input[type=text]{height:32px;width:100%;font-size:var(--text-sm);border-radius:8px;background:hsl(220 30% 11% / .5);border:1px solid var(--color-border);color:var(--color-text);padding:0 8px;font-family:inherit}
+input:focus{outline:none;box-shadow:0 0 0 2px var(--color-primary-dim)}
+.wflist{border:1px solid var(--color-border);border-radius:8px;max-height:210px;overflow:auto}
+.wfopt{display:flex;align-items:center;gap:9px;padding:7px 10px;font-size:var(--text-sm);border-bottom:1px solid var(--color-border-soft);cursor:pointer}
+.wfopt:last-child{border-bottom:0}
+.wfopt:hover{background:var(--color-bg-elev1)}
+.wfopt.na{cursor:not-allowed;color:var(--color-text-dim)}
+.wfopt.na:hover{background:transparent}
+.wfopt .why{margin-left:auto;font-size:var(--text-xs);color:var(--color-text-dim)}
+.wfopt .flds{margin-left:auto;font-family:var(--font-mono);font-size:10px;color:var(--color-text-dim)}
+.seg{display:inline-flex;border:1px solid var(--color-border);border-radius:999px;padding:2px;gap:2px}
+.seg button{background:transparent;border:0;color:var(--color-text-muted);font-size:var(--text-xs);padding:6px 14px;border-radius:999px;cursor:pointer;font-family:inherit}
+.seg button.on{background:var(--color-primary-dim);color:var(--color-primary)}
+.runsas{margin-top:8px;border:1px solid var(--color-border-soft);border-left:3px solid var(--color-primary);border-radius:8px;padding:8px 12px;font-size:var(--text-sm);color:var(--color-text-muted);background:var(--color-bg-elev1);line-height:1.5}
+.runsas b{color:var(--color-text)}
+.fromhint{font-size:var(--text-xs);color:var(--color-primary);margin-bottom:8px}
+.actions{display:flex;gap:8px;align-items:center;margin-top:14px;flex-wrap:wrap}
+
+/* show once */
+.once{border:1px solid hsl(38 92% 60% / .45);border-radius:var(--radius-lg);background:hsl(38 92% 60% / .05);padding:16px 18px}
+.once h3{margin:0 0 4px;font-size:var(--text-base)}
+.oncewarn{font-size:var(--text-sm);color:var(--color-warning);margin-bottom:10px}
+.secret{display:flex;gap:8px;align-items:center;font-family:var(--font-mono);font-size:var(--text-sm);background:var(--color-bg);border:1px solid var(--color-border);border-radius:8px;padding:8px 10px;word-break:break-all}
+.secret span{flex:1}
+pre.code{margin:6px 0 0;font-family:var(--font-mono);font-size:11.5px;line-height:1.6;background:var(--color-bg);border:1px solid var(--color-border);border-radius:8px;padding:10px 12px;overflow-x:auto;color:var(--color-text-muted);white-space:pre}
+pre.code .s{color:hsl(142 60% 70%)}
+pre.code .k{color:var(--color-primary)}
+.codehead{display:flex;align-items:center;justify-content:space-between;margin-top:12px;font-size:var(--text-xs);color:var(--color-text-dim)}
+.copy{background:var(--color-bg-elev1);border:1px solid var(--color-border);color:var(--color-text-muted);border-radius:6px;font-size:11px;padding:3px 9px;cursor:pointer;font-family:inherit}
+.copy.done{color:var(--color-success);border-color:hsl(142 71% 45% / .4)}
+details.resp summary{cursor:pointer;font-size:var(--text-xs);color:var(--color-text-muted);margin-top:12px}
+
+/* list (A table) */
+table{width:100%;border-collapse:collapse}
+th{font-family:var(--font-mono);font-size:10px;text-transform:uppercase;letter-spacing:.06em;color:var(--color-text-dim);text-align:left;font-weight:500;padding:6px 8px;border-bottom:1px solid var(--color-border)}
+td{font-size:var(--text-sm);padding:10px 8px;border-bottom:1px solid var(--color-border-soft);vertical-align:top}
+tr.krow{cursor:pointer}
+tr.krow:hover td{background:hsl(220 30% 11% / .35)}
+tr.krow.sel td{background:var(--color-primary-dim)}
+tr.dead td{color:var(--color-text-dim)}
+.kname{font-weight:600;display:flex;gap:6px;align-items:center}
+.kprefix{font-family:var(--font-mono);font-size:10px;color:var(--color-text-dim)}
+.caret{display:inline-block;width:12px;color:var(--color-text-dim);transition:transform .15s}
+.open .caret{transform:rotate(90deg)}
+tr.actrow td{background:var(--color-bg-elev1);padding:12px 16px}
+.newflash td{animation:flash 1.6s ease}
+@keyframes flash{0%{background:hsl(142 71% 45% / .18)}100%{background:transparent}}
+.receipt{font-size:var(--text-xs);color:var(--color-text-dim);margin-top:4px}
+.receipt::before{content:"✎ ";color:var(--color-text-muted)}
+
+/* activity */
+.act{width:100%}
+.act td{font-size:var(--text-xs);padding:6px 8px;border-bottom:1px solid var(--color-border-soft)}
+.act td.t{font-family:var(--font-mono);color:var(--color-text-dim);white-space:nowrap}
+.verb{font-family:var(--font-mono);font-size:10px;padding:1px 6px;border-radius:4px;background:var(--color-muted);color:var(--color-text-muted)}
+.verb.start{background:var(--color-primary-dim);color:var(--color-primary)}
+.res.ok{color:var(--color-success)}
+.res.no{color:hsl(0 80% 80%)}
+.acthead{display:flex;justify-content:space-between;align-items:center;margin-bottom:6px;font-size:var(--text-xs);color:var(--color-text-dim)}
+
+/* B: split */
+.split{display:grid;grid-template-columns:minmax(0,1fr) 0px;gap:0;transition:grid-template-columns .2s ease}
+.split.withpanel{grid-template-columns:minmax(0,1fr) 400px;gap:14px}
+.side{border:1px solid var(--color-border);border-radius:var(--radius-lg);background:var(--color-surface);padding:16px 18px;overflow:hidden;min-width:0}
+.split:not(.withpanel) .side{display:none}
+.side h3{margin:0;font-size:var(--text-base)}
+.side .sec{margin-top:14px;padding-top:12px;border-top:1px solid var(--color-border-soft)}
+.side .sec h4{margin:0 0 6px;font-family:var(--font-mono);font-size:10px;text-transform:uppercase;letter-spacing:.06em;color:var(--color-text-dim);font-weight:500}
+.facts{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px}
+.fact{border:1px solid var(--color-border-soft);border-radius:8px;padding:7px 9px;font-size:var(--text-xs);color:var(--color-text-muted)}
+.fact .k{font-family:var(--font-mono);font-size:10px;text-transform:uppercase;color:var(--color-text-dim);margin-bottom:2px}
+.fact .v{color:var(--color-text);font-size:var(--text-sm)}
+
+/* modal + sheet */
+.scrim{position:fixed;inset:0;background:hsl(222 47% 4% / .7);display:grid;place-items:center;z-index:50;padding:16px}
+.modal{width:min(620px,100%);max-height:90vh;overflow:auto;border:1px solid var(--color-border);border-radius:var(--radius-lg);background:var(--color-surface);padding:18px 20px;box-shadow:var(--shadow-lg)}
+.modal h2{margin:0 0 4px;font-size:var(--text-lg)}
+.steps{display:flex;gap:6px;font-family:var(--font-mono);font-size:10px;color:var(--color-text-dim);margin-bottom:12px}
+.steps span.on{color:var(--color-primary)}
+.sheet{width:min(480px,100%);border:1px solid hsl(0 72% 51% / .45);border-top:3px solid hsl(0 72% 51%);border-radius:var(--radius-lg);background:var(--color-surface);padding:18px 20px;box-shadow:var(--shadow-lg)}
+.sheet h2{margin:0 0 10px;font-size:var(--text-lg)}
+.sheet ul{margin:8px 0 0;padding-left:18px;font-size:var(--text-sm);color:var(--color-text-muted);line-height:1.7}
+.sheet ul b{color:var(--color-text)}
+.sheet .kept{margin-top:10px;font-size:var(--text-sm);color:var(--color-text-muted);border:1px solid var(--color-border-soft);border-radius:8px;padding:8px 12px}
+
+/* C: key cards */
+.kcards{display:grid;gap:12px}
+.kc{border:1px solid var(--color-border);border-radius:var(--radius-lg);background:var(--color-surface);padding:14px 16px;transition:border-color .2s}
+.kc.dead{opacity:.62}
+.kc.fresh{border-color:hsl(142 71% 45% / .55)}
+.kc.drafting{border-color:var(--color-primary);box-shadow:0 0 0 1px var(--color-primary-dim)}
+.kc.oncecard{border-color:hsl(38 92% 60% / .55);background:hsl(38 92% 60% / .04)}
+.kc .top{display:flex;align-items:center;gap:8px;flex-wrap:wrap}
+.kc .top .nm{font-weight:600}
+.kc .top .sp{flex:1}
+.kc .meta{display:flex;gap:14px;flex-wrap:wrap;font-size:var(--text-xs);color:var(--color-text-dim);margin-top:6px}
+.kc .meta b{color:var(--color-text-muted);font-weight:500}
+.ticks{display:flex;gap:3px;align-items:flex-end;margin-top:10px;height:18px}
+.tick{width:7px;border-radius:2px;cursor:pointer;transition:transform .1s}
+.tick:hover{transform:scaleY(1.25)}
+.tick.s{height:18px;background:var(--color-primary)}
+.tick.r{height:11px;background:hsl(220 20% 40%)}
+.tick.x{height:18px;background:hsl(0 72% 55%)}
+.tickcap{font-size:10px;color:var(--color-text-dim);font-family:var(--font-mono);margin-top:4px}
+.tickdetail{margin-top:8px;font-size:var(--text-xs);color:var(--color-text-muted);background:var(--color-bg-elev1);border:1px solid var(--color-border-soft);border-radius:8px;padding:7px 10px}
+
+.empty{text-align:center;padding:26px 10px}
+.empty .ic{font-size:26px;margin-bottom:8px}
+.empty p{margin:0 auto 14px;max-width:420px;font-size:var(--text-sm);color:var(--color-text-muted);line-height:1.6}
+.legend{max-width:1080px;margin:0 auto 24px;padding:0 16px;font-size:var(--text-xs);color:var(--color-text-dim);line-height:1.7}
+.legend b{color:var(--color-text-muted)}
+@media (max-width:760px){
+  .split.withpanel{grid-template-columns:1fr}
+  .form .row{grid-template-columns:1fr}
+  .hide-sm{display:none}
+  .facts{grid-template-columns:1fr}
+}
+#sketch-tools{position:fixed;bottom:12px;right:12px;z-index:9999;font-family:system-ui;font-size:12px;background:rgba(0,0,0,.7);color:#fff;padding:8px 12px;border-radius:8px;opacity:.4;transition:opacity .2s;display:flex;gap:6px;align-items:center}
+#sketch-tools:hover{opacity:1}
+#sketch-tools button{background:#222;color:#fff;border:1px solid #444;border-radius:4px;font-size:11px;padding:2px 6px;cursor:pointer}
+</style>
+</head>
+<body>
+<div id="vnav"><span class="lbl">293 · API keys tab</span>
+  <button class="vtab active" data-v="A">A · One card, rows open in place</button>
+  <button class="vtab" data-v="B">B · List + side panel, create in a dialog</button>
+  <button class="vtab" data-v="C">★ C · A card per key, the draft becomes the key (winner)</button>
+</div>
+<div id="states"><span class="lbl">state</span>
+  <button class="stab" data-s="empty">No keys yet</button>
+  <button class="stab active" data-s="keys">Has keys</button>
+  <button class="stab" data-s="fromcard">New key from a workflow's ⋯ menu</button>
+  <button class="stab" data-s="once">Just created (shown once)</button>
+  <button class="stab" data-s="revoke">Revoke</button>
+  <button class="stab" data-s="admin">Org admin: every member's keys</button>
+</div>
+<div id="note"></div>
+<div id="page"></div>
+<div class="legend">
+  <b>Fixed in every variant (293-CONTEXT):</b> a key is yours, in one organisation, and its runs run as you (D-01) · it lists the published workflows it may start (D-02) · expiry 30 / 90 / 365 days / never, default 90; revoke takes effect on the next call (D-04) · a workflow that needs a file upload can't be picked yet (D-11) · per-key limits are set by the operator and shown read-only (D-14) · every call is listed in the key's activity, refusals with their reason (D-16, D-17) · the secret is shown once, with ready <span class="mono">curl</span> lines (D-19) · admins see and revoke every member's keys (D-03, D-18).
+  Endpoint paths, the <span class="mono">srl_</span> prefix and <span class="mono">$SYREL_URL</span> are placeholders; the build picks them (Claude's discretion).
+</div>
+<div id="sketch-tools">
+  <button onclick="vw('375px')">Phone</button><button onclick="vw('768px')">Tablet</button><button onclick="vw('')">Desktop</button>
+</div>
+<script>
+/* ---------------- data ---------------- */
+const WF = [
+  {id:"wf_crb", name:"Contract Renewal Brief", fields:["counterparty","renewal_date"], ok:true},
+  {id:"wf_soc", name:"SOC 2 Evidence Pull", fields:["control_family","period"], ok:true},
+  {id:"wf_vrr", name:"Vendor Risk Review", fields:["vendor_name"], ok:true},
+  {id:"wf_chs", name:"Customer Health Summary", fields:["account"], ok:true},
+  {id:"wf_wsr", name:"Weekly Status Report", fields:[], ok:true},
+  {id:"wf_onb", name:"Onboarding Checklist", fields:["new_hire_form (file)"], ok:false, why:"needs a file upload, not possible with a key yet"},
+];
+const DRAFTS = ["Quarterly Board Pack (draft)", "Incident Postmortem (draft)"];
+const ME = "Sam Rivera";
+
+function seedKeys(){
+  return [
+    {id:"k1", label:"n8n-prod", prefix:"srl_live_8Hq2", owner:ME, wfs:["Contract Renewal Brief","Vendor Risk Review"], gone:["Vendor Risk Review"],
+     created:"24 Oct 2026", expires:"22 Jan 2027", expiresIn:"in 90 days", last:"4 min ago", state:"active",
+     ticks:"rsrrrsrrxrrsrrrrxsrr",
+     calls:[
+      {t:"10:42", v:"read", wf:"Contract Renewal Brief", run:"7f3a91", ok:true, r:"finished · 1 file"},
+      {t:"10:40", v:"read", wf:"Contract Renewal Brief", run:"7f3a91", ok:true, r:"running · step 3 of 4"},
+      {t:"10:38", v:"start", wf:"Contract Renewal Brief", run:"7f3a91", ok:true, r:"started"},
+      {t:"10:12", v:"start", wf:"Vendor Risk Review", run:null, ok:false, r:"workflow is no longer published"},
+      {t:"09:55", v:"start", wf:"Contract Renewal Brief", run:null, ok:false, r:"over the limit: 10 starts a minute"},
+      {t:"09:50", v:"read", wf:"—", run:"2c91e0", ok:false, r:"not found: this key did not start that run"},
+      {t:"09:31", v:"read", wf:"Contract Renewal Brief", run:"b80d14", ok:true, r:"waiting for a person · Priya Shah"},
+     ]},
+    {id:"k2", label:"nightly-soc2-script", prefix:"srl_live_Zt0c", owner:ME, wfs:["SOC 2 Evidence Pull"], gone:[],
+     created:"2 Sep 2026", expires:"never", expiresIn:"never expires", last:"yesterday, 02:00", state:"active",
+     ticks:"srrrsrrrsrrrsrrrsrrr",
+     calls:[
+      {t:"Yesterday 02:04", v:"read", wf:"SOC 2 Evidence Pull", run:"e11c07", ok:true, r:"finished · 3 files"},
+      {t:"Yesterday 02:00", v:"start", wf:"SOC 2 Evidence Pull", run:"e11c07", ok:true, r:"started"},
+     ]},
+    {id:"k3", label:"zapier-test", prefix:"srl_live_q9Lm", owner:ME, wfs:["Customer Health Summary"], gone:[],
+     created:"5 Sep 2026", expires:"5 Oct 2026", expiresIn:"expired 19 days ago", last:"3 Oct 2026", state:"expired",
+     ticks:"srx", calls:[{t:"6 Oct 09:00", v:"start", wf:"Customer Health Summary", run:null, ok:false, r:"key expired on 5 Oct"}]},
+    {id:"k4", label:"old-partner-portal", prefix:"srl_live_A3vv", owner:ME, wfs:["Weekly Status Report"], gone:[],
+     created:"1 Jul 2026", expires:"29 Sep 2026", expiresIn:"revoked", last:"11 Sep 2026", state:"revoked", revokedBy:"you", revokedAt:"12 Sep 2026",
+     ticks:"srrsr", calls:[]},
+  ];
+}
+const ORG_EXTRA = [
+  {id:"k5", label:"hubspot-sync", prefix:"srl_live_mm71", owner:"Priya Shah", wfs:["Customer Health Summary"], gone:[], created:"14 Oct 2026", expires:"12 Jan 2027", expiresIn:"in 80 days", last:"1 h ago", state:"active", ticks:"srrsrrsrr", calls:[{t:"09:20", v:"start", wf:"Customer Health Summary", run:"44ab02", ok:true, r:"started"}]},
+  {id:"k6", label:"jenkins-legal", prefix:"srl_live_Pq4e", owner:"Leo Martins", wfs:["Contract Renewal Brief","SOC 2 Evidence Pull"], gone:[], created:"20 Aug 2026", expires:"never", expiresIn:"never expires", last:"never used", state:"active", ticks:"", calls:[]},
+];
+
+/* ---------------- state ---------------- */
+let V="A", S="keys";
+let keys=seedKeys();
+let ui={};          // per-render transient UI
+function resetUI(){
+  keys = seedKeys();
+  if(S==="admin") keys = keys.concat(ORG_EXTRA.map(k=>({...k})));
+  ui = {creating:false, form:{label:"", wfs:[], exp:"90"}, once:null, openId:null, sideId:null, sheet:null, tick:null, copied:{}};
+  if(S==="empty") keys=[];
+  if(S==="fromcard"){ ui.creating=true; ui.form={label:"", wfs:["Contract Renewal Brief"], exp:"90"}; ui.from="Contract Renewal Brief"; }
+  if(S==="once"){ const k=makeKey({label:"n8n-staging", wfs:["Contract Renewal Brief"], exp:"90"}); ui.once=k; }
+  if(S==="revoke"){ ui.sheet={id:"k1"}; ui.sideId="k1"; ui.openId="k1"; }
+  if(S==="keys"){ ui.openId = V==="A" ? "k1" : null; ui.sideId = V==="B" ? "k1" : null; }
+}
+function makeKey(f){
+  const rnd = "srl_live_"+"Kd7wN2pQ9xV4tR8mY1bH6sJ3cF5gL0aE".split("").sort(()=>Math.random()-.5).join("").slice(0,28);
+  const expTxt = {30:"23 Nov 2026",90:"22 Jan 2027",365:"24 Oct 2027",never:"never"}[f.exp];
+  const k = {id:"new"+Date.now(), label:f.label, prefix:rnd.slice(0,13), secret:rnd, owner:ME, wfs:f.wfs.slice(), gone:[], created:"24 Oct 2026",
+    expires:expTxt, expiresIn: f.exp==="never"?"never expires":"in "+f.exp+" days", last:"never used", state:"active", ticks:"", calls:[], fresh:true};
+  return k;
+}
+
+/* ---------------- shared pieces ---------------- */
+const esc=s=>String(s).replace(/[&<>]/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;"}[c]));
+function stateTag(k){
+  if(k.state==="revoked") return `<span class="tag off">revoked</span>`;
+  if(k.state==="expired") return `<span class="tag off">expired</span>`;
+  if(k.gone.length) return `<span class="tag warn">⚠ 1 workflow refused</span>`;
+  return `<span class="tag ok">● active</span>`;
+}
+function wfChips(k){
+  return k.wfs.map(w=>k.gone.includes(w)
+    ? `<span class="wfchip gone" title="">⚠ ${esc(w)} · no longer published</span>`
+    : `<span class="wfchip">${esc(w)}</span>`).join("");
+}
+function goneLine(k){
+  return k.gone.length ? `<div class="small" style="color:var(--color-warning);margin-top:4px">${esc(k.gone[0])} was unpublished, so calls to it are refused. Publish it again, or make a key without it.</div>` : "";
+}
+function limitsLine(){ return `<div class="limits">Each key: 10 starts and 120 status reads a minute. Set by your operator.</div>`; }
+
+function createForm(){
+  const f=ui.form;
+  const can = f.label.trim() && f.wfs.length;
+  return `<div class="form">
+    ${ui.from?`<div class="fromhint">From the ⋯ menu of ${esc(ui.from)}. It is already picked.</div>`:""}
+    <div class="row"><label for="kl">Label</label><div>
+      <input id="kl" type="text" placeholder="e.g. n8n-prod" value="${esc(f.label)}" oninput="ui.form.label=this.value;refreshCreate()">
+      <div class="small dim" style="margin-top:4px">Shown in activity and the audit log. The secret never is.</div></div></div>
+    <div class="row"><label>Workflows</label><div>
+      <div class="wflist">${WF.map(w=> w.ok
+        ? `<label class="wfopt"><input type="checkbox" ${f.wfs.includes(w.name)?"checked":""} onchange="toggleWf('${w.name}')"> ${esc(w.name)}<span class="flds">${w.fields.length?w.fields.join(", "):"no inputs"}</span></label>`
+        : `<div class="wfopt na"><input type="checkbox" disabled> ${esc(w.name)}<span class="why">${w.why}</span></div>`).join("")}
+      </div>
+      <div class="small dim" style="margin-top:4px">Only published workflows are listed. ${DRAFTS.length} drafts are hidden until they are published.</div></div></div>
+    <div class="row"><label>Expires</label><div>
+      <div class="seg">${["30","90","365","never"].map(e=>`<button class="${f.exp===e?"on":""}" onclick="ui.form.exp='${e}';render()">${e==="never"?"Never":e+" days"}</button>`).join("")}</div>
+      <div class="small dim" style="margin-top:4px">${f.exp==="never"?"It works until you revoke it.":"You can revoke it any time before then."}</div></div></div>
+    <div class="runsas">Runs started with this key <b>run as you</b>: they search the folders you can search and appear in your chat history, one thread per run. Anyone holding the key can start the workflows above.</div>
+    <div class="actions">
+      <button class="btn" id="createBtn" ${can?"":"disabled"} onclick="doCreate()">Create key</button>
+      <button class="btn ghost" onclick="cancelCreate()">Cancel</button>
+      <span class="small dim" id="createWhy">${can?"":(!f.label.trim()?"Add a label.":"Pick at least one workflow.")}</span>
+    </div></div>`;
+}
+function curlStart(k){
+  const w = WF.find(x=>x.name===k.wfs[0]);
+  const inputs = w.fields.length ? w.fields.map((f,i)=>`<span class="s">"${f}"</span>: <span class="s">"${i? "2026-12-01":"Acme Logistics"}"</span>`).join(", ") : "";
+  return `curl -X POST "$SYREL_URL/api/v1/workflows/<span class="k">${w.id}</span>/runs" \\
+  -H "Authorization: Bearer <span class="k">${k.secret}</span>" \\
+  -H "Content-Type: application/json" \\
+  -d '{ "inputs": { ${inputs} } }'
+
+# → { "run_id": "7f3a91c2-…", "status": "running" }`;
+}
+function curlRead(k){
+  return `curl "$SYREL_URL/api/v1/runs/<span class="k">RUN_ID</span>" \\
+  -H "Authorization: Bearer <span class="k">${k.secret}</span>"`;
+}
+function respSample(){
+  return `{
+  "status": "waiting_for_person",      <span class="s">// running · waiting_for_person · finished · failed · stopped</span>
+  "waiting_on": "Priya Shah",          <span class="s">// answered in the app, never through the key</span>
+  "steps": [ { "name": "Find the contract", "state": "done" },
+             { "name": "Approve the summary", "state": "waiting" } ],
+  "output": null,
+  "files": []                          <span class="s">// short-lived download links once finished</span>
+}`;
+}
+function copyBtn(id){ return `<button class="copy ${ui.copied[id]?"done":""}" onclick="doCopy('${id}')">${ui.copied[id]?"✓ Copied":"Copy"}</button>`; }
+function showOnce(k, compact){
+  return `<div class="${compact?"":"once"}">
+    ${compact?"":`<h3>${esc(k.label)} is ready</h3>`}
+    <div class="oncewarn">⚠ Copy the secret now. It is not stored and can't be shown again; if you lose it, revoke the key and make a new one.</div>
+    <div class="secret"><span>${k.secret}</span>${copyBtn("secret")}</div>
+    <div class="codehead"><span>Start ${esc(k.wfs[0])}${k.wfs.length>1?` (the other ${k.wfs.length-1} work the same way)`:""}</span>${copyBtn("start")}</div>
+    <pre class="code">${curlStart(k)}</pre>
+    <div class="codehead"><span>Read its status and result (poll until it finishes)</span>${copyBtn("read")}</div>
+    <pre class="code">${curlRead(k)}</pre>
+    <details class="resp"><summary>What a status read returns</summary><pre class="code">${respSample()}</pre></details>
+    <div class="actions"><button class="btn" onclick="doneOnce()">I've saved the secret</button>
+      <a class="link small" href="#" onclick="return false">Guide: start a workflow from outside ↗</a></div>
+  </div>`;
+}
+function activity(k, limit){
+  if(!k.calls.length) return `<div class="small dim">${k.state==="revoked"?"Revoked before any calls in the last 30 days.":"No calls yet. The first start will show here."}</div>`;
+  const rows = k.calls.slice(0,limit||99).map(c=>`<tr>
+    <td class="t">${c.t}</td><td><span class="verb ${c.v}">${c.v}</span></td>
+    <td class="hide-sm">${esc(c.wf)}</td>
+    <td>${c.run?`<a class="link mono" href="#" onclick="return false">run ${c.run}</a>`:`<span class="dim">no run</span>`}</td>
+    <td class="res ${c.ok?"ok":"no"}">${c.ok?"✓":"✕ refused:"} ${esc(c.r)}</td></tr>`).join("");
+  return `<div class="acthead"><span>Recent calls · last used ${k.last}</span><a class="link" href="#" onclick="return false">All in the audit log →</a></div>
+    <table class="act">${rows}</table>`;
+}
+function revokeSheet(){
+  const k = keys.find(x=>x.id===ui.sheet.id);
+  const other = k.owner!==ME;
+  const live = k.calls.find(c=>c.ok && /running|waiting/.test(c.r));
+  return `<div class="scrim" onclick="if(event.target===this){ui.sheet=null;render()}"><div class="sheet" role="dialog" aria-labelledby="rvh">
+    <h2 id="rvh">Revoke ${esc(k.label)}?</h2>
+    <div class="small muted">${other?`This key belongs to <b>${esc(k.owner)}</b>. They will see that an admin revoked it.`:`The next call with this key is refused.`}</div>
+    <ul>
+      <li>Starts <b>${k.wfs.map(esc).join("</b> and <b>")}</b></li>
+      <li>Last used <b>${k.last}</b>${k.calls.length?` · ${k.calls.length} calls in the last 30 days`:""}</li>
+      <li>Owner <b>${esc(k.owner)}</b> · created ${k.created}</li>
+    </ul>
+    <div class="kept">${live?`Run <span class="mono">${live.run}</span> started with this key keeps going in the app, but the outside system can no longer read its result.`:`Runs already started keep their records in the app.`} Revoking can't be undone; a replacement is a new key with a new secret.</div>
+    <div class="actions"><button class="btn danger" onclick="doRevoke()">Revoke ${esc(k.label)}</button><button class="btn ghost" onclick="ui.sheet=null;render()">Keep it</button></div>
+  </div></div>`;
+}
+function emptyState(){
+  return `<div class="empty"><div class="ic">🔑</div>
+    <p>No keys yet. A key lets another system, such as n8n, a script or a scheduler elsewhere, start one of your published workflows and read its result.</p>
+    <button class="btn" onclick="startCreate()">New key</button></div>`;
+}
+function ownerCell(k){ return S==="admin"?`<td class="hide-sm">${esc(k.owner)}${k.owner===ME?' <span class="dim">(you)</span>':""}</td>`:""; }
+function revokeBtn(k){
+  if(k.state!=="active") return k.state==="revoked"?`<div class="receipt">Revoked by ${k.revokedBy} · ${k.revokedAt} · recorded</div>`:"";
+  return `<button class="btn dangerghost sm" onclick="event.stopPropagation();ui.sheet={id:'${k.id}'};render()">Revoke</button>`;
+}
+
+/* ---------------- page chrome ---------------- */
+function chrome(inner){
+  if(S==="admin"){
+    return `<div class="band"><div class="sh">◆</div><div><b>Northwind Legal · Organisation admin</b><div class="s">You can see and revoke every member's keys. You can't see their secrets; nobody can.</div></div></div>
+      <div class="tabs">${["Members","Experts","Audit","Settings","Invitations & Roles","SSO","Retention","API keys"].map(t=>`<span class="${t==="API keys"?"on":""}">${t}</span>`).join("")}</div>${inner}`;
+  }
+  return `<div class="ph"><h1>Settings</h1><span class="sub">Northwind Legal</span></div>
+    <div class="tabs">${["AI Model","Search & Retrieval","Integrations","Preferences","Memory","Audit Log","API keys"].map(t=>`<span class="${t==="API keys"?"on":""}">${t}</span>`).join("")}</div>${inner}`;
+}
+function headerCard(title, desc, btn){
+  return `<div class="hrow"><div><h2>${title}</h2><div class="desc">${desc}</div></div>${btn||""}</div>`;
+}
+const DESC_ME = "Let another system start your published workflows and read the result. Each key starts only the workflows you pick, and its runs run as you.";
+const DESC_ADMIN = "Every key in Northwind Legal. Runs started with a key run as the member who made it.";
+
+/* ---------------- Variant A: one card, rows expand in place ---------------- */
+function renderA(){
+  let body;
+  const newBtn = (!ui.creating && !ui.once && S!=="admin" && keys.length) ? `<button class="btn" onclick="startCreate()">New key</button>` : "";
+  body = `<div class="card">${headerCard(S==="admin"?"API keys · whole organisation":"API keys", S==="admin"?DESC_ADMIN:DESC_ME, newBtn)}`;
+  if(ui.once) body += showOnce(ui.once);
+  else if(ui.creating) body += `<div style="border:1px solid var(--color-border);border-radius:10px;padding:12px 14px;margin-bottom:12px;background:var(--color-bg)"><div style="font-weight:600;margin-bottom:4px">New key</div>${createForm()}</div>`;
+  if(!ui.once){
+    if(!keys.length && !ui.creating) body += emptyState();
+    else if(keys.length) body += `<table><thead><tr><th>Key</th>${S==="admin"?'<th class="hide-sm">Owner</th>':""}<th>Starts</th><th class="hide-sm">Expires</th><th class="hide-sm">Last used</th><th></th></tr></thead><tbody>
+      ${keys.map(k=>{
+        const open = ui.openId===k.id;
+        return `<tr class="krow ${open?"open":""} ${k.state!=="active"?"dead":""} ${k.fresh?"newflash":""}" onclick="ui.openId=${open?"null":`'${k.id}'`};render()">
+          <td><div class="kname"><span class="caret">▸</span>${esc(k.label)} ${stateTag(k)}</div><div class="kprefix" style="margin-left:18px">${k.prefix}…</div></td>
+          ${ownerCell(k)}
+          <td>${wfChips(k)}${goneLine(k)}</td>
+          <td class="hide-sm">${k.expires}<div class="small dim">${k.expiresIn}</div></td>
+          <td class="hide-sm">${k.last}</td>
+          <td style="text-align:right">${revokeBtn(k)}</td></tr>
+          ${open?`<tr class="actrow"><td colspan="${S==="admin"?6:5}">${activity(k)}</td></tr>`:""}`;
+      }).join("")}</tbody></table>`;
+    if(keys.length) body += limitsLine();
+  }
+  body += `</div>`;
+  return chrome(body);
+}
+
+/* ---------------- Variant B: list + side panel, create in a dialog ---------------- */
+function renderB(){
+  const side = ui.sideId ? keys.find(k=>k.id===ui.sideId) : null;
+  const newBtn = (S!=="admin" && keys.length) ? `<button class="btn" onclick="startCreate()">New key</button>` : "";
+  let list = `<div class="card" style="margin:0">${headerCard(S==="admin"?"API keys · whole organisation":"API keys", S==="admin"?DESC_ADMIN:DESC_ME, newBtn)}`;
+  if(!keys.length) list += emptyState();
+  else{
+    list += `<table><thead><tr><th>Key</th>${S==="admin"?'<th class="hide-sm">Owner</th>':""}<th>Status</th><th class="hide-sm">Last used</th></tr></thead><tbody>
+      ${keys.map(k=>`<tr class="krow ${ui.sideId===k.id?"sel":""} ${k.state!=="active"?"dead":""} ${k.fresh?"newflash":""}" onclick="ui.sideId=${ui.sideId===k.id?"null":`'${k.id}'`};render()">
+        <td><div class="kname">${esc(k.label)}</div><div class="small dim">${k.wfs.length} workflow${k.wfs.length>1?"s":""} · <span class="mono">${k.prefix}…</span></div></td>
+        ${ownerCell(k)}
+        <td>${stateTag(k)}</td><td class="hide-sm">${k.last}</td></tr>`).join("")}</tbody></table>${limitsLine()}`;
+  }
+  list += `</div>`;
+  let panel = "";
+  if(side){
+    panel = `<div class="side">
+      <div class="hrow"><div><h3>${esc(side.label)}</h3><div class="kprefix">${side.prefix}… · owner ${esc(side.owner)}</div></div><button class="link small" onclick="ui.sideId=null;render()">Close ✕</button></div>
+      <div style="margin-top:8px">${stateTag(side)}</div>
+      <div class="sec"><h4>Starts</h4>${wfChips(side)}${goneLine(side)}</div>
+      <div class="sec"><h4>Facts</h4><div class="facts">
+        <div class="fact"><div class="k">Created</div><div class="v">${side.created}</div></div>
+        <div class="fact"><div class="k">Expires</div><div class="v">${side.expires}</div><div>${side.expiresIn}</div></div>
+        <div class="fact"><div class="k">Runs as</div><div class="v">${esc(side.owner)}</div></div>
+        <div class="fact"><div class="k">Last used</div><div class="v">${side.last}</div></div></div></div>
+      <div class="sec"><h4>Activity</h4>${activity(side,6)}</div>
+      <div class="sec">${side.state==="active"?`<button class="btn dangerghost" onclick="ui.sheet={id:'${side.id}'};render()">Revoke this key</button><div class="small dim" style="margin-top:6px">Takes effect on the next call. Can't be undone.</div>`:revokeBtn(side)}</div>
+    </div>`;
+  }
+  let html = chrome(`<div class="split ${side?"withpanel":""}">${list}${panel||'<div class="side"></div>'}</div>`);
+  if(ui.creating || ui.once){
+    html += `<div class="scrim"><div class="modal" role="dialog">
+      <div class="steps"><span class="${ui.once?"":"on"}">1 · What it may start</span><span>→</span><span class="${ui.once?"on":""}">2 · Copy the secret</span></div>
+      <h2>${ui.once?esc(ui.once.label)+" is ready":"New key"}</h2>
+      ${ui.once?showOnce(ui.once,true):createForm()}</div></div>`;
+  }
+  return html;
+}
+
+/* ---------------- Variant C: a card per key; the draft card becomes the key ---------------- */
+function tickStrip(k){
+  if(!k.ticks) return `<div class="tickcap">no calls yet</div>`;
+  const t = k.ticks.split("").map((c,i)=>`<span class="tick ${c}" title="" onclick="ui.tick={id:'${k.id}',i:${i}};render()"></span>`).join("");
+  let det="";
+  if(ui.tick && ui.tick.id===k.id){
+    const c = k.calls[ui.tick.i % Math.max(k.calls.length,1)];
+    det = c?`<div class="tickdetail"><span class="mono dim">${c.t}</span> · <span class="verb ${c.v}">${c.v}</span> · ${esc(c.wf)} · ${c.run?`<a class="link mono" href="#" onclick="return false">run ${c.run}</a>`:"no run"} · <span class="res ${c.ok?"ok":"no"}">${c.ok?"✓":"✕ refused:"} ${esc(c.r)}</span></div>`:"";
+  }
+  return `<div class="ticks">${t}</div><div class="tickcap">last ${k.ticks.length} calls · <span style="color:var(--color-primary)">■</span> start <span style="color:hsl(220 20% 55%)">■</span> read <span style="color:hsl(0 72% 60%)">■</span> refused · tap one</div>${det}`;
+}
+function keyCard(k){
+  const open = ui.openId===k.id;
+  return `<div class="kc ${k.state!=="active"?"dead":""} ${k.fresh?"fresh":""}">
+    <div class="top"><span>🔑</span><span class="nm">${esc(k.label)}</span>${stateTag(k)}<span class="kprefix">${k.prefix}…</span><span class="sp"></span>${revokeBtn(k)}</div>
+    <div style="margin-top:6px">${wfChips(k)}</div>${goneLine(k)}
+    <div class="meta">${S==="admin"?`<span>owner <b>${esc(k.owner)}</b></span>`:""}<span>expires <b>${k.expires}</b> (${k.expiresIn})</span><span>last used <b>${k.last}</b></span><span>created ${k.created}</span></div>
+    ${k.state==="active"||k.calls.length?tickStrip(k):""}
+    ${k.calls.length?`<div style="margin-top:8px"><button class="link small" onclick="ui.openId=${open?"null":`'${k.id}'`};render()">${open?"Hide activity":"Show activity"}</button></div>`:""}
+    ${open?`<div style="margin-top:8px">${activity(k)}</div>`:""}
+  </div>`;
+}
+function renderC(){
+  const newBtn = (!ui.creating && !ui.once && S!=="admin" && keys.length) ? `<button class="btn" onclick="startCreate()">New key</button>` : "";
+  let html = `<div class="card" style="padding-bottom:12px">${headerCard(S==="admin"?"API keys · whole organisation":"API keys", S==="admin"?DESC_ADMIN:DESC_ME, newBtn)}${keys.length?limitsLine():""}</div><div class="kcards">`;
+  if(ui.creating) html += `<div class="kc drafting"><div class="top"><span>🔑</span><span class="nm">${esc(ui.form.label)||'<span class="dim">New key</span>'}</span><span class="tag">draft · not created</span></div><div style="margin-top:10px">${createForm()}</div></div>`;
+  if(ui.once) html += `<div class="kc oncecard"><div class="top"><span>🔑</span><span class="nm">${esc(ui.once.label)}</span><span class="tag ok">● created</span><span class="kprefix">${ui.once.prefix}…</span></div><div style="margin-top:6px">${wfChips(ui.once)}</div><div style="margin-top:12px">${showOnce(ui.once,true)}</div></div>`;
+  if(!keys.length && !ui.creating && !ui.once) html += `<div class="kc">${emptyState()}</div>`;
+  html += keys.map(keyCard).join("");
+  html += `</div>`;
+  return chrome(html);
+}
+
+/* ---------------- actions ---------------- */
+function startCreate(){ ui.creating=true; ui.from=null; ui.form={label:"",wfs:[],exp:"90"}; render(); setTimeout(()=>{const i=document.getElementById("kl"); i&&i.focus()},30); }
+function cancelCreate(){ ui.creating=false; ui.from=null; render(); }
+function toggleWf(n){ const a=ui.form.wfs; const i=a.indexOf(n); i<0?a.push(n):a.splice(i,1); render(); }
+function refreshCreate(){
+  const f=ui.form, can=f.label.trim()&&f.wfs.length;
+  const b=document.getElementById("createBtn"); if(b) b.disabled=!can;
+  const w=document.getElementById("createWhy"); if(w) w.textContent = can?"":(!f.label.trim()?"Add a label.":"Pick at least one workflow.");
+  if(V==="C"){ const nm=document.querySelector(".kc.drafting .nm"); if(nm) nm.innerHTML = esc(f.label)||'<span class="dim">New key</span>'; }
+}
+function doCreate(){ ui.once=makeKey(ui.form); ui.creating=false; ui.copied={}; render(); }
+function doneOnce(){ const k=ui.once; delete k.secret; keys.unshift(k); ui.once=null; ui.openId=null; ui.sideId = V==="B"?k.id:null; render(); setTimeout(()=>{keys.forEach(x=>x.fresh=false)},1800); }
+function doCopy(id){ ui.copied[id]=true; try{navigator.clipboard.writeText(id==="secret"?ui.once.secret:"curl …")}catch(e){} render(); }
+function doRevoke(){ const k=keys.find(x=>x.id===ui.sheet.id); k.state="revoked"; k.revokedBy = k.owner===ME?"you":"you (admin)"; k.revokedAt="just now"; k.expiresIn="revoked"; ui.sheet=null; render(); }
+
+const NOTES = {
+  A:"<b>A · One card.</b> The path of least resistance: the shipped Settings SectionCard. New key opens a form inside the card; the secret replaces it in place; each row opens its activity under itself.",
+  B:"<b>B · List + side panel.</b> The list stays short (label, status, last used). Clicking a key opens a 400px side panel with its facts, activity and revoke. Creating is a two-step dialog: what it may start, then copy the secret.",
+  C:"<b>C · A card per key.</b> Each key is a card with its workflows and a strip of its last calls (tap a bar for that call). The draft card you fill in becomes the key card, then shows the secret once in place."
+};
+function render(){
+  document.querySelectorAll(".vtab").forEach(b=>b.classList.toggle("active",b.dataset.v===V));
+  document.querySelectorAll(".stab").forEach(b=>b.classList.toggle("active",b.dataset.s===S));
+  document.getElementById("note").innerHTML = NOTES[V];
+  let html = V==="A"?renderA():V==="B"?renderB():renderC();
+  if(ui.sheet) html += revokeSheet();
+  document.getElementById("page").innerHTML = html;
+}
+function vw(w){ document.getElementById("page").style.maxWidth = w||""; }
+document.querySelectorAll(".vtab").forEach(b=>b.onclick=()=>{V=b.dataset.v; resetUI(); render();});
+document.querySelectorAll(".stab").forEach(b=>b.onclick=()=>{S=b.dataset.s; resetUI(); render();});
+document.addEventListener("keydown",e=>{ if(e.key==="Escape"&&ui.sheet){ui.sheet=null;render()} });
+resetUI(); render();
+</script>
+</body>
+</html>

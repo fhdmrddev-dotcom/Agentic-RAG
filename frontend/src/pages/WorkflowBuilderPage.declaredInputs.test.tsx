@@ -363,17 +363,28 @@ describe("⭐ an EMPTY builder reaches a PUBLISHED workflow with a declared inpu
     async () => {
       await driveToDraft()
 
-      // ⚠ NO create has happened yet, and that is asserted rather than assumed — it is the
-      // premise of the correction above. If a future change makes a generated draft write
-      // on arrival, this line reds and the block comment gets re-measured.
-      expect(definitionWrites()).toHaveLength(0)
+      // ⚠ 296-07 (BUG-261024-02) — AMENDED DELIBERATELY, exactly as the line this replaces
+      // asked: "if a future change makes a generated draft write on arrival, this line reds
+      // and the block comment gets re-measured". It did. A generated draft is now CREATED on
+      // arrival (an untouched draft used to be lost), so the CREATE carries no declaration and
+      // the declare reaches the wire on the first PATCH. The block comment above describes the
+      // pre-296 order and is kept as the record of why this case is shaped the way it is.
+      await waitForCreate()
+      expect(declaredKeysIn(firstWriteBody())).toBeNull()
 
       const typed = await declareAnInputThroughTheDom()
 
       // The autosave debounce is REAL elapsed time; nothing here shortens it, because a
       // person waiting is the behaviour under test.
-      await waitForCreate()
-      expect(declaredKeysIn(firstWriteBody())).toEqual([typed])
+      await waitFor(
+        () =>
+          expect(
+            requests.filter((r) => r.method === "PATCH" && r.path === `/workflows/${DRAFT_ID}`)
+              .length,
+          ).toBeGreaterThan(0),
+        { timeout: 8000 },
+      )
+      expect(declaredKeysIn(lastPatchBody())).toEqual([typed])
 
       // ── (2) the plan's criterion — a SECOND edit, so a PATCH exists to assert on ──
       fireEvent.click(screen.getByTestId(`declared-input-required-${typed}`))
@@ -428,19 +439,28 @@ describe("⭐ an EMPTY builder reaches a PUBLISHED workflow with a declared inpu
       // The editor is REACHABLE here too — proved, not assumed. The difference between this
       // case and the one above must be the DECLARE, never the ARRIVAL.
       expect(screen.getByTestId("declared-inputs-affordance")).toBeInTheDocument()
-      expect(definitionWrites()).toHaveLength(0)
-
-      fireEvent.click(screen.getByTestId("builder-stateful-toggle"))
+      // 296-07 (BUG-261024-02) — AMENDED DELIBERATELY: the arrival now CREATES the draft, so
+      // the toggle's write is the first PATCH rather than the create.
       await waitForCreate()
 
+      fireEvent.click(screen.getByTestId("builder-stateful-toggle"))
+      await waitFor(
+        () =>
+          expect(
+            requests.filter((r) => r.method === "PATCH" && r.path === `/workflows/${DRAFT_ID}`)
+              .length,
+          ).toBeGreaterThan(0),
+        { timeout: 8000 },
+      )
+
       const writes = definitionWrites()
-      expect(writes.length).toBeGreaterThan(0)
+      expect(writes.length).toBeGreaterThan(1)
       for (const write of writes) {
         expect(declaredKeysIn(JSON.parse(write.body!) as Record<string, unknown>)).toBeNull()
       }
       // …and the edit that caused the write DID reach the body, so the write is not an
       // empty one that would carry no `inputs` for the wrong reason.
-      expect(firstWriteBody().is_stateful).toBe(true)
+      expect(lastPatchBody().is_stateful).toBe(true)
     },
     40000,
   )

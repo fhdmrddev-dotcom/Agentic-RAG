@@ -411,6 +411,11 @@ class TestMaxIterationsConfig:
     verbatim from threads.py into ``app.services.agent_loop.run_agent_loop``.
     These source-grep guards now read agent_loop.py — same GEN-04 intent,
     new file location.
+
+    Phase 292.1 (D-17/D-18) — the source-literal pins are consciously retired: the caps
+    became operator settings read once per run by `resolve_round_cap`, so the literals
+    `max_iterations = 15` / `= 8` no longer exist in agent_loop.py. The GEN-04 VALUES are
+    re-pinned on the defaults instead.
     """
 
     def _read_threads_source(self) -> str:
@@ -422,28 +427,27 @@ class TestMaxIterationsConfig:
             return f.read()
 
     def test_general_mode_max_iterations_is_15(self):
-        """General agent mode must allow 15 iterations (was 8) — GEN-04."""
-        source = self._read_threads_source()
-        assert "max_iterations = 15" in source, (
-            "Expected 'max_iterations = 15' in agent_loop.py for general mode "
-            "(B1 mode branch moved here in Phase 089-03)."
-        )
+        """General agent mode must allow 15 iterations (was 8) — GEN-04, now the default."""
+        from types import SimpleNamespace
+
+        from app.services.text_tool_calls import ROUND_CAP_DEFAULTS, resolve_round_cap
+
+        assert ROUND_CAP_DEFAULTS["general"] == 15
+        assert resolve_round_cap(SimpleNamespace(), "general") == 15
 
     def test_explorer_mode_max_iterations_is_8(self):
-        """Explorer mode must allow 8 iterations (was 6) — GEN-04."""
-        source = self._read_threads_source()
-        assert "max_iterations = 8" in source, (
-            "Expected 'max_iterations = 8' in agent_loop.py for explorer mode "
-            "(B1 mode branch moved here in Phase 089-03)."
-        )
+        """Explorer mode must allow 8 iterations (was 6) — GEN-04, now the default."""
+        from types import SimpleNamespace
+
+        from app.services.text_tool_calls import ROUND_CAP_DEFAULTS, resolve_round_cap
+
+        assert ROUND_CAP_DEFAULTS["explorer"] == 8
+        assert resolve_round_cap(SimpleNamespace(), "explorer") == 8
 
     def test_old_general_max_iterations_8_is_gone(self):
-        """After the fix, 'max_iterations = 8' should refer to explorer, not general.
-        There should be exactly ONE occurrence of 'max_iterations = 8' (explorer)
-        and ONE occurrence of 'max_iterations = 15' (general).
-        This test passes only after both changes are applied."""
+        """The cap is read in ONE place (the resolver), never hard-coded per mode again."""
         source = self._read_threads_source()
-        count_8 = source.count("max_iterations = 8")
-        count_15 = source.count("max_iterations = 15")
-        assert count_8 == 1, f"Expected exactly 1 occurrence of 'max_iterations = 8' but found {count_8}"
-        assert count_15 == 1, f"Expected exactly 1 occurrence of 'max_iterations = 15' but found {count_15}"
+        assert "def run_agent_loop" in source  # non-vacuity: we read the right file
+        assert source.count("resolve_round_cap(user_settings, body.agent_mode)") == 1
+        assert source.count("max_iterations = 8") == 0
+        assert source.count("max_iterations = 15") == 0

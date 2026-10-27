@@ -4,7 +4,12 @@ from fastapi import APIRouter, Depends, HTTPException, Request, status
 from starlette.concurrency import run_in_threadpool
 from supabase import Client
 
-from app.dependencies import get_current_user, get_supabase, get_user_supabase_client
+from app.dependencies import (
+    get_current_user,
+    get_supabase,
+    get_user_supabase_client,
+    resolve_active_org_or_none,
+)
 from app.models.folder import FolderCreate, FolderMoveRequest, FolderUpdate, FolderResponse
 from app.services.audit_service import write_audit_entry
 from app.services.retention import hold_guard  # Phase 275 (D-15): the one hold check
@@ -45,14 +50,20 @@ async def list_children(
 @router.post("", response_model=FolderResponse, status_code=status.HTTP_201_CREATED)
 async def create_folder(
     body: FolderCreate,
+    request: Request = None,  # FastAPI injects it; direct callers may omit it (no header -> None)
     current_user: dict = Depends(get_current_user),
     supabase: Client = Depends(get_user_supabase_client),
 ):
     """Create a new folder. Validates parent_id ownership if provided."""
+    # 296-01 (BUG-261021-02): the folder belongs to the VALIDATED active org, not to the mig-106
+    # trigger's LIMIT-1 guess (the wrong org for a two-org user) — create_thread's D-268-07 shape.
+    # No header / non-member header → None → no key → byte-identical; a parent in another org than
+    # the active one is refused with the same 404, so no cross-org child can be made.
+    _active_org = await resolve_active_org_or_none(request, current_user)
     if body.parent_id:
         visible = await fetch_visible_folders(supabase, current_user["id"])
-        visible_ids = {f["id"] for f in visible}
-        if str(body.parent_id) not in visible_ids:
+        parent = next((f for f in visible if f["id"] == str(body.parent_id)), None)
+        if parent is None or (_active_org and str(parent.get("org_id")) != _active_org):
             raise HTTPException(status_code=404, detail="Parent folder not found")
 
     # Check for duplicate folder name under same parent for same user
@@ -66,23 +77,23 @@ async def create_folder(
         name_check_query = name_check_query.eq("parent_id", str(body.parent_id))
     else:
         name_check_query = name_check_query.is_("parent_id", "null")
-    name_check = name_check_query.maybe_single().execute()
+    # 296 review BE-WR-06 (D-v2.5-01): both supabase-py calls here run off the event loop.
+    name_check = await aexec(name_check_query.maybe_single())
     if name_check and name_check.data:
         raise HTTPException(
             status_code=409,
             detail="A folder with this name already exists in this location",
         )
 
-    result = (
-        supabase.table("folders")
-        .insert({
-            "user_id": current_user["id"],
-            "name": body.name.strip(),
-            "parent_id": str(body.parent_id) if body.parent_id else None,
-            "is_org_shared": body.is_org_shared,
-        })
-        .execute()
-    )
+    row = {
+        "user_id": current_user["id"],
+        "name": body.name.strip(),
+        "parent_id": str(body.parent_id) if body.parent_id else None,
+        "is_org_shared": body.is_org_shared,
+    }
+    if _active_org:
+        row["org_id"] = _active_org
+    result = await aexec(supabase.table("folders").insert(row))
     return result.data[0]
 
 

@@ -97,6 +97,8 @@ import { RunCostBadge } from "@/components/workflow/RunCostBadge"
 // own dispatch and its own pressed state; this page hands it a thread id and nothing else.
 import { StopControl } from "@/components/chat/StopControl"
 import { WaitingOnLine } from "@/components/workflows/WaitingOnLine"
+// 293-03 (D-24): how the run started — a leaf with no hook, so this page gains none (G-5).
+import { RunOriginLine } from "@/components/workflows/RunOriginLine"
 // ── Phase 200 — the run surface's right-hand spine. Both are PANEL parts taken as
 //    props, not the panel SHELL: see the mount docblock at the canvas region below for
 //    why the shell itself cannot come here (a global chat singleton, and the previewer).
@@ -1115,13 +1117,17 @@ export function WorkflowRunPage({ runId, onBack, onOpenThread }: Props) {
    */
   const [alertText, setAlertText] = useState<string | null>(null)
   const alertedForRef = useRef<string | null>(null)
+  // 296-04 (289-F-A): which run this page has SEEN live. A run that then reads `failed` swaps to
+  // the report, which would drop the alert below; the report announces it instead (one prop).
+  const seenLiveRef = useRef<string | null>(null)
   useEffect(() => {
     if (loadPhase !== "ready" || !run) return
+    if (!isTerminal) seenLiveRef.current = run.id
     if (!ALERTING_STATUSES.has(run.status)) return
     if (alertedForRef.current === run.id) return
     alertedForRef.current = run.id
     setAlertText(band.sentence)
-  }, [loadPhase, run, band.sentence])
+  }, [loadPhase, run, band.sentence, isTerminal])
 
   // ── The three states that are not a run ─────────────────────────────────────
 
@@ -1147,6 +1153,9 @@ export function WorkflowRunPage({ runId, onBack, onOpenThread }: Props) {
         runId={runId}
         onBack={onBack}
         onOpenThread={loadPhase === "ready" ? onOpenThread : undefined}
+        watchedFailure={
+          run?.status === "failed" && seenLiveRef.current === run.id ? band.sentence : undefined
+        }
       />
     )
   }
@@ -1300,6 +1309,7 @@ export function WorkflowRunPage({ runId, onBack, onOpenThread }: Props) {
         <div className="flex flex-wrap items-baseline gap-x-3 gap-y-1">
           <span className="text-xs font-semibold text-foreground">{band.sentence}</span>
           <WaitingOnLine waitingOn={run?.waiting_on} />
+          <RunOriginLine origin={run?.origin} />
           <span className="text-xs text-muted-foreground" data-testid="run-elapsed">
             {elapsed.number ? <span>{elapsed.number} </span> : null}
             {elapsed.text}

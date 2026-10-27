@@ -1,0 +1,7 @@
+{
+  "mode": "resume-model",
+  "provider": "openrouter",
+  "model": "deepseek/deepseek-v4-pro",
+  "verdict": "\u26d4",
+  "reason": "402 insufficient credit (BUG-261024-03 / 292.1 OpenRouter row) \u2014 operator top-up owed; --probe saw: failed: APIStatusError: Error code: 402 - {'error': {'message': 'This request requires more credits, or fewer max_tokens. You requested up to 32768 tokens, but can only afford 1195. To increase, visit https://openrouter.ai/s"
+}

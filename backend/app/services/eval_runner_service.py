@@ -45,6 +45,7 @@ from app.config import get_model_capability
 from app.db.runs import finalize_run
 from app.models.message import MessageCreate
 from app.services.agent_loop import RunContext, run_agent_loop
+from app.services.text_tool_calls import ROUND_CAP_DEFAULTS  # 296-06 (292.1-IN-04)
 
 logger = logging.getLogger(__name__)
 
@@ -530,6 +531,20 @@ async def _run_arm(
         pulse.cancel()
 
 
+# 296-06 (292.1-IN-04): a skill eval's round cap, fixed. It used to read the owner's
+# ``chat_max_tool_rounds`` (``run_agent_loop`` → ``resolve_round_cap``), so lowering the chat knob
+# changed eval verdicts and left cap-pause carrier rows in eval threads. Today's effective default.
+EVAL_MAX_TOOL_ROUNDS = ROUND_CAP_DEFAULTS["general"]
+
+
+def _with_eval_round_cap(user_settings):
+    """A COPY of ``user_settings`` whose chat round cap is ``EVAL_MAX_TOOL_ROUNDS``; the owner's
+    settings object is never mutated. Anything that is not a pydantic model passes unchanged."""
+    if not hasattr(user_settings, "model_copy"):
+        return user_settings
+    return user_settings.model_copy(update={"chat_max_tool_rounds": EVAL_MAX_TOOL_ROUNDS})
+
+
 async def _run_arm_body(
     *,
     redis,
@@ -571,7 +586,8 @@ async def _run_arm_body(
         run_id=run_id,
         thread_id=thread_id,
         current_user=current_user,
-        user_settings=user_settings,
+        # 296-06 (292.1-IN-04): an eval arm runs on its own fixed round cap, never the chat knob.
+        user_settings=_with_eval_round_cap(user_settings),
         body=body,
         redis=redis,
         supabase=supabase,

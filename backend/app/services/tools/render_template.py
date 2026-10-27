@@ -320,6 +320,8 @@ def _read_acroform(path):
         options = _acro_opt_values(inh["opt"]) if ftype == "choice" else []
         tu = node.get("/TU")
         v = node.get("/V")
+        if v is not None and hasattr(v, "get_object"):
+            v = v.get_object()
         out.append({
             "name": name,
             "field_type": ftype,
@@ -327,6 +329,9 @@ def _read_acroform(path):
             "options": options,
             "tooltip": (_acro_str(tu).strip() or None) if tu is not None else None,
             "value": None if v is None else _acro_str(v),
+            # 296-03 (291-WR-04): the TYPE of /V, so the read-back can tell a button that was set
+            # (a PDF name) from one whose /V came back as a text string.
+            "value_is_name": v is not None and type(v).__name__ == "NameObject",
             "widget_as": [_acro_str(w.get("/AS")) for w in widgets if w.get("/AS") is not None],
         })
 
@@ -357,8 +362,50 @@ def _refused_sentence(field):
     return "The answer for “%s” isn't one of this form's choices, so it was left blank." % label
 
 
+def _name_button_values(writer, values):
+    """296-03 (291-WR-04): write each checkbox / radio answer as a PDF NAME on its field node.
+
+    pypdf writes a field's /V as a TEXT string and fixes the type only on a widget that is
+    its own field (a lone checkbox). A radio group's /V lives on the parent, so it stayed
+    text, and viewers that read /V by type saw an unset button."""
+    from pypdf.generic import NameObject
+
+    acro = writer._root_object.get("/AcroForm")
+    top = acro.get_object().get("/Fields") if acro is not None else None
+    if top is None:
+        return
+    seen = set()
+
+    def _walk(ref, prefix, ft, depth):
+        if depth > 32:
+            return
+        idnum = getattr(ref, "idnum", None)
+        if idnum is not None:
+            if idnum in seen:
+                return
+            seen.add(idnum)
+        node = ref.get_object()
+        t = node.get("/T")
+        name = (("%s.%s" % (prefix, t)) if prefix else _acro_str(t)) if t is not None else prefix
+        ft = node.get("/FT", ft)
+        kids = node.get("/Kids")
+        kids = list(kids.get_object()) if kids is not None else []
+        field_kids = [k for k in kids if "/T" in k.get_object()]
+        if field_kids:
+            for k in field_kids:
+                _walk(k, name, ft, depth + 1)
+            return
+        want = values.get(name)
+        if str(ft) == "/Btn" and isinstance(want, str) and want.startswith("/"):
+            node[NameObject("/V")] = NameObject(want)
+
+    for ref in top.get_object():
+        _walk(ref, "", None, 0)
+
+
 def _write_values(writer, values):
     writer.update_page_form_field_values(None, values, auto_regenerate=False)
+    _name_button_values(writer, values)
 
 
 def fill_acroform(template_path, flat_values, out_path):
@@ -440,10 +487,12 @@ def fill_acroform(template_path, flat_values, out_path):
             continue
         if got["field_type"] in ("checkbox", "radio"):
             ases = got["widget_as"]
+            # 296-03 (291-WR-04): a button's /V must come back as a NAME, not just spell right.
+            typed = got["value"] is None or got["value_is_name"]
             if want == "/Off":
-                ok = (got["value"] in (None, "/Off")) and all(a == "/Off" for a in ases)
+                ok = typed and (got["value"] in (None, "/Off")) and all(a == "/Off" for a in ases)
             else:
-                ok = got["value"] == want and want in ases
+                ok = typed and got["value"] == want and want in ases
         else:
             ok = got["value"] == want
         if not ok:
@@ -453,7 +502,8 @@ def fill_acroform(template_path, flat_values, out_path):
         if got is None:
             continue
         if want == "/Off":
-            ok = (got["value"] in (None, "/Off")) and all(a == "/Off" for a in got["widget_as"])
+            typed = got["value"] is None or got["value_is_name"]
+            ok = typed and (got["value"] in (None, "/Off")) and all(a == "/Off" for a in got["widget_as"])
         else:
             ok = got["value"] in (None, "")
         if not ok:

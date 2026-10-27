@@ -1,0 +1,518 @@
+{
+  "rows": [
+    {
+      "provider": "anthropic",
+      "model": "claude-opus-5-5",
+      "required": true,
+      "extra": false,
+      "calling_mode": "NATIVE (native SDK adapter)",
+      "verdict": "OBSERVATION (prose-final on every attempt)",
+      "classification": "prose-final",
+      "run_id": "1673d166-8063-4dfc-b83f-fff1a0394123",
+      "thread_id": "b7f4d27b-15af-4e0c-8512-a795d770dfc8",
+      "attempts": 3,
+      "continue": null,
+      "markup_hits": [],
+      "tools_used": [
+        "search_documents",
+        "write_todos"
+      ],
+      "threads": [
+        "714eb1a3-3e2b-45b4-a2cf-063b00bb3026",
+        "699df254-756e-43c4-a133-f68b84c10691",
+        "b7f4d27b-15af-4e0c-8512-a795d770dfc8"
+      ],
+      "reload_equal": true,
+      "evidence": ".planning/phases/292.1-tool-limit-continue-that-always-fires-bug-261024-03/evidence/board/anthropic-1673d166-8063-4dfc-b83f-fff1a0394123.json"
+    },
+    {
+      "provider": "deepseek",
+      "model": "deepseek-v4-pro",
+      "required": true,
+      "extra": false,
+      "calling_mode": "NATIVE",
+      "verdict": "PASS",
+      "classification": "text-pause",
+      "run_id": "18175e3e-bf41-42c2-a5ba-b5c17aa02e3e",
+      "thread_id": "6ce1b3dc-877b-4ce7-a243-b3193c135093",
+      "attempts": 1,
+      "continue": {
+        "http": 200,
+        "body": {
+          "status": "ok",
+          "run_id": "18175e3e-bf41-42c2-a5ba-b5c17aa02e3e",
+          "continues_used": 1,
+          "continues_remaining": 2
+        },
+        "status_after": "completed",
+        "same_run_id": true,
+        "continues_used_before": 0,
+        "continues_used_after": 1,
+        "continues_used_plus_1": true,
+        "model_provider_unchanged": true,
+        "model_provider": [
+          "deepseek-v4-pro",
+          "deepseek"
+        ],
+        "tool_starts_after_resume": [
+          "search_documents",
+          "execute_code"
+        ],
+        "carrier_first_call": "search_documents",
+        "queued_call_ran_first": true,
+        "events_after_resume": [
+          "citations",
+          "code_executing",
+          "code_execution_complete",
+          "code_execution_start",
+          "code_stdout",
+          "confidence",
+          "delta",
+          "done",
+          "final_output_files",
+          "iteration_start",
+          "planning",
+          "reasoning_delta",
+          "sources",
+          "stream_end",
+          "suggestions",
+          "tool_args_progress",
+          "tool_end",
+          "tool_preparing",
+          "tool_start",
+          "turn_boundary"
+        ]
+      },
+      "markup_hits": [],
+      "tools_used": [
+        "execute_code",
+        "search_documents"
+      ],
+      "threads": [
+        "6ce1b3dc-877b-4ce7-a243-b3193c135093"
+      ],
+      "reload_equal": true,
+      "evidence": ".planning/phases/292.1-tool-limit-continue-that-always-fires-bug-261024-03/evidence/board/deepseek-18175e3e-bf41-42c2-a5ba-b5c17aa02e3e.json"
+    },
+    {
+      "provider": "lmstudio",
+      "model": "qwen-agentworld-35b-a3b",
+      "required": false,
+      "extra": false,
+      "calling_mode": "NATIVE",
+      "blocked": "extra (self-hosted) group \u2014 not one of the required 8; not driven unless named in --providers",
+      "verdict": "\u26d4"
+    },
+    {
+      "provider": "moonshot",
+      "model": "kimi-k3.1-pro-highspeed",
+      "required": true,
+      "extra": false,
+      "calling_mode": "NATIVE",
+      "verdict": "OBSERVATION (1 prose-final; 2 ended ['failed'] \u2014 provider error)",
+      "classification": "other (failed)",
+      "run_id": "fe4747b5-357d-42cb-902a-cdcabfdde5ab",
+      "thread_id": "c1c91e35-be9a-41a8-9e20-9df66065bf5c",
+      "attempts": 3,
+      "continue": null,
+      "markup_hits": [],
+      "tools_used": [
+        "search_documents"
+      ],
+      "threads": [
+        "66a381cd-7d79-4d12-b230-ef7b104c4c81",
+        "58d84c14-f89e-4cbf-878d-b216675eaf79",
+        "c1c91e35-be9a-41a8-9e20-9df66065bf5c"
+      ],
+      "reload_equal": true,
+      "evidence": ".planning/phases/292.1-tool-limit-continue-that-always-fires-bug-261024-03/evidence/board/moonshot-fe4747b5-357d-42cb-902a-cdcabfdde5ab.json"
+    },
+    {
+      "provider": "openai",
+      "model": "gpt-5.6-luna",
+      "required": true,
+      "extra": false,
+      "calling_mode": "NATIVE",
+      "verdict": "OBSERVATION (prose-final on every attempt)",
+      "classification": "prose-final",
+      "run_id": "34748d7c-29a8-42d0-bf5c-0607b1d87401",
+      "thread_id": "3eb22e66-0d2a-4d60-b19f-1ef6276f296c",
+      "attempts": 3,
+      "continue": null,
+      "markup_hits": [],
+      "tools_used": [
+        "write_todos"
+      ],
+      "threads": [
+        "8eac1b35-963c-49f1-8710-93765c88c33b",
+        "494afd11-b97e-4b93-9572-f5d2ad424384",
+        "3eb22e66-0d2a-4d60-b19f-1ef6276f296c"
+      ],
+      "reload_equal": true,
+      "evidence": ".planning/phases/292.1-tool-limit-continue-that-always-fires-bug-261024-03/evidence/board/openai-34748d7c-29a8-42d0-bf5c-0607b1d87401.json"
+    },
+    {
+      "provider": "openrouter",
+      "model": "deepseek/deepseek-v4-pro",
+      "required": true,
+      "extra": false,
+      "calling_mode": "NATIVE",
+      "verdict": "\u26d4 every attempt ended ['failed'] before the cap (provider error \u2014 runs.error)",
+      "classification": "other (failed)",
+      "run_id": "e06cad5a-1e5c-4be6-9fe2-33c27d59802e",
+      "thread_id": "18177f97-0682-4ba9-b3ec-5106f4de1f7d",
+      "attempts": 3,
+      "continue": null,
+      "markup_hits": [],
+      "tools_used": [],
+      "threads": [
+        "ecaa5e0d-8ebc-4012-9f99-1244e1768c58",
+        "3e1a999d-0fed-4c1a-8023-7ce5842db84d",
+        "18177f97-0682-4ba9-b3ec-5106f4de1f7d"
+      ],
+      "reload_equal": true,
+      "evidence": ".planning/phases/292.1-tool-limit-continue-that-always-fires-bug-261024-03/evidence/board/openrouter-e06cad5a-1e5c-4be6-9fe2-33c27d59802e.json"
+    },
+    {
+      "provider": "zhipu",
+      "model": "glm-5.3-flash",
+      "required": true,
+      "extra": false,
+      "calling_mode": "NATIVE",
+      "verdict": "OBSERVATION (prose-final on every attempt)",
+      "classification": "prose-final",
+      "run_id": "d77378e0-bf63-41df-8565-498ac7f6caa3",
+      "thread_id": "54757112-ba0f-4ade-a549-42c2b8a9a0c6",
+      "attempts": 3,
+      "continue": null,
+      "markup_hits": [],
+      "tools_used": [
+        "search_documents"
+      ],
+      "threads": [
+        "cb9e2975-0bba-45d8-b1d0-f2ba0caed7e7",
+        "08ceb5e4-ed44-4314-af55-e31cbb91bf7b",
+        "54757112-ba0f-4ade-a549-42c2b8a9a0c6"
+      ],
+      "reload_equal": true,
+      "evidence": ".planning/phases/292.1-tool-limit-continue-that-always-fires-bug-261024-03/evidence/board/zhipu-d77378e0-bf63-41df-8565-498ac7f6caa3.json"
+    },
+    {
+      "provider": "openrouter",
+      "model": "deepseek/deepseek-v4.1-flash",
+      "required": false,
+      "extra": true,
+      "calling_mode": "NATIVE",
+      "verdict": "\u26d4 every attempt ended ['failed'] before the cap (provider error \u2014 runs.error)",
+      "classification": "other (failed)",
+      "run_id": "ced47148-56dc-42cf-a21f-ac6c9fde8be3",
+      "thread_id": "c3bb7d86-5f62-4a77-a09a-afb8e0cbc7ae",
+      "attempts": 3,
+      "continue": null,
+      "markup_hits": [],
+      "tools_used": [],
+      "threads": [
+        "f64e5935-86ff-4ca2-b389-abf8cb3c579f",
+        "47c7178d-132b-4f24-9c5d-33c51f0de0bb",
+        "c3bb7d86-5f62-4a77-a09a-afb8e0cbc7ae"
+      ],
+      "reload_equal": true,
+      "evidence": ".planning/phases/292.1-tool-limit-continue-that-always-fires-bug-261024-03/evidence/board/openrouter-extra-ced47148-56dc-42cf-a21f-ac6c9fde8be3.json"
+    },
+    {
+      "provider": "google",
+      "model": "gemini-3.8-flash",
+      "required": true,
+      "extra": false,
+      "calling_mode": "NATIVE (native SDK adapter)",
+      "verdict": "PASS",
+      "classification": "structured-pause",
+      "run_id": "fcdd3e75-29c4-43c6-a0b1-5a6163baf934",
+      "thread_id": "61f08251-0882-48bc-99f4-99f5d98ed80c",
+      "attempts": 1,
+      "continue": {
+        "http": 200,
+        "body": {
+          "status": "ok",
+          "run_id": "fcdd3e75-29c4-43c6-a0b1-5a6163baf934",
+          "continues_used": 1,
+          "continues_remaining": 2
+        },
+        "status_after": "completed",
+        "same_run_id": true,
+        "continues_used_before": 0,
+        "continues_used_after": 1,
+        "continues_used_plus_1": true,
+        "model_provider_unchanged": true,
+        "model_provider": [
+          "gemini-3.8-flash",
+          "google"
+        ],
+        "tool_starts_after_resume": [
+          "search_documents",
+          "execute_code"
+        ],
+        "carrier_first_call": "search_documents",
+        "queued_call_ran_first": true,
+        "events_after_resume": [
+          "citations",
+          "code_executing",
+          "code_execution_complete",
+          "code_execution_start",
+          "confidence",
+          "delta",
+          "done",
+          "final_output_files",
+          "iteration_start",
+          "planning",
+          "sources",
+          "stream_end",
+          "suggestions",
+          "tool_args_progress",
+          "tool_end",
+          "tool_preparing",
+          "tool_start"
+        ]
+      },
+      "markup_hits": [],
+      "tools_used": [
+        "execute_code",
+        "search_documents"
+      ],
+      "threads": [
+        "61f08251-0882-48bc-99f4-99f5d98ed80c"
+      ],
+      "reload_equal": true,
+      "evidence": ".planning/phases/292.1-tool-limit-continue-that-always-fires-bug-261024-03/evidence/board/google-fcdd3e75-29c4-43c6-a0b1-5a6163baf934.json"
+    },
+    {
+      "provider": "minimax",
+      "model": "MiniMax-M3",
+      "required": true,
+      "extra": false,
+      "calling_mode": "NATIVE",
+      "verdict": "PASS",
+      "classification": "structured-pause",
+      "run_id": "6983fd71-418c-4952-a4d3-bb56254bef44",
+      "thread_id": "39e39cea-a8f8-43fd-bd02-e583add910ed",
+      "attempts": 1,
+      "continue": {
+        "http": 200,
+        "body": {
+          "status": "ok",
+          "run_id": "6983fd71-418c-4952-a4d3-bb56254bef44",
+          "continues_used": 1,
+          "continues_remaining": 2
+        },
+        "status_after": "completed",
+        "same_run_id": true,
+        "continues_used_before": 0,
+        "continues_used_after": 1,
+        "continues_used_plus_1": true,
+        "model_provider_unchanged": true,
+        "model_provider": [
+          "MiniMax-M3",
+          "minimax"
+        ],
+        "tool_starts_after_resume": [
+          "search_documents",
+          "execute_code"
+        ],
+        "carrier_first_call": "search_documents",
+        "queued_call_ran_first": true,
+        "events_after_resume": [
+          "citations",
+          "code_executing",
+          "code_execution_complete",
+          "code_execution_start",
+          "code_stdout",
+          "confidence",
+          "delta",
+          "done",
+          "final_output_files",
+          "iteration_start",
+          "planning",
+          "reasoning_delta",
+          "sources",
+          "stream_end",
+          "suggestions",
+          "tool_args_progress",
+          "tool_end",
+          "tool_preparing",
+          "tool_start",
+          "turn_boundary"
+        ]
+      },
+      "markup_hits": [],
+      "tools_used": [
+        "execute_code",
+        "search_documents"
+      ],
+      "threads": [
+        "39e39cea-a8f8-43fd-bd02-e583add910ed"
+      ],
+      "reload_equal": true,
+      "evidence": ".planning/phases/292.1-tool-limit-continue-that-always-fires-bug-261024-03/evidence/board/minimax-6983fd71-418c-4952-a4d3-bb56254bef44.json"
+    }
+  ],
+  "probes": {
+    "typed_continue": {
+      "attempts": [
+        {
+          "thread_id": "a6d673d1-6a9e-4d84-8766-76eaac5dd625",
+          "run_id": "9b9182dc-2a6f-4ec8-a7f9-440b5c684c3d",
+          "status": "completed",
+          "paused": true,
+          "classification": "text-pause",
+          "provider": "deepseek",
+          "model": "deepseek-v4-pro"
+        }
+      ],
+      "threads": [
+        "a6d673d1-6a9e-4d84-8766-76eaac5dd625"
+      ],
+      "probe": {
+        "provider": "deepseek",
+        "model": "deepseek-v4-pro",
+        "thread_id": "a6d673d1-6a9e-4d84-8766-76eaac5dd625",
+        "paused_run_id": "9b9182dc-2a6f-4ec8-a7f9-440b5c684c3d",
+        "http": 200,
+        "body": {
+          "continued": true,
+          "run_id": "9b9182dc-2a6f-4ec8-a7f9-440b5c684c3d",
+          "message_id": null,
+          "continues_used": 1,
+          "continues_remaining": 2
+        },
+        "continued": true,
+        "same_run_id": true,
+        "message_id_null": true,
+        "user_rows_before_after": [
+          1,
+          1
+        ],
+        "runs_rows_before_after": [
+          1,
+          1
+        ],
+        "continues_used_before_after": [
+          0,
+          1
+        ],
+        "status_after": "cap_paused",
+        "verdict": "PASS"
+      },
+      "markup_hits": [],
+      "evidence": ".planning/phases/292.1-tool-limit-continue-that-always-fires-bug-261024-03/evidence/board/typed-continue.json"
+    },
+    "long": {
+      "provider": "deepseek",
+      "model": "deepseek-v4-pro",
+      "prompt_bytes": 6658,
+      "verdict": "PASS",
+      "classification": "text-pause",
+      "run_id": "2ef2050e-d0ad-4bf2-9bbb-64d38aaa56d1",
+      "continue": {
+        "http": 200,
+        "body": {
+          "status": "ok",
+          "run_id": "2ef2050e-d0ad-4bf2-9bbb-64d38aaa56d1",
+          "continues_used": 1,
+          "continues_remaining": 2
+        },
+        "status_after": "completed",
+        "same_run_id": true,
+        "continues_used_before": 0,
+        "continues_used_after": 1,
+        "continues_used_plus_1": true,
+        "model_provider_unchanged": true,
+        "model_provider": [
+          "deepseek-v4-pro",
+          "deepseek"
+        ],
+        "tool_starts_after_resume": [
+          "search_documents",
+          "execute_code"
+        ],
+        "carrier_first_call": "search_documents",
+        "queued_call_ran_first": true,
+        "events_after_resume": [
+          "citations",
+          "code_executing",
+          "code_execution_complete",
+          "code_execution_start",
+          "code_stdout",
+          "confidence",
+          "delta",
+          "done",
+          "final_output_files",
+          "iteration_start",
+          "planning",
+          "reasoning_delta",
+          "sources",
+          "stream_end",
+          "suggestions",
+          "tool_args_progress",
+          "tool_end",
+          "tool_preparing",
+          "tool_start",
+          "turn_boundary"
+        ]
+      },
+      "markup_hits": [],
+      "threads": [
+        "f8a78671-4768-4752-90bd-73887225e516"
+      ],
+      "evidence": ".planning/phases/292.1-tool-limit-continue-that-always-fires-bug-261024-03/evidence/board/long-deepseek-2ef2050e-d0ad-4bf2-9bbb-64d38aaa56d1.json"
+    },
+    "parallel": {
+      "provider": "deepseek",
+      "model": "deepseek-v4-pro",
+      "thread_a": "7e4b0c64-6340-441c-876d-c47bb0e35ae9",
+      "run_a": "db1bf671-c4da-4613-b092-db4513f6754f",
+      "a_first_status": "completed",
+      "a_continue_http": 200,
+      "a_final": "completed",
+      "thread_b": "fe519331-fcc9-401b-a672-9790a0820f3a",
+      "run_b": "43cb6b97-c3ac-4d66-ac1c-404c1baa2571",
+      "b_final": "completed",
+      "a_in_own_thread": true,
+      "b_in_own_thread": true,
+      "threads": [
+        "7e4b0c64-6340-441c-876d-c47bb0e35ae9",
+        "fe519331-fcc9-401b-a672-9790a0820f3a"
+      ],
+      "markup_hits": [],
+      "verdict": "PASS",
+      "evidence": ".planning/phases/292.1-tool-limit-continue-that-always-fires-bug-261024-03/evidence/board/parallel-deepseek.json"
+    }
+  },
+  "markup_hits": 0,
+  "threads_scanned": [
+    "08ceb5e4-ed44-4314-af55-e31cbb91bf7b",
+    "18177f97-0682-4ba9-b3ec-5106f4de1f7d",
+    "39e39cea-a8f8-43fd-bd02-e583add910ed",
+    "3e1a999d-0fed-4c1a-8023-7ce5842db84d",
+    "3eb22e66-0d2a-4d60-b19f-1ef6276f296c",
+    "47c7178d-132b-4f24-9c5d-33c51f0de0bb",
+    "494afd11-b97e-4b93-9572-f5d2ad424384",
+    "54757112-ba0f-4ade-a549-42c2b8a9a0c6",
+    "58d84c14-f89e-4cbf-878d-b216675eaf79",
+    "61f08251-0882-48bc-99f4-99f5d98ed80c",
+    "66a381cd-7d79-4d12-b230-ef7b104c4c81",
+    "699df254-756e-43c4-a133-f68b84c10691",
+    "6ce1b3dc-877b-4ce7-a243-b3193c135093",
+    "714eb1a3-3e2b-45b4-a2cf-063b00bb3026",
+    "7e4b0c64-6340-441c-876d-c47bb0e35ae9",
+    "8eac1b35-963c-49f1-8710-93765c88c33b",
+    "a6d673d1-6a9e-4d84-8766-76eaac5dd625",
+    "b7f4d27b-15af-4e0c-8512-a795d770dfc8",
+    "c1c91e35-be9a-41a8-9e20-9df66065bf5c",
+    "c3bb7d86-5f62-4a77-a09a-afb8e0cbc7ae",
+    "cb9e2975-0bba-45d8-b1d0-f2ba0caed7e7",
+    "ecaa5e0d-8ebc-4012-9f99-1244e1768c58",
+    "f64e5935-86ff-4ca2-b389-abf8cb3c579f",
+    "f8a78671-4768-4752-90bd-73887225e516",
+    "fe519331-fcc9-401b-a672-9790a0820f3a"
+  ]
+}
