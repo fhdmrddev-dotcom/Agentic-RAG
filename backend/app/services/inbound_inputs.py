@@ -116,10 +116,15 @@ def declared_fields(definition: dict | str | None) -> list[DeclaredField]:
                     source=source,
                 )
             )
-    return [
-        f for f in fields
-        if f.key not in RESERVED_RUN_INPUT_KEYS and f.source != "kb_auto"
-    ]
+    out = _Fields(f for f in fields if f.key not in RESERVED_RUN_INPUT_KEYS and f.source != "kb_auto")
+    out.look_ups = sum(1 for f in fields if f.source == "kb_auto")  # 296 review BE-WR-03
+    return out
+
+
+class _Fields(list):
+    """The asked-for fields; ``look_ups`` counts the declared Look-it-up inputs left out."""
+
+    look_ups = 0
 
 
 def needs_file_upload(fields: list[DeclaredField]) -> bool:
@@ -131,8 +136,9 @@ def needs_typed_task(fields: list[DeclaredField]) -> bool:
     """296-06 (293-IN-06): True when the workflow declares no launch field at all, so it starts
     from the typed task — the browser's ``entryInputFields`` falls back to ``kickoff_prompt`` for
     exactly this shape. A key cannot send a typed task yet, so the picker greys it, ``create_key``
-    refuses it and an inbound start refuses it (``needs_task``)."""
-    return not fields
+    refuses it and an inbound start refuses it (``needs_task``). A workflow whose only inputs are
+    Look-it-up ones declares inputs, so it never falls back to the task (296 review BE-WR-03)."""
+    return not fields and not getattr(fields, "look_ups", 0)
 
 
 def missing_required(definition: Any, inputs: Any) -> list[str]:

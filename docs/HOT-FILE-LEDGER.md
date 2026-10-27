@@ -12101,7 +12101,7 @@ cells rot within days.
 | [`backend/app/services/rate_limit.py`](docs/HOT-FILE-LEDGER.md#backendappservicesrate_limitpy) | 4 / 2 / 138 (was `3 / 1 / 109`) | no (2 phases) | 296-01: per-user citation limit (10/min, [ASSUMED]) on `hit`. ⛔ no process-local state; no env var; fails CLOSED (503) |
 | [`backend/app/db/api_keys.py`](docs/HOT-FILE-LEDGER.md#backendappdbapi_keyspy) | 5 / 2 / 307 (was `4 / 1 / 303`) | no (young) | young. 296-06 (293-IN-08): revoke_key returns `revoked_now` from the UPDATE status tag. ⛔ owner predicate in every statement; key_hash only in auth |
 | [`backend/app/models/api_key.py`](docs/HOT-FILE-LEDGER.md#backendappmodelsapi_keypy) | 2 / 2 / 117 (was `1 / 1 / 113`) | no (young) | young. 296-06 (293-IN-06): `needs_task` added to WorkflowRefState. ⛔ no field carries the secret except the create response |
-| [`backend/app/services/inbound_inputs.py`](docs/HOT-FILE-LEDGER.md#backendappservicesinbound_inputspy) | 7 / 2 / 306 (was `6 / 1 / 258`) | no (young) | young. 296-06: missing_required (287-T01, one predicate for kickoffs + key calls), needs_typed_task (293-IN-06), INBOUND_MAX_BODY_BYTES (293-IN-03). ⛔ pure; strips _-keys |
+| [`backend/app/services/inbound_inputs.py`](docs/HOT-FILE-LEDGER.md#backendappservicesinbound_inputspy) | 8 / 2 / 312 (was `7 / 2 / 306`) | no (young) | 296 review BE-WR-03: declared_fields records the Look-it-up inputs it leaves out; needs_typed_task is False when any were declared. |
 | [`backend/app/api/api_keys.py`](docs/HOT-FILE-LEDGER.md#backendappapiapi_keyspy) | 3 / 2 / 421 (was `2 / 1 / 392`) | no (young) | young. 296-06: needs_task state + picker reason (293-IN-06); create_key names only what the picker offers; revoke audits only the call that revoked (293-IN-08). ⛔ 404 for miss AND foreign |
 | [`backend/app/services/unattended_launch.py`](docs/HOT-FILE-LEDGER.md#backendappservicesunattended_launchpy) | 6 / 2 / 361 (was `5 / 1 / 354`) | no (young) | young. 296-02 (293-IN-04): the _drive_run task is held in a module _BACKGROUND_TASKS set with add_done_callback(discard) (P9) until done |
 | [`backend/app/api/schedules.py`](docs/HOT-FILE-LEDGER.md#backendappapischedulespy) | 4 / 4 / 299 | ⚠ **FIRES** | ⚠ absent its ENTIRE LIFE — row added 296-02 (D-26). 296-02 (295-IN-05): Run now answers with `outcome` + a worded `detail`; ScheduledLaunchRefused caught first; raw exception logged only |
@@ -22849,6 +22849,12 @@ CLAUDE.md FIRING cell before this touch (moved verbatim): | `frontend/src/provid
 **`3 / 2 / 376` (was `2 / 2 / 365`).** 296 G-4 row 12: re-reads the frame when the kickoff's run id arrives; a FINISHED frame (the previous run's) never supplies elapsed or origin. Found live: a fresh in-thread start showed no answer until re-entry, and a stale `1 phase done… · 1m 57s` (the previous run's); bisected pre-existing (`07e2e4ba8`). Diagnosis `.planning/phases/296-close-v4-7-debt/evidence/g4/12-diagnosis.md`, RED `6a6791309`.
 
 Scan-list cell before this touch (moved verbatim): | [`frontend/src/components/chat/ThreadRunLine.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentschatthreadrunlinetsx) | 2 / 2 / 365 (was `1 / 1 / 357`) | no (1 phase) | ⚠ re-derived at 244-13 and UNMOVED — `244` FIXED G-1 in its INPUT, not here, so it is still at phase 1 and NOT one away. Detail section owed at its 3rd phase · 293 touch: see §Phase 293 close |
+
+### `backend/app/services/inbound_inputs.py` — 296 review BE-WR-03 (2026-10-27)
+
+**`8 / 2 / 312` (was `7 / 2 / 306`).** 296 review BE-WR-03: declared_fields records the Look-it-up inputs it leaves out; needs_typed_task is False when any were declared. A workflow whose only inputs are Look-it-up was greyed in the key picker, refused by create_key and refused inbound (`needs_task`), unlike the browser. RED `3116847ce`.
+
+Scan-list cell before this touch (moved verbatim): | [`backend/app/services/inbound_inputs.py`](docs/HOT-FILE-LEDGER.md#backendappservicesinbound_inputspy) | 7 / 2 / 306 (was `6 / 1 / 258`) | no (young) | young. 296-06: missing_required (287-T01, one predicate for kickoffs + key calls), needs_typed_task (293-IN-06), INBOUND_MAX_BODY_BYTES (293-IN-03). ⛔ pure; strips _-keys |
 
 ### `backend/app/api/inbound.py` — 296 SECURITY AR-05 (2026-10-27)
 
