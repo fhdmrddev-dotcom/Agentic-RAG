@@ -1,7 +1,11 @@
 {
-  "gate": "D-39 automated provenance check (297-02 Task 1), run 2026-10-27",
-  "verdict": "FAILED - one field. Nothing installed. Plan stopped before the install, per D-39 and the orchestrator brief.",
-  "failing_field": "react@19.2.9 and react-dom@19.2.9 repository.url = git+https://github.com/react/react.git; the gate requires it to contain \"facebook/react\"",
+  "gate": "D-39 automated provenance check (297-02 Task 1), re-run fresh 2026-10-27T18:40Z after the operator checkpoint",
+  "verdict": "PASSED under the amended rule. Single serialized install authorised.",
+  "repository_rule": "facebook/react OR react/react (D-39 amended ec35fed56)",
+  "history": {
+    "first_run": "2026-10-27T18:35Z - FAILED on react/react-dom repository.url (react/react, gate required facebook/react). Nothing installed; plan stopped (commit 23478a202).",
+    "operator_decision": "2026-10-27 - ACCEPT github.com/react/react. D-39 amended on develop as ec35fed56: for react and react-dom, repository.url may contain facebook/react OR react/react. Every other field unchanged."
+  },
   "checks": {
     "react-router@8.5.0": {
       "repository.url": "https://github.com/remix-run/react-router",
@@ -20,26 +24,29 @@
     },
     "react@19.2.9": {
       "repository.url": "git+https://github.com/react/react.git",
-      "repository_contains_facebook/react": false,
-      "dist.integrity": "sha512-RuLdAokXv3sRmZa2/N8QH0KmTBIgDKC+buRUikGqow31+mGSGidLCX2o4XFq8OV+xBFWfhM9DVgTq1PPHADH4w==",
+      "repository_matches_amended_rule": true,
       "maintainers": ["fb <opensource+npm@fb.com>", "react-bot <react-core@meta.com>"],
-      "gitHead": "3d06b4005ac0cf9dec37267f26174adfe6d83611",
-      "pass": false
+      "dist.integrity": "sha512-RuLdAokXv3sRmZa2/N8QH0KmTBIgDKC+buRUikGqow31+mGSGidLCX2o4XFq8OV+xBFWfhM9DVgTq1PPHADH4w==",
+      "integrity_is_sha512": true,
+      "scripts": null,
+      "no_preinstall_install_postinstall": true,
+      "pass": true
     },
     "react-dom@19.2.9": {
       "repository.url": "git+https://github.com/react/react.git",
-      "repository_contains_facebook/react": false,
-      "dist.integrity": "sha512-YceU74W21fXEHszKBLj16MY0CmvpFKOs60iVrIyW/cCgOPsZJNaB6GVJEtIUqt6AG6EjzKLui5lPRrxAeS328Q==",
+      "repository_matches_amended_rule": true,
       "maintainers": ["fb <opensource+npm@fb.com>", "react-bot <react-core@meta.com>"],
-      "pass": false
+      "dist.integrity": "sha512-YceU74W21fXEHszKBLj16MY0CmvpFKOs60iVrIyW/cCgOPsZJNaB6GVJEtIUqt6AG6EjzKLui5lPRrxAeS328Q==",
+      "integrity_is_sha512": true,
+      "scripts": { "start": "node server.js" },
+      "no_preinstall_install_postinstall": true,
+      "pass": true
     }
   },
-  "evidence_bearing_on_the_failure": {
-    "note": "Collected so the operator can decide. Not used to override the gate.",
-    "github_redirect": "curl -sI https://github.com/facebook/react -> HTTP/1.1 301 Moved Permanently, Location: https://github.com/react/react (2026-10-27T18:35Z)",
-    "maintainers_unchanged": "react@19.2.0 and react@19.2.9 list the same two npm maintainers: fb <opensource+npm@fb.com>, react-bot <react-core@meta.com>; react-dom@19.2.9 the same",
+  "evidence_for_the_amendment": {
+    "github_redirect": "curl -sI https://github.com/facebook/react -> HTTP/1.1 301 Moved Permanently, Location: https://github.com/react/react (re-checked 2026-10-27T18:40Z)",
+    "maintainers_unchanged": "react@19.2.0, react@19.2.9 and react-dom@19.2.9 list the same two npm maintainers: fb <opensource+npm@fb.com>, react-bot <react-core@meta.com>",
     "transition_point": "react@19.2.7 repository.url = git+https://github.com/facebook/react.git; react@19.2.8 = git+https://github.com/react/react.git",
-    "installed_today": "frontend/node_modules/react is 19.2.4, repository https://github.com/facebook/react.git; react-dom@19.2.4 repository.url = git+https://github.com/facebook/react.git"
-  },
-  "reading": "Consistent with the upstream repository moving from github.com/facebook/react to github.com/react/react between 19.2.7 and 19.2.8 (same publishers, GitHub's own 301). The gate was written before that move. The operator decides whether D-39's react/react-dom field is amended to accept github.com/react/react."
+    "orchestrator": "re-verified independently; registry signatures present"
+  }
 }
