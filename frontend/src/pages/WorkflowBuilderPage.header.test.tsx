@@ -1770,6 +1770,9 @@ describe("Phase 200.3 (SEED-164 / D-03) — Builder header Test Run action", () 
         status: "draft",
       }),
       "",
+      // 297-REVIEW WR-02 (2026-10-28): Test Run now hands the launch a `beforeNavigate` hook, so
+      // the leave-guard latch is armed at the launch's own navigation rather than before the await.
+      expect.objectContaining({ beforeNavigate: expect.any(Function) }),
     )
   })
 
