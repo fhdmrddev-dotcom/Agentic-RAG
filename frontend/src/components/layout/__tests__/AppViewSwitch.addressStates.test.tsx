@@ -15,7 +15,8 @@
  * facts other fences depend on: one comment-stripped run comparison, and the fallback last.
  */
 import { describe, it, expect, beforeEach, afterEach, vi } from "vitest"
-import { render, screen, fireEvent, cleanup } from "@testing-library/react"
+import { useLayoutEffect } from "react"
+import { act, render, screen, fireEvent, cleanup } from "@testing-library/react"
 
 vi.mock("@/lib/api/_core", async (importOriginal) => {
   const actual = await importOriginal<typeof import("@/lib/api/_core")>()
@@ -60,6 +61,8 @@ vi.mock("@/pages/WorkflowRunPage", async (importOriginal) => {
 })
 
 import { ChatLayout } from "../ChatLayout"
+import { useOperatorProbe } from "@/hooks/useOperatorProbe"
+import { useEffectiveFeatures } from "@/hooks/useEffectiveFeatures"
 import { EffectiveFeaturesProvider } from "@/providers/EffectiveFeaturesProvider"
 import { ADDRESS_NOT_FOUND_COPY, ADMIN_HOLD_COPY } from "../AddressNotFound"
 import { COPY_LOADING } from "@/pages/WorkflowRunPage"
@@ -222,6 +225,68 @@ describe.each<[ActiveView, string]>([
 /** Line-anchored comment stripper (`renameFence.test.ts`). */
 const codeOf = (src: string) =>
   src.replace(/\r\n/g, "\n").replace(/\/\*[\s\S]*?\*\//g, "").replace(/^\s*\/\/.*$/gm, "")
+
+// ── 297-REVIEW WR-03 (2026-10-28) — the sign-in EDGE, driven, never set as props ──────────────
+// Both probes start `loading = true`, but while App is signed out they answer for `null` at once
+// and drop it to false. On the render where the session arrives they still read "answered, not an
+// operator, no features" — the passive effect that re-arms `loading` runs only after that commit
+// has painted. So for one frame a cold `/app/admin` showed S1 and a cold `/app/runs/<id>` showed
+// the dev fallback. The cases below run the REAL hooks across `userId: null → "u-297"` and look
+// at the DOM in a layout effect, i.e. in EVERY commit, so a one-frame flash cannot hide.
+function SignInHarness({ userId, view }: { userId: string | null; view: ActiveView }) {
+  const probe = useOperatorProbe(userId)
+  const feats = useEffectiveFeatures(userId)
+  useLayoutEffect(() => {
+    const text = document.body.textContent ?? ""
+    if (text.includes(ADDRESS_NOT_FOUND_COPY.heading)) flashes.push(`S1@${userId ?? "signed-out"}`)
+    if (/This view has no screen/.test(text)) flashes.push(`fallback@${userId ?? "signed-out"}`)
+  })
+  return (
+    <EffectiveFeaturesProvider value={feats}>
+      <ChatLayout
+        onSignOut={vi.fn()}
+        activeView={view}
+        onNavigate={vi.fn()}
+        navItems={[]}
+        isOperator={probe.isOperator}
+        operatorIdentity={probe.identity}
+        prefillMessage={null}
+        onSetPrefillMessage={vi.fn()}
+        studioSkillId={null}
+        studioTab="evals"
+        onOpenStudio={vi.fn()}
+        onReviewEvals={vi.fn()}
+        onStudioTabChange={vi.fn()}
+        onTuneSkill={vi.fn()}
+        activeRunId={view === "workflow-run" ? "5d3f1a2b-7c4e-4f6a-9a8b-1c2d3e4f5a97" : null}
+        openRun={vi.fn()}
+        addressNotFound={false}
+        operatorLoading={probe.loading}
+      />
+    </EffectiveFeaturesProvider>
+  )
+}
+const flashes: string[] = []
+
+describe.each<[ActiveView, string]>([
+  ["control-room", ADMIN_HOLD_COPY],
+  ["admin-spend", ADMIN_HOLD_COPY],
+  ["workflow-run", COPY_LOADING],
+])("WR-03 — signing in on a cold %s address holds from the FIRST signed-in commit", (view, hold) => {
+  it("never paints S1 or the fallback between sign-in and the probes answering", async () => {
+    flashes.length = 0
+    // The probes never answer: the hold is the only correct state for the whole window.
+    vi.stubGlobal("fetch", vi.fn(() => new Promise<Response>(() => {})))
+    const { rerender } = render(<SignInHarness userId={null} view={view} />)
+    await act(async () => {})
+    flashes.length = 0 // signed out is not under test (App shows AuthPage there)
+    await act(async () => {
+      rerender(<SignInHarness userId="u-297" view={view} />)
+    })
+    expect(flashes).toEqual([])
+    expect(screen.getByText(hold)).toBeInTheDocument()
+  })
+})
 
 describe("source facts other fences depend on", () => {
   it("AddressNotFound never renders the trailing fallback tag (one home for it)", () => {

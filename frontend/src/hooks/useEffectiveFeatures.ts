@@ -39,6 +39,11 @@ export interface UseEffectiveFeatures {
 export function useEffectiveFeatures(userId: string | null): UseEffectiveFeatures {
   const [features, setFeatures] = useState<EffectiveFeatures>({})
   const [loading, setLoading] = useState(true)
+  // 297-REVIEW WR-03 (2026-10-28): the user the current answer belongs to. On the render where
+  // `userId` changes (sign-in), the answer on hand is still the previous user's — the effect
+  // below that re-arms `loading` runs only after that commit has painted. So `loading` is also
+  // true whenever the answer is not for THIS user, from the very first render that names them.
+  const [answeredFor, setAnsweredFor] = useState<string | null | undefined>(undefined)
   // A refetch nonce (the D-04 bounce re-sync) — bumping it re-runs the effect for
   // the SAME user, re-reading the (possibly tightened) map within the TTL window.
   const [nonce, setNonce] = useState(0)
@@ -55,6 +60,7 @@ export function useEffectiveFeatures(userId: string | null): UseEffectiveFeature
     if (!userId) {
       setFeatures({})
       setLoading(false)
+      setAnsweredFor(null)
       return () => {
         cancelled = true
       }
@@ -74,7 +80,10 @@ export function useEffectiveFeatures(userId: string | null): UseEffectiveFeature
         if (!cancelled) setFeatures({})
       })
       .finally(() => {
-        if (!cancelled) setLoading(false)
+        if (!cancelled) {
+          setLoading(false)
+          setAnsweredFor(userId)
+        }
       })
 
     return () => {
@@ -82,5 +91,5 @@ export function useEffectiveFeatures(userId: string | null): UseEffectiveFeature
     }
   }, [userId, nonce])
 
-  return { features, loading, refetch }
+  return { features, loading: loading || answeredFor !== userId, refetch }
 }
