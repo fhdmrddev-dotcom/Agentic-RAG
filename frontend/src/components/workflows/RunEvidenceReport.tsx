@@ -338,7 +338,8 @@ function Report({
                   <div className="font-mono text-[10px] text-muted-foreground">{r.typeLine}</div>
                   {r.output !== null ? (
                     // 296-04 (289-F-B): the shared sanitised renderer (marked + DOMPurify), no second one.
-                    <MarkdownRenderer content={r.output} className="mt-0.5 text-xs text-muted-foreground" />
+                    // 296 review FE-WR-02: a colleague's browser fetches nothing an LLM wrote.
+                    <MarkdownRenderer content={r.output} className="mt-0.5 text-xs text-muted-foreground" noRemoteMedia />
                   ) : null}
                   {r.count !== null ? <div className="mt-0.5 text-xs text-muted-foreground">{r.count}</div> : null}
                   <StepEvidenceLine confidence={r.confidence} unsourced={r.unsourced} />

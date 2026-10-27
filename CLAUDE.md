@@ -439,7 +439,7 @@ node scripts/check-hot-file-ledger.cjs <phase-dir>   # 0 clear · 1 missing rows
 | `backend/app/services/run_evidence.py` | 6 / 4 / 555 | ⚠ FIRES, absent here — row added 296-01 · D-05 withheld cascade · ⛔ |
 | `frontend/src/lib/api/runEvidence.ts` | 3 / 3 / 137 | ⚠ now FIRES (293) — row added 293-03 · one optional field |
 | `frontend/src/components/workflows/evidenceView.ts` | 4 / 3 / 387 | ⚠ now FIRES (293) — row added 293-03 · origin passed through |
-| `frontend/src/components/workflows/RunEvidenceReport.tsx` | 5 / 4 / 494 (was `4 / 3 / 472`) | 296-04: wraps, markdown output, watched-failure alert · ⚠ FIRES |
+| `frontend/src/components/workflows/RunEvidenceReport.tsx` | 6 / 4 / 495 (was `5 / 4 / 494`) | 296 review FE-WR-02: output renders with noRemoteMedia · ⚠ FIRES |
 | `frontend/src/components/workflows/evidenceVocabulary.ts` | 5 / 3 / 261 | ⚠ now FIRES (296) · 296-04: neutral NO_MATCH/UNSOURCED + DOWNLOAD_UNAVAILABLE |
 | `backend/app/models/thread.py` | 25 / 17 / 550 (was `24 / 16 / 545`) | 293-03: ONE field (origin) |
 | `frontend/src/components/workflows/canvasModel.ts` | 16 / 8 / 836 (was `15 / 8 / 831`) | 296-07: comparePhaseOrder, engineArmed; isGrounded drops escalated |
