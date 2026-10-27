@@ -158,7 +158,9 @@ beforeEach(() => {
   mockGetThreadWorkflow.mockResolvedValue({ active_workflow_run_id: "wfrun-121" })
 })
 
-function renderLayout(onNavigate = vi.fn()) {
+// D-297-09 (Phase 297-02, D-15 / D-18): a run opens through the `openRun` route navigator with
+// its `workflow_runs.id`; ChatLayout no longer flips the view by name for a run.
+function renderLayout(onNavigate = vi.fn(), openRun = vi.fn()) {
   render(
     // ⚠ AMENDED AGAIN BY THE PHASE-188 CODE-REVIEW FIX (CR-05). The run home is
     // canvas-era surface and is now gated on `visual_workflow_canvas`, so the retarget
@@ -174,17 +176,18 @@ function renderLayout(onNavigate = vi.fn()) {
         onSignOut={vi.fn()}
         activeView="workflows"
         onNavigate={onNavigate}
+        openRun={openRun}
         prefillMessage={null}
         onSetPrefillMessage={vi.fn()}
       />
     </EffectiveFeaturesProvider>,
   )
-  return { onNavigate }
+  return { onNavigate, openRun }
 }
 
 describe("ChatLayout — Workflows-page Run launches a workflow (SC#2, D-02/D-03)", () => {
   it("Run → doRun calls createThread + postMessage({workflowDefinitionId}) + navigates to the run surface", async () => {
-    const { onNavigate } = renderLayout()
+    const { onNavigate, openRun } = renderLayout()
 
     // Drive the page launch: click the published card's Run, fill the kickoff, confirm.
     const cards = await screen.findAllByTestId("published-card")
@@ -210,7 +213,8 @@ describe("ChatLayout — Workflows-page Run launches a workflow (SC#2, D-02/D-03
     await waitFor(() => expect(mockGetThreadWorkflow).toHaveBeenCalledWith("thread-new"))
 
     // Phase 188-09 (D-188-12): the user lands on the run, NOT in the chat message list.
-    await waitFor(() => expect(onNavigate).toHaveBeenCalledWith("workflow-run"))
+    // D-297-09: by its anchor id, through the route navigator.
+    await waitFor(() => expect(openRun).toHaveBeenCalledWith("wfrun-121"))
     expect(onNavigate).not.toHaveBeenCalledWith("chat")
 
     // WR-04 invariant: a SUCCESSFUL launch never deletes the created thread.

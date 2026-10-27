@@ -4369,11 +4369,11 @@ const BASELINE = {
   "StepEvidenceLine.test.tsx": 15, // 289-02 — the KB evidence line or nothing
   "evidenceView.test.ts": 34, // 293-03: 31 -> 34 (measured 33 at base; +1 the view carries the recorded origin). 289-REVIEW WR-03: 29 -> 31 (final-attempt Checks fact, timed-out kind). 289-04 — payload to view-model, privacy applied twice
   "RunEvidenceReport.test.tsx": 26, // 289-04 — the report by content, button sets, 404 screen
-  "runDeepLink.test.ts": 12, // 289-04 — strict-UUID ?run= read/write/clear
+  "runDeepLink.test.ts": 13, // 289-04 — strict-UUID ?run= read; 297-02 (D-297-11): write/clear retired, replaced by 5 legacy-alias cases (12 -> 13)
   "runEvidence.test.ts": 3, // 289-04 — the client: encodeURIComponent, ApiError(status)
   "runEvidence.contract.test.ts": 3, // 289-05 I1 — RunEvidence vs the shared contract fixture
   // 289-REVIEW WR-05 (2026-10-20) — created by the review fix, adopted in BOTH knobs in one commit.
-  "ChatLayout.runDeepLink.test.tsx": 2, // ?run= is cleared when a LIVE run page is left
+  "ChatLayout.runDeepLink.test.tsx": 3, // 297-02 (D-297-10): the run address follows the view — cold /app/runs/<id>, Back to Workflows, legacy ?run= replaced (2 -> 3)
   // -- Phase 290-04 (2026-10-21, VIS-01 / VIS-04): the seven suites 290-01..03 created, pinned at the
   // gate's own printed actuals (count gate OK, failed 0). All seven sit under the src/components/workflows
   // directory entry in TARGETS (headerPin under __tests__/, two under library/), so they need a pin only.
@@ -4415,8 +4415,9 @@ const BASELINE = {
   // 293-04 — under the `src/components/workflows` directory entry, so a pin only.
   "WorkflowCardMenu.apiKey293.test.tsx": 4, // ⋯ New API key… under Schedules on owned published rows only, payload {id, name}; absent without onApiKey (seam286 pin unchanged)
   // ── Phase 297-01 (REG-09 / D-01, D-03) — adopted, both knobs, same commit (2026-10-27).
-  "useAppNavigation.test.tsx": 13, // 297-01 — characterization of App's moved view/tab state: boot initializer (4 shapes + home), studio navigators, one-shot Library hand-off, bounceHome, no router import
+  "useAppNavigation.test.tsx": 30, // 297-01 characterization (13), re-targeted to the URL by 297-02: refresh, push/replace, Back/Forward, same-address no-op, legacy + bare + pre-auth + unknown addresses, POP spends the hand-off (13 -> 30)
   // ── Phase 297-02 (LINK-01 / D-11, D-12, D-25) — adopted, both knobs, same commit (2026-10-27).
+  "noRawHistoryWrites.test.ts": 3, // 297-02 (D-297-15 / D-33) — tree-wide: no raw History write in stripped product code; planted fixture caught; > 200 files swept
   "appRoutes.test.ts": 111, // 297-02 — route table: 12-member round-trip, D-11 table, strict ids, legacy ?run= / ?connections=1 / /admin/spend, bare prefixes, pre-auth untouched, hostile inputs never throw or leave the origin
 }
 
@@ -6459,6 +6460,8 @@ const TARGETS = [
   "src/hooks/__tests__/useAppNavigation.test.tsx",
   // Phase 297-02 — FILE-LEVEL (no src/lib/__tests__ directory entry), SAME commit as its BASELINE pin.
   "src/lib/__tests__/appRoutes.test.ts",
+  // Phase 297-02 — FILE-LEVEL (no src/__tests__/routing directory entry), SAME commit as its pin.
+  "src/__tests__/routing/noRawHistoryWrites.test.ts",
 ]
 
 const REPO_ROOT = path.resolve(__dirname, "..")

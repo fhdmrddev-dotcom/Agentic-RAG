@@ -415,12 +415,17 @@ describe("RunEvidenceReport: the version banners (D-04)", () => {
 })
 
 describe("RunEvidenceReport: the shareable address (SC#3)", () => {
-  it("writes ?run=<id> while shown and clears it on unmount", async () => {
+  // D-297-12 (Phase 297-02, D-18 / D-33): RE-TARGETED, not retired. The run's address is now
+  // `/app/runs/<id>`, owned by the route; the report writing `?run=` beside the router would be a
+  // second History writer that erases the router's entry index. So the address must be UNTOUCHED.
+  it("leaves window.location unchanged on mount and on unmount — the route owns the address", async () => {
+    const before = `${window.location.pathname}${window.location.search}`
     const { unmount } = renderReport(ownerPayload())
     await ready()
-    expect(new URLSearchParams(window.location.search).get("run")).toBe(RUN_ID)
-    unmount()
+    expect(`${window.location.pathname}${window.location.search}`).toBe(before)
     expect(new URLSearchParams(window.location.search).get("run")).toBeNull()
+    unmount()
+    expect(`${window.location.pathname}${window.location.search}`).toBe(before)
   })
 })
 
