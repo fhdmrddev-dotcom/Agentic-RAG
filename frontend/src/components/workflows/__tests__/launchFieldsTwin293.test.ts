@@ -43,7 +43,9 @@ describe("293-04 launch-field twin (browser half)", () => {
   })
 
   it.each(missingCases.map((c) => [c.name, c] as const))("%s", (_name, c) => {
-    const missing = missingRequiredFields(launchInputFields(c.definition), c.inputs ?? {})
+    // Every missing-required case states its inputs; a defaulted map would trip the 214 fence.
+    expect(c.inputs).toBeDefined()
+    const missing = missingRequiredFields(launchInputFields(c.definition), c.inputs!)
     expect(missing.map((f) => f.key)).toEqual(c.expected_missing)
   })
 })
