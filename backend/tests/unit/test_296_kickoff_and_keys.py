@@ -392,6 +392,14 @@ def test_a_field_less_workflow_needs_a_typed_task():
     ) is False
 
 
+def test_a_look_it_up_only_workflow_does_not_need_a_typed_task():
+    """296 review BE-WR-03: Look-it-up (kb_auto) inputs are never asked for, but they ARE declared,
+    so the browser never falls back to the typed task for this shape and neither may a key."""
+    only_look_up = {"inputs": [{"key": "policy", "label": "Policy", "source": "kb_auto"}]}
+    assert ii.declared_fields(only_look_up) == []
+    assert ii.needs_typed_task(ii.declared_fields(only_look_up)) is False
+
+
 def test_an_inbound_start_of_a_task_only_workflow_is_refused_in_words(monkeypatch):
     from tests.unit.phase293_inbound_fakes import all_audits
     from tests.unit.test_293_inbound_start import URL
