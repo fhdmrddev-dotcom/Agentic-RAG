@@ -264,10 +264,26 @@ describe("295-10 / D-r1-02 — after an answer, the open tab follows the re-driv
       cb.onPhaseCompleted?.("research", 0)
       cb.onPhaseStarted?.({ phase: "wrap", phaseIndex: 1, phaseType: "llm_single" })
       cb.onPhaseCompleted?.("wrap", 1)
+    })
+    // 296 G-4 S3: `run_completed` now ends the segment and re-reads the server, which wrote
+    // `finish_run` and every step before it emitted the event — so the frame says so too.
+    frame = {
+      ...PAUSED_FRAME,
+      active_workflow_run_id: null,
+      locked: false,
+      lock_is_stale: false,
+      mode: "deep",
+      run_status: "completed",
+      phases: [
+        { phase_index: 0, slug: "research", status: "completed", phase_type: "llm_agent" },
+        { phase_index: 1, slug: "wrap", status: "completed", phase_type: "llm_single" },
+      ],
+    }
+    await act(async () => {
       cb.onRunCompleted?.("completed")
     })
 
-    expect(phaseStatuses()).toEqual(["research:done", "wrap:done"])
+    await waitFor(() => expect(phaseStatuses()).toEqual(["research:done", "wrap:done"]))
     // And no second thread was opened to get there.
     expect(useStreamsStore.getState().viewedThreadId).toBe(THREAD_ID)
   })

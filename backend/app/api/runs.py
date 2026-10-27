@@ -884,6 +884,23 @@ async def _redrive_paused_workflow_run(
                     logger.exception(
                         "ask_user_response: producer-shell finalize failed for %s", _pid
                     )
+                # 296 G-4 S3: end the shell's stream as run_producer does (finalize → sentinel →
+                # EXPIRE); without it a follow's SSE waits out the consumer timeout and its
+                # onTerminal reconcile never runs.
+                try:
+                    from app.api.threads import _emit_terminal  # noqa: PLC0415
+                    from app.services.harness.run_handoff import (  # noqa: PLC0415
+                        resume_shell_status,
+                    )
+
+                    _status = resume_shell_status(_escape)
+                    await _emit_terminal(
+                        redis, _pid, _RUN_STATUS_TO_TERMINAL_TYPE[_status],
+                        **({"error": REDRIVE_FAILED_REASON} if _failed else {}),
+                    )
+                    await redis.expire(f"run:{_pid}", 600 if _status == "completed" else 60)
+                except BaseException:
+                    logger.exception("ask_user_response: shell terminal sentinel failed for %s", _pid)
             RUN_TASKS.pop(run_id, None)
 
     _t = asyncio.create_task(_wake())

@@ -1886,7 +1886,10 @@ export function StreamsProvider({ children }: PropsWithChildren) {
         lastEventAtRef.current.set(threadId, Date.now())
       }
       const originalOnTerminal = callbacks.onTerminal
+      let segmentEnded = false
       callbacks.onTerminal = (kind, errorPayload) => {
+        if (segmentEnded) return
+        segmentEnded = true
         // ⛔ Phase 243 (CHAT-02): drain the coalesced delta buffer BEFORE this wrapper
         // body runs. It reconciles / snapshots the message, and a flush that landed
         // afterwards would append the buffered tail onto replaced content.
@@ -1911,6 +1914,15 @@ export function StreamsProvider({ children }: PropsWithChildren) {
             .then(() => refreshPhaseSpineAfterStop(threadId))
             .catch((err) => console.warn("[StreamsProvider] follow terminal reconcile failed", err))
         }
+      }
+      // 296 G-4 S3: the run's own end event ends the segment (as cap_paused does for a Deep
+      // continuation) — a re-drive stream written before its sentinel landed would otherwise
+      // hold the follow, and its reconcile above, until the server's consumer timeout.
+      const onRunCompleted = callbacks.onRunCompleted
+      callbacks.onRunCompleted = (status) => {
+        onRunCompleted?.(status)
+        callbacks.onTerminal("done")
+        controller.abort()
       }
       subscribeToRun(
         producerRunId,

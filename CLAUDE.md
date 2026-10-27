@@ -412,7 +412,7 @@ node scripts/check-hot-file-ledger.cjs <phase-dir>   # 0 clear · 1 missing rows
 | `frontend/src/components/chat/MessageItem.tsx` | 84 / 39 / 1059 (was `83 / 42 / 1050`) | 292.1 UAT: Deep Continue re-attaches the run's stream (+1 else-if) · ⛔ |
 | `frontend/src/components/chat/CitationList.tsx` | 5 / 5 / 91 | 294-05: ONE CitationCheckAction beside the trigger · extraction FIRST |
 | `backend/app/api/threads.py` | 283 / 95 / 2745 (was `282 / 94 / 2744`) | 296-06: one provider= kwarg at the kickoff create_workflow_run · ⛔ |
-| `frontend/src/providers/StreamsProvider.tsx` | 118 / 45 / 5222 (was `117 / 45 / 5218`) | 296 review FE-CR-01: a refused kickoff stashes no draft (one spread) · ⛔ |
+| `frontend/src/providers/StreamsProvider.tsx` | 119 / 45 / 5234 (was `118 / 45 / 5222`) | 296 G-4 S3: the follow ends its segment on run_completed · ⛔ |
 | `frontend/src/hooks/useMessages.ts` | 74 / 27 / 127 | extraction due |
 | `backend/app/services/anthropic_service.py` | 12 / 11 / 373 (was `11 / 10 / 354`) | honoured by construction (282-01: constructor kwargs) · adapter audit due |
 | `backend/app/services/embedding_service.py` | 9 / 5 / 354 | ⚠ absent for its entire life at 5 phases — row added 236 (SC#2) |
@@ -464,7 +464,7 @@ node scripts/check-hot-file-ledger.cjs <phase-dir>   # 0 clear · 1 missing rows
 | `backend/app/services/sub_agent_models.py` | 5 / 3 / 263 (was absent) | ⚠ absent its ENTIRE LIFE — row added 296-06; not touched |
 | `backend/app/services/run_reconciler.py` | 6 / 4 / 415 (was `5 / 3 / 406`) | 296-02: all steps completed → completed (one column, one condition) |
 | `backend/app/services/circuit_breaker.py` | 1 / 1 / 331 | ⚠ absent its ENTIRE LIFE — row added 256-02 · ⛔ |
-| `backend/app/api/runs.py` | 53 / 23 / 2033 (was `52 / 22 / 2003`) | 296-02: 4 small touches (worded reason, return, held retry, select) · ⛔ |
+| `backend/app/api/runs.py` | 54 / 23 / 2050 (was `53 / 23 / 2033`) | 296 G-4 S3: re-drive shell ends its stream (sentinel + EXPIRE) · ⛔ |
 | `backend/app/api/panel.py` | 6 / 5 / 285 | 295-03: ONE engine_pause key on /pending · honoured by construction |
 | `backend/app/utils/folder_utils.py` | 9 / 5 / 302 | ⚠ absent its ENTIRE LIFE — row added 295-10 · ⛔ |
 | `backend/app/services/harness/human_input.py` | 7 / 4 / 376 (was `6 / 3 / 375`) | 296-02: one stale comment corrected (the boot sweep now sets the flag) · ⛔ |
