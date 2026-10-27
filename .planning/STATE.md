@@ -1,15 +1,15 @@
 ---
 gsd_state_version: 1.0
 milestone: v4.7
-milestone_name: Workflows You Can See and Start Anywhere
+milestone_name: Workflows You Can See and Start Anywhere — 🚧 IN PROGRESS
 status: milestone_complete
-last_updated: "2026-10-26T16:00:00.000Z"
+last_updated: "2026-10-27T14:06:30.634Z"
 progress:
-  total_phases: 18
-  completed_phases: 11
-  total_plans: 53
-  completed_plans: 51
-  percent: 56
+  total_phases: 12
+  completed_phases: 12
+  total_plans: 60
+  completed_plans: 63
+  percent: 100
 ---
 
 # Project State
@@ -28,7 +28,7 @@ See: `.planning/PROJECT.md` (updated 2026-10-18)
 
 **Core value:** The agent acts as an AI colleague — it knows your knowledge base, can run code, and
 can be taught new behaviours (skills) that persist and can be shared.
-**Current focus:** Phase 296 CLOSED 2026-10-27 — next: the operator-gated deploy of 292.1 + 293 + 296 (cloud migrations 214 → 215 → 216, each shown before it runs)
+**Current focus:** 292.1 + 293 + 296 LIVE 2026-10-27 — production `3ec36f998` (master `f152c2c4e`); cloud migs 214, 215 (VERIFY 15/15), 216 (VERIFY PASS) applied first, each operator-approved; advisors 0 ERROR
 
 ---
 
