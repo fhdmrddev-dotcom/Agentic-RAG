@@ -95,12 +95,13 @@ export function useStartWorkflowInThread(threadId: string) {
         surfaceId: "chat",
       })
         .then(() => {
-          // Only a refusal of THIS send: a new entry that either stashed this kickoff as a failed
-          // draft (the 400/422 arm) or is the 409 lock arm. A snapshot failure is not ours.
+          // Only a refusal of THIS send: a new entry with a refusal status (the 400/422 arm, which
+          // stashes no draft for a kickoff — FE-CR-01, or the 409 lock arm). A snapshot failure
+          // (network / 5xx / 404) is not ours.
           const st = useStreamsStore.getState()
           const after = st.reconcileErrors.get(threadId)
           if (!after || after === before) return
-          if (st.failedSendDrafts.get(threadId) === kickoff || statusOf(after) === 409) throw after
+          if ([400, 409, 422].includes(statusOf(after) ?? 0)) throw after
         })
         .catch((err: unknown) => {
           useStreamsStore.setState((st) => {

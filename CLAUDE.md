@@ -412,7 +412,7 @@ node scripts/check-hot-file-ledger.cjs <phase-dir>   # 0 clear · 1 missing rows
 | `frontend/src/components/chat/MessageItem.tsx` | 84 / 39 / 1059 (was `83 / 42 / 1050`) | 292.1 UAT: Deep Continue re-attaches the run's stream (+1 else-if) · ⛔ |
 | `frontend/src/components/chat/CitationList.tsx` | 5 / 5 / 91 | 294-05: ONE CitationCheckAction beside the trigger · extraction FIRST |
 | `backend/app/api/threads.py` | 283 / 95 / 2745 (was `282 / 94 / 2744`) | 296-06: one provider= kwarg at the kickoff create_workflow_run · ⛔ |
-| `frontend/src/providers/StreamsProvider.tsx` | 117 / 45 / 5218 (was `116 / 44 / 5210`) | 296-04: one guarded reconcile in the follow terminal · ⛔ |
+| `frontend/src/providers/StreamsProvider.tsx` | 118 / 45 / 5222 (was `117 / 45 / 5218`) | 296 review FE-CR-01: a refused kickoff stashes no draft (one spread) · ⛔ |
 | `frontend/src/hooks/useMessages.ts` | 74 / 27 / 127 | extraction due |
 | `backend/app/services/anthropic_service.py` | 12 / 11 / 373 (was `11 / 10 / 354`) | honoured by construction (282-01: constructor kwargs) · adapter audit due |
 | `backend/app/services/embedding_service.py` | 9 / 5 / 354 | ⚠ absent for its entire life at 5 phases — row added 236 (SC#2) |
@@ -478,7 +478,7 @@ node scripts/check-hot-file-ledger.cjs <phase-dir>   # 0 clear · 1 missing rows
 | `frontend/src/components/chat/ChatArea.tsx` | 94 / 44 / 1189 (was `93 / 43 / 1186`) | honoured by construction (287-03: ONE mount, 0 hooks) · ⛔ |
 | `frontend/src/stores/streamsStore.ts` | 28 / 19 / 662 (was `27 / 18 / 660`) | 296-04: initializer typed StreamsState (TS2345 gone) · ⛔ |
 | `frontend/src/components/chat/ThreadWorkflowPicker.tsx` | 3 / 2 / 144 (was `1 / 1 / 91`) | 296-04: failure line + Escape/outside dismissal · ⛔ |
-| `frontend/src/components/chat/useStartWorkflowInThread.ts` | 2 / 2 / 173 (was `1 / 1 / 85`) | 296-04: owns a refused start (worded, Retry, no prefill) · ⛔ |
+| `frontend/src/components/chat/useStartWorkflowInThread.ts` | 3 / 2 / 174 (was `2 / 2 / 173`) | 296 review FE-CR-01: refusal read by status (400/409/422), not by draft · ⛔ |
 | `frontend/src/lib/toolMeta.ts` | 10 / 6 / 218 | ⚠ absent its ENTIRE LIFE — row added 244-13 · ⛔ |
 | `frontend/src/components/panel/PendingAskCard.tsx` | 25 / 12 / 1132 (was `24 / 11 / 1103`) | 296-04: one ask per live workflow run; passed clock waits |
 | `frontend/src/pages/WorkflowRunPage.tsx` | 35 / 15 / 1604 (was `34 / 14 / 1597`) | 296-04: one ref + one prop (watchedFailure); useState 4, useEffect 4 · ⛔ |

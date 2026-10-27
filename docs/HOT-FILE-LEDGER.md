@@ -11524,12 +11524,12 @@ cells rot within days.
 | [`backend/app/db/entitlements.py`](docs/HOT-FILE-LEDGER.md#backendappdbentitlementspy) | 2 / 1 / 169 | no (new) | young (created Phase 258). Row added AT CREATION — absent row is invisible to G-5 (TIER-01/02). |
 | [`backend/app/services/entitlement_service.py`](docs/HOT-FILE-LEDGER.md#backendappservicesentitlement_servicepy) | 2 / 1 / 130 | no (new) | young (created Phase 258). Row added AT CREATION. Single commercial boundary home (TIER-01/03/04/05). |
 | [`frontend/src/components/chat/ThreadWorkflowPicker.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentschatthreadworkflowpickertsx) | 3 / 2 / 144 (was `1 / 1 / 91`) | no (2 phases) | 296-04: the refused-start line (role=alert, Retry start / Dismiss message) under the trigger; Escape and outside pointer-down close the list; aria-expanded / aria-controls |
-| [`frontend/src/components/chat/useStartWorkflowInThread.ts`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentschatusestartworkflowinthreadts) | 2 / 2 / 173 (was `1 / 1 / 85`) | no (2 phases) | 296-04: the send chain ends in .catch; a refusal is worded (409/422/other), the kickoff draft is never pre-filled; exposes failure/retry/dismiss. Still reads no conversation |
+| [`frontend/src/components/chat/useStartWorkflowInThread.ts`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentschatusestartworkflowinthreadts) | 3 / 2 / 174 (was `2 / 2 / 173`) | no (2 phases) | 296 review FE-CR-01: a refusal of this send is recognised by its status (400/409/422) instead of by the stashed draft, which the provider no longer writes for a kickoff. |
 | [`frontend/src/components/chat/ToolCallPanel.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentschattoolcallpaneltsx) | 55 / 23 / 409 (was `54 / 22 / 407`) | ⚠ **FIRES** | ✅ G-5 DISCHARGED (227-02). **273-05**: `stepLabel` + `ARGS_HIDDEN.livePanel` replace one name check; no new branch |
 | [`frontend/src/components/chat/tool-bodies/SearchDocumentsBody.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentschattool-bodiessearchdocumentsbodytsx) | 3 / 3 / 71 | ⚠ **FIRES** (crossed in 272) | ⚠ absent its ENTIRE LIFE — row added 272-05. **F-3**: `summarize` names refused / invalid / empty / not-searchable / unavailable |
 | [`frontend/src/components/chat/MessageItem.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentschatmessageitemtsx) | 84 / 39 / 1059 (was `83 / 42 / 1050`) | ⚠ **FIRES** | 292.1 UAT: Deep Continue re-attaches the run's stream (+1 else-if) · ⛔ |
 | [`backend/app/api/threads.py`](docs/HOT-FILE-LEDGER.md#backendappapithreadspy) | 283 / 95 / 2745 (was `282 / 94 / 2744`) | ⚠ **FIRES** | 296-06 (SEED-362 kickoff half): ONE kwarg `provider=_resolved_provider` on the existing create_workflow_run call. The 287-T01 guard lives in preflight (workflow_kickoff.py), not here · ⛔ |
-| [`frontend/src/providers/StreamsProvider.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrcprovidersstreamsprovidertsx) | 117 / 45 / 5218 (was `116 / 44 / 5210`) | ⚠ **FIRES** | 296-04: ONE guarded reconcile (then one step re-read) in the follow onTerminal wrapper; useState 0→0, useEffect 9→9 · ⛔ |
+| [`frontend/src/providers/StreamsProvider.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrcprovidersstreamsprovidertsx) | 118 / 45 / 5222 (was `117 / 45 / 5218`) | ⚠ **FIRES** | 296 review FE-CR-01: the 400/422 ApiError arm no longer stashes a composer draft when the send is a workflow kickoff (one conditional spread). Driven live first. |
 | [`frontend/src/hooks/useMessages.ts`](docs/HOT-FILE-LEDGER.md#frontendsrchooksusemessagests) | 74 / 27 / 127 | ⚠ **FIRES** | extraction due |
 | [`backend/app/services/anthropic_service.py`](docs/HOT-FILE-LEDGER.md#backendappservicesanthropic_servicepy) | 12 / 11 / 373 (was `11 / 10 / 354`) | ⚠ **FIRES** | **282-01**: ONE `_anthropic_client` builder (budget in the constructor, connect 5 s, cloud retries 2) + trailing `timeout_s` on `stream_anthropic`. honoured by construction; adapter-pattern audit due |
 | [`frontend/src/components/workflows/WorkflowCanvas.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentsworkflowsworkflowcanvastsx) | 33 / 11 / 1757 (was `32 / 10 / 1744`) | **FIRES** | 296-07 (D-09, operator decision): ONE controlled prop pair (view / onViewChange) + tabpanel attrs on 2 bodies; useState 8→8. ⛔ extraction still FIRST next |
@@ -22781,6 +22781,22 @@ CLAUDE.md verdict cell as of 2026-10-18 (replaced by 286-05):
 Scan-list cell before this 296-02 touch (moved verbatim): | [`backend/app/services/harness_engine.py`](docs/HOT-FILE-LEDGER.md#backendappservicesharness_enginepy) | 68 / 26 / 2961 (was `67 / 26 / 2957`) | ⚠ **FIRES** | 295-09 WR-07: the pause arm skips its `pause_run` when the engine ask already wrote it (ONE guarded line, If 86→87), so a re-driven run is never flipped back. Armed-block seam still OWED |
 
 CLAUDE.md FIRING cell before this 296-02 touch (moved verbatim): | `backend/app/services/harness_engine.py` | 68 / 26 / 2961 (was `67 / 26 / 2957`) | 295-09 WR-07: one pause write per engine ask · armed seam OWED · ⛔ |
+
+### `frontend/src/providers/StreamsProvider.tsx` — 296 review FE-CR-01 (2026-10-27)
+
+**`118 / 45 / 5222` (was `117 / 45 / 5218`).** 296 review FE-CR-01: the 400/422 ApiError arm no longer stashes a composer draft when the send is a workflow kickoff (one conditional spread). Driven live first. Evidence: `.planning/phases/296-close-v4-7-debt/evidence/g4/FE-CR-01-refused-kickoff-prefills-composer.jpg` (before) and `FE-CR-01-fixed-worded-no-prefill.jpg` (after), both driven with a page-local 422 stub on the kickoff POST. RED `0429bc53c`.
+
+Scan-list cell before this touch (moved verbatim): | [`frontend/src/providers/StreamsProvider.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrcprovidersstreamsprovidertsx) | 117 / 45 / 5218 (was `116 / 44 / 5210`) | ⚠ **FIRES** | 296-04: ONE guarded reconcile (then one step re-read) in the follow onTerminal wrapper; useState 0→0, useEffect 9→9 · ⛔ |
+
+CLAUDE.md FIRING cell before this touch (moved verbatim): | `frontend/src/providers/StreamsProvider.tsx` | 117 / 45 / 5218 (was `116 / 44 / 5210`) | 296-04: one guarded reconcile in the follow terminal · ⛔ |
+
+### `frontend/src/components/chat/useStartWorkflowInThread.ts` — 296 review FE-CR-01 (2026-10-27)
+
+**`3 / 2 / 174` (was `2 / 2 / 173`).** 296 review FE-CR-01: a refusal of this send is recognised by its status (400/409/422) instead of by the stashed draft, which the provider no longer writes for a kickoff. Evidence: `.planning/phases/296-close-v4-7-debt/evidence/g4/FE-CR-01-refused-kickoff-prefills-composer.jpg` (before) and `FE-CR-01-fixed-worded-no-prefill.jpg` (after), both driven with a page-local 422 stub on the kickoff POST. RED `0429bc53c`.
+
+Scan-list cell before this touch (moved verbatim): | [`frontend/src/components/chat/useStartWorkflowInThread.ts`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentschatusestartworkflowinthreadts) | 2 / 2 / 173 (was `1 / 1 / 85`) | no (2 phases) | 296-04: the send chain ends in .catch; a refusal is worded (409/422/other), the kickoff draft is never pre-filled; exposes failure/retry/dismiss. Still reads no conversation |
+
+CLAUDE.md FIRING cell before this touch (moved verbatim): | `frontend/src/components/chat/useStartWorkflowInThread.ts` | 2 / 2 / 173 (was `1 / 1 / 85`) | 296-04: owns a refused start (worded, Retry, no prefill) · ⛔ |
 
 ### `backend/app/services/harness_engine.py` — 296 review CR-01 (2026-10-27)
 

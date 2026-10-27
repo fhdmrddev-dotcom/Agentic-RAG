@@ -3306,9 +3306,13 @@ export function StreamsProvider({ children }: PropsWithChildren) {
               useStreamsStore.getState().actions.setMessagesForBucket(surfaceId, threadId, (prev) =>
                 prev.filter((m) => m.id !== assistantId && m.id !== userMsg.id),
               )
+              // 296 review FE-CR-01: a workflow kickoff's text is not the person's — never stash it
+              // (the composer would show `Run <name>` before the starter hook could clear it).
               useStreamsStore.setState((s) => ({
                 reconcileErrors: new Map(s.reconcileErrors).set(threadId, err),
-                failedSendDrafts: new Map(s.failedSendDrafts).set(threadId, content),
+                ...(opts?.workflowDefinitionId
+                  ? {}
+                  : { failedSendDrafts: new Map(s.failedSendDrafts).set(threadId, content) }),
               }))
             } else {
               // genuine network / non-HTTP failure — unchanged swallow-to-failed-placeholder.
