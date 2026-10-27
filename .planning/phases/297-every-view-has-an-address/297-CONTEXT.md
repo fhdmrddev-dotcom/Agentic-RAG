@@ -204,6 +204,13 @@ Requirements: REG-09, LINK-01, LINK-07, LINK-08.
   (`npm view react-router@8.5.0 repository.url maintainers dist.integrity`, expect `remix-run`) stands
   in for the slopcheck the researcher could not run. The install runs once, serialized — worktree
   `node_modules` is a junction to the operator's real tree.
+  **AMENDED 2026-10-27 (operator decision, at 297-02's provenance checkpoint):** the gate failed on
+  one field: `react@19.2.9` / `react-dom@19.2.9` name `git+https://github.com/react/react.git`. The
+  rule now accepts **`facebook/react` OR `react/react`** for react and react-dom. Evidence, verified
+  independently by the orchestrator: `github.com/facebook/react` → **301** `github.com/react/react`;
+  npm maintainers unchanged across 19.2.7→19.2.9 (`fb <opensource+npm@fb.com>`, `react-bot
+  <react-core@meta.com>`); the switch is exactly at 19.2.8 (2026-07-21); every version carries a
+  registry signature. All other D-39 fields unchanged.
 - **D-40:** The IA skill's "wired with NO router" line is amended (corrected beside the original,
   never deleted) in the router plan.
 - **D-41:** The parity suite reuses the Vercel evaluator already in `docsVercelRouting.test.ts`.
