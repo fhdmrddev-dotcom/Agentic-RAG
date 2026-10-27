@@ -282,10 +282,21 @@ export function useAppNavigation(): AppNavigation {
   // It runs while rendering, on the render where the view changes (React's "adjust state when
   // an input changes" pattern), so no frame ever shows a spent hand-off — an effect would paint
   // one frame with the stale tab first.
+  //
+  // ⚠ 297-REVIEW WR-04 (2026-10-28): a navigation the leave guard CANCELS is spent too. The
+  // attention route sets the hand-off before it navigates; when the blocker cancels that push
+  // the view never changes, so a view-keyed spend alone left "health" pending and the next plain
+  // entry into the Library opened on Health — the defect above, reopened by Cancel. The blocker
+  // turning "blocked" is folded into the SAME writer (still two `setLibraryTab(` writers), and
+  // the same rule decides: off the Library, the hand-off is spent.
   const [viewSeen, setViewSeen] = useState<ActiveView>(activeView)
-  if (viewSeen !== activeView) {
+  const leaveBlocked = blocker.state === "blocked"
+  const [blockedSeen, setBlockedSeen] = useState(leaveBlocked)
+  if (viewSeen !== activeView || blockedSeen !== leaveBlocked) {
+    const spend = viewSeen !== activeView || leaveBlocked
     setViewSeen(activeView)
-    setLibraryTab((pending) => libraryTabAfterNavigate(pending, activeView))
+    setBlockedSeen(leaveBlocked)
+    if (spend) setLibraryTab((pending) => libraryTabAfterNavigate(pending, activeView))
   }
   const handleNavigate = (next: ActiveView) => {
     if (next === "workflow-run") {

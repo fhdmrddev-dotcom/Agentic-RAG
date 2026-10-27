@@ -310,6 +310,37 @@ describe("leave guard — the forced 403 bounce passes (D-42) and the latch is o
   })
 })
 
+// ── 297-REVIEW WR-04 (2026-10-28) — a CANCELLED leave spends the Library hand-off it set ──────
+// `handleOpenLibraryHealth` hands the Library its Health tab BEFORE it navigates. When the blocker
+// cancels that push the view never changes, so the view-keyed spend never ran and the pending
+// "health" survived: the next plain entry into the Library opened on Health (the 235-15 defect,
+// reopened by Cancel).
+describe("leave guard — a cancelled navigation leaves no Library hand-off behind (WR-04)", () => {
+  it("dirty attention-route click + Cancel, then a plain Library entry: the page decides (no Health)", async () => {
+    const router = mount(["/app/workflows"])
+    box.dirty = true
+    act(() => nav().handleOpenLibraryHealth())
+    expect(confirmSpy).toHaveBeenCalledTimes(1)
+    await waitFor(() => expect(blockerResetAfterBlock(router)).toBe(true))
+    expect(where(router)).toBe("/app/workflows")
+    await waitFor(() => expect(nav().libraryTab).toBeUndefined())
+    box.dirty = false
+    act(() => nav().onNavigate("documents"))
+    await waitFor(() => expect(where(router)).toBe("/app/library"))
+    expect(nav().libraryTab).toBeUndefined()
+  })
+
+  it("positive control: the same click with OK lands on the Library WITH the Health hand-off", async () => {
+    const router = mount(["/app/workflows"])
+    box.dirty = true
+    confirmSpy.mockReturnValue(true)
+    act(() => nav().handleOpenLibraryHealth())
+    await waitFor(() => expect(where(router)).toBe("/app/library"))
+    expect(confirmSpy).toHaveBeenCalledTimes(1)
+    expect(nav().libraryTab).toBe("health")
+  })
+})
+
 describe("leave-guard registry — unit", () => {
   it("register / unregister drives hasTenants", () => {
     const r = createLeaveGuardRegistry()
