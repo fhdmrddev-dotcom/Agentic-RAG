@@ -636,7 +636,7 @@ node scripts/check-hot-file-ledger.cjs <phase-dir>   # 0 clear · 1 missing rows
 | `frontend/src/components/admin/AuditTab.tsx` | 7 / 4 / 770 | ⚠ FIRES, absent here — row added 293-04 · 5 map entries only |
 | `frontend/src/components/org/OrgAuditTab.tsx` | 4 / 3 / 415 | ⚠ now FIRES (293) — row added · 5 map entries · shared vocab OWED |
 | `frontend/src/lib/api/documents.ts` | 10 / 9 / 595 (was `8 / 8 / 503`) | 284-05: five whole-list clients deleted (D-16) · ⛔ |
-| `backend/app/api/folders.py` | 15 / 10 / 287 (was `14 / 9 / 277`) | 296-01: create_folder stamps the active org; cross-org parent 404 |
+| `backend/app/api/folders.py` | 16 / 10 / 288 (was `15 / 10 / 287`) | 296 review BE-WR-06: name check + insert via aexec (off-loop) |
 | `backend/app/api/kb.py` | 14 / 9 / 515 (was `13 / 8 / 504`) | last touch 275-02 · ⛔ |
 | `backend/app/services/audit_service.py` | 9 / 9 / 98 (was `8 / 8 / 96`) | 293-01: five api_key.* action types · ⛔ |
 | `backend/app/services/expert_scope.py` | 8 / 4 / 159 (was `6 / 3 / 632`) | ✅ G-5 DISCHARGED (279-01): pure / statement / events |

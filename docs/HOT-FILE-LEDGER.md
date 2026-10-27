@@ -11942,7 +11942,7 @@ cells rot within days.
 | [`frontend/src/lib/api/attachments.ts`](docs/HOT-FILE-LEDGER.md#frontendsrclibapiattachmentsts) | 1 / 1 / 129 (was `0 / 0 / 0`) | no (young) | 274-03. promote / preview / library-links clients + wire types. ⛔ getAuthHeaders (X-Org-Id); server sentence verbatim; field names fenced vs backend in 274-05 |
 | [`frontend/src/lib/attachmentLifetime.ts`](docs/HOT-FILE-LEDGER.md#frontendsrclibattachmentlifetimets) | 1 / 1 / 35 (was `0 / 0 / 0`) | no (young) | 274-03. ONE rule: thread-life (null expiry) + prefix-stripped display name. ⛔ its ^[0-9a-f]{8}- regex is lockstep with the backend's (fenced in 274-05) |
 | [`backend/app/services/template_asset_service.py`](docs/HOT-FILE-LEDGER.md#backendappservicestemplate_asset_servicepy) | 5 / 4 / 379 (was `4 / 3 / 344`) | ⚠ **FIRES** | 295-02: Branch 2's WHERE moved verbatim into `_STAGED_TEMPLATE_WHERE`; one `has_staged_template` probe (+1 def, If 12→12). Honoured by construction |
-| [`backend/app/api/folders.py`](docs/HOT-FILE-LEDGER.md#backendappapifolderspy) | 15 / 10 / 287 (was `14 / 9 / 277`) | ⚠ **FIRES** | Honoured by construction. **296-01**: create_folder stamps the validated active org; a cross-org parent gets the existing 404 |
+| [`backend/app/api/folders.py`](docs/HOT-FILE-LEDGER.md#backendappapifolderspy) | 16 / 10 / 288 (was `15 / 10 / 287`) | ⚠ **FIRES** | 296 review BE-WR-06: create_folder's name check and insert run through `aexec` (off the event loop, D-v2.5-01). Two expressions, no new branch |
 | [`backend/app/api/kb.py`](docs/HOT-FILE-LEDGER.md#backendappapikbpy) | 14 / 9 / 515 (was `13 / 8 / 504`) | ⚠ **FIRES** | **275-02**: ls/tree/glob's 7 document reads gain `.eq(RETRIEVABLE_COLUMN, True)`. ⛔ `read_path` untouched (Library GET content shares it) |
 | [`backend/app/services/audit_service.py`](docs/HOT-FILE-LEDGER.md#backendappservicesaudit_servicepy) | 9 / 9 / 98 (was `8 / 8 / 96`) | ⚠ **FIRES** | ⚠ absent its ENTIRE LIFE — row added 275-01. **275-01**: +3 connector.watch.*, +10 retention/folder types (mig 204). ⛔ ⊆ the live CHECK (boot) · 293 touch: see §Phase 293 close |
 | [`backend/app/services/document_relationship_service.py`](docs/HOT-FILE-LEDGER.md#backendappservicesdocument_relationship_servicepy) | 6 / 4 / 465 (was `5 / 3 / 457`) | ⚠ **FIRES** | honoured by construction — one default-False kwarg + one `.eq` per read leg, Library callers unchanged, source fence (row column, not a 2nd query) |
@@ -22781,6 +22781,14 @@ CLAUDE.md verdict cell as of 2026-10-18 (replaced by 286-05):
 Scan-list cell before this 296-02 touch (moved verbatim): | [`backend/app/services/harness_engine.py`](docs/HOT-FILE-LEDGER.md#backendappservicesharness_enginepy) | 68 / 26 / 2961 (was `67 / 26 / 2957`) | ⚠ **FIRES** | 295-09 WR-07: the pause arm skips its `pause_run` when the engine ask already wrote it (ONE guarded line, If 86→87), so a re-driven run is never flipped back. Armed-block seam still OWED |
 
 CLAUDE.md FIRING cell before this 296-02 touch (moved verbatim): | `backend/app/services/harness_engine.py` | 68 / 26 / 2961 (was `67 / 26 / 2957`) | 295-09 WR-07: one pause write per engine ask · armed seam OWED · ⛔ |
+
+### `backend/app/api/folders.py` — 296 review BE-WR-06 (2026-10-27)
+
+**`16 / 10 / 288` (was `15 / 10 / 287`).** 296 review BE-WR-06: `create_folder`'s duplicate-name check and its INSERT (rewritten by 296-01) were synchronous supabase-py `.execute()` calls inside `async def`, against D-v2.5-01. Both now go through `aexec` (`run_in_threadpool`). Two expressions changed, no new branch. RED `1e6e17adc` (`tests/unit/test_296_review_folders_off_loop.py` records the thread each `.execute()` ran on).
+
+Scan-list cell before this touch (moved verbatim): | [`backend/app/api/folders.py`](docs/HOT-FILE-LEDGER.md#backendappapifolderspy) | 15 / 10 / 287 (was `14 / 9 / 277`) | ⚠ **FIRES** | Honoured by construction. **296-01**: create_folder stamps the validated active org; a cross-org parent gets the existing 404 |
+
+CLAUDE.md FIRING cell before this touch (moved verbatim): | `backend/app/api/folders.py` | 15 / 10 / 287 (was `14 / 9 / 277`) | 296-01: create_folder stamps the active org; cross-org parent 404 |
 
 ### `backend/app/api/runs.py` — 296 G-4 scenario 3 (2026-10-27)
 
