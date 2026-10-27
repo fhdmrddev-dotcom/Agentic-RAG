@@ -1,15 +1,15 @@
 ---
 gsd_state_version: 1.0
-milestone: v4.7
-milestone_name: Workflows You Can See and Start Anywhere — ✅ SHIPPED 2026-10-27
-status: milestone_complete
-last_updated: "2026-10-27T15:00:00.000Z"
+milestone: v4.8
+milestone_name: Every Page Has a Link
+status: planning
+last_updated: "2026-10-27T18:00:00.000Z"
 progress:
-  total_phases: 12
-  completed_phases: 12
-  total_plans: 60
-  completed_plans: 63   # 60 planned + 3 gap fixes in 295 (08, 09, 10)
-  percent: 100
+  total_phases: 0
+  completed_phases: 0
+  total_plans: 0
+  completed_plans: 0
+  percent: 0
 ---
 
 # Project State
@@ -29,7 +29,7 @@ See: `.planning/PROJECT.md` (updated 2026-10-27)
 
 **Core value:** The agent acts as an AI colleague — it knows your knowledge base, can run code, and
 can be taught new behaviours (skills) that persist and can be shared.
-**Current focus:** between milestones. v4.7 closed 2026-10-27; next is `/gsd:new-milestone` (v4.8).
+**Current focus:** v4.8 Every Page Has a Link — defining requirements (started 2026-10-27).
 
 ---
 
@@ -42,13 +42,24 @@ reviewer exists, so a phase closes `verification_mode: self-verified`, never `re
 
 ## Current Position
 
-Milestone: none active. **v4.7 Workflows You Can See and Start Anywhere COMPLETED 2026-10-27 by hand:**
+Phase: Not started (defining requirements)
+Plan: —
+Status: Defining requirements
+Last activity: 2026-10-27 — Milestone v4.8 Every Page Has a Link started (phases from 297, migrations from 217)
+
+Scope set at intake: per-view URLs (SEED-185/015/178), run-waiting notifications in-app + email
+(SEED-281), lists follow the active org — decided per-org (SEED-389), v4.7 close-out
+(BUG-261027-01..05, SEED-391). Open Platform (SEED-013) moved to v4.9.
+
+### Previous milestone (v4.7)
+
+**v4.7 Workflows You Can See and Start Anywhere COMPLETED 2026-10-27 by hand:**
 archives in `.planning/milestones/v4.7-*` (ROADMAP, REQUIREMENTS, MILESTONE-AUDIT + the 2026-10-26
 reading as `-261026`, STATE-at-close, and `v4.7-phases/` with all 12 phase folders), tag `v4.7` (local, not pushed), 21/21 requirements, audit
 `tech_debt` with a 296 addendum, no blockers. Closed core 7 phase types / 1 emitter / **30 tools**.
 Phases resume at **297**; migrations at **217**.
 
-Next: `/gsd:new-milestone`. Sweep `node scripts/check-seeds-register.cjs` first (incl. SEED-384..391)
+Carried into v4.8 intake (2026-10-27): the seeds sweep (incl. SEED-384..391)
 and the open bugs (BUG-261027-01..05, minor; 04 and 05 found by the close integration check). Open Platform (`SEED-013`) was named as v4.8 at v4.7 intake.
 
 ---

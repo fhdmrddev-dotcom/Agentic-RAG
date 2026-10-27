@@ -10,9 +10,19 @@ The agent acts as an AI colleague — it knows your knowledge base, can run code
 
 ---
 
-## Current Milestone: none — v4.7 closed 2026-10-27
+## Current Milestone: v4.8 Every Page Has a Link
 
-**Next:** run `/gsd:new-milestone` (v4.8; Open Platform `SEED-013` was named as v4.8 at v4.7 intake). Phases resume at **297**, migrations at **217**. Sweep `node scripts/check-seeds-register.cjs` first.
+**Started:** 2026-10-27. Phases from **297**, migrations from **217**.
+
+**Goal:** Every place in the app has its own URL, and a person is told, with a link, when a run is waiting on them.
+
+**Target features:**
+- **A URL for every view** (`SEED-185`, `SEED-015`, `SEED-178`): each view, thread, workflow run and Expert is addressable; refresh lands back in the same place; browser Back/Forward work; links can be copied and shared (the server still decides who may open them).
+- **Told when a run waits on you** (`SEED-281`): an in-app notice plus an email from an app-owned mailer, each linking straight to the waiting run.
+- **Lists follow the active org** (`SEED-389`): Library folders and the Workflows list show only the active org's items (decided per-org at intake).
+- **v4.7 close-out**: BUG-261027-01..05 and the six `SEED-391` review findings.
+
+**Key context:** Open Platform (`SEED-013`), named as v4.8 at v4.7 intake, moves to v4.9. Addressable URLs come first because notifications, Projects (`SEED-151`) and an external API all need a link to point at. The email half adds one new piece of infrastructure (an app-owned sender: one secret, env only), which also answers `SEED-281`'s deferred option D-235-02 C.
 
 ---
 
@@ -1230,7 +1240,14 @@ All 20 v3.3 requirements delivered (16 CORE + 4 STRETCH).
 
 ### Active (current milestone)
 
+*v4.8 Every Page Has a Link — STARTED 2026-10-27. Requirements live in `.planning/REQUIREMENTS.md`; scope summary under "Current Milestone" above.*
+
+<details>
+<summary>Superseded Active note (v4.6-era, preserved)</summary>
+
 *v4.6 Pay It Down — STARTED 2026-10-12. Requirements live in `.planning/REQUIREMENTS.md`; scope summary under "Current Milestone" above.*
+
+</details>
 
 <details>
 <summary>Superseded Active note (v4.5-close, preserved)</summary>
@@ -1525,3 +1542,5 @@ This document evolves at phase transitions and milestone boundaries.
 *Last updated: 2026-10-18 — **milestone v4.7 Workflows You Can See and Start Anywhere STARTED** (phases from 286, migrations from 210).*
 
 *Last updated: 2026-10-24 — **Phase 292 More Ways to Show It complete** (VIS-02 validated: diagram / comparison / timeline from a closed registry of six; tool count 30; migration 213 applied to cloud, code not yet deployed).*
+
+*Last updated: 2026-10-27 — **milestone v4.8 Every Page Has a Link STARTED** (phases from 297, migrations from 217). Open Platform moved to v4.9.*
