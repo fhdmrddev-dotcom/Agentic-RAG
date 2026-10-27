@@ -1,7 +1,7 @@
 ---
 phase: 297
 slug: every-view-has-an-address
-status: draft
+status: approved
 shadcn_initialized: true
 preset: not applicable (existing components.json: style default, baseColor slate, cssVariables true, iconLibrary lucide)
 created: 2026-10-27
@@ -291,11 +291,11 @@ belongs to the router plan, not this contract.
 
 ## Checker Sign-Off
 
-- [ ] Dimension 1 Copywriting: PASS
-- [ ] Dimension 2 Visuals: PASS
-- [ ] Dimension 3 Color: PASS
-- [ ] Dimension 4 Typography: PASS
-- [ ] Dimension 5 Spacing: PASS
-- [ ] Dimension 6 Registry Safety: PASS
+- [x] Dimension 1 Copywriting: PASS
+- [x] Dimension 2 Visuals: FLAG (non-blocking — focal point is the h1; CTA the only control; no icon on S1/S2)
+- [x] Dimension 3 Color: PASS
+- [x] Dimension 4 Typography: PASS
+- [x] Dimension 5 Spacing: FLAG (non-blocking — 12px gap-3/px-3 are inherited exceptions from shipped markup)
+- [x] Dimension 6 Registry Safety: PASS
 
 **Approval:** pending
