@@ -105,7 +105,7 @@ Requirements: [`REQUIREMENTS.md`](REQUIREMENTS.md). **28 v4.8 requirements, 28 m
 Plans:
 **Wave 1**
 
-- [ ] 297-01-PLAN.md — behaviour-neutral G-5 extraction: `useAppNavigation` + `AppViewSwitch`, 8 fences re-targeted (REG-09)
+- [x] 297-01-PLAN.md — behaviour-neutral G-5 extraction: `useAppNavigation` + `AppViewSwitch`, 8 fences re-targeted (REG-09)
 
 **Wave 2** *(blocked on Wave 1 completion)*
 
