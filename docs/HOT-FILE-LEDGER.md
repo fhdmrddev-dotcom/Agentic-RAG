@@ -12107,7 +12107,7 @@ cells rot within days.
 | [`backend/app/api/schedules.py`](docs/HOT-FILE-LEDGER.md#backendappapischedulespy) | 4 / 4 / 299 | ⚠ **FIRES** | ⚠ absent its ENTIRE LIFE — row added 296-02 (D-26). 296-02 (295-IN-05): Run now answers with `outcome` + a worded `detail`; ScheduledLaunchRefused caught first; raw exception logged only |
 | [`backend/app/models/schedule.py`](docs/HOT-FILE-LEDGER.md#backendappmodelsschedulepy) | 3 / 3 / 231 | ⚠ **FIRES** | ⚠ absent its ENTIRE LIFE — row added 296-02 (D-26). 296-02 (295-IN-05): ScheduleTriggerResult gains one additive `outcome` Literal (launched/refused/not_loaded/error) |
 | [`backend/app/services/harness/run_read_words.py`](docs/HOT-FILE-LEDGER.md#backendappservicesharnessrun_read_wordspy) | 1 / 1 / 99 (was `0 / 0 / 0`) | no (young) | young (planned 293-02). MOVED waiting_who / unsourced_who / compose_waiting_on (workflow_runs seam). ⛔ pure leaf; re-exported |
-| [`backend/app/api/inbound.py`](docs/HOT-FILE-LEDGER.md#backendappapiinboundpy) | 8 / 2 / 701 (was `7 / 1 / 672`) | no (young) | young. 296-06: _BodyCapRoute (293-IN-03, 413 from Content-Length before the body is read); file link peeks, limits, then consumes (293-IN-01). ⛔ key dependency only; byte-identical 404 |
+| [`backend/app/api/inbound.py`](docs/HOT-FILE-LEDGER.md#backendappapiinboundpy) | 9 / 2 / 711 (was `8 / 2 / 701`) | no (young) | 296 SECURITY AR-05: _BodyCapRoute also counts a CHUNKED body as it streams and answers 413 at the cap (prod API has no proxy limit). |
 | [`frontend/src/lib/api/apiKeys.ts`](docs/HOT-FILE-LEDGER.md#frontendsrclibapiapikeysts) | 2 / 2 / 174 (was `1 / 1 / 174`) | no (young) | young. 296-06 (293-IN-06): `needs_task` in the workflow-ref state union. ⛔ not re-exported from the lib/api barrel |
 | [`frontend/src/components/settings/apiKeys/apiKeysCopy.ts`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentssettingsapikeysapikeyscopyts) | 4 / 2 / 281 (was `2 / 1 / 270`) | no (young) | young. 296-06 (293-IN-06): the UI-SPEC F needs_task strings (picker row, chip, line, call reason). ⛔ true leaf, imports nothing |
 | [`frontend/src/components/settings/apiKeys/apiKeyFacts.ts`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentssettingsapikeysapikeyfactsts) | 3 / 2 / 308 (was `1 / 1 / 298`) | no (young) | young. 296-06 (293-IN-06): needs_task maps to its chip/line, call words and picker row. ⛔ pure, no React, spells no string |
@@ -22835,6 +22835,12 @@ CLAUDE.md FIRING cell before this touch (moved verbatim): | `backend/app/service
 Scan-list cell before this touch (moved verbatim): | [`backend/app/api/folders.py`](docs/HOT-FILE-LEDGER.md#backendappapifolderspy) | 15 / 10 / 287 (was `14 / 9 / 277`) | ⚠ **FIRES** | Honoured by construction. **296-01**: create_folder stamps the validated active org; a cross-org parent gets the existing 404 |
 
 CLAUDE.md FIRING cell before this touch (moved verbatim): | `backend/app/api/folders.py` | 15 / 10 / 287 (was `14 / 9 / 277`) | 296-01: create_folder stamps the active org; cross-org parent 404 |
+
+### `backend/app/api/inbound.py` — 296 SECURITY AR-05 (2026-10-27)
+
+**`9 / 2 / 711` (was `8 / 2 / 701`).** The phase security audit found the BE-WR-02 acceptance did not hold for production: `docs/DEPLOYMENT-PIPELINE.md` routes the API straight to the Coolify VPS, past the onebox nginx `client_max_body_size`. A body with no `Content-Length` (chunked) is now read through `request.stream()` with a running count and refused 413 at `INBOUND_MAX_BODY_BYTES`; the bytes read are cached on `request._body` so the handler parses them unchanged. RED `c8b5427c1`.
+
+Scan-list cell before this touch (moved verbatim): | [`backend/app/api/inbound.py`](docs/HOT-FILE-LEDGER.md#backendappapiinboundpy) | 8 / 2 / 701 (was `7 / 1 / 672`) | no (young) | young. 296-06: _BodyCapRoute (293-IN-03, 413 from Content-Length before the body is read); file link peeks, limits, then consumes (293-IN-01). ⛔ key dependency only; byte-identical 404 |
 
 ### `backend/app/api/runs.py` — 296 G-4 scenario 3 (2026-10-27)
 

@@ -93,6 +93,16 @@ class _BodyCapRoute(APIRoute):
             size = request.headers.get("content-length", "")
             if size.isdigit() and int(size) > INBOUND_MAX_BODY_BYTES:
                 return JSONResponse(status_code=413, content={"detail": BODY_TOO_LARGE_DETAIL})
+            # 296 SECURITY AR-05: no length (a chunked body) → count it as it streams and stop
+            # at the cap; production's API has no proxy body limit in front of it.
+            if not size.isdigit() and request.method in ("POST", "PUT", "PATCH"):
+                chunks, total = [], 0
+                async for chunk in request.stream():
+                    total += len(chunk)
+                    if total > INBOUND_MAX_BODY_BYTES:
+                        return JSONResponse(status_code=413, content={"detail": BODY_TOO_LARGE_DETAIL})
+                    chunks.append(chunk)
+                request._body = b"".join(chunks)  # Starlette's cache: .body()/.json() read it back
             return await handler(request)
 
         return capped
