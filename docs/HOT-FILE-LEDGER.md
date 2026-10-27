@@ -5002,6 +5002,34 @@ CLAUDE.md verdict cell as of 2026-10-19 (replaced by 289-REVIEW WR-05, moved ver
 
 Scan-list cell as of 2026-10-19 (replaced by 289-REVIEW WR-05, moved verbatim): 62 / 32 / 1140 (was `61 / 31 / 1137`) | **FIRES** | **289-04**: ONE initializer `useState(() => readRunDeepLink())` (+3 L); hook counts unchanged (useState 5/4, useEffect 5)
 
+### `frontend/src/components/layout/ChatLayout.tsx` — Phase 297 (297-01)
+
+**`65 / 34 / 882` (was `64 / 33 / 1158`).** ⭐ **G-5 seam TAKEN — the `AppViewSwitch` extraction this
+section named at 262-05.** 1158 → 882 (−276 lines), move only. The base expression `:840-1129`
+(`{activeView === "chat" ? (…) : (…)}`, 290 lines) is now `AppViewSwitch`'s `return`; `diff -w` of the
+two shows ONLY the two enclosing-brace lines. The page imports used only inside it (ChatArea,
+ThreadNavigationProvider, WorkspacePanel, LibraryPage, SkillsPage, ConnectionsPage, SettingsPage +
+SETTINGS_TAB_STORAGE_KEY, writeApiKeyPrepick, WorkflowsPage, SkillStudioPage, ControlRoomPage,
+OrgAdminShell, WorkflowRunPage, AdminSpendPage, ExpertCatalogPage, UnknownViewFallback,
+setThreadActiveExpert, startScopedChat, Menu) moved with it. ChatLayout renders `<AppViewSwitch …/>`
+where the expression was, with 37 same-named props, and keeps every hook: `useThreads`, `useFolders`,
+the org effects, the drawer + history state, the ⌘K/⌘. listeners, `doRun`, `openRunSurface`, the ONE
+`useEffectiveFeaturesOptional()` read (`canvasEnabled`, passed down), the ONE `ATTENTION_PRODUCERS.flatMap`,
+NavPanel, ChatHistoryColumn, the palette, the mobile drawer and ChatLaunchForm. The `?run=` clear effect
+(WR-05) stays here; 297-02 retires it.
+
+Fences re-targeted (none retired, no expect value changed): **D-297-01** `activeViewReachability.test.ts`,
+**D-297-02** `renameFence.test.ts`, **D-297-03** `ChatLayout.fallback.test.tsx` (+ a one-home arm: ChatLayout
+code mounts no fallback; pin 4 → 5), **D-297-04** `ChatLayout.scrollFrame.test.tsx` links 2-3,
+**D-297-05** `ChatLayout.launch.test.tsx` (switch-shape cases; doRun cases stay here), **D-297-06**
+`ChatArea.expertThread.test.tsx` (two-ended: `patchThread={patchThread}` here, `onThreadUpdated` there),
+**D-297-08** `LibraryPage.tabAttention.test.tsx` (the Library mount arm reads the switch; `flatMap === 1`
+stays here).
+
+Scan-list cell as of 2026-10-27 (replaced by 297-01, moved verbatim): 64 / 33 / 1158 (was `63 / 32 / 1147`) | **FIRES** | **289-REVIEW WR-05**: ONE `useEffect` clears `?run=` whenever `activeView` is not the run view (live runs never mount the report that cleared it). +7 L, 0 branches · 293 touch: see §Phase 293 close
+
+CLAUDE.md verdict cell as of 2026-10-27 (replaced by 297-01, moved verbatim): | `frontend/src/components/layout/ChatLayout.tsx` | 64 / 33 / 1158 (was `63 / 32 / 1147`) | 293-04: onOpenApiKeys (pre-pick + tab 7) + SettingsPage onOpenRun |
+
 ## Phase 200.1 wave 2 (`200.1-02`, RUN-04) — the triples RE-DERIVED for every file the phase touched
 
 **Six non-test source files were touched by Phase 200.1 across its three plans.** All eight triples
@@ -10140,6 +10168,29 @@ CLAUDE.md verdict cell as of 2026-10-19 (replaced by 289-05, moved verbatim): | 
 
 **276-06**: boot splash spin ring → moving Iris (`thinking`) in a `role=status`; no hook. Reachability fence green
 
+### `frontend/src/App.tsx` — Phase 297 (297-01)
+
+**`39 / 29 / 340` (was `37 / 28 / 422`).** ⭐ **G-5 seam TAKEN — the `useAppNavigation()` hook this
+section named at 262-05.** 422 → 340 (−82 lines), move only. The base lines `:156-171` (the view
+initializer), `:173-194` (studio state + four navigators) and `:196-240` (the Library hand-off comment
+block, `libraryTab`, `handleOpenLibraryHealth`, `handleNavigate`) moved to `hooks/useAppNavigation.ts`
+byte-for-byte (84 lines, 0 differing, checked line by line). App calls `useAppNavigation()` once at the
+old position, before every early return; the 403 listener calls `nav.bounceHome()` (the same bare view
+setter, now a stable `useCallback`); ChatLayout's props read `nav.*` under unchanged names. App keeps
+the ONE `useEffectiveFeatures(` call, `useOperatorProbe`, `prefillMessage`, the `/setup` and `/invite`
+gates and the provider stack. `ActiveView` stays exported on ONE line (D-38); one correction line sits
+BESIDE the union docblock, never through it.
+
+Fences re-targeted (none retired, no expect value changed): **D-297-07** `LibraryPage.initialTab.test.tsx`
+(the clearing-rule wiring reads the hook; App arm kept for `onNavigate={setActiveView}`), **D-297-08**
+`LibraryPage.tabAttention.test.tsx` (`setLibraryTab(` `=== 2` in the hook and `=== 0` in App).
+⚠ The raw `useState<ActiveView>` grep on App still reads 1: that is the 188-09 union docblock's prose,
+kept verbatim; the code count is 0.
+
+Scan-list cell as of 2026-10-27 (replaced by 297-01, moved verbatim): 37 / 28 / 422 (was `36 / 27 / 418`) | **FIRES** | **289-04**: `readRunDeepLink()` seed inside the existing `useState<ActiveView>` initializer (+4 L); hook counts unchanged. Reachability fence green
+
+CLAUDE.md verdict cell as of 2026-10-27 (replaced by 297-01, moved verbatim): | `frontend/src/App.tsx` | 37 / 28 / 422 (was `36 / 27 / 418`) | 289-04: deep-link seed in the existing initializer (+4 L) |
+
 ## frontend/src/components/library/HealthTab.tsx
 
 **9 / 2 / 199** · no (2 phases) · the Library's Health tab body.
@@ -11551,7 +11602,7 @@ cells rot within days.
 | [`backend/app/middleware/canvas_gate.py`](docs/HOT-FILE-LEDGER.md#backendappmiddlewarecanvas_gatepy) | 9 / 6 / 396 (was `8 / 5 / 391`) | **FIRES** | **289-03**: ONE CANVAS_GATED_PATHS member (`…/evidence`) + comment, same commit as its include_router. ⛔ test_182 never imports the set |
 | [`backend/app/models/thread.py`](docs/HOT-FILE-LEDGER.md#backendappmodelsthreadpy) | 25 / 17 / 550 (was `24 / 16 / 545`) | ⚠ **FIRES** | 295-05: ONE field (`WorkflowPhaseState.unsourced`, a plain dict to avoid the harness import cycle). Honoured by construction · 293 touch: see §Phase 293 close |
 | [`frontend/src/components/workflows/canvasModel.ts`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentsworkflowscanvasmodelts) | 16 / 8 / 836 (was `15 / 8 / 831`) | ⚠ **FIRES** | 296-07: comparePhaseOrder + engineArmed delegations (290-IN-01/FU); isGrounded is every cause except escalated (BUG-261021-05 b) |
-| [`frontend/src/components/layout/ChatLayout.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentslayoutchatlayouttsx) | 64 / 33 / 1158 (was `63 / 32 / 1147`) | **FIRES** | **289-REVIEW WR-05**: ONE `useEffect` clears `?run=` whenever `activeView` is not the run view (live runs never mount the report that cleared it). +7 L, 0 branches · 293 touch: see §Phase 293 close |
+| [`frontend/src/components/layout/ChatLayout.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentslayoutchatlayouttsx) | 65 / 34 / 882 (was `64 / 33 / 1158`) | **FIRES** | 297-01: G-5 seam TAKEN — mount switch → AppViewSwitch, move only (−276 L). See §Phase 297 (297-01) |
 | [`frontend/src/components/library/LibraryCloudImport.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentslibrarylibrarycloudimporttsx) | 1 / 1 / 194 | no (new) | young (created 244-06). Row added AT CREATION. The Library's single-file cloud door — ⛔ it renders a REASON in every unavailable state; a silent grey-out is the same failure as a silent root write |
 | [`frontend/src/components/library/LibraryHeaderBar.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentslibrarylibraryheaderbartsx--row-added-244-04) | 5 / 4 / 262 (was `4 / 3 / 249`) | ⚠ **FIRES** | **284-03**: optional `totalState`: "Counting…" while loading, "Count not known yet" on failure, never "0 documents" before an answer; numbers grouped |
 | [`frontend/src/components/layout/ChatHistoryColumn.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentslayoutchathistorycolumntsx) | 7 / 2 / 513 | below threshold | ⚠ **ABSENT from BOTH for its ENTIRE LIFE — row added 244-01 at its SECOND phase** (`settingsSearchPayload.ts` precedent). D-244-20 claimed a row existed; the gate refuted it |
@@ -11777,7 +11828,7 @@ cells rot within days.
 | [`frontend/src/components/sources/watchProductMark.ts`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentssourceswatchproductmarkts) | 0 / 0 / 38 | no (new) | young (240) — which PRODUCT a watched folder came from, read from its ADDRESS. ⛔ Never from `service_id`: Gmail and Drive share one connection |
 | [`frontend/src/components/sources/CreateWatchModal.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentssourcescreatewatchmodaltsx) | 4 / 1 / 283 | no (1 phase) | honoured by construction (**240**): byte-unchanged. ⛔ Its auto-select of `capable[0]` is why BUG-260908-02 mattered most here |
 | [`frontend/src/components/layout/NavPanel.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentslayoutnavpaneltsx) | 26 / 14 / 420 (was `25 / 14 / 416`) | ⚠ **FIRES** | **276-01** (D-14): Iris mark `<img>`; **276-06** (D-27): on the dark `#0A0E18` chip, classes only. 244-14's `overflow-x-hidden` stands |
-| [`frontend/src/App.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrcapptsx) | 37 / 28 / 422 (was `36 / 27 / 418`) | **FIRES** | **289-04**: `readRunDeepLink()` seed inside the existing `useState<ActiveView>` initializer (+4 L); hook counts unchanged. Reachability fence green |
+| [`frontend/src/App.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrcapptsx) | 39 / 29 / 340 (was `37 / 28 / 422`) | **FIRES** | 297-01: G-5 seam TAKEN — view/tab state → useAppNavigation, move only (−82 L). See §Phase 297 (297-01) |
 | [`frontend/src/lib/nav-items.ts`](docs/HOT-FILE-LEDGER.md#frontendsrclibnav-itemsts) | 13 / 9 / 173 (was `12 / 8 / 153`) | ⚠ **FIRES** | **283-02** (FIX-01): the Settings entry UNGOVERNED (no `feature` key); per-tab gate in the page, per-route `require_visible` at the API. `visibleNavItems` unchanged |
 | [`frontend/src/components/library/HealthTab.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentslibraryhealthtabtsx) | 9 / 2 / 199 | no (2 phases) | row added 235 BELOW threshold on purpose. One import, one optional prop, one mount, ZERO branches; the handler lives at the page boundary |
 | [`frontend/src/pages/librarySelection.ts`](docs/HOT-FILE-LEDGER.md#frontendsrcpageslibraryselectionts) | 2 / 2 / 312 | no (2 phases) | ⚠ absent for its entire life — row added 235, which did NOT modify it but made `App.tsx` import `LibraryTab` from it rather than re-declare it |
