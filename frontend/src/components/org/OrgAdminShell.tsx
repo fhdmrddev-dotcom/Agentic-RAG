@@ -56,57 +56,14 @@ import { InvitationsTab } from "./InvitationsTab"
 import { SsoTab } from "./SsoTab"
 import { OrgExpertsTab } from "./OrgExpertsTab"
 import { RetentionTab } from "@/components/retention/RetentionTab"
+// Phase 293-04: the tab registry (OrgAdminTab / TabDef / TABS) moved verbatim to orgAdminTabs.ts.
+import { TABS, type OrgAdminTab } from "./orgAdminTabs"
+import { OrgApiKeysTab } from "./OrgApiKeysTab"
 
 interface OrgAdminShellProps {
   /** Return to the ordinary app surface (navigates to "chat"). */
   onBack: () => void
 }
-
-type OrgAdminTab =
-  | "members"
-  | "experts"
-  | "audit"
-  | "settings"
-  | "invitations"
-  | "sso"
-  | "subscription"
-  | "retention"
-
-interface TabDef {
-  id: OrgAdminTab
-  label: string
-  locked: boolean
-  /** Plain, roadmap-number-free "coming soon" copy for the locked body (T-146-10). */
-  lockedDescription?: string
-}
-
-// The 080-A org-admin band-tab IA (D-166-01): three live tabs, then the four honest
-// locks that NAME the arriving capability in plain words (never a roadmap number —
-// T-146-10 / T-166-13). The operator zone's warning tint is NOT used anywhere here —
-// this is the indigo zone.
-const TABS: readonly TabDef[] = [
-  { id: "members", label: "Members", locked: false },
-  // Phase 261 (PACK-07): In-App Expert Management & Authoring Tab
-  { id: "experts", label: "Experts", locked: false },
-  { id: "audit", label: "Audit", locked: false },
-  { id: "settings", label: "Settings", locked: false },
-  // Phase 167 (D-167-07): the invitations home is LIVE — the org shell owns the
-  // invitation fetch + mutations; the leaf is InvitationsTab.
-  { id: "invitations", label: "Invitations & Roles", locked: false },
-  // Phase 168 (D-168-01 / SSO-01): the SSO home is LIVE — the org shell owns the SSO-config
-  // fetch + create/remove mutations; the leaf is SsoTab (render-gated on canManageSso).
-  { id: "sso", label: "SSO", locked: false },
-  {
-    id: "subscription",
-    label: "Subscription",
-    locked: true,
-    lockedDescription: "Plan and billing management is coming soon.",
-  },
-  // Phase 275 (D-01 / RET-01..04): the Retention home is LIVE — its leaf is self-contained
-  // (it owns its fetches, like OrgExpertsTab); the shell gains only this flip, one render branch
-  // and the recording pulse.
-  { id: "retention", label: "Retention", locked: false },
-]
 
 // Read-only member roster page size (068-A shape). The server clamps <= 100; one modest
 // page keeps the manager-gated read light — client-side search filters the loaded page.
@@ -437,6 +394,9 @@ export function OrgAdminShell({ onBack }: OrgAdminShellProps) {
           // 275-REVIEW F-WR-10: keyed on the active org, so a switch remounts it (fresh reads)
           // instead of showing the previous org's posture/policies/holds over writes sent as the new one.
           <RetentionTab key={activeOrgId ?? "none"} onRecorded={pulse} />
+        ) : activeTab === "api-keys" ? (
+          // Phase 293-04: keyed on the org for the same F-WR-10 reason — a switch re-reads.
+          <OrgApiKeysTab key={activeOrgId ?? "none"} orgName={orgName} onRecorded={pulse} onOpenAudit={() => setActiveTab("audit")} />
         ) : activeTab === "sso" ? (
           // Phase 168 (D-168-01 / SSO-01): the live SSO home. The shell owns the fetch +
           // create/remove; SsoTab is a pure leaf. canManageSso is the render-only gate

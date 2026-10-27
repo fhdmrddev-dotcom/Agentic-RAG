@@ -490,6 +490,30 @@ _TOOL_LEAD = {
     "remember": "Removed: remember things.",
 }
 
+#: 296-03 (291-S2-F1): the power, as a noun, in "It was written for {power}, which was removed."
+_TOOL_NOUN = {
+    "web_search": "web search",
+    "execute_code": "running code",
+    "save_skill": "saving skills",
+    "attach_skill_file": "attaching files to skills",
+    "remember": "remembering things",
+}
+
+
+def hollow_step_item(step_name: str, powers: list[str]) -> dict:
+    """291-S2-F1: the item for a step whose every tool was removed (UI-SPEC E words)."""
+    nouns = [_TOOL_NOUN.get(p, p) for p in powers]
+    power = nouns[0] if len(nouns) == 1 else ", ".join(nouns[:-1]) + " and " + nouns[-1]
+    verb = "was" if len(nouns) == 1 else "were"
+    return {
+        "lead": f"“{step_name}” has nothing left to use.",
+        "reason": (
+            f"It was written for {power}, which {verb} removed. "
+            "Edit the step or delete it before you publish."
+        ),
+    }
+
+
 POWERS_REMOVAL_BROKE_DRAFT = "removed_powers_broke_draft"
 _BROKE_DRAFT_DETAIL = (
     "Your attached files asked for actions only your description can add. Removing them left "
@@ -577,6 +601,9 @@ def remove_unasked_powers(
                 phase = phase.model_copy(
                     update={"config": config.model_copy(update={"available_tools": stripped})}
                 )
+                if not stripped:  # 296-03 (291-S2-F1): said right after the removal that caused it
+                    gone = [t for t in tools if t in POWER_TOOLS and t not in tools_ok]
+                    removed.append(hollow_step_item(_safe_attr(phase.name or phase.slug), gone))
         kept.append(phase)
 
     if not removed:

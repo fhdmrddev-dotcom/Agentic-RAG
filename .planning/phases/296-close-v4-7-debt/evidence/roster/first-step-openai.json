@@ -1,0 +1,18 @@
+{
+  "mode": "first-step",
+  "provider": "openai",
+  "model": "gpt-5.6-luna",
+  "definition_id": "f7a1c9e4-8b85-4b0f-a180-313851931767",
+  "thread_id": "b504fd1f-3ba5-4e3d-9faf-984e831fb65f",
+  "send_http": 201,
+  "send": "{\"message_id\": \"5bb32b60-84f8-42fd-b81f-6ae8c867e3bb\", \"run_id\": \"2286929c-3caf-4a9e-affd-3afb3ecf08e3\", \"model\": \"gpt-5.6-luna\", \"provider\": \"openai\"}",
+  "workflow_run": {
+    "id": "7e7b922d-a5d3-42e7-85ef-bd6e317de1c3",
+    "status": "completed",
+    "model": "gpt-5.6-luna"
+  },
+  "first_step_status": "completed",
+  "first_step_output_preview": "{\"text\": \"Lisbon is a historic and scenic capital city in Portugal known for its colorful neighborhoods, hills, trams, and views over the Tagus River.\"}",
+  "names_lisbon": true,
+  "verdict": "PASS"
+}

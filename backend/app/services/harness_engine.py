@@ -344,6 +344,7 @@ def _finalize_run_grounding(
     run_source_refs: list[dict],
     run_citations: list[dict],
     run_similarity_scores: list[float],
+    user_settings=None,  # 296-02 (289-F3): the run owner's confidence buckets
 ) -> tuple[list[dict], list[dict], dict | None]:
     """Dedupe the union + compute confidence, MATCHING the Deep path exactly.
 
@@ -380,7 +381,7 @@ def _finalize_run_grounding(
     final_confidence: dict | None = None
     if run_similarity_scores:
         final_avg = sum(run_similarity_scores) / len(run_similarity_scores)
-        level = _compute_confidence(final_avg)
+        level = _compute_confidence(final_avg, user_settings)
         disclaimer = CONFIDENCE_DISCLAIMER if level == "low" else None
         final_confidence = {
             "level": level,
@@ -1012,16 +1013,19 @@ async def _run_phase_with_gates(
         # when nothing did. Both event types are already in the ``harness_audit`` CHECK
         # constraint — this checkpoint introduces NO new one (Pitfall 6 /
         # ``BUG-260731-02``, where an unlisted kind killed the run).
-        await write_audit(
-            pool, run_id, user_id=_audit_user_id,
-            event_type="action_risk_pending",
-            metadata={"phase": phase.slug, "timing": "pre"},
-        )
-        # ``phase`` only: the raw sentence is deliberately NOT carried here — it IS the
-        # user-facing prompt and already reaches the browser on the durable
-        # ``ask_user_prompt`` row + emit inside the helper (T-185-05-04). THE CONSUMER
-        # IS PHASE 188's run surface; an unhandled event is inert.
-        await _emit(redis, stream_run_id, "action_risk_pending", phase=phase.slug)
+        # 296-02 (295-RES-a): announced ONCE. The answered re-drive (``consume_engine_answer``
+        # recorded this step's approval) only USES the approval, so it writes no second row.
+        if phase.slug not in (getattr(ctx, "engine_ask_approved", None) or {}):
+            await write_audit(
+                pool, run_id, user_id=_audit_user_id,
+                event_type="action_risk_pending",
+                metadata={"phase": phase.slug, "timing": "pre"},
+            )
+            # ``phase`` only: the raw sentence is deliberately NOT carried here — it IS the
+            # user-facing prompt and already reaches the browser on the durable
+            # ``ask_user_prompt`` row + emit inside the helper (T-185-05-04). THE CONSUMER
+            # IS PHASE 188's run surface; an unhandled event is inert.
+            await _emit(redis, stream_run_id, "action_risk_pending", phase=phase.slug)
 
         # ``_ACTION_RISK_FINDING_PREFIX`` is retained because DELTA 1 inside the helper
         # splits the prompt back out of the finding on ``"|"``. ``failed_idx=None``: the
@@ -2292,7 +2296,8 @@ async def run_workflow(
     # full deduped CITATION objects (Deep D-13: row["source_refs"] = unique_citations
     # when present, else unique_sources) so the references render with passages.
     _final_source_refs, _final_citations, _final_confidence = _finalize_run_grounding(
-        run_source_refs, run_citations, run_similarity_scores
+        run_source_refs, run_citations, run_similarity_scores,
+        user_settings=getattr(ctx, "user_settings", None),
     )
     for _attr, _val in (
         ("final_source_refs", _final_source_refs),
@@ -2555,8 +2560,11 @@ async def _build_resume_context(run, redis, pool):
     # precedence is unchanged downstream: phase.config.model or ctx.model. If loading
     # fails for any reason, fall back to None settings + "" model (the resolver
     # returns "" for None) so phase.config.model still applies — never block resume.
-    from app.models.user_settings import load_user_settings
-    from app.services.sub_agent_models import resolve_workflow_ctx_model
+    from app.models.user_settings import load_user_settings, override_provider
+    from app.services.sub_agent_models import (
+        resolve_sub_agent_model_safely,
+        resolve_workflow_ctx_model,
+    )
 
     _owner_settings = None
     if run.get("user_id") is not None:
@@ -2568,7 +2576,29 @@ async def _build_resume_context(run, redis, pool):
                 "(falling back to phase-level model only)", run.get("run_id"),
             )
             _owner_settings = None
-    _ctx_model = resolve_workflow_ctx_model(_owner_settings)
+    # 296-02 (SEED-362): a resumed run continues on the run's OWN model (and the provider its
+    # kickoff recorded in metadata), not the owner's current default. A known provider is used
+    # as recorded — validating it against the owner's active provider would swap it back. No
+    # recorded provider → the safe resolver; no recorded model → the owner default, as before.
+    _run_meta = run.get("metadata") or {}
+    if isinstance(_run_meta, str):
+        try:
+            _run_meta = json.loads(_run_meta)
+        except (ValueError, TypeError):
+            _run_meta = {}
+    _run_provider = _run_meta.get("provider") if isinstance(_run_meta, dict) else None
+    # 296 review CR-01: the settings must name that provider too (its key, base URL and
+    # active_provider), the way kickoff's override_provider does; no key → the safe path.
+    if _run_provider and _owner_settings is not None and _run_provider != getattr(
+            _owner_settings, "active_provider", None):
+        _switched = override_provider(_owner_settings, _run_provider)
+        _run_provider, _owner_settings = (
+            (_run_provider, _switched) if _switched is not _owner_settings else (None, _owner_settings))
+    _ctx_model = (
+        run["model"] if run.get("model") and _run_provider
+        else resolve_sub_agent_model_safely(_owner_settings, override_model=run["model"])
+        if run.get("model") else resolve_workflow_ctx_model(_owner_settings)
+    )
 
     _resume_ctx = SimpleNamespace(
         run_id=run["run_id"],
@@ -2580,6 +2610,7 @@ async def _build_resume_context(run, redis, pool):
         # absent → only phase.config.model applied.
         user_settings=_owner_settings,
         model=_ctx_model,
+        provider=_run_provider,  # 296-02 (SEED-362): None when the kickoff recorded none
         # F8 (092-07): the persisted inputs (kickoff_prompt) for the resumed run.
         inputs=_resume_inputs,
         # 092-07: coerce to str, mirroring str(run["thread_id"]) above. On the
@@ -2668,13 +2699,12 @@ async def resume_stranded_workflows(*, pool, redis) -> int:
 
       1. ``claim_run`` (CAS) — only ONE worker resumes each run (Pitfall 7); with
          WORKER_COUNT=2 the loser skips. Idempotent + atomic.
-      2. Inspect the active phase. If it is an ``llm_human_input`` phase mid-ask:
-           - ANSWERED (``ask_user_response_exists`` True): the answer is durable →
-             do NOT re-ask; let ``run_workflow`` re-run the phase, which re-reads
-             the durable answer and proceeds.
-           - PENDING (False): ``resume_pending_prompt`` re-SUBSCRIBES + re-SADDs +
-             re-EMITs the SAME prompt (subscribe-before-emit, Pitfall 2) and blocks
-             on the answer BEFORE handing back to the loop.
+      2. ~~Inspect the active phase. If it is an ``llm_human_input`` phase mid-ask:
+         answered → re-run and re-read; pending → ``resume_pending_prompt`` re-emits the
+         SAME prompt.~~ 296-02 (BUG-261025-03): that branch was unreachable (the row carries
+         no type), and every boot re-asked. Now step 2c, after the definition load: the
+         latest prompt UNANSWERED → ``pause_run`` and move on (ask nothing); ANSWERED →
+         re-drive with ``resume_answered_tool_call_id`` so the executor consumes it.
       2b. Phase 185 (L-7): an ARMED action-risk step parked on its pre-gate is NOT
          an ``llm_human_input`` phase (its stored config type is ``llm_agent`` and it
          has no stored output), so step 2 never sees it. It gets its own branch,
@@ -2712,23 +2742,11 @@ async def resume_stranded_workflows(*, pool, redis) -> int:
         if _engine_tcid and await get_ask_user_response(pool, run_id, str(_engine_tcid)) is None:
             await pause_run(pool, run_id)
             continue
-        if active is not None and _is_llm_human_input(active):
-            tool_call_id = _active_tool_call_id(active)
-            if tool_call_id is not None:
-                answered = await ask_user_response_exists(pool, run_id, tool_call_id)
-                if not answered:
-                    pending = await get_pending_ask_user(pool, run_id)
-                    if pending is not None and pending.get("tool_call_id"):
-                        await resume_pending_prompt(
-                            redis,
-                            run_id,
-                            pending["tool_call_id"],
-                            pending.get("prompt") or "",
-                            pending.get("options") or [],
-                            pending.get("timeout_seconds")
-                            or settings.ask_user_max_timeout_seconds,
-                        )
-                # answered → fall through; run_workflow re-reads the durable answer.
+        # ~~2. human-input branch keyed on ``_is_llm_human_input(active)`` /
+        # ``_active_tool_call_id(active)``~~ DELETED (296-02, BUG-261025-03): it read
+        # ``active["config"]`` and ``output.tool_call_id``, which the real ``get_active_phase``
+        # row never carries, so it was dead for every pending human ask and each boot minted a
+        # new prompt. The live arm is 2c below, classified by the DEFINITION.
 
         # 3. Load the definition + ctx and re-drive (rides run_workflow).
         definition = await _load_run_definition(pool, run_id)
@@ -2746,6 +2764,20 @@ async def resume_stranded_workflows(*, pool, redis) -> int:
             )
             await fail_unloadable_definition(pool, run_id, user_id=run.get("user_id"))
             continue
+
+        # 2c. 296-02 (BUG-261025-03 / D-24) — a step WAITING ON A PERSON, classified by the
+        #     definition (``_active_spec``, the armed branch's own lookup). Its latest prompt
+        #     unanswered → leave the run paused and ask nothing (``pause_run`` releases the
+        #     claim, so the answer route re-drives at once); answered while the server was
+        #     down → consume it on the re-drive (2c-answered, below), never re-ask. No prompt
+        #     row yet (a crash before the insert) → the ordinary re-drive asks, once.
+        _hi_tcid = None
+        if getattr(getattr(_active_spec(active, definition), "config", None),
+                   "phase_type", None) == "llm_human_input":
+            _hi_tcid = ((await get_pending_ask_user(pool, run_id)) or {}).get("tool_call_id")
+            if _hi_tcid and await get_ask_user_response(pool, run_id, str(_hi_tcid)) is None:
+                await pause_run(pool, run_id)
+                continue
 
         # 2b. Phase 185 (GOVERN-03 / RESEARCH L-7) — the ARMED action-risk branch.
         #     Runs AFTER the definition load because the arming is only legible on the
@@ -2787,6 +2819,9 @@ async def resume_stranded_workflows(*, pool, redis) -> int:
         ctx = await _build_resume_context(run, redis, pool)
         if _engine_tcid:  # 2a, answered: consume on the re-drive; the run stops reading paused
             ctx.resume_answered_tool_call_id = str(_engine_tcid)
+            await resume_run(pool, run_id)
+        elif _hi_tcid:  # 2c, answered: ``_exec_llm_human_input`` consumes it, asks nothing
+            ctx.resume_answered_tool_call_id = str(_hi_tcid)
             await resume_run(pool, run_id)
         # Facet C (092-07): MANDATORY resume finalizer — terminalize the
         # producer-shell minted in _build_resume_context on EVERY exit path
@@ -2903,20 +2938,23 @@ def _is_armed_action_risk(active_phase: dict, definition) -> bool:
     for anything without a matching ``PhaseSpec`` — a definition that no longer carries
     the slug falls through to the ordinary re-drive, which is fail-closed either way.
     """
-    slug = active_phase.get("slug")
+    return bool(getattr(_active_spec(active_phase, definition), "action_risk_armed", False))
+
+
+def _active_spec(active_phase: dict | None, definition):
+    """The definition's ``PhaseSpec`` for the active phase row, matched by ``slug`` — or None.
+
+    296-02: extracted from ``_is_armed_action_risk`` so the boot sweep's human-input arm
+    (BUG-261025-03) reads the step's type from the SAME lookup instead of a second
+    classifier. The row itself never carries the type (``get_active_phase`` selects no
+    ``config``). ~~``_active_tool_call_id``~~ was deleted with the dead branch it served.
+    """
+    slug = (active_phase or {}).get("slug")
     if not slug or definition is None:
-        return False
+        return None
     for spec in getattr(definition, "phases", None) or []:
         if getattr(spec, "slug", None) == slug:
-            return bool(getattr(spec, "action_risk_armed", False))
-    return False
-
-
-def _active_tool_call_id(active_phase: dict) -> str | None:
-    """The ask_user ``tool_call_id`` stored by the llm_human_input executor (Plan 03)."""
-    output = active_phase.get("output")
-    if isinstance(output, dict):
-        return output.get("tool_call_id")
+            return spec
     return None
 
 

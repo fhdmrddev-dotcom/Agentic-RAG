@@ -138,7 +138,9 @@ describe("MessageItem.tsx source fence (G-5, comments stripped)", () => {
     // check). It holds its own state and effect, so useState / useEffect here stay at the base.
     expect([...src.matchAll(/\buseState\s*[<(]/g)]).toHaveLength(3)
     expect([...src.matchAll(/\buseEffect\s*\(/g)]).toHaveLength(0)
-    expect([...src.matchAll(/\buse[A-Z]\w*\s*[<(]/g)]).toHaveLength(8)
+    // 292.1-03 (D-14): +1 deliberate hook, the `useStreamsStore` selector for the Continue card's
+    // `Continuing…` state (a store read, no state or effect of its own), so the two above hold.
+    expect([...src.matchAll(/\buse[A-Z]\w*\s*[<(]/g)]).toHaveLength(9)
   })
 })
 

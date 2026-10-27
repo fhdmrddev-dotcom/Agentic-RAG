@@ -67,7 +67,10 @@ def _backend_paths() -> dict[str, list[str]]:
 
 def test_fixture_names_every_object_path_of_the_contract():
     assert set(_paths()) == {
-        "$", "run", "run.started_by", "definition", "definition.phases[]", "definition_changed",
+        "$", "run", "run.started_by",
+        # 293-03 (START-04 / D-22): how the run started, {kind, label, actor_name}.
+        "run.origin",
+        "definition", "definition.phases[]", "definition_changed",
         "deliverable", "phase_log[]", "phase_log[].confidence", "phase_log[].human_input",
         # 295-05 (RUN-01 / D-04): the unsourced mark, {continued_by: <words>, at: <ISO>}.
         "phase_log[].unsourced",

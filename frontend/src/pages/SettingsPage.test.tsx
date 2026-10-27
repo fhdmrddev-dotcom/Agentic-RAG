@@ -528,3 +528,88 @@ describe("SettingsPage — search breadth and iterative scan (241 / D-09)", () =
     ).toBeInTheDocument()
   })
 })
+
+/**
+ * 292.1 UAT (operator, 2026-10-24): "I set the limit of the rounds to 2 and hit save, but it is not
+ * saving." The section had TWO save buttons — the leaf's own "Save tool rounds" and the page's
+ * "Save AI Model" — and the operator clicked the one whose body did not carry the round limits:
+ * `app_settings.updated_at` moved, the cap stayed 15, and nothing said so. The fix is ONE save per
+ * section, so these cases drive the button the operator actually pressed and assert the WIRE body.
+ */
+describe("SettingsPage — the tool-round limits ride Save AI Model (292.1 UAT)", () => {
+  const CHAT = "Tool rounds per chat turn"
+  const saveAI = () => screen.getByRole("button", { name: "Save AI Model" })
+
+  it("typing 2 and clicking Save AI Model sends chat_max_tool_rounds: 2, then shows the server's value", async () => {
+    mockUpdateSettings.mockImplementation(async () => mkSettings({ chat_max_tool_rounds: 2, explorer_max_tool_rounds: 8 }))
+    renderSettings()
+    const chat = (await screen.findByLabelText(CHAT)) as HTMLInputElement
+    await waitFor(() => expect(chat.value).toBe("15"))
+
+    await userEvent.clear(chat)
+    await userEvent.type(chat, "2")
+    await userEvent.click(saveAI())
+
+    await waitFor(() => expect(mockUpdateSettings).toHaveBeenCalledTimes(1))
+    const body = mockUpdateSettings.mock.calls[0][0]
+    expect(body).toHaveProperty("chat_max_tool_rounds", 2)
+    // The untouched explorer cap is not sent (changed fields only), and the model fields still are.
+    expect(body).not.toHaveProperty("explorer_max_tool_rounds")
+    expect(body).toHaveProperty("llm_model", "claude-sonnet-4-6")
+    expect(await screen.findByRole("button", { name: /Saved!/ })).toBeInTheDocument()
+    expect((screen.getByLabelText(CHAT) as HTMLInputElement).value).toBe("2")
+  })
+
+  it("there is no separate 'Save tool rounds' button — one save for the section", async () => {
+    renderSettings()
+    await screen.findByLabelText(CHAT)
+    expect(screen.queryByRole("button", { name: /save tool rounds/i })).not.toBeInTheDocument()
+    expect(saveAI()).toBeInTheDocument()
+  })
+
+  it("a cleared field never sends 0", async () => {
+    renderSettings()
+    const chat = (await screen.findByLabelText(CHAT)) as HTMLInputElement
+    await waitFor(() => expect(chat.value).toBe("15"))
+
+    await userEvent.clear(chat)
+    await userEvent.click(saveAI())
+
+    await waitFor(() => expect(mockUpdateSettings).toHaveBeenCalledTimes(1))
+    expect(mockUpdateSettings.mock.calls[0][0]).not.toHaveProperty("chat_max_tool_rounds")
+  })
+
+  it("the API's bounds refusal shows verbatim in the section's error banner, never Saved", async () => {
+    const REFUSAL =
+      "Tool rounds per chat turn must be between 2 and 50. At 1 no tool could ever run; above 50 a single turn can run for a very long time."
+    mockUpdateSettings.mockRejectedValueOnce(new Error(REFUSAL))
+    renderSettings()
+    const chat = (await screen.findByLabelText(CHAT)) as HTMLInputElement
+    await waitFor(() => expect(chat.value).toBe("15"))
+
+    await userEvent.clear(chat)
+    await userEvent.type(chat, "20")
+    await userEvent.click(saveAI())
+
+    expect(await screen.findByText(REFUSAL)).toBeInTheDocument()
+    expect(mockUpdateSettings.mock.calls[0][0]).toHaveProperty("chat_max_tool_rounds", 20)
+    expect(screen.queryByRole("button", { name: /Saved!/ })).not.toBeInTheDocument()
+  })
+
+  it("WR-05: when the limits' read failed, Save AI Model still saves the model fields and sends NO round field", async () => {
+    // The page reads first (the leaf only mounts once the page has loaded), then the leaf reads.
+    mockGetSettings.mockReset()
+    mockGetSettings.mockResolvedValueOnce(mkSettings())
+    mockGetSettings.mockRejectedValueOnce(new Error("Failed to get settings"))
+    renderSettings()
+    expect(await screen.findByText(/Couldn't load the current tool-round limits/)).toBeInTheDocument()
+
+    await userEvent.click(saveAI())
+
+    await waitFor(() => expect(mockUpdateSettings).toHaveBeenCalledTimes(1))
+    const body = mockUpdateSettings.mock.calls[0][0]
+    expect(body).toHaveProperty("llm_model", "claude-sonnet-4-6")
+    expect(body).not.toHaveProperty("chat_max_tool_rounds")
+    expect(body).not.toHaveProperty("explorer_max_tool_rounds")
+  })
+})

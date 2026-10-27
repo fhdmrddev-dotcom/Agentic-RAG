@@ -43,6 +43,9 @@ const EXPECTED_KEYS: DescribeRefusalKey[] = [
   // 291-06 (WR-08) — the powers guard's own refusal: a removal of file-planted actions left a
   // draft that cannot run. Without the row it read the generic sentence, blaming the model.
   "could_not_generate:removed_powers_broke_draft",
+  // 296-07 (291-S1-copy b) — AMENDED DELIBERATELY: 296-03's `provider_error` sub-reason (the
+  // provider refused the call). Without the row it read "describe the work in more detail".
+  "could_not_generate:provider_error",
   "grounding_failed",
 ]
 

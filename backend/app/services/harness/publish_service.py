@@ -580,6 +580,12 @@ async def publish_workflow(
                 )
         if answered:
             result["auto_answered"] = answered
+    # 296-03 (291-S6-F7 / D-08): a practice run that answered declared inputs with stand-ins
+    # says so — a publish never passes silently on fake answers. The same helper built the
+    # golden run's inputs, so the note names exactly the fields that got a stand-in.
+    _note = stand_in_note(golden_run_inputs(definition, golden_input)[1])
+    if _note:
+        result.setdefault("auto_answered", []).append({"phase": None, "message": _note})
     return result
 
 
@@ -1319,7 +1325,13 @@ def _interactive_phase_failures(definition) -> list:
             wait = getattr(cfg, "timeout_seconds", None)
             ceiling = settings.ask_user_max_timeout_seconds
             if isinstance(wait, bool) or not isinstance(wait, int) or wait <= 0 or wait > ceiling:
-                minutes = max(1, ceiling // 60)
+                # 296-03 (288-WR-02): whole minutes only when the ceiling IS whole minutes; a
+                # 90-second ceiling read "1 minute", which the author then could not satisfy.
+                span = (
+                    f"{ceiling // 60} minute{'' if ceiling // 60 == 1 else 's'}"
+                    if ceiling >= 60 and ceiling % 60 == 0
+                    else f"{ceiling} seconds"
+                )
                 who = f'the pause step "{label}"' if label else "one pause step"
                 failures.append(
                     {
@@ -1327,7 +1339,7 @@ def _interactive_phase_failures(definition) -> list:
                         "message": (
                             f"Publishing needs a clear time limit, and {who} waits outside "
                             f"the allowed range. Set how long it waits to between 1 second "
-                            f"and {minutes} minute{'' if minutes == 1 else 's'} to publish."
+                            f"and {span} to publish."
                         ),
                     }
                 )
@@ -1529,6 +1541,62 @@ def _judge_named_failures(verdict: dict) -> list:
     return failures or [{"summary": "overall_passed is not True"}]
 
 
+#: 296-03 (291-S6-F7 / D-08): the typed stand-ins a golden run answers a declared input with.
+GOLDEN_DATE_STAND_IN = "2026-01-15"
+GOLDEN_NUMBER_STAND_IN = "1"
+GOLDEN_TEXT_STAND_IN = "a short example answer"
+
+
+def golden_run_inputs(definition, golden_input: str) -> tuple[dict[str, str], list[str]]:
+    """The golden run's inputs, and the labels of the fields it answered with a stand-in.
+
+    ⚠ KEY-AWARE, because a placeholder is READ BY A MODEL and shown in a receipt. The first cut
+    used an address shape for EVERY field, so an essay workflow was handed
+    `topic = golden-run-placeholder-topic@example.invalid` and dutifully wrote 200 words about an
+    email address. Operator caught it on the first published run. An address-shaped value goes
+    only where an address belongs, and keeps the RFC 2606 `.invalid` TLD (see the caller).
+
+    296-03 (D-08 amended): 291 added `date`, `number` and `enum` to `InputFieldSpec.type`, so the
+    TYPE now picks the stand-in — the first non-blank option, a fixed ISO date, `1`, or a short
+    plain answer. `InputFieldSpec` has no example field, so every one of these is a stand-in and
+    is NAMED (the second value) so publishing can say it used one; address keys are not listed.
+    """
+    inputs: dict[str, str] = {"kickoff_prompt": golden_input}
+    stood_in: list[str] = []
+    for spec in getattr(definition, "inputs", None) or []:
+        key = getattr(spec, "key", None)
+        # Never shadow the kickoff prompt: it carries the author's real golden input.
+        if not key or key in inputs:
+            continue
+        k = key.lower()
+        if any(t in k for t in ("email", "mail", "recipient", "sender", "cc", "bcc")) or k in {"to", "from"}:
+            inputs[key] = f"golden-run-placeholder-{key}@example.invalid"
+            continue
+        ftype = getattr(spec, "type", "text")
+        options = [o for o in (getattr(spec, "enum_options", None) or []) if str(o).strip()]
+        if ftype == "enum" and options:
+            inputs[key] = str(options[0])
+        elif ftype == "date":
+            inputs[key] = GOLDEN_DATE_STAND_IN
+        elif ftype == "number":
+            inputs[key] = GOLDEN_NUMBER_STAND_IN
+        else:
+            inputs[key] = GOLDEN_TEXT_STAND_IN
+        stood_in.append(_clean_label(getattr(spec, "label", None)) or key)
+    return inputs, stood_in
+
+
+def stand_in_note(labels: list[str]) -> str | None:
+    """291-S6-F7: the one sentence a publish adds when its practice run used stand-in answers."""
+    if not labels:
+        return None
+    fields = labels[0] if len(labels) == 1 else ", ".join(labels[:-1]) + " and " + labels[-1]
+    pronoun = "it" if len(labels) == 1 else "them"
+    return (
+        f"The practice run had no example for {fields}, so it used a stand-in answer for {pronoun}."
+    )
+
+
 async def _drive_golden_run(
     *,
     definition_id: UUID,
@@ -1632,28 +1700,11 @@ async def _drive_golden_run(
     # guard failed. The golden run already records instead of sending and withholds `org_id`
     # so a credential cannot be scoped; this is a THIRD independent reason a publish-time
     # send cannot deliver. Do not replace it with a real-looking address.
-    golden_inputs: dict[str, str] = {"kickoff_prompt": golden_input}
-    for _spec in getattr(definition, "inputs", None) or []:
-        _key = getattr(_spec, "key", None)
-        # Never shadow the kickoff prompt: it carries the author's real golden input.
-        if _key and _key not in golden_inputs:
-            # ⚠ KEY-AWARE, because a placeholder is READ BY A MODEL and shown in a receipt.
-            # The first cut used an address shape for EVERY field, so an essay workflow was
-            # handed `topic = golden-run-placeholder-topic@example.invalid` and dutifully wrote
-            # 200 words about an email address. Operator caught it on the first published run.
-            #
-            # `InputFieldSpec.type` is `"text"` for every field today, so the KEY is the only
-            # signal available. An address-shaped value goes only where an address belongs —
-            # everywhere else gets a plainly-worded placeholder that reads as one.
-            _k = _key.lower()
-            _is_addr = any(
-                _t in _k for _t in ("email", "mail", "recipient", "sender", "cc", "bcc")
-            ) or _k in {"to", "from"}
-            golden_inputs[_key] = (
-                f"golden-run-placeholder-{_key}@example.invalid"
-                if _is_addr
-                else f"golden run placeholder for {_key}"
-            )
+    golden_inputs, _stood_in = golden_run_inputs(definition, golden_input)
+    # 296-06 (291-S6-F8): the first step reads the kickoff, so the stand-in answers ride it as
+    # `key: value` lines, exactly as an in-app start does (one composer, `launch_kickoff`).
+    from app.services.inbound_inputs import launch_kickoff  # noqa: PLC0415
+    golden_inputs["kickoff_prompt"] = launch_kickoff(golden_input, definition, golden_inputs)
 
     # ── 3. create the golden run (is_golden_run=True — the REAL run on the KB) ────
     run_id = await create_workflow_run(

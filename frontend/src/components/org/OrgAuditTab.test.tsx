@@ -9,9 +9,12 @@
  * two-audience raw-code reveal.
  */
 import { describe, it, expect, vi } from "vitest"
-import { render, screen } from "@testing-library/react"
+import { render, screen, within } from "@testing-library/react"
+import userEvent from "@testing-library/user-event"
 
 import { OrgAuditTab } from "./OrgAuditTab"
+import orgAuditSrc from "./OrgAuditTab.tsx?raw"
+import controlRoomAuditSrc from "@/components/admin/AuditTab.tsx?raw"
 import type { OrgAuditPage } from "@/lib/api"
 
 const OWN_PAGE: OrgAuditPage = {
@@ -142,5 +145,58 @@ describe("OrgAuditTab — plain-first vocabulary + ⌥ raw-code reveal", () => {
     render(<OrgAuditTab {...baseProps} result={ALL_PAGE} showTechnical={true} />)
     expect(screen.getByText("Uploaded a document")).toBeInTheDocument()
     expect(screen.getByText("document.upload")).toBeInTheDocument()
+  })
+
+  it("an action code with no label still renders raw — never an invented label", () => {
+    const page: OrgAuditPage = {
+      ...ALL_PAGE,
+      entries: [{ id: "u1", user_id: "u1", action_type: "brand.new_code", metadata: null, created_at: "2026-07-20T10:00:00Z", org_id: "o1" }],
+      total: 1,
+    }
+    render(<OrgAuditTab {...baseProps} result={page} showTechnical={false} />)
+    expect(screen.getByText("brand.new_code")).toBeInTheDocument()
+  })
+})
+
+// ── Phase 293-04 (D-17) — the api_key.* rows are worded, never raw codes ─────────────────────
+const API_KEY_LABELS: ReadonlyArray<[string, string]> = [
+  ["api_key.create", "Made an API key"],
+  ["api_key.revoke", "Revoked an API key"],
+  ["api_key.start", "Started a run with an API key"],
+  ["api_key.read", "Read a run with an API key"],
+  ["api_key.refused", "Refused an API key call"],
+]
+
+describe("OrgAuditTab — API key rows (293-04 / D-17)", () => {
+  it.each(API_KEY_LABELS)("%s renders as %s, not the raw code", (code, label) => {
+    const page: OrgAuditPage = {
+      ...ALL_PAGE,
+      entries: [{ id: "k1", user_id: "u1", action_type: code, metadata: { api_key_label: "n8n-prod" }, created_at: "2026-10-25T10:00:00Z", org_id: "o1" }],
+      total: 1,
+    }
+    render(<OrgAuditTab {...baseProps} result={page} showTechnical={false} />)
+    expect(screen.getByText(label)).toBeInTheDocument()
+    expect(screen.queryByText(code)).toBeNull()
+  })
+
+  it("the action filter offers an API keys group listing the five labels", async () => {
+    const user = userEvent.setup()
+    render(<OrgAuditTab {...baseProps} result={ALL_PAGE} />)
+    await user.click(screen.getByRole("button", { name: /any action/i }))
+    const heading = screen.getByText("API keys")
+    const group = heading.parentElement as HTMLElement
+    for (const [, label] of API_KEY_LABELS) {
+      expect(within(group).getByText(label)).toBeInTheDocument()
+    }
+  })
+
+  it("the Control Room AuditTab carries the IDENTICAL five entries and group (one vocabulary, two homes)", () => {
+    for (const [code, label] of API_KEY_LABELS) {
+      const line = `"${code}": { label: "${label}", group: "API keys" },`
+      expect(orgAuditSrc).toContain(line)
+      expect(controlRoomAuditSrc).toContain(line)
+    }
+    expect(controlRoomAuditSrc).toMatch(/type ActionGroup = [^\n]*"API keys"/)
+    expect(orgAuditSrc).toMatch(/type ActionGroup = [^\n]*"API keys"/)
   })
 })

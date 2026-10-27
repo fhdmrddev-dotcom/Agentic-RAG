@@ -1,0 +1,98 @@
+{
+  "at": "2026-10-24T17:29:19",
+  "cap": 2,
+  "prompts": {
+    "V1-sequential-6": "You must complete ALL SIX of the following tool calls, strictly one at a time, each as its own separate tool call, and each one depends on the result of the previous one, so you must wait for each result before making the next call:\n1) search_documents for 'project plan';\n2) search_documents for the milestones named in result 1;\n3) search_documents for the owners of those milestones;\n4) search_documents for the risks attached to those milestones;\n5) execute_code: compute the number of milestones per quarter from results 2-4;\n6) execute_code: draw a bar chart of the counts computed in step 5.\nDo NOT write any prose, summary, explanation or partial answer until all six calls have returned. If any search returns nothing, still make the next call with your best query. Never skip, merge or reorder a step.",
+    "V2-parallel-rounds": "Work in rounds of PARALLEL tool calls and do not write any prose until every round is done.\nRound A \u2014 in ONE turn, call search_documents four times in parallel: 'project plan', 'milestones', 'owners', 'risks'.\nRound B \u2014 after those return, in ONE turn, call search_documents four more times in parallel for the details of each milestone you found (use your best query if nothing was found).\nRound C \u2014 after those return, in ONE turn, call execute_code twice in parallel: one to count milestones per quarter, one to draw a bar chart of them.\nOnly after Round C has returned may you write your answer. Never skip or merge a round."
+  },
+  "rows": [
+    {
+      "provider": "anthropic",
+      "model": "claude-opus-5-5",
+      "calling_mode": "NATIVE (native SDK adapter)",
+      "verdict": "PASS",
+      "paused": true,
+      "classification": "empty-pause",
+      "paused_variant": "V1-sequential-6",
+      "attempts": [
+        {
+          "variant": "V1-sequential-6",
+          "run_id": "89f31bd9-827d-43f7-9870-12d67301a3b9",
+          "thread_id": "f897a877-bf81-4fa2-9231-d659efdfd43c",
+          "status": "completed",
+          "paused": true,
+          "classification": "empty-pause",
+          "tool_starts": [
+            "search_documents"
+          ],
+          "final_output": {
+            "kind": "empty",
+            "message_id": "24866b99-5b7e-4a82-972a-b3b36cc06c06",
+            "chars": 0,
+            "markup_at": null,
+            "harmony_at": null,
+            "preview": ""
+          },
+          "error": null
+        }
+      ],
+      "continue": {
+        "http": 200,
+        "body": {
+          "status": "ok",
+          "run_id": "89f31bd9-827d-43f7-9870-12d67301a3b9",
+          "continues_used": 1,
+          "continues_remaining": 2,
+          "stream_since": "1792848572361-0"
+        },
+        "status_after": "cap_paused",
+        "same_run_id": true,
+        "continues_used_before": 0,
+        "continues_used_after": 1,
+        "continues_used_plus_1": true,
+        "model_provider_unchanged": true,
+        "model_provider": [
+          "claude-opus-5-5",
+          "anthropic"
+        ],
+        "tool_starts_after_resume": [
+          "search_documents"
+        ],
+        "carrier_first_call": null,
+        "queued_call_ran_first": null,
+        "events_after_resume": [
+          "cap_paused",
+          "citations",
+          "confidence",
+          "iteration_start",
+          "planning",
+          "sources",
+          "stream_end",
+          "suggestions",
+          "tool_end",
+          "tool_preparing",
+          "tool_start"
+        ]
+      },
+      "markup_hits": [],
+      "threads": [
+        "f897a877-bf81-4fa2-9231-d659efdfd43c"
+      ],
+      "reload_equal": true,
+      "evidence": ".planning/phases/292.1-tool-limit-continue-that-always-fires-bug-261024-03/evidence/force-pending/anthropic-89f31bd9-827d-43f7-9870-12d67301a3b9.json"
+    }
+  ],
+  "knob_set": {
+    "http": 200,
+    "chat_max_tool_rounds": 2,
+    "explorer_max_tool_rounds": 8,
+    "at": "2026-10-24T17:29:20"
+  },
+  "knob_after": {
+    "http": 200,
+    "chat_max_tool_rounds": 15,
+    "explorer_max_tool_rounds": 8,
+    "at": "2026-10-24T17:29:42"
+  },
+  "markup_hits": 0
+}

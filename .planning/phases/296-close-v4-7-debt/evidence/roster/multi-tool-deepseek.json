@@ -1,0 +1,15 @@
+{
+  "mode": "multi-tool",
+  "provider": "deepseek",
+  "model": "deepseek-v4-pro",
+  "thread_id": "f72062b9-db02-4689-8935-394bc86a0fb0",
+  "run_id": "03674dad-2ec6-4087-83c4-5f70844e13f2",
+  "status": "completed",
+  "tools": [
+    "search_documents",
+    "execute_code"
+  ],
+  "markup_hits": [],
+  "final_preview": "The revenue search found a revenue table showing regional sales \u2014 EMEA at 120 and APAC at 98 [1][2] \u2014 plus a large corpus inventory listing many financial-report titles related to revenue and margin. The number is 391.",
+  "verdict": "PASS"
+}

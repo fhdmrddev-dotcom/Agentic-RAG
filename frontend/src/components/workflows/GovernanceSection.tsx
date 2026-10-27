@@ -83,6 +83,7 @@ import {
   ACTION_RISK_LOCKED_REFUSAL,
   GROUNDING_ALREADY_SET_NOTE,
   GROUNDING_ATTACHED_GATE,
+  GOVERNANCE_ESCALATED_UNCHECKED,
   GROUNDING_DIAL_LOOSE_LABEL,
   GROUNDING_DIAL_STRICT_LABEL,
   GROUNDING_LOCK_REFUSAL,
@@ -364,13 +365,20 @@ export function GovernanceSection({
         </p>
       )}
 
-      {(cause === "detected" || cause === "escalated") && (
+      {/* 296-07 (BUG-261021-05, D-04 amended b): the attached gate is `detected` ONLY, the one
+          cause the engine attaches a check for. An escalated step says nothing is checked. */}
+      {cause === "detected" && (
         <p
           data-testid="governance-attached"
           className="mt-1.5 flex gap-1.5 text-[11px] leading-snug text-foreground"
         >
           <span aria-hidden="true">🔒</span>
           <span className="min-w-0">{GROUNDING_ATTACHED_GATE}</span>
+        </p>
+      )}
+      {cause === "escalated" && (
+        <p data-testid="governance-escalated-no-check" className={NOTE_CLASSES}>
+          {GOVERNANCE_ESCALATED_UNCHECKED}
         </p>
       )}
 

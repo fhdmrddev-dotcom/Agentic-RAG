@@ -5,6 +5,7 @@ status: partially-answered
 partial: true
 status_note: |
   Phase 288 (2026-10-19) answered the publish half: a workflow with an llm_human_input pause publishes through the real gauntlet (driven live), a 0 / negative / above-1800 wait is refused with a named reason (RED at base, GREEN at head), the verdict carries auto_answered (server side; see the finding that the Builder closes the gauntlet on success), and the run surface says who the run waits on, same after reload. STILL OPEN: notification when a run pauses, batching, the judge scoring a pause workflow on the mock answer (3 of 4 live attempts blocked), the paused-then-answered re-drive stranding a run, and the Expired card offering no answer control (all in 288-04-SUMMARY.md findings).
+folded_into: "288"
 surface: Agentic-RAG
 trigger_when: unset
 ---

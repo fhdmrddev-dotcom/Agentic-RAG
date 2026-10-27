@@ -1,0 +1,33 @@
+{
+ "run_id": "1e932094-5f46-4d55-95fb-786c92f63b0a",
+ "final": {
+  "run_id": "1e932094-5f46-4d55-95fb-786c92f63b0a",
+  "status": "waiting_for_person",
+  "step_index": 2,
+  "step_total": 3,
+  "waiting_on": {
+   "who": "the person who started this run"
+  },
+  "output_text": "## First, on \"Run 295-07 / S6 approve / wrap\"\n\nI can't do that part. I have no workflow, approval, or run-execution capability in this phase — my only tool searches the document knowledge base, so \"approve\" and \"wrap\" for run 295-07 aren't actions I can perform. I'd also flag that **nothing in the knowledge base references a run ID \"295-07\" or an \"S6\" stage gate** — I searched for both explicitly and got no matching document. If S6 is a stage gate in your delivery process, there is no stage-gate paper or S6 pack in this workspace that I can find, so I can't ground an approval on a retrieved source.\n\nWhat I *can* give you is the latest project status that exists in the knowledge base.\n\n## Latest project status — Project Meridian, Week 9 of 24\n\n**No document later than Week 9 is present**, so Week 9 is the current status of record.\n\n**Overall status: AMBER** — moved down from Green this week because two risks escalated; the critical path now runs through the data-migration validation gate and the third-party policy-rating API integration [1]. (Week 8 had recorded GREEN with no critical blockers [5].)\n\n**Progress**\n- Cloud landing zone provisioned and security-hardened, with sign-off received; security hardening sign-off also logged Done [1][3].\n- Legacy data profiling complete: 412,000 customer records and 38,000 policies profiled [1][3].\n- ~6% duplicate customer records found in the legacy CRM during profiling [1].\n- Cutover runbook drafted at v0.3, for review at the next steering committee [1].\n- Still in progress: de-duplication pass build (Priya Nair), policy-rating API stub (Tom Becker), cutover runbook draft (Dana Whitfield) [3].\n\n**Open risks** (Risk Review #4, Week 9 — seven risks logged)\n- **M-01 Data quality** — High/High, escalated; ~6% duplicates/partially merged records; mitigation is a deterministic de-duplication pass plus a hard gate blocking migration above a 0.5% duplicate rate; owner Priya Nair, In progress [2][1].\n- **M-02 Integration dependency** — Medium/High, Open; Acme Ratings Ltd API contract still unsigned, putting Week 13 integration test entry at risk; mitigation is vendor escalation plus a stub-based fallback; owner Tom Becker [2][1].\n- **M-03 Resourcing** — Medium/Medium, Mitigating; two senior engineers shared 50/50 with the Billing programme; dedicated-allocation request submitted to the resourcing board [2].\n- **M-04 Security/compliance (GDPR)** — Medium/High, Open; production PII copied into lower test environments for UAT; mitigation is anonymise/pseudonymise before it leaves production; owner Sade Okafor [2].\n- **M-05 Cutover and rollback** — Low/High, Open; narrow Week-24 weekend cutover window with no rehearsed rollback; mitigation is a Week-22 rollback rehearsal and go/no-go checkpoint; owner Tom Becker [2].\n- **M-06 User adoption and training** — Medium/Medium, **Not started**; agents have no exposure to the new UI; phased training from Week 16 plus floor-walkers at go-live; owner Rita Lindqvist [2].\n- **M-07 Budget and scope** — Medium/Medium, Mitigating; stakeholders requesting extra custom reports beyond scope; route through formal change control [2].\n- Strategic risks from the charter still open at last report: SR-01 executive sponsorship continuity (Low/High, Marcus Alvarez), SR-02 regulatory/security assessment booked Week 14 (Low/High, Sade Okafor), SR-03 legacy decommission dependency re-pointing the actuarial feed (Medium/High, Priya Nair) [4].\n\n**Next steps** (planned for Week 10)\n- Build and test the deterministic de-duplication pass against the 0.5% validation gate [1][3].\n- Escalate the policy-rating API contract to vendor account management [1].\n- Prepare the stub-based integration fallback so internal testing isn't blocked [1].\n- Milestones: Week 11 data migration dress rehearsal; Week 13 integration test entry; Week 18 UAT begins; Week 24 production cutover and legacy decommission [3].\n\n**Decisions needing a steering committee** — these look like the closest thing to an approval item in the current record: dedicated allocation of the two senior engineers shared with the Billing programme (M-03), and budget for the stub-based integration fallback (M-02) [1]. If \"S6 approve\" refers to these, note they are recorded as *requested*, not granted, in the latest documents.\n\nSources: [1] weekly-meeting-notes-week9.md; [2] risk-log.md (Risk Review #4, Week 9); [3] sprint-task-log.md (Sprint 5, Week 9); [4] project-charter-source.md; [5] weekly-meeting-notes-week8.md.\n\nIf run 295-07 / S6 has its own records, they aren't in this workspace — point me at the folder or upload the pack and I'll ground the approval on it.",
+  "end_reason": null,
+  "steps": [
+   {
+    "name": "Find the project status",
+    "state": "completed"
+   },
+   {
+    "name": "Approve the note",
+    "state": "active"
+   },
+   {
+    "name": "Wrap up",
+    "state": "pending"
+   }
+  ],
+  "files": [],
+  "_statuses_seen": [
+   "running",
+   "waiting_for_person"
+  ]
+ }
+}

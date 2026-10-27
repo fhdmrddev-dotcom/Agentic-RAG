@@ -4,12 +4,13 @@ title: Failed runs carry no recorded reason
 reported: 2026-10-20
 surface: Agentic-RAG
 severity: minor
-status: folded
+status: closed
 affected_areas: [backend/harness, backend/audit]
 folded_into: "295"
-verified_closed_by: null
+verified_closed_by: "295"
 related_seeds: [SEED-295, SEED-152]
 re_open_trigger: null
+fixed_by_commit: "bfe4e49ac (fix(295-04): every run ends with a recorded reason, RUN-04); 296-02 ba6bc4f64 worded the remaining re-drive reason (295-IN-07); closed by the 296-05 record flip"
 reproduces_on:
   branch: develop
   commit: 46c23fe00

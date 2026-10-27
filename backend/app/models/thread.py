@@ -510,6 +510,11 @@ class ThreadWorkflowState(BaseModel):
     last_run_status: str | None = None
     last_run_created_at: datetime | None = None
     last_run_updated_at: datetime | None = None
+    # Phase 293 (START-04 / D-24) — how the LAST run started, as recorded at start: the
+    # `origin_for_wire` dict `{kind, label, actor_name}` off the same anchor-then-latest row the
+    # three fields above read; null when it was not recorded. A plain dict because importing the
+    # harness package from this module is circular. ThreadRunLine renders it in both states.
+    origin: dict | None = None
     # Phase 098-UAT run-honesty fix (B) — the run's durable per-phase status array
     # (ordered by phase_index), so the frontend reconcile floor can rebuild an
     # honest timeline for a TERMINAL run (which previously returned [] / blanked).

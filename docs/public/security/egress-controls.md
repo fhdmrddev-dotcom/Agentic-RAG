@@ -53,4 +53,4 @@ Each call through a connection writes an audit receipt naming the connection, th
 
 ## What does not exist
 
-Syrel has no generic "call any URL" step, and receives no webhooks — the only inbound callbacks are the OAuth sign-in redirects. Inbound webhooks and API keys are Not available today. [See what's planned](/docs/api/roadmap-open-platform).
+Syrel has no generic "call any URL" step, and receives no webhooks — the only inbound callbacks are the OAuth sign-in redirects. Inbound calls with an API key exist, but they only start a published workflow the key lists and read back the runs it started; they open no new outbound path. Inbound webhooks are Not available today. [See what's planned](/docs/api/roadmap-open-platform).

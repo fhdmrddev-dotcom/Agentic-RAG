@@ -20,6 +20,7 @@ per-provider round-trip invariant is preserved byte-identically.
 from __future__ import annotations
 
 import asyncio
+import hashlib
 import json
 import logging
 import re
@@ -63,10 +64,18 @@ from app.services.google_service import stream_google
 from app.services.tool_parser import parse_structured_tool_calls
 from app.services.artifact_history import redact_artifact_args  # 273 (I-4) — the one persist hook
 from app.services.structured_text_holdback import (  # 273 (SC#2, Pitfall 2, OV-273-04)
+    FAILED_CALL_NOTICE,
     StructuredTextHoldback,
     drop_held,
     failed_tool_call,
     replace_failed_call,
+)
+from app.services.text_tool_calls import (  # 292.1 (BUG-261024-03) — text-form tool calls, provider-blind
+    TagHoldback,
+    cap_round_unanswered,
+    resolve_round_cap,
+    settle,
+    strip_markup,
 )
 from app.services.citation_markers import (
     apply_citation_instruction,
@@ -140,17 +149,6 @@ class _NoConnectorScope(Exception):
     is already logged, in words, at the raise site.
     """
 
-
-
-# XPROV-02b (Phase 175 / D-02b): fixed honest-incomplete copy for a detected DeepSeek
-# DSML leak (the model wrote a tool call as visible text, so it never ran). Emitted via
-# the EXISTING 'error' SSE event from the post-drain hook. Deliberately a FIXED string —
-# it MUST NOT interpolate the model's raw (attacker-controllable) leaked markup, so it
-# cannot break the SSE contract or echo injected content (T-175-02-02).
-DSML_LEAK_ERROR_MESSAGE = (
-    "The model tried to call a tool but wrote it as text, so it didn't run. "
-    "Please retry."
-)
 
 
 # ---------------------------------------------------------------------------
@@ -370,6 +368,9 @@ def build_cap_paused_carrier_tool_calls(tool_calls_buffer: dict) -> list[dict]:
             "tool_call_id": tc.get("id"),
             "name": tc.get("name", "?"),
             "arguments": tc.get("arguments"),
+            # 292.1 D-UAT-1: Gemini 400s a replayed call without its thought_signature
+            # (D-075.5-01). Only when present, so every other carrier stays byte-identical.
+            **({"thought_signature": tc["thought_signature"]} if tc.get("thought_signature") else {}),
         })
     return carrier
 
@@ -385,8 +386,20 @@ async def persist_cap_paused(
     continues_used: int,
     emit: Callable[..., Awaitable[Any]],
     org_id: str | None = None,
+    reasoning_content: str | None = None,
 ) -> str:
     """Persist the dropped tool calls + emit the NON-terminal cap_paused event.
+
+    Phase 292.1 (D-07): an EMPTY buffer (the forced-final round wrote tool-call markup that could
+    not be parsed) still pauses. Its carrier holds ONE marker entry — kind set, name None — so the
+    Continue read's ``@>`` filter still matches THIS pause (an empty array would fall through to an
+    older pause's calls); ``load_cap_paused_tool_calls`` drops name-less entries, so nothing runs.
+    Operator option A (2026-10-24): a forced-final round that wrote no answer at all pauses the same way.
+
+    SEED-323: ``reasoning_content`` (the paused round's thinking) rides the FIRST carrier entry so
+    the Continue replay can pass it back — DeepSeek thinking mode 400s a replayed tool-call turn
+    without it (https://api-docs.deepseek.com/guides/thinking_mode). Absent → byte-identical. On the
+    marker it is a record only: the Continue read drops name-less entries, reasoning and all.
 
     Phase 268 (D-268-22 / Pitfall 3): ``org_id`` is the turn's validated active org. The Continue
     endpoint looks the carrier up ``AND org_id = <the run's org>``; the run now carries the active
@@ -402,6 +415,10 @@ async def persist_cap_paused(
     """
     tool_names = [tc.get("name", "?") for tc in tool_calls_buffer.values()]
     carrier = build_cap_paused_carrier_tool_calls(tool_calls_buffer)
+    if not carrier:  # 292.1 (D-07 / option A): the empty-queue marker
+        carrier = [{"kind": "iteration_cap_paused", "tool_call_id": None, "name": None, "arguments": None}]
+    if reasoning_content:  # SEED-323 — on the marker too (a record only: the Continue read drops it)
+        carrier[0]["reasoning_content"] = reasoning_content
 
     # (1) DURABLE persist FIRST (the Continue endpoint reads this row).
     try:
@@ -413,7 +430,7 @@ async def persist_cap_paused(
                 "content": (
                     f"⏸ Reached the iteration limit with {len(tool_names)} "
                     f"tool(s) still queued. Continue to run them."
-                ),
+                ) if tool_names else "⏸ Reached the tool-use limit for this turn. Continue to keep going.",
                 "tool_calls": carrier,
                 **({"org_id": org_id} if org_id else {}),
             })
@@ -433,7 +450,7 @@ async def persist_cap_paused(
         message=(
             f"⏸ Reached the iteration limit — {len(tool_names)} tool(s) "
             f"weren't run yet. Continue to run them."
-        ),
+        ) if tool_names else "⏸ Reached the tool-use limit for this turn. Continue to keep going.",
         tool_names=tool_names,
         continues_used=continues_used,
         continues_remaining=continues_remaining,
@@ -1056,7 +1073,9 @@ def _reconstruct_history(
     # Phase 268 (D-268-26 / SEED-319): a scope change is TOLD to the model — one note, prepended to the
     # NEXT user message (never a mid-history system row). The words and the fold live in scope_note.py.
     _scope_fold = ScopeNoteFold()
-    for msg in history_rows:
+    # 292.1 UAT (run 238b0589): rows after the last user row are the CURRENT turn — only a Continue has any.
+    _turn_start = max((i for i, r in enumerate(history_rows) if r.get("role") == "user"), default=-1)
+    for _row_i, msg in enumerate(history_rows):
         # Phase 267 (D-267-10) — transcript-only: rendered to people, never sent to a model.
         # One kind check against the one-home allowlist; every other system kind is untouched.
         _first_call = msg.get("tool_calls")
@@ -1105,6 +1124,11 @@ def _reconstruct_history(
                         }
                         for tc in tool_calls_data
                     ],
+                    # DeepSeek thinking mode 400s a replayed tool-call turn of the current chain without
+                    # reasoning_content (https://api-docs.deepseek.com/guides/thinking_mode). The row keeps
+                    # only its last round's; only when present, so every other row stays byte-identical.
+                    **({"reasoning_content": msg["reasoning_content"]}
+                       if _row_i > _turn_start and msg.get("reasoning_content") else {}),
                 })
                 # 2. Tool result messages (one per tool call)
                 for tc in tool_calls_data:
@@ -1521,11 +1545,11 @@ async def run_agent_loop(
     if body.agent_mode == "explorer":
         active_system_prompt = EXPLORER_SYSTEM_PROMPT
         active_tools = get_explorer_tools()
-        max_iterations = 8   # GEN-04: was 6
     else:
         active_system_prompt = SYSTEM_PROMPT
         active_tools = None  # None = use default get_tools() in create_streaming_chat
-        max_iterations = 15  # GEN-04: was 8
+    # 292.1 (D-17 / D-18): the round caps are operator settings, read once per run (GEN-04 defaults 15 / 8).
+    max_iterations = resolve_round_cap(user_settings, body.agent_mode)
     active_system_prompt += today_line()  # Phase 272 (D-07) — today's date + the month rule, both modes
 
     # Augment system prompt with folder scope context so LLM generates scoped queries
@@ -1956,6 +1980,7 @@ async def run_agent_loop(
     # WITH a non-empty buffer (Landmine 8). Surfaced via result_sink so the
     # producer's _shielded_finalize writes cap_paused instead of completed.
     _cap_disposition: str | None = None
+    _cap_unanswered = False  # 292.1 option A: the forced-final round paused with no answer → no fallback
     # Phase 073 TOKEN-COL-01 (D-073-07): per-run usage accumulators.
     # Both default to None — D-073-09 NULL sentinel if NO iteration produced
     # a usage payload. First successful usage event flips None to int; subsequent
@@ -2004,11 +2029,28 @@ async def run_agent_loop(
                 "Agent loop produced no content for thread %s — persisting empty assistant message",
                 thread_id,
             )
+        # 292.1 (D-10 / D-24): the provider-blind save point — tool-call markup is never persisted,
+        # by any route; markup-only becomes the one worded sentence, never an empty answer.
+        _saved_content = strip_markup(full_content)
+        if _saved_content is not full_content:
+            # 296-06 (292.1-IN-02): length + sha256 only — never a preview of the answer text.
+            logger.warning(
+                "text_tool_markup_at_save run=%s len=%d sha256=%s",
+                run_id, len(full_content) - len(_saved_content),
+                hashlib.sha256(full_content.encode("utf-8")).hexdigest(),
+            )
+            if not _saved_content.strip():
+                _saved_content = FAILED_CALL_NOTICE
+                # 296-06 (292.1-IN-02): stream the substituted sentence, so live == reloaded.
+                try:
+                    await _emit(redis, run_id, 'delta', content=FAILED_CALL_NOTICE)
+                except Exception:  # noqa: BLE001 — informational; the save must still happen
+                    logger.warning("save-point notice delta failed for run %s", run_id, exc_info=True)
         row: dict = {
             "thread_id": thread_id,
             "user_id": current_user["id"],
             "role": "assistant",
-            "content": _strip_nul(full_content),
+            "content": _strip_nul(_saved_content),
         }
         if persisted_tool_calls:
             completed_tools = [tc for tc in persisted_tool_calls if tc.get("status") == "done"]
@@ -2036,7 +2078,7 @@ async def run_agent_loop(
                 await get_pg_pool(),
                 thread_id=UUID(thread_id) if isinstance(thread_id, str) else thread_id,
                 user_id=UUID(current_user["id"]) if isinstance(current_user["id"], str) else current_user["id"],
-                content=_strip_nul(full_content),
+                content=_strip_nul(_saved_content),
                 tool_calls=row.get("tool_calls"),
                 source_refs=row.get("source_refs"),
                 confidence_level=row.get("confidence_level"),
@@ -2188,9 +2230,14 @@ async def run_agent_loop(
                     "id": dc.get("tool_call_id") or "",
                     "name": dc.get("name", "?"),
                     "arguments": dc.get("arguments") or "{}",
+                    "thought_signature": dc.get("thought_signature"),
                 }
                 for dc in ctx.dropped_tool_calls
             ]
+            # SEED-323 (292.1): the paused round's reasoning rides the first carrier entry; DeepSeek
+            # thinking mode 400s a replayed tool-call turn without it
+            # (https://api-docs.deepseek.com/guides/thinking_mode). Provider-blind: only when present.
+            _resume_rc = (ctx.dropped_tool_calls[0] or {}).get("reasoning_content")
             messages.append({
                 "role": "assistant",
                 "tool_calls": [
@@ -2198,9 +2245,12 @@ async def run_agent_loop(
                         "id": rc["id"],
                         "type": "function",
                         "function": {"name": rc["name"], "arguments": rc["arguments"]},
+                        # 292.1 D-UAT-1: echo Gemini's signature the D-075.5-01 way (main path ~3113).
+                        **({"thought_signature": rc["thought_signature"]} if rc["thought_signature"] else {}),
                     }
                     for rc in _resume_calls
                 ],
+                **({"reasoning_content": _resume_rc} if _resume_rc else {}),
             })
             _resume_ctx = ToolContext(
                 redis=redis,
@@ -2323,6 +2373,7 @@ async def run_agent_loop(
             # On the final iteration force a text response to avoid an infinite loop
             force_no_tools = (iteration == max_iterations - 1)
             tool_choice = "none" if force_no_tools else "auto"
+            _cap_markup_seen = False  # 292.1 (D-07): unparseable call markup on the forced-final round
             _provider_retries = 0
             _MAX_PROVIDER_RETRIES = 2
             _retry_delays = [0.5, 1.5]
@@ -2387,6 +2438,9 @@ async def run_agent_loop(
                     _build_from_progress: bool = False
                     # 273 (SC#2, Pitfall 2, OV-273-04): set per provider call on the STRUCTURED path only.
                     _structured_holdback: StructuredTextHoldback | None = None
+                    # 292.1 (D-11): one tag holdback per provider call on EVERY path — tool-call
+                    # markup written as text never streams; text_tool_calls.settle decides post-drain.
+                    _tag_holdback = TagHoldback()
 
                     async def _on_chunk(_event):
                         """ONE provider-agnostic consumer handler (D-02 / D-04) for
@@ -2434,9 +2488,12 @@ async def run_agent_loop(
                             _text = _event.get("content", "")
                             if _text:
                                 full_content += _text
+                                # 292.1 (D-11): the tag holdback gates first, on every path.
+                                _text = _tag_holdback.feed(_text)
                                 if _structured_holdback is None:
-                                    await _emit(redis, run_id, 'delta', content=_text)
-                                else:
+                                    if _text:
+                                        await _emit(redis, run_id, 'delta', content=_text)
+                                elif _text:
                                     # 273 (SC#2, Pitfall 2, OV-273-04): only EMISSION is gated — a
                                     # tool-call block is never streamed as answer text.
                                     _released = _structured_holdback.feed(_text)
@@ -2598,12 +2655,18 @@ async def run_agent_loop(
                         # agent_runner's `except asyncio.TimeoutError` catches the
                         # propagated TimeoutError and sets _terminal_status='timed_out'
                         # (Phase 066 D-066-06/07).
-                        await _drain_stream_with_close_on_cancel(
-                            _stream,
-                            per_call_budget,
-                            _on_chunk,
-                            close_fn=_stream.close,
-                        )
+                        try:
+                            await _drain_stream_with_close_on_cancel(
+                                _stream,
+                                per_call_budget,
+                                _on_chunk,
+                                close_fn=_stream.close,
+                            )
+                        except BaseException:
+                            # 292.1 (D-11, 273-REVIEW WR-06(b) parity): held text was never shown,
+                            # so the producer's sink must not persist it either (I-2).
+                            full_content = drop_held(full_content, _tag_holdback.finish())
+                            raise
                         break  # stream completed
 
                     else:
@@ -2714,36 +2777,12 @@ async def run_agent_loop(
                             # 273-REVIEW WR-06(b): the stream aborted (timeout, provider error,
                             # cancel) while text was held. It was never emitted, so it must not
                             # persist either — live and reload stay identical (I-2).
+                            # 292.1 (D-11): text the tag holdback held was never shown either (it
+                            # sits AFTER anything the structured holdback held, so drop it first).
+                            full_content = drop_held(full_content, _tag_holdback.finish())
                             if _structured_holdback is not None:
                                 full_content = drop_held(full_content, _structured_holdback.finish(False))
                             raise
-
-                        # XPROV-02b (Phase 175, Option B — post-drain, deepseek-leak-only).
-                        # If the sanitizer detected a DSML leak (DeepSeek wrote a tool call
-                        # as visible text, so the tool never ran), end the turn HONESTLY via
-                        # the EXISTING 'error' SSE event — no new event type, no per-chunk
-                        # edit. The getattr default keeps every non-deepseek / non-leak
-                        # stream byte-identical (anthropic/google streams lack the attr).
-                        if getattr(stream, "dsml_leaked", False):
-                            # XPROV-02b fix (Phase 175 code-review CR-01): a DSML leak is
-                            # NOT a provider crash — the stream completed; DeepSeek merely
-                            # wrote a tool call as visible text (the tool never ran). Surface
-                            # the honest notice the SAME way the provider-error path does
-                            # (~L2800 below): append it to `full_content` so it PERSISTS in the
-                            # finalized assistant message, and emit it as a `delta` so the live
-                            # view shows it inline. Do NOT emit the terminal `error` SSE event:
-                            # api.ts (frontend/src/lib/api.ts:838) treats `error` as terminal
-                            # (onTerminal + return) while THIS path keeps streaming and
-                            # finalizes the run as `completed` — that mismatch showed a phantom
-                            # terminal error over a silently-empty persisted turn, the exact
-                            # "silently incomplete" outcome XPROV-02b set out to fix.
-                            _leak_notice = (
-                                f"\n\n{DSML_LEAK_ERROR_MESSAGE}"
-                                if full_content
-                                else DSML_LEAK_ERROR_MESSAGE
-                            )
-                            full_content += _leak_notice
-                            await _emit(redis, run_id, 'delta', content=_leak_notice)
 
                         # Parse tool calls based on calling mode
                         if calling_mode == CallingMode.STRUCTURED:
@@ -2830,6 +2869,43 @@ async def run_agent_loop(
                         continue
                     raise  # non-retryable or retries exhausted → caught by outer except APIError
 
+            # 292.1 (BUG-261024-03, D-04 / D-05 / D-07 / D-09) — the ONE post-drain site for tool
+            # calls written as TEXT, for every provider. Every rule lives in text_tool_calls.
+            _tag_held = _tag_holdback.finish()
+            if _tag_held and not full_content.endswith(_tag_held):
+                full_content = drop_held(full_content, _tag_held)  # never shown → never persisted (I-2)
+                _tag_held = ""
+            _shown = full_content[: len(full_content) - len(_tag_held)]
+            _settled = settle(
+                full_content,
+                {t["function"]["name"] for t in (active_tools or get_tools(user_settings))},
+                buffer_has_calls=bool(tool_calls_buffer),
+            )
+            if _settled.markup_len:
+                logger.warning(
+                    "text_tool_markup run=%s iteration=%d kind=%s len=%d sha256=%s preview=%r",
+                    run_id, iteration, _settled.kind, _settled.markup_len,
+                    _settled.markup_sha256, _settled.markup_preview,
+                )
+            if _settled.kind == "parsed":
+                # Queued at the cap (D-05) or dispatched like any call (D-09). The preamble stays as
+                # the tool turn's content; the native buffer path below emits its turn_boundary.
+                for _pi, _pc in enumerate(_settled.calls):
+                    tool_calls_buffer[_pi] = _pc
+                    await _emit(redis, run_id, 'tool_preparing', name=_pc["name"], index=_pi)
+                await asyncio.sleep(0)
+                finish_reason = "tool_calls"
+                full_content = _settled.visible
+            elif _settled.kind == "unparseable" and force_no_tools:
+                full_content = _settled.visible
+                _cap_markup_seen = True  # D-07: pause with nothing queued
+            elif _settled.kind == "unparseable":
+                full_content, _ = replace_failed_call(_settled.visible, "")  # D-09: worded, never raw
+            elif _settled.kind == "stripped":
+                full_content = _settled.visible
+            if full_content.startswith(_shown) and len(full_content) > len(_shown):
+                await _emit(redis, run_id, 'delta', content=full_content[len(_shown):])
+
             logger.debug(
                 "Iteration %d finish_reason=%r tool_calls_buffered=%d",
                 iteration, finish_reason, len(tool_calls_buffer),
@@ -2846,7 +2922,12 @@ async def run_agent_loop(
             # `if not tool_calls_buffer:` short-circuit fires and the
             # tool execution round is skipped (avoids billing for
             # tool runs whose output never influences the answer).
-            if force_no_tools and tool_calls_buffer:
+            # 292.1 option A (operator, 2026-10-24): an EMPTY forced-final round pauses like D-07.
+            _cap_unanswered = cap_round_unanswered(
+                force_no_tools=force_no_tools, buffer_has_calls=bool(tool_calls_buffer),
+                markup_seen=_cap_markup_seen, visible=full_content,
+            )
+            if force_no_tools and (tool_calls_buffer or _cap_markup_seen or _cap_unanswered):
                 _dropped_count = len(tool_calls_buffer)
                 _tool_names = [tc.get("name", "?") for tc in tool_calls_buffer.values()]
                 logger.warning(
@@ -2884,6 +2965,7 @@ async def run_agent_loop(
                     continues_used=_continues_used,
                     emit=_emit,
                     org_id=current_user.get("org_id"),  # Phase 268 (D-268-22 / Pitfall 3)
+                    reasoning_content=full_reasoning_content or None,  # SEED-323 (292.1)
                 )
                 tool_calls_buffer = {}   # persisted above — now skip the tool execution round
 
@@ -3350,8 +3432,9 @@ async def run_agent_loop(
                     ],
                 )
 
-        # Fallback: if the loop ended with no content produced, emit a safe message
-        if not full_content:
+        # Fallback: if the loop ended with no content produced, emit a safe message.
+        # 292.1 option A: not when the forced-final round paused — the limit line + Continue speak.
+        if not full_content and not _cap_unanswered:
             # GEN-07: two distinct messages — context overflow vs empty model response
             # Context overflow is caught earlier (finish_reason == "length").
             # This branch = model returned empty content after all iterations/retries.

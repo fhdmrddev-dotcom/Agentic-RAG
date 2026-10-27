@@ -169,11 +169,12 @@ import type { TemplateReadAnswer } from "@/components/workflows/useTemplateFirst
 import type { DraftedExtras } from "@/components/workflows/useTemplateFirstDraft"
 // 193.1-07 (D-06 rule 2) — the bind's own sentence. Authored in its module, never here: an
 // interpolating string is a function in a `.ts` vocabulary file, and the filename is DATA.
-import { templateBindFailedMessage } from "@/components/workflows/templateFirstVocabulary"
+import { FILES_LOCKED_WHILE_COMPOSING } from "@/components/workflows/templateFirstVocabulary"
+import { bindFailureLines } from "@/components/workflows/templateDraftBind"
 // 193.1-08 (D-24) — the pre-draft attach row, mounted on THIS screen and on the loose door's.
 // ONE component, two mounts: the marginal cost of the second is a mount and a prop, and the
 // alternative is two surfaces that drift. See the mount below for WHERE it lands and why.
-import { DescribeTemplateRow } from "@/components/workflows/DescribeTemplateRow"
+import { DescribeTemplateRow, UnplacedSentencesNote } from "@/components/workflows/DescribeTemplateRow"
 // 291-04 (sketch 291-describe-files winner B) — the template row's PEER, mounted beside it on
 // this screen and on the loose door's, for the same one-component-two-mounts reason.
 import { DescribeReferencesSection } from "@/components/workflows/DescribeReferencesSection"
@@ -276,6 +277,8 @@ import type { GenerateReadiness, WorkflowDefinitionJSON } from "@/lib/api"
 // step itself: `soulDeliverable` answers *whether* a file is produced and this answers
 // *which step*, and re-implementing either here is the drift `soulData.ts` forbids.
 import { terminalEmitSlug } from "@/components/workflows/soulData"
+// 296-07 (290-IN-03) — the untitled-workflow words, imported from their one home.
+import { UNTITLED_WORKFLOW } from "@/components/workflows/evidenceVocabulary"
 
 /** The read-only canvas, code-split behind the toggle (see the docblock). The module
  *  also exports a `default`, so the `.then(...)` shim below is belt-and-braces — it
@@ -443,7 +446,10 @@ function gatesFor(phase: PhaseSpecJSON | null, kbTools: readonly string[]): Phas
   // `already-set` deliberately produces NO row. Its gate is owned by the Sourcing-
   // strictness control a few rows above, and 185-07's section says so in words; a second
   // claim here would be two surfaces one scroll apart describing one stored field.
-  return cause === "detected" || cause === "escalated"
+  // 296-07 (BUG-261021-05, D-04 amended to option b): `detected` ONLY. The engine's
+  // `grounding.effective_phase` attaches the citations gate for that cause and no other, so a
+  // locked gate row on an escalated step promised a check that never runs.
+  return cause === "detected"
     ? [{ label: GOVERNANCE_GATE_ROW_LABEL, locked: true }]
     : []
 }
@@ -672,6 +678,9 @@ export function WorkflowBuilderPage({
   // Phase 183-07 (D-183-02): which graph the column shows. SESSION state only — it
   // cold-starts on "spine" on every mount and is persisted nowhere.
   const [graphView, setGraphView] = useState<"spine" | "canvas">("spine")
+  // 296-07 (290-WR-02 / D-09) — the canvas's Steps | Team view, lifted here (one controlled
+  // prop pair) so the page can make the Team view genuinely read-only. Session state only.
+  const [canvasView, setCanvasView] = useState<"steps" | "team">("steps")
   // Phase 286-02 (2026-10-18, D-10a) — TOMBSTONE. The six id→name lookup values (folder,
   // folder options, skill, connection, MCP server URL, per-tool read-only declaration), their
   // comments and their one mount read moved VERBATIM to
@@ -816,7 +825,10 @@ export function WorkflowBuilderPage({
     onPickTemplateFile,
     onClearTemplateFile,
     bindHeldTemplate,
-    bindFailed,
+    // 296-07 (291-IN-08 / IN-03 / WR-01) — every failure, the unplaced sentences, the lock.
+    bindFailures,
+    bindUnplaced,
+    composing,
     // 291-04 — the ticks and the references, forwarded to the two door sections as they are.
     untickedKeys,
     onToggleBlank,
@@ -864,6 +876,10 @@ export function WorkflowBuilderPage({
       setReceiptPhases(def.phases)
       setReadiness(verdict)
       setArrivalExtras(extras)
+      // 296-07 (BUG-261024-02) — KEEP the generated draft. The write loop is dirty-gated and a
+      // generation is not an edit, so an untouched draft was never saved and was lost on leave.
+      // `saveNow` reads the store at fire time; reached through an arrow (declared below).
+      void persistence.saveNow()
     },
     // ⚠ 193.1-07 (D-06 / S-3) — THE SHIPPED ATTACH HANDLER, REACHED THROUGH AN ARROW, and
     // the arrow is load-bearing rather than stylistic. `onTemplateAttached` is declared far
@@ -914,6 +930,9 @@ export function WorkflowBuilderPage({
   // the user is on Canvas, the column falls back to the Spine rather than stranding
   // them on a surface that just vanished.
   const activeGraphView = canvasEnabled ? graphView : "spine"
+  // 296-07 (D-09) — the Team view is showing: undo/redo do nothing and the side panel is not
+  // rendered. The selection is kept, so Steps re-opens the panel on the same step.
+  const teamShown = activeGraphView === "canvas" && canvasView === "team"
 
   // D-183-05 — ONE selection contract, shared by BOTH views, owned by the page. Click
   // a node to anchor the `clamp(480px, 38%, 640px)` form panel; click the same node
@@ -1004,7 +1023,8 @@ export function WorkflowBuilderPage({
    * honest: the in-memory definition now differs from what was PATCHed.
    */
   useEffect(() => {
-    if (!canvasEnabled || activeGraphView !== "canvas") return
+    // 296-07 (D-09): `teamShown` — the Team view is read-only, and the notice is left alone.
+    if (!canvasEnabled || activeGraphView !== "canvas" || teamShown) return
 
     const onKeyDown = (event: KeyboardEvent) => {
       if (!event.metaKey && !event.ctrlKey) return
@@ -1033,7 +1053,7 @@ export function WorkflowBuilderPage({
 
     window.addEventListener("keydown", onKeyDown)
     return () => window.removeEventListener("keydown", onKeyDown)
-  }, [canvasEnabled, activeGraphView, store])
+  }, [canvasEnabled, activeGraphView, teamShown, store])
 
   // The current working definition (drafted state only). `selectDefinition` is the ONE
   // place the store's two halves recombine into a definition — fed here from the two
@@ -2027,6 +2047,12 @@ export function WorkflowBuilderPage({
               document held the row's reading is `idle`, so it renders its control and NOTHING
               else new, and the CTA is enabled exactly when it is today (D-08, by construction
               — no document ⇒ nothing to wait for ⇒ no gate, and no second conditional). */}
+          {/* 296-07 (291-WR-01): said once, above the two locked sections. */}
+          {composing && (
+            <p id="describe-files-locked" data-testid="describe-files-locked" role="status" className="text-xs text-muted-foreground">
+              {FILES_LOCKED_WHILE_COMPOSING}
+            </p>
+          )}
           <DescribeTemplateRow
             state={templateRead}
             filename={templateFile?.name}
@@ -2034,6 +2060,8 @@ export function WorkflowBuilderPage({
             onClear={onClearTemplateFile}
             untickedKeys={untickedKeys}
             onToggleBlank={onToggleBlank}
+            disabled={composing}
+            disabledNoteId="describe-files-locked"
           />
 
           {/* 291-04 — the references section, the template row's peer (sketch B): rule, then
@@ -2047,6 +2075,8 @@ export function WorkflowBuilderPage({
             anyReading={anyReading}
             onAddFiles={onAddReferenceFiles}
             onRemove={onRemoveReference}
+            disabled={composing}
+            disabledNoteId="describe-files-locked"
           />
 
           <div className="flex flex-col items-center gap-3">
@@ -2160,7 +2190,11 @@ export function WorkflowBuilderPage({
           // findings, and the three callbacks. The canvas composes; it derives nothing.
           session={canvasSession}
           // 290-03 (VIS-01 / D-06, D-07) — the Steps | Team switch; the canvas reads the phases it already has, so the picture costs no request.
-          team={{ workflowName: typeof meta.name === "string" && meta.name.length > 0 ? meta.name : meta.slug ?? "Untitled workflow" }}
+          // 296-07 (290-IN-03): a blank name or slug never yields `Team picture for `.
+          team={{ workflowName: (typeof meta.name === "string" ? meta.name.trim() : "") || (typeof meta.slug === "string" ? meta.slug.trim() : "") || UNTITLED_WORKFLOW }}
+          // 296-07 (290-WR-02 / D-09) — the view, controlled here so `teamShown` gates the page.
+          view={canvasView}
+          onViewChange={setCanvasView}
         />
       </Suspense>
     ) : (
@@ -2735,14 +2769,20 @@ export function WorkflowBuilderPage({
           "attaching failed" would leave the author with a workflow that dies at the worst
           possible moment. The wording lives in `templateFirstVocabulary.ts` and names the one
           place the fix lives; this page authors none of it. */}
-      {bindFailed && (
-        <p
+      {/* 296-07 (291-IN-08 / 291-IN-03): ONE block, ONE map — every bind failure (the template's
+          own sentence, then one sentence naming every reference), and the sentences the template
+          bind could not place. */}
+      {(bindFailures.length > 0 || bindUnplaced.length > 0) && (
+        <div
           data-testid="template-bind-failed"
           role="status"
           className="border-b border-warning/30 bg-warning/5 px-4 py-2 text-[12.5px] text-muted-foreground"
         >
-          {templateBindFailedMessage(bindFailed.filename)}
-        </p>
+          {bindFailureLines(bindFailures).map((line) => (
+            <p key={line}>{line}</p>
+          ))}
+          <UnplacedSentencesNote sentences={bindUnplaced} />
+        </div>
       )}
 
       {/* ── Phase 200 (FE-WIRING) — THE GRAPH TRACK IS NOT DIMMED WHILE THE PANEL IS OPEN,
@@ -2784,10 +2824,11 @@ export function WorkflowBuilderPage({
       <div
         data-testid="builder-grid"
         className="grid min-h-0 min-w-0 flex-1 overflow-hidden motion-safe:transition-[grid-template-columns] motion-safe:duration-300"
-        style={{ gridTemplateColumns: "minmax(0,1fr) " + (panelOpen ? "clamp(480px, 38%, 640px)" : "44px") }}
+        style={{ gridTemplateColumns: "minmax(0,1fr) " + (teamShown ? "0px" : panelOpen ? "clamp(480px, 38%, 640px)" : "44px") }}
       >
         {graphColumn}
-        <PhaseFormPanel
+        {/* 296-07 (D-09): not rendered while the read-only Team view shows; its track is 0px. */}
+        {teamShown ? null : <PhaseFormPanel
           phase={selectedPhase}
           open={panelOpen}
           folderName={boundFolderName ?? undefined}
@@ -2826,6 +2867,8 @@ export function WorkflowBuilderPage({
             filename: templateAsset?.filename,
             assetId: templateAsset?.assetId,
             onAttached: onTemplateAttached,
+            // 296-07 (291-S3-F2): the declared inputs, so a bound form's rows read as labels.
+            declaredInputs: Array.isArray(meta.inputs) ? (meta.inputs as Array<Record<string, unknown>>) : undefined,
           }}
           // 193.1-09 (SC#3) — SPREAD-CONDITIONAL, the `rails` shape below rather than the
           // `template` shape above, and the difference is deliberate: `template` is a control
@@ -2886,7 +2929,7 @@ export function WorkflowBuilderPage({
               })}
           {...(canvasEnabled ? { rails, onGovernanceChange } : {})}
           isStateful={meta.is_stateful === true}
-        />
+        />}
       </div>
     </div>
     </SelectedPhaseSlugProvider>

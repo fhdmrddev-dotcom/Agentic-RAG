@@ -331,6 +331,22 @@ def test_nl_gen_regression_test_count_unchanged():
     the assertion to ``>=``. A floor would answer a different question than the one the
     Phase-177 lesson asked: an exact count is what catches a silent swap of one test for
     another, and that is the failure this backstop exists for.
+
+    ⚠ AND IT MOVED AGAIN, 8 → 11, AT PHASE 206.2 — RE-DERIVED at 296-05 (288-T-2) with the
+    same command, never assumed. This pin was RED from 2026-08-25 to 2026-10-27 because it
+    lives outside ``tests/unit`` (the warning above, firing again):
+
+    | Ref             | defs | What added them                                        |
+    |-----------------|------|--------------------------------------------------------|
+    | ``7740e0106~1`` | 8    | the value this literal held                              |
+    | ``7740e0106``   | 11   | 206.2-01 RED — the MCP publish boundary: an MCP-shaped   |
+    |                 |      | ``external_action`` publishes clean; an MCP tool name on |
+    |                 |      | an ``llm_agent`` still blocks; a tool_name that disagrees|
+    |                 |      | with ``available_tools`` is flagged                      |
+
+    Three deliberate additions, none replacing a deleted test (found with
+    ``git log -S "def test_an_mcp_shaped_external_action_step_publishes_clean"`` and its two
+    siblings, all one commit), so the literal is bumped, not relaxed.
     """
     fidelity = _TESTS_DIR / "unit" / "test_103_grounding_fidelity.py"
     nl_generate = _TESTS_DIR / "unit" / "test_103_nl_generate.py"
@@ -338,8 +354,8 @@ def test_nl_gen_regression_test_count_unchanged():
     assert fidelity.exists(), f"the grounding-fidelity backstop is GONE: {fidelity}"
     assert nl_generate.exists(), f"the NL-gen backstop is GONE: {nl_generate}"
 
-    assert _count_test_defs(fidelity) == 8, (
-        "test_103_grounding_fidelity.py must hold exactly 8 tests — a dropped grounding "
+    assert _count_test_defs(fidelity) == 11, (
+        "test_103_grounding_fidelity.py must hold exactly 11 tests — a dropped grounding "
         "test silently removes the extraction backstop (Phase-177 lesson)"
     )
     assert _count_test_defs(nl_generate) == 6, (

@@ -3,7 +3,10 @@ seed_id: SEED-195
 title: n8n's real fit is INBOUND — n8n calls us, we do not call n8n — and the app has no inbound trigger surface at all, so the integration everyone pictures is the one that does not fit
 created: 2026-08-23
 planted_during: Operator note review, 2026-08-23 — "see also special cases for integrating n8n with RAG application"
-status: planted
+status: partially-answered
+partial: true
+status_note: "Partially answered by Phase 293 (293-05 REG-06, 2026-10-25): owner-scoped API keys that start only the published workflows they list, with status read-back, one-time file links, per-key rate limits and audit. Still open: the folder-scope / tool-subset credential this body asks for."
+folded_into: "293"
 priority: medium
 surface: Agentic-RAG
 relates_to:

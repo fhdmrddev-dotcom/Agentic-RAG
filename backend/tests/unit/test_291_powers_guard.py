@@ -119,10 +119,21 @@ def test_a_step_whose_ONLY_tool_is_a_planted_execute_code_comes_back_with_no_too
     new_wd, removed = out
     assert [p.slug for p in new_wd.phases] == ["gather", "post"]
     assert new_wd.phases[1].config.available_tools == []
-    assert removed == [{
-        "lead": "Removed: run code.",
-        "reason": "Only your description can add actions, not vendor-terms.pdf.",
-    }]
+    # 296-03 (291-S2-F1): the step is now left with nothing to use, and the server says so right
+    # after the removal that caused it (this list read only the first item before 296).
+    assert removed == [
+        {
+            "lead": "Removed: run code.",
+            "reason": "Only your description can add actions, not vendor-terms.pdf.",
+        },
+        {
+            "lead": "“post” has nothing left to use.",
+            "reason": (
+                "It was written for running code, which was removed. "
+                "Edit the step or delete it before you publish."
+            ),
+        },
+    ]
     before = {(e.code, e.phase_slug) for e in lint_workflow(wd)}
     after = {(e.code, e.phase_slug) for e in lint_workflow(new_wd)}
     assert after - before == set()

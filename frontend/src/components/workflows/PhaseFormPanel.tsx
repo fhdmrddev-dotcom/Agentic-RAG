@@ -284,6 +284,9 @@ export interface PhaseFormPanelProps {
     assetId?: string  // its `asset_id`, from the SAME descriptor as `filename` (260814-q5r)
     /** The returned descriptor, handed up — the caller appends and saves. */
     onAttached: (asset: { kind: "template"; asset_id: string; filename: string; mime: string }) => void
+    /** 296-07 (291-S3-F2) — the declared inputs, passed straight through, so a bound form's
+     *  rows read as the labels of the inputs that fill them. */
+    declaredInputs?: readonly { key?: unknown; label?: unknown; fills?: unknown }[]
   }
   /**
    * Phase 193.1 (AUTH-03 / SC#3) — which of the attached template's fields the draft's own

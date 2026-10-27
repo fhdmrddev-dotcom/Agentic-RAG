@@ -20,6 +20,13 @@ of the CONTRACT BETWEEN the two modules, not of either module alone:
   3. the write MERGES rather than replaces                           (trip must not clobber)
   4. a plain dict is bound, never ``json.dumps``                     (the jsonb string trap)
   5. the arming failure does not stop the launch                     (fail-open asymmetry)
+
+Phase 293: the unattended core moved to services/unattended_launch.py (the ledger's named seam
+'split cadence claiming from job execution'); this fence moved with it on purpose. The source
+scans below (arm_run_budget CALLED, armed before ``_drive_run``, guarded by try, the
+``mirror_run_active`` / ``finalize_run_terminal`` pair) now read ``UNATTENDED``, because that is
+where the scheduler's runs are armed and driven. ``SCHEDULER`` keeps its name for the one
+assertion that is still about the scheduler: it CALLS the shared core (``test_293_seams_moved``).
 """
 
 from __future__ import annotations
@@ -33,6 +40,8 @@ import pytest
 
 REPO = Path(__file__).resolve().parents[2]
 SCHEDULER = REPO / "app" / "services" / "scheduler_service.py"
+# Phase 293: the arming / driving / finalizing code these scans police lives here now.
+UNATTENDED = REPO / "app" / "services" / "unattended_launch.py"
 DB_WORKFLOWS = REPO / "app" / "db" / "workflows.py"
 
 
@@ -94,11 +103,11 @@ def test_the_breaker_reads_metadata_and_the_scheduler_therefore_writes_metadata(
     # in the very file written to catch a seam defect. It is an AST CALL walk now.
     calls = {
         n.func.id
-        for n in ast.walk(ast.parse(_src(SCHEDULER)))
+        for n in ast.walk(ast.parse(_src(UNATTENDED)))
         if isinstance(n, ast.Call) and isinstance(n.func, ast.Name)
     }
     assert "arm_run_budget" in calls, (
-        "scheduler_service.py does not CALL arm_run_budget (an import is not a use) — "
+        "unattended_launch.py does not CALL arm_run_budget (an import is not a use) — "
         "this is the original defect"
     )
 
@@ -114,7 +123,7 @@ def test_the_budget_is_armed_before_the_run_is_driven():
     source order, so a comment mentioning either name cannot satisfy it (the 187-24 trap,
     which has fired repeatedly in this repo).
     """
-    tree = ast.parse(_src(SCHEDULER))
+    tree = ast.parse(_src(UNATTENDED))
 
     arm_line = drive_line = None
     for node in ast.walk(tree):
@@ -239,7 +248,7 @@ async def test_a_failed_arming_does_not_stop_the_run_from_launching():
 
     # ...and the CALLER is what swallows it. The scheduler wraps the call in try/except
     # and logs at exception level; assert the guard exists around the call itself.
-    tree = ast.parse(_src(SCHEDULER))
+    tree = ast.parse(_src(UNATTENDED))
     guarded = False
     for node in ast.walk(tree):
         if not isinstance(node, ast.Try):
@@ -300,11 +309,11 @@ def test_a_scheduled_run_is_mirrored_into_the_operators_active_list():
     which already bit this very file once and was caught by driving the counterfactual)."""
     calls = {
         n.func.id
-        for n in ast.walk(ast.parse(_src(SCHEDULER)))
+        for n in ast.walk(ast.parse(_src(UNATTENDED)))
         if isinstance(n, ast.Call) and isinstance(n.func, ast.Name)
     }
     assert "mirror_run_active" in calls, (
-        "scheduler_service.py does not mirror its run into runs:active — the Control Room "
+        "unattended_launch.py does not mirror its run into runs:active — the Control Room "
         "cannot see scheduled runs"
     )
 
@@ -319,7 +328,7 @@ def test_the_scheduler_finalizes_through_the_co_writer_so_no_ghost_is_left_behin
     """
     calls = {
         n.func.id
-        for n in ast.walk(ast.parse(_src(SCHEDULER)))
+        for n in ast.walk(ast.parse(_src(UNATTENDED)))
         if isinstance(n, ast.Call) and isinstance(n.func, ast.Name)
     }
     assert "finalize_run_terminal" in calls, "must finalize through the mirror co-writer"

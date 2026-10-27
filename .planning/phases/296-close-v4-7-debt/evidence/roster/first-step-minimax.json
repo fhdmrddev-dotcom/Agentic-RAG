@@ -1,0 +1,18 @@
+{
+  "mode": "first-step",
+  "provider": "minimax",
+  "model": "MiniMax-M3",
+  "definition_id": "468bb3a3-e334-4af3-8958-31c764e16644",
+  "thread_id": "bc0dd67a-dac1-4c61-abce-9acb717b33ba",
+  "send_http": 201,
+  "send": "{\"message_id\": \"3107c93a-7558-4ee6-9dd9-9805d33ba867\", \"run_id\": \"27d38d02-dcf6-491f-8b0c-563992f52d58\", \"model\": \"MiniMax-M3\", \"provider\": \"minimax\"}",
+  "workflow_run": {
+    "id": "f92d6db2-bb28-4237-bdc6-cfa848f38773",
+    "status": "completed",
+    "model": "MiniMax-M3"
+  },
+  "first_step_status": "completed",
+  "first_step_output_preview": "{\"text\": \"\\n\\nLisbon is Portugal\\u2019s vibrant coastal capital, renowned for its historic architecture, scenic hills, and rich culture.\"}",
+  "names_lisbon": true,
+  "verdict": "PASS"
+}

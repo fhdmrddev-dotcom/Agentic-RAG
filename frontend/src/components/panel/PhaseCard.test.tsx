@@ -1188,7 +1188,7 @@ describe("PhaseCard 281-03 — template_fields_missing never reads as a citation
 // Asserted by the rendered WORDS (presence assertions miss content drift), and on a COLLAPSED
 // done card: a step kept without sources must not look like a quiet completed step.
 describe("PhaseCard 295-05 — an unsourced step reads unsourced, even folded", () => {
-  const NOTE = "This output was kept without sources — it does not cite your documents."
+  const NOTE = "This output was kept without sources — it does not cite any document."
 
   it("a done, collapsed card shows Unsourced, who continued, and the note", () => {
     render(

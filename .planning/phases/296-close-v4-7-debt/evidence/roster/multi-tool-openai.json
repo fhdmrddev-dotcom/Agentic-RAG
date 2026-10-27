@@ -1,0 +1,15 @@
+{
+  "mode": "multi-tool",
+  "provider": "openai",
+  "model": "gpt-5.6-luna",
+  "thread_id": "90752779-9626-447e-94c4-2bbe384a3a9c",
+  "run_id": "9dae1585-b6bf-4c51-b66d-9201d9bfbf23",
+  "status": "completed",
+  "tools": [
+    "search_documents",
+    "execute_code"
+  ],
+  "markup_hits": [],
+  "final_preview": "The search found revenue data for EMEA (120) and APAC (98) in `sample.csv` and `sample.xlsx` [1][2].  \n391.",
+  "verdict": "PASS"
+}

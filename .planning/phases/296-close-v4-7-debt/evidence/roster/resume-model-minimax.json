@@ -1,0 +1,54 @@
+{
+  "mode": "resume-model",
+  "provider": "minimax",
+  "model": "MiniMax-M3",
+  "owner_default": {
+    "provider": "deepseek",
+    "model": "deepseek-v4-flash"
+  },
+  "non_default": true,
+  "definition_id": "5b4cbaf0-8232-4459-8a5f-036135a26d4e",
+  "thread_id": "1f2912e5-1829-4252-aab0-58bdc836a35b",
+  "send_http": 201,
+  "status_before_answer": "paused",
+  "answer_http": 200,
+  "answer_body": "{\"status\":\"ok\"}",
+  "workflow_run_after": {
+    "status": "completed",
+    "model": "MiniMax-M3",
+    "metadata_provider": "minimax"
+  },
+  "first_segment_runs": [
+    {
+      "run_id": "5205435b-bc31-49b4-86f5-6547854dc210",
+      "status": "completed",
+      "model": "MiniMax-M3",
+      "provider": "minimax"
+    }
+  ],
+  "resumed_segment_runs": [
+    {
+      "run_id": "d71152c2-e4da-43fd-af3b-0fa511e0a5dc",
+      "status": "completed",
+      "model": "unknown",
+      "provider": "unknown"
+    }
+  ],
+  "phases": [
+    {
+      "slug": "pick",
+      "status": "completed",
+      "output_preview": "{\"text\": \"Pick a colour.\", \"answer\": \"Blue\", \"tool_call_id\": \"2dc99da32a794ecb85a8c59de0708e90\"}"
+    },
+    {
+      "slug": "say",
+      "status": "completed",
+      "output_preview": "{\"text\": \"\\n\\nBlue.\"}"
+    }
+  ],
+  "recorded_for_resume": {
+    "model": "MiniMax-M3",
+    "provider": "minimax"
+  },
+  "verdict": "PASS"
+}

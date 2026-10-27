@@ -4,12 +4,13 @@ title: Evidence page shows a colleague a later step's output that restates a wit
 reported: 2026-10-20
 surface: Agentic-RAG
 severity: major
-status: open
+status: closed
 affected_areas: [backend/run-evidence, privacy]
-folded_into: null
-verified_closed_by: null
+folded_into: "296"
+verified_closed_by: "296"
 related_seeds: [SEED-364]
-re_open_trigger: "A phase that touches the run-evidence read (backend/app/api/workflow_runs.py evidence assembly) or ratifies sharing derived content of owner-private documents. Reviewed at 295 discuss (2026-10-20) and left: privacy/evidence-page, not run dead-ends."
+re_open_trigger: null
+fixed_by_commit: "296-01: RED 8939b5522, GREEN 70fefa6f4 (D-05: once an upstream step is withheld, every later step is withheld for a non-owner, WITHHELD_UPSTREAM_SENTENCE)"
 reproduces_on:
   branch: develop
   commit: 4b37c72aa
@@ -35,3 +36,7 @@ The masking promise ("a document you don't have access to") holds for titles but
 ## Fix direction (not a decision)
 
 Withhold for a non-owner every step downstream of a withheld step, or every step after the first masked citation. Alternatively, get explicit operator ratification of the residual as an accepted risk. Pin it with the two-step fixture from the live drive.
+
+## Closed 2026-10-27 (296)
+
+Verified closed by G-4 scenario 2 in `.planning/phases/296-close-v4-7-debt/296-HUMAN-UAT.md` (PASS with evidence under `evidence/g4/`). Status was `folded`.

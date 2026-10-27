@@ -112,12 +112,9 @@
  * never by its words.
  */
 import { useCallback, useEffect, useMemo, useRef, useState } from "react"
-import {
-  generateWorkflow,
-  readDescribeFile,
-  uploadWorkflowReference,
-  uploadWorkflowTemplate,
-} from "@/lib/api"
+import { generateWorkflow, readDescribeFile } from "@/lib/api"
+// 296-07 (step 0) — the post-draft bind, moved to its own leaf.
+import { bindDraftFiles, type BindSubject } from "./templateDraftBind"
 // 197-06 (D-13) — the response type's new arm, imported as a TYPE. The client half of this
 // concern already lives in that module; declaring a structurally-similar shape here would be
 // the `TemplateReadAnswer` mistake in a second place — two homes for one server answer.
@@ -131,7 +128,6 @@ import type {
   GenerateField,
   GenerateRemoved,
   ReferenceAssetDescriptor,
-  WordAnchor,
 } from "@/lib/api"
 import type { BuilderPhase, BuilderStore, TemplateAssetDescriptor } from "./builderStore"
 // Phase 281 (FIX-10) — the describe refusal table's KEY builders. A leaf module: it imports
@@ -141,6 +137,7 @@ import { ENTITLEMENT_REFUSED_KEY } from "./describeRefusalVocabulary"
 // 291-06 (CR-02) — the client-only key for a form the drafter cannot be sent.
 import { FORM_NOT_SENDABLE_KEY } from "./describeRefusalVocabulary"
 // 291-04 — the references' notices are worded in the vocabulary leaf; this module passes DATA.
+import type { BindFailure } from "./templateFirstVocabulary"
 import {
   REFS_REFUSED_FALLBACK,
   refsDuplicate,
@@ -623,46 +620,8 @@ function referenceBodiesFor(references: readonly HeldReference[]): DescribeRefer
   )
 }
 
-/**
- * 291-04 (D-07) — WHICH DOOR the slot's file is stored through at the first save.
- *
- *  · a template, a fillable PDF form, or a deck → the TEMPLATE door, the shipped way;
- *  · Word blanks → the template door WITH the ticked anchors, which stores the fillable copy;
- *    with every blank unticked there is nothing to fill, so it is kept as a reference;
- *  · a file with no fields, a flat or scanned PDF, or a Word file a copy cannot be made of →
- *    the REFERENCE door: it is used as a reference, so it is kept as one;
- *  · a read that never answered → the shipped template upload, except a PDF, which the
- *    template door can only fill when it has fields, so it is kept as a reference.
- *
- * ⚠ A deck stays a TEMPLATE: the reference door does not take decks, and a deck template is
- * filled at run time by the shipped engine.
- */
-function bindPlanFor(
-  file: File,
-  answer: TemplateReadAnswer | null,
-): { door: "template"; anchors?: WordAnchor[] } | { door: "reference" } {
-  if (!answer) return { door: "template" }
-  if (answer.state.kind === "unavailable") {
-    return file.name.toLowerCase().endsWith(".pdf") ? { door: "reference" } : { door: "template" }
-  }
-  const result = answer.state.result
-  switch (result.arm) {
-    case "template_fields":
-    case "form_fields":
-    case "not_word":
-      return { door: "template" }
-    case "blanks": {
-      const anchors = result.fields.flatMap((f) =>
-        !answer.unticked.includes(f.key) && f.anchor_kind !== null && f.anchor_label !== null
-          ? [{ key: f.key, anchor_kind: f.anchor_kind, anchor_label: f.anchor_label }]
-          : [],
-      )
-      return anchors.length > 0 ? { door: "template", anchors } : { door: "reference" }
-    }
-    default:
-      return { door: "reference" }
-  }
-}
+// 296-07 Task 2 (step 0, "extraction FIRST") — `bindPlanFor` and the bind loop MOVED, unchanged,
+// to `templateDraftBind.ts`. This hook keeps the state the bind reports into.
 
 export interface TemplateFirstDraftArgs {
   /** The Builder's store instance. The ONLY thing this hook reaches into directly, and it
@@ -840,7 +799,20 @@ export interface TemplateFirstDraft {
    * sentence stay two different things and neither replaces the other.
    */
   bindFailed: { filename: string } | null
+  /**
+   * 296-07 (291-IN-08) — EVERY failure of the last bind, in order, each a kind and a filename
+   * (still no server prose). `bindFailed` above is the last of these, kept for its readers.
+   */
+  bindFailures: readonly BindFailure[]
+  /** 296-07 (291-IN-03) — the sentences the template bind could not place a blank for. */
+  bindUnplaced: readonly string[]
+  /** 296-07 (291-WR-01) — a draft is being written: the file sections are locked. */
+  composing: boolean
 }
+
+/** Frozen empties, so the returned arrays keep one identity at rest. */
+const NO_FAILURES: readonly BindFailure[] = Object.freeze([])
+const NO_SENTENCES: readonly string[] = Object.freeze([])
 
 export function useTemplateFirstDraft(args: TemplateFirstDraftArgs): TemplateFirstDraft {
   const {
@@ -904,8 +876,33 @@ export function useTemplateFirstDraft(args: TemplateFirstDraftArgs): TemplateFir
 
   // The two writers of the held document. Stable identities, so the row does not re-render
   // on every keystroke in the describe box.
-  const onPickTemplateFile = useCallback((file: File) => setTemplateFile(file), [])
-  const onClearTemplateFile = useCallback(() => setTemplateFile(null), [])
+  // 296-07 (291-WR-01) — while a draft is being written the files are LOCKED: the sections
+  // render disabled, and these writers refuse too, so the bind can only see what was sent.
+  const composing = builderPhase === "composing"
+  const composingRef = useRef(composing)
+  useEffect(() => {
+    composingRef.current = composing
+  })
+  const onPickTemplateFile = useCallback((file: File) => {
+    if (!composingRef.current) setTemplateFile(file)
+  }, [])
+  const onClearTemplateFile = useCallback(() => {
+    if (!composingRef.current) setTemplateFile(null)
+  }, [])
+  const addReferenceFiles = referenceReads.addFiles
+  const removeReferenceAt = referenceReads.removeAt
+  const onAddReferenceFiles = useCallback(
+    (files: readonly File[]) => {
+      if (!composingRef.current) addReferenceFiles(files)
+    },
+    [addReferenceFiles],
+  )
+  const onRemoveReference = useCallback(
+    (index: number) => {
+      if (!composingRef.current) removeReferenceAt(index)
+    },
+    [removeReferenceAt],
+  )
 
   // ── 193.1-07 (D-06) — THE BIND ─────────────────────────────────────────────────────────
   //
@@ -946,48 +943,44 @@ export function useTemplateFirstDraft(args: TemplateFirstDraftArgs): TemplateFir
     allowedConnectionIdsRef.current = initialAllowedConnectionIds
   })
 
-  const [bindFailed, setBindFailed] = useState<{ filename: string } | null>(null)
+  // 296-07 (291-IN-08 / 291-IN-03) — every failure of the last bind, and its unplaced sentences.
+  const [bindFailures, setBindFailures] = useState<readonly BindFailure[]>(NO_FAILURES)
+  const [bindUnplaced, setBindUnplaced] = useState<readonly string[]>(NO_SENTENCES)
+  const lastFailure = bindFailures.length > 0 ? bindFailures[bindFailures.length - 1] : null
+  const bindFailed = useMemo(
+    () => (lastFailure ? { filename: lastFailure.filename } : null),
+    [lastFailure],
+  )
+  /**
+   * 296-07 (291-WR-01 / 291-WR-02) — WHAT THE DRAFT WAS WRITTEN FROM, taken in `onDraft`. The
+   * bind attaches this, never the live lists: a file changed after the press was not read by
+   * the model, and a reference whose read never answered was never sent. `null` until a draft
+   * is written (the bind then falls back to the live lists, the pre-296 path no product flow
+   * reaches: the bind only runs on the create a generation now triggers).
+   */
+  const bindSnapshotRef = useRef<BindSubject | null>(null)
 
-  const bindHeldTemplate = useCallback(async (definitionId: string) => {
-    const file = templateFileRef.current
-    const references = referencesRef.current
-    // NO DOCUMENT, NO ACT. SC#4's fast path is untouched by construction rather than by a
-    // flag: a session that supplied nothing performs no upload and can raise no failure.
-    if (!file && references.length === 0) return
-    const referenceAssets: ReferenceAssetDescriptor[] = []
-    if (file) {
-      try {
-        const plan = bindPlanFor(file, templateAnswerRef.current)
-        if (plan.door === "reference") {
-          referenceAssets.push(await uploadWorkflowReference(definitionId, file))
-        } else {
-          // ⚠ Without anchors the call is the shipped one, argument for argument.
-          const asset =
-            plan.anchors !== undefined
-              ? await uploadWorkflowTemplate(definitionId, file, plan.anchors)
-              : await uploadWorkflowTemplate(definitionId, file)
-          setBindFailed(null)
-          // The host's single writer. This module appends nothing to `assets[]` itself.
-          onTemplateBoundRef.current(asset)
-        }
-      } catch (err) {
-        // The developer's evidence, at the boundary, in full.
-        console.error(err)
-        // …and the person's, which cannot carry any of it.
-        setBindFailed({ filename: file.name })
-      }
-    }
-    // 291-04 (D-07) — every held reference, kept with the draft. One failure names its file
-    // and does not stop the others.
-    for (const reference of references) {
-      try {
-        referenceAssets.push(await uploadWorkflowReference(definitionId, reference.file))
-      } catch (err) {
-        console.error(err)
-        setBindFailed({ filename: reference.file.name })
-      }
-    }
-    if (referenceAssets.length > 0) onReferencesBoundRef.current(referenceAssets)
+  // 296-07 (step 0) — the bind loop lives in `templateDraftBind.ts`; this wrapper hands it the
+  // refs it reads at fire time and the setters it reports into. Behaviour unchanged.
+  const bindHeldTemplate = useCallback((definitionId: string) => {
+    // A new bind answers afresh: the last bind's failures and sentences are cleared first.
+    setBindFailures(NO_FAILURES)
+    setBindUnplaced(NO_SENTENCES)
+    return bindDraftFiles(
+      definitionId,
+      // 296-07 (291-WR-01 / WR-02): the snapshot `onDraft` took, when there is one.
+      bindSnapshotRef.current ?? {
+        file: templateFileRef.current,
+        answer: templateAnswerRef.current,
+        references: referencesRef.current,
+      },
+      {
+        onTemplateBound: (asset) => onTemplateBoundRef.current(asset),
+        onReferencesBound: (assets) => onReferencesBoundRef.current(assets),
+        onFailed: (failure) => setBindFailures((prev) => [...prev, failure]),
+        onUnplaced: (sentences) => setBindUnplaced(sentences),
+      },
+    )
   }, [])
 
   const onDraft = useCallback(async () => {
@@ -1026,6 +1019,15 @@ export function useTemplateFirstDraft(args: TemplateFirstDraftArgs): TemplateFir
       return
     }
     const referenceBodies = referenceBodiesFor(referencesRef.current)
+    // 296-07 (291-WR-01 / WR-02) — the SNAPSHOT the bind attaches: the slot file and its reading
+    // as they are now, and only the references whose text is in this request.
+    bindSnapshotRef.current = {
+      file: templateFileRef.current,
+      answer: templateAnswerRef.current,
+      references: referencesRef.current.filter(
+        (r) => r.state.kind === "read" && r.state.result.arm === "reference",
+      ),
+    }
     try {
       const result = await generateWorkflow({
         describe: text,
@@ -1146,10 +1148,13 @@ export function useTemplateFirstDraft(args: TemplateFirstDraftArgs): TemplateFir
     onToggleBlank: slot.toggleBlank,
     references: referenceReads.references,
     referenceNotice: referenceReads.notice,
-    onAddReferenceFiles: referenceReads.addFiles,
-    onRemoveReference: referenceReads.removeAt,
+    onAddReferenceFiles,
+    onRemoveReference,
     anyReading,
     bindHeldTemplate,
     bindFailed,
+    bindFailures,
+    bindUnplaced,
+    composing,
   }
 }

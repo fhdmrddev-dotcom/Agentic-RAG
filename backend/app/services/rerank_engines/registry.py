@@ -46,6 +46,12 @@ JEV_MAX_STATE_BYTES = 28_000
 JEV_MAX_IN_FLIGHT = 4
 OPENAI_MAX_QUESTIONS = 200
 
+# 296-03 (294-LOCAL): the longest a local cross-encoder inference may run before the search keeps
+# today's order. 294 measured a median of 18.5 s per search on a CPU, so 30 s lets a normal search
+# finish and stops a stuck one stalling the answer. ⚠ The Settings copy says "past 30 seconds"
+# (``rerankEngines.ts`` local ``latencyNote``); ``test_296_rerank_and_claims`` pins the two equal.
+LOCAL_INFERENCE_TIMEOUT_S = 30.0
+
 
 @dataclass(frozen=True)
 class EngineSpec:
@@ -75,7 +81,9 @@ ENGINES: dict[str, EngineSpec] = {
         id="local", label="On this server", default_model="BAAI/bge-reranker-v2-m3",
         model_pattern=r"/", key_source=None, hosted=False, probabilistic=False, steering=False,
         citation_check=False, input_usd_per_million=None,
-        timeout_s=0.0, connect_timeout_s=0.0,   # no network; inference latency is measured (plan 02)
+        # No network, so no connect timeout. 296-03: the inference timeout (local.py reads the
+        # module constant at call time, so a test can shorten it).
+        timeout_s=LOCAL_INFERENCE_TIMEOUT_S, connect_timeout_s=0.0,
     ),
     "jev": EngineSpec(
         id="jev", label="Jev via OpenRouter", default_model="typesafe/jev-1.14",

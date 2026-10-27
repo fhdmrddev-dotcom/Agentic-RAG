@@ -18,6 +18,8 @@ import { askInChat } from "@/components/library/find/askInChat"
 // Phase 235-08 — the tab union from the page's own leaf, the `type StudioTab` idiom below.
 import type { LibraryTab } from "@/pages/librarySelection"
 import { SettingsPage } from "@/pages/SettingsPage"
+import { SETTINGS_TAB_STORAGE_KEY } from "@/components/settings/settingsTabs"
+import { writeApiKeyPrepick } from "@/components/settings/apiKeys/apiKeyPrepick"
 import { ConnectionsPage } from "@/pages/ConnectionsPage"
 import { SkillsPage } from "@/pages/SkillsPage"
 import { WorkflowsPage } from "@/pages/WorkflowsPage"
@@ -946,7 +948,8 @@ export function ChatLayout({ onSignOut, activeView, onNavigate, navItems, isOper
             // home, not one page wearing two labels. See `ConnectionsPage.tsx`.
             <ConnectionsPage />
           ) : activeView === "settings" ? (
-            <SettingsPage />
+            // 293-04: API keys activity opens a run in the SAME run room the workflows page uses.
+            <SettingsPage onOpenRun={canvasEnabled ? openRunSurface : undefined} />
           ) : activeView === "workflows" ? (
             // Phase 103-06 (REQ-7): the Workflows page mounts here (additive branch
             // BEFORE the trailing KnowledgeHealthPage else — the existing chat +
@@ -965,6 +968,14 @@ export function ChatLayout({ onSignOut, activeView, onNavigate, navItems, isOper
               // SEED-218 / D-27: the describe door's connect control → the UNGOVERNED Connections
               // door, never operator-only `settings`. Not canvas-gated: Connections always exists.
               onOpenConnections={() => onNavigate("connections")}
+              // 293-04 (D-18): a published card's ⋯ "New API key…" → Settings → API keys with that
+              // workflow pre-picked. No URL, no router (three homes): the pre-pick rides
+              // sessionStorage and the tab rides the same localStorage key Settings reads.
+              onOpenApiKeys={(s) => {
+                writeApiKeyPrepick({ workflowId: s.id, name: s.name })
+                localStorage.setItem(SETTINGS_TAB_STORAGE_KEY, "7")
+                onNavigate("settings")
+              }}
             />
           ) : activeView === "skill-studio" ? (
             // Phase 137-06 (PANEL-01 / D-01 / sketch 057-A): the unified Skill Studio

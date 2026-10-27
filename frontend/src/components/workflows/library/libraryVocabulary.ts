@@ -765,6 +765,17 @@ export function automationMoreCount(n: number): string {
   return `+${n} more`
 }
 
+/** Phase 293-03 (D-25): the card's next-run fragment, `next Mon 26 Oct, 09:00`. The time is the
+ *  SERVER's soonest active `next_run_at`, only formatted in the browser. */
+export const AUTOMATION_NEXT = "next"
+/** …and when that instant is already behind the viewer's clock: said, never hidden. */
+export const AUTOMATION_NEXT_PAST = "next was due"
+
+/** `next {when}` / `next was due {when}`. */
+export function automationNextAt(when: string, past: boolean): string {
+  return `${past ? AUTOMATION_NEXT_PAST : AUTOMATION_NEXT} ${when}`
+}
+
 /**
  * Phase 290-02 (2026-10-21, VIS-04 / D-01..D-05) — the card's STEP LINE words.
  *
@@ -804,5 +815,6 @@ export function stepLineMoreLabel(n: number): string {
 /** The expanded toggle's text: fold the line back to its first steps. */
 export const STEP_LINE_LESS = "Show less"
 
-/** The floor for a step with no `phase_type`, so no chip is ever empty. */
-export const STEP_LINE_UNTYPED = "A step with no type"
+/** The floor for a step with no `phase_type`, so no chip is ever empty. 296-07 (290-IN-02):
+ *  re-exported under its shipped name from the ONE home in `phaseVocabulary.ts`. */
+export { STEP_UNTYPED as STEP_LINE_UNTYPED } from "@/components/workflows/phaseVocabulary"

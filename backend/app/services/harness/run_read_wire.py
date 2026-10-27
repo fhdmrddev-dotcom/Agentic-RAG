@@ -18,12 +18,17 @@ and the chat panel cannot disagree about either one:
   * ``deadline_passed`` (D-37). "The answer window has passed" is a fact about TIME — the
     prompt's own ``created_at + timeout_seconds`` — never about ``runs.status``. An engine ask
     pauses the run at second 0 with ``timeout_seconds`` null and must never read as passed.
+  * ``origin`` (Phase 293, D-22 / D-23). How a run was started, read only from the two columns
+    ``create_workflow_run`` stamped once at start (``origin_kind`` / ``origin_label``). The wire
+    is ``{"kind", "label", "actor_name"}``; a NULL kind (every run that was never backfilled) or
+    any kind outside the three is ``None`` — never a default kind, never guessed. ``actor_name``
+    is an app-start fact only: a schedule or a key names no person.
 """
 from __future__ import annotations
 
 import json
 from datetime import datetime, timedelta
-from typing import Any, Iterable
+from typing import Any, Iterable, Literal
 
 from pydantic import BaseModel
 
@@ -32,6 +37,8 @@ from pydantic import BaseModel
 END_REASON_AUDIT_KINDS: tuple[str, ...] = ("run_failed", "policy_applied")
 _CANCEL_POLICY = "run_cancelled"
 _ENDED = frozenset({"failed", "cancelled"})
+# Phase 293 — the three recorded start kinds (migration 215's CHECK). Anything else reads None.
+ORIGIN_KINDS = frozenset({"app", "schedule", "key"})
 
 
 class UnsourcedMark(BaseModel):
@@ -124,6 +131,29 @@ def _instant(raw: Any) -> datetime | None:
     return None
 
 
+class RunOriginWire(BaseModel):
+    """Phase 293 — how a run started, as recorded at start. Every run read declares this."""
+
+    kind: Literal["app", "schedule", "key"]
+    label: str | None = None
+    actor_name: str | None = None
+
+
+def origin_for_wire(kind: Any, label: Any, actor_name: Any) -> dict[str, Any] | None:
+    """``{"kind", "label", "actor_name"}`` for a recorded origin, else ``None``.
+
+    ``kind`` must be one of ``ORIGIN_KINDS`` exactly (no coercion); a blank label or name reads
+    ``None``. ``actor_name`` is kept only for an app start.
+    """
+    if not isinstance(kind, str) or kind not in ORIGIN_KINDS:
+        return None
+    return {
+        "kind": kind,
+        "label": _nonblank(label),
+        "actor_name": _nonblank(actor_name) if kind == "app" else None,
+    }
+
+
 def deadline_passed(timeout_seconds: Any, created_at: Any, now: datetime) -> bool:
     """True only when the prompt HAS a deadline and it is behind ``now``.
 
@@ -142,9 +172,12 @@ def deadline_passed(timeout_seconds: Any, created_at: Any, now: datetime) -> boo
 
 __all__ = [
     "END_REASON_AUDIT_KINDS",
+    "ORIGIN_KINDS",
+    "RunOriginWire",
     "UnsourcedMark",
     "deadline_passed",
     "end_reason_for_wire",
+    "origin_for_wire",
     "resolve_end_reason",
     "unsourced_for_wire",
 ]

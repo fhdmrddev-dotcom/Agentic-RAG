@@ -21,6 +21,7 @@ D-07 prune never applies here.
 """
 from __future__ import annotations
 
+import contextvars
 import logging
 import os
 import threading
@@ -30,6 +31,7 @@ from typing import Any
 
 from langsmith import traceable
 
+from app.services.rerank_engines import registry
 from app.services.rerank_engines.tracing import EngineCall, record_engine_call, redact_inputs, span_outputs
 
 logger = logging.getLogger(__name__)
@@ -118,9 +120,20 @@ def warm(model_name: str, *, wait: bool = False, timeout_s: float | None = None)
     return _resident(model_name) is not None
 
 
+class LocalInferenceTimeout(RuntimeError):
+    """296-03 (294-LOCAL): the inference ran past ``LOCAL_INFERENCE_TIMEOUT_S``. The dispatcher's
+    any-failure arm keeps today's order (the same output as the not-resident path) and logs a
+    warning; the abandoned inference finishes on its own thread and is discarded."""
+
+
 @traceable(name="rerank.local", run_type="llm", process_inputs=redact_inputs,
            metadata={"ls_provider": "local"})
-def _score(query: str, documents: list[dict], top_n: int, *, model_name: str, model: Any) -> dict:
+def _score(query: str, documents: list[dict], top_n: int, *, model_name: str) -> dict:
+    # 296-03 (294-IN-01): the span's inputs carry the model NAME only. Base took the CrossEncoder
+    # as an argument, and LangSmith recorded its repr (the whole architecture) on every search.
+    model = _resident(model_name)
+    if model is None:  # replaced by a rerank_model change since rerank() looked
+        raise LocalModelWarming(model_name)
     started = time.perf_counter()
     pairs = [(query, doc["content"]) for doc in documents]
     scores = model.predict(pairs)
@@ -142,9 +155,28 @@ def _score(query: str, documents: list[dict], top_n: int, *, model_name: str, mo
 
 def rerank(query: str, documents: list[dict], top_n: int, *, api_key: str | None = None, model: str,
            instruction: str | None = None, keep_documents: bool = False) -> list[dict]:
-    """Rerank via the resident CrossEncoder. Raises ``LocalModelWarming`` while it is not resident."""
-    resident = _resident(model)
-    if resident is None:
+    """Rerank via the resident CrossEncoder. Raises ``LocalModelWarming`` while it is not resident,
+    and ``LocalInferenceTimeout`` when scoring runs past ``LOCAL_INFERENCE_TIMEOUT_S``."""
+    if _resident(model) is None:
         _start_background_load(model)
         raise LocalModelWarming(model)
-    return _score(query, documents, top_n, model_name=model, model=resident)["rows"]
+    # 296-03 (294-LOCAL): score on a worker thread and stop waiting at the timeout. The context
+    # is copied so the LangSmith parent and the engine-call capture follow the work (tracing.py).
+    timeout_s = registry.LOCAL_INFERENCE_TIMEOUT_S
+    ctx = contextvars.copy_context()
+    box: dict[str, Any] = {}
+
+    def _work() -> None:
+        try:
+            box["rows"] = ctx.run(_score, query, documents, top_n, model_name=model)["rows"]
+        except BaseException as exc:  # noqa: BLE001 — re-raised on the caller's thread
+            box["error"] = exc
+
+    worker = threading.Thread(target=_work, name="local-rerank-infer", daemon=True)
+    worker.start()
+    worker.join(timeout_s)
+    if worker.is_alive():  # the dispatcher logs the WARNING (by type) and keeps today's order
+        raise LocalInferenceTimeout(model)
+    if "error" in box:
+        raise box["error"]
+    return box["rows"]

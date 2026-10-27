@@ -88,9 +88,11 @@ describe("WorkflowScheduleModal 214-09 — declared entry inputs (STEP-02 / D-21
   const declaredDefinition = {
     slug: "vendor-outreach",
     version: 1,
+    // 296-04 (287-SCHED): `subject_line` is declared OPTIONAL here, so the cadence case can still
+    // send it empty; an absent `required` reads true and Add schedule now refuses it empty.
     inputs: [
       { key: "to", label: "Recipient email" },
-      { key: "subject_line" },
+      { key: "subject_line", required: false },
       { key: "kickoff_prompt" },
     ],
     phases: [
@@ -195,6 +197,10 @@ describe("WorkflowScheduleModal 214-09 — declared entry inputs (STEP-02 / D-21
   it("the cadence contract is UNTOUCHED in both arms — exactly one cadence, the other explicit null", async () => {
     // Arm 1: cron (the default). Exactly one cadence key carries a value.
     const modal = await openForm(declaredDefinition)
+    // 296-04 (287-SCHED): the required recipient is filled, or Add schedule refuses by name.
+    fireEvent.change(within(modal).getByTestId("schedule-input-to"), {
+      target: { value: "a@b.c" },
+    })
     submit(modal)
     await waitFor(() => expect(api.createWorkflowSchedule).toHaveBeenCalledTimes(1))
     let [, payload] = vi.mocked(api.createWorkflowSchedule).mock.calls[0]
@@ -231,5 +237,178 @@ describe("WorkflowScheduleModal 214-09 — declared entry inputs (STEP-02 / D-21
     // The only text inputs the form grows are named by a DECLARED key.
     const testIds = Array.from(code.matchAll(/data-testid=\{?`?schedule-input-\$\{f\.key\}/g))
     expect(testIds.length).toBe(1)
+  })
+})
+
+/**
+ * ── 296-04 (BUG-261025-01 / 295-IN-05 / 287-SCHED) — Run now says what happened, ON THE ROW ──
+ *
+ * Reported: pressing a row's Run now changed nothing visible near the row; the only sentence was
+ * a 12px muted notice at the bottom of the create form. The server's trigger result now carries
+ * an `outcome` (296-02), and its `detail` is already a worded sentence for every refusal, so it is
+ * rendered verbatim, toned by outcome, inside the row that was pressed.
+ */
+describe("WorkflowScheduleModal 296-04 — Run now feedback on the row (BUG-261025-01)", () => {
+  const dummyWorkflow = { id: "wf-123", name: "Daily ETL" }
+  const row = (id: string, name: string) => ({
+    id,
+    workflow_id: "wf-123",
+    name,
+    cron_expression: "0 3 * * *",
+    interval_seconds: null,
+    timezone: "UTC",
+    is_active: true,
+    max_tokens_per_run: 500000,
+    max_duration_seconds: 1800,
+    inputs: {},
+    last_run_at: "2026-10-25T03:00:00Z",
+    next_run_at: "2026-10-27T03:00:00Z",
+    last_status: "completed",
+  })
+  const ROWS = [row("s-1", "Morning digest"), row("s-2", "Evening digest")]
+
+  beforeEach(() => {
+    vi.clearAllMocks()
+    vi.mocked(api.listWorkflowSchedules).mockResolvedValue(ROWS)
+    vi.mocked(api.getEffectiveFeaturesPayload).mockResolvedValue({
+      features: {},
+      scheduler_process_enabled: true,
+    })
+  })
+
+  async function openList() {
+    render(<WorkflowScheduleModal workflow={dummyWorkflow} onClose={vi.fn()} />)
+    await waitFor(() => expect(screen.getAllByTestId("schedule-row")).toHaveLength(2))
+    return screen.getAllByTestId("schedule-row")
+  }
+
+  it("pending: the pressed row's Run now spins, is busy and disabled, and says Starting…", async () => {
+    let resolve: (v: unknown) => void = () => {}
+    vi.mocked(api.triggerSchedule).mockReturnValue(new Promise((r) => (resolve = r)) as never)
+    const rows = await openList()
+    const btn = within(rows[1]).getByTestId("schedule-run-now")
+    fireEvent.click(btn)
+    await waitFor(() => expect(btn.getAttribute("aria-busy")).toBe("true"))
+    expect(btn).toBeDisabled()
+    expect(within(btn).getByText("Starting…").className).toContain("sr-only")
+    const spinner = btn.querySelector("svg")
+    expect(spinner?.getAttribute("class") ?? "").toContain("animate-spin")
+    expect(spinner?.getAttribute("class") ?? "").toContain("motion-reduce:animate-none")
+    // The other row is not the one starting.
+    expect(within(rows[0]).getByTestId("schedule-run-now").getAttribute("aria-busy")).not.toBe("true")
+    resolve({ launched: true, outcome: "launched" })
+    await waitFor(() => expect(btn.getAttribute("aria-busy")).not.toBe("true"))
+  })
+
+  it("launched: ✓ + the started sentence, role=status, inside THAT row; no bottom notice", async () => {
+    vi.mocked(api.triggerSchedule).mockResolvedValue({ launched: true, outcome: "launched" } as never)
+    const rows = await openList()
+    fireEvent.click(within(rows[1]).getByTestId("schedule-run-now"))
+    const line = await within(screen.getAllByTestId("schedule-row")[1]).findByTestId("schedule-run-result")
+    expect(line.getAttribute("role")).toBe("status")
+    expect(line.textContent).toBe("✓Started. It runs in the background — open the run log to watch it.")
+    expect(line.className).toContain("text-foreground")
+    expect(within(screen.getAllByTestId("schedule-row")[0]).queryByTestId("schedule-run-result")).toBeNull()
+    expect(screen.queryByTestId("schedule-notice")).toBeNull()
+  })
+
+  it.each([
+    ["refused", "It didn't start: the workflow needs a typed task."],
+    ["not_loaded", "It didn't start: the workflow could not be loaded (it was deleted, or is no longer yours)."],
+  ])("%s: the detail verbatim, warning tone, role=status", async (outcome, detail) => {
+    vi.mocked(api.triggerSchedule).mockResolvedValue({ launched: false, outcome, detail } as never)
+    const rows = await openList()
+    fireEvent.click(within(rows[0]).getByTestId("schedule-run-now"))
+    const line = await within(screen.getAllByTestId("schedule-row")[0]).findByTestId("schedule-run-result")
+    expect(line.textContent).toBe(detail)
+    expect(line.getAttribute("role")).toBe("status")
+    expect(line.className).toContain("text-[hsl(var(--warning))]")
+  })
+
+  it("error: the detail verbatim, the failure tone, role=alert", async () => {
+    const detail = "It didn't start because of a problem on our side. Nothing ran — try again in a moment."
+    vi.mocked(api.triggerSchedule).mockResolvedValue({ launched: false, outcome: "error", detail } as never)
+    const rows = await openList()
+    fireEvent.click(within(rows[0]).getByTestId("schedule-run-now"))
+    const line = await within(screen.getAllByTestId("schedule-row")[0]).findByTestId("schedule-run-result")
+    expect(line.textContent).toBe(detail)
+    expect(line.getAttribute("role")).toBe("alert")
+    expect(line.className).toContain("text-[hsl(0_80%_80%)]")
+  })
+
+  it("an old backend (no outcome): launched reads success, anything else the failure tone", async () => {
+    vi.mocked(api.triggerSchedule).mockResolvedValue({ launched: false, detail: "Nope." } as never)
+    const rows = await openList()
+    fireEvent.click(within(rows[0]).getByTestId("schedule-run-now"))
+    const line = await within(screen.getAllByTestId("schedule-row")[0]).findByTestId("schedule-run-result")
+    expect(line.textContent).toBe("Nope.")
+    expect(line.className).toContain("text-[hsl(0_80%_80%)]")
+  })
+
+  it("one result line per modal: the next action clears it", async () => {
+    vi.mocked(api.triggerSchedule).mockResolvedValue({ launched: true, outcome: "launched" } as never)
+    vi.mocked(api.updateSchedule).mockResolvedValue({} as never)
+    const rows = await openList()
+    fireEvent.click(within(rows[0]).getByTestId("schedule-run-now"))
+    await within(screen.getAllByTestId("schedule-row")[0]).findByTestId("schedule-run-result")
+    fireEvent.click(within(screen.getAllByTestId("schedule-row")[1]).getByTestId("schedule-toggle"))
+    await waitFor(() => expect(screen.queryByTestId("schedule-run-result")).toBeNull())
+  })
+})
+
+describe("WorkflowScheduleModal 296-04 — Add schedule refuses a missing required input (287-SCHED)", () => {
+  const dummyWorkflow = { id: "wf-123", name: "Daily ETL" }
+  const definition = {
+    slug: "vendor-outreach",
+    version: 1,
+    inputs: [{ key: "to", label: "Recipient" }, { key: "note", required: false }],
+    phases: [{ slug: "emit", phase_index: 0, config: { phase_type: "llm_single" } }],
+  }
+
+  beforeEach(() => {
+    vi.clearAllMocks()
+    vi.mocked(api.listWorkflowSchedules).mockResolvedValue([])
+    vi.mocked(api.getEffectiveFeaturesPayload).mockResolvedValue({
+      features: {},
+      scheduler_process_enabled: true,
+    })
+    vi.mocked(api.createWorkflowSchedule).mockResolvedValue({} as never)
+  })
+
+  async function open() {
+    render(<WorkflowScheduleModal workflow={dummyWorkflow} definition={definition as never} onClose={vi.fn()} />)
+    const modal = await screen.findByTestId("schedule-modal")
+    await waitFor(() => expect(within(modal).getByTestId("schedule-name")).toBeInTheDocument())
+    fireEvent.change(within(modal).getByTestId("schedule-name"), { target: { value: "Weekly" } })
+    return modal
+  }
+
+  it("an empty required input is refused by name under the inputs; nothing is created; the button stays enabled", async () => {
+    const modal = await open()
+    fireEvent.click(within(modal).getByTestId("schedule-create"))
+    const refusal = await within(modal).findByTestId("schedule-required-refusal")
+    expect(refusal.textContent).toBe("Recipient is required")
+    expect(refusal.getAttribute("role")).toBe("alert")
+    expect(refusal.className).toContain("text-[12px]")
+    expect(refusal.className).toContain("text-destructive")
+    // Directly under the inputs, not at the form bottom.
+    expect(refusal.previousElementSibling?.getAttribute("data-testid")).toBe("schedule-inputs")
+    expect(api.createWorkflowSchedule).not.toHaveBeenCalled()
+    expect(within(modal).getByTestId("schedule-create")).not.toBeDisabled()
+  })
+
+  it("the refusal clears on the next keystroke in any input", async () => {
+    const modal = await open()
+    fireEvent.click(within(modal).getByTestId("schedule-create"))
+    await within(modal).findByTestId("schedule-required-refusal")
+    fireEvent.change(within(modal).getByTestId("schedule-input-note"), { target: { value: "x" } })
+    expect(within(modal).queryByTestId("schedule-required-refusal")).toBeNull()
+  })
+
+  it("filled, it creates", async () => {
+    const modal = await open()
+    fireEvent.change(within(modal).getByTestId("schedule-input-to"), { target: { value: "ops@x.test" } })
+    fireEvent.click(within(modal).getByTestId("schedule-create"))
+    await waitFor(() => expect(api.createWorkflowSchedule).toHaveBeenCalledTimes(1))
   })
 })

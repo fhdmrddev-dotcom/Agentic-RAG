@@ -3,6 +3,7 @@ seed_id: SEED-084
 title: Starter / seed workflow library (fork-a-starter)
 status: shipped
 status_note: "Shipped by Phase 287 (2026-10-19): START-03 fork isolation proven (test_287_fork_isolation.py). SC#4 one-click DEVIATED (menu + ForkNameDialog kept, A-04), operator to rule. Original body Status: dormant is superseded."
+folded_into: "287"
 surface: Agentic-RAG
 trigger_when: unset
 ---

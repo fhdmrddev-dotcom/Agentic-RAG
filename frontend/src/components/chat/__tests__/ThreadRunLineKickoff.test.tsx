@@ -102,6 +102,8 @@ vi.mock("@/lib/supabase", () => ({
 import { StreamsProvider, useStreamActions } from "@/providers/StreamsProvider"
 import { useStreamsStore } from "@/stores/streamsStore"
 import { MessageList } from "../MessageList"
+import { ThreadRunLine } from "../ThreadRunLine"
+import threadRunLineRaw from "../ThreadRunLine.tsx?raw"
 
 const THREAD = "thread-H"
 const EMPTY: Message[] = []
@@ -584,5 +586,61 @@ describe("244-13 / WR-07 — the cap_paused SSE inherits the lock's mode", () =>
     expect(lock?.mode).toBe("cap_paused")
     // …and the consequence on screen: no live run line for a run that is stopped.
     expect(screen.queryByTestId("thread-run-line")).toBeNull()
+  })
+})
+
+// ═════════════════════════════════════════════════════════════════════════════
+// Phase 293-03 (START-04 / D-24) — the origin line in BOTH states
+// ═════════════════════════════════════════════════════════════════════════════
+//
+// Step 0 measured that a workflow run's turn carries no tool_calls, so RunCard never mounts
+// for it; this line is the chat surface a workflow run actually renders. The origin comes off
+// the same persisted frame the stopped reading already uses, never the live buckets.
+
+const ORIGIN_FRAME_BASE = {
+  ...HARNESS_LIVE_FRAME,
+  origin: { kind: "key" as const, label: "n8n-prod", actor_name: null },
+}
+
+describe("293-03 — how the run started, on the thread's run line", () => {
+  it("LIVE: the origin sentence follows the live line once the frame arrives", async () => {
+    useStreamsStore.setState({ harnessKickoffThreads: new Set([THREAD]) })
+    mockGetThreadWorkflow.mockResolvedValue(ORIGIN_FRAME_BASE)
+    render(<ThreadRunLine threadId={THREAD} />)
+    const line = screen.getByTestId("thread-run-line")
+    expect(line).toHaveAttribute("data-run-line-state", "live")
+    const origin = await screen.findByTestId("run-origin")
+    expect(origin.textContent).toBe("Started by key n8n-prod")
+    expect(line.contains(origin)).toBe(true)
+  })
+
+  it("STOPPED: the stopped receipt carries the same sentence", async () => {
+    mockGetThreadWorkflow.mockResolvedValue({
+      ...ORIGIN_FRAME_BASE,
+      mode: "deep",
+      locked: false,
+      active_workflow_run_id: null,
+      last_run_status: "cancelled",
+      origin: { kind: "schedule", label: "Monday digest", actor_name: null },
+    })
+    render(<ThreadRunLine threadId={THREAD} />)
+    const line = await screen.findByTestId("thread-run-line")
+    expect(line).toHaveAttribute("data-run-line-state", "stopped")
+    expect(screen.getByTestId("run-origin").textContent).toBe("Started by schedule Monday digest")
+  })
+
+  it("an unrecorded origin shows nothing, and the line keeps one mount (G-5)", async () => {
+    mockGetThreadWorkflow.mockResolvedValue({
+      ...ORIGIN_FRAME_BASE,
+      mode: "deep",
+      locked: false,
+      active_workflow_run_id: null,
+      last_run_status: "cancelled",
+      origin: null,
+    })
+    render(<ThreadRunLine threadId={THREAD} />)
+    await screen.findByTestId("thread-run-line")
+    expect(screen.queryByTestId("run-origin")).toBeNull()
+    expect(threadRunLineRaw.split("<RunOriginLine").length - 1).toBe(1)
   })
 })

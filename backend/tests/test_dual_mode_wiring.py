@@ -2458,7 +2458,10 @@ def test_live_wf_ctx_sets_inputs_kickoff_prompt_in_source():
     # `"kickoff_prompt": body.content` as the first key (folder_id, when present, is
     # merged AFTER via **{...}) — assert that F8 substring survives across both modules.
     src = inspect.getsource(threads_mod) + inspect.getsource(wk_mod)
-    assert src.count('"kickoff_prompt": body.content') >= 2, (
+    # Phase 293-05 (D-3), retargeted on purpose: both sites now compose the kickoff from the typed
+    # text PLUS the declared launch values through ONE helper (an empty task box used to send an
+    # empty kickoff). The mirror invariant is unchanged: the same call at both sites.
+    assert src.count('"kickoff_prompt": launch_kickoff(body.content') >= 2, (
         "harness wf_ctx AND create_workflow_run must both set "
         "inputs['kickoff_prompt'] = body.content (the consumption half of SEED-047 — "
         "without it the first phase gets an empty user turn and asks for the topic)"

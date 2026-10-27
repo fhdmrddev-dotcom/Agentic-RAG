@@ -1,0 +1,22 @@
+{
+  "mode": "pinned-emit",
+  "provider": "google",
+  "model": "gemini-3.8-flash",
+  "pinned_model": "gpt-5.6-luna",
+  "pinned_provider": "openai",
+  "definition_id": "1fd55d35-01e3-4e24-b2b5-8249744e7b84",
+  "thread_id": "74b9c107-59a7-4ec2-8689-a7c982573a44",
+  "send_http": 201,
+  "send": "{\"message_id\": \"c33d4ee1-5ced-453e-b523-b8f67e8524fb\", \"run_id\": \"1443d45d-2ac2-48fe-be69-a468ae42c198\", \"model\": \"gemini-3.8-flash\", \"provider\": \"google\"}",
+  "workflow_run": {
+    "id": "bf4f0920-26be-4f28-a735-cd049d9545a8",
+    "status": "completed"
+  },
+  "emit_validated_providers": [
+    "openai"
+  ],
+  "emit_failed_on": [],
+  "failures": [],
+  "has_400": false,
+  "verdict": "PASS"
+}

@@ -260,6 +260,11 @@ interface WorkflowsPageProps {
    * door gets `undefined` and its picker keeps rendering a plain span, not a dead control.
    */
   onOpenConnections?: () => void
+  /**
+   * Phase 293-04 (D-18) — a published card's ⋯ "New API key…": `ChatLayout` writes the pre-pick,
+   * selects Settings tab "7" and navigates. Threaded straight to the cards; ABSENT ⇒ no menu item.
+   */
+  onOpenApiKeys?: (scope: { id: string; name: string }) => void
 }
 
 /**
@@ -291,7 +296,7 @@ type PageView = "library" | "builder" | "run-log"
  */
 type SourceState = "pending" | "ok" | "failed"
 
-export function WorkflowsPage({ folders, onLaunch, onOpenRun, onOpenConnections }: WorkflowsPageProps) {
+export function WorkflowsPage({ folders, onLaunch, onOpenRun, onOpenConnections, onOpenApiKeys }: WorkflowsPageProps) {
   // Phase 184.1-01: does this page host the Builder's chrome, or has the Builder taken it?
   // Fail-closed and read through the shared rule — see `useCanvasGate`'s docblock for why
   // an ancestor has to ask at all (the three bands are contributed at three nesting levels).
@@ -354,7 +359,8 @@ export function WorkflowsPage({ folders, onLaunch, onOpenRun, onOpenConnections 
     } | null
   >(null)
   // The post-publish Run CTA (sketch 023-A): set on a gauntlet PASS.
-  const [runCta, setRunCta] = useState<{ slug: string; version: number } | null>(null)
+  // 296-07 (288-F-4): `notes` — the publish verdict's auto-answered messages, shown under the line.
+  const [runCta, setRunCta] = useState<{ slug: string; version: number; notes: readonly string[] } | null>(null)
   // 192.1-03 (D-01): the fork-failure notice STATE left with the fork concern — it is the
   // hook's, and this page reads it back off `useWorkflowFork` below. The notice's RENDER stays
   // here, in the failure region it has always shared with `failedSources`; see that render
@@ -810,9 +816,9 @@ export function WorkflowsPage({ folders, onLaunch, onOpenRun, onOpenConnections 
   }, [refetchDrafts, refetchPublished])
 
   const onGauntletPublished = useCallback(
-    (version: number, slug: string) => {
+    (version: number, slug: string, notes: readonly string[]) => {
       setPageView("library")
-      setRunCta({ slug, version })
+      setRunCta({ slug, version, notes })
       refetchPublished().catch(console.error)
       refetchDrafts().catch(console.error)
     },
@@ -987,7 +993,7 @@ export function WorkflowsPage({ folders, onLaunch, onOpenRun, onOpenConnections 
                         }
                       : undefined
                   }
-                  onPublished={(version) =>
+                  onPublished={(version, notes) =>
                     // WR-04: the definition's own slug is the lookup key (the loaded
                     // definition carries it for Open/Tweak; the just-built draft
                     // carries it for a fresh build) — never the hardcoded "workflow"
@@ -1000,6 +1006,7 @@ export function WorkflowsPage({ folders, onLaunch, onOpenRun, onOpenConnections 
                         : typeof (builderInitial?.definition as { slug?: unknown } | null)?.slug === "string"
                           ? ((builderInitial!.definition as { slug: string }).slug)
                           : "workflow",
+                      notes,
                     )
                   }
                 />
@@ -1108,6 +1115,13 @@ export function WorkflowsPage({ folders, onLaunch, onOpenRun, onOpenConnections 
         >
           <span>
             Published <b>{runCtaWf.name}</b> v{runCta?.version}. Ready to run it.
+            {/* 296-07 (288-F-4 / 291-S6-F7): each verdict `auto_answered` message, verbatim, as
+                React text — the gauntlet auto-returns on success, so this is where it is seen. */}
+            {(runCta?.notes ?? []).map((note, i) => (
+              <span key={i} data-testid="run-cta-note" className="block text-[12px] text-muted-foreground">
+                {note}
+              </span>
+            ))}
           </span>
           <button
             type="button"
@@ -1284,6 +1298,7 @@ export function WorkflowsPage({ folders, onLaunch, onOpenRun, onOpenConnections 
                    ONE definition version, which is the version that will run unattended. The
                    card explains the asymmetry with `onRunLog` in its own prop docblock. */
                 onSchedule={setScheduleFor}
+                onApiKey={onOpenApiKeys}
                 onOpen={handleOpen}
                 onForkNewVersion={onForkNewVersion}
                 onForkStarter={onForkStarter}

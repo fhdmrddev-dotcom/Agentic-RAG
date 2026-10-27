@@ -2,15 +2,14 @@
 gsd_state_version: 1.0
 milestone: v4.7
 milestone_name: Workflows You Can See and Start Anywhere
-status: ready_to_plan
-last_updated: 2026-10-24T04:54:30.202Z
+status: milestone_complete
+last_updated: "2026-10-26T16:00:00.000Z"
 progress:
-  total_phases: 17
-  completed_phases: 9
-  total_plans: 44
-  completed_plans: 47
-  percent: 53
-stopped_at: Phase 292 complete (3/3) — next open phase is 293
+  total_phases: 18
+  completed_phases: 11
+  total_plans: 53
+  completed_plans: 51
+  percent: 56
 ---
 
 # Project State
@@ -29,7 +28,7 @@ See: `.planning/PROJECT.md` (updated 2026-10-18)
 
 **Core value:** The agent acts as an AI colleague — it knows your knowledge base, can run code, and
 can be taught new behaviours (skills) that persist and can be shared.
-**Current focus:** Phase 293 — Start From Outside, and Close Out
+**Current focus:** Phase 296 CLOSED 2026-10-27 — next: the operator-gated deploy of 292.1 + 293 + 296 (cloud migrations 214 → 215 → 216, each shown before it runs)
 
 ---
 
@@ -42,8 +41,20 @@ reviewer exists, so a phase closes `verification_mode: self-verified`, never `re
 
 ## Current Position
 
-Phase: 293 (Start From Outside, and Close Out) — not started. (The SDK's phase.complete pointed at 294, which is already complete and live; corrected by hand.)
+Phase: 296 (close-v4-7-debt) — CLOSED 2026-10-27, 7/7, VERIFICATION passed (`296-VERIFICATION.md`, independent_review: self). G-4 all eight scenarios PASS (3 after its fix) + optional rows 9-12 PASS (11, 12 after fixes), Claude-driven in Chrome with evidence under `evidence/g4/`. Gates: backend 69 ≤ 71 twice (set = 296-01 base), vitest count gate OK (12236, 0 failing), tsc 62 = base set, ledger/size/seeds OK. Code review (2 fresh-context passes, 111 files): 2 critical + 9 warnings resolved (10 fixed, BE-WR-01 → SEED-388), info → SEED-391. SECURITY 44/44 closed; AR-05 (chunked inbound body, prod has no proxy cap) FIXED in-phase. Post-execution fixes, each RED-first: 293-F-4, BE-CR-01 resume provider, FE-CR-01 kickoff draft, G-4 S3 re-drive stream sentinel, G-4 row 12 fresh in-thread answer, BE-WR-03, AR-05. Board: resume-model 6/6, pinned emit 6/6, multi-tool 6/6 (Moonshot 429 / OpenRouter 402 blocked). 10 bug reports closed (`01546a07d`); new: BUG-261027-01..03, SEED-388..391. OWED (operator): deploy — cloud migs 214, 215, 216 by SQL editor (each shown first), backend promote, `get_advisors(security)`; OpenRouter top-up → 292.1/291/287 rows; Moonshot reinstate; 294-ENV dev `.env` lines.
+Previous: Phase: 293 (Start From Outside, and Close Out) — CLOSED 2026-10-26. NOT deployed.
+  What shipped: API keys (one person, one org, chosen workflows, expiry 30/90/365/never); `/inbound` start + status + one-time file link; run origin (app / schedule / key) on 4 surfaces; the card shows the next run time; per-key limits in Settings; seed close-out (REG-06). Migration 215.
+  Verification passed 6/6 (`afdd5e4d1`). Operator signed G-4 2026-10-25. SECURITY 36/36 closed, 0 open (`e6026c21f`); accepted AR-05 (key lists show member/revoker emails) and AR-06 (per-IP limit sees the proxy IP behind nginx/Traefik; re-open when a proxy-aware client-IP helper lands or `/inbound` gets real outside traffic).
+  UAT 12/12 (`24a2f5692`): 1 issue (a refusal showed the raw code `workflows_disabled`), fixed under G-3 by `048dec8e9` (three reasons worded + a test that reads every backend refusal reason), re-checked live (`761b10a02`). G-7 clear.
+  Gates (293-05): backend unit 70 failed / 9855 passed (<= 71); vitest count gate OK 12102.
+  Deploy order: migration 215 to cloud FIRST, then backend; `get_advisors(security)` at that deploy.
+  Local leftovers (dev DB only): keys A2, B, C, D, P and the active `293 weekly check` schedule from 293-05; UAT key `293-uat` revoked.
+Previous: Phase: 292.1 (Tool-limit Continue that always fires) — CLOSED BY DECISION 2026-10-24, operator signed G-4. NOT deployed.
+  4 plans + review fixes + 7 live-found fixes on develop (last 90f485dd2). Verifier human_needed (no code gaps). Gates: backend 70 failed / 9595 (<=71), vitest count gate OK 11936.
+  OWED: OpenRouter DeepSeek board row (402 out of credits) — BUG-261024-03 stays `folded` until `scripts/run-2921-board.py --run --providers openrouter` passes after a top-up. Moonshot ⛔ (account suspended).
+  Deploy order: migration 214 to cloud FIRST, then backend; get_advisors(security) at that deploy.
 Previous: Phase: 292 (More Ways to Show It) — COMPLETE 2026-10-24, operator signed G-4
+  **DEPLOYED 2026-10-24: production 6db8cf40a (master e10fca283) carries 292.** Mig 213 applied to cloud first (VERIFY 8/8, advisors 0 ERROR); pre-promotion gates: deploy-drift PASS, greenfield privileges OK, schema ACL parity OK; prod /health 200, /docs 401. Operator smoke test (a diagram/comparison/timeline chat on the live domain) recommended.
   3/3 plans + review fixes on develop (last 2b4ee5998). 4/4 SC verified in code; registry 3 → 6, tool count 30. Gates: backend 70 failed (= base), vitest count gate OK 11878, tsc 63 == base.
   Mig 213 APPLIED to cloud Supabase 2026-10-24 (operator-requested; apply_migration 213_message_artifacts_more_components): VERIFY 8/8 PASS, get_advisors(security) 0 ERROR, nothing on message_artifacts (pre-existing WARN/INFO only). Cloud had 8 rows (7 chart, 1 table), all pass. Backend code not pushed yet.
   Live re-checks PASSED after the operator restarted the backend: F-1 (plain compare → comparison, both providers; WR-02 revised refuse→drop 637a1f3cf), G4-1 diagrams, G-4 reloads 6/6, browser parallel thread. OWED: operator G-4 sign-off only (292-HUMAN-UAT test 5). 375px + LA timezone ⛔ (Chrome MCP).
@@ -55,10 +66,11 @@ Previous: Phase: 292 — EXECUTING
   UAT fixes on develop: 6f3311262, d01547f50, 183cac200, 34f643ce7, e03c3c88e, f8ee7d051. Open findings + triggers: 291 deferred-items.md; BUG-261024-01 (Moonshot schema).
   Mig 212 APPLIED to cloud Supabase 2026-10-24 (verified); full-schema.sql regenerated (251b44639). Anthropic key ROTATED by the operator 2026-10-24 (the key held in old LangSmith traces is revoked).
 Previous: Phase: 290 (the-card-and-the-team-picture) — EXECUTED, human_needed (2026-10-22)
-Plan: Not started
+Plan: 1 of 5
 
 ### Roadmap Evolution
 
+- Phase 296 added (2026-10-26, operator): Close v4.7 Debt. Scope chosen: all defects in one phase (~60 items), features to v4.8; deploy after the fixes.
 - Phase 291 planned (2026-10-22, autonomous run): 5 plans in 4 waves (W1: 01 read the files · W2: 02 draft from the files ‖ 03 fill the form back · W3: 04 the describe door · W4: 05 arrival card + close-out). Research, PATTERNS, UI-SPEC (approved rev 1). Planning-time decisions D-31..D-35 added to CONTEXT; D-32 narrows D-05 (references not read at run time) and D-33 narrows D-07 (reload counted from first autosave) — owed: operator ack. Plan check passed in round 2 (2 blockers + 4 warnings fixed in round 1; W2 null-keys closed by hand). Decisions 35/35 cited in must_haves (gate parses 21; rest checked by hand). Filed BUG-261022-01. Next: `/gsd:execute-phase 291`.
 - Phase 294 added (2026-10-20, operator): Decision Engine: Rerank and Citation Check (DEC-01..03). It is outside the workflow theme, independent of 290-293, and can run any time after 289. Intake research: `phases/294-decision-engine-rerank-and-citation-check/294-INTAKE-RESEARCH.md`. `gsd-sdk query phase.add` wrote the entry under the v3.0 section; it was moved by hand into v4.7.
 - Phase 294 context gathered (2026-10-20): `phases/294-decision-engine-rerank-and-citation-check/294-CONTEXT.md` (D-01..D-24). DEC-01 amended: Jev via OpenRouter only. Next for 294: `/gsd:sketch` (D-20, G-2) before `/gsd:plan-phase 294`. Phase 290 is still the current position.
@@ -86,6 +98,9 @@ Live at `4e767a3a2` (2026-10-16): phases 280-285, migrations 207-209 in cloud. B
 
 ## Owed (operator)
 
+- 293: before deploying, paste migration 215 into the cloud Supabase SQL editor, then deploy the backend, then run `get_advisors(security)`. Bugs logged and not fixed: BUG-261025-01, -02, -03; F-2 deferred.
+- 292.1: top up OpenRouter, then run the OpenRouter board row to close BUG-261024-03; merged worktree branches undeleted (omc guardrail blocks `git branch -D`).
+
 - Confirm the Coolify rebuild from outside; run a logged-in production smoke test.
 - 282: G4-4, G4-6 (needs an approved write), A1 LangSmith nesting, Add-form click-through.
 - 281: G-4 rows A, C, D.
@@ -98,6 +113,12 @@ Live at `4e767a3a2` (2026-10-16): phases 280-285, migrations 207-209 in cloud. B
 
 ## Guardrail overrides
 
+- **Phase 296 — G-5 over the one-touch forecast, recorded not hidden (296-03, 2026-10-26):** `backend/app/services/workflow_authoring.py` (FIRES) went from 11 to 15 functions against a forecast of one condition: telling the author about connected-but-unticked services (291-S2-F3) needed a fail-closed lookup of their connections plus three small helpers. Named seam OWED: the next touch moves those helpers into their own module first. Detail: `296-03-SUMMARY.md`.
+- **Phase 296 — G-8 plan count 7, 2026-10-26:** 7 plans in 4 waves against the 3-5 target (D-14 allowed splitting W2 or W3). W2 (39 inventory rows, ~35 files) and W3 (~30 rows, ~35 files) each exceed one executor context; split along RESEARCH's 02a/02b line (296-02 run lifecycle, DB-mutating · 296-06 inbound/providers/wire) and 296-03 / 296-07 (describe backend · builder/describe UI). ≤ 2 test-running agents per wave; DB-mutating plans 01/02/05 never share a wave. Verifier, TDD RED, security review and migration discipline not cut.
+- **Phase 296 — G-5 audited reading of one-touch (D-16), written before any source edit, 2026-10-26:** `backend/app/services/harness_engine.py` (68/26, ⛔, armed seam OWED) takes FOUR one-statement touches in plan 02: (1) the boot-sweep human-input arm (BUG-261025-03); (2) one guard on the armed `action_risk_pending` write (295-RES-a); (3) one kwarg at `_compute_confidence` (289-F3); (4) one model + provider read in `_build_resume_context` (SEED-362). The named armed-block seam is NOT taken; it stays owed. `backend/app/api/runs.py` (52/22, ⛔) takes five small touches: one worded reason, one return fix, one held retry task, one select column, and DEBT-3 only if it reds. Measured counts go in 296-02-SUMMARY. Further per-file overrides (WorkflowCanvas.tsx D-09 prop pair, WorkflowBuilderPage.tsx ×5, workflow_runs.py one annotation, useTemplateFirstDraft.ts if the extraction is impossible) are collected from SUMMARYs by 296-05.
+- **Phase 296 — G-5 measured over the audited reading (296-02, 2026-10-26):** `harness_engine.py` took 4 touches, larger than one statement each: the dead boot-sweep human branch deleted + an ~8-line arm (BUG-261025-03, `_active_spec` extracted as allowed); one `if` around the armed audit (RES-a, guard reads `ctx.engine_ask_approved`, not the plan's flag); 3 lines (289-F3); ~15 lines for resume model/provider (SEED-362). `api/runs.py` took 4 (DEBT-3 did not reproduce, no change): worded reason constant, return fix, held retry (`_BACKGROUND_TASKS`/`_spawn`/`_redrive_after_lease`), select columns. Armed seam still OWED. Detail: `296-02-SUMMARY.md`.
+- **Phase 296 — G-5 on two ⛔ frontend files (296-07, 2026-10-26):** `WorkflowCanvas.tsx` (extraction FIRST) takes one controlled prop pair `view`/`onViewChange` by operator decision D-09 (useState 8 → 8); extraction still OWED. `WorkflowBuilderPage.tsx` took 6 touches against a forecast of 5 (the sixth: the describe-door lock hint + disabled sections 291-WR-01 needed); useState 16 → 17, useEffect 6 → 6. `useTemplateFirstDraft.ts` extraction taken first (move-only), no override. Detail: `296-07-SUMMARY.md`.
+- **Phase 296 — G-5 measured (296-06, 2026-10-26):** `phase_types.py` (G-5 OWED) took 3 touches against a forecast of 1-2: one precedence expression, one retry guard, one new helper `_note_pinned_model_not_run` (1 def, 4 ifs) + its call. `workflow_runs.py` (extraction FIRST): one import name + one annotation, as audited. `scheduler_service.py` and `publish_service.py` (both FIRE): one statement each, outside `files_modified` (291-S6-F8 schedule/golden arms). `workflow_authoring_doors.py` now FIRES (3 phases), row added. `test_278`'s AST fence on `_handle_execute_code` retired deliberately, reason in the test. Detail: `296-06-SUMMARY.md`.
 - **Phase 295 — G-2 (sketch before plan for UX), 2026-10-20:** not run. The operator asked for autonomous end-to-end completion. The found-nothing pause reuses `PendingAskCard`'s live-answer layout, and the unsourced mark reuses the 289 evidence-line vocabulary (295-CONTEXT D-30). The G-4 browser drive is the check. The operator may ask for a sketch of the pause card.
 - **Phase 295 — plan 05 G-5 over budget, recorded, not hidden (2026-10-21):** the work stayed one-touch in shape but exceeded the count:
   - `api/workflow_runs.py`: +5 functions. 3 do I/O, so they cannot live in the new pure `run_read_wire.py`.
@@ -126,3 +147,5 @@ Live at `4e767a3a2` (2026-10-16): phases 280-285, migrations 207-209 in cloud. B
 - **Phase 288 — drive tooling, 2026-10-19:** the live drives S1-S4 and the roster were run through headless Chromium (Playwright) and local DB reads, not the claude-in-chrome tools, which the executor did not have. Evidence: `288-VALIDATION.md`, `evidence/`.
 - **Phase 288 — plan 04 notes:** SEED-183 flipped to `answered` (generate-and-dismiss arm owed, billing) and SEED-164 to `partially-answered`; SEED-137 cited as re-run green (`test_187_armed_checkpoint_property`, `test_185_engine_attachment`). The 286 OpenAPI/AST pins and the 276 OpenAPI snapshot were deliberately re-baselined for the two additive wire fields (reason in the test docstring). `test_182_validate`'s interactive-phase case was inherited red since 200.3 and is re-pointed.
 - **Phase 288 — open defects found live (not fixed, no gap round):** F-1 Expired card offers no answer while the line says it will continue; F-2 the judge blocks a mock-answered pause workflow often; F-3 a paused run answered after its window strands `active`; F-4 the Builder closes the gauntlet on success so the `auto_answered` note is never seen. Details in `288-04-SUMMARY.md`.
+
+- **Phase 296 — post-execution fixes outside the plans, 2026-10-27 (recorded, not hidden):** G-3 fast fixes on hot files after the G-4 drive and review: `harness_engine.py` (BE-CR-01, one If), `api/runs.py` (re-drive sentinel), `StreamsProvider.tsx` ×3 (FE-CR-01, S3, row 12), `ThreadRunLine.tsx` (row 12), `inbound.py` (AR-05), `inbound_inputs.py` (BE-WR-03), plus the 7-warning merge; each RED-first with ledger rows + sections in the same commit. No `--gaps` round was opened (G-7): every item was ≤ 1 file / small or docs-only.

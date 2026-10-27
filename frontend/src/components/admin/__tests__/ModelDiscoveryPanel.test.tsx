@@ -557,3 +557,53 @@ describe("ModelDiscoveryPanel (159) — D-159-03 family-default pre-fill (three-
     expect(within(row).getByRole("spinbutton", { name: /max out for gemini-neo/i })).toHaveValue(32768)
   })
 })
+
+describe("ModelDiscoveryPanel — per-provider filter", () => {
+  it("clicking a provider card narrows new / changed / vanished to that provider; clicking again clears it", async () => {
+    const { user, container } = await runDiscovery()
+    const openaiCard = container.querySelector<HTMLElement>('[data-provider="openai"]')!
+
+    await user.click(openaiCard)
+    expect(openaiCard).toHaveAttribute("aria-pressed", "true")
+    expect(container.querySelector('[data-new-model="gpt-5.6-nova"]')).not.toBeNull()
+    expect(container.querySelector('[data-new-model="gemini-3-pro"]')).toBeNull()
+    expect(screen.queryByText("z-ai/glm-5.1")).toBeNull()
+    expect(screen.getByText("gpt-4-turbo")).toBeInTheDocument()
+
+    await user.click(openaiCard)
+    expect(openaiCard).toHaveAttribute("aria-pressed", "false")
+    expect(container.querySelector('[data-new-model="gemini-3-pro"]')).not.toBeNull()
+    expect(screen.getByText("z-ai/glm-5.1")).toBeInTheDocument()
+  })
+
+  it("an ok provider with nothing new says its models are already in the registry", async () => {
+    const { user, container } = await runDiscovery()
+    await user.click(container.querySelector<HTMLElement>('[data-provider="openrouter"]')!)
+    // openrouter has one CHANGED row, so the empty note must not show yet.
+    expect(screen.queryByTestId("provider-filter-empty")).toBeNull()
+    await user.click(screen.getByRole("button", { name: /show all providers/i }))
+    await user.click(container.querySelector<HTMLElement>('[data-provider="anthropic"]')!)
+    // anthropic had no key — it returned nothing, so "already in the registry" would be false.
+    expect(screen.queryByTestId("provider-filter-empty")).toBeNull()
+  })
+
+  it("shows the returned and new counts on an ok provider card", async () => {
+    const user = userEvent.setup()
+    const onRun = vi.fn().mockResolvedValue({
+      ...RESULT,
+      providers: RESULT.providers.map((p) => (p.provider === "openai" ? { ...p, returned: 42 } : p)),
+    })
+    const { container } = render(
+      <ModelDiscoveryPanel
+        onRunDiscovery={onRun}
+        onConfirm={vi.fn().mockResolvedValue(undefined)}
+        filterEnabled={false}
+        onSetFilter={vi.fn().mockResolvedValue(undefined)}
+      />,
+    )
+    await user.click(screen.getByRole("button", { name: /run discovery/i }))
+    await screen.findByText(/propose-only/i)
+    const card = container.querySelector<HTMLElement>('[data-provider="openai"]')!
+    expect(within(card).getByTestId("provider-counts")).toHaveTextContent("42 returned · 1 new")
+  })
+})

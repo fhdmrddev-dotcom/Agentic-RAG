@@ -1,0 +1,22 @@
+{
+  "mode": "pinned-emit",
+  "provider": "minimax",
+  "model": "MiniMax-M3",
+  "pinned_model": "deepseek-v4-pro",
+  "pinned_provider": "deepseek",
+  "definition_id": "3d75b98c-a086-4ad3-818c-5f18ac824b04",
+  "thread_id": "4dfcaf63-88b3-4378-833c-4b7257d9e799",
+  "send_http": 201,
+  "send": "{\"message_id\": \"997fbeb4-c275-4d05-a064-246229ec7497\", \"run_id\": \"e00b32f1-5546-4971-876c-5ad57ce8c5d7\", \"model\": \"MiniMax-M3\", \"provider\": \"minimax\"}",
+  "workflow_run": {
+    "id": "e34a12ed-3969-4be3-b5de-c693a639e4ad",
+    "status": "completed"
+  },
+  "emit_validated_providers": [
+    "deepseek"
+  ],
+  "emit_failed_on": [],
+  "failures": [],
+  "has_400": false,
+  "verdict": "PASS"
+}

@@ -32,6 +32,7 @@ import {
   AUTOMATION_CADENCE,
   AUTOMATION_RUNS_ITSELF,
   automationMoreCount,
+  automationNextAt,
 } from "./libraryVocabulary"
 
 export interface AutomationFacts {
@@ -39,9 +40,42 @@ export interface AutomationFacts {
   readonly phrase: string | null
   /** `+2 more`, when this row carries more than one ACTIVE schedule. `null` otherwise. */
   readonly more: string | null
+  /** 293-03 (D-25): `next Mon 26 Oct, 09:00` (or `next was due …`), off the server's instant.
+   *  `null` on every silent row and when the instant cannot be read. No hover title carries
+   *  more (the library's D-14 rule: touch has no hover), so the year shows when it differs. */
+  readonly next: string | null
 }
 
-const SILENT: AutomationFacts = { phrase: null, more: null }
+const SILENT: AutomationFacts = { phrase: null, more: null, next: null }
+
+/**
+ * 293-03 (D-25) — FORMAT ONLY. The instant is the server's soonest active schedule; nothing
+ * here works out when a schedule fires. The viewer's own time zone, en-GB parts, 24-hour.
+ */
+const NEXT_SHORT: Intl.DateTimeFormatOptions = {
+  weekday: "short",
+  day: "numeric",
+  month: "short",
+  year: "numeric",
+  hour: "2-digit",
+  minute: "2-digit",
+  hourCycle: "h23",
+}
+
+function partsOf(ms: number, options: Intl.DateTimeFormatOptions): Record<string, string> {
+  const out: Record<string, string> = {}
+  for (const p of new Intl.DateTimeFormat("en-GB", options).formatToParts(ms)) out[p.type] = p.value
+  return out
+}
+
+function nextFacts(iso: string, now: number): string | null {
+  const ms = Date.parse(iso)
+  if (!Number.isFinite(ms)) return null
+  const at = partsOf(ms, NEXT_SHORT)
+  const nowYear = partsOf(now, { year: "numeric" }).year
+  const date = `${at.weekday} ${at.day} ${at.month}${at.year === nowYear ? "" : ` ${at.year}`}`
+  return automationNextAt(`${date}, ${at.hour}:${at.minute}`, ms <= now)
+}
 
 /**
  * ⚠ OWN-PROPERTY LOOKUP, NEVER `AUTOMATION_CADENCE[cron] ?? fallback`. A coalesced bracket
@@ -75,12 +109,15 @@ function cadenceWords(cron: string | null | undefined): string | null {
  * than "runs on its own", and the humane form ("every 15 minutes") is a duration formatter
  * this file will not grow inline. Re-open when a second surface needs one.
  */
-export function automationFacts(row: {
-  nextScheduleAt?: string | null
-  nextScheduleCron?: string | null
-  nextScheduleIntervalSeconds?: number | null
-  nextScheduleCount?: number | null
-}): AutomationFacts {
+export function automationFacts(
+  row: {
+    nextScheduleAt?: string | null
+    nextScheduleCron?: string | null
+    nextScheduleIntervalSeconds?: number | null
+    nextScheduleCount?: number | null
+  },
+  now: number = Date.now(),
+): AutomationFacts {
   // Absence — either kind. See the docblock: two reasons, one silence, kept distinguishable
   // by comparing against each value rather than testing truthiness.
   if (row.nextScheduleAt === undefined || row.nextScheduleAt === null) return SILENT
@@ -91,5 +128,5 @@ export function automationFacts(row: {
   const n = row.nextScheduleCount
   const more = typeof n === "number" && n > 1 ? automationMoreCount(n - 1) : null
 
-  return { phrase, more }
+  return { phrase, more, next: nextFacts(row.nextScheduleAt, now) }
 }

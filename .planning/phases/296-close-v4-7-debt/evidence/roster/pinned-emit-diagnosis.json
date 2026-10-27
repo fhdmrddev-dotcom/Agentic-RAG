@@ -1,0 +1,13 @@
+{
+  "row": "293-F-4 pinned emit — live FAIL on a pin to gpt-5.6-luna from any non-OpenAI run provider",
+  "measured": "2026-10-27, local stack, backend at develop a3cac42da",
+  "live_board": {
+    "pin_gpt-5.6-luna": {"anthropic": "FAIL", "deepseek": "FAIL", "google": "FAIL", "minimax": "FAIL", "zhipu": "FAIL"},
+    "pin_deepseek-v4-pro": {"openai": "PASS", "anthropic": "PASS", "google": "PASS", "minimax": "PASS", "zhipu": "PASS"},
+    "control_unpinned": {"openai": "PASS", "deepseek": "PASS"}
+  },
+  "what_the_routing_does": "296-06's precedence sends the pinned shot to the PINNED model's provider: every failed row's emit_failed audit names provider=openai, model=gpt-5.6-luna, and forced_emit injects the OpenAI key with llm_base_url '' (the SDK default). Measured by patching _build_request: active_provider still reads the RUN's provider ('deepseek'), key_is_openai=True.",
+  "the_400": "One real shot (scratch pin_400.py, run settings on deepseek, shot to openai gpt-5.6-luna): BadRequestError 400 — \"Function tools with reasoning_effort are not supported for gpt-5.6-luna in /v1/chat/completions. To use function tools, use /v1/responses or set reasoning_effort to 'none'.\" (param: reasoning_effort). The same shot with run settings on openai succeeds (emit_rung=strict_force).",
+  "cause_reading": "The dispatcher resolves the API SURFACE with resolve_api_surface(model, request.user_settings). Under the run provider's settings the pinned Responses-API model is sent to /v1/chat/completions with reasoning_effort and tools, which OpenAI refuses. A pin to a chat-completions model (deepseek-v4-pro) is unaffected — every such row PASSED. Not fixed here: a product change in harness/phase_types.py / forced_emit.py (both FIRE) is a G-7 decision for the orchestrator.",
+  "evidence_files": ["pinned-emit-anthropic.json", "pinned-emit-deepseek.json", "pinned-emit-google.json", "pinned-emit-minimax.json", "pinned-emit-zhipu.json", "pinned-emit-pin-deepseek-*.json", "pinned-emit-control-*.json", "pinned-emit-openai.json"]
+}

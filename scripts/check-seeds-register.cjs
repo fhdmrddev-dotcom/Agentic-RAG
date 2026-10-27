@@ -26,6 +26,7 @@
  *   node scripts/check-seeds-register.cjs --files a.md b.md     # per-file mode (no count floor)
  *   node scripts/check-seeds-register.cjs --phase <NNN>         # trigger sweep vs files_modified
  *   node scripts/check-seeds-register.cjs --self-test           # D-04's arms, temp fixture register
+ *   node scripts/check-seeds-register.cjs --require-settled SEED-163,SEED-195   # 293-05 close-out arm
  *
  * EXIT  0 = clear · 1 = violation · 2 = harness error
  *
@@ -61,7 +62,9 @@ const root = path.resolve(__dirname, '..');
 const SEEDS_DIR = path.join(root, '.planning', 'seeds');
 
 /** A register entry. The filename is the authority for the id — frontmatter disagrees on 1+ file. */
-const SEED_FILE_RE = /^SEED-(\d{3})-.*\.md$/;
+// 296-05 (293-IN-07): `\d{3,}`, not `\d{3}` — a SEED-1000 file was invisible to every mode (driven
+// RED in a scratch copy of the register: `[unknown-seed] SEED-1000`, the file not even counted).
+const SEED_FILE_RE = /^SEED-(\d{3,})-.*\.md$/;
 
 const RED = '\x1b[31m';
 const YEL = '\x1b[33m';
@@ -484,7 +487,7 @@ function headingId(entry) {
   const body = entry.text.slice(entry.fmEnd);
   const m = body.match(/^#[ \t]+(.*)$/m);
   if (!m) return null;
-  const h = m[1].match(/SEED-(\d{3})/);
+  const h = m[1].match(/SEED-(\d{3,})/);
   return h ? h[1] : null;
 }
 
@@ -688,6 +691,41 @@ function analyse({ dir, filesModified = [], surfaces = [], selectFiles = null, m
   };
 }
 
+/**
+ * `--require-settled <SEED-id,…>` (293-05, D-28) — a close-out proves its intake seeds are SETTLED.
+ *
+ * For each LISTED id: `[unknown-seed]` when no file carries it, `[still-planted]` when its status is
+ * one that means "not decided yet" (planted, dormant, open, folded), `[no-destination]` when it has
+ * neither `folded_into` nor a `status_note` saying where it went. ⚠ SCOPED TO THE LIST on purpose: a
+ * register-wide "folded but planted" rule would red SEED-197 and SEED-297, which are deliberate
+ * partial folds. ⚠ No `STATUS_ENUM` change, so the TEMPLATE / gate / plant-seed sync rule does not fire.
+ */
+const UNSETTLED = new Set(['planted', 'dormant', 'open', 'folded']);
+
+function requireSettled(entries, ids) {
+  const out = [];
+  for (const raw of ids) {
+    const id = String(raw).trim().toUpperCase();
+    const num = (id.match(/^SEED-(\d{3,})$/) || [])[1];
+    const hits = num ? entries.filter((e) => e.id === num && statusToken(e) !== 'superseded-id') : [];
+    if (!hits.length) {
+      out.push({ code: 'unknown-seed', id, why: 'no register file carries this id' });
+      continue;
+    }
+    const e = hits[0];
+    const status = statusToken(e);
+    if (UNSETTLED.has(status)) {
+      out.push({ code: 'still-planted', id, why: `status is \`${status}\`, so the close-out never said what happened to it` });
+    }
+    const dest = keyValue(e.fm, 'folded_into');
+    const note = keyValue(e.fm, 'status_note') || statusNote(e);
+    if ((!dest || /^(null|~)$/i.test(dest)) && !note) {
+      out.push({ code: 'no-destination', id, why: 'neither `folded_into` nor `status_note` says where it went' });
+    }
+  }
+  return out;
+}
+
 // ─────────────────────────────────────────────────────────────────────────────────────────────
 // --self-test — D-04's four arms and the count assertion, made RE-RUNNABLE FOREVER
 //
@@ -838,6 +876,30 @@ function runSelfTest() {
       record(5, 'an EMPTY register raises a harness error', raised instanceof HarnessError,
         raised ? `raised ${raised.constructor.name}` : 'NOTHING was raised — the gate would have reported a clean result over zero files');
     }
+
+    // ── ARMS 6 + 7 — `--require-settled` (293-05, D-28): a LISTED seed still planted, and a
+    //    listed seed settled with no destination, each FAIL; a settled seed with one, and an
+    //    UNLISTED planted seed, do not (the arm is scoped to the list on purpose: SEED-197 and
+    //    SEED-297 are deliberate partial folds that a register-wide rule would red).
+    {
+      const d = mkdir('arm67');
+      const base = { surface: 'Agentic-RAG', trigger_when: 'never', created: '2026-01-01' };
+      writeFixture(d, 'SEED-931-still-planted.md', seed({ seed_id: 'SEED-931', title: 'still planted', status: 'planted', ...base }));
+      writeFixture(d, 'SEED-932-no-destination.md', seed({ seed_id: 'SEED-932', title: 'no destination', status: 'shipped', ...base }));
+      writeFixture(d, 'SEED-933-settled.md', seed({ seed_id: 'SEED-933', title: 'settled', status: 'shipped', folded_into: '"293"', ...base }));
+      writeFixture(d, 'SEED-934-unlisted-planted.md', seed({ seed_id: 'SEED-934', title: 'unlisted', status: 'planted', ...base }));
+      const a = analyse({ dir: d });
+      const impl = typeof requireSettled === 'function';
+      const got = impl ? requireSettled(a.entries, ['SEED-931', 'SEED-932', 'SEED-933', 'SEED-935']) : [];
+      const codes = got.map((f) => `${f.code}:${f.id}`).sort().join(',');
+      record(6, 'a LISTED planted seed FAILS [still-planted]; an unknown id FAILS [unknown-seed]',
+        impl && codes.includes('still-planted:SEED-931') && codes.includes('unknown-seed:SEED-935')
+          && !codes.includes('SEED-934') && !codes.includes('SEED-933'),
+        impl ? `got [${codes || 'none'}]` : 'requireSettled is not implemented');
+      record(7, 'a LISTED seed settled with no folded_into and no status_note FAILS [no-destination]',
+        impl && codes.includes('no-destination:SEED-932'),
+        impl ? `got [${codes || 'none'}]` : 'requireSettled is not implemented');
+    }
   } finally {
     fs.rmSync(rootTmp, { recursive: true, force: true });
   }
@@ -888,6 +950,16 @@ function main() {
     if (!phaseArg || phaseArg.startsWith('--')) fail('--phase takes a phase number, e.g. --phase 251');
     if (mode === 'files') fail('--files and --phase are different modes; give one or the other');
     mode = 'phase';
+  }
+
+  // 293-05 (D-28): `--require-settled SEED-a,SEED-b` — an empty list is a harness error, never a
+  // pass over nothing.
+  let settleIds = null;
+  const settleIdx = argv.indexOf('--require-settled');
+  if (settleIdx !== -1) {
+    const v = argv[settleIdx + 1];
+    settleIds = v && !v.startsWith('--') ? v.split(',').map((s) => s.trim()).filter(Boolean) : [];
+    if (!settleIds.length) fail('--require-settled takes a comma-separated list of SEED ids, e.g. --require-settled SEED-163,SEED-195');
   }
 
   // ⚠ The blast radius is resolved BEFORE the analysis, so the CLI is a printer over ONE pure call
@@ -992,6 +1064,21 @@ function main() {
     }
   }
 
+  let settled = [];
+  if (settleIds) {
+    settled = requireSettled(a.entries, settleIds);
+    console.log(`
+require-settled — ${settleIds.length} listed seed(s)`);
+    for (const f of settled) console.log(`  [${f.code}] ${f.id} — ${f.why}`);
+    if (!settled.length) console.log(`  ${GRN}all ${settleIds.length} settled${RST} — every listed seed has a real status and a destination.`);
+  }
+
+  if (settled.length && !(dups.length || violations.length)) {
+    console.log(`
+${RED}SEEDS REGISTER GATE FAILS${RST} — ${settled.length} listed seed(s) not settled.`);
+    return 1;
+  }
+
   if (dups.length || violations.length) {
     console.log(`
 ⛔ A register that answers an id lookup with two files, or a status scan with a token no scan knows,
@@ -1041,5 +1128,5 @@ module.exports = {
   frontmatter, readKey, keyValue, readList, stripComment,
   readRegister, assertAccounting, skippedTotal, analyse,
   STATUS_ENUM, REQUIRED_KEYS, HarnessError,
-  norm, unquote, seedDate, statusToken, statusNote,
+  norm, unquote, seedDate, statusToken, statusNote, requireSettled,
 };

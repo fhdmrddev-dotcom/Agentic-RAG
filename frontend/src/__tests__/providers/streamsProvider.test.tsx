@@ -1941,6 +1941,21 @@ describe("099-08 — kickoff refusal surfaces the server detail", () => {
     expect(useStreamsStore.getState().failedSendDrafts.get("thread-A")).toBe("my prompt")
   })
 
+  it.each([400, 422])(
+    "Test 2b — 296 review FE-CR-01: a refused WORKFLOW kickoff (%s) stashes no composer draft",
+    async (status) => {
+      // Measured live 2026-10-27: the kickoff text `Run <name>` landed in the composer, so Enter
+      // sent it as a Deep message. The kickoff text is not the person's; the refusal still records.
+      mockPostMessage.mockRejectedValueOnce(new ApiError("refused", status))
+      const { result } = renderProvider()
+      await act(async () => {
+        await result.current.sendMessage("thread-A", "Run Plain flow", { workflowDefinitionId: "wf-1" })
+      })
+      expect(useStreamsStore.getState().failedSendDrafts.has("thread-A")).toBe(false)
+      expect((useStreamsStore.getState().reconcileErrors.get("thread-A") as ApiError).status).toBe(status)
+    },
+  )
+
   it("Test 3 — 409 lock-refusal is byte-equivalent: fixed copy, temps rolled back, NO draft stashed", async () => {
     // 279-03 D-15: was new ApiError("ignored", 409) — any 409 used to mean the lock
     mockPostMessage.mockRejectedValueOnce(

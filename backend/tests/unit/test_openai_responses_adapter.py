@@ -435,7 +435,7 @@ def test_close_delegates_to_the_raw_stream():
     stream = _ClosableResponsesStream(_Raw(), "openai")
     stream.close()
     assert closed == [True]
-    assert stream.dsml_leaked is False
+    assert not hasattr(stream, "dsml_leaked")  # 292.1-REVIEW IN-03: dead flag removed with its reader
 
 
 # ── The narrow summary fallback ───────────────────────────────────────────────

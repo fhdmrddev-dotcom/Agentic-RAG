@@ -48,6 +48,7 @@ from app.services.citation_check_service import (
     upsert_check,
 )
 from app.services.citation_claims import extract_claims
+from app.services.rate_limit import enforce_user_citation_limit
 from app.services.rerank_engines import citation_check_availability
 from app.utils.db import aexec, maybe_row
 
@@ -157,6 +158,10 @@ async def post_citation_check(
     availability = citation_check_availability(user_settings)
     if not availability.available:
         raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail={"reason": availability.reason})
+
+    # 296-01 (SEED-365 / D-13): the per-user limit, BEFORE the in-flight claim, so a limited (or
+    # uncounted, Redis-down) call never sets the nx key and never reaches the paid engine.
+    await enforce_user_citation_limit(redis, user_id=str(current_user["id"]))
 
     token = secrets.token_hex(16)
     key = _inflight_key(message_id)

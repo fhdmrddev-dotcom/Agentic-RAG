@@ -79,6 +79,7 @@ from app.services.openai_service import (
 # Narrow runtime import (mirrors agent_loop.py:1637) — avoids module-load-time
 # cycle; the boundary-bytes config read MOVES IN with the boundary dicts.
 from app.models.user_settings import tool_args_progress_emit_boundary_bytes
+from app.services.provider_gateway.schema_moonshot import moonshot_tools  # 296-06 (BUG-261024-01)
 
 if TYPE_CHECKING:  # pragma: no cover
     from .dispatcher import GatewayRequest
@@ -161,46 +162,12 @@ def _accumulate_chunk_usage(
     )
 
 
-# The char DeepSeek uses in its native tool-call markup is the fullwidth vertical
-# bar U+FF5C (｜), NOT the ASCII pipe (this file is UTF-8). The opener below begins
-# a "<｜｜DSML｜｜tool_calls>" block that DeepSeek can leak into visible content.
-_DSML_OPENER = "<｜｜DSML｜｜"
-
-
-def _strip_deepseek_tool_markup(
-    text: str, pending: str, leaking: bool
-) -> tuple[str, str, bool]:
-    """Suppress DeepSeek native tool-call markup that leaked into VISIBLE content.
-
-    DeepSeek sometimes emits a tool call as plain text using its
-    ``<｜｜DSML｜｜tool_calls>…`` markup instead of the structured ``tool_calls``
-    delta (observed on long tool-chains — thread 5a86a9fd, 2026-07-08, where ~16 KB
-    of raw markup rendered in the chat). Our normalizer treats ``delta.content`` as
-    visible assistant text, so the markup leaked verbatim. Once the opener appears we
-    drop everything from it onward; any prose BEFORE it is preserved untouched.
-
-    This ONLY stops the dirty content — it does NOT re-parse the markup into a real
-    tool call, so the leaked tool does not execute (re-parse is a tracked follow-up).
-    Provider-scoped: the caller invokes this for ``deepseek`` only, so every other
-    provider's visible content stays byte-identical.
-
-    Returns ``(visible_out, new_pending, new_leaking)``. ``pending`` carries a short
-    trailing fragment that could be the opener split across streaming chunks.
-    Pure/side-effect-free — see ``test_openai_compat_dsml_strip.py``.
-    """
-    if leaking:
-        return "", "", True
-    buf = pending + text
-    idx = buf.find(_DSML_OPENER)
-    if idx != -1:
-        return buf[:idx], "", True
-    # No full opener yet — hold back the longest tail that is a prefix of the opener
-    # (it may arrive split across chunks). Everything before that tail is emitted.
-    max_tail = min(len(_DSML_OPENER) - 1, len(buf))
-    for k in range(max_tail, 0, -1):
-        if _DSML_OPENER.startswith(buf[-k:]):
-            return buf[:-k], buf[-k:], False
-    return buf, "", False
+# Phase 292.1 (D-01 / D-02): the deepseek-only DSML strip that lived here
+# (its opener constant, the strip function and the stream's leak flag) is retired
+# deliberately. It was gated on one provider name, so a DeepSeek model routed through
+# an aggregator never reached it (D-01), and its two-bar opener could not match the
+# one-bar production spelling (D-02). Tool-call markup is now owned provider-blind by
+# `app.services.text_tool_calls` in the agent loop (held live, parsed or worded).
 
 
 class _ClosableEventStream:
@@ -220,13 +187,6 @@ class _ClosableEventStream:
         self._raw = raw_stream
         self._provider = active_provider_name
         self._calling_mode = calling_mode
-        # XPROV-02b (Phase 175): set True inside _normalize the moment a DeepSeek DSML
-        # leak begins (tool-call markup written as visible text). The consumer reads it
-        # post-drain and emits the existing 'error' SSE event so the turn ends honestly
-        # instead of silently incomplete. Stays False for clean/non-deepseek streams
-        # (D-14 default-inert) — the consumer's read is getattr-defaulted so plain
-        # anthropic/google generators (which lack this attr) are byte-identical.
-        self.dsml_leaked = False
         self._gen = self._normalize()
 
     def __iter__(self):
@@ -259,12 +219,6 @@ class _ClosableEventStream:
         # BUG-260526-02: Kimi/Moonshot <think> tag state machine — adapter-local
         # stream state (one stream = one think-block tracker).
         _in_think_block: bool = False
-        # DeepSeek native tool-call markup can leak into the VISIBLE content channel
-        # on long tool-chains (thread 5a86a9fd, 2026-07-08). Per-stream state for
-        # suppressing it — see _strip_deepseek_tool_markup. deepseek-only; inert
-        # for every other provider (the caller gates on active_provider_name).
-        _dsml_leaking: bool = False
-        _dsml_pending: str = ""
         _announced_tools: set[int] = set()
         # Phase 075.6 Plan 01 / Req #3 / RESEARCH L1 / L-4: OpenAI-native and
         # OpenRouter share this normalizer (both go through the OpenAI Python SDK
@@ -345,22 +299,11 @@ class _ClosableEventStream:
                                 _remaining = ""
                     if _reasoning:
                         yield {"type": "reasoning_delta", "content": _reasoning}
-                    # DeepSeek-only: suppress native tool-call markup that leaked
-                    # into the visible channel (never re-render a raw <｜｜DSML｜｜…>
-                    # block). No-op for moonshot/minimax/zhipu — their markup differs
-                    # and this opener will simply never match.
-                    if active_provider_name == "deepseek":
-                        _visible, _dsml_pending, _dsml_leaking = (
-                            _strip_deepseek_tool_markup(
-                                _visible, _dsml_pending, _dsml_leaking
-                            )
-                        )
-                        # XPROV-02b: once the opener appears, _dsml_leaking latches
-                        # True — surface it on the instance so the consumer can emit
-                        # one honest 'error' post-drain. Idempotent; never edits the
-                        # per-chunk emit dicts or the finish dict (Option B, D-14).
-                        if _dsml_leaking:
-                            self.dsml_leaked = True
+                    # Phase 292.1 (D-01 / D-02 / D-10): tool-call markup written as text
+                    # is NOT handled here any more. The deepseek-only strip that lived
+                    # here was gated on one provider name (cause D-01) and matched the
+                    # wrong opener (D-02); text-form calls now reach the loop as ordinary
+                    # deltas for EVERY provider, where text_tool_calls owns them.
                     if _visible:
                         yield {"type": "delta", "content": _visible}
                 else:
@@ -469,18 +412,6 @@ class _ClosableEventStream:
                     "tool_calls": _fin_tcs,
                 }
 
-        # Stream-end DSML flush (XPROV-02a / Phase 175). The deepseek strip holds a
-        # short trailing fragment in _dsml_pending when a chunk ends in a partial
-        # OPENER prefix (it may be the opener split across chunks). If the stream ends
-        # while that fragment is still held AND we are NOT leaking, the fragment is
-        # real content — flush it as a final delta so a deepseek turn ending mid-prefix
-        # doesn't silently swallow it. Reachable ONLY on the deepseek path (only the
-        # deepseek-gated strip populates _dsml_pending) → every other provider is
-        # byte-identical. If we ARE leaking at stream end, flush nothing (the markup
-        # stays suppressed — the SC#2 no-dirty-render floor holds).
-        if _dsml_pending and not _dsml_leaking:
-            yield {"type": "delta", "content": _dsml_pending}
-
         # Stream end — emit the accumulated usage so the consumer SUMs it across
         # iterations (byte-identical to the pre-extraction per-chunk += for the
         # OpenAI-path providers). Only emit when a usage payload was seen.
@@ -521,7 +452,8 @@ def open_openai_compat_stream(
         model=request.model,
         user_settings=request.user_settings,
         tool_choice=request.tool_choice,
-        tools_override=request.tools,
+        # 296-06 (BUG-261024-01): a Moonshot ENDPOINT gets ref-free schemas (logic in the leaf).
+        tools_override=moonshot_tools(request.tools) if _retries_provider == "moonshot" else request.tools,
         force_tool_name=request.force_tool_name,
         strict_response_format=request.strict_schema,
         **(

@@ -40,6 +40,14 @@
  * on it.
  */
 
+// 296-07 (290-OBS-vocab) — EVERY map lookup in this module goes through `own()`. Each one reads
+// an author-supplied key (`phase_type`, `capability`, an id), and a bare `MAP[key]` returns the
+// `Object` FUNCTION for `"constructor"`. It is a module-local copy of `ownProperty.ts`'s helper,
+// NOT an import: this module still has zero imports, and its suite fences that property.
+function own<T>(table: Readonly<Record<string, T>>, key: string): T | undefined {
+  return Object.prototype.hasOwnProperty.call(table, key) ? table[key] : undefined
+}
+
 // ── Definition read shapes ──────────────────────────────────────────────────────
 // Moved VERBATIM from PhaseSpineGraph.tsx:48-71 (field sets unchanged). Their
 // looseness is deliberate and documented: the Builder refines the real definition;
@@ -208,6 +216,34 @@ export function branchConditionOf(
  * tier above it (`derivedFace` below), so a step with something bound now says what
  * it does and this sentence is the honest floor beneath that.
  */
+/**
+ * 296-07 (290-IN-02) — the words for a step with NO type, in ONE home. The library's step
+ * line (`STEP_LINE_UNTYPED`) and the team picture (`TEAM_STEP_UNTYPED`) re-export it under
+ * their shipped names rather than spelling it a second and third time.
+ */
+export const STEP_UNTYPED = "A step with no type"
+
+/**
+ * 296-07 (290-IN-01) — the ONE step order the canvas and the team picture both draw:
+ * `phase_index` first, slug as the tie-break. A missing or non-finite `phase_index` reads as
+ * 0. The canvas used to subtract `undefined` (NaN, which fell straight through to the slug)
+ * while the picture coerced to 0, so an unindexed step could sit in a different place on
+ * each view. One comparator, two callers, so they cannot drift again.
+ */
+export function comparePhaseOrder(
+  a: { phase_index?: unknown; slug?: unknown },
+  b: { phase_index?: unknown; slug?: unknown },
+): number {
+  const index = (p: { phase_index?: unknown }) =>
+    typeof p.phase_index === "number" && Number.isFinite(p.phase_index) ? p.phase_index : 0
+  const slug = (p: { slug?: unknown }) => (typeof p.slug === "string" ? p.slug : "")
+  const d = index(a) - index(b)
+  if (d !== 0) return d
+  const sa = slug(a)
+  const sb = slug(b)
+  return sa < sb ? -1 : sa > sb ? 1 : 0
+}
+
 export const PHASE_TYPE_SENTENCES: Record<string, string> = {
   programmatic: "Prepare the inputs",
   llm_single: "Write it up",
@@ -295,7 +331,7 @@ export function nodeTitle(phase: PhaseSpecJSON, ctx: NameContext = NO_NAME_CONTE
   // `?? ""` rather than a bare read: an absent `config` is a malformed author-supplied
   // row, and a projection must resolve it rather than throw (CANVAS-01 totality).
   const type = phase.config?.phase_type ?? ""
-  return PHASE_TYPE_SENTENCES[type] ?? type
+  return own(PHASE_TYPE_SENTENCES, type) ?? type
 }
 
 /**
@@ -303,8 +339,8 @@ export function nodeTitle(phase: PhaseSpecJSON, ctx: NameContext = NO_NAME_CONTE
  * `"<type label> · <slug>"`, with the raw type standing in when unmapped.
  */
 export function technicalTitle(phase: PhaseSpecJSON): string {
-  const type = phase.config.phase_type
-  const label = PHASE_TYPE_LABELS[type] ?? type
+  const type = phase.config?.phase_type ?? ""
+  const label = own(PHASE_TYPE_LABELS, type) ?? type
   return `${label} · ${phase.slug}`
 }
 
@@ -466,10 +502,11 @@ export function groundingCauseOf(
   phase: PhaseSpecJSON,
   kbTools: readonly string[],
 ): GroundingCause {
-  const rawTools = phase.config.available_tools
-  const citationPolicy = phase.config.citation_policy
+  // 296-07 (290-OBS-vocab) — `config` may be absent on a hand-edited row; read it as empty.
+  const rawTools = phase.config?.available_tools
+  const citationPolicy = phase.config?.citation_policy
   return groundingCause({
-    phaseType: phase.config.phase_type,
+    phaseType: phase.config?.phase_type ?? "",
     availableTools: Array.isArray(rawTools) ? rawTools.filter((t): t is string => typeof t === "string") : [],
     kbTools,
     groundingEscalated: phase.grounding_escalated === true,
@@ -500,7 +537,8 @@ export function intersectingKbToolOf(
   phase: PhaseSpecJSON,
   kbTools: readonly string[],
 ): string | null {
-  const rawTools = phase.config.available_tools
+  // 296-07 — guarded like its sibling now is, so the two still read `config` identically.
+  const rawTools = phase.config?.available_tools
   return firstKbTool(Array.isArray(rawTools) ? rawTools : [], kbTools)
 }
 
@@ -511,6 +549,17 @@ export function intersectingKbToolOf(
  */
 export function actionRiskArmed(phase: PhaseSpecJSON): boolean {
   return phase.action_risk_armed === true
+}
+
+/**
+ * 296-07 (290-FU-canvas) — is this step armed WHEN IT RUNS? The stored flag, OR a type the
+ * engine always arms: the backend `PhaseSpec` D-04 validator coerces every `external_action`
+ * step to `action_risk_armed = True`, and `minimalPhaseFor` writes no flag, so a fresh step
+ * arrives unflagged in memory. The canvas paints THIS, so it draws what will happen.
+ * `actionRiskArmed` above stays the plain stored read (the team ledger names its source).
+ */
+export function engineArmed(phase: PhaseSpecJSON): boolean {
+  return actionRiskArmed(phase) || phase.config?.phase_type === EXTERNAL_ACTION_PHASE_TYPE
 }
 
 // ── Phase 187 (VOCAB-01 / D-187-04, D-187-05) — THE CONFIG-DERIVED NODE FACE ────
@@ -840,9 +889,10 @@ export function derivedFace(inputs: DerivedFaceInputs): string | null {
   //     `EXTERNAL_CAPABILITY_SENTENCES` is a plain object literal, so
   //     `SENTENCES[capability]` for `"constructor"` returns the `Object` FUNCTION rather
   //     than firing any fallback — the measured hard render crash of 188.1-04. The
-  //     `runVocabulary.ts` `own()` precedent is copied INLINE and NOT imported: this
-  //     module has ZERO import statements today and this is not the change that should
-  //     give a shared-vocabulary leaf its first one.
+  //     `runVocabulary.ts` `own()` precedent is copied and NOT imported: this module has
+  //     ZERO import statements and this is not the change that should give a
+  //     shared-vocabulary leaf its first one. (296-07: the inline checks became the
+  //     module-local `own()` at the top of this file, which every lookup now shares.)
   //
   //     ⚠ NEVER FABRICATE A FACE. An unrecognised stored capability falls THROUGH to the
   //     type sentence ("Reach outside"), which is the same floor tiers (2) and (3) obey:
@@ -876,21 +926,15 @@ export function derivedFace(inputs: DerivedFaceInputs): string | null {
       return tool
     }
 
-    if (
-      typeof inputs.capability === "string" &&
-      Object.prototype.hasOwnProperty.call(EXTERNAL_CAPABILITY_SENTENCES, inputs.capability)
-    ) {
-      const verb = EXTERNAL_CAPABILITY_SENTENCES[inputs.capability]
+    // 296-07 (290-OBS-vocab) — the two inline own-property checks are now the shared `own()`.
+    const capability = typeof inputs.capability === "string" ? inputs.capability : ""
+    const verb = own(EXTERNAL_CAPABILITY_SENTENCES, capability)
+    if (verb !== undefined) {
       const destination =
         typeof inputs.connectionName === "string" ? inputs.connectionName.trim() : ""
-      if (
-        destination.length > 0 &&
-        Object.prototype.hasOwnProperty.call(
-          EXTERNAL_CAPABILITY_DESTINATION_JOINERS,
-          inputs.capability,
-        )
-      ) {
-        return `${verb} ${EXTERNAL_CAPABILITY_DESTINATION_JOINERS[inputs.capability]} ${destination}`
+      const joiner = own(EXTERNAL_CAPABILITY_DESTINATION_JOINERS, capability)
+      if (destination.length > 0 && joiner !== undefined) {
+        return `${verb} ${joiner} ${destination}`
       }
       return verb
     }
@@ -926,7 +970,7 @@ export function derivedFaceOf(
   // A `skill_ref` is a resolved UUID. A miss yields `undefined` — NEVER the raw id.
   const rawSkillRef = config.skill_ref
   const skillName =
-    typeof rawSkillRef === "string" ? ctx.skillNames?.[rawSkillRef] : undefined
+    typeof rawSkillRef === "string" && ctx.skillNames ? own(ctx.skillNames, rawSkillRef) : undefined
 
   // `folder_scope` is a LIST of ids. Only a single scoped folder can name the step:
   // a face that named one of several would be wrong, and a count is not a name.
@@ -935,7 +979,8 @@ export function derivedFaceOf(
     Array.isArray(rawScope) && rawScope.length === 1 && typeof rawScope[0] === "string"
       ? rawScope[0]
       : undefined
-  const folderName = soleFolderId !== undefined ? ctx.folderNames?.[soleFolderId] : undefined
+  const folderName =
+    soleFolderId !== undefined && ctx.folderNames ? own(ctx.folderNames, soleFolderId) : undefined
 
   // `capability` is a bare stored string (D-13), NOT an id needing a lookup, so it is
   // read behind a `typeof` guard exactly as its siblings are and handed straight through.
@@ -951,7 +996,9 @@ export function derivedFaceOf(
   // which is the same floor D-187-05 sets for every other name-reading tier.
   const rawConnectionId = config.connection_id
   const connectionName =
-    typeof rawConnectionId === "string" ? ctx.connectionNames?.[rawConnectionId] : undefined
+    typeof rawConnectionId === "string" && ctx.connectionNames
+      ? own(ctx.connectionNames, rawConnectionId)
+      : undefined
 
   const rawToolName = config.tool_name
   const toolName =
@@ -1003,7 +1050,7 @@ export function derivedFaceOf(
  * unchanged and is now FULL.
  */
 export function waitsForYou(phase: PhaseSpecJSON): boolean {
-  return phase.config.phase_type === HUMAN_INPUT_PHASE_TYPE
+  return phase.config?.phase_type === HUMAN_INPUT_PHASE_TYPE
 }
 
 /**

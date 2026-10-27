@@ -1,0 +1,22 @@
+{
+  "mode": "pinned-emit",
+  "provider": "zhipu",
+  "model": "glm-5.3-flash",
+  "pinned_model": "deepseek-v4-pro",
+  "pinned_provider": "deepseek",
+  "definition_id": "cf40c7ad-95dc-43f2-babb-cb42a6023e01",
+  "thread_id": "3715f69b-530b-49ee-896b-84e1aaed3df8",
+  "send_http": 201,
+  "send": "{\"message_id\": \"03b47144-3ca5-4356-b1e6-ef709d3edeee\", \"run_id\": \"06df3619-2530-4cd6-bcb5-c668bd9c4066\", \"model\": \"glm-5.3-flash\", \"provider\": \"zhipu\"}",
+  "workflow_run": {
+    "id": "27cb0b2c-568d-4b40-9556-9b6214cfbdd2",
+    "status": "completed"
+  },
+  "emit_validated_providers": [
+    "deepseek"
+  ],
+  "emit_failed_on": [],
+  "failures": [],
+  "has_400": false,
+  "verdict": "PASS"
+}

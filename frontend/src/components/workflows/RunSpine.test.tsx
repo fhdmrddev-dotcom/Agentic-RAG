@@ -234,7 +234,7 @@ describe("RunSpine — Phase 289 (TRUST-01 / D-10): the evidence line sits under
 })
 
 describe("RunSpine — Phase 295-05 (RUN-01 / D-04): the unsourced mark, by its words", () => {
-  const NOTE = "This output was kept without sources — it does not cite your documents."
+  const NOTE = "This output was kept without sources — it does not cite any document."
   const MARKED = [
     {
       slug: "gather",

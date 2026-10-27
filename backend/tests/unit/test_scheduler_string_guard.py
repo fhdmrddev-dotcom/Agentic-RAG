@@ -4,6 +4,10 @@ Verifies:
 1. String-scalar definition deserialization guard in `launch_scheduled_run` (CONN-11).
 2. Fallback to `row.org_id` when `schedule.org_id` is missing/null (CONN-11).
 3. Legacy default budget lift (50k -> 500k, 600s -> 1800s) and custom budget preservation (CONN-10).
+
+Phase 293: the background drive moved from ``scheduler_service._drive_run`` to
+``unattended_launch._drive_run`` (the scheduler's named seam); the patch target follows it on
+purpose, so these launches still never start a real drive.
 """
 import json
 from unittest.mock import AsyncMock, MagicMock, patch
@@ -85,7 +89,7 @@ async def test_launch_scheduled_run_parses_string_scalar_definition():
         patch("app.dependencies.get_service_role_supabase", return_value=mock_supabase) as mock_get_sb,
         patch("app.db.workflows.create_workflow_run", AsyncMock(return_value=uuid4())) as mock_create_run,
         patch("app.db.workflows.arm_run_budget", AsyncMock()) as mock_arm_budget,
-        patch("app.services.scheduler_service._drive_run", AsyncMock()),
+        patch("app.services.unattended_launch._drive_run", AsyncMock()),
     ):
         run_id = await launch_scheduled_run(schedule_row, pool=mock_pool, redis=mock_redis)
         assert run_id is not None
@@ -145,7 +149,7 @@ async def test_launch_scheduled_run_preserves_custom_low_budgets():
         patch("app.dependencies.get_service_role_supabase", return_value=mock_supabase),
         patch("app.db.workflows.create_workflow_run", AsyncMock(return_value=uuid4())) as mock_create_run,
         patch("app.db.workflows.arm_run_budget", AsyncMock()) as mock_arm_budget,
-        patch("app.services.scheduler_service._drive_run", AsyncMock()),
+        patch("app.services.unattended_launch._drive_run", AsyncMock()),
     ):
         run_id = await launch_scheduled_run(schedule_row, pool=mock_pool, redis=mock_redis)
         assert run_id is not None

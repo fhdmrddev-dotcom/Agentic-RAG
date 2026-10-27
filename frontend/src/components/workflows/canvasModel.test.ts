@@ -498,11 +498,14 @@ describe("canvasModel.toCanvas — grounded / armed (Phase 185)", () => {
     expect(phaseNodes(toCanvas(other, { kbTools: SERVER_KB_TOOLS }).nodes)[0].data.grounded).toBe(false)
   })
 
-  it("grounding_escalated marks a step with no tool at all — cause ESCALATED", () => {
+  // 296-07 (BUG-261021-05) — D-04 amended (b), 296: AMENDED DELIBERATELY. An escalated step with
+  // no document tool is checked by nothing when it runs (the engine synthesizes the gate for
+  // `detected` only), so the canvas no longer claims the seal for it.
+  it("grounding_escalated on a step with no tool at all is NOT grounded — cause ESCALATED checks nothing", () => {
     const escalated: PhaseSpecJSON[] = [
       { slug: "think", phase_index: 0, config: { phase_type: "llm_agent" }, grounding_escalated: true },
     ]
-    expect(phaseNodes(toCanvas(escalated, { kbTools: SERVER_KB_TOOLS }).nodes)[0].data.grounded).toBe(true)
+    expect(phaseNodes(toCanvas(escalated, { kbTools: SERVER_KB_TOOLS }).nodes)[0].data.grounded).toBe(false)
   })
 
   it("a stored escalation on a type that carries no dial is INERT (D-185-07)", () => {

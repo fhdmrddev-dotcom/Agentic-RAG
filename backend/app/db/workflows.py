@@ -393,6 +393,10 @@ _AUDIT_EVENT_TYPES = frozenset(
 
 
 # ── run creation (Phase 092 MODE-01 / Q5 — the net-new atomic transaction) ───
+# Phase 293 (D-22): the migration-215 CHECK's literals, mirrored for a refusal before the write.
+_RUN_ORIGIN_KINDS: frozenset[str] = frozenset({"app", "schedule", "key"})
+
+
 async def create_workflow_run(
     pool: asyncpg.Pool,
     *,
@@ -403,6 +407,10 @@ async def create_workflow_run(
     model: str | None,
     user_id: UUID,
     is_golden_run: bool = False,
+    origin_kind: str | None = None,
+    origin_label: str | None = None,
+    origin_ref: UUID | None = None,
+    provider: str | None = None,
 ) -> UUID:
     """Atomically create a workflow run + its phase rows + set the thread anchor.
 
@@ -439,6 +447,13 @@ async def create_workflow_run(
     final output the publish-path judge grades (no mocks, no opt-out); the flag
     only marks the row so the receipt VIEW (Phase 107) can distinguish "what good
     looked like at publish approval" from a normal run.
+
+    Phase 293 (D-22): ``origin_kind`` / ``origin_label`` / ``origin_ref`` (keyword-only, default
+    None — every existing caller stays byte-identical) record WHERE the run was started:
+    ``app`` (the kickoff in ``threads.py``), ``schedule`` (+ the schedule name and id), or
+    ``key`` (+ the key label and id). The origin is written ONCE here and the migration-215
+    trigger makes it immutable. Any other kind is refused before a write; the publish golden
+    run passes none, because it is a validation run, not a start (D-23).
 
     ── Migration 122 — THE DEFINITION SNAPSHOT, AND WHY IT IS WRITTEN *HERE* ────────────
 
@@ -514,16 +529,28 @@ async def create_workflow_run(
     ``backend/tests/test_migration_122.py`` asserts ``jsonb_typeof`` on every stored value; it
     went RED on the first two real runs, which is the pin working exactly as written.
 
+    296-02 (SEED-362): ``provider`` (keyword-only, default None) records the run's provider in
+    ``metadata`` in the SAME INSERT, so a resumed run continues on it. ``None`` runs the INSERT
+    text unchanged, byte for byte (``test_296_engine_touches.py`` pins it).
+
     Returns the new workflow_run id.
     """
+    if origin_kind is not None and origin_kind not in _RUN_ORIGIN_KINDS:
+        raise ValueError(f"unknown run origin kind {origin_kind!r}")
     async with pool.acquire() as con:
         async with con.transaction():
-            run_id = await con.fetchval(
-                """
-                INSERT INTO workflow_runs (thread_id, definition_id, status, inputs, model, user_id, is_golden_run, definition_snapshot)
-                VALUES ($1, $2, 'active', $3::jsonb, $4, $5, $6, $7::jsonb)
+            _insert = """
+                INSERT INTO workflow_runs (thread_id, definition_id, status, inputs, model, user_id, is_golden_run, definition_snapshot, origin_kind, origin_label, origin_ref)
+                VALUES ($1, $2, 'active', $3::jsonb, $4, $5, $6, $7::jsonb, $8, $9, $10)
                 RETURNING id
-                """,
+                """
+            _extra: tuple = ()
+            if provider is not None:  # SEED-362: the plain dict; the pool's codec encodes it
+                _insert = _insert.replace(", origin_ref)", ", origin_ref, metadata)").replace(
+                    "$10)", "$10, $11::jsonb)")
+                _extra = ({"provider": provider},)
+            run_id = await con.fetchval(
+                _insert,
                 thread_id,
                 definition_id,
                 json.dumps(inputs),
@@ -535,6 +562,10 @@ async def create_workflow_run(
                 # encodes it; handing over a string gets it encoded TWICE and stores a jsonb
                 # STRING SCALAR, which is what the first two real runs did.
                 definition.model_dump(mode="json"),
+                origin_kind,
+                origin_label,
+                origin_ref,
+                *_extra,
             )
             for ps in sorted(definition.phases, key=lambda p: p.phase_index):
                 await con.execute(
@@ -1007,7 +1038,11 @@ async def publish_definition(
 # every VALUE below still travels as ``$N`` — including the token itself, which is bound
 # as ``$5`` in the guarded UPDATE. Nothing about the injection posture changed.
 async def create_workflow_definition(
-    pool: asyncpg.Pool, *, definition: WorkflowDefinition, user_id: UUID
+    pool: asyncpg.Pool,
+    *,
+    definition: WorkflowDefinition,
+    user_id: UUID,
+    org_id: UUID | None = None,
 ) -> dict:
     """INSERT a new DRAFT definition, RETURNING ``{id, version}`` (REQ-1 create).
 
@@ -1025,17 +1060,31 @@ async def create_workflow_definition(
     Returns ``{id, version, token}`` — ``token`` is the Phase 186 (D-186-07) opaque
     concurrency token of the row as just inserted, so the client can chain its first
     autosave PATCH without a re-read.
+
+    ``org_id`` (296-01, BUG-261021-02, keyword-only): the caller's VALIDATED active org. ``None``
+    runs the EXISTING statement unchanged, so the mig-106 trigger still fills ``org_id``; a value
+    is bound as ``$6`` and the trigger keeps it verbatim.
     """
-    row = await pool.fetchrow(
+    sql = (
         f"INSERT INTO workflow_definitions (slug, version, name, status, definition, created_by, is_system_global) "
         f"VALUES ($1, $2, $3, 'draft', $4::jsonb, $5, false) "
-        f"RETURNING id, version, {CONCURRENCY_TOKEN_SQL} AS token",
+        f"RETURNING id, version, {CONCURRENCY_TOKEN_SQL} AS token"
+    )
+    args: list = [
         definition.slug,
         definition.version,
         definition.name,
         json.dumps(definition.model_dump(mode="json")),
         user_id,
-    )
+    ]
+    if org_id is not None:
+        sql = (
+            f"INSERT INTO workflow_definitions (slug, version, name, status, definition, created_by, is_system_global, org_id) "
+            f"VALUES ($1, $2, $3, 'draft', $4::jsonb, $5, false, $6) "
+            f"RETURNING id, version, {CONCURRENCY_TOKEN_SQL} AS token"
+        )
+        args.append(org_id)
+    row = await pool.fetchrow(sql, *args)
     return dict(row)
 
 
@@ -1641,7 +1690,7 @@ async def find_resumable_runs(pool: asyncpg.Pool) -> list[dict]:
     rows = await pool.fetch(
         """
         SELECT wr.id AS run_id, wr.thread_id, wr.current_phase_id, wr.inputs,
-               wr.org_id, wr.is_golden_run, t.user_id
+               wr.org_id, wr.is_golden_run, t.user_id, wr.model, wr.metadata
         FROM workflow_runs wr
         JOIN threads t ON t.id = wr.thread_id
         WHERE wr.status IN ('active', 'paused')
@@ -2137,9 +2186,14 @@ async def cancel_active_phases(pool: asyncpg.Pool, workflow_run_id: UUID) -> Non
 
     ⚠ The predicate below is written on ONE source line ON PURPOSE (193.2-08: a rule
     written WRAPPED failed its own literal ``grep -q`` and read as "already fixed").
+
+    295-IN-03 (296-02): the same UPDATE drops ``output._awaiting_answer`` (an engine ask's
+    stash: the unaccepted draft and folder names), so a Stopped step keeps nothing a raw-output
+    reader or export could ship. Only an object output can carry the stash (``stash_awaiting_answer``
+    writes one); any other output is left exactly as it is.
     """
     await pool.execute(
-        "UPDATE workflow_phases SET status='cancelled', updated_at=now(), completed_at = now() WHERE workflow_run_id = $1 AND status = 'active'",
+        "UPDATE workflow_phases SET status='cancelled', updated_at=now(), completed_at = now(), output = CASE WHEN jsonb_typeof(output) = 'object' THEN output - '_awaiting_answer' ELSE output END WHERE workflow_run_id = $1 AND status = 'active'",
         workflow_run_id,
     )
 

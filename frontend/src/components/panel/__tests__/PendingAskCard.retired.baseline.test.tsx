@@ -276,8 +276,13 @@ describe("194.1-01 — the three shipped retirement sentences, READ from source"
      * 2026-10-21 — 295 D-r2-01 RE-BASELINED 1102 → 1104, not loosened: the stack treats any
      * non-terminal run status (not only `paused`) as live, so a re-driven `active` run's next ask
      * is not retired. `useState` 7 → 7, `useEffect` 3 → 3. Retirement fences untouched and green.
+     *
+     * 2026-10-26 — 296-04 (BUG-261025-03, UI half) RE-BASELINED 1104 → 1133, not loosened: the
+     * stack keeps one ask per live workflow run (a pure helper), and the card reads a passed clock
+     * on a live workflow run as `paused` (one optional prop, one derived const). `useState` 7 → 7,
+     * `useEffect` 3 → 3. Retirement fences untouched and green.
      */
-    expect(src.split("\n").length).toBe(1104)
+    expect(src.split("\n").length).toBe(1133)
   })
 
   /** (a) The 404-expiry constant — `setExpiredMessage("…")` in the catch. */

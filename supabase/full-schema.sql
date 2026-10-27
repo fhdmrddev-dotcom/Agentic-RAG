@@ -565,10 +565,11 @@ BEGIN
 
   -- NEW: defensive personal-org provisioning — identical logic to §A, wrapped in a swallow so a
   -- failure logs a WARNING and returns normally instead of aborting the signup INSERT.
+  -- 216 (SEED-364): the org name is a constant; it no longer embeds the signup email.
   BEGIN
     IF NOT EXISTS (SELECT 1 FROM public.org_members m WHERE m.user_id = new.id) THEN
       v_org_id := public.create_org_with_default_dept(
-                    COALESCE(new.email, new.id::text) || '''s Organization', NULL, 'General');
+                    'My organization', NULL, 'General');
       INSERT INTO public.org_members (org_id, user_id, role)
       VALUES (v_org_id, new.id, 'org-admin')
       ON CONFLICT (org_id, user_id) DO NOTHING;
@@ -1197,9 +1198,84 @@ END;
 $$;
 
 
+--
+-- Name: workflow_runs_origin_immutable(); Type: FUNCTION; Schema: public; Owner: -
+--
+
+CREATE FUNCTION public.workflow_runs_origin_immutable() RETURNS trigger
+    LANGUAGE plpgsql
+    SET search_path TO ''
+    AS $$
+BEGIN
+    IF TG_OP = 'UPDATE' THEN
+        -- Assign, never RAISE: an unrelated update of a run row must keep working.
+        NEW.origin_kind := OLD.origin_kind;
+        NEW.origin_label := OLD.origin_label;
+        NEW.origin_ref := OLD.origin_ref;
+    ELSIF current_user IN ('anon', 'authenticated') THEN
+        -- A client-role INSERT (the owner insert policy) may not claim an origin.
+        NEW.origin_kind := NULL;
+        NEW.origin_label := NULL;
+        NEW.origin_ref := NULL;
+    END IF;
+    RETURN NEW;
+END;
+$$;
+
+
 SET default_tablespace = '';
 
 SET default_table_access_method = heap;
+
+--
+-- Name: api_keys; Type: TABLE; Schema: public; Owner: -
+--
+
+CREATE TABLE public.api_keys (
+    id uuid DEFAULT gen_random_uuid() NOT NULL,
+    org_id uuid NOT NULL,
+    user_id uuid NOT NULL,
+    label text NOT NULL,
+    key_prefix text NOT NULL,
+    key_hash text NOT NULL,
+    workflows jsonb NOT NULL,
+    expires_at timestamp with time zone,
+    revoked_at timestamp with time zone,
+    revoked_by uuid,
+    last_used_at timestamp with time zone,
+    created_at timestamp with time zone DEFAULT now() NOT NULL,
+    CONSTRAINT api_keys_label_check CHECK (((char_length(btrim(label)) >= 1) AND (char_length(btrim(label)) <= 60))),
+    CONSTRAINT api_keys_workflows_check CHECK (((jsonb_typeof(workflows) = 'array'::text) AND (jsonb_array_length(workflows) >= 1)))
+);
+
+
+--
+-- Name: TABLE api_keys; Type: COMMENT; Schema: public; Owner: -
+--
+
+COMMENT ON TABLE public.api_keys IS 'Phase 293 (START-02). One API key per row: one member, one org, one or more published workflows. The secret is never stored; only its SHA-256 digest. Written only by the backend pool.';
+
+
+--
+-- Name: COLUMN api_keys.key_prefix; Type: COMMENT; Schema: public; Owner: -
+--
+
+COMMENT ON COLUMN public.api_keys.key_prefix IS 'The first 13 characters of the secret (srl_live_ + 4), shown so a member can tell keys apart.';
+
+
+--
+-- Name: COLUMN api_keys.workflows; Type: COMMENT; Schema: public; Owner: -
+--
+
+COMMENT ON COLUMN public.api_keys.workflows IS 'Snapshot [{id, name}] of the workflow rows this key may start. NO foreign key on purpose: a deleted workflow still renders as a deleted chip. A key pins the workflow VERSION row it was made for, as schedules do.';
+
+
+--
+-- Name: COLUMN api_keys.expires_at; Type: COMMENT; Schema: public; Owner: -
+--
+
+COMMENT ON COLUMN public.api_keys.expires_at IS 'NULL = never expires. Re-checked on every call, as are revoked_at and the owner''s membership.';
+
 
 --
 -- Name: app_settings; Type: TABLE; Schema: public; Owner: -
@@ -1291,7 +1367,15 @@ CREATE TABLE public.app_settings (
     custom_api_key text,
     document_download_url_ttl_seconds integer DEFAULT 60 NOT NULL,
     harness_authoring_model text DEFAULT ''::text NOT NULL,
+    chat_max_tool_rounds integer DEFAULT 15 NOT NULL,
+    explorer_max_tool_rounds integer DEFAULT 8 NOT NULL,
+    api_key_starts_per_minute integer DEFAULT 10 NOT NULL,
+    api_key_reads_per_minute integer DEFAULT 120 NOT NULL,
+    CONSTRAINT app_settings_api_key_reads_per_minute_bound CHECK (((api_key_reads_per_minute >= 10) AND (api_key_reads_per_minute <= 600))),
+    CONSTRAINT app_settings_api_key_starts_per_minute_bound CHECK (((api_key_starts_per_minute >= 1) AND (api_key_starts_per_minute <= 60))),
+    CONSTRAINT app_settings_chat_max_tool_rounds_bound CHECK (((chat_max_tool_rounds >= 2) AND (chat_max_tool_rounds <= 50))),
     CONSTRAINT app_settings_download_ttl_bounds CHECK (((document_download_url_ttl_seconds >= 10) AND (document_download_url_ttl_seconds <= 900))),
+    CONSTRAINT app_settings_explorer_max_tool_rounds_bound CHECK (((explorer_max_tool_rounds >= 2) AND (explorer_max_tool_rounds <= 50))),
     CONSTRAINT app_settings_extraction_table_engine_pdf_check CHECK ((extraction_table_engine_pdf = ANY (ARRAY['camelot'::text, 'pdfplumber'::text]))),
     CONSTRAINT app_settings_hnsw_ef_search_bounds CHECK (((hnsw_ef_search IS NULL) OR ((hnsw_ef_search >= 10) AND (hnsw_ef_search <= 1000)))),
     CONSTRAINT app_settings_hnsw_iterative_scan_values CHECK (((hnsw_iterative_scan IS NULL) OR (hnsw_iterative_scan = ANY (ARRAY['off'::text, 'strict_order'::text, 'relaxed_order'::text])))),
@@ -1393,6 +1477,34 @@ COMMENT ON COLUMN public.app_settings.document_download_url_ttl_seconds IS 'Life
 
 
 --
+-- Name: COLUMN app_settings.chat_max_tool_rounds; Type: COMMENT; Schema: public; Owner: -
+--
+
+COMMENT ON COLUMN public.app_settings.chat_max_tool_rounds IS 'Phase 292.1 (BUG-261024-03). Tool rounds a general chat turn may run before it stops with the limit line and a Continue button. Default 15. Bounded 2..50 by the API (app/api/settings.py) and by app_settings_chat_max_tool_rounds_bound. Read once per run.';
+
+
+--
+-- Name: COLUMN app_settings.explorer_max_tool_rounds; Type: COMMENT; Schema: public; Owner: -
+--
+
+COMMENT ON COLUMN public.app_settings.explorer_max_tool_rounds IS 'Phase 292.1 (BUG-261024-03). Tool rounds an explorer (sub-agent) turn may run before it stops with the limit line and a Continue button. Default 8. Bounded 2..50 by the API (app/api/settings.py) and by app_settings_explorer_max_tool_rounds_bound. Read once per run.';
+
+
+--
+-- Name: COLUMN app_settings.api_key_starts_per_minute; Type: COMMENT; Schema: public; Owner: -
+--
+
+COMMENT ON COLUMN public.app_settings.api_key_starts_per_minute IS 'Phase 293 (D-14). Runs one API key may start per minute, counted in Redis across every worker. Default 10. Bounded 1..60 by the API (app/api/settings.py) and by app_settings_api_key_starts_per_minute_bound.';
+
+
+--
+-- Name: COLUMN app_settings.api_key_reads_per_minute; Type: COMMENT; Schema: public; Owner: -
+--
+
+COMMENT ON COLUMN public.app_settings.api_key_reads_per_minute IS 'Phase 293 (D-14). Run status reads one API key may make per minute, counted in Redis across every worker. Default 120. Bounded 10..600 by the API (app/api/settings.py) and by app_settings_api_key_reads_per_minute_bound.';
+
+
+--
 -- Name: audit_log; Type: TABLE; Schema: public; Owner: -
 --
 
@@ -1403,7 +1515,7 @@ CREATE TABLE public.audit_log (
     metadata jsonb DEFAULT '{}'::jsonb NOT NULL,
     created_at timestamp with time zone DEFAULT now() NOT NULL,
     org_id uuid NOT NULL,
-    CONSTRAINT audit_log_action_type_check CHECK ((action_type = ANY (ARRAY['document.upload'::text, 'document.delete'::text, 'search.query'::text, 'code.execute'::text, 'skill.load'::text, 'thread.create'::text, 'thread.delete'::text, 'settings.update'::text, 'memory.remember'::text, 'memory.recall'::text, 'feedback.submit'::text, 'view.create'::text, 'view.delete'::text, 'relationship.create'::text, 'relationship.delete'::text, 'classification.apply'::text, 'classification.rule.create'::text, 'metadata.update'::text, 'metadata.field.create'::text, 'connector.call'::text, 'connector.grant'::text, 'connector.watch.create'::text, 'connector.watch.delete'::text, 'connector.watch.sync'::text, 'retention.policy.create'::text, 'retention.policy.update'::text, 'retention.policy.delete'::text, 'retention.hold.create'::text, 'retention.hold.update'::text, 'retention.hold.release'::text, 'retention.disposition.confirm'::text, 'retention.document.unarchive'::text, 'retention.document.keep'::text, 'folder.delete'::text])))
+    CONSTRAINT audit_log_action_type_check CHECK ((action_type = ANY (ARRAY['document.upload'::text, 'document.delete'::text, 'search.query'::text, 'code.execute'::text, 'skill.load'::text, 'thread.create'::text, 'thread.delete'::text, 'settings.update'::text, 'memory.remember'::text, 'memory.recall'::text, 'feedback.submit'::text, 'view.create'::text, 'view.delete'::text, 'relationship.create'::text, 'relationship.delete'::text, 'classification.apply'::text, 'classification.rule.create'::text, 'metadata.update'::text, 'metadata.field.create'::text, 'connector.call'::text, 'connector.grant'::text, 'connector.watch.create'::text, 'connector.watch.delete'::text, 'connector.watch.sync'::text, 'retention.policy.create'::text, 'retention.policy.update'::text, 'retention.policy.delete'::text, 'retention.hold.create'::text, 'retention.hold.update'::text, 'retention.hold.release'::text, 'retention.disposition.confirm'::text, 'retention.document.unarchive'::text, 'retention.document.keep'::text, 'folder.delete'::text, 'api_key.create'::text, 'api_key.revoke'::text, 'api_key.start'::text, 'api_key.read'::text, 'api_key.refused'::text])))
 );
 
 
@@ -4346,6 +4458,10 @@ CREATE TABLE public.workflow_runs (
     input_tokens integer,
     output_tokens integer,
     token_coverage text[],
+    origin_kind text,
+    origin_label text,
+    origin_ref uuid,
+    CONSTRAINT workflow_runs_origin_kind_check CHECK (((origin_kind IS NULL) OR (origin_kind = ANY (ARRAY['app'::text, 'schedule'::text, 'key'::text])))),
     CONSTRAINT workflow_runs_status_check CHECK ((status = ANY (ARRAY['active'::text, 'paused'::text, 'cap_paused'::text, 'completed'::text, 'failed'::text, 'cancelled'::text])))
 );
 
@@ -4433,6 +4549,27 @@ COMMENT ON COLUMN public.workflow_runs.output_tokens IS 'Phase 256 (METER-03). S
 --
 
 COMMENT ON COLUMN public.workflow_runs.token_coverage IS 'Phase 256 (D-256-07 / SC#4). WHICH COUNTING LEGS this run''s totals actually include, e.g. {agent,single,batch,emit}. Written from ONE module-level constant, db.workflows.TOKEN_COVERAGE_LEGS, in the same commit as the leg it names — so a run persisted before a leg shipped reads honestly as NOT covering it, forever, with no memory required. Coverage is RECORDED, never INFERRED: deriving it from created_at against a ship date is "someone''s memory" encoded as a comparison, which SC#4 forbids. Phase 257''s METER-07 "what it cannot see" view reads THIS COLUMN, never hand-written prose. THREE states and all three are distinct: NULL = no instrumented leg ever reported usage for this run (a pre-182 row, or a run whose every leg was silent) · {} = reported, but covering nothing · a populated array = exactly the legs listed. Same grain rule as input_tokens (D-256-03) and same read rule over public.runs — sum only rows WHERE parent_run_id IS NULL (D-256-01).';
+
+
+--
+-- Name: COLUMN workflow_runs.origin_kind; Type: COMMENT; Schema: public; Owner: -
+--
+
+COMMENT ON COLUMN public.workflow_runs.origin_kind IS 'Phase 293 (START-04). app | schedule | key — what started this run. NULL on runs from before migration 215 that no schedule started. Frozen after insert (workflow_runs_origin_immutable).';
+
+
+--
+-- Name: COLUMN workflow_runs.origin_label; Type: COMMENT; Schema: public; Owner: -
+--
+
+COMMENT ON COLUMN public.workflow_runs.origin_label IS 'The schedule name or key label, snapshotted at start (renaming later never rewrites history). NULL for app starts and for a deleted schedule.';
+
+
+--
+-- Name: COLUMN workflow_runs.origin_ref; Type: COMMENT; Schema: public; Owner: -
+--
+
+COMMENT ON COLUMN public.workflow_runs.origin_ref IS 'The schedule id or API key id. A key status read is scoped by it (origin_kind = ''key'' AND origin_ref = key id).';
 
 
 --
@@ -4584,6 +4721,22 @@ COMMENT ON COLUMN public.workspace_files.library_document_id IS 'Phase 274 (ATT-
 --
 
 COMMENT ON COLUMN public.workspace_files.library_link IS 'Phase 274 (ATT-03 / D-28). saved = this attachment was saved to the Library; already = an identical document already existed. Meaningful ONLY when library_document_id is non-null (no pairing CHECK: SET NULL nulls only the FK column).';
+
+
+--
+-- Name: api_keys api_keys_key_hash_key; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.api_keys
+    ADD CONSTRAINT api_keys_key_hash_key UNIQUE (key_hash);
+
+
+--
+-- Name: api_keys api_keys_pkey; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.api_keys
+    ADD CONSTRAINT api_keys_pkey PRIMARY KEY (id);
 
 
 --
@@ -5320,6 +5473,27 @@ ALTER TABLE ONLY public.workspace_files
 
 ALTER TABLE ONLY public.workspace_file_versions
     ADD CONSTRAINT workspace_versions_file_version_unique UNIQUE (workspace_file_id, version);
+
+
+--
+-- Name: api_keys_org_id_idx; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX api_keys_org_id_idx ON public.api_keys USING btree (org_id);
+
+
+--
+-- Name: api_keys_owner_label_active_uq; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE UNIQUE INDEX api_keys_owner_label_active_uq ON public.api_keys USING btree (org_id, user_id, lower(btrim(label))) WHERE (revoked_at IS NULL);
+
+
+--
+-- Name: audit_log_api_key_id_idx; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX audit_log_api_key_id_idx ON public.audit_log USING btree (((metadata ->> 'api_key_id'::text))) WHERE (action_type ~~ 'api_key.%'::text);
 
 
 --
@@ -6555,6 +6729,20 @@ CREATE INDEX user_memory_user_updated_idx ON public.user_memory USING btree (use
 
 
 --
+-- Name: workflow_runs_origin_key_idx; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX workflow_runs_origin_key_idx ON public.workflow_runs USING btree (origin_ref) WHERE (origin_kind = 'key'::text);
+
+
+--
+-- Name: api_keys api_keys_autofill_org_id; Type: TRIGGER; Schema: public; Owner: -
+--
+
+CREATE TRIGGER api_keys_autofill_org_id BEFORE INSERT ON public.api_keys FOR EACH ROW EXECUTE FUNCTION public.autofill_org_id_by_owner('user_id');
+
+
+--
 -- Name: audit_log audit_log_autofill_org_id; Type: TRIGGER; Schema: public; Owner: -
 --
 
@@ -7115,6 +7303,20 @@ CREATE TRIGGER workflow_runs_autofill_org_id BEFORE INSERT ON public.workflow_ru
 
 
 --
+-- Name: workflow_runs workflow_runs_origin_client_insert; Type: TRIGGER; Schema: public; Owner: -
+--
+
+CREATE TRIGGER workflow_runs_origin_client_insert BEFORE INSERT ON public.workflow_runs FOR EACH ROW EXECUTE FUNCTION public.workflow_runs_origin_immutable();
+
+
+--
+-- Name: workflow_runs workflow_runs_origin_immutable; Type: TRIGGER; Schema: public; Owner: -
+--
+
+CREATE TRIGGER workflow_runs_origin_immutable BEFORE UPDATE ON public.workflow_runs FOR EACH ROW EXECUTE FUNCTION public.workflow_runs_origin_immutable();
+
+
+--
 -- Name: workflow_runs workflow_runs_set_updated_at; Type: TRIGGER; Schema: public; Owner: -
 --
 
@@ -7147,6 +7349,14 @@ CREATE TRIGGER workspace_file_versions_autofill_org_id BEFORE INSERT ON public.w
 --
 
 CREATE TRIGGER workspace_files_autofill_org_id BEFORE INSERT ON public.workspace_files FOR EACH ROW EXECUTE FUNCTION public.autofill_org_id_by_owner('created_by');
+
+
+--
+-- Name: api_keys api_keys_user_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.api_keys
+    ADD CONSTRAINT api_keys_user_id_fkey FOREIGN KEY (user_id) REFERENCES auth.users(id) ON DELETE CASCADE;
 
 
 --
@@ -8857,6 +9067,13 @@ CREATE POLICY "Users can view own skill versions" ON public.skill_versions FOR S
 
 
 --
+-- Name: api_keys Users can view their own API keys; Type: POLICY; Schema: public; Owner: -
+--
+
+CREATE POLICY "Users can view their own API keys" ON public.api_keys FOR SELECT TO authenticated USING (((org_id IN ( SELECT public.current_user_org_ids() AS current_user_org_ids)) AND (auth.uid() = user_id)));
+
+
+--
 -- Name: document_chunks Users can view their own chunks; Type: POLICY; Schema: public; Owner: -
 --
 
@@ -8910,6 +9127,12 @@ CREATE POLICY "Users can view tuner runs on own or global skills" ON public.tune
    FROM public.skills
   WHERE ((skills.id = tuner_runs.skill_id) AND (skills.is_org_shared = true))))))));
 
+
+--
+-- Name: api_keys; Type: ROW SECURITY; Schema: public; Owner: -
+--
+
+ALTER TABLE public.api_keys ENABLE ROW LEVEL SECURITY;
 
 --
 -- Name: app_settings; Type: ROW SECURITY; Schema: public; Owner: -
@@ -10345,8 +10568,9 @@ begin
   -- logs a WARNING and returns normally instead of aborting the signup INSERT.
   begin
     if not exists (select 1 from public.org_members m where m.user_id = new.id) then
+      -- migration 216 (296 / SEED-364): a constant name; it never embeds the signup email.
       v_org_id := public.create_org_with_default_dept(
-                    coalesce(new.email, new.id::text) || '''s Organization', null, 'General');
+                    'My organization', null, 'General');
       insert into public.org_members (org_id, user_id, role)
       values (v_org_id, new.id, 'org-admin')
       on conflict (org_id, user_id) do nothing;
@@ -10915,6 +11139,12 @@ REVOKE EXECUTE ON FUNCTION public.message_artifacts_immutable() FROM anon;
 REVOKE EXECUTE ON FUNCTION public.message_artifacts_immutable() FROM authenticated;
 GRANT EXECUTE ON FUNCTION public.message_artifacts_immutable() TO service_role;
 
+-- migration 215 — workflow_runs' origin freeze trigger function (Group A shape: trigger-only).
+REVOKE EXECUTE ON FUNCTION public.workflow_runs_origin_immutable() FROM PUBLIC;
+REVOKE EXECUTE ON FUNCTION public.workflow_runs_origin_immutable() FROM anon;
+REVOKE EXECUTE ON FUNCTION public.workflow_runs_origin_immutable() FROM authenticated;
+GRANT EXECUTE ON FUNCTION public.workflow_runs_origin_immutable() TO service_role;
+
 -- migration 204 — Phase 275: the hold predicates and the folder walk are service_role ONLY (W-5b);
 -- the trigger functions are trigger-only (Group A shape, no grant). Copied, not retyped.
 REVOKE EXECUTE ON FUNCTION public.retention_folder_ancestors(uuid) FROM PUBLIC;
@@ -10990,3 +11220,11 @@ REVOKE ALL ON TABLE public.message_citation_checks FROM authenticated;
 REVOKE ALL ON TABLE public.message_citation_checks FROM service_role;
 GRANT SELECT ON TABLE public.message_citation_checks TO authenticated;
 GRANT SELECT, INSERT, UPDATE, DELETE ON TABLE public.message_citation_checks TO service_role;
+
+-- migration 215 — api_keys: owners READ (column grant, key_hash never granted); only the backend writes.
+REVOKE ALL ON TABLE public.api_keys FROM PUBLIC;
+REVOKE ALL ON TABLE public.api_keys FROM anon;
+REVOKE ALL ON TABLE public.api_keys FROM authenticated;
+REVOKE ALL ON TABLE public.api_keys FROM service_role;
+GRANT SELECT (id, org_id, user_id, label, key_prefix, workflows, expires_at, revoked_at, revoked_by, last_used_at, created_at) ON TABLE public.api_keys TO authenticated;
+GRANT SELECT, INSERT, UPDATE, DELETE ON TABLE public.api_keys TO service_role;

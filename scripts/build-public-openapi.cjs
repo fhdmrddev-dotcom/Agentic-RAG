@@ -49,9 +49,13 @@ const TITLE = "Syrel API"
 // sends). The copy now says what is true: bearer-only, for scripts/curl; browsers use this reference.
 const DESCRIPTION =
   "The HTTP API behind Syrel's own interface.\n\n" +
-  "**Authentication.** Syrel has no API keys, personal access tokens or service accounts today. " +
-  "A script authenticates as a signed-in user and sends that user's token " +
-  "(`Authorization: Bearer <token>`). The planned answer is SEED-013 (Open Platform).\n\n" +
+  // Phase 293 (D-20): API keys shipped; the old "Syrel has no keys" sentence is retired on purpose.
+  "**Authentication.** There are two ways in. A script can sign in as a user and send that user's " +
+  "token (`Authorization: Bearer <token>`), or use an API key made in Settings → API keys " +
+  "(`Authorization: Bearer srl_live_…`). A key starts only the published workflows it lists, runs " +
+  "as the person who made it, and is rate limited; it can call only the `/inbound` endpoints. " +
+  "Webhooks, personal access tokens and service accounts are not available today; they are part of " +
+  "the Open Platform plan (SEED-013).\n\n" +
   "**Organizations.** Requests that act inside an organization send its id in the `X-Org-Id` header.\n\n" +
   "Operator (`/admin`) endpoints are not listed here; they answer 404 to anyone who is not an " +
   "operator.\n\n" +
@@ -118,13 +122,13 @@ const TAG_GROUPS = [
   },
   {
     name: "Automation",
-    tags: ["workflows", "schedules", "workflow-runs", "skills", "skill-evals", "skill-test-cases", "skill-tuner"],
+    tags: ["workflows", "schedules", "workflow-runs", "inbound", "skills", "skill-evals", "skill-test-cases", "skill-tuner"],
   },
   { name: "Connect", tags: ["connectors", "sources"] },
   { name: "Experts", tags: ["experts"] },
   {
     name: "Account & org",
-    tags: ["org", "preferences", "features", "model-registry", "settings", "audit", "feedback"],
+    tags: ["org", "api-keys", "preferences", "features", "model-registry", "settings", "audit", "feedback"],
   },
   { name: "System", tags: [SYSTEM_TAG] },
 ]

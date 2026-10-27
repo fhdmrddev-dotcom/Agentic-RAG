@@ -610,7 +610,10 @@ async def _is_current_question(run_id: UUID, tool_call_id: str) -> bool:
     return bool(pending) and str(pending.get("tool_call_id")) == str(tool_call_id)
 
 
-_REDRIVE_FAILED_REASON = "Your answer was saved, but the run could not continue."
+#: 295-IN-07 (296-02): the ONE sentence a failed answer re-drive ends with. The failed phase, the
+#: ``run_failed`` audit (which the run page reads as "Why it stopped"), the emit and the producer
+#: shell's error all carry it, so no code-like string can surface as a reason.
+REDRIVE_FAILED_REASON = "The run couldn't continue after the answer was given."
 # 289-REVIEW WR-06: the paused run's definition could not be loaded, so it was never re-driven.
 _REDRIVE_NO_DEFINITION_REASON = "Your answer was saved, but the workflow could not be loaded."
 
@@ -623,7 +626,7 @@ async def _fail_redrive(
     redis=None,
     stream_run_id=None,
     from_statuses: tuple[str, ...] = ("active",),
-    reason: str = _REDRIVE_FAILED_REASON,
+    reason: str = REDRIVE_FAILED_REASON,
 ) -> None:
     """End a paused run whose re-drive could not continue: `failed`, with words (D-12 / SEED-360).
 
@@ -667,7 +670,7 @@ async def _fail_redrive(
         await finish_run(pool, run_id, "failed")
         await write_audit(
             pool, run_id, user_id=owner_user_id, event_type="run_failed",
-            metadata={"reason": "ask_user re-drive failed"},
+            metadata={"reason": reason},  # 295-IN-07: the worded sentence, never a code
         )
     except Exception:
         logger.exception("ask_user_response: could not end failed re-drive for run %s", run_id)
@@ -681,7 +684,30 @@ async def _fail_redrive(
             logger.warning("ask_user_response: run_failed emit failed for run %s", run_id)
 
 
-async def _redrive_paused_workflow_run(run_id: UUID, tool_call_id: str, redis) -> bool:
+#: 289-WR-06b (296-02): held references for the one delayed re-drive retry (run_transport's P9
+#: shape) — a bare ``create_task`` can be garbage-collected mid-sleep.
+_BACKGROUND_TASKS: set[asyncio.Task] = set()
+
+
+def _spawn(coro) -> asyncio.Task:
+    """Schedule a fire-and-forget coroutine and retain a strong reference until it is done."""
+    t = asyncio.create_task(coro)
+    _BACKGROUND_TASKS.add(t)
+    t.add_done_callback(_BACKGROUND_TASKS.discard)
+    return t
+
+
+async def _redrive_after_lease(run_id: UUID, tool_call_id: str, redis) -> None:
+    """289-WR-06b: ONE retry once the claim lease has expired. A second lost claim logs and
+    stops (``_retry=False``) — never a loop. A run that is no longer ``paused`` by then (the
+    claimant re-drove it) is simply not found."""
+    await asyncio.sleep(settings.harness_resume_lease_seconds + 1)
+    await _redrive_paused_workflow_run(run_id, tool_call_id, redis, _retry=False)
+
+
+async def _redrive_paused_workflow_run(
+    run_id: UUID, tool_call_id: str, redis, *, _retry: bool = True
+) -> bool:
     """Wake a `paused` workflow run in-process after its human gate has been answered.
 
     ⚠ **WITHOUT THIS, D-10's OWN SENTENCE IS FALSE.** *"Answering later still resumes;
@@ -692,7 +718,8 @@ async def _redrive_paused_workflow_run(run_id: UUID, tool_call_id: str, redis) -
     resumes *only when the server next restarts* — and the UI would have to SAY so, which
     is a wording nobody should ship. RESEARCH's option (b), taken.
 
-    Returns True if a re-drive was spawned. Every other path returns False, and **no path
+    Returns True if a re-drive was spawned — and ONLY then (289-IN-05, 296-02). Every other
+    path returns False, including a context build that failed and ended the run, and **no path
     raises**: the caller's persist has already succeeded and the answer is durable, so a
     failure here must never turn a recorded answer into a non-200 (the same posture
     Step 4's PUBLISH already takes, for the same reason).
@@ -739,7 +766,7 @@ async def _redrive_paused_workflow_run(run_id: UUID, tool_call_id: str, redis) -
     row = await pool.fetchrow(
         """
         SELECT wr.id AS run_id, wr.thread_id, wr.current_phase_id, wr.inputs,
-               wr.org_id, wr.is_golden_run, t.user_id
+               wr.org_id, wr.is_golden_run, t.user_id, wr.model, wr.metadata
         FROM workflow_runs wr
         JOIN threads t ON t.id = wr.thread_id
         WHERE wr.id = $1
@@ -754,6 +781,8 @@ async def _redrive_paused_workflow_run(run_id: UUID, tool_call_id: str, redis) -
     if not await claim_run(pool, run_id, settings.harness_resume_lease_seconds):
         # Somebody else (the boot sweep, or a racing second answer) owns this run.
         logger.info("ask_user_response: re-drive skipped, run %s already claimed", run_id)
+        if _retry:  # 289-WR-06b: one held retry after the lease, so the answer is not stranded
+            _spawn(_redrive_after_lease(run_id, tool_call_id, redis))
         return False
 
     definition = await _load_run_definition(pool, run_id)
@@ -782,11 +811,12 @@ async def _redrive_paused_workflow_run(run_id: UUID, tool_call_id: str, redis) -
         ctx.resume_answered_tool_call_id = tool_call_id
     except Exception:
         # The run is already `active` here, so a raise must not reach the route's belt and
-        # leave it stranded (D-12). The answer stays recorded; the run ends truthfully, and
-        # True is returned because the only caller ignores the value.
+        # leave it stranded (D-12). The answer stays recorded; the run ends truthfully.
+        # ~~True is returned because the only caller ignores the value~~ 289-IN-05: nothing
+        # was spawned, so False.
         logger.exception("ask_user_response: re-drive context failed for run %s", run_id)
         await _fail_redrive(pool, run_id, row["user_id"], redis=redis)
-        return True
+        return False
 
     async def _wake():
         _failed = False
@@ -844,7 +874,7 @@ async def _redrive_paused_workflow_run(run_id: UUID, tool_call_id: str, redis) -
                         pool,
                         run_id=_pid,
                         status=resume_shell_status(_escape),
-                        error="ask_user re-drive failed" if _failed else None,
+                        error=REDRIVE_FAILED_REASON if _failed else None,
                         completed_at=_dt.now(_tz.utc),
                         message_id=None,
                         input_tokens=_in_tok,
@@ -854,6 +884,23 @@ async def _redrive_paused_workflow_run(run_id: UUID, tool_call_id: str, redis) -
                     logger.exception(
                         "ask_user_response: producer-shell finalize failed for %s", _pid
                     )
+                # 296 G-4 S3: end the shell's stream as run_producer does (finalize → sentinel →
+                # EXPIRE); without it a follow's SSE waits out the consumer timeout and its
+                # onTerminal reconcile never runs.
+                try:
+                    from app.api.threads import _emit_terminal  # noqa: PLC0415
+                    from app.services.harness.run_handoff import (  # noqa: PLC0415
+                        resume_shell_status,
+                    )
+
+                    _status = resume_shell_status(_escape)
+                    await _emit_terminal(
+                        redis, _pid, _RUN_STATUS_TO_TERMINAL_TYPE[_status],
+                        **({"error": REDRIVE_FAILED_REASON} if _failed else {}),
+                    )
+                    await redis.expire(f"run:{_pid}", 600 if _status == "completed" else 60)
+                except BaseException:
+                    logger.exception("ask_user_response: shell terminal sentinel failed for %s", _pid)
             RUN_TASKS.pop(run_id, None)
 
     _t = asyncio.create_task(_wake())
@@ -1151,6 +1198,44 @@ def resolve_phase_available_tools(definition, active_slug: str) -> list:
     return []
 
 
+#: 292.1-REVIEW WR-03: the 409 a Continue gets when another Continue already claimed this pause
+#: (the counter compare-and-set matched no row). The typed-continue gate keys on this exact detail.
+CONTINUE_ALREADY_CLAIMED = "This Continue is already under way."
+
+
+async def _deep_run_is_paused(row: dict, run_id: UUID) -> bool:
+    """292.1-REVIEW CR-01: is this terminal-looking Deep run actually a tool-limit pause?
+
+    Only ``completed`` can be (a first-turn pause finalizes ``completed`` by design — run_producer);
+    ``failed`` / ``cancelled`` / ``timed_out`` never are, and never cost a read. The decision itself
+    lives in ONE place, ``app.db.runs.run_is_cap_paused``, org-scoped by the run's own org exactly
+    as the Deep consume's carrier read below is."""
+    if row.get("status") != "completed":
+        return False
+    from app.db.runs import run_is_cap_paused  # noqa: PLC0415
+    from app.dependencies import get_pg_pool  # noqa: PLC0415
+
+    _org = row.get("org_id")
+    return await run_is_cap_paused(
+        await get_pg_pool(), run_id, org_id=UUID(_org) if isinstance(_org, str) else _org
+    )
+
+
+async def _stream_tail_id(redis, run_id: UUID) -> str | None:
+    """292.1 UAT — the last entry id of ``run:{run_id}``: ``"0"`` when the buffer is gone (the
+    continuation re-creates it), ``None`` when Redis cannot be read (the Continue still proceeds;
+    the browser then follows nothing, as before)."""
+    try:
+        entries = await redis.xrevrange(f"run:{run_id}", count=1)
+    except Exception:  # noqa: BLE001 — a read never fails the Continue
+        logger.warning("continue: tail read of run:%s failed; no stream_since", run_id, exc_info=True)
+        return None
+    if not entries:
+        return "0"
+    entry_id = entries[0][0]
+    return entry_id.decode() if isinstance(entry_id, (bytes, bytearray)) else str(entry_id)
+
+
 @router.post("/{run_id}/continue", status_code=200)
 async def continue_run(
     run_id: UUID,
@@ -1171,7 +1256,8 @@ async def continue_run(
         # Phase 163 (D-05): pull org_id off the RLS-verified run row so the Deep
         # continuation's cap-paused read (load_cap_paused_tool_calls) can carry an
         # org-scoping predicate on the service-role pool (belt-and-suspenders).
-        .select("run_id, status, thread_id, continues_used, org_id")
+        # 292.1 (orchestrator ruling 4): model + provider too — a Continue resumes on the run's own.
+        .select("run_id, status, thread_id, continues_used, org_id, model, provider")
         .eq("run_id", str(run_id))
         .eq("user_id", current_user["id"])
         .maybe_single()
@@ -1247,6 +1333,19 @@ async def continue_run(
         wf_row = wf_resp.data if wf_resp is not None else None
         if wf_row is not None:
             continues_used = wf_row.get("continues_used") or 0
+    elif row.get("status") in _TERMINAL_RUN_STATUSES and not await _deep_run_is_paused(row, run_id):
+        # ── SEED-324 (folded into 292.1): a Deep run that already FINISHED has nothing to
+        # continue. Refused before the counter write and the spawn, so a stale card or a replayed
+        # request cannot re-drive a completed / failed run. A 409, not the `refused` payload: the
+        # Continue card reads `refused` as "Continue limit reached". `streaming` is deliberately
+        # NOT refused — the cap_paused SSE event precedes the finalizer's status write, so a fast
+        # press legitimately sees `streaming`. Harness anchors keep their own rule (branch above).
+        # ⚠ 292.1-REVIEW CR-01: "terminal" alone is NOT "finished" — a FIRST-turn pause finalizes
+        # as `completed` by design, so `completed` asks the carrier-aware predicate first.
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail="This run has already finished, so there is nothing to continue. Start a new message to keep going.",
+        )
 
     # ── Step 3: refuse the 4th Continue server-side (D-06 / T-092-10) ──
     # Durable counter — never an in-memory count (WORKER_COUNT=2). No spawn.
@@ -1266,6 +1365,7 @@ async def continue_run(
 
     # ── Step 4: transactionally increment continues_used on the carrying row ──
     _new_used = continues_used + 1
+    _claimed = True
     try:
         if active_workflow_run_id is not None:
             await aexec(
@@ -1278,20 +1378,31 @@ async def continue_run(
             # the user-JWT client matched 0 rows in silence and the Continue cap never counted.
             # Ownership was proven by the RLS read above; the service client writes, and the
             # UPDATE keeps its own user_id scope because that client bypasses RLS.
-            await aexec(
+            # 292.1-REVIEW WR-03: a COMPARE-AND-SET on the counter this request read. Two Continues
+            # for one pause (the button + a typed "continue", or a double press) both read N; only
+            # one UPDATE still matches `continues_used = N`, so only one spawns a continuation. The
+            # loser matched 0 rows and is refused below — never a second loop on the same run_id.
+            _claim = await aexec(
                 service_supabase.table("runs")
                 .update({"continues_used": _new_used, "status": "streaming"})
                 .eq("run_id", str(run_id))
                 .eq("user_id", current_user["id"])
+                .eq("continues_used", continues_used)
             )
+            _claimed = bool(_claim is not None and _claim.data)
     except Exception:
         logger.exception("continue: continues_used increment failed for run %s", run_id)
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail="Failed to record continue",
         )
+    if not _claimed:
+        logger.info("continue: run %s was already claimed by another Continue (counter moved past %d)",
+                    run_id, continues_used)
+        raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail=CONTINUE_ALREADY_CLAIMED)
 
     # ── Step 5: branch — Harness re-drive vs Deep consume ──
+    _stream_since: str | None = None  # Deep only (292.1 UAT); set just before the spawn below
     if active_workflow_run_id is not None:
         # Harness: re-read available_tools from the definition (D-08) + re-drive.
         from app.services.harness_engine import (  # noqa: PLC0415
@@ -1585,6 +1696,10 @@ async def continue_run(
         dropped = await load_cap_paused_tool_calls(
             pool, thread_uuid, org_id=_cont_org_uuid
         )
+        # 292.1 UAT (run 5549031c): the continuation XADDs to this SAME run:{id}, which still holds
+        # the paused segment's events and its `done` (the wire carries no ids). The tail read
+        # BEFORE the spawn is the offset the browser follows from; read after, events could be lost.
+        _stream_since = await _stream_tail_id(redis, run_id)
         await spawn_continuation_run(
             run_id=run_id,
             thread_id=thread_id,
@@ -1600,6 +1715,10 @@ async def continue_run(
             # Phase 163 (D-05/D-09): the Deep continuation producer is service-role.
             supabase=service_supabase,
             dropped_tool_calls=dropped,
+            # 292.1 (orchestrator ruling 4): resume on the run's OWN model/provider, never the
+            # operator default. None-safe: a row without them continues exactly as before.
+            model=row.get("model"),
+            provider=row.get("provider"),
         )
 
     _resp = {
@@ -1613,6 +1732,8 @@ async def continue_run(
     # the Harness re-drive mints one; the Deep consume path keeps the same run_id.
     if active_workflow_run_id is not None:
         _resp["producer_run_id"] = str(_producer_id)
+    elif _stream_since is not None:
+        _resp["stream_since"] = _stream_since
     return _resp
 
 

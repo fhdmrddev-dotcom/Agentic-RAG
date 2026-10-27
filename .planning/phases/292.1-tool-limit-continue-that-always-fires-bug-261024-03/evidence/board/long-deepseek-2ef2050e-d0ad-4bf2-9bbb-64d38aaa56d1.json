@@ -1,0 +1,135 @@
+{
+  "provider": "deepseek",
+  "model": "deepseek-v4-pro",
+  "prompt_bytes": 6658,
+  "verdict": "PASS",
+  "classification": "text-pause",
+  "run_id": "2ef2050e-d0ad-4bf2-9bbb-64d38aaa56d1",
+  "continue": {
+    "http": 200,
+    "body": {
+      "status": "ok",
+      "run_id": "2ef2050e-d0ad-4bf2-9bbb-64d38aaa56d1",
+      "continues_used": 1,
+      "continues_remaining": 2
+    },
+    "status_after": "completed",
+    "same_run_id": true,
+    "continues_used_before": 0,
+    "continues_used_after": 1,
+    "continues_used_plus_1": true,
+    "model_provider_unchanged": true,
+    "model_provider": [
+      "deepseek-v4-pro",
+      "deepseek"
+    ],
+    "tool_starts_after_resume": [
+      "search_documents",
+      "execute_code"
+    ],
+    "carrier_first_call": "search_documents",
+    "queued_call_ran_first": true,
+    "events_after_resume": [
+      "citations",
+      "code_executing",
+      "code_execution_complete",
+      "code_execution_start",
+      "code_stdout",
+      "confidence",
+      "delta",
+      "done",
+      "final_output_files",
+      "iteration_start",
+      "planning",
+      "reasoning_delta",
+      "sources",
+      "stream_end",
+      "suggestions",
+      "tool_args_progress",
+      "tool_end",
+      "tool_preparing",
+      "tool_start",
+      "turn_boundary"
+    ]
+  },
+  "markup_hits": [],
+  "threads": [
+    "f8a78671-4768-4752-90bd-73887225e516"
+  ],
+  "prompt": "Here is our project plan, inlined in full.\n\n- Milestone 1: Q2 2026 \u2014 workstream B delivers deliverable 1 after review by the steering group; dependencies: milestone 1; risk: medium; owner: team G.\n- Milestone 2: Q3 2026 \u2014 workstream C delivers deliverable 2 after review by the steering group; dependencies: milestone 1; risk: medium; owner: team H.\n- Milestone 3: Q4 2026 \u2014 workstream D delivers deliverable 3 after review by the steering group; dependencies: milestone 2; risk: medium; owner: team I.\n- Milestone 4: Q1 2026 \u2014 workstream E delivers deliverable 4 after review by the steering group; \u2026",
+  "attempts": [
+    {
+      "thread_id": "f8a78671-4768-4752-90bd-73887225e516",
+      "run_id": "2ef2050e-d0ad-4bf2-9bbb-64d38aaa56d1",
+      "status": "completed",
+      "paused": true,
+      "run": {
+        "run_id": "2ef2050e-d0ad-4bf2-9bbb-64d38aaa56d1",
+        "thread_id": "f8a78671-4768-4752-90bd-73887225e516",
+        "status": "completed",
+        "model": "deepseek-v4-pro",
+        "provider": "deepseek",
+        "continues_used": 0,
+        "started_at": "2026-10-24 08:58:00.891602+00:00",
+        "error": null
+      },
+      "classification": "text-pause",
+      "carrier": [
+        {
+          "kind": "iteration_cap_paused",
+          "name": "search_documents",
+          "arguments": "{\"query\": \"milestones deliverable review steering group quarter milestones per quarter\"}",
+          "tool_call_id": "call_13d70d48ea324049ba9f8565",
+          "reasoning_content": "The search for \"project plan\" returned PMO governance framework documents, which are about a different project plan (PMO governance implementation), not the inlined project plan with milestones 1-40 and workstreams A-F. The inlined content in the user's message is the actual project plan they provided. The documents found don't match the inlined plan. But the user's instruction is to search documents for the project plan, then milestones, then draw chart. The inlined plan is the source of truth for the chart. The search results are about PMO governance, not the inlined plan.\n\nLet me proceed to step 2 as instructed: search again for milestones."
+        }
+      ],
+      "tool_starts": [
+        "search_documents"
+      ],
+      "event_types": [
+        "cap_paused",
+        "citations",
+        "confidence",
+        "delta",
+        "done",
+        "iteration_start",
+        "planning",
+        "reasoning_delta",
+        "sources",
+        "stream_end",
+        "suggestions",
+        "tool_end",
+        "tool_preparing",
+        "tool_start",
+        "turn_boundary"
+      ],
+      "cap_paused_event": {
+        "type": "cap_paused",
+        "kind": "iteration_cap_paused",
+        "message": "\u23f8 Reached the iteration limit \u2014 1 tool(s) weren't run yet. Continue to run them.",
+        "tool_names": [
+          "search_documents"
+        ],
+        "continues_used": 0,
+        "continues_remaining": 3
+      },
+      "live_markup_at": null,
+      "live_preview": "I'll do these three steps one at a time, waiting for each result before proceeding.\n\n**Step 1: Search for the project plan.**Step 1 complete. The search surfaced PMO governance documents, not the inlined plan with workstreams A\u2013F.\n\n**Step 2: Search for milestones.**\n\n",
+      "redis_last_id": "1792832296339-0"
+    }
+  ],
+  "paused": true,
+  "reload": {
+    "f8a78671-4768-4752-90bd-73887225e516": {
+      "http": 200,
+      "equal": true,
+      "compared": 2,
+      "diffs": [],
+      "db_rows_not_in_reload": []
+    }
+  },
+  "tools_used": [
+    "execute_code",
+    "search_documents"
+  ]
+}

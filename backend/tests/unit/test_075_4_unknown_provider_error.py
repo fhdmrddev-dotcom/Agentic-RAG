@@ -141,8 +141,29 @@ def test_provider_base_urls_is_single_source_of_truth() -> None:
 def test_known_providers_includes_all_five_providers() -> None:
     """Sanity: the 5 providers currently shipped (openai, anthropic, google,
     openrouter, ollama) are all in _PROVIDER_BASE_URLS. If you add a 6th,
-    update this test + the UAT scoreboard recipe in CLAUDE.md."""
+    update this test + the UAT scoreboard recipe in CLAUDE.md.
+
+    ⚠ RE-DERIVED at 296-05 (inventory row 292.1-test_075_4). The set grew 5 → 11 and this pin
+    was never updated, so it was the one standing red inside the gated ``tests/unit`` set.
+    Every addition is dated, found with ``git log -S '"<key>": ' -- backend/app/config.py``:
+
+    | Added                     | Commit      | Phase                                         |
+    |---------------------------|-------------|-----------------------------------------------|
+    | deepseek, moonshot,       | ``ce05de972`` | 076.1-01 (2026-05-25) — 4 curated direct    |
+    | minimax, zhipu            |             | providers                                     |
+    | lmstudio                  | ``bf7f34e33`` | 111-01 (2026-06-15)                         |
+    | custom                    | ``0b7cde5d8`` | mig 180 quick task (2026-09-12) — SEED-173  |
+
+    The name is kept so the failing-id set reads this test moving from red to green; the
+    function still answers its original question (a provider was added or removed silently).
+    The UAT roster in CLAUDE.md is derived from ``MODEL_CAPABILITIES``, never from this map.
+    """
     from app.config import _PROVIDER_BASE_URLS
 
-    expected = {"openai", "anthropic", "google", "openrouter", "ollama"}
+    expected = {
+        "openai", "anthropic", "google", "openrouter", "ollama",  # 075.4's five
+        "deepseek", "moonshot", "minimax", "zhipu",  # 076.1-01
+        "lmstudio",  # 111-01
+        "custom",  # mig 180 (SEED-173)
+    }
     assert set(_PROVIDER_BASE_URLS.keys()) == expected

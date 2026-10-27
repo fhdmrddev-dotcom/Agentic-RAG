@@ -1,0 +1,22 @@
+{
+  "mode": "pinned-emit",
+  "provider": "anthropic",
+  "model": "claude-opus-5-5",
+  "pinned_model": "deepseek-v4-pro",
+  "pinned_provider": "deepseek",
+  "definition_id": "aa35cad3-226e-4651-90b5-608698d9e711",
+  "thread_id": "c3d9226d-a170-4402-b688-b2fb6674379b",
+  "send_http": 201,
+  "send": "{\"message_id\": \"9d4355cb-7bd9-4613-9298-c940c60e92cd\", \"run_id\": \"8d09a903-144d-4c35-8fff-21d6a2fd78d4\", \"model\": \"claude-opus-5-5\", \"provider\": \"anthropic\"}",
+  "workflow_run": {
+    "id": "33333ced-30d6-407c-b3af-e8f2dbcdab3d",
+    "status": "completed"
+  },
+  "emit_validated_providers": [
+    "deepseek"
+  ],
+  "emit_failed_on": [],
+  "failures": [],
+  "has_400": false,
+  "verdict": "PASS"
+}

@@ -540,6 +540,17 @@ export const GROUNDING_PUBLISH_CONSEQUENCE =
 /** Why the step is locked, when the cause is `escalated` — the one authored cause. */
 export const GROUNDING_WHY_ESCALATED = "Because you turned this on by hand."
 
+/**
+ * 296-07 (BUG-261021-05, D-04 amended to option b) — what an ESCALATED step is told instead of
+ * the attached-gate line. The engine attaches a citations check only for `detected`
+ * (`grounding.effective_phase`), so a step marked by hand that cannot search the documents is
+ * checked by nothing. Wording follows `GovernanceSection.tsx`'s llm_single trap note
+ * (Claude's discretion, recorded in 296-07-SUMMARY.md). The stored bit keeps its other
+ * meaning: it still removes Continue if a document tool is added later.
+ */
+export const GOVERNANCE_ESCALATED_UNCHECKED =
+  "Marked to prove its sources, but this step can't search your documents, so nothing is checked when it runs."
+
 /** The `already-set` reading: the strictness is the citation policy's, not this dial's. */
 export const GROUNDING_ALREADY_SET_NOTE =
   "This step already has to cite its sources — that comes from its citation policy above, not from this dial."
@@ -837,10 +848,12 @@ export function seedReceiptStepReason(cause: GroundingCause, tool?: string | nul
   }
 }
 
-/** The close: everything else is the author's, and nothing has been committed. The
- *  draft is not saved and not published — sketch 150-B's fourth load-bearing property. */
+/** The close: everything else is the author's, and nothing is published — sketch 150-B's
+ *  fourth load-bearing property. 296-07 (BUG-261024-02 / 291-S1-copy a): the builder now
+ *  SAVES the generated draft on arrival, so "Nothing is saved" became false; the sentence
+ *  says what is true from generation onward. */
 export const SEED_RECEIPT_NOTHING_COMMITTED =
-  "Everything else is yours to change. Nothing is saved or published yet."
+  "Everything else is yours to change. It's saved as a draft and not published yet."
 
 /** The dismiss control's ACCESSIBLE label. Carries no glyph, for the same reason
  *  `GOVERNANCE_SEAL_LABEL` does not: the mark renders as an `aria-hidden` child and a

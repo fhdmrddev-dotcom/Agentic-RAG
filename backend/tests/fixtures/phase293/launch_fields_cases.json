@@ -1,0 +1,144 @@
+{
+  "_comment": "Phase 293 (D-11). The declared launch fields of a workflow definition, as the browser's soulData.launchInputFields computes them and as backend/app/services/inbound_inputs.declared_fields must. Read by backend/tests/unit/test_293_inbound_inputs.py AND by the frontend twin test in 293-04, so the two rules cannot drift. expected_keys is in declared order; expected_required is parallel to it.",
+  "cases": [
+    {
+      "name": "legacy input_keys win over inputs[] and are all required",
+      "definition": {
+        "input_keys": ["customer", "contract_text"],
+        "inputs": [{"key": "ignored", "label": "Ignored", "type": "text"}]
+      },
+      "expected_keys": ["customer", "contract_text"],
+      "expected_required": [true, true]
+    },
+    {
+      "name": "inputs[] with an explicit required false",
+      "definition": {
+        "inputs": [
+          {"key": "customer", "label": "Customer", "type": "text"},
+          {"key": "notes", "label": "Notes", "type": "text", "required": false}
+        ]
+      },
+      "expected_keys": ["customer", "notes"],
+      "expected_required": [true, false]
+    },
+    {
+      "name": "a kb_auto source is found in the documents, never asked for",
+      "definition": {
+        "inputs": [
+          {"key": "policy", "label": "Policy", "type": "kb_auto", "source": "kb_auto"},
+          {"key": "region", "label": "Region", "type": "enum", "enum_options": ["EU", "US"]}
+        ]
+      },
+      "expected_keys": ["region"],
+      "expected_required": [true]
+    },
+    {
+      "name": "the reserved run keys are dropped",
+      "definition": {
+        "inputs": [
+          {"key": "kickoff_prompt", "label": "Kickoff", "type": "text"},
+          {"key": "folder_id", "label": "Folder", "type": "text"},
+          {"key": "topic", "label": "Topic", "type": "text"}
+        ]
+      },
+      "expected_keys": ["topic"],
+      "expected_required": [true]
+    },
+    {
+      "name": "a file field is declared (and makes the workflow need a file upload)",
+      "definition": {
+        "inputs": [
+          {"key": "contract", "label": "Contract", "type": "file"},
+          {"key": "customer", "label": "Customer", "type": "text"}
+        ]
+      },
+      "expected_keys": ["contract", "customer"],
+      "expected_required": [true, true],
+      "needs_file_upload": true
+    },
+    {
+      "name": "an empty definition asks for nothing (the kickoff fallback is reserved)",
+      "definition": {},
+      "expected_keys": [],
+      "expected_required": []
+    },
+    {
+      "name": "legacy input_keys still drop the reserved keys",
+      "definition": {"input_keys": ["kickoff_prompt", "account"]},
+      "expected_keys": ["account"],
+      "expected_required": [true]
+    },
+    {
+      "name": "an input with an empty key is skipped",
+      "definition": {
+        "inputs": [
+          {"key": "", "label": "Nameless", "type": "text"},
+          {"key": "amount", "label": "Amount", "type": "number", "required": null}
+        ]
+      },
+      "expected_keys": ["amount"],
+      "expected_required": [true]
+    },
+    {
+      "name": "missing (296-06, 287-T01): a blank required value is missing, a blank optional one is not",
+      "definition": {
+        "inputs": [
+          {"key": "customer", "label": "Customer", "type": "text"},
+          {"key": "notes", "label": "Notes", "type": "text", "required": false}
+        ]
+      },
+      "expected_keys": ["customer", "notes"],
+      "expected_required": [true, false],
+      "inputs": {"customer": "   ", "notes": ""},
+      "expected_missing": ["customer"]
+    },
+    {
+      "name": "missing (296-06, 287-T01): a kb_auto and a reserved key are never missing",
+      "definition": {
+        "inputs": [
+          {"key": "policy", "label": "Policy", "type": "kb_auto", "source": "kb_auto"},
+          {"key": "kickoff_prompt", "label": "Kickoff", "type": "text"},
+          {"key": "topic", "label": "Topic", "type": "text"}
+        ]
+      },
+      "expected_keys": ["topic"],
+      "expected_required": [true],
+      "inputs": {},
+      "expected_missing": ["topic"]
+    },
+    {
+      "name": "missing (296-06, 287-T01): a file field the launcher shows is missing like any other",
+      "definition": {
+        "inputs": [
+          {"key": "contract", "label": "Contract", "type": "file"},
+          {"key": "customer", "label": "Customer", "type": "text"}
+        ]
+      },
+      "expected_keys": ["contract", "customer"],
+      "expected_required": [true, true],
+      "needs_file_upload": true,
+      "inputs": {"customer": "Acme"},
+      "expected_missing": ["contract"]
+    },
+    {
+      "name": "missing (296-06, 287-T01): legacy input_keys are all required, in declared order",
+      "definition": {"input_keys": ["customer", "contract_text", "region"]},
+      "expected_keys": ["customer", "contract_text", "region"],
+      "expected_required": [true, true, true],
+      "inputs": {"contract_text": "x"},
+      "expected_missing": ["customer", "region"]
+    },
+    {
+      "name": "missing (296-06, 287-T01): a filled required value misses nothing",
+      "definition": {
+        "inputs": [
+          {"key": "amount", "label": "Amount", "type": "number", "required": null}
+        ]
+      },
+      "expected_keys": ["amount"],
+      "expected_required": [true],
+      "inputs": {"amount": "12"},
+      "expected_missing": []
+    }
+  ]
+}

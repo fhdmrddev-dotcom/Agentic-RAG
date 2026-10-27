@@ -573,7 +573,12 @@ def test_wr05_both_judges_send_the_note_as_the_system_prompt():
     with patch("app.services.forced_emit.forced_emit", _forced), \
             patch("app.config.get_model_capability", return_value={"provider": "openai"}):
         asyncio.run(validator_kinds._validate_llm_judge_rubric(
-            _recorded_output(), {"model": "m", "business_requirement": "r"}, SimpleNamespace(),
+            # ⚠ 296-02 (295-IN-08 / D-07): the note now rides only a BY-DESIGN recording, read off
+            # the run (a golden run, or live_connectors not fully on). The bare SimpleNamespace()
+            # this passed made the verdict depend on whatever settings cache an earlier test left
+            # (it went red in the 296-02 gate run), so the run is named a golden run explicitly.
+            _recorded_output(), {"model": "m", "business_requirement": "r"},
+            SimpleNamespace(is_golden_run=True),
         ))
     assert seen, "the in-run judge never called forced_emit"
     assert _NOTE_WORDS in seen[0]["system_prompt"]

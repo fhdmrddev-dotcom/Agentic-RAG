@@ -1038,7 +1038,7 @@ describe("194.1-03 R5 — both honesty arms still reach the screen with no place
     expect(useStreamsStore.getState().failedSendDrafts.has(THREAD)).toBe(false)
   })
 
-  it("279-REVIEW WR-06 — a NON-lock 409 takes the generic arm: the server's words, the draft stashed", async () => {
+  it("279-REVIEW WR-06 — a NON-lock 409 takes the generic arm: the server's words, no kickoff draft", async () => {
     const { ApiError } = await import("@/lib/api")
     const MSG = "Switch to this chat's organization to keep chatting with its Expert."
     mockPostMessage.mockRejectedValue(new ApiError(MSG, 409))
@@ -1051,7 +1051,8 @@ describe("194.1-03 R5 — both honesty arms still reach the screen with no place
     expect(readBucket(THREAD).filter((m) => m.role === "assistant")).toHaveLength(0)
     expect(readBucket(THREAD).filter((m) => m.role === "user")).toHaveLength(0)
     expect(useStreamsStore.getState().reconcileErrors.get(THREAD)?.message).toBe(MSG)
-    expect(useStreamsStore.getState().failedSendDrafts.get(THREAD)).toBe("hi")
+    // 296 review FE-CR-01: a workflow kickoff's text (`Run <name>`) is never stashed as a draft.
+    expect(useStreamsStore.getState().failedSendDrafts.has(THREAD)).toBe(false)
   })
 
   it("the generic ApiError rollback arm is UNAFFECTED — routes to reconcileErrors", async () => {
@@ -1068,7 +1069,8 @@ describe("194.1-03 R5 — both honesty arms still reach the screen with no place
     expect(useStreamsStore.getState().reconcileErrors.get(THREAD)?.message).toBe(
       "that skill is disabled",
     )
-    expect(useStreamsStore.getState().failedSendDrafts.get(THREAD)).toBe("hi")
+    // 296 review FE-CR-01: a workflow kickoff's text (`Run <name>`) is never stashed as a draft.
+    expect(useStreamsStore.getState().failedSendDrafts.has(THREAD)).toBe(false)
   })
 })
 

@@ -4,12 +4,13 @@ title: A knowledge-base step that finds nothing, or answers without citation mar
 reported: 2026-10-20
 surface: Agentic-RAG
 severity: major
-status: folded
+status: closed
 affected_areas: [backend/harness, workflows/citations-gate]
 folded_into: "295"
-verified_closed_by: null
+verified_closed_by: "295"
 related_seeds: [SEED-295, SEED-152]
 re_open_trigger: null
+fixed_by_commit: "80fc12e76, 5fea3cb72, b101092f3 (295-03: a found-nothing KB step pauses durably with worded choices, RUN-01); live 295 S1 and the eight-provider scoreboard; closed by the 296-05 record flip"
 reproduces_on:
   branch: develop
   commit: 46c23fe00

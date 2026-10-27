@@ -34,6 +34,15 @@ logging.getLogger("langsmith").setLevel(logging.ERROR)
 
 logger = logging.getLogger(__name__)
 
+# SEED-363 (Phase 296) — the boot sweeps that CLAIM runs (resume_stranded_workflows and
+# the orphan reconciler, boot + periodic) run only when this is True. tests/conftest.py
+# sets it False in pytest_configure, so a TestClient lifespan never claims, re-drives or
+# terminalizes a live run in the shared local DB. A module flag, deliberately NOT an env
+# var or a setting: nothing outside the test suite should be able to turn these off, and
+# a new env var would owe the deploy artifacts (check-deploy-drift.sh). Read at lifespan
+# time as a module global, so a test's assignment takes effect.
+RUN_BOOT_SWEEPS = True
+
 # Phase 093 D-20 — opt-in backend file log-sink. Runs AFTER load_dotenv (so
 # os.environ carries LOG_FILE_PATH) and AFTER the asyncio suppressor above. Unset
 # env var = no handler = byte-identical console-only logging. Imports only stdlib
@@ -403,7 +412,7 @@ async def lifespan(app_instance):
         except Exception:
             logger.exception("Harness resume sweep failed (app continues)")
 
-    if not _setup_mode:  # Phase 158 (D-03) — a fresh box has no DB to reconcile
+    if not _setup_mode and RUN_BOOT_SWEEPS:  # Phase 158 (D-03); SEED-363 (296)
         asyncio.create_task(_resume_stranded())
 
     # Phase 137.1 (EVAL-05g / BUG-260702-02) — boot-time orphan reconciler. When a
@@ -427,7 +436,7 @@ async def lifespan(app_instance):
         except Exception:
             logger.exception("Run reconciler failed (app continues)")
 
-    if not _setup_mode:  # Phase 158 (D-03) — a fresh box has no DB to reconcile
+    if not _setup_mode and RUN_BOOT_SWEEPS:  # Phase 158 (D-03); SEED-363 (296)
         asyncio.create_task(_reconcile_orphans())
 
     # Phase 100 (TMPL-01, D-07) — in-process janitor: GC expired template rows +
@@ -483,7 +492,7 @@ async def lifespan(app_instance):
                 logger.exception("Periodic run reconciler failed (app continues)")
             await asyncio.sleep(settings.run_stale_sweep_interval_seconds)
 
-    if not _setup_mode:  # Phase 158 (D-03) — a fresh box has no runs to reconcile
+    if not _setup_mode and RUN_BOOT_SWEEPS:  # Phase 158 (D-03); SEED-363 (296)
         asyncio.create_task(_reconcile_orphans_periodic())
 
     # Phase 204 (SCHED-01 / D-204-09 / D-204-11) — the background workflow scheduler.
@@ -875,7 +884,7 @@ async def list_models():
     return {"models": models, "default": settings.llm_model}
 
 
-from app.api import threads, runs, documents, settings as settings_api, folders, kb, skills, audit, knowledge_health, feedback, sandbox_outputs, workspace, workspace_promote, retention, admin, panel, workflows, workflow_runs, workflow_run_evidence,metadata_fields, document_views, document_search, document_relationships, classification_rules, document_governance, skill_tuner, skill_test_cases, evals, features, setup as setup_api, org, me_preferences, connectors, model_registry, schedules, document_queries, library, checked_queries, takeoff, sources, experts, api_docs, citation_checks  # noqa: E402
+from app.api import threads, runs, documents, settings as settings_api, folders, kb, skills, audit, knowledge_health, feedback, sandbox_outputs, workspace, workspace_promote, retention, admin, panel, workflows, workflow_runs, workflow_run_evidence, metadata_fields, document_views, document_search, document_relationships, classification_rules, document_governance, skill_tuner, skill_test_cases, evals, features, setup as setup_api, org, me_preferences, connectors, model_registry, schedules, document_queries, library, checked_queries, takeoff, sources, experts, api_docs, citation_checks, api_keys, inbound  # noqa: E402
 
 app.include_router(threads.router)
 app.include_router(runs.router)
@@ -924,6 +933,9 @@ app.include_router(sources.router)  # Phase 234 (LIB-08 / SURF-01 / VIS-05) — 
 app.include_router(sources.router, prefix="/api")  # Phase 234 alias (/api/sources)
 app.include_router(experts.router)  # Phase 259 (PACK-01 / PACK-06) — expert bundles manifest (/experts)
 app.include_router(api_docs.router)  # Phase 276 DOCS-04 — gated live API explorer
+app.include_router(api_keys.router)  # Phase 293 D-18 — /api-keys: a member's own API keys (create, list, revoke)
+app.include_router(api_keys.org_router)  # Phase 293 D-03 — /org/api-keys: org admins see and revoke every key
+app.include_router(inbound.router)  # Phase 293 START-02 — /inbound: outside systems start a published workflow and read it back with an API key (never canvas-gated)
 # Phase 182 (D-182-04): the TEMPORARY Phase-181 "/canvas/ping" canary router was RETIRED here.
 # The real require_canvas-gated routes (POST /workflows/validate + GET /workflows/grounding-bundle,
 # mounted on workflows.router above) now carry the byte-identical 404-when-off gate, so the

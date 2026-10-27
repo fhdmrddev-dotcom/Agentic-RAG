@@ -60,3 +60,10 @@ human_verification:
 7. Record the G-2 override in STATE.md, and re-run the count gate for a verdict line over the final pins.
 
 _Verifier: Claude (gsd-verifier)_
+
+## Note added 2026-10-27 (Phase 296, 296-05)
+
+- SC#4 "one click": the operator accepted the shipped menu + name dialog as one action (296 D-12, 2026-10-26).
+- Item 6 (the starter-card "answer arrives in chat" wording) is planted as SEED-378 (needs a sketch under G-2).
+- Items 4 and 5 (287-V-4 required-field refusal; the optional 50-message row) are folded into 296-HUMAN-UAT.md as optional rows 11 and 12.
+- 287-WR-03 (the fork-isolation test never attempted the attack) is fixed by 296-05: `test_287_fork_isolation.py::test_a_non_owner_cannot_write_a_starter_or_anothers_fork` attempts every write a non-owner could aim at a fork or a starter, on the service-role path and as a user JWT (RLS), with positive controls on both.

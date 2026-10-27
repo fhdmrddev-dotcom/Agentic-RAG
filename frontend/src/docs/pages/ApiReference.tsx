@@ -104,10 +104,12 @@ export function ApiReference({ load = defaultLoad }: { load?: () => Promise<Scal
             Every action in the Syrel app goes through this API. This reference lists the public endpoints.
           </p>
           <Callout kind="info">
+            {/* Phase 293 (D-20): API keys shipped; the callout says so (UI-SPEC "Public docs copy"). */}
             <p>
-              <strong>No API keys today.</strong> Syrel has no API keys, personal access tokens or service accounts. A
-              script signs in as a user and sends that user's token with each request. API keys, webhooks and rate
-              limits are not available today — <a href="/docs/api/roadmap-open-platform">see what's planned</a>. Read{" "}
+              <strong>Two ways in.</strong> A script can sign in as a user and send that user's token, or use an{" "}
+              <strong>API key</strong> made in Settings → API keys. A key starts only the published workflows it lists,
+              runs as the person who made it, and is rate limited. Webhooks are not available today —{" "}
+              <a href="/docs/api/roadmap-open-platform">see what's planned</a>. Read{" "}
               <a href="/docs/api/concepts/authentication">Authentication</a> first.
             </p>
           </Callout>

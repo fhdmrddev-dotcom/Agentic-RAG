@@ -1,0 +1,70 @@
+[
+ {
+  "row": "board",
+  "check": "active provider row (one-LLM-step workflow, key start) completes",
+  "pass": true,
+  "run_id": "9ba9f29e-a99e-463c-8499-f49cd31f35b2",
+  "status": "completed",
+  "model": null,
+  "output_chars": 349
+ },
+ {
+  "row": "board",
+  "check": "multi-tool row (search_documents + execute_code) completes",
+  "pass": true,
+  "run_id": "56161819-1788-4573-ac36-0e7fbc3210cc",
+  "status": "completed",
+  "tools_in_audit": [],
+  "output_chars": 2517
+ },
+ {
+  "row": "board",
+  "check": "parallel: two key starts during a streaming chat, each in its own thread",
+  "pass": true,
+  "chat_post": {
+   "http": 201,
+   "body": {
+    "message_id": "51cecabd-8ac8-4dfd-949b-6d822e23a189",
+    "run_id": "beab2d19-2b1d-42f4-8f5b-1a58270335f0",
+    "model": "deepseek-v4-flash",
+    "provider": "deepseek"
+   }
+  },
+  "keyC": {
+   "http": 201,
+   "body": {
+    "run_id": "46000978-04ec-406b-b816-ec3d3e4fc39c",
+    "status": "running"
+   }
+  },
+  "keyP": {
+   "http": 201,
+   "body": {
+    "run_id": "556b4e3a-0c86-4b3d-89e0-e936f4f74a27",
+    "status": "running"
+   }
+  },
+  "finals": {
+   "keyC": {
+    "run_id": "46000978-04ec-406b-b816-ec3d3e4fc39c",
+    "status": "completed",
+    "thread_id": "97914cd8-5265-4e7f-baee-c1f1e16808c3"
+   },
+   "keyP": {
+    "run_id": "556b4e3a-0c86-4b3d-89e0-e936f4f74a27",
+    "status": "completed",
+    "thread_id": "b77b24bf-1582-4c7d-ba07-df11ea323f06"
+   }
+  },
+  "chat_thread": "41766bba-b096-4d4c-9d90-d3d79d58646d"
+ },
+ {
+  "row": "board",
+  "check": "long-message row (>= 5 KB input) completes",
+  "pass": true,
+  "run_id": "e0a86773-1791-4926-ba8a-f5862a875116",
+  "input_bytes": 7000,
+  "status": "completed",
+  "output_chars": 486
+ }
+]
