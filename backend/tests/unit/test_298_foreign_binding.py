@@ -484,3 +484,267 @@ def test_the_helper_never_imports_publish_service():
     src = Path(_ffr().__file__).read_text(encoding="utf-8")
     code = "\n".join(ln for ln in src.splitlines() if not ln.lstrip().startswith("#"))
     assert "publish_service" not in code
+
+
+# ═════════════════════════════════════════════════════════════════════════════════════════════
+# The three launch doors (D-30). Each is ONE call to the same helper.
+# ═════════════════════════════════════════════════════════════════════════════════════════════
+
+
+def _published_row(definition: dict, *, org=ORG_A, glob=False, owner=USER):
+    return {"id": str(uuid4()), "definition": definition, "status": "published",
+            "is_system_global": glob, "created_by": owner, "skill_snapshots": None,
+            "org_id": org}
+
+
+async def _preflight(row, *, pool, scope_assert=None, supabase=None):
+    from app.services import workflow_kickoff
+    from app.services.entitlement_service import EntitlementResult
+
+    user = {"id": USER, "org_id": ORG_A}
+    body = SimpleNamespace(workflow_definition_id=uuid4(), inputs={})
+    allowed = EntitlementResult(allowed=True, capability="workflows", current_tier="enterprise")
+    sb = supabase or MagicMock()
+
+    async def _passthrough(**kw):
+        return kw["definition"]
+
+    with (
+        patch("app.api.threads.workflows_enabled", return_value=True),
+        patch("app.api.threads.get_pg_pool", new_callable=AsyncMock, return_value=pool),
+        patch("app.services.entitlement_service.check_entitlement", new_callable=AsyncMock,
+              return_value=allowed),
+        patch.object(workflow_kickoff, "aexec", AsyncMock(return_value=SimpleNamespace(data=row))),
+        patch.object(workflow_kickoff, "assert_folder_scopes_subset",
+                     scope_assert or AsyncMock()) as scope,
+        patch.object(workflow_kickoff, "_ensure_skill_snapshots", side_effect=_passthrough) as snap,
+        patch("app.services.template_service.pin_templates_for_run", AsyncMock()),
+        patch.object(_ffr(), "fetch_visible_folders",
+                     AsyncMock(return_value=list(FOLDERS.values()))),
+    ):
+        try:
+            out = await workflow_kickoff.preflight_workflow_kickoff(
+                request=MagicMock(), body=body, thread_id=str(uuid4()),
+                thread_row={"active_workflow_run_id": None}, supabase=sb, current_user=user,
+            )
+            return out, snap, scope, None, sb
+        except HTTPException as exc:
+            return None, snap, scope, exc, sb
+
+
+@pytest.mark.asyncio
+async def test_preflight_refuses_a_foreign_binding_with_the_coded_422():
+    pool = FakePool()
+    out, snap, _scope, exc, _sb = await _preflight(
+        _published_row(_defn(project=F_A1, output=F_B1)), pool=pool)
+    assert out is None and exc is not None and exc.status_code == 422
+    assert exc.detail == {"code": "folder_in_other_org", "message": ONE_VISIBLE}
+    snap.assert_not_called()  # refused before the snapshot materialize (nothing written)
+
+
+@pytest.mark.asyncio
+async def test_preflight_selects_the_row_org_and_uses_it():
+    pool = FakePool()
+    _, _, _, exc, sb = await _preflight(
+        _published_row(_defn(project=F_A1, output=F_B1), org=ORG_B), pool=pool)
+    # the row is in org B, so org B's folder is in-org; F_A1 is now the foreign one
+    assert exc is not None and exc.status_code == 422
+    assert "“Client Files” is in Personal" in exc.detail["message"]
+    select_arg = sb.table.return_value.select.call_args.args[0]
+    assert "org_id" in [t.strip() for t in select_arg.split(",")]
+
+
+@pytest.mark.asyncio
+async def test_preflight_keeps_the_unrestricted_subset_400_first():
+    pool = FakePool()
+    boom = AsyncMock(side_effect=ValueError("phase 'p0' folder_scope is not a subset"))
+    _, _, _, exc, _ = await _preflight(
+        _published_row(_defn(project=F_A1, output=F_B1)), pool=pool, scope_assert=boom)
+    assert exc.status_code == 400
+    assert pool.calls == [], "the org check never ran"
+
+
+@pytest.mark.asyncio
+async def test_preflight_skips_system_global_definitions():
+    pool = FakePool()
+    out, _, _, exc, _ = await _preflight(
+        _published_row(_defn(project=F_B1), glob=True), pool=pool)
+    assert exc is None and out is not None
+    assert pool.calls == []
+
+
+@pytest.mark.asyncio
+async def test_preflight_admits_a_clean_definition():
+    pool = FakePool()
+    out, snap, _, exc, _ = await _preflight(
+        _published_row(_defn(project=F_A1, kb=[F_A2])), pool=pool)
+    assert exc is None and out is not None
+    snap.assert_called_once()
+
+
+# ── scheduler ────────────────────────────────────────────────────────────────────────────────
+
+
+WF_ID = str(uuid4())
+
+
+def _schedule():
+    return {"id": uuid4(), "user_id": USER, "workflow_id": WF_ID, "org_id": ORG_A,
+            "name": "Weekly", "inputs": {}}
+
+
+async def _schedule_launch(definition: dict, *, def_org=ORG_A, glob=False):
+    from app.services import scheduler_service
+    from app.services.entitlement_service import EntitlementResult
+
+    pool = FakePool(definitions={WF_ID: {"org_id": def_org, "created_by": USER,
+                                         "is_system_global": glob, "definition": "{}"}})
+    allowed = EntitlementResult(allowed=True, capability="workflows", current_tier="enterprise")
+    launch = AsyncMock(return_value=uuid4())
+    with (
+        patch("app.db.workflows.get_definition", new_callable=AsyncMock,
+              return_value={"definition": definition}),
+        patch("app.db.schedules.record_schedule_outcome", new_callable=AsyncMock) as record,
+        patch("app.services.unattended_launch.launch_unattended_run", launch),
+        patch("app.services.unattended_launch.workflows_disabled", return_value=False),
+        patch("app.services.entitlement_service.check_entitlement", new_callable=AsyncMock,
+              return_value=allowed),
+        patch("app.dependencies.get_active_org_id", AsyncMock(side_effect=AssertionError("400"))),
+    ):
+        try:
+            await scheduler_service.launch_scheduled_run(_schedule(), pool=pool, redis=MagicMock())
+            return record, launch, None, pool
+        except scheduler_service.ScheduledLaunchRefused as refused:
+            return record, launch, refused, pool
+
+
+@pytest.mark.asyncio
+async def test_a_scheduled_launch_records_the_sentence_then_refuses():
+    record, launch, refused, _ = await _schedule_launch(_defn(project=F_A1, output=F_B1))
+    assert refused is not None and str(refused) == ONE_VISIBLE
+    record.assert_awaited_once()
+    assert record.await_args.kwargs["status"] == ONE_VISIBLE
+    launch.assert_not_called()
+
+
+@pytest.mark.asyncio
+async def test_a_clean_scheduled_launch_launches_with_no_extra_outcome_write():
+    record, launch, refused, _ = await _schedule_launch(_defn(project=F_A1, kb=[F_A2]))
+    assert refused is None
+    record.assert_not_called()
+    launch.assert_awaited_once()
+
+
+@pytest.mark.asyncio
+async def test_an_unbound_scheduled_launch_reads_nothing_new():
+    record, launch, refused, pool = await _schedule_launch(_defn())
+    assert refused is None and pool.calls == []
+    launch.assert_awaited_once()
+
+
+@pytest.mark.asyncio
+async def test_a_system_global_scheduled_definition_is_never_checked():
+    record, launch, refused, _ = await _schedule_launch(_defn(project=F_B1), glob=True)
+    assert refused is None
+    launch.assert_awaited_once()
+
+
+# ── API key ──────────────────────────────────────────────────────────────────────────────────
+
+
+def _inbound(monkeypatch, definition: dict, *, def_org=None):
+    from uuid import UUID as _U
+
+    from fastapi.testclient import TestClient
+
+    from app.db import api_keys as api_keys_db
+    from tests.unit import phase293_inbound_fakes as fakes
+
+    org = def_org or fakes.ORG_ID
+
+    class Pool(fakes.FakePool):
+        async def fetchval(self, sql, *args):
+            flat = " ".join(sql.split())
+            if "FROM workflow_definitions" in flat:
+                self._log(sql, args)
+                return org
+            return await super().fetchval(sql, *args)
+
+        async def fetch(self, sql, *args):
+            flat = " ".join(sql.split())
+            if "FROM folders" in flat or "FROM organizations" in flat:
+                self._log(sql, args)
+                return await FakePool().fetch(sql, *args)
+            return await super().fetch(sql, *args)
+
+    events: list = []
+    now, later, _ = fakes.audit_spies(monkeypatch, events)
+    rows = [{"id": _U(fakes.WF_ID), "readable": True, "name": "Weekly digest",
+             "status": "published", "definition": json.dumps(definition)}]
+
+    async def _key_workflows(_pool, *, workflow_ids, user_id, org_id):
+        return rows
+
+    monkeypatch.setattr(api_keys_db, "get_key_workflows", _key_workflows)
+    launch = AsyncMock(return_value=_U(fakes.RUN_ID))
+    monkeypatch.setattr("app.services.unattended_launch.launch_unattended_run", launch)
+    monkeypatch.setattr("app.services.entitlement_service.enforce_entitlement",
+                        AsyncMock(return_value=None))
+    monkeypatch.setattr("app.dependencies.get_active_org_id",
+                        AsyncMock(side_effect=AssertionError("400")))
+    pool = Pool(events)
+    client = TestClient(fakes.build_app(key=fakes.make_key(), pool=pool, redis=fakes.FakeRedis()))
+    return {"client": client, "launch": launch, "now": now, "later": later, "pool": pool,
+            "url": f"/inbound/workflows/{fakes.WF_ID}/runs"}
+
+
+def _inbound_defn(**kw):
+    from tests.unit import phase293_inbound_fakes as fakes
+
+    d = _defn(**kw)
+    d["inputs"] = fakes.DEFINITION["inputs"]
+    return d
+
+
+def _key_owned_folders():
+    """The fake key's owner owns F_A1 (in the key's org) and F_B1 (in org B)."""
+    from tests.unit import phase293_inbound_fakes as fakes
+
+    owned = {
+        F_A1: {**FOLDERS[F_A1], "org_id": fakes.ORG_ID, "user_id": fakes.USER_ID},
+        F_B1: {**FOLDERS[F_B1], "user_id": fakes.USER_ID},
+    }
+    return patch.dict(FOLDERS, owned), patch.dict(ORGS, {fakes.ORG_ID: "Personal"})
+
+
+def test_an_api_key_start_bound_to_a_foreign_folder_is_refused_in_a_plain_string(monkeypatch):
+    from tests.unit.phase293_inbound_fakes import all_audits
+
+    p1, p2 = _key_owned_folders()
+    with p1, p2:
+        env = _inbound(monkeypatch, _inbound_defn(project=F_A1, output=F_B1))
+        r = env["client"].post(env["url"], json={"inputs": {"topic": "x"}})
+    assert r.status_code == 422
+    assert r.json()["detail"] == ONE_VISIBLE, "a plain string, not the coded object"
+    env["launch"].assert_not_called()
+    refused = [a for a in all_audits(env["now"], env["later"]) if a[0] == "api_key.refused"]
+    assert [a[1]["reason"] for a in refused] == ["foreign_folder"]
+
+
+def test_a_clean_api_key_start_proceeds(monkeypatch):
+    p1, p2 = _key_owned_folders()
+    with p1, p2:
+        env = _inbound(monkeypatch, _inbound_defn(project=F_A1))
+        r = env["client"].post(env["url"], json={"inputs": {"topic": "x"}})
+    assert r.status_code == 201, r.text
+    env["launch"].assert_awaited_once()
+
+
+def test_the_launch_doors_never_call_get_active_org_id():
+    from pathlib import Path
+
+    import app.api.inbound as inbound
+    import app.services.scheduler_service as sched
+
+    for mod in (inbound, sched):
+        assert "get_active_org_id" not in Path(mod.__file__).read_text(encoding="utf-8")
