@@ -2,16 +2,16 @@
 gsd_state_version: 1.0
 milestone: v4.8
 milestone_name: Every Page Has a Link
-status: ready_to_plan
+status: human_needed
 last_updated: 2026-10-27T21:45:44.691Z
-last_activity: 2026-10-28 -- Phase 298 execution started
+last_activity: 2026-10-28 -- Phase 298 executed; verification human_needed (G-4 owed)
 progress:
   total_phases: 13
   completed_phases: 0
   total_plans: 4
   completed_plans: 4
   percent: 0
-stopped_at: Phase 298 planned (5 plans, 5 serial waves) — ready to execute
+stopped_at: Phase 298 executed 5/5 + review fixes; 4/4 SC verified in code; G-4 rows owed (two-org account); not deployed
 ---
 
 # Project State
@@ -46,8 +46,12 @@ reviewer exists, so a phase closes `verification_mode: self-verified`, never `re
 
 Phase: 298
 Plan: 5 of 5
-Status: Executing (main tree, one plan at a time — every wave is a single plan; no other session active)
-Last activity: 2026-10-28 — 298 CONTEXT + ORG-AUDIT written (audit: cloud 0 multi-org users)
+Status: Executed — human_needed (verification 4/4 SC in code; security 34/34 closed; G-4 rows owed)
+Last activity: 2026-10-28 — 298 executed: 5 plans, review (1 BL + 9 WR) → 9 fixed + WR-08 deferred to 299; not deployed
+
+Owed for 298 (in order): run `298-HUMAN-UAT.md` rows as the two-org dev account (G4-1 first); acknowledge residuals
+AR-298-R1 (WR-06 `LIMIT 1`) and AR-298-R2 (WR-05 bind race) in `298-SECURITY.md`; then flip SEED-389/317 → shipped,
+SEED-313 → answered. Deploy order: paste mig 217 into cloud → `get_advisors(security)` → backend (boot guard needs 217).
 
 Scope set at intake: per-view URLs (SEED-185/015/178), run-waiting notifications in-app + email
 (SEED-281), lists follow the active org — decided per-org (SEED-389), v4.7 close-out
@@ -79,6 +83,7 @@ applied; `get_advisors(security)` 0 ERROR. Branch `develop`.
 
 - Moonshot account reinstatement (429 suspended) → re-run its rows; BUG-261024-01 stays `folded` until then.
 - 294-ENV: remove the two dev-only lines from `backend/.env` (`DECISION_ENGINE_FAULT_BASE_URL` and its `ENVIRONMENT` partner).
+- 298: G-4 rows G4-1..7 + A-1 (`298-HUMAN-UAT.md`, sign in as `fhdmrd.dev@gmail.com`); mig 217 to cloud before the 298 backend ships.
 - Optional: restore Supabase MCP `read_only=true` (the write-needing deploy is done).
 - Push tag `v4.7` when wanted (local only).
 - Carried from v4.6: Coolify rebuild confirmation + logged-in production smoke; 282 G4-4 / G4-6 / A1; 281 G-4 rows A, C, D.

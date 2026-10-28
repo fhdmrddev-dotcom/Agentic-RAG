@@ -233,7 +233,7 @@ Plans:
 | Phase | Plans Complete | Status | Completed |
 |-------|----------------|--------|-----------|
 | 297. Every View Has an Address | 4/4 | Complete (2026-10-28) | verified passed 5/5; security 19/19; review 4 WR fixed; UAT 15 PASS + P7 Moonshot ⛔ (live 429, BUG-261024-01); not deployed |
-| 298. Lists Follow the Active Org | 0/TBD | Not started | - |
+| 298. Lists Follow the Active Org | 5/5 | Executed — human_needed | 4/4 SC in code; security 34/34; review 1 BL + 9 WR → 9 fixed, WR-08 → 299; G-4 owed (G4-1 first); mig 217 local only; not deployed |
 | 299. Links to the Thing Itself | 0/TBD | Not started | - |
 | 300. Told When a Run Waits (Backend and Mailer) | 0/TBD | Not started | - |
 | 301. The Waiting-on-You Notice | 0/TBD | Not started | - |
