@@ -15,6 +15,10 @@ THIS IS A SEPARATE HELPER FROM ``threads._require_thread_org`` and never a widen
 gates an Expert thread and fails CLOSED when no org resolves; this one gates every other item and
 fails OPEN when no org resolves. The send door calls both, the Expert one first.
 
+299-REVIEW WR-01: the run sentence says to start the workflow from a NEW chat in its org, never
+"switch to run it": refused on a chat in X, switching to Y and sending again on that SAME chat is
+refused by the chat guard ("This chat is in X"), so that remedy could never succeed.
+
 THE WORDS (UI-SPEC S8) name the org, then say what to do — never a status number or a status
 word (the test lists the banned words). The org name is read only on a mismatch, with one statement on the pool;
 the caller is a member of that org (the row is theirs, read under RLS), so naming it leaks nothing
@@ -33,14 +37,14 @@ logger = logging.getLogger(__name__)
 #: The org-named sentences, by the write they refuse.
 REFUSALS = {
     "chat": "This chat is in {org}. Switch to {org} to keep chatting.",
-    "run": "This workflow is in {org}. Switch to {org} to run it.",
+    "run": "This workflow is in {org}. Switch to {org} and start it from a new chat there.",
     "tweak": "This workflow is in {org}. Switch to {org} to make your own copy.",
 }
 
 #: The same sentences when the org's name cannot be read.
 REFUSALS_UNNAMED = {
     "chat": "This chat is in another of your organizations. Switch to it to keep chatting.",
-    "run": "This workflow is in another of your organizations. Switch to it to run it.",
+    "run": "This workflow is in another of your organizations. Switch to it and start it from a new chat there.",
     "tweak": "This workflow is in another of your organizations. Switch to it to make your own copy.",
 }
 

@@ -50,7 +50,7 @@ const PERSONAL = { org_id: "A", name: "Personal", role: "owner" }
 const ACME = { org_id: "B", name: "Acme Legal", role: "member" }
 const BANNED = /409|conflict|forbidden|invalid/i
 
-const RUN_REFUSAL = "This workflow is in Acme Legal. Switch to Acme Legal to run it."
+const RUN_REFUSAL = "This workflow is in Acme Legal. Switch to Acme Legal and start it from a new chat there."
 const TWEAK_REFUSAL = "This workflow is in Acme Legal. Switch to Acme Legal to make your own copy."
 const SEND_REFUSAL = "This chat is in Acme Legal. Switch to Acme Legal to keep chatting."
 

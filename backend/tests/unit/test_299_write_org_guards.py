@@ -34,7 +34,7 @@ ORG_B = str(uuid4())
 ORGS = {ORG_A: "Acme Legal", ORG_B: "Personal"}
 
 CHAT_A = "This chat is in Acme Legal. Switch to Acme Legal to keep chatting."
-RUN_A = "This workflow is in Acme Legal. Switch to Acme Legal to run it."
+RUN_A = "This workflow is in Acme Legal. Switch to Acme Legal and start it from a new chat there."
 TWEAK_A = "This workflow is in Acme Legal. Switch to Acme Legal to make your own copy."
 
 
@@ -200,7 +200,10 @@ def _defn_json():
                         "config": {"phase_type": "llm_single", "prompt": "Go."}}]}
 
 
-async def _preflight(*, def_org, glob, thread_org):
+_UNSET = object()
+
+
+async def _preflight(*, def_org, glob, thread_org, active_org=_UNSET):
     from app.services import workflow_kickoff
     from app.services.entitlement_service import EntitlementResult
 
@@ -228,7 +231,10 @@ async def _preflight(*, def_org, glob, thread_org):
                 request=MagicMock(), body=SimpleNamespace(workflow_definition_id=uuid4(), inputs={}),
                 thread_id=str(uuid4()),
                 thread_row={"active_workflow_run_id": None, "org_id": thread_org},
-                supabase=MagicMock(), current_user={"id": USER, "org_id": thread_org},
+                supabase=MagicMock(),
+                # send_message adds "org_id" to the caller ONLY when an active org resolved.
+                current_user={"id": USER} if active_org is None
+                else {"id": USER, "org_id": thread_org if active_org is _UNSET else active_org},
             )
             return out, None, snap, pool
         except HTTPException as exc:
@@ -239,6 +245,29 @@ async def test_kickoff_of_another_orgs_workflow_is_refused():
     out, exc, snap, _pool = await _preflight(def_org=ORG_A, glob=False, thread_org=ORG_B)
     assert exc is not None and exc.status_code == 409 and exc.detail == RUN_A
     snap.assert_not_called()  # refused before the snapshot materialize
+
+
+async def test_a_header_less_kickoff_never_reaches_the_org_guard():
+    """299-REVIEW WR-01 (second half), DRIVEN and found unreachable: "with no X-Org-Id this guard
+    still refuses". A header-less send carries no "org_id" on the caller, and the 258 entitlement
+    gate fails closed on that (403 "No active organization") BEFORE the definition is even read,
+    so the org guard is never reached and never names an org."""
+    from app.services.entitlement_service import EntitlementDeniedException
+
+    out, exc, snap, pool = await _preflight(def_org=ORG_A, glob=False, thread_org=ORG_B, active_org=None)
+    assert out is None and isinstance(exc, EntitlementDeniedException)
+    assert not [c for c in pool.calls if "organizations" in c[0]]
+    snap.assert_not_called()
+
+
+def test_the_run_refusal_never_sends_the_person_back_to_this_chat():
+    """299-REVIEW WR-01: refused on a chat in org X for a workflow in org Y, the remedy must be one
+    that can succeed. "Switch to Y to run it" sends the person to Y, where the SAME chat's next send
+    is refused by the chat guard ("This chat is in X. Switch to X") — a ping-pong. The run sentence
+    names a remedy off this chat: start it from a new chat in the workflow's org."""
+    for table in (_guard().REFUSALS, _guard().REFUSALS_UNNAMED):
+        assert "new chat" in table["run"], table["run"]
+        assert not table["run"].endswith("to run it."), table["run"]
 
 
 async def test_kickoff_of_a_global_workflow_is_never_refused():
