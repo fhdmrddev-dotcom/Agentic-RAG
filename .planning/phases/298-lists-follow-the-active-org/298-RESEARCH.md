@@ -912,23 +912,32 @@ END; $$;
 | A6 | Moving schedules with a workflow (vs refusing) is the desired behaviour | Move | wrong-org scheduled runs |
 | A7 | A `folder-labels` read route is the right home for D-15 names | D-15 | alternative design |
 
-## Open Questions
+## Open Questions (RESOLVED)
+
+All six were resolved in `298-CONTEXT.md` (post-research amendments, 2026-10-28). Where CONTEXT
+differs from the recommendation below, CONTEXT wins.
 
 1. **Published definitions in the move.** What we know: the immutability trigger blocks any `org_id`
    change. Unclear: whether the operator accepts amending that guard. Recommendation: amend in 217 with the
    role + GUC guard; the planner records it as a decision (it is a security-bearing DDL change).
+   **RESOLVED: D-31** — published workflows are NOT movable in v1; the trigger is left untouched; 217 only extends the audit CHECK.
 2. **Threads bound to a moved folder.** Refusing keeps the move bounded but may make most folders
    unmovable for an active chat user. Recommendation: refuse with a count ("2 chats in Personal use this
    folder") in v1; seed the alternative.
+   **RESOLVED: D-33** — refused, worded.
 3. **"A workflow" = one row or the slug family.** Recommendation: the caller's rows sharing the slug, all
    or none (the run log and library cards already treat the slug as the workflow).
+   **RESOLVED: D-31** — drafts only, one row.
 4. **`inputs[].folder_scope` (kb_auto) and `output_target_folder`.** D-13 names only `project_folder_id`
    and per-phase `folder_scope`; `folder_scope_violations` checks only those. Recommendation: keep D-13's
    set for the refusal; flag kb_auto inputs as a seed.
+   **RESOLVED: D-34** — the refusal set includes kb_auto `inputs[].folder_scope` and `output_target_folder`.
 5. **Which org's audit ledger carries the move row.** One row per D-20. Recommendation: the source org
    (the org losing the item), metadata naming both.
+   **RESOLVED: D-35** — source org, inside the move transaction.
 6. **Root documents count: archived in or out.** Recommendation: match the Library Root list default the
    person will see after Switch (archived hidden).
+   **RESOLVED: D-36** — archived excluded.
 
 ## Environment Availability
 
