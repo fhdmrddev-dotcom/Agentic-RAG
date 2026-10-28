@@ -176,7 +176,7 @@ Plans:
 
 - [x] 299-01-PLAN.md — the `GET /links/{kind}/{id}` resolver (one statement per kind, one 404), run `org_id`, and the write-org guards (LINK-04, LINK-05)
 - [x] 299-05-PLAN.md — sign-in returns to the link, the boot screen gives up with a retry, and "Loading your chats…" until the list answers (LINK-06, FIX-02)
-- [ ] 299-02-PLAN.md — chat / workflow / Expert addresses, the thread lives in the URL, open a workflow or Expert by id (LINK-02, LINK-03)
+- [x] 299-02-PLAN.md — chat / workflow / Expert addresses, the thread lives in the URL, open a workflow or Expert by id (LINK-02, LINK-03)
 - [ ] 299-03-PLAN.md — the one gate: the in-place "can't be opened" card, "This is in <org> — switch?", the sign-in resume (LINK-04, LINK-05, LINK-06)
 - [ ] 299-04-PLAN.md — the Link control on five surfaces with an honest who-can-open line, and "Saves in <org>" (LINK-03, LINK-05)
 
