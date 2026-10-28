@@ -33,7 +33,9 @@ cards, the "added by" connections, the document-type list) from ONE grouping-set
 reads the VIEW `public.library_documents` (migration 207 — own documents ∪ documents in org-shared
 folders the caller does not own), NOT the RLS-wide `documents` table that `index-summary` reads,
 so its numbers equal `GET /documents`' totals by construction: both read one SQL home of the
-visible set. Same RLS path (`get_user_pg_connection`), no new SQL function, nothing bounded by the
+visible set, narrowed by ONE shared org predicate (Phase 298, D-32: `$1` = the caller's validated
+active org, or NULL = today's unnarrowed scan — `GET /documents` adds the same `org_id = <org>` to
+every read). Same RLS path (`get_user_pg_connection`), no new SQL function, nothing bounded by the
 number of documents — only by folders, statuses, steps, connections and types.
 """
 from datetime import datetime
@@ -42,6 +44,7 @@ from fastapi import APIRouter, Depends, Request
 from pydantic import BaseModel, Field
 
 from app.dependencies import get_current_user, get_user_pg_connection
+from app.services import org_lists  # Phase 298 (D-06): the one home of list narrowing
 from app.services.openai_service import resolve_effective_embedding_provider
 
 router = APIRouter(prefix="/library", tags=["library"])
@@ -177,7 +180,7 @@ FROM (
   SELECT folder_id, status, ingestion_step, source_connection_id, file_size, chunk_count,
          archived_at, error_message, metadata->>'document_type' AS doc_type
   FROM public.library_documents
-  WHERE is_latest
+  WHERE is_latest AND ($1::uuid IS NULL OR org_id = $1)
 ) v
 GROUP BY GROUPING SETS ((), (folder_id), (status), (status, ingestion_step),
                         (source_connection_id), (doc_type))
@@ -285,8 +288,10 @@ async def get_library_summary(
     at most one name read bounded by the distinct connection ids. Ungated, like
     `index-summary`: these are the caller's own corpus facts.
     """
+    # 298 (D-02/D-32): the same org predicate as GET /documents; None binds NULL = today's scan.
+    active_org = await org_lists.active_org_uuid(request, current_user)
     async with get_user_pg_connection(request, current_user) as conn:
-        rows = await conn.fetch(LIBRARY_SUMMARY_SQL)
+        rows = await conn.fetch(LIBRARY_SUMMARY_SQL, active_org)
         conn_ids = sorted(
             {r["source_connection_id"] for r in rows
              if not r["g_c"] and r["source_connection_id"] is not None},

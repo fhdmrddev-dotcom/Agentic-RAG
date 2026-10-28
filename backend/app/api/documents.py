@@ -32,6 +32,7 @@ from app.models.document import (
 )
 from app.models.document import ConversationMessage, ConversationResponse  # Phase 240
 from app.models.user_settings import load_app_settings, load_app_settings_async
+from app.services import org_lists  # Phase 298 (D-06): the one home of list narrowing
 from app.services.audit_service import write_audit_entry
 from app.services.embedding_service import chunk_text, embed_chunks, extract_metadata, read_enabled_field_defs
 from app.services.email_attachments import ingest_email_attachments
@@ -882,6 +883,7 @@ async def list_documents(
     kind: Literal["spreadsheet"] | None = Query(
         None, description="`spreadsheet` = .xlsx / .xls / .csv or a spreadsheet / CSV MIME type."
     ),
+    request: Request = None,  # FastAPI injects it; direct callers may omit it (no header -> None)
     current_user: dict = Depends(get_current_user),
     supabase: Client = Depends(get_user_supabase_client),
 ):
@@ -896,6 +898,10 @@ async def list_documents(
     """
     if folder_id is not None and folder_id != "root":
         folder_id = _uuid_or_422(folder_id, "folder_id")
+    # 298 (D-02/D-32): resolved ONCE, before build() (sync, re-invoked by aexec_page). Every read
+    # of this route — Root, status-only, a folder — narrows to it, the same predicate as
+    # LIBRARY_SUMMARY_SQL, so the pill and its list agree. None -> no predicate. Only shrinks.
+    active_org = await org_lists.active_org(request, current_user)
 
     def build():
         q = (
@@ -903,6 +909,7 @@ async def list_documents(
             .select(LIST_SELECT, count="exact")
             .eq("is_latest", True)
         )
+        q = org_lists.by_org(q, active_org)
         if folder_id == "root":
             q = q.is_("folder_id", "null")
         elif folder_id is not None:
