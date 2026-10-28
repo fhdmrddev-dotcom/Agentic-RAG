@@ -347,3 +347,166 @@ def test_create_draft_declares_the_optional_query_param():
     # truthy FieldInfo object that would send every direct create down the guarded read.
     assert param.default is None
     assert "Query" in repr(param.annotation) or "Query" in json.dumps(str(param.annotation))
+
+
+# ── §5 the ask_user answer is stamped with the RUN's org (Task 3) ───────────────────────────
+
+
+class _Builder:
+    def __init__(self, table):
+        self.table, self.cols, self.payload, self.filters = table, None, None, []
+
+    def select(self, cols):
+        self.cols = cols
+        return self
+
+    def eq(self, k, v):
+        self.filters.append((k, v))
+        return self
+
+    def maybe_single(self):
+        return self
+
+    def insert(self, payload):
+        self.payload = payload
+        return self
+
+
+class _Supabase:
+    def __init__(self):
+        self.builders: list[_Builder] = []
+
+    def table(self, name):
+        b = _Builder(name)
+        self.builders.append(b)
+        return b
+
+
+async def _answer(*, deep_row, wf_row=None, anchor=None):
+    from app.api import runs as runs_mod
+
+    sb = _Supabase()
+    run_id = uuid4()
+
+    async def fake_aexec(b):
+        if b.payload is not None:
+            return SimpleNamespace(data=[{"id": str(uuid4())}])
+        if b.table == "runs":
+            return SimpleNamespace(data=deep_row)
+        if b.table == "workflow_runs":
+            return SimpleNamespace(data=wf_row)
+        if b.table == "threads":
+            return SimpleNamespace(data={"active_workflow_run_id": str(run_id)} if anchor else None)
+        raise AssertionError(b.table)
+
+    body = SimpleNamespace(tool_call_id="tc1", response_text="Yes", choice_index=0, folder_id=None)
+    with patch.object(runs_mod, "aexec", side_effect=fake_aexec), \
+            patch.object(runs_mod, "_is_current_question", AsyncMock(return_value=True)), \
+            patch.object(runs_mod, "_engine_answer_refusal", AsyncMock(return_value=None)), \
+            patch.object(runs_mod, "_redrive_paused_workflow_run", AsyncMock()), \
+            patch("app.api.threads._emit", AsyncMock()), \
+            patch("app.services.ask_user_service.publish_response", AsyncMock()):
+        out = await runs_mod.submit_ask_user_response(
+            run_id=run_id, body=body, current_user={"id": USER}, supabase=sb, redis=MagicMock())
+    inserts = [b for b in sb.builders if b.payload is not None]
+    return out, sb, inserts
+
+
+async def test_a_deep_answer_carries_the_runs_org():
+    out, sb, inserts = await _answer(deep_row={"run_id": "r", "thread_id": "t", "status": "active",
+                                               "org_id": ORG_A})
+    assert out == {"status": "ok"}
+    runs_select = [b for b in sb.builders if b.table == "runs"][0]
+    assert "org_id" in [c.strip() for c in runs_select.cols.split(",")]
+    assert len(inserts) == 1 and inserts[0].table == "messages"
+    assert inserts[0].payload["org_id"] == ORG_A
+
+
+async def test_a_workflow_answer_carries_the_workflow_runs_org():
+    out, sb, inserts = await _answer(deep_row=None,
+                                     wf_row={"id": "w", "thread_id": "t", "org_id": ORG_A},
+                                     anchor=True)
+    assert out == {"status": "ok"}
+    wf_select = [b for b in sb.builders if b.table == "workflow_runs"][0]
+    assert "org_id" in [c.strip() for c in wf_select.cols.split(",")]
+    assert inserts[0].payload["org_id"] == ORG_A
+    assert inserts[0].payload["origin"] == "harness"
+
+
+# ── §6 a new schedule is stamped with the definition's org (Task 3) ─────────────────────────
+
+BASE_CREATE_SCHEDULE_SQL_SHA256 = "45acad7ff821ef9ccd7f3a5f701ffaa795a19df56225f03583035571edb5a9bf"
+
+
+class _SchedPool:
+    def __init__(self):
+        self.calls: list[tuple[str, tuple]] = []
+
+    async def fetchrow(self, sql, *args):
+        self.calls.append((sql, args))
+        return {}
+
+
+def _sched_kwargs(**extra):
+    return dict(workflow_id=uuid4(), user_id=uuid4(), name="n", cron_expression="0 * * * *",
+                interval_seconds=None, timezone="UTC", is_active=True, max_tokens_per_run=1,
+                max_duration_seconds=1, inputs={}, **extra)
+
+
+async def test_create_schedule_without_an_org_issues_todays_insert_byte_for_byte():
+    import hashlib
+
+    from app.db import schedules
+
+    pool = _SchedPool()
+    await schedules.create_schedule(pool, **_sched_kwargs())
+    sql, args = pool.calls[0]
+    assert hashlib.sha256(sql.encode()).hexdigest() == BASE_CREATE_SCHEDULE_SQL_SHA256
+    assert len(args) == 11
+
+
+async def test_create_schedule_with_an_org_names_and_binds_the_column():
+    from app.db import schedules
+
+    pool = _SchedPool()
+    await schedules.create_schedule(pool, **_sched_kwargs(org_id=UUID(ORG_A)))
+    sql, args = pool.calls[0]
+    flat = " ".join(sql.split())
+    assert "next_run_at, org_id)" in flat and "$12)" in flat
+    assert args[-1] == UUID(ORG_A) and len(args) == 12
+
+
+async def _schedule_route(*, definitions, active_org):
+    from app.api import schedules as sched_api
+
+    pool = OrgPool(definitions=definitions)
+    created = AsyncMock(return_value={"id": uuid4()})
+    wf = next(iter(definitions)) if definitions else str(uuid4())
+    body = SimpleNamespace(name="n", cron_expression="0 * * * *", interval_seconds=None,
+                           timezone="UTC", is_active=True, max_tokens_per_run=1,
+                           max_duration_seconds=1, inputs={})
+    with patch.object(sched_api, "get_pg_pool", AsyncMock(return_value=pool)), \
+            patch.object(sched_api, "get_definition", AsyncMock(return_value={"status": "published"})), \
+            patch.object(sched_api, "create_schedule", created), \
+            patch.object(sched_api, "_serialize", lambda row: row), \
+            patch("app.services.org_lists.resolve_active_org_or_none", AsyncMock(return_value=active_org)):
+        await sched_api.create_workflow_schedule(
+            workflow_id=UUID(wf), body=body, current_user={"id": USER},
+            request=SimpleNamespace(headers={}, state=SimpleNamespace()),
+        )
+    return created.await_args.kwargs
+
+
+async def test_a_schedule_of_your_workflow_is_stamped_with_its_org_not_the_active_one():
+    kw = await _schedule_route(definitions=_src(org=ORG_A), active_org=ORG_B)
+    assert kw["org_id"] == UUID(ORG_A)
+
+
+async def test_a_schedule_of_a_global_workflow_is_stamped_with_the_active_org():
+    kw = await _schedule_route(definitions=_src(glob=True), active_org=ORG_B)
+    assert kw["org_id"] == UUID(ORG_B)
+
+
+async def test_a_schedule_of_a_global_workflow_with_no_active_org_leaves_it_to_the_trigger():
+    kw = await _schedule_route(definitions=_src(glob=True), active_org=None)
+    assert kw.get("org_id") is None
