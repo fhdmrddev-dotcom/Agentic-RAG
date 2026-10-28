@@ -13,6 +13,7 @@ import { ThreadCommandPalette } from "./ThreadCommandPalette"
 // used — moved here verbatim. ChatLayout renders it with same-named props.
 import { AppViewSwitch } from "./AppViewSwitch"
 import type { ThreadNavigation } from "@/components/chat/threadNavigation"
+import type { EntityLink } from "@/hooks/useAppNavigation"
 import type { PanelState } from "@/components/panel/WorkspacePanel"
 import { subscribeOpenPanel } from "@/components/panel/panelOpenSignal"
 import { askInChat } from "@/components/library/find/askInChat"
@@ -130,6 +131,9 @@ interface Props {
   openRun?: (workflowRunId: string) => void
   addressNotFound?: boolean
   operatorLoading?: boolean
+  /** Phase 299-02 (LINK-02 / D-02): the address's entity and its navigators, from App's ONE
+   *  navigation hook. Optional on purpose — the 235-08 precedent above. */
+  entityLink?: EntityLink
 }
 
 export function ChatLayout({ onSignOut, activeView, onNavigate, navItems, isOperator, operatorIdentity, prefillMessage, onSetPrefillMessage, studioSkillId, studioTab, onOpenStudio, onReviewEvals, onStudioTabChange, onTuneSkill, libraryTab, onOpenLibraryHealth, activeRunId, openRun, addressNotFound = false, operatorLoading = false }: Props) {

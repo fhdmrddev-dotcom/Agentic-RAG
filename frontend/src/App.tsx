@@ -334,6 +334,7 @@ function App() {
               activeRunId={nav.runId}
               openRun={nav.openRun}
               addressNotFound={nav.addressNotFound}
+              entityLink={nav.entityLink}
               operatorLoading={operatorLoading}
             />
           </CitationNavProvider>

@@ -11848,7 +11848,7 @@ cells rot within days.
 | [`frontend/src/components/sources/watchProductMark.ts`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentssourceswatchproductmarkts) | 0 / 0 / 38 | no (new) | young (240) — which PRODUCT a watched folder came from, read from its ADDRESS. ⛔ Never from `service_id`: Gmail and Drive share one connection |
 | [`frontend/src/components/sources/CreateWatchModal.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentssourcescreatewatchmodaltsx) | 4 / 1 / 283 | no (1 phase) | honoured by construction (**240**): byte-unchanged. ⛔ Its auto-select of `capable[0]` is why BUG-260908-02 mattered most here |
 | [`frontend/src/components/layout/NavPanel.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentslayoutnavpaneltsx) | 26 / 14 / 420 (was `25 / 14 / 416`) | ⚠ **FIRES** | **276-01** (D-14): Iris mark `<img>`; **276-06** (D-27): on the dark `#0A0E18` chip, classes only. 244-14's `overflow-x-hidden` stands |
-| [`frontend/src/App.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrcapptsx) | 43 / 30 / 349 (was `42 / 29 / 355`) | **FIRES** | 299-05: the splash JSX becomes `<BootScreen />` (one expression; IrisAvatar import swapped for BootScreen's). See §Phase 299 (299-05) |
+| [`frontend/src/App.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrcapptsx) | 44 / 30 / 350 (was `43 / 30 / 349`) | **FIRES** | 299-02: one prop `entityLink={nav.entityLink}` on `<ChatLayout>` (honoured by construction). See §Phase 299 (299-02) |
 | [`frontend/src/lib/nav-items.ts`](docs/HOT-FILE-LEDGER.md#frontendsrclibnav-itemsts) | 13 / 9 / 173 (was `12 / 8 / 153`) | ⚠ **FIRES** | **283-02** (FIX-01): the Settings entry UNGOVERNED (no `feature` key); per-tab gate in the page, per-route `require_visible` at the API. `visibleNavItems` unchanged |
 | [`frontend/src/components/library/HealthTab.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentslibraryhealthtabtsx) | 9 / 2 / 199 | no (2 phases) | row added 235 BELOW threshold on purpose. One import, one optional prop, one mount, ZERO branches; the handler lives at the page boundary |
 | [`frontend/src/pages/librarySelection.ts`](docs/HOT-FILE-LEDGER.md#frontendsrcpageslibraryselectionts) | 2 / 2 / 312 | no (2 phases) | ⚠ absent for its entire life — row added 235, which did NOT modify it but made `App.tsx` import `LibraryTab` from it rather than re-declare it |
@@ -12201,9 +12201,9 @@ cells rot within days.
 | [`frontend/src/components/workflows/library/automationFacts.ts`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentsworkflowslibraryautomationfactsts) | 2 / 2 / 132 (was `1 / 1 / 95`) | no (young) | absent its ENTIRE LIFE (created 204.1) — row added 293. 293-03: next from server next_run_at. ⛔ spells no string; never computes |
 | [`frontend/src/components/admin/AuditTab.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentsadminaudittabtsx) | 8 / 5 / 771 (was `7 / 4 / 770`) | ⚠ **FIRES** | 298-review WR-07: one PLATFORM_ACTION_META entry, org.item.move → 'Moved an item to another organization' (Organizing), identical to OrgAuditTab's (fenced). Data only |
 | [`frontend/src/components/org/OrgAuditTab.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentsorgorgaudittabtsx) | 5 / 4 / 416 (was `4 / 3 / 415`) | ⚠ **FIRES** | 298-review WR-07: one ACTION_META entry, org.item.move → 'Moved an item to another organization' (Organizing), identical to AuditTab's (fenced). ⛔ shared audit vocabulary still OWED |
-| [`frontend/src/hooks/useAppNavigation.ts`](docs/HOT-FILE-LEDGER.md#frontendsrchooksuseappnavigationts) | 4 / 1 / 290 (was `3 / 1 / 240`) | no (young) | 297-03: the ONE useBlocker over the leave-guard registry; latch cleared per location key. ⛔ the ONLY router-hook caller (D-08); setLibraryTab( exactly 2 |
+| [`frontend/src/hooks/useAppNavigation.ts`](docs/HOT-FILE-LEDGER.md#frontendsrchooksuseappnavigationts) | 9 / 2 / 452 (was `4 / 1 / 290`) | no (young) | 299-02: one entityLink object (target, route, openThread/Workflow/Expert, leaveThread); Chat → last thread. ⛔ ONLY router-hook caller; setLibraryTab( exactly 2; one blocker |
 | [`frontend/src/components/layout/AppViewSwitch.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentslayoutappviewswitchtsx) | 2 / 1 / 523 (was `1 / 1 / 473`) | no (young) | 297-02: S1 first non-chat arm; run hold inside the one run arm; admin arms gated on the operator probe. ⛔ one run comparison; fallback last; every hold lives here, never at App |
-| [`frontend/src/lib/appRoutes.ts`](docs/HOT-FILE-LEDGER.md#frontendsrclibapproutests) | 1 / 1 / 198 (was `0 / 0 / 0`) | no (young) | young (created 297-02). STRICT LEAF: one home of /app path vocabulary (D-11). ⛔ never throws; strict UUID; no host in any output |
+| [`frontend/src/lib/appRoutes.ts`](docs/HOT-FILE-LEDGER.md#frontendsrclibapproutests) | 2 / 2 / 219 (was `1 / 1 / 198`) | no (young) | 299-02: chat / workflows / experts entity variants beside runs (D-01). STRICT LEAF. ⛔ never throws; strict UUID; ?run= is the chat home's only; no host |
 | [`frontend/src/components/layout/AddressNotFound.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentslayoutaddressnotfoundtsx) | 1 / 1 / 51 (was `0 / 0 / 0`) | no (young) | young (created 297-02). S1 + S2 and their copy, one home. ⛔ no path prop, no icon; never renders the trailing fallback tag |
 | [`frontend/src/lib/leaveGuard.ts`](docs/HOT-FILE-LEDGER.md#frontendsrclibleaveguardts) | 1 / 1 / 97 (was `0 / 0 / 0`) | no (young) | young (created 297-03). Leave-guard registry, no-op default (D-21); one-shot latch (D-32/D-42). ⛔ no component; react-only imports; never throws |
 | [`backend/app/services/org_lists.py`](docs/HOT-FILE-LEDGER.md#backendappservicesorg_listspy) | 2 / 1 / 108 (was `1 / 1 / 71`) | no | young (298-01). 298-review WR-09: root_upload_org 503s when a sent header cannot be validated. ⛔ list helpers: None → no predicate, never raise |
@@ -19229,6 +19229,16 @@ Scan-list cell as of 2026-10-28 (replaced by 299-05, moved verbatim): 42 / 29 / 
 
 CLAUDE.md verdict cell as of 2026-10-28 (replaced by 299-05, moved verbatim): | `frontend/src/App.tsx` | 42 / 29 / 355 (was `41 / 29 / 348`) | 297-03: one LeaveGuardContext.Provider (no key, one-identity value) |
 
+### `frontend/src/App.tsx` — Phase 299 (299-02)
+
+**`44 / 30 / 350`** (was `43 / 30 / 349`)
+
+One prop expression: `entityLink={nav.entityLink}` on `<ChatLayout>`, beside `addressNotFound`. No hook, no state, no provider and no key added; the provider order is byte-identical, so `navigationKeepsStreams.test.tsx` and `SetupWizard.test.tsx` stay green unedited. Honoured by construction (the 297 one-expression precedent); the logic lives in `useAppNavigation.ts` (the navigators) and `useThreadAddress.ts` (the binding).
+
+Scan-list cell as of 2026-10-28 (replaced by 299-02, moved verbatim): 43 / 30 / 349 (was `42 / 29 / 355`) | **FIRES** | 299-05: the splash JSX becomes `<BootScreen />` (one expression; IrisAvatar import swapped for BootScreen's). See §Phase 299 (299-05)
+
+CLAUDE.md verdict cell as of 2026-10-28 (replaced by 299-02, moved verbatim): | `frontend/src/App.tsx` | 43 / 30 / 349 (was `42 / 29 / 355`) | 299-05: splash → <BootScreen /> (one expression) |
+
 ### `frontend/src/components/classification/ClassificationRulesPage.tsx` — Phase 271
 
 **`3 / 3 / 264`** at 271 close. **271-02 (P-07):** one shape, no `embedded` flag; the outer padding and old h1 dropped; the sub-view header renders Back ("Library"), "Filing rules", the shipped subtitle and New rule. Its only mount is now inside `LibraryPage`. Live (G4-3): the sub-view reads Filing rules, never Classification rules, and the seeded rule is listed. It measures 3 phases, so it FIRES.
@@ -25929,6 +25939,16 @@ The ONE `useBlocker` in product code (D-21). It holds one `LeaveGuardRegistry` f
 
 Scan-list cell as of 2026-10-27 (replaced by 297-03, moved verbatim): 3 / 1 / 240 (was `1 / 1 / 160`) | no (young) | 297-02: view/runId/studioSkillId derived from the location; one canonical REPLACE effect. ⛔ the ONLY router-hook caller (D-08); setLibraryTab( exactly 2
 
+### `frontend/src/hooks/useAppNavigation.ts` — Phase 299 (299-02)
+
+**`9 / 2 / 452`** (was `4 / 1 / 290` — that cell was stale by four 297-REVIEW commits; re-derived here)
+
+Returns ONE new key, `entityLink` (exported type `EntityLink`): `target` (`{ kind: "thread" | "workflow" | "run" | "expert"; id }` from the parsed address, or `null`), `route` (the parsed entity route, for a copy control), and four navigators through `go` — `openThread(id, opts?)` (push, or replace when asked), `openWorkflow(id)`, `openExpert(id)`, `leaveThread()` (REPLACE with `/app`, and a no-op off a thread address). One `useMemo` over `parsed` and the four stable callbacks, so the object keeps one identity while the address is unchanged. `go`'s strict-UUID guard covers the three new id variants (T-299-18). A `lastThreadId` ref mirrors `lastRunId`: `handleNavigate("chat")` goes to `/app/chat/<last>` when one was seen, else `/app`, and is a no-op on any chat address. ⚠ Two refinements beyond the plan text, both pinned: (1) `go` updates `lastThreadId` synchronously with the write, because the palette / launch shape calls a navigator and then the legacy `onNavigate("chat")` in one handler, and an effect-synced memory would push a stale thread second; (2) seeing the chat HOME clears it, so a thread the person left with `leaveThread` is not re-opened by the rail. `bounceHome` still replaces with the thread-less `/app`. The canonical REPLACE effect already carried `location.hash`, so a bare `/chat/<uuid>#access_token=…` lands on `/app/chat/<uuid>` with the hash (Pitfall 10, pinned).
+
+**Binding invariants (unchanged, re-checked):** ⛔ still the ONLY module calling `useLocation` / `useNavigate` / `useBlocker` (D-08); ⛔ `setLibraryTab(` exactly 2 in comment-stripped code; ⛔ one blocker; ⛔ the Library hand-off comment block untouched. Pinned by `useAppNavigation.test.tsx` (35 → 63, exact PUSH counts by location key under StrictMode).
+
+Scan-list cell as of 2026-10-28 (replaced by 299-02, moved verbatim): 4 / 1 / 290 (was `3 / 1 / 240`) | no (young) | 297-03: the ONE useBlocker over the leave-guard registry; latch cleared per location key. ⛔ the ONLY router-hook caller (D-08); setLibraryTab( exactly 2
+
 ### `frontend/src/components/layout/AppViewSwitch.tsx`
 
 **Added AT PLANNING (Phase 297, 2026-10-27) with `0 / 0 / 0`** — the file does not exist yet; plan
@@ -25985,6 +26005,14 @@ Scan-list cell as of 2026-10-27 (replaced by 297-02, moved verbatim): 1 / 1 / 47
 - Legacy aliases: `?run=<uuid>` and `?connections=1` apply only where the path says chat;
   `/admin/spend[/…]` and bare known prefixes (D-13). `/setup`, `/invite` and bare `/` are never rewritten.
 - Pinned by `src/lib/__tests__/appRoutes.test.ts` (111) and the route leg in `activeViewReachability.test.ts`.
+
+### `frontend/src/lib/appRoutes.ts` — Phase 299 (299-02)
+
+**`2 / 2 / 219`** (was `1 / 1 / 198`)
+
+Three id-bearing variants join the `AppRoute` union — `{ view: "chat"; threadId }`, `{ view: "workflows"; definitionId }`, `{ view: "experts"; bundleId }` — beside 297's `workflow-run`. They are NOT new `ActiveView` members, so `VIEW_PATHS`, the parity suite's one-address-per-member `CANONICAL` set and the reachability route leg are unchanged. `viewOf` gains three arms in the `runs` / `skills` style (`head === "chat" && isStrictUuid(id)` → lowercased); `formatAppRoute` narrows with `"threadId" in route` so `{ view: "chat" }` still formats to `/app` and a thread is never the home. The legacy `?run=` alias now applies to the chat HOME only (a thread address keeps its thread; D-05 home behaviour byte-identical). Imports unchanged (the `ActiveView` type and `runDeepLink`); a dated 299 paragraph sits beside the ⛔ docblock, which stays true. Pinned by `appRoutes.test.ts` (111 → 144, new cases only — the exact-equality fences for `/app` and `/app/chat` unedited) and `appRouteParity.test.ts` (78 → 91, an `ENTITY` list beside `CANONICAL`; all three layers already served `/app/*`, so no host config changed).
+
+Scan-list cell as of 2026-10-28 (replaced by 299-02, moved verbatim): 1 / 1 / 198 (was `0 / 0 / 0`) | no (young) | young (created 297-02). STRICT LEAF: one home of /app path vocabulary (D-11). ⛔ never throws; strict UUID; no host in any output
 
 ### `frontend/src/components/layout/AddressNotFound.tsx`
 
