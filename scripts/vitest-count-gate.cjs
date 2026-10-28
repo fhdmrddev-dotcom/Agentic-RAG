@@ -4479,6 +4479,10 @@ const BASELINE = {
   "SwitchOrgPrompt.test.tsx": 15, // 299-03 (D-16 / D-17 / D-39) — every S3 sentence from orgItemsCopy (still no import); heading focus + body + caption (uppercase) + title + Stay outline + Switch the only filled button + avatar initial, nothing on render; section not alert; caption per kind; tail + chip for one / two answering chats, none otherwise; one handler per button; Switching… status replaces the buttons; title / org as React text; source: no switchOrg(, no HTML, no spelled sentence
   "CantBeOpened.test.tsx": 18, // 299-03 (D-12..D-15, D-36) — the words per kind, no reason (comment-stripped scan), no raw path prop; run card focus/section/inert behind/filled exit + outline copy; lowercase rebuild; Copy address success 2 s + status, refused selects + shortcut word; unparseable variant (297 words, no address); AddressNotFound renders the same card; identical DOM for missing vs foreign
   "ChatLayout.mobileLoading.test.tsx": 4, // 299-05 (FIX-02 / BUG-261027-02) — real ChatLayout + useThreads + ChatHistoryColumn, listThreads deferred: desktop first load says "Loading your chats…" then "No recent chats" only after a settled []; chats answer → rows, no loader; mobile drawer the same (empty sentence style unchanged); a settled no-match search still says "No chats match your search."
+  // ── Phase 299-04 (LINK-03 / D-20, D-21, D-33, D-34, D-39) — both knobs, same commit (2026-10-28). src/lib/__tests__
+  //    and src/components/share/__tests__ have no directory entry, so each new file is FILE-LEVEL in TARGETS below.
+  "linkAudience.lockstep.test.ts": 20, // 299-04 (D-33 / D-34 / T-299-32) — audienceOf equals every row of backend link_audience_cases.json (?raw) and the backend TERMINAL_RUN_STATUSES literal; an unfinished run never opens for members; the five UI-D15 sentences verbatim, null org falls back to owner-only, each sentence once in the leaf, the leaf imports nothing; linkNoun per kind
+  "ShareLinkMenu.test.tsx": 11, // 299-04 (D-20 / D-21 / D-39 / UI-D12..UI-D15) — trigger word Link (not Share), icon hidden, icon-only below md, aria-label per kind; surface label + host address in <code> + ONE Copy link item + audience line (org name foreground), described-by both; unknown / no org falls back; copies origin + path once (no ? / #), stays open, ✓ Link copied 2 s + status; refused selects the code + shortcut word, never success; no toast / popover / input; the ⋯ sub form
 }
 
 // Still COMPUTED, never hand-written — the reduce is the single source, so the
@@ -6566,6 +6570,9 @@ const TARGETS = [
   "src/components/layout/__tests__/CantBeOpened.test.tsx",
   "src/components/layout/__tests__/LinkGate.test.tsx",
   "src/components/layout/__tests__/SwitchOrgPrompt.test.tsx",
+  // Phase 299-04 — FILE-LEVEL (no src/lib/__tests__ or src/components/share/__tests__ directory entry), SAME commit as their pins.
+  "src/lib/__tests__/linkAudience.lockstep.test.ts",
+  "src/components/share/__tests__/ShareLinkMenu.test.tsx",
 ]
 
 const REPO_ROOT = path.resolve(__dirname, "..")
