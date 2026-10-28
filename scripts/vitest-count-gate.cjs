@@ -4456,6 +4456,12 @@ const BASELINE = {
   "MoveToOrgSheet.test.tsx": 23, // 298-review WR-02: 22 → 23 (two hosts, one sheet, survivor takes over) · 298-05 298-05 (RED commit pinned 21; the suite holds 22 — corrected at GREEN) — checking shows no count and no Move (Keep focused); the clean anatomy + every UI-D18 count sentence; refusals verbatim in one amber alert with only Close (preview list, 403); server text is text; preview failed + Try again; Moving can't be dismissed and Moved records ONCE on the 200; 409/403/5xx at confirm; 4+ orgs pick first; no red in any state
   "MoveToOrgMenuItem.test.tsx": 16, // 298-05 — the menu item: one per other org by name at 2-3 orgs, collapsed at 4+, absent solo / no provider / non-owner, opens THIS item's move tagged with the org, a subtree holding the selection says so; the Root-document button: owned latest Root only, collapsed at 4+, absent otherwise, opens the sheet
   "moveMounts.test.tsx": 12, // 298-05 — the three homes through the real components: folder ⋯ (owner, 2 orgs, between Share and Delete, menu widens; non-owner + solo absent; opens from the tree's host; leaves the tree only on the refetch), Library resets only a selection that moved, Root document button in the Download row (Close after Moved closes the panel; folder/older/not-owned absent), draft ⋯ (menuitem, WR-03 roles; published + starter never), drafts feed re-read
+  // ── Phase 299-05 (LINK-06 / D-22..D-24 / SEED-312) — both knobs, same commit (2026-10-28). None of the
+  //    three has a directory entry (src/lib/__tests__, src/hooks/__tests__, src/pages/__tests__ are all
+  //    file-level), so each is FILE-LEVEL in TARGETS below.
+  "returnTo.test.ts": 49, // 299-05 — returnTarget rebuilt-never-echoed (run/home/view/bare + the appRoutes HOSTILE set + pre-auth → null, never throws), kindWord kind-only, RETURN_LINE words, the sessionStorage copy (stored rebuilt, taken once, 15-min TTL, planted //evil → null, throwing storage swallowed)
+  "useAuth.test.ts": 9, // 299-05 — SSO redirectTo / sign-up emailRedirectTo = origin + rebuilt path (or /app) + remembered; password passes none and forgets; rejected getSession ends loading with user null; a hung one keeps loading and no timer clears a signed-in user (Pitfall 6)
+  "AuthPage.returnLine.test.tsx": 8, // 299-05 — S5: the kind-only line under the form on an entity address, sign-up wording after the switch, no line on home / a view / off-site / unknown, React text only
 }
 
 // Still COMPUTED, never hand-written — the reduce is the single source, so the
@@ -6526,6 +6532,10 @@ const TARGETS = [
   "src/components/org/__tests__/MoveToOrgSheet.test.tsx",
   "src/components/org/__tests__/MoveToOrgMenuItem.test.tsx",
   "src/components/org/__tests__/moveMounts.test.tsx",
+  // Phase 299-05 — FILE-LEVEL (no src/lib/__tests__, src/hooks/__tests__ or src/pages/__tests__ directory entry), SAME commit as their pins.
+  "src/lib/__tests__/returnTo.test.ts",
+  "src/hooks/__tests__/useAuth.test.ts",
+  "src/pages/__tests__/AuthPage.returnLine.test.tsx",
 ]
 
 const REPO_ROOT = path.resolve(__dirname, "..")
