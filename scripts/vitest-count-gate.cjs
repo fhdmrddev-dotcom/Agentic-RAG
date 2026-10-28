@@ -4445,7 +4445,7 @@ const BASELINE = {
   "FolderTree.test.tsx": 15, // 298-04 ADOPTED: 10 existing + 4 — loading says "Loading folders…" never "No folders yet", Root kept with no count, no stale rows, empty sentence unchanged · RAISED 14 → 15 at 298-05: the elsewhere line mounts once under the Folders header, above Root
   "LibraryPage.orgSwitch.test.tsx": 7, // 298-review: 5 → 7 (WR-01 a saved view does not survive the switch; IN-05 a late refreshViews never repaints) · 298-04 — 298-04 — real useFolders + useLibraryDocuments over a fake network: old org's folder/document gone at once, loading line, late answer dropped, Root + panel reset (UI-D10), fields/views/provenance re-read (SEED-317), Root count never 0
   "WorkflowsPage.orgSwitch.test.tsx": 6, // 298-04 — real page + feeds hook: old org's workflow/draft gone at once, "Loading your workflows…" never the empty sentence, late answer dropped, project filter back to All, each feed re-read once · RAISED 4 → 6 at 298-05: the elsewhere line mounts once atop the list region, also while loading
-  "useThreads.orgSwitch.test.ts": 5, // 298-review WR-03: 4 → 5 (a failed refetch after a switch ends switching) · 298-04 — 298-04 — switching false on first render (UI-D9), old threads drop at once + switching until answered, late answer dropped, newThread lands in the new org
+  "useThreads.orgSwitch.test.ts": 9, // RAISED 5 → 9 at 299-05 (FIX-02): pending true on first render, a settled [] ends it, true again after a switch until answered, a failed first load settles it · 298-review WR-03: 4 → 5 (a failed refetch after a switch ends switching) · 298-04 — 298-04 — switching false on first render (UI-D9), old threads drop at once + switching until answered, late answer dropped, newThread lands in the new org
   "ChatHistoryColumn.orgSwitch.test.tsx": 6, // 298-04 — loading says "Loading your chats…" never "No recent chats", hides handed rows, empty sentence unchanged without it, a streaming old-org thread is not listed · RAISED 4 → 6 at 298-05: the elsewhere line mounts atop the list, and stays under a title filter
   "folderLabel.test.ts": 8, // 298-04 — optionLabel/chipLabel words (in-org name, "lives in {Org}", active-org label plain, unseen → UNNAMED_KB_OPTION never the id) + getFolderLabels ([] no request, comma-joined, chunked at 50, ApiError). Covered by the src/components/workflows directory entry
   "useBuilderNameMaps.orgLabels.test.tsx": 8, // 298-04 — one label read for the missing bound ids, chip-form names + folderLabels, nothing asked when all in-org, unseen gets no name, failure non-fatal, re-read per org; the real page's option / UNNAMED / flag-off chip words. Covered by the src/components/workflows directory entry
@@ -4463,6 +4463,7 @@ const BASELINE = {
   "useAuth.test.ts": 9, // 299-05 — SSO redirectTo / sign-up emailRedirectTo = origin + rebuilt path (or /app) + remembered; password passes none and forgets; rejected getSession ends loading with user null; a hung one keeps loading and no timer clears a signed-in user (Pitfall 6)
   "AuthPage.returnLine.test.tsx": 8, // 299-05 — S5: the kind-only line under the form on an entity address, sign-up wording after the switch, no line on home / a view / off-site / unknown, React text only
   "BootScreen.test.tsx": 9, // 299-05 — S6 on one clock (fake timers): 0-7.9 s verbatim splash, 8 s "Still connecting…" in the same status, 20 s heading + body + focused Try again (idle Iris, no alert), kept sentence only on an entity address, reload once + no History write, unmount clears both timers; App's splash branch IS BootScreen (gives up at 20 s, never the sign-in form), and resolves to the card as today
+  "ChatLayout.mobileLoading.test.tsx": 4, // 299-05 (FIX-02 / BUG-261027-02) — real ChatLayout + useThreads + ChatHistoryColumn, listThreads deferred: desktop first load says "Loading your chats…" then "No recent chats" only after a settled []; chats answer → rows, no loader; mobile drawer the same (empty sentence style unchanged); a settled no-match search still says "No chats match your search."
 }
 
 // Still COMPUTED, never hand-written — the reduce is the single source, so the
@@ -6539,6 +6540,7 @@ const TARGETS = [
   "src/pages/__tests__/AuthPage.returnLine.test.tsx",
   // Phase 299-05 — FILE-LEVEL (no src/components/layout/__tests__ directory entry), SAME commit as its pin.
   "src/components/layout/__tests__/BootScreen.test.tsx",
+  "src/components/layout/__tests__/ChatLayout.mobileLoading.test.tsx",
 ]
 
 const REPO_ROOT = path.resolve(__dirname, "..")
