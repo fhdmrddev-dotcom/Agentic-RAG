@@ -12206,12 +12206,12 @@ cells rot within days.
 | [`frontend/src/lib/appRoutes.ts`](docs/HOT-FILE-LEDGER.md#frontendsrclibapproutests) | 1 / 1 / 198 (was `0 / 0 / 0`) | no (young) | young (created 297-02). STRICT LEAF: one home of /app path vocabulary (D-11). ⛔ never throws; strict UUID; no host in any output |
 | [`frontend/src/components/layout/AddressNotFound.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentslayoutaddressnotfoundtsx) | 1 / 1 / 51 (was `0 / 0 / 0`) | no (young) | young (created 297-02). S1 + S2 and their copy, one home. ⛔ no path prop, no icon; never renders the trailing fallback tag |
 | [`frontend/src/lib/leaveGuard.ts`](docs/HOT-FILE-LEDGER.md#frontendsrclibleaveguardts) | 1 / 1 / 97 (was `0 / 0 / 0`) | no (young) | young (created 297-03). Leave-guard registry, no-op default (D-21); one-shot latch (D-32/D-42). ⛔ no component; react-only imports; never throws |
-| [`backend/app/services/org_lists.py`](docs/HOT-FILE-LEDGER.md#backendappservicesorg_listspy) | 1 / 1 / 71 | no | young (created 298-01). Polarity-safe list narrowing, one home (D-06). ⛔ None → {} / no predicate; never an empty set, never restrict_org_ids=None; never the 400-ing org gate |
+| [`backend/app/services/org_lists.py`](docs/HOT-FILE-LEDGER.md#backendappservicesorg_listspy) | 2 / 1 / 108 (was `1 / 1 / 71`) | no | young (298-01). 298-review WR-09: root_upload_org 503s when a sent header cannot be validated. ⛔ list helpers: None → no predicate, never raise |
 | [`backend/app/api/org_items.py`](docs/HOT-FILE-LEDGER.md#backendappapiorg_itemspy) | 2 / 1 / 354 (was `1 / 1 / 227`) | no | young (298-01 reads; 298-03 move-preview + move, thin over org_move). ⛔ every route 401 without a bearer (router dependency); only member orgs named |
 | [`frontend/src/hooks/useActiveOrgId.ts`](docs/HOT-FILE-LEDGER.md#frontendsrchooksuseactiveorgidts) | 1 / 1 / 18 | no | young (created 298-01). The one active-org key for list hooks (D-08). ⛔ answers are tagged with getActiveOrgId() at SEND time, never with this state |
 | [`frontend/src/providers/OrgProvider.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrcprovidersorgprovidertsx) | 4 / 3 / 222 (was `3 / 2 / 217`) | ⚠ **FIRES** | ⚠ now FIRES (298). 298-01: the WR-01 self-heal calls syncActiveOrgHeader before setActiveOrgIdState (D-36), mirroring switchOrg. ⛔ the provider never remounts on a switch (297) |
-| [`backend/app/services/foreign_folder_refusal.py`](docs/HOT-FILE-LEDGER.md#backendappservicesforeign_folder_refusalpy) | 1 / 1 / 293 | no (young) | young (created 298-02). ORG-05 one home: bound set (D-34), worded refusal (D-14), publish-parity confirm (D-13). ⛔ definition org from the row, never the viewer; never restrict_org_ids=set() |
-| [`backend/app/services/org_move.py`](docs/HOT-FILE-LEDGER.md#backendappservicesorg_movepy) | 1 / 1 / 986 | no | young (created 298-03). Preview + one pool transaction per move, audit row inside it (D-35). ⛔ both-org membership checked in the txn; only the clean case moves (D-33) |
+| [`backend/app/services/foreign_folder_refusal.py`](docs/HOT-FILE-LEDGER.md#backendappservicesforeign_folder_refusalpy) | 2 / 1 / 305 (was `1 / 1 / 293`) | no (young) | young (298-02). 298-review WR-06: owner_default reads the mig-106 trigger's org for a header-less create. ⛔ never refuse with no org to compare |
+| [`backend/app/services/org_move.py`](docs/HOT-FILE-LEDGER.md#backendappservicesorg_movepy) | 5 / 1 / 1137 (was `1 / 1 / 986`) | no | young (298-03). 298-review: CR-01 mixed-org refusal + self-match-free joins; WR-04 ancestor refusals; WR-05 residual TOCTOU window named. ⛔ both-org membership in the txn |
 | [`frontend/src/hooks/useFolders.ts`](docs/HOT-FILE-LEDGER.md#frontendsrchooksusefoldersts) | 5 / 4 / 200 (was `4 / 4 / 197`) | ⚠ **FIRES** | 298-05: useOrgItemsVersion() joins the load effect's deps — a move refetches in the background; the moved folder leaves only on that answer (UI-D19) |
 | [`frontend/src/components/workflows/history/RunLogPanel.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentsworkflowshistoryrunlogpaneltsx) | 3 / 1 / 344 (was `2 / 1 / 342`) | no (young) | 298-05: one JSX line, {scope === null && <ElsewhereLine kind="runs">} atop the scroll region (absent on a workflow-scoped log, UI-D6), + its import |
 | [`frontend/src/components/workflows/DescribeKbPicker.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentsworkflowsdescribekbpickertsx) | 4 / 2 / 461 (was `3 / 1 / 407`) | no (2 phases) | 298-04: folder read keyed on the org; an unoffered held id is LOOKED UP (pending/failed kept as UNNAMED, answered-with kept as 'lives in', answered-without dropped). ⛔ ONE @/lib/api import line |
@@ -26759,3 +26759,21 @@ Scan-list cell as of 2026-10-28 (replaced by 298-review, moved verbatim): 1 / 1 
 Scan-list cell as of 2026-10-28 (replaced by 298-review, moved verbatim): 379 / 81 / 6808 (was `378 / 81 / 6806`) | ⚠ **FIRES** | 298-05 T3 RED: moveMounts (12) pinned FILE-LEVEL in both knobs; useFolders 17 → 18, useLibraryDocuments 28 → 30 (the after-move refetch cases); none lowered
 
 CLAUDE.md verdict cell as of 2026-10-28 (replaced by 298-review, moved verbatim): | `scripts/vitest-count-gate.cjs` | 379 / 81 / 6808 (was `378 / 81 / 6806`) | 298-05: moveMounts (12) pinned; useFolders 17→18, useLibraryDocuments 28→30 |
+
+### `backend/app/services/org_move.py` — 298-review (2026-10-28)
+
+**`5 / 1 / 1137` (was `1 / 1 / 986`).** 298-review: CR-01 `_mixed_org_refusals` (a subfolder/document stamped in another org refuses; collision/same-name joins exclude the moving set); WR-04 `_ancestor_refusals` (org-shared, chat, workflow, Expert on an ancestor; watch arm refuted); WR-05 docstring names the residual window (live `test_wr05_*`).
+
+Scan-list cell as of 2026-10-28 (replaced by 298-review, moved verbatim): 1 / 1 / 986 | no | young (created 298-03). Preview + one pool transaction per move, audit row inside it (D-35). ⛔ both-org membership checked in the txn; only the clean case moves (D-33)
+
+### `backend/app/services/foreign_folder_refusal.py` — 298-review (2026-10-28)
+
+**`2 / 1 / 305` (was `1 / 1 / 293`).** 298-review WR-06: `owner_default` keyword; with no definition org and no id it reads the owner's LIMIT 1 membership (the trigger's statement), only when the definition binds anything.
+
+Scan-list cell as of 2026-10-28 (replaced by 298-review, moved verbatim): 1 / 1 / 293 | no (young) | young (created 298-02). ORG-05 one home: bound set (D-34), worded refusal (D-14), publish-parity confirm (D-13). ⛔ definition org from the row, never the viewer; never restrict_org_ids=set()
+
+### `backend/app/services/org_lists.py` — 298-review (2026-10-28)
+
+**`2 / 1 / 108` (was `1 / 1 / 71`).** 298-review WR-09: `root_upload_org` re-asks once when a well-formed header was sent and the lenient resolver said None: non-member → None, member → org, failed read → 503 (`ORG_UNCONFIRMED`). List helpers unchanged.
+
+Scan-list cell as of 2026-10-28 (replaced by 298-review, moved verbatim): 1 / 1 / 71 | no | young (created 298-01). Polarity-safe list narrowing, one home (D-06). ⛔ None → {} / no predicate; never an empty set, never restrict_org_ids=None; never the 400-ing org gate
