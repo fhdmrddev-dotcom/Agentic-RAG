@@ -96,6 +96,9 @@ WHERE d.id = $1
 #: titles are owner-only (the threads SELECT policy), and the evidence report a member reads never
 #: shows one. Everyone else reads the name the evidence report shows: the run's frozen definition
 #: name, else the definition row's.
+#: 299-REVIEW WR-02: membership of the run's org binds BOTH arms — the run read a link opens is
+#: backed by ``workflow_runs_select_own`` (``org_id IN current_user_org_ids()``), so a run in an org
+#: its owner has left must not resolve with that org (the gate would offer a switch that cannot land).
 RUN_SQL = """
 SELECT wr.id,
        COALESCE(NULLIF(t.title, ''), NULLIF(wr.definition_snapshot->>'name', ''), NULLIF(d.name, ''),
@@ -106,9 +109,8 @@ LEFT JOIN public.threads t ON t.id = wr.thread_id AND t.user_id = $2
 LEFT JOIN public.workflow_definitions d ON d.id = wr.definition_id
 LEFT JOIN public.organizations o ON o.id = wr.org_id
 WHERE wr.id = $1
-  AND (wr.user_id = $2
-       OR (wr.status IN ('completed', 'failed', 'cancelled')
-           AND EXISTS (SELECT 1 FROM public.org_members m WHERE m.org_id = wr.org_id AND m.user_id = $2)))
+  AND EXISTS (SELECT 1 FROM public.org_members m WHERE m.org_id = wr.org_id AND m.user_id = $2)
+  AND (wr.user_id = $2 OR wr.status IN ('completed', 'failed', 'cancelled'))
 """
 
 #: D-07 / P2: system, or the caller is a member of the BUNDLE's org and the bundle is org/public,

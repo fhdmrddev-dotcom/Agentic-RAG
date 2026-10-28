@@ -83,6 +83,16 @@ def test_run_statement_is_owner_or_member_once_finished(mod):
     assert "auth.uid()" not in sql  # pool kind: auth.uid() is NULL there
 
 
+def test_run_statement_requires_membership_on_the_owner_arm_too(mod):
+    # 299-REVIEW WR-02: the membership EXISTS is ANDed with BOTH arms, matching RLS's
+    # workflow_runs_select_own — never only with the member arm.
+    sql = _flat(mod.SQL_BY_KIND["run"])
+    assert (
+        "AND EXISTS (SELECT 1 FROM public.org_members m WHERE m.org_id = wr.org_id AND m.user_id = $2)"
+        " AND (wr.user_id = $2 OR wr.status IN ('completed', 'failed', 'cancelled'))"
+    ) in sql
+
+
 def test_run_statement_reads_the_chat_title_only_for_its_owner(mod):
     # 299-REVIEW CR-02: a member of a finished run's org must never read the owner's private chat
     # title; everyone else reads the run's frozen workflow name (the evidence report's).

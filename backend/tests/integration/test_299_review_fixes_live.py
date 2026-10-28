@@ -219,3 +219,30 @@ async def test_cr03_a_disabled_experts_audience_never_promises_more_than_the_rea
                 assert await lr.lookup(conn, "expert", bid, other_mgr) is not None, (vis, audience)
         assert seen["org"] == seen["public"] == "managers_only"
         assert seen["private"] == seen["granted"] == "only_you"
+
+
+# ── WR-02 (backend half) ─────────────────────────────────────────────────────────
+
+
+@pytest.mark.parametrize("status", ["active", "completed"])
+async def test_wr02_a_run_in_an_org_its_owner_left_does_not_resolve(status):
+    """The run read the link opens (``read_workflow_run``, user JWT) is backed by
+    ``workflow_runs_select_own``, which requires membership of the run's org. The resolver must not
+    answer 200 with an org the caller is no longer in — the gate would offer a switch that can
+    never land."""
+    async with _Tx() as conn:
+        u = await _user(conn, "u")
+        org_a = await _org(conn, f"299r A {uuid4().hex[:6]}")
+        org_b = await _org(conn, f"299r B {uuid4().hex[:6]}")
+        await _member(conn, org_a, u)
+        await _member(conn, org_b, u)
+        wf = await _definition(conn, u, org_a)
+        thread = await conn.fetchval(
+            "INSERT INTO public.threads (user_id, org_id, title) VALUES ($1, $2, $3) RETURNING id",
+            u, org_a, "299r thread",
+        )
+        run = await _run(conn, thread, wf, org_a, u, status=status)
+        assert await lr.lookup(conn, "run", run, u) is not None  # still a member: opens
+
+        await _leave(conn, org_a, u)
+        assert await lr.lookup(conn, "run", run, u) is None
