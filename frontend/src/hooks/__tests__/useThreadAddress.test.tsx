@@ -310,18 +310,18 @@ describe("useThreadAddress — the IN-01 org-change reset never drops the addres
 })
 
 // ── The fake-link harness ───────────────────────────────────────────────────────────────────
-function fakeLink(threadId: string | null): EntityLink & {
-  openThread: ReturnType<typeof vi.fn>
-  leaveThread: ReturnType<typeof vi.fn>
-} {
-  return {
+function fakeLink(threadId: string | null) {
+  const openThread = vi.fn<EntityLink["openThread"]>()
+  const leaveThread = vi.fn<EntityLink["leaveThread"]>()
+  const link: EntityLink = {
     target: threadId ? { kind: "thread", id: threadId } : null,
     route: threadId ? { view: "chat", threadId } : null,
-    openThread: vi.fn(),
+    openThread,
     openWorkflow: vi.fn(),
     openExpert: vi.fn(),
-    leaveThread: vi.fn(),
+    leaveThread,
   }
+  return Object.assign(link, { openThread, leaveThread })
 }
 
 interface HookProps {

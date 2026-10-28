@@ -31,6 +31,7 @@ import { launchInputFields, type DefShape, type EntryInputField } from "@/compon
 import { useOrgOptional } from "@/providers/OrgProvider"
 import { useEffectiveFeaturesOptional } from "@/providers/EffectiveFeaturesProvider"
 import { useThreads } from "@/hooks/useThreads"
+import { useThreadAddress } from "@/hooks/useThreadAddress"
 // Phase 299-05 (FIX-02 / D-27): the mobile list's loading arm, the same words + Iris as the column.
 import { SyrelLoader } from "@/components/ui/SyrelLoader"
 import { LOADING_CHATS } from "@/components/org/orgItemsCopy"
@@ -136,7 +137,7 @@ interface Props {
   entityLink?: EntityLink
 }
 
-export function ChatLayout({ onSignOut, activeView, onNavigate, navItems, isOperator, operatorIdentity, prefillMessage, onSetPrefillMessage, studioSkillId, studioTab, onOpenStudio, onReviewEvals, onStudioTabChange, onTuneSkill, libraryTab, onOpenLibraryHealth, activeRunId, openRun, addressNotFound = false, operatorLoading = false }: Props) {
+export function ChatLayout({ onSignOut, activeView, onNavigate, navItems, isOperator, operatorIdentity, prefillMessage, onSetPrefillMessage, studioSkillId, studioTab, onOpenStudio, onReviewEvals, onStudioTabChange, onTuneSkill, libraryTab, onOpenLibraryHealth, activeRunId, openRun, addressNotFound = false, operatorLoading = false, entityLink }: Props) {
   const {
     threads,
     selectedThread,
@@ -152,21 +153,6 @@ export function ChatLayout({ onSignOut, activeView, onNavigate, navItems, isOper
 
   const { folders } = useFolders()
 
-  // Phase 267 plan 04 (PACK-24 · D-267-16 / T-267-46) — the no-router thread door, provided ONCE
-  // to the chat surface so the transcript's handoff pointer can open a thread without a prop
-  // travelling through MessageList / MessageItem. `findThread` resolves only from THIS list; a
-  // thread it does not hold is rendered as words, never as a control.
-  const threadNavigation = useMemo<ThreadNavigation>(
-    () => ({
-      findThread: (id) => threads.find((t) => t.id === id) ?? null,
-      openThread: (thread) => {
-        selectThread(thread)
-        onNavigate("chat")
-      },
-      refreshThreads: loadThreads,
-    }),
-    [threads, selectThread, onNavigate, loadThreads],
-  )
   const { theme, toggleTheme } = useTheme()
 
   // Phase 166 Plan 05 (ADMIN-01 / D-166-08): the org context (render-only). canManage
@@ -174,6 +160,36 @@ export function ChatLayout({ onSignOut, activeView, onNavigate, navItems, isOper
   const org = useOrgOptional()
   const canManage = org?.canManage ?? false
   const activeOrgId = org?.activeOrgId ?? null
+
+  // Phase 299-02 (LINK-02 / D-02, D-32): the open thread lives in the address. ONE hook call; the
+  // URL ⇄ selection binding is in `useThreadAddress.ts`, never here (G-5, honoured by construction).
+  // Without App's `entityLink` (a suite mounting this alone) it is inert and `openThread` is the
+  // pre-299 pair, select + onNavigate("chat").
+  const { openThread, holding: threadHolding } = useThreadAddress({
+    threadId: entityLink?.target?.kind === "thread" ? entityLink.target.id : null,
+    onChatView: activeView === "chat",
+    threads,
+    threadsPending,
+    selectedThread,
+    selectThread,
+    entityLink,
+    activeOrgId,
+    legacyOpenChat: () => onNavigate("chat"),
+  })
+
+  // Phase 267 plan 04 (PACK-24 · D-267-16 / T-267-46) — the no-router thread door, provided ONCE
+  // to the chat surface so the transcript's handoff pointer can open a thread without a prop
+  // travelling through MessageList / MessageItem. `findThread` resolves only from THIS list; a
+  // thread it does not hold is rendered as words, never as a control.
+  // Phase 299-02 (D-02): moved below the org read (unchanged) so it can use `openThread`.
+  const threadNavigation = useMemo<ThreadNavigation>(
+    () => ({
+      findThread: (id) => threads.find((t) => t.id === id) ?? null,
+      openThread,
+      refreshThreads: loadThreads,
+    }),
+    [threads, openThread, loadThreads],
+  )
 
   // Phase 156 (POLISH-01, Wave 1 / RESEARCH Pitfall 1): the single app-wide thread
   // bootstrap. Lifted UP from the old NavPanel (which only mounted on the chat view)
@@ -498,11 +514,11 @@ export function ChatLayout({ onSignOut, activeView, onNavigate, navItems, isOper
         openRun?.(workflowRunId)
         return
       }
-      selectThread(thread)
+      // Phase 299-02 (D-02): one entry — the thread's own address (select + push in `openThread`).
       opts?.beforeNavigate?.()
-      onNavigate("chat")
+      openThread(thread)
     },
-    [loadThreads, selectThread, onNavigate, openRun, canvasEnabled],
+    [loadThreads, openThread, openRun, canvasEnabled],
   )
 
   // ── Phase 188 Plan 10 (RUNVIZ-03 / D-188-13): the thread → run direction of the
@@ -882,6 +898,9 @@ export function ChatLayout({ onSignOut, activeView, onNavigate, navItems, isOper
         selectThread={selectThread}
         loadThreads={loadThreads}
         deleteThread={deleteThread}
+        openThread={openThread}
+        threadHolding={threadHolding}
+        entityLink={entityLink}
       />
 
       {/* ── Phase 214-12 (STEP-02 / D-214-04): chat's launch moment. ───────────────────────

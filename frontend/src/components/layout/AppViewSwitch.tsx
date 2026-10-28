@@ -37,6 +37,8 @@ import type { useThreads } from "@/hooks/useThreads"
 import type { useFolders } from "@/hooks/useFolders"
 import type { ActiveView } from "@/App"
 import type { OperatorIdentity, PublishedWorkflow } from "@/lib/api"
+import type { Thread } from "@/types"
+import type { EntityLink } from "@/hooks/useAppNavigation"
 import { Menu } from "lucide-react"
 // Phase 262 plan 05 (PACK-13 / D-262-08): the SHIPPED PATCH the composer's invite door
 // already issues — the same mechanism, reached one register lower so a surface outside the
@@ -131,6 +133,13 @@ export interface AppViewSwitchProps {
   loadThreads: Threads["loadThreads"]
   /** Delete a thread. */
   deleteThread: Threads["deleteThread"]
+  /** Phase 299-02 (D-02): select a thread AND put its address on screen (one entry) —
+   *  ChatLayout's `useThreadAddress().openThread`. Optional: absent, the pre-299 pair runs. */
+  openThread?: (thread: Thread) => void
+  /** Phase 299-02 (Pitfall 5): a thread address is on screen and its thread is not selected yet. */
+  threadHolding?: boolean
+  /** Phase 299-02 (D-03 / D-04): App's entity navigators — the linked workflow / Expert id. */
+  entityLink?: EntityLink
 }
 
 /**
@@ -201,6 +210,8 @@ export function AppViewSwitch({
   featuresLoading = false,
   isOperator = false,
   operatorLoading = false,
+  openThread,
+  threadHolding = false,
 }: AppViewSwitchProps) {
   return (
       activeView === "chat" && !addressNotFound ? (
@@ -228,6 +239,11 @@ export function AppViewSwitch({
           }}
         >
           <main className="min-w-0 min-h-0 overflow-hidden">
+            {/* Phase 299-02 (Pitfall 5): a thread address whose thread is not selected yet holds
+                here, never as the empty welcome composer (ChatArea with no thread). */}
+            {threadHolding ? (
+              <AddressHolding sentence="Opening the chat…" />
+            ) : (
             <ThreadNavigationProvider value={threadNavigation}>
             <ChatArea
               thread={selectedThread}
@@ -257,6 +273,7 @@ export function AppViewSwitch({
               onReopenHistory={historyCollapsed ? () => setHistoryCollapsedPersisted(false) : undefined}
             />
             </ThreadNavigationProvider>
+            )}
           </main>
           <WorkspacePanel
             selectedThread={selectedThread}
@@ -498,8 +515,10 @@ export function AppViewSwitch({
                       createThread: newThread,
                       setExpert: setThreadActiveExpert,
                       refreshThreads: loadThreads,
-                      selectThread,
-                      navigate: () => onNavigate("chat"),
+                      // Phase 299-02 (D-02): with `openThread` the selection writes the thread's
+                      // address (one entry) and the navigate step has nothing left to do.
+                      selectThread: openThread ?? selectThread,
+                      navigate: openThread ? () => {} : () => onNavigate("chat"),
                       // 262-UAT 3.6: a refused scoping PATCH no longer leaves an empty thread.
                       discardThread: deleteThread,
                     },
