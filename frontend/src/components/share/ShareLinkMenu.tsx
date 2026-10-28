@@ -9,7 +9,7 @@
  *    a link grants nothing (T-299-33) — the resolver's rule decides who opens it.
  * ⛔ UI-D13: ONE FOCUSABLE ELEMENT. The only interactive child of the `role="menu"` content is the
  *    Copy link item, so `aria-required-children` (WR-03) stays green. The address is a `<code>`, not
- *    an `<input>`: a Radix menu fights a focused input.
+ *    a text input: a Radix menu fights a focused input.
  * ⛔ The address is REBUILT from the route (`formatAppRoute`), never echoed from the location, so it
  *    never carries a token, a query string or a hash (T-299-31). Shown: host + path. Copied:
  *    origin + path.
