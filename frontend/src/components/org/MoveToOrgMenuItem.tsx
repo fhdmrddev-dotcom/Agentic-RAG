@@ -12,7 +12,8 @@
  * by the list's `ElsewhereLine`) renders it instead. So no home gains state for it.
  *
  * ⚠ Each item is a `DropdownMenuItem`, which keeps `WorkflowCardMenu`'s WR-03
- * `aria-required-children` sweep green.
+ * `aria-required-children` sweep green. Each carries `data-move-item`, so a narrow menu can widen
+ * by CSS alone when one renders (`has-[[data-move-item]]:w-56`) — no home needs an org read.
  */
 import { ArrowRightLeft } from "lucide-react"
 import { DropdownMenuItem } from "@/components/ui/dropdown-menu"
@@ -57,6 +58,7 @@ export function MoveToOrgMenuItem({ kind, itemId, itemName, owned, subtree, sele
   if (targets.length >= 3) {
     return (
       <DropdownMenuItem
+        data-move-item
         aria-label={MOVE_TO_ANOTHER_ORG}
         onClick={(e) => {
           e.stopPropagation()
@@ -73,6 +75,7 @@ export function MoveToOrgMenuItem({ kind, itemId, itemName, owned, subtree, sele
       {targets.map((t) => (
         <DropdownMenuItem
           key={t.org_id}
+          data-move-item
           aria-label={moveToMenuLabel(t.name)}
           onClick={(e) => {
             e.stopPropagation()

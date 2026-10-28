@@ -16,6 +16,7 @@
  */
 import { useCallback, useEffect, useState, type Dispatch, type SetStateAction } from "react"
 import { useActiveOrgId } from "@/hooks/useActiveOrgId"
+import { useLastMoved } from "@/lib/elsewhereCounts"
 import { listMetadataFields, listViews } from "@/lib/api"
 import { listExpertInstalls } from "@/lib/api/experts"
 import { provenanceByFolder } from "@/components/experts/catalog/expertCatalog"
@@ -51,6 +52,21 @@ export function useLibraryOrgSwitch({ dispatch, setSelectedDocId }: LibraryOrgSw
     setSeenOrg(activeOrgId)
     dispatch({ type: "SELECT_FOLDER", folderId: null })
     setSelectedDocId(null)
+  }
+
+  // 298-05 (UI-D19) — a folder move whose subtree held the selection: back to Root, panel closed
+  // (the selected folder now lives in another org, and a specific-folder read is not narrowed).
+  // Any other move leaves the selection alone; a moved Root document's panel closes through the
+  // panel's own onClose once its sheet is dismissed (so "Moved · recorded" is seen first).
+  // Same during-render pattern as the switch above, and only for moves made after mount.
+  const lastMoved = useLastMoved()
+  const [seenMove, setSeenMove] = useState(lastMoved?.seq ?? 0)
+  if (lastMoved !== null && lastMoved.seq !== seenMove) {
+    setSeenMove(lastMoved.seq)
+    if (lastMoved.kind === "folder" && lastMoved.holdsSelection) {
+      dispatch({ type: "SELECT_FOLDER", folderId: null })
+      setSelectedDocId(null)
+    }
   }
 
   // ── Phase 114: the filter bar + Views group state ───────────────────────────

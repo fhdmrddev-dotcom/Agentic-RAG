@@ -32,6 +32,7 @@ import type { Provenance } from "@/components/workflows/library/libraryRow"
 import { useActiveOrgId } from "@/hooks/useActiveOrgId"
 // The header seam, read from `_core` (never the barrel, which suites mock wholesale).
 import { getActiveOrgId } from "@/lib/api/_core"
+import { useOrgItemsVersion } from "@/lib/elsewhereCounts"
 
 /** Rows held with the org their request was sent under; `undefined` = never answered. */
 interface Tagged<T> {
@@ -224,6 +225,16 @@ export function useWorkflowLibraryFeeds({ selectedProjectId, onOrgSwitch }: Work
     fetchedOrgRef.current = activeOrgId
     void Promise.allSettled([refetchStarters(), refetchDrafts()])
   }, [activeOrgId, refetchStarters, refetchDrafts])
+
+  // 298-05 (UI-D19) — a move re-reads the drafts (the only workflow kind that moves, D-31); the
+  // moved draft leaves the page on that answer. Not on mount: the page's own effect asks first.
+  const moveVersion = useOrgItemsVersion()
+  const fetchedMoveRef = useRef(moveVersion)
+  useEffect(() => {
+    if (fetchedMoveRef.current === moveVersion) return
+    fetchedMoveRef.current = moveVersion
+    void refetchDrafts().catch(() => {})
+  }, [moveVersion, refetchDrafts])
 
   // 298-04 — what the page sees: the ACTIVE org's rows and states, else none and `pending`.
   // ⚠ This is not a re-query returning a source to `pending` (the docblock above forbids that):

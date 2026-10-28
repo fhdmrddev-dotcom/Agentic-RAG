@@ -44,6 +44,7 @@ import { useActiveOrgId } from "@/hooks/useActiveOrgId"
 import { getDocument, getLibrarySummary, listDocumentsPage, resolveAdHoc, resolveView } from "@/lib/api"
 // The header seam, read from `_core` (never the barrel, which suites mock wholesale).
 import { getActiveOrgId } from "@/lib/api/_core"
+import { useOrgItemsVersion } from "@/lib/elsewhereCounts"
 import type { Document, LibrarySummary, ViewFilter } from "@/types"
 
 export type LibraryLoadState = "loading" | "ready" | "error"
@@ -195,6 +196,9 @@ export function useLibraryDocuments({
 
   // Rule 6 — the org key (no keyed remount: the hook re-asks, the page stays mounted).
   const activeOrgId = useActiveOrgId()
+  // 298-05 (UI-D19): a move re-asks the page and the numbers — silently (not part of the request
+  // identity, so the rows stay on screen and a moved row leaves only on the answer).
+  const moveVersion = useOrgItemsVersion()
   const [heldSummary, setHeldSummary] = useState<{ org: string | null; summary: LibrarySummary } | null>(null)
   const [summaryStateHeld, setSummaryState] = useState<LibraryLoadState>("loading")
   const [summaryTick, setSummaryTick] = useState(0)
@@ -261,7 +265,7 @@ export function useLibraryDocuments({
         }))
       },
     )
-  }, [sourceKey, pageKey, includeArchived, offset, limit, attempt, changeTick])
+  }, [sourceKey, pageKey, includeArchived, offset, limit, attempt, changeTick, moveVersion])
 
   // Derived (UI-SPEC §Loading vocabulary): rows belong to THIS source, or none are shown (cold);
   // the settled request is the one asked for, or the person is waiting (warm). A change hint is
@@ -306,7 +310,7 @@ export function useLibraryDocuments({
         if (!summaryKnownRef.current) setSummaryState("error")
       },
     )
-  }, [summaryTick, activeOrgId])
+  }, [summaryTick, activeOrgId, moveVersion])
   // Rule 6 — the summary on screen is the ACTIVE org's or none; a held answer for another org
   // reads as still loading (never "0", never the old org's number).
   const summary = heldSummary !== null && heldSummary.org === activeOrgId ? heldSummary.summary : null

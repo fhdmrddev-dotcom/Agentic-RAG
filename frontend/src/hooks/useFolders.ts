@@ -11,6 +11,7 @@ import {
 // suites mock the barrel wholesale, and a missing `getActiveOrgId` there would crash this hook.
 import { getActiveOrgId } from "@/lib/api/_core"
 import { useActiveOrgId } from "@/hooks/useActiveOrgId"
+import { useOrgItemsVersion } from "@/lib/elsewhereCounts"
 import type { Folder } from "@/types"
 
 interface UseFolders {
@@ -84,10 +85,12 @@ export function useFolders(): UseFolders {
     }
   }, [])
 
-  // The list read, re-asked on every org switch (D-08).
+  // The list read, re-asked on every org switch (D-08) and after every move (298-05, UI-D19): a
+  // background refetch, so a moved folder leaves the tree only when this answer lands.
+  const moveVersion = useOrgItemsVersion()
   useEffect(() => {
     loadFolders().catch(console.error)
-  }, [loadFolders, activeOrgId])
+  }, [loadFolders, activeOrgId, moveVersion])
 
   useEffect(() => {
     let cancelled = false
