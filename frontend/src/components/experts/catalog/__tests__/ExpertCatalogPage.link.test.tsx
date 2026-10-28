@@ -119,8 +119,8 @@ describe("ExpertCatalogPage — openBundleId opens that Expert's detail (D-04)",
   // refused getExpert opens nothing" — the silent no-op `clipboard.ts` calls worse than none. The
   // gate had already answered 200 (e.g. a system Expert for a person whose plan lacks Experts, a 403
   // from the capability gate), so nothing at all told the person the link did not open. A refusal
-  // (a 4xx) now shows the ONE can't-be-opened card over the catalog; the catalog still renders behind.
-  it("a refused getExpert (a 4xx) shows the can't-be-opened card over the catalog", async () => {
+  // (a 403 or 404) now shows the ONE can't-be-opened card over the catalog; the catalog renders behind.
+  it("a refused getExpert (a 403 / 404) shows the can't-be-opened card over the catalog", async () => {
     vi.mocked(api.listExperts).mockResolvedValue([A])
     vi.mocked(expertsApi.getExpert).mockRejectedValue(
       Object.assign(new Error("Capability 'experts' requires 'enterprise' tier"), { status: 403 }),
@@ -136,9 +136,13 @@ describe("ExpertCatalogPage — openBundleId opens that Expert's detail (D-04)",
     expect(onLeaveLink).toHaveBeenCalledTimes(1)
   })
 
-  it("a getExpert that could not be ASKED (a network throw, a 5xx) shows no card (T-299-25)", async () => {
+  it.each([
+    ["a network throw", new TypeError("Failed to fetch")],
+    ["a 5xx", Object.assign(new Error("Failed to get expert"), { status: 503 })],
+    ["a 401 (a session to refresh)", Object.assign(new Error("Not authenticated"), { status: 401 })],
+  ])("a getExpert that was not a refusal (%s) shows no card (T-299-25)", async (_label, failure) => {
     vi.mocked(api.listExperts).mockResolvedValue([A])
-    vi.mocked(expertsApi.getExpert).mockRejectedValue(new TypeError("Failed to fetch"))
+    vi.mocked(expertsApi.getExpert).mockRejectedValue(failure)
     renderPage(ID_X)
     await waitFor(() => expect(expertsApi.getExpert).toHaveBeenCalledTimes(1))
     await act(async () => {})

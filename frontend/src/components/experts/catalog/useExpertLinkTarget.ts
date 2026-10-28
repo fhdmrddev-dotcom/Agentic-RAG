@@ -29,7 +29,7 @@ export interface ExpertLinkTargetArgs {
  * ⚠ CORRECTED BY 299-REVIEW WR-03 — "a refused read opens nothing" is kept above rather than
  * deleted, because it was the defect: the gate had already answered 200 (a system Expert for a
  * person whose plan lacks Experts gets a 403 here), so NOTHING told them the link did not open.
- * The hook now RETURNS whether the address's Expert was refused — a 4xx from `getExpert` — and
+ * The hook now RETURNS whether the address's Expert was refused — a 403 or 404 from `getExpert` — and
  * the page shows the one can't-be-opened card. A throw with no status (a network failure) or a 5xx
  * is an outage, never "can't be opened" (T-299-25): it still opens nothing and shows nothing.
  */
@@ -59,9 +59,11 @@ export function useExpertLinkTarget({ id, experts, loading, setInspected }: Expe
         if (current.current === linked) setRef.current(expert)
       })
       .catch((err: unknown) => {
-        // An outage opens nothing and shows nothing; only a refusal (4xx) is "can't be opened".
+        // An outage opens nothing and shows nothing; only a refusal is "can't be opened".
         const status = (err as { status?: unknown } | null)?.status
-        if (current.current === linked && typeof status === "number" && status >= 400 && status < 500) {
+        // 403 (the plan / visibility gates) and 404 (missing ≡ not yours) are the refusals; a 401
+        // is a session that needs a refresh, never "can't be opened".
+        if (current.current === linked && (status === 403 || status === 404)) {
           setRefusedId(linked)
         }
       })
