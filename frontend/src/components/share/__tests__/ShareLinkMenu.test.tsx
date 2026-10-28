@@ -174,7 +174,8 @@ describe("ShareLinkMenu — Copy link and the one receipt", () => {
       fireEvent.click(within(menu).getByRole("menuitem"))
     })
     expect(document.querySelector("[data-sonner-toaster], [role='alert'], [data-toast]")).toBeNull()
-    const src = source as string
+    // comments stripped: the docblock may NAME the rule ("there is no toast system")
+    const src = (source as string).replace(/\/\*[\s\S]*?\*\//g, "").replace(/^\s*\/\/.*$/gm, "")
     expect(src).not.toMatch(/toast/i)
     expect(src).not.toContain("@radix-ui/react-popover")
     expect(src).not.toContain("<input")
