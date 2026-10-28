@@ -167,3 +167,50 @@ def test_no_connection_rows_means_no_name_read():
     finally:
         library_api.get_user_pg_connection = orig
     assert len(calls) == 1
+
+
+# ── Phase 298 (298-01, D-32) — the summary and its lists share ONE org predicate ──────────────
+
+ORG_A = "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa"
+
+
+def test_the_summary_narrows_with_the_same_org_predicate_as_the_lists():
+    """D-32: ``GET /documents`` adds ``org_id = <active>`` to every read and the summary carries the
+    same predicate, so the IngestionTab pill and its lists can never disagree. ``$1`` NULL (no org
+    resolved) is today's unnarrowed scan."""
+    sql = library_api.LIBRARY_SUMMARY_SQL
+    assert sql.count("($1::uuid IS NULL OR org_id = $1)") == 1
+    assert "WHERE is_latest AND ($1::uuid IS NULL OR org_id = $1)" in sql
+
+
+def _drive_summary(monkeypatch, resolved):
+    calls: list[tuple[str, tuple]] = []
+
+    class FakeConn:
+        async def fetch(self, sql, *args):
+            calls.append((sql, args))
+            return [_row(n=0)]
+
+    @asynccontextmanager
+    async def fake_user_conn(request, current_user):
+        yield FakeConn()
+
+    async def fake_resolve(request, current_user):
+        return resolved
+
+    monkeypatch.setattr(library_api, "get_user_pg_connection", fake_user_conn)
+    monkeypatch.setattr("app.services.org_lists.resolve_active_org_or_none", fake_resolve)
+    asyncio.run(library_api.get_library_summary(MagicMock(), {"id": "u-1"}))
+    return calls
+
+
+def test_the_summary_scan_binds_the_resolved_org(monkeypatch):
+    calls = _drive_summary(monkeypatch, ORG_A)
+    assert len(calls) == 1
+    assert calls[0][1] == (UUID(ORG_A),)
+
+
+def test_the_summary_scan_binds_null_when_no_org_resolves(monkeypatch):
+    calls = _drive_summary(monkeypatch, None)
+    assert len(calls) == 1
+    assert calls[0][1] == (None,)
