@@ -37,9 +37,14 @@
  *
  * ⛔ Never touches the streams provider or its subscriptions.
  */
-import { useEffect, useReducer, useRef, type ReactNode } from "react"
+import { useEffect, useReducer, useRef, useState, type ReactNode } from "react"
+import { Button } from "@/components/ui/button"
 import { resolveLink, type LinkAnswer, type LinkKind, type LinkTarget } from "@/lib/api/links"
 import { useOrgOptional } from "@/providers/OrgProvider"
+// READ only (F4): the answering chats are snapshotted here; the store is never written.
+import { useStreamsStore } from "@/stores/streamsStore"
+import { OPEN_IT_AFTER_ALL, SWITCH_BACK, THIS_ORG, stayedIn, yourChatInStill } from "@/components/org/orgItemsCopy"
+import type { SwitchOrgPromptProps } from "./SwitchOrgPrompt"
 import { COPY_LOADING } from "@/pages/WorkflowRunPage"
 import type { EntityLink } from "@/hooks/useAppNavigation"
 import type { AppRoute } from "@/lib/appRoutes"
@@ -71,13 +76,19 @@ const EXIT_ROUTE: Record<LinkKind, AppRoute> = {
   expert: { view: "experts" },
 }
 
-/** The decision the switch renders. */
-export type GateState =
+/** A bar the switch renders as the first child of the main region (the Stay notice, UI-D9, or the
+ *  after-switch line, UI-D10), or `null`. */
+type WithNotice = { notice: ReactNode }
+
+type GateCore =
   | { status: "none" }
   | { status: "holding"; kind: LinkKind; sentence: string }
   | { status: "cant"; kind: LinkKind; route: AppRoute | null; exit: AppRoute }
-  | { status: "prompt"; kind: LinkKind; target: LinkTarget }
+  | { status: "prompt"; kind: LinkKind; target: LinkTarget; prompt: SwitchOrgPromptProps }
   | { status: "open"; kind: LinkKind }
+
+/** The decision the switch renders. */
+export type GateState = GateCore & WithNotice
 
 export interface LinkGateProps {
   /** App's entity navigators. Absent (a suite mounting the layout alone): the gate is inert. */
@@ -98,7 +109,9 @@ export function LinkGate({ entityLink, threads, threadsPending, loadThreads, sel
   const activeOrgId = org?.activeOrgId ?? null
   // A fresh device: the provider has not picked an org yet. Without a provider there is no org to
   // compare against (and nothing to switch to), so nothing holds on it.
-  const orgHold = org !== null && activeOrgId === null && (org.loading || org.orgs.length > 0)
+  // (`orgs` is read defensively: several layout suites mock the context with only the fields they use.)
+  const memberships = org?.orgs ?? []
+  const orgHold = org !== null && activeOrgId === null && (org.loading || memberships.length > 0)
 
   const target = entityLink?.target ?? null
   const kind = target?.kind ?? null
@@ -189,21 +202,138 @@ export function LinkGate({ entityLink, threads, threadsPending, loadThreads, sel
     selectThread(found)
   }, [key, target, inList, threads, selectThread])
 
+  // ── Stay / Back to it / Switch / Switch back (D-16, D-17, D-19, D-37, D-39) ──
+  const address = entityLink?.address ?? null
+  const currentName = memberships.find((o) => o.org_id === activeOrgId)?.name ?? THIS_ORG
+  // The active org's answering chats, oldest first, titled from the active org's list.
+  const answeringIn = (ids: Iterable<string>) => {
+    const out: { id: string; title: string }[] = []
+    for (const id of ids) {
+      const t = threads.find((x) => x.id === id)
+      if (t) out.push({ id: t.id, title: t.title })
+    }
+    return out
+  }
+  const streamingIds = useStreamsStore((s) => s.streamingThreads)
+  const streaming = answeringIn(streamingIds)
+
+  // The Stay notice lives from the Stay click until the address changes AGAIN after landing.
+  const [stayed, setStayed] = useState<{ from: string; landed: string | null; route: AppRoute; current: string } | null>(null)
+  // The after-switch line: a SNAPSHOT taken before the switch, kept until the address changes.
+  const [afterSwitch, setAfterSwitch] = useState<{
+    address: string
+    previousOrgId: string
+    previousName: string
+    threadId: string
+  } | null>(null)
+  const [switchingKey, setSwitchingKey] = useState<string | null>(null)
+  // React's "adjust state when an input changes" pattern: no frame shows a stale notice.
+  if (stayed !== null && address !== null) {
+    if (stayed.landed === null) {
+      if (address !== stayed.from) setStayed({ ...stayed, landed: address })
+    } else if (address !== stayed.landed) setStayed(null)
+  }
+  if (afterSwitch !== null && address !== afterSwitch.address) setAfterSwitch(null)
+  if (switchingKey !== null && switchingKey !== key) setSwitchingKey(null)
+
+  const stay = (to?: AppRoute) => {
+    if (!entityLink || !entityLink.route) return
+    setStayed({ from: entityLink.address, landed: null, route: entityLink.route, current: currentName })
+    // ⛔ No org write and no subscription touched: Stay is an address REPLACE and nothing else.
+    if (to) entityLink.leave(to)
+    else entityLink.leave()
+  }
+  const switchTo = (t: LinkTarget) => {
+    if (!org || t.org_id === null || !entityLink || key === null) return
+    // F4: SNAPSHOT FIRST. The streams provider tears every run subscription down on an org change,
+    // so the answering chats are read before `switchOrg`, never re-derived afterwards.
+    const snapshot = answeringIn(useStreamsStore.getState().streamingThreads)
+    const last = snapshot[snapshot.length - 1]
+    setAfterSwitch(
+      last && activeOrgId !== null
+        ? { address: entityLink.address, previousOrgId: activeOrgId, previousName: currentName, threadId: last.id }
+        : null,
+    )
+    setSwitchingKey(key)
+    org.switchOrg(t.org_id)
+  }
+  const switchBack = () => {
+    if (!org || !afterSwitch || !entityLink) return
+    const back = afterSwitch
+    setAfterSwitch(null)
+    org.switchOrg(back.previousOrgId)
+    entityLink.openThread(back.threadId)
+  }
+
   // ── the decision ──
-  let gate: GateState
-  if (target === null || kind === null) gate = { status: "none" }
-  else if (orgHold || (kind === "thread" && threadsPending)) gate = { status: "holding", kind, sentence: HOLDING_SENTENCE[kind] }
-  else if (inList) gate = { status: "open", kind }
-  else if (answer === undefined) gate = { status: "holding", kind, sentence: HOLDING_SENTENCE[kind] }
-  else if (answer.status === "cant") gate = { status: "cant", kind, route: entityLink?.route ?? null, exit: EXIT_ROUTE[kind] }
-  else if (!sameOrg(answer.target)) gate = { status: "prompt", kind, target: answer.target }
-  else if (kind === "thread") {
+  let core: GateCore
+  if (target === null || kind === null) core = { status: "none" }
+  else if (orgHold || (kind === "thread" && threadsPending)) core = { status: "holding", kind, sentence: HOLDING_SENTENCE[kind] }
+  else if (inList) core = { status: "open", kind }
+  else if (answer === undefined) core = { status: "holding", kind, sentence: HOLDING_SENTENCE[kind] }
+  else if (answer.status === "cant") core = { status: "cant", kind, route: entityLink?.route ?? null, exit: EXIT_ROUTE[kind] }
+  else if (!sameOrg(answer.target)) {
+    const t = answer.target
+    core = {
+      status: "prompt",
+      kind,
+      target: t,
+      prompt: {
+        target: t,
+        currentOrgName: currentName,
+        streaming,
+        switching: switchingKey === key,
+        onStay: () => stay(),
+        onSwitch: () => switchTo(t),
+        onBackToIt: () => {
+          const latest = streaming[streaming.length - 1]
+          if (latest) stay({ view: "chat", threadId: latest.id })
+        },
+      },
+    }
+  } else if (kind === "thread") {
     // Same org, not in the list: reloaded once; still absent → can't be opened.
-    gate =
+    core =
       key !== null && reloadState.current.get(key) === "done"
         ? { status: "cant", kind, route: entityLink?.route ?? null, exit: EXIT_ROUTE[kind] }
         : { status: "holding", kind, sentence: HOLDING_SENTENCE[kind] }
-  } else gate = { status: "open", kind }
+  } else core = { status: "open", kind }
+
+  let notice: ReactNode = null
+  if (stayed !== null && address !== null && address !== stayed.from) {
+    // UI-D9: one line at the top of the surface the person landed on, until the next navigation.
+    notice = (
+      <div
+        role="status"
+        className="flex shrink-0 items-center gap-2 border-b border-border/40 bg-card px-4 py-2 text-xs text-muted-foreground"
+      >
+        <span>{stayedIn(stayed.current)}</span>
+        <Button
+          variant="outline"
+          size="sm"
+          onClick={() => {
+            const route = stayed.route
+            setStayed(null)
+            entityLink?.openRoute(route)
+          }}
+        >
+          {OPEN_IT_AFTER_ALL}
+        </Button>
+      </div>
+    )
+  } else if (afterSwitch !== null && address === afterSwitch.address && core.status === "open") {
+    // UI-D10: present tense only (reattach-on-return is assumption A1, unproven until G-4 row 2).
+    notice = (
+      <div className="mx-6 mt-4 flex shrink-0 items-center gap-2 rounded-md border border-border/40 bg-card px-4 py-2 text-xs text-muted-foreground">
+        <span aria-hidden="true" className="h-2 w-2 shrink-0 rounded-full bg-muted-foreground animate-pulse motion-reduce:animate-none" />
+        <span>{yourChatInStill(afterSwitch.previousName)}</span>
+        <Button variant="outline" size="sm" onClick={switchBack}>
+          {SWITCH_BACK}
+        </Button>
+      </div>
+    )
+  }
+  const gate: GateState = { ...core, notice }
 
   return <>{children(gate)}</>
 }

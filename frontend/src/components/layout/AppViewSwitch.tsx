@@ -27,6 +27,7 @@ import { AddressNotFound, AddressHolding, ADMIN_HOLD_COPY } from "./AddressNotFo
 // Phase 299-03 (D-12..D-15, D-28): the one gate in front of every entity address, and its card.
 import { LinkGate, HOLDING_SENTENCE } from "./LinkGate"
 import { CantBeOpened } from "./CantBeOpened"
+import { SwitchOrgPrompt } from "./SwitchOrgPrompt"
 // Phase 257 (METER-07): Operator Spend & Metering cockpit
 import { AdminSpendPage } from "@/pages/admin/AdminSpendPage"
 // Phase 262 plan 05 (PACK-11 / PACK-13 / D-262-03): the Expert catalog, and the ordered
@@ -259,6 +260,13 @@ export function AppViewSwitch({
           }}
         >
           <main className="min-w-0 min-h-0 overflow-hidden">
+            {/* Phase 299-03 (UI-D9 / UI-D10): the gate's notice bar (the Stay notice or the
+                after-switch line) sits at the top of the chat region. The column below is ALWAYS
+                present — never added only while a notice shows — so ChatArea is never remounted,
+                and the min-h-0 chain (`flex h-full min-h-0` → `min-h-0 flex-1`) still bounds it. */}
+            <div className="flex h-full min-h-0 flex-col">
+            {gate.notice}
+            <div className="min-h-0 flex-1">
             {/* Phase 299-02 (Pitfall 5): a thread address whose thread is not selected yet holds
                 here, never as the empty welcome composer (ChatArea with no thread). */}
             {threadHolding ? (
@@ -294,6 +302,8 @@ export function AppViewSwitch({
             />
             </ThreadNavigationProvider>
             )}
+            </div>
+            </div>
           </main>
           <WorkspacePanel
             selectedThread={selectedThread}
@@ -322,6 +332,9 @@ export function AppViewSwitch({
             <Menu className="h-5 w-5" />
           </button>
         </div>
+        {/* Phase 299-03 (UI-D9 / UI-D10): the gate's notice bar, above the region (a flex column,
+            so the region below shrinks to fit rather than being clipped). */}
+        {gate.notice}
         <main className="flex-1 overflow-hidden">
           {/* ⚠ NOTHING GOES BETWEEN THE BRANCH BELOW AND ITS MOUNT. `renameFence.test.ts`
               asserts that key link inside a 120-character window, so a comment in the gap
@@ -345,7 +358,9 @@ export function AppViewSwitch({
           ) : gate.status === "holding" ? (
             <AddressHolding sentence={gate.sentence} />
           ) : gate.status === "prompt" ? (
-            <AddressHolding sentence={HOLDING_SENTENCE[gate.kind]} />
+            // Phase 299-03 (D-16 / D-39): "This is in <org> — switch?" replaces the main region.
+            // Nothing switches without a click; the handlers are the gate's.
+            <SwitchOrgPrompt {...gate.prompt} />
           ) : activeView === "documents" ? (
             <LibraryPage onNavigate={onNavigate} initialTab={libraryTab} attentionConditions={attentionConditions} onAskInChat={handleAskInChat} />
           ) : activeView === "skills" ? (

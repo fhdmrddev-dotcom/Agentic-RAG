@@ -567,7 +567,11 @@ const LISTS: Record<string, Thread[]> = {
 function E2E() {
   const nav = useAppNavigation()
   const [orgId, setOrgId] = useState("A")
-  org.value = { activeOrgId: orgId, orgs: ORGS, loading: false, switchOrg: (id: string) => { e2e.switches.push(id); setOrgId(id) } }
+  // The mocked org context reads `org.value`; Switch updates it in the handler (never in render)
+  // and re-renders this harness through the setter registered here.
+  useEffect(() => {
+    e2e.setOrg = setOrgId
+  }, [])
   const [held, setHeld] = useState<{ org: string; rows: Thread[] }>({ org: "A", rows: LISTS.A })
   const pending = held.org !== orgId
   useEffect(() => {
@@ -582,6 +586,7 @@ function E2E() {
   useEffect(() => {
     if (lastOrg.current === orgId) return
     lastOrg.current = orgId
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- mirrors ChatLayout's IN-01 effect, which is the behaviour under test
     setSelected(null)
   }, [orgId])
   const link = nav.entityLink
@@ -610,9 +615,19 @@ function E2E() {
     </LinkGate>
   )
 }
-const e2e = { switches: [] as string[] }
+const e2e = { switches: [] as string[], setOrg: null as null | ((id: string) => void) }
 
 async function mountE2E() {
+  org.value = {
+    activeOrgId: "A",
+    orgs: ORGS,
+    loading: false,
+    switchOrg: (id: string) => {
+      e2e.switches.push(id)
+      org.value = { ...org.value!, activeOrgId: id }
+      e2e.setOrg?.(id)
+    },
+  }
   const router = createMemoryRouter([{ path: "*", Component: E2E }], { initialEntries: ["/app"] })
   const seen: string[] = []
   router.subscribe((s) => seen.push(s.location.pathname))
