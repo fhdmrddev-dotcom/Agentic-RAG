@@ -40,6 +40,7 @@ import { SwitchOrgPrompt } from "../SwitchOrgPrompt"
 import { useStreamsStore } from "@/stores/streamsStore"
 import { useAppNavigation } from "@/hooks/useAppNavigation"
 import { useThreadAddress } from "@/hooks/useThreadAddress"
+import { noteMoved } from "@/lib/elsewhereCounts"
 
 const ID = "5d0c2a9e-3b1f-4c6d-8e7a-1f2b3c4d5e71"
 const OTHER = "5d0c2a9e-3b1f-4c6d-8e7a-1f2b3c4d5e72"
@@ -286,6 +287,65 @@ describe("the answer is cached for the gate's life (it does not depend on the ac
     await act(async () => {})
     expect(client.resolveLink).toHaveBeenCalledTimes(1)
     expect(gateText()).toContain("cant | workflow")
+  })
+})
+
+// 299-REVIEW WR-04: the lifetime cache's premise ("the answer names the ITEM's org, so it does not
+// depend on the active org") stopped holding when 298 made an item's org MOVABLE. Two events can
+// change an answer: a move (the 298 move version) and a change in the person's memberships (an
+// invite accepted, an org left). Either one invalidates the cache; the address on screen keeps its
+// answer until the new one is in (no flash of the holding line over an open page).
+describe("the cache is invalidated by a move or a membership change (299-REVIEW WR-04)", () => {
+  it("a move: the next visit re-asks, and a workflow moved to the active org opens without a prompt", async () => {
+    client.resolveLink.mockResolvedValue({ status: "ok", target: target({ kind: "workflow", org_id: "B", org_name: "Acme Legal" }) })
+    const g = mountGate(fakeLink("workflow"))
+    await act(async () => {})
+    expect(gateText()).toContain("prompt | workflow | Acme Legal")
+    g.rerenderWith(fakeLink(null))
+    // The workflow is moved into Northwind (the active org); the server now says so.
+    client.resolveLink.mockResolvedValue({ status: "ok", target: target({ kind: "workflow", org_id: "A", org_name: "Northwind" }) })
+    act(() => noteMoved({ kind: "draft", id: ID }))
+    g.rerenderWith(fakeLink("workflow"))
+    await act(async () => {})
+    expect(client.resolveLink).toHaveBeenCalledTimes(2)
+    expect(gateText()).toBe("open | workflow")
+  })
+
+  it("a move while the address is on screen re-asks but keeps the current decision until the answer", async () => {
+    client.resolveLink.mockResolvedValue({ status: "ok", target: target({ kind: "workflow", org_id: "A" }) })
+    mountGate(fakeLink("workflow"))
+    await act(async () => {})
+    expect(gateText()).toBe("open | workflow")
+    let answer: (a: unknown) => void = () => {}
+    client.resolveLink.mockReturnValue(new Promise((r) => (answer = r)))
+    act(() => noteMoved({ kind: "draft", id: ID }))
+    expect(client.resolveLink).toHaveBeenCalledTimes(2)
+    expect(gateText()).toBe("open | workflow") // never a holding flash over the open page
+    await act(async () => answer({ status: "ok", target: target({ kind: "workflow", org_id: "B", org_name: "Acme Legal" }) }))
+    expect(gateText()).toContain("prompt | workflow | Acme Legal")
+  })
+
+  it("a new membership (an accepted invite): a cached can't-be-opened is asked again", async () => {
+    client.resolveLink.mockResolvedValue({ status: "cant" })
+    const g = mountGate(fakeLink("expert"))
+    await act(async () => {})
+    expect(gateText()).toContain("cant | expert")
+    client.resolveLink.mockResolvedValue({ status: "ok", target: target({ kind: "expert", org_id: "A" }) })
+    org.value = { ...org.value!, orgs: [...ORGS, { org_id: "C", name: "Globex", role: "member" }] }
+    g.rerenderWith(fakeLink("expert"))
+    await act(async () => {})
+    expect(client.resolveLink).toHaveBeenCalledTimes(2)
+    expect(gateText()).toBe("open | expert")
+  })
+
+  it("the SAME memberships in a new array ask nothing new", async () => {
+    client.resolveLink.mockResolvedValue({ status: "cant" })
+    const g = mountGate(fakeLink("expert"))
+    await act(async () => {})
+    org.value = { ...org.value!, orgs: ORGS.map((o) => ({ ...o })) }
+    g.rerenderWith(fakeLink("expert"))
+    await act(async () => {})
+    expect(client.resolveLink).toHaveBeenCalledTimes(1)
   })
 })
 

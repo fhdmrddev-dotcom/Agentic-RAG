@@ -32,6 +32,13 @@
  * second request. The kind is read off the parsed route's target, never off `activeView`, so the
  * switch keeps ONE stripped workflow-run comparison.
  *
+ * ⚠ CORRECTED BY 299-REVIEW WR-04 — "for the gate's life" is kept above rather than deleted. 298
+ * made an item's org MOVABLE, and a membership can be gained or lost, so an answer can change
+ * after all. A move (298's move version) or a change in the person's SET of memberships drops
+ * every cached answer except the one on screen, which is marked stale and asked again while it
+ * stays displayed — no holding line flashes over an open page. A switch changes neither, so the
+ * after-Switch reuse stands.
+ *
  * D-24 (resume): once signed in, the gate consumes the remembered sign-in target ONCE on mount;
  * `entityLink.resume()` replaces the address with it only when the address on screen is chat home.
  *
@@ -41,6 +48,7 @@ import { useEffect, useReducer, useRef, useState, type ReactNode } from "react"
 import { Button } from "@/components/ui/button"
 import { resolveLink, type LinkAnswer, type LinkKind, type LinkTarget } from "@/lib/api/links"
 import { useOrgOptional } from "@/providers/OrgProvider"
+import { useOrgItemsVersion } from "@/lib/elsewhereCounts"
 // READ only (F4): the answering chats are snapshotted here; the store is never written.
 import { useStreamsStore } from "@/stores/streamsStore"
 import { OPEN_IT_AFTER_ALL, SWITCH_BACK, THIS_ORG, stayedIn, yourChatInStill } from "@/components/org/orgItemsCopy"
@@ -125,6 +133,11 @@ export function LinkGate({ entityLink, threads, threadsPending, loadThreads, sel
   const mounted = useRef(false)
   const retryTimer = useRef<number | null>(null)
   const [, bump] = useReducer((n: number) => n + 1, 0)
+  // 299-REVIEW WR-04: the two events that can change an answer (see the docblock).
+  const moveVersion = useOrgItemsVersion()
+  const membershipKey = memberships.map((o) => o.org_id).sort().join(",")
+  const epochSeen = useRef({ moveVersion, membershipKey })
+  const stale = useRef(new Set<string>())
 
   useEffect(() => {
     mounted.current = true
@@ -139,10 +152,22 @@ export function LinkGate({ entityLink, threads, threadsPending, loadThreads, sel
   // list settled without it.
   const needsAnswer = target !== null && !orgHold && !(target.kind === "thread" && (threadsPending || inList))
   const askKey = needsAnswer ? key : null
+  // Declared BEFORE the ask, so a stale mark is in place when the ask effect of the same commit runs.
+  useEffect(() => {
+    const seen = epochSeen.current
+    epochSeen.current = { moveVersion, membershipKey }
+    // The first membership answer (none → some) is a load, not a change.
+    const changed = moveVersion !== seen.moveVersion || (seen.membershipKey !== "" && membershipKey !== seen.membershipKey)
+    if (!changed) return
+    for (const k of [...cache.current.keys()]) {
+      if (k === wantedKey.current) stale.current.add(k)
+      else cache.current.delete(k)
+    }
+  }, [moveVersion, membershipKey])
   useEffect(() => {
     wantedKey.current = askKey
     if (askKey === null || target === null) return
-    if (cache.current.has(askKey) || inflight.current.has(askKey)) return
+    if ((cache.current.has(askKey) && !stale.current.has(askKey)) || inflight.current.has(askKey)) return
     const { kind: k, id } = target
     const attempt = (n: number) => {
       inflight.current.add(askKey)
@@ -150,6 +175,7 @@ export function LinkGate({ entityLink, threads, threadsPending, loadThreads, sel
         (answer) => {
           inflight.current.delete(askKey)
           cache.current.set(askKey, answer)
+          stale.current.delete(askKey)
           if (mounted.current) bump()
         },
         () => {
@@ -157,15 +183,16 @@ export function LinkGate({ entityLink, threads, threadsPending, loadThreads, sel
           if (!mounted.current || wantedKey.current !== askKey) return
           retryTimer.current = window.setTimeout(() => {
             retryTimer.current = null
-            if (mounted.current && wantedKey.current === askKey && !cache.current.has(askKey)) attempt(n + 1)
+            if (mounted.current && wantedKey.current === askKey && (!cache.current.has(askKey) || stale.current.has(askKey))) attempt(n + 1)
           }, retryDelay(n))
         },
       )
     }
     attempt(0)
-    // `target` is read for its kind and id, which `askKey` already carries.
+    // `target` is read for its kind and id, which `askKey` already carries. The move version and
+    // the membership set re-run the ask for a stale answer (WR-04).
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [askKey])
+  }, [askKey, moveVersion, membershipKey])
 
   // ── D-24: resume a remembered sign-in target, once ──
   const resumed = useRef(false)
