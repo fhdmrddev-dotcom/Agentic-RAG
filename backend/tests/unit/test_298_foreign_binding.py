@@ -346,7 +346,7 @@ def _request(org: str | None):
 
 
 async def _create(body: dict, *, active_org, pool):
-    created = AsyncMock(return_value={"id": uuid4(), "version": 1})
+    created = AsyncMock(return_value={"id": uuid4(), "version": 1, "token": "t"})
     with patch.object(workflows_mod, "get_pg_pool", AsyncMock(return_value=pool)), \
             patch.object(workflows_mod, "resolve_active_org_or_none",
                          AsyncMock(return_value=active_org)), \

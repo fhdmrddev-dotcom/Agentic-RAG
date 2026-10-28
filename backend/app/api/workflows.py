@@ -77,6 +77,7 @@ from app.models.harness import WorkflowDefinition
 # discipline). NEVER import the orchestration fns by name — patch the module attr.
 from app.services import workflow_authoring
 from app.services import org_lists  # Phase 298 (D-06): the one home of list narrowing
+from app.services import foreign_folder_refusal  # Phase 298 (ORG-05): the one refusal home
 # Phase 182 (VALID-01 / D-182-06): ``grounding`` is imported as a MODULE for the same
 # patchability reason as ``publish_service`` above — the /validate + /grounding-bundle
 # routes resolve ``grounding.<fn>`` at call time, so a test can monkeypatch the shared
@@ -1218,6 +1219,8 @@ async def create_draft(
     # 296-01 (BUG-261021-02): the draft belongs to the VALIDATED active org (create_thread's
     # D-268-07 shape); None keeps the INSERT byte-identical and the mig-106 trigger decides.
     _active_org = await resolve_active_org_or_none(request, current_user)
+    # 298 (D-13/D-36): a folder outside the org this draft is stamped in → coded 422; no org → skip.
+    await foreign_folder_refusal.raise_if_foreign(body, definition_org=_active_org, pool=pool, user_id=user_id)
     try:
         row = await create_workflow_definition(
             pool, definition=body, user_id=user_id,
@@ -1361,6 +1364,8 @@ async def update_draft(
             await assert_phase_models_registered(
                 body, previous=_coerce_definition(stored.get("definition"))
             )
+    # 298 (D-13/D-36): only an ADDED or CHANGED foreign binding → coded 422; not-owned falls through.
+    await foreign_folder_refusal.raise_if_foreign_change(pool, definition_id, user_id, body)
     try:
         row = await update_workflow_definition(
             pool, definition_id, definition=body, user_id=user_id, token=if_match
