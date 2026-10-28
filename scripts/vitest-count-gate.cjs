@@ -3045,7 +3045,7 @@ const BASELINE = {
   //     proving the parser really sees six entries per map and a driven falsification proving
   //     a single changed utility is caught.
   "runLogRow.test.ts": 24, // 293-03: 21 -> 24 (the origin sentence is the last atom; unrecorded and unknown compose as before)
-  "RunLogPanel.test.tsx": 20,
+  "RunLogPanel.test.tsx": 23, // RAISED 20 → 23 at 298-04 (2026-10-28): an org switch clears the rows at once + says loading, drops the late answer, a failure there is still never an empty log
   "runLogTone.mirror.test.ts": 10,
   // ── THE LAST TWO OF PHASE 200'S UNPINNED SUITES, pinned at their measured actuals ───────
   //
@@ -4444,6 +4444,9 @@ const BASELINE = {
   "useFolders.test.ts": 17, // 298-04 ADOPTED: 10 existing + 7 — loading flag, switch drops rows at once, late old-org answer discarded, create lands in the new org, Realtime org filter (INSERT ignored, UPDATE removes) and its polarity
   "FolderTree.test.tsx": 14, // 298-04 ADOPTED: 10 existing + 4 — loading says "Loading folders…" never "No folders yet", Root kept with no count, no stale rows, empty sentence unchanged
   "LibraryPage.orgSwitch.test.tsx": 5, // 298-04 — real useFolders + useLibraryDocuments over a fake network: old org's folder/document gone at once, loading line, late answer dropped, Root + panel reset (UI-D10), fields/views/provenance re-read (SEED-317), Root count never 0
+  "WorkflowsPage.orgSwitch.test.tsx": 4, // 298-04 — real page + feeds hook: old org's workflow/draft gone at once, "Loading your workflows…" never the empty sentence, late answer dropped, project filter back to All, each feed re-read once
+  "useThreads.orgSwitch.test.ts": 4, // 298-04 — switching false on first render (UI-D9), old threads drop at once + switching until answered, late answer dropped, newThread lands in the new org
+  "ChatHistoryColumn.orgSwitch.test.tsx": 4, // 298-04 — loading says "Loading your chats…" never "No recent chats", hides handed rows, empty sentence unchanged without it, a streaming old-org thread is not listed
 }
 
 // Still COMPUTED, never hand-written — the reduce is the single source, so the
@@ -6505,6 +6508,9 @@ const TARGETS = [
   "src/__tests__/hooks/useFolders.test.ts",
   "src/__tests__/components/FolderTree.test.tsx",
   "src/pages/__tests__/LibraryPage.orgSwitch.test.tsx",
+  "src/pages/__tests__/WorkflowsPage.orgSwitch.test.tsx",
+  "src/__tests__/hooks/useThreads.orgSwitch.test.ts",
+  "src/components/layout/__tests__/ChatHistoryColumn.orgSwitch.test.tsx",
 ]
 
 const REPO_ROOT = path.resolve(__dirname, "..")

@@ -11671,7 +11671,7 @@ cells rot within days.
 | [`backend/app/api/settings.py`](docs/HOT-FILE-LEDGER.md#backendappapisettingspy) | 47 / 25 / 1301 (was `46 / 24 / 1250`) | ⚠ **FIRES** | 292.1-02: two bounded writes (2..50) via _range_refusal_detail + allow-list +2 (+51 −0). ⛔ never a retyped id list; GET never echoes a key · 293 touch: see §Phase 293 close |
 | [`backend/app/services/multimodal_service.py`](docs/HOT-FILE-LEDGER.md#backendappservicesmultimodal_servicepy) | 14 / 7 / 984 | ⚠ **FIRES** | ⚠ absent from BOTH for its ENTIRE LIFE at **7 phases** — row added SEED-227, which is also where its silent truncation was found |
 | [`backend/app/api/documents.py`](docs/HOT-FILE-LEDGER.md#backendappapidocumentspy) | 101 / 40 / 2709 (was `99 / 39 / 2698`) | ⚠ **FIRES** | 298-01: list_documents one `org_lists.by_org` in build() (every read, D-32); upload one `org_id=root_upload_org(...)` on the ONE minter call. Honoured by construction. ⛔ see section |
-| [`scripts/vitest-count-gate.cjs`](docs/HOT-FILE-LEDGER.md#scriptsvitest-count-gatecjs) | 372 / 81 / 6787 (was `366 / 81 / 6784`) | ⚠ **FIRES** | 298-04 T2 move-only: librarySubtree.fences 143 → 148 (the new library module's five it.each sweeps); none lowered. Corrects 298-04 T1's row triple (366 → measured without --follow) |
+| [`scripts/vitest-count-gate.cjs`](docs/HOT-FILE-LEDGER.md#scriptsvitest-count-gatecjs) | 373 / 81 / 6793 (was `372 / 81 / 6787`) | ⚠ **FIRES** | 298-04 T2 RED: WorkflowsPage.orgSwitch (4), useThreads.orgSwitch (4), ChatHistoryColumn.orgSwitch (4) pinned FILE-LEVEL in the same commit; RunLogPanel 20 → 23; none lowered |
 | [`scripts/check-deploy-drift.sh`](docs/HOT-FILE-LEDGER.md#scriptscheck-deploy-driftsh) | 5 / 4 / 267 | ⚠ **FIRES** | ⚠ absent its ENTIRE LIFE — row added 294-05. 294-01: DECISION_ENGINE_FAULT_BASE_URL registered as intentionally omitted (+2) |
 | [`scripts/build-public-openapi.cjs`](docs/HOT-FILE-LEDGER.md#scriptsbuild-public-openapicjs) | 11 / 5 / 472 (was `7 / 3 / 468`) | ⚠ **FIRES** | 298-01: `org-items` in the Account & org TAG_GROUPS entry + `/org-items/` in FLAGGED_PREFIXES (UI-internal). Two tokens. ⚠ prior row stale (`7 / 3 / 468` vs measured `10 / 4 / 468` pre-298). |
 | [`scripts/check-seeds-register.cjs`](docs/HOT-FILE-LEDGER.md#scriptscheck-seeds-registercjs) | 7 / 3 / 1132 | ⚠ **FIRES** | ⚠ absent its ENTIRE LIFE — row added 296-05, now FIRES (251 / 293 / 296). 296-05: three `\d{3}` → `\d{3,}` (293-IN-07). ⛔ the STATUS_ENUM triple |
@@ -26398,3 +26398,11 @@ Scan-list cell as of 2026-10-28 (replaced by 298-04, moved verbatim): 0 / 0 / 0 
 Scan-list cell as of 2026-10-28 (replaced by 298-04, moved verbatim): 366 / 81 / 6784 (was `370 / 81 / 6774`) | ⚠ **FIRES** | 298-04 T1 RED: useFolders.test.ts (17) + FolderTree.test.tsx (14) ADOPTED, LibraryPage.orgSwitch (5) pinned, FILE-LEVEL in the same commit; useLibraryDocuments 25 → 28; none lowered
 
 CLAUDE.md verdict cell as of 2026-10-28 (replaced by 298-04, moved verbatim): | `scripts/vitest-count-gate.cjs` | 366 / 81 / 6784 (was `370 / 81 / 6774`) | 298-04: useFolders + FolderTree ADOPTED, LibraryPage.orgSwitch pinned |
+
+### `scripts/vitest-count-gate.cjs` — 298-04 (2026-10-28)
+
+**`373 / 81 / 6793` (was `372 / 81 / 6787`).** 298-04 Task 2 RED commit. Three new suites pinned in BASELINE and listed FILE-LEVEL in TARGETS (no directory entry covers `src/pages/__tests__`, `src/__tests__/hooks` or `src/components/layout/__tests__`): `WorkflowsPage.orgSwitch.test.tsx` 4, `useThreads.orgSwitch.test.ts` 4, `ChatHistoryColumn.orgSwitch.test.tsx` 4. `RunLogPanel.test.tsx` raised 20 → 23 (dated). No pin lowered.
+
+Scan-list cell as of 2026-10-28 (replaced by 298-04, moved verbatim): 372 / 81 / 6787 (was `366 / 81 / 6784`) | ⚠ **FIRES** | 298-04 T2 move-only: librarySubtree.fences 143 → 148 (the new library module's five it.each sweeps); none lowered. Corrects 298-04 T1's row triple (366 → measured without --follow)
+
+CLAUDE.md verdict cell as of 2026-10-28 (replaced by 298-04, moved verbatim): | `scripts/vitest-count-gate.cjs` | 372 / 81 / 6787 (was `366 / 81 / 6784`) | 298-04: librarySubtree.fences 143 → 148 (new library module) |
