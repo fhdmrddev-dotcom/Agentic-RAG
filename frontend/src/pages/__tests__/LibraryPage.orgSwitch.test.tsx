@@ -8,10 +8,10 @@
  * first and the state second, exactly as `switchOrg` does.
  */
 import { describe, it, expect, vi, beforeEach, beforeAll, afterEach } from "vitest"
-import { act, render, screen, fireEvent, waitFor } from "@testing-library/react"
+import { act, render, renderHook, screen, fireEvent, waitFor } from "@testing-library/react"
 import { TooltipProvider } from "@/components/ui/tooltip"
 import { CitationNavProvider } from "@/lib/citationNav"
-import type { Document, DocumentListResponse, Folder, LibrarySummary } from "@/types"
+import type { Document, DocumentListResponse, Folder, LibrarySummary, SavedView } from "@/types"
 import { summarizeDocuments } from "@/test-utils/fakeLibraryApi"
 
 const orgStore = vi.hoisted(() => {
@@ -79,6 +79,7 @@ vi.mock("@/lib/supabase", () => ({
 }))
 
 import { setActiveOrgId, getActiveOrgId } from "@/lib/api/_core"
+import { useLibraryOrgSwitch } from "@/hooks/useLibraryOrgSwitch"
 
 function folder(id: string, name: string): Folder {
   return {
@@ -249,6 +250,41 @@ describe("LibraryPage — switching org (298-04)", () => {
     await waitFor(() => expect(experts.listExpertInstalls).toHaveBeenCalledTimes(2))
     expect(api.listViews).toHaveBeenCalledTimes(2)
     expect(api.listMetadataFields).toHaveBeenCalledTimes(2)
+  })
+
+  it("298-review WR-01: a saved view open in the old org does not survive the switch", async () => {
+    const viewA = {
+      id: "v-a", name: "Invoices A", is_system_global: false,
+      filter_expr: { op: "and", conditions: [{ field: "document_type", op: "eq", value: "invoice" }] },
+    } as unknown as SavedView
+    api.listViews.mockImplementation(async () => (getActiveOrgId() === "org-a" ? [viewA] : []))
+    api.resolveView.mockImplementation(async (_id: string, opts: { count_only?: boolean } = {}) =>
+      opts.count_only ? { total: 1 } : { documents: [doc("dv", "view-hit.pdf")], total: 1, offset: 0, limit: 25 },
+    )
+    renderPage()
+    fireEvent.click(await screen.findByText("Invoices A"))
+    expect(await screen.findByText("view-hit.pdf")).toBeInTheDocument()
+
+    api.resolveView.mockClear()
+    act(() => switchOrg("org-b"))
+    expect(await screen.findByText("bravo-b.pdf")).toBeInTheDocument()
+    expect(screen.queryByText("view-hit.pdf")).toBeNull()
+    const listed = api.resolveView.mock.calls.filter(([, opts]) => !(opts as { count_only?: boolean })?.count_only)
+    expect(listed).toEqual([])
+  })
+
+  it("298-review IN-05: a views refresh answered after a switch never repaints the old org's views", async () => {
+    const { result } = renderHook(() =>
+      useLibraryOrgSwitch({ dispatch: vi.fn(), setSelectedDocId: vi.fn() }),
+    )
+    await waitFor(() => expect(api.listViews).toHaveBeenCalledTimes(1))
+    const late = deferred<SavedView[]>()
+    api.listViews.mockImplementationOnce(() => late.promise)
+    act(() => result.current.refreshViews())
+    act(() => switchOrg("org-b"))
+    await waitFor(() => expect(api.listViews).toHaveBeenCalledTimes(3))
+    await act(async () => late.resolve([{ id: "old", name: "Old A", is_system_global: false } as unknown as SavedView]))
+    expect(result.current.views.map((v) => v.id)).not.toContain("old")
   })
 
   it("the Root count is omitted while the new org's summary is unanswered — never 0", async () => {
