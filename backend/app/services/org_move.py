@@ -34,7 +34,7 @@ to_org, counts}``). Move and receipt commit together or not at all.
 
 ⚠ RESIDUAL WINDOW (298-review WR-05) — the re-run does not SERIALIZE the binders. A concurrent
 draft save (``raise_if_foreign_change`` then the UPDATE, two pool calls with no transaction) or a
-chat folder bind (``_authorize_thread_folder`` then a supabase-py INSERT, which waits on the
+chat folder bind (``_authorize_thread_folder`` then a supabase-py write, which waits on the
 folder's ``FOR UPDATE`` but does not re-check after it) whose org check ran before this move
 committed still writes after it: a draft or a chat in the source org then binds a folder now in the
 target. Nothing in the database refuses either row (the live ``test_wr05_*`` cases pin both). A
