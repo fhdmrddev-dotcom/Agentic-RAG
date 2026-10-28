@@ -755,3 +755,47 @@ async def test_a_hold_placed_after_the_preview_is_caught_inside_the_transaction(
         await _execute(w, "folder", root)
     assert e.value.status == 409 and "legal hold" in e.value.sentence
     assert await w.snapshot() == before
+
+
+# ── D-22: the two routes as role `anon` (plan-check W4) ──────────────────────
+
+
+async def test_the_move_routes_refuse_the_anon_key_with_a_401_and_change_nothing(w):
+    """The local ``anon`` key as the bearer, through the REAL ``get_current_user`` against local
+    GoTrue (only ``get_supabase`` is pointed at the local stack — the unit conftest's placeholder URL
+    would otherwise read as an unreachable auth service, a 503). No row changes org, no receipt."""
+    import httpx
+
+    from app.dependencies import get_current_user, get_supabase
+    from app.main import app
+    from tests.integration._271_gotrue_users import _admin, _local_env
+
+    root = await w.folder()
+    draft = await w.draft("Brief")
+    d = await w.doc("MSA.pdf")
+    before = await w.snapshot()
+    anon = _local_env()["SUPABASE_ANON_KEY"]
+    saved_user = app.dependency_overrides.pop(get_current_user, None)
+    app.dependency_overrides[get_supabase] = _admin
+    try:
+        transport = httpx.ASGITransport(app=app)
+        async with httpx.AsyncClient(transport=transport, base_url="http://test") as client:
+            headers = {"Authorization": f"Bearer {anon}", "X-Org-Id": w.a}
+            for kind, item in (("folder", root), ("draft", draft), ("document", d)):
+                r = await client.get(
+                    "/org-items/move-preview", params={"kind": kind, "id": str(item), "to": w.b}, headers=headers
+                )
+                assert r.status_code == 401, (kind, r.status_code, r.text)
+                r = await client.post(
+                    "/org-items/move", json={"kind": kind, "id": str(item), "to_org_id": w.b}, headers=headers
+                )
+                assert r.status_code == 401, (kind, r.status_code, r.text)
+            # And with no bearer at all.
+            r = await client.post("/org-items/move", json={"kind": "folder", "id": str(root), "to_org_id": w.b})
+            assert r.status_code == 401
+    finally:
+        app.dependency_overrides.pop(get_supabase, None)
+        if saved_user is not None:
+            app.dependency_overrides[get_current_user] = saved_user
+    assert await w.snapshot() == before
+    assert await w.audit_count() == 0

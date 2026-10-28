@@ -257,3 +257,148 @@ def test_every_org_items_route_answers_401_without_a_bearer(mod):
     finally:
         if saved is not None:
             app.dependency_overrides[get_current_user] = saved
+
+
+# ── §5 the move routes (298-03, D-19 / D-21 / D-22) ───────────────────────────
+#
+# ``GET /org-items/move-preview?kind=&id=&to=`` and ``POST /org-items/move`` are thin: they hand
+# the request to ``org_move.preview_move`` / ``org_move.execute_move`` and translate a
+# ``MoveRefused`` into ``HTTPException(status, detail=<the sentence>)``. The service is stubbed
+# here; its live proof is ``tests/integration/test_298_org_move_live.py``.
+
+ITEM = "44444444-4444-4444-8444-444444444444"
+
+
+def _preview_obj():
+    from app.services.org_move import MoveCounts, MovePreview
+
+    return MovePreview(
+        kind="folder", item_id=ITEM, item_name="Q3 Contracts", from_org_id=ORG_A,
+        from_org_name="Personal", to_org_id=ORG_B, to_org_name="Acme Legal",
+        counts=MoveCounts(subfolders=2, documents=14, earlier_versions=1, past_runs=0),
+        refusals=["“Q3 Contracts” is shared with everyone in Personal. Make it private first, then move it."],
+    )
+
+
+@pytest.fixture
+def move_client(mod, monkeypatch):
+    from fastapi.testclient import TestClient
+
+    from app.dependencies import get_current_user
+    from app.main import app
+    from app.services import org_move
+
+    calls: list[tuple[str, dict]] = []
+    behaviour: dict = {"raise": None}
+    pool = object()
+
+    async def fake_pool():
+        return pool
+
+    async def fake_preview(p, **kwargs):
+        assert p is pool
+        calls.append(("preview", kwargs))
+        if behaviour["raise"]:
+            raise behaviour["raise"]
+        return _preview_obj()
+
+    async def fake_execute(p, **kwargs):
+        assert p is pool
+        calls.append(("execute", kwargs))
+        if behaviour["raise"]:
+            raise behaviour["raise"]
+        moved = _preview_obj()
+        moved.refusals = []
+        return moved
+
+    monkeypatch.setattr(mod, "get_pg_pool", fake_pool)
+    monkeypatch.setattr(org_move, "preview_move", fake_preview)
+    monkeypatch.setattr(org_move, "execute_move", fake_execute)
+    saved = app.dependency_overrides.get(get_current_user)
+    app.dependency_overrides[get_current_user] = lambda: USER
+    try:
+        client = TestClient(app)
+        client.headers.update({"Authorization": "Bearer t"})
+        yield client, calls, behaviour
+    finally:
+        if saved is None:
+            app.dependency_overrides.pop(get_current_user, None)
+        else:
+            app.dependency_overrides[get_current_user] = saved
+
+
+def test_the_router_mounts_both_move_routes(mod):
+    from app.main import app
+
+    mounted = {(getattr(r, "path", None), m) for r in app.routes for m in (getattr(r, "methods", None) or ())}
+    assert ("/org-items/move-preview", "GET") in mounted
+    assert ("/org-items/move", "POST") in mounted
+
+
+def test_the_move_routes_call_the_service(mod):
+    import inspect
+
+    src = inspect.getsource(mod)
+    assert "org_move.preview_move(" in src and "org_move.execute_move(" in src
+
+
+def test_preview_passes_through_with_its_refusals_and_a_200(move_client):
+    client, calls, _b = move_client
+    resp = client.get("/org-items/move-preview", params={"kind": "folder", "id": ITEM, "to": ORG_B})
+    assert resp.status_code == 200, resp.text
+    assert resp.json() == {
+        "kind": "folder", "item_id": ITEM, "item_name": "Q3 Contracts",
+        "from_org": {"id": ORG_A, "name": "Personal"}, "to_org": {"id": ORG_B, "name": "Acme Legal"},
+        "counts": {"subfolders": 2, "documents": 14, "earlier_versions": 1, "past_runs": 0},
+        "refusals": ["“Q3 Contracts” is shared with everyone in Personal. Make it private first, then move it."],
+    }
+    assert calls == [("preview", {"user_id": USER["id"], "kind": "folder", "item_id": ITEM, "to_org_id": ORG_B})]
+
+
+def test_move_posts_the_body_and_answers_what_moved(move_client):
+    client, calls, _b = move_client
+    resp = client.post("/org-items/move", json={"kind": "folder", "id": ITEM, "to_org_id": ORG_B})
+    assert resp.status_code == 200, resp.text
+    assert resp.json()["refusals"] == [] and resp.json()["to_org"] == {"id": ORG_B, "name": "Acme Legal"}
+    assert calls == [("execute", {"user_id": USER["id"], "kind": "folder", "item_id": ITEM, "to_org_id": ORG_B})]
+
+
+@pytest.mark.parametrize("status_code", [403, 404, 409, 422])
+def test_a_refusal_keeps_its_status_and_its_sentence_as_a_plain_detail(move_client, status_code):
+    from app.services.org_move import MoveRefused
+
+    client, _calls, behaviour = move_client
+    behaviour["raise"] = MoveRefused("A worded reason.", status_code)
+    for resp in (
+        client.get("/org-items/move-preview", params={"kind": "folder", "id": ITEM, "to": ORG_B}),
+        client.post("/org-items/move", json={"kind": "folder", "id": ITEM, "to_org_id": ORG_B}),
+    ):
+        assert resp.status_code == status_code
+        assert resp.json() == {"detail": "A worded reason."}
+
+
+@pytest.mark.parametrize("kind", ["thread", "run", "", "FOLDER"])
+def test_a_kind_outside_the_three_is_a_422_before_the_service(move_client, kind):
+    client, calls, _b = move_client
+    assert client.get("/org-items/move-preview", params={"kind": kind, "id": ITEM, "to": ORG_B}).status_code == 422
+    assert client.post("/org-items/move", json={"kind": kind, "id": ITEM, "to_org_id": ORG_B}).status_code == 422
+    assert calls == []
+
+
+@pytest.mark.parametrize("bad", ["nope", "1234", "{" + ITEM + "}"])
+def test_a_non_uuid_is_a_422_before_the_service(move_client, bad):
+    client, calls, _b = move_client
+    assert client.get("/org-items/move-preview", params={"kind": "folder", "id": bad, "to": ORG_B}).status_code == 422
+    assert client.get("/org-items/move-preview", params={"kind": "folder", "id": ITEM, "to": bad}).status_code == 422
+    assert client.post("/org-items/move", json={"kind": "folder", "id": bad, "to_org_id": ORG_B}).status_code == 422
+    assert client.post("/org-items/move", json={"kind": "folder", "id": ITEM, "to_org_id": bad}).status_code == 422
+    assert calls == []
+
+
+def test_the_move_body_forbids_extra_fields_and_needs_every_field(move_client):
+    client, calls, _b = move_client
+    body = {"kind": "folder", "id": ITEM, "to_org_id": ORG_B}
+    assert client.post("/org-items/move", json={**body, "from_org_id": ORG_A}).status_code == 422
+    for missing in body:
+        assert client.post("/org-items/move", json={k: v for k, v in body.items() if k != missing}).status_code == 422
+    assert calls == []
