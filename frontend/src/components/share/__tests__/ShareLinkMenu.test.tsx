@@ -104,6 +104,17 @@ describe("ShareLinkMenu — the surface", () => {
     expect(within(menu).getByText("Northwind").className).toContain("text-foreground")
   })
 
+  it("⚠ WR-03 — every direct element child of the menu carries a permitted role", async () => {
+    const PERMITTED = ["menuitem", "menuitemradio", "menuitemcheckbox", "group", "separator"]
+    const { menu } = await openRunMenu()
+    const children = Array.from(menu.children)
+    expect(children.length).toBeGreaterThan(1)
+    const offending = children
+      .filter((el) => !PERMITTED.includes(el.getAttribute("role") ?? ""))
+      .map((el) => `${el.tagName.toLowerCase()}[role=${el.getAttribute("role") ?? "none"}]`)
+    expect(offending).toEqual([])
+  })
+
   it("the item is described by the address and the audience line", async () => {
     const { menu } = await openRunMenu()
     const item = within(menu).getByRole("menuitem")

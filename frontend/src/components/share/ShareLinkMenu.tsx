@@ -25,6 +25,7 @@ import { Button } from "@/components/ui/button"
 import {
   DropdownMenu,
   DropdownMenuContent,
+  DropdownMenuGroup,
   DropdownMenuItem,
   DropdownMenuLabel,
   DropdownMenuSub,
@@ -90,16 +91,24 @@ function LinkSurfaceBody({ route, kind, audience, orgId }: ShareLinkMenuProps) {
     label = copyShortcutWord()
   }
 
+  // ⚠ WR-03: every direct child of `role="menu"` is a menuitem or a group, so the heading, the
+  // address, the status and the audience line sit inside `DropdownMenuGroup`s (the card menu's
+  // consequence-note precedent) — a bare label or <code> there breaks `aria-required-children`.
   return (
     <>
-      <DropdownMenuLabel className="px-1 pb-2 pt-0 text-sm font-semibold text-foreground">{linkToThis(kind)}</DropdownMenuLabel>
-      <code
-        ref={addressRef}
-        id={addressId}
-        className="mb-2 block select-all break-all rounded-md bg-muted/40 px-2 py-2 font-mono text-[11px] text-muted-foreground"
-      >
-        {shown}
-      </code>
+      <DropdownMenuGroup>
+        <DropdownMenuLabel className="px-1 pb-2 pt-0 text-sm font-semibold text-foreground">{linkToThis(kind)}</DropdownMenuLabel>
+        <code
+          ref={addressRef}
+          id={addressId}
+          className="mb-2 block select-all break-all rounded-md bg-muted/40 px-2 py-2 font-mono text-[11px] text-muted-foreground"
+        >
+          {shown}
+        </code>
+        <span role="status" className="sr-only">
+          {copy === "copied" ? LINK_COPIED : ""}
+        </span>
+      </DropdownMenuGroup>
       <DropdownMenuItem
         aria-describedby={`${addressId} ${audienceId}`}
         onSelect={(event) => {
@@ -117,14 +126,11 @@ function LinkSurfaceBody({ route, kind, audience, orgId }: ShareLinkMenuProps) {
         <Copy className="mr-2 h-3.5 w-3.5" aria-hidden="true" />
         <span>{label}</span>
       </DropdownMenuItem>
-      <DropdownMenuLabel id={audienceId} className="px-1 pb-0 pt-2 text-xs font-normal text-muted-foreground">
+      <DropdownMenuGroup id={audienceId} className="px-1 pt-2 text-xs font-normal text-muted-foreground">
         {before}
         {org !== null && <span className="text-foreground">{org}</span>}
         {after}
-      </DropdownMenuLabel>
-      <span role="status" className="sr-only">
-        {copy === "copied" ? LINK_COPIED : ""}
-      </span>
+      </DropdownMenuGroup>
     </>
   )
 }
