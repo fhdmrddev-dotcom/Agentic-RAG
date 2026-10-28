@@ -466,8 +466,8 @@ export type {
 } from "./api/org"
 
 // ── orgItems (Phase 298-04) ────────────────────────────────────────────
-export { getFolderLabels } from "./api/orgItems"
-export type { FolderLabel } from "./api/orgItems"
+export { getFolderLabels, getElsewhereCounts, getMovePreview, moveOrgItem } from "./api/orgItems"
+export type { FolderLabel, ElsewhereOrgCounts, MovePreview, OrgItemMoveKind } from "./api/orgItems"
 
 // ── connectors ─────────────────────────────────────────────────────────
 export {

@@ -39,6 +39,7 @@ import { ApiError, listWorkflowRuns, type WorkflowRunListItem } from "@/lib/api"
 // file's own suite mocks wholesale).
 import { useActiveOrgId } from "@/hooks/useActiveOrgId"
 import { getActiveOrgId } from "@/lib/api/_core"
+import { ElsewhereLine } from "@/components/org/ElsewhereLine"
 import { runLogRowFacts } from "./runLogRow"
 import { LOG_GUTTER_TONE, LOG_RUN_TONE } from "./runLogTone"
 import {
@@ -204,6 +205,7 @@ export function RunLogPanel({ scope, onClearScope, onOpenRun }: RunLogPanelProps
       </header>
 
       <div className="min-h-0 flex-1 overflow-y-auto">
+        {scope === null && <ElsewhereLine kind="runs" className="px-6 pt-4" />}
         {/* ⚠ LOADING RENDERS NO COUNT. A count of 0 during a load is a lie — the
             `WorkflowsPage` D-16 rule, applied at the surface it was written for. */}
         {loading ? (

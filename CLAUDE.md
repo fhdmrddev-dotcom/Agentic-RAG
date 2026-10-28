@@ -421,7 +421,7 @@ node scripts/check-hot-file-ledger.cjs <phase-dir>   # 0 clear · 1 missing rows
 | `frontend/src/components/workflows/PhaseNodeCard.tsx` | 18 / 9 / 490 (was `17 / 8 / 489`) | 290: forecast unused — chips went on the library card, not here |
 | `backend/app/services/harness/phase_types.py` | 66 / 33 / 3135 (was `65 / 33 / 3131`) | 296-06: emit pin precedence, retry guard, 1 notice helper · G-5 OWED |
 | `backend/app/services/tools/render_template.py` | 6 / 3 / 1163 (was `3 / 2 / 1094`) | 296-03: button /V written as a name, read back typed · now FIRES · ⛔ |
-| `frontend/src/pages/WorkflowsPage.tsx` | 51 / 22 / 1390 (was `50 / 22 / 1390`) | 298-04: onOrgSwitch arg on the feeds hook call (UI-D10) |
+| `frontend/src/pages/WorkflowsPage.tsx` | 52 / 22 / 1392 (was `51 / 22 / 1390`) | 298-05: one ElsewhereLine mount atop the list region (+ its import) |
 | `frontend/src/components/workflows/library/WorkflowCard.tsx` | 26 / 11 / 1373 (was `25 / 10 / 1371`) | 296-07: comment-only (MARK_ICON docblock, 286-S04-2) |
 | `frontend/src/components/workflows/library/libraryVocabulary.ts` | 15 / 8 / 820 (was `14 / 7 / 819`) | 296-07: STEP_LINE_UNTYPED re-exports the one home (data) |
 | `frontend/src/components/workflows/library/libraryFilter.ts` | 6 / 4 / 435 | ⚠ absent at 4 phases and NO PLAN NAMED IT (192.2) |
@@ -446,7 +446,7 @@ node scripts/check-hot-file-ledger.cjs <phase-dir>   # 0 clear · 1 missing rows
 | `frontend/src/components/layout/ChatLayout.tsx` | 69 / 35 / 905 (was `68 / 34 / 902`) | 298-04: history column loading= (switching); mobile pick reset |
 | `frontend/src/components/layout/ChatLaunchForm.tsx` | 6 / 4 / 191 (was `5 / 4 / 183`) | 296 G-4 row 11: refused Run scrolls the refusal into view |
 | `frontend/src/components/workflows/LaunchInputFields.tsx` | 3 / 3 / 145 | 287-01: leaf stays non-blocking; docblock only · 214.1-01 trigger TAKEN |
-| `frontend/src/components/layout/ChatHistoryColumn.tsx` | 8 / 3 / 522 (was `7 / 2 / 513`) | ⚠ now FIRES (298) · 298-04: optional loading line (UI-D8) |
+| `frontend/src/components/layout/ChatHistoryColumn.tsx` | 9 / 3 / 524 (was `8 / 3 / 522`) | 298-05: one ElsewhereLine mount atop hc-list (+ its import) |
 | `frontend/src/hooks/useThreads.ts` | 7 / 4 / 117 (was `5 / 3 / 65`) | 298-04: org-tagged rows + switching (plan-sanctioned) · ⛔ |
 | `backend/app/services/harness/grounding.py` | 23 / 10 / 1437 (was `21 / 8 / 1414`) | 295-03: ONE pure predicate (is_engine_citation_gate) |
 | `frontend/src/components/workflows/PhaseFormPanel.tsx` | 30 / 14 / 1566 | honoured by construction ×6 (185 / 193 / 193.1 / 199 / 200 / **214**) |
@@ -485,7 +485,7 @@ node scripts/check-hot-file-ledger.cjs <phase-dir>   # 0 clear · 1 missing rows
 | `frontend/src/components/workflows/WaitingOnLine.tsx` | 1 / 1 / 26 | young (created 288-03) · leaf, no hook · ⛔ |
 | `frontend/src/components/chat/OutputFileCard.tsx` | 8 / 7 / 219 | honoured by construction (195) |
 | `frontend/src/components/panel/FilesSection.tsx` | 12 / 8 / 354 (was `10 / 6 / 363`) | ⚠ STALE · last touch 274-04 |
-| `frontend/src/lib/api.ts` | 213 / 127 / 552 (was `211 / 126 / 546`) | 298-04: + getFolderLabels barrel block (orgItems) |
+| `frontend/src/lib/api.ts` | 214 / 127 / 552 (was `213 / 127 / 552`) | 298-05: orgItems block + elsewhere + move-preview + move (one block) |
 | `frontend/src/types/index.ts` | 102 / 81 / 1685 (was `101 / 80 / 1674`) | 293-03: one RunOrigin type + one optional field · seam OWED |
 | `backend/app/main.py` | 96 / 70 / 992 (was `95 / 69 / 991`) | 298-01: one include_router(org_items.router) + its import token · ⛔ |
 | `backend/app/config.py` | 93 / 54 / 1809 (was `92 / 54 / 1790`) | honoured by construction (282-04: self-hosted default 900) · seam OWED · ⛔ |
@@ -632,7 +632,7 @@ node scripts/check-hot-file-ledger.cjs <phase-dir>   # 0 clear · 1 missing rows
 | `frontend/src/components/experts/catalog/ExpertDetailModal.tsx` | 7 / 5 / 531 (was `6 / 4 / 531`) | honoured by construction (279-03: ONE copy change) |
 | `frontend/src/components/experts/catalog/startScopedChat.ts` | 1 / 1 / 70 | ⚠ 0/0/0 AT PLANNING · measured at 262-04 · ⛔ |
 | `backend/app/services/ingest_splice.py` | 22 / 8 / 1043 (was `19 / 7 / 930`) | honoured by construction (280: minter-only hunks) · ⛔ |
-| `frontend/src/components/ingestion/FolderTree.tsx` | 15 / 10 / 221 (was `14 / 9 / 213`) | 298-04: optional loading → 'Loading folders…' (UI-D8) · ⛔ |
+| `frontend/src/components/ingestion/FolderTree.tsx` | 16 / 10 / 225 (was `15 / 10 / 221`) | 298-05: one ElsewhereLine mount above Root (+ its import) |
 | `frontend/src/components/ingestion/FolderNode.tsx` | 15 / 8 / 316 (was `13 / 7 / 303`) | 284-03: no counts yet → slot omitted, never 0 · ⛔ |
 | `frontend/src/components/ingestion/NavRow.tsx` | 6 / 4 / 269 | ⚠ absent its ENTIRE LIFE — row added 266-05 · ⛔ |
 | `backend/app/models/document.py` | 14 / 11 / 275 (was `13 / 10 / 221`) | 284-02: five paged envelopes, additive · ⛔ |

@@ -8,6 +8,7 @@ import { FolderCreateInput } from "./FolderCreateInput"
 import { ApiRefusal } from "@/lib/api/refusal"
 import { SyrelLoader } from "@/components/ui/SyrelLoader"
 import { LOADING_FOLDERS } from "@/components/org/orgItemsCopy"
+import { ElsewhereLine } from "@/components/org/ElsewhereLine"
 import type { Folder } from "@/types"
 
 interface FolderTreeProps {
@@ -157,6 +158,9 @@ export function FolderTree({
           <TooltipContent>New Folder</TooltipContent>
         </Tooltip>
       </div>
+
+      {/* 298-05 (D-17 / UI-D4): your folders + Root documents in your other orgs, above Root. */}
+      <ElsewhereLine kind="library" className="px-2 mb-2" />
 
       {/* Root node — also renders through the shared NavRow (D-114-13). It already
           had a count; now it shares the same row as every folder. */}

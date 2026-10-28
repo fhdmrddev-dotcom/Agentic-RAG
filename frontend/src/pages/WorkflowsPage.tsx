@@ -139,6 +139,7 @@ import type { ChipId, LibraryRow, Provenance } from "@/components/workflows/libr
 // state and layout, and declares no card, no filter item and no modal of its own.
 import { RunLogPanel } from "@/components/workflows/history/RunLogPanel"
 import { useWorkflowLibraryFeeds } from "@/components/workflows/library/useWorkflowLibraryFeeds"
+import { ElsewhereLine } from "@/components/org/ElsewhereLine"
 import { LibraryToolbar } from "@/components/workflows/library/LibraryToolbar"
 import { WorkflowScheduleModal } from "@/components/workflows/WorkflowScheduleModal"
 import { WorkflowCard } from "@/components/workflows/library/WorkflowCard"
@@ -1206,6 +1207,7 @@ export function WorkflowsPage({ folders, onLaunch, onOpenRun, onOpenConnections,
           cap is what keeps the card's internal hierarchy legible at any window width; `gap-3`
           becomes the sheet's `gap-md` (16px) for the same reason. */}
       <div className="min-h-0 flex-1 overflow-y-auto p-6">
+        <ElsewhereLine kind="workflows" className="mx-auto mb-4 max-w-[1200px]" />
         {loading ? null : visibleRows.length > 0 ? (
           <div
             data-testid="library-list"
