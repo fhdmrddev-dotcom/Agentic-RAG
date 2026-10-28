@@ -105,7 +105,8 @@ def test_217_keeps_every_earlier_literal_and_adds_the_move_type():
 
 
 def test_217_repairs_no_data_adds_no_function_and_changes_no_privilege():
-    code = _code(_migration("217"))
+    # Quoted literals out first: 'connector.grant' is an action type, not a GRANT statement.
+    code = re.sub(r"'[^']*'", "''", _code(_migration("217")))
     for pattern in (
         r"\bCREATE\s+(OR\s+REPLACE\s+)?FUNCTION\b",
         r"\bGRANT\b",

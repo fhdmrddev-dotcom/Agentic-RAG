@@ -12015,7 +12015,7 @@ cells rot within days.
 | [`backend/app/services/template_asset_service.py`](docs/HOT-FILE-LEDGER.md#backendappservicestemplate_asset_servicepy) | 5 / 4 / 379 (was `4 / 3 / 344`) | ⚠ **FIRES** | 295-02: Branch 2's WHERE moved verbatim into `_STAGED_TEMPLATE_WHERE`; one `has_staged_template` probe (+1 def, If 12→12). Honoured by construction |
 | [`backend/app/api/folders.py`](docs/HOT-FILE-LEDGER.md#backendappapifolderspy) | 17 / 11 / 298 (was `16 / 10 / 288`) | ⚠ **FIRES** | 298-01: list_folders + list_children pass `**org_lists.folder_kw(...)` — `{}` without an org, so byte-identical; fetch_visible_folders untouched (sha256-pinned). Honoured by construction. |
 | [`backend/app/api/kb.py`](docs/HOT-FILE-LEDGER.md#backendappapikbpy) | 14 / 9 / 515 (was `13 / 8 / 504`) | ⚠ **FIRES** | **275-02**: ls/tree/glob's 7 document reads gain `.eq(RETRIEVABLE_COLUMN, True)`. ⛔ `read_path` untouched (Library GET content shares it) |
-| [`backend/app/services/audit_service.py`](docs/HOT-FILE-LEDGER.md#backendappservicesaudit_servicepy) | 9 / 9 / 98 (was `8 / 8 / 96`) | ⚠ **FIRES** | ⚠ absent its ENTIRE LIFE — row added 275-01. **275-01**: +3 connector.watch.*, +10 retention/folder types (mig 204). ⛔ ⊆ the live CHECK (boot) · 293 touch: see §Phase 293 close |
+| [`backend/app/services/audit_service.py`](docs/HOT-FILE-LEDGER.md#backendappservicesaudit_servicepy) | 10 / 10 / 100 (was `9 / 9 / 98`) | ⚠ **FIRES** | 298-03: one lockstep literal `org.item.move` (mig 217), honoured by construction. ⛔ ⊆ the live CHECK (boot) · 275 / 293 touches: see its section |
 | [`backend/app/services/document_relationship_service.py`](docs/HOT-FILE-LEDGER.md#backendappservicesdocument_relationship_servicepy) | 6 / 4 / 465 (was `5 / 3 / 457`) | ⚠ **FIRES** | honoured by construction — one default-False kwarg + one `.eq` per read leg, Library callers unchanged, source fence (row column, not a 2nd query) |
 | [`backend/app/services/retention/__init__.py`](docs/HOT-FILE-LEDGER.md#backendappservicesretention__init__py) | 1 / 1 / 6 | no (young) | young (created 275-01). Package docstring only. Row added AT CREATION |
 | [`backend/app/services/retention/hold_guard.py`](docs/HOT-FILE-LEDGER.md#backendappservicesretentionhold_guardpy) | 1 / 1 / 319 | no (young) | young (275-01). The ONE Python hold check (D-32): folders FIRST (B-1); PT409→one 409; a member never sees a matter. ⛔ call sites add a line |
@@ -20276,6 +20276,16 @@ had been RED since 223 at "exactly 19"; 275-01 re-pinned it to the whole set (34
 #### CLAUDE.md verdict cell as of 2026-10-12 (moved by 277)
 
 ⚠ absent its ENTIRE LIFE — row added 275-01. **275-01**: +3 connector.watch.*, +10 retention types. ⛔ ⊆ live CHECK
+
+#### 298-03 (2026-10-28) — `10 / 10 / 100` (was `9 / 9 / 98`)
+
+One lockstep literal, honoured by construction: `"org.item.move"` (with its one comment line) after the
+Phase 293 block, the receipt the per-item org move (`org_move.py`) writes inside its own transaction.
+Migration 217 re-states the CHECK with every live literal plus this one, in the same commit. ⚠ **Deploy
+order:** a backend carrying this literal will not boot against a database without 217
+(`assert_action_types_synced`), so 217 goes to the cloud DB before the backend. The integration pin
+(`test_110_audit_drift_guard.py`) had been RED again since 293 (the five `api_key.*` types); 298-03
+re-pinned it to 40 under fence id D-298-04, the reason in its body.
 
 ### `backend/app/services/document_relationship_service.py`
 
