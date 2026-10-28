@@ -1,7 +1,8 @@
 ---
 phase: 299
 slug: links-to-the-thing-itself
-status: draft
+status: approved
+reviewed_at: 2026-10-28
 shadcn_initialized: true
 preset: none (components.json style "default", baseColor slate, cssVariables, iconLibrary lucide)
 created: 2026-10-28
