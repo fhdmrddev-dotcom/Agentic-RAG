@@ -268,3 +268,114 @@ describe("appRoutes · hostile inputs (T-297-05 / T-297-06)", () => {
     expect(canonicalAddress(null as unknown as string, null as unknown as string)).toBeNull()
   })
 })
+
+// ── Phase 299-02 (LINK-02 / D-01, D-05, D-32) — ENTITY ADDRESSES. New cases only: every fence
+// above is unedited, so `/app` and `/app/chat` still parse to exactly `{ view: "chat" }`.
+const THREAD = "5d0c2a9e-3b1f-4c6d-8e7a-1f2b3c4d5e6f"
+const DEFINITION = "7e1d3b0f-4c2a-4d7e-9f8b-2a3b4c5d6e7f"
+const BUNDLE = "9f2e4c1a-5d3b-4e8f-a09c-3b4c5d6e7f80"
+
+describe("appRoutes · entity addresses parse, lowercased (299-02 / D-01)", () => {
+  it.each<[string, AppRoute]>([
+    [`/app/chat/${THREAD}`, { view: "chat", threadId: THREAD }],
+    [`/app/chat/${THREAD.toUpperCase()}`, { view: "chat", threadId: THREAD }],
+    [`/app/workflows/${DEFINITION}`, { view: "workflows", definitionId: DEFINITION }],
+    [`/app/workflows/${DEFINITION.toUpperCase()}`, { view: "workflows", definitionId: DEFINITION }],
+    [`/app/experts/${BUNDLE}`, { view: "experts", bundleId: BUNDLE }],
+    [`/app/experts/${BUNDLE.toUpperCase()}`, { view: "experts", bundleId: BUNDLE }],
+  ])("%s parses to its entity route", (path, route) => {
+    expect(parseAppLocation(path, "")).toEqual(route)
+  })
+
+  it("the id-less forms carry NO id key at all (exact shape, not merely an undefined id)", () => {
+    for (const path of ["/app", "/app/chat", "/app/workflows", "/app/experts"]) {
+      const parsed = parseAppLocation(path, "")
+      expect("threadId" in parsed, path).toBe(false)
+      expect("definitionId" in parsed, path).toBe(false)
+      expect("bundleId" in parsed, path).toBe(false)
+    }
+    expect(parseAppLocation("/app/workflows", "")).toEqual({ view: "workflows" })
+    expect(parseAppLocation("/app/experts", "")).toEqual({ view: "experts" })
+  })
+
+  it.each([
+    "/app/chat/not-a-uuid",
+    `/app/chat/${THREAD}/extra`,
+    `/app/chat/${THREAD}x`,
+    `/app/chat/${THREAD.slice(0, 35)}`,
+    "/app/workflows/not-a-uuid",
+    `/app/workflows/${DEFINITION}/extra`,
+    "/app/experts/not-a-uuid",
+    `/app/experts/${BUNDLE}/extra`,
+    `/app/experts/${BUNDLE}.json`,
+    "/app/library/" + THREAD,
+    "/app/settings/" + THREAD,
+  ])("%s is not-found and never canonicalised", (path) => {
+    expect(() => parseAppLocation(path, "")).not.toThrow()
+    expect(parseAppLocation(path, "")).toEqual({ view: "not-found" })
+    expect(canonicalAddress(path, "")).toBeNull()
+  })
+})
+
+describe("appRoutes · entity addresses format and round-trip (299-02 / D-01, D-32)", () => {
+  it("each entity route formats to its own address — a thread is NEVER /app", () => {
+    expect(formatAppRoute({ view: "chat", threadId: THREAD })).toBe(`/app/chat/${THREAD}`)
+    expect(formatAppRoute({ view: "workflows", definitionId: DEFINITION })).toBe(`/app/workflows/${DEFINITION}`)
+    expect(formatAppRoute({ view: "experts", bundleId: BUNDLE })).toBe(`/app/experts/${BUNDLE}`)
+  })
+
+  it("ids are written lowercased", () => {
+    expect(formatAppRoute({ view: "chat", threadId: THREAD.toUpperCase() })).toBe(`/app/chat/${THREAD}`)
+    expect(formatAppRoute({ view: "workflows", definitionId: DEFINITION.toUpperCase() })).toBe(`/app/workflows/${DEFINITION}`)
+    expect(formatAppRoute({ view: "experts", bundleId: BUNDLE.toUpperCase() })).toBe(`/app/experts/${BUNDLE}`)
+  })
+
+  it("the id-less forms are unchanged", () => {
+    expect(formatAppRoute({ view: "chat" })).toBe("/app")
+    expect(formatAppRoute({ view: "workflows" })).toBe("/app/workflows")
+    expect(formatAppRoute({ view: "experts" })).toBe("/app/experts")
+  })
+
+  it.each<AppRoute>([
+    { view: "chat", threadId: THREAD },
+    { view: "workflows", definitionId: DEFINITION },
+    { view: "experts", bundleId: BUNDLE },
+  ])("%o round-trips format → parse, and its address is already canonical", (route) => {
+    const path = formatAppRoute(route)
+    expect(parseAppLocation(path, "")).toEqual(route)
+    expect(canonicalAddress(path, "")).toBeNull()
+  })
+})
+
+describe("appRoutes · entity addresses normalise by the same rules (299-02 / D-13)", () => {
+  it.each<[string, string]>([
+    [`/app/chat/${THREAD.toUpperCase()}`, `/app/chat/${THREAD}`],
+    [`/app/chat/${THREAD}/`, `/app/chat/${THREAD}`],
+    [`/chat/${THREAD}`, `/app/chat/${THREAD}`],
+    [`/workflows/${DEFINITION}`, `/app/workflows/${DEFINITION}`],
+    [`/experts/${BUNDLE}`, `/app/experts/${BUNDLE}`],
+    [`/experts/${BUNDLE.toUpperCase()}/`, `/app/experts/${BUNDLE}`],
+  ])("%s → %s", (path, canonical) => {
+    expect(canonicalAddress(path, "")).toBe(canonical)
+  })
+
+  it("a bare entity address keeps any query it carried", () => {
+    expect(canonicalAddress(`/chat/${THREAD}`, "?x=1")).toBe(`/app/chat/${THREAD}?x=1`)
+  })
+
+  it("the legacy ?run= alias belongs to the chat HOME only — a thread address keeps its thread", () => {
+    expect(parseAppLocation(`/app/chat/${THREAD}`, `?run=${RUN}`)).toEqual({ view: "chat", threadId: THREAD })
+    expect(canonicalAddress(`/app/chat/${THREAD}`, `?run=${RUN}`)).toBeNull()
+    // D-05: the home's alias is untouched.
+    expect(canonicalAddress("/app", `?run=${RUN}`)).toBe(`/app/runs/${RUN}`)
+  })
+
+  it("no canonical entity address ever leaves the origin", () => {
+    for (const p of [`/chat/${THREAD}`, `//chat/${THREAD}`, `/app//chat/${THREAD}`, `/app/chat/%2F%2Fevil.com`]) {
+      const out = canonicalAddress(p, "")
+      if (out === null) continue
+      expect(out.startsWith("/app")).toBe(true)
+      expect(out).not.toContain("://")
+    }
+  })
+})
