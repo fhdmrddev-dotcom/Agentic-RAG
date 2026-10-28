@@ -7,7 +7,7 @@
  * plan's. A thread still streaming from the org that was left is not listed, and nothing throws.
  */
 import { describe, it, expect, vi, beforeEach } from "vitest"
-import { render, screen } from "@testing-library/react"
+import { fireEvent, render, screen } from "@testing-library/react"
 import type { Folder, Thread } from "@/types"
 
 const { streamingIds, stopThread } = vi.hoisted(() => ({
@@ -18,6 +18,14 @@ vi.mock("@/providers/StreamsProvider", () => ({
   useStreamingThreadIds: () => streamingIds,
   useStreamActions: () => ({ stopThread }),
   getActiveRunStartMs: () => null,
+}))
+
+// Phase 298-05 (D-17 / UI-D4) — a one-line probe that proves WHERE the elsewhere line mounts. The
+// real line renders nothing without 2+ orgs, so standing it in changes no other case here.
+vi.mock("@/components/org/ElsewhereLine", () => ({
+  ElsewhereLine: ({ kind, className }: { kind: string; className?: string }) => (
+    <div data-testid="elsewhere-probe" data-kind={kind} data-class={className ?? ""} />
+  ),
 }))
 
 import { ChatHistoryColumn } from "../ChatHistoryColumn"
@@ -76,5 +84,23 @@ describe("ChatHistoryColumn — an org switch (298-04)", () => {
     // The column renders no row, chip or label for a thread its list does not hold.
     expect(document.body.innerHTML).not.toContain("t-streaming-old-org")
     expect(document.body.textContent ?? "").not.toMatch(/something went wrong/i)
+  })
+})
+
+// ── Phase 298-05 (D-17 / UI-D4) — the elsewhere line's mount point ──────────────────────────
+describe("ChatHistoryColumn — the elsewhere line (298-05)", () => {
+  it("mounts ONE threads line at the top of the list, above the first group", () => {
+    renderColumn({ threads: [mkThread("t1", "Budget chat")] })
+    const probes = screen.getAllByTestId("elsewhere-probe")
+    expect(probes).toHaveLength(1)
+    expect(probes[0]).toHaveAttribute("data-kind", "threads")
+    expect(probes[0].compareDocumentPosition(screen.getByText("Budget chat")) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy()
+  })
+
+  it("is still there under a title filter that matches nothing (it counts more chats, not matches)", () => {
+    renderColumn({ threads: [mkThread("t1", "Budget chat")] })
+    fireEvent.change(screen.getByPlaceholderText("Filter this list…"), { target: { value: "zzz" } })
+    expect(screen.getByText("No chats match your search.")).toBeInTheDocument()
+    expect(screen.getByTestId("elsewhere-probe")).toHaveAttribute("data-kind", "threads")
   })
 })

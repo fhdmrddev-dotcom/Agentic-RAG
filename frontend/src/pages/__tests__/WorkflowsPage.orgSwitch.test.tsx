@@ -53,6 +53,14 @@ vi.mock("@/lib/api", async (importOriginal) => {
   }
 })
 
+// Phase 298-05 (D-17 / UI-D4) — a one-line probe that proves WHERE the elsewhere line mounts. The
+// real line renders nothing without 2+ orgs, so standing it in changes no other case here.
+vi.mock("@/components/org/ElsewhereLine", () => ({
+  ElsewhereLine: ({ kind, className }: { kind: string; className?: string }) => (
+    <div data-testid="elsewhere-probe" data-kind={kind} data-class={className ?? ""} />
+  ),
+}))
+
 import { WorkflowsPage } from "@/pages/WorkflowsPage"
 import { setActiveOrgId, getActiveOrgId } from "@/lib/api/_core"
 import { LIBRARY_STATES } from "@/components/workflows/library/libraryVocabulary"
@@ -172,5 +180,27 @@ describe("WorkflowsPage — switching org (298-04)", () => {
     expect(api.listDraftWorkflows).toHaveBeenCalledTimes(2)
     expect(api.listPublishedWorkflows).toHaveBeenCalledTimes(2)
     expect(api.listStarterWorkflows).toHaveBeenCalledTimes(2)
+  })
+})
+
+// ── Phase 298-05 (D-17 / UI-D4) — the elsewhere line's mount point ──────────────────────────
+describe("WorkflowsPage — the elsewhere line (298-05)", () => {
+  it("mounts ONE workflows line at the top of the list region, inside the grid's width, above the cards", async () => {
+    render(<WorkflowsPage folders={folders} onLaunch={vi.fn()} />)
+    expect(await screen.findByText("Alpha Review")).toBeInTheDocument()
+    const probes = screen.getAllByTestId("elsewhere-probe").filter((p) => p.getAttribute("data-kind") === "workflows")
+    expect(probes).toHaveLength(1)
+    expect(probes[0].getAttribute("data-class")).toContain("max-w-[1200px]")
+    expect(probes[0].getAttribute("data-class")).toContain("mb-4")
+    const list = screen.getByTestId("library-list")
+    expect(probes[0].parentElement).toBe(list.parentElement)
+    expect(probes[0].compareDocumentPosition(list) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy()
+  })
+
+  it("is present while the feeds load too (it renders its own nothing until its answer)", () => {
+    api.listPublishedWorkflows.mockImplementation(() => new Promise(() => {}))
+    render(<WorkflowsPage folders={folders} onLaunch={vi.fn()} />)
+    expect(screen.getByTestId("library-loading")).toBeInTheDocument()
+    expect(screen.getAllByTestId("elsewhere-probe").some((p) => p.getAttribute("data-kind") === "workflows")).toBe(true)
   })
 })

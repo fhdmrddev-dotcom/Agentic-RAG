@@ -5,6 +5,13 @@ import { describe, it, expect, vi } from "vitest"
 import { render, screen, fireEvent } from "@testing-library/react"
 import { TooltipProvider } from "@/components/ui/tooltip"
 import { FolderTree } from "@/components/ingestion/FolderTree"
+// Phase 298-05 (D-17 / UI-D4) — a one-line probe that proves WHERE the elsewhere line mounts. The
+// real line renders nothing without 2+ orgs, so standing it in changes no other case here.
+vi.mock("@/components/org/ElsewhereLine", () => ({
+  ElsewhereLine: ({ kind, className }: { kind: string; className?: string }) => (
+    <div data-testid="elsewhere-probe" data-kind={kind} data-class={className ?? ""} />
+  ),
+}))
 import type { Folder } from "@/types"
 
 function renderWithTooltip(ui: React.ReactElement) {
@@ -177,3 +184,18 @@ describe("FolderTree — loading (298-04)", () => {
   })
 })
 
+
+// ── Phase 298-05 (D-17 / UI-D4) — the elsewhere line's mount point ──────────────────────────
+describe("FolderTree — the elsewhere line (298-05)", () => {
+  it("mounts ONE library line under the Folders header and above Root, in the tree's gutter", () => {
+    renderWithTooltip(<FolderTree {...defaultProps} />)
+    const probes = screen.getAllByTestId("elsewhere-probe")
+    expect(probes).toHaveLength(1)
+    expect(probes[0]).toHaveAttribute("data-kind", "library")
+    expect(probes[0].getAttribute("data-class")).toContain("px-2")
+    const header = screen.getByText("Folders")
+    const root = screen.getByText("Root")
+    expect(header.compareDocumentPosition(probes[0]) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy()
+    expect(probes[0].compareDocumentPosition(root) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy()
+  })
+})

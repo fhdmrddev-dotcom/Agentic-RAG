@@ -46,6 +46,13 @@ const { listWorkflowRuns, ApiError } = vi.hoisted(() => {
 })
 
 vi.mock("@/lib/api", () => ({ listWorkflowRuns, ApiError }))
+// Phase 298-05 (D-17 / UI-D4) — a one-line probe that proves WHERE the elsewhere line mounts. The
+// real line renders nothing without 2+ orgs, so standing it in changes no other case here.
+vi.mock("@/components/org/ElsewhereLine", () => ({
+  ElsewhereLine: ({ kind, className }: { kind: string; className?: string }) => (
+    <div data-testid="elsewhere-probe" data-kind={kind} data-class={className ?? ""} />
+  ),
+}))
 
 // Phase 298-04 (D-08 / D-09) — a flippable active org standing in for OrgProvider. Every case
 // above runs with no active org (null), exactly as before this block existed.
@@ -390,3 +397,24 @@ describe("RunLogPanel §7 — an org switch (298-04)", () => {
   })
 })
 
+
+// ── Phase 298-05 (D-17 / UI-D6) — the elsewhere line's mount point ──────────────────────────
+describe("RunLogPanel §8 — the elsewhere line (298-05)", () => {
+  it("the WHOLE log mounts ONE runs line at the top of its scroll region", async () => {
+    listWorkflowRuns.mockResolvedValue(pageOf([runOf()], 1))
+    render(<RunLogPanel scope={null} onOpenRun={vi.fn()} />)
+    await screen.findByTestId("run-log-row-run-1")
+    const probes = screen.getAllByTestId("elsewhere-probe")
+    expect(probes).toHaveLength(1)
+    expect(probes[0]).toHaveAttribute("data-kind", "runs")
+    expect(probes[0].getAttribute("data-class")).toContain("px-6")
+    expect(probes[0].compareDocumentPosition(screen.getByTestId("run-log-row-run-1")) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy()
+  })
+
+  it("a log scoped to ONE workflow has no elsewhere line (the count covers every run)", async () => {
+    listWorkflowRuns.mockResolvedValue(pageOf([runOf()], 1))
+    render(<RunLogPanel scope={{ slug: "qbr", name: "Quarterly Business Review" }} onOpenRun={vi.fn()} />)
+    await screen.findByTestId("run-log-row-run-1")
+    expect(screen.queryByTestId("elsewhere-probe")).toBeNull()
+  })
+})

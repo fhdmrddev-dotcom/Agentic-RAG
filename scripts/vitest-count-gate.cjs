@@ -3045,7 +3045,7 @@ const BASELINE = {
   //     proving the parser really sees six entries per map and a driven falsification proving
   //     a single changed utility is caught.
   "runLogRow.test.ts": 24, // 293-03: 21 -> 24 (the origin sentence is the last atom; unrecorded and unknown compose as before)
-  "RunLogPanel.test.tsx": 23, // RAISED 20 → 23 at 298-04 (2026-10-28): an org switch clears the rows at once + says loading, drops the late answer, a failure there is still never an empty log
+  "RunLogPanel.test.tsx": 25, // RAISED 20 → 23 at 298-04 (2026-10-28): an org switch clears the rows at once + says loading, drops the late answer, a failure there is still never an empty log · RAISED 23 → 25 at 298-05: the elsewhere line mounts atop the whole log, and not on a scoped one
   "runLogTone.mirror.test.ts": 10,
   // ── THE LAST TWO OF PHASE 200'S UNPINNED SUITES, pinned at their measured actuals ───────
   //
@@ -4442,13 +4442,17 @@ const BASELINE = {
   //    and FolderTree.test.tsx were in NEITHER knob before this (no src/__tests__/hooks or
   //    src/__tests__/components directory entry), so they are ADOPTED (existing + new), not raised.
   "useFolders.test.ts": 17, // 298-04 ADOPTED: 10 existing + 7 — loading flag, switch drops rows at once, late old-org answer discarded, create lands in the new org, Realtime org filter (INSERT ignored, UPDATE removes) and its polarity
-  "FolderTree.test.tsx": 14, // 298-04 ADOPTED: 10 existing + 4 — loading says "Loading folders…" never "No folders yet", Root kept with no count, no stale rows, empty sentence unchanged
+  "FolderTree.test.tsx": 15, // 298-04 ADOPTED: 10 existing + 4 — loading says "Loading folders…" never "No folders yet", Root kept with no count, no stale rows, empty sentence unchanged · RAISED 14 → 15 at 298-05: the elsewhere line mounts once under the Folders header, above Root
   "LibraryPage.orgSwitch.test.tsx": 5, // 298-04 — real useFolders + useLibraryDocuments over a fake network: old org's folder/document gone at once, loading line, late answer dropped, Root + panel reset (UI-D10), fields/views/provenance re-read (SEED-317), Root count never 0
-  "WorkflowsPage.orgSwitch.test.tsx": 4, // 298-04 — real page + feeds hook: old org's workflow/draft gone at once, "Loading your workflows…" never the empty sentence, late answer dropped, project filter back to All, each feed re-read once
+  "WorkflowsPage.orgSwitch.test.tsx": 6, // 298-04 — real page + feeds hook: old org's workflow/draft gone at once, "Loading your workflows…" never the empty sentence, late answer dropped, project filter back to All, each feed re-read once · RAISED 4 → 6 at 298-05: the elsewhere line mounts once atop the list region, also while loading
   "useThreads.orgSwitch.test.ts": 4, // 298-04 — switching false on first render (UI-D9), old threads drop at once + switching until answered, late answer dropped, newThread lands in the new org
-  "ChatHistoryColumn.orgSwitch.test.tsx": 4, // 298-04 — loading says "Loading your chats…" never "No recent chats", hides handed rows, empty sentence unchanged without it, a streaming old-org thread is not listed
+  "ChatHistoryColumn.orgSwitch.test.tsx": 6, // 298-04 — loading says "Loading your chats…" never "No recent chats", hides handed rows, empty sentence unchanged without it, a streaming old-org thread is not listed · RAISED 4 → 6 at 298-05: the elsewhere line mounts atop the list, and stays under a title filter
   "folderLabel.test.ts": 8, // 298-04 — optionLabel/chipLabel words (in-org name, "lives in {Org}", active-org label plain, unseen → UNNAMED_KB_OPTION never the id) + getFolderLabels ([] no request, comma-joined, chunked at 50, ApiError). Covered by the src/components/workflows directory entry
   "useBuilderNameMaps.orgLabels.test.tsx": 8, // 298-04 — one label read for the missing bound ids, chip-form names + folderLabels, nothing asked when all in-org, unseen gets no name, failure non-fatal, re-read per org; the real page's option / UNNAMED / flag-off chip words. Covered by the src/components/workflows directory entry
+  // ── Phase 298-05 (ORG-06 / D-16 / D-17) — both knobs, same commit (2026-10-28). Neither new file has a
+  //    directory entry (src/__tests__/lib, src/components/org), so both are FILE-LEVEL.
+  "elsewhereCounts.test.ts": 13, // 298-05 — one GET for 4 mounts, loading has no rows, a switch re-asks + drops the late answer, a foreign-header answer never writes, nothing asked solo/no org, failed is warned, invalidate keeps the last answer, noteMoved bumps version + lastMoved, reset, the open-move request, and the three client calls (URL, body, ApiRefusal)
+  "ElsewhereLine.test.tsx": 21, // 298-05 — absent while loading / solo / no provider / [] / all-zero / failed (never "0 more"); the exact UI-D5 words for every kind and plural; one line per org in server order; never the active org; long names truncate but stay whole; Switch is a primary button, focuses the wrapper then calls switchOrg
 }
 
 // Still COMPUTED, never hand-written — the reduce is the single source, so the
@@ -6513,6 +6517,9 @@ const TARGETS = [
   "src/pages/__tests__/WorkflowsPage.orgSwitch.test.tsx",
   "src/__tests__/hooks/useThreads.orgSwitch.test.ts",
   "src/components/layout/__tests__/ChatHistoryColumn.orgSwitch.test.tsx",
+  // Phase 298-05 — FILE-LEVEL (no src/__tests__/lib or src/components/org directory entry), SAME commit as their pins.
+  "src/__tests__/lib/elsewhereCounts.test.ts",
+  "src/components/org/__tests__/ElsewhereLine.test.tsx",
 ]
 
 const REPO_ROOT = path.resolve(__dirname, "..")
