@@ -2531,7 +2531,10 @@ const BASELINE = {
   // 290-02 (2026-10-21, VIS-04): RAISED 133 -> 143 from this script's own actual column. All +10 are 290-02's:
   //   ./stepLine.ts and ./StepChipLine.tsx joined LIBRARY_SUBTREE_PATHS (15 -> 17), and each path runs five it.each
   //   sweeps. The suite measured 133 at the phase base 1f9673d25 (run on the base tree, 290-04-GATES.md).
-  "librarySubtree.fences.test.ts": 143,
+  // 298-04 (2026-10-28, ORG-02 / G-5): RAISED 143 -> 148, measured (the suite printed 148 passed). All +5 are
+  //   298-04's: ./useWorkflowLibraryFeeds.ts joined LIBRARY_SUBTREE_PATHS (17 -> 18, fence id D-298-06) in the
+  //   move-only commit that created it, and each path runs five it.each sweeps.
+  "librarySubtree.fences.test.ts": 148,
   // ── 192.1-07 Task 1 (LIB-05 / D-19 / D-20 / D-36): a NEW suite, pinned in its first commit ─
   // 162-B's name prompt, in `RunModal.a11y.test.tsx`'s posture (the four Radix jsdom shims,
   // `axe()` on the OPEN dialog, roles and accessible names rather than class-name reading).

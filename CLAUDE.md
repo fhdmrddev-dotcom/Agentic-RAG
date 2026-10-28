@@ -421,7 +421,7 @@ node scripts/check-hot-file-ledger.cjs <phase-dir>   # 0 clear · 1 missing rows
 | `frontend/src/components/workflows/PhaseNodeCard.tsx` | 18 / 9 / 490 (was `17 / 8 / 489`) | 290: forecast unused — chips went on the library card, not here |
 | `backend/app/services/harness/phase_types.py` | 66 / 33 / 3135 (was `65 / 33 / 3131`) | 296-06: emit pin precedence, retry guard, 1 notice helper · G-5 OWED |
 | `backend/app/services/tools/render_template.py` | 6 / 3 / 1163 (was `3 / 2 / 1094`) | 296-03: button /V written as a name, read back typed · now FIRES · ⛔ |
-| `frontend/src/pages/WorkflowsPage.tsx` | 49 / 21 / 1496 (was `48 / 21 / 1484`) | 297 review WR-02: Test Run arms the latch via beforeNavigate |
+| `frontend/src/pages/WorkflowsPage.tsx` | 50 / 22 / 1390 (was `49 / 21 / 1496`) | 298-04 move-only: feeds → useWorkflowLibraryFeeds (seam TAKEN) |
 | `frontend/src/components/workflows/library/WorkflowCard.tsx` | 26 / 11 / 1373 (was `25 / 10 / 1371`) | 296-07: comment-only (MARK_ICON docblock, 286-S04-2) |
 | `frontend/src/components/workflows/library/libraryVocabulary.ts` | 15 / 8 / 820 (was `14 / 7 / 819`) | 296-07: STEP_LINE_UNTYPED re-exports the one home (data) |
 | `frontend/src/components/workflows/library/libraryFilter.ts` | 6 / 4 / 435 | ⚠ absent at 4 phases and NO PLAN NAMED IT (192.2) |
@@ -494,7 +494,7 @@ node scripts/check-hot-file-ledger.cjs <phase-dir>   # 0 clear · 1 missing rows
 | `backend/app/services/multimodal_service.py` | 14 / 7 / 984 | ⚠ absent from BOTH for its ENTIRE LIFE at **7 phases** |
 | `backend/app/api/documents.py` | 101 / 40 / 2709 (was `99 / 39 / 2698`) | 298-01: one by_org in build() + one root_upload_org kwarg · ⛔ |
 | `backend/app/api/library.py` | 3 / 3 / 304 (was `2 / 2 / 299`) | ⚠ now FIRES (298) · 298-01: summary shares the lists' org predicate ($1) |
-| `scripts/vitest-count-gate.cjs` | 366 / 81 / 6784 (was `370 / 81 / 6774`) | 298-04: useFolders + FolderTree ADOPTED, LibraryPage.orgSwitch pinned |
+| `scripts/vitest-count-gate.cjs` | 372 / 81 / 6787 (was `366 / 81 / 6784`) | 298-04: librarySubtree.fences 143 → 148 (new library module) |
 | `scripts/check-deploy-drift.sh` | 5 / 4 / 267 | ⚠ absent its ENTIRE LIFE — row added 294-05 · fault var omitted |
 | `scripts/build-public-openapi.cjs` | 11 / 5 / 472 (was `7 / 3 / 468`) | 298-01: org-items tag (Account & org) + /org-items/ FLAGGED (2 lines) |
 | `scripts/check-seeds-register.cjs` | 7 / 3 / 1132 | ⚠ FIRES, absent here — row added 296-05 · `\d{3,}` ids · ⛔ |
