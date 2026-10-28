@@ -169,6 +169,42 @@ make worse).
 - **D-28:** Cross-provider roster: not exercised — no provider, prompt or streaming code changes. The
   chat-retrieval row of D-25 runs on one provider; stated as a decision, not omitted.
 
+### Post-research amendments (2026-10-28, `--auto`, from 298-RESEARCH.md)
+- **D-29 (amends D-07):** `uploadDocument` (`frontend/src/lib/api/documents.ts:164-171`) sends no
+  `X-Org-Id`, so the Root-upload stamp also needs the client to attach the active-org header. The backend
+  helper returns `None` whenever a folder is given, so the 280-03 folder arm is byte-identical.
+- **D-30 (amends D-13):** scheduled runs (`scheduler_service.launch_scheduled_run`) and API-key runs
+  (`inbound.start_workflow_run`) do not go through `preflight_workflow_kickoff`. Each gets its own call to
+  the same refusal helper beside `template_refusal` (the 295 precedent): a recorded schedule outcome with
+  the worded reason, and a 422 for the API key. The definition's org must be read from the row (today
+  `get_definition` omits `org_id`, so `scheduler_service.py:132` reads `None`).
+- **D-31 (amends D-19):** **published workflows are NOT movable in v1.** The
+  `workflow_definitions_block_published_update` trigger rejects an `org_id` change on a published row, and
+  loosening a publish lock is not worth it at a measured mis-stamp count of 0. Movable workflows = **drafts
+  only, one row**. A published workflow in the wrong org shows in the count with Switch; a seed records
+  the published move. Migration 217 therefore only extends the audit action CHECK.
+- **D-32 (amends D-02):** narrow **every non-folder read** of `GET /documents` (Root and the IngestionTab
+  status lists) with the same predicate as `LIBRARY_SUMMARY_SQL` (`$1::uuid IS NULL OR org_id = $1`), so the
+  summary pill and its lists always agree.
+- **D-33 (amends D-19):** a folder move is **refused** (worded) when any chat thread is bound to a folder in
+  the subtree, when a workflow binds a folder in the subtree, or on any blocker the research lists
+  (duplicate-content collision in the target org, version history crossing the subtree, watch, hold,
+  retention, org-shared). Only the clean case moves.
+- **D-34 (amends D-13):** the refusal's folder set is **every folder the definition names**:
+  `project_folder_id`, per-phase `folder_scope`, kb_auto `inputs[].folder_scope`, and
+  `output_target_folder`.
+- **D-35 (amends D-20):** the move runs as **one asyncpg transaction on the pool** (child tables have no
+  user UPDATE policy) with the audit row written **inside** it, recorded under the **org the item leaves**,
+  metadata naming the target org. Membership in both orgs is checked inside the same transaction.
+  ⚠ Deploy order: the boot audit-type sync check refuses to start without mig 217, so 217 is pasted
+  (local, then cloud) **before** the new backend runs.
+- **D-36 (amends D-14/D-16):** the attended save/launch refusal uses the existing `stale_token` shape,
+  `detail={code: "folder_in_other_org", message}`, and the Builder save + chat in-thread picker branch on
+  `code` (today they swallow every 422 as a generic message); scheduled/API-key keep a plain string. The
+  count excludes archived Root documents (matches the list default). OrgProvider calls
+  `syncActiveOrgHeader` when it adopts the default org on a fresh device, so an org-tagged list guard
+  cannot wait forever.
+
 ### Claude's Discretion
 - Route and module names, the response shape of the elsewhere-count route, exact copy beyond the
   sentences above (keep them plain and specific), and the request-guard mechanism in D-09.
