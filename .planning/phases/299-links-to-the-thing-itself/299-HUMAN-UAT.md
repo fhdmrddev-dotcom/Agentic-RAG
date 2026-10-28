@@ -33,7 +33,7 @@ Fill the Verdict + Evidence cells there.
 |---|---|---|
 | G4-2 | Other-org run link with a live chat: Stay, Switch, Switch back | ✅ PASS 2026-10-29 (Claude) — **A1 holds: still streaming at Switch back** |
 | A-2 | Thread A streams while thread B is opened by pasted address | ✅ PASS 2026-10-29 (Claude) |
-| G4-1 | Copy link → fresh tab; also the RunModal "Saves in" caption and the 340 px link surface at mobile width | ✅ core PASS 2026-10-29 (Claude); RunModal caption + 340 px mobile still owed |
+| G4-1 | Copy link → fresh tab; also the RunModal "Saves in" caption and the 340 px link surface at mobile width | ✅ core + RunModal caption PASS 2026-10-29 (Claude); **340 px mobile still owed** (operator) |
 | G4-3 | Missing ≡ forbidden: same card, same 404 body and headers (DevTools) | ✅ PASS 2026-10-29 (Claude) |
 | G4-4a | Signed-out return — password | 5 |
 | G4-4b | Signed-out return — sign-up email link | 6 |
