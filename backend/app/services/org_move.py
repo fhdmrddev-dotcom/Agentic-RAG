@@ -27,10 +27,20 @@ sentence; ``execute_move`` refuses on the first.
 ONE TRANSACTION ON THE POOL (D-20 / D-35). ``execute_move`` runs ``async with pool.acquire() as con:
 async with con.transaction():`` and, on that one connection: checks ``org_members`` for the caller in
 BOTH the source org (read from the row, never from the client) and the target org; locks the moved
-rows ``FOR UPDATE``; re-runs every refusal (so a blocker created between preview and confirm is
+rows ``FOR UPDATE``; re-runs every refusal (so a blocker COMMITTED between preview and confirm is
 caught — TOCTOU); updates ``org_id`` on every moved row; and INSERTs exactly one ``audit_log`` row
 (``org.item.move``, ``org_id`` = the org the item LEAVES, metadata ``{kind, item_id, from_org,
 to_org, counts}``). Move and receipt commit together or not at all.
+
+⚠ RESIDUAL WINDOW (298-review WR-05) — the re-run does not SERIALIZE the binders. A concurrent
+draft save (``raise_if_foreign_change`` then the UPDATE, two pool calls with no transaction) or a
+chat folder bind (``_authorize_thread_folder`` then a supabase-py INSERT, which waits on the
+folder's ``FOR UPDATE`` but does not re-check after it) whose org check ran before this move
+committed still writes after it: a draft or a chat in the source org then binds a folder now in the
+target. Nothing in the database refuses either row (the live ``test_wr05_*`` cases pin both). A
+shared advisory lock would need both writers inside a pool transaction, and the chat insert is not
+on the pool. Bounded: a workflow is then refused at launch in words (ORG-05, every door); the chat
+keeps reading the folder (it is still the caller's own), it is only listed under the other org.
 
 Why the pool and not the caller's RLS connection: the document child tables are service-written and
 have no authenticated UPDATE policy, so a user-JWT move would silently update 0 child rows and
