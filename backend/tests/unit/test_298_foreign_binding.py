@@ -6,8 +6,8 @@ kb_auto ``inputs[].folder_scope`` and ``output_target_folder``, in that order.
 
 Where it is enforced, through ONE helper (``app.services.foreign_folder_refusal``):
 
-  * save — ``create_draft`` (against the active org it stamps; header-less = skipped, the launch
-    check is the backstop) and ``update_draft`` (only ids the request ADDS or CHANGES; an
+  * save — ``create_draft`` (against the active org it stamps; header-less = against the org the
+    mig-106 trigger stamps, 298-review WR-06 / D-298-09) and ``update_draft`` (only ids the request ADDS or CHANGES; an
     unchanged stored foreign binding saves through, preserved). Coded 422 (D-36).
   * launch — the attended preflight (coded 422), the scheduler (a recorded schedule outcome,
     then ``ScheduledLaunchRefused``) and the API-key start (``_refused(reason="foreign_folder")``,
@@ -68,9 +68,10 @@ CANT_OPEN = (
 class FakePool:
     """Answers by SQL shape; records every statement in ``calls``."""
 
-    def __init__(self, *, definitions: dict | None = None):
+    def __init__(self, *, definitions: dict | None = None, owner_org: str | None = None):
         self.calls: list[tuple[str, tuple]] = []
         self.definitions = definitions or {}
+        self.owner_org = owner_org  # the org the mig-106 trigger would stamp (298-review WR-06)
 
     def _log(self, sql, args):
         flat = " ".join(sql.split())
@@ -97,6 +98,8 @@ class FakePool:
 
     async def fetchval(self, sql, *args):
         flat = self._log(sql, args)
+        if "FROM public.org_members" in flat:
+            return self.owner_org
         if "FROM workflow_definitions" in flat:
             row = self.definitions.get(str(args[0]))
             if row is None:
@@ -371,10 +374,31 @@ async def test_create_with_the_active_org_refuses_a_foreign_folder_with_the_code
     created.assert_not_called()
 
 
+# D-298-09 (298-review WR-06): this case used to read "header-less = skipped" (exc None, no read).
+# A header-less draft is still stamped — by the mig-106 trigger, with the owner's LIMIT 1 org — so
+# the save is now checked against THAT org, read with the trigger's own statement, and only when
+# the definition binds anything.
 @pytest.mark.asyncio
-async def test_create_with_no_header_skips_the_save_check():
-    pool = FakePool()
+async def test_create_with_no_header_checks_against_the_org_the_trigger_stamps():
+    pool = FakePool(owner_org=ORG_A)
     created, exc = await _create(_defn(project=F_B1), active_org=None, pool=pool)
+    assert exc is not None and exc.status_code == 422
+    assert exc.detail == {"code": "folder_in_other_org", "message": ONE_VISIBLE}
+    created.assert_not_called()
+
+
+@pytest.mark.asyncio
+async def test_create_with_no_header_saves_a_binding_in_the_stamped_org():
+    pool = FakePool(owner_org=ORG_B)
+    created, exc = await _create(_defn(project=F_B1), active_org=None, pool=pool)
+    assert exc is None
+    created.assert_awaited_once()
+
+
+@pytest.mark.asyncio
+async def test_create_with_no_header_and_no_binding_reads_nothing():
+    pool = FakePool(owner_org=ORG_A)
+    created, exc = await _create(_defn(), active_org=None, pool=pool)
     assert exc is None
     created.assert_awaited_once()
     assert pool.calls == []
