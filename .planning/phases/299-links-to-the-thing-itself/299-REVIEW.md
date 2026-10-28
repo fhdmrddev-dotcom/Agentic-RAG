@@ -59,6 +59,20 @@ findings:
   info: 5
   total: 13
 status: issues_found
+fix_pass:
+  fixed_at: 2026-10-29
+  base: a7e94786d
+  scope: critical_warning
+  outcomes:
+    CR-01: fixed (dfc135486)
+    CR-02: fixed (0ac730b70)
+    CR-03: fixed (339338102)
+    WR-01: fixed, sentence only; header-less half no_change_needed (00bb01f9c)
+    WR-02: fixed, backend half; client half no_change_needed (0da754f48)
+    WR-03: fixed (92739897f wording, 45fca202c card, fd27b4ca6 403/404 only)
+    WR-04: fixed (4c408abaa)
+    WR-05: fixed (08750fa18)
+    IN-01..IN-05: out of scope (not touched)
 ---
 
 # Phase 299: Code Review Report
@@ -101,9 +115,89 @@ address-to-selection binding, the audience twin, the return-to-link flow and the
    orgs, and the gate's switch can hang forever on an org the caller is no longer in. There are
    also gate-cache and link-focus robustness gaps.
 
+## Fix outcomes (2026-10-29, base `a7e94786d`)
+
+Each finding was DRIVEN before it was fixed: a test reproducing the failure scenario was written
+and seen to fail, then the smallest fix turned it green. The backend resolver findings were driven
+on the real local Postgres (`backend/tests/integration/test_299_review_fixes_live.py`, one
+transaction per case, always rolled back) as well as pinned in the unit suite.
+
+| ID | Outcome | Commit | RED evidence |
+|----|---------|--------|--------------|
+| CR-01 | fixed | `dfc135486` | live: `workflow_org` returned org A after the owner left A |
+| CR-02 | fixed | `0ac730b70` | live: a member read `Severance terms for J. Smith` |
+| CR-03 | fixed | `339338102` | live: another manager got the 404 for a disabled private Expert whose line promised managers; both fixture suites red on the new rows |
+| WR-01 | fixed (sentence); header-less half **no_change_needed** | `00bb01f9c` | unit: the run sentence told the person to switch and retry on the same chat; the header-less claim does not reproduce (see below) |
+| WR-02 | fixed (backend); client half **no_change_needed** | `0da754f48` | live: a run in a left org resolved (active + completed) |
+| WR-03 | fixed | `92739897f`, `45fca202c`, `fd27b4ca6` | fixture, lockstep and shareMounts red on the new wording; `ExpertCatalogPage.link` red on the refused-link card |
+| WR-04 | fixed | `4c408abaa` | `LinkGate.test.tsx`: 3 new cases red |
+| WR-05 | fixed | `08750fa18` | `useWorkflowLinkTarget.test.tsx`: 4 cases red (old arg name aliased, so the red is behavioural) |
+
+**What was decided, and why:**
+- **CR-01:** the membership arm (the definitions SELECT policy's own) went into
+  `WORKFLOW_ORG_SQL`. A definition in an org its owner left now reads like a global one, so the
+  schedule takes the caller's active org (a member org, the pre-299 trigger shape) and the Tweak
+  guard names nothing. The review's "better still: refuse with a 404" was NOT taken: it needs a new
+  response arm in `schedules.py` (FIRING). The operator may still prefer refusing.
+- **CR-02:** the threads join carries `t.user_id = $2`; non-owners read
+  `definition_snapshot->>'name'`, else the definition row's name. That is the evidence report's own
+  precedence (`workflow_run_evidence.py:375-377`), so the link never shows more than the report a
+  member can already read.
+- **CR-03:** the real read rule was checked first: `EXPERT_SQL` and
+  `get_expert -> check_expert_grant_access` both AND the manager arm with the visibility arm. Both
+  twins answer `managers_only` only for org/public; private and granted read `only_you`. Three
+  fixture rows added (disabled public / private / granted; 12 -> 15).
+- **WR-01:** the guard module's contract is "no org resolved -> do nothing". **The header-less half
+  of the finding does not reproduce.** A header-less send carries no `org_id` on the caller
+  (`get_current_user` returns `{id, email}`; `send_message` adds `org_id` only when the header
+  validates), and the 258 entitlement gate (`enforce_entitlement`, `workflow_kickoff.py:228`) fails
+  closed with a 403 "No active organization" BEFORE the definition is read, so the org guard is
+  never reached. Pinned by `test_a_header_less_kickoff_never_reaches_the_org_guard`. The ping-pong
+  IS real and was fixed in the words only: "This workflow is in {org}. Switch to {org} and start it
+  from a new chat there." The comparison (definition vs thread) is unchanged, because the chat guard
+  already makes the thread's org the active one; `workflow_kickoff.py` is byte-unchanged. (Switching
+  the comparison to the active org was tried and reverted: it changed nothing reachable and broke
+  two 298 matrix fixtures that carry no thread org.)
+- **WR-02:** backend: membership now binds both arms of `RUN_SQL`, matching
+  `workflow_runs_select_own` behind the run read. With that, **all four kinds require membership of
+  the item's org** (thread and workflow through RLS, run and Expert in the statement), so the server
+  never answers with an org the caller is not in. **The client half does not reproduce:** the
+  claimed "Switching to X... forever" depends on `OrgProvider`'s self-heal re-adopting another org,
+  but the self-heal fires only while `activeOrgId === null` (`OrgProvider.tsx:125-135`), and
+  `switchOrg` sets the new id synchronously (`:178-185`), so the gate's next render is `open`, not
+  `switching`. A client-side "not in memberships -> can't be opened" check was NOT added: the
+  membership list can lag an accepted invite, which would turn a working link into a false card.
+- **WR-03:** the system-Expert line now names the gate (new audience `plan_experts`: "Opens for
+  anyone signed in whose plan includes Experts."), with no gate added to the resolver (D-08). A
+  refused `getExpert` (a 403 or 404; its thrown error now carries `status`) shows the one can't-be-opened
+  card over the catalog, and the exit pushes `/app/experts`. A network throw, a 5xx or a 401 still shows
+  nothing (T-299-25).
+- **WR-04:** a 298 move (`useOrgItemsVersion`) or a change in the SET of membership ids drops the
+  cache; the answer on screen is marked stale and re-asked while it stays displayed (no holding
+  flash). The first membership load is not a change. The after-Switch reuse (no second request) and
+  "leave and come back asks nothing new" both still hold when nothing moved.
+- **WR-05:** the filters (query, chips, project) are cleared first, once per id; the hook also
+  re-runs on the rendered rows; the once-per-id memory resets when the address names no workflow.
+  `StreamsProvider.tsx` and `setViewingThread` are untouched.
+
+**Gates at the end of the pass (HEAD after the last fix commit):**
+- Backend unit: `69 failed, 10426 passed, 1 skipped, 2 xfailed, 2 xpassed` (ceiling 71). The first
+  full run read 70: the WR-03 `plan_experts` literal had made the committed OpenAPI snapshot stale
+  (`test_276_openapi_snapshot_fresh`, green at base); regenerated and committed, then re-run.
+- Vitest: `count gate OK — 565/565 pinned files present, no per-file decrease, 0 failing.`
+- Typecheck: `npx tsc -p tsconfig.app.json --noEmit` 61 errors at base `a7e94786d` and 61 at HEAD;
+  set diff 0 new, 0 gone.
+- Live resolver suites: `test_299_review_fixes_live.py` + `test_299_links_live.py` 8 passed.
+- `check-hot-file-ledger.cjs` OK; `check-claude-md-size.cjs` OK.
+
+**Not fixed here (Info, out of scope):** IN-01..IN-05. IN-04 (`is_enabled: null`) still stands:
+the CR-03 edit kept each twin's own null reading.
+
 ## Critical Issues
 
 ### CR-01: A new schedule can be stamped into an org the caller has LEFT, and runs there unattended
+
+**Outcome:** fixed, `dfc135486` (membership arm in `WORKFLOW_ORG_SQL`).
 
 **File:** `backend/app/services/link_resolver.py:162-166` (`WORKFLOW_ORG_SQL`), used at `backend/app/api/schedules.py:146-147` and `backend/app/db/schedules.py:91-110`
 
@@ -152,6 +246,8 @@ Add a unit case where a "former member" owns a definition in an org they are no 
 
 ### CR-02: The run resolver discloses the owner's PRIVATE chat title to every member of the run's org
 
+**Outcome:** fixed, `0ac730b70` (chat title only for its owner; others read the frozen name).
+
 **File:** `backend/app/services/link_resolver.py:102-114` (`RUN_SQL`)
 
 **Issue:** For a finished run, the org-member arm admits any member of `wr.org_id`. The
@@ -192,6 +288,8 @@ Add a route test asserting that a non-owner member never receives the thread tit
 
 ### CR-03: "Turned off" Expert audience over-promises: a disabled private or granted Expert does not open for "people who manage Experts"
 
+**Outcome:** fixed, `339338102` (both twins + 3 fixture rows).
+
 **File:** `backend/app/services/link_resolver.py:203-206` and `frontend/src/lib/linkAudience.ts:41,58`
 
 **Issue:** `audience_of` and `audienceOf` both return `managers_only` for any disabled bundle,
@@ -228,6 +326,8 @@ fixture so both twins are pinned to the narrower answer.
 
 ### WR-01: The kickoff guard's refusal sends the user back and forth between two orgs, and it fires for callers with no org header too
 
+**Outcome:** fixed in the words, `00bb01f9c`; the header-less half is no_change_needed (the 258 entitlement gate 403s first).
+
 **File:** `backend/app/services/workflow_kickoff.py:311-312`
 
 **Issue:** This guard compares the **definition's** org with the **thread's** org, not with the
@@ -250,6 +350,8 @@ thread's org.
   on this thread.
 
 ### WR-02: The gate offers to switch to an org the caller is not in, then shows "Switching to X…" forever
+
+**Outcome:** backend fixed, `0da754f48`; client half no_change_needed (`switchOrg` lands synchronously).
 
 **File:** `backend/app/services/link_resolver.py:110-113` (owner arm) and `frontend/src/components/layout/LinkGate.tsx:246-259, 237, 285`
 
@@ -274,6 +376,8 @@ The same hang happens whenever a switch does not land, for any reason.
   the buttons.
 
 ### WR-03: A system Expert's "Opens for anyone signed in to Syrel" ignores the `experts` capability gate, and the open fails silently
+
+**Outcome:** fixed, `92739897f` (wording), `45fca202c` (the card) and `fd27b4ca6` (only a 403/404 is a refusal; a 401 is not).
 
 **File:** `backend/app/services/link_resolver.py:200-202` and `frontend/src/lib/linkAudience.ts:40,53`; consumer `frontend/src/components/experts/catalog/useExpertLinkTarget.ts:39-45`
 
@@ -300,6 +404,8 @@ The person sees the catalog (or its tier refusal) with nothing opened and no
 
 ### WR-04: LinkGate's lifetime answer cache goes stale after a 298 move-to-org, and keeps a `cant` after access is gained
 
+**Outcome:** fixed, `4c408abaa`.
+
 **File:** `frontend/src/components/layout/LinkGate.tsx:122, 145, 179`
 
 **Issue:** The cache is keyed `kind:id` for the gate's whole life, on the stated premise that
@@ -316,6 +422,8 @@ item's org mutable (Move to org):
 only the in-session "after Switch" reuse the docblock needs.
 
 ### WR-05: A workflow link can silently do nothing on a mounted Workflows page (filters not cleared; once-per-id)
+
+**Outcome:** fixed, `08750fa18`.
 
 **File:** `frontend/src/components/workflows/library/useWorkflowLinkTarget.ts:65-89`
 
