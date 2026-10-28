@@ -4462,6 +4462,7 @@ const BASELINE = {
   "returnTo.test.ts": 49, // 299-05 — returnTarget rebuilt-never-echoed (run/home/view/bare + the appRoutes HOSTILE set + pre-auth → null, never throws), kindWord kind-only, RETURN_LINE words, the sessionStorage copy (stored rebuilt, taken once, 15-min TTL, planted //evil → null, throwing storage swallowed)
   "useAuth.test.ts": 9, // 299-05 — SSO redirectTo / sign-up emailRedirectTo = origin + rebuilt path (or /app) + remembered; password passes none and forgets; rejected getSession ends loading with user null; a hung one keeps loading and no timer clears a signed-in user (Pitfall 6)
   "AuthPage.returnLine.test.tsx": 8, // 299-05 — S5: the kind-only line under the form on an entity address, sign-up wording after the switch, no line on home / a view / off-site / unknown, React text only
+  "BootScreen.test.tsx": 9, // 299-05 — S6 on one clock (fake timers): 0-7.9 s verbatim splash, 8 s "Still connecting…" in the same status, 20 s heading + body + focused Try again (idle Iris, no alert), kept sentence only on an entity address, reload once + no History write, unmount clears both timers; App's splash branch IS BootScreen (gives up at 20 s, never the sign-in form), and resolves to the card as today
 }
 
 // Still COMPUTED, never hand-written — the reduce is the single source, so the
@@ -6536,6 +6537,8 @@ const TARGETS = [
   "src/lib/__tests__/returnTo.test.ts",
   "src/hooks/__tests__/useAuth.test.ts",
   "src/pages/__tests__/AuthPage.returnLine.test.tsx",
+  // Phase 299-05 — FILE-LEVEL (no src/components/layout/__tests__ directory entry), SAME commit as its pin.
+  "src/components/layout/__tests__/BootScreen.test.tsx",
 ]
 
 const REPO_ROOT = path.resolve(__dirname, "..")
