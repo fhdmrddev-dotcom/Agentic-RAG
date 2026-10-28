@@ -984,6 +984,9 @@ export interface WorkflowRunRead {
   end_reason?: string | null
   /** Phase 293 (D-22): how this run started, as recorded at start; null when it was not. */
   origin?: RunOrigin | null
+  /** Phase 299 (D-10): the org the run was started in; null for a run with no org. Feeds the
+   *  link surface's who-can-open line (a FINISHED run opens for that org's members, D-34). */
+  org_id?: string | null
 }
 
 /**

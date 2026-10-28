@@ -45,6 +45,9 @@ export interface ShareLinkMenuProps {
   audience: Audience
   /** The item's org (the name is resolved from the org context). Null for an org-less item. */
   orgId: string | null
+  /** The org's NAME when the surface already holds it and not its id (the finished-run evidence
+   *  report reads `org_name` only). When given, it is used as-is and `orgId` is not looked up. */
+  orgName?: string | null
   className?: string
 }
 
@@ -57,14 +60,15 @@ export function linkToThis(kind: LinkAudienceKind): string {
   return `Link to this ${linkNoun(kind)}`
 }
 
-function useOrgName(orgId: string | null): string | null {
+function useOrgName(orgId: string | null, given: string | null | undefined): string | null {
   const org = useOrgOptional()
+  if (given !== undefined) return given
   if (!orgId) return null
   return org?.orgs?.find((o) => o.org_id === orgId)?.name ?? null
 }
 
-function LinkSurfaceBody({ route, kind, audience, orgId }: ShareLinkMenuProps) {
-  const orgName = useOrgName(orgId)
+function LinkSurfaceBody({ route, kind, audience, orgId, orgName: givenOrgName }: ShareLinkMenuProps) {
+  const orgName = useOrgName(orgId, givenOrgName)
   const addressRef = useRef<HTMLElement | null>(null)
   const [copy, setCopy] = useState<"idle" | "copied" | "refused">("idle")
   const addressId = useId()

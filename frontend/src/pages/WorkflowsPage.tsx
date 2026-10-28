@@ -157,6 +157,7 @@ import {
   type ForkSeed,
 } from "@/components/workflows/library/useWorkflowFork"
 import { useWorkflowLinkTarget } from "@/components/workflows/library/useWorkflowLinkTarget"
+import { ShareLinkMenu } from "@/components/share/ShareLinkMenu"
 // Phase 192.1-07 (LIB-05 / D-19): 162-B's name prompt. It is MOUNTED here and wired to the
 // hook's pending fork; the page holds no fork logic of its own — see the mount below.
 import { ForkNameDialog } from "@/components/workflows/library/ForkNameDialog"
@@ -803,6 +804,8 @@ export function WorkflowsPage({ folders, onLaunch, onOpenRun, onOpenConnections,
         <span className="text-[13px] font-medium text-foreground">
           {builderInitial ? builderInitial.label : "Build a workflow"}
         </span>
+        {/* 299-04 (D-20 / UI-SPEC S4): ONE mount — a draft's own address; absent before a draft has an id. */}
+        {builderInitial?.draftId && <ShareLinkMenu route={{ view: "workflows", definitionId: builderInitial.draftId }} kind="workflow" audience="only_you" orgId={null} />}
         <NetNewFlag />
       </>
     )

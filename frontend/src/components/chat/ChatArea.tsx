@@ -34,6 +34,7 @@ import { Clock, Menu, PanelLeftOpen } from "lucide-react"
 // Phase 276-06 (D-24 / D-27): the empty-chat hero is the static Iris (idle: nothing is working).
 import { IrisAvatar } from "./IrisAvatar"
 import { ThreadWorkflowPicker } from "./ThreadWorkflowPicker"
+import { ShareLinkMenu } from "@/components/share/ShareLinkMenu"
 
 interface Props {
   thread: Thread | null
@@ -1041,6 +1042,8 @@ export function ChatArea({ thread, onCreateThread, onThreadUpdated, onTitleUpdat
           {attentionDot}
         </button>
         <h2 className="font-headline font-semibold text-sm truncate text-foreground">{thread.title}</h2>
+        {/* Phase 299-04 (D-20 / UI-SPEC S4): ONE mount — the chat's own address, copied from its header. */}
+        {thread && <ShareLinkMenu route={{ view: "chat", threadId: thread.id }} kind="thread" audience="only_you" orgId={null} className="ml-auto flex-none" />}
         {/* Phase 268 (UI-SPEC §9-D6): the header folder pill is REMOVED — the composer's scope chip
             is the one home of scope. The pill could not express `held`, so under a Restricted
             Expert it named a folder that is not searched, beside a chip that says it is not. */}
