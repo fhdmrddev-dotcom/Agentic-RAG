@@ -145,7 +145,7 @@ Plans:
 
 **Wave 3** *(blocked on Wave 2 completion)*
 
-- [ ] 298-03-PLAN.md — migration 217 (audit type) + the one-transaction audited move of a folder / Root document / draft, move routes, seeds (ORG-06)
+- [x] 298-03-PLAN.md — migration 217 (audit type) + the one-transaction audited move of a folder / Root document / draft, move routes, seeds (ORG-06)
 
 **Wave 4** *(blocked on Wave 3 completion)*
 
