@@ -1,0 +1,198 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Sketch 299-4 — Sign-in Return and Boot</title>
+<link rel="stylesheet" href="../themes/default.css">
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Manrope:wght@600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+<style>
+*{box-sizing:border-box}
+body{margin:0;background:var(--color-bg);color:var(--color-text);font-family:var(--font-sans);font-size:var(--text-base)}
+#vnav,#states{display:flex;align-items:center;gap:8px;padding:10px 16px;border-bottom:1px solid var(--color-border);flex-wrap:wrap}
+.lbl{font-family:var(--font-mono);font-size:var(--text-xs);color:var(--color-text-dim);margin-right:6px}
+.vtab,.stab{background:transparent;border:1px solid var(--color-border);color:var(--color-text-muted);font-size:var(--text-xs);padding:6px 12px;border-radius:999px;cursor:pointer;font-family:inherit;transition:all .15s ease}
+.vtab:hover,.stab:hover{border-color:var(--color-primary)}
+.vtab.active{background:var(--color-primary-dim);border-color:var(--color-primary);color:var(--color-primary)}
+.stab.active{background:var(--color-accent);color:var(--color-text)}
+#note{padding:8px 16px;font-size:var(--text-sm);color:var(--color-text-muted);border-bottom:1px solid var(--color-border-soft);line-height:1.5}
+#note b{color:var(--color-text)}
+.sec{max-width:1180px;margin:0 auto;padding:18px 16px}
+.sec h2{font-family:var(--font-mono);font-size:11px;font-weight:500;letter-spacing:.08em;text-transform:uppercase;color:var(--color-text-dim);margin:0 0 10px}
+.sec .sub{font-size:var(--text-sm);color:var(--color-text-muted);margin:-4px 0 12px;line-height:1.5}
+.row3{display:grid;grid-template-columns:minmax(0,1.3fr) minmax(0,1fr);gap:18px}
+@media (max-width:900px){.row3{grid-template-columns:minmax(0,1fr)}}
+.screen{border:1px solid var(--color-border-soft);border-radius:var(--radius-lg);background:var(--color-bg-elev1);min-height:440px;display:grid;place-items:center;position:relative;overflow:hidden}
+.addr{position:absolute;top:0;left:0;right:0;font-family:var(--font-mono);font-size:11px;color:var(--color-text-dim);padding:7px 12px;border-bottom:1px solid var(--color-border-soft);background:var(--color-bg);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+
+/* sign-in card */
+.auth{width:min(360px,90%);margin-top:30px}
+.brand{display:flex;gap:10px;align-items:center;justify-content:center;margin-bottom:14px}
+.iris{width:34px;height:34px;border-radius:50%;background:radial-gradient(circle at 50% 50%,var(--color-primary) 0 18%,hsl(239 60% 40%) 19% 46%,transparent 47%),conic-gradient(from 0deg,hsl(239 100% 82% / .9),hsl(262 80% 70% / .5),hsl(239 100% 82% / .9));}
+.iris.think{animation:spin 2.4s linear infinite}
+@keyframes spin{to{transform:rotate(360deg)}}
+.brand b{font-family:var(--font-headline);font-size:var(--text-lg)}
+.card{border:1px solid var(--color-border);border-radius:var(--radius-lg);background:var(--color-surface);padding:20px}
+.card .hd{font-size:var(--text-sm);color:var(--color-text-muted);text-align:center;margin-bottom:14px}
+.dest{display:flex;gap:10px;align-items:center;border:1px solid hsl(239 100% 82% / .3);background:var(--color-primary-dim);border-radius:10px;padding:10px 12px;margin-bottom:14px;font-size:var(--text-sm)}
+.dest .ic{width:26px;height:26px;border-radius:7px;background:hsl(239 100% 82% / .2);display:grid;place-items:center;flex:none}
+.dest small{display:block;font-size:var(--text-xs);color:var(--color-text-muted)}
+.f{display:block;margin-bottom:10px}
+.f span{display:block;font-size:var(--text-xs);color:var(--color-text-muted);margin-bottom:4px}
+.f input{width:100%;height:34px;border-radius:8px;background:hsl(220 30% 11% / .5);border:1px solid var(--color-border);color:var(--color-text);padding:0 10px;font-family:inherit;font-size:var(--text-sm)}
+.btn{background:transparent;border:1px solid var(--color-border);color:var(--color-text);border-radius:8px;padding:8px 14px;font-size:var(--text-sm);cursor:pointer;font-family:inherit;white-space:nowrap}
+.btn:hover{border-color:var(--color-primary)}
+.btn.primary{background:var(--color-primary-strong);border-color:transparent;color:#fff}
+.btn.w{width:100%}
+.or{display:flex;align-items:center;gap:8px;font-size:var(--text-xs);color:var(--color-text-dim);margin:12px 0}
+.or:before,.or:after{content:"";flex:1;height:1px;background:var(--color-border-soft)}
+.quiet{font-size:var(--text-xs);color:var(--color-text-dim);text-align:center;margin-top:12px;line-height:1.5}
+.toggle{font-size:var(--text-xs);color:var(--color-text-muted);text-align:center;margin-top:12px}
+.toggle a{color:var(--color-primary);cursor:pointer}
+
+/* landed */
+.landed{width:100%;height:100%;padding:44px 22px 22px;display:flex;flex-direction:column;gap:10px}
+.landed .crumb{font-size:var(--text-xs);color:var(--color-text-dim)}
+.landed h1{font-family:var(--font-headline);font-size:var(--text-md);margin:0}
+.landed .meta{font-size:var(--text-sm);color:var(--color-text-muted)}
+.landed .ghost{height:46px;border:1px solid var(--color-border);border-radius:10px;background:var(--color-surface)}
+
+/* why panel */
+.why{border:1px solid var(--color-border-soft);border-radius:var(--radius-lg);background:var(--color-bg-elev1);padding:14px 16px;font-size:var(--text-sm);line-height:1.6;color:var(--color-text-muted)}
+.why b{color:var(--color-text)}
+.why ul{margin:8px 0 0;padding-left:18px}
+.why code{font-family:var(--font-mono);font-size:11px;color:var(--color-text)}
+
+/* boot */
+.bootrow{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:14px}
+@media (max-width:900px){.bootrow{grid-template-columns:minmax(0,1fr)}}
+.boot{border:1px solid var(--color-border-soft);border-radius:var(--radius-lg);background:var(--color-bg);min-height:230px;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:12px;padding:18px;text-align:center;position:relative}
+.boot.live{outline:2px solid var(--color-primary-dim)}
+.boot .t{position:absolute;top:8px;left:10px;font-family:var(--font-mono);font-size:10px;color:var(--color-text-dim)}
+.boot p{margin:0;font-size:var(--text-sm);color:var(--color-text-muted);max-width:260px;line-height:1.5}
+.boot h3{margin:0;font-size:var(--text-base);font-weight:600}
+.irisbig{width:56px;height:56px}
+.player{display:flex;gap:8px;align-items:center;margin-bottom:12px;flex-wrap:wrap}
+.clock{font-family:var(--font-mono);font-size:var(--text-xs);color:var(--color-text-muted)}
+
+/* phone */
+.phones{display:flex;gap:18px;flex-wrap:wrap}
+.phone{width:250px;height:440px;border:1px solid var(--color-border);border-radius:28px;background:var(--color-bg-elev1);padding:16px 12px;position:relative}
+.phone .cap{font-family:var(--font-mono);font-size:10px;color:var(--color-text-dim);text-align:center;margin-bottom:10px}
+.phone .srch{height:30px;border-radius:999px;border:1px solid var(--color-border);font-size:var(--text-xs);color:var(--color-text-dim);display:flex;align-items:center;padding:0 12px;margin-bottom:10px}
+.phone .r{font-size:var(--text-xs);color:var(--color-text-muted);padding:8px 8px;border-radius:8px}
+.phone .empty{font-size:10px;color:var(--color-text-muted);text-align:center;font-style:italic;padding:16px 0}
+.phone .load{display:flex;flex-direction:column;align-items:center;gap:8px;padding:28px 0;font-size:var(--text-xs);color:var(--color-text-muted)}
+.phone .bad{position:absolute;top:-10px;right:14px;font-family:var(--font-mono);font-size:10px;border-radius:999px;padding:2px 8px}
+.bad.no{background:var(--color-danger-dim);color:hsl(0 80% 80%)}
+.bad.yes{background:var(--color-success-dim);color:var(--color-success)}
+.sk{height:12px;border-radius:6px;background:linear-gradient(90deg,var(--color-surface),var(--color-surface-hi),var(--color-surface));background-size:200% 100%;animation:sh 1.6s infinite;margin:10px 8px}
+@keyframes sh{to{background-position:-200% 0}}
+</style>
+</head>
+<body>
+<div id="vnav"><span class="lbl">SIGN-IN VARIANT</span>
+  <button class="vtab active" data-v="A">★ A · Quiet line under the form</button>
+  <button class="vtab" data-v="B">B · The card names where you're going</button>
+  <button class="vtab" data-v="C">C · Silent return (comparison)</button>
+</div>
+<div id="states"><span class="lbl">LINK</span>
+  <button class="stab active" data-l="run">a workflow run</button>
+  <button class="stab" data-l="chat">a chat</button>
+  <button class="stab" data-l="expert">an Expert</button>
+  <button class="stab" data-l="outside">a link pointing off-site</button>
+  <span class="lbl" style="margin-left:10px">MOMENT</span>
+  <button class="stab active" data-m="form">Sign in</button>
+  <button class="stab" data-m="signup">Sign up</button>
+  <button class="stab" data-m="sso">Back from SSO</button>
+  <button class="stab" data-m="landed">Landed</button>
+</div>
+<div id="note"></div>
+
+<div class="sec">
+  <h2>1 · Signed out, a link opened</h2>
+  <div class="row3"><div class="screen" id="auth"></div><div class="why" id="why"></div></div>
+</div>
+
+<div class="sec">
+  <h2>2 · The boot screen gives up instead of hanging (LINK-06)</h2>
+  <p class="sub">Today: the Iris spins forever if auth or the setup probe never answers. Proposed: three stages on one clock. Press play to run it at real speed, or click a stage.</p>
+  <div class="player"><button class="btn" id="play">▶ Play (throttled network)</button><button class="btn" id="ok">▶ Play (answers at 4s)</button><span class="clock" id="clock">0.0s</span></div>
+  <div class="bootrow">
+    <div class="boot" data-b="0"><span class="t">0 – 8s</span><div class="iris think irisbig"></div><p style="opacity:.0">&nbsp;</p></div>
+    <div class="boot" data-b="1"><span class="t">8 – 20s</span><div class="iris think irisbig"></div><p>Still connecting…</p></div>
+    <div class="boot" data-b="2"><span class="t">after 20s</span><div class="iris irisbig" style="filter:grayscale(.7);opacity:.7"></div><h3>Can't reach Syrel</h3><p>Check your connection and try again. Your link is kept — you'll still land on it.</p><button class="btn primary" id="retry">Try again</button></div>
+  </div>
+</div>
+
+<div class="sec">
+  <h2>3 · Chat list while it loads (FIX-02)</h2>
+  <p class="sub">Desktop already shows "Loading your chats…" (<code>ChatHistoryColumn.tsx:470</code>). The mobile list in <code>ChatLayout.tsx:711</code> still says "No recent chats" while it loads — that is the remaining fix.</p>
+  <div class="phones">
+    <div class="phone"><span class="bad no">today</span><div class="cap">mobile · loading</div><div class="srch">Search chats…</div><div class="empty">No recent chats</div></div>
+    <div class="phone"><span class="bad yes">proposed</span><div class="cap">mobile · loading</div><div class="srch">Search chats…</div><div class="load"><div class="iris think" style="width:26px;height:26px"></div>Loading your chats…</div></div>
+    <div class="phone"><span class="bad yes">proposed alt</span><div class="cap">mobile · loading (skeleton)</div><div class="srch">Search chats…</div><div class="sk" style="width:70%"></div><div class="sk" style="width:85%"></div><div class="sk" style="width:60%"></div><div class="sk" style="width:78%"></div></div>
+    <div class="phone"><div class="cap">mobile · loaded, truly empty</div><div class="srch">Search chats…</div><div class="empty">No recent chats</div></div>
+  </div>
+</div>
+
+<script>
+const LINKS={
+  run:{path:"/app/runs/c41d8e2a-6f39-4b07-8a1c-9e2d5b7f0a63",kind:"a workflow run",ic:"⛓",title:"Q3 supplier batch",crumb:"Workflows › Contract review"},
+  chat:{path:"/app/chat/7f3c2a10-4b8e-4d21-9a55-0c1e6b2f9d44",kind:"a chat",ic:"💬",title:"Renewal clause comparison",crumb:"Chat"},
+  expert:{path:"/app/experts/9a0e7c35-2d14-4f68-b9a3-1c6e8d4f2b57",kind:"an Expert",ic:"✦",title:"Contracts Analyst",crumb:"Experts"},
+  outside:{path:"/app?next=//evil.example/login",kind:null,ic:"",title:"Chat",crumb:"Chat"}
+};
+let V="A",L="run",M="form";
+const NOTES={
+  A:"<b>A — one quiet line under the form.</b> The sign-in form is unchanged; a dim sentence names the KIND of thing the link opens. Nothing more can be said: a signed-out visitor is not allowed to learn the item's title.",
+  B:"<b>B — the card names where you're going.</b> A highlighted row above the fields: \"Signing in to open a workflow run\". Clear for someone arriving from an email; the email-notification phase (300) leans on this journey.",
+  C:"<b>C — silent return.</b> The form looks exactly as today and you simply land on the link afterwards. The comparison case: does saying it add anything?"
+};
+function destLine(){const k=LINKS[L].kind;if(!k||V==="C")return"";
+  if(V==="A")return "";
+  return `<div class="dest"><span class="ic">${LINKS[L].ic}</span><span>Signing in to open ${k}<small>You'll go straight there.</small></span></div>`}
+function quiet(){const k=LINKS[L].kind;if(!k||V!=="A")return"";return `<div class="quiet">After you sign in, you'll go to ${k}.</div>`}
+function authHTML(){
+  const lk=LINKS[L];const addr=`<div class="addr">app.syrel.ai${lk.path}</div>`;
+  if(M==="landed"){const bad=L==="outside";
+    return addr.replace(lk.path,bad?"/app":lk.path)+`<div class="landed"><div class="crumb">${lk.crumb}</div><h1>${lk.title}</h1><div class="meta">${bad?"The link pointed off-site, so you landed on Chat instead.":"Opened the link you were sent."}</div><div class="ghost"></div><div class="ghost"></div><div class="ghost" style="opacity:.5"></div></div>`}
+  if(M==="sso")return addr+`<div style="text-align:center"><div class="iris think" style="width:44px;height:44px;margin:0 auto 12px"></div><div style="font-size:var(--text-sm);color:var(--color-text-muted)">Finishing sign-in…</div>${LINKS[L].kind&&V!=="C"?`<div class="quiet">Then opening ${LINKS[L].kind}.</div>`:""}</div>`;
+  const up=M==="signup";
+  return addr+`<div class="auth"><div class="brand"><div class="iris"></div><b>Syrel</b></div><div class="card"><div class="hd">${up?"Create a new account":"Sign in to your account"}</div>${destLine()}
+    <label class="f"><span>Email</span><input value="sam@northwind.co"></label><label class="f"><span>Password</span><input type="password" value="••••••••••"></label>
+    <button class="btn primary w" data-m2="landed">${up?"Create account":"Sign in"}</button><div class="or">or</div><button class="btn w" data-m2="sso">Continue with SSO</button>${quiet()}
+    <div class="toggle">${up?'Have an account? <a data-m2="form">Sign in</a>':'New here? <a data-m2="signup">Create an account</a>'}</div></div></div>`}
+function whyHTML(){
+  return `<b>What this must guarantee (LINK-06, security_enforcement)</b><ul>
+  <li>Same landing for <b>password, SSO and sign-up</b> — the address is kept across the SSO round trip, not only in memory.</li>
+  <li>Only a <b>same-origin relative</b> <code>/app/…</code> path is kept. Try "a link pointing off-site" → you land on Chat, and no line names a destination.</li>
+  <li>No token rides in the kept address.</li>
+  <li>Signed out, the page may name the <b>kind</b> (from the path) but never the item's title.</li>
+  <li>If, after sign-in, the link is not yours to open, you get 299-1's "can't be opened" page — never a silent drop to Chat.</li></ul>`}
+function render(){
+  document.getElementById("note").innerHTML=NOTES[V];
+  document.getElementById("auth").innerHTML=authHTML();
+  document.getElementById("why").innerHTML=whyHTML();
+  document.querySelectorAll("[data-m2]").forEach(b=>b.onclick=()=>setM(b.dataset.m2));
+}
+function setM(m){M=m;document.querySelectorAll("[data-m]").forEach(x=>x.classList.toggle("active",x.dataset.m===m));render();if(m==="sso")setTimeout(()=>{if(M==="sso")setM("landed")},1600)}
+document.querySelectorAll(".vtab").forEach(b=>b.onclick=()=>{V=b.dataset.v;document.querySelectorAll(".vtab").forEach(x=>x.classList.toggle("active",x===b));render()});
+document.querySelectorAll("[data-l]").forEach(b=>b.onclick=()=>{L=b.dataset.l;document.querySelectorAll("[data-l]").forEach(x=>x.classList.toggle("active",x===b));render()});
+document.querySelectorAll("[data-m]").forEach(b=>b.onclick=()=>setM(b.dataset.m));
+render();
+
+/* boot clock */
+let timer=null;
+function stage(i){document.querySelectorAll(".boot").forEach(b=>b.classList.toggle("live",+b.dataset.b===i))}
+function play(answerAt){clearInterval(timer);let t=0;stage(0);timer=setInterval(()=>{t+=0.1;document.getElementById("clock").textContent=t.toFixed(1)+"s";
+  if(answerAt&&t>=answerAt){clearInterval(timer);document.getElementById("clock").textContent=t.toFixed(1)+"s — answered, app opens (no message ever shown)";stage(-1);return}
+  if(t>=20){clearInterval(timer);stage(2)}else if(t>=8)stage(1)},100)}
+document.getElementById("play").onclick=()=>play(null);
+document.getElementById("ok").onclick=()=>play(4);
+document.getElementById("retry").onclick=()=>play(null);
+document.querySelectorAll(".boot").forEach(b=>b.onclick=e=>{if(e.target.id==="retry")return;clearInterval(timer);stage(+b.dataset.b)});
+stage(0);
+</script>
+</body>
+</html>

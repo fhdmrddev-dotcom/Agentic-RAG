@@ -1,0 +1,140 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Sketch 299-3 — Copy Link</title>
+<link rel="stylesheet" href="../themes/default.css">
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Manrope:wght@600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+<style>
+*{box-sizing:border-box}
+body{margin:0;background:var(--color-bg);color:var(--color-text);font-family:var(--font-sans);font-size:var(--text-base)}
+#vnav{display:flex;align-items:center;gap:8px;padding:10px 16px;border-bottom:1px solid var(--color-border);flex-wrap:wrap}
+.lbl{font-family:var(--font-mono);font-size:var(--text-xs);color:var(--color-text-dim);margin-right:6px}
+.vtab{background:transparent;border:1px solid var(--color-border);color:var(--color-text-muted);font-size:var(--text-xs);padding:6px 12px;border-radius:999px;cursor:pointer;font-family:inherit;transition:all .15s ease}
+.vtab:hover{border-color:var(--color-primary)}
+.vtab.active{background:var(--color-primary-dim);border-color:var(--color-primary);color:var(--color-primary)}
+#note{padding:8px 16px;font-size:var(--text-sm);color:var(--color-text-muted);border-bottom:1px solid var(--color-border-soft);line-height:1.5}
+#note b{color:var(--color-text)}
+.grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:18px;padding:18px 16px 90px;max-width:1240px;margin:0 auto}
+@media (max-width:900px){.grid{grid-template-columns:minmax(0,1fr)}}
+.pane{border:1px solid var(--color-border-soft);border-radius:var(--radius-lg);background:var(--color-bg-elev1);overflow:visible}
+.pane .cap{font-family:var(--font-mono);font-size:11px;color:var(--color-text-dim);padding:8px 12px;border-bottom:1px solid var(--color-border-soft);display:flex;justify-content:space-between;gap:8px}
+.pane .cap code{color:var(--color-text-muted)}
+.body{padding:16px;position:relative;min-height:190px}
+
+/* surfaces */
+.thead{display:flex;align-items:center;gap:10px;padding:8px 4px 12px;border-bottom:1px solid var(--color-border-soft)}
+.thead .t{flex:1;font-size:var(--text-sm);font-weight:500;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.bubble{margin-top:14px;font-size:var(--text-sm);color:var(--color-text-muted);line-height:1.6}
+.wcard{border:1px solid var(--color-border);border-radius:var(--radius-lg);background:var(--color-surface);padding:14px 16px;max-width:360px;position:relative}
+.wcard .top{display:flex;gap:10px;align-items:flex-start}
+.wcard .gut{width:3px;align-self:stretch;border-radius:3px;background:var(--color-success)}
+.wcard h3{font-size:var(--text-sm);margin:0 0 4px;font-weight:600}
+.wcard .q{font-size:var(--text-xs);color:var(--color-text-dim)}
+.wcard .pills{display:flex;gap:4px;margin-top:10px;flex-wrap:wrap}
+.pill{font-size:10px;border:1px solid var(--color-border);border-radius:999px;padding:2px 8px;color:var(--color-text-muted)}
+.rhead .crumb{font-size:var(--text-xs);color:var(--color-text-dim);margin-bottom:4px}
+.rhead .row{display:flex;gap:10px;align-items:center}
+.rhead h1{font-family:var(--font-headline);font-size:var(--text-md);margin:0;flex:1}
+.rhead .meta{font-size:var(--text-xs);color:var(--color-text-muted);margin-top:4px}
+.modal{border:1px solid var(--color-border);border-radius:var(--radius-lg);background:var(--color-surface);padding:16px 18px;max-width:430px;box-shadow:var(--shadow-md)}
+.modal .row{display:flex;gap:12px;align-items:flex-start}
+.modal .av{width:42px;height:42px;border-radius:12px;background:hsl(262 60% 50% / .3);display:grid;place-items:center;font-size:18px}
+.modal h2{font-size:var(--text-base);margin:0 0 3px}
+.modal .cat{font-size:var(--text-xs);color:var(--color-text-dim)}
+.modal p{font-size:var(--text-sm);color:var(--color-text-muted);line-height:1.55;margin:12px 0}
+.modal .foot{display:flex;gap:8px;align-items:center}
+
+.btn{background:transparent;border:1px solid var(--color-border);color:var(--color-text);border-radius:8px;padding:6px 12px;font-size:var(--text-sm);cursor:pointer;font-family:inherit;white-space:nowrap;display:inline-flex;gap:6px;align-items:center}
+.btn:hover{border-color:var(--color-primary)}
+.btn.primary{background:var(--color-primary-strong);border-color:transparent;color:#fff}
+.icon{width:30px;height:30px;border-radius:8px;border:1px solid transparent;background:transparent;color:var(--color-text-muted);cursor:pointer;display:grid;place-items:center;font-size:15px;position:relative}
+.icon:hover{background:var(--color-surface);border-color:var(--color-border);color:var(--color-text)}
+.icon.done{color:var(--color-success)}
+.tip{position:absolute;top:calc(100% + 6px);right:0;white-space:nowrap;font-size:11px;background:var(--color-bg);border:1px solid var(--color-border);border-radius:6px;padding:4px 8px;color:var(--color-text);pointer-events:none;opacity:0;transition:opacity .15s;z-index:5}
+.icon:hover .tip,.icon:focus-visible .tip,.icon.done .tip{opacity:1}
+
+/* A: ⋯ menu */
+.menu{position:absolute;top:calc(100% + 4px);right:0;min-width:200px;background:var(--color-surface);border:1px solid var(--color-border);border-radius:10px;padding:4px;box-shadow:var(--shadow-lg);z-index:10}
+.menu .mi{display:flex;gap:9px;align-items:center;padding:7px 10px;border-radius:7px;font-size:var(--text-sm);color:var(--color-text-muted);cursor:pointer}
+.menu .mi:hover{background:var(--color-bg-elev1);color:var(--color-text)}
+.menu .mi.hi{color:var(--color-text)}
+.menu .div{height:1px;background:var(--color-border-soft);margin:4px 0}
+.anchor{position:relative;display:inline-block}
+
+/* C: popover */
+.pop{position:absolute;top:calc(100% + 6px);right:0;width:340px;background:var(--color-surface);border:1px solid var(--color-border);border-radius:12px;padding:14px;box-shadow:var(--shadow-lg);z-index:10}
+.pop h4{margin:0 0 8px;font-size:var(--text-sm);font-weight:600}
+.pop .url{display:flex;gap:6px}
+.pop input{flex:1;min-width:0;height:32px;font-family:var(--font-mono);font-size:11px;border-radius:8px;background:var(--color-bg-elev1);border:1px solid var(--color-border);color:var(--color-text-muted);padding:0 8px}
+.pop .who{margin-top:10px;font-size:var(--text-xs);color:var(--color-text-muted);line-height:1.5;display:flex;gap:8px}
+.pop .who .sq{width:18px;height:18px;border-radius:5px;background:hsl(199 70% 42%);color:#fff;font-size:10px;font-weight:700;display:grid;place-items:center;flex:none}
+
+/* the one receipt */
+.receipt{position:fixed;left:50%;bottom:22px;transform:translate(-50%,20px);opacity:0;transition:all .2s ease;background:var(--color-bg-elev1);border:1px solid var(--color-border);border-left:3px solid var(--color-success);border-radius:10px;padding:9px 14px;font-size:var(--text-sm);box-shadow:var(--shadow-lg);z-index:30}
+.receipt.show{transform:translate(-50%,0);opacity:1}
+.receipt code{font-family:var(--font-mono);font-size:11px;color:var(--color-text-dim)}
+.flag{position:fixed;right:14px;bottom:14px;max-width:310px;font-size:var(--text-xs);line-height:1.5;color:var(--color-text-muted);background:var(--color-bg-elev1);border:1px solid var(--color-border);border-left:3px solid var(--color-accent-violet);border-radius:8px;padding:10px 12px}
+.flag b{color:var(--color-text)}
+@media (max-width:900px){.flag{position:static;margin:0 16px 16px;max-width:none}}
+</style>
+</head>
+<body>
+<div id="vnav"><span class="lbl">VARIANT</span>
+  <button class="vtab active" data-v="A">A · "Copy link" in each ⋯ menu</button>
+  <button class="vtab" data-v="B">B · A link icon in each header</button>
+  <button class="vtab" data-v="C">★ C · Share popover with who can open it</button>
+</div>
+<div id="note"></div>
+<div class="grid" id="grid"></div>
+<div class="receipt" id="receipt" role="status" aria-live="polite"></div>
+<div class="flag"><b>Fixed in every variant (LINK-02/03):</b> the copied text is the item's own <code>/app/…</code> address on the app's origin, never a token. Click any control — the address really goes to your clipboard.</div>
+
+<script>
+const ORIGIN="https://app.syrel.ai";
+const ITEMS=[
+  {id:"chat",cap:"Chat thread header",path:"/app/chat/7f3c2a10-4b8e-4d21-9a55-0c1e6b2f9d44",noun:"chat",menu:["Rename","Move to folder","Move to another org…","—","Delete"]},
+  {id:"wf",cap:"Workflow library card",path:"/app/workflows/2b9e4f71-0d6c-4a38-b1e2-5f7a9c3d8e10",noun:"workflow",menu:["Run","Edit","Duplicate","—","Delete"]},
+  {id:"run",cap:"Workflow run page header",path:"/app/runs/c41d8e2a-6f39-4b07-8a1c-9e2d5b7f0a63",noun:"run",menu:["Re-run","Download evidence","—","Stop run"]},
+  {id:"exp",cap:"Expert detail",path:"/app/experts/9a0e7c35-2d14-4f68-b9a3-1c6e8d4f2b57",noun:"Expert",menu:["Start a chat","Invite into a chat","—","Uninstall"]}
+];
+let V="A",open=null,done=null;
+const NOTES={
+  A:"<b>A — \"Copy link\" lives in each item's ⋯ menu</b>, first in the list, everywhere the item already has a menu. Nothing new in any header; one receipt at the bottom says it worked.",
+  B:"<b>B — a link icon in each header</b>, beside the item's title. One click, no menu. The icon flips to ✓ and the tooltip reads \"Link copied\". The card has no header, so it gets the icon on hover/focus.",
+  C:"<b>C — a share popover.</b> Shows the address, a Copy button, and one line saying who can open it (members of the item's org). Answers \"will they be able to open this?\" before you paste it."
+};
+function copy(p){const url=ORIGIN+p;try{navigator.clipboard.writeText(url).catch(()=>{})}catch(e){}
+  const r=document.getElementById("receipt");r.innerHTML=`✓ Link copied &nbsp;<code>${url.replace("https://","")}</code>`;r.classList.add("show");clearTimeout(r._t);r._t=setTimeout(()=>r.classList.remove("show"),2200)}
+function control(it){
+  if(V==="A"){
+    const m=open===it.id?`<div class="menu" role="menu"><div class="mi hi" role="menuitem" data-copy="${it.id}">🔗 Copy link</div>${it.menu.map(x=>x==="—"?'<div class="div"></div>':`<div class="mi">${x}</div>`).join("")}</div>`:"";
+    return `<span class="anchor"><button class="icon" aria-label="More actions" data-open="${it.id}">⋯</button>${m}</span>`;
+  }
+  if(V==="B"){
+    const d=done===it.id;
+    return `<span class="anchor"><button class="icon ${d?"done":""}" aria-label="Copy link to this ${it.noun}" data-copy="${it.id}">${d?"✓":"🔗"}<span class="tip">${d?"Link copied":"Copy link"}</span></button></span><button class="icon" aria-label="More actions">⋯</button>`;
+  }
+  const p=open===it.id?`<div class="pop" role="dialog" aria-label="Share link"><h4>Link to this ${it.noun}</h4><div class="url"><input readonly value="${(ORIGIN+it.path).replace("https://","")}"><button class="btn primary" data-copy="${it.id}">${done===it.id?"Copied":"Copy"}</button></div><div class="who"><span class="sq">N</span><span>Opens for members of <b>Northwind</b> who can see this ${it.noun}. Anyone else sees "can't be opened".</span></div></div>`:"";
+  return `<span class="anchor"><button class="btn" data-open="${it.id}">🔗 Share</button>${p}</span><button class="icon" aria-label="More actions">⋯</button>`;
+}
+function surface(it){
+  const c=control(it);
+  if(it.id==="chat")return `<div class="thead"><span class="t">Renewal clause comparison</span>${c}</div><div class="bubble">The Halden agreement auto-renews for 12 months unless either party gives 90 days' written notice…</div>`;
+  if(it.id==="wf")return `<div class="wcard"><div class="top"><span class="gut"></span><div style="flex:1"><h3>Contract review</h3><div class="q">Ran 2 days ago · Published v4</div></div>${c}</div><div class="pills"><span class="pill">Collect</span><span class="pill">Extract</span><span class="pill">Approve</span><span class="pill">Send</span></div></div>`;
+  if(it.id==="run")return `<div class="rhead"><div class="crumb">Workflows › Contract review</div><div class="row"><h1>Q3 supplier batch</h1>${c}</div><div class="meta">2 of 4 steps done · waiting on you · started 11:42</div></div>`;
+  return `<div class="modal"><div class="row"><div class="av">⚖</div><div style="flex:1"><h2>Contracts Analyst</h2><div class="cat">Legal · installed in Northwind</div></div>${c}</div><p>Reads supplier contracts, pulls renewal, liability and termination terms, and cites the clause for every answer.</p><div class="foot"><button class="btn primary">Start a chat</button><button class="btn">Invite into a chat</button></div></div>`;
+}
+function render(){
+  document.getElementById("note").innerHTML=NOTES[V];
+  document.getElementById("grid").innerHTML=ITEMS.map(it=>`<section class="pane"><div class="cap"><span>${it.cap}</span><code>${it.path}</code></div><div class="body">${surface(it)}</div></section>`).join("");
+  document.querySelectorAll("[data-open]").forEach(b=>b.onclick=e=>{e.stopPropagation();open=open===b.dataset.open?null:b.dataset.open;done=null;render()});
+  document.querySelectorAll("[data-copy]").forEach(b=>b.onclick=e=>{e.stopPropagation();const it=ITEMS.find(x=>x.id===b.dataset.copy);copy(it.path);done=it.id;if(V==="A")open=null;render();if(V==="B")setTimeout(()=>{done=null;render()},1600)});
+}
+document.addEventListener("click",()=>{if(open){open=null;render()}});
+document.querySelectorAll(".vtab").forEach(b=>b.onclick=()=>{V=b.dataset.v;open=null;done=null;document.querySelectorAll(".vtab").forEach(x=>x.classList.toggle("active",x===b));render()});
+render();
+</script>
+</body>
+</html>
