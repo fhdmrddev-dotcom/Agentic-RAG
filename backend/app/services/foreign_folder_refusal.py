@@ -64,6 +64,11 @@ _ORG_NAMES_SQL = "SELECT id, name FROM organizations WHERE id = ANY($1::uuid[])"
 _DEFINITION_ORG_SQL = (
     "SELECT org_id FROM workflow_definitions WHERE id = $1 AND NOT is_system_global"
 )
+# 298-review WR-06: the org the mig-106 trigger stamps on a header-less INSERT — the trigger's own
+# statement (``autofill_org_id_by_owner``), so the check and the stamp read the same membership.
+_OWNER_DEFAULT_ORG_SQL = (
+    "SELECT om.org_id FROM public.org_members om WHERE om.user_id = $1 LIMIT 1"
+)
 _STORED_SQL = (
     "SELECT org_id, definition, is_system_global FROM workflow_definitions "
     "WHERE id = $1 AND created_by = $2"
@@ -170,8 +175,13 @@ async def foreign_binding_refusal(
     definition_id: Any = None,
     supabase=None,
     candidates: list[str] | None = None,
+    owner_default: bool = False,
 ) -> str | None:
     """The refusal sentence when the definition binds a folder outside its org, else ``None``.
+
+    ``owner_default`` (298-review WR-06, the header-less create): with no ``definition_org`` and no
+    ``definition_id``, compare against the org the mig-106 trigger will stamp (the owner's
+    ``LIMIT 1`` membership, the trigger's own statement) instead of skipping the check.
 
     ``candidates`` ``None`` checks the whole bound set (create, launch); a list checks only those
     ids (update: the ids the request adds or changes). ``definition_org`` may be omitted when
@@ -187,6 +197,8 @@ async def foreign_binding_refusal(
     org = _uuid_str(definition_org)
     if org is None and definition_id is not None:
         org = await definition_org_id(pool, definition_id)
+    if org is None and definition_id is None and owner_default:
+        org = _uuid_str(await pool.fetchval(_OWNER_DEFAULT_ORG_SQL, UUID(str(user_id))))
     if org is None:
         return None  # system-global, or no org to compare against: never refuse, never widen
 
