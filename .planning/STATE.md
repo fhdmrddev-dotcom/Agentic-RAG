@@ -3,15 +3,15 @@ gsd_state_version: 1.0
 milestone: v4.8
 milestone_name: Every Page Has a Link
 status: human_needed
-last_updated: 2026-10-27T21:45:44.691Z
-last_activity: 2026-10-28 -- Phase 298 executed; verification human_needed (G-4 owed)
+last_updated: 2026-10-29T00:00:00.000Z
+last_activity: 2026-10-29 -- Phase 299 executed; verification human_needed (G-4 owed)
 progress:
   total_phases: 13
   completed_phases: 0
   total_plans: 4
   completed_plans: 4
   percent: 0
-stopped_at: Phase 298 executed 5/5 + review fixes; 4/4 SC verified in code; G-4 rows owed (two-org account); LIVE 2026-10-28 (prod b813d2711)
+stopped_at: Phase 299 executed 5/5 + review fixes (3 CR + 5 WR); 5/5 SC + 6/6 reqs verified in code; security 36/36; G-4 rows owed (two-org account, G4-2 first); NOT deployed
 ---
 
 # Project State
@@ -31,7 +31,7 @@ See: `.planning/PROJECT.md` (updated 2026-10-27)
 
 **Core value:** The agent acts as an AI colleague — it knows your knowledge base, can run code, and
 can be taught new behaviours (skills) that persist and can be shared.
-**Current focus:** Phase 299 — links to the thing itself (planned 2026-10-28: 5 plans, 5 serial waves 01→05→02→03→04; plan-check passed after 1 revision; next: execute)
+**Current focus:** Phase 299 — links to the thing itself (executed 2026-10-29: human_needed; next: operator runs `299-HUMAN-UAT.md`, G4-2 first; then Phase 300)
 
 ---
 
@@ -44,10 +44,16 @@ reviewer exists, so a phase closes `verification_mode: self-verified`, never `re
 
 ## Current Position
 
-Phase: 298
+Phase: 299
 Plan: 5 of 5
-Status: Executed — human_needed (verification 4/4 SC in code; security 34/34 closed; G-4 rows owed)
-Last activity: 2026-10-28 — 298 executed: 5 plans, review (1 BL + 9 WR) → 9 fixed + WR-08 deferred to 299; 297+298 LIVE 2026-10-28 (prod b813d2711)
+Status: Executed — human_needed (verification 5/5 SC + 6/6 reqs in code; security 36/36 closed; G-4 rows owed)
+Last activity: 2026-10-29 — 299 executed: 5 plans (01→05→02→03→04), review 3 CR + 5 WR → 6 fixed + 2 partly no_change_needed (WR-01 header-less half, WR-02 client half), IN-01..05 open; gates: backend 69 ≤ 71, vitest count gate OK (13176), tsc 61 = base. NOT deployed.
+
+Owed for 299 (in order): run `299-HUMAN-UAT.md` as the two-org dev account (G4-2 first — assumption A1, the answer survives
+Switch back); decide the four open items (run-link rail highlight; fork refusal by sentence; CR-01 fallback to active org vs 404;
+first-save Builder draft has no Link); before deploy add Supabase Auth Redirect URLs `https://app.<domain>/**`, `https://<domain>/**`
+and the one-box origin (cloud write — per-action approval); after deploy `get_advisors(security)`. At close: SEED-178/015/312 → shipped,
+BUG-261027-02 → closed only if G4-5a passes. No migration ships with 299.
 
 Owed for 298 (in order): run `298-HUMAN-UAT.md` rows as the two-org dev account (G4-1 first); acknowledge residuals
 AR-298-R1 (WR-06 `LIMIT 1`) and AR-298-R2 (WR-05 bind race) in `298-SECURITY.md`; then flip SEED-389/317 → shipped,
@@ -84,6 +90,7 @@ applied; `get_advisors(security)` 0 ERROR. Branch `develop`.
 - Moonshot account reinstatement (429 suspended) → re-run its rows; BUG-261024-01 stays `folded` until then.
 - 294-ENV: remove the two dev-only lines from `backend/.env` (`DECISION_ENGINE_FAULT_BASE_URL` and its `ENVIRONMENT` partner).
 - 298: G-4 rows G4-1..7 + A-1 (`298-HUMAN-UAT.md`, sign in as `fhdmrd.dev@gmail.com`); mig 217 already in cloud (2026-10-28).
+- 299: G-4 + four-axis rows (`299-HUMAN-UAT.md`, 19 owed + G4-4c ⛔ SSO); Supabase Auth Redirect URLs before its deploy.
 - Optional: restore Supabase MCP `read_only=true` (the write-needing deploy is done).
 - Push tag `v4.7` when wanted (local only).
 - Carried from v4.6: Coolify rebuild confirmation + logged-in production smoke; 282 G4-4 / G4-6 / A1; 281 G-4 rows A, C, D.
