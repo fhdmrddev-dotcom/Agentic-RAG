@@ -546,6 +546,8 @@ export function AppViewSwitch({
               folders={folders}
               // Phase 299-02 (D-04): the address's Expert opens in its detail.
               openBundleId={entityLink?.target?.kind === "expert" ? entityLink.target.id : null}
+              // 299-REVIEW WR-03: a refused linked Expert's card exits to the catalog's own address.
+              onLeaveLink={() => entityLink?.openRoute({ view: "experts" })}
               // 267 (D-267-08): a missing required connection's Connect control uses the SAME
               // shipped door the composer uses above — no per-service deep link.
               onOpenConnections={() => onNavigate("connections")}

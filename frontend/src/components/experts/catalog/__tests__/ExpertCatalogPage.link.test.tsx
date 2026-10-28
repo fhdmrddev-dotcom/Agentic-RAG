@@ -115,14 +115,47 @@ describe("ExpertCatalogPage — openBundleId opens that Expert's detail (D-04)",
     expect(expertsApi.getExpert).not.toHaveBeenCalled()
   })
 
-  it("a refused getExpert opens nothing and the catalog still renders", async () => {
+  // RE-TARGETED under 299-REVIEW WR-03 (the reason, kept in the body): this case used to pin "a
+  // refused getExpert opens nothing" — the silent no-op `clipboard.ts` calls worse than none. The
+  // gate had already answered 200 (e.g. a system Expert for a person whose plan lacks Experts, a 403
+  // from the capability gate), so nothing at all told the person the link did not open. A refusal
+  // (a 4xx) now shows the ONE can't-be-opened card over the catalog; the catalog still renders behind.
+  it("a refused getExpert (a 4xx) shows the can't-be-opened card over the catalog", async () => {
     vi.mocked(api.listExperts).mockResolvedValue([A])
-    vi.mocked(expertsApi.getExpert).mockRejectedValue(new Error("Expert not found"))
+    vi.mocked(expertsApi.getExpert).mockRejectedValue(
+      Object.assign(new Error("Capability 'experts' requires 'enterprise' tier"), { status: 403 }),
+    )
+    const onLeaveLink = vi.fn()
+    render(<ExpertCatalogPage folders={[]} onStartChat={vi.fn()} openBundleId={ID_X} onLeaveLink={onLeaveLink} />)
+    expect(await screen.findByRole("heading", { level: 1, name: "This Expert can't be opened" })).toBeInTheDocument()
+    expect(screen.queryByRole("dialog")).toBeNull()
+    expect(screen.getByText("Contract Reviewer")).toBeInTheDocument()
+    // The rebuilt canonical address, never the requested path (D-36).
+    expect(screen.getByText(`${window.location.host}/app/experts/${ID_X}`)).toBeInTheDocument()
+    await userEvent.click(screen.getByRole("button", { name: "Go to Experts" }))
+    expect(onLeaveLink).toHaveBeenCalledTimes(1)
+  })
+
+  it("a getExpert that could not be ASKED (a network throw, a 5xx) shows no card (T-299-25)", async () => {
+    vi.mocked(api.listExperts).mockResolvedValue([A])
+    vi.mocked(expertsApi.getExpert).mockRejectedValue(new TypeError("Failed to fetch"))
     renderPage(ID_X)
     await waitFor(() => expect(expertsApi.getExpert).toHaveBeenCalledTimes(1))
     await act(async () => {})
+    expect(screen.queryByRole("heading", { level: 1 })).toBeNull()
     expect(screen.queryByRole("dialog")).toBeNull()
     expect(screen.getByText("Contract Reviewer")).toBeInTheDocument()
+  })
+
+  it("the card leaves with the address: a different id clears it", async () => {
+    vi.mocked(api.listExperts).mockResolvedValue([A, B])
+    vi.mocked(expertsApi.getExpert).mockRejectedValue(Object.assign(new Error("Expert bundle not found"), { status: 404 }))
+    const view = renderPage(ID_X)
+    expect(await screen.findByRole("heading", { level: 1, name: "This Expert can't be opened" })).toBeInTheDocument()
+    view.rerenderWith(ID_B)
+    const dialog = await screen.findByRole("dialog")
+    expect(within(dialog).getByText("Margin Watcher")).toBeInTheDocument()
+    expect(screen.queryByRole("heading", { level: 1, name: "This Expert can't be opened" })).toBeNull()
   })
 
   it("closing the modal does not reopen it while the address is unchanged", async () => {

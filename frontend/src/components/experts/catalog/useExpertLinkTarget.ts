@@ -1,4 +1,4 @@
-import { useEffect, useRef } from "react"
+import { useEffect, useRef, useState } from "react"
 import { getExpert } from "@/lib/api/experts"
 import type { ExpertBundle } from "@/types"
 
@@ -25,8 +25,15 @@ export interface ExpertLinkTargetArgs {
  * ⛔ READ-ONLY: the list, or one `getExpert`. ⛔ ONCE PER ID — a ref keyed on the id, so closing
  * the modal never reopens it while the address is unchanged, and a late answer for an id the
  * address has since left is dropped.
+ *
+ * ⚠ CORRECTED BY 299-REVIEW WR-03 — "a refused read opens nothing" is kept above rather than
+ * deleted, because it was the defect: the gate had already answered 200 (a system Expert for a
+ * person whose plan lacks Experts gets a 403 here), so NOTHING told them the link did not open.
+ * The hook now RETURNS whether the address's Expert was refused — a 4xx from `getExpert` — and
+ * the page shows the one can't-be-opened card. A throw with no status (a network failure) or a 5xx
+ * is an outage, never "can't be opened" (T-299-25): it still opens nothing and shows nothing.
  */
-export function useExpertLinkTarget({ id, experts, loading, setInspected }: ExpertLinkTargetArgs): void {
+export function useExpertLinkTarget({ id, experts, loading, setInspected }: ExpertLinkTargetArgs): boolean {
   const linked = id ? id.toLowerCase() : null
   const setRef = useRef(setInspected)
   useEffect(() => {
@@ -34,6 +41,7 @@ export function useExpertLinkTarget({ id, experts, loading, setInspected }: Expe
   })
   const handled = useRef<string | null>(null)
   const current = useRef<string | null>(linked)
+  const [refusedId, setRefusedId] = useState<string | null>(null)
   useEffect(() => {
     current.current = linked
   }, [linked])
@@ -50,8 +58,14 @@ export function useExpertLinkTarget({ id, experts, loading, setInspected }: Expe
       .then((expert) => {
         if (current.current === linked) setRef.current(expert)
       })
-      .catch(() => {
-        // A refused or failed read opens nothing; the catalog is left exactly as it was.
+      .catch((err: unknown) => {
+        // An outage opens nothing and shows nothing; only a refusal (4xx) is "can't be opened".
+        const status = (err as { status?: unknown } | null)?.status
+        if (current.current === linked && typeof status === "number" && status >= 400 && status < 500) {
+          setRefusedId(linked)
+        }
       })
   }, [linked, loading, experts])
+
+  return linked !== null && refusedId === linked
 }

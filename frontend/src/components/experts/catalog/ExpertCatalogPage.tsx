@@ -65,6 +65,7 @@ import { ExpertDetailModal } from "./ExpertDetailModal"
 import { useExpertLinkTarget } from "./useExpertLinkTarget"
 import { ALL_CATEGORIES, categoriesOf, decodeEntities, filterExperts } from "./expertCatalog"
 import { SyrelLoader } from "@/components/ui/SyrelLoader"
+import { CantBeOpened } from "@/components/layout/CantBeOpened"
 
 /** How often the page re-reads the list while an install is running (T-266-28: only then). */
 export const INSTALL_POLL_MS = 4000
@@ -79,6 +80,9 @@ export interface ExpertCatalogPageProps {
   /** Phase 299-02 (D-04): the Expert the address names (`/app/experts/<id>`) — its detail opens
    *  from the list, else from `getExpert(id)` (in `useExpertLinkTarget`). Absent ⇒ nothing opens. */
   openBundleId?: string | null
+  /** 299-REVIEW WR-03: the can't-be-opened card's exit ("Go to Experts") — a push to the catalog's
+   *  own address. Absent ⇒ the card's exit just dismisses it. */
+  onLeaveLink?: () => void
   /**
    * The caller's visible folders, for naming an Expert's knowledge scope. Consumed by the
    * detail modal (plan 04) via `resolveFolderNames`; declared now so the contract is one place.
@@ -107,7 +111,10 @@ export function ExpertCatalogPage(props: ExpertCatalogPageProps) {
   const [query, setQuery] = useState("")
   const [category, setCategory] = useState(ALL_CATEGORIES)
   // Phase 299-02 (D-04): the address's Expert opens in the ONE detail modal below.
-  useExpertLinkTarget({ id: props.openBundleId ?? null, experts, loading, setInspected })
+  const linkRefused = useExpertLinkTarget({ id: props.openBundleId ?? null, experts, loading, setInspected })
+  // 299-REVIEW WR-03: a refused linked Expert shows the ONE card over the catalog (D-12 / D-13).
+  const [dismissedLink, setDismissedLink] = useState<string | null>(null)
+  const showLinkCard = linkRefused && dismissedLink !== props.openBundleId
 
   useEffect(() => {
     let mounted = true
@@ -227,7 +234,7 @@ export function ExpertCatalogPage(props: ExpertCatalogPageProps) {
     }
   }, [anyInstalling])
 
-  return (
+  const catalog = (
     // The app's <main> is `overflow-hidden`, so the page must own its scroll (the WorkflowsPage
     // shape). Without this wrapper a catalog taller than the window could not be scrolled at all.
     <div className="h-full min-h-0 overflow-y-auto">
@@ -372,5 +379,16 @@ export function ExpertCatalogPage(props: ExpertCatalogPageProps) {
       />
     </div>
     </div>
+  )
+  return showLinkCard && props.openBundleId ? (
+    <CantBeOpened
+      kind="expert"
+      route={{ view: "experts", bundleId: props.openBundleId.toLowerCase() }}
+      onGo={() => (props.onLeaveLink ? props.onLeaveLink() : setDismissedLink(props.openBundleId ?? null))}
+    >
+      {catalog}
+    </CantBeOpened>
+  ) : (
+    catalog
   )
 }

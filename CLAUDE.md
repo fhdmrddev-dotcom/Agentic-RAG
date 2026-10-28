@@ -605,7 +605,7 @@ node scripts/check-hot-file-ledger.cjs <phase-dir>   # 0 clear · 1 missing rows
 | `backend/app/services/entitlement_service.py` | 2 / 1 / 130 | young (created 258) |
 | `backend/app/db/experts.py` | 5 / 4 / 749 | ⚠ row STALE · last touch 266-01 · ⛔ |
 | `backend/app/models/expert.py` | 6 / 4 / 131 | ⚠ STALE · last touch 267-01 |
-| `frontend/src/lib/api/experts.ts` | 12 / 6 / 422 (was `9 / 5 / 418`) | last touch 279-03 (one comment word) |
+| `frontend/src/lib/api/experts.ts` | 13 / 7 / 424 (was `12 / 6 / 422`) | 299-REVIEW WR-03: thrown Error carries res.status (one expression) |
 | `backend/app/services/expert_service.py` | 11 / 7 / 619 | ⚠ STALE · last touch 267-01 · ⛔ |
 | `backend/app/services/expert_authoring.py` | 7 / 3 / 393 | ⚠ now FIRES (`5/2/393`). **267-01**: one prompt line (tool floor has no effect) |
 | `frontend/src/components/experts/ExpertAuthoringStudio.tsx` | 6 / 3 / 1550 | ⚠ now FIRES · last touch 267-03 · Extraction OWED |
@@ -629,7 +629,7 @@ node scripts/check-hot-file-ledger.cjs <phase-dir>   # 0 clear · 1 missing rows
 | `frontend/src/components/experts/expertIcon.tsx` | 1 / 1 / 72 | ⚠ 0/0/0 AT PLANNING · measured 1/1/72 at 262-02 · ⛔ |
 | `frontend/src/components/experts/catalog/expertCatalog.ts` | 15 / 5 / 508 (was `13 / 4 / 489`) | honoured by construction (279-03: ONE `onThread` option) |
 | `frontend/src/components/experts/catalog/ExpertCard.tsx` | 5 / 4 / 296 | ⚠ STALE (`3/3/295`). **276-07**: category text via `decodeEntities` |
-| `frontend/src/components/experts/catalog/ExpertCatalogPage.tsx` | 11 / 7 / 376 (was `9 / 6 / 372`) | 299-02: one prop + one hook call (useExpertLinkTarget) |
+| `frontend/src/components/experts/catalog/ExpertCatalogPage.tsx` | 12 / 7 / 394 (was `11 / 7 / 376`) | 299-REVIEW WR-03: refused link → CantBeOpened over catalog (+1 prop) |
 | `frontend/src/components/experts/catalog/ExpertDetailModal.tsx` | 9 / 6 / 540 (was `8 / 6 / 536`) | 299-04: link in the header + Saves in beside Start a chat (D-20) |
 | `frontend/src/components/experts/catalog/startScopedChat.ts` | 1 / 1 / 70 | ⚠ 0/0/0 AT PLANNING · measured at 262-04 · ⛔ |
 | `backend/app/services/ingest_splice.py` | 22 / 8 / 1043 (was `19 / 7 / 930`) | honoured by construction (280: minter-only hunks) · ⛔ |
