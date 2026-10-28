@@ -4,14 +4,14 @@ milestone: v4.8
 milestone_name: Every Page Has a Link
 status: ready_to_plan
 last_updated: 2026-10-27T21:45:44.691Z
-last_activity: 2026-10-27 -- Phase 297 execution started
+last_activity: 2026-10-28 -- Phase 298 context gathered (auto)
 progress:
   total_phases: 13
   completed_phases: 0
   total_plans: 4
   completed_plans: 4
   percent: 0
-stopped_at: Phase 297 complete (4/4) — ready to discuss Phase 298
+stopped_at: Phase 298 context gathered — ready to plan
 ---
 
 # Project State
@@ -47,7 +47,7 @@ reviewer exists, so a phase closes `verification_mode: self-verified`, never `re
 Phase: 298
 Plan: Not started
 Status: Ready to plan
-Last activity: 2026-10-27
+Last activity: 2026-10-28 — 298 CONTEXT + ORG-AUDIT written (audit: cloud 0 multi-org users)
 
 Scope set at intake: per-view URLs (SEED-185/015/178), run-waiting notifications in-app + email
 (SEED-281), lists follow the active org — decided per-org (SEED-389), v4.7 close-out
@@ -94,4 +94,6 @@ applied; `get_advisors(security)` 0 ERROR. Branch `develop`.
 
 ## Guardrail overrides
 
-None yet in this cycle. The 286-296 overrides are in `milestones/v4.7-STATE-at-close.md`.
+- **298 G-2 (2026-10-28):** the "N more in <org> · Switch" line, the out-of-org picker marker and the move confirm are new UI. Under the operator's autonomous mandate ("continue autonomously end to end") the sketch/UI-SPEC is self-approved in planning; the operator sees it at G-4 (298 D-23).
+
+The 286-296 overrides are in `milestones/v4.7-STATE-at-close.md`.
