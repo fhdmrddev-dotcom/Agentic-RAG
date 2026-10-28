@@ -19,3 +19,5 @@
 - **Fix (owed by the 299-01 owner / phase close):** add `router:links` to the `covers:` of the
   docs page for links/sharing in `docs/public` (or write that page). The gate itself says: fix the
   page's covers, never add an exclusion.
+
+**CLOSED 2026-10-28 by the orchestrator (fix(299) docs coverage commit):** `router:links` added to `docs/public/api/overview.md` covers (the `router:org_items` precedent); `check-docs-coverage.cjs` OK, `docsCoverageGate.test.ts` 8/8.
