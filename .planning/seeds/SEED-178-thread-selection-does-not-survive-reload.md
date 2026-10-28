@@ -3,7 +3,9 @@ seed_id: SEED-178
 title: The open chat thread does not survive a page reload — no per-thread URL, nothing persisted — which is why "restore the model across REFRESH" was unreachable and BUG-260718-04 had to be split
 created: 2026-08-18
 planted_during: Phase 196 verification (G-4 row U-C1, driven live with Chrome DevTools MCP against localhost:5173)
-status: planted
+status: folded
+status_note: "Folded into Phase 299 at discuss-phase 2026-10-28 (299-CONTEXT.md)."
+folded_into: "299"
 priority: medium
 relates_to:
   - SEED-185 — ⚠ **THE ROOT. This seed is the THREAD-SHAPED INSTANCE of an app-wide gap.** Measured

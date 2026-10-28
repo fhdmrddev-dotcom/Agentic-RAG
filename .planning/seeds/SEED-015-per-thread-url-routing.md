@@ -2,7 +2,9 @@
 seed_id: SEED-015
 title: Per-thread URL routing — F5/deep-link returns to the same thread instead of the landing screen
 created: 2026-05-14
-status: planted
+status: folded
+status_note: "Folded into Phase 299 at discuss-phase 2026-10-28 (299-CONTEXT.md)."
+folded_into: "299"
 priority: medium
 re_open_triggers:
   - User explicitly asks for "share a link to this conversation" / deep-link UX

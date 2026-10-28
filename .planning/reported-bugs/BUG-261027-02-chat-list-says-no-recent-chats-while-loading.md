@@ -4,9 +4,9 @@ title: The chat list shows No recent chats for several seconds on load, before 1
 reported: 2026-10-27
 surface: Agentic-RAG
 severity: minor
-status: open
+status: folded
 affected_areas: ['frontend/chat', 'frontend/layout']
-folded_into: null
+folded_into: "299"
 verified_closed_by: null
 related_seeds: []
 re_open_trigger: "Fold at the next /gsd:discuss-phase whose files touch frontend/chat; found during the 296 G-4 drive, outside 296's inventory"
