@@ -33,11 +33,16 @@ const h = vi.hoisted(() => ({
   probe: {
     mounts: 0,
     unmounts: 0,
+    // Phase 299-03: when set, the probe also renders the REAL link gate and its prompt (the Stay case).
+    gate: false,
+    gateThreads: [] as { id: string; title: string }[],
     props: null as null | {
       activeView: string
       onNavigate: (v: string) => void
       // Phase 299-02: App's one entity navigator object (D-02).
       entityLink?: { openThread: (id: string) => void; target: { kind: string; id: string } | null }
+      // Phase 299-03: the gate reads the whole navigator object.
+      [k: string]: unknown
     },
     actions: null as null | {
       setViewingThread: (id: string | null) => void
@@ -49,7 +54,13 @@ const h = vi.hoisted(() => ({
   // Phase 299-02: thread ADDRESSES take strict UUIDs (D-01), so the address case streams in these.
   THREAD_U: "5d0c2a9e-3b1f-4c6d-8e7a-1f2b3c4d5e71",
   THREAD_V: "5d0c2a9e-3b1f-4c6d-8e7a-1f2b3c4d5e72",
+  // Phase 299-03: a run that lives in ANOTHER of the person's orgs (the switch prompt's case).
+  RUN_B: "8b2c4d1e-5f3a-4b6c-9d7e-0f1a2b3c4d5e",
+  resolveLink: vi.fn(),
 }))
+
+// Phase 299-03: the link resolver answers "this run is in Acme Legal" for the Stay case.
+vi.mock("@/lib/api/links", () => ({ resolveLink: h.resolveLink }))
 
 vi.mock("@/hooks/useAuth", () => ({
   useAuth: () => ({
@@ -105,6 +116,8 @@ vi.mock("@/lib/supabase", () => ({
 // The probe stands where ChatLayout stands: under the real providers, fed by the real hook.
 vi.mock("@/components/layout/ChatLayout", async () => {
   const { useStreamActions } = await import("@/providers/StreamsProvider")
+  const { LinkGate } = await import("@/components/layout/LinkGate")
+  const { SwitchOrgPrompt } = await import("@/components/layout/SwitchOrgPrompt")
   function ChatLayoutProbe(props: NonNullable<typeof h.probe.props>) {
     h.probe.props = props
     const actions = useStreamActions()
@@ -115,14 +128,35 @@ vi.mock("@/components/layout/ChatLayout", async () => {
       }
     }, [])
     h.probe.actions = actions as unknown as typeof h.probe.actions
-    return <div data-testid="probe">{props.activeView}</div>
+    if (!h.probe.gate) return <div data-testid="probe">{props.activeView}</div>
+    const threads = h.probe.gateThreads.map((t) => ({ ...t, user_id: "user-297", folder_id: null, created_at: "", updated_at: "" }))
+    return (
+      <div data-testid="probe">
+        <LinkGate
+          entityLink={props.entityLink as never}
+          threads={threads}
+          threadsPending={false}
+          loadThreads={async () => {}}
+        >
+          {(gate) => (
+            <>
+              {gate.notice}
+              {gate.status === "prompt" ? <SwitchOrgPrompt {...gate.prompt} /> : <span>{gate.status}</span>}
+            </>
+          )}
+        </LinkGate>
+      </div>
+    )
   }
   return { ChatLayout: ChatLayoutProbe }
 })
 
-const { THREAD_A, RUN, THREAD_U, THREAD_V } = h
+const { THREAD_A, RUN, THREAD_U, THREAD_V, RUN_B } = h
 
 import App from "@/App"
+import { screen, fireEvent } from "@testing-library/react"
+import * as api from "@/lib/api"
+import { ACTIVE_ORG_STORAGE_KEY, getActiveOrgId, setActiveOrgId } from "@/lib/api/_core"
 import { useStreamsStore } from "@/stores/streamsStore"
 import mainSource from "@/main.tsx?raw"
 import appSource from "@/App.tsx?raw"
@@ -144,6 +178,8 @@ beforeEach(() => {
   h.probe.unmounts = 0
   h.probe.props = null
   h.probe.actions = null
+  h.probe.gate = false
+  h.probe.gateThreads = []
   vi.stubGlobal("fetch", vi.fn(() => Promise.resolve(new Response("{}", { status: 200 }))))
   h.mockGetMessages.mockResolvedValue([])
   h.mockGetActiveRuns.mockResolvedValue({ active_runs: [] })
@@ -254,6 +290,82 @@ describe("D-02 — a live stream survives thread-address navigation (299-02)", (
     expect(useStreamsStore.getState().streamingThreads.has(THREAD_U)).toBe(true)
     expect(h.probe.mounts).toBe(1)
     expect(h.probe.unmounts).toBe(0)
+  })
+})
+
+// Phase 299-03 (D-17 / D-37 / T-299-27): "Stay in <org>" on the switch prompt is NOT a switch. The
+// active org, the one subscription and its abort signal are untouched — four-axis: a live stream in
+// the active org, a link into another org, the prompt, Stay. StreamsProvider is not edited.
+describe("D-17 — Stay on the switch prompt keeps the live stream (299-03)", () => {
+  it("a stream in A, a link into B, Stay: org A, one subscription, never aborted, address REPLACED", async () => {
+    window.localStorage.setItem(ACTIVE_ORG_STORAGE_KEY, "org-a")
+    const memberships = {
+      org_id: "org-a",
+      role: "owner",
+      can_manage: false,
+      can_audit_view: false,
+      can_manage_sso: false,
+      memberships: [
+        { org_id: "org-a", name: "Northwind", role: "owner" },
+        { org_id: "org-b", name: "Acme Legal", role: "member" },
+      ],
+    }
+    vi.mocked(api.getOrgPermissions).mockResolvedValue(memberships as never)
+    h.resolveLink.mockResolvedValue({
+      status: "ok",
+      target: { kind: "run", id: RUN_B, org_id: "org-b", org_name: "Acme Legal", title: "Contract review", state: null, audience: "only_you" },
+    })
+    h.probe.gate = true
+    h.probe.gateThreads = [{ id: THREAD_A, title: "Renewal clause comparison" }]
+    try {
+      const router = createMemoryRouter([{ path: "*", Component: App }], { initialEntries: ["/app"] })
+      render(<RouterProvider router={router} />)
+      await waitFor(() => expect(h.probe.actions).not.toBeNull(), SETUP)
+      await act(async () => {
+        h.probe.actions!.setViewingThread(THREAD_A)
+      })
+      await waitFor(() => expect(h.mockGetThreadWorkflow).toHaveBeenCalled(), SETUP)
+      await act(async () => {
+        void h.probe.actions!.sendMessage(THREAD_A, "research this thoroughly")
+      })
+      await waitFor(() => expect(h.mockSubscribeToRun).toHaveBeenCalledTimes(1), SETUP)
+      const signal = h.mockSubscribeToRun.mock.calls[0][3] as AbortSignal
+      const subsBefore = useStreamsStore.getState().subscriptionsByThread.get(THREAD_A)?.size
+      expect(subsBefore).toBeGreaterThan(0)
+
+      await act(async () => {
+        await router.navigate(`/app/runs/${RUN_B}`)
+      })
+      await waitFor(() => expect(screen.getByRole("heading", { level: 1, name: "This is in Acme Legal" })).toBeInTheDocument(), SETUP)
+      expect(screen.getByText("“Renewal clause comparison” is still answering")).toBeInTheDocument()
+
+      await act(async () => {
+        fireEvent.click(screen.getByRole("button", { name: "Stay in Northwind" }))
+      })
+      await waitFor(() => expect(router.state.location.pathname).toBe("/app"))
+      expect(router.state.historyAction).toBe("REPLACE")
+      expect(screen.getByText("You stayed in Northwind. The link wasn't opened.")).toBeInTheDocument()
+
+      expect(getActiveOrgId()).toBe("org-a")
+      expect(window.localStorage.getItem(ACTIVE_ORG_STORAGE_KEY)).toBe("org-a")
+      expect(h.mockSubscribeToRun).toHaveBeenCalledTimes(1)
+      expect(signal.aborted).toBe(false)
+      expect(useStreamsStore.getState().subscriptionsByThread.get(THREAD_A)?.size).toBe(subsBefore)
+      expect(useStreamsStore.getState().streamingThreads.has(THREAD_A)).toBe(true)
+      expect(h.probe.mounts).toBe(1)
+      expect(h.probe.unmounts).toBe(0)
+    } finally {
+      window.localStorage.removeItem(ACTIVE_ORG_STORAGE_KEY)
+      setActiveOrgId(null)
+      vi.mocked(api.getOrgPermissions).mockResolvedValue({
+        org_id: null,
+        role: "member",
+        can_manage: false,
+        can_audit_view: false,
+        can_manage_sso: false,
+        memberships: [],
+      } as never)
+    }
   })
 })
 
