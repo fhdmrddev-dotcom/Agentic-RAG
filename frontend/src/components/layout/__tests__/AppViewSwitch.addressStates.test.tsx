@@ -277,7 +277,9 @@ const VIEW_OF: Record<Kind, ActiveView> = { thread: "chat", workflow: "workflows
 const settle = () => act(async () => {})
 
 describe("S1 for a link the server refuses: the generic area of its kind behind the card (D-12 / D-13)", () => {
-  beforeEach(() => links.resolveLink.mockReset())
+  beforeEach(() => {
+    links.resolveLink.mockReset()
+  })
 
   it("a run: the Workflows library behind (no linked id), never the run page; the area is inert", async () => {
     links.resolveLink.mockResolvedValue({ status: "cant" })
@@ -350,7 +352,9 @@ describe("S1 for a link the server refuses: the generic area of its kind behind 
 })
 
 describe("S2 / open: the gate holds, then opens the page with the linked id (299-03)", () => {
-  beforeEach(() => links.resolveLink.mockReset())
+  beforeEach(() => {
+    links.resolveLink.mockReset()
+  })
 
   it.each<[Kind, string]>([
     ["workflow", "Opening the workflow…"],

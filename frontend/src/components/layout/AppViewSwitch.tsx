@@ -24,6 +24,9 @@ import { OrgAdminShell } from "@/components/org/OrgAdminShell"
 import { WorkflowRunPage, COPY_LOADING } from "@/pages/WorkflowRunPage"
 // Phase 297-02 (D-14 / D-19 / D-35): the not-found and holding states, as arms of this switch.
 import { AddressNotFound, AddressHolding, ADMIN_HOLD_COPY } from "./AddressNotFound"
+// Phase 299-03 (D-12..D-15, D-28): the one gate in front of every entity address, and its card.
+import { LinkGate, HOLDING_SENTENCE } from "./LinkGate"
+import { CantBeOpened } from "./CantBeOpened"
 // Phase 257 (METER-07): Operator Spend & Metering cockpit
 import { AdminSpendPage } from "@/pages/admin/AdminSpendPage"
 // Phase 262 plan 05 (PACK-11 / PACK-13 / D-262-03): the Expert catalog, and the ordered
@@ -140,6 +143,9 @@ export interface AppViewSwitchProps {
   threadHolding?: boolean
   /** Phase 299-02 (D-03 / D-04): App's entity navigators — the linked workflow / Expert id. */
   entityLink?: EntityLink
+  /** Phase 299-03: true until the active org's chat list has answered (`useThreads().pending`) —
+   *  the gate holds a thread address on it rather than asking the server. */
+  threadsPending?: boolean
 }
 
 /**
@@ -213,9 +219,22 @@ export function AppViewSwitch({
   openThread,
   threadHolding = false,
   entityLink,
+  threadsPending = false,
 }: AppViewSwitchProps) {
+  // Phase 299-03 (D-28): the gate is a component with a render-prop child, so this switch still
+  // owns no hooks. It renders the child's result directly (no wrapper element). A thread address
+  // the gate refuses or prompts for renders on the NON-chat side, so the main region behind the
+  // card is empty (no composer, no welcome) while the history column stays live.
   return (
-      activeView === "chat" && !addressNotFound ? (
+    <LinkGate
+      entityLink={entityLink}
+      threads={threads}
+      threadsPending={threadsPending}
+      loadThreads={loadThreads}
+      selectThread={selectThread}
+    >
+      {(gate) => (
+      activeView === "chat" && !addressNotFound && gate.status !== "cant" && gate.status !== "prompt" ? (
         // Phase 087-06: App-level chat|panel CSS grid (panel-shell.md D1). The
         // panel column resolves against the REAL row width (not the panel's own
         // indefinite flex width), so 1fr + clamp(...) always sums to the row —
@@ -243,7 +262,7 @@ export function AppViewSwitch({
             {/* Phase 299-02 (Pitfall 5): a thread address whose thread is not selected yet holds
                 here, never as the empty welcome composer (ChatArea with no thread). */}
             {threadHolding ? (
-              <AddressHolding sentence="Opening the chat…" />
+              <AddressHolding sentence={HOLDING_SENTENCE.thread} />
             ) : (
             <ThreadNavigationProvider value={threadNavigation}>
             <ChatArea
@@ -312,6 +331,21 @@ export function AppViewSwitch({
               is set only by App's `handleOpenLibraryHealth`. */}
           {addressNotFound ? (
             <AddressNotFound onGoHome={() => onNavigate("chat")} />
+          ) : gate.status === "cant" ? (
+            // Phase 299-03 (D-12 / D-13 / D-15): the one card over the GENERIC area of the kind —
+            // the library for a workflow or a run (never the run page), the catalog for an Expert,
+            // nothing for a chat — with no linked id. The exit is a push, so Back returns here.
+            <CantBeOpened kind={gate.kind} route={gate.route} onGo={() => entityLink?.openRoute(gate.exit)}>
+              {gate.kind === "workflow" || gate.kind === "run" ? (
+                <WorkflowsPage folders={folders} onLaunch={doRun} />
+              ) : gate.kind === "expert" ? (
+                <ExpertCatalogPage folders={folders} onStartChat={() => {}} />
+              ) : undefined}
+            </CantBeOpened>
+          ) : gate.status === "holding" ? (
+            <AddressHolding sentence={gate.sentence} />
+          ) : gate.status === "prompt" ? (
+            <AddressHolding sentence={HOLDING_SENTENCE[gate.kind]} />
           ) : activeView === "documents" ? (
             <LibraryPage onNavigate={onNavigate} initialTab={libraryTab} attentionConditions={attentionConditions} onAskInChat={handleAskInChat} />
           ) : activeView === "skills" ? (
@@ -543,5 +577,7 @@ export function AppViewSwitch({
         </main>
         </div>
       )
+      )}
+    </LinkGate>
   )
 }

@@ -17,6 +17,8 @@ import { canonicalAddress, formatAppRoute, parseAppLocation, type AppRoute } fro
 import { isStrictUuid } from "@/lib/runDeepLink"
 // Phase 297-03 (D-21): the leave-guard registry the ONE blocker below consults.
 import { createLeaveGuardRegistry, type LeaveGuardRegistry } from "@/lib/leaveGuard"
+// Phase 299-03 (D-24): the remembered sign-in target the gate resumes once (299-05's leaf).
+import { takeReturnTarget } from "@/lib/returnTo"
 
 /**
  * Phase 299-02 (LINK-02 / D-01, D-02, D-32) — what the address names, and the navigators that
@@ -36,6 +38,16 @@ export interface EntityLink {
   openExpert: (id: string) => void
   /** REPLACE a thread address with `/app` (a deselect). A no-op off a thread address. */
   leaveThread: () => void
+  /** Phase 299-03: the canonical address on screen (the rebuilt route; the raw path off a route). */
+  address: string
+  /** Phase 299-03 (D-17 Stay): REPLACE the address with `route`, else the last non-entity place
+   *  seen in this tab, else `/app`. */
+  leave: (route?: AppRoute) => void
+  /** Phase 299-03 (D-15): PUSH a route (an exit from the card, "Open it after all"). */
+  openRoute: (route: AppRoute) => void
+  /** Phase 299-03 (D-24 / Pitfall 7): consume the remembered sign-in target ONCE and REPLACE the
+   *  address with it — only when the address on screen is the chat home (`/` or `/app`). */
+  resume: () => void
 }
 
 export interface AppNavigation {
@@ -154,13 +166,16 @@ export function useAppNavigation(): AppNavigation {
   // Phase 299-02 (D-02): the last thread address seen — Chat returns to it, the mirror of
   // `lastRunId`. Seeing the chat HOME clears it, so a thread the person left is not re-opened.
   const lastThreadId = useRef<string | null>(null)
+  // Phase 299-03 (D-17): the last NON-entity place seen in this tab — where Stay returns to.
+  const lastPlace = useRef<AppRoute | null>(null)
   useEffect(() => {
     here.current = `${location.pathname}${location.search}`
     if (runId) lastRunId.current = runId
     if (studioSkillId) lastSkillId.current = studioSkillId
     if (threadId) lastThreadId.current = threadId
     else if (onChatHome) lastThreadId.current = null
-  }, [location.pathname, location.search, runId, studioSkillId, threadId, onChatHome])
+    if (parsed.view !== "not-found" && parsed.view !== "pre-auth" && entityOf(parsed) === null) lastPlace.current = parsed
+  }, [location.pathname, location.search, runId, studioSkillId, threadId, onChatHome, parsed])
 
   // ── 297-REVIEW WR-01 (2026-10-28) — every entry the router writes FROM carries an `idx`. ──
   // The router seeds an `idx` into each History entry it writes and, on Back/Forward, computes
@@ -406,17 +421,38 @@ export function useAppNavigation(): AppNavigation {
     if (!threadOfPath(here.current)) return
     go({ view: "chat" }, { replace: true })
   }, [go])
+  // Phase 299-03 (D-15 / D-17 / D-24): the gate's navigators, all through `go`.
+  const leave = useCallback(
+    (route?: AppRoute) => go(route ?? lastPlace.current ?? { view: "chat" }, { replace: true }),
+    [go],
+  )
+  const openRoute = useCallback((route: AppRoute) => go(route), [go])
+  const resume = useCallback(() => {
+    // Consumed whatever happens next, so a stale target can never resume on a later visit.
+    const stored = takeReturnTarget()
+    if (stored === null) return
+    if (location.pathname !== "/" && location.pathname !== "/app") return
+    const q = stored.indexOf("?")
+    const route = parseAppLocation(q < 0 ? stored : stored.slice(0, q), q < 0 ? "" : stored.slice(q))
+    if (route.view === "not-found" || route.view === "pre-auth") return
+    go(route, { replace: true })
+  }, [go, location.pathname])
   const entityLink = useMemo<EntityLink>(() => {
     const target = entityOf(parsed)
+    const isRoute = parsed.view !== "not-found" && parsed.view !== "pre-auth"
     return {
       target,
-      route: target && parsed.view !== "not-found" && parsed.view !== "pre-auth" ? parsed : null,
+      route: target && isRoute ? parsed : null,
+      address: isRoute ? formatAppRoute(parsed) : `${location.pathname}${location.search}`,
       openThread,
       openWorkflow,
       openExpert,
       leaveThread,
+      leave,
+      openRoute,
+      resume,
     }
-  }, [parsed, openThread, openWorkflow, openExpert, leaveThread])
+  }, [parsed, location.pathname, location.search, openThread, openWorkflow, openExpert, leaveThread, leave, openRoute, resume])
   // Phase 297-01 kept the 403 bounce as the bare view setter. Phase 297-02: a REPLACE to the
   // home address (D-15) — Back must not lead back to the surface the server just refused.
   // Phase 297-03 (D-42): a forced exit does NOT ask. The server withdrew access, so the edit cannot

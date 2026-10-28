@@ -320,6 +320,11 @@ function fakeLink(threadId: string | null) {
     openWorkflow: vi.fn(),
     openExpert: vi.fn(),
     leaveThread,
+    // Phase 299-03: the gate's navigators joined EntityLink (type-only here; this hook calls none).
+    address: threadId ? `/app/chat/${threadId}` : "/app",
+    leave: vi.fn(),
+    openRoute: vi.fn(),
+    resume: vi.fn(),
   }
   return Object.assign(link, { openThread, leaveThread })
 }

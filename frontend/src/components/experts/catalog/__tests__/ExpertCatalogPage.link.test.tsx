@@ -23,6 +23,15 @@ vi.mock("@/lib/api/experts", async () => {
   const actual = await vi.importActual<typeof import("@/lib/api/experts")>("@/lib/api/experts")
   return { ...actual, installExpert: vi.fn(), getExpert: vi.fn() }
 })
+// Phase 299-03 (D-12): the switch now asks the link gate before it opens a linked id, so the wire
+// cases answer the resolver as a system-global item (org_id null opens in the active org, D-35).
+vi.mock("@/lib/api/links", () => ({
+  resolveLink: vi.fn(async (kind: string, id: string) => ({
+    status: "ok",
+    target: { kind, id, org_id: null, org_name: null, title: "Item", state: null, audience: "everyone" },
+  })),
+}))
+
 // The workflows arm of the wire case: the page is stood in by a probe that records its props.
 const workflowsProps = vi.hoisted(() => ({ last: null as null | Record<string, unknown> }))
 vi.mock("@/pages/WorkflowsPage", () => ({
@@ -157,6 +166,11 @@ function link(kind: "workflow" | "expert" | "thread", id: string): EntityLink {
     openWorkflow: vi.fn(),
     openExpert: vi.fn(),
     leaveThread: vi.fn(),
+    // Phase 299-03: the gate's navigators (address / leave / openRoute / resume).
+    address: `/x/${id}`,
+    leave: vi.fn(),
+    openRoute: vi.fn(),
+    resume: vi.fn(),
   }
 }
 
@@ -206,16 +220,20 @@ function renderSwitch(activeView: "workflows" | "experts", entityLink: EntityLin
 }
 
 describe("AppViewSwitch — the linked id reaches its page (D-03 / D-04)", () => {
-  it("a workflow target hands linkedDefinitionId to the Workflows page", () => {
+  // RE-TARGETED under 299-03 D-12 (the reason, kept in the body): the switch now asks the server
+  // about a linked id before the page opens, so the id reaches the page once the gate's answer is
+  // in (here: a system-global item, which opens in the active org). The assertion is unchanged.
+  it("a workflow target hands linkedDefinitionId to the Workflows page", async () => {
     renderSwitch("workflows", link("workflow", ID_A))
-    expect(screen.getByTestId("workflows-probe")).toBeInTheDocument()
+    expect(await screen.findByTestId("workflows-probe")).toBeInTheDocument()
     expect(workflowsProps.last?.linkedDefinitionId).toBe(ID_A)
   })
 
-  it("no target, or a target of another kind, hands null", () => {
+  it("no target, or a target of another kind, hands null", async () => {
     renderSwitch("workflows", undefined)
     expect(workflowsProps.last?.linkedDefinitionId).toBeNull()
     renderSwitch("workflows", link("expert", ID_A))
+    await act(async () => {})
     expect(workflowsProps.last?.linkedDefinitionId).toBeNull()
   })
 
@@ -226,10 +244,15 @@ describe("AppViewSwitch — the linked id reaches its page (D-03 / D-04)", () =>
     expect(within(dialog).getByText("Margin Watcher")).toBeInTheDocument()
   })
 
+  // RE-TARGETED under 299-03 D-12 (the reason, kept in the body): a thread target is now decided by
+  // the link gate first. No list here holds the thread, so the gate refuses it with the one card
+  // (an empty main region for a chat) and the catalog is never handed the id. The property under
+  // test is unchanged: no Expert opens, and no per-Expert read is made.
   it("a thread target on the experts view opens no Expert", async () => {
     vi.mocked(api.listExperts).mockResolvedValue([A, B])
     renderSwitch("experts", link("thread", ID_B))
-    await screen.findByText("Margin Watcher")
+    expect(await screen.findByRole("heading", { level: 1, name: "This chat can't be opened" })).toBeInTheDocument()
     expect(screen.queryByRole("dialog")).toBeNull()
+    expect(expertsApi.getExpert).not.toHaveBeenCalled()
   })
 })

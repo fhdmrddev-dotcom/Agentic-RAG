@@ -147,6 +147,7 @@ describe("no entity address", () => {
   })
 
   it("on first mount it asks to resume a remembered sign-in target exactly once (StrictMode)", () => {
+    client.resolveLink.mockReturnValue(new Promise(() => {}))
     const link = fakeLink(null)
     const g = mountGate(link, { strict: true })
     g.rerenderWith(link)
@@ -198,13 +199,18 @@ describe("a thread address", () => {
 
   it("200 same org but absent from the list → the list is reloaded once, then open when found (and selected)", async () => {
     client.resolveLink.mockResolvedValue({ status: "ok", target: target({ kind: "thread" }) })
+    let reloaded: () => void = () => {}
+    const loadThreads = vi.fn(() => new Promise<void>((r) => (reloaded = r)))
     const link = fakeLink("thread")
-    const g = mountGate(link, { threads: [] })
+    const g = mountGate(link, { threads: [], loadThreads })
     await act(async () => {})
     expect(g.loadThreads).toHaveBeenCalledTimes(1)
+    // While the reload is out, it holds — never a premature "can't be opened".
     expect(gateText()).toBe("holding | thread | Opening the chat…")
     const found = thread(ID, "Renewal")
+    // The real list hook commits the rows before its promise settles.
     await act(async () => g.rerenderWith(link, [found]))
+    await act(async () => reloaded())
     expect(gateText()).toBe("open | thread")
     expect(g.selectThread).toHaveBeenCalledWith(found)
     expect(g.loadThreads).toHaveBeenCalledTimes(1)

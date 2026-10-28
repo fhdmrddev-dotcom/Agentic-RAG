@@ -644,7 +644,7 @@ export function ChatLayout({ onSignOut, activeView, onNavigate, navItems, isOper
       {/* Phase 156 REFINEMENT: mounted only when NOT collapsed — folding it away frees
           its ~300px to the conversation (the chat grid below is flex-1, so it reflows to
           full-width). The ▷ reopen handle lives in the chat top-bar (ChatArea). */}
-      {activeView === "chat" && !addressNotFound && !historyCollapsed && (
+      {activeView === "chat" && !historyCollapsed && (
         <ChatHistoryColumn
           threads={threads}
           selectedThread={selectedThread}
@@ -901,6 +901,7 @@ export function ChatLayout({ onSignOut, activeView, onNavigate, navItems, isOper
         openThread={openThread}
         threadHolding={threadHolding}
         entityLink={entityLink}
+        threadsPending={threadsPending}
       />
 
       {/* ── Phase 214-12 (STEP-02 / D-214-04): chat's launch moment. ───────────────────────
