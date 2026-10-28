@@ -1,7 +1,9 @@
 ---
 phase: 298
 slug: lists-follow-the-active-org
-status: draft
+status: approved
+reviewed_at: 2026-10-28
+review_note: "gsd-ui-checker APPROVED, 6 non-blocking FLAGs (generic 'Switch'/'Continue' labels, no declared focal point, shipped 500-weight buttons, inherited 12/20px spacing) — accepted as-is"
 shadcn_initialized: true
 preset: none (components.json style "default", baseColor slate, cssVariables, icon library lucide)
 created: 2026-10-28
