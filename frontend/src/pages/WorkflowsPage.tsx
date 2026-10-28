@@ -366,7 +366,7 @@ export function WorkflowsPage({ folders, onLaunch, onOpenRun, onOpenConnections,
     refetchPublished,
     refetchStarters,
     refetchDrafts,
-  } = useWorkflowLibraryFeeds({ selectedProjectId })
+  } = useWorkflowLibraryFeeds({ selectedProjectId, onOrgSwitch: () => setSelectedProjectId(null) })
 
   /**
    * ⚠ `Promise.allSettled`, NEVER `Promise.all` — this is the single highest-risk defect the

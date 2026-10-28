@@ -133,7 +133,7 @@ export function ChatLayout({ onSignOut, activeView, onNavigate, navItems, isOper
   const {
     threads,
     selectedThread,
-    loading: _loading,
+    switching: threadsSwitching,
     loadThreads,
     selectThread,
     newThread,
@@ -195,6 +195,8 @@ export function ChatLayout({ onSignOut, activeView, onNavigate, navItems, isOper
     // briefly show a stale thread (and reconcile it via a cross-org getSnapshot 404) that is
     // absent from the new org's list. The user re-picks from the refetched new-org threads.
     selectThread(null)
+    // 298-04 (UI-D10): the mobile new-chat folder pick may name an old-org folder — reset it.
+    setMobileFolderId(null)
     loadThreads().catch(console.error)
   }, [activeOrgId, loadThreads, selectThread])
 
@@ -630,6 +632,7 @@ export function ChatLayout({ onSignOut, activeView, onNavigate, navItems, isOper
           folders={folders}
           onOpenPalette={() => setPaletteOpen(true)}
           onCollapse={() => setHistoryCollapsedPersisted(true)}
+          loading={threadsSwitching}
         />
       )}
 
