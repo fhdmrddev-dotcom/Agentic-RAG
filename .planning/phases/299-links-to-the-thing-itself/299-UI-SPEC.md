@@ -64,19 +64,21 @@ Declared values (multiples of 4 only):
 | Token | Value | Usage in this phase |
 |-------|-------|---------------------|
 | xs | 4px | Gap between the item-kind caption and the item title in the prompt's item box (`gap-1`). Gap between the copy glyph and its label |
-| sm | 8px | Gap between paired buttons (S1, S3). Inner padding of the address block (`px-2 py-1.5`: 8px / 6px, see exceptions). Gap between the trigger icon and its word |
-| md | 16px | Space under the S1 body and under the address block (`mb-4`). S3 box padding (`px-4 py-3`, see exceptions). Gap between the S3 heading group and its buttons. The S5 line's top margin (`mt-4`) |
+| sm | 8px | Gap between paired buttons (S1, S3). Inner padding of the address block (`px-2 py-2`) in S1 and S4. Space under the S1 heading (`mb-2`). Vertical padding of the S3 item box, chip and lines (`py-2`). Gap between the trigger icon and its word |
+| md | 16px | Space under the S1 body and under the address block (`mb-4`). Horizontal padding of the S3 item box, chip, after-switch line and Stay notice (`px-4`). The link surface's padding (`p-4`). The S6 stage-2 and stage-3 stacks (`gap-4`). Gap between the S3 heading group and its buttons. The S5 line's top margin (`mt-4`) |
 | lg | 24px | S1 card padding (`p-6`). S6 stage-3 frame padding (`p-6`). The after-switch line's horizontal inset (`mx-6`), matching the run page's `px-6` gutter |
 | xl | 32px | S3 main-area padding (`p-8`), from the sketch's `padding:32px`. S1 outer padding where the dim overlay meets the region edge (`p-8`) |
 | 2xl | 48px | Not used |
 | 3xl | 64px | Not used |
 
-Exceptions (all inherited from shipped markup or the sketch, and all multiples of 4 except one
-inherited 6px):
-- **12px** (`gap-3`, `py-3`, `p-3`): the S2 and S6 stacks (verbatim from 297 `AddressHolding` and
-  the splash), the link surface's padding (`p-3`), and the S3 "still answering" line (`px-3 py-2`).
-- **6px** (`py-1.5`): the address block's vertical padding and the shipped `DropdownMenuItem` rows.
-  Both are inherited from the sketch and from `dropdown-menu.tsx`, and are not re-decided here.
+Exceptions (each is **shipped markup reused verbatim**; no new markup in this phase uses either value):
+
+| Value | Where, and only there | Why it stays |
+|-------|-----------------------|--------------|
+| **12px** (`gap-3`) | The S2 holding stack: 297's shipped `AddressHolding` component, reused verbatim and not edited | Re-spacing a shipped component for one phase would fork its look from `WorkflowRunPage`'s loading state, which the hand-off depends on |
+| **6px** (`py-1.5`) | The rows of the shipped `DropdownMenuItem` / `DropdownMenuSubTrigger` (`src/components/ui/dropdown-menu.tsx`), used as-is for **Copy link** and **Link to this workflow** | Shipped primitive; not re-styled |
+
+Every other value in this phase's new markup is 4, 8, 16, 24 or 32px.
 - **Touch targets.** Trigger buttons are `h-9` (36px) at `md` and up. In the mobile chat header the
   link trigger is icon-only at `h-11 w-11` (44px), matching the shipped mobile menu button beside
   it. `Back to it` and `Open it after all` are `Button size="sm"` (36px). S1/S3/S6 actions keep
@@ -176,10 +178,10 @@ history row opens that chat and so replaces the card.
 │  │          bg-background/60 ─────────────────────────────────┐    │
 │  │   ┌ card: w-[min(420px,100%)] rounded-xl border-border        │  │
 │  │   │       bg-card p-6 shadow-xl text-left ─────────────┐     │  │
-│  │   │ This workflow run can't be opened                    │ ← h1 16/600 foreground, mb-1.5
+│  │   │ This workflow run can't be opened                    │ ← h1 16/600 foreground, mb-2
 │  │   │ If someone sent you this link, ask them to check it. │ ← p 14/400 muted, mb-4
 │  │   │ ┌ app.syrel.ai/app/runs/c41d8e2a-…-9e2d5b7f0a63 ┐    │ ← code 11 mono muted, bg-muted/40
-│  │   │ └────────────────────────────────────────────────┘    │    rounded-md px-2 py-1.5 mb-4
+│  │   │ └────────────────────────────────────────────────┘    │    rounded-md px-2 py-2 mb-4
 │  │   │ [ Go to Workflows ]  [ Copy address ]                │ ← flex gap-2; filled primary + outline
 │  │   └──────────────────────────────────────────────────────┘     │
 └────────────────────────────────────────────────────────────────────┘
@@ -256,7 +258,7 @@ the history column (active org's chats) stay. Nothing switches without a click.
   to open it? Your chat that's answering now keeps going.   (last sentence only when a chat is answering)
    ┌───────────────────────────────────────────┐
    │ WORKFLOW RUN                               │       ← item box: inline-flex flex-col gap-1 text-left
-   │ Contract review — Q3 supplier batch        │         rounded-lg border-border bg-muted/40 px-4 py-3 mb-4
+   │ Contract review — Q3 supplier batch        │         rounded-lg border-border bg-muted/40 px-4 py-2 mb-4
    └───────────────────────────────────────────┘          caption 11 mono uppercase muted; title 14/600
      [ Stay in Northwind ]  [ Switch to Acme Legal ]     ← flex gap-2 justify-center; outline + filled primary
 
@@ -284,8 +286,8 @@ colour field (F8). The sketch's coloured square becomes the shipped gradient ini
 name is always in real text beside it.
 
 **The "still answering" chip (D-17), only while a chat in the active org is streaming:**
-- Position: `absolute bottom-4 left-1/2 -translate-x-1/2`, `rounded-full border-border bg-card px-3 py-1.5 shadow-md`, 12px muted.
-- A pulsing dot (`h-1.5 w-1.5 rounded-full bg-primary animate-pulse`, steady under reduced motion; the
+- Position: `absolute bottom-4 left-1/2 -translate-x-1/2`, `rounded-full border-border bg-card px-4 py-2 shadow-md`, 12px muted.
+- A pulsing dot (`h-2 w-2 rounded-full bg-muted-foreground animate-pulse`, steady under reduced motion; the
   dot is decorative, `aria-hidden`), then the words, then `Button variant="outline" size="sm"` **"Back to it"**.
 - One chat: "“{thread title}” is still answering". Two or more: "{N} chats are still answering".
 - **Back to it** = Stay, landing on that chat (`/app/chat/<id>`). With 2+ chats it lands on the
@@ -312,7 +314,7 @@ name is always in real text beside it.
 - The org chip in the rail updates through the shipped switcher. No extra animation is added.
 - **UI-D10: the "still answering" line after a switch.** This line shows only when the snapshot was
   non-empty. It sits at the top of the opened item's main region:
-  `mx-6 mt-4 flex items-center gap-2 rounded-md border border-border/40 bg-card px-3 py-2 text-xs text-muted-foreground`.
+  `mx-6 mt-4 flex items-center gap-2 rounded-md border border-border/40 bg-card px-4 py-2 text-xs text-muted-foreground`.
   Content: a decorative dot, "Your chat in {Previous} is still answering.", then
   `Button variant="outline" size="sm"` **"Switch back"**.
   - The wording is deliberately the present-tense fact the server guarantees (the run keeps going on
@@ -350,12 +352,12 @@ shape is kept unchanged: one control, then a surface with the address, Copy and 
 - `Button variant="ghost" size="sm"` with `Link2` (`h-4 w-4`, `aria-hidden`) and the word "Link",
   plus `aria-label="Link to this {noun}"`. On the mobile chat header (`< md`), it is icon-only at
   `h-11 w-11`.
-- It is a `DropdownMenuTrigger`, with `DropdownMenuContent align="end" className="w-[340px] p-3"`.
+- It is a `DropdownMenuTrigger`, with `DropdownMenuContent align="end" className="w-[340px] p-4"`.
 
 | Surface | Mount (one each) | Notes |
 |---------|------------------|-------|
 | Chat header | After the `<h2>` title, `ml-auto` (`ChatArea.tsx` header row) | Only when a thread exists |
-| Workflow library card | **The first item of the card's ⋯ menu**: a `DropdownMenuSub`. `DropdownMenuSubTrigger` shows `Link2` + "Link to this workflow", and `DropdownMenuSubContent` has the same body (`w-[340px] p-3`) | One `DropdownMenuSub` (the `MoveToOrgMenuItem` one-mount pattern); WR-03 stays green |
+| Workflow library card | **The first item of the card's ⋯ menu**: a `DropdownMenuSub`. `DropdownMenuSubTrigger` shows `Link2` + "Link to this workflow", and `DropdownMenuSubContent` has the same body (`w-[340px] p-4`) | One `DropdownMenuSub` (the `MoveToOrgMenuItem` one-mount pattern); WR-03 stays green |
 | Builder header (draft only) | In the breadcrumb group, after the draft label | Absent on the pre-draft "Build a workflow" state (no id) |
 | Run page header | In the title row, after the version chip and before the Stop control | Never moves or replaces Stop |
 | Expert detail | In the `DialogHeader` title row, `ml-auto`, before the dialog's close control (inside the existing `pr-8`) | The menu portals above the dialog |
@@ -364,7 +366,7 @@ shape is kept unchanged: one control, then a surface with the address, Copy and 
 
 ```
 Link to this workflow run                      ← DropdownMenuLabel 14/600 foreground, px-1 pb-2
-┌ app.syrel.ai/app/runs/c41d8e2a-…0a63 ┐       ← <code> 11 mono muted, bg-muted/40 rounded-md px-2 py-1.5,
+┌ app.syrel.ai/app/runs/c41d8e2a-…0a63 ┐       ← <code> 11 mono muted, bg-muted/40 rounded-md px-2 py-2,
 └───────────────────────────────────────┘         select-all break-all, mb-2 (real text, not an <input>)
 [⧉ Copy link]                                  ← DropdownMenuItem 14/400; the ONLY focusable element
 Opens for members of Northwind.                ← DropdownMenuLabel 12/400 muted, px-1 pt-2; org name text-foreground
@@ -456,8 +458,8 @@ When the wait ends at any stage, the app proceeds at once, and a stage message n
 | Stage | Time | Render |
 |-------|------|--------|
 | 1 | 0 to 8 s | Today's markup **verbatim**: `flex h-screen items-center justify-center`, `role="status" aria-label="Loading Syrel"`, `IrisAvatar state="thinking" size={56}`. No words |
-| 2 | 8 to 20 s | The same Iris, and below it (`flex-col gap-3`) `<p className="text-sm text-muted-foreground">Still connecting…</p>` inside the same `role="status"` wrapper (announced politely) |
-| 3 | after 20 s | `IrisAvatar state="idle" size={56}` (static), `<h1 className="text-base font-semibold text-foreground">Can't reach Syrel</h1>`, `<p className="max-w-[260px] text-sm text-muted-foreground">`, and `Button` (filled primary) **"Try again"**, all in a `flex-col items-center gap-3 p-6 text-center` stack |
+| 2 | 8 to 20 s | The same Iris, and below it (`flex-col gap-4`) `<p className="text-sm text-muted-foreground">Still connecting…</p>` inside the same `role="status"` wrapper (announced politely) |
+| 3 | after 20 s | `IrisAvatar state="idle" size={56}` (static), `<h1 className="text-base font-semibold text-foreground">Can't reach Syrel</h1>`, `<p className="max-w-[260px] text-sm text-muted-foreground">`, and `Button` (filled primary) **"Try again"**, all in a `flex-col items-center gap-4 p-6 text-center` stack |
 
 Stage 3 body:
 - Always: "Check your connection and try again."
@@ -643,7 +645,7 @@ form (16); "link is kept" sentence only on an entity link (17); words + Iris, no
   granted). It is one word and the winner's shape is unchanged.
 - UI-D14 moves the sketch's bottom receipt into the surface (no toast system; skill rule 062-A).
 - UI-D10 shortens the sketch's after-switch sentence until G-4 row 2 proves reattach (A1).
-- Inherited spacing exceptions: 12px and 6px (shipped markup), as in 297/298.
+- Spacing exceptions are limited to shipped markup reused verbatim: 12px in 297's `AddressHolding` (S2) and 6px in the shipped `DropdownMenuItem` rows. All new markup uses 4/8/16/24/32px (revision 1).
 
 ---
 
