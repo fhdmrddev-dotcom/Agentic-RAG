@@ -148,10 +148,15 @@ SQL_BY_KIND: dict[str, str] = {
 #: else NULL. Owner-scoped (``$2``) because it runs on the pool: an id of someone else's definition
 #: must read exactly like an id that does not exist, or the guard naming the org becomes an
 #: existence oracle (T-299-09). A global definition is never the caller's org to name.
+#: 299-REVIEW CR-01: and only an org the caller is STILL a member of — on the pool RLS does not
+#: apply, so membership is in the statement (the definitions SELECT policy's own arm). A definition
+#: whose org the owner has left reads like a global one: the caller's active org, never the old one.
 WORKFLOW_ORG_SQL = """
 SELECT CASE WHEN d.is_system_global THEN NULL ELSE d.org_id END
 FROM public.workflow_definitions d
 WHERE d.id = $1 AND d.created_by = $2
+  AND (d.is_system_global
+       OR EXISTS (SELECT 1 FROM public.org_members m WHERE m.org_id = d.org_id AND m.user_id = $2))
 """
 
 

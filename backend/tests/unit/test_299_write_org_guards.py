@@ -336,6 +336,20 @@ def test_the_source_org_read_is_owner_scoped():
     assert "CASE WHEN d.is_system_global THEN NULL ELSE d.org_id END" in sql
 
 
+def test_the_source_org_read_requires_current_membership():
+    """299-REVIEW CR-01: the read runs on the POOL (no RLS), so the caller's membership of the
+    definition's org must be IN the statement. Without it a definition whose org the owner LEFT
+    named that org, and a new schedule was stamped into (and run unattended in) it. The live proof
+    is ``tests/integration/test_299_review_fixes_live.py``."""
+    from app.services import link_resolver
+
+    sql = " ".join(link_resolver.WORKFLOW_ORG_SQL.split())
+    assert (
+        "EXISTS (SELECT 1 FROM public.org_members m WHERE m.org_id = d.org_id AND m.user_id = $2)"
+        in sql
+    )
+
+
 def test_create_draft_declares_the_optional_query_param():
     import inspect
 
