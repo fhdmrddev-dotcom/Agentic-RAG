@@ -4,7 +4,7 @@ milestone: v4.8
 milestone_name: Every Page Has a Link
 status: ready_to_plan
 last_updated: 2026-10-27T21:45:44.691Z
-last_activity: 2026-10-28 -- Phase 298 planned (auto)
+last_activity: 2026-10-28 -- Phase 298 execution started
 progress:
   total_phases: 13
   completed_phases: 0
@@ -46,7 +46,7 @@ reviewer exists, so a phase closes `verification_mode: self-verified`, never `re
 
 Phase: 298
 Plan: 0 of 5
-Status: Ready to execute (plan-check PASSED round 2)
+Status: Executing (main tree, one plan at a time — every wave is a single plan; no other session active)
 Last activity: 2026-10-28 — 298 CONTEXT + ORG-AUDIT written (audit: cloud 0 multi-org users)
 
 Scope set at intake: per-view URLs (SEED-185/015/178), run-waiting notifications in-app + email
