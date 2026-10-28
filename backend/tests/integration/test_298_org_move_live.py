@@ -574,6 +574,38 @@ async def test_refused_documents_shared_with_the_org_through_a_connection(w):
     await _assert_refused(w, "folder", root, "shared with everyone in")
 
 
+# ── 298-review CR-01: a moving row stamped in another org ───────────────────
+#
+# A subfolder or a document inside the moved folder carries its OWN org_id (the SEED-313 class:
+# a header-less upload into an org-A folder stamped with the owner's LIMIT 1 org). Membership was
+# checked only against the ROOT's org, so such a row could leave an org the caller is not in, and
+# the receipt named the wrong from-org. The repair move into the stray row's own org matched the
+# row against ITSELF in the target-side collision / same-name joins.
+
+
+async def test_refused_a_document_inside_stamped_in_an_org_the_caller_is_not_in(w):
+    root = await w.folder()
+    stray = await w.doc("Report.pdf", folder=root, org=w.c)
+    p = await _assert_refused(w, "folder", root, "holds 1 document that is in another organization")
+    assert await w.org_of("documents", stray) == w.c
+    c_name = await w.name(w.c)
+    assert not any(c_name in s for s in p.refusals), "an org the caller is not in was named"
+
+
+async def test_refused_a_subfolder_stamped_in_another_org(w):
+    root = await w.folder()
+    await w.folder("Signed", parent=root, org=w.c)
+    await _assert_refused(w, "folder", root, "holds 1 folder that is in another organization")
+
+
+async def test_the_mis_stamp_repair_is_refused_in_words_never_as_a_self_collision(w):
+    root = await w.folder()
+    await w.doc("Report.pdf", folder=root, org=w.b)
+    b_name = await w.name(w.b)
+    p = await _assert_refused(w, "folder", root, f"holds 1 document that is in {b_name}")
+    assert not any("is already in" in s for s in p.refusals), p.refusals
+
+
 async def test_a_folder_with_many_blockers_states_every_one(w):
     root = await w.folder()
     await w.folder("Team", parent=root, shared=True)
