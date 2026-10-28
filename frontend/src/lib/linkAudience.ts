@@ -38,8 +38,11 @@ export function audienceOf(kind: LinkAudienceKind, facts: AudienceFacts): Audien
   }
   if (kind === "expert") {
     if (facts.is_system) return "everyone"
-    if (facts.is_enabled === false) return "managers_only"
-    if (facts.visibility === "org" || facts.visibility === "public") return "org_members"
+    const orgWide = facts.visibility === "org" || facts.visibility === "public"
+    // 299-REVIEW CR-03: the manager arm is ANDed with visibility on the server, so a disabled
+    // private / granted Expert is never wider than its creator.
+    if (facts.is_enabled === false) return orgWide ? "managers_only" : "only_you"
+    if (orgWide) return "org_members"
     if (facts.visibility === "granted") return "granted"
     return "only_you"
   }

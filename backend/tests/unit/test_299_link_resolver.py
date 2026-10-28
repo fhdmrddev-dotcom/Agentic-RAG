@@ -134,7 +134,7 @@ async def test_lookup_issues_one_fetchrow_with_the_kinds_statement(mod, kind):
 
 
 def test_fixture_is_non_vacuous():
-    assert len(CASES) == 12
+    assert len(CASES) == 15
     assert {c["kind"] for c in CASES} == {"thread", "workflow", "run", "expert"}
     assert {c["audience"] for c in CASES} == {
         "only_you", "org_members", "granted", "everyone", "managers_only",

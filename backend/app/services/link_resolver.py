@@ -198,9 +198,12 @@ def audience_of(kind: str, facts: Mapping[str, Any]) -> Audience:
     if kind == "expert":
         if facts.get("is_system"):
             return "everyone"
-        if not facts.get("is_enabled", True):
-            return "managers_only"
         visibility = facts.get("visibility")
+        if not facts.get("is_enabled", True):
+            # 299-REVIEW CR-03: the manager arm is ANDed with the visibility arm (EXPERT_SQL,
+            # check_expert_grant_access), so "managers" is true only where every manager passes
+            # visibility. A disabled private / granted Expert is never wider than its creator.
+            return "managers_only" if visibility in ("org", "public") else "only_you"
         if visibility in ("org", "public"):
             return "org_members"
         if visibility == "granted":

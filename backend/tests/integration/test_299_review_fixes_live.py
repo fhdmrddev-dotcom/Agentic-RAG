@@ -169,3 +169,53 @@ async def test_cr02_a_run_with_no_snapshot_falls_back_like_the_evidence_report()
         run = await _run(conn, thread, wf, org_a, u)  # a pre-122 run: no snapshot
         theirs = await lr.lookup(conn, "run", run, m)
         assert theirs is not None and theirs["title"] == "Live name"
+
+
+# ── CR-03 ────────────────────────────────────────────────────────────────────────
+
+
+async def _manage_role(conn) -> str:
+    role = await conn.fetchval(
+        "SELECT role FROM public.role_permissions WHERE permission_key = 'experts:manage' "
+        "AND role NOT IN ('member', 'dept-admin') ORDER BY role LIMIT 1"
+    )
+    if role is None:
+        role = "org-admin"
+        await conn.execute(
+            "INSERT INTO public.role_permissions (role, permission_key) VALUES ($1, $2)",
+            role, "experts:manage",
+        )
+    return role
+
+
+async def test_cr03_a_disabled_experts_audience_never_promises_more_than_the_read():
+    """For every visibility a disabled Expert can have, the audience the share line shows must be
+    honoured by the statement: "managers" must mean EVERY manager in the org can open it."""
+    async with _Tx() as conn:
+        role = await _manage_role(conn)
+        creator, other_mgr, grantee = [await _user(conn, k) for k in ("c", "om", "g")]
+        org_a = await _org(conn, f"299r A {uuid4().hex[:6]}")
+        for uid in (creator, other_mgr, grantee):
+            await _member(conn, org_a, uid, role)
+        bundles = {}
+        for vis in ("org", "public", "private", "granted"):
+            bundles[vis] = await conn.fetchval(
+                "INSERT INTO public.expert_bundles (org_id, created_by, name, slug, visibility, is_enabled)"
+                " VALUES ($1, $2, $3, $4, $5, false) RETURNING id",
+                org_a, creator, f"299r {vis}", f"299r-{vis}-{uuid4().hex[:8]}", vis,
+            )
+        await conn.execute(
+            "INSERT INTO public.expert_grants (expert_id, grantee_type, grantee_id) VALUES ($1, 'user', $2)",
+            bundles["granted"], str(grantee),
+        )
+        seen = {}
+        for vis, bid in bundles.items():
+            row = await lr.lookup(conn, "expert", bid, creator)
+            assert row is not None, vis  # a manager-creator opens every one of them
+            audience = lr.to_target("expert", row).audience
+            seen[vis] = audience
+            if audience == "managers_only":
+                # ⛔ "opens for people who manage Experts in <org>" — so another manager must open it.
+                assert await lr.lookup(conn, "expert", bid, other_mgr) is not None, (vis, audience)
+        assert seen["org"] == seen["public"] == "managers_only"
+        assert seen["private"] == seen["granted"] == "only_you"
