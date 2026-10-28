@@ -1,9 +1,9 @@
 ---
 phase: 299-links-to-the-thing-itself
-status: owed
+status: partial
 created: 2026-10-29
 rows_total: 20
-rows_run: 0
+rows_run: 4
 rows_blocked: 1
 driver: operator
 ---
@@ -24,6 +24,8 @@ account `fhdmrd.dev@gmail.com` (`22f9c615` + `c1f18150`) and the fixture `s296-g
 
 ## Rows
 
+**2026-10-29 — Claude drove 4 rows** in the operator's already-signed-in Chrome (`fhdmrd@gmail.com`, ONE org `22f9c615`, proven via `GET /org/me`). Evidence in `299-VALIDATION.md`. The rest need a **second org** (G4-2, A-2, X-1..X-8 — that account is in one org), a **signed-out session** (G4-4a/b/d) or **network throttling/blocking** (G4-5a/b), so they stay owed.
+
 Full row text (steps, pass line, failure line) lives in `299-VALIDATION.md` → G-4 rows and four-axis rows.
 Fill the Verdict + Evidence cells there.
 
@@ -31,28 +33,30 @@ Fill the Verdict + Evidence cells there.
 |---|---|---|
 | G4-2 | Other-org run link with a live chat: Stay, Switch, Switch back | **1st** — assumption A1 (the answer survives Switch back) rests on this row alone |
 | A-2 | Thread A streams while thread B is opened by pasted address | 2 (same setup as G4-2) |
-| G4-1 | Copy link → fresh tab; also the RunModal "Saves in" caption and the 340 px link surface at mobile width | 3 |
-| G4-3 | Missing ≡ forbidden: same card, same 404 body and headers (DevTools) | 4 |
+| G4-1 | Copy link → fresh tab; also the RunModal "Saves in" caption and the 340 px link surface at mobile width | ✅ core PASS 2026-10-29 (Claude); RunModal caption + 340 px mobile still owed |
+| G4-3 | Missing ≡ forbidden: same card, same 404 body and headers (DevTools) | ✅ PASS 2026-10-29 (Claude) |
 | G4-4a | Signed-out return — password | 5 |
 | G4-4b | Signed-out return — sign-up email link | 6 |
 | G4-4d | Off-site return target planted in sessionStorage → lands on chat, never off-origin | 7 |
 | G4-5a | Slow 3G: "Loading your chats…" at desktop and mobile; never "No recent chats" | 8 — **BUG-261027-02 closes only if this passes** |
 | G4-5b | Auth blocked: 8 s "Still connecting…", 20 s "Can't reach Syrel" + Try again keeps the URL | 9 |
-| A-1 | Multi-tool run reattaches from its address in a fresh tab | 10 |
-| A-3 | ≥ 50-message thread opened by address, refreshed → same thread at its tail | 11 |
+| A-1 | Multi-tool run reattaches from its address in a fresh tab | ✅ PASS 2026-10-29 (Claude) |
+| A-3 | ≥ 50-message thread opened by address, refreshed → same thread at its tail | ✅ PASS 2026-10-29 (Claude) |
 | X-1..X-8 | Full native roster + OpenRouter (derive from `MODEL_CAPABILITIES`): stream survives A → B → Back → Forward + other-org link + Stay | 12 |
 | G4-4c | SSO return | ⛔ **BLOCKED (D-41)** — cloud has 0 SSO / SAML providers; covered by `useAuth.test.ts` |
 
 Also check during G4-1/G4-2 (layout the test DOM cannot measure, 299-03 deviation 3): the chat still scrolls
 normally after a notice appears above it.
 
-## Operator decisions open (from `299-VERIFICATION.md`)
+## Operator decisions (from `299-VERIFICATION.md`)
 
-1. Run-link rail highlight is not shown (NavPanel left alone). Accept, or a one-line NavPanel follow-up.
-2. Fork refusal is recognised by sentence wording (pinned by a test). Accept, or a stable error code later.
-3. CR-01: a schedule whose workflow is in an org the owner left falls back to the active org. Accept, or 404.
-4. A Builder draft created by its first save shows no Link until reopened.
-5. IN-01..IN-05 left open (see `299-REVIEW.md`).
+Operator, 2026-10-29: *"accept all three decisions, keep going"* — decisions 1-3 below are **ACCEPTED**.
+
+1. ✅ ACCEPTED — Run-link rail highlight is not shown (NavPanel left alone).
+2. ✅ ACCEPTED — Fork refusal is recognised by sentence wording (pinned by a test against `item_org_guard.py`).
+3. ✅ ACCEPTED — CR-01: a schedule whose workflow is in an org the owner left falls back to the active org.
+4. OPEN (not named in the answer) — A Builder draft created by its first save shows no Link until reopened.
+5. OPEN — IN-01..IN-05 (see `299-REVIEW.md`).
 
 ## Before deploy (operator)
 
