@@ -314,3 +314,27 @@ describe("MoveToOrgSheet — a move is not destructive (UI-D2)", () => {
     expect(seen).toHaveLength(6)
   })
 })
+
+// ── 298-review WR-02 — one move request opens ONE sheet, however many hosts are mounted ──────
+// On a phone the Library mounts its sidebar twice (the CSS-hidden desktop column and the folder
+// bottom sheet), so two ElsewhereLine hosts read the same request. Each sheet portals to <body>.
+describe("MoveToOrgSheetHost — a single sheet per request (298-review WR-02)", () => {
+  it("two mounted hosts render one sheet and ask for one preview; the survivor takes over", async () => {
+    const { MoveToOrgSheetHost } = await import("../MoveToOrgSheet")
+    const { openMoveSheet, closeMoveSheet } = await import("@/lib/elsewhereCounts")
+    client.getMovePreview.mockReturnValue(new Promise(() => {}))
+    const first = render(<MoveToOrgSheetHost kinds={["folder"]} />)
+    render(<MoveToOrgSheetHost kinds={["folder"]} />)
+    act(() =>
+      openMoveSheet({
+        kind: "folder", itemId: "f1", itemName: "Q3 Contracts", targets: [ACME],
+        holdsSelection: false, openedIn: null,
+      }),
+    )
+    await waitFor(() => expect(screen.getAllByRole("dialog")).toHaveLength(1))
+    expect(client.getMovePreview).toHaveBeenCalledTimes(1)
+    first.unmount()
+    await waitFor(() => expect(screen.getAllByRole("dialog")).toHaveLength(1))
+    act(() => closeMoveSheet())
+  })
+})
