@@ -175,6 +175,9 @@ skill-studio tab in the URL, any change to who may open an item.
   every new file. `useAuth.ts` and `_core.ts` already FIRE at 4 phases.
 - **D-41:** whether a SAML SSO provider is configured is read through the Supabase MCP (read-only) before G-4 row 4;
   if none, that row is ⛔ with the reason.
+  **RESOLVED 2026-10-28:** cloud reads `auth.sso_providers` 0 · `saml_providers` 0 · `sso_domains` 0 (Supabase MCP,
+  read-only). The live SSO round trip is ⛔ (no provider configured); SSO return is proven by unit tests on
+  `useAuth.signInWithSSO`'s `redirectTo` + the sessionStorage resume, and the password + sign-up arms are driven live.
 
 ### Claude's Discretion
 - Resolver module names, response model name, the exact 404 body text.
