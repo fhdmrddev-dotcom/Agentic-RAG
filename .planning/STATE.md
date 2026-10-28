@@ -11,7 +11,7 @@ progress:
   total_plans: 4
   completed_plans: 4
   percent: 0
-stopped_at: Phase 298 executed 5/5 + review fixes; 4/4 SC verified in code; G-4 rows owed (two-org account); not deployed
+stopped_at: Phase 298 executed 5/5 + review fixes; 4/4 SC verified in code; G-4 rows owed (two-org account); LIVE 2026-10-28 (prod b813d2711)
 ---
 
 # Project State
@@ -47,11 +47,11 @@ reviewer exists, so a phase closes `verification_mode: self-verified`, never `re
 Phase: 298
 Plan: 5 of 5
 Status: Executed — human_needed (verification 4/4 SC in code; security 34/34 closed; G-4 rows owed)
-Last activity: 2026-10-28 — 298 executed: 5 plans, review (1 BL + 9 WR) → 9 fixed + WR-08 deferred to 299; not deployed
+Last activity: 2026-10-28 — 298 executed: 5 plans, review (1 BL + 9 WR) → 9 fixed + WR-08 deferred to 299; 297+298 LIVE 2026-10-28 (prod b813d2711)
 
 Owed for 298 (in order): run `298-HUMAN-UAT.md` rows as the two-org dev account (G4-1 first); acknowledge residuals
 AR-298-R1 (WR-06 `LIMIT 1`) and AR-298-R2 (WR-05 bind race) in `298-SECURITY.md`; then flip SEED-389/317 → shipped,
-SEED-313 → answered. Mig 217 APPLIED in cloud 2026-10-28 (CHECK 40 types, advisor: no new finding); backend deploy waits on operator "deploy".
+SEED-313 → answered. Mig 217 APPLIED in cloud 2026-10-28 (CHECK 40 types, advisor: no new finding); 297+298 deployed 2026-10-28: master 879c96555, production b813d2711; Vercel + Coolify verified (new /org-items/* routes 401, /docs 401, health ok).
 
 Scope set at intake: per-view URLs (SEED-185/015/178), run-waiting notifications in-app + email
 (SEED-281), lists follow the active org — decided per-org (SEED-389), v4.7 close-out
