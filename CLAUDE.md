@@ -465,7 +465,7 @@ node scripts/check-hot-file-ledger.cjs <phase-dir>   # 0 clear · 1 missing rows
 | `backend/app/services/sub_agent_models.py` | 5 / 3 / 263 (was absent) | ⚠ absent its ENTIRE LIFE — row added 296-06; not touched |
 | `backend/app/services/run_reconciler.py` | 7 / 4 / 419 (was `6 / 4 / 415`) | 296 review BE-WR-04: skipped counts as finished (one column) |
 | `backend/app/services/circuit_breaker.py` | 1 / 1 / 331 | ⚠ absent its ENTIRE LIFE — row added 256-02 · ⛔ |
-| `backend/app/api/runs.py` | 54 / 23 / 2050 (was `53 / 23 / 2033`) | 296 G-4 S3: re-drive shell ends its stream (sentinel + EXPIRE) · ⛔ |
+| `backend/app/api/runs.py` | 55 / 24 / 2054 (was `54 / 23 / 2050`) | 299-01: ask answer insert carries the run's org_id (D-18) · ⛔ |
 | `backend/app/api/panel.py` | 6 / 5 / 285 | 295-03: ONE engine_pause key on /pending · honoured by construction |
 | `backend/app/utils/folder_utils.py` | 9 / 5 / 302 | ⚠ absent its ENTIRE LIFE — row added 295-10 · ⛔ |
 | `backend/app/services/harness/human_input.py` | 7 / 4 / 376 (was `6 / 3 / 375`) | 296-02: one stale comment corrected (the boot sweep now sets the flag) · ⛔ |
@@ -501,7 +501,7 @@ node scripts/check-hot-file-ledger.cjs <phase-dir>   # 0 clear · 1 missing rows
 | `scripts/check-seeds-register.cjs` | 7 / 3 / 1132 | ⚠ FIRES, absent here — row added 296-05 · `\d{3,}` ids · ⛔ |
 | `backend/app/services/eval_runner_service.py` | 14 / 9 / 1056 (was `13 / 8 / 1040`) | 296-06: eval arm on a fixed EVAL_MAX_TOOL_ROUNDS (copy of settings) |
 | `backend/app/services/scheduler_service.py` | 13 / 8 / 332 (was `12 / 7 / 314`) | 298-02: foreign-folder refusal beside template_refusal (pool only) |
-| `backend/app/api/schedules.py` | 4 / 4 / 299 | ⚠ FIRES, absent here — row added 296-02 · worded Run now (outcome) |
+| `backend/app/api/schedules.py` | 5 / 5 / 303 (was `4 / 4 / 299`) | 299-01: new schedule stamped with the workflow's org (D-18) |
 | `backend/app/api/inbound.py` | 10 / 3 / 719 (was `9 / 2 / 711`) | ⚠ now FIRES (298) · 298-02: one foreign_folder _refused (plain 422) · ⛔ |
 | `frontend/src/components/settings/apiKeys/apiKeysCopy.ts` | 5 / 3 / 283 (was `4 / 2 / 281`) | ⚠ now FIRES (298) · 298-02: one string (calls.foreignFolder) · ⛔ |
 | `frontend/src/components/settings/apiKeys/apiKeyFacts.ts` | 4 / 3 / 310 (was `3 / 2 / 308`) | ⚠ now FIRES (298) · 298-02: one case, foreign_folder call words · ⛔ |

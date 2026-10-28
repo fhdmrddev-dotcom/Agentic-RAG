@@ -176,6 +176,12 @@ class _RecordingPool:
         self.calls.append((sql, args))
         return self._fetch_result
 
+    async def fetchval(self, sql, *args):
+        # 299 (D-18): the schedule route reads the definition's org with one fetchval; this fake
+        # answers "no org of yours" (a global or unknown definition), so the INSERT is today's.
+        self.calls.append((sql, args))
+        return None
+
     async def execute(self, sql, *args):
         self.calls.append((sql, args))
         return "UPDATE 1"

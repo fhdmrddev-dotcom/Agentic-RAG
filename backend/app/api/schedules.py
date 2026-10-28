@@ -38,7 +38,7 @@ from __future__ import annotations
 import logging
 from uuid import UUID
 
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, HTTPException, Request, status
 
 from app.db.schedules import (
     create_schedule,
@@ -52,6 +52,7 @@ from app.db.schedules import (
 from app.db.workflows import get_definition
 from app.dependencies import get_current_user, get_pg_pool, get_redis, require_visible
 from app.services.entitlement_service import require_capability
+from app.services import link_resolver, org_lists  # 299 (D-18): a new schedule's org is the item's
 from app.models.schedule import (
     ScheduleTriggerResult,
     WorkflowScheduleCreate,
@@ -106,6 +107,7 @@ async def create_workflow_schedule(
     workflow_id: UUID,
     body: WorkflowScheduleCreate,
     current_user: dict = Depends(get_current_user),
+    request: Request = None,  # 299: FastAPI injects it; direct callers may omit it (no header -> None)
 ) -> WorkflowScheduleRead:
     """Schedule a published workflow. 404 if the caller cannot load it, 400 if it is a draft.
 
@@ -141,6 +143,8 @@ async def create_workflow_schedule(
         max_tokens_per_run=body.max_tokens_per_run,
         max_duration_seconds=body.max_duration_seconds,
         inputs=body.inputs,
+        # 299 (D-18/D-38): your workflow's own org; a global one → the active org; neither → the trigger.
+        org_id=await link_resolver.workflow_org(pool, workflow_id, owner_id=user_id) or await org_lists.active_org_uuid(request, current_user),
     )
     return _serialize(row)
 

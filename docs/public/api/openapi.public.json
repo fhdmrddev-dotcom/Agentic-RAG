@@ -106,6 +106,9 @@
       "name": "org-items"
     },
     {
+      "name": "links"
+    },
+    {
       "name": "api-keys"
     },
     {
@@ -192,6 +195,7 @@
       "tags": [
         "org",
         "org-items",
+        "links",
         "api-keys",
         "preferences",
         "features",
@@ -6440,15 +6444,40 @@
         ],
         "summary": "Create Draft",
         "operationId": "create_draft_workflows_post",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "from_definition_id",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "When this draft copies one of your workflows: that workflow's id. A copy of a workflow in another of your organizations is refused.",
+              "title": "From Definition Id"
+            },
+            "description": "When this draft copies one of your workflows: that workflow's id. A copy of a workflow in another of your organizations is refused."
+          }
+        ],
         "requestBody": {
+          "required": true,
           "content": {
             "application/json": {
               "schema": {
                 "$ref": "#/components/schemas/WorkflowDefinition"
               }
             }
-          },
-          "required": true
+          }
         },
         "responses": {
           "201": {
@@ -6471,12 +6500,7 @@
               }
             }
           }
-        },
-        "security": [
-          {
-            "HTTPBearer": []
-          }
-        ]
+        }
       }
     },
     "/workflows/drafts": {
@@ -14180,6 +14204,76 @@
           }
         ]
       }
+    },
+    "/links/{kind}/{item_id}": {
+      "get": {
+        "tags": [
+          "links"
+        ],
+        "summary": "Resolve Link",
+        "description": "**UI-internal: may change.** This endpoint serves Syrel's own interface and is not a stable contract.\n\nWhether you can open a thread, workflow, run or Expert, and in which of your organizations.",
+        "operationId": "resolve_link_links__kind___item_id__get",
+        "security": [
+          {
+            "HTTPBearer": []
+          },
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "kind",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Kind"
+            }
+          },
+          {
+            "name": "item_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Item Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/LinkTarget"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not found — the one answer for every item you cannot open."
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        },
+        "x-badges": [
+          {
+            "name": "UI-internal: may change",
+            "position": "after",
+            "color": "#F7B23B"
+          }
+        ]
+      }
     }
   },
   "components": {
@@ -21212,6 +21306,90 @@
         "type": "object",
         "title": "LibrarySummary",
         "description": "Every Library number over the caller's visible set (latest versions; archived INCLUDED in total / root / folders, as the Library has always counted them)."
+      },
+      "LinkTarget": {
+        "properties": {
+          "kind": {
+            "type": "string",
+            "enum": [
+              "thread",
+              "workflow",
+              "run",
+              "expert"
+            ],
+            "title": "Kind"
+          },
+          "id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Id"
+          },
+          "org_id": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "uuid"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Org Id"
+          },
+          "org_name": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Org Name"
+          },
+          "title": {
+            "type": "string",
+            "title": "Title"
+          },
+          "state": {
+            "anyOf": [
+              {
+                "type": "string",
+                "enum": [
+                  "draft",
+                  "published"
+                ]
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "State"
+          },
+          "audience": {
+            "type": "string",
+            "enum": [
+              "only_you",
+              "org_members",
+              "granted",
+              "everyone",
+              "managers_only"
+            ],
+            "title": "Audience"
+          }
+        },
+        "type": "object",
+        "required": [
+          "kind",
+          "id",
+          "org_id",
+          "org_name",
+          "title",
+          "state",
+          "audience"
+        ],
+        "title": "LinkTarget",
+        "description": "What a link opens: the item, its org (``None`` for a system-global / system item), its title, a workflow's draft/published state, and who a link to it opens for."
       },
       "LlmAgentPhaseConfig": {
         "properties": {
@@ -30764,6 +30942,18 @@
               }
             ],
             "title": "Metadata"
+          },
+          "org_id": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "uuid"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Org Id"
           },
           "model": {
             "anyOf": [
