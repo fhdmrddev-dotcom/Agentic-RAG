@@ -141,7 +141,7 @@ Plans:
 
 **Wave 2** *(blocked on Wave 1 completion)*
 
-- [ ] 298-02-PLAN.md — ORG-05 refusal at save + all four launch doors, the D-25 before/after matrix, refusal shown verbatim in the UI (ORG-05)
+- [x] 298-02-PLAN.md — ORG-05 refusal at save + all four launch doors, the D-25 before/after matrix, refusal shown verbatim in the UI (ORG-05)
 
 **Wave 3** *(blocked on Wave 2 completion)*
 
