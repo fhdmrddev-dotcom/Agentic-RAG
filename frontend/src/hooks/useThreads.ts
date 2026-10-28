@@ -72,6 +72,10 @@ export function useThreads(): UseThreads {
       const data = await listThreads()
       if (myReq !== reqIdRef.current) return
       setHeld({ org: sentUnder, rows: data })
+    } catch (err) {
+      // 298-review WR-03: a failed answer still settles the org it was asked under (as useFolders).
+      if (myReq === reqIdRef.current) setHeld({ org: sentUnder, rows: [] })
+      throw err
     } finally {
       if (myReq === reqIdRef.current) setLoading(false)
     }
