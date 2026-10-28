@@ -30,6 +30,9 @@ import { launchInputFields, type DefShape, type EntryInputField } from "@/compon
 import { useOrgOptional } from "@/providers/OrgProvider"
 import { useEffectiveFeaturesOptional } from "@/providers/EffectiveFeaturesProvider"
 import { useThreads } from "@/hooks/useThreads"
+// Phase 299-05 (FIX-02 / D-27): the mobile list's loading arm, the same words + Iris as the column.
+import { SyrelLoader } from "@/components/ui/SyrelLoader"
+import { LOADING_CHATS } from "@/components/org/orgItemsCopy"
 import { useFolders } from "@/hooks/useFolders"
 import { useTheme } from "@/hooks/useTheme"
 import type { ActiveView } from "@/App"
@@ -133,7 +136,7 @@ export function ChatLayout({ onSignOut, activeView, onNavigate, navItems, isOper
   const {
     threads,
     selectedThread,
-    switching: threadsSwitching,
+    pending: threadsPending,
     loadThreads,
     selectThread,
     newThread,
@@ -632,7 +635,7 @@ export function ChatLayout({ onSignOut, activeView, onNavigate, navItems, isOper
           folders={folders}
           onOpenPalette={() => setPaletteOpen(true)}
           onCollapse={() => setHistoryCollapsedPersisted(true)}
-          loading={threadsSwitching}
+          loading={threadsPending}
         />
       )}
 
@@ -708,7 +711,9 @@ export function ChatLayout({ onSignOut, activeView, onNavigate, navItems, isOper
               </div>
             </div>
             <div className="space-y-0.5 mt-2">
-              {mobileFiltered.length === 0 ? (
+              {threadsPending ? (
+                <SyrelLoader size="section" label={LOADING_CHATS} className="justify-center py-4 text-xs text-muted-foreground" />
+              ) : mobileFiltered.length === 0 ? (
                 <p className="text-[10px] text-muted-foreground text-center py-4 italic">
                   {mobileQuery.trim() ? "No chats match your search." : "No recent chats"}
                 </p>
