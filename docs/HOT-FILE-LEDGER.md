@@ -12207,7 +12207,7 @@ cells rot within days.
 | [`frontend/src/components/layout/AddressNotFound.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentslayoutaddressnotfoundtsx) | 1 / 1 / 51 (was `0 / 0 / 0`) | no (young) | young (created 297-02). S1 + S2 and their copy, one home. ⛔ no path prop, no icon; never renders the trailing fallback tag |
 | [`frontend/src/lib/leaveGuard.ts`](docs/HOT-FILE-LEDGER.md#frontendsrclibleaveguardts) | 1 / 1 / 97 (was `0 / 0 / 0`) | no (young) | young (created 297-03). Leave-guard registry, no-op default (D-21); one-shot latch (D-32/D-42). ⛔ no component; react-only imports; never throws |
 | [`backend/app/services/org_lists.py`](docs/HOT-FILE-LEDGER.md#backendappservicesorg_listspy) | 1 / 1 / 71 | no | young (created 298-01). Polarity-safe list narrowing, one home (D-06). ⛔ None → {} / no predicate; never an empty set, never restrict_org_ids=None; never the 400-ing org gate |
-| [`backend/app/api/org_items.py`](docs/HOT-FILE-LEDGER.md#backendappapiorg_itemspy) | 1 / 1 / 227 | no | young (created 298-01; move routes 298-03). /org-items: elsewhere counts (RLS conn), folder labels. ⛔ every route 401 without a bearer (router dependency); only member orgs named |
+| [`backend/app/api/org_items.py`](docs/HOT-FILE-LEDGER.md#backendappapiorg_itemspy) | 2 / 1 / 354 (was `1 / 1 / 227`) | no | young (298-01 reads; 298-03 move-preview + move, thin over org_move). ⛔ every route 401 without a bearer (router dependency); only member orgs named |
 | [`frontend/src/hooks/useActiveOrgId.ts`](docs/HOT-FILE-LEDGER.md#frontendsrchooksuseactiveorgidts) | 1 / 1 / 18 | no | young (created 298-01). The one active-org key for list hooks (D-08). ⛔ answers are tagged with getActiveOrgId() at SEND time, never with this state |
 | [`frontend/src/providers/OrgProvider.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrcprovidersorgprovidertsx) | 4 / 3 / 222 (was `3 / 2 / 217`) | ⚠ **FIRES** | ⚠ now FIRES (298). 298-01: the WR-01 self-heal calls syncActiveOrgHeader before setActiveOrgIdState (D-36), mirroring switchOrg. ⛔ the provider never remounts on a switch (297) |
 | [`backend/app/services/foreign_folder_refusal.py`](docs/HOT-FILE-LEDGER.md#backendappservicesforeign_folder_refusalpy) | 1 / 1 / 293 | no (young) | young (created 298-02). ORG-05 one home: bound set (D-34), worded refusal (D-14), publish-parity confirm (D-13). ⛔ definition org from the row, never the viewer; never restrict_org_ids=set() |
@@ -26018,6 +26018,17 @@ Scan-list cell as of 2026-10-28 (replaced by 298-01, moved verbatim): 0 / 0 / 0 
 **298-01 (2026-10-28): created, measured `1 / 1 / 227` in its creating commit.** `GET /elsewhere` (one round trip over `get_user_pg_connection`; `[]` without a query when no org resolves; archived Root documents excluded, D-36) and `GET /folder-labels` (≤ 50 strict UUIDs; unrestricted `fetch_visible_folders`; ids not visible or whose org name is unreadable are omitted — no oracle). ⚠ **The 401 is a router dependency, not the shared `HTTPBearer()`**: on FastAPI 0.115.6 the shared scheme answers **403** for a missing header (measured: `GET /folders` → 403 `Not authenticated`), and D-22 asks for 401 — so `_require_bearer` (`HTTPBearer(auto_error=False)` → 401 + `WWW-Authenticate: Bearer`) is on the router, which also covers the routes 298-03 adds. Live-proven, including the counts SQL as `anon`.
 
 Scan-list cell as of 2026-10-28 (replaced by 298-01, moved verbatim): 0 / 0 / 0 | no (planned 298-01) | young (planned 298-01; move routes 298-03). /org-items: elsewhere counts (RLS conn), folder labels, move preview + move. ⛔ every route 401 without a bearer; only member orgs named
+
+**298-03 (2026-10-28): `2 / 1 / 354` (was `1 / 1 / 227`).** Two routes added, both thin over
+`app.services.org_move`: `GET /move-preview?kind=&id=&to=` (200 with every refusal sentence, nothing
+written) and `POST /move` (`MoveRequest`, `extra="forbid"`; the source org is never accepted from the
+body). `kind` is a `Literal` and both ids pass `org_move.parse_id` BEFORE the service is called, so a bad
+kind or a non-UUID is a 422 with no lookup. A `MoveRefused` becomes `HTTPException(status, detail=<the
+sentence>)`, a plain string. The routes inherit the router's `_require_bearer`, and the live suite proves
+both answer 401 to the local `anon` key and to no bearer, changing nothing. The module docstring's
+"read-only by construction" line now covers the two reads only.
+
+Scan-list cell as of 2026-10-28 (replaced by 298-03, moved verbatim): 1 / 1 / 227 | no | young (created 298-01; move routes 298-03). /org-items: elsewhere counts (RLS conn), folder labels. ⛔ every route 401 without a bearer (router dependency); only member orgs named
 
 ### `frontend/src/hooks/useActiveOrgId.ts`
 

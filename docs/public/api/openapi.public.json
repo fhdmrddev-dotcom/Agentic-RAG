@@ -14036,6 +14036,150 @@
           }
         ]
       }
+    },
+    "/org-items/move-preview": {
+      "get": {
+        "tags": [
+          "org-items"
+        ],
+        "summary": "Get Move Preview",
+        "description": "**UI-internal: may change.** This endpoint serves Syrel's own interface and is not a stable contract.\n\nWhat moving one of your items to another of your organizations would do.",
+        "operationId": "get_move_preview_org_items_move_preview_get",
+        "security": [
+          {
+            "HTTPBearer": []
+          },
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "kind",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "enum": [
+                "folder",
+                "document",
+                "draft"
+              ],
+              "type": "string",
+              "description": "folder, document (a Root document) or draft",
+              "title": "Kind"
+            },
+            "description": "folder, document (a Root document) or draft"
+          },
+          {
+            "name": "id",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "description": "The item's id.",
+              "title": "Id"
+            },
+            "description": "The item's id."
+          },
+          {
+            "name": "to",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "description": "The organization to move it to.",
+              "title": "To"
+            },
+            "description": "The organization to move it to."
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MovePreviewResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        },
+        "x-badges": [
+          {
+            "name": "UI-internal: may change",
+            "position": "after",
+            "color": "#F7B23B"
+          }
+        ]
+      }
+    },
+    "/org-items/move": {
+      "post": {
+        "tags": [
+          "org-items"
+        ],
+        "summary": "Move Item",
+        "description": "**UI-internal: may change.** This endpoint serves Syrel's own interface and is not a stable contract.\n\nMove one of your items to another organization you belong to, with an audit record.",
+        "operationId": "move_item_org_items_move_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/MoveRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MovePreviewResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          },
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "x-badges": [
+          {
+            "name": "UI-internal: may change",
+            "position": "after",
+            "color": "#F7B23B"
+          }
+        ]
+      }
     }
   },
   "components": {
@@ -22318,6 +22462,112 @@
         "title": "ModelDefaultBody",
         "description": "PUT /me/preferences body. ``default_model=None`` CLEARS the override."
       },
+      "MoveCountsOut": {
+        "properties": {
+          "subfolders": {
+            "type": "integer",
+            "title": "Subfolders"
+          },
+          "documents": {
+            "type": "integer",
+            "title": "Documents"
+          },
+          "earlier_versions": {
+            "type": "integer",
+            "title": "Earlier Versions"
+          },
+          "past_runs": {
+            "type": "integer",
+            "title": "Past Runs"
+          }
+        },
+        "type": "object",
+        "required": [
+          "subfolders",
+          "documents",
+          "earlier_versions",
+          "past_runs"
+        ],
+        "title": "MoveCountsOut"
+      },
+      "MovePreviewResponse": {
+        "properties": {
+          "kind": {
+            "type": "string",
+            "enum": [
+              "folder",
+              "document",
+              "draft"
+            ],
+            "title": "Kind"
+          },
+          "item_id": {
+            "type": "string",
+            "title": "Item Id"
+          },
+          "item_name": {
+            "type": "string",
+            "title": "Item Name"
+          },
+          "from_org": {
+            "$ref": "#/components/schemas/OrgRef"
+          },
+          "to_org": {
+            "$ref": "#/components/schemas/OrgRef"
+          },
+          "counts": {
+            "$ref": "#/components/schemas/MoveCountsOut"
+          },
+          "refusals": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Refusals"
+          }
+        },
+        "type": "object",
+        "required": [
+          "kind",
+          "item_id",
+          "item_name",
+          "from_org",
+          "to_org",
+          "counts",
+          "refusals"
+        ],
+        "title": "MovePreviewResponse"
+      },
+      "MoveRequest": {
+        "properties": {
+          "kind": {
+            "type": "string",
+            "enum": [
+              "folder",
+              "document",
+              "draft"
+            ],
+            "title": "Kind"
+          },
+          "id": {
+            "type": "string",
+            "title": "Id"
+          },
+          "to_org_id": {
+            "type": "string",
+            "title": "To Org Id"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "kind",
+          "id",
+          "to_org_id"
+        ],
+        "title": "MoveRequest",
+        "description": "One item, one target org. Nothing else is accepted — the source org is read from the row."
+      },
       "OAuthAuthorizeRequest": {
         "properties": {
           "provider": {
@@ -22561,6 +22811,24 @@
         ],
         "title": "OAuthTokenResponse",
         "description": "Safe public projection of a connector token (no ciphertexts!)."
+      },
+      "OrgRef": {
+        "properties": {
+          "id": {
+            "type": "string",
+            "title": "Id"
+          },
+          "name": {
+            "type": "string",
+            "title": "Name"
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "name"
+        ],
+        "title": "OrgRef"
       },
       "PaletteFolder": {
         "properties": {
