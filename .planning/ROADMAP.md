@@ -174,7 +174,7 @@ Plans:
 **How we'd know this failed**: a forbidden link can be told apart from a missing one (status, wording, timing), so the page leaks that an item exists; the org switches without asking; a write from a cross-org page lands in the wrong org; the return-to-link accepts an outside URL (open redirect) or a token rides in the URL; SSO return works locally and fails on cloud because the Redirect URLs lack `https://app.<domain>/**`; the boot screen still hangs with the network throttled; "No recent chats" still flashes on a slow load.
 **Plans**: 5 plans (serial waves 1-5: every plan edits docs/HOT-FILE-LEDGER.md, CLAUDE.md and/or scripts/vitest-count-gate.cjs)
 
-- [ ] 299-01-PLAN.md — the `GET /links/{kind}/{id}` resolver (one statement per kind, one 404), run `org_id`, and the write-org guards (LINK-04, LINK-05)
+- [x] 299-01-PLAN.md — the `GET /links/{kind}/{id}` resolver (one statement per kind, one 404), run `org_id`, and the write-org guards (LINK-04, LINK-05)
 - [ ] 299-05-PLAN.md — sign-in returns to the link, the boot screen gives up with a retry, and "Loading your chats…" until the list answers (LINK-06, FIX-02)
 - [ ] 299-02-PLAN.md — chat / workflow / Expert addresses, the thread lives in the URL, open a workflow or Expert by id (LINK-02, LINK-03)
 - [ ] 299-03-PLAN.md — the one gate: the in-place "can't be opened" card, "This is in <org> — switch?", the sign-in resume (LINK-04, LINK-05, LINK-06)
