@@ -149,7 +149,7 @@ Plans:
 
 **Wave 4** *(blocked on Wave 3 completion)*
 
-- [ ] 298-04-PLAN.md — frontend refresh-on-switch for every list (move-only LibraryPage/WorkflowsPage extractions first) + the out-of-org picker marker (ORG-01..05)
+- [x] 298-04-PLAN.md — frontend refresh-on-switch for every list (move-only LibraryPage/WorkflowsPage extractions first) + the out-of-org picker marker (ORG-01..05)
 
 **Wave 5** *(blocked on Wave 4 completion)*
 
