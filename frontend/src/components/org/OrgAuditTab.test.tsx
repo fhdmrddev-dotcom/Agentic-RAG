@@ -200,3 +200,32 @@ describe("OrgAuditTab — API key rows (293-04 / D-17)", () => {
     expect(orgAuditSrc).toMatch(/type ActionGroup = [^\n]*"API keys"/)
   })
 })
+
+// ── 298-review WR-07 — the org move's receipt (migration 217) is worded, never a raw code ─────
+const MOVE_LINE = `"org.item.move": { label: "Moved an item to another organization", group: "Organizing" },`
+
+describe("OrgAuditTab — the org move receipt (298-review WR-07)", () => {
+  it("org.item.move renders as a plain label, not the raw code", () => {
+    const page: OrgAuditPage = {
+      ...ALL_PAGE,
+      entries: [{ id: "m1", user_id: "u1", action_type: "org.item.move", metadata: { kind: "folder" }, created_at: "2026-10-28T10:00:00Z", org_id: "o1" }],
+      total: 1,
+    }
+    render(<OrgAuditTab {...baseProps} result={page} showTechnical={false} />)
+    expect(screen.getByText("Moved an item to another organization")).toBeInTheDocument()
+    expect(screen.queryByText("org.item.move")).toBeNull()
+  })
+
+  it("the action filter lists it under Organizing", async () => {
+    const user = userEvent.setup()
+    render(<OrgAuditTab {...baseProps} result={ALL_PAGE} />)
+    await user.click(screen.getByRole("button", { name: /any action/i }))
+    const group = screen.getByText("Organizing").parentElement as HTMLElement
+    expect(within(group).getByText("Moved an item to another organization")).toBeInTheDocument()
+  })
+
+  it("the Control Room AuditTab carries the IDENTICAL entry (one vocabulary, two homes)", () => {
+    expect(orgAuditSrc).toContain(MOVE_LINE)
+    expect(controlRoomAuditSrc).toContain(MOVE_LINE)
+  })
+})
