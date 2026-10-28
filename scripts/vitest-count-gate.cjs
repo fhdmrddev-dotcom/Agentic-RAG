@@ -3644,7 +3644,7 @@ const BASELINE = {
   "LibraryPage.test.tsx": 12,
   "librarySelection.test.ts": 25,
   "useDocuments.test.ts": 14, // RAISED 7 → 14 at 284-REVIEW WR-01 (a membership-changing Realtime UPDATE refetches; a cosmetic one merges)
-  "useLibraryDocuments.test.ts": 25, // 284-01 Task 2 — the D-24 Library data hook. BOTH KNOBS, SAME COMMIT. · RAISED 13 → 24 at 284-03 (the server body: page + summary + read by id, the Realtime hint) · RAISED 24 → 25 at 284-REVIEW WR-01 (the on-page rows reach useDocuments)
+  "useLibraryDocuments.test.ts": 28, // 284-01 Task 2 — the D-24 Library data hook. BOTH KNOBS, SAME COMMIT. · RAISED 13 → 24 at 284-03 (the server body: page + summary + read by id, the Realtime hint) · RAISED 24 → 25 at 284-REVIEW WR-01 (the on-page rows reach useDocuments) · RAISED 25 → 28 at 298-04 (2026-10-28): an org switch is cold + drops the late answer, the summary is null until the new org answers, a failed first summary there reads error
   "DocumentList.test.tsx": 7,
   "DocumentList.moveToFolder.test.tsx": 4,
   "ViewsGroup.test.tsx": 10,
@@ -4435,6 +4435,12 @@ const BASELINE = {
   //    was in NEITHER knob before this (no src/lib directory entry), so it is ADOPTED at 24 existing + 6 new = 30.
   "api.workflows.test.ts": 30, // 298-02 ADOPTED: coded 422 -> WorkflowFolderRefusedError on create + update, other 422 unchanged, allOrgs omits X-Org-Id
   "threads.folderRefusal.test.ts": 3, // 298-02 — postMessage keeps detail.message (and code) from an object detail; string detail and array fallback unchanged
+  // ── Phase 298-04 (ORG-01..04 / D-08..D-12) — both knobs, same commit (2026-10-28). useFolders.test.ts
+  //    and FolderTree.test.tsx were in NEITHER knob before this (no src/__tests__/hooks or
+  //    src/__tests__/components directory entry), so they are ADOPTED (existing + new), not raised.
+  "useFolders.test.ts": 17, // 298-04 ADOPTED: 10 existing + 7 — loading flag, switch drops rows at once, late old-org answer discarded, create lands in the new org, Realtime org filter (INSERT ignored, UPDATE removes) and its polarity
+  "FolderTree.test.tsx": 14, // 298-04 ADOPTED: 10 existing + 4 — loading says "Loading folders…" never "No folders yet", Root kept with no count, no stale rows, empty sentence unchanged
+  "LibraryPage.orgSwitch.test.tsx": 5, // 298-04 — real useFolders + useLibraryDocuments over a fake network: old org's folder/document gone at once, loading line, late answer dropped, Root + panel reset (UI-D10), fields/views/provenance re-read (SEED-317), Root count never 0
 }
 
 // Still COMPUTED, never hand-written — the reduce is the single source, so the
@@ -6492,6 +6498,10 @@ const TARGETS = [
   // Phase 298-02 — FILE-LEVEL (no src/lib or src/lib/api/__tests__ directory entry), SAME commit as their pins.
   "src/lib/api.workflows.test.ts",
   "src/lib/api/__tests__/threads.folderRefusal.test.ts",
+  // Phase 298-04 — FILE-LEVEL (no src/__tests__/hooks, src/__tests__/components or src/pages/__tests__ directory entry), SAME commit as their pins.
+  "src/__tests__/hooks/useFolders.test.ts",
+  "src/__tests__/components/FolderTree.test.tsx",
+  "src/pages/__tests__/LibraryPage.orgSwitch.test.tsx",
 ]
 
 const REPO_ROOT = path.resolve(__dirname, "..")

@@ -145,3 +145,35 @@ describe("FolderTree", () => {
     expect(globeIcons.length).toBe(0)
   })
 })
+
+// ── Phase 298-04 (UI-D8) — the tree's own loading line on an org switch ─────────────────────
+describe("FolderTree — loading (298-04)", () => {
+  it("with loading true it says 'Loading folders…' and NEVER 'No folders yet'", () => {
+    renderWithTooltip(<FolderTree {...defaultProps} folders={[]} loading />)
+    const status = screen.getByRole("status")
+    expect(status).toHaveTextContent("Loading folders…")
+    expect(status).toHaveAccessibleName("Loading folders…")
+    expect(screen.queryByText("No folders yet")).toBeNull()
+    expect(screen.queryByText("Create a folder to organize your documents.")).toBeNull()
+  })
+
+  it("keeps the Root row while loading, with its count omitted (never 0)", () => {
+    renderWithTooltip(<FolderTree {...defaultProps} folders={[]} loading />)
+    const root = screen.getByText("Root")
+    expect(root).toBeInTheDocument()
+    expect(root.closest("[role]")?.textContent ?? root.parentElement?.textContent).not.toMatch(/\d/)
+  })
+
+  it("renders no folder row while loading, even if stale folders are passed", () => {
+    renderWithTooltip(<FolderTree {...defaultProps} loading />)
+    expect(screen.queryByText("Alpha")).toBeNull()
+    expect(screen.getByText("Loading folders…")).toBeInTheDocument()
+  })
+
+  it("with loading false and no folders the shipped empty sentence is unchanged", () => {
+    renderWithTooltip(<FolderTree {...defaultProps} folders={[]} loading={false} />)
+    expect(screen.getByText("No folders yet")).toBeInTheDocument()
+    expect(screen.queryByText("Loading folders…")).toBeNull()
+  })
+})
+

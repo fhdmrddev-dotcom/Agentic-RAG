@@ -46,8 +46,39 @@ vi.mock("@/lib/api", async (importOriginal) => {
   }
 })
 
+// Phase 298-04 (D-08 / D-09) — a flippable active org standing in for OrgProvider.
+const orgStore = vi.hoisted(() => {
+  let current: string | null = null
+  const subs = new Set<() => void>()
+  return {
+    get: () => current,
+    set: (v: string | null) => {
+      current = v
+      subs.forEach((f) => f())
+    },
+    subscribe: (f: () => void) => {
+      subs.add(f)
+      return () => {
+        subs.delete(f)
+      }
+    },
+  }
+})
+vi.mock("@/providers/OrgProvider", async () => {
+  const { useSyncExternalStore } = await import("react")
+  return {
+    useOrgOptional: () => ({ activeOrgId: useSyncExternalStore(orgStore.subscribe, orgStore.get) }),
+  }
+})
+
 import { DocumentListError } from "@/lib/api/documents"
+import { setActiveOrgId } from "@/lib/api/_core"
 import { useLibraryDocuments, type UseLibraryDocumentsArgs } from "@/hooks/useLibraryDocuments"
+
+function switchOrg(next: string | null) {
+  setActiveOrgId(next)
+  orgStore.set(next)
+}
 
 function doc(id: string, over: Partial<Document> = {}): Document {
   return {
@@ -492,5 +523,62 @@ describe("useLibraryDocuments — the server body (284-03)", () => {
     expect(typeof result.current.refresh).toBe("function")
     expect(result.current.uploading).toBe(false)
     expect(result.current.uploadingCount).toBe(0)
+  })
+})
+
+// ── Phase 298-04 (D-08 / D-09) — an org switch is a COLD source switch ─────────────────────
+describe("useLibraryDocuments — follows the active org (298-04)", () => {
+  beforeEach(() => switchOrg("org-a"))
+  afterEach(() => switchOrg(null))
+
+  it("a switch clears the rows AT ONCE (cold) and drops a late answer for the old org", async () => {
+    const { result } = renderHook(() => useLibraryDocuments(BASE_ARGS))
+    await waitFor(() => expect(result.current.listState).toBe("ready"))
+    expect(result.current.rows.map((d) => d.id)).toEqual(["r3", "r1"])
+
+    const slowA = deferred<DocumentListResponse>()
+    const pageB = deferred<DocumentListResponse>()
+    // An A refetch is still in flight when the person switches; B answers first.
+    mockListDocumentsPage.mockReturnValueOnce(slowA.promise)
+    act(() => result.current.retry())
+    mockListDocumentsPage.mockReturnValueOnce(pageB.promise)
+    act(() => switchOrg("org-b"))
+    expect(result.current.rows).toEqual([])
+    expect(result.current.listState).toBe("cold")
+    expect(result.current.total).toBeNull()
+
+    const b1 = doc("b1")
+    await act(async () => pageB.resolve({ documents: [b1], total: 1, offset: 0, limit: 25 }))
+    await act(async () => slowA.resolve({ documents: [r1], total: 1, offset: 0, limit: 25 }))
+    expect(result.current.rows.map((d) => d.id)).toEqual(["b1"])
+    expect(result.current.listState).toBe("ready")
+  })
+
+  it("the summary reads null (never the old org's numbers) until the new org answers", async () => {
+    const { result } = renderHook(() => useLibraryDocuments(BASE_ARGS))
+    await waitFor(() => expect(result.current.summaryState).toBe("ready"))
+    expect(result.current.summary).not.toBeNull()
+
+    const sumB = deferred<LibrarySummary>()
+    mockGetLibrarySummary.mockReturnValueOnce(sumB.promise)
+    act(() => switchOrg("org-b"))
+    expect(result.current.summary).toBeNull()
+    expect(result.current.summaryState).toBe("loading")
+    expect(result.current.archivedHidden).toBeNull()
+    expect(result.current.inFlight).toBeNull()
+
+    const answer = summarizeDocuments([doc("b1")])
+    await act(async () => sumB.resolve(answer))
+    expect(result.current.summary).toEqual(answer)
+    expect(result.current.summaryState).toBe("ready")
+  })
+
+  it("a failed FIRST summary in the new org reads error (the old org's answer does not count as known)", async () => {
+    const { result } = renderHook(() => useLibraryDocuments(BASE_ARGS))
+    await waitFor(() => expect(result.current.summaryState).toBe("ready"))
+    mockGetLibrarySummary.mockRejectedValueOnce(new DocumentListError(500, "x"))
+    act(() => switchOrg("org-b"))
+    await waitFor(() => expect(result.current.summaryState).toBe("error"))
+    expect(result.current.summary).toBeNull()
   })
 })
