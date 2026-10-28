@@ -233,8 +233,8 @@ const BASELINE = {
   //    printed `actual` of the suites run together, never hand-counted. soulData.requiredFields,
   //    starterFork.287 live under the `src/components/workflows` directory TARGETS entry;
   //    the chat + providers ones are named FILE-LEVEL below (no bare directory entry exists).
-  "ThreadWorkflowPicker.test.tsx": 9,
-  "useStartWorkflowInThread.test.tsx": 7,
+  "ThreadWorkflowPicker.test.tsx": 17, // 2026-10-28 298-02: 9 -> 17 (printed actual; +1 a folder refusal shows the server sentence with no Retry)
+  "useStartWorkflowInThread.test.tsx": 24, // 2026-10-28 298-02: 7 -> 24 (printed actual; +5 the coded folder refusal is kind folder, other 422s unchanged)
   "ChatArea.threadWorkflowPicker.test.tsx": 5,
   "StreamsProvider.inputs.test.tsx": 3,
   "soulData.requiredFields.test.ts": 7,
@@ -1083,7 +1083,7 @@ const BASELINE = {
   // flag-off promise — every one of which has been deletable with the gate green until now.
   //
   // Read from THIS SCRIPT'S OWN `actual` column, never hand-counted from `it(` literals.
-  "useDraftPersistence.test.tsx": 59,
+  "useDraftPersistence.test.tsx": 63, // 2026-10-28 298-02: 59 -> 63 (folder refusal sentence, UI-D13 retry clears it, create arm, header-less reload)
   // What would be unguarded without this entry: the whole-table properties of the template-first
   // surface's words — non-emptiness, pairwise distinctness, the zero-import leaf claim, and the
   // two that carry this phase's honesty requirements. (a) The three no-fields footings are
@@ -4431,6 +4431,10 @@ const BASELINE = {
   //    at 6 existing + 2 new = 8, not raised.
   "uploadDocument.orgHeader.test.ts": 4, // 298-01 — Root upload sends X-Org-Id = getActiveOrgId() at send time, omits it when null, never a Content-Type
   "OrgProvider.test.tsx": 8, // 298-01 ADOPTED (6 Phase 166 cases) + 2: the WR-01 self-heal syncs the header before a child effect sees the adopted org (D-36); useActiveOrgId null outside / org inside
+  // ── Phase 298-02 (ORG-05 / D-36 / D-12) — both knobs, same commit (2026-10-28). api.workflows.test.ts
+  //    was in NEITHER knob before this (no src/lib directory entry), so it is ADOPTED at 24 existing + 6 new = 30.
+  "api.workflows.test.ts": 30, // 298-02 ADOPTED: coded 422 -> WorkflowFolderRefusedError on create + update, other 422 unchanged, allOrgs omits X-Org-Id
+  "threads.folderRefusal.test.ts": 3, // 298-02 — postMessage keeps detail.message (and code) from an object detail; string detail and array fallback unchanged
 }
 
 // Still COMPUTED, never hand-written — the reduce is the single source, so the
@@ -6485,6 +6489,9 @@ const TARGETS = [
   // Phase 298-01 — FILE-LEVEL (no src/lib/api/__tests__ or src/providers directory entry), SAME commit as their pins.
   "src/lib/api/__tests__/uploadDocument.orgHeader.test.ts",
   "src/providers/OrgProvider.test.tsx",
+  // Phase 298-02 — FILE-LEVEL (no src/lib or src/lib/api/__tests__ directory entry), SAME commit as their pins.
+  "src/lib/api.workflows.test.ts",
+  "src/lib/api/__tests__/threads.folderRefusal.test.ts",
 ]
 
 const REPO_ROOT = path.resolve(__dirname, "..")

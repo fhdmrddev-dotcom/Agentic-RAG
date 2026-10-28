@@ -2180,3 +2180,88 @@ describe("useDraftPersistence — 193.1-07: a misbehaving `onDraftCreated`", () 
     expect("await onDraftCreatedRef.current(created.id)").toMatch(/await\s+onDraftCreatedRef/)
   })
 })
+
+// ── 298-02 (ORG-05 / D-36 / UI-D12 / UI-D13) — the folder refusal is the server's sentence ─────
+
+describe("useDraftPersistence — 298-02: a folder in another org is refused in the server's words", () => {
+  const SENTENCE =
+    "“Q3 Contracts” is in Acme Legal, not in this workflow's organization (Personal). Pick a folder from Personal."
+
+  async function folderError(): Promise<Error> {
+    const { WorkflowFolderRefusedError } = await import("@/lib/api/workflows")
+    return new WorkflowFolderRefusedError(SENTENCE)
+  }
+
+  it("a refused PATCH shows the server's sentence, never HOLD_UNREADABLE, and files no receipt", async () => {
+    mockedUpdate.mockRejectedValueOnce(await folderError())
+    const h = harness()
+    h.edit()
+    await advance(AUTOSAVE_DEBOUNCE_MS)
+    await flush()
+    expect(stateOf(h.view)).toEqual({ kind: "error", sentence: SENTENCE })
+    expect(stateOf(h.view)).not.toEqual({ kind: "error", sentence: HOLD_UNREADABLE })
+    expect(h.markSaved).not.toHaveBeenCalled()
+    expect(h.store.getState().dirty).toBe(true)
+  })
+
+  it("UI-D13: the edit stays on screen, and the next (in-org) save clears the refusal", async () => {
+    mockedUpdate.mockRejectedValueOnce(await folderError())
+    mockedUpdate.mockResolvedValue(write("T-AFTER"))
+    const h = harness()
+    h.edit()
+    await advance(AUTOSAVE_DEBOUNCE_MS)
+    await flush()
+    expect(stateOf(h.view).kind).toBe("error")
+    const phasesAfterRefusal = h.store.getState().phases.length
+
+    h.edit()
+    await advance(AUTOSAVE_DEBOUNCE_MS)
+    await flush()
+    expect(mockedUpdate).toHaveBeenCalledTimes(2)
+    expect(stateOf(h.view).kind).not.toBe("error")
+    expect(h.markSaved).toHaveBeenCalled()
+    expect(h.store.getState().phases.length).toBe(phasesAfterRefusal + 1)
+  })
+
+  it("a refused CREATE shows the same sentence", async () => {
+    mockedCreate.mockRejectedValueOnce(await folderError())
+    const h = harness({ draftId: null, token: null })
+    h.edit()
+    await advance(AUTOSAVE_DEBOUNCE_MS)
+    await flush()
+    expect(stateOf(h.view)).toEqual({ kind: "error", sentence: SENTENCE })
+  })
+})
+
+describe("useDraftPersistence — 298-02 (D-12): reload reads the caller's drafts with no org header", () => {
+  it("reload asks for allOrgs, so a draft in another org than the active one is still found", async () => {
+    mockedUpdate.mockRejectedValueOnce(new WorkflowStaleTokenError("T-SERVER"))
+    const h = harness()
+    h.edit()
+    await advance(AUTOSAVE_DEBOUNCE_MS)
+    await flush()
+    expect(stateOf(h.view).kind).toBe("conflict")
+
+    const serverRow: WorkflowDraftRow = {
+      id: DRAFT_ID,
+      slug: "risk-register",
+      version: 1,
+      name: "Risk register",
+      definition: { ...draft(), phases: [phase("server-side", 0)] },
+      token: "T-RELOADED",
+    }
+    // The active org is now a DIFFERENT org: the org-narrowed list would not hold this draft.
+    mockedList.mockImplementation(async (_signal?: AbortSignal, opts?: { allOrgs?: boolean }) =>
+      opts?.allOrgs ? [serverRow] : [],
+    )
+
+    await act(async () => {
+      await h.view.result.current.reload()
+    })
+
+    expect(mockedList).toHaveBeenCalledTimes(1)
+    expect(mockedList.mock.calls[0][1]).toEqual({ allOrgs: true })
+    expect(stateOf(h.view)).toEqual({ kind: "idle" })
+    expect(stateOf(h.view)).not.toEqual({ kind: "error", sentence: DRAFT_GONE_SENTENCE })
+  })
+})
