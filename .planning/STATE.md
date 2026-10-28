@@ -31,7 +31,7 @@ See: `.planning/PROJECT.md` (updated 2026-10-27)
 
 **Core value:** The agent acts as an AI colleague — it knows your knowledge base, can run code, and
 can be taught new behaviours (skills) that persist and can be shared.
-**Current focus:** Phase 298 — lists follow the active org
+**Current focus:** Phase 299 — links to the thing itself (context gathered 2026-10-28, auto mode; next: plan-phase)
 
 ---
 
