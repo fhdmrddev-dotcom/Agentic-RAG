@@ -39,6 +39,7 @@ measured against ``supabase/full-schema.sql`` on 2026-10-28):
 """
 from __future__ import annotations
 
+import re
 from typing import Any, Literal, Mapping
 from uuid import UUID
 
@@ -143,12 +144,26 @@ SQL_BY_KIND: dict[str, str] = {
     "expert": EXPERT_SQL,
 }
 
-#: The schedule stamp's read (299-01 Task 3): a non-global definition's org, else NULL.
+#: The source org of a Tweak and of a new schedule: the CALLER'S OWN non-global definition's org,
+#: else NULL. Owner-scoped (``$2``) because it runs on the pool: an id of someone else's definition
+#: must read exactly like an id that does not exist, or the guard naming the org becomes an
+#: existence oracle (T-299-09). A global definition is never the caller's org to name.
 WORKFLOW_ORG_SQL = """
 SELECT CASE WHEN d.is_system_global THEN NULL ELSE d.org_id END
 FROM public.workflow_definitions d
-WHERE d.id = $1
+WHERE d.id = $1 AND d.created_by = $2
 """
+
+
+_UUID_RE = re.compile(
+    r"^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$"
+)
+
+
+def strict_uuid(raw: Any) -> UUID | None:
+    """A canonical hyphenated UUID string -> ``UUID``; anything else (``None``, braces, no hyphens,
+    a non-string) -> ``None``. ``UUID()`` alone accepts forms a path or query value never should."""
+    return UUID(raw) if isinstance(raw, str) and _UUID_RE.match(raw) else None
 
 
 async def lookup(conn: Any, kind: str, item_id: UUID, caller_id: UUID):
@@ -220,6 +235,7 @@ def to_target(kind: str, row: Mapping[str, Any]) -> LinkTarget:
     )
 
 
-async def workflow_org(pool: Any, workflow_id: UUID) -> UUID | None:
-    """A non-global definition's org, else ``None`` (also ``None`` for an unknown id)."""
-    return await pool.fetchval(WORKFLOW_ORG_SQL, workflow_id)
+async def workflow_org(pool: Any, workflow_id: UUID, *, owner_id: UUID) -> UUID | None:
+    """The caller's own non-global definition's org, else ``None`` — for an unknown id, a global
+    one and someone else's alike."""
+    return await pool.fetchval(WORKFLOW_ORG_SQL, workflow_id, owner_id)

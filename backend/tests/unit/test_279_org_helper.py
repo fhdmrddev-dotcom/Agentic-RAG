@@ -261,14 +261,33 @@ async def test_an_expert_thread_with_no_active_org_is_refused_before_any_write()
 
 
 @pytest.mark.asyncio
-async def test_a_plain_thread_in_another_org_is_not_refused():
-    """No Expert in play → the helper is a no-op; the send proceeds exactly as 268 drives it."""
+async def test_a_plain_thread_in_another_org_is_not_refused_by_the_expert_helper():
+    """No Expert in play → ``_require_thread_org`` is still a no-op for a plain thread.
+
+    ⚠ RE-TARGETED DELIBERATELY 2026-10-28 (Phase 299, D-18 / D-38). This case used to assert that
+    a plain thread in another org than the active one SENDS (message written, preflight and run
+    registered). Phase 299 made that send a worded refusal on purpose: a link can open a chat in
+    another of the caller's orgs, and a send after a manual org switch would otherwise stamp the
+    turn with the wrong org. The refusal is a SEPARATE helper (``item_org_guard``), never a
+    widening of ``_require_thread_org`` — so what this fence protects is unchanged: the Expert
+    helper still does not fire on a plain thread (its sentence is absent), and the refusal still
+    comes before every write. The send in the SAME org still proceeds exactly as 268 drives it."""
     row = {"id": THREAD_ID, "active_workflow_run_id": None, "org_id": ORG_A, "active_expert_id": None}
     h = _SendHarness(active_org=ORG_B, thread_row=row, scoping=_scoping(None))
-    await _send(h)
-    assert len(h.inserted_rows) == 1, "the user message was written"
-    assert h.preflight.await_count == 1
-    assert h.register.await_count == 1
+    with pytest.raises(HTTPException) as exc:
+        await _send(h)
+    assert exc.value.status_code == 409
+    # The harness pool is a bare MagicMock, so the org name is unreadable: the worded fallback.
+    # The named sentence is pinned in test_299_write_org_guards.py.
+    assert exc.value.detail == "This chat is in another of your organizations. Switch to it to keep chatting."
+    assert "Expert" not in exc.value.detail, "the Expert helper fired on a plain thread"
+    _assert_nothing_written(h)
+
+    same = _SendHarness(active_org=ORG_A, thread_row=row, scoping=_scoping(None))
+    await _send(same)
+    assert len(same.inserted_rows) == 1, "the user message was written"
+    assert same.preflight.await_count == 1
+    assert same.register.await_count == 1
 
 
 # ── the preview door and the clear (279-02 Commit A) ─────────────────────────────────────────

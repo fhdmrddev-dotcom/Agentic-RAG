@@ -411,7 +411,7 @@ node scripts/check-hot-file-ledger.cjs <phase-dir>   # 0 clear · 1 missing rows
 | `frontend/src/components/chat/ToolCallPanel.tsx` | 51 / 23 / 351 | ✅ **G-5 DISCHARGED (227-02)** |
 | `frontend/src/components/chat/MessageItem.tsx` | 84 / 39 / 1059 (was `83 / 42 / 1050`) | 292.1 UAT: Deep Continue re-attaches the run's stream (+1 else-if) · ⛔ |
 | `frontend/src/components/chat/CitationList.tsx` | 5 / 5 / 91 | 294-05: ONE CitationCheckAction beside the trigger · extraction FIRST |
-| `backend/app/api/threads.py` | 284 / 96 / 2752 (was `283 / 95 / 2745`) | 298-01: list_threads one org_lists.by_org predicate (narrows only) · ⛔ |
+| `backend/app/api/threads.py` | 285 / 97 / 2756 (was `284 / 96 / 2752`) | 299-01: send_message one refuse_if_other_org call (D-18) · ⛔ |
 | `frontend/src/providers/StreamsProvider.tsx` | 120 / 45 / 5250 (was `119 / 45 / 5234`) | 296 G-4 row 12: kickoff terminal reconciles; kickoff clears old steps · ⛔ |
 | `frontend/src/hooks/useMessages.ts` | 74 / 27 / 127 | extraction due |
 | `backend/app/services/anthropic_service.py` | 12 / 11 / 373 (was `11 / 10 / 354`) | honoured by construction (282-01: constructor kwargs) · adapter audit due |
@@ -432,7 +432,7 @@ node scripts/check-hot-file-ledger.cjs <phase-dir>   # 0 clear · 1 missing rows
 | `frontend/src/components/workflows/DraftArrivalCard.tsx` | 5 / 4 / 688 (was `4 / 3 / 625`) | 291-05: two optional props + one fold boolean; rows in a leaf · ⛔ |
 | `frontend/src/components/workflows/DecisionsList.tsx` | 5 / 3 / 429 | ⚠ now FIRES (291) · 291-05: one optional prop, one template-row sub-line |
 | `frontend/src/components/workflows/decisionsVocabulary.ts` | 6 / 4 / 344 (was `4 / 3 / 327`) | 291-05: one glyph + one formatter, still a zero-import leaf · ⛔ |
-| `backend/app/api/workflows.py` | 53 / 27 / 1712 (was `52 / 27 / 1712`) | 298-review WR-06: header-less create_draft checks the trigger's org · split OWED |
+| `backend/app/api/workflows.py` | 54 / 28 / 1722 (was `53 / 27 / 1712`) | 299-01: create_draft from_definition_id + one tweak guard · split OWED |
 | `backend/app/api/workflow_wire.py` | 4 / 4 / 532 (was `3 / 3 / 517`) | 296-06: AutoAnsweredNote + unplaced_sentences, additive |
 | `backend/app/api/workflow_authoring_doors.py` | 5 / 3 / 797 (was `4 / 2 / 793`) | ⚠ now FIRES (296) · 296-06: bind returns unplaced_sentences |
 | `backend/app/api/workflow_runs.py` | 23 / 17 / 1453 (was `22 / 16 / 1449`) | 299-01: D-10 one field (org_id), no branch · extraction FIRST |
@@ -548,7 +548,7 @@ node scripts/check-hot-file-ledger.cjs <phase-dir>   # 0 clear · 1 missing rows
 | `backend/app/models/message.py` | 25 / 17 / 292 (was `24 / 16 / 287`) | 293-03: ONE field (run_origin, a dict: a harness import is circular) |
 | `backend/app/models/user_settings.py` | 61 / 37 / 1776 (was `60 / 36 / 1769`) | 293-01: two per-key limit fields + _val · ⛔ |
 | `backend/app/services/harness/reachability.py` | 5 / 5 / 498 (was `4 / 4 / 463`) | 295-02: one pure lint check (no_template_bound) |
-| `backend/app/services/workflow_kickoff.py` | 14 / 11 / 605 (was `13 / 10 / 602`) | 298-02: org_id select token + one raise_if_foreign after the 400 |
+| `backend/app/services/workflow_kickoff.py` | 15 / 12 / 608 (was `14 / 11 / 605`) | 299-01: one refuse_if_other_org beside raise_if_foreign (D-18) |
 | `frontend/src/components/workflows/WorkflowScheduleModal.tsx` | 5 / 4 / 723 (was `3 / 3 / 601`) | 296-04: row-local Run now result + required refusal |
 | `frontend/src/components/workflows/nodePresentation.ts` | 8 / 7 / 221 | ⚠ absent from BOTH for its ENTIRE LIFE at **7 phases** |
 | `frontend/src/lib/api/threads.ts` | 25 / 15 / 2006 (was `24 / 14 / 1994`) | 298-02: postMessage reads detail.message + code (object detail) · ⛔ |

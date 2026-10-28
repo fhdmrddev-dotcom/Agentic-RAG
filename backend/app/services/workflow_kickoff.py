@@ -47,6 +47,7 @@ from app.services.inbound_inputs import launch_kickoff, missing_required  # 293-
 from app.utils.db import aexec
 from app.utils.folder_utils import fetch_visible_folders
 from app.services.foreign_folder_refusal import raise_if_foreign  # 298 ORG-05
+from app.services import item_org_guard  # 299 D-18/D-38
 from app.services.harness.scope import (
     assert_folder_scopes_subset,
     resolve_project_subtree,
@@ -307,6 +308,8 @@ async def preflight_workflow_kickoff(*, request, body, thread_id, thread_row, su
                 status_code=status.HTTP_400_BAD_REQUEST,
                 detail=str(_scope_err),
             )
+        # 299 (D-18/D-38): a non-global workflow in another org than this thread's → worded 409.
+        await item_org_guard.refuse_if_other_org(None if _def_row.get("is_system_global") else _def_row.get("org_id"), (thread_row or {}).get("org_id"), kind="run", pool=get_pg_pool)
         # 298 (D-13/D-30/D-36): a folder outside the ROW's org → coded 422; globals skip (D-01).
         await raise_if_foreign(_kickoff_definition, definition_org=None if _def_row.get("is_system_global") else _def_row.get("org_id"), pool=await get_pg_pool(), user_id=current_user["id"], supabase=supabase)
 
