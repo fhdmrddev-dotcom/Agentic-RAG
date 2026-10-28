@@ -573,17 +573,21 @@ export function returnTarget(pathname: string, search: string): string | null {
 | A5 | No production thread or run sits in an org that differs from its owner's active-org usage in a way the new send/kickoff 409 would wrongly refuse (298 audit measured 0 mis-stamps) | Write inventory | A legitimate send refused; the 409 is worded and the user can switch |
 | A6 | supabase-js `_initialize` parses the URL before any app effect could replace it. This matters only for bare-prefix links, and the normaliser carries the hash anyway | Pattern 7 | None in practice: the hash survives the replace |
 
-## Open Questions
+## Open Questions (RESOLVED)
 
 1. **Is "New chat pushes `/app`" (D-02) meant literally?** (F7)
    - Known: New chat creates and selects a real thread.
    - Recommendation: push `/app/chat/<newId>`. Record it as a D-02 amendment at plan time.
+   - **RESOLVED:** D-32.
 2. **Is a SAML SSO provider configured locally or on cloud, and what is the local Redirect URL allow-list?**
    - Known: no `supabase/config.toml` is tracked in the repo.
    - Recommendation: read the cloud Auth config via the Supabase MCP (read, no approval needed) before G-4 row 4. If none is configured, the SSO row is ⛔ with that reason (D-25). Password and sign-up rows still run.
+   - **RESOLVED:** D-41 (2026-10-28: cloud has 0 SSO providers; the SSO row is ⛔).
 3. **Should the schedule-create org fix be in 299 or seeded?**
    - Recommendation: include it (one kwarg each in `schedules.py` and `db/schedules.py`, which is young). It is a write reachable from the workflow card, and LINK-05 says "nothing is saved under the wrong org".
+   - **RESOLVED:** included — 299-01 Task 3 (D-38).
 4. **Is the "re-run" in SC#3 the library card's Run?** (F5) Recommendation: yes. Record it as a CONTEXT amendment; do not build a run-page re-run.
+   - **RESOLVED:** D-38.
 
 ## Environment Availability
 
