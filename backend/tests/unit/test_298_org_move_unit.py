@@ -242,3 +242,14 @@ def test_membership_and_locks_run_inside_the_transaction(mod):
 def test_there_is_no_bulk_entry_point(mod):
     public = [n for n, v in vars(mod).items() if inspect.iscoroutinefunction(v) and not n.startswith("_")]
     assert sorted(public) == ["execute_move", "preview_move"]
+
+
+def test_the_docstring_names_the_toctou_residual_window(mod):
+    """298-review WR-05: the re-run inside the transaction catches blockers on the rows the move
+    LOCKS; it does not serialize a concurrent draft save or chat-folder bind whose org check ran
+    before the move committed (the live suite's ``test_wr05_*`` cases drive that window). The
+    docstring must say so instead of claiming every blocker created since the preview is caught."""
+    doc = mod.__doc__
+    assert "RESIDUAL WINDOW" in doc
+    assert "draft save" in doc and "chat" in doc
+    assert "so a blocker created between preview and confirm is\ncaught" not in doc

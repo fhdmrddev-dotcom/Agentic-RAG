@@ -857,6 +857,41 @@ async def test_a_hold_placed_after_the_preview_is_caught_inside_the_transaction(
     assert await w.snapshot() == before
 
 
+# ── 298-review WR-05: the residual window the move does NOT serialize ──────────
+#
+# The re-run inside the transaction sees blockers on the rows it locks. A draft save or a chat
+# folder bind whose org check ran BEFORE the move committed still writes after it: nothing in
+# the database refuses a definition or a thread in A binding a folder now in B. These cases
+# sequence that window (check, move, write) and pin that it exists, so the docstring names it.
+
+
+async def test_wr05_a_draft_save_checked_before_the_move_still_binds_after_it(w):
+    from app.services import foreign_folder_refusal
+
+    root = await w.folder()
+    draft = await w.draft("Brief")
+    new_def = {"project_folder_id": str(root), "phases": []}
+    # 1. the PATCH's org check runs first: the folder is still in A, the draft's org
+    assert await foreign_folder_refusal.changed_binding_refusal(w.pool, draft, w.u, new_def) is None
+    # 2. the move commits in between (the draft did not bind it yet, so nothing refuses)
+    await _execute(w, "folder", root)
+    # 3. the PATCH's write lands
+    await w.pool.execute(
+        "UPDATE public.workflow_definitions SET definition = $1 WHERE id = $2", new_def, draft
+    )
+    assert (await w.org_of("workflow_definitions", draft), await w.org_of("folders", root)) == (w.a, w.b)
+
+
+async def test_wr05_a_chat_bound_after_the_move_is_not_refused_by_the_database(w):
+    root = await w.folder()
+    await _execute(w, "folder", root)
+    thread = await w.pool.fetchval(
+        "INSERT INTO public.threads (user_id, org_id, title, folder_id) VALUES ($1, $2, 't', $3) RETURNING id",
+        w.u, UUID(w.a), root,
+    )
+    assert (await w.org_of("threads", thread), await w.org_of("folders", root)) == (w.a, w.b)
+
+
 # ── D-22: the two routes as role `anon` (plan-check W4) ──────────────────────
 
 
