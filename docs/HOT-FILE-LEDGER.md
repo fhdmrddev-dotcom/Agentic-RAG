@@ -11671,7 +11671,7 @@ cells rot within days.
 | [`backend/app/api/settings.py`](docs/HOT-FILE-LEDGER.md#backendappapisettingspy) | 47 / 25 / 1301 (was `46 / 24 / 1250`) | ⚠ **FIRES** | 292.1-02: two bounded writes (2..50) via _range_refusal_detail + allow-list +2 (+51 −0). ⛔ never a retyped id list; GET never echoes a key · 293 touch: see §Phase 293 close |
 | [`backend/app/services/multimodal_service.py`](docs/HOT-FILE-LEDGER.md#backendappservicesmultimodal_servicepy) | 14 / 7 / 984 | ⚠ **FIRES** | ⚠ absent from BOTH for its ENTIRE LIFE at **7 phases** — row added SEED-227, which is also where its silent truncation was found |
 | [`backend/app/api/documents.py`](docs/HOT-FILE-LEDGER.md#backendappapidocumentspy) | 101 / 40 / 2709 (was `99 / 39 / 2698`) | ⚠ **FIRES** | 298-01: list_documents one `org_lists.by_org` in build() (every read, D-32); upload one `org_id=root_upload_org(...)` on the ONE minter call. Honoured by construction. ⛔ see section |
-| [`scripts/vitest-count-gate.cjs`](docs/HOT-FILE-LEDGER.md#scriptsvitest-count-gatecjs) | 379 / 81 / 6808 (was `378 / 81 / 6806`) | ⚠ **FIRES** | 298-05 T3 RED: moveMounts (12) pinned FILE-LEVEL in both knobs; useFolders 17 → 18, useLibraryDocuments 28 → 30 (the after-move refetch cases); none lowered |
+| [`scripts/vitest-count-gate.cjs`](docs/HOT-FILE-LEDGER.md#scriptsvitest-count-gatecjs) | 380 / 81 / 6808 (was `379 / 81 / 6808`) | ⚠ **FIRES** | 298-review: 4 BASELINE pins raised, none lowered — OrgAuditTab 16→19, LibraryPage.orgSwitch 5→7, useThreads.orgSwitch 4→5, MoveToOrgSheet 22→23 |
 | [`scripts/check-deploy-drift.sh`](docs/HOT-FILE-LEDGER.md#scriptscheck-deploy-driftsh) | 5 / 4 / 267 | ⚠ **FIRES** | ⚠ absent its ENTIRE LIFE — row added 294-05. 294-01: DECISION_ENGINE_FAULT_BASE_URL registered as intentionally omitted (+2) |
 | [`scripts/build-public-openapi.cjs`](docs/HOT-FILE-LEDGER.md#scriptsbuild-public-openapicjs) | 11 / 5 / 472 (was `7 / 3 / 468`) | ⚠ **FIRES** | 298-01: `org-items` in the Account & org TAG_GROUPS entry + `/org-items/` in FLAGGED_PREFIXES (UI-internal). Two tokens. ⚠ prior row stale (`7 / 3 / 468` vs measured `10 / 4 / 468` pre-298). |
 | [`scripts/check-seeds-register.cjs`](docs/HOT-FILE-LEDGER.md#scriptscheck-seeds-registercjs) | 7 / 3 / 1132 | ⚠ **FIRES** | ⚠ absent its ENTIRE LIFE — row added 296-05, now FIRES (251 / 293 / 296). 296-05: three `\d{3}` → `\d{3,}` (293-IN-07). ⛔ the STATUS_ENUM triple |
@@ -26751,3 +26751,11 @@ Scan-list cell as of 2026-10-28 (replaced by 298-review, moved verbatim): 3 / 1 
 **`2 / 1 / 465` (was `1 / 1 / 433`).** 298-review WR-02: a module-level claim list (useSyncExternalStore) makes the host a singleton per request kind: the earliest still-mounted claimant renders the sheet, a survivor takes over on unmount. No FIRING file touched (LibraryPage / ElsewhereLine unchanged).
 
 Scan-list cell as of 2026-10-28 (replaced by 298-review, moved verbatim): 1 / 1 / 433 | no (young) | young (created 298-05): victim-naming bottom sheet, no red (UI-D16/17) + MoveToOrgSheetHost. ⛔ no Move before the preview; refusals verbatim, Close only; moving undismissable; noteMoved once on 200
+
+### `scripts/vitest-count-gate.cjs` — 298-review (2026-10-28)
+
+**`380 / 81 / 6808` (was `379 / 81 / 6808`).** 298-review: four BASELINE pins raised for the review's RED cases, none lowered, no file added to either knob (all four were already pinned): `OrgAuditTab.test.tsx` 16 → 19 (WR-07), `LibraryPage.orgSwitch.test.tsx` 5 → 7 (WR-01, IN-05), `useThreads.orgSwitch.test.ts` 4 → 5 (WR-03), `MoveToOrgSheet.test.tsx` 22 → 23 (WR-02).
+
+Scan-list cell as of 2026-10-28 (replaced by 298-review, moved verbatim): 379 / 81 / 6808 (was `378 / 81 / 6806`) | ⚠ **FIRES** | 298-05 T3 RED: moveMounts (12) pinned FILE-LEVEL in both knobs; useFolders 17 → 18, useLibraryDocuments 28 → 30 (the after-move refetch cases); none lowered
+
+CLAUDE.md verdict cell as of 2026-10-28 (replaced by 298-review, moved verbatim): | `scripts/vitest-count-gate.cjs` | 379 / 81 / 6808 (was `378 / 81 / 6806`) | 298-05: moveMounts (12) pinned; useFolders 17→18, useLibraryDocuments 28→30 |
