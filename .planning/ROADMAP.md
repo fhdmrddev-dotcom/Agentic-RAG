@@ -153,7 +153,7 @@ Plans:
 
 **Wave 5** *(blocked on Wave 4 completion)*
 
-- [ ] 298-05-PLAN.md — the "N more … in <org> · Switch" line and the Move to <org> sheet on its three homes (ORG-06)
+- [x] 298-05-PLAN.md — the "N more … in <org> · Switch" line and the Move to <org> sheet on its three homes (ORG-06)
 
 **UI hint**: yes
 **Flags**: **Narrowing goes through the existing `restrict_org_ids`** on the list routes only (research: `/folders`, `/folders/{id}/children`, `/workflows/published`, `/workflows/drafts`, plus the thread list and run history decided at intake); `fetch_visible_folders` (~20 callers) is unchanged. **G-5**: `backend/app/api/threads.py` (`283 / 95`, the hottest backend file), `backend/app/api/workflows.py` (26, split OWED), `backend/app/api/folders.py` (10), `backend/app/api/workflow_runs.py` (15), `backend/app/services/workflow_kickoff.py` (10), `publish_service.py` (16), `LibraryPage.tsx` (20), `WorkflowsPage.tsx` (20), `useThreads.ts` (3), `useDocuments.ts` (5). Each touch must be one expression honoured by construction, or the phase takes the named seam first; read each section at discuss. **G-2** sketch for the "N items in <org>" line and the per-item move (small, but new UI). **G-4**. **Four-axis** (UI state): org switch while a stream is live. **Migration** only if the audited move needs one (next free number). **Security**: the move is a cross-org write — `security_enforcement`, membership checked on both orgs, anon-role test on any new path. Mis-stamp sources: mig 105 backfill and mig 106 `LIMIT 1` autofill (research pitfall 7).
