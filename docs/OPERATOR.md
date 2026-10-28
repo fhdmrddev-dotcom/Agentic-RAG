@@ -551,6 +551,12 @@ For cloud production serving the marketing landing page at `https://<domain>` an
    - In Supabase Dashboard → Authentication → URL Configuration:
      - Update **Site URL** to `https://app.<domain>`.
      - Add `https://app.<domain>/**` and `https://<domain>/**` to **Redirect URLs**.
+     - Add the one-box origin too — the box's own `FRONTEND_URL` origin with `/**` (for a local
+       one-box, `http://localhost:8080/**`). **Phase 299 sign-in return:** SSO and the sign-up
+       confirmation email now ask Supabase to send the browser back to the link the person opened
+       (`<origin>/app/...`). A value not on this list silently falls back to the **Site URL**, so the
+       person lands on chat instead of the link (the app's same-tab copy usually recovers it, but
+       do not rely on that).
 5. **CORS & Redirect Verification:**
    - Ensure backend `FRONTEND_URL` comma-separated list contains both origins.
 6. **Deploy Parity Check:**

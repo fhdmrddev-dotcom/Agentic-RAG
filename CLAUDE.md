@@ -682,6 +682,8 @@ node scripts/check-hot-file-ledger.cjs <phase-dir>   # 0 clear · 1 missing rows
 | `frontend/src/components/sources/RunHistoryList.tsx` | 5 / 3 / 275 | ⚠ now FIRES (285) — row added 285-03 · comment-only change (285-01) |
 | `frontend/nginx.conf` | 3 / 3 / 76 | ⚠ now FIRES — row added 293-REVIEW WR-01 · one proxy header · ⛔ |
 | `frontend/src/hooks/useFolders.ts` | 5 / 4 / 200 (was `4 / 4 / 197`) | 298-05: useOrgItemsVersion() in the load deps (a move refetches) |
+| `frontend/src/hooks/useAuth.ts` | 6 / 5 / 128 (was `5 / 4 / 100`) | ⚠ absent while FIRING — row added 299-05 · redirect + .catch · ⛔ |
+| `frontend/src/pages/AuthPage.tsx` | 5 / 3 / 32 (was `4 / 2 / 26`) | ⚠ now FIRES (299) · 299-05: one quiet S5 line (kind only) |
 
 
 When a new phase enters discuss-phase, the orchestrator must scan PLAN.md `files_modified` against this ledger. Any match against a G-5-firing row means the discuss-phase produces a refactor recommendation as the first option, not the planned feature — and the phase reads that file's section in `docs/HOT-FILE-LEDGER.md` before planning, because that is where the named seam and the binding invariants live.
