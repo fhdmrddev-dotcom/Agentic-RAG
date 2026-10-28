@@ -212,6 +212,7 @@ export function AppViewSwitch({
   operatorLoading = false,
   openThread,
   threadHolding = false,
+  entityLink,
 }: AppViewSwitchProps) {
   return (
       activeView === "chat" && !addressNotFound ? (
@@ -361,6 +362,8 @@ export function AppViewSwitch({
                 localStorage.setItem(SETTINGS_TAB_STORAGE_KEY, "7")
                 onNavigate("settings")
               }}
+              // Phase 299-02 (D-03): the address's workflow (an owned draft or a visible card).
+              linkedDefinitionId={entityLink?.target?.kind === "workflow" ? entityLink.target.id : null}
             />
           ) : activeView === "skill-studio" ? (
             // Phase 137-06 (PANEL-01 / D-01 / sketch 057-A): the unified Skill Studio
@@ -492,6 +495,8 @@ export function AppViewSwitch({
             // person clicks that thread again. `startScopedChat`'s docblock owns that rule.
             <ExpertCatalogPage
               folders={folders}
+              // Phase 299-02 (D-04): the address's Expert opens in its detail.
+              openBundleId={entityLink?.target?.kind === "expert" ? entityLink.target.id : null}
               // 267 (D-267-08): a missing required connection's Connect control uses the SAME
               // shipped door the composer uses above — no per-service deep link.
               onOpenConnections={() => onNavigate("connections")}

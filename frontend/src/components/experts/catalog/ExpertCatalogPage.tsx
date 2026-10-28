@@ -62,6 +62,7 @@ import type { ExpertBundle, Folder } from "@/types"
 import { cn } from "@/lib/utils"
 import { ExpertCard } from "./ExpertCard"
 import { ExpertDetailModal } from "./ExpertDetailModal"
+import { useExpertLinkTarget } from "./useExpertLinkTarget"
 import { ALL_CATEGORIES, categoriesOf, decodeEntities, filterExperts } from "./expertCatalog"
 import { SyrelLoader } from "@/components/ui/SyrelLoader"
 
@@ -75,6 +76,9 @@ function freshInspected(prev: ExpertBundle | null, rows: ExpertBundle[]): Expert
 }
 
 export interface ExpertCatalogPageProps {
+  /** Phase 299-02 (D-04): the Expert the address names (`/app/experts/<id>`) — its detail opens
+   *  from the list, else from `getExpert(id)` (in `useExpertLinkTarget`). Absent ⇒ nothing opens. */
+  openBundleId?: string | null
   /**
    * The caller's visible folders, for naming an Expert's knowledge scope. Consumed by the
    * detail modal (plan 04) via `resolveFolderNames`; declared now so the contract is one place.
@@ -102,6 +106,8 @@ export function ExpertCatalogPage(props: ExpertCatalogPageProps) {
   const [error, setError] = useState<string | null>(null)
   const [query, setQuery] = useState("")
   const [category, setCategory] = useState(ALL_CATEGORIES)
+  // Phase 299-02 (D-04): the address's Expert opens in the ONE detail modal below.
+  useExpertLinkTarget({ id: props.openBundleId ?? null, experts, loading, setInspected })
 
   useEffect(() => {
     let mounted = true

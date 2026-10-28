@@ -421,8 +421,8 @@ node scripts/check-hot-file-ledger.cjs <phase-dir>   # 0 clear · 1 missing rows
 | `frontend/src/components/workflows/PhaseNodeCard.tsx` | 18 / 9 / 490 (was `17 / 8 / 489`) | 290: forecast unused — chips went on the library card, not here |
 | `backend/app/services/harness/phase_types.py` | 66 / 33 / 3135 (was `65 / 33 / 3131`) | 296-06: emit pin precedence, retry guard, 1 notice helper · G-5 OWED |
 | `backend/app/services/tools/render_template.py` | 6 / 3 / 1163 (was `3 / 2 / 1094`) | 296-03: button /V written as a name, read back typed · now FIRES · ⛔ |
-| `frontend/src/pages/WorkflowsPage.tsx` | 52 / 22 / 1392 (was `51 / 22 / 1390`) | 298-05: one ElsewhereLine mount atop the list region (+ its import) |
-| `frontend/src/components/workflows/library/WorkflowCard.tsx` | 26 / 11 / 1373 (was `25 / 10 / 1371`) | 296-07: comment-only (MARK_ICON docblock, 286-S04-2) |
+| `frontend/src/pages/WorkflowsPage.tsx` | 53 / 23 / 1399 (was `52 / 22 / 1392`) | 299-02: one prop + one hook call (useWorkflowLinkTarget) |
+| `frontend/src/components/workflows/library/WorkflowCard.tsx` | 27 / 12 / 1374 (was `26 / 11 / 1373`) | 299-02: one data-row-id |
 | `frontend/src/components/workflows/library/WorkflowCardMenu.tsx` | 3 / 3 / 498 | ⚠ now FIRES (298) · 298-05: one draft-only MoveToOrgMenuItem mount |
 | `frontend/src/components/workflows/library/libraryVocabulary.ts` | 15 / 8 / 820 (was `14 / 7 / 819`) | 296-07: STEP_LINE_UNTYPED re-exports the one home (data) |
 | `frontend/src/components/workflows/library/libraryFilter.ts` | 6 / 4 / 435 | ⚠ absent at 4 phases and NO PLAN NAMED IT (192.2) |
@@ -629,7 +629,7 @@ node scripts/check-hot-file-ledger.cjs <phase-dir>   # 0 clear · 1 missing rows
 | `frontend/src/components/experts/expertIcon.tsx` | 1 / 1 / 72 | ⚠ 0/0/0 AT PLANNING · measured 1/1/72 at 262-02 · ⛔ |
 | `frontend/src/components/experts/catalog/expertCatalog.ts` | 15 / 5 / 508 (was `13 / 4 / 489`) | honoured by construction (279-03: ONE `onThread` option) |
 | `frontend/src/components/experts/catalog/ExpertCard.tsx` | 5 / 4 / 296 | ⚠ STALE (`3/3/295`). **276-07**: category text via `decodeEntities` |
-| `frontend/src/components/experts/catalog/ExpertCatalogPage.tsx` | 9 / 6 / 372 (was `8 / 5 / 359`) | honoured by construction (279-03: ONE reason expression) |
+| `frontend/src/components/experts/catalog/ExpertCatalogPage.tsx` | 11 / 7 / 376 (was `9 / 6 / 372`) | 299-02: one prop + one hook call (useExpertLinkTarget) |
 | `frontend/src/components/experts/catalog/ExpertDetailModal.tsx` | 7 / 5 / 531 (was `6 / 4 / 531`) | honoured by construction (279-03: ONE copy change) |
 | `frontend/src/components/experts/catalog/startScopedChat.ts` | 1 / 1 / 70 | ⚠ 0/0/0 AT PLANNING · measured at 262-04 · ⛔ |
 | `backend/app/services/ingest_splice.py` | 22 / 8 / 1043 (was `19 / 7 / 930`) | honoured by construction (280: minter-only hunks) · ⛔ |

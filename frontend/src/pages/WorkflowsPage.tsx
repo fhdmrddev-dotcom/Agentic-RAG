@@ -156,6 +156,7 @@ import {
   useWorkflowFork,
   type ForkSeed,
 } from "@/components/workflows/library/useWorkflowFork"
+import { useWorkflowLinkTarget } from "@/components/workflows/library/useWorkflowLinkTarget"
 // Phase 192.1-07 (LIB-05 / D-19): 162-B's name prompt. It is MOUNTED here and wired to the
 // hook's pending fork; the page holds no fork logic of its own — see the mount below.
 import { ForkNameDialog } from "@/components/workflows/library/ForkNameDialog"
@@ -273,6 +274,9 @@ interface WorkflowsPageProps {
    * selects Settings tab "7" and navigates. Threaded straight to the cards; ABSENT ⇒ no menu item.
    */
   onOpenApiKeys?: (scope: { id: string; name: string }) => void
+  /** Phase 299-02 (D-03): the definition id the address names (`/app/workflows/<id>`) — an owned
+   *  draft opens in the Builder, a visible published card is focused. Absent ⇒ nothing opens. */
+  linkedDefinitionId?: string | null
 }
 
 /**
@@ -289,7 +293,7 @@ interface WorkflowsPageProps {
 type PageView = "library" | "builder" | "run-log"
 
 
-export function WorkflowsPage({ folders, onLaunch, onOpenRun, onOpenConnections, onOpenApiKeys }: WorkflowsPageProps) {
+export function WorkflowsPage({ folders, onLaunch, onOpenRun, onOpenConnections, onOpenApiKeys, linkedDefinitionId = null }: WorkflowsPageProps) {
   // Phase 184.1-01: does this page host the Builder's chrome, or has the Builder taken it?
   // Fail-closed and read through the shared rule — see `useCanvasGate`'s docblock for why
   // an ancestor has to ask at all (the three bands are contributed at three nesting levels).
@@ -635,6 +639,9 @@ export function WorkflowsPage({ folders, onLaunch, onOpenRun, onOpenConnections,
     onOpenDraft,
     onForked,
   })
+
+  // Phase 299-02 (D-03): open the address's workflow — below `onOpenDraft` for the TDZ reason above.
+  useWorkflowLinkTarget({ id: linkedDefinitionId, drafts, rows, loading, onOpenDraft, clearProjectFilter: () => setSelectedProjectId(null) })
 
   // 186-07: a TRUE fresh build seeds nothing at all — no row exists yet, so there is no
   // token to carry. `useDraftPersistence` creates the row on the first write and adopts

@@ -11607,8 +11607,8 @@ cells rot within days.
 | [`frontend/src/components/workflows/FlowEdge.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentsworkflowsflowedgetsx) | 3 / 3 / 462 | ⚠ **FIRES — EXACTLY AT THRESHOLD** | honoured by construction (200) — ⚠ absent, and it crossed the threshold in the commit that added its row |
 | [`frontend/src/components/workflows/PhaseNodeCard.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentsworkflowsphasenodecardtsx) | 18 / 9 / 490 (was `17 / 8 / 489`) | **FIRES** | 290: the 286 forecast went UNUSED (the chips went on the library card, UI-SPEC §9); file untouched. honoured by construction (199) — ⚠ the 200 canvas port stays REVERTED |
 | [`backend/app/services/harness/phase_types.py`](docs/HOT-FILE-LEDGER.md#backendappservicesharnessphase_typespy) | 66 / 33 / 3135 (was `65 / 33 / 3131`) | ⚠ **FIRES** | 296-06: pinned-model provider arm (293-F-4); retry needs KB evidence (291-IN-01); one notice helper for a swapped agent pin, hardened (str-only, never raises). G-5 OWED |
-| [`frontend/src/pages/WorkflowsPage.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrcpagesworkflowspagetsx) | 52 / 22 / 1392 (was `51 / 22 / 1390`) | ⚠ **FIRES** | 298-05: one JSX mount, <ElsewhereLine kind="workflows"> at the top of the p-6 list region inside the grid's max-w-[1200px], + its import. No state, no hook, no other line |
-| [`frontend/src/components/workflows/library/WorkflowCard.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentsworkflowslibraryworkflowcardtsx) | 26 / 11 / 1373 (was `25 / 10 / 1371`) | **FIRES** | 296-07 (286-S04-2): comment-only — the MARK_ICON docblock and the CalendarClock comment name the icons this file draws today |
+| [`frontend/src/pages/WorkflowsPage.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrcpagesworkflowspagetsx) | 53 / 23 / 1399 (was `52 / 22 / 1392`) | ⚠ **FIRES** | 299-02: one optional prop (linkedDefinitionId) + one useWorkflowLinkTarget call below onOpenDraft (TDZ); the logic lives in the hook. Honoured by construction |
+| [`frontend/src/components/workflows/library/WorkflowCard.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentsworkflowslibraryworkflowcardtsx) | 27 / 12 / 1374 (was `26 / 11 / 1373`) | **FIRES** | 299-02: one attribute data-row-id={row.id} on the root, beside data-provenance (the link target). Honoured by construction; seam286 pin snapshot +5 attrs |
 | [`frontend/src/components/workflows/library/libraryVocabulary.ts`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentsworkflowslibrarylibraryvocabularyts) | 15 / 8 / 820 (was `14 / 7 / 819`) | ⚠ **FIRES** | 296-07 (290-IN-02): STEP_LINE_UNTYPED is a re-export of phaseVocabulary.STEP_UNTYPED (one home); no seam proposed |
 | [`frontend/src/components/workflows/library/libraryFilter.ts`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentsworkflowslibrarylibraryfilterts) | 6 / 4 / 435 | ⚠ **FIRES** | ⚠ absent at 4 phases and NO PLAN NAMED IT (192.2) |
 | [`frontend/src/components/workflows/library/libraryRow.ts`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentsworkflowslibrarylibraryrowts) | 4 / 3 / 201 | ⚠ **FIRES — EXACTLY AT THRESHOLD** | ⚠ absent, on the boundary (added 192.2) |
@@ -11928,7 +11928,7 @@ cells rot within days.
 | [`frontend/src/components/experts/expertIcon.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentsexpertsexperticontsx) | 1 / 1 / 72 | no (new) | ⚠ `0/0/0` AT PLANNING; **measured `1/1/72` at 262-02**. ⛔ The ONE home of expert-icon resolution — a CLOSED 11-key lucide map. Reads `icon`, never `slug`/`name`: that match IS the retired artefact |
 | [`frontend/src/components/experts/catalog/expertCatalog.ts`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentsexpertscatalogexpertcatalogts) | 15 / 5 / 508 (was `13 / 4 / 489`) | ⚠ **FIRES — 5 phases** | honoured by construction (**279-03 A/B**): `wontUse` → `wontSearch` + ONE `{ onThread }` option on `previewLedgerColumns`. ⛔ words only from here |
 | [`frontend/src/components/experts/catalog/ExpertCard.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentsexpertscatalogexpertcardtsx) | 5 / 4 / 296 (was `3 / 3 / 295`) | ⚠ **FIRES — 4 phases** | **276-07**: honoured by construction, the category text wrapped in `decodeEntities`. ⛔ words only from `expertCatalog.ts` |
-| [`frontend/src/components/experts/catalog/ExpertCatalogPage.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentsexpertscatalogexpertcatalogpagetsx) | 9 / 6 / 372 (was `8 / 5 / 359`) | ⚠ **FIRES — 6 phases** | honoured by construction (**279-03 F**, WR-07): ONE reason expression (network sentence only for TypeError); `listExperts(true, false)` ×3 |
+| [`frontend/src/components/experts/catalog/ExpertCatalogPage.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentsexpertscatalogexpertcatalogpagetsx) | 11 / 7 / 376 (was `9 / 6 / 372`) | ⚠ **FIRES — 7 phases** | 299-02: one optional prop (openBundleId) + one useExpertLinkTarget call; the read fallback lives in the hook. Honoured by construction |
 | [`frontend/src/components/experts/catalog/ExpertDetailModal.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentsexpertscatalogexpertdetailmodaltsx) | 7 / 5 / 531 (was `6 / 4 / 531`) | ⚠ **FIRES — 5 phases** | honoured by construction (**279-03 A**): ONE copy change ("will not be searched"). ⚠ no test pins that copy (review note) |
 | [`frontend/src/components/experts/catalog/startScopedChat.ts`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentsexpertscatalogstartscopedchatts) | 1 / 1 / 70 | no (new) | ⚠ `0/0/0` AT PLANNING; measured at **262-04**. ⛔ refresh BEFORE select — the created row is pre-patch and its hook has no updater for that column. A rejected patch does NOT navigate |
 | [`backend/app/services/expert_install_service.py`](docs/HOT-FILE-LEDGER.md#backendappservicesexpert_install_servicepy) | 3 / 1 / 648 | no (1 phase) | planning triple `0/0/0`. **266-05 F-1**: Retry hands on a STRING id (an asyncpg UUID crashed live). ⛔ org only from the active-org dep; never a SYSTEM_USER_ID row |
@@ -12202,7 +12202,7 @@ cells rot within days.
 | [`frontend/src/components/admin/AuditTab.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentsadminaudittabtsx) | 8 / 5 / 771 (was `7 / 4 / 770`) | ⚠ **FIRES** | 298-review WR-07: one PLATFORM_ACTION_META entry, org.item.move → 'Moved an item to another organization' (Organizing), identical to OrgAuditTab's (fenced). Data only |
 | [`frontend/src/components/org/OrgAuditTab.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentsorgorgaudittabtsx) | 5 / 4 / 416 (was `4 / 3 / 415`) | ⚠ **FIRES** | 298-review WR-07: one ACTION_META entry, org.item.move → 'Moved an item to another organization' (Organizing), identical to AuditTab's (fenced). ⛔ shared audit vocabulary still OWED |
 | [`frontend/src/hooks/useAppNavigation.ts`](docs/HOT-FILE-LEDGER.md#frontendsrchooksuseappnavigationts) | 9 / 2 / 452 (was `4 / 1 / 290`) | no (young) | 299-02: one entityLink object (target, route, openThread/Workflow/Expert, leaveThread); Chat → last thread. ⛔ ONLY router-hook caller; setLibraryTab( exactly 2; one blocker |
-| [`frontend/src/components/layout/AppViewSwitch.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentslayoutappviewswitchtsx) | 3 / 2 / 542 (was `2 / 1 / 523`) | no (young) | 299-02: chat main holds ("Opening the chat…") while a thread address is unresolved; startScopedChat via openThread. ⛔ no hooks; one run comparison; fallback last |
+| [`frontend/src/components/layout/AppViewSwitch.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentslayoutappviewswitchtsx) | 4 / 2 / 547 (was `3 / 2 / 542`) | no (young) | 299-02: chat holds while a thread address is unresolved; workflows / experts arms pass the linked id from entityLink. ⛔ no hooks; one run comparison; fallback last |
 | [`frontend/src/lib/appRoutes.ts`](docs/HOT-FILE-LEDGER.md#frontendsrclibapproutests) | 2 / 2 / 219 (was `1 / 1 / 198`) | no (young) | 299-02: chat / workflows / experts entity variants beside runs (D-01). STRICT LEAF. ⛔ never throws; strict UUID; ?run= is the chat home's only; no host |
 | [`frontend/src/components/layout/AddressNotFound.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentslayoutaddressnotfoundtsx) | 1 / 1 / 51 (was `0 / 0 / 0`) | no (young) | young (created 297-02). S1 + S2 and their copy, one home. ⛔ no path prop, no icon; never renders the trailing fallback tag |
 | [`frontend/src/lib/leaveGuard.ts`](docs/HOT-FILE-LEDGER.md#frontendsrclibleaveguardts) | 1 / 1 / 97 (was `0 / 0 / 0`) | no (young) | young (created 297-03). Leave-guard registry, no-op default (D-21); one-shot latch (D-32/D-42). ⛔ no component; react-only imports; never throws |
@@ -12231,8 +12231,8 @@ cells rot within days.
 | [`frontend/src/lib/returnTo.ts`](docs/HOT-FILE-LEDGER.md#frontendsrclibreturntots) | 1 / 1 / 127 | no (young) | young (created 299-05). return-to-link leaf (D-23/D-24). ⛔ strict leaf; rebuilt via formatAppRoute, never echoed; sessionStorage 15-min TTL, re-validated, consumed once |
 | [`frontend/src/components/layout/BootScreen.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentslayoutbootscreentsx) | 2 / 1 / 89 (was `1 / 1 / 89`) | no (young) | young (created 299-05). three-stage boot clock 8 s / 20 s (D-26, SEED-312). ⛔ Try again = reload (no History write); never decides auth |
 | [`frontend/src/hooks/useThreadAddress.ts`](docs/HOT-FILE-LEDGER.md#frontendsrchooksusethreadaddressts) | 1 / 1 / 176 (was `0 / 0 / 0`) | no (young) | young (created 299-02). URL ⇄ selected thread binding (D-02/D-32), one effect. ⛔ never setViewingThread, never a router hook; refs for the list; IN-01 window |
-| [`frontend/src/components/workflows/library/useWorkflowLinkTarget.ts`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentsworkflowslibraryuseworkflowlinktargetts) | 0 / 0 / 0 | no (planned 299-02) | young (planned 299-02). open a draft / focus a published card by id (D-03). ⛔ no write on open; in LIBRARY_SUBTREE_PATHS; never imports the page |
-| [`frontend/src/components/experts/catalog/useExpertLinkTarget.ts`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentsexpertscataloguseexpertlinktargetts) | 0 / 0 / 0 | no (planned 299-02) | young (planned 299-02). open an Expert's detail by id (D-04). ⛔ read only (list or getExpert); fires once per id |
+| [`frontend/src/components/workflows/library/useWorkflowLinkTarget.ts`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentsworkflowslibraryuseworkflowlinktargetts) | 1 / 1 / 90 (was `0 / 0 / 0`) | no (young) | young (created 299-02). open a draft / focus a published card by id (D-03). ⛔ no write on open; in LIBRARY_SUBTREE_PATHS; never imports the page; once per id |
+| [`frontend/src/components/experts/catalog/useExpertLinkTarget.ts`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentsexpertscataloguseexpertlinktargetts) | 1 / 1 / 57 (was `0 / 0 / 0`) | no (young) | young (created 299-02). open an Expert's detail by id (D-04). ⛔ read only (list or one getExpert); fires once per id; a late answer for a left id dropped |
 | [`frontend/src/lib/clipboard.ts`](docs/HOT-FILE-LEDGER.md#frontendsrclibclipboardts) | 0 / 0 / 0 | no (planned 299-03) | young (planned 299-03). copyText → copied or refused (D-21). ⛔ never throws; never reports a refused copy as copied |
 | [`frontend/src/lib/api/links.ts`](docs/HOT-FILE-LEDGER.md#frontendsrclibapilinksts) | 0 / 0 / 0 | no (planned 299-03) | young (planned 299-03). resolveLink client: 404 → cant, anything else throws (D-06). ⛔ an outage is never reported as can't-be-opened |
 | [`frontend/src/components/layout/CantBeOpened.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentslayoutcantbeopenedtsx) | 0 / 0 / 0 | no (planned 299-03) | young (planned 299-03). the one in-place card (D-12..D-15, D-36), absorbs AddressNotFound. ⛔ no raw path prop; rebuilt address only; one copy home |
@@ -21119,6 +21119,16 @@ CLAUDE.md verdict cell as of 2026-10-13 (replaced by 279-04):
 
 > ⚠ STALE (`7/4/359`). **276-07**: pill label decoded; filter stays raw
 
+### `frontend/src/components/experts/catalog/ExpertCatalogPage.tsx` — Phase 299 (299-02)
+
+**`11 / 7 / 376`** (was `9 / 6 / 372` — one intervening commit uncounted by the old cell; re-derived)
+
+One optional prop `openBundleId?: string | null` and ONE call, `useExpertLinkTarget({ id: props.openBundleId ?? null, experts, loading, setInspected })`, beside the page's existing state (plus its import). The `inspected` state still controls the ONE `ExpertDetailModal` mount; the hook only sets it. The page's own imports are unchanged apart from the hook — its "exactly ONE list read" property (`ExpertCatalogPage.test.tsx` (8)/(8b), green unedited) is the page's; the per-id fallback read lives in `useExpertLinkTarget.ts` and fires only for a linked id the list does not hold. Honoured by construction.
+
+Scan-list cell as of 2026-10-28 (replaced by 299-02, moved verbatim): 9 / 6 / 372 (was `8 / 5 / 359`) | ⚠ **FIRES — 6 phases** | honoured by construction (**279-03 F**, WR-07): ONE reason expression (network sentence only for TypeError); `listExperts(true, false)` ×3
+
+CLAUDE.md verdict cell as of 2026-10-28 (replaced by 299-02, moved verbatim): | `frontend/src/components/experts/catalog/ExpertCatalogPage.tsx` | 9 / 6 / 372 (was `8 / 5 / 359`) | honoured by construction (279-03: ONE reason expression) |
+
 ### `frontend/src/components/experts/catalog/ExpertDetailModal.tsx` — Phase 279 close
 
 **`7 / 5 / 531` (was `6 / 4 / 531`).** Honoured by construction (279-03 Commit A): ONE copy change ("will not be searched"). ⚠ Review note: no test pins that copy.
@@ -24368,6 +24378,16 @@ Scan-list disposition cell as of 2026-10-21 (replaced by 290-04):
 
 > **286-04** seam TAKEN (named 3×): ⋯ menu + armed draft delete → `WorkflowCardMenu.tsx`; card holds 0 `useState`, drawing only. ⚠ compiler lint now covers the whole card
 
+### `frontend/src/components/workflows/library/WorkflowCard.tsx` — Phase 299 (299-02)
+
+**`27 / 12 / 1374`** (was `26 / 11 / 1373`)
+
+One attribute: `data-row-id={row.id}` on the card's root, directly after `data-provenance`, so `useWorkflowLinkTarget` can find the card a `/app/workflows/<id>` link names. No behaviour, class or text change. ⚠ The 286-04 characterization pin (`WorkflowCard.seam286.pin.test.tsx`) snapshots each resting card's `outerHTML`, so its `.snap` gains exactly the five attribute insertions (one per row state) and nothing else — updated in the same commit, the 290-02 precedent (`c30ac9f73`). The pin's purpose (the 286 menu move changed no behaviour) is untouched: the attribute is a new, deliberate output, not drift.
+
+Scan-list cell as of 2026-10-28 (replaced by 299-02, moved verbatim): 26 / 11 / 1373 (was `25 / 10 / 1371`) | **FIRES** | 296-07 (286-S04-2): comment-only — the MARK_ICON docblock and the CalendarClock comment name the icons this file draws today
+
+CLAUDE.md verdict cell as of 2026-10-28 (replaced by 299-02, moved verbatim): | `frontend/src/components/workflows/library/WorkflowCard.tsx` | 26 / 11 / 1373 (was `25 / 10 / 1371`) | 296-07: comment-only (MARK_ICON docblock, 286-S04-2) |
+
 ### `frontend/src/components/workflows/library/libraryVocabulary.ts` — Phase 290 (290-02)
 
 **`12 / 6 / 802` (was `11 / 5 / 766`), re-derived 2026-10-21 by 290-04.** 290-02 spent +36 / −0, all of it data: six `STEP_LINE_` entries (`STEP_LINE_LABEL` "Steps, in run order", `STEP_LINE_JOINER` "→", `stepLineMore(n)`, `stepLineMoreLabel(n)`, `STEP_LINE_LESS` "Show less", `STEP_LINE_UNTYPED` "A step with no type"; `:782-802`). The two formatters are total one-liners and there is no other logic. No `PHASE_TYPE_SENTENCES` value is copied in (chip words are read through `own()` in `stepLine.ts`). The 286 forecast ("chip labels are vocabulary entries (data), no logic") was met exactly. No seam proposed.
@@ -25994,6 +26014,14 @@ Props only (⛔ still no hook): three optional props `openThread`, `threadHoldin
 
 Scan-list cell as of 2026-10-28 (replaced by 299-02, moved verbatim): 2 / 1 / 523 (was `1 / 1 / 473`) | no (young) | 297-02: S1 first non-chat arm; run hold inside the one run arm; admin arms gated on the operator probe. ⛔ one run comparison; fallback last; every hold lives here, never at App
 
+### `frontend/src/components/layout/AppViewSwitch.tsx` — Phase 299 (299-02, Task 3)
+
+**`4 / 2 / 547`** (was `3 / 2 / 542`)
+
+`entityLink` is now destructured and read in two places, props only: `<WorkflowsPage linkedDefinitionId={entityLink?.target?.kind === "workflow" ? entityLink.target.id : null} />` and `<ExpertCatalogPage openBundleId={entityLink?.target?.kind === "expert" ? entityLink.target.id : null} />`. The kind is read off the parsed route's target, never off `activeView`, so the comment-stripped `workflow-run` comparison count stays one. ⛔ Still no React hook in this file. Pinned by the wire cases in `ExpertCatalogPage.link.test.tsx`.
+
+Scan-list cell as of 2026-10-28 (replaced by 299-02 Task 3, moved verbatim): 3 / 2 / 542 (was `2 / 1 / 523`) | no (young) | 299-02: chat main holds ("Opening the chat…") while a thread address is unresolved; startScopedChat via openThread. ⛔ no hooks; one run comparison; fallback last
+
 ### `frontend/src/lib/appRoutes.ts`
 
 **Added AT PLANNING (Phase 297, 2026-10-27) with `0 / 0 / 0`** — the file did not exist yet; plan
@@ -26604,6 +26632,16 @@ Scan-list cell as of 2026-10-28 (replaced by 298-05 T1 GREEN, moved verbatim): 5
 
 CLAUDE.md verdict cell as of 2026-10-28 (replaced by 298-05 T1 GREEN, moved verbatim): | `frontend/src/pages/WorkflowsPage.tsx` | 51 / 22 / 1390 (was `50 / 22 / 1390`) | 298-04: onOrgSwitch arg on the feeds hook call (UI-D10) |
 
+### `frontend/src/pages/WorkflowsPage.tsx` — Phase 299 (299-02)
+
+**`53 / 23 / 1399`** (was `52 / 22 / 1392`)
+
+One optional prop `linkedDefinitionId?: string | null` (destructured with a `null` default) and ONE hook call, `useWorkflowLinkTarget({ id: linkedDefinitionId, drafts, rows, loading, onOpenDraft, clearProjectFilter: () => setSelectedProjectId(null) })`, placed directly below the `useWorkflowFork` call — i.e. below `onOpenDraft`, `rows` and `loading`, for the temporal-dead-zone reason the 192-14 / 192.1-03 comments above it record. Plus its import line. Every value it reads is state the page already held; the project-filter reset is the one the 298 `onOrgSwitch` path uses. No new state, no effect in the page; the decision logic lives in `library/useWorkflowLinkTarget.ts`. Honoured by construction. All WorkflowsPage suites green unedited.
+
+Scan-list cell as of 2026-10-28 (replaced by 299-02, moved verbatim): 52 / 22 / 1392 (was `51 / 22 / 1390`) | ⚠ **FIRES** | 298-05: one JSX mount, <ElsewhereLine kind="workflows"> at the top of the p-6 list region inside the grid's max-w-[1200px], + its import. No state, no hook, no other line
+
+CLAUDE.md verdict cell as of 2026-10-28 (replaced by 299-02, moved verbatim): | `frontend/src/pages/WorkflowsPage.tsx` | 52 / 22 / 1392 (was `51 / 22 / 1390`) | 298-05: one ElsewhereLine mount atop the list region (+ its import) |
+
 ### `frontend/src/components/layout/ChatHistoryColumn.tsx` — 298-05 T1 GREEN (2026-10-28)
 
 **`9 / 3 / 524` (was `8 / 3 / 522`).** Plan 298-05 Task 1 GREEN (D-17 / UI-D4): one JSX line, `<ElsewhereLine kind="threads" className="px-2 pb-2" />`, first child of hc-list, above the loading / empty / grouped branches, plus its import. It stays under a title filter (it counts more chats, not matches). No state added.
@@ -26922,9 +26960,23 @@ Planning cell (replaced by 299-02, moved verbatim): 0 / 0 / 0 | no (planned 299-
 
 **Added AT PLANNING (Phase 299, 2026-10-28) with `0 / 0 / 0`** — the file does not exist yet; plan `299-02` creates it and re-derives the triple in its creating commit (the 297 leaveGuard.ts precedent). young (planned 299-02). open a draft / focus a published card by id (D-03). ⛔ no write on open; in LIBRARY_SUBTREE_PATHS; never imports the page
 
+### `frontend/src/components/workflows/library/useWorkflowLinkTarget.ts` — Created — Phase 299 (299-02), measured `1 / 1 / 90`
+
+Measured in its creating commit (`feat(299-02): a workflow or Expert opens from its address`). `useWorkflowLinkTarget({ id, drafts, rows, loading, onOpenDraft, clearProjectFilter })`, generic over the drafts row (typed structurally as `{ id }`, so the module imports no client API at all). Once nothing is loading: an id in the drafts feed → `onOpenDraft(thatRow)` (the page's own opener, so the opaque concurrency field travels by construction); an id among the visible published / starter rows → `clearProjectFilter()` once, then `[data-row-id="<id>"]` is scrolled into view, given `tabindex="-1"` if it has none, focused, and wears `ring-2 ring-primary/60 ring-offset-2 ring-offset-background` for `LINK_TARGET_MARK_MS` (2000). A card not rendered yet (the cleared filter re-querying) is retried when the rows change. An id in neither list, or `null`, does nothing.
+
+**Binding invariants:** ⛔ no write on open (T-299-19) — the suite auto-mocks `@/lib/api` and `@/lib/api/workflows` and asserts EVERY function uncalled; ⛔ once per id (a ref keyed on the lowercased id) — a refetch never re-opens the Builder over edits; ⛔ decides nothing it cannot see — 299-03's gate owns "can't be opened"; ⛔ in `LIBRARY_SUBTREE_PATHS` (F1 / F4 / F5 / F6 sweep it) and never names the page; ⛔ the docblock does not spell the draft's opaque field name (F6's scoping control lists the four modules that may). Pinned by `library/__tests__/useWorkflowLinkTarget.test.tsx` (12).
+
+Planning cell (replaced by 299-02, moved verbatim): 0 / 0 / 0 | no (planned 299-02) | young (planned 299-02). open a draft / focus a published card by id (D-03). ⛔ no write on open; in LIBRARY_SUBTREE_PATHS; never imports the page
+
 ### `frontend/src/components/experts/catalog/useExpertLinkTarget.ts`
 
 **Added AT PLANNING (Phase 299, 2026-10-28) with `0 / 0 / 0`** — the file does not exist yet; plan `299-02` creates it and re-derives the triple in its creating commit (the 297 leaveGuard.ts precedent). young (planned 299-02). open an Expert's detail by id (D-04). ⛔ read only (list or getExpert); fires once per id
+
+### `frontend/src/components/experts/catalog/useExpertLinkTarget.ts` — Created — Phase 299 (299-02), measured `1 / 1 / 57`
+
+Measured in its creating commit. `useExpertLinkTarget({ id, experts, loading, setInspected })`: once the catalog's ONE grant-aware list read has answered, an Expert in it is handed to the page's own `setInspected` (the one `ExpertDetailModal` opens on it, no second read); an Expert not in it is asked for ONCE with `getExpert(id)` (`GET /experts/{id}` — the grant-aware per-Expert read; never `/resolve`, never the management arm) and opened on the answer; a rejection opens nothing. **Binding invariants:** ⛔ read-only; ⛔ once per id (closing the modal never reopens it while the address is unchanged); ⛔ an answer for an id the address has since left is dropped; ⛔ `getExpert` is never asked while the list is loading. The page's own docblock rule ("exactly ONE read") still holds for the page: the fallback read lives here and fires only on a linked id the list does not hold. Pinned by `catalog/__tests__/ExpertCatalogPage.link.test.tsx` (11, incl. the AppViewSwitch wire).
+
+Planning cell (replaced by 299-02, moved verbatim): 0 / 0 / 0 | no (planned 299-02) | young (planned 299-02). open an Expert's detail by id (D-04). ⛔ read only (list or getExpert); fires once per id
 
 ### `frontend/src/lib/clipboard.ts`
 

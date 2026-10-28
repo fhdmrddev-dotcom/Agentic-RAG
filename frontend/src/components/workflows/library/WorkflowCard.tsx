@@ -1023,6 +1023,7 @@ export function WorkflowCard({
       data-testid={ROOT_TESTID[row.provenance]}
       data-card="workflow-card"
       data-provenance={row.provenance}
+      data-row-id={row.id}
       className={
         CARD_CLASSES +
         (row.provenance === "draft" ? " border-dashed border-border" : " border-border") +
