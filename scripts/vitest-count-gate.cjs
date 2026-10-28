@@ -3186,7 +3186,7 @@ const BASELINE = {
   // silent LAST-WINS override. 217-10 extended this barrel guard to `api/documents.ts`
   // (it covered `connectors.ts` only); the `+2` is exactly its two new `it` blocks, read
   // from this gate's own printed `3 -> 5 +2` row, with no residual.
-  "apiBarrel.test.ts": 5,
+  "apiBarrel.test.ts": 6, // RAISED 5 -> 6 at 299-03 (2026-10-28): the links client (resolveLink) is re-exported from the barrel
   // ── Added in Phase 213 (213-05 / GATE-1) — per-tool grants list invariants ──
   // ⚠ 8 → 9 at Phase 252 (252-05 / W-7 / D-33). The pin read `8` against a file that has
   // carried NINE cases since Phase 221 — one unit of PERMANENT SLACK, standing for the whole
@@ -4470,6 +4470,12 @@ const BASELINE = {
   "useWorkflowLinkTarget.test.tsx": 12, // 299-02 (D-03 / T-299-19) — owned draft → onOpenDraft(row) once with its token, once per id, uppercase id; published / starter card → filter cleared, scrolled, focused, marked 2 s, late card focused once; loading / unseen id / no id do nothing; a new id handled; no client API call in any case; source: no api import, never names the page; WorkflowCard root data-row-id
   "ExpertCatalogPage.link.test.tsx": 11, // 299-02 (D-04) — openBundleId in the list opens its modal (no second read), absent → getExpert(id) once, not asked while loading, refused read opens nothing, closed stays closed, a new id opens, none reads nothing; AppViewSwitch hands linkedDefinitionId / openBundleId from entityLink (kind-checked)
   "useThreadAddress.test.tsx": 21, // 299-02 — real router + fake link: cold address holds then selects once (no entry), absent thread keeps holding, refetch does not re-run, pick/New chat/openThread/off-chat pick + Chat/rail each ONE entry, Back selects and pushes nothing, Back home deselects, plain deselect replaces, IN-01 org change keeps the address (x2), leaveThread counts, holding, inert without a link, source fence
+  // ── Phase 299-03 (LINK-04 / D-12..D-15, D-36) — both knobs, same commit (2026-10-28). src/lib/__tests__,
+  //    src/lib/api/__tests__ and src/components/layout/__tests__ have no directory entry, so each new file
+  //    is FILE-LEVEL in TARGETS below.
+  "clipboard.test.ts": 8, // 299-03 (D-21 / UI-D7) — copyText copied / refused (reject, missing API, sync throw), never throws; selectAllIn selects the text, null is a no-op; Ctrl+C vs ⌘C word; leaf (no React)
+  "links.test.ts": 9, // 299-03 (D-06 / T-299-25) — resolveLink GETs /links/<kind>/<id> with auth headers; 200 → ok + target, 404 → cant, 500/503/401/403 and a network error throw ApiError (an outage is never can't-be-opened); id URL-encoded
+  "CantBeOpened.test.tsx": 18, // 299-03 (D-12..D-15, D-36) — the words per kind, no reason (comment-stripped scan), no raw path prop; run card focus/section/inert behind/filled exit + outline copy; lowercase rebuild; Copy address success 2 s + status, refused selects + shortcut word; unparseable variant (297 words, no address); AddressNotFound renders the same card; identical DOM for missing vs foreign
   "ChatLayout.mobileLoading.test.tsx": 4, // 299-05 (FIX-02 / BUG-261027-02) — real ChatLayout + useThreads + ChatHistoryColumn, listThreads deferred: desktop first load says "Loading your chats…" then "No recent chats" only after a settled []; chats answer → rows, no loader; mobile drawer the same (empty sentence style unchanged); a settled no-match search still says "No chats match your search."
 }
 
@@ -6552,6 +6558,10 @@ const TARGETS = [
   "src/hooks/__tests__/useThreadAddress.test.tsx",
   // Phase 299-02 — FILE-LEVEL (the experts catalog tests are listed file by file), SAME commit as its pin.
   "src/components/experts/catalog/__tests__/ExpertCatalogPage.link.test.tsx",
+  // Phase 299-03 — FILE-LEVEL (no src/lib/__tests__, src/lib/api/__tests__ or src/components/layout/__tests__ directory entry), SAME commit as their pins.
+  "src/lib/__tests__/clipboard.test.ts",
+  "src/lib/api/__tests__/links.test.ts",
+  "src/components/layout/__tests__/CantBeOpened.test.tsx",
 ]
 
 const REPO_ROOT = path.resolve(__dirname, "..")

@@ -10,6 +10,7 @@ import { describe, it, expect } from "vitest"
 import * as ApiBarrel from "../api"
 import * as ConnectorsDomain from "../api/connectors"
 import * as DocumentsDomain from "../api/documents"
+import * as LinksDomain from "../api/links"
 
 describe("lib/api.ts barrel re-exports (D-207-06)", () => {
   it("re-exports all runtime symbols from lib/api/connectors.ts", () => {
@@ -78,6 +79,15 @@ describe("lib/api.ts barrel re-exports — documents domain (Phase 217, D-207-06
       expect((ApiBarrel as Record<string, unknown>)[fn]).toBe(
         (DocumentsDomain as Record<string, unknown>)[fn],
       )
+    }
+  })
+
+  // Phase 299-03 (D-06): the link resolver client, re-exported in ONE block beside orgItems.
+  it("re-exports the links client (resolveLink) from lib/api/links.ts", () => {
+    const names = Object.keys(LinksDomain)
+    expect(names).toContain("resolveLink")
+    for (const name of names) {
+      expect((ApiBarrel as Record<string, unknown>)[name]).toBe((LinksDomain as Record<string, unknown>)[name])
     }
   })
 })
