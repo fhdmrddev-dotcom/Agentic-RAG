@@ -92,12 +92,17 @@ WHERE d.id = $1
 
 #: D-34 / P1: owner at any status, OR any member of the run's org once it has finished — the
 #: ``workflow_run_evidence._ACCESS_SQL`` rule, on the pool.
+#: 299-REVIEW CR-02: the chat title joins ONLY for the chat's owner (``t.user_id = $2``) — thread
+#: titles are owner-only (the threads SELECT policy), and the evidence report a member reads never
+#: shows one. Everyone else reads the name the evidence report shows: the run's frozen definition
+#: name, else the definition row's.
 RUN_SQL = """
 SELECT wr.id,
-       COALESCE(NULLIF(t.title, ''), NULLIF(d.name, ''), 'Workflow run') AS title,
+       COALESCE(NULLIF(t.title, ''), NULLIF(wr.definition_snapshot->>'name', ''), NULLIF(d.name, ''),
+                'Workflow run') AS title,
        wr.status, wr.org_id, o.name AS org_name
 FROM public.workflow_runs wr
-LEFT JOIN public.threads t ON t.id = wr.thread_id
+LEFT JOIN public.threads t ON t.id = wr.thread_id AND t.user_id = $2
 LEFT JOIN public.workflow_definitions d ON d.id = wr.definition_id
 LEFT JOIN public.organizations o ON o.id = wr.org_id
 WHERE wr.id = $1

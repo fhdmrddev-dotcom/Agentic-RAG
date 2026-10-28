@@ -114,3 +114,58 @@ async def test_cr01_a_global_definition_and_a_stranger_still_name_no_org():
         # Someone else's definition in a shared org reads like an id that does not exist.
         assert await lr.workflow_org(conn, wf, owner_id=other) is None
         assert await lr.workflow_org(conn, uuid4(), owner_id=u) is None
+
+
+# ── CR-02 ────────────────────────────────────────────────────────────────────────
+
+
+async def _run(conn, thread: UUID, definition: UUID, org: UUID, owner: UUID, *, status: str = "completed", snapshot_name: str | None = None) -> UUID:
+    snapshot = json.dumps({"name": snapshot_name}) if snapshot_name is not None else None
+    return await conn.fetchval(
+        "INSERT INTO public.workflow_runs (thread_id, definition_id, status, org_id, user_id, definition_snapshot)"
+        " VALUES ($1, $2, $3, $4, $5, $6::jsonb) RETURNING id",
+        thread, definition, status, org, owner, snapshot,
+    )
+
+
+async def test_cr02_a_member_never_reads_the_owners_private_chat_title():
+    async with _Tx() as conn:
+        u = await _user(conn, "u")
+        m = await _user(conn, "m")
+        org_a = await _org(conn, f"299r A {uuid4().hex[:6]}")
+        await _member(conn, org_a, u)
+        await _member(conn, org_a, m)
+        wf = await _definition(conn, u, org_a, name="Live name")
+        thread = await conn.fetchval(
+            "INSERT INTO public.threads (user_id, org_id, title) VALUES ($1, $2, $3) RETURNING id",
+            u, org_a, "Severance terms for J. Smith",
+        )
+        run = await _run(conn, thread, wf, org_a, u, snapshot_name="Tender review")
+
+        # The owner still reads her own chat's title.
+        mine = await lr.lookup(conn, "run", run, u)
+        assert mine is not None and mine["title"] == "Severance terms for J. Smith"
+
+        # ⛔ A member of the run's org opens it (D-34) but never reads the private chat title:
+        # the run's frozen workflow name, as the evidence report shows it.
+        theirs = await lr.lookup(conn, "run", run, m)
+        assert theirs is not None
+        assert theirs["title"] == "Tender review"
+        assert lr.to_target("run", theirs).title == "Tender review"
+
+
+async def test_cr02_a_run_with_no_snapshot_falls_back_like_the_evidence_report():
+    async with _Tx() as conn:
+        u = await _user(conn, "u")
+        m = await _user(conn, "m")
+        org_a = await _org(conn, f"299r A {uuid4().hex[:6]}")
+        await _member(conn, org_a, u)
+        await _member(conn, org_a, m)
+        wf = await _definition(conn, u, org_a, name="Live name")
+        thread = await conn.fetchval(
+            "INSERT INTO public.threads (user_id, org_id, title) VALUES ($1, $2, $3) RETURNING id",
+            u, org_a, "Private title",
+        )
+        run = await _run(conn, thread, wf, org_a, u)  # a pre-122 run: no snapshot
+        theirs = await lr.lookup(conn, "run", run, m)
+        assert theirs is not None and theirs["title"] == "Live name"

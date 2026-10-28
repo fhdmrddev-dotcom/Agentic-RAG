@@ -83,6 +83,14 @@ def test_run_statement_is_owner_or_member_once_finished(mod):
     assert "auth.uid()" not in sql  # pool kind: auth.uid() is NULL there
 
 
+def test_run_statement_reads_the_chat_title_only_for_its_owner(mod):
+    # 299-REVIEW CR-02: a member of a finished run's org must never read the owner's private chat
+    # title; everyone else reads the run's frozen workflow name (the evidence report's).
+    sql = _flat(mod.SQL_BY_KIND["run"])
+    assert "LEFT JOIN public.threads t ON t.id = wr.thread_id AND t.user_id = $2" in sql
+    assert "wr.definition_snapshot->>'name'" in sql
+
+
 def test_expert_statement_evaluates_membership_in_the_bundles_org(mod):
     sql = _flat(mod.SQL_BY_KIND["expert"])
     assert "b.id = $1" in sql
