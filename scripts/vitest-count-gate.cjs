@@ -656,7 +656,7 @@ const BASELINE = {
   // invisibly, because `POST /workflows/generate` mints `unbound_retrieval` on
   // `project_folder_id is None` and a dangling id would suppress the very verdict the
   // picker exists to help the author satisfy.
-  "DescribeKbPicker.test.tsx": 37,
+  "DescribeKbPicker.test.tsx": 43, // RAISED 37 → 43 at 298-04 (2026-10-28): a held id from another org is looked up before any drop (pending / answered / empty list / failed / offered), org re-read; the 3 surrender cases amended (D-298-07)
   "ProblemsTray.test.tsx": 30,
   "verdictModel.test.ts": 29,
   // 188-12 de-slacking, both inherited stale-low pins (26/49 and 24/46).
@@ -4447,6 +4447,8 @@ const BASELINE = {
   "WorkflowsPage.orgSwitch.test.tsx": 4, // 298-04 — real page + feeds hook: old org's workflow/draft gone at once, "Loading your workflows…" never the empty sentence, late answer dropped, project filter back to All, each feed re-read once
   "useThreads.orgSwitch.test.ts": 4, // 298-04 — switching false on first render (UI-D9), old threads drop at once + switching until answered, late answer dropped, newThread lands in the new org
   "ChatHistoryColumn.orgSwitch.test.tsx": 4, // 298-04 — loading says "Loading your chats…" never "No recent chats", hides handed rows, empty sentence unchanged without it, a streaming old-org thread is not listed
+  "folderLabel.test.ts": 8, // 298-04 — optionLabel/chipLabel words (in-org name, "lives in {Org}", active-org label plain, unseen → UNNAMED_KB_OPTION never the id) + getFolderLabels ([] no request, comma-joined, chunked at 50, ApiError). Covered by the src/components/workflows directory entry
+  "useBuilderNameMaps.orgLabels.test.tsx": 8, // 298-04 — one label read for the missing bound ids, chip-form names + folderLabels, nothing asked when all in-org, unseen gets no name, failure non-fatal, re-read per org; the real page's option / UNNAMED / flag-off chip words. Covered by the src/components/workflows directory entry
 }
 
 // Still COMPUTED, never hand-written — the reduce is the single source, so the

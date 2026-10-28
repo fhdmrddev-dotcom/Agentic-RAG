@@ -11671,7 +11671,7 @@ cells rot within days.
 | [`backend/app/api/settings.py`](docs/HOT-FILE-LEDGER.md#backendappapisettingspy) | 47 / 25 / 1301 (was `46 / 24 / 1250`) | ⚠ **FIRES** | 292.1-02: two bounded writes (2..50) via _range_refusal_detail + allow-list +2 (+51 −0). ⛔ never a retyped id list; GET never echoes a key · 293 touch: see §Phase 293 close |
 | [`backend/app/services/multimodal_service.py`](docs/HOT-FILE-LEDGER.md#backendappservicesmultimodal_servicepy) | 14 / 7 / 984 | ⚠ **FIRES** | ⚠ absent from BOTH for its ENTIRE LIFE at **7 phases** — row added SEED-227, which is also where its silent truncation was found |
 | [`backend/app/api/documents.py`](docs/HOT-FILE-LEDGER.md#backendappapidocumentspy) | 101 / 40 / 2709 (was `99 / 39 / 2698`) | ⚠ **FIRES** | 298-01: list_documents one `org_lists.by_org` in build() (every read, D-32); upload one `org_id=root_upload_org(...)` on the ONE minter call. Honoured by construction. ⛔ see section |
-| [`scripts/vitest-count-gate.cjs`](docs/HOT-FILE-LEDGER.md#scriptsvitest-count-gatecjs) | 373 / 81 / 6793 (was `372 / 81 / 6787`) | ⚠ **FIRES** | 298-04 T2 RED: WorkflowsPage.orgSwitch (4), useThreads.orgSwitch (4), ChatHistoryColumn.orgSwitch (4) pinned FILE-LEVEL in the same commit; RunLogPanel 20 → 23; none lowered |
+| [`scripts/vitest-count-gate.cjs`](docs/HOT-FILE-LEDGER.md#scriptsvitest-count-gatecjs) | 374 / 81 / 6795 (was `373 / 81 / 6793`) | ⚠ **FIRES** | 298-04 T3 RED: folderLabel (8) + useBuilderNameMaps.orgLabels (8) pinned (src/components/workflows dir entry); DescribeKbPicker 37 → 43; none lowered |
 | [`scripts/check-deploy-drift.sh`](docs/HOT-FILE-LEDGER.md#scriptscheck-deploy-driftsh) | 5 / 4 / 267 | ⚠ **FIRES** | ⚠ absent its ENTIRE LIFE — row added 294-05. 294-01: DECISION_ENGINE_FAULT_BASE_URL registered as intentionally omitted (+2) |
 | [`scripts/build-public-openapi.cjs`](docs/HOT-FILE-LEDGER.md#scriptsbuild-public-openapicjs) | 11 / 5 / 472 (was `7 / 3 / 468`) | ⚠ **FIRES** | 298-01: `org-items` in the Account & org TAG_GROUPS entry + `/org-items/` in FLAGGED_PREFIXES (UI-internal). Two tokens. ⚠ prior row stale (`7 / 3 / 468` vs measured `10 / 4 / 468` pre-298). |
 | [`scripts/check-seeds-register.cjs`](docs/HOT-FILE-LEDGER.md#scriptscheck-seeds-registercjs) | 7 / 3 / 1132 | ⚠ **FIRES** | ⚠ absent its ENTIRE LIFE — row added 296-05, now FIRES (251 / 293 / 296). 296-05: three `\d{3}` → `\d{3,}` (293-IN-07). ⛔ the STATUS_ENUM triple |
@@ -26450,3 +26450,11 @@ CLAUDE.md verdict cell as of 2026-10-28 (replaced by 298-04, moved verbatim): | 
 Scan-list cell as of 2026-10-28 (replaced by 298-04, moved verbatim): 7 / 2 / 513 | below threshold | ⚠ **ABSENT from BOTH for its ENTIRE LIFE — row added 244-01 at its SECOND phase** (`settingsSearchPayload.ts` precedent). D-244-20 claimed a row existed; the gate refuted it
 
 CLAUDE.md verdict cell as of 2026-10-28 (replaced by 298-04 for `frontend/src/components/layout/ChatHistoryColumn.tsx`, moved verbatim): | `frontend/src/components/layout/ChatHistoryColumn.tsx` | 7 / 2 / 513 | ⚠ absent its ENTIRE LIFE — row added 244-01 |
+
+### `scripts/vitest-count-gate.cjs` — 298-04 (2026-10-28)
+
+**`374 / 81 / 6795` (was `373 / 81 / 6793`).** 298-04 Task 3 RED commit. `folderLabel.test.ts` 8 and `useBuilderNameMaps.orgLabels.test.tsx` 8 pinned in BASELINE; both sit under `src/components/workflows`, which has a directory entry in TARGETS, so no file-level entry is needed. `DescribeKbPicker.test.tsx` raised 37 → 43 (dated; its three surrender cases amended under D-298-07). No pin lowered.
+
+Scan-list cell as of 2026-10-28 (replaced by 298-04, moved verbatim): 373 / 81 / 6793 (was `372 / 81 / 6787`) | ⚠ **FIRES** | 298-04 T2 RED: WorkflowsPage.orgSwitch (4), useThreads.orgSwitch (4), ChatHistoryColumn.orgSwitch (4) pinned FILE-LEVEL in the same commit; RunLogPanel 20 → 23; none lowered
+
+CLAUDE.md verdict cell as of 2026-10-28 (replaced by 298-04, moved verbatim): | `scripts/vitest-count-gate.cjs` | 373 / 81 / 6793 (was `372 / 81 / 6787`) | 298-04: 3 org-switch suites pinned; RunLogPanel 20 → 23 |

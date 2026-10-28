@@ -24,7 +24,7 @@
  * (recorded in the SUMMARY).
  */
 import { describe, it, expect, beforeEach, beforeAll, afterAll, vi, type MockInstance } from "vitest"
-import { render, screen, waitFor, fireEvent } from "@testing-library/react"
+import { act, render, screen, waitFor, fireEvent } from "@testing-library/react"
 
 import describeKbPickerSource from "./DescribeKbPicker?raw"
 import {
@@ -43,6 +43,9 @@ import {
 
 const api = vi.hoisted(() => ({
   listFolders: vi.fn(),
+  // Phase 298-04 (D-15): the folder-labels read — the picker's SECOND permitted symbol. It is not
+  // in FORBIDDEN_SYMBOLS; it is asked only for a held id the narrowed list does not offer.
+  getFolderLabels: vi.fn(),
   createFolder: vi.fn(),
   listSkills: vi.fn(),
   generateWorkflow: vi.fn(),
@@ -53,6 +56,32 @@ const api = vi.hoisted(() => ({
 }))
 
 vi.mock("@/lib/api", () => api)
+
+// Phase 298-04 (D-08) — a flippable active org standing in for OrgProvider. Every case above the
+// 298-04 block runs with no active org (null), exactly as before.
+const orgStore = vi.hoisted(() => {
+  let current: string | null = null
+  const subs = new Set<() => void>()
+  return {
+    get: () => current,
+    set: (v: string | null) => {
+      current = v
+      subs.forEach((f) => f())
+    },
+    subscribe: (f: () => void) => {
+      subs.add(f)
+      return () => {
+        subs.delete(f)
+      }
+    },
+  }
+})
+vi.mock("@/providers/OrgProvider", async () => {
+  const { useSyncExternalStore } = await import("react")
+  return {
+    useOrgOptional: () => ({ activeOrgId: useSyncExternalStore(orgStore.subscribe, orgStore.get) }),
+  }
+})
 
 /** Everything the picker may NOT reach. All must stay at zero. */
 const FORBIDDEN_SYMBOLS = [
@@ -97,6 +126,9 @@ const TWO_FOLDERS = [POLICIES, CONTRACTS]
 beforeEach(() => {
   vi.clearAllMocks()
   api.listFolders.mockResolvedValue(TWO_FOLDERS)
+  // 298-04: by default the label read answers WITHOUT the asked id — "the caller cannot see it".
+  api.getFolderLabels.mockReset()
+  api.getFolderLabels.mockResolvedValue([])
 })
 
 const renderPicker = (props: Partial<{ value: string; onChange: (id: string) => void }> = {}) => {
@@ -553,10 +585,16 @@ describe("DescribeKbPicker — an unofferable choice is surrendered, never sent 
     expect(offered).toContain(CONTRACTS.id)
   })
 
+  // ⚠ D-298-07 — the four surrender cases below are amended ON PURPOSE by 298-04 (D-15). The
+  // rule "never keep an id the caller cannot see" is unchanged; what TRIGGERS the surrender
+  // moved: the narrowed list (298-01) no longer offers a bound folder that lives in another org,
+  // so "not in the list" stopped meaning "cannot see". The drop now waits for the folder-labels
+  // read to ANSWER WITHOUT the id. Each case asserts that read was asked for exactly that id.
   it("a held id the server does NOT offer is handed back as '' once the request settles", async () => {
     const { onChange } = renderPicker({ value: DANGLING })
     await waitFor(() => expect(stateOf()).toBe("ready"))
     await waitFor(() => expect(onChange).toHaveBeenCalledWith(""))
+    expect(api.getFolderLabels).toHaveBeenCalledWith([DANGLING])
   })
 
   it("ANTI-CASE — a held id the server DOES offer is left completely alone", async () => {
@@ -572,6 +610,7 @@ describe("DescribeKbPicker — an unofferable choice is surrendered, never sent 
     await waitFor(() => expect(stateOf()).toBe("unavailable"))
     expect(picker()).toBeNull()
     await waitFor(() => expect(onChange).toHaveBeenCalledWith(""))
+    expect(api.getFolderLabels).toHaveBeenCalledWith([DANGLING])
   })
 
   it("'there are none' surrenders it too", async () => {
@@ -580,6 +619,7 @@ describe("DescribeKbPicker — an unofferable choice is surrendered, never sent 
     await waitFor(() => expect(stateOf()).toBe("none"))
     expect(picker()).toBeNull()
     await waitFor(() => expect(onChange).toHaveBeenCalledWith(""))
+    expect(api.getFolderLabels).toHaveBeenCalledWith([DANGLING])
   })
 
   it("NOT-ASKED-YET IS NOT NOT-OFFERED — nothing is surrendered while the request is in flight", async () => {
@@ -794,6 +834,66 @@ describe("199-08 — sheet c9 §4: the three readings are distinct WITHOUT any c
     // …and no network symbol was added: still exactly the one shipped api import.
     expect(describeKbPickerSource.match(/from "@\/lib\/api"/g) ?? []).toHaveLength(1)
     expectNothingElseCalled()
+  })
+})
+
+// ── 7c. Phase 298-04 (D-15 / UI-D11) — a bound folder in ANOTHER org is kept, by name ─
+
+describe("DescribeKbPicker — a held id from another org is looked up before anything is dropped (298-04)", () => {
+  const Q3 = { id: "f-q3", name: "Q3 Contracts", org_id: "org-legal", org_name: "Acme Legal" }
+
+  it("while the label read is pending the id stays held and reads UNNAMED_KB_OPTION — nothing is surrendered", async () => {
+    api.getFolderLabels.mockReturnValue(new Promise(() => {}))
+    const { onChange } = renderPicker({ value: Q3.id })
+    await waitFor(() => expect(stateOf()).toBe("ready"))
+    expect(await screen.findByTestId("describe-kb-chosen")).toHaveTextContent("A knowledge base outside your folders")
+    expect(onChange).not.toHaveBeenCalled()
+  })
+
+  it("when the read answers WITH it, the chosen row reads 'Q3 Contracts — lives in Acme Legal' and the id is kept", async () => {
+    api.getFolderLabels.mockResolvedValue([Q3])
+    const { onChange } = renderPicker({ value: Q3.id })
+    await waitFor(() =>
+      expect(screen.getByTestId("describe-kb-chosen")).toHaveTextContent("Q3 Contracts — lives in Acme Legal"),
+    )
+    expect(onChange).not.toHaveBeenCalled()
+    expect(api.getFolderLabels).toHaveBeenCalledTimes(1)
+  })
+
+  it("it is kept even when the narrowed list is EMPTY (the list narrowing alone never drops it)", async () => {
+    api.listFolders.mockResolvedValue([])
+    api.getFolderLabels.mockResolvedValue([Q3])
+    const { onChange } = renderPicker({ value: Q3.id })
+    await waitFor(() =>
+      expect(screen.getByTestId("describe-kb-chosen")).toHaveTextContent("Q3 Contracts — lives in Acme Legal"),
+    )
+    expect(onChange).not.toHaveBeenCalled()
+  })
+
+  it("a FAILED label read keeps the id, shown as UNNAMED_KB_OPTION — a failure is not an answer", async () => {
+    api.getFolderLabels.mockRejectedValue(new Error("network"))
+    const { onChange } = renderPicker({ value: Q3.id })
+    await waitFor(() => expect(api.getFolderLabels).toHaveBeenCalledTimes(1))
+    expect(await screen.findByTestId("describe-kb-chosen")).toHaveTextContent("A knowledge base outside your folders")
+    expect(onChange).not.toHaveBeenCalled()
+  })
+
+  it("an offered id is never looked up", async () => {
+    renderPicker({ value: POLICIES.id })
+    expect(await screen.findByTestId("describe-kb-chosen")).toHaveTextContent(POLICIES.name)
+    expect(api.getFolderLabels).not.toHaveBeenCalled()
+  })
+
+  it("re-reads its folders when the active org changes (D-08)", async () => {
+    renderPicker()
+    await waitFor(() => expect(stateOf()).toBe("ready"))
+    expect(api.listFolders).toHaveBeenCalledTimes(1)
+    try {
+      act(() => orgStore.set("org-b"))
+      await waitFor(() => expect(api.listFolders).toHaveBeenCalledTimes(2))
+    } finally {
+      act(() => orgStore.set(null))
+    }
   })
 })
 
