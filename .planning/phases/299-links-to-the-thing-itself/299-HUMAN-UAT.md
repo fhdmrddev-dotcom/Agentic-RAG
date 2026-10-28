@@ -3,8 +3,8 @@ phase: 299-links-to-the-thing-itself
 status: partial
 created: 2026-10-29
 rows_total: 20
-rows_run: 6
-rows_blocked: 1
+rows_run: 13
+rows_blocked: 2
 driver: operator
 ---
 
@@ -24,7 +24,7 @@ account `fhdmrd.dev@gmail.com` (`22f9c615` + `c1f18150`) and the fixture `s296-g
 
 ## Rows
 
-**2026-10-29 — Claude drove 6 rows** (G4-2 + A-2 after the operator signed the tab in as `fhdmrd.dev@gmail.com`) in the operator's already-signed-in Chrome (`fhdmrd@gmail.com`, ONE org `22f9c615`, proven via `GET /org/me`). Evidence in `299-VALIDATION.md`. The rest need a **second org** (G4-2, A-2, X-1..X-8 — that account is in one org), a **signed-out session** (G4-4a/b/d) or **network throttling/blocking** (G4-5a/b), so they stay owed.
+**2026-10-29 — Claude drove 13 rows** (G4-2, A-2 and X-1..X-8 after the operator signed the tab in as `fhdmrd.dev@gmail.com`; X-7 ⛔) in the operator's already-signed-in Chrome (`fhdmrd@gmail.com`, ONE org `22f9c615`, proven via `GET /org/me`). Evidence in `299-VALIDATION.md`. The rest need a **second org** (G4-2, A-2, X-1..X-8 — that account is in one org), a **signed-out session** (G4-4a/b/d) or **network throttling/blocking** (G4-5a/b), so they stay owed.
 
 Full row text (steps, pass line, failure line) lives in `299-VALIDATION.md` → G-4 rows and four-axis rows.
 Fill the Verdict + Evidence cells there.
@@ -42,7 +42,7 @@ Fill the Verdict + Evidence cells there.
 | G4-5b | Auth blocked: 8 s "Still connecting…", 20 s "Can't reach Syrel" + Try again keeps the URL | 9 |
 | A-1 | Multi-tool run reattaches from its address in a fresh tab | ✅ PASS 2026-10-29 (Claude) |
 | A-3 | ≥ 50-message thread opened by address, refreshed → same thread at its tail | ✅ PASS 2026-10-29 (Claude) |
-| X-1..X-8 | Full native roster + OpenRouter (derive from `MODEL_CAPABILITIES`): stream survives A → B → Back → Forward + other-org link + Stay | 12 |
+| X-1..X-8 | Full native roster + OpenRouter (derive from `MODEL_CAPABILITIES`): stream survives A → B → Back → Forward + other-org link + Stay | ✅ 7/8 PASS 2026-10-29 (Claude); ⛔ X-7 Moonshot rate-limited (BUG-261024-01) |
 | G4-4c | SSO return | ⛔ **BLOCKED (D-41)** — cloud has 0 SSO / SAML providers; covered by `useAuth.test.ts` |
 
 Also check during G4-1/G4-2 (layout the test DOM cannot measure, 299-03 deviation 3): the chat still scrolls
