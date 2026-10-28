@@ -4422,7 +4422,7 @@ const BASELINE = {
   // ── Phase 297-02 (LINK-01 / D-11, D-12, D-25) — adopted, both knobs, same commit (2026-10-27).
   "noRawHistoryWrites.test.ts": 4, // 297-02 (D-297-15 / D-33) — tree-wide: no raw History write in stripped product code; planted fixture caught; > 200 files swept. 2026-10-28 297-REVIEW WR-01: 3 -> 4, the one sanctioned idx stamp in useAppNavigation (exact text, counted once, nowhere else)
   "AppViewSwitch.addressStates.test.tsx": 19, // 297-02 (D-14, D-19, D-34, D-35) — S1 words + Go to Chat, history column hidden, run hold vs fallback vs page, admin hold / S1 / console, one run comparison, fallback last. 2026-10-28 297-REVIEW WR-03: 16 -> 19, the sign-in edge driven through the REAL probes (admin / spend / run: no S1, no fallback in any commit)
-  "navigationKeepsStreams.test.tsx": 3, // 297-02 (D-10 / D-07) — real App + OrgProvider + StreamsProvider: six navigations, one subscription, signal not aborted, probe mounted once; main.tsx one route, no provider key
+  "navigationKeepsStreams.test.tsx": 4, // RAISED 3 -> 4 at 299-02 (2026-10-28): a live stream survives /app/chat/U -> /app/chat/V -> Back -> Library -> Chat (one subscription, never aborted, probe mounted once) ·  297-02 (D-10 / D-07) — real App + OrgProvider + StreamsProvider: six navigations, one subscription, signal not aborted, probe mounted once; main.tsx one route, no provider key
   "appRoutes.test.ts": 144, // RAISED 111 -> 144 at 299-02 (2026-10-28): chat/workflows/experts entity addresses parse lowercased, id-less forms carry no id key, wrong-shape ids not-found, format + round-trip, bare + uppercase + trailing-slash normalise, ?run= home-only ·  297-02 — route table: 12-member round-trip, D-11 table, strict ids, legacy ?run= / ?connections=1 / /admin/spend, bare prefixes, pre-auth untouched, hostile inputs never throw or leave the origin
   // ── Phase 297-03 (LINK-07 / D-21, D-24, D-32, D-42) — adopted, both knobs, same commit (2026-10-27).
   "useAppNavigation.leaveGuard.test.tsx": 26, // 297-03 — one app blocker: dirty asks EXACTLY once under StrictMode (Back/Forward/rail), clean 0, no-op default, forced bounce 0, one-shot latch, reverted POP 1/2/3, registry unit. 2026-10-28 297-REVIEW WR-01: 23 -> 24, browser router over a raw hash-write entry (Cancel keeps the Builder). WR-04: 24 -> 26, a cancelled attention-route click spends the Health hand-off (+ OK positive control)
@@ -4463,6 +4463,9 @@ const BASELINE = {
   "useAuth.test.ts": 9, // 299-05 — SSO redirectTo / sign-up emailRedirectTo = origin + rebuilt path (or /app) + remembered; password passes none and forgets; rejected getSession ends loading with user null; a hung one keeps loading and no timer clears a signed-in user (Pitfall 6)
   "AuthPage.returnLine.test.tsx": 8, // 299-05 — S5: the kind-only line under the form on an entity address, sign-up wording after the switch, no line on home / a view / off-site / unknown, React text only
   "BootScreen.test.tsx": 9, // 299-05 — S6 on one clock (fake timers): 0-7.9 s verbatim splash, 8 s "Still connecting…" in the same status, 20 s heading + body + focused Try again (idle Iris, no alert), kept sentence only on an entity address, reload once + no History write, unmount clears both timers; App's splash branch IS BootScreen (gives up at 20 s, never the sign-in form), and resolves to the card as today
+  // ── Phase 299-02 (LINK-02 / D-02, D-32) — both knobs, same commit (2026-10-28). src/hooks/__tests__
+  //    has no directory entry, so the new file is FILE-LEVEL in TARGETS below.
+  "useThreadAddress.test.tsx": 21, // 299-02 — real router + fake link: cold address holds then selects once (no entry), absent thread keeps holding, refetch does not re-run, pick/New chat/openThread/off-chat pick + Chat/rail each ONE entry, Back selects and pushes nothing, Back home deselects, plain deselect replaces, IN-01 org change keeps the address (x2), leaveThread counts, holding, inert without a link, source fence
   "ChatLayout.mobileLoading.test.tsx": 4, // 299-05 (FIX-02 / BUG-261027-02) — real ChatLayout + useThreads + ChatHistoryColumn, listThreads deferred: desktop first load says "Loading your chats…" then "No recent chats" only after a settled []; chats answer → rows, no loader; mobile drawer the same (empty sentence style unchanged); a settled no-match search still says "No chats match your search."
 }
 
@@ -6541,6 +6544,8 @@ const TARGETS = [
   // Phase 299-05 — FILE-LEVEL (no src/components/layout/__tests__ directory entry), SAME commit as its pin.
   "src/components/layout/__tests__/BootScreen.test.tsx",
   "src/components/layout/__tests__/ChatLayout.mobileLoading.test.tsx",
+  // Phase 299-02 — FILE-LEVEL (no src/hooks/__tests__ directory entry), SAME commit as its pin.
+  "src/hooks/__tests__/useThreadAddress.test.tsx",
 ]
 
 const REPO_ROOT = path.resolve(__dirname, "..")

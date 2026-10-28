@@ -33,7 +33,12 @@ const h = vi.hoisted(() => ({
   probe: {
     mounts: 0,
     unmounts: 0,
-    props: null as null | { activeView: string; onNavigate: (v: string) => void },
+    props: null as null | {
+      activeView: string
+      onNavigate: (v: string) => void
+      // Phase 299-02: App's one entity navigator object (D-02).
+      entityLink?: { openThread: (id: string) => void; target: { kind: string; id: string } | null }
+    },
     actions: null as null | {
       setViewingThread: (id: string | null) => void
       sendMessage: (threadId: string, text: string) => Promise<unknown>
@@ -41,6 +46,9 @@ const h = vi.hoisted(() => ({
   },
   THREAD_A: "thread-297-a",
   RUN: "run-297-a",
+  // Phase 299-02: thread ADDRESSES take strict UUIDs (D-01), so the address case streams in these.
+  THREAD_U: "5d0c2a9e-3b1f-4c6d-8e7a-1f2b3c4d5e71",
+  THREAD_V: "5d0c2a9e-3b1f-4c6d-8e7a-1f2b3c4d5e72",
 }))
 
 vi.mock("@/hooks/useAuth", () => ({
@@ -97,7 +105,7 @@ vi.mock("@/lib/supabase", () => ({
 // The probe stands where ChatLayout stands: under the real providers, fed by the real hook.
 vi.mock("@/components/layout/ChatLayout", async () => {
   const { useStreamActions } = await import("@/providers/StreamsProvider")
-  function ChatLayoutProbe(props: { activeView: string; onNavigate: (v: string) => void }) {
+  function ChatLayoutProbe(props: NonNullable<typeof h.probe.props>) {
     h.probe.props = props
     const actions = useStreamActions()
     useEffect(() => {
@@ -112,7 +120,7 @@ vi.mock("@/components/layout/ChatLayout", async () => {
   return { ChatLayout: ChatLayoutProbe }
 })
 
-const { THREAD_A, RUN } = h
+const { THREAD_A, RUN, THREAD_U, THREAD_V } = h
 
 import App from "@/App"
 import { useStreamsStore } from "@/stores/streamsStore"
@@ -200,6 +208,50 @@ describe("D-10 — a live stream in thread A survives six navigations", () => {
     expect(signal.aborted).toBe(false)
     expect(useStreamsStore.getState().subscriptionsByThread.get(THREAD_A)?.size).toBe(subsBefore)
     expect(useStreamsStore.getState().streamingThreads.has(THREAD_A)).toBe(true)
+    expect(h.probe.mounts).toBe(1)
+    expect(h.probe.unmounts).toBe(0)
+  })
+})
+
+// Phase 299-02 (D-02 / T-299-21): the selected thread now lives in the address, so a thread change
+// is a NAVIGATION. It must be the same kind of navigation as the six above: no key, no remount, the
+// one subscription untouched. Driven through App's own `entityLink` (the prop ChatLayout receives).
+describe("D-02 — a live stream survives thread-address navigation (299-02)", () => {
+  it("/app/chat/U → /app/chat/V → Back keeps the one subscription, never aborted, probe mounted once", async () => {
+    const router = createMemoryRouter([{ path: "*", Component: App }], { initialEntries: [`/app/chat/${THREAD_U}`] })
+    render(<RouterProvider router={router} />)
+
+    await waitFor(() => expect(h.probe.actions).not.toBeNull(), SETUP)
+    expect(h.probe.props!.entityLink?.target).toEqual({ kind: "thread", id: THREAD_U })
+    await act(async () => {
+      h.probe.actions!.setViewingThread(THREAD_U)
+    })
+    await waitFor(() => expect(h.mockGetThreadWorkflow).toHaveBeenCalled(), SETUP)
+    await act(async () => {
+      void h.probe.actions!.sendMessage(THREAD_U, "research this thoroughly")
+    })
+    await waitFor(() => expect(h.mockSubscribeToRun).toHaveBeenCalledTimes(1), SETUP)
+    const signal = h.mockSubscribeToRun.mock.calls[0][3] as AbortSignal
+    const subsBefore = useStreamsStore.getState().subscriptionsByThread.get(THREAD_U)?.size
+    expect(subsBefore).toBeGreaterThan(0)
+
+    await act(async () => {
+      h.probe.props!.entityLink!.openThread(THREAD_V)
+    })
+    expect(router.state.location.pathname).toBe(`/app/chat/${THREAD_V}`)
+    expect(h.probe.props!.entityLink?.target).toEqual({ kind: "thread", id: THREAD_V })
+    await act(() => router.navigate(-1))
+    expect(router.state.location.pathname).toBe(`/app/chat/${THREAD_U}`)
+    await nav("documents")
+    expect(router.state.location.pathname).toBe("/app/library")
+    await nav("chat")
+    // Chat returns to the last thread address (D-02).
+    expect(router.state.location.pathname).toBe(`/app/chat/${THREAD_U}`)
+
+    expect(h.mockSubscribeToRun).toHaveBeenCalledTimes(1)
+    expect(signal.aborted).toBe(false)
+    expect(useStreamsStore.getState().subscriptionsByThread.get(THREAD_U)?.size).toBe(subsBefore)
+    expect(useStreamsStore.getState().streamingThreads.has(THREAD_U)).toBe(true)
     expect(h.probe.mounts).toBe(1)
     expect(h.probe.unmounts).toBe(0)
   })
