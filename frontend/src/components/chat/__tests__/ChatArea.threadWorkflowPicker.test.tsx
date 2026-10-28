@@ -11,6 +11,7 @@
  */
 import { afterEach, beforeAll, beforeEach, describe, expect, it, vi } from "vitest"
 import { act, cleanup, render, screen, waitFor } from "@testing-library/react"
+import userEvent from "@testing-library/user-event"
 import type { ReactNode } from "react"
 import type { Thread } from "@/types"
 
@@ -164,5 +165,28 @@ describe("ChatArea - the ThreadWorkflowPicker mount", () => {
     await screen.findByTestId("thread-workflow-trigger")
     await act(async () => {})
     expect(h.listPublishedWorkflows.mock.calls.length).toBeLessThanOrEqual(baseline)
+  })
+})
+// Phase 299-04 (D-20 / UI-SPEC S4) — the chat header's ONE link mount, in this file because it needs
+// ChatArea's real harness (the streams provider); the surface itself is pinned in ShareLinkMenu.test.
+describe("ChatArea - the link control in the header (299-04)", () => {
+  it("with a thread: a compact 'Link to this chat' trigger after the title, owner-only, the chat's own address", async () => {
+    const user = userEvent.setup()
+    render(shell(<ChatArea thread={THREAD} onCreateThread={vi.fn()} folders={[]} />))
+    const trigger = await screen.findByRole("button", { name: "Link to this chat" })
+    const title = screen.getByRole("heading", { name: "Board prep" })
+    expect(title.compareDocumentPosition(trigger) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy()
+    expect(trigger.className).toContain("ml-auto")
+    expect(trigger.className).toContain("h-11")
+    await user.click(trigger)
+    const menu = await screen.findByRole("menu")
+    expect(menu.querySelector("code")?.textContent).toBe(`${window.location.host}/app/chat/thread-a`)
+    expect(menu).toHaveTextContent("Opens only for you, on any device you're signed in on.")
+  })
+
+  it("no thread (the welcome screen): no link control", async () => {
+    render(shell(<ChatArea thread={null} onCreateThread={vi.fn()} folders={[]} />))
+    await screen.findByRole("textbox")
+    expect(screen.queryByRole("button", { name: "Link to this chat" })).toBeNull()
   })
 })

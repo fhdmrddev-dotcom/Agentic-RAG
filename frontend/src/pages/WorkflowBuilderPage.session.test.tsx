@@ -41,6 +41,7 @@
  */
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest"
 import { act, cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react"
+import userEvent from "@testing-library/user-event"
 
 // FILE-LOCAL, never `setupTests.ts` — the helper patches HTMLElement.prototype and a
 // global install would perturb every suite and destroy the phase's count differential.
@@ -928,5 +929,43 @@ describe("WorkflowBuilderPage session 186-07 — autosave writes without being a
     // Reload re-reads the drafts list; Overwrite re-enters the writer. Neither happened.
     expect(mockListDrafts).not.toHaveBeenCalled()
     expect(screen.getByTestId("builder-conflict-banner")).toBeInTheDocument()
+  })
+})
+// Phase 299-04 (D-20 / UI-SPEC S4) — the Builder header's ONE link mount, in this file because it
+// needs the whole page factory; the surface itself is pinned in ShareLinkMenu.test.
+describe("WorkflowsPage Builder - the link control on a draft (299-04)", () => {
+  it("an OPENED draft shows 'Link to this workflow' with the draft's own address, owner-only", async () => {
+    mockListDrafts.mockResolvedValue([
+      { id: "draft-1", slug: "vendor-brief", version: 1, name: "Vendor brief", definition, token: "tok" },
+    ])
+    render(
+      <EffectiveFeaturesProvider value={{ ...FLAG_ON, refetch: vi.fn() }}>
+        <div style={{ width: 1200, height: 800 }}>
+          <WorkflowsPage folders={[]} onLaunch={vi.fn()} />
+        </div>
+      </EffectiveFeaturesProvider>,
+    )
+    fireEvent.click(await screen.findByTestId("draft-open"))
+    await screen.findByTestId("door-govern")
+    const trigger = screen.getByRole("button", { name: "Link to this workflow" })
+    const user = userEvent.setup()
+    await user.click(trigger)
+    const menu = await screen.findByRole("menu")
+    expect(menu.querySelector("code")?.textContent).toBe(`${window.location.host}/app/workflows/draft-1`)
+    expect(menu).toHaveTextContent("Opens only for you, on any device you're signed in on.")
+  })
+
+  it("the pre-draft 'Build a workflow' state has no link control (no id yet)", async () => {
+    render(
+      <EffectiveFeaturesProvider value={{ ...FLAG_ON, refetch: vi.fn() }}>
+        <div style={{ width: 1200, height: 800 }}>
+          <WorkflowsPage folders={[]} onLaunch={vi.fn()} />
+        </div>
+      </EffectiveFeaturesProvider>,
+    )
+    fireEvent.click(await screen.findByTestId("library-create"))
+    await screen.findByTestId("workflow-doors")
+    expect(screen.getByText("Build a workflow")).toBeInTheDocument()
+    expect(screen.queryByRole("button", { name: "Link to this workflow" })).toBeNull()
   })
 })

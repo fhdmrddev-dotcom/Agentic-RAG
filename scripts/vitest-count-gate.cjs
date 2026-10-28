@@ -235,7 +235,7 @@ const BASELINE = {
   //    the chat + providers ones are named FILE-LEVEL below (no bare directory entry exists).
   "ThreadWorkflowPicker.test.tsx": 17, // 2026-10-28 298-02: 9 -> 17 (printed actual; +1 a folder refusal shows the server sentence with no Retry)
   "useStartWorkflowInThread.test.tsx": 24, // 2026-10-28 298-02: 7 -> 24 (printed actual; +5 the coded folder refusal is kind folder, other 422s unchanged)
-  "ChatArea.threadWorkflowPicker.test.tsx": 5,
+  "ChatArea.threadWorkflowPicker.test.tsx": 7, // RAISED 5 -> 7 at 299-04: the header link mount (after the title, compact, owner-only, the chat's own address) and none on the welcome screen
   "StreamsProvider.inputs.test.tsx": 3,
   "soulData.requiredFields.test.ts": 7,
   "starterFork.287.test.tsx": 3,
@@ -2353,7 +2353,7 @@ const BASELINE = {
   // before pinning by two standalone runs, both `23 passed (23)` / 0 failing. Read from this
   // script's own `actual` column: it reported `— 23 new` on the run that first put the file
   // inside TARGETS, and `delta 0` on the two runs after this pin landed.
-  "WorkflowBuilderPage.session.test.tsx": 23,
+  "WorkflowBuilderPage.session.test.tsx": 25, // RAISED 23 -> 25 at 299-04: an opened draft shows the link with its own address (owner-only); the pre-draft chooser has none
   // ── 192-12 (Phase 192 Wave 8, the CLOSING commit): THE EXEMPTION EXPIRES ───────────────
   //
   // 188-12's statement, applied to this phase's own output: AN UNPINNED SUITE IS AN
@@ -4483,6 +4483,7 @@ const BASELINE = {
   //    and src/components/share/__tests__ have no directory entry, so each new file is FILE-LEVEL in TARGETS below.
   "linkAudience.lockstep.test.ts": 20, // 299-04 (D-33 / D-34 / T-299-32) — audienceOf equals every row of backend link_audience_cases.json (?raw) and the backend TERMINAL_RUN_STATUSES literal; an unfinished run never opens for members; the five UI-D15 sentences verbatim, null org falls back to owner-only, each sentence once in the leaf, the leaf imports nothing; linkNoun per kind
   "ShareLinkMenu.test.tsx": 12, // RAISED 11 -> 12 at 299-04 (WR-03 sweep over the header surface: every direct child a menuitem or group) · 299-04 (D-20 / D-21 / D-39 / UI-D12..UI-D15) — trigger word Link (not Share), icon hidden, icon-only below md, aria-label per kind; surface label + host address in <code> + ONE Copy link item + audience line (org name foreground), described-by both; unknown / no org falls back; copies origin + path once (no ? / #), stays open, ✓ Link copied 2 s + status; refused selects the code + shortcut word, never success; no toast / popover / input; the ⋯ sub form
+  "shareMounts.test.tsx": 14, // 299-04 (D-20 / D-33 / D-34) — card ⋯ menu: Link to this workflow is the FIRST item + WR-03, starter = anyone, published / draft owner-only, copies /app/workflows/<id>; run page: unfinished run trigger after v-chip before Stop + owner-only, a finished run's evidence report carries it and opens for the run's org, no org stays owner-only; Expert detail: trigger before the close control inside pr-8, six visibility / system / off lines, copies /app/experts/<id>
 }
 
 // Still COMPUTED, never hand-written — the reduce is the single source, so the
@@ -6573,6 +6574,7 @@ const TARGETS = [
   // Phase 299-04 — FILE-LEVEL (no src/lib/__tests__ or src/components/share/__tests__ directory entry), SAME commit as their pins.
   "src/lib/__tests__/linkAudience.lockstep.test.ts",
   "src/components/share/__tests__/ShareLinkMenu.test.tsx",
+  "src/components/share/__tests__/shareMounts.test.tsx",
 ]
 
 const REPO_ROOT = path.resolve(__dirname, "..")
