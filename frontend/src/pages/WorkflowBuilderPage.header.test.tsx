@@ -275,7 +275,9 @@ function headerBandsAbove(grid: Element, root: Element): Element[] {
 }
 
 /** Collapse whitespace runs so the literal is diffable and indentation-independent. */
-const normalise = (html: string) => html.replace(/\s+/g, " ").trim()
+// 299-04: a Radix trigger's `useId` id (`radix-_r_N_`) is a render-order counter, not content,
+// so it is normalised away — the pinned markup carries `radix-ID` where the Link trigger's id is.
+const normalise = (html: string) => html.replace(/\s+/g, " ").replace(/radix-_r_[0-9a-z]+_/g, "radix-ID").trim()
 
 /** The three bands, outermost first, as ONE normalised string. */
 function headerMarkup(grid: Element, root: Element): string {
@@ -502,8 +504,15 @@ describe("Builder header, canvas flag OFF — three separate bands (D-181-01)", 
  *    `text-foreground` while also moving its text node. That is a DIFFERENT re-capture from this
  *    one and still owes the four-part procedure.
  */
+/*
+ * ⚠ 299-04 RE-CAPTURE (2026-10-28) — a BEHAVIOUR change, explained here as the note above asks:
+ * the breadcrumb band gains ONE node, the draft's "Link" trigger (D-20 / UI-SPEC S4: "in the
+ * breadcrumb group, after the draft label"). Band 1 gains exactly that `<button>` between the
+ * label span and the net-new flag; bands 2 and 3 are byte-unchanged. The class-free atom pins
+ * below gain exactly one word, "Link", in the same position.
+ */
 const FLAG_OFF_HEADER_MARKUP = [
-  `<div class="flex items-center gap-3 border-b border-border px-4 py-2"><button type="button" data-testid="builder-back" class="rounded-md border border-border px-2.5 py-1 text-[13px] text-muted-foreground hover:text-foreground">← Workflows</button><span class="text-[13px] font-medium text-foreground">Edit · Vendor brief v1</span><span data-testid="net-new-flag" title="Net-new surface — only GET /workflows/published + POST /workflows/{id}/publish are live today" class="rounded-full border border-accent-violet/40 bg-accent-violet/15 px-1.5 py-0.5 font-mono text-[8px] font-semibold uppercase text-accent-violet">net-new</span></div>`,
+  `<div class="flex items-center gap-3 border-b border-border px-4 py-2"><button type="button" data-testid="builder-back" class="rounded-md border border-border px-2.5 py-1 text-[13px] text-muted-foreground hover:text-foreground">← Workflows</button><span class="text-[13px] font-medium text-foreground">Edit · Vendor brief v1</span><button class="inline-flex items-center justify-center whitespace-nowrap text-sm font-medium ring-offset-background transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 [&amp;_svg]:pointer-events-none [&amp;_svg]:size-4 [&amp;_svg]:shrink-0 hover:bg-accent hover:text-accent-foreground rounded-md h-11 w-11 gap-2 px-0 md:h-9 md:w-auto md:px-3" aria-label="Link to this workflow" type="button" id="radix-ID" aria-haspopup="menu" aria-expanded="false" data-state="closed"><svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-link2 lucide-link-2 h-4 w-4" aria-hidden="true"><path d="M9 17H7A5 5 0 0 1 7 7h2"></path><path d="M15 7h2a5 5 0 1 1 0 10h-2"></path><line x1="8" x2="16" y1="12" y2="12"></line></svg><span class="hidden md:inline">Link</span></button><span data-testid="net-new-flag" title="Net-new surface — only GET /workflows/published + POST /workflows/{id}/publish are live today" class="rounded-full border border-accent-violet/40 bg-accent-violet/15 px-1.5 py-0.5 font-mono text-[8px] font-semibold uppercase text-accent-violet">net-new</span></div>`,
   `<div class="flex items-center gap-3 border-b border-border px-4 py-2"><button type="button" data-testid="both-doors" class="px-1 py-1 text-[13px] text-muted-foreground underline-offset-2 hover:text-foreground hover:underline focus-visible:text-foreground focus-visible:underline focus-visible:outline-none">‹ Change how I start</button><span aria-hidden="true" class="mx-0.5 h-4 w-px bg-border"></span><span class="text-[13px] font-medium text-foreground">Build it myself</span><span data-testid="judge-locked" title="The llm_judge_rubric output-quality judge is the publish gauntlet's hard wall — it runs on EVERY tier and cannot be switched off (TIERS.judgeAlwaysOn)." class="ml-auto inline-flex items-center gap-1 rounded-full border border-accent-violet/40 bg-accent-violet/10 px-2 py-0.5 font-mono text-[9px] font-semibold uppercase text-accent-violet"><span aria-hidden="true">🔒</span> judge always-on</span></div>`,
   `<header class="flex items-center justify-between border-b border-border px-4 py-2.5"><div class="flex min-w-0 items-center gap-2"><span class="min-w-0 truncate text-[14px] font-semibold text-muted-foreground">vendor-brief</span><span class="shrink-0 rounded bg-muted px-1.5 py-0.5 font-mono text-[11px] text-muted-foreground">draft</span></div><div class="flex shrink-0 items-center gap-2"><div data-testid="builder-save-state" class="flex items-center gap-2"><button type="button" data-testid="builder-save-draft" class="inline-flex items-center gap-1.5 rounded-md border border-border bg-card px-3 py-1.5 text-[13px] font-medium text-foreground transition-opacity hover:bg-accent/40 disabled:cursor-not-allowed disabled:opacity-60">Save draft</button></div><div><button type="button" data-testid="publish-trigger" class="rounded-md bg-primary px-3 py-1.5 text-[13px] font-semibold text-primary-foreground hover:opacity-90">◆ Publish…</button></div></div></header>`,
 ].join("\n")
@@ -1285,6 +1294,8 @@ describe("199-09 / sheet c10 §1 — the header's RESTING atoms, pinned as liter
     expect(headerAtoms(screen.getByTestId("builder-grid"), container)).toEqual([
       "← Workflows",
       "Edit · Vendor brief v1",
+      // 299-04 (D-20): the draft's Link trigger, after the draft label — the ONE new atom.
+      "Link",
       "net-new",
       STRIP_BACK,
       STRIP_LABEL_GOVERN,
@@ -1314,6 +1325,8 @@ describe("199-09 / sheet c10 §1 — the header's RESTING atoms, pinned as liter
     expect(headerAtoms(screen.getByTestId("builder-grid"), container)).toEqual([
       "← Workflows",
       "Edit · Vendor brief v1",
+      // 299-04 (D-20): the draft's Link trigger, after the draft label — the ONE new atom.
+      "Link",
       "net-new",
       "vendor-brief",
       "draft",
