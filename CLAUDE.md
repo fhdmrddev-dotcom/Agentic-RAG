@@ -486,7 +486,7 @@ node scripts/check-hot-file-ledger.cjs <phase-dir>   # 0 clear · 1 missing rows
 | `frontend/src/components/workflows/WaitingOnLine.tsx` | 1 / 1 / 26 | young (created 288-03) · leaf, no hook · ⛔ |
 | `frontend/src/components/chat/OutputFileCard.tsx` | 8 / 7 / 219 | honoured by construction (195) |
 | `frontend/src/components/panel/FilesSection.tsx` | 12 / 8 / 354 (was `10 / 6 / 363`) | ⚠ STALE · last touch 274-04 |
-| `frontend/src/lib/api.ts` | 214 / 127 / 552 (was `213 / 127 / 552`) | 298-05: orgItems block + elsewhere + move-preview + move (one block) |
+| `frontend/src/lib/api.ts` | 215 / 128 / 556 (was `214 / 127 / 552`) | 299-03: one links export block |
 | `frontend/src/types/index.ts` | 102 / 81 / 1685 (was `101 / 80 / 1674`) | 293-03: one RunOrigin type + one optional field · seam OWED |
 | `backend/app/main.py` | 97 / 71 / 993 (was `96 / 70 / 992`) | 299-01: one include_router(links.router) + its import token · ⛔ |
 | `backend/app/config.py` | 93 / 54 / 1809 (was `92 / 54 / 1790`) | honoured by construction (282-04: self-hosted default 900) · seam OWED · ⛔ |
