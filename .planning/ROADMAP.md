@@ -172,7 +172,14 @@ Plans:
   5. The chat list shows a loading state, not "No recent chats", while threads load (FIX-02).
 
 **How we'd know this failed**: a forbidden link can be told apart from a missing one (status, wording, timing), so the page leaks that an item exists; the org switches without asking; a write from a cross-org page lands in the wrong org; the return-to-link accepts an outside URL (open redirect) or a token rides in the URL; SSO return works locally and fails on cloud because the Redirect URLs lack `https://app.<domain>/**`; the boot screen still hangs with the network throttled; "No recent chats" still flashes on a slow load.
-**Plans**: TBD
+**Plans**: 5 plans (serial waves 1-5: every plan edits docs/HOT-FILE-LEDGER.md, CLAUDE.md and/or scripts/vitest-count-gate.cjs)
+
+- [ ] 299-01-PLAN.md — the `GET /links/{kind}/{id}` resolver (one statement per kind, one 404), run `org_id`, and the write-org guards (LINK-04, LINK-05)
+- [ ] 299-05-PLAN.md — sign-in returns to the link, the boot screen gives up with a retry, and "Loading your chats…" until the list answers (LINK-06, FIX-02)
+- [ ] 299-02-PLAN.md — chat / workflow / Expert addresses, the thread lives in the URL, open a workflow or Expert by id (LINK-02, LINK-03)
+- [ ] 299-03-PLAN.md — the one gate: the in-place "can't be opened" card, "This is in <org> — switch?", the sign-in resume (LINK-04, LINK-05, LINK-06)
+- [ ] 299-04-PLAN.md — the Link control on five surfaces with an honest who-can-open line, and "Saves in <org>" (LINK-03, LINK-05)
+
 **UI hint**: yes
 **Flags**: **G-2 sketch FIRST** for the "can't be opened" page, the switch prompt, the copy-link control and the loading/not-found states. **G-4** (operator's "I'd recognise failure here" scenarios at scope time). **security_enforcement**: identical 404 for missing and forbidden, same-origin relative return paths only, server resolves each entity's org and writes use it or are refused (research pitfall 4); additive `org_id` on the run read. **Four-axis** (UI state; the switch prompt and a live stream). **G-5**: `ChatLayout.tsx` / `App.tsx` (now through 297's extracted modules), `backend/app/api/threads.py` (95), `backend/app/api/workflow_runs.py` (15), `ChatHistoryColumn.tsx`, `useThreads.ts` (3), `OrgAdminShell.tsx` (6), `SettingsPage.tsx` (30), `ExpertCatalogPage.tsx` (6), `startScopedChat.ts`. **Research flags**: Expert bundle org semantics (what an Expert link means across orgs); one live SSO round trip on cloud; how return-to-link interacts with supabase-js `^2.99.2` hash-token handling. **Operator action**: add `https://app.<domain>/**` (and the one-box origin) to Supabase Auth Redirect URLs — on the deploy parity checklist. Folds `SEED-178`, `SEED-015`, `SEED-312`, `BUG-261027-02`.
 

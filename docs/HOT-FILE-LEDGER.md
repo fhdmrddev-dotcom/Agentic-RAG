@@ -12225,6 +12225,24 @@ cells rot within days.
 | [`frontend/src/components/org/MoveToOrgSheet.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentsorgmovetoorgsheettsx) | 2 / 1 / 465 (was `1 / 1 / 433`) | no (young) | 298-review WR-02: MoveToOrgSheetHost claims in mount order; only the earliest mounted claimant of a kind renders the sheet (the phone Library mounts two). ⛔ no red; preview before Move |
 | [`frontend/src/components/org/MoveToOrgMenuItem.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentsorgmovetoorgmenuitemtsx) | 2 / 1 / 91 (was `1 / 1 / 88`) | no (young) | young (298-05): Move to <Org>… DropdownMenuItem(s) with data-move-item (menus widen by CSS), one per other org by name, collapsed at 4+. ⛔ absent solo / non-owner / no provider |
 | [`frontend/src/components/org/MoveToOrgButton.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentsorgmovetoorgbuttontsx) | 1 / 1 / 82 | no (young) | young (created 298-05): Root-document move button(s) for the detail panel; owns its sheet; onMoved after the moved sheet closes. ⛔ only an owned latest Root document at 2+ orgs |
+| [`backend/app/api/links.py`](docs/HOT-FILE-LEDGER.md#backendappapilinkspy) | 0 / 0 / 0 | no (planned 299-01) | young (planned 299-01). GET /links/{kind}/{id}: one 404 body for every refusal (D-06/D-08). ⛔ no get_active_org_id / require_capability / require_visible; 401 router-level |
+| [`backend/app/services/link_resolver.py`](docs/HOT-FILE-LEDGER.md#backendappserviceslink_resolverpy) | 0 / 0 / 0 | no (planned 299-01) | young (planned 299-01). one SQL per kind; run + expert on the pool with $2 = caller (P1/P2). ⛔ one statement per kind; audience rule twinned with lib/linkAudience.ts |
+| [`backend/app/services/item_org_guard.py`](docs/HOT-FILE-LEDGER.md#backendappservicesitem_org_guardpy) | 0 / 0 / 0 | no (planned 299-01) | young (planned 299-01). D-18 409 helper (send / kickoff / Tweak). ⛔ no-op without an active org (298 D-03); never a widening of _require_thread_org |
+| [`frontend/src/lib/returnTo.ts`](docs/HOT-FILE-LEDGER.md#frontendsrclibreturntots) | 0 / 0 / 0 | no (planned 299-05) | young (planned 299-05). return-to-link leaf (D-23/D-24). ⛔ strict leaf; rebuilt via formatAppRoute, never echoed; sessionStorage TTL, consumed once |
+| [`frontend/src/components/layout/BootScreen.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentslayoutbootscreentsx) | 0 / 0 / 0 | no (planned 299-05) | young (planned 299-05). three-stage boot clock 8 s / 20 s (D-26, SEED-312). ⛔ Try again = reload (no History write); never decides auth |
+| [`frontend/src/hooks/useThreadAddress.ts`](docs/HOT-FILE-LEDGER.md#frontendsrchooksusethreadaddressts) | 0 / 0 / 0 | no (planned 299-02) | young (planned 299-02). URL ⇄ selected thread binding (D-02/D-32). ⛔ never setViewingThread, never a router hook; deps [threadId, pending] |
+| [`frontend/src/components/workflows/library/useWorkflowLinkTarget.ts`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentsworkflowslibraryuseworkflowlinktargetts) | 0 / 0 / 0 | no (planned 299-02) | young (planned 299-02). open a draft / focus a published card by id (D-03). ⛔ no write on open; in LIBRARY_SUBTREE_PATHS; never imports the page |
+| [`frontend/src/components/experts/catalog/useExpertLinkTarget.ts`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentsexpertscataloguseexpertlinktargetts) | 0 / 0 / 0 | no (planned 299-02) | young (planned 299-02). open an Expert's detail by id (D-04). ⛔ read only (list or getExpert); fires once per id |
+| [`frontend/src/lib/clipboard.ts`](docs/HOT-FILE-LEDGER.md#frontendsrclibclipboardts) | 0 / 0 / 0 | no (planned 299-03) | young (planned 299-03). copyText → copied or refused (D-21). ⛔ never throws; never reports a refused copy as copied |
+| [`frontend/src/lib/api/links.ts`](docs/HOT-FILE-LEDGER.md#frontendsrclibapilinksts) | 0 / 0 / 0 | no (planned 299-03) | young (planned 299-03). resolveLink client: 404 → cant, anything else throws (D-06). ⛔ an outage is never reported as can't-be-opened |
+| [`frontend/src/components/layout/CantBeOpened.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentslayoutcantbeopenedtsx) | 0 / 0 / 0 | no (planned 299-03) | young (planned 299-03). the one in-place card (D-12..D-15, D-36), absorbs AddressNotFound. ⛔ no raw path prop; rebuilt address only; one copy home |
+| [`frontend/src/components/layout/LinkGate.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentslayoutlinkgatetsx) | 0 / 0 / 0 | no (planned 299-03) | young (planned 299-03). resolve + decide: holding / cant / prompt / open; resume (D-12..D-17, D-24). ⛔ no router hook; StreamsProvider untouched |
+| [`frontend/src/components/layout/SwitchOrgPrompt.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentslayoutswitchorgprompttsx) | 0 / 0 / 0 | no (planned 299-03) | young (planned 299-03). This is in <org> — switch? (D-16/D-17/D-39). ⛔ never calls switchOrg itself; one filled button; words from orgItemsCopy |
+| [`frontend/src/components/share/ShareLinkMenu.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentssharesharelinkmenutsx) | 0 / 0 / 0 | no (planned 299-04) | young (planned 299-04). link surface on DropdownMenu (D-20/D-21/D-39). ⛔ one focusable item; copied = origin + formatAppRoute; no toast |
+| [`frontend/src/lib/linkAudience.ts`](docs/HOT-FILE-LEDGER.md#frontendsrcliblinkaudiencets) | 0 / 0 / 0 | no (planned 299-04) | young (planned 299-04). who-can-open line (D-33/D-34). ⛔ strict leaf; pinned to backend/tests/unit/fixtures/link_audience_cases.json |
+| [`frontend/src/components/org/SavesInOrg.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentsorgsavesinorgtsx) | 0 / 0 / 0 | no (planned 299-04) | young (planned 299-04). Saves in <org> caption (D-18/D-38). ⛔ renders nothing below 2 orgs; only on buttons that create |
+| [`frontend/src/hooks/useAuth.ts`](docs/HOT-FILE-LEDGER.md#frontendsrchooksuseauthts) | 5 / 4 / 100 | ⚠ **FIRES** | ⚠ absent its ENTIRE LIFE at 4 phases — row added at 299 planning (F10). 299-05: redirect options + getSession catch. ⛔ no hash access; no timer sets user |
+| [`frontend/src/components/workflows/library/useWorkflowFork.ts`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentsworkflowslibraryuseworkflowforkts) | 3 / 1 / 517 | no | ⚠ absent its entire life — row added at 299 planning (F10). 299-04: the Tweak fork sends fromDefinitionId (D-38) |
 
 
 
@@ -26777,3 +26795,79 @@ Scan-list cell as of 2026-10-28 (replaced by 298-review, moved verbatim): 1 / 1 
 **`2 / 1 / 108` (was `1 / 1 / 71`).** 298-review WR-09: `root_upload_org` re-asks once when a well-formed header was sent and the lenient resolver said None: non-member → None, member → org, failed read → 503 (`ORG_UNCONFIRMED`). List helpers unchanged.
 
 Scan-list cell as of 2026-10-28 (replaced by 298-review, moved verbatim): 1 / 1 / 71 | no | young (created 298-01). Polarity-safe list narrowing, one home (D-06). ⛔ None → {} / no predicate; never an empty set, never restrict_org_ids=None; never the 400-ing org gate
+
+## Phase 299 — rows added AT PLANNING (2026-10-28)
+
+### `backend/app/api/links.py`
+
+**Added AT PLANNING (Phase 299, 2026-10-28) with `0 / 0 / 0`** — the file does not exist yet; plan `299-01` creates it and re-derives the triple in its creating commit (the 297 leaveGuard.ts precedent). young (planned 299-01). GET /links/{kind}/{id}: one 404 body for every refusal (D-06/D-08). ⛔ no get_active_org_id / require_capability / require_visible; 401 router-level
+
+### `backend/app/services/link_resolver.py`
+
+**Added AT PLANNING (Phase 299, 2026-10-28) with `0 / 0 / 0`** — the file does not exist yet; plan `299-01` creates it and re-derives the triple in its creating commit (the 297 leaveGuard.ts precedent). young (planned 299-01). one SQL per kind; run + expert on the pool with $2 = caller (P1/P2). ⛔ one statement per kind; audience rule twinned with lib/linkAudience.ts
+
+### `backend/app/services/item_org_guard.py`
+
+**Added AT PLANNING (Phase 299, 2026-10-28) with `0 / 0 / 0`** — the file does not exist yet; plan `299-01` creates it and re-derives the triple in its creating commit (the 297 leaveGuard.ts precedent). young (planned 299-01). D-18 409 helper (send / kickoff / Tweak). ⛔ no-op without an active org (298 D-03); never a widening of _require_thread_org
+
+### `frontend/src/lib/returnTo.ts`
+
+**Added AT PLANNING (Phase 299, 2026-10-28) with `0 / 0 / 0`** — the file does not exist yet; plan `299-05` creates it and re-derives the triple in its creating commit (the 297 leaveGuard.ts precedent). young (planned 299-05). return-to-link leaf (D-23/D-24). ⛔ strict leaf; rebuilt via formatAppRoute, never echoed; sessionStorage TTL, consumed once
+
+### `frontend/src/components/layout/BootScreen.tsx`
+
+**Added AT PLANNING (Phase 299, 2026-10-28) with `0 / 0 / 0`** — the file does not exist yet; plan `299-05` creates it and re-derives the triple in its creating commit (the 297 leaveGuard.ts precedent). young (planned 299-05). three-stage boot clock 8 s / 20 s (D-26, SEED-312). ⛔ Try again = reload (no History write); never decides auth
+
+### `frontend/src/hooks/useThreadAddress.ts`
+
+**Added AT PLANNING (Phase 299, 2026-10-28) with `0 / 0 / 0`** — the file does not exist yet; plan `299-02` creates it and re-derives the triple in its creating commit (the 297 leaveGuard.ts precedent). young (planned 299-02). URL ⇄ selected thread binding (D-02/D-32). ⛔ never setViewingThread, never a router hook; deps [threadId, pending]
+
+### `frontend/src/components/workflows/library/useWorkflowLinkTarget.ts`
+
+**Added AT PLANNING (Phase 299, 2026-10-28) with `0 / 0 / 0`** — the file does not exist yet; plan `299-02` creates it and re-derives the triple in its creating commit (the 297 leaveGuard.ts precedent). young (planned 299-02). open a draft / focus a published card by id (D-03). ⛔ no write on open; in LIBRARY_SUBTREE_PATHS; never imports the page
+
+### `frontend/src/components/experts/catalog/useExpertLinkTarget.ts`
+
+**Added AT PLANNING (Phase 299, 2026-10-28) with `0 / 0 / 0`** — the file does not exist yet; plan `299-02` creates it and re-derives the triple in its creating commit (the 297 leaveGuard.ts precedent). young (planned 299-02). open an Expert's detail by id (D-04). ⛔ read only (list or getExpert); fires once per id
+
+### `frontend/src/lib/clipboard.ts`
+
+**Added AT PLANNING (Phase 299, 2026-10-28) with `0 / 0 / 0`** — the file does not exist yet; plan `299-03` creates it and re-derives the triple in its creating commit (the 297 leaveGuard.ts precedent). young (planned 299-03). copyText → copied or refused (D-21). ⛔ never throws; never reports a refused copy as copied
+
+### `frontend/src/lib/api/links.ts`
+
+**Added AT PLANNING (Phase 299, 2026-10-28) with `0 / 0 / 0`** — the file does not exist yet; plan `299-03` creates it and re-derives the triple in its creating commit (the 297 leaveGuard.ts precedent). young (planned 299-03). resolveLink client: 404 → cant, anything else throws (D-06). ⛔ an outage is never reported as can't-be-opened
+
+### `frontend/src/components/layout/CantBeOpened.tsx`
+
+**Added AT PLANNING (Phase 299, 2026-10-28) with `0 / 0 / 0`** — the file does not exist yet; plan `299-03` creates it and re-derives the triple in its creating commit (the 297 leaveGuard.ts precedent). young (planned 299-03). the one in-place card (D-12..D-15, D-36), absorbs AddressNotFound. ⛔ no raw path prop; rebuilt address only; one copy home
+
+### `frontend/src/components/layout/LinkGate.tsx`
+
+**Added AT PLANNING (Phase 299, 2026-10-28) with `0 / 0 / 0`** — the file does not exist yet; plan `299-03` creates it and re-derives the triple in its creating commit (the 297 leaveGuard.ts precedent). young (planned 299-03). resolve + decide: holding / cant / prompt / open; resume (D-12..D-17, D-24). ⛔ no router hook; StreamsProvider untouched
+
+### `frontend/src/components/layout/SwitchOrgPrompt.tsx`
+
+**Added AT PLANNING (Phase 299, 2026-10-28) with `0 / 0 / 0`** — the file does not exist yet; plan `299-03` creates it and re-derives the triple in its creating commit (the 297 leaveGuard.ts precedent). young (planned 299-03). This is in <org> — switch? (D-16/D-17/D-39). ⛔ never calls switchOrg itself; one filled button; words from orgItemsCopy
+
+### `frontend/src/components/share/ShareLinkMenu.tsx`
+
+**Added AT PLANNING (Phase 299, 2026-10-28) with `0 / 0 / 0`** — the file does not exist yet; plan `299-04` creates it and re-derives the triple in its creating commit (the 297 leaveGuard.ts precedent). young (planned 299-04). link surface on DropdownMenu (D-20/D-21/D-39). ⛔ one focusable item; copied = origin + formatAppRoute; no toast
+
+### `frontend/src/lib/linkAudience.ts`
+
+**Added AT PLANNING (Phase 299, 2026-10-28) with `0 / 0 / 0`** — the file does not exist yet; plan `299-04` creates it and re-derives the triple in its creating commit (the 297 leaveGuard.ts precedent). young (planned 299-04). who-can-open line (D-33/D-34). ⛔ strict leaf; pinned to backend/tests/unit/fixtures/link_audience_cases.json
+
+### `frontend/src/components/org/SavesInOrg.tsx`
+
+**Added AT PLANNING (Phase 299, 2026-10-28) with `0 / 0 / 0`** — the file does not exist yet; plan `299-04` creates it and re-derives the triple in its creating commit (the 297 leaveGuard.ts precedent). young (planned 299-04). Saves in <org> caption (D-18/D-38). ⛔ renders nothing below 2 orgs; only on buttons that create
+
+### `frontend/src/hooks/useAuth.ts`
+
+**`5 / 4 / 100`, re-derived 2026-10-28 at 299 planning — ⚠ ALREADY FIRES (4 phases) and had NO ROW for its entire life** (299-RESEARCH F10). Plan `299-05` is its next touch: `getSession` gains a `.catch` that sets `loading=false` (SEED-312); `signInWithSSO` / `signUp` pass `redirectTo` / `emailRedirectTo` built only from `lib/returnTo.ts`; password sign-in clears the stored target.
+
+**Binding invariants (299):** ⛔ no app code reads or writes the URL hash (supabase-js implicit flow owns it); ⛔ no timer ever sets `user` to null (Pitfall 6 — a slow session read must never show the sign-in form to a signed-in person); redirect values are `window.location.origin` + a `returnTarget` result, never the raw address.
+
+### `frontend/src/components/workflows/library/useWorkflowFork.ts`
+
+**`3 / 1 / 517`, re-derived 2026-10-28 at 299 planning — no row for its entire life** (299-RESEARCH F10). Plan `299-04` is its next touch: the Tweak path calls `createWorkflowDraft(forked, signal, { fromDefinitionId })` so the server's D-18 refusal (`POST /workflows?from_definition_id=`) can fire. Below threshold; no seam owed.
