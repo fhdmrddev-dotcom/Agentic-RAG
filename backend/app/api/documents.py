@@ -576,6 +576,7 @@ async def upload_document(
     # which has RLS enabled but NO `authenticated` INSERT policy, so a user-JWT client would be
     # silently denied. Request-scoped work above uses the RLS-enforced `supabase`.
     service_supabase: Client = Depends(get_supabase),
+    request: Request = None,  # FastAPI injects it; direct callers may omit it (no header -> None)
 ):
     # Normalize mime type (strip charset suffix)
     mime_type = (file.content_type or "").split(";")[0].strip()
@@ -620,6 +621,9 @@ async def upload_document(
         user_id=current_user["id"],
         supabase=supabase,
         folder_id=folder_id,
+        # 298 (D-07, SEED-313): a ROOT upload lands in the validated active org — the org whose
+        # Root list will show it. Foldered: None, so the 280-03 arm (the folder's own org) holds.
+        org_id=await org_lists.root_upload_org(request, current_user, folder_id),
     )
     doc = mint_result.document
 

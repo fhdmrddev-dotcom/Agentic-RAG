@@ -64,6 +64,7 @@ vi.mock("@/lib/api", async () => {
 import { getActiveOrgId, setActiveOrgId, ACTIVE_ORG_STORAGE_KEY, type OrgPermissions } from "@/lib/api"
 import { OrgProvider, useOrg, useOrgOptional, type OrgValue } from "@/providers/OrgProvider"
 import { StreamsProvider } from "@/providers/StreamsProvider"
+import { useActiveOrgId } from "@/hooks/useActiveOrgId"
 import { useStreamsStore } from "@/stores/streamsStore"
 
 const THREAD_A = "thread-A"
@@ -261,9 +262,6 @@ describe("Phase 298-01 — OrgProvider self-heal header ordering (D-36)", () => 
   })
 
   it("useActiveOrgId() is null outside a provider and the provider's org inside", async () => {
-    // A variable specifier so the suite still LOADS while the hook does not exist (298-01 RED).
-    const hookModule = "@/hooks/useActiveOrgId"
-    const { useActiveOrgId } = (await import(/* @vite-ignore */ hookModule)) as typeof import("@/hooks/useActiveOrgId")
     expect(renderHook(() => useActiveOrgId()).result.current).toBeNull()
     const wrapper = ({ children }: { children: ReactNode }) => (
       <OrgProvider userId="user-1">{children}</OrgProvider>

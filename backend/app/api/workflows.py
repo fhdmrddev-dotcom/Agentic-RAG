@@ -76,6 +76,7 @@ from app.models.harness import WorkflowDefinition
 # stays patchable in tests (mirrors the threads.py module-import-for-patchability
 # discipline). NEVER import the orchestration fns by name — patch the module attr.
 from app.services import workflow_authoring
+from app.services import org_lists  # Phase 298 (D-06): the one home of list narrowing
 # Phase 182 (VALID-01 / D-182-06): ``grounding`` is imported as a MODULE for the same
 # patchability reason as ``publish_service`` above — the /validate + /grounding-bundle
 # routes resolve ``grounding.<fn>`` at call time, so a test can monkeypatch the shared
@@ -404,6 +405,7 @@ class DraftRow(BaseModel):
 async def get_published_workflows(
     project_folder_id: UUID | None = None,
     scope: str | None = None,
+    request: Request = None,  # FastAPI injects it; direct callers may omit it (no header -> None)
     current_user: dict = Depends(get_current_user),
 ) -> list[PublishedWorkflow]:
     """List the published workflow definitions the user may start (D-01 picker feed).
@@ -436,6 +438,8 @@ async def get_published_workflows(
         user_id=UUID(user_id) if isinstance(user_id, str) else user_id,
         project_folder_id=project_folder_id,
         owned_only=(scope == "mine"),
+        # 298 (D-01/D-02): narrows to the validated active org (globals kept); None = today.
+        org_id=await org_lists.active_org_uuid(request, current_user),
     )
     # Phase 192 (D-04): the row's raw ``created_by`` is consumed HERE and dies HERE — it is
     # compared against the authenticated caller to produce one bit and is never assigned to a
@@ -1236,6 +1240,7 @@ async def create_draft(
     dependencies=[Depends(require_visible("workflow_authoring"))],  # Phase 148 (VIS-01) — authoring gate
 )
 async def list_drafts(
+    request: Request = None,  # FastAPI injects it; direct callers may omit it (no header -> None)
     current_user: dict = Depends(get_current_user),
 ) -> list[DraftRow]:
     """List the caller's OWN drafts (the drafts shelf — D-103-4).
@@ -1246,7 +1251,10 @@ async def list_drafts(
     """
     pool = await get_pg_pool()
     user_id = _coerce_user_id(current_user)
-    rows = await list_draft_workflows(pool, user_id=user_id)
+    # 298 (D-01/D-02): the caller's own drafts IN the active org; None = today's whole shelf.
+    rows = await list_draft_workflows(
+        pool, user_id=user_id, org_id=await org_lists.active_org_uuid(request, current_user)
+    )
     return [
         DraftRow(
             id=r["id"],

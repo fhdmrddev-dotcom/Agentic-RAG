@@ -401,7 +401,8 @@ async def test_a_published_feed_with_an_org_keeps_globals_and_binds_the_org(feed
     assert f" AND (wd.is_system_global = true OR wd.org_id = ${n})" in sql
     # the fence substrings survive (an AND-append, never a rewrite)
     assert "WHERE status = 'published' AND " in sql
-    assert sql.index(f"wd.org_id = ${n}") < sql.index("ORDER BY")
+    # the outer ORDER BY (the LATERALs carry their own, earlier in the text)
+    assert sql.index(f"wd.org_id = ${n}") < sql.rindex("ORDER BY")
 
 
 async def test_the_drafts_feed_with_an_org_appends_one_owner_org_predicate():
