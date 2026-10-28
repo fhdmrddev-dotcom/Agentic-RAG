@@ -23,14 +23,24 @@ above all) are not edited.
   list; an explicit ``None`` would break the rule that an unrestricted call to a documented
   monkeypatch seam is byte-identical ON THE WIRE, not merely in outcome.
 
-Every helper here can only SHRINK a set the caller can already read. None of them widens a scope,
-writes, or raises.
+Every helper here can only SHRINK a set the caller can already read. None of them widens a scope
+or writes, and the list helpers never raise. ⚠ ``root_upload_org`` is the one WRITE decision here,
+so it refuses (503) rather than fall back when a header it was sent cannot be validated
+(298-review WR-09).
 """
 from __future__ import annotations
 
 from uuid import UUID
 
+from fastapi import HTTPException, status
+
+from app import dependencies as _deps
 from app.dependencies import resolve_active_org_or_none
+
+#: 298-review WR-09: the Root upload's refusal when the org it was sent under cannot be confirmed.
+ORG_UNCONFIRMED = (
+    "We couldn't confirm your organization just now, so the file was not uploaded. Try again."
+)
 
 
 async def active_org(request, current_user: dict) -> str | None:
@@ -68,4 +78,31 @@ async def root_upload_org(request, current_user: dict, folder_id) -> str | None:
     """
     if folder_id:
         return None
-    return await active_org(request, current_user)
+    org = await active_org(request, current_user)
+    if org is not None:
+        return org
+    return await _confirm_header_or_refuse(request, current_user)
+
+
+async def _confirm_header_or_refuse(request, current_user: dict) -> str | None:
+    """298-review WR-09: ``resolve_active_org_or_none`` answers ``None`` both for "no / foreign
+    header" and for "the membership read FAILED". For a list ``None`` is the safe polarity; for a
+    Root upload it means the mig-106 ``LIMIT 1`` org (the SEED-313 mis-stamp, and the upload then
+    vanishes from the Root list it was sent from). So when a well-formed header WAS sent, re-ask
+    once: not a member -> ``None`` (fall back, as before); member -> the org; the read fails ->
+    503, nothing minted. No header (API keys, unattended callers) never probes."""
+    header_org = request.headers.get("X-Org-Id") if request is not None else None
+    org_uuid = _deps._to_uuid(header_org) if header_org else None
+    if org_uuid is None:
+        return None
+    try:
+        async with _deps.get_user_pg_connection(request, current_user) as conn:
+            row = await conn.fetchrow(
+                "SELECT role FROM public.org_members WHERE org_id = $1 AND user_id = auth.uid()",
+                org_uuid,
+            )
+    except Exception:  # noqa: BLE001 — a DB boundary; a WRITE must not guess the org
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE, detail=ORG_UNCONFIRMED
+        ) from None
+    return str(org_uuid) if row is not None else None
