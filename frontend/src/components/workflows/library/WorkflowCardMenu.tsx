@@ -56,6 +56,7 @@ import type { LibraryRow } from "./libraryRow"
 import type { WorkflowDeleteSheetHandle } from "./WorkflowDeleteSheet"
 import { MoveToOrgMenuItem } from "@/components/org/MoveToOrgMenuItem"
 import { ShareLinkMenuSub } from "@/components/share/ShareLinkMenu"
+import { SavesInOrg } from "@/components/org/SavesInOrg"
 import { audienceOf } from "@/lib/linkAudience"
 
 // ── The menu's words and classes (moved verbatim from WorkflowCard.tsx, 286-04) ──────────
@@ -435,6 +436,9 @@ export function WorkflowCardMenu({
                     className={MENU_NOTE_CLASSES}
                   >
                     {hasExistingFork ? FORK_CONSEQUENCE_EXISTING : FORK_CONSEQUENCE}
+                    {/* 299-04 (UI-D11): ONE mount — where the copy will be saved (2+ orgs only);
+                        an existing fork creates nothing, so it says nothing about saving. */}
+                    {!hasExistingFork && <SavesInOrg asSentence />}
                   </DropdownMenuGroup>
                 )}
               </DropdownMenuContent>

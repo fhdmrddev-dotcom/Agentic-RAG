@@ -196,6 +196,9 @@ describe("299-04 — Tweak", () => {
     const menu = await openMenu("published")
     const sub = within(menu).getByRole("menuitem", { name: /Link to this workflow/ })
     expect(sub.textContent).not.toContain("Saves in")
+  })
+
+  it("the header link surface never carries the caption", async () => {
     render(<ShareLinkMenu route={{ view: "chat", threadId: "t1" }} kind="thread" audience="only_you" orgId={null} />)
     await userEvent.setup().click(screen.getByRole("button", { name: "Link to this chat" }))
     const menus = await screen.findAllByRole("menu")
@@ -296,7 +299,8 @@ function backendSentences(src: string, kind: string): string[] {
   for (const block of ["REFUSALS = {", "REFUSALS_UNNAMED = {"]) {
     const start = src.indexOf(block)
     if (start < 0) throw new Error(`could not find ${block} in item_org_guard.py — update THIS parser`)
-    const body = src.slice(start, src.indexOf("}", start))
+    // the block ends at a line that is just "}" — the sentences themselves contain "{org}"
+    const body = src.slice(start, src.indexOf("\n}", start))
     const m = body.match(new RegExp(`"${kind}":\\s*"([^"]+)"`))
     if (!m) throw new Error(`no ${kind} entry in ${block}`)
     out.push(m[1].replace(/\{org\}/g, "Acme Legal"))

@@ -1140,7 +1140,8 @@ export function WorkflowsPage({ folders, onLaunch, onOpenRun, onOpenConnections,
           role="status"
           className="border-b border-warning/30 bg-warning/5 px-6 py-2 text-[12.5px] text-muted-foreground"
         >
-          {forkFailedMessage(forkFailed.name, forkFailed.conflict)}
+          {/* 299-04 (S8): the server's org-named Tweak refusal verbatim, else the page's own sentence. */}
+          {forkFailed.sentence ?? forkFailedMessage(forkFailed.name, forkFailed.conflict)}
         </p>
       )}
 

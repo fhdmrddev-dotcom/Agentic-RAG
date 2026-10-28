@@ -83,6 +83,7 @@ import {
 import { ExpertIcon } from "@/components/experts/expertIcon"
 import { ShareLinkMenu } from "@/components/share/ShareLinkMenu"
 import { audienceOf } from "@/lib/linkAudience"
+import { SavesInOrg } from "@/components/org/SavesInOrg"
 import {
   Dialog,
   DialogContent,
@@ -529,6 +530,9 @@ export function ExpertDetailModal({
           ) : (
             <FooterLine>{view.line}</FooterLine>
           )}
+          {/* 299-04 (UI-D11 / D-18): ONE mount beside Start a chat — where the new chat will be saved
+              (2+ orgs only). Not on Install: an install creates no item from this page. */}
+          {(view.kind === "legacy" || view.kind === "chat") && <SavesInOrg className="ml-2 self-center" />}
         </div>
       </DialogContent>
     </Dialog>

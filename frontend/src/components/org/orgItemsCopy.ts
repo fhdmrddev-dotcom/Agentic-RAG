@@ -202,3 +202,9 @@ export function yourChatInStill(previous: string): string {
 export const SWITCH_BACK = "Switch back"
 /** When an org's name is not known yet (the memberships have not answered). */
 export const THIS_ORG = "this organization"
+/** 299-04 (UI-D11 / D-18) — the caption on a button that creates an item, for a 2+ org person.
+ *  A hint only: the server's refusal (S8) is the guarantee. */
+export const SAVES_IN_PREFIX = "Saves in "
+export function savesIn(org: string): string {
+  return `${SAVES_IN_PREFIX}${org}`
+}

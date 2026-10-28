@@ -143,6 +143,26 @@ export interface PendingFork {
   kind: "version" | "starter"
 }
 
+/**
+ * The fork's failure notice. `name` + `conflict` select one of the page's own sentences; they
+ * cannot carry server prose (T-192-40).
+ *
+ * ⚠ 299-04 (S8 / D-38): `sentence` is the ONE exception, and it is narrow by construction — it is
+ * set only from a `WorkflowOrgRefusedError`, which the API client raises only for the Tweak 409
+ * whose fixed, org-named shape is pinned to `item_org_guard.py`. Any other failure keeps the
+ * prose-free shape, so no other server body reaches the screen.
+ */
+export interface ForkFailure {
+  name: string
+  conflict: boolean
+  sentence?: string
+}
+
+/** Classified by NAME (the `useDraftPersistence.refusalOf` idiom), never by prototype. */
+function isOrgRefusal(e: unknown): e is Error {
+  return e instanceof Error && e.name === "WorkflowOrgRefusedError"
+}
+
 export interface WorkflowForkArgs {
   /** The drafts feed, server-scoped to `created_by = caller`. Feeds `draftBySlug`. */
   drafts: WorkflowDraftRow[]
@@ -166,7 +186,7 @@ export interface WorkflowForkArgs {
 
 export interface WorkflowFork {
   /** The notice state. `null` = nothing to say. Rendered by the page's failure region. */
-  forkFailed: { name: string; conflict: boolean } | null
+  forkFailed: ForkFailure | null
   /** The caller's own drafts by slug, highest version wins. Also feeds `hasExistingFork`. */
   draftBySlug: Map<string, WorkflowDraftRow>
   /**
@@ -202,7 +222,7 @@ export function useWorkflowFork(args: WorkflowForkArgs): WorkflowFork {
    * ⚠ 192.1-03 (T-192.1-03): THE SHAPE IS NOT WIDENED BY THE MOVE. Widening it is the whole
    * disclosure threat — it is the only path from a thrown server error to the screen.
    */
-  const [forkFailed, setForkFailed] = useState<{ name: string; conflict: boolean } | null>(null)
+  const [forkFailed, setForkFailed] = useState<ForkFailure | null>(null)
 
   /**
    * 192.1-07 (D-19) — THE FORK THAT HAS BEEN ASKED FOR AND NOT YET NAMED.
@@ -311,7 +331,9 @@ export function useWorkflowFork(args: WorkflowForkArgs): WorkflowFork {
       // message left standing over a later success is its own kind of lie (T-192-43).
       setForkFailed(null)
       try {
-        const created = await createWorkflowDraft(forked)
+        // 299-04 (D-38): the Tweak names the published workflow it copies, so the server can
+        // refuse a copy of a workflow in another of the caller's orgs (299-01).
+        const created = await createWorkflowDraft(forked, undefined, { fromDefinitionId: wf.id })
         await refetchDrafts()
         // Load the fork's existing definition into the editing view with its NEW id.
         onForked({
@@ -339,7 +361,7 @@ export function useWorkflowFork(args: WorkflowForkArgs): WorkflowFork {
         // pointer costs nothing. The line's PURPOSE is unchanged — the developer's raw
         // evidence, which the person's sentence never replaces.
         console.error("[useWorkflowFork] Tweak fork failed", e)
-        setForkFailed({ name: wf.name, conflict: isForkConflict(e) })
+        setForkFailed(isOrgRefusal(e) ? { name: wf.name, conflict: false, sentence: e.message } : { name: wf.name, conflict: isForkConflict(e) })
       }
     },
     // ⚠ `draftBySlug` AND `onOpenDraft` ARE NO LONGER READ HERE — the existing-draft branch
