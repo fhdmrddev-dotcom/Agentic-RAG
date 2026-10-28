@@ -108,7 +108,10 @@ describe("buildToolReadOnlyMap", () => {
     expect(nameMapsSource).toMatch(/import \{ buildToolReadOnlyMap \}/)
     expect(nameMapsSource).toMatch(/setToolReadOnly\(buildToolReadOnlyMap\(connections\)\)/)
     // The hop the move added: the page must still CALL the hook, or the join is dead again.
-    expect(pageSource).toMatch(/useBuilderNameMaps\(\)/)
+    // ⚠ D-298-08 — amended ON PURPOSE by 298-04: the page now passes the bindings it already
+    // holds (`useBuilderNameMaps({ meta, phases })`, D-15's label read), so the empty-argument
+    // spelling is gone. The property pinned is unchanged: the page CALLS the hook.
+    expect(pageSource).toMatch(/useBuilderNameMaps\(/)
     // …and that the state actually reaches the context the canvas reads.
     expect(pageSource).toMatch(/^\s+toolReadOnly,$/m)
   })

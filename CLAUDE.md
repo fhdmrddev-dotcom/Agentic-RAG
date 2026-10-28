@@ -427,7 +427,7 @@ node scripts/check-hot-file-ledger.cjs <phase-dir>   # 0 clear · 1 missing rows
 | `frontend/src/components/workflows/library/libraryFilter.ts` | 6 / 4 / 435 | ⚠ absent at 4 phases and NO PLAN NAMED IT (192.2) |
 | `frontend/src/components/workflows/library/libraryRow.ts` | 4 / 3 / 201 | ⚠ absent, on the boundary (added 192.2) |
 | `frontend/src/components/workflows/WorkflowDoorSwitch.tsx` | 20 / 13 / 1104 (was `18 / 12 / 1075`) | 291-04: one hook, one mount, one handoff spread (+33 −4) |
-| `frontend/src/pages/WorkflowBuilderPage.tsx` | 65 / 27 / 2940 (was `64 / 27 / 2935`) | 296-07: D-09 pair, saveNow, bind block, gatesFor detected-only · ⛔ |
+| `frontend/src/pages/WorkflowBuilderPage.tsx` | 66 / 28 / 2942 (was `65 / 27 / 2940`) | 298-04: name maps get {meta, phases}; one optionLabel(...) option |
 | `frontend/src/components/workflows/DraftArrivalCard.tsx` | 5 / 4 / 688 (was `4 / 3 / 625`) | 291-05: two optional props + one fold boolean; rows in a leaf · ⛔ |
 | `frontend/src/components/workflows/DecisionsList.tsx` | 5 / 3 / 429 | ⚠ now FIRES (291) · 291-05: one optional prop, one template-row sub-line |
 | `frontend/src/components/workflows/decisionsVocabulary.ts` | 6 / 4 / 344 (was `4 / 3 / 327`) | 291-05: one glyph + one formatter, still a zero-import leaf · ⛔ |
@@ -485,7 +485,7 @@ node scripts/check-hot-file-ledger.cjs <phase-dir>   # 0 clear · 1 missing rows
 | `frontend/src/components/workflows/WaitingOnLine.tsx` | 1 / 1 / 26 | young (created 288-03) · leaf, no hook · ⛔ |
 | `frontend/src/components/chat/OutputFileCard.tsx` | 8 / 7 / 219 | honoured by construction (195) |
 | `frontend/src/components/panel/FilesSection.tsx` | 12 / 8 / 354 (was `10 / 6 / 363`) | ⚠ STALE · last touch 274-04 |
-| `frontend/src/lib/api.ts` | 211 / 126 / 546 (was `210 / 125 / 530`) | 291-04: +16 barrel re-exports (describe read, references) |
+| `frontend/src/lib/api.ts` | 213 / 127 / 552 (was `211 / 126 / 546`) | 298-04: + getFolderLabels barrel block (orgItems) |
 | `frontend/src/types/index.ts` | 102 / 81 / 1685 (was `101 / 80 / 1674`) | 293-03: one RunOrigin type + one optional field · seam OWED |
 | `backend/app/main.py` | 96 / 70 / 992 (was `95 / 69 / 991`) | 298-01: one include_router(org_items.router) + its import token · ⛔ |
 | `backend/app/config.py` | 93 / 54 / 1809 (was `92 / 54 / 1790`) | honoured by construction (282-04: self-hosted default 900) · seam OWED · ⛔ |
@@ -494,7 +494,7 @@ node scripts/check-hot-file-ledger.cjs <phase-dir>   # 0 clear · 1 missing rows
 | `backend/app/services/multimodal_service.py` | 14 / 7 / 984 | ⚠ absent from BOTH for its ENTIRE LIFE at **7 phases** |
 | `backend/app/api/documents.py` | 101 / 40 / 2709 (was `99 / 39 / 2698`) | 298-01: one by_org in build() + one root_upload_org kwarg · ⛔ |
 | `backend/app/api/library.py` | 3 / 3 / 304 (was `2 / 2 / 299`) | ⚠ now FIRES (298) · 298-01: summary shares the lists' org predicate ($1) |
-| `scripts/vitest-count-gate.cjs` | 374 / 81 / 6795 (was `373 / 81 / 6793`) | 298-04: folderLabel + orgLabels pinned; DescribeKbPicker 37 → 43 |
+| `scripts/vitest-count-gate.cjs` | 375 / 81 / 6795 (was `374 / 81 / 6795`) | 298-04: DescribeKbPicker 43 → 48 (+5 predate 298-04) |
 | `scripts/check-deploy-drift.sh` | 5 / 4 / 267 | ⚠ absent its ENTIRE LIFE — row added 294-05 · fault var omitted |
 | `scripts/build-public-openapi.cjs` | 11 / 5 / 472 (was `7 / 3 / 468`) | 298-01: org-items tag (Account & org) + /org-items/ FLAGGED (2 lines) |
 | `scripts/check-seeds-register.cjs` | 7 / 3 / 1132 | ⚠ FIRES, absent here — row added 296-05 · `\d{3,}` ids · ⛔ |

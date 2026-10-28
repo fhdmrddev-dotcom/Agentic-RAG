@@ -465,6 +465,10 @@ export type {
   IngestVisibility,
 } from "./api/org"
 
+// ── orgItems (Phase 298-04) ────────────────────────────────────────────
+export { getFolderLabels } from "./api/orgItems"
+export type { FolderLabel } from "./api/orgItems"
+
 // ── connectors ─────────────────────────────────────────────────────────
 export {
   ConnectorApiError,

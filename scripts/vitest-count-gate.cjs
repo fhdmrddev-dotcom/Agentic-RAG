@@ -656,7 +656,7 @@ const BASELINE = {
   // invisibly, because `POST /workflows/generate` mints `unbound_retrieval` on
   // `project_folder_id is None` and a dangling id would suppress the very verdict the
   // picker exists to help the author satisfy.
-  "DescribeKbPicker.test.tsx": 43, // RAISED 37 → 43 at 298-04 (2026-10-28): a held id from another org is looked up before any drop (pending / answered / empty list / failed / offered), org re-read; the 3 surrender cases amended (D-298-07)
+  "DescribeKbPicker.test.tsx": 48, // RAISED 37 → 48 at 298-04 (2026-10-28), read from the suite's own count (48 passed): +6 are 298-04's, +5 PREDATE it (the file measured 42 before 298-04; the pin had been 5 behind). The 298-04 six: a held id from another org is looked up before any drop (pending / answered / empty list / failed / offered), org re-read; the 3 surrender cases amended (D-298-07)
   "ProblemsTray.test.tsx": 30,
   "verdictModel.test.ts": 29,
   // 188-12 de-slacking, both inherited stale-low pins (26/49 and 24/46).
