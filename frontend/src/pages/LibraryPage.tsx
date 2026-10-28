@@ -393,6 +393,7 @@ export function LibraryPage({
   const { customFields, views, setViews, refreshViews, folderProvenance } = useLibraryOrgSwitch({
     dispatch,
     setSelectedDocId,
+    listReset: { findDispatch, setListTarget },
   })
 
   // ── Phase 114 (D-114-17): sidebar→rail collapse on panel-open, pinnable ──────

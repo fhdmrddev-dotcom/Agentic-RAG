@@ -16,6 +16,7 @@
  */
 import { useCallback, useEffect, useState, type Dispatch, type SetStateAction } from "react"
 import { useActiveOrgId } from "@/hooks/useActiveOrgId"
+import { getActiveOrgId } from "@/lib/api/_core"
 import { useLastMoved } from "@/lib/elsewhereCounts"
 import { listMetadataFields, listViews } from "@/lib/api"
 import { listExpertInstalls } from "@/lib/api/experts"
@@ -27,6 +28,13 @@ export interface LibraryOrgSwitchArgs {
   dispatch: Dispatch<{ type: "SELECT_FOLDER"; folderId: null }>
   /** The page's open-document setter (the right-side detail panel). */
   setSelectedDocId: Dispatch<SetStateAction<string | null>>
+  /** 298-review WR-01: what the page's own folder handler also clears — the Find search and the
+   *  list target (a saved view or an ad-hoc filter, page state outside the reducer). Without it a
+   *  switch left the old org's resolved view on screen under a sidebar reading Root. */
+  listReset?: {
+    findDispatch: Dispatch<{ type: "CLEAR_SEARCH" }>
+    setListTarget: (target: null) => void
+  }
 }
 
 export interface LibraryOrgSwitch {
@@ -37,7 +45,7 @@ export interface LibraryOrgSwitch {
   folderProvenance: Record<string, string>
 }
 
-export function useLibraryOrgSwitch({ dispatch, setSelectedDocId }: LibraryOrgSwitchArgs): LibraryOrgSwitch {
+export function useLibraryOrgSwitch({ dispatch, setSelectedDocId, listReset }: LibraryOrgSwitchArgs): LibraryOrgSwitch {
   const activeOrgId = useActiveOrgId()
 
   // UI-D10 — a switch AFTER mount: back to Root, panel closed (every reset visible, none silent).
@@ -52,6 +60,9 @@ export function useLibraryOrgSwitch({ dispatch, setSelectedDocId }: LibraryOrgSw
     setSeenOrg(activeOrgId)
     dispatch({ type: "SELECT_FOLDER", folderId: null })
     setSelectedDocId(null)
+    // 298-review WR-01: the rest of what choosing Root does (`handleSelectFolder`).
+    listReset?.findDispatch({ type: "CLEAR_SEARCH" })
+    listReset?.setListTarget(null)
   }
 
   // 298-05 (UI-D19) — a folder move whose subtree held the selection: back to Root, panel closed
@@ -89,8 +100,10 @@ export function useLibraryOrgSwitch({ dispatch, setSelectedDocId }: LibraryOrgSw
     }
   }, [activeOrgId])
 
+  // 298-review IN-05: tagged with the header at send time, like the mount read's `live` guard.
   const refreshViews = useCallback(() => {
-    listViews().then(setViews).catch(() => {})
+    const askedUnder = getActiveOrgId()
+    listViews().then((rows) => getActiveOrgId() === askedUnder && setViews(rows)).catch(() => {})
   }, [])
 
   // Phase 266 (D-266-13): an installed Expert's folder names where it came from —

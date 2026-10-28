@@ -15,6 +15,9 @@
    unsaved filter the list resolves) is page state the hook cannot reach without a new argument on
    `LibraryPage`'s call line. Views are per-user, and their resolve is not part of this phase's
    narrowing. Re-open trigger: a view-resolve narrowing decision, or the next LibraryPage touch.
+   **CLOSED 2026-10-28 by 298-review WR-01:** `useLibraryOrgSwitch` takes an optional `listReset`
+   (`findDispatch`, `setListTarget`) — one property on LibraryPage's call — and the switch reset now
+   clears the Find search and the list target, as `handleSelectFolder` does.
 3. **The DescribeKbPicker surrender now takes one round trip.** A held id the folder list does not
    offer is kept (shown as `UNNAMED_KB_OPTION`) until the folder-labels read answers. A Draft click
    inside that window sends the held id. The id is visible on screen the whole time (CR-R5-01's
