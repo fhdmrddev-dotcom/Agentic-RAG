@@ -6,6 +6,8 @@ surface: Agentic-RAG
 status: partially-answered
 partial: true
 status_note: |
+  Phase 298 discuss (2026-10-28) FOLDS the open no-folder arm: a Root upload stamps the active org (298 D-07),
+  because 298 narrows Root documents by org. Status stays partially-answered until 298 ships.
   Moved `planted` -> `partially-answered` on 2026-10-14 (Phase 280 plan 04). Original line: `status: planted`.
   AXIS SETTLED (folder arm): 280-03 D-26 (`8f83c307e`, BUG-261014-01) - a /upload INTO A FOLDER now mints in that
   folder's org (membership checked; otherwise the identical 404), so a two-org user's foldered upload no longer
@@ -19,7 +21,7 @@ trigger_paths: ["backend/app/api/documents.py", "backend/app/dependencies.py", "
 trigger_surfaces: []
 migration_note:
 relates_to: ["266", "RESEARCH C-8", "D-266-18"]
-folded_into: null
+folded_into: "298"
 renumbered_from: null
 renumbered_because: null
 ---

@@ -38,6 +38,7 @@ import { DocumentImagesSection } from "./DocumentImagesSection"
 import { DocumentQueriesSection } from "./DocumentQueriesSection"
 import { TakeoffSection } from "./TakeoffSection"
 import { DocumentDownloadButton } from "./DocumentDownloadButton"
+import { MoveToOrgButton } from "@/components/org/MoveToOrgButton"
 import { DocumentFileFacts } from "./DocumentFileFacts"
 import { ConfidenceChip, TIER } from "./ConfidenceChip"
 import { InlineEdit, type InlineFieldType } from "./InlineEdit"
@@ -298,6 +299,7 @@ export function DocumentDetailPanel({
       {/* Phase 270 (UI-SPEC §1) — Download on its own row; keyed so a document change resets its state. */}
       <div className="flex items-center gap-2 px-4 pb-3">
         <DocumentDownloadButton key={doc.id} doc={doc} density="panel" />
+        <MoveToOrgButton document={doc} currentUserId={currentUserId} onMoved={onClose} />
       </div>
       </div>
 

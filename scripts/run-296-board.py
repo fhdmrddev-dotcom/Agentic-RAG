@@ -77,7 +77,7 @@ def _load(name: str, file: str):
 b273 = _load("run_273_board", "run-273-board.py")
 b2921 = _load("run_2921_board", "run-2921-board.py")
 
-_PHASE_DIR = _REPO / ".planning" / "phases" / "296-close-v4-7-debt"
+_PHASE_DIR = _REPO / ".planning" / "milestones" / "v4.7-phases" / "296-close-v4-7-debt"
 _OUT = _PHASE_DIR / "evidence" / "roster"
 _CREATED = _OUT / "created.json"
 _LOCK = Path(os.getenv("LOCALAPPDATA", "C:/Users/fhdmr/AppData/Local")) / "Temp" / "agentic-rag-localdb.lock"

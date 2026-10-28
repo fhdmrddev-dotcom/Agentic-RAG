@@ -154,6 +154,7 @@ import { Play } from "lucide-react"
 import { useTemplateFirstDraft } from "@/components/workflows/useTemplateFirstDraft"
 // 286-02 (D-10a) — the id→name lookup values and their one mount read, cut out under G-5.
 import { useBuilderNameMaps } from "@/components/workflows/useBuilderNameMaps"
+import { optionLabel } from "@/components/workflows/folderLabel"
 // 286-02 (D-10b) — the page's copy constants; seven are re-exported below, one is page-only.
 import {
   EMPTY_DRAFT_INVITATION,
@@ -162,7 +163,6 @@ import {
   REQUIREMENT_INVITATION,
   REQUIREMENT_AI_MARK_LABEL,
   REQUIREMENT_AI_MARK_EXPLANATION,
-  UNNAMED_KB_OPTION,
   UNSAVED_LEAVE_PROMPT,
 } from "@/components/workflows/builderCopy"
 import type { TemplateReadAnswer } from "@/components/workflows/useTemplateFirstDraft"
@@ -363,6 +363,8 @@ export { PUBLISHED_CONFLICT_MESSAGE }
  * same thing the two re-exports above do for the save wording and the 409 sentence.
  * `UNNAMED_KB_OPTION` is imported but NOT re-exported: it was never part of this module's
  * export set, and `WorkflowBuilderPage.seam286.pin.test.tsx` pins that set.
+ * ⚠ CORRECTED 2026-10-28 (298-04): it is no longer imported here either — the bound-folder
+ * option's text comes from `folderLabel.optionLabel`, which falls back to it.
  */
 export {
   EMPTY_DRAFT_INVITATION,
@@ -687,8 +689,8 @@ export function WorkflowBuilderPage({
   // `@/components/workflows/useBuilderNameMaps`. This page reads the values and never sets
   // them. Called HERE, at the old state-block position, because `nameContext` below is
   // memoised from these values and two callbacks list `nameContext` in their dependencies.
-  const { folderNames, folderOptions, skillNames, connectionNames, mcpServerUrls, toolReadOnly } =
-    useBuilderNameMaps()
+  const { folderNames, folderLabels, folderOptions, skillNames, connectionNames, mcpServerUrls, toolReadOnly } =
+    useBuilderNameMaps({ meta, phases })
   // The persisted draft id as a RENDERED value (null until the first save on a fresh build;
   // pre-seeded for Open/Tweak). The write loop keeps its own synchronous mirror — that is
   // what collapses the first save to exactly one create — and reports the id it minted here
@@ -2398,7 +2400,7 @@ export function WorkflowBuilderPage({
           </option>
         ))}
         {boundFolderId !== "" && !folderOptions.some((f) => f.id === boundFolderId) && (
-          <option value={boundFolderId}>{UNNAMED_KB_OPTION}</option>
+          <option value={boundFolderId}>{optionLabel(boundFolderId, { label: folderLabels[boundFolderId] })}</option>
         )}
       </select>
     </span>

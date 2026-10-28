@@ -35,6 +35,11 @@
  */
 import { useCallback, useEffect, useMemo, useRef, useState } from "react"
 import { ApiError, listWorkflowRuns, type WorkflowRunListItem } from "@/lib/api"
+// 298-04: the org key, and the header seam read from `_core` (never the barrel, which this
+// file's own suite mocks wholesale).
+import { useActiveOrgId } from "@/hooks/useActiveOrgId"
+import { getActiveOrgId } from "@/lib/api/_core"
+import { ElsewhereLine } from "@/components/org/ElsewhereLine"
 import { runLogRowFacts } from "./runLogRow"
 import { LOG_GUTTER_TONE, LOG_RUN_TONE } from "./runLogTone"
 import {
@@ -80,10 +85,19 @@ export interface RunLogPanelProps {
   onOpenRun?: (runId: string) => void
 }
 
+/** One stable empty page (a module constant, so a mismatched render never mints a new array). */
+const NO_RUNS: WorkflowRunListItem[] = []
+
 export function RunLogPanel({ scope, onClearScope, onOpenRun }: RunLogPanelProps) {
-  const [rows, setRows] = useState<WorkflowRunListItem[]>([])
-  const [total, setTotal] = useState(0)
-  const [loading, setLoading] = useState(true)
+  // Phase 298-04 (D-08 / D-09 / UI-D8) — the log follows the active org. The rows are held with
+  // the org their request was SENT under (the header) and render only while that org is the
+  // active one, so a switch drops the old org's rows at once and reads as loading until the new
+  // org answers; the generation counter below drops a late old-org answer. ⛔ No keyed remount.
+  const activeOrgId = useActiveOrgId()
+  const [held, setHeld] = useState<{ org: string | null; rows: WorkflowRunListItem[]; total: number }>(
+    () => ({ org: activeOrgId, rows: [], total: 0 }),
+  )
+  const [loadingHeld, setLoading] = useState(true)
   /** `null` = no failure. Two failure words, because a canvas-off 404 and a 5xx are different
    *  facts and a person can act on one of them. */
   const [failure, setFailure] = useState<string | null>(null)
@@ -102,6 +116,7 @@ export function RunLogPanel({ scope, onClearScope, onOpenRun }: RunLogPanelProps
   const load = useCallback(
     async (offset: number) => {
       const mine = ++generation.current
+      const sentUnder = getActiveOrgId()
       if (offset === 0) {
         setLoading(true)
         setFailure(null)
@@ -115,15 +130,18 @@ export function RunLogPanel({ scope, onClearScope, onOpenRun }: RunLogPanelProps
           offset,
         })
         if (generation.current !== mine) return
-        setRows((prev) => (offset === 0 ? page.runs : [...prev, ...page.runs]))
-        setTotal(page.total)
+        setHeld((prev) => ({
+          org: sentUnder,
+          rows: offset === 0 || prev.org !== sentUnder ? page.runs : [...prev.rows, ...page.runs],
+          total: page.total,
+        }))
       } catch (err) {
         if (generation.current !== mine) return
         // ⚠ A FAILURE IS NEVER RENDERED AS AN EMPTY LOG. "We could not look" and "we looked and
         // there is nothing" are different facts, and showing the second when the first is true
         // is how a surface tells a person their work is gone.
         setFailure(err instanceof ApiError && err.status === 404 ? LOG_UNAVAILABLE : LOG_FAILED)
-        if (offset === 0) setRows([])
+        if (offset === 0) setHeld({ org: sentUnder, rows: [], total: 0 })
       } finally {
         if (generation.current === mine) {
           setLoading(false)
@@ -131,12 +149,20 @@ export function RunLogPanel({ scope, onClearScope, onOpenRun }: RunLogPanelProps
         }
       }
     },
-    [scope],
+    // 298-04: `activeOrgId` re-keys the read, so an org switch re-asks (D-08).
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [scope, activeOrgId],
   )
 
   useEffect(() => {
     void load(0)
   }, [load])
+
+  // 298-04 — the ACTIVE org's rows, or none (and the loading line) while another org's are held.
+  const current = held.org === activeOrgId
+  const rows = current ? held.rows : NO_RUNS
+  const total = current ? held.total : 0
+  const loading = loadingHeld || !current
 
   // P-1 — ONE clock for the whole render. See this file's header.
   const now = Date.now()
@@ -179,6 +205,7 @@ export function RunLogPanel({ scope, onClearScope, onOpenRun }: RunLogPanelProps
       </header>
 
       <div className="min-h-0 flex-1 overflow-y-auto">
+        {scope === null && <ElsewhereLine kind="runs" className="px-6 pt-4" />}
         {/* ⚠ LOADING RENDERS NO COUNT. A count of 0 during a load is a lie — the
             `WorkflowsPage` D-16 rule, applied at the surface it was written for. */}
         {loading ? (

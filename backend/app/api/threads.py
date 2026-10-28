@@ -86,6 +86,7 @@ from app.services.thread_handoff import (
     summarise_thread_for_handoff,
     write_handoff,
 )
+from app.services import org_lists  # Phase 298 (D-06): the one home of list narrowing
 from app.services.audit_service import write_audit_entry
 from app.services.typed_continue import is_continue_word  # 292.1 D-13 — pure word match, no model call
 from app.services.thread_workspace_cleanup import collect_thread_workspace_paths, remove_workspace_paths  # 274 D-08
@@ -268,6 +269,7 @@ from uuid import UUID  # Phase 062 D-062-04: typed path param for list_active_ru
 
 @router.get("", response_model=list[ThreadResponse])
 async def list_threads(
+    request: Request = None,  # FastAPI injects it; direct callers may omit it (no header -> None)
     current_user: dict = Depends(get_current_user),
     supabase: Client = Depends(get_user_supabase_client),
 ):
@@ -276,11 +278,16 @@ async def list_threads(
     # the eval panel, so they must never appear in the chat sidebar. ADDITIVE narrowing filter on
     # this G-5 hot file: it only SHRINKS the result set for the same user (no widened rows, no
     # IDOR); real chat threads default is_eval=false and are unaffected.
+    # 298 (D-02): the same kind of ADDITIVE filter — the validated active org, one org_id
+    # predicate via org_lists.by_org; no org resolved -> the identical chain as before.
     response = (
-        supabase.table("threads")
-        .select("*")
-        .eq("user_id", current_user["id"])
-        .eq("is_eval", False)
+        org_lists.by_org(
+            supabase.table("threads")
+            .select("*")
+            .eq("user_id", current_user["id"])
+            .eq("is_eval", False),
+            await org_lists.active_org(request, current_user),
+        )
         .order("updated_at", desc=True)
         .execute()
     )

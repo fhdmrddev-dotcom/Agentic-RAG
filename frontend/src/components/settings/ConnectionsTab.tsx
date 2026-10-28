@@ -1140,12 +1140,11 @@ function ConnectionRow({
             </DropdownMenuItem>
           )}
 
-          <DropdownMenuItem
-            data-testid="connections-action-try-chat"
-            onSelect={() => {
-              window.location.hash = "#chat"
-            }}
-          >
+          {/* Phase 297-02 (D-20 / D-37): the hash write this item made is DELETED. Nothing ever read
+              `#chat`, so the item did nothing before and does nothing now; with the router the
+              write would also erase its entry index (D-33). No navigator reaches this tab, so the
+              item's real behaviour is owed to SEED-392 rather than wired here. */}
+          <DropdownMenuItem data-testid="connections-action-try-chat">
             Try in Chat
           </DropdownMenuItem>
 

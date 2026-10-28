@@ -7,12 +7,20 @@
  * link into the run page, so the next reload dropped the person back on that run instead of
  * where they had navigated: the address bar no longer named the record on screen.
  *
- * The run page itself is stubbed here as a LIVE run (no report, so nothing of its own clears the
- * link); the case is that leaving the view clears it.
+ * D-297-10 (Phase 297-02, D-16 / D-18): RE-TARGETED, not retired. The run now has its own address,
+ * `/app/runs/<id>`, held by the router, and nothing writes `?run=` any more. The property WR-05
+ * protected is unchanged — the address names the record on screen, before AND after leaving it —
+ * so the cases drive the real hook + ChatLayout under a memory router: a cold run address shows the
+ * live run and stays put, Back to Workflows lands on `/app/workflows` with no `run` anywhere, and
+ * the legacy `?run=` link still opens the run on its new address.
+ *
+ * The run page itself is stubbed here as a LIVE run (no report, so nothing of its own touches the
+ * address).
  */
-import { useState } from "react"
 import { describe, it, expect, beforeEach, afterEach, vi } from "vitest"
-import { render, screen, fireEvent, cleanup } from "@testing-library/react"
+import { render, screen, fireEvent, cleanup, waitFor } from "@testing-library/react"
+import { createMemoryRouter } from "react-router"
+import { RouterProvider } from "react-router/dom"
 
 vi.mock("@/lib/api/_core", async (importOriginal) => {
   const actual = await importOriginal<typeof import("@/lib/api/_core")>()
@@ -57,38 +65,47 @@ vi.mock("@/pages/WorkflowRunPage", () => ({
 
 import { ChatLayout } from "../ChatLayout"
 import { EffectiveFeaturesProvider } from "@/providers/EffectiveFeaturesProvider"
-import type { ActiveView } from "@/App"
+import { useAppNavigation } from "@/hooks/useAppNavigation"
 
 const RUN_ID = "229f45ae-c85e-4707-a46c-bf4787541547"
 
-function Harness() {
-  const [view, setView] = useState<ActiveView>("workflow-run")
+/** App's wiring, minus auth and the provider stack: the hook feeds ChatLayout's props. */
+function Shell() {
+  const nav = useAppNavigation()
   return (
     <EffectiveFeaturesProvider
       value={{ features: { visual_workflow_canvas: true }, loading: false, refetch: vi.fn() }}
     >
       <ChatLayout
         onSignOut={vi.fn()}
-        activeView={view}
-        onNavigate={(v: ActiveView) => setView(v)}
+        activeView={nav.activeView}
+        onNavigate={nav.onNavigate}
         navItems={[]}
         isOperator={false}
         operatorIdentity={null}
         prefillMessage={null}
         onSetPrefillMessage={vi.fn()}
-        studioSkillId={null}
-        studioTab="evals"
-        onOpenStudio={vi.fn()}
-        onReviewEvals={vi.fn()}
-        onStudioTabChange={vi.fn()}
-        onTuneSkill={vi.fn()}
+        studioSkillId={nav.studioSkillId}
+        studioTab={nav.studioTab}
+        onOpenStudio={nav.handleOpenStudio}
+        onReviewEvals={nav.handleReviewEvals}
+        onStudioTabChange={nav.handleStudioTabChange}
+        onTuneSkill={nav.handleTuneSkill}
+        activeRunId={nav.runId}
+        openRun={nav.openRun}
+        addressNotFound={nav.addressNotFound}
       />
     </EffectiveFeaturesProvider>
   )
 }
 
+function renderAt(entry: string) {
+  const router = createMemoryRouter([{ path: "*", Component: Shell }], { initialEntries: [entry] })
+  render(<RouterProvider router={router} />)
+  return router
+}
+
 beforeEach(() => {
-  window.history.replaceState(null, "", `/app?run=${RUN_ID}&keep=1`)
   vi.stubGlobal("fetch", vi.fn(() => Promise.resolve(new Response("[]", { status: 200 }))))
   vi.spyOn(console, "error").mockImplementation(() => {})
 })
@@ -97,23 +114,31 @@ afterEach(() => {
   cleanup()
   vi.unstubAllGlobals()
   vi.restoreAllMocks()
-  window.history.replaceState(null, "", "/")
 })
 
-describe("ChatLayout · the run deep link follows the view (289-REVIEW WR-05)", () => {
-  it("keeps ?run= while the live run page is on screen", async () => {
-    render(<Harness />)
+describe("ChatLayout · the run address follows the view (289-REVIEW WR-05, D-297-10)", () => {
+  it("a cold /app/runs/<id> shows the live run and the address stays on it", async () => {
+    const router = renderAt(`/app/runs/${RUN_ID}`)
     await screen.findByTestId("live-run-stub")
-    expect(new URLSearchParams(window.location.search).get("run")).toBe(RUN_ID)
+    expect(router.state.location.pathname).toBe(`/app/runs/${RUN_ID}`)
+    expect(router.state.location.search).toBe("")
   })
 
-  it("clears ?run= when the person leaves a LIVE run's page, and keeps every other param", async () => {
-    render(<Harness />)
+  it("Back to Workflows lands on /app/workflows with no run anywhere in the address", async () => {
+    const router = renderAt(`/app/runs/${RUN_ID}`)
     fireEvent.click(await screen.findByRole("button", { name: "Back to Workflows" }))
     await screen.findByTestId("workflows-stub")
+    expect(router.state.location.pathname).toBe("/app/workflows")
+    expect(router.state.location.search).toBe("")
+    expect(`${router.state.location.pathname}${router.state.location.search}`).not.toContain(RUN_ID)
+  })
 
-    const q = new URLSearchParams(window.location.search)
-    expect(q.get("run")).toBeNull()
-    expect(q.get("keep")).toBe("1")
+  it("the legacy /app?run=<id> link still opens the run, on its new address (replaced, D-16)", async () => {
+    const router = renderAt(`/app?run=${RUN_ID}&keep=1`)
+    await screen.findByTestId("live-run-stub")
+    await waitFor(() => expect(router.state.location.pathname).toBe(`/app/runs/${RUN_ID}`))
+    expect(new URLSearchParams(router.state.location.search).get("run")).toBeNull()
+    expect(new URLSearchParams(router.state.location.search).get("keep")).toBe("1")
+    expect(router.state.historyAction).toBe("REPLACE")
   })
 })

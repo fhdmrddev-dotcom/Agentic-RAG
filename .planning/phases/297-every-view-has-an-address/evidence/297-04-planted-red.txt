@@ -1,0 +1,149 @@
+Phase 297-04 (LINK-08 / D-26) - planted-RED evidence for frontend/src/__tests__/routing/appRouteParity.test.ts
+Recorded 2026-10-27 at worktree HEAD c5a59105b (the GREEN commit; plan base 34b51fcce).
+
+Method: one plant at a time, never two live together. For each file: copy the bytes aside, md5sum,
+plant (a scripted regex edit asserted to apply exactly once), run ONLY the parity suite, capture the
+failing case names and the first assertion lines, write the saved bytes back, then prove the restore
+with md5sum AND `git diff --quiet` (`git checkout -- <dir>` is not a restore under autocrlf on this box).
+Nothing from any plant was committed. The plants:
+  nginx.conf    - deleted the `location /app/ { try_files $uri /app.html; }` block
+  vercel.json   - deleted the app-host catch-all rewrite (source "/(.*)", has host "app\\.(.*)", destination "/app.html")
+  devRouting.ts - the final `return "/app.html" + search` changed to `return "/index.html"`
+
+Reading the vercel.json result: with the app-host catch-all gone, every canonical /app/* address
+STAYS green, and correctly so - the host-unscoped "/app" and "/app/(.*)" rewrites still serve app.html
+on any host. What the catch-all alone carries is /setup, /invite, /admin/spend and bare paths on the
+app host, plus the apex redirects that land there; those are the rows that red. The suite evaluates
+the config rather than assuming it.
+Under the nginx plant the nginx negative control also reds, by design: its own precondition (the
+block exists, so removing it changes the text) is false once the block is already gone.
+`location = /app` is untouched by that plant, which is why /app itself stays green there.
+
+### Layer: frontend/nginx.conf
+md5 before: 30ec4dbda1988cf788510110d76557e3
+planted nginx: 3463 -> 3399 chars
+plant diff (git diff --stat):
+ frontend/nginx.conf | 3 ---
+ 1 file changed, 3 deletions(-)
+--- RED run: npx vitest run src/__tests__/routing/appRouteParity.test.ts
+vitest exit code: 1
+     × nginx serves app.html for /app/library 4ms
+     × nginx serves app.html for /app/skills 1ms
+     × nginx serves app.html for /app/skills/a1b2c3d4-e5f6-4a7b-8c9d-0e1f2a3b4c5d 1ms
+     × nginx serves app.html for /app/settings 1ms
+     × nginx serves app.html for /app/workflows 0ms
+     × nginx serves app.html for /app/connections 0ms
+     × nginx serves app.html for /app/admin 0ms
+     × nginx serves app.html for /app/admin/spend 0ms
+     × nginx serves app.html for /app/org 0ms
+     × nginx serves app.html for /app/runs/3f2b8c1e-4d5a-4b6c-8d7e-9f0a1b2c3d4e 0ms
+     × nginx serves app.html for /app/experts 0ms
+     × nginx without the `location /app/` block does not serve app.html for /app/library 1ms
+⎯⎯⎯⎯⎯⎯ Failed Tests 12 ⎯⎯⎯⎯⎯⎯⎯
+      Tests  12 failed | 66 passed (78)
+--- first assertion lines:
+AssertionError: nginx /app/library: expected '/index.html' to be '/app.html' // Object.is equality
+Expected: "/app.html"
+Received: "/index.html"
+AssertionError: nginx /app/skills: expected '/index.html' to be '/app.html' // Object.is equality
+Expected: "/app.html"
+Received: "/index.html"
+AssertionError: nginx /app/skills/a1b2c3d4-e5f6-4a7b-8c9d-0e1f2a3b4c5d: expected '/index.html' to be '/app.html' // Object.is equality
+Expected: "/app.html"
+Received: "/index.html"
+AssertionError: nginx /app/settings: expected '/index.html' to be '/app.html' // Object.is equality
+Expected: "/app.html"
+Received: "/index.html"
+restored by writing the saved bytes back
+md5 after:  30ec4dbda1988cf788510110d76557e3
+md5 match: YES
+git diff --quiet -- frontend/nginx.conf exit code: 0
+
+
+### Layer: frontend/vercel.json
+md5 before: f1fb6545332adb0711fcbb6694a4f59d
+planted vercel: 2547 -> 2364 chars
+plant diff (git diff --stat):
+ frontend/vercel.json | 10 ----------
+ 1 file changed, 10 deletions(-)
+--- RED run: npx vitest run src/__tests__/routing/appRouteParity.test.ts
+vitest exit code: 1
+     × app host serves app.html for /admin/spend 6ms
+     × app host serves app.html for /setup 1ms
+     × app host serves app.html for /invite?token=x 1ms
+     × apex redirects /admin/spend to the app host, path kept, and it lands on app.html 1ms
+     × apex redirects /setup to the app host, path kept, and it lands on app.html 1ms
+     × apex redirects /invite?token=x to the app host, path kept, and it lands on app.html 1ms
+     × bare /workflows: dev app.html, app host app.html, apex 404, one-box landing 0ms
+     × Vercel without the app-host catch-all (and the /app rewrites) does not serve app.html 1ms
+⎯⎯⎯⎯⎯⎯⎯ Failed Tests 8 ⎯⎯⎯⎯⎯⎯⎯
+      Tests  8 failed | 70 passed (78)
+--- first assertion lines:
+AssertionError: Vercel app.syrel.example/admin/spend: expected { kind: '404' } to deeply equal { kind: 'rewrite', to: '/app.html' }
+- Expected
++ Received
+-   "kind": "rewrite",
+-   "to": "/app.html",
++   "kind": "404",
+AssertionError: Vercel app.syrel.example/setup: expected { kind: '404' } to deeply equal { kind: 'rewrite', to: '/app.html' }
+- Expected
++ Received
+-   "kind": "rewrite",
+-   "to": "/app.html",
++   "kind": "404",
+restored by writing the saved bytes back
+md5 after:  f1fb6545332adb0711fcbb6694a4f59d
+md5 match: YES
+git diff --quiet -- frontend/vercel.json exit code: 0
+
+
+### Layer: frontend/devRouting.ts
+md5 before: 0725e26cc8cae56dc207a789093a0f62
+planted dev: 1562 -> 1555 chars
+plant diff (git diff --stat):
+ frontend/devRouting.ts | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
+--- RED run: npx vitest run src/__tests__/routing/appRouteParity.test.ts
+vitest exit code: 1
+     × dev serves app.html for /app, keeping the query 4ms
+     × dev serves app.html for /app/library, keeping the query 1ms
+     × dev serves app.html for /app/skills, keeping the query 0ms
+     × dev serves app.html for /app/skills/a1b2c3d4-e5f6-4a7b-8c9d-0e1f2a3b4c5d, keeping the query 0ms
+     × dev serves app.html for /app/settings, keeping the query 0ms
+     × dev serves app.html for /app/workflows, keeping the query 0ms
+     × dev serves app.html for /app/connections, keeping the query 0ms
+     × dev serves app.html for /app/admin, keeping the query 0ms
+     × dev serves app.html for /app/admin/spend, keeping the query 0ms
+     × dev serves app.html for /app/org, keeping the query 0ms
+     × dev serves app.html for /app/runs/3f2b8c1e-4d5a-4b6c-8d7e-9f0a1b2c3d4e, keeping the query 0ms
+     × dev serves app.html for /app/experts, keeping the query 0ms
+     × dev serves app.html for /app?run=3f2b8c1e-4d5a-4b6c-8d7e-9f0a1b2c3d4e, keeping the query 1ms
+     × dev serves app.html for /app?connections=1&oauth_error=x, keeping the query 0ms
+     × dev serves app.html for /admin/spend, keeping the query 0ms
+     × dev serves app.html for /setup, keeping the query 0ms
+     × dev serves app.html for /invite?token=x, keeping the query 0ms
+     × bare /workflows: dev app.html, app host app.html, apex 404, one-box landing 0ms
+⎯⎯⎯⎯⎯⎯ Failed Tests 18 ⎯⎯⎯⎯⎯⎯⎯
+      Tests  18 failed | 60 passed (78)
+--- first assertion lines:
+AssertionError: dev rewrite of /app: expected '/index.html' to be '/app.html' // Object.is equality
+Expected: "/app.html"
+Received: "/index.html"
+AssertionError: dev rewrite of /app/library: expected '/index.html' to be '/app.html' // Object.is equality
+Expected: "/app.html"
+Received: "/index.html"
+AssertionError: dev rewrite of /app/skills: expected '/index.html' to be '/app.html' // Object.is equality
+Expected: "/app.html"
+Received: "/index.html"
+AssertionError: dev rewrite of /app/skills/a1b2c3d4-e5f6-4a7b-8c9d-0e1f2a3b4c5d: expected '/index.html' to be '/app.html' // Object.is equality
+Expected: "/app.html"
+Received: "/index.html"
+restored by writing the saved bytes back
+md5 after:  0725e26cc8cae56dc207a789093a0f62
+md5 match: YES
+git diff --quiet -- frontend/devRouting.ts exit code: 0
+
+
+### After all three restores
+git diff --quiet -- frontend/nginx.conf frontend/vercel.json frontend/devRouting.ts frontend/middleware.ts : exit 0
+appRouteParity + docsVercelRouting + devRouting + vercelRouting: 4 files, 101 tests passed (78 + 8 + 7 + 8)

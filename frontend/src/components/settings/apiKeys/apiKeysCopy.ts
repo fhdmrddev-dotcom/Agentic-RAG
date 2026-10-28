@@ -248,6 +248,8 @@ export const API_KEYS_COPY = {
     invalidBody: "the inputs were not a JSON object of text values",
     /** 293-04 authored: the workflow's template is not bound yet (the scheduler's lint refusal). */
     noTemplate: "the workflow has no template set up yet",
+    /** 298-02 (ORG-05): the workflow binds a folder outside its organization (reason `foreign_folder`). */
+    foreignFolder: "the workflow uses a folder from another organization",
     /** 293 UAT: the operator's Workflows kill switch is off (reason `workflows_disabled`, CR-01). */
     workflowsDisabled: "workflows are turned off by the administrator",
     /** 293 UAT: the limiter could not be reached, so the call was refused (reason `limiter_unavailable`). */

@@ -1,0 +1,22 @@
+{
+  "results": {
+    "moonshot": {
+      "model": "kimi-k3.1-pro-highspeed",
+      "thread_id": "154f0cac-7c9a-46ca-b81b-fc34b157c5a4",
+      "run_id": "06b15158-f0c4-4ff9-9d50-495e1198a488",
+      "status": "failed",
+      "error": "failed: RateLimitError: Error code: 429 - {'error': {'message': 'Your account org-<redacted> <ak-<redacted>> is suspended due to insufficient balance, please recharge your account or check you",
+      "answer_preview": "*Rate limited by the provider \u2014 please retry in a moment.*",
+      "verdict": "\u26d4"
+    },
+    "openrouter": {
+      "model": "deepseek/deepseek-v4-pro",
+      "thread_id": "157d0e8b-5d1d-4c69-bd1e-53301ea5f631",
+      "run_id": "47ea6426-00bc-433c-b972-37276000e415",
+      "status": "completed",
+      "error": "",
+      "answer_preview": "ready.",
+      "verdict": "PASS"
+    }
+  }
+}

@@ -804,11 +804,23 @@ export async function postMessage(
   // detail (unparseable body, or detail is a non-string FastAPI validation array).
   if (!res.ok) {
     const body = (await res.json().catch(() => null)) as { detail?: unknown } | null
-    throw new ApiError(
+    // 298-02 (D-36): an OBJECT detail with a string `message` (the coded folder refusal) carries
+    // its sentence and its `code`, so the Run modal and launch form show the words and the
+    // in-thread starter can branch on the code. A string detail reads exactly as before.
+    const coded =
+      body?.detail && typeof body.detail === "object" && !Array.isArray(body.detail)
+        ? (body.detail as { code?: unknown; message?: unknown })
+        : null
+    const codedMessage = typeof coded?.message === "string" ? coded.message : null
+    const err = new ApiError(
       entitlementRefusalMessage(body) ??
-        (typeof body?.detail === "string" ? body.detail : "Failed to send message"),
+        (typeof body?.detail === "string" ? body.detail : codedMessage ?? "Failed to send message"),
       res.status,
     )
+    if (codedMessage !== null && typeof coded?.code === "string") {
+      Object.assign(err, { code: coded.code })
+    }
+    throw err
   }
   return (await res.json()) as PostMessageResponse
 }

@@ -54,6 +54,7 @@ import { deleteWorkflowDraft } from "@/lib/api"
 import { FORK_CONSEQUENCE, FORK_CONSEQUENCE_EXISTING, FORK_VERB } from "./libraryVocabulary"
 import type { LibraryRow } from "./libraryRow"
 import type { WorkflowDeleteSheetHandle } from "./WorkflowDeleteSheet"
+import { MoveToOrgMenuItem } from "@/components/org/MoveToOrgMenuItem"
 
 // ── The menu's words and classes (moved verbatim from WorkflowCard.tsx, 286-04) ──────────
 
@@ -288,6 +289,10 @@ export function WorkflowCardMenu({
                     {API_KEYS_COPY.menu.newApiKey}
                   </DropdownMenuItem>
                 )}
+
+                {/* 298-05 (D-31 / UI-D15) — a DRAFT only (a published or starter row never moves);
+                    renders nothing unless owned at 2+ orgs. A `DropdownMenuItem`: WR-03 stays green. */}
+                {row.provenance === "draft" && <MoveToOrgMenuItem kind="draft" itemId={row.id} itemName={row.name} owned={owned} />}
 
                 {/* ── The fork: ONE WORD, TWO FUNCTIONS (D-12) ──────────────────────
                     Both items carry the same label and route to DIFFERENT handlers.

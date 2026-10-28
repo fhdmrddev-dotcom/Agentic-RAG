@@ -20,7 +20,7 @@ Config (`--config`, a JSON file kept OUTSIDE the repo) names the fixtures, by id
 Usage (repo root, backend venv):
   KEY_A=… KEY_B=… KEY_C=… KEY_D=… KEY_P=… USER_EMAIL=… USER_PASSWORD=… \
   backend/venv/Scripts/python scripts/drive-293-inbound.py --config <cfg.json> \
-      --rows sc1,sc2,sc3,sc4,sc5,board --evidence .planning/phases/293-start-from-outside-and-close-out/evidence
+      --rows sc1,sc2,sc3,sc4,sc5,board --evidence .planning/milestones/v4.7-phases/293-start-from-outside-and-close-out/evidence
 """
 from __future__ import annotations
 

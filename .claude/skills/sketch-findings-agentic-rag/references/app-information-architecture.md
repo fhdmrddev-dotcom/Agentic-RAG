@@ -2,6 +2,8 @@
 
 The single authoritative wiring diagram for how the new Workflow Studio surfaces (Workflows page, Builder, Publish gauntlet, Run-in-thread) attach to the *existing* Agentic-RAG app navigation. The load-bearing truth: **there is no router and no URL** — the whole app is one flat `useState<ActiveView>` union in `App.tsx`. Every "redirect" is a `setActiveView` view-switch, an intra-page state change, a modal, or a **create-thread-then-switch**. A workflow is **a mode of a thread, never page-resident**. This file is the IA reference you consult when building ANY of 018–022; **all 11 open decisions (OD-1..OD-11) were ADOPTED by the operator on 2026-06-14** ("publish is the test"), so this is the locked contract, not a list of open questions.
 
+⚠ **CORRECTED 2026-10-27 (Phase 297-02, D-40) — beside the original, never replacing it:** the app now HAS a router — react-router 8.5 in data mode, ONE catch-all route above `<App />` (no children, no key, so the provider stack never remounts), and the view is DERIVED from the address through `frontend/src/lib/appRoutes.ts` (every `ActiveView` member has an `/app/...` address: `/app`, `/app/library`, `/app/workflows`, `/app/runs/<id>`, …). Navigators still arrive as props and still read `onNavigate(view)`; only `hooks/useAppNavigation.ts` calls the router hooks. **The three-homes WORKFLOW concern triad (Builder / Workflows page / Chat-thread execution) is unchanged** — what changed is how a view is reached, not which homes exist. Tab and entity addresses (Settings tabs, Library tabs, per-thread) are Phase 299.
+
 ## Design Decisions
 
 ### D1 — The THREE HOMES rule (one home per concern; every edge respects the split)

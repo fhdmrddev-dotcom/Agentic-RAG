@@ -2,7 +2,7 @@
 
 ## What This Is
 
-A RAG-based AI agent platform where users organize documents into nested folders and interact with a customizable AI agent. The agent remembers preferences across threads, extracts tables and images from documents, shows confidence and citations, runs code in a sandbox, and can be taught new skills that persist. As of v2.7 the agent also keeps a per-thread workspace of versioned files, manages a todo list, can spawn sub-agents, and can pause to ask the user a question — all surfaced live in a collapsible right-side workspace panel. As of v2.8 the agent can also run inside a deterministic, locked workflow (Harness Mode) — ordered phases the model cannot escape, with per-phase tool whitelists, validation gates, and a live phase timeline — alongside today's free-form Deep Mode chat. The Deep Midnight visual design delivers a glassmorphic, mobile-responsive experience with knowledge health dashboards and user feedback loops. As of v3.0, documents are a first-class, metadata-driven surface: user-defined custom metadata with per-field confidence, metadata-driven saved views ("virtual folders"), typed document relationships, suggest-then-confirm auto-classification, a light governance-health view, and configurable multi-provider embeddings. As of v3.9 a **connection** is `{service identity, auth, discovered tools, per-tool grants}`, so adding a service adds rows rather than code. As of v4.0 the knowledge base **reads itself**: a source — Google Drive, OneDrive/SharePoint via Microsoft Graph, any MCP file server, or a mailbox — is connected once, previewed before it brings anything in, and then watched on the shipped scheduler, with one visibility per connection enforced in RLS and provenance riding every row. As of v4.5 a document is an object you can find by what it is and download, the agent can answer with interactive artifacts from a closed component registry, chat attachments belong to their thread, and an org admin can set retention with legal hold.
+A RAG-based AI agent platform where users organize documents into nested folders and interact with a customizable AI agent. The agent remembers preferences across threads, extracts tables and images from documents, shows confidence and citations, runs code in a sandbox, and can be taught new skills that persist. As of v2.7 the agent also keeps a per-thread workspace of versioned files, manages a todo list, can spawn sub-agents, and can pause to ask the user a question — all surfaced live in a collapsible right-side workspace panel. As of v2.8 the agent can also run inside a deterministic, locked workflow (Harness Mode) — ordered phases the model cannot escape, with per-phase tool whitelists, validation gates, and a live phase timeline — alongside today's free-form Deep Mode chat. The Deep Midnight visual design delivers a glassmorphic, mobile-responsive experience with knowledge health dashboards and user feedback loops. As of v3.0, documents are a first-class, metadata-driven surface: user-defined custom metadata with per-field confidence, metadata-driven saved views ("virtual folders"), typed document relationships, suggest-then-confirm auto-classification, a light governance-health view, and configurable multi-provider embeddings. As of v3.9 a **connection** is `{service identity, auth, discovered tools, per-tool grants}`, so adding a service adds rows rather than code. As of v4.0 the knowledge base **reads itself**: a source — Google Drive, OneDrive/SharePoint via Microsoft Graph, any MCP file server, or a mailbox — is connected once, previewed before it brings anything in, and then watched on the shipped scheduler, with one visibility per connection enforced in RLS and provenance riding every row. As of v4.5 a document is an object you can find by what it is and download, the agent can answer with interactive artifacts from a closed component registry, chat attachments belong to their thread, and an org admin can set retention with legal hold. As of v4.7 a workflow can be started from a thread, a starter, a schedule or an API key, is authored from your own files, and shows what a run did and on what evidence; a run that finds nothing pauses and asks instead of failing.
 
 ## Core Value
 
@@ -10,23 +10,48 @@ The agent acts as an AI colleague — it knows your knowledge base, can run code
 
 ---
 
-## Current Milestone: v4.7 Workflows You Can See and Start Anywhere
+## Current Milestone: v4.8 Every Page Has a Link
 
-**Started:** 2026-10-18 · phases resume at **286**, migrations at **210**.
+**Started:** 2026-10-27. Phases from **297**, migrations from **217**.
 
-**Goal:** Workflows become easier to start, finish authoring and understand at a glance, with visuals that show what a run did.
+**Goal:** Every place in the app has its own URL, and a person is told, with a link, when a run is waiting on them.
 
 **Target features:**
-- **Start anywhere:** launch a workflow from inside a thread (SEED-232), scheduled and inbound triggers (SEED-014, SEED-195), a fork-a-starter library (SEED-084).
-- **Authoring that finishes the job:** natural-language authoring proposes the blocking business field (SEED-163), a workflow that pauses for a person can be published (SEED-164), generalized describe-it authoring (SEED-051).
-- **Visuals:** multi-agent engine view (SEED-086), richer artifact vocabulary (SEED-337), per-run provenance receipt (SEED-348), workflow card matches its approved sketch (SEED-155), canvas scale hardening (SEED-347).
-- **Trust:** confidence on workflow phase outputs (SEED-152).
+- **A URL for every view** (`SEED-185`, `SEED-015`, `SEED-178`): each view, thread, workflow run and Expert is addressable; refresh lands back in the same place; browser Back/Forward work; links can be copied and shared (the server still decides who may open them).
+- **Told when a run waits on you** (`SEED-281`): an in-app notice plus an email from an app-owned mailer, each linking straight to the waiting run.
+- **Lists follow the active org** (`SEED-389`): Library folders and the Workflows list show only the active org's items (decided per-org at intake).
+- **v4.7 close-out**: BUG-261027-01..05 and the six `SEED-391` review findings.
 
-**Out of scope (decided at intake):** Open Platform / public API / MCP server (SEED-013, planned as v4.8); anything not about workflows or visuals. Visual work is sketch-first (G-2); hot-file refactors first where G-5 fires.
+**Key context:** Open Platform (`SEED-013`), named as v4.8 at v4.7 intake, moves to v4.9. Addressable URLs come first because notifications, Projects (`SEED-151`) and an external API all need a link to point at. The email half adds one new piece of infrastructure (an app-owned sender: one secret, env only), which also answers `SEED-281`'s deferred option D-235-02 C.
 
 ---
 
-## Last Shipped: v4.6 Pay It Down (2026-10-16)
+## Last Shipped: v4.7 Workflows You Can See and Start Anywhere (2026-10-27)
+
+**Started:** 2026-10-18 · **Shipped:** 2026-10-27, git tag `v4.7` · 12 phases (286-296, 292.1 inserted;
+294, 295 and 296 added in-milestone), 60 plans (+3 gap fixes), migrations 210-216, 10 days.
+**21 / 21 requirements satisfied.** Integration 23/23 (14 + 9 added by 296). Audit `tech_debt`, no blockers.
+Deployed to production 2026-10-27 (`3ec36f998`).
+
+A workflow can now be started from a thread, forked from a starter, run on a schedule or started from
+outside with an API key, and each run shows how it was started (287, 293). Authoring finishes the job:
+drafts survive navigation, a workflow that pauses for a person can be published, and describe-it
+authoring works from your own template, form and reference files (288, 291). You can see what a run
+did: a read-only run page with its evidence and per-step confidence, library cards with phase chips, a
+team picture of orchestrator, workers and judge, and three new artifact types (289, 290, 292). A run
+that finds nothing pauses and asks instead of failing, and every run ends in a true state with a reason
+(295, 292.1). Rerank and a per-sentence citation check ship behind a Settings switch, off in cloud (294).
+Phase 296 then closed the v4.7 debt, including two security items (provider keys out of LangSmith
+traces; folder and workflow create honour the active org). Closed core unchanged: 7 / 1 / 30.
+
+**Owed (operator):** OpenRouter top-up (402) and Moonshot reinstatement (429) for their roster rows
+(BUG-261024-03 and BUG-261024-01 stay `folded` until they pass); 294-ENV dev `.env` lines; optional
+Supabase MCP `read_only=true` restore. Rerank and citation check stay off in cloud until SEED-365's
+remaining half (concurrency cap, spend ledger) lands.
+
+---
+
+## Previously Shipped: v4.6 Pay It Down (2026-10-16)
 
 **Started:** 2026-10-12 · **Shipped:** 2026-10-16, git tag `v4.6` · 9 phases (277-285), 34 plans,
 migrations 207-209, 5 days. **24 / 24 requirements satisfied.** Integration 9/9. Audit `tech_debt`, no blockers.
@@ -42,7 +67,7 @@ along their named seams (277-279). Closed core unchanged: 7 phase types / 1 emit
 **Owed (operator):** Coolify rebuild confirmation and a logged-in production smoke; 282 G4-4 / G4-6 / A1;
 281 G-4 rows A, C, D. Medium/minor bugs not named in the requirements stay open in `.planning/reported-bugs/`.
 
-**Next milestone:** not started. Run `/gsd:new-milestone` (sweep `node scripts/check-seeds-register.cjs` first).
+**Next milestone:** v4.7 (shipped 2026-10-27, above).
 
 ---
 
@@ -1164,6 +1189,24 @@ All 20 v3.3 requirements delivered (16 CORE + 4 STRETCH).
 - ✓ `BUS-171`'s operator queue is a decision list — REG-03, v4.2 (251)
 - ⛔ `DEBT-06` — **8 of 14 rows unmet** (239, 241, 242, 244, 245, 251, 252, 253). Accepted as documented debt at close by operator decision; `done` needs Gemini, `refused` needs an operator ruling (`REG-03`). **A refusal is not a pass.**
 
+### Validated (v4.7 — Workflows You Can See and Start Anywhere)
+
+- ✓ Start a workflow from inside a thread, run attached to it — START-01, v4.7 (287)
+- ✓ Start a run from outside with an org-scoped, rate-limited, audited API key and read the result — START-02, v4.7 (293)
+- ✓ Fork a starter into your own draft (menu + name dialog, ruled one action by D-12); curated starters pass the gauntlet — START-03, v4.7 (287)
+- ✓ A scheduled or key-started run shows its origin, and the card shows last and next run — START-04, v4.7 (293)
+- ✓ A workflow that pauses for a person can be published; the run says who it waits on — AUTH-01, v4.7 (288, 295)
+- ✓ Describe-it authoring from uploaded template / form / reference files — AUTH-02, v4.7 (291)
+- ✓ A draft's configuration survives navigation — AUTH-03, v4.7 (288)
+- ✓ Truthful team picture (orchestrator, workers, judge), no invented edges — VIS-01, v4.7 (290)
+- ✓ Diagram, comparison and timeline artifacts from the closed registry (3 → 6) — VIS-02, v4.7 (292)
+- ✓ One read-only run page with export and its evidence — VIS-03, v4.7 (289)
+- ✓ Library card matches its sketch (phase chips) — VIS-04, v4.7 (290)
+- ✓ Confidence on KB-grounded phase outputs, on the run surface and receipt — TRUST-01, v4.7 (289)
+- ✓ Seed statuses match reality — REG-06, v4.7 (293); G-5 refactors before features — REG-07, v4.7 (286)
+- ✓ Decision engine switch, rerank with a conservative threshold, per-sentence citation check — DEC-01..03, v4.7 (294; off in cloud)
+- ✓ Found-nothing pauses and asks; template-less report refused at save; judge ignores recorded-not-sent; every run ends true with a reason — RUN-01..04, v4.7 (295)
+
 ### Validated (v4.5 — Find It, Show It)
 
 - ✓ Download the original file (org-checked, short-lived URL) and labelled file facts — FIND-04, FIND-05, v4.5 (270)
@@ -1197,7 +1240,14 @@ All 20 v3.3 requirements delivered (16 CORE + 4 STRETCH).
 
 ### Active (current milestone)
 
+*v4.8 Every Page Has a Link — STARTED 2026-10-27. Requirements live in `.planning/REQUIREMENTS.md`; scope summary under "Current Milestone" above.*
+
+<details>
+<summary>Superseded Active note (v4.6-era, preserved)</summary>
+
 *v4.6 Pay It Down — STARTED 2026-10-12. Requirements live in `.planning/REQUIREMENTS.md`; scope summary under "Current Milestone" above.*
+
+</details>
 
 <details>
 <summary>Superseded Active note (v4.5-close, preserved)</summary>
@@ -1492,3 +1542,5 @@ This document evolves at phase transitions and milestone boundaries.
 *Last updated: 2026-10-18 — **milestone v4.7 Workflows You Can See and Start Anywhere STARTED** (phases from 286, migrations from 210).*
 
 *Last updated: 2026-10-24 — **Phase 292 More Ways to Show It complete** (VIS-02 validated: diagram / comparison / timeline from a closed registry of six; tool count 30; migration 213 applied to cloud, code not yet deployed).*
+
+*Last updated: 2026-10-27 — **milestone v4.8 Every Page Has a Link STARTED** (phases from 297, migrations from 217). Open Platform moved to v4.9.*

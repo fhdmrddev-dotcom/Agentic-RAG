@@ -154,7 +154,8 @@ interface Props {
 
 // ── Copy (188-UI-SPEC § Copywriting Contract — verbatim, single-sourced) ────────
 
-const COPY_LOADING = "Opening the run…"
+// Phase 297-02 (D-297-17): exported so the switch's cold-link hold says the SAME sentence.
+export const COPY_LOADING = "Opening the run…"
 // 289-04 (D-05 / D-14a): the not-available pair ("That run isn't available." / "It may have
 // been deleted, or it belongs to another account.") is retired here; a 404 now renders the
 // evidence report's ONE refusal screen, whose words live in `evidenceVocabulary.ts`.

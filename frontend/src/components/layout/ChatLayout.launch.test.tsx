@@ -258,6 +258,11 @@ vi.mock("@/pages/WorkflowsPage", () => ({
 
 import { ChatLayout } from "./ChatLayout"
 import chatLayoutSource from "./ChatLayout?raw"
+// D-297-05 (Phase 297-01, REG-09): the mount switch moved VERBATIM out of ChatLayout into
+// AppViewSwitch, so the four switch-SHAPE cases (stripper needle, branch-before-fallback, the
+// chat-only split point, the run-receipt gate) read the switch. The doRun cases stay on ChatLayout,
+// which still owns doRun. RE-TARGETED, not retired; no expect value changed.
+import switchSource from "./AppViewSwitch?raw"
 // 214-12: the launch form's own source, fenced below — D-214-04's rejected arm is enforced by
 // a measurement over this file, not by the paragraph inside it.
 import chatLaunchFormSource from "./ChatLaunchForm?raw"
@@ -284,11 +289,15 @@ function withCanvas(on: boolean, node: React.ReactElement) {
   )
 }
 
-function baseProps(activeView: ActiveView, onNavigate = vi.fn()) {
+// D-297-09 (Phase 297-02, D-15 / D-18): the run surface is a ROUTE now. ChatLayout no longer holds
+// the run id or navigates by view name for a run: doRun and the panel hand the `workflow_runs.id`
+// to the `openRun` prop (App wires it to the router), and the id comes back down as `activeRunId`.
+function baseProps(activeView: ActiveView, onNavigate = vi.fn(), openRun = vi.fn()) {
   return {
     onSignOut: vi.fn(),
     activeView,
     onNavigate,
+    openRun,
     navItems: [],
     isOperator: false,
     operatorIdentity: null,
@@ -305,12 +314,13 @@ function baseProps(activeView: ActiveView, onNavigate = vi.fn()) {
 
 function renderLayout(activeView: ActiveView = "workflows", canvasOn = true) {
   const onNavigate = vi.fn()
-  const props = baseProps(activeView, onNavigate)
+  const openRun = vi.fn()
+  const props = baseProps(activeView, onNavigate, openRun)
   const utils = render(withCanvas(canvasOn, <ChatLayout {...props} />))
-  /** Re-render the SAME instance on another view (ChatLayout's activeRunId survives). */
-  const showView = (view: ActiveView) =>
-    utils.rerender(withCanvas(canvasOn, <ChatLayout {...props} activeView={view} />))
-  return { ...utils, onNavigate, showView }
+  /** Re-render the SAME instance on another view, holding the run id the route would hold. */
+  const showView = (view: ActiveView, activeRunId: string | null = null) =>
+    utils.rerender(withCanvas(canvasOn, <ChatLayout {...props} activeView={view} activeRunId={activeRunId} />))
+  return { ...utils, onNavigate, openRun, showView }
 }
 
 beforeEach(() => {
@@ -334,14 +344,16 @@ beforeEach(() => {
 
 describe("ChatLayout launch — the run gets its own room (SPEC Req 6 / D-188-12)", () => {
   it("navigates to the run surface and NEVER to the chat view", async () => {
-    const { onNavigate } = renderLayout()
+    const { onNavigate, openRun } = renderLayout()
 
     fireEvent.click(screen.getByTestId("drive-launch"))
 
-    await waitFor(() => expect(onNavigate).toHaveBeenCalledWith("workflow-run"))
+    // D-297-09: the run is opened by its id through the route navigator.
+    await waitFor(() => expect(openRun).toHaveBeenCalledWith(ANCHOR_RUN_ID))
     expect(onNavigate).not.toHaveBeenCalledWith("chat")
     // Exactly one navigation for one launch — no intermediate hop through chat.
-    expect(onNavigate).toHaveBeenCalledTimes(1)
+    expect(openRun).toHaveBeenCalledTimes(1)
+    expect(onNavigate).not.toHaveBeenCalled()
   })
 
   // ── 2. The surviving half — the guard against over-deleting ────────────────
@@ -367,13 +379,15 @@ describe("ChatLayout launch — the run gets its own room (SPEC Req 6 / D-188-12
 
   // ── 3. The id trap (T-188-09-01) ───────────────────────────────────────────
   it("hands the run surface the ANCHOR id, never the producer id from the POST response", async () => {
-    const { showView } = renderLayout()
+    const { showView, openRun } = renderLayout()
     fireEvent.click(screen.getByTestId("drive-launch"))
-    await waitFor(() => expect(mockGetThreadWorkflow).toHaveBeenCalled())
+    await waitFor(() => expect(openRun).toHaveBeenCalled())
+    // D-297-09: the id handed to the route navigator is the anchor, never the producer row.
+    expect(openRun).toHaveBeenCalledWith(ANCHOR_RUN_ID)
+    expect(openRun).not.toHaveBeenCalledWith(PRODUCER_RUN_ID)
 
-    // App would flip activeView in response to onNavigate; ChatLayout's activeRunId
-    // is its own state and survives the re-render.
-    showView("workflow-run")
+    // App routes to /app/runs/<id> in response; the route hands the same id back down.
+    showView("workflow-run", openRun.mock.calls[0][0] as string)
 
     const page = await screen.findByTestId("run-page-stub")
     expect(page).toHaveTextContent(ANCHOR_RUN_ID)
@@ -387,7 +401,7 @@ describe("ChatLayout launch — the run gets its own room (SPEC Req 6 / D-188-12
   it("WR-04: a failed launch cleans up the thread, re-throws, and navigates NOWHERE", async () => {
     const boom = new Error("template failed validation (422)")
     mockPostMessage.mockRejectedValue(boom)
-    const { onNavigate } = renderLayout()
+    const { onNavigate, openRun } = renderLayout()
 
     fireEvent.click(screen.getByTestId("drive-launch"))
 
@@ -399,6 +413,7 @@ describe("ChatLayout launch — the run gets its own room (SPEC Req 6 / D-188-12
     expect(launchOutcome.resolved).toBe(false)
     // And nothing navigated: a failed launch has no room to land in.
     expect(onNavigate).not.toHaveBeenCalled()
+    expect(openRun).not.toHaveBeenCalled()
     expect(mockGetThreadWorkflow).not.toHaveBeenCalled()
   })
 
@@ -409,7 +424,7 @@ describe("ChatLayout launch — the run gets its own room (SPEC Req 6 / D-188-12
       mode: "deep",
       active_workflow_run_id: null,
     })
-    const { onNavigate } = renderLayout()
+    const { onNavigate, openRun } = renderLayout()
 
     fireEvent.click(screen.getByTestId("drive-launch"))
 
@@ -418,6 +433,7 @@ describe("ChatLayout launch — the run gets its own room (SPEC Req 6 / D-188-12
       expect.objectContaining({ id: THREAD_ID }),
     )
     expect(onNavigate).not.toHaveBeenCalledWith("workflow-run")
+    expect(openRun).not.toHaveBeenCalled()
   })
 
   it("a FAILED anchor read also degrades to the shipped behaviour — the launch already succeeded", async () => {
@@ -458,12 +474,13 @@ describe("ChatLayout launch — the run gets its own room (SPEC Req 6 / D-188-12
 
 describe("ChatLayout — the run home is gated on visual_workflow_canvas (CR-05)", () => {
   it("a flag-off launch restores the shipped behaviour: select the thread, land in chat", async () => {
-    const { onNavigate } = renderLayout("workflows", false)
+    const { onNavigate, openRun } = renderLayout("workflows", false)
 
     fireEvent.click(screen.getByTestId("drive-launch"))
 
     await waitFor(() => expect(onNavigate).toHaveBeenCalledWith("chat"))
     expect(onNavigate).not.toHaveBeenCalledWith("workflow-run")
+    expect(openRun).not.toHaveBeenCalled()
     // The thread is SELECTED — this is the half that made the flag-off launch a dead end.
     expect(mockSelectThread).toHaveBeenCalledWith(expect.objectContaining({ id: THREAD_ID }))
     // The launch itself is untouched: still created, still kicked off, still not deleted.
@@ -496,7 +513,8 @@ describe("ChatLayout — the run home is gated on visual_workflow_canvas (CR-05)
     // The receipt is the OTHER door into this home. It renders nothing without the
     // callback (its own suite fences that), so withholding the callback is what removes
     // the affordance rather than leaving a control that opens a fallback page.
-    const code = codeOf(chatLayoutSource)
+    // D-297-05: the receipt gate is in the switch's chat branch since the move.
+    const code = codeOf(switchSource)
     expect(code).toMatch(/onOpenRun=\{canvasEnabled \? openRunSurface : undefined\}/)
   })
 })
@@ -545,14 +563,19 @@ function codeOf(source: string): string {
 }
 
 const CHAT_LAYOUT_CODE = codeOf(chatLayoutSource)
+/** D-297-05: the mount switch's code — where the branch-order facts below now live. */
+const SWITCH_CODE = codeOf(switchSource)
 
 describe("ChatLayout — source fence: branch order and the chat-only chrome", () => {
   it("the comment stripper works — and this file really does carry the tokens in prose", () => {
+    // D-297-05: identity anchors — the switch is the real file, and ChatLayout renders it.
+    expect(SWITCH_CODE).toContain("export function AppViewSwitch")
+    expect(CHAT_LAYOUT_CODE).toContain("<AppViewSwitch")
     // The precondition that makes stripping necessary: the raw source carries the branch
     // condition MORE times than the code does.
     const NEEDLE = `activeView === "workflow-run"`
-    const raw = chatLayoutSource.split(NEEDLE).length - 1
-    const stripped = CHAT_LAYOUT_CODE.split(NEEDLE).length - 1
+    const raw = switchSource.split(NEEDLE).length - 1
+    const stripped = SWITCH_CODE.split(NEEDLE).length - 1
     expect(raw).toBeGreaterThan(stripped)
     expect(stripped).toBe(1)
 
@@ -565,11 +588,11 @@ describe("ChatLayout — source fence: branch order and the chat-only chrome", (
   })
 
   it("places the run-surface branch BEFORE the trailing UnknownViewFallback", () => {
-    const branch = CHAT_LAYOUT_CODE.indexOf(`activeView === "workflow-run"`)
+    const branch = SWITCH_CODE.indexOf(`activeView === "workflow-run"`)
     // ⚠ Match the JSX TAG (with the `<`), not the bare identifier — the module's IMPORT
     // also spells `UnknownViewFallback`, and indexOf would otherwise resolve to line 13's
     // import rather than the trailing element this ordering assertion is about.
-    const fallback = CHAT_LAYOUT_CODE.indexOf("<UnknownViewFallback")
+    const fallback = SWITCH_CODE.indexOf("<UnknownViewFallback")
     expect(branch).toBeGreaterThan(-1)
     expect(fallback).toBeGreaterThan(-1)
     expect(branch).toBeLessThan(fallback)
@@ -578,21 +601,21 @@ describe("ChatLayout — source fence: branch order and the chat-only chrome", (
   it("mounts ChatArea and WorkspacePanel ONLY inside the chat branch", () => {
     // The else branch opens with the non-chat <main>. Everything after that index is on
     // the side of the split the run surface lives on.
-    const elseBranch = CHAT_LAYOUT_CODE.indexOf(`<main className="flex-1 overflow-hidden">`)
+    const elseBranch = SWITCH_CODE.indexOf(`<main className="flex-1 overflow-hidden">`)
     expect(elseBranch).toBeGreaterThan(-1)
 
     for (const tag of ["<ChatArea", "<WorkspacePanel"]) {
-      const first = CHAT_LAYOUT_CODE.indexOf(tag)
+      const first = SWITCH_CODE.indexOf(tag)
       expect(first).toBeGreaterThan(-1)
       // Mounted before the split point…
       expect(first).toBeLessThan(elseBranch)
       // …and never again after it.
-      expect(CHAT_LAYOUT_CODE.indexOf(tag, elseBranch)).toBe(-1)
+      expect(SWITCH_CODE.indexOf(tag, elseBranch)).toBe(-1)
     }
 
     // POSITIVE CONTROL — the "never again after it" probe really does find a tag that IS
     // present after the split point, so the -1 above is a measurement, not a tautology.
-    expect(CHAT_LAYOUT_CODE.indexOf("UnknownViewFallback", elseBranch)).toBeGreaterThan(-1)
+    expect(SWITCH_CODE.indexOf("UnknownViewFallback", elseBranch)).toBeGreaterThan(-1)
   })
 
   it("resolves the run id from the thread anchor, and names neither of the wrong-id tokens", () => {
@@ -603,6 +626,9 @@ describe("ChatLayout — source fence: branch order and the chat-only chrome", (
     const WRONG_FIELD = ["res", ".run_id"].join("")
     expect(chatLayoutSource).not.toMatch(new RegExp(WRONG_TYPE))
     expect(chatLayoutSource).not.toMatch(new RegExp(WRONG_FIELD))
+    // D-297-05: the run room's mount moved into the switch — it must not name them either.
+    expect(switchSource).not.toMatch(new RegExp(WRONG_TYPE))
+    expect(switchSource).not.toMatch(new RegExp(WRONG_FIELD))
     // POSITIVE CONTROL — both assembled needles really do match the shapes they forbid.
     expect("import type { PostMessageResponse } from '@/lib/api'").toMatch(new RegExp(WRONG_TYPE))
     expect("setActiveRunId(res.run_id)").toMatch(new RegExp(WRONG_FIELD))

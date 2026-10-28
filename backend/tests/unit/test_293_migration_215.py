@@ -215,9 +215,16 @@ def test_audit_check_gains_the_five_api_key_types():
         assert action in literals, action
 
 
+#: D-298-05 — amended ON PURPOSE by 298-03. Migration 217 re-states the CHECK after 215 and adds
+#: the org move type; 215 cannot name a type that did not exist when it shipped. The frozenset is
+#: held against 217's CHECK by ``test_298_migration_217_shape.py``; here only the types a LATER
+#: migration introduced are excused — every other frozenset type must still be in 215's CHECK.
+_ADDED_BY_LATER_MIGRATIONS = frozenset({"org.item.move"})  # migration 217 (Phase 298)
+
+
 def test_audit_check_never_falls_behind_the_frozenset():
     literals = _audit_check_literals()
-    missing = set(VALID_ACTION_TYPES) - literals
+    missing = set(VALID_ACTION_TYPES) - literals - _ADDED_BY_LATER_MIGRATIONS
     assert not missing, f"the recreated CHECK drops live action types: {sorted(missing)}"
 
 

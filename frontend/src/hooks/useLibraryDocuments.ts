@@ -24,6 +24,10 @@
  *    refetch instead (284-REVIEW WR-01).
  * 5. A STALE ANSWER IS DROPPED (`useDocumentFind`'s `reqIdRef` guard): a slow earlier request can
  *    never overwrite a later one.
+ * 6. AN ORG SWITCH IS A COLD SOURCE SWITCH (Phase 298-04, D-08 / D-09). The active org is part of
+ *    the source identity, so the old org's rows clear at once and its late answer is dropped by
+ *    rule 5. The summary is held with the org its request was SENT under (the header) and reads
+ *    `null` while that org is not the active one, so no count ever shows the old org's number.
  */
 import {
   useCallback,
@@ -36,7 +40,11 @@ import {
 } from "react"
 
 import { useDocuments } from "@/hooks/useDocuments"
+import { useActiveOrgId } from "@/hooks/useActiveOrgId"
 import { getDocument, getLibrarySummary, listDocumentsPage, resolveAdHoc, resolveView } from "@/lib/api"
+// The header seam, read from `_core` (never the barrel, which suites mock wholesale).
+import { getActiveOrgId } from "@/lib/api/_core"
+import { useOrgItemsVersion } from "@/lib/elsewhereCounts"
 import type { Document, LibrarySummary, ViewFilter } from "@/types"
 
 export type LibraryLoadState = "loading" | "ready" | "error"
@@ -186,14 +194,21 @@ export function useLibraryDocuments({
   const [attempt, setAttempt] = useState(0)
   const [changeTick, setChangeTick] = useState(0)
 
-  const [summary, setSummary] = useState<LibrarySummary | null>(null)
-  const [summaryState, setSummaryState] = useState<LibraryLoadState>("loading")
+  // Rule 6 — the org key (no keyed remount: the hook re-asks, the page stays mounted).
+  const activeOrgId = useActiveOrgId()
+  // 298-05 (UI-D19): a move re-asks the page and the numbers — silently (not part of the request
+  // identity, so the rows stay on screen and a moved row leaves only on the answer).
+  const moveVersion = useOrgItemsVersion()
+  const [heldSummary, setHeldSummary] = useState<{ org: string | null; summary: LibrarySummary } | null>(null)
+  const [summaryStateHeld, setSummaryState] = useState<LibraryLoadState>("loading")
   const [summaryTick, setSummaryTick] = useState(0)
 
   const reqIdRef = useRef(0)
   const summaryReqRef = useRef(0)
   const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
   const summaryKnownRef = useRef(false)
+  // The org the summary effect last asked for; a different org resets "known" (rule 6).
+  const summaryOrgRef = useRef(activeOrgId)
 
   // ── the change hint (D-08): ONE refetch per 500 ms window, however many events land in it ──
   const scheduleChange = useCallback(() => {
@@ -225,12 +240,13 @@ export function useLibraryDocuments({
 
   // ── the page ──────────────────────────────────────────────────────────────────────────
   // Keyed on the SERIALISED source, so a new-but-equal object is the same list (no refetch).
-  const sourceKey = JSON.stringify(source)
+  // Rule 6: the active org joins the key, so a switch is a cold source switch.
+  const sourceKey = JSON.stringify({ source, org: activeOrgId })
   const pageKey = `${offset}:${limit}:${includeArchived}`
   useEffect(() => {
     const myReq = ++reqIdRef.current
     const request = { sourceKey, pageKey, attempt }
-    readList(JSON.parse(sourceKey) as LibrarySource, includeArchived, offset, limit).then(
+    readList((JSON.parse(sourceKey) as { source: LibrarySource }).source, includeArchived, offset, limit).then(
       (answer) => {
         if (myReq !== reqIdRef.current) return
         setSettled({ ...request, answeredKey: sourceKey, answeredPage: { offset, limit }, ...answer, error: null })
@@ -249,7 +265,7 @@ export function useLibraryDocuments({
         }))
       },
     )
-  }, [sourceKey, pageKey, includeArchived, offset, limit, attempt, changeTick])
+  }, [sourceKey, pageKey, includeArchived, offset, limit, attempt, changeTick, moveVersion])
 
   // Derived (UI-SPEC §Loading vocabulary): rows belong to THIS source, or none are shown (cold);
   // the settled request is the one asked for, or the person is waiting (warm). A change hint is
@@ -275,11 +291,17 @@ export function useLibraryDocuments({
   // ── the numbers ───────────────────────────────────────────────────────────────────────
   useEffect(() => {
     const myReq = ++summaryReqRef.current
+    // Rule 6: another org's answer is not "known" for this one — its first failure says so.
+    if (summaryOrgRef.current !== activeOrgId) {
+      summaryOrgRef.current = activeOrgId
+      summaryKnownRef.current = false
+    }
+    const sentUnder = getActiveOrgId()
     getLibrarySummary().then(
       (s) => {
         if (myReq !== summaryReqRef.current) return
         summaryKnownRef.current = true
-        setSummary(s)
+        setHeldSummary({ org: sentUnder, summary: s })
         setSummaryState("ready")
       },
       () => {
@@ -288,7 +310,12 @@ export function useLibraryDocuments({
         if (!summaryKnownRef.current) setSummaryState("error")
       },
     )
-  }, [summaryTick])
+  }, [summaryTick, activeOrgId, moveVersion])
+  // Rule 6 — the summary on screen is the ACTIVE org's or none; a held answer for another org
+  // reads as still loading (never "0", never the old org's number).
+  const summary = heldSummary !== null && heldSummary.org === activeOrgId ? heldSummary.summary : null
+  const summaryState: LibraryLoadState =
+    summaryStateHeld === "ready" && summary === null ? "loading" : summaryStateHeld
 
   const refresh = useCallback(async () => {
     setChangeTick((n) => n + 1)

@@ -1,0 +1,43 @@
+ROSTER overlay rows read by load_all_model_overrides: 31 · direct SQL (removed=false): 31
+ROSTER seed ids (MODEL_CAPABILITIES): 61 · union rows: 45
+ROSTER eligible (enabled, not deprecated, not removed): 42
+ROSTER openrouter_tool_strategy (app settings) = <OpenRouterToolStrategy.QUALITY: 'quality'>
+ROSTER groups=9 (required 8, extra 1)
+ROSTER REQUIRED provider=anthropic  newest=claude-opus-5-5 source=overlay (DB-only row) native_tools=True emit_tier=None predicted_calling_mode=NATIVE (native SDK adapter) ids_in_group=4 tied_with=['claude-sonnet-5-5', 'claude-opus-5-5']
+ROSTER REQUIRED provider=deepseek   newest=deepseek-v4-pro source=seed + overlay native_tools=True emit_tier=force predicted_calling_mode=NATIVE ids_in_group=2 tied_with=['deepseek-v4-flash', 'deepseek-v4-pro']
+ROSTER REQUIRED provider=google     newest=gemini-3.8-flash source=overlay (DB-only row) native_tools=True emit_tier=None predicted_calling_mode=NATIVE (native SDK adapter) ids_in_group=5
+ROSTER EXTRA    provider=lmstudio   newest=qwen-agentworld-35b-a3b source=overlay (DB-only row) native_tools=True emit_tier=None predicted_calling_mode=NATIVE ids_in_group=7
+ROSTER REQUIRED provider=minimax    newest=MiniMax-M3 source=seed native_tools=True emit_tier=force predicted_calling_mode=NATIVE ids_in_group=1
+ROSTER REQUIRED provider=moonshot   newest=kimi-k3.1-pro-highspeed source=overlay (DB-only row) native_tools=True emit_tier=None predicted_calling_mode=NATIVE ids_in_group=3
+ROSTER REQUIRED provider=openai     newest=gpt-5.6-luna source=seed native_tools=True emit_tier=force_strict predicted_calling_mode=NATIVE ids_in_group=8 tied_with=['gpt-5.6-sol', 'gpt-5.6-terra', 'gpt-5.6-luna']
+ROSTER REQUIRED provider=openrouter newest=deepseek/deepseek-v4.1-flash source=overlay (DB-only row) native_tools=True emit_tier=None predicted_calling_mode=NATIVE ids_in_group=5
+ROSTER REQUIRED provider=zhipu      newest=glm-5.3-flash source=overlay (DB-only row) native_tools=True emit_tier=None predicted_calling_mode=NATIVE ids_in_group=7 tied_with=['glm-5.3', 'glm-5.3-flashx', 'glm-5.3-flash']
+ROSTER rows predicted STRUCTURED: NONE
+ROSTER ⚠ no derived row is predicted STRUCTURED — the live SC#2 holdback check needs a STRUCTURED row; see 273-UAT-LOG.md (the plan assumed OpenRouter is STRUCTURED).
+ROSTER STRUCTURED-routing candidates (keyed, enabled, any group): ['lmstudio:nvidia_nvidia-nemotron-nano-9b-v2']
+
+ROSTER openrouter deepseek/* ids (seed ∪ DB overlay): ['deepseek/deepseek-chat', 'deepseek/deepseek-r1', 'deepseek/deepseek-v4-pro', 'deepseek/deepseek-v4.1-flash']
+ROSTER openrouter row FORCED (D-22): derived newest=deepseek/deepseek-v4.1-flash -> deepseek/deepseek-v4-pro
+ROSTER deepseek/deepseek-v4.1-flash-1017 is NOT in the DB registry — no production-id extra row
+ROSTER extra row: openrouter deepseek/deepseek-v4.1-flash (the derived newest openrouter id — the production model's family)
+SC10_KEY baseline active_provider=deepseek saved_llm_model='deepseek-v4-flash' (⚠ the saved llm_model — NOT any --model you pass — is what reaches a phase)
+SC10_KEY provider=anthropic api_key=present request_model=claude-haiku-4-5-20251001 predicted_effective_model=claude-haiku-4-5-20251001
+SC10_KEY provider=deepseek api_key=present request_model=deepseek-v4-flash predicted_effective_model=deepseek-v4-flash
+SC10_KEY provider=google api_key=present request_model=gemini-3.5-flash predicted_effective_model=gemini-3.5-flash
+SC10_KEY provider=lmstudio api_key=present request_model=qwen-agentworld-35b-a3b predicted_effective_model=deepseek-v4-flash ⚠ _SUB_AGENT_MODEL_DEFAULTS['lmstudio'] is empty and 'lmstudio' is a flexible provider — the saved llm_model passes through UNSLASHED (predicted 404); pin phase.config.model via --openrouter-definition-slug to drive it
+SC10_KEY provider=minimax api_key=present request_model=MiniMax-M2.7-highspeed predicted_effective_model=MiniMax-M2.7-highspeed
+SC10_KEY provider=moonshot api_key=present request_model=kimi-k2.6 predicted_effective_model=kimi-k2.6
+SC10_KEY provider=openai api_key=present request_model=gpt-5.4-mini predicted_effective_model=gpt-5.4-mini
+SC10_KEY provider=openrouter api_key=present request_model=deepseek/deepseek-v4-pro predicted_effective_model=deepseek-v4-flash ⚠ _SUB_AGENT_MODEL_DEFAULTS['openrouter'] is empty and 'openrouter' is a flexible provider — the saved llm_model passes through UNSLASHED (predicted 404); pin phase.config.model via --openrouter-definition-slug to drive it
+SC10_KEY provider=zhipu api_key=present request_model=glm-5-turbo predicted_effective_model=glm-5-turbo
+SC10_KEY provider=openrouter api_key=present request_model=deepseek/deepseek-v4.1-flash predicted_effective_model=deepseek-v4-flash ⚠ _SUB_AGENT_MODEL_DEFAULTS['openrouter'] is empty and 'openrouter' is a flexible provider — the saved llm_model passes through UNSLASHED (predicted 404); pin phase.config.model via --openrouter-definition-slug to drive it
+
+
+anthropic  claude-opus-5-5              active
+deepseek   deepseek-v4-pro              active
+google     gemini-3.8-flash             active
+minimax    MiniMax-M3                   active
+moonshot   kimi-k3.1-pro-highspeed      ⛔ account suspended for insufficient balance (HTTP 429, BUG-261024-01) — the provider refuses every call
+openai     gpt-5.6-luna                 active
+openrouter deepseek/deepseek-v4-pro     ⛔ 402 insufficient credit (BUG-261024-03 / 292.1 OpenRouter row) — operator top-up owed
+zhipu      glm-5.3-flash                active

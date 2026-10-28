@@ -69,7 +69,7 @@ _spec = importlib.util.spec_from_file_location("run_273_board", _REPO / "scripts
 b273 = importlib.util.module_from_spec(_spec)
 _spec.loader.exec_module(b273)  # type: ignore[union-attr]
 
-_PHASE_DIR = _REPO / ".planning" / "phases" / "292-more-ways-to-show-it"
+_PHASE_DIR = _REPO / ".planning" / "milestones" / "v4.7-phases" / "292-more-ways-to-show-it"
 _EVIDENCE = _PHASE_DIR / "evidence"
 _FIXTURES = _EVIDENCE / "fixtures"
 _LOCK = Path(os.getenv("LOCALAPPDATA", "C:/Users/fhdmr/AppData/Local")) / "Temp" / "agentic-rag-localdb.lock"

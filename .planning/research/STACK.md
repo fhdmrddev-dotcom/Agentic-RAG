@@ -1,745 +1,257 @@
-# Stack Research
+# Stack Research — v4.8 "Every Page Has a Link"
 
-**Domain:** Scheduled, permission-aware, multi-source document ingestion at scale — added to a shipped FastAPI + Supabase + connector platform
-**Milestone:** v4.0 Connected Knowledge
-**Researched:** 2026-09-04
-**Confidence:** HIGH on the recommendations (every one is grounded in a file in this repo plus a live version check); MEDIUM on two clearly-marked provider details.
+**Domain:** Adding URL routing, an app-owned mailer and run-waiting notifications to a shipped React + Vite SPA with a FastAPI backend (Agentic RAG / "Syrel")
+**Researched:** 2026-10-27
+**Confidence:** HIGH for versions, bundle cost and hosting behaviour (measured). MEDIUM for the router choice, which is a judgement between two good options. LOW for SMTP egress from the Hostinger VPS (not measured; we avoid depending on it).
+
+> Scope: only what the three new capabilities need. RAG, SSE, the harness, connectors, the scheduler, org RLS and Auth are validated and are not re-researched here.
 
 ---
 
-## ⭐ The headline: v4.0 needs **ZERO new Python packages**
+## TL;DR — what changes in the stack
 
-Every one of the six axes in the question resolves to something this repo **already ships**. That is not a
-convenient coincidence — it is what the v3.9 connector architecture was built for, and the binding v4.0
-constraint (*"a watched source must be DATA, not code"*) is only achievable if the answer stays inside the
-existing transport, parser and claim primitives.
+| Decision | Recommendation | New dependency? |
+|---|---|---|
+| Client router | **`react-router@^8.5.0`, data mode (`createBrowserRouter` + `RouterProvider` from `react-router/dom`), used as a router only, with no loaders or actions** | **Yes, one** (frontend) |
+| React | Bump `react` and `react-dom` from `^19.2.4` to **`^19.2.9`** (React Router 8 requires `>=19.2.7`) | Version bump |
+| CI Node | Bump `frontend-tests.yml` from `node-version: "20"` to **`"22"`** (React Router 8 declares `engines.node >=22.22.0`; Node 20 is past end of life) | No |
+| SPA fallback | **No rewrite changes if every new route lives under `/app/…`.** Both hosts already serve `app.html` there (measured on production). Add a parity test instead. | No |
+| Mailer transport (cloud) | **Resend REST API called with `httpx`**, which is already a dependency. This replaces the lazy `import resend` in `backend/app/services/email_provider.py`; that package was never installed in any built image. | **No** |
+| Mailer transport (one-box / any SMTP) | **stdlib `smtplib`** run off the event loop (`asyncio.to_thread` or `run_in_threadpool`), added as `EMAIL_PROVIDER=smtp` | **No** |
+| Email templates | **Jinja2 3.1.6** (already declared) with `select_autoescape(["html"])` and an HTML part plus a plain-text part | No |
+| In-app notification store | **A Postgres table with RLS, an outbox drained with `FOR UPDATE SKIP LOCKED`, Realtime as a hint, and TanStack Query fetching the real answer.** No notification library or SaaS. | No |
 
-| Axis | The temptation | What actually applies | New package? |
-|---|---|---|---|
-| Microsoft Graph (OneDrive/SharePoint) | `msgraph-sdk` 1.62.0 | raw REST through `security/egress.send_pinned_http` — the pattern `cloud_storage.py` already uses for Drive | **No** |
-| Google Drive | `google-api-python-client` 2.200.0 | `cloud_storage._list_google_drive_files` already exists and already talks Drive v3 through the binder | **No** |
-| MCP file surface | an MCP SDK | `services/mcp_client.py` (480 L, `list_tools` / `call_tool`, egress-validated) | **No** |
-| Email / mailbox | `talon`, `email-reply-parser`, `mail-parser`, `O365` | `services/email_extraction_service.py` (Phase 203) — RFC822 parse, **quoted-reply stripping**, attachments-as-children with caps, threading headers | **No** |
-| Durable job queue | `arq` / `dramatiq` / `celery` / `pgmq` | the shipped `db/schedules.claim_due_schedules` pattern: `FOR UPDATE SKIP LOCKED` + in-transaction advance, on `asyncpg` | **No** |
-| Embedding batch + fallback | LangChain (**banned**), `tenacity` | `tiktoken` (installed) for the token budget, `services/circuit_breaker.py` for the trip | **No** |
-| Content hashing | `xxhash` / `blake3` | `hashlib.sha256` — it is already the dedup key, enforced by a UNIQUE INDEX | **No** |
-
-**What v4.0 *does* need is not packages.** It needs (a) new rows in existing registries, (b) ~4 new
-`ALLOWED_HOST_SUFFIXES` egress keys, (c) 2–3 SQL migrations, and (d) ~5 env knobs registered in the
-Phase-157 deploy artifacts under the same-commit parity rule. That list is in
-[§ What v4.0 actually adds](#what-v40-actually-adds) below.
+Net: **one new frontend package, zero new Python packages.**
 
 ---
 
 ## Recommended Stack
 
-### Core Technologies — all already installed
+### Core Technologies
 
-| Technology | Version (in `backend/requirements.txt`) | Purpose in v4.0 | Why it is the right answer here |
+| Technology | Version | Purpose | Why Recommended |
 |---|---|---|---|
-| `httpx` | `>=0.28.0` (installed) | The ONE transport for Drive, Graph, Gmail and Graph-mail | Every outbound connector byte in this app goes through `security/egress.send_pinned_http`, which wraps httpx with **DNS pinning, an allow-list, explicit redirect refusal (`follow_redirects=False`) and a decompression-safe `max_bytes` cap**. A vendor SDK owns its own transport and would bypass all five. This is not a preference — `cloud_storage.py:252` records that a raw `httpx.AsyncClient` on the Drive path *was* the CR finding that created the `drive_read` key. |
-| `asyncpg` | `>=0.29` (installed) | The durable ingestion job queue | `db/schedules.py:264-340` already implements exactly the claim semantics a job queue needs, on this driver, and `scheduler_service.py`'s header records **why it needs no leader election and no Redis coordination**. Copying a proven in-repo pattern beats importing an unproven external one. |
-| `tiktoken` | `>=0.12.0` (installed) | Token budgeting for embedding batches | OpenAI's embeddings endpoint caps a request at **300,000 tokens summed across all inputs** — a batcher that counts only *array length* will still 400. `tiktoken` is the encoder the app already uses for the context window. |
-| `hashlib` (stdlib) | — | `content_hash` for the preview's *already here* split | `documents.py:620` computes `sha256(raw)` and migration `043` puts a **partial unique index on `(user_id, content_hash, folder_id)`**. The v4.0 preview MUST look up this exact column with this exact value, or the *already here* arm is a different question from the one the DB answers. |
-| `redis` | `>=5.2,<6` (installed) | Rate-limit tokens + per-connection poll leases — **not** the job queue | Redis stays what `CLAUDE.md` says it is: a best-effort buffer. Durable job state belongs in Postgres, where RLS and the audit ledger live. |
-| `croniter` | `>=3.0.0` (installed) | Watch cadence | The shipped scheduler already parses cadence with it (`models/schedule.py`). SC#1 demands the **shipped** scheduler, so the cadence vocabulary is already chosen. |
-| `openai` | `>=2.0.0` (installed) | Embeddings, incl. every OpenAI-compatible endpoint | `openai_service.resolve_embedding_endpoint` already routes OpenAI / Ollama / LM Studio / any OpenAI-compatible base URL through **one** SDK. The "provider fallback" is an *endpoint list*, not a new client. |
+| `react-router` | **8.5.0** (2026-10-19; v8.0.0 shipped 2026-06-17) | URL ↔ view and entity routing, Back/Forward, link clicks, navigation blocking | Most proven SPA router. Declarative and data modes run against the same route table, so we can adopt it without restructuring the app. Data mode adds `useBlocker`, which we need now that Back/Forward can leave a dirty Builder, connection form, round-limits or model-registry editor. It is headless, so all data stays in TanStack Query. |
+| `react` / `react-dom` | **19.2.9** (patch on the installed 19.2 line, 2026-10-14) | Peer requirement of React Router 8 (`>=19.2.7`) | Patch-only bump that stays on 19.2.x. **19.3.x is deliberately not adopted here**: it is a minor-line change with its own surface (including `<ViewTransition>`), and nothing in this milestone needs it. Every pinned peer accepts 19.2.9 (checked: remotion and @remotion/* `>=16.8`, @xyflow/react `>=17`, @scalar `^18 \|\| ^19`, @lobehub/icons `^19`). |
+| Resend REST API via `httpx` | API `POST https://api.resend.com/emails`; `httpx>=0.28.0` already declared | App-owned transactional email in cloud | **Port 443, so the open question of whether the Hostinger VPS allows outbound SMTP never arises.** `Idempotency-Key` (24 h window, at most 256 chars) prevents a double send across the two uvicorn workers. Async-native. The `test_189_no_egress` sentinel already intercepts `httpx.AsyncClient.send`. Free tier: 3,000/month and 100/day; Pro is $20/month for 50k. |
+| stdlib `smtplib` | Python stdlib | `EMAIL_PROVIDER=smtp` for the self-hosted one-box and any operator-supplied relay | No dependency. It is the library `security/egress.py` already binds, `test_189_no_egress` already patches `smtplib.SMTP.__init__`, and `test_190_smtp_header_injection` gives a CRLF-refusal precedent to copy. Every major provider (Resend, Postmark, SES, Mailgun, Workspace relay, Postfix) speaks SMTP, so one-box operators can use whatever they have. |
+| Jinja2 | **3.1.6** (already in `requirements.txt`) | HTML and text email bodies | Already a direct dependency (`docxtpl` uses it). Turning autoescape on replaces the hand `html.escape` calls in `ResendProvider`, which is the WR-02 class of bug fixed once for all templates. |
+| Postgres + Supabase Realtime + TanStack Query | existing (`@tanstack/react-query ^5.90.21`, `@supabase/supabase-js ^2.99.2`) | In-app notice of a waiting run, plus the email outbox | Already the pattern (`useDocuments`/`useFolders` use `postgres_changes` as an invalidation hint). It satisfies D-v2.5-03 (Realtime is a hint; reconcile by fetch) and SEED-281's rule that the server derives the verdict. |
 
-### Supporting: what already ships that v4.0 must call, not re-write
+### Supporting Libraries
 
-| Module | What it already does | v4.0 integration point |
+| Library | Version | Purpose | When to Use |
+|---|---|---|---|
+| (none new) | | Route parameter validation | Validate with a **project-owned pure resolver** (`parseAppLocation(pathname, search) → AppRoute` discriminated union), extending the strict-UUID discipline already in `frontend/src/lib/runDeepLink.ts` and the `resolveRoute` shape in `frontend/src/docs/router.ts`. Do **not** add zod or valibot just for route params. |
+| `aiosmtplib` | 5.1.3 (2026-09-08, zero deps) | asyncio-native SMTP | **Only if** SMTP must ever be sent from inside a hot async path. Not recommended now: (1) the outbox worker can use `to_thread` cheaply at notification volume; (2) aiosmtplib bypasses `smtplib.SMTP.__init__`, so `test_189`'s egress sentinel would not see it, and whether its `socket.socket.connect` floor catches an asyncio connect depends on the event loop. That last point is **unverified**. |
+| `resend` (PyPI) | 2.50.0 (2026-10-16) | Official Resend SDK | **Not recommended.** The sync path pulls in `requests`; async needs the `[async]` extra. The SDK covers one POST that `httpx` already makes. Note the current state: `email_provider.py` lazy-imports it, it is **absent from `requirements.txt`**, and it is **not installed in the local venv** (`ModuleNotFoundError`, measured). So `EMAIL_PROVIDER=resend` cannot work in any built image today; `org.py` catches the error and only logs it. |
+
+### Development Tools
+
+| Tool | Purpose | Notes |
 |---|---|---|
-| `backend/app/security/egress.py` | `send_pinned_http(capability, method, url, …, allowed_host=, max_bytes=)`; `ALLOWED_HOST_SUFFIXES` keyed by capability; refuses 30x with `EgressRefused("redirected")` | **Every** adapter's `list` and `read` call. New capability keys (below) are the only change. |
-| `backend/app/services/cloud_storage.py` | `_list_google_drive_files` (Drive v3 `files.list`, `q`, `pageToken`, `fields`) + `_fetch_google_drive_file` (metadata → export-or-`alt=media`, 25 MB cap) | The Drive adapter is a **generalisation** of these two functions, not a new file. `fetch_cloud_file`'s `NotImplementedError` branch is literally where the Graph adapter plugs in. |
-| `backend/app/services/mcp_client.py` | `list_tools` / `call_tool` over JSON-RPC 2.0, `validate_mcp_destination`, 2 MB response cap, explicit `auth_scheme` | The MCP-file adapter: `list` → a `list_*`-shaped tool, `read` → a `read_*`-shaped tool. |
-| `backend/app/services/email_extraction_service.py` | `parse_eml_bytes` / `parse_msg_bytes` → `ParsedEmail{message_id, in_reply_to, references, attachments}`, `strip_quoted_replies`, `format_email_text_for_retrieval`, `MAX_ATTACHMENTS_PER_EMAIL=50` | **The whole email shape answer.** Both mailbox adapters fetch RFC822 bytes and hand them here. |
-| `backend/app/services/oauth_service.py` | `_PROVIDER_META` — and **`"microsoft"` already exists at `:104`** with `Files.Read.All` + `offline_access` + PKCE on the `/common` tenant | The Graph adapter's auth is already declared. It needs scopes *added*, not invented. |
-| `backend/app/db/schedules.py` | `claim_due_schedules` — `FOR UPDATE SKIP LOCKED` + in-transaction advance | The template for `claim_due_ingestion_jobs`. Copy the *transaction shape*, including the un-advanceable-row deactivation. |
-| `backend/app/services/circuit_breaker.py` | trip/reset on a failing dependency | The embedding-provider fallback's trip condition. |
-| `backend/app/services/connectors/grants.py` | 92 L, the grant-time gate; denies on a MISSING key by design (T-211-05) | A watch is a **read grant**. It must arrive ungranted and be allowed per-tool like everything else. |
+| Mailpit (bundled with local `supabase start`) | Catch local SMTP mail | Point `EMAIL_PROVIDER=smtp` at the local Mailpit SMTP port to drive the SMTP path without a real provider. **Verify the published port** with `docker ps` on the `supabase_inbucket_*` container; no `config.toml` was found in the repo. It falls inside the reserved 54320-54335 block. |
+| `frontend/src/lib/activeViewReachability.ts` | Executable inventory of views | Extend it with a **fourth leg** (each `ActiveView` member maps to a route path) so a view without a URL fails CI the way a view without a render branch does today. |
+| `scripts/check-landing-first-paint.cjs` | Proves landing first paint carries no app code | Re-run after adding the router. It must be imported only from the `app.html` entry chain, never from `index.html` (landing) or `docs.html`. |
 
 ---
 
-## 1 · Microsoft Graph (OneDrive / SharePoint)
+## Installation
 
-### Verdict: **raw REST through `send_pinned_http`. Do NOT add `msgraph-sdk`.**
+```bash
+# frontend/ — one new package plus a patch bump of React (legacy-peer-deps=true is already set in .npmrc)
+npm install react-router@^8.5.0 react@^19.2.9 react-dom@^19.2.9
 
-**Versions checked live on PyPI 2026-09-04:** `msgraph-sdk` **1.62.0** (2026-09-02) · `msgraph-core` **1.5.1** ·
-`azure-identity` **1.25.3** · `msal` **1.38.0**. All current and healthy — the rejection is architectural, not
-a maintenance judgement.
-
-**Why raw REST, in this repo specifically:**
-
-1. **`msgraph-sdk` owns its own HTTP stack (Kiota + `httpx` + a middleware pipeline) and its own auth
-   (`azure-identity` credential objects).** Calls made through it would not pass `validate_destination`,
-   would not be DNS-pinned, would not refuse redirects, and would not be capped by `max_bytes`. The
-   `cloud_storage.py:252` comment records what happened the *last* time a Google path used a raw client:
-   *"no scheme check, no allow-list, no DNS pin, no redirect refusal, no size cap — on a path that
-   downloads a file a person names."* Adopting the SDK re-creates that hole with a nicer API on top.
-2. **`azure-identity` + `msal` model auth as a credential object that mints and caches its own tokens.**
-   This app's tokens live encrypted in `connector_tokens` and are minted by
-   `oauth_refresh_service.get_fresh_access_token(connection_id)`. Two token caches that disagree is exactly
-   the failure class `mcp_client.py`'s `auth_scheme` docstring was written about.
-3. **The surface actually needed is four endpoints.** Listing children, listing a site's drives, reading
-   an item's metadata, and downloading one file. Against that, `msgraph-sdk` pulls ~10 packages
-   (`microsoft-kiota-*` × 5, `azure-core`, `azure-identity`, `msal`, `msal-extensions`, `std-uritemplate`)
-   into a Coolify image that must also build PyMuPDF, camelot, and sentence-transformers.
-
-### ⚠ The load-bearing finding: `/content` is a **302**, and this app refuses redirects
-
-`GET /drives/{id}/items/{id}/content` returns **`302 Found`** with a `Location` pointing at a
-**pre-authenticated URL on a different host** — Microsoft's own example is
-`https://b0mpua-by3301.files.1drv.com/…`, and for SharePoint it is a `*.sharepoint.com` host.
-([driveItem: get content](https://learn.microsoft.com/en-us/graph/api/driveitem-get-content))
-
-`egress.py:746/769` sets `follow_redirects=False` **twice, explicitly**, and raises
-`EgressRefused("redirected")` on a 30x. **So the obvious call fails by design.** The adapter must instead:
-
-```
-GET /v1.0/drives/{drive-id}/items/{item-id}?$select=id,name,size,file,@microsoft.graph.downloadUrl
-→ then a SECOND send_pinned_http to the returned URL under a SEPARATE egress key
+# backend/ — nothing to install. httpx, jinja2 and smtplib (stdlib) are already present.
 ```
 
-This is not a workaround; it is the documented path Microsoft recommends for exactly this reason (CORS
-preflight prohibits the 302). It costs **one extra round trip per file** and it means the download host is
-`*.1drv.com` / `*.sharepoint.com`, **not `graph.microsoft.com`** — which is why it needs its own key.
-
-### Auth: what is different about Graph
-
-| Concern | Fact | Consequence for us |
-|---|---|---|
-| Provider entry | **Already shipped** — `oauth_service.py:104`, `/common` tenant, PKCE on, `prompt=consent`, scopes `openid offline_access User.Read Files.Read.All` | Auth is a **scope edit**, not a new provider. This is the v3.9 architecture paying off. |
-| Tenant | `/common` accepts work/school **and** personal Microsoft accounts | Keep `/common`. A tenant-specific authority (`/{tenant-id}`) is a BYO-OAuth field, not a code branch. Note: personal accounts have **no SharePoint**, so `Sites.Read.All` is silently useless there — the availability probe (`google/availability.py` pattern) should say so rather than returning a bare 403. |
-| `Files.Read.All`, delegated | **Admin consent NOT required** (verified: [graphpermissions.merill.net](https://graphpermissions.merill.net/permission/Files.Read.All)) | A user *can* self-consent — but most enterprise tenants disable user consent tenant-wide. **Plan the UX for "your admin must approve this", and make the refusal say so.** Confidence: HIGH on the metadata, MEDIUM on "your tenant will actually allow it". |
-| `Files.Read.All`, **application** | **Admin consent required** | Do not go here. Application permissions read *every* file in the tenant with no signed-in user — that is precisely the ACL flattening `SEED-210` fenced, and it is incompatible with the operator's chosen Option 3. |
-| SharePoint document libraries | Need `Sites.Read.All` (delegated, admin consent not required) | **Add it.** Without it the adapter sees OneDrive only and a SharePoint folder map fails at list time. |
-| Mailbox (§4) | `Mail.Read` (delegated) or least-privileged `Mail.ReadBasic` | **Add `Mail.Read`** — `Mail.ReadBasic` cannot read the body, which is the whole point. |
-| Refresh | `offline_access` already present; Microsoft requires `scope` on the refresh POST | `oauth_refresh_service.py` already POSTs `scope`; verify against the Microsoft arm at implementation. |
-| ⚠ Scope widening | `oauth_service.py:50` already records the rule: *"a wider scope here would grant more than any code can use"*, and a row authorised before a scope was added does **not** have it | Adding `Sites.Read.All` / `Mail.Read` **requires a re-consent** for every existing Microsoft connection, and `availability.py`'s `scope_missing` state is how the UI must say so. That is a designed-for case, not a bug. |
-
-### Delta queries — a **FUTURE fact**, deliberately not a dependency
-
-`driveItem: delta` and `message: delta` both exist in Graph v1.0
-([delta query overview](https://learn.microsoft.com/en-us/graph/delta-query-overview)). Their real cost,
-recorded so a future phase does not discover it:
-
-- **Token expiry is not a fixed number for Outlook entities** — it depends on the size of an internal
-  server-side delta-token cache, so a token can die at any time.
-- **`410 Gone` + an empty `$deltatoken` means "restart with a full sync"** — the adapter must retain a full
-  crawl path anyway, so delta is *additive*, never a replacement.
-- **Replays are explicitly documented as possible**, so the consumer must be idempotent on
-  `content_hash` regardless.
-- OneDrive/SharePoint use `token=latest`, not the `$deltatoken=latest` that Entra resources use.
-
-**Net:** every property delta needs (idempotent consume, full-crawl fallback, a cursor column) is a
-property polling needs anyway. Ship polling; leave a nullable `delta_cursor TEXT` column in the
-watched-source table and nothing else. ⚠ And the screen still says **"checked every N minutes"** — the
-binding constraint holds.
-
-### Cheapest polling shape today
-
-```
-list:  GET /v1.0/drives/{drive-id}/items/{item-id}/children
-       ?$select=id,name,size,lastModifiedDateTime,file,folder,parentReference,eTag
-       &$top=200&$orderby=lastModifiedDateTime desc
-read:  GET /v1.0/drives/{drive-id}/items/{item-id}?$select=@microsoft.graph.downloadUrl,name,size,file
-       then GET <that url>  (separate egress key)
+```yaml
+# .github/workflows/frontend-tests.yml — both jobs (lines 36 and 68)
+node-version: "22"   # was "20"; react-router@8 declares engines.node >=22.22.0
 ```
 
-`$select` is doing real work: the default `driveItem` payload is large and the binder's `max_bytes` is a
-hard cap, so an unselected list of 200 items is a *refusal*, not a slow request.
+`frontend/Dockerfile` already builds on `node:22-alpine` (a floating tag, so it resolves to the current 22.x). **Vercel's project Node version was not checked**: confirm it is 22.x or 24.x in project settings. npm only warns on `engines` (no `engine-strict`), so a mismatch would not fail the build. It would only mean running outside React Router's support window.
 
 ---
 
-## 2 · Google Drive
+## (a) Router choice: the evidence
 
-### Verdict: **extend `cloud_storage.py`. Do NOT add `google-api-python-client`.**
+### Measured bundle cost
 
-**Versions checked live 2026-09-04:** `google-api-python-client` **2.200.0** (2026-09-01) ·
-`google-auth` **2.57.1** (2026-09-04) · `google-auth-oauthlib` **1.4.1**. Current — again, the rejection is
-architectural.
+I built a minimal app with esbuild (minified, React external, `NODE_ENV=production`, router + params + search + navigate + Link) against React 19.3.1 in the scratchpad:
 
-Same three reasons as Graph, plus a fourth that is specific and decisive: **the code already exists and
-already goes through the binder.** `_list_google_drive_files` and `_fetch_google_drive_file` were
-*hardened onto* `send_pinned_http` on 2026-08-31 as a CR finding. Introducing `googleapiclient.discovery`
-would build a second, unpinned Drive client beside the pinned one — the "two parsers that disagree"
-anti-pattern `google/availability.py` opens by refusing.
+| Router | min | **min+gzip** | Notes |
+|---|---|---|---|
+| wouter 3.13.0 | 6.4 KB | **3.1 KB** | |
+| react-router 8.5.0, declarative (`BrowserRouter`) | 42.3 KB | **15.1 KB** | no `useBlocker` |
+| @tanstack/react-router 1.170.46 | 78.5 KB | **28.3 KB** | |
+| react-router 8.5.0, data mode (`createBrowserRouter`) | 100.6 KB | **33.4 KB** | `useBlocker`, `ScrollRestoration`, `useNavigation` |
 
-### Scopes: **nothing new is needed for reading**
+(Bundlephobia's whole-package figures, 63.7 KB gz for react-router and 31 KB for TanStack, overstate the tree-shaken cost; use the table above.) All of these load **only in the `app.html` chunk**. The landing page and docs are unaffected.
 
-`oauth_service.py:43` already grants **`https://www.googleapis.com/auth/drive.readonly`**, which covers
-`files.list`, `files.get`, `files.export`, `files.get?alt=media` **and** `changes.list`/`getStartPageToken`.
-No re-consent, no new scope, no admin approval. Drive is the **cheapest** of the four families for exactly
-this reason — which is a good argument for it being the first adapter shipped.
+### Why React Router 8 in data mode
 
-⚠ One nuance: `drive.readonly` sees files the user can access, including **shared-with-me** items. A folder
-map onto a shared drive additionally needs the shared-drive parameters below; it does **not** need a wider
-scope.
+1. **Incremental adoption fits this code.** Navigation today is one `useState<ActiveView>` in `App.tsx`, with about 13 call sites going through `handleNavigate` and the setters passed down to `ChatLayout`. The lowest-risk migration keeps those signatures. `activeView` becomes **derived** from `useLocation()` via the pure resolver, and `setActiveView(v)` becomes `navigate(pathFor(v))`. React Router does this with one layout route whose `Component` is the existing shell. No component below `ChatLayout` has to change.
+2. **`useBlocker` is the reason to choose data mode over declarative.** Back/Forward is a new exit from views with unsaved state (`BuilderSaveRegion`, `ConnectionFormPanel`, `AgentRoundLimits`, `ModelRegistryTab`, `InlineEdit` all carry dirty state). In React Router, `useBlocker` exists **only** in data mode (confirmed in the official "Picking a mode" docs). The extra 18 KB gz buys that guard without changing library later.
+3. **Use it as a router, not a data layer.** No `loader`/`action`/`Form`. Data stays in TanStack Query and the SSE providers. Mixing two data layers is the expensive mistake.
+4. **Typed params come from our resolver, not the library.** The values arrive in shared links and are attacker-controlled. The project already treats them that way (`runDeepLink.ts` accepts a strict UUID or `null`). One resolver, unit-tested as a pure function, is stronger and more auditable here than library-level typing.
 
-### Cheapest polling shape today
+### Why not TanStack Router (a close second)
 
-```
-GET https://www.googleapis.com/drive/v3/files
-  q      = "'<FOLDER_ID>' in parents and trashed = false
-            and mimeType != 'application/vnd.google-apps.folder'
-            and modifiedTime > '<RFC3339 last_seen>'"
-  fields = "nextPageToken, files(id,name,mimeType,size,modifiedTime,md5Checksum,version,parents)"
-  orderBy= "modifiedTime desc"
-  pageSize = 100                       # the API max; the shipped code caps at 100 already
-  supportsAllDrives = true             # shared drives
-  includeItemsFromAllDrives = true
-  corpora = "drive" & driveId = "<id>" # only when the map targets a shared drive
-```
+Its strengths are real: first-class typed params, `validateSearch`, it pairs with the TanStack Query we already use, and it is smaller than RR data mode (28 vs 33 KB gz). It loses on **adoption cost in G-5 hot files**. Its type safety is earned by making the route tree the architecture: a registered router type, `from`-scoped hooks, and in practice the file-based codegen plugin that emits `routeTree.gen.ts`. That restructures `App.tsx` (28 phases) and `ChatLayout.tsx` (33 phases) far more than a derived `activeView` does, and adds a generated file to a repo with hot-file and size gates. **Choose it instead if** the team decides to make routes the primary architecture (per-route code splitting, route-level data preloading) rather than an address bar for the existing shell.
 
-Three things this shape buys that the shipped `_list_google_drive_files` does not yet do:
+### Why not wouter
 
-1. **`modifiedTime > '<cursor>'` is the whole poll optimisation.** It is a supported `q` term with
-   `<, <=, =, !=, >, >=` ([Search for files](https://developers.google.com/workspace/drive/api/guides/search-files)),
-   so a poll over an unchanged folder returns an empty page for one request. That is the honest
-   "checked every N minutes" cost.
-2. **`md5Checksum` is returned in the LIST response** for binary files — so the preview's *already here*
-   split can often be answered **without downloading a single byte**. See §5 for exactly how far that goes
-   (it is not the whole answer).
-3. **`incompleteSearch`** must be read from the response. On a large shared-drive corpus Drive may return
-   partial results; a watcher that ignores it silently under-reports, which is the worst possible failure
-   for a preview screen that claims completeness.
+At 3 KB it is the lightest, and its hooks work **without** a provider, which would spare many existing tests. But it has **no navigation blocker**, no navigation-type signal for scroll restoration, and a much smaller maintainer base. The blocker gap alone disqualifies it for a product with dirty editors.
 
-The shipped list function currently **excludes folders unconditionally** and filters by `name contains`.
-Both are attach-flow choices. Generalise the `q` construction into the adapter; keep the response-shaping
-(`{id, name, mime_type, size, modified_at, …}`) exactly as it is, because that dict is already the shape
-the generic contract wants.
+### Why not keep hand-rolling (the `docs/router.ts` pattern)
 
-### Google-native files: the export trap, already solved
+That pattern is fine for read-only docs. For the app it would mean reimplementing correct `<a>` click semantics (modifier keys, middle-click, `target`), history listening via `useSyncExternalStore`, blocking on POP navigations, and scroll restoration. Each is a known bug farm.
 
-`_fetch_google_drive_file` already handles `application/vnd.google-apps.document|spreadsheet` by exporting
-to PDF. Two gaps to close in v4.0, both known:
+### React Router 8 facts that bind the plan (from the official CHANGELOG)
 
-- **`presentation` is missing** from the export branch (Slides), and so is `drawing`. Today they fall to
-  `alt=media`, which returns a 403 for any Google-native type.
-- **A Google-native file has no `md5Checksum` and no stable byte identity.** Its exported PDF bytes are
-  **not** guaranteed reproducible across exports, so `sha256(exported_bytes)` can churn. Use
-  `modifiedTime` + `version` as the change detector for native types and hash the export only to fill the
-  column. This is a real, findable source of "the same Doc re-ingests every night".
+- **ESM-only**; minimums **React 19.2.7+**, **Node 22.22.0+**. **Vite 7+** applies only to `@react-router/dev` (framework mode, which we do not use). We are on Vite 8 regardless.
+- **`react-router-dom` is removed.** Import from `react-router`, and import `RouterProvider` from **`react-router/dom`**. Training data and most web examples still say `react-router-dom`, and that import fails under v8.
+- Middleware is always on in data mode; harmless with no loaders.
+- 8.5 deprecates the RR view-transition APIs in favour of React 19.3's `<ViewTransition>`. Do not adopt either.
+- Yearly major cadence: **v9 is expected around May 2027** (when Node 22 reaches end of life). Budget an upgrade then.
 
-### `changes.list` / `startPageToken` — FUTURE
+### Integration rules (the ones that prevent a rewrite)
 
-Drive's delta is `changes.getStartPageToken` → `changes.list(pageToken)`, and it is **account-wide, not
-folder-scoped** — you get every change the token can see and filter client-side to your mapped folders.
-Page tokens do expire (Drive returns `410` and you re-acquire). Same verdict as Graph: leave the
-`delta_cursor` column, ship polling.
+- **Keep router hooks at the shell boundary** (`App`/`ChatLayout`) and keep passing navigator callbacks down as props, as today. `useNavigate()` outside a router **throws**. Pushing hooks into leaf components would force a router wrapper into a large share of existing vitest suites and collide with the per-file count gate.
+- **`/setup` and `/invite` keep their current pre-router short-circuits** (`App.tsx:320`/`:337`) so the finalized-lockout and invite flows stay byte-for-byte (SEED-185 note 3).
+- **Legacy URLs keep working:** `/app?run=<uuid>` (Phase 289, already shared in production) becomes `<Navigate replace>` to the canonical run path. `/app?connections=1&…` is built server-side by the OAuth callbacks (eight redirect sites via `primary_frontend_origin()`). Keep reading it, or change those sites in the same phase. `/admin/spend` is the same.
+- **`app.<domain>/`** is rewritten to `app.html` by `frontend/middleware.ts` *without* changing the URL (SEED-242 wanted no path in the bar). So the route table needs `/` **and** `/app` both mapped to home. **Do not** add a redirect from `/` to `/app`.
 
 ---
 
-## 3 · Durable ingestion job queue
+## (b) SPA fallback on Vercel and nginx
 
-### ⭐ Verdict: **a plain Postgres table with `FOR UPDATE SKIP LOCKED`, drained by a lifespan task in the existing uvicorn workers. This is unambiguously the fewest moving parts, and it is the option this repo has already debugged in production.**
+**Measured against production on 2026-10-27:**
 
-Everything else on the menu adds either **a process** or **an extension**, and both are deployment-artifact
-changes on a single-box Coolify target.
+| Request | Result |
+|---|---|
+| `https://app.superrag.cloud/app/runs/<uuid>` | **200**, `<title>Syrel</title>` (app.html) |
+| `https://app.superrag.cloud/app/a.b` (a dot in the path) | **200**, app.html |
+| `https://superrag.cloud/app/runs/x` | **308** → `https://app.superrag.cloud/app/runs/x` |
+| `https://superrag.cloud/app?run=abc` | **308** → `https://app.superrag.cloud/app?run=abc` (query preserved) |
+| `https://agentic-rag-rho.vercel.app/app` | **308** → `https://app.agentic-rag-rho.vercel.app/app` → **DNS failure (curl 000)** |
 
-### The comparison, weighed against the real constraints
+**Conclusions:**
 
-| Option | Version (live 2026-09-04) | New always-on process? | New infra dependency? | Verdict |
+1. **Put every new route under `/app/…` and Vercel needs no change.** The `app.*` host-scoped catch-all `/(.*) → /app.html` already covers it, and the apex redirects preserve path and query.
+2. **nginx (one-box) needs no change either.** `location /app/ { try_files $uri /app.html; }` already serves every `/app/*` deep link. `app.html` references assets by absolute `/assets/…` (Vite `base` is the default `/`), so nested paths load correctly.
+3. ⚠ **Do not create top-level app routes outside `/app/`** (for example `/threads/:id`). On the one-box, `location /` falls back to **`index.html`, the landing page**, so such a link would silently open marketing. Adding one would need matching edits in `vercel.json` redirects and rewrites, `frontend/nginx.conf` and `frontend/devRouting.ts` (the three files `devRouting.ts` says must agree). Keeping one prefix avoids that.
+4. ⚠ **No dots in route path segments.** Production serves dotted paths, but `devRouting.ts` passes any dotted path through as a file, so it **404s in dev only**. UUIDs and slugs are fine; put filenames or versions in the search string.
+5. ⚠ **Pre-existing, out of scope but relevant:** the apex redirect's host regex matches `*.vercel.app`, so **preview and `vercel.app` deployments cannot open the app at all** (they redirect to a non-existent `app.<preview>.vercel.app`). Deep links make that host more visible; record it, do not silently fix it inside the router phase.
+6. **Add a parity test, not a rule change:** enumerate the route table's top-level prefixes and assert that each one is covered by `devRouting.ts`, `vercel.json` and `nginx.conf`. This is the same three-file agreement as the existing `devRouting.test.ts`, driven from the router's own table.
+
+---
+
+## (c) App-owned transactional email
+
+**A mailer seam already exists, and it is broken in every built image.** `backend/app/services/email_provider.py` (Phase 167) has an `EmailProvider` protocol switched by `EMAIL_PROVIDER = none | resend`, with `RESEND_API_KEY` and `INVITE_FROM_EMAIL` already in `onebox.env.example`, `docker-compose.prod.yml`, `docs/OPERATOR.md` and `check-deploy-drift.sh`. The `resend` provider lazy-imports a package that is in no requirements file and no image, so it raises, and `org.py` swallows the error into a log line. (SEED-281's "no app-owned mailer exists" was therefore half-true: there is a seam, but no working sender.)
+
+**Recommendation: extend that seam rather than build a second one.**
+
+| Provider value | Transport | For | Secrets (env only) | Infra (env) |
 |---|---|---|---|---|
-| **Plain PG table + `SKIP LOCKED`** | — (uses `asyncpg>=0.29`, installed) | **No** — lifespan task, same as `SchedulerService` | **No** | ✅ **RECOMMENDED** |
-| `pgmq` (Supabase Queues) | ext `1.4.4` on Supabase; `tembo-pgmq-python` **0.10.0** (last release **2025-03-31**) | No | **Yes** — a Postgres extension that must exist in local CLI Postgres *and* cloud Supabase | ⛔ Reject |
-| `arq` | **0.28.0** (2026-04-16) | **Yes** | Redis (have it) | ⛔ Reject |
-| `dramatiq` | **2.2.1** (2026-09-02) | **Yes** | Redis or RabbitMQ | ⛔ Reject |
-| `rq` | **2.12.0** (2026-08-30) | **Yes** (and it forks per job — poor fit for asyncio) | Redis | ⛔ Reject |
-| `celery` | **5.6.3** (2026-03-26) | **Yes** (+ beat if scheduling) | Redis/AMQP | ⛔ Reject — heaviest option on the board |
-| `procrastinate` | **3.9.0** (2026-06-20) | Yes (a worker; can be embedded, but it is a framework) | Postgres (have it) | ⚠ Closest runner-up |
-| `pgqueuer` | **1.3.2** (2026-07-27) | Yes | Postgres (have it) | ⚠ Second runner-up |
+| `none` (default, unchanged) | log the link | offline and dev | none | none |
+| `resend` | **`httpx.AsyncClient` → `POST https://api.resend.com/emails`**, `Authorization: Bearer`, `Idempotency-Key: <outbox row id>` | Vercel/Coolify cloud | `RESEND_API_KEY` (existing) | none |
+| `smtp` (new) | stdlib `smtplib` (`SMTP_SSL` on 465 or `starttls` on 587) via `to_thread` | one-box, any relay | `SMTP_PASSWORD` | `SMTP_HOST`, `SMTP_PORT`, `SMTP_USERNAME`, `SMTP_SECURITY` (`ssl\|starttls`) |
 
-### Why the plain table wins here, concretely
+- **Generalize the protocol** from `send_invite(...)` to `send(message: OutboundEmail)`. Re-express invites on it so both kinds of mail share one transport and one escaping boundary.
+- **Non-secret knobs go to `app_settings` and the Settings UI** (CLAUDE.md rule, plus the operator's "everything in the UI except secrets"): notifications on or off, sender display name and from-address (env `INVITE_FROM_EMAIL` stays as a seed or fallback), and the N-2 "about to expire" lead time. Per-user opt-out goes in `user_settings`. SMTP host and port are infra; they also belong in the one-box first-run setup overlay (`INFRA_KEYS`).
+- **Links in mail** are built with the existing `primary_frontend_origin()` + `/app/runs/<id>` (never the raw comma-separated `FRONTEND_URL`, per BUG-260904-04). On cloud, if the primary origin is the apex, the link takes one 308 hop to `app.` and still lands correctly (measured above).
+- **The mailer is not a connector.** Put it beside `email_provider.py`, never under `services/connectors/`. The connector source fences ban `smtplib.`, `httpx.` and `.sendmail(` there, and egress pinning exists for *user-configured* hosts, whereas these hosts are operator env.
+- **Deployment-artifact parity (same commit):** the new `SMTP_*` vars plus any changed meaning of `EMAIL_PROVIDER` must update `deploy/onebox.env.example`, `docs/OPERATOR.md` (which today tells operators to `pip install resend` into the container, a step that dies with the container), `docker-compose.prod.yml` and `scripts/check-deploy-drift.sh`.
 
-1. **The pattern already ships and its correctness argument is already written down.**
-   `db/schedules.py:264-340` implements it, and `scheduler_service.py`'s module header states the property
-   that matters: *"This loop can therefore run in **every** uvicorn worker with no leader election, no
-   advisory lock of its own and no Redis coordination — which is the point: a leader-election scheme has a
-   failure mode where the leader dies and nothing fires, and that failure is silent."*
-   With `WORKER_COUNT=2` (and any future N) the claim is safe **by construction**.
-   ⚠ Copy the *whole* transaction shape, including `db/schedules.py`'s un-advanceable-row rule: a job that
-   cannot be advanced is **terminalised**, never left claimable, or it re-fires every tick forever.
-2. **A separate worker process is a deploy-artifact change with teeth.** `docker-compose.prod.yml` would
-   gain a fourth service; `deploy/onebox.env.example` would gain its knobs; `docs/OPERATOR.md` would gain a
-   step; and `scripts/check-deploy-drift.sh` **hard-fails** on any unclassified new key. The compose file's
-   own Phase-204 comment already made this call once, verbatim: *"NOT a separate compose service ON
-   PURPOSE: it is a lifespan task inside the backend, so it scales with `WORKER_COUNT` and needs no leader
-   — the claim is a database transaction."* v4.0 should not reverse a decision this repo made deliberately
-   nine phases ago without a new reason, and there is none.
-3. **RLS.** `CLAUDE.md`: *"All tables need Row-Level Security."* An `ingestion_jobs` table gets an owner
-   policy like every other table. `pgmq` creates its queue tables in a `pgmq` schema outside that regime —
-   which means the milestone whose entire premise is *the permission model just got harder* would put its
-   job bodies (containing external file ids and folder paths) in the one place RLS does not reach.
-4. **Local↔cloud parity is this project's #1 documented gotcha.** `pgmq` must be enabled on the cloud
-   Supabase project *and* be present in the local Supabase CLI Postgres image. `CLAUDE.md`'s migration rule
-   is *paste into the SQL editor* — an extension that is not installable that way, or whose version differs
-   between local and cloud, is exactly the class of drift `docs/DEPLOYMENT-LESSONS.md` exists for.
-   ([Supabase pgmq docs](https://supabase.com/docs/guides/queues/pgmq))
-5. **Redis is declared best-effort here.** `CLAUDE.md`: *"Supabase Realtime is a best-effort hint, not a
-   source of truth."* The same posture governs Redis in this codebase (run buffers, streams). Putting the
-   only durable record of *"we owe this customer an ingest"* in Redis inverts that.
+### Provider comparison (cost and ecosystem, for the cloud sender)
 
-**The honest counter-argument, stated rather than hidden:** ingestion is **CPU-heavy** (PyMuPDF, camelot,
-pdfplumber, sentence-transformers). Draining it inside the uvicorn workers means extraction competes with
-request serving. Two things make this acceptable *today*: (a) it is already true — the shipped path is a
-`BackgroundTask` in the same process, so v4.0 changes durability, not placement; (b) the mitigation is the
-shipped one, `run_in_threadpool` per D-v2.5-01, plus a **concurrency cap** (`INGEST_MAX_CONCURRENT`)
-which is the "cap" half of the milestone requirement anyway.
-
-⭐ **Plant the re-open trigger rather than pretending the risk is absent:** *when p95 chat TTFB regresses
-measurably while an ingest batch is draining, extract the drainer into a second process.* The table-based
-queue makes that a **deployment** change with no code change — the same `claim → work → terminalise` loop
-runs in a `python -m app.workers.ingest` entrypoint against the same table. That optionality is a further
-argument for the table over any broker: **you can leave without a rewrite.**
-
-### Shape (for the roadmapper — this is the migration, not the plan)
-
-```sql
--- <NNN>_ingestion_jobs.sql
-create table public.ingestion_jobs (
-  id            uuid primary key default gen_random_uuid(),
-  user_id       uuid not null references auth.users(id) on delete cascade,
-  org_id        uuid not null,
-  source_id     uuid not null references public.watched_sources(id) on delete cascade,
-  external_id   text not null,              -- Drive fileId / Graph itemId / message id
-  status        text not null default 'queued',   -- queued|claimed|done|failed|cancelled
-  attempts      int  not null default 0,
-  max_attempts  int  not null default 3,
-  claimed_at    timestamptz,
-  claimed_by    text,                        -- worker/pid, for observability only
-  run_after     timestamptz not null default now(),   -- retry backoff lives here
-  last_error    text,
-  payload       jsonb not null default '{}'::jsonb,
-  created_at    timestamptz not null default now(),
-  updated_at    timestamptz not null default now()
-);
-create index on public.ingestion_jobs (status, run_after) where status in ('queued','claimed');
-create unique index on public.ingestion_jobs (source_id, external_id) where status <> 'done';
-alter table public.ingestion_jobs enable row level security;   -- owner policy, per CLAUDE.md
-```
-
-Claim, mirroring `claim_due_schedules` exactly:
-
-```sql
-SELECT ... FROM ingestion_jobs
- WHERE status = 'queued' AND run_after <= now()
- ORDER BY run_after
- LIMIT $1
- FOR UPDATE SKIP LOCKED;
--- …and in the SAME transaction: UPDATE ... SET status='claimed', attempts=attempts+1, claimed_at=now()
-```
-
-⚠ **The in-transaction status flip is the load-bearing half**, exactly as `db/schedules.py:279` says of
-`next_run_at`. `SKIP LOCKED` alone only prevents *simultaneous* claims. **Resume** is then free: a
-`claimed` row older than a lease window is swept back to `queued` by the same loop — which is precisely how
-`resume_stranded_workflows` already works in this repo.
-
----
-
-## 4 · Email / mailbox
-
-### ⭐ Verdict: **add no email library. Fetch RFC822 bytes and hand them to the shipped `email_extraction_service`. The mailbox is then a byte-shaped source like the other three.**
-
-**Versions checked live 2026-09-04, all rejected:** `talon` **1.4.4** (last release **2017-08-24**) ·
-`email-reply-parser` **0.5.12** (last release **2020-10-07**) · `mail-parser` **4.6.4** · `O365` **2.1.9**.
-The first two are the canonical quoted-reply strippers and both are effectively abandoned; the second two
-duplicate stdlib + shipped code.
-
-### The fetch, per provider — both return the same bytes
-
-| Provider | Call | Auth | New scope? |
+| Option | Python story | Price (verified 2026-10-27) | Verdict |
 |---|---|---|---|
-| Gmail | `GET /gmail/v1/users/me/messages?q=…` → `GET /gmail/v1/users/me/messages/{id}?format=raw` (`raw` = base64url RFC822) | existing Google token | **No** — `gmail.readonly` already granted (`oauth_service.py:58`) |
-| Graph mail | `GET /v1.0/me/mailFolders/{id}/messages?$select=id,receivedDateTime,internetMessageId` → `GET /v1.0/me/messages/{id}/$value` (**MIME**, verified: *"The MIME content begins with the `MIME-Version` header"*) | existing Microsoft token | **Yes** — add `Mail.Read` |
-
-Both land on `parse_eml_bytes(raw)`. **One parser, two adapters, zero new code paths** — which is the
-milestone's binding constraint satisfied on the axis most likely to break it.
-
-### The SHAPE problem — flagged explicitly, as asked, and it is *mostly already solved*
-
-`PROJECT.md` and `STATE.md` both warn that *"email is a second SHAPE smuggled in as a fourth provider."*
-That warning is correct about the **product** decision and **over-stated about the code**. Measured:
-
-| Shape problem | Status in this repo | What v4.0 still owes |
-|---|---|---|
-| **Quoted-reply duplication** | ✅ `strip_quoted_replies()` ships (`email_extraction_service.py:201`) and runs before chunking | Nothing. Do **not** add `talon`. |
-| **Attachments-as-children** | ✅ ships, with `MAX_ATTACHMENTS_PER_EMAIL = 50` and `MAX_ATTACHMENT_BYTES = 25 MB`, and the caps live in the service *because `documents.py` parses the bytes a second time* | Make the watcher respect the **same** caps — a mailbox watch can amplify far harder than a manual upload. |
-| **Threads** | ⚠ `ParsedEmail` carries `message_id`, `in_reply_to`, `references` — **and the v3.8 audit records that email thread dedup is "stored and read by nothing"** | ⭐ **This is the one real net-new decision.** |
-| **No stable document boundary** | ⛔ open | ⭐ **A scope decision, not a library.** |
-
-### The one decision the roadmapper must force
-
-**What is one document — a message, or a thread?**
-
-- **A message.** `internetMessageId` / `Message-ID` is globally unique and immutable; `content_hash` over
-  the RFC822 bytes works unchanged; the shipped dedup index works unchanged; `strip_quoted_replies` already
-  removes the duplication that makes per-message ingestion noisy. **Cost:** a 40-message thread is 40
-  documents, and retrieval over it feels shredded.
-- **A thread.** Matches how people think and how `SEED-212` frames transcripts. **Cost:** a thread has **no
-  stable identity and no stable bytes** — it grows. Every new reply changes the document, so
-  `content_hash` churns on every poll, `documents_dedup_idx` fires against the *previous* version, and the
-  "already here / will be added" preview becomes a lie. It requires a supersede-and-re-embed lifecycle that
-  does not exist today.
-
-**Recommendation, one sentence:** ship **one message = one document**, store `thread_key` (normalised
-`references[0] or in_reply_to or message_id`, plus Gmail's `threadId` / Graph's `conversationId` as an
-adapter-supplied hint) as a **retrieval grouping column that finally gets READ** — which closes the v3.8
-`stored and read by nothing` finding — and plant thread-as-document behind a trigger (*re-open when a real
-tenant reports shredded thread recall*).
-
-⚠ **And flag the size honestly at scoping:** a mailbox watch is the family most likely to be the one that
-overruns. Drive/Graph/MCP-file are ~1 adapter each over shipped code; mail is 2 adapters plus a
-document-boundary decision plus an amplification cap plus a PII surface that no other family has. **If the
-milestone has to cut one family, this is the one** — and unlike the others, cutting it costs no
-architecture, because the byte contract is identical when it returns.
+| **Resend (REST via httpx)** | No SDK needed; official SDK 2.50.0 exists | Free 3k/month, 100/day; Pro $20/month for 50k | **Recommended.** It is already the configured provider name, has idempotency keys, uses port 443, and the free tier covers approval notices. |
+| Postmark | **No official Python SDK**; community `postmarker` was last released 2022-01 | Free 100/month; $15/month for 10k, then $1.80 per 1k | Strong deliverability, but costs more and has a stale client. Reachable later through `smtp` with no code change. |
+| AWS SES | `boto3` 1.43.x (heavy, sync), IAM setup, sandbox exit request | about $0.10 per 1k (training data, not re-verified) | Cheapest at volume, highest setup cost. Overkill for N-1..N-4. Reachable through `smtp` if ever wanted. |
+| Plain SMTP only | stdlib | provider-dependent | Shipped as the one-box path. As the *cloud* path it depends on outbound SMTP ports from the Hostinger VPS: Hostinger says port 25 is open and caps at 5 mails/minute, and **465/587 are unverified**. Resend's alternative ports 2465/2587 are a fallback if needed. |
 
 ---
 
-## 5 · Content hashing / dedup
+## (d) In-app notification store: build on what exists
 
-### Verdict: **`hashlib.sha256` over the exact bytes that get ingested. Change nothing. Add nothing.**
+**Use Postgres + RLS + the existing Realtime-as-hint + TanStack Query. Add no library.**
 
-**What to hash — settled by the database, not by preference:**
-
-`documents.py:620` computes `content_hash = hashlib.sha256(raw).hexdigest()` and migration
-`043_documents_dedup_unique_index.sql` creates
-`UNIQUE INDEX documents_dedup_idx ON documents (user_id, content_hash, folder_id) WHERE status != 'failed'`.
-
-**The v4.0 preview's *"already here"* arm is a lookup against that column.** If the watcher hashes anything
-other than what the upload path hashes — normalised text, extracted text, a provider-supplied checksum —
-then a file uploaded by hand and the same file seen by the watcher produce **different** hashes, the
-preview says *will be added*, the insert hits the unique index, and the job fails on a constraint that was
-supposed to be the answer. **Byte-identical hashing is the interoperability contract with the shipped
-upload path**, and it is why "bytes vs normalized text" is not actually an open question here.
-
-`xxhash` **4.0.1** and `blake3` **1.0.9** are both current and both faster. **Do not add either.** SHA-256 at
-~1–2 GB/s is nowhere near the bottleneck when the same 25 MB file just crossed the internet and is about to
-be parsed by PyMuPDF; and swapping the algorithm invalidates every existing `content_hash` in the corpus.
-
-### Streaming vs buffered — the API-not-filesystem interaction
-
-⚠ **This app cannot stream-hash today, and that is a deliberate security property, not an oversight.**
-`send_pinned_http` reads with `stream=True` internally but returns a `PinnedResponse` whose `body` is
-`bytes`, capped by `max_bytes` and decompression-safe (`_decode_bounded`). The cap **is** the defence: the
-`cloud_storage.py` comment records that an unbounded read was *"a memory exhaustion any Drive account could
-trigger."*
-
-So the shape is: **cap first, buffer, hash the buffer.** With `max_bytes = 25 MB` (matching the app's own
-upload ceiling — *"a file this cannot fetch is a file it could not have ingested anyway"*) and a concurrency
-cap on the drainer, peak memory is bounded at `INGEST_MAX_CONCURRENT × 25 MB`. **Set both knobs together**
-— a queue cap without a byte cap is not a cap.
-
-⛔ **Do not "fix" this by adding a streaming download path that bypasses the binder.** That is precisely the
-regression the 2026-08-31 hardening closed. If ingesting >25 MB files ever becomes a requirement, the change
-is a `max_bytes` raise plus a chunked-hash *inside* `egress.py` where the cap and the decompression guard
-already live — one place, not per adapter.
-
-### Provider-supplied checksums: a **pre-filter**, never the key
-
-| Source | Cheap pre-download signal | Trustworthy as `content_hash`? |
-|---|---|---|
-| Google Drive | `md5Checksum` (in the `files.list` response), `version`, `modifiedTime` | **No** — wrong algorithm. ✅ Excellent as a "did this change since last poll" filter, and it is free in the list call. Absent on Google-native types. |
-| Microsoft Graph | `file.hashes` — `quickXorHash` (OneDrive for Business / SharePoint) or `sha1Hash`/`sha256Hash` (personal OneDrive); plus `eTag` / `cTag` | **No** — inconsistent across tenants; `quickXorHash` is a Microsoft-proprietary algorithm with no Python stdlib support. Use `eTag`/`cTag` as the change signal. **Confidence: MEDIUM** — verify the hash facet against a live tenant before relying on any specific member. |
-| MCP file surface | whatever the server chooses to expose — usually nothing | **No.** Assume no pre-filter exists; this adapter must download to know. |
-| Mail | `internetMessageId` is immutable | Use it as the **identity**; still hash the RFC822 bytes for the column. |
-
-**The rule to write into the contract:** provider metadata answers *"should I download this?"*;
-`sha256(bytes)` answers *"have I already got this?"* Two different questions, and conflating them is how a
-preview ends up lying in both directions.
-
----
-
-## 6 · Embedding batching + provider fallback
-
-### Verdict: **hand-rolled, ~60 lines, inside `openai_service.embed_texts`. No library. LangChain is banned and would be the wrong answer even if it were not.**
-
-### Today's defect, measured
-
-```python
-# backend/app/services/openai_service.py:2129
-def embed_texts(texts, model=None, user_settings=None):
-    client = get_embedding_client(user_settings)
-    response = client.embeddings.create(model=..., input=texts)   # ← every chunk, one request
-    return [item.embedding for item in response.data]
-```
-
-One request, no batching, no retry, no fallback, **and it is synchronous** — called from
-`embedding_service.py:123`, `multimodal_service.py:413` and `:888`. Three call sites, one function: the fix
-lands in exactly one place and all three inherit it. That is the strongest possible integration point.
-
-### The limits to batch against (verified)
-
-| Provider | Max inputs/request | Max tokens/input | Max tokens/request |
-|---|---|---|---|
-| **OpenAI** `text-embedding-3-*` | **2048** | **8192** | **300,000 summed across all inputs** ([API reference](https://developers.openai.com/api/reference/resources/embeddings/methods/create)) |
-| **Google** `gemini-embedding-*` | not published on the guide page — **treat as unknown** | **8192** ([Gemini embeddings](https://ai.google.dev/gemini-api/docs/embeddings)) | not published |
-| Ollama / LM Studio / OpenAI-compatible | server-dependent; typically far lower | model-dependent | server-dependent |
-
-⚠ **The 300,000-token ceiling is the one that actually bites** and it is the one a naive batcher misses:
-2048 chunks × 800 tokens = 1.6 M tokens, a `400` on a request whose array length was legal. **Batch on
-BOTH axes** — and default conservatively (e.g. 96 inputs / 100k tokens) because the same code path serves
-Ollama and LM Studio, whose real limits are much smaller and undiscoverable.
-
-```python
-MAX_INPUTS_PER_BATCH  = 96       # settings knob; ≤ 2048 for OpenAI, far lower for local servers
-MAX_TOKENS_PER_BATCH  = 100_000  # settings knob; < 300_000 OpenAI hard ceiling
-# count with tiktoken (installed); flush on whichever bound trips first;
-# a single chunk over MAX_TOKENS_PER_INPUT is a NAMED refusal, never a silent truncation.
-```
-
-⭐ **Put these in `user_settings` / `app_settings`, not env** — `CLAUDE.md`: *"Settings live in
-`user_settings` / `app_settings` and the Settings UI; env vars are for secrets and infra only."*
-`SettingsPage.tsx` already has the Retrieval section these belong beside.
-
-### ⚠ The fallback constraint nobody states until it breaks: **dimension is global and immutable**
-
-`document_chunks.embedding` is `vector(N)` for a **single** N (mig `002` created it at 1536; mig `008`
-`ALTER`s the type and **sets the column to NULL**; `config.py:914` `embedding_dimensions: int = 1536`).
-Two consequences that must be written into the fallback design:
-
-1. **A fallback provider MUST emit the same dimension** or the INSERT fails. OpenAI's `dimensions` parameter
-   and Gemini's `output_dimensionality` make matching *possible*.
-2. ⛔ **Matching the dimension does not make the vectors compatible.** Different providers produce different
-   vector spaces. A corpus half-embedded by OpenAI and half by Gemini has silently degraded recall with a
-   green status everywhere — the worst failure mode this milestone could ship, on the milestone whose
-   requirement is *filtered-vector recall at corpus scale*.
-
-**So "embedding-provider fallback" must mean, in priority order:**
-
-1. **Retry the same endpoint** with exponential backoff + jitter on `429` / `5xx` / timeout. This alone
-   closes `BUG-260815-05` (*an embedding-provider 429 surfaces as "your documents returned nothing"*).
-2. **Fail over to a different credential/endpoint for the SAME model** — a second OpenAI key, an Azure
-   OpenAI deployment of the same model, an OpenAI-compatible mirror. Same vector space, safe.
-3. **Trip `circuit_breaker.py` and PAUSE the queue with a named, user-visible refusal** — the ingestion
-   jobs go back to `queued` with `run_after = now() + backoff`, which the durable queue from §3 makes free.
-   ⭐ **This is the correct third arm, and a cross-provider vector swap is not.**
-
-⛔ **Never** silently switch embedding *provider* mid-corpus. A deliberate provider change is the shipped
-**re-embed job** (Phase 111.1), which exists precisely because this is a corpus-wide operation.
-
-### Why not a library
-
-LangChain is banned by `CLAUDE.md` and would in any case bring its own retry, its own batcher, its own
-provider abstraction and its own opinion about dimensions — four things this app already decides for itself
-in `resolve_embedding_endpoint`. `tenacity` **9.1.4** is the only credible small addition and it is still a
-**no**: the app already owns `circuit_breaker.py`, and a second retry vocabulary beside it is the
-"two parsers that disagree" pattern `google/availability.py` opens by refusing.
-
----
-
-## Keeping the adapters thin — what would leak, and where the fence goes
-
-The binding constraint is *one generic `list → read → hash → splice` contract, four thin adapters*. Here is
-the precise inventory of what tries to leak, per family.
-
-### The generic contract (the shared path — must contain NO vendor vocabulary)
-
-```python
-class SourceItem(BaseModel):        # Pydantic — CLAUDE.md rule
-    external_id: str                # opaque to the shared path
-    name: str
-    mime_type: str | None
-    size: int | None
-    modified_at: datetime | None
-    change_token: str | None        # md5Checksum | eTag | cTag | version — OPAQUE, compared for equality only
-    parent_path: str | None
-
-class SourceAdapter(Protocol):      # mirrors services/connectors/protocol.py
-    async def list_items(self, source, cursor: str | None) -> tuple[list[SourceItem], str | None]: ...
-    async def read_item(self, source, external_id: str) -> tuple[str, bytes, str]:  # (filename, bytes, mime)
-        ...
-```
-
-`read_item`'s return triple is **deliberately identical to the shipped `fetch_cloud_file` signature** —
-`tuple[str, bytes, str]`. The generic path then does `sha256(bytes) → dedup lookup → splice`, which is
-byte-for-byte what `documents.py` already does for an upload.
-
-### The leak table
-
-| Family | What WILL leak into the shared path if unguarded | Where the fence goes |
-|---|---|---|
-| **Google Drive** | The `q` DSL (`'<id>' in parents and trashed = false`); `pageToken`; the **export-vs-`alt=media`** branch for `vnd.google-apps.*`; `md5Checksum`; `incompleteSearch`; `supportsAllDrives`/`corpora` | All of it inside `adapters/drive.py`. The shared path sees `SourceItem` + bytes. **The export decision is the sharpest leak risk** — the generic path must never learn what a Google-native MIME type is. |
-| **Microsoft Graph** | `$select` / `$top` / `$orderby` OData; the **two-step `@microsoft.graph.downloadUrl` dance forced by the 302**; `driveId` vs `siteId` addressing; `file.hashes` variance; `eTag`/`cTag` | `adapters/graph.py`. ⚠ **The two-step download is the single biggest leak risk in the milestone** — if `read_item` returns a *URL* instead of *bytes*, the redirect problem is now the shared path's problem and every other adapter has to care. **`read_item` returns bytes. Always.** |
-| **MCP file surface** | Tool *names* (`list_files`? `search`? `read_document`?) — an MCP server chooses its own; JSON-RPC envelopes; `list_tools` discovery | `adapters/mcp_file.py` + **a stored per-connection tool mapping** (`{list_tool, read_tool, arg names}`) which is **DATA on the connection row**, exactly as v3.9's `discovered_tools` + `tool_grants` already are. ⭐ **This is the family that proves the constraint** — if the MCP adapter needs code per server, the design has failed. |
-| **Email** | `q=` (Gmail) vs `$filter` (Graph); `format=raw` base64url vs `$value` raw MIME; `threadId` vs `conversationId`; the message-vs-thread boundary | `adapters/gmail.py` + `adapters/graph_mail.py`, each returning **RFC822 bytes**. `parse_eml_bytes` is shared and already exists. `thread_key` is normalised **in the adapter**; the shared path stores an opaque string. |
-| **All four** | Provider error bodies | ⭐ Already fenced by precedent: `google/_http.error_reason` returns only `error.status` + `details[].reason` because *"a Google error body echoes the request, which for Drive and Gmail is the person's own search query."* **Every new adapter needs the same discipline, and it must be one parser per provider — never a second one.** |
-
-**The one-line test for the roadmapper:** *grep the shared ingest path for `google`, `drive`, `graph`,
-`microsoft`, `gmail`, `mcp`, `mime`, `$select`, `alt=media`.* Any hit is a leak. That grep is cheap enough
-to be an acceptance criterion.
-
----
-
-## What v4.0 actually adds
-
-### New egress capability keys (`security/egress.py → ALLOWED_HOST_SUFFIXES`)
-
-| Key | Allowed host suffixes | Why a separate key |
-|---|---|---|
-| `graph_read` | `graph.microsoft.com` | Same reasoning the file records for `drive_read` vs `gmail_read`: a spec declares exactly one key, so the separation is greppable. |
-| `graph_download` | `1drv.com`, `sharepoint.com` | ⭐ **Mandatory** — the pre-authenticated download URL is on a *different host*. Without this key the Graph adapter cannot read a single file. |
-| `graph_mail_read` | `graph.microsoft.com` | Buys no host separation; buys `grep -c "graph_mail_read"` = *"what can read a mailbox?"* |
-| *(reuse)* `drive_read`, `gmail_read` | `googleapis.com` | Already exist. **Nothing widens.** |
-
-⚠ `graph_download`'s hosts are **supplied by a remote response**. Do not pass the returned URL's host as
-`allowed_host=` — that would let the response choose its own destination. Pin it with the suffix list, so a
-tampered `@microsoft.graph.downloadUrl` is refused.
-
-### OAuth scope additions (`oauth_service.py → _PROVIDER_META["microsoft"]`)
-
-Add `Sites.Read.All` (SharePoint document libraries) and `Mail.Read` (mailbox). Both are delegated,
-neither requires admin consent in Entra's metadata — **but expect tenants to require it anyway.**
-⚠ Existing Microsoft connections do not have these; `availability.py`'s `scope_missing` state is the
-UI answer, and re-consent is the remedy.
-
-**Google needs no scope change at all.** `drive.readonly` and `gmail.readonly` already ship.
-
-### Migrations (numbered, `<digits>_name.sql`, pasted into the SQL editor per `CLAUDE.md`)
-
-1. `watched_sources` — connection ref, external folder id, target `folder_id`, cadence, `last_polled_at`,
-   `last_status`, **nullable `delta_cursor`** (reserved, unused), `is_active`. RLS on.
-2. `ingestion_jobs` — the §3 shape. RLS on.
-3. `watched_source_items` — `(source_id, external_id) → content_hash, change_token, document_id,
-   last_seen_at`. This is what makes the three-way preview a **lookup** rather than a guess, and what makes
-   *"a file removed at the source is NOT removed from the Library"* observable rather than silent.
-
-### Env knobs (⚠ **same-commit** into `deploy/onebox.env.example` + `docker-compose.prod.yml` + `docs/OPERATOR.md`, or `scripts/check-deploy-drift.sh` hard-fails)
-
-```
-WATCHER_PROCESS_ENABLED=false          # OFF by default — mirrors SCHEDULER_PROCESS_ENABLED exactly
-WATCHER_POLL_INTERVAL_SECONDS=300
-INGEST_MAX_CONCURRENT=2                # the cap; pair it with the byte cap or it is not a cap
-INGEST_MAX_ATTEMPTS=3
-INGEST_CLAIM_LEASE_SECONDS=900         # older `claimed` rows sweep back to `queued` — this IS resume
-```
-
-Batch sizes are **settings rows**, not env — see §6.
+- **Read side:** a server-computed answer to "is anything waiting on me", registered as the second `ATTENTION_PRODUCERS` tenant in `frontend/src/components/layout/attentionConditions.ts` (the seam SEED-281 names; re-baseline `NavPanel.badge.test.tsx`'s literal `length === 1` in the same commit). The verdict comes from the server (D-235-05), derived from the existing pending-ask rows, **not** from a client scan.
+- **Write and delivery side:** a migration (from 217) adds an outbox or notification table with RLS on `user_id` and `org_id`, plus a unique key on `(kind, subject_id, recipient)` so one waiting run produces exactly one email. Drain it in **every** uvicorn worker with `FOR UPDATE SKIP LOCKED` and a lease column. This is the `scheduler_service.py` and `watch_service.py` pattern: no leader election, which matters because a dead leader means silently no email.
+- **Realtime:** if the table joins the `supabase_realtime` publication, treat each event only as `queryClient.invalidateQueries(...)`, then fetch (D-v2.5-03). The anon-role blind spot (BUG-260911-01) applies: write an RLS test that queries **as `anon` and as a second user**, not only through the service role.
 
 ---
 
 ## Alternatives Considered
 
-| Recommended | Alternative | When the alternative would win |
+| Recommended | Alternative | When to Use the Alternative |
 |---|---|---|
-| raw REST + `send_pinned_http` | `msgraph-sdk` 1.62.0 / `google-api-python-client` 2.200.0 | If this app had **no** egress binder and no OAuth token store. It has both, and they are security-bearing. |
-| PG table + `SKIP LOCKED` | `procrastinate` 3.9.0 | If jobs needed cron, chaining, priorities, and a real admin UI. v4.0 needs claim/retry/resume — the 5% of a job framework this repo has already written. |
-| PG table + `SKIP LOCKED` | `arq` 0.28.0 | If ingestion moved to a genuinely separate autoscaled fleet. On a **single Coolify box** the broker buys nothing and costs a service. |
-| PG table + `SKIP LOCKED` | `pgmq` / Supabase Queues | If the queue were multi-consumer across services with visibility-timeout semantics. Here it costs an extension in the local↔cloud parity path and puts job bodies outside RLS. |
-| stdlib `email` + shipped parser | `talon` 1.4.4 | Never, at those release dates — and `strip_quoted_replies` already ships. |
-| `hashlib.sha256` | `blake3` 1.0.9 / `xxhash` 4.0.1 | If hashing were the bottleneck. It is not, and swapping invalidates every existing `content_hash`. |
-| hand-rolled batcher | LangChain text splitters/embeddings | **Banned by `CLAUDE.md`.** Also wrong: it would own retry, batching and provider choice, all of which `resolve_embedding_endpoint` already decides. |
-| `circuit_breaker.py` | `tenacity` 9.1.4 | If there were no in-repo breaker. There is. |
-
----
+| React Router 8 data mode | React Router 8 declarative (15 KB gz) | If the team accepts no Back/Forward guard on dirty editors. The swap is mechanical later (same route objects). |
+| React Router 8 data mode | TanStack Router 1.170 | If routes become the primary architecture (route-level code splitting and preloading tied to TanStack Query), not just an address bar for the existing shell. |
+| Resend over httpx | Resend Python SDK 2.50 | If we later need SDK-only features (batch, templates, webhook verification helpers) and accept `requests` plus a new pin. |
+| stdlib smtplib (threaded) | aiosmtplib 5.1.3 | If SMTP is ever sent from an async request path at volume. Extend the egress sentinel first. |
+| Postgres outbox + Realtime hint | Novu / Knock / MagicBell / Courier | Never for this product shape. See below. |
 
 ## What NOT to Use
 
-| Avoid | Why, specifically | Use instead |
+| Avoid | Why | Use Instead |
 |---|---|---|
-| `msgraph-sdk` / `azure-identity` / `msal` | Bypasses `send_pinned_http` (DNS pin, allow-list, redirect refusal, size cap) and duplicates the encrypted token store. ~10 transitive packages onto a Coolify image that already builds PyMuPDF + camelot + sentence-transformers. | `send_pinned_http` + `get_fresh_access_token` |
-| `google-api-python-client` / `google-auth-oauthlib` | Same, **plus** it would be the *second* Drive client in a file whose comment records the first raw one as a CR finding. | Extend `cloud_storage.py` |
-| `O365` 2.1.9 | A whole opinionated Microsoft object model for four endpoints; its own auth backend. | Four `send_pinned_http` calls |
-| `talon` (2017) / `email-reply-parser` (2020) | Unmaintained **and** redundant — `strip_quoted_replies` ships and runs before chunking. | `email_extraction_service.strip_quoted_replies` |
-| `mail-parser` 4.6.4 | Wraps stdlib `email`, which `parse_eml_bytes` already uses directly. | `parse_eml_bytes` |
-| `celery` / `rq` / `dramatiq` / `arq` | Each needs an always-on worker process → a fourth compose service → `check-deploy-drift.sh` → `OPERATOR.md` → a Coolify service. `rq` forks per job, which fits an asyncio codebase badly. | `ingestion_jobs` + `SKIP LOCKED` |
-| `pgmq` / `tembo-pgmq-python` 0.10.0 | A Postgres extension in the local↔cloud parity path (#1 documented gotcha); queue tables outside the RLS regime; the Python wrapper's last release is **2025-03-31**. | `ingestion_jobs` + `SKIP LOCKED` |
-| Redis as the durable job store | Redis is declared best-effort infra here. The one durable record of *"we owe a customer an ingest"* must survive a flush. | Postgres |
-| LangChain / LangGraph / `llama-index` | **Hard project rule.** | raw SDK + Pydantic |
-| `blake3` / `xxhash` | Not the bottleneck; changing the algorithm invalidates `documents_dedup_idx`. | `hashlib.sha256` |
-| `tenacity` | Second retry vocabulary beside `circuit_breaker.py`. | `circuit_breaker.py` + a backoff helper |
-| **A webhook / push-notification receiver** | Drive `changes.watch` and Graph `subscriptions` both require a **public inbound HTTPS endpoint** — that is `SEED-013`/`SEED-195` Open Platform, explicitly a **separate milestone**. And the screen must say *"checked every N minutes."* | Polling |
-| **Graph *application* permissions** (`Files.Read.All` app-only) | Reads every file in the tenant with no signed-in user. That is the ACL flattening `SEED-210` fenced, and it contradicts the operator's chosen Option 3. | Delegated only |
-| **Following the Graph `/content` 302** | `egress.py` refuses 30x by design (`EgressRefused("redirected")`). "Just set `follow_redirects=True`" removes a security property to save one round trip. | `$select=@microsoft.graph.downloadUrl` + a second pinned call |
-| **A streaming download that bypasses the binder** | Re-creates the exact unbounded-read hole the 2026-08-31 hardening closed. | Raise `max_bytes` *inside* `egress.py` if ever needed |
-| **Cross-provider embedding fallback** | Same dimension ≠ same vector space. Silently degrades recall corpus-wide with a green status. | Retry → same-model alternate endpoint → **trip the breaker and pause** |
-
----
+| `react-router-dom` | **Removed in React Router v8**; imports fail. Most examples online still use it. | `react-router`, and `react-router/dom` for `RouterProvider` |
+| React Router framework mode / `@react-router/dev` | Takes over the Vite build and entry points, and conflicts with the three-entry (`index.html`/`app.html`/`docs.html`) `rollupOptions.input` build and `middleware.ts` | Data mode inside the existing `app.html` entry |
+| RR `loader`/`action`/`<Form>` | A second data layer beside TanStack Query and the SSE providers | Router for addressing only |
+| Hash routing (`/#/…`) | Avoids rewrites, but breaks the existing `?run=` and OAuth `?connections=1` contracts, cannot be read server-side for email link building, and looks wrong in a B2B product | History routing under `/app/` (rewrites already exist) |
+| Routes outside `/app/` | The one-box falls back to the **landing** `index.html` | `/app/<view>/<id>` |
+| Novu (self-hosted) | Single-VM minimum is **4 vCPU / 8 GB + MongoDB + Redis with AOF + object storage** (official docs). Our VPS is KVM 1 (1 vCPU / 4 GB). | Postgres table + outbox |
+| Knock / MagicBell / Courier (SaaS) | Third-party data processor for org data, a second source of truth, and no one-box story | Same |
+| Web Push / service worker | VAPID keys, a service-worker lifecycle and permission prompts. Not needed for N-1 (email already reaches someone outside the app). | Defer; record in SEED-281's register if wanted |
+| `premailer` | Last release 2021 | Hand-inline the few styles in one Jinja template |
+| Putting the decision (approve/deny) inside the email | SEED-281 rule 2: it needs its own auth story and becomes a second source of truth | Email says "go and look" with a link to `/app/runs/<id>` |
+| Using a user's SMTP connector as the sender | Belongs to the user (D-235-02) | `EMAIL_PROVIDER` app-owned sender |
 
 ## Stack Patterns by Variant
 
-**If the milestone must ship one adapter first:**
-- **Google Drive.** Zero new scopes, zero new egress keys, and two-thirds of the code already exists in
-  `cloud_storage.py`. It proves the generic contract at the lowest cost.
+**Vercel + Coolify cloud:**
+- `EMAIL_PROVIDER=resend`, `RESEND_API_KEY` in Coolify env; from-address on a Resend-verified domain (SPF/DKIM DNS at Hostinger is an operator step).
+- Deep links: `https://app.superrag.cloud/app/...`; no `vercel.json` change.
 
-**If the milestone must cut a source family:**
-- **Cut email.** It is 2 adapters + a document-boundary decision + an amplification cap + a PII surface no
-  other family has. Drive/Graph/MCP-file are one shape; mail is a second. **And the byte contract is
-  identical when it comes back**, so cutting it costs no architecture.
+**Self-hosted one-box (nginx):**
+- `EMAIL_PROVIDER=smtp` + `SMTP_*`, or `none` for link-only (still the default).
+- Deep links: `http(s)://<host>/app/...`; no `nginx.conf` change.
 
-**If ingestion measurably degrades chat latency:**
-- Run the same drain loop as a **second process** against the same `ingestion_jobs` table
-  (`python -m app.workers.ingest`). Deployment change, zero code change. That optionality is itself an
-  argument for the table over any broker.
-
-**If a customer needs >25 MB source files:**
-- Raise `max_bytes` **in `egress.py`**, where the cap and the decompression guard already live — never per
-  adapter, and never by adding a bypass path.
-
-**If a real tenant reports shredded thread recall:**
-- That is the trigger to revisit message-as-document. `thread_key` will already be stored and read.
-
----
+**Local dev:**
+- `EMAIL_PROVIDER=none`, or `smtp` pointed at local Mailpit.
+- Vite `appRoutingPlugin` already rewrites non-dotted `/app/*` to `app.html`.
 
 ## Version Compatibility
 
-| Package | Constraint | Note |
+| Package A | Compatible With | Notes |
 |---|---|---|
-| `httpx>=0.28.0` | installed, unpinned upper | `supabase-py` + `openai` + `anthropic` + `langsmith` all support 0.28+. The Docling-era `<0.29` cap is gone (D-071.3-10). **Adding a vendor SDK would very likely reintroduce an httpx upper bound** — a further argument against `msgraph-sdk`. |
-| `asyncpg>=0.29` | installed | Supports `FOR UPDATE SKIP LOCKED` and explicit transactions; already used by `db/schedules.py`. |
-| `croniter>=3.0.0` | installed | Already the scheduler's cadence parser. |
-| `tiktoken>=0.12.0` | installed | Encoder for the token-budget half of the batcher. |
-| `openai>=2.0.0` | installed | `embeddings.create(dimensions=…)` available on `text-embedding-3-*`. |
-| `redis>=5.2,<6` | installed | Unchanged role. |
-| `supabase>=2.29.0` | installed | ⚠ `CLAUDE.md`: a major bump must re-verify `backend/tests/integration/test_supabase_*.py`. Nothing in v4.0 requires a bump. |
-| pgvector column | `vector(N)`, N global (`config.embedding_dimensions=1536`) | ⭐ **The binding constraint on any embedding fallback.** |
-
-**Installation:**
-
-```bash
-# backend/requirements.txt — NO CHANGES REQUIRED FOR v4.0.
-# If a future phase disproves this, the burden is on that phase to state which
-# security property of send_pinned_http the new package preserves.
-```
-
----
+| react-router@8.5.0 | react / react-dom `>=19.2.7` | Installed is 19.2.4, so the **bump is required**. `npm install` honours `^19.2.4` but lock files pin 19.2.4. |
+| react-router@8.5.0 | Node `>=22.22.0` (engines) | CI `frontend-tests.yml` is on Node 20, so bump it. Docker is `node:22-alpine`. Vercel: verify. |
+| react-router@8.5.0 | Vite 8.0 (installed) | The Vite 7+ floor applies only to `@react-router/dev`, which we do not use. |
+| react@19.2.9 | remotion 4.0.532, @xyflow/react 12.11.2, @scalar/api-reference-react 0.9.77, @lobehub/icons 5.10.0 | All peer ranges accept it (checked via `npm view`). |
+| httpx>=0.28 | Resend REST API | Already pinned; egress residual fence (`test_190_residual_fence`) triggers on any httpx bump; that is unrelated to this, but do not bump httpx in the same phase. |
+| jinja2 3.1.6 | docxtpl 0.20.x | Already co-installed. |
 
 ## Sources
 
-**In-repo (HIGH — read directly at HEAD on 2026-09-04):**
-- `backend/app/security/egress.py` — `send_pinned_http` signature, `ALLOWED_HOST_SUFFIXES`, `follow_redirects=False` (`:746`, `:769`), `EgressRefused("redirected")`
-- `backend/app/services/cloud_storage.py` — Drive v3 list + fetch through the binder; the 25 MB cap and its rationale
-- `backend/app/services/oauth_service.py:104` — **the `microsoft` provider entry already exists** with `Files.Read.All` + `offline_access` + PKCE
-- `backend/app/services/connectors/service_tools.py:39-97` — the granted Google scope set (`drive.readonly`, `gmail.readonly`, …)
-- `backend/app/services/email_extraction_service.py` — `parse_eml_bytes`, `strip_quoted_replies`, attachment caps, `message_id`/`in_reply_to`/`references`
-- `backend/app/db/schedules.py:264-340` — `claim_due_schedules`, the `SKIP LOCKED` + in-transaction-advance pattern
-- `backend/app/services/scheduler_service.py` — "no leader election, no Redis coordination" rationale
-- `backend/app/services/openai_service.py:2129` — `embed_texts` sending every chunk in one request; `resolve_embedding_endpoint`
-- `backend/app/api/documents.py:620` + `supabase/migrations/043_documents_dedup_unique_index.sql` — `sha256(raw)` and `documents_dedup_idx`
-- `supabase/migrations/002`, `008`, `034` + `backend/app/config.py:914` — the global `vector(N)` dimension
-- `docker-compose.prod.yml`, `deploy/onebox.env.example`, `scripts/check-deploy-drift.sh` — the deploy-artifact parity surface
-- `backend/app/services/mcp_client.py`, `docs/CONNECTOR-ARCHITECTURE.md` — the MCP-first verdict and the shipped client
-
-**External (versions pulled live from the PyPI JSON API, 2026-09-04):**
-`msgraph-sdk` 1.62.0 · `msgraph-core` 1.5.1 · `azure-identity` 1.25.3 · `msal` 1.38.0 ·
-`google-api-python-client` 2.200.0 · `google-auth` 2.57.1 · `google-auth-oauthlib` 1.4.1 ·
-`arq` 0.28.0 · `dramatiq` 2.2.1 · `rq` 2.12.0 · `celery` 5.6.3 · `procrastinate` 3.9.0 ·
-`pgqueuer` 1.3.2 · `tembo-pgmq-python` 0.10.0 · `talon` 1.4.4 · `email-reply-parser` 0.5.12 ·
-`mail-parser` 4.6.4 · `O365` 2.1.9 · `tenacity` 9.1.4 · `xxhash` 4.0.1 · `blake3` 1.0.9 — **HIGH**
-
-**Official documentation (HIGH):**
-- [driveItem: get content](https://learn.microsoft.com/en-us/graph/api/driveitem-get-content) — the 302, the `@microsoft.graph.downloadUrl` workaround, the delegated/application permission table
-- [Get message](https://learn.microsoft.com/en-us/graph/api/message-get) — `$value` returns MIME; `Mail.ReadBasic`/`Mail.Read`
-- [Delta query overview](https://learn.microsoft.com/en-us/graph/delta-query-overview) — `driveItem`/`message` delta support, token expiry, `410 Gone` resync, documented replays
-- [Search for files (Drive v3)](https://developers.google.com/workspace/drive/api/guides/search-files) — `q` terms, `modifiedTime` operators, shared-drive params, `incompleteSearch`
-- [OpenAI embeddings API reference](https://developers.openai.com/api/reference/resources/embeddings/methods/create) — 2048 inputs / 8192 tokens per input / **300,000 tokens per request**
-- [Gemini embeddings](https://ai.google.dev/gemini-api/docs/embeddings) — 8192-token input limit; **batch size not published**
-- [Supabase pgmq](https://supabase.com/docs/guides/queues/pgmq) — requires enablement; Supabase's pinned extension version trails upstream
-
-**MEDIUM confidence, flagged as such:**
-- Graph `driveItem.file.hashes` membership (`quickXorHash` for OneDrive for Business/SharePoint vs `sha1Hash`/`sha256Hash` for personal) — **verify against a live tenant** before any code depends on a specific member.
-- `Files.Read.All` delegated "admin consent: No" is Entra permission *metadata*; most enterprise tenants disable user consent, so **plan for admin approval as the default lived experience.**
+- React Router CHANGELOG (raw, `remix-run/react-router` main): v8.0.0 (2026-06-17) baseline, ESM-only, removed `react-router-dom`; v8.5.0 (2026-10-19). **HIGH**
+- https://reactrouter.com/start/modes: declarative vs data mode API availability (`useBlocker`, `ScrollRestoration` are data-mode only). **HIGH**
+- npm registry (`npm view`): react-router 8.5.0, @tanstack/react-router 1.170.46 (2026-10-22), wouter 3.13.0, react 19.2.9 / 19.3.1, peer ranges. **HIGH**
+- Local esbuild measurement of tree-shaken bundles (scratchpad `rbench/`). **HIGH**, for the shapes measured
+- Production probes with `curl` against `superrag.cloud`, `app.superrag.cloud`, `agentic-rag-rho.vercel.app` (2026-10-27). **HIGH**
+- PyPI JSON: resend 2.50.0, aiosmtplib 5.1.3, boto3 1.43.119, postmarker 1.0 (2022), premailer 3.10.0 (2021), jinja2 3.1.6. **HIGH**
+- https://resend.com/docs/api-reference/emails/send-email (endpoint, `Idempotency-Key` 24 h); https://resend.com/docs/send-with-smtp (ports 465/2465 SMTPS, 25/587/2587 STARTTLS); https://resend.com/pricing. **HIGH**
+- https://postmarkapp.com/pricing. **HIGH**
+- https://docs.novu.co/community/self-hosting-novu/overview (self-host infrastructure). **HIGH**
+- https://www.hostinger.com/support/7854530-is-smtp-port-25-blocked-on-vps/ (port 25 open, 5/minute cap; nothing published on 465/587). **MEDIUM** (465/587 unverified)
+- Repo: `frontend/package.json`, `frontend/vite.config.ts`, `frontend/vercel.json`, `frontend/middleware.ts`, `frontend/devRouting.ts`, `frontend/nginx.conf`, `frontend/Dockerfile`, `frontend/src/App.tsx`, `frontend/src/lib/runDeepLink.ts`, `frontend/src/docs/router.ts`, `frontend/src/components/layout/attentionConditions.ts`, `backend/requirements.txt`, `backend/app/services/email_provider.py`, `backend/app/api/org.py`, `backend/app/config.py` (`primary_frontend_origin`), `backend/app/security/egress.py`, `backend/tests/unit/test_189_no_egress.py`, `test_190_residual_fence.py`, `deploy/onebox.env.example`, `backend/.env.example`, `.github/workflows/frontend-tests.yml`, `docs/DEPLOYMENT-PIPELINE.md`.
 
 ---
-*Stack research for: scheduled, permission-aware, multi-source ingestion at scale*
-*Researched: 2026-09-04*
+*Stack research for: v4.8 Every Page Has a Link*
+*Researched: 2026-10-27*

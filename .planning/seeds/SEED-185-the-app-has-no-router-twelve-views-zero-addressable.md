@@ -3,8 +3,16 @@ seed_id: SEED-185
 title: The app has no client-side router at all — twelve views, zero addressable URLs — so nothing can be shared, bookmarked, refreshed or opened in a new tab, and the browser Back button does nothing
 created: 2026-08-18
 planted_during: Phase 197 close — operator observation, after watching Claude navigate to localhost:5173/workflows and get the chat page
-status: planted
+status: folded
+partial: true
+folded_into: "297"
 status_note: |
+  ── 2026-10-27 · FOLDED into Phase 297 at `/gsd:discuss-phase 297` (partial: true). 297 claims the
+  TOP-LEVEL half — every `ActiveView` member gets an `/app/...` address, refresh and Back/Forward land
+  on it, `/app/runs/<id>` is fixed as the run link, and the bare-path case this seed was planted on
+  (`/workflows` rendering chat) is parsed. The ENTITY half (per-thread, per-Expert, Skill Studio /
+  Settings / Org tab addresses, the plain "can't be opened" page) stays with Phase 299 (LINK-02..06,
+  with SEED-178 and SEED-015). Flip to `shipped` only when 299 closes too.
   ── 2026-09-16 · reviewed at `/gsd:discuss-phase 252`, LEFT PLANTED (REG-02 sweep).
   Fired on `frontend/src/**` breadth only. 252 is scoped to the v4.2 milestone audit §8; a router is
   a capability, and G-7 forbids one in a gap-closure phase.

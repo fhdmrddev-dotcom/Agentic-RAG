@@ -74,6 +74,35 @@ export class WorkflowDraftUnreadableError extends Error {
 }
 
 /**
+ * Phase 298-02 (ORG-05 / D-36) — the save was refused because the workflow binds a folder that
+ * lives in another organization than the workflow's own.
+ *
+ * The server answers that refusal with a 422 whose `detail` is `{code: "folder_in_other_org",
+ * message}` (the `stale_token` precedent). THE CLIENT BRANCHES ON `code`, NEVER ON PROSE, and
+ * `message` is the server's sentence, authored for the person (it names the folder, and names
+ * the folder's organization only when the person can see that folder). It is shown verbatim
+ * (UI-D12) — which is why this is its own class rather than `WorkflowDraftUnreadableError`, whose
+ * job is to hide a raw validation body.
+ *
+ * `name` is set explicitly: `useDraftPersistence.refusalOf` classifies by name, never by
+ * prototype, so a class arriving through a second module copy still classifies.
+ */
+export class WorkflowFolderRefusedError extends Error {
+  constructor(message: string) {
+    super(message)
+    this.name = "WorkflowFolderRefusedError"
+  }
+}
+
+/** The folder refusal's sentence when `body` is the coded 422, else `null` (D-36). */
+function folderRefusalOf(body: unknown): string | null {
+  const detail = (body as { detail?: unknown } | null)?.detail
+  if (!detail || typeof detail !== "object") return null
+  const { code, message } = detail as { code?: unknown; message?: unknown }
+  return code === "folder_in_other_org" && typeof message === "string" ? message : null
+}
+
+/**
  * Phase 193 (AUTH-03, piece 2) — the descriptor `POST /workflows/{id}/template` returns.
  *
  * FIELD-FOR-FIELD the backend's `TemplateAssetRef` (`workflows.py:1617`), which is itself
@@ -447,14 +476,29 @@ export async function createWorkflowDraft(
   })
   if (!res.ok) {
     const body = await res.json().catch(() => null)
+    // 298-02 (D-36): THE CLIENT BRANCHES ON `code`, NEVER ON PROSE — before every other reading.
+    const folderRefusal = res.status === 422 ? folderRefusalOf(body) : null
+    if (folderRefusal !== null) throw new WorkflowFolderRefusedError(folderRefusal)
     throw new Error(entitlementRefusalMessage(body) ?? `Failed to create workflow draft (status ${res.status})`)
   }
   return (await res.json()) as WorkflowDraftWriteResult
 }
 
-/** GET /workflows/drafts — the caller's own draft rows (owner-scoped server-side). */
-export async function listDraftWorkflows(signal?: AbortSignal): Promise<WorkflowDraftRow[]> {
-  const headers = await getAuthHeaders()
+/**
+ * GET /workflows/drafts — the caller's own draft rows (owner-scoped server-side).
+ *
+ * Since 298 the server narrows this list to the active org named by `X-Org-Id`. `allOrgs`
+ * omits that header, and an absent header means TODAY'S SET — every draft the caller owns, in
+ * any org (the D-03 polarity rule, used deliberately). Only the Builder's reload (D-12) asks for
+ * it: a Builder left open on another org's draft must still find its own row by id, rather than
+ * report it "deleted somewhere else". Every other caller keeps the active-org list.
+ */
+export async function listDraftWorkflows(
+  signal?: AbortSignal,
+  opts?: { allOrgs?: boolean },
+): Promise<WorkflowDraftRow[]> {
+  const headers = (await getAuthHeaders()) as Record<string, string>
+  if (opts?.allOrgs) delete headers["X-Org-Id"]
   const res = await fetch(`${API_BASE}/workflows/drafts`, { headers, signal })
   if (!res.ok) throw new Error(`Failed to list draft workflows (status ${res.status})`)
   return (await res.json()) as WorkflowDraftRow[]
@@ -541,6 +585,10 @@ export async function updateWorkflowDraft(
   if (res.status === 422) {
     // Read the body for the LOG only; a body that will not parse must not mask the 422.
     const rawBody = await res.json().catch(() => null)
+    // 298-02 (D-36): the ONE 422 whose words are for the person. THE CLIENT BRANCHES ON `code`,
+    // NEVER ON PROSE; every other 422 stays the unreadable-shape refusal, unchanged.
+    const folderRefusal = folderRefusalOf(rawBody)
+    if (folderRefusal !== null) throw new WorkflowFolderRefusedError(folderRefusal)
     throw new WorkflowDraftUnreadableError(rawBody)
   }
   if (res.status === 404) throw new WorkflowNotFoundError()
