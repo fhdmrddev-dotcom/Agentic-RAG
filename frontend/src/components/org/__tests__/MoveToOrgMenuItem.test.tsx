@@ -83,9 +83,11 @@ describe("MoveToOrgMenuItem — eligibility (absent, never disabled)", () => {
   })
 
   it.each([
-    ["a solo user", () => setOrgs([PERSONAL]), true],
-    ["outside an OrgProvider", () => (org.value = null), true],
-    ["a non-owner", () => setOrgs([PERSONAL, ACME]), false],
+    ["a solo user", (): void => setOrgs([PERSONAL]), true],
+    ["outside an OrgProvider", (): void => {
+      org.value = null
+    }, true],
+    ["a non-owner", (): void => setOrgs([PERSONAL, ACME]), false],
   ] as const)("%s: absent", async (_label, arrange, owned) => {
     arrange()
     const { menu } = await renderInMenu(
