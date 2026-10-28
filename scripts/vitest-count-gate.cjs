@@ -4484,6 +4484,7 @@ const BASELINE = {
   "linkAudience.lockstep.test.ts": 20, // 299-04 (D-33 / D-34 / T-299-32) — audienceOf equals every row of backend link_audience_cases.json (?raw) and the backend TERMINAL_RUN_STATUSES literal; an unfinished run never opens for members; the five UI-D15 sentences verbatim, null org falls back to owner-only, each sentence once in the leaf, the leaf imports nothing; linkNoun per kind
   "ShareLinkMenu.test.tsx": 12, // RAISED 11 -> 12 at 299-04 (WR-03 sweep over the header surface: every direct child a menuitem or group) · 299-04 (D-20 / D-21 / D-39 / UI-D12..UI-D15) — trigger word Link (not Share), icon hidden, icon-only below md, aria-label per kind; surface label + host address in <code> + ONE Copy link item + audience line (org name foreground), described-by both; unknown / no org falls back; copies origin + path once (no ? / #), stays open, ✓ Link copied 2 s + status; refused selects the code + shortcut word, never success; no toast / popover / input; the ⋯ sub form
   "shareMounts.test.tsx": 14, // 299-04 (D-20 / D-33 / D-34) — card ⋯ menu: Link to this workflow is the FIRST item + WR-03, starter = anyone, published / draft owner-only, copies /app/workflows/<id>; run page: unfinished run trigger after v-chip before Stop + owner-only, a finished run's evidence report carries it and opens for the run's org, no org stays owner-only; Expert detail: trigger before the close control inside pr-8, six visibility / system / off lines, copies /app/experts/<id>
+  "savesInOrg.test.tsx": 20, // 299-04 (D-18 / D-38 / UI-D11 / S8) — SavesInOrg: 2+ orgs name in foreground, sentence form, nothing at 1 org / no context / unknown active org; RunModal caption under Run + refused launch verbatim; Tweak consequence gains it (not at 1 org, not on an existing fork, never on Copy link); fork sends fromDefinitionId (starter none), org refusal verbatim in forkFailed.sentence, other failures keep the prose-free shape; createWorkflowDraft URL with / without the option, every backend tweak sentence (?raw item_org_guard.py) → WorkflowOrgRefusedError, slug 409 is not; Expert Start a chat caption; postMessage chat sentence verbatim
 }
 
 // Still COMPUTED, never hand-written — the reduce is the single source, so the
@@ -6575,6 +6576,7 @@ const TARGETS = [
   "src/lib/__tests__/linkAudience.lockstep.test.ts",
   "src/components/share/__tests__/ShareLinkMenu.test.tsx",
   "src/components/share/__tests__/shareMounts.test.tsx",
+  "src/components/share/__tests__/savesInOrg.test.tsx",
 ]
 
 const REPO_ROOT = path.resolve(__dirname, "..")
