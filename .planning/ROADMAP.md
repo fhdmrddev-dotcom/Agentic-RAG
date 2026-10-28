@@ -135,10 +135,24 @@ Plans:
 **Plans**: 5 plans in 5 waves (01 → 02 → 03 → 04 → 05 — serial: every plan re-derives the shared ledger docs, and 01/02/03 mutate the local DB)
 
 Plans:
+**Wave 1**
+
 - [ ] 298-01-PLAN.md — backend narrowing of every list (org_lists.py), Root-upload org stamp, `/org-items` elsewhere counts + folder labels, client org plumbing (ORG-01..04, ORG-06)
+
+**Wave 2** *(blocked on Wave 1 completion)*
+
 - [ ] 298-02-PLAN.md — ORG-05 refusal at save + all four launch doors, the D-25 before/after matrix, refusal shown verbatim in the UI (ORG-05)
+
+**Wave 3** *(blocked on Wave 2 completion)*
+
 - [ ] 298-03-PLAN.md — migration 217 (audit type) + the one-transaction audited move of a folder / Root document / draft, move routes, seeds (ORG-06)
+
+**Wave 4** *(blocked on Wave 3 completion)*
+
 - [ ] 298-04-PLAN.md — frontend refresh-on-switch for every list (move-only LibraryPage/WorkflowsPage extractions first) + the out-of-org picker marker (ORG-01..05)
+
+**Wave 5** *(blocked on Wave 4 completion)*
+
 - [ ] 298-05-PLAN.md — the "N more … in <org> · Switch" line and the Move to <org> sheet on its three homes (ORG-06)
 
 **UI hint**: yes
