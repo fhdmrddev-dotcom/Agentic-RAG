@@ -12199,8 +12199,8 @@ cells rot within days.
 | [`frontend/src/components/workflows/runOriginVocabulary.ts`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentsworkflowsrunoriginvocabularyts) | 1 / 1 / 33 (was `0 / 0 / 0`) | no (young) | young (planned 293-03). originSentence(): the only home of the six sentences. ⛔ never returns app/manual for NULL |
 | [`frontend/src/components/workflows/history/runLogRow.ts`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentsworkflowshistoryrunlogrowts) | 2 / 1 / 143 (was `1 / 1 / 138`) | no (young) | absent its ENTIRE LIFE (created 200) — row added 293. 293-03: origin as the LAST atom. ⛔ pure; unmeasured duration stays unsaid |
 | [`frontend/src/components/workflows/library/automationFacts.ts`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentsworkflowslibraryautomationfactsts) | 2 / 2 / 132 (was `1 / 1 / 95`) | no (young) | absent its ENTIRE LIFE (created 204.1) — row added 293. 293-03: next from server next_run_at. ⛔ spells no string; never computes |
-| [`frontend/src/components/admin/AuditTab.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentsadminaudittabtsx) | 7 / 4 / 770 (was `6 / 3 / 763`) | ⚠ **FIRES** | absent its ENTIRE LIFE at 3 phases (146/148/155) — row added 293. 293-04: api_key.* entries + "API keys" group in PLATFORM_ACTION_META only. ⛔ unknown codes stay raw |
-| [`frontend/src/components/org/OrgAuditTab.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentsorgorgaudittabtsx) | 4 / 3 / 415 (was `3 / 2 / 408`) | ⚠ **FIRES** | absent its ENTIRE LIFE (166/167) — row added 293. 293-04: api_key.* labels + "API keys" group in ACTION_META only. ⛔ never invents a label |
+| [`frontend/src/components/admin/AuditTab.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentsadminaudittabtsx) | 8 / 5 / 771 (was `7 / 4 / 770`) | ⚠ **FIRES** | 298-review WR-07: one PLATFORM_ACTION_META entry, org.item.move → 'Moved an item to another organization' (Organizing), identical to OrgAuditTab's (fenced). Data only |
+| [`frontend/src/components/org/OrgAuditTab.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentsorgorgaudittabtsx) | 5 / 4 / 416 (was `4 / 3 / 415`) | ⚠ **FIRES** | 298-review WR-07: one ACTION_META entry, org.item.move → 'Moved an item to another organization' (Organizing), identical to AuditTab's (fenced). ⛔ shared audit vocabulary still OWED |
 | [`frontend/src/hooks/useAppNavigation.ts`](docs/HOT-FILE-LEDGER.md#frontendsrchooksuseappnavigationts) | 4 / 1 / 290 (was `3 / 1 / 240`) | no (young) | 297-03: the ONE useBlocker over the leave-guard registry; latch cleared per location key. ⛔ the ONLY router-hook caller (D-08); setLibraryTab( exactly 2 |
 | [`frontend/src/components/layout/AppViewSwitch.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentslayoutappviewswitchtsx) | 2 / 1 / 523 (was `1 / 1 / 473`) | no (young) | 297-02: S1 first non-chat arm; run hold inside the one run arm; admin arms gated on the operator probe. ⛔ one run comparison; fallback last; every hold lives here, never at App |
 | [`frontend/src/lib/appRoutes.ts`](docs/HOT-FILE-LEDGER.md#frontendsrclibapproutests) | 1 / 1 / 198 (was `0 / 0 / 0`) | no (young) | young (created 297-02). STRICT LEAF: one home of /app path vocabulary (D-11). ⛔ never throws; strict UUID; no host in any output |
@@ -26715,3 +26715,19 @@ CLAUDE.md verdict cell as of 2026-10-28 (replaced by 298-review, moved verbatim)
 Scan-list cell as of 2026-10-28 (replaced by 298-review, moved verbatim): 7 / 4 / 117 (was `5 / 3 / 65`) | ⚠ **FIRES** | 298-04: org-tagged rows (header at send, latest-wins) + `switching` (true only while another org's answer is held; false on first paint, UI-D9). ⛔ selectThread stays a bare setState
 
 CLAUDE.md verdict cell as of 2026-10-28 (replaced by 298-review, moved verbatim): | `frontend/src/hooks/useThreads.ts` | 7 / 4 / 117 (was `5 / 3 / 65`) | 298-04: org-tagged rows + switching (plan-sanctioned) · ⛔ |
+
+### `frontend/src/components/org/OrgAuditTab.tsx` — 298-review (2026-10-28)
+
+**`5 / 4 / 416` (was `4 / 3 / 415`).** 298-review WR-07: one `ACTION_META` data entry for migration 217's `org.item.move`, under Organizing, so the move's receipt reads as words and sits in a filter group. The identical line lives in the Control Room AuditTab; `OrgAuditTab.test.tsx` fences both. Shared vocabulary module still OWED.
+
+Scan-list cell as of 2026-10-28 (replaced by 298-review, moved verbatim): 4 / 3 / 415 (was `3 / 2 / 408`) | ⚠ **FIRES** | absent its ENTIRE LIFE (166/167) — row added 293. 293-04: api_key.* labels + "API keys" group in ACTION_META only. ⛔ never invents a label
+
+CLAUDE.md verdict cell as of 2026-10-28 (replaced by 298-review, moved verbatim): | `frontend/src/components/org/OrgAuditTab.tsx` | 4 / 3 / 415 | ⚠ now FIRES (293) — row added · 5 map entries · shared vocab OWED |
+
+### `frontend/src/components/admin/AuditTab.tsx` — 298-review (2026-10-28)
+
+**`8 / 5 / 771` (was `7 / 4 / 770`).** 298-review WR-07: one `PLATFORM_ACTION_META` data entry for migration 217's `org.item.move` (Organizing). Data only; `useState(` unchanged. The identical line is fenced against `OrgAuditTab.tsx` by `OrgAuditTab.test.tsx`.
+
+Scan-list cell as of 2026-10-28 (replaced by 298-review, moved verbatim): 7 / 4 / 770 (was `6 / 3 / 763`) | ⚠ **FIRES** | absent its ENTIRE LIFE at 3 phases (146/148/155) — row added 293. 293-04: api_key.* entries + "API keys" group in PLATFORM_ACTION_META only. ⛔ unknown codes stay raw
+
+CLAUDE.md verdict cell as of 2026-10-28 (replaced by 298-review, moved verbatim): | `frontend/src/components/admin/AuditTab.tsx` | 7 / 4 / 770 | ⚠ FIRES, absent here — row added 293-04 · 5 map entries only |
