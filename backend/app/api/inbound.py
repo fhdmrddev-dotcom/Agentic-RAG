@@ -74,6 +74,7 @@ from app.services.inbound_inputs import (
     inbound_kickoff,
     validate_inbound_inputs,
 )
+from app.services.foreign_folder_refusal import foreign_binding_refusal  # 298 ORG-05 (D-30)
 from app.services.rate_limit import enforce_ip_limit, enforce_key_limit
 
 logger = logging.getLogger(__name__)
@@ -364,6 +365,13 @@ async def start_workflow_run(
     if sentence is not None:
         raise await _refused(
             key, redis=redis, call="start", reason="no_template", workflow_id=str(wid),
+            exc=HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, detail=sentence),
+        )
+    # 298 (D-13/D-30): a folder outside the definition's org (read from the row) → plain-string 422.
+    sentence = await foreign_binding_refusal(definition, definition_id=wid, pool=pool, user_id=owner_id)
+    if sentence is not None:
+        raise await _refused(
+            key, redis=redis, call="start", reason="foreign_folder", workflow_id=str(wid),
             exc=HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, detail=sentence),
         )
 

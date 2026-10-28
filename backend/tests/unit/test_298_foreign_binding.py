@@ -521,6 +521,9 @@ async def _preflight(row, *, pool, scope_assert=None, supabase=None):
         patch("app.services.template_service.pin_templates_for_run", AsyncMock()),
         patch.object(_ffr(), "fetch_visible_folders",
                      AsyncMock(return_value=list(FOLDERS.values()))),
+        # publish's rule, stubbed to agree with the pool read (its parity is the matrix's subject)
+        patch.object(_ffr(), "folder_scope_violations",
+                     AsyncMock(return_value=[ValueError("outside the org")])),
     ):
         try:
             out = await workflow_kickoff.preflight_workflow_kickoff(
@@ -550,8 +553,9 @@ async def test_preflight_selects_the_row_org_and_uses_it():
     # the row is in org B, so org B's folder is in-org; F_A1 is now the foreign one
     assert exc is not None and exc.status_code == 422
     assert "“Client Files” is in Personal" in exc.detail["message"]
-    select_arg = sb.table.return_value.select.call_args.args[0]
-    assert "org_id" in [t.strip() for t in select_arg.split(",")]
+    selects = [c.args[0] for c in sb.table.return_value.select.call_args_list
+               if c.args and "skill_snapshots" in c.args[0]]
+    assert selects and "org_id" in [t.strip() for t in selects[0].split(",")]
 
 
 @pytest.mark.asyncio

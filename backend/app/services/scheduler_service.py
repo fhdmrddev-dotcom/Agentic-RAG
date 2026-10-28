@@ -131,6 +131,24 @@ async def launch_scheduled_run(
         await record_schedule_outcome(pool, _as_uuid(schedule["id"]), status=sentence)
         raise ScheduledLaunchRefused(sentence)
 
+    # ── Phase 298 (D-13 / D-30) — a folder outside the definition's org is refused here too ──
+    # The org is read from the ROW (get_definition omits it); system-global rows read None and are
+    # never checked (D-01). No supabase client here, so the pool read alone decides. Same shape
+    # as the template block above: recorded on the schedule in words, then raised.
+    from app.services.foreign_folder_refusal import foreign_binding_refusal
+
+    sentence = await foreign_binding_refusal(definition, definition_id=workflow_id, pool=pool, user_id=owner_id)
+    if sentence is not None:
+        from app.db.schedules import record_schedule_outcome
+
+        logger.warning(
+            "schedule %s not launched: workflow %s binds a folder outside its organization",
+            schedule.get("id"),
+            workflow_id,
+        )
+        await record_schedule_outcome(pool, _as_uuid(schedule["id"]), status=sentence)
+        raise ScheduledLaunchRefused(sentence)
+
     org_id = schedule.get("org_id") or row.get("org_id")
 
     # ── 258 F-2 / TIER-01 — a scheduled run is EXECUTION too ─────────────────────────

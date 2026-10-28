@@ -46,6 +46,7 @@ from app.models.message import RESERVED_RUN_INPUT_KEYS
 from app.services.inbound_inputs import launch_kickoff, missing_required  # 293-05 D-3; 296-06
 from app.utils.db import aexec
 from app.utils.folder_utils import fetch_visible_folders
+from app.services.foreign_folder_refusal import raise_if_foreign  # 298 ORG-05
 from app.services.harness.scope import (
     assert_folder_scopes_subset,
     resolve_project_subtree,
@@ -232,7 +233,7 @@ async def preflight_workflow_kickoff(*, request, body, thread_id, thread_row, su
         # existence) — a user cannot start another user's private workflow.
         _def_resp = await aexec(
             supabase.table("workflow_definitions")
-            .select("id, definition, status, is_system_global, created_by, skill_snapshots")
+            .select("id, definition, status, is_system_global, created_by, skill_snapshots, org_id")
             .eq("id", str(body.workflow_definition_id))
             .or_(f"is_system_global.eq.true,created_by.eq.{current_user['id']}")
             .maybe_single()
@@ -306,6 +307,8 @@ async def preflight_workflow_kickoff(*, request, body, thread_id, thread_row, su
                 status_code=status.HTTP_400_BAD_REQUEST,
                 detail=str(_scope_err),
             )
+        # 298 (D-13/D-30/D-36): a folder outside the ROW's org → coded 422; globals skip (D-01).
+        await raise_if_foreign(_kickoff_definition, definition_org=None if _def_row.get("is_system_global") else _def_row.get("org_id"), pool=await get_pg_pool(), user_id=current_user["id"], supabase=supabase)
 
         # 099 WFSKILL-01 (D-10 gate + D-03a lazy snapshot): validate every phase
         # skill_ref resolves to a visible, enabled skill (ValueError → 400, same as the
