@@ -139,4 +139,21 @@ describe("useThreads — follows the active org (298-04)", () => {
     act(() => result.current.selectThread(result.current.threads[1]))
     expect(result.current.selectedThread?.id).toBe("tb")
   })
+
+  it("298-review WR-03: a FAILED refetch after a switch ends switching (never loading forever)", async () => {
+    api.listThreads.mockResolvedValueOnce([thread("ta", "Alpha chat")])
+    const { result } = renderHook(() => useThreads())
+    await act(async () => {
+      await result.current.loadThreads()
+    })
+    act(() => switchOrg("org-b"))
+    expect(result.current.switching).toBe(true)
+    api.listThreads.mockRejectedValueOnce(new Error("502"))
+    await act(async () => {
+      await expect(result.current.loadThreads()).rejects.toThrow("502")
+    })
+    expect(result.current.switching).toBe(false)
+    expect(result.current.loading).toBe(false)
+    expect(result.current.threads).toEqual([])
+  })
 })
