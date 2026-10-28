@@ -176,6 +176,45 @@ async def test_a_malformed_header_resolves_none(org_lists):
     assert await org_lists.active_org(_req("not-a-uuid"), USER) is None
 
 
+def _conn_answering(monkeypatch, answer):
+    """``get_user_pg_connection`` whose membership read returns ``answer`` or raises it."""
+    class Conn:
+        async def fetchrow(self, sql, *args):
+            assert "org_members" in sql
+            if isinstance(answer, Exception):
+                raise answer
+            return answer
+
+    @asynccontextmanager
+    async def fake_conn(request, current_user):
+        yield Conn()
+
+    monkeypatch.setattr("app.dependencies.get_user_pg_connection", fake_conn)
+
+
+async def test_wr09_a_root_upload_whose_header_cannot_be_validated_is_a_503(org_lists, monkeypatch):
+    """298-review WR-09: a DB error while validating the header must not fall back to the mig-106
+    LIMIT 1 org (the SEED-313 mis-stamp) — the lists keep None, the WRITE refuses."""
+    from fastapi import HTTPException
+
+    _conn_answering(monkeypatch, ConnectionError("db down"))
+    assert await org_lists.active_org(_req(ORG_A), USER) is None  # the list polarity, unchanged
+    with pytest.raises(HTTPException) as e:
+        await org_lists.root_upload_org(_req(ORG_A), USER, None)
+    assert e.value.status_code == 503
+    assert "{" not in str(e.value.detail) and str(e.value.detail).endswith(".")
+
+
+async def test_wr09_a_root_upload_with_a_non_member_header_still_falls_back(org_lists, monkeypatch):
+    _conn_answering(monkeypatch, None)
+    assert await org_lists.root_upload_org(_req(ORG_A), USER, None) is None
+
+
+async def test_wr09_a_root_upload_with_no_header_never_probes(org_lists, monkeypatch):
+    _conn_answering(monkeypatch, AssertionError("must not probe without a header"))
+    assert await org_lists.root_upload_org(_req(), USER, None) is None
+
+
 def test_org_lists_never_imports_the_400ing_gate(org_lists):
     src = inspect.getsource(org_lists)
     assert "get_active_org_id" not in src
