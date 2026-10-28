@@ -103,6 +103,9 @@
       "name": "org"
     },
     {
+      "name": "org-items"
+    },
+    {
       "name": "api-keys"
     },
     {
@@ -188,6 +191,7 @@
       "name": "Account & org",
       "tags": [
         "org",
+        "org-items",
         "api-keys",
         "preferences",
         "features",
@@ -13928,6 +13932,110 @@
           }
         }
       }
+    },
+    "/org-items/elsewhere": {
+      "get": {
+        "tags": [
+          "org-items"
+        ],
+        "summary": "Get Elsewhere Counts",
+        "description": "**UI-internal: may change.** This endpoint serves Syrel's own interface and is not a stable contract.\n\nYour own items in your other organizations, counted per organization.",
+        "operationId": "get_elsewhere_counts_org_items_elsewhere_get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ElsewhereCounts"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          },
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "x-badges": [
+          {
+            "name": "UI-internal: may change",
+            "position": "after",
+            "color": "#F7B23B"
+          }
+        ]
+      }
+    },
+    "/org-items/folder-labels": {
+      "get": {
+        "tags": [
+          "org-items"
+        ],
+        "summary": "Get Folder Labels",
+        "description": "**UI-internal: may change.** This endpoint serves Syrel's own interface and is not a stable contract.\n\nThe name and organization of folders you can already see, by id.",
+        "operationId": "get_folder_labels_org_items_folder_labels_get",
+        "security": [
+          {
+            "HTTPBearer": []
+          },
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "ids",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Up to 50 folder ids, comma-separated. Unknown or unreadable ids are omitted.",
+              "title": "Ids"
+            },
+            "description": "Up to 50 folder ids, comma-separated. Unknown or unreadable ids are omitted."
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/FolderLabels"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        },
+        "x-badges": [
+          {
+            "name": "UI-internal: may change",
+            "position": "after",
+            "color": "#F7B23B"
+          }
+        ]
+      }
     }
   },
   "components": {
@@ -17910,6 +18018,65 @@
         ],
         "title": "DuplicateOf"
       },
+      "ElsewhereCounts": {
+        "properties": {
+          "orgs": {
+            "items": {
+              "$ref": "#/components/schemas/ElsewhereOrgCounts"
+            },
+            "type": "array",
+            "title": "Orgs"
+          }
+        },
+        "type": "object",
+        "required": [
+          "orgs"
+        ],
+        "title": "ElsewhereCounts"
+      },
+      "ElsewhereOrgCounts": {
+        "properties": {
+          "org_id": {
+            "type": "string",
+            "title": "Org Id"
+          },
+          "org_name": {
+            "type": "string",
+            "title": "Org Name"
+          },
+          "folders": {
+            "type": "integer",
+            "title": "Folders"
+          },
+          "root_documents": {
+            "type": "integer",
+            "title": "Root Documents"
+          },
+          "workflows": {
+            "type": "integer",
+            "title": "Workflows"
+          },
+          "threads": {
+            "type": "integer",
+            "title": "Threads"
+          },
+          "runs": {
+            "type": "integer",
+            "title": "Runs"
+          }
+        },
+        "type": "object",
+        "required": [
+          "org_id",
+          "org_name",
+          "folders",
+          "root_documents",
+          "workflows",
+          "threads",
+          "runs"
+        ],
+        "title": "ElsewhereOrgCounts"
+      },
       "ExpertBundleCreate": {
         "properties": {
           "name": {
@@ -19013,6 +19180,50 @@
           "last_indexed"
         ],
         "title": "FolderIndexRow"
+      },
+      "FolderLabel": {
+        "properties": {
+          "id": {
+            "type": "string",
+            "title": "Id"
+          },
+          "name": {
+            "type": "string",
+            "title": "Name"
+          },
+          "org_id": {
+            "type": "string",
+            "title": "Org Id"
+          },
+          "org_name": {
+            "type": "string",
+            "title": "Org Name"
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "name",
+          "org_id",
+          "org_name"
+        ],
+        "title": "FolderLabel"
+      },
+      "FolderLabels": {
+        "properties": {
+          "labels": {
+            "items": {
+              "$ref": "#/components/schemas/FolderLabel"
+            },
+            "type": "array",
+            "title": "Labels"
+          }
+        },
+        "type": "object",
+        "required": [
+          "labels"
+        ],
+        "title": "FolderLabels"
       },
       "FolderMoveRequest": {
         "properties": {

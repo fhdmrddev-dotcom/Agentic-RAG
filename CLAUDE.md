@@ -411,7 +411,7 @@ node scripts/check-hot-file-ledger.cjs <phase-dir>   # 0 clear · 1 missing rows
 | `frontend/src/components/chat/ToolCallPanel.tsx` | 51 / 23 / 351 | ✅ **G-5 DISCHARGED (227-02)** |
 | `frontend/src/components/chat/MessageItem.tsx` | 84 / 39 / 1059 (was `83 / 42 / 1050`) | 292.1 UAT: Deep Continue re-attaches the run's stream (+1 else-if) · ⛔ |
 | `frontend/src/components/chat/CitationList.tsx` | 5 / 5 / 91 | 294-05: ONE CitationCheckAction beside the trigger · extraction FIRST |
-| `backend/app/api/threads.py` | 283 / 95 / 2745 (was `282 / 94 / 2744`) | 296-06: one provider= kwarg at the kickoff create_workflow_run · ⛔ |
+| `backend/app/api/threads.py` | 284 / 96 / 2752 (was `283 / 95 / 2745`) | 298-01: list_threads one org_lists.by_org predicate (narrows only) · ⛔ |
 | `frontend/src/providers/StreamsProvider.tsx` | 120 / 45 / 5250 (was `119 / 45 / 5234`) | 296 G-4 row 12: kickoff terminal reconciles; kickoff clears old steps · ⛔ |
 | `frontend/src/hooks/useMessages.ts` | 74 / 27 / 127 | extraction due |
 | `backend/app/services/anthropic_service.py` | 12 / 11 / 373 (was `11 / 10 / 354`) | honoured by construction (282-01: constructor kwargs) · adapter audit due |
@@ -431,10 +431,10 @@ node scripts/check-hot-file-ledger.cjs <phase-dir>   # 0 clear · 1 missing rows
 | `frontend/src/components/workflows/DraftArrivalCard.tsx` | 5 / 4 / 688 (was `4 / 3 / 625`) | 291-05: two optional props + one fold boolean; rows in a leaf · ⛔ |
 | `frontend/src/components/workflows/DecisionsList.tsx` | 5 / 3 / 429 | ⚠ now FIRES (291) · 291-05: one optional prop, one template-row sub-line |
 | `frontend/src/components/workflows/decisionsVocabulary.ts` | 6 / 4 / 344 (was `4 / 3 / 327`) | 291-05: one glyph + one formatter, still a zero-import leaf · ⛔ |
-| `backend/app/api/workflows.py` | 50 / 26 / 1699 (was `49 / 26 / 1699`) | 296-06: delete_draft FK arm → worded 409 · split OWED |
+| `backend/app/api/workflows.py` | 51 / 27 / 1707 (was `50 / 26 / 1699`) | 298-01: org_id=active_org_uuid on /published + /drafts · split OWED |
 | `backend/app/api/workflow_wire.py` | 4 / 4 / 532 (was `3 / 3 / 517`) | 296-06: AutoAnsweredNote + unplaced_sentences, additive |
 | `backend/app/api/workflow_authoring_doors.py` | 5 / 3 / 797 (was `4 / 2 / 793`) | ⚠ now FIRES (296) · 296-06: bind returns unplaced_sentences |
-| `backend/app/api/workflow_runs.py` | 21 / 15 / 1445 (was `20 / 14 / 1444`) | 296-06: confidence typed (1 import name, 1 annotation) · extraction FIRST |
+| `backend/app/api/workflow_runs.py` | 22 / 16 / 1449 (was `21 / 15 / 1445`) | 298-01: one by_org on runs_query (audited one-touch) · extraction FIRST |
 | `backend/app/api/workflow_run_evidence.py` | 6 / 4 / 405 (was `5 / 4 / 408`) | 296-06: RunEvidenceConfidence re-exported (move only) |
 | `backend/app/services/run_evidence.py` | 6 / 4 / 555 | ⚠ FIRES, absent here — row added 296-01 · D-05 withheld cascade · ⛔ |
 | `frontend/src/lib/api/runEvidence.ts` | 3 / 3 / 137 | ⚠ now FIRES (293) — row added 293-03 · one optional field |
@@ -450,7 +450,7 @@ node scripts/check-hot-file-ledger.cjs <phase-dir>   # 0 clear · 1 missing rows
 | `frontend/src/hooks/useThreads.ts` | 5 / 3 / 65 | ⚠ now FIRES · last touch 267-04 · ⛔ |
 | `backend/app/services/harness/grounding.py` | 23 / 10 / 1437 (was `21 / 8 / 1414`) | 295-03: ONE pure predicate (is_engine_citation_gate) |
 | `frontend/src/components/workflows/PhaseFormPanel.tsx` | 30 / 14 / 1566 | honoured by construction ×6 (185 / 193 / 193.1 / 199 / 200 / **214**) |
-| `backend/app/db/workflows.py` | 63 / 31 / 2862 (was `59 / 30 / 2827`) | 296-01 org_id kwarg; 296-02 resume provider + _awaiting_answer strip |
+| `backend/app/db/workflows.py` | 64 / 32 / 2874 (was `63 / 31 / 2862`) | 298-01: keyword-only org_id AND-append on published + drafts feeds |
 | `backend/app/services/harness/publish_service.py` | 36 / 16 / 2061 (was `35 / 16 / 2057`) | 296-06: golden kickoff via launch_kickoff (S6-F8), one statement |
 | `backend/app/services/workflow_authoring.py` | 23 / 13 / 1269 (was `18 / 12 / 1120`) | 296-03: unticked told; provider_error; file-free requirement · seam OWED |
 | `backend/app/models/harness.py` | 22 / 20 / 776 (was `20 / 19 / 766`) | 291-02: InputFieldSpec origin + note, omitted when absent |
@@ -487,15 +487,16 @@ node scripts/check-hot-file-ledger.cjs <phase-dir>   # 0 clear · 1 missing rows
 | `frontend/src/components/panel/FilesSection.tsx` | 12 / 8 / 354 (was `10 / 6 / 363`) | ⚠ STALE · last touch 274-04 |
 | `frontend/src/lib/api.ts` | 211 / 126 / 546 (was `210 / 125 / 530`) | 291-04: +16 barrel re-exports (describe read, references) |
 | `frontend/src/types/index.ts` | 102 / 81 / 1685 (was `101 / 80 / 1674`) | 293-03: one RunOrigin type + one optional field · seam OWED |
-| `backend/app/main.py` | 95 / 69 / 991 (was `94 / 68 / 982`) | 296-02: RUN_BOOT_SWEEPS module flag gates the 3 run sweeps (SEED-363) · ⛔ |
+| `backend/app/main.py` | 96 / 70 / 992 (was `95 / 69 / 991`) | 298-01: one include_router(org_items.router) + its import token · ⛔ |
 | `backend/app/config.py` | 93 / 54 / 1809 (was `92 / 54 / 1790`) | honoured by construction (282-04: self-hosted default 900) · seam OWED · ⛔ |
 | `backend/app/api/admin.py` | 44 / 17 / 2054 (was `43 / 17 / 2051`) | quick-261024: discover summary gains a `returned` count (+3) · ⛔ |
 | `backend/app/api/settings.py` | 47 / 25 / 1301 (was `46 / 24 / 1250`) | 293-01: two bounded per-key limit writes; allow-list +2 |
 | `backend/app/services/multimodal_service.py` | 14 / 7 / 984 | ⚠ absent from BOTH for its ENTIRE LIFE at **7 phases** |
-| `backend/app/api/documents.py` | 99 / 39 / 2698 (was `97 / 38 / 2653`) | honoured by construction (285-03: enqueue-fail → doc failed, 201) · ⛔ |
-| `scripts/vitest-count-gate.cjs` | 352 / 79 / 6733 (was `350 / 79 / 6728`) | 293-03: 3 pins added (1 FILE-LEVEL), 4 raised, none lowered |
+| `backend/app/api/documents.py` | 101 / 40 / 2709 (was `99 / 39 / 2698`) | 298-01: one by_org in build() + one root_upload_org kwarg · ⛔ |
+| `backend/app/api/library.py` | 3 / 3 / 304 (was `2 / 2 / 299`) | ⚠ now FIRES (298) · 298-01: summary shares the lists' org predicate ($1) |
+| `scripts/vitest-count-gate.cjs` | 369 / 81 / 6767 (was `344 / 81 / 6692`) | 298-01: 2 suites pinned FILE-LEVEL (OrgProvider ADOPTED), none lowered |
 | `scripts/check-deploy-drift.sh` | 5 / 4 / 267 | ⚠ absent its ENTIRE LIFE — row added 294-05 · fault var omitted |
-| `scripts/build-public-openapi.cjs` | 7 / 3 / 468 | ⚠ now FIRES (294) · 294-03: citation_checks tag (one line) |
+| `scripts/build-public-openapi.cjs` | 11 / 5 / 472 (was `7 / 3 / 468`) | 298-01: org-items tag (Account & org) + /org-items/ FLAGGED (2 lines) |
 | `scripts/check-seeds-register.cjs` | 7 / 3 / 1132 | ⚠ FIRES, absent here — row added 296-05 · `\d{3,}` ids · ⛔ |
 | `backend/app/services/eval_runner_service.py` | 14 / 9 / 1056 (was `13 / 8 / 1040`) | 296-06: eval arm on a fixed EVAL_MAX_TOOL_ROUNDS (copy of settings) |
 | `backend/app/services/scheduler_service.py` | 12 / 7 / 314 (was `11 / 6 / 308`) | 296-06: scheduled kickoff via launch_kickoff (S6-F8), else byte-identical |
@@ -636,8 +637,9 @@ node scripts/check-hot-file-ledger.cjs <phase-dir>   # 0 clear · 1 missing rows
 | `frontend/src/components/org/OrgAdminShell.tsx` | 10 / 6 / 416 (was `7 / 5 / 454`) | ✅ seam TAKEN 293-04 (orgAdminTabs.ts, move-only) · +1 render branch · ⛔ |
 | `frontend/src/components/admin/AuditTab.tsx` | 7 / 4 / 770 | ⚠ FIRES, absent here — row added 293-04 · 5 map entries only |
 | `frontend/src/components/org/OrgAuditTab.tsx` | 4 / 3 / 415 | ⚠ now FIRES (293) — row added · 5 map entries · shared vocab OWED |
-| `frontend/src/lib/api/documents.ts` | 10 / 9 / 595 (was `8 / 8 / 503`) | 284-05: five whole-list clients deleted (D-16) · ⛔ |
-| `backend/app/api/folders.py` | 16 / 10 / 288 (was `15 / 10 / 287`) | 296 review BE-WR-06: name check + insert via aexec (off-loop) |
+| `frontend/src/lib/api/documents.ts` | 11 / 10 / 599 (was `10 / 9 / 595`) | 298-01: uploadDocument sends X-Org-Id read at send time (D-29) · ⛔ |
+| `frontend/src/providers/OrgProvider.tsx` | 4 / 3 / 222 (was `3 / 2 / 217`) | ⚠ now FIRES (298) · 298-01: self-heal syncs the header first (D-36) · ⛔ |
+| `backend/app/api/folders.py` | 17 / 11 / 298 (was `16 / 10 / 288`) | 298-01: one org_lists.folder_kw keyword ×2 list routes (narrows only) |
 | `backend/app/api/kb.py` | 14 / 9 / 515 (was `13 / 8 / 504`) | last touch 275-02 · ⛔ |
 | `backend/app/services/audit_service.py` | 9 / 9 / 98 (was `8 / 8 / 96`) | 293-01: five api_key.* action types · ⛔ |
 | `backend/app/services/expert_scope.py` | 8 / 4 / 159 (was `6 / 3 / 632`) | ✅ G-5 DISCHARGED (279-01): pure / statement / events |
