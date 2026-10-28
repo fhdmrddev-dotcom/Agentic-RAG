@@ -20,6 +20,7 @@
  */
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest"
 import { render, renderHook, act } from "@testing-library/react"
+import { useEffect } from "react"
 import type { ReactNode } from "react"
 import type { Todo, WorkspaceFile, PendingAsk, TaskRunIndexItem, Phase } from "@/types"
 
@@ -229,5 +230,46 @@ describe("Phase 166-02 — OrgProvider context accessors", () => {
     await act(async () => {})
     expect(orgHandle!.orgs.length).toBe(2)
     expect(orgHandle!.canManage).toBe(true)
+  })
+})
+
+// ── Phase 298-01 (D-36) — the WR-01 self-heal syncs the header BEFORE the state flip ──────────
+//
+// A child effect keyed on `activeOrgId` (every 298 list hook) tags its answer with
+// `getActiveOrgId()` at send time. React runs CHILD effects before the provider's own
+// persist/sync effect in the same commit, so when the self-heal flipped state alone the child saw
+// the NEW org in state while the header still read the OLD one (null) — the request went out
+// header-less, its answer was tagged with the wrong org, and the list was dropped forever
+// (RESEARCH Pitfall 6b). switchOrg already syncs first (D-166-08); the self-heal now does too.
+describe("Phase 298-01 — OrgProvider self-heal header ordering (D-36)", () => {
+  it("getActiveOrgId() already equals the adopted org when a child effect sees it", async () => {
+    const seenByChild: Array<string | null> = []
+    function ChildProbe() {
+      const org = useOrgOptional()?.activeOrgId ?? null
+      useEffect(() => {
+        if (org === "org-1") seenByChild.push(getActiveOrgId())
+      }, [org])
+      return null
+    }
+    render(
+      <OrgProvider userId="user-1">
+        <ChildProbe />
+      </OrgProvider>,
+    )
+    await act(async () => {})
+    expect(seenByChild).toEqual(["org-1"])
+  })
+
+  it("useActiveOrgId() is null outside a provider and the provider's org inside", async () => {
+    // A variable specifier so the suite still LOADS while the hook does not exist (298-01 RED).
+    const hookModule = "@/hooks/useActiveOrgId"
+    const { useActiveOrgId } = (await import(/* @vite-ignore */ hookModule)) as typeof import("@/hooks/useActiveOrgId")
+    expect(renderHook(() => useActiveOrgId()).result.current).toBeNull()
+    const wrapper = ({ children }: { children: ReactNode }) => (
+      <OrgProvider userId="user-1">{children}</OrgProvider>
+    )
+    const { result } = renderHook(() => useActiveOrgId(), { wrapper })
+    await act(async () => {})
+    expect(result.current).toBe("org-1")
   })
 })

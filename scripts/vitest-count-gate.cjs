@@ -4426,6 +4426,11 @@ const BASELINE = {
   "WorkflowsPage.leaveGuard.test.tsx": 15, // 297-03 — the Builder tenant: connect control + golden-run link asked EXACTLY once (latch), Test Run 0 and no armed latch, dirty Back/rail 1, clean / no Builder 0. 2026-10-28 297-REVIEW WR-02: 12 -> 15, a refused-save Test Run asks once (Cancel launches nothing, OK asks once), latch not armed across the launch await
   // ── Phase 297-04 (LINK-08 / D-26, D-41) — adopted, both knobs, same commit (2026-10-27). Self-contained block.
   "appRouteParity.test.ts": 78, // 297-04 — 17 addresses (12 from formatAppRoute + 3 legacy + 2 pre-auth) x 4 layers (dev, Vercel app host, apex redirect, nginx) = 68, + 2 input/shape, 2 middleware, 1 known-fact, 5 negative controls
+  // ── Phase 298-01 (D-29 / D-36) — both knobs, same commit (2026-10-28). OrgProvider.test.tsx
+  //    was in NEITHER knob before this (no src/providers directory entry), so it is ADOPTED here
+  //    at 6 existing + 2 new = 8, not raised.
+  "uploadDocument.orgHeader.test.ts": 4, // 298-01 — Root upload sends X-Org-Id = getActiveOrgId() at send time, omits it when null, never a Content-Type
+  "OrgProvider.test.tsx": 8, // 298-01 ADOPTED (6 Phase 166 cases) + 2: the WR-01 self-heal syncs the header before a child effect sees the adopted org (D-36); useActiveOrgId null outside / org inside
 }
 
 // Still COMPUTED, never hand-written — the reduce is the single source, so the
@@ -6477,6 +6482,9 @@ const TARGETS = [
   "src/pages/__tests__/WorkflowsPage.leaveGuard.test.tsx",
   // Phase 297-04 — FILE-LEVEL (no src/__tests__/routing directory entry), SAME commit as its pin. Self-contained block.
   "src/__tests__/routing/appRouteParity.test.ts",
+  // Phase 298-01 — FILE-LEVEL (no src/lib/api/__tests__ or src/providers directory entry), SAME commit as their pins.
+  "src/lib/api/__tests__/uploadDocument.orgHeader.test.ts",
+  "src/providers/OrgProvider.test.tsx",
 ]
 
 const REPO_ROOT = path.resolve(__dirname, "..")

@@ -338,3 +338,169 @@ def test_fetch_visible_folders_source_is_byte_identical_to_base():
 
     src = inspect.getsource(fetch_visible_folders)
     assert hashlib.sha256(src.encode("utf-8")).hexdigest() == FETCH_VISIBLE_FOLDERS_BASE_SHA256
+
+
+# ══ 298-01 Task 2 — the workflow feeds, the Root-upload stamp ═════════════════════════════════
+
+ORG_B = "bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb"
+_UID = UUID(USER["id"])
+_FOLDER = UUID("22222222-2222-4222-8222-222222222222")
+
+#: sha256 + length of the SQL each builder produced at base ``828d884b1`` (2026-10-28), recorded
+#: from the UNMODIFIED builders before any 298 code. With no org the SQL must be byte-identical:
+#: ``test_library_run_facts.py`` runs the shipped SQL live against ``list_published_workflows(pool,
+#: user_id=me)`` with no org, and the pool bypasses RLS, so the WHERE is the access boundary.
+BASE_FEED_SQL = {
+    "published": ("d36a28bf537c4e83fcedb2ed067e0faac58c931b2a3befcf3821158e2ae7f5b4", 1075, 1),
+    "published_owned": ("642078bb80f6a8070d0aa030c9ee49ea9eeca6b459a7f707786bd2c7d4d00e95", 1046, 1),
+    "published_project": ("06180bdca23aae16d0d22e7faff13805fb4eb0f2e70f152289ff967f758d0dc3", 1117, 2),
+    "drafts": ("e7aff59b87f6a68f1eef37b25942dc6714ded8c36a2f0367eecf43d3317f9804", 576, 1),
+}
+
+
+class _FakePool:
+    def __init__(self):
+        self.calls: list[tuple[str, tuple]] = []
+
+    async def fetch(self, sql, *args):
+        self.calls.append((sql, args))
+        return []
+
+
+def _feed_calls():
+    from app.db import workflows as wdb
+
+    return {
+        "published": lambda p, **kw: wdb.list_published_workflows(p, user_id=_UID, **kw),
+        "published_owned": lambda p, **kw: wdb.list_published_workflows(
+            p, user_id=_UID, owned_only=True, **kw
+        ),
+        "published_project": lambda p, **kw: wdb.list_published_workflows(
+            p, user_id=_UID, project_folder_id=_FOLDER, **kw
+        ),
+        "drafts": lambda p, **kw: wdb.list_draft_workflows(p, user_id=_UID, **kw),
+    }
+
+
+@pytest.mark.parametrize("feed", sorted(BASE_FEED_SQL))
+async def test_a_feed_without_an_org_is_byte_identical_to_base(feed):
+    pool = _FakePool()
+    await _feed_calls()[feed](pool)
+    sql, args = pool.calls[0]
+    digest, length, nargs = BASE_FEED_SQL[feed]
+    assert (hashlib.sha256(sql.encode()).hexdigest(), len(sql), len(args)) == (digest, length, nargs)
+
+
+@pytest.mark.parametrize("feed", ["published", "published_owned", "published_project"])
+async def test_a_published_feed_with_an_org_keeps_globals_and_binds_the_org(feed):
+    pool = _FakePool()
+    await _feed_calls()[feed](pool, org_id=UUID(ORG_B))
+    sql, args = pool.calls[0]
+    n = len(args)
+    assert args[-1] == UUID(ORG_B)
+    assert f" AND (wd.is_system_global = true OR wd.org_id = ${n})" in sql
+    # the fence substrings survive (an AND-append, never a rewrite)
+    assert "WHERE status = 'published' AND " in sql
+    assert sql.index(f"wd.org_id = ${n}") < sql.index("ORDER BY")
+
+
+async def test_the_drafts_feed_with_an_org_appends_one_owner_org_predicate():
+    pool = _FakePool()
+    await _feed_calls()["drafts"](pool, org_id=UUID(ORG_B))
+    sql, args = pool.calls[0]
+    assert args == (_UID, UUID(ORG_B))
+    assert "WHERE status = 'draft' AND created_by = $1 AND wd.org_id = $2 ORDER BY" in sql
+
+
+async def _drive_published(monkeypatch, resolved):
+    from app.api import workflows as wf_api
+
+    seen: list[dict] = []
+
+    async def fake_list(pool, **kw):
+        seen.append(kw)
+        return []
+
+    async def fake_pool():
+        return object()
+
+    monkeypatch.setattr(wf_api, "list_published_workflows", fake_list)
+    monkeypatch.setattr(wf_api, "get_pg_pool", fake_pool)
+    _stub_resolve(monkeypatch, resolved)
+    out = await wf_api.get_published_workflows(
+        project_folder_id=None, scope=None, current_user=USER, request=_req(resolved)
+    )
+    return out, seen
+
+
+async def test_the_published_route_passes_the_active_org(org_lists, monkeypatch):
+    out, seen = await _drive_published(monkeypatch, ORG_B)
+    assert out == []
+    assert seen[0]["org_id"] == UUID(ORG_B)
+
+
+async def test_the_published_route_passes_none_without_an_org(org_lists, monkeypatch):
+    _out, seen = await _drive_published(monkeypatch, None)
+    assert seen[0]["org_id"] is None
+
+
+@pytest.mark.parametrize("resolved,expected", [(ORG_B, UUID(ORG_B)), (None, None)])
+async def test_the_drafts_route_passes_the_active_org(org_lists, monkeypatch, resolved, expected):
+    from app.api import workflows as wf_api
+
+    seen: list[dict] = []
+
+    async def fake_list(pool, **kw):
+        seen.append(kw)
+        return []
+
+    async def fake_pool():
+        return object()
+
+    monkeypatch.setattr(wf_api, "list_draft_workflows", fake_list)
+    monkeypatch.setattr(wf_api, "get_pg_pool", fake_pool)
+    _stub_resolve(monkeypatch, resolved)
+    assert await wf_api.list_drafts(current_user=USER, request=_req(resolved)) == []
+    assert seen[0]["org_id"] == expected
+
+
+async def _drive_upload(monkeypatch, *, folder_id, resolved):
+    from app.api import documents as documents_api
+    from app.services import ingest_splice
+
+    minted: list[dict] = []
+
+    async def fake_mint(**kw):
+        minted.append(kw)
+        return SimpleNamespace(document={"id": "d1"}, is_duplicate=True)
+
+    async def read():
+        return b"hello"
+
+    monkeypatch.setattr(ingest_splice, "async_mint_document_row", fake_mint)
+    _stub_resolve(monkeypatch, resolved)
+    upload = SimpleNamespace(content_type="text/plain", filename="a.txt", read=read)
+    out = await documents_api.upload_document(
+        response=SimpleNamespace(status_code=201), background_tasks=None, file=upload,
+        folder_id=folder_id, engines=None, current_user=USER, supabase=None,
+        service_supabase=None, request=_req(resolved),
+    )
+    return out, minted
+
+
+async def test_a_root_upload_is_minted_in_the_active_org(org_lists, monkeypatch):
+    out, minted = await _drive_upload(monkeypatch, folder_id=None, resolved=ORG_B)
+    assert out["already_in_library"] is True
+    assert len(minted) == 1 and minted[0]["org_id"] == ORG_B and minted[0]["folder_id"] is None
+
+
+async def test_a_root_upload_without_an_org_passes_none(org_lists, monkeypatch):
+    _out, minted = await _drive_upload(monkeypatch, folder_id=None, resolved=None)
+    assert minted[0]["org_id"] is None
+
+
+async def test_a_foldered_upload_is_unchanged(org_lists, monkeypatch):
+    """The 280-03 arm: the minter derives the folder's own org. Passing an org there would make
+    it compare and 404 a folder of another org, so the route passes None and never resolves."""
+    _out, minted = await _drive_upload(monkeypatch, folder_id="f-1", resolved=ORG_B)
+    assert minted[0]["org_id"] is None and minted[0]["folder_id"] == "f-1"
