@@ -2534,7 +2534,7 @@ const BASELINE = {
   // 298-04 (2026-10-28, ORG-02 / G-5): RAISED 143 -> 148, measured (the suite printed 148 passed). All +5 are
   //   298-04's: ./useWorkflowLibraryFeeds.ts joined LIBRARY_SUBTREE_PATHS (17 -> 18, fence id D-298-06) in the
   //   move-only commit that created it, and each path runs five it.each sweeps.
-  "librarySubtree.fences.test.ts": 148,
+  "librarySubtree.fences.test.ts": 153, // RAISED 148 -> 153 at 299-02 (D-299-02): ./useWorkflowLinkTarget.ts joins LIBRARY_SUBTREE_PATHS (19), five it.each sweeps +5
   // ── 192.1-07 Task 1 (LIB-05 / D-19 / D-20 / D-36): a NEW suite, pinned in its first commit ─
   // 162-B's name prompt, in `RunModal.a11y.test.tsx`'s posture (the four Radix jsdom shims,
   // `axe()` on the OPEN dialog, roles and accessible names rather than class-name reading).
@@ -4465,6 +4465,10 @@ const BASELINE = {
   "BootScreen.test.tsx": 9, // 299-05 — S6 on one clock (fake timers): 0-7.9 s verbatim splash, 8 s "Still connecting…" in the same status, 20 s heading + body + focused Try again (idle Iris, no alert), kept sentence only on an entity address, reload once + no History write, unmount clears both timers; App's splash branch IS BootScreen (gives up at 20 s, never the sign-in form), and resolves to the card as today
   // ── Phase 299-02 (LINK-02 / D-02, D-32) — both knobs, same commit (2026-10-28). src/hooks/__tests__
   //    has no directory entry, so the new file is FILE-LEVEL in TARGETS below.
+  // 299-02 Task 3 — useWorkflowLinkTarget.test.tsx sits under the `src/components/workflows` directory
+  //    entry, so a pin only; ExpertCatalogPage.link.test.tsx is FILE-LEVEL in TARGETS below.
+  "useWorkflowLinkTarget.test.tsx": 12, // 299-02 (D-03 / T-299-19) — owned draft → onOpenDraft(row) once with its token, once per id, uppercase id; published / starter card → filter cleared, scrolled, focused, marked 2 s, late card focused once; loading / unseen id / no id do nothing; a new id handled; no client API call in any case; source: no api import, never names the page; WorkflowCard root data-row-id
+  "ExpertCatalogPage.link.test.tsx": 11, // 299-02 (D-04) — openBundleId in the list opens its modal (no second read), absent → getExpert(id) once, not asked while loading, refused read opens nothing, closed stays closed, a new id opens, none reads nothing; AppViewSwitch hands linkedDefinitionId / openBundleId from entityLink (kind-checked)
   "useThreadAddress.test.tsx": 21, // 299-02 — real router + fake link: cold address holds then selects once (no entry), absent thread keeps holding, refetch does not re-run, pick/New chat/openThread/off-chat pick + Chat/rail each ONE entry, Back selects and pushes nothing, Back home deselects, plain deselect replaces, IN-01 org change keeps the address (x2), leaveThread counts, holding, inert without a link, source fence
   "ChatLayout.mobileLoading.test.tsx": 4, // 299-05 (FIX-02 / BUG-261027-02) — real ChatLayout + useThreads + ChatHistoryColumn, listThreads deferred: desktop first load says "Loading your chats…" then "No recent chats" only after a settled []; chats answer → rows, no loader; mobile drawer the same (empty sentence style unchanged); a settled no-match search still says "No chats match your search."
 }
@@ -6546,6 +6550,8 @@ const TARGETS = [
   "src/components/layout/__tests__/ChatLayout.mobileLoading.test.tsx",
   // Phase 299-02 — FILE-LEVEL (no src/hooks/__tests__ directory entry), SAME commit as its pin.
   "src/hooks/__tests__/useThreadAddress.test.tsx",
+  // Phase 299-02 — FILE-LEVEL (the experts catalog tests are listed file by file), SAME commit as its pin.
+  "src/components/experts/catalog/__tests__/ExpertCatalogPage.link.test.tsx",
 ]
 
 const REPO_ROOT = path.resolve(__dirname, "..")
