@@ -12206,6 +12206,25 @@ cells rot within days.
 | [`frontend/src/lib/appRoutes.ts`](docs/HOT-FILE-LEDGER.md#frontendsrclibapproutests) | 1 / 1 / 198 (was `0 / 0 / 0`) | no (young) | young (created 297-02). STRICT LEAF: one home of /app path vocabulary (D-11). ⛔ never throws; strict UUID; no host in any output |
 | [`frontend/src/components/layout/AddressNotFound.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentslayoutaddressnotfoundtsx) | 1 / 1 / 51 (was `0 / 0 / 0`) | no (young) | young (created 297-02). S1 + S2 and their copy, one home. ⛔ no path prop, no icon; never renders the trailing fallback tag |
 | [`frontend/src/lib/leaveGuard.ts`](docs/HOT-FILE-LEDGER.md#frontendsrclibleaveguardts) | 1 / 1 / 97 (was `0 / 0 / 0`) | no (young) | young (created 297-03). Leave-guard registry, no-op default (D-21); one-shot latch (D-32/D-42). ⛔ no component; react-only imports; never throws |
+| [`backend/app/services/org_lists.py`](docs/HOT-FILE-LEDGER.md#backendappservicesorg_listspy) | 0 / 0 / 0 | no (planned 298-01) | young (planned 298-01). Polarity-safe list narrowing, one home (D-06). ⛔ None → {} / no predicate; never set(), never restrict_org_ids=None; never get_active_org_id |
+| [`backend/app/api/org_items.py`](docs/HOT-FILE-LEDGER.md#backendappapiorg_itemspy) | 0 / 0 / 0 | no (planned 298-01) | young (planned 298-01; move routes 298-03). /org-items: elsewhere counts (RLS conn), folder labels, move preview + move. ⛔ every route 401 without a bearer; only member orgs named |
+| [`frontend/src/hooks/useActiveOrgId.ts`](docs/HOT-FILE-LEDGER.md#frontendsrchooksuseactiveorgidts) | 0 / 0 / 0 | no (planned 298-01) | young (planned 298-01). The one active-org key for list hooks (D-08). ⛔ answers are tagged with getActiveOrgId() at SEND time, never with this state |
+| [`frontend/src/providers/OrgProvider.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrcprovidersorgprovidertsx) | 3 / 2 / 217 | no | ⚠ absent its ENTIRE LIFE — row added AT PLANNING 298. 298-01: self-heal syncs the X-Org-Id header before the state set (D-36). ⛔ the provider never remounts on a switch (297) |
+| [`backend/app/services/foreign_folder_refusal.py`](docs/HOT-FILE-LEDGER.md#backendappservicesforeign_folder_refusalpy) | 0 / 0 / 0 | no (planned 298-02) | young (planned 298-02). ORG-05: bound-folder set (D-34) + the worded refusal, one home for save + 3 launch doors (D-13/D-30). ⛔ definition org from the row, never the viewer |
+| [`backend/app/services/org_move.py`](docs/HOT-FILE-LEDGER.md#backendappservicesorg_movepy) | 0 / 0 / 0 | no (planned 298-03) | young (planned 298-03). Preview + one pool transaction per move, audit row inside it (D-35). ⛔ both-org membership checked in the txn; only the clean case moves (D-33) |
+| [`frontend/src/hooks/useFolders.ts`](docs/HOT-FILE-LEDGER.md#frontendsrchooksusefoldersts) | 3 / 3 / 115 | yes | ⚠ FIRES with NO row — added AT PLANNING 298 (two of its buckets are bare 03/08). 298-04: org-tagged state + Realtime org filter (D-09/D-10). ⛔ Realtime is a hint; refetch is truth |
+| [`frontend/src/components/workflows/history/RunLogPanel.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentsworkflowshistoryrunlogpaneltsx) | 1 / 0 / 317 | no | ⚠ absent its ENTIRE LIFE — row added AT PLANNING 298. 298-04: org key in load deps, rows cleared on switch (D-09); 298-05: one ElsewhereLine mount |
+| [`frontend/src/components/workflows/DescribeKbPicker.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentsworkflowsdescribekbpickertsx) | 3 / 1 / 407 | no | ⚠ absent its ENTIRE LIFE — row added AT PLANNING 298. 298-04: drop a held id only when the label read omits it (D-15). ⛔ exactly ONE @/lib/api import line |
+| [`frontend/src/hooks/useLibraryOrgSwitch.ts`](docs/HOT-FILE-LEDGER.md#frontendsrchooksuselibraryorgswitchts) | 0 / 0 / 0 | no (planned 298-04) | young (planned 298-04). LibraryPage's org-keyed effects moved out move-only (G-5 seam): fields, views, provenance (SEED-317), selection reset on switch (D-08) |
+| [`frontend/src/components/workflows/library/useWorkflowLibraryFeeds.ts`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentsworkflowslibraryuseworkflowlibraryfeedsts) | 0 / 0 / 0 | no (planned 298-04) | young (planned 298-04). WorkflowsPage's three feeds moved out move-only (G-5 seam), then org-tagged (D-09). ⛔ per-source state + latest-wins tickets kept |
+| [`frontend/src/lib/api/orgItems.ts`](docs/HOT-FILE-LEDGER.md#frontendsrclibapiorgitemsts) | 0 / 0 / 0 | no (planned 298-04) | young (planned 298-04; 298-05 adds counts + move). Client for /org-items. ⛔ move refusals throw ApiRefusal with the server sentence |
+| [`frontend/src/components/org/orgItemsCopy.ts`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentsorgorgitemscopyts) | 0 / 0 / 0 | no (planned 298-04) | young (planned 298-04). One home of the phase's new strings (marker, loading, elsewhere, move sheet). ⛔ leaf, no imports |
+| [`frontend/src/components/workflows/folderLabel.ts`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentsworkflowsfolderlabelts) | 0 / 0 / 0 | no (planned 298-04) | young (planned 298-04). labelFor: in-org name, out-of-org name + lives in <org>, else UNNAMED_KB_OPTION (D-15). ⛔ never a raw id |
+| [`frontend/src/lib/elsewhereCounts.ts`](docs/HOT-FILE-LEDGER.md#frontendsrclibelsewherecountsts) | 0 / 0 / 0 | no (planned 298-05) | young (planned 298-05). Elsewhere-count store keyed by active org, one in-flight GET per org (D-16), move version bump. ⛔ a stale-org answer never writes |
+| [`frontend/src/components/org/ElsewhereLine.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentsorgelsewherelinetsx) | 0 / 0 / 0 | no (planned 298-05) | young (planned 298-05). N more … in <org> · Switch (D-17). ⛔ absent while loading, at 0, on failure; never reads 0 |
+| [`frontend/src/components/org/MoveToOrgSheet.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentsorgmovetoorgsheettsx) | 0 / 0 / 0 | no (planned 298-05) | young (planned 298-05). Victim-naming bottom sheet (UI-D16/17). ⛔ no Move button before the preview; server refusals verbatim; no optimistic vanish |
+| [`frontend/src/components/org/MoveToOrgMenuItem.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentsorgmovetoorgmenuitemtsx) | 0 / 0 / 0 | no (planned 298-05) | young (planned 298-05). Move to <org>… DropdownMenuItem leaf (UI-D15). ⛔ absent (never disabled) for solo users and non-owners |
+| [`frontend/src/components/org/MoveToOrgButton.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentsorgmovetoorgbuttontsx) | 0 / 0 / 0 | no (planned 298-05) | young (planned 298-05). Root-document move button for the detail panel (UI-D15). ⛔ only for an owned latest Root document at 2+ orgs |
 
 
 
@@ -25973,3 +25992,79 @@ and unregisters in the effect cleanup. Pinned by `src/hooks/__tests__/useAppNavi
   `LeaveGuardContext.Provider` directly, with no `key` and the hook's one-identity registry as its value.
 
 Scan-list cell as of 2026-10-27 (replaced by 297-03, moved verbatim): 0 / 0 / 0 | no (planned 297-03) | young (planned 297-03). Leave-guard registry context, safe no-op default (D-21); one-shot latch (D-32/D-42). No component. Measured in its creating commit
+
+### `backend/app/services/org_lists.py`
+
+**Added AT PLANNING (Phase 298, 2026-10-28) with `0 / 0 / 0`** — the file does not exist yet; plan `298-01` creates it and re-derives the triple in its creating commit (the 297 leaveGuard.ts precedent). young (planned 298-01). Polarity-safe list narrowing, one home (D-06). ⛔ None → {} / no predicate; never set(), never restrict_org_ids=None; never get_active_org_id
+
+### `backend/app/api/org_items.py`
+
+**Added AT PLANNING (Phase 298, 2026-10-28) with `0 / 0 / 0`** — the file does not exist yet; plan `298-01` creates it and re-derives the triple in its creating commit (the 297 leaveGuard.ts precedent). young (planned 298-01; move routes 298-03). /org-items: elsewhere counts (RLS conn), folder labels, move preview + move. ⛔ every route 401 without a bearer; only member orgs named
+
+### `frontend/src/hooks/useActiveOrgId.ts`
+
+**Added AT PLANNING (Phase 298, 2026-10-28) with `0 / 0 / 0`** — the file does not exist yet; plan `298-01` creates it and re-derives the triple in its creating commit (the 297 leaveGuard.ts precedent). young (planned 298-01). The one active-org key for list hooks (D-08). ⛔ answers are tagged with getActiveOrgId() at SEND time, never with this state
+
+### `frontend/src/providers/OrgProvider.tsx`
+
+**Added AT PLANNING (Phase 298, 2026-10-28), measured `3 / 2 / 217`** with the CLAUDE.md recipe on `2bb23a742`. The file had no scan-list row, so G-5 could never fire on it. ⚠ absent its ENTIRE LIFE — row added AT PLANNING 298. 298-01: self-heal syncs the X-Org-Id header before the state set (D-36). ⛔ the provider never remounts on a switch (297) The executing plan re-derives the triple in the commit that touches it.
+
+### `backend/app/services/foreign_folder_refusal.py`
+
+**Added AT PLANNING (Phase 298, 2026-10-28) with `0 / 0 / 0`** — the file does not exist yet; plan `298-02` creates it and re-derives the triple in its creating commit (the 297 leaveGuard.ts precedent). young (planned 298-02). ORG-05: bound-folder set (D-34) + the worded refusal, one home for save + 3 launch doors (D-13/D-30). ⛔ definition org from the row, never the viewer
+
+### `backend/app/services/org_move.py`
+
+**Added AT PLANNING (Phase 298, 2026-10-28) with `0 / 0 / 0`** — the file does not exist yet; plan `298-03` creates it and re-derives the triple in its creating commit (the 297 leaveGuard.ts precedent). young (planned 298-03). Preview + one pool transaction per move, audit row inside it (D-35). ⛔ both-org membership checked in the txn; only the clean case moves (D-33)
+
+### `frontend/src/hooks/useFolders.ts`
+
+**Added AT PLANNING (Phase 298, 2026-10-28), measured `3 / 3 / 115`** with the CLAUDE.md recipe on `2bb23a742`. The file had no scan-list row, so G-5 could never fire on it. ⚠ FIRES with NO row — added AT PLANNING 298 (two of its buckets are bare 03/08). 298-04: org-tagged state + Realtime org filter (D-09/D-10). ⛔ Realtime is a hint; refetch is truth The executing plan re-derives the triple in the commit that touches it.
+
+### `frontend/src/components/workflows/history/RunLogPanel.tsx`
+
+**Added AT PLANNING (Phase 298, 2026-10-28), measured `1 / 0 / 317`** with the CLAUDE.md recipe on `2bb23a742`. The file had no scan-list row, so G-5 could never fire on it. ⚠ absent its ENTIRE LIFE — row added AT PLANNING 298. 298-04: org key in load deps, rows cleared on switch (D-09); 298-05: one ElsewhereLine mount The executing plan re-derives the triple in the commit that touches it.
+
+### `frontend/src/components/workflows/DescribeKbPicker.tsx`
+
+**Added AT PLANNING (Phase 298, 2026-10-28), measured `3 / 1 / 407`** with the CLAUDE.md recipe on `2bb23a742`. The file had no scan-list row, so G-5 could never fire on it. ⚠ absent its ENTIRE LIFE — row added AT PLANNING 298. 298-04: drop a held id only when the label read omits it (D-15). ⛔ exactly ONE @/lib/api import line The executing plan re-derives the triple in the commit that touches it.
+
+### `frontend/src/hooks/useLibraryOrgSwitch.ts`
+
+**Added AT PLANNING (Phase 298, 2026-10-28) with `0 / 0 / 0`** — the file does not exist yet; plan `298-04` creates it and re-derives the triple in its creating commit (the 297 leaveGuard.ts precedent). young (planned 298-04). LibraryPage's org-keyed effects moved out move-only (G-5 seam): fields, views, provenance (SEED-317), selection reset on switch (D-08)
+
+### `frontend/src/components/workflows/library/useWorkflowLibraryFeeds.ts`
+
+**Added AT PLANNING (Phase 298, 2026-10-28) with `0 / 0 / 0`** — the file does not exist yet; plan `298-04` creates it and re-derives the triple in its creating commit (the 297 leaveGuard.ts precedent). young (planned 298-04). WorkflowsPage's three feeds moved out move-only (G-5 seam), then org-tagged (D-09). ⛔ per-source state + latest-wins tickets kept
+
+### `frontend/src/lib/api/orgItems.ts`
+
+**Added AT PLANNING (Phase 298, 2026-10-28) with `0 / 0 / 0`** — the file does not exist yet; plan `298-04` creates it and re-derives the triple in its creating commit (the 297 leaveGuard.ts precedent). young (planned 298-04; 298-05 adds counts + move). Client for /org-items. ⛔ move refusals throw ApiRefusal with the server sentence
+
+### `frontend/src/components/org/orgItemsCopy.ts`
+
+**Added AT PLANNING (Phase 298, 2026-10-28) with `0 / 0 / 0`** — the file does not exist yet; plan `298-04` creates it and re-derives the triple in its creating commit (the 297 leaveGuard.ts precedent). young (planned 298-04). One home of the phase's new strings (marker, loading, elsewhere, move sheet). ⛔ leaf, no imports
+
+### `frontend/src/components/workflows/folderLabel.ts`
+
+**Added AT PLANNING (Phase 298, 2026-10-28) with `0 / 0 / 0`** — the file does not exist yet; plan `298-04` creates it and re-derives the triple in its creating commit (the 297 leaveGuard.ts precedent). young (planned 298-04). labelFor: in-org name, out-of-org name + lives in <org>, else UNNAMED_KB_OPTION (D-15). ⛔ never a raw id
+
+### `frontend/src/lib/elsewhereCounts.ts`
+
+**Added AT PLANNING (Phase 298, 2026-10-28) with `0 / 0 / 0`** — the file does not exist yet; plan `298-05` creates it and re-derives the triple in its creating commit (the 297 leaveGuard.ts precedent). young (planned 298-05). Elsewhere-count store keyed by active org, one in-flight GET per org (D-16), move version bump. ⛔ a stale-org answer never writes
+
+### `frontend/src/components/org/ElsewhereLine.tsx`
+
+**Added AT PLANNING (Phase 298, 2026-10-28) with `0 / 0 / 0`** — the file does not exist yet; plan `298-05` creates it and re-derives the triple in its creating commit (the 297 leaveGuard.ts precedent). young (planned 298-05). N more … in <org> · Switch (D-17). ⛔ absent while loading, at 0, on failure; never reads 0
+
+### `frontend/src/components/org/MoveToOrgSheet.tsx`
+
+**Added AT PLANNING (Phase 298, 2026-10-28) with `0 / 0 / 0`** — the file does not exist yet; plan `298-05` creates it and re-derives the triple in its creating commit (the 297 leaveGuard.ts precedent). young (planned 298-05). Victim-naming bottom sheet (UI-D16/17). ⛔ no Move button before the preview; server refusals verbatim; no optimistic vanish
+
+### `frontend/src/components/org/MoveToOrgMenuItem.tsx`
+
+**Added AT PLANNING (Phase 298, 2026-10-28) with `0 / 0 / 0`** — the file does not exist yet; plan `298-05` creates it and re-derives the triple in its creating commit (the 297 leaveGuard.ts precedent). young (planned 298-05). Move to <org>… DropdownMenuItem leaf (UI-D15). ⛔ absent (never disabled) for solo users and non-owners
+
+### `frontend/src/components/org/MoveToOrgButton.tsx`
+
+**Added AT PLANNING (Phase 298, 2026-10-28) with `0 / 0 / 0`** — the file does not exist yet; plan `298-05` creates it and re-derives the triple in its creating commit (the 297 leaveGuard.ts precedent). young (planned 298-05). Root-document move button for the detail panel (UI-D15). ⛔ only for an owned latest Root document at 2+ orgs

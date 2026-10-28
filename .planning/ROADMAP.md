@@ -132,7 +132,15 @@ Plans:
   4. A user with items in another org sees "N items in <org>" instead of nothing, and can move a pre-296 mis-stamped item to the right org one item at a time; each move writes an audit row (ORG-06).
 
 **How we'd know this failed**: `fetch_visible_folders` is changed and an unattended run (no `X-Org-Id`) gets a 400 for a two-org user; a bulk re-stamp runs; the count reads 0 while items exist; the old org's list flashes after a switch, or an action on it writes under the new org; the refusal is a 500 or a generic error; an out-of-org binding renders blank instead of by name; chat retrieval silently loses folders it used to see.
-**Plans**: TBD
+**Plans**: 5 plans in 5 waves (01 → 02 → 03 → 04 → 05 — serial: every plan re-derives the shared ledger docs, and 01/02/03 mutate the local DB)
+
+Plans:
+- [ ] 298-01-PLAN.md — backend narrowing of every list (org_lists.py), Root-upload org stamp, `/org-items` elsewhere counts + folder labels, client org plumbing (ORG-01..04, ORG-06)
+- [ ] 298-02-PLAN.md — ORG-05 refusal at save + all four launch doors, the D-25 before/after matrix, refusal shown verbatim in the UI (ORG-05)
+- [ ] 298-03-PLAN.md — migration 217 (audit type) + the one-transaction audited move of a folder / Root document / draft, move routes, seeds (ORG-06)
+- [ ] 298-04-PLAN.md — frontend refresh-on-switch for every list (move-only LibraryPage/WorkflowsPage extractions first) + the out-of-org picker marker (ORG-01..05)
+- [ ] 298-05-PLAN.md — the "N more … in <org> · Switch" line and the Move to <org> sheet on its three homes (ORG-06)
+
 **UI hint**: yes
 **Flags**: **Narrowing goes through the existing `restrict_org_ids`** on the list routes only (research: `/folders`, `/folders/{id}/children`, `/workflows/published`, `/workflows/drafts`, plus the thread list and run history decided at intake); `fetch_visible_folders` (~20 callers) is unchanged. **G-5**: `backend/app/api/threads.py` (`283 / 95`, the hottest backend file), `backend/app/api/workflows.py` (26, split OWED), `backend/app/api/folders.py` (10), `backend/app/api/workflow_runs.py` (15), `backend/app/services/workflow_kickoff.py` (10), `publish_service.py` (16), `LibraryPage.tsx` (20), `WorkflowsPage.tsx` (20), `useThreads.ts` (3), `useDocuments.ts` (5). Each touch must be one expression honoured by construction, or the phase takes the named seam first; read each section at discuss. **G-2** sketch for the "N items in <org>" line and the per-item move (small, but new UI). **G-4**. **Four-axis** (UI state): org switch while a stream is live. **Migration** only if the audited move needs one (next free number). **Security**: the move is a cross-org write — `security_enforcement`, membership checked on both orgs, anon-role test on any new path. Mis-stamp sources: mig 105 backfill and mig 106 `LIMIT 1` autofill (research pitfall 7).
 
