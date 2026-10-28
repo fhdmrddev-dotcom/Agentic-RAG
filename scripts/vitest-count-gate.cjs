@@ -4453,6 +4453,8 @@ const BASELINE = {
   //    directory entry (src/__tests__/lib, src/components/org), so both are FILE-LEVEL.
   "elsewhereCounts.test.ts": 13, // 298-05 — one GET for 4 mounts, loading has no rows, a switch re-asks + drops the late answer, a foreign-header answer never writes, nothing asked solo/no org, failed is warned, invalidate keeps the last answer, noteMoved bumps version + lastMoved, reset, the open-move request, and the three client calls (URL, body, ApiRefusal)
   "ElsewhereLine.test.tsx": 21, // 298-05 — absent while loading / solo / no provider / [] / all-zero / failed (never "0 more"); the exact UI-D5 words for every kind and plural; one line per org in server order; never the active org; long names truncate but stay whole; Switch is a primary button, focuses the wrapper then calls switchOrg
+  "MoveToOrgSheet.test.tsx": 21, // 298-05 — checking shows no count and no Move (Keep focused); the clean anatomy + every UI-D18 count sentence; refusals verbatim in one amber alert with only Close (preview list, 403); server text is text; preview failed + Try again; Moving can't be dismissed and Moved records ONCE on the 200; 409/403/5xx at confirm; 4+ orgs pick first; no red in any state
+  "MoveToOrgMenuItem.test.tsx": 16, // 298-05 — the menu item: one per other org by name at 2-3 orgs, collapsed at 4+, absent solo / no provider / non-owner, opens THIS item's move tagged with the org, a subtree holding the selection says so; the Root-document button: owned latest Root only, collapsed at 4+, absent otherwise, opens the sheet
 }
 
 // Still COMPUTED, never hand-written — the reduce is the single source, so the
@@ -6520,6 +6522,8 @@ const TARGETS = [
   // Phase 298-05 — FILE-LEVEL (no src/__tests__/lib or src/components/org directory entry), SAME commit as their pins.
   "src/__tests__/lib/elsewhereCounts.test.ts",
   "src/components/org/__tests__/ElsewhereLine.test.tsx",
+  "src/components/org/__tests__/MoveToOrgSheet.test.tsx",
+  "src/components/org/__tests__/MoveToOrgMenuItem.test.tsx",
 ]
 
 const REPO_ROOT = path.resolve(__dirname, "..")
