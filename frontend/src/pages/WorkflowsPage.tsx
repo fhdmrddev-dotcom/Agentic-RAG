@@ -642,7 +642,7 @@ export function WorkflowsPage({ folders, onLaunch, onOpenRun, onOpenConnections,
   })
 
   // Phase 299-02 (D-03): open the address's workflow — below `onOpenDraft` for the TDZ reason above.
-  useWorkflowLinkTarget({ id: linkedDefinitionId, drafts, rows, loading, onOpenDraft, clearProjectFilter: () => setSelectedProjectId(null) })
+  useWorkflowLinkTarget({ id: linkedDefinitionId, drafts, rows, shown: visibleRows, loading, onOpenDraft, clearFilters: clearAllFilters })
 
   // 186-07: a TRUE fresh build seeds nothing at all — no row exists yet, so there is no
   // token to carry. `useDraftPersistence` creates the row on the first write and adopts

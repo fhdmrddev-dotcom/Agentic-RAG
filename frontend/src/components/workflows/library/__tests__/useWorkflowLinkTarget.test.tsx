@@ -49,13 +49,15 @@ interface Args {
   drafts: WorkflowDraftRow[]
   rows: LibraryRow[]
   loading: boolean
+  /** The rows the page actually renders (after query / chips / project); defaults to `rows`. */
+  shown?: LibraryRow[]
 }
 
 function setup(initial: Args) {
   const onOpenDraft = vi.fn()
   const clearProjectFilter = vi.fn()
   const view = renderHook(
-    (a: Args) => useWorkflowLinkTarget({ ...a, onOpenDraft, clearProjectFilter }),
+    (a: Args) => useWorkflowLinkTarget({ ...a, shown: a.shown ?? a.rows, onOpenDraft, clearFilters: clearProjectFilter }),
     { initialProps: initial },
   )
   return { onOpenDraft, clearProjectFilter, view }
@@ -160,11 +162,17 @@ describe("useWorkflowLinkTarget — it decides nothing it cannot see", () => {
     expect(scrollIntoView).not.toHaveBeenCalled()
   })
 
-  it("an id in neither list does nothing (299-03's gate owns that answer)", () => {
+  // RE-TARGETED under 299-REVIEW WR-05 (the reason, kept in the body): this case pinned "the filter
+  // is NOT cleared" for an id absent from the rows. But a PUBLISHED workflow outside the selected
+  // project is absent precisely BECAUSE the project filter narrows the published feed server-side,
+  // so waiting to find it before clearing meant it was never found. The gate has already answered
+  // that the id opens; the hook now clears the filters once for it. It still opens nothing,
+  // focuses nothing and calls no client function for an id it cannot see.
+  it("an id in neither list opens and focuses nothing (299-03's gate owns that answer); it clears the filters once", () => {
     plantCard(OTHER_ID)
     const { onOpenDraft, clearProjectFilter } = setup({ id: OTHER_ID, drafts: [draft], rows: [row(PUBLISHED_ID, "published")], loading: false })
     expect(onOpenDraft).not.toHaveBeenCalled()
-    expect(clearProjectFilter).not.toHaveBeenCalled()
+    expect(clearProjectFilter).toHaveBeenCalledTimes(1)
     expect(scrollIntoView).not.toHaveBeenCalled()
     expectNoApiCall()
   })
@@ -182,6 +190,44 @@ describe("useWorkflowLinkTarget — it decides nothing it cannot see", () => {
     view.rerender({ id: PUBLISHED_ID, drafts: [draft], rows: [row(PUBLISHED_ID, "published")], loading: false })
     expect(document.activeElement).toBe(card)
     expect(onOpenDraft).toHaveBeenCalledTimes(1)
+  })
+})
+
+// 299-REVIEW WR-05: three ways a link silently did nothing on a mounted Workflows page.
+describe("useWorkflowLinkTarget — a link never silently does nothing (299-REVIEW WR-05)", () => {
+  it("a published workflow OUTSIDE the selected project (absent from the server-narrowed rows) clears the filters, then is focused", () => {
+    const { clearProjectFilter, view } = setup({ id: PUBLISHED_ID, drafts: [], rows: [row(OTHER_ID, "published")], loading: false })
+    expect(clearProjectFilter).toHaveBeenCalledTimes(1)
+    const card = plantCard(PUBLISHED_ID)
+    view.rerender({ id: PUBLISHED_ID, drafts: [], rows: [row(OTHER_ID, "published"), row(PUBLISHED_ID, "published")], loading: false })
+    expect(document.activeElement).toBe(card)
+    expect(clearProjectFilter).toHaveBeenCalledTimes(1)
+  })
+
+  it("a card hidden by the search box or a chip (in rows, not rendered) is focused once the cleared filters render it", () => {
+    const rows = [row(PUBLISHED_ID, "published"), row(OTHER_ID, "published")]
+    const drafts: WorkflowDraftRow[] = [] // stable, as the page's state is
+    const { clearProjectFilter, view } = setup({ id: PUBLISHED_ID, drafts, rows, loading: false, shown: [rows[1]] })
+    expect(clearProjectFilter).toHaveBeenCalledTimes(1)
+    expect(scrollIntoView).not.toHaveBeenCalled()
+    const card = plantCard(PUBLISHED_ID)
+    // The SAME rows and drafts (query and chips filter client-side); only what is rendered changed.
+    view.rerender({ id: PUBLISHED_ID, drafts, rows, loading: false, shown: rows })
+    expect(scrollIntoView).toHaveBeenCalledTimes(1)
+    expect(document.activeElement).toBe(card)
+  })
+
+  it("leaving the address and coming back to the same id focuses the card again (Back / Forward)", () => {
+    const card = plantCard(PUBLISHED_ID)
+    const rows = [row(PUBLISHED_ID, "published")]
+    const { clearProjectFilter, view } = setup({ id: PUBLISHED_ID, drafts: [], rows, loading: false })
+    expect(scrollIntoView).toHaveBeenCalledTimes(1)
+    view.rerender({ id: null, drafts: [], rows, loading: false })
+    card.blur()
+    view.rerender({ id: PUBLISHED_ID, drafts: [], rows, loading: false })
+    expect(scrollIntoView).toHaveBeenCalledTimes(2)
+    expect(document.activeElement).toBe(card)
+    expect(clearProjectFilter).toHaveBeenCalledTimes(2)
   })
 })
 
