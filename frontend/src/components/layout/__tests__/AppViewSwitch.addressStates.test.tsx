@@ -60,6 +60,21 @@ vi.mock("@/pages/WorkflowRunPage", async (importOriginal) => {
   return { ...actual, WorkflowRunPage: () => <div data-testid="run-page-stub" /> }
 })
 
+// Phase 299-03: the pages the gate draws BEHIND the card (or opens), stubbed to print the linked id
+// they were handed, and the resolver client the gate asks.
+vi.mock("@/pages/WorkflowsPage", () => ({
+  WorkflowsPage: (p: { linkedDefinitionId?: string | null }) => (
+    <div data-testid="workflows-page-stub">{`linked:${String(p.linkedDefinitionId ?? null)}`}</div>
+  ),
+}))
+vi.mock("@/components/experts/catalog/ExpertCatalogPage", () => ({
+  ExpertCatalogPage: (p: { openBundleId?: string | null }) => (
+    <div data-testid="experts-page-stub">{`open:${String(p.openBundleId ?? null)}`}</div>
+  ),
+}))
+const links = vi.hoisted(() => ({ resolveLink: vi.fn() }))
+vi.mock("@/lib/api/links", () => ({ resolveLink: links.resolveLink }))
+
 import { ChatLayout } from "../ChatLayout"
 import { useOperatorProbe } from "@/hooks/useOperatorProbe"
 import { useEffectiveFeatures } from "@/hooks/useEffectiveFeatures"
@@ -69,6 +84,8 @@ import { COPY_LOADING } from "@/pages/WorkflowRunPage"
 import type { ActiveView } from "@/App"
 import addressNotFoundSource from "../AddressNotFound.tsx?raw"
 import switchSource from "../AppViewSwitch.tsx?raw"
+import type { EntityLink } from "@/hooks/useAppNavigation"
+import type { AppRoute } from "@/lib/appRoutes"
 
 interface Opts {
   addressNotFound?: boolean
@@ -77,6 +94,8 @@ interface Opts {
   isOperator?: boolean
   operatorLoading?: boolean
   onNavigate?: (v: ActiveView) => void
+  /** Phase 299-03: App's entity navigators (a fake), so the gate is live. */
+  entityLink?: EntityLink
 }
 
 function renderAt(activeView: ActiveView, o: Opts = {}) {
@@ -108,6 +127,7 @@ function renderAt(activeView: ActiveView, o: Opts = {}) {
         openRun={vi.fn()}
         addressNotFound={o.addressNotFound ?? false}
         operatorLoading={o.operatorLoading ?? false}
+        entityLink={o.entityLink}
       />
     </EffectiveFeaturesProvider>,
   )
@@ -160,12 +180,17 @@ describe("S1 — an address that opens nothing (D-14)", () => {
     expect(block.querySelector("svg")).toBeNull()
   })
 
-  it("hides the chat history column (with the positive control)", () => {
+  // RE-TARGETED under 299-03 D-14 (UI-SPEC S1, sketch 299-1 B), never deleted: 297 hid the history
+  // column on S1. 299's one card sits over the MAIN region only, with the history column live behind
+  // it (clicking a row opens that chat and so replaces the card), so the same case now asserts the
+  // column is SHOWN on S1, with the same positive control and the same rail assertion.
+  it("D-14: keeps the chat history column live behind the card (with the positive control)", () => {
     renderAt("chat")
     expect(screen.getByTestId("history-stub")).toBeInTheDocument()
     cleanup()
     renderAt("chat", { addressNotFound: true })
-    expect(screen.queryByTestId("history-stub")).not.toBeInTheDocument()
+    expect(screen.getByTestId("history-stub")).toBeInTheDocument()
+    expect(screen.getByRole("heading", { level: 1 })).toHaveTextContent("This address doesn't open anything")
     // The rail stays (D-43: it highlights Chat; NavPanel is not edited in 297).
     expect(screen.getAllByTestId("nav-stub").length).toBeGreaterThan(0)
   })
@@ -219,6 +244,137 @@ describe.each<[ActiveView, string]>([
     renderAt(view, { isOperator: true, operatorLoading: false })
     expect(screen.getByTestId(pageTestId)).toBeInTheDocument()
     expect(screen.queryByText("This address doesn't open anything")).not.toBeInTheDocument()
+  })
+})
+
+// ── Phase 299-03 (D-12..D-15, D-36) — the gate inside the layout ──────────────────────────────
+const LINKED = "c41d8e2a-1b2c-4d3e-8f9a-9e2d5b7f0a63"
+const FOREIGN = "c41d8e2a-1b2c-4d3e-8f9a-9e2d5b7f0a64"
+type Kind = "thread" | "workflow" | "run" | "expert"
+function linkTo(kind: Kind, id = LINKED): EntityLink {
+  const route: AppRoute =
+    kind === "thread"
+      ? { view: "chat", threadId: id }
+      : kind === "workflow"
+        ? { view: "workflows", definitionId: id }
+        : kind === "run"
+          ? { view: "workflow-run", runId: id }
+          : { view: "experts", bundleId: id }
+  return {
+    target: { kind, id },
+    route,
+    address: `/x/${id}`,
+    openThread: vi.fn(),
+    openWorkflow: vi.fn(),
+    openExpert: vi.fn(),
+    leaveThread: vi.fn(),
+    leave: vi.fn(),
+    openRoute: vi.fn(),
+    resume: vi.fn(),
+  }
+}
+const VIEW_OF: Record<Kind, ActiveView> = { thread: "chat", workflow: "workflows", run: "workflow-run", expert: "experts" }
+const settle = () => act(async () => {})
+
+describe("S1 for a link the server refuses: the generic area of its kind behind the card (D-12 / D-13)", () => {
+  beforeEach(() => links.resolveLink.mockReset())
+
+  it("a run: the Workflows library behind (no linked id), never the run page; the area is inert", async () => {
+    links.resolveLink.mockResolvedValue({ status: "cant" })
+    renderAt("workflow-run", { canvas: true, entityLink: linkTo("run") })
+    await settle()
+    expect(screen.getByRole("heading", { level: 1 })).toHaveTextContent("This workflow run can't be opened")
+    expect(screen.getByText("If someone sent you this link, ask them to check it.")).toBeInTheDocument()
+    const behind = screen.getByTestId("workflows-page-stub")
+    expect(behind).toHaveTextContent("linked:null")
+    expect(behind.closest("[inert]")).not.toBeNull()
+    expect(behind.closest('[aria-hidden="true"]')).not.toBeNull()
+    expect(screen.queryByTestId("run-page-stub")).not.toBeInTheDocument()
+    expect(document.querySelector("code")?.textContent).toBe(`${window.location.host}/app/runs/${LINKED}`)
+  })
+
+  it("a workflow: the library behind with no linked id", async () => {
+    links.resolveLink.mockResolvedValue({ status: "cant" })
+    renderAt("workflows", { entityLink: linkTo("workflow") })
+    await settle()
+    expect(screen.getByRole("heading", { level: 1 })).toHaveTextContent("This workflow can't be opened")
+    expect(screen.getByTestId("workflows-page-stub")).toHaveTextContent("linked:null")
+  })
+
+  it("an Expert: the catalog behind with no open id; the exit is Go to Experts", async () => {
+    links.resolveLink.mockResolvedValue({ status: "cant" })
+    const link = linkTo("expert")
+    renderAt("experts", { entityLink: link })
+    await settle()
+    expect(screen.getByRole("heading", { level: 1 })).toHaveTextContent("This Expert can't be opened")
+    expect(screen.getByTestId("experts-page-stub")).toHaveTextContent("open:null")
+    fireEvent.click(screen.getByRole("button", { name: "Go to Experts" }))
+    expect(link.openRoute).toHaveBeenCalledWith({ view: "experts" })
+  })
+
+  it("a chat: an empty main region (no composer, no welcome) beside the LIVE history column", async () => {
+    links.resolveLink.mockResolvedValue({ status: "cant" })
+    const link = linkTo("thread")
+    renderAt("chat", { entityLink: link })
+    await settle()
+    await settle()
+    expect(screen.getByRole("heading", { level: 1 })).toHaveTextContent("This chat can't be opened")
+    expect(screen.getByTestId("history-stub")).toBeInTheDocument()
+    expect(screen.queryByTestId("chat-area-stub")).not.toBeInTheDocument()
+    expect(screen.queryByTestId("workspace-panel-stub")).not.toBeInTheDocument()
+    fireEvent.click(screen.getByRole("button", { name: "Go to Chat" }))
+    // D-15: a PUSH to the chat home, so Back returns to the card.
+    expect(link.openRoute).toHaveBeenCalledWith({ view: "chat" })
+  })
+
+  it("Go to Workflows is a push through openRoute (D-15), never a silent fallback to chat", async () => {
+    links.resolveLink.mockResolvedValue({ status: "cant" })
+    const link = linkTo("run")
+    const { onNavigate } = renderAt("workflow-run", { canvas: true, entityLink: link })
+    await settle()
+    fireEvent.click(screen.getByRole("button", { name: "Go to Workflows" }))
+    expect(link.openRoute).toHaveBeenCalledWith({ view: "workflows" })
+    expect(onNavigate).not.toHaveBeenCalledWith("chat")
+  })
+
+  it("a made-up id and a foreign id render the same main region, id aside (T-299-23)", async () => {
+    links.resolveLink.mockResolvedValue({ status: "cant" })
+    renderAt("workflow-run", { canvas: true, entityLink: linkTo("run", LINKED) })
+    await settle()
+    const first = (document.querySelector("main") as HTMLElement).innerHTML.split(LINKED).join("<id>")
+    cleanup()
+    renderAt("workflow-run", { canvas: true, entityLink: linkTo("run", FOREIGN) })
+    await settle()
+    expect((document.querySelector("main") as HTMLElement).innerHTML.split(FOREIGN).join("<id>")).toBe(first)
+  })
+})
+
+describe("S2 / open: the gate holds, then opens the page with the linked id (299-03)", () => {
+  beforeEach(() => links.resolveLink.mockReset())
+
+  it.each<[Kind, string]>([
+    ["workflow", "Opening the workflow…"],
+    ["expert", "Opening the Expert…"],
+    ["run", "Opening the run…"],
+  ])("a %s address holds with its sentence while the answer is out", async (kind, sentence) => {
+    links.resolveLink.mockReturnValue(new Promise(() => {}))
+    renderAt(VIEW_OF[kind], { canvas: true, entityLink: linkTo(kind) })
+    await settle()
+    expect(screen.getByRole("status")).toHaveTextContent(sentence)
+    expect(screen.queryByTestId("workflows-page-stub")).not.toBeInTheDocument()
+    expect(screen.queryByTestId("experts-page-stub")).not.toBeInTheDocument()
+    expect(screen.queryByTestId("run-page-stub")).not.toBeInTheDocument()
+  })
+
+  it("an answer in the active org opens the page with the linked id; no card", async () => {
+    links.resolveLink.mockResolvedValue({
+      status: "ok",
+      target: { kind: "workflow", id: LINKED, org_id: null, org_name: null, title: "W", state: "published", audience: "everyone" },
+    })
+    renderAt("workflows", { entityLink: linkTo("workflow") })
+    await settle()
+    expect(screen.getByTestId("workflows-page-stub")).toHaveTextContent(`linked:${LINKED}`)
+    expect(screen.queryByRole("heading", { level: 1 })).not.toBeInTheDocument()
   })
 })
 
@@ -307,6 +463,14 @@ describe("source facts other fences depend on", () => {
     const firstS1 = code.indexOf("<AddressNotFound", split)
     expect(firstS1).toBeGreaterThan(split)
     expect(firstS1).toBeLessThan(code.indexOf("<LibraryPage", split))
+  })
+
+  it("299-03 (D-28): the switch wraps its body in ONE LinkGate and still calls no React hook", () => {
+    const code = codeOf(switchSource)
+    expect(code.split("<LinkGate").length - 1).toBe(1)
+    expect(code).not.toMatch(/\buse(State|Effect|Memo|Ref|Callback|Reducer|Context|LayoutEffect)\(/)
+    // Non-vacuity: the stripper left the code in place.
+    expect(code).toContain("export function AppViewSwitch")
   })
 
   it("the run hold's sentence has ONE spelling — the switch never writes it itself", () => {

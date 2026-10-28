@@ -24,6 +24,8 @@ import { RouterProvider } from "react-router/dom"
 import { useAppNavigation, type AppNavigation } from "../useAppNavigation"
 // The hook's own source, read as text for the D-05 import fence below.
 import hookSource from "../useAppNavigation.ts?raw"
+// Phase 299-03: the return-target store the resume cases write and read.
+import { rememberReturnTarget, takeReturnTarget } from "@/lib/returnTo"
 
 const RUN_ID = "229f45ae-c85e-4707-a46c-bf4787541547"
 const SKILL_1 = "0b9c3a51-7d2e-4f6a-9a8b-1c2d3e4f5a61"
@@ -589,5 +591,95 @@ describe("useAppNavigation — a bare entity address keeps its token hash (299-0
     const router = mount(`/app/workflows/${DEFINITION.toUpperCase()}`)
     await waitFor(() => expect(where(router)).toBe(`/app/workflows/${DEFINITION}`))
     expect(router.state.historyAction).toBe("REPLACE")
+  })
+})
+
+// ── Phase 299-03 (D-15 / D-17 / D-24) — the gate's navigators: address, leave, openRoute, resume ──
+describe("useAppNavigation — entityLink.address, leave, openRoute (299-03)", () => {
+  it("address is the canonical path on screen (lowercase id, rebuilt)", async () => {
+    mount(`/app/chat/${THREAD_A.toUpperCase()}`)
+    await waitFor(() => expect(nav().entityLink.address).toBe(`/app/chat/${THREAD_A}`))
+    cleanup()
+    mount("/app/library")
+    expect(nav().entityLink.address).toBe("/app/library")
+  })
+
+  it("leave() REPLACES the entity address with the last non-entity place in this tab", async () => {
+    const router = mount("/app/library")
+    act(() => nav().openRun(RUN_ID))
+    await waitFor(() => expect(where(router)).toBe(`/app/runs/${RUN_ID}`))
+    act(() => nav().entityLink.leave())
+    await waitFor(() => expect(where(router)).toBe("/app/library"))
+    expect(router.state.historyAction).toBe("REPLACE")
+  })
+
+  it("leave() on a cold entity address (no earlier place) REPLACES it with /app", async () => {
+    const router = mount(`/app/workflows/${DEFINITION}`)
+    await act(async () => {})
+    act(() => nav().entityLink.leave())
+    await waitFor(() => expect(where(router)).toBe("/app"))
+    expect(router.state.historyAction).toBe("REPLACE")
+  })
+
+  it("leave(route) REPLACES with that route (Back to it lands on the answering chat)", async () => {
+    const router = mount(`/app/runs/${RUN_ID}`)
+    await act(async () => {})
+    act(() => nav().entityLink.leave({ view: "chat", threadId: THREAD_B }))
+    await waitFor(() => expect(where(router)).toBe(`/app/chat/${THREAD_B}`))
+    expect(router.state.historyAction).toBe("REPLACE")
+  })
+
+  it("openRoute(route) PUSHES one entry, so Back returns to the card (D-15)", async () => {
+    const router = mount(`/app/runs/${RUN_ID}`)
+    const counter = pushCounter(router)
+    act(() => nav().entityLink.openRoute({ view: "workflows" }))
+    await waitFor(() => expect(where(router)).toBe("/app/workflows"))
+    expect(counter.pushed()).toBe(1)
+    await act(() => router.navigate(-1))
+    await waitFor(() => expect(where(router)).toBe(`/app/runs/${RUN_ID}`))
+    counter.unsubscribe()
+  })
+})
+
+describe("useAppNavigation — entityLink.resume (299-03 / D-24, Pitfall 7)", () => {
+  afterEach(() => window.sessionStorage.clear())
+
+  it("on /app, a remembered target REPLACES the address (no new entry) and is consumed", async () => {
+    rememberReturnTarget(`/app/runs/${RUN_ID}`)
+    const router = mount("/app")
+    const counter = pushCounter(router)
+    act(() => nav().entityLink.resume())
+    await waitFor(() => expect(where(router)).toBe(`/app/runs/${RUN_ID}`))
+    expect(router.state.historyAction).toBe("REPLACE")
+    expect(counter.pushed()).toBe(0)
+    expect(takeReturnTarget()).toBeNull()
+    counter.unsubscribe()
+  })
+
+  it("on bare / it is replaced too", async () => {
+    rememberReturnTarget(`/app/chat/${THREAD_A}`)
+    const router = mount("/")
+    act(() => nav().entityLink.resume())
+    await waitFor(() => expect(where(router)).toBe(`/app/chat/${THREAD_A}`))
+    expect(router.state.historyAction).toBe("REPLACE")
+  })
+
+  it("anywhere else the address is left alone — and the stored value is still consumed", async () => {
+    rememberReturnTarget(`/app/runs/${RUN_ID}`)
+    const router = mount("/app/library")
+    const key = router.state.location.key
+    act(() => nav().entityLink.resume())
+    await act(async () => {})
+    expect(where(router)).toBe("/app/library")
+    expect(router.state.location.key).toBe(key)
+    expect(takeReturnTarget()).toBeNull()
+  })
+
+  it("with nothing remembered it writes nothing", async () => {
+    const router = mount("/app")
+    const key = router.state.location.key
+    act(() => nav().entityLink.resume())
+    await act(async () => {})
+    expect(router.state.location.key).toBe(key)
   })
 })
