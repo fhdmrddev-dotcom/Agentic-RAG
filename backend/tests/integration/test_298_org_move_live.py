@@ -557,7 +557,8 @@ async def test_refused_same_content_already_in_the_target(w):
     await w.doc("MSA.pdf", folder=root, content_hash="h298collide")
     await w.doc("Copy.pdf", org=w.b, content_hash="h298collide")
     p = await _assert_refused(w, "folder", root, "“MSA.pdf” is already in")
-    assert any(s == f"“MSA.pdf” is already in {await w.name(w.b)}." for s in p.refusals)
+    target = await w.name(w.b)
+    assert f"“MSA.pdf” is already in {target}." in p.refusals
 
 
 async def test_refused_same_name_already_in_the_target(w):

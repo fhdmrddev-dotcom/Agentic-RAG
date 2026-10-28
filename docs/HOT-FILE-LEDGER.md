@@ -12211,7 +12211,7 @@ cells rot within days.
 | [`frontend/src/hooks/useActiveOrgId.ts`](docs/HOT-FILE-LEDGER.md#frontendsrchooksuseactiveorgidts) | 1 / 1 / 18 | no | young (created 298-01). The one active-org key for list hooks (D-08). ⛔ answers are tagged with getActiveOrgId() at SEND time, never with this state |
 | [`frontend/src/providers/OrgProvider.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrcprovidersorgprovidertsx) | 4 / 3 / 222 (was `3 / 2 / 217`) | ⚠ **FIRES** | ⚠ now FIRES (298). 298-01: the WR-01 self-heal calls syncActiveOrgHeader before setActiveOrgIdState (D-36), mirroring switchOrg. ⛔ the provider never remounts on a switch (297) |
 | [`backend/app/services/foreign_folder_refusal.py`](docs/HOT-FILE-LEDGER.md#backendappservicesforeign_folder_refusalpy) | 1 / 1 / 293 | no (young) | young (created 298-02). ORG-05 one home: bound set (D-34), worded refusal (D-14), publish-parity confirm (D-13). ⛔ definition org from the row, never the viewer; never restrict_org_ids=set() |
-| [`backend/app/services/org_move.py`](docs/HOT-FILE-LEDGER.md#backendappservicesorg_movepy) | 0 / 0 / 0 | no (planned 298-03) | young (planned 298-03). Preview + one pool transaction per move, audit row inside it (D-35). ⛔ both-org membership checked in the txn; only the clean case moves (D-33) |
+| [`backend/app/services/org_move.py`](docs/HOT-FILE-LEDGER.md#backendappservicesorg_movepy) | 1 / 1 / 986 | no | young (created 298-03). Preview + one pool transaction per move, audit row inside it (D-35). ⛔ both-org membership checked in the txn; only the clean case moves (D-33) |
 | [`frontend/src/hooks/useFolders.ts`](docs/HOT-FILE-LEDGER.md#frontendsrchooksusefoldersts) | 3 / 3 / 115 | yes | ⚠ FIRES with NO row — added AT PLANNING 298 (two of its buckets are bare 03/08). 298-04: org-tagged state + Realtime org filter (D-09/D-10). ⛔ Realtime is a hint; refetch is truth |
 | [`frontend/src/components/workflows/history/RunLogPanel.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentsworkflowshistoryrunlogpaneltsx) | 1 / 0 / 317 | no | ⚠ absent its ENTIRE LIFE — row added AT PLANNING 298. 298-04: org key in load deps, rows cleared on switch (D-09); 298-05: one ElsewhereLine mount |
 | [`frontend/src/components/workflows/DescribeKbPicker.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentsworkflowsdescribekbpickertsx) | 3 / 1 / 407 | no | ⚠ absent its ENTIRE LIFE — row added AT PLANNING 298. 298-04: drop a held id only when the label read omits it (D-15). ⛔ exactly ONE @/lib/api import line |
@@ -26038,6 +26038,21 @@ Scan-list cell as of 2026-10-28 (replaced by 298-01, moved verbatim): 0 / 0 / 0 
 ### `backend/app/services/org_move.py`
 
 **Added AT PLANNING (Phase 298, 2026-10-28) with `0 / 0 / 0`** — the file does not exist yet; plan `298-03` creates it and re-derives the triple in its creating commit (the 297 leaveGuard.ts precedent). young (planned 298-03). Preview + one pool transaction per move, audit row inside it (D-35). ⛔ both-org membership checked in the txn; only the clean case moves (D-33)
+
+**298-03 (2026-10-28): created, measured `1 / 1 / 986` in its creating commit.** `preview_move` (read-only, a
+pooled connection, every refusal sentence) and `execute_move` (one `con.transaction()`: target then source
+membership through `org_members` — the source org read from the row — collect `FOR UPDATE`, re-run every
+refusal, the `org_id` UPDATEs, then ONE `INSERT INTO public.audit_log` under the source org). Kinds: a folder
+subtree (root lock first, subtree re-read under its own locks), a Root document's version family (owner +
+name + org), a draft row. Every document child table with `org_id` moves with its document; the live suite
+proves it generically over information_schema. ⛔ **Invariants:** never `write_audit_entry` (it swallows);
+no bulk entry point (a fence enumerates the public coroutines); a missing and a not-owned item read the same
+404 sentence; an org is named only when the caller is a member of it. A racing `UniqueViolationError` and a
+`PT409` hold backstop map to worded 409s (the hold sentence is the move's own, not `map_hold_refusal`'s
+"Nothing was deleted."). Every refusal class was seeded live; the collision and workflow-binding classes were
+driven RED by planting their checks out, then restored md5-identical (Pitfall 8).
+
+Scan-list cell as of 2026-10-28 (replaced by 298-03, moved verbatim): 0 / 0 / 0 | no (planned 298-03) | young (planned 298-03). Preview + one pool transaction per move, audit row inside it (D-35). ⛔ both-org membership checked in the txn; only the clean case moves (D-33)
 
 ### `frontend/src/hooks/useFolders.ts`
 
