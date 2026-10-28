@@ -11671,7 +11671,7 @@ cells rot within days.
 | [`backend/app/api/settings.py`](docs/HOT-FILE-LEDGER.md#backendappapisettingspy) | 47 / 25 / 1301 (was `46 / 24 / 1250`) | ⚠ **FIRES** | 292.1-02: two bounded writes (2..50) via _range_refusal_detail + allow-list +2 (+51 −0). ⛔ never a retyped id list; GET never echoes a key · 293 touch: see §Phase 293 close |
 | [`backend/app/services/multimodal_service.py`](docs/HOT-FILE-LEDGER.md#backendappservicesmultimodal_servicepy) | 14 / 7 / 984 | ⚠ **FIRES** | ⚠ absent from BOTH for its ENTIRE LIFE at **7 phases** — row added SEED-227, which is also where its silent truncation was found |
 | [`backend/app/api/documents.py`](docs/HOT-FILE-LEDGER.md#backendappapidocumentspy) | 101 / 40 / 2709 (was `99 / 39 / 2698`) | ⚠ **FIRES** | 298-01: list_documents one `org_lists.by_org` in build() (every read, D-32); upload one `org_id=root_upload_org(...)` on the ONE minter call. Honoured by construction. ⛔ see section |
-| [`scripts/vitest-count-gate.cjs`](docs/HOT-FILE-LEDGER.md#scriptsvitest-count-gatecjs) | 378 / 81 / 6806 (was `377 / 81 / 6806`) | ⚠ **FIRES** | 298-05 T2 GREEN: MoveToOrgSheet 21 → 22 — the RED commit's pin under-counted its own suite by one (the confirm describe holds 5 cases, not 4). Read from the suite's printed count; none lowered |
+| [`scripts/vitest-count-gate.cjs`](docs/HOT-FILE-LEDGER.md#scriptsvitest-count-gatecjs) | 379 / 81 / 6808 (was `378 / 81 / 6806`) | ⚠ **FIRES** | 298-05 T3 RED: moveMounts (12) pinned FILE-LEVEL in both knobs; useFolders 17 → 18, useLibraryDocuments 28 → 30 (the after-move refetch cases); none lowered |
 | [`scripts/check-deploy-drift.sh`](docs/HOT-FILE-LEDGER.md#scriptscheck-deploy-driftsh) | 5 / 4 / 267 | ⚠ **FIRES** | ⚠ absent its ENTIRE LIFE — row added 294-05. 294-01: DECISION_ENGINE_FAULT_BASE_URL registered as intentionally omitted (+2) |
 | [`scripts/build-public-openapi.cjs`](docs/HOT-FILE-LEDGER.md#scriptsbuild-public-openapicjs) | 11 / 5 / 472 (was `7 / 3 / 468`) | ⚠ **FIRES** | 298-01: `org-items` in the Account & org TAG_GROUPS entry + `/org-items/` in FLAGGED_PREFIXES (UI-internal). Two tokens. ⚠ prior row stale (`7 / 3 / 468` vs measured `10 / 4 / 468` pre-298). |
 | [`scripts/check-seeds-register.cjs`](docs/HOT-FILE-LEDGER.md#scriptscheck-seeds-registercjs) | 7 / 3 / 1132 | ⚠ **FIRES** | ⚠ absent its ENTIRE LIFE — row added 296-05, now FIRES (251 / 293 / 296). 296-05: three `\d{3}` → `\d{3,}` (293-IN-07). ⛔ the STATUS_ENUM triple |
@@ -26629,3 +26629,11 @@ Scan-list cell as of 2026-10-28 (replaced by 298-05 T2 GREEN, moved verbatim): 0
 **`1 / 1 / 82`.** Created by 298-05 Task 2 GREEN: renders null unless folder_id is null, is_latest is not false, the signed-in id owns the document and moveTargets is non-empty; outline sm button(s) per target or the collapsed form; renders MoveToOrgSheet (kind document) itself since it is not inside a menu; onMoved runs when the sheet closes after a successful move.
 
 Scan-list cell as of 2026-10-28 (replaced by 298-05 T2 GREEN, moved verbatim): 0 / 0 / 0 | no (planned 298-05) | young (planned 298-05). Root-document move button for the detail panel (UI-D15). ⛔ only for an owned latest Root document at 2+ orgs
+
+### `scripts/vitest-count-gate.cjs` — 298-05 T3 RED (2026-10-28)
+
+**`379 / 81 / 6808` (was `378 / 81 / 6806`).** 298-05 Task 3 RED commit. moveMounts.test.tsx 12 pinned FILE-LEVEL in both knobs. useFolders.test.ts 17 → 18 and useLibraryDocuments.test.ts 28 → 30 for their after-move refetch cases. No pin lowered.
+
+Scan-list cell as of 2026-10-28 (replaced by 298-05 T3 RED, moved verbatim): 378 / 81 / 6806 (was `377 / 81 / 6806`) | ⚠ **FIRES** | 298-05 T2 GREEN: MoveToOrgSheet 21 → 22 — the RED commit's pin under-counted its own suite by one (the confirm describe holds 5 cases, not 4). Read from the suite's printed count; none lowered
+
+CLAUDE.md verdict cell as of 2026-10-28 (replaced by 298-05 T3 RED, moved verbatim): | `scripts/vitest-count-gate.cjs` | 378 / 81 / 6806 (was `377 / 81 / 6806`) | 298-05: MoveToOrgSheet pin 21 → 22 (the RED commit miscounted) |

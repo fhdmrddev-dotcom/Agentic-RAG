@@ -582,3 +582,41 @@ describe("useLibraryDocuments — follows the active org (298-04)", () => {
     expect(result.current.summary).toBeNull()
   })
 })
+
+// ── Phase 298-05 (D-21 / UI-D19) — a move refetches the page AND the numbers, silently ─────────
+describe("useLibraryDocuments — after a move (298-05)", () => {
+  beforeEach(() => switchOrg("org-a"))
+  afterEach(() => switchOrg(null))
+
+  it("noteMoved re-asks the page without going cold; the moved row stays until the answer", async () => {
+    const { noteMoved } = await import("@/lib/elsewhereCounts")
+    const { result } = renderHook(() => useLibraryDocuments(BASE_ARGS))
+    await waitFor(() => expect(result.current.listState).toBe("ready"))
+    expect(result.current.rows.map((d) => d.id)).toEqual(["r3", "r1"])
+    const pages = mockListDocumentsPage.mock.calls.length
+    const after = deferred<DocumentListResponse>()
+    mockListDocumentsPage.mockReturnValueOnce(after.promise)
+    act(() => noteMoved({ kind: "document", id: "r1" }))
+    await waitFor(() => expect(mockListDocumentsPage.mock.calls.length).toBe(pages + 1))
+    expect(result.current.listState).toBe("ready")
+    expect(result.current.rows.map((d) => d.id)).toEqual(["r3", "r1"])
+    await act(async () => after.resolve({ documents: [r3], total: 1, offset: 0, limit: 25 }))
+    expect(result.current.rows.map((d) => d.id)).toEqual(["r3"])
+  })
+
+  it("noteMoved re-asks the summary too, keeping the last numbers meanwhile (never null, never 0)", async () => {
+    const { noteMoved } = await import("@/lib/elsewhereCounts")
+    const { result } = renderHook(() => useLibraryDocuments(BASE_ARGS))
+    await waitFor(() => expect(result.current.summaryState).toBe("ready"))
+    const before = result.current.summary
+    const sums = mockGetLibrarySummary.mock.calls.length
+    const next = deferred<LibrarySummary>()
+    mockGetLibrarySummary.mockReturnValueOnce(next.promise)
+    act(() => noteMoved({ kind: "folder", id: "F" }))
+    await waitFor(() => expect(mockGetLibrarySummary.mock.calls.length).toBe(sums + 1))
+    expect(result.current.summary).toEqual(before)
+    const answer = summarizeDocuments([r3])
+    await act(async () => next.resolve(answer))
+    expect(result.current.summary).toEqual(answer)
+  })
+})

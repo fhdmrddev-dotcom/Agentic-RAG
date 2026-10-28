@@ -379,3 +379,34 @@ describe("useFolders — follows the active org (298-04)", () => {
     expect(result.current.folders.map((f) => f.name)).toEqual(["A renamed", "Contracts B"])
   })
 })
+
+// ── Phase 298-05 (D-21 / UI-D19) — a move refetches; the moved folder leaves on the ANSWER ──────
+describe("useFolders — after a move (298-05)", () => {
+  beforeEach(() => {
+    vi.clearAllMocks()
+    mockListFolders.mockReset()
+    mockOn.mockReturnValue(mockChannel)
+    mockSubscribe.mockReturnValue(mockChannel)
+    switchOrg("org-a")
+  })
+  afterEach(() => switchOrg(null))
+
+  const Moved = makeFolder({ id: "fm", name: "Q3 Contracts" })
+  const Stays = makeFolder({ id: "fs", name: "Stays" })
+
+  it("noteMoved re-asks the list; the moved folder stays until that answer removes it", async () => {
+    const { noteMoved } = await import("@/lib/elsewhereCounts")
+    mockListFolders.mockResolvedValueOnce([Moved, Stays])
+    const { result } = renderHook(() => useFolders())
+    await waitFor(() => expect(result.current.folders.map((f) => f.id)).toEqual(["fm", "fs"]))
+    const after = deferred<Folder[]>()
+    mockListFolders.mockReturnValueOnce(after.promise)
+    act(() => noteMoved({ kind: "folder", id: "fm" }))
+    await waitFor(() => expect(mockListFolders).toHaveBeenCalledTimes(2))
+    // A background refetch: no loading line, and NO optimistic removal.
+    expect(result.current.loading).toBe(false)
+    expect(result.current.folders.map((f) => f.id)).toEqual(["fm", "fs"])
+    await act(async () => after.resolve([Stays]))
+    expect(result.current.folders.map((f) => f.id)).toEqual(["fs"])
+  })
+})

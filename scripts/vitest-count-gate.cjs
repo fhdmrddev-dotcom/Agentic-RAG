@@ -3647,7 +3647,7 @@ const BASELINE = {
   "LibraryPage.test.tsx": 12,
   "librarySelection.test.ts": 25,
   "useDocuments.test.ts": 14, // RAISED 7 → 14 at 284-REVIEW WR-01 (a membership-changing Realtime UPDATE refetches; a cosmetic one merges)
-  "useLibraryDocuments.test.ts": 28, // 284-01 Task 2 — the D-24 Library data hook. BOTH KNOBS, SAME COMMIT. · RAISED 13 → 24 at 284-03 (the server body: page + summary + read by id, the Realtime hint) · RAISED 24 → 25 at 284-REVIEW WR-01 (the on-page rows reach useDocuments) · RAISED 25 → 28 at 298-04 (2026-10-28): an org switch is cold + drops the late answer, the summary is null until the new org answers, a failed first summary there reads error
+  "useLibraryDocuments.test.ts": 30, // 284-01 Task 2 — the D-24 Library data hook. BOTH KNOBS, SAME COMMIT. · RAISED 13 → 24 at 284-03 (the server body: page + summary + read by id, the Realtime hint) · RAISED 24 → 25 at 284-REVIEW WR-01 (the on-page rows reach useDocuments) · RAISED 25 → 28 at 298-04 (2026-10-28): an org switch is cold + drops the late answer, the summary is null until the new org answers, a failed first summary there reads error · RAISED 28 → 30 at 298-05: a move re-asks the page (silently, row kept until the answer) and the summary (last numbers kept)
   "DocumentList.test.tsx": 7,
   "DocumentList.moveToFolder.test.tsx": 4,
   "ViewsGroup.test.tsx": 10,
@@ -4441,7 +4441,7 @@ const BASELINE = {
   // ── Phase 298-04 (ORG-01..04 / D-08..D-12) — both knobs, same commit (2026-10-28). useFolders.test.ts
   //    and FolderTree.test.tsx were in NEITHER knob before this (no src/__tests__/hooks or
   //    src/__tests__/components directory entry), so they are ADOPTED (existing + new), not raised.
-  "useFolders.test.ts": 17, // 298-04 ADOPTED: 10 existing + 7 — loading flag, switch drops rows at once, late old-org answer discarded, create lands in the new org, Realtime org filter (INSERT ignored, UPDATE removes) and its polarity
+  "useFolders.test.ts": 18, // 298-04 ADOPTED: 10 existing + 7 — loading flag, switch drops rows at once, late old-org answer discarded, create lands in the new org, Realtime org filter (INSERT ignored, UPDATE removes) and its polarity · RAISED 17 → 18 at 298-05: a move re-asks, the moved folder stays until the answer
   "FolderTree.test.tsx": 15, // 298-04 ADOPTED: 10 existing + 4 — loading says "Loading folders…" never "No folders yet", Root kept with no count, no stale rows, empty sentence unchanged · RAISED 14 → 15 at 298-05: the elsewhere line mounts once under the Folders header, above Root
   "LibraryPage.orgSwitch.test.tsx": 5, // 298-04 — real useFolders + useLibraryDocuments over a fake network: old org's folder/document gone at once, loading line, late answer dropped, Root + panel reset (UI-D10), fields/views/provenance re-read (SEED-317), Root count never 0
   "WorkflowsPage.orgSwitch.test.tsx": 6, // 298-04 — real page + feeds hook: old org's workflow/draft gone at once, "Loading your workflows…" never the empty sentence, late answer dropped, project filter back to All, each feed re-read once · RAISED 4 → 6 at 298-05: the elsewhere line mounts once atop the list region, also while loading
@@ -4455,6 +4455,7 @@ const BASELINE = {
   "ElsewhereLine.test.tsx": 21, // 298-05 — absent while loading / solo / no provider / [] / all-zero / failed (never "0 more"); the exact UI-D5 words for every kind and plural; one line per org in server order; never the active org; long names truncate but stay whole; Switch is a primary button, focuses the wrapper then calls switchOrg
   "MoveToOrgSheet.test.tsx": 22, // 298-05 (RED commit pinned 21; the suite holds 22 — corrected at GREEN) — checking shows no count and no Move (Keep focused); the clean anatomy + every UI-D18 count sentence; refusals verbatim in one amber alert with only Close (preview list, 403); server text is text; preview failed + Try again; Moving can't be dismissed and Moved records ONCE on the 200; 409/403/5xx at confirm; 4+ orgs pick first; no red in any state
   "MoveToOrgMenuItem.test.tsx": 16, // 298-05 — the menu item: one per other org by name at 2-3 orgs, collapsed at 4+, absent solo / no provider / non-owner, opens THIS item's move tagged with the org, a subtree holding the selection says so; the Root-document button: owned latest Root only, collapsed at 4+, absent otherwise, opens the sheet
+  "moveMounts.test.tsx": 12, // 298-05 — the three homes through the real components: folder ⋯ (owner, 2 orgs, between Share and Delete, menu widens; non-owner + solo absent; opens from the tree's host; leaves the tree only on the refetch), Library resets only a selection that moved, Root document button in the Download row (Close after Moved closes the panel; folder/older/not-owned absent), draft ⋯ (menuitem, WR-03 roles; published + starter never), drafts feed re-read
 }
 
 // Still COMPUTED, never hand-written — the reduce is the single source, so the
@@ -6524,6 +6525,7 @@ const TARGETS = [
   "src/components/org/__tests__/ElsewhereLine.test.tsx",
   "src/components/org/__tests__/MoveToOrgSheet.test.tsx",
   "src/components/org/__tests__/MoveToOrgMenuItem.test.tsx",
+  "src/components/org/__tests__/moveMounts.test.tsx",
 ]
 
 const REPO_ROOT = path.resolve(__dirname, "..")
