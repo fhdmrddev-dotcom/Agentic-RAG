@@ -431,7 +431,7 @@ node scripts/check-hot-file-ledger.cjs <phase-dir>   # 0 clear · 1 missing rows
 | `frontend/src/components/workflows/DraftArrivalCard.tsx` | 5 / 4 / 688 (was `4 / 3 / 625`) | 291-05: two optional props + one fold boolean; rows in a leaf · ⛔ |
 | `frontend/src/components/workflows/DecisionsList.tsx` | 5 / 3 / 429 | ⚠ now FIRES (291) · 291-05: one optional prop, one template-row sub-line |
 | `frontend/src/components/workflows/decisionsVocabulary.ts` | 6 / 4 / 344 (was `4 / 3 / 327`) | 291-05: one glyph + one formatter, still a zero-import leaf · ⛔ |
-| `backend/app/api/workflows.py` | 51 / 27 / 1707 (was `50 / 26 / 1699`) | 298-01: org_id=active_org_uuid on /published + /drafts · split OWED |
+| `backend/app/api/workflows.py` | 52 / 27 / 1712 (was `51 / 27 / 1707`) | 298-02: one raise_if_foreign per save route (ORG-05) · split OWED |
 | `backend/app/api/workflow_wire.py` | 4 / 4 / 532 (was `3 / 3 / 517`) | 296-06: AutoAnsweredNote + unplaced_sentences, additive |
 | `backend/app/api/workflow_authoring_doors.py` | 5 / 3 / 797 (was `4 / 2 / 793`) | ⚠ now FIRES (296) · 296-06: bind returns unplaced_sentences |
 | `backend/app/api/workflow_runs.py` | 22 / 16 / 1449 (was `21 / 15 / 1445`) | 298-01: one by_org on runs_query (audited one-touch) · extraction FIRST |
@@ -477,8 +477,8 @@ node scripts/check-hot-file-ledger.cjs <phase-dir>   # 0 clear · 1 missing rows
 | `frontend/src/components/chat/MessageList.tsx` | 24 / 11 / 376 | ⚠ STALE · last touch 267-04 |
 | `frontend/src/components/chat/ChatArea.tsx` | 94 / 44 / 1189 (was `93 / 43 / 1186`) | honoured by construction (287-03: ONE mount, 0 hooks) · ⛔ |
 | `frontend/src/stores/streamsStore.ts` | 28 / 19 / 662 (was `27 / 18 / 660`) | 296-04: initializer typed StreamsState (TS2345 gone) · ⛔ |
-| `frontend/src/components/chat/ThreadWorkflowPicker.tsx` | 3 / 2 / 144 (was `1 / 1 / 91`) | 296-04: failure line + Escape/outside dismissal · ⛔ |
-| `frontend/src/components/chat/useStartWorkflowInThread.ts` | 3 / 2 / 174 (was `2 / 2 / 173`) | 296 review FE-CR-01: refusal read by status (400/409/422), not by draft · ⛔ |
+| `frontend/src/components/chat/ThreadWorkflowPicker.tsx` | 4 / 3 / 144 (was `3 / 2 / 144`) | ⚠ now FIRES (298) · 298-02: no Retry for a folder refusal · ⛔ |
+| `frontend/src/components/chat/useStartWorkflowInThread.ts` | 4 / 3 / 186 (was `3 / 2 / 174`) | ⚠ now FIRES (298) · 298-02: kind folder shows the server sentence · ⛔ |
 | `frontend/src/lib/toolMeta.ts` | 10 / 6 / 218 | ⚠ absent its ENTIRE LIFE — row added 244-13 · ⛔ |
 | `frontend/src/components/panel/PendingAskCard.tsx` | 25 / 12 / 1132 (was `24 / 11 / 1103`) | 296-04: one ask per live workflow run; passed clock waits |
 | `frontend/src/pages/WorkflowRunPage.tsx` | 36 / 16 / 1605 (was `35 / 15 / 1604`) | 297-02: COPY_LOADING exported, one keyword · ⛔ |
@@ -494,13 +494,16 @@ node scripts/check-hot-file-ledger.cjs <phase-dir>   # 0 clear · 1 missing rows
 | `backend/app/services/multimodal_service.py` | 14 / 7 / 984 | ⚠ absent from BOTH for its ENTIRE LIFE at **7 phases** |
 | `backend/app/api/documents.py` | 101 / 40 / 2709 (was `99 / 39 / 2698`) | 298-01: one by_org in build() + one root_upload_org kwarg · ⛔ |
 | `backend/app/api/library.py` | 3 / 3 / 304 (was `2 / 2 / 299`) | ⚠ now FIRES (298) · 298-01: summary shares the lists' org predicate ($1) |
-| `scripts/vitest-count-gate.cjs` | 369 / 81 / 6767 (was `344 / 81 / 6692`) | 298-01: 2 suites pinned FILE-LEVEL (OrgProvider ADOPTED), none lowered |
+| `scripts/vitest-count-gate.cjs` | 370 / 81 / 6774 (was `369 / 81 / 6767`) | 298-02: 2 FILE-LEVEL pins (api.workflows ADOPTED), 3 raised |
 | `scripts/check-deploy-drift.sh` | 5 / 4 / 267 | ⚠ absent its ENTIRE LIFE — row added 294-05 · fault var omitted |
 | `scripts/build-public-openapi.cjs` | 11 / 5 / 472 (was `7 / 3 / 468`) | 298-01: org-items tag (Account & org) + /org-items/ FLAGGED (2 lines) |
 | `scripts/check-seeds-register.cjs` | 7 / 3 / 1132 | ⚠ FIRES, absent here — row added 296-05 · `\d{3,}` ids · ⛔ |
 | `backend/app/services/eval_runner_service.py` | 14 / 9 / 1056 (was `13 / 8 / 1040`) | 296-06: eval arm on a fixed EVAL_MAX_TOOL_ROUNDS (copy of settings) |
-| `backend/app/services/scheduler_service.py` | 12 / 7 / 314 (was `11 / 6 / 308`) | 296-06: scheduled kickoff via launch_kickoff (S6-F8), else byte-identical |
+| `backend/app/services/scheduler_service.py` | 13 / 8 / 332 (was `12 / 7 / 314`) | 298-02: foreign-folder refusal beside template_refusal (pool only) |
 | `backend/app/api/schedules.py` | 4 / 4 / 299 | ⚠ FIRES, absent here — row added 296-02 · worded Run now (outcome) |
+| `backend/app/api/inbound.py` | 10 / 3 / 719 (was `9 / 2 / 711`) | ⚠ now FIRES (298) · 298-02: one foreign_folder _refused (plain 422) · ⛔ |
+| `frontend/src/components/settings/apiKeys/apiKeysCopy.ts` | 5 / 3 / 283 (was `4 / 2 / 281`) | ⚠ now FIRES (298) · 298-02: one string (calls.foreignFolder) · ⛔ |
+| `frontend/src/components/settings/apiKeys/apiKeyFacts.ts` | 4 / 3 / 310 (was `3 / 2 / 308`) | ⚠ now FIRES (298) · 298-02: one case, foreign_folder call words · ⛔ |
 | `backend/app/models/schedule.py` | 3 / 3 / 231 | ⚠ FIRES, absent here — row added 296-02 · one additive field (outcome) |
 | `frontend/src/components/panel/PhaseCard.tsx` | 22 / 14 / 821 (was `21 / 14 / 817`) | 296 review FE-WR-01: paused step drops running instruments |
 | `frontend/src/components/panel/PhaseTimeline.tsx` | 11 / 9 / 408 (was `10 / 8 / 404`) | 296-04: derives runPaused from its frame, passes it |
@@ -544,12 +547,12 @@ node scripts/check-hot-file-ledger.cjs <phase-dir>   # 0 clear · 1 missing rows
 | `backend/app/models/message.py` | 25 / 17 / 292 (was `24 / 16 / 287`) | 293-03: ONE field (run_origin, a dict: a harness import is circular) |
 | `backend/app/models/user_settings.py` | 61 / 37 / 1776 (was `60 / 36 / 1769`) | 293-01: two per-key limit fields + _val · ⛔ |
 | `backend/app/services/harness/reachability.py` | 5 / 5 / 498 (was `4 / 4 / 463`) | 295-02: one pure lint check (no_template_bound) |
-| `backend/app/services/workflow_kickoff.py` | 13 / 10 / 602 (was `12 / 9 / 597`) | 296-06: one missing_required guard in preflight (422, before any write) |
+| `backend/app/services/workflow_kickoff.py` | 14 / 11 / 605 (was `13 / 10 / 602`) | 298-02: org_id select token + one raise_if_foreign after the 400 |
 | `frontend/src/components/workflows/WorkflowScheduleModal.tsx` | 5 / 4 / 723 (was `3 / 3 / 601`) | 296-04: row-local Run now result + required refusal |
 | `frontend/src/components/workflows/nodePresentation.ts` | 8 / 7 / 221 | ⚠ absent from BOTH for its ENTIRE LIFE at **7 phases** |
-| `frontend/src/lib/api/threads.ts` | 24 / 14 / 1994 (was `23 / 13 / 1992`) | 293-03: origin on ThreadWorkflowState (types only) · ⛔ |
+| `frontend/src/lib/api/threads.ts` | 25 / 15 / 2006 (was `24 / 14 / 1994`) | 298-02: postMessage reads detail.message + code (object detail) · ⛔ |
 | `frontend/src/lib/api/connectors.ts` | 17 / 11 / 740 | honoured by construction (244-06) · ⛔ |
-| `frontend/src/lib/api/workflows.ts` | 14 / 14 / 1313 (was `13 / 13 / 1290`) | 296-07: bind response type + splitTemplateBind (keeps assets[] clean) |
+| `frontend/src/lib/api/workflows.ts` | 15 / 15 / 1361 (was `14 / 14 / 1313`) | 298-02: WorkflowFolderRefusedError on both 422 arms; allOrgs list |
 | `frontend/src/lib/connectionMark.tsx` | 7 / 4 / 313 | ✅ **the move IS the seam, and it was TAKEN (214-08)** |
 | `frontend/src/components/ingestion/DocumentList.tsx` | 31 / 15 / 372 (was `31 / 16 / 372`) | last touch 275-02/04 |
 | `frontend/src/pages/LibraryPage.tsx` | 63 / 20 / 1344 (was `57 / 19 / 1297`) | seam TAKEN (284-01 hook); lines rose → G-5 NOT discharged · ⛔ |

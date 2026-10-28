@@ -414,6 +414,12 @@ function refusalOf(
   if (name === "WorkflowDraftUnreadableError") {
     return { kind: "error", sentence: HOLD_UNREADABLE }
   }
+  // 298-02 (D-36 / UI-D12): a folder in another org. The server authored this sentence for the
+  // person, so it is shown verbatim. Not terminal: the edit stays, and the next in-org save
+  // clears it (UI-D13).
+  if (name === "WorkflowFolderRefusedError" && err instanceof Error) {
+    return { kind: "error", sentence: err.message }
+  }
   if (name === "WorkflowConflictError") {
     return { kind: "error", sentence: PUBLISHED_CONFLICT_MESSAGE }
   }
@@ -991,7 +997,9 @@ export function useDraftPersistence(args: DraftPersistenceArgs): DraftPersistenc
     setResolving(true)
     const id = draftIdRef.current
     try {
-      const rows = id === null ? [] : await listDraftWorkflows()
+      // 298 (D-12): header-less on purpose — a Builder left open on another org's draft must not
+      // report it deleted. The PATCH writes by id and the row keeps its own org.
+      const rows = id === null ? [] : await listDraftWorkflows(undefined, { allOrgs: true })
       const row = rows.find((r) => r.id === id)
       if (!row || !row.definition) {
         // Deleted somewhere else, or never persisted. Land honestly, never silently — a

@@ -7,7 +7,7 @@ import { COPY } from "./composerCopy"
 
 /** 296-04 (287-WR-02 / 287-IN-03): why an in-thread start did not run, worded for the person. */
 export interface StartFailure {
-  kind: "locked" | "inputs" | "failed"
+  kind: "locked" | "inputs" | "folder" | "failed"
   message: string
 }
 
@@ -16,10 +16,21 @@ function statusOf(err: unknown): number | null {
   return typeof s === "number" ? s : null
 }
 
-/** One sentence per cause, from `composerCopy` (never server text). */
+/**
+ * One sentence per cause, from `composerCopy` (never server text) — with ONE recorded exception.
+ *
+ * 298-02 (D-14 / UI-D12): a 422 carrying the code `folder_in_other_org` shows the server's
+ * sentence. It is authored server-side for exactly this surface: it names the folder, and its
+ * org only when the person can see that folder, so the client has nothing to add and no safe
+ * way to say it better. The CODE decides, never the prose; every other 422 keeps its sentence.
+ */
 function failureFor(err: unknown, name: string): StartFailure {
   const status = statusOf(err)
   if (status === 409) return { kind: "locked", message: COPY.shared.startLocked(name) }
+  const code = (err as { code?: unknown } | null)?.code
+  if (status === 422 && code === "folder_in_other_org" && err instanceof Error && err.message) {
+    return { kind: "folder", message: err.message }
+  }
   if (status === 422) return { kind: "inputs", message: COPY.shared.startInputsRefused(name) }
   return { kind: "failed", message: COPY.shared.startFailed(name) }
 }
@@ -144,7 +155,8 @@ export function useStartWorkflowInThread(threadId: string) {
    *  else re-sends the same workflow with the same inputs. */
   const retry = useCallback(() => {
     const last = lastAttempt.current
-    if (!failure || !last || failure.kind === "locked") return
+    // 298-02: a folder refusal offers no Retry — the same published workflow is refused again.
+    if (!failure || !last || failure.kind === "locked" || failure.kind === "folder") return
     setFailure(null)
     if (failure.kind === "inputs") {
       setPendingValues(last.inputs)
