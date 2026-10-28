@@ -34,6 +34,8 @@ VALID_ACTION_TYPES = frozenset({
     "folder.delete",
     # Phase 293 (D-16 / lockstep with migration 215 CHECK) — API keys:
     "api_key.create", "api_key.revoke", "api_key.start", "api_key.read", "api_key.refused",
+    # Phase 298 (D-20 / lockstep with migration 217 CHECK) — the per-item org move:
+    "org.item.move",
 })
 
 

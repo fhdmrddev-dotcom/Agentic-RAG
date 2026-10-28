@@ -257,3 +257,84 @@ describe("useStartWorkflowInThread — 296-04: a refused start is worded, never 
     expect(mockSend).toHaveBeenCalledTimes(1)
   })
 })
+
+/**
+ * 298-02 (ORG-05 / D-14 / UI-D12) — the ONE refusal the hook shows in the server's words.
+ *
+ * A workflow bound to a folder in another organization is refused with a 422 carrying the code
+ * `folder_in_other_org` and a sentence authored server-side for exactly this surface (it names the
+ * folder, and its org only when the person can see it). Every other 422 still reads
+ * "some of its inputs weren't accepted" — the code, never the prose, decides which.
+ */
+describe("useStartWorkflowInThread — 298-02: a folder refusal shows the server's sentence", () => {
+  const SENTENCE =
+    "“Q3 Contracts” is in Acme Legal, not in this workflow's organization (Personal). Pick a folder from Personal."
+
+  class CodedApiError extends Error {
+    status: number
+    code?: string
+    constructor(message: string, status: number, code?: string) {
+      super(message)
+      this.status = status
+      this.code = code
+    }
+  }
+
+  beforeEach(() => {
+    useStreamsStore.setState({ failedSendDrafts: new Map(), reconcileErrors: new Map() })
+  })
+
+  async function startPlain(result: { current: ReturnType<typeof useStartWorkflowInThread> }) {
+    act(() => result.current.openPicker())
+    await waitFor(() => expect(result.current.workflows).toHaveLength(2))
+    act(() => result.current.start(PLAIN, {}))
+  }
+
+  it("a rejected send carrying the code → kind folder, the server's message verbatim", async () => {
+    mockSend.mockRejectedValue(new CodedApiError(SENTENCE, 422, "folder_in_other_org"))
+    const { result } = renderHook(() => useStartWorkflowInThread("t-1"))
+    await startPlain(result)
+    await waitFor(() =>
+      expect(result.current.failure).toEqual({ kind: "folder", message: SENTENCE }),
+    )
+  })
+
+  it("the provider's recorded refusal carrying the code → kind folder too", async () => {
+    mockSend.mockImplementation(async (threadId: string) => {
+      useStreamsStore.setState((s) => ({
+        reconcileErrors: new Map(s.reconcileErrors).set(
+          threadId,
+          new CodedApiError(SENTENCE, 422, "folder_in_other_org"),
+        ),
+      }))
+    })
+    const { result } = renderHook(() => useStartWorkflowInThread("t-1"))
+    await startPlain(result)
+    await waitFor(() => expect(result.current.failure?.kind).toBe("folder"))
+    expect(result.current.failure?.message).toBe(SENTENCE)
+  })
+
+  it("a 422 with any other code (or none) still reads the inputs sentence", async () => {
+    mockSend.mockRejectedValue(new CodedApiError("server words", 422, "something_else"))
+    const { result } = renderHook(() => useStartWorkflowInThread("t-1"))
+    await startPlain(result)
+    await waitFor(() => expect(result.current.failure?.kind).toBe("inputs"))
+    expect(result.current.failure?.message).not.toContain("server words")
+  })
+
+  it("a 409 is unchanged", async () => {
+    mockSend.mockRejectedValue(new CodedApiError("x", 409, "folder_in_other_org"))
+    const { result } = renderHook(() => useStartWorkflowInThread("t-1"))
+    await startPlain(result)
+    await waitFor(() => expect(result.current.failure?.kind).toBe("locked"))
+  })
+
+  it("no Retry for a folder refusal: the same published workflow would be refused again", async () => {
+    mockSend.mockRejectedValueOnce(new CodedApiError(SENTENCE, 422, "folder_in_other_org"))
+    const { result } = renderHook(() => useStartWorkflowInThread("t-1"))
+    await startPlain(result)
+    await waitFor(() => expect(result.current.failure?.kind).toBe("folder"))
+    act(() => result.current.retry())
+    expect(mockSend).toHaveBeenCalledTimes(1)
+  })
+})

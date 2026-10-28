@@ -6,6 +6,9 @@ import { FolderNode } from "./FolderNode"
 import { NavRow } from "./NavRow"
 import { FolderCreateInput } from "./FolderCreateInput"
 import { ApiRefusal } from "@/lib/api/refusal"
+import { SyrelLoader } from "@/components/ui/SyrelLoader"
+import { LOADING_FOLDERS } from "@/components/org/orgItemsCopy"
+import { ElsewhereLine } from "@/components/org/ElsewhereLine"
 import type { Folder } from "@/types"
 
 interface FolderTreeProps {
@@ -24,6 +27,9 @@ interface FolderTreeProps {
   onRenameFolder: (id: string, name: string) => Promise<void>
   onDeleteFolder: (id: string) => Promise<void>
   onToggleOrgShared: (id: string) => Promise<void>
+  /** Phase 298-04 (UI-D8): the active org's folders are not answered yet (first load or an org
+   *  switch). The tree body says so instead of "No folders yet"; Root stays, its count omitted. */
+  loading?: boolean
 }
 
 export function FolderTree({
@@ -38,6 +44,7 @@ export function FolderTree({
   onRenameFolder,
   onDeleteFolder,
   onToggleOrgShared,
+  loading = false,
 }: FolderTreeProps) {
   const [expandedIds, setExpandedIds] = useState<Set<string>>(new Set())
   const [editingId, setEditingId] = useState<string | null>(null)
@@ -152,6 +159,9 @@ export function FolderTree({
         </Tooltip>
       </div>
 
+      {/* 298-05 (D-17 / UI-D4): your folders + Root documents in your other orgs, above Root. */}
+      <ElsewhereLine kind="library" className="px-2 mb-2" />
+
       {/* Root node — also renders through the shared NavRow (D-114-13). It already
           had a count; now it shares the same row as every folder. */}
       <NavRow
@@ -171,8 +181,10 @@ export function FolderTree({
         />
       )}
 
-      {/* Tree body or empty state */}
-      {folders.length === 0 && creatingInParentId === null ? (
+      {/* Tree body, loading line (298-04 UI-D8) or empty state */}
+      {loading ? (
+        <SyrelLoader size="section" label={LOADING_FOLDERS} className="px-2 py-3 text-xs text-muted-foreground" />
+      ) : folders.length === 0 && creatingInParentId === null ? (
         <div className="text-center py-6">
           <p className="text-sm font-medium">No folders yet</p>
           <p className="text-xs text-muted-foreground mt-1">

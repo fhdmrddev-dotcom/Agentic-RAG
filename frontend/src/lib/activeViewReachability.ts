@@ -5,6 +5,10 @@
  *   1. a member of `ActiveView` in `App.tsx`
  *   2. a render branch in `ChatLayout.tsx`
  *   3. something that navigates to it
+ * ⚠ CORRECTED 2026-10-27 (Phase 297) — KEPT RATHER THAN OVERWRITTEN: since 297-01 the render
+ * branch lives in `AppViewSwitch.tsx` (a render branch in AppViewSwitch.tsx), and since 297-02 the
+ * app HAS a router — one catch-all route, view derived from the address — so a home has a fourth
+ * leg: an address in `appRoutes.ts`. `activeViewRouteLeg` below is that leg's executable half.
  * — the "reachability triad". Leg 2 was carried by PROSE in three comment blocks and by
  * nothing executable: `262-RESEARCH.md` R-2 measured that a branchless 13th member ships
  * GREEN today, because ChatLayout's trailing `<UnknownViewFallback view={activeView as never} />`
@@ -138,6 +142,48 @@ function readLayout(layoutSource: string): LayoutFacts {
     )
   }
   return { branched, lastComparisonPos, fallbackPos }
+}
+
+/** A fixed id for the members whose address carries one; any strict UUID would do. */
+const ROUTE_FIXTURE_ID = "00000000-0000-4000-8000-000000000297"
+
+/** The route table's two functions, passed IN so this module keeps no runtime import of it. */
+export interface RouteTable {
+  parseAppLocation: (pathname: string, search: string) => { view: string }
+  formatAppRoute: (route: never) => string
+}
+
+export interface RouteLegReport {
+  /** Members whose address does not parse back to the same view — the defect. */
+  unrouted: string[]
+}
+
+/**
+ * Phase 297-02 (D-25) — THE ROUTE LEG. For every `ActiveView` member, format a sample route,
+ * parse it back, and report the members whose round-trip does not return the same view. Members
+ * come from the same AST read as the render leg, so the vacuity refusal is inherited: an app
+ * source with no members THROWS rather than reporting nothing unrouted.
+ *
+ * @throws {ActiveViewReachabilityError} when the app source parses to no members.
+ */
+export function activeViewRouteLeg(appSource: string, routes: RouteTable): RouteLegReport {
+  const members = readMembers(appSource)
+  const unrouted: string[] = []
+  for (const view of members) {
+    try {
+      const sample =
+        view === "workflow-run"
+          ? { view, runId: ROUTE_FIXTURE_ID }
+          : view === "skill-studio"
+            ? { view, skillId: ROUTE_FIXTURE_ID }
+            : { view }
+      const path = routes.formatAppRoute(sample as never)
+      if (typeof path !== "string" || routes.parseAppLocation(path, "").view !== view) unrouted.push(view)
+    } catch {
+      unrouted.push(view)
+    }
+  }
+  return { unrouted }
 }
 
 /**

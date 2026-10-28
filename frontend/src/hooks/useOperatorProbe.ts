@@ -41,6 +41,11 @@ export interface UseOperatorProbe {
 export function useOperatorProbe(userId: string | null): UseOperatorProbe {
   const [identity, setIdentity] = useState<OperatorIdentity | null>(null)
   const [loading, setLoading] = useState(true)
+  // 297-REVIEW WR-03 (2026-10-28): the user the current answer belongs to. On the render where
+  // `userId` changes (sign-in), the answer on hand is still the previous user's — the effect
+  // below that re-arms `loading` runs only after that commit has painted. So `loading` is also
+  // true whenever the answer is not for THIS user, from the very first render that names them.
+  const [answeredFor, setAnsweredFor] = useState<string | null | undefined>(undefined)
 
   useEffect(() => {
     // Local per-run cancel flag (not a shared ref): the effect re-runs whenever
@@ -54,6 +59,7 @@ export function useOperatorProbe(userId: string | null): UseOperatorProbe {
     if (!userId) {
       setIdentity(null)
       setLoading(false)
+      setAnsweredFor(null)
       return () => {
         cancelled = true
       }
@@ -74,7 +80,10 @@ export function useOperatorProbe(userId: string | null): UseOperatorProbe {
         if (!cancelled) setIdentity(null)
       })
       .finally(() => {
-        if (!cancelled) setLoading(false)
+        if (!cancelled) {
+          setLoading(false)
+          setAnsweredFor(userId)
+        }
       })
 
     return () => {
@@ -82,5 +91,5 @@ export function useOperatorProbe(userId: string | null): UseOperatorProbe {
     }
   }, [userId])
 
-  return { isOperator: identity !== null, identity, loading }
+  return { isOperator: identity !== null, identity, loading: loading || answeredFor !== userId }
 }

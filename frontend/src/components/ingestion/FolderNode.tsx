@@ -21,6 +21,7 @@ import {
 import { cn } from "@/lib/utils"
 import { ApiRefusal } from "@/lib/api/refusal"
 import { HoldRefusalNotice } from "@/components/retention/HoldRefusalNotice"
+import { MoveToOrgMenuItem } from "@/components/org/MoveToOrgMenuItem"
 import { NavRow } from "./NavRow"
 import { FolderCreateInput } from "./FolderCreateInput"
 import type { FolderNode as FolderNodeType } from "@/lib/folderTree"
@@ -194,7 +195,7 @@ export function FolderNode({
                   <MoreHorizontal className="h-3 w-3" aria-hidden="true" />
                 </Button>
               </DropdownMenuTrigger>
-              <DropdownMenuContent align="end" className="w-40">
+              <DropdownMenuContent align="end" className="w-40 has-[[data-move-item]]:w-56">
                 <DropdownMenuItem
                   onClick={(e) => {
                     e.stopPropagation()
@@ -215,6 +216,8 @@ export function FolderNode({
                     {node.is_org_shared ? "Make private" : "Share with org"}
                   </DropdownMenuItem>
                 )}
+                {/* 298-05 (UI-D15): renders nothing unless owned at 2+ orgs; the menu widens when it does. */}
+                <MoveToOrgMenuItem kind="folder" itemId={node.id} itemName={node.name} owned={isOwner} subtree={node} selectedId={selectedFolderId} />
                 <DropdownMenuSeparator />
                 <DropdownMenuItem
                   className="text-destructive focus:text-destructive"

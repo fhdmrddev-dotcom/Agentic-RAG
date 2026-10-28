@@ -430,8 +430,11 @@ export function WorkspacePanel({
   )
 
   // ── The panel body (shared by the side column AND the mobile sheet). ──
+  // `relative` makes this scroller the containing block for the `sr-only` announcers inside it
+  // (PhaseTimeline, TodosSection, FilePreview). Without it they anchored to the page, landed at
+  // their static position below a long task list, and made the whole document scrollable.
   const body = (
-    <div className="flex h-full flex-col overflow-y-auto">
+    <div className="relative flex h-full flex-col overflow-y-auto">
       {/* Pending ask_user pins to the VERY TOP regardless of section order (D-03). */}
       {pendingAsks.length > 0 && (
         <div className="border-b border-border/40 p-2">

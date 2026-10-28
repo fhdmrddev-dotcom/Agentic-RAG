@@ -78,6 +78,11 @@ _EXPECTED = frozenset({
     "retention.hold.create", "retention.hold.update", "retention.hold.release",
     "retention.disposition.confirm", "retention.document.unarchive", "retention.document.keep",
     "folder.delete",
+    # D-298-04 — re-pinned ON PURPOSE by 298-03. This fence was RED again since Phase 293 added the
+    # five api_key.* types (migration 215) without touching it (it read `extra=[api_key.*]` at the
+    # 298-03 base, measured). 298-03 names them and adds the per-item org move (migration 217).
+    "api_key.create", "api_key.revoke", "api_key.start", "api_key.read", "api_key.refused",  # 293 (215)
+    "org.item.move",                                                       # 298 (migration 217)
 })
 
 
@@ -114,11 +119,11 @@ async def test_valid_action_types_subset_of_live_check(pg_pool):
 
 
 def test_valid_action_types_is_exactly_the_expected_set():
-    """The frozenset is exactly the expected strings (no DB needed) — 34 at 275-01."""
+    """The frozenset is exactly the expected strings (no DB needed) — 34 at 275-01, 40 at 298-03."""
     from app.services.audit_service import VALID_ACTION_TYPES
     assert VALID_ACTION_TYPES == _EXPECTED, (
         f"VALID_ACTION_TYPES != expected; "
         f"missing={sorted(_EXPECTED - VALID_ACTION_TYPES)}, "
         f"extra={sorted(VALID_ACTION_TYPES - _EXPECTED)}"
     )
-    assert len(VALID_ACTION_TYPES) == 34
+    assert len(VALID_ACTION_TYPES) == 40  # D-298-04

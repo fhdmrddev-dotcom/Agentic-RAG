@@ -56,7 +56,7 @@ from datetime import datetime, timezone
 from typing import Any
 from uuid import UUID
 
-from fastapi import APIRouter, Depends, HTTPException, Query, status
+from fastapi import APIRouter, Depends, HTTPException, Query, Request, status
 from pydantic import BaseModel, Field
 from supabase import Client
 
@@ -81,6 +81,7 @@ from app.dependencies import (
 # disagree about what a step even IS.
 from app.models.thread import declared_phase_measure, phase_output_object, step_identity
 from app.utils.db import aexec
+from app.services import org_lists  # Phase 298 (D-06): the one home of list narrowing
 # 257.1 (SC#4) — cost is READ through the one conversion home and the one rate resolver,
 # never re-derived at this call site. `app.dependencies` is imported as a module here (not
 # `from ... import get_pg_pool`) to match `api/admin_spend.py`, whose `deps.get_pg_pool()`
@@ -675,6 +676,7 @@ async def list_workflow_runs(
     ),
     limit: int = Query(default=50, ge=1, le=200),
     offset: int = Query(default=0, ge=0),
+    request: Request = None,  # FastAPI injects it; direct callers may omit it (no header -> None)
     current_user: dict = Depends(canvas_caller),
     supabase: Client = Depends(get_user_supabase_client),
 ) -> WorkflowRunListRead:
@@ -735,6 +737,8 @@ async def list_workflow_runs(
     )
     if definition_ids is not None:
         runs_query = runs_query.in_("definition_id", definition_ids)
+    # 298 (D-02, D-298-01): ON TOP of the owner scope — the validated active org; None -> no-op.
+    runs_query = org_lists.by_org(runs_query, await org_lists.active_org(request, current_user))
     runs_resp = await aexec(
         runs_query.order("created_at", desc=True)
         .order("id", desc=True)

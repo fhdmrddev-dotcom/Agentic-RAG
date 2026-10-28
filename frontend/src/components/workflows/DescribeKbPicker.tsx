@@ -47,9 +47,12 @@
  * carry no severity word and claims nothing about publishing succeeding or failing — a
  * word-class fence with positive controls holds it there.
  */
-import { useEffect, useState } from "react"
+import { useEffect, useRef, useState } from "react"
 
-import { listFolders } from "@/lib/api"
+import { getFolderLabels, listFolders } from "@/lib/api"
+import type { FolderLabel } from "@/lib/api/orgItems"
+import { useActiveOrgId } from "@/hooks/useActiveOrgId"
+import { optionLabel } from "@/components/workflows/folderLabel"
 
 /** The question, asked in the Builder's own words so the door and the Builder's describe
  *  screen read as the same product rather than two dialects. */
@@ -167,12 +170,23 @@ export function DescribeKbPicker({
    */
   const [choosing, setChoosing] = useState(false)
 
+  // Phase 298-04 (D-08): the folder read below re-runs for each org the person switches to.
+  const activeOrgId = useActiveOrgId()
+  const askedOrgRef = useRef(activeOrgId)
+
   // ONE best-effort request on mount, in the `cancelled` idiom the Builder's own folder
   // effect uses. A failure renders nothing and never retries (`T-187-R5-05`): this is a
   // read that costs a round trip and buys an optional convenience, so a retry loop on the
   // fastest path in the product would be a poor trade.
   useEffect(() => {
     let cancelled = false
+    // 298-04: a re-read for a NEW org starts from "not asked yet" — the old org's rows are not
+    // this org's answer, and "loading" is the state that claims nothing (and drops nothing).
+    if (askedOrgRef.current !== activeOrgId) {
+      askedOrgRef.current = activeOrgId
+      setOptions([])
+      setState("loading")
+    }
     void (async () => {
       try {
         const folders = await listFolders()
@@ -201,7 +215,7 @@ export function DescribeKbPicker({
     return () => {
       cancelled = true
     }
-  }, [])
+  }, [activeOrgId])
 
   // ── CR-R5-01 — WHAT IS SENT IS ALWAYS SOMETHING THE AUTHOR CAN SEE ──
   //
@@ -223,12 +237,50 @@ export function DescribeKbPicker({
   // because "not asked yet" is not "not offered", and `unavailable` is INCLUDED for the
   // reason that matters here: when nothing renders, the author cannot see or change what
   // would be sent, whatever the reason for the emptiness.
+  //
+  // ⚠ 298-04 (D-15) — THE TRIGGER MOVED; THE RULE DID NOT. The folder list is now NARROWED to
+  // the active org (298-01), so a bound folder that lives in ANOTHER org is "not offered" while
+  // the author can still see it. Dropping it there would silently unbind a folder merely because
+  // the list narrowed. So an unoffered held id is LOOKED UP first (the folder-labels read, which
+  // answers only for folders the caller can already see):
+  //   · pending, or the read FAILED → the id is kept, shown as UNNAMED_KB_OPTION (visible, so
+  //     nothing is sent invisibly; a failure is not an answer);
+  //   · answered WITH it → kept, shown as "{name} — lives in {Org}";
+  //   · answered WITHOUT it → surrendered back as "" — today's CR-R5-01 drop, unchanged.
+  // The parent's `onChange` is read through a ref so a new callback identity never re-asks.
+  const onChangeRef = useRef(onChange)
+  onChangeRef.current = onChange
+  const unoffered = state !== "loading" && value !== "" && !options.some((f) => f.id === value)
+  const [lookup, setLookup] = useState<{ id: string; label: FolderLabel | null; settled: boolean } | null>(null)
   useEffect(() => {
-    if (state === "loading") return
-    if (value === "") return
-    if (options.some((f) => f.id === value)) return
-    onChange("")
-  }, [state, options, value, onChange])
+    if (!unoffered) return
+    let cancelled = false
+    setLookup({ id: value, label: null, settled: false })
+    // Through a resolved promise, so even a synchronous throw lands in the failure arm below.
+    Promise.resolve()
+      .then(() => getFolderLabels([value]))
+      .then(
+        (labels) => {
+          if (cancelled) return
+          const label = labels.find((l) => l.id === value) ?? null
+          setLookup({ id: value, label, settled: true })
+          if (label === null) onChangeRef.current("")
+        },
+        () => {
+          // A failed lookup knows nothing — the id stays held and visible (UNNAMED_KB_OPTION).
+        },
+      )
+    return () => {
+      cancelled = true
+    }
+  }, [unoffered, value])
+  const heldLookup = unoffered && lookup !== null && lookup.id === value ? lookup : null
+  // The held id as a row the author can SEE — unless the read answered without it.
+  const held: FolderOption | null = !unoffered
+    ? null
+    : heldLookup !== null && heldLookup.settled && heldLookup.label === null
+      ? null
+      : { id: value, label: optionLabel(value, { label: heldLookup?.label ?? null, activeOrgId }) }
 
   // The state probe. `hidden` + `aria-hidden` — no surface, nothing in the accessibility
   // tree, and (being `display:none`) not a flex item, so an unoffered picker adds no gap
@@ -269,7 +321,11 @@ export function DescribeKbPicker({
    * words. It must not render nothing either: silence is what let this whole control vanish
    * without the author being told anything at all.
    */
-  if (state === "unavailable") {
+  // 298-04: a held id from another org (or one still being looked up) is SHOWN, whatever the
+  // list's own state — so it can never be held without the author seeing it.
+  const chosen = options.find((f) => f.id === value) ?? held
+
+  if (state === "unavailable" && chosen === null) {
     return frame(
       <p
         data-testid="describe-kb-unavailable"
@@ -289,7 +345,7 @@ export function DescribeKbPicker({
    * control here with no destination would be an affordance that does nothing — worse than the
    * fact standing alone. `onUploadDocuments` is how an owner supplies the destination.
    */
-  if (state === "none" || options.length === 0) {
+  if ((state === "none" || options.length === 0) && chosen === null) {
     return frame(
       <div
         data-testid="describe-kb-empty"
@@ -311,8 +367,6 @@ export function DescribeKbPicker({
       </div>,
     )
   }
-
-  const chosen = options.find((f) => f.id === value) ?? null
 
   /**
    * ── ARM 2 (SHEET) — ONE CHOSEN ───────────────────────────────────────────────────────

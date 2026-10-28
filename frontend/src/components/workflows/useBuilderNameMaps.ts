@@ -34,15 +34,34 @@
  *
  * ⚠ NAMES ONLY cross the trust boundary here (CONN-03 SC#4): `id`, `name`, `mcp_server_url`
  * and, through `buildToolReadOnlyMap`, each discovered tool's explicit `readOnlyHint`.
+ *
+ * ── PHASE 298-04 (D-08 / D-15 / UI-D11) ──────────────────────────────────────────────────
+ *
+ * The folder list is now NARROWED to the active org (298-01), so a folder this workflow binds
+ * in ANOTHER org is no longer in it. Two additions, both best-effort like the reads above:
+ *   1. The mount read re-runs when the active org changes (`useActiveOrgId()`), the same
+ *      `cancelled` idiom dropping a late answer. No keyed remount (297 rule).
+ *   2. For the bound ids the page passes (`project_folder_id` and every phase's `folder_scope`)
+ *      that the list lacks, ONE folder-labels read asks what they are called and where they
+ *      live. Their chip-form names ("Q3 Contracts · lives in Acme Legal") join `folderNames`,
+ *      so every face that already reads the map shows the marker as words; the raw labels go
+ *      to `folderLabels` for the page's `<option>`. An id the read omits gets NO name — the
+ *      page's `UNNAMED_KB_OPTION` fallback stays exactly as it was.
  */
-import { useEffect, useState } from "react"
-import { listConnectorConnections, listFolders, listSkills } from "@/lib/api"
+import { useEffect, useMemo, useState } from "react"
+import { getFolderLabels, listConnectorConnections, listFolders, listSkills } from "@/lib/api"
+import type { FolderLabel } from "@/lib/api/orgItems"
+import { useActiveOrgId } from "@/hooks/useActiveOrgId"
+import { chipLabel } from "@/components/workflows/folderLabel"
 import { buildToolReadOnlyMap } from "@/components/workflows/toolReadOnlyMap"
 import type { IdNameMap } from "@/components/workflows/PhaseFormPanel"
 
 /** What the page reads. Plain values; the setters stay inside the hook. */
 export interface BuilderNameMaps {
+  /** Folder id → name. 298-04: an out-of-org bound folder's entry is its chip-form label. */
   folderNames: IdNameMap
+  /** 298-04 (D-15): the folder-labels read's answer for bound ids the narrowed list lacks. */
+  folderLabels: Record<string, FolderLabel>
   folderOptions: Array<{ id: string; name: string }>
   skillNames: IdNameMap
   connectionNames: IdNameMap
@@ -50,10 +69,38 @@ export interface BuilderNameMaps {
   toolReadOnly: Record<string, Record<string, boolean>>
 }
 
-export function useBuilderNameMaps(): BuilderNameMaps {
+/**
+ * 298-04 — the folders the workflow binds, as the page already holds them: the definition's
+ * `project_folder_id` and each phase's `folder_scope`. Loose shapes on purpose: the hook reads
+ * two keys and nothing else.
+ */
+export interface BuilderBoundFolders {
+  meta?: { project_folder_id?: unknown } | null
+  phases?: ReadonlyArray<{ config?: unknown }> | null
+}
+
+function boundIdsOf(bound: BuilderBoundFolders | undefined): string[] {
+  const ids = new Set<string>()
+  const project = bound?.meta?.project_folder_id
+  if (typeof project === "string" && project.length > 0) ids.add(project)
+  for (const phase of bound?.phases ?? []) {
+    const scope = (phase?.config as { folder_scope?: unknown } | undefined)?.folder_scope
+    if (!Array.isArray(scope)) continue
+    for (const id of scope) if (typeof id === "string" && id.length > 0) ids.add(id)
+  }
+  return [...ids].sort()
+}
+
+export function useBuilderNameMaps(bound?: BuilderBoundFolders): BuilderNameMaps {
+  // 298-04 (D-08): the org key the mount read below re-runs on.
+  const activeOrgId = useActiveOrgId()
   // Phase 103-ux: id→name maps so the form panel renders folder + skill NAMES (never
   // UUIDs). Fetched once on mount; failures degrade to showing the raw id.
-  const [folderNames, setFolderNames] = useState<IdNameMap>({})
+  // 298-04: the narrowed list's names; `folderNames` below is this plus the labelled misses.
+  const [listedNames, setFolderNames] = useState<IdNameMap>({})
+  // 298-04: `null` until the folder list has answered (a miss is only a miss once it has).
+  const [listed, setListed] = useState<ReadonlySet<string> | null>(null)
+  const [folderLabels, setFolderLabels] = useState<Record<string, FolderLabel>>({})
   const [folderOptions, setFolderOptions] = useState<Array<{ id: string; name: string }>>([])
   const [skillNames, setSkillNames] = useState<IdNameMap>({})
   // Phase 200 (FE-WIRING): connection id→name, so an `external_action` step's face names its
@@ -88,6 +135,7 @@ export function useBuilderNameMaps(): BuilderNameMaps {
         for (const f of folders) map[f.id] = f.name
         setFolderNames(map)
         setFolderOptions(folders.map((f) => ({ id: f.id, name: f.name })))
+        setListed(new Set(folders.map((f) => f.id)))
       } catch {
         /* non-fatal — the panel falls back to the raw id */
       }
@@ -135,7 +183,46 @@ export function useBuilderNameMaps(): BuilderNameMaps {
     return () => {
       cancelled = true
     }
-  }, [])
+  }, [activeOrgId])
 
-  return { folderNames, folderOptions, skillNames, connectionNames, mcpServerUrls, toolReadOnly }
+  // 298-04 (D-15) — the bound ids the answered list lacks, as one stable key.
+  const boundKey = boundIdsOf(bound).join(",")
+  const missingKey = useMemo(() => {
+    if (listed === null || boundKey === "") return ""
+    return boundKey
+      .split(",")
+      .filter((id) => !listed.has(id))
+      .join(",")
+  }, [boundKey, listed])
+
+  // ONE label read per distinct set of misses, best-effort in its own `try` (a refusal or an
+  // older mock without the symbol leaves the names as they were — the UNNAMED fallback).
+  useEffect(() => {
+    if (missingKey === "") return
+    let cancelled = false
+    void (async () => {
+      try {
+        const labels = await getFolderLabels(missingKey.split(","))
+        if (cancelled) return
+        const next: Record<string, FolderLabel> = {}
+        for (const label of labels) next[label.id] = label
+        setFolderLabels(next)
+      } catch {
+        /* non-fatal — an unlabelled miss keeps the page's UNNAMED_KB_OPTION fallback */
+      }
+    })()
+    return () => {
+      cancelled = true
+    }
+  }, [missingKey])
+
+  const folderNames = useMemo<IdNameMap>(() => {
+    const ids = Object.keys(folderLabels).filter((id) => !(id in listedNames))
+    if (ids.length === 0) return listedNames
+    const merged: IdNameMap = { ...listedNames }
+    for (const id of ids) merged[id] = chipLabel(id, { label: folderLabels[id], activeOrgId })
+    return merged
+  }, [listedNames, folderLabels, activeOrgId])
+
+  return { folderNames, folderLabels, folderOptions, skillNames, connectionNames, mcpServerUrls, toolReadOnly }
 }

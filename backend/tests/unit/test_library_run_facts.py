@@ -1072,10 +1072,18 @@ def test_the_placeholder_numbering_is_PROVED_unchanged():
     ``${len(params)}`` project filter); ``list_starter_workflows`` **0** — its only ``$1``
     lives in the shared lateral, not in its own source; ``list_draft_workflows`` **1**.
     """
+    # ── D-298-02 (Phase 298, 2026-10-28) — AMENDED DELIBERATELY, never tripped by surprise ──
+    # 298 adds ONE keyword-only ``org_id`` filter to each of the two owned feeds, and so ONE
+    # placeholder to each source: published 3 -> 4 (another ``${len(params)}``, appended AFTER
+    # the project filter, so it is ``$2`` or ``$3`` at runtime and renumbers nothing), draft
+    # 1 -> 2 (a literal ``$2`` emitted ONLY when an org is passed, beside a conditional bind).
+    # The ``$1`` counts do not move, and with no org the SQL is byte-identical to base — pinned
+    # by sha256 in ``test_298_list_narrowing.py``. The fence's purpose (no silent renumbering)
+    # still holds; only its literal moved, with the reason here.
     for name, source, dollars, ones in (
-        ("published", _published_source(), 3, 2),
+        ("published", _published_source(), 4, 2),
         ("starter", _starter_source(), 0, 0),
-        ("draft", _draft_source(), 1, 1),
+        ("draft", _draft_source(), 2, 1),
     ):
         code = _code_only(source)
         assert code.count("$") == dollars, f"{name}: placeholder count moved"
@@ -1087,6 +1095,14 @@ def test_the_placeholder_numbering_is_PROVED_unchanged():
     published = _code_only(_published_source())
     assert "params: list = [user_id]" in published
     assert "definition->>'project_folder_id' = ${len(params)}" in published
+    # D-298-02: the org filter is derived from the params list too, after the project filter.
+    assert published.index("wd.org_id = ${len(params)}") > published.index(
+        "definition->>'project_folder_id' = ${len(params)}"
+    )
+    draft = _code_only(_draft_source())
+    # (``_code_only`` round-trips through ``ast.unparse``, so needles avoid quote style.)
+    assert "AND wd.org_id = $2 " in draft
+    assert "*([org_id] if org_id is not None else [])" in draft
 
 
 def test_the_owner_scope_on_the_lateral_is_STILL_byte_identical():

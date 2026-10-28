@@ -11,6 +11,7 @@ from app.dependencies import (
     resolve_active_org_or_none,
 )
 from app.models.folder import FolderCreate, FolderMoveRequest, FolderUpdate, FolderResponse
+from app.services import org_lists  # Phase 298 (D-06): the one home of list narrowing
 from app.services.audit_service import write_audit_entry
 from app.services.retention import hold_guard  # Phase 275 (D-15): the one hold check
 from app.utils.db import aexec, maybe_row
@@ -23,11 +24,16 @@ router = APIRouter(prefix="/folders", tags=["folders"])
 
 @router.get("", response_model=list[FolderResponse])
 async def list_folders(
+    request: Request = None,  # FastAPI injects it; direct callers may omit it (no header -> None)
     current_user: dict = Depends(get_current_user),
     supabase: Client = Depends(get_user_supabase_client),
 ):
     """List all folders visible to the current user (owned + global subtree)."""
-    folders = await fetch_visible_folders(supabase, current_user["id"])
+    # 298 (D-02/D-04): the active org NARROWS the tree — ONE keyword, forwarded only when an org
+    # resolved (org_lists.folder_kw -> {} otherwise, so no header is byte-identical). Only shrinks.
+    folders = await fetch_visible_folders(
+        supabase, current_user["id"], **await org_lists.folder_kw(request, current_user)
+    )
     folders.sort(key=lambda f: f["name"])
     # SEED-091 / D-164-05 (TEN-06): null the seeding owner on non-owned global folders.
     return _null_foreign_global_owner(folders, current_user["id"])
@@ -36,11 +42,15 @@ async def list_folders(
 @router.get("/{folder_id}/children", response_model=list[FolderResponse])
 async def list_children(
     folder_id: str,
+    request: Request = None,  # FastAPI injects it; direct callers may omit it (no header -> None)
     current_user: dict = Depends(get_current_user),
     supabase: Client = Depends(get_user_supabase_client),
 ):
     """List direct children of a folder that are visible to the current user."""
-    visible = await fetch_visible_folders(supabase, current_user["id"])
+    # 298 (D-02/D-04): same one org keyword as list_folders — narrows only, {} without an org.
+    visible = await fetch_visible_folders(
+        supabase, current_user["id"], **await org_lists.folder_kw(request, current_user)
+    )
     children = [f for f in visible if f["parent_id"] == folder_id]
     children.sort(key=lambda f: f["name"])
     # SEED-091 / D-164-05 (TEN-06): null the seeding owner on non-owned global folders.

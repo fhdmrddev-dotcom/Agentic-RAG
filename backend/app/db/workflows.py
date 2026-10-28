@@ -591,6 +591,7 @@ async def list_published_workflows(
     user_id: UUID,
     project_folder_id: UUID | None = None,
     owned_only: bool = False,
+    org_id: UUID | None = None,
 ) -> list[dict]:
     """Published workflow definitions visible to a user (the picker feed).
 
@@ -719,6 +720,12 @@ async def list_published_workflows(
     if project_folder_id is not None:
         params.append(str(project_folder_id))  # definition->>'key' returns TEXT → bind str
         sql += f" AND definition->>'project_folder_id' = ${len(params)}"
+    # 298 (D-01/D-02): the active org, AND-appended like the project filter above, in BOTH
+    # branches. System-global rows stay for every org; ``wd.`` because two LATERALs are joined.
+    # ``org_id=None`` (no org resolved) appends nothing — the SQL is byte-identical. Only shrinks.
+    if org_id is not None:
+        params.append(org_id)
+        sql += f" AND (wd.is_system_global = true OR wd.org_id = ${len(params)})"
     # ── SITE 1 of 3 — Phase 193.2 (BUG-260815-02, D-15 / D-16): RECENCY, not alphabet ──
     #
     # ⚠ THE DIVERGENCE BELOW IS A DECISION, NOT AN INCONSISTENCY, AND THIS IS WHERE IT IS
@@ -1088,7 +1095,9 @@ async def create_workflow_definition(
     return dict(row)
 
 
-async def list_draft_workflows(pool: asyncpg.Pool, *, user_id: UUID) -> list[dict]:
+async def list_draft_workflows(
+    pool: asyncpg.Pool, *, user_id: UUID, org_id: UUID | None = None
+) -> list[dict]:
     """The caller's OWN drafts (the Workflows page drafts shelf — D-103-4).
 
     Owner-scoped ONLY (``status = 'draft' AND created_by = $1``) — a second user's
@@ -1199,8 +1208,11 @@ async def list_draft_workflows(pool: asyncpg.Pool, *, user_id: UUID) -> list[dic
         + f"FROM workflow_definitions wd "
         + _LAST_RUN_LATERAL_SQL
         + f"WHERE status = 'draft' AND created_by = $1 "
-        f"ORDER BY updated_at DESC, id DESC",
+        # 298 (D-01/D-02): the active org on top of the owner scope; None appends nothing.
+        + (f"AND wd.org_id = $2 " if org_id is not None else "")
+        + f"ORDER BY updated_at DESC, id DESC",
         user_id,
+        *([org_id] if org_id is not None else []),
     )
     return [dict(r) for r in rows]
 

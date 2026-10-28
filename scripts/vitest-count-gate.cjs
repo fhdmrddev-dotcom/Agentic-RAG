@@ -233,8 +233,8 @@ const BASELINE = {
   //    printed `actual` of the suites run together, never hand-counted. soulData.requiredFields,
   //    starterFork.287 live under the `src/components/workflows` directory TARGETS entry;
   //    the chat + providers ones are named FILE-LEVEL below (no bare directory entry exists).
-  "ThreadWorkflowPicker.test.tsx": 9,
-  "useStartWorkflowInThread.test.tsx": 7,
+  "ThreadWorkflowPicker.test.tsx": 17, // 2026-10-28 298-02: 9 -> 17 (printed actual; +1 a folder refusal shows the server sentence with no Retry)
+  "useStartWorkflowInThread.test.tsx": 24, // 2026-10-28 298-02: 7 -> 24 (printed actual; +5 the coded folder refusal is kind folder, other 422s unchanged)
   "ChatArea.threadWorkflowPicker.test.tsx": 5,
   "StreamsProvider.inputs.test.tsx": 3,
   "soulData.requiredFields.test.ts": 7,
@@ -656,7 +656,7 @@ const BASELINE = {
   // invisibly, because `POST /workflows/generate` mints `unbound_retrieval` on
   // `project_folder_id is None` and a dangling id would suppress the very verdict the
   // picker exists to help the author satisfy.
-  "DescribeKbPicker.test.tsx": 37,
+  "DescribeKbPicker.test.tsx": 48, // RAISED 37 → 48 at 298-04 (2026-10-28), read from the suite's own count (48 passed): +6 are 298-04's, +5 PREDATE it (the file measured 42 before 298-04; the pin had been 5 behind). The 298-04 six: a held id from another org is looked up before any drop (pending / answered / empty list / failed / offered), org re-read; the 3 surrender cases amended (D-298-07)
   "ProblemsTray.test.tsx": 30,
   "verdictModel.test.ts": 29,
   // 188-12 de-slacking, both inherited stale-low pins (26/49 and 24/46).
@@ -1083,7 +1083,7 @@ const BASELINE = {
   // flag-off promise — every one of which has been deletable with the gate green until now.
   //
   // Read from THIS SCRIPT'S OWN `actual` column, never hand-counted from `it(` literals.
-  "useDraftPersistence.test.tsx": 59,
+  "useDraftPersistence.test.tsx": 63, // 2026-10-28 298-02: 59 -> 63 (folder refusal sentence, UI-D13 retry clears it, create arm, header-less reload)
   // What would be unguarded without this entry: the whole-table properties of the template-first
   // surface's words — non-emptiness, pairwise distinctness, the zero-import leaf claim, and the
   // two that carry this phase's honesty requirements. (a) The three no-fields footings are
@@ -2531,7 +2531,10 @@ const BASELINE = {
   // 290-02 (2026-10-21, VIS-04): RAISED 133 -> 143 from this script's own actual column. All +10 are 290-02's:
   //   ./stepLine.ts and ./StepChipLine.tsx joined LIBRARY_SUBTREE_PATHS (15 -> 17), and each path runs five it.each
   //   sweeps. The suite measured 133 at the phase base 1f9673d25 (run on the base tree, 290-04-GATES.md).
-  "librarySubtree.fences.test.ts": 143,
+  // 298-04 (2026-10-28, ORG-02 / G-5): RAISED 143 -> 148, measured (the suite printed 148 passed). All +5 are
+  //   298-04's: ./useWorkflowLibraryFeeds.ts joined LIBRARY_SUBTREE_PATHS (17 -> 18, fence id D-298-06) in the
+  //   move-only commit that created it, and each path runs five it.each sweeps.
+  "librarySubtree.fences.test.ts": 148,
   // ── 192.1-07 Task 1 (LIB-05 / D-19 / D-20 / D-36): a NEW suite, pinned in its first commit ─
   // 162-B's name prompt, in `RunModal.a11y.test.tsx`'s posture (the four Radix jsdom shims,
   // `axe()` on the OPEN dialog, roles and accessible names rather than class-name reading).
@@ -3042,7 +3045,7 @@ const BASELINE = {
   //     proving the parser really sees six entries per map and a driven falsification proving
   //     a single changed utility is caught.
   "runLogRow.test.ts": 24, // 293-03: 21 -> 24 (the origin sentence is the last atom; unrecorded and unknown compose as before)
-  "RunLogPanel.test.tsx": 20,
+  "RunLogPanel.test.tsx": 25, // RAISED 20 → 23 at 298-04 (2026-10-28): an org switch clears the rows at once + says loading, drops the late answer, a failure there is still never an empty log · RAISED 23 → 25 at 298-05: the elsewhere line mounts atop the whole log, and not on a scoped one
   "runLogTone.mirror.test.ts": 10,
   // ── THE LAST TWO OF PHASE 200'S UNPINNED SUITES, pinned at their measured actuals ───────
   //
@@ -3256,7 +3259,7 @@ const BASELINE = {
   //   eighth-entry count). ⛔ An EXTENSION, never a lowering — the D-07 pair above is intact.
   "nav-items.test.ts": 6, // 283-02: +1 (the Settings door stands for a member, FIX-01)
   "navItemsConnections.test.ts": 6,
-  "activeViewReachability.test.ts": 11,
+  "activeViewReachability.test.ts": 15, // 297-02 (D-297-14) — +4 route-leg cases (7a-7d), the eleven stay
 
   // ── Phase 243 (243-01 / CHAT-01 / CHAT-04 / D-243-16) — the thinking block's
   // ── PRE-EXTRACTION characterization net. Pinned in the SAME COMMIT that creates the file
@@ -3644,7 +3647,7 @@ const BASELINE = {
   "LibraryPage.test.tsx": 12,
   "librarySelection.test.ts": 25,
   "useDocuments.test.ts": 14, // RAISED 7 → 14 at 284-REVIEW WR-01 (a membership-changing Realtime UPDATE refetches; a cosmetic one merges)
-  "useLibraryDocuments.test.ts": 25, // 284-01 Task 2 — the D-24 Library data hook. BOTH KNOBS, SAME COMMIT. · RAISED 13 → 24 at 284-03 (the server body: page + summary + read by id, the Realtime hint) · RAISED 24 → 25 at 284-REVIEW WR-01 (the on-page rows reach useDocuments)
+  "useLibraryDocuments.test.ts": 30, // 284-01 Task 2 — the D-24 Library data hook. BOTH KNOBS, SAME COMMIT. · RAISED 13 → 24 at 284-03 (the server body: page + summary + read by id, the Realtime hint) · RAISED 24 → 25 at 284-REVIEW WR-01 (the on-page rows reach useDocuments) · RAISED 25 → 28 at 298-04 (2026-10-28): an org switch is cold + drops the late answer, the summary is null until the new org answers, a failed first summary there reads error · RAISED 28 → 30 at 298-05: a move re-asks the page (silently, row kept until the answer) and the summary (last numbers kept)
   "DocumentList.test.tsx": 7,
   "DocumentList.moveToFolder.test.tsx": 4,
   "ViewsGroup.test.tsx": 10,
@@ -3697,7 +3700,7 @@ const BASELINE = {
   "HealthTiles.test.tsx": 6,
   "HealthSignalChips.test.tsx": 14, // +1 BUG-260923-02 stale paging
   "CheckedQueriesSection.test.tsx": 12, // +1 BUG-260923-02 paging
-  "ChatLayout.fallback.test.tsx": 4,
+  "ChatLayout.fallback.test.tsx": 5, // 297-01 (D-297-03): 4 -> 5, re-targeted to AppViewSwitch + the one-home arm (ChatLayout code mounts no fallback)
   "DocumentQueriesSection.test.tsx": 8,
   "FilterBar.test.tsx": 10,
   "DocumentStatusBadge.test.tsx": 19,
@@ -4369,11 +4372,11 @@ const BASELINE = {
   "StepEvidenceLine.test.tsx": 15, // 289-02 — the KB evidence line or nothing
   "evidenceView.test.ts": 34, // 293-03: 31 -> 34 (measured 33 at base; +1 the view carries the recorded origin). 289-REVIEW WR-03: 29 -> 31 (final-attempt Checks fact, timed-out kind). 289-04 — payload to view-model, privacy applied twice
   "RunEvidenceReport.test.tsx": 26, // 289-04 — the report by content, button sets, 404 screen
-  "runDeepLink.test.ts": 12, // 289-04 — strict-UUID ?run= read/write/clear
+  "runDeepLink.test.ts": 13, // 289-04 — strict-UUID ?run= read; 297-02 (D-297-11): write/clear retired, replaced by 5 legacy-alias cases (12 -> 13)
   "runEvidence.test.ts": 3, // 289-04 — the client: encodeURIComponent, ApiError(status)
   "runEvidence.contract.test.ts": 3, // 289-05 I1 — RunEvidence vs the shared contract fixture
   // 289-REVIEW WR-05 (2026-10-20) — created by the review fix, adopted in BOTH knobs in one commit.
-  "ChatLayout.runDeepLink.test.tsx": 2, // ?run= is cleared when a LIVE run page is left
+  "ChatLayout.runDeepLink.test.tsx": 3, // 297-02 (D-297-10): the run address follows the view — cold /app/runs/<id>, Back to Workflows, legacy ?run= replaced (2 -> 3)
   // -- Phase 290-04 (2026-10-21, VIS-01 / VIS-04): the seven suites 290-01..03 created, pinned at the
   // gate's own printed actuals (count gate OK, failed 0). All seven sit under the src/components/workflows
   // directory entry in TARGETS (headerPin under __tests__/, two under library/), so they need a pin only.
@@ -4411,9 +4414,48 @@ const BASELINE = {
   // 293-04 (SEED-287) — OrgAuditTab.test.tsx existed since 166 and was in NEITHER knob, so it ran
   // nowhere the gate could see. Adopted at its measured count: 8 pre-existing + 1 unknown-code case
   // + 7 api_key.* cases (5 labels, the API keys filter group, the ?raw lockstep with admin/AuditTab.tsx).
-  "OrgAuditTab.test.tsx": 16,
+  "OrgAuditTab.test.tsx": 19, // 298-review WR-07: 16 → 19 (org.item.move label, Organizing filter, identical line in both maps)
   // 293-04 — under the `src/components/workflows` directory entry, so a pin only.
   "WorkflowCardMenu.apiKey293.test.tsx": 4, // ⋯ New API key… under Schedules on owned published rows only, payload {id, name}; absent without onApiKey (seam286 pin unchanged)
+  // ── Phase 297-01 (REG-09 / D-01, D-03) — adopted, both knobs, same commit (2026-10-27).
+  "useAppNavigation.test.tsx": 35, // 297-01 characterization (13), re-targeted to the URL by 297-02: refresh, push/replace, Back/Forward, same-address no-op, legacy + bare + pre-auth + unknown addresses, POP spends the hand-off (13 -> 30). 2026-10-28 297-REVIEW IN-02: 30 -> 33, Chat at / and /app?code= adds no entry; bounceHome at / rewrites nothing and arms no latch. IN-03: 33 -> 34, single-flush positive control (/workflows replaced). IN-01: 34 -> 35, a non-UUID run/skill id pushes nothing
+  // ── Phase 297-02 (LINK-01 / D-11, D-12, D-25) — adopted, both knobs, same commit (2026-10-27).
+  "noRawHistoryWrites.test.ts": 4, // 297-02 (D-297-15 / D-33) — tree-wide: no raw History write in stripped product code; planted fixture caught; > 200 files swept. 2026-10-28 297-REVIEW WR-01: 3 -> 4, the one sanctioned idx stamp in useAppNavigation (exact text, counted once, nowhere else)
+  "AppViewSwitch.addressStates.test.tsx": 19, // 297-02 (D-14, D-19, D-34, D-35) — S1 words + Go to Chat, history column hidden, run hold vs fallback vs page, admin hold / S1 / console, one run comparison, fallback last. 2026-10-28 297-REVIEW WR-03: 16 -> 19, the sign-in edge driven through the REAL probes (admin / spend / run: no S1, no fallback in any commit)
+  "navigationKeepsStreams.test.tsx": 3, // 297-02 (D-10 / D-07) — real App + OrgProvider + StreamsProvider: six navigations, one subscription, signal not aborted, probe mounted once; main.tsx one route, no provider key
+  "appRoutes.test.ts": 111, // 297-02 — route table: 12-member round-trip, D-11 table, strict ids, legacy ?run= / ?connections=1 / /admin/spend, bare prefixes, pre-auth untouched, hostile inputs never throw or leave the origin
+  // ── Phase 297-03 (LINK-07 / D-21, D-24, D-32, D-42) — adopted, both knobs, same commit (2026-10-27).
+  "useAppNavigation.leaveGuard.test.tsx": 26, // 297-03 — one app blocker: dirty asks EXACTLY once under StrictMode (Back/Forward/rail), clean 0, no-op default, forced bounce 0, one-shot latch, reverted POP 1/2/3, registry unit. 2026-10-28 297-REVIEW WR-01: 23 -> 24, browser router over a raw hash-write entry (Cancel keeps the Builder). WR-04: 24 -> 26, a cancelled attention-route click spends the Health hand-off (+ OK positive control)
+  "WorkflowsPage.leaveGuard.test.tsx": 15, // 297-03 — the Builder tenant: connect control + golden-run link asked EXACTLY once (latch), Test Run 0 and no armed latch, dirty Back/rail 1, clean / no Builder 0. 2026-10-28 297-REVIEW WR-02: 12 -> 15, a refused-save Test Run asks once (Cancel launches nothing, OK asks once), latch not armed across the launch await
+  // ── Phase 297-04 (LINK-08 / D-26, D-41) — adopted, both knobs, same commit (2026-10-27). Self-contained block.
+  "appRouteParity.test.ts": 78, // 297-04 — 17 addresses (12 from formatAppRoute + 3 legacy + 2 pre-auth) x 4 layers (dev, Vercel app host, apex redirect, nginx) = 68, + 2 input/shape, 2 middleware, 1 known-fact, 5 negative controls
+  // ── Phase 298-01 (D-29 / D-36) — both knobs, same commit (2026-10-28). OrgProvider.test.tsx
+  //    was in NEITHER knob before this (no src/providers directory entry), so it is ADOPTED here
+  //    at 6 existing + 2 new = 8, not raised.
+  "uploadDocument.orgHeader.test.ts": 4, // 298-01 — Root upload sends X-Org-Id = getActiveOrgId() at send time, omits it when null, never a Content-Type
+  "OrgProvider.test.tsx": 8, // 298-01 ADOPTED (6 Phase 166 cases) + 2: the WR-01 self-heal syncs the header before a child effect sees the adopted org (D-36); useActiveOrgId null outside / org inside
+  // ── Phase 298-02 (ORG-05 / D-36 / D-12) — both knobs, same commit (2026-10-28). api.workflows.test.ts
+  //    was in NEITHER knob before this (no src/lib directory entry), so it is ADOPTED at 24 existing + 6 new = 30.
+  "api.workflows.test.ts": 30, // 298-02 ADOPTED: coded 422 -> WorkflowFolderRefusedError on create + update, other 422 unchanged, allOrgs omits X-Org-Id
+  "threads.folderRefusal.test.ts": 3, // 298-02 — postMessage keeps detail.message (and code) from an object detail; string detail and array fallback unchanged
+  // ── Phase 298-04 (ORG-01..04 / D-08..D-12) — both knobs, same commit (2026-10-28). useFolders.test.ts
+  //    and FolderTree.test.tsx were in NEITHER knob before this (no src/__tests__/hooks or
+  //    src/__tests__/components directory entry), so they are ADOPTED (existing + new), not raised.
+  "useFolders.test.ts": 18, // 298-04 ADOPTED: 10 existing + 7 — loading flag, switch drops rows at once, late old-org answer discarded, create lands in the new org, Realtime org filter (INSERT ignored, UPDATE removes) and its polarity · RAISED 17 → 18 at 298-05: a move re-asks, the moved folder stays until the answer
+  "FolderTree.test.tsx": 15, // 298-04 ADOPTED: 10 existing + 4 — loading says "Loading folders…" never "No folders yet", Root kept with no count, no stale rows, empty sentence unchanged · RAISED 14 → 15 at 298-05: the elsewhere line mounts once under the Folders header, above Root
+  "LibraryPage.orgSwitch.test.tsx": 7, // 298-review: 5 → 7 (WR-01 a saved view does not survive the switch; IN-05 a late refreshViews never repaints) · 298-04 — 298-04 — real useFolders + useLibraryDocuments over a fake network: old org's folder/document gone at once, loading line, late answer dropped, Root + panel reset (UI-D10), fields/views/provenance re-read (SEED-317), Root count never 0
+  "WorkflowsPage.orgSwitch.test.tsx": 6, // 298-04 — real page + feeds hook: old org's workflow/draft gone at once, "Loading your workflows…" never the empty sentence, late answer dropped, project filter back to All, each feed re-read once · RAISED 4 → 6 at 298-05: the elsewhere line mounts once atop the list region, also while loading
+  "useThreads.orgSwitch.test.ts": 5, // 298-review WR-03: 4 → 5 (a failed refetch after a switch ends switching) · 298-04 — 298-04 — switching false on first render (UI-D9), old threads drop at once + switching until answered, late answer dropped, newThread lands in the new org
+  "ChatHistoryColumn.orgSwitch.test.tsx": 6, // 298-04 — loading says "Loading your chats…" never "No recent chats", hides handed rows, empty sentence unchanged without it, a streaming old-org thread is not listed · RAISED 4 → 6 at 298-05: the elsewhere line mounts atop the list, and stays under a title filter
+  "folderLabel.test.ts": 8, // 298-04 — optionLabel/chipLabel words (in-org name, "lives in {Org}", active-org label plain, unseen → UNNAMED_KB_OPTION never the id) + getFolderLabels ([] no request, comma-joined, chunked at 50, ApiError). Covered by the src/components/workflows directory entry
+  "useBuilderNameMaps.orgLabels.test.tsx": 8, // 298-04 — one label read for the missing bound ids, chip-form names + folderLabels, nothing asked when all in-org, unseen gets no name, failure non-fatal, re-read per org; the real page's option / UNNAMED / flag-off chip words. Covered by the src/components/workflows directory entry
+  // ── Phase 298-05 (ORG-06 / D-16 / D-17) — both knobs, same commit (2026-10-28). Neither new file has a
+  //    directory entry (src/__tests__/lib, src/components/org), so both are FILE-LEVEL.
+  "elsewhereCounts.test.ts": 13, // 298-05 — one GET for 4 mounts, loading has no rows, a switch re-asks + drops the late answer, a foreign-header answer never writes, nothing asked solo/no org, failed is warned, invalidate keeps the last answer, noteMoved bumps version + lastMoved, reset, the open-move request, and the three client calls (URL, body, ApiRefusal)
+  "ElsewhereLine.test.tsx": 21, // 298-05 — absent while loading / solo / no provider / [] / all-zero / failed (never "0 more"); the exact UI-D5 words for every kind and plural; one line per org in server order; never the active org; long names truncate but stay whole; Switch is a primary button, focuses the wrapper then calls switchOrg
+  "MoveToOrgSheet.test.tsx": 23, // 298-review WR-02: 22 → 23 (two hosts, one sheet, survivor takes over) · 298-05 298-05 (RED commit pinned 21; the suite holds 22 — corrected at GREEN) — checking shows no count and no Move (Keep focused); the clean anatomy + every UI-D18 count sentence; refusals verbatim in one amber alert with only Close (preview list, 403); server text is text; preview failed + Try again; Moving can't be dismissed and Moved records ONCE on the 200; 409/403/5xx at confirm; 4+ orgs pick first; no red in any state
+  "MoveToOrgMenuItem.test.tsx": 16, // 298-05 — the menu item: one per other org by name at 2-3 orgs, collapsed at 4+, absent solo / no provider / non-owner, opens THIS item's move tagged with the org, a subtree holding the selection says so; the Root-document button: owned latest Root only, collapsed at 4+, absent otherwise, opens the sheet
+  "moveMounts.test.tsx": 12, // 298-05 — the three homes through the real components: folder ⋯ (owner, 2 orgs, between Share and Delete, menu widens; non-owner + solo absent; opens from the tree's host; leaves the tree only on the refetch), Library resets only a selection that moved, Root document button in the Download row (Close after Moved closes the panel; folder/older/not-owned absent), draft ⋯ (menuitem, WR-03 roles; published + starter never), drafts feed re-read
 }
 
 // Still COMPUTED, never hand-written — the reduce is the single source, so the
@@ -6451,6 +6493,39 @@ const TARGETS = [
   "src/components/org/OrgApiKeysTab.test.tsx",
   // 293-04 (SEED-287) — FILE-LEVEL, SAME commit as its first-ever BASELINE pin.
   "src/components/org/OrgAuditTab.test.tsx",
+  // Phase 297-01 — FILE-LEVEL (no directory entry), in the SAME commit as its BASELINE pin.
+  "src/hooks/__tests__/useAppNavigation.test.tsx",
+  // Phase 297-02 — FILE-LEVEL (no src/lib/__tests__ directory entry), SAME commit as its BASELINE pin.
+  "src/lib/__tests__/appRoutes.test.ts",
+  // Phase 297-02 — FILE-LEVEL (no src/__tests__/routing directory entry), SAME commit as its pin.
+  "src/__tests__/routing/noRawHistoryWrites.test.ts",
+  // Phase 297-02 — FILE-LEVEL, SAME commit as their pins.
+  "src/__tests__/routing/navigationKeepsStreams.test.tsx",
+  "src/components/layout/__tests__/AppViewSwitch.addressStates.test.tsx",
+  // ── Phase 297-03 — FILE-LEVEL (no src/hooks/__tests__ directory entry), SAME commit as its BASELINE pin.
+  "src/hooks/__tests__/useAppNavigation.leaveGuard.test.tsx",
+  "src/pages/__tests__/WorkflowsPage.leaveGuard.test.tsx",
+  // Phase 297-04 — FILE-LEVEL (no src/__tests__/routing directory entry), SAME commit as its pin. Self-contained block.
+  "src/__tests__/routing/appRouteParity.test.ts",
+  // Phase 298-01 — FILE-LEVEL (no src/lib/api/__tests__ or src/providers directory entry), SAME commit as their pins.
+  "src/lib/api/__tests__/uploadDocument.orgHeader.test.ts",
+  "src/providers/OrgProvider.test.tsx",
+  // Phase 298-02 — FILE-LEVEL (no src/lib or src/lib/api/__tests__ directory entry), SAME commit as their pins.
+  "src/lib/api.workflows.test.ts",
+  "src/lib/api/__tests__/threads.folderRefusal.test.ts",
+  // Phase 298-04 — FILE-LEVEL (no src/__tests__/hooks, src/__tests__/components or src/pages/__tests__ directory entry), SAME commit as their pins.
+  "src/__tests__/hooks/useFolders.test.ts",
+  "src/__tests__/components/FolderTree.test.tsx",
+  "src/pages/__tests__/LibraryPage.orgSwitch.test.tsx",
+  "src/pages/__tests__/WorkflowsPage.orgSwitch.test.tsx",
+  "src/__tests__/hooks/useThreads.orgSwitch.test.ts",
+  "src/components/layout/__tests__/ChatHistoryColumn.orgSwitch.test.tsx",
+  // Phase 298-05 — FILE-LEVEL (no src/__tests__/lib or src/components/org directory entry), SAME commit as their pins.
+  "src/__tests__/lib/elsewhereCounts.test.ts",
+  "src/components/org/__tests__/ElsewhereLine.test.tsx",
+  "src/components/org/__tests__/MoveToOrgSheet.test.tsx",
+  "src/components/org/__tests__/MoveToOrgMenuItem.test.tsx",
+  "src/components/org/__tests__/moveMounts.test.tsx",
 ]
 
 const REPO_ROOT = path.resolve(__dirname, "..")

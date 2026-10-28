@@ -16301,6 +16301,226 @@
      }
     }
    }
+  },
+  "/org-items/elsewhere": {
+   "get": {
+    "tags": [
+     "org-items"
+    ],
+    "summary": "Get Elsewhere Counts",
+    "description": "Your own items in your other organizations, counted per organization.\n\nOne row per organization you belong to other than the active one (`X-Org-Id`), with its name\nand how many of your folders, Root documents (archived excluded), workflows, chats and runs\nlive there. Without an active organization the answer is an empty list.",
+    "operationId": "get_elsewhere_counts_org_items_elsewhere_get",
+    "responses": {
+     "200": {
+      "description": "Successful Response",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/ElsewhereCounts"
+        }
+       }
+      }
+     }
+    },
+    "security": [
+     {
+      "HTTPBearer": []
+     },
+     {
+      "HTTPBearer": []
+     }
+    ]
+   }
+  },
+  "/org-items/folder-labels": {
+   "get": {
+    "tags": [
+     "org-items"
+    ],
+    "summary": "Get Folder Labels",
+    "description": "The name and organization of folders you can already see, by id.\n\nFor each requested id that is one of your visible folders, its name, its organization's id and\nthat organization's name. An id you cannot see is left out, exactly like an id that does not\nexist.",
+    "operationId": "get_folder_labels_org_items_folder_labels_get",
+    "security": [
+     {
+      "HTTPBearer": []
+     },
+     {
+      "HTTPBearer": []
+     }
+    ],
+    "parameters": [
+     {
+      "name": "ids",
+      "in": "query",
+      "required": false,
+      "schema": {
+       "anyOf": [
+        {
+         "type": "string"
+        },
+        {
+         "type": "null"
+        }
+       ],
+       "description": "Up to 50 folder ids, comma-separated. Unknown or unreadable ids are omitted.",
+       "title": "Ids"
+      },
+      "description": "Up to 50 folder ids, comma-separated. Unknown or unreadable ids are omitted."
+     }
+    ],
+    "responses": {
+     "200": {
+      "description": "Successful Response",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/FolderLabels"
+        }
+       }
+      }
+     },
+     "422": {
+      "description": "Validation Error",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      }
+     }
+    }
+   }
+  },
+  "/org-items/move-preview": {
+   "get": {
+    "tags": [
+     "org-items"
+    ],
+    "summary": "Get Move Preview",
+    "description": "What moving one of your items to another of your organizations would do.\n\nThe item's name, the organization it is in and the one it would move to, how many subfolders,\ndocuments, earlier versions and past runs that covers, and every reason it can't move yet.\nNothing is changed. The answer is a 200 even when the move is refused \u2014 the reasons are listed.",
+    "operationId": "get_move_preview_org_items_move_preview_get",
+    "security": [
+     {
+      "HTTPBearer": []
+     },
+     {
+      "HTTPBearer": []
+     }
+    ],
+    "parameters": [
+     {
+      "name": "kind",
+      "in": "query",
+      "required": true,
+      "schema": {
+       "enum": [
+        "folder",
+        "document",
+        "draft"
+       ],
+       "type": "string",
+       "description": "folder, document (a Root document) or draft",
+       "title": "Kind"
+      },
+      "description": "folder, document (a Root document) or draft"
+     },
+     {
+      "name": "id",
+      "in": "query",
+      "required": true,
+      "schema": {
+       "type": "string",
+       "description": "The item's id.",
+       "title": "Id"
+      },
+      "description": "The item's id."
+     },
+     {
+      "name": "to",
+      "in": "query",
+      "required": true,
+      "schema": {
+       "type": "string",
+       "description": "The organization to move it to.",
+       "title": "To"
+      },
+      "description": "The organization to move it to."
+     }
+    ],
+    "responses": {
+     "200": {
+      "description": "Successful Response",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/MovePreviewResponse"
+        }
+       }
+      }
+     },
+     "422": {
+      "description": "Validation Error",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      }
+     }
+    }
+   }
+  },
+  "/org-items/move": {
+   "post": {
+    "tags": [
+     "org-items"
+    ],
+    "summary": "Move Item",
+    "description": "Move one of your items to another organization you belong to, with an audit record.\n\nA folder moves with its subfolders and documents; a Root document with its earlier versions; a\ndraft workflow on its own (its past runs stay where they ran). Every check is repeated at the\nmoment of the move; if anything blocks it, nothing changes and the reason is the error detail.",
+    "operationId": "move_item_org_items_move_post",
+    "requestBody": {
+     "content": {
+      "application/json": {
+       "schema": {
+        "$ref": "#/components/schemas/MoveRequest"
+       }
+      }
+     },
+     "required": true
+    },
+    "responses": {
+     "200": {
+      "description": "Successful Response",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/MovePreviewResponse"
+        }
+       }
+      }
+     },
+     "422": {
+      "description": "Validation Error",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      }
+     }
+    },
+    "security": [
+     {
+      "HTTPBearer": []
+     },
+     {
+      "HTTPBearer": []
+     }
+    ]
+   }
   }
  },
  "components": {
@@ -20490,6 +20710,65 @@
     "title": "DuplicateOf",
     "description": "The completed Library copy that holds the same bytes (D-13)."
    },
+   "ElsewhereCounts": {
+    "properties": {
+     "orgs": {
+      "items": {
+       "$ref": "#/components/schemas/ElsewhereOrgCounts"
+      },
+      "type": "array",
+      "title": "Orgs"
+     }
+    },
+    "type": "object",
+    "required": [
+     "orgs"
+    ],
+    "title": "ElsewhereCounts"
+   },
+   "ElsewhereOrgCounts": {
+    "properties": {
+     "org_id": {
+      "type": "string",
+      "title": "Org Id"
+     },
+     "org_name": {
+      "type": "string",
+      "title": "Org Name"
+     },
+     "folders": {
+      "type": "integer",
+      "title": "Folders"
+     },
+     "root_documents": {
+      "type": "integer",
+      "title": "Root Documents"
+     },
+     "workflows": {
+      "type": "integer",
+      "title": "Workflows"
+     },
+     "threads": {
+      "type": "integer",
+      "title": "Threads"
+     },
+     "runs": {
+      "type": "integer",
+      "title": "Runs"
+     }
+    },
+    "type": "object",
+    "required": [
+     "org_id",
+     "org_name",
+     "folders",
+     "root_documents",
+     "workflows",
+     "threads",
+     "runs"
+    ],
+    "title": "ElsewhereOrgCounts"
+   },
    "ExpertBundleCreate": {
     "properties": {
      "name": {
@@ -21743,6 +22022,50 @@
      "last_indexed"
     ],
     "title": "FolderIndexRow"
+   },
+   "FolderLabel": {
+    "properties": {
+     "id": {
+      "type": "string",
+      "title": "Id"
+     },
+     "name": {
+      "type": "string",
+      "title": "Name"
+     },
+     "org_id": {
+      "type": "string",
+      "title": "Org Id"
+     },
+     "org_name": {
+      "type": "string",
+      "title": "Org Name"
+     }
+    },
+    "type": "object",
+    "required": [
+     "id",
+     "name",
+     "org_id",
+     "org_name"
+    ],
+    "title": "FolderLabel"
+   },
+   "FolderLabels": {
+    "properties": {
+     "labels": {
+      "items": {
+       "$ref": "#/components/schemas/FolderLabel"
+      },
+      "type": "array",
+      "title": "Labels"
+     }
+    },
+    "type": "object",
+    "required": [
+     "labels"
+    ],
+    "title": "FolderLabels"
    },
    "FolderMoveRequest": {
     "properties": {
@@ -24853,6 +25176,112 @@
     "title": "ModelLockUpdate",
     "description": "Body for PUT /admin/models/{id}/lock (the D-149-07 dedicated lock seam, SEPARATE\nfrom the capability PATCH). ``locked`` is a strict bool (Pydantic)."
    },
+   "MoveCountsOut": {
+    "properties": {
+     "subfolders": {
+      "type": "integer",
+      "title": "Subfolders"
+     },
+     "documents": {
+      "type": "integer",
+      "title": "Documents"
+     },
+     "earlier_versions": {
+      "type": "integer",
+      "title": "Earlier Versions"
+     },
+     "past_runs": {
+      "type": "integer",
+      "title": "Past Runs"
+     }
+    },
+    "type": "object",
+    "required": [
+     "subfolders",
+     "documents",
+     "earlier_versions",
+     "past_runs"
+    ],
+    "title": "MoveCountsOut"
+   },
+   "MovePreviewResponse": {
+    "properties": {
+     "kind": {
+      "type": "string",
+      "enum": [
+       "folder",
+       "document",
+       "draft"
+      ],
+      "title": "Kind"
+     },
+     "item_id": {
+      "type": "string",
+      "title": "Item Id"
+     },
+     "item_name": {
+      "type": "string",
+      "title": "Item Name"
+     },
+     "from_org": {
+      "$ref": "#/components/schemas/OrgRef"
+     },
+     "to_org": {
+      "$ref": "#/components/schemas/OrgRef"
+     },
+     "counts": {
+      "$ref": "#/components/schemas/MoveCountsOut"
+     },
+     "refusals": {
+      "items": {
+       "type": "string"
+      },
+      "type": "array",
+      "title": "Refusals"
+     }
+    },
+    "type": "object",
+    "required": [
+     "kind",
+     "item_id",
+     "item_name",
+     "from_org",
+     "to_org",
+     "counts",
+     "refusals"
+    ],
+    "title": "MovePreviewResponse"
+   },
+   "MoveRequest": {
+    "properties": {
+     "kind": {
+      "type": "string",
+      "enum": [
+       "folder",
+       "document",
+       "draft"
+      ],
+      "title": "Kind"
+     },
+     "id": {
+      "type": "string",
+      "title": "Id"
+     },
+     "to_org_id": {
+      "type": "string",
+      "title": "To Org Id"
+     }
+    },
+    "additionalProperties": false,
+    "type": "object",
+    "required": [
+     "kind",
+     "id",
+     "to_org_id"
+    ],
+    "title": "MoveRequest",
+    "description": "One item, one target org. Nothing else is accepted \u2014 the source org is read from the row."
+   },
    "OAuthAuthorizeRequest": {
     "properties": {
      "provider": {
@@ -25148,6 +25577,24 @@
     ],
     "title": "OperatorBody",
     "description": "The first operator + the infra it is minted against (D-11). Infra travels in the body\nbecause the store is not written until finalize \u2014 each step is stateless + re-entrant."
+   },
+   "OrgRef": {
+    "properties": {
+     "id": {
+      "type": "string",
+      "title": "Id"
+     },
+     "name": {
+      "type": "string",
+      "title": "Name"
+     }
+    },
+    "type": "object",
+    "required": [
+     "id",
+     "name"
+    ],
+    "title": "OrgRef"
    },
    "PaletteFolder": {
     "properties": {

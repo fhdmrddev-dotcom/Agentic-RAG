@@ -212,7 +212,15 @@ def test_there_is_no_all_users_mode(client, monkeypatch):
     from app.api.workflow_runs import list_workflow_runs
 
     params = set(inspect.signature(list_workflow_runs).parameters)
-    assert params == {"slug", "limit", "offset", "current_user", "supabase"}
+    # ── D-298-01 (Phase 298, 2026-10-28) — AMENDED DELIBERATELY, never tripped by surprise ──
+    # `request` joins the set. The fence's purpose — NO parameter WIDENS the scope — still
+    # holds, because `request` can only NARROW: it carries the `X-Org-Id` header, which is
+    # read solely through `org_lists.active_org` -> `resolve_active_org_or_none`, re-validated
+    # against the caller's own membership on their RLS connection. A non-member or absent header
+    # resolves None and the log is today's owner-scoped log; a member header adds ONE
+    # `org_id = <org>` predicate ON TOP of `user_id = <caller>`. It is not a query parameter,
+    # so no `?user_id=` / `?all=` became possible. Any OTHER new name still fails here.
+    assert params == {"slug", "limit", "offset", "current_user", "supabase", "request"}
 
 
 # ── §2 THE SLUG FILTER, ACROSS VERSIONS ───────────────────────────────────────

@@ -242,6 +242,8 @@ function refusedWords(call: ApiKeyCall, ctx: CallContext): string | null {
     case "no_template":
     case "no_template_bound":
       return C.calls.noTemplate
+    case "foreign_folder": // 298-02 (ORG-05)
+      return C.calls.foreignFolder
     case "workflows_disabled":
       return C.calls.workflowsDisabled
     case "limiter_unavailable":

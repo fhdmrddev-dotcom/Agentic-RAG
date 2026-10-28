@@ -82,7 +82,7 @@ export function ThreadWorkflowPicker({ thread, locked, busy = false }: { thread:
           className="flex basis-full flex-wrap items-center gap-2 text-xs text-[hsl(0_80%_80%)]"
         >
           <span>{s.failure.message}</span>
-          {s.failure.kind !== "locked" && (
+          {s.failure.kind !== "locked" && s.failure.kind !== "folder" && (
             <Button type="button" variant="outline" size="sm" onClick={s.retry}>
               {COPY.shared.startRetry}
             </Button>

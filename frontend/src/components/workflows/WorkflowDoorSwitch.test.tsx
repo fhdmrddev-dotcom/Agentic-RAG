@@ -77,6 +77,10 @@ vi.mock("@/lib/api", () => ({
   updateSchedule: () => Promise.resolve({}),
   deleteSchedule: () => Promise.resolve(undefined),
   triggerSchedule: () => Promise.resolve({ launched: false }),
+  // 298-04 (D-15) — the folder-labels read DescribeKbPicker asks before it surrenders an
+  // unoffered held id. Answers "none of those" by default, i.e. the caller cannot see it, which is
+  // what every case here that removes a folder from the list means.
+  getFolderLabels: () => Promise.resolve([]),
   generateWorkflow: mockGenerateWorkflow,
   createWorkflowDraft: vi.fn(),
   updateWorkflowDraft: vi.fn(),
@@ -529,6 +533,11 @@ describe("WorkflowDoorSwitch — THE ROUND TRIP: a loose-door workflow can be bo
     fireEvent.click(screen.getByTestId("door-card-describe"))
 
     await waitFor(() => expect(screen.queryByTestId("project-folder-picker")).toBeNull())
+    // ⚠ D-298-07 (298-04, D-15) — the surrender now waits for the folder-labels read to answer
+    // WITHOUT the id (the narrowed list alone no longer proves the author cannot see it). Until it
+    // answers the id is held AND SHOWN (the chosen row reads UNNAMED_KB_OPTION), so it is never
+    // held invisibly; this wait lets that one round trip settle before drafting.
+    await waitFor(() => expect(screen.queryByTestId("describe-kb-chosen")).toBeNull())
 
     fireEvent.change(screen.getByTestId("describe-box"), { target: { value: "Vendor risk" } })
     fireEvent.click(screen.getByTestId("describe-draft"))

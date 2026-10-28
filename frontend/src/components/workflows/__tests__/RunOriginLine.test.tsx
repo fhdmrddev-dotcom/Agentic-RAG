@@ -76,6 +76,9 @@ describe("RunOriginLine (293-03)", () => {
     expect(count(reportRaw, "<RunOriginLine")).toBe(1)
     expect(reportRaw).toContain("<RunOriginLine origin={view.origin} />")
     expect(count(reportRaw, "useState(")).toBe(2)
-    expect(count(reportRaw, "useEffect(")).toBe(2)
+    // D-297-12 (Phase 297-02, D-18 / D-33): RE-TARGETED 2 -> 1, not loosened. The report's
+    // `?run=` writer effect was DELETED (the route owns the run's address now), so one effect
+    // is left: the evidence fetch. The fence's job — no NEW hook — is unchanged and still exact.
+    expect(count(reportRaw, "useEffect(")).toBe(1)
   })
 })

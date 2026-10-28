@@ -43,6 +43,9 @@ import {
 // StreamsProvider, so any test rendering this column mocks/stubs that provider).
 import { useStreamingThreadIds, useStreamActions } from "@/providers/StreamsProvider"
 import { ActiveRunsTray } from "@/components/chat/ActiveRunsTray"
+import { SyrelLoader } from "@/components/ui/SyrelLoader"
+import { LOADING_CHATS } from "@/components/org/orgItemsCopy"
+import { ElsewhereLine } from "@/components/org/ElsewhereLine"
 
 interface Props {
   threads: Thread[]
@@ -61,6 +64,10 @@ interface Props {
   // Optional (same seam idiom as onOpenPalette) — the ⟨| header button renders only
   // when ChatLayout wires it; the ▷ reopen handle lives in the chat top-bar (ChatArea).
   onCollapse?: () => void
+  // Phase 298-04 (D-11 / UI-D8 / UI-D9): the list is being re-read for a newly active org.
+  // Optional; ChatLayout passes `useThreads().switching`, which is false on first paint, so the
+  // first-paint empty sentence is unchanged (BUG-261027-02 is Phase 299's).
+  loading?: boolean
 }
 
 export function ChatHistoryColumn({
@@ -73,6 +80,7 @@ export function ChatHistoryColumn({
   folders,
   onOpenPalette,
   onCollapse,
+  loading = false,
 }: Props) {
   // SEED-064: which threads have a live run (reactive on start/stop, not tokens)
   // + the cross-thread stop action. Lifted verbatim from NavPanel.
@@ -457,7 +465,10 @@ export function ChatHistoryColumn({
 
       {/* hc-list: date-grouped rows, or the honest empty-state. */}
       <div className="flex-1 overflow-y-auto overflow-x-hidden px-2.5 py-2 scrollbar-thin">
-        {filtered.length === 0 ? (
+        <ElsewhereLine kind="threads" className="px-2 pb-2" />
+        {loading ? (
+          <SyrelLoader size="section" label={LOADING_CHATS} className="justify-center py-10 px-3 text-sm text-muted-foreground" />
+        ) : filtered.length === 0 ? (
           <p className="text-center text-muted-foreground text-sm py-10 px-3">
             {query.trim() ? "No chats match your search." : "No recent chats"}
           </p>

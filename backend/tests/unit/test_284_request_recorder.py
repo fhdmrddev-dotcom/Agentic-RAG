@@ -365,4 +365,12 @@ async def test_the_summary_reads_the_view_and_sends_no_id_list(monkeypatch):
     for sql, args in sql_seen:
         reads_docs = any(f"public.{t}" in sql for t in DOC_TABLES)
         assert not (reads_docs and "ANY($" in sql), sql
-        assert not args, "the summary passes no parameter list"
+        # ── D-298-03 (Phase 298, 2026-10-28) — AMENDED DELIBERATELY ──
+        # The summary scan now binds ONE scalar: the validated active org (or None = today's
+        # scan), the same org predicate GET /documents adds (D-32). The fence's purpose — no
+        # id LIST is ever sent to a document table (nothing bounded by the number of documents)
+        # — still holds: at most one non-sequence argument, never a list/tuple/set of ids.
+        assert len(args) <= 1, "the summary passes at most the one org scalar"
+        assert not any(isinstance(a, (list, tuple, set, frozenset)) for a in args), (
+            "the summary passes no parameter list"
+        )

@@ -1129,6 +1129,39 @@ Repair-only milestone: 14 major-bug fixes, 5 v4.5 debt items, 3 owed G-5 extract
 
 ---
 
+## Milestone: v4.7 — Workflows You Can See and Start Anywhere
+
+**Shipped:** 2026-10-27
+**Phases:** 12 (286-296, 292.1 inserted) | **Plans:** 60 (+3 gap fixes in 295)
+**Timeline:** 2026-10-18 → 2026-10-27 (10 days) | **Commits:** 885 since `v4.6`
+
+### What Was Built
+Start a workflow from a thread, from a starter, from a schedule or from outside with an API key; finish authoring from your own files; see what a run did (run page, evidence report, confidence, card chips, team picture, diagram/comparison/timeline artifacts); runs that pause durably instead of dead-ending; rerank and citation check. Phase 296 then closed the v4.7 debt (133 inventory rows). See MILESTONES.md.
+
+### What Worked
+- The audit at 293's close was followed by a debt phase (296) rather than carrying ~60 items forward; every inventory row ended fixed, accepted with a reason, seeded or operator-owed (coverage script: 0 missing).
+- Claude drove G-4 in Chrome with evidence files; the drive found 2 defects green unit tests passed over (a re-driven run's stream never ending; a fresh in-thread start's answer never rendering), and the live roster proved a review finding (a resumed run sent through the owner's default provider, 5 of 6 providers FAIL before the fix).
+- Measuring before building: 295 came from a measurement (35 of 36 gate failures were the citations gate), not from the planted seed.
+
+### What Was Inefficient
+- Two phases (294, 295) were added mid-milestone outside the theme; requirements grew 14 → 21 and the ROADMAP milestone line still read "286-293, 14 requirements" at close.
+- The stored audit went stale within a day (296 landed 128 commits after it); the close needed an addendum.
+- `gsd-sdk query phase.add` wrote 294 and 295 under the v3.0 section; both moved by hand. gap rounds without PLAN.md read 0 in the G-7 script.
+- OpenRouter (402) and Moonshot (429) blocked roster rows for most of the milestone.
+
+### Patterns Established
+- A stream/follow fix is done only when driven live — a unit test calling the terminal handler by hand passed while the wire never sent one.
+- Deploy order held for three migrations in one push: each cloud migration shown, approved, applied and verified, then the backend, then `get_advisors(security)`.
+
+### Key Lessons
+- An audit is a claim about a tree; re-check it at close when a phase landed after it.
+- Plant fresh G-4 fixtures; old local runs and users vanish (SEED-390).
+
+### Cost Observations
+- Not measured this milestone.
+
+---
+
 ## Cross-Milestone Trends
 
 | Milestone | Phases | Plans | Avg Plans/Phase | Timeline |
@@ -1161,6 +1194,7 @@ Repair-only milestone: 14 major-bug fixes, 5 v4.5 debt items, 3 owed G-5 extract
 | v4.4 Experts That Actually Work | 5 | 24 | 4.8 | 7 days |
 | v4.5 Find It, Show It | 7 | 38 | 5.4 | 14 days |
 | v4.6 Pay It Down | 9 | 34 | 3.8 | 5 days |
+| v4.7 Workflows You Can See and Start Anywhere | 12 | 60 | 5.0 | 10 days |
 
 > ⚠ The v3.4 and v3.5 rows were **missing** from this table and were added at the v3.6 close —
 > both milestones shipped without a trends row. **v3.6 is the project's largest milestone by plan

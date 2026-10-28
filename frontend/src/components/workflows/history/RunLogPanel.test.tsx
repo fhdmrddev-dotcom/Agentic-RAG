@@ -18,12 +18,14 @@
  * the URL, the auth headers and the error class, and a suite that stubbed `fetch` would be
  * asserting this component against a URL it does not construct.
  */
-import { describe, it, expect, vi, beforeEach } from "vitest"
-import { render, screen, waitFor } from "@testing-library/react"
+import { describe, it, expect, vi, beforeEach, afterEach } from "vitest"
+import { act, render, screen, waitFor } from "@testing-library/react"
 import userEvent from "@testing-library/user-event"
 
 import { RunLogPanel } from "./RunLogPanel"
+import { setActiveOrgId } from "@/lib/api/_core"
 import {
+  LOG_LOADING,
   LOG_FAILED,
   LOG_SUBTITLE,
   LOG_UNAVAILABLE,
@@ -44,6 +46,39 @@ const { listWorkflowRuns, ApiError } = vi.hoisted(() => {
 })
 
 vi.mock("@/lib/api", () => ({ listWorkflowRuns, ApiError }))
+// Phase 298-05 (D-17 / UI-D4) — a one-line probe that proves WHERE the elsewhere line mounts. The
+// real line renders nothing without 2+ orgs, so standing it in changes no other case here.
+vi.mock("@/components/org/ElsewhereLine", () => ({
+  ElsewhereLine: ({ kind, className }: { kind: string; className?: string }) => (
+    <div data-testid="elsewhere-probe" data-kind={kind} data-class={className ?? ""} />
+  ),
+}))
+
+// Phase 298-04 (D-08 / D-09) — a flippable active org standing in for OrgProvider. Every case
+// above runs with no active org (null), exactly as before this block existed.
+const orgStore = vi.hoisted(() => {
+  let current: string | null = null
+  const subs = new Set<() => void>()
+  return {
+    get: () => current,
+    set: (v: string | null) => {
+      current = v
+      subs.forEach((f) => f())
+    },
+    subscribe: (f: () => void) => {
+      subs.add(f)
+      return () => {
+        subs.delete(f)
+      }
+    },
+  }
+})
+vi.mock("@/providers/OrgProvider", async () => {
+  const { useSyncExternalStore } = await import("react")
+  return {
+    useOrgOptional: () => ({ activeOrgId: useSyncExternalStore(orgStore.subscribe, orgStore.get) }),
+  }
+})
 
 function runOf(over: Partial<WorkflowRunListItem> = {}): WorkflowRunListItem {
   return {
@@ -299,5 +334,87 @@ describe("RunLogPanel §6 — paging", () => {
     render(<RunLogPanel scope={null} onOpenRun={vi.fn()} />)
     await screen.findByTestId("run-log-row-run-1")
     expect(screen.queryByTestId("run-log-more")).not.toBeInTheDocument()
+  })
+})
+
+// ── Phase 298-04 (D-08 / D-09 / UI-D8) — the log follows an org switch ─────────────────────
+describe("RunLogPanel §7 — an org switch (298-04)", () => {
+  function switchOrg(next: string | null) {
+    setActiveOrgId(next)
+    orgStore.set(next)
+  }
+  function deferred<T>() {
+    let resolve!: (v: T) => void
+    let reject!: (e: unknown) => void
+    const promise = new Promise<T>((res, rej) => {
+      resolve = res
+      reject = rej
+    })
+    return { promise, resolve, reject }
+  }
+  beforeEach(() => switchOrg("org-a"))
+  afterEach(() => switchOrg(null))
+
+  it("clears the old org's rows AT ONCE and says it is loading — no count, no empty sentence", async () => {
+    listWorkflowRuns.mockResolvedValueOnce(pageOf([runOf({ id: "run-a" })], 1))
+    render(<RunLogPanel scope={null} onOpenRun={vi.fn()} />)
+    await screen.findByTestId("run-log-row-run-a")
+
+    const pageB = deferred<WorkflowRunListPage>()
+    listWorkflowRuns.mockReturnValueOnce(pageB.promise)
+    act(() => switchOrg("org-b"))
+    expect(screen.queryByTestId("run-log-row-run-a")).toBeNull()
+    expect(screen.getByTestId("run-log-loading")).toHaveTextContent(LOG_LOADING)
+    expect(screen.queryByTestId("run-log-count")).toBeNull()
+    expect(screen.queryByTestId("run-log-empty")).toBeNull()
+
+    await act(async () => pageB.resolve(pageOf([runOf({ id: "run-b" })], 1)))
+    expect(await screen.findByTestId("run-log-row-run-b")).toBeInTheDocument()
+    expect(screen.queryByTestId("run-log-loading")).toBeNull()
+  })
+
+  it("a late answer for the old org is dropped", async () => {
+    const pageA = deferred<WorkflowRunListPage>()
+    listWorkflowRuns.mockReturnValueOnce(pageA.promise)
+    listWorkflowRuns.mockResolvedValueOnce(pageOf([runOf({ id: "run-b" })], 1))
+    render(<RunLogPanel scope={null} onOpenRun={vi.fn()} />)
+    act(() => switchOrg("org-b"))
+    await screen.findByTestId("run-log-row-run-b")
+    await act(async () => pageA.resolve(pageOf([runOf({ id: "run-a" })], 1)))
+    expect(screen.queryByTestId("run-log-row-run-a")).toBeNull()
+    expect(screen.getByTestId("run-log-row-run-b")).toBeInTheDocument()
+  })
+
+  it("a failure in the new org is still never an empty log", async () => {
+    listWorkflowRuns.mockResolvedValueOnce(pageOf([runOf({ id: "run-a" })], 1))
+    render(<RunLogPanel scope={null} onOpenRun={vi.fn()} />)
+    await screen.findByTestId("run-log-row-run-a")
+    listWorkflowRuns.mockRejectedValueOnce(new ApiError("boom", 500))
+    act(() => switchOrg("org-b"))
+    expect(await screen.findByTestId("run-log-failed")).toHaveTextContent(LOG_FAILED)
+    expect(screen.queryByTestId("run-log-empty")).toBeNull()
+    expect(screen.queryByTestId("run-log-row-run-a")).toBeNull()
+  })
+})
+
+
+// ── Phase 298-05 (D-17 / UI-D6) — the elsewhere line's mount point ──────────────────────────
+describe("RunLogPanel §8 — the elsewhere line (298-05)", () => {
+  it("the WHOLE log mounts ONE runs line at the top of its scroll region", async () => {
+    listWorkflowRuns.mockResolvedValue(pageOf([runOf()], 1))
+    render(<RunLogPanel scope={null} onOpenRun={vi.fn()} />)
+    await screen.findByTestId("run-log-row-run-1")
+    const probes = screen.getAllByTestId("elsewhere-probe")
+    expect(probes).toHaveLength(1)
+    expect(probes[0]).toHaveAttribute("data-kind", "runs")
+    expect(probes[0].getAttribute("data-class")).toContain("px-6")
+    expect(probes[0].compareDocumentPosition(screen.getByTestId("run-log-row-run-1")) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy()
+  })
+
+  it("a log scoped to ONE workflow has no elsewhere line (the count covers every run)", async () => {
+    listWorkflowRuns.mockResolvedValue(pageOf([runOf()], 1))
+    render(<RunLogPanel scope={{ slug: "qbr", name: "Quarterly Business Review" }} onOpenRun={vi.fn()} />)
+    await screen.findByTestId("run-log-row-run-1")
+    expect(screen.queryByTestId("elsewhere-probe")).toBeNull()
   })
 })

@@ -27,10 +27,15 @@
 
 import { describe, it, expect } from "vitest"
 
-import { activeViewReachability } from "@/lib/activeViewReachability"
+import { activeViewReachability, activeViewRouteLeg } from "@/lib/activeViewReachability"
+import { formatAppRoute, parseAppLocation } from "@/lib/appRoutes"
 
 import appSourceRaw from "@/App.tsx?raw"
-import layoutSourceRaw from "@/components/layout/ChatLayout.tsx?raw"
+// D-297-01 (Phase 297-01, REG-09): RE-TARGETED, not retired. The mount switch moved VERBATIM out
+// of ChatLayout into AppViewSwitch, so the render-branch leg reads the switch's home. Reading
+// ChatLayout here would still find three comparisons (drawer + history column) and quietly red
+// (3)/(4) — the fix is the source path, never a relaxed expect. App stays the members source.
+import layoutSourceRaw from "@/components/layout/AppViewSwitch.tsx?raw"
 
 const lf = (s: string) => s.replace(/\r\n/g, "\n")
 const APP = lf(appSourceRaw)
@@ -49,12 +54,13 @@ function appWithExtraMember(member: string): string {
 }
 
 describe("activeViewReachability · (1) self-guard — the raw imports are the files we think they are", () => {
-  it("App.tsx?raw and ChatLayout.tsx?raw are non-empty and carry their own declarations", () => {
+  it("App.tsx?raw and AppViewSwitch.tsx?raw are non-empty and carry their own declarations", () => {
     // A sweep of the wrong file must not be able to read as a pass.
     expect(APP.length).toBeGreaterThan(1000)
     expect(LAYOUT.length).toBeGreaterThan(1000)
     expect(APP).toContain("export type ActiveView")
-    expect(LAYOUT).toContain("export function ChatLayout")
+    // D-297-01: the switch's own identity anchor (was ChatLayout's before the move).
+    expect(LAYOUT).toContain("export function AppViewSwitch")
   })
 })
 
@@ -112,6 +118,32 @@ describe("activeViewReachability · (4)/(5) the positional fallback must stay LA
       }
     `
     expect(activeViewReachability(APP, noFallback).fallbackIsLast).toBe(false)
+  })
+})
+
+// D-297-14 (Phase 297-02, LINK-01 / D-25): THE ROUTE LEG — new cases, the eleven above stay.
+// The triad gains a fourth leg the day the app gets addresses: a member with a render branch but
+// no address is reachable only by a click and is lost on every refresh. The parser and formatter
+// are passed IN, so the checker keeps no runtime import of the route table; members still come
+// from App.tsx's AST, so a comment cannot satisfy the leg.
+describe("activeViewReachability · (7) the route leg — every member has an address (D-25)", () => {
+  const ROUTES = { parseAppLocation, formatAppRoute }
+
+  it("(7a) every shipped ActiveView member round-trips format → parse", () => {
+    expect(activeViewRouteLeg(APP, ROUTES)).toEqual({ unrouted: [] })
+  })
+
+  it("(7b) THE RED — a synthetic 13th member with no address is reported unrouted", () => {
+    expect(activeViewRouteLeg(appWithExtraMember(SYNTHETIC_MEMBER), ROUTES).unrouted).toEqual([SYNTHETIC_MEMBER])
+  })
+
+  it("(7c) a zero-member app source THROWS — the route leg inherits the vacuity refusal", () => {
+    expect(() => activeViewRouteLeg("export type ActiveView = string\n", ROUTES)).toThrow(/ActiveView/)
+  })
+
+  it("(7d) a parser that answers not-found for everything reports EVERY member unrouted", () => {
+    const report = activeViewRouteLeg(APP, { parseAppLocation: () => ({ view: "not-found" }), formatAppRoute })
+    expect(report.unrouted.length).toBeGreaterThanOrEqual(12)
   })
 })
 

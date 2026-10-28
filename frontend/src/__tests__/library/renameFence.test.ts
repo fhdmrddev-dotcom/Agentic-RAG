@@ -64,6 +64,10 @@ import { describe, it, expect } from "vitest"
 
 import appSource from "@/App.tsx?raw"
 import layoutSource from "@/components/layout/ChatLayout.tsx?raw"
+// D-297-02 (Phase 297-01, REG-09): the ActiveView mount switch moved VERBATIM from ChatLayout into
+// AppViewSwitch, so case (b), the Library key link and the page-import arm read the switch.
+// ChatLayout keeps its own identity + length floor (it is still the shell); App's needle is unmoved.
+import switchSource from "@/components/layout/AppViewSwitch.tsx?raw"
 import navSource from "@/lib/nav-items.ts?raw"
 import pageSource from "@/pages/LibraryPage.tsx?raw"
 // ⚠ ADDED at sketch 231-A. The page's `<h1>` and its subtitle moved into the header row this
@@ -81,6 +85,7 @@ const lf = (s: string): string => s.replace(/\r\n/g, "\n")
 
 const APP = lf(appSource)
 const LAYOUT = lf(layoutSource)
+const SWITCH = lf(switchSource)
 const NAV = lf(navSource)
 const PAGE = lf(pageSource)
 const DOCS_PY = lf(docsPySource)
@@ -101,6 +106,8 @@ describe("renameFence · self-guards", () => {
   it("every ?raw import carries a non-trivial file, not an empty string", () => {
     expect(APP.length).toBeGreaterThan(4000)
     expect(LAYOUT.length).toBeGreaterThan(20000)
+    // D-297-02: the switch's floor — measured at 297-01 as ~27k chars, so 20000 is a floor.
+    expect(SWITCH.length).toBeGreaterThan(20000)
     expect(NAV.length).toBeGreaterThan(1500)
     expect(PAGE.length).toBeGreaterThan(15000)
     expect(DOCS_PY.length).toBeGreaterThan(50000)
@@ -110,6 +117,8 @@ describe("renameFence · self-guards", () => {
     // A non-empty sweep of the WRONG file is the same bug as a sweep of the empty string.
     expect(APP).toContain("export type ActiveView")
     expect(LAYOUT).toContain("export function ChatLayout")
+    // D-297-02: the switch's own identity anchor.
+    expect(SWITCH).toContain("export function AppViewSwitch")
     expect(NAV).toContain("export const NAV_ITEMS")
     expect(PAGE).toContain("export function LibraryPage")
     expect(DOCS_PY).toContain('supabase.table("documents")')
@@ -146,10 +155,11 @@ describe("renameFence · what the Documents→Library rename must not touch", ()
   it("(b) ChatLayout's trailing else is now UnknownViewFallback — KnowledgeHealthPage is retired", () => {
     // 217.1-14: the KnowledgeHealthPage fallback is replaced with UnknownViewFallback.
     // Assert GONE: the old fallback no longer exists in ChatLayout.
-    expect(LAYOUT).not.toContain("<KnowledgeHealthPage />")
+    // D-297-02: read from the switch's home (moved verbatim out of ChatLayout).
+    expect(SWITCH).not.toContain("<KnowledgeHealthPage />")
     // Assert PRESENT: UnknownViewFallback with the type escape hatch is there instead.
-    expect(LAYOUT).toContain("UnknownViewFallback")
-    expect(LAYOUT).toContain("as never")
+    expect(SWITCH).toContain("UnknownViewFallback")
+    expect(SWITCH).toContain("as never")
   })
 
   it("(c) the nav label reads Library while `view: \"documents\"` is unchanged", () => {
@@ -178,11 +188,13 @@ describe("renameFence · what the Documents→Library rename must not touch", ()
     // `activeView === "documents"` renders `LibraryPage`, adjacently. That is preserved
     // verbatim, including the 120-character proximity window; only the trailing ` />` is
     // dropped, so the mount may carry props without this fence claiming to own its signature.
+    // D-297-02: the key link reads the switch's home; the window and the pattern are unchanged.
     expect(
       /activeView === "documents" \?[\s\S]{0,120}<LibraryPage onNavigate=\{onNavigate\}/.test(
-        LAYOUT,
+        SWITCH,
       ),
     ).toBe(true)
+    expect(SWITCH).not.toContain("<IngestionPage")
     expect(LAYOUT).not.toContain("<IngestionPage")
   })
 
@@ -208,7 +220,8 @@ describe("renameFence · what the Documents→Library rename must not touch", ()
     expect(headerBarSource.length).toBeGreaterThan(1500)
     expect(PAGE + headerBarSource).toMatch(/Library\s*<\/h1>/)
     expect(PAGE + headerBarSource).not.toContain(">Documents</h1>")
-    expect(LAYOUT).toContain('from "@/pages/LibraryPage"')
+    // D-297-02: the page import moved with the mount, into the switch.
+    expect(SWITCH).toContain('from "@/pages/LibraryPage"')
   })
 })
 

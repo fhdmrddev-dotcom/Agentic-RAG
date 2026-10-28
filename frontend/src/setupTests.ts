@@ -7,6 +7,7 @@ import * as axeMatchers from "vitest-axe/matchers"
 import { afterEach, expect } from "vitest"
 import { resetAskDrafts } from "@/stores/askDraftStore"
 import { resetCitationChecks } from "@/stores/citationCheckStore"
+import { resetElsewhereCounts } from "@/lib/elsewhereCounts"
 expect.extend(axeMatchers)
 // Phase 282-02 (D-24): the ask draft store is a module singleton that outlives cleanup(), and a
 // leaked selection is toggled OFF by the next case's click — so every case starts with no drafts.
@@ -15,3 +16,6 @@ afterEach(() => resetAskDrafts())
 // the requested-id set would otherwise leak into the next case). It imports its API client lazily,
 // so this import does not cache lib/api/_core ahead of any suite's vi.mock of it.
 afterEach(() => resetCitationChecks())
+// Phase 298-05: the org-items store (elsewhere counts, the move version, the open move) is a module
+// singleton too. Like the citation store it loads its API client lazily, for the same reason.
+afterEach(() => resetElsewhereCounts())

@@ -123,6 +123,9 @@ const LIBRARY_SUBTREE_PATHS = [
   // ── 290-02 (2026-10-21, VIS-04 / D-01): the card's chip line — pure resolver, then its render ──
   "./stepLine.ts",
   "./StepChipLine.tsx",
+  // ── 298-04 (2026-10-28, ORG-02 / D-26 G-5): WorkflowsPage's three feeds, moved out move-only ──
+  // Listed in the commit that creates it, for the reason this array's docblock gives.
+  "./useWorkflowLibraryFeeds.ts",
 ] as const
 
 /** The house `?raw` / `import.meta.glob` idiom (`PhaseFormPanel.rails.test.tsx:422`). */
@@ -174,7 +177,11 @@ describe("the sweep is looking at something (non-vacuity)", () => {
     // ⚠ 290-02 read it the same way: `expected [ './libraryRow.ts', …(16) ] to have a length of
     // 15 but got 17` was OBSERVED before the 17 was written (two modules: `./stepLine.ts` and
     // `./StepChipLine.tsx`, the card's chip line, VIS-04).
-    expect(LIBRARY_SUBTREE_PATHS).toHaveLength(17)
+    // ⚠ D-298-06 — amended ON PURPOSE by 298-04: `./useWorkflowLibraryFeeds.ts` (the feeds moved
+    // out of WorkflowsPage, G-5 seam) joins the corpus, so the length is 18 — the array's measured
+    // length after the one addition, and the five `it.each` sweeps grow the suite by +5 (1133 → 1138
+    // across the WorkflowsPage suite set, measured).
+    expect(LIBRARY_SUBTREE_PATHS).toHaveLength(18)
     for (const later of [
       "./RunModal.tsx",
       "./WorkflowDeleteSheet.tsx",

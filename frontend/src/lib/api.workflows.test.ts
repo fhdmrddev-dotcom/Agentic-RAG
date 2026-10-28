@@ -393,3 +393,80 @@ describe("updateWorkflowDraft — a refusal is classified by machine code, never
     warnSpy.mockRestore()
   })
 })
+
+// ── Phase 298-02 (ORG-05 / D-36) — the folder refusal is CODED, and the client branches on the
+//    code, never on the prose. The sentence is the server's, shown verbatim (UI-D12). ─────────
+describe("298-02 — a folder in another org is refused by code, and the server's sentence is kept", () => {
+  const SENTENCE =
+    "“Q3 Contracts” is in Acme Legal, not in this workflow's organization (Personal). Pick a folder from Personal."
+  const CODED = { detail: { code: "folder_in_other_org", message: SENTENCE } }
+
+  it("updateWorkflowDraft: a coded 422 throws WorkflowFolderRefusedError carrying the message", async () => {
+    const { WorkflowFolderRefusedError } = await import("@/lib/api/workflows")
+    vi.stubGlobal("fetch", vi.fn().mockResolvedValue(jsonRes(422, CODED)))
+    const err = await updateWorkflowDraft("wf-1", { slug: "wf", phases: [] }, "T").catch(
+      (e: unknown) => e,
+    )
+    expect(err).toBeInstanceOf(WorkflowFolderRefusedError)
+    expect((err as Error).name).toBe("WorkflowFolderRefusedError")
+    expect((err as Error).message).toBe(SENTENCE)
+  })
+
+  it("updateWorkflowDraft: any OTHER 422 is still WorkflowDraftUnreadableError (unchanged)", async () => {
+    const warnSpy = vi.spyOn(console, "warn").mockImplementation(() => {})
+    vi.stubGlobal(
+      "fetch",
+      vi.fn().mockResolvedValue(jsonRes(422, { detail: { code: "something_else", message: "x" } })),
+    )
+    const err = await updateWorkflowDraft("wf-1", { slug: "wf", phases: [] }, "T").catch(
+      (e: unknown) => e,
+    )
+    expect(err).toBeInstanceOf(WorkflowDraftUnreadableError)
+    warnSpy.mockRestore()
+  })
+
+  it("createWorkflowDraft: a coded 422 throws WorkflowFolderRefusedError carrying the message", async () => {
+    const { WorkflowFolderRefusedError } = await import("@/lib/api/workflows")
+    vi.stubGlobal("fetch", vi.fn().mockResolvedValue(jsonRes(422, CODED)))
+    const err = await createWorkflowDraft({ slug: "wf", phases: [] }).catch((e: unknown) => e)
+    expect(err).toBeInstanceOf(WorkflowFolderRefusedError)
+    expect((err as Error).message).toBe(SENTENCE)
+  })
+
+  it("createWorkflowDraft: other failures are unchanged", async () => {
+    const { WorkflowFolderRefusedError } = await import("@/lib/api/workflows")
+    vi.stubGlobal("fetch", vi.fn().mockResolvedValue(jsonRes(422, { detail: [{ loc: ["body"] }] })))
+    const err = await createWorkflowDraft({ slug: "wf", phases: [] }).catch((e: unknown) => e)
+    expect(err).not.toBeInstanceOf(WorkflowFolderRefusedError)
+    expect((err as Error).message).toBe("Failed to create workflow draft (status 422)")
+  })
+})
+
+// ── Phase 298-02 (D-12) — the draft reload reads the caller's drafts with NO org header ─────────
+describe("298-02 — listDraftWorkflows({ allOrgs: true }) omits X-Org-Id; the default keeps it", () => {
+  afterEach(async () => {
+    const { setActiveOrgId } = await import("@/lib/api/_core")
+    setActiveOrgId(null)
+  })
+
+  it("the default call sends the active org", async () => {
+    const { setActiveOrgId } = await import("@/lib/api/_core")
+    setActiveOrgId("org-b")
+    const spy = vi.fn().mockResolvedValue(jsonRes(200, []))
+    vi.stubGlobal("fetch", spy)
+    await listDraftWorkflows()
+    const headers = spy.mock.calls[0][1].headers as Record<string, string>
+    expect(headers["X-Org-Id"]).toBe("org-b")
+  })
+
+  it("allOrgs sends no X-Org-Id, and keeps the Authorization header", async () => {
+    const { setActiveOrgId } = await import("@/lib/api/_core")
+    setActiveOrgId("org-b")
+    const spy = vi.fn().mockResolvedValue(jsonRes(200, []))
+    vi.stubGlobal("fetch", spy)
+    await listDraftWorkflows(undefined, { allOrgs: true })
+    const headers = spy.mock.calls[0][1].headers as Record<string, string>
+    expect("X-Org-Id" in headers).toBe(false)
+    expect(headers.Authorization).toBe("Bearer tok-123")
+  })
+})

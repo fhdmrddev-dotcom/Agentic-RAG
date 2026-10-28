@@ -247,3 +247,28 @@ describe("ThreadWorkflowPicker - the conversation is never read (D-07 / T-287-09
     expect(`props.mess${"ages"}.at(-1)`).toContain(needles[0])
   })
 })
+
+describe("ThreadWorkflowPicker — 298-02 a folder refusal (ORG-05 / UI-D12)", () => {
+  const SENTENCE =
+    "“Q3 Contracts” is in Acme Legal, not in this workflow's organization (Personal). Pick a folder from Personal."
+
+  class CodedApiError extends Error {
+    status: number
+    code: string
+    constructor(message: string, status: number, code: string) {
+      super(message)
+      this.status = status
+      this.code = code
+    }
+  }
+
+  it("shows the server's sentence verbatim, with Dismiss and no Retry", async () => {
+    mockSend.mockRejectedValue(new CodedApiError(SENTENCE, 422, "folder_in_other_org"))
+    render(<ThreadWorkflowPicker thread={THREAD} locked={false} />)
+    await openPicker()
+    fireEvent.click(await screen.findByTestId("thread-workflow-item-wf-plain"))
+    expect(await screen.findByTestId("thread-workflow-start-failure")).toHaveTextContent(SENTENCE)
+    expect(screen.queryByRole("button", { name: "Retry start" })).toBeNull()
+    expect(screen.getByRole("button", { name: "Dismiss message" })).toBeInTheDocument()
+  })
+})

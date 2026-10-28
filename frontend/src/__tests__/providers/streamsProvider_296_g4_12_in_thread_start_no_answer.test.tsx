@@ -4,7 +4,7 @@
  * server-side in ~4 s and its answer row is persisted, but the chat column ends at the user bubble
  * "Run 293 board: deepseek" and the run status line disappears. A reopen renders the answer.
  *
- * Diagnosis: `.planning/phases/296-close-v4-7-debt/evidence/g4/12-diagnosis.md`.
+ * Diagnosis: `.planning/milestones/v4.7-phases/296-close-v4-7-debt/evidence/g4/12-diagnosis.md`.
  *
  * THE PATH. `useStartWorkflowInThread` → `sendMessage(threadId, "Run <name>", {workflowDefinitionId})`.
  * The stream is followed by sendMessage's OWN kickoff follow (`subscribeToRun(run_id, "0", …)`), not by

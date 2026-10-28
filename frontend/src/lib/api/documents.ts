@@ -31,7 +31,7 @@ import type {
   PageParams,
   WorkspaceFile,
 } from "../../types"
-import { API_BASE, getAuthHeaders, getAuthToken } from "./_core"
+import { API_BASE, getActiveOrgId, getAuthHeaders, getAuthToken } from "./_core"
 // Phase 275 (S10): imported, never re-exported — the barrel contract (apiBarrel.test.ts).
 import { refusalOf } from "./refusal"
 
@@ -166,9 +166,13 @@ export async function uploadDocument(file: File, folderId?: string | null): Prom
   const formData = new FormData()
   formData.append("file", file)
   if (folderId) formData.append("folder_id", folderId)
+  // 298 (D-29 / D-07): the active org, read at SEND time, so a Root upload is minted in the org
+  // whose Root list shows it (the server re-validates membership). Still no Content-Type — the
+  // browser writes the multipart boundary.
+  const orgId = getActiveOrgId()
   const res = await fetch(`${API_BASE}/documents/upload`, {
     method: "POST",
-    headers: { Authorization: `Bearer ${token}` },
+    headers: { Authorization: `Bearer ${token}`, ...(orgId ? { "X-Org-Id": orgId } : {}) },
     body: formData,
   })
   if (!res.ok) {

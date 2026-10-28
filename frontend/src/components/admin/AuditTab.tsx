@@ -81,6 +81,7 @@ const PLATFORM_ACTION_META: Record<string, { label: string; group: ActionGroup }
   "relationship.delete": { label: "Unlinked documents", group: "Organizing" },
   "classification.rule.create": { label: "Created a classification rule", group: "Organizing" },
   "metadata.field.create": { label: "Added a metadata field", group: "Organizing" },
+  "org.item.move": { label: "Moved an item to another organization", group: "Organizing" },
   "settings.update": { label: "Changed settings", group: "Other" },
   "feedback.submit": { label: "Sent feedback", group: "Other" },
   // Phase 293-04 (D-17): the five api_key.* rows (migration 215), worded — never raw codes. The SAME

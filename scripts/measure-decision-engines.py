@@ -6,7 +6,7 @@ Run it with the backend virtualenv, from the repository root, with local infra u
     backend/venv/Scripts/python scripts/measure-decision-engines.py \\
         --heldout backend/tests/unit/fixtures/decision_heldout_v1.json \\
         --arms off,local,jev,openai_decisions --pool 20 --top-k 5 \\
-        --json-out .planning/phases/294-decision-engine-rerank-and-citation-check/294-measurement.json \\
+        --json-out .planning/milestones/v4.7-phases/294-decision-engine-rerank-and-citation-check/294-measurement.json \\
         --label 294-02
 
 This file owns argument parsing, printing and the exit code, and **NO measurement logic** — every

@@ -125,6 +125,11 @@ export function OrgProvider({
   // when activeOrgId becomes non-null).
   useEffect(() => {
     if (resolvedOrgId && activeOrgId === null) {
+      // 298 (D-36): sync the `X-Org-Id` header FIRST, exactly as switchOrg does (D-166-08).
+      // React runs child effects before this provider's persist/sync effect in the same commit,
+      // so without this a list hook keyed on the adopted org would send header-less and tag its
+      // answer with the old (null) org — then drop it as another org's answer, forever.
+      syncActiveOrgHeader(resolvedOrgId)
       setActiveOrgIdState(resolvedOrgId)
     }
   }, [resolvedOrgId, activeOrgId])

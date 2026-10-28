@@ -1,99 +1,119 @@
-# Requirements: Milestone v4.7 Workflows You Can See and Start Anywhere
+# Requirements: Milestone v4.8 Every Page Has a Link
 
-**Defined:** 2026-10-18 (operator intake; research skipped — every item has a planted seed with context)
+**Defined:** 2026-10-27 (operator intake + research: `.planning/research/SUMMARY.md`)
 **Core value:** The agent acts as an AI colleague — it knows your knowledge base, can run code, and can be taught new behaviours (skills) that persist and can be shared.
-**Milestone goal:** Workflows become easier to start, finish authoring and understand at a glance, with visuals that show what a run did.
+**Milestone goal:** Every place in the app has its own URL, and a person is told, with a link, when a run is waiting on them.
 
-Seeds folded at intake: SEED-232, SEED-195, SEED-014, SEED-084, SEED-164, SEED-051, SEED-183, SEED-086, SEED-337, SEED-348, SEED-155, SEED-152. SEED-163 is already delivered (Phase 193.2) and is only flipped (REG-06).
+Seeds folded at intake: SEED-185, SEED-015, SEED-178, SEED-281 (the run-waiting half), SEED-389, SEED-391, SEED-312.
+Bugs folded at intake: BUG-261027-01, -02, -03, -04, -05.
 
-## v4.7 Requirements
+Decided at intake (operator, 2026-10-27):
+- Library, Workflows, the thread list and run history follow the active org.
+- The "waiting on you" badge counts waiting runs in every org the user belongs to, and each item names its org.
+- Notification email goes to the run owner for any waiting run that is still waiting after a delay, plus an in-app notice. The sender is app-owned, not a user's connection.
+- Open Platform (`SEED-013`) moves to v4.9.
 
-### Start (START)
+## v4.8 Requirements
 
-- [x] **START-01**: From inside a thread, a user can start a workflow, fill its launch form, and see the run attached to that thread. — `SEED-232`
-- [x] **START-02**: An external system can start a workflow run through an authenticated inbound call and read the result back. Org-scoped, rate-limited, audited. — `SEED-195`
-- [x] **START-03**: A user can fork a starter workflow into their own draft in one click; at least 5 curated starters ship, each passing the publish gauntlet. — `SEED-084` (287: fork is menu + name dialog, not literal one click; operator to rule)
-- [x] **START-04**: A run started by a schedule or an inbound call shows how it was started, and its last and next run are visible. — `SEED-014`
+### Links (LINK)
 
-### Author (AUTH)
+- [x] **LINK-01**: Every top-level view has its own `/app/...` address. Opening it directly, refreshing, or pressing Back/Forward lands on that view. — `SEED-185`
+- [ ] **LINK-02**: A chat thread, a workflow, a workflow run and an Expert each have their own address, and a refresh returns to the same item. — `SEED-178`, `SEED-015`
+- [ ] **LINK-03**: A user can copy a link to what they are looking at, and opening it in a new tab or on another signed-in machine opens the same item. Existing links keep working: `?run=`, `?connections=1`, `/admin/spend`, `/setup` and `/invite`.
+- [ ] **LINK-04**: A link to something that does not exist, or that the user may not open, shows one plain "can't be opened" page. The page is the same in both cases and never silently falls back to chat.
+- [ ] **LINK-05**: A link to an item in another org the user belongs to asks "This is in <org> — switch?" before switching. Nothing is saved under the wrong org.
+- [ ] **LINK-06**: After signing in by password, SSO or sign-up, the user lands on the link they first opened. The boot screen cannot hang forever. — `SEED-312`
+- [x] **LINK-07**: Leaving a page with unsaved edits by Back/Forward asks before discarding them.
+- [x] **LINK-08**: Every address works in local dev, on the cloud app domain and on the self-hosted one-box. An automated check fails if the routing layers disagree.
 
-- [x] **AUTH-01**: A workflow that pauses for a person can be published, and the run surface shows who it is waiting on. — `SEED-164`
-- [x] **AUTH-02**: Describe-it authoring can take uploaded assets (template, form, reference docs) and derive the inputs, phases and tools from them. — `SEED-051`
-- [x] **AUTH-03**: A draft's configuration does not vanish when the author navigates away. — `SEED-183`
+### Active org (ORG)
 
-### See (VIS)
+- [ ] **ORG-01**: Library folders show only the active org's items, and switching org refreshes the list. — `SEED-389`
+- [ ] **ORG-02**: The Workflows list, both published and drafts, shows only the active org's workflows. — `SEED-389`
+- [ ] **ORG-03**: The chat thread list shows only the active org's threads.
+- [ ] **ORG-04**: Workflow run history shows only the active org's runs.
+- [ ] **ORG-05**: Saving or launching a workflow that points at another org's folder is refused with a worded reason. Scheduled runs, API-key runs and chat retrieval keep working as before.
+- [ ] **ORG-06**: A user who has items in another org sees an honest count of them rather than a silent gap. Items stamped to the wrong org before Phase 296 can be moved one at a time, and each move is audited. The audit is measured before any filter ships.
 
-- [x] **VIS-01**: A multi-agent workflow can be viewed as a truthful picture of orchestrator, workers and judge, with no edges the schema does not have. Sketch first (G-2). — `SEED-086`
-- [x] **VIS-02**: The agent can show more artifact types beyond chart, table and metric; the new set is chosen at sketch time from a closed registry only. — `SEED-337`
-- [x] **VIS-03**: A finished run has one read-only page, with export, showing what it did and on what evidence (definition version, phase log, verdicts, cited sources). — `SEED-348`
-- [x] **VIS-04**: The workflow library card matches its approved sketch: labelled phase chips, and the description no longer dominates. — `SEED-155`
+### Told when a run waits on you (NOTE)
 
-### Trust (TRUST)
+- [ ] **NOTE-01**: When a workflow run starts waiting on a person, its owner sees it in an in-app "waiting on you" list and badge. Waiting means a question or an approval, including on scheduled and API-key runs. The list covers every org the owner belongs to, and each item names its org and links to the run. — `SEED-281`
+- [ ] **NOTE-02**: If the run is still waiting after a delay, the owner gets one email linking to the run. The delay defaults to 2 minutes and is a Settings knob. Answering in time means no email. A restart, a deploy or the second worker never sends it twice. — `SEED-281`
+- [ ] **NOTE-03**: The email contains no document content: only the workflow name, the org, how long the run has waited, and the link.
+- [ ] **NOTE-04**: A user can turn notification email off in their own Settings. The in-app notice stays.
+- [ ] **NOTE-05**: Once the question is answered or the run ends, its notice leaves the list and the badge.
+- [ ] **NOTE-06**: The app can send email from a built image: through Resend on cloud and through SMTP on the one-box. The secret lives in env and every other knob in Settings. Invite email uses the same sender, and a failed send is visible rather than only logged.
 
-- [x] **TRUST-01**: Each workflow phase output that came from the knowledge base carries a confidence level, shown on the run surface and in the receipt. — `SEED-152`
+### v4.7 close-out (FIX)
+
+- [ ] **FIX-01**: The Workspace panel lists the files a thread produced instead of "No files yet". — `BUG-261027-01`
+- [ ] **FIX-02**: The chat list shows a loading state, not "No recent chats", while threads are loading. — `BUG-261027-02`
+- [ ] **FIX-03**: A schedule row words a launch failure in plain language, and Run now updates only that row. — `BUG-261027-03`
+- [ ] **FIX-04**: A scheduled run whose required input is blank is refused before launch, and the refusal names the input. — `BUG-261027-04`
+- [ ] **FIX-05**: A paused run started by an API key or a schedule resumes on the provider it started on. — `BUG-261027-05`
+- [ ] **FIX-06**: The six 296 review findings in `SEED-391` are each fixed or accepted with a reason. — `SEED-391`
 
 ### Register hygiene (REG)
 
-- [x] **REG-06**: Seed statuses match reality: SEED-163 flipped, and each seed this milestone folds is updated.
-- [x] **REG-07**: Hot-file refactors that guardrail G-5 requires are done before the feature phases that touch those files.
-
-### Decision engine (DEC) — added 2026-10-20 by the operator, outside the milestone's workflow theme
-
-- [x] **DEC-01**: A Settings switch turns the decision engine on or off and picks the engine: Jev (TypeSafe, ~~direct or~~ via OpenRouter), OpenAI Decisions (`gpt-6-luna`), or a local model. Off is the default and leaves retrieval exactly as it is today. *Amended 2026-10-20 (294-CONTEXT D-03, operator): Jev ships via OpenRouter only; TypeSafe direct is deferred.*
-- [x] **DEC-02**: When on, knowledge-base search reranks its candidates with the chosen engine, accepts an optional steering instruction from the agent, and drops only candidates below a conservative threshold. Any engine failure falls back to the current order.
-- [x] **DEC-03**: A user can check an answer's citations and see, for each cited sentence, whether its source supports it fully, partly, not at all, or contradicts it, with a confidence.
-
-### Runs (RUN) — added 2026-10-20 by the operator, from measured run failures
-
-- [x] **RUN-01**: A knowledge-base step that finds nothing, or answers without citations, pauses the run and asks the person (search elsewhere / continue unsourced, visibly marked / stop) instead of failing it; a locked must-prove-it workflow never offers continue-unsourced. — `BUG-261020-07`
-- [x] **RUN-02**: A report step with no template is refused when the workflow is saved or published, with a message that names the missing template. — `BUG-261020-08`
-- [x] **RUN-03**: The publish judge does not fail a workflow because a recorded-not-sent action did not send. — `BUG-261020-09`
-- [x] **RUN-04**: Every run ends in a true state with a reason: none stays active after its phases end, none fails without a recorded reason, and a run waiting for approval reads waiting. — `BUG-261020-10`, `-11`, `-12`
+- [ ] **REG-08**: Seed and bug statuses match reality:
+  - every folded seed and bug is updated;
+  - SEED-281's stale premises are corrected;
+  - the excluded pause kinds (the tool-round cap, chat `ask_user`) are recorded;
+  - the two pre-existing defects found by research are filed as bug reports. These are built images being unable to send invite email, and `*.vercel.app` previews being unable to open the app.
+- [x] **REG-09**: The G-5 extractions on `App.tsx` and `ChatLayout.tsx` ship behaviour-neutral before the router lands, and their guard tests are re-targeted, not deleted.
 
 ## Future Requirements (deferred)
 
-- Decision-engine model routing (simple turns to a cheaper model) — after DEC-02 is measured; needs the full provider roster.
-- Decision-engine chunk tagging at ingestion (table of contents, footer, signature, personal data) — through the classification splice (`ingest_splice.py`).
-
-- `SEED-347` canvas scale hardening — conditional on a real large workflow.
-- `SEED-013` Open Platform (public API, MCP server) — planned as v4.8.
-- Owed operator verification from v4.6: Coolify rebuild confirmation, logged-in production smoke, 282 G4-4/G4-6/A1, 281 G-4 rows A/C/D.
+- One reminder email when a run is still waiting long after the first email.
+- Notify approvers or org admins beyond the run owner (approver groups, escalation).
+- Push, Slack or Teams notifications.
+- An email when a scheduled run fails.
+- Notices for the tool-round-cap pause and for chat `ask_user`.
+- Chat retrieval and the KB picker scoped to the active org (they still read every org's folders).
+- Public share links for people outside the org.
 
 ## Out of Scope
 
-| Item | Reason |
-|------|--------|
-| New tools, phase types or emitters beyond the closed core (7 / 1 / 30) | Extension Contract; needs explicit approval per requirement |
-| Open Platform / public API / MCP server | Next milestone (v4.8) |
-| Medium/minor open bugs not named above | Carried in `.planning/reported-bugs/` |
+| Feature | Reason |
+|---------|--------|
+| Approve or answer from inside the email | Mail scanners open links; the decision stays on the signed-in run page |
+| Org name or slug in the URL | IDs are globally unique; the server works out the org from the item |
+| Auto-approve or auto-continue when nobody answers | A pause nobody was told about must never resolve itself (`SEED-281`) |
+| Scroll position, open panels and other UI state in the URL | The URL carries only which view and which item |
+| A full notification history centre | The list shows what is waiting now; history can come later |
+| Open Platform: public API, MCP server, webhooks (`SEED-013`) | Moved to v4.9; needs this milestone's links first |
 
 ## Traceability
 
+*Filled by the roadmap.*
+
 | Requirement | Phase | Status |
 |-------------|-------|--------|
-| REG-07 | Phase 286 | Complete |
-| START-01 | Phase 287 | Complete |
-| START-03 | Phase 287 | Complete |
-| AUTH-03 | Phase 288 | Complete |
-| AUTH-01 | Phase 288 | Complete |
-| VIS-03 | Phase 289 | Complete |
-| TRUST-01 | Phase 289 | Complete |
-| VIS-04 | Phase 290 | Complete |
-| VIS-01 | Phase 290 | Complete |
-| AUTH-02 | Phase 291 | Complete (2026-10-24) |
-| VIS-02 | Phase 292 | Complete |
-| START-02 | Phase 293 | Complete |
-| START-04 | Phase 293 | Complete |
-| REG-06 | Phase 293 | Complete |
-| DEC-01 | Phase 294 | Complete (live 2026-10-20) |
-| DEC-02 | Phase 294 | Complete (live 2026-10-20) |
-| DEC-03 | Phase 294 | Complete (live 2026-10-20) |
-| RUN-01 | Phase 295 | Complete (operator signed 2026-10-24) |
-| RUN-02 | Phase 295 | Complete (operator signed 2026-10-24) |
-| RUN-03 | Phase 295 | Complete (operator signed 2026-10-24) |
-| RUN-04 | Phase 295 | Complete (operator signed 2026-10-24) |
-
-Mapped: 21/21, no orphans, no duplicates.
-
----
-*Requirements defined: 2026-10-18*
+| LINK-01 | Phase 297 | Complete |
+| LINK-02 | Phase 299 | Pending |
+| LINK-03 | Phase 299 | Pending |
+| LINK-04 | Phase 299 | Pending |
+| LINK-05 | Phase 299 | Pending |
+| LINK-06 | Phase 299 | Pending |
+| LINK-07 | Phase 297 | Complete |
+| LINK-08 | Phase 297 | Complete |
+| ORG-01 | Phase 298 | Pending |
+| ORG-02 | Phase 298 | Pending |
+| ORG-03 | Phase 298 | Pending |
+| ORG-04 | Phase 298 | Pending |
+| ORG-05 | Phase 298 | Pending |
+| ORG-06 | Phase 298 | Pending |
+| NOTE-01 | Phase 301 | Pending |
+| NOTE-02 | Phase 300 | Pending |
+| NOTE-03 | Phase 300 | Pending |
+| NOTE-04 | Phase 300 | Pending |
+| NOTE-05 | Phase 301 | Pending |
+| NOTE-06 | Phase 300 | Pending |
+| FIX-01 | Phase 302 | Pending |
+| FIX-02 | Phase 299 | Pending |
+| FIX-03 | Phase 302 | Pending |
+| FIX-04 | Phase 300 | Pending |
+| FIX-05 | Phase 300 | Pending |
+| FIX-06 | Phase 302 | Pending |
+| REG-08 | Phase 302 | Pending |
+| REG-09 | Phase 297 | Complete |
