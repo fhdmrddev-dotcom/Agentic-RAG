@@ -148,6 +148,34 @@ skill-studio tab in the URL, any change to who may open an item.
   5. Throttle network → the chat list says "Loading your chats…", never "No recent chats"; block Auth
      → boot shows "Still connecting…" then "Can't reach Syrel" + Try again.
 
+### Amendments from research (2026-10-28, `--auto`, recommended option each time; 299-RESEARCH.md F1-F7)
+- **D-32 (amends D-02, F7):** "New chat" already creates a real thread, so it pushes `/app/chat/<newId>`; only a
+  thread-less chat home is `/app`.
+- **D-33 (amends D-07/D-20, F1):** a published workflow is visible to its OWNER (or system-global), not to org
+  members. The resolver rule and the share line follow that: "Opens only for you, on any device you're signed in on".
+- **D-34 (amends D-07/D-20, F2):** a run is openable by its owner, or by any member of its org once it has finished
+  (the evidence-report rule, `workflow_run_evidence.py`). The share line differs for a running run (owner only) and
+  a finished one ("Opens for members of <org>").
+- **D-35 (amends D-09, F3):** `workflow_definitions.org_id` is NOT NULL; "no switch prompt" keys off
+  `is_system_global` / `is_system`, and the resolver returns `org_id: null` for those rows.
+- **D-36 (amends D-12, F6):** the can't-be-opened card shows only the REBUILT canonical address of a parsed item link
+  (from `formatAppRoute`), and no address at all for a mistyped one — never echoes the requested path (297 rule).
+- **D-37 (amends D-19, F4):** Stay keeps `subscriptionsRef` unchanged. Switch goes through `switchOrg`, which aborts
+  run subscriptions by design (`StreamsProvider.tsx` is not edited); for Switch the proof is that the run keeps going
+  on the server and reattaches on switch-back — G-4 row 2.
+- **D-38 (amends D-18, F5):** the run page has no re-run control; "re-run" in SC#3 means Run from the workflow's
+  library card. No new re-run button (that would be a new capability). Guards added where research found the active
+  org stamped: sending a message on a non-Expert thread, workflow launch, answering an ask, Tweak (optional
+  `from_definition_id`), schedule creation (one keyword in `schedules.py` + `db/schedules.py`; `db/workflows.py`
+  untouched so 298 WR-08 stays deferred).
+- **D-39 (F8/F9):** the org mark is 298's `OrgAvatar` (initial, no colour); the share surface is built on the existing
+  `DropdownMenu` (no popover primitive exists).
+- **D-40 (F10):** ledger rows + `docs/HOT-FILE-LEDGER.md` sections added, in the same commit as the first touch, for
+  `useAuth.ts`, `lib/api/_core.ts`, `lib/supabase.ts`, `SignInForm.tsx`, `SignUpForm.tsx`, `useWorkflowFork.ts` and
+  every new file. `useAuth.ts` and `_core.ts` already FIRE at 4 phases.
+- **D-41:** whether a SAML SSO provider is configured is read through the Supabase MCP (read-only) before G-4 row 4;
+  if none, that row is ⛔ with the reason.
+
 ### Claude's Discretion
 - Resolver module names, response model name, the exact 404 body text.
 - Copy-to-clipboard fallback mechanics; popover component reuse (existing popover primitive).
