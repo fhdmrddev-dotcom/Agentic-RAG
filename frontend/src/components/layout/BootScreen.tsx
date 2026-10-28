@@ -16,7 +16,7 @@
  * HERE and not as a timer in `useAuth`: this clock changes only what the screen SAYS.
  * ⛔ The retry button is `window.location.reload()` — the URL is kept, so the link survives, and it is
  * not a History write (`noRawHistoryWrites.test.ts`).
- * ⛔ No amber, no red, no `role="alert"` (UI-D3): a slow network is not an error the person made.
+ * ⛔ No amber, no red, no alert role (UI-D3): a slow network is not an error the person made.
  * The "kept" sentence appears only on an entity address (UI-D17) — on plain `/app` it would
  * promise a link nobody opened.
  */
