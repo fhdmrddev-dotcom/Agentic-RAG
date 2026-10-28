@@ -13,7 +13,7 @@
  * ⛔ A STRICT LEAF — no dependencies, no React. The surface derives the audience here, never twice.
  */
 
-export type Audience = "only_you" | "org_members" | "granted" | "everyone" | "managers_only"
+export type Audience = "only_you" | "org_members" | "granted" | "everyone" | "managers_only" | "plan_experts"
 
 export type LinkAudienceKind = "thread" | "workflow" | "run" | "expert"
 
@@ -37,7 +37,8 @@ export function audienceOf(kind: LinkAudienceKind, facts: AudienceFacts): Audien
     return finished && facts.has_org ? "org_members" : "only_you"
   }
   if (kind === "expert") {
-    if (facts.is_system) return "everyone"
+    // 299-REVIEW WR-03: the Experts surface is plan-gated for the active org.
+    if (facts.is_system) return "plan_experts"
     const orgWide = facts.visibility === "org" || facts.visibility === "public"
     // 299-REVIEW CR-03: the manager arm is ANDed with visibility on the server, so a disabled
     // private / granted Expert is never wider than its creator.
@@ -54,6 +55,7 @@ const ONLY_YOU = "Opens only for you, on any device you're signed in on."
 /** The parts of the UI-D15 line, so a surface can render the org name in its own weight. */
 export function audienceParts(audience: Audience, orgName: string | null): { before: string; org: string | null; after: string } {
   if (audience === "everyone") return { before: "Opens for anyone signed in to Syrel.", org: null, after: "" }
+  if (audience === "plan_experts") return { before: "Opens for anyone signed in whose plan includes Experts.", org: null, after: "" }
   // An org-scoped line with no org name would claim members of an unnamed org — fall back.
   if (audience === "only_you" || !orgName) return { before: ONLY_YOU, org: null, after: "" }
   if (audience === "org_members") return { before: "Opens for members of ", org: orgName, after: "." }

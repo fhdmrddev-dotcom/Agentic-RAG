@@ -147,7 +147,7 @@ def test_fixture_is_non_vacuous():
     assert len(CASES) == 15
     assert {c["kind"] for c in CASES} == {"thread", "workflow", "run", "expert"}
     assert {c["audience"] for c in CASES} == {
-        "only_you", "org_members", "granted", "everyone", "managers_only",
+        "only_you", "org_members", "granted", "everyone", "managers_only", "plan_experts",
     }
 
 
@@ -209,7 +209,8 @@ def test_to_target_system_expert_has_no_org(mod):
     row = {"id": uuid4(), "title": "Analyst", "is_system": True, "is_enabled": True,
            "visibility": "public", "org_id": None, "org_name": None}
     t = mod.to_target("expert", row)
-    assert (t.org_id, t.org_name, t.state, t.audience) == (None, None, None, "everyone")
+    # 299-REVIEW WR-03: the /experts router is capability-gated for the ACTIVE org
+    assert (t.org_id, t.org_name, t.state, t.audience) == (None, None, None, "plan_experts")
 
 
 def test_to_target_never_returns_an_empty_title(mod):

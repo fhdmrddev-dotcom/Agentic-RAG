@@ -26,7 +26,7 @@ export interface LinkTarget {
   org_name: string | null
   title: string
   state: "draft" | "published" | null
-  audience: "only_you" | "org_members" | "granted" | "everyone" | "managers_only"
+  audience: "only_you" | "org_members" | "granted" | "everyone" | "managers_only" | "plan_experts"
 }
 
 export type LinkAnswer = { status: "ok"; target: LinkTarget } | { status: "cant" }

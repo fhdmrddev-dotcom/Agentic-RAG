@@ -69,6 +69,7 @@ describe("299-04 — the UI-D15 sentences", () => {
     expect(audienceLine("org_members", "Acme Legal")).toBe("Opens for members of Acme Legal.")
     expect(audienceLine("granted", "Acme Legal")).toBe("Opens for the people it's shared with in Acme Legal.")
     expect(audienceLine("everyone", "Acme Legal")).toBe("Opens for anyone signed in to Syrel.")
+    expect(audienceLine("plan_experts", "Acme Legal")).toBe("Opens for anyone signed in whose plan includes Experts.")
     expect(audienceLine("managers_only", "Acme Legal")).toBe(
       "It's turned off, so it opens only for people who manage Experts in Acme Legal.",
     )
@@ -79,6 +80,7 @@ describe("299-04 — the UI-D15 sentences", () => {
     expect(audienceLine("granted", null)).toBe(ONLY_YOU)
     expect(audienceLine("managers_only", null)).toBe(ONLY_YOU)
     expect(audienceLine("everyone", null)).toBe("Opens for anyone signed in to Syrel.")
+    expect(audienceLine("plan_experts", null)).toBe("Opens for anyone signed in whose plan includes Experts.")
   })
 
   it("every sentence appears in the leaf exactly once (one home)", () => {
@@ -88,6 +90,7 @@ describe("299-04 — the UI-D15 sentences", () => {
       "Opens for members of ",
       "Opens for the people it's shared with in ",
       "Opens for anyone signed in to Syrel.",
+      "Opens for anyone signed in whose plan includes Experts.",
       "It's turned off, so it opens only for people who manage Experts in ",
     ]) {
       expect(src.split(fragment).length - 1).toBe(1)

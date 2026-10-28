@@ -302,7 +302,7 @@ describe("299-04 — the Expert detail", () => {
     [{ visibility: "granted" }, "Opens for the people it's shared with in Northwind."],
     [{ visibility: "private" }, ONLY_YOU],
     [{ is_enabled: false }, "It's turned off, so it opens only for people who manage Experts in Northwind."],
-    [{ is_system: true, org_id: null }, "Opens for anyone signed in to Syrel."],
+    [{ is_system: true, org_id: null }, "Opens for anyone signed in whose plan includes Experts."],
   ] as const)("%j reads %j and copies origin + /app/experts/<id>", async (over, line) => {
     renderExpert(bundle(over as Partial<ExpertBundle>))
     const { menu, copied } = await openAndCopy("Link to this Expert")

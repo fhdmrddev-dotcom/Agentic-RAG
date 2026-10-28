@@ -6,7 +6,7 @@
   {"kind": "run", "facts": {"status": "active", "has_org": true}, "audience": "only_you"},
   {"kind": "run", "facts": {"status": "completed", "has_org": true}, "audience": "org_members"},
   {"kind": "run", "facts": {"status": "completed", "has_org": false}, "audience": "only_you"},
-  {"kind": "expert", "facts": {"is_system": true, "is_enabled": true, "visibility": "public"}, "audience": "everyone"},
+  {"kind": "expert", "facts": {"is_system": true, "is_enabled": true, "visibility": "public"}, "audience": "plan_experts"},
   {"kind": "expert", "facts": {"is_system": false, "is_enabled": false, "visibility": "org"}, "audience": "managers_only"},
   {"kind": "expert", "facts": {"is_system": false, "is_enabled": false, "visibility": "public"}, "audience": "managers_only"},
   {"kind": "expert", "facts": {"is_system": false, "is_enabled": false, "visibility": "private"}, "audience": "only_you"},

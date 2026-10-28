@@ -46,7 +46,7 @@ from uuid import UUID
 from pydantic import BaseModel
 
 Kind = Literal["thread", "workflow", "run", "expert"]
-Audience = Literal["only_you", "org_members", "granted", "everyone", "managers_only"]
+Audience = Literal["only_you", "org_members", "granted", "everyone", "managers_only", "plan_experts"]
 
 KINDS: tuple[str, ...] = ("thread", "workflow", "run", "expert")
 
@@ -199,7 +199,10 @@ def audience_of(kind: str, facts: Mapping[str, Any]) -> Audience:
         return "org_members" if finished and facts.get("has_org") else "only_you"
     if kind == "expert":
         if facts.get("is_system"):
-            return "everyone"
+            # 299-REVIEW WR-03: every /experts read is behind require_capability("experts") for
+            # the ACTIVE org, so a system Expert opens for anyone whose plan includes Experts —
+            # not for everyone. The gate is worded, never added to this route (D-08: no 403).
+            return "plan_experts"
         visibility = facts.get("visibility")
         if not facts.get("is_enabled", True):
             # 299-REVIEW CR-03: the manager arm is ANDed with the visibility arm (EXPERT_SQL,
