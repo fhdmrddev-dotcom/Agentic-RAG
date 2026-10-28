@@ -16,7 +16,8 @@ workflow is refused in words (D-31: the publish lock is not loosened). Both are 
 THE ONLY CLEAN CASE MOVES (D-33). Every blocker the research found is a refusal sentence that names
 the item, the cause and the way out (UI-SPEC §4): org-shared, legal hold, watched by a connection,
 retention policy / pending decision / retention history / archived, contents not owned, contents
-stamped in another organization than the folder's (298-review CR-01), chats bound
+stamped in another organization than the folder's (298-review CR-01), an org-shared ancestor or one
+a chat, workflow or Expert binds (298-review WR-04), chats bound
 to the folder, a workflow binding it (every D-34 arm, double-encoded definitions included), an
 Expert install or bundle, a classification rule, a saved view, a recall check, a document still
 processing, a version family crossing the subtree, a relationship with one end staying behind, and
@@ -218,6 +219,14 @@ def s_mixed_orgs(name: str, n: int, one: str, many: str, where: str, src: str) -
     return (
         f"{q(name)} holds {plural(n, one, many)} that {_is(n)} in {where}, not in {src}. "
         f"Move {'it' if n == 1 else 'them'} out of {q(name)} first, then move the folder."
+    )
+
+
+def s_inside(name: str, ancestor: str, clause: str) -> str:
+    """298-review WR-04: a blocker inherited from an ANCESTOR folder (the move detaches the root)."""
+    return (
+        f"{q(name)} is inside {q(ancestor)}, which {clause}. "
+        f"Move {q(name)} out of {q(ancestor)} first, then move it."
     )
 
 
@@ -699,6 +708,91 @@ async def _mixed_org_refusals(
             )
 
 
+_ANCESTORS_SQL = """
+SELECT f.id, f.name, f.is_org_shared, a.depth
+FROM public.retention_folder_ancestors($1) a JOIN public.folders f ON f.id = a.folder_id
+WHERE a.depth > 0 ORDER BY a.depth
+"""
+
+
+async def _ancestor_refusals(
+    con, items: _Items, *, user_id: UUID, src_name: str, found: dict[str, list[str]],
+) -> None:
+    """298-review WR-04: blockers that reach the subtree THROUGH an ancestor folder.
+
+    Org-shared visibility (``is_in_global_subtree``) and the chat / workflow / Expert bindings all
+    expand to a bound folder's descendants, and the move detaches the root (``parent_id = NULL``),
+    so each would silently lose the subtree. The same walk the retention arm uses
+    (``retention_folder_ancestors``, CYCLE-safe); the NEAREST ancestor carrying each blocker is
+    named. NOT refused on an ancestor: a connector watch (``WatchService`` writes into
+    ``library_folder_id`` itself, never a descendant; the subtree's own watch items are checked
+    above), a saved view (per-user, re-pickable) and a classification rule (files into its own
+    folder only)."""
+    ancestors = await con.fetch(_ANCESTORS_SQL, items.item_id)
+    if not ancestors:
+        return
+    name = items.name
+    anc_ids = _ids(ancestors)
+
+    def nearest(ids: set[UUID]) -> Any:
+        return next((a for a in ancestors if a["id"] in ids), None)
+
+    def add(code: str, ancestor: Any, clause: str) -> None:
+        found.setdefault(code, []).append(s_inside(name, ancestor["name"], clause))
+
+    shared = nearest({a["id"] for a in ancestors if a["is_org_shared"]})
+    if shared is not None:
+        add("org_shared", shared, f"is shared with everyone in {src_name}")
+
+    chats = {
+        r["folder_id"]: r["n"] for r in await con.fetch(
+            "SELECT folder_id, count(*) AS n FROM public.threads WHERE folder_id = ANY($1::uuid[]) "
+            "GROUP BY folder_id", anc_ids,
+        )
+    }
+    if chats:
+        a = nearest(set(chats))
+        n = int(chats[a["id"]])
+        add("chats", a, f"{plural(n, 'chat', 'chats')} in {src_name} {'uses' if n == 1 else 'use'}")
+
+    candidates = await con.fetch(
+        "SELECT id, name, created_by, definition FROM public.workflow_definitions "
+        "WHERE definition::text LIKE ANY($1::text[]) ORDER BY name, id",
+        [f"%{aid}%" for aid in anc_ids],
+    )
+    by_anc: dict[UUID, Any] = {}
+    for wf in candidates:
+        bound = set(bound_folder_ids(wf["definition"]))
+        for a in ancestors:
+            if str(a["id"]) in bound and a["id"] not in by_anc:
+                by_anc[a["id"]] = wf
+    if by_anc:
+        a = nearest(set(by_anc))
+        wf = by_anc[a["id"]]
+        who = f"the workflow {q(wf['name'])}" if wf["created_by"] == user_id else "a workflow you can't open"
+        add("workflows", a, f"{who} uses")
+
+    installs = await con.fetch(
+        "SELECT folder_id, org_id FROM public.expert_installs WHERE folder_id = ANY($1::uuid[])",
+        anc_ids,
+    )
+    bundles = await con.fetch(
+        "SELECT knowledge_folder_ids FROM public.expert_bundles WHERE knowledge_folder_ids && $1::uuid[]",
+        anc_ids,
+    )
+    if installs:
+        a = nearest({r["folder_id"] for r in installs})
+        orgs = [r["org_id"] for r in installs if r["folder_id"] == a["id"]]
+        members = await _member_orgs(con, user_id, orgs)
+        names = await _org_names(con, members)
+        org = next((names[o] for o in sorted(members, key=str) if o in names), None)
+        add("expert", a, f"an Expert installed in {org} reads" if org else "an Expert reads")
+    elif bundles:
+        a = nearest({fid for r in bundles for fid in (r["knowledge_folder_ids"] or [])})
+        if a is not None:
+            add("expert", a, "an Expert reads")
+
+
 async def _folder_refusals(
     con, items: _Items, *, user_id: UUID, src_name: str, found: dict[str, list[str]],
 ) -> None:
@@ -904,6 +998,7 @@ async def _prepare(
             con, items, user_id=user_id, src=src, src_name=src_name, found=found
         )
         await _folder_refusals(con, items, user_id=user_id, src_name=src_name, found=found)
+        await _ancestor_refusals(con, items, user_id=user_id, src_name=src_name, found=found)
     if kind in ("folder", "document"):
         await _document_refusals(
             con, items, user_id=user_id, src_name=src_name, dst=to_org_id, dst_name=dst_name,

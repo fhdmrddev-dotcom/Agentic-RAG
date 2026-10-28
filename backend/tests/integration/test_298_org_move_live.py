@@ -609,8 +609,8 @@ async def test_the_mis_stamp_repair_is_refused_in_words_never_as_a_self_collisio
 # ── 298-review WR-04: blockers inherited from an ANCESTOR folder ────────────
 #
 # The move detaches the root (parent_id = NULL), so anything that reaches the subtree THROUGH an
-# ancestor (org-shared visibility, a chat / workflow / Expert / watch bound to a parent folder,
-# all of which expand to descendants) silently loses it. Retention already walked the ancestors;
+# ancestor (org-shared visibility, a chat / workflow / Expert bound to a parent folder, all of
+# which expand to descendants) silently loses it. Retention already walked the ancestors;
 # the other blockers looked only at the subtree's own ids.
 
 
@@ -652,7 +652,9 @@ async def test_refused_inside_an_ancestor_an_expert_reads(w):
     await _assert_refused(w, "folder", root, "is inside “Clients”, which an Expert installed in")
 
 
-async def test_refused_inside_a_watched_ancestor(w):
+async def test_a_watched_ancestor_does_not_refuse(w):
+    """WR-04's watch arm REFUTED: WatchService writes into library_folder_id itself, never a
+    descendant, so a subfolder under a watched folder is not cut off by moving it."""
     clients = await w.folder("Clients")
     root = await w.folder(parent=clients)
     conn = await w.pool.fetchval(
@@ -663,7 +665,7 @@ async def test_refused_inside_a_watched_ancestor(w):
         "INSERT INTO public.connector_watches (org_id, user_id, connection_id, source_folder_id, source_folder_name,"
         " library_folder_id) VALUES ($1, $2, $3, 'ext', 'Ext', $4)", UUID(w.a), w.u, conn, clients,
     )
-    await _assert_refused(w, "folder", root, "is inside “Clients”, which is kept in sync from a connected source")
+    assert (await _preview(w, "folder", root)).refusals == []
 
 
 async def test_an_unbound_private_ancestor_does_not_refuse(w):
