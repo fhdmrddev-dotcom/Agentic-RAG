@@ -606,6 +606,72 @@ async def test_the_mis_stamp_repair_is_refused_in_words_never_as_a_self_collisio
     assert not any("is already in" in s for s in p.refusals), p.refusals
 
 
+# ── 298-review WR-04: blockers inherited from an ANCESTOR folder ────────────
+#
+# The move detaches the root (parent_id = NULL), so anything that reaches the subtree THROUGH an
+# ancestor (org-shared visibility, a chat / workflow / Expert / watch bound to a parent folder,
+# all of which expand to descendants) silently loses it. Retention already walked the ancestors;
+# the other blockers looked only at the subtree's own ids.
+
+
+async def test_refused_inside_an_org_shared_ancestor(w):
+    team = await w.folder("Team", shared=True)
+    root = await w.folder(parent=team)
+    await _assert_refused(w, "folder", root, "is inside “Team”, which is shared with everyone in")
+
+
+async def test_refused_inside_an_ancestor_a_chat_uses(w):
+    clients = await w.folder("Clients")
+    root = await w.folder(parent=clients)
+    await w.pool.execute(
+        "INSERT INTO public.threads (user_id, org_id, title, folder_id) VALUES ($1, $2, 't', $3)",
+        w.u, UUID(w.a), clients,
+    )
+    await _assert_refused(w, "folder", root, "is inside “Clients”, which 1 chat in")
+
+
+async def test_refused_inside_an_ancestor_a_workflow_binds(w):
+    clients = await w.folder("Clients")
+    mid = await w.folder("2026", parent=clients)
+    root = await w.folder(parent=mid)
+    await w.draft("Contract review", definition={"project_folder_id": str(clients), "phases": []})
+    await _assert_refused(w, "folder", root, "is inside “Clients”, which the workflow “Contract review” uses")
+
+
+async def test_refused_inside_an_ancestor_an_expert_reads(w):
+    clients = await w.folder("Clients")
+    root = await w.folder(parent=clients)
+    bundle = await w.pool.fetchval(
+        "INSERT INTO public.expert_bundles (created_by, name, slug, org_id) VALUES ($1, 'E', $2, $3) RETURNING id",
+        w.u, f"e298a-{uuid4().hex[:8]}", UUID(w.a),
+    )
+    await w.pool.execute(
+        "INSERT INTO public.expert_installs (org_id, expert_bundle_id, folder_id, corpus_version)"
+        " VALUES ($1, $2, $3, 'v1')", UUID(w.a), bundle, clients,
+    )
+    await _assert_refused(w, "folder", root, "is inside “Clients”, which an Expert installed in")
+
+
+async def test_refused_inside_a_watched_ancestor(w):
+    clients = await w.folder("Clients")
+    root = await w.folder(parent=clients)
+    conn = await w.pool.fetchval(
+        "INSERT INTO public.connector_connections (org_id, created_by, name, service_id)"
+        " VALUES ($1, $2, 'Drive 298a', 'google_drive') RETURNING id", UUID(w.a), w.u,
+    )
+    await w.pool.execute(
+        "INSERT INTO public.connector_watches (org_id, user_id, connection_id, source_folder_id, source_folder_name,"
+        " library_folder_id) VALUES ($1, $2, $3, 'ext', 'Ext', $4)", UUID(w.a), w.u, conn, clients,
+    )
+    await _assert_refused(w, "folder", root, "is inside “Clients”, which is kept in sync from a connected source")
+
+
+async def test_an_unbound_private_ancestor_does_not_refuse(w):
+    clients = await w.folder("Clients")
+    root = await w.folder(parent=clients)
+    assert (await _preview(w, "folder", root)).refusals == []
+
+
 async def test_a_folder_with_many_blockers_states_every_one(w):
     root = await w.folder()
     await w.folder("Team", parent=root, shared=True)
