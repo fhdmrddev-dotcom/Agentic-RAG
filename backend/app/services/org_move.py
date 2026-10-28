@@ -15,7 +15,8 @@ workflow is refused in words (D-31: the publish lock is not loosened). Both are 
 
 THE ONLY CLEAN CASE MOVES (D-33). Every blocker the research found is a refusal sentence that names
 the item, the cause and the way out (UI-SPEC §4): org-shared, legal hold, watched by a connection,
-retention policy / pending decision / retention history / archived, contents not owned, chats bound
+retention policy / pending decision / retention history / archived, contents not owned, contents
+stamped in another organization than the folder's (298-review CR-01), chats bound
 to the folder, a workflow binding it (every D-34 arm, double-encoded definitions included), an
 Expert install or bundle, a classification rule, a saved view, a recall check, a document still
 processing, a version family crossing the subtree, a relationship with one end staying behind, and
@@ -89,6 +90,7 @@ REFUSAL_ORDER: tuple[str, ...] = (
     "archived",
     "not_owned_folders",
     "not_owned_documents",
+    "mixed_orgs",
     "chats",
     "workflows",
     "live_run",
@@ -208,6 +210,14 @@ def s_not_owned_documents(name: str, n: int) -> str:
     return (
         f"{q(name)} holds {plural(n, 'document', 'documents')} you don't own, "
         "so it can't move as a whole."
+    )
+
+
+def s_mixed_orgs(name: str, n: int, one: str, many: str, where: str, src: str) -> str:
+    """298-review CR-01: a subfolder or document inside the folder is stamped in another org."""
+    return (
+        f"{q(name)} holds {plural(n, one, many)} that {_is(n)} in {where}, not in {src}. "
+        f"Move {'it' if n == 1 else 'them'} out of {q(name)} first, then move the folder."
     )
 
 
@@ -629,6 +639,7 @@ async def _document_refusals(
         FROM public.documents m
         JOIN public.documents t
           ON t.org_id = $2 AND t.user_id = m.user_id AND t.content_hash = m.content_hash
+         AND NOT (t.id = ANY($1::uuid[]))
         WHERE m.id = ANY($1::uuid[]) AND m.content_hash IS NOT NULL
           AND (
             (m.status = 'completed' AND t.status = 'completed')
@@ -646,6 +657,7 @@ async def _document_refusals(
         """
         SELECT DISTINCT m.filename FROM public.documents m
         JOIN public.documents t ON t.org_id = $2 AND t.user_id = m.user_id AND t.filename = m.filename
+         AND NOT (t.id = ANY($1::uuid[]))
         WHERE m.id = ANY($1::uuid[]) ORDER BY m.filename
         """,
         list(moving), dst,
@@ -654,6 +666,37 @@ async def _document_refusals(
     for r in same_name:
         if r["filename"] not in colliding:
             add("name_in_target", s_name_in_target(r["filename"], dst_name))
+
+
+async def _mixed_org_refusals(
+    con, items: _Items, *, user_id: UUID, src: UUID, src_name: str, found: dict[str, list[str]],
+) -> None:
+    """298-review CR-01: every moving row must already be in the source org.
+
+    Subfolders and documents carry their OWN ``org_id`` (the SEED-313 class). Membership is checked
+    against the root's org only, so a row stamped elsewhere would leave an org the caller may not be
+    in, under a receipt naming the wrong from-org. Refusal, not a per-org membership sweep: the safe
+    polarity, and the way out (move the stray rows out of the folder) is the user's to choose. An org
+    is named only when the caller is a member of it (T-298-21)."""
+    stray_folders = [f for f in items.folders if f["org_id"] != src]
+    stray_docs = [d for d in items.documents if d["org_id"] != src]
+    if not (stray_folders or stray_docs):
+        return
+    members = await _member_orgs(con, user_id, [r["org_id"] for r in (*stray_folders, *stray_docs)])
+    names = await _org_names(con, members)
+
+    def where(rows: list[Any]) -> str:
+        orgs = {r["org_id"] for r in rows}
+        if len(orgs) > 1:
+            return "other organizations"
+        (org,) = orgs
+        return names.get(org, "another organization") if org in members else "another organization"
+
+    for rows, one, many in ((stray_folders, "folder", "folders"), (stray_docs, "document", "documents")):
+        if rows:
+            found.setdefault("mixed_orgs", []).append(
+                s_mixed_orgs(items.name, len(rows), one, many, where(rows), src_name)
+            )
 
 
 async def _folder_refusals(
@@ -857,6 +900,9 @@ async def _prepare(
     found: dict[str, list[str]] = {}
     past_runs = 0
     if kind == "folder":
+        await _mixed_org_refusals(
+            con, items, user_id=user_id, src=src, src_name=src_name, found=found
+        )
         await _folder_refusals(con, items, user_id=user_id, src_name=src_name, found=found)
     if kind in ("folder", "document"):
         await _document_refusals(
