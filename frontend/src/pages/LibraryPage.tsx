@@ -266,7 +266,7 @@ export function LibraryPage({
   onAskInChat?: (question: string) => Promise<boolean> | void
 } = {}) {
   const { user } = useAuth()
-  const { folders, createFolder, renameFolder, deleteFolder, toggleOrgShared } = useFolders()
+  const { folders, loading: foldersLoading, createFolder, renameFolder, deleteFolder, toggleOrgShared } = useFolders()
 
   // ⭐ ONE reducer replaces `selectedFolderId`, `selectedViewId`, `editingView`, `filter` and
   // `folderSheetOpen` — five React state hooks and the five handlers that had to keep them
@@ -633,6 +633,7 @@ export function LibraryPage({
         onRenameFolder={renameFolder}
         onDeleteFolder={deleteFolder}
         onToggleOrgShared={toggleOrgShared}
+        loading={foldersLoading}
       />
       <ViewsGroup
         views={views}

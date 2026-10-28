@@ -555,7 +555,7 @@ node scripts/check-hot-file-ledger.cjs <phase-dir>   # 0 clear · 1 missing rows
 | `frontend/src/lib/api/workflows.ts` | 15 / 15 / 1361 (was `14 / 14 / 1313`) | 298-02: WorkflowFolderRefusedError on both 422 arms; allOrgs list |
 | `frontend/src/lib/connectionMark.tsx` | 7 / 4 / 313 | ✅ **the move IS the seam, and it was TAKEN (214-08)** |
 | `frontend/src/components/ingestion/DocumentList.tsx` | 31 / 15 / 372 (was `31 / 16 / 372`) | last touch 275-02/04 |
-| `frontend/src/pages/LibraryPage.tsx` | 68 / 21 / 1345 (was `63 / 20 / 1344`) | 298-04 move-only: mount reads → useLibraryOrgSwitch (seam TAKEN) · ⛔ |
+| `frontend/src/pages/LibraryPage.tsx` | 69 / 21 / 1346 (was `68 / 21 / 1345`) | 298-04: loading={foldersLoading} on FolderTree (2nd + last touch) · ⛔ |
 | `backend/app/services/retrieval_service.py` | 25 / 14 / 181 (was `24 / 13 / 176`) | ✅ DISCHARGED 272-01 · 294-01: instruction kwarg + redacted trace (+6 −1) |
 | `backend/app/services/retrieval_scope.py` | 7 / 5 / 503 (was `6 / 4 / 463`) | 284-04: `_fetch_all` moved in verbatim · extraction FIRST next · ⛔ |
 | `backend/app/services/document_search_service.py` | 8 / 4 / 505 (was `5 / 3 / 584`) | 284-04: one view read; two-legs invariant RETIRED deliberately · ⛔ |
@@ -632,7 +632,7 @@ node scripts/check-hot-file-ledger.cjs <phase-dir>   # 0 clear · 1 missing rows
 | `frontend/src/components/experts/catalog/ExpertDetailModal.tsx` | 7 / 5 / 531 (was `6 / 4 / 531`) | honoured by construction (279-03: ONE copy change) |
 | `frontend/src/components/experts/catalog/startScopedChat.ts` | 1 / 1 / 70 | ⚠ 0/0/0 AT PLANNING · measured at 262-04 · ⛔ |
 | `backend/app/services/ingest_splice.py` | 22 / 8 / 1043 (was `19 / 7 / 930`) | honoured by construction (280: minter-only hunks) · ⛔ |
-| `frontend/src/components/ingestion/FolderTree.tsx` | 14 / 9 / 213 (was `13 / 8 / 213`) | 284-03: Root count passes through, no `?? 0` · ⛔ |
+| `frontend/src/components/ingestion/FolderTree.tsx` | 15 / 10 / 221 (was `14 / 9 / 213`) | 298-04: optional loading → 'Loading folders…' (UI-D8) · ⛔ |
 | `frontend/src/components/ingestion/FolderNode.tsx` | 15 / 8 / 316 (was `13 / 7 / 303`) | 284-03: no counts yet → slot omitted, never 0 · ⛔ |
 | `frontend/src/components/ingestion/NavRow.tsx` | 6 / 4 / 269 | ⚠ absent its ENTIRE LIFE — row added 266-05 · ⛔ |
 | `backend/app/models/document.py` | 14 / 11 / 275 (was `13 / 10 / 221`) | 284-02: five paged envelopes, additive · ⛔ |
@@ -680,6 +680,7 @@ node scripts/check-hot-file-ledger.cjs <phase-dir>   # 0 clear · 1 missing rows
 | `backend/app/db/watches.py` | 6 / 4 / 828 | ⚠ FIRES, absent here — row added 285-03 · honoured by construction (285-02) |
 | `frontend/src/components/sources/RunHistoryList.tsx` | 5 / 3 / 275 | ⚠ now FIRES (285) — row added 285-03 · comment-only change (285-01) |
 | `frontend/nginx.conf` | 3 / 3 / 76 | ⚠ now FIRES — row added 293-REVIEW WR-01 · one proxy header · ⛔ |
+| `frontend/src/hooks/useFolders.ts` | 4 / 4 / 197 | 298-04: org-tagged rows + loading; Realtime org filter (D-10) · ⛔ |
 
 
 When a new phase enters discuss-phase, the orchestrator must scan PLAN.md `files_modified` against this ledger. Any match against a G-5-firing row means the discuss-phase produces a refactor recommendation as the first option, not the planned feature — and the phase reads that file's section in `docs/HOT-FILE-LEDGER.md` before planning, because that is where the named seam and the binding invariants live.

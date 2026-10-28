@@ -6,10 +6,16 @@
  *   1. the metadata field defs + the saved views (Phase 114), and
  *   2. the Expert-install provenance read (Phase 266, D-266-13).
  *
- * ⛔ MOVED VERBATIM, comments included. The page gains one call to this hook in place of the
- * state and the two effects; what each read does and when it fires is unchanged by the move.
+ * ⛔ MOVED VERBATIM, comments included (the move-only commit). The page gains one call to this
+ * hook in place of the state and the two effects.
+ *
+ * Phase 298-04 (D-08 / UI-D10) — then the org arm: both reads re-ask when the active org changes
+ * (SEED-317's trigger fires here), and a switch after mount returns the selection to Root and
+ * closes the document panel, because an old-org folder id would read a specific-folder list that
+ * is not narrowed. ⛔ No keyed remount (297 rule): the page stays mounted and re-asks.
  */
 import { useCallback, useEffect, useState, type Dispatch, type SetStateAction } from "react"
+import { useActiveOrgId } from "@/hooks/useActiveOrgId"
 import { listMetadataFields, listViews } from "@/lib/api"
 import { listExpertInstalls } from "@/lib/api/experts"
 import { provenanceByFolder } from "@/components/experts/catalog/expertCatalog"
@@ -30,16 +36,42 @@ export interface LibraryOrgSwitch {
   folderProvenance: Record<string, string>
 }
 
-export function useLibraryOrgSwitch(_switchArgs: LibraryOrgSwitchArgs): LibraryOrgSwitch {
+export function useLibraryOrgSwitch({ dispatch, setSelectedDocId }: LibraryOrgSwitchArgs): LibraryOrgSwitch {
+  const activeOrgId = useActiveOrgId()
+
+  // UI-D10 — a switch AFTER mount: back to Root, panel closed (every reset visible, none silent).
+  // The first render records the org and does nothing, so first paint is unchanged.
+  // ⚠ DURING RENDER, not in an effect (React's "adjust state while rendering" pattern, the same
+  // one the page uses for its pager clamp). In an effect, `useLibraryDocuments`' own effect — which
+  // runs first — would already have asked for the OLD org's folder under the new org's header,
+  // and a specific-folder read is not narrowed. Here the render restarts with Root selected, so no
+  // effect ever sees the old folder id with the new org.
+  const [seenOrg, setSeenOrg] = useState(activeOrgId)
+  if (seenOrg !== activeOrgId) {
+    setSeenOrg(activeOrgId)
+    dispatch({ type: "SELECT_FOLDER", folderId: null })
+    setSelectedDocId(null)
+  }
+
   // ── Phase 114: the filter bar + Views group state ───────────────────────────
   const [customFields, setCustomFields] = useState<MetadataFieldDef[]>([])
   const [views, setViews] = useState<SavedView[]>([])
 
-  // Load the field defs (for the operator menu) + the saved views once.
+  // Load the field defs (for the operator menu) + the saved views once — and again for each org
+  // the person switches to (298-04, D-08).
+  // D-09: an answer asked under the previous org is dropped (`live`), so it cannot repaint.
   useEffect(() => {
-    listMetadataFields().then(setCustomFields).catch(() => setCustomFields([]))
-    listViews().then(setViews).catch(() => setViews([]))
-  }, [])
+    let live = true
+    listMetadataFields()
+      .then((rows) => live && setCustomFields(rows))
+      .catch(() => live && setCustomFields([]))
+    listViews()
+      .then((rows) => live && setViews(rows))
+      .catch(() => live && setViews([]))
+    return () => {
+      live = false
+    }
+  }, [activeOrgId])
 
   const refreshViews = useCallback(() => {
     listViews().then(setViews).catch(() => {})
@@ -63,7 +95,7 @@ export function useLibraryOrgSwitch(_switchArgs: LibraryOrgSwitchArgs): LibraryO
     return () => {
       mounted = false
     }
-  }, [])
+  }, [activeOrgId])
 
   return { customFields, views, setViews, refreshViews, folderProvenance }
 }

@@ -198,7 +198,7 @@ describe("LibraryPage — switching org (298-04)", () => {
     expect(screen.queryByText("alpha-a.pdf")).toBeNull()
     expect(screen.getByText("Loading folders…")).toBeInTheDocument()
     expect(screen.queryByText("No folders yet")).toBeNull()
-    expect(screen.getByText("Root")).toBeInTheDocument()
+    expect(screen.getByRole("button", { name: "Root" })).toBeInTheDocument()
 
     await act(async () => foldersB.resolve(ORG_B.folders))
     expect(await screen.findByText("Contracts B")).toBeInTheDocument()
