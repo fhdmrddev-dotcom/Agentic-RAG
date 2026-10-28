@@ -555,7 +555,7 @@ node scripts/check-hot-file-ledger.cjs <phase-dir>   # 0 clear · 1 missing rows
 | `frontend/src/lib/api/workflows.ts` | 15 / 15 / 1361 (was `14 / 14 / 1313`) | 298-02: WorkflowFolderRefusedError on both 422 arms; allOrgs list |
 | `frontend/src/lib/connectionMark.tsx` | 7 / 4 / 313 | ✅ **the move IS the seam, and it was TAKEN (214-08)** |
 | `frontend/src/components/ingestion/DocumentList.tsx` | 31 / 15 / 372 (was `31 / 16 / 372`) | last touch 275-02/04 |
-| `frontend/src/pages/LibraryPage.tsx` | 63 / 20 / 1344 (was `57 / 19 / 1297`) | seam TAKEN (284-01 hook); lines rose → G-5 NOT discharged · ⛔ |
+| `frontend/src/pages/LibraryPage.tsx` | 68 / 21 / 1345 (was `63 / 20 / 1344`) | 298-04 move-only: mount reads → useLibraryOrgSwitch (seam TAKEN) · ⛔ |
 | `backend/app/services/retrieval_service.py` | 25 / 14 / 181 (was `24 / 13 / 176`) | ✅ DISCHARGED 272-01 · 294-01: instruction kwarg + redacted trace (+6 −1) |
 | `backend/app/services/retrieval_scope.py` | 7 / 5 / 503 (was `6 / 4 / 463`) | 284-04: `_fetch_all` moved in verbatim · extraction FIRST next · ⛔ |
 | `backend/app/services/document_search_service.py` | 8 / 4 / 505 (was `5 / 3 / 584`) | 284-04: one view read; two-legs invariant RETIRED deliberately · ⛔ |

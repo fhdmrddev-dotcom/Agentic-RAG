@@ -46,18 +46,15 @@ import { AnimatedNumber } from "@/components/ui/AnimatedNumber"
 // derive from the whole library is this hook's; the page derives nothing from documents.
 import { useLibraryDocuments } from "@/hooks/useLibraryDocuments"
 import { useFolders } from "@/hooks/useFolders"
+import { useLibraryOrgSwitch } from "@/hooks/useLibraryOrgSwitch"
 import { useAuth } from "@/hooks/useAuth"
 import {
-  listMetadataFields,
-  listViews,
   updateView,
 } from "@/lib/api"
-import { listExpertInstalls } from "@/lib/api/experts"
 // Phase 275 (S7-S9): the ONE batched retention read + its leaves (no fetch in any of them).
 import { useRetentionStates } from "@/components/retention/useRetentionStates"
 import { RetentionFolderLine } from "@/components/retention/RetentionFolderLine"
 import { ArchivedHiddenLine } from "@/components/retention/ArchivedHiddenLine"
-import { provenanceByFolder } from "@/components/experts/catalog/expertCatalog"
 import { Sheet, SheetContent } from "@/components/ui/sheet"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip"
@@ -65,7 +62,7 @@ import { useCitationNavOptional } from "@/lib/citationNav"
 import { clampPageOffset } from "@/lib/pageClamp"
 import { cn } from "@/lib/utils"
 import { EMPTY_FILTER } from "@/types"
-import type { MetadataFieldDef, SavedView, ViewFilter } from "@/types"
+import type { SavedView, ViewFilter } from "@/types"
 import type { ActiveView } from "@/App"
 // Phase 244 plan 04 (SHELL-05 · BUG-260911-03) — the shell's ALREADY-RESOLVED conditions and
 // the strict leaf that buckets them. ⛔ A TYPE and a PURE FUNCTION only: this page must never
@@ -345,8 +342,6 @@ export function LibraryPage({
   const isWide = useIsWide()
 
   // ── Phase 114: the filter bar + Views group state ───────────────────────────
-  const [customFields, setCustomFields] = useState<MetadataFieldDef[]>([])
-  const [views, setViews] = useState<SavedView[]>([])
   // The active filter / selected view the list resolves (null = "no active filter, show the
   // folder view"). ⛔ NOT in the reducer, by decision: it names what the list ASKS the server
   // for, and the hook owns the answer (284-03 moved the resolve itself into `useLibraryDocuments`,
@@ -393,15 +388,12 @@ export function LibraryPage({
       ? libDocs.rowsPage
       : { offset: pageOffset, limit: pageSize }
 
-  // Load the field defs (for the operator menu) + the saved views once.
-  useEffect(() => {
-    listMetadataFields().then(setCustomFields).catch(() => setCustomFields([]))
-    listViews().then(setViews).catch(() => setViews([]))
-  }, [])
-
-  const refreshViews = useCallback(() => {
-    listViews().then(setViews).catch(() => {})
-  }, [])
+  // Phase 298-04 (G-5 seam, move-only): the field defs + saved views and the Expert-install
+  // provenance read live in `useLibraryOrgSwitch` with their comments.
+  const { customFields, views, setViews, refreshViews, folderProvenance } = useLibraryOrgSwitch({
+    dispatch,
+    setSelectedDocId,
+  })
 
   // ── Phase 114 (D-114-17): sidebar→rail collapse on panel-open, pinnable ──────
   // Default-on collapse the first time the detail panel opens; respect a manual
@@ -489,26 +481,6 @@ export function LibraryPage({
     for (const [id, bucket] of Object.entries(folderCounts)) counts[id] = bucket.count
     return counts
   }, [libDocs.summary])
-
-  // Phase 266 (D-266-13): an installed Expert's folder names where it came from —
-  // "Shared with org · from Financial Analyzer" — through NavRow's existing shared label.
-  // ⚠ A standard-tier org is REFUSED this read (403, the capability gate on the whole
-  // `/experts` router); `listExpertInstalls` turns that into `[]`, and any other failure is a
-  // missing note, not an error — the tree renders exactly as before either way.
-  const [folderProvenance, setFolderProvenance] = useState<Record<string, string>>({})
-  useEffect(() => {
-    let mounted = true
-    listExpertInstalls()
-      .then((rows) => {
-        if (mounted) setFolderProvenance(provenanceByFolder(rows))
-      })
-      .catch(() => {
-        if (mounted) setFolderProvenance({})
-      })
-    return () => {
-      mounted = false
-    }
-  }, [])
 
   // ── Resolve an active filter into the list (the SAME surface for ad-hoc + saved,
   // D-114-1). A saved view resolves by id (`resolveView`); an UNSAVED ad-hoc filter
