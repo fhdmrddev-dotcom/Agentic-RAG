@@ -3,7 +3,7 @@ phase: 299-links-to-the-thing-itself
 status: partial
 created: 2026-10-29
 rows_total: 20
-rows_run: 4
+rows_run: 6
 rows_blocked: 1
 driver: operator
 ---
@@ -24,15 +24,15 @@ account `fhdmrd.dev@gmail.com` (`22f9c615` + `c1f18150`) and the fixture `s296-g
 
 ## Rows
 
-**2026-10-29 — Claude drove 4 rows** in the operator's already-signed-in Chrome (`fhdmrd@gmail.com`, ONE org `22f9c615`, proven via `GET /org/me`). Evidence in `299-VALIDATION.md`. The rest need a **second org** (G4-2, A-2, X-1..X-8 — that account is in one org), a **signed-out session** (G4-4a/b/d) or **network throttling/blocking** (G4-5a/b), so they stay owed.
+**2026-10-29 — Claude drove 6 rows** (G4-2 + A-2 after the operator signed the tab in as `fhdmrd.dev@gmail.com`) in the operator's already-signed-in Chrome (`fhdmrd@gmail.com`, ONE org `22f9c615`, proven via `GET /org/me`). Evidence in `299-VALIDATION.md`. The rest need a **second org** (G4-2, A-2, X-1..X-8 — that account is in one org), a **signed-out session** (G4-4a/b/d) or **network throttling/blocking** (G4-5a/b), so they stay owed.
 
 Full row text (steps, pass line, failure line) lives in `299-VALIDATION.md` → G-4 rows and four-axis rows.
 Fill the Verdict + Evidence cells there.
 
 | Row | What | Run order |
 |---|---|---|
-| G4-2 | Other-org run link with a live chat: Stay, Switch, Switch back | **1st** — assumption A1 (the answer survives Switch back) rests on this row alone |
-| A-2 | Thread A streams while thread B is opened by pasted address | 2 (same setup as G4-2) |
+| G4-2 | Other-org run link with a live chat: Stay, Switch, Switch back | ✅ PASS 2026-10-29 (Claude) — **A1 holds: still streaming at Switch back** |
+| A-2 | Thread A streams while thread B is opened by pasted address | ✅ PASS 2026-10-29 (Claude) |
 | G4-1 | Copy link → fresh tab; also the RunModal "Saves in" caption and the 340 px link surface at mobile width | ✅ core PASS 2026-10-29 (Claude); RunModal caption + 340 px mobile still owed |
 | G4-3 | Missing ≡ forbidden: same card, same 404 body and headers (DevTools) | ✅ PASS 2026-10-29 (Claude) |
 | G4-4a | Signed-out return — password | 5 |
