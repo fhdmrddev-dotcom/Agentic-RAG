@@ -172,6 +172,15 @@ export function useMoveSheetRequest(): MoveSheetRequest | null {
   return useOrgItemsStore((s) => s.moveRequest)
 }
 
+/**
+ * The orgs an item may move to: every membership but the active one, ordered by name (the route's
+ * `ORDER BY o.name`). Empty for a solo user, so a caller renders nothing (absent, never disabled).
+ */
+export function moveTargets(orgs: readonly OrgMembership[] | undefined, activeOrgId: string | null): OrgMembership[] {
+  if (!orgs || orgs.length < 2) return []
+  return orgs.filter((o) => o.org_id !== activeOrgId).sort((a, b) => a.name.localeCompare(b.name))
+}
+
 /** Empty everything (counts, version, last move, open move). Called by setupTests.ts. */
 export function resetElsewhereCounts(): void {
   reqId += 1

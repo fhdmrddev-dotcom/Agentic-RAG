@@ -11671,7 +11671,7 @@ cells rot within days.
 | [`backend/app/api/settings.py`](docs/HOT-FILE-LEDGER.md#backendappapisettingspy) | 47 / 25 / 1301 (was `46 / 24 / 1250`) | ⚠ **FIRES** | 292.1-02: two bounded writes (2..50) via _range_refusal_detail + allow-list +2 (+51 −0). ⛔ never a retyped id list; GET never echoes a key · 293 touch: see §Phase 293 close |
 | [`backend/app/services/multimodal_service.py`](docs/HOT-FILE-LEDGER.md#backendappservicesmultimodal_servicepy) | 14 / 7 / 984 | ⚠ **FIRES** | ⚠ absent from BOTH for its ENTIRE LIFE at **7 phases** — row added SEED-227, which is also where its silent truncation was found |
 | [`backend/app/api/documents.py`](docs/HOT-FILE-LEDGER.md#backendappapidocumentspy) | 101 / 40 / 2709 (was `99 / 39 / 2698`) | ⚠ **FIRES** | 298-01: list_documents one `org_lists.by_org` in build() (every read, D-32); upload one `org_id=root_upload_org(...)` on the ONE minter call. Honoured by construction. ⛔ see section |
-| [`scripts/vitest-count-gate.cjs`](docs/HOT-FILE-LEDGER.md#scriptsvitest-count-gatecjs) | 377 / 81 / 6806 (was `376 / 81 / 6802`) | ⚠ **FIRES** | 298-05 T2 RED: MoveToOrgSheet (21) + MoveToOrgMenuItem (16) pinned FILE-LEVEL in both knobs (no src/components/org directory entry); none raised or lowered |
+| [`scripts/vitest-count-gate.cjs`](docs/HOT-FILE-LEDGER.md#scriptsvitest-count-gatecjs) | 378 / 81 / 6806 (was `377 / 81 / 6806`) | ⚠ **FIRES** | 298-05 T2 GREEN: MoveToOrgSheet 21 → 22 — the RED commit's pin under-counted its own suite by one (the confirm describe holds 5 cases, not 4). Read from the suite's printed count; none lowered |
 | [`scripts/check-deploy-drift.sh`](docs/HOT-FILE-LEDGER.md#scriptscheck-deploy-driftsh) | 5 / 4 / 267 | ⚠ **FIRES** | ⚠ absent its ENTIRE LIFE — row added 294-05. 294-01: DECISION_ENGINE_FAULT_BASE_URL registered as intentionally omitted (+2) |
 | [`scripts/build-public-openapi.cjs`](docs/HOT-FILE-LEDGER.md#scriptsbuild-public-openapicjs) | 11 / 5 / 472 (was `7 / 3 / 468`) | ⚠ **FIRES** | 298-01: `org-items` in the Account & org TAG_GROUPS entry + `/org-items/` in FLAGGED_PREFIXES (UI-internal). Two tokens. ⚠ prior row stale (`7 / 3 / 468` vs measured `10 / 4 / 468` pre-298). |
 | [`scripts/check-seeds-register.cjs`](docs/HOT-FILE-LEDGER.md#scriptscheck-seeds-registercjs) | 7 / 3 / 1132 | ⚠ **FIRES** | ⚠ absent its ENTIRE LIFE — row added 296-05, now FIRES (251 / 293 / 296). 296-05: three `\d{3}` → `\d{3,}` (293-IN-07). ⛔ the STATUS_ENUM triple |
@@ -12220,11 +12220,11 @@ cells rot within days.
 | [`frontend/src/lib/api/orgItems.ts`](docs/HOT-FILE-LEDGER.md#frontendsrclibapiorgitemsts) | 2 / 1 / 120 (was `1 / 1 / 45`) | no (young) | 298-05: + getElsewhereCounts (ApiError on non-OK), getMovePreview + moveOrgItem (non-OK → ApiRefusal with the server sentence via refusalOf). ⛔ refusal text rendered as React text by the sheet |
 | [`frontend/src/components/org/orgItemsCopy.ts`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentsorgorgitemscopyts) | 2 / 1 / 154 (was `1 / 1 / 18`) | no (young) | 298-05: + the elsewhere line (elsewhereLead exact plurals, Switch) and the move sheet words (titles, count sentence, what changes, terminals). ⛔ strict leaf, no imports; never '0 more' |
 | [`frontend/src/components/workflows/folderLabel.ts`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentsworkflowsfolderlabelts) | 1 / 1 / 47 | no (young) | young (created 298-04): optionLabel / chipLabel — in-org name, '{name} — lives in {Org}' / '· lives in', active-org label plain, else UNNAMED_KB_OPTION. ⛔ pure leaf, never a raw id |
-| [`frontend/src/lib/elsewhereCounts.ts`](docs/HOT-FILE-LEDGER.md#frontendsrclibelsewherecountsts) | 1 / 1 / 179 | no (young) | young (created 298-05): one GET per active org (D-16), foreign/late answers dropped, failed → nothing; move version + lastMoved; the open move request. ⛔ lazy client, org passed in (setupTests) |
+| [`frontend/src/lib/elsewhereCounts.ts`](docs/HOT-FILE-LEDGER.md#frontendsrclibelsewherecountsts) | 2 / 1 / 188 (was `1 / 1 / 179`) | no (young) | young (298-05): one GET per active org (D-16), stale answers dropped, failed → nothing; move version + lastMoved; the open move request; moveTargets (others by name). ⛔ lazy client, org passed in |
 | [`frontend/src/components/org/ElsewhereLine.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentsorgelsewherelinetsx) | 1 / 1 / 79 | no (young) | young (created 298-05): N more … in <Org> · Switch (D-17). ⛔ absent while loading, solo, no org, at 0, on failure; never '0 more'; Switch focuses the wrapper then switchOrg |
-| [`frontend/src/components/org/MoveToOrgSheet.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentsorgmovetoorgsheettsx) | 0 / 0 / 0 | no (planned 298-05) | young (planned 298-05). Victim-naming bottom sheet (UI-D16/17). ⛔ no Move button before the preview; server refusals verbatim; no optimistic vanish |
-| [`frontend/src/components/org/MoveToOrgMenuItem.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentsorgmovetoorgmenuitemtsx) | 0 / 0 / 0 | no (planned 298-05) | young (planned 298-05). Move to <org>… DropdownMenuItem leaf (UI-D15). ⛔ absent (never disabled) for solo users and non-owners |
-| [`frontend/src/components/org/MoveToOrgButton.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentsorgmovetoorgbuttontsx) | 0 / 0 / 0 | no (planned 298-05) | young (planned 298-05). Root-document move button for the detail panel (UI-D15). ⛔ only for an owned latest Root document at 2+ orgs |
+| [`frontend/src/components/org/MoveToOrgSheet.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentsorgmovetoorgsheettsx) | 1 / 1 / 433 | no (young) | young (created 298-05): victim-naming bottom sheet, no red (UI-D16/17) + MoveToOrgSheetHost. ⛔ no Move before the preview; refusals verbatim, Close only; moving undismissable; noteMoved once on 200 |
+| [`frontend/src/components/org/MoveToOrgMenuItem.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentsorgmovetoorgmenuitemtsx) | 1 / 1 / 88 | no (young) | young (created 298-05): Move to <Org>… DropdownMenuItem(s), one per other org by name, collapsed at 4+. ⛔ absent (never disabled) solo / non-owner / no provider; only asks for the sheet |
+| [`frontend/src/components/org/MoveToOrgButton.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentsorgmovetoorgbuttontsx) | 1 / 1 / 82 | no (young) | young (created 298-05): Root-document move button(s) for the detail panel; owns its sheet; onMoved after the moved sheet closes. ⛔ only an owned latest Root document at 2+ orgs |
 
 
 
@@ -26597,3 +26597,35 @@ Scan-list cell as of 2026-10-28 (replaced by 298-05 T1 GREEN, moved verbatim): 0
 Scan-list cell as of 2026-10-28 (replaced by 298-05 T2 RED, moved verbatim): 376 / 81 / 6802 (was `375 / 81 / 6795`) | ⚠ **FIRES** | 298-05 T1 RED: elsewhereCounts (13) + ElsewhereLine (21) pinned FILE-LEVEL, both knobs; FolderTree 14→15, ChatHistoryColumn.orgSwitch 4→6, RunLogPanel 23→25, WorkflowsPage.orgSwitch 4→6; none lowered
 
 CLAUDE.md verdict cell as of 2026-10-28 (replaced by 298-05 T2 RED, moved verbatim): | `scripts/vitest-count-gate.cjs` | 376 / 81 / 6802 (was `375 / 81 / 6795`) | 298-05: elsewhereCounts + ElsewhereLine pinned; 4 mount pins raised |
+
+### `scripts/vitest-count-gate.cjs` — 298-05 T2 GREEN (2026-10-28)
+
+**`378 / 81 / 6806` (was `377 / 81 / 6806`).** 298-05 Task 2 GREEN commit: MoveToOrgSheet.test.tsx re-pinned 21 → 22 from the suite's own printed count. The RED commit had counted the confirm describe as 4 cases; it holds 5. Raising a pin only tightens it.
+
+Scan-list cell as of 2026-10-28 (replaced by 298-05 T2 GREEN, moved verbatim): 377 / 81 / 6806 (was `376 / 81 / 6802`) | ⚠ **FIRES** | 298-05 T2 RED: MoveToOrgSheet (21) + MoveToOrgMenuItem (16) pinned FILE-LEVEL in both knobs (no src/components/org directory entry); none raised or lowered
+
+CLAUDE.md verdict cell as of 2026-10-28 (replaced by 298-05 T2 GREEN, moved verbatim): | `scripts/vitest-count-gate.cjs` | 377 / 81 / 6806 (was `376 / 81 / 6802`) | 298-05: MoveToOrgSheet (21) + MoveToOrgMenuItem (16) pinned |
+
+### `frontend/src/lib/elsewhereCounts.ts` — 298-05 T2 GREEN (2026-10-28)
+
+**`2 / 1 / 188` (was `1 / 1 / 179`).** 298-05 Task 2 GREEN: + moveTargets(orgs, activeOrgId) — every membership but the active one, by name, [] below 2 orgs — shared by the menu item and the Root-document button so both apply one eligibility rule.
+
+Scan-list cell as of 2026-10-28 (replaced by 298-05 T2 GREEN, moved verbatim): 1 / 1 / 179 | no (young) | young (created 298-05): one GET per active org (D-16), foreign/late answers dropped, failed → nothing; move version + lastMoved; the open move request. ⛔ lazy client, org passed in (setupTests)
+
+### `frontend/src/components/org/MoveToOrgSheet.tsx` — 298-05 T2 GREEN (2026-10-28)
+
+**`1 / 1 / 433`.** Created by 298-05 Task 2 GREEN on the WorkflowDeleteSheet arrangement (bottom Sheet, mx-auto max-w-lg, raised + transparent boxes, ✎ footer) with ReleaseHoldDialog's refusal split (4xx ApiRefusal = the server's sentence; 5xx / network = a failure with Try again). The lifecycle lives in a body component inside SheetContent so each open starts fresh. Keep it here is the default focus; Moving ignores every dismissal; noteMoved runs once on the 200. No destructive class anywhere: failures and refusals are amber. MoveToOrgSheetHost renders a row menu's request for the kinds its list owns and closes a request opened under another org.
+
+Scan-list cell as of 2026-10-28 (replaced by 298-05 T2 GREEN, moved verbatim): 0 / 0 / 0 | no (planned 298-05) | young (planned 298-05). Victim-naming bottom sheet (UI-D16/17). ⛔ no Move button before the preview; server refusals verbatim; no optimistic vanish
+
+### `frontend/src/components/org/MoveToOrgMenuItem.tsx` — 298-05 T2 GREEN (2026-10-28)
+
+**`1 / 1 / 88`.** Created by 298-05 Task 2 GREEN: reads useOrgOptional + moveTargets; renders null unless owned with another org to move to; at 2-3 orgs one DropdownMenuItem per target (ArrowRightLeft, full name as aria-label, truncate), at 4+ one 'Move to another organization…'. Choosing writes the request (tagged with the active org; a folder whose subtree holds the selection says so). It renders no sheet itself, because the menu's content unmounts on close.
+
+Scan-list cell as of 2026-10-28 (replaced by 298-05 T2 GREEN, moved verbatim): 0 / 0 / 0 | no (planned 298-05) | young (planned 298-05). Move to <org>… DropdownMenuItem leaf (UI-D15). ⛔ absent (never disabled) for solo users and non-owners
+
+### `frontend/src/components/org/MoveToOrgButton.tsx` — 298-05 T2 GREEN (2026-10-28)
+
+**`1 / 1 / 82`.** Created by 298-05 Task 2 GREEN: renders null unless folder_id is null, is_latest is not false, the signed-in id owns the document and moveTargets is non-empty; outline sm button(s) per target or the collapsed form; renders MoveToOrgSheet (kind document) itself since it is not inside a menu; onMoved runs when the sheet closes after a successful move.
+
+Scan-list cell as of 2026-10-28 (replaced by 298-05 T2 GREEN, moved verbatim): 0 / 0 / 0 | no (planned 298-05) | young (planned 298-05). Root-document move button for the detail panel (UI-D15). ⛔ only for an owned latest Root document at 2+ orgs
