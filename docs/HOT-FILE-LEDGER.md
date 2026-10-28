@@ -11848,7 +11848,7 @@ cells rot within days.
 | [`frontend/src/components/sources/watchProductMark.ts`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentssourceswatchproductmarkts) | 0 / 0 / 38 | no (new) | young (240) — which PRODUCT a watched folder came from, read from its ADDRESS. ⛔ Never from `service_id`: Gmail and Drive share one connection |
 | [`frontend/src/components/sources/CreateWatchModal.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentssourcescreatewatchmodaltsx) | 4 / 1 / 283 | no (1 phase) | honoured by construction (**240**): byte-unchanged. ⛔ Its auto-select of `capable[0]` is why BUG-260908-02 mattered most here |
 | [`frontend/src/components/layout/NavPanel.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentslayoutnavpaneltsx) | 26 / 14 / 420 (was `25 / 14 / 416`) | ⚠ **FIRES** | **276-01** (D-14): Iris mark `<img>`; **276-06** (D-27): on the dark `#0A0E18` chip, classes only. 244-14's `overflow-x-hidden` stands |
-| [`frontend/src/App.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrcapptsx) | 42 / 29 / 355 (was `41 / 29 / 348`) | **FIRES** | 297-03: one LeaveGuardContext.Provider around CitationNavProvider (no key, one-identity value). See §Phase 297 (297-03) |
+| [`frontend/src/App.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrcapptsx) | 43 / 30 / 349 (was `42 / 29 / 355`) | **FIRES** | 299-05: the splash JSX becomes `<BootScreen />` (one expression; IrisAvatar import swapped for BootScreen's). See §Phase 299 (299-05) |
 | [`frontend/src/lib/nav-items.ts`](docs/HOT-FILE-LEDGER.md#frontendsrclibnav-itemsts) | 13 / 9 / 173 (was `12 / 8 / 153`) | ⚠ **FIRES** | **283-02** (FIX-01): the Settings entry UNGOVERNED (no `feature` key); per-tab gate in the page, per-route `require_visible` at the API. `visibleNavItems` unchanged |
 | [`frontend/src/components/library/HealthTab.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentslibraryhealthtabtsx) | 9 / 2 / 199 | no (2 phases) | row added 235 BELOW threshold on purpose. One import, one optional prop, one mount, ZERO branches; the handler lives at the page boundary |
 | [`frontend/src/pages/librarySelection.ts`](docs/HOT-FILE-LEDGER.md#frontendsrcpageslibraryselectionts) | 2 / 2 / 312 | no (2 phases) | ⚠ absent for its entire life — row added 235, which did NOT modify it but made `App.tsx` import `LibraryTab` from it rather than re-declare it |
@@ -12229,7 +12229,7 @@ cells rot within days.
 | [`backend/app/services/link_resolver.py`](docs/HOT-FILE-LEDGER.md#backendappserviceslink_resolverpy) | 2 / 1 / 241 (was `1 / 1 / 225`) | no (young) | young (created 299-01). one SQL per kind; run + expert on the pool with $2 = caller (P1/P2). ⛔ one statement per kind; audience rule twinned with lib/linkAudience.ts |
 | [`backend/app/services/item_org_guard.py`](docs/HOT-FILE-LEDGER.md#backendappservicesitem_org_guardpy) | 1 / 1 / 74 | no (young) | young (created 299-01). D-18 409 helper (send / kickoff / Tweak). ⛔ no-op without an active org (298 D-03); never a widening of _require_thread_org |
 | [`frontend/src/lib/returnTo.ts`](docs/HOT-FILE-LEDGER.md#frontendsrclibreturntots) | 1 / 1 / 127 | no (young) | young (created 299-05). return-to-link leaf (D-23/D-24). ⛔ strict leaf; rebuilt via formatAppRoute, never echoed; sessionStorage 15-min TTL, re-validated, consumed once |
-| [`frontend/src/components/layout/BootScreen.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentslayoutbootscreentsx) | 0 / 0 / 0 | no (planned 299-05) | young (planned 299-05). three-stage boot clock 8 s / 20 s (D-26, SEED-312). ⛔ Try again = reload (no History write); never decides auth |
+| [`frontend/src/components/layout/BootScreen.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentslayoutbootscreentsx) | 1 / 1 / 89 | no (young) | young (created 299-05). three-stage boot clock 8 s / 20 s (D-26, SEED-312). ⛔ Try again = reload (no History write); never decides auth |
 | [`frontend/src/hooks/useThreadAddress.ts`](docs/HOT-FILE-LEDGER.md#frontendsrchooksusethreadaddressts) | 0 / 0 / 0 | no (planned 299-02) | young (planned 299-02). URL ⇄ selected thread binding (D-02/D-32). ⛔ never setViewingThread, never a router hook; deps [threadId, pending] |
 | [`frontend/src/components/workflows/library/useWorkflowLinkTarget.ts`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentsworkflowslibraryuseworkflowlinktargetts) | 0 / 0 / 0 | no (planned 299-02) | young (planned 299-02). open a draft / focus a published card by id (D-03). ⛔ no write on open; in LIBRARY_SUBTREE_PATHS; never imports the page |
 | [`frontend/src/components/experts/catalog/useExpertLinkTarget.ts`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentsexpertscataloguseexpertlinktargetts) | 0 / 0 / 0 | no (planned 299-02) | young (planned 299-02). open an Expert's detail by id (D-04). ⛔ read only (list or getExpert); fires once per id |
@@ -19218,6 +19218,16 @@ One import and one wrapper: `<LeaveGuardContext.Provider value={nav.leaveGuards}
 Scan-list cell as of 2026-10-27 (replaced by 297-03, moved verbatim): 41 / 29 / 348 (was `39 / 29 / 340`) | **FIRES** | 297-02: nav props threaded (runId, openRun, addressNotFound, operatorLoading); dated router correction beside 188-09. See §Phase 297 (297-02)
 
 CLAUDE.md verdict cell as of 2026-10-27 (replaced by 297-03, moved verbatim): | `frontend/src/App.tsx` | 41 / 29 / 348 (was `39 / 29 / 340`) | 297-02: nav props threaded; router correction beside the 188-09 docblock |
+
+### `frontend/src/App.tsx` — Phase 299 (299-05)
+
+**`43 / 30 / 349`** (was `42 / 29 / 355`)
+
+One expression: the splash branch `if (loading || setupStatus === null)` now returns `<BootScreen />` (D-26 / SEED-312), and the `IrisAvatar` import is swapped for `BootScreen`'s (App no longer renders the Iris itself; the markup moved verbatim into `components/layout/BootScreen.tsx` with its 276-06 comment). The D-06 comment above the branch stays; a two-line dated comment sits beside it. The condition is unchanged, so the wizard / lock-out / invite / AuthPage order below is byte-identical, and `SetupWizard.test.tsx` + `navigationKeepsStreams.test.tsx` stay green unedited. Honoured by construction (the 297 one-expression precedent).
+
+Scan-list cell as of 2026-10-28 (replaced by 299-05, moved verbatim): 42 / 29 / 355 (was `41 / 29 / 348`) | **FIRES** | 297-03: one LeaveGuardContext.Provider around CitationNavProvider (no key, one-identity value). See §Phase 297 (297-03)
+
+CLAUDE.md verdict cell as of 2026-10-28 (replaced by 299-05, moved verbatim): | `frontend/src/App.tsx` | 42 / 29 / 355 (was `41 / 29 / 348`) | 297-03: one LeaveGuardContext.Provider (no key, one-identity value) |
 
 ### `frontend/src/components/classification/ClassificationRulesPage.tsx` — Phase 271
 
@@ -26827,6 +26837,8 @@ Scan-list cell as of 2026-10-28 (replaced by 298-review, moved verbatim): 1 / 1 
 ### `frontend/src/components/layout/BootScreen.tsx`
 
 **Added AT PLANNING (Phase 299, 2026-10-28) with `0 / 0 / 0`** — the file does not exist yet; plan `299-05` creates it and re-derives the triple in its creating commit (the 297 leaveGuard.ts precedent). young (planned 299-05). three-stage boot clock 8 s / 20 s (D-26, SEED-312). ⛔ Try again = reload (no History write); never decides auth
+
+**Created 299-05 (2026-10-28) — measured `1 / 1 / 89` in its creating commit.** `BOOT_COPY` (S6's five strings, exported beside the component with the AddressNotFound.tsx eslint precedent) and `BootScreen()`: one `useState<"iris" | "still" | "gaveup">` advanced by two timeouts (8 000 / 20 000 ms) set in ONE effect with cleanup; the "kept" sentence decided once at mount from `kindWord(window.location...)`. Stage 1 is App's pre-299 splash markup verbatim (`flex h-screen items-center justify-center` › `role="status" aria-label="Loading Syrel"` › `IrisAvatar state="thinking" size={56}`, the 276-06 comment kept); stage 2 adds the sentence inside the same status element (the Iris element is not remounted); stage 3 is a heading + body + filled `Button` focused on appear. **Binding invariants:** ⛔ ONE clock, here — never a timer in `useAuth` (D-26's reasoned deviation: a timeout there could show a signed-in person the sign-in form, Pitfall 6); ⛔ never decides auth, only what the screen says; ⛔ Try again is `window.location.reload()`, never a History write (`noRawHistoryWrites.test.ts`); ⛔ no amber, no red, no `role="alert"` (UI-D3); ⛔ the kept sentence only on an entity address (UI-D17).
 
 ### `frontend/src/hooks/useThreadAddress.ts`
 

@@ -167,7 +167,8 @@ describe("BootScreen — three stages on one clock (S6)", () => {
     const { unmount } = render(<BootScreen />)
     expect(vi.getTimerCount()).toBe(2)
     unmount()
-    expect(clear).toHaveBeenCalledTimes(2)
+    // At least our two; the Iris clears its own handles on unmount too, so the call count is not ours alone.
+    expect(clear.mock.calls.length).toBeGreaterThanOrEqual(2)
     expect(vi.getTimerCount()).toBe(0)
     act(() => {
       vi.advanceTimersByTime(30_000)

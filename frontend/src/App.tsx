@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from "react"
 import { AlertTriangle, Lock } from "lucide-react"
 // Phase 276-06 (D-24 / D-27): the boot splash is the moving Iris (a real wait).
-import { IrisAvatar } from "./components/chat/IrisAvatar"
+import { BootScreen } from "./components/layout/BootScreen"
 import "./index.css"
 import { useAuth } from "./hooks/useAuth"
 import { AuthPage } from "./pages/AuthPage"
@@ -224,16 +224,10 @@ function App() {
   // Phase 158 (D-06): hold the existing spinner until BOTH the auth state AND the one-shot
   // setup probe resolve — so a fresh box shows the wizard (never a flash of AuthPage first)
   // and a configured box falls straight through to its unchanged path once the probe returns.
+  // Phase 299-05 (D-26 / SEED-312): the splash is the three-stage BootScreen — today's markup for
+  // 8 s, then words, then a give-up with Try again at 20 s. It never decides auth (Pitfall 6).
   if (loading || setupStatus === null) {
-    return (
-      <div className="flex h-screen items-center justify-center">
-        {/* Phase 276-06: the Iris in its thinking state replaces the generic spin ring; under
-            reduced motion it is the static mark with the lit core. */}
-        <div role="status" aria-label="Loading Syrel">
-          <IrisAvatar state="thinking" size={56} />
-        </div>
-      </div>
-    )
+    return <BootScreen />
   }
 
   // Phase 158 (D-06): the pre-auth setup branch, BEFORE the !user check. Render the wizard
