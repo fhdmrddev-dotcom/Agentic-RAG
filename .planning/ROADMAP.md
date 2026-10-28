@@ -137,7 +137,7 @@ Plans:
 Plans:
 **Wave 1**
 
-- [ ] 298-01-PLAN.md — backend narrowing of every list (org_lists.py), Root-upload org stamp, `/org-items` elsewhere counts + folder labels, client org plumbing (ORG-01..04, ORG-06)
+- [x] 298-01-PLAN.md — backend narrowing of every list (org_lists.py), Root-upload org stamp, `/org-items` elsewhere counts + folder labels, client org plumbing (ORG-01..04, ORG-06)
 
 **Wave 2** *(blocked on Wave 1 completion)*
 
