@@ -25,7 +25,7 @@
  * content unmounts when it closes, so a sheet rendered inside the menu item would die the moment
  * it opened; the host lives in the list's `ElsewhereLine` instead, which outlives the menu.
  */
-import { useEffect, useRef, useState, type RefObject } from "react"
+import { useEffect, useRef, useState, useSyncExternalStore, type RefObject } from "react"
 import { ArrowRightLeft, Check, Loader2 } from "lucide-react"
 
 import { Sheet, SheetContent, SheetHeader, SheetTitle } from "@/components/ui/sheet"
@@ -401,6 +401,26 @@ function MoveSheetBody({ kind, itemId, itemName, targets, holdsSelection, descId
  * owns. Mounted by `ElsewhereLine`, which every list with a move home already renders once. A
  * request opened under another org closes on a switch (UI-D10), never rendering for the new org.
  */
+// 298-review WR-02 — ONE sheet per request, however many hosts are mounted. On a phone the
+// Library renders its sidebar twice (the CSS-hidden desktop column stays mounted, and the folder
+// bottom sheet mounts a second copy), so two hosts read the same request and each portalled its
+// own sheet: a second "Move to …" that re-POSTed into the SAME_ORG 422. Hosts claim in mount order;
+// the EARLIEST still-mounted claimant of a request's kind renders it, so the sheet survives the
+// folder sheet closing around it, and a survivor takes over when the owner unmounts.
+let hostClaims: ReadonlyArray<{ id: number; kinds: readonly ("folder" | "draft")[] }> = []
+let nextHostId = 0
+const claimListeners = new Set<() => void>()
+function emitClaims() {
+  claimListeners.forEach((f) => f())
+}
+function subscribeClaims(f: () => void) {
+  claimListeners.add(f)
+  return () => {
+    claimListeners.delete(f)
+  }
+}
+const readClaims = () => hostClaims
+
 export function MoveToOrgSheetHost({
   kinds,
   returnFocusFallback,
@@ -410,7 +430,19 @@ export function MoveToOrgSheetHost({
 }) {
   const request = useMoveSheetRequest()
   const activeOrgId = useOrgOptional()?.activeOrgId ?? null
-  const mine = request !== null && kinds.includes(request.kind) ? request : null
+  const [hostId] = useState(() => ++nextHostId)
+  const kindsKey = kinds.join(",")
+  useEffect(() => {
+    hostClaims = [...hostClaims, { id: hostId, kinds: kindsKey.split(",") as ("folder" | "draft")[] }]
+    emitClaims()
+    return () => {
+      hostClaims = hostClaims.filter((c) => c.id !== hostId)
+      emitClaims()
+    }
+  }, [hostId, kindsKey])
+  const claims = useSyncExternalStore(subscribeClaims, readClaims, readClaims)
+  const owner = request === null ? undefined : claims.find((c) => c.kinds.includes(request.kind))
+  const mine = request !== null && kinds.includes(request.kind) && owner?.id === hostId ? request : null
   const stale = mine !== null && mine.openedIn !== activeOrgId
   useEffect(() => {
     if (stale) closeMoveSheet()
