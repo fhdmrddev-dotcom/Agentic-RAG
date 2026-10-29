@@ -867,11 +867,19 @@ BEGIN
                 ON CONFLICT (notification_id) DO NOTHING;
             END IF;
         ELSIF tc->>'kind' = 'ask_user_response' AND tc->>'tool_call_id' IS NOT NULL THEN
+            -- 300-REVIEW WR-04: this function is SECURITY DEFINER and tool_call_id is client-
+            -- supplied (the answer route checks it on the harness branch only), so the close is
+            -- scoped to runs in the ANSWER's own thread. A row written in another user's thread
+            -- can never close this notice. The answer route and the engine's expiry row both
+            -- write into the run's thread, so both still close it.
             UPDATE public.notifications n
                SET closed_at = now(),
                    closed_reason = CASE WHEN (tc->>'expired') = 'true' THEN 'run_ended' ELSE 'answered' END
              WHERE n.tool_call_id = tc->>'tool_call_id'
-               AND n.closed_at IS NULL;
+               AND n.closed_at IS NULL
+               AND n.run_id IN (SELECT wr.id
+                                  FROM public.workflow_runs wr
+                                 WHERE wr.thread_id = NEW.thread_id);
         END IF;
     EXCEPTION WHEN OTHERS THEN
         RAISE WARNING 'notify_on_ask_row swallowed: %', SQLERRM;

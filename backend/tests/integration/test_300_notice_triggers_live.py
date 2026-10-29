@@ -348,6 +348,45 @@ async def test_an_answer_for_another_question_leaves_the_notice_open():
         assert n["closed_at"] is None
 
 
+@pytest.mark.parametrize("origin", ["deep", "harness"])
+async def test_another_users_answer_in_their_own_thread_cannot_close_the_notice(origin):
+    """300-REVIEW WR-04: the close ran SECURITY DEFINER on the client-supplied tool_call_id alone.
+    The answer route checks the id only on the harness branch, so a deep-origin answer row with
+    another user's prompt id — written in the answerer's OWN thread — closed that user's notice
+    (their email became skipped_answered). The close is now scoped to the answer's thread."""
+    async with _world() as w:
+        c = w.conn
+        await _prompt(c, w, w.run, "tc-victim")
+        foreign_thread = await c.fetchval(
+            "INSERT INTO public.threads (user_id, org_id, title) VALUES ($1, $2, 'foreign') RETURNING id",
+            w.other, w.org_b,
+        )
+        await _run(c, w, thread=foreign_thread, org=w.org_b, user=w.other)
+        tool_call = {"kind": "ask_user_response", "tool_call_id": "tc-victim", "response_text": "x",
+                     "choice_index": None, "folder_id": None}
+        await c.execute(
+            "INSERT INTO public.messages (thread_id, user_id, role, content, origin, org_id, tool_calls)"
+            " VALUES ($1, $2, 'system', 'x', $3, $4, $5::jsonb)",
+            foreign_thread, w.other, origin, w.org_b, json.dumps([tool_call]),
+        )
+        (n,) = await _notices(c, w.run)
+        assert n["closed_at"] is None and n["closed_reason"] is None, "a foreign answer closed the notice"
+        # non-vacuity: the owner's own answer, in the run's thread, still closes it
+        await _response(c, w, "tc-victim")
+        (n,) = await _notices(c, w.run)
+        assert n["closed_reason"] == "answered"
+
+
+async def test_an_expiry_row_in_the_runs_thread_still_closes_the_notice():
+    """WR-04 non-regression: the engine's expiry row is written in the run's own thread."""
+    async with _world() as w:
+        c = w.conn
+        await _prompt(c, w, w.run, "tc-exp2")
+        await _response(c, w, "tc-exp2", expired=True)
+        (n,) = await _notices(c, w.run)
+        assert n["closed_reason"] == "run_ended"
+
+
 async def test_an_expired_response_closes_the_notice_as_run_ended():
     async with _world() as w:
         c = w.conn
