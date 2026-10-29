@@ -4426,6 +4426,9 @@ const BASELINE = {
   "InvitationsTab.test.tsx": 17, // 300-05 — first-ever pin: 8 shipped (send gate, chips, resend/revoke, role picker) + 9 'Email not sent' chip / resend-line cases
   "InviteMemberDialog.test.tsx": 7, // 300-05 — the three result arms by their words, Copy link focused on failed, older backend never a false failure, org.ts unwraps
   "inviteDeliveryCopy.test.ts": 6, // 300-05 — the D-11 sentence verbatim, three titles, chip + resend line, no provider/error/retry words, zero imports
+  // ── Phase 301-03 (NOTE-01 / UI-D4, D-02, D-06, D-28) — FILE-LEVEL in TARGETS, same commit.
+  "waitingVocabulary.test.ts": 24, // 301-03 — every waiting-list word verbatim, count sentence / 99+ pill / kind / origin / waited ladder (future + unparseable = under a minute) / and N more / org initial, no raw wire word, zero imports
+  "OrgIdentity.test.tsx": 17, // 301-03 — first-ever pin: 13 shipped (roleBadgeMeta, RoleBadge, OrgAvatar) + 4 xs cases (default class string byte-identical, size default, xs 16px / 10px, pending at xs)
   // 293-04 — under the `src/components/workflows` directory entry, so a pin only.
   "WorkflowCardMenu.apiKey293.test.tsx": 4, // ⋯ New API key… under Schedules on owned published rows only, payload {id, name}; absent without onApiKey (seam286 pin unchanged)
   // ── Phase 297-01 (REG-09 / D-01, D-03) — adopted, both knobs, same commit (2026-10-27).
@@ -6545,6 +6548,9 @@ const TARGETS = [
   "src/components/org/InvitationsTab.test.tsx",
   "src/components/org/InviteMemberDialog.test.tsx",
   "src/components/org/inviteDeliveryCopy.test.ts",
+  // 301-03 — FILE-LEVEL, SAME commit as their BASELINE pins.
+  "src/components/layout/waitingVocabulary.test.ts",
+  "src/components/org/OrgIdentity.test.tsx",
   // Phase 297-01 — FILE-LEVEL (no directory entry), in the SAME commit as its BASELINE pin.
   "src/hooks/__tests__/useAppNavigation.test.tsx",
   // Phase 297-02 — FILE-LEVEL (no src/lib/__tests__ directory entry), SAME commit as its BASELINE pin.

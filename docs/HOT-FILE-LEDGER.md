@@ -12270,10 +12270,10 @@ cells rot within days.
 | [`backend/app/api/notifications.py`](docs/HOT-FILE-LEDGER.md#backendappapinotificationspy) | 0 / 0 / 0 | no (planned 301-01) | young (planned 301-01). GET /notifications: the caller's open waiting notices across member orgs (D-15, D-27). ⛔ pool + $1 caller; no X-Org-Id; 401 router-level |
 | [`frontend/src/lib/api/notifications.ts`](docs/HOT-FILE-LEDGER.md#frontendsrclibapinotificationsts) | 1 / 1 / 51 (was `0 / 0 / 0`) | no (young) | young (created 301-02). getWaitingNotices(signal) wire client (D-15, D-28). ⛔ kept out of the @/lib/api barrel |
 | [`frontend/src/hooks/useWaitingNotices.ts`](docs/HOT-FILE-LEDGER.md#frontendsrchooksusewaitingnoticests) | 1 / 1 / 211 (was `0 / 0 / 0`) | no (young) | young (created 301-02). Fetch is truth, Realtime a hint (D-17, D-18, D-33). ⛔ never reads the payload; one call site (D-14) |
-| [`frontend/src/components/layout/waitingVocabulary.ts`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentslayoutwaitingvocabularyts) | 0 / 0 / 0 | no (planned 301-03) | young (planned 301-03). Every waiting-list word (UI-SPEC copy, D-28). ⛔ zero-import leaf |
+| [`frontend/src/components/layout/waitingVocabulary.ts`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentslayoutwaitingvocabularyts) | 1 / 1 / 79 (was `0 / 0 / 0`) | no (young) | young (created 301-03). Every waiting-list word (UI-SPEC copy, D-02, D-06, D-10, D-28). ⛔ zero-import leaf; no raw wire word reaches the screen |
 | [`frontend/src/components/layout/WaitingOnYouControl.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentslayoutwaitingonyoucontroltsx) | 0 / 0 / 0 | no (planned 301-03) | young (planned 301-03). Rail control + drawer row (D-01, D-02, D-03). ⛔ presentational: no fetch, no supabase; never switchOrg |
 | [`frontend/src/components/layout/WaitingOnYouList.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentslayoutwaitingonyoulisttsx) | 0 / 0 / 0 | no (planned 301-03) | young (planned 301-03). Rows as DropdownMenuItems (D-05..D-10, D-29). ⛔ no dismiss / mark-read; minute tick only while open |
-| [`frontend/src/components/org/OrgIdentity.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentsorgorgidentitytsx) | 1 / 1 / 94 | no (1 phase) | Added AT PLANNING 301 (absent its entire life). 301-03: one optional size "xs" on OrgAvatar (UI-D4). ⛔ default output byte-identical |
+| [`frontend/src/components/org/OrgIdentity.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentsorgorgidentitytsx) | 2 / 2 / 99 (was `1 / 1 / 94`) | no (2 phases) | 301-03: one optional size "xs" on OrgAvatar (UI-D4). ⛔ default output byte-identical |
 
 
 
@@ -27939,6 +27939,14 @@ CLAUDE.md verdict cell: none (the file does not fire).
 
 Planned cell: young (planned 301-03). Every waiting-list word (UI-SPEC copy, D-28). ⛔ zero-import leaf
 
+#### 301-03 Task 1 (created, D-02, D-06, D-10, D-28, 2026-10-30)
+
+**`1 / 1 / 79` (created).** `WAITING_COPY` (label, header, empty, loading, failed, stale, untitledWorkflow, unnamedOrg — verbatim from UI-SPEC) plus `countSentence`, `pillText` (99+), `kindWords` (unknown → "needs you"), `originWords` (schedule / key only), `waitedPhrase` (future or unparseable created_at → "under a minute"), `moreLine`, `orgInitial`. Binding invariants: ⛔ zero imports (`?raw` fence in `waitingVocabulary.test.ts`); its types are local, never imported from `attentionConditions.ts`; ⛔ no dismiss / mark-read / snooze word, because no such control exists (D-09).
+
+Scan-list cell as of 2026-10-30 (replaced by 301-03 Task 1 (created), moved verbatim): 0 / 0 / 0 | no (planned 301-03) | young (planned 301-03). Every waiting-list word (UI-SPEC copy, D-28). ⛔ zero-import leaf |
+
+CLAUDE.md verdict cell: none (the file does not fire).
+
 ### `frontend/src/components/layout/WaitingOnYouControl.tsx`
 
 **Added AT PLANNING (Phase 301, 2026-10-30) with `0 / 0 / 0`** — the file does not exist yet; the plan named in the cell creates it, and the triple is re-derived when this phase's ledger refresh runs (301-02 for its own files in their creating commit; 301-03 Task 3 for 301-01's, which runs ledger-free so it can share wave 1 with 301-02).
@@ -27956,3 +27964,11 @@ Planned cell: young (planned 301-03). Rows as DropdownMenuItems (D-05..D-10, D-2
 **Added AT PLANNING (Phase 301, 2026-10-30) with `1 / 1 / 94`** — measured with the recipe (1 commit, phase 177). ⚠ **ABSENT FROM THE SCAN LIST FOR ITS ENTIRE LIFE**, found by `check-hot-file-ledger.cjs` when 301's plans named it (RESEARCH F14). 301-03 Task 1 adds one optional `size?: "default" | "xs"` prop to `OrgAvatar` (UI-SPEC UI-D4); the default class string must stay byte-identical at every current caller.
 
 Planned cell: Added AT PLANNING 301 (absent its entire life). 301-03: one optional size "xs" on OrgAvatar (UI-D4). ⛔ default output byte-identical
+
+#### 301-03 Task 1 (UI-D4, 2026-10-30)
+
+**`2 / 2 / 99` (was `1 / 1 / 94`).** One optional prop on `OrgAvatarProps`, `size?: "default" | "xs"`; `"xs"` swaps `h-9 w-9` → `h-4 w-4` and `text-sm` → `text-[10px]` in `AVATAR_BASE` at render time. `AVATAR_BASE` itself is unchanged, so every existing caller renders the byte-identical class string — pinned by an exact-string case in `OrgIdentity.test.tsx`. Pending styling still applies at xs. Binding invariant: ⛔ the default output never changes.
+
+Scan-list cell as of 2026-10-30 (replaced by 301-03 Task 1, moved verbatim): 1 / 1 / 94 | no (1 phase) | Added AT PLANNING 301 (absent its entire life). 301-03: one optional size "xs" on OrgAvatar (UI-D4). ⛔ default output byte-identical |
+
+CLAUDE.md verdict cell: none (the file does not fire).
