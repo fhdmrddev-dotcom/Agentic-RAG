@@ -178,13 +178,22 @@ async def launch_unattended_run(
     )
     thread_id = _as_uuid(thread_resp.data[0]["id"])
 
+    # 300-01 (FIX-05 / D-17, D-33): the owner's resolved (model, provider), recorded on the run
+    # (metadata.provider, the same INSERT) and in the first drive's ctx, exactly as the in-app
+    # door has since 296 (SEED-362), so a resume continues on the provider the run started on.
+    # (None, None) on any failure: the INSERT is then byte-identical to before.
+    from app.services.run_model_resolution import resolve_owner_run_model
+
+    _model, _provider = await resolve_owner_run_model(owner_id)
+
     run_id = await create_workflow_run(
         pool,
         thread_id=thread_id,
         definition_id=workflow_id,
         definition=definition,
         inputs=inputs,
-        model=None,
+        model=_model,
+        provider=_provider,
         user_id=owner_id,
         origin_kind=origin_kind,
         origin_label=origin_label,
@@ -238,6 +247,8 @@ async def launch_unattended_run(
             on_finish=on_finish,
             run_label=run_label,
             log_ref=log_ref,
+            model=_model,
+            provider=_provider,
         )
     )
     _BACKGROUND_TASKS.add(_task)
@@ -258,8 +269,13 @@ async def _drive_run(
     on_finish: OnFinish | None = None,
     run_label: str = "scheduled",
     log_ref: Any = None,
+    model: str | None = None,
+    provider: str | None = None,
 ) -> None:
     """Build the ctx, run the workflow, terminalize the producer shell, report the outcome.
+
+    ``model`` / ``provider`` (300-01, D-33) are the pair the launch recorded; the first drive's
+    ctx reads them the way a resume reads the run row, so both start on the same provider.
 
     Every exit path finalizes the shell (see the module docblock) and every exit path calls
     ``on_finish``. An unattended run whose outcome nobody recorded is a run whose author has no
@@ -278,6 +294,8 @@ async def _drive_run(
                 "user_id": owner_id,
                 "org_id": org_id,
                 "inputs": inputs,
+                "model": model,
+                **({"metadata": {"provider": provider}} if provider else {}),
             },
             redis,
             pool,

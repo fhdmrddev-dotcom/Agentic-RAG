@@ -299,10 +299,46 @@ async def resolve_run_model(*, body, user_settings):
     return resolved_model, resolved_provider, model_fallback_notice, body, user_settings
 
 
+async def resolve_owner_run_model(owner_id) -> tuple[str | None, str | None]:
+    """300-01 (FIX-05 / D-17, D-33) — the (model, provider) an UNATTENDED run starts on.
+
+    The schedule and API-key doors have no request, so they resolve from the OWNER's effective
+    settings: the workflow ctx model (``resolve_workflow_ctx_model``, the same resolution the
+    resume and Continue paths use) and the owner's active provider. ``unattended_launch`` calls
+    this ONCE and records the pair on ``workflow_runs`` (``metadata.provider``) and in the first
+    drive's ctx dict, so a resume hours later continues on the provider the run started on.
+
+    FAIL-SOFT (T-300-05): ``load_user_settings`` is blocking, so it runs off the event loop
+    (D-v2.5-01); any failure logs identifiers only and returns ``(None, None)`` — today's
+    behaviour — never an exception into the launch.
+    """
+    try:
+        # Function-local (the model_registry.py discipline): keeps the settings + resolution
+        # modules off this module's import path.
+        from fastapi.concurrency import run_in_threadpool  # noqa: PLC0415
+
+        from app.models.user_settings import load_user_settings  # noqa: PLC0415
+        from app.services.sub_agent_models import resolve_workflow_ctx_model  # noqa: PLC0415
+
+        owner_settings = await run_in_threadpool(load_user_settings, str(owner_id))
+        model = resolve_workflow_ctx_model(owner_settings) or None
+        provider = getattr(owner_settings, "active_provider", None) or None
+        return model, provider
+    except Exception:  # noqa: BLE001 — an unattended launch never fails on this
+        logger.warning(
+            "resolve_owner_run_model: owner %s settings could not be resolved; the run "
+            "records no model/provider (resume falls back to the owner default)",
+            owner_id,
+            exc_info=True,
+        )
+        return None, None
+
+
 __all__ = [
     "_resolve_enabled_model",
     "_reresolve_fallback_provider",
     "_apply_fallback_to_request",
     "apply_user_model_default",
+    "resolve_owner_run_model",
     "resolve_run_model",
 ]

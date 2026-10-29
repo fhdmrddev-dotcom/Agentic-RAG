@@ -500,7 +500,9 @@ node scripts/check-hot-file-ledger.cjs <phase-dir>   # 0 clear · 1 missing rows
 | `scripts/build-public-openapi.cjs` | 11 / 5 / 472 (was `7 / 3 / 468`) | 298-01: org-items tag (Account & org) + /org-items/ FLAGGED (2 lines) |
 | `scripts/check-seeds-register.cjs` | 7 / 3 / 1132 | ⚠ FIRES, absent here — row added 296-05 · `\d{3,}` ids · ⛔ |
 | `backend/app/services/eval_runner_service.py` | 14 / 9 / 1056 (was `13 / 8 / 1040`) | 296-06: eval arm on a fixed EVAL_MAX_TOOL_ROUNDS (copy of settings) |
-| `backend/app/services/scheduler_service.py` | 14 / 9 / 352 (was `13 / 8 / 332`) | 300-01: fire-time blank-input refusal (D-14), one block |
+| `backend/app/services/scheduler_service.py` | 15 / 9 / 372 (was `14 / 9 / 352`) | 300-01: blank-input block + waiting outcome (D-14, D-26) |
+| `backend/app/services/unattended_launch.py` | 7 / 3 / 379 (was `6 / 2 / 361`) | ⚠ now FIRES (300) · 300-01: records the owner's model + provider (D-33) |
+| `backend/app/services/run_model_resolution.py` | 4 / 3 / 344 (was `3 / 2 / 308`) | ⚠ now FIRES (300) · 300-01: resolve_owner_run_model (D-33) |
 | `backend/app/api/schedules.py` | 6 / 6 / 341 (was `5 / 5 / 303`) | 300-01: create/patch/resume 422 by label (D-14) |
 | `backend/app/services/inbound_inputs.py` | 9 / 3 / 352 (was `8 / 2 / 312`) | ⚠ now FIRES (300) · 300-01: labels + sentence beside the one predicate |
 | `backend/app/api/inbound.py` | 10 / 3 / 719 (was `9 / 2 / 711`) | ⚠ now FIRES (298) · 298-02: one foreign_folder _refused (plain 422) · ⛔ |

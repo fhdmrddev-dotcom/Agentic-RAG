@@ -11838,7 +11838,7 @@ cells rot within days.
 | [`backend/app/services/extractors/aspects/dxf.py`](docs/HOT-FILE-LEDGER.md#backendappservicesextractorsaspectsdxfpy) | 2 / 0 / 180 | no (0 phases) | ⚠ absent for its entire life — row added `SEED-226`. It is the only path that READS measurements rather than inferring them (`DIMENSION` values the CAD software computed) |
 | [`frontend/src/components/workflows/publishBlockedStep.ts`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentsworkflowspublishblockedstepts) | 2 / 1 / 183 (was `0 / 0 / 176`) | no (1 phase) | young (`BUG-260828-09`). **281-03**: ONE `BLOCKED_STEP_NEXT_NO_RUN` constant. ⚠ It derives NO second name ladder: `nodeTitle` is called, and `name ?? slug` is the one forbidden edit |
 | [`frontend/src/components/workflows/PublishBlockedStepCard.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentsworkflowspublishblockedstepcardtsx) | 2 / 1 / 109 (was `0 / 0 / 101`) | no (1 phase) | young (`BUG-260828-09`). **281-03**: ONE optional `canOpenRun` flag; next line is `BLOCKED_STEP_NEXT_NO_RUN` when there is no link; the cause keeps its line breaks. ⚠ **G-2 OVERRIDDEN, not satisfied** |
-| [`backend/app/services/scheduler_service.py`](docs/HOT-FILE-LEDGER.md#backendappservicesscheduler_servicepy) | 14 / 9 / 352 (was `13 / 8 / 332`) | ⚠ **FIRES** | 300-01 (D-14): ONE fire-time block after the foreign-folder block — missing_required_labels on the RAW stored definition → record the sentence + ScheduledLaunchRefused. Honoured by construction |
+| [`backend/app/services/scheduler_service.py`](docs/HOT-FILE-LEDGER.md#backendappservicesscheduler_servicepy) | 15 / 9 / 372 (was `14 / 9 / 352`) | ⚠ **FIRES** | 300-01: fire-time blank-input block (D-14) + _record_outcome reads the newest run; paused → waiting (D-26). Honoured by construction |
 | [`backend/app/db/schedules.py`](docs/HOT-FILE-LEDGER.md#backendappdbschedulespy) | 2 / 2 / 369 (was `1 / 1 / 359`) | no (2 phases) | single data-access home for workflow_schedules; claim_due_schedules SKIP LOCKED claim. 299-01: create_schedule keyword-only `org_id` (None = base SQL, sha256 pinned) |
 | [`backend/app/services/watch_service.py`](docs/HOT-FILE-LEDGER.md#backendappserviceswatch_servicepy) | 8 / 6 / 769 (was `7 / 5 / 643`) | ⚠ **FIRES** | Honoured by construction. **285-01**: a failed item is retried through the SAME new-file body (cap 3); typed `last_error`; minted marker. Still 2 minter calls. Listing-loop seam not triggered |
 | [`backend/app/db/watches.py`](docs/HOT-FILE-LEDGER.md#backendappdbwatchespy) | 6 / 4 / 828 (was `4 / 3 / 709`) | ⚠ **FIRES** | Honoured by construction. **285-01**: upsert takes `failed_attempts` / `minted` (COALESCE keeps), `release_watch(run_error=)`. **285-02**: `watch_purge_scope` + a frozen dataclass, asyncpg only |
@@ -12174,7 +12174,7 @@ cells rot within days.
 | [`backend/app/models/api_key.py`](docs/HOT-FILE-LEDGER.md#backendappmodelsapi_keypy) | 2 / 2 / 117 (was `1 / 1 / 113`) | no (young) | young. 296-06 (293-IN-06): `needs_task` added to WorkflowRefState. ⛔ no field carries the secret except the create response |
 | [`backend/app/services/inbound_inputs.py`](docs/HOT-FILE-LEDGER.md#backendappservicesinbound_inputspy) | 9 / 3 / 352 (was `8 / 2 / 312`) | ⚠ **FIRES** | 300-01 (D-14): the loop factored into _missing_fields; missing_required_labels + join_labels + blank_required_sentence beside it. ONE predicate. ⛔ pure; strips _-keys |
 | [`backend/app/api/api_keys.py`](docs/HOT-FILE-LEDGER.md#backendappapiapi_keyspy) | 3 / 2 / 421 (was `2 / 1 / 392`) | no (young) | young. 296-06: needs_task state + picker reason (293-IN-06); create_key names only what the picker offers; revoke audits only the call that revoked (293-IN-08). ⛔ 404 for miss AND foreign |
-| [`backend/app/services/unattended_launch.py`](docs/HOT-FILE-LEDGER.md#backendappservicesunattended_launchpy) | 6 / 2 / 361 (was `5 / 1 / 354`) | no (young) | young. 296-02 (293-IN-04): the _drive_run task is held in a module _BACKGROUND_TASKS set with add_done_callback(discard) (P9) until done |
+| [`backend/app/services/unattended_launch.py`](docs/HOT-FILE-LEDGER.md#backendappservicesunattended_launchpy) | 7 / 3 / 379 (was `6 / 2 / 361`) | ⚠ **FIRES** | 300-01 (D-33): one resolve_owner_run_model call; model + provider to the writer and to _drive_run's ctx dict. ⛔ owner identity, explicit org_id, caps armed first |
 | [`backend/app/api/schedules.py`](docs/HOT-FILE-LEDGER.md#backendappapischedulespy) | 6 / 6 / 341 (was `5 / 5 / 303`) | ⚠ **FIRES** | 300-01 (D-14): one _refuse_blank_required helper; create calls it before the INSERT, patch only for inputs / resume after the owner-scoped read. A pause reads nothing new |
 | [`backend/app/models/schedule.py`](docs/HOT-FILE-LEDGER.md#backendappmodelsschedulepy) | 3 / 3 / 231 | ⚠ **FIRES** | ⚠ absent its ENTIRE LIFE — row added 296-02 (D-26). 296-02 (295-IN-05): ScheduleTriggerResult gains one additive `outcome` Literal (launched/refused/not_loaded/error) |
 | [`backend/app/services/harness/run_read_words.py`](docs/HOT-FILE-LEDGER.md#backendappservicesharnessrun_read_wordspy) | 1 / 1 / 99 (was `0 / 0 / 0`) | no (young) | young (planned 293-02). MOVED waiting_who / unsourced_who / compose_waiting_on (workflow_runs seam). ⛔ pure leaf; re-exported |
@@ -12247,7 +12247,7 @@ cells rot within days.
 | [`backend/app/api/me_preferences.py`](docs/HOT-FILE-LEDGER.md#backendappapimepreferencespy) | 1 / 1 / 120 | no (1 phase) | Added AT PLANNING 300. 300-05: notification-email keys on GET + one PUT route (D-09). ⛔ ungated, auth.uid() merge; default_model semantics byte-identical |
 | [`backend/app/services/connectors/smtp_adapter.py`](docs/HOT-FILE-LEDGER.md#backendappservicesconnectorssmtpadapterpy) | 1 / 1 / 482 | no (1 phase) | Added AT PLANNING 300. 300-03: the body gains a rendered HTML alternative (D-24, D-32). ⛔ header guard + refused-recipient check stay; no CC/BCC/attachment |
 | [`backend/app/services/health_probe.py`](docs/HOT-FILE-LEDGER.md#backendappserviceshealthprobepy) | 1 / 1 / 116 | no (1 phase) | Added AT PLANNING 300. 300-04: probe_email (D-12). ⛔ off / held back is neutral, never down; a reason never names a recipient |
-| [`backend/app/services/run_model_resolution.py`](docs/HOT-FILE-LEDGER.md#backendappservicesrunmodelresolutionpy) | 3 / 2 / 308 | no (reaches 3 in 300) | Added AT PLANNING 300. 300-01: resolve_owner_run_model, the ONE FIX-05 helper (D-33). ⛔ owner settings loaded off the loop; (None, None) on failure |
+| [`backend/app/services/run_model_resolution.py`](docs/HOT-FILE-LEDGER.md#backendappservicesrunmodelresolutionpy) | 4 / 3 / 344 (was `3 / 2 / 308`) | ⚠ **FIRES** | 300-01: resolve_owner_run_model, the ONE FIX-05 helper (D-33). ⛔ owner settings loaded off the loop; (None, None) on failure |
 | [`frontend/src/components/admin/HealthSignals.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentsadminhealthsignalstsx) | 5 / 4 / 316 | ⚠ **FIRES** | Added AT PLANNING 300: absent at 4 phases. 300-04: one Email tile (D-12, UI-D13). ⛔ pure leaf; Off / Held back / Test mode never red |
 | [`frontend/src/components/org/InvitationsTab.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentsorginvitationstabtsx) | 3 / 2 / 290 | no (reaches 3 in 300) | Added AT PLANNING 300. 300-05: Email not sent chip + resend failure line (D-11). ⛔ server truth on re-fetch, no optimistic flip |
 | [`frontend/src/components/org/InviteMemberDialog.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentsorginvitememberdialogtsx) | 3 / 2 / 281 | no (reaches 3 in 300) | Added AT PLANNING 300. 300-05: three result arms (UI-D12). ⛔ never names the provider or an error code; Copy link focused on the failed arm |
@@ -25427,6 +25427,14 @@ Twenty-eight rows added at planning: twenty-six files Phase 293 creates and two 
 
 Scan-list cell before this 296-02 touch (moved verbatim): | [`backend/app/services/unattended_launch.py`](docs/HOT-FILE-LEDGER.md#backendappservicesunattended_launchpy) | 5 / 1 / 354 (was `3 / 1 / 324`) | no (young) | young (planned 293-02). Shared unattended core + the kill-switch gate (293-REVIEW CR-01). ⛔ owner identity, explicit org_id, caps armed first |
 
+### `backend/app/services/unattended_launch.py` — 300-01 (FIX-05 / D-17, D-33, 2026-10-29)
+
+**`7 / 3 / 379` (was `6 / 2 / 361`) — crosses into G-5 at this commit (293, 296, 300).** One function-local import and ONE `resolve_owner_run_model(owner_id)` call immediately before `create_workflow_run`, which now receives `model=_model, provider=_provider` (the writer puts the provider in `metadata` in the same INSERT; `(None, None)` keeps the INSERT byte-identical). `_drive_run` gains two keyword params (default `None`); its ctx dict carries `"model"` and, only when a provider resolved, `"metadata": {"provider": …}` — the shape `harness_engine._build_resume_context` already reads (not edited, D-18). The API-key door inherits the fix by calling the same core. `run_lifecycle.py` / `run_producer.py` untouched (D-33). Seam if it grows: the background drive (`_drive_run` + its finalizer) is the separable half.
+
+Scan-list cell as of 2026-10-29 (replaced by 300-01, moved verbatim): 6 / 2 / 361 (was `5 / 1 / 354`) | no (young) | young. 296-02 (293-IN-04): the _drive_run task is held in a module _BACKGROUND_TASKS set with add_done_callback(discard) (P9) until done
+
+CLAUDE.md verdict cell: none before 300-01 (the file did not fire); row added by 300-01.
+
 ### `backend/app/services/harness/run_read_words.py`
 
 **`0 / 0 / 0`** at 293 planning (2026-10-25). Young; row added AT PLANNING (the 273 / 290 / 292.1 precedent), so `check-hot-file-ledger.cjs 293` binds before the file exists. MOVED waiting_who / unsourced_who / compose_waiting_on (workflow_runs seam). ⛔ pure leaf; re-exported Does not fire. Re-derive the triple at the 293-05 close.
@@ -26368,6 +26376,14 @@ CLAUDE.md verdict cell as of 2026-10-28 (replaced by 298-02, moved verbatim): | 
 Scan-list cell as of 2026-10-29 (replaced by 300-01, moved verbatim): 13 / 8 / 332 (was `12 / 7 / 314`) | ⚠ **FIRES** | 298-02: foreign_binding_refusal beside template_refusal (definition_id lazy read, pool only) → record_schedule_outcome(sentence) + ScheduledLaunchRefused. The :134 org line untouched
 
 CLAUDE.md verdict cell as of 2026-10-29 (replaced by 300-01, moved verbatim): | `backend/app/services/scheduler_service.py` | 13 / 8 / 332 (was `12 / 7 / 314`) | 298-02: foreign-folder refusal beside template_refusal (pool only) |
+
+### `backend/app/services/scheduler_service.py` — 300-01 Task 2 (2026-10-29)
+
+**`15 / 9 / 372` (was `14 / 9 / 352`).** D-26: inside the existing `_record_outcome` closure only — when the drive reports `completed`, one `pool.fetchval` reads the newest `workflow_runs.status` for the schedule (`inputs->>'_schedule_id' = $1 ORDER BY created_at DESC LIMIT 1`); `paused` records the waiting outcome, anything else `completed`; a failed read logs and records `completed` (today's); `failed` is recorded as-is with no read. 300-02's run-status trigger flips that outcome to the run's terminal status when the run ends. ⚠ `cap_paused` is NOT mapped to waiting (the spec names `paused`, a person's answer). Pinned by `test_300_unattended_provider.py`.
+
+Scan-list cell as of 2026-10-29 (replaced by 300-01 Task 2, moved verbatim): 14 / 9 / 352 (was `13 / 8 / 332`) | ⚠ **FIRES** | 300-01 (D-14): ONE fire-time block after the foreign-folder block — missing_required_labels on the RAW stored definition → record the sentence + ScheduledLaunchRefused. Honoured by construction
+
+CLAUDE.md verdict cell as of 2026-10-29 (replaced by 300-01 Task 2, moved verbatim): | `backend/app/services/scheduler_service.py` | 14 / 9 / 352 (was `13 / 8 / 332`) | 300-01: fire-time blank-input refusal (D-14), one block |
 
 ### `backend/app/api/inbound.py` — 298-02 (2026-10-28)
 
@@ -27453,6 +27469,14 @@ Sixteen rows planted by the Phase 300 planner, because `node scripts/check-hot-f
 ### `backend/app/services/run_model_resolution.py`
 
 **Added AT PLANNING (Phase 300, 2026-10-29) at `3 / 2 / 308`** — measured, never copied. Added AT PLANNING 300. 300-01: resolve_owner_run_model, the ONE FIX-05 helper (D-33). ⛔ owner settings loaded off the loop; (None, None) on failure
+
+#### 300-01 (FIX-05 / D-33, 2026-10-29)
+
+**`4 / 3 / 344` (was `3 / 2 / 308`) — crosses into G-5 at this commit.** `async def resolve_owner_run_model(owner_id) -> (model, provider)` beside `resolve_run_model`, in `__all__`: `run_in_threadpool(load_user_settings, str(owner_id))` (D-v2.5-01), then `resolve_workflow_ctx_model(s) or None` and `s.active_provider or None`; every failure logs the owner id only and returns `(None, None)`. Function-local imports (the `model_registry.py` discipline). ONE caller: `unattended_launch.launch_unattended_run` — no fourth copy of the resolution.
+
+Scan-list cell as of 2026-10-29 (replaced by 300-01, moved verbatim): 3 / 2 / 308 | no (reaches 3 in 300) | Added AT PLANNING 300. 300-01: resolve_owner_run_model, the ONE FIX-05 helper (D-33). ⛔ owner settings loaded off the loop; (None, None) on failure
+
+CLAUDE.md verdict cell: none before 300-01 (the file did not fire); row added by 300-01.
 
 ### `frontend/src/components/admin/HealthSignals.tsx`
 
