@@ -2,13 +2,13 @@
 gsd_state_version: 1.0
 milestone: v4.8
 milestone_name: Every Page Has a Link
-status: verifying
-last_updated: "2026-10-29T19:38:59.809Z"
-last_activity: "2026-10-29 — 300 executed: 5 plans (01+02 → 03 → 04 → 05), review 0 BL + 5 WR + 6 IN → 9 fixed (IN-05/06 deferred), security UF-1 fixed in 218 (residual → SEED-396); gates: backend 69 ≤ 71, vitest count gate OK (13300), tsc 61 = base, phase live suites 75 passed. NOT deployed."
+status: executing
+last_updated: "2026-10-29T20:29:47.157Z"
+last_activity: 2026-10-29 -- Phase 301 planning complete
 progress:
   total_phases: 13
   completed_phases: 4
-  total_plans: 19
+  total_plans: 22
   completed_plans: 19
   percent: 31
 ---
@@ -45,8 +45,8 @@ reviewer exists, so a phase closes `verification_mode: self-verified`, never `re
 
 Phase: 300
 Plan: 5 of 5
-Status: Executed — human_needed (verification 5/5 SC + 6/6 reqs in code; security 41/41 closed; G-4 + roster rows owed)
-Last activity: 2026-10-29 — 300 executed: 5 plans (01+02 → 03 → 04 → 05), review 0 BL + 5 WR + 6 IN → 9 fixed (IN-05/06 deferred), security UF-1 fixed in 218 (residual → SEED-396); gates: backend 69 ≤ 71, vitest count gate OK (13300), tsc 61 = base, phase live suites 75 passed. NOT deployed.
+Status: Ready to execute
+Last activity: 2026-10-29 -- Phase 301 planning complete
 
 Owed for 300 (in order): run `300-HUMAN-UAT.md` (G4-5 first; FIX-05 roster must be re-run after IN-03; G4-6 only after 299 G4-4a); approve 3 fixer-written strings (WR-05, IN-01, IN-04). Before deploy: paste mig 218 into cloud SQL editor (per-action approval) → `get_advisors(security)`; ⏸ Resend DEFERRED by operator 2026-10-29 — deploy without a mail provider (deliveries `suppressed`, invites → Copy link); when revived: Coolify EMAIL_PROVIDER / RESEND_API_KEY / ENVIRONMENT=production; Resend sender + SPF/DKIM/DMARC. At close: REQUIREMENTS NOTE-02/03/04/06 + FIX-04/05 → done; BUG-261027-03/04/05 + BUG-260828-05/06 → closed when their rows pass.
 

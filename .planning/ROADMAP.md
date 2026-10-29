@@ -200,11 +200,13 @@ Plans:
 **Plans**: 5 plans in 4 waves (01 ‖ 02 → 03 → 04 → 05; serialized after wave 1 because every plan with a FIRING file edits the CLAUDE.md FIRING table and the ledger, and 02/04 mutate the local DB)
 
 Plans:
+
 - [x] 300-01-PLAN.md — scheduled runs launch and resume right: blank required input refused by label (FIX-04), starting provider recorded (FIX-05), "waiting" outcome, schedule row words + per-row Run now
 - [x] 300-02-PLAN.md — migration 218: notices + outbox + fail-soft SECURITY DEFINER triggers + Settings/invite columns; local apply, schema regen, trigger/RLS/anon live tests
 - [x] 300-03-PLAN.md — one app mailer (none / Resend REST / SMTP) from a built image, dev guard, run-waiting renderer, invite outcome, email-step honesty (D-23/D-24), deploy parity
 - [x] 300-04-PLAN.md — outbox drainer in every worker (SKIP LOCKED, frozen payload, re-check, opt-out, retries) + the Control Room Email tile
 - [x] 300-05-PLAN.md — Settings email knobs + the member's opt-out switch + the invite dialog/list failure words; phase closing gates
+
 **UI hint**: yes (the email opt-out and delay knob in Settings)
 **Flags**: **Migration**: next free number, research places `217` here — `notifications` (one open notice per recipient and run, partial unique index) and `notification_deliveries` (outbox, RLS deny-all), plus triggers on the `messages` ask rows and on `workflow_runs` status. Every table gets RLS; any SECURITY DEFINER trigger function has `EXECUTE` revoked from `PUBLIC` (not just `anon`); an **anon-role test** is written; `get_advisors(security)` read on cloud after the operator paste. Pasted via SQL editor, then `regenerate-full-schema.sh`. Trigger bodies swallow their own errors; "still waiting" is re-checked before each send; outbox drained in every worker with `FOR UPDATE SKIP LOCKED`, unique key plus Resend `Idempotency-Key`; a DB-backed test. **Mailer**: Resend REST via existing `httpx` (no new package) and stdlib `smtplib` (`EMAIL_PROVIDER=smtp`) off the event loop; a clean-image import test. **Deployment-artifact parity (same commit)**: new env vars in `deploy/onebox.env.example`, `docs/OPERATOR.md` (incl. the Step-3 seed list for the delay knob), `docker-compose.prod.yml`, `scripts/check-deploy-drift.sh`. **Operator actions**: Coolify env (`EMAIL_PROVIDER`, the Resend key); sender on a `notify.<domain>` subdomain with SPF, DKIM and DMARC `p=none` at Hostinger; check the VPS allows outbound SMTP for the one-box. **security_enforcement** (`/gsd:secure-phase`). **Research flags**: terminal-status literals; per-type pause expiry (never state an expiry in the email); whether production has ever sent an email. **Excluded pause kinds**: tool-round cap and chat `ask_user` (recorded by REG-08). **G-5**: `main.py` (69; drainer start-up, mind the `RUN_BOOT_SWEEPS` flag), `config.py` (54), `models/user_settings.py` (37), `api/settings.py` (25), `SettingsPage.tsx` (30), `scheduler_service.py` (7), `workflow_kickoff.py` (10), `run_lifecycle.py` (7), `run_producer.py` (14) for FIX-04/05; `backend/app/api/org.py` FIRES at 3 phases (166-168) with **no ledger row** — add one at planning; `email_provider.py` reaches 3 phases here. **Four-axis + full native roster** for FIX-05 (resume on provider). Folds `SEED-281` (run-waiting half), `BUG-261027-04`, `BUG-261027-05`, and the pre-existing "built images cannot send invite email" defect once REG-08 files it.
 
@@ -224,9 +226,15 @@ Plans:
 **Plans**: 3 plans in 2 waves (01 ‖ 02 → 03; 301-01 runs ledger-free so it can share wave 1, and 301-03 refreshes its ledger rows)
 
 Plans:
+**Wave 1**
+
 - [ ] 301-01-PLAN.md — GET /notifications (pool, caller as $1, every member org, active/paused runs only) + migration 219 (notifications in the Realtime publication, supplement §4) + OpenAPI regenerated; route/shape/live tests (anon, cross-user, left-org, ended run, chat-ask exclusion)
 - [ ] 301-02-PLAN.md — useWaitingNotices (fetch is truth, Realtime a hint, 60 s poll, focus, org switch) + waiting-runs as the second ATTENTION_PRODUCERS tenant with a required mark; pins re-baselined to 2; the Library mark stays the Library's
+
+**Wave 2** *(blocked on Wave 1 completion)*
+
 - [ ] 301-03-PLAN.md — the Waiting on you rail control + list (menu-item rows open the run, never switch org), drawer row, non-chat hamburger dot, Library action keyboard-reachable (BUG-261029-01), 301-VALIDATION.md, phase ledger refresh + closing gates
+
 **UI hint**: yes
 **Flags**: **G-2 sketch FIRST** (badge placement beyond the Library, row naming its org, mark-read) — the approved mockup is the acceptance bar. **G-4**. **Four-axis UAT** (UI state; parallel-thread: a notice arrives while another thread streams). Realtime is a hint, reconcile on (re)connect (D-v2.5-03). The badge is the second tenant of `ATTENTION_PRODUCERS`; re-baseline its `length === 1` pin in the same commit (research). **G-5**: `ChatLayout.tsx` (33, through 297's extracted modules), `NavPanel.tsx` (14), `PendingAskCard.tsx` (12, if the run page links back); `attentionConditions.ts` reaches 3 phases here. Load `Skill("sketch-findings-agentic-rag")` (IA / attention patterns) before sketching.
 
