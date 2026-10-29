@@ -69,6 +69,7 @@ import {
 import { LaunchInputFields } from "@/components/workflows/LaunchInputFields"
 import { RUN_TEMPLATE_LABEL } from "./libraryVocabulary"
 import { useCanvasGate } from "@/pages/WorkflowBuilderPage"
+import { SavesInOrg } from "@/components/org/SavesInOrg"
 import type { PublishedWorkflow } from "@/lib/api"
 import type { Folder } from "@/types"
 
@@ -728,6 +729,9 @@ export function RunModal({
             {submitting ? "Running…" : "▶ Run workflow"}
           </button>
         </div>
+        {/* 299-04 (UI-D11 / D-18): ONE mount under the Run row — where the run will be saved, for a
+            2+ org person only. A hint; the server refuses a mismatched org (S8, shown in launchError). */}
+        <SavesInOrg className="bg-muted/30 px-6 pb-3 text-right" />
       </div>
     </div>
   )

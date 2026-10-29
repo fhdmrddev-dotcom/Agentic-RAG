@@ -156,6 +156,8 @@ import {
   useWorkflowFork,
   type ForkSeed,
 } from "@/components/workflows/library/useWorkflowFork"
+import { useWorkflowLinkTarget } from "@/components/workflows/library/useWorkflowLinkTarget"
+import { ShareLinkMenu } from "@/components/share/ShareLinkMenu"
 // Phase 192.1-07 (LIB-05 / D-19): 162-B's name prompt. It is MOUNTED here and wired to the
 // hook's pending fork; the page holds no fork logic of its own — see the mount below.
 import { ForkNameDialog } from "@/components/workflows/library/ForkNameDialog"
@@ -273,6 +275,9 @@ interface WorkflowsPageProps {
    * selects Settings tab "7" and navigates. Threaded straight to the cards; ABSENT ⇒ no menu item.
    */
   onOpenApiKeys?: (scope: { id: string; name: string }) => void
+  /** Phase 299-02 (D-03): the definition id the address names (`/app/workflows/<id>`) — an owned
+   *  draft opens in the Builder, a visible published card is focused. Absent ⇒ nothing opens. */
+  linkedDefinitionId?: string | null
 }
 
 /**
@@ -289,7 +294,7 @@ interface WorkflowsPageProps {
 type PageView = "library" | "builder" | "run-log"
 
 
-export function WorkflowsPage({ folders, onLaunch, onOpenRun, onOpenConnections, onOpenApiKeys }: WorkflowsPageProps) {
+export function WorkflowsPage({ folders, onLaunch, onOpenRun, onOpenConnections, onOpenApiKeys, linkedDefinitionId = null }: WorkflowsPageProps) {
   // Phase 184.1-01: does this page host the Builder's chrome, or has the Builder taken it?
   // Fail-closed and read through the shared rule — see `useCanvasGate`'s docblock for why
   // an ancestor has to ask at all (the three bands are contributed at three nesting levels).
@@ -636,6 +641,9 @@ export function WorkflowsPage({ folders, onLaunch, onOpenRun, onOpenConnections,
     onForked,
   })
 
+  // Phase 299-02 (D-03): open the address's workflow — below `onOpenDraft` for the TDZ reason above.
+  useWorkflowLinkTarget({ id: linkedDefinitionId, drafts, rows, shown: visibleRows, loading, onOpenDraft, clearFilters: clearAllFilters })
+
   // 186-07: a TRUE fresh build seeds nothing at all — no row exists yet, so there is no
   // token to carry. `useDraftPersistence` creates the row on the first write and adopts
   // the token that create returns, which is the same posture as `token: null`.
@@ -796,6 +804,8 @@ export function WorkflowsPage({ folders, onLaunch, onOpenRun, onOpenConnections,
         <span className="text-[13px] font-medium text-foreground">
           {builderInitial ? builderInitial.label : "Build a workflow"}
         </span>
+        {/* 299-04 (D-20 / UI-SPEC S4): ONE mount — a draft's own address; absent before a draft has an id. */}
+        {builderInitial?.draftId && <ShareLinkMenu route={{ view: "workflows", definitionId: builderInitial.draftId }} kind="workflow" audience="only_you" orgId={null} />}
         <NetNewFlag />
       </>
     )
@@ -1130,7 +1140,8 @@ export function WorkflowsPage({ folders, onLaunch, onOpenRun, onOpenConnections,
           role="status"
           className="border-b border-warning/30 bg-warning/5 px-6 py-2 text-[12.5px] text-muted-foreground"
         >
-          {forkFailedMessage(forkFailed.name, forkFailed.conflict)}
+          {/* 299-04 (S8): the server's org-named Tweak refusal verbatim, else the page's own sentence. */}
+          {forkFailed.sentence ?? forkFailedMessage(forkFailed.name, forkFailed.conflict)}
         </p>
       )}
 

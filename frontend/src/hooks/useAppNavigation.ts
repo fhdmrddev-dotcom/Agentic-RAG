@@ -17,6 +17,38 @@ import { canonicalAddress, formatAppRoute, parseAppLocation, type AppRoute } fro
 import { isStrictUuid } from "@/lib/runDeepLink"
 // Phase 297-03 (D-21): the leave-guard registry the ONE blocker below consults.
 import { createLeaveGuardRegistry, type LeaveGuardRegistry } from "@/lib/leaveGuard"
+// Phase 299-03 (D-24): the remembered sign-in target the gate resumes once (299-05's leaf).
+import { takeReturnTarget } from "@/lib/returnTo"
+
+/**
+ * Phase 299-02 (LINK-02 / D-01, D-02, D-32) — what the address names, and the navigators that
+ * write one. ONE object, so a page receives a single prop rather than six. Every navigator goes
+ * through `go`: a strict-UUID guard, a no-op when the address is already on screen, one entry.
+ */
+export interface EntityLink {
+  /** The entity the address names, or `null` off an entity address. Ids are lowercased. */
+  target: { kind: "thread" | "workflow" | "run" | "expert"; id: string } | null
+  /** The parsed entity route (for `formatAppRoute` in a copy / share control), or `null`. */
+  route: AppRoute | null
+  /** Push `/app/chat/<id>` (`replace` swaps the entry instead — for correcting a stale address). */
+  openThread: (id: string, opts?: { replace?: boolean }) => void
+  /** Push `/app/workflows/<id>`. */
+  openWorkflow: (id: string) => void
+  /** Push `/app/experts/<id>`. */
+  openExpert: (id: string) => void
+  /** REPLACE a thread address with `/app` (a deselect). A no-op off a thread address. */
+  leaveThread: () => void
+  /** Phase 299-03: the canonical address on screen (the rebuilt route; the raw path off a route). */
+  address: string
+  /** Phase 299-03 (D-17 Stay): REPLACE the address with `route`, else the last non-entity place
+   *  seen in this tab, else `/app`. */
+  leave: (route?: AppRoute) => void
+  /** Phase 299-03 (D-15): PUSH a route (an exit from the card, "Open it after all"). */
+  openRoute: (route: AppRoute) => void
+  /** Phase 299-03 (D-24 / Pitfall 7): consume the remembered sign-in target ONCE and REPLACE the
+   *  address with it — only when the address on screen is the chat home (`/` or `/app`). */
+  resume: () => void
+}
 
 export interface AppNavigation {
   /** The view on screen — one `ActiveView` member. */
@@ -54,6 +86,26 @@ export interface AppNavigation {
   /** Phase 297-03 (D-21): the leave-guard registry the app's ONE blocker consults. One identity
    *  for the hook's lifetime, so App's `LeaveGuardContext.Provider` value never changes. */
   leaveGuards: LeaveGuardRegistry
+  /** Phase 299-02 (D-01): the entity the address names and its navigators. One identity while the
+   *  address is unchanged, so an effect keyed on it does not re-run on an unrelated render. */
+  entityLink: EntityLink
+}
+
+/** The entity a parsed address names (299-02 / D-01), or `null`. */
+function entityOf(parsed: ReturnType<typeof parseAppLocation>): EntityLink["target"] {
+  if (parsed.view === "workflow-run") return { kind: "run", id: parsed.runId }
+  if ("threadId" in parsed) return { kind: "thread", id: parsed.threadId }
+  if ("definitionId" in parsed) return { kind: "workflow", id: parsed.definitionId }
+  if ("bundleId" in parsed) return { kind: "expert", id: parsed.bundleId }
+  return null
+}
+
+/** The thread a formatted chat address names (299-02): its id, `null` for the chat home, `undefined` off chat. */
+function threadOfPath(path: string): string | null | undefined {
+  const q = path.indexOf("?")
+  const parsed = parseAppLocation(q < 0 ? path : path.slice(0, q), q < 0 ? "" : path.slice(q))
+  if (parsed.view !== "chat") return undefined
+  return "threadId" in parsed ? parsed.threadId : null
 }
 
 /**
@@ -102,17 +154,28 @@ export function useAppNavigation(): AppNavigation {
     parsed.view === "not-found" || parsed.view === "pre-auth" ? "chat" : parsed.view
   const runId = parsed.view === "workflow-run" ? parsed.runId : null
   const studioSkillId = parsed.view === "skill-studio" ? parsed.skillId : null
+  // Phase 299-02 (D-02): the thread on screen (`/app/chat/<id>`); `null` on the chat home and off chat.
+  const threadId = "threadId" in parsed ? parsed.threadId : null
+  const onChatHome = parsed.view === "chat" && threadId === null
 
   // The latest address, read by the navigators so they keep ONE identity across renders (App's
   // 403 listener depends on `bounceHome`). Synced after commit; every caller is an event handler.
   const here = useRef("")
   const lastRunId = useRef<string | null>(null)
   const lastSkillId = useRef<string | null>(null)
+  // Phase 299-02 (D-02): the last thread address seen — Chat returns to it, the mirror of
+  // `lastRunId`. Seeing the chat HOME clears it, so a thread the person left is not re-opened.
+  const lastThreadId = useRef<string | null>(null)
+  // Phase 299-03 (D-17): the last NON-entity place seen in this tab — where Stay returns to.
+  const lastPlace = useRef<AppRoute | null>(null)
   useEffect(() => {
     here.current = `${location.pathname}${location.search}`
     if (runId) lastRunId.current = runId
     if (studioSkillId) lastSkillId.current = studioSkillId
-  }, [location.pathname, location.search, runId, studioSkillId])
+    if (threadId) lastThreadId.current = threadId
+    else if (onChatHome) lastThreadId.current = null
+    if (parsed.view !== "not-found" && parsed.view !== "pre-auth" && entityOf(parsed) === null) lastPlace.current = parsed
+  }, [location.pathname, location.search, runId, studioSkillId, threadId, onChatHome, parsed])
 
   // ── 297-REVIEW WR-01 (2026-10-28) — every entry the router writes FROM carries an `idx`. ──
   // The router seeds an `idx` into each History entry it writes and, on Back/Forward, computes
@@ -181,10 +244,18 @@ export function useAppNavigation(): AppNavigation {
       // refuse is never pushed — the address would open S1 instead of the run or skill asked for.
       if (route.view === "workflow-run" && !isStrictUuid(route.runId)) return
       if (route.view === "skill-studio" && !isStrictUuid(route.skillId)) return
+      // Phase 299-02 (T-299-18): the same refusal for every entity id.
+      if ("threadId" in route && !isStrictUuid(route.threadId)) return
+      if ("definitionId" in route && !isStrictUuid(route.definitionId)) return
+      if ("bundleId" in route && !isStrictUuid(route.bundleId)) return
       const target = formatAppRoute(route)
       if (isOnScreen(target)) return
       ensureEntryIdx(here.current.split("?")[0])
       here.current = target
+      // 299-02: the last-thread memory moves WITH the write, not one commit later, so a second
+      // navigator call in the same handler (open a thread, then the legacy Chat call) reads it.
+      const thread = threadOfPath(target)
+      if (thread !== undefined) lastThreadId.current = thread
       void navigate(target, { replace: opts.replace === true })
     },
     [navigate, ensureEntryIdx, isOnScreen],
@@ -327,9 +398,61 @@ export function useAppNavigation(): AppNavigation {
       if (lastSkillId.current) go({ view: "skill-studio", skillId: lastSkillId.current })
       return
     }
+    // Phase 299-02 (D-02): Chat returns to the last thread address seen, else the home. Already on
+    // a chat address it is a no-op — the chat view is on screen.
+    if (next === "chat") {
+      if (threadOfPath(here.current) !== undefined) return
+      go(lastThreadId.current ? { view: "chat", threadId: lastThreadId.current } : { view: "chat" })
+      return
+    }
     go({ view: next })
   }
   const openRun = useCallback((id: string) => go({ view: "workflow-run", runId: id }), [go])
+
+  // Phase 299-02 (LINK-02 / D-01, D-02): the entity navigators, all through `go`.
+  const openThread = useCallback(
+    (id: string, opts?: { replace?: boolean }) => go({ view: "chat", threadId: id }, opts),
+    [go],
+  )
+  const openWorkflow = useCallback((id: string) => go({ view: "workflows", definitionId: id }), [go])
+  const openExpert = useCallback((id: string) => go({ view: "experts", bundleId: id }), [go])
+  const leaveThread = useCallback(() => {
+    // Only a thread address is left; anywhere else this writes nothing.
+    if (!threadOfPath(here.current)) return
+    go({ view: "chat" }, { replace: true })
+  }, [go])
+  // Phase 299-03 (D-15 / D-17 / D-24): the gate's navigators, all through `go`.
+  const leave = useCallback(
+    (route?: AppRoute) => go(route ?? lastPlace.current ?? { view: "chat" }, { replace: true }),
+    [go],
+  )
+  const openRoute = useCallback((route: AppRoute) => go(route), [go])
+  const resume = useCallback(() => {
+    // Consumed whatever happens next, so a stale target can never resume on a later visit.
+    const stored = takeReturnTarget()
+    if (stored === null) return
+    if (location.pathname !== "/" && location.pathname !== "/app") return
+    const q = stored.indexOf("?")
+    const route = parseAppLocation(q < 0 ? stored : stored.slice(0, q), q < 0 ? "" : stored.slice(q))
+    if (route.view === "not-found" || route.view === "pre-auth") return
+    go(route, { replace: true })
+  }, [go, location.pathname])
+  const entityLink = useMemo<EntityLink>(() => {
+    const target = entityOf(parsed)
+    const isRoute = parsed.view !== "not-found" && parsed.view !== "pre-auth"
+    return {
+      target,
+      route: target && isRoute ? parsed : null,
+      address: isRoute ? formatAppRoute(parsed) : `${location.pathname}${location.search}`,
+      openThread,
+      openWorkflow,
+      openExpert,
+      leaveThread,
+      leave,
+      openRoute,
+      resume,
+    }
+  }, [parsed, location.pathname, location.search, openThread, openWorkflow, openExpert, leaveThread, leave, openRoute, resume])
   // Phase 297-01 kept the 403 bounce as the bare view setter. Phase 297-02: a REPLACE to the
   // home address (D-15) — Back must not lead back to the surface the server just refused.
   // Phase 297-03 (D-42): a forced exit does NOT ask. The server withdrew access, so the edit cannot
@@ -360,5 +483,6 @@ export function useAppNavigation(): AppNavigation {
     libraryTab,
     handleOpenLibraryHealth,
     leaveGuards: registry,
+    entityLink,
   }
 }

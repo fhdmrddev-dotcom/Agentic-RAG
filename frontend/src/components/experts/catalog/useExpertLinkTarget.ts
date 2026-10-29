@@ -1,0 +1,73 @@
+import { useEffect, useRef, useState } from "react"
+import { getExpert } from "@/lib/api/experts"
+import type { ExpertBundle } from "@/types"
+
+export interface ExpertLinkTargetArgs {
+  /** The Expert bundle id the address names (`/app/experts/<id>`), or `null`. */
+  id: string | null
+  /** The catalog's ONE grant-aware list read. */
+  experts: readonly ExpertBundle[]
+  /** True until that read has answered. */
+  loading: boolean
+  /** The catalog's own detail-modal state setter. */
+  setInspected: (expert: ExpertBundle) => void
+}
+
+/**
+ * Phase 299-02 (LINK-02 / D-04) — OPEN AN EXPERT FROM ITS ADDRESS.
+ *
+ * Once the catalog's list has answered, an Expert in it opens its detail modal straight from the
+ * list (no second read). An Expert NOT in it — the list's default filters hide it, or it was just
+ * shared — is asked for ONCE with `getExpert(id)`: the server's own grant-aware per-Expert read,
+ * never the resolver arm and never the management arm. A refused read opens nothing: the catalog
+ * stays as it is, and "can't be opened" is plan 299-03's gate, not this hook's.
+ *
+ * ⛔ READ-ONLY: the list, or one `getExpert`. ⛔ ONCE PER ID — a ref keyed on the id, so closing
+ * the modal never reopens it while the address is unchanged, and a late answer for an id the
+ * address has since left is dropped.
+ *
+ * ⚠ CORRECTED BY 299-REVIEW WR-03 — "a refused read opens nothing" is kept above rather than
+ * deleted, because it was the defect: the gate had already answered 200 (a system Expert for a
+ * person whose plan lacks Experts gets a 403 here), so NOTHING told them the link did not open.
+ * The hook now RETURNS whether the address's Expert was refused — a 403 or 404 from `getExpert` — and
+ * the page shows the one can't-be-opened card. A throw with no status (a network failure) or a 5xx
+ * is an outage, never "can't be opened" (T-299-25): it still opens nothing and shows nothing.
+ */
+export function useExpertLinkTarget({ id, experts, loading, setInspected }: ExpertLinkTargetArgs): boolean {
+  const linked = id ? id.toLowerCase() : null
+  const setRef = useRef(setInspected)
+  useEffect(() => {
+    setRef.current = setInspected
+  })
+  const handled = useRef<string | null>(null)
+  const current = useRef<string | null>(linked)
+  const [refusedId, setRefusedId] = useState<string | null>(null)
+  useEffect(() => {
+    current.current = linked
+  }, [linked])
+
+  useEffect(() => {
+    if (linked === null || loading || handled.current === linked) return
+    handled.current = linked
+    const listed = experts.find((e) => e.id.toLowerCase() === linked)
+    if (listed) {
+      setRef.current(listed)
+      return
+    }
+    getExpert(linked)
+      .then((expert) => {
+        if (current.current === linked) setRef.current(expert)
+      })
+      .catch((err: unknown) => {
+        // An outage opens nothing and shows nothing; only a refusal is "can't be opened".
+        const status = (err as { status?: unknown } | null)?.status
+        // 403 (the plan / visibility gates) and 404 (missing ≡ not yours) are the refusals; a 401
+        // is a session that needs a refresh, never "can't be opened".
+        if (current.current === linked && (status === 403 || status === 404)) {
+          setRefusedId(linked)
+        }
+      })
+  }, [linked, loading, experts])
+
+  return linked !== null && refusedId === linked
+}

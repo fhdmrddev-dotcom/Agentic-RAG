@@ -87,6 +87,16 @@ property); ``workflows_moved_ast.json`` +3 / −3 (the ``body_sha256`` of ``Publ
 ``workflows_routes.json`` showed no numstat (line endings only, restored). A first capture was
 discarded because ``AutoAnsweredNote``'s docstring carried plan ids into the public schema
 description; the docstring was reworded and the capture run again.
+
+DELIBERATE RE-BASELINE (Phase 299-01, 2026-10-28, D-38): ``POST /workflows`` (``create_draft``) gained
+ONE optional query parameter, ``from_definition_id`` — the published workflow a Tweak copies — so a
+copy of the caller's own workflow from another of their orgs is refused in words instead of being
+stamped with the wrong org. No route was added or removed and no existing parameter changed; the
+fence's intent is unchanged. ``PIN286_CAPTURE=1`` was run once and each fixture diff was read:
+``workflows_openapi.json`` +28 / −8 (the one ``parameters`` entry; the operation's ``security`` and
+``requestBody.required`` keys re-ordered around it, values unchanged); ``workflows_routes.json``
++3 / −1 (``query_params`` of the create row: ``[]`` -> ``["from_definition_id"]``);
+``workflows_moved_ast.json`` showed no numstat (``create_draft`` is not a moved handler).
 """
 
 from __future__ import annotations

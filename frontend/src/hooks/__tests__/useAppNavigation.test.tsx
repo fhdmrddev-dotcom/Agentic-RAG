@@ -24,6 +24,8 @@ import { RouterProvider } from "react-router/dom"
 import { useAppNavigation, type AppNavigation } from "../useAppNavigation"
 // The hook's own source, read as text for the D-05 import fence below.
 import hookSource from "../useAppNavigation.ts?raw"
+// Phase 299-03: the return-target store the resume cases write and read.
+import { rememberReturnTarget, takeReturnTarget } from "@/lib/returnTo"
 
 const RUN_ID = "229f45ae-c85e-4707-a46c-bf4787541547"
 const SKILL_1 = "0b9c3a51-7d2e-4f6a-9a8b-1c2d3e4f5a61"
@@ -357,5 +359,327 @@ describe("useAppNavigation — D-05 / D-08: the router hooks live here, from rea
     expect(src).not.toContain("react-router-dom")
     expect(src).toContain("useLocation()")
     expect(src).toContain("useNavigate()")
+  })
+})
+
+// ── Phase 299-02 (LINK-02 / D-01, D-02, D-32) — the entity addresses and the ONE `entityLink` object.
+// New cases only. History entries are counted EXACTLY: every PUSH the router commits is recorded by
+// its location key, so a navigator that writes two entries (or one where none is owed) reds here.
+const THREAD_A = "5d0c2a9e-3b1f-4c6d-8e7a-1f2b3c4d5e61"
+const THREAD_B = "5d0c2a9e-3b1f-4c6d-8e7a-1f2b3c4d5e62"
+const DEFINITION = "7e1d3b0f-4c2a-4d7e-9f8b-2a3b4c5d6e7f"
+const BUNDLE = "9f2e4c1a-5d3b-4e8f-a09c-3b4c5d6e7f80"
+
+function pushCounter(router: ReturnType<typeof mount>) {
+  const pushed = new Set<string>()
+  const unsubscribe = router.subscribe((state) => {
+    if (state.historyAction === "PUSH") pushed.add(state.location.key)
+  })
+  return { pushed: () => pushed.size, unsubscribe }
+}
+
+describe("useAppNavigation — entityLink.target reads the address (299-02 / D-01)", () => {
+  it("/app/chat/<A> is the chat view with target {kind: thread, id: A}", () => {
+    mount(`/app/chat/${THREAD_A}`)
+    expect(nav().activeView).toBe("chat")
+    expect(nav().addressNotFound).toBe(false)
+    expect(nav().entityLink.target).toEqual({ kind: "thread", id: THREAD_A })
+    expect(nav().entityLink.route).toEqual({ view: "chat", threadId: THREAD_A })
+  })
+
+  it("an uppercase thread id is lowercased in the target", () => {
+    mount(`/app/chat/${THREAD_A.toUpperCase()}`)
+    expect(nav().entityLink.target).toEqual({ kind: "thread", id: THREAD_A })
+  })
+
+  it("/app/workflows/<D> is the workflows view with a workflow target", () => {
+    mount(`/app/workflows/${DEFINITION}`)
+    expect(nav().activeView).toBe("workflows")
+    expect(nav().entityLink.target).toEqual({ kind: "workflow", id: DEFINITION })
+    expect(nav().entityLink.route).toEqual({ view: "workflows", definitionId: DEFINITION })
+  })
+
+  it("/app/experts/<E> is the experts view with an expert target", () => {
+    mount(`/app/experts/${BUNDLE}`)
+    expect(nav().activeView).toBe("experts")
+    expect(nav().entityLink.target).toEqual({ kind: "expert", id: BUNDLE })
+  })
+
+  it("/app/runs/<R> is the run view with a run target (297's address, now also an entity)", () => {
+    mount(`/app/runs/${RUN_ID}`)
+    expect(nav().activeView).toBe("workflow-run")
+    expect(nav().runId).toBe(RUN_ID)
+    expect(nav().entityLink.target).toEqual({ kind: "run", id: RUN_ID })
+    expect(nav().entityLink.route).toEqual({ view: "workflow-run", runId: RUN_ID })
+  })
+
+  it.each(["/app", "/app/library", "/app/workflows", "/app/experts", "/app/nonsense", "/setup"])(
+    "%s has no entity target",
+    (entry) => {
+      mount(entry)
+      expect(nav().entityLink.target).toBeNull()
+      expect(nav().entityLink.route).toBeNull()
+    },
+  )
+
+  it("entityLink keeps ONE identity while the address is unchanged (effects keyed on it do not churn)", async () => {
+    mount(`/app/chat/${THREAD_A}`)
+    await act(async () => {})
+    const first = nav().entityLink
+    act(() => nav().handleStudioTabChange("versions"))
+    expect(nav().entityLink).toBe(first)
+  })
+})
+
+describe("useAppNavigation — the entityLink navigators write exactly one entry (299-02 / D-02, D-32)", () => {
+  it("openThread(A) from /app/library pushes /app/chat/A — one entry", async () => {
+    const router = mount("/app/library")
+    const counter = pushCounter(router)
+    act(() => nav().entityLink.openThread(THREAD_A))
+    await waitFor(() => expect(where(router)).toBe(`/app/chat/${THREAD_A}`))
+    expect(counter.pushed()).toBe(1)
+    expect(nav().activeView).toBe("chat")
+    counter.unsubscribe()
+  })
+
+  it("openThread(A) while /app/chat/A is on screen is a no-op", async () => {
+    const router = mount(`/app/chat/${THREAD_A}`)
+    await act(async () => {})
+    const key = router.state.location.key
+    act(() => nav().entityLink.openThread(THREAD_A))
+    act(() => nav().entityLink.openThread(THREAD_A.toUpperCase()))
+    await act(async () => {})
+    expect(router.state.location.key).toBe(key)
+  })
+
+  it("openThread(B) from /app/chat/A pushes /app/chat/B and Back returns to /app/chat/A", async () => {
+    const router = mount(`/app/chat/${THREAD_A}`)
+    const counter = pushCounter(router)
+    act(() => nav().entityLink.openThread(THREAD_B))
+    await waitFor(() => expect(where(router)).toBe(`/app/chat/${THREAD_B}`))
+    expect(counter.pushed()).toBe(1)
+    await act(() => router.navigate(-1))
+    await waitFor(() => expect(where(router)).toBe(`/app/chat/${THREAD_A}`))
+    expect(nav().entityLink.target).toEqual({ kind: "thread", id: THREAD_A })
+    counter.unsubscribe()
+  })
+
+  it("openThread(B, {replace: true}) REPLACES the entry", async () => {
+    const router = mount(`/app/chat/${THREAD_A}`)
+    act(() => nav().entityLink.openThread(THREAD_B, { replace: true }))
+    await waitFor(() => expect(where(router)).toBe(`/app/chat/${THREAD_B}`))
+    expect(router.state.historyAction).toBe("REPLACE")
+  })
+
+  it("leaveThread() at /app/chat/A REPLACES the entry with /app", async () => {
+    const router = mount(`/app/chat/${THREAD_A}`)
+    const counter = pushCounter(router)
+    act(() => nav().entityLink.leaveThread())
+    await waitFor(() => expect(where(router)).toBe("/app"))
+    expect(router.state.historyAction).toBe("REPLACE")
+    expect(counter.pushed()).toBe(0)
+    counter.unsubscribe()
+  })
+
+  it("leaveThread() off a thread address writes nothing", async () => {
+    const router = mount("/app/library")
+    const key = router.state.location.key
+    act(() => nav().entityLink.leaveThread())
+    await act(async () => {})
+    expect(router.state.location.key).toBe(key)
+    expect(where(router)).toBe("/app/library")
+  })
+
+  it("openWorkflow(D) pushes /app/workflows/D; openExpert(E) pushes /app/experts/E", async () => {
+    const router = mount("/app")
+    const counter = pushCounter(router)
+    act(() => nav().entityLink.openWorkflow(DEFINITION))
+    await waitFor(() => expect(where(router)).toBe(`/app/workflows/${DEFINITION}`))
+    expect(nav().activeView).toBe("workflows")
+    act(() => nav().entityLink.openExpert(BUNDLE))
+    await waitFor(() => expect(where(router)).toBe(`/app/experts/${BUNDLE}`))
+    expect(nav().activeView).toBe("experts")
+    expect(counter.pushed()).toBe(2)
+    counter.unsubscribe()
+  })
+
+  it("T-299-18: a non-UUID id pushes nothing, for every id variant", async () => {
+    const router = mount("/app/library")
+    const key = router.state.location.key
+    act(() => nav().entityLink.openThread("not-a-uuid"))
+    act(() => nav().entityLink.openWorkflow("../settings"))
+    act(() => nav().entityLink.openExpert(`${BUNDLE}x`))
+    act(() => nav().entityLink.openThread(""))
+    await act(async () => {})
+    expect(router.state.location.key).toBe(key)
+    expect(where(router)).toBe("/app/library")
+  })
+})
+
+describe("useAppNavigation — Chat returns to the last thread (299-02 / D-02, the workflow-run arm's mirror)", () => {
+  it("before any thread, onNavigate('chat') goes to /app", async () => {
+    const router = mount("/app/library")
+    act(() => nav().onNavigate("chat"))
+    await waitFor(() => expect(where(router)).toBe("/app"))
+  })
+
+  it("after visiting /app/chat/A, onNavigate('chat') from the Library goes to /app/chat/A", async () => {
+    const router = mount(`/app/chat/${THREAD_A}`)
+    await act(async () => {})
+    act(() => nav().onNavigate("documents"))
+    await waitFor(() => expect(where(router)).toBe("/app/library"))
+    const counter = pushCounter(router)
+    act(() => nav().onNavigate("chat"))
+    await waitFor(() => expect(where(router)).toBe(`/app/chat/${THREAD_A}`))
+    expect(counter.pushed()).toBe(1)
+    counter.unsubscribe()
+  })
+
+  it("after the chat home is seen again, onNavigate('chat') goes to /app (a left thread is not re-opened)", async () => {
+    const router = mount(`/app/chat/${THREAD_A}`)
+    await act(async () => {})
+    act(() => nav().entityLink.leaveThread())
+    await waitFor(() => expect(where(router)).toBe("/app"))
+    act(() => nav().onNavigate("documents"))
+    await waitFor(() => expect(where(router)).toBe("/app/library"))
+    act(() => nav().onNavigate("chat"))
+    await waitFor(() => expect(where(router)).toBe("/app"))
+  })
+
+  it("onNavigate('chat') on a thread address is a no-op (the chat view is already on screen)", async () => {
+    const router = mount(`/app/chat/${THREAD_A}`)
+    await act(async () => {})
+    const key = router.state.location.key
+    act(() => nav().onNavigate("chat"))
+    await act(async () => {})
+    expect(router.state.location.key).toBe(key)
+  })
+
+  it("openThread(A) then onNavigate('chat') in ONE handler writes one entry, onto A", async () => {
+    // The palette / launch shape: a navigator call followed by the legacy Chat call. The last-thread
+    // memory must move with `go`, not one commit later, or the second call pushes a stale thread.
+    const router = mount("/app/library")
+    const counter = pushCounter(router)
+    act(() => {
+      nav().entityLink.openThread(THREAD_A)
+      nav().onNavigate("chat")
+    })
+    await waitFor(() => expect(where(router)).toBe(`/app/chat/${THREAD_A}`))
+    await act(async () => {})
+    expect(counter.pushed()).toBe(1)
+    counter.unsubscribe()
+  })
+
+  it("bounceHome from a thread address still REPLACES with /app (the 403 home is the thread-less home)", async () => {
+    const router = mount(`/app/chat/${THREAD_A}`)
+    act(() => nav().bounceHome())
+    await waitFor(() => expect(where(router)).toBe("/app"))
+    expect(router.state.historyAction).toBe("REPLACE")
+  })
+})
+
+describe("useAppNavigation — a bare entity address keeps its token hash (299-02 / Pitfall 10)", () => {
+  it("cold /chat/<id>#access_token=x is REPLACED by /app/chat/<id>#access_token=x", async () => {
+    const router = mount(`/chat/${THREAD_A}#access_token=x`)
+    await waitFor(() => expect(router.state.location.pathname).toBe(`/app/chat/${THREAD_A}`))
+    expect(router.state.location.hash).toBe("#access_token=x")
+    expect(router.state.historyAction).toBe("REPLACE")
+    expect(nav().entityLink.target).toEqual({ kind: "thread", id: THREAD_A })
+  })
+
+  it("an uppercase /app/workflows/<ID> is replaced by its lowercase address", async () => {
+    const router = mount(`/app/workflows/${DEFINITION.toUpperCase()}`)
+    await waitFor(() => expect(where(router)).toBe(`/app/workflows/${DEFINITION}`))
+    expect(router.state.historyAction).toBe("REPLACE")
+  })
+})
+
+// ── Phase 299-03 (D-15 / D-17 / D-24) — the gate's navigators: address, leave, openRoute, resume ──
+describe("useAppNavigation — entityLink.address, leave, openRoute (299-03)", () => {
+  it("address is the canonical path on screen (lowercase id, rebuilt)", async () => {
+    mount(`/app/chat/${THREAD_A.toUpperCase()}`)
+    await waitFor(() => expect(nav().entityLink.address).toBe(`/app/chat/${THREAD_A}`))
+    cleanup()
+    mount("/app/library")
+    expect(nav().entityLink.address).toBe("/app/library")
+  })
+
+  it("leave() REPLACES the entity address with the last non-entity place in this tab", async () => {
+    const router = mount("/app/library")
+    act(() => nav().openRun(RUN_ID))
+    await waitFor(() => expect(where(router)).toBe(`/app/runs/${RUN_ID}`))
+    act(() => nav().entityLink.leave())
+    await waitFor(() => expect(where(router)).toBe("/app/library"))
+    expect(router.state.historyAction).toBe("REPLACE")
+  })
+
+  it("leave() on a cold entity address (no earlier place) REPLACES it with /app", async () => {
+    const router = mount(`/app/workflows/${DEFINITION}`)
+    await act(async () => {})
+    act(() => nav().entityLink.leave())
+    await waitFor(() => expect(where(router)).toBe("/app"))
+    expect(router.state.historyAction).toBe("REPLACE")
+  })
+
+  it("leave(route) REPLACES with that route (Back to it lands on the answering chat)", async () => {
+    const router = mount(`/app/runs/${RUN_ID}`)
+    await act(async () => {})
+    act(() => nav().entityLink.leave({ view: "chat", threadId: THREAD_B }))
+    await waitFor(() => expect(where(router)).toBe(`/app/chat/${THREAD_B}`))
+    expect(router.state.historyAction).toBe("REPLACE")
+  })
+
+  it("openRoute(route) PUSHES one entry, so Back returns to the card (D-15)", async () => {
+    const router = mount(`/app/runs/${RUN_ID}`)
+    const counter = pushCounter(router)
+    act(() => nav().entityLink.openRoute({ view: "workflows" }))
+    await waitFor(() => expect(where(router)).toBe("/app/workflows"))
+    expect(counter.pushed()).toBe(1)
+    await act(() => router.navigate(-1))
+    await waitFor(() => expect(where(router)).toBe(`/app/runs/${RUN_ID}`))
+    counter.unsubscribe()
+  })
+})
+
+describe("useAppNavigation — entityLink.resume (299-03 / D-24, Pitfall 7)", () => {
+  afterEach(() => window.sessionStorage.clear())
+
+  it("on /app, a remembered target REPLACES the address (no new entry) and is consumed", async () => {
+    rememberReturnTarget(`/app/runs/${RUN_ID}`)
+    const router = mount("/app")
+    const counter = pushCounter(router)
+    act(() => nav().entityLink.resume())
+    await waitFor(() => expect(where(router)).toBe(`/app/runs/${RUN_ID}`))
+    expect(router.state.historyAction).toBe("REPLACE")
+    expect(counter.pushed()).toBe(0)
+    expect(takeReturnTarget()).toBeNull()
+    counter.unsubscribe()
+  })
+
+  it("on bare / it is replaced too", async () => {
+    rememberReturnTarget(`/app/chat/${THREAD_A}`)
+    const router = mount("/")
+    act(() => nav().entityLink.resume())
+    await waitFor(() => expect(where(router)).toBe(`/app/chat/${THREAD_A}`))
+    expect(router.state.historyAction).toBe("REPLACE")
+  })
+
+  it("anywhere else the address is left alone — and the stored value is still consumed", async () => {
+    rememberReturnTarget(`/app/runs/${RUN_ID}`)
+    const router = mount("/app/library")
+    const key = router.state.location.key
+    act(() => nav().entityLink.resume())
+    await act(async () => {})
+    expect(where(router)).toBe("/app/library")
+    expect(router.state.location.key).toBe(key)
+    expect(takeReturnTarget()).toBeNull()
+  })
+
+  it("with nothing remembered it writes nothing", async () => {
+    const router = mount("/app")
+    const key = router.state.location.key
+    act(() => nav().entityLink.resume())
+    await act(async () => {})
+    expect(router.state.location.key).toBe(key)
   })
 })

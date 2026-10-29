@@ -74,6 +74,8 @@ EXPECTED_BOUNDED_FIELDS = {
     # 293 (D-14) — CHECKs in migration 215 (app_settings_api_key_*_per_minute_bound).
     "api_key_starts_per_minute",
     "api_key_reads_per_minute",
+    # 300 (D-07) — CHECK in migration 218 (app_settings_notification_email_delay_seconds_bound).
+    "notification_email_delay_seconds",
 }
 
 

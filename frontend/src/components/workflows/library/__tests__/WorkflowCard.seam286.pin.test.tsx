@@ -157,16 +157,18 @@ describe("286-04 pin — the resting card's DOM, per row state", () => {
 // ── 2 · the open menu ───────────────────────────────────────────────────────────────
 
 describe("286-04 pin — the open `⋯` menu, per row state", () => {
+  // 299-04 (D-20): every state gains ONE leading menuitem — "Link to this workflow", the
+  // `DropdownMenuSub` trigger that is now the menu's FIRST item. Nothing else moved.
   const EXPECTED_ROLES: Record<string, string[]> = {
-    // Run log, Schedules, the fork verb, the heavy delete, the consequence note.
-    "published-owned": ["menuitem", "menuitem", "menuitem", "menuitem", "group"],
+    // Link, Run log, Schedules, the fork verb, the heavy delete, the consequence note.
+    "published-owned": ["menuitem", "menuitem", "menuitem", "menuitem", "menuitem", "group"],
     // Same minus the heavy delete: `runnable && owned` gates it.
-    "published-shared": ["menuitem", "menuitem", "menuitem", "group"],
-    // Run log, the fork verb, the consequence note (no Schedules: published only; no delete).
-    starter: ["menuitem", "menuitem", "group"],
-    // Run log, the light delete. No fork, no Schedules, no consequence note.
-    draft: ["menuitem", "menuitem"],
-    "already-forked": ["menuitem", "menuitem", "menuitem", "menuitem", "group"],
+    "published-shared": ["menuitem", "menuitem", "menuitem", "menuitem", "group"],
+    // Link, Run log, the fork verb, the consequence note (no Schedules: published only; no delete).
+    starter: ["menuitem", "menuitem", "menuitem", "group"],
+    // Link, Run log, the light delete. No fork, no Schedules, no consequence note.
+    draft: ["menuitem", "menuitem", "menuitem"],
+    "already-forked": ["menuitem", "menuitem", "menuitem", "menuitem", "menuitem", "group"],
   }
 
   it.each(STATES)("$label opens a menu with the same items and DOM", async ({ label, row, hasExistingFork }) => {

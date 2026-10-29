@@ -13,8 +13,14 @@ interface UseThreads {
   /** Phase 298-04 (D-11 / UI-D9): true ONLY while the held answer belongs to ANOTHER org than the
    *  active one — i.e. during an org switch. False on the first render, so first paint is
    *  unchanged (BUG-261027-02 stays for Phase 299). ChatLayout drives the history column's
-   *  "Loading your chats…" line with it. */
+   *  "Loading your chats…" line with it.
+   *  ⚠ CORRECTED 2026-10-28 (Phase 299-05, FIX-02 / D-27): BUG-261027-02 is now answered by
+   *  `pending` below, and ChatLayout reads `pending`, not this flag; `switching` keeps its meaning. */
   switching: boolean
+  /** Phase 299-05 (FIX-02 / D-27): true until the ACTIVE org's list has answered — before the first
+   *  answer AND during a switch. A settled answer (including `[]`, and the WR-03 failed-load `[]`)
+   *  ends it, so "No recent chats" is said only after the list has actually answered empty. */
+  pending: boolean
   loadThreads: () => Promise<void>
   /** Select a thread — or pass `null` to DESELECT (IN-01: clear the stale old-org
    *  selection on an org switch). Widening to `Thread | null` is backward-compatible:
@@ -116,6 +122,7 @@ export function useThreads(): UseThreads {
 
   const threads = held !== null && held.org === activeOrgId ? held.rows : NO_THREADS
   const switching = held !== null && held.org !== activeOrgId
+  const pending = held === null || held.org !== activeOrgId
 
-  return { threads, selectedThread, loading, switching, loadThreads, selectThread, newThread, deleteThread, renameThread, updateThreadTitle, patchThread }
+  return { threads, selectedThread, loading, switching, pending, loadThreads, selectThread, newThread, deleteThread, renameThread, updateThreadTitle, patchThread }
 }

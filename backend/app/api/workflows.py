@@ -78,6 +78,7 @@ from app.models.harness import WorkflowDefinition
 from app.services import workflow_authoring
 from app.services import org_lists  # Phase 298 (D-06): the one home of list narrowing
 from app.services import foreign_folder_refusal  # Phase 298 (ORG-05): the one refusal home
+from app.services import item_org_guard, link_resolver  # Phase 299 (D-38): Tweak stays in its org
 # Phase 182 (VALID-01 / D-182-06): ``grounding`` is imported as a MODULE for the same
 # patchability reason as ``publish_service`` above — the /validate + /grounding-bundle
 # routes resolve ``grounding.<fn>`` at call time, so a test can monkeypatch the shared
@@ -1200,6 +1201,12 @@ async def create_draft(
     body: WorkflowDefinition,
     request: Request = None,  # FastAPI injects it; direct callers may omit it (no header -> None)
     current_user: dict = Depends(get_current_user),
+    # 299 (D-38): the published workflow this draft is a Tweak of, when it is one. Optional.
+    from_definition_id: Annotated[
+        str | None,
+        Query(description="When this draft copies one of your workflows: that workflow's id. "
+                          "A copy of a workflow in another of your organizations is refused."),
+    ] = None,
 ) -> DraftCreateResponse:
     """Persist a NEW draft (REQ-1 create) — returns ``{id, version}``.
 
@@ -1219,6 +1226,9 @@ async def create_draft(
     # 296-01 (BUG-261021-02): the draft belongs to the VALIDATED active org (create_thread's
     # D-268-07 shape); None keeps the INSERT byte-identical and the mig-106 trigger decides.
     _active_org = await resolve_active_org_or_none(request, current_user)
+    # 299 (D-38): a Tweak of YOUR non-global workflow in another org → worded 409; an unreadable source is silent.
+    if _active_org and (_source_id := link_resolver.strict_uuid(from_definition_id)):
+        await item_org_guard.refuse_if_other_org(await link_resolver.workflow_org(pool, _source_id, owner_id=user_id), _active_org, kind="tweak", pool=pool)
     # 298 (D-13/D-36): a folder outside the org this draft is stamped in → coded 422; no org → the trigger's.
     await foreign_folder_refusal.raise_if_foreign(body, definition_org=_active_org, pool=pool, user_id=user_id, owner_default=True)
     try:

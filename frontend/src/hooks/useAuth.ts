@@ -3,6 +3,21 @@ import type { User, Session } from "@supabase/supabase-js"
 import { supabase, SUPABASE_CLIENT_REHYDRATED } from "../lib/supabase"
 import { clearCacheForUser } from "@/lib/streamsCache"
 import { ACTIVE_ORG_STORAGE_KEY, setActiveOrgId } from "@/lib/api"
+import { forgetReturnTarget, rememberReturnTarget, returnTarget } from "@/lib/returnTo"
+
+/**
+ * Phase 299-05 (LINK-06 / D-24): where the auth server should send the browser back to after a
+ * sign-in that LEAVES the page (SSO, the sign-up confirmation email) — always
+ * `window.location.origin` + a `returnTarget` result (the rebuilt `/app` path, never the raw
+ * address), or `/app` when the address names nothing. A non-null target is also remembered in
+ * sessionStorage, because GoTrue falls back to the Site URL for a value not on its Redirect URLs
+ * list; plan 299-03's resume takes it once after sign-in.
+ */
+function leavingRedirect(): string {
+  const target = returnTarget(window.location.pathname, window.location.search)
+  if (target !== null) rememberReturnTarget(target)
+  return window.location.origin + (target ?? "/app")
+}
 
 interface UseAuth {
   user: User | null
@@ -19,6 +34,11 @@ interface UseAuth {
   signOut: () => Promise<void>
 }
 
+// Phase 299-05 (D-24 / T-299-13): no app code here reads or writes the URL hash. The auth client
+// owns it (implicit flow, `detectSessionInUrl`): its `_initialize` parses the returning token and
+// clears the hash itself. And no timer lives here (D-26 / Pitfall 6): a slow session read must
+// never flip a signed-in person to the sign-in form, so the visible bound on the wait is
+// BootScreen's 20 s clock, and the only new arm is the getSession `.catch` (SEED-312).
 export function useAuth(): UseAuth {
   const [user, setUser] = useState<User | null>(null)
   const [session, setSession] = useState<Session | null>(null)
@@ -40,6 +60,9 @@ export function useAuth(): UseAuth {
         setUser(data.session?.user ?? null)
         setLoading(false)
       })
+        // Phase 299-05 (SEED-312): a session read that REJECTS ends the wait. `user` is not
+        // touched, so a person a SIGNED_IN event already set stays signed in.
+        .catch(() => setLoading(false))
       const { data: listener } = supabase.auth.onAuthStateChange((_event, sess) => {
         setSession(sess)
         setUser(sess?.user ?? null)
@@ -57,12 +80,16 @@ export function useAuth(): UseAuth {
   }, [])
 
   const signIn = async (email: string, password: string) => {
+    // Phase 299-05 (D-24): the password path never leaves the page, so the address is still the
+    // link — no redirect option, and any copy an earlier SSO attempt stored is dropped.
+    forgetReturnTarget()
     const { error } = await supabase.auth.signInWithPassword({ email, password })
     if (error) throw error
   }
 
   const signUp = async (email: string, password: string) => {
-    const { error } = await supabase.auth.signUp({ email, password })
+    // Phase 299-05 (D-24): the confirmation email's link returns to the link the person opened.
+    const { error } = await supabase.auth.signUp({ email, password, options: { emailRedirectTo: leavingRedirect() } })
     if (error) throw error
   }
 
@@ -72,7 +99,8 @@ export function useAuth(): UseAuth {
   // success the browser leaves for the IdP; on error we surface it to the caller (the login
   // form falls back to the password field). `signInWithPassword` above is UNTOUCHED (SC#3).
   const signInWithSSO = async (domain: string) => {
-    const { data, error } = await supabase.auth.signInWithSSO({ domain })
+    // Phase 299-05 (D-24): the IdP sends the browser back to the link the person opened.
+    const { data, error } = await supabase.auth.signInWithSSO({ domain, options: { redirectTo: leavingRedirect() } })
     if (error) throw error
     if (data?.url) window.location.href = data.url
   }

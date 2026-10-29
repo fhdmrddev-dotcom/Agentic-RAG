@@ -404,6 +404,9 @@ class WorkflowRunRead(BaseModel):
     # while this field did not exist and the query never fetched the column, so the sentence
     # could not render on any run. Removing any ONE of the three restores that.
     metadata: dict[str, Any] | None = None
+    # 299 (D-10): the run's org, from the column the ownership select already names — so a run
+    # page can say which org it is in without a second read. Declared + populated in lockstep.
+    org_id: UUID | None = None
     # ── Phase 257.1 (ROADMAP SC#4) — DECLARED, SELECTED AND POPULATED IN LOCKSTEP, and the
     # ── docblock above is the reason this note exists rather than a bare field list. ─────
     #
@@ -1357,6 +1360,7 @@ async def read_workflow_run(
         # back as a dict, but a string scalar has been measured on sibling columns in this
         # tree, so a non-dict is dropped rather than handed to the client as a bare string.
         metadata=run.get("metadata") if isinstance(run.get("metadata"), dict) else None,
+        org_id=run.get("org_id"),  # 299 (D-10)
         # Phase 257.1 (SC#4) — the values computed just above.
         model=run_model,
         cost_usd=run_cost_usd,

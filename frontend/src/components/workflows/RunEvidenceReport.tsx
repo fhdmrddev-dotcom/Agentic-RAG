@@ -75,6 +75,8 @@ import {
   exportFileName,
 } from "@/components/workflows/evidenceVocabulary"
 import { own } from "@/components/workflows/ownProperty"
+import { ShareLinkMenu } from "@/components/share/ShareLinkMenu"
+import { audienceOf } from "@/lib/linkAudience"
 
 interface Props {
   /** The `workflow_runs.id` whose record to show. */
@@ -215,6 +217,9 @@ function Report({
           </div>
         </div>
         <div className="flex flex-wrap items-center gap-1.5 grow-0 shrink print:hidden">
+          {/* 299-04 (D-20 / D-34): ONE mount — a finished run's page IS this report (289-04's early
+              return), so its link lives here; a finished run with an org opens for its members. */}
+          <ShareLinkMenu route={{ view: "workflow-run", runId: view.runId }} kind="run" audience={audienceOf("run", { status: payload.run.status, has_org: payload.run.org_name !== null })} orgId={null} orgName={payload.run.org_name} />
           <Button
             variant="outline"
             size="sm"

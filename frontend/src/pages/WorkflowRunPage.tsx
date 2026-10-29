@@ -96,6 +96,8 @@ import { RunCostBadge } from "@/components/workflow/RunCostBadge"
 // Phase 194.1 Plan 07 (R3) — the FOURTH and last mount of the ONE shared Stop. It owns its
 // own dispatch and its own pressed state; this page hands it a thread id and nothing else.
 import { StopControl } from "@/components/chat/StopControl"
+import { ShareLinkMenu } from "@/components/share/ShareLinkMenu"
+import { audienceOf } from "@/lib/linkAudience"
 import { WaitingOnLine } from "@/components/workflows/WaitingOnLine"
 // 293-03 (D-24): how the run started — a leaf with no hook, so this page gains none (G-5).
 import { RunOriginLine } from "@/components/workflows/RunOriginLine"
@@ -1223,6 +1225,9 @@ export function WorkflowRunPage({ runId, onBack, onOpenThread }: Props) {
           {run?.workflow_name ? (
             <span className="font-mono text-xs text-muted-foreground">v{run.workflow_version}</span>
           ) : null}
+          {/* 299-04 (D-20 / UI-SPEC S4): ONE mount after the version chip, before the Stop group (Stop
+              unmoved). A finished run with an org opens for its members; otherwise owner-only (D-34). */}
+          <ShareLinkMenu route={{ view: "workflow-run", runId }} kind="run" audience={audienceOf("run", { status: run?.status, has_org: !!run?.org_id })} orgId={run?.org_id ?? null} />
           {/* ── THE STOP (Phase 194.1 Plan 07 / R3 / D-19) ──────────────────────────────
                 SKETCH 169-A, chosen over the sketch's OWN lean toward B, and the reason is
                 a measurement rather than taste: `isTerminal` (:604) is a component-level

@@ -1,4 +1,6 @@
 import logging
+from email.utils import parseaddr
+from typing import Literal
 
 from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException
 from pydantic import BaseModel, Field
@@ -28,6 +30,7 @@ from app.models.user_settings import (
 from app.services.rerank_engines.registry import ACCEPTED_PROVIDER_IDS
 from app.services.retrieval_tuning import app_settings_has_hnsw_columns
 from app.services.audit_service import write_audit_entry
+from app.services.email_provider import configured_provider
 from app.services.reembed_service import start_reembed
 from app.services.skill_tuner_service import resolve_skill_builder_model
 
@@ -53,6 +56,8 @@ _BOUNDED_SETTINGS_FIELDS = frozenset(
         # 293 (D-14) — the per-key API limits, bounded 1..60 and 10..600 (migration 215 CHECKs agree).
         "api_key_starts_per_minute",
         "api_key_reads_per_minute",
+        # 300 (D-07) — the run-waiting email delay, bounded 60..3600 (migration 218 CHECK agrees).
+        "notification_email_delay_seconds",
     }
 )
 
@@ -117,6 +122,14 @@ class FullSettingsResponse(BaseModel):
     # 293 (D-14) — per-key API limits a minute, shared by every worker. App-wide.
     api_key_starts_per_minute: int
     api_key_reads_per_minute: int
+    # 300 (D-07, D-08, D-10) — the mail knobs. The provider is READ-ONLY: it is the env's
+    # EMAIL_PROVIDER name, never its secret (the API key and the mail-server login stay in the
+    # environment and are never read by this module).
+    notification_email_delay_seconds: int
+    email_from_address: str
+    email_from_name: str
+    email_dev_redirect_address: str
+    email_provider: Literal["none", "resend", "smtp"]
     # SEED-258 — the source file ceiling, plus the bounds the UI must state rather than
     # re-type. ⛔ The bounds are SERVED, never hardcoded in the form: a form carrying its own
     # copy of `50` is a fourth private constant, which is the defect this replaced.
@@ -356,6 +369,10 @@ class SettingsUpdate(BaseModel):
     explorer_max_tool_rounds: int | None = None  # 292.1 (D-18) — bounded 2..50
     api_key_starts_per_minute: int | None = None  # 293 (D-14) — bounded 1..60
     api_key_reads_per_minute: int | None = None   # 293 (D-14) — bounded 10..600
+    notification_email_delay_seconds: int | None = None  # 300 (D-07) — bounded 60..3600
+    email_from_address: str | None = None          # 300 (D-08) — "" or one address
+    email_from_name: str | None = None             # 300 (D-08) — 1-60 chars, no control chars
+    email_dev_redirect_address: str | None = None  # 300 (D-10) — "" or one address
     # SEED-258 — the source file ceiling. ONE knob; the MCP envelope cap is DERIVED from it
     # server-side and is deliberately NOT a field here.
     source_max_file_size_mb: int | None = None
@@ -457,6 +474,11 @@ async def _build_response(s=None) -> FullSettingsResponse:
         explorer_max_tool_rounds=s.explorer_max_tool_rounds,
         api_key_starts_per_minute=s.api_key_starts_per_minute,
         api_key_reads_per_minute=s.api_key_reads_per_minute,
+        notification_email_delay_seconds=s.notification_email_delay_seconds,
+        email_from_address=s.email_from_address or "",
+        email_from_name=s.email_from_name,
+        email_dev_redirect_address=s.email_dev_redirect_address or "",
+        email_provider=configured_provider(),
         # SEED-258. The bounds ride along so the form can state them without owning them.
         source_max_file_size_mb=s.source_max_file_size_mb,
         source_max_file_size_mb_floor=SOURCE_MAX_FILE_SIZE_MB_FLOOR,
@@ -624,6 +646,31 @@ async def _range_refusal_detail(
             f"is at fault. Set it to a value between {lo} and {hi} to save this tab."
         )
     return typed_detail
+
+
+_NOT_AN_EMAIL_ADDRESS = "That isn't an email address."
+
+
+def _is_control_character(ch: str) -> bool:
+    return ord(ch) < 32 or ord(ch) == 127 or ch in ("", " ", " ")
+
+
+def _is_single_email_address(value: str) -> bool:
+    """300 (D-08, T-300-38) — exactly one bare ``local@domain``.
+
+    Mirrors ``smtp_adapter._validated_envelope_recipient``: no whitespace or control character,
+    no second address, and the address parser must agree with the literal input (it silently
+    rewrites ``v@ex ample.com`` into a different address, so anything it normalises is refused).
+    """
+    if any(ch.isspace() or _is_control_character(ch) for ch in value):
+        return False
+    if "," in value or ";" in value:
+        return False
+    display_name, address = parseaddr(value)
+    if display_name or address != value:
+        return False
+    local_part, separator, domain = address.partition("@")
+    return bool(separator and local_part and domain and "@" not in domain and "." in domain)
 
 
 # ── Routes ────────────────────────────────────────────────────────────────────
@@ -866,6 +913,56 @@ async def update_settings(
                 ),
             )
         updates["api_key_reads_per_minute"] = body.api_key_reads_per_minute
+
+    # 300 (D-07) — the run-waiting email delay. ⚠ BOUNDED ON WRITE; migration 218's CHECK is the
+    #   backstop. Below a minute a person answering promptly is emailed anyway; above an hour the
+    #   email arrives after the moment it was for.
+    if body.notification_email_delay_seconds is not None:
+        if not 60 <= body.notification_email_delay_seconds <= 3600:
+            raise HTTPException(
+                status_code=400,
+                detail=await _range_refusal_detail(
+                    field="notification_email_delay_seconds",
+                    label="Wait before emailing (seconds)",
+                    submitted=body.notification_email_delay_seconds,
+                    lo=60,
+                    hi=3600,
+                    typed_detail=(
+                        "Wait before emailing (seconds) must be between 60 and 3600. Under a "
+                        "minute, people who answer straight away are emailed anyway; over an hour, "
+                        "the email arrives after it could help."
+                    ),
+                ),
+            )
+        updates["notification_email_delay_seconds"] = body.notification_email_delay_seconds
+
+    # 300 (D-08, D-10) — the sender address and the test address: empty (use the environment's
+    #   address / hold mail back) or exactly one address. ⛔ Refused, never repaired: a value the
+    #   address parser would rewrite is a different address from the one typed.
+    for field in ("email_from_address", "email_dev_redirect_address"):
+        value = getattr(body, field)
+        if value is None:
+            continue
+        if value.strip() == "":
+            updates[field] = ""
+            continue
+        if not _is_single_email_address(value):
+            raise HTTPException(status_code=400, detail=_NOT_AN_EMAIL_ADDRESS)
+        updates[field] = value
+
+    # 300 (D-08) — the sender name people see. ⛔ Nothing is stripped silently: a CR/LF would
+    #   start a new mail header, so any control character is refused with a sentence.
+    if body.email_from_name is not None:
+        name = body.email_from_name
+        if not 1 <= len(name) <= 60 or any(_is_control_character(ch) for ch in name):
+            raise HTTPException(
+                status_code=400,
+                detail=(
+                    "Send from (name) must be 1 to 60 characters, with no line breaks or other "
+                    "control characters."
+                ),
+            )
+        updates["email_from_name"] = name
 
     # SEED-258 — the file ceiling every connected source refuses at.
     #

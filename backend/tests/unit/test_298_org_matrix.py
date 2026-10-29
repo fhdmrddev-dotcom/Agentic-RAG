@@ -177,8 +177,10 @@ async def _scheduled(header, definition=IN_ORG, *, def_org=ORG_A):
     from app.services import scheduler_service
     from app.services.entitlement_service import EntitlementResult
 
+    # 300-01 (D-14): the definition's required "topic" carries a value, or fire time refuses it
+    # for the blank input before the org check this matrix is about.
     schedule = {"id": uuid4(), "user_id": U, "workflow_id": DEF_ID, "org_id": ORG_A,
-                "name": "Weekly", "inputs": {}}
+                "name": "Weekly", "inputs": {"topic": "Lisbon"}}
     allowed = EntitlementResult(allowed=True, capability="workflows", current_tier="enterprise")
     launch = AsyncMock(return_value=uuid4())
     with (

@@ -87,6 +87,7 @@ from app.services.thread_handoff import (
     write_handoff,
 )
 from app.services import org_lists  # Phase 298 (D-06): the one home of list narrowing
+from app.services import item_org_guard  # Phase 299 (D-18/D-38): an item page's writes stay in its org
 from app.services.audit_service import write_audit_entry
 from app.services.typed_continue import is_continue_word  # 292.1 D-13 — pure word match, no model call
 from app.services.thread_workspace_cleanup import collect_thread_workspace_paths, remove_workspace_paths  # 274 D-08
@@ -1834,6 +1835,9 @@ async def send_message(
     # no orphan message is left behind. No active org on an Expert thread is refused too (fail closed).
     _require_thread_org(thread_resp.data, active_org_id, expert_id=thread_resp.data.get("active_expert_id"),
                         detail="Switch to this chat's organization to keep chatting with its Expert.")
+    # 299 (D-18/D-38): any OTHER chat whose org is not the active one is refused in words naming it,
+    # before the typed Continue, the preflight and the INSERT. No active org → no-op (298 D-03).
+    await item_org_guard.refuse_if_other_org(thread_resp.data.get("org_id"), active_org_id, kind="chat", pool=get_pg_pool)
     # 292.1 (D-12): a typed continue word on a paused Deep thread resumes THAT run via continue_run,
     # exactly like the button. The one delegating branch (D-20); the decisions live in the helper.
     if (_continued := await _typed_continue_or_none(request=request, body=body, thread_row=thread_resp.data, current_user=current_user, supabase=supabase, service_supabase=service_supabase, redis=redis)) is not None:

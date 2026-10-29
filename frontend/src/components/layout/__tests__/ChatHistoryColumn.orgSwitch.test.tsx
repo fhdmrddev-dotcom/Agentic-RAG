@@ -5,6 +5,11 @@
  * "Loading your chats…" in place of the list and never "No recent chats". Without it, the
  * shipped empty sentence is unchanged — first paint is Phase 299's (BUG-261027-02), not this
  * plan's. A thread still streaming from the org that was left is not listed, and nothing throws.
+ *
+ * ⚠ CORRECTED 2026-10-28 (Phase 299-05, FIX-02 / D-27): ChatLayout now passes
+ * `useThreads().pending` (true before the first answer too), so first paint no longer says
+ * "No recent chats" either. This column is unmodified, and every case here holds as written —
+ * the first-load cases through the real ChatLayout live in `ChatLayout.mobileLoading.test.tsx`.
  */
 import { describe, it, expect, vi, beforeEach } from "vitest"
 import { fireEvent, render, screen } from "@testing-library/react"

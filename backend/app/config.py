@@ -1717,13 +1717,22 @@ class Settings(BaseSettings):
 
     # Phase 167 (INV-01, D-167-02) — env-switched invitation email delivery. The DEFAULT is
     # ``none``: the app just LOGS the invite link (offline/self-hosted safe — no email service
-    # or API key required). Set ``EMAIL_PROVIDER=resend`` + ``RESEND_API_KEY`` +
-    # ``INVITE_FROM_EMAIL`` to send real email (the ``resend`` package is an opt-in lazy import,
-    # NOT a default requirement). The link base reuses ``frontend_url`` above — no new
-    # APP_BASE_URL env var. RESEND_API_KEY is a secret → env only (never app_settings).
-    email_provider: str = "none"  # none | resend
+    # or API key required). Set ``EMAIL_PROVIDER=resend`` + ``RESEND_API_KEY`` to send through
+    # Resend's REST API, or ``EMAIL_PROVIDER=smtp`` + the ``SMTP_*`` vars below to send through
+    # the operator's own mail server — nothing to install for either (300 D-21). The link base
+    # reuses ``frontend_url`` above — no new APP_BASE_URL env var. Secrets → env only (never
+    # app_settings). ``INVITE_FROM_EMAIL`` is the sender FALLBACK while the Settings "Send from"
+    # address is empty (300 D-08).
+    email_provider: str = "none"  # none | resend | smtp
     resend_api_key: str = ""
     invite_from_email: str = ""
+    # Phase 300 (D-28) — the one-box sends through SMTP. Infra + secret, so env only; the
+    # sender address/name, the wait before emailing and the test address live in Settings.
+    smtp_host: str = ""
+    smtp_port: int = 587
+    smtp_username: str = ""
+    smtp_password: str = ""
+    smtp_security: str = "starttls"  # starttls | ssl | none
 
 
 settings = Settings()

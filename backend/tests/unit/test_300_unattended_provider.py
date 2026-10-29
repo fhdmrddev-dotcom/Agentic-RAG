@@ -1,0 +1,280 @@
+"""Phase 300-01 Task 2 (FIX-05 / D-17, D-33, D-26; BUG-261027-05).
+
+An API-key or scheduled run records the model and provider it STARTED on — the owner's resolved
+pair at launch, through ONE helper (``resolve_owner_run_model``) — on ``workflow_runs.metadata``
+and in the first drive's ctx dict, so the existing resume reader (``harness_engine``, never
+edited here) continues on that provider. And a scheduled drive that ends with its run PAUSED
+records ``waiting`` on the schedule, never ``completed`` (D-26).
+
+Stubbed throughout: settings, the writer and the pool are fakes; nothing reaches Postgres.
+"""
+from __future__ import annotations
+
+from pathlib import Path
+from types import SimpleNamespace
+from unittest.mock import AsyncMock, MagicMock, patch
+from uuid import uuid4
+
+import pytest
+
+BACKEND = Path(__file__).resolve().parents[2]
+
+
+# ── resolve_owner_run_model ─────────────────────────────────────────────────────────────────
+
+
+def _chain(rmr, *, loaded, overlaid, resolved_provider, aligned=None, ctx_model):
+    """Patch the in-app door's chain: load -> per-user overlay -> resolve_run_model -> ctx model."""
+    aligned = aligned if aligned is not None else overlaid
+    return (
+        patch("app.models.user_settings.load_user_settings", return_value=loaded),
+        patch.object(rmr, "apply_user_model_default", AsyncMock(return_value=overlaid)),
+        patch.object(rmr, "resolve_run_model", AsyncMock(
+            return_value=("ignored", resolved_provider, None, object(), aligned))),
+        patch("app.services.sub_agent_models.resolve_workflow_ctx_model", return_value=ctx_model),
+    )
+
+
+@pytest.mark.asyncio
+async def test_the_helper_resolves_the_owners_pair_the_way_the_in_app_door_does():
+    """300-REVIEW IN-03 (D-17 "exactly as the in-app door does"): the owner's per-user default
+    model (SEED-116, apply_user_model_default) is applied, and the provider is resolved from it
+    by resolve_run_model — never read off the org's active_provider."""
+    from app.services import run_model_resolution as rmr
+
+    loaded = SimpleNamespace(active_provider="openai", llm_model="gpt-5.5")
+    overlaid = SimpleNamespace(active_provider="openai", llm_model="claude-opus-4-7")
+    aligned = SimpleNamespace(active_provider="anthropic", llm_model="claude-opus-4-7")
+    owner = uuid4()
+    load, overlay, resolve, ctx = _chain(rmr, loaded=loaded, overlaid=overlaid,
+                                         resolved_provider="anthropic", aligned=aligned,
+                                         ctx_model="claude-opus-4-7")
+    with load as load_m, overlay as overlay_m, resolve as resolve_m, ctx as ctx_m:
+        out = await rmr.resolve_owner_run_model(owner)
+
+    assert out == ("claude-opus-4-7", "anthropic")
+    load_m.assert_called_once_with(str(owner))
+    overlay_m.assert_awaited_once()
+    assert overlay_m.await_args.args[1] == {"id": str(owner)}
+    assert overlay_m.await_args.args[2] is loaded
+    rkw = resolve_m.await_args.kwargs
+    assert rkw["user_settings"] is overlaid
+    assert rkw["body"].model is None and rkw["body"].provider is None  # no request override
+    ctx_m.assert_called_once_with(aligned)
+
+
+@pytest.mark.asyncio
+async def test_blank_values_read_none():
+    from app.services import run_model_resolution as rmr
+
+    settings = SimpleNamespace(active_provider="")
+    load, overlay, resolve, ctx = _chain(rmr, loaded=settings, overlaid=settings,
+                                         resolved_provider="", ctx_model="")
+    with load, overlay, resolve, ctx:
+        assert await rmr.resolve_owner_run_model(uuid4()) == (None, None)
+
+
+@pytest.mark.asyncio
+async def test_a_failed_settings_load_is_none_none_and_never_raises(caplog):
+    from app.services import run_model_resolution as rmr
+
+    with patch("app.models.user_settings.load_user_settings",
+               side_effect=RuntimeError("db down secret")):
+        assert await rmr.resolve_owner_run_model(uuid4()) == (None, None)
+    assert caplog.records, "the failure is logged"
+
+
+def test_the_helper_is_exported():
+    from app.services import run_model_resolution as rmr
+
+    assert "resolve_owner_run_model" in rmr.__all__
+
+
+# ── launch_unattended_run records the pair ──────────────────────────────────────────────────
+
+
+async def _launch(pair):
+    from app.services import unattended_launch
+
+    supabase = MagicMock()
+    supabase.table.return_value.insert.return_value.execute.return_value.data = [
+        {"id": str(uuid4())}
+    ]
+    resolve = AsyncMock(return_value=pair)
+    drive = AsyncMock()
+    with (
+        patch("app.dependencies.get_service_role_supabase", return_value=supabase),
+        patch("app.db.workflows.create_workflow_run", AsyncMock(return_value=uuid4())) as create,
+        patch("app.db.workflows.arm_run_budget", AsyncMock()),
+        patch("app.services.run_model_resolution.resolve_owner_run_model", resolve),
+        patch.object(unattended_launch, "_drive_run", drive),
+    ):
+        await unattended_launch.launch_unattended_run(
+            owner_id=uuid4(), org_id=uuid4(), workflow_id=uuid4(), definition=MagicMock(),
+            inputs={}, title="t", max_tokens=500_000, max_duration=1_800,
+            pool=MagicMock(), redis=MagicMock(), origin_kind="key",
+        )
+    return resolve, create, drive
+
+
+@pytest.mark.asyncio
+async def test_the_launch_records_the_resolved_model_and_provider():
+    resolve, create, drive = await _launch(("claude-opus-4-7", "anthropic"))
+    resolve.assert_awaited_once()
+    kw = create.call_args.kwargs
+    assert (kw["model"], kw["provider"]) == ("claude-opus-4-7", "anthropic")
+    dkw = drive.call_args.kwargs
+    assert (dkw["model"], dkw["provider"]) == ("claude-opus-4-7", "anthropic")
+
+
+@pytest.mark.asyncio
+async def test_with_nothing_resolved_the_writer_call_is_todays():
+    _, create, _ = await _launch((None, None))
+    kw = create.call_args.kwargs
+    assert kw["model"] is None
+    assert kw.get("provider") is None
+
+
+def test_the_helper_is_called_once_in_the_core_source():
+    src = (BACKEND / "app" / "services" / "unattended_launch.py").read_text(encoding="utf-8")
+    assert src.count("resolve_owner_run_model(") == 1
+    assert "model=None," not in src
+
+
+# ── the first drive's ctx dict ──────────────────────────────────────────────────────────────
+
+
+async def _drive(model, provider):
+    from app.services import unattended_launch
+
+    build = AsyncMock(side_effect=RuntimeError("stop after the dict is captured"))
+    finished = AsyncMock()
+    with patch("app.services.harness_engine._build_resume_context", build):
+        await unattended_launch._drive_run(
+            run_id=uuid4(), thread_id=uuid4(), owner_id=uuid4(), org_id=None, inputs={},
+            definition=object(), pool=MagicMock(), redis=MagicMock(), on_finish=finished,
+            model=model, provider=provider,
+        )
+    return build.call_args.args[0], finished
+
+
+@pytest.mark.asyncio
+async def test_the_drive_dict_carries_the_model_and_the_provider():
+    run, _ = await _drive("claude-opus-4-7", "anthropic")
+    assert run["model"] == "claude-opus-4-7"
+    assert run["metadata"] == {"provider": "anthropic"}
+
+
+@pytest.mark.asyncio
+async def test_no_provider_adds_no_metadata_key():
+    run, finished = await _drive(None, None)
+    assert "metadata" not in run
+    assert not run.get("model")
+    finished.assert_awaited_once()
+    assert finished.await_args.args[0] == "failed"
+    # 300-REVIEW WR-01: the drive names its own run to the callback.
+    assert len(finished.await_args.args) == 2
+
+
+# ── D-26: a paused scheduled run reads "waiting" ────────────────────────────────────────────
+
+
+class _StatusPool:
+    def __init__(self, status=None, exc=None):
+        self.status, self.exc, self.calls = status, exc, []
+
+    async def fetchval(self, sql, *args):
+        self.calls.append((sql, args))
+        if self.exc:
+            raise self.exc
+        return self.status
+
+
+async def _outcome(drive_status: str, pool) -> tuple[list, AsyncMock]:
+    """Run launch_scheduled_run with a fake core that calls on_finish(drive_status)."""
+    from app.services import scheduler_service
+    from app.services.entitlement_service import EntitlementResult
+
+    run_id = uuid4()
+
+    async def _core(**kw):
+        # 300-REVIEW WR-01: the drive hands on_finish the id of the run IT launched.
+        await kw["on_finish"](drive_status, run_id)
+        return run_id
+
+    allowed = EntitlementResult(allowed=True, capability="workflows", current_tier="enterprise")
+    schedule = {"id": uuid4(), "user_id": str(uuid4()), "workflow_id": str(uuid4()),
+                "org_id": str(uuid4()), "name": "Weekly", "inputs": {}}
+    with (
+        patch("app.db.workflows.get_definition", new_callable=AsyncMock, return_value={
+            "definition": {"slug": "s", "version": 1, "name": "W", "phases": []}}),
+        patch("app.db.schedules.record_schedule_outcome", new_callable=AsyncMock) as record,
+        patch("app.services.unattended_launch.launch_unattended_run", _core),
+        patch("app.services.unattended_launch.workflows_disabled", return_value=False),
+        patch("app.services.foreign_folder_refusal.foreign_binding_refusal",
+              new_callable=AsyncMock, return_value=None),
+        patch("app.services.entitlement_service.check_entitlement", new_callable=AsyncMock,
+              return_value=allowed),
+    ):
+        await scheduler_service.launch_scheduled_run(schedule, pool=pool, redis=MagicMock())
+    schedule["_run_id"] = run_id
+    return [c.kwargs["status"] for c in record.await_args_list], schedule
+
+
+@pytest.mark.asyncio
+async def test_a_drive_that_ends_paused_records_waiting():
+    pool = _StatusPool("paused")
+    statuses, schedule = await _outcome("completed", pool)
+    assert statuses == ["waiting"]
+    sql, args = pool.calls[0]
+    # 300-REVIEW WR-01: THIS drive's run, by id — never the schedule's newest run, which an
+    # overlapping Run now or a quick re-fire can own.
+    assert "WHERE id = $1" in sql
+    assert "ORDER BY" not in sql and "_schedule_id" not in sql
+    assert args == (schedule["_run_id"],)
+
+
+@pytest.mark.asyncio
+async def test_a_drive_whose_run_failed_cleanly_records_failed():
+    """300-REVIEW WR-01: the engine's fail_run arm finishes the run 'failed' and RETURNS, so the
+    drive reports 'completed'. The row must read the run's own status, never "Finished."."""
+    statuses, _ = await _outcome("completed", _StatusPool("failed"))
+    assert statuses == ["failed"]
+
+
+@pytest.mark.asyncio
+async def test_a_drive_whose_run_was_stopped_records_cancelled():
+    statuses, _ = await _outcome("completed", _StatusPool("cancelled"))
+    assert statuses == ["cancelled"]
+
+
+@pytest.mark.asyncio
+async def test_a_drive_that_ends_completed_records_completed():
+    statuses, _ = await _outcome("completed", _StatusPool("completed"))
+    assert statuses == ["completed"]
+
+
+@pytest.mark.asyncio
+async def test_a_failed_status_read_records_completed():
+    statuses, _ = await _outcome("completed", _StatusPool(exc=RuntimeError("boom")))
+    assert statuses == ["completed"]
+
+
+@pytest.mark.asyncio
+async def test_failed_is_recorded_as_is_with_no_read():
+    pool = _StatusPool("paused")
+    statuses, _ = await _outcome("failed", pool)
+    assert statuses == ["failed"]
+    assert pool.calls == []
+
+
+# ── the API-key door inherits the fix, unedited ─────────────────────────────────────────────
+
+
+def test_the_key_door_calls_the_shared_core():
+    """The key door inherits the fix by calling the same core. That inbound.py, run_lifecycle.py,
+    run_producer.py and harness_engine.py carry no 300-01 edit is checked once, at plan close,
+    by ``git diff <plan-base> --stat`` (recorded in 300-01-SUMMARY.md) — a test pinned to a base
+    SHA would go red on the next legitimate edit."""
+    src = (BACKEND / "app" / "api" / "inbound.py").read_text(encoding="utf-8")
+    assert "launch_unattended_run(" in src

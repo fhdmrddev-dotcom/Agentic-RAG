@@ -28,6 +28,14 @@
  *
  * Two kinds of address are deliberately left alone: `/setup` and `/invite` are pre-auth pages App
  * renders itself (D-17), and bare `/` is chat (D-13 — the `app.` host serves the app there).
+ *
+ * Phase 299-02 (2026-10-28, LINK-02 / D-01): three ENTITY addresses join the table —
+ * `/app/chat/<uuid>` (a thread), `/app/workflows/<uuid>` (a definition) and `/app/experts/<uuid>`
+ * (an Expert bundle), beside 297's `/app/runs/<uuid>`. They are id-bearing variants of existing
+ * views, not new `ActiveView` members, so `VIEW_PATHS` and the reachability route leg are
+ * unchanged; the id-less forms still carry no id key at all (`/app` is exactly `{ view: "chat" }`).
+ * Every rule above holds for them unchanged: strict UUIDs, lowercased, never throws, no host.
+ * The legacy `?run=` alias stays the chat HOME's — a thread address keeps its thread.
  */
 
 import type { ActiveView } from "@/App"
@@ -36,6 +44,10 @@ import { isStrictUuid, readRunParam } from "@/lib/runDeepLink"
 export type AppRoute =
   | { view: "workflow-run"; runId: string }
   | { view: "skill-studio"; skillId: string }
+  // Phase 299-02 (D-01): the entity variants. The id-less forms below stay id-free.
+  | { view: "chat"; threadId: string }
+  | { view: "workflows"; definitionId: string }
+  | { view: "experts"; bundleId: string }
   | { view: Exclude<ActiveView, "workflow-run" | "skill-studio"> }
 
 /** What an address resolves to: a view, nothing (`not-found`), or a pre-auth page App owns. */
@@ -71,6 +83,10 @@ const BARE_PREFIXES = new Set(["chat", "library", "skills", "settings", "workflo
 export function formatAppRoute(route: AppRoute): string {
   if (route.view === "workflow-run") return `${VIEW_PATHS["workflow-run"]}/${route.runId.toLowerCase()}`
   if (route.view === "skill-studio") return `${VIEW_PATHS["skill-studio"]}/${route.skillId.toLowerCase()}`
+  // Phase 299-02 (D-01 / D-32): a thread is `/app/chat/<id>`, never the `/app` home.
+  if ("threadId" in route) return `/app/chat/${route.threadId.toLowerCase()}`
+  if ("definitionId" in route) return `${VIEW_PATHS.workflows}/${route.definitionId.toLowerCase()}`
+  if ("bundleId" in route) return `${VIEW_PATHS.experts}/${route.bundleId.toLowerCase()}`
   return VIEW_PATHS[route.view]
 }
 
@@ -120,6 +136,10 @@ function viewOf(rest: string[]): ParsedLocation {
   if (head === "admin" && id === "spend") return { view: "admin-spend" }
   if (head === "runs" && isStrictUuid(id)) return { view: "workflow-run", runId: id.toLowerCase() }
   if (head === "skills" && isStrictUuid(id)) return { view: "skill-studio", skillId: id.toLowerCase() }
+  // Phase 299-02 (D-01): the entity arms, beside runs / skills and by the same strict-UUID rule.
+  if (head === "chat" && isStrictUuid(id)) return { view: "chat", threadId: id.toLowerCase() }
+  if (head === "workflows" && isStrictUuid(id)) return { view: "workflows", definitionId: id.toLowerCase() }
+  if (head === "experts" && isStrictUuid(id)) return { view: "experts", bundleId: id.toLowerCase() }
   return NOT_FOUND
 }
 
@@ -147,8 +167,9 @@ function resolve(pathname: string, search: string): Resolution {
     parsed = NOT_FOUND
   }
 
-  // The legacy query aliases apply only where the path itself says "chat" (D-16).
-  if (parsed.view === "chat") {
+  // The legacy query aliases apply only where the path itself says "chat" (D-16) — and, since
+  // 299-02, only on the chat HOME: a thread address keeps its thread (D-05).
+  if (parsed.view === "chat" && !("threadId" in parsed)) {
     const query = new URLSearchParams(typeof search === "string" ? search : "")
     if (query.has("run")) {
       const runId = readRunParam(search)

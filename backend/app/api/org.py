@@ -45,7 +45,7 @@ from app.dependencies import (
 )
 from app.services import invitation_service, sso_domain_blocklist, sso_provider_service
 from app.services.audit_service import write_audit_entry
-from app.services.email_provider import compose_invite_link, get_email_provider
+from app.services.email_provider import SendOutcome, compose_invite_link, send_invite
 
 logger = logging.getLogger(__name__)
 
@@ -54,6 +54,39 @@ logger = logging.getLogger(__name__)
 # schema-valid (mig 104 CHECK) but greyed until Phase 169; super-admin is refused
 # server-side (D-167-03). Validated BEFORE any mint/insert.
 _INVITE_ROLES = frozenset({"member", "org-admin"})
+
+# 300 D-11 — how the invite's email went, in the wire's words. A mail outage never blocks the
+# invite (link-first); it is returned to the inviter and stored on the row instead of only logged.
+_EMAIL_DELIVERY = {"sent": "sent", "failed": "failed", "suppressed": "not_configured"}
+
+
+async def _record_invite_delivery(
+    request: Request, current_user: dict, invitation_id, outcome: SendOutcome
+) -> str:
+    """Store the outcome on ``org_invitations`` (migration 218) and return its wire word.
+
+    Runs on the CALLER'S user-JWT connection (the ``org_invitations_update`` RLS policy admits an
+    ``org:invite`` holder). A failure to store it is logged by invitation id and never fails the
+    invite. The stored reason is the mailer's short sentence, which never carries an address,
+    a subject, a link or a secret.
+    """
+    delivery = _EMAIL_DELIVERY.get(outcome.status, "failed")
+    if delivery == "failed":
+        logger.warning("invite email not sent for invitation %s: %s", invitation_id, outcome.reason)
+    try:
+        async with get_user_pg_connection(request, current_user) as conn:
+            await conn.execute(
+                "UPDATE public.org_invitations SET email_delivery = $2::text, "
+                "email_failed_at = CASE WHEN $2::text = 'failed' THEN now() ELSE NULL END, "
+                "email_failure = $3 WHERE id = $1",
+                invitation_id, delivery, outcome.reason if delivery == "failed" else None,
+            )
+    except Exception as exc:  # link-first: storing the outcome never fails the invite
+        logger.warning(
+            "could not store the email outcome for invitation %s (%s)",
+            invitation_id, type(exc).__name__,
+        )
+    return delivery
 
 # Every invitation lifecycle event records an audit row that must land on the org's
 # /org/audit tab. It REUSES the existing valid 'settings.update' action_type (org
@@ -406,11 +439,15 @@ async def send_org_invitation(
     org_name = org_row["name"] if org_row else "your organization"
     link = compose_invite_link(raw)
     try:
-        # WR-01 (D-v2.5-01): send_invite is a BLOCKING HTTP call on the resend path — never
-        # run it directly on the event loop. run_in_threadpool keeps the async handler free.
-        await run_in_threadpool(get_email_provider().send_invite, email, link, org_name)
+        # WR-01 (D-v2.5-01): send_invite is BLOCKING (HTTP or SMTP) — never run it directly on
+        # the event loop. run_in_threadpool keeps the async handler free.
+        outcome = await run_in_threadpool(send_invite, email, link, org_name)
     except Exception as exc:  # link-first: delivery never fails the invite
-        logger.error("invite email delivery failed for %s: %s", email, exc)
+        logger.warning(
+            "invite email raised for invitation %s (%s)", inv_row["id"], type(exc).__name__
+        )
+        outcome = SendOutcome("failed", reason="The email could not be sent.")
+    email_delivery = await _record_invite_delivery(request, current_user, inv_row["id"], outcome)
 
     await write_audit_entry(
         user_id=current_user["id"],
@@ -436,6 +473,9 @@ async def send_org_invitation(
                 inv_row["expires_at"].isoformat() if inv_row["expires_at"] else None
             ),
         },
+        "email_delivery": email_delivery,
+        # 300-REVIEW IN-01: a "sent" email outside production went to the Settings test address.
+        "email_to_test_address": email_delivery == "sent" and outcome.redirected,
     }
 
 
@@ -454,7 +494,7 @@ async def list_org_invitations(
     """
     active_org = deps._to_uuid(request.state.active_org)
     cols = (
-        "SELECT id, email, role, status, expires_at, invited_by, created_at "
+        "SELECT id, email, role, status, expires_at, invited_by, created_at, email_delivery "
         "FROM public.org_invitations WHERE org_id = $1"
     )
     async with get_user_pg_connection(request, current_user) as conn:
@@ -476,6 +516,7 @@ async def list_org_invitations(
                 "expires_at": r["expires_at"].isoformat() if r["expires_at"] else None,
                 "invited_by": str(r["invited_by"]) if r["invited_by"] else None,
                 "created_at": r["created_at"].isoformat() if r["created_at"] else None,
+                "email_delivery": r.get("email_delivery"),
             }
             for r in rows
         ]
@@ -527,11 +568,15 @@ async def resend_org_invitation(
     org_name = org_row["name"] if org_row else "your organization"
     link = compose_invite_link(raw)
     try:
-        # WR-01 (D-v2.5-01): blocking HTTP on the resend path — wrap so the async handler
-        # never stalls the event loop while Resend responds.
-        await run_in_threadpool(get_email_provider().send_invite, row["email"], link, org_name)
+        # WR-01 (D-v2.5-01): send_invite blocks (HTTP or SMTP) — wrap so the async handler
+        # never stalls the event loop while the mail provider responds.
+        outcome = await run_in_threadpool(send_invite, row["email"], link, org_name)
     except Exception as exc:  # link-first: delivery never fails the resend
-        logger.error("invite email re-delivery failed for %s: %s", row["email"], exc)
+        logger.warning(
+            "invite email raised for invitation %s (%s)", row["id"], type(exc).__name__
+        )
+        outcome = SendOutcome("failed", reason="The email could not be sent.")
+    email_delivery = await _record_invite_delivery(request, current_user, row["id"], outcome)
 
     await write_audit_entry(
         user_id=current_user["id"],
@@ -549,6 +594,8 @@ async def resend_org_invitation(
     return {
         "link": link,
         "invitation": {"id": str(row["id"]), "email": row["email"], "role": row["role"]},
+        "email_delivery": email_delivery,
+        "email_to_test_address": email_delivery == "sent" and outcome.redirected,
     }
 
 

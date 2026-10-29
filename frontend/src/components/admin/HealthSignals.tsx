@@ -23,6 +23,10 @@
 //                                 a deliberately-disabled sandbox is NEVER red)
 //   dependencies absent / null  → neutral "—" placeholder (older backend / loading)
 //
+// Phase 300 (D-12 / UI-SPEC S5) — a FOURTH dependency tile, "Email", from the additive
+// `dependencies.email` (the app mailer's mode + the newest outbox outcome). Its words
+// live in `emailView` below; only "Last send failed" is red.
+//
 // PURE PRESENTATIONAL LEAF: props in, DOM out. The shell (Plan 06) owns the fetch
 // and the `showTechnical` toggle state and passes both down. A null `signals`
 // (loading / not-yet-fetched) renders a calm dimmed placeholder — never a crash.
@@ -92,14 +96,85 @@ type DepStatus = "up" | "slow" | "down" | "off" | "unknown"
 
 // Plain labels + the raw `dependencies.<key>` field revealed under ⌥ Technical.
 const DEP_ORDER: ReadonlyArray<{
-  key: "redis" | "supabase" | "sandbox"
+  key: "redis" | "supabase" | "sandbox" | "email"
   label: string
   sub: string
 }> = [
   { key: "redis", label: "Redis", sub: "in-memory run buffer" },
   { key: "supabase", label: "Database", sub: "Postgres, storage & auth" },
   { key: "sandbox", label: "Code sandbox", sub: "Docker code execution" },
+  { key: "email", label: "Email", sub: "email delivery" },
 ]
+
+// ── Phase 300 (D-12 / UI-SPEC S5) — the app mailer, as the operator sees it ───
+// Additive `signals.dependencies.email` (health_probe.probe_email). It is wider than
+// the three probes above (mode / provider / last outcome), so it is typed HERE and
+// read off the payload — this leaf stays the one home of every tile word. Only a
+// real failure (or, 300-REVIEW IN-04, a transport that cannot send: "Can't send") is red:
+// Off, Held back, Test mode and Ready are neutral, and skipped
+// or suppressed sends never reach this tile as failures (the probe does not read them).
+interface EmailProbe {
+  state: "up" | "down" | "off"
+  mode?: "off" | "held_back" | "test" | "live"
+  provider?: "none" | "resend" | "smtp"
+  last_sent_at?: string | null
+  last_failure_at?: string | null
+  last_failure_reason?: string | null
+  latency_ms?: null
+  /** 300-REVIEW IN-04: the mailer's sentence for a transport that cannot send on config alone
+   *  (no sender address, key or host). Absent on an older backend. */
+  config_problem?: string | null
+}
+
+interface EmailView {
+  dot: string
+  value: string
+  sub: string
+}
+
+const EMAIL_PROVIDER_WORD: Record<string, string> = {
+  resend: "Resend",
+  smtp: "your mail server",
+}
+
+/** The server's timestamp, absolute (never a fabricated "just now"). */
+function when(iso: string): string {
+  return new Date(iso).toLocaleString()
+}
+
+function emailView(probe: EmailProbe | null | undefined, loading: boolean): EmailView {
+  if (loading || !probe) {
+    return { dot: "bg-muted-foreground/25", value: "—", sub: "email delivery" }
+  }
+  const mode = probe.mode ?? (probe.state === "off" ? "off" : "live")
+  if (mode === "off" || probe.provider === "none") {
+    return { dot: "bg-muted-foreground/40", value: "Off", sub: "Not set up. Invitation links are copied by hand" }
+  }
+  if (mode === "held_back") {
+    return {
+      dot: "bg-muted-foreground/40",
+      value: "Held back",
+      sub: "Not production and no test address, so emails are only logged",
+    }
+  }
+  const provider = EMAIL_PROVIDER_WORD[probe.provider ?? ""] ?? "your mail server"
+  if (probe.config_problem) {
+    // IN-04: named before the first send, never "Ready".
+    return { dot: "bg-destructive", value: "Can't send", sub: `via ${provider}: ${probe.config_problem}` }
+  }
+  if (probe.state === "down") {
+    const at = probe.last_failure_at ? `, ${when(probe.last_failure_at)}` : ""
+    const reason = probe.last_failure_reason ?? "the email could not be sent."
+    return { dot: "bg-destructive", value: "Last send failed", sub: `via ${provider}${at}: ${reason}` }
+  }
+  if (mode === "test") {
+    return { dot: "bg-muted-foreground/40", value: "Test mode", sub: "Every email goes to the test address" }
+  }
+  if (probe.last_sent_at) {
+    return { dot: "bg-success", value: "Sending", sub: `via ${provider}, last sent ${when(probe.last_sent_at)}` }
+  }
+  return { dot: "bg-muted-foreground/25", value: "Ready", sub: `via ${provider}, nothing sent yet` }
+}
 
 /** Map a probe (or its absence) to a display status. `off` is honored FIRST so a
  *  deliberately-disabled sandbox can never fall through to a red "down" (Pitfall 6). */
@@ -238,15 +313,39 @@ export function HealthSignals({ signals, showTechnical }: HealthSignalsProps) {
         ))}
       </div>
 
-      {/* Phase 147 (ADMIN-02 / 064-B) — dependency-health dots (up/slow/down/off). */}
+      {/* Phase 147 (ADMIN-02 / 064-B) — dependency-health dots (up/slow/down/off).
+          300 (UI-D13): four columns at lg, the backpressure row's breakpoints. */}
       <div
         className={cn(
-          "grid grid-cols-1 gap-2.5 sm:grid-cols-3",
+          "grid grid-cols-1 gap-2.5 sm:grid-cols-2 lg:grid-cols-4",
           loading && "opacity-40",
         )}
         aria-busy={loading}
       >
         {DEP_ORDER.map((d) => {
+          if (d.key === "email") {
+            const email = (deps as { email?: EmailProbe } | undefined)?.email ?? null
+            const view = emailView(email, loading)
+            return (
+              <div
+                key={d.key}
+                data-testid="dep-email"
+                className="rounded-[10px] border border-border bg-card px-4 py-4"
+              >
+                <div className="mb-2 flex items-center gap-2 text-xs text-muted-foreground">
+                  <span aria-hidden="true" className={cn("h-1.5 w-1.5 flex-none rounded-full", view.dot)} />
+                  {d.label}
+                </div>
+                <div className="text-sm font-semibold text-foreground">{view.value}</div>
+                <div className="mt-1 break-words text-[11px] text-muted-foreground">{view.sub}</div>
+                {showTechnical && (
+                  <div className="mt-2 font-mono text-[11px] text-muted-foreground">
+                    dependencies.email · {email?.provider ?? "—"}
+                  </div>
+                )}
+              </div>
+            )
+          }
           const probe = deps?.[d.key] ?? null
           const status = loading ? "unknown" : depStatus(probe)
           return (

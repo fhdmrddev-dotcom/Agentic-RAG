@@ -32,6 +32,9 @@ export interface ExpertBundle {
   visibility: string
   is_system: boolean
   is_enabled: boolean
+  /** Phase 299-04: the org the bundle belongs to (the server's `SELECT *` always carried it);
+   *  null for a system template. Names the org in the link surface's who-can-open line. */
+  org_id?: string | null
   icon?: string
   category?: string
   when_to_use?: string

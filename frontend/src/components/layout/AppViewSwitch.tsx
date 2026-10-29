@@ -24,6 +24,10 @@ import { OrgAdminShell } from "@/components/org/OrgAdminShell"
 import { WorkflowRunPage, COPY_LOADING } from "@/pages/WorkflowRunPage"
 // Phase 297-02 (D-14 / D-19 / D-35): the not-found and holding states, as arms of this switch.
 import { AddressNotFound, AddressHolding, ADMIN_HOLD_COPY } from "./AddressNotFound"
+// Phase 299-03 (D-12..D-15, D-28): the one gate in front of every entity address, and its card.
+import { LinkGate, HOLDING_SENTENCE } from "./LinkGate"
+import { CantBeOpened } from "./CantBeOpened"
+import { SwitchOrgPrompt } from "./SwitchOrgPrompt"
 // Phase 257 (METER-07): Operator Spend & Metering cockpit
 import { AdminSpendPage } from "@/pages/admin/AdminSpendPage"
 // Phase 262 plan 05 (PACK-11 / PACK-13 / D-262-03): the Expert catalog, and the ordered
@@ -37,6 +41,8 @@ import type { useThreads } from "@/hooks/useThreads"
 import type { useFolders } from "@/hooks/useFolders"
 import type { ActiveView } from "@/App"
 import type { OperatorIdentity, PublishedWorkflow } from "@/lib/api"
+import type { Thread } from "@/types"
+import type { EntityLink } from "@/hooks/useAppNavigation"
 import { Menu } from "lucide-react"
 // Phase 262 plan 05 (PACK-13 / D-262-08): the SHIPPED PATCH the composer's invite door
 // already issues — the same mechanism, reached one register lower so a surface outside the
@@ -131,6 +137,16 @@ export interface AppViewSwitchProps {
   loadThreads: Threads["loadThreads"]
   /** Delete a thread. */
   deleteThread: Threads["deleteThread"]
+  /** Phase 299-02 (D-02): select a thread AND put its address on screen (one entry) —
+   *  ChatLayout's `useThreadAddress().openThread`. Optional: absent, the pre-299 pair runs. */
+  openThread?: (thread: Thread) => void
+  /** Phase 299-02 (Pitfall 5): a thread address is on screen and its thread is not selected yet. */
+  threadHolding?: boolean
+  /** Phase 299-02 (D-03 / D-04): App's entity navigators — the linked workflow / Expert id. */
+  entityLink?: EntityLink
+  /** Phase 299-03: true until the active org's chat list has answered (`useThreads().pending`) —
+   *  the gate holds a thread address on it rather than asking the server. */
+  threadsPending?: boolean
 }
 
 /**
@@ -201,9 +217,25 @@ export function AppViewSwitch({
   featuresLoading = false,
   isOperator = false,
   operatorLoading = false,
+  openThread,
+  threadHolding = false,
+  entityLink,
+  threadsPending = false,
 }: AppViewSwitchProps) {
+  // Phase 299-03 (D-28): the gate is a component with a render-prop child, so this switch still
+  // owns no hooks. It renders the child's result directly (no wrapper element). A thread address
+  // the gate refuses or prompts for renders on the NON-chat side, so the main region behind the
+  // card is empty (no composer, no welcome) while the history column stays live.
   return (
-      activeView === "chat" && !addressNotFound ? (
+    <LinkGate
+      entityLink={entityLink}
+      threads={threads}
+      threadsPending={threadsPending}
+      loadThreads={loadThreads}
+      selectThread={selectThread}
+    >
+      {(gate) => (
+      activeView === "chat" && !addressNotFound && gate.status !== "cant" && gate.status !== "prompt" ? (
         // Phase 087-06: App-level chat|panel CSS grid (panel-shell.md D1). The
         // panel column resolves against the REAL row width (not the panel's own
         // indefinite flex width), so 1fr + clamp(...) always sums to the row —
@@ -228,6 +260,18 @@ export function AppViewSwitch({
           }}
         >
           <main className="min-w-0 min-h-0 overflow-hidden">
+            {/* Phase 299-03 (UI-D9 / UI-D10): the gate's notice bar (the Stay notice or the
+                after-switch line) sits at the top of the chat region. The column below is ALWAYS
+                present — never added only while a notice shows — so ChatArea is never remounted,
+                and the min-h-0 chain (`flex h-full min-h-0` → `min-h-0 flex-1`) still bounds it. */}
+            <div className="flex h-full min-h-0 flex-col">
+            {gate.notice}
+            <div className="min-h-0 flex-1">
+            {/* Phase 299-02 (Pitfall 5): a thread address whose thread is not selected yet holds
+                here, never as the empty welcome composer (ChatArea with no thread). */}
+            {threadHolding ? (
+              <AddressHolding sentence={HOLDING_SENTENCE.thread} />
+            ) : (
             <ThreadNavigationProvider value={threadNavigation}>
             <ChatArea
               thread={selectedThread}
@@ -257,6 +301,9 @@ export function AppViewSwitch({
               onReopenHistory={historyCollapsed ? () => setHistoryCollapsedPersisted(false) : undefined}
             />
             </ThreadNavigationProvider>
+            )}
+            </div>
+            </div>
           </main>
           <WorkspacePanel
             selectedThread={selectedThread}
@@ -285,6 +332,9 @@ export function AppViewSwitch({
             <Menu className="h-5 w-5" />
           </button>
         </div>
+        {/* Phase 299-03 (UI-D9 / UI-D10): the gate's notice bar, above the region (a flex column,
+            so the region below shrinks to fit rather than being clipped). */}
+        {gate.notice}
         <main className="flex-1 overflow-hidden">
           {/* ⚠ NOTHING GOES BETWEEN THE BRANCH BELOW AND ITS MOUNT. `renameFence.test.ts`
               asserts that key link inside a 120-character window, so a comment in the gap
@@ -294,6 +344,23 @@ export function AppViewSwitch({
               is set only by App's `handleOpenLibraryHealth`. */}
           {addressNotFound ? (
             <AddressNotFound onGoHome={() => onNavigate("chat")} />
+          ) : gate.status === "cant" ? (
+            // Phase 299-03 (D-12 / D-13 / D-15): the one card over the GENERIC area of the kind —
+            // the library for a workflow or a run (never the run page), the catalog for an Expert,
+            // nothing for a chat — with no linked id. The exit is a push, so Back returns here.
+            <CantBeOpened kind={gate.kind} route={gate.route} onGo={() => entityLink?.openRoute(gate.exit)}>
+              {gate.kind === "workflow" || gate.kind === "run" ? (
+                <WorkflowsPage folders={folders} onLaunch={doRun} />
+              ) : gate.kind === "expert" ? (
+                <ExpertCatalogPage folders={folders} onStartChat={() => {}} />
+              ) : undefined}
+            </CantBeOpened>
+          ) : gate.status === "holding" ? (
+            <AddressHolding sentence={gate.sentence} />
+          ) : gate.status === "prompt" ? (
+            // Phase 299-03 (D-16 / D-39): "This is in <org> — switch?" replaces the main region.
+            // Nothing switches without a click; the handlers are the gate's.
+            <SwitchOrgPrompt {...gate.prompt} />
           ) : activeView === "documents" ? (
             <LibraryPage onNavigate={onNavigate} initialTab={libraryTab} attentionConditions={attentionConditions} onAskInChat={handleAskInChat} />
           ) : activeView === "skills" ? (
@@ -344,6 +411,8 @@ export function AppViewSwitch({
                 localStorage.setItem(SETTINGS_TAB_STORAGE_KEY, "7")
                 onNavigate("settings")
               }}
+              // Phase 299-02 (D-03): the address's workflow (an owned draft or a visible card).
+              linkedDefinitionId={entityLink?.target?.kind === "workflow" ? entityLink.target.id : null}
             />
           ) : activeView === "skill-studio" ? (
             // Phase 137-06 (PANEL-01 / D-01 / sketch 057-A): the unified Skill Studio
@@ -475,6 +544,10 @@ export function AppViewSwitch({
             // person clicks that thread again. `startScopedChat`'s docblock owns that rule.
             <ExpertCatalogPage
               folders={folders}
+              // Phase 299-02 (D-04): the address's Expert opens in its detail.
+              openBundleId={entityLink?.target?.kind === "expert" ? entityLink.target.id : null}
+              // 299-REVIEW WR-03: a refused linked Expert's card exits to the catalog's own address.
+              onLeaveLink={() => entityLink?.openRoute({ view: "experts" })}
               // 267 (D-267-08): a missing required connection's Connect control uses the SAME
               // shipped door the composer uses above — no per-service deep link.
               onOpenConnections={() => onNavigate("connections")}
@@ -498,8 +571,10 @@ export function AppViewSwitch({
                       createThread: newThread,
                       setExpert: setThreadActiveExpert,
                       refreshThreads: loadThreads,
-                      selectThread,
-                      navigate: () => onNavigate("chat"),
+                      // Phase 299-02 (D-02): with `openThread` the selection writes the thread's
+                      // address (one entry) and the navigate step has nothing left to do.
+                      selectThread: openThread ?? selectThread,
+                      navigate: openThread ? () => {} : () => onNavigate("chat"),
                       // 262-UAT 3.6: a refused scoping PATCH no longer leaves an empty thread.
                       discardThread: deleteThread,
                     },
@@ -519,5 +594,7 @@ export function AppViewSwitch({
         </main>
         </div>
       )
+      )}
+    </LinkGate>
   )
 }

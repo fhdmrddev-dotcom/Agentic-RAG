@@ -324,15 +324,40 @@
         "summary": "Create Draft",
         "description": "Persist a NEW draft (REQ-1 create) — returns ``{id, version}``.\n\nServer-forced invariants (T-103-01-03): ``status='draft'`` is forced on the body\nserver-side (never trusted from the client); the DB fn binds ``is_system_global=false`` +\n``created_by=user_id`` literally/by the trusted owner. A hallucinated/extra key in\nthe body is already a 422 (``WorkflowDefinition`` is ``extra='forbid'``).",
         "operationId": "create_draft_workflows_post",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "from_definition_id",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "When this draft copies one of your workflows: that workflow's id. A copy of a workflow in another of your organizations is refused.",
+              "title": "From Definition Id"
+            },
+            "description": "When this draft copies one of your workflows: that workflow's id. A copy of a workflow in another of your organizations is refused."
+          }
+        ],
         "requestBody": {
+          "required": true,
           "content": {
             "application/json": {
               "schema": {
                 "$ref": "#/components/schemas/WorkflowDefinition"
               }
             }
-          },
-          "required": true
+          }
         },
         "responses": {
           "201": {
@@ -355,12 +380,7 @@
               }
             }
           }
-        },
-        "security": [
-          {
-            "HTTPBearer": []
-          }
-        ]
+        }
       }
     },
     "/workflows/drafts": {

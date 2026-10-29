@@ -81,6 +81,9 @@ import {
   Wrench,
 } from "lucide-react"
 import { ExpertIcon } from "@/components/experts/expertIcon"
+import { ShareLinkMenu } from "@/components/share/ShareLinkMenu"
+import { audienceOf } from "@/lib/linkAudience"
+import { SavesInOrg } from "@/components/org/SavesInOrg"
 import {
   Dialog,
   DialogContent,
@@ -269,6 +272,9 @@ export function ExpertDetailModal({
                 {expert.is_system ? "System Template" : "Org Custom"}
               </p>
             </div>
+            {/* 299-04 (D-20 / UI-SPEC S4): ONE mount — the Expert's own address, before the close
+                control (inside the row's pr-8); the line follows the bundle's own rule (D-33). */}
+            <ShareLinkMenu route={{ view: "experts", bundleId: expert.id }} kind="expert" audience={audienceOf("expert", { is_system: expert.is_system, is_enabled: expert.is_enabled, visibility: expert.visibility })} orgId={expert.org_id ?? null} className="ml-auto flex-none" />
           </div>
           <DialogDescription className="max-h-[20vh] overflow-y-auto text-left text-xs text-muted-foreground">
             {description || HONEST.noDescription}
@@ -524,6 +530,9 @@ export function ExpertDetailModal({
           ) : (
             <FooterLine>{view.line}</FooterLine>
           )}
+          {/* 299-04 (UI-D11 / D-18): ONE mount beside Start a chat — where the new chat will be saved
+              (2+ orgs only). Not on Install: an install creates no item from this page. */}
+          {(view.kind === "legacy" || view.kind === "chat") && <SavesInOrg className="ml-2 self-center" />}
         </div>
       </DialogContent>
     </Dialog>

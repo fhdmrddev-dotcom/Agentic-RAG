@@ -63,6 +63,7 @@ async def create_schedule(
     max_tokens_per_run: int,
     max_duration_seconds: int,
     inputs: dict[str, Any],
+    org_id: UUID | None = None,
 ) -> dict:
     """Insert one schedule and return it, with ``next_run_at`` ALREADY COMPUTED.
 
@@ -74,17 +75,25 @@ async def create_schedule(
     ``org_id`` is NOT bound: the ``autofill_org_id_by_owner('user_id')`` trigger resolves it
     from the owner, and the column is ``NOT NULL``, so a user with no org is REFUSED rather
     than silently written into the wrong tenant.
+
+    ⚠ AMENDED 2026-10-28 (Phase 299, D-18 / D-38) — the paragraph above is kept, and is now true
+    only when ``org_id`` is NOT passed. The trigger's owner read is ``LIMIT 1``, so for a person in
+    two orgs it picks one of them regardless of which workflow is being scheduled. When the route
+    knows the item's org (the definition's, or the active org for a global definition) it passes
+    ``org_id`` and the column is named and bound explicitly. Without it the SQL string is
+    byte-identical to before (sha256 pinned in ``test_299_write_org_guards.py``).
     """
     next_run_at = compute_next_run_at(
         cron_expression=cron_expression,
         interval_seconds=interval_seconds,
         timezone=timezone,
     )
+    org_col, org_val, org_args = (", org_id", ", $12", (org_id,)) if org_id is not None else ("", "", ())
     row = await pool.fetchrow(
         f"INSERT INTO workflow_schedules "
         f"(workflow_id, user_id, name, cron_expression, interval_seconds, timezone, "
-        f" is_active, max_tokens_per_run, max_duration_seconds, inputs, next_run_at) "
-        f"VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11) "
+        f" is_active, max_tokens_per_run, max_duration_seconds, inputs, next_run_at{org_col}) "
+        f"VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11{org_val}) "
         f"RETURNING {_SCHEDULE_COLUMNS}",
         workflow_id,
         user_id,
@@ -97,6 +106,7 @@ async def create_schedule(
         max_duration_seconds,
         inputs,  # plain dict — the pool's jsonb codec encodes it (see the module docblock)
         next_run_at,
+        *org_args,
     )
     return dict(row)
 

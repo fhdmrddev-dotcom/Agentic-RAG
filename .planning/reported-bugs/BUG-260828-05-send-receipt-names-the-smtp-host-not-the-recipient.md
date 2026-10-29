@@ -3,8 +3,8 @@ id: BUG-260828-05
 title: The send receipt names the SMTP host instead of the recipient
 surface: Agentic-RAG
 severity: medium
-status: open
-folded_into: null
+status: folded  # 2026-10-29: folded into Phase 300 at discuss-phase (300-CONTEXT.md)
+folded_into: "300"
 reported: 2026-08-28
 reported_by: operator, driving Phase 214's G-4 checkpoint
 affected_areas: [backend/app/services/harness/phase_types.py, run-surfaces]

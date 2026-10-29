@@ -142,6 +142,55 @@ export async function setModelDefault(model: string | null): Promise<ModelDefaul
   }
 }
 
+// ─────────────────────────────────────────────────────────────────────────────
+// Phase 300-05 (NOTE-04 / D-09) — the member's own "Email me when a run is waiting on me".
+//
+// ⛔ ITS OWN PUT. `setModelDefault` above PUTs /me/preferences, which reads a missing
+// `default_model` as "clear it"; a switch saved through it would wipe the member's default
+// chat model. `setNotificationEmailPreference` uses /me/preferences/notification-email, which
+// merges ONE key on the server. Both reads and the write are ungated and RLS-scoped.
+// ─────────────────────────────────────────────────────────────────────────────
+
+/** The switch's server view. `delayWords` is the operator's delay in the email's own words,
+ *  composed by the server (the client never formats seconds); null when an older server omits it. */
+export interface NotificationEmailPreference {
+  enabled: boolean
+  delayWords: string | null
+  emailConfigured: boolean
+}
+
+function notificationEmailFrom(body: Record<string, unknown>): NotificationEmailPreference {
+  return {
+    // Unset reads ON (D-09). An older backend that omits the key has no opt-out at all.
+    enabled: (body.notification_email_enabled as boolean | undefined) ?? true,
+    delayWords: (body.notification_email_delay_words as string | undefined) ?? null,
+    // An older backend says nothing about its provider; never claim "not set up" for it.
+    emailConfigured: (body.email_configured as boolean | undefined) ?? true,
+  }
+}
+
+/** Read the caller's own run-waiting email switch (`GET /me/preferences`). */
+export async function getNotificationEmailPreference(): Promise<NotificationEmailPreference> {
+  const headers = await getAuthHeaders()
+  const res = await fetch(`${API_BASE}/me/preferences`, { headers, cache: "no-store" })
+  if (!res.ok) throw new ApiError("Couldn't load this setting.", res.status)
+  return notificationEmailFrom((await res.json()) as Record<string, unknown>)
+}
+
+/** Turn the caller's own run-waiting email on or off; returns the server's view. */
+export async function setNotificationEmailPreference(
+  enabled: boolean,
+): Promise<NotificationEmailPreference> {
+  const headers = await getAuthHeaders()
+  const res = await fetch(`${API_BASE}/me/preferences/notification-email`, {
+    method: "PUT",
+    headers,
+    body: JSON.stringify({ enabled }),
+  })
+  if (!res.ok) throw new ApiError("Couldn't save this. Try again.", res.status)
+  return notificationEmailFrom((await res.json()) as Record<string, unknown>)
+}
+
 // Phase 111.1 EMBED-05 — re-embed lifecycle (Plan 05 backend). Counts are derived
 // live from document_chunks on every fetch (the source of truth — reconcile-on-fetch,
 // D-v2.5-03); `status` is a cosmetic hint reconciled against the counts (counts win).

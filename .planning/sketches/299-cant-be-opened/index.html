@@ -1,0 +1,152 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Sketch 299-1 — Can't Be Opened</title>
+<link rel="stylesheet" href="../themes/default.css">
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Manrope:wght@600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+<style>
+*{box-sizing:border-box}
+body{margin:0;background:var(--color-bg);color:var(--color-text);font-family:var(--font-sans);font-size:var(--text-base)}
+#vnav,#states{display:flex;align-items:center;gap:8px;padding:10px 16px;border-bottom:1px solid var(--color-border);flex-wrap:wrap}
+.lbl{font-family:var(--font-mono);font-size:var(--text-xs);color:var(--color-text-dim);margin-right:6px}
+.vtab,.stab{background:transparent;border:1px solid var(--color-border);color:var(--color-text-muted);font-size:var(--text-xs);padding:6px 12px;border-radius:999px;cursor:pointer;font-family:inherit;transition:all .15s ease}
+.vtab:hover,.stab:hover{border-color:var(--color-primary)}
+.vtab.active{background:var(--color-primary-dim);border-color:var(--color-primary);color:var(--color-primary)}
+.stab.active{background:var(--color-accent);color:var(--color-text)}
+.sep{width:1px;height:20px;background:var(--color-border);margin:0 6px}
+#note{padding:8px 16px;font-size:var(--text-sm);color:var(--color-text-muted);border-bottom:1px solid var(--color-border-soft);line-height:1.5}
+#note b{color:var(--color-text)}
+
+/* proof strip: what the browser and the server see */
+#proof{display:flex;gap:18px;flex-wrap:wrap;padding:8px 16px;font-family:var(--font-mono);font-size:11px;color:var(--color-text-dim);border-bottom:1px solid var(--color-border-soft);background:var(--color-bg-elev1)}
+#proof b{color:var(--color-text-muted);font-weight:500}
+#proof .same{color:var(--color-success)}
+
+/* app frame: 58px rail · optional history column · main */
+.frame{display:grid;grid-template-columns:58px minmax(0,1fr);height:calc(100vh - 168px);min-height:520px}
+.frame.withhist{grid-template-columns:58px 260px minmax(0,1fr)}
+.rail{background:var(--color-bg-elev1);border-right:1px solid var(--color-border);display:flex;flex-direction:column;align-items:center;gap:6px;padding:12px 0}
+.rail .ic{width:36px;height:36px;border-radius:10px;display:grid;place-items:center;color:var(--color-text-dim);font-size:16px}
+.rail .ic.on{background:var(--color-primary-dim);color:var(--color-primary)}
+.rail .sp{flex:1}
+.rail .me{width:30px;height:30px;border-radius:50%;background:hsl(239 60% 50% / .35);display:grid;place-items:center;font-size:12px;font-weight:600}
+.hist{border-right:1px solid var(--color-border);background:var(--color-bg-elev1);padding:12px 10px;overflow:hidden}
+.hist .h{font-size:var(--text-sm);font-weight:600;margin:2px 6px 10px}
+.hist .search{height:30px;border-radius:8px;border:1px solid var(--color-border);margin:0 4px 12px;font-size:var(--text-xs);color:var(--color-text-dim);display:flex;align-items:center;padding:0 10px}
+.hist .grp{font-size:10px;font-weight:700;letter-spacing:.09em;text-transform:uppercase;color:var(--color-text-dim);margin:12px 8px 6px}
+.hist .row{font-size:var(--text-sm);color:var(--color-text-muted);padding:7px 8px;border-radius:8px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.lib{padding:22px 28px}
+.lib h2{font-family:var(--font-headline);font-size:var(--text-lg);margin:0 0 4px}
+.lib .sub{font-size:var(--text-sm);color:var(--color-text-dim);margin-bottom:16px}
+.lib .cards{display:grid;grid-template-columns:repeat(auto-fill,minmax(200px,1fr));gap:12px;opacity:.38}
+.lib .c{height:96px;border:1px solid var(--color-border);border-radius:var(--radius-lg);background:var(--color-surface)}
+main{position:relative;overflow:auto}
+
+/* the page itself */
+.nf{display:flex;flex-direction:column;align-items:center;justify-content:center;height:100%;padding:32px;gap:12px;text-align:center}
+.nf h1{font-size:var(--text-base);font-weight:500;margin:0}
+.nf p{max-width:380px;font-size:var(--text-sm);color:var(--color-text-muted);margin:0;line-height:1.55}
+.btn{background:transparent;border:1px solid var(--color-border);color:var(--color-text);border-radius:8px;padding:7px 14px;font-size:var(--text-sm);cursor:pointer;font-family:inherit}
+.btn:hover{border-color:var(--color-primary)}
+.btn.primary{background:var(--color-primary-strong);border-color:transparent;color:#fff}
+.mark{width:40px;height:40px;border-radius:12px;display:grid;place-items:center;background:var(--color-bg-elev1);border:1px solid var(--color-border);color:var(--color-text-dim);font-size:18px}
+
+/* B: in-place card over the area it belongs to */
+.inplace{position:absolute;inset:0;display:grid;place-items:center;background:hsl(222 47% 6% / .55)}
+.inplace .card{width:min(420px,92%);border:1px solid var(--color-border);border-radius:var(--radius-lg);background:var(--color-surface);padding:22px 24px;text-align:left;box-shadow:var(--shadow-lg)}
+.inplace .card h1{font-size:var(--text-base);font-weight:600;margin:0 0 6px}
+.inplace .card p{font-size:var(--text-sm);color:var(--color-text-muted);margin:0 0 16px;line-height:1.55}
+.inplace .addr{font-family:var(--font-mono);font-size:11px;color:var(--color-text-dim);background:var(--color-bg-elev1);border-radius:6px;padding:6px 8px;margin-bottom:14px;word-break:break-all}
+
+/* C: full page with next steps */
+.full{max-width:520px;margin:9vh auto 0;padding:0 16px}
+.full h1{font-family:var(--font-headline);font-size:var(--text-xl);margin:16px 0 8px;font-weight:600}
+.full .lead{font-size:var(--text-sm);color:var(--color-text-muted);line-height:1.6;margin:0 0 20px}
+.steps{border:1px solid var(--color-border);border-radius:var(--radius-lg);background:var(--color-surface)}
+.steps .s{display:flex;gap:12px;padding:14px 16px;border-bottom:1px solid var(--color-border-soft);font-size:var(--text-sm)}
+.steps .s:last-child{border-bottom:0}
+.steps .n{font-family:var(--font-mono);font-size:11px;color:var(--color-primary);width:16px;padding-top:2px}
+.steps .t b{display:block;font-weight:500;margin-bottom:2px}
+.steps .t span{color:var(--color-text-muted);font-size:var(--text-xs);line-height:1.5}
+.link{color:var(--color-primary);background:none;border:0;padding:0;font:inherit;cursor:pointer}
+.full .acts{display:flex;gap:8px;margin-top:18px}
+.who{margin-top:22px;font-size:var(--text-xs);color:var(--color-text-dim)}
+
+.flag{position:fixed;right:14px;bottom:14px;max-width:320px;font-size:var(--text-xs);line-height:1.5;color:var(--color-text-muted);background:var(--color-bg-elev1);border:1px solid var(--color-border);border-left:3px solid var(--color-accent-violet);border-radius:8px;padding:10px 12px}
+.flag b{color:var(--color-text)}
+@media (max-width:760px){.frame.withhist{grid-template-columns:58px minmax(0,1fr)}.hist{display:none}}
+</style>
+</head>
+<body>
+<div id="vnav"><span class="lbl">VARIANT</span>
+  <button class="vtab active" data-v="A">A · 297's page, new words</button>
+  <button class="vtab" data-v="B">★ B · In place, over its own area</button>
+  <button class="vtab" data-v="C">C · Full page with what to do next</button>
+</div>
+<div id="states"><span class="lbl">LINK TO</span>
+  <button class="stab active" data-k="chat">a chat</button>
+  <button class="stab" data-k="workflow">a workflow</button>
+  <button class="stab" data-k="run">a workflow run</button>
+  <button class="stab" data-k="expert">an Expert</button>
+  <button class="stab" data-k="typo">a mistyped address (297)</button>
+  <span class="sep"></span><span class="lbl">WHY (server-side only)</span>
+  <button class="stab active" data-r="missing">deleted / never existed</button>
+  <button class="stab" data-r="forbidden">exists, you may not open it</button>
+</div>
+<div id="note"></div>
+<div id="proof"></div>
+<div id="stage"></div>
+<div class="flag"><b>Fixed in every variant (LINK-04):</b> missing and not-allowed render the <b>same words, same status (404), same timing</b>. Flip "WHY" — nothing on screen changes. The page never names the item, its org or its owner, and never falls back to chat.</div>
+
+<script>
+const KINDS={
+  chat:{noun:"chat",path:"/app/chat/7f3c2a10-4b8e-4d21-9a55-0c1e6b2f9d44",home:"Go to Chat",area:"chat"},
+  workflow:{noun:"workflow",path:"/app/workflows/2b9e4f71-0d6c-4a38-b1e2-5f7a9c3d8e10",home:"Go to Workflows",area:"workflows"},
+  run:{noun:"workflow run",path:"/app/runs/c41d8e2a-6f39-4b07-8a1c-9e2d5b7f0a63",home:"Go to Workflows",area:"workflows"},
+  expert:{noun:"Expert",path:"/app/experts/9a0e7c35-2d14-4f68-b9a3-1c6e8d4f2b57",home:"Go to Experts",area:"experts"},
+  typo:{noun:null,path:"/app/workflws/2b9e",home:"Go to Chat",area:"chat"}
+};
+let V="A",K="chat",R="missing";
+const NOTES={
+  A:"<b>A — reuse 297's centred page.</b> The one component <code>AddressNotFound</code> already ships; it gains the item noun. A mistyped address and a forbidden link land on the same page, so there is one page and one set of words in the product.",
+  B:"<b>B — in place.</b> The page opens inside the area the link points at (chat history, the workflow library, the Experts catalog), dimmed behind one card. You keep your bearings; the address is shown so you can tell the sender which link failed.",
+  C:"<b>C — full page with next steps.</b> A worded page that explains the two honest possibilities together (deleted, or not shared with you) and gives three concrete moves. Signed-in identity is shown so a wrong-account visit is easy to spot."
+};
+function heading(){const k=KINDS[K];return k.noun?`This ${k.noun} can't be opened`:"This address doesn't open anything"}
+function body(){const k=KINDS[K];return k.noun?"It may have been deleted, or it isn't shared with you. If someone sent you this link, ask them to check it.":"It may be mistyped or out of date."}
+function rail(){const a=KINDS[K].area;const ic=(n,g)=>`<div class="ic ${a===n?"on":""}">${g}</div>`;
+  return `<nav class="rail">${ic("new","＋")}${ic("chat","💬")}<div class="ic">📚</div>${ic("workflows","⛓")}${ic("experts","✦")}<div class="ic">⚙</div><div class="sp"></div><div class="me">SN</div></nav>`}
+function hist(){return `<aside class="hist"><div class="h">Chats</div><div class="search">Search chats…</div><div class="grp">Today</div><div class="row">Q3 vendor contract summary</div><div class="row">Renewal clause comparison</div><div class="grp">Yesterday</div><div class="row">Onboarding checklist draft</div><div class="row">Board pack — risk section</div><div class="grp">Previous 7 days</div><div class="row">Supplier due-diligence notes</div></aside>`}
+function areaBehind(){const a=KINDS[K].area;
+  if(a==="chat")return `<div class="lib"><h2>&nbsp;</h2></div>`;
+  const t=a==="workflows"?["Workflows","Your workflows and the ones shared in Northwind"]:["Experts","Specialists you can bring into a chat"];
+  return `<div class="lib"><h2>${t[0]}</h2><div class="sub">${t[1]}</div><div class="cards">${"<div class=c></div>".repeat(6)}</div></div>`}
+function render(){
+  const k=KINDS[K];
+  document.getElementById("note").innerHTML=NOTES[V];
+  document.getElementById("proof").innerHTML=`<span><b>address</b> ${k.path}</span><span><b>server answer</b> 404 · {"detail":"not_found"}</span><span><b>render</b> identical</span><span class="same">● ${R==="missing"?"deleted":"not allowed"} → same page</span>`;
+  let html="";
+  if(V==="A"){
+    html=`<div class="frame">${rail()}<main><div class="nf"><div class="mark">∅</div><h1>${heading()}</h1><p>${body()}</p><button class="btn">${k.home}</button></div></main></div>`;
+  }else if(V==="B"){
+    const withHist=k.area==="chat";
+    html=`<div class="frame ${withHist?"withhist":""}">${rail()}${withHist?hist():""}<main>${areaBehind()}<div class="inplace"><div class="card"><h1>${heading()}</h1><p>${body()}</p><div class="addr">${location.host||"app.syrel.ai"}${k.path}</div><div style="display:flex;gap:8px"><button class="btn primary">${k.home}</button><button class="btn" onclick="this.textContent='Address copied'">Copy address</button></div></div></div></main></div>`;
+  }else{
+    const steps=k.noun?`
+      <div class="s"><span class="n">1</span><div class="t"><b>Ask the person who sent it</b><span>They can check the link, or share the ${k.noun} with you if it lives somewhere you can't see.</span></div></div>
+      <div class="s"><span class="n">2</span><div class="t"><b>Check which account you're using</b><span>You're signed in as <b style="display:inline">sam@northwind.co</b>. <button class="link">Sign in as someone else</button></span></div></div>
+      <div class="s"><span class="n">3</span><div class="t"><b>Look for it yourself</b><span>Search your ${k.area==="chat"?"chats":k.area} — it may have moved or been renamed.</span></div></div>`
+      :`<div class="s"><span class="n">1</span><div class="t"><b>Check the address</b><span>A letter may be missing or the link was cut short.</span></div></div>`;
+    html=`<div class="frame">${rail()}<main><div class="full"><div class="mark">∅</div><h1>${heading()}</h1><p class="lead">${body()}</p><div class="steps">${steps}</div><div class="acts"><button class="btn primary">${k.home}</button></div><div class="who">Nothing about this link is shown until it opens for you.</div></div></main></div>`;
+  }
+  document.getElementById("stage").innerHTML=html;
+}
+document.querySelectorAll(".vtab").forEach(b=>b.onclick=()=>{V=b.dataset.v;document.querySelectorAll(".vtab").forEach(x=>x.classList.toggle("active",x===b));render()});
+document.querySelectorAll("[data-k]").forEach(b=>b.onclick=()=>{K=b.dataset.k;document.querySelectorAll("[data-k]").forEach(x=>x.classList.toggle("active",x===b));render()});
+document.querySelectorAll("[data-r]").forEach(b=>b.onclick=()=>{R=b.dataset.r;document.querySelectorAll("[data-r]").forEach(x=>x.classList.toggle("active",x===b));render()});
+render();
+</script>
+</body>
+</html>
