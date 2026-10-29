@@ -500,9 +500,9 @@ node scripts/check-hot-file-ledger.cjs <phase-dir>   # 0 clear · 1 missing rows
 | `scripts/build-public-openapi.cjs` | 11 / 5 / 472 (was `7 / 3 / 468`) | 298-01: org-items tag (Account & org) + /org-items/ FLAGGED (2 lines) |
 | `scripts/check-seeds-register.cjs` | 7 / 3 / 1132 | ⚠ FIRES, absent here — row added 296-05 · `\d{3,}` ids · ⛔ |
 | `backend/app/services/eval_runner_service.py` | 14 / 9 / 1056 (was `13 / 8 / 1040`) | 296-06: eval arm on a fixed EVAL_MAX_TOOL_ROUNDS (copy of settings) |
-| `backend/app/services/scheduler_service.py` | 15 / 9 / 372 (was `14 / 9 / 352`) | 300-01: blank-input block + waiting outcome (D-14, D-26) |
-| `backend/app/services/unattended_launch.py` | 7 / 3 / 379 (was `6 / 2 / 361`) | ⚠ now FIRES (300) · 300-01: records the owner's model + provider (D-33) |
-| `backend/app/services/run_model_resolution.py` | 4 / 3 / 344 (was `3 / 2 / 308`) | ⚠ now FIRES (300) · 300-01: resolve_owner_run_model (D-33) |
+| `backend/app/services/scheduler_service.py` | 16 / 9 / 375 (was `15 / 9 / 372`) | 300-REVIEW WR-01: outcome reads THIS run by id; failed/cancelled kept |
+| `backend/app/services/unattended_launch.py` | 8 / 3 / 383 (was `7 / 3 / 379`) | 300-REVIEW WR-01: on_finish(status, run_id) names the run it drove |
+| `backend/app/services/run_model_resolution.py` | 5 / 3 / 371 (was `4 / 3 / 344`) | 300-REVIEW IN-03: owner pair via the in-app chain (overlay + resolve) |
 | `backend/app/api/schedules.py` | 6 / 6 / 341 (was `5 / 5 / 303`) | 300-01: create/patch/resume 422 by label (D-14) |
 | `backend/app/services/inbound_inputs.py` | 9 / 3 / 352 (was `8 / 2 / 312`) | ⚠ now FIRES (300) · 300-01: labels + sentence beside the one predicate |
 | `backend/app/api/inbound.py` | 10 / 3 / 719 (was `9 / 2 / 711`) | ⚠ now FIRES (298) · 298-02: one foreign_folder _refused (plain 422) · ⛔ |
@@ -529,12 +529,12 @@ node scripts/check-hot-file-ledger.cjs <phase-dir>   # 0 clear · 1 missing rows
 | `frontend/src/components/workflows/RunTranscript.tsx` | 7 / 3 / 652 | ⚠ **FIRES on a component with NO MOUNT in the product** |
 | `frontend/src/components/settings/ConnectionsTab.tsx` | 26 / 10 / 1634 (was `25 / 9 / 1635`) | 297-02: dead #chat hash write deleted (D-37) · item inert → SEED-392 |
 | `frontend/src/components/settings/ConnectionFormPanel.tsx` | 28 / 10 / 2477 | ⭐ NAMED SEAM TAKEN (239-08) · wider seam OWED · ⛔ |
-| `frontend/src/lib/api/org.ts` | 12 / 9 / 646 (was `11 / 8 / 629`) | 300-05: email_delivery on invite results + rows (D-11) |
-| `frontend/src/components/org/InviteMemberDialog.tsx` | 4 / 3 / 316 | ⚠ now FIRES (300) · 300-05: three result arms (UI-D12) · ⛔ |
+| `frontend/src/lib/api/org.ts` | 13 / 9 / 650 (was `12 / 9 / 646`) | 300-REVIEW IN-01: email_to_test_address on the send result |
+| `frontend/src/components/org/InviteMemberDialog.tsx` | 5 / 3 / 326 (was `4 / 3 / 316`) | 300-REVIEW IN-01: a test-address arm; never bolds the invitee · ⛔ |
 | `frontend/src/components/org/InvitationsTab.tsx` | 4 / 3 / 310 | ⚠ now FIRES (300) · 300-05: Email not sent chip + resend line · ⛔ |
 | `frontend/src/components/settings/connectionsCopy.ts` | 16 / 9 / 804 | ⚠ row STALE · honoured by construction (BUG-260912-01) |
 | `frontend/src/components/settings/connectionFormCopy.ts` | 19 / 8 / 1631 | seam named (239-05), RODE it (239-07) · ⛔ |
-| `frontend/src/pages/SettingsPage.tsx` | 63 / 31 / 1698 (was `62 / 30 / 1690`) | 300-05: one EmailSettings ref/spread/adopt/mount · ⛔ |
+| `frontend/src/pages/SettingsPage.tsx` | 64 / 31 / 1704 (was `63 / 31 / 1698`) | 300-REVIEW WR-05: EmailSettings invalid() vetoes the save · ⛔ |
 | `frontend/src/pages/settingsSearchPayload.ts` | 2 / 2 / 116 | young (created 242) |
 | `frontend/src/components/settings/ModelPillRow.tsx` | 5 / 4 / 151 | ⚠ FIRES · honoured by construction (249-02) · ⛔ |
 | `frontend/src/components/workflows/phaseVocabulary.ts` | 18 / 8 / 1102 (was `16 / 6 / 990`) | 296-07: own() lookups, STEP_UNTYPED, comparePhaseOrder, engineArmed |
@@ -691,9 +691,9 @@ node scripts/check-hot-file-ledger.cjs <phase-dir>   # 0 clear · 1 missing rows
 | `frontend/src/hooks/useFolders.ts` | 5 / 4 / 200 (was `4 / 4 / 197`) | 298-05: useOrgItemsVersion() in the load deps (a move refetches) |
 | `frontend/src/hooks/useAuth.ts` | 6 / 5 / 128 (was `5 / 4 / 100`) | ⚠ absent while FIRING — row added 299-05 · redirect + .catch · ⛔ |
 | `frontend/src/pages/AuthPage.tsx` | 5 / 3 / 32 (was `4 / 2 / 26`) | ⚠ now FIRES (299) · 299-05: one quiet S5 line (kind only) |
-| `backend/app/api/org.py` | 12 / 4 / 1068 (was `11 / 3 / 1024`) | 300-03: invite email_delivery stored + returned (D-11) |
-| `backend/app/services/email_provider.py` | 6 / 3 / 362 (was `5 / 3 / 374`) | ⚠ now FIRES (300) · 300-03: one mailer seam (D-21) · ⛔ |
-| `frontend/src/components/admin/HealthSignals.tsx` | 6 / 5 / 407 (was `5 / 4 / 316`) | 300-04: one Email tile (D-12, UI-D13); Off / Held back never red |
+| `backend/app/api/org.py` | 13 / 4 / 1071 (was `12 / 4 / 1068`) | 300-REVIEW IN-01: email_to_test_address on send + resend responses |
+| `backend/app/services/email_provider.py` | 10 / 3 / 413 (was `6 / 3 / 362`) | 300-REVIEW: SMTP_SECURITY fail-closed, redirected flag, config check · ⛔ |
+| `frontend/src/components/admin/HealthSignals.tsx` | 7 / 5 / 415 (was `6 / 5 / 407`) | 300-REVIEW IN-04: config_problem reads "Can't send", red, pre-send |
 
 
 When a new phase enters discuss-phase, the orchestrator must scan PLAN.md `files_modified` against this ledger. Any match against a G-5-firing row means the discuss-phase produces a refactor recommendation as the first option, not the planned feature — and the phase reads that file's section in `docs/HOT-FILE-LEDGER.md` before planning, because that is where the named seam and the binding invariants live.

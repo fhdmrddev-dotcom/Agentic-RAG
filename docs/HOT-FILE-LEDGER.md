@@ -11743,12 +11743,12 @@ cells rot within days.
 | [`frontend/src/components/settings/ConnectionFormPanel.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentssettingsconnectionformpaneltsx) | 28 / 10 / 2477 | ⚠ **FIRES** | ⭐ **NAMED SEAM TAKEN (239-08)** — `SourceToolsCard.tsx` extracted, `2807 → 2477`, a pure move. ⛔ the WIDER `ConnectionShapeFields.tsx` seam stays OWED. See §239-08 |
 | [`frontend/src/components/settings/SourceToolsCard.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentssettingssourcetoolscardtsx) | 1 / 1 / 403 | no (1 phase) | young — created by the 239-08 extraction. Carries the `mcp` fence as a guard clause, and inherits the panel's copy / zero-`title=` fences. See §239-08 |
 | [`frontend/src/components/settings/ConnectionGrantsList.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentssettingsconnectiongrantslisttsx) | 5 / 2 / 259 | no (2 phases) | 344 → 222 (221-01) → **259**. The availability slot is a CHILD it forwards, not markup it owns |
-| [`frontend/src/lib/api/org.ts`](docs/HOT-FILE-LEDGER.md#frontendsrclibapiorgts) | 12 / 9 / 646 (was `11 / 8 / 629`) | ⚠ **FIRES** | 300-05: email_delivery on Invitation (optional) + SendInvitationResult + the resend result, one private `deliveryFrom` unwrap (older backend → not_configured). NOT the barrel. See §239-03 |
+| [`frontend/src/lib/api/org.ts`](docs/HOT-FILE-LEDGER.md#frontendsrclibapiorgts) | 13 / 9 / 650 (was `12 / 9 / 646`) | ⚠ **FIRES** | 300-REVIEW IN-01: SendInvitationResult.email_to_test_address (boolean; true only when the wire says exactly true). Resend result unchanged |
 | [`backend/app/services/connectors/service_tools.py`](docs/HOT-FILE-LEDGER.md#backendappservicesconnectorsservice_toolspy) | 11 / 1 / 2018 | no (1 phase) | row added 221. Re-derived 232: 2018 L; internal Google Drive tools delegate to sources adapter |
 | [`backend/app/services/connectors/grants.py`](docs/HOT-FILE-LEDGER.md#backendappservicesconnectorsgrantspy) | 1 / 1 / 92 | no (1 phase) | ⚠ absent — row added 221. It is THE grant-time gate: 92 L deciding every connector call |
 | [`frontend/src/components/settings/connectionsCopy.ts`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentssettingsconnectionscopyts) | 15 / 8 / 784 | ⚠ **FIRES** | no seam proposed — a vocabulary doing one thing many times is the right shape. ⚠ row was STALE at `13 / 7 / 737`. honoured by construction (**239-03**): one word, one union member. See §239-03 |
 | [`frontend/src/components/settings/connectionFormCopy.ts`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentssettingsconnectionformcopyts) | 19 / 8 / 1631 | ⚠ **FIRES** | ⚠ row STALE TWICE (`15 / 8 / 1216`, `17 / 8 / 1293`). ⛔ 239-05 named the seam — `configFromDraft`'s ARM SET; 239-07 RODE it: one serializer both arms call. See §239-07 |
-| [`frontend/src/pages/SettingsPage.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrcpagessettingspagetsx) | 63 / 31 / 1698 (was `62 / 30 / 1690`) | ⚠ **FIRES** | 300-05: one EmailSettings import + ref + changes() spread + adopt() + mount after ApiKeyLimits; useState 49 → 49. Honoured by construction · 293 touch: see §Phase 293 close |
+| [`frontend/src/pages/SettingsPage.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrcpagessettingspagetsx) | 64 / 31 / 1704 (was `63 / 31 / 1698`) | ⚠ **FIRES** | 300-REVIEW WR-05: handleSaveIntegrations reads emailSettingsRef.current?.invalid() first; a sentence → setError + return before the PUT. useState count unchanged (49) |
 | [`frontend/src/pages/settingsSearchPayload.ts`](docs/HOT-FILE-LEDGER.md#frontendsrcpagessettingssearchpayloadts) | 2 / 2 / 116 | no (2 phases) | Created by 242. Row added AT CREATION rather than at the third phase — an absent row makes G-5 absent forever, silently, at any count |
 | [`frontend/src/components/settings/SourceFileCeilingCard.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentssettingssourcefileceilingcardtsx) | 1 / 1 / 117 | no (1 phase) | young (239-10) — ⚠ a row minted at creation reads `1 / 1` forever unless RE-DERIVED. Owns no number and no sentence |
 | [`frontend/src/components/settings/sourceCeilingCopy.ts`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentssettingssourceceilingcopyts) | 1 / 1 / 109 | no (1 phase) | young (239-10) — the ONE number it owns (recommendation) is pinned to `user_settings.py` by a `?raw` test; the bounds are SERVED |
@@ -11846,7 +11846,7 @@ cells rot within days.
 | [`backend/app/services/extractors/aspects/dxf.py`](docs/HOT-FILE-LEDGER.md#backendappservicesextractorsaspectsdxfpy) | 2 / 0 / 180 | no (0 phases) | ⚠ absent for its entire life — row added `SEED-226`. It is the only path that READS measurements rather than inferring them (`DIMENSION` values the CAD software computed) |
 | [`frontend/src/components/workflows/publishBlockedStep.ts`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentsworkflowspublishblockedstepts) | 2 / 1 / 183 (was `0 / 0 / 176`) | no (1 phase) | young (`BUG-260828-09`). **281-03**: ONE `BLOCKED_STEP_NEXT_NO_RUN` constant. ⚠ It derives NO second name ladder: `nodeTitle` is called, and `name ?? slug` is the one forbidden edit |
 | [`frontend/src/components/workflows/PublishBlockedStepCard.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentsworkflowspublishblockedstepcardtsx) | 2 / 1 / 109 (was `0 / 0 / 101`) | no (1 phase) | young (`BUG-260828-09`). **281-03**: ONE optional `canOpenRun` flag; next line is `BLOCKED_STEP_NEXT_NO_RUN` when there is no link; the cause keeps its line breaks. ⚠ **G-2 OVERRIDDEN, not satisfied** |
-| [`backend/app/services/scheduler_service.py`](docs/HOT-FILE-LEDGER.md#backendappservicesscheduler_servicepy) | 15 / 9 / 372 (was `14 / 9 / 352`) | ⚠ **FIRES** | 300-01: fire-time blank-input block (D-14) + _record_outcome reads the newest run; paused → waiting (D-26). Honoured by construction |
+| [`backend/app/services/scheduler_service.py`](docs/HOT-FILE-LEDGER.md#backendappservicesscheduler_servicepy) | 16 / 9 / 375 (was `15 / 9 / 372`) | ⚠ **FIRES** | 300-REVIEW WR-01: _record_outcome(status, run_id) reads the launched run BY ID (never the newest); paused → waiting, failed / cancelled as themselves. Honoured by construction |
 | [`backend/app/db/schedules.py`](docs/HOT-FILE-LEDGER.md#backendappdbschedulespy) | 2 / 2 / 369 (was `1 / 1 / 359`) | no (2 phases) | single data-access home for workflow_schedules; claim_due_schedules SKIP LOCKED claim. 299-01: create_schedule keyword-only `org_id` (None = base SQL, sha256 pinned) |
 | [`backend/app/services/watch_service.py`](docs/HOT-FILE-LEDGER.md#backendappserviceswatch_servicepy) | 8 / 6 / 769 (was `7 / 5 / 643`) | ⚠ **FIRES** | Honoured by construction. **285-01**: a failed item is retried through the SAME new-file body (cap 3); typed `last_error`; minted marker. Still 2 minter calls. Listing-loop seam not triggered |
 | [`backend/app/db/watches.py`](docs/HOT-FILE-LEDGER.md#backendappdbwatchespy) | 6 / 4 / 828 (was `4 / 3 / 709`) | ⚠ **FIRES** | Honoured by construction. **285-01**: upsert takes `failed_attempts` / `minted` (COALESCE keeps), `release_watch(run_error=)`. **285-02**: `watch_purge_scope` + a frozen dataclass, asyncpg only |
@@ -11983,7 +11983,7 @@ cells rot within days.
 | [`frontend/src/docs/pages/Changelog.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrcdocspageschangelogtsx) | 2 / 1 / 128 (was `1 / 1 / 125`) | no (new) | young (created 276). Row added AT PLANNING. 276-03: P5 changelog; 276-07 hero link. ⛔ v4.5 Not yet released from parseHistory released flag |
 | [`frontend/src/docs/pages/BuildStory.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrcdocspagesbuildstorytsx) | 1 / 1 / 88 (was `0 / 0 / 0`) | no (new) | young (created 276-07). Row added AT PLANNING. D-26: five chapters in order, releases from parseHistory, one VideoSlot each. ⛔ an id-less slot renders nothing |
 | [`frontend/src/pages/SetupWizard.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrcpagessetupwizardtsx) | 3 / 3 / 352 (was `2 / 2 / 345`) | ⚠ **NOW FIRES — 3 phases** | ⚠ absent its ENTIRE LIFE; row added at 276-07 planning. **276-07**: the static Iris mark on the dark chip in the header. ⛔ no logic change |
-| [`backend/app/services/email_provider.py`](docs/HOT-FILE-LEDGER.md#backendappservicesemail_providerpy) | 6 / 3 / 362 (was `5 / 3 / 374`) | ⚠ **FIRES** | ⚠ now FIRES (300). 300-03 (D-21): the ONE mailer seam — none / Resend REST / SMTP, dev guard, shell; shim gone. ⛔ never raises; no secret or recipient in a reason or log |
+| [`backend/app/services/email_provider.py`](docs/HOT-FILE-LEDGER.md#backendappservicesemail_providerpy) | 10 / 3 / 413 (was `6 / 3 / 362`) | ⚠ **FIRES** | 300-REVIEW WR-02 smtp_security_problem (unknown / none+login refused pre-connect); IN-01 SendOutcome.redirected; IN-02 link logged for none only; IN-04 transport_config_problem. ⛔ one seam |
 | [`frontend/src/docs/pages/ChangelogVersion.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrcdocspageschangelogversiontsx) | 1 / 1 / 52 (was `0 / 0 / 0`) | no (new) | young (created 276). Row added AT PLANNING. 276-03: changelog version page |
 | [`frontend/src/docs/pages/ApiReference.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrcdocspagesapireferencetsx) | 3 / 2 / 144 (was `1 / 1 / 135`) | no (new) | young (created 276). Row added AT PLANNING. 276-03: P6 lazy Scalar. ⛔ telemetry off, agent disabled, test-request hidden; dynamic import only · 293 touch: see §Phase 293 close |
 | [`frontend/src/docs/components/Markdown.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrcdocscomponentsmarkdowntsx) | 1 / 1 / 134 (was `0 / 0 / 0`) | no (new) | young (created 276). Row added AT PLANNING. 276-03: react-markdown + gfm. ⛔ NO rehype-raw — raw HTML stays text (XSS) |
@@ -12182,7 +12182,7 @@ cells rot within days.
 | [`backend/app/models/api_key.py`](docs/HOT-FILE-LEDGER.md#backendappmodelsapi_keypy) | 2 / 2 / 117 (was `1 / 1 / 113`) | no (young) | young. 296-06 (293-IN-06): `needs_task` added to WorkflowRefState. ⛔ no field carries the secret except the create response |
 | [`backend/app/services/inbound_inputs.py`](docs/HOT-FILE-LEDGER.md#backendappservicesinbound_inputspy) | 9 / 3 / 352 (was `8 / 2 / 312`) | ⚠ **FIRES** | 300-01 (D-14): the loop factored into _missing_fields; missing_required_labels + join_labels + blank_required_sentence beside it. ONE predicate. ⛔ pure; strips _-keys |
 | [`backend/app/api/api_keys.py`](docs/HOT-FILE-LEDGER.md#backendappapiapi_keyspy) | 3 / 2 / 421 (was `2 / 1 / 392`) | no (young) | young. 296-06: needs_task state + picker reason (293-IN-06); create_key names only what the picker offers; revoke audits only the call that revoked (293-IN-08). ⛔ 404 for miss AND foreign |
-| [`backend/app/services/unattended_launch.py`](docs/HOT-FILE-LEDGER.md#backendappservicesunattended_launchpy) | 7 / 3 / 379 (was `6 / 2 / 361`) | ⚠ **FIRES** | 300-01 (D-33): one resolve_owner_run_model call; model + provider to the writer and to _drive_run's ctx dict. ⛔ owner identity, explicit org_id, caps armed first |
+| [`backend/app/services/unattended_launch.py`](docs/HOT-FILE-LEDGER.md#backendappservicesunattended_launchpy) | 8 / 3 / 383 (was `7 / 3 / 379`) | ⚠ **FIRES** | 300-REVIEW WR-01: OnFinish is (status, run_id); _drive_run passes its own run_id on every exit path. One call site changed. ⛔ owner identity, explicit org_id, caps armed first |
 | [`backend/app/api/schedules.py`](docs/HOT-FILE-LEDGER.md#backendappapischedulespy) | 6 / 6 / 341 (was `5 / 5 / 303`) | ⚠ **FIRES** | 300-01 (D-14): one _refuse_blank_required helper; create calls it before the INSERT, patch only for inputs / resume after the owner-scoped read. A pause reads nothing new |
 | [`backend/app/models/schedule.py`](docs/HOT-FILE-LEDGER.md#backendappmodelsschedulepy) | 3 / 3 / 231 | ⚠ **FIRES** | ⚠ absent its ENTIRE LIFE — row added 296-02 (D-26). 296-02 (295-IN-05): ScheduleTriggerResult gains one additive `outcome` Literal (launched/refused/not_loaded/error) |
 | [`backend/app/services/harness/run_read_words.py`](docs/HOT-FILE-LEDGER.md#backendappservicesharnessrun_read_wordspy) | 1 / 1 / 99 (was `0 / 0 / 0`) | no (young) | young (planned 293-02). MOVED waiting_who / unsourced_who / compose_waiting_on (workflow_runs seam). ⛔ pure leaf; re-exported |
@@ -12251,14 +12251,14 @@ cells rot within days.
 | [`frontend/src/components/org/SavesInOrg.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentsorgsavesinorgtsx) | 1 / 1 / 46 (was `0 / 0 / 0`) | no (young) | young (created 299-04). Saves in <org> caption (D-18/D-38/UI-D11). ⛔ renders nothing below 2 orgs or without an active org name; only on Run / Tweak / Start a chat; words from orgItemsCopy |
 | [`frontend/src/hooks/useAuth.ts`](docs/HOT-FILE-LEDGER.md#frontendsrchooksuseauthts) | 6 / 5 / 128 (was `5 / 4 / 100`) | ⚠ **FIRES** | 299-05: SSO redirectTo / sign-up emailRedirectTo from returnTo + one getSession .catch. ⛔ no hash access; no timer sets user (Pitfall 6) |
 | [`frontend/src/components/workflows/library/useWorkflowFork.ts`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentsworkflowslibraryuseworkflowforkts) | 4 / 2 / 539 (was `3 / 1 / 517`) | no | 299-04: Tweak sends fromDefinitionId (D-38); a WorkflowOrgRefusedError lands as forkFailed.sentence, every other failure keeps the prose-free shape. Below threshold |
-| [`backend/app/api/org.py`](docs/HOT-FILE-LEDGER.md#backendappapiorgpy) | 12 / 4 / 1068 (was `11 / 3 / 1024`) | ⚠ **FIRES** | 300-03 (D-11): run_in_threadpool(send_invite) at both sites; one _record_invite_delivery stores + returns email_delivery. ⛔ link-first: a mail failure never fails the invite |
+| [`backend/app/api/org.py`](docs/HOT-FILE-LEDGER.md#backendappapiorgpy) | 13 / 4 / 1071 (was `12 / 4 / 1068`) | ⚠ **FIRES** | 300-REVIEW IN-01: one additive response key at both invite sites — email_to_test_address = sent AND outcome.redirected. Nothing stored; the CHECK on email_delivery untouched |
 | [`backend/app/api/me_preferences.py`](docs/HOT-FILE-LEDGER.md#backendappapimepreferencespy) | 2 / 2 / 190 (was `1 / 1 / 120`) | no (2 phases) | 300-05: three notification-email keys on GET + one ungated PUT /me/preferences/notification-email (D-09). ⛔ one auth.uid() merge; put_my_preferences byte-identical (hash-pinned) |
 | [`backend/app/services/connectors/smtp_adapter.py`](docs/HOT-FILE-LEDGER.md#backendappservicesconnectorssmtpadapterpy) | 2 / 2 / 594 (was `1 / 1 / 482`) | no (2 phases) | 300-03 (D-24, D-32): the body gains a js-default markdown HTML alternative + a line-preserving text part. ⛔ header guard + refused-recipient check stay; no CC/BCC/attachment |
 | [`backend/app/services/health_probe.py`](docs/HOT-FILE-LEDGER.md#backendappserviceshealthprobepy) | 2 / 2 / 197 (was `1 / 1 / 116`) | no (2 phases) | 300-04: probe_email (D-12) in the gather + __all__. ⛔ off / held back is neutral, never down; a reason never names a recipient |
-| [`backend/app/services/run_model_resolution.py`](docs/HOT-FILE-LEDGER.md#backendappservicesrunmodelresolutionpy) | 4 / 3 / 344 (was `3 / 2 / 308`) | ⚠ **FIRES** | 300-01: resolve_owner_run_model, the ONE FIX-05 helper (D-33). ⛔ owner settings loaded off the loop; (None, None) on failure |
-| [`frontend/src/components/admin/HealthSignals.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentsadminhealthsignalstsx) | 6 / 5 / 407 (was `5 / 4 / 316`) | ⚠ **FIRES** | 300-04: one Email tile (D-12, UI-D13), words in emailView; dep row sm:2 lg:4. ⛔ pure leaf; Off / Held back / Test mode never red |
+| [`backend/app/services/run_model_resolution.py`](docs/HOT-FILE-LEDGER.md#backendappservicesrunmodelresolutionpy) | 5 / 3 / 371 (was `4 / 3 / 344`) | ⚠ **FIRES** | 300-REVIEW IN-03: resolve_owner_run_model walks the in-app door's chain — load, apply_user_model_default, resolve_run_model (empty body), resolve_workflow_ctx_model. ⛔ off-loop load; (None, None) |
+| [`frontend/src/components/admin/HealthSignals.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentsadminhealthsignalstsx) | 7 / 5 / 415 (was `6 / 5 / 407`) | ⚠ **FIRES** | 300-REVIEW IN-04: EmailProbe.config_problem (optional); emailView reads "Can't send" / via {Provider}: {sentence}, destructive dot, before the down arm. Older backend unchanged |
 | [`frontend/src/components/org/InvitationsTab.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentsorginvitationstabtsx) | 4 / 3 / 310 (was `3 / 2 / 290`) | ⚠ **FIRES** | ⚠ now FIRES (300). 300-05: Email not sent chip (shipped StatusChip, muted) + resend failure line (D-11). ⛔ server truth on re-fetch, no optimistic flip |
-| [`frontend/src/components/org/InviteMemberDialog.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentsorginvitememberdialogtsx) | 4 / 3 / 316 (was `3 / 2 / 281`) | ⚠ **FIRES** | ⚠ now FIRES (300). 300-05: three result arms by email_delivery (UI-D12), words from inviteDeliveryCopy. ⛔ never names the provider or an error code; Copy link focused on the failed arm |
+| [`frontend/src/components/org/InviteMemberDialog.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentsorginvitememberdialogtsx) | 5 / 3 / 326 (was `4 / 3 / 316`) | ⚠ **FIRES** | 300-REVIEW IN-01: one useState (toTestAddress) reset on open; a sent-to-test arm before the sent arm, words from inviteDeliveryCopy. The three shipped arms unchanged |
 | [`frontend/src/lib/api/schedules.ts`](docs/HOT-FILE-LEDGER.md#frontendsrclibapischedulests) | 3 / 3 / 166 (was `2 / 2 / 129`) | ⚠ **FIRES** | 300-01: ScheduleRefusalError (an ApiError) for {detail:{code,message,missing}}; string + array arms unchanged. ⛔ not re-exported via lib/api.ts |
 | [`backend/app/db/notifications.py`](docs/HOT-FILE-LEDGER.md#backendappdbnotificationspy) | 1 / 1 / 326 (was `0 / 0 / 0`) | no (young) | young (created 300-04). Outbox claim (SKIP LOCKED), still-waiting, opt-out, outcome (D-12, D-13, D-20). ⛔ never selects prompt text; state flip inside the claim txn |
 | [`backend/app/services/notification_drainer.py`](docs/HOT-FILE-LEDGER.md#backendappservicesnotificationdrainerpy) | 1 / 1 / 208 (was `0 / 0 / 0`) | no (young) | young (created 300-04). Per-worker outbox drainer, SchedulerService shape (D-20). ⛔ send outside the claim txn; at most 3 attempts; SMTP at-most-once |
@@ -19995,6 +19995,14 @@ Scan-list cell as of 2026-10-29 (replaced by 300-03 Task 2, moved verbatim): 5 /
 
 CLAUDE.md verdict cell as of 2026-10-29 (replaced by 300-03 Task 2, moved verbatim): | `backend/app/services/email_provider.py` | 5 / 3 / 374 (was `4 / 2 / 105`) | ⚠ now FIRES (300) · 300-03: one mailer seam (D-21) · ⛔ |
 
+### `backend/app/services/email_provider.py` — 300-REVIEW fixes (2026-10-29)
+
+**`10 / 3 / 413` (was `6 / 3 / 362`).** Four review fixes, one commit each. WR-02: `SMTP_SECURITY_VALUES` + `smtp_security_problem()` — an unknown value, or `none` with a username, fails before any socket opens (no password over plaintext). IN-01: `SendOutcome.redirected`, set via `dataclasses.replace` when the dev guard rewrote the recipient. IN-02: the offline-flow `invite link for ...` INFO line runs only when the provider is `none`. IN-04: `transport_config_problem(provider, app)` — the mailer's own config refusals, read by the health probe.
+
+Scan-list cell as of 2026-10-29 (replaced by 300-REVIEW, moved verbatim): 6 / 3 / 362 (was `5 / 3 / 374`) | ⚠ **FIRES** | ⚠ now FIRES (300). 300-03 (D-21): the ONE mailer seam — none / Resend REST / SMTP, dev guard, shell; shim gone. ⛔ never raises; no secret or recipient in a reason or log
+
+CLAUDE.md verdict cell as of 2026-10-29 (replaced by 300-REVIEW, moved verbatim): | `backend/app/services/email_provider.py` | 6 / 3 / 362 (was `5 / 3 / 374`) | ⚠ now FIRES (300) · 300-03: one mailer seam (D-21) · ⛔ |
+
 ### `frontend/src/docs/pages/ChangelogVersion.tsx`
 
 **`0 / 0 / 0`** at 276 planning. Young (created in Phase 276). 276-03: changelog version page. 276-05 re-derives the triple at close.
@@ -25493,6 +25501,14 @@ Scan-list cell as of 2026-10-29 (replaced by 300-01, moved verbatim): 6 / 2 / 36
 
 CLAUDE.md verdict cell: none before 300-01 (the file did not fire); row added by 300-01.
 
+### `backend/app/services/unattended_launch.py` — 300-REVIEW fixes (2026-10-29)
+
+**`8 / 3 / 383` (was `7 / 3 / 379`).** WR-01: `OnFinish = Callable[[str, UUID], ...]` and the one `on_finish(...)` call in `_drive_run`'s `finally` passes `run_id`, so the scheduler reads THAT run. The only caller is `scheduler_service`; `test_256_producer_shells`' callback was widened to match. The docstring states that `completed` means only that `run_workflow` returned.
+
+Scan-list cell as of 2026-10-29 (replaced by 300-REVIEW, moved verbatim): 7 / 3 / 379 (was `6 / 2 / 361`) | ⚠ **FIRES** | 300-01 (D-33): one resolve_owner_run_model call; model + provider to the writer and to _drive_run's ctx dict. ⛔ owner identity, explicit org_id, caps armed first
+
+CLAUDE.md verdict cell as of 2026-10-29 (replaced by 300-REVIEW, moved verbatim): | `backend/app/services/unattended_launch.py` | 7 / 3 / 379 (was `6 / 2 / 361`) | ⚠ now FIRES (300) · 300-01: records the owner's model + provider (D-33) |
+
 ### `backend/app/services/harness/run_read_words.py`
 
 **`0 / 0 / 0`** at 293 planning (2026-10-25). Young; row added AT PLANNING (the 273 / 290 / 292.1 precedent), so `check-hot-file-ledger.cjs 293` binds before the file exists. MOVED waiting_who / unsourced_who / compose_waiting_on (workflow_runs seam). ⛔ pure leaf; re-exported Does not fire. Re-derive the triple at the 293-05 close.
@@ -26450,6 +26466,14 @@ CLAUDE.md verdict cell as of 2026-10-29 (replaced by 300-01, moved verbatim): | 
 Scan-list cell as of 2026-10-29 (replaced by 300-01 Task 2, moved verbatim): 14 / 9 / 352 (was `13 / 8 / 332`) | ⚠ **FIRES** | 300-01 (D-14): ONE fire-time block after the foreign-folder block — missing_required_labels on the RAW stored definition → record the sentence + ScheduledLaunchRefused. Honoured by construction
 
 CLAUDE.md verdict cell as of 2026-10-29 (replaced by 300-01 Task 2, moved verbatim): | `backend/app/services/scheduler_service.py` | 14 / 9 / 352 (was `13 / 8 / 332`) | 300-01: fire-time blank-input refusal (D-14), one block |
+
+### `backend/app/services/scheduler_service.py` — 300-REVIEW fixes (2026-10-29)
+
+**`16 / 9 / 375` (was `15 / 9 / 372`).** WR-01 (commit `fix(300): WR-01`): `_record_outcome` now takes the `run_id` the drive names and reads `SELECT status FROM workflow_runs WHERE id = $1` — never the schedule's newest run, which an overlapping Run now could own. `paused` records `waiting`; `failed` / `cancelled` (the engine's `fail_run` arm and a stop both RETURN, so the drive says `completed`) are recorded as themselves, each with its D-15 sentence. A failed read still records `completed`. Inside the existing closure only.
+
+Scan-list cell as of 2026-10-29 (replaced by 300-REVIEW, moved verbatim): 15 / 9 / 372 (was `14 / 9 / 352`) | ⚠ **FIRES** | 300-01: fire-time blank-input block (D-14) + _record_outcome reads the newest run; paused → waiting (D-26). Honoured by construction
+
+CLAUDE.md verdict cell as of 2026-10-29 (replaced by 300-REVIEW, moved verbatim): | `backend/app/services/scheduler_service.py` | 15 / 9 / 372 (was `14 / 9 / 352`) | 300-01: blank-input block + waiting outcome (D-14, D-26) |
 
 ### `backend/app/api/inbound.py` — 298-02 (2026-10-28)
 
@@ -27536,6 +27560,14 @@ Scan-list cell as of 2026-10-29 (replaced by 300-03, moved verbatim): 11 / 3 / 1
 
 CLAUDE.md verdict cell as of 2026-10-29 (replaced by 300-03, moved verbatim): | `backend/app/api/org.py` | 11 / 3 / 1024 | ⚠ absent while FIRING — row added at 300 planning · 300-03 invite outcome |
 
+### `backend/app/api/org.py` — 300-REVIEW fixes (2026-10-29)
+
+**`13 / 4 / 1071` (was `12 / 4 / 1068`).** IN-01: `"email_to_test_address": email_delivery == "sent" and outcome.redirected` added to the send and the resend responses. The stored `email_delivery` and migration 218's CHECK are unchanged.
+
+Scan-list cell as of 2026-10-29 (replaced by 300-REVIEW, moved verbatim): 12 / 4 / 1068 (was `11 / 3 / 1024`) | ⚠ **FIRES** | 300-03 (D-11): run_in_threadpool(send_invite) at both sites; one _record_invite_delivery stores + returns email_delivery. ⛔ link-first: a mail failure never fails the invite
+
+CLAUDE.md verdict cell as of 2026-10-29 (replaced by 300-REVIEW, moved verbatim): | `backend/app/api/org.py` | 12 / 4 / 1068 (was `11 / 3 / 1024`) | 300-03: invite email_delivery stored + returned (D-11) |
+
 ### `backend/app/api/me_preferences.py`
 
 **Added AT PLANNING (Phase 300, 2026-10-29) at `1 / 1 / 120`** — measured, never copied. Added AT PLANNING 300. 300-05: notification-email keys on GET + one PUT route (D-09). ⛔ ungated, auth.uid() merge; default_model semantics byte-identical
@@ -27565,6 +27597,14 @@ Scan-list cell as of 2026-10-29 (replaced by 300-03, moved verbatim): 1 / 1 / 48
 Scan-list cell as of 2026-10-29 (replaced by 300-01, moved verbatim): 3 / 2 / 308 | no (reaches 3 in 300) | Added AT PLANNING 300. 300-01: resolve_owner_run_model, the ONE FIX-05 helper (D-33). ⛔ owner settings loaded off the loop; (None, None) on failure
 
 CLAUDE.md verdict cell: none before 300-01 (the file did not fire); row added by 300-01.
+
+### `backend/app/services/run_model_resolution.py` — 300-REVIEW fixes (2026-10-29)
+
+**`5 / 3 / 371` (was `4 / 3 / 344`).** IN-03 (D-17 "exactly as the in-app door does"): the helper applied neither the owner's per-user default (SEED-116) nor the model-derived provider. It now runs `apply_user_model_default(None, {"id": owner}, settings)`, then `resolve_run_model(body=_NoOverrideBody(), ...)` (a two-field pydantic model, because `_apply_fallback_to_request` rebuilds the body with `model_copy`), then `resolve_workflow_ctx_model` on the aligned settings. Still fail-soft to `(None, None)`. Smoke-driven against the local DB: a fresh owner resolves `('gpt-4o', 'openai')`.
+
+Scan-list cell as of 2026-10-29 (replaced by 300-REVIEW, moved verbatim): 4 / 3 / 344 (was `3 / 2 / 308`) | ⚠ **FIRES** | 300-01: resolve_owner_run_model, the ONE FIX-05 helper (D-33). ⛔ owner settings loaded off the loop; (None, None) on failure
+
+CLAUDE.md verdict cell as of 2026-10-29 (replaced by 300-REVIEW, moved verbatim): | `backend/app/services/run_model_resolution.py` | 4 / 3 / 344 (was `3 / 2 / 308`) | ⚠ now FIRES (300) · 300-01: resolve_owner_run_model (D-33) |
 
 ### `frontend/src/components/admin/HealthSignals.tsx`
 
@@ -27634,6 +27674,14 @@ Scan-list cell as of 2026-10-29 (replaced by 300-04, moved verbatim): 5 / 4 / 31
 
 CLAUDE.md verdict cell as of 2026-10-29 (replaced by 300-04, moved verbatim): | `frontend/src/components/admin/HealthSignals.tsx` | 5 / 4 / 316 | ⚠ absent while FIRING — row added at 300 planning · 300-04 Email tile |
 
+### `frontend/src/components/admin/HealthSignals.tsx` — 300-REVIEW fixes (2026-10-29)
+
+**`7 / 5 / 415` (was `6 / 5 / 407`).** IN-04: one optional field and one `emailView` arm. A new tile state beyond UI-SPEC S5's table (Claude's-discretion words): value "Can't send", sub-line `via {Provider}: {sentence}`, `bg-destructive` — a transport that cannot send is a real failure, not "Ready".
+
+Scan-list cell as of 2026-10-29 (replaced by 300-REVIEW, moved verbatim): 6 / 5 / 407 (was `5 / 4 / 316`) | ⚠ **FIRES** | 300-04: one Email tile (D-12, UI-D13), words in emailView; dep row sm:2 lg:4. ⛔ pure leaf; Off / Held back / Test mode never red
+
+CLAUDE.md verdict cell as of 2026-10-29 (replaced by 300-REVIEW, moved verbatim): | `frontend/src/components/admin/HealthSignals.tsx` | 6 / 5 / 407 (was `5 / 4 / 316`) | 300-04: one Email tile (D-12, UI-D13); Off / Held back never red |
+
 ### `scripts/vitest-count-gate.cjs` — 300-04 (2026-10-29)
 
 **`396 / 83 / 6868` (was `395 / 83 / 6865`).** ONE BASELINE pin added beside the a11y suite's — `HealthSignals.email.test.tsx` 11 — and its FILE-LEVEL TARGET beside `HealthSignals.a11y.test.tsx` (the admin tests are named one by one, never a directory entry). None raised, none lowered.
@@ -27698,6 +27746,14 @@ Scan-list cell as of 2026-10-29 (replaced by 300-05 Task 2, moved verbatim): 62 
 
 CLAUDE.md verdict cell as of 2026-10-29 (replaced by 300-05 Task 2, moved verbatim): | `frontend/src/pages/SettingsPage.tsx` | 62 / 30 / 1690 (was `61 / 30 / 1681`) | 293-03: one ref + changes() spread + adopt(); useState 49 → 49 · ⛔ |
 
+### `frontend/src/pages/SettingsPage.tsx` — 300-REVIEW fixes (2026-10-29)
+
+**`64 / 31 / 1704` (was `63 / 31 / 1698`).** WR-05: an invalid address was silently left out of the PUT, the save said "Saved" and `adopt()` wiped the typed value. Six lines at the top of `handleSaveIntegrations`: the card's veto sentence goes to the existing error home and the save returns before `setSavingIntegrations(true)`. Pinned by `EmailSettings.test.tsx`'s wiring test (`emailSettingsRef` x5).
+
+Scan-list cell as of 2026-10-29 (replaced by 300-REVIEW, moved verbatim): 63 / 31 / 1698 (was `62 / 30 / 1690`) | ⚠ **FIRES** | 300-05: one EmailSettings import + ref + changes() spread + adopt() + mount after ApiKeyLimits; useState 49 → 49. Honoured by construction · 293 touch: see §Phase 293 close
+
+CLAUDE.md verdict cell as of 2026-10-29 (replaced by 300-REVIEW, moved verbatim): | `frontend/src/pages/SettingsPage.tsx` | 63 / 31 / 1698 (was `62 / 30 / 1690`) | 300-05: one EmailSettings ref/spread/adopt/mount · ⛔ |
+
 ### `frontend/src/lib/api/skills.ts` — 300-05 Task 2 (2026-10-29)
 
 **`10 / 7 / 779` (was `9 / 6 / 767`).** Type-only, additive: `notification_email_delay_seconds?`, `email_from_address?`, `email_from_name?`, `email_dev_redirect_address?` on both `FullAppSettings` and `SettingsUpdate`; `email_provider?: "none" | "resend" | "smtp"` on `FullAppSettings` ONLY — the env's provider name is never writable (D-08), so `SettingsUpdate` cannot carry it. Every field optional: an older backend renders the card on its defaults.
@@ -27754,6 +27810,14 @@ Scan-list cell as of 2026-10-29 (replaced by 300-05 Task 3, moved verbatim): 11 
 
 CLAUDE.md verdict cell as of 2026-10-29 (replaced by 300-05 Task 3, moved verbatim): | `frontend/src/lib/api/org.ts` | 11 / 8 / 629 | ⚠ absent its ENTIRE LIFE · THIRD wire-type drift (239) |
 
+### `frontend/src/lib/api/org.ts` — 300-REVIEW fixes (2026-10-29)
+
+**`13 / 9 / 650` (was `12 / 9 / 646`).** IN-01: one field on `SendInvitationResult` and one line in `sendInvitation`'s return (`body.email_to_test_address === true`). `resendInvitation` is unchanged (its list UI never names the recipient).
+
+Scan-list cell as of 2026-10-29 (replaced by 300-REVIEW, moved verbatim): 12 / 9 / 646 (was `11 / 8 / 629`) | ⚠ **FIRES** | 300-05: email_delivery on Invitation (optional) + SendInvitationResult + the resend result, one private `deliveryFrom` unwrap (older backend → not_configured). NOT the barrel. See §239-03
+
+CLAUDE.md verdict cell as of 2026-10-29 (replaced by 300-REVIEW, moved verbatim): | `frontend/src/lib/api/org.ts` | 12 / 9 / 646 (was `11 / 8 / 629`) | 300-05: email_delivery on invite results + rows (D-11) |
+
 ### `frontend/src/components/org/InviteMemberDialog.tsx` — 300-05 Task 3 (2026-10-29)
 
 **`4 / 3 / 316` (was `3 / 2 / 281`) — crosses into G-5 at this commit.** Inside the shipped link-first panel, ONE `delivery` state (reset on open) set from `sendInvitation`'s `email_delivery` (`?? "not_configured"`), and the title from `deliveryTitle(delivery)`. Arms: `sent` → "We emailed an invitation to **{email}**. You can also copy the link and send it yourself." (`font-semibold`); `failed` → a NEUTRAL `role="status"` box (`border-border bg-muted/40`, `MailX` aria-hidden) with the D-11 sentence, and one effect focusing the shipped Copy link button through a ref; `not_configured` → the shipped body byte-identical. The expiry line stays on all three. ⛔ The docblock's "reserved operator warning tint is never used" rule holds (UI-D2: no amber in the org zone). ⛔ Next touch should take the result panel out as a leaf: the file now carries form + three result arms.
@@ -27761,6 +27825,14 @@ CLAUDE.md verdict cell as of 2026-10-29 (replaced by 300-05 Task 3, moved verbat
 Scan-list cell as of 2026-10-29 (replaced by 300-05 Task 3, moved verbatim): 3 / 2 / 281 | no (reaches 3 in 300) | Added AT PLANNING 300. 300-05: three result arms (UI-D12). ⛔ never names the provider or an error code; Copy link focused on the failed arm |
 
 CLAUDE.md verdict cell: none before 300-05 Task 3 (row added by 300-05 Task 3).
+
+### `frontend/src/components/org/InviteMemberDialog.tsx` — 300-REVIEW fixes (2026-10-29)
+
+**`5 / 3 / 326` (was `4 / 3 / 316`).** IN-01: outside production a `sent` email went to the Settings test address, but the dialog bolded the invitee as its recipient. One state + one arm: "Outside production, the email went to the test address set in Settings, not to {invitee}. Copy the link and send it yourself." (Claude's-discretion words, in `inviteDeliveryCopy.ts`).
+
+Scan-list cell as of 2026-10-29 (replaced by 300-REVIEW, moved verbatim): 4 / 3 / 316 (was `3 / 2 / 281`) | ⚠ **FIRES** | ⚠ now FIRES (300). 300-05: three result arms by email_delivery (UI-D12), words from inviteDeliveryCopy. ⛔ never names the provider or an error code; Copy link focused on the failed arm
+
+CLAUDE.md verdict cell as of 2026-10-29 (replaced by 300-REVIEW, moved verbatim): | `frontend/src/components/org/InviteMemberDialog.tsx` | 4 / 3 / 316 | ⚠ now FIRES (300) · 300-05: three result arms (UI-D12) · ⛔ |
 
 ### `frontend/src/components/org/InvitationsTab.tsx` — 300-05 Task 3 (2026-10-29)
 
