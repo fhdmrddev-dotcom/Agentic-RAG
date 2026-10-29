@@ -81,7 +81,7 @@ and the open bugs (BUG-261027-01..05, minor; 04 and 05 found by the close integr
 
 Live at `31416d335` (master `f73dc7cb5`), 2026-10-29: v4.7 + v4.8 phases 297-300. Cloud migrations 210-218
 applied (218 on 2026-10-29: verify PASS); `get_advisors(security)` 0 ERROR. New backend answered 19:26:45 UTC, frontend bundle
-carries 299 copy 19:27 UTC. **No mail provider in cloud (Resend deferred)** — deliveries record `suppressed`, invites → Copy link. Branch `develop`.
+carries 299 copy 19:27 UTC; operator smoke: chat list loads on app.superrag.cloud. **No mail provider in cloud (Resend deferred)** — deliveries record `suppressed`, invites → Copy link. Branch `develop`.
 
 ## Owed (operator)
 
