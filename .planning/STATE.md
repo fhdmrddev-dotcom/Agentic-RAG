@@ -31,7 +31,7 @@ See: `.planning/PROJECT.md` (updated 2026-10-27)
 
 **Core value:** The agent acts as an AI colleague — it knows your knowledge base, can run code, and
 can be taught new behaviours (skills) that persist and can be shared.
-**Current focus:** Phase 300 — told when a run waits (UAT 12/15 PASS locally 2026-10-29; owed: G4-8 + real-mail G4-1 after deploy). NOT deployed; mig 218 local only. Phase 299 CLOSED 2026-10-29 (UAT 18/20; 2 rows owed by decision).
+**Current focus:** Phase 300 — told when a run waits (UAT 12/15 PASS locally 2026-10-29; owed: G4-8 + real-mail G4-1 after deploy). NOT deployed; **mig 218 APPLIED TO CLOUD 2026-10-29** (verify PASS, advisors 0 ERROR; new INFO = outbox RLS-no-policy, by design D-19). Phase 299 CLOSED 2026-10-29 (UAT 18/20; 2 rows owed by decision).
 
 ---
 
