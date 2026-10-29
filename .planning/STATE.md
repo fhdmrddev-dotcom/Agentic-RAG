@@ -4,7 +4,7 @@ milestone: v4.8
 milestone_name: Every Page Has a Link
 status: human_needed
 last_updated: 2026-10-29T00:00:00.000Z
-last_activity: 2026-10-29 -- Phase 299 UAT 13/19 run, rest POSTPONED by operator; moving to Phase 300
+last_activity: 2026-10-29 -- Phase 300 context gathered (4 areas; 5 bugs + SEED-281 folded); planning next
 progress:
   total_phases: 13
   completed_phases: 0
@@ -31,7 +31,7 @@ See: `.planning/PROJECT.md` (updated 2026-10-27)
 
 **Core value:** The agent acts as an AI colleague — it knows your knowledge base, can run code, and
 can be taught new behaviours (skills) that persist and can be shared.
-**Current focus:** Phase 300 — told when a run waits (next: `/gsd:discuss-phase 300`). Phase 299 stays human_needed with 6 UAT rows POSTPONED by operator decision 2026-10-29.
+**Current focus:** Phase 300 — told when a run waits (context gathered 2026-10-29; autonomous plan → execute under way). Phase 299 stays human_needed with 6 UAT rows POSTPONED by operator decision 2026-10-29.
 
 ---
 
@@ -109,5 +109,7 @@ applied; `get_advisors(security)` 0 ERROR. Branch `develop`.
 - **298 G-2 (2026-10-28):** the "N more in <org> · Switch" line, the out-of-org picker marker and the move confirm are new UI. Under the operator's autonomous mandate ("continue autonomously end to end") the sketch/UI-SPEC is self-approved in planning; the operator sees it at G-4 (298 D-23).
 
 - **299 G-2 (2026-10-28):** UI-SPEC self-approved under the autonomous mandate (checker 6/6 after one spacing revision). Four details depart from the operator-picked sketch winners and are shown to the operator at G-4: UI-D12 the trigger says "Link" not "Share" (a link grants no access); UI-D14 the "✓ Link copied" receipt sits inside the link surface, not at the bottom (no toast system, rule 062-A); UI-D16 the sign-in return line sits after the whole form (keeps `SignInForm`/`SignUpForm` unedited); UI-D10 the after-switch line is shortened until G-4 row 2 proves reattach.
+
+- **300 G-2 (2026-10-29):** UI hint (Settings email switch + delay knob, invite-dialog failure line, schedule-row words) — small surfaces in existing components; UI-SPEC self-approved under the operator's autonomous mandate ("continue autonomously end to end for this phase"); operator sees it at G-4.
 
 The 286-296 overrides are in `milestones/v4.7-STATE-at-close.md`.
