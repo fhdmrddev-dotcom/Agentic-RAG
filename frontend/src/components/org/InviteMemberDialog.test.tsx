@@ -53,6 +53,7 @@ function result(email_delivery: "sent" | "failed" | "not_configured") {
     link: LINK,
     invitation: { id: "i1", email: "new@acme.test", role: "member", status: "pending", expires_at: null },
     email_delivery,
+    email_to_test_address: false,
   }
 }
 
@@ -89,6 +90,24 @@ describe("InviteMemberDialog — the three result arms (UI-D12)", () => {
     expect(within(dialog).getByTestId("invite-link").textContent).toBe(LINK)
     expect(within(dialog).getByText(EXPIRY)).toBeInTheDocument()
     expect(within(dialog).queryByText(FAILED)).toBeNull()
+    noForbiddenWords(dialog)
+  })
+
+  // 300-REVIEW IN-01: outside production a "sent" email went to the Settings test address.
+  it("sent to the test address: says so, and never bolds the invitee as the recipient", async () => {
+    mockSend.mockResolvedValue({ ...result("sent"), email_to_test_address: true })
+    const dialog = await sendTo()
+    expect(within(dialog).getByRole("heading").textContent).toBe("Invitation sent")
+    const text = dialog.textContent ?? ""
+    expect(text).not.toContain("We emailed an invitation to")
+    expect(
+      within(dialog).getByText((_, el) =>
+        el?.tagName === "P" &&
+        el.textContent ===
+          "Outside production, the email went to the test address set in Settings, not to new@acme.test. Copy the link and send it yourself.",
+      ),
+    ).toBeInTheDocument()
+    expect(within(dialog).getByTestId("invite-link").textContent).toBe(LINK)
     noForbiddenWords(dialog)
   })
 
@@ -147,6 +166,15 @@ describe("lib/api/org — email_delivery on the invite results (D-11)", () => {
   it("sendInvitation carries the server's email_delivery", async () => {
     stub({ link: LINK, invitation: {}, email_delivery: "failed" })
     expect((await orgApi.sendInvitation("a@b.co", "member")).email_delivery).toBe("failed")
+  })
+
+  it("sendInvitation carries email_to_test_address, false when absent or not exactly true", async () => {
+    stub({ link: LINK, invitation: {}, email_delivery: "sent", email_to_test_address: true })
+    expect((await orgApi.sendInvitation("a@b.co", "member")).email_to_test_address).toBe(true)
+    stub({ link: LINK, invitation: {}, email_delivery: "sent" })
+    expect((await orgApi.sendInvitation("a@b.co", "member")).email_to_test_address).toBe(false)
+    stub({ link: LINK, invitation: {}, email_delivery: "sent", email_to_test_address: "yes" })
+    expect((await orgApi.sendInvitation("a@b.co", "member")).email_to_test_address).toBe(false)
   })
 
   it("sendInvitation from an older backend reads not_configured", async () => {

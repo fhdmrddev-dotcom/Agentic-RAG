@@ -17,6 +17,9 @@ export const INVITE_DELIVERY = {
   /** The `sent` body, split around the bolded email address. */
   sentBefore: "We emailed an invitation to ",
   sentAfter: ". You can also copy the link and send it yourself.",
+  /** 300-REVIEW IN-01: a `sent` email that went to the test address (outside production). */
+  sentToTestBefore: "Outside production, the email went to the test address set in Settings, not to ",
+  sentToTestAfter: ". Copy the link and send it yourself.",
   /** D-11, verbatim. */
   failed: "Invitation created, but the email didn't send. Copy the link and send it yourself.",
   /** The invitations list: a pending row whose latest send failed. */

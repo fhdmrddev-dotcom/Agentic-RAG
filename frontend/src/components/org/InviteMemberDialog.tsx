@@ -91,6 +91,8 @@ export function InviteMemberDialog({ open, onClose, onCreated }: Props) {
   const [sentLink, setSentLink] = useState<string | null>(null)
   // 300-05 (D-11): how the invitation email went, from the server's answer.
   const [delivery, setDelivery] = useState<InviteDelivery>("not_configured")
+  // 300-REVIEW IN-01: a "sent" email that went to the test address, outside production.
+  const [toTestAddress, setToTestAddress] = useState(false)
   const [copied, setCopied] = useState(false)
   const copyRef = useRef<HTMLButtonElement>(null)
 
@@ -104,6 +106,7 @@ export function InviteMemberDialog({ open, onClose, onCreated }: Props) {
     setError(null)
     setSentLink(null)
     setDelivery("not_configured")
+    setToTestAddress(false)
     setCopied(false)
   }, [open])
 
@@ -120,6 +123,7 @@ export function InviteMemberDialog({ open, onClose, onCreated }: Props) {
       const result = await sendInvitation(email.trim(), role)
       // An older backend omits the field: read as "no email attempted", never a failure.
       setDelivery(result.email_delivery ?? "not_configured")
+      setToTestAddress(result.email_to_test_address === true)
       setSentLink(result.link)
       onCreated() // re-fetch-not-optimistic: the parent reloads the pending list
     } catch (err) {
@@ -164,7 +168,13 @@ export function InviteMemberDialog({ open, onClose, onCreated }: Props) {
         {sentLink ? (
           /* ── Link-first success (D-167-02): surface the copy/share link. ── */
           <div className="min-w-0 space-y-3 py-2">
-            {delivery === "sent" ? (
+            {delivery === "sent" && toTestAddress ? (
+              <p className="break-words text-sm text-muted-foreground">
+                {INVITE_DELIVERY.sentToTestBefore}
+                <span className="font-medium text-foreground">{email.trim()}</span>
+                {INVITE_DELIVERY.sentToTestAfter}
+              </p>
+            ) : delivery === "sent" ? (
               <p className="break-words text-sm text-muted-foreground">
                 {INVITE_DELIVERY.sentBefore}
                 <span className="font-semibold text-foreground">{email.trim()}</span>

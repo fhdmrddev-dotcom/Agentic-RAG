@@ -269,6 +269,9 @@ export interface SendInvitationResult {
   link: string
   invitation: Invitation
   email_delivery: InviteEmailDelivery
+  /** 300-REVIEW IN-01: outside production a "sent" email went to the Settings test address,
+   *  not to the invitee. `false` when absent (an older backend) or anything but `true`. */
+  email_to_test_address: boolean
 }
 
 /** An older backend that says nothing about delivery is read as "no email attempted" —
@@ -305,6 +308,7 @@ export async function sendInvitation(
     link: body.link ?? "",
     invitation: (body.invitation ?? {}) as Invitation,
     email_delivery: deliveryFrom(body.email_delivery),
+    email_to_test_address: body.email_to_test_address === true,
   }
 }
 

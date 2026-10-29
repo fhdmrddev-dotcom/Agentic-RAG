@@ -107,6 +107,31 @@ def test_send_returns_and_stores_the_delivery(client, auth_headers, wired, monke
     assert args[2] == (outcome.reason if delivery == "failed" else None)
 
 
+@pytest.mark.parametrize("outcome, to_test", [
+    (SendOutcome("sent", provider="resend", redirected=True), True),
+    (SendOutcome("sent", provider="resend"), False),
+    (SendOutcome("failed", reason="Resend refused the email (HTTP 500).", provider="resend",
+                 redirected=True), False),
+])
+def test_send_says_when_the_email_went_to_the_test_address(client, auth_headers, wired,
+                                                           monkeypatch, outcome, to_test):
+    """300-REVIEW IN-01: outside production a 'sent' email went to the Settings test address,
+    so the dialog must not bold the invitee as its recipient."""
+    _seed_send(wired)
+    _stub_send(monkeypatch, outcome)
+    body = _post(client, auth_headers).json()
+    assert body["email_to_test_address"] is to_test
+
+
+def test_resend_says_when_the_email_went_to_the_test_address(client, auth_headers, wired,
+                                                             monkeypatch):
+    _seed_resend(wired)
+    _stub_send(monkeypatch, SendOutcome("sent", provider="smtp", redirected=True))
+    res = client.post(f"/org/invitations/{INVITE_ID}/resend",
+                      headers={**auth_headers, "X-Org-Id": ACTIVE_ORG})
+    assert res.json()["email_to_test_address"] is True
+
+
 def test_a_raising_sender_is_a_failed_delivery_never_a_500(client, auth_headers, wired,
                                                           monkeypatch, caplog):
     _seed_send(wired)

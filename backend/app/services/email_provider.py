@@ -46,7 +46,7 @@ import logging
 import re
 import smtplib
 import ssl
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 from email.message import EmailMessage
 from email.utils import formataddr
 from typing import Literal
@@ -87,6 +87,9 @@ class SendOutcome:
     provider: str = "none"
     provider_id: str | None = None
     retryable: bool = False
+    #: 300-REVIEW IN-01: outside production the send was rewritten to the Settings test address,
+    #: so a ``sent`` outcome did NOT reach its real recipient. Callers say so in words.
+    redirected: bool = False
 
 
 def configured_provider() -> Literal["none", "resend", "smtp"]:
@@ -321,6 +324,7 @@ def _send(msg: OutboundEmail, idempotency_key: str | None) -> SendOutcome:
     app = load_app_settings()
     to = (msg.to or "").strip()
     subject = one_line(msg.subject)
+    redirected = False
     if not is_production_environment():
         redirect = (getattr(app, "email_dev_redirect_address", "") or "").strip()
         if not redirect:
@@ -332,6 +336,7 @@ def _send(msg: OutboundEmail, idempotency_key: str | None) -> SendOutcome:
             )
         to = redirect
         subject = "[Test] " + subject
+        redirected = True
 
     address = one_line(getattr(app, "email_from_address", "") or settings.invite_from_email or "").strip()
     if not address:
@@ -342,8 +347,10 @@ def _send(msg: OutboundEmail, idempotency_key: str | None) -> SendOutcome:
         return SendOutcome("failed", reason="The recipient address is not usable.", provider=provider)
 
     if provider == "resend":
-        return _send_resend(sender, to, subject, msg, idempotency_key)
-    return _send_smtp(sender, address, to, subject, msg)
+        outcome = _send_resend(sender, to, subject, msg, idempotency_key)
+    else:
+        outcome = _send_smtp(sender, address, to, subject, msg)
+    return replace(outcome, redirected=True) if redirected else outcome
 
 
 def send_email(msg: OutboundEmail, *, idempotency_key: str | None = None) -> SendOutcome:

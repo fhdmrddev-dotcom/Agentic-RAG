@@ -151,13 +151,17 @@ def test_outside_production_the_test_address_receives_a_test_subject(env, monkey
     assert body["subject"] == "[Test] Report is waiting on you"
     assert body["text"] == "plain body" and body["html"] == "<p>html body</p>"
     assert REAL_TO not in rec.requests[0].content.decode()
+    # 300-REVIEW IN-01: the outcome says it went to the test address, so no caller can tell the
+    # inviter "We emailed <invitee>".
+    assert out.redirected is True
 
 
 def test_production_ignores_the_test_address(env, monkeypatch):
     env["app"] = _app(email_dev_redirect_address=TEST_TO)
     rec = _resend(monkeypatch)
 
-    ep.send_email(_msg())
+    out = ep.send_email(_msg())
+    assert out.redirected is False
 
     body = rec.body()
     assert body["to"] == [REAL_TO]

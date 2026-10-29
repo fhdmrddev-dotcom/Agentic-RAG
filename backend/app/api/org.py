@@ -474,6 +474,8 @@ async def send_org_invitation(
             ),
         },
         "email_delivery": email_delivery,
+        # 300-REVIEW IN-01: a "sent" email outside production went to the Settings test address.
+        "email_to_test_address": email_delivery == "sent" and outcome.redirected,
     }
 
 
@@ -593,6 +595,7 @@ async def resend_org_invitation(
         "link": link,
         "invitation": {"id": str(row["id"]), "email": row["email"], "role": row["role"]},
         "email_delivery": email_delivery,
+        "email_to_test_address": email_delivery == "sent" and outcome.redirected,
     }
 
 
