@@ -345,10 +345,10 @@ Not a rename/refactor phase — omitted. (Cloud state to carry at deploy: migrat
 | A2 | `SUBSCRIBED` re-fires after a socket rejoin (read from source, not driven) | Q3 | Reconcile still happens via focus + 60 s poll |
 | A3 | Scheduled runs resolve the model from owner settings, not a per-request body | Q8 | Only affects the schedule UAT row's provider label |
 
-## Open Questions
+## Open Questions (RESOLVED)
 
-1. **"· scheduled" on the row (F7)** — wire it (recommended, one column) or remove from the sketch? Decide in planning; SC#4 compares against the sketch.
-2. **Approval row in G-4** — no ready-made published approval workflow was located on the local DB this session (only question steps were searched). Recommendation: author one tiny `external_action` (send_email, posture ask) workflow in the dev org during UAT prep, or drive the approval case at the DB/unit level and keep the Chrome rows to questions.
+1. **"· scheduled" on the row (F7)** — RESOLVED: CONTEXT D-28 (wired; `origin` on the wire, row words in the vocabulary leaf). Original question: wire it (recommended, one column) or remove from the sketch? Decide in planning; SC#4 compares against the sketch.
+2. **Approval row in G-4** — RESOLVED: CONTEXT D-34 (approval proven at unit/DB level; a small approval workflow authored for G-4 only if cheap). Original question: no ready-made published approval workflow was located on the local DB this session (only question steps were searched). Recommendation: author one tiny `external_action` (send_email, posture ask) workflow in the dev org during UAT prep, or drive the approval case at the DB/unit level and keep the Chrome rows to questions.
 
 ## Environment Availability
 
