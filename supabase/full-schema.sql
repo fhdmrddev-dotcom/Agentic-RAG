@@ -837,10 +837,15 @@ BEGIN
         IF tc->>'kind' = 'ask_user_prompt'
            AND NEW.origin = 'harness'
            AND tc->>'run_id' ~* '^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$' THEN
+            -- 300-SECURITY UF-1: the messages INSERT policy checks user_id + org only, so a row naming
+            -- another user's run could be written by that other user in their OWN thread. This
+            -- function is SECURITY DEFINER, so the write is scoped to prompts in the run's own
+            -- thread — where engine_ask.py and human_input.py write them.
             SELECT wr.id, wr.user_id, wr.org_id, wr.status, wr.is_golden_run
               INTO r
               FROM public.workflow_runs wr
-             WHERE wr.id = (tc->>'run_id')::uuid;
+             WHERE wr.id = (tc->>'run_id')::uuid
+               AND wr.thread_id = NEW.thread_id;
             IF FOUND
                AND r.user_id IS NOT NULL
                AND NOT coalesce(r.is_golden_run, false)

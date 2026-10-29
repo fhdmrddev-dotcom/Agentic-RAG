@@ -317,6 +317,38 @@ async def test_a_run_that_is_not_waiting_writes_no_notice(status):
         assert await _notices(w.conn, run) == []
 
 
+async def test_a_prompt_outside_the_runs_thread_writes_no_notice():
+    """300-SECURITY UF-1: the messages INSERT policy checks user_id + org only, so a signed-in user
+    who knows another user's workflow-run id could write a harness prompt row in THEIR OWN thread
+    naming that run, and the SECURITY DEFINER trigger wrote (or re-pointed) the victim's notice and
+    its email. The engine and human_input write prompts into the run's own thread, so the write is
+    now scoped to it."""
+    async with _world() as w:
+        c = w.conn
+        foreign_thread = await c.fetchval(
+            "INSERT INTO public.threads (user_id, org_id, title) VALUES ($1, $2, 'foreign') RETURNING id",
+            w.other, w.org_b,
+        )
+        tool_call = {"kind": "ask_user_prompt", "tool_call_id": "tc-forged", "prompt": "x",
+                     "options": [], "timeout_seconds": None, "run_id": str(w.run)}
+        await c.execute(
+            "INSERT INTO public.messages (thread_id, user_id, role, content, origin, org_id, tool_calls)"
+            " VALUES ($1, $2, 'system', 'x', 'harness', $3, $4::jsonb)",
+            foreign_thread, w.other, w.org_b, json.dumps([tool_call]),
+        )
+        assert await _notices(c, w.run) == [], "a prompt in another thread wrote the run owner's notice"
+        # non-vacuity: the same prompt in the run's own thread writes it
+        await _prompt(c, w, w.run, "tc-own")
+        assert [n["tool_call_id"] for n in await _notices(c, w.run)] == ["tc-own"]
+        # and a forged prompt cannot re-point an OPEN notice either
+        await c.execute(
+            "INSERT INTO public.messages (thread_id, user_id, role, content, origin, org_id, tool_calls)"
+            " VALUES ($1, $2, 'system', 'x', 'harness', $3, $4::jsonb)",
+            foreign_thread, w.other, w.org_b, json.dumps([tool_call]),
+        )
+        assert [n["tool_call_id"] for n in await _notices(c, w.run)] == ["tc-own"]
+
+
 async def test_a_malformed_run_id_writes_nothing_and_the_message_lands():
     async with _world() as w:
         c = w.conn
