@@ -1,7 +1,9 @@
 ---
 phase: 301
 slug: the-waiting-on-you-notice
-status: draft
+status: approved
+reviewed_at: 2026-10-29
+reviewed_by: gsd-ui-checker (6/6, 3 non-blocking FLAGs; self-approved under the autonomous mandate — operator sketch approval owed at G-4)
 shadcn_initialized: true
 preset: not applicable
 created: 2026-10-29
@@ -70,6 +72,8 @@ All new markup uses 4 / 8 / 16 / 24 / 32 px.
 | 44px drawer row (`min-h-11`) | S3 | Touch target. 44 is on the 4px grid |
 
 ---
+
+> Scale weights are **400 and 600 only**. 500 and 700 are NOT part of this scale; they appear solely inside shipped class strings copied verbatim (`RailItem` `font-medium`, the Library badge `font-bold`).
 
 ## Typography
 
