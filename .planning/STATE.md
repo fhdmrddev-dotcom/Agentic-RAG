@@ -116,4 +116,6 @@ carries 299 copy 19:27 UTC; operator smoke: chat list loads on app.superrag.clou
 
 - **300-03 G-5 (2026-10-29):** `backend/app/services/harness/phase_types.py` FIRES ("G-5 OWED") and 300-03 touches it anyway: one hunk inside `_external_action_sent_body` for D-23 (the send_email receipt names the recipient "(via host)" and says the mail server accepted it). Honoured by construction; the owed refactor is NOT discharged.
 
+- **301 G-2 (2026-10-29):** ROADMAP says "the approved mockup is the acceptance bar". Under the operator's autonomous mandate ("continue autonomously end to end") the sketch winner was SELF-PICKED: `.planning/sketches/301-waiting-on-you/` ★ A (own rail control; B avatar / C Workflows rejected in the README). SC#4 ("matches the operator-approved sketch") therefore stays owed to the operator at G-4 — show the sketch beside the built control first.
+
 The 286-296 overrides are in `milestones/v4.7-STATE-at-close.md`.
