@@ -254,13 +254,27 @@ export interface Invitation {
   expires_at: string | null
   invited_by?: string | null
   created_at?: string | null
+  /** 300-05 (D-11) — how the latest invitation email went; null when none was attempted.
+   *  Optional: an older backend omits it. */
+  email_delivery?: InviteEmailDelivery | null
 }
 
+/** 300-05 (D-11) — whether the invitation EMAIL went. The invite itself always succeeds and
+ *  always returns its link; `not_configured` means no email was attempted. */
+export type InviteEmailDelivery = "sent" | "failed" | "not_configured"
+
 /** `POST /org/invitations` result — the copy/share `link` (raw token, link-first
- *  D-167-02) + the created pending `invitation`. */
+ *  D-167-02) + the created pending `invitation` + how its email went (300-05, D-11). */
 export interface SendInvitationResult {
   link: string
   invitation: Invitation
+  email_delivery: InviteEmailDelivery
+}
+
+/** An older backend that says nothing about delivery is read as "no email attempted" —
+ *  never as a failure the inviter did not have. */
+function deliveryFrom(raw: unknown): InviteEmailDelivery {
+  return raw === "sent" || raw === "failed" || raw === "not_configured" ? raw : "not_configured"
 }
 
 /** `POST /org/invitations/accept` result — the org the invitee JOINED, their granted
@@ -290,6 +304,7 @@ export async function sendInvitation(
   return {
     link: body.link ?? "",
     invitation: (body.invitation ?? {}) as Invitation,
+    email_delivery: deliveryFrom(body.email_delivery),
   }
 }
 
@@ -309,15 +324,17 @@ export async function listInvitations(status?: string): Promise<Invitation[]> {
 /** Re-mint a fresh token + expiry for a pending invite (`POST /org/invitations/{id}/resend`;
  *  org:invite-gated). Returns the FRESH copy/share link (D-167-02). A non-pending /
  *  cross-org id → 404 server-side. */
-export async function resendInvitation(id: string): Promise<{ link: string }> {
+export async function resendInvitation(
+  id: string,
+): Promise<{ link: string; email_delivery: InviteEmailDelivery }> {
   const headers = await getAuthHeaders()
   const res = await fetch(`${API_BASE}/org/invitations/${id}/resend`, {
     method: "POST",
     headers,
   })
   if (!res.ok) throw new ApiError("Failed to resend the invitation.", res.status)
-  const body = (await res.json()) as { link?: string }
-  return { link: body.link ?? "" }
+  const body = (await res.json()) as { link?: string; email_delivery?: unknown }
+  return { link: body.link ?? "", email_delivery: deliveryFrom(body.email_delivery) }
 }
 
 /** Revoke a pending invite (`DELETE /org/invitations/{id}`; org:invite-gated). A soft

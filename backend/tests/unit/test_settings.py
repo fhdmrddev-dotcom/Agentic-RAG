@@ -49,6 +49,11 @@ def _fake_settings(**overrides):
         # 293 (D-14) — the per-key API limits; the response REQUIRES them as well.
         api_key_starts_per_minute=10,
         api_key_reads_per_minute=120,
+        # 300 (D-07, D-08, D-10) — the mail knobs; the response REQUIRES them as well.
+        notification_email_delay_seconds=120,
+        email_from_address="",
+        email_from_name="Syrel",
+        email_dev_redirect_address="",
         # SEED-258, present for the same reason the two above are: the response genuinely
         # REQUIRES it. The bounds beside it in the response are code constants, not settings,
         # so they are deliberately NOT stubbed here — a stubbable bound is a settable bound.

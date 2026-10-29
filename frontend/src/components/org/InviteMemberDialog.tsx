@@ -21,9 +21,15 @@
  * SECURITY (T-167-17): this modal is render courtesy only — every write is server-gated on
  * `org:invite` (Plan 02). A forced mount without the permission 403s at the wire.
  * Org-indigo `primary` accent throughout — the reserved operator warning tint is never used.
+ *
+ * Phase 300-05 (NOTE-06 / D-11, UI-D12): the result panel has THREE arms by `email_delivery` —
+ * "Invitation sent" (we emailed it), "Invitation created" (the email did not go: the D-11 sentence
+ * in a NEUTRAL box, and Copy link takes focus, since the link is the one thing left to do) and the
+ * shipped "Invitation ready" (no email attempted, or an older backend). Every word comes from
+ * `inviteDeliveryCopy.ts`; no arm names the mail provider, an error code, or a retry.
  */
-import { useEffect, useState } from "react"
-import { Check, Copy, Link2 } from "lucide-react"
+import { useEffect, useRef, useState } from "react"
+import { Check, Copy, Link2, MailX } from "lucide-react"
 
 import {
   Dialog,
@@ -35,6 +41,7 @@ import {
 import { Button } from "@/components/ui/button"
 import { sendInvitation, ApiError } from "@/lib/api"
 import { cn } from "@/lib/utils"
+import { INVITE_DELIVERY, deliveryTitle, type InviteDelivery } from "./inviteDeliveryCopy"
 
 interface Props {
   open: boolean
@@ -82,7 +89,10 @@ export function InviteMemberDialog({ open, onClose, onCreated }: Props) {
   const [error, setError] = useState<string | null>(null)
   // The link-first success panel: the raw-token invite link to copy/share (D-167-02).
   const [sentLink, setSentLink] = useState<string | null>(null)
+  // 300-05 (D-11): how the invitation email went, from the server's answer.
+  const [delivery, setDelivery] = useState<InviteDelivery>("not_configured")
   const [copied, setCopied] = useState(false)
+  const copyRef = useRef<HTMLButtonElement>(null)
 
   // Reset-on-open (the CreateLinkDialog posture): clear form + result + errors when the
   // modal is (re)opened so a prior send never bleeds into the next.
@@ -93,8 +103,14 @@ export function InviteMemberDialog({ open, onClose, onCreated }: Props) {
     setLoading(false)
     setError(null)
     setSentLink(null)
+    setDelivery("not_configured")
     setCopied(false)
   }, [open])
+
+  // The failed arm: a keyboard user lands on the one thing left to do (UI-SPEC S4).
+  useEffect(() => {
+    if (sentLink && delivery === "failed") copyRef.current?.focus()
+  }, [sentLink, delivery])
 
   async function handleConfirm() {
     if (!looksLikeEmail(email)) return
@@ -102,6 +118,8 @@ export function InviteMemberDialog({ open, onClose, onCreated }: Props) {
     setError(null)
     try {
       const result = await sendInvitation(email.trim(), role)
+      // An older backend omits the field: read as "no email attempted", never a failure.
+      setDelivery(result.email_delivery ?? "not_configured")
       setSentLink(result.link)
       onCreated() // re-fetch-not-optimistic: the parent reloads the pending list
     } catch (err) {
@@ -140,17 +158,33 @@ export function InviteMemberDialog({ open, onClose, onCreated }: Props) {
     >
       <DialogContent>
         <DialogHeader>
-          <DialogTitle>{sentLink ? "Invitation ready" : "Invite a member"}</DialogTitle>
+          <DialogTitle>{sentLink ? deliveryTitle(delivery) : "Invite a member"}</DialogTitle>
         </DialogHeader>
 
         {sentLink ? (
           /* ── Link-first success (D-167-02): surface the copy/share link. ── */
           <div className="min-w-0 space-y-3 py-2">
-            <p className="break-words text-sm text-muted-foreground">
-              Share this link with{" "}
-              <span className="font-medium text-foreground">{email.trim()}</span>. They join
-              your organization by opening it and signing in.
-            </p>
+            {delivery === "sent" ? (
+              <p className="break-words text-sm text-muted-foreground">
+                {INVITE_DELIVERY.sentBefore}
+                <span className="font-semibold text-foreground">{email.trim()}</span>
+                {INVITE_DELIVERY.sentAfter}
+              </p>
+            ) : delivery === "failed" ? (
+              <div
+                role="status"
+                className="flex items-start gap-2 rounded-md border border-border bg-muted/40 px-4 py-2"
+              >
+                <MailX className="mt-1 h-4 w-4 shrink-0 text-muted-foreground" aria-hidden="true" />
+                <p className="text-sm text-foreground">{INVITE_DELIVERY.failed}</p>
+              </div>
+            ) : (
+              <p className="break-words text-sm text-muted-foreground">
+                Share this link with{" "}
+                <span className="font-medium text-foreground">{email.trim()}</span>. They join
+                your organization by opening it and signing in.
+              </p>
+            )}
             <div className="flex items-stretch gap-2">
               <div className="flex min-w-0 flex-1 items-center gap-2 rounded-md border border-primary/30 bg-primary/[0.06] px-3 py-2">
                 <Link2 className="h-3.5 w-3.5 flex-none text-primary" aria-hidden="true" />
@@ -163,6 +197,7 @@ export function InviteMemberDialog({ open, onClose, onCreated }: Props) {
                 </span>
               </div>
               <Button
+                ref={copyRef}
                 type="button"
                 variant="outline"
                 onClick={copyLink}

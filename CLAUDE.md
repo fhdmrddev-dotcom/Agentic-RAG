@@ -491,11 +491,11 @@ node scripts/check-hot-file-ledger.cjs <phase-dir>   # 0 clear · 1 missing rows
 | `backend/app/main.py` | 98 / 72 / 1020 (was `97 / 71 / 993`) | 300-04: drainer start/stop under the boot-sweep gate (D-20) · ⛔ |
 | `backend/app/config.py` | 96 / 55 / 1831 (was `93 / 54 / 1809`) | 300-03: SMTP_* fields (D-28) · seam OWED · ⛔ |
 | `backend/app/api/admin.py` | 44 / 17 / 2054 (was `43 / 17 / 2051`) | quick-261024: discover summary gains a `returned` count (+3) · ⛔ |
-| `backend/app/api/settings.py` | 47 / 25 / 1301 (was `46 / 24 / 1250`) | 293-01: two bounded per-key limit writes; allow-list +2 |
+| `backend/app/api/settings.py` | 48 / 26 / 1398 (was `47 / 25 / 1301`) | 300-05: four email knobs + read-only provider (D-07/D-08) |
 | `backend/app/services/multimodal_service.py` | 14 / 7 / 984 | ⚠ absent from BOTH for its ENTIRE LIFE at **7 phases** |
 | `backend/app/api/documents.py` | 101 / 40 / 2709 (was `99 / 39 / 2698`) | 298-01: one by_org in build() + one root_upload_org kwarg · ⛔ |
 | `backend/app/api/library.py` | 3 / 3 / 304 (was `2 / 2 / 299`) | ⚠ now FIRES (298) · 298-01: summary shares the lists' org predicate ($1) |
-| `scripts/vitest-count-gate.cjs` | 396 / 83 / 6868 (was `395 / 83 / 6865`) | 300-04: 1 FILE-LEVEL pin added (HealthSignals.email 11), none lowered |
+| `scripts/vitest-count-gate.cjs` | 398 / 83 / 6881 (was `397 / 83 / 6873`) | 300-05: 3 org pins added (InvitationsTab 17, dialog 7, copy 6) |
 | `scripts/check-deploy-drift.sh` | 6 / 5 / 271 (was `5 / 4 / 267`) | 300-03: SMTP_* parity |
 | `scripts/build-public-openapi.cjs` | 11 / 5 / 472 (was `7 / 3 / 468`) | 298-01: org-items tag (Account & org) + /org-items/ FLAGGED (2 lines) |
 | `scripts/check-seeds-register.cjs` | 7 / 3 / 1132 | ⚠ FIRES, absent here — row added 296-05 · `\d{3,}` ids · ⛔ |
@@ -529,10 +529,12 @@ node scripts/check-hot-file-ledger.cjs <phase-dir>   # 0 clear · 1 missing rows
 | `frontend/src/components/workflows/RunTranscript.tsx` | 7 / 3 / 652 | ⚠ **FIRES on a component with NO MOUNT in the product** |
 | `frontend/src/components/settings/ConnectionsTab.tsx` | 26 / 10 / 1634 (was `25 / 9 / 1635`) | 297-02: dead #chat hash write deleted (D-37) · item inert → SEED-392 |
 | `frontend/src/components/settings/ConnectionFormPanel.tsx` | 28 / 10 / 2477 | ⭐ NAMED SEAM TAKEN (239-08) · wider seam OWED · ⛔ |
-| `frontend/src/lib/api/org.ts` | 11 / 8 / 629 | ⚠ absent its ENTIRE LIFE · THIRD wire-type drift (239) |
+| `frontend/src/lib/api/org.ts` | 12 / 9 / 646 (was `11 / 8 / 629`) | 300-05: email_delivery on invite results + rows (D-11) |
+| `frontend/src/components/org/InviteMemberDialog.tsx` | 4 / 3 / 316 | ⚠ now FIRES (300) · 300-05: three result arms (UI-D12) · ⛔ |
+| `frontend/src/components/org/InvitationsTab.tsx` | 4 / 3 / 310 | ⚠ now FIRES (300) · 300-05: Email not sent chip + resend line · ⛔ |
 | `frontend/src/components/settings/connectionsCopy.ts` | 16 / 9 / 804 | ⚠ row STALE · honoured by construction (BUG-260912-01) |
 | `frontend/src/components/settings/connectionFormCopy.ts` | 19 / 8 / 1631 | seam named (239-05), RODE it (239-07) · ⛔ |
-| `frontend/src/pages/SettingsPage.tsx` | 62 / 30 / 1690 (was `61 / 30 / 1681`) | 293-03: one ref + changes() spread + adopt(); useState 49 → 49 · ⛔ |
+| `frontend/src/pages/SettingsPage.tsx` | 63 / 31 / 1698 (was `62 / 30 / 1690`) | 300-05: one EmailSettings ref/spread/adopt/mount · ⛔ |
 | `frontend/src/pages/settingsSearchPayload.ts` | 2 / 2 / 116 | young (created 242) |
 | `frontend/src/components/settings/ModelPillRow.tsx` | 5 / 4 / 151 | ⚠ FIRES · honoured by construction (249-02) · ⛔ |
 | `frontend/src/components/workflows/phaseVocabulary.ts` | 18 / 8 / 1102 (was `16 / 6 / 990`) | 296-07: own() lookups, STEP_UNTYPED, comparePhaseOrder, engineArmed |
@@ -621,7 +623,8 @@ node scripts/check-hot-file-ledger.cjs <phase-dir>   # 0 clear · 1 missing rows
 | `frontend/src/components/chat/InviteExpertDialog.tsx` | 10 / 5 / 648 (was `4 / 4 / 614`) | honoured by construction (279-03: ONE field + prop) · seam TAKEN |
 | `frontend/src/components/skills/SkillFormDialog.tsx` | 13 / 9 / 657 | ⚠ row STALE · honoured by construction (263-04) · ⛔ |
 | `backend/app/api/skills.py` | 20 / 10 / 859 (was `19 / 10 / 858`) | ⛔ FIRES · last touch 280-01 (6 maybe_row guards) |
-| `frontend/src/lib/api/skills.ts` | 9 / 6 / 767 (was `8 / 5 / 761`) | 293-03: two optional limit fields on FullAppSettings + SettingsUpdate |
+| `frontend/src/lib/api/skills.ts` | 10 / 7 / 779 (was `9 / 6 / 767`) | 300-05: four optional email fields + provider |
+| `frontend/src/lib/api/settings.ts` | 11 / 5 / 529 | ⚠ FIRES, absent here — row added 300-05 · switch's own PUT (D-09) · ⛔ |
 | `backend/app/services/openai_service.py` | 84 / 42 / 2731 (was `81 / 41 / 2623`) | 292: SHOW_ARTIFACT_TOOL schema + description only (30 tools) · ⛔ |
 | `backend/app/services/provider_gateway/openai_compat.py` | 10 / 7 / 468 (was `9 / 6 / 466`) | 296-06: one moonshot_tools conditional keyed on the endpoint provider |
 | `backend/app/services/provider_gateway/dispatcher.py` | 10 / 4 / 260 (was `6 / 2 / 153`) | ⚠ FIRES (row was stale) · 282-01: off-loop open, shared deadline · ⛔ |
