@@ -105,9 +105,29 @@ vi.mock("@/lib/supabase", () => ({
         data: { subscription: { unsubscribe: vi.fn() } },
       }),
     },
-    channel: vi.fn(),
+    // Phase 301-02 (F11): `useWaitingNotices` now runs inside every ChatLayout mount and opens a
+    // user-scoped channel. `vi.fn()` alone returned `undefined` (the hook survives that too), but
+    // a real-shaped channel — a chainable `on` and a `subscribe` — is what the shell meets in the
+    // product, so the double carries one. `subscribe` never fires its status callback here.
+    channel: vi.fn(() => {
+      const ch: { on: ReturnType<typeof vi.fn>; subscribe: ReturnType<typeof vi.fn> } = {
+        on: vi.fn(),
+        subscribe: vi.fn(),
+      }
+      ch.on.mockReturnValue(ch)
+      ch.subscribe.mockReturnValue(ch)
+      return ch
+    }),
     removeChannel: vi.fn(),
   },
+}))
+
+// Phase 301-02 (D-14 / D-15): the waiting-notices client is NOT in the `@/lib/api` barrel either,
+// so it is mocked by its own path, exactly like `@/lib/api/sources` above. Zero notices by default:
+// every case below that predates 301 is a world with nothing waiting.
+const { mockGetWaitingNotices } = vi.hoisted(() => ({ mockGetWaitingNotices: vi.fn() }))
+vi.mock("@/lib/api/notifications", () => ({
+  getWaitingNotices: mockGetWaitingNotices,
 }))
 
 // Heavy leaves that are irrelevant to the signal and pull their own seams.
@@ -155,7 +175,7 @@ const TWO_STOPPED = {
 
 const NONE_STOPPED = { stopped: [], reader_running: true, poll_interval_seconds: 600 }
 
-function renderLayout() {
+function renderLayout(overrides: { onOpenLibraryHealth?: (() => void) | undefined } = { onOpenLibraryHealth: vi.fn() }) {
   return render(
     <TooltipProvider>
       <StreamsProvider>
@@ -174,7 +194,7 @@ function renderLayout() {
           onReviewEvals={vi.fn()}
           onStudioTabChange={vi.fn()}
           onTuneSkill={vi.fn()}
-          onOpenLibraryHealth={vi.fn()}
+          onOpenLibraryHealth={overrides.onOpenLibraryHealth}
         />
       </StreamsProvider>
     </TooltipProvider>,
@@ -184,6 +204,7 @@ function renderLayout() {
 beforeEach(() => {
   vi.clearAllMocks()
   mockGetSourceHealth.mockResolvedValue(TWO_STOPPED)
+  mockGetWaitingNotices.mockResolvedValue({ notices: [], total: 0 })
 })
 afterEach(() => cleanup())
 
@@ -261,6 +282,84 @@ describe("ChatLayout attention signal — a healthy instance is silent", () => {
     expect(screen.queryByTestId("drawer-attention-badge")).toBeNull()
     // The Library door is still there — silence is the absence of a SIGNAL, not of the nav.
     expect(screen.getAllByRole("button", { name: "Library" }).length).toBeGreaterThan(0)
+  })
+})
+
+// ══ PHASE 301-02 (D-12 / D-14) — THE LIBRARY MARK STAYS THE LIBRARY'S ════════════════════
+//
+// A waiting run is a SECOND tenant of the one read. It must never add to the Library's number
+// (rail badge, drawer badge) — those count `library` conditions only — but a waiting run ALONE
+// must still light the phone's hamburger dot, because the dot is the only signal a closed drawer
+// has. The words of the waiting list are 301-03's; this block proves the counts.
+const ONE_STOPPED = { ...TWO_STOPPED, stopped: [TWO_STOPPED.stopped[0]] }
+const TWO_WAITING = {
+  notices: [
+    {
+      id: "n-1",
+      run_id: "run-1",
+      org_id: "org-a",
+      org_name: "Acme",
+      workflow_name: "Quarterly review",
+      kind: "question" as const,
+      origin: "app" as const,
+      created_at: "2026-10-30T09:00:00Z",
+    },
+    {
+      id: "n-2",
+      run_id: "run-2",
+      org_id: "org-b",
+      org_name: "Beta",
+      workflow_name: "Contract approval",
+      kind: "approval" as const,
+      origin: "schedule" as const,
+      created_at: "2026-10-30T08:00:00Z",
+    },
+  ],
+  total: 2,
+}
+
+describe("301-02 — the mark partition in the shell", () => {
+  it("a WAITING-ONLY world: no Library badge anywhere, and the hamburger dot IS lit", async () => {
+    mockGetSourceHealth.mockResolvedValue(NONE_STOPPED)
+    mockGetWaitingNotices.mockResolvedValue(TWO_WAITING)
+    const user = userEvent.setup()
+    renderLayout()
+
+    expect(await screen.findByTestId("drawer-trigger-dot")).toBeInTheDocument()
+    expect(screen.queryByTestId("rail-badge")).toBeNull()
+    await user.click(screen.getByRole("button", { name: /open navigation/i }))
+    expect(screen.queryByTestId("drawer-attention-badge")).toBeNull()
+  })
+
+  it("a MIXED world: the Library badges read 1, never 3, and the dot is lit", async () => {
+    mockGetSourceHealth.mockResolvedValue(ONE_STOPPED)
+    mockGetWaitingNotices.mockResolvedValue(TWO_WAITING)
+    const user = userEvent.setup()
+    renderLayout()
+
+    const railBadge = await screen.findByTestId("rail-badge")
+    // Both fetches have landed before the count is read — otherwise "1" would be vacuous.
+    await waitFor(() => expect(mockGetWaitingNotices).toHaveBeenCalledTimes(1))
+    expect(screen.getByTestId("drawer-trigger-dot")).toBeInTheDocument()
+    expect(railBadge).toHaveTextContent(/^1$/)
+    await user.click(screen.getByRole("button", { name: /open navigation/i }))
+    expect(await screen.findByTestId("drawer-attention-badge")).toHaveTextContent(/^1$/)
+  })
+
+  it("reads each source of attention EXACTLY ONCE on mount (D-14)", async () => {
+    mockGetSourceHealth.mockResolvedValue(ONE_STOPPED)
+    mockGetWaitingNotices.mockResolvedValue(TWO_WAITING)
+    renderLayout()
+    await screen.findByTestId("rail-badge")
+    expect(mockGetSourceHealth).toHaveBeenCalledTimes(1)
+    expect(mockGetWaitingNotices).toHaveBeenCalledTimes(1)
+  })
+
+  it("the waiting dot does not depend on a Library navigator being wired", async () => {
+    mockGetSourceHealth.mockResolvedValue(NONE_STOPPED)
+    mockGetWaitingNotices.mockResolvedValue(TWO_WAITING)
+    renderLayout({ onOpenLibraryHealth: undefined })
+    expect(await screen.findByTestId("drawer-trigger-dot")).toBeInTheDocument()
   })
 })
 

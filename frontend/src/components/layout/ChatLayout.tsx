@@ -601,16 +601,36 @@ export function ChatLayout({ onSignOut, activeView, onNavigate, navItems, isOper
   //
   // The callback is memoised so the produced conditions are stable across renders.
   const openLibraryHealth = useCallback(() => onOpenLibraryHealth?.(), [onOpenLibraryHealth])
+  // Phase 301-02 (D-13): producers take ONE context object, memoised, so each tenant reads the
+  // door it leads to (Library health, or a run) and the conditions stay stable across renders.
+  const openRunForAttention = useCallback((runId: string) => openRun?.(runId), [openRun])
+  const attentionCtx = useMemo(
+    () => ({ openLibraryHealth, openRun: openRunForAttention }),
+    [openLibraryHealth, openRunForAttention],
+  )
   const attentionConditions = attentionRegistry.ATTENTION_PRODUCERS.flatMap((producer) =>
-    producer.use(openLibraryHealth),
+    producer.use(attentionCtx),
   )
   // ⚠ Rules of hooks hold across the loop above because the registry is a FROZEN module
   // constant: its length cannot change between renders, so the hook call order cannot either.
-  const attentionCount = attentionConditions.length
+  //
+  // ⚠ Phase 301-02 (D-12): "three renderers hang off this single line" is still true, but the
+  // conditions now carry a MARK and the renderers no longer read the same slice. The rail badge,
+  // its popover and the drawer's Library badge read LIBRARY conditions only (`libraryConditions`
+  // below, and NavPanel's own `conditionsForMark`); the hamburger dot reads EITHER mark
+  // (`dotCount`); the Library's tab strip still receives the FULL list and counts only its own
+  // marks (`attentionCountByTab`); 301-03's waiting control reads the waiting slice. A waiting run
+  // therefore never adds to the Library's number, and a waiting run alone still lights the dot.
+  const libraryConditions = attentionRegistry.conditionsForMark(attentionConditions, "library")
+  const attentionCount = libraryConditions.length
   // ⛔ NOTHING IS DERIVED HERE. The server applied the soft-failure debounce; an instance
   // where one check failed and the next recovered arrives as an empty array and signals
   // nothing (SC#4).
   const showAttention = attentionCount > 0 && Boolean(onOpenLibraryHealth)
+  // The drawer-opening dot: Library conditions (when actionable) PLUS the server's waiting total
+  // (never a row count, F8). ⛔ Not gated on `onOpenLibraryHealth` — a waiting run leads to its
+  // run, not to the Library, so a shell with no Library navigator must still signal it.
+  const dotCount = (showAttention ? attentionCount : 0) + attentionRegistry.waitingTotal(attentionConditions)
   // Phase 244 plan 04 (SHELL-05 · BUG-260911-03): a FOURTH renderer hangs off the SAME one
   // read — the Library's own tab strip. ⛔ The conditions travel DOWN as data (see the mount
   // below); nothing here calls `useSourceAttention()` and neither does the page, because arm 1
@@ -871,8 +891,8 @@ export function ChatLayout({ onSignOut, activeView, onNavigate, navItems, isOper
         prefillMessage={prefillMessage}
         onSetPrefillMessage={onSetPrefillMessage}
         setDrawerOpen={setDrawerOpen}
-        showAttention={showAttention}
-        attentionCount={attentionCount}
+        showAttention={dotCount > 0}
+        attentionCount={dotCount}
         historyCollapsed={historyCollapsed}
         setHistoryCollapsedPersisted={setHistoryCollapsedPersisted}
         canvasEnabled={canvasEnabled}
