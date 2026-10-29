@@ -4,7 +4,7 @@ milestone: v4.8
 milestone_name: Every Page Has a Link
 status: human_needed
 last_updated: 2026-10-29T00:00:00.000Z
-last_activity: 2026-10-29 -- Phase 300 context gathered (4 areas; 5 bugs + SEED-281 folded); planning next
+last_activity: 2026-10-29 -- Phase 300 planned: 5 plans / 4 waves, checker passed (0 blockers); executing
 progress:
   total_phases: 13
   completed_phases: 0
@@ -31,7 +31,7 @@ See: `.planning/PROJECT.md` (updated 2026-10-27)
 
 **Core value:** The agent acts as an AI colleague — it knows your knowledge base, can run code, and
 can be taught new behaviours (skills) that persist and can be shared.
-**Current focus:** Phase 300 — told when a run waits (context gathered 2026-10-29; autonomous plan → execute under way). Phase 299 stays human_needed with 6 UAT rows POSTPONED by operator decision 2026-10-29.
+**Current focus:** Phase 300 — told when a run waits (planned 2026-10-29: 5 plans, waves 01+02 → 03 → 04 → 05; executing autonomously). Phase 299 stays human_needed with 6 UAT rows POSTPONED by operator decision 2026-10-29.
 
 ---
 
