@@ -11908,7 +11908,7 @@ cells rot within days.
 | [`frontend/src/components/chat/ActiveConnectorChips.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentschatactiveconnectorchipstsx) | 2 / 2 / 82 | no (2 phases) | ⚠ absent for its entire life — row added 244-05 at its SECOND phase. **244**: the row container HOISTED out; it is bare chips now, `null` on empty (D-244-26) |
 | [`frontend/src/stores/streamsStore.ts`](docs/HOT-FILE-LEDGER.md#frontendsrcstoresstreamsstorets) | 28 / 19 / 662 (was `27 / 18 / 660`) | ⚠ **FIRES** | 296-04 (287-TSC): the initializer is annotated `(): StreamsState`, so the TS2345 at :492 is gone. Type only · ⛔ |
 | [`frontend/src/lib/toolMeta.ts`](docs/HOT-FILE-LEDGER.md#frontendsrclibtoolmetats) | 12 / 8 / 367 (was `11 / 7 / 352`) | ⚠ **FIRES** | **273-05**: `stepLabel` (show_artifact phrase, every other tool byte-identical to `toolLabel`). ⛔ the ONE home of the activity string |
-| [`scripts/full-schema-supplement.sql`](docs/HOT-FILE-LEDGER.md#scriptsfull-schema-supplementsql) | 25 / 17 / 863 (was `23 / 15 / 848`) | ⚠ **FIRES** | 296-01: mig 216 handle_new_user copy, one expression (no-email org name). Honoured by construction |
+| [`scripts/full-schema-supplement.sql`](docs/HOT-FILE-LEDGER.md#scriptsfull-schema-supplementsql) | 26 / 18 / 888 (was `25 / 17 / 863`) | ⚠ **FIRES** | 300-02: mig 218's REVOKE/GRANT block appended (25 lines) — the schema dump omits privileges. Honoured by construction |
 | [`scripts/check-schema-acl-parity.cjs`](docs/HOT-FILE-LEDGER.md#scriptscheck-schema-acl-paritycjs) | 4 / 2 / 1156 | no (2 phases) | ⚠ row STALE at `3/2/883` ONE PLAN LATER, same day — lines rot faster than phases. **253-03**: it finally READS `full-schema.sql` (`assertTailIdentity`); 29 → 35 self-test arms |
 | [`scripts/check-greenfield-privileges.py`](docs/HOT-FILE-LEDGER.md#scriptscheck-greenfield-privilegespy) | 2 / 1 / 1312 | no (1 phase) | ⚠ row STALE at `1/1/1157` the same day it was written. **253-03**: `_statements` replaces `line.find("--")`; ⛔ a SKIP is exit 2, never 0 |
 | [`.claude/hooks/schema-acl-parity-guard.js`](docs/HOT-FILE-LEDGER.md#claudehooksschema-acl-parity-guardjs) | 2 / 1 / 145 | no (1 phase) | young (created 253-02). Row added AT CREATION — `.claude/` is EXEMPT, so no gate can ever demand it. ⛔ its SILENCE reads as "clear": every path a payload can carry must be extracted |
@@ -22681,6 +22681,16 @@ CLAUDE.md verdict cell as of 2026-10-16 (replaced by 284-05):
 
 > ⚠ row STALE · last touch 266-01 · ⛔
 
+
+### `scripts/full-schema-supplement.sql` — Phase 300 (300-02)
+
+Re-derived 2026-10-29 with the CLAUDE.md recipe: **26 / 18 / 888** (was `25 / 17 / 863`). 300-02 appended migration 218's
+privilege statements (REVOKE EXECUTE on `notify_on_ask_row()` / `notify_on_run_status()` from PUBLIC, anon and authenticated;
+the deny-all grants on `notifications` / `notification_deliveries`), 25 lines, because `regenerate-full-schema.sh` dumps without
+privileges — without the copy a greenfield install from `full-schema.sql` would leave both trigger functions callable by everyone
+and anon holding full access on both tables. `check-greenfield-privileges.py` read "greenfield privileges OK" afterwards.
+Append-only, one block: honoured by construction. The plan had said this file would not change; the deviation is recorded in
+`300-02-SUMMARY.md`, and this row/section were written at phase close by the orchestrator (same split 296-01 used).
 
 ### `scripts/full-schema-supplement.sql` — Phase 294 (294-03)
 
