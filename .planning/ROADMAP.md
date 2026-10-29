@@ -200,8 +200,8 @@ Plans:
 **Plans**: 5 plans in 4 waves (01 ‖ 02 → 03 → 04 → 05; serialized after wave 1 because every plan with a FIRING file edits the CLAUDE.md FIRING table and the ledger, and 02/04 mutate the local DB)
 
 Plans:
-- [ ] 300-01-PLAN.md — scheduled runs launch and resume right: blank required input refused by label (FIX-04), starting provider recorded (FIX-05), "waiting" outcome, schedule row words + per-row Run now
-- [ ] 300-02-PLAN.md — migration 218: notices + outbox + fail-soft SECURITY DEFINER triggers + Settings/invite columns; local apply, schema regen, trigger/RLS/anon live tests
+- [x] 300-01-PLAN.md — scheduled runs launch and resume right: blank required input refused by label (FIX-04), starting provider recorded (FIX-05), "waiting" outcome, schedule row words + per-row Run now
+- [x] 300-02-PLAN.md — migration 218: notices + outbox + fail-soft SECURITY DEFINER triggers + Settings/invite columns; local apply, schema regen, trigger/RLS/anon live tests
 - [ ] 300-03-PLAN.md — one app mailer (none / Resend REST / SMTP) from a built image, dev guard, run-waiting renderer, invite outcome, email-step honesty (D-23/D-24), deploy parity
 - [ ] 300-04-PLAN.md — outbox drainer in every worker (SKIP LOCKED, frozen payload, re-check, opt-out, retries) + the Control Room Email tile
 - [ ] 300-05-PLAN.md — Settings email knobs + the member's opt-out switch + the invite dialog/list failure words; phase closing gates
@@ -249,7 +249,7 @@ Plans:
 | 297. Every View Has an Address | 4/4 | Complete (2026-10-28) | verified passed 5/5; security 19/19; review 4 WR fixed; UAT 15 PASS + P7 Moonshot ⛔ (live 429, BUG-261024-01); LIVE 2026-10-28 (prod b813d2711) |
 | 298. Lists Follow the Active Org | 5/5 | Executed — human_needed | 4/4 SC in code; security 34/34; review 1 BL + 9 WR → 9 fixed, WR-08 → 299; G-4 owed (G4-1 first); mig 217 in cloud; LIVE 2026-10-28 (prod b813d2711) |
 | 299. Links to the Thing Itself | 5/5 | Executed — human_needed | 5/5 SC + 6/6 reqs in code; security 36/36; UAT 13/19 PASS, 6 POSTPONED 2026-10-29 (G4-5a first; G4-4c ⛔ SSO); not deployed; Redirect URLs owed |
-| 300. Told When a Run Waits (Backend and Mailer) | 0/TBD | Not started | - |
+| 300. Told When a Run Waits (Backend and Mailer) | 2/5 | In progress | wave 1 (01 scheduler fixes, 02 mig 218 local) merged 2026-10-29; mig 218 NOT in cloud |
 | 301. The Waiting-on-You Notice | 0/TBD | Not started | - |
 | 302. Close-Out and a True Register | 0/TBD | Not started | - |
 
