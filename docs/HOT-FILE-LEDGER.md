@@ -12243,6 +12243,22 @@ cells rot within days.
 | [`frontend/src/components/org/SavesInOrg.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentsorgsavesinorgtsx) | 1 / 1 / 46 (was `0 / 0 / 0`) | no (young) | young (created 299-04). Saves in <org> caption (D-18/D-38/UI-D11). ⛔ renders nothing below 2 orgs or without an active org name; only on Run / Tweak / Start a chat; words from orgItemsCopy |
 | [`frontend/src/hooks/useAuth.ts`](docs/HOT-FILE-LEDGER.md#frontendsrchooksuseauthts) | 6 / 5 / 128 (was `5 / 4 / 100`) | ⚠ **FIRES** | 299-05: SSO redirectTo / sign-up emailRedirectTo from returnTo + one getSession .catch. ⛔ no hash access; no timer sets user (Pitfall 6) |
 | [`frontend/src/components/workflows/library/useWorkflowFork.ts`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentsworkflowslibraryuseworkflowforkts) | 4 / 2 / 539 (was `3 / 1 / 517`) | no | 299-04: Tweak sends fromDefinitionId (D-38); a WorkflowOrgRefusedError lands as forkFailed.sentence, every other failure keeps the prose-free shape. Below threshold |
+| [`backend/app/api/org.py`](docs/HOT-FILE-LEDGER.md#backendappapiorgpy) | 11 / 3 / 1024 | ⚠ **FIRES** | Added AT PLANNING 300: absent its ENTIRE LIFE at 3 phases. 300-03: invite delivery outcome stored + returned (D-11). ⛔ link-first: a mail failure never fails the invite |
+| [`backend/app/api/me_preferences.py`](docs/HOT-FILE-LEDGER.md#backendappapimepreferencespy) | 1 / 1 / 120 | no (1 phase) | Added AT PLANNING 300. 300-05: notification-email keys on GET + one PUT route (D-09). ⛔ ungated, auth.uid() merge; default_model semantics byte-identical |
+| [`backend/app/services/connectors/smtp_adapter.py`](docs/HOT-FILE-LEDGER.md#backendappservicesconnectorssmtpadapterpy) | 1 / 1 / 482 | no (1 phase) | Added AT PLANNING 300. 300-03: the body gains a rendered HTML alternative (D-24, D-32). ⛔ header guard + refused-recipient check stay; no CC/BCC/attachment |
+| [`backend/app/services/health_probe.py`](docs/HOT-FILE-LEDGER.md#backendappserviceshealthprobepy) | 1 / 1 / 116 | no (1 phase) | Added AT PLANNING 300. 300-04: probe_email (D-12). ⛔ off / held back is neutral, never down; a reason never names a recipient |
+| [`backend/app/services/run_model_resolution.py`](docs/HOT-FILE-LEDGER.md#backendappservicesrunmodelresolutionpy) | 3 / 2 / 308 | no (reaches 3 in 300) | Added AT PLANNING 300. 300-01: resolve_owner_run_model, the ONE FIX-05 helper (D-33). ⛔ owner settings loaded off the loop; (None, None) on failure |
+| [`frontend/src/components/admin/HealthSignals.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentsadminhealthsignalstsx) | 5 / 4 / 316 | ⚠ **FIRES** | Added AT PLANNING 300: absent at 4 phases. 300-04: one Email tile (D-12, UI-D13). ⛔ pure leaf; Off / Held back / Test mode never red |
+| [`frontend/src/components/org/InvitationsTab.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentsorginvitationstabtsx) | 3 / 2 / 290 | no (reaches 3 in 300) | Added AT PLANNING 300. 300-05: Email not sent chip + resend failure line (D-11). ⛔ server truth on re-fetch, no optimistic flip |
+| [`frontend/src/components/org/InviteMemberDialog.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentsorginvitememberdialogtsx) | 3 / 2 / 281 | no (reaches 3 in 300) | Added AT PLANNING 300. 300-05: three result arms (UI-D12). ⛔ never names the provider or an error code; Copy link focused on the failed arm |
+| [`frontend/src/lib/api/schedules.ts`](docs/HOT-FILE-LEDGER.md#frontendsrclibapischedulests) | 2 / 2 / 129 | no (reaches 3 in 300) | Added AT PLANNING 300. 300-01: reads the structured missing_required refusal (D-14). ⛔ server sentences only; a code routes the line, never words |
+| [`backend/app/db/notifications.py`](docs/HOT-FILE-LEDGER.md#backendappdbnotificationspy) | 0 / 0 / 0 | no (planned 300-04) | young (planned 300-04). Outbox claim (SKIP LOCKED), still-waiting, opt-out, outcome (D-12, D-13, D-20). ⛔ never selects prompt text; state flip inside the claim txn |
+| [`backend/app/services/notification_drainer.py`](docs/HOT-FILE-LEDGER.md#backendappservicesnotificationdrainerpy) | 0 / 0 / 0 | no (planned 300-04) | young (planned 300-04). Per-worker outbox drainer, SchedulerService shape (D-20). ⛔ send outside the claim txn; at most 3 attempts; SMTP at-most-once |
+| [`backend/app/services/run_waiting_email.py`](docs/HOT-FILE-LEDGER.md#backendappservicesrunwaitingemailpy) | 0 / 0 / 0 | no (planned 300-03) | young (planned 300-03). Pure run-waiting renderer + duration words (NOTE-03, D-02..D-06). ⛔ never accepts prompt text; subject control chars stripped |
+| [`frontend/src/components/workflows/scheduleOutcomeVocabulary.ts`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentsworkflowsscheduleoutcomevocabularyts) | 0 / 0 / 0 | no (planned 300-01) | young (planned 300-01). last_status → one sentence (D-15, D-26). ⛔ zero-import leaf; no raw status token reaches the screen |
+| [`frontend/src/components/settings/EmailSettings.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentssettingsemailsettingstsx) | 0 / 0 / 0 | no (planned 300-05) | young (planned 300-05). Operator Email card, ApiKeyLimits shape (D-07, D-08, D-10). ⛔ changes()/adopt() handle, no own Save; never sends a cleared delay |
+| [`frontend/src/components/settings/EmailNotificationPreference.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentssettingsemailnotificationpreferencetsx) | 0 / 0 / 0 | no (planned 300-05) | young (planned 300-05). Member switch (D-09). ⛔ calls only ungated /me/preferences; never shows On before the read answers |
+| [`frontend/src/components/org/inviteDeliveryCopy.ts`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentsorginvitedeliverycopyts) | 0 / 0 / 0 | no (planned 300-05) | young (planned 300-05). Invite delivery sentences (D-11, UI-D12). ⛔ zero-import leaf; D-11 sentence verbatim |
 
 
 
@@ -27389,3 +27405,72 @@ Scan-list cell before 299-REVIEW WR-05 (replaced, moved verbatim): 1 / 1 / 90 (w
 Scan-list cell before 299-REVIEW WR-05 (replaced, moved verbatim): 55 / 23 / 1403 (was `54 / 23 / 1402`) | ⚠ **FIRES** | 299-04: ONE ShareLinkMenu after the draft label (D-20); the fork notice renders forkFailed.sentence ?? forkFailedMessage(...) (S8). No state, no hook |
 
 CLAUDE.md verdict cell before 299-REVIEW WR-05 (replaced, moved verbatim): | `frontend/src/pages/WorkflowsPage.tsx` | 55 / 23 / 1403 (was `54 / 23 / 1402`) | 299-04: link on a draft; the fork notice shows the org refusal |
+
+## Phase 300 — rows added AT PLANNING (2026-10-29)
+
+Sixteen rows planted by the Phase 300 planner, because `node scripts/check-hot-file-ledger.cjs --files …` over the phase's planned `files_modified` printed `[no-row]` for each. Nine are EXISTING files that never had a row (two of them FIRE: `backend/app/api/org.py` at 3 phases, the ROADMAP-named one, and `frontend/src/components/admin/HealthSignals.tsx` at 4); seven are files Phase 300 creates, planted with `0 / 0 / 0` and re-derived by the plan that creates them in its creating commit (the 297 leaveGuard.ts / 299 precedent). Triples measured with the CLAUDE.md recipe on 2026-10-29 at HEAD `0cb5e0108`; six-digit quick buckets excluded.
+
+### `backend/app/api/org.py`
+
+**Added AT PLANNING (Phase 300, 2026-10-29) at `11 / 3 / 1024`** — measured, never copied. Added AT PLANNING 300: absent its ENTIRE LIFE at 3 phases. 300-03: invite delivery outcome stored + returned (D-11). ⛔ link-first: a mail failure never fails the invite
+
+### `backend/app/api/me_preferences.py`
+
+**Added AT PLANNING (Phase 300, 2026-10-29) at `1 / 1 / 120`** — measured, never copied. Added AT PLANNING 300. 300-05: notification-email keys on GET + one PUT route (D-09). ⛔ ungated, auth.uid() merge; default_model semantics byte-identical
+
+### `backend/app/services/connectors/smtp_adapter.py`
+
+**Added AT PLANNING (Phase 300, 2026-10-29) at `1 / 1 / 482`** — measured, never copied. Added AT PLANNING 300. 300-03: the body gains a rendered HTML alternative (D-24, D-32). ⛔ header guard + refused-recipient check stay; no CC/BCC/attachment
+
+### `backend/app/services/health_probe.py`
+
+**Added AT PLANNING (Phase 300, 2026-10-29) at `1 / 1 / 116`** — measured, never copied. Added AT PLANNING 300. 300-04: probe_email (D-12). ⛔ off / held back is neutral, never down; a reason never names a recipient
+
+### `backend/app/services/run_model_resolution.py`
+
+**Added AT PLANNING (Phase 300, 2026-10-29) at `3 / 2 / 308`** — measured, never copied. Added AT PLANNING 300. 300-01: resolve_owner_run_model, the ONE FIX-05 helper (D-33). ⛔ owner settings loaded off the loop; (None, None) on failure
+
+### `frontend/src/components/admin/HealthSignals.tsx`
+
+**Added AT PLANNING (Phase 300, 2026-10-29) at `5 / 4 / 316`** — measured, never copied. Added AT PLANNING 300: absent at 4 phases. 300-04: one Email tile (D-12, UI-D13). ⛔ pure leaf; Off / Held back / Test mode never red
+
+### `frontend/src/components/org/InvitationsTab.tsx`
+
+**Added AT PLANNING (Phase 300, 2026-10-29) at `3 / 2 / 290`** — measured, never copied. Added AT PLANNING 300. 300-05: Email not sent chip + resend failure line (D-11). ⛔ server truth on re-fetch, no optimistic flip
+
+### `frontend/src/components/org/InviteMemberDialog.tsx`
+
+**Added AT PLANNING (Phase 300, 2026-10-29) at `3 / 2 / 281`** — measured, never copied. Added AT PLANNING 300. 300-05: three result arms (UI-D12). ⛔ never names the provider or an error code; Copy link focused on the failed arm
+
+### `frontend/src/lib/api/schedules.ts`
+
+**Added AT PLANNING (Phase 300, 2026-10-29) at `2 / 2 / 129`** — measured, never copied. Added AT PLANNING 300. 300-01: reads the structured missing_required refusal (D-14). ⛔ server sentences only; a code routes the line, never words
+
+### `backend/app/db/notifications.py`
+
+**Added AT PLANNING (Phase 300, 2026-10-29) with `0 / 0 / 0`** — the file does not exist yet; plan `300-04` creates it and re-derives the triple in its creating commit. young (planned 300-04). Outbox claim (SKIP LOCKED), still-waiting, opt-out, outcome (D-12, D-13, D-20). ⛔ never selects prompt text; state flip inside the claim txn
+
+### `backend/app/services/notification_drainer.py`
+
+**Added AT PLANNING (Phase 300, 2026-10-29) with `0 / 0 / 0`** — the file does not exist yet; plan `300-04` creates it and re-derives the triple in its creating commit. young (planned 300-04). Per-worker outbox drainer, SchedulerService shape (D-20). ⛔ send outside the claim txn; at most 3 attempts; SMTP at-most-once
+
+### `backend/app/services/run_waiting_email.py`
+
+**Added AT PLANNING (Phase 300, 2026-10-29) with `0 / 0 / 0`** — the file does not exist yet; plan `300-03` creates it and re-derives the triple in its creating commit. young (planned 300-03). Pure run-waiting renderer + duration words (NOTE-03, D-02..D-06). ⛔ never accepts prompt text; subject control chars stripped
+
+### `frontend/src/components/workflows/scheduleOutcomeVocabulary.ts`
+
+**Added AT PLANNING (Phase 300, 2026-10-29) with `0 / 0 / 0`** — the file does not exist yet; plan `300-01` creates it and re-derives the triple in its creating commit. young (planned 300-01). last_status → one sentence (D-15, D-26). ⛔ zero-import leaf; no raw status token reaches the screen
+
+### `frontend/src/components/settings/EmailSettings.tsx`
+
+**Added AT PLANNING (Phase 300, 2026-10-29) with `0 / 0 / 0`** — the file does not exist yet; plan `300-05` creates it and re-derives the triple in its creating commit. young (planned 300-05). Operator Email card, ApiKeyLimits shape (D-07, D-08, D-10). ⛔ changes()/adopt() handle, no own Save; never sends a cleared delay
+
+### `frontend/src/components/settings/EmailNotificationPreference.tsx`
+
+**Added AT PLANNING (Phase 300, 2026-10-29) with `0 / 0 / 0`** — the file does not exist yet; plan `300-05` creates it and re-derives the triple in its creating commit. young (planned 300-05). Member switch (D-09). ⛔ calls only ungated /me/preferences; never shows On before the read answers
+
+### `frontend/src/components/org/inviteDeliveryCopy.ts`
+
+**Added AT PLANNING (Phase 300, 2026-10-29) with `0 / 0 / 0`** — the file does not exist yet; plan `300-05` creates it and re-derives the triple in its creating commit. young (planned 300-05). Invite delivery sentences (D-11, UI-D12). ⛔ zero-import leaf; D-11 sentence verbatim
+
