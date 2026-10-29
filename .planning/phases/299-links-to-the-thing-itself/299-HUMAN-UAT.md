@@ -4,7 +4,7 @@ status: partial
 postponed: 2026-10-29
 created: 2026-10-29
 rows_total: 20
-rows_run: 13
+rows_run: 14
 rows_blocked: 2
 driver: operator
 ---
@@ -30,7 +30,7 @@ Operator: *"can we move to next phase and postpone these?"* — the six owed row
 work moves to Phase 300. Run first when resumed: **G4-5a** (it is the only thing that closes BUG-261027-02).
 Phase 300 cannot close until **G4-4a** has run, because its signed-out email journey depends on 299's sign-in return.
 
-Owed: G4-5a, G4-5b, G4-4a, G4-4b, G4-4d, the 340 px mobile Link check; decision 4; X-7 Moonshot re-run (⛔ BUG-261024-01).
+Owed: G4-5a, G4-5b, G4-4b, G4-4d, the 340 px mobile Link check; decision 4; X-7 Moonshot re-run (⛔ BUG-261024-01).
 
 ## Rows
 
@@ -45,7 +45,7 @@ Fill the Verdict + Evidence cells there.
 | A-2 | Thread A streams while thread B is opened by pasted address | ✅ PASS 2026-10-29 (Claude) |
 | G4-1 | Copy link → fresh tab; also the RunModal "Saves in" caption and the 340 px link surface at mobile width | ✅ core + RunModal caption PASS 2026-10-29 (Claude); **340 px mobile still owed** (operator) |
 | G4-3 | Missing ≡ forbidden: same card, same 404 body and headers (DevTools) | ✅ PASS 2026-10-29 (Claude) |
-| G4-4a | Signed-out return — password | 5 |
+| G4-4a | Signed-out return — password | ✅ PASS 2026-10-29 (Claude; operator signed out + in) — unblocks 300 G4-6 |
 | G4-4b | Signed-out return — sign-up email link | 6 |
 | G4-4d | Off-site return target planted in sessionStorage → lands on chat, never off-origin | 7 |
 | G4-5a | Slow 3G: "Loading your chats…" at desktop and mobile; never "No recent chats" | 8 — **BUG-261027-02 closes only if this passes** |
