@@ -818,6 +818,12 @@ export function SettingsPage({ onOpenRun }: { onOpenRun?: (runId: string) => voi
   }
 
   const handleSaveIntegrations = async () => {
+    // 300-REVIEW WR-05: an invalid changed address vetoes the save (never a silent drop + "Saved").
+    const emailRefusal = emailSettingsRef.current?.invalid() ?? null
+    if (emailRefusal) {
+      setError(emailRefusal)
+      return
+    }
     setSavingIntegrations(true)
     setError(null)
     try {

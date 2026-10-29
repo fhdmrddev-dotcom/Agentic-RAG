@@ -224,6 +224,43 @@ describe("EmailSettings — changed fields only (S3)", () => {
     },
   )
 
+  // 300-REVIEW WR-05: an invalid address used to be silently left out of the PUT; the save then
+  // said "Saved" and adopt() wiped the typed value and its error line. The card now VETOES the
+  // save: invalid() names the problem, and the page returns before its PUT.
+  it.each([
+    ["from", () => from()],
+    ["test", () => testAddr()],
+  ])("an invalid changed %s address vetoes the save and shows its line", async (_label, field) => {
+    const ref = renderLeaf()
+    await waitFor(() => expect(delay().value).toBe("120"))
+    fireEvent.change(field(), { target: { value: "notify@" } })
+    expect(screen.queryByRole("alert")).toBeNull()
+    let refusal: string | null = null
+    act(() => {
+      refusal = ref.current!.invalid()
+    })
+    expect(refusal).toBe("An email address in the Email card isn't valid. Fix it, then save again.")
+    // the field's own line shows even though it was never blurred, and the typed value stays
+    expect((await screen.findByRole("alert")).textContent).toBe("That isn't an email address.")
+    expect(field().value).toBe("notify@")
+  })
+
+  it("nothing invalid vetoes nothing (unchanged, valid, emptied)", async () => {
+    const ref = renderLeaf()
+    await waitFor(() => expect(delay().value).toBe("120"))
+    expect(ref.current!.invalid()).toBeNull()
+    fireEvent.change(from(), { target: { value: "" } })
+    fireEvent.change(testAddr(), { target: { value: "me@example.com" } })
+    expect(ref.current!.invalid()).toBeNull()
+  })
+
+  it("before the read has answered, nothing vetoes the save", async () => {
+    getSettings.mockReturnValue(new Promise(() => {}))
+    const ref = renderLeaf()
+    await waitFor(() => expect(getSettings).toHaveBeenCalled())
+    expect(ref.current!.invalid()).toBeNull()
+  })
+
   it("a cleared name restores the loaded value on blur and is never sent", async () => {
     const ref = renderLeaf()
     await waitFor(() => expect(name().value).toBe("Syrel"))
@@ -292,7 +329,7 @@ describe("EmailSettings — loading (S3)", () => {
 describe("SettingsPage wiring (300-05, G-5: one ref, one spread, one adopt, one mount)", () => {
   it("mounts the card once in Integrations, after ApiKeyLimits, and rides Save Integrations", () => {
     const src = settingsPageRaw.replace(/\r\n/g, "\n")
-    expect(src.split("emailSettingsRef").length - 1).toBe(4)
+    expect(src.split("emailSettingsRef").length - 1).toBe(5)
     expect(src).toContain("useRef<EmailSettingsHandle>(null)")
     expect(src).toContain("...emailSettingsRef.current?.changes()")
     expect(src).toContain("emailSettingsRef.current?.adopt(updated)")
@@ -306,5 +343,12 @@ describe("SettingsPage wiring (300-05, G-5: one ref, one spread, one adopt, one 
     const spread = src.indexOf("...emailSettingsRef.current?.changes()")
     expect(spread).toBeGreaterThan(save)
     expect(spread).toBeLessThan(src.indexOf("await updateSettings(body)", save))
+    // WR-05: the card's veto is read FIRST and returns before the PUT, into the error home.
+    const veto = src.indexOf("emailSettingsRef.current?.invalid()")
+    expect(veto).toBeGreaterThan(save)
+    expect(veto).toBeLessThan(src.indexOf("setSavingIntegrations(true)", save))
+    expect(src.slice(veto, src.indexOf("setSavingIntegrations(true)", save))).toMatch(
+      /setError\(emailRefusal\)\s*return/,
+    )
   })
 })

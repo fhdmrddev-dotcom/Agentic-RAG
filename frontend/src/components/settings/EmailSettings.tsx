@@ -24,6 +24,10 @@ import { getSettings, type FullAppSettings, type SettingsUpdate } from "@/lib/ap
  * ⛔ Invariants:
  *  - It owns its fetch and drafts; the page reaches it only through the handle below.
  *  - CHANGED FIELDS ONLY, and only VALID ones: an invalid address shows its line and is not sent.
+ *  - An invalid changed address VETOES the section's save (300-REVIEW WR-05): `invalid()` returns
+ *    the sentence for the page's error home and the page returns before its PUT, so the save can
+ *    never say "Saved" while silently dropping the address, and `adopt()` never wipes the typed
+ *    value and its line.
  *  - A cleared or non-numeric delay is never sent (`Number("") === 0` must never reach the server).
  *  - Until the read has answered, `changes()` is `{}`.
  *  - After a save the fields show the SERVER's values, never the typed ones.
@@ -48,6 +52,7 @@ const COPY = {
   testHint:
     "Outside production, every email goes here instead of to its real recipient. Leave it empty and nothing is sent outside production: each email is only logged.",
   notAnAddress: "That isn't an email address.",
+  saveRefused: "An email address in the Email card isn't valid. Fix it, then save again.",
   loadFailed: "Couldn't load the email settings.",
   retry: "Retry loading email settings",
 } as const
@@ -103,6 +108,9 @@ type Knobs = { delay: number; from: string; name: string; test: string }
 export type EmailSettingsHandle = {
   /** The changed knobs, ready to spread into the section's body; `{}` until the read has answered. */
   changes: () => SettingsUpdate
+  /** WR-05: the sentence refusing the save while a changed address is invalid, else `null`.
+   *  Also shows that field's own line, blurred or not. */
+  invalid: () => string | null
   /** Show the values the server now holds. */
   adopt: (
     saved: Pick<
@@ -211,6 +219,14 @@ export function EmailSettings({ ref }: { ref?: Ref<EmailSettingsHandle> }) {
   // drafts as last committed.
   useImperativeHandle(ref, () => ({
     changes,
+    invalid() {
+      if (loadState !== "loaded") return null
+      const badFrom = fromDraft !== loaded.from && !addressOk(fromDraft)
+      const badTest = testDraft !== loaded.test && !addressOk(testDraft)
+      if (!badFrom && !badTest) return null
+      setTouched((t) => ({ from: t.from || badFrom, test: t.test || badTest }))
+      return COPY.saveRefused
+    },
     adopt(saved) {
       if (loadState !== "loaded") return
       show({
