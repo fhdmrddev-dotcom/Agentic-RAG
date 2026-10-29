@@ -228,8 +228,8 @@ Plans:
 Plans:
 **Wave 1**
 
-- [ ] 301-01-PLAN.md — GET /notifications (pool, caller as $1, every member org, active/paused runs only) + migration 219 (notifications in the Realtime publication, supplement §4) + OpenAPI regenerated; route/shape/live tests (anon, cross-user, left-org, ended run, chat-ask exclusion)
-- [ ] 301-02-PLAN.md — useWaitingNotices (fetch is truth, Realtime a hint, 60 s poll, focus, org switch) + waiting-runs as the second ATTENTION_PRODUCERS tenant with a required mark; pins re-baselined to 2; the Library mark stays the Library's
+- [x] 301-01-PLAN.md — GET /notifications (pool, caller as $1, every member org, active/paused runs only) + migration 219 (notifications in the Realtime publication, supplement §4) + OpenAPI regenerated; route/shape/live tests (anon, cross-user, left-org, ended run, chat-ask exclusion)
+- [x] 301-02-PLAN.md — useWaitingNotices (fetch is truth, Realtime a hint, 60 s poll, focus, org switch) + waiting-runs as the second ATTENTION_PRODUCERS tenant with a required mark; pins re-baselined to 2; the Library mark stays the Library's
 
 **Wave 2** *(blocked on Wave 1 completion)*
 
