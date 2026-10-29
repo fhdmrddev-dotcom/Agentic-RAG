@@ -8092,6 +8092,14 @@ Five sentences, not one; the headline names the author's step name and the missi
 
 296-04 (BUG-261025-01 / 295-IN-05 / 287-SCHED): three useState (`runningId`, `runResult`, `requiredRefusal`) replace one (`notice`); a pure `runNowResult` reads `outcome` (old backend: launched → success, else error tone) and the server `detail` verbatim; the result line renders inside the pressed row; Add schedule refuses through the imported `missingRequiredFields` / `requiredFieldsMessage` (296-07 owns `soulData.ts`). Triple `5 / 4 / 723` (was `3 / 3 / 601`). Previous CLAUDE.md cell kept verbatim: ⚠ absent for its entire life; it crossed the threshold in 214-09 on a. Previous scan-list cell kept verbatim: 3 / 3 / 601 | ⚠ **FIRES — EXACTLY AT THRESHOLD** | ⚠ absent for its entire life; it crossed the threshold in 214-09 on a LAUNCH-CRITICAL path — row and BASELINE pin both added at this close.
 
+### `frontend/src/components/workflows/WorkflowScheduleModal.tsx` — 300-01 (D-15, D-16, D-14 client half, D-26; 2026-10-29)
+
+**`6 / 5 / 812` (was `5 / 4 / 723`).** BUG-261027-03: the ` · ${s.last_status}` interpolation is gone — the row renders "Last ran: {when}" and, under it, `scheduleOutcomeLine(s.last_status)` as its own `mt-1 text-[12px] break-words` line toned from the shipped `RUN_NOW_TONE` (muted → `text-muted-foreground`). D-16: `runningId` / `runResult` became `runningIds` (a Set) and `runResults` (a map keyed by schedule id); Run now no longer goes through `withBusy` — only its row's Run now / Pause / Delete are disabled, the Add form and the close button stay usable, and a row's line clears only when that row is pressed again (or the dialog unmounts). `refresh` has a quiet mode: "Loading…" only before the first list is shown, `aria-busy` on the `<ul>` after; a failed quiet refetch keeps the shown list. D-14: a `missing_required` refusal (read by `code` off the thrown error, never by importing the class — no `@/lib/api` mock has to learn a name) goes to `schedule-required-refusal` from create and to that row's line (warning) from Resume. No new component, no new hook. ⚠ Extraction FIRST next: the row (`<li>` + its three buttons + three lines) is the seam.
+
+Scan-list cell as of 2026-10-29 (replaced by 300-01, moved verbatim): 5 / 4 / 723 (was `3 / 3 / 601`) | ⚠ **FIRES** | 296-04: Run now spins on its row (aria-busy, Starting…) and its worded result sits under Last ran; Add schedule refuses an empty required input by name. Bottom notice removed
+
+CLAUDE.md verdict cell as of 2026-10-29 (replaced by 300-01, moved verbatim): | `frontend/src/components/workflows/WorkflowScheduleModal.tsx` | 5 / 4 / 723 (was `3 / 3 / 601`) | 296-04: row-local Run now result + required refusal |
+
 ### `frontend/src/components/workflows/argumentModel.ts`
 
 **Triple at Phase 214's close (2026-08-28): `1 / 1 / 313` — G-5: no (1 phase).** young (214-07) — the three argument sources as data
@@ -11671,7 +11679,7 @@ cells rot within days.
 | [`backend/app/api/settings.py`](docs/HOT-FILE-LEDGER.md#backendappapisettingspy) | 47 / 25 / 1301 (was `46 / 24 / 1250`) | ⚠ **FIRES** | 292.1-02: two bounded writes (2..50) via _range_refusal_detail + allow-list +2 (+51 −0). ⛔ never a retyped id list; GET never echoes a key · 293 touch: see §Phase 293 close |
 | [`backend/app/services/multimodal_service.py`](docs/HOT-FILE-LEDGER.md#backendappservicesmultimodal_servicepy) | 14 / 7 / 984 | ⚠ **FIRES** | ⚠ absent from BOTH for its ENTIRE LIFE at **7 phases** — row added SEED-227, which is also where its silent truncation was found |
 | [`backend/app/api/documents.py`](docs/HOT-FILE-LEDGER.md#backendappapidocumentspy) | 101 / 40 / 2709 (was `99 / 39 / 2698`) | ⚠ **FIRES** | 298-01: list_documents one `org_lists.by_org` in build() (every read, D-32); upload one `org_id=root_upload_org(...)` on the ONE minter call. Honoured by construction. ⛔ see section |
-| [`scripts/vitest-count-gate.cjs`](docs/HOT-FILE-LEDGER.md#scriptsvitest-count-gatecjs) | 380 / 81 / 6808 (was `379 / 81 / 6808`) | ⚠ **FIRES** | 298-review: 4 BASELINE pins raised, none lowered — OrgAuditTab 16→19, LibraryPage.orgSwitch 5→7, useThreads.orgSwitch 4→5, MoveToOrgSheet 22→23 |
+| [`scripts/vitest-count-gate.cjs`](docs/HOT-FILE-LEDGER.md#scriptsvitest-count-gatecjs) | 395 / 83 / 6865 (was `380 / 81 / 6808`) | ⚠ **FIRES** | 300-01: 2 BASELINE pins added (scheduleOutcomeVocabulary 16, schedulesRefusal 4 + its FILE-LEVEL TARGET), WorkflowScheduleModal 9→29 raised, none lowered |
 | [`scripts/check-deploy-drift.sh`](docs/HOT-FILE-LEDGER.md#scriptscheck-deploy-driftsh) | 5 / 4 / 267 | ⚠ **FIRES** | ⚠ absent its ENTIRE LIFE — row added 294-05. 294-01: DECISION_ENGINE_FAULT_BASE_URL registered as intentionally omitted (+2) |
 | [`scripts/build-public-openapi.cjs`](docs/HOT-FILE-LEDGER.md#scriptsbuild-public-openapicjs) | 11 / 5 / 472 (was `7 / 3 / 468`) | ⚠ **FIRES** | 298-01: `org-items` in the Account & org TAG_GROUPS entry + `/org-items/` in FLAGGED_PREFIXES (UI-internal). Two tokens. ⚠ prior row stale (`7 / 3 / 468` vs measured `10 / 4 / 468` pre-298). |
 | [`scripts/check-seeds-register.cjs`](docs/HOT-FILE-LEDGER.md#scriptscheck-seeds-registercjs) | 7 / 3 / 1132 | ⚠ **FIRES** | ⚠ absent its ENTIRE LIFE — row added 296-05, now FIRES (251 / 293 / 296). 296-05: three `\d{3}` → `\d{3,}` (293-IN-07). ⛔ the STATUS_ENUM triple |
@@ -11785,7 +11793,7 @@ cells rot within days.
 | [`frontend/src/components/workflows/DeclaredInputsEditor.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentsworkflowsdeclaredinputseditortsx) | 1 / 1 / 333 | no (1 phase) | young (214.1-01) — the authoring surface `BUG-260828-02` says did not exist. ⚠ G-2 OVERRIDDEN, not satisfied |
 | [`frontend/src/components/workflows/PublishRefusalList.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentsworkflowspublishrefusallisttsx) | 2 / 1 / 178 | no (1 phase) | young (214-10) — the refusal renders as a CAUSE, not a status |
 | [`frontend/src/components/workflows/StepIdentity.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentsworkflowsstepidentitytsx) | 1 / 1 / 161 | no (1 phase) | young (214-08) — ONE element, four sizes, both names as props; it resolves nothing |
-| [`frontend/src/components/workflows/WorkflowScheduleModal.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentsworkflowsworkflowschedulemodaltsx) | 5 / 4 / 723 (was `3 / 3 / 601`) | ⚠ **FIRES** | 296-04: Run now spins on its row (aria-busy, Starting…) and its worded result sits under Last ran; Add schedule refuses an empty required input by name. Bottom notice removed |
+| [`frontend/src/components/workflows/WorkflowScheduleModal.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentsworkflowsworkflowschedulemodaltsx) | 6 / 5 / 812 (was `5 / 4 / 723`) | ⚠ **FIRES** | 300-01: outcome sentence line (scheduleOutcomeLine), per-row Run now (runningIds + runResults map, no global busy), quiet refresh. No new component or hook. Extraction FIRST next |
 | [`frontend/src/types/schedule.ts`](docs/HOT-FILE-LEDGER.md#frontendsrctypesschedulets) | 2 / 2 / 77 | no (2 phases) | row added 296-04: one optional `outcome` on `ScheduleTriggerResult` (the 296-02 trigger contract). Types only; does not fire |
 | [`frontend/src/components/workflows/argumentModel.ts`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentsworkflowsargumentmodelts) | 1 / 1 / 313 | no (1 phase) | young (214-07) — the three argument sources as data |
 | [`frontend/src/components/workflows/argumentVocabulary.ts`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentsworkflowsargumentvocabularyts) | 1 / 1 / 254 | no (1 phase) | young (214-07) — every sentence the argument form says |
@@ -11838,7 +11846,7 @@ cells rot within days.
 | [`backend/app/services/extractors/aspects/dxf.py`](docs/HOT-FILE-LEDGER.md#backendappservicesextractorsaspectsdxfpy) | 2 / 0 / 180 | no (0 phases) | ⚠ absent for its entire life — row added `SEED-226`. It is the only path that READS measurements rather than inferring them (`DIMENSION` values the CAD software computed) |
 | [`frontend/src/components/workflows/publishBlockedStep.ts`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentsworkflowspublishblockedstepts) | 2 / 1 / 183 (was `0 / 0 / 176`) | no (1 phase) | young (`BUG-260828-09`). **281-03**: ONE `BLOCKED_STEP_NEXT_NO_RUN` constant. ⚠ It derives NO second name ladder: `nodeTitle` is called, and `name ?? slug` is the one forbidden edit |
 | [`frontend/src/components/workflows/PublishBlockedStepCard.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentsworkflowspublishblockedstepcardtsx) | 2 / 1 / 109 (was `0 / 0 / 101`) | no (1 phase) | young (`BUG-260828-09`). **281-03**: ONE optional `canOpenRun` flag; next line is `BLOCKED_STEP_NEXT_NO_RUN` when there is no link; the cause keeps its line breaks. ⚠ **G-2 OVERRIDDEN, not satisfied** |
-| [`backend/app/services/scheduler_service.py`](docs/HOT-FILE-LEDGER.md#backendappservicesscheduler_servicepy) | 13 / 8 / 332 (was `12 / 7 / 314`) | ⚠ **FIRES** | 298-02: foreign_binding_refusal beside template_refusal (definition_id lazy read, pool only) → record_schedule_outcome(sentence) + ScheduledLaunchRefused. The :134 org line untouched |
+| [`backend/app/services/scheduler_service.py`](docs/HOT-FILE-LEDGER.md#backendappservicesscheduler_servicepy) | 15 / 9 / 372 (was `14 / 9 / 352`) | ⚠ **FIRES** | 300-01: fire-time blank-input block (D-14) + _record_outcome reads the newest run; paused → waiting (D-26). Honoured by construction |
 | [`backend/app/db/schedules.py`](docs/HOT-FILE-LEDGER.md#backendappdbschedulespy) | 2 / 2 / 369 (was `1 / 1 / 359`) | no (2 phases) | single data-access home for workflow_schedules; claim_due_schedules SKIP LOCKED claim. 299-01: create_schedule keyword-only `org_id` (None = base SQL, sha256 pinned) |
 | [`backend/app/services/watch_service.py`](docs/HOT-FILE-LEDGER.md#backendappserviceswatch_servicepy) | 8 / 6 / 769 (was `7 / 5 / 643`) | ⚠ **FIRES** | Honoured by construction. **285-01**: a failed item is retried through the SAME new-file body (cap 3); typed `last_error`; minted marker. Still 2 minter calls. Listing-loop seam not triggered |
 | [`backend/app/db/watches.py`](docs/HOT-FILE-LEDGER.md#backendappdbwatchespy) | 6 / 4 / 828 (was `4 / 3 / 709`) | ⚠ **FIRES** | Honoured by construction. **285-01**: upsert takes `failed_attempts` / `minted` (COALESCE keeps), `release_watch(run_error=)`. **285-02**: `watch_purge_scope` + a frozen dataclass, asyncpg only |
@@ -12172,10 +12180,10 @@ cells rot within days.
 | [`backend/app/services/rate_limit.py`](docs/HOT-FILE-LEDGER.md#backendappservicesrate_limitpy) | 4 / 2 / 138 (was `3 / 1 / 109`) | no (2 phases) | 296-01: per-user citation limit (10/min, [ASSUMED]) on `hit`. ⛔ no process-local state; no env var; fails CLOSED (503) |
 | [`backend/app/db/api_keys.py`](docs/HOT-FILE-LEDGER.md#backendappdbapi_keyspy) | 5 / 2 / 307 (was `4 / 1 / 303`) | no (young) | young. 296-06 (293-IN-08): revoke_key returns `revoked_now` from the UPDATE status tag. ⛔ owner predicate in every statement; key_hash only in auth |
 | [`backend/app/models/api_key.py`](docs/HOT-FILE-LEDGER.md#backendappmodelsapi_keypy) | 2 / 2 / 117 (was `1 / 1 / 113`) | no (young) | young. 296-06 (293-IN-06): `needs_task` added to WorkflowRefState. ⛔ no field carries the secret except the create response |
-| [`backend/app/services/inbound_inputs.py`](docs/HOT-FILE-LEDGER.md#backendappservicesinbound_inputspy) | 8 / 2 / 312 (was `7 / 2 / 306`) | no (young) | 296 review BE-WR-03: declared_fields records the Look-it-up inputs it leaves out; needs_typed_task is False when any were declared. |
+| [`backend/app/services/inbound_inputs.py`](docs/HOT-FILE-LEDGER.md#backendappservicesinbound_inputspy) | 9 / 3 / 352 (was `8 / 2 / 312`) | ⚠ **FIRES** | 300-01 (D-14): the loop factored into _missing_fields; missing_required_labels + join_labels + blank_required_sentence beside it. ONE predicate. ⛔ pure; strips _-keys |
 | [`backend/app/api/api_keys.py`](docs/HOT-FILE-LEDGER.md#backendappapiapi_keyspy) | 3 / 2 / 421 (was `2 / 1 / 392`) | no (young) | young. 296-06: needs_task state + picker reason (293-IN-06); create_key names only what the picker offers; revoke audits only the call that revoked (293-IN-08). ⛔ 404 for miss AND foreign |
-| [`backend/app/services/unattended_launch.py`](docs/HOT-FILE-LEDGER.md#backendappservicesunattended_launchpy) | 6 / 2 / 361 (was `5 / 1 / 354`) | no (young) | young. 296-02 (293-IN-04): the _drive_run task is held in a module _BACKGROUND_TASKS set with add_done_callback(discard) (P9) until done |
-| [`backend/app/api/schedules.py`](docs/HOT-FILE-LEDGER.md#backendappapischedulespy) | 5 / 5 / 303 (was `4 / 4 / 299`) | ⚠ **FIRES** | 299-01: create_workflow_schedule gains `request: Request = None` and ONE `org_id=` keyword (your workflow's org, else the active org, else the trigger). Honoured by construction |
+| [`backend/app/services/unattended_launch.py`](docs/HOT-FILE-LEDGER.md#backendappservicesunattended_launchpy) | 7 / 3 / 379 (was `6 / 2 / 361`) | ⚠ **FIRES** | 300-01 (D-33): one resolve_owner_run_model call; model + provider to the writer and to _drive_run's ctx dict. ⛔ owner identity, explicit org_id, caps armed first |
+| [`backend/app/api/schedules.py`](docs/HOT-FILE-LEDGER.md#backendappapischedulespy) | 6 / 6 / 341 (was `5 / 5 / 303`) | ⚠ **FIRES** | 300-01 (D-14): one _refuse_blank_required helper; create calls it before the INSERT, patch only for inputs / resume after the owner-scoped read. A pause reads nothing new |
 | [`backend/app/models/schedule.py`](docs/HOT-FILE-LEDGER.md#backendappmodelsschedulepy) | 3 / 3 / 231 | ⚠ **FIRES** | ⚠ absent its ENTIRE LIFE — row added 296-02 (D-26). 296-02 (295-IN-05): ScheduleTriggerResult gains one additive `outcome` Literal (launched/refused/not_loaded/error) |
 | [`backend/app/services/harness/run_read_words.py`](docs/HOT-FILE-LEDGER.md#backendappservicesharnessrun_read_wordspy) | 1 / 1 / 99 (was `0 / 0 / 0`) | no (young) | young (planned 293-02). MOVED waiting_who / unsourced_who / compose_waiting_on (workflow_runs seam). ⛔ pure leaf; re-exported |
 | [`backend/app/api/inbound.py`](docs/HOT-FILE-LEDGER.md#backendappapiinboundpy) | 10 / 3 / 719 (was `9 / 2 / 711`) | ⚠ **FIRES** | ⚠ now FIRES (298). 298-02: one foreign_binding_refusal beside template_refusal → _refused(reason="foreign_folder"), plain-string 422 (pool only). ⛔ no get_active_org_id on this path |
@@ -12247,15 +12255,15 @@ cells rot within days.
 | [`backend/app/api/me_preferences.py`](docs/HOT-FILE-LEDGER.md#backendappapimepreferencespy) | 1 / 1 / 120 | no (1 phase) | Added AT PLANNING 300. 300-05: notification-email keys on GET + one PUT route (D-09). ⛔ ungated, auth.uid() merge; default_model semantics byte-identical |
 | [`backend/app/services/connectors/smtp_adapter.py`](docs/HOT-FILE-LEDGER.md#backendappservicesconnectorssmtpadapterpy) | 1 / 1 / 482 | no (1 phase) | Added AT PLANNING 300. 300-03: the body gains a rendered HTML alternative (D-24, D-32). ⛔ header guard + refused-recipient check stay; no CC/BCC/attachment |
 | [`backend/app/services/health_probe.py`](docs/HOT-FILE-LEDGER.md#backendappserviceshealthprobepy) | 1 / 1 / 116 | no (1 phase) | Added AT PLANNING 300. 300-04: probe_email (D-12). ⛔ off / held back is neutral, never down; a reason never names a recipient |
-| [`backend/app/services/run_model_resolution.py`](docs/HOT-FILE-LEDGER.md#backendappservicesrunmodelresolutionpy) | 3 / 2 / 308 | no (reaches 3 in 300) | Added AT PLANNING 300. 300-01: resolve_owner_run_model, the ONE FIX-05 helper (D-33). ⛔ owner settings loaded off the loop; (None, None) on failure |
+| [`backend/app/services/run_model_resolution.py`](docs/HOT-FILE-LEDGER.md#backendappservicesrunmodelresolutionpy) | 4 / 3 / 344 (was `3 / 2 / 308`) | ⚠ **FIRES** | 300-01: resolve_owner_run_model, the ONE FIX-05 helper (D-33). ⛔ owner settings loaded off the loop; (None, None) on failure |
 | [`frontend/src/components/admin/HealthSignals.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentsadminhealthsignalstsx) | 5 / 4 / 316 | ⚠ **FIRES** | Added AT PLANNING 300: absent at 4 phases. 300-04: one Email tile (D-12, UI-D13). ⛔ pure leaf; Off / Held back / Test mode never red |
 | [`frontend/src/components/org/InvitationsTab.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentsorginvitationstabtsx) | 3 / 2 / 290 | no (reaches 3 in 300) | Added AT PLANNING 300. 300-05: Email not sent chip + resend failure line (D-11). ⛔ server truth on re-fetch, no optimistic flip |
 | [`frontend/src/components/org/InviteMemberDialog.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentsorginvitememberdialogtsx) | 3 / 2 / 281 | no (reaches 3 in 300) | Added AT PLANNING 300. 300-05: three result arms (UI-D12). ⛔ never names the provider or an error code; Copy link focused on the failed arm |
-| [`frontend/src/lib/api/schedules.ts`](docs/HOT-FILE-LEDGER.md#frontendsrclibapischedulests) | 2 / 2 / 129 | no (reaches 3 in 300) | Added AT PLANNING 300. 300-01: reads the structured missing_required refusal (D-14). ⛔ server sentences only; a code routes the line, never words |
+| [`frontend/src/lib/api/schedules.ts`](docs/HOT-FILE-LEDGER.md#frontendsrclibapischedulests) | 3 / 3 / 166 (was `2 / 2 / 129`) | ⚠ **FIRES** | 300-01: ScheduleRefusalError (an ApiError) for {detail:{code,message,missing}}; string + array arms unchanged. ⛔ not re-exported via lib/api.ts |
 | [`backend/app/db/notifications.py`](docs/HOT-FILE-LEDGER.md#backendappdbnotificationspy) | 0 / 0 / 0 | no (planned 300-04) | young (planned 300-04). Outbox claim (SKIP LOCKED), still-waiting, opt-out, outcome (D-12, D-13, D-20). ⛔ never selects prompt text; state flip inside the claim txn |
 | [`backend/app/services/notification_drainer.py`](docs/HOT-FILE-LEDGER.md#backendappservicesnotificationdrainerpy) | 0 / 0 / 0 | no (planned 300-04) | young (planned 300-04). Per-worker outbox drainer, SchedulerService shape (D-20). ⛔ send outside the claim txn; at most 3 attempts; SMTP at-most-once |
 | [`backend/app/services/run_waiting_email.py`](docs/HOT-FILE-LEDGER.md#backendappservicesrunwaitingemailpy) | 0 / 0 / 0 | no (planned 300-03) | young (planned 300-03). Pure run-waiting renderer + duration words (NOTE-03, D-02..D-06). ⛔ never accepts prompt text; subject control chars stripped |
-| [`frontend/src/components/workflows/scheduleOutcomeVocabulary.ts`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentsworkflowsscheduleoutcomevocabularyts) | 0 / 0 / 0 | no (planned 300-01) | young (planned 300-01). last_status → one sentence (D-15, D-26). ⛔ zero-import leaf; no raw status token reaches the screen |
+| [`frontend/src/components/workflows/scheduleOutcomeVocabulary.ts`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentsworkflowsscheduleoutcomevocabularyts) | 1 / 1 / 67 | no (young) | young (created 300-01). last_status → one sentence (D-15, D-26). ⛔ zero-import leaf; no raw status token reaches the screen |
 | [`frontend/src/components/settings/EmailSettings.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentssettingsemailsettingstsx) | 0 / 0 / 0 | no (planned 300-05) | young (planned 300-05). Operator Email card, ApiKeyLimits shape (D-07, D-08, D-10). ⛔ changes()/adopt() handle, no own Save; never sends a cleared delay |
 | [`frontend/src/components/settings/EmailNotificationPreference.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentssettingsemailnotificationpreferencetsx) | 0 / 0 / 0 | no (planned 300-05) | young (planned 300-05). Member switch (D-09). ⛔ calls only ungated /me/preferences; never shows On before the read answers |
 | [`frontend/src/components/org/inviteDeliveryCopy.ts`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentsorginvitedeliverycopyts) | 0 / 0 / 0 | no (planned 300-05) | young (planned 300-05). Invite delivery sentences (D-11, UI-D12). ⛔ zero-import leaf; D-11 sentence verbatim |
@@ -23069,6 +23077,14 @@ Scan-list cell before this touch (moved verbatim): | [`frontend/src/components/c
 
 Scan-list cell before this touch (moved verbatim): | [`backend/app/services/inbound_inputs.py`](docs/HOT-FILE-LEDGER.md#backendappservicesinbound_inputspy) | 7 / 2 / 306 (was `6 / 1 / 258`) | no (young) | young. 296-06: missing_required (287-T01, one predicate for kickoffs + key calls), needs_typed_task (293-IN-06), INBOUND_MAX_BODY_BYTES (293-IN-03). ⛔ pure; strips _-keys |
 
+### `backend/app/services/inbound_inputs.py` — 300-01 Task 1 (2026-10-29)
+
+**`9 / 3 / 352` (was `8 / 2 / 312`) — crosses into G-5 at this commit (293, 296, 300).** D-14: the `missing_required` loop is factored into a private `_missing_fields` that both `missing_required` (keys, byte-identical results) and the new `missing_required_labels` (labels, the key when blank) call, so the browser pin in `launch_fields_cases.json` still covers ONE predicate. `join_labels` and `blank_required_sentence(labels, *, saved_schedule)` build the UI-SPEC §S6b/§S6c words; `MISSING_REQUIRED_CODE = "missing_required"` is the wire code 300-02 shares. ⛔ still pure, no I/O. Seam if it grows: the TRUST-03 envelope half (`wrap_untrusted_input` .. `inbound_kickoff`) is the separable one.
+
+Scan-list cell as of 2026-10-29 (replaced by 300-01, moved verbatim): 8 / 2 / 312 (was `7 / 2 / 306`) | no (young) | 296 review BE-WR-03: declared_fields records the Look-it-up inputs it leaves out; needs_typed_task is False when any were declared.
+
+CLAUDE.md verdict cell: none before 300-01 (the file did not fire); row added by 300-01.
+
 ### `backend/app/api/inbound.py` — 296 SECURITY AR-05 (2026-10-27)
 
 **`9 / 2 / 711` (was `8 / 2 / 701`).** The phase security audit found the BE-WR-02 acceptance did not hold for production: `docs/DEPLOYMENT-PIPELINE.md` routes the API straight to the Coolify VPS, past the onebox nginx `client_max_body_size`. A body with no `Content-Length` (chunked) is now read through `request.stream()` with a running count and refused 413 at `INBOUND_MAX_BODY_BYTES`; the bytes read are cached on `request._body` so the handler parses them unchanged. RED `c8b5427c1`.
@@ -25419,6 +25435,14 @@ Twenty-eight rows added at planning: twenty-six files Phase 293 creates and two 
 
 Scan-list cell before this 296-02 touch (moved verbatim): | [`backend/app/services/unattended_launch.py`](docs/HOT-FILE-LEDGER.md#backendappservicesunattended_launchpy) | 5 / 1 / 354 (was `3 / 1 / 324`) | no (young) | young (planned 293-02). Shared unattended core + the kill-switch gate (293-REVIEW CR-01). ⛔ owner identity, explicit org_id, caps armed first |
 
+### `backend/app/services/unattended_launch.py` — 300-01 (FIX-05 / D-17, D-33, 2026-10-29)
+
+**`7 / 3 / 379` (was `6 / 2 / 361`) — crosses into G-5 at this commit (293, 296, 300).** One function-local import and ONE `resolve_owner_run_model(owner_id)` call immediately before `create_workflow_run`, which now receives `model=_model, provider=_provider` (the writer puts the provider in `metadata` in the same INSERT; `(None, None)` keeps the INSERT byte-identical). `_drive_run` gains two keyword params (default `None`); its ctx dict carries `"model"` and, only when a provider resolved, `"metadata": {"provider": …}` — the shape `harness_engine._build_resume_context` already reads (not edited, D-18). The API-key door inherits the fix by calling the same core. `run_lifecycle.py` / `run_producer.py` untouched (D-33). Seam if it grows: the background drive (`_drive_run` + its finalizer) is the separable half.
+
+Scan-list cell as of 2026-10-29 (replaced by 300-01, moved verbatim): 6 / 2 / 361 (was `5 / 1 / 354`) | no (young) | young. 296-02 (293-IN-04): the _drive_run task is held in a module _BACKGROUND_TASKS set with add_done_callback(discard) (P9) until done
+
+CLAUDE.md verdict cell: none before 300-01 (the file did not fire); row added by 300-01.
+
 ### `backend/app/services/harness/run_read_words.py`
 
 **`0 / 0 / 0`** at 293 planning (2026-10-25). Young; row added AT PLANNING (the 273 / 290 / 292.1 precedent), so `check-hot-file-ledger.cjs 293` binds before the file exists. MOVED waiting_who / unsourced_who / compose_waiting_on (workflow_runs seam). ⛔ pure leaf; re-exported Does not fire. Re-derive the triple at the 293-05 close.
@@ -26353,6 +26377,22 @@ Scan-list cell as of 2026-10-28 (replaced by 298-02, moved verbatim): 12 / 7 / 3
 
 CLAUDE.md verdict cell as of 2026-10-28 (replaced by 298-02, moved verbatim): | `backend/app/services/scheduler_service.py` | 12 / 7 / 314 (was `11 / 6 / 308`) | 296-06: scheduled kickoff via launch_kickoff (S6-F8), else byte-identical |
 
+### `backend/app/services/scheduler_service.py` — 300-01 Task 1 (2026-10-29)
+
+**`14 / 9 / 352` (was `13 / 8 / 332`).** FIX-04 / D-14 (BUG-261027-04): ONE block after the 298 foreign-folder block and before the entitlement check, the template-refusal shape: `missing_required_labels(row.get("definition"), schedule.get("inputs") or {})` → `blank_required_sentence(labels, saved_schedule=True)` → `logger.warning` naming the schedule id and the COUNT (never a value, T-300-03) → `record_schedule_outcome(sentence)` → `raise ScheduledLaunchRefused(sentence)`. ⛔ It reads the RAW stored definition (`row["definition"]`, a JSON string or dict), never the parsed model. Two pre-existing fakes declared a required `topic` with a blank schedule (`test_298_org_matrix._scheduled`, `test_296_step_inputs_and_routing` S6-F8-c) and were re-drawn to keep their intent. Pinned by `test_300_schedule_required_inputs.py`.
+
+Scan-list cell as of 2026-10-29 (replaced by 300-01, moved verbatim): 13 / 8 / 332 (was `12 / 7 / 314`) | ⚠ **FIRES** | 298-02: foreign_binding_refusal beside template_refusal (definition_id lazy read, pool only) → record_schedule_outcome(sentence) + ScheduledLaunchRefused. The :134 org line untouched
+
+CLAUDE.md verdict cell as of 2026-10-29 (replaced by 300-01, moved verbatim): | `backend/app/services/scheduler_service.py` | 13 / 8 / 332 (was `12 / 7 / 314`) | 298-02: foreign-folder refusal beside template_refusal (pool only) |
+
+### `backend/app/services/scheduler_service.py` — 300-01 Task 2 (2026-10-29)
+
+**`15 / 9 / 372` (was `14 / 9 / 352`).** D-26: inside the existing `_record_outcome` closure only — when the drive reports `completed`, one `pool.fetchval` reads the newest `workflow_runs.status` for the schedule (`inputs->>'_schedule_id' = $1 ORDER BY created_at DESC LIMIT 1`); `paused` records the waiting outcome, anything else `completed`; a failed read logs and records `completed` (today's); `failed` is recorded as-is with no read. 300-02's run-status trigger flips that outcome to the run's terminal status when the run ends. ⚠ `cap_paused` is NOT mapped to waiting (the spec names `paused`, a person's answer). Pinned by `test_300_unattended_provider.py`.
+
+Scan-list cell as of 2026-10-29 (replaced by 300-01 Task 2, moved verbatim): 14 / 9 / 352 (was `13 / 8 / 332`) | ⚠ **FIRES** | 300-01 (D-14): ONE fire-time block after the foreign-folder block — missing_required_labels on the RAW stored definition → record the sentence + ScheduledLaunchRefused. Honoured by construction
+
+CLAUDE.md verdict cell as of 2026-10-29 (replaced by 300-01 Task 2, moved verbatim): | `backend/app/services/scheduler_service.py` | 14 / 9 / 352 (was `13 / 8 / 332`) | 300-01: fire-time blank-input refusal (D-14), one block |
+
 ### `backend/app/api/inbound.py` — 298-02 (2026-10-28)
 
 **`10 / 3 / 719` (was `9 / 2 / 711`).** Crossed into G-5 at this commit (293, 296, 298). One import and one block beside the template refusal: `foreign_binding_refusal(definition, definition_id=wid, pool=pool, user_id=owner_id)` (the org is read from the row, equal to the key's org for a non-global row by `_SCOPE_SQL`; globals read `None`), and a sentence → `raise await _refused(..., reason="foreign_folder", exc=HTTPException(422, detail=sentence))`, so the existing rate-limited `api_key.refused` audit row is written (T-298-14). ⛔ No `get_active_org_id` on this path — a header-less key call must never 400 (T-298-11, asserted by the matrix).
@@ -26906,6 +26946,14 @@ Scan-list cell as of 2026-10-28 (replaced by 298-review, moved verbatim): 379 / 
 
 CLAUDE.md verdict cell as of 2026-10-28 (replaced by 298-review, moved verbatim): | `scripts/vitest-count-gate.cjs` | 379 / 81 / 6808 (was `378 / 81 / 6806`) | 298-05: moveMounts (12) pinned; useFolders 17→18, useLibraryDocuments 28→30 |
 
+### `scripts/vitest-count-gate.cjs` — 300-01 (2026-10-29)
+
+**`395 / 83 / 6865` (was `380 / 81 / 6808`; the 299 commits between were not re-derived here, so the `was` is the last recorded cell).** 300-01: two BASELINE pins ADDED beside the `WorkflowScheduleModal.test.tsx` entry — `scheduleOutcomeVocabulary.test.ts` 16 (pin only; the `src/components/workflows` directory TARGET runs it) and `schedulesRefusal.test.ts` 4 (plus a FILE-LEVEL TARGET beside `links.test.ts`, no `src/lib/api/__tests__` directory entry) — and ONE raised: `WorkflowScheduleModal.test.tsx` 9 → 29 (the 9 was the 214 pin, never raised as 296-04 grew the file; its "one result line per modal" case was RE-TARGETED to D-16, not dropped). None lowered. Placed mid-table rather than at the tail so the parallel 300-02 append cannot collide.
+
+Scan-list cell as of 2026-10-29 (replaced by 300-01, moved verbatim): 380 / 81 / 6808 (was `379 / 81 / 6808`) | ⚠ **FIRES** | 298-review: 4 BASELINE pins raised, none lowered — OrgAuditTab 16→19, LibraryPage.orgSwitch 5→7, useThreads.orgSwitch 4→5, MoveToOrgSheet 22→23
+
+CLAUDE.md verdict cell as of 2026-10-29 (replaced by 300-01, moved verbatim): | `scripts/vitest-count-gate.cjs` | 380 / 81 / 6808 (was `379 / 81 / 6808`) | 298-review: 4 pins raised (OrgAuditTab, LibraryPage/useThreads orgSwitch, sheet) |
+
 ### `backend/app/services/org_move.py` — 298-review (2026-10-28)
 
 **`5 / 1 / 1137` (was `1 / 1 / 986`).** 298-review: CR-01 `_mixed_org_refusals` (a subfolder/document stamped in another org refuses; collision/same-name joins exclude the moving set); WR-04 `_ancestor_refusals` (org-shared, chat, workflow, Expert on an ancestor; watch arm refuted); WR-05 docstring names the residual window (live `test_wr05_*`).
@@ -27143,6 +27191,14 @@ CLAUDE.md verdict cell as of 2026-10-28 (replaced by 299-01, moved verbatim): | 
 Scan-list cell as of 2026-10-28 (replaced by 299-01, moved verbatim): 4 / 4 / 299 | ⚠ **FIRES** | ⚠ absent its ENTIRE LIFE — row added 296-02 (D-26). 296-02 (295-IN-05): Run now answers with `outcome` + a worded `detail`; ScheduledLaunchRefused caught first; raw exception logged only
 
 CLAUDE.md verdict cell as of 2026-10-28 (replaced by 299-01, moved verbatim): | `backend/app/api/schedules.py` | 4 / 4 / 299 | ⚠ FIRES, absent here — row added 296-02 · worded Run now (outcome) |
+
+### `backend/app/api/schedules.py` — 300-01 Task 1 (2026-10-29)
+
+**`6 / 6 / 341` (was `5 / 5 / 303`).** FIX-04 / D-14: one module helper `_refuse_blank_required(definition, inputs, *, saved_schedule)` raising 422 `{code: "missing_required", message, missing: [labels]}`. Create calls it after the published 400 and before `create_schedule` (`saved_schedule=False`). Patch calls it ONLY when `inputs` is sent or `is_active` is True: the owner-scoped `get_schedule` first (None → the existing 404 path, no existence oracle, T-300-02), then `get_definition`; an unreadable definition skips the check (fire time catches it). A pause alone reads nothing new. Pinned by `test_300_schedule_required_inputs.py`.
+
+Scan-list cell as of 2026-10-29 (replaced by 300-01, moved verbatim): 5 / 5 / 303 (was `4 / 4 / 299`) | ⚠ **FIRES** | 299-01: create_workflow_schedule gains `request: Request = None` and ONE `org_id=` keyword (your workflow's org, else the active org, else the trigger). Honoured by construction
+
+CLAUDE.md verdict cell as of 2026-10-29 (replaced by 300-01, moved verbatim): | `backend/app/api/schedules.py` | 5 / 5 / 303 (was `4 / 4 / 299`) | 299-01: new schedule stamped with the workflow's org (D-18) |
 
 ### `backend/app/db/schedules.py`
 
@@ -27430,6 +27486,14 @@ Sixteen rows planted by the Phase 300 planner, because `node scripts/check-hot-f
 
 **Added AT PLANNING (Phase 300, 2026-10-29) at `3 / 2 / 308`** — measured, never copied. Added AT PLANNING 300. 300-01: resolve_owner_run_model, the ONE FIX-05 helper (D-33). ⛔ owner settings loaded off the loop; (None, None) on failure
 
+#### 300-01 (FIX-05 / D-33, 2026-10-29)
+
+**`4 / 3 / 344` (was `3 / 2 / 308`) — crosses into G-5 at this commit.** `async def resolve_owner_run_model(owner_id) -> (model, provider)` beside `resolve_run_model`, in `__all__`: `run_in_threadpool(load_user_settings, str(owner_id))` (D-v2.5-01), then `resolve_workflow_ctx_model(s) or None` and `s.active_provider or None`; every failure logs the owner id only and returns `(None, None)`. Function-local imports (the `model_registry.py` discipline). ONE caller: `unattended_launch.launch_unattended_run` — no fourth copy of the resolution.
+
+Scan-list cell as of 2026-10-29 (replaced by 300-01, moved verbatim): 3 / 2 / 308 | no (reaches 3 in 300) | Added AT PLANNING 300. 300-01: resolve_owner_run_model, the ONE FIX-05 helper (D-33). ⛔ owner settings loaded off the loop; (None, None) on failure
+
+CLAUDE.md verdict cell: none before 300-01 (the file did not fire); row added by 300-01.
+
 ### `frontend/src/components/admin/HealthSignals.tsx`
 
 **Added AT PLANNING (Phase 300, 2026-10-29) at `5 / 4 / 316`** — measured, never copied. Added AT PLANNING 300: absent at 4 phases. 300-04: one Email tile (D-12, UI-D13). ⛔ pure leaf; Off / Held back / Test mode never red
@@ -27446,6 +27510,14 @@ Sixteen rows planted by the Phase 300 planner, because `node scripts/check-hot-f
 
 **Added AT PLANNING (Phase 300, 2026-10-29) at `2 / 2 / 129`** — measured, never copied. Added AT PLANNING 300. 300-01: reads the structured missing_required refusal (D-14). ⛔ server sentences only; a code routes the line, never words
 
+#### 300-01 (D-14, 2026-10-29)
+
+**`3 / 3 / 166` (was `2 / 2 / 129`) — crosses into G-5 at this commit.** `export class ScheduleRefusalError extends ApiError { code; missing }`; a private `scheduleFailure(res)` builds it when `readScheduleFailure` returns the new object arm (`detail` an object with string `code` + `message`), else today's `ApiError`. The string-detail and array-detail arms are byte-identical, the entitlement arm still runs first, and the three throwing sites are one call each. ⛔ NOT re-exported through `lib/api.ts` (the 196-08 mock-factory measurement); the modal reads `code` off the error.
+
+Scan-list cell as of 2026-10-29 (replaced by 300-01, moved verbatim): 2 / 2 / 129 | no (reaches 3 in 300) | Added AT PLANNING 300. 300-01: reads the structured missing_required refusal (D-14). ⛔ server sentences only; a code routes the line, never words
+
+CLAUDE.md verdict cell: none before 300-01 (the file did not fire); row added by 300-01.
+
 ### `backend/app/db/notifications.py`
 
 **Added AT PLANNING (Phase 300, 2026-10-29) with `0 / 0 / 0`** — the file does not exist yet; plan `300-04` creates it and re-derives the triple in its creating commit. young (planned 300-04). Outbox claim (SKIP LOCKED), still-waiting, opt-out, outcome (D-12, D-13, D-20). ⛔ never selects prompt text; state flip inside the claim txn
@@ -27461,6 +27533,12 @@ Sixteen rows planted by the Phase 300 planner, because `node scripts/check-hot-f
 ### `frontend/src/components/workflows/scheduleOutcomeVocabulary.ts`
 
 **Added AT PLANNING (Phase 300, 2026-10-29) with `0 / 0 / 0`** — the file does not exist yet; plan `300-01` creates it and re-derives the triple in its creating commit. young (planned 300-01). last_status → one sentence (D-15, D-26). ⛔ zero-import leaf; no raw status token reaches the screen
+
+#### 300-01 — created (2026-10-29)
+
+**`1 / 1 / 67`** in its creating commit. `scheduleOutcomeLine(lastStatus) -> {text, tone} | null`: six known tokens (UI-SPEC §S6a + Claude's-discretion words for `cancelled` and `cadence_error`, recorded in the docblock), a value containing a space reads "Didn't run — {sentence}" with a full stop added when missing, any other token reads the neutral sentence, absent reads `null`. Zero imports, asserted over its `?raw` text with a positive control.
+
+Scan-list cell as of 2026-10-29 (replaced by 300-01, moved verbatim): 0 / 0 / 0 | no (planned 300-01) | young (planned 300-01). last_status → one sentence (D-15, D-26). ⛔ zero-import leaf; no raw status token reaches the screen
 
 ### `frontend/src/components/settings/EmailSettings.tsx`
 

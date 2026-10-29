@@ -149,6 +149,26 @@ async def launch_scheduled_run(
         await record_schedule_outcome(pool, _as_uuid(schedule["id"]), status=sentence)
         raise ScheduledLaunchRefused(sentence)
 
+    # ── Phase 300 (FIX-04 / D-14) — a blank required input is refused here, by label ──────────
+    # A workflow can gain a required input after the schedule was saved, so the save-time 422 is
+    # not enough. The ONE predicate, on the RAW stored definition (``row["definition"]``, a JSON
+    # string or dict): the parsed model is not what ``declared_fields`` reads. Same shape as the
+    # blocks above: recorded on the schedule in words, then raised. The log carries a COUNT only.
+    from app.services.inbound_inputs import blank_required_sentence, missing_required_labels
+
+    labels = missing_required_labels(row.get("definition"), schedule.get("inputs") or {})
+    if labels:
+        from app.db.schedules import record_schedule_outcome
+
+        sentence = blank_required_sentence(labels, saved_schedule=True)
+        logger.warning(
+            "schedule %s not launched: %d required input(s) have no value",
+            schedule.get("id"),
+            len(labels),
+        )
+        await record_schedule_outcome(pool, _as_uuid(schedule["id"]), status=sentence)
+        raise ScheduledLaunchRefused(sentence)
+
     org_id = schedule.get("org_id") or row.get("org_id")
 
     # ── 258 F-2 / TIER-01 — a scheduled run is EXECUTION too ─────────────────────────
@@ -197,6 +217,26 @@ async def launch_scheduled_run(
         # Every exit path of the background drive reports here (see unattended_launch).
         from app.db.schedules import record_schedule_outcome
 
+        # 300-01 (D-26): the drive reports "completed" when run_workflow RETURNS, which it also
+        # does when the run paused to wait for a person — the row then read "Finished". Read the
+        # schedule's newest run; a paused one records the waiting outcome instead. 300-02's
+        # run-status trigger (migration 218) flips that outcome to the run's terminal status
+        # when the run ends. A failed read records today's "completed".
+        if status == "completed":
+            try:
+                latest = await pool.fetchval(
+                    "SELECT status FROM workflow_runs WHERE inputs->>'_schedule_id' = $1 "
+                    "ORDER BY created_at DESC LIMIT 1",
+                    str(schedule_id),
+                )
+                if latest == "paused":
+                    status = "waiting"
+            except Exception:  # noqa: BLE001 — the outcome is a hint; never fail the drive
+                logger.warning(
+                    "schedule %s: could not read its latest run status; recording completed",
+                    schedule_id,
+                    exc_info=True,
+                )
         await record_schedule_outcome(pool, schedule_id, status=status)
 
     return await launch_unattended_run(

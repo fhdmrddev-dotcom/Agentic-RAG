@@ -115,8 +115,11 @@ async def test_s6_f8_c_a_schedule_without_declared_answers_is_byte_identical():
         "name": "Monday brief", "inputs": {"kickoff_prompt": "Weekly brief"},
         "max_tokens_per_run": 500_000, "max_duration_seconds": 1_800,
     }
+    # 300-01 (D-14): a schedule with a blank REQUIRED input is now refused at fire time, so
+    # "no declared answers" is drawn with every declared input optional.
+    _optional = {**_DEF, "inputs": [{**i, "required": False} for i in _DEF["inputs"]]}
     with (
-        patch("app.db.workflows.get_definition", AsyncMock(return_value={"definition": _DEF})),
+        patch("app.db.workflows.get_definition", AsyncMock(return_value={"definition": _optional})),
         patch("app.services.entitlement_service.check_entitlement",
               AsyncMock(return_value=EntitlementResult(allowed=True, capability="workflows"))),
         patch("app.services.unattended_launch.launch_unattended_run",
