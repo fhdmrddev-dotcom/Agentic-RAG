@@ -11872,7 +11872,7 @@ cells rot within days.
 | [`frontend/src/components/sources/runHistoryFold.ts`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentssourcesrunhistoryfoldts) | 1 / 1 / 125 | no (1 phase) | young (235) — the pure quiet-run fold; separating it is what proved the fence's collapsed-3/expanded-17 red was a FIXTURE defect |
 | [`frontend/src/components/sources/RunHistoryList.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentssourcesrunhistorylisttsx) | 5 / 3 / 275 (was `2 / 1 / 235`) | ⚠ **FIRES** | ⚠ now FIRES (3 phases). **285-01**: comment only + one vitest pin (a success row's run summary is never rendered, T-235-12). Extraction FIRST at the next feature phase |
 | [`frontend/src/components/layout/AttentionPopover.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentslayoutattentionpopovertsx) | 1 / 1 / 109 | no (1 phase) | young (235) — ⛔ it renders no verdict and derives no count; it is handed conditions and draws them |
-| [`frontend/src/components/layout/attentionConditions.ts`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentslayoutattentionconditionsts) | 3 / 2 / 200 | no (2 phases) | ⚠ row was STALE at `1 / 1 / 102`. honoured by construction (**244-04**): ONE optional `tab?: LibraryTab` set by the one existing producer — no second tenant, `detail` byte-identical |
+| [`frontend/src/components/layout/attentionConditions.ts`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentslayoutattentionconditionsts) | 5 / 3 / 424 (was `3 / 2 / 200`) | ⚠ **FIRES** | ⚠ now FIRES (301). 301-02: second tenant waiting-runs; required mark; ctx object; conditionsForMark/waitingTotal. ⛔ one useWaitingNotices( call |
 | [`frontend/src/components/library/SourcesAttentionSection.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentslibrarysourcesattentionsectiontsx) | 2 / 1 / 197 | no (1 phase) | young (235) — three separately-named honest states. ⛔ A DOOR, never a repair; no handler ⇒ no control |
 | [`frontend/src/hooks/useSourceAttention.ts`](docs/HOT-FILE-LEDGER.md#frontendsrchooksusesourceattentionts) | 2 / 1 / 131 | no (1 phase) | young (235) — ⛔ a consumer reading only `loading` + `stopped` will print an all-clear it never received. `verdictKnown` is the sixth field |
 | [`frontend/src/lib/libraryTabHandoff.ts`](docs/HOT-FILE-LEDGER.md#frontendsrcliblibrarytabhandoffts) | 1 / 1 / 59 | no (1 phase) | young (235-15) — the hand-off LIFETIME rule. ⛔ An intent consumed once, never a mode; a strict leaf with zero runtime imports, so it is tested without mounting anything |
@@ -13894,6 +13894,16 @@ function**, never the hook — and the `?raw` inventories in both of this plan's
 it that way.
 
 ---
+
+### `frontend/src/components/layout/attentionConditions.ts` — 301-02 (D-11, D-12, D-13, D-14, D-31)
+
+**`5 / 3 / 424` (was `3 / 2 / 200` — ⚠ that cell was stale: measured `4 / 2 / 226` at base `d9ff4c5eb`) — crosses into G-5 at this commit.** The registry's second tenant, argued against D-235-03 rather than smuggled: `AttentionCondition` is now the `LibraryCondition | WaitingCondition` union on a REQUIRED `mark` (D-31); `AttentionContext { openLibraryHealth, openRun, reportWaitingStatus? }` replaces the bare callback (D-13); `useStoppedSourceConditions(ctx)` adds `mark: "library"`; `useWaitingRunConditions(ctx)` is the ONE `useWaitingNotices()` call site (D-14), maps notices to waiting conditions (no `tab` key, `detail` "", `total` the server count) and reports `WaitingStatus` through a primitive-dep effect; the strict leaves `conditionsForMark` and `waitingTotal` (never `.length`, F8); `attentionCountByTab` narrows on `mark === "library"`; `ATTENTION_PRODUCERS` gains `waiting-runs`. The D-235-03 sentence, the one-entry comment and the stale "no router (SEED-185)" sentence are kept struck through, each with a CORRECTED paragraph beside it naming Phase 301 and SEED-281.
+
+Binding invariants: ⛔ exactly ONE `useWaitingNotices(` product call site (the `?raw` inventory fence in `attentionTab.test.ts`); ⛔ both producer-count pins assert 2 plus both keys — a THIRD tenant argues with them; ⛔ the mark is required and the Library renderers read `conditionsForMark(…, "library")`, never a re-typed filter; ⛔ the docblock keeps the prose token `MOUNTED SUBTREE` and the code keeps `useSourceAttention()` (both inventory fences self-guard on them). Named seam for the next refactor: move each producer into its own module beside its hook (`stoppedSourcesProducer.ts`, `waitingRunsProducer.ts`), leaving this file the types, the leaves and the frozen array.
+
+Scan-list cell as of 2026-10-30 (replaced by 301-02, moved verbatim): 3 / 2 / 200 | no (2 phases) | ⚠ row was STALE at `1 / 1 / 102`. honoured by construction (**244-04**): ONE optional `tab?: LibraryTab` set by the one existing producer — no second tenant, `detail` byte-identical |
+
+CLAUDE.md verdict cell: none before 301-02 (the file did not fire); row added by 301-02.
 
 ## `frontend/src/components/chat/ChatAttachmentChip.tsx`
 

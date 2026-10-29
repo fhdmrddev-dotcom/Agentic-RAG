@@ -66,6 +66,7 @@ type NavProps = React.ComponentProps<typeof NavPanel>
 /** Two stopped sources, shaped exactly as the one registered producer emits them. */
 function conditions(n: number, onOpen = vi.fn()): AttentionCondition[] {
   return Array.from({ length: n }, (_, i) => ({
+    mark: "library" as const, // 301-02 (D-31): every condition carries a required mark
     id: `watch-${i + 1}`,
     title: `Rate sheets ${i + 1}`,
     detail: "The watched folder is no longer shared with this connection.",

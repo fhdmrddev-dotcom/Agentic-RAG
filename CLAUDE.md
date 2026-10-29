@@ -445,6 +445,7 @@ node scripts/check-hot-file-ledger.cjs <phase-dir>   # 0 clear · 1 missing rows
 | `backend/app/models/thread.py` | 25 / 17 / 550 (was `24 / 16 / 545`) | 293-03: ONE field (origin) |
 | `frontend/src/components/workflows/canvasModel.ts` | 16 / 8 / 836 (was `15 / 8 / 831`) | 296-07: comparePhaseOrder, engineArmed; isGrounded drops escalated |
 | `frontend/src/components/layout/ChatLayout.tsx` | 73 / 36 / 934 (was `72 / 36 / 933`) | 299-03: history column live behind the card; threadsPending prop |
+| `frontend/src/components/layout/attentionConditions.ts` | 5 / 3 / 424 (was `3 / 2 / 200`) | ⚠ now FIRES (301) · 301-02: 2nd tenant waiting-runs, required mark · ⛔ |
 | `frontend/src/components/layout/ChatLaunchForm.tsx` | 6 / 4 / 191 (was `5 / 4 / 183`) | 296 G-4 row 11: refused Run scrolls the refusal into view |
 | `frontend/src/components/workflows/LaunchInputFields.tsx` | 3 / 3 / 145 | 287-01: leaf stays non-blocking; docblock only · 214.1-01 trigger TAKEN |
 | `frontend/src/components/layout/ChatHistoryColumn.tsx` | 9 / 3 / 524 (was `8 / 3 / 522`) | 298-05: one ElsewhereLine mount atop hc-list (+ its import) |

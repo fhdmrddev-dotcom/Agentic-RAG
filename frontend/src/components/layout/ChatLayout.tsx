@@ -601,8 +601,15 @@ export function ChatLayout({ onSignOut, activeView, onNavigate, navItems, isOper
   //
   // The callback is memoised so the produced conditions are stable across renders.
   const openLibraryHealth = useCallback(() => onOpenLibraryHealth?.(), [onOpenLibraryHealth])
+  // Phase 301-02 (D-13): producers take ONE context object, memoised, so each tenant reads the
+  // door it leads to (Library health, or a run) and the conditions stay stable across renders.
+  const openRunForAttention = useCallback((runId: string) => openRun?.(runId), [openRun])
+  const attentionCtx = useMemo(
+    () => ({ openLibraryHealth, openRun: openRunForAttention }),
+    [openLibraryHealth, openRunForAttention],
+  )
   const attentionConditions = attentionRegistry.ATTENTION_PRODUCERS.flatMap((producer) =>
-    producer.use(openLibraryHealth),
+    producer.use(attentionCtx),
   )
   // ⚠ Rules of hooks hold across the loop above because the registry is a FROZEN module
   // constant: its length cannot change between renders, so the hook call order cannot either.

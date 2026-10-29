@@ -206,7 +206,8 @@ describe("attention tab attribution — the producer names the tab that owns the
     const { result } = renderHook(() => useStoppedSourceConditions(ctx()))
     await vi.waitFor(() => expect(result.current.length).toBe(2))
     for (const condition of result.current) {
-      expect(condition.tab).toBe("health")
+      // 301-02 (D-31): narrowed on the required mark — a wrong mark fails here too.
+      expect(condition.mark === "library" && condition.tab).toBe("health")
     }
   })
 
@@ -216,7 +217,7 @@ describe("attention tab attribution — the producer names the tab that owns the
     // decide a destination would be a second decider — the thing D-235-05 exists to forbid.
     const { result } = renderHook(() => useStoppedSourceConditions(ctx()))
     await vi.waitFor(() => expect(result.current.length).toBe(2))
-    expect(new Set(result.current.map((c) => c.tab))).toEqual(new Set(["health"]))
+    expect(new Set(result.current.map((c) => c.mark === "library" && c.tab))).toEqual(new Set(["health"]))
     expect(new Set(stoppedFixture.map((s) => s.cause)).size).toBe(2)
   })
 })
