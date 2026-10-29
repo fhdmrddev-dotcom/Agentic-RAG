@@ -109,6 +109,9 @@
       "name": "links"
     },
     {
+      "name": "notifications"
+    },
+    {
       "name": "api-keys"
     },
     {
@@ -196,6 +199,7 @@
         "org",
         "org-items",
         "links",
+        "notifications",
         "api-keys",
         "preferences",
         "features",
@@ -14310,6 +14314,43 @@
             }
           }
         },
+        "x-badges": [
+          {
+            "name": "UI-internal: may change",
+            "position": "after",
+            "color": "#F7B23B"
+          }
+        ]
+      }
+    },
+    "/notifications": {
+      "get": {
+        "tags": [
+          "notifications"
+        ],
+        "summary": "List Waiting Notices",
+        "description": "**UI-internal: may change.** This endpoint serves Syrel's own interface and is not a stable contract.\n\nThe workflow runs waiting on you, across every organization you belong to.",
+        "operationId": "list_waiting_notices_notifications_get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/WaitingNotices"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          },
+          {
+            "HTTPBearer": []
+          }
+        ],
         "x-badges": [
           {
             "name": "UI-internal: may change",
@@ -29572,6 +29613,97 @@
         },
         "type": "object",
         "title": "ViewUpdate"
+      },
+      "WaitingNotice": {
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Id"
+          },
+          "run_id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Run Id"
+          },
+          "org_id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Org Id"
+          },
+          "org_name": {
+            "type": "string",
+            "title": "Org Name"
+          },
+          "workflow_name": {
+            "type": "string",
+            "title": "Workflow Name"
+          },
+          "kind": {
+            "type": "string",
+            "enum": [
+              "question",
+              "approval"
+            ],
+            "title": "Kind"
+          },
+          "origin": {
+            "anyOf": [
+              {
+                "type": "string",
+                "enum": [
+                  "app",
+                  "schedule",
+                  "key"
+                ]
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Origin"
+          },
+          "created_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Created At"
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "run_id",
+          "org_id",
+          "org_name",
+          "workflow_name",
+          "kind",
+          "origin",
+          "created_at"
+        ],
+        "title": "WaitingNotice",
+        "description": "One workflow run that is waiting on you."
+      },
+      "WaitingNotices": {
+        "properties": {
+          "notices": {
+            "items": {
+              "$ref": "#/components/schemas/WaitingNotice"
+            },
+            "type": "array",
+            "title": "Notices"
+          },
+          "total": {
+            "type": "integer",
+            "title": "Total"
+          }
+        },
+        "type": "object",
+        "required": [
+          "notices",
+          "total"
+        ],
+        "title": "WaitingNotices",
+        "description": "Your open notices (at most 50, waited-longest first) and how many are open in total."
       },
       "WatchCreateRequest": {
         "properties": {

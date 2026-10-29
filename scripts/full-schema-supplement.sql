@@ -24,7 +24,7 @@
 --               flag retired -> s.is_system OR s.is_org_shared, D-165-01), 112 (skill-files
 --               read policy: shared branch ORG-GATED to current_user_org_ids(), SEED-125 CR-02)
 --   auth     -> migration 001 (on_auth_user_created)
---   realtime -> migrations 002 (documents), 014 (folders), 032 (messages)
+--   realtime -> migrations 002 (documents), 014 (folders), 032 (messages), 219 (notifications)
 --   ACLs     -> ⚠ CORRECTED 2026-09-16 (Phase 253 / CRED-03). ~~This list named
 --               migration 118 and migration 181 and nothing else.~~ It was wrong by TEN
 --               migrations, and the original is struck through rather than deleted because
@@ -233,6 +233,9 @@ DO $$ BEGIN ALTER PUBLICATION supabase_realtime ADD TABLE public.folders;
 EXCEPTION WHEN duplicate_object THEN NULL; END $$;
 
 DO $$ BEGIN ALTER PUBLICATION supabase_realtime ADD TABLE public.messages;
+EXCEPTION WHEN duplicate_object THEN NULL; END $$;
+
+DO $$ BEGIN ALTER PUBLICATION supabase_realtime ADD TABLE public.notifications;
 EXCEPTION WHEN duplicate_object THEN NULL; END $$;
 
 
