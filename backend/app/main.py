@@ -533,6 +533,24 @@ async def lifespan(app_instance):
             _scheduler = None
     app_instance.state.workflow_scheduler = _scheduler
 
+    # Phase 300 (NOTE-02 / D-20) — the run-waiting email drainer. Runs in EVERY worker on
+    # purpose, like the scheduler: exactly-once is owned by db/notifications.py (SKIP LOCKED
+    # plus the 'sending' flip inside the claiming transaction), never by this process. Gated
+    # on the boot-sweep flag, NOT on a new env var: tests/conftest.py sets RUN_BOOT_SWEEPS
+    # False, so a test lifespan never drains the shared local outbox (T-300-32).
+    _drainer = None
+    if not _setup_mode and RUN_BOOT_SWEEPS:  # Phase 158 (D-03); SEED-363 (296); 300 (D-20)
+        try:
+            from app.services.notification_drainer import NotificationDrainer
+
+            _drainer = NotificationDrainer(await get_pg_pool())
+            _drainer.start()
+            logger.info("Run-waiting email drainer started")
+        except Exception:
+            logger.exception("Run-waiting email drainer failed to start (app continues)")
+            _drainer = None
+    app_instance.state.notification_drainer = _drainer
+
     # Phase 230 (QUEUE-01 / QUEUE-05 / D-05) — the durable ingestion queue daemon.
     # Runs in every worker with concurrency bounding and stale claim recovery (G-1).
     _ingestion_queue = None
@@ -654,6 +672,15 @@ async def lifespan(app_instance):
             await _sched.stop()
     except Exception:  # noqa: BLE001
         logger.exception("Workflow scheduler stop failed at lifespan shutdown")
+
+    # Phase 300 (D-20) — stop the run-waiting email drainer. A row it had claimed but not yet
+    # recorded stays 'sending' and is resolved by the next worker's stale-claim recovery.
+    try:
+        _nd = getattr(app_instance.state, "notification_drainer", None)
+        if _nd is not None:
+            await _nd.stop()
+    except Exception:  # noqa: BLE001
+        logger.exception("Run-waiting email drainer stop failed at lifespan shutdown")
 
     # Phase 230 — stop the ingestion queue worker before cancelling in-flight tasks
     try:

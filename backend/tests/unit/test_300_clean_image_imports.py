@@ -30,6 +30,9 @@ MAIL_PATH_MODULES = [
     APP / "services" / "email_provider.py",
     APP / "services" / "run_waiting_email.py",
     APP / "services" / "connectors" / "smtp_adapter.py",
+    # 300-04: the run-waiting outbox (claim / re-check / outcome) and the per-worker drainer.
+    APP / "db" / "notifications.py",
+    APP / "services" / "notification_drainer.py",
 ]
 
 #: import name -> the DECLARED distribution that ships it. ``starlette`` is a hard dependency of

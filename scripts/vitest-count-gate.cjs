@@ -358,6 +358,7 @@ const BASELINE = {
   "CapabilityGrid.a11y.test.tsx": 6,
   "MaintenancePanel.a11y.test.tsx": 7,
   "HealthSignals.a11y.test.tsx": 5,
+  "HealthSignals.email.test.tsx": 11, // 300-04 (D-12 / UI-SPEC S5) — every Email tile state by its words, only the failed state red, the 4-column row
   "OperatorBand.a11y.test.tsx": 6,
   "TechnicalNamesToggle.a11y.test.tsx": 4,
   "LockedTab.a11y.test.tsx": 4,
@@ -6303,6 +6304,8 @@ const TARGETS = [
   "src/components/admin/__tests__/CapabilityGrid.a11y.test.tsx",
   "src/components/admin/__tests__/MaintenancePanel.a11y.test.tsx",
   "src/components/admin/__tests__/HealthSignals.a11y.test.tsx",
+  // Phase 300-04 — FILE-LEVEL (the admin tests are named one by one, never a directory entry), SAME commit as its pin.
+  "src/components/admin/__tests__/HealthSignals.email.test.tsx",
   "src/components/admin/__tests__/OperatorBand.a11y.test.tsx",
   "src/components/admin/__tests__/TechnicalNamesToggle.a11y.test.tsx",
   "src/components/admin/__tests__/LockedTab.a11y.test.tsx",
