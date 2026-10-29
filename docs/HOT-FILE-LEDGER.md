@@ -11674,13 +11674,13 @@ cells rot within days.
 | [`frontend/src/lib/api.ts`](docs/HOT-FILE-LEDGER.md#frontendsrclibapits) | 215 / 128 / 556 (was `214 / 127 / 552`) | ⚠ **FIRES** | 299-03: one links export block (resolveLink + LinkKind / LinkTarget / LinkAnswer) beside the orgItems block. No other re-export changed |
 | [`frontend/src/types/index.ts`](docs/HOT-FILE-LEDGER.md#frontendsrctypesindexts) | 103 / 82 / 1688 (was `102 / 81 / 1685`) | ⚠ **FIRES** | 299-04: ONE optional field, ExpertBundle.org_id (the experts read is SELECT *, so the wire always carried it). Additive. Seam still owed |
 | [`backend/app/main.py`](docs/HOT-FILE-LEDGER.md#backendappmainpy) | 97 / 71 / 993 (was `96 / 70 / 992`) | ⚠ **FIRES** | 299-01: ONE `app.include_router(links.router)` + one name in the api import list. Honoured by construction. ⛔ see section |
-| [`backend/app/config.py`](docs/HOT-FILE-LEDGER.md#backendappconfigpy) | 93 / 54 / 1809 (was `92 / 54 / 1790`) | ⚠ **FIRES** | **282-01** ceiling 1800 + boot check + DB-tier clamp; **282-04** `DEFAULT_LLM_CALL_TIMEOUT_SECONDS_SELF_HOSTED` 900 via the mig 180 predicate. No env var. honoured by construction |
+| [`backend/app/config.py`](docs/HOT-FILE-LEDGER.md#backendappconfigpy) | 96 / 55 / 1831 (was `93 / 54 / 1809`) | ⚠ **FIRES** | 300-03 (D-28): five smtp_* env fields in the existing email block; provider comment none / resend / smtp; stale lazy-import sentence deleted. Honoured by construction |
 | [`backend/app/api/admin.py`](docs/HOT-FILE-LEDGER.md#backendappapiadminpy) | 44 / 17 / 2054 (was `43 / 17 / 2051`) | ⚠ **FIRES** | honoured by construction (quick-261024): the discover providers summary gains `returned` = len(ids), so a mostly-known provider no longer reads as "found little". ⛔ add still lands disabled |
 | [`backend/app/api/settings.py`](docs/HOT-FILE-LEDGER.md#backendappapisettingspy) | 47 / 25 / 1301 (was `46 / 24 / 1250`) | ⚠ **FIRES** | 292.1-02: two bounded writes (2..50) via _range_refusal_detail + allow-list +2 (+51 −0). ⛔ never a retyped id list; GET never echoes a key · 293 touch: see §Phase 293 close |
 | [`backend/app/services/multimodal_service.py`](docs/HOT-FILE-LEDGER.md#backendappservicesmultimodal_servicepy) | 14 / 7 / 984 | ⚠ **FIRES** | ⚠ absent from BOTH for its ENTIRE LIFE at **7 phases** — row added SEED-227, which is also where its silent truncation was found |
 | [`backend/app/api/documents.py`](docs/HOT-FILE-LEDGER.md#backendappapidocumentspy) | 101 / 40 / 2709 (was `99 / 39 / 2698`) | ⚠ **FIRES** | 298-01: list_documents one `org_lists.by_org` in build() (every read, D-32); upload one `org_id=root_upload_org(...)` on the ONE minter call. Honoured by construction. ⛔ see section |
 | [`scripts/vitest-count-gate.cjs`](docs/HOT-FILE-LEDGER.md#scriptsvitest-count-gatecjs) | 395 / 83 / 6865 (was `380 / 81 / 6808`) | ⚠ **FIRES** | 300-01: 2 BASELINE pins added (scheduleOutcomeVocabulary 16, schedulesRefusal 4 + its FILE-LEVEL TARGET), WorkflowScheduleModal 9→29 raised, none lowered |
-| [`scripts/check-deploy-drift.sh`](docs/HOT-FILE-LEDGER.md#scriptscheck-deploy-driftsh) | 5 / 4 / 267 | ⚠ **FIRES** | ⚠ absent its ENTIRE LIFE — row added 294-05. 294-01: DECISION_ENGINE_FAULT_BASE_URL registered as intentionally omitted (+2) |
+| [`scripts/check-deploy-drift.sh`](docs/HOT-FILE-LEDGER.md#scriptscheck-deploy-driftsh) | 6 / 5 / 271 (was `5 / 4 / 267`) | ⚠ **FIRES** | 300-03 (D-28): the five SMTP_* vars registered in OMITTED_FROM_ONEBOX (commented in the one-box preset); email comment rewritten. No check changed |
 | [`scripts/build-public-openapi.cjs`](docs/HOT-FILE-LEDGER.md#scriptsbuild-public-openapicjs) | 11 / 5 / 472 (was `7 / 3 / 468`) | ⚠ **FIRES** | 298-01: `org-items` in the Account & org TAG_GROUPS entry + `/org-items/` in FLAGGED_PREFIXES (UI-internal). Two tokens. ⚠ prior row stale (`7 / 3 / 468` vs measured `10 / 4 / 468` pre-298). |
 | [`scripts/check-seeds-register.cjs`](docs/HOT-FILE-LEDGER.md#scriptscheck-seeds-registercjs) | 7 / 3 / 1132 | ⚠ **FIRES** | ⚠ absent its ENTIRE LIFE — row added 296-05, now FIRES (251 / 293 / 296). 296-05: three `\d{3}` → `\d{3,}` (293-IN-07). ⛔ the STATUS_ENUM triple |
 | [`scripts/decision-fault-server.py`](docs/HOT-FILE-LEDGER.md#scriptsdecision-fault-serverpy) | 2 / 2 / 216 | no (young) | young (294 / 296). 296-05: `ok` answers a `choice` question with its first offered option (294-IN-03). ⛔ loopback only, never logs a body |
@@ -11775,7 +11775,7 @@ cells rot within days.
 | [`frontend/src/components/settings/grantsVocabulary.ts`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentssettingsgrantsvocabularyts) | 3 / 2 / 115 | no (2 phases) | ⚠ absent for its entire life — row added 221-02. There is deliberately NO `READY` string in it |
 | [`backend/app/services/connector_service.py`](docs/HOT-FILE-LEDGER.md#backendappservicesconnector_servicepy) | 28 / 11 / 1858 | ⚠ **FIRES** | ⚠ row STALE (`25/9/1772`) — 248 and 252 touched it. NOT modified by 253; re-derived under CR-08. honoured by construction (**239-06**) |
 | [`backend/app/models/message.py`](docs/HOT-FILE-LEDGER.md#backendappmodelsmessagepy) | 25 / 17 / 292 (was `24 / 16 / 287`) | ⚠ **FIRES** | **292.1 D-UAT-2**: `run_status` Literal gains `cap_paused` (+2). ⛔ deleting `artifacts` makes reload render no artifacts, silently · 293 touch: see §Phase 293 close |
-| [`backend/app/models/user_settings.py`](docs/HOT-FILE-LEDGER.md#backendappmodelsuser_settingspy) | 61 / 37 / 1776 (was `60 / 36 / 1769`) | ⚠ **FIRES** | 293 touch: see §Phase 293 close (previous cell moved there verbatim) |
+| [`backend/app/models/user_settings.py`](docs/HOT-FILE-LEDGER.md#backendappmodelsuser_settingspy) | 62 / 38 / 1788 (was `61 / 37 / 1776`) | ⚠ **FIRES** | 300-03 (D-07/D-08/D-10, mig 218): four email fields + four _val lines, no env fallback in the model. Honoured by construction |
 | [`backend/app/api/setup.py`](docs/HOT-FILE-LEDGER.md#backendappapisetuppy) | 7 / 2 / 490 | no (1 phase) | ⚠ **absent for its ENTIRE LIFE — row added 249-03**. ⛔ it deliberately does NOT catch `SettingsWriteRefused`: a refused `setup_complete` reported as success is the bug one layer up |
 | [`backend/app/services/setup_service.py`](docs/HOT-FILE-LEDGER.md#backendappservicessetup_servicepy) | 4 / 2 / 514 | no (1 phase) | ⚠ **absent for its ENTIRE LIFE — row added 249-03**. Same deliberate non-catch as `api/setup.py`; its bool cannot express *the database refused the value* |
 | [`backend/app/api/evals.py`](docs/HOT-FILE-LEDGER.md#backendappapievalspy) | 24 / 7 / 3237 | ⚠ **FIRES** | ⚠ **absent for its ENTIRE LIFE at 7 phases — row added 249-04, which left the file BYTE-UNCHANGED.** ⛔ `_tile_for_run`'s engine-shaped sentence must stay the LAST resort |
@@ -11983,7 +11983,7 @@ cells rot within days.
 | [`frontend/src/docs/pages/Changelog.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrcdocspageschangelogtsx) | 2 / 1 / 128 (was `1 / 1 / 125`) | no (new) | young (created 276). Row added AT PLANNING. 276-03: P5 changelog; 276-07 hero link. ⛔ v4.5 Not yet released from parseHistory released flag |
 | [`frontend/src/docs/pages/BuildStory.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrcdocspagesbuildstorytsx) | 1 / 1 / 88 (was `0 / 0 / 0`) | no (new) | young (created 276-07). Row added AT PLANNING. D-26: five chapters in order, releases from parseHistory, one VideoSlot each. ⛔ an id-less slot renders nothing |
 | [`frontend/src/pages/SetupWizard.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrcpagessetupwizardtsx) | 3 / 3 / 352 (was `2 / 2 / 345`) | ⚠ **NOW FIRES — 3 phases** | ⚠ absent its ENTIRE LIFE; row added at 276-07 planning. **276-07**: the static Iris mark on the dark chip in the header. ⛔ no logic change |
-| [`backend/app/services/email_provider.py`](docs/HOT-FILE-LEDGER.md#backendappservicesemail_providerpy) | 4 / 2 / 105 (was `3 / 1 / 95`) | no (2 phases) | ⚠ absent its ENTIRE LIFE; row added at 276-07 planning. 276-07: hosted PNG lockup + "Syrel" in the invite. ⛔ org name AND every URL html-escaped (WR-02) |
+| [`backend/app/services/email_provider.py`](docs/HOT-FILE-LEDGER.md#backendappservicesemail_providerpy) | 5 / 3 / 374 (was `4 / 2 / 105`) | ⚠ **FIRES** | ⚠ now FIRES (300). 300-03 (D-21): the ONE mailer seam — none / Resend REST / SMTP, dev guard, shell. ⛔ never raises; no secret or recipient in a reason or log |
 | [`frontend/src/docs/pages/ChangelogVersion.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrcdocspageschangelogversiontsx) | 1 / 1 / 52 (was `0 / 0 / 0`) | no (new) | young (created 276). Row added AT PLANNING. 276-03: changelog version page |
 | [`frontend/src/docs/pages/ApiReference.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrcdocspagesapireferencetsx) | 3 / 2 / 144 (was `1 / 1 / 135`) | no (new) | young (created 276). Row added AT PLANNING. 276-03: P6 lazy Scalar. ⛔ telemetry off, agent disabled, test-request hidden; dynamic import only · 293 touch: see §Phase 293 close |
 | [`frontend/src/docs/components/Markdown.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrcdocscomponentsmarkdowntsx) | 1 / 1 / 134 (was `0 / 0 / 0`) | no (new) | young (created 276). Row added AT PLANNING. 276-03: react-markdown + gfm. ⛔ NO rehype-raw — raw HTML stays text (XSS) |
@@ -19979,6 +19979,14 @@ Scan-list cell as of 2026-10-20 (replaced by 294-05, moved verbatim): 1 / 1 / 11
 
 **`4 / 2 / 105`** re-derived at 276-07 (2026-10-05), counting the 276-07 Task 2 commit. `ResendProvider.send_invite` prepends `<img src="{safe_logo}" alt="Syrel" width="160" height="80">` where `safe_logo = html.escape(primary_frontend_origin() + "/brand/syrel-lockup-email.png", quote=True)`; the body says "… on Syrel." and the plain-text subject becomes "You're invited to {org} on Syrel". `NoneLogProvider` is unchanged. Pinned by `backend/tests/unit/test_276_invite_email_brand.py` (planted `</a><script>` org). Two phases; G-5 does not fire.
 
+### `backend/app/services/email_provider.py` — 300-03 Task 1 (2026-10-29)
+
+**`5 / 3 / 374` (was `4 / 2 / 105`) — crosses into G-5 at this commit (3 phases with 300).** D-21: rewritten as the ONE app mailer. `send_email(OutboundEmail, *, idempotency_key) -> SendOutcome` with three providers — `none` (suppressed), `resend` (REST over `httpx` through the `_http_client` seam; the `resend` SDK was never in the built image, so the shipped lazy import could not send one invite), `smtp` (stdlib `smtplib.SMTP`/`SMTP_SSL` from env `SMTP_*`, deliberately NOT `open_pinned_smtp`: the operator relay may be local). The D-10 dev guard lives inside the seam (`is_production_environment()`), `one_line` is the header guard, `shell_html` the UI-SPEC S1 shell, `send_invite` the invite on it. ⛔ BLOCKING, every caller uses `run_in_threadpool`; ⛔ never raises; ⛔ no API key, password, recipient, subject or link in a reason or a log. `compose_invite_link` unchanged. A temporary `get_email_provider` shim keeps `api/org.py` importing until Task 2. Seam if it grows: the two transports into a `mail_transports.py` leaf. Pinned by `test_300_mailer.py`, `test_276_invite_email_brand.py` (re-pointed, D-34), `test_300_clean_image_imports.py`.
+
+Scan-list cell as of 2026-10-29 (replaced by 300-03, moved verbatim): 4 / 2 / 105 (was `3 / 1 / 95`) | no (2 phases) | ⚠ absent its ENTIRE LIFE; row added at 276-07 planning. 276-07: hosted PNG lockup + "Syrel" in the invite. ⛔ org name AND every URL html-escaped (WR-02) |
+
+CLAUDE.md verdict cell: none before 300-03 (the file did not fire); row added by 300-03.
+
 ### `frontend/src/docs/pages/ChangelogVersion.tsx`
 
 **`0 / 0 / 0`** at 276 planning. Young (created in Phase 276). 276-03: changelog version page. 276-05 re-derives the triple at close.
@@ -21971,6 +21979,14 @@ CLAUDE.md verdict cell before 282-04 (replaced):
 
 > honoured by construction (282-01) · `MODEL_CAPABILITIES` seam OWED · ⛔
 
+### `backend/app/config.py` — 300-03 Task 1 (2026-10-29)
+
+**`96 / 55 / 1831` (was `93 / 54 / 1809`; the row was stale by two commits).** D-28: ONE hunk in the existing Phase 167 email block — the `email_provider` literal comment now reads `none | resend | smtp`, the stale *"the `resend` package is an opt-in lazy import"* sentence is deleted (300 D-21 removed the SDK), `invite_from_email` is documented as the sender FALLBACK (D-08), and five env fields are added: `smtp_host`, `smtp_port` (587), `smtp_username`, `smtp_password`, `smtp_security` (`starttls | ssl | none`). Infra and a secret, so env only; every other email knob is in `app_settings` (migration 218). Deploy parity in the same commit (`.env.example`, onebox preset, compose, OPERATOR.md, drift script). Honoured by construction: no new branch, no new import. The owed seam (split the Settings class by concern) is NOT taken.
+
+Scan-list cell as of 2026-10-29 (replaced by 300-03, moved verbatim): 93 / 54 / 1809 (was `92 / 54 / 1790`) | ⚠ **FIRES** | **282-01** ceiling 1800 + boot check + DB-tier clamp; **282-04** `DEFAULT_LLM_CALL_TIMEOUT_SECONDS_SELF_HOSTED` 900 via the mig 180 predicate. No env var. honoured by construction |
+
+CLAUDE.md verdict cell as of 2026-10-29 (replaced by 300-03, moved verbatim): | `backend/app/config.py` | 93 / 54 / 1809 (was `92 / 54 / 1790`) | honoured by construction (282-04: self-hosted default 900) · seam OWED · ⛔ |
+
 ### `backend/app/api/admin.py` — 282-04
 
 **`43 / 17 / 2051` (was `42 / 17 / 2024`).** **282-04** (D-29): the PATCH's timeout sentence moves into `_timeout_out_of_range_detail(lo, hi, val)`; `AddModelRequest.llm_call_timeout_seconds` (optional) is type- and range-checked before any DB touch with that same helper and joins `_ADD_MODEL_CAP_COLUMNS`. Blank writes nothing. `enabled` stays forced False.
@@ -23910,6 +23926,14 @@ Scan-list cell as of 2026-10-20 (replaced by 294-05, moved verbatim): 2 / 1 / 10
 
 No scan-list row existed before 294-05 (2026-10-20).
 
+### `scripts/check-deploy-drift.sh` — 300-03 Task 1 (2026-10-29)
+
+**`6 / 5 / 271` (was `5 / 4 / 267`).** D-28 parity: `SMTP_HOST SMTP_PORT SMTP_USERNAME SMTP_PASSWORD SMTP_SECURITY` registered in `OMITTED_FROM_ONEBOX` with the reason (they are active in `backend/.env.example`, and ship COMMENTED in `deploy/onebox.env.example` — the one-box's SMTP path — and passed through by `docker-compose.prod.yml`); the email comment rewritten for three providers. No check changed. ⚠ D-27: the Settings knobs are documented in OPERATOR.md with NO `NNN_name.sql` filename, because check 2 counts every such mention as a seed. Verdict at this commit: `RESULT: PASS`.
+
+Scan-list cell as of 2026-10-29 (replaced by 300-03, moved verbatim): 5 / 4 / 267 | ⚠ **FIRES** | ⚠ absent its ENTIRE LIFE — row added 294-05. 294-01: DECISION_ENGINE_FAULT_BASE_URL registered as intentionally omitted (+2) |
+
+CLAUDE.md verdict cell as of 2026-10-29 (replaced by 300-03, moved verbatim): | `scripts/check-deploy-drift.sh` | 5 / 4 / 267 | ⚠ absent its ENTIRE LIFE — row added 294-05 · fault var omitted |
+
 ## `backend/app/api/panel.py`
 
 **Re-derived at 295-03's base `ea1347c4d` with the `CLAUDE.md` recipe, BEFORE the edit: `5 commits / 4 phases / 282 L`.** Phase buckets, verbatim: `085` · `093` · `096` · `163`; no six-digit quick-task bucket to drop. ⚠ **G-5 FIRES at 4 phases against a threshold of 3, and the file had NO ROW in either document for its entire life** (`grep -c "api/panel.py" CLAUDE.md` returned `0`): the same invisibility the `api/runs.py` and `models/thread.py` rows recorded, found the same way, by re-deriving the triple of a file a plan was about to edit. History (`git log -- backend/app/api/panel.py`): `32242511a`/`e54851682` (085-04, the panel router + `/ask_user/pending` + `/tasks`), `02c71c54a` (093-05, the prior-phase `draft` on the prompt), `3632515c0` (096-03, the dead-run liveness filter, dual id namespace), `a8e53b46b` (163-06, the user-JWT RLS connection).
@@ -25129,6 +25153,14 @@ CLAUDE.md FIRING cell before 292.1 (replaced): honoured by construction (294-04:
 Scan-list disposition cell before 292.1 (replaced): quick-261024: `load_app_settings_async` now warms the hot override cache AND the tombstone set; `_build_providers` hides registry-REMOVED ids even when `provider_model_lists` names them. ⛔ seam OWED
 
 CLAUDE.md FIRING cell before 292.1 (replaced): quick-261024: picker warms hot + tombstone caches · ⛔
+
+### `backend/app/models/user_settings.py` — 300-03 Task 1 (2026-10-29)
+
+**`62 / 38 / 1788` (was `61 / 37 / 1776`).** Fields + loader lines only, beside the 293 D-14 precedent: `notification_email_delay_seconds: int = 120` (D-07), `email_from_address: str = ""` and `email_from_name: str = "Syrel"` (D-08), `email_dev_redirect_address: str = ""` (D-10), each loaded by `_val(row, key, None, default)` so a database without migration 218 still reads 120 / "" / Syrel / "". ⛔ No env fallback in the MODEL: `send_email` applies `email_from_address or settings.invite_from_email`, so the Settings read shows the stored value, never the env one. Pinned by `test_300_mailer.py`.
+
+Scan-list cell as of 2026-10-29 (replaced by 300-03, moved verbatim): 61 / 37 / 1776 (was `60 / 36 / 1769`) | ⚠ **FIRES** | 293 touch: see §Phase 293 close (previous cell moved there verbatim) |
+
+CLAUDE.md verdict cell as of 2026-10-29 (replaced by 300-03, moved verbatim): | `backend/app/models/user_settings.py` | 61 / 37 / 1776 (was `60 / 36 / 1769`) | 293-01: two per-key limit fields + _val · ⛔ |
 
 ### `frontend/src/pages/SettingsPage.tsx` — Phase 292.1 close
 

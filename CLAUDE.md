@@ -489,14 +489,14 @@ node scripts/check-hot-file-ledger.cjs <phase-dir>   # 0 clear · 1 missing rows
 | `frontend/src/lib/api.ts` | 215 / 128 / 556 (was `214 / 127 / 552`) | 299-03: one links export block |
 | `frontend/src/types/index.ts` | 103 / 82 / 1688 (was `102 / 81 / 1685`) | 299-04: ExpertBundle.org_id (the wire already sent it) · seam OWED |
 | `backend/app/main.py` | 97 / 71 / 993 (was `96 / 70 / 992`) | 299-01: one include_router(links.router) + its import token · ⛔ |
-| `backend/app/config.py` | 93 / 54 / 1809 (was `92 / 54 / 1790`) | honoured by construction (282-04: self-hosted default 900) · seam OWED · ⛔ |
+| `backend/app/config.py` | 96 / 55 / 1831 (was `93 / 54 / 1809`) | 300-03: SMTP_* fields (D-28) · seam OWED · ⛔ |
 | `backend/app/api/admin.py` | 44 / 17 / 2054 (was `43 / 17 / 2051`) | quick-261024: discover summary gains a `returned` count (+3) · ⛔ |
 | `backend/app/api/settings.py` | 47 / 25 / 1301 (was `46 / 24 / 1250`) | 293-01: two bounded per-key limit writes; allow-list +2 |
 | `backend/app/services/multimodal_service.py` | 14 / 7 / 984 | ⚠ absent from BOTH for its ENTIRE LIFE at **7 phases** |
 | `backend/app/api/documents.py` | 101 / 40 / 2709 (was `99 / 39 / 2698`) | 298-01: one by_org in build() + one root_upload_org kwarg · ⛔ |
 | `backend/app/api/library.py` | 3 / 3 / 304 (was `2 / 2 / 299`) | ⚠ now FIRES (298) · 298-01: summary shares the lists' org predicate ($1) |
 | `scripts/vitest-count-gate.cjs` | 395 / 83 / 6865 (was `380 / 81 / 6808`) | 300-01: 2 pins added, 1 raised (ScheduleModal 9→29), none lowered |
-| `scripts/check-deploy-drift.sh` | 5 / 4 / 267 | ⚠ absent its ENTIRE LIFE — row added 294-05 · fault var omitted |
+| `scripts/check-deploy-drift.sh` | 6 / 5 / 271 (was `5 / 4 / 267`) | 300-03: SMTP_* parity |
 | `scripts/build-public-openapi.cjs` | 11 / 5 / 472 (was `7 / 3 / 468`) | 298-01: org-items tag (Account & org) + /org-items/ FLAGGED (2 lines) |
 | `scripts/check-seeds-register.cjs` | 7 / 3 / 1132 | ⚠ FIRES, absent here — row added 296-05 · `\d{3,}` ids · ⛔ |
 | `backend/app/services/eval_runner_service.py` | 14 / 9 / 1056 (was `13 / 8 / 1040`) | 296-06: eval arm on a fixed EVAL_MAX_TOOL_ROUNDS (copy of settings) |
@@ -549,7 +549,7 @@ node scripts/check-hot-file-ledger.cjs <phase-dir>   # 0 clear · 1 missing rows
 | `backend/app/services/sources/__init__.py` | 5 / 3 / 40 | ⚠ absent while FIRING — row added 239-03 |
 | `backend/app/services/mcp_client.py` | 9 / 6 / 526 | ⚠ row STALE TWICE (SEED-258) |
 | `backend/app/models/message.py` | 25 / 17 / 292 (was `24 / 16 / 287`) | 293-03: ONE field (run_origin, a dict: a harness import is circular) |
-| `backend/app/models/user_settings.py` | 61 / 37 / 1776 (was `60 / 36 / 1769`) | 293-01: two per-key limit fields + _val · ⛔ |
+| `backend/app/models/user_settings.py` | 62 / 38 / 1788 (was `61 / 37 / 1776`) | 300-03: four email knobs + _val lines · ⛔ |
 | `backend/app/services/harness/reachability.py` | 5 / 5 / 498 (was `4 / 4 / 463`) | 295-02: one pure lint check (no_template_bound) |
 | `backend/app/services/workflow_kickoff.py` | 15 / 12 / 608 (was `14 / 11 / 605`) | 299-01: one refuse_if_other_org beside raise_if_foreign (D-18) |
 | `frontend/src/components/workflows/WorkflowScheduleModal.tsx` | 6 / 5 / 812 (was `5 / 4 / 723`) | 300-01: outcome words + per-row Run now (D-15/D-16) |
@@ -689,6 +689,7 @@ node scripts/check-hot-file-ledger.cjs <phase-dir>   # 0 clear · 1 missing rows
 | `frontend/src/hooks/useAuth.ts` | 6 / 5 / 128 (was `5 / 4 / 100`) | ⚠ absent while FIRING — row added 299-05 · redirect + .catch · ⛔ |
 | `frontend/src/pages/AuthPage.tsx` | 5 / 3 / 32 (was `4 / 2 / 26`) | ⚠ now FIRES (299) · 299-05: one quiet S5 line (kind only) |
 | `backend/app/api/org.py` | 11 / 3 / 1024 | ⚠ absent while FIRING — row added at 300 planning · 300-03 invite outcome |
+| `backend/app/services/email_provider.py` | 5 / 3 / 374 (was `4 / 2 / 105`) | ⚠ now FIRES (300) · 300-03: one mailer seam (D-21) · ⛔ |
 | `frontend/src/components/admin/HealthSignals.tsx` | 5 / 4 / 316 | ⚠ absent while FIRING — row added at 300 planning · 300-04 Email tile |
 
 

@@ -61,7 +61,7 @@ def _declared_distributions() -> set[str]:
 
 
 def _top_level_imports(path: Path) -> set[str]:
-    tree = ast.parse(path.read_text(encoding="utf-8"))
+    tree = ast.parse(path.read_text(encoding="utf-8-sig"))
     names = set()
     for node in ast.walk(tree):  # ast.walk reaches function-local imports too
         if isinstance(node, ast.Import):

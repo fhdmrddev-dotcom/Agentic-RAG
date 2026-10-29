@@ -406,12 +406,12 @@ def test_an_unexpected_exception_becomes_a_failed_outcome(env, monkeypatch):
 # ── shell ──────────────────────────────────────────────────────────────────────────────
 
 def test_the_shell_escapes_the_logo_origin_and_wraps_the_inner_html(monkeypatch):
-    monkeypatch.setattr(settings, "frontend_url", 'https://app.example.com",x="1,https://b.example.com')
+    monkeypatch.setattr(settings, "frontend_url", 'https://app.example.com/"onload="x,https://b.example.com')
     out = ep.shell_html("<p>inner</p>", footer_html="<p>foot</p>")
     assert "max-width:560px" in out and "padding:24px" in out and "#0F172A" in out
     assert "<p>inner</p>" in out and "<p>foot</p>" in out
     assert "border-top:1px solid #E2E4E9" in out and "#6B7280" in out
-    assert '",x="1' not in out and "&quot;,x=&quot;1" in out
+    assert '"onload="x' not in out and "&quot;onload=&quot;x" in out
     assert "b.example.com" not in out
     assert "border-top" not in ep.shell_html("<p>inner</p>")
 
