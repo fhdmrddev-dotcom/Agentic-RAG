@@ -444,7 +444,7 @@ node scripts/check-hot-file-ledger.cjs <phase-dir>   # 0 clear · 1 missing rows
 | `frontend/src/components/workflows/evidenceVocabulary.ts` | 5 / 3 / 261 | ⚠ now FIRES (296) · 296-04: neutral NO_MATCH/UNSOURCED + DOWNLOAD_UNAVAILABLE |
 | `backend/app/models/thread.py` | 25 / 17 / 550 (was `24 / 16 / 545`) | 293-03: ONE field (origin) |
 | `frontend/src/components/workflows/canvasModel.ts` | 16 / 8 / 836 (was `15 / 8 / 831`) | 296-07: comparePhaseOrder, engineArmed; isGrounded drops escalated |
-| `frontend/src/components/layout/ChatLayout.tsx` | 73 / 36 / 934 (was `72 / 36 / 933`) | 299-03: history column live behind the card; threadsPending prop |
+| `frontend/src/components/layout/ChatLayout.tsx` | 75 / 37 / 954 (was `73 / 36 / 934`) | 301-02: ctx into the one flatMap; Library badge reads library mark |
 | `frontend/src/components/layout/attentionConditions.ts` | 5 / 3 / 424 (was `3 / 2 / 200`) | ⚠ now FIRES (301) · 301-02: 2nd tenant waiting-runs, required mark · ⛔ |
 | `frontend/src/components/layout/ChatLaunchForm.tsx` | 6 / 4 / 191 (was `5 / 4 / 183`) | 296 G-4 row 11: refused Run scrolls the refusal into view |
 | `frontend/src/components/workflows/LaunchInputFields.tsx` | 3 / 3 / 145 | 287-01: leaf stays non-blocking; docblock only · 214.1-01 trigger TAKEN |
@@ -496,7 +496,7 @@ node scripts/check-hot-file-ledger.cjs <phase-dir>   # 0 clear · 1 missing rows
 | `backend/app/services/multimodal_service.py` | 14 / 7 / 984 | ⚠ absent from BOTH for its ENTIRE LIFE at **7 phases** |
 | `backend/app/api/documents.py` | 101 / 40 / 2709 (was `99 / 39 / 2698`) | 298-01: one by_org in build() + one root_upload_org kwarg · ⛔ |
 | `backend/app/api/library.py` | 3 / 3 / 304 (was `2 / 2 / 299`) | ⚠ now FIRES (298) · 298-01: summary shares the lists' org predicate ($1) |
-| `scripts/vitest-count-gate.cjs` | 398 / 83 / 6881 (was `397 / 83 / 6873`) | 300-05: 3 org pins added (InvitationsTab 17, dialog 7, copy 6) |
+| `scripts/vitest-count-gate.cjs` | 400 / 84 / 6886 (was `398 / 83 / 6881`) | 301-02: waiting pin 23; 3 attention pins raised (17, 14, 20) |
 | `scripts/check-deploy-drift.sh` | 6 / 5 / 271 (was `5 / 4 / 267`) | 300-03: SMTP_* parity |
 | `scripts/build-public-openapi.cjs` | 11 / 5 / 472 (was `7 / 3 / 468`) | 298-01: org-items tag (Account & org) + /org-items/ FLAGGED (2 lines) |
 | `scripts/check-seeds-register.cjs` | 7 / 3 / 1132 | ⚠ FIRES, absent here — row added 296-05 · `\d{3,}` ids · ⛔ |
@@ -583,7 +583,7 @@ node scripts/check-hot-file-ledger.cjs <phase-dir>   # 0 clear · 1 missing rows
 | `frontend/src/components/workflows/verdictModel.ts` | 8 / 4 / 363 (was `6 / 3 / 355`) | 295-02: one Record entry (BLOCKED_SENTENCE.lint) |
 | `frontend/src/components/library/IngestionTab.tsx` | 20 / 7 / 706 (was `17 / 6 / 512`) | 284-03: summary + three paged status lists; layout unchanged · ⛔ |
 | `frontend/src/components/ingestion/__tests__/IngestionStrip.test.tsx` | 3 / 3 / 516 | ⚠ absent; row added 233, which repaired the INHERITED red `229-03` cau |
-| `frontend/src/components/layout/NavPanel.tsx` | 26 / 14 / 420 (was `25 / 14 / 416`) | last touch 276-01 / 276-06 (D-27) |
+| `frontend/src/components/layout/NavPanel.tsx` | 28 / 15 / 428 (was `26 / 14 / 420`) | 301-02: Library badge + popover read conditionsForMark library |
 | `frontend/src/App.tsx` | 44 / 30 / 350 (was `43 / 30 / 349`) | 299-02: one prop (entityLink) |
 | `frontend/src/main.tsx` | 5 / 3 / 32 (was `3 / 1 / 10`) | ⚠ now FIRES (297) · one '*' route, no children, no key · ⛔ |
 | `frontend/src/index.css` | 35 / 19 / 1239 (was `34 / 18 / 1196`) | 294-05: ONE verdict block keyed on citation-marker--v-* (+43) |

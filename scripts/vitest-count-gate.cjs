@@ -3873,8 +3873,8 @@ const BASELINE = {
   // which the behaviour cases are structurally blind to and which is the link that ACTUALLY broke.
   "IngestionTab.reconnectControl.test.tsx": 6,
   "SourcesAttentionSection.test.tsx": 13,
-  "NavPanel.badge.test.tsx": 14,
-  "ChatLayout.badge.test.tsx": 5,
+  "NavPanel.badge.test.tsx": 17, // RAISED 14 -> 17 at 301-02 (D-11 / D-12): producer pin re-baselined to 2 + both keys; one library + two waiting rows -> badge 1, popover one row; waiting-only -> no badge
+  "ChatLayout.badge.test.tsx": 14, // RAISED 5 -> 14 at 301-02 (D-12 / D-14): waiting-only (no Library badge, dot lit), mixed (1 not 3), one read each on mount, dot without a Library navigator; the pin had trailed the file (5 pinned, 10 shipped)
   "useSourceAttention.test.tsx": 13,
   "LibraryPage.initialTab.test.tsx": 6,
   // Phase 238 (D-238-08). 6 cases; the load-bearing one is "refuses a service_id that LOOKS
@@ -4029,7 +4029,7 @@ const BASELINE = {
   // to be "health"`); the other EIGHT are controls that were green before the edit and whose
   // job is to prove the edit changed nothing else — the registry's one-tenant count, the five
   // cause sentences asserted on their WORDS, and the `?raw` reader inventory.
-  "attentionTab.test.ts": 10,
+  "attentionTab.test.ts": 20, // RAISED 10 -> 20 at 301-02 (D-11 / D-13 / D-14 / D-31): pin 2 + both keys; ctx-object stopped tenant (mark library); waiting-runs mapping, onOpen -> openRun, four WaitingStatus reports, no-report safe; conditionsForMark / waitingTotal / attentionCountByTab partition; useWaitingNotices( inventory fence + self-guard
   // ── Phase 244 (244-04 T2 / SHELL-05 / BUG-260911-03) ────────────────────────────────────
   // ⛔ BOTH KNOBS, and this script has now recorded the same fact about `src/pages` a dozen
   // times: there is NO `src/pages` bare-directory entry in TARGETS — it is reached by NAMED
