@@ -147,6 +147,21 @@ SELECT coalesce(
 
 RECIPIENT_SQL = "SELECT email FROM auth.users WHERE id = $1"
 
+#: 300-REVIEW WR-03: re-stamp ONE row's lease the moment its send starts. The batch shares one
+#: ``claimed_at``, and rows are sent one at a time, so on a slow relay a row still QUEUED could
+#: pass the lease and be reclaimed by another worker (SMTP: ``'failed'``; Resend: ``'retry'``,
+#: then a second claim). Matching ``attempts`` as well as ``'sending'`` is load-bearing: a Resend
+#: row reclaimed AND re-claimed elsewhere is ``'sending'`` again, one attempt later, and must not
+#: be sent by both workers at once. No row back = no longer ours: never send it.
+RENEW_LEASE_SQL = """
+UPDATE public.notification_deliveries
+   SET claimed_at = now()
+ WHERE id = $1
+   AND status = 'sending'
+   AND attempts = $2
+RETURNING true
+"""
+
 RECORD_SQL = """
 UPDATE public.notification_deliveries
    SET status = $2,
@@ -297,6 +312,12 @@ async def record_delivery_outcome(
         logger.exception("record_delivery_outcome failed for delivery %s", delivery_id)
 
 
+async def renew_delivery_lease(pool: asyncpg.Pool, delivery: "ClaimedDelivery") -> bool:
+    """WR-03: stamp this row's lease now, if it is still this worker's claim. ``False`` = another
+    worker reclaimed it (or claimed it again): the caller must NOT send and must record nothing."""
+    return bool(await pool.fetchval(RENEW_LEASE_SQL, delivery.id, delivery.attempts))
+
+
 async def latest_delivery_facts(pool: asyncpg.Pool) -> dict:
     """For the Control Room Email tile: the newest send, and the newest failure with its words.
 
@@ -322,5 +343,6 @@ __all__ = [
     "email_opted_in",
     "recipient_email",
     "record_delivery_outcome",
+    "renew_delivery_lease",
     "latest_delivery_facts",
 ]

@@ -17,7 +17,8 @@ Per claimed row, in this order (D-13, D-09), on a fresh read AFTER the claim com
   2. opted in? (``user_settings.preferences.notification_email_enabled``, default on) — else
      ``skipped_opted_out``, nothing sent, the notice left alone;
   3. an address on record? — else ``failed``;
-  4. send the frozen payload under ``Idempotency-Key: run-waiting/<delivery id>``, off the event
+  4. renew this row's lease (WR-03) — lost to another worker means never send it;
+  5. send the frozen payload under ``Idempotency-Key: run-waiting/<delivery id>``, off the event
      loop (``send_email`` is blocking), then map the outcome (D-12): sent / suppressed / retry
      (retryable, attempts left: +60 s after the first attempt, +300 s after the second) / failed.
 
@@ -121,6 +122,13 @@ class NotificationDrainer:
         if not to:
             await db.record_delivery_outcome(self._pool, row.id, status="failed", reason=NO_ADDRESS_REASON)
             self.failed += 1
+            return False
+
+        # WR-03: the batch was claimed under ONE claimed_at and is sent row by row, so stamp this
+        # row's lease as its send STARTS. Lost (reclaimed or re-claimed by another worker while it
+        # sat in this batch): never send it, and never record over that worker's outcome.
+        if not await db.renew_delivery_lease(self._pool, row):
+            logger.warning("notification delivery %s was reclaimed before sending; not sent", row.id)
             return False
 
         msg = OutboundEmail(to=to, subject=row.subject, text=row.text_body, html=row.html_body)

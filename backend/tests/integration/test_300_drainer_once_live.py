@@ -309,3 +309,89 @@ async def test_a_crash_mid_send_is_resent_only_on_resend(monkeypatch, row_provid
         else:
             assert send.calls == [], "SMTP / none are at-most-once: never re-sent after a crash"
             assert row["reason"] == "Interrupted while sending; not retried to avoid a duplicate."
+
+
+@pytest.mark.parametrize("provider", ["smtp", "resend"])
+async def test_a_row_reclaimed_while_queued_in_a_slow_batch_is_never_sent_by_its_first_worker(
+    monkeypatch, provider
+):
+    """300-REVIEW WR-03, live. Worker A claims a row; while it is still QUEUED behind slow sends,
+    its lease passes and worker B reclaims it (SMTP: 'failed'; Resend: 'retry', then B claims it
+    again). When A reaches the row it must send nothing and record nothing over B's outcome."""
+    monkeypatch.setattr(drainer_mod, "configured_provider", lambda: provider)
+    from app.db import notifications as db
+
+    async with _world() as w:
+        a_send = CountingSend()
+        a = NotificationDrainer(w.pool, send=a_send)
+        (a_row,) = await db.claim_due_deliveries(
+            w.pool, limit=5, render=drainer_mod.render_delivery, now=NOW, provider=provider
+        )
+        assert a_row.id == w.delivery and a_row.attempts == 1
+        # A's batch is slow: this row's shared claimed_at is past the lease when B ticks.
+        await w.pool.execute(
+            "UPDATE public.notification_deliveries SET claimed_at = $2 WHERE id = $1",
+            w.delivery, NOW - timedelta(hours=1),
+        )
+        b_send = CountingSend()
+        b = NotificationDrainer(w.pool, send=b_send)
+        await b.tick(now=NOW)
+        after_b = await _delivery(w)
+        if provider == "smtp":
+            assert after_b["status"] == "failed" and b_send.calls == []
+        else:
+            assert after_b["status"] == "sent" and after_b["attempts"] == 2 and len(b_send.calls) == 1
+
+        # A finally reaches the row it claimed earlier.
+        sent = await a._process(a_row, now=NOW)
+
+        assert sent is False
+        assert a_send.calls == [], "WR-03: the first worker sent a row it no longer owned"
+        final = await _delivery(w)
+        assert final["status"] == after_b["status"] and final["attempts"] == after_b["attempts"]
+        assert final["reason"] == after_b["reason"]
+
+
+async def test_renewing_the_lease_keeps_a_queued_row_from_being_reclaimed():
+    """WR-03: the row whose send starts is re-stamped, so another worker's reclaim skips it."""
+    from app.db import notifications as db
+
+    async with _world() as w:
+        (row,) = await db.claim_due_deliveries(
+            w.pool, limit=5, render=drainer_mod.render_delivery, now=NOW, provider="smtp"
+        )
+        await w.pool.execute(
+            "UPDATE public.notification_deliveries SET claimed_at = $2 WHERE id = $1",
+            w.delivery, NOW - timedelta(hours=1),
+        )
+        assert await db.renew_delivery_lease(w.pool, row) is True
+        # A reclaim pinned to the claim's era sees a lease stamped at a real now(): not stale.
+        await db.reclaim_stale_sending(w.pool, lease_seconds=600, provider="smtp", now=NOW)
+        assert (await _delivery(w))["status"] == "sending"
+
+
+async def test_a_resend_row_re_claimed_elsewhere_is_not_sent_by_its_first_worker_too(monkeypatch):
+    """WR-03, the attempts half: B reclaimed AND re-claimed the row, so it is 'sending' again (one
+    attempt later) while B's send is in flight. A's renew must not match it: no concurrent send."""
+    monkeypatch.setattr(drainer_mod, "configured_provider", lambda: "resend")
+    from app.db import notifications as db
+
+    async with _world() as w:
+        (a_row,) = await db.claim_due_deliveries(
+            w.pool, limit=5, render=drainer_mod.render_delivery, now=NOW, provider="resend"
+        )
+        await w.pool.execute(
+            "UPDATE public.notification_deliveries SET claimed_at = $2 WHERE id = $1",
+            w.delivery, NOW - timedelta(hours=1),
+        )
+        assert await db.reclaim_stale_sending(w.pool, lease_seconds=600, provider="resend", now=NOW) == 1
+        (b_row,) = await db.claim_due_deliveries(
+            w.pool, limit=5, render=drainer_mod.render_delivery, now=NOW, provider="resend"
+        )
+        assert b_row.attempts == 2 and (await _delivery(w))["status"] == "sending"
+
+        a_send = CountingSend()
+        assert await NotificationDrainer(w.pool, send=a_send)._process(a_row, now=NOW) is False
+        assert a_send.calls == [], "WR-03: two workers would POST the same delivery at once"
+        row = await _delivery(w)
+        assert row["status"] == "sending" and row["attempts"] == 2

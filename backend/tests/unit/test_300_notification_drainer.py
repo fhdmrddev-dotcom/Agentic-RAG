@@ -70,6 +70,9 @@ def fake_db(monkeypatch):
         "reclaims": [],
         "raise_for": set(),    # delivery ids whose still_waiting raises
         "claim_kwargs": [],
+        "lease_lost": set(),   # delivery ids another worker reclaimed (WR-03)
+        "renewed": [],         # renew_delivery_lease calls, in order
+        "events": [],          # ordering log: ("renew", id) / ("send", id)
     }
 
     async def claim_due_deliveries(pool, *, limit, render, now=None, provider="none"):
@@ -94,6 +97,11 @@ def fake_db(monkeypatch):
     async def record_delivery_outcome(pool, delivery_id, **kwargs):
         state["outcomes"].append({"id": delivery_id, **kwargs})
 
+    async def renew_delivery_lease(pool, delivery):
+        state["renewed"].append(delivery.id)
+        state["events"].append(("renew", delivery.id))
+        return delivery.id not in state["lease_lost"]
+
     for name, fn in {
         "claim_due_deliveries": claim_due_deliveries,
         "reclaim_stale_sending": reclaim_stale_sending,
@@ -101,6 +109,7 @@ def fake_db(monkeypatch):
         "email_opted_in": email_opted_in,
         "recipient_email": recipient_email,
         "record_delivery_outcome": record_delivery_outcome,
+        "renew_delivery_lease": renew_delivery_lease,
     }.items():
         monkeypatch.setattr(db, name, fn)
     monkeypatch.setattr(drainer_mod, "configured_provider", lambda: "resend")
@@ -261,6 +270,48 @@ async def test_a_retry_whose_run_was_answered_meanwhile_sends_nothing(fake_db):
 
 
 # ── isolation and the loop (D-20) ────────────────────────────────────────────────
+
+
+# ── WR-03: the lease is stamped when each row's send STARTS ──────────────────────
+
+
+async def test_a_row_reclaimed_by_another_worker_mid_batch_is_never_sent(fake_db):
+    """300-REVIEW WR-03: a batch claims 20 rows under one claimed_at and sends them one at a time.
+    On a slow relay the lease of a row still QUEUED can expire, and another worker reclaims it
+    (SMTP: 'failed', Resend: 'retry' and a second claim). The first worker must then not send it
+    and must not record over the other worker's outcome."""
+    first, lost, last = _claimed(), _claimed(), _claimed()
+    fake_db["claims"].append([first, lost, last])
+    fake_db["lease_lost"].add(lost.id)
+    send = Recorder()
+    d = _drainer(send)
+
+    sent = await d.tick(now=PINNED)
+
+    assert sent == 2
+    assert [key for _, key in send.calls] == [f"run-waiting/{first.id}", f"run-waiting/{last.id}"]
+    assert [o["id"] for o in fake_db["outcomes"]] == [first.id, last.id]
+    assert fake_db["renewed"] == [first.id, lost.id, last.id]
+
+
+async def test_the_lease_is_renewed_after_the_re_checks_and_just_before_the_send(fake_db):
+    row = _claimed()
+    fake_db["claims"].append([row])
+
+    def send(msg, *, idempotency_key=None):
+        fake_db["events"].append(("send", row.id))
+        return SendOutcome("sent", provider="resend", provider_id="re_1")
+
+    await _drainer(send).tick(now=PINNED)
+    assert fake_db["events"] == [("renew", row.id), ("send", row.id)]
+
+
+async def test_a_skipped_row_renews_no_lease(fake_db):
+    row = _claimed()
+    fake_db["claims"].append([row])
+    fake_db["waiting"] = False
+    await _drainer(Recorder()).tick(now=PINNED)
+    assert fake_db["renewed"] == []
 
 
 async def test_one_row_raising_never_stops_the_rest_of_the_batch(fake_db):
