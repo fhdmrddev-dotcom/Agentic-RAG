@@ -110,7 +110,8 @@ const DEP_ORDER: ReadonlyArray<{
 // Additive `signals.dependencies.email` (health_probe.probe_email). It is wider than
 // the three probes above (mode / provider / last outcome), so it is typed HERE and
 // read off the payload — this leaf stays the one home of every tile word. Only a
-// real failure is red: Off, Held back, Test mode and Ready are neutral, and skipped
+// real failure (or, 300-REVIEW IN-04, a transport that cannot send: "Can't send") is red:
+// Off, Held back, Test mode and Ready are neutral, and skipped
 // or suppressed sends never reach this tile as failures (the probe does not read them).
 interface EmailProbe {
   state: "up" | "down" | "off"
@@ -120,6 +121,9 @@ interface EmailProbe {
   last_failure_at?: string | null
   last_failure_reason?: string | null
   latency_ms?: null
+  /** 300-REVIEW IN-04: the mailer's sentence for a transport that cannot send on config alone
+   *  (no sender address, key or host). Absent on an older backend. */
+  config_problem?: string | null
 }
 
 interface EmailView {
@@ -154,6 +158,10 @@ function emailView(probe: EmailProbe | null | undefined, loading: boolean): Emai
     }
   }
   const provider = EMAIL_PROVIDER_WORD[probe.provider ?? ""] ?? "your mail server"
+  if (probe.config_problem) {
+    // IN-04: named before the first send, never "Ready".
+    return { dot: "bg-destructive", value: "Can't send", sub: `via ${provider}: ${probe.config_problem}` }
+  }
   if (probe.state === "down") {
     const at = probe.last_failure_at ? `, ${when(probe.last_failure_at)}` : ""
     const reason = probe.last_failure_reason ?? "the email could not be sent."

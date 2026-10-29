@@ -242,6 +242,22 @@ def smtp_security_problem() -> str | None:
     return None
 
 
+def transport_config_problem(provider: str, app) -> str | None:
+    """300-REVIEW IN-04: the sentence a send through ``provider`` would fail with on CONFIG alone,
+    else ``None``. Pure (no network). The words are the mailer's own refusals, checked in the
+    order a send meets them, so the Control Room names the problem before the first send."""
+    address = one_line(getattr(app, "email_from_address", "") or settings.invite_from_email or "").strip()
+    if not address:
+        return "No sender address is set."
+    if provider == "resend" and not (settings.resend_api_key or "").strip():
+        return "RESEND_API_KEY is not set."
+    if provider == "smtp":
+        if not (settings.smtp_host or "").strip():
+            return "SMTP_HOST is not set."
+        return smtp_security_problem()
+    return None
+
+
 def _send_smtp(sender_header: str, sender_address: str, to: str, subject: str,
                msg: OutboundEmail) -> SendOutcome:
     host = (settings.smtp_host or "").strip()

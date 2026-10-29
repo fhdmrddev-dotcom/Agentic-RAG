@@ -19,6 +19,7 @@ type Email = {
   last_failure_at: string | null
   last_failure_reason: string | null
   latency_ms: null
+  config_problem: string | null
 }
 
 const SENT = "2026-10-29T09:00:00+00:00"
@@ -128,6 +129,29 @@ describe("HealthSignals — the Email tile (UI-SPEC S5)", () => {
     expect(sub.className).toContain("break-words")
     expect(sub.className).not.toContain("truncate")
     expect(dot().className).toContain("bg-destructive")
+  })
+
+  // 300-REVIEW IN-04: a transport that cannot send on config alone read "Ready" until the first
+  // real send failed. It now reads "Can't send" with the mailer's sentence, red, before any send.
+  it("a transport that cannot send → Can't send, with the mailer's sentence, red", () => {
+    render(
+      <HealthSignals
+        signals={signals({ state: "down", config_problem: "No sender address is set." })}
+        showTechnical={false}
+      />,
+    )
+    const t = within(tile())
+    expect(t.getByText("Can't send")).toBeInTheDocument()
+    expect(t.queryByText("Ready")).toBeNull()
+    expect(t.queryByText("Last send failed")).toBeNull()
+    const sub = t.getByText("via Resend: No sender address is set.")
+    expect(sub.className).toContain("break-words")
+    expect(dot().className).toContain("bg-destructive")
+  })
+
+  it("an older backend with no config_problem reads exactly as before", () => {
+    render(<HealthSignals signals={signals({ config_problem: undefined } as Partial<Email>)} showTechnical={false} />)
+    expect(within(tile()).getByText("Ready")).toBeInTheDocument()
   })
 
   it("a probe failure with no timestamp still names the reason", () => {

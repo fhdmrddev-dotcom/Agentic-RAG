@@ -38,7 +38,7 @@ from app.api.api_docs import is_production_environment
 from app.config import settings
 from app.db.notifications import latest_delivery_facts
 from app.models.user_settings import load_app_settings
-from app.services.email_provider import configured_provider
+from app.services.email_provider import configured_provider, transport_config_problem
 
 logger = logging.getLogger(__name__)
 
@@ -128,7 +128,9 @@ async def probe_email() -> dict:
     ``held_back`` (mail is only logged, D-10); not production with one → ``test``; production →
     ``live``. ``state``: ``off`` for off / held back (a deliberate config, NEVER ``down``);
     ``down`` when the newest failed delivery is newer than the newest sent one (or nothing was
-    ever sent), or when the record could not be read; else ``up``. Skipped and suppressed
+    ever sent), or when the record could not be read; else ``up``. ``config_problem`` (IN-04):
+    in live or test mode, the mailer's sentence for a transport that cannot send on config alone
+    (``state: down``, no outbox read); ``None`` otherwise. Skipped and suppressed
     deliveries are never failures. The reason is the mailer's own address-free sentence; the
     probe never carries a recipient, a subject or a link (T-300-33), and it never raises.
     """
@@ -140,20 +142,28 @@ async def probe_email() -> dict:
         "last_failure_at": None,
         "last_failure_reason": None,
         "latency_ms": None,
+        "config_problem": None,
     }
     try:
         provider = configured_provider()
         out["provider"] = provider
         if provider == "none":
             return out
+        app = await run_in_threadpool(load_app_settings)
         if is_production_environment():
             out["mode"] = "live"
         else:
-            app = await run_in_threadpool(load_app_settings)
             redirect = (getattr(app, "email_dev_redirect_address", "") or "").strip()
             out["mode"] = "test" if redirect else "held_back"
             if not redirect:
                 return out
+        # 300-REVIEW IN-04: a transport that cannot send on config alone (no sender address, no
+        # key, no host, a refused SMTP_SECURITY) used to read "Ready" until the first real send
+        # failed. Named now, in the mailer's own words; the outbox is not read.
+        problem = transport_config_problem(provider, app)
+        if problem:
+            out.update(state="down", config_problem=problem)
+            return out
     except Exception as exc:  # noqa: BLE001 — a probe never raises
         logger.warning("health probe: email mode unreadable (%s)", type(exc).__name__)
         out.update(state="down", mode="live", last_failure_reason=EMAIL_RECORD_UNREADABLE)
