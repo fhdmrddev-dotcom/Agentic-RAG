@@ -4,9 +4,9 @@ title: A scheduled run launches with a blank required input (the schedule door s
 reported: 2026-10-27
 surface: Agentic-RAG
 severity: minor
-status: open
+status: folded  # 2026-10-29: folded into Phase 300 at discuss-phase (300-CONTEXT.md)
 affected_areas: ['backend/schedules', 'backend/workflows']
-folded_into: null
+folded_into: "300"
 verified_closed_by: null
 related_seeds: []
 re_open_trigger: "Fold at the next /gsd:discuss-phase whose files touch backend/app/services/scheduler_service.py or backend/app/api/schedules.py; found by the v4.7 close integration check, outside 296's inventory"
