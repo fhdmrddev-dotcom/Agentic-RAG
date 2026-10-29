@@ -37,7 +37,15 @@ findings:
   warning: 2
   info: 7
   total: 9
-status: issues_found
+status: all_fixed
+fix_scope: critical_warning
+fixed_at: 2026-10-30
+findings_in_scope: 2
+fixed: 2
+skipped: 0
+fixes:
+  WR-01: f348ba91e
+  WR-02: 7404177b2
 ---
 
 # Phase 301: Code Review Report
@@ -119,6 +127,8 @@ const softRefresh = useCallback(() => {
 
 In `ChatLayout.badge.test.tsx`, make the channel double's `subscribe` call `cb("SUBSCRIBED")` on a microtask, so the D-14 count measures what ships.
 
+**Status: FIXED — `f348ba91e`** (2026-10-30, gsd-code-fixer). The shape differs from the suggestion above, on purpose: the `lastSettled` 2 s skip would DROP a trigger (a SUBSCRIBED or focus right after a fetch settled would never ask), which D-17 does not allow. Instead every trigger calls `request()`: requests inside one 250 ms trailing window (`REFETCH_COALESCE_MS`, counted from the first trigger and never reset, so a stream cannot starve the ask) become one GET, and a request that lands while a GET is out owes exactly ONE follow-up after it rather than aborting and refiring. The public `refresh()` keeps its abort-and-restart contract. The `ChatLayout.badge` channel double now reports `SUBSCRIBED` on a microtask and records it; the D-14 case asserts the status was delivered, waits for the settled pill, lets the window close, and only then counts 1. Before the fix, that double turned four shell cases red (one mount = 2 GETs). New hook cases: mount + membership load + SUBSCRIBED = 1 GET; visibilitychange + focus = 1 GET; an event during a fetch keeps it (not aborted) and owes one follow-up. All three were driven RED first.
+
 ### WR-02: `membershipKey` is not a membership signal — it flaps to `""` on every active-org switch and on any probe failure
 
 **File:** `frontend/src/hooks/useWaitingNotices.ts:101-108` (source: `frontend/src/hooks/useOrgPermissionsProbe.ts:91-93, 101-104`)
@@ -147,6 +157,11 @@ useEffect(() => {
 ```
 
 Keep the mount refresh as its own effect. Also consider dropping `activeOrgId` as a trigger: the answer is org-independent, and D-17 only needs it so an org switch reconciles, which a settled membership key plus the Realtime event already cover.
+
+**Status: FIXED — `7404177b2`** (2026-10-30, gsd-code-fixer). The fix keys on the set itself and does not read probe `loading`. An empty membership list is skipped, not recorded. That covers the CLOSED window during an org switch and also a failed probe, which leaves `loading` false with `[]`, so a `loading` gate alone would still flap. The first non-empty set is recorded without a fetch, because the mount fetch already reflects it. Only a later, different non-empty set refetches. `activeOrgId` is KEPT as a trigger, because D-17 names an active-org switch explicitly. It now goes through the WR-01 coalescer, so an org switch costs one GET instead of three. New hook cases, all driven RED first:
+- an org switch is 1 GET;
+- a failed probe and its recovery cost 0 GETs;
+- a genuine change between two non-empty sets refetches even across a transient `[]`, and a reorder of the same set does not.
 
 ## Info
 
