@@ -818,6 +818,114 @@ $$;
 
 
 --
+-- Name: notify_on_ask_row(); Type: FUNCTION; Schema: public; Owner: -
+--
+
+CREATE FUNCTION public.notify_on_ask_row() RETURNS trigger
+    LANGUAGE plpgsql SECURITY DEFINER
+    SET search_path TO ''
+    AS $_$
+DECLARE
+    tc        jsonb;
+    r         record;
+    v_nid     uuid;
+    v_created timestamptz;
+    v_delay   integer;
+BEGIN
+    BEGIN
+        tc := NEW.tool_calls->0;
+        IF tc->>'kind' = 'ask_user_prompt'
+           AND NEW.origin = 'harness'
+           AND tc->>'run_id' ~* '^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$' THEN
+            SELECT wr.id, wr.user_id, wr.org_id, wr.status, wr.is_golden_run
+              INTO r
+              FROM public.workflow_runs wr
+             WHERE wr.id = (tc->>'run_id')::uuid;
+            IF FOUND
+               AND r.user_id IS NOT NULL
+               AND NOT coalesce(r.is_golden_run, false)
+               AND r.status IN ('active', 'paused') THEN
+                INSERT INTO public.notifications (recipient_id, org_id, run_id, kind, tool_call_id)
+                VALUES (
+                    r.user_id,
+                    r.org_id,
+                    r.id,
+                    CASE WHEN tc->'engine_pause'->>'kind' = 'action_risk' THEN 'approval' ELSE 'question' END,
+                    tc->>'tool_call_id'
+                )
+                ON CONFLICT (recipient_id, run_id) WHERE closed_at IS NULL
+                DO UPDATE SET tool_call_id = EXCLUDED.tool_call_id, kind = EXCLUDED.kind
+                RETURNING id, created_at INTO v_nid, v_created;
+
+                SELECT s.notification_email_delay_seconds
+                  INTO v_delay
+                  FROM public.app_settings s
+                 WHERE s.id = 'global';
+
+                INSERT INTO public.notification_deliveries (notification_id, due_at)
+                VALUES (v_nid, v_created + make_interval(secs => coalesce(v_delay, 120)))
+                ON CONFLICT (notification_id) DO NOTHING;
+            END IF;
+        ELSIF tc->>'kind' = 'ask_user_response' AND tc->>'tool_call_id' IS NOT NULL THEN
+            UPDATE public.notifications n
+               SET closed_at = now(),
+                   closed_reason = CASE WHEN (tc->>'expired') = 'true' THEN 'run_ended' ELSE 'answered' END
+             WHERE n.tool_call_id = tc->>'tool_call_id'
+               AND n.closed_at IS NULL;
+        END IF;
+    EXCEPTION WHEN OTHERS THEN
+        RAISE WARNING 'notify_on_ask_row swallowed: %', SQLERRM;
+    END;
+    RETURN NULL;
+END;
+$_$;
+
+
+--
+-- Name: notify_on_run_status(); Type: FUNCTION; Schema: public; Owner: -
+--
+
+CREATE FUNCTION public.notify_on_run_status() RETURNS trigger
+    LANGUAGE plpgsql SECURITY DEFINER
+    SET search_path TO ''
+    AS $_$
+DECLARE
+    v_sid uuid;
+BEGIN
+    BEGIN
+        UPDATE public.notifications n
+           SET closed_at = now(),
+               closed_reason = 'run_ended'
+         WHERE n.run_id = NEW.id
+           AND n.closed_at IS NULL;
+
+        IF NEW.inputs->>'_schedule_id' ~* '^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$' THEN
+            v_sid := (NEW.inputs->>'_schedule_id')::uuid;
+            IF EXISTS (
+                SELECT 1 FROM public.workflow_schedules ws
+                 WHERE ws.id = v_sid AND ws.last_status = 'waiting'
+            ) THEN
+                UPDATE public.workflow_schedules ws
+                   SET last_status = NEW.status
+                 WHERE ws.id = v_sid
+                   AND ws.last_status = 'waiting'
+                   AND NOT EXISTS (
+                       SELECT 1 FROM public.workflow_runs o
+                        WHERE o.id <> NEW.id
+                          AND o.inputs->>'_schedule_id' = NEW.inputs->>'_schedule_id'
+                          AND o.created_at > NEW.created_at
+                   );
+            END IF;
+        END IF;
+    EXCEPTION WHEN OTHERS THEN
+        RAISE WARNING 'notify_on_run_status swallowed: %', SQLERRM;
+    END;
+    RETURN NULL;
+END;
+$_$;
+
+
+--
 -- Name: query_user_documents(text); Type: FUNCTION; Schema: public; Owner: -
 --
 
@@ -1371,6 +1479,10 @@ CREATE TABLE public.app_settings (
     explorer_max_tool_rounds integer DEFAULT 8 NOT NULL,
     api_key_starts_per_minute integer DEFAULT 10 NOT NULL,
     api_key_reads_per_minute integer DEFAULT 120 NOT NULL,
+    notification_email_delay_seconds integer DEFAULT 120 NOT NULL,
+    email_from_address text,
+    email_from_name text DEFAULT 'Syrel'::text NOT NULL,
+    email_dev_redirect_address text,
     CONSTRAINT app_settings_api_key_reads_per_minute_bound CHECK (((api_key_reads_per_minute >= 10) AND (api_key_reads_per_minute <= 600))),
     CONSTRAINT app_settings_api_key_starts_per_minute_bound CHECK (((api_key_starts_per_minute >= 1) AND (api_key_starts_per_minute <= 60))),
     CONSTRAINT app_settings_chat_max_tool_rounds_bound CHECK (((chat_max_tool_rounds >= 2) AND (chat_max_tool_rounds <= 50))),
@@ -1380,6 +1492,7 @@ CREATE TABLE public.app_settings (
     CONSTRAINT app_settings_hnsw_ef_search_bounds CHECK (((hnsw_ef_search IS NULL) OR ((hnsw_ef_search >= 10) AND (hnsw_ef_search <= 1000)))),
     CONSTRAINT app_settings_hnsw_iterative_scan_values CHECK (((hnsw_iterative_scan IS NULL) OR (hnsw_iterative_scan = ANY (ARRAY['off'::text, 'strict_order'::text, 'relaxed_order'::text])))),
     CONSTRAINT app_settings_multimodal_max_vision_calls_bound CHECK (((multimodal_max_vision_calls IS NULL) OR ((multimodal_max_vision_calls >= 1) AND (multimodal_max_vision_calls <= 1000)))),
+    CONSTRAINT app_settings_notification_email_delay_seconds_bound CHECK (((notification_email_delay_seconds >= 60) AND (notification_email_delay_seconds <= 3600))),
     CONSTRAINT app_settings_source_max_file_size_mb_bounds CHECK (((source_max_file_size_mb IS NULL) OR ((source_max_file_size_mb >= 1) AND (source_max_file_size_mb <= 50)))),
     CONSTRAINT app_settings_vision_max_pages_bound CHECK (((vision_max_pages IS NULL) OR ((vision_max_pages >= 1) AND (vision_max_pages <= 500))))
 );
@@ -1502,6 +1615,34 @@ COMMENT ON COLUMN public.app_settings.api_key_starts_per_minute IS 'Phase 293 (D
 --
 
 COMMENT ON COLUMN public.app_settings.api_key_reads_per_minute IS 'Phase 293 (D-14). Run status reads one API key may make per minute, counted in Redis across every worker. Default 120. Bounded 10..600 by the API (app/api/settings.py) and by app_settings_api_key_reads_per_minute_bound.';
+
+
+--
+-- Name: COLUMN app_settings.notification_email_delay_seconds; Type: COMMENT; Schema: public; Owner: -
+--
+
+COMMENT ON COLUMN public.app_settings.notification_email_delay_seconds IS 'Phase 300 (D-07). Seconds a run must still be waiting before its owner is emailed. One app-wide operator knob, default 120. Bounded 60..3600 by the API and by this CHECK (app_settings_notification_email_delay_seconds_bound).';
+
+
+--
+-- Name: COLUMN app_settings.email_from_address; Type: COMMENT; Schema: public; Owner: -
+--
+
+COMMENT ON COLUMN public.app_settings.email_from_address IS 'Phase 300 (D-08). The From address of every app email. NULL or empty = fall back to the INVITE_FROM_EMAIL env var so an existing install keeps sending.';
+
+
+--
+-- Name: COLUMN app_settings.email_from_name; Type: COMMENT; Schema: public; Owner: -
+--
+
+COMMENT ON COLUMN public.app_settings.email_from_name IS 'Phase 300 (D-03 / D-08). The From display name of every app email. Default Syrel.';
+
+
+--
+-- Name: COLUMN app_settings.email_dev_redirect_address; Type: COMMENT; Schema: public; Owner: -
+--
+
+COMMENT ON COLUMN public.app_settings.email_dev_redirect_address IS 'Phase 300 (D-10). Outside production every app email is rewritten to this address; NULL = the send is recorded as suppressed and only logged. Production ignores it.';
 
 
 --
@@ -3502,6 +3643,94 @@ COMMENT ON COLUMN public.model_rates.effective_from IS 'Timestamp from which thi
 
 
 --
+-- Name: notification_deliveries; Type: TABLE; Schema: public; Owner: -
+--
+
+CREATE TABLE public.notification_deliveries (
+    id uuid DEFAULT gen_random_uuid() NOT NULL,
+    notification_id uuid NOT NULL,
+    channel text DEFAULT 'email'::text NOT NULL,
+    status text DEFAULT 'pending'::text NOT NULL,
+    attempts integer DEFAULT 0 NOT NULL,
+    due_at timestamp with time zone NOT NULL,
+    claimed_at timestamp with time zone,
+    subject text,
+    text_body text,
+    html_body text,
+    waited_seconds integer,
+    provider text,
+    provider_message_id text,
+    reason text,
+    sent_at timestamp with time zone,
+    created_at timestamp with time zone DEFAULT now() NOT NULL,
+    updated_at timestamp with time zone DEFAULT now() NOT NULL,
+    CONSTRAINT notification_deliveries_channel_check CHECK ((channel = 'email'::text)),
+    CONSTRAINT notification_deliveries_status_check CHECK ((status = ANY (ARRAY['pending'::text, 'retry'::text, 'sending'::text, 'sent'::text, 'failed'::text, 'suppressed'::text, 'skipped_opted_out'::text, 'skipped_answered'::text])))
+);
+
+
+--
+-- Name: TABLE notification_deliveries; Type: COMMENT; Schema: public; Owner: -
+--
+
+COMMENT ON TABLE public.notification_deliveries IS 'Phase 300 (D-12, D-19, D-20). The run-waiting email outbox: exactly one delivery per notice (notification_id UNIQUE). Deny-all to every client role (RLS on, no policy); drained by the backend pool with FOR UPDATE SKIP LOCKED.';
+
+
+--
+-- Name: COLUMN notification_deliveries.subject; Type: COMMENT; Schema: public; Owner: -
+--
+
+COMMENT ON COLUMN public.notification_deliveries.subject IS 'subject / text_body / html_body / waited_seconds are rendered ONCE at first claim and frozen here, so a retry resends the identical payload under the same Idempotency-Key (D-31).';
+
+
+--
+-- Name: COLUMN notification_deliveries.reason; Type: COMMENT; Schema: public; Owner: -
+--
+
+COMMENT ON COLUMN public.notification_deliveries.reason IS 'Words for the outcome of a failed / suppressed / skipped delivery. Never a secret, never a key.';
+
+
+--
+-- Name: notifications; Type: TABLE; Schema: public; Owner: -
+--
+
+CREATE TABLE public.notifications (
+    id uuid DEFAULT gen_random_uuid() NOT NULL,
+    recipient_id uuid NOT NULL,
+    org_id uuid,
+    run_id uuid NOT NULL,
+    kind text NOT NULL,
+    tool_call_id text,
+    created_at timestamp with time zone DEFAULT now() NOT NULL,
+    closed_at timestamp with time zone,
+    closed_reason text,
+    CONSTRAINT notifications_closed_reason_check CHECK (((closed_reason IS NULL) OR (closed_reason = ANY (ARRAY['answered'::text, 'run_ended'::text])))),
+    CONSTRAINT notifications_kind_check CHECK ((kind = ANY (ARRAY['question'::text, 'approval'::text])))
+);
+
+
+--
+-- Name: TABLE notifications; Type: COMMENT; Schema: public; Owner: -
+--
+
+COMMENT ON TABLE public.notifications IS 'Phase 300 (NOTE-02, D-18). One row per wait: a workflow run waiting on its owner for an answer or an approval. Written and closed ONLY by the triggers notify_on_ask_row / notify_on_run_status. org_id is copied from workflow_runs.org_id, never from messages.org_id. Read by its recipient only (Phase 301 lists it).';
+
+
+--
+-- Name: COLUMN notifications.kind; Type: COMMENT; Schema: public; Owner: -
+--
+
+COMMENT ON COLUMN public.notifications.kind IS 'question | approval. approval when the pause is an action-risk checkpoint (engine_pause.kind = action_risk), else question. Never derived from the question text (D-04).';
+
+
+--
+-- Name: COLUMN notifications.closed_reason; Type: COMMENT; Schema: public; Owner: -
+--
+
+COMMENT ON COLUMN public.notifications.closed_reason IS 'answered = an ask_user_response with the same tool_call_id; run_ended = the run reached a terminal status, or the engine expired the prompt.';
+
+
+--
 -- Name: operator_audit_log; Type: TABLE; Schema: public; Owner: -
 --
 
@@ -3553,9 +3782,34 @@ CREATE TABLE public.org_invitations (
     invited_by uuid,
     created_at timestamp with time zone DEFAULT now() NOT NULL,
     updated_at timestamp with time zone DEFAULT now() NOT NULL,
+    email_delivery text,
+    email_failed_at timestamp with time zone,
+    email_failure text,
+    CONSTRAINT org_invitations_email_delivery_check CHECK (((email_delivery IS NULL) OR (email_delivery = ANY (ARRAY['sent'::text, 'failed'::text, 'not_configured'::text])))),
     CONSTRAINT org_invitations_role_check CHECK ((role = ANY (ARRAY['super-admin'::text, 'org-admin'::text, 'dept-admin'::text, 'member'::text]))),
     CONSTRAINT org_invitations_status_check CHECK ((status = ANY (ARRAY['pending'::text, 'accepted'::text, 'expired'::text, 'revoked'::text])))
 );
+
+
+--
+-- Name: COLUMN org_invitations.email_delivery; Type: COMMENT; Schema: public; Owner: -
+--
+
+COMMENT ON COLUMN public.org_invitations.email_delivery IS 'Phase 300 (D-11). Outcome of the last invitation email: sent | failed | not_configured. NULL = never attempted (rows from before migration 218). A failed send never blocks the invitation.';
+
+
+--
+-- Name: COLUMN org_invitations.email_failed_at; Type: COMMENT; Schema: public; Owner: -
+--
+
+COMMENT ON COLUMN public.org_invitations.email_failed_at IS 'Phase 300 (D-11). When the last invitation email failed; NULL when it did not.';
+
+
+--
+-- Name: COLUMN org_invitations.email_failure; Type: COMMENT; Schema: public; Owner: -
+--
+
+COMMENT ON COLUMN public.org_invitations.email_failure IS 'Phase 300 (D-11). Words for why the last invitation email failed. Never a secret.';
 
 
 --
@@ -5073,6 +5327,30 @@ ALTER TABLE ONLY public.model_capabilities_overrides
 
 ALTER TABLE ONLY public.model_rates
     ADD CONSTRAINT model_rates_pkey PRIMARY KEY (id);
+
+
+--
+-- Name: notification_deliveries notification_deliveries_notification_id_key; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.notification_deliveries
+    ADD CONSTRAINT notification_deliveries_notification_id_key UNIQUE (notification_id);
+
+
+--
+-- Name: notification_deliveries notification_deliveries_pkey; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.notification_deliveries
+    ADD CONSTRAINT notification_deliveries_pkey PRIMARY KEY (id);
+
+
+--
+-- Name: notifications notifications_pkey; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.notifications
+    ADD CONSTRAINT notifications_pkey PRIMARY KEY (id);
 
 
 --
@@ -6610,6 +6888,41 @@ CREATE INDEX model_capabilities_overrides_removed_idx ON public.model_capabiliti
 
 
 --
+-- Name: notification_deliveries_due_idx; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX notification_deliveries_due_idx ON public.notification_deliveries USING btree (status, due_at) WHERE (status = ANY (ARRAY['pending'::text, 'retry'::text]));
+
+
+--
+-- Name: notifications_one_open_per_recipient_run; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE UNIQUE INDEX notifications_one_open_per_recipient_run ON public.notifications USING btree (recipient_id, run_id) WHERE (closed_at IS NULL);
+
+
+--
+-- Name: notifications_open_tool_call_idx; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX notifications_open_tool_call_idx ON public.notifications USING btree (tool_call_id) WHERE (closed_at IS NULL);
+
+
+--
+-- Name: notifications_recipient_created_idx; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX notifications_recipient_created_idx ON public.notifications USING btree (recipient_id, created_at DESC);
+
+
+--
+-- Name: notifications_run_idx; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX notifications_run_idx ON public.notifications USING btree (run_id);
+
+
+--
 -- Name: retention_policies_org_class_uniq; Type: INDEX; Schema: public; Owner: -
 --
 
@@ -7051,10 +7364,24 @@ CREATE TRIGGER messages_autofill_org_id BEFORE INSERT ON public.messages FOR EAC
 
 
 --
+-- Name: messages messages_notify_on_ask; Type: TRIGGER; Schema: public; Owner: -
+--
+
+CREATE TRIGGER messages_notify_on_ask AFTER INSERT ON public.messages FOR EACH ROW WHEN (((new.role = 'system'::text) AND (new.tool_calls IS NOT NULL))) EXECUTE FUNCTION public.notify_on_ask_row();
+
+
+--
 -- Name: metadata_field_definitions metadata_field_definitions_autofill_org_id; Type: TRIGGER; Schema: public; Owner: -
 --
 
 CREATE TRIGGER metadata_field_definitions_autofill_org_id BEFORE INSERT ON public.metadata_field_definitions FOR EACH ROW EXECUTE FUNCTION public.autofill_org_id_by_owner('user_id');
+
+
+--
+-- Name: notification_deliveries notification_deliveries_set_updated_at; Type: TRIGGER; Schema: public; Owner: -
+--
+
+CREATE TRIGGER notification_deliveries_set_updated_at BEFORE UPDATE ON public.notification_deliveries FOR EACH ROW EXECUTE FUNCTION public.set_updated_at();
 
 
 --
@@ -7300,6 +7627,13 @@ CREATE TRIGGER workflow_phases_set_updated_at BEFORE UPDATE ON public.workflow_p
 --
 
 CREATE TRIGGER workflow_runs_autofill_org_id BEFORE INSERT ON public.workflow_runs FOR EACH ROW EXECUTE FUNCTION public.autofill_org_id_from_parent('thread_id', 'threads', 'id');
+
+
+--
+-- Name: workflow_runs workflow_runs_notify_on_status; Type: TRIGGER; Schema: public; Owner: -
+--
+
+CREATE TRIGGER workflow_runs_notify_on_status AFTER UPDATE OF status ON public.workflow_runs FOR EACH ROW WHEN (((new.status IS DISTINCT FROM old.status) AND (new.status = ANY (ARRAY['completed'::text, 'failed'::text, 'cancelled'::text])))) EXECUTE FUNCTION public.notify_on_run_status();
 
 
 --
@@ -8024,6 +8358,38 @@ ALTER TABLE ONLY public.model_rates
 
 
 --
+-- Name: notification_deliveries notification_deliveries_notification_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.notification_deliveries
+    ADD CONSTRAINT notification_deliveries_notification_id_fkey FOREIGN KEY (notification_id) REFERENCES public.notifications(id) ON DELETE CASCADE;
+
+
+--
+-- Name: notifications notifications_org_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.notifications
+    ADD CONSTRAINT notifications_org_id_fkey FOREIGN KEY (org_id) REFERENCES public.organizations(id) ON DELETE CASCADE;
+
+
+--
+-- Name: notifications notifications_recipient_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.notifications
+    ADD CONSTRAINT notifications_recipient_id_fkey FOREIGN KEY (recipient_id) REFERENCES auth.users(id) ON DELETE CASCADE;
+
+
+--
+-- Name: notifications notifications_run_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.notifications
+    ADD CONSTRAINT notifications_run_id_fkey FOREIGN KEY (run_id) REFERENCES public.workflow_runs(id) ON DELETE CASCADE;
+
+
+--
 -- Name: operator_users operator_users_user_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
 --
 
@@ -8549,6 +8915,13 @@ ALTER TABLE ONLY public.workspace_files
 
 ALTER TABLE ONLY public.workspace_files
     ADD CONSTRAINT workspace_files_thread_id_fkey FOREIGN KEY (thread_id) REFERENCES public.threads(id) ON DELETE CASCADE;
+
+
+--
+-- Name: notifications Recipients read their own notices; Type: POLICY; Schema: public; Owner: -
+--
+
+CREATE POLICY "Recipients read their own notices" ON public.notifications FOR SELECT TO authenticated USING ((recipient_id = ( SELECT auth.uid() AS uid)));
 
 
 --
@@ -9712,6 +10085,18 @@ CREATE POLICY model_rates_select_policy ON public.model_rates FOR SELECT TO auth
    FROM public.org_members m
   WHERE (m.user_id = auth.uid())))));
 
+
+--
+-- Name: notification_deliveries; Type: ROW SECURITY; Schema: public; Owner: -
+--
+
+ALTER TABLE public.notification_deliveries ENABLE ROW LEVEL SECURITY;
+
+--
+-- Name: notifications; Type: ROW SECURITY; Schema: public; Owner: -
+--
+
+ALTER TABLE public.notifications ENABLE ROW LEVEL SECURITY;
 
 --
 -- Name: operator_audit_log; Type: ROW SECURITY; Schema: public; Owner: -
@@ -11228,3 +11613,28 @@ REVOKE ALL ON TABLE public.api_keys FROM authenticated;
 REVOKE ALL ON TABLE public.api_keys FROM service_role;
 GRANT SELECT (id, org_id, user_id, label, key_prefix, workflows, expires_at, revoked_at, revoked_by, last_used_at, created_at) ON TABLE public.api_keys TO authenticated;
 GRANT SELECT, INSERT, UPDATE, DELETE ON TABLE public.api_keys TO service_role;
+
+-- migration 218 — notifications: recipients READ (one owner-only policy); only the two notice
+-- trigger functions and the backend write. notification_deliveries (the outbox) is deny-all to
+-- every client role. Copied, not retyped.
+REVOKE ALL ON TABLE public.notifications FROM PUBLIC;
+REVOKE ALL ON TABLE public.notifications FROM anon;
+REVOKE ALL ON TABLE public.notifications FROM authenticated;
+REVOKE ALL ON TABLE public.notifications FROM service_role;
+GRANT SELECT ON TABLE public.notifications TO authenticated;
+GRANT ALL ON TABLE public.notifications TO service_role;
+REVOKE ALL ON TABLE public.notification_deliveries FROM PUBLIC;
+REVOKE ALL ON TABLE public.notification_deliveries FROM anon;
+REVOKE ALL ON TABLE public.notification_deliveries FROM authenticated;
+REVOKE ALL ON TABLE public.notification_deliveries FROM service_role;
+GRANT ALL ON TABLE public.notification_deliveries TO service_role;
+
+-- migration 218 — the two notice trigger functions (Group A shape: trigger-only).
+REVOKE EXECUTE ON FUNCTION public.notify_on_ask_row() FROM PUBLIC;
+REVOKE EXECUTE ON FUNCTION public.notify_on_ask_row() FROM anon;
+REVOKE EXECUTE ON FUNCTION public.notify_on_ask_row() FROM authenticated;
+GRANT EXECUTE ON FUNCTION public.notify_on_ask_row() TO service_role;
+REVOKE EXECUTE ON FUNCTION public.notify_on_run_status() FROM PUBLIC;
+REVOKE EXECUTE ON FUNCTION public.notify_on_run_status() FROM anon;
+REVOKE EXECUTE ON FUNCTION public.notify_on_run_status() FROM authenticated;
+GRANT EXECUTE ON FUNCTION public.notify_on_run_status() TO service_role;
