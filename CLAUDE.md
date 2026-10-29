@@ -488,14 +488,14 @@ node scripts/check-hot-file-ledger.cjs <phase-dir>   # 0 clear · 1 missing rows
 | `frontend/src/components/panel/FilesSection.tsx` | 12 / 8 / 354 (was `10 / 6 / 363`) | ⚠ STALE · last touch 274-04 |
 | `frontend/src/lib/api.ts` | 215 / 128 / 556 (was `214 / 127 / 552`) | 299-03: one links export block |
 | `frontend/src/types/index.ts` | 103 / 82 / 1688 (was `102 / 81 / 1685`) | 299-04: ExpertBundle.org_id (the wire already sent it) · seam OWED |
-| `backend/app/main.py` | 97 / 71 / 993 (was `96 / 70 / 992`) | 299-01: one include_router(links.router) + its import token · ⛔ |
+| `backend/app/main.py` | 98 / 72 / 1020 (was `97 / 71 / 993`) | 300-04: drainer start/stop under the boot-sweep gate (D-20) · ⛔ |
 | `backend/app/config.py` | 96 / 55 / 1831 (was `93 / 54 / 1809`) | 300-03: SMTP_* fields (D-28) · seam OWED · ⛔ |
 | `backend/app/api/admin.py` | 44 / 17 / 2054 (was `43 / 17 / 2051`) | quick-261024: discover summary gains a `returned` count (+3) · ⛔ |
 | `backend/app/api/settings.py` | 47 / 25 / 1301 (was `46 / 24 / 1250`) | 293-01: two bounded per-key limit writes; allow-list +2 |
 | `backend/app/services/multimodal_service.py` | 14 / 7 / 984 | ⚠ absent from BOTH for its ENTIRE LIFE at **7 phases** |
 | `backend/app/api/documents.py` | 101 / 40 / 2709 (was `99 / 39 / 2698`) | 298-01: one by_org in build() + one root_upload_org kwarg · ⛔ |
 | `backend/app/api/library.py` | 3 / 3 / 304 (was `2 / 2 / 299`) | ⚠ now FIRES (298) · 298-01: summary shares the lists' org predicate ($1) |
-| `scripts/vitest-count-gate.cjs` | 395 / 83 / 6865 (was `380 / 81 / 6808`) | 300-01: 2 pins added, 1 raised (ScheduleModal 9→29), none lowered |
+| `scripts/vitest-count-gate.cjs` | 396 / 83 / 6868 (was `395 / 83 / 6865`) | 300-04: 1 FILE-LEVEL pin added (HealthSignals.email 11), none lowered |
 | `scripts/check-deploy-drift.sh` | 6 / 5 / 271 (was `5 / 4 / 267`) | 300-03: SMTP_* parity |
 | `scripts/build-public-openapi.cjs` | 11 / 5 / 472 (was `7 / 3 / 468`) | 298-01: org-items tag (Account & org) + /org-items/ FLAGGED (2 lines) |
 | `scripts/check-seeds-register.cjs` | 7 / 3 / 1132 | ⚠ FIRES, absent here — row added 296-05 · `\d{3,}` ids · ⛔ |
@@ -690,7 +690,7 @@ node scripts/check-hot-file-ledger.cjs <phase-dir>   # 0 clear · 1 missing rows
 | `frontend/src/pages/AuthPage.tsx` | 5 / 3 / 32 (was `4 / 2 / 26`) | ⚠ now FIRES (299) · 299-05: one quiet S5 line (kind only) |
 | `backend/app/api/org.py` | 12 / 4 / 1068 (was `11 / 3 / 1024`) | 300-03: invite email_delivery stored + returned (D-11) |
 | `backend/app/services/email_provider.py` | 6 / 3 / 362 (was `5 / 3 / 374`) | ⚠ now FIRES (300) · 300-03: one mailer seam (D-21) · ⛔ |
-| `frontend/src/components/admin/HealthSignals.tsx` | 5 / 4 / 316 | ⚠ absent while FIRING — row added at 300 planning · 300-04 Email tile |
+| `frontend/src/components/admin/HealthSignals.tsx` | 6 / 5 / 407 (was `5 / 4 / 316`) | 300-04: one Email tile (D-12, UI-D13); Off / Held back never red |
 
 
 When a new phase enters discuss-phase, the orchestrator must scan PLAN.md `files_modified` against this ledger. Any match against a G-5-firing row means the discuss-phase produces a refactor recommendation as the first option, not the planned feature — and the phase reads that file's section in `docs/HOT-FILE-LEDGER.md` before planning, because that is where the named seam and the binding invariants live.
