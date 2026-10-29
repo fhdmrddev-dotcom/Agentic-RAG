@@ -149,6 +149,26 @@ async def launch_scheduled_run(
         await record_schedule_outcome(pool, _as_uuid(schedule["id"]), status=sentence)
         raise ScheduledLaunchRefused(sentence)
 
+    # ── Phase 300 (FIX-04 / D-14) — a blank required input is refused here, by label ──────────
+    # A workflow can gain a required input after the schedule was saved, so the save-time 422 is
+    # not enough. The ONE predicate, on the RAW stored definition (``row["definition"]``, a JSON
+    # string or dict): the parsed model is not what ``declared_fields`` reads. Same shape as the
+    # blocks above: recorded on the schedule in words, then raised. The log carries a COUNT only.
+    from app.services.inbound_inputs import blank_required_sentence, missing_required_labels
+
+    labels = missing_required_labels(row.get("definition"), schedule.get("inputs") or {})
+    if labels:
+        from app.db.schedules import record_schedule_outcome
+
+        sentence = blank_required_sentence(labels, saved_schedule=True)
+        logger.warning(
+            "schedule %s not launched: %d required input(s) have no value",
+            schedule.get("id"),
+            len(labels),
+        )
+        await record_schedule_outcome(pool, _as_uuid(schedule["id"]), status=sentence)
+        raise ScheduledLaunchRefused(sentence)
+
     org_id = schedule.get("org_id") or row.get("org_id")
 
     # ── 258 F-2 / TIER-01 — a scheduled run is EXECUTION too ─────────────────────────

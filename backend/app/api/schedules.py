@@ -52,6 +52,11 @@ from app.db.schedules import (
 from app.db.workflows import get_definition
 from app.dependencies import get_current_user, get_pg_pool, get_redis, require_visible
 from app.services.entitlement_service import require_capability
+from app.services.inbound_inputs import (  # 300-01 (D-14): the one blank-required predicate
+    MISSING_REQUIRED_CODE,
+    blank_required_sentence,
+    missing_required_labels,
+)
 from app.services import link_resolver, org_lists  # 299 (D-18): a new schedule's org is the item's
 from app.models.schedule import (
     ScheduleTriggerResult,
@@ -82,6 +87,23 @@ def _coerce_user_id(current_user: dict) -> UUID:
     """The trusted owner id as a UUID — `api/workflows.py`'s helper, same shape."""
     user_id = current_user["id"]
     return UUID(user_id) if isinstance(user_id, str) else user_id
+
+
+def _refuse_blank_required(definition, inputs, *, saved_schedule: bool) -> None:
+    """300-01 (D-14): the schedule doors' 422 for a blank required input, named by label.
+
+    ``definition`` is the RAW stored definition (a JSON string or dict); ``declared_fields``
+    decodes it. The detail is structured so the browser reads ``code``, never the words."""
+    labels = missing_required_labels(definition, inputs or {})
+    if labels:
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail={
+                "code": MISSING_REQUIRED_CODE,
+                "message": blank_required_sentence(labels, saved_schedule=saved_schedule),
+                "missing": labels,
+            },
+        )
 
 
 def _serialize(row: dict) -> WorkflowScheduleRead:
@@ -130,6 +152,9 @@ async def create_workflow_schedule(
                 "an unattended run of a mutable workflow is one nobody agreed to"
             ),
         )
+    # 300-01 (FIX-04 / D-14): a blank required input is refused BEFORE the INSERT, by label,
+    # with the one predicate the in-app and key doors use. Never trusts the browser pre-check.
+    _refuse_blank_required(definition_row.get("definition"), body.inputs, saved_schedule=False)
 
     row = await create_schedule(
         pool,
@@ -206,11 +231,24 @@ async def patch_schedule(
     """
     user_id = _coerce_user_id(current_user)
     pool = await get_pg_pool()
+    fields = body.model_dump(exclude_unset=True)
+    # 300-01 (D-14): editing the inputs, or RESUMING, re-checks the required inputs against the
+    # CURRENT definition (it may have gained one). A pause alone reads nothing new. The check
+    # runs only on the caller's own row; a foreign id falls through to the 404 below unchanged.
+    if "inputs" in fields or fields.get("is_active") is True:
+        stored = await get_schedule(pool, schedule_id, user_id=user_id)
+        if stored is not None:
+            definition_row = await get_definition(pool, stored["workflow_id"], user_id=user_id)
+            if definition_row is not None:  # unreadable: fire time catches the rest
+                effective = fields["inputs"] if "inputs" in fields else stored.get("inputs")
+                _refuse_blank_required(
+                    definition_row.get("definition"), effective, saved_schedule=True
+                )
     row = await update_schedule(
         pool,
         schedule_id,
         user_id=user_id,
-        fields=body.model_dump(exclude_unset=True),
+        fields=fields,
     )
     if row is None:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=_NOT_FOUND)

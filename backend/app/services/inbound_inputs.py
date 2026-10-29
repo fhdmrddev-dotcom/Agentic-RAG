@@ -152,9 +152,14 @@ def missing_required(definition: Any, inputs: Any) -> list[str]:
     or whitespace-only. A number counts as given, as ``launch_kickoff`` writes it. Pinned to the
     browser by the ``expected_missing`` cases in ``launch_fields_cases.json``.
     """
+    return [f.key for f in _missing_fields(definition, inputs)]
+
+
+def _missing_fields(definition: Any, inputs: Any) -> list[DeclaredField]:
+    """The ONE loop behind ``missing_required`` and ``missing_required_labels`` (300-01, D-14)."""
     raw = definition.model_dump(mode="json") if hasattr(definition, "model_dump") else definition
     given = inputs if isinstance(inputs, dict) else {}
-    missing: list[str] = []
+    missing: list[DeclaredField] = []
     for field in declared_fields(raw):
         if not field.required:
             continue
@@ -162,8 +167,43 @@ def missing_required(definition: Any, inputs: Any) -> list[str]:
         if isinstance(value, (int, float)) and not isinstance(value, bool):
             continue
         if not isinstance(value, str) or value.strip() == "":
-            missing.append(field.key)
+            missing.append(field)
     return missing
+
+
+# ── 300-01 (FIX-04 / D-14) — a schedule's blank required input, named by its LABEL ──────────
+# The wire code of the schedule doors' 422 (create, patch-inputs, resume). 300-02 writes the
+# same literal; the browser tells this refusal apart by the code, never by matching words.
+MISSING_REQUIRED_CODE = "missing_required"
+
+
+def missing_required_labels(definition: Any, inputs: Any) -> list[str]:
+    """The same blank required fields as ``missing_required``, by label (the key when it has
+    none — ``_label`` already falls back), in declared order. Empty exactly when it is."""
+    return [f.label for f in _missing_fields(definition, inputs)]
+
+
+def join_labels(labels: list[str]) -> str:
+    """``A`` · ``A and B`` · ``A, B and C``."""
+    if len(labels) <= 1:
+        return "".join(labels)
+    return ", ".join(labels[:-1]) + " and " + labels[-1]
+
+
+def blank_required_sentence(labels: list[str], *, saved_schedule: bool) -> str:
+    """The author-facing refusal (UI-SPEC §S6b/§S6c). ``saved_schedule`` adds the way out: the
+    schedule modal has no edit form for a saved schedule's inputs, so re-adding is the step."""
+    many = len(labels) > 1
+    sentence = (
+        f"{join_labels(labels)} {'are' if many else 'is'} required and "
+        f"{'have' if many else 'has'} no value."
+    )
+    if saved_schedule:
+        sentence += (
+            f" Add a new schedule with {'them' if many else 'it'} filled in, "
+            f"then delete this one."
+        )
+    return sentence
 
 
 def _is_fenced(key: str) -> bool:

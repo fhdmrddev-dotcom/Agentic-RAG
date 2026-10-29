@@ -11838,7 +11838,7 @@ cells rot within days.
 | [`backend/app/services/extractors/aspects/dxf.py`](docs/HOT-FILE-LEDGER.md#backendappservicesextractorsaspectsdxfpy) | 2 / 0 / 180 | no (0 phases) | ⚠ absent for its entire life — row added `SEED-226`. It is the only path that READS measurements rather than inferring them (`DIMENSION` values the CAD software computed) |
 | [`frontend/src/components/workflows/publishBlockedStep.ts`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentsworkflowspublishblockedstepts) | 2 / 1 / 183 (was `0 / 0 / 176`) | no (1 phase) | young (`BUG-260828-09`). **281-03**: ONE `BLOCKED_STEP_NEXT_NO_RUN` constant. ⚠ It derives NO second name ladder: `nodeTitle` is called, and `name ?? slug` is the one forbidden edit |
 | [`frontend/src/components/workflows/PublishBlockedStepCard.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentsworkflowspublishblockedstepcardtsx) | 2 / 1 / 109 (was `0 / 0 / 101`) | no (1 phase) | young (`BUG-260828-09`). **281-03**: ONE optional `canOpenRun` flag; next line is `BLOCKED_STEP_NEXT_NO_RUN` when there is no link; the cause keeps its line breaks. ⚠ **G-2 OVERRIDDEN, not satisfied** |
-| [`backend/app/services/scheduler_service.py`](docs/HOT-FILE-LEDGER.md#backendappservicesscheduler_servicepy) | 13 / 8 / 332 (was `12 / 7 / 314`) | ⚠ **FIRES** | 298-02: foreign_binding_refusal beside template_refusal (definition_id lazy read, pool only) → record_schedule_outcome(sentence) + ScheduledLaunchRefused. The :134 org line untouched |
+| [`backend/app/services/scheduler_service.py`](docs/HOT-FILE-LEDGER.md#backendappservicesscheduler_servicepy) | 14 / 9 / 352 (was `13 / 8 / 332`) | ⚠ **FIRES** | 300-01 (D-14): ONE fire-time block after the foreign-folder block — missing_required_labels on the RAW stored definition → record the sentence + ScheduledLaunchRefused. Honoured by construction |
 | [`backend/app/db/schedules.py`](docs/HOT-FILE-LEDGER.md#backendappdbschedulespy) | 2 / 2 / 369 (was `1 / 1 / 359`) | no (2 phases) | single data-access home for workflow_schedules; claim_due_schedules SKIP LOCKED claim. 299-01: create_schedule keyword-only `org_id` (None = base SQL, sha256 pinned) |
 | [`backend/app/services/watch_service.py`](docs/HOT-FILE-LEDGER.md#backendappserviceswatch_servicepy) | 8 / 6 / 769 (was `7 / 5 / 643`) | ⚠ **FIRES** | Honoured by construction. **285-01**: a failed item is retried through the SAME new-file body (cap 3); typed `last_error`; minted marker. Still 2 minter calls. Listing-loop seam not triggered |
 | [`backend/app/db/watches.py`](docs/HOT-FILE-LEDGER.md#backendappdbwatchespy) | 6 / 4 / 828 (was `4 / 3 / 709`) | ⚠ **FIRES** | Honoured by construction. **285-01**: upsert takes `failed_attempts` / `minted` (COALESCE keeps), `release_watch(run_error=)`. **285-02**: `watch_purge_scope` + a frozen dataclass, asyncpg only |
@@ -12172,10 +12172,10 @@ cells rot within days.
 | [`backend/app/services/rate_limit.py`](docs/HOT-FILE-LEDGER.md#backendappservicesrate_limitpy) | 4 / 2 / 138 (was `3 / 1 / 109`) | no (2 phases) | 296-01: per-user citation limit (10/min, [ASSUMED]) on `hit`. ⛔ no process-local state; no env var; fails CLOSED (503) |
 | [`backend/app/db/api_keys.py`](docs/HOT-FILE-LEDGER.md#backendappdbapi_keyspy) | 5 / 2 / 307 (was `4 / 1 / 303`) | no (young) | young. 296-06 (293-IN-08): revoke_key returns `revoked_now` from the UPDATE status tag. ⛔ owner predicate in every statement; key_hash only in auth |
 | [`backend/app/models/api_key.py`](docs/HOT-FILE-LEDGER.md#backendappmodelsapi_keypy) | 2 / 2 / 117 (was `1 / 1 / 113`) | no (young) | young. 296-06 (293-IN-06): `needs_task` added to WorkflowRefState. ⛔ no field carries the secret except the create response |
-| [`backend/app/services/inbound_inputs.py`](docs/HOT-FILE-LEDGER.md#backendappservicesinbound_inputspy) | 8 / 2 / 312 (was `7 / 2 / 306`) | no (young) | 296 review BE-WR-03: declared_fields records the Look-it-up inputs it leaves out; needs_typed_task is False when any were declared. |
+| [`backend/app/services/inbound_inputs.py`](docs/HOT-FILE-LEDGER.md#backendappservicesinbound_inputspy) | 9 / 3 / 352 (was `8 / 2 / 312`) | ⚠ **FIRES** | 300-01 (D-14): the loop factored into _missing_fields; missing_required_labels + join_labels + blank_required_sentence beside it. ONE predicate. ⛔ pure; strips _-keys |
 | [`backend/app/api/api_keys.py`](docs/HOT-FILE-LEDGER.md#backendappapiapi_keyspy) | 3 / 2 / 421 (was `2 / 1 / 392`) | no (young) | young. 296-06: needs_task state + picker reason (293-IN-06); create_key names only what the picker offers; revoke audits only the call that revoked (293-IN-08). ⛔ 404 for miss AND foreign |
 | [`backend/app/services/unattended_launch.py`](docs/HOT-FILE-LEDGER.md#backendappservicesunattended_launchpy) | 6 / 2 / 361 (was `5 / 1 / 354`) | no (young) | young. 296-02 (293-IN-04): the _drive_run task is held in a module _BACKGROUND_TASKS set with add_done_callback(discard) (P9) until done |
-| [`backend/app/api/schedules.py`](docs/HOT-FILE-LEDGER.md#backendappapischedulespy) | 5 / 5 / 303 (was `4 / 4 / 299`) | ⚠ **FIRES** | 299-01: create_workflow_schedule gains `request: Request = None` and ONE `org_id=` keyword (your workflow's org, else the active org, else the trigger). Honoured by construction |
+| [`backend/app/api/schedules.py`](docs/HOT-FILE-LEDGER.md#backendappapischedulespy) | 6 / 6 / 341 (was `5 / 5 / 303`) | ⚠ **FIRES** | 300-01 (D-14): one _refuse_blank_required helper; create calls it before the INSERT, patch only for inputs / resume after the owner-scoped read. A pause reads nothing new |
 | [`backend/app/models/schedule.py`](docs/HOT-FILE-LEDGER.md#backendappmodelsschedulepy) | 3 / 3 / 231 | ⚠ **FIRES** | ⚠ absent its ENTIRE LIFE — row added 296-02 (D-26). 296-02 (295-IN-05): ScheduleTriggerResult gains one additive `outcome` Literal (launched/refused/not_loaded/error) |
 | [`backend/app/services/harness/run_read_words.py`](docs/HOT-FILE-LEDGER.md#backendappservicesharnessrun_read_wordspy) | 1 / 1 / 99 (was `0 / 0 / 0`) | no (young) | young (planned 293-02). MOVED waiting_who / unsourced_who / compose_waiting_on (workflow_runs seam). ⛔ pure leaf; re-exported |
 | [`backend/app/api/inbound.py`](docs/HOT-FILE-LEDGER.md#backendappapiinboundpy) | 10 / 3 / 719 (was `9 / 2 / 711`) | ⚠ **FIRES** | ⚠ now FIRES (298). 298-02: one foreign_binding_refusal beside template_refusal → _refused(reason="foreign_folder"), plain-string 422 (pool only). ⛔ no get_active_org_id on this path |
@@ -23069,6 +23069,14 @@ Scan-list cell before this touch (moved verbatim): | [`frontend/src/components/c
 
 Scan-list cell before this touch (moved verbatim): | [`backend/app/services/inbound_inputs.py`](docs/HOT-FILE-LEDGER.md#backendappservicesinbound_inputspy) | 7 / 2 / 306 (was `6 / 1 / 258`) | no (young) | young. 296-06: missing_required (287-T01, one predicate for kickoffs + key calls), needs_typed_task (293-IN-06), INBOUND_MAX_BODY_BYTES (293-IN-03). ⛔ pure; strips _-keys |
 
+### `backend/app/services/inbound_inputs.py` — 300-01 Task 1 (2026-10-29)
+
+**`9 / 3 / 352` (was `8 / 2 / 312`) — crosses into G-5 at this commit (293, 296, 300).** D-14: the `missing_required` loop is factored into a private `_missing_fields` that both `missing_required` (keys, byte-identical results) and the new `missing_required_labels` (labels, the key when blank) call, so the browser pin in `launch_fields_cases.json` still covers ONE predicate. `join_labels` and `blank_required_sentence(labels, *, saved_schedule)` build the UI-SPEC §S6b/§S6c words; `MISSING_REQUIRED_CODE = "missing_required"` is the wire code 300-02 shares. ⛔ still pure, no I/O. Seam if it grows: the TRUST-03 envelope half (`wrap_untrusted_input` .. `inbound_kickoff`) is the separable one.
+
+Scan-list cell as of 2026-10-29 (replaced by 300-01, moved verbatim): 8 / 2 / 312 (was `7 / 2 / 306`) | no (young) | 296 review BE-WR-03: declared_fields records the Look-it-up inputs it leaves out; needs_typed_task is False when any were declared.
+
+CLAUDE.md verdict cell: none before 300-01 (the file did not fire); row added by 300-01.
+
 ### `backend/app/api/inbound.py` — 296 SECURITY AR-05 (2026-10-27)
 
 **`9 / 2 / 711` (was `8 / 2 / 701`).** The phase security audit found the BE-WR-02 acceptance did not hold for production: `docs/DEPLOYMENT-PIPELINE.md` routes the API straight to the Coolify VPS, past the onebox nginx `client_max_body_size`. A body with no `Content-Length` (chunked) is now read through `request.stream()` with a running count and refused 413 at `INBOUND_MAX_BODY_BYTES`; the bytes read are cached on `request._body` so the handler parses them unchanged. RED `c8b5427c1`.
@@ -26353,6 +26361,14 @@ Scan-list cell as of 2026-10-28 (replaced by 298-02, moved verbatim): 12 / 7 / 3
 
 CLAUDE.md verdict cell as of 2026-10-28 (replaced by 298-02, moved verbatim): | `backend/app/services/scheduler_service.py` | 12 / 7 / 314 (was `11 / 6 / 308`) | 296-06: scheduled kickoff via launch_kickoff (S6-F8), else byte-identical |
 
+### `backend/app/services/scheduler_service.py` — 300-01 Task 1 (2026-10-29)
+
+**`14 / 9 / 352` (was `13 / 8 / 332`).** FIX-04 / D-14 (BUG-261027-04): ONE block after the 298 foreign-folder block and before the entitlement check, the template-refusal shape: `missing_required_labels(row.get("definition"), schedule.get("inputs") or {})` → `blank_required_sentence(labels, saved_schedule=True)` → `logger.warning` naming the schedule id and the COUNT (never a value, T-300-03) → `record_schedule_outcome(sentence)` → `raise ScheduledLaunchRefused(sentence)`. ⛔ It reads the RAW stored definition (`row["definition"]`, a JSON string or dict), never the parsed model. Two pre-existing fakes declared a required `topic` with a blank schedule (`test_298_org_matrix._scheduled`, `test_296_step_inputs_and_routing` S6-F8-c) and were re-drawn to keep their intent. Pinned by `test_300_schedule_required_inputs.py`.
+
+Scan-list cell as of 2026-10-29 (replaced by 300-01, moved verbatim): 13 / 8 / 332 (was `12 / 7 / 314`) | ⚠ **FIRES** | 298-02: foreign_binding_refusal beside template_refusal (definition_id lazy read, pool only) → record_schedule_outcome(sentence) + ScheduledLaunchRefused. The :134 org line untouched
+
+CLAUDE.md verdict cell as of 2026-10-29 (replaced by 300-01, moved verbatim): | `backend/app/services/scheduler_service.py` | 13 / 8 / 332 (was `12 / 7 / 314`) | 298-02: foreign-folder refusal beside template_refusal (pool only) |
+
 ### `backend/app/api/inbound.py` — 298-02 (2026-10-28)
 
 **`10 / 3 / 719` (was `9 / 2 / 711`).** Crossed into G-5 at this commit (293, 296, 298). One import and one block beside the template refusal: `foreign_binding_refusal(definition, definition_id=wid, pool=pool, user_id=owner_id)` (the org is read from the row, equal to the key's org for a non-global row by `_SCOPE_SQL`; globals read `None`), and a sentence → `raise await _refused(..., reason="foreign_folder", exc=HTTPException(422, detail=sentence))`, so the existing rate-limited `api_key.refused` audit row is written (T-298-14). ⛔ No `get_active_org_id` on this path — a header-less key call must never 400 (T-298-11, asserted by the matrix).
@@ -27143,6 +27159,14 @@ CLAUDE.md verdict cell as of 2026-10-28 (replaced by 299-01, moved verbatim): | 
 Scan-list cell as of 2026-10-28 (replaced by 299-01, moved verbatim): 4 / 4 / 299 | ⚠ **FIRES** | ⚠ absent its ENTIRE LIFE — row added 296-02 (D-26). 296-02 (295-IN-05): Run now answers with `outcome` + a worded `detail`; ScheduledLaunchRefused caught first; raw exception logged only
 
 CLAUDE.md verdict cell as of 2026-10-28 (replaced by 299-01, moved verbatim): | `backend/app/api/schedules.py` | 4 / 4 / 299 | ⚠ FIRES, absent here — row added 296-02 · worded Run now (outcome) |
+
+### `backend/app/api/schedules.py` — 300-01 Task 1 (2026-10-29)
+
+**`6 / 6 / 341` (was `5 / 5 / 303`).** FIX-04 / D-14: one module helper `_refuse_blank_required(definition, inputs, *, saved_schedule)` raising 422 `{code: "missing_required", message, missing: [labels]}`. Create calls it after the published 400 and before `create_schedule` (`saved_schedule=False`). Patch calls it ONLY when `inputs` is sent or `is_active` is True: the owner-scoped `get_schedule` first (None → the existing 404 path, no existence oracle, T-300-02), then `get_definition`; an unreadable definition skips the check (fire time catches it). A pause alone reads nothing new. Pinned by `test_300_schedule_required_inputs.py`.
+
+Scan-list cell as of 2026-10-29 (replaced by 300-01, moved verbatim): 5 / 5 / 303 (was `4 / 4 / 299`) | ⚠ **FIRES** | 299-01: create_workflow_schedule gains `request: Request = None` and ONE `org_id=` keyword (your workflow's org, else the active org, else the trigger). Honoured by construction
+
+CLAUDE.md verdict cell as of 2026-10-29 (replaced by 300-01, moved verbatim): | `backend/app/api/schedules.py` | 5 / 5 / 303 (was `4 / 4 / 299`) | 299-01: new schedule stamped with the workflow's org (D-18) |
 
 ### `backend/app/db/schedules.py`
 
