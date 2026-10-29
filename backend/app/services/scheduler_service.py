@@ -213,28 +213,31 @@ async def launch_scheduled_run(
 
     schedule_id = _as_uuid(schedule["id"])
 
-    async def _record_outcome(status: str) -> None:
+    async def _record_outcome(status: str, run_id: UUID | None = None) -> None:
         # Every exit path of the background drive reports here (see unattended_launch).
         from app.db.schedules import record_schedule_outcome
 
-        # 300-01 (D-26): the drive reports "completed" when run_workflow RETURNS, which it also
-        # does when the run paused to wait for a person — the row then read "Finished". Read the
-        # schedule's newest run; a paused one records the waiting outcome instead. 300-02's
-        # run-status trigger (migration 218) flips that outcome to the run's terminal status
-        # when the run ends. A failed read records today's "completed".
-        if status == "completed":
+        # 300-01 (D-26) + 300-REVIEW WR-01: the drive reports "completed" whenever run_workflow
+        # RETURNS — which it also does when the run paused for a person, and when the engine's
+        # fail_run arm finished it "failed" (or it was stopped). Read THIS drive's run, by id,
+        # and record what it actually holds: paused -> the waiting outcome, failed / cancelled
+        # as themselves (each has its D-15 sentence). 300-02's run-status trigger (migration
+        # 218) later flips "waiting" to the run's terminal status. A failed read records
+        # "completed", as before.
+        if status == "completed" and run_id is not None:
             try:
                 latest = await pool.fetchval(
-                    "SELECT status FROM workflow_runs WHERE inputs->>'_schedule_id' = $1 "
-                    "ORDER BY created_at DESC LIMIT 1",
-                    str(schedule_id),
+                    "SELECT status FROM workflow_runs WHERE id = $1", run_id
                 )
                 if latest == "paused":
                     status = "waiting"
+                elif latest in ("failed", "cancelled"):
+                    status = latest
             except Exception:  # noqa: BLE001 — the outcome is a hint; never fail the drive
                 logger.warning(
-                    "schedule %s: could not read its latest run status; recording completed",
+                    "schedule %s: could not read run %s status; recording completed",
                     schedule_id,
+                    run_id,
                     exc_info=True,
                 )
         await record_schedule_outcome(pool, schedule_id, status=status)

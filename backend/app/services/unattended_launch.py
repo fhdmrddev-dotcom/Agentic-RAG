@@ -44,7 +44,9 @@ from uuid import UUID
 
 logger = logging.getLogger(__name__)
 
-OnFinish = Callable[[str], Awaitable[Any]]
+#: ``on_finish(status, run_id)``. 300-REVIEW WR-01: the drive names the run it launched, so the
+#: scheduler reads THAT run's status, never the schedule's newest run.
+OnFinish = Callable[[str, UUID], Awaitable[Any]]
 
 #: 293-IN-04 (296-02): strong references to the drive tasks until they finish (run_transport's
 #: P9 shape). The event loop keeps only a weak reference to a task, so a bare ``create_task``
@@ -144,8 +146,10 @@ async def launch_unattended_run(
     that stamp. An unattended run that ran as "the system" would retrieve across every tenant's
     documents.
 
-    ``on_finish`` is awaited with the terminal status (``"completed"`` / ``"failed"``) on every
-    exit path of the background drive; the scheduler passes its outcome record.
+    ``on_finish`` is awaited with the drive's status (``"completed"`` / ``"failed"``) and this
+    run's id on every exit path of the background drive; the scheduler passes its outcome record.
+    ``"completed"`` means only that ``run_workflow`` RETURNED: the engine's ``fail_run`` arm and
+    a pause both return, so the callback reads the run row for its real status (WR-01).
     """
     # 293-REVIEW CR-01: the kill switch, BEFORE the thread insert, so any unattended door that
     # forgets its own check still writes nothing. Each caller also checks first, with its words.
@@ -372,7 +376,7 @@ async def _drive_run(
             except Exception:  # noqa: BLE001
                 logger.exception("%s-run producer-shell finalize failed for %s", run_label, pid)
         if on_finish is not None:
-            await on_finish("failed" if failed else "completed")
+            await on_finish("failed" if failed else "completed", run_id)
 
 
 def _as_uuid(value: Any) -> UUID:

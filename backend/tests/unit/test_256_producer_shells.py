@@ -426,7 +426,7 @@ async def _drive_site5(box, *, ctx_is_none: bool = False):
     ):
         _schedule_id = uuid.uuid4()
 
-        async def _on_finish(status):
+        async def _on_finish(status, run_id=None):
             await _schedules_db.record_schedule_outcome(None, _schedule_id, status=status)
 
         await sched._drive_run(

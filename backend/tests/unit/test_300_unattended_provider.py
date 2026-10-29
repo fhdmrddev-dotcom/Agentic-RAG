@@ -148,7 +148,10 @@ async def test_no_provider_adds_no_metadata_key():
     run, finished = await _drive(None, None)
     assert "metadata" not in run
     assert not run.get("model")
-    finished.assert_awaited_once_with("failed")
+    finished.assert_awaited_once()
+    assert finished.await_args.args[0] == "failed"
+    # 300-REVIEW WR-01: the drive names its own run to the callback.
+    assert len(finished.await_args.args) == 2
 
 
 # ── D-26: a paused scheduled run reads "waiting" ────────────────────────────────────────────
@@ -170,9 +173,12 @@ async def _outcome(drive_status: str, pool) -> tuple[list, AsyncMock]:
     from app.services import scheduler_service
     from app.services.entitlement_service import EntitlementResult
 
+    run_id = uuid4()
+
     async def _core(**kw):
-        await kw["on_finish"](drive_status)
-        return uuid4()
+        # 300-REVIEW WR-01: the drive hands on_finish the id of the run IT launched.
+        await kw["on_finish"](drive_status, run_id)
+        return run_id
 
     allowed = EntitlementResult(allowed=True, capability="workflows", current_tier="enterprise")
     schedule = {"id": uuid4(), "user_id": str(uuid4()), "workflow_id": str(uuid4()),
@@ -189,6 +195,7 @@ async def _outcome(drive_status: str, pool) -> tuple[list, AsyncMock]:
               return_value=allowed),
     ):
         await scheduler_service.launch_scheduled_run(schedule, pool=pool, redis=MagicMock())
+    schedule["_run_id"] = run_id
     return [c.kwargs["status"] for c in record.await_args_list], schedule
 
 
@@ -198,8 +205,25 @@ async def test_a_drive_that_ends_paused_records_waiting():
     statuses, schedule = await _outcome("completed", pool)
     assert statuses == ["waiting"]
     sql, args = pool.calls[0]
-    assert "inputs->>'_schedule_id'" in sql and "ORDER BY created_at DESC" in sql
-    assert args == (str(schedule["id"]),)
+    # 300-REVIEW WR-01: THIS drive's run, by id — never the schedule's newest run, which an
+    # overlapping Run now or a quick re-fire can own.
+    assert "WHERE id = $1" in sql
+    assert "ORDER BY" not in sql and "_schedule_id" not in sql
+    assert args == (schedule["_run_id"],)
+
+
+@pytest.mark.asyncio
+async def test_a_drive_whose_run_failed_cleanly_records_failed():
+    """300-REVIEW WR-01: the engine's fail_run arm finishes the run 'failed' and RETURNS, so the
+    drive reports 'completed'. The row must read the run's own status, never "Finished."."""
+    statuses, _ = await _outcome("completed", _StatusPool("failed"))
+    assert statuses == ["failed"]
+
+
+@pytest.mark.asyncio
+async def test_a_drive_whose_run_was_stopped_records_cancelled():
+    statuses, _ = await _outcome("completed", _StatusPool("cancelled"))
+    assert statuses == ["cancelled"]
 
 
 @pytest.mark.asyncio
