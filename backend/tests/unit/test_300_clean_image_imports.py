@@ -28,6 +28,7 @@ REQUIREMENTS = BACKEND / "requirements.txt"
 #: The modules on the app's outbound-mail path.
 MAIL_PATH_MODULES = [
     APP / "services" / "email_provider.py",
+    APP / "services" / "run_waiting_email.py",
     APP / "services" / "connectors" / "smtp_adapter.py",
 ]
 

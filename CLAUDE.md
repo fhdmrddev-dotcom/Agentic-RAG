@@ -688,8 +688,8 @@ node scripts/check-hot-file-ledger.cjs <phase-dir>   # 0 clear · 1 missing rows
 | `frontend/src/hooks/useFolders.ts` | 5 / 4 / 200 (was `4 / 4 / 197`) | 298-05: useOrgItemsVersion() in the load deps (a move refetches) |
 | `frontend/src/hooks/useAuth.ts` | 6 / 5 / 128 (was `5 / 4 / 100`) | ⚠ absent while FIRING — row added 299-05 · redirect + .catch · ⛔ |
 | `frontend/src/pages/AuthPage.tsx` | 5 / 3 / 32 (was `4 / 2 / 26`) | ⚠ now FIRES (299) · 299-05: one quiet S5 line (kind only) |
-| `backend/app/api/org.py` | 11 / 3 / 1024 | ⚠ absent while FIRING — row added at 300 planning · 300-03 invite outcome |
-| `backend/app/services/email_provider.py` | 5 / 3 / 374 (was `4 / 2 / 105`) | ⚠ now FIRES (300) · 300-03: one mailer seam (D-21) · ⛔ |
+| `backend/app/api/org.py` | 12 / 4 / 1068 (was `11 / 3 / 1024`) | 300-03: invite email_delivery stored + returned (D-11) |
+| `backend/app/services/email_provider.py` | 6 / 3 / 362 (was `5 / 3 / 374`) | ⚠ now FIRES (300) · 300-03: one mailer seam (D-21) · ⛔ |
 | `frontend/src/components/admin/HealthSignals.tsx` | 5 / 4 / 316 | ⚠ absent while FIRING — row added at 300 planning · 300-04 Email tile |
 
 

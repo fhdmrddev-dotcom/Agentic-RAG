@@ -11983,7 +11983,7 @@ cells rot within days.
 | [`frontend/src/docs/pages/Changelog.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrcdocspageschangelogtsx) | 2 / 1 / 128 (was `1 / 1 / 125`) | no (new) | young (created 276). Row added AT PLANNING. 276-03: P5 changelog; 276-07 hero link. ⛔ v4.5 Not yet released from parseHistory released flag |
 | [`frontend/src/docs/pages/BuildStory.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrcdocspagesbuildstorytsx) | 1 / 1 / 88 (was `0 / 0 / 0`) | no (new) | young (created 276-07). Row added AT PLANNING. D-26: five chapters in order, releases from parseHistory, one VideoSlot each. ⛔ an id-less slot renders nothing |
 | [`frontend/src/pages/SetupWizard.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrcpagessetupwizardtsx) | 3 / 3 / 352 (was `2 / 2 / 345`) | ⚠ **NOW FIRES — 3 phases** | ⚠ absent its ENTIRE LIFE; row added at 276-07 planning. **276-07**: the static Iris mark on the dark chip in the header. ⛔ no logic change |
-| [`backend/app/services/email_provider.py`](docs/HOT-FILE-LEDGER.md#backendappservicesemail_providerpy) | 5 / 3 / 374 (was `4 / 2 / 105`) | ⚠ **FIRES** | ⚠ now FIRES (300). 300-03 (D-21): the ONE mailer seam — none / Resend REST / SMTP, dev guard, shell. ⛔ never raises; no secret or recipient in a reason or log |
+| [`backend/app/services/email_provider.py`](docs/HOT-FILE-LEDGER.md#backendappservicesemail_providerpy) | 6 / 3 / 362 (was `5 / 3 / 374`) | ⚠ **FIRES** | ⚠ now FIRES (300). 300-03 (D-21): the ONE mailer seam — none / Resend REST / SMTP, dev guard, shell; shim gone. ⛔ never raises; no secret or recipient in a reason or log |
 | [`frontend/src/docs/pages/ChangelogVersion.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrcdocspageschangelogversiontsx) | 1 / 1 / 52 (was `0 / 0 / 0`) | no (new) | young (created 276). Row added AT PLANNING. 276-03: changelog version page |
 | [`frontend/src/docs/pages/ApiReference.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrcdocspagesapireferencetsx) | 3 / 2 / 144 (was `1 / 1 / 135`) | no (new) | young (created 276). Row added AT PLANNING. 276-03: P6 lazy Scalar. ⛔ telemetry off, agent disabled, test-request hidden; dynamic import only · 293 touch: see §Phase 293 close |
 | [`frontend/src/docs/components/Markdown.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrcdocscomponentsmarkdowntsx) | 1 / 1 / 134 (was `0 / 0 / 0`) | no (new) | young (created 276). Row added AT PLANNING. 276-03: react-markdown + gfm. ⛔ NO rehype-raw — raw HTML stays text (XSS) |
@@ -12251,7 +12251,7 @@ cells rot within days.
 | [`frontend/src/components/org/SavesInOrg.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentsorgsavesinorgtsx) | 1 / 1 / 46 (was `0 / 0 / 0`) | no (young) | young (created 299-04). Saves in <org> caption (D-18/D-38/UI-D11). ⛔ renders nothing below 2 orgs or without an active org name; only on Run / Tweak / Start a chat; words from orgItemsCopy |
 | [`frontend/src/hooks/useAuth.ts`](docs/HOT-FILE-LEDGER.md#frontendsrchooksuseauthts) | 6 / 5 / 128 (was `5 / 4 / 100`) | ⚠ **FIRES** | 299-05: SSO redirectTo / sign-up emailRedirectTo from returnTo + one getSession .catch. ⛔ no hash access; no timer sets user (Pitfall 6) |
 | [`frontend/src/components/workflows/library/useWorkflowFork.ts`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentsworkflowslibraryuseworkflowforkts) | 4 / 2 / 539 (was `3 / 1 / 517`) | no | 299-04: Tweak sends fromDefinitionId (D-38); a WorkflowOrgRefusedError lands as forkFailed.sentence, every other failure keeps the prose-free shape. Below threshold |
-| [`backend/app/api/org.py`](docs/HOT-FILE-LEDGER.md#backendappapiorgpy) | 11 / 3 / 1024 | ⚠ **FIRES** | Added AT PLANNING 300: absent its ENTIRE LIFE at 3 phases. 300-03: invite delivery outcome stored + returned (D-11). ⛔ link-first: a mail failure never fails the invite |
+| [`backend/app/api/org.py`](docs/HOT-FILE-LEDGER.md#backendappapiorgpy) | 12 / 4 / 1068 (was `11 / 3 / 1024`) | ⚠ **FIRES** | 300-03 (D-11): run_in_threadpool(send_invite) at both sites; one _record_invite_delivery stores + returns email_delivery. ⛔ link-first: a mail failure never fails the invite |
 | [`backend/app/api/me_preferences.py`](docs/HOT-FILE-LEDGER.md#backendappapimepreferencespy) | 1 / 1 / 120 | no (1 phase) | Added AT PLANNING 300. 300-05: notification-email keys on GET + one PUT route (D-09). ⛔ ungated, auth.uid() merge; default_model semantics byte-identical |
 | [`backend/app/services/connectors/smtp_adapter.py`](docs/HOT-FILE-LEDGER.md#backendappservicesconnectorssmtpadapterpy) | 1 / 1 / 482 | no (1 phase) | Added AT PLANNING 300. 300-03: the body gains a rendered HTML alternative (D-24, D-32). ⛔ header guard + refused-recipient check stay; no CC/BCC/attachment |
 | [`backend/app/services/health_probe.py`](docs/HOT-FILE-LEDGER.md#backendappserviceshealthprobepy) | 1 / 1 / 116 | no (1 phase) | Added AT PLANNING 300. 300-04: probe_email (D-12). ⛔ off / held back is neutral, never down; a reason never names a recipient |
@@ -12262,7 +12262,7 @@ cells rot within days.
 | [`frontend/src/lib/api/schedules.ts`](docs/HOT-FILE-LEDGER.md#frontendsrclibapischedulests) | 3 / 3 / 166 (was `2 / 2 / 129`) | ⚠ **FIRES** | 300-01: ScheduleRefusalError (an ApiError) for {detail:{code,message,missing}}; string + array arms unchanged. ⛔ not re-exported via lib/api.ts |
 | [`backend/app/db/notifications.py`](docs/HOT-FILE-LEDGER.md#backendappdbnotificationspy) | 0 / 0 / 0 | no (planned 300-04) | young (planned 300-04). Outbox claim (SKIP LOCKED), still-waiting, opt-out, outcome (D-12, D-13, D-20). ⛔ never selects prompt text; state flip inside the claim txn |
 | [`backend/app/services/notification_drainer.py`](docs/HOT-FILE-LEDGER.md#backendappservicesnotificationdrainerpy) | 0 / 0 / 0 | no (planned 300-04) | young (planned 300-04). Per-worker outbox drainer, SchedulerService shape (D-20). ⛔ send outside the claim txn; at most 3 attempts; SMTP at-most-once |
-| [`backend/app/services/run_waiting_email.py`](docs/HOT-FILE-LEDGER.md#backendappservicesrunwaitingemailpy) | 0 / 0 / 0 | no (planned 300-03) | young (planned 300-03). Pure run-waiting renderer + duration words (NOTE-03, D-02..D-06). ⛔ never accepts prompt text; subject control chars stripped |
+| [`backend/app/services/run_waiting_email.py`](docs/HOT-FILE-LEDGER.md#backendappservicesrunwaitingemailpy) | 1 / 1 / 115 (was `0 / 0 / 0`) | no (young) | young (created 300-03). Pure run-waiting renderer + duration words (NOTE-03, D-02..D-06). ⛔ never accepts prompt text; subject control chars stripped |
 | [`frontend/src/components/workflows/scheduleOutcomeVocabulary.ts`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentsworkflowsscheduleoutcomevocabularyts) | 1 / 1 / 67 | no (young) | young (created 300-01). last_status → one sentence (D-15, D-26). ⛔ zero-import leaf; no raw status token reaches the screen |
 | [`frontend/src/components/settings/EmailSettings.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentssettingsemailsettingstsx) | 0 / 0 / 0 | no (planned 300-05) | young (planned 300-05). Operator Email card, ApiKeyLimits shape (D-07, D-08, D-10). ⛔ changes()/adopt() handle, no own Save; never sends a cleared delay |
 | [`frontend/src/components/settings/EmailNotificationPreference.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentssettingsemailnotificationpreferencetsx) | 0 / 0 / 0 | no (planned 300-05) | young (planned 300-05). Member switch (D-09). ⛔ calls only ungated /me/preferences; never shows On before the read answers |
@@ -19987,6 +19987,14 @@ Scan-list cell as of 2026-10-29 (replaced by 300-03, moved verbatim): 4 / 2 / 10
 
 CLAUDE.md verdict cell: none before 300-03 (the file did not fire); row added by 300-03.
 
+### `backend/app/services/email_provider.py` — 300-03 Task 2 (2026-10-29)
+
+**`6 / 3 / 362` (was `5 / 3 / 374`).** The temporary `get_email_provider` shim is deleted now that `api/org.py` calls `send_invite` directly (`grep get_email_provider` over `backend/app` and `backend/tests` reads 0). `send_invite` (built in Task 1 because the re-pointed `test_276` needs it) is unchanged.
+
+Scan-list cell as of 2026-10-29 (replaced by 300-03 Task 2, moved verbatim): 5 / 3 / 374 (was `4 / 2 / 105`) | ⚠ **FIRES** | ⚠ now FIRES (300). 300-03 (D-21): the ONE mailer seam — none / Resend REST / SMTP, dev guard, shell. ⛔ never raises; no secret or recipient in a reason or log |
+
+CLAUDE.md verdict cell as of 2026-10-29 (replaced by 300-03 Task 2, moved verbatim): | `backend/app/services/email_provider.py` | 5 / 3 / 374 (was `4 / 2 / 105`) | ⚠ now FIRES (300) · 300-03: one mailer seam (D-21) · ⛔ |
+
 ### `frontend/src/docs/pages/ChangelogVersion.tsx`
 
 **`0 / 0 / 0`** at 276 planning. Young (created in Phase 276). 276-03: changelog version page. 276-05 re-derives the triple at close.
@@ -27502,6 +27510,14 @@ Sixteen rows planted by the Phase 300 planner, because `node scripts/check-hot-f
 
 **Added AT PLANNING (Phase 300, 2026-10-29) at `11 / 3 / 1024`** — measured, never copied. Added AT PLANNING 300: absent its ENTIRE LIFE at 3 phases. 300-03: invite delivery outcome stored + returned (D-11). ⛔ link-first: a mail failure never fails the invite
 
+### `backend/app/api/org.py` — 300-03 Task 2 (2026-10-29)
+
+**`12 / 4 / 1068` (was `11 / 3 / 1024`).** D-11, honoured by construction: both send sites now read `outcome = await run_in_threadpool(send_invite, …)` inside the EXISTING try (a raise becomes `SendOutcome("failed", "The email could not be sent.")`, logged by invitation id, never the address), then ONE module helper `_record_invite_delivery` maps sent / failed / suppressed → `sent` / `failed` / `not_configured`, writes `email_delivery` (+ `email_failed_at`, `email_failure` only when failed) with one UPDATE on a fresh `get_user_pg_connection` block in its own try/except, and returns the word. Both responses gain `"email_delivery"`; the list's column literal and each row gain it. ⛔ link-first: nothing here can fail the invite (pinned by `test_300_invite_outcome.py`, including a failing UPDATE). ⛔ `token_hash` still never selected.
+
+Scan-list cell as of 2026-10-29 (replaced by 300-03, moved verbatim): 11 / 3 / 1024 | ⚠ **FIRES** | Added AT PLANNING 300: absent its ENTIRE LIFE at 3 phases. 300-03: invite delivery outcome stored + returned (D-11). ⛔ link-first: a mail failure never fails the invite |
+
+CLAUDE.md verdict cell as of 2026-10-29 (replaced by 300-03, moved verbatim): | `backend/app/api/org.py` | 11 / 3 / 1024 | ⚠ absent while FIRING — row added at 300 planning · 300-03 invite outcome |
+
 ### `backend/app/api/me_preferences.py`
 
 **Added AT PLANNING (Phase 300, 2026-10-29) at `1 / 1 / 120`** — measured, never copied. Added AT PLANNING 300. 300-05: notification-email keys on GET + one PUT route (D-09). ⛔ ungated, auth.uid() merge; default_model semantics byte-identical
@@ -27561,6 +27577,12 @@ CLAUDE.md verdict cell: none before 300-01 (the file did not fire); row added by
 ### `backend/app/services/run_waiting_email.py`
 
 **Added AT PLANNING (Phase 300, 2026-10-29) with `0 / 0 / 0`** — the file does not exist yet; plan `300-03` creates it and re-derives the triple in its creating commit. young (planned 300-03). Pure run-waiting renderer + duration words (NOTE-03, D-02..D-06). ⛔ never accepts prompt text; subject control chars stripped
+
+### `backend/app/services/run_waiting_email.py` — 300-03 Task 2 (2026-10-29)
+
+**`1 / 1 / 115` (created).** Pure renderer: `duration_words(seconds)` (UI-D7 floor words, the ONE home S2's delay words reuse), `RenderedEmail`, and `render_run_waiting(*, workflow_name, org_name, waited_seconds, run_id, kind)` — keyword-only, exactly those five inputs (signature pinned). Subject `{name} is waiting on you` through `one_line`, clipped at 120; HTML on `shell_html` with the footer block, every value `html.escape`d (attributes `quote=True`); text alternative is UI-SPEC S1's seven-line layout verbatim. Links are `/app/runs/<id>` and `/app/settings` on `primary_frontend_origin()`. ⛔ never accepts prompt text; ⛔ no token, no query string, no expiry. Pinned by `test_300_run_waiting_email.py`; walked by `test_300_clean_image_imports.py`.
+
+Scan-list cell as of 2026-10-29 (replaced by 300-03, moved verbatim): 0 / 0 / 0 | no (planned 300-03) | young (planned 300-03). Pure run-waiting renderer + duration words (NOTE-03, D-02..D-06). ⛔ never accepts prompt text; subject control chars stripped |
 
 ### `frontend/src/components/workflows/scheduleOutcomeVocabulary.ts`
 

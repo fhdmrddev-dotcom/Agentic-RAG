@@ -360,15 +360,3 @@ def send_invite(to: str, link: str, org_name: str) -> SendOutcome:
         # The offline / self-hosted flow (Phase 167): the link is still findable in the log.
         logger.info("invite link for %s (org=%s): %s", to, org_name, link)
     return outcome
-
-
-class _ShimProvider:
-    """⚠ TEMPORARY (300-03 Task 1 → removed in Task 2): keeps ``api/org.py``'s import working
-    until it calls ``send_invite`` directly."""
-
-    def send_invite(self, to: str, link: str, org_name: str) -> None:
-        send_invite(to, link, org_name)
-
-
-def get_email_provider() -> _ShimProvider:
-    return _ShimProvider()
