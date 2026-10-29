@@ -265,8 +265,24 @@ describe("NavPanel badge — the popover names what is broken and opens Health",
     renderRail({ attentionConditions: conditions(1), onOpenLibraryHealth })
     await user.click(screen.getByRole("button", { name: COPY.badgeTitle(1) }))
 
-    const action = await screen.findByRole("button", { name: COPY.popOpenHealth })
+    // ⚠ CORRECTED at Phase 301 (D-26 / BUG-261029-01): this read `findByRole("button", …)`.
+    // Radix Menu cancels Tab inside its content, so a plain button there was unreachable from
+    // the keyboard; the action is now a menu item, and is found by that role.
+    const action = await screen.findByRole("menuitem", { name: COPY.popOpenHealth })
     await user.click(action)
+    expect(onOpenLibraryHealth).toHaveBeenCalledTimes(1)
+  })
+
+  it("its ONE action is reachable from the keyboard — arrow keys + Enter (D-26, BUG-261029-01)", async () => {
+    const user = userEvent.setup()
+    const onOpenLibraryHealth = vi.fn()
+    renderRail({ attentionConditions: conditions(1), onOpenLibraryHealth })
+    screen.getByRole("button", { name: COPY.badgeTitle(1) }).focus()
+    await user.keyboard("{Enter}")
+    await screen.findByTestId("rail-popover")
+    await user.keyboard("{ArrowDown}")
+    expect(screen.getByRole("menuitem", { name: COPY.popOpenHealth })).toHaveFocus()
+    await user.keyboard("{Enter}")
     expect(onOpenLibraryHealth).toHaveBeenCalledTimes(1)
   })
 
@@ -298,7 +314,7 @@ describe("NavPanel badge — the popover names what is broken and opens Health",
     expect(screen.getAllByTestId("rail-pop-item")).toHaveLength(1)
     expect(screen.getByText("Rate sheets 1")).toBeInTheDocument()
     expect(screen.queryByText("Waiting workflow 1")).toBeNull()
-    expect(screen.getAllByRole("button", { name: COPY.popOpenHealth })).toHaveLength(1)
+    expect(screen.getAllByRole("menuitem", { name: COPY.popOpenHealth })).toHaveLength(1) // 301-03 D-26: was role "button"
   })
 
   it("a waiting-only world renders no Library badge at all", () => {
