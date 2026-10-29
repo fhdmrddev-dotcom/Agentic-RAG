@@ -29,7 +29,12 @@ DevTools offline on one tab, answer a run in another, go back online: the count 
 result: owed (manual realtime disconnect leaves channels closed, so it cannot stand in)
 
 ### 4. Live "needs your approval" row
-Doc Q&A step 2 is "Wait for your approval": answer step 1, then the row should read "needs your approval".
+Needs a published workflow with an ARMED action-risk checkpoint owned by the dev account; run it and the row
+should read "needs your approval".
+Tried 2026-10-30: Doc Q&A's "Wait for your approval" step is a human-input QUESTION (notice `kind = question`,
+correct per D-04 — approval is only an action-risk checkpoint); "295-07 S7 armed email" is published but owned by
+another user, so it refuses ("Workflow not found", 299 D-33). No `kind = approval` notice has ever been written
+locally. Cheapest path: author + publish a one-step send_email (posture ask) workflow on the dev account.
 result: owed (DB/unit-proven, D-34)
 
 ### 5. Moonshot cross-provider row
