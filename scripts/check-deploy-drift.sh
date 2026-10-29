@@ -100,10 +100,14 @@ OMITTED_FROM_ONEBOX=(
   DATABASE_URL POSTGRES_DB POSTGRES_HOST POSTGRES_PASSWORD POSTGRES_PORT POSTGRES_USER
   # embeddings base URL — optional; falls back to the LLM provider endpoint
   EMBEDDING_BASE_URL
-  # invitation email (Phase 167) — optional; only when EMAIL_PROVIDER=resend. The default
-  # EMAIL_PROVIDER=none logs the invite link and needs neither. (EMAIL_PROVIDER itself IS in
+  # app email (Phase 167 / 300) — optional; the default EMAIL_PROVIDER=none sends nothing and
+  # needs none of these. RESEND_API_KEY only for EMAIL_PROVIDER=resend; INVITE_FROM_EMAIL is
+  # only the sender fallback (Settings → Email supersedes it); the SMTP_* vars only for
+  # EMAIL_PROVIDER=smtp — the one-box path, so all five ship COMMENTED in onebox.env.example
+  # and are passed through by docker-compose.prod.yml. (EMAIL_PROVIDER itself IS in
   # onebox.env.example, so it is not omitted here.)
   RESEND_API_KEY INVITE_FROM_EMAIL
+  SMTP_HOST SMTP_PORT SMTP_USERNAME SMTP_PASSWORD SMTP_SECURITY
   # Supabase Management API access token (Phase 248 / CRED-04) — used by scripts/check-security-advisors.sh
   # for cloud advisory checks; not a one-box knob
   SUPABASE_ACCESS_TOKEN

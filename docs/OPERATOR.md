@@ -411,16 +411,56 @@ which models they can serve. Pin the model IDs you know your key serves (e.g.
 `OPENAI_MODELS=...`) rather than relying on a default that may not exist for this account. A
 stale default silently degraded metadata extraction to NULL in production once.
 
-### Invitation email — optional; the default just logs the link (Phase 167)
+### App email — invitations and run-waiting notices (Phase 167; one mailer since Phase 300)
 
-Org-admins invite teammates by a secure link. Delivery is env-switched and **off by default** —
-no email account needed to run:
+The app sends two kinds of email: an **invitation** (an org-admin invites a teammate) and a
+**run-waiting notice** (a workflow run has waited on its owner's answer or approval longer than
+the configured wait). Both go through one mailer. Delivery is env-switched and **off by
+default** — no email account is needed to run, and **nothing needs installing for any
+provider** (every provider ships in the built image):
 
-- **`EMAIL_PROVIDER=none`** (default) — the app **logs the invite link** (visible in
-  `docker compose logs backend`) and the org-admin copies + shares it. Works fully offline.
-- **`EMAIL_PROVIDER=resend`** — sends real email. Opt-in: `pip install resend` into the backend
-  venv (it is **not** a default requirement), then set `RESEND_API_KEY` (secret — env only) and
-  `INVITE_FROM_EMAIL` (your verified from-address).
+- **`EMAIL_PROVIDER=none`** (default) — nothing is sent. The app **logs the invite link**
+  (visible in `docker compose logs backend`) and the org-admin copies + shares it. The invite
+  dialog says the email was not set up. Works fully offline.
+- **`EMAIL_PROVIDER=smtp`** — sends through **your own mail server** (the one-box path). Set:
+  - `SMTP_HOST` — your mail relay's host name.
+  - `SMTP_PORT` — `587` (default) for STARTTLS, `465` for implicit TLS.
+  - `SMTP_SECURITY` — `starttls` (default) | `ssl` | `none` (`none` only for a trusted relay
+    on your own network).
+  - `SMTP_USERNAME` / `SMTP_PASSWORD` — the relay login (the password is a secret — env only).
+    Leave the username empty for a relay that needs no login.
+  - ⚠ **Many VPS providers block outbound SMTP by default** (ports 25/465/587). Confirm with
+    your provider, or open a support ticket, before relying on it.
+- **`EMAIL_PROVIDER=resend`** — sends through Resend's REST API. Set `RESEND_API_KEY` (secret —
+  env only).
+
+`INVITE_FROM_EMAIL` is the **fallback** sender address. Every other email knob lives in the app,
+under **Settings → Integrations → Email** (operators only), not in the environment:
+
+| Setting | Default | Notes |
+|---|---|---|
+| Send from (address) | empty → `INVITE_FROM_EMAIL` | the address every app email comes from; replies are not read |
+| Send from (name) | `Syrel` | the sender name people see |
+| Wait before emailing (seconds) | `120` | bounded 60–3600; a run still waiting this long emails its owner |
+| Test address (outside production) | empty | see the production note below |
+
+These are columns with defaults, so there is nothing to seed: a fresh database reads the
+defaults above.
+
+⚠ **`ENVIRONMENT=production` is a deploy checklist item for email.** Outside production, every
+email is sent to the Settings **test address** instead of its real recipient, with `[Test] ` in
+front of the subject — or, when no test address is set, it is **not sent at all** and only
+logged. That keeps development and staging from mailing real people. On a production box,
+confirm `ENVIRONMENT=production` is set, or no real person will ever receive an email.
+
+**Sender domain (DNS).** Send from a dedicated subdomain, e.g. `notify@notify.<your-domain>`,
+and publish the records your provider gives you at your DNS host (for this deployment:
+Hostinger): **SPF**, **DKIM**, and a **DMARC** record starting at `p=none`. For Resend, add and
+verify the domain under Resend → Domains first.
+
+⚠ **Production has never sent an app email before Phase 300** — the shipped Resend path could
+not run from a built image. The first real send is the phase's lived-experience (G-4) row:
+invite yourself, then check the inbox, the spam folder and the invite dialog's result.
 
 The invite-link base reuses `FRONTEND_URL` (above) — there is **no** separate base-URL var.
 

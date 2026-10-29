@@ -11614,7 +11614,7 @@ cells rot within days.
 | [`frontend/src/components/workflows/WorkflowCanvas.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentsworkflowsworkflowcanvastsx) | 33 / 11 / 1757 (was `32 / 10 / 1744`) | **FIRES** | 296-07 (D-09, operator decision): ONE controlled prop pair (view / onViewChange) + tabpanel attrs on 2 bodies; useState 8→8. ⛔ extraction still FIRST next |
 | [`frontend/src/components/workflows/FlowEdge.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentsworkflowsflowedgetsx) | 3 / 3 / 462 | ⚠ **FIRES — EXACTLY AT THRESHOLD** | honoured by construction (200) — ⚠ absent, and it crossed the threshold in the commit that added its row |
 | [`frontend/src/components/workflows/PhaseNodeCard.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentsworkflowsphasenodecardtsx) | 18 / 9 / 490 (was `17 / 8 / 489`) | **FIRES** | 290: the 286 forecast went UNUSED (the chips went on the library card, UI-SPEC §9); file untouched. honoured by construction (199) — ⚠ the 200 canvas port stays REVERTED |
-| [`backend/app/services/harness/phase_types.py`](docs/HOT-FILE-LEDGER.md#backendappservicesharnessphase_typespy) | 66 / 33 / 3135 (was `65 / 33 / 3131`) | ⚠ **FIRES** | 296-06: pinned-model provider arm (293-F-4); retry needs KB evidence (291-IN-01); one notice helper for a swapped agent pin, hardened (str-only, never raises). G-5 OWED |
+| [`backend/app/services/harness/phase_types.py`](docs/HOT-FILE-LEDGER.md#backendappservicesharnessphase_typespy) | 67 / 34 / 3147 (was `66 / 33 / 3135`) | ⚠ **FIRES** | 300-03 (D-23, G-5 override audited in STATE.md): one hunk in _external_action_sent_body — send_email names the recipient (via host). Owed refactor NOT discharged |
 | [`frontend/src/pages/WorkflowsPage.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrcpagesworkflowspagetsx) | 56 / 23 / 1403 (was `55 / 23 / 1403`) | ⚠ **FIRES** | honoured by construction (299-REVIEW WR-05): the useWorkflowLinkTarget call passes shown: visibleRows and clearFilters: clearAllFilters (one expression) |
 | [`frontend/src/components/workflows/library/WorkflowCard.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentsworkflowslibraryworkflowcardtsx) | 27 / 12 / 1374 (was `26 / 11 / 1373`) | **FIRES** | 299-02: one attribute data-row-id={row.id} on the root, beside data-provenance (the link target). Honoured by construction; seam286 pin snapshot +5 attrs |
 | [`frontend/src/components/workflows/library/libraryVocabulary.ts`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentsworkflowslibrarylibraryvocabularyts) | 15 / 8 / 820 (was `14 / 7 / 819`) | ⚠ **FIRES** | 296-07 (290-IN-02): STEP_LINE_UNTYPED is a re-export of phaseVocabulary.STEP_UNTYPED (one home); no seam proposed |
@@ -11674,13 +11674,13 @@ cells rot within days.
 | [`frontend/src/lib/api.ts`](docs/HOT-FILE-LEDGER.md#frontendsrclibapits) | 215 / 128 / 556 (was `214 / 127 / 552`) | ⚠ **FIRES** | 299-03: one links export block (resolveLink + LinkKind / LinkTarget / LinkAnswer) beside the orgItems block. No other re-export changed |
 | [`frontend/src/types/index.ts`](docs/HOT-FILE-LEDGER.md#frontendsrctypesindexts) | 103 / 82 / 1688 (was `102 / 81 / 1685`) | ⚠ **FIRES** | 299-04: ONE optional field, ExpertBundle.org_id (the experts read is SELECT *, so the wire always carried it). Additive. Seam still owed |
 | [`backend/app/main.py`](docs/HOT-FILE-LEDGER.md#backendappmainpy) | 97 / 71 / 993 (was `96 / 70 / 992`) | ⚠ **FIRES** | 299-01: ONE `app.include_router(links.router)` + one name in the api import list. Honoured by construction. ⛔ see section |
-| [`backend/app/config.py`](docs/HOT-FILE-LEDGER.md#backendappconfigpy) | 93 / 54 / 1809 (was `92 / 54 / 1790`) | ⚠ **FIRES** | **282-01** ceiling 1800 + boot check + DB-tier clamp; **282-04** `DEFAULT_LLM_CALL_TIMEOUT_SECONDS_SELF_HOSTED` 900 via the mig 180 predicate. No env var. honoured by construction |
+| [`backend/app/config.py`](docs/HOT-FILE-LEDGER.md#backendappconfigpy) | 96 / 55 / 1831 (was `93 / 54 / 1809`) | ⚠ **FIRES** | 300-03 (D-28): five smtp_* env fields in the existing email block; provider comment none / resend / smtp; stale lazy-import sentence deleted. Honoured by construction |
 | [`backend/app/api/admin.py`](docs/HOT-FILE-LEDGER.md#backendappapiadminpy) | 44 / 17 / 2054 (was `43 / 17 / 2051`) | ⚠ **FIRES** | honoured by construction (quick-261024): the discover providers summary gains `returned` = len(ids), so a mostly-known provider no longer reads as "found little". ⛔ add still lands disabled |
 | [`backend/app/api/settings.py`](docs/HOT-FILE-LEDGER.md#backendappapisettingspy) | 47 / 25 / 1301 (was `46 / 24 / 1250`) | ⚠ **FIRES** | 292.1-02: two bounded writes (2..50) via _range_refusal_detail + allow-list +2 (+51 −0). ⛔ never a retyped id list; GET never echoes a key · 293 touch: see §Phase 293 close |
 | [`backend/app/services/multimodal_service.py`](docs/HOT-FILE-LEDGER.md#backendappservicesmultimodal_servicepy) | 14 / 7 / 984 | ⚠ **FIRES** | ⚠ absent from BOTH for its ENTIRE LIFE at **7 phases** — row added SEED-227, which is also where its silent truncation was found |
 | [`backend/app/api/documents.py`](docs/HOT-FILE-LEDGER.md#backendappapidocumentspy) | 101 / 40 / 2709 (was `99 / 39 / 2698`) | ⚠ **FIRES** | 298-01: list_documents one `org_lists.by_org` in build() (every read, D-32); upload one `org_id=root_upload_org(...)` on the ONE minter call. Honoured by construction. ⛔ see section |
 | [`scripts/vitest-count-gate.cjs`](docs/HOT-FILE-LEDGER.md#scriptsvitest-count-gatecjs) | 395 / 83 / 6865 (was `380 / 81 / 6808`) | ⚠ **FIRES** | 300-01: 2 BASELINE pins added (scheduleOutcomeVocabulary 16, schedulesRefusal 4 + its FILE-LEVEL TARGET), WorkflowScheduleModal 9→29 raised, none lowered |
-| [`scripts/check-deploy-drift.sh`](docs/HOT-FILE-LEDGER.md#scriptscheck-deploy-driftsh) | 5 / 4 / 267 | ⚠ **FIRES** | ⚠ absent its ENTIRE LIFE — row added 294-05. 294-01: DECISION_ENGINE_FAULT_BASE_URL registered as intentionally omitted (+2) |
+| [`scripts/check-deploy-drift.sh`](docs/HOT-FILE-LEDGER.md#scriptscheck-deploy-driftsh) | 6 / 5 / 271 (was `5 / 4 / 267`) | ⚠ **FIRES** | 300-03 (D-28): the five SMTP_* vars registered in OMITTED_FROM_ONEBOX (commented in the one-box preset); email comment rewritten. No check changed |
 | [`scripts/build-public-openapi.cjs`](docs/HOT-FILE-LEDGER.md#scriptsbuild-public-openapicjs) | 11 / 5 / 472 (was `7 / 3 / 468`) | ⚠ **FIRES** | 298-01: `org-items` in the Account & org TAG_GROUPS entry + `/org-items/` in FLAGGED_PREFIXES (UI-internal). Two tokens. ⚠ prior row stale (`7 / 3 / 468` vs measured `10 / 4 / 468` pre-298). |
 | [`scripts/check-seeds-register.cjs`](docs/HOT-FILE-LEDGER.md#scriptscheck-seeds-registercjs) | 7 / 3 / 1132 | ⚠ **FIRES** | ⚠ absent its ENTIRE LIFE — row added 296-05, now FIRES (251 / 293 / 296). 296-05: three `\d{3}` → `\d{3,}` (293-IN-07). ⛔ the STATUS_ENUM triple |
 | [`scripts/decision-fault-server.py`](docs/HOT-FILE-LEDGER.md#scriptsdecision-fault-serverpy) | 2 / 2 / 216 | no (young) | young (294 / 296). 296-05: `ok` answers a `choice` question with its first offered option (294-IN-03). ⛔ loopback only, never logs a body |
@@ -11775,7 +11775,7 @@ cells rot within days.
 | [`frontend/src/components/settings/grantsVocabulary.ts`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentssettingsgrantsvocabularyts) | 3 / 2 / 115 | no (2 phases) | ⚠ absent for its entire life — row added 221-02. There is deliberately NO `READY` string in it |
 | [`backend/app/services/connector_service.py`](docs/HOT-FILE-LEDGER.md#backendappservicesconnector_servicepy) | 28 / 11 / 1858 | ⚠ **FIRES** | ⚠ row STALE (`25/9/1772`) — 248 and 252 touched it. NOT modified by 253; re-derived under CR-08. honoured by construction (**239-06**) |
 | [`backend/app/models/message.py`](docs/HOT-FILE-LEDGER.md#backendappmodelsmessagepy) | 25 / 17 / 292 (was `24 / 16 / 287`) | ⚠ **FIRES** | **292.1 D-UAT-2**: `run_status` Literal gains `cap_paused` (+2). ⛔ deleting `artifacts` makes reload render no artifacts, silently · 293 touch: see §Phase 293 close |
-| [`backend/app/models/user_settings.py`](docs/HOT-FILE-LEDGER.md#backendappmodelsuser_settingspy) | 61 / 37 / 1776 (was `60 / 36 / 1769`) | ⚠ **FIRES** | 293 touch: see §Phase 293 close (previous cell moved there verbatim) |
+| [`backend/app/models/user_settings.py`](docs/HOT-FILE-LEDGER.md#backendappmodelsuser_settingspy) | 62 / 38 / 1788 (was `61 / 37 / 1776`) | ⚠ **FIRES** | 300-03 (D-07/D-08/D-10, mig 218): four email fields + four _val lines, no env fallback in the model. Honoured by construction |
 | [`backend/app/api/setup.py`](docs/HOT-FILE-LEDGER.md#backendappapisetuppy) | 7 / 2 / 490 | no (1 phase) | ⚠ **absent for its ENTIRE LIFE — row added 249-03**. ⛔ it deliberately does NOT catch `SettingsWriteRefused`: a refused `setup_complete` reported as success is the bug one layer up |
 | [`backend/app/services/setup_service.py`](docs/HOT-FILE-LEDGER.md#backendappservicessetup_servicepy) | 4 / 2 / 514 | no (1 phase) | ⚠ **absent for its ENTIRE LIFE — row added 249-03**. Same deliberate non-catch as `api/setup.py`; its bool cannot express *the database refused the value* |
 | [`backend/app/api/evals.py`](docs/HOT-FILE-LEDGER.md#backendappapievalspy) | 24 / 7 / 3237 | ⚠ **FIRES** | ⚠ **absent for its ENTIRE LIFE at 7 phases — row added 249-04, which left the file BYTE-UNCHANGED.** ⛔ `_tile_for_run`'s engine-shaped sentence must stay the LAST resort |
@@ -11983,7 +11983,7 @@ cells rot within days.
 | [`frontend/src/docs/pages/Changelog.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrcdocspageschangelogtsx) | 2 / 1 / 128 (was `1 / 1 / 125`) | no (new) | young (created 276). Row added AT PLANNING. 276-03: P5 changelog; 276-07 hero link. ⛔ v4.5 Not yet released from parseHistory released flag |
 | [`frontend/src/docs/pages/BuildStory.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrcdocspagesbuildstorytsx) | 1 / 1 / 88 (was `0 / 0 / 0`) | no (new) | young (created 276-07). Row added AT PLANNING. D-26: five chapters in order, releases from parseHistory, one VideoSlot each. ⛔ an id-less slot renders nothing |
 | [`frontend/src/pages/SetupWizard.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrcpagessetupwizardtsx) | 3 / 3 / 352 (was `2 / 2 / 345`) | ⚠ **NOW FIRES — 3 phases** | ⚠ absent its ENTIRE LIFE; row added at 276-07 planning. **276-07**: the static Iris mark on the dark chip in the header. ⛔ no logic change |
-| [`backend/app/services/email_provider.py`](docs/HOT-FILE-LEDGER.md#backendappservicesemail_providerpy) | 4 / 2 / 105 (was `3 / 1 / 95`) | no (2 phases) | ⚠ absent its ENTIRE LIFE; row added at 276-07 planning. 276-07: hosted PNG lockup + "Syrel" in the invite. ⛔ org name AND every URL html-escaped (WR-02) |
+| [`backend/app/services/email_provider.py`](docs/HOT-FILE-LEDGER.md#backendappservicesemail_providerpy) | 6 / 3 / 362 (was `5 / 3 / 374`) | ⚠ **FIRES** | ⚠ now FIRES (300). 300-03 (D-21): the ONE mailer seam — none / Resend REST / SMTP, dev guard, shell; shim gone. ⛔ never raises; no secret or recipient in a reason or log |
 | [`frontend/src/docs/pages/ChangelogVersion.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrcdocspageschangelogversiontsx) | 1 / 1 / 52 (was `0 / 0 / 0`) | no (new) | young (created 276). Row added AT PLANNING. 276-03: changelog version page |
 | [`frontend/src/docs/pages/ApiReference.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrcdocspagesapireferencetsx) | 3 / 2 / 144 (was `1 / 1 / 135`) | no (new) | young (created 276). Row added AT PLANNING. 276-03: P6 lazy Scalar. ⛔ telemetry off, agent disabled, test-request hidden; dynamic import only · 293 touch: see §Phase 293 close |
 | [`frontend/src/docs/components/Markdown.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrcdocscomponentsmarkdowntsx) | 1 / 1 / 134 (was `0 / 0 / 0`) | no (new) | young (created 276). Row added AT PLANNING. 276-03: react-markdown + gfm. ⛔ NO rehype-raw — raw HTML stays text (XSS) |
@@ -12251,9 +12251,9 @@ cells rot within days.
 | [`frontend/src/components/org/SavesInOrg.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentsorgsavesinorgtsx) | 1 / 1 / 46 (was `0 / 0 / 0`) | no (young) | young (created 299-04). Saves in <org> caption (D-18/D-38/UI-D11). ⛔ renders nothing below 2 orgs or without an active org name; only on Run / Tweak / Start a chat; words from orgItemsCopy |
 | [`frontend/src/hooks/useAuth.ts`](docs/HOT-FILE-LEDGER.md#frontendsrchooksuseauthts) | 6 / 5 / 128 (was `5 / 4 / 100`) | ⚠ **FIRES** | 299-05: SSO redirectTo / sign-up emailRedirectTo from returnTo + one getSession .catch. ⛔ no hash access; no timer sets user (Pitfall 6) |
 | [`frontend/src/components/workflows/library/useWorkflowFork.ts`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentsworkflowslibraryuseworkflowforkts) | 4 / 2 / 539 (was `3 / 1 / 517`) | no | 299-04: Tweak sends fromDefinitionId (D-38); a WorkflowOrgRefusedError lands as forkFailed.sentence, every other failure keeps the prose-free shape. Below threshold |
-| [`backend/app/api/org.py`](docs/HOT-FILE-LEDGER.md#backendappapiorgpy) | 11 / 3 / 1024 | ⚠ **FIRES** | Added AT PLANNING 300: absent its ENTIRE LIFE at 3 phases. 300-03: invite delivery outcome stored + returned (D-11). ⛔ link-first: a mail failure never fails the invite |
+| [`backend/app/api/org.py`](docs/HOT-FILE-LEDGER.md#backendappapiorgpy) | 12 / 4 / 1068 (was `11 / 3 / 1024`) | ⚠ **FIRES** | 300-03 (D-11): run_in_threadpool(send_invite) at both sites; one _record_invite_delivery stores + returns email_delivery. ⛔ link-first: a mail failure never fails the invite |
 | [`backend/app/api/me_preferences.py`](docs/HOT-FILE-LEDGER.md#backendappapimepreferencespy) | 1 / 1 / 120 | no (1 phase) | Added AT PLANNING 300. 300-05: notification-email keys on GET + one PUT route (D-09). ⛔ ungated, auth.uid() merge; default_model semantics byte-identical |
-| [`backend/app/services/connectors/smtp_adapter.py`](docs/HOT-FILE-LEDGER.md#backendappservicesconnectorssmtpadapterpy) | 1 / 1 / 482 | no (1 phase) | Added AT PLANNING 300. 300-03: the body gains a rendered HTML alternative (D-24, D-32). ⛔ header guard + refused-recipient check stay; no CC/BCC/attachment |
+| [`backend/app/services/connectors/smtp_adapter.py`](docs/HOT-FILE-LEDGER.md#backendappservicesconnectorssmtpadapterpy) | 2 / 2 / 594 (was `1 / 1 / 482`) | no (2 phases) | 300-03 (D-24, D-32): the body gains a js-default markdown HTML alternative + a line-preserving text part. ⛔ header guard + refused-recipient check stay; no CC/BCC/attachment |
 | [`backend/app/services/health_probe.py`](docs/HOT-FILE-LEDGER.md#backendappserviceshealthprobepy) | 1 / 1 / 116 | no (1 phase) | Added AT PLANNING 300. 300-04: probe_email (D-12). ⛔ off / held back is neutral, never down; a reason never names a recipient |
 | [`backend/app/services/run_model_resolution.py`](docs/HOT-FILE-LEDGER.md#backendappservicesrunmodelresolutionpy) | 4 / 3 / 344 (was `3 / 2 / 308`) | ⚠ **FIRES** | 300-01: resolve_owner_run_model, the ONE FIX-05 helper (D-33). ⛔ owner settings loaded off the loop; (None, None) on failure |
 | [`frontend/src/components/admin/HealthSignals.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentsadminhealthsignalstsx) | 5 / 4 / 316 | ⚠ **FIRES** | Added AT PLANNING 300: absent at 4 phases. 300-04: one Email tile (D-12, UI-D13). ⛔ pure leaf; Off / Held back / Test mode never red |
@@ -12262,7 +12262,7 @@ cells rot within days.
 | [`frontend/src/lib/api/schedules.ts`](docs/HOT-FILE-LEDGER.md#frontendsrclibapischedulests) | 3 / 3 / 166 (was `2 / 2 / 129`) | ⚠ **FIRES** | 300-01: ScheduleRefusalError (an ApiError) for {detail:{code,message,missing}}; string + array arms unchanged. ⛔ not re-exported via lib/api.ts |
 | [`backend/app/db/notifications.py`](docs/HOT-FILE-LEDGER.md#backendappdbnotificationspy) | 0 / 0 / 0 | no (planned 300-04) | young (planned 300-04). Outbox claim (SKIP LOCKED), still-waiting, opt-out, outcome (D-12, D-13, D-20). ⛔ never selects prompt text; state flip inside the claim txn |
 | [`backend/app/services/notification_drainer.py`](docs/HOT-FILE-LEDGER.md#backendappservicesnotificationdrainerpy) | 0 / 0 / 0 | no (planned 300-04) | young (planned 300-04). Per-worker outbox drainer, SchedulerService shape (D-20). ⛔ send outside the claim txn; at most 3 attempts; SMTP at-most-once |
-| [`backend/app/services/run_waiting_email.py`](docs/HOT-FILE-LEDGER.md#backendappservicesrunwaitingemailpy) | 0 / 0 / 0 | no (planned 300-03) | young (planned 300-03). Pure run-waiting renderer + duration words (NOTE-03, D-02..D-06). ⛔ never accepts prompt text; subject control chars stripped |
+| [`backend/app/services/run_waiting_email.py`](docs/HOT-FILE-LEDGER.md#backendappservicesrunwaitingemailpy) | 1 / 1 / 115 (was `0 / 0 / 0`) | no (young) | young (created 300-03). Pure run-waiting renderer + duration words (NOTE-03, D-02..D-06). ⛔ never accepts prompt text; subject control chars stripped |
 | [`frontend/src/components/workflows/scheduleOutcomeVocabulary.ts`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentsworkflowsscheduleoutcomevocabularyts) | 1 / 1 / 67 | no (young) | young (created 300-01). last_status → one sentence (D-15, D-26). ⛔ zero-import leaf; no raw status token reaches the screen |
 | [`frontend/src/components/settings/EmailSettings.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentssettingsemailsettingstsx) | 0 / 0 / 0 | no (planned 300-05) | young (planned 300-05). Operator Email card, ApiKeyLimits shape (D-07, D-08, D-10). ⛔ changes()/adopt() handle, no own Save; never sends a cleared delay |
 | [`frontend/src/components/settings/EmailNotificationPreference.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentssettingsemailnotificationpreferencetsx) | 0 / 0 / 0 | no (planned 300-05) | young (planned 300-05). Member switch (D-09). ⛔ calls only ungated /me/preferences; never shows On before the read answers |
@@ -19979,6 +19979,22 @@ Scan-list cell as of 2026-10-20 (replaced by 294-05, moved verbatim): 1 / 1 / 11
 
 **`4 / 2 / 105`** re-derived at 276-07 (2026-10-05), counting the 276-07 Task 2 commit. `ResendProvider.send_invite` prepends `<img src="{safe_logo}" alt="Syrel" width="160" height="80">` where `safe_logo = html.escape(primary_frontend_origin() + "/brand/syrel-lockup-email.png", quote=True)`; the body says "… on Syrel." and the plain-text subject becomes "You're invited to {org} on Syrel". `NoneLogProvider` is unchanged. Pinned by `backend/tests/unit/test_276_invite_email_brand.py` (planted `</a><script>` org). Two phases; G-5 does not fire.
 
+### `backend/app/services/email_provider.py` — 300-03 Task 1 (2026-10-29)
+
+**`5 / 3 / 374` (was `4 / 2 / 105`) — crosses into G-5 at this commit (3 phases with 300).** D-21: rewritten as the ONE app mailer. `send_email(OutboundEmail, *, idempotency_key) -> SendOutcome` with three providers — `none` (suppressed), `resend` (REST over `httpx` through the `_http_client` seam; the `resend` SDK was never in the built image, so the shipped lazy import could not send one invite), `smtp` (stdlib `smtplib.SMTP`/`SMTP_SSL` from env `SMTP_*`, deliberately NOT `open_pinned_smtp`: the operator relay may be local). The D-10 dev guard lives inside the seam (`is_production_environment()`), `one_line` is the header guard, `shell_html` the UI-SPEC S1 shell, `send_invite` the invite on it. ⛔ BLOCKING, every caller uses `run_in_threadpool`; ⛔ never raises; ⛔ no API key, password, recipient, subject or link in a reason or a log. `compose_invite_link` unchanged. A temporary `get_email_provider` shim keeps `api/org.py` importing until Task 2. Seam if it grows: the two transports into a `mail_transports.py` leaf. Pinned by `test_300_mailer.py`, `test_276_invite_email_brand.py` (re-pointed, D-34), `test_300_clean_image_imports.py`.
+
+Scan-list cell as of 2026-10-29 (replaced by 300-03, moved verbatim): 4 / 2 / 105 (was `3 / 1 / 95`) | no (2 phases) | ⚠ absent its ENTIRE LIFE; row added at 276-07 planning. 276-07: hosted PNG lockup + "Syrel" in the invite. ⛔ org name AND every URL html-escaped (WR-02) |
+
+CLAUDE.md verdict cell: none before 300-03 (the file did not fire); row added by 300-03.
+
+### `backend/app/services/email_provider.py` — 300-03 Task 2 (2026-10-29)
+
+**`6 / 3 / 362` (was `5 / 3 / 374`).** The temporary `get_email_provider` shim is deleted now that `api/org.py` calls `send_invite` directly (`grep get_email_provider` over `backend/app` and `backend/tests` reads 0). `send_invite` (built in Task 1 because the re-pointed `test_276` needs it) is unchanged.
+
+Scan-list cell as of 2026-10-29 (replaced by 300-03 Task 2, moved verbatim): 5 / 3 / 374 (was `4 / 2 / 105`) | ⚠ **FIRES** | ⚠ now FIRES (300). 300-03 (D-21): the ONE mailer seam — none / Resend REST / SMTP, dev guard, shell. ⛔ never raises; no secret or recipient in a reason or log |
+
+CLAUDE.md verdict cell as of 2026-10-29 (replaced by 300-03 Task 2, moved verbatim): | `backend/app/services/email_provider.py` | 5 / 3 / 374 (was `4 / 2 / 105`) | ⚠ now FIRES (300) · 300-03: one mailer seam (D-21) · ⛔ |
+
 ### `frontend/src/docs/pages/ChangelogVersion.tsx`
 
 **`0 / 0 / 0`** at 276 planning. Young (created in Phase 276). 276-03: changelog version page. 276-05 re-derives the triple at close.
@@ -21971,6 +21987,14 @@ CLAUDE.md verdict cell before 282-04 (replaced):
 
 > honoured by construction (282-01) · `MODEL_CAPABILITIES` seam OWED · ⛔
 
+### `backend/app/config.py` — 300-03 Task 1 (2026-10-29)
+
+**`96 / 55 / 1831` (was `93 / 54 / 1809`; the row was stale by two commits).** D-28: ONE hunk in the existing Phase 167 email block — the `email_provider` literal comment now reads `none | resend | smtp`, the stale *"the `resend` package is an opt-in lazy import"* sentence is deleted (300 D-21 removed the SDK), `invite_from_email` is documented as the sender FALLBACK (D-08), and five env fields are added: `smtp_host`, `smtp_port` (587), `smtp_username`, `smtp_password`, `smtp_security` (`starttls | ssl | none`). Infra and a secret, so env only; every other email knob is in `app_settings` (migration 218). Deploy parity in the same commit (`.env.example`, onebox preset, compose, OPERATOR.md, drift script). Honoured by construction: no new branch, no new import. The owed seam (split the Settings class by concern) is NOT taken.
+
+Scan-list cell as of 2026-10-29 (replaced by 300-03, moved verbatim): 93 / 54 / 1809 (was `92 / 54 / 1790`) | ⚠ **FIRES** | **282-01** ceiling 1800 + boot check + DB-tier clamp; **282-04** `DEFAULT_LLM_CALL_TIMEOUT_SECONDS_SELF_HOSTED` 900 via the mig 180 predicate. No env var. honoured by construction |
+
+CLAUDE.md verdict cell as of 2026-10-29 (replaced by 300-03, moved verbatim): | `backend/app/config.py` | 93 / 54 / 1809 (was `92 / 54 / 1790`) | honoured by construction (282-04: self-hosted default 900) · seam OWED · ⛔ |
+
 ### `backend/app/api/admin.py` — 282-04
 
 **`43 / 17 / 2051` (was `42 / 17 / 2024`).** **282-04** (D-29): the PATCH's timeout sentence moves into `_timeout_out_of_range_detail(lo, hi, val)`; `AddModelRequest.llm_call_timeout_seconds` (optional) is type- and range-checked before any DB touch with that same helper and joins `_ADD_MODEL_CAP_COLUMNS`. Blank writes nothing. `enabled` stays forced False.
@@ -23910,6 +23934,14 @@ Scan-list cell as of 2026-10-20 (replaced by 294-05, moved verbatim): 2 / 1 / 10
 
 No scan-list row existed before 294-05 (2026-10-20).
 
+### `scripts/check-deploy-drift.sh` — 300-03 Task 1 (2026-10-29)
+
+**`6 / 5 / 271` (was `5 / 4 / 267`).** D-28 parity: `SMTP_HOST SMTP_PORT SMTP_USERNAME SMTP_PASSWORD SMTP_SECURITY` registered in `OMITTED_FROM_ONEBOX` with the reason (they are active in `backend/.env.example`, and ship COMMENTED in `deploy/onebox.env.example` — the one-box's SMTP path — and passed through by `docker-compose.prod.yml`); the email comment rewritten for three providers. No check changed. ⚠ D-27: the Settings knobs are documented in OPERATOR.md with NO `NNN_name.sql` filename, because check 2 counts every such mention as a seed. Verdict at this commit: `RESULT: PASS`.
+
+Scan-list cell as of 2026-10-29 (replaced by 300-03, moved verbatim): 5 / 4 / 267 | ⚠ **FIRES** | ⚠ absent its ENTIRE LIFE — row added 294-05. 294-01: DECISION_ENGINE_FAULT_BASE_URL registered as intentionally omitted (+2) |
+
+CLAUDE.md verdict cell as of 2026-10-29 (replaced by 300-03, moved verbatim): | `scripts/check-deploy-drift.sh` | 5 / 4 / 267 | ⚠ absent its ENTIRE LIFE — row added 294-05 · fault var omitted |
+
 ## `backend/app/api/panel.py`
 
 **Re-derived at 295-03's base `ea1347c4d` with the `CLAUDE.md` recipe, BEFORE the edit: `5 commits / 4 phases / 282 L`.** Phase buckets, verbatim: `085` · `093` · `096` · `163`; no six-digit quick-task bucket to drop. ⚠ **G-5 FIRES at 4 phases against a threshold of 3, and the file had NO ROW in either document for its entire life** (`grep -c "api/panel.py" CLAUDE.md` returned `0`): the same invisibility the `api/runs.py` and `models/thread.py` rows recorded, found the same way, by re-deriving the triple of a file a plan was about to edit. History (`git log -- backend/app/api/panel.py`): `32242511a`/`e54851682` (085-04, the panel router + `/ask_user/pending` + `/tasks`), `02c71c54a` (093-05, the prior-phase `draft` on the prompt), `3632515c0` (096-03, the dead-run liveness filter, dual id namespace), `a8e53b46b` (163-06, the user-JWT RLS connection).
@@ -25130,6 +25162,14 @@ Scan-list disposition cell before 292.1 (replaced): quick-261024: `load_app_sett
 
 CLAUDE.md FIRING cell before 292.1 (replaced): quick-261024: picker warms hot + tombstone caches · ⛔
 
+### `backend/app/models/user_settings.py` — 300-03 Task 1 (2026-10-29)
+
+**`62 / 38 / 1788` (was `61 / 37 / 1776`).** Fields + loader lines only, beside the 293 D-14 precedent: `notification_email_delay_seconds: int = 120` (D-07), `email_from_address: str = ""` and `email_from_name: str = "Syrel"` (D-08), `email_dev_redirect_address: str = ""` (D-10), each loaded by `_val(row, key, None, default)` so a database without migration 218 still reads 120 / "" / Syrel / "". ⛔ No env fallback in the MODEL: `send_email` applies `email_from_address or settings.invite_from_email`, so the Settings read shows the stored value, never the env one. Pinned by `test_300_mailer.py`.
+
+Scan-list cell as of 2026-10-29 (replaced by 300-03, moved verbatim): 61 / 37 / 1776 (was `60 / 36 / 1769`) | ⚠ **FIRES** | 293 touch: see §Phase 293 close (previous cell moved there verbatim) |
+
+CLAUDE.md verdict cell as of 2026-10-29 (replaced by 300-03, moved verbatim): | `backend/app/models/user_settings.py` | 61 / 37 / 1776 (was `60 / 36 / 1769`) | 293-01: two per-key limit fields + _val · ⛔ |
+
 ### `frontend/src/pages/SettingsPage.tsx` — Phase 292.1 close
 
 **`59 / 29 / 1669`** at 292.1 close (was `57 / 28 / 1662`). G-5: ⚠ **FIRES**. Honoured by construction (292.1-02, the 294-04 `RerankEngineBlock` precedent): one import, one comment, one mount in the AI-model tab (+3 −0); no `useState`, no hydrate entry, no payload entry.
@@ -25904,6 +25944,14 @@ CLAUDE.md FIRING cell before this 296-06 touch (moved verbatim): | `backend/app/
 Scan-list cell before this 296-06 touch (moved verbatim): | [`backend/app/services/harness/phase_types.py`](docs/HOT-FILE-LEDGER.md#backendappservicesharnessphase_typespy) | 65 / 33 / 3131 (was `64 / 33 / 3095`) | ⚠ **FIRES** | 296-06: pinned-model provider arm at forced_emit (293-F-4); retry needs KB evidence (291-IN-01); one notice helper + call for an agent step's swapped pin. G-5 OWED · 293 touch: see §Phase 293 close |
 
 CLAUDE.md FIRING cell before this 296-06 touch (moved verbatim): | `backend/app/services/harness/phase_types.py` | 65 / 33 / 3131 (was `64 / 33 / 3095`) | 296-06: emit pin precedence, retry guard, 1 notice helper · G-5 OWED |
+
+### `backend/app/services/harness/phase_types.py` — 300-03 Task 3 (2026-10-29)
+
+**`67 / 34 / 3147` (was `66 / 33 / 3135`).** ⚠ G-5 FIRES ("G-5 OWED") and this touch is an AUDITED OVERRIDE, recorded under `STATE.md → Guardrail overrides` in the same commit — the owed refactor is NOT discharged. D-23 (BUG-260828-05), one hunk inside `_external_action_sent_body` only (`git diff <base> -- phase_types.py | grep -c '^@@'` = 1): for `send_email` the first line reads "the mail server accepted it" (UI-D14) and `Destination` reads `{to} (via {host})`, `to` from `resolved` (a list is comma-joined in order); an empty `to` falls back to the host. Every other capability's receipt is byte-identical (pinned against the pre-300 literal in `test_300_email_step_honesty.py`). The docstring records that the recipient IS named for send_email and the credential never is. Nothing else in the file changed.
+
+Scan-list cell as of 2026-10-29 (replaced by 300-03, moved verbatim): 66 / 33 / 3135 (was `65 / 33 / 3131`) | ⚠ **FIRES** | 296-06: pinned-model provider arm (293-F-4); retry needs KB evidence (291-IN-01); one notice helper for a swapped agent pin, hardened (str-only, never raises). G-5 OWED |
+
+CLAUDE.md verdict cell as of 2026-10-29 (replaced by 300-03, moved verbatim): | `backend/app/services/harness/phase_types.py` | 66 / 33 / 3135 (was `65 / 33 / 3131`) | 296-06: emit pin precedence, retry guard, 1 notice helper · G-5 OWED |
 
 ### `backend/app/api/workflows.py` — 296-06 (293-DEL sentence on one source line)
 
@@ -27470,6 +27518,14 @@ Sixteen rows planted by the Phase 300 planner, because `node scripts/check-hot-f
 
 **Added AT PLANNING (Phase 300, 2026-10-29) at `11 / 3 / 1024`** — measured, never copied. Added AT PLANNING 300: absent its ENTIRE LIFE at 3 phases. 300-03: invite delivery outcome stored + returned (D-11). ⛔ link-first: a mail failure never fails the invite
 
+### `backend/app/api/org.py` — 300-03 Task 2 (2026-10-29)
+
+**`12 / 4 / 1068` (was `11 / 3 / 1024`).** D-11, honoured by construction: both send sites now read `outcome = await run_in_threadpool(send_invite, …)` inside the EXISTING try (a raise becomes `SendOutcome("failed", "The email could not be sent.")`, logged by invitation id, never the address), then ONE module helper `_record_invite_delivery` maps sent / failed / suppressed → `sent` / `failed` / `not_configured`, writes `email_delivery` (+ `email_failed_at`, `email_failure` only when failed) with one UPDATE on a fresh `get_user_pg_connection` block in its own try/except, and returns the word. Both responses gain `"email_delivery"`; the list's column literal and each row gain it. ⛔ link-first: nothing here can fail the invite (pinned by `test_300_invite_outcome.py`, including a failing UPDATE). ⛔ `token_hash` still never selected.
+
+Scan-list cell as of 2026-10-29 (replaced by 300-03, moved verbatim): 11 / 3 / 1024 | ⚠ **FIRES** | Added AT PLANNING 300: absent its ENTIRE LIFE at 3 phases. 300-03: invite delivery outcome stored + returned (D-11). ⛔ link-first: a mail failure never fails the invite |
+
+CLAUDE.md verdict cell as of 2026-10-29 (replaced by 300-03, moved verbatim): | `backend/app/api/org.py` | 11 / 3 / 1024 | ⚠ absent while FIRING — row added at 300 planning · 300-03 invite outcome |
+
 ### `backend/app/api/me_preferences.py`
 
 **Added AT PLANNING (Phase 300, 2026-10-29) at `1 / 1 / 120`** — measured, never copied. Added AT PLANNING 300. 300-05: notification-email keys on GET + one PUT route (D-09). ⛔ ungated, auth.uid() merge; default_model semantics byte-identical
@@ -27477,6 +27533,12 @@ Sixteen rows planted by the Phase 300 planner, because `node scripts/check-hot-f
 ### `backend/app/services/connectors/smtp_adapter.py`
 
 **Added AT PLANNING (Phase 300, 2026-10-29) at `1 / 1 / 482`** — measured, never copied. Added AT PLANNING 300. 300-03: the body gains a rendered HTML alternative (D-24, D-32). ⛔ header guard + refused-recipient check stay; no CC/BCC/attachment
+
+### `backend/app/services/connectors/smtp_adapter.py` — 300-03 Task 3 (2026-10-29)
+
+**`2 / 2 / 594` (was `1 / 1 / 482`).** D-24 / D-32 (BUG-260828-06): one module-level `_MD = MarkdownIt("js-default", {"breaks": True, "html": False})` with image / table / strikethrough / hr disabled, a core rule capping headings at h3, and `validateLink` narrowed to http / https / mailto. The plain `set_content(body)` becomes `set_content(_markdown_to_text(body))` + ONE `add_alternative(_markdown_to_html(body), subtype="html")`; the text walk drops markers, keeps line breaks, writes links as `text (url)`; the HTML wrapper is UI-D15's (no Syrel chrome). The `INPUT_SCHEMA` comment and the body description say an HTML ALTERNATIVE OF THE BODY now exists; CC / BCC / attachments stay refused. ⛔ never the `commonmark` preset (it passes `<script>`); ⛔ the D-05 banned-token fence still holds (no transport named here). `test_190_smtp_header_injection.py`'s clean-send case now reads the body from the text/plain part (the message is multipart). Pinned by `test_300_email_step_honesty.py`; walked by `test_300_clean_image_imports.py`.
+
+Scan-list cell as of 2026-10-29 (replaced by 300-03, moved verbatim): 1 / 1 / 482 | no (1 phase) | Added AT PLANNING 300. 300-03: the body gains a rendered HTML alternative (D-24, D-32). ⛔ header guard + refused-recipient check stay; no CC/BCC/attachment |
 
 ### `backend/app/services/health_probe.py`
 
@@ -27529,6 +27591,12 @@ CLAUDE.md verdict cell: none before 300-01 (the file did not fire); row added by
 ### `backend/app/services/run_waiting_email.py`
 
 **Added AT PLANNING (Phase 300, 2026-10-29) with `0 / 0 / 0`** — the file does not exist yet; plan `300-03` creates it and re-derives the triple in its creating commit. young (planned 300-03). Pure run-waiting renderer + duration words (NOTE-03, D-02..D-06). ⛔ never accepts prompt text; subject control chars stripped
+
+### `backend/app/services/run_waiting_email.py` — 300-03 Task 2 (2026-10-29)
+
+**`1 / 1 / 115` (created).** Pure renderer: `duration_words(seconds)` (UI-D7 floor words, the ONE home S2's delay words reuse), `RenderedEmail`, and `render_run_waiting(*, workflow_name, org_name, waited_seconds, run_id, kind)` — keyword-only, exactly those five inputs (signature pinned). Subject `{name} is waiting on you` through `one_line`, clipped at 120; HTML on `shell_html` with the footer block, every value `html.escape`d (attributes `quote=True`); text alternative is UI-SPEC S1's seven-line layout verbatim. Links are `/app/runs/<id>` and `/app/settings` on `primary_frontend_origin()`. ⛔ never accepts prompt text; ⛔ no token, no query string, no expiry. Pinned by `test_300_run_waiting_email.py`; walked by `test_300_clean_image_imports.py`.
+
+Scan-list cell as of 2026-10-29 (replaced by 300-03, moved verbatim): 0 / 0 / 0 | no (planned 300-03) | young (planned 300-03). Pure run-waiting renderer + duration words (NOTE-03, D-02..D-06). ⛔ never accepts prompt text; subject control chars stripped |
 
 ### `frontend/src/components/workflows/scheduleOutcomeVocabulary.ts`
 

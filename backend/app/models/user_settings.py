@@ -304,6 +304,13 @@ class UserEffectiveSettings(BaseModel):
     #   `services/rate_limit.py`. App-wide, bounded 1..60 and 10..600 (API + CHECK).
     api_key_starts_per_minute: int = 10
     api_key_reads_per_minute: int = 120
+    # 300 (migration 218): D-07 the wait before a run-waiting email (bounded 60..3600), D-08 the
+    #   sender (an empty address means the env INVITE_FROM_EMAIL — applied in send_email, not
+    #   here), D-10 the test address every email goes to outside production.
+    notification_email_delay_seconds: int = 120
+    email_from_address: str = ""
+    email_from_name: str = "Syrel"
+    email_dev_redirect_address: str = ""
 
     # Phase 075.10 (migration 049): tool_args_progress SSE emission cadence.
     chat_tool_args_progress_emit_boundary_bytes: int = 256
@@ -1207,6 +1214,11 @@ def _build_settings_from_row(row: dict) -> UserEffectiveSettings:
         # 293 D-14 — a database without migration 215 still reads 10 / 120.
         api_key_starts_per_minute=int(_val(row, "api_key_starts_per_minute", None, 10)),
         api_key_reads_per_minute=int(_val(row, "api_key_reads_per_minute", None, 120)),
+        # 300 D-07/D-08/D-10 — a database without migration 218 still reads 120 / "" / Syrel / "".
+        notification_email_delay_seconds=int(_val(row, "notification_email_delay_seconds", None, 120)),
+        email_from_address=str(_val(row, "email_from_address", None, "")),
+        email_from_name=str(_val(row, "email_from_name", None, "Syrel")),
+        email_dev_redirect_address=str(_val(row, "email_dev_redirect_address", None, "")),
 
         chat_tool_args_progress_emit_boundary_bytes=int(
             _val(row, "chat_tool_args_progress_emit_boundary_bytes", None, 256)

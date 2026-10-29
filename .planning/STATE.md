@@ -112,4 +112,6 @@ applied; `get_advisors(security)` 0 ERROR. Branch `develop`.
 
 - **300 G-2 (2026-10-29):** UI hint (Settings email switch + delay knob, invite-dialog failure line, schedule-row words) — small surfaces in existing components; UI-SPEC self-approved under the operator's autonomous mandate ("continue autonomously end to end for this phase"); operator sees it at G-4.
 
+- **300-03 G-5 (2026-10-29):** `backend/app/services/harness/phase_types.py` FIRES ("G-5 OWED") and 300-03 touches it anyway: one hunk inside `_external_action_sent_body` for D-23 (the send_email receipt names the recipient "(via host)" and says the mail server accepted it). Honoured by construction; the owed refactor is NOT discharged.
+
 The 286-296 overrides are in `milestones/v4.7-STATE-at-close.md`.
