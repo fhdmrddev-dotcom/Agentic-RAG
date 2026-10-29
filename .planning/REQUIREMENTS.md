@@ -18,11 +18,11 @@ Decided at intake (operator, 2026-10-27):
 ### Links (LINK)
 
 - [x] **LINK-01**: Every top-level view has its own `/app/...` address. Opening it directly, refreshing, or pressing Back/Forward lands on that view. — `SEED-185`
-- [ ] **LINK-02**: A chat thread, a workflow, a workflow run and an Expert each have their own address, and a refresh returns to the same item. — `SEED-178`, `SEED-015`
-- [ ] **LINK-03**: A user can copy a link to what they are looking at, and opening it in a new tab or on another signed-in machine opens the same item. Existing links keep working: `?run=`, `?connections=1`, `/admin/spend`, `/setup` and `/invite`.
-- [ ] **LINK-04**: A link to something that does not exist, or that the user may not open, shows one plain "can't be opened" page. The page is the same in both cases and never silently falls back to chat.
-- [ ] **LINK-05**: A link to an item in another org the user belongs to asks "This is in <org> — switch?" before switching. Nothing is saved under the wrong org.
-- [ ] **LINK-06**: After signing in by password, SSO or sign-up, the user lands on the link they first opened. The boot screen cannot hang forever. — `SEED-312`
+- [x] **LINK-02**: A chat thread, a workflow, a workflow run and an Expert each have their own address, and a refresh returns to the same item. — `SEED-178`, `SEED-015`
+- [x] **LINK-03**: A user can copy a link to what they are looking at, and opening it in a new tab or on another signed-in machine opens the same item. Existing links keep working: `?run=`, `?connections=1`, `/admin/spend`, `/setup` and `/invite`.
+- [x] **LINK-04**: A link to something that does not exist, or that the user may not open, shows one plain "can't be opened" page. The page is the same in both cases and never silently falls back to chat.
+- [x] **LINK-05**: A link to an item in another org the user belongs to asks "This is in <org> — switch?" before switching. Nothing is saved under the wrong org.
+- [x] **LINK-06**: After signing in by password, SSO or sign-up, the user lands on the link they first opened. The boot screen cannot hang forever. — `SEED-312`
 - [x] **LINK-07**: Leaving a page with unsaved edits by Back/Forward asks before discarding them.
 - [x] **LINK-08**: Every address works in local dev, on the cloud app domain and on the self-hosted one-box. An automated check fails if the routing layers disagree.
 
@@ -47,7 +47,7 @@ Decided at intake (operator, 2026-10-27):
 ### v4.7 close-out (FIX)
 
 - [ ] **FIX-01**: The Workspace panel lists the files a thread produced instead of "No files yet". — `BUG-261027-01`
-- [ ] **FIX-02**: The chat list shows a loading state, not "No recent chats", while threads are loading. — `BUG-261027-02`
+- [x] **FIX-02**: The chat list shows a loading state, not "No recent chats", while threads are loading. — `BUG-261027-02`
 - [ ] **FIX-03**: A schedule row words a launch failure in plain language, and Run now updates only that row. — `BUG-261027-03`
 - [ ] **FIX-04**: A scheduled run whose required input is blank is refused before launch, and the refusal names the input. — `BUG-261027-04`
 - [ ] **FIX-05**: A paused run started by an API key or a schedule resumes on the provider it started on. — `BUG-261027-05`
@@ -90,11 +90,11 @@ Decided at intake (operator, 2026-10-27):
 | Requirement | Phase | Status |
 |-------------|-------|--------|
 | LINK-01 | Phase 297 | Complete |
-| LINK-02 | Phase 299 | Pending |
-| LINK-03 | Phase 299 | Pending |
-| LINK-04 | Phase 299 | Pending |
-| LINK-05 | Phase 299 | Pending |
-| LINK-06 | Phase 299 | Pending |
+| LINK-02 | Phase 299 | Complete |
+| LINK-03 | Phase 299 | Complete |
+| LINK-04 | Phase 299 | Complete |
+| LINK-05 | Phase 299 | Complete |
+| LINK-06 | Phase 299 | Complete |
 | LINK-07 | Phase 297 | Complete |
 | LINK-08 | Phase 297 | Complete |
 | ORG-01 | Phase 298 | Pending |
@@ -110,7 +110,7 @@ Decided at intake (operator, 2026-10-27):
 | NOTE-05 | Phase 301 | Pending |
 | NOTE-06 | Phase 300 | Pending |
 | FIX-01 | Phase 302 | Pending |
-| FIX-02 | Phase 299 | Pending |
+| FIX-02 | Phase 299 | Complete |
 | FIX-03 | Phase 302 | Pending |
 | FIX-04 | Phase 300 | Pending |
 | FIX-05 | Phase 300 | Pending |

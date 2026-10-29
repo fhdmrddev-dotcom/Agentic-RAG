@@ -79,7 +79,7 @@ Requirements: [`REQUIREMENTS.md`](REQUIREMENTS.md). **28 v4.8 requirements, 28 m
 
 - [x] **Phase 297: Every View Has an Address**: split `App.tsx` / `ChatLayout.tsx` behaviour-neutral, then give every top-level view an `/app/...` address with refresh, Back/Forward, unsaved-edit guard and a cross-host parity check (REG-09, LINK-01, LINK-07, LINK-08)
 - [ ] **Phase 298: Lists Follow the Active Org**: Library, Workflows, threads and run history narrowed to the active org; foreign-org folders refused with a reason; out-of-org items counted and movable one at a time, audited (ORG-01..06)
-- [ ] **Phase 299: Links to the Thing Itself**: thread, workflow, run and Expert addresses; copy link; one "can't be opened" page; the "switch org?" prompt; sign-in returns to the link; chat list loading state (LINK-02..06, FIX-02)
+- [x] **Phase 299: Links to the Thing Itself**: thread, workflow, run and Expert addresses; copy link; one "can't be opened" page; the "switch org?" prompt; sign-in returns to the link; chat list loading state (LINK-02..06, FIX-02)
 - [ ] **Phase 300: Told When a Run Waits (Backend and Mailer)**: scheduled-run input refusal and resume-on-provider fixed first; notices written by triggers; one content-free email per waiting run after the delay; per-user opt-out; Resend + SMTP from a built image (NOTE-02, NOTE-03, NOTE-04, NOTE-06, FIX-04, FIX-05)
 - [ ] **Phase 301: The Waiting-on-You Notice**: in-app list and badge across all orgs, each item naming its org and opening the run; it leaves once answered (NOTE-01, NOTE-05)
 - [ ] **Phase 302: Close-Out and a True Register**: Workspace panel files, schedule row wording, the six SEED-391 findings, and the register made true (FIX-01, FIX-03, FIX-06, REG-08)
@@ -248,7 +248,7 @@ Plans:
 |-------|----------------|--------|-----------|
 | 297. Every View Has an Address | 4/4 | Complete (2026-10-28) | verified passed 5/5; security 19/19; review 4 WR fixed; UAT 15 PASS + P7 Moonshot ⛔ (live 429, BUG-261024-01); LIVE 2026-10-28 (prod b813d2711) |
 | 298. Lists Follow the Active Org | 5/5 | Executed — human_needed | 4/4 SC in code; security 34/34; review 1 BL + 9 WR → 9 fixed, WR-08 → 299; G-4 owed (G4-1 first); mig 217 in cloud; LIVE 2026-10-28 (prod b813d2711) |
-| 299. Links to the Thing Itself | 5/5 | Executed — human_needed | 5/5 SC + 6/6 reqs in code; security 36/36; UAT 13/19 PASS, 6 POSTPONED 2026-10-29 (G4-5a first; G4-4c ⛔ SSO); not deployed; Redirect URLs owed |
+| 299. Links to the Thing Itself | 5/5 | Complete 2026-10-29 | 5/5 SC + 6/6 reqs; security 36/36; UAT 18/20 PASS; owed by decision: G4-4b email-link leg (cloud), X-7 Moonshot (⛔ balance); G4-4c ⛔ SSO; IN-01..05 deferred; not deployed; Redirect URLs before deploy |
 | 300. Told When a Run Waits (Backend and Mailer) | 5/5 | Executed — human_needed | 5/5 SC + 6/6 reqs in code; security 41/41 (UF-1 fixed); review 5 WR + 4 IN fixed; UAT owed (G4-5 first; G4-6 after 299 G4-4a); not deployed; mig 218 local only |
 | 301. The Waiting-on-You Notice | 0/TBD | Not started | - |
 | 302. Close-Out and a True Register | 0/TBD | Not started | - |

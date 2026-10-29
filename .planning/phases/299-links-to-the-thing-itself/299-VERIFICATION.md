@@ -2,7 +2,8 @@
 phase: 299-links-to-the-thing-itself
 verified: 2026-10-29T00:00:00Z
 verification_mode: self-verified   # OV-SOLO-01: no independent reviewer
-status: human_needed
+status: passed
+status_history: "human_needed (2026-10-29) → passed at close 2026-10-29: human UAT 18/20 PASS (299-HUMAN-UAT.md); G4-4b email-link leg + X-7 Moonshot owed by decision; G4-4c ⛔ SSO"
 score: 5/5 roadmap success criteria verified in code and tests; 6/6 requirements satisfied in code; lived-experience and 4-axis rows owed
 overrides_applied: 0
 re_verification: false

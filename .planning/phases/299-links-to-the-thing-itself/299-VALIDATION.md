@@ -100,3 +100,5 @@ A provider with no key or a known blocker is recorded ⛔ with the reason and is
 - SEED-178, SEED-015 → `shipped` (D-01/D-02); SEED-312 → `shipped` (D-26); BUG-261027-02 → `closed` only if
   G4-5a passes.
 - Record the run-kind rail-highlight deviation (299-03 SUMMARY) and the A1 reattach result (G4-2) here.
+
+**Recorded at close (2026-10-29):** ✅ register flipped — SEED-178, SEED-015, SEED-312 → `shipped`; BUG-261027-02 → `closed` (G4-5a passed). **Rail-highlight deviation:** UI-SPEC S1 asks the rail to highlight **Workflows** behind a run's card; 299-03 does not — no rail item claims `workflow-run`, so while a refused, holding or prompting run link is on screen the rail reads as in the run room (nothing current). Accepted as decision 1. **A1 reattach (G4-2):** the other chat was STILL STREAMING at Switch back and finished with every saved line on screen.

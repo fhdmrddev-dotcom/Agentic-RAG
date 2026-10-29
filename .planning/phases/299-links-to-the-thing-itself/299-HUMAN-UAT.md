@@ -1,6 +1,8 @@
 ---
 phase: 299-links-to-the-thing-itself
-status: partial
+status: complete
+closed: 2026-10-29
+owed_at_close: "G4-4b email-link leg (cloud, local auto-confirm sends none); X-7 Moonshot re-run (⛔ BUG-261024-01, Kimi account suspended for balance); G4-4c ⛔ SSO (D-41)"
 postponed: 2026-10-29
 created: 2026-10-29
 rows_total: 20
@@ -9,7 +11,7 @@ rows_blocked: 2
 driver: operator
 ---
 
-# Phase 299 — Human UAT (owed)
+# Phase 299 — Human UAT (closed 2026-10-29, 2 rows owed by decision)
 
 Verification returned `human_needed` (`299-VERIFICATION.md`): 5/5 ROADMAP success criteria and 6/6 requirements
 (LINK-02..06, FIX-02) are verified in code and tests, but the G-4 lived-experience rows and the four-axis rows
@@ -66,7 +68,7 @@ Operator, 2026-10-29: *"accept all three decisions, keep going"* — decisions 1
 2. ✅ ACCEPTED — Fork refusal is recognised by sentence wording (pinned by a test against `item_org_guard.py`).
 3. ✅ ACCEPTED — CR-01: a schedule whose workflow is in an org the owner left falls back to the active org.
 4. ✅ ACCEPTED (operator, 2026-10-29: "accept") — A Builder draft created by its first save shows no Link until reopened.
-5. OPEN — IN-01..IN-05 (see `299-REVIEW.md`).
+5. ⏸ DEFERRED at close (2026-10-29; operator: "proceed until you finish this phase, do not ask") — IN-01..IN-05 stay as written in `299-REVIEW.md` (Info, not fixed). Re-open trigger: the next phase whose `files_modified` names `item_org_guard.py`, the link hooks or `audience` helpers; IN-01 and IN-03 (write guards that can be skipped / fail open on a membership read error) first.
 
 ## Before deploy (operator)
 

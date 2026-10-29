@@ -31,7 +31,7 @@ See: `.planning/PROJECT.md` (updated 2026-10-27)
 
 **Core value:** The agent acts as an AI colleague — it knows your knowledge base, can run code, and
 can be taught new behaviours (skills) that persist and can be shared.
-**Current focus:** Phase 300 — told when a run waits (executed 2026-10-29: human_needed; next: `300-HUMAN-UAT.md`, G4-5 first; G4-6 needs 299 G4-4a). NOT deployed; mig 218 local only. Phase 299 stays human_needed with 6 UAT rows POSTPONED by operator decision 2026-10-29.
+**Current focus:** Phase 300 — told when a run waits (UAT 12/15 PASS locally 2026-10-29; owed: G4-8 + real-mail G4-1 after deploy). NOT deployed; mig 218 local only. Phase 299 CLOSED 2026-10-29 (UAT 18/20; 2 rows owed by decision).
 
 ---
 
@@ -51,11 +51,10 @@ Last activity: 2026-10-29 — 300 executed: 5 plans (01+02 → 03 → 04 → 05)
 
 Owed for 300 (in order): run `300-HUMAN-UAT.md` (G4-5 first; FIX-05 roster must be re-run after IN-03; G4-6 only after 299 G4-4a); approve 3 fixer-written strings (WR-05, IN-01, IN-04). Before deploy: paste mig 218 into cloud SQL editor (per-action approval) → `get_advisors(security)`; Coolify EMAIL_PROVIDER / RESEND_API_KEY / ENVIRONMENT=production; Resend sender + SPF/DKIM/DMARC. At close: REQUIREMENTS NOTE-02/03/04/06 + FIX-04/05 → done; BUG-261027-03/04/05 + BUG-260828-05/06 → closed when their rows pass.
 
-Owed for 299 — **POSTPONED by operator decision 2026-10-29** ("move to next phase and postpone these"). Claude drove 13/19 rows, all PASS
-(G4-2: A1 holds; X-7 Moonshot ⛔ rate-limited). Still owed, run first → last: G4-5a (closes BUG-261027-02), G4-5b, G4-4a, G4-4b, G4-4d,
-340 px mobile Link check; decision 4 (first-save Builder draft shows no Link). Decisions 1-3 ACCEPTED. **300 cannot close until G4-4a runs.**
-Before deploy add Supabase Auth Redirect URLs `https://app.<domain>/**`, `https://<domain>/**` and the one-box origin (cloud write — per-action
-approval); after deploy `get_advisors(security)`. At close: SEED-178/015/312 → shipped, BUG-261027-02 → closed only if G4-5a passes. No migration ships with 299.
+Phase 299 — **CLOSED 2026-10-29** (operator: "proceed until you finish this phase, do not ask"). UAT 18/20 PASS; owed by decision: G4-4b email-link leg
+(cloud — local Supabase auto-confirms), X-7 Moonshot (⛔ Kimi balance); G4-4c ⛔ SSO (D-41). Decisions 1-4 accepted; IN-01..05 deferred (re-open at the next phase on
+`item_org_guard.py` / link hooks). SEED-178/015/312 → shipped, BUG-261027-02 → closed. Before deploy add Supabase Auth Redirect URLs `https://app.<domain>/**`,
+`https://<domain>/**` and the one-box origin (cloud write — per-action approval); after deploy `get_advisors(security)`. No migration ships with 299.
 
 Owed for 298 (in order): run `298-HUMAN-UAT.md` rows as the two-org dev account (G4-1 first); acknowledge residuals
 AR-298-R1 (WR-06 `LIMIT 1`) and AR-298-R2 (WR-05 bind race) in `298-SECURITY.md`; then flip SEED-389/317 → shipped,
@@ -93,7 +92,7 @@ applied; `get_advisors(security)` 0 ERROR. Branch `develop`.
 - 294-ENV: remove the two dev-only lines from `backend/.env` (`DECISION_ENGINE_FAULT_BASE_URL` and its `ENVIRONMENT` partner).
 - 298: G-4 rows G4-1..7 + A-1 (`298-HUMAN-UAT.md`, sign in as `fhdmrd.dev@gmail.com`); mig 217 already in cloud (2026-10-28).
 - 300: 15 UAT rows (`300-HUMAN-UAT.md`, G4-5 first) + 3 copy approvals; mig 218 to cloud before its deploy.
-- 299: 6 UAT rows POSTPONED (G4-5a first; `299-HUMAN-UAT.md`) + decision 4 + G4-4c ⛔ SSO; Supabase Auth Redirect URLs before its deploy.
+- 299: CLOSED 2026-10-29; owed by decision G4-4b email-link leg (cloud) + X-7 Moonshot; Supabase Auth Redirect URLs before its deploy.
 - Optional: restore Supabase MCP `read_only=true` (the write-needing deploy is done).
 - Push tag `v4.7` when wanted (local only).
 - Carried from v4.6: Coolify rebuild confirmation + logged-in production smoke; 282 G4-4 / G4-6 / A1; 281 G-4 rows A, C, D.
