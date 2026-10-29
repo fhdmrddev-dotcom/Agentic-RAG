@@ -263,7 +263,7 @@ Plans:
 | 298. Lists Follow the Active Org | 5/5 | Executed — human_needed | 4/4 SC in code; security 34/34; review 1 BL + 9 WR → 9 fixed, WR-08 → 299; G-4 owed (G4-1 first); mig 217 in cloud; LIVE 2026-10-28 (prod b813d2711) |
 | 299. Links to the Thing Itself | 5/5 | Complete 2026-10-29 | 5/5 SC + 6/6 reqs; security 36/36; UAT 18/20 PASS; owed by decision: G4-4b email-link leg (cloud), X-7 Moonshot (⛔ balance); G4-4c ⛔ SSO; IN-01..05 deferred; Redirect URLs added; LIVE 2026-10-29 (prod 31416d335) |
 | 300. Told When a Run Waits (Backend and Mailer) | 5/5 | Executed — human_needed | 5/5 SC + 6/6 reqs in code; security 41/41 (UF-1 fixed); review 5 WR + 4 IN fixed; UAT 12/15 PASS (G4-8 + real-mail G4-1 owed — Resend deferred); LIVE 2026-10-29 (prod 31416d335); mig 218 in cloud |
-| 301. The Waiting-on-You Notice | 3/3 | Executed — human_needed | 3/3 SC in code (SC#1-3 verified); review 2 WR fixed; UAT driven: G4-1/2/3a-b/4 phone/5, XP 7/8 (Moonshot blocked), MT-1/PT-1/LM-1 PASS; owed: SC#4 operator sketch approval (first), G4-4 stopped-source + keyboard, real socket rejoin, live approval row, a clean count-gate run; mig 219 local only |
+| 301. The Waiting-on-You Notice | 3/3 | Executed — human_needed | 3/3 SC in code (SC#1-3 verified); review 2 WR fixed; UAT driven: G4-1/2/3a-b/4 phone/5, XP 7/8 (Moonshot blocked), MT-1/PT-1/LM-1 PASS; owed: SC#4 operator sketch approval (first), G4-4 stopped-source + keyboard, real socket rejoin, live approval row; count gate OK (quiet run); mig 219 local only |
 | 302. Close-Out and a True Register | 0/TBD | Not started | - |
 
 ---

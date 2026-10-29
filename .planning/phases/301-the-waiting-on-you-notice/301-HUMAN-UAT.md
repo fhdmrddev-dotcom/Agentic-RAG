@@ -42,7 +42,9 @@ result: blocked — BUG-261024-01 (Moonshot balance)
 
 ### 6. One clean vitest count-gate run at HEAD
 `GSD_VITEST_MAX_WORKERS=2 node scripts/vitest-count-gate.cjs` on a quiet machine → `count gate OK`.
-result: owed (3 loaded runs each had one red in a different provably-unmodified suite; base ran clean)
+result: PASS 2026-10-30 — quiet-machine run at HEAD 4274b7367: "count gate OK — 577/577 pinned files present,
+no per-file decrease, 0 failing." (The 3 earlier loaded runs each had one red in a different provably-unmodified
+suite while other agents were running; base ran clean.)
 
 ## Summary
 
