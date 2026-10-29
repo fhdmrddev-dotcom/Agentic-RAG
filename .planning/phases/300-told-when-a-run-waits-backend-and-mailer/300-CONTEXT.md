@@ -133,6 +133,40 @@ sign in → land on the run) needs Phase 299's sign-in return, whose UAT row **G
   markdown renderer already in the backend is reused if one exists; otherwise the smallest safe renderer
   (escape first, allow-list tags) — no new package unless research proves none exists.
 
+### Addendum after research (auto, 2026-10-29) — resolves 300-RESEARCH.md open questions
+- **D-25: Production has never sent an app email.** Measured read-only on prod 2026-10-29: `org_invitations`
+  has 0 rows and `audit_log` has 0 `invitation.send`/`invitation.resend` events. The first real send is this
+  phase's G-4 / deploy; there is no history to stay compatible with.
+- **D-26: A scheduled run that pauses for a person must not read "Finished" on its schedule row.**
+  `unattended_launch.py:357` records `completed` for a run that is waiting (research finding). The row
+  shows a waiting sentence ("Waiting on you — answer in the run") from the same D-15 vocabulary; the
+  recorded outcome distinguishes waiting from finished. In scope as part of D-15 (the row's words), not a
+  new capability.
+- **D-27: The delay knob is documented in `docs/OPERATOR.md`'s email section, with NO Step-3 seed row and
+  no migration filename** — a column-default setting is schema, not a seed (house rule from mig 214;
+  `check-deploy-drift.sh` counts any `NNN_name.sql` named in OPERATOR.md as a seed). This overrides D-07's
+  "Step-3 seed list" wording.
+- **D-28: SMTP host, port, username, password and TLS mode are env vars (`SMTP_*`)** — infrastructure
+  credentials, like `RESEND_API_KEY`; every Phase-157 parity artifact updated in the same commit.
+  The from-address/from-name/delay/redirect stay in Settings (D-08).
+- **D-29: 300 ships NO `GET /notifications` route.** `notifications` gets an owner-only SELECT policy so 301
+  can read it; the route and list are 301's (NOTE-01). ROADMAP's 301 "depends on GET /notifications"
+  line is satisfied by 301 itself.
+- **D-30: The dev guard keys on `ENVIRONMENT`.** Coolify must carry `ENVIRONMENT=production` or every cloud
+  email is redirected/suppressed — an operator deploy-checklist item, written into `docs/OPERATOR.md`.
+- **D-31: Resend body is rendered ONCE at first claim and stored on the outbox row**, so a retry resends the
+  identical payload under the same `Idempotency-Key` (Resend returns 409 on a changed body). Every request
+  sends a `User-Agent`. SMTP is at-most-once: a delivery stuck mid-send after a crash is marked `failed`,
+  never re-sent.
+- **D-32: D-24's renderer is `markdown-it-py` (`js-default` preset, `html=False`, `breaks=True`)**, already
+  in the built image transitively; declare it in `backend/requirements.txt`. The `commonmark` preset is
+  forbidden (passes `<script>`).
+- **D-33: FIX-05 is one helper** `resolve_owner_run_model(owner_id)` in `run_model_resolution.py`, called once
+  in `unattended_launch.launch_unattended_run`, recording model + provider at launch and in the first drive
+  ctx. `run_lifecycle.py` / `run_producer.py` are NOT touched.
+- **D-34: Re-point, never delete, `test_276_invite_email_brand.py`** — it passes today only by stubbing a
+  `resend` module that is not installed anywhere; it moves onto the REST provider.
+
 ### Claude's Discretion
 - Exact wording of the email body sentences, the Settings switch labels and the dependency-health line
   (words-first rule; no raw status words).
