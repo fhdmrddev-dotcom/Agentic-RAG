@@ -159,7 +159,10 @@ async def _world(*, opted_out: bool = False):
             leftover = await con.fetchval(
                 "SELECT (SELECT count(*) FROM auth.users WHERE id = $1)"
                 " + (SELECT count(*) FROM public.notifications WHERE recipient_id = $1)"
-                " + (SELECT count(*) FROM public.organizations WHERE id = ANY($2::uuid[]))",
+                " + (SELECT count(*) FROM public.organizations WHERE id = ANY($2::uuid[]))"
+                " + (SELECT count(*) FROM public.workflow_definitions WHERE created_by = $1)"
+                " + (SELECT count(*) FROM public.threads WHERE user_id = $1)"
+                " + (SELECT count(*) FROM public.workflow_runs WHERE user_id = $1)",
                 owner, created_orgs,
             )
         await pool.close()
@@ -260,7 +263,8 @@ async def test_a_retry_resends_the_frozen_payload_under_the_same_key():
         assert mid["status"] == "retry" and mid["attempts"] == 1 and mid["reason"] == "Resend is busy."
 
         # the frozen payload must survive even if the facts it was rendered from change
-        await w.pool.execute("UPDATE public.workflow_definitions SET name = 'Renamed' WHERE id = $1", w.definition)
+        # (a published definition is immutable, so the org's name is the fact that moves)
+        await w.pool.execute("UPDATE public.organizations SET name = 'Renamed Org' WHERE id = $1", w.org)
         await d.tick(now=NOW + timedelta(minutes=2))
 
         assert len(send.calls) == 2
