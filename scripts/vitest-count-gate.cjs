@@ -3569,7 +3569,11 @@ const BASELINE = {
   // took opposite answers, which is why the check is made per file and never inferred.
   "WorkflowBuilderPage.declaredInputs.test.tsx": 9,
   "StepIdentity.coverage.test.tsx": 23,
-  "WorkflowScheduleModal.test.tsx": 9,
+  "WorkflowScheduleModal.test.tsx": 29, // RAISED 9 -> 29 at 300-01 (D-15 / D-16 / D-26): +10 row-words / per-row Run now cases; the 9 was the 214 pin, never raised as 296-04 grew the file (the "one result line per modal" case RE-TARGETED to D-16, not dropped)
+  // ── Phase 300-01 (D-15 / D-26 / D-14 client half) — both knobs, same commit. scheduleOutcomeVocabulary
+  //    sits under the "src/components/workflows" directory entry (pin only); schedulesRefusal is FILE-LEVEL in TARGETS.
+  "scheduleOutcomeVocabulary.test.ts": 16, // 300-01 — every UI-SPEC S6a row (known tokens, server sentence prefix + full stop, neutral unknown token, null), zero-import leaf over ?raw
+  "schedulesRefusal.test.ts": 4, // 300-01 — {detail:{code,message,missing}} throws ScheduleRefusalError (an ApiError); string and array details keep today's ApiError
   "argumentModel.test.ts": 26,
   "argumentVocabulary.test.ts": 45, // 289-05: 44 -> 45 (the export-format exemption's own scope case)
   "describeServiceMatch.test.ts": 15,
@@ -6569,6 +6573,8 @@ const TARGETS = [
   // Phase 299-03 — FILE-LEVEL (no src/lib/__tests__, src/lib/api/__tests__ or src/components/layout/__tests__ directory entry), SAME commit as their pins.
   "src/lib/__tests__/clipboard.test.ts",
   "src/lib/api/__tests__/links.test.ts",
+  // Phase 300-01 — FILE-LEVEL (no src/lib/api/__tests__ directory entry), SAME commit as its pin.
+  "src/lib/api/__tests__/schedulesRefusal.test.ts",
   "src/components/layout/__tests__/CantBeOpened.test.tsx",
   "src/components/layout/__tests__/LinkGate.test.tsx",
   "src/components/layout/__tests__/SwitchOrgPrompt.test.tsx",

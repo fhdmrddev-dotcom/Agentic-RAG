@@ -43,10 +43,13 @@ describe("scheduleOutcomeLine — every row of UI-SPEC §S6a", () => {
     expect(scheduleOutcomeLine(status as string | null | undefined)).toBeNull()
   })
 
-  it("a known token never renders as itself", () => {
+  it("a token never renders as itself", () => {
     for (const [status] of CASES) {
       if (status.includes(" ")) continue
-      expect(scheduleOutcomeLine(status)?.text).not.toContain(status)
+      const text = scheduleOutcomeLine(status)?.text ?? ""
+      expect(text).not.toBe(status)
+      // a snake_case wire token never appears inside the sentence either
+      if (status.includes("_")) expect(text).not.toContain(status)
     }
   })
 

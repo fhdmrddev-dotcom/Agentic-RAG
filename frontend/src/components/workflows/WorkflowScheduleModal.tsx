@@ -55,6 +55,8 @@ import {
   requiredFieldsMessage,
   type DefShape,
 } from "@/components/workflows/soulData"
+// 300-01 (D-15 / D-26): the row's last outcome, in words. A zero-import leaf.
+import { scheduleOutcomeLine, type ScheduleOutcomeTone } from "@/components/workflows/scheduleOutcomeVocabulary"
 
 export interface WorkflowScheduleModalProps {
   /** The workflow being scheduled. `id` is its definition id; `name` is what the header says. */
@@ -133,6 +135,20 @@ function runNowResult(scheduleId: string, r: ScheduleTriggerResult): RunNowResul
   return { scheduleId, tone: outcome === "error" ? "error" : "warning", text }
 }
 
+/** 300-01 (D-15): the outcome line's tone, from the shipped Run now tones (muted is the row's). */
+const OUTCOME_TONE: Record<ScheduleOutcomeTone, string> = {
+  muted: "text-muted-foreground",
+  warning: RUN_NOW_TONE.warning,
+  error: RUN_NOW_TONE.error,
+}
+
+/** 300-01 (D-14): the schedule doors' structured blank-input refusal. Read by its CODE off the
+ *  thrown error (`ScheduleRefusalError` in `lib/api/schedules.ts`) rather than by importing the
+ *  class, so no suite that mocks `@/lib/api` has to carry a new name. Never by matching words. */
+function isMissingRequired(e: unknown): e is Error {
+  return e instanceof Error && (e as { code?: unknown }).code === "missing_required"
+}
+
 /** The cadence, in words. Reads the ROW, never a form value. */
 function cadenceText(s: WorkflowSchedule): string {
   if (s.cron_expression) return `${s.cron_expression} (${s.timezone})`
@@ -157,9 +173,15 @@ export function WorkflowScheduleModal({
   const [loadFailed, setLoadFailed] = useState(false)
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState<string | null>(null)
-  // 296-04 (BUG-261025-01): the row being started, and the one result line (per modal).
-  const [runningId, setRunningId] = useState<string | null>(null)
-  const [runResult, setRunResult] = useState<RunNowResult | null>(null)
+  // 300-01 (D-16): the rows being started, and each row's own result line (keyed by schedule
+  // id). Starting B never erases A's line; a line clears when its own row is pressed again, and
+  // the whole map goes with the dialog when it closes (unmount).
+  const [runningIds, setRunningIds] = useState<ReadonlySet<string>>(() => new Set())
+  const [runResults, setRunResults] = useState<Readonly<Record<string, RunNowResult>>>({})
+  // 300-01 (D-16): "Loading…" replaces the list only before any list has been shown; every later
+  // refresh keeps the list in place and marks the <ul> aria-busy instead.
+  const listShown = useRef(false)
+  const [refetching, setRefetching] = useState(false)
   // 296-04 (287-SCHED): the refusal for an empty required launch input, under the inputs.
   const [requiredRefusal, setRequiredRefusal] = useState<string | null>(null)
   const [schedulerEnabled, setSchedulerEnabled] = useState<boolean | null>(null)
@@ -183,13 +205,16 @@ export function WorkflowScheduleModal({
   const [inputValues, setInputValues] = useState<Record<string, string>>({})
 
   const refresh = useCallback(async () => {
-    setLoading(true)
+    const quiet = listShown.current
+    if (quiet) setRefetching(true)
+    else setLoading(true)
     try {
       const [rows, featuresPayload] = await Promise.all([
         listWorkflowSchedules(workflow.id),
         getEffectiveFeaturesPayload().catch(() => null),
       ])
       setSchedules(rows)
+      listShown.current = true
       if (featuresPayload && typeof featuresPayload.scheduler_process_enabled === "boolean") {
         setSchedulerEnabled(featuresPayload.scheduler_process_enabled)
       }
@@ -199,9 +224,12 @@ export function WorkflowScheduleModal({
       // ⚠ An empty list and a failed read are DIFFERENT CLAIMS, and only one of them is ours
       // to make. Without this flag the failure path renders "No schedules yet" — an
       // affirmative statement about the user's own data, made from evidence we do not have.
-      setLoadFailed(true)
+      // 300-01 (D-16): a failed QUIET refetch keeps the list already shown (the last answer
+      // the server gave) rather than swapping it for the failure line.
+      if (!quiet) setLoadFailed(true)
     } finally {
       setLoading(false)
+      setRefetching(false)
     }
   }, [workflow.id, onChanged])
 
@@ -247,7 +275,6 @@ export function WorkflowScheduleModal({
     if (busy) return
     setBusy(true)
     setError(null)
-    setRunResult(null)
     try {
       await work()
     } catch (e) {
@@ -290,17 +317,28 @@ export function WorkflowScheduleModal({
         ? { kickoff_prompt: kickoff.trim() }
         : {}
       for (const f of launchFields) inputs[f.key] = inputValues[f.key] ?? ""
-      await createWorkflowSchedule(workflow.id, {
-        name: name.trim(),
-        // ⚠ EXACTLY ONE cadence goes on the wire. Sending both is a 422 by design, and
-        // sending the unused one as `null` rather than omitting it keeps that explicit.
-        cron_expression: kind === "cron" ? cron.trim() : null,
-        interval_seconds: kind === "interval" ? intervalSeconds : null,
-        timezone,
-        max_tokens_per_run: maxTokens,
-        max_duration_seconds: maxDuration,
-        inputs,
-      })
+      try {
+        await createWorkflowSchedule(workflow.id, {
+          name: name.trim(),
+          // ⚠ EXACTLY ONE cadence goes on the wire. Sending both is a 422 by design, and
+          // sending the unused one as `null` rather than omitting it keeps that explicit.
+          cron_expression: kind === "cron" ? cron.trim() : null,
+          interval_seconds: kind === "interval" ? intervalSeconds : null,
+          timezone,
+          max_tokens_per_run: maxTokens,
+          max_duration_seconds: maxDuration,
+          inputs,
+        })
+      } catch (e) {
+        // 300-01 (D-14, UI-SPEC S6c): the server still refused a blank required input (the
+        // workflow gained one while the dialog was open). Its sentence goes in the SAME home
+        // as the client pre-check, under the inputs, never in the bottom error line.
+        if (isMissingRequired(e)) {
+          setRequiredRefusal(e.message)
+          return
+        }
+        throw e
+      }
       setName("")
       setKickoff("")
       setInputValues({})
@@ -308,9 +346,29 @@ export function WorkflowScheduleModal({
     })
   }
 
+  /** 300-01 (D-16): set or clear ONE row's result line, leaving every other row's alone. */
+  const setRowResult = (id: string, result: RunNowResult | null) =>
+    setRunResults((prev) => {
+      const next = { ...prev }
+      if (result) next[id] = result
+      else delete next[id]
+      return next
+    })
+
   const onToggle = (s: WorkflowSchedule) =>
     withBusy(async () => {
-      await updateSchedule(s.id, { is_active: !s.is_active })
+      setRowResult(s.id, null)
+      try {
+        await updateSchedule(s.id, { is_active: !s.is_active })
+      } catch (e) {
+        // 300-01 (D-14, UI-SPEC S6c): a Resume refused for a blank required input is a ROW
+        // action's answer, so it reads on that row, in the warning tone.
+        if (isMissingRequired(e)) {
+          setRowResult(s.id, { scheduleId: s.id, tone: "warning", text: e.message })
+          return
+        }
+        throw e
+      }
       await refresh()
     })
 
@@ -320,20 +378,35 @@ export function WorkflowScheduleModal({
       await refresh()
     })
 
-  const onRunNow = (s: WorkflowSchedule) =>
-    withBusy(async () => {
-      setRunningId(s.id)
-      try {
-        const result = await triggerSchedule(s.id)
-        // ⚠ `launched: false` is a real answer with a reason, not an error. Saying "failed"
-        // would hide the one fact that tells the person what to do next. 296-04: the line now
-        // sits on the pressed row, toned by `outcome`.
-        setRunResult(runNowResult(s.id, result))
-      } finally {
-        setRunningId(null)
-      }
-      await refresh()
-    })
+  // 300-01 (D-16): Run now no longer takes the global busy guard. Only the pressed row is busy
+  // (its Run now, Pause and Delete); every other row, the Add form and the close button stay
+  // usable, and the refresh after it keeps the list in place.
+  const onRunNow = async (s: WorkflowSchedule) => {
+    if (runningIds.has(s.id)) return
+    setRowResult(s.id, null)
+    setRunningIds((prev) => new Set(prev).add(s.id))
+    try {
+      const result = await triggerSchedule(s.id)
+      // ⚠ `launched: false` is a real answer with a reason, not an error. Saying "failed"
+      // would hide the one fact that tells the person what to do next. 296-04: the line
+      // sits on the pressed row, toned by `outcome`.
+      setRowResult(s.id, runNowResult(s.id, result))
+    } catch (e) {
+      // The server's own sentence, on the row that was pressed.
+      setRowResult(s.id, {
+        scheduleId: s.id,
+        tone: "error",
+        text: e instanceof Error ? e.message : "It did not start.",
+      })
+    } finally {
+      setRunningIds((prev) => {
+        const next = new Set(prev)
+        next.delete(s.id)
+        return next
+      })
+    }
+    await refresh()
+  }
 
   return (
     <div
@@ -393,10 +466,17 @@ export function WorkflowScheduleModal({
                 Nothing is scheduled yet.
               </p>
             ) : (
-              <ul className="flex flex-col gap-2" data-testid="schedule-list">
+              <ul
+                className="flex flex-col gap-2"
+                data-testid="schedule-list"
+                aria-busy={refetching ? "true" : undefined}
+              >
                 {schedules.map((s) => {
                   const next = whenText(s.next_run_at)
                   const last = whenText(s.last_run_at)
+                  const outcome = scheduleOutcomeLine(s.last_status)
+                  const runResult = runResults[s.id]
+                  const starting = runningIds.has(s.id)
                   return (
                     <li
                       key={s.id}
@@ -414,9 +494,18 @@ export function WorkflowScheduleModal({
                           <p className="truncate text-[12px] text-muted-foreground">Next: {next}</p>
                         ) : null}
                         {last ? (
-                          <p className="truncate text-[12px] text-muted-foreground">
-                            Last ran: {last}
-                            {s.last_status ? ` · ${s.last_status}` : ""}
+                          <p className="truncate text-[12px] text-muted-foreground">Last ran: {last}</p>
+                        ) : null}
+                        {/* 300-01 (D-15 / D-26, UI-SPEC S6a): the last outcome as ONE sentence,
+                            on its own line. It WRAPS, never truncates: a clipped refusal hides
+                            the input name, the one fact the author needs. The raw value never
+                            reaches the screen. */}
+                        {outcome ? (
+                          <p
+                            data-testid="schedule-last-outcome"
+                            className={`mt-1 text-[12px] break-words ${OUTCOME_TONE[outcome.tone]}`}
+                          >
+                            {outcome.text}
                           </p>
                         ) : null}
                         {!s.is_active ? (
@@ -424,7 +513,7 @@ export function WorkflowScheduleModal({
                         ) : null}
                         {/* 296-04 (BUG-261025-01): the Run now result, on THIS row, under Last ran.
                             Polite for a start or a refusal; an alert only for a genuine error. */}
-                        {runResult?.scheduleId === s.id ? (
+                        {runResult ? (
                           <p
                             data-testid="schedule-run-result"
                             role={runResult.tone === "error" ? "alert" : "status"}
@@ -439,13 +528,13 @@ export function WorkflowScheduleModal({
                         <button
                           type="button"
                           data-testid="schedule-run-now"
-                          disabled={busy}
-                          aria-busy={runningId === s.id ? true : undefined}
+                          disabled={busy || starting}
+                          aria-busy={starting ? true : undefined}
                           onClick={() => void onRunNow(s)}
                           title="Run now (this does not change the cadence)"
                           className="rounded-md p-1.5 text-muted-foreground transition-colors hover:text-foreground disabled:opacity-50"
                         >
-                          {runningId === s.id ? (
+                          {starting ? (
                             <>
                               <Loader2
                                 className="h-3.5 w-3.5 animate-spin motion-reduce:animate-none"
@@ -463,7 +552,7 @@ export function WorkflowScheduleModal({
                         <button
                           type="button"
                           data-testid="schedule-toggle"
-                          disabled={busy}
+                          disabled={busy || starting}
                           onClick={() => void onToggle(s)}
                           className="rounded-md border border-border px-2 py-1 text-[12px] text-foreground transition-colors hover:bg-muted disabled:opacity-50"
                         >
@@ -472,7 +561,7 @@ export function WorkflowScheduleModal({
                         <button
                           type="button"
                           data-testid="schedule-delete"
-                          disabled={busy}
+                          disabled={busy || starting}
                           onClick={() => void onRemove(s)}
                           className="rounded-md p-1.5 text-muted-foreground transition-colors hover:text-destructive disabled:opacity-50"
                         >

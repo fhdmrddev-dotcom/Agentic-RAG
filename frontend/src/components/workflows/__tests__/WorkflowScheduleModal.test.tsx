@@ -395,6 +395,10 @@ describe("WorkflowScheduleModal 300-01 — the row speaks words; Run now busies 
   async function openWith(rows: unknown[]) {
     vi.mocked(api.listWorkflowSchedules).mockResolvedValue(rows as never)
     render(<WorkflowScheduleModal workflow={dummyWorkflow} onClose={vi.fn()} />)
+    if (rows.length === 0) {
+      await screen.findByTestId("schedule-empty")
+      return []
+    }
     await waitFor(() => expect(screen.getAllByTestId("schedule-row")).toHaveLength(rows.length))
     return screen.getAllByTestId("schedule-row")
   }

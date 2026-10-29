@@ -8092,6 +8092,14 @@ Five sentences, not one; the headline names the author's step name and the missi
 
 296-04 (BUG-261025-01 / 295-IN-05 / 287-SCHED): three useState (`runningId`, `runResult`, `requiredRefusal`) replace one (`notice`); a pure `runNowResult` reads `outcome` (old backend: launched → success, else error tone) and the server `detail` verbatim; the result line renders inside the pressed row; Add schedule refuses through the imported `missingRequiredFields` / `requiredFieldsMessage` (296-07 owns `soulData.ts`). Triple `5 / 4 / 723` (was `3 / 3 / 601`). Previous CLAUDE.md cell kept verbatim: ⚠ absent for its entire life; it crossed the threshold in 214-09 on a. Previous scan-list cell kept verbatim: 3 / 3 / 601 | ⚠ **FIRES — EXACTLY AT THRESHOLD** | ⚠ absent for its entire life; it crossed the threshold in 214-09 on a LAUNCH-CRITICAL path — row and BASELINE pin both added at this close.
 
+### `frontend/src/components/workflows/WorkflowScheduleModal.tsx` — 300-01 (D-15, D-16, D-14 client half, D-26; 2026-10-29)
+
+**`6 / 5 / 812` (was `5 / 4 / 723`).** BUG-261027-03: the ` · ${s.last_status}` interpolation is gone — the row renders "Last ran: {when}" and, under it, `scheduleOutcomeLine(s.last_status)` as its own `mt-1 text-[12px] break-words` line toned from the shipped `RUN_NOW_TONE` (muted → `text-muted-foreground`). D-16: `runningId` / `runResult` became `runningIds` (a Set) and `runResults` (a map keyed by schedule id); Run now no longer goes through `withBusy` — only its row's Run now / Pause / Delete are disabled, the Add form and the close button stay usable, and a row's line clears only when that row is pressed again (or the dialog unmounts). `refresh` has a quiet mode: "Loading…" only before the first list is shown, `aria-busy` on the `<ul>` after; a failed quiet refetch keeps the shown list. D-14: a `missing_required` refusal (read by `code` off the thrown error, never by importing the class — no `@/lib/api` mock has to learn a name) goes to `schedule-required-refusal` from create and to that row's line (warning) from Resume. No new component, no new hook. ⚠ Extraction FIRST next: the row (`<li>` + its three buttons + three lines) is the seam.
+
+Scan-list cell as of 2026-10-29 (replaced by 300-01, moved verbatim): 5 / 4 / 723 (was `3 / 3 / 601`) | ⚠ **FIRES** | 296-04: Run now spins on its row (aria-busy, Starting…) and its worded result sits under Last ran; Add schedule refuses an empty required input by name. Bottom notice removed
+
+CLAUDE.md verdict cell as of 2026-10-29 (replaced by 300-01, moved verbatim): | `frontend/src/components/workflows/WorkflowScheduleModal.tsx` | 5 / 4 / 723 (was `3 / 3 / 601`) | 296-04: row-local Run now result + required refusal |
+
 ### `frontend/src/components/workflows/argumentModel.ts`
 
 **Triple at Phase 214's close (2026-08-28): `1 / 1 / 313` — G-5: no (1 phase).** young (214-07) — the three argument sources as data
@@ -11671,7 +11679,7 @@ cells rot within days.
 | [`backend/app/api/settings.py`](docs/HOT-FILE-LEDGER.md#backendappapisettingspy) | 47 / 25 / 1301 (was `46 / 24 / 1250`) | ⚠ **FIRES** | 292.1-02: two bounded writes (2..50) via _range_refusal_detail + allow-list +2 (+51 −0). ⛔ never a retyped id list; GET never echoes a key · 293 touch: see §Phase 293 close |
 | [`backend/app/services/multimodal_service.py`](docs/HOT-FILE-LEDGER.md#backendappservicesmultimodal_servicepy) | 14 / 7 / 984 | ⚠ **FIRES** | ⚠ absent from BOTH for its ENTIRE LIFE at **7 phases** — row added SEED-227, which is also where its silent truncation was found |
 | [`backend/app/api/documents.py`](docs/HOT-FILE-LEDGER.md#backendappapidocumentspy) | 101 / 40 / 2709 (was `99 / 39 / 2698`) | ⚠ **FIRES** | 298-01: list_documents one `org_lists.by_org` in build() (every read, D-32); upload one `org_id=root_upload_org(...)` on the ONE minter call. Honoured by construction. ⛔ see section |
-| [`scripts/vitest-count-gate.cjs`](docs/HOT-FILE-LEDGER.md#scriptsvitest-count-gatecjs) | 380 / 81 / 6808 (was `379 / 81 / 6808`) | ⚠ **FIRES** | 298-review: 4 BASELINE pins raised, none lowered — OrgAuditTab 16→19, LibraryPage.orgSwitch 5→7, useThreads.orgSwitch 4→5, MoveToOrgSheet 22→23 |
+| [`scripts/vitest-count-gate.cjs`](docs/HOT-FILE-LEDGER.md#scriptsvitest-count-gatecjs) | 395 / 83 / 6865 (was `380 / 81 / 6808`) | ⚠ **FIRES** | 300-01: 2 BASELINE pins added (scheduleOutcomeVocabulary 16, schedulesRefusal 4 + its FILE-LEVEL TARGET), WorkflowScheduleModal 9→29 raised, none lowered |
 | [`scripts/check-deploy-drift.sh`](docs/HOT-FILE-LEDGER.md#scriptscheck-deploy-driftsh) | 5 / 4 / 267 | ⚠ **FIRES** | ⚠ absent its ENTIRE LIFE — row added 294-05. 294-01: DECISION_ENGINE_FAULT_BASE_URL registered as intentionally omitted (+2) |
 | [`scripts/build-public-openapi.cjs`](docs/HOT-FILE-LEDGER.md#scriptsbuild-public-openapicjs) | 11 / 5 / 472 (was `7 / 3 / 468`) | ⚠ **FIRES** | 298-01: `org-items` in the Account & org TAG_GROUPS entry + `/org-items/` in FLAGGED_PREFIXES (UI-internal). Two tokens. ⚠ prior row stale (`7 / 3 / 468` vs measured `10 / 4 / 468` pre-298). |
 | [`scripts/check-seeds-register.cjs`](docs/HOT-FILE-LEDGER.md#scriptscheck-seeds-registercjs) | 7 / 3 / 1132 | ⚠ **FIRES** | ⚠ absent its ENTIRE LIFE — row added 296-05, now FIRES (251 / 293 / 296). 296-05: three `\d{3}` → `\d{3,}` (293-IN-07). ⛔ the STATUS_ENUM triple |
@@ -11785,7 +11793,7 @@ cells rot within days.
 | [`frontend/src/components/workflows/DeclaredInputsEditor.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentsworkflowsdeclaredinputseditortsx) | 1 / 1 / 333 | no (1 phase) | young (214.1-01) — the authoring surface `BUG-260828-02` says did not exist. ⚠ G-2 OVERRIDDEN, not satisfied |
 | [`frontend/src/components/workflows/PublishRefusalList.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentsworkflowspublishrefusallisttsx) | 2 / 1 / 178 | no (1 phase) | young (214-10) — the refusal renders as a CAUSE, not a status |
 | [`frontend/src/components/workflows/StepIdentity.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentsworkflowsstepidentitytsx) | 1 / 1 / 161 | no (1 phase) | young (214-08) — ONE element, four sizes, both names as props; it resolves nothing |
-| [`frontend/src/components/workflows/WorkflowScheduleModal.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentsworkflowsworkflowschedulemodaltsx) | 5 / 4 / 723 (was `3 / 3 / 601`) | ⚠ **FIRES** | 296-04: Run now spins on its row (aria-busy, Starting…) and its worded result sits under Last ran; Add schedule refuses an empty required input by name. Bottom notice removed |
+| [`frontend/src/components/workflows/WorkflowScheduleModal.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentsworkflowsworkflowschedulemodaltsx) | 6 / 5 / 812 (was `5 / 4 / 723`) | ⚠ **FIRES** | 300-01: outcome sentence line (scheduleOutcomeLine), per-row Run now (runningIds + runResults map, no global busy), quiet refresh. No new component or hook. Extraction FIRST next |
 | [`frontend/src/types/schedule.ts`](docs/HOT-FILE-LEDGER.md#frontendsrctypesschedulets) | 2 / 2 / 77 | no (2 phases) | row added 296-04: one optional `outcome` on `ScheduleTriggerResult` (the 296-02 trigger contract). Types only; does not fire |
 | [`frontend/src/components/workflows/argumentModel.ts`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentsworkflowsargumentmodelts) | 1 / 1 / 313 | no (1 phase) | young (214-07) — the three argument sources as data |
 | [`frontend/src/components/workflows/argumentVocabulary.ts`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentsworkflowsargumentvocabularyts) | 1 / 1 / 254 | no (1 phase) | young (214-07) — every sentence the argument form says |
@@ -12251,11 +12259,11 @@ cells rot within days.
 | [`frontend/src/components/admin/HealthSignals.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentsadminhealthsignalstsx) | 5 / 4 / 316 | ⚠ **FIRES** | Added AT PLANNING 300: absent at 4 phases. 300-04: one Email tile (D-12, UI-D13). ⛔ pure leaf; Off / Held back / Test mode never red |
 | [`frontend/src/components/org/InvitationsTab.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentsorginvitationstabtsx) | 3 / 2 / 290 | no (reaches 3 in 300) | Added AT PLANNING 300. 300-05: Email not sent chip + resend failure line (D-11). ⛔ server truth on re-fetch, no optimistic flip |
 | [`frontend/src/components/org/InviteMemberDialog.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentsorginvitememberdialogtsx) | 3 / 2 / 281 | no (reaches 3 in 300) | Added AT PLANNING 300. 300-05: three result arms (UI-D12). ⛔ never names the provider or an error code; Copy link focused on the failed arm |
-| [`frontend/src/lib/api/schedules.ts`](docs/HOT-FILE-LEDGER.md#frontendsrclibapischedulests) | 2 / 2 / 129 | no (reaches 3 in 300) | Added AT PLANNING 300. 300-01: reads the structured missing_required refusal (D-14). ⛔ server sentences only; a code routes the line, never words |
+| [`frontend/src/lib/api/schedules.ts`](docs/HOT-FILE-LEDGER.md#frontendsrclibapischedulests) | 3 / 3 / 166 (was `2 / 2 / 129`) | ⚠ **FIRES** | 300-01: ScheduleRefusalError (an ApiError) for {detail:{code,message,missing}}; string + array arms unchanged. ⛔ not re-exported via lib/api.ts |
 | [`backend/app/db/notifications.py`](docs/HOT-FILE-LEDGER.md#backendappdbnotificationspy) | 0 / 0 / 0 | no (planned 300-04) | young (planned 300-04). Outbox claim (SKIP LOCKED), still-waiting, opt-out, outcome (D-12, D-13, D-20). ⛔ never selects prompt text; state flip inside the claim txn |
 | [`backend/app/services/notification_drainer.py`](docs/HOT-FILE-LEDGER.md#backendappservicesnotificationdrainerpy) | 0 / 0 / 0 | no (planned 300-04) | young (planned 300-04). Per-worker outbox drainer, SchedulerService shape (D-20). ⛔ send outside the claim txn; at most 3 attempts; SMTP at-most-once |
 | [`backend/app/services/run_waiting_email.py`](docs/HOT-FILE-LEDGER.md#backendappservicesrunwaitingemailpy) | 0 / 0 / 0 | no (planned 300-03) | young (planned 300-03). Pure run-waiting renderer + duration words (NOTE-03, D-02..D-06). ⛔ never accepts prompt text; subject control chars stripped |
-| [`frontend/src/components/workflows/scheduleOutcomeVocabulary.ts`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentsworkflowsscheduleoutcomevocabularyts) | 0 / 0 / 0 | no (planned 300-01) | young (planned 300-01). last_status → one sentence (D-15, D-26). ⛔ zero-import leaf; no raw status token reaches the screen |
+| [`frontend/src/components/workflows/scheduleOutcomeVocabulary.ts`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentsworkflowsscheduleoutcomevocabularyts) | 1 / 1 / 67 | no (young) | young (created 300-01). last_status → one sentence (D-15, D-26). ⛔ zero-import leaf; no raw status token reaches the screen |
 | [`frontend/src/components/settings/EmailSettings.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentssettingsemailsettingstsx) | 0 / 0 / 0 | no (planned 300-05) | young (planned 300-05). Operator Email card, ApiKeyLimits shape (D-07, D-08, D-10). ⛔ changes()/adopt() handle, no own Save; never sends a cleared delay |
 | [`frontend/src/components/settings/EmailNotificationPreference.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentssettingsemailnotificationpreferencetsx) | 0 / 0 / 0 | no (planned 300-05) | young (planned 300-05). Member switch (D-09). ⛔ calls only ungated /me/preferences; never shows On before the read answers |
 | [`frontend/src/components/org/inviteDeliveryCopy.ts`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentsorginvitedeliverycopyts) | 0 / 0 / 0 | no (planned 300-05) | young (planned 300-05). Invite delivery sentences (D-11, UI-D12). ⛔ zero-import leaf; D-11 sentence verbatim |
@@ -26938,6 +26946,14 @@ Scan-list cell as of 2026-10-28 (replaced by 298-review, moved verbatim): 379 / 
 
 CLAUDE.md verdict cell as of 2026-10-28 (replaced by 298-review, moved verbatim): | `scripts/vitest-count-gate.cjs` | 379 / 81 / 6808 (was `378 / 81 / 6806`) | 298-05: moveMounts (12) pinned; useFolders 17→18, useLibraryDocuments 28→30 |
 
+### `scripts/vitest-count-gate.cjs` — 300-01 (2026-10-29)
+
+**`395 / 83 / 6865` (was `380 / 81 / 6808`; the 299 commits between were not re-derived here, so the `was` is the last recorded cell).** 300-01: two BASELINE pins ADDED beside the `WorkflowScheduleModal.test.tsx` entry — `scheduleOutcomeVocabulary.test.ts` 16 (pin only; the `src/components/workflows` directory TARGET runs it) and `schedulesRefusal.test.ts` 4 (plus a FILE-LEVEL TARGET beside `links.test.ts`, no `src/lib/api/__tests__` directory entry) — and ONE raised: `WorkflowScheduleModal.test.tsx` 9 → 29 (the 9 was the 214 pin, never raised as 296-04 grew the file; its "one result line per modal" case was RE-TARGETED to D-16, not dropped). None lowered. Placed mid-table rather than at the tail so the parallel 300-02 append cannot collide.
+
+Scan-list cell as of 2026-10-29 (replaced by 300-01, moved verbatim): 380 / 81 / 6808 (was `379 / 81 / 6808`) | ⚠ **FIRES** | 298-review: 4 BASELINE pins raised, none lowered — OrgAuditTab 16→19, LibraryPage.orgSwitch 5→7, useThreads.orgSwitch 4→5, MoveToOrgSheet 22→23
+
+CLAUDE.md verdict cell as of 2026-10-29 (replaced by 300-01, moved verbatim): | `scripts/vitest-count-gate.cjs` | 380 / 81 / 6808 (was `379 / 81 / 6808`) | 298-review: 4 pins raised (OrgAuditTab, LibraryPage/useThreads orgSwitch, sheet) |
+
 ### `backend/app/services/org_move.py` — 298-review (2026-10-28)
 
 **`5 / 1 / 1137` (was `1 / 1 / 986`).** 298-review: CR-01 `_mixed_org_refusals` (a subfolder/document stamped in another org refuses; collision/same-name joins exclude the moving set); WR-04 `_ancestor_refusals` (org-shared, chat, workflow, Expert on an ancestor; watch arm refuted); WR-05 docstring names the residual window (live `test_wr05_*`).
@@ -27494,6 +27510,14 @@ CLAUDE.md verdict cell: none before 300-01 (the file did not fire); row added by
 
 **Added AT PLANNING (Phase 300, 2026-10-29) at `2 / 2 / 129`** — measured, never copied. Added AT PLANNING 300. 300-01: reads the structured missing_required refusal (D-14). ⛔ server sentences only; a code routes the line, never words
 
+#### 300-01 (D-14, 2026-10-29)
+
+**`3 / 3 / 166` (was `2 / 2 / 129`) — crosses into G-5 at this commit.** `export class ScheduleRefusalError extends ApiError { code; missing }`; a private `scheduleFailure(res)` builds it when `readScheduleFailure` returns the new object arm (`detail` an object with string `code` + `message`), else today's `ApiError`. The string-detail and array-detail arms are byte-identical, the entitlement arm still runs first, and the three throwing sites are one call each. ⛔ NOT re-exported through `lib/api.ts` (the 196-08 mock-factory measurement); the modal reads `code` off the error.
+
+Scan-list cell as of 2026-10-29 (replaced by 300-01, moved verbatim): 2 / 2 / 129 | no (reaches 3 in 300) | Added AT PLANNING 300. 300-01: reads the structured missing_required refusal (D-14). ⛔ server sentences only; a code routes the line, never words
+
+CLAUDE.md verdict cell: none before 300-01 (the file did not fire); row added by 300-01.
+
 ### `backend/app/db/notifications.py`
 
 **Added AT PLANNING (Phase 300, 2026-10-29) with `0 / 0 / 0`** — the file does not exist yet; plan `300-04` creates it and re-derives the triple in its creating commit. young (planned 300-04). Outbox claim (SKIP LOCKED), still-waiting, opt-out, outcome (D-12, D-13, D-20). ⛔ never selects prompt text; state flip inside the claim txn
@@ -27509,6 +27533,12 @@ CLAUDE.md verdict cell: none before 300-01 (the file did not fire); row added by
 ### `frontend/src/components/workflows/scheduleOutcomeVocabulary.ts`
 
 **Added AT PLANNING (Phase 300, 2026-10-29) with `0 / 0 / 0`** — the file does not exist yet; plan `300-01` creates it and re-derives the triple in its creating commit. young (planned 300-01). last_status → one sentence (D-15, D-26). ⛔ zero-import leaf; no raw status token reaches the screen
+
+#### 300-01 — created (2026-10-29)
+
+**`1 / 1 / 67`** in its creating commit. `scheduleOutcomeLine(lastStatus) -> {text, tone} | null`: six known tokens (UI-SPEC §S6a + Claude's-discretion words for `cancelled` and `cadence_error`, recorded in the docblock), a value containing a space reads "Didn't run — {sentence}" with a full stop added when missing, any other token reads the neutral sentence, absent reads `null`. Zero imports, asserted over its `?raw` text with a positive control.
+
+Scan-list cell as of 2026-10-29 (replaced by 300-01, moved verbatim): 0 / 0 / 0 | no (planned 300-01) | young (planned 300-01). last_status → one sentence (D-15, D-26). ⛔ zero-import leaf; no raw status token reaches the screen
 
 ### `frontend/src/components/settings/EmailSettings.tsx`
 
