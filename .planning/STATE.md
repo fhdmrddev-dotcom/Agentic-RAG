@@ -3,8 +3,8 @@ gsd_state_version: 1.0
 milestone: v4.8
 milestone_name: Every Page Has a Link
 status: executing
-last_updated: "2026-10-29T20:29:47.157Z"
-last_activity: 2026-10-29 -- Phase 301 planning complete
+last_updated: "2026-10-29T20:30:34.542Z"
+last_activity: 2026-10-29 -- Phase 301 execution started
 progress:
   total_phases: 13
   completed_phases: 4
@@ -30,7 +30,7 @@ See: `.planning/PROJECT.md` (updated 2026-10-27)
 
 **Core value:** The agent acts as an AI colleague — it knows your knowledge base, can run code, and
 can be taught new behaviours (skills) that persist and can be shared.
-**Current focus:** Phase 300 — told when a run waits (UAT 12/15 PASS locally 2026-10-29; owed: G4-8 + real-mail G4-1 after deploy). **LIVE 2026-10-29 (prod `31416d335`)**; mig 218 in cloud (verify PASS, advisors 0 ERROR; new INFO = outbox RLS-no-policy, by design D-19). Phase 299 CLOSED 2026-10-29 (UAT 18/20; 2 rows owed by decision).
+**Current focus:** Phase 301 — The Waiting-on-You Notice
 
 ---
 
@@ -43,10 +43,10 @@ reviewer exists, so a phase closes `verification_mode: self-verified`, never `re
 
 ## Current Position
 
-Phase: 300
-Plan: 5 of 5
-Status: Ready to execute
-Last activity: 2026-10-29 -- Phase 301 planning complete
+Phase: 301 (The Waiting-on-You Notice) — EXECUTING
+Plan: 1 of 3
+Status: Executing Phase 301
+Last activity: 2026-10-29 -- Phase 301 execution started
 
 Owed for 300 (in order): run `300-HUMAN-UAT.md` (G4-5 first; FIX-05 roster must be re-run after IN-03; G4-6 only after 299 G4-4a); approve 3 fixer-written strings (WR-05, IN-01, IN-04). Before deploy: paste mig 218 into cloud SQL editor (per-action approval) → `get_advisors(security)`; ⏸ Resend DEFERRED by operator 2026-10-29 — deploy without a mail provider (deliveries `suppressed`, invites → Copy link); when revived: Coolify EMAIL_PROVIDER / RESEND_API_KEY / ENVIRONMENT=production; Resend sender + SPF/DKIM/DMARC. At close: REQUIREMENTS NOTE-02/03/04/06 + FIX-04/05 → done; BUG-261027-03/04/05 + BUG-260828-05/06 → closed when their rows pass.
 
