@@ -225,3 +225,27 @@ def test_a_bad_sender_name_is_refused_with_its_label(saved, bad):
 def test_a_sixty_character_name_is_accepted(saved):
     _put(email_from_name="x" * 60)
     assert saved["updates"]["email_from_name"] == "x" * 60
+
+
+# ── the client's duration-words twin is pinned to the server's (D-07, UI-D7) ─────────────────
+
+_FRONTEND_CASES = (
+    Path(__file__).resolve().parents[3]
+    / "frontend" / "src" / "components" / "settings" / "__tests__" / "EmailSettings.test.tsx"
+)
+
+
+def test_the_shared_duration_case_list_agrees_with_duration_words():
+    """``EmailSettings.test.tsx`` drives the card's live hint through ``DURATION_CASES``; this reads
+    the SAME literal and checks every case against the server's one home of the words. A client
+    table that drifted from ``duration_words`` reds one side or the other."""
+    import re
+
+    from app.services.run_waiting_email import duration_words
+
+    source = _FRONTEND_CASES.read_text(encoding="utf-8")
+    block = source.split("// DURATION_CASES_START", 1)[1].split("// DURATION_CASES_END", 1)[0]
+    cases = [(int(s), w) for s, w in re.findall(r"\[\s*(\d+)\s*,\s*\"([^\"]+)\"\s*\]", block)]
+    assert len(cases) >= 6, cases
+    for seconds, words in cases:
+        assert duration_words(seconds) == words, (seconds, words)
