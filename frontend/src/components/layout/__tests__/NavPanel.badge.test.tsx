@@ -270,6 +270,48 @@ describe("NavPanel badge — the popover names what is broken and opens Health",
     expect(onOpenLibraryHealth).toHaveBeenCalledTimes(1)
   })
 
+  // Phase 301-02 (D-12): a waiting run is NOT a Library condition. Given one library and two
+  // waiting rows, the Library badge reads 1 and its popover lists exactly the library row.
+  it("counts and lists ONLY library conditions — waiting rows never reach the Library badge (D-12)", async () => {
+    const user = userEvent.setup()
+    const waitingRow = (i: number): AttentionCondition => ({
+      mark: "waiting",
+      id: `n-${i}`,
+      title: `Waiting workflow ${i}`,
+      detail: "",
+      onOpen: vi.fn(),
+      runId: `run-${i}`,
+      orgId: "org-a",
+      orgName: "Acme",
+      since: "2026-10-30T09:00:00Z",
+      kind: "question",
+      origin: "app",
+      total: 2,
+    })
+    renderRail({
+      attentionConditions: [...conditions(1), waitingRow(1), waitingRow(2)],
+      onOpenLibraryHealth: vi.fn(),
+    })
+    expect(screen.getByTestId("rail-badge")).toHaveTextContent(/^1$/)
+    await user.click(screen.getByRole("button", { name: COPY.badgeTitle(1) }))
+    await screen.findByTestId("rail-popover")
+    expect(screen.getAllByTestId("rail-pop-item")).toHaveLength(1)
+    expect(screen.getByText("Rate sheets 1")).toBeInTheDocument()
+    expect(screen.queryByText("Waiting workflow 1")).toBeNull()
+    expect(screen.getAllByRole("button", { name: COPY.popOpenHealth })).toHaveLength(1)
+  })
+
+  it("a waiting-only world renders no Library badge at all", () => {
+    renderRail({
+      attentionConditions: [{
+        mark: "waiting", id: "n-1", title: "W", detail: "", onOpen: vi.fn(), runId: "run-1",
+        orgId: "org-a", orgName: "Acme", since: "2026-10-30T09:00:00Z", kind: "approval", total: 1,
+      }],
+      onOpenLibraryHealth: vi.fn(),
+    })
+    expect(screen.queryByTestId("rail-badge")).toBeNull()
+  })
+
   it("opening the popover navigates nowhere — only the action does", async () => {
     const user = userEvent.setup()
     const onNavigate = vi.fn()
