@@ -35,6 +35,8 @@ import { MessageSquare, FileText } from "lucide-react"
 import type { NavItem } from "@/lib/nav-items"
 
 const { mockGetSourceHealth } = vi.hoisted(() => ({ mockGetSourceHealth: vi.fn() }))
+// 301 WR-01: every Realtime status the channel double hands the hook, in order.
+const realtime = vi.hoisted(() => ({ delivered: [] as string[] }))
 
 // ⛔ `@/lib/api/sources` IS NOT IN THE `@/lib/api` BARREL (235-RESEARCH P-10): a
 // `vi.mock("@/lib/api", …)` alone NEVER intercepts it, and this suite's whole subject is how
@@ -108,14 +110,26 @@ vi.mock("@/lib/supabase", () => ({
     // Phase 301-02 (F11): `useWaitingNotices` now runs inside every ChatLayout mount and opens a
     // user-scoped channel. `vi.fn()` alone returned `undefined` (the hook survives that too), but
     // a real-shaped channel — a chainable `on` and a `subscribe` — is what the shell meets in the
-    // product, so the double carries one. `subscribe` never fires its status callback here.
+    // product, so the double carries one.
+    // ⚠ 301 WR-01: `subscribe` DOES report "SUBSCRIBED" on a microtask, as a real join does. The
+    // earlier double never fired its status callback, so the D-14 "exactly once on mount" count
+    // below could not see the SUBSCRIBED refetch the product makes — a fence blind to the trigger
+    // it was meant to count. `realtime.delivered` records each status handed over (non-vacuity).
     channel: vi.fn(() => {
       const ch: { on: ReturnType<typeof vi.fn>; subscribe: ReturnType<typeof vi.fn> } = {
         on: vi.fn(),
         subscribe: vi.fn(),
       }
       ch.on.mockReturnValue(ch)
-      ch.subscribe.mockReturnValue(ch)
+      ch.subscribe.mockImplementation((cb?: (status: string) => void) => {
+        if (typeof cb === "function") {
+          queueMicrotask(() => {
+            realtime.delivered.push("SUBSCRIBED")
+            cb("SUBSCRIBED")
+          })
+        }
+        return ch
+      })
       return ch
     }),
     removeChannel: vi.fn(),
@@ -143,6 +157,7 @@ vi.mock("@/pages/SkillsPage", () => ({
 }))
 
 import { ChatLayout } from "../ChatLayout"
+import { REFETCH_COALESCE_MS } from "@/hooks/useWaitingNotices"
 import { StreamsProvider } from "@/providers/StreamsProvider"
 import { TooltipProvider } from "@/components/ui/tooltip"
 
@@ -215,6 +230,7 @@ function renderLayout(
 
 beforeEach(() => {
   vi.clearAllMocks()
+  realtime.delivered.length = 0
   mockGetSourceHealth.mockResolvedValue(TWO_STOPPED)
   mockGetWaitingNotices.mockResolvedValue({ notices: [], total: 0 })
 })
@@ -363,6 +379,13 @@ describe("301-02 — the mark partition in the shell", () => {
     mockGetWaitingNotices.mockResolvedValue(TWO_WAITING)
     renderLayout()
     await screen.findByTestId("rail-badge")
+    // The waiting answer has LANDED (only a settled total of 2 renders this pill)…
+    expect(await screen.findByTestId("rail-waiting-badge")).toHaveTextContent(/^2$/)
+    // …and the channel really did report SUBSCRIBED, so the count below measures the trigger the
+    // product fires rather than a double that never fires it (301 WR-01).
+    expect(realtime.delivered).toContain("SUBSCRIBED")
+    // Let any trailing coalesce window close before counting.
+    await new Promise((r) => setTimeout(r, REFETCH_COALESCE_MS + 100))
     expect(mockGetSourceHealth).toHaveBeenCalledTimes(1)
     expect(mockGetWaitingNotices).toHaveBeenCalledTimes(1)
   })

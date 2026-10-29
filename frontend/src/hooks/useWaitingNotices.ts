@@ -14,6 +14,10 @@
  * socket), window focus, the tab becoming visible, an active-org or membership change, and the
  * 60 s poll (D-17).
  *
+ * 301 WR-01: those triggers arrive in bursts, so each one only REQUESTS a fetch. Requests
+ * inside one short window become one GET, and a request that lands while a GET is already out
+ * owes exactly one follow-up after it (never an abort-and-refire).
+ *
  * ── ⛔ HAS A VERDICT EVER ARRIVED? (`verdictKnown`, the T-235-39 shape) ─────────────────
  *
  * After a rejected FIRST fetch `loading` is false and `notices` is `[]` — identical to the server
@@ -50,6 +54,16 @@ import { useOrgOptional } from "@/providers/OrgProvider"
 /** D-17: within the 30-120 s band. Realtime makes the usual case immediate; this is the floor. */
 const POLL_MS = 60_000
 
+/**
+ * 301 WR-01: how long a freshness trigger waits for its siblings before it asks. The triggers
+ * arrive in bursts — mount with the channel's first SUBSCRIBED, a tab return's visibilitychange
+ * with its focus — and each used to abort the previous request and start a new one. The abort is
+ * client-side only, so the server still ran the auth round trip and the query for every one of
+ * them. A trailing window counted from the FIRST trigger (never reset, so a stream of triggers
+ * cannot starve the ask) folds a burst into one GET.
+ */
+export const REFETCH_COALESCE_MS = 250
+
 export interface WaitingNoticesState {
   /** The server's rows, verbatim. Possibly capped — see `total`. */
   notices: WaitingNotice[]
@@ -74,12 +88,30 @@ export function useWaitingNotices(): WaitingNoticesState {
 
   const inFlight = useRef<AbortController | null>(null)
   const answered = useRef(false)
+  // 301 WR-01: the coalescer's state. `pendingTimer` is the open window; `followUp` records a
+  // trigger that arrived while a request was already out, so ONE more ask goes after it lands.
+  const pendingTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
+  const followUp = useRef(false)
 
-  const refresh = useCallback(() => {
+  // Ask now. A request started here covers every trigger before it, so it also closes any open
+  // window and clears any owed follow-up.
+  const start = useCallback(function start() {
+    if (pendingTimer.current !== null) {
+      clearTimeout(pendingTimer.current)
+      pendingTimer.current = null
+    }
+    followUp.current = false
     // The newest ask wins: whatever is still open is abandoned rather than raced.
     inFlight.current?.abort()
     const controller = new AbortController()
     inFlight.current = controller
+
+    const settled = () => {
+      inFlight.current = null
+      // A trigger landed while this request was out: its answer may predate that trigger, so ask
+      // once more. Never lost, never more than one.
+      if (followUp.current) start()
+    }
 
     getWaitingNotices(controller.signal)
       .then((next) => {
@@ -88,6 +120,7 @@ export function useWaitingNotices(): WaitingNoticesState {
         setVerdict(next)
         setLoading(false)
         setFailedSinceLast(false)
+        settled()
       })
       .catch(() => {
         // An abort is not a failure — the replacement fetch owns the outcome.
@@ -95,8 +128,25 @@ export function useWaitingNotices(): WaitingNoticesState {
         // A real failure keeps the previous answer; it is only "stale" if there was one.
         setLoading(false)
         if (answered.current) setFailedSinceLast(true)
+        settled()
       })
   }, [])
+
+  // Every freshness trigger comes through here (D-17): open a window if none is open; when it
+  // closes, ask — or, if a request is already out, owe exactly one follow-up instead of aborting it.
+  const request = useCallback(() => {
+    if (pendingTimer.current !== null) return
+    pendingTimer.current = setTimeout(() => {
+      pendingTimer.current = null
+      if (inFlight.current) followUp.current = true
+      else start()
+    }, REFETCH_COALESCE_MS)
+  }, [start])
+
+  // The public verb keeps its contract: re-fetch now, aborting whatever is in flight.
+  const refresh = useCallback(() => {
+    start()
+  }, [start])
 
   // The refetch keys (D-17 / F17): the active org, and the SET of orgs the person belongs to.
   const activeOrgId = useActiveOrgId()
@@ -104,26 +154,29 @@ export function useWaitingNotices(): WaitingNoticesState {
   const membershipKey = (orgs ?? []).map((o) => o.org_id).sort().join(",")
 
   useEffect(() => {
-    refresh()
-  }, [refresh, activeOrgId, membershipKey])
+    request()
+  }, [request, activeOrgId, membershipKey])
 
   useEffect(() => {
     return () => {
+      if (pendingTimer.current !== null) clearTimeout(pendingTimer.current)
+      pendingTimer.current = null
+      followUp.current = false
       inFlight.current?.abort()
     }
   }, [])
 
   useEffect(() => {
-    const id = setInterval(refresh, POLL_MS)
+    const id = setInterval(request, POLL_MS)
     return () => {
       clearInterval(id)
     }
-  }, [refresh])
+  }, [request])
 
   useEffect(() => {
-    const onFocus = () => refresh()
+    const onFocus = () => request()
     const onVisibility = () => {
-      if (document.visibilityState === "visible") refresh()
+      if (document.visibilityState === "visible") request()
     }
     window.addEventListener("focus", onFocus)
     document.addEventListener("visibilitychange", onVisibility)
@@ -131,10 +184,10 @@ export function useWaitingNotices(): WaitingNoticesState {
       window.removeEventListener("focus", onFocus)
       document.removeEventListener("visibilitychange", onVisibility)
     }
-  }, [refresh])
+  }, [request])
 
   // The Realtime hint. Everything inside is defensive: a broken socket must cost freshness, never
-  // the shell (D-33). The event callback calls refresh() and ignores its argument entirely.
+  // the shell (D-33). The event callback calls request() and ignores its argument entirely.
   const channelRef = useRef<ChannelLike>(null)
   useEffect(() => {
     let cancelled = false
@@ -153,10 +206,10 @@ export function useWaitingNotices(): WaitingNoticesState {
           channel,
           "postgres_changes",
           { event: "*", schema: "public", table: "notifications", filter: `recipient_id=eq.${uid}` },
-          () => refresh(),
+          () => request(),
         )
         subscribe?.call(channel, (status: string) => {
-          if (status === "SUBSCRIBED") refresh()
+          if (status === "SUBSCRIBED") request()
         })
       } catch {
         // Realtime is a hint: the poll and the focus listeners still keep the list fresh.
@@ -198,7 +251,7 @@ export function useWaitingNotices(): WaitingNoticesState {
         }
       }
     }
-  }, [refresh])
+  }, [request])
 
   return {
     notices: verdict?.notices ?? [],
