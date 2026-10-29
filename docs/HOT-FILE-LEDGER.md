@@ -12268,8 +12268,8 @@ cells rot within days.
 | [`frontend/src/components/settings/EmailNotificationPreference.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentssettingsemailnotificationpreferencetsx) | 1 / 1 / 155 (was `0 / 0 / 0`) | no (1 phase) | young (created 300-05). Member switch (D-09). ⛔ calls only ungated /me/preferences; never shows On before the read answers |
 | [`frontend/src/components/org/inviteDeliveryCopy.ts`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentsorginvitedeliverycopyts) | 1 / 1 / 32 (was `0 / 0 / 0`) | no (1 phase) | young (created 300-05). Invite delivery sentences (D-11, UI-D12). ⛔ zero-import leaf; D-11 sentence verbatim |
 | [`backend/app/api/notifications.py`](docs/HOT-FILE-LEDGER.md#backendappapinotificationspy) | 0 / 0 / 0 | no (planned 301-01) | young (planned 301-01). GET /notifications: the caller's open waiting notices across member orgs (D-15, D-27). ⛔ pool + $1 caller; no X-Org-Id; 401 router-level |
-| [`frontend/src/lib/api/notifications.ts`](docs/HOT-FILE-LEDGER.md#frontendsrclibapinotificationsts) | 0 / 0 / 0 | no (planned 301-02) | young (planned 301-02). getWaitingNotices(signal) wire client (D-15, D-28). ⛔ kept out of the @/lib/api barrel |
-| [`frontend/src/hooks/useWaitingNotices.ts`](docs/HOT-FILE-LEDGER.md#frontendsrchooksusewaitingnoticests) | 0 / 0 / 0 | no (planned 301-02) | young (planned 301-02). Fetch is truth, Realtime a hint (D-17, D-18, D-33). ⛔ never reads the payload; one call site (D-14) |
+| [`frontend/src/lib/api/notifications.ts`](docs/HOT-FILE-LEDGER.md#frontendsrclibapinotificationsts) | 1 / 1 / 51 (was `0 / 0 / 0`) | no (young) | young (created 301-02). getWaitingNotices(signal) wire client (D-15, D-28). ⛔ kept out of the @/lib/api barrel |
+| [`frontend/src/hooks/useWaitingNotices.ts`](docs/HOT-FILE-LEDGER.md#frontendsrchooksusewaitingnoticests) | 1 / 1 / 211 (was `0 / 0 / 0`) | no (young) | young (created 301-02). Fetch is truth, Realtime a hint (D-17, D-18, D-33). ⛔ never reads the payload; one call site (D-14) |
 | [`frontend/src/components/layout/waitingVocabulary.ts`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentslayoutwaitingvocabularyts) | 0 / 0 / 0 | no (planned 301-03) | young (planned 301-03). Every waiting-list word (UI-SPEC copy, D-28). ⛔ zero-import leaf |
 | [`frontend/src/components/layout/WaitingOnYouControl.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentslayoutwaitingonyoucontroltsx) | 0 / 0 / 0 | no (planned 301-03) | young (planned 301-03). Rail control + drawer row (D-01, D-02, D-03). ⛔ presentational: no fetch, no supabase; never switchOrg |
 | [`frontend/src/components/layout/WaitingOnYouList.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentslayoutwaitingonyoulisttsx) | 0 / 0 / 0 | no (planned 301-03) | young (planned 301-03). Rows as DropdownMenuItems (D-05..D-10, D-29). ⛔ no dismiss / mark-read; minute tick only while open |
@@ -27877,11 +27877,27 @@ Planned cell: young (planned 301-01). GET /notifications: the caller's open wait
 
 Planned cell: young (planned 301-02). getWaitingNotices(signal) wire client (D-15, D-28). ⛔ kept out of the @/lib/api barrel
 
+#### Created 301-02 (D-15, D-27, D-28, 2026-10-30)
+
+**`1 / 1 / 51` (created).** `getWaitingNotices(signal?)` in `getSourceHealth`'s shape (`getAuthHeaders()` → `fetch(${API_BASE}/notifications, { headers, signal })` → `!res.ok` throws `ApiError`), plus the `WaitingNotice` / `WaitingNotices` wire types mirroring 301-01. Binding invariants: ⛔ NOT in the `@/lib/api` barrel (every consumer suite mocks this path by name and declares `getWaitingNotices`); ⛔ the wire type carries no question text (T-301-17); ⛔ `total` is the server count of ALL open notices, so a badge reads it and never `notices.length`.
+
+Scan-list cell as of 2026-10-30 (replaced by 301-02, moved verbatim): 0 / 0 / 0 | no (planned 301-02) | young (planned 301-02). getWaitingNotices(signal) wire client (D-15, D-28). ⛔ kept out of the @/lib/api barrel |
+
+CLAUDE.md verdict cell: none (the file does not fire).
+
 ### `frontend/src/hooks/useWaitingNotices.ts`
 
 **Added AT PLANNING (Phase 301, 2026-10-30) with `0 / 0 / 0`** — the file does not exist yet; the plan named in the cell creates it, and the triple is re-derived when this phase's ledger refresh runs (301-02 for its own files in their creating commit; 301-03 Task 3 for 301-01's, which runs ledger-free so it can share wave 1 with 301-02).
 
 Planned cell: young (planned 301-02). Fetch is truth, Realtime a hint (D-17, D-18, D-33). ⛔ never reads the payload; one call site (D-14)
+
+#### Created 301-02 (D-14, D-17, D-18, D-33, 2026-10-30)
+
+**`1 / 1 / 211` (created).** `useWaitingNotices()` returns `{ notices, total, loading, verdictKnown, failedSinceLast, refresh }`. Refetches on mount, on an active-org or membership-set change, every 60 s, on window focus, on the tab becoming visible, on any Realtime event on the person's own notices and on every `SUBSCRIBED`; a newer refresh aborts the in-flight one. A failed fetch keeps the last answer (`verdictKnown` stays true, `failedSinceLast` becomes true). Binding invariants: ⛔ the Realtime callback calls `refresh()` and never reads its argument (`?raw` fence in `useWaitingNotices.test.tsx`); ⛔ user-scoped channel (`recipient_id=eq.<uid>`), outside `StreamsProvider`; ⛔ every Supabase touch is inside try/catch, so a broken socket costs freshness, never the shell; ⛔ exactly one call site (`attentionConditions.ts`, D-14); ⛔ no minute tick here.
+
+Scan-list cell as of 2026-10-30 (replaced by 301-02, moved verbatim): 0 / 0 / 0 | no (planned 301-02) | young (planned 301-02). Fetch is truth, Realtime a hint (D-17, D-18, D-33). ⛔ never reads the payload; one call site (D-14) |
+
+CLAUDE.md verdict cell: none (the file does not fire).
 
 ### `frontend/src/components/layout/waitingVocabulary.ts`
 

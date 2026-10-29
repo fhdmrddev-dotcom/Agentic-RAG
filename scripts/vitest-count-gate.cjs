@@ -4496,6 +4496,9 @@ const BASELINE = {
   "ShareLinkMenu.test.tsx": 12, // RAISED 11 -> 12 at 299-04 (WR-03 sweep over the header surface: every direct child a menuitem or group) · 299-04 (D-20 / D-21 / D-39 / UI-D12..UI-D15) — trigger word Link (not Share), icon hidden, icon-only below md, aria-label per kind; surface label + host address in <code> + ONE Copy link item + audience line (org name foreground), described-by both; unknown / no org falls back; copies origin + path once (no ? / #), stays open, ✓ Link copied 2 s + status; refused selects the code + shortcut word, never success; no toast / popover / input; the ⋯ sub form
   "shareMounts.test.tsx": 14, // 299-04 (D-20 / D-33 / D-34) — card ⋯ menu: Link to this workflow is the FIRST item + WR-03, starter = anyone, published / draft owner-only, copies /app/workflows/<id>; run page: unfinished run trigger after v-chip before Stop + owner-only, a finished run's evidence report carries it and opens for the run's org, no org stays owner-only; Expert detail: trigger before the close control inside pr-8, six visibility / system / off lines, copies /app/experts/<id>
   "savesInOrg.test.tsx": 21, // 21 at GREEN (the header-surface no-caption case split into its own test: an open modal menu blocks a second trigger) · 299-04 (D-18 / D-38 / UI-D11 / S8) — SavesInOrg: 2+ orgs name in foreground, sentence form, nothing at 1 org / no context / unknown active org; RunModal caption under Run + refused launch verbatim; Tweak consequence gains it (not at 1 org, not on an existing fork, never on Copy link); fork sends fromDefinitionId (starter none), org refusal verbatim in forkFailed.sentence, other failures keep the prose-free shape; createWorkflowDraft URL with / without the option, every backend tweak sentence (?raw item_org_guard.py) → WorkflowOrgRefusedError, slug 409 is not; Expert Start a chat caption; postMessage chat sentence verbatim
+  // ── Phase 301-02 (NOTE-01 / NOTE-05 · D-15, D-17, D-18, D-33) — both knobs, same commit (2026-10-30). src/hooks/__tests__
+  //    has no directory entry, so the new file is FILE-LEVEL in TARGETS below.
+  "useWaitingNotices.test.tsx": 23, // 301-02 — getWaitingNotices once on mount with a signal; verbatim notices + total; loading / verdictKnown before an answer; a rejected first fetch fabricates nothing; a later failure keeps the list + failedSinceLast, cleared by the next success; newer refresh aborts the old; 60 s poll + none after unmount; focus, visible (not hidden), org and membership changes refetch; user-scoped channel + recipient_id filter; an event refetches and the FETCHED list wins over a forged body; SUBSCRIBED refetches, CHANNEL_ERROR not; removeChannel on unmount; throwing / undefined channel, missing / non-promise / rejecting getSession degrade to the poll; ?raw fence (no payload.new/.old, recipient_id=eq., SUBSCRIBED, no StreamsProvider)
 }
 
 // Still COMPUTED, never hand-written — the reduce is the single source, so the
@@ -6599,6 +6602,8 @@ const TARGETS = [
   "src/components/share/__tests__/ShareLinkMenu.test.tsx",
   "src/components/share/__tests__/shareMounts.test.tsx",
   "src/components/share/__tests__/savesInOrg.test.tsx",
+  // Phase 301-02 — FILE-LEVEL (no src/hooks/__tests__ directory entry), SAME commit as its pin.
+  "src/hooks/__tests__/useWaitingNotices.test.tsx",
 ]
 
 const REPO_ROOT = path.resolve(__dirname, "..")
