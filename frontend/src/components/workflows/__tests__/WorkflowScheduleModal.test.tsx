@@ -345,14 +345,188 @@ describe("WorkflowScheduleModal 296-04 — Run now feedback on the row (BUG-2610
     expect(line.className).toContain("text-[hsl(0_80%_80%)]")
   })
 
-  it("one result line per modal: the next action clears it", async () => {
+  // 300-01 (D-16) RE-TARGETED: this case read "one result line per modal: the next action clears
+  // it". D-16 keeps results PER ROW, so another row's action no longer erases this row's line.
+  it("a result line stays on its row when ANOTHER row's Pause is pressed (D-16, was: one line per modal)", async () => {
     vi.mocked(api.triggerSchedule).mockResolvedValue({ launched: true, outcome: "launched" } as never)
     vi.mocked(api.updateSchedule).mockResolvedValue({} as never)
     const rows = await openList()
     fireEvent.click(within(rows[0]).getByTestId("schedule-run-now"))
     await within(screen.getAllByTestId("schedule-row")[0]).findByTestId("schedule-run-result")
     fireEvent.click(within(screen.getAllByTestId("schedule-row")[1]).getByTestId("schedule-toggle"))
-    await waitFor(() => expect(screen.queryByTestId("schedule-run-result")).toBeNull())
+    await waitFor(() => expect(api.updateSchedule).toHaveBeenCalledTimes(1))
+    await waitFor(() => expect(api.listWorkflowSchedules).toHaveBeenCalledTimes(3))
+    expect(
+      within(screen.getAllByTestId("schedule-row")[0]).getByTestId("schedule-run-result").textContent,
+    ).toBe("✓Started. It runs in the background — open the run log to watch it.")
+  })
+})
+
+describe("WorkflowScheduleModal 300-01 — the row speaks words; Run now busies one row (D-15, D-16, D-26)", () => {
+  const dummyWorkflow = { id: "wf-123", name: "Daily ETL" }
+  const BLANK_INPUT =
+    "Client name is required and has no value. Add a new schedule with it filled in, then delete this one."
+  const row = (id: string, name: string, last_status: string | null = "completed", is_active = true) => ({
+    id,
+    workflow_id: "wf-123",
+    name,
+    cron_expression: "0 3 * * *",
+    interval_seconds: null,
+    timezone: "UTC",
+    is_active,
+    max_tokens_per_run: 500000,
+    max_duration_seconds: 1800,
+    inputs: {},
+    last_run_at: "2026-10-25T03:00:00Z",
+    next_run_at: "2026-10-27T03:00:00Z",
+    last_status,
+  })
+  const THREE = [row("s-1", "One"), row("s-2", "Two"), row("s-3", "Three")]
+
+  beforeEach(() => {
+    vi.clearAllMocks()
+    vi.mocked(api.listWorkflowSchedules).mockResolvedValue(THREE)
+    vi.mocked(api.getEffectiveFeaturesPayload).mockResolvedValue({
+      features: {},
+      scheduler_process_enabled: true,
+    })
+  })
+
+  async function openWith(rows: unknown[]) {
+    vi.mocked(api.listWorkflowSchedules).mockResolvedValue(rows as never)
+    render(<WorkflowScheduleModal workflow={dummyWorkflow} onClose={vi.fn()} />)
+    await waitFor(() => expect(screen.getAllByTestId("schedule-row")).toHaveLength(rows.length))
+    return screen.getAllByTestId("schedule-row")
+  }
+
+  it("launch_failed reads a sentence on its own wrapping line, and the token appears nowhere", async () => {
+    const [r] = await openWith([row("s-1", "One", "launch_failed")])
+    const outcome = within(r).getByTestId("schedule-last-outcome")
+    expect(outcome.textContent).toBe("Didn't start. Press Run now to see why.")
+    expect(outcome.className).toContain("break-words")
+    expect(outcome.className).toContain("mt-1")
+    expect(outcome.className).not.toContain("truncate")
+    expect(outcome.className).toContain("text-[hsl(0_80%_80%)]")
+    expect(within(r).getByText(/^Last ran: /).textContent).not.toContain("·")
+    expect(screen.getByTestId("schedule-modal").textContent).not.toContain("launch_failed")
+  })
+
+  it("the FIX-04 blank-input sentence reads as Didn't run — <sentence>", async () => {
+    const [r] = await openWith([row("s-1", "One", BLANK_INPUT)])
+    expect(within(r).getByTestId("schedule-last-outcome").textContent).toBe(`Didn't run — ${BLANK_INPUT}`)
+  })
+
+  it("a paused scheduled run reads waiting, never Finished (D-26)", async () => {
+    const [r] = await openWith([row("s-1", "One", "waiting")])
+    const outcome = within(r).getByTestId("schedule-last-outcome")
+    expect(outcome.textContent).toBe("Waiting on you — answer in the run.")
+    expect(outcome.className).toContain("text-[hsl(var(--warning))]")
+    expect(screen.queryByText("Finished.")).toBeNull()
+  })
+
+  it("no last_status renders no outcome line", async () => {
+    const [r] = await openWith([row("s-1", "One", null)])
+    expect(within(r).queryByTestId("schedule-last-outcome")).toBeNull()
+  })
+
+  it("first open still shows Loading… before the first list answers", async () => {
+    let answer: (v: unknown) => void = () => {}
+    vi.mocked(api.listWorkflowSchedules).mockReturnValue(new Promise((r) => (answer = r)) as never)
+    render(<WorkflowScheduleModal workflow={dummyWorkflow} onClose={vi.fn()} />)
+    expect(screen.getByText("Loading…")).toBeInTheDocument()
+    answer(THREE)
+    await waitFor(() => expect(screen.getAllByTestId("schedule-row")).toHaveLength(3))
+  })
+
+  it("Run now on row 2 of 3 busies only row 2; the list never swaps to Loading…", async () => {
+    let started: (v: unknown) => void = () => {}
+    vi.mocked(api.triggerSchedule).mockReturnValue(new Promise((r) => (started = r)) as never)
+    const rows = await openWith(THREE)
+    let refetched: (v: unknown) => void = () => {}
+    vi.mocked(api.listWorkflowSchedules).mockReturnValue(new Promise((r) => (refetched = r)) as never)
+
+    const btn = within(rows[1]).getByTestId("schedule-run-now")
+    fireEvent.click(btn)
+    await waitFor(() => expect(btn.getAttribute("aria-busy")).toBe("true"))
+    expect(within(btn).getByText("Starting…").className).toContain("sr-only")
+    expect(within(rows[1]).getByTestId("schedule-toggle")).toBeDisabled()
+    expect(within(rows[1]).getByTestId("schedule-delete")).toBeDisabled()
+    expect(within(rows[0]).getByTestId("schedule-run-now")).not.toBeDisabled()
+    expect(within(rows[2]).getByTestId("schedule-run-now")).not.toBeDisabled()
+    expect(within(rows[0]).getByTestId("schedule-toggle")).not.toBeDisabled()
+    expect(screen.getByTestId("schedule-modal-close")).not.toBeDisabled()
+    fireEvent.change(screen.getByTestId("schedule-name"), { target: { value: "Weekly" } })
+    expect(screen.getByTestId("schedule-create")).not.toBeDisabled()
+
+    started({ launched: true, outcome: "launched" })
+    // The refetch is in flight: the list stays, aria-busy on the <ul>, no "Loading…".
+    await waitFor(() => expect(screen.getByTestId("schedule-list").getAttribute("aria-busy")).toBe("true"))
+    expect(screen.queryByText("Loading…")).toBeNull()
+    expect(screen.getAllByTestId("schedule-row")).toHaveLength(3)
+    refetched(THREE)
+    await waitFor(() => expect(screen.getByTestId("schedule-list").getAttribute("aria-busy")).toBeNull())
+    expect(
+      within(screen.getAllByTestId("schedule-row")[1]).getByTestId("schedule-run-result").textContent,
+    ).toBe("✓Started. It runs in the background — open the run log to watch it.")
+  })
+
+  it("each row keeps its own result; pressing a row again clears only its line", async () => {
+    const refused = "It didn't start: the workflow needs a typed task."
+    vi.mocked(api.triggerSchedule)
+      .mockResolvedValueOnce({ launched: true, outcome: "launched" } as never)
+      .mockResolvedValueOnce({ launched: false, outcome: "refused", detail: refused } as never)
+    const rows = await openWith(THREE)
+    fireEvent.click(within(rows[0]).getByTestId("schedule-run-now"))
+    await within(screen.getAllByTestId("schedule-row")[0]).findByTestId("schedule-run-result")
+    fireEvent.click(within(screen.getAllByTestId("schedule-row")[1]).getByTestId("schedule-run-now"))
+    const second = await within(screen.getAllByTestId("schedule-row")[1]).findByTestId("schedule-run-result")
+    expect(second.textContent).toBe(refused)
+    expect(
+      within(screen.getAllByTestId("schedule-row")[0]).getByTestId("schedule-run-result").textContent,
+    ).toBe("✓Started. It runs in the background — open the run log to watch it.")
+
+    let again: (v: unknown) => void = () => {}
+    vi.mocked(api.triggerSchedule).mockReturnValue(new Promise((r) => (again = r)) as never)
+    fireEvent.click(within(screen.getAllByTestId("schedule-row")[0]).getByTestId("schedule-run-now"))
+    await waitFor(() =>
+      expect(within(screen.getAllByTestId("schedule-row")[0]).queryByTestId("schedule-run-result")).toBeNull(),
+    )
+    expect(within(screen.getAllByTestId("schedule-row")[1]).getByTestId("schedule-run-result").textContent).toBe(refused)
+    again({ launched: true, outcome: "launched" })
+    await within(screen.getAllByTestId("schedule-row")[0]).findByTestId("schedule-run-result")
+  })
+
+  it("a create the server refuses for a blank required input shows its sentence under the inputs", async () => {
+    const { ScheduleRefusalError } = await import("@/lib/api/schedules")
+    vi.mocked(api.createWorkflowSchedule).mockRejectedValue(
+      new ScheduleRefusalError("Client name is required and has no value.", 422, "missing_required", ["Client name"]),
+    )
+    await openWith([])
+    fireEvent.change(screen.getByTestId("schedule-name"), { target: { value: "Weekly" } })
+    fireEvent.click(screen.getByTestId("schedule-create"))
+    const refusal = await screen.findByTestId("schedule-required-refusal")
+    expect(refusal.textContent).toBe("Client name is required and has no value.")
+    expect(refusal.getAttribute("role")).toBe("alert")
+    expect(screen.queryByTestId("schedule-error")).toBeNull()
+  })
+
+  it("a Resume the server refuses for the same reason reads on that row, warning tone", async () => {
+    const { ScheduleRefusalError } = await import("@/lib/api/schedules")
+    vi.mocked(api.updateSchedule).mockRejectedValue(
+      new ScheduleRefusalError(BLANK_INPUT, 422, "missing_required", ["Client name"]),
+    )
+    const rows = await openWith([row("s-1", "One", null, false), row("s-2", "Two")])
+    fireEvent.click(within(rows[0]).getByTestId("schedule-toggle"))
+    const line = await within(screen.getAllByTestId("schedule-row")[0]).findByTestId("schedule-run-result")
+    expect(line.textContent).toBe(BLANK_INPUT)
+    expect(line.className).toContain("text-[hsl(var(--warning))]")
+    expect(within(screen.getAllByTestId("schedule-row")[1]).queryByTestId("schedule-run-result")).toBeNull()
+    expect(screen.queryByTestId("schedule-error")).toBeNull()
+  })
+
+  it("the raw last_status interpolation is gone from the source", () => {
+    expect(scheduleModalSource).toContain("scheduleOutcomeLine(")
+    expect(scheduleModalSource).not.toContain("last_status}")
   })
 })
 
