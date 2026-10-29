@@ -337,3 +337,55 @@ describe("NavPanel badge — the popover names what is broken and opens Health",
     expect(onNavigate).not.toHaveBeenCalled()
   })
 })
+
+// ══ PHASE 301-03 (D-01 / UI-D2) — THE WAITING CONTROL HAS ITS OWN PLACE ON THE RAIL ═══════
+//
+// Always present (zero rows too), at both widths, directly after New chat and before the first
+// nav item. The Library badge keeps counting library conditions only; the waiting pill reads the
+// server's total.
+describe("301-03 — the Waiting on you control on the rail", () => {
+  const waiting = (i: number, total: number): AttentionCondition => ({
+    mark: "waiting", id: `n-${i}`, title: `Waiting workflow ${i}`, detail: "", onOpen: vi.fn(),
+    runId: `run-${i}`, orgId: "org-a", orgName: "Acme", since: "2026-10-30T09:00:00Z",
+    kind: "question", origin: "app", total,
+  })
+
+  it("is present with zero conditions and with some, collapsed and expanded", () => {
+    for (const expanded of [false, true]) {
+      for (const attentionConditions of [[], [waiting(1, 1)]]) {
+        const { unmount } = renderRail({ expanded, attentionConditions })
+        expect(screen.getByTestId("rail-waiting-trigger")).toBeInTheDocument()
+        unmount()
+      }
+    }
+  })
+
+  it("sits after New chat and before the first nav item, in DOM order", () => {
+    renderRail({ attentionConditions: [] })
+    const newChat = screen.getByRole("button", { name: "New chat" })
+    const waitingCtl = screen.getByTestId("rail-waiting-trigger")
+    const firstNav = screen.getByRole("button", { name: "Chat" })
+    expect(newChat.compareDocumentPosition(waitingCtl) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy()
+    expect(waitingCtl.compareDocumentPosition(firstNav) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy()
+  })
+
+  it("the waiting pill reads the server total while the Library badge still counts library only", () => {
+    renderRail({
+      attentionConditions: [...conditions(1), waiting(1, 5), waiting(2, 5)],
+      onOpenLibraryHealth: vi.fn(),
+      waitingStatus: "answered",
+    })
+    expect(screen.getByTestId("rail-badge")).toHaveTextContent(/^1$/)
+    expect(screen.getByTestId("rail-waiting-badge")).toHaveTextContent(/^5$/)
+    expect(screen.getByRole("button", { name: "5 workflow runs are waiting on you" })).toBeInTheDocument()
+  })
+
+  it("is not gated on a Library navigator, and waits for an answer before showing a pill", () => {
+    const { unmount } = renderRail({ attentionConditions: [waiting(1, 2)], waitingStatus: "answered" })
+    expect(screen.getByTestId("rail-waiting-badge")).toHaveTextContent(/^2$/)
+    unmount()
+    renderRail({ attentionConditions: [], waitingStatus: "loading" })
+    expect(screen.getByRole("button", { name: "Waiting on you" })).toBeInTheDocument()
+    expect(screen.queryByTestId("rail-waiting-badge")).toBeNull()
+  })
+})
