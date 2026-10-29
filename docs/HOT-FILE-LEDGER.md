@@ -11614,7 +11614,7 @@ cells rot within days.
 | [`frontend/src/components/workflows/WorkflowCanvas.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentsworkflowsworkflowcanvastsx) | 33 / 11 / 1757 (was `32 / 10 / 1744`) | **FIRES** | 296-07 (D-09, operator decision): ONE controlled prop pair (view / onViewChange) + tabpanel attrs on 2 bodies; useState 8→8. ⛔ extraction still FIRST next |
 | [`frontend/src/components/workflows/FlowEdge.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentsworkflowsflowedgetsx) | 3 / 3 / 462 | ⚠ **FIRES — EXACTLY AT THRESHOLD** | honoured by construction (200) — ⚠ absent, and it crossed the threshold in the commit that added its row |
 | [`frontend/src/components/workflows/PhaseNodeCard.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentsworkflowsphasenodecardtsx) | 18 / 9 / 490 (was `17 / 8 / 489`) | **FIRES** | 290: the 286 forecast went UNUSED (the chips went on the library card, UI-SPEC §9); file untouched. honoured by construction (199) — ⚠ the 200 canvas port stays REVERTED |
-| [`backend/app/services/harness/phase_types.py`](docs/HOT-FILE-LEDGER.md#backendappservicesharnessphase_typespy) | 66 / 33 / 3135 (was `65 / 33 / 3131`) | ⚠ **FIRES** | 296-06: pinned-model provider arm (293-F-4); retry needs KB evidence (291-IN-01); one notice helper for a swapped agent pin, hardened (str-only, never raises). G-5 OWED |
+| [`backend/app/services/harness/phase_types.py`](docs/HOT-FILE-LEDGER.md#backendappservicesharnessphase_typespy) | 67 / 34 / 3147 (was `66 / 33 / 3135`) | ⚠ **FIRES** | 300-03 (D-23, G-5 override audited in STATE.md): one hunk in _external_action_sent_body — send_email names the recipient (via host). Owed refactor NOT discharged |
 | [`frontend/src/pages/WorkflowsPage.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrcpagesworkflowspagetsx) | 56 / 23 / 1403 (was `55 / 23 / 1403`) | ⚠ **FIRES** | honoured by construction (299-REVIEW WR-05): the useWorkflowLinkTarget call passes shown: visibleRows and clearFilters: clearAllFilters (one expression) |
 | [`frontend/src/components/workflows/library/WorkflowCard.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentsworkflowslibraryworkflowcardtsx) | 27 / 12 / 1374 (was `26 / 11 / 1373`) | **FIRES** | 299-02: one attribute data-row-id={row.id} on the root, beside data-provenance (the link target). Honoured by construction; seam286 pin snapshot +5 attrs |
 | [`frontend/src/components/workflows/library/libraryVocabulary.ts`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentsworkflowslibrarylibraryvocabularyts) | 15 / 8 / 820 (was `14 / 7 / 819`) | ⚠ **FIRES** | 296-07 (290-IN-02): STEP_LINE_UNTYPED is a re-export of phaseVocabulary.STEP_UNTYPED (one home); no seam proposed |
@@ -12253,7 +12253,7 @@ cells rot within days.
 | [`frontend/src/components/workflows/library/useWorkflowFork.ts`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentsworkflowslibraryuseworkflowforkts) | 4 / 2 / 539 (was `3 / 1 / 517`) | no | 299-04: Tweak sends fromDefinitionId (D-38); a WorkflowOrgRefusedError lands as forkFailed.sentence, every other failure keeps the prose-free shape. Below threshold |
 | [`backend/app/api/org.py`](docs/HOT-FILE-LEDGER.md#backendappapiorgpy) | 12 / 4 / 1068 (was `11 / 3 / 1024`) | ⚠ **FIRES** | 300-03 (D-11): run_in_threadpool(send_invite) at both sites; one _record_invite_delivery stores + returns email_delivery. ⛔ link-first: a mail failure never fails the invite |
 | [`backend/app/api/me_preferences.py`](docs/HOT-FILE-LEDGER.md#backendappapimepreferencespy) | 1 / 1 / 120 | no (1 phase) | Added AT PLANNING 300. 300-05: notification-email keys on GET + one PUT route (D-09). ⛔ ungated, auth.uid() merge; default_model semantics byte-identical |
-| [`backend/app/services/connectors/smtp_adapter.py`](docs/HOT-FILE-LEDGER.md#backendappservicesconnectorssmtpadapterpy) | 1 / 1 / 482 | no (1 phase) | Added AT PLANNING 300. 300-03: the body gains a rendered HTML alternative (D-24, D-32). ⛔ header guard + refused-recipient check stay; no CC/BCC/attachment |
+| [`backend/app/services/connectors/smtp_adapter.py`](docs/HOT-FILE-LEDGER.md#backendappservicesconnectorssmtpadapterpy) | 2 / 2 / 594 (was `1 / 1 / 482`) | no (2 phases) | 300-03 (D-24, D-32): the body gains a js-default markdown HTML alternative + a line-preserving text part. ⛔ header guard + refused-recipient check stay; no CC/BCC/attachment |
 | [`backend/app/services/health_probe.py`](docs/HOT-FILE-LEDGER.md#backendappserviceshealthprobepy) | 1 / 1 / 116 | no (1 phase) | Added AT PLANNING 300. 300-04: probe_email (D-12). ⛔ off / held back is neutral, never down; a reason never names a recipient |
 | [`backend/app/services/run_model_resolution.py`](docs/HOT-FILE-LEDGER.md#backendappservicesrunmodelresolutionpy) | 4 / 3 / 344 (was `3 / 2 / 308`) | ⚠ **FIRES** | 300-01: resolve_owner_run_model, the ONE FIX-05 helper (D-33). ⛔ owner settings loaded off the loop; (None, None) on failure |
 | [`frontend/src/components/admin/HealthSignals.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentsadminhealthsignalstsx) | 5 / 4 / 316 | ⚠ **FIRES** | Added AT PLANNING 300: absent at 4 phases. 300-04: one Email tile (D-12, UI-D13). ⛔ pure leaf; Off / Held back / Test mode never red |
@@ -25945,6 +25945,14 @@ Scan-list cell before this 296-06 touch (moved verbatim): | [`backend/app/servic
 
 CLAUDE.md FIRING cell before this 296-06 touch (moved verbatim): | `backend/app/services/harness/phase_types.py` | 65 / 33 / 3131 (was `64 / 33 / 3095`) | 296-06: emit pin precedence, retry guard, 1 notice helper · G-5 OWED |
 
+### `backend/app/services/harness/phase_types.py` — 300-03 Task 3 (2026-10-29)
+
+**`67 / 34 / 3147` (was `66 / 33 / 3135`).** ⚠ G-5 FIRES ("G-5 OWED") and this touch is an AUDITED OVERRIDE, recorded under `STATE.md → Guardrail overrides` in the same commit — the owed refactor is NOT discharged. D-23 (BUG-260828-05), one hunk inside `_external_action_sent_body` only (`git diff <base> -- phase_types.py | grep -c '^@@'` = 1): for `send_email` the first line reads "the mail server accepted it" (UI-D14) and `Destination` reads `{to} (via {host})`, `to` from `resolved` (a list is comma-joined in order); an empty `to` falls back to the host. Every other capability's receipt is byte-identical (pinned against the pre-300 literal in `test_300_email_step_honesty.py`). The docstring records that the recipient IS named for send_email and the credential never is. Nothing else in the file changed.
+
+Scan-list cell as of 2026-10-29 (replaced by 300-03, moved verbatim): 66 / 33 / 3135 (was `65 / 33 / 3131`) | ⚠ **FIRES** | 296-06: pinned-model provider arm (293-F-4); retry needs KB evidence (291-IN-01); one notice helper for a swapped agent pin, hardened (str-only, never raises). G-5 OWED |
+
+CLAUDE.md verdict cell as of 2026-10-29 (replaced by 300-03, moved verbatim): | `backend/app/services/harness/phase_types.py` | 66 / 33 / 3135 (was `65 / 33 / 3131`) | 296-06: emit pin precedence, retry guard, 1 notice helper · G-5 OWED |
+
 ### `backend/app/api/workflows.py` — 296-06 (293-DEL sentence on one source line)
 
 **`50 / 26 / 1699 (was `49 / 26 / 1699`)`.** 296-06 follow-up: the 409 sentence's two string literals were re-flowed so the phrase `a run record from an earlier publish attempt still points to it` sits on one source line (the plan's acceptance grep). Same sentence on the wire, same line count.
@@ -27525,6 +27533,12 @@ CLAUDE.md verdict cell as of 2026-10-29 (replaced by 300-03, moved verbatim): | 
 ### `backend/app/services/connectors/smtp_adapter.py`
 
 **Added AT PLANNING (Phase 300, 2026-10-29) at `1 / 1 / 482`** — measured, never copied. Added AT PLANNING 300. 300-03: the body gains a rendered HTML alternative (D-24, D-32). ⛔ header guard + refused-recipient check stay; no CC/BCC/attachment
+
+### `backend/app/services/connectors/smtp_adapter.py` — 300-03 Task 3 (2026-10-29)
+
+**`2 / 2 / 594` (was `1 / 1 / 482`).** D-24 / D-32 (BUG-260828-06): one module-level `_MD = MarkdownIt("js-default", {"breaks": True, "html": False})` with image / table / strikethrough / hr disabled, a core rule capping headings at h3, and `validateLink` narrowed to http / https / mailto. The plain `set_content(body)` becomes `set_content(_markdown_to_text(body))` + ONE `add_alternative(_markdown_to_html(body), subtype="html")`; the text walk drops markers, keeps line breaks, writes links as `text (url)`; the HTML wrapper is UI-D15's (no Syrel chrome). The `INPUT_SCHEMA` comment and the body description say an HTML ALTERNATIVE OF THE BODY now exists; CC / BCC / attachments stay refused. ⛔ never the `commonmark` preset (it passes `<script>`); ⛔ the D-05 banned-token fence still holds (no transport named here). `test_190_smtp_header_injection.py`'s clean-send case now reads the body from the text/plain part (the message is multipart). Pinned by `test_300_email_step_honesty.py`; walked by `test_300_clean_image_imports.py`.
+
+Scan-list cell as of 2026-10-29 (replaced by 300-03, moved verbatim): 1 / 1 / 482 | no (1 phase) | Added AT PLANNING 300. 300-03: the body gains a rendered HTML alternative (D-24, D-32). ⛔ header guard + refused-recipient check stay; no CC/BCC/attachment |
 
 ### `backend/app/services/health_probe.py`
 

@@ -419,7 +419,7 @@ node scripts/check-hot-file-ledger.cjs <phase-dir>   # 0 clear · 1 missing rows
 | `frontend/src/components/workflows/WorkflowCanvas.tsx` | 33 / 11 / 1757 (was `32 / 10 / 1744`) | 296-07: D-09 one controlled view pair; extraction FIRST next · ⛔ |
 | `frontend/src/components/workflows/FlowEdge.tsx` | 3 / 3 / 462 | honoured by construction (200) |
 | `frontend/src/components/workflows/PhaseNodeCard.tsx` | 18 / 9 / 490 (was `17 / 8 / 489`) | 290: forecast unused — chips went on the library card, not here |
-| `backend/app/services/harness/phase_types.py` | 66 / 33 / 3135 (was `65 / 33 / 3131`) | 296-06: emit pin precedence, retry guard, 1 notice helper · G-5 OWED |
+| `backend/app/services/harness/phase_types.py` | 67 / 34 / 3147 (was `66 / 33 / 3135`) | 300-03: send_email receipt names the recipient (D-23) · G-5 OWED |
 | `backend/app/services/tools/render_template.py` | 6 / 3 / 1163 (was `3 / 2 / 1094`) | 296-03: button /V written as a name, read back typed · now FIRES · ⛔ |
 | `frontend/src/pages/WorkflowsPage.tsx` | 56 / 23 / 1403 (was `55 / 23 / 1403`) | 299-REVIEW WR-05: link hook gets visibleRows + clearAllFilters |
 | `frontend/src/components/workflows/library/WorkflowCard.tsx` | 27 / 12 / 1374 (was `26 / 11 / 1373`) | 299-02: one data-row-id |

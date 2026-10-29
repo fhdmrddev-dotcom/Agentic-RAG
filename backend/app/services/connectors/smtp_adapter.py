@@ -63,6 +63,7 @@ from email.utils import parseaddr
 from types import MappingProxyType
 from typing import Any, Mapping
 
+from markdown_it import MarkdownIt
 from pydantic import ValidationError
 from starlette.concurrency import run_in_threadpool
 
@@ -92,6 +93,111 @@ _SCHEME_FOR_TLS: dict[str, str] = {
 }
 
 _CONTROL_CHARACTERS = frozenset(chr(code) for code in range(32)) | {chr(127)}
+
+
+# ── the body: markdown → a text part + an HTML alternative (300 D-24 / D-32) ─────────────
+# ⚠ THE PRESET IS LOAD-BEARING. ``js-default`` with ``html=False`` escapes raw HTML (a
+# ``<script>`` in the body arrives as text) and refuses ``javascript:`` links; the
+# ``commonmark`` preset passes raw HTML straight through and is forbidden here. Images, tables,
+# strikethrough and rules are disabled (a remote image is a tracking pixel the AUTHOR did not
+# choose), headings are capped at h3, and a link is kept only for http, https or mailto.
+_MD = MarkdownIt("js-default", {"breaks": True, "html": False}).disable(
+    ["image", "table", "strikethrough", "hr"]
+)
+_LINK_SCHEMES = ("http://", "https://", "mailto:")
+
+
+def _cap_headings(state) -> None:
+    for token in state.tokens:
+        if token.type in ("heading_open", "heading_close") and token.tag in ("h4", "h5", "h6"):
+            token.tag = "h3"
+
+
+def _link_allowed(url: str) -> bool:
+    return url.strip().lower().startswith(_LINK_SCHEMES)
+
+
+_MD.core.ruler.push("cap_headings", _cap_headings)
+_MD.validateLink = _link_allowed
+
+#: UI-D15 — the author's message to their recipient, so no Syrel chrome: no lockup, no footer.
+_BODY_WRAPPER_OPEN = (
+    '<div style="max-width:640px;padding:24px;'
+    "font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Helvetica,Arial,sans-serif;"
+    'font-size:16px;line-height:1.5;color:#0F172A">'
+)
+
+
+def _markdown_to_html(body: str) -> str:
+    return f"{_BODY_WRAPPER_OPEN}{_MD.render(body)}</div>"
+
+
+def _inline_text(children) -> str:
+    """An inline run as plain text: markers dropped, line breaks kept, a link as ``text (url)``."""
+    parts: list[str] = []
+    open_links: list[tuple[int, str]] = []
+    for child in children or ():
+        if child.type in ("text", "code_inline"):
+            parts.append(child.content)
+        elif child.type in ("softbreak", "hardbreak"):
+            parts.append("\n")
+        elif child.type == "link_open":
+            open_links.append((len(parts), str(child.attrGet("href") or "")))
+        elif child.type == "link_close" and open_links:
+            start, href = open_links.pop()
+            label = "".join(parts[start:])
+            if href and href != label:
+                parts.append(f" ({href})")
+    return "".join(parts)
+
+
+def _markdown_to_text(body: str) -> str:
+    """The text part: the same words with the markdown markers removed (``##``, ``**``, ``_``),
+    list items as ``- `` / ``1. ``, code kept verbatim, line breaks kept, and one blank line
+    between blocks."""
+    out: list[str] = []
+    lists: list[list] = []
+    marker: str | None = None
+
+    def gap() -> None:
+        if out and out[-1] != "":
+            out.append("")
+
+    def emit(text: str) -> None:
+        nonlocal marker
+        lines = text.split("\n")
+        if marker is not None:
+            lines[0] = f"{'  ' * (len(lists) - 1)}{marker} {lines[0]}"
+            marker = None
+        out.extend(lines)
+
+    for token in _MD.parse(body):
+        kind = token.type
+        if kind in ("bullet_list_open", "ordered_list_open"):
+            if not lists:
+                gap()
+            start = token.attrGet("start")
+            lists.append(["-" if kind == "bullet_list_open" else "ordered", int(start or 1)])
+        elif kind in ("bullet_list_close", "ordered_list_close"):
+            if lists:
+                lists.pop()
+        elif kind == "list_item_open" and lists:
+            current = lists[-1]
+            if current[0] == "-":
+                marker = "-"
+            else:
+                marker = f"{current[1]}."
+                current[1] += 1
+        elif kind in ("paragraph_open", "heading_open", "blockquote_open"):
+            if marker is None and not token.hidden and not lists:
+                gap()
+        elif kind == "inline":
+            emit(_inline_text(token.children))
+        elif kind in ("fence", "code_block"):
+            if marker is None and not lists:
+                gap()
+            emit(token.content.rstrip("\n"))
+    return "\n".join(out).strip("\n")
 
 
 # ── refusals ──────────────────────────────────────────────────────────────────────────────
@@ -286,10 +392,12 @@ class Adapter:
 
     CAPABILITY: str = CAPABILITY
 
-    #: The thin three, and nothing else (D-32). No CC, no BCC, no attachment, no HTML part:
-    #: each is a new outbound surface inside a phase gated on `threats_open: 0`, and a `bcc`
-    #: property in particular would hand an author, through configuration, exactly the
-    #: capability T12 exists to keep off the wire.
+    #: The thin three, and nothing else (D-32). No CC, no BCC, no attachment: each is a new
+    #: outbound surface inside a phase gated on `threats_open: 0`, and a `bcc` property in
+    #: particular would hand an author, through configuration, exactly the capability T12
+    #: exists to keep off the wire. ⚠ 300 D-24 reverses 190's D-32 for the BODY ONLY: the body
+    #: is now sent as text plus a rendered HTML ALTERNATIVE of that same body (markdown-it-py
+    #: ``js-default``, ``html=False``). No new input exists; CC, BCC and attachments stay refused.
     INPUT_SCHEMA: Mapping[str, Any] = MappingProxyType({
         "type": "object",
         "additionalProperties": False,
@@ -305,7 +413,10 @@ class Adapter:
             }),
             "body": MappingProxyType({
                 "type": "string",
-                "description": "The plain-text message body.",
+                "description": (
+                    "The message body, in markdown. Sent as plain text with a rendered HTML "
+                    "alternative of the same body."
+                ),
             }),
         }),
     })
@@ -358,11 +469,12 @@ class Adapter:
                 raise SmtpHeaderRefused(
                     f"the {header} header was refused by the message composer: {exc}"
                 ) from None
-        # A plain-text part only. There is no rendered-markup surface to break out of, which
-        # is why nothing is escaped here and why an HTML part is out of scope (D-32) rather
-        # than merely unimplemented - `email_provider.ResendProvider` has to escape precisely
-        # because it emits markup.
-        message.set_content(body)
+        # 300 D-24 (BUG-260828-06): the agent writes markdown, so the body is sent as a text
+        # part with the markers removed and the line breaks kept, plus an HTML alternative of
+        # the SAME body. The HTML comes only from `_MD` (js-default, html=False): raw HTML in
+        # the body is escaped as text, a javascript: link is not a link, no image is loaded.
+        message.set_content(_markdown_to_text(body))
+        message.add_alternative(_markdown_to_html(body), subtype="html")
 
         # ── the socket, from egress and nowhere else (D-05) ──
         session = await open_pinned_smtp(

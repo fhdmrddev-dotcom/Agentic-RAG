@@ -431,7 +431,9 @@ async def test_a_clean_send_REACHES_the_transport_with_the_validated_envelope(mo
     )
     assert from_addr == SMTP_CONFIG["from_address"]
     assert msg["Subject"] == GOOD_SUBJECT
-    assert msg.get_content().strip() == GOOD_BODY
+    # 300 D-24: the message is now multipart/alternative (text + an HTML alternative of the
+    # same body), so the body is read from its text/plain part — the property is unchanged.
+    assert msg.get_body(preferencelist=("plain",)).get_content().strip() == GOOD_BODY
     assert msg["Bcc"] is None and msg["Cc"] is None, (
         f"the composed message grew a copy header: {msg.items()!r}"
     )

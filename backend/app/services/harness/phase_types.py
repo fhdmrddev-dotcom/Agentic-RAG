@@ -2284,17 +2284,29 @@ def _external_action_sent_body(capability: str, resolved: dict, result, host: st
 
     It opens with the send, in the past tense, because here that is TRUE. The 189 discipline
     is unchanged in substance: a body may never claim more than the wire supports, so the
-    destination HOST is named (D-08 permits it; the recipient and the credential are not
-    named) and the vendor's words ride verbatim when it gave any.
+    destination HOST is named and the vendor's words ride verbatim when it gave any. The
+    credential is never named.
+
+    ⚠ 300 D-23 (BUG-260828-05, an operator decision overruling 190's D-08 half): for
+    ``send_email`` the recipient IS named — "Destination: {to} (via {host})" — because who
+    the email went to is the one thing the receipt's reader needs. And its first line names
+    the mail SERVER as what accepted it (UI-D14): an SMTP 250 proves the server took the
+    message, not that the person received it. Every other capability's receipt is unchanged.
     """
     labels = ["Action", "Destination", *(str(k) for k in resolved)]
     width = max(len(lbl) for lbl in labels)
+    accepted, destination = "the destination accepted it", host
+    if capability == "send_email":
+        to = resolved.get("to")
+        to = ", ".join(str(t) for t in to) if isinstance(to, (list, tuple)) else (to or "")
+        accepted = "the mail server accepted it"
+        destination = f"{to} (via {host})" if str(to).strip() else host
     lines = [
-        f"Sent. {_EXTERNAL_ACTION_PHRASE[capability]} — the destination accepted it.",
+        f"Sent. {_EXTERNAL_ACTION_PHRASE[capability]} — {accepted}.",
         "",
         "What this step did",
         f"  {'Action'.ljust(width)}: {_EXTERNAL_ACTION_PHRASE[capability]}",
-        f"  {'Destination'.ljust(width)}: {host}",
+        f"  {'Destination'.ljust(width)}: {destination}",
     ]
     lines += [f"  {str(key).ljust(width)}: {_clip_for_body(value)}" for key, value in resolved.items()]
     words = (getattr(result, "provider_message", "") or "").strip()
