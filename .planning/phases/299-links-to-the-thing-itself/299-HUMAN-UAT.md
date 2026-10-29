@@ -30,7 +30,7 @@ Operator: *"can we move to next phase and postpone these?"* — the six owed row
 work moves to Phase 300. Run first when resumed: **G4-5a** (it is the only thing that closes BUG-261027-02).
 Phase 300 cannot close until **G4-4a** has run, because its signed-out email journey depends on 299's sign-in return.
 
-Owed: G4-5a, G4-5b, G4-4b email-link leg (cloud), the 340 px mobile Link check; decision 4; X-7 Moonshot re-run (⛔ BUG-261024-01).
+Owed: G4-5a, G4-5b, G4-4b email-link leg (cloud), the 340 px mobile Link check; X-7 Moonshot re-run (⛔ BUG-261024-01).
 
 ## Rows
 
@@ -65,7 +65,7 @@ Operator, 2026-10-29: *"accept all three decisions, keep going"* — decisions 1
 1. ✅ ACCEPTED — Run-link rail highlight is not shown (NavPanel left alone).
 2. ✅ ACCEPTED — Fork refusal is recognised by sentence wording (pinned by a test against `item_org_guard.py`).
 3. ✅ ACCEPTED — CR-01: a schedule whose workflow is in an org the owner left falls back to the active org.
-4. OPEN (not named in the answer) — A Builder draft created by its first save shows no Link until reopened.
+4. ✅ ACCEPTED (operator, 2026-10-29: "accept") — A Builder draft created by its first save shows no Link until reopened.
 5. OPEN — IN-01..IN-05 (see `299-REVIEW.md`).
 
 ## Before deploy (operator)
