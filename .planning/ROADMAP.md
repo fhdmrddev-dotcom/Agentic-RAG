@@ -248,8 +248,8 @@ Plans:
 |-------|----------------|--------|-----------|
 | 297. Every View Has an Address | 4/4 | Complete (2026-10-28) | verified passed 5/5; security 19/19; review 4 WR fixed; UAT 15 PASS + P7 Moonshot ⛔ (live 429, BUG-261024-01); LIVE 2026-10-28 (prod b813d2711) |
 | 298. Lists Follow the Active Org | 5/5 | Executed — human_needed | 4/4 SC in code; security 34/34; review 1 BL + 9 WR → 9 fixed, WR-08 → 299; G-4 owed (G4-1 first); mig 217 in cloud; LIVE 2026-10-28 (prod b813d2711) |
-| 299. Links to the Thing Itself | 5/5 | Complete 2026-10-29 | 5/5 SC + 6/6 reqs; security 36/36; UAT 18/20 PASS; owed by decision: G4-4b email-link leg (cloud), X-7 Moonshot (⛔ balance); G4-4c ⛔ SSO; IN-01..05 deferred; not deployed; Redirect URLs before deploy |
-| 300. Told When a Run Waits (Backend and Mailer) | 5/5 | Executed — human_needed | 5/5 SC + 6/6 reqs in code; security 41/41 (UF-1 fixed); review 5 WR + 4 IN fixed; UAT owed (G4-5 first; G4-6 after 299 G4-4a); not deployed; mig 218 local only |
+| 299. Links to the Thing Itself | 5/5 | Complete 2026-10-29 | 5/5 SC + 6/6 reqs; security 36/36; UAT 18/20 PASS; owed by decision: G4-4b email-link leg (cloud), X-7 Moonshot (⛔ balance); G4-4c ⛔ SSO; IN-01..05 deferred; Redirect URLs added; LIVE 2026-10-29 (prod 31416d335) |
+| 300. Told When a Run Waits (Backend and Mailer) | 5/5 | Executed — human_needed | 5/5 SC + 6/6 reqs in code; security 41/41 (UF-1 fixed); review 5 WR + 4 IN fixed; UAT 12/15 PASS (G4-8 + real-mail G4-1 owed — Resend deferred); LIVE 2026-10-29 (prod 31416d335); mig 218 in cloud |
 | 301. The Waiting-on-You Notice | 0/TBD | Not started | - |
 | 302. Close-Out and a True Register | 0/TBD | Not started | - |
 

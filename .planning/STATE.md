@@ -31,7 +31,7 @@ See: `.planning/PROJECT.md` (updated 2026-10-27)
 
 **Core value:** The agent acts as an AI colleague — it knows your knowledge base, can run code, and
 can be taught new behaviours (skills) that persist and can be shared.
-**Current focus:** Phase 300 — told when a run waits (UAT 12/15 PASS locally 2026-10-29; owed: G4-8 + real-mail G4-1 after deploy). NOT deployed; **mig 218 APPLIED TO CLOUD 2026-10-29** (verify PASS, advisors 0 ERROR; new INFO = outbox RLS-no-policy, by design D-19). Phase 299 CLOSED 2026-10-29 (UAT 18/20; 2 rows owed by decision).
+**Current focus:** Phase 300 — told when a run waits (UAT 12/15 PASS locally 2026-10-29; owed: G4-8 + real-mail G4-1 after deploy). **LIVE 2026-10-29 (prod `31416d335`)**; mig 218 in cloud (verify PASS, advisors 0 ERROR; new INFO = outbox RLS-no-policy, by design D-19). Phase 299 CLOSED 2026-10-29 (UAT 18/20; 2 rows owed by decision).
 
 ---
 
@@ -79,8 +79,9 @@ and the open bugs (BUG-261027-01..05, minor; 04 and 05 found by the close integr
 
 ## Production
 
-Live at `3ec36f998` (master `f152c2c4e`), 2026-10-27: all of v4.7 (286-296). Cloud migrations 210-216
-applied; `get_advisors(security)` 0 ERROR. Branch `develop`.
+Live at `31416d335` (master `f73dc7cb5`), 2026-10-29: v4.7 + v4.8 phases 297-300. Cloud migrations 210-218
+applied (218 on 2026-10-29: verify PASS); `get_advisors(security)` 0 ERROR. New backend answered 19:26:45 UTC, frontend bundle
+carries 299 copy 19:27 UTC. **No mail provider in cloud (Resend deferred)** — deliveries record `suppressed`, invites → Copy link. Branch `develop`.
 
 ## Owed (operator)
 
