@@ -388,7 +388,10 @@ def send_invite(to: str, link: str, org_name: str) -> SendOutcome:
         text=text,
         html=shell_html(inner),
     ))
-    if outcome.status == "suppressed":
+    if outcome.status == "suppressed" and outcome.provider == "none":
         # The offline / self-hosted flow (Phase 167): the link is still findable in the log.
+        # 300-REVIEW IN-02: ONLY there. A dev-guard hold-back (outside production, no test
+        # address) is also "suppressed", and must not write the raw-token link and the
+        # recipient into every staging log; the inviter holds the link in the dialog.
         logger.info("invite link for %s (org=%s): %s", to, org_name, link)
     return outcome

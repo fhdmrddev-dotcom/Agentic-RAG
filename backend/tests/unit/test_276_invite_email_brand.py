@@ -92,3 +92,22 @@ def test_the_none_provider_is_unchanged(captured, monkeypatch, caplog):
     assert captured == []
     assert outcome.status == "suppressed"
     assert LINK in caplog.text
+
+
+def test_a_dev_guard_hold_back_never_logs_the_invite_token(captured, monkeypatch, caplog):
+    """300-REVIEW IN-02: outside production with no test address every send is held back as
+    'suppressed'. That used to log the recipient and the raw-token link at INFO on every staging
+    invite. Only the offline EMAIL_PROVIDER=none flow (Phase 167) logs the link."""
+    monkeypatch.setattr(settings, "environment", "development")
+    monkeypatch.setattr(
+        email_provider, "load_app_settings",
+        lambda: type("A", (), {"email_dev_redirect_address": "", "email_from_address": "",
+                               "email_from_name": ""})(),
+    )
+    with caplog.at_level(logging.DEBUG, logger="app.services.email_provider"):
+        outcome = email_provider.send_invite("p@example.com", LINK, "Acme")
+
+    assert captured == []
+    assert outcome.status == "suppressed"
+    assert "token=abc" not in caplog.text
+    assert "p@example.com" not in caplog.text
