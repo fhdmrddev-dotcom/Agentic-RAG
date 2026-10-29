@@ -11679,7 +11679,7 @@ cells rot within days.
 | [`backend/app/api/settings.py`](docs/HOT-FILE-LEDGER.md#backendappapisettingspy) | 48 / 26 / 1398 (was `47 / 25 / 1301`) | ⚠ **FIRES** | 300-05: four email knobs + read-only provider name (D-07/D-08/D-10); delay via _range_refusal_detail + allow-list +1. Honoured by construction. ⛔ no mail secret on the wire |
 | [`backend/app/services/multimodal_service.py`](docs/HOT-FILE-LEDGER.md#backendappservicesmultimodal_servicepy) | 14 / 7 / 984 | ⚠ **FIRES** | ⚠ absent from BOTH for its ENTIRE LIFE at **7 phases** — row added SEED-227, which is also where its silent truncation was found |
 | [`backend/app/api/documents.py`](docs/HOT-FILE-LEDGER.md#backendappapidocumentspy) | 101 / 40 / 2709 (was `99 / 39 / 2698`) | ⚠ **FIRES** | 298-01: list_documents one `org_lists.by_org` in build() (every read, D-32); upload one `org_id=root_upload_org(...)` on the ONE minter call. Honoured by construction. ⛔ see section |
-| [`scripts/vitest-count-gate.cjs`](docs/HOT-FILE-LEDGER.md#scriptsvitest-count-gatecjs) | 397 / 83 / 6873 (was `396 / 83 / 6868`) | ⚠ **FIRES** | 300-05: 2 BASELINE pins added (EmailSettings 28, EmailNotificationPreference 17) + their FILE-LEVEL TARGETS beside ApiKeyLimits, none lowered |
+| [`scripts/vitest-count-gate.cjs`](docs/HOT-FILE-LEDGER.md#scriptsvitest-count-gatecjs) | 398 / 83 / 6881 (was `397 / 83 / 6873`) | ⚠ **FIRES** | 300-05: 3 BASELINE pins added (InvitationsTab 17, its first; InviteMemberDialog 7; inviteDeliveryCopy 6) + FILE-LEVEL TARGETS, none lowered |
 | [`scripts/check-deploy-drift.sh`](docs/HOT-FILE-LEDGER.md#scriptscheck-deploy-driftsh) | 6 / 5 / 271 (was `5 / 4 / 267`) | ⚠ **FIRES** | 300-03 (D-28): the five SMTP_* vars registered in OMITTED_FROM_ONEBOX (commented in the one-box preset); email comment rewritten. No check changed |
 | [`scripts/build-public-openapi.cjs`](docs/HOT-FILE-LEDGER.md#scriptsbuild-public-openapicjs) | 11 / 5 / 472 (was `7 / 3 / 468`) | ⚠ **FIRES** | 298-01: `org-items` in the Account & org TAG_GROUPS entry + `/org-items/` in FLAGGED_PREFIXES (UI-internal). Two tokens. ⚠ prior row stale (`7 / 3 / 468` vs measured `10 / 4 / 468` pre-298). |
 | [`scripts/check-seeds-register.cjs`](docs/HOT-FILE-LEDGER.md#scriptscheck-seeds-registercjs) | 7 / 3 / 1132 | ⚠ **FIRES** | ⚠ absent its ENTIRE LIFE — row added 296-05, now FIRES (251 / 293 / 296). 296-05: three `\d{3}` → `\d{3,}` (293-IN-07). ⛔ the STATUS_ENUM triple |
@@ -11743,7 +11743,7 @@ cells rot within days.
 | [`frontend/src/components/settings/ConnectionFormPanel.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentssettingsconnectionformpaneltsx) | 28 / 10 / 2477 | ⚠ **FIRES** | ⭐ **NAMED SEAM TAKEN (239-08)** — `SourceToolsCard.tsx` extracted, `2807 → 2477`, a pure move. ⛔ the WIDER `ConnectionShapeFields.tsx` seam stays OWED. See §239-08 |
 | [`frontend/src/components/settings/SourceToolsCard.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentssettingssourcetoolscardtsx) | 1 / 1 / 403 | no (1 phase) | young — created by the 239-08 extraction. Carries the `mcp` fence as a guard clause, and inherits the panel's copy / zero-`title=` fences. See §239-08 |
 | [`frontend/src/components/settings/ConnectionGrantsList.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentssettingsconnectiongrantslisttsx) | 5 / 2 / 259 | no (2 phases) | 344 → 222 (221-01) → **259**. The availability slot is a CHILD it forwards, not markup it owns |
-| [`frontend/src/lib/api/org.ts`](docs/HOT-FILE-LEDGER.md#frontendsrclibapiorgts) | 11 / 8 / 629 | ⚠ **FIRES** | ⚠ absent for its ENTIRE LIFE at **4 phases** — row added 221, then STALE at `6 / 4 / 562`. **NOT covered by `lib/api.ts`: that row is the BARREL.** ⚠ THIRD wire-type drift here. See §239-03 |
+| [`frontend/src/lib/api/org.ts`](docs/HOT-FILE-LEDGER.md#frontendsrclibapiorgts) | 12 / 9 / 646 (was `11 / 8 / 629`) | ⚠ **FIRES** | 300-05: email_delivery on Invitation (optional) + SendInvitationResult + the resend result, one private `deliveryFrom` unwrap (older backend → not_configured). NOT the barrel. See §239-03 |
 | [`backend/app/services/connectors/service_tools.py`](docs/HOT-FILE-LEDGER.md#backendappservicesconnectorsservice_toolspy) | 11 / 1 / 2018 | no (1 phase) | row added 221. Re-derived 232: 2018 L; internal Google Drive tools delegate to sources adapter |
 | [`backend/app/services/connectors/grants.py`](docs/HOT-FILE-LEDGER.md#backendappservicesconnectorsgrantspy) | 1 / 1 / 92 | no (1 phase) | ⚠ absent — row added 221. It is THE grant-time gate: 92 L deciding every connector call |
 | [`frontend/src/components/settings/connectionsCopy.ts`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentssettingsconnectionscopyts) | 15 / 8 / 784 | ⚠ **FIRES** | no seam proposed — a vocabulary doing one thing many times is the right shape. ⚠ row was STALE at `13 / 7 / 737`. honoured by construction (**239-03**): one word, one union member. See §239-03 |
@@ -12257,8 +12257,8 @@ cells rot within days.
 | [`backend/app/services/health_probe.py`](docs/HOT-FILE-LEDGER.md#backendappserviceshealthprobepy) | 2 / 2 / 197 (was `1 / 1 / 116`) | no (2 phases) | 300-04: probe_email (D-12) in the gather + __all__. ⛔ off / held back is neutral, never down; a reason never names a recipient |
 | [`backend/app/services/run_model_resolution.py`](docs/HOT-FILE-LEDGER.md#backendappservicesrunmodelresolutionpy) | 4 / 3 / 344 (was `3 / 2 / 308`) | ⚠ **FIRES** | 300-01: resolve_owner_run_model, the ONE FIX-05 helper (D-33). ⛔ owner settings loaded off the loop; (None, None) on failure |
 | [`frontend/src/components/admin/HealthSignals.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentsadminhealthsignalstsx) | 6 / 5 / 407 (was `5 / 4 / 316`) | ⚠ **FIRES** | 300-04: one Email tile (D-12, UI-D13), words in emailView; dep row sm:2 lg:4. ⛔ pure leaf; Off / Held back / Test mode never red |
-| [`frontend/src/components/org/InvitationsTab.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentsorginvitationstabtsx) | 3 / 2 / 290 | no (reaches 3 in 300) | Added AT PLANNING 300. 300-05: Email not sent chip + resend failure line (D-11). ⛔ server truth on re-fetch, no optimistic flip |
-| [`frontend/src/components/org/InviteMemberDialog.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentsorginvitememberdialogtsx) | 3 / 2 / 281 | no (reaches 3 in 300) | Added AT PLANNING 300. 300-05: three result arms (UI-D12). ⛔ never names the provider or an error code; Copy link focused on the failed arm |
+| [`frontend/src/components/org/InvitationsTab.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentsorginvitationstabtsx) | 4 / 3 / 310 (was `3 / 2 / 290`) | ⚠ **FIRES** | ⚠ now FIRES (300). 300-05: Email not sent chip (shipped StatusChip, muted) + resend failure line (D-11). ⛔ server truth on re-fetch, no optimistic flip |
+| [`frontend/src/components/org/InviteMemberDialog.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentsorginvitememberdialogtsx) | 4 / 3 / 316 (was `3 / 2 / 281`) | ⚠ **FIRES** | ⚠ now FIRES (300). 300-05: three result arms by email_delivery (UI-D12), words from inviteDeliveryCopy. ⛔ never names the provider or an error code; Copy link focused on the failed arm |
 | [`frontend/src/lib/api/schedules.ts`](docs/HOT-FILE-LEDGER.md#frontendsrclibapischedulests) | 3 / 3 / 166 (was `2 / 2 / 129`) | ⚠ **FIRES** | 300-01: ScheduleRefusalError (an ApiError) for {detail:{code,message,missing}}; string + array arms unchanged. ⛔ not re-exported via lib/api.ts |
 | [`backend/app/db/notifications.py`](docs/HOT-FILE-LEDGER.md#backendappdbnotificationspy) | 1 / 1 / 326 (was `0 / 0 / 0`) | no (young) | young (created 300-04). Outbox claim (SKIP LOCKED), still-waiting, opt-out, outcome (D-12, D-13, D-20). ⛔ never selects prompt text; state flip inside the claim txn |
 | [`backend/app/services/notification_drainer.py`](docs/HOT-FILE-LEDGER.md#backendappservicesnotificationdrainerpy) | 1 / 1 / 208 (was `0 / 0 / 0`) | no (young) | young (created 300-04). Per-worker outbox drainer, SchedulerService shape (D-20). ⛔ send outside the claim txn; at most 3 attempts; SMTP at-most-once |
@@ -12266,7 +12266,7 @@ cells rot within days.
 | [`frontend/src/components/workflows/scheduleOutcomeVocabulary.ts`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentsworkflowsscheduleoutcomevocabularyts) | 1 / 1 / 67 | no (young) | young (created 300-01). last_status → one sentence (D-15, D-26). ⛔ zero-import leaf; no raw status token reaches the screen |
 | [`frontend/src/components/settings/EmailSettings.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentssettingsemailsettingstsx) | 1 / 1 / 324 (was `0 / 0 / 0`) | no (1 phase) | young (created 300-05). Operator Email card, ApiKeyLimits shape (D-07, D-08, D-10). ⛔ changes()/adopt() handle, no own Save; never sends a cleared delay or an invalid address |
 | [`frontend/src/components/settings/EmailNotificationPreference.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentssettingsemailnotificationpreferencetsx) | 1 / 1 / 155 (was `0 / 0 / 0`) | no (1 phase) | young (created 300-05). Member switch (D-09). ⛔ calls only ungated /me/preferences; never shows On before the read answers |
-| [`frontend/src/components/org/inviteDeliveryCopy.ts`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentsorginvitedeliverycopyts) | 0 / 0 / 0 | no (planned 300-05) | young (planned 300-05). Invite delivery sentences (D-11, UI-D12). ⛔ zero-import leaf; D-11 sentence verbatim |
+| [`frontend/src/components/org/inviteDeliveryCopy.ts`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentsorginvitedeliverycopyts) | 1 / 1 / 32 (was `0 / 0 / 0`) | no (1 phase) | young (created 300-05). Invite delivery sentences (D-11, UI-D12). ⛔ zero-import leaf; D-11 sentence verbatim |
 
 
 
@@ -27735,3 +27735,43 @@ CLAUDE.md verdict cell: none (the file does not fire).
 Scan-list cell as of 2026-10-29 (replaced by 300-05 Task 2, moved verbatim): 396 / 83 / 6868 (was `395 / 83 / 6865`) | ⚠ **FIRES** | 300-04: 1 BASELINE pin added (HealthSignals.email 11) + its FILE-LEVEL TARGET beside the a11y suite, none lowered |
 
 CLAUDE.md verdict cell as of 2026-10-29 (replaced by 300-05 Task 2, moved verbatim): | `scripts/vitest-count-gate.cjs` | 396 / 83 / 6868 (was `395 / 83 / 6865`) | 300-04: 1 FILE-LEVEL pin added (HealthSignals.email 11), none lowered |
+
+### `frontend/src/lib/api/org.ts` — 300-05 Task 3 (2026-10-29)
+
+**`12 / 9 / 646` (was `11 / 8 / 629`).** Additive wire types: `InviteEmailDelivery = "sent" | "failed" | "not_configured"`; `Invitation.email_delivery?: … | null` (the list row's latest attempt); `SendInvitationResult.email_delivery` and `resendInvitation`'s `{link, email_delivery}`. ONE private `deliveryFrom(raw)` unwrap: anything but the three values — including an older backend that omits the field — reads `not_configured`, so the inviter is never told about a failure they did not have. `OrgAdminShell.tsx`'s `handleResend` still destructures `{ link }` and is untouched: the list's resend line reads the RE-FETCHED row, not the resend result. ⚠ The fourth wire-type change in this module; the contract is the backend's 300-03 invite wire, stated verbatim in 300-05-PLAN `<interfaces>`.
+
+Scan-list cell as of 2026-10-29 (replaced by 300-05 Task 3, moved verbatim): 11 / 8 / 629 | ⚠ **FIRES** | ⚠ absent for its ENTIRE LIFE at **4 phases** — row added 221, then STALE at `6 / 4 / 562`. **NOT covered by `lib/api.ts`: that row is the BARREL.** ⚠ THIRD wire-type drift here. See §239-03 |
+
+CLAUDE.md verdict cell as of 2026-10-29 (replaced by 300-05 Task 3, moved verbatim): | `frontend/src/lib/api/org.ts` | 11 / 8 / 629 | ⚠ absent its ENTIRE LIFE · THIRD wire-type drift (239) |
+
+### `frontend/src/components/org/InviteMemberDialog.tsx` — 300-05 Task 3 (2026-10-29)
+
+**`4 / 3 / 316` (was `3 / 2 / 281`) — crosses into G-5 at this commit.** Inside the shipped link-first panel, ONE `delivery` state (reset on open) set from `sendInvitation`'s `email_delivery` (`?? "not_configured"`), and the title from `deliveryTitle(delivery)`. Arms: `sent` → "We emailed an invitation to **{email}**. You can also copy the link and send it yourself." (`font-semibold`); `failed` → a NEUTRAL `role="status"` box (`border-border bg-muted/40`, `MailX` aria-hidden) with the D-11 sentence, and one effect focusing the shipped Copy link button through a ref; `not_configured` → the shipped body byte-identical. The expiry line stays on all three. ⛔ The docblock's "reserved operator warning tint is never used" rule holds (UI-D2: no amber in the org zone). ⛔ Next touch should take the result panel out as a leaf: the file now carries form + three result arms.
+
+Scan-list cell as of 2026-10-29 (replaced by 300-05 Task 3, moved verbatim): 3 / 2 / 281 | no (reaches 3 in 300) | Added AT PLANNING 300. 300-05: three result arms (UI-D12). ⛔ never names the provider or an error code; Copy link focused on the failed arm |
+
+CLAUDE.md verdict cell: none before 300-05 Task 3 (row added by 300-05 Task 3).
+
+### `frontend/src/components/org/InvitationsTab.tsx` — 300-05 Task 3 (2026-10-29)
+
+**`4 / 3 / 310` (was `3 / 2 / 290`) — crosses into G-5 at this commit.** In `InvitationRow` only: `emailFailed = isPending && inv.email_delivery === "failed"`; when true a second `<StatusChip tone="muted" testId="invitation-email-status">` (the shipped chip, unchanged) with `MailX` (aria-hidden) and "Email not sent" follows the status chip, and — under a fresh resend link — the line "The email didn't send. Copy the link and send it yourself." (`mt-1 pl-12 text-xs`). ⛔ Both read the row the shell RE-FETCHED after the resend (`OrgAdminShell.handleResend` awaits `fetchInvitations()` before returning the link), so a resend that went removes the chip and the line with no optimistic state and no prop change. Not shown for `sent`, `not_configured`, null, or any non-pending row.
+
+Scan-list cell as of 2026-10-29 (replaced by 300-05 Task 3, moved verbatim): 3 / 2 / 290 | no (reaches 3 in 300) | Added AT PLANNING 300. 300-05: Email not sent chip + resend failure line (D-11). ⛔ server truth on re-fetch, no optimistic flip |
+
+CLAUDE.md verdict cell: none before 300-05 Task 3 (row added by 300-05 Task 3).
+
+### `frontend/src/components/org/inviteDeliveryCopy.ts` — 300-05 Task 3 (created) (2026-10-29)
+
+**`1 / 1 / 32` (created).** Zero imports. `INVITE_DELIVERY` carries the three titles, the `sent` body split around the email, the D-11 sentence verbatim, the list chip "Email not sent" and the resend line; `deliveryTitle(delivery)` and the `InviteDelivery` key type. Read by `InviteMemberDialog.tsx` and `InvitationsTab.tsx`; `inviteDeliveryCopy.test.ts` asserts the words, the absence of provider / error-code / retry words, and the zero-import rule over its source.
+
+Scan-list cell as of 2026-10-29 (replaced by 300-05 Task 3 (created), moved verbatim): 0 / 0 / 0 | no (planned 300-05) | young (planned 300-05). Invite delivery sentences (D-11, UI-D12). ⛔ zero-import leaf; D-11 sentence verbatim |
+
+CLAUDE.md verdict cell: none (the file does not fire).
+
+### `scripts/vitest-count-gate.cjs` — 300-05 Task 3 (2026-10-29)
+
+**`398 / 83 / 6881` (was `397 / 83 / 6873`).** THREE BASELINE pins beside `OrgAuditTab.test.tsx`'s — `InvitationsTab.test.tsx` 17 (⚠ the suite had NO pin before: the plan said "raise InvitationsTab's pin", measured there was none, so it is adopted at 8 shipped + 9 new cases), `InviteMemberDialog.test.tsx` 7, `inviteDeliveryCopy.test.ts` 6 (counts from the vitest JSON reporter) — and their FILE-LEVEL TARGETS beside OrgAuditTab's (no `src/components/org` directory entry). None raised, none lowered.
+
+Scan-list cell as of 2026-10-29 (replaced by 300-05 Task 3, moved verbatim): 397 / 83 / 6873 (was `396 / 83 / 6868`) | ⚠ **FIRES** | 300-05: 2 BASELINE pins added (EmailSettings 28, EmailNotificationPreference 17) + their FILE-LEVEL TARGETS beside ApiKeyLimits, none lowered |
+
+CLAUDE.md verdict cell as of 2026-10-29 (replaced by 300-05 Task 3, moved verbatim): | `scripts/vitest-count-gate.cjs` | 397 / 83 / 6873 (was `396 / 83 / 6868`) | 300-05: 2 pins added (EmailSettings 28, EmailNotificationPreference 17) |

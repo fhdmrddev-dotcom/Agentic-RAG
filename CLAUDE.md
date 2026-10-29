@@ -495,7 +495,7 @@ node scripts/check-hot-file-ledger.cjs <phase-dir>   # 0 clear · 1 missing rows
 | `backend/app/services/multimodal_service.py` | 14 / 7 / 984 | ⚠ absent from BOTH for its ENTIRE LIFE at **7 phases** |
 | `backend/app/api/documents.py` | 101 / 40 / 2709 (was `99 / 39 / 2698`) | 298-01: one by_org in build() + one root_upload_org kwarg · ⛔ |
 | `backend/app/api/library.py` | 3 / 3 / 304 (was `2 / 2 / 299`) | ⚠ now FIRES (298) · 298-01: summary shares the lists' org predicate ($1) |
-| `scripts/vitest-count-gate.cjs` | 397 / 83 / 6873 (was `396 / 83 / 6868`) | 300-05: 2 pins added (EmailSettings 28, EmailNotificationPreference 17) |
+| `scripts/vitest-count-gate.cjs` | 398 / 83 / 6881 (was `397 / 83 / 6873`) | 300-05: 3 org pins added (InvitationsTab 17, dialog 7, copy 6) |
 | `scripts/check-deploy-drift.sh` | 6 / 5 / 271 (was `5 / 4 / 267`) | 300-03: SMTP_* parity |
 | `scripts/build-public-openapi.cjs` | 11 / 5 / 472 (was `7 / 3 / 468`) | 298-01: org-items tag (Account & org) + /org-items/ FLAGGED (2 lines) |
 | `scripts/check-seeds-register.cjs` | 7 / 3 / 1132 | ⚠ FIRES, absent here — row added 296-05 · `\d{3,}` ids · ⛔ |
@@ -529,7 +529,9 @@ node scripts/check-hot-file-ledger.cjs <phase-dir>   # 0 clear · 1 missing rows
 | `frontend/src/components/workflows/RunTranscript.tsx` | 7 / 3 / 652 | ⚠ **FIRES on a component with NO MOUNT in the product** |
 | `frontend/src/components/settings/ConnectionsTab.tsx` | 26 / 10 / 1634 (was `25 / 9 / 1635`) | 297-02: dead #chat hash write deleted (D-37) · item inert → SEED-392 |
 | `frontend/src/components/settings/ConnectionFormPanel.tsx` | 28 / 10 / 2477 | ⭐ NAMED SEAM TAKEN (239-08) · wider seam OWED · ⛔ |
-| `frontend/src/lib/api/org.ts` | 11 / 8 / 629 | ⚠ absent its ENTIRE LIFE · THIRD wire-type drift (239) |
+| `frontend/src/lib/api/org.ts` | 12 / 9 / 646 (was `11 / 8 / 629`) | 300-05: email_delivery on invite results + rows (D-11) |
+| `frontend/src/components/org/InviteMemberDialog.tsx` | 4 / 3 / 316 | ⚠ now FIRES (300) · 300-05: three result arms (UI-D12) · ⛔ |
+| `frontend/src/components/org/InvitationsTab.tsx` | 4 / 3 / 310 | ⚠ now FIRES (300) · 300-05: Email not sent chip + resend line · ⛔ |
 | `frontend/src/components/settings/connectionsCopy.ts` | 16 / 9 / 804 | ⚠ row STALE · honoured by construction (BUG-260912-01) |
 | `frontend/src/components/settings/connectionFormCopy.ts` | 19 / 8 / 1631 | seam named (239-05), RODE it (239-07) · ⛔ |
 | `frontend/src/pages/SettingsPage.tsx` | 63 / 31 / 1698 (was `62 / 30 / 1690`) | 300-05: one EmailSettings ref/spread/adopt/mount · ⛔ |

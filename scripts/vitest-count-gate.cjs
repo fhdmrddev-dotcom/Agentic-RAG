@@ -4422,6 +4422,10 @@ const BASELINE = {
   // nowhere the gate could see. Adopted at its measured count: 8 pre-existing + 1 unknown-code case
   // + 7 api_key.* cases (5 labels, the API keys filter group, the ?raw lockstep with admin/AuditTab.tsx).
   "OrgAuditTab.test.tsx": 19, // 298-review WR-07: 16 → 19 (org.item.move label, Organizing filter, identical line in both maps)
+  // ── Phase 300-05 (D-11 / UI-SPEC S4) — FILE-LEVEL in TARGETS (no `src/components/org` entry), same commit.
+  "InvitationsTab.test.tsx": 17, // 300-05 — first-ever pin: 8 shipped (send gate, chips, resend/revoke, role picker) + 9 'Email not sent' chip / resend-line cases
+  "InviteMemberDialog.test.tsx": 7, // 300-05 — the three result arms by their words, Copy link focused on failed, older backend never a false failure, org.ts unwraps
+  "inviteDeliveryCopy.test.ts": 6, // 300-05 — the D-11 sentence verbatim, three titles, chip + resend line, no provider/error/retry words, zero imports
   // 293-04 — under the `src/components/workflows` directory entry, so a pin only.
   "WorkflowCardMenu.apiKey293.test.tsx": 4, // ⋯ New API key… under Schedules on owned published rows only, payload {id, name}; absent without onApiKey (seam286 pin unchanged)
   // ── Phase 297-01 (REG-09 / D-01, D-03) — adopted, both knobs, same commit (2026-10-27).
@@ -6534,6 +6538,10 @@ const TARGETS = [
   "src/components/org/OrgApiKeysTab.test.tsx",
   // 293-04 (SEED-287) — FILE-LEVEL, SAME commit as its first-ever BASELINE pin.
   "src/components/org/OrgAuditTab.test.tsx",
+  // 300-05 — FILE-LEVEL, SAME commit as their BASELINE pins.
+  "src/components/org/InvitationsTab.test.tsx",
+  "src/components/org/InviteMemberDialog.test.tsx",
+  "src/components/org/inviteDeliveryCopy.test.ts",
   // Phase 297-01 — FILE-LEVEL (no directory entry), in the SAME commit as its BASELINE pin.
   "src/hooks/__tests__/useAppNavigation.test.tsx",
   // Phase 297-02 — FILE-LEVEL (no src/lib/__tests__ directory entry), SAME commit as its BASELINE pin.
