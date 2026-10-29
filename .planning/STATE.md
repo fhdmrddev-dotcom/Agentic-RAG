@@ -118,4 +118,7 @@ carries 299 copy 19:27 UTC; operator smoke: chat list loads on app.superrag.clou
 
 - **301 G-2 (2026-10-29):** ROADMAP says "the approved mockup is the acceptance bar". Under the operator's autonomous mandate ("continue autonomously end to end") the sketch winner was SELF-PICKED: `.planning/sketches/301-waiting-on-you/` ★ A (own rail control; B avatar / C Workflows rejected in the README). SC#4 ("matches the operator-approved sketch") therefore stays owed to the operator at G-4 — show the sketch beside the built control first.
 
+- **301 schema-drift gate (2026-10-30):** `verify.schema-drift 301` reports blocking drift for `219_notifications_realtime.sql` because no `supabase db push` ran. Overridden by rule: CLAUDE.md forbids `db push`; 219 was applied locally through asyncpg (SQL-editor equivalent, verify PASS twice) and `full-schema.sql` regenerated at `cb74b23dc`. Cloud paste + `get_advisors(security)` stay owed at deploy.
+- **301 vitest count gate (2026-10-30):** not `count gate OK` at HEAD — three loaded runs, one red each in a DIFFERENT provably-unmodified suite (`WorkflowBuilderPage.canvas` ×2, `LibraryPage.review284` ×1), each passing alone; base `d9ff4c5eb` ran clean once. Recorded as an owed clean gate run, not waved through.
+
 The 286-296 overrides are in `milestones/v4.7-STATE-at-close.md`.
