@@ -4,14 +4,14 @@ milestone: v4.8
 milestone_name: Every Page Has a Link
 status: human_needed
 last_updated: 2026-10-29T00:00:00.000Z
-last_activity: 2026-10-29 -- Phase 300 planned: 5 plans / 4 waves, checker passed (0 blockers); executing
+last_activity: 2026-10-29 -- Phase 300 executed; verification human_needed (5/5 SC in code); UAT owed
 progress:
   total_phases: 13
   completed_phases: 0
   total_plans: 4
   completed_plans: 4
   percent: 0
-stopped_at: Phase 299 executed 5/5 + review fixes (3 CR + 5 WR); 5/5 SC + 6/6 reqs verified in code; security 36/36; G-4 rows owed (two-org account, G4-2 first); NOT deployed
+stopped_at: Phase 300 executed 5/5 + review fixes (9) + UF-1; 5/5 SC + 6/6 reqs verified in code; security 41/41; UAT owed; NOT deployed (mig 218 local only)
 ---
 
 # Project State
@@ -31,7 +31,7 @@ See: `.planning/PROJECT.md` (updated 2026-10-27)
 
 **Core value:** The agent acts as an AI colleague — it knows your knowledge base, can run code, and
 can be taught new behaviours (skills) that persist and can be shared.
-**Current focus:** Phase 300 — told when a run waits (planned 2026-10-29: 5 plans, waves 01+02 → 03 → 04 → 05; executing autonomously). Phase 299 stays human_needed with 6 UAT rows POSTPONED by operator decision 2026-10-29.
+**Current focus:** Phase 300 — told when a run waits (executed 2026-10-29: human_needed; next: `300-HUMAN-UAT.md`, G4-5 first; G4-6 needs 299 G4-4a). NOT deployed; mig 218 local only. Phase 299 stays human_needed with 6 UAT rows POSTPONED by operator decision 2026-10-29.
 
 ---
 
@@ -44,10 +44,12 @@ reviewer exists, so a phase closes `verification_mode: self-verified`, never `re
 
 ## Current Position
 
-Phase: 299
+Phase: 300
 Plan: 5 of 5
-Status: Executed — human_needed (verification 5/5 SC + 6/6 reqs in code; security 36/36 closed; G-4 rows owed)
-Last activity: 2026-10-29 — 299 executed: 5 plans (01→05→02→03→04), review 3 CR + 5 WR → 6 fixed + 2 partly no_change_needed (WR-01 header-less half, WR-02 client half), IN-01..05 open; gates: backend 69 ≤ 71, vitest count gate OK (13176), tsc 61 = base. NOT deployed.
+Status: Executed — human_needed (verification 5/5 SC + 6/6 reqs in code; security 41/41 closed; G-4 + roster rows owed)
+Last activity: 2026-10-29 — 300 executed: 5 plans (01+02 → 03 → 04 → 05), review 0 BL + 5 WR + 6 IN → 9 fixed (IN-05/06 deferred), security UF-1 fixed in 218 (residual → SEED-396); gates: backend 69 ≤ 71, vitest count gate OK (13300), tsc 61 = base, phase live suites 75 passed. NOT deployed.
+
+Owed for 300 (in order): run `300-HUMAN-UAT.md` (G4-5 first; FIX-05 roster must be re-run after IN-03; G4-6 only after 299 G4-4a); approve 3 fixer-written strings (WR-05, IN-01, IN-04). Before deploy: paste mig 218 into cloud SQL editor (per-action approval) → `get_advisors(security)`; Coolify EMAIL_PROVIDER / RESEND_API_KEY / ENVIRONMENT=production; Resend sender + SPF/DKIM/DMARC. At close: REQUIREMENTS NOTE-02/03/04/06 + FIX-04/05 → done; BUG-261027-03/04/05 + BUG-260828-05/06 → closed when their rows pass.
 
 Owed for 299 — **POSTPONED by operator decision 2026-10-29** ("move to next phase and postpone these"). Claude drove 13/19 rows, all PASS
 (G4-2: A1 holds; X-7 Moonshot ⛔ rate-limited). Still owed, run first → last: G4-5a (closes BUG-261027-02), G4-5b, G4-4a, G4-4b, G4-4d,
@@ -90,6 +92,7 @@ applied; `get_advisors(security)` 0 ERROR. Branch `develop`.
 - Moonshot account reinstatement (429 suspended) → re-run its rows; BUG-261024-01 stays `folded` until then.
 - 294-ENV: remove the two dev-only lines from `backend/.env` (`DECISION_ENGINE_FAULT_BASE_URL` and its `ENVIRONMENT` partner).
 - 298: G-4 rows G4-1..7 + A-1 (`298-HUMAN-UAT.md`, sign in as `fhdmrd.dev@gmail.com`); mig 217 already in cloud (2026-10-28).
+- 300: 15 UAT rows (`300-HUMAN-UAT.md`, G4-5 first) + 3 copy approvals; mig 218 to cloud before its deploy.
 - 299: 6 UAT rows POSTPONED (G4-5a first; `299-HUMAN-UAT.md`) + decision 4 + G4-4c ⛔ SSO; Supabase Auth Redirect URLs before its deploy.
 - Optional: restore Supabase MCP `read_only=true` (the write-needing deploy is done).
 - Push tag `v4.7` when wanted (local only).
