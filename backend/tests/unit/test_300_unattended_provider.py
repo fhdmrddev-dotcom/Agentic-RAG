@@ -23,32 +23,54 @@ BACKEND = Path(__file__).resolve().parents[2]
 # ── resolve_owner_run_model ─────────────────────────────────────────────────────────────────
 
 
+def _chain(rmr, *, loaded, overlaid, resolved_provider, aligned=None, ctx_model):
+    """Patch the in-app door's chain: load -> per-user overlay -> resolve_run_model -> ctx model."""
+    aligned = aligned if aligned is not None else overlaid
+    return (
+        patch("app.models.user_settings.load_user_settings", return_value=loaded),
+        patch.object(rmr, "apply_user_model_default", AsyncMock(return_value=overlaid)),
+        patch.object(rmr, "resolve_run_model", AsyncMock(
+            return_value=("ignored", resolved_provider, None, object(), aligned))),
+        patch("app.services.sub_agent_models.resolve_workflow_ctx_model", return_value=ctx_model),
+    )
+
+
 @pytest.mark.asyncio
-async def test_the_helper_returns_the_owners_model_and_active_provider():
+async def test_the_helper_resolves_the_owners_pair_the_way_the_in_app_door_does():
+    """300-REVIEW IN-03 (D-17 "exactly as the in-app door does"): the owner's per-user default
+    model (SEED-116, apply_user_model_default) is applied, and the provider is resolved from it
+    by resolve_run_model — never read off the org's active_provider."""
     from app.services import run_model_resolution as rmr
 
-    settings = SimpleNamespace(active_provider="anthropic")
+    loaded = SimpleNamespace(active_provider="openai", llm_model="gpt-5.5")
+    overlaid = SimpleNamespace(active_provider="openai", llm_model="claude-opus-4-7")
+    aligned = SimpleNamespace(active_provider="anthropic", llm_model="claude-opus-4-7")
     owner = uuid4()
-    with (
-        patch("app.models.user_settings.load_user_settings", return_value=settings) as load,
-        patch("app.services.sub_agent_models.resolve_workflow_ctx_model",
-              return_value="claude-opus-4-7") as ctx_model,
-    ):
+    load, overlay, resolve, ctx = _chain(rmr, loaded=loaded, overlaid=overlaid,
+                                         resolved_provider="anthropic", aligned=aligned,
+                                         ctx_model="claude-opus-4-7")
+    with load as load_m, overlay as overlay_m, resolve as resolve_m, ctx as ctx_m:
         out = await rmr.resolve_owner_run_model(owner)
+
     assert out == ("claude-opus-4-7", "anthropic")
-    load.assert_called_once_with(str(owner))
-    ctx_model.assert_called_once_with(settings)
+    load_m.assert_called_once_with(str(owner))
+    overlay_m.assert_awaited_once()
+    assert overlay_m.await_args.args[1] == {"id": str(owner)}
+    assert overlay_m.await_args.args[2] is loaded
+    rkw = resolve_m.await_args.kwargs
+    assert rkw["user_settings"] is overlaid
+    assert rkw["body"].model is None and rkw["body"].provider is None  # no request override
+    ctx_m.assert_called_once_with(aligned)
 
 
 @pytest.mark.asyncio
 async def test_blank_values_read_none():
     from app.services import run_model_resolution as rmr
 
-    with (
-        patch("app.models.user_settings.load_user_settings",
-              return_value=SimpleNamespace(active_provider="")),
-        patch("app.services.sub_agent_models.resolve_workflow_ctx_model", return_value=""),
-    ):
+    settings = SimpleNamespace(active_provider="")
+    load, overlay, resolve, ctx = _chain(rmr, loaded=settings, overlaid=settings,
+                                         resolved_provider="", ctx_model="")
+    with load, overlay, resolve, ctx:
         assert await rmr.resolve_owner_run_model(uuid4()) == (None, None)
 
 

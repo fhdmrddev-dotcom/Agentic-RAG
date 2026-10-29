@@ -29,6 +29,8 @@ from __future__ import annotations
 
 import logging
 
+from pydantic import BaseModel
+
 logger = logging.getLogger(__name__)
 
 
@@ -302,11 +304,22 @@ async def resolve_run_model(*, body, user_settings):
 async def resolve_owner_run_model(owner_id) -> tuple[str | None, str | None]:
     """300-01 (FIX-05 / D-17, D-33) — the (model, provider) an UNATTENDED run starts on.
 
-    The schedule and API-key doors have no request, so they resolve from the OWNER's effective
-    settings: the workflow ctx model (``resolve_workflow_ctx_model``, the same resolution the
-    resume and Continue paths use) and the owner's active provider. ``unattended_launch`` calls
-    this ONCE and records the pair on ``workflow_runs`` (``metadata.provider``) and in the first
-    drive's ctx dict, so a resume hours later continues on the provider the run started on.
+    The schedule and API-key doors have no request, so they walk the IN-APP DOOR's own chain for
+    the owner, with no request override (300-REVIEW IN-03 — D-17 "exactly as the in-app door
+    does"; ``threads.py``'s workflow kickoff runs the same four steps):
+
+      1. ``load_user_settings(owner)`` — the effective settings;
+      2. ``apply_user_model_default`` — the OWNER's per-user default model (SEED-116), honouring
+         the operator lock and allowed-set; a strict no-op when the owner has none;
+      3. ``resolve_run_model`` with an empty body — the provider derived from that model (the
+         registry-verified capability, else the active provider) plus the D-149-10 disabled-model
+         fallback, and the settings aligned to that provider;
+      4. ``resolve_workflow_ctx_model`` on those settings — the workflow ctx model (the resolution
+         the resume and Continue paths use).
+
+    ``unattended_launch`` calls this ONCE and records the pair on ``workflow_runs``
+    (``metadata.provider``) and in the first drive's ctx dict, so a resume hours later continues
+    on the provider the run started on.
 
     FAIL-SOFT (T-300-05): ``load_user_settings`` is blocking, so it runs off the event loop
     (D-v2.5-01); any failure logs identifiers only and returns ``(None, None)`` — today's
@@ -321,9 +334,14 @@ async def resolve_owner_run_model(owner_id) -> tuple[str | None, str | None]:
         from app.services.sub_agent_models import resolve_workflow_ctx_model  # noqa: PLC0415
 
         owner_settings = await run_in_threadpool(load_user_settings, str(owner_id))
+        owner_settings = await apply_user_model_default(
+            None, {"id": str(owner_id)}, owner_settings
+        )
+        _model, provider, _notice, _body, owner_settings = await resolve_run_model(
+            body=_NoOverrideBody(), user_settings=owner_settings
+        )
         model = resolve_workflow_ctx_model(owner_settings) or None
-        provider = getattr(owner_settings, "active_provider", None) or None
-        return model, provider
+        return model, (provider or None)
     except Exception:  # noqa: BLE001 — an unattended launch never fails on this
         logger.warning(
             "resolve_owner_run_model: owner %s settings could not be resolved; the run "
@@ -332,6 +350,15 @@ async def resolve_owner_run_model(owner_id) -> tuple[str | None, str | None]:
             exc_info=True,
         )
         return None, None
+
+
+class _NoOverrideBody(BaseModel):
+    """IN-03: an unattended launch has no request, so nothing overrides the owner's model or
+    provider. A pydantic model because ``_apply_fallback_to_request`` rebuilds ``body`` with
+    ``model_copy`` when the disabled-model fallback fires."""
+
+    model: str | None = None
+    provider: str | None = None
 
 
 __all__ = [
