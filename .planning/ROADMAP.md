@@ -241,7 +241,7 @@ Plans:
 |-------|----------------|--------|-----------|
 | 297. Every View Has an Address | 4/4 | Complete (2026-10-28) | verified passed 5/5; security 19/19; review 4 WR fixed; UAT 15 PASS + P7 Moonshot ⛔ (live 429, BUG-261024-01); LIVE 2026-10-28 (prod b813d2711) |
 | 298. Lists Follow the Active Org | 5/5 | Executed — human_needed | 4/4 SC in code; security 34/34; review 1 BL + 9 WR → 9 fixed, WR-08 → 299; G-4 owed (G4-1 first); mig 217 in cloud; LIVE 2026-10-28 (prod b813d2711) |
-| 299. Links to the Thing Itself | 5/5 | Executed — human_needed | 5/5 SC + 6/6 reqs in code; security 36/36; review 3 CR + 5 WR → fixed; G-4 owed (G4-2 first; G4-4c ⛔ SSO); not deployed; Redirect URLs owed |
+| 299. Links to the Thing Itself | 5/5 | Executed — human_needed | 5/5 SC + 6/6 reqs in code; security 36/36; UAT 13/19 PASS, 6 POSTPONED 2026-10-29 (G4-5a first; G4-4c ⛔ SSO); not deployed; Redirect URLs owed |
 | 300. Told When a Run Waits (Backend and Mailer) | 0/TBD | Not started | - |
 | 301. The Waiting-on-You Notice | 0/TBD | Not started | - |
 | 302. Close-Out and a True Register | 0/TBD | Not started | - |

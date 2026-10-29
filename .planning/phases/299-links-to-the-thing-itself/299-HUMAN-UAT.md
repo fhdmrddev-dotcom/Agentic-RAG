@@ -1,6 +1,7 @@
 ---
 phase: 299-links-to-the-thing-itself
 status: partial
+postponed: 2026-10-29
 created: 2026-10-29
 rows_total: 20
 rows_run: 13
@@ -21,6 +22,15 @@ session (return-after-sign-in). Both mean signing the operator's browser session
 which Claude does not do. Same constraint as 298 (`298-HUMAN-UAT.md`). Two-org accounts on local: the dev
 account `fhdmrd.dev@gmail.com` (`22f9c615` + `c1f18150`) and the fixture `s296-g4-colleague@example.test`.
 **Before row 1, prove the active org** (profile menu shows the org name).
+
+## Postponed by operator decision (2026-10-29)
+
+Operator: *"can we move to next phase and postpone these?"* — the six owed rows below and decision 4 are
+**postponed, not run**. Phase 299 stays `human_needed` and is **not closed** (ROADMAP checkbox unticked);
+work moves to Phase 300. Run first when resumed: **G4-5a** (it is the only thing that closes BUG-261027-02).
+Phase 300 cannot close until **G4-4a** has run, because its signed-out email journey depends on 299's sign-in return.
+
+Owed: G4-5a, G4-5b, G4-4a, G4-4b, G4-4d, the 340 px mobile Link check; decision 4; X-7 Moonshot re-run (⛔ BUG-261024-01).
 
 ## Rows
 
