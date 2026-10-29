@@ -40,6 +40,8 @@ before G4-6; Phase 300 cannot close until both have run.
 | COPY | Approve or change three un-specced strings the review fixer wrote: WR-05 save veto ("An email address in the Email card isn't valid. Fix it, then save again."), IN-01 test-address invite line ("Outside production, the email went to the test address set in Settings, not to {invitee}. Copy the link and send it yourself."), IN-04 tile state "Can't send" | Operator decision | any |
 | DEPLOY | Paste migration 218 (incl. WR-04 + UF-1 amendments) into cloud SQL editor → `get_advisors(security)`; Coolify `EMAIL_PROVIDER`, `RESEND_API_KEY`, `ENVIRONMENT=production`; Resend sender on `notify.<domain>` + SPF/DKIM/DMARC at Hostinger; one-box outbound SMTP; CI image build | Operator, only on "deploy" (each cloud write needs per-action approval) | at deploy |
 
+⏸ **Resend DEFERRED by operator (2026-10-29: "I want to defer resend for now").** 299 + 300 may deploy with `EMAIL_PROVIDER` unset/`none`: notices are still written, deliveries record `suppressed` ("Email is not set up on this server."), invites fall back to Copy link. Migration 218 still goes first (the drainer and triggers need it). G4-8 and the real-mailbox half of G4-1 stay owed until a provider is configured (Resend on cloud, or SMTP on the one-box).
+
 ## Results (2026-10-29, Claude, local)
 
 Driven in Chrome as `fhdmrd.dev@gmail.com` (active org `c1f18150…`, "fhdmrd.dev@gmail.com's Organization"),
