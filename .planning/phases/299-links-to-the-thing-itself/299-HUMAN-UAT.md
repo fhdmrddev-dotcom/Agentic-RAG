@@ -4,7 +4,7 @@ status: partial
 postponed: 2026-10-29
 created: 2026-10-29
 rows_total: 20
-rows_run: 17
+rows_run: 18
 rows_blocked: 2
 driver: operator
 ---
@@ -30,7 +30,7 @@ Operator: *"can we move to next phase and postpone these?"* — the six owed row
 work moves to Phase 300. Run first when resumed: **G4-5a** (it is the only thing that closes BUG-261027-02).
 Phase 300 cannot close until **G4-4a** has run, because its signed-out email journey depends on 299's sign-in return.
 
-Owed: G4-5b, G4-4b email-link leg (cloud), the 340 px mobile Link check; X-7 Moonshot re-run (⛔ BUG-261024-01).
+Owed: G4-4b email-link leg (cloud); X-7 Moonshot re-run (⛔ BUG-261024-01).
 
 ## Rows
 
@@ -43,13 +43,13 @@ Fill the Verdict + Evidence cells there.
 |---|---|---|
 | G4-2 | Other-org run link with a live chat: Stay, Switch, Switch back | ✅ PASS 2026-10-29 (Claude) — **A1 holds: still streaming at Switch back** |
 | A-2 | Thread A streams while thread B is opened by pasted address | ✅ PASS 2026-10-29 (Claude) |
-| G4-1 | Copy link → fresh tab; also the RunModal "Saves in" caption and the 340 px link surface at mobile width | ✅ core + RunModal caption PASS 2026-10-29 (Claude); **340 px mobile still owed** (operator) |
+| G4-1 | Copy link → fresh tab; also the RunModal "Saves in" caption and the 340 px link surface at mobile width | ✅ core + RunModal caption PASS 2026-10-29 (Claude); 340 px mobile ✅ PASS 2026-10-29 (Claude, 372 + 321 px frames) |
 | G4-3 | Missing ≡ forbidden: same card, same 404 body and headers (DevTools) | ✅ PASS 2026-10-29 (Claude) |
 | G4-4a | Signed-out return — password | ✅ PASS 2026-10-29 (Claude; operator signed out + in) — unblocks 300 G4-6 |
 | G4-4b | Signed-out return — sign-up email link | ✅ PASS 2026-10-29 (Claude) except the email-link leg — ⛔ local auto-confirm sends no email; owed on cloud |
 | G4-4d | Off-site return target planted in sessionStorage → lands on chat, never off-origin | ✅ PASS 2026-10-29 (Claude) |
 | G4-5a | Slow 3G: "Loading your chats…" at desktop and mobile; never "No recent chats" | ✅ PASS 2026-10-29 (Claude, in-tab request delay) — **BUG-261027-02 may close at 299 close** |
-| G4-5b | Auth blocked: 8 s "Still connecting…", 20 s "Can't reach Syrel" + Try again keeps the URL | 9 |
+| G4-5b | Auth blocked: 8 s "Still connecting…", 20 s "Can't reach Syrel" + Try again keeps the URL | ✅ PASS 2026-10-29 (Claude, in-frame auth block) |
 | A-1 | Multi-tool run reattaches from its address in a fresh tab | ✅ PASS 2026-10-29 (Claude) |
 | A-3 | ≥ 50-message thread opened by address, refreshed → same thread at its tail | ✅ PASS 2026-10-29 (Claude) |
 | X-1..X-8 | Full native roster + OpenRouter (derive from `MODEL_CAPABILITIES`): stream survives A → B → Back → Forward + other-org link + Stay | ✅ 7/8 PASS 2026-10-29 (Claude); ⛔ X-7 Moonshot rate-limited (BUG-261024-01) |
