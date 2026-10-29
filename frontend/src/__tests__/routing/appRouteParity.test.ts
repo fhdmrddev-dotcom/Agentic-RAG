@@ -57,7 +57,20 @@ const CANONICAL: string[] = VIEWS.map((view) => formatAppRoute(sampleRoute(view)
 const LEGACY = [`/app?run=${RUN_ID}`, "/app?connections=1&oauth_error=x", "/admin/spend"]
 const PRE_AUTH = ["/setup", "/invite?token=x"]
 
-const ALL = [...CANONICAL, ...LEGACY, ...PRE_AUTH]
+// Phase 299-02 (LINK-02 / D-01): the entity addresses. They are NOT `ActiveView` members (a thread,
+// a workflow and an Expert open inside the chat / workflows / experts views), so they come from the
+// SAME formatter over the route table's id-bearing variants, in their own list — CANONICAL above
+// stays one address per member.
+const THREAD_ID = "5d0c2a9e-3b1f-4c6d-8e7a-1f2b3c4d5e6f"
+const DEFINITION_ID = "7e1d3b0f-4c2a-4d7e-9f8b-2a3b4c5d6e7f"
+const BUNDLE_ID = "9f2e4c1a-5d3b-4e8f-a09c-3b4c5d6e7f80"
+const ENTITY: string[] = [
+  formatAppRoute({ view: "chat", threadId: THREAD_ID }),
+  formatAppRoute({ view: "workflows", definitionId: DEFINITION_ID }),
+  formatAppRoute({ view: "experts", bundleId: BUNDLE_ID }),
+]
+
+const ALL = [...CANONICAL, ...ENTITY, ...LEGACY, ...PRE_AUTH]
 
 function split(url: string): { pathname: string; search: string } {
   const i = url.indexOf("?")
@@ -104,6 +117,12 @@ describe("the parity inputs are the route table's (LINK-08)", () => {
     expect(new Set(CANONICAL).size).toBe(VIEWS.length)
     expect(CANONICAL).toContain(`/app/runs/${RUN_ID}`)
     expect(CANONICAL).toContain(`/app/skills/${SKILL_ID}`)
+  })
+
+  it("299-02: the three entity addresses are distinct, under /app, and none is a view's own address", () => {
+    expect(ENTITY).toEqual([`/app/chat/${THREAD_ID}`, `/app/workflows/${DEFINITION_ID}`, `/app/experts/${BUNDLE_ID}`])
+    expect(new Set(ENTITY).size).toBe(3)
+    for (const path of ENTITY) expect(CANONICAL).not.toContain(path)
   })
 
   it("every canonical address starts /app and no segment contains a dot", () => {

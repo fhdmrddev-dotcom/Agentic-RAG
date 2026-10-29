@@ -3010,3 +3010,12 @@ reuses 267-B's event-card shape.
 | # | Name | Design Question | Winner | Tags |
 |---|------|----------------|--------|------|
 | 293 | api-keys-tab | How the API keys tab lays out create, the show-once secret + curl, the list with last-used and activity, revoke, and the admin's org-wide list (one card / list + side panel / a card per key) | ★ C a card per key, draft becomes the key, call strip (operator, 2026-10-24) | phase-293, start-02, seed-195, settings, api-keys |
+
+## Sketch 299 — Links to the Thing Itself (Phase 299, G-2 gate)
+
+| # | Name | Design Question | Winner | Tags |
+|---|------|----------------|--------|------|
+| 299 | cant-be-opened | One page for missing OR not-allowed links, identical words/status/timing (297 page with new words / in place over its area / full page with next steps) | ★ B in place, over its own area (operator, 2026-10-28) | phase-299, link-04, security, not-found |
+| 299 | switch-org | Where "This is in <org> — switch?" appears and how declining visibly changes nothing, live stream included (replaces main area / dialog over current view / banner) | ★ A prompt replaces the main area (operator, 2026-10-28) | phase-299, link-05, org-switch, live-stream |
+| 299 | copy-link | Where copy link sits on chat, workflow, run, Expert, and the one receipt (menu item / header link icon / share popover with who-can-open) | ★ C share popover with who-can-open line (operator, 2026-10-28) | phase-299, link-02, link-03, copy-link |
+| 299 | sign-in-return-and-boot | Whether sign-in names the destination kind, the boot give-up stages, the mobile chat-list loading state (quiet line / card names it / silent) | ★ A quiet line under the form (operator, 2026-10-28) | phase-299, link-06, fix-02, sign-in, boot |

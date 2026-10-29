@@ -1,7 +1,8 @@
 ---
 seed_id: SEED-281
 title: Nobody is told an approval is waiting — an unattended run pauses for a person who is never notified, and this is the collection point for every notification need
-status: planted
+status: folded
+folded_into: "300, 301"
 planted: 2026-08-29
 planted_by: operator, watching a 04:19 scheduled run stop silently at its approval step
 surface: Agentic-RAG
@@ -27,6 +28,9 @@ re_open_trigger: >
   Immediately for the DOCUMENTATION half (this file). For the BUILD: the first milestone that
   schedules anything customer-facing, or the second recorded instance of a pause nobody saw.
 status_note: >
+  2026-10-29: FOLDED at /gsd:discuss-phase 300 — the run-waiting EMAIL half is Phase 300 (NOTE-02..04, 06),
+  the in-app list + badge half is Phase 301 (NOTE-01, NOTE-05). Flip to `shipped` only when 301 ships.
+  Previous note kept below.
   ⚠ STILL `planted`, DELIBERATELY. Phase 235 shipped the SURFACE this seed needs and registered
   exactly ONE producer (a broken source) — nothing about this seed's own notification need shipped,
   so flipping to `folded` or `closed` would be a lie the register would then carry forever. What

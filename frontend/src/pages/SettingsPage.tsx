@@ -49,6 +49,7 @@ import { EngineHealthCard } from "@/components/settings/EngineHealthCard"
 // SEED-258 — the source file ceiling. The card owns the copy; this page owns the wire.
 import { SourceFileCeilingCard } from "@/components/settings/SourceFileCeilingCard"
 import { ApiKeyLimits, type ApiKeyLimitsHandle } from "@/components/settings/ApiKeyLimits"
+import { EmailSettings, type EmailSettingsHandle } from "@/components/settings/EmailSettings"
 import { SOURCE_CEILING_RECOMMENDED_MB } from "@/components/settings/sourceCeilingCopy"
 import { JudgeModelPicker } from "@/components/settings/JudgeModelPicker"
 import { AuthoringModelPicker } from "@/components/settings/AuthoringModelPicker"
@@ -698,6 +699,8 @@ export function SettingsPage({ onOpenRun }: { onOpenRun?: (runId: string) => voi
   const roundLimitsRef = useRef<AgentRoundLimitsHandle>(null)
   // 293-03 (D-14): the per-key limits ride Save Integrations, the AgentRoundLimits pattern.
   const apiKeyLimitsRef = useRef<ApiKeyLimitsHandle>(null)
+  // 300-05 (D-07/D-08/D-10): the mail knobs ride Save Integrations the same way.
+  const emailSettingsRef = useRef<EmailSettingsHandle>(null)
 
   const handleSaveAIModel = async () => {
     // Plan 075.4-04 Task 1 (D-075.4-F3) — flushSync commits pending onChange
@@ -815,6 +818,12 @@ export function SettingsPage({ onOpenRun }: { onOpenRun?: (runId: string) => voi
   }
 
   const handleSaveIntegrations = async () => {
+    // 300-REVIEW WR-05: an invalid changed address vetoes the save (never a silent drop + "Saved").
+    const emailRefusal = emailSettingsRef.current?.invalid() ?? null
+    if (emailRefusal) {
+      setError(emailRefusal)
+      return
+    }
     setSavingIntegrations(true)
     setError(null)
     try {
@@ -830,10 +839,12 @@ export function SettingsPage({ onOpenRun }: { onOpenRun?: (runId: string) => voi
         source_max_file_size_mb: sourceMaxFileSizeMb,
         // 293-03 (D-14): ONE save per section — the per-key limits ride this PUT ({} until read).
         ...apiKeyLimitsRef.current?.changes(),
+        ...emailSettingsRef.current?.changes(),
       }
       const updated = await updateSettings(body)
       hydrate(updated)
       apiKeyLimitsRef.current?.adopt(updated)
+      emailSettingsRef.current?.adopt(updated)
       setSavedIntegrations(true)
       setTimeout(() => setSavedIntegrations(false), 2500)
     } catch (e: unknown) {
@@ -1627,6 +1638,9 @@ export function SettingsPage({ onOpenRun }: { onOpenRun?: (runId: string) => voi
 
               {/* 293-03 (D-14 / UI-SPEC Surface 6): the operator's per-key limits. */}
               <ApiKeyLimits ref={apiKeyLimitsRef} />
+
+              {/* 300-05 (UI-SPEC S3): who emails come from, the delay, the test address. */}
+              <EmailSettings ref={emailSettingsRef} />
 
               {/* Save Integrations button */}
               <div className="flex justify-end">

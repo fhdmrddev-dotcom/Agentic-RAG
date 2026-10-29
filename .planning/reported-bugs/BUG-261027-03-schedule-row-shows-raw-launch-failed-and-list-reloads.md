@@ -4,9 +4,9 @@ title: A schedule row shows the raw status word launch_failed, and Run now repla
 reported: 2026-10-27
 surface: Agentic-RAG
 severity: minor
-status: open
+status: folded  # 2026-10-29: folded into Phase 300 at discuss-phase (300-CONTEXT.md)
 affected_areas: ['frontend/workflows', 'workflow/schedules']
-folded_into: null
+folded_into: "300"
 verified_closed_by: null
 related_seeds: []
 re_open_trigger: "Fold at the next /gsd:discuss-phase whose files touch frontend/workflows; found during the 296 G-4 drive, outside 296's inventory"

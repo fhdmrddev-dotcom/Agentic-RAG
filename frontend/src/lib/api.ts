@@ -469,6 +469,10 @@ export type {
 export { getFolderLabels, getElsewhereCounts, getMovePreview, moveOrgItem } from "./api/orgItems"
 export type { FolderLabel, ElsewhereOrgCounts, MovePreview, OrgItemMoveKind } from "./api/orgItems"
 
+// ── links (Phase 299-03) ───────────────────────────────────────────────
+export { resolveLink } from "./api/links"
+export type { LinkKind, LinkTarget, LinkAnswer } from "./api/links"
+
 // ── connectors ─────────────────────────────────────────────────────────
 export {
   ConnectorApiError,

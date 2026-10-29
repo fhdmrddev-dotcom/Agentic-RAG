@@ -948,7 +948,7 @@ async def submit_ask_user_response(
     # 404 (NOT 403) on missing row — never leak existence to other users.
     row_resp = await aexec(
         supabase.table("runs")
-        .select("run_id, thread_id, status")
+        .select("run_id, thread_id, status, org_id")  # 299 (D-18): the answer's org is the run's
         .eq("run_id", str(run_id))
         .eq("user_id", current_user["id"])
         .maybe_single()
@@ -986,7 +986,7 @@ async def submit_ask_user_response(
         # ``resume_pending_prompt`` re-subscribes on after a worker restart).
         wf_self_resp = await aexec(
             supabase.table("workflow_runs")
-            .select("id, thread_id")
+            .select("id, thread_id, org_id")
             .eq("id", str(run_id))
             .eq("user_id", current_user["id"])  # owner-scoped — no existence leak
             .maybe_single()
@@ -1009,6 +1009,7 @@ async def submit_ask_user_response(
                     "run_id": str(run_id),
                     "thread_id": wf_self["thread_id"],
                     "status": None,
+                    "org_id": wf_self.get("org_id"),
                 }
                 # CTX-01 (A2): confirmed workflow_run reply → tag 'harness'.
                 _origin = "harness"
@@ -1078,6 +1079,9 @@ async def submit_ask_user_response(
                 "user_id": current_user["id"],
                 "role": "system",
                 "content": body.response_text,
+                # 299 (D-18/D-38): stamped with the RUN's org, never the owner trigger's LIMIT-1 guess
+                # (a two-org caller answering from a link). NULL still falls to the trigger.
+                "org_id": row.get("org_id"),
                 # CTX-01 (A2): 'harness' only on the confirmed-workflow branch, else 'deep'.
                 "origin": _origin,
                 "tool_calls": [{

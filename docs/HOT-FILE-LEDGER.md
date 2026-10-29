@@ -8092,6 +8092,14 @@ Five sentences, not one; the headline names the author's step name and the missi
 
 296-04 (BUG-261025-01 / 295-IN-05 / 287-SCHED): three useState (`runningId`, `runResult`, `requiredRefusal`) replace one (`notice`); a pure `runNowResult` reads `outcome` (old backend: launched → success, else error tone) and the server `detail` verbatim; the result line renders inside the pressed row; Add schedule refuses through the imported `missingRequiredFields` / `requiredFieldsMessage` (296-07 owns `soulData.ts`). Triple `5 / 4 / 723` (was `3 / 3 / 601`). Previous CLAUDE.md cell kept verbatim: ⚠ absent for its entire life; it crossed the threshold in 214-09 on a. Previous scan-list cell kept verbatim: 3 / 3 / 601 | ⚠ **FIRES — EXACTLY AT THRESHOLD** | ⚠ absent for its entire life; it crossed the threshold in 214-09 on a LAUNCH-CRITICAL path — row and BASELINE pin both added at this close.
 
+### `frontend/src/components/workflows/WorkflowScheduleModal.tsx` — 300-01 (D-15, D-16, D-14 client half, D-26; 2026-10-29)
+
+**`6 / 5 / 812` (was `5 / 4 / 723`).** BUG-261027-03: the ` · ${s.last_status}` interpolation is gone — the row renders "Last ran: {when}" and, under it, `scheduleOutcomeLine(s.last_status)` as its own `mt-1 text-[12px] break-words` line toned from the shipped `RUN_NOW_TONE` (muted → `text-muted-foreground`). D-16: `runningId` / `runResult` became `runningIds` (a Set) and `runResults` (a map keyed by schedule id); Run now no longer goes through `withBusy` — only its row's Run now / Pause / Delete are disabled, the Add form and the close button stay usable, and a row's line clears only when that row is pressed again (or the dialog unmounts). `refresh` has a quiet mode: "Loading…" only before the first list is shown, `aria-busy` on the `<ul>` after; a failed quiet refetch keeps the shown list. D-14: a `missing_required` refusal (read by `code` off the thrown error, never by importing the class — no `@/lib/api` mock has to learn a name) goes to `schedule-required-refusal` from create and to that row's line (warning) from Resume. No new component, no new hook. ⚠ Extraction FIRST next: the row (`<li>` + its three buttons + three lines) is the seam.
+
+Scan-list cell as of 2026-10-29 (replaced by 300-01, moved verbatim): 5 / 4 / 723 (was `3 / 3 / 601`) | ⚠ **FIRES** | 296-04: Run now spins on its row (aria-busy, Starting…) and its worded result sits under Last ran; Add schedule refuses an empty required input by name. Bottom notice removed
+
+CLAUDE.md verdict cell as of 2026-10-29 (replaced by 300-01, moved verbatim): | `frontend/src/components/workflows/WorkflowScheduleModal.tsx` | 5 / 4 / 723 (was `3 / 3 / 601`) | 296-04: row-local Run now result + required refusal |
+
 ### `frontend/src/components/workflows/argumentModel.ts`
 
 **Triple at Phase 214's close (2026-08-28): `1 / 1 / 313` — G-5: no (1 phase).** young (214-07) — the three argument sources as data
@@ -11583,7 +11591,7 @@ cells rot within days.
 | [`frontend/src/components/experts/ProposedSkillCard.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentsexpertsproposedskillcardtsx) | 1 / 1 / 86 | no (new) | young (created 263-04). Row added AT CREATION. ⛔ The ONE home of the "does not exist" mark — dashed+violet, never red (D-263-01); a second styling makes a proposal read as an error. |
 | [`frontend/src/components/org/OrgAdminShell.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentsorgorgadminshelltsx) | 10 / 6 / 416 (was `7 / 5 / 454`) | ⚠ **FIRES** | ⚠ STALE (`3/5/442`, read `no`). **275-04**: Retention live — ONE render branch + ONE `recordingPulse` (1.6 s) to OrgBand. ⛔ extraction FIRST next touch · 293 touch: see §Phase 293 close |
 | [`frontend/src/components/org/OrgExpertsTab.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentsorgorgexpertstabtsx) | 2 / 2 / 324 | no (2 phases) | ⚠ row was STALE at `1 / 1 / 347`. honoured by construction (**262-02**): its `ICON_MAP` + `renderExpertIcon` MOVED OUT verbatim — a PURE move; its pinned suite is byte-unchanged and green |
-| [`frontend/src/lib/api/experts.ts`](docs/HOT-FILE-LEDGER.md#frontendsrclibapiexpertsts) | 12 / 6 / 422 (was `9 / 5 / 418`) | ⛔ **FIRES — 6 phases** | honoured by construction (**279-03**): one comment word ("Won't search"). ⛔ one client function per route |
+| [`frontend/src/lib/api/experts.ts`](docs/HOT-FILE-LEDGER.md#frontendsrclibapiexpertsts) | 13 / 7 / 424 (was `12 / 6 / 422`) | ⛔ **FIRES — 6 phases** | honoured by construction (299-REVIEW WR-03): handleResponse's thrown Error carries res.status (additive, one expression). ⛔ one client function per route |
 | [`backend/app/db/experts.py`](docs/HOT-FILE-LEDGER.md#backendappdbexpertspy) | 5 / 4 / 749 | ⚠ **FIRES — 4 phases** | ⚠ row STALE at `4/3/567`. honoured by construction (**266-01**): SIX install queries ADDED (guarded-upsert claim). ⛔ no existing query touched |
 | [`backend/app/models/expert.py`](docs/HOT-FILE-LEDGER.md#backendappmodelsexpertpy) | 6 / 4 / 131 (was `3 / 3 / 93`) | ⚠ **FIRES — 4 phases** | ⚠ row STALE (`3/3/93`). honoured by construction (**267-01**): `tool_floor_enabled` kept for compatibility, described as unread (D-267-02). ⛔ no field removed — the PATCH round-trip stays |
 | [`backend/app/services/expert_service.py`](docs/HOT-FILE-LEDGER.md#backendappservicesexpert_servicepy) | 11 / 7 / 619 (was `9 / 6 / 575`) | ⛔ **FIRES — 7 phases** | ⚠ row STALE (`9/6/575`). honoured by construction (**267-01**): `connection_states` is THE one 'is it connected' rule; the resolver strips by it. ⛔ pure data — no LLM import, no `while` |
@@ -11599,36 +11607,36 @@ cells rot within days.
 | [`frontend/src/components/chat/ToolCallPanel.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentschattoolcallpaneltsx) | 55 / 23 / 409 (was `54 / 22 / 407`) | ⚠ **FIRES** | ✅ G-5 DISCHARGED (227-02). **273-05**: `stepLabel` + `ARGS_HIDDEN.livePanel` replace one name check; no new branch |
 | [`frontend/src/components/chat/tool-bodies/SearchDocumentsBody.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentschattool-bodiessearchdocumentsbodytsx) | 3 / 3 / 71 | ⚠ **FIRES** (crossed in 272) | ⚠ absent its ENTIRE LIFE — row added 272-05. **F-3**: `summarize` names refused / invalid / empty / not-searchable / unavailable |
 | [`frontend/src/components/chat/MessageItem.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentschatmessageitemtsx) | 84 / 39 / 1059 (was `83 / 42 / 1050`) | ⚠ **FIRES** | 292.1 UAT: Deep Continue re-attaches the run's stream (+1 else-if) · ⛔ |
-| [`backend/app/api/threads.py`](docs/HOT-FILE-LEDGER.md#backendappapithreadspy) | 284 / 96 / 2752 (was `283 / 95 / 2745`) | ⚠ **FIRES** | 298-01: list_threads wraps the filter chain in ONE `org_lists.by_org(...)` before .order (no org = today's chain, pinned). Honoured by construction. |
+| [`backend/app/api/threads.py`](docs/HOT-FILE-LEDGER.md#backendappapithreadspy) | 285 / 97 / 2756 (was `284 / 96 / 2752`) | ⚠ **FIRES** | 299-01: ONE awaited `item_org_guard.refuse_if_other_org(...)` in send_message after `_require_thread_org` + one import. No branch. Honoured by construction. |
 | [`frontend/src/providers/StreamsProvider.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrcprovidersstreamsprovidertsx) | 120 / 45 / 5250 (was `119 / 45 / 5234`) | ⚠ **FIRES** | 296 G-4 row 12: sendMessage's kickoff follow now reconciles the viewed thread at its terminal (the R5 kickoff has no assistant node) and clears the previous run's step slice at kickoff. |
 | [`frontend/src/hooks/useMessages.ts`](docs/HOT-FILE-LEDGER.md#frontendsrchooksusemessagests) | 74 / 27 / 127 | ⚠ **FIRES** | extraction due |
 | [`backend/app/services/anthropic_service.py`](docs/HOT-FILE-LEDGER.md#backendappservicesanthropic_servicepy) | 12 / 11 / 373 (was `11 / 10 / 354`) | ⚠ **FIRES** | **282-01**: ONE `_anthropic_client` builder (budget in the constructor, connect 5 s, cloud retries 2) + trailing `timeout_s` on `stream_anthropic`. honoured by construction; adapter-pattern audit due |
 | [`frontend/src/components/workflows/WorkflowCanvas.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentsworkflowsworkflowcanvastsx) | 33 / 11 / 1757 (was `32 / 10 / 1744`) | **FIRES** | 296-07 (D-09, operator decision): ONE controlled prop pair (view / onViewChange) + tabpanel attrs on 2 bodies; useState 8→8. ⛔ extraction still FIRST next |
 | [`frontend/src/components/workflows/FlowEdge.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentsworkflowsflowedgetsx) | 3 / 3 / 462 | ⚠ **FIRES — EXACTLY AT THRESHOLD** | honoured by construction (200) — ⚠ absent, and it crossed the threshold in the commit that added its row |
 | [`frontend/src/components/workflows/PhaseNodeCard.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentsworkflowsphasenodecardtsx) | 18 / 9 / 490 (was `17 / 8 / 489`) | **FIRES** | 290: the 286 forecast went UNUSED (the chips went on the library card, UI-SPEC §9); file untouched. honoured by construction (199) — ⚠ the 200 canvas port stays REVERTED |
-| [`backend/app/services/harness/phase_types.py`](docs/HOT-FILE-LEDGER.md#backendappservicesharnessphase_typespy) | 66 / 33 / 3135 (was `65 / 33 / 3131`) | ⚠ **FIRES** | 296-06: pinned-model provider arm (293-F-4); retry needs KB evidence (291-IN-01); one notice helper for a swapped agent pin, hardened (str-only, never raises). G-5 OWED |
-| [`frontend/src/pages/WorkflowsPage.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrcpagesworkflowspagetsx) | 52 / 22 / 1392 (was `51 / 22 / 1390`) | ⚠ **FIRES** | 298-05: one JSX mount, <ElsewhereLine kind="workflows"> at the top of the p-6 list region inside the grid's max-w-[1200px], + its import. No state, no hook, no other line |
-| [`frontend/src/components/workflows/library/WorkflowCard.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentsworkflowslibraryworkflowcardtsx) | 26 / 11 / 1373 (was `25 / 10 / 1371`) | **FIRES** | 296-07 (286-S04-2): comment-only — the MARK_ICON docblock and the CalendarClock comment name the icons this file draws today |
+| [`backend/app/services/harness/phase_types.py`](docs/HOT-FILE-LEDGER.md#backendappservicesharnessphase_typespy) | 67 / 34 / 3147 (was `66 / 33 / 3135`) | ⚠ **FIRES** | 300-03 (D-23, G-5 override audited in STATE.md): one hunk in _external_action_sent_body — send_email names the recipient (via host). Owed refactor NOT discharged |
+| [`frontend/src/pages/WorkflowsPage.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrcpagesworkflowspagetsx) | 56 / 23 / 1403 (was `55 / 23 / 1403`) | ⚠ **FIRES** | honoured by construction (299-REVIEW WR-05): the useWorkflowLinkTarget call passes shown: visibleRows and clearFilters: clearAllFilters (one expression) |
+| [`frontend/src/components/workflows/library/WorkflowCard.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentsworkflowslibraryworkflowcardtsx) | 27 / 12 / 1374 (was `26 / 11 / 1373`) | **FIRES** | 299-02: one attribute data-row-id={row.id} on the root, beside data-provenance (the link target). Honoured by construction; seam286 pin snapshot +5 attrs |
 | [`frontend/src/components/workflows/library/libraryVocabulary.ts`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentsworkflowslibrarylibraryvocabularyts) | 15 / 8 / 820 (was `14 / 7 / 819`) | ⚠ **FIRES** | 296-07 (290-IN-02): STEP_LINE_UNTYPED is a re-export of phaseVocabulary.STEP_UNTYPED (one home); no seam proposed |
 | [`frontend/src/components/workflows/library/libraryFilter.ts`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentsworkflowslibrarylibraryfilterts) | 6 / 4 / 435 | ⚠ **FIRES** | ⚠ absent at 4 phases and NO PLAN NAMED IT (192.2) |
 | [`frontend/src/components/workflows/library/libraryRow.ts`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentsworkflowslibrarylibraryrowts) | 4 / 3 / 201 | ⚠ **FIRES — EXACTLY AT THRESHOLD** | ⚠ absent, on the boundary (added 192.2) |
 | [`frontend/src/components/workflows/WorkflowDoorSwitch.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentsworkflowsworkflowdoorswitchtsx) | 20 / 13 / 1104 (was `18 / 12 / 1075`) | **FIRES** | 291-04: one hook, one mount (the references section), one handoff spread (+33 −4). Honoured by construction (193 / 193.1 / 199 / 214 / 291) |
 | [`frontend/src/pages/WorkflowBuilderPage.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrcpagesworkflowbuilderpagetsx) | 66 / 28 / 2942 (was `65 / 27 / 2940`) | ⚠ **FIRES** | 298-04: useBuilderNameMaps({ meta, phases }) + folderLabels in its destructure, and the one bound-folder <option> = optionLabel(...); UNNAMED_KB_OPTION import moved to folderLabel. useState unchanged |
-| [`backend/app/api/workflows.py`](docs/HOT-FILE-LEDGER.md#backendappapiworkflowspy) | 53 / 27 / 1712 (was `52 / 27 / 1712`) | ⚠ **FIRES** | 298-review WR-06: create_draft's raise_if_foreign gains owner_default=True (header-less = the mig-106 trigger's org, not skipped); comment updated. ⛔ split OWED |
-| [`backend/app/api/workflow_runs.py`](docs/HOT-FILE-LEDGER.md#backendappapiworkflow_runspy) | 22 / 16 / 1449 (was `21 / 15 / 1445`) | ⚠ **FIRES** | 298-01: one `runs_query = org_lists.by_org(...)` + `request` param — audited one-touch override (296-06 precedent); fence amended D-298-01. ⛔ extraction FIRST next: the wording helpers |
+| [`backend/app/api/workflows.py`](docs/HOT-FILE-LEDGER.md#backendappapiworkflowspy) | 54 / 28 / 1722 (was `53 / 27 / 1712`) | ⚠ **FIRES** | 299-01 (D-38): create_draft gains optional `from_definition_id` query + ONE guarded refuse_if_other_org (tweak). No new route; 286 fence re-baselined. ⛔ split OWED |
+| [`backend/app/api/workflow_runs.py`](docs/HOT-FILE-LEDGER.md#backendappapiworkflow_runspy) | 23 / 17 / 1453 (was `22 / 16 / 1449`) | ⚠ **FIRES** | 299-01 (D-10): ONE additive model field `org_id` + one `org_id=run.get("org_id")` kwarg from the column the ownership select already names. No branch, no query. ⛔ extraction FIRST next |
 | [`backend/app/services/harness/phase_confidence.py`](docs/HOT-FILE-LEDGER.md#backendappservicesharnessphase_confidencepy) | 2 / 2 / 167 (was `1 / 1 / 153`) | no (young) | young. 296-06 (289-IN-07): RunEvidenceConfidence moved here VERBATIM beside confidence_for_wire (one home, both run reads). ⛔ no provider import |
 | [`backend/app/services/run_evidence.py`](docs/HOT-FILE-LEDGER.md#backendappservicesrun_evidencepy) | 6 / 4 / 555 (was `5 / 3 / 525`) | ⚠ **FIRES** | 296-01: D-05 withheld cascade (one flag, one elif) + canonical-UUID filter on the cited ids. ⛔ no I/O; owner path untouched |
 | [`backend/app/api/workflow_run_evidence.py`](docs/HOT-FILE-LEDGER.md#backendappapiworkflow_run_evidencepy) | 6 / 4 / 405 (was `5 / 4 / 408`) | ⚠ **FIRES** | 296-06 (289-IN-07): RunEvidenceConfidence re-exported from phase_confidence (move only). ⛔ ONE access query; 404 parity |
 | [`backend/app/middleware/canvas_gate.py`](docs/HOT-FILE-LEDGER.md#backendappmiddlewarecanvas_gatepy) | 9 / 6 / 396 (was `8 / 5 / 391`) | **FIRES** | **289-03**: ONE CANVAS_GATED_PATHS member (`…/evidence`) + comment, same commit as its include_router. ⛔ test_182 never imports the set |
 | [`backend/app/models/thread.py`](docs/HOT-FILE-LEDGER.md#backendappmodelsthreadpy) | 25 / 17 / 550 (was `24 / 16 / 545`) | ⚠ **FIRES** | 295-05: ONE field (`WorkflowPhaseState.unsourced`, a plain dict to avoid the harness import cycle). Honoured by construction · 293 touch: see §Phase 293 close |
 | [`frontend/src/components/workflows/canvasModel.ts`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentsworkflowscanvasmodelts) | 16 / 8 / 836 (was `15 / 8 / 831`) | ⚠ **FIRES** | 296-07: comparePhaseOrder + engineArmed delegations (290-IN-01/FU); isGrounded is every cause except escalated (BUG-261021-05 b) |
-| [`frontend/src/components/layout/ChatLayout.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentslayoutchatlayouttsx) | 69 / 35 / 905 (was `67 / 34 / 897`) | ⚠ **FIRES** | 298-04: `switching: threadsSwitching` replaces the dropped `loading: _loading`, passed as loading= on ChatHistoryColumn; the existing org-change effect also clears mobileFolderId. ⛔ no new effect |
+| [`frontend/src/components/layout/ChatLayout.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentslayoutchatlayouttsx) | 73 / 36 / 934 (was `72 / 36 / 933`) | ⚠ **FIRES** | 299-03: history-column guard drops `!addressNotFound` (live behind the card) + one threadsPending pass-through. ⛔ no new useState/useEffect; IN-01 effect unedited |
 | [`frontend/src/components/library/LibraryCloudImport.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentslibrarylibrarycloudimporttsx) | 1 / 1 / 194 | no (new) | young (created 244-06). Row added AT CREATION. The Library's single-file cloud door — ⛔ it renders a REASON in every unavailable state; a silent grey-out is the same failure as a silent root write |
 | [`frontend/src/components/library/LibraryHeaderBar.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentslibrarylibraryheaderbartsx--row-added-244-04) | 5 / 4 / 262 (was `4 / 3 / 249`) | ⚠ **FIRES** | **284-03**: optional `totalState`: "Counting…" while loading, "Count not known yet" on failure, never "0 documents" before an answer; numbers grouped |
 | [`frontend/src/components/layout/ChatHistoryColumn.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentslayoutchathistorycolumntsx) | 9 / 3 / 524 (was `8 / 3 / 522`) | ⚠ **FIRES** | 298-05: one JSX mount, <ElsewhereLine kind="threads"> first in hc-list (shown under a title filter too), + its import. No state, no other line |
 | [`frontend/src/components/settings/ActionRow.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentssettingsactionrowtsx) | 1 / 1 / 153 | no (1 phase) | Single action permission row in grant list; renders direction, posture buttons, and forward-action reset affordance (CRED-02). |
 | [`frontend/src/components/settings/McpAuthDoor.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentssettingsmcpauthdoortsx) | 3 / 1 / 451 | no (1 phase) | Second writer of custom_client_id (Phase 222 BYO door). CRED-01 inline refusal shared with ConnectionFormPanel via customClientIdError; both doors must enforce the same boundary. |
-| [`frontend/src/hooks/useThreads.ts`](docs/HOT-FILE-LEDGER.md#frontendsrchooksusethreadsts) | 8 / 4 / 121 (was `7 / 4 / 117`) | ⚠ **FIRES** | 298-review WR-03: one catch arm in loadThreads, a failed answer settles its org (rows []) and rethrows, as useFolders. ⛔ org-tagged rows; switching only while another org is held |
+| [`frontend/src/hooks/useThreads.ts`](docs/HOT-FILE-LEDGER.md#frontendsrchooksusethreadsts) | 9 / 5 / 128 (was `8 / 4 / 121`) | ⚠ **FIRES** | 299-05 (FIX-02): one derived const `pending` (no answer yet, or another org held) + one return key. ⛔ selectThread stays a bare setState; switching unchanged |
 | [`backend/app/services/harness/grounding.py`](docs/HOT-FILE-LEDGER.md#backendappservicesharnessgroundingpy) | 23 / 10 / 1437 (was `22 / 9 / 1417`) | ⚠ **FIRES** | 295-03: ONE pure predicate `is_engine_citation_gate` (+1 def, If 24→24); `on_failure="fail_run"` kept (D-51). Honoured by construction |
 | [`frontend/src/components/workflows/PhaseFormPanel.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentsworkflowsphaseformpaneltsx) | 31 / 15 / 1569 (was `30 / 14 / 1566`) | **FIRES** | honoured by construction ×7 (296-07: one optional key on the template prop type, passed through to TemplateAttachSection) |
 | [`backend/app/db/workflows.py`](docs/HOT-FILE-LEDGER.md#backendappdbworkflowspy) | 64 / 32 / 2874 (was `63 / 31 / 2862`) | ⚠ **FIRES** | 298-01: keyword-only `org_id` on list_published_workflows (globals kept, `wd.` qualified) + list_draft_workflows; no org = SQL byte-identical (sha256-pinned); placeholder fence amended D-298-02. |
@@ -11638,7 +11646,7 @@ cells rot within days.
 | [`frontend/src/components/workflows/builderStore.ts`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentsworkflowsbuilderstorets) | 16 / 9 / 1039 (was `14 / 8 / 968`) | **FIRES** | 291: two actions (`addReferenceAssets` 291-04, `setInputSource` 291-05) and NO state field; the ≤ 1 store field forecast held. Honoured by construction (193.2 / 197 / 214.1 / 291) |
 | [`frontend/src/components/panel/WorkspacePanel.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentspanelworkspacepaneltsx) | 17 / 11 / 646 (was `16 / 10 / 646`) | **FIRES** | honoured by construction (194 / 194.1 / **282-02**: ONE `home="panel"` prop on the existing `PendingAskStack` mount; the `pendingAsks.length > 0 &&` condition byte-identical) |
 | [`backend/app/services/run_lifecycle.py`](docs/HOT-FILE-LEDGER.md#backendappservicesrun_lifecyclepy) | 11 / 7 / 827 (was `10 / 6 / 776`) | ⚠ **FIRES** | 296-02 (295-RES-b): broadcast_run_cancellation gains stopped_by (sibling run_cancelled_by key, same TTL) + cancelled_by reader; Step 3a broadcasts the stopper BEFORE task.cancel() |
-| [`backend/app/api/runs.py`](docs/HOT-FILE-LEDGER.md#backendappapirunspy) | 54 / 23 / 2050 (was `53 / 23 / 2033`) | ⚠ **FIRES** | 296 G-4 S3: `_wake`'s finally now ends the re-drive shell's stream as run_producer does (terminal sentinel from the shell status, then EXPIRE 600/60), after finalize_run. |
+| [`backend/app/api/runs.py`](docs/HOT-FILE-LEDGER.md#backendappapirunspy) | 55 / 24 / 2054 (was `54 / 23 / 2050`) | ⚠ **FIRES** | 299-01: ask_user_response stamps the answer with the run's org — `org_id` select token ×2, one synthesized-row key, one insert key. No branch. Honoured by construction. |
 | [`backend/app/services/harness_engine.py`](docs/HOT-FILE-LEDGER.md#backendappservicesharness_enginepy) | 70 / 27 / 2999 (was `69 / 27 / 2992`) | ⚠ **FIRES** | 296 review CR-01: `_build_resume_context` switches the owner's settings to the run's recorded provider (`override_provider`); no key → the safe resolver. One guarded If. Armed seam still OWED |
 | [`frontend/src/components/chat/RunCard.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentschatruncardtsx) | 31 / 16 / 729 (was `28 / 14 / 710`) | **FIRES** | ⭐ G-5 DISCHARGED (243-02). **276-06**: avatar pulse + header spinner removed (D-27: one live avatar); provider logo static. ⛔ Bot stays the unknown-provider fallback |
 | [`frontend/src/components/chat/WorkingBadge.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentschatworkingbadgetsx) | 3 / 2 / 50 (was `2 / 1 / 56`) | no (2 phases) | ⚠ absent its ENTIRE LIFE; row added at 276-06 planning. 276-06: the ✦ glyph and its pulse gone (the Iris avatar is the motion); the word stays. ⛔ memo equality unchanged |
@@ -11650,29 +11658,29 @@ cells rot within days.
 | [`frontend/src/components/chat/MessageList.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentschatmessagelisttsx) | 24 / 11 / 376 (was `21 / 9 / 307`) | **FIRES** | ⚠ row STALE (`21/9/307`). honoured by construction (**267-04**): the turn index skips system rows via ONE module-level helper; no prop added |
 | [`frontend/src/hooks/useFollowScroll.ts`](docs/HOT-FILE-LEDGER.md#frontendsrchooksusefollowscrollts) | 4 / 2 / 314 | does not fire | ⛔ **NO ROW FOR ITS ENTIRE LIFE — added 243-03**, then STALE at `3/2/265` one phase on. **243-06:** the re-arm now asks whether the reader is STILL leaving, not what they last did |
 | [`frontend/src/lib/throttle.ts`](docs/HOT-FILE-LEDGER.md#frontendsrclibthrottlets) | 2 / 2 / 108 | does not fire | ⛔ **NO ROW FOR ITS ENTIRE LIFE — added 243-03.** TWO opposite primitives on purpose; ⛔ never unify them — one of the two call sites breaks silently |
-| [`frontend/src/components/chat/ChatArea.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentschatchatareatsx) | 94 / 44 / 1189 (was `93 / 43 / 1186`) | **FIRES** | honoured by construction (**287-03**): ONE mount of ThreadWorkflowPicker, zero new hooks, no logic. ⛔ no scope branch in send |
+| [`frontend/src/components/chat/ChatArea.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentschatchatareatsx) | 96 / 45 / 1192 (was `95 / 44 / 1189`) | **FIRES** | honoured by construction (**299-04**): ONE ShareLinkMenu mount after the header title (D-20), owner-only, zero new hooks, no logic. ⛔ no scope branch in send |
 | [`frontend/src/components/panel/PendingAskCard.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentspanelpendingaskcardtsx) | 25 / 12 / 1132 (was `24 / 11 / 1103`) | ⚠ **FIRES** | 296-04: stack keeps the newest ask per live workflow run (pure helper); card reads a passed clock on a live run as paused (one prop). useState 7→7, useEffect 3→3 |
-| [`frontend/src/pages/WorkflowRunPage.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrcpagesworkflowrunpagetsx) | 36 / 16 / 1605 (was `35 / 15 / 1604`) | **FIRES** | 297-02: COPY_LOADING exported, one keyword |
+| [`frontend/src/pages/WorkflowRunPage.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrcpagesworkflowrunpagetsx) | 37 / 17 / 1610 (was `36 / 16 / 1605`) | **FIRES** | 299-04: ONE ShareLinkMenu after the version chip, before the Stop group (Stop unmoved); audienceOf(run). ⛔ no re-run control (D-38); a finished run's link lives in RunEvidenceReport |
 | [`frontend/src/components/workflows/WaitingOnLine.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentsworkflowswaitingonlinetsx) | 1 / 1 / 26 | does not fire | young (created **288-03**): leaf that renders the server-composed waiting-on sentence verbatim; no hook, no API import |
 | [`frontend/src/components/workflows/StepEvidenceLine.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentsworkflowsstepevidencelinetsx) | 2 / 2 / 145 (was `1 / 1 / 93`) | no (2 phases) | 295-05: the unsourced arm; the confidence arm is byte-unchanged (an innerHTML test pins it). Two phases; does not fire |
 | [`frontend/src/components/workflows/evidenceVocabulary.ts`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentsworkflowsevidencevocabularyts) | 5 / 3 / 261 (was `4 / 2 / 254`) | ⚠ **FIRES** (3 phases, crossed in 296) | 296-04: neutral `NO_MATCH_EXPLANATION` / `UNSOURCED_NOTE` (no "your documents") + `DOWNLOAD_UNAVAILABLE`. Words only; now FIRES (289, 295, 296) |
 | [`frontend/src/components/workflows/evidenceView.ts`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentsworkflowsevidenceviewts) | 4 / 3 / 387 (was `3 / 2 / 382`) | ⚠ **FIRES** | 295-05: one view field `endReason`, computed once from the C.1 table. Two phases; does not fire · 293 touch: see §Phase 293 close |
-| [`frontend/src/components/workflows/RunEvidenceReport.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentsworkflowsrunevidencereporttsx) | 7 / 5 / 492 (was `6 / 4 / 495`) | ⚠ **FIRES** | 297-02: ?run= writer effect deleted (D-18) |
+| [`frontend/src/components/workflows/RunEvidenceReport.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentsworkflowsrunevidencereporttsx) | 8 / 6 / 497 (was `7 / 5 / 492`) | ⚠ **FIRES** | 299-04: ONE ShareLinkMenu first in the print:hidden actions row; a finished run with an org opens for its members (D-34), name from payload.run.org_name. Writes nothing |
 | [`frontend/src/lib/api/runEvidence.ts`](docs/HOT-FILE-LEDGER.md#frontendsrclibapirunevidencets) | 3 / 3 / 137 (was `2 / 2 / 134`) | ⚠ **FIRES** | 295-05: TS twins for `unsourced` and `end_reason`, widened in lockstep with the contract fixture. Two phases; does not fire · 293 touch: see §Phase 293 close |
 | [`frontend/src/lib/runDeepLink.ts`](docs/HOT-FILE-LEDGER.md#frontendsrclibrundeeplinkts) | 3 / 2 / 41 (was `1 / 1 / 63`) | no (2 phases) | 297-02: write/clear helpers and the window reader deleted (D-18, D-33); isStrictUuid + readRunParam (pure) remain for the route table. ⛔ strict UUID only |
 | [`frontend/src/index.css`](docs/HOT-FILE-LEDGER.md#frontendsrcindexcss) | 35 / 19 / 1239 (was `34 / 18 / 1196`) | ⚠ **FIRES** | 294-05: ONE verdict block keyed only on citation-marker--v-* and __verdict (+43). ⛔ no app-wide rule |
 | [`frontend/src/components/chat/OutputFileCard.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentschatoutputfilecardtsx) | 8 / 7 / 219 | **FIRES** | honoured by construction (195) |
 | [`frontend/src/components/panel/FilesSection.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentspanelfilessectiontsx) | 12 / 8 / 354 (was `10 / 6 / 363`) | ⚠ **FIRES** | ⚠ STALE (`10/6/363`). **274-04**: 1 import, 1 trailing-slot line, 1 Shift+F10 arm, 2 signatures widened to `string \| null`; agent rows byte-identical |
-| [`frontend/src/lib/api.ts`](docs/HOT-FILE-LEDGER.md#frontendsrclibapits) | 214 / 127 / 552 (was `213 / 127 / 552`) | ⚠ **FIRES** | 298-05: the one orgItems block re-exports getElsewhereCounts, getMovePreview, moveOrgItem + their types beside getFolderLabels. No other re-export changed |
-| [`frontend/src/types/index.ts`](docs/HOT-FILE-LEDGER.md#frontendsrctypesindexts) | 102 / 81 / 1685 (was `101 / 80 / 1674`) | ⚠ **FIRES** | 295-05: THREE fields, not the planned two (`Phase.unsourced`, `PendingAsk.engine_pause` + `EnginePause`, `AskUserAnswerBody.folder_id`). Additive. Seam OWED · 293 touch: see §Phase 293 close |
-| [`backend/app/main.py`](docs/HOT-FILE-LEDGER.md#backendappmainpy) | 96 / 70 / 992 (was `95 / 69 / 991`) | ⚠ **FIRES** | 298-01: ONE `app.include_router(org_items.router)` + one name in the api import list. Honoured by construction. ⛔ see section |
-| [`backend/app/config.py`](docs/HOT-FILE-LEDGER.md#backendappconfigpy) | 93 / 54 / 1809 (was `92 / 54 / 1790`) | ⚠ **FIRES** | **282-01** ceiling 1800 + boot check + DB-tier clamp; **282-04** `DEFAULT_LLM_CALL_TIMEOUT_SECONDS_SELF_HOSTED` 900 via the mig 180 predicate. No env var. honoured by construction |
+| [`frontend/src/lib/api.ts`](docs/HOT-FILE-LEDGER.md#frontendsrclibapits) | 215 / 128 / 556 (was `214 / 127 / 552`) | ⚠ **FIRES** | 299-03: one links export block (resolveLink + LinkKind / LinkTarget / LinkAnswer) beside the orgItems block. No other re-export changed |
+| [`frontend/src/types/index.ts`](docs/HOT-FILE-LEDGER.md#frontendsrctypesindexts) | 103 / 82 / 1688 (was `102 / 81 / 1685`) | ⚠ **FIRES** | 299-04: ONE optional field, ExpertBundle.org_id (the experts read is SELECT *, so the wire always carried it). Additive. Seam still owed |
+| [`backend/app/main.py`](docs/HOT-FILE-LEDGER.md#backendappmainpy) | 98 / 72 / 1020 (was `97 / 71 / 993`) | ⚠ **FIRES** | 300-04: ONE drainer start block under `not _setup_mode and RUN_BOOT_SWEEPS` + ONE stop block beside the scheduler's. Honoured by construction. ⛔ see section |
+| [`backend/app/config.py`](docs/HOT-FILE-LEDGER.md#backendappconfigpy) | 96 / 55 / 1831 (was `93 / 54 / 1809`) | ⚠ **FIRES** | 300-03 (D-28): five smtp_* env fields in the existing email block; provider comment none / resend / smtp; stale lazy-import sentence deleted. Honoured by construction |
 | [`backend/app/api/admin.py`](docs/HOT-FILE-LEDGER.md#backendappapiadminpy) | 44 / 17 / 2054 (was `43 / 17 / 2051`) | ⚠ **FIRES** | honoured by construction (quick-261024): the discover providers summary gains `returned` = len(ids), so a mostly-known provider no longer reads as "found little". ⛔ add still lands disabled |
-| [`backend/app/api/settings.py`](docs/HOT-FILE-LEDGER.md#backendappapisettingspy) | 47 / 25 / 1301 (was `46 / 24 / 1250`) | ⚠ **FIRES** | 292.1-02: two bounded writes (2..50) via _range_refusal_detail + allow-list +2 (+51 −0). ⛔ never a retyped id list; GET never echoes a key · 293 touch: see §Phase 293 close |
+| [`backend/app/api/settings.py`](docs/HOT-FILE-LEDGER.md#backendappapisettingspy) | 48 / 26 / 1398 (was `47 / 25 / 1301`) | ⚠ **FIRES** | 300-05: four email knobs + read-only provider name (D-07/D-08/D-10); delay via _range_refusal_detail + allow-list +1. Honoured by construction. ⛔ no mail secret on the wire |
 | [`backend/app/services/multimodal_service.py`](docs/HOT-FILE-LEDGER.md#backendappservicesmultimodal_servicepy) | 14 / 7 / 984 | ⚠ **FIRES** | ⚠ absent from BOTH for its ENTIRE LIFE at **7 phases** — row added SEED-227, which is also where its silent truncation was found |
 | [`backend/app/api/documents.py`](docs/HOT-FILE-LEDGER.md#backendappapidocumentspy) | 101 / 40 / 2709 (was `99 / 39 / 2698`) | ⚠ **FIRES** | 298-01: list_documents one `org_lists.by_org` in build() (every read, D-32); upload one `org_id=root_upload_org(...)` on the ONE minter call. Honoured by construction. ⛔ see section |
-| [`scripts/vitest-count-gate.cjs`](docs/HOT-FILE-LEDGER.md#scriptsvitest-count-gatecjs) | 380 / 81 / 6808 (was `379 / 81 / 6808`) | ⚠ **FIRES** | 298-review: 4 BASELINE pins raised, none lowered — OrgAuditTab 16→19, LibraryPage.orgSwitch 5→7, useThreads.orgSwitch 4→5, MoveToOrgSheet 22→23 |
-| [`scripts/check-deploy-drift.sh`](docs/HOT-FILE-LEDGER.md#scriptscheck-deploy-driftsh) | 5 / 4 / 267 | ⚠ **FIRES** | ⚠ absent its ENTIRE LIFE — row added 294-05. 294-01: DECISION_ENGINE_FAULT_BASE_URL registered as intentionally omitted (+2) |
+| [`scripts/vitest-count-gate.cjs`](docs/HOT-FILE-LEDGER.md#scriptsvitest-count-gatecjs) | 398 / 83 / 6881 (was `397 / 83 / 6873`) | ⚠ **FIRES** | 300-05: 3 BASELINE pins added (InvitationsTab 17, its first; InviteMemberDialog 7; inviteDeliveryCopy 6) + FILE-LEVEL TARGETS, none lowered |
+| [`scripts/check-deploy-drift.sh`](docs/HOT-FILE-LEDGER.md#scriptscheck-deploy-driftsh) | 6 / 5 / 271 (was `5 / 4 / 267`) | ⚠ **FIRES** | 300-03 (D-28): the five SMTP_* vars registered in OMITTED_FROM_ONEBOX (commented in the one-box preset); email comment rewritten. No check changed |
 | [`scripts/build-public-openapi.cjs`](docs/HOT-FILE-LEDGER.md#scriptsbuild-public-openapicjs) | 11 / 5 / 472 (was `7 / 3 / 468`) | ⚠ **FIRES** | 298-01: `org-items` in the Account & org TAG_GROUPS entry + `/org-items/` in FLAGGED_PREFIXES (UI-internal). Two tokens. ⚠ prior row stale (`7 / 3 / 468` vs measured `10 / 4 / 468` pre-298). |
 | [`scripts/check-seeds-register.cjs`](docs/HOT-FILE-LEDGER.md#scriptscheck-seeds-registercjs) | 7 / 3 / 1132 | ⚠ **FIRES** | ⚠ absent its ENTIRE LIFE — row added 296-05, now FIRES (251 / 293 / 296). 296-05: three `\d{3}` → `\d{3,}` (293-IN-07). ⛔ the STATUS_ENUM triple |
 | [`scripts/decision-fault-server.py`](docs/HOT-FILE-LEDGER.md#scriptsdecision-fault-serverpy) | 2 / 2 / 216 | no (young) | young (294 / 296). 296-05: `ok` answers a `choice` question with its first offered option (294-IN-03). ⛔ loopback only, never logs a body |
@@ -11691,7 +11699,7 @@ cells rot within days.
 | [`frontend/src/components/workflows/RunReceipt.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentsworkflowsrunreceipttsx) | 3 / 1 / 241 | no (young) | young (200); does not fire (1 phase). **Phase 289 NOT EDITED**: the 286 forecast's chip went to StepEvidenceLine; the report never imports this file |
 | [`frontend/src/components/workflows/doorVocabulary.ts`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentsworkflowsdoorvocabularyts) | 6 / 4 / 540 | ⚠ **FIRES** | no seam proposed — a vocabulary doing one thing many times is the right shape (214); ⚠ absent until 199, and it is no longer at threshold |
 | [`frontend/src/components/workflows/StepTypePicker.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentsworkflowssteptypepickertsx) | 7 / 3 / 522 | ⚠ **FIRES — EXACTLY AT THRESHOLD** | honoured by construction (199) — ⚠ absent, on the boundary |
-| [`frontend/src/components/workflows/library/RunModal.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentsworkflowslibraryrunmodaltsx) | 13 / 8 / 748 (was `12 / 8 / 740`) | ⚠ **FIRES** | 296 G-4 row 11: a refused Run scrolls the required refusal into view (`block: nearest`): one ref, one effect, one call in handleRun. useState unchanged |
+| [`frontend/src/components/workflows/library/RunModal.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentsworkflowslibraryrunmodaltsx) | 14 / 9 / 752 (was `13 / 8 / 748`) | ⚠ **FIRES** | 299-04: ONE SavesInOrg under the Run button row (2+ orgs only). A refused launch's server sentence already reaches launchError verbatim (S8) — unchanged |
 | [`frontend/src/components/panel/PanelEmpty.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentspanelpanelemptytsx) | 4 / 4 / 52 | ⚠ **FIRES** | ⚠ absent at 4 phases — invisible to G-5 for its entire life (199) |
 | [`frontend/src/components/chat/StopControl.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentschatstopcontroltsx) | 3 / 1 / 315 | no (1 phase) | young — owes a detail section at its 3rd phase |
 | [`frontend/src/components/chat/ThreadRunLine.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentschatthreadrunlinetsx) | 3 / 2 / 376 (was `2 / 2 / 365`) | no (1 phase) | 296 G-4 row 12: re-reads the frame when the kickoff's run id arrives; a FINISHED frame (the previous run's) never supplies elapsed or origin. |
@@ -11735,17 +11743,17 @@ cells rot within days.
 | [`frontend/src/components/settings/ConnectionFormPanel.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentssettingsconnectionformpaneltsx) | 28 / 10 / 2477 | ⚠ **FIRES** | ⭐ **NAMED SEAM TAKEN (239-08)** — `SourceToolsCard.tsx` extracted, `2807 → 2477`, a pure move. ⛔ the WIDER `ConnectionShapeFields.tsx` seam stays OWED. See §239-08 |
 | [`frontend/src/components/settings/SourceToolsCard.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentssettingssourcetoolscardtsx) | 1 / 1 / 403 | no (1 phase) | young — created by the 239-08 extraction. Carries the `mcp` fence as a guard clause, and inherits the panel's copy / zero-`title=` fences. See §239-08 |
 | [`frontend/src/components/settings/ConnectionGrantsList.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentssettingsconnectiongrantslisttsx) | 5 / 2 / 259 | no (2 phases) | 344 → 222 (221-01) → **259**. The availability slot is a CHILD it forwards, not markup it owns |
-| [`frontend/src/lib/api/org.ts`](docs/HOT-FILE-LEDGER.md#frontendsrclibapiorgts) | 11 / 8 / 629 | ⚠ **FIRES** | ⚠ absent for its ENTIRE LIFE at **4 phases** — row added 221, then STALE at `6 / 4 / 562`. **NOT covered by `lib/api.ts`: that row is the BARREL.** ⚠ THIRD wire-type drift here. See §239-03 |
+| [`frontend/src/lib/api/org.ts`](docs/HOT-FILE-LEDGER.md#frontendsrclibapiorgts) | 13 / 9 / 650 (was `12 / 9 / 646`) | ⚠ **FIRES** | 300-REVIEW IN-01: SendInvitationResult.email_to_test_address (boolean; true only when the wire says exactly true). Resend result unchanged |
 | [`backend/app/services/connectors/service_tools.py`](docs/HOT-FILE-LEDGER.md#backendappservicesconnectorsservice_toolspy) | 11 / 1 / 2018 | no (1 phase) | row added 221. Re-derived 232: 2018 L; internal Google Drive tools delegate to sources adapter |
 | [`backend/app/services/connectors/grants.py`](docs/HOT-FILE-LEDGER.md#backendappservicesconnectorsgrantspy) | 1 / 1 / 92 | no (1 phase) | ⚠ absent — row added 221. It is THE grant-time gate: 92 L deciding every connector call |
 | [`frontend/src/components/settings/connectionsCopy.ts`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentssettingsconnectionscopyts) | 15 / 8 / 784 | ⚠ **FIRES** | no seam proposed — a vocabulary doing one thing many times is the right shape. ⚠ row was STALE at `13 / 7 / 737`. honoured by construction (**239-03**): one word, one union member. See §239-03 |
 | [`frontend/src/components/settings/connectionFormCopy.ts`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentssettingsconnectionformcopyts) | 19 / 8 / 1631 | ⚠ **FIRES** | ⚠ row STALE TWICE (`15 / 8 / 1216`, `17 / 8 / 1293`). ⛔ 239-05 named the seam — `configFromDraft`'s ARM SET; 239-07 RODE it: one serializer both arms call. See §239-07 |
-| [`frontend/src/pages/SettingsPage.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrcpagessettingspagetsx) | 62 / 30 / 1690 (was `60 / 29 / 1674`) | ⚠ **FIRES** | 293 touch: see §Phase 293 close (previous cell moved there verbatim) |
+| [`frontend/src/pages/SettingsPage.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrcpagessettingspagetsx) | 64 / 31 / 1704 (was `63 / 31 / 1698`) | ⚠ **FIRES** | 300-REVIEW WR-05: handleSaveIntegrations reads emailSettingsRef.current?.invalid() first; a sentence → setError + return before the PUT. useState count unchanged (49) |
 | [`frontend/src/pages/settingsSearchPayload.ts`](docs/HOT-FILE-LEDGER.md#frontendsrcpagessettingssearchpayloadts) | 2 / 2 / 116 | no (2 phases) | Created by 242. Row added AT CREATION rather than at the third phase — an absent row makes G-5 absent forever, silently, at any count |
 | [`frontend/src/components/settings/SourceFileCeilingCard.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentssettingssourcefileceilingcardtsx) | 1 / 1 / 117 | no (1 phase) | young (239-10) — ⚠ a row minted at creation reads `1 / 1` forever unless RE-DERIVED. Owns no number and no sentence |
 | [`frontend/src/components/settings/sourceCeilingCopy.ts`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentssettingssourceceilingcopyts) | 1 / 1 / 109 | no (1 phase) | young (239-10) — the ONE number it owns (recommendation) is pinned to `user_settings.py` by a `?raw` test; the bounds are SERVED |
 | [`frontend/src/components/settings/ModelPillRow.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentssettingsmodelpillrowtsx) | 5 / 4 / 151 | ⚠ **FIRES** | honoured by construction (**249-02**): its local `_tooltipFor` DELETED for the shared module. ⛔ it had been claiming `timeout=90s` against a real default of 300 |
-| [`frontend/src/lib/api/settings.ts`](docs/HOT-FILE-LEDGER.md#frontendsrclibapisettingsts) | 9 / 3 / 464 (was `7 / 3 / 460`) | no (2 phases) | ⚠ **absent for its ENTIRE LIFE — row added 249-02** at its third touch. The chat picker's wire type; ⛔ every new field is OPTIONAL, so an older backend renders exactly as before |
+| [`frontend/src/lib/api/settings.ts`](docs/HOT-FILE-LEDGER.md#frontendsrclibapisettingsts) | 11 / 5 / 529 (was `9 / 3 / 464`) | ⚠ **FIRES** | ⚠ row was STALE (measured `10 / 4` at 300-05, scan list said 2 phases). 300-05: getNotificationEmailPreference / setNotificationEmailPreference (own PUT, D-09). ⛔ every new field OPTIONAL |
 | [`frontend/src/lib/unverifiedModelCopy.ts`](docs/HOT-FILE-LEDGER.md#frontendsrclibunverifiedmodelcopyts) | 1 / 1 / 88 | no (new) | young (created 249-02). Row added AT CREATION. THE one home for the unverified chip's words, 2 consumers; ⛔ `describeToolsLost` must state the CONSEQUENCE, not that defaults were applied |
 | [`frontend/src/components/settings/servicesCatalog.ts`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentssettingsservicescatalogts) | 2 / 1 / 211 | no (1 phase) | young (212) — the presentation lookup migration 127's `service_id` COMMENT names |
 | [`frontend/src/components/settings/catalogCopy.ts`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentssettingscatalogcopyts) | 1 / 1 / 22 | no (1 phase) | young (212) |
@@ -11767,14 +11775,14 @@ cells rot within days.
 | [`frontend/src/components/settings/grantsVocabulary.ts`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentssettingsgrantsvocabularyts) | 3 / 2 / 115 | no (2 phases) | ⚠ absent for its entire life — row added 221-02. There is deliberately NO `READY` string in it |
 | [`backend/app/services/connector_service.py`](docs/HOT-FILE-LEDGER.md#backendappservicesconnector_servicepy) | 28 / 11 / 1858 | ⚠ **FIRES** | ⚠ row STALE (`25/9/1772`) — 248 and 252 touched it. NOT modified by 253; re-derived under CR-08. honoured by construction (**239-06**) |
 | [`backend/app/models/message.py`](docs/HOT-FILE-LEDGER.md#backendappmodelsmessagepy) | 25 / 17 / 292 (was `24 / 16 / 287`) | ⚠ **FIRES** | **292.1 D-UAT-2**: `run_status` Literal gains `cap_paused` (+2). ⛔ deleting `artifacts` makes reload render no artifacts, silently · 293 touch: see §Phase 293 close |
-| [`backend/app/models/user_settings.py`](docs/HOT-FILE-LEDGER.md#backendappmodelsuser_settingspy) | 61 / 37 / 1776 (was `60 / 36 / 1769`) | ⚠ **FIRES** | 293 touch: see §Phase 293 close (previous cell moved there verbatim) |
+| [`backend/app/models/user_settings.py`](docs/HOT-FILE-LEDGER.md#backendappmodelsuser_settingspy) | 62 / 38 / 1788 (was `61 / 37 / 1776`) | ⚠ **FIRES** | 300-03 (D-07/D-08/D-10, mig 218): four email fields + four _val lines, no env fallback in the model. Honoured by construction |
 | [`backend/app/api/setup.py`](docs/HOT-FILE-LEDGER.md#backendappapisetuppy) | 7 / 2 / 490 | no (1 phase) | ⚠ **absent for its ENTIRE LIFE — row added 249-03**. ⛔ it deliberately does NOT catch `SettingsWriteRefused`: a refused `setup_complete` reported as success is the bug one layer up |
 | [`backend/app/services/setup_service.py`](docs/HOT-FILE-LEDGER.md#backendappservicessetup_servicepy) | 4 / 2 / 514 | no (1 phase) | ⚠ **absent for its ENTIRE LIFE — row added 249-03**. Same deliberate non-catch as `api/setup.py`; its bool cannot express *the database refused the value* |
 | [`backend/app/api/evals.py`](docs/HOT-FILE-LEDGER.md#backendappapievalspy) | 24 / 7 / 3237 | ⚠ **FIRES** | ⚠ **absent for its ENTIRE LIFE at 7 phases — row added 249-04, which left the file BYTE-UNCHANGED.** ⛔ `_tile_for_run`'s engine-shaped sentence must stay the LAST resort |
 | [`backend/app/services/settings_broadcast.py`](docs/HOT-FILE-LEDGER.md#backendappservicessettings_broadcastpy) | 1 / 1 / 228 | no (1 phase) | young (**BUG-260902-06**) — the cross-worker cache-invalidation leaf: one channel, one payload builder, one re-warm dispatcher, one subscriber |
 | [`backend/app/services/connectors/args.py`](docs/HOT-FILE-LEDGER.md#backendappservicesconnectorsargspy) | 2 / 1 / 474 | no (1 phase) | young (214-01) — the shared argument leaf: resolution, satisfiability, and ONE schema accessor |
 | [`backend/app/services/harness/reachability.py`](docs/HOT-FILE-LEDGER.md#backendappservicesharnessreachabilitypy) | 5 / 5 / 498 (was `4 / 4 / 463`) | ⚠ **FIRES** | 295-02: `no_template_bound` in LINT_CODES + pure `_check_template_bound` (+1 def, If 20→22). ⚠ now FIRES at 5 phases |
-| [`backend/app/services/workflow_kickoff.py`](docs/HOT-FILE-LEDGER.md#backendappservicesworkflow_kickoffpy) | 14 / 11 / 605 (was `13 / 10 / 602`) | ⚠ **FIRES** | 298-02: `org_id` added to the `_def_resp` select (one token) and ONE awaited raise_if_foreign after the unrestricted subset 400, with the user client (publish-parity confirm). Globals skip |
+| [`backend/app/services/workflow_kickoff.py`](docs/HOT-FILE-LEDGER.md#backendappservicesworkflow_kickoffpy) | 15 / 12 / 608 (was `14 / 11 / 605`) | ⚠ **FIRES** | 299-01: ONE awaited refuse_if_other_org (kind=run) beside raise_if_foreign, reusing its row-org expression vs the thread's org. Globals skip. Honoured by construction |
 | [`frontend/src/components/layout/ChatLaunchForm.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentslayoutchatlaunchformtsx) | 6 / 4 / 191 (was `5 / 4 / 183`) | ⚠ **FIRES** (214, 287, 291, 296) | 296 G-4 row 11: a refused Run scrolls the `… are required` refusal into view (`block: nearest`): one ref, one effect, one call in submit. Reads nothing new |
 | [`frontend/src/components/workflows/ArgumentEditor.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentsworkflowsargumenteditortsx) | 1 / 1 / 226 | no (1 phase) | young (214-07) — the argument form; the raw-JSON surface it replaced was DELETED, not hidden |
 | [`frontend/src/components/workflows/ArgumentRow.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentsworkflowsargumentrowtsx) | 1 / 1 / 362 | no (1 phase) | young (214-07) — one row, one three-arm source picker, one gutter that WIDENS rather than inserts |
@@ -11785,7 +11793,7 @@ cells rot within days.
 | [`frontend/src/components/workflows/DeclaredInputsEditor.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentsworkflowsdeclaredinputseditortsx) | 1 / 1 / 333 | no (1 phase) | young (214.1-01) — the authoring surface `BUG-260828-02` says did not exist. ⚠ G-2 OVERRIDDEN, not satisfied |
 | [`frontend/src/components/workflows/PublishRefusalList.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentsworkflowspublishrefusallisttsx) | 2 / 1 / 178 | no (1 phase) | young (214-10) — the refusal renders as a CAUSE, not a status |
 | [`frontend/src/components/workflows/StepIdentity.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentsworkflowsstepidentitytsx) | 1 / 1 / 161 | no (1 phase) | young (214-08) — ONE element, four sizes, both names as props; it resolves nothing |
-| [`frontend/src/components/workflows/WorkflowScheduleModal.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentsworkflowsworkflowschedulemodaltsx) | 5 / 4 / 723 (was `3 / 3 / 601`) | ⚠ **FIRES** | 296-04: Run now spins on its row (aria-busy, Starting…) and its worded result sits under Last ran; Add schedule refuses an empty required input by name. Bottom notice removed |
+| [`frontend/src/components/workflows/WorkflowScheduleModal.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentsworkflowsworkflowschedulemodaltsx) | 6 / 5 / 812 (was `5 / 4 / 723`) | ⚠ **FIRES** | 300-01: outcome sentence line (scheduleOutcomeLine), per-row Run now (runningIds + runResults map, no global busy), quiet refresh. No new component or hook. Extraction FIRST next |
 | [`frontend/src/types/schedule.ts`](docs/HOT-FILE-LEDGER.md#frontendsrctypesschedulets) | 2 / 2 / 77 | no (2 phases) | row added 296-04: one optional `outcome` on `ScheduleTriggerResult` (the 296-02 trigger contract). Types only; does not fire |
 | [`frontend/src/components/workflows/argumentModel.ts`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentsworkflowsargumentmodelts) | 1 / 1 / 313 | no (1 phase) | young (214-07) — the three argument sources as data |
 | [`frontend/src/components/workflows/argumentVocabulary.ts`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentsworkflowsargumentvocabularyts) | 1 / 1 / 254 | no (1 phase) | young (214-07) — every sentence the argument form says |
@@ -11798,8 +11806,8 @@ cells rot within days.
 | [`frontend/src/lib/api/knowledge.ts`](docs/HOT-FILE-LEDGER.md#frontendsrclibapiknowledgets) | 10 / 8 / 915 (was `8 / 7 / 910`) | ⚠ **FIRES** | 296-07 (291-IN-05): GenerateField.covered_by may now be null as well as input or step (types only) |
 | [`frontend/src/lib/api/threads.ts`](docs/HOT-FILE-LEDGER.md#frontendsrclibapithreadsts) | 25 / 15 / 2006 (was `24 / 14 / 1994`) | ⚠ **FIRES** | 298-02: postMessage reads detail.message from an OBJECT detail and attaches its string code to the ApiError; a string detail reads as before |
 | [`frontend/src/lib/api/connectors.ts`](docs/HOT-FILE-LEDGER.md#frontendsrclibapiconnectorsts) | 17 / 11 / 740 | ⚠ **FIRES** | ⚠ row was STALE at `16 / 10 / 718`. honoured by construction (**244-06**): `importCloudFile` gains a REQUIRED body declared BESIDE `SourcePreviewRequest` — ⛔ never inline in a component |
-| [`frontend/src/lib/api/skills.ts`](docs/HOT-FILE-LEDGER.md#frontendsrclibapiskillsts) | 9 / 6 / 767 (was `8 / 5 / 761`) | ⚠ **FIRES** | 292.1-02: two optional fields on FullAppSettings + SettingsUpdate (+6 −0), type-only. Holds FullAppSettings, not only skills · 293 touch: see §Phase 293 close |
-| [`frontend/src/lib/api/workflows.ts`](docs/HOT-FILE-LEDGER.md#frontendsrclibapiworkflowsts) | 15 / 15 / 1361 (was `14 / 14 / 1313`) | ⚠ **FIRES** | 298-02: WorkflowFolderRefusedError (name set) thrown on the coded 422 in create + update, before every other reading; listDraftWorkflows(signal, {allOrgs}) omits X-Org-Id |
+| [`frontend/src/lib/api/skills.ts`](docs/HOT-FILE-LEDGER.md#frontendsrclibapiskillsts) | 10 / 7 / 779 (was `9 / 6 / 767`) | ⚠ **FIRES** | 300-05: four optional email fields on FullAppSettings + SettingsUpdate, read-only optional email_provider on FullAppSettings only (+12 −0), type-only · 293 touch: see §Phase 293 close |
+| [`frontend/src/lib/api/workflows.ts`](docs/HOT-FILE-LEDGER.md#frontendsrclibapiworkflowsts) | 17 / 16 / 1395 (was `16 / 16 / 1364`) | ⚠ **FIRES** | 299-04: WorkflowRunRead.org_id; createWorkflowDraft opts.fromDefinitionId → ?from_definition_id= (absent → today's URL); the Tweak org 409 → WorkflowOrgRefusedError (verbatim sentence) |
 | [`frontend/src/lib/connectionMark.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrclibconnectionmarktsx) | 7 / 4 / 313 | ⚠ **FIRES** | ✅ **the move IS the seam, and it was TAKEN (214-08)** — `settings/` → `lib/`; four run + canvas surfaces now import ONE map |
 | [`frontend/src/components/ingestion/DocumentList.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentsingestiondocumentlisttsx) | 31 / 15 / 372 (was `31 / 16 / 372`) | ⚠ **FIRES** | **275-02/04**: 409 → HoldRefusalNotice; ONE `retention` prop; a HELD row's delete opens straight into the refusal (`requestDelete`). Seven `<td>` kept |
 | [`frontend/src/pages/LibraryPage.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrcpageslibrarypagetsx) | 70 / 21 / 1347 (was `69 / 21 / 1346`) | ⚠ **FIRES** | 298-review WR-01: one property on the useLibraryOrgSwitch call, listReset: { findDispatch, setListTarget }; the logic lives in the hook. ⛔ no keyed remount; switch resets run during render |
@@ -11838,8 +11846,8 @@ cells rot within days.
 | [`backend/app/services/extractors/aspects/dxf.py`](docs/HOT-FILE-LEDGER.md#backendappservicesextractorsaspectsdxfpy) | 2 / 0 / 180 | no (0 phases) | ⚠ absent for its entire life — row added `SEED-226`. It is the only path that READS measurements rather than inferring them (`DIMENSION` values the CAD software computed) |
 | [`frontend/src/components/workflows/publishBlockedStep.ts`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentsworkflowspublishblockedstepts) | 2 / 1 / 183 (was `0 / 0 / 176`) | no (1 phase) | young (`BUG-260828-09`). **281-03**: ONE `BLOCKED_STEP_NEXT_NO_RUN` constant. ⚠ It derives NO second name ladder: `nodeTitle` is called, and `name ?? slug` is the one forbidden edit |
 | [`frontend/src/components/workflows/PublishBlockedStepCard.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentsworkflowspublishblockedstepcardtsx) | 2 / 1 / 109 (was `0 / 0 / 101`) | no (1 phase) | young (`BUG-260828-09`). **281-03**: ONE optional `canOpenRun` flag; next line is `BLOCKED_STEP_NEXT_NO_RUN` when there is no link; the cause keeps its line breaks. ⚠ **G-2 OVERRIDDEN, not satisfied** |
-| [`backend/app/services/scheduler_service.py`](docs/HOT-FILE-LEDGER.md#backendappservicesscheduler_servicepy) | 13 / 8 / 332 (was `12 / 7 / 314`) | ⚠ **FIRES** | 298-02: foreign_binding_refusal beside template_refusal (definition_id lazy read, pool only) → record_schedule_outcome(sentence) + ScheduledLaunchRefused. The :134 org line untouched |
-| [`backend/app/db/schedules.py`](docs/HOT-FILE-LEDGER.md#backendappdbschedulespy) | 1 / 1 / 359 | no (1 phase) | single data-access home for workflow_schedules; claim_due_schedules SKIP LOCKED claim; young (204) |
+| [`backend/app/services/scheduler_service.py`](docs/HOT-FILE-LEDGER.md#backendappservicesscheduler_servicepy) | 16 / 9 / 375 (was `15 / 9 / 372`) | ⚠ **FIRES** | 300-REVIEW WR-01: _record_outcome(status, run_id) reads the launched run BY ID (never the newest); paused → waiting, failed / cancelled as themselves. Honoured by construction |
+| [`backend/app/db/schedules.py`](docs/HOT-FILE-LEDGER.md#backendappdbschedulespy) | 2 / 2 / 369 (was `1 / 1 / 359`) | no (2 phases) | single data-access home for workflow_schedules; claim_due_schedules SKIP LOCKED claim. 299-01: create_schedule keyword-only `org_id` (None = base SQL, sha256 pinned) |
 | [`backend/app/services/watch_service.py`](docs/HOT-FILE-LEDGER.md#backendappserviceswatch_servicepy) | 8 / 6 / 769 (was `7 / 5 / 643`) | ⚠ **FIRES** | Honoured by construction. **285-01**: a failed item is retried through the SAME new-file body (cap 3); typed `last_error`; minted marker. Still 2 minter calls. Listing-loop seam not triggered |
 | [`backend/app/db/watches.py`](docs/HOT-FILE-LEDGER.md#backendappdbwatchespy) | 6 / 4 / 828 (was `4 / 3 / 709`) | ⚠ **FIRES** | Honoured by construction. **285-01**: upsert takes `failed_attempts` / `minted` (COALESCE keeps), `release_watch(run_error=)`. **285-02**: `watch_purge_scope` + a frozen dataclass, asyncpg only |
 | [`backend/app/api/sources.py`](docs/HOT-FILE-LEDGER.md#backendappapisourcespy) | 11 / 5 / 713 (was `10 / 4 / 698`) | ⚠ **FIRES** | Honoured by construction. **285-02**: both purge doors ask `db.watches.watch_purge_scope` and purge only `purge_doc_ids`; door 2 reports `kept_count`. No inline SQL. Extraction discharged (280-01) |
@@ -11848,7 +11856,7 @@ cells rot within days.
 | [`frontend/src/components/sources/watchProductMark.ts`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentssourceswatchproductmarkts) | 0 / 0 / 38 | no (new) | young (240) — which PRODUCT a watched folder came from, read from its ADDRESS. ⛔ Never from `service_id`: Gmail and Drive share one connection |
 | [`frontend/src/components/sources/CreateWatchModal.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentssourcescreatewatchmodaltsx) | 4 / 1 / 283 | no (1 phase) | honoured by construction (**240**): byte-unchanged. ⛔ Its auto-select of `capable[0]` is why BUG-260908-02 mattered most here |
 | [`frontend/src/components/layout/NavPanel.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentslayoutnavpaneltsx) | 26 / 14 / 420 (was `25 / 14 / 416`) | ⚠ **FIRES** | **276-01** (D-14): Iris mark `<img>`; **276-06** (D-27): on the dark `#0A0E18` chip, classes only. 244-14's `overflow-x-hidden` stands |
-| [`frontend/src/App.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrcapptsx) | 42 / 29 / 355 (was `41 / 29 / 348`) | **FIRES** | 297-03: one LeaveGuardContext.Provider around CitationNavProvider (no key, one-identity value). See §Phase 297 (297-03) |
+| [`frontend/src/App.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrcapptsx) | 44 / 30 / 350 (was `43 / 30 / 349`) | **FIRES** | 299-02: one prop `entityLink={nav.entityLink}` on `<ChatLayout>` (honoured by construction). See §Phase 299 (299-02) |
 | [`frontend/src/lib/nav-items.ts`](docs/HOT-FILE-LEDGER.md#frontendsrclibnav-itemsts) | 13 / 9 / 173 (was `12 / 8 / 153`) | ⚠ **FIRES** | **283-02** (FIX-01): the Settings entry UNGOVERNED (no `feature` key); per-tab gate in the page, per-route `require_visible` at the API. `visibleNavItems` unchanged |
 | [`frontend/src/components/library/HealthTab.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentslibraryhealthtabtsx) | 9 / 2 / 199 | no (2 phases) | row added 235 BELOW threshold on purpose. One import, one optional prop, one mount, ZERO branches; the handler lives at the page boundary |
 | [`frontend/src/pages/librarySelection.ts`](docs/HOT-FILE-LEDGER.md#frontendsrcpageslibraryselectionts) | 2 / 2 / 312 | no (2 phases) | ⚠ absent for its entire life — row added 235, which did NOT modify it but made `App.tsx` import `LibraryTab` from it rather than re-declare it |
@@ -11900,7 +11908,7 @@ cells rot within days.
 | [`frontend/src/components/chat/ActiveConnectorChips.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentschatactiveconnectorchipstsx) | 2 / 2 / 82 | no (2 phases) | ⚠ absent for its entire life — row added 244-05 at its SECOND phase. **244**: the row container HOISTED out; it is bare chips now, `null` on empty (D-244-26) |
 | [`frontend/src/stores/streamsStore.ts`](docs/HOT-FILE-LEDGER.md#frontendsrcstoresstreamsstorets) | 28 / 19 / 662 (was `27 / 18 / 660`) | ⚠ **FIRES** | 296-04 (287-TSC): the initializer is annotated `(): StreamsState`, so the TS2345 at :492 is gone. Type only · ⛔ |
 | [`frontend/src/lib/toolMeta.ts`](docs/HOT-FILE-LEDGER.md#frontendsrclibtoolmetats) | 12 / 8 / 367 (was `11 / 7 / 352`) | ⚠ **FIRES** | **273-05**: `stepLabel` (show_artifact phrase, every other tool byte-identical to `toolLabel`). ⛔ the ONE home of the activity string |
-| [`scripts/full-schema-supplement.sql`](docs/HOT-FILE-LEDGER.md#scriptsfull-schema-supplementsql) | 25 / 17 / 863 (was `23 / 15 / 848`) | ⚠ **FIRES** | 296-01: mig 216 handle_new_user copy, one expression (no-email org name). Honoured by construction |
+| [`scripts/full-schema-supplement.sql`](docs/HOT-FILE-LEDGER.md#scriptsfull-schema-supplementsql) | 26 / 18 / 888 (was `25 / 17 / 863`) | ⚠ **FIRES** | 300-02: mig 218's REVOKE/GRANT block appended (25 lines) — the schema dump omits privileges. Honoured by construction |
 | [`scripts/check-schema-acl-parity.cjs`](docs/HOT-FILE-LEDGER.md#scriptscheck-schema-acl-paritycjs) | 4 / 2 / 1156 | no (2 phases) | ⚠ row STALE at `3/2/883` ONE PLAN LATER, same day — lines rot faster than phases. **253-03**: it finally READS `full-schema.sql` (`assertTailIdentity`); 29 → 35 self-test arms |
 | [`scripts/check-greenfield-privileges.py`](docs/HOT-FILE-LEDGER.md#scriptscheck-greenfield-privilegespy) | 2 / 1 / 1312 | no (1 phase) | ⚠ row STALE at `1/1/1157` the same day it was written. **253-03**: `_statements` replaces `line.find("--")`; ⛔ a SKIP is exit 2, never 0 |
 | [`.claude/hooks/schema-acl-parity-guard.js`](docs/HOT-FILE-LEDGER.md#claudehooksschema-acl-parity-guardjs) | 2 / 1 / 145 | no (1 phase) | young (created 253-02). Row added AT CREATION — `.claude/` is EXEMPT, so no gate can ever demand it. ⛔ its SILENCE reads as "clear": every path a payload can carry must be extracted |
@@ -11928,8 +11936,8 @@ cells rot within days.
 | [`frontend/src/components/experts/expertIcon.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentsexpertsexperticontsx) | 1 / 1 / 72 | no (new) | ⚠ `0/0/0` AT PLANNING; **measured `1/1/72` at 262-02**. ⛔ The ONE home of expert-icon resolution — a CLOSED 11-key lucide map. Reads `icon`, never `slug`/`name`: that match IS the retired artefact |
 | [`frontend/src/components/experts/catalog/expertCatalog.ts`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentsexpertscatalogexpertcatalogts) | 15 / 5 / 508 (was `13 / 4 / 489`) | ⚠ **FIRES — 5 phases** | honoured by construction (**279-03 A/B**): `wontUse` → `wontSearch` + ONE `{ onThread }` option on `previewLedgerColumns`. ⛔ words only from here |
 | [`frontend/src/components/experts/catalog/ExpertCard.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentsexpertscatalogexpertcardtsx) | 5 / 4 / 296 (was `3 / 3 / 295`) | ⚠ **FIRES — 4 phases** | **276-07**: honoured by construction, the category text wrapped in `decodeEntities`. ⛔ words only from `expertCatalog.ts` |
-| [`frontend/src/components/experts/catalog/ExpertCatalogPage.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentsexpertscatalogexpertcatalogpagetsx) | 9 / 6 / 372 (was `8 / 5 / 359`) | ⚠ **FIRES — 6 phases** | honoured by construction (**279-03 F**, WR-07): ONE reason expression (network sentence only for TypeError); `listExperts(true, false)` ×3 |
-| [`frontend/src/components/experts/catalog/ExpertDetailModal.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentsexpertscatalogexpertdetailmodaltsx) | 7 / 5 / 531 (was `6 / 4 / 531`) | ⚠ **FIRES — 5 phases** | honoured by construction (**279-03 A**): ONE copy change ("will not be searched"). ⚠ no test pins that copy (review note) |
+| [`frontend/src/components/experts/catalog/ExpertCatalogPage.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentsexpertscatalogexpertcatalogpagetsx) | 12 / 7 / 394 (was `11 / 7 / 376`) | ⚠ **FIRES — 7 phases** | 299-REVIEW WR-03: one optional prop (onLeaveLink) + the return wrapped in CantBeOpened when the linked Expert was refused. Honoured by construction |
+| [`frontend/src/components/experts/catalog/ExpertDetailModal.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentsexpertscatalogexpertdetailmodaltsx) | 9 / 6 / 540 (was `8 / 6 / 536`) | ⚠ **FIRES — 5 phases** | honoured by construction (**299-04**): ONE ShareLinkMenu in the header (D-20) + ONE SavesInOrg beside Start a chat, chat arm only (UI-D11) |
 | [`frontend/src/components/experts/catalog/startScopedChat.ts`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentsexpertscatalogstartscopedchatts) | 1 / 1 / 70 | no (new) | ⚠ `0/0/0` AT PLANNING; measured at **262-04**. ⛔ refresh BEFORE select — the created row is pre-patch and its hook has no updater for that column. A rejected patch does NOT navigate |
 | [`backend/app/services/expert_install_service.py`](docs/HOT-FILE-LEDGER.md#backendappservicesexpert_install_servicepy) | 3 / 1 / 648 | no (1 phase) | planning triple `0/0/0`. **266-05 F-1**: Retry hands on a STRING id (an asyncpg UUID crashed live). ⛔ org only from the active-org dep; never a SYSTEM_USER_ID row |
 | [`backend/app/services/expert_corpus.py`](docs/HOT-FILE-LEDGER.md#backendappservicesexpert_corpuspy) | 1 / 1 / 174 | no (1 phase) | planning triple `0/0/0`. First-party corpora are DATA: slug `fullmatch` + path containment, CRLF→LF before any hash. ⛔ nothing is imported from the corpus dir |
@@ -11954,7 +11962,7 @@ cells rot within days.
 | [`frontend/src/components/chat/ScopePicker.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentschatscopepickertsx) | 1 / 1 / 285 (was `0 / 0 / 0`) | no (new) | young (created 268-03). DropdownMenu picker; Apply/Cancel are menu items (Radix traps Tab). ⛔ no `scope_mode` token |
 | [`frontend/src/components/chat/scopeCopy.ts`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentschatscopecopyts) | 2 / 1 / 196 (was `0 / 0 / 0`) | no (new) | young (created 268-03). ⛔ the ONE home of chip/picker/pending-note wording; `explainFor` keeps the Expert rule out of the leaves |
 | [`frontend/src/components/auth/AuthCardShell.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentsauthauthcardshelltsx) | 3 / 2 / 55 (was `2 / 2 / 52`) | no (2 phases) | ⚠ absent its ENTIRE LIFE — row added AT 276 PLANNING. 276-01 D-21: Iris mark img; 276-06 (D-27): on the dark chip. Classes only, no logic |
-| [`frontend/src/pages/AuthPage.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrcpagesauthpagetsx) | 4 / 2 / 26 | no (2 phases) | ⚠ absent its ENTIRE LIFE — row added AT 276 PLANNING. 276-01 D-21: title prop → "Syrel". One string |
+| [`frontend/src/pages/AuthPage.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrcpagesauthpagetsx) | 5 / 3 / 32 (was `4 / 2 / 26`) | ⚠ **FIRES** (now, 299) | 299-05: one quiet S5 line after the form (kind only, React text). Forms untouched; no new prop |
 | [`frontend/src/landing/components/CompareSection.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrclandingcomponentscomparesectiontsx) | 3 / 2 / 121 | no (2 phases) | ⚠ absent its ENTIRE LIFE — row added AT 276 PLANNING. 276-01: two prose strings → Syrel. ⛔ landing fence: no app/docs imports |
 | [`frontend/src/landing/components/LandingFooter.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrclandingcomponentslandingfootertsx) | 4 / 2 / 57 (was `3 / 2 / 52`) | no (2 phases) | ⚠ absent its ENTIRE LIFE — row added AT 276 PLANNING. 276-01 mark + © Syrel; 276-03 Docs/Changelog links, absolute hashes. ⛔ shared by landing AND docs entries |
 | [`frontend/src/landing/components/Navigation.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrclandingcomponentsnavigationtsx) | 5 / 2 / 153 (was `4 / 2 / 150`) | no (2 phases) | ⚠ STALE (`4/2/150`). **G4-1**: ONE optional `drawerClassName` prop passed through. ⛔ shared by BOTH entries — landing passes no docs props |
@@ -11975,7 +11983,7 @@ cells rot within days.
 | [`frontend/src/docs/pages/Changelog.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrcdocspageschangelogtsx) | 2 / 1 / 128 (was `1 / 1 / 125`) | no (new) | young (created 276). Row added AT PLANNING. 276-03: P5 changelog; 276-07 hero link. ⛔ v4.5 Not yet released from parseHistory released flag |
 | [`frontend/src/docs/pages/BuildStory.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrcdocspagesbuildstorytsx) | 1 / 1 / 88 (was `0 / 0 / 0`) | no (new) | young (created 276-07). Row added AT PLANNING. D-26: five chapters in order, releases from parseHistory, one VideoSlot each. ⛔ an id-less slot renders nothing |
 | [`frontend/src/pages/SetupWizard.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrcpagessetupwizardtsx) | 3 / 3 / 352 (was `2 / 2 / 345`) | ⚠ **NOW FIRES — 3 phases** | ⚠ absent its ENTIRE LIFE; row added at 276-07 planning. **276-07**: the static Iris mark on the dark chip in the header. ⛔ no logic change |
-| [`backend/app/services/email_provider.py`](docs/HOT-FILE-LEDGER.md#backendappservicesemail_providerpy) | 4 / 2 / 105 (was `3 / 1 / 95`) | no (2 phases) | ⚠ absent its ENTIRE LIFE; row added at 276-07 planning. 276-07: hosted PNG lockup + "Syrel" in the invite. ⛔ org name AND every URL html-escaped (WR-02) |
+| [`backend/app/services/email_provider.py`](docs/HOT-FILE-LEDGER.md#backendappservicesemail_providerpy) | 10 / 3 / 413 (was `6 / 3 / 362`) | ⚠ **FIRES** | 300-REVIEW WR-02 smtp_security_problem (unknown / none+login refused pre-connect); IN-01 SendOutcome.redirected; IN-02 link logged for none only; IN-04 transport_config_problem. ⛔ one seam |
 | [`frontend/src/docs/pages/ChangelogVersion.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrcdocspageschangelogversiontsx) | 1 / 1 / 52 (was `0 / 0 / 0`) | no (new) | young (created 276). Row added AT PLANNING. 276-03: changelog version page |
 | [`frontend/src/docs/pages/ApiReference.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrcdocspagesapireferencetsx) | 3 / 2 / 144 (was `1 / 1 / 135`) | no (new) | young (created 276). Row added AT PLANNING. 276-03: P6 lazy Scalar. ⛔ telemetry off, agent disabled, test-request hidden; dynamic import only · 293 touch: see §Phase 293 close |
 | [`frontend/src/docs/components/Markdown.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrcdocscomponentsmarkdowntsx) | 1 / 1 / 134 (was `0 / 0 / 0`) | no (new) | young (created 276). Row added AT PLANNING. 276-03: react-markdown + gfm. ⛔ NO rehype-raw — raw HTML stays text (XSS) |
@@ -12089,7 +12097,7 @@ cells rot within days.
 | [`frontend/src/components/metadata/DocumentChunksSection.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentsmetadatadocumentchunkssectiontsx) | 4 / 3 / 265 (was `2 / 2 / 161`) | ⚠ **FIRES** | ⚠ now FIRES (3 phases). **284-03**: chunks page by scroll sentinel (200 at a time, `IntersectionObserver`, root = the bounded region); header = exact total. ⛔ no overscroll; one Tab stop |
 | [`frontend/src/components/settings/settingsTabs.ts`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentssettingssettingstabsts) | 3 / 2 / 126 (was `2 / 1 / 123`) | no (1 phase) | young (created 283-01; 283-02 added Preferences "6" + the first-visible fallback). ONE home of tab id / audience / order / fallback; labels stay literal JSX · 293 touch: see §Phase 293 close |
 | [`frontend/src/components/settings/AuditLogSection.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentssettingsauditlogsectiontsx) | 1 / 1 / 221 (was `0 / 0 / 0`) | no (1 phase) | young (created 283-01). Row added AT CREATION. The Audit Log tab body, moved verbatim out of `SettingsPage.tsx`; imports the `@/lib/api` barrel |
-| [`frontend/src/components/settings/PreferencesSection.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentssettingspreferencessectiontsx) | 1 / 1 / 39 (was `0 / 0 / 0`) | no (1 phase) | young (created 283-02). Preferences tab ("6") body: technical-names toggle + default model, moved verbatim from tab "0". ⛔ calls no gated endpoint |
+| [`frontend/src/components/settings/PreferencesSection.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentssettingspreferencessectiontsx) | 2 / 2 / 43 (was `1 / 1 / 39`) | no (2 phases) | 300-05: one `<EmailNotificationPreference />` mount after the default chat model (+4). ⛔ calls no gated endpoint |
 | [`frontend/src/landing/facts.ts`](docs/HOT-FILE-LEDGER.md#frontendsrclandingfactsts) | 8 / 4 / 546 (was `6 / 3 / 546`) | ⚠ **NOW FIRES** (3 phases) | 288-02: Pause stage `what` string corrected (one string, length unchanged) · 293 touch: see §Phase 293 close |
 | [`backend/app/api/document_views.py`](docs/HOT-FILE-LEDGER.md#backendappapidocument_viewspy) | 13 / 6 / 323 (was `11 / 5 / 300`) | ⚠ **FIRES** | ⚠ FIRES (6 phases). **284-04**: both resolve routes page (`offset`/`limit` ≤ 200/`include_archived`) via `resolve_filter(via_view=True)`; honoured by construction. ⛔ 404-not-403 gate |
 | [`backend/app/api/library.py`](docs/HOT-FILE-LEDGER.md#backendappapilibrarypy) | 3 / 3 / 304 (was `2 / 2 / 299`) | ⚠ **FIRES** | ⚠ now FIRES (298). 298-01: LIBRARY_SUMMARY_SQL `AND ($1::uuid IS NULL OR org_id = $1)` + one bind — the same predicate as GET /documents (D-32). NULL = today's scan. |
@@ -12117,7 +12125,7 @@ cells rot within days.
 | [`frontend/src/components/workflows/useBuilderNameMaps.ts`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentsworkflowsusebuildernamemapsts) | 2 / 2 / 228 (was `1 / 1 / 141`) | no (young) | 298-04: mount read keyed on useActiveOrgId; takes the page's {meta, phases}; ONE folder-labels read for bound ids the list lacks → chip-form names + folderLabels. ⛔ names only; listFolders( count 3 |
 | [`frontend/src/components/workflows/builderCopy.ts`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentsworkflowsbuildercopyts) | 1 / 1 / 174 | no (young) | young (286-02). Leaf of the Builder's 8 copy constants; RE-EXPORTED by `WorkflowBuilderPage.tsx` so every import and `?raw` fence resolves |
 | [`frontend/src/hooks/useWorkflowRun.ts`](docs/HOT-FILE-LEDGER.md#frontendsrchooksuseworkflowrunts) | 1 / 1 / 218 | no (young) | young (286-03). Run read + stale guard + `refreshRun`; 5 s poll + terminal edge. ⛔ poll called AFTER `isTerminal` (CR-01); invariant-8 tokens never appear here |
-| [`frontend/src/components/workflows/library/WorkflowCardMenu.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentsworkflowslibraryworkflowcardmenutsx) | 3 / 3 / 498 (was `2 / 2 / 493`) | ⚠ **now FIRES** (3 phases) | 298-05: one gated mount, {row.provenance === "draft" && <MoveToOrgMenuItem kind="draft">} before the forks (D-31: published + starter never). A DropdownMenuItem, WR-03 green |
+| [`frontend/src/components/workflows/library/WorkflowCardMenu.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentsworkflowslibraryworkflowcardmenutsx) | 5 / 4 / 510 (was `4 / 4 / 506`) | ⚠ **now FIRES** (3 phases) | 299-04: ShareLinkMenuSub first (D-20); the fork consequence line gains SavesInOrg asSentence only when the verb creates (UI-D11). ⛔ WR-03 green |
 | [`backend/app/services/rerank_service.py`](docs/HOT-FILE-LEDGER.md#backendappservicesrerank_servicepy) | 5 / 1 / 114 (was `3 / 0 / 122`) | no (1 phase) | 294-01: thin dispatcher over rerank_engines; a failure returns documents[:n]. ⛔ first 4 params positional; process_inputs=redact_inputs |
 | [`backend/app/services/rerank_engines/__init__.py`](docs/HOT-FILE-LEDGER.md#backendappservicesrerank_engines__init__py) | 3 / 1 / 224 (was `0 / 0 / 0`) | no (young) | young (created 294-01; 294-03 reuses). get_engine, resolve_credentials, citation_check_availability, loopback-only fault URL. ⛔ a key is never logged, traced or returned |
 | [`backend/app/services/rerank_engines/registry.py`](docs/HOT-FILE-LEDGER.md#backendappservicesrerank_enginesregistrypy) | 2 / 2 / 104 (was `1 / 1 / 96`) | no (2 phases) | 296-03: `LOCAL_INFERENCE_TIMEOUT_S = 30.0` = the local row's timeout_s; pinned to rerankEngines.ts latencyNote. ⛔ no I/O; imported by api/settings.py |
@@ -12172,10 +12180,10 @@ cells rot within days.
 | [`backend/app/services/rate_limit.py`](docs/HOT-FILE-LEDGER.md#backendappservicesrate_limitpy) | 4 / 2 / 138 (was `3 / 1 / 109`) | no (2 phases) | 296-01: per-user citation limit (10/min, [ASSUMED]) on `hit`. ⛔ no process-local state; no env var; fails CLOSED (503) |
 | [`backend/app/db/api_keys.py`](docs/HOT-FILE-LEDGER.md#backendappdbapi_keyspy) | 5 / 2 / 307 (was `4 / 1 / 303`) | no (young) | young. 296-06 (293-IN-08): revoke_key returns `revoked_now` from the UPDATE status tag. ⛔ owner predicate in every statement; key_hash only in auth |
 | [`backend/app/models/api_key.py`](docs/HOT-FILE-LEDGER.md#backendappmodelsapi_keypy) | 2 / 2 / 117 (was `1 / 1 / 113`) | no (young) | young. 296-06 (293-IN-06): `needs_task` added to WorkflowRefState. ⛔ no field carries the secret except the create response |
-| [`backend/app/services/inbound_inputs.py`](docs/HOT-FILE-LEDGER.md#backendappservicesinbound_inputspy) | 8 / 2 / 312 (was `7 / 2 / 306`) | no (young) | 296 review BE-WR-03: declared_fields records the Look-it-up inputs it leaves out; needs_typed_task is False when any were declared. |
+| [`backend/app/services/inbound_inputs.py`](docs/HOT-FILE-LEDGER.md#backendappservicesinbound_inputspy) | 9 / 3 / 352 (was `8 / 2 / 312`) | ⚠ **FIRES** | 300-01 (D-14): the loop factored into _missing_fields; missing_required_labels + join_labels + blank_required_sentence beside it. ONE predicate. ⛔ pure; strips _-keys |
 | [`backend/app/api/api_keys.py`](docs/HOT-FILE-LEDGER.md#backendappapiapi_keyspy) | 3 / 2 / 421 (was `2 / 1 / 392`) | no (young) | young. 296-06: needs_task state + picker reason (293-IN-06); create_key names only what the picker offers; revoke audits only the call that revoked (293-IN-08). ⛔ 404 for miss AND foreign |
-| [`backend/app/services/unattended_launch.py`](docs/HOT-FILE-LEDGER.md#backendappservicesunattended_launchpy) | 6 / 2 / 361 (was `5 / 1 / 354`) | no (young) | young. 296-02 (293-IN-04): the _drive_run task is held in a module _BACKGROUND_TASKS set with add_done_callback(discard) (P9) until done |
-| [`backend/app/api/schedules.py`](docs/HOT-FILE-LEDGER.md#backendappapischedulespy) | 4 / 4 / 299 | ⚠ **FIRES** | ⚠ absent its ENTIRE LIFE — row added 296-02 (D-26). 296-02 (295-IN-05): Run now answers with `outcome` + a worded `detail`; ScheduledLaunchRefused caught first; raw exception logged only |
+| [`backend/app/services/unattended_launch.py`](docs/HOT-FILE-LEDGER.md#backendappservicesunattended_launchpy) | 8 / 3 / 383 (was `7 / 3 / 379`) | ⚠ **FIRES** | 300-REVIEW WR-01: OnFinish is (status, run_id); _drive_run passes its own run_id on every exit path. One call site changed. ⛔ owner identity, explicit org_id, caps armed first |
+| [`backend/app/api/schedules.py`](docs/HOT-FILE-LEDGER.md#backendappapischedulespy) | 6 / 6 / 341 (was `5 / 5 / 303`) | ⚠ **FIRES** | 300-01 (D-14): one _refuse_blank_required helper; create calls it before the INSERT, patch only for inputs / resume after the owner-scoped read. A pause reads nothing new |
 | [`backend/app/models/schedule.py`](docs/HOT-FILE-LEDGER.md#backendappmodelsschedulepy) | 3 / 3 / 231 | ⚠ **FIRES** | ⚠ absent its ENTIRE LIFE — row added 296-02 (D-26). 296-02 (295-IN-05): ScheduleTriggerResult gains one additive `outcome` Literal (launched/refused/not_loaded/error) |
 | [`backend/app/services/harness/run_read_words.py`](docs/HOT-FILE-LEDGER.md#backendappservicesharnessrun_read_wordspy) | 1 / 1 / 99 (was `0 / 0 / 0`) | no (young) | young (planned 293-02). MOVED waiting_who / unsourced_who / compose_waiting_on (workflow_runs seam). ⛔ pure leaf; re-exported |
 | [`backend/app/api/inbound.py`](docs/HOT-FILE-LEDGER.md#backendappapiinboundpy) | 10 / 3 / 719 (was `9 / 2 / 711`) | ⚠ **FIRES** | ⚠ now FIRES (298). 298-02: one foreign_binding_refusal beside template_refusal → _refused(reason="foreign_folder"), plain-string 422 (pool only). ⛔ no get_active_org_id on this path |
@@ -12201,10 +12209,10 @@ cells rot within days.
 | [`frontend/src/components/workflows/library/automationFacts.ts`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentsworkflowslibraryautomationfactsts) | 2 / 2 / 132 (was `1 / 1 / 95`) | no (young) | absent its ENTIRE LIFE (created 204.1) — row added 293. 293-03: next from server next_run_at. ⛔ spells no string; never computes |
 | [`frontend/src/components/admin/AuditTab.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentsadminaudittabtsx) | 8 / 5 / 771 (was `7 / 4 / 770`) | ⚠ **FIRES** | 298-review WR-07: one PLATFORM_ACTION_META entry, org.item.move → 'Moved an item to another organization' (Organizing), identical to OrgAuditTab's (fenced). Data only |
 | [`frontend/src/components/org/OrgAuditTab.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentsorgorgaudittabtsx) | 5 / 4 / 416 (was `4 / 3 / 415`) | ⚠ **FIRES** | 298-review WR-07: one ACTION_META entry, org.item.move → 'Moved an item to another organization' (Organizing), identical to AuditTab's (fenced). ⛔ shared audit vocabulary still OWED |
-| [`frontend/src/hooks/useAppNavigation.ts`](docs/HOT-FILE-LEDGER.md#frontendsrchooksuseappnavigationts) | 4 / 1 / 290 (was `3 / 1 / 240`) | no (young) | 297-03: the ONE useBlocker over the leave-guard registry; latch cleared per location key. ⛔ the ONLY router-hook caller (D-08); setLibraryTab( exactly 2 |
-| [`frontend/src/components/layout/AppViewSwitch.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentslayoutappviewswitchtsx) | 2 / 1 / 523 (was `1 / 1 / 473`) | no (young) | 297-02: S1 first non-chat arm; run hold inside the one run arm; admin arms gated on the operator probe. ⛔ one run comparison; fallback last; every hold lives here, never at App |
-| [`frontend/src/lib/appRoutes.ts`](docs/HOT-FILE-LEDGER.md#frontendsrclibapproutests) | 1 / 1 / 198 (was `0 / 0 / 0`) | no (young) | young (created 297-02). STRICT LEAF: one home of /app path vocabulary (D-11). ⛔ never throws; strict UUID; no host in any output |
-| [`frontend/src/components/layout/AddressNotFound.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentslayoutaddressnotfoundtsx) | 1 / 1 / 51 (was `0 / 0 / 0`) | no (young) | young (created 297-02). S1 + S2 and their copy, one home. ⛔ no path prop, no icon; never renders the trailing fallback tag |
+| [`frontend/src/hooks/useAppNavigation.ts`](docs/HOT-FILE-LEDGER.md#frontendsrchooksuseappnavigationts) | 10 / 2 / 488 (was `9 / 2 / 452`) | no (young) | 299-03: entityLink + address, leave (REPLACE), openRoute (push), resume (/ or /app only). ⛔ ONLY router-hook caller; setLibraryTab( exactly 2; one blocker |
+| [`frontend/src/components/layout/AppViewSwitch.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentslayoutappviewswitchtsx) | 7 / 2 / 600 (was `6 / 2 / 598`) | no (young) | 299-REVIEW WR-03: one prop on the experts arm (onLeaveLink → openRoute experts). ⛔ no hooks; one run comparison; fallback last |
+| [`frontend/src/lib/appRoutes.ts`](docs/HOT-FILE-LEDGER.md#frontendsrclibapproutests) | 2 / 2 / 219 (was `1 / 1 / 198`) | no (young) | 299-02: chat / workflows / experts entity variants beside runs (D-01). STRICT LEAF. ⛔ never throws; strict UUID; ?run= is the chat home's only; no host |
+| [`frontend/src/components/layout/AddressNotFound.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentslayoutaddressnotfoundtsx) | 2 / 2 / 46 (was `1 / 1 / 51`) | no (young) | 299-03: AddressNotFound renders CantBeOpened's unparseable variant; ADDRESS_NOT_FOUND_COPY re-exported. ⛔ no path prop, no icon; never renders the trailing fallback tag |
 | [`frontend/src/lib/leaveGuard.ts`](docs/HOT-FILE-LEDGER.md#frontendsrclibleaveguardts) | 1 / 1 / 97 (was `0 / 0 / 0`) | no (young) | young (created 297-03). Leave-guard registry, no-op default (D-21); one-shot latch (D-32/D-42). ⛔ no component; react-only imports; never throws |
 | [`backend/app/services/org_lists.py`](docs/HOT-FILE-LEDGER.md#backendappservicesorg_listspy) | 2 / 1 / 108 (was `1 / 1 / 71`) | no | young (298-01). 298-review WR-09: root_upload_org 503s when a sent header cannot be validated. ⛔ list helpers: None → no predicate, never raise |
 | [`backend/app/api/org_items.py`](docs/HOT-FILE-LEDGER.md#backendappapiorg_itemspy) | 2 / 1 / 354 (was `1 / 1 / 227`) | no | young (298-01 reads; 298-03 move-preview + move, thin over org_move). ⛔ every route 401 without a bearer (router dependency); only member orgs named |
@@ -12218,13 +12226,47 @@ cells rot within days.
 | [`frontend/src/hooks/useLibraryOrgSwitch.ts`](docs/HOT-FILE-LEDGER.md#frontendsrchooksuselibraryorgswitchts) | 4 / 1 / 130 (was `3 / 1 / 117`) | no (young) | 298-review WR-01: switch reset also clears Find + listTarget (optional listReset); IN-05: refreshViews drops an answer sent under another org. ⛔ no keyed remount |
 | [`frontend/src/components/workflows/library/useWorkflowLibraryFeeds.ts`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentsworkflowslibraryuseworkflowlibraryfeedsts) | 3 / 1 / 265 (was `2 / 1 / 254`) | no (young) | 298-05: useOrgItemsVersion() — a move after mount re-reads the drafts feed only (D-31: drafts are the only workflow kind that moves) |
 | [`frontend/src/lib/api/orgItems.ts`](docs/HOT-FILE-LEDGER.md#frontendsrclibapiorgitemsts) | 2 / 1 / 120 (was `1 / 1 / 45`) | no (young) | 298-05: + getElsewhereCounts (ApiError on non-OK), getMovePreview + moveOrgItem (non-OK → ApiRefusal with the server sentence via refusalOf). ⛔ refusal text rendered as React text by the sheet |
-| [`frontend/src/components/org/orgItemsCopy.ts`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentsorgorgitemscopyts) | 2 / 1 / 154 (was `1 / 1 / 18`) | no (young) | 298-05: + the elsewhere line (elsewhereLead exact plurals, Switch) and the move sheet words (titles, count sentence, what changes, terminals). ⛔ strict leaf, no imports; never '0 more' |
+| [`frontend/src/components/org/orgItemsCopy.ts`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentsorgorgitemscopyts) | 4 / 2 / 210 (was `3 / 2 / 204`) | no (young) | 299-04: + SAVES_IN_PREFIX / savesIn(org) (UI-D11). ⛔ strict leaf, no imports; the one home of org words |
 | [`frontend/src/components/workflows/folderLabel.ts`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentsworkflowsfolderlabelts) | 1 / 1 / 47 | no (young) | young (created 298-04): optionLabel / chipLabel — in-org name, '{name} — lives in {Org}' / '· lives in', active-org label plain, else UNNAMED_KB_OPTION. ⛔ pure leaf, never a raw id |
 | [`frontend/src/lib/elsewhereCounts.ts`](docs/HOT-FILE-LEDGER.md#frontendsrclibelsewherecountsts) | 2 / 1 / 188 (was `1 / 1 / 179`) | no (young) | young (298-05): one GET per active org (D-16), stale answers dropped, failed → nothing; move version + lastMoved; the open move request; moveTargets (others by name). ⛔ lazy client, org passed in |
 | [`frontend/src/components/org/ElsewhereLine.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentsorgelsewherelinetsx) | 2 / 1 / 95 (was `1 / 1 / 79`) | no (young) | young (298-05): N more … in <Org> · Switch (D-17) + hosts the row-menu move sheet (library: folder, workflows: draft). ⛔ absent while loading, solo, at 0, on failure; never '0 more' |
 | [`frontend/src/components/org/MoveToOrgSheet.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentsorgmovetoorgsheettsx) | 2 / 1 / 465 (was `1 / 1 / 433`) | no (young) | 298-review WR-02: MoveToOrgSheetHost claims in mount order; only the earliest mounted claimant of a kind renders the sheet (the phone Library mounts two). ⛔ no red; preview before Move |
 | [`frontend/src/components/org/MoveToOrgMenuItem.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentsorgmovetoorgmenuitemtsx) | 2 / 1 / 91 (was `1 / 1 / 88`) | no (young) | young (298-05): Move to <Org>… DropdownMenuItem(s) with data-move-item (menus widen by CSS), one per other org by name, collapsed at 4+. ⛔ absent solo / non-owner / no provider |
 | [`frontend/src/components/org/MoveToOrgButton.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentsorgmovetoorgbuttontsx) | 1 / 1 / 82 | no (young) | young (created 298-05): Root-document move button(s) for the detail panel; owns its sheet; onMoved after the moved sheet closes. ⛔ only an owned latest Root document at 2+ orgs |
+| [`backend/app/api/links.py`](docs/HOT-FILE-LEDGER.md#backendappapilinkspy) | 1 / 1 / 93 | no (young) | young (created 299-01). GET /links/{kind}/{id}: one 404 body for every refusal (D-06/D-08). ⛔ no get_active_org_id / require_capability / require_visible; 401 router-level |
+| [`backend/app/services/link_resolver.py`](docs/HOT-FILE-LEDGER.md#backendappserviceslink_resolverpy) | 7 / 1 / 259 (was `6 / 1 / 256`) | no (young) | 299-REVIEW WR-03: a system Expert's audience is plan_experts (the /experts router is capability-gated). ⛔ one statement per kind; audience twinned with linkAudience.ts |
+| [`backend/app/services/item_org_guard.py`](docs/HOT-FILE-LEDGER.md#backendappservicesitem_org_guardpy) | 2 / 1 / 78 (was `1 / 1 / 74`) | no (young) | 299-REVIEW WR-01: run sentence says start it from a new chat in the workflow's org (no switch/send ping-pong). ⛔ no-op without an active org (298 D-03); never a widening of _require_thread_org |
+| [`frontend/src/lib/returnTo.ts`](docs/HOT-FILE-LEDGER.md#frontendsrclibreturntots) | 1 / 1 / 127 | no (young) | young (created 299-05). return-to-link leaf (D-23/D-24). ⛔ strict leaf; rebuilt via formatAppRoute, never echoed; sessionStorage 15-min TTL, re-validated, consumed once |
+| [`frontend/src/components/layout/BootScreen.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentslayoutbootscreentsx) | 2 / 1 / 89 (was `1 / 1 / 89`) | no (young) | young (created 299-05). three-stage boot clock 8 s / 20 s (D-26, SEED-312). ⛔ Try again = reload (no History write); never decides auth |
+| [`frontend/src/hooks/useThreadAddress.ts`](docs/HOT-FILE-LEDGER.md#frontendsrchooksusethreadaddressts) | 1 / 1 / 176 (was `0 / 0 / 0`) | no (young) | young (created 299-02). URL ⇄ selected thread binding (D-02/D-32), one effect. ⛔ never setViewingThread, never a router hook; refs for the list; IN-01 window |
+| [`frontend/src/components/workflows/library/useWorkflowLinkTarget.ts`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentsworkflowslibraryuseworkflowlinktargetts) | 2 / 1 / 111 (was `1 / 1 / 90`) | no (young) | 299-REVIEW WR-05: clears ALL filters first (once per id); re-runs on what is rendered; resets when the address names no workflow. ⛔ no write on open; in LIBRARY_SUBTREE_PATHS; never imports the page |
+| [`frontend/src/components/experts/catalog/useExpertLinkTarget.ts`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentsexpertscataloguseexpertlinktargetts) | 3 / 1 / 73 (was `1 / 1 / 57`) | no (young) | 299-REVIEW WR-03: returns whether the linked Expert was refused (403/404 from getExpert). ⛔ read only; once per id; an outage or a 401 is never can't-be-opened |
+| [`frontend/src/lib/clipboard.ts`](docs/HOT-FILE-LEDGER.md#frontendsrclibclipboardts) | 1 / 1 / 40 (was `0 / 0 / 0`) | no (young) | young (created 299-03). copyText → copied or refused (D-21). ⛔ never throws; never reports a refused copy as copied; no React |
+| [`frontend/src/lib/api/links.ts`](docs/HOT-FILE-LEDGER.md#frontendsrclibapilinksts) | 2 / 1 / 46 (was `1 / 1 / 46`) | no (young) | 299-REVIEW WR-03: the audience union gains plan_experts (types only). ⛔ an outage is never reported as can't-be-opened |
+| [`frontend/src/components/layout/CantBeOpened.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentslayoutcantbeopenedtsx) | 1 / 1 / 159 (was `0 / 0 / 0`) | no (young) | young (created 299-03). the one in-place card (D-12..D-15, D-36); 297's S1 is its unparseable variant. ⛔ no raw path prop; rebuilt address only; one copy home |
+| [`frontend/src/components/layout/LinkGate.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentslayoutlinkgatetsx) | 3 / 1 / 366 (was `2 / 1 / 339`) | no (young) | 299-REVIEW WR-04: a 298 move or a membership-set change drops cached answers; the one on screen is re-asked while it stays shown. ⛔ no router hook; streams store READ only |
+| [`frontend/src/components/layout/SwitchOrgPrompt.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentslayoutswitchorgprompttsx) | 1 / 1 / 124 (was `0 / 0 / 0`) | no (young) | young (created 299-03). This is in <org> — switch? + the still-answering chip (D-16/D-17/D-39). ⛔ never calls switchOrg itself; one filled button; words from orgItemsCopy |
+| [`frontend/src/components/share/ShareLinkMenu.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentssharesharelinkmenutsx) | 4 / 1 / 177 (was `3 / 1 / 177`) | no (young) | young (created 299-04). link surface on DropdownMenu (D-20/D-21/D-39). ⛔ one focusable item; menuitem/group children; copied = origin + formatAppRoute; no toast; audience from the leaf |
+| [`frontend/src/lib/linkAudience.ts`](docs/HOT-FILE-LEDGER.md#frontendsrcliblinkaudiencets) | 3 / 1 / 78 (was `2 / 1 / 76`) | no (young) | 299-REVIEW WR-03: system Expert → plan_experts: "Opens for anyone signed in whose plan includes Experts." ⛔ strict leaf; pinned to link_audience_cases.json + TERMINAL_RUN_STATUSES |
+| [`frontend/src/components/org/SavesInOrg.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentsorgsavesinorgtsx) | 1 / 1 / 46 (was `0 / 0 / 0`) | no (young) | young (created 299-04). Saves in <org> caption (D-18/D-38/UI-D11). ⛔ renders nothing below 2 orgs or without an active org name; only on Run / Tweak / Start a chat; words from orgItemsCopy |
+| [`frontend/src/hooks/useAuth.ts`](docs/HOT-FILE-LEDGER.md#frontendsrchooksuseauthts) | 6 / 5 / 128 (was `5 / 4 / 100`) | ⚠ **FIRES** | 299-05: SSO redirectTo / sign-up emailRedirectTo from returnTo + one getSession .catch. ⛔ no hash access; no timer sets user (Pitfall 6) |
+| [`frontend/src/components/workflows/library/useWorkflowFork.ts`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentsworkflowslibraryuseworkflowforkts) | 4 / 2 / 539 (was `3 / 1 / 517`) | no | 299-04: Tweak sends fromDefinitionId (D-38); a WorkflowOrgRefusedError lands as forkFailed.sentence, every other failure keeps the prose-free shape. Below threshold |
+| [`backend/app/api/org.py`](docs/HOT-FILE-LEDGER.md#backendappapiorgpy) | 13 / 4 / 1071 (was `12 / 4 / 1068`) | ⚠ **FIRES** | 300-REVIEW IN-01: one additive response key at both invite sites — email_to_test_address = sent AND outcome.redirected. Nothing stored; the CHECK on email_delivery untouched |
+| [`backend/app/api/me_preferences.py`](docs/HOT-FILE-LEDGER.md#backendappapimepreferencespy) | 2 / 2 / 190 (was `1 / 1 / 120`) | no (2 phases) | 300-05: three notification-email keys on GET + one ungated PUT /me/preferences/notification-email (D-09). ⛔ one auth.uid() merge; put_my_preferences byte-identical (hash-pinned) |
+| [`backend/app/services/connectors/smtp_adapter.py`](docs/HOT-FILE-LEDGER.md#backendappservicesconnectorssmtpadapterpy) | 2 / 2 / 594 (was `1 / 1 / 482`) | no (2 phases) | 300-03 (D-24, D-32): the body gains a js-default markdown HTML alternative + a line-preserving text part. ⛔ header guard + refused-recipient check stay; no CC/BCC/attachment |
+| [`backend/app/services/health_probe.py`](docs/HOT-FILE-LEDGER.md#backendappserviceshealthprobepy) | 2 / 2 / 197 (was `1 / 1 / 116`) | no (2 phases) | 300-04: probe_email (D-12) in the gather + __all__. ⛔ off / held back is neutral, never down; a reason never names a recipient |
+| [`backend/app/services/run_model_resolution.py`](docs/HOT-FILE-LEDGER.md#backendappservicesrunmodelresolutionpy) | 5 / 3 / 371 (was `4 / 3 / 344`) | ⚠ **FIRES** | 300-REVIEW IN-03: resolve_owner_run_model walks the in-app door's chain — load, apply_user_model_default, resolve_run_model (empty body), resolve_workflow_ctx_model. ⛔ off-loop load; (None, None) |
+| [`frontend/src/components/admin/HealthSignals.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentsadminhealthsignalstsx) | 7 / 5 / 415 (was `6 / 5 / 407`) | ⚠ **FIRES** | 300-REVIEW IN-04: EmailProbe.config_problem (optional); emailView reads "Can't send" / via {Provider}: {sentence}, destructive dot, before the down arm. Older backend unchanged |
+| [`frontend/src/components/org/InvitationsTab.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentsorginvitationstabtsx) | 4 / 3 / 310 (was `3 / 2 / 290`) | ⚠ **FIRES** | ⚠ now FIRES (300). 300-05: Email not sent chip (shipped StatusChip, muted) + resend failure line (D-11). ⛔ server truth on re-fetch, no optimistic flip |
+| [`frontend/src/components/org/InviteMemberDialog.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentsorginvitememberdialogtsx) | 5 / 3 / 326 (was `4 / 3 / 316`) | ⚠ **FIRES** | 300-REVIEW IN-01: one useState (toTestAddress) reset on open; a sent-to-test arm before the sent arm, words from inviteDeliveryCopy. The three shipped arms unchanged |
+| [`frontend/src/lib/api/schedules.ts`](docs/HOT-FILE-LEDGER.md#frontendsrclibapischedulests) | 3 / 3 / 166 (was `2 / 2 / 129`) | ⚠ **FIRES** | 300-01: ScheduleRefusalError (an ApiError) for {detail:{code,message,missing}}; string + array arms unchanged. ⛔ not re-exported via lib/api.ts |
+| [`backend/app/db/notifications.py`](docs/HOT-FILE-LEDGER.md#backendappdbnotificationspy) | 1 / 1 / 326 (was `0 / 0 / 0`) | no (young) | young (created 300-04). Outbox claim (SKIP LOCKED), still-waiting, opt-out, outcome (D-12, D-13, D-20). ⛔ never selects prompt text; state flip inside the claim txn |
+| [`backend/app/services/notification_drainer.py`](docs/HOT-FILE-LEDGER.md#backendappservicesnotificationdrainerpy) | 1 / 1 / 208 (was `0 / 0 / 0`) | no (young) | young (created 300-04). Per-worker outbox drainer, SchedulerService shape (D-20). ⛔ send outside the claim txn; at most 3 attempts; SMTP at-most-once |
+| [`backend/app/services/run_waiting_email.py`](docs/HOT-FILE-LEDGER.md#backendappservicesrunwaitingemailpy) | 1 / 1 / 115 (was `0 / 0 / 0`) | no (young) | young (created 300-03). Pure run-waiting renderer + duration words (NOTE-03, D-02..D-06). ⛔ never accepts prompt text; subject control chars stripped |
+| [`frontend/src/components/workflows/scheduleOutcomeVocabulary.ts`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentsworkflowsscheduleoutcomevocabularyts) | 1 / 1 / 67 | no (young) | young (created 300-01). last_status → one sentence (D-15, D-26). ⛔ zero-import leaf; no raw status token reaches the screen |
+| [`frontend/src/components/settings/EmailSettings.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentssettingsemailsettingstsx) | 1 / 1 / 324 (was `0 / 0 / 0`) | no (1 phase) | young (created 300-05). Operator Email card, ApiKeyLimits shape (D-07, D-08, D-10). ⛔ changes()/adopt() handle, no own Save; never sends a cleared delay or an invalid address |
+| [`frontend/src/components/settings/EmailNotificationPreference.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentssettingsemailnotificationpreferencetsx) | 1 / 1 / 155 (was `0 / 0 / 0`) | no (1 phase) | young (created 300-05). Member switch (D-09). ⛔ calls only ungated /me/preferences; never shows On before the read answers |
+| [`frontend/src/components/org/inviteDeliveryCopy.ts`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentsorginvitedeliverycopyts) | 1 / 1 / 32 (was `0 / 0 / 0`) | no (1 phase) | young (created 300-05). Invite delivery sentences (D-11, UI-D12). ⛔ zero-import leaf; D-11 sentence verbatim |
 
 
 
@@ -19201,6 +19243,26 @@ Scan-list cell as of 2026-10-27 (replaced by 297-03, moved verbatim): 41 / 29 / 
 
 CLAUDE.md verdict cell as of 2026-10-27 (replaced by 297-03, moved verbatim): | `frontend/src/App.tsx` | 41 / 29 / 348 (was `39 / 29 / 340`) | 297-02: nav props threaded; router correction beside the 188-09 docblock |
 
+### `frontend/src/App.tsx` — Phase 299 (299-05)
+
+**`43 / 30 / 349`** (was `42 / 29 / 355`)
+
+One expression: the splash branch `if (loading || setupStatus === null)` now returns `<BootScreen />` (D-26 / SEED-312), and the `IrisAvatar` import is swapped for `BootScreen`'s (App no longer renders the Iris itself; the markup moved verbatim into `components/layout/BootScreen.tsx` with its 276-06 comment). The D-06 comment above the branch stays; a two-line dated comment sits beside it. The condition is unchanged, so the wizard / lock-out / invite / AuthPage order below is byte-identical, and `SetupWizard.test.tsx` + `navigationKeepsStreams.test.tsx` stay green unedited. Honoured by construction (the 297 one-expression precedent).
+
+Scan-list cell as of 2026-10-28 (replaced by 299-05, moved verbatim): 42 / 29 / 355 (was `41 / 29 / 348`) | **FIRES** | 297-03: one LeaveGuardContext.Provider around CitationNavProvider (no key, one-identity value). See §Phase 297 (297-03)
+
+CLAUDE.md verdict cell as of 2026-10-28 (replaced by 299-05, moved verbatim): | `frontend/src/App.tsx` | 42 / 29 / 355 (was `41 / 29 / 348`) | 297-03: one LeaveGuardContext.Provider (no key, one-identity value) |
+
+### `frontend/src/App.tsx` — Phase 299 (299-02)
+
+**`44 / 30 / 350`** (was `43 / 30 / 349`)
+
+One prop expression: `entityLink={nav.entityLink}` on `<ChatLayout>`, beside `addressNotFound`. No hook, no state, no provider and no key added; the provider order is byte-identical, so `navigationKeepsStreams.test.tsx` and `SetupWizard.test.tsx` stay green unedited. Honoured by construction (the 297 one-expression precedent); the logic lives in `useAppNavigation.ts` (the navigators) and `useThreadAddress.ts` (the binding).
+
+Scan-list cell as of 2026-10-28 (replaced by 299-02, moved verbatim): 43 / 30 / 349 (was `42 / 29 / 355`) | **FIRES** | 299-05: the splash JSX becomes `<BootScreen />` (one expression; IrisAvatar import swapped for BootScreen's). See §Phase 299 (299-05)
+
+CLAUDE.md verdict cell as of 2026-10-28 (replaced by 299-02, moved verbatim): | `frontend/src/App.tsx` | 43 / 30 / 349 (was `42 / 29 / 355`) | 299-05: splash → <BootScreen /> (one expression) |
+
 ### `frontend/src/components/classification/ClassificationRulesPage.tsx` — Phase 271
 
 **`3 / 3 / 264`** at 271 close. **271-02 (P-07):** one shape, no `embedded` flag; the outer padding and old h1 dropped; the sub-view header renders Back ("Library"), "Filing rules", the shipped subtitle and New rule. Its only mount is now inside `LibraryPage`. Live (G4-3): the sub-view reads Filing rules, never Classification rules, and the seeded rule is listed. It measures 3 phases, so it FIRES.
@@ -19765,6 +19827,8 @@ Thirty-seven watched files named by 276 plans had no scan row (six existing land
 
 **`3 / 1 / 26`** measured at 276 planning (2026-10-04); absent from the scan list until then. 276-01 D-21: title prop → "Syrel". One string. 276-05 re-derives the triple at close.
 
+**299-05 (2026-10-28) — `5 / 3 / 32` (was `4 / 2 / 26`); ⚠ G-5 NOW FIRES at 3 phases (177, 276, 299).** One sibling after the form ternary inside `AuthCardShell`: `{line && <p className="mt-4 text-center text-xs text-muted-foreground">{line}</p>}`, where `line = RETURN_LINE[mode](kind)` when `kindWord(window.location.pathname, window.location.search)` is non-null (S5 / D-22). No new prop, so `App.tsx`'s mount is unchanged. **Binding invariants:** ⛔ the kind only, never a title (T-299-14); ⛔ React text, never `dangerouslySetInnerHTML`; ⛔ `SignInForm.tsx` / `SignUpForm.tsx` are not modified (UI-D16: the line therefore sits under the form's "Sign up" row). The next feature touch here should first ask whether the card's composition (forms + line) wants a seam. Scan-list cell as of 2026-10-28 (replaced by 299-05, moved verbatim): 4 / 2 / 26 | no (2 phases) | ⚠ absent its ENTIRE LIFE — row added AT 276 PLANNING. 276-01 D-21: title prop → "Syrel". One string
+
 ### `frontend/src/landing/components/CompareSection.tsx`
 
 **`2 / 1 / 121`** measured at 276 planning (2026-10-04); absent from the scan list until then. 276-01: two prose strings → Syrel. ⛔ landing fence: no app/docs imports. 276-05 re-derives the triple at close.
@@ -19914,6 +19978,30 @@ Scan-list cell as of 2026-10-20 (replaced by 294-05, moved verbatim): 1 / 1 / 11
 **`3 / 1 / 95`** at 276 planning. Absent from the scan list for its whole life; the row was added at 276-07 planning because 276-07 modifies it. 276-07 adds a hosted PNG lockup (absolute URL from `primary_frontend_origin()`, no new env var) and the product name to the Resend invite. ⛔ WR-02 stands: the org name and every interpolated URL are `html.escape`d. 276-07 re-derives the triple at close.
 
 **`4 / 2 / 105`** re-derived at 276-07 (2026-10-05), counting the 276-07 Task 2 commit. `ResendProvider.send_invite` prepends `<img src="{safe_logo}" alt="Syrel" width="160" height="80">` where `safe_logo = html.escape(primary_frontend_origin() + "/brand/syrel-lockup-email.png", quote=True)`; the body says "… on Syrel." and the plain-text subject becomes "You're invited to {org} on Syrel". `NoneLogProvider` is unchanged. Pinned by `backend/tests/unit/test_276_invite_email_brand.py` (planted `</a><script>` org). Two phases; G-5 does not fire.
+
+### `backend/app/services/email_provider.py` — 300-03 Task 1 (2026-10-29)
+
+**`5 / 3 / 374` (was `4 / 2 / 105`) — crosses into G-5 at this commit (3 phases with 300).** D-21: rewritten as the ONE app mailer. `send_email(OutboundEmail, *, idempotency_key) -> SendOutcome` with three providers — `none` (suppressed), `resend` (REST over `httpx` through the `_http_client` seam; the `resend` SDK was never in the built image, so the shipped lazy import could not send one invite), `smtp` (stdlib `smtplib.SMTP`/`SMTP_SSL` from env `SMTP_*`, deliberately NOT `open_pinned_smtp`: the operator relay may be local). The D-10 dev guard lives inside the seam (`is_production_environment()`), `one_line` is the header guard, `shell_html` the UI-SPEC S1 shell, `send_invite` the invite on it. ⛔ BLOCKING, every caller uses `run_in_threadpool`; ⛔ never raises; ⛔ no API key, password, recipient, subject or link in a reason or a log. `compose_invite_link` unchanged. A temporary `get_email_provider` shim keeps `api/org.py` importing until Task 2. Seam if it grows: the two transports into a `mail_transports.py` leaf. Pinned by `test_300_mailer.py`, `test_276_invite_email_brand.py` (re-pointed, D-34), `test_300_clean_image_imports.py`.
+
+Scan-list cell as of 2026-10-29 (replaced by 300-03, moved verbatim): 4 / 2 / 105 (was `3 / 1 / 95`) | no (2 phases) | ⚠ absent its ENTIRE LIFE; row added at 276-07 planning. 276-07: hosted PNG lockup + "Syrel" in the invite. ⛔ org name AND every URL html-escaped (WR-02) |
+
+CLAUDE.md verdict cell: none before 300-03 (the file did not fire); row added by 300-03.
+
+### `backend/app/services/email_provider.py` — 300-03 Task 2 (2026-10-29)
+
+**`6 / 3 / 362` (was `5 / 3 / 374`).** The temporary `get_email_provider` shim is deleted now that `api/org.py` calls `send_invite` directly (`grep get_email_provider` over `backend/app` and `backend/tests` reads 0). `send_invite` (built in Task 1 because the re-pointed `test_276` needs it) is unchanged.
+
+Scan-list cell as of 2026-10-29 (replaced by 300-03 Task 2, moved verbatim): 5 / 3 / 374 (was `4 / 2 / 105`) | ⚠ **FIRES** | ⚠ now FIRES (300). 300-03 (D-21): the ONE mailer seam — none / Resend REST / SMTP, dev guard, shell. ⛔ never raises; no secret or recipient in a reason or log |
+
+CLAUDE.md verdict cell as of 2026-10-29 (replaced by 300-03 Task 2, moved verbatim): | `backend/app/services/email_provider.py` | 5 / 3 / 374 (was `4 / 2 / 105`) | ⚠ now FIRES (300) · 300-03: one mailer seam (D-21) · ⛔ |
+
+### `backend/app/services/email_provider.py` — 300-REVIEW fixes (2026-10-29)
+
+**`10 / 3 / 413` (was `6 / 3 / 362`).** Four review fixes, one commit each. WR-02: `SMTP_SECURITY_VALUES` + `smtp_security_problem()` — an unknown value, or `none` with a username, fails before any socket opens (no password over plaintext). IN-01: `SendOutcome.redirected`, set via `dataclasses.replace` when the dev guard rewrote the recipient. IN-02: the offline-flow `invite link for ...` INFO line runs only when the provider is `none`. IN-04: `transport_config_problem(provider, app)` — the mailer's own config refusals, read by the health probe.
+
+Scan-list cell as of 2026-10-29 (replaced by 300-REVIEW, moved verbatim): 6 / 3 / 362 (was `5 / 3 / 374`) | ⚠ **FIRES** | ⚠ now FIRES (300). 300-03 (D-21): the ONE mailer seam — none / Resend REST / SMTP, dev guard, shell; shim gone. ⛔ never raises; no secret or recipient in a reason or log
+
+CLAUDE.md verdict cell as of 2026-10-29 (replaced by 300-REVIEW, moved verbatim): | `backend/app/services/email_provider.py` | 6 / 3 / 362 (was `5 / 3 / 374`) | ⚠ now FIRES (300) · 300-03: one mailer seam (D-21) · ⛔ |
 
 ### `frontend/src/docs/pages/ChangelogVersion.tsx`
 
@@ -21079,6 +21167,16 @@ CLAUDE.md verdict cell as of 2026-10-13 (replaced by 279-04):
 
 > ⚠ STALE (`7/4/359`). **276-07**: pill label decoded; filter stays raw
 
+### `frontend/src/components/experts/catalog/ExpertCatalogPage.tsx` — Phase 299 (299-02)
+
+**`11 / 7 / 376`** (was `9 / 6 / 372` — one intervening commit uncounted by the old cell; re-derived)
+
+One optional prop `openBundleId?: string | null` and ONE call, `useExpertLinkTarget({ id: props.openBundleId ?? null, experts, loading, setInspected })`, beside the page's existing state (plus its import). The `inspected` state still controls the ONE `ExpertDetailModal` mount; the hook only sets it. The page's own imports are unchanged apart from the hook — its "exactly ONE list read" property (`ExpertCatalogPage.test.tsx` (8)/(8b), green unedited) is the page's; the per-id fallback read lives in `useExpertLinkTarget.ts` and fires only for a linked id the list does not hold. Honoured by construction.
+
+Scan-list cell as of 2026-10-28 (replaced by 299-02, moved verbatim): 9 / 6 / 372 (was `8 / 5 / 359`) | ⚠ **FIRES — 6 phases** | honoured by construction (**279-03 F**, WR-07): ONE reason expression (network sentence only for TypeError); `listExperts(true, false)` ×3
+
+CLAUDE.md verdict cell as of 2026-10-28 (replaced by 299-02, moved verbatim): | `frontend/src/components/experts/catalog/ExpertCatalogPage.tsx` | 9 / 6 / 372 (was `8 / 5 / 359`) | honoured by construction (279-03: ONE reason expression) |
+
 ### `frontend/src/components/experts/catalog/ExpertDetailModal.tsx` — Phase 279 close
 
 **`7 / 5 / 531` (was `6 / 4 / 531`).** Honoured by construction (279-03 Commit A): ONE copy change ("will not be searched"). ⚠ Review note: no test pins that copy.
@@ -21897,6 +21995,14 @@ CLAUDE.md verdict cell before 282-04 (replaced):
 
 > honoured by construction (282-01) · `MODEL_CAPABILITIES` seam OWED · ⛔
 
+### `backend/app/config.py` — 300-03 Task 1 (2026-10-29)
+
+**`96 / 55 / 1831` (was `93 / 54 / 1809`; the row was stale by two commits).** D-28: ONE hunk in the existing Phase 167 email block — the `email_provider` literal comment now reads `none | resend | smtp`, the stale *"the `resend` package is an opt-in lazy import"* sentence is deleted (300 D-21 removed the SDK), `invite_from_email` is documented as the sender FALLBACK (D-08), and five env fields are added: `smtp_host`, `smtp_port` (587), `smtp_username`, `smtp_password`, `smtp_security` (`starttls | ssl | none`). Infra and a secret, so env only; every other email knob is in `app_settings` (migration 218). Deploy parity in the same commit (`.env.example`, onebox preset, compose, OPERATOR.md, drift script). Honoured by construction: no new branch, no new import. The owed seam (split the Settings class by concern) is NOT taken.
+
+Scan-list cell as of 2026-10-29 (replaced by 300-03, moved verbatim): 93 / 54 / 1809 (was `92 / 54 / 1790`) | ⚠ **FIRES** | **282-01** ceiling 1800 + boot check + DB-tier clamp; **282-04** `DEFAULT_LLM_CALL_TIMEOUT_SECONDS_SELF_HOSTED` 900 via the mig 180 predicate. No env var. honoured by construction |
+
+CLAUDE.md verdict cell as of 2026-10-29 (replaced by 300-03, moved verbatim): | `backend/app/config.py` | 93 / 54 / 1809 (was `92 / 54 / 1790`) | honoured by construction (282-04: self-hosted default 900) · seam OWED · ⛔ |
+
 ### `backend/app/api/admin.py` — 282-04
 
 **`43 / 17 / 2051` (was `42 / 17 / 2024`).** **282-04** (D-29): the PATCH's timeout sentence moves into `_timeout_out_of_range_detail(lo, hi, val)`; `AddModelRequest.llm_call_timeout_seconds` (optional) is type- and range-checked before any DB touch with that same helper and joins `_ADD_MODEL_CAP_COLUMNS`. Blank writes nothing. `enabled` stays forced False.
@@ -22584,6 +22690,16 @@ CLAUDE.md verdict cell as of 2026-10-16 (replaced by 284-05):
 > ⚠ row STALE · last touch 266-01 · ⛔
 
 
+### `scripts/full-schema-supplement.sql` — Phase 300 (300-02)
+
+Re-derived 2026-10-29 with the CLAUDE.md recipe: **26 / 18 / 888** (was `25 / 17 / 863`). 300-02 appended migration 218's
+privilege statements (REVOKE EXECUTE on `notify_on_ask_row()` / `notify_on_run_status()` from PUBLIC, anon and authenticated;
+the deny-all grants on `notifications` / `notification_deliveries`), 25 lines, because `regenerate-full-schema.sh` dumps without
+privileges — without the copy a greenfield install from `full-schema.sql` would leave both trigger functions callable by everyone
+and anon holding full access on both tables. `check-greenfield-privileges.py` read "greenfield privileges OK" afterwards.
+Append-only, one block: honoured by construction. The plan had said this file would not change; the deviation is recorded in
+`300-02-SUMMARY.md`, and this row/section were written at phase close by the orchestrator (same split 296-01 used).
+
 ### `scripts/full-schema-supplement.sql` — Phase 294 (294-03)
 
 **`23 / 15 / 848` (was `21 / 14 / 838`).** +9: the migration 211 grant block (owner SELECT, service_role writes) mirrored for ACL parity.
@@ -23002,6 +23118,14 @@ Scan-list cell before this touch (moved verbatim): | [`frontend/src/components/c
 **`8 / 2 / 312` (was `7 / 2 / 306`).** 296 review BE-WR-03: declared_fields records the Look-it-up inputs it leaves out; needs_typed_task is False when any were declared. A workflow whose only inputs are Look-it-up was greyed in the key picker, refused by create_key and refused inbound (`needs_task`), unlike the browser. RED `3116847ce`.
 
 Scan-list cell before this touch (moved verbatim): | [`backend/app/services/inbound_inputs.py`](docs/HOT-FILE-LEDGER.md#backendappservicesinbound_inputspy) | 7 / 2 / 306 (was `6 / 1 / 258`) | no (young) | young. 296-06: missing_required (287-T01, one predicate for kickoffs + key calls), needs_typed_task (293-IN-06), INBOUND_MAX_BODY_BYTES (293-IN-03). ⛔ pure; strips _-keys |
+
+### `backend/app/services/inbound_inputs.py` — 300-01 Task 1 (2026-10-29)
+
+**`9 / 3 / 352` (was `8 / 2 / 312`) — crosses into G-5 at this commit (293, 296, 300).** D-14: the `missing_required` loop is factored into a private `_missing_fields` that both `missing_required` (keys, byte-identical results) and the new `missing_required_labels` (labels, the key when blank) call, so the browser pin in `launch_fields_cases.json` still covers ONE predicate. `join_labels` and `blank_required_sentence(labels, *, saved_schedule)` build the UI-SPEC §S6b/§S6c words; `MISSING_REQUIRED_CODE = "missing_required"` is the wire code 300-02 shares. ⛔ still pure, no I/O. Seam if it grows: the TRUST-03 envelope half (`wrap_untrusted_input` .. `inbound_kickoff`) is the separable one.
+
+Scan-list cell as of 2026-10-29 (replaced by 300-01, moved verbatim): 8 / 2 / 312 (was `7 / 2 / 306`) | no (young) | 296 review BE-WR-03: declared_fields records the Look-it-up inputs it leaves out; needs_typed_task is False when any were declared.
+
+CLAUDE.md verdict cell: none before 300-01 (the file did not fire); row added by 300-01.
 
 ### `backend/app/api/inbound.py` — 296 SECURITY AR-05 (2026-10-27)
 
@@ -23828,6 +23952,14 @@ Scan-list cell as of 2026-10-20 (replaced by 294-05, moved verbatim): 2 / 1 / 10
 
 No scan-list row existed before 294-05 (2026-10-20).
 
+### `scripts/check-deploy-drift.sh` — 300-03 Task 1 (2026-10-29)
+
+**`6 / 5 / 271` (was `5 / 4 / 267`).** D-28 parity: `SMTP_HOST SMTP_PORT SMTP_USERNAME SMTP_PASSWORD SMTP_SECURITY` registered in `OMITTED_FROM_ONEBOX` with the reason (they are active in `backend/.env.example`, and ship COMMENTED in `deploy/onebox.env.example` — the one-box's SMTP path — and passed through by `docker-compose.prod.yml`); the email comment rewritten for three providers. No check changed. ⚠ D-27: the Settings knobs are documented in OPERATOR.md with NO `NNN_name.sql` filename, because check 2 counts every such mention as a seed. Verdict at this commit: `RESULT: PASS`.
+
+Scan-list cell as of 2026-10-29 (replaced by 300-03, moved verbatim): 5 / 4 / 267 | ⚠ **FIRES** | ⚠ absent its ENTIRE LIFE — row added 294-05. 294-01: DECISION_ENGINE_FAULT_BASE_URL registered as intentionally omitted (+2) |
+
+CLAUDE.md verdict cell as of 2026-10-29 (replaced by 300-03, moved verbatim): | `scripts/check-deploy-drift.sh` | 5 / 4 / 267 | ⚠ absent its ENTIRE LIFE — row added 294-05 · fault var omitted |
+
 ## `backend/app/api/panel.py`
 
 **Re-derived at 295-03's base `ea1347c4d` with the `CLAUDE.md` recipe, BEFORE the edit: `5 commits / 4 phases / 282 L`.** Phase buckets, verbatim: `085` · `093` · `096` · `163`; no six-digit quick-task bucket to drop. ⚠ **G-5 FIRES at 4 phases against a threshold of 3, and the file had NO ROW in either document for its entire life** (`grep -c "api/panel.py" CLAUDE.md` returned `0`): the same invisibility the `api/runs.py` and `models/thread.py` rows recorded, found the same way, by re-deriving the triple of a file a plan was about to edit. History (`git log -- backend/app/api/panel.py`): `32242511a`/`e54851682` (085-04, the panel router + `/ask_user/pending` + `/tasks`), `02c71c54a` (093-05, the prior-phase `draft` on the prompt), `3632515c0` (096-03, the dead-run liveness filter, dual id namespace), `a8e53b46b` (163-06, the user-JWT RLS connection).
@@ -24327,6 +24459,16 @@ CLAUDE.md verdict cell as of 2026-10-21 (replaced by 290-04):
 Scan-list disposition cell as of 2026-10-21 (replaced by 290-04):
 
 > **286-04** seam TAKEN (named 3×): ⋯ menu + armed draft delete → `WorkflowCardMenu.tsx`; card holds 0 `useState`, drawing only. ⚠ compiler lint now covers the whole card
+
+### `frontend/src/components/workflows/library/WorkflowCard.tsx` — Phase 299 (299-02)
+
+**`27 / 12 / 1374`** (was `26 / 11 / 1373`)
+
+One attribute: `data-row-id={row.id}` on the card's root, directly after `data-provenance`, so `useWorkflowLinkTarget` can find the card a `/app/workflows/<id>` link names. No behaviour, class or text change. ⚠ The 286-04 characterization pin (`WorkflowCard.seam286.pin.test.tsx`) snapshots each resting card's `outerHTML`, so its `.snap` gains exactly the five attribute insertions (one per row state) and nothing else — updated in the same commit, the 290-02 precedent (`c30ac9f73`). The pin's purpose (the 286 menu move changed no behaviour) is untouched: the attribute is a new, deliberate output, not drift.
+
+Scan-list cell as of 2026-10-28 (replaced by 299-02, moved verbatim): 26 / 11 / 1373 (was `25 / 10 / 1371`) | **FIRES** | 296-07 (286-S04-2): comment-only — the MARK_ICON docblock and the CalendarClock comment name the icons this file draws today
+
+CLAUDE.md verdict cell as of 2026-10-28 (replaced by 299-02, moved verbatim): | `frontend/src/components/workflows/library/WorkflowCard.tsx` | 26 / 11 / 1373 (was `25 / 10 / 1371`) | 296-07: comment-only (MARK_ICON docblock, 286-S04-2) |
 
 ### `frontend/src/components/workflows/library/libraryVocabulary.ts` — Phase 290 (290-02)
 
@@ -25038,6 +25180,14 @@ Scan-list disposition cell before 292.1 (replaced): quick-261024: `load_app_sett
 
 CLAUDE.md FIRING cell before 292.1 (replaced): quick-261024: picker warms hot + tombstone caches · ⛔
 
+### `backend/app/models/user_settings.py` — 300-03 Task 1 (2026-10-29)
+
+**`62 / 38 / 1788` (was `61 / 37 / 1776`).** Fields + loader lines only, beside the 293 D-14 precedent: `notification_email_delay_seconds: int = 120` (D-07), `email_from_address: str = ""` and `email_from_name: str = "Syrel"` (D-08), `email_dev_redirect_address: str = ""` (D-10), each loaded by `_val(row, key, None, default)` so a database without migration 218 still reads 120 / "" / Syrel / "". ⛔ No env fallback in the MODEL: `send_email` applies `email_from_address or settings.invite_from_email`, so the Settings read shows the stored value, never the env one. Pinned by `test_300_mailer.py`.
+
+Scan-list cell as of 2026-10-29 (replaced by 300-03, moved verbatim): 61 / 37 / 1776 (was `60 / 36 / 1769`) | ⚠ **FIRES** | 293 touch: see §Phase 293 close (previous cell moved there verbatim) |
+
+CLAUDE.md verdict cell as of 2026-10-29 (replaced by 300-03, moved verbatim): | `backend/app/models/user_settings.py` | 61 / 37 / 1776 (was `60 / 36 / 1769`) | 293-01: two per-key limit fields + _val · ⛔ |
+
 ### `frontend/src/pages/SettingsPage.tsx` — Phase 292.1 close
 
 **`59 / 29 / 1669`** at 292.1 close (was `57 / 28 / 1662`). G-5: ⚠ **FIRES**. Honoured by construction (292.1-02, the 294-04 `RerankEngineBlock` precedent): one import, one comment, one mount in the AI-model tab (+3 −0); no `useState`, no hydrate entry, no payload entry.
@@ -25342,6 +25492,22 @@ Twenty-eight rows added at planning: twenty-six files Phase 293 creates and two 
 **`6 / 2 / 361`.** 296-02 (293-IN-04): `asyncio.create_task(_drive_run(...))` is bound to `_task`, added to a module `_BACKGROUND_TASKS: set[asyncio.Task]`, and discarded by `add_done_callback` — run_transport's P9 shape — so an unattended run's drive cannot be garbage-collected mid-run (the loop keeps only a weak reference).
 
 Scan-list cell before this 296-02 touch (moved verbatim): | [`backend/app/services/unattended_launch.py`](docs/HOT-FILE-LEDGER.md#backendappservicesunattended_launchpy) | 5 / 1 / 354 (was `3 / 1 / 324`) | no (young) | young (planned 293-02). Shared unattended core + the kill-switch gate (293-REVIEW CR-01). ⛔ owner identity, explicit org_id, caps armed first |
+
+### `backend/app/services/unattended_launch.py` — 300-01 (FIX-05 / D-17, D-33, 2026-10-29)
+
+**`7 / 3 / 379` (was `6 / 2 / 361`) — crosses into G-5 at this commit (293, 296, 300).** One function-local import and ONE `resolve_owner_run_model(owner_id)` call immediately before `create_workflow_run`, which now receives `model=_model, provider=_provider` (the writer puts the provider in `metadata` in the same INSERT; `(None, None)` keeps the INSERT byte-identical). `_drive_run` gains two keyword params (default `None`); its ctx dict carries `"model"` and, only when a provider resolved, `"metadata": {"provider": …}` — the shape `harness_engine._build_resume_context` already reads (not edited, D-18). The API-key door inherits the fix by calling the same core. `run_lifecycle.py` / `run_producer.py` untouched (D-33). Seam if it grows: the background drive (`_drive_run` + its finalizer) is the separable half.
+
+Scan-list cell as of 2026-10-29 (replaced by 300-01, moved verbatim): 6 / 2 / 361 (was `5 / 1 / 354`) | no (young) | young. 296-02 (293-IN-04): the _drive_run task is held in a module _BACKGROUND_TASKS set with add_done_callback(discard) (P9) until done
+
+CLAUDE.md verdict cell: none before 300-01 (the file did not fire); row added by 300-01.
+
+### `backend/app/services/unattended_launch.py` — 300-REVIEW fixes (2026-10-29)
+
+**`8 / 3 / 383` (was `7 / 3 / 379`).** WR-01: `OnFinish = Callable[[str, UUID], ...]` and the one `on_finish(...)` call in `_drive_run`'s `finally` passes `run_id`, so the scheduler reads THAT run. The only caller is `scheduler_service`; `test_256_producer_shells`' callback was widened to match. The docstring states that `completed` means only that `run_workflow` returned.
+
+Scan-list cell as of 2026-10-29 (replaced by 300-REVIEW, moved verbatim): 7 / 3 / 379 (was `6 / 2 / 361`) | ⚠ **FIRES** | 300-01 (D-33): one resolve_owner_run_model call; model + provider to the writer and to _drive_run's ctx dict. ⛔ owner identity, explicit org_id, caps armed first
+
+CLAUDE.md verdict cell as of 2026-10-29 (replaced by 300-REVIEW, moved verbatim): | `backend/app/services/unattended_launch.py` | 7 / 3 / 379 (was `6 / 2 / 361`) | ⚠ now FIRES (300) · 300-01: records the owner's model + provider (D-33) |
 
 ### `backend/app/services/harness/run_read_words.py`
 
@@ -25805,6 +25971,14 @@ Scan-list cell before this 296-06 touch (moved verbatim): | [`backend/app/servic
 
 CLAUDE.md FIRING cell before this 296-06 touch (moved verbatim): | `backend/app/services/harness/phase_types.py` | 65 / 33 / 3131 (was `64 / 33 / 3095`) | 296-06: emit pin precedence, retry guard, 1 notice helper · G-5 OWED |
 
+### `backend/app/services/harness/phase_types.py` — 300-03 Task 3 (2026-10-29)
+
+**`67 / 34 / 3147` (was `66 / 33 / 3135`).** ⚠ G-5 FIRES ("G-5 OWED") and this touch is an AUDITED OVERRIDE, recorded under `STATE.md → Guardrail overrides` in the same commit — the owed refactor is NOT discharged. D-23 (BUG-260828-05), one hunk inside `_external_action_sent_body` only (`git diff <base> -- phase_types.py | grep -c '^@@'` = 1): for `send_email` the first line reads "the mail server accepted it" (UI-D14) and `Destination` reads `{to} (via {host})`, `to` from `resolved` (a list is comma-joined in order); an empty `to` falls back to the host. Every other capability's receipt is byte-identical (pinned against the pre-300 literal in `test_300_email_step_honesty.py`). The docstring records that the recipient IS named for send_email and the credential never is. Nothing else in the file changed.
+
+Scan-list cell as of 2026-10-29 (replaced by 300-03, moved verbatim): 66 / 33 / 3135 (was `65 / 33 / 3131`) | ⚠ **FIRES** | 296-06: pinned-model provider arm (293-F-4); retry needs KB evidence (291-IN-01); one notice helper for a swapped agent pin, hardened (str-only, never raises). G-5 OWED |
+
+CLAUDE.md verdict cell as of 2026-10-29 (replaced by 300-03, moved verbatim): | `backend/app/services/harness/phase_types.py` | 66 / 33 / 3135 (was `65 / 33 / 3131`) | 296-06: emit pin precedence, retry guard, 1 notice helper · G-5 OWED |
+
 ### `backend/app/api/workflows.py` — 296-06 (293-DEL sentence on one source line)
 
 **`50 / 26 / 1699 (was `49 / 26 / 1699`)`.** 296-06 follow-up: the 409 sentence's two string literals were re-flowed so the phrase `a run record from an earlier publish attempt still points to it` sits on one source line (the plan's acceptance grep). Same sentence on the wire, same line count.
@@ -25899,6 +26073,16 @@ The ONE `useBlocker` in product code (D-21). It holds one `LeaveGuardRegistry` f
 
 Scan-list cell as of 2026-10-27 (replaced by 297-03, moved verbatim): 3 / 1 / 240 (was `1 / 1 / 160`) | no (young) | 297-02: view/runId/studioSkillId derived from the location; one canonical REPLACE effect. ⛔ the ONLY router-hook caller (D-08); setLibraryTab( exactly 2
 
+### `frontend/src/hooks/useAppNavigation.ts` — Phase 299 (299-02)
+
+**`9 / 2 / 452`** (was `4 / 1 / 290` — that cell was stale by four 297-REVIEW commits; re-derived here)
+
+Returns ONE new key, `entityLink` (exported type `EntityLink`): `target` (`{ kind: "thread" | "workflow" | "run" | "expert"; id }` from the parsed address, or `null`), `route` (the parsed entity route, for a copy control), and four navigators through `go` — `openThread(id, opts?)` (push, or replace when asked), `openWorkflow(id)`, `openExpert(id)`, `leaveThread()` (REPLACE with `/app`, and a no-op off a thread address). One `useMemo` over `parsed` and the four stable callbacks, so the object keeps one identity while the address is unchanged. `go`'s strict-UUID guard covers the three new id variants (T-299-18). A `lastThreadId` ref mirrors `lastRunId`: `handleNavigate("chat")` goes to `/app/chat/<last>` when one was seen, else `/app`, and is a no-op on any chat address. ⚠ Two refinements beyond the plan text, both pinned: (1) `go` updates `lastThreadId` synchronously with the write, because the palette / launch shape calls a navigator and then the legacy `onNavigate("chat")` in one handler, and an effect-synced memory would push a stale thread second; (2) seeing the chat HOME clears it, so a thread the person left with `leaveThread` is not re-opened by the rail. `bounceHome` still replaces with the thread-less `/app`. The canonical REPLACE effect already carried `location.hash`, so a bare `/chat/<uuid>#access_token=…` lands on `/app/chat/<uuid>` with the hash (Pitfall 10, pinned).
+
+**Binding invariants (unchanged, re-checked):** ⛔ still the ONLY module calling `useLocation` / `useNavigate` / `useBlocker` (D-08); ⛔ `setLibraryTab(` exactly 2 in comment-stripped code; ⛔ one blocker; ⛔ the Library hand-off comment block untouched. Pinned by `useAppNavigation.test.tsx` (35 → 63, exact PUSH counts by location key under StrictMode).
+
+Scan-list cell as of 2026-10-28 (replaced by 299-02, moved verbatim): 4 / 1 / 290 (was `3 / 1 / 240`) | no (young) | 297-03: the ONE useBlocker over the leave-guard registry; latch cleared per location key. ⛔ the ONLY router-hook caller (D-08); setLibraryTab( exactly 2
+
 ### `frontend/src/components/layout/AppViewSwitch.tsx`
 
 **Added AT PLANNING (Phase 297, 2026-10-27) with `0 / 0 / 0`** — the file does not exist yet; plan
@@ -25936,6 +26120,22 @@ Pinned by `components/layout/__tests__/AppViewSwitch.addressStates.test.tsx` (16
 
 Scan-list cell as of 2026-10-27 (replaced by 297-02, moved verbatim): 1 / 1 / 473 (was `0 / 0 / 0`) | no (young) | young (created 297-01). ChatLayout's mount switch moved verbatim (D-01). ⛔ no hooks; fallback LAST; one stripped workflow-run test; canvasEnabled passed in
 
+### `frontend/src/components/layout/AppViewSwitch.tsx` — Phase 299 (299-02)
+
+**`3 / 2 / 542`** (was `2 / 1 / 523`)
+
+Props only (⛔ still no hook): three optional props `openThread`, `threadHolding`, `entityLink` (the last is read in 299-02 Task 3 for the workflows / experts arms). Inside the chat branch's first `<main>` — its class string and the grid's (scroll-chain links 2-3) unchanged — `threadHolding` renders `<AddressHolding sentence="Opening the chat…" />` instead of `ThreadNavigationProvider` + ChatArea, so a cold `/app/chat/<id>` never flashes the empty welcome composer (Pitfall 5). The Expert start-chat seams use `selectThread: openThread ?? selectThread` and a no-op `navigate` when `openThread` is present (the selection already wrote the address — one entry), else today's `onNavigate("chat")`. The trailing fallback stays LAST and the comment-stripped `workflow-run` comparison count stays one (`activeViewReachability.test.ts`, `AppViewSwitch.addressStates.test.tsx` green unedited).
+
+Scan-list cell as of 2026-10-28 (replaced by 299-02, moved verbatim): 2 / 1 / 523 (was `1 / 1 / 473`) | no (young) | 297-02: S1 first non-chat arm; run hold inside the one run arm; admin arms gated on the operator probe. ⛔ one run comparison; fallback last; every hold lives here, never at App
+
+### `frontend/src/components/layout/AppViewSwitch.tsx` — Phase 299 (299-02, Task 3)
+
+**`4 / 2 / 547`** (was `3 / 2 / 542`)
+
+`entityLink` is now destructured and read in two places, props only: `<WorkflowsPage linkedDefinitionId={entityLink?.target?.kind === "workflow" ? entityLink.target.id : null} />` and `<ExpertCatalogPage openBundleId={entityLink?.target?.kind === "expert" ? entityLink.target.id : null} />`. The kind is read off the parsed route's target, never off `activeView`, so the comment-stripped `workflow-run` comparison count stays one. ⛔ Still no React hook in this file. Pinned by the wire cases in `ExpertCatalogPage.link.test.tsx`.
+
+Scan-list cell as of 2026-10-28 (replaced by 299-02 Task 3, moved verbatim): 3 / 2 / 542 (was `2 / 1 / 523`) | no (young) | 299-02: chat main holds ("Opening the chat…") while a thread address is unresolved; startScopedChat via openThread. ⛔ no hooks; one run comparison; fallback last
+
 ### `frontend/src/lib/appRoutes.ts`
 
 **Added AT PLANNING (Phase 297, 2026-10-27) with `0 / 0 / 0`** — the file did not exist yet; plan
@@ -25955,6 +26155,14 @@ Scan-list cell as of 2026-10-27 (replaced by 297-02, moved verbatim): 1 / 1 / 47
 - Legacy aliases: `?run=<uuid>` and `?connections=1` apply only where the path says chat;
   `/admin/spend[/…]` and bare known prefixes (D-13). `/setup`, `/invite` and bare `/` are never rewritten.
 - Pinned by `src/lib/__tests__/appRoutes.test.ts` (111) and the route leg in `activeViewReachability.test.ts`.
+
+### `frontend/src/lib/appRoutes.ts` — Phase 299 (299-02)
+
+**`2 / 2 / 219`** (was `1 / 1 / 198`)
+
+Three id-bearing variants join the `AppRoute` union — `{ view: "chat"; threadId }`, `{ view: "workflows"; definitionId }`, `{ view: "experts"; bundleId }` — beside 297's `workflow-run`. They are NOT new `ActiveView` members, so `VIEW_PATHS`, the parity suite's one-address-per-member `CANONICAL` set and the reachability route leg are unchanged. `viewOf` gains three arms in the `runs` / `skills` style (`head === "chat" && isStrictUuid(id)` → lowercased); `formatAppRoute` narrows with `"threadId" in route` so `{ view: "chat" }` still formats to `/app` and a thread is never the home. The legacy `?run=` alias now applies to the chat HOME only (a thread address keeps its thread; D-05 home behaviour byte-identical). Imports unchanged (the `ActiveView` type and `runDeepLink`); a dated 299 paragraph sits beside the ⛔ docblock, which stays true. Pinned by `appRoutes.test.ts` (111 → 144, new cases only — the exact-equality fences for `/app` and `/app/chat` unedited) and `appRouteParity.test.ts` (78 → 91, an `ENTITY` list beside `CANONICAL`; all three layers already served `/app/*`, so no host config changed).
+
+Scan-list cell as of 2026-10-28 (replaced by 299-02, moved verbatim): 1 / 1 / 198 (was `0 / 0 / 0`) | no (young) | young (created 297-02). STRICT LEAF: one home of /app path vocabulary (D-11). ⛔ never throws; strict UUID; no host in any output
 
 ### `frontend/src/components/layout/AddressNotFound.tsx`
 
@@ -26242,6 +26450,30 @@ CLAUDE.md verdict cell as of 2026-10-28 (replaced by 298-02, moved verbatim): | 
 Scan-list cell as of 2026-10-28 (replaced by 298-02, moved verbatim): 12 / 7 / 314 (was `11 / 6 / 308`) | ⚠ **FIRES** | 296-06 (291-S6-F8): the scheduled kickoff goes through launch_kickoff, so declared answers reach the first step once; no answers = byte-identical. Honoured by construction
 
 CLAUDE.md verdict cell as of 2026-10-28 (replaced by 298-02, moved verbatim): | `backend/app/services/scheduler_service.py` | 12 / 7 / 314 (was `11 / 6 / 308`) | 296-06: scheduled kickoff via launch_kickoff (S6-F8), else byte-identical |
+
+### `backend/app/services/scheduler_service.py` — 300-01 Task 1 (2026-10-29)
+
+**`14 / 9 / 352` (was `13 / 8 / 332`).** FIX-04 / D-14 (BUG-261027-04): ONE block after the 298 foreign-folder block and before the entitlement check, the template-refusal shape: `missing_required_labels(row.get("definition"), schedule.get("inputs") or {})` → `blank_required_sentence(labels, saved_schedule=True)` → `logger.warning` naming the schedule id and the COUNT (never a value, T-300-03) → `record_schedule_outcome(sentence)` → `raise ScheduledLaunchRefused(sentence)`. ⛔ It reads the RAW stored definition (`row["definition"]`, a JSON string or dict), never the parsed model. Two pre-existing fakes declared a required `topic` with a blank schedule (`test_298_org_matrix._scheduled`, `test_296_step_inputs_and_routing` S6-F8-c) and were re-drawn to keep their intent. Pinned by `test_300_schedule_required_inputs.py`.
+
+Scan-list cell as of 2026-10-29 (replaced by 300-01, moved verbatim): 13 / 8 / 332 (was `12 / 7 / 314`) | ⚠ **FIRES** | 298-02: foreign_binding_refusal beside template_refusal (definition_id lazy read, pool only) → record_schedule_outcome(sentence) + ScheduledLaunchRefused. The :134 org line untouched
+
+CLAUDE.md verdict cell as of 2026-10-29 (replaced by 300-01, moved verbatim): | `backend/app/services/scheduler_service.py` | 13 / 8 / 332 (was `12 / 7 / 314`) | 298-02: foreign-folder refusal beside template_refusal (pool only) |
+
+### `backend/app/services/scheduler_service.py` — 300-01 Task 2 (2026-10-29)
+
+**`15 / 9 / 372` (was `14 / 9 / 352`).** D-26: inside the existing `_record_outcome` closure only — when the drive reports `completed`, one `pool.fetchval` reads the newest `workflow_runs.status` for the schedule (`inputs->>'_schedule_id' = $1 ORDER BY created_at DESC LIMIT 1`); `paused` records the waiting outcome, anything else `completed`; a failed read logs and records `completed` (today's); `failed` is recorded as-is with no read. 300-02's run-status trigger flips that outcome to the run's terminal status when the run ends. ⚠ `cap_paused` is NOT mapped to waiting (the spec names `paused`, a person's answer). Pinned by `test_300_unattended_provider.py`.
+
+Scan-list cell as of 2026-10-29 (replaced by 300-01 Task 2, moved verbatim): 14 / 9 / 352 (was `13 / 8 / 332`) | ⚠ **FIRES** | 300-01 (D-14): ONE fire-time block after the foreign-folder block — missing_required_labels on the RAW stored definition → record the sentence + ScheduledLaunchRefused. Honoured by construction
+
+CLAUDE.md verdict cell as of 2026-10-29 (replaced by 300-01 Task 2, moved verbatim): | `backend/app/services/scheduler_service.py` | 14 / 9 / 352 (was `13 / 8 / 332`) | 300-01: fire-time blank-input refusal (D-14), one block |
+
+### `backend/app/services/scheduler_service.py` — 300-REVIEW fixes (2026-10-29)
+
+**`16 / 9 / 375` (was `15 / 9 / 372`).** WR-01 (commit `fix(300): WR-01`): `_record_outcome` now takes the `run_id` the drive names and reads `SELECT status FROM workflow_runs WHERE id = $1` — never the schedule's newest run, which an overlapping Run now could own. `paused` records `waiting`; `failed` / `cancelled` (the engine's `fail_run` arm and a stop both RETURN, so the drive says `completed`) are recorded as themselves, each with its D-15 sentence. A failed read still records `completed`. Inside the existing closure only.
+
+Scan-list cell as of 2026-10-29 (replaced by 300-REVIEW, moved verbatim): 15 / 9 / 372 (was `14 / 9 / 352`) | ⚠ **FIRES** | 300-01: fire-time blank-input block (D-14) + _record_outcome reads the newest run; paused → waiting (D-26). Honoured by construction
+
+CLAUDE.md verdict cell as of 2026-10-29 (replaced by 300-REVIEW, moved verbatim): | `backend/app/services/scheduler_service.py` | 15 / 9 / 372 (was `14 / 9 / 352`) | 300-01: blank-input block + waiting outcome (D-14, D-26) |
 
 ### `backend/app/api/inbound.py` — 298-02 (2026-10-28)
 
@@ -26538,6 +26770,16 @@ Scan-list cell as of 2026-10-28 (replaced by 298-05 T1 GREEN, moved verbatim): 5
 
 CLAUDE.md verdict cell as of 2026-10-28 (replaced by 298-05 T1 GREEN, moved verbatim): | `frontend/src/pages/WorkflowsPage.tsx` | 51 / 22 / 1390 (was `50 / 22 / 1390`) | 298-04: onOrgSwitch arg on the feeds hook call (UI-D10) |
 
+### `frontend/src/pages/WorkflowsPage.tsx` — Phase 299 (299-02)
+
+**`53 / 23 / 1399`** (was `52 / 22 / 1392`)
+
+One optional prop `linkedDefinitionId?: string | null` (destructured with a `null` default) and ONE hook call, `useWorkflowLinkTarget({ id: linkedDefinitionId, drafts, rows, loading, onOpenDraft, clearProjectFilter: () => setSelectedProjectId(null) })`, placed directly below the `useWorkflowFork` call — i.e. below `onOpenDraft`, `rows` and `loading`, for the temporal-dead-zone reason the 192-14 / 192.1-03 comments above it record. Plus its import line. Every value it reads is state the page already held; the project-filter reset is the one the 298 `onOrgSwitch` path uses. No new state, no effect in the page; the decision logic lives in `library/useWorkflowLinkTarget.ts`. Honoured by construction. All WorkflowsPage suites green unedited.
+
+Scan-list cell as of 2026-10-28 (replaced by 299-02, moved verbatim): 52 / 22 / 1392 (was `51 / 22 / 1390`) | ⚠ **FIRES** | 298-05: one JSX mount, <ElsewhereLine kind="workflows"> at the top of the p-6 list region inside the grid's max-w-[1200px], + its import. No state, no hook, no other line
+
+CLAUDE.md verdict cell as of 2026-10-28 (replaced by 299-02, moved verbatim): | `frontend/src/pages/WorkflowsPage.tsx` | 52 / 22 / 1392 (was `51 / 22 / 1390`) | 298-05: one ElsewhereLine mount atop the list region (+ its import) |
+
 ### `frontend/src/components/layout/ChatHistoryColumn.tsx` — 298-05 T1 GREEN (2026-10-28)
 
 **`9 / 3 / 524` (was `8 / 3 / 522`).** Plan 298-05 Task 1 GREEN (D-17 / UI-D4): one JSX line, `<ElsewhereLine kind="threads" className="px-2 pb-2" />`, first child of hc-list, above the loading / empty / grouped branches, plus its import. It stays under a title filter (it counts more chats, not matches). No state added.
@@ -26716,6 +26958,32 @@ Scan-list cell as of 2026-10-28 (replaced by 298-review, moved verbatim): 7 / 4 
 
 CLAUDE.md verdict cell as of 2026-10-28 (replaced by 298-review, moved verbatim): | `frontend/src/hooks/useThreads.ts` | 7 / 4 / 117 (was `5 / 3 / 65`) | 298-04: org-tagged rows + switching (plan-sanctioned) · ⛔ |
 
+### `frontend/src/hooks/useThreads.ts` — 299-05 (2026-10-28)
+
+**`9 / 5 / 128` (was `8 / 4 / 121`).** FIX-02 / D-27 / BUG-261027-02: one derived const beside `switching` — `const pending = held === null || held.org !== activeOrgId` — and `pending` in the return object, plus its interface docblock. `switching`'s own docblock keeps "BUG-261027-02 stays for Phase 299" with a dated correction beside it (kept, not deleted). `pending` is true before the first answer AND during a switch; a settled answer ends it, including `[]` and the WR-03 failed-load `[]`, so a failed first load still shows the empty sentence after ChatLayout's retry (pre-existing, not widened). ⛔ `selectThread` stays `setSelectedThread(thread)` (the ChatHistoryColumn.clickPath fence is green); no new state, effect or request. Consumers: ChatLayout today; plan 299-02's thread-address hook next.
+
+Scan-list cell as of 2026-10-28 (replaced by 299-05, moved verbatim): 8 / 4 / 121 (was `7 / 4 / 117`) | ⚠ **FIRES** | 298-review WR-03: one catch arm in loadThreads, a failed answer settles its org (rows []) and rethrows, as useFolders. ⛔ org-tagged rows; switching only while another org is held
+
+CLAUDE.md verdict cell as of 2026-10-28 (replaced by 299-05, moved verbatim): | `frontend/src/hooks/useThreads.ts` | 8 / 4 / 121 (was `7 / 4 / 117`) | 298-review WR-03: a failed refetch settles its org (catch arm) · ⛔ |
+
+### `frontend/src/components/layout/ChatLayout.tsx` — 299-05 (2026-10-28)
+
+**`70 / 36 / 910` (was `69 / 35 / 905`).** FIX-02 / D-27, the 298-04 three-touch precedent: the `useThreads()` destructure takes `pending: threadsPending` in place of `switching: threadsSwitching` (switching was read nowhere else); `<ChatHistoryColumn loading={threadsPending} />`; the mobile drawer list's ternary gains a first arm `threadsPending ? <SyrelLoader size="section" label={LOADING_CHATS} … /> : …`, plus the two imports. "No recent chats" (text-[10px] italic) and "No chats match your search." are unchanged and now said only after a settled answer. ⛔ `ChatHistoryColumn.tsx` and `StreamsProvider.tsx` are NOT modified; no new effect or state. Fenced by `ChatLayout.mobileLoading.test.tsx` (real ChatLayout + useThreads + ChatHistoryColumn, a deferred list).
+
+Scan-list cell as of 2026-10-28 (replaced by 299-05, moved verbatim): 69 / 35 / 905 (was `67 / 34 / 897`) | ⚠ **FIRES** | 298-04: `switching: threadsSwitching` replaces the dropped `loading: _loading`, passed as loading= on ChatHistoryColumn; the existing org-change effect also clears mobileFolderId. ⛔ no new effect
+
+CLAUDE.md verdict cell as of 2026-10-28 (replaced by 299-05, moved verbatim): | `frontend/src/components/layout/ChatLayout.tsx` | 69 / 35 / 905 (was `68 / 34 / 902`) | 298-04: history column loading= (switching); mobile pick reset |
+
+### `frontend/src/components/layout/ChatLayout.tsx` — Phase 299 (299-02)
+
+**`72 / 36 / 933`** (was `70 / 36 / 910`; two 299-02 commits — the Task 1 type-only `entityLink?:` Props line, then this)
+
+A **deliberate multi-token touch — one hook call, two openThread swaps, three optional pass-through props, activeOrgId passed in; no new useState/useEffect (grep-asserted); the URL⇄selection logic lives in useThreadAddress.ts, so G-5 is honoured by construction.** Concretely: the optional `entityLink?: EntityLink` prop (type-only import from `useAppNavigation`, declared in Task 1 and destructured here); ONE `const { openThread, holding: threadHolding } = useThreadAddress({...})` placed after the org read (it needs `activeOrgId`), with `legacyOpenChat: () => onNavigate("chat")` so the hook is the pre-299 pair when App's link is absent; the `threadNavigation` memo MOVED below that call, unchanged except `openThread` (it can no longer sit above a value it reads); the `doRun` tail `selectThread(thread); opts?.beforeNavigate?.(); onNavigate("chat")` became `opts?.beforeNavigate?.(); openThread(thread)` (deps follow); and `openThread`, `threadHolding`, `entityLink` passed to AppViewSwitch. The IN-01 org-change effect is NOT edited. `git diff 593068492 -- …/ChatLayout.tsx | grep -c '^+.*\(useState\|useEffect\)('` = 0. No launch / startChat fence needed re-targeting: with no `entityLink` (every suite that mounts ChatLayout alone) `openThread` still calls `selectThread` then `onNavigate("chat")`, and all 38 suites that name ChatLayout / AppViewSwitch / useAppNavigation stay green unedited (856 cases).
+
+Scan-list cell as of 2026-10-28 (replaced by 299-02, moved verbatim): 70 / 36 / 910 (was `69 / 35 / 905`) | ⚠ **FIRES** | 299-05: `pending: threadsPending` replaces `switching: threadsSwitching`; loading={threadsPending}; one mobile-list loading arm (SyrelLoader + LOADING_CHATS). ⛔ no new effect or state
+
+CLAUDE.md verdict cell as of 2026-10-28 (replaced by 299-02, moved verbatim): | `frontend/src/components/layout/ChatLayout.tsx` | 70 / 36 / 910 (was `69 / 35 / 905`) | 299-05: pending → loading= and the mobile arm |
+
 ### `frontend/src/components/org/OrgAuditTab.tsx` — 298-review (2026-10-28)
 
 **`5 / 4 / 416` (was `4 / 3 / 415`).** 298-review WR-07: one `ACTION_META` data entry for migration 217's `org.item.move`, under Organizing, so the move's receipt reads as words and sits in a filter group. The identical line lives in the Control Room AuditTab; `OrgAuditTab.test.tsx` fences both. Shared vocabulary module still OWED.
@@ -26760,6 +27028,14 @@ Scan-list cell as of 2026-10-28 (replaced by 298-review, moved verbatim): 379 / 
 
 CLAUDE.md verdict cell as of 2026-10-28 (replaced by 298-review, moved verbatim): | `scripts/vitest-count-gate.cjs` | 379 / 81 / 6808 (was `378 / 81 / 6806`) | 298-05: moveMounts (12) pinned; useFolders 17→18, useLibraryDocuments 28→30 |
 
+### `scripts/vitest-count-gate.cjs` — 300-01 (2026-10-29)
+
+**`395 / 83 / 6865` (was `380 / 81 / 6808`; the 299 commits between were not re-derived here, so the `was` is the last recorded cell).** 300-01: two BASELINE pins ADDED beside the `WorkflowScheduleModal.test.tsx` entry — `scheduleOutcomeVocabulary.test.ts` 16 (pin only; the `src/components/workflows` directory TARGET runs it) and `schedulesRefusal.test.ts` 4 (plus a FILE-LEVEL TARGET beside `links.test.ts`, no `src/lib/api/__tests__` directory entry) — and ONE raised: `WorkflowScheduleModal.test.tsx` 9 → 29 (the 9 was the 214 pin, never raised as 296-04 grew the file; its "one result line per modal" case was RE-TARGETED to D-16, not dropped). None lowered. Placed mid-table rather than at the tail so the parallel 300-02 append cannot collide.
+
+Scan-list cell as of 2026-10-29 (replaced by 300-01, moved verbatim): 380 / 81 / 6808 (was `379 / 81 / 6808`) | ⚠ **FIRES** | 298-review: 4 BASELINE pins raised, none lowered — OrgAuditTab 16→19, LibraryPage.orgSwitch 5→7, useThreads.orgSwitch 4→5, MoveToOrgSheet 22→23
+
+CLAUDE.md verdict cell as of 2026-10-29 (replaced by 300-01, moved verbatim): | `scripts/vitest-count-gate.cjs` | 380 / 81 / 6808 (was `379 / 81 / 6808`) | 298-review: 4 pins raised (OrgAuditTab, LibraryPage/useThreads orgSwitch, sheet) |
+
 ### `backend/app/services/org_move.py` — 298-review (2026-10-28)
 
 **`5 / 1 / 1137` (was `1 / 1 / 986`).** 298-review: CR-01 `_mixed_org_refusals` (a subfolder/document stamped in another org refuses; collision/same-name joins exclude the moving set); WR-04 `_ancestor_refusals` (org-shared, chat, workflow, Expert on an ancestor; watch arm refuted); WR-05 docstring names the residual window (live `test_wr05_*`).
@@ -26777,3 +27053,807 @@ Scan-list cell as of 2026-10-28 (replaced by 298-review, moved verbatim): 1 / 1 
 **`2 / 1 / 108` (was `1 / 1 / 71`).** 298-review WR-09: `root_upload_org` re-asks once when a well-formed header was sent and the lenient resolver said None: non-member → None, member → org, failed read → 503 (`ORG_UNCONFIRMED`). List helpers unchanged.
 
 Scan-list cell as of 2026-10-28 (replaced by 298-review, moved verbatim): 1 / 1 / 71 | no | young (created 298-01). Polarity-safe list narrowing, one home (D-06). ⛔ None → {} / no predicate; never an empty set, never restrict_org_ids=None; never the 400-ing org gate
+
+## Phase 299 — rows added AT PLANNING (2026-10-28)
+
+### `backend/app/api/links.py`
+
+**Added AT PLANNING (Phase 299, 2026-10-28) with `0 / 0 / 0`** — the file does not exist yet; plan `299-01` creates it and re-derives the triple in its creating commit (the 297 leaveGuard.ts precedent). young (planned 299-01). GET /links/{kind}/{id}: one 404 body for every refusal (D-06/D-08). ⛔ no get_active_org_id / require_capability / require_visible; 401 router-level
+
+**Created 299-01 (2026-10-28) — measured `1 / 1 / 93` in its creating commit.** Thin route over `app.services.link_resolver`: validates `kind` and a strict UUID IN the handler (a `UUID`-typed path param would 422 a malformed id), picks the connection by `POOL_KINDS`, issues one `lookup`, folds with `to_target`. **Binding invariants:** ⛔ ONE refusal body, `NOT_FOUND_DETAIL = "Not found"`, for malformed id / unknown kind / missing / forbidden (status, body and headers minus `date` asserted equal in `test_299_links_route.py`); malformed input refused before ANY I/O; ⛔ never imports `get_active_org_id`, `require_capability` or `require_visible` (source scan, comments and strings stripped); never `str(exc)`; ⛔ `_require_bearer` is a ROUTER dependency so a later route inherits the 401 (the sweep enumerates `router.routes`); `X-Org-Id` never consulted.
+
+### `backend/app/services/link_resolver.py`
+
+**Added AT PLANNING (Phase 299, 2026-10-28) with `0 / 0 / 0`** — the file does not exist yet; plan `299-01` creates it and re-derives the triple in its creating commit (the 297 leaveGuard.ts precedent). young (planned 299-01). one SQL per kind; run + expert on the pool with $2 = caller (P1/P2). ⛔ one statement per kind; audience rule twinned with lib/linkAudience.ts
+
+**Created 299-01 (2026-10-28) — measured `1 / 1 / 225` in its creating commit.** `SQL_BY_KIND` (one constant statement per kind), `POOL_KINDS = {run, expert}`, `lookup` (exactly ONE `fetchrow`), pure `audience_of` / `to_target`, and `workflow_org` (the source-org read of a Tweak and a new schedule — owner-scoped `$2` since 299-01 Task 2, so another user's definition id reads like a missing one, T-299-09), and `strict_uuid` (canonical-form parse). **Binding invariants:** ⛔ one statement per kind for missing AND forbidden (D-08); ⛔ `POOL_KINDS` exists because two RLS policies are NARROWER than the read rule — P1 `workflow_runs_select_own` is owner-only (the D-34 member arm could never match on the user JWT), P2 `expert_bundles_read_policy` has no granted arm — so on the pool the `$2` predicates ARE the wall, copied in shape from `workflow_run_evidence._ACCESS_SQL` and `check_expert_grant_access`; ⛔ the workflow statement has NO `org_members` arm (D-33); the Expert role grant matches the role held IN THE BUNDLE'S ORG; ⛔ never the active-org gate; ⛔ `audience_of` is twinned with `frontend/src/lib/linkAudience.ts`, both pinned to `backend/tests/unit/fixtures/link_audience_cases.json` — change the fixture, never one side. Live-driven 2026-10-28: planting `TRUE` over the run terminal-status arm or over the Expert role-grant arm reds `test_299_links_live.py`; planting `TRUE OR` over the workflow owner arm does NOT, because RLS still holds the line on an RLS kind — the posture working as written.
+
+### `backend/app/services/item_org_guard.py`
+
+**Added AT PLANNING (Phase 299, 2026-10-28) with `0 / 0 / 0`** — the file does not exist yet; plan `299-01` creates it and re-derives the triple in its creating commit (the 297 leaveGuard.ts precedent). young (planned 299-01). D-18 409 helper (send / kickoff / Tweak). ⛔ no-op without an active org (298 D-03); never a widening of _require_thread_org
+
+**Created 299-01 (2026-10-28) — measured `1 / 1 / 74` in its creating commit.** `REFUSALS` / `REFUSALS_UNNAMED` (the three S8 sentences, org named, and the unreadable-name fallback) and `refuse_if_other_org(row_org_id, active_org_id, *, kind, pool)`. **Binding invariants:** ⛔ no-op AND no I/O when either org is empty (298 D-03 polarity); `pool` may be a pool or the `get_pg_pool` factory, awaited only on a mismatch so the no-op path never touches the DB; ⛔ a SEPARATE helper from `threads._require_thread_org` (Expert threads, fails CLOSED) — never a widening of it; ⛔ the sentences carry no status number or status word (asserted); an unreadable name degrades the wording, never the refusal. Callers: send_message (chat), preflight_workflow_kickoff (run), create_draft (tweak).
+
+### `frontend/src/lib/returnTo.ts`
+
+**Added AT PLANNING (Phase 299, 2026-10-28) with `0 / 0 / 0`** — the file does not exist yet; plan `299-05` creates it and re-derives the triple in its creating commit (the 297 leaveGuard.ts precedent). young (planned 299-05). return-to-link leaf (D-23/D-24). ⛔ strict leaf; rebuilt via formatAppRoute, never echoed; sessionStorage TTL, consumed once
+
+**Created 299-05 (2026-10-28) — measured `1 / 1 / 127` in its creating commit.** `returnTarget(pathname, search)` (the `canonicalAddress` try/catch + `startsWith("/app")` idiom; output built ONLY from `formatAppRoute`), `kindWord` (matched by the parsed view's id key — `runId` today, `threadId` / `definitionId` / `bundleId` light up when 299-02 adds those routes, with no edit here), `RETURN_LINE` (S5's two sentences), and `rememberReturnTarget` / `takeReturnTarget` / `forgetReturnTarget` over ONE sessionStorage key holding `{path, at}`. **Binding invariants:** ⛔ strict leaf — the only dependency is `appRoutes.ts`; ⛔ rebuild, never echo: nothing returned or stored is the input string, so no host, query or hash ever leaves (T-299-11, T-299-13); ⛔ the stored copy is untrusted on read — removed before it is judged, TTL 15 min, re-validated through `returnTarget` and required to equal its own rebuild (T-299-12); ⛔ every storage touch is try/catch (private mode); ⛔ sessionStorage, never localStorage — a copy outliving the tab would resume on a normal visit later (Pitfall 7). Consumers: `useAuth.ts` (SSO / sign-up), `AuthPage.tsx` (the line), `BootScreen.tsx` (the kept sentence), and plan 299-03's resume.
+
+### `frontend/src/components/layout/BootScreen.tsx`
+
+**Added AT PLANNING (Phase 299, 2026-10-28) with `0 / 0 / 0`** — the file does not exist yet; plan `299-05` creates it and re-derives the triple in its creating commit (the 297 leaveGuard.ts precedent). young (planned 299-05). three-stage boot clock 8 s / 20 s (D-26, SEED-312). ⛔ Try again = reload (no History write); never decides auth
+
+**Created 299-05 (2026-10-28) — measured `1 / 1 / 89` in its creating commit.** `BOOT_COPY` (S6's five strings, exported beside the component with the AddressNotFound.tsx eslint precedent) and `BootScreen()`: one `useState<"iris" | "still" | "gaveup">` advanced by two timeouts (8 000 / 20 000 ms) set in ONE effect with cleanup; the "kept" sentence decided once at mount from `kindWord(window.location...)`. Stage 1 is App's pre-299 splash markup verbatim (`flex h-screen items-center justify-center` › `role="status" aria-label="Loading Syrel"` › `IrisAvatar state="thinking" size={56}`, the 276-06 comment kept); stage 2 adds the sentence inside the same status element (the Iris element is not remounted); stage 3 is a heading + body + filled `Button` focused on appear. **Binding invariants:** ⛔ ONE clock, here — never a timer in `useAuth` (D-26's reasoned deviation: a timeout there could show a signed-in person the sign-in form, Pitfall 6); ⛔ never decides auth, only what the screen says; ⛔ Try again is `window.location.reload()`, never a History write (`noRawHistoryWrites.test.ts`); ⛔ no amber, no red, no `role="alert"` (UI-D3); ⛔ the kept sentence only on an entity address (UI-D17).
+
+### `frontend/src/hooks/useThreadAddress.ts`
+
+**Added AT PLANNING (Phase 299, 2026-10-28) with `0 / 0 / 0`** — the file does not exist yet; plan `299-02` creates it and re-derives the triple in its creating commit (the 297 leaveGuard.ts precedent). young (planned 299-02). URL ⇄ selected thread binding (D-02/D-32). ⛔ never setViewingThread, never a router hook; deps [threadId, pending]
+
+### `frontend/src/hooks/useThreadAddress.ts` — Created — Phase 299 (299-02), measured `1 / 1 / 176`
+
+Measured in its creating commit (`feat(299-02): the open thread lives in the address`). `useThreadAddress({ threadId, onChatView, threads, threadsPending, selectedThread, selectThread, entityLink, activeOrgId, legacyOpenChat? }) → { openThread(thread), holding }`.
+
+ONE effect binds the selection and `/app/chat/<id>` both ways, deciding from what CHANGED since it last ran (a `seen` ref): address → selection once the active org's list has answered (no History write); selection → address on the chat view (`entityLink.openThread`, a push; New chat makes a real thread, so D-32's `/app/chat/<newId>` falls out); a person's deselect of the address's thread → `entityLink.leaveThread()` (a replace); Back onto `/app` with a selection → `selectThread(null)`. A thread picked OFF the chat view (Ask in chat, the palette, the run page, an Expert start) wins when the chat view is next entered, and the address is corrected with a REPLACE, so the legacy "select, then `onNavigate(\"chat\")`" shape still writes one entry and never lands on the rail's remembered thread. `holding` = on the chat view, a thread address, and that thread not the selection (Pitfall 5) — AppViewSwitch shows "Opening the chat…" then. `openThread(thread)` = `selectThread(thread)` + `entityLink.openThread(thread.id)`; with no `entityLink` the hook is inert and `openThread` is the pre-299 pair (`selectThread` + `legacyOpenChat`), so suites that mount ChatLayout alone see no change.
+
+⚠ **Reasoned deviations from the plan text:** (1) ONE effect, not the plan's Effect 1 (`[threadId, threadsPending]`) + Effect 2 (`[selectedThread?.id, onChatView]`) — the address and the selection often change in the same commit, and two effects each acting on their half is the Pitfall-4 ping-pong; deps are the inputs only (`threadId`, selected id, view, pending, org), the list is read through a ref, so a refetch never re-runs it (pinned). (2) The IN-01 guard is a WINDOW, not "org unchanged since the last run": ChatLayout's `selectThread(null)` lands one commit after the org change, by which time the effect has already recorded the new org (the pending flag flips in the same render), so a last-run comparison would read IN-01's null as a person's deselect. The window opens on an org change and closes at the first deselect or when the new list settles. (3) A deselect only leaves when the deselected thread IS the address's thread.
+
+**Binding invariants:** ⛔ never calls `setViewingThread` (ChatArea stays its sole caller); ⛔ imports nothing from the streams provider or its store; ⛔ no router hook (D-08) and no raw History write — every address change goes through `entityLink`; ⛔ `selectThread` stays the bare setState in `useThreads.ts` — this hook only calls it. Pinned by `src/hooks/__tests__/useThreadAddress.test.tsx` (21: a real router under StrictMode counting entries by location key, plus a fake link for call counts and a comment-stripped source fence). Both IN-01 arms and the off-chat pick arm were driven RED by planting their removal (3 and 1 cases fail; restored).
+
+Planning cell (replaced by 299-02, moved verbatim): 0 / 0 / 0 | no (planned 299-02) | young (planned 299-02). URL ⇄ selected thread binding (D-02/D-32). ⛔ never setViewingThread, never a router hook; deps [threadId, pending]
+
+### `frontend/src/components/workflows/library/useWorkflowLinkTarget.ts`
+
+**Added AT PLANNING (Phase 299, 2026-10-28) with `0 / 0 / 0`** — the file does not exist yet; plan `299-02` creates it and re-derives the triple in its creating commit (the 297 leaveGuard.ts precedent). young (planned 299-02). open a draft / focus a published card by id (D-03). ⛔ no write on open; in LIBRARY_SUBTREE_PATHS; never imports the page
+
+### `frontend/src/components/workflows/library/useWorkflowLinkTarget.ts` — Created — Phase 299 (299-02), measured `1 / 1 / 90`
+
+Measured in its creating commit (`feat(299-02): a workflow or Expert opens from its address`). `useWorkflowLinkTarget({ id, drafts, rows, loading, onOpenDraft, clearProjectFilter })`, generic over the drafts row (typed structurally as `{ id }`, so the module imports no client API at all). Once nothing is loading: an id in the drafts feed → `onOpenDraft(thatRow)` (the page's own opener, so the opaque concurrency field travels by construction); an id among the visible published / starter rows → `clearProjectFilter()` once, then `[data-row-id="<id>"]` is scrolled into view, given `tabindex="-1"` if it has none, focused, and wears `ring-2 ring-primary/60 ring-offset-2 ring-offset-background` for `LINK_TARGET_MARK_MS` (2000). A card not rendered yet (the cleared filter re-querying) is retried when the rows change. An id in neither list, or `null`, does nothing.
+
+**Binding invariants:** ⛔ no write on open (T-299-19) — the suite auto-mocks `@/lib/api` and `@/lib/api/workflows` and asserts EVERY function uncalled; ⛔ once per id (a ref keyed on the lowercased id) — a refetch never re-opens the Builder over edits; ⛔ decides nothing it cannot see — 299-03's gate owns "can't be opened"; ⛔ in `LIBRARY_SUBTREE_PATHS` (F1 / F4 / F5 / F6 sweep it) and never names the page; ⛔ the docblock does not spell the draft's opaque field name (F6's scoping control lists the four modules that may). Pinned by `library/__tests__/useWorkflowLinkTarget.test.tsx` (12).
+
+Planning cell (replaced by 299-02, moved verbatim): 0 / 0 / 0 | no (planned 299-02) | young (planned 299-02). open a draft / focus a published card by id (D-03). ⛔ no write on open; in LIBRARY_SUBTREE_PATHS; never imports the page
+
+### `frontend/src/components/experts/catalog/useExpertLinkTarget.ts`
+
+**Added AT PLANNING (Phase 299, 2026-10-28) with `0 / 0 / 0`** — the file does not exist yet; plan `299-02` creates it and re-derives the triple in its creating commit (the 297 leaveGuard.ts precedent). young (planned 299-02). open an Expert's detail by id (D-04). ⛔ read only (list or getExpert); fires once per id
+
+### `frontend/src/components/experts/catalog/useExpertLinkTarget.ts` — Created — Phase 299 (299-02), measured `1 / 1 / 57`
+
+Measured in its creating commit. `useExpertLinkTarget({ id, experts, loading, setInspected })`: once the catalog's ONE grant-aware list read has answered, an Expert in it is handed to the page's own `setInspected` (the one `ExpertDetailModal` opens on it, no second read); an Expert not in it is asked for ONCE with `getExpert(id)` (`GET /experts/{id}` — the grant-aware per-Expert read; never `/resolve`, never the management arm) and opened on the answer; a rejection opens nothing. **Binding invariants:** ⛔ read-only; ⛔ once per id (closing the modal never reopens it while the address is unchanged); ⛔ an answer for an id the address has since left is dropped; ⛔ `getExpert` is never asked while the list is loading. The page's own docblock rule ("exactly ONE read") still holds for the page: the fallback read lives here and fires only on a linked id the list does not hold. Pinned by `catalog/__tests__/ExpertCatalogPage.link.test.tsx` (11, incl. the AppViewSwitch wire).
+
+Planning cell (replaced by 299-02, moved verbatim): 0 / 0 / 0 | no (planned 299-02) | young (planned 299-02). open an Expert's detail by id (D-04). ⛔ read only (list or getExpert); fires once per id
+
+### `frontend/src/lib/clipboard.ts`
+
+**Added AT PLANNING (Phase 299, 2026-10-28) with `0 / 0 / 0`** — the file does not exist yet; plan `299-03` creates it and re-derives the triple in its creating commit (the 297 leaveGuard.ts precedent). young (planned 299-03). copyText → copied or refused (D-21). ⛔ never throws; never reports a refused copy as copied
+
+**Created 299-03 (2026-10-28) — measured `1 / 1 / 40` in its creating commit.** `copyText(text) → "copied" | "refused"` (FilePreview's `CopyContentButton` idiom, extracted: the missing-API guard, the rejected write and a synchronous throw all answer `refused`), `selectAllIn(el)` (the `Selection.selectAllChildren` fallback) and `copyShortcutWord()` ("Press Ctrl+C to copy" / "Press ⌘C to copy"). **Binding invariants:** ⛔ a leaf — no React, no app import; ⛔ never throws; ⛔ never reports a refused copy as copied (the caller selects the text and names the shortcut instead). Consumers: `CantBeOpened.tsx` (Copy address) and 299-04's link surface. Pinned by `src/lib/__tests__/clipboard.test.ts` (8).
+
+Planning cell (replaced by 299-03, moved verbatim): 0 / 0 / 0 | no (planned 299-03) | young (planned 299-03). copyText → copied or refused (D-21). ⛔ never throws; never reports a refused copy as copied
+
+### `frontend/src/lib/api/links.ts`
+
+**Added AT PLANNING (Phase 299, 2026-10-28) with `0 / 0 / 0`** — the file does not exist yet; plan `299-03` creates it and re-derives the triple in its creating commit (the 297 leaveGuard.ts precedent). young (planned 299-03). resolveLink client: 404 → cant, anything else throws (D-06). ⛔ an outage is never reported as can't-be-opened
+
+**Created 299-03 (2026-10-28) — measured `1 / 1 / 46` in its creating commit.** `resolveLink(kind, id)` GETs `${API_BASE}/links/<kind>/<id>` (both segments URL-encoded) with `getAuthHeaders()` (the orgItems.ts idiom); `LinkKind`, `LinkTarget` (299-01's 200 shape) and `LinkAnswer`. **Binding invariants:** ⛔ 404 is the ONLY answer that becomes `{status: "cant"}` — missing and forbidden are one answer server-side (T-299-23); ⛔ every other non-OK status and any network error THROWS `ApiError`, so an outage is never shown as "can't be opened" (T-299-25); ⛔ the answer does not depend on `X-Org-Id`. Re-exported from `lib/api.ts` in one block. Pinned by `src/lib/api/__tests__/links.test.ts` (9) and `apiBarrel.test.ts`.
+
+Planning cell (replaced by 299-03, moved verbatim): 0 / 0 / 0 | no (planned 299-03) | young (planned 299-03). resolveLink client: 404 → cant, anything else throws (D-06). ⛔ an outage is never reported as can't-be-opened
+
+### `frontend/src/components/layout/CantBeOpened.tsx`
+
+**Added AT PLANNING (Phase 299, 2026-10-28) with `0 / 0 / 0`** — the file does not exist yet; plan `299-03` creates it and re-derives the triple in its creating commit (the 297 leaveGuard.ts precedent). young (planned 299-03). the one in-place card (D-12..D-15, D-36), absorbs AddressNotFound. ⛔ no raw path prop; rebuilt address only; one copy home
+
+**Created 299-03 (2026-10-28) — measured `1 / 1 / 159` in its creating commit.** `CantBeOpened({ kind, route, onGo, children? })`, `CANT_BE_OPENED_COPY` and 297's `ADDRESS_NOT_FOUND_COPY` (moved here verbatim). The overlay (`absolute inset-0 grid place-items-center p-8 bg-background/60`) sits over `children` — the generic area of the kind — wrapped `inert` + `aria-hidden`; the card is a `<section aria-labelledby>` whose h1 (600, `tabIndex -1`) is focused once on mount (UI-D6). The address line is `window.location.host + formatAppRoute(route)` and exists only for a kind WITH a route; Copy address uses `lib/clipboard.ts` (✓ for 2 s + an sr-only status; refused → the code text selected + the shortcut word). The heading id is a constant, not `useId()`, so two renders of one answer are byte-identical. **Binding invariants (carried over from AddressNotFound.tsx):** ⛔ no raw path prop, no icon (T-297-09) — the props type has no path/pathname/href; ⛔ the words name the kind only, never a reason/title/org/owner (comment-stripped source scan); ⛔ one copy home (UI-D4); ⛔ never renders the trailing fallback tag. Pinned by `src/components/layout/__tests__/CantBeOpened.test.tsx` (18).
+
+Planning cell (replaced by 299-03, moved verbatim): 0 / 0 / 0 | no (planned 299-03) | young (planned 299-03). the one in-place card (D-12..D-15, D-36), absorbs AddressNotFound. ⛔ no raw path prop; rebuilt address only; one copy home
+
+### `frontend/src/components/layout/LinkGate.tsx`
+
+**Added AT PLANNING (Phase 299, 2026-10-28) with `0 / 0 / 0`** — the file does not exist yet; plan `299-03` creates it and re-derives the triple in its creating commit (the 297 leaveGuard.ts precedent). young (planned 299-03). resolve + decide: holding / cant / prompt / open; resume (D-12..D-17, D-24). ⛔ no router hook; StreamsProvider untouched
+
+**Created 299-03 (2026-10-28) — measured `1 / 1 / 209` in its creating commit.** `LinkGate({ entityLink, threads, threadsPending, loadThreads, selectThread?, children })` where `children: (gate: GateState) => ReactNode`; `HOLDING_SENTENCE` (S2's four sentences; the run's is a getter over `COPY_LOADING`, read at render, because several layout suites stub the run page's module without its constant). The decision table is in the docblock: no entity address → `none`; org unknown / chat list pending → `holding`; a thread already in the list → `open` with NO server call; otherwise ONE `resolveLink(kind, id)` per kind:id, cached in a ref Map for the gate's life (the answer names the item's own org, so it does not depend on the active org); 404 → `cant` (with the parsed route and the kind's exit route); 200 with `org_id` null or the active org → `open` (a same-org thread absent from the list: `loadThreads()` once, then open + select, or `cant`); 200 in another org → `prompt`; a throw → `holding`, retried at 2 s, 4 s, 8 s, then every 8 s, stopped when the address changes or on unmount. `entityLink.resume()` runs once in a mount effect (a ref guard, StrictMode-safe). **Binding invariants:** ⛔ exactly ONE `resolveLink(` call site; ⛔ no `useLocation` / `useNavigate` (297 D-08 — every address read/write goes through `entityLink`); ⛔ a throw NEVER produces the card (T-299-25); ⛔ the kind is read off the parsed route's target, never off `activeView` (AppViewSwitch keeps one stripped workflow-run comparison); ⛔ never imports or touches the streams provider. Pinned by `src/components/layout/__tests__/LinkGate.test.tsx` (28) and the layout cases in `AppViewSwitch.addressStates.test.tsx`.
+
+Planning cell (replaced by 299-03, moved verbatim): 0 / 0 / 0 | no (planned 299-03) | young (planned 299-03). resolve + decide: holding / cant / prompt / open; resume (D-12..D-17, D-24). ⛔ no router hook; StreamsProvider untouched
+
+### `frontend/src/components/layout/SwitchOrgPrompt.tsx`
+
+**Added AT PLANNING (Phase 299, 2026-10-28) with `0 / 0 / 0`** — the file does not exist yet; plan `299-03` creates it and re-derives the triple in its creating commit (the 297 leaveGuard.ts precedent). young (planned 299-03). This is in <org> — switch? (D-16/D-17/D-39). ⛔ never calls switchOrg itself; one filled button; words from orgItemsCopy
+
+**Created 299-03 (2026-10-28) — measured `1 / 1 / 124` in its creating commit.** `SwitchOrgPrompt({ target, currentOrgName, streaming, switching, onStay, onSwitch, onBackToIt })` — UI-SPEC S3 tokens: container `relative flex h-full items-center justify-center p-8` (`relative` added so the chip can sit `absolute bottom-4`), a `<section aria-labelledby>` (`max-w-[440px] text-center`) with the target org's `OrgAvatar` initial, the h1 (focused on mount and again when switching flips), the body (+ the keeps-going tail only while a chat in the active org is answering), the item box (kind caption, uppercase by CSS, + the resolver's title as React text), then Stay (outline) + `switchToLabel(org)` (the ONLY filled button) — or, while switching, a `role="status"` "Switching to {Org}…". The still-answering chip (one title in curly quotes, or a count; a decorative steady-under-reduced-motion dot; outline "Back to it") shows only while a chat answers and not while switching. **Binding invariants:** ⛔ never calls `switchOrg` — the handlers are `LinkGate`'s, so the snapshot-before-switch rule lives in one place; ⛔ every word from `orgItemsCopy.ts` (a source scan asserts no sentence is spelled here); ⛔ no `dangerouslySetInnerHTML` (T-299-28); ⛔ org identity is name + initial circle, never a colour (UI-D8). Pinned by `src/components/layout/__tests__/SwitchOrgPrompt.test.tsx` (15).
+
+Planning cell (replaced by 299-03, moved verbatim): 0 / 0 / 0 | no (planned 299-03) | young (planned 299-03). This is in <org> — switch? (D-16/D-17/D-39). ⛔ never calls switchOrg itself; one filled button; words from orgItemsCopy
+
+### `frontend/src/lib/api.ts` — Phase 299 (299-03)
+
+**`215 / 128 / 556` (was `214 / 127 / 552`).** Plan 299-03 Task 1 GREEN: ONE new export block, `// ── links (Phase 299-03) ──`, directly below the orgItems block — `resolveLink` and the types `LinkKind`, `LinkTarget`, `LinkAnswer`. No other re-export changed. The gate imports from `@/lib/api/links` directly; the barrel keeps the public surface complete (`apiBarrel.test.ts` 5 → 6). The 197 / 206 seam decision is untouched.
+
+Scan-list cell as of 2026-10-28 (replaced by 299-03, moved verbatim): 214 / 127 / 552 (was `213 / 127 / 552`) | ⚠ **FIRES** | 298-05: the one orgItems block re-exports getElsewhereCounts, getMovePreview, moveOrgItem + their types beside getFolderLabels. No other re-export changed
+
+CLAUDE.md verdict cell as of 2026-10-28 (replaced by 299-03, moved verbatim): | `frontend/src/lib/api.ts` | 214 / 127 / 552 (was `213 / 127 / 552`) | 298-05: orgItems block + elsewhere + move-preview + move (one block) |
+
+### `frontend/src/components/layout/AddressNotFound.tsx` — Phase 299 (299-03)
+
+**`2 / 2 / 46` (was `1 / 1 / 51`).** 299-03: delegates to CantBeOpened; copy re-exported. `AddressNotFound({ onGoHome })` now returns `<CantBeOpened kind={null} route={null} onGo={onGoHome} />` — the unparseable variant of the one card, 297's words verbatim, no address line, no Copy address. `ADDRESS_NOT_FOUND_COPY` moved verbatim into `CantBeOpened.tsx` and is re-exported here under the same name, so the admin refusal arms in `AppViewSwitch` and every 297 suite import it unchanged; `ADMIN_HOLD_COPY` and `AddressHolding` stay here. Import direction is one way (this module → CantBeOpened), so no cycle. The 297 docblock stays, with a dated 299 paragraph beside it. `AppViewSwitch.addressStates.test.tsx` stays green unedited for S1 (the heading's container text is still heading + body + "Go to Chat").
+
+Scan-list cell as of 2026-10-28 (replaced by 299-03, moved verbatim): 1 / 1 / 51 (was `0 / 0 / 0`) | no (young) | young (created 297-02). S1 + S2 and their copy, one home. ⛔ no path prop, no icon; never renders the trailing fallback tag
+
+### `frontend/src/components/share/ShareLinkMenu.tsx`
+
+**Added AT PLANNING (Phase 299, 2026-10-28) with `0 / 0 / 0`** — the file does not exist yet; plan `299-04` creates it and re-derives the triple in its creating commit (the 297 leaveGuard.ts precedent). young (planned 299-04). link surface on DropdownMenu (D-20/D-21/D-39). ⛔ one focusable item; copied = origin + formatAppRoute; no toast
+
+**Created 299-04 (2026-10-28) — measured `1 / 1 / 167` in its creating commit.** `ShareLinkMenu({ route, kind, audience, orgId, className? })` (the header form: a ghost `Button size="sm"` `DropdownMenuTrigger` with `Link2` + the word "Link", `aria-label` "Link to this {noun}", icon-only `h-11 w-11` below md, `md:h-9 md:w-auto`; `DropdownMenuContent align="end" w-[340px] p-4`) and `ShareLinkMenuSub` (the card ⋯ menu form: a `DropdownMenuSub` whose SubTrigger reads "Link to this {noun}"). Both render one private `LinkSurfaceBody`: the heading label, a `<code>` with `window.location.host + formatAppRoute(route)`, ONE "Copy link" `DropdownMenuItem` (`onSelect` preventDefault → `copyText(origin + path)`; success → "✓ Link copied" for 2 s + an sr-only `role=status`; refused → `selectAllIn(code)` + `copyShortcutWord()`), and the audience label from `audienceParts` with the org name in `text-foreground`. The org NAME is resolved here from `useOrgOptional()?.orgs` by `orgId`, so every mount is one expression. **Binding invariants:** ⛔ the Copy link item is the only focusable element (UI-D13 / WR-03); ⛔ no `<input>` (Radix menu fights a focused input); ⛔ the address is rebuilt from the route, never echoed — no token, query or hash (T-299-31); ⛔ the audience is never derived here — `lib/linkAudience.ts` only; ⛔ no toast, no popover package (UI-D14 / D-39). Pinned by `src/components/share/__tests__/ShareLinkMenu.test.tsx` (12). ⚠ **Fixed in the same plan (Rule 1):** the UI-SPEC body as drawn put a bare label, a `<code>` and the status span directly under `role="menu"`, which the WR-03 five-role sweep (added to this suite) drove RED; the heading + address + status and the audience line now sit inside `DropdownMenuGroup`s, so every direct child is a menuitem or a group.
+
+Planning cell (replaced by 299-04, moved verbatim): 0 / 0 / 0 | no (planned 299-04) | young (planned 299-04). link surface on DropdownMenu (D-20/D-21/D-39). ⛔ one focusable item; copied = origin + formatAppRoute; no toast
+
+### `frontend/src/lib/linkAudience.ts`
+
+**Added AT PLANNING (Phase 299, 2026-10-28) with `0 / 0 / 0`** — the file does not exist yet; plan `299-04` creates it and re-derives the triple in its creating commit (the 297 leaveGuard.ts precedent). young (planned 299-04). who-can-open line (D-33/D-34). ⛔ strict leaf; pinned to backend/tests/unit/fixtures/link_audience_cases.json
+
+**Created 299-04 (2026-10-28) — measured `1 / 1 / 73` in its creating commit.** `audienceOf(kind, facts)` (the same rule as `link_resolver.audience_of`), `audienceParts(audience, orgName)` / `audienceLine(audience, orgName)` (the UI-D15 sentences, each spelled once), `linkNoun(kind)` and `TERMINAL_RUN_STATUSES`. **Binding invariants:** ⛔ a strict leaf — no dependencies; ⛔ never promises more than the rule: chat, draft, a non-global published workflow and an unfinished run are owner-only (D-33 / D-34); ⛔ an org-scoped audience with no org NAME falls back to the owner-only line (never "members of" an unnamed org); ⛔ the rule has one twin — `backend/app/services/link_resolver.py` — and both are pinned to `backend/tests/unit/fixtures/link_audience_cases.json`. Pinned by `src/lib/__tests__/linkAudience.lockstep.test.ts` (20: every fixture row, the backend TERMINAL_RUN_STATUSES literal, the sentences).
+
+Planning cell (replaced by 299-04, moved verbatim): 0 / 0 / 0 | no (planned 299-04) | young (planned 299-04). who-can-open line (D-33/D-34). ⛔ strict leaf; pinned to backend/tests/unit/fixtures/link_audience_cases.json
+
+### `frontend/src/components/org/SavesInOrg.tsx`
+
+**Added AT PLANNING (Phase 299, 2026-10-28) with `0 / 0 / 0`** — the file does not exist yet; plan `299-04` creates it and re-derives the triple in its creating commit (the 297 leaveGuard.ts precedent). young (planned 299-04). Saves in <org> caption (D-18/D-38). ⛔ renders nothing below 2 orgs; only on buttons that create
+
+**Created 299-04 (2026-10-28) — measured `1 / 1 / 46` in its creating commit.** `SavesInOrg({ className?, asSentence? })` reads `useOrgOptional()`: renders `<p class="text-xs text-muted-foreground">Saves in <span class="text-foreground">{name}</span></p>`, or the trailing sentence ` Saves in {name}.` when `asSentence`; returns null below 2 orgs, outside an OrgProvider, or when the active org names no membership. **Binding invariants:** ⛔ exactly three mounts, each one expression — `RunModal.tsx` (under the Run row), `WorkflowCardMenu.tsx` (the fork consequence line, only when the verb CREATES — not on an existing fork) and `ExpertDetailModal.tsx` (beside Start a chat, not on Install); ⛔ a hint only — the server's org guard (299-01) is the guarantee; ⛔ words from `orgItemsCopy.ts` (`SAVES_IN_PREFIX`). Pinned by `src/components/share/__tests__/savesInOrg.test.tsx`.
+
+Scan-list cell as of 2026-10-28 (replaced by 299-04, moved verbatim): 0 / 0 / 0 | no (planned 299-04) | young (planned 299-04). Saves in <org> caption (D-18/D-38). ⛔ renders nothing below 2 orgs; only on buttons that create
+
+### `frontend/src/hooks/useAuth.ts`
+
+**`5 / 4 / 100`, re-derived 2026-10-28 at 299 planning — ⚠ ALREADY FIRES (4 phases) and had NO ROW for its entire life** (299-RESEARCH F10). Plan `299-05` is its next touch: `getSession` gains a `.catch` that sets `loading=false` (SEED-312); `signInWithSSO` / `signUp` pass `redirectTo` / `emailRedirectTo` built only from `lib/returnTo.ts`; password sign-in clears the stored target.
+
+**Binding invariants (299):** ⛔ no app code reads or writes the URL hash (supabase-js implicit flow owns it); ⛔ no timer ever sets `user` to null (Pitfall 6 — a slow session read must never show the sign-in form to a signed-in person); redirect values are `window.location.origin` + a `returnTarget` result, never the raw address.
+
+**299-05 (2026-10-28) — `6 / 5 / 128` (was `5 / 4 / 100`).** One private helper `leavingRedirect()` (origin + `returnTarget(...)` or `/app`; remembers a non-null target), used as `options.redirectTo` by `signInWithSSO` and `options.emailRedirectTo` by `signUp`; `signIn` (password) calls `forgetReturnTarget()` first and passes no redirect; the `getSession().then(...)` chain gains `.catch(() => setLoading(false))` (SEED-312), which never touches `user`. ⛔ **No timer was added, deliberately** (D-26's reasoned deviation): the visible bound on the wait is `BootScreen.tsx`'s 20 s give-up; a timeout here that cleared `loading` or `user` would show the sign-in form to a signed-in person whose session read is merely slow. `useAuth.test.ts` asserts a never-resolving `getSession` leaves `loading` true and a SIGNED_IN user set after 120 s of fake time. `SignInForm.test.tsx` (which pins `signInWithSSO("ssocorp.com")` exactly) is unedited and green: the redirect is computed INSIDE the hook, so the form's call shape is unchanged. Scan-list cell as of 2026-10-28 (replaced by 299-05, moved verbatim): 5 / 4 / 100 | ⚠ **FIRES** | ⚠ absent its ENTIRE LIFE at 4 phases — row added at 299 planning (F10). 299-05: redirect options + getSession catch. ⛔ no hash access; no timer sets user
+
+### `frontend/src/components/workflows/library/useWorkflowFork.ts`
+
+**`3 / 1 / 517`, re-derived 2026-10-28 at 299 planning — no row for its entire life** (299-RESEARCH F10). Plan `299-04` is its next touch: the Tweak path calls `createWorkflowDraft(forked, signal, { fromDefinitionId })` so the server's D-18 refusal (`POST /workflows?from_definition_id=`) can fire. Below threshold; no seam owed.
+
+**299-04 (2026-10-28) — `4 / 2 / 539` (was `3 / 1 / 517`).** The Tweak path (`createNewVersion`) calls `createWorkflowDraft(forked, undefined, { fromDefinitionId: wf.id })` so the server's D-18 refusal can fire; the starter path passes none (a starter is system-global, D-35). Still exactly TWO draft-create call sites (the T-192-42 raw-count pin). The failure shape becomes `ForkFailure { name, conflict, sentence? }`: ⚠ **a deliberate, narrow widening of T-192-40's prose-free shape** — `sentence` is set ONLY from an error NAMED `WorkflowOrgRefusedError`, which the API client raises only for the Tweak 409 whose fixed org-named shape is pinned to `item_org_guard.py`; every other failure keeps `{ name, conflict }`. The page renders `forkFailed.sentence ?? forkFailedMessage(...)`. Below threshold; no seam owed.
+
+Scan-list cell as of 2026-10-28 (replaced by 299-04, moved verbatim): 3 / 1 / 517 | no | ⚠ absent its entire life — row added at 299 planning (F10). 299-04: the Tweak fork sends fromDefinitionId (D-38)
+
+### `backend/app/main.py` — 299-01 (2026-10-28)
+
+**`97 / 71 / 993` (was `96 / 70 / 992`).** ONE mount line beside the 298 org_items mount — `app.include_router(links.router)  # Phase 299 D-06 …` — and the name `links` appended to the existing `from app.api import …` list. No lifespan, middleware or singleton change; the D-PRD-12 multi-worker audit is unaffected (the router holds no state). Honoured by construction.
+
+Scan-list cell as of 2026-10-28 (replaced by 299-01, moved verbatim): 96 / 70 / 992 (was `95 / 69 / 991`) | ⚠ **FIRES** | 298-01: ONE `app.include_router(org_items.router)` + one name in the api import list. Honoured by construction. ⛔ see section
+
+CLAUDE.md verdict cell as of 2026-10-28 (replaced by 299-01, moved verbatim): | `backend/app/main.py` | 96 / 70 / 992 (was `95 / 69 / 991`) | 298-01: one include_router(org_items.router) + its import token · ⛔ |
+
+### `backend/app/api/workflow_runs.py` — 299-01 (2026-10-28)
+
+**`23 / 17 / 1453` (was `22 / 16 / 1449`).** D-10, one field: `WorkflowRunRead.org_id: UUID | None = None` declared beside `metadata`, and `org_id=run.get("org_id")` in the model construction. The ownership select ALREADY named `org_id`, so the 210 lockstep (declared / selected / populated) holds with no new query and no new branch. The star-select literal is typed nowhere (test_214 counts it). On an "extraction FIRST" file this is an audited one-touch (the 296-06 / 298-01 precedent); the wording-helper extraction is still owed.
+
+Scan-list cell as of 2026-10-28 (replaced by 299-01, moved verbatim): 22 / 16 / 1449 (was `21 / 15 / 1445`) | ⚠ **FIRES** | 298-01: one `runs_query = org_lists.by_org(...)` + `request` param — audited one-touch override (296-06 precedent); fence amended D-298-01. ⛔ extraction FIRST next: the wording helpers
+
+CLAUDE.md verdict cell as of 2026-10-28 (replaced by 299-01, moved verbatim): | `backend/app/api/workflow_runs.py` | 22 / 16 / 1449 (was `21 / 15 / 1445`) | 298-01: one by_org on runs_query (audited one-touch) · extraction FIRST |
+
+### `backend/app/api/threads.py` — 299-01 (2026-10-28)
+
+**`285 / 97 / 2756` (was `284 / 96 / 2752`).** ONE awaited call in `send_message`, directly after the existing `_require_thread_org(...)`: `await item_org_guard.refuse_if_other_org(thread_resp.data.get("org_id"), active_org_id, kind="chat", pool=get_pg_pool)` + one import line. The factory `get_pg_pool` is the module name, so the `app.api.threads.get_pg_pool` patch surface still intercepts and the no-op path never resolves a pool. It sits BEFORE the typed Continue, the preflight and the user-message INSERT, so a refused send writes nothing. No new `if` in send_message (the 279 "0 new send-path branches" fence stays green). `test_279_org_helper.py::test_a_plain_thread_in_another_org_is_not_refused` RE-TARGETED DELIBERATELY (renamed `..._by_the_expert_helper`, reason in its body): the Expert helper still does not fire on a plain thread; the send is now refused by the separate guard.
+
+Scan-list cell as of 2026-10-28 (replaced by 299-01, moved verbatim): 284 / 96 / 2752 (was `283 / 95 / 2745`) | ⚠ **FIRES** | 298-01: list_threads wraps the filter chain in ONE `org_lists.by_org(...)` before .order (no org = today's chain, pinned). Honoured by construction.
+
+CLAUDE.md verdict cell as of 2026-10-28 (replaced by 299-01, moved verbatim): | `backend/app/api/threads.py` | 284 / 96 / 2752 (was `283 / 95 / 2745`) | 298-01: list_threads one org_lists.by_org predicate (narrows only) · ⛔ |
+
+### `backend/app/api/workflows.py` — 299-01 (2026-10-28)
+
+**`54 / 28 / 1722` (was `53 / 27 / 1712`).** `create_draft` gains ONE optional `from_definition_id: Annotated[str | None, Query(...)] = None` (a plain None default, so direct callers that omit it are unchanged) and ONE guarded call after `_active_org` resolves: only with an active org AND a canonical UUID, read the CALLER'S OWN non-global source org (`link_resolver.workflow_org(..., owner_id=user_id)`) and `refuse_if_other_org(..., kind="tweak")`. An unreadable / foreign / global source is silent. No new `@router.` line. `test_286_workflows_seam_pins.py` re-baselined under D-38 (OpenAPI +28/−8, routes +3/−1, moved AST unchanged), reason in its docstring.
+
+Scan-list cell as of 2026-10-28 (replaced by 299-01, moved verbatim): 53 / 27 / 1712 (was `52 / 27 / 1712`) | ⚠ **FIRES** | 298-review WR-06: create_draft's raise_if_foreign gains owner_default=True (header-less = the mig-106 trigger's org, not skipped); comment updated. ⛔ split OWED
+
+CLAUDE.md verdict cell as of 2026-10-28 (replaced by 299-01, moved verbatim): | `backend/app/api/workflows.py` | 53 / 27 / 1712 (was `52 / 27 / 1712`) | 298-review WR-06: header-less create_draft checks the trigger's org · split OWED |
+
+### `backend/app/services/workflow_kickoff.py` — 299-01 (2026-10-28)
+
+**`15 / 12 / 608` (was `14 / 11 / 605`).** ONE awaited `item_org_guard.refuse_if_other_org(<the raise_if_foreign row-org expression>, (thread_row or {}).get("org_id"), kind="run", pool=get_pg_pool)` placed directly before the `raise_if_foreign` line + one import. A system-global definition never refuses; a thread row without an org (every pre-299 test fixture) is a no-op. Only `send_message` calls the preflight — scheduled and API-key launches are untouched.
+
+Scan-list cell as of 2026-10-28 (replaced by 299-01, moved verbatim): 14 / 11 / 605 (was `13 / 10 / 602`) | ⚠ **FIRES** | 298-02: `org_id` added to the `_def_resp` select (one token) and ONE awaited raise_if_foreign after the unrestricted subset 400, with the user client (publish-parity confirm). Globals skip
+
+CLAUDE.md verdict cell as of 2026-10-28 (replaced by 299-01, moved verbatim): | `backend/app/services/workflow_kickoff.py` | 14 / 11 / 605 (was `13 / 10 / 602`) | 298-02: org_id select token + one raise_if_foreign after the 400 |
+
+### `backend/app/api/runs.py` — 299-01 (2026-10-28)
+
+**`55 / 24 / 2054` (was `54 / 23 / 2050`).** In `submit_ask_user_response` only (the identical `continue_run` fallback is untouched): the Deep `runs` select and the harness `workflow_runs` fallback select each gain the `org_id` token, the synthesized fallback `row` carries `"org_id": wf_self.get("org_id")`, and the `messages` insert names `"org_id": row.get("org_id")`. Both selects read a NOT NULL column, so the answer is stamped with the RUN's org instead of mig 106's owner-trigger `LIMIT 1` guess (wrong for a two-org caller answering from a link); a NULL still falls to the trigger. No new `if`, no new query.
+
+Scan-list cell as of 2026-10-28 (replaced by 299-01, moved verbatim): 54 / 23 / 2050 (was `53 / 23 / 2033`) | ⚠ **FIRES** | 296 G-4 S3: `_wake`'s finally now ends the re-drive shell's stream as run_producer does (terminal sentinel from the shell status, then EXPIRE 600/60), after finalize_run.
+
+CLAUDE.md verdict cell as of 2026-10-28 (replaced by 299-01, moved verbatim): | `backend/app/api/runs.py` | 54 / 23 / 2050 (was `53 / 23 / 2033`) | 296 G-4 S3: re-drive shell ends its stream (sentinel + EXPIRE) · ⛔ |
+
+### `backend/app/api/schedules.py` — 299-01 (2026-10-28)
+
+**`5 / 5 / 303` (was `4 / 4 / 299`).** `create_workflow_schedule` gains `request: Request = None` (not an OpenAPI parameter; the 286 `/workflows` sub-document is unchanged by it) and ONE keyword on the existing `create_schedule` call: `org_id=await link_resolver.workflow_org(pool, workflow_id, owner_id=user_id) or await org_lists.active_org_uuid(request, current_user)`. Your own non-global workflow → its org; a system-global one → the validated active org; neither → `None`, and `create_schedule` then issues today's INSERT byte for byte. `db/workflows.py` is NOT edited (298 WR-08 stays deferred): `get_definition` returns no org column, so the org is read through `link_resolver`. `tests/unit/test_workflow_scheduler.py`'s `_RecordingPool` gained a `fetchval` answering `None` (a fake that did not model the pool).
+
+Scan-list cell as of 2026-10-28 (replaced by 299-01, moved verbatim): 4 / 4 / 299 | ⚠ **FIRES** | ⚠ absent its ENTIRE LIFE — row added 296-02 (D-26). 296-02 (295-IN-05): Run now answers with `outcome` + a worded `detail`; ScheduledLaunchRefused caught first; raw exception logged only
+
+CLAUDE.md verdict cell as of 2026-10-28 (replaced by 299-01, moved verbatim): | `backend/app/api/schedules.py` | 4 / 4 / 299 | ⚠ FIRES, absent here — row added 296-02 · worded Run now (outcome) |
+
+### `backend/app/api/schedules.py` — 300-01 Task 1 (2026-10-29)
+
+**`6 / 6 / 341` (was `5 / 5 / 303`).** FIX-04 / D-14: one module helper `_refuse_blank_required(definition, inputs, *, saved_schedule)` raising 422 `{code: "missing_required", message, missing: [labels]}`. Create calls it after the published 400 and before `create_schedule` (`saved_schedule=False`). Patch calls it ONLY when `inputs` is sent or `is_active` is True: the owner-scoped `get_schedule` first (None → the existing 404 path, no existence oracle, T-300-02), then `get_definition`; an unreadable definition skips the check (fire time catches it). A pause alone reads nothing new. Pinned by `test_300_schedule_required_inputs.py`.
+
+Scan-list cell as of 2026-10-29 (replaced by 300-01, moved verbatim): 5 / 5 / 303 (was `4 / 4 / 299`) | ⚠ **FIRES** | 299-01: create_workflow_schedule gains `request: Request = None` and ONE `org_id=` keyword (your workflow's org, else the active org, else the trigger). Honoured by construction
+
+CLAUDE.md verdict cell as of 2026-10-29 (replaced by 300-01, moved verbatim): | `backend/app/api/schedules.py` | 5 / 5 / 303 (was `4 / 4 / 299`) | 299-01: new schedule stamped with the workflow's org (D-18) |
+
+### `backend/app/db/schedules.py`
+
+**`2 / 2 / 369` (was `1 / 1 / 359`), section added 299-01 (2026-10-28) — the row had no section.** The single data-access home for `workflow_schedules` (created 204; `claim_due_schedules` is the SKIP LOCKED claim). 299-01: `create_schedule` gains keyword-only `org_id: UUID | None = None`; when given, the INSERT names `org_id` and binds it as `$12`; when `None` the SQL string is byte-identical to base (sha256 `45acad7f…edb5a9bf`, 11 args, pinned in `test_299_write_org_guards.py`). The docstring's "org_id is NOT bound" paragraph is kept and AMENDED beside it (dated), not deleted. **Binding invariants:** ⛔ without `org_id` the mig-106 trigger still decides; ⛔ never a NULL bind of `org_id` (the column is only named when a value is given).
+
+Scan-list cell as of 2026-10-28 (replaced by 299-01, moved verbatim): 1 / 1 / 359 | no (1 phase) | single data-access home for workflow_schedules; claim_due_schedules SKIP LOCKED claim; young (204)
+
+### `frontend/src/components/layout/AppViewSwitch.tsx` — Phase 299 (299-03)
+
+**`5 / 2 / 583`** (was `4 / 2 / 547`). Props only (⛔ still no React hook — fenced by a comment-stripped scan in `AppViewSwitch.addressStates.test.tsx`): the whole return is wrapped in `<LinkGate entityLink threads threadsPending loadThreads selectThread>{(gate) => (…)}</LinkGate>`; LinkGate renders its child's result directly, so no DOM was added. The chat branch's condition additionally requires `gate.status` not `cant` / `prompt` (a refused or prompting thread address renders on the NON-chat side, so the main region behind the card is empty — no composer, no welcome); the chat hold now reads `HOLDING_SENTENCE.thread` (one spelling). In the non-chat `<main>`, S1 (`addressNotFound`) stays the FIRST arm, followed by `gate.status === "cant"` → `<CantBeOpened kind route onGo={() => entityLink?.openRoute(gate.exit)}>` over the generic area (`WorkflowsPage` with no linked id for a workflow or a run — never `WorkflowRunPage`; `ExpertCatalogPage` with no open id for an Expert; nothing for a chat), then `holding` → `<AddressHolding sentence={gate.sentence} />`, then `prompt` (299-03 Task 3 renders `SwitchOrgPrompt` here), then the existing arms untouched. One new optional prop, `threadsPending`. The trailing fallback stays LAST, the comment-stripped `workflow-run` comparison count stays one, the scroll-chain class strings are unchanged, and `sentence={COPY_LOADING}` stays in the run arm. Fences: `AppViewSwitch.addressStates.test.tsx` (19 → 30; the 297 history-column case RE-TARGETED under D-14), `activeViewReachability.test.ts` and `ChatLayout.launch.test.tsx` green unedited.
+
+Scan-list cell as of 2026-10-28 (replaced by 299-03, moved verbatim): 4 / 2 / 547 (was `3 / 2 / 542`) | no (young) | 299-02: chat holds while a thread address is unresolved; workflows / experts arms pass the linked id from entityLink. ⛔ no hooks; one run comparison; fallback last
+
+
+### `frontend/src/hooks/useAppNavigation.ts` — Phase 299 (299-03)
+
+**`10 / 2 / 488`** (was `9 / 2 / 452`). `EntityLink` gains four members, all through `go` (still the one write path): `address` (the rebuilt canonical path on screen; the raw path off a route — never displayed, used for change detection), `leave(route?)` (REPLACE with `route`, else `lastPlace` — the last NON-entity route seen in this tab, recorded in the same sync effect as `lastRunId` — else `{ view: "chat" }`), `openRoute(route)` (a push: the card's exits and "Open it after all") and `resume()` (`takeReturnTarget()` from 299-05's leaf, consumed whatever happens; parsed with `parseAppLocation`, and `go(parsed, { replace: true })` ONLY when the pathname on screen is `/` or `/app` — Pitfall 7). `resume` closes over the pathname, so `entityLink` still keeps one identity while the address is unchanged. **Binding invariants unchanged:** ⛔ still the ONLY caller of the router hooks; ⛔ one `useBlocker`; ⛔ `setLibraryTab(` exactly two writers; ⛔ the one raw History write stays `ensureEntryIdx`. Pinned by `useAppNavigation.test.tsx` (63 → 72).
+
+Scan-list cell as of 2026-10-28 (replaced by 299-03, moved verbatim): 9 / 2 / 452 (was `4 / 1 / 290`) | no (young) | 299-02: one entityLink object (target, route, openThread/Workflow/Expert, leaveThread); Chat → last thread. ⛔ ONLY router-hook caller; setLibraryTab( exactly 2; one blocker
+
+
+### `frontend/src/components/layout/ChatLayout.tsx` — Phase 299 (299-03)
+
+**`73 / 36 / 934`** (was `72 / 36 / 933`). Two touches, both props/conditions (⚠ the plan said ONE token; the second is a reasoned addition): (1) the history-column guard drops `&& !addressNotFound` — UI-SPEC S1 keeps the column live behind the card (a row click opens that chat and replaces the card); (2) `threadsPending={threadsPending}` is passed to AppViewSwitch, because the gate must hold a thread address until the active org's list has answered and AppViewSwitch did not receive that value (`threadHolding` cannot tell "pending" from "absent"). No new useState / useEffect; the IN-01 org-change effect is not edited. 297-02's "history column hidden on S1" assertion was RE-TARGETED under D-14 in `AppViewSwitch.addressStates.test.tsx` with its reason in the test body.
+
+Scan-list cell as of 2026-10-28 (replaced by 299-03, moved verbatim): 72 / 36 / 933 (was `70 / 36 / 910`) | ⚠ **FIRES** | 299-02: one useThreadAddress call; openThread at threadNavigation + doRun tail; 3 pass-through props. ⛔ no new useState/useEffect; IN-01 effect unedited
+
+CLAUDE.md verdict cell as of 2026-10-28 (replaced by 299-03, moved verbatim): | `frontend/src/components/layout/ChatLayout.tsx` | 72 / 36 / 933 (was `70 / 36 / 910`) | 299-02: one useThreadAddress call; openThread swaps |
+
+### `frontend/src/components/org/orgItemsCopy.ts` — Phase 299 (299-03)
+
+**`3 / 2 / 204`** (was `2 / 1 / 154`). One appended block, `// ── Phase 299-03 … "This is in <org> — switch?" ──`: `thisIsIn(org)`, `workingIn(current, org)`, `KEEPS_GOING_TAIL` (leading space on purpose), `KIND_CAPTION` (Chat / Workflow / Workflow run / Expert — uppercase by CSS), `stayIn(current)`, `switchingTo(org)`, `stillAnsweringOne(title)` (curly quotes), `stillAnsweringMany(n)`, `BACK_TO_IT`, `stayedIn(current)`, `OPEN_IT_AFTER_ALL`, `yourChatInStill(previous)` (UI-D10 present tense only — A1 unproven until G-4 row 2), `SWITCH_BACK`, and `THIS_ORG` ("this organization", used only when an org's name has not answered yet — a reasoned addition so no sentence ever renders an empty name). The Accept button reuses the 298 `switchToLabel`. ⛔ Still a strict leaf: no import statement (asserted by `SwitchOrgPrompt.test.tsx`). Nothing above the block changed.
+
+Scan-list cell as of 2026-10-28 (replaced by 299-03, moved verbatim): 2 / 1 / 154 (was `1 / 1 / 18`) | no (young) | 298-05: + the elsewhere line (elsewhereLead exact plurals, Switch) and the move sheet words (titles, count sentence, what changes, terminals). ⛔ strict leaf, no imports; never '0 more'
+
+
+### `frontend/src/components/layout/LinkGate.tsx` — Phase 299 (299-03, Task 3)
+
+**`2 / 1 / 339`** (was `1 / 1 / 209`). The prompt branch: `gate.prompt` carries `SwitchOrgPrompt`'s props — the server's target, the active org's name (from the memberships, `THIS_ORG` until they answer), `streaming` (`useStreamsStore((s) => s.streamingThreads)` intersected with the active org's list for titles, oldest first), `switching` and three handlers. **Stay** → `entityLink.leave()` (a REPLACE) and the stayed notice `{from, landed, route, current}`; **Back to it** → the same with `leave({ view: "chat", threadId: <latest answering> })`; **Switch** → `useStreamsStore.getState().streamingThreads` is read FIRST (F4: the provider tears every run subscription down on an org change), the after-switch snapshot is recorded when non-empty, then `org.switchOrg(target.org_id)` ONCE; the cached answer then matches the new active org and the item opens with no second request. **Switch back** → `switchOrg(previous)` + `entityLink.openThread(<snapshot thread>)`. Both bars are returned as `gate.notice` (React's adjust-state-during-render pattern clears them: the stayed notice at the next address after landing, the after-switch line when the address changes). `memberships` is read defensively (`org?.orgs ?? []`) because several layout suites mock the context with only the fields they use. **Binding invariants:** ⛔ exactly two `switchOrg(` call sites (Switch, Switch back), never on render (T-299-26); ⛔ the streams store is READ only, `StreamsProvider.tsx` and `streamsStore.ts` byte-unchanged (T-299-27); ⛔ still one `resolveLink(` and no router hook. Pinned by `LinkGate.test.tsx` (28 → 41, incl. the revision-1 end-to-end thread case through the real router + `useAppNavigation` + `useThreadAddress` + an IN-01 deselect) and `navigationKeepsStreams.test.tsx` (4 → 5, Stay keeps the one subscription).
+
+Scan-list cell as of 2026-10-28 (replaced by 299-03, moved verbatim): 1 / 1 / 209 (was `0 / 0 / 0`) | no (young) | young (created 299-03). resolve + decide none / holding / cant / prompt / open; resume once (D-12..D-17, D-24). ⛔ no router hook; a throw never shows the card; StreamsProvider untouched
+
+
+### `frontend/src/components/layout/AppViewSwitch.tsx` — Phase 299 (299-03, Task 3)
+
+**`6 / 2 / 598`** (was `5 / 2 / 583`). Props only (⛔ still no hook): the `prompt` arm renders `<SwitchOrgPrompt {...gate.prompt} />` in place of the Task 2 holding stand-in, and `{gate.notice}` renders at the top of each main region. Non-chat side: between the `md:hidden` bar and `<main className="flex-1 overflow-hidden">`, inside the existing flex column, so the region shrinks rather than being clipped. Chat side: inside the pinned `<main className="min-w-0 min-h-0 overflow-hidden">` (class string unchanged), an ALWAYS-present `<div className="flex h-full min-h-0 flex-col">{gate.notice}<div className="min-h-0 flex-1">…</div></div>` — always present, so ChatArea is never remounted when a notice appears or goes, and the min-h-0 chain still bounds the transcript (⚠ jsdom cannot see layout: the chain is owed to G-4's browser drive, the 244-01 precedent). The trailing fallback stays LAST, one stripped `workflow-run` comparison, `sentence={COPY_LOADING}` unchanged; `ChatLayout.scrollFrame.test.tsx` and `ChatLayout.launch.test.tsx` green unedited.
+
+Scan-list cell as of 2026-10-28 (replaced by 299-03, moved verbatim): 5 / 2 / 583 (was `4 / 2 / 547`) | no (young) | 299-03: body wrapped in ONE <LinkGate> render-prop; cant / holding / prompt arms right after S1; threadsPending prop. ⛔ no hooks; one run comparison; fallback last
+
+
+### `frontend/src/components/chat/ChatArea.tsx` — Phase 299 (299-04)
+
+**299-04 (2026-10-28) — `96 / 45 / 1192` (was `95 / 44 / 1189`).** Honoured by construction: ONE import and ONE JSX expression after the header `<h2>` — `{thread && <ShareLinkMenu route={{ view: "chat", threadId: thread.id }} kind="thread" audience="only_you" orgId={null} className="ml-auto flex-none" />}` (D-20 / UI-SPEC S4). A chat always opens only for its owner (D-33), so the audience is a constant here, not a derivation. Zero hooks, zero state, no change to send / scope / streams. Pinned by the two 299-04 cases in `ChatArea.threadWorkflowPicker.test.tsx` (5 → 7). ⚠ The triple's "was" is re-derived from git (`95`), one commit above the previous row's `94`.
+
+CLAUDE.md verdict cell as of 2026-10-28 (replaced by 299-04, moved verbatim): | `frontend/src/components/chat/ChatArea.tsx` | 94 / 44 / 1189 (was `93 / 43 / 1186`) | honoured by construction (287-03: ONE mount, 0 hooks) · ⛔ |
+
+Scan-list cell as of 2026-10-28 (replaced by 299-04, moved verbatim): 94 / 44 / 1189 (was `93 / 43 / 1186`) | **FIRES** | honoured by construction (**287-03**): ONE mount of ThreadWorkflowPicker, zero new hooks, no logic. ⛔ no scope branch in send
+
+### `frontend/src/components/workflows/library/WorkflowCardMenu.tsx` — Phase 299 (299-04)
+
+**299-04 (2026-10-28) — `4 / 4 / 506` (was `3 / 3 / 498`).** ONE `<ShareLinkMenuSub route={{ view: "workflows", definitionId: row.id }} kind="workflow" audience={audienceOf("workflow", { status, is_system_global: row.provenance === "starter" })} orgId={null} />` as the FIRST child of the menu (D-20 / UI-SPEC S4). The row carries no global flag; a `starter` row IS the system-global shelf (`list_starter_workflows` returns `status='published' AND is_system_global=true` and the published feed drops the globals), so provenance is the fact. **Binding invariants:** ⛔ WR-03 — the SubTrigger is a `menuitem`, the sub's body never renders while closed; ⛔ no audience derived here — `lib/linkAudience.ts`. `WorkflowCard.seam286.pin.test.tsx`'s `EXPECTED_ROLES` gains ONE leading `menuitem` per state and its 5 menu snapshots were updated; each was proven identical to base once the one SubTrigger node is removed.
+
+CLAUDE.md verdict cell as of 2026-10-28 (replaced by 299-04, moved verbatim): | `frontend/src/components/workflows/library/WorkflowCardMenu.tsx` | 3 / 3 / 498 | ⚠ now FIRES (298) · 298-05: one draft-only MoveToOrgMenuItem mount |
+
+Scan-list cell as of 2026-10-28 (replaced by 299-04, moved verbatim): 3 / 3 / 498 (was `2 / 2 / 493`) | ⚠ **now FIRES** (3 phases) | 298-05: one gated mount, {row.provenance === "draft" && <MoveToOrgMenuItem kind="draft">} before the forks (D-31: published + starter never). A DropdownMenuItem, WR-03 green
+
+**299-04 Task 3 (2026-10-28) — `5 / 4 / 510` (was `4 / 4 / 506`).** One import and ONE expression inside the `fork-consequence` group after its sentence: `{!hasExistingFork && <SavesInOrg asSentence />}` — the line every fork verb is `aria-describedby`, so the caption is read with Tweak / Use this starter. An existing fork opens a draft and creates nothing, so it says nothing about saving. Still one node (the group), still WR-03 green.
+
+CLAUDE.md verdict cell as of 2026-10-28 (replaced by 299-04, moved verbatim): | `frontend/src/components/workflows/library/WorkflowCardMenu.tsx` | 4 / 4 / 506 (was `3 / 3 / 498`) | 299-04: ShareLinkMenuSub is the menu's FIRST item (D-20) · WR-03 green |
+
+Scan-list cell as of 2026-10-28 (replaced by 299-04, moved verbatim): 4 / 4 / 506 (was `3 / 3 / 498`) | ⚠ **now FIRES** (3 phases) | 299-04: ONE ShareLinkMenuSub as the menu's first child; audience from audienceOf (starter = system-global → anyone; draft / published owner-only). ⛔ WR-03: a menuitem SubTrigger
+
+### `frontend/src/pages/WorkflowsPage.tsx` — Phase 299 (299-04)
+
+**299-04 (2026-10-28) — `54 / 23 / 1402` (was `53 / 23 / 1399`).** ONE import and ONE expression in the Builder breadcrumb group after the draft label: `{builderInitial?.draftId && <ShareLinkMenu route={{ view: "workflows", definitionId: builderInitial.draftId }} kind="workflow" audience="only_you" orgId={null} />}` (D-20). Absent on the pre-draft "Build a workflow" state (no id). A draft opens only for its owner (D-33). ⚠ Known limit, recorded not widened: a Builder that mints its draft by its FIRST save keeps `builderInitial` null, so it shows no link until it is reopened from the library. Pinned by the two 299-04 cases in `WorkflowBuilderPage.session.test.tsx` (23 → 25).
+
+CLAUDE.md verdict cell as of 2026-10-28 (replaced by 299-04, moved verbatim): | `frontend/src/pages/WorkflowsPage.tsx` | 53 / 23 / 1399 (was `52 / 22 / 1392`) | 299-02: one prop + one hook call (useWorkflowLinkTarget) |
+
+Scan-list cell as of 2026-10-28 (replaced by 299-04, moved verbatim): 53 / 23 / 1399 (was `52 / 22 / 1392`) | ⚠ **FIRES** | 299-02: one optional prop (linkedDefinitionId) + one useWorkflowLinkTarget call below onOpenDraft (TDZ); the logic lives in the hook. Honoured by construction
+
+**299-04 Task 3 (2026-10-28) — `55 / 23 / 1403` (was `54 / 23 / 1402`).** ONE expression changed in the fork-failure notice: `{forkFailed.sentence ?? forkFailedMessage(forkFailed.name, forkFailed.conflict)}` — the server's org-named Tweak refusal verbatim (S8), else the page's own sentence exactly as before. Recorded as the plan's "a failure home that replaces the server sentence" deviation: before this, the org 409 would have read "A version of … already exists" (`isForkConflict` is a `409` substring test).
+
+CLAUDE.md verdict cell as of 2026-10-28 (replaced by 299-04, moved verbatim): | `frontend/src/pages/WorkflowsPage.tsx` | 54 / 23 / 1402 (was `53 / 23 / 1399`) | 299-04: one ShareLinkMenu after the draft label (D-20) |
+
+Scan-list cell as of 2026-10-28 (replaced by 299-04, moved verbatim): 54 / 23 / 1402 (was `53 / 23 / 1399`) | ⚠ **FIRES** | 299-04: ONE ShareLinkMenu after the Builder draft label, only when builderInitial has a draftId (D-20); owner-only. No state, no hook
+
+### `frontend/src/pages/WorkflowRunPage.tsx` — Phase 299 (299-04)
+
+**299-04 (2026-10-28) — `37 / 17 / 1610` (was `36 / 16 / 1605`).** Two imports and ONE expression in the title row after the version chip and before the right-grouped Stop / centre-switch block: `<ShareLinkMenu route={{ view: "workflow-run", runId }} kind="run" audience={audienceOf("run", { status: run?.status, has_org: !!run?.org_id })} orgId={run?.org_id ?? null} />`. ⚠ **Measured, not assumed:** this header only ever renders for an UNFINISHED run — 289-04's early return sends a finished run (and the owner read's 404) to `RunEvidenceReport` — so this mount always reads owner-only (D-34), and the finished-run link (the members-of line) is mounted in the report's actions row instead. **Binding invariants:** ⛔ no re-run / relaunch control (D-38); ⛔ Stop never moves; ⛔ zero run-mutating controls besides Stop / Answer. `WorkflowRunPage.seam286.pin` snapshot `ready: a non-terminal run` updated; proven identical to base once the one Link button node is removed.
+
+CLAUDE.md verdict cell as of 2026-10-28 (replaced by 299-04, moved verbatim): | `frontend/src/pages/WorkflowRunPage.tsx` | 36 / 16 / 1605 (was `35 / 15 / 1604`) | 297-02: COPY_LOADING exported, one keyword · ⛔ |
+
+Scan-list cell as of 2026-10-28 (replaced by 299-04, moved verbatim): 36 / 16 / 1605 (was `35 / 15 / 1604`) | **FIRES** | 297-02: COPY_LOADING exported, one keyword
+
+### `frontend/src/components/experts/catalog/ExpertDetailModal.tsx` — Phase 299 (299-04)
+
+**299-04 (2026-10-28) — `8 / 6 / 536` (was `7 / 5 / 531`).** Two imports and ONE expression after the name / meta column inside the header's `pr-8` row, so it sits before the dialog's ✕: `<ShareLinkMenu route={{ view: "experts", bundleId: expert.id }} kind="expert" audience={audienceOf("expert", { is_system, is_enabled, visibility })} orgId={expert.org_id ?? null} className="ml-auto flex-none" />`. The org NAME is resolved by the menu from the org context. `ExpertBundle.org_id` was added to `types/index.ts` in the same commit (the server's `SELECT *` always carried it). Pinned by `share/__tests__/shareMounts.test.tsx` (the six visibility / system / off lines). Task 3 of the same plan adds the Saves-in caption beside Start a chat.
+
+CLAUDE.md verdict cell as of 2026-10-28 (replaced by 299-04, moved verbatim): | `frontend/src/components/experts/catalog/ExpertDetailModal.tsx` | 7 / 5 / 531 (was `6 / 4 / 531`) | honoured by construction (279-03: ONE copy change) |
+
+Scan-list cell as of 2026-10-28 (replaced by 299-04, moved verbatim): 7 / 5 / 531 (was `6 / 4 / 531`) | ⚠ **FIRES — 5 phases** | honoured by construction (**279-03 A**): ONE copy change ("will not be searched"). ⚠ no test pins that copy (review note)
+
+**299-04 Task 3 (2026-10-28) — `9 / 6 / 540` (was `8 / 6 / 536`).** One import and ONE expression after the footer's primary ternary: `{(view.kind === "legacy" || view.kind === "chat") && <SavesInOrg className="ml-2 self-center" />}` — only beside Start a chat (an install creates no item from this page). The footer's "exactly two controls" holds: the caption is text, not a control.
+
+CLAUDE.md verdict cell as of 2026-10-28 (replaced by 299-04, moved verbatim): | `frontend/src/components/experts/catalog/ExpertDetailModal.tsx` | 8 / 6 / 536 (was `7 / 5 / 531`) | 299-04: one ShareLinkMenu in the header row, before close (D-20) |
+
+Scan-list cell as of 2026-10-28 (replaced by 299-04, moved verbatim): 8 / 6 / 536 (was `7 / 5 / 531`) | ⚠ **FIRES — 5 phases** | honoured by construction (**299-04**): ONE ShareLinkMenu in the DialogHeader title row (inside pr-8), audienceOf(expert) from visibility / is_system / is_enabled; org from the bundle's org_id
+
+### `frontend/src/lib/api/workflows.ts` — Phase 299 (299-04)
+
+**299-04 (2026-10-28) — `16 / 16 / 1364` (was `15 / 15 / 1361`).** ONE optional field, `org_id?: string | null`, on `WorkflowRunRead` (D-10 client — `GET /workflow-runs/{id}` carries it since 299-01). It feeds the run page's link line. Types only; no runtime change. Task 3 of the same plan adds `createWorkflowDraft`'s `fromDefinitionId` option.
+
+CLAUDE.md verdict cell as of 2026-10-28 (replaced by 299-04, moved verbatim): | `frontend/src/lib/api/workflows.ts` | 15 / 15 / 1361 (was `14 / 14 / 1313`) | 298-02: WorkflowFolderRefusedError on both 422 arms; allOrgs list |
+
+Scan-list cell as of 2026-10-28 (replaced by 299-04, moved verbatim): 15 / 15 / 1361 (was `14 / 14 / 1313`) | ⚠ **FIRES** | 298-02: WorkflowFolderRefusedError (name set) thrown on the coded 422 in create + update, before every other reading; listDraftWorkflows(signal, {allOrgs}) omits X-Org-Id
+
+**299-04 Task 3 (2026-10-28) — `17 / 16 / 1395` (was `16 / 16 / 1364`).** `createWorkflowDraft(def, signal?, opts?: { fromDefinitionId?: string })` appends `?from_definition_id=<encoded id>` only when set — without it the URL is byte-identical. New `WorkflowOrgRefusedError` (name set, the folder-refusal idiom) thrown for a 409 whose string `detail` matches the org guard's fixed Tweak shape (`This workflow is in … Switch to … to make your own copy.`, named and unnamed), checked after the folder refusal and before the generic throw. ⚠ This classifies on a SENTENCE SHAPE, where 298 D-36 branches on a `code`: the 299-01 guard sends a bare string detail, and the only other 409 here is the machine-worded slug/version clash. The shape is pinned against `backend/app/services/item_org_guard.py` (`savesInOrg.test.tsx` reads REFUSALS / REFUSALS_UNNAMED via `?raw`), so a reworded server sentence goes red rather than silently falling back. A coded detail would be the stronger fix — recorded for a later phase, not taken here (no backend change in this plan).
+
+CLAUDE.md verdict cell as of 2026-10-28 (replaced by 299-04, moved verbatim): | `frontend/src/lib/api/workflows.ts` | 16 / 16 / 1364 (was `15 / 15 / 1361`) | 299-04: WorkflowRunRead.org_id (D-10 client), types only |
+
+Scan-list cell as of 2026-10-28 (replaced by 299-04, moved verbatim): 16 / 16 / 1364 (was `15 / 15 / 1361`) | ⚠ **FIRES** | 299-04: one optional org_id on WorkflowRunRead (D-10 client; the server sends it since 299-01). Types only
+
+### `frontend/src/types/index.ts` — Phase 299 (299-04)
+
+**299-04 (2026-10-28) — `103 / 82 / 1688` (was `102 / 81 / 1685`).** NOT in the plan's `files_modified` — added as a Rule 3 deviation: the plan's Expert mount reads `expert.org_id`, and the client type did not declare a field the server has always returned (`backend/app/db/experts.py` reads `SELECT *`; `models/expert.py` `ExpertBundle.org_id`). ONE optional field, additive, no runtime change. The seam this file owes is unchanged.
+
+CLAUDE.md verdict cell as of 2026-10-28 (replaced by 299-04, moved verbatim): | `frontend/src/types/index.ts` | 102 / 81 / 1685 (was `101 / 80 / 1674`) | 293-03: one RunOrigin type + one optional field · seam OWED |
+
+Scan-list cell as of 2026-10-28 (replaced by 299-04, moved verbatim): 102 / 81 / 1685 (was `101 / 80 / 1674`) | ⚠ **FIRES** | 295-05: THREE fields, not the planned two (`Phase.unsourced`, `PendingAsk.engine_pause` + `EnginePause`, `AskUserAnswerBody.folder_id`). Additive. Seam OWED · 293 touch: see §Phase 293 close
+
+### `frontend/src/components/workflows/RunEvidenceReport.tsx` — Phase 299 (299-04)
+
+**299-04 (2026-10-28) — `8 / 6 / 497` (was `7 / 5 / 492`).** NOT in the plan's `files_modified` — added as a Rule 2 deviation, measured: a finished run's page IS this report (WorkflowRunPage's 289-04 early return), so the plan's header mount could never show D-34's "Opens for members of {Org}." and a finished run — the run people share — would have had no link at all. Two imports and ONE expression first in the `print:hidden` actions row: `<ShareLinkMenu route={{ view: "workflow-run", runId: view.runId }} kind="run" audience={audienceOf("run", { status: payload.run.status, has_org: payload.run.org_name !== null })} orgId={null} orgName={payload.run.org_name} />` — the evidence read carries the org NAME, not its id, so `ShareLinkMenu` gained an optional `orgName`. The evidence read 404s an unfinished run, so the status here is terminal by construction. **Binding invariants:** ⛔ the report still writes nothing (Link only copies an address); ⛔ it appears for a colleague too, and its line holds for them (they are the org's members). `RunEvidenceReport.test.tsx`'s two exact button-name sets each gained "Link".
+
+CLAUDE.md verdict cell as of 2026-10-28 (replaced by 299-04, moved verbatim): | `frontend/src/components/workflows/RunEvidenceReport.tsx` | 7 / 5 / 492 (was `6 / 4 / 495`) | 297-02: ?run= writer effect deleted (D-18) · ⚠ FIRES |
+
+Scan-list cell as of 2026-10-28 (replaced by 299-04, moved verbatim): 7 / 5 / 492 (was `6 / 4 / 495`) | ⚠ **FIRES** | 297-02: ?run= writer effect deleted (D-18)
+
+### `frontend/src/components/share/ShareLinkMenu.tsx` — Phase 299 (299-04)
+
+**299-04 Task 2 (2026-10-28) — `3 / 1 / 177` (was `2 / 1 / 173`).** One optional prop, `orgName?: string | null`: when given it is used as-is and `orgId` is not looked up — for the finished-run evidence report, whose read carries `org_name` and no id. Mounts: ChatArea header, the card ⋯ menu (Sub), the Builder header, the run page header, the evidence report actions row, the Expert detail header.
+
+**299-04 close (2026-10-28) — `4 / 1 / 177` (was `3 / 1 / 177`).** Comment only: the docblock names the no-input rule in words ("a text input") rather than spelling the tag, so the plan's raw `grep -c "<input"` acceptance check reads 0 for the right reason.
+
+Scan-list cell as of 2026-10-28 (replaced by 299-04, moved verbatim): 1 / 1 / 167 (was `0 / 0 / 0`) | no (young) | young (created 299-04). link surface on DropdownMenu (D-20/D-21/D-39). ⛔ one focusable item; copied = origin + formatAppRoute; no toast; audience from the leaf
+
+
+### `frontend/src/components/org/orgItemsCopy.ts` — Phase 299 (299-04)
+
+**299-04 (2026-10-28) — `4 / 2 / 210` (was `3 / 2 / 204`).** One constant and one function: `SAVES_IN_PREFIX = "Saves in "` and `savesIn(org)` (UI-D11). Still a strict leaf (`grep -c import` = 0).
+
+Scan-list cell as of 2026-10-28 (replaced by 299-04, moved verbatim): 3 / 2 / 204 (was `2 / 1 / 154`) | no (young) | 299-03: + the switch prompt words (heading, body, tail, captions, Stay, Switching…, still answering, stayed, after-switch, THIS_ORG). ⛔ strict leaf, no imports
+
+### `frontend/src/components/workflows/library/RunModal.tsx` — Phase 299 (299-04)
+
+**299-04 (2026-10-28) — `14 / 9 / 752` (was `13 / 8 / 748`).** One import and ONE expression directly under the footer's Run row: `<SavesInOrg className="bg-muted/30 px-6 pb-3 text-right" />` (UI-D11; the footer's own `bg-muted/30` is carried so the caption reads as part of the bar — a deliberate refinement of the UI-SPEC's `mt-2 text-right`, owed a look at G-4 row 1). S8: `handleRun`'s catch already sets `launchError` to `e.message`, and the run refusal arrives as `ApiError(detail)` through `postMessage`'s string-detail path, so the org sentence shows verbatim with no change here (asserted in `savesInOrg.test.tsx`).
+
+CLAUDE.md verdict cell as of 2026-10-28 (replaced by 299-04, moved verbatim): | `frontend/src/components/workflows/library/RunModal.tsx` | 13 / 8 / 748 (was `12 / 8 / 740`) | 296 G-4 row 11: refused Run scrolls the refusal into view |
+
+Scan-list cell as of 2026-10-28 (replaced by 299-04, moved verbatim): 13 / 8 / 748 (was `12 / 8 / 740`) | ⚠ **FIRES** | 296 G-4 row 11: a refused Run scrolls the required refusal into view (`block: nearest`): one ref, one effect, one call in handleRun. useState unchanged
+
+### `backend/app/services/link_resolver.py` — Phase 299 (299-REVIEW CR-01)
+
+**CR-01 (2026-10-29) — `3 / 1 / 246`.** `WORKFLOW_ORG_SQL` gains the definitions SELECT policy's own membership arm (`d.is_system_global OR EXISTS org_members …`), because it runs on the pool where RLS does not apply. A definition whose org its owner LEFT now reads like a global one, so a new schedule takes the active org (a member org — the pre-299 trigger shape) and the Tweak guard names nothing. Driven RED on real Postgres in `backend/tests/integration/test_299_review_fixes_live.py`.
+
+Scan-list cell before 299-REVIEW CR-01 (replaced, moved verbatim): 2 / 1 / 241 (was `1 / 1 / 225`) | no (young) | young (created 299-01). one SQL per kind; run + expert on the pool with $2 = caller (P1/P2). ⛔ one statement per kind; audience rule twinned with lib/linkAudience.ts |
+
+### `backend/app/services/link_resolver.py` — Phase 299 (299-REVIEW CR-02)
+
+**CR-02 (2026-10-29) — `4 / 1 / 251`.** `RUN_SQL` joins `threads` with `AND t.user_id = $2`, so a member of a finished run's org (D-34) never reads the owner's private chat title (thread titles are owner-only; the evidence report never shows one). Everyone else reads the name the evidence report shows: `definition_snapshot->>'name'`, else the definition row's. Same statement for missing and forbidden; driven RED on real Postgres.
+
+Scan-list cell before 299-REVIEW CR-02 (replaced, moved verbatim): 3 / 1 / 246 (was `2 / 1 / 241`) | no (young) | 299-REVIEW CR-01: WORKFLOW_ORG_SQL requires membership of the definition's org (a left org reads like a global one). ⛔ one statement per kind; audience twinned with linkAudience.ts |
+
+### `backend/app/services/link_resolver.py` — Phase 299 (299-REVIEW CR-03)
+
+**CR-03 (2026-10-29) — `5 / 1 / 254`.** `audience_of` narrows a DISABLED Expert by visibility first: `managers_only` only for org/public (where every manager passes the visibility arm), else `only_you` — because `EXPERT_SQL` and `check_expert_grant_access` AND the manager arm with the visibility arm. Changed in lockstep with `frontend/src/lib/linkAudience.ts`; the fixture gains disabled public / private / granted rows (15). Driven RED on real Postgres: another manager could not open a disabled private Expert whose line promised managers.
+
+Scan-list cell before 299-REVIEW CR-03 (replaced, moved verbatim): 4 / 1 / 251 (was `3 / 1 / 246`) | no (young) | 299-REVIEW CR-02: RUN_SQL joins the chat title only for its owner; others read the run's frozen name. ⛔ one statement per kind; audience twinned with linkAudience.ts |
+
+### `frontend/src/lib/linkAudience.ts` — Phase 299 (299-REVIEW CR-03)
+
+**CR-03 (2026-10-29) — `2 / 1 / 76`.** `audienceOf` mirrors `link_resolver.audience_of`'s CR-03 narrowing: a disabled Expert reads `managers_only` only when org/public, else `only_you`. Still a strict leaf; the lockstep fence iterates the fixture's three new disabled rows.
+
+Scan-list cell before 299-REVIEW CR-03 (replaced, moved verbatim): 1 / 1 / 73 (was `0 / 0 / 0`) | no (young) | young (created 299-04). who-can-open line (D-33/D-34). ⛔ strict leaf; pinned to backend link_audience_cases.json + TERMINAL_RUN_STATUSES |
+
+### `backend/app/services/link_resolver.py` — Phase 299 (299-REVIEW WR-02)
+
+**WR-02 (2026-10-29) — `6 / 1 / 256`.** `RUN_SQL`'s membership `EXISTS` now binds BOTH arms (`EXISTS member AND (owner OR finished)`), matching `workflow_runs_select_own` — the RLS policy behind the user-JWT run read a link opens. A run in an org its owner left reads like a missing one (404), so the gate never offers a switch into an org the caller is not in. Driven RED on real Postgres (active + completed).
+
+Scan-list cell before 299-REVIEW WR-02 (replaced, moved verbatim): 5 / 1 / 254 (was `4 / 1 / 251`) | no (young) | 299-REVIEW CR-03: a disabled private/granted Expert's audience is only_you (managers only for org/public). ⛔ one statement per kind; audience twinned with linkAudience.ts |
+
+### `backend/app/services/item_org_guard.py` — Phase 299 (299-REVIEW WR-01)
+
+**WR-01 (2026-10-29) — `2 / 1 / 78`.** The `run` refusal (named and unnamed) now reads *"This workflow is in {org}. Switch to {org} and start it from a new chat there."* The old *"Switch to {org} to run it"* could never succeed on an in-thread start: switching sends the person to the workflow's org, where the SAME chat's next send is refused by the chat guard (*"This chat is in X"*). The comparison is unchanged (definition vs thread; the chat guard already makes the thread's org the active one) and `workflow_kickoff.py` is byte-unchanged. The review's header-less half was driven and found unreachable: the 258 entitlement gate fails closed (403) on a caller with no active org before the guard runs.
+
+Scan-list cell before 299-REVIEW WR-01 (replaced, moved verbatim): 1 / 1 / 74 | no (young) | young (created 299-01). D-18 409 helper (send / kickoff / Tweak). ⛔ no-op without an active org (298 D-03); never a widening of _require_thread_org |
+
+### `backend/app/services/link_resolver.py` — Phase 299 (299-REVIEW WR-03)
+
+**WR-03 (2026-10-29) — `7 / 1 / 259`.** `audience_of` answers `plan_experts` for a system Expert (was `everyone`): every `/experts` read is behind `require_capability("experts")` for the ACTIVE org (`api/experts.py:72-76`), so the line is worded around the gate rather than the gate being added to this route (D-08: no 403 here). New `Audience` literal, in lockstep with `linkAudience.ts` and `lib/api/links.ts`; the fixture's system-Expert row moves to it.
+
+Scan-list cell before 299-REVIEW WR-03 (replaced, moved verbatim): 6 / 1 / 256 (was `5 / 1 / 254`) | no (young) | 299-REVIEW WR-02: RUN_SQL membership binds the owner arm too (RLS workflow_runs_select_own). ⛔ one statement per kind; audience twinned with linkAudience.ts |
+
+### `frontend/src/lib/linkAudience.ts` — Phase 299 (299-REVIEW WR-03)
+
+**WR-03 (2026-10-29) — `3 / 1 / 78`.** `audienceOf` answers `plan_experts` for a system Expert, and `audienceParts` spells its one sentence: *"Opens for anyone signed in whose plan includes Experts."* (no org name, so no owner-only fallback). Still a strict leaf; every sentence still appears exactly once.
+
+Scan-list cell before 299-REVIEW WR-03 (replaced, moved verbatim): 2 / 1 / 76 (was `1 / 1 / 73`) | no (young) | 299-REVIEW CR-03: disabled private/granted Expert → only_you (managers only for org/public), in lockstep with audience_of. ⛔ strict leaf; pinned to link_audience_cases.json + TERMINAL_RUN_STATUSES |
+
+### `frontend/src/lib/api/links.ts` — Phase 299 (299-REVIEW WR-03)
+
+**WR-03 (2026-10-29) — `2 / 1 / 46`.** The `LinkTarget.audience` union gains `plan_experts`, mirroring the backend `Audience` literal. Types only.
+
+Scan-list cell before 299-REVIEW WR-03 (replaced, moved verbatim): 1 / 1 / 46 (was `0 / 0 / 0`) | no (young) | young (created 299-03). resolveLink: 404 → cant, anything else throws (D-06). ⛔ an outage is never reported as can't-be-opened |
+
+### `frontend/src/lib/api/experts.ts` — Phase 299 (299-REVIEW WR-03)
+
+**WR-03 (2026-10-29) — `13 / 7 / 424`.** `handleResponse` throws `Object.assign(new Error(msg), { status: res.status })` — the message is unchanged, the status rides along, so `useExpertLinkTarget` can tell a refusal (4xx) from an outage. One expression; no new client function.
+
+Scan-list cell before 299-REVIEW WR-03 (replaced, moved verbatim): 12 / 6 / 422 (was `9 / 5 / 418`) | ⛔ **FIRES — 6 phases** | honoured by construction (**279-03**): one comment word ("Won't search"). ⛔ one client function per route |
+
+CLAUDE.md verdict cell before 299-REVIEW WR-03 (replaced, moved verbatim): | `frontend/src/lib/api/experts.ts` | 12 / 6 / 422 (was `9 / 5 / 418`) | last touch 279-03 (one comment word) |
+
+### `frontend/src/components/experts/catalog/useExpertLinkTarget.ts` — Phase 299 (299-REVIEW WR-03)
+
+**WR-03 (2026-10-29) — `2 / 1 / 71`.** The hook now RETURNS a boolean: the address's Expert was refused by `getExpert` with a 4xx. The original *"a refused read opens nothing"* is kept in the docblock as the corrected claim. A throw with no status (network) or a 5xx still opens and shows nothing (T-299-25). Still read only, once per id; a late answer for a left id is dropped.
+
+Scan-list cell before 299-REVIEW WR-03 (replaced, moved verbatim): 1 / 1 / 57 (was `0 / 0 / 0`) | no (young) | young (created 299-02). open an Expert's detail by id (D-04). ⛔ read only (list or one getExpert); fires once per id; a late answer for a left id dropped |
+
+### `frontend/src/components/experts/catalog/ExpertCatalogPage.tsx` — Phase 299 (299-REVIEW WR-03)
+
+**WR-03 (2026-10-29) — `12 / 7 / 394`.** A refused linked Expert renders the ONE can't-be-opened card over the catalog: the body is bound to `catalog` and the return wraps it in `CantBeOpened` (kind expert, the rebuilt `/app/experts/<id>` route) when `useExpertLinkTarget` says refused. One optional prop, `onLeaveLink` (the exit push); absent, the exit dismisses the card. No new read.
+
+Scan-list cell before 299-REVIEW WR-03 (replaced, moved verbatim): 11 / 7 / 376 (was `9 / 6 / 372`) | ⚠ **FIRES — 7 phases** | 299-02: one optional prop (openBundleId) + one useExpertLinkTarget call; the read fallback lives in the hook. Honoured by construction |
+
+CLAUDE.md verdict cell before 299-REVIEW WR-03 (replaced, moved verbatim): | `frontend/src/components/experts/catalog/ExpertCatalogPage.tsx` | 11 / 7 / 376 (was `9 / 6 / 372`) | 299-02: one prop + one hook call (useExpertLinkTarget) |
+
+### `frontend/src/components/layout/AppViewSwitch.tsx` — Phase 299 (299-REVIEW WR-03)
+
+**WR-03 (2026-10-29) — `7 / 2 / 600`.** One prop on the Experts arm's `ExpertCatalogPage`: `onLeaveLink={() => entityLink?.openRoute({ view: "experts" })}` — the refused-link card's exit is a push, so Back returns to it (D-15). Still owns no hook.
+
+Scan-list cell before 299-REVIEW WR-03 (replaced, moved verbatim): 6 / 2 / 598 (was `5 / 2 / 583`) | no (young) | 299-03 T3: prompt arm renders SwitchOrgPrompt; gate.notice above each region (a stable flex column in the chat main). ⛔ no hooks; one run comparison; fallback last |
+
+### `frontend/src/components/layout/LinkGate.tsx` — Phase 299 (299-REVIEW WR-04)
+
+**WR-04 (2026-10-29) — `3 / 1 / 366`.** The answer cache was "for the gate's life" on the premise that an answer cannot change; 298's Move to org and a gained/lost membership both change it. A move (`useOrgItemsVersion()`) or a change in the SET of membership ids (sorted key, so a fresh array of the same orgs asks nothing) drops every cached answer except the address on screen, which is marked stale and re-asked while it stays displayed (no holding flash over an open page). The first membership load is not a change. A Switch changes neither, so the after-Switch reuse stands.
+
+Scan-list cell before 299-REVIEW WR-04 (replaced, moved verbatim): 2 / 1 / 339 (was `1 / 1 / 209`) | no (young) | 299-03 T3: + Stay / Back to it / Switch (snapshot BEFORE switchOrg) / Switch back; stayed notice + after-switch line as gate.notice. ⛔ no router hook; streams store READ only |
+
+### `frontend/src/components/workflows/library/useWorkflowLinkTarget.ts` — Phase 299 (299-REVIEW WR-05)
+
+**WR-05 (2026-10-29) — `2 / 1 / 111`.** Three silent no-ops fixed: (1) the filters are cleared FIRST, once per id — a published workflow outside the selected project is absent from the server-narrowed rows until then; (2) `clearProjectFilter` → `clearFilters` (the page's clear-all: query, chips, project) and a new `shown` arg (the rendered rows) re-runs the search when the cleared filters bring the card back; (3) the once-per-id memory resets when the address names no workflow, so Back/Forward onto the same id runs again. The three claims are kept in the docblock as corrected. Still no write and no client import.
+
+Scan-list cell before 299-REVIEW WR-05 (replaced, moved verbatim): 1 / 1 / 90 (was `0 / 0 / 0`) | no (young) | young (created 299-02). open a draft / focus a published card by id (D-03). ⛔ no write on open; in LIBRARY_SUBTREE_PATHS; never imports the page; once per id |
+
+### `frontend/src/pages/WorkflowsPage.tsx` — Phase 299 (299-REVIEW WR-05)
+
+**WR-05 (2026-10-29) — `56 / 23 / 1403`.** The one `useWorkflowLinkTarget` call now passes `shown: visibleRows` and `clearFilters: clearAllFilters` (the existing clear-all callback, declared above it) instead of a project-only reset. One expression; no new state, effect or read.
+
+Scan-list cell before 299-REVIEW WR-05 (replaced, moved verbatim): 55 / 23 / 1403 (was `54 / 23 / 1402`) | ⚠ **FIRES** | 299-04: ONE ShareLinkMenu after the draft label (D-20); the fork notice renders forkFailed.sentence ?? forkFailedMessage(...) (S8). No state, no hook |
+
+CLAUDE.md verdict cell before 299-REVIEW WR-05 (replaced, moved verbatim): | `frontend/src/pages/WorkflowsPage.tsx` | 55 / 23 / 1403 (was `54 / 23 / 1402`) | 299-04: link on a draft; the fork notice shows the org refusal |
+
+## Phase 300 — rows added AT PLANNING (2026-10-29)
+
+Sixteen rows planted by the Phase 300 planner, because `node scripts/check-hot-file-ledger.cjs --files …` over the phase's planned `files_modified` printed `[no-row]` for each. Nine are EXISTING files that never had a row (two of them FIRE: `backend/app/api/org.py` at 3 phases, the ROADMAP-named one, and `frontend/src/components/admin/HealthSignals.tsx` at 4); seven are files Phase 300 creates, planted with `0 / 0 / 0` and re-derived by the plan that creates them in its creating commit (the 297 leaveGuard.ts / 299 precedent). Triples measured with the CLAUDE.md recipe on 2026-10-29 at HEAD `0cb5e0108`; six-digit quick buckets excluded.
+
+### `backend/app/api/org.py`
+
+**Added AT PLANNING (Phase 300, 2026-10-29) at `11 / 3 / 1024`** — measured, never copied. Added AT PLANNING 300: absent its ENTIRE LIFE at 3 phases. 300-03: invite delivery outcome stored + returned (D-11). ⛔ link-first: a mail failure never fails the invite
+
+### `backend/app/api/org.py` — 300-03 Task 2 (2026-10-29)
+
+**`12 / 4 / 1068` (was `11 / 3 / 1024`).** D-11, honoured by construction: both send sites now read `outcome = await run_in_threadpool(send_invite, …)` inside the EXISTING try (a raise becomes `SendOutcome("failed", "The email could not be sent.")`, logged by invitation id, never the address), then ONE module helper `_record_invite_delivery` maps sent / failed / suppressed → `sent` / `failed` / `not_configured`, writes `email_delivery` (+ `email_failed_at`, `email_failure` only when failed) with one UPDATE on a fresh `get_user_pg_connection` block in its own try/except, and returns the word. Both responses gain `"email_delivery"`; the list's column literal and each row gain it. ⛔ link-first: nothing here can fail the invite (pinned by `test_300_invite_outcome.py`, including a failing UPDATE). ⛔ `token_hash` still never selected.
+
+Scan-list cell as of 2026-10-29 (replaced by 300-03, moved verbatim): 11 / 3 / 1024 | ⚠ **FIRES** | Added AT PLANNING 300: absent its ENTIRE LIFE at 3 phases. 300-03: invite delivery outcome stored + returned (D-11). ⛔ link-first: a mail failure never fails the invite |
+
+CLAUDE.md verdict cell as of 2026-10-29 (replaced by 300-03, moved verbatim): | `backend/app/api/org.py` | 11 / 3 / 1024 | ⚠ absent while FIRING — row added at 300 planning · 300-03 invite outcome |
+
+### `backend/app/api/org.py` — 300-REVIEW fixes (2026-10-29)
+
+**`13 / 4 / 1071` (was `12 / 4 / 1068`).** IN-01: `"email_to_test_address": email_delivery == "sent" and outcome.redirected` added to the send and the resend responses. The stored `email_delivery` and migration 218's CHECK are unchanged.
+
+Scan-list cell as of 2026-10-29 (replaced by 300-REVIEW, moved verbatim): 12 / 4 / 1068 (was `11 / 3 / 1024`) | ⚠ **FIRES** | 300-03 (D-11): run_in_threadpool(send_invite) at both sites; one _record_invite_delivery stores + returns email_delivery. ⛔ link-first: a mail failure never fails the invite
+
+CLAUDE.md verdict cell as of 2026-10-29 (replaced by 300-REVIEW, moved verbatim): | `backend/app/api/org.py` | 12 / 4 / 1068 (was `11 / 3 / 1024`) | 300-03: invite email_delivery stored + returned (D-11) |
+
+### `backend/app/api/me_preferences.py`
+
+**Added AT PLANNING (Phase 300, 2026-10-29) at `1 / 1 / 120`** — measured, never copied. Added AT PLANNING 300. 300-05: notification-email keys on GET + one PUT route (D-09). ⛔ ungated, auth.uid() merge; default_model semantics byte-identical
+
+### `backend/app/services/connectors/smtp_adapter.py`
+
+**Added AT PLANNING (Phase 300, 2026-10-29) at `1 / 1 / 482`** — measured, never copied. Added AT PLANNING 300. 300-03: the body gains a rendered HTML alternative (D-24, D-32). ⛔ header guard + refused-recipient check stay; no CC/BCC/attachment
+
+### `backend/app/services/connectors/smtp_adapter.py` — 300-03 Task 3 (2026-10-29)
+
+**`2 / 2 / 594` (was `1 / 1 / 482`).** D-24 / D-32 (BUG-260828-06): one module-level `_MD = MarkdownIt("js-default", {"breaks": True, "html": False})` with image / table / strikethrough / hr disabled, a core rule capping headings at h3, and `validateLink` narrowed to http / https / mailto. The plain `set_content(body)` becomes `set_content(_markdown_to_text(body))` + ONE `add_alternative(_markdown_to_html(body), subtype="html")`; the text walk drops markers, keeps line breaks, writes links as `text (url)`; the HTML wrapper is UI-D15's (no Syrel chrome). The `INPUT_SCHEMA` comment and the body description say an HTML ALTERNATIVE OF THE BODY now exists; CC / BCC / attachments stay refused. ⛔ never the `commonmark` preset (it passes `<script>`); ⛔ the D-05 banned-token fence still holds (no transport named here). `test_190_smtp_header_injection.py`'s clean-send case now reads the body from the text/plain part (the message is multipart). Pinned by `test_300_email_step_honesty.py`; walked by `test_300_clean_image_imports.py`.
+
+Scan-list cell as of 2026-10-29 (replaced by 300-03, moved verbatim): 1 / 1 / 482 | no (1 phase) | Added AT PLANNING 300. 300-03: the body gains a rendered HTML alternative (D-24, D-32). ⛔ header guard + refused-recipient check stay; no CC/BCC/attachment |
+
+### `backend/app/services/health_probe.py`
+
+**Added AT PLANNING (Phase 300, 2026-10-29) at `1 / 1 / 116`** — measured, never copied. Added AT PLANNING 300. 300-04: probe_email (D-12). ⛔ off / held back is neutral, never down; a reason never names a recipient
+
+### `backend/app/services/run_model_resolution.py`
+
+**Added AT PLANNING (Phase 300, 2026-10-29) at `3 / 2 / 308`** — measured, never copied. Added AT PLANNING 300. 300-01: resolve_owner_run_model, the ONE FIX-05 helper (D-33). ⛔ owner settings loaded off the loop; (None, None) on failure
+
+#### 300-01 (FIX-05 / D-33, 2026-10-29)
+
+**`4 / 3 / 344` (was `3 / 2 / 308`) — crosses into G-5 at this commit.** `async def resolve_owner_run_model(owner_id) -> (model, provider)` beside `resolve_run_model`, in `__all__`: `run_in_threadpool(load_user_settings, str(owner_id))` (D-v2.5-01), then `resolve_workflow_ctx_model(s) or None` and `s.active_provider or None`; every failure logs the owner id only and returns `(None, None)`. Function-local imports (the `model_registry.py` discipline). ONE caller: `unattended_launch.launch_unattended_run` — no fourth copy of the resolution.
+
+Scan-list cell as of 2026-10-29 (replaced by 300-01, moved verbatim): 3 / 2 / 308 | no (reaches 3 in 300) | Added AT PLANNING 300. 300-01: resolve_owner_run_model, the ONE FIX-05 helper (D-33). ⛔ owner settings loaded off the loop; (None, None) on failure
+
+CLAUDE.md verdict cell: none before 300-01 (the file did not fire); row added by 300-01.
+
+### `backend/app/services/run_model_resolution.py` — 300-REVIEW fixes (2026-10-29)
+
+**`5 / 3 / 371` (was `4 / 3 / 344`).** IN-03 (D-17 "exactly as the in-app door does"): the helper applied neither the owner's per-user default (SEED-116) nor the model-derived provider. It now runs `apply_user_model_default(None, {"id": owner}, settings)`, then `resolve_run_model(body=_NoOverrideBody(), ...)` (a two-field pydantic model, because `_apply_fallback_to_request` rebuilds the body with `model_copy`), then `resolve_workflow_ctx_model` on the aligned settings. Still fail-soft to `(None, None)`. Smoke-driven against the local DB: a fresh owner resolves `('gpt-4o', 'openai')`.
+
+Scan-list cell as of 2026-10-29 (replaced by 300-REVIEW, moved verbatim): 4 / 3 / 344 (was `3 / 2 / 308`) | ⚠ **FIRES** | 300-01: resolve_owner_run_model, the ONE FIX-05 helper (D-33). ⛔ owner settings loaded off the loop; (None, None) on failure
+
+CLAUDE.md verdict cell as of 2026-10-29 (replaced by 300-REVIEW, moved verbatim): | `backend/app/services/run_model_resolution.py` | 4 / 3 / 344 (was `3 / 2 / 308`) | ⚠ now FIRES (300) · 300-01: resolve_owner_run_model (D-33) |
+
+### `frontend/src/components/admin/HealthSignals.tsx`
+
+**Added AT PLANNING (Phase 300, 2026-10-29) at `5 / 4 / 316`** — measured, never copied. Added AT PLANNING 300: absent at 4 phases. 300-04: one Email tile (D-12, UI-D13). ⛔ pure leaf; Off / Held back / Test mode never red
+
+### `frontend/src/components/org/InvitationsTab.tsx`
+
+**Added AT PLANNING (Phase 300, 2026-10-29) at `3 / 2 / 290`** — measured, never copied. Added AT PLANNING 300. 300-05: Email not sent chip + resend failure line (D-11). ⛔ server truth on re-fetch, no optimistic flip
+
+### `frontend/src/components/org/InviteMemberDialog.tsx`
+
+**Added AT PLANNING (Phase 300, 2026-10-29) at `3 / 2 / 281`** — measured, never copied. Added AT PLANNING 300. 300-05: three result arms (UI-D12). ⛔ never names the provider or an error code; Copy link focused on the failed arm
+
+### `frontend/src/lib/api/schedules.ts`
+
+**Added AT PLANNING (Phase 300, 2026-10-29) at `2 / 2 / 129`** — measured, never copied. Added AT PLANNING 300. 300-01: reads the structured missing_required refusal (D-14). ⛔ server sentences only; a code routes the line, never words
+
+#### 300-01 (D-14, 2026-10-29)
+
+**`3 / 3 / 166` (was `2 / 2 / 129`) — crosses into G-5 at this commit.** `export class ScheduleRefusalError extends ApiError { code; missing }`; a private `scheduleFailure(res)` builds it when `readScheduleFailure` returns the new object arm (`detail` an object with string `code` + `message`), else today's `ApiError`. The string-detail and array-detail arms are byte-identical, the entitlement arm still runs first, and the three throwing sites are one call each. ⛔ NOT re-exported through `lib/api.ts` (the 196-08 mock-factory measurement); the modal reads `code` off the error.
+
+Scan-list cell as of 2026-10-29 (replaced by 300-01, moved verbatim): 2 / 2 / 129 | no (reaches 3 in 300) | Added AT PLANNING 300. 300-01: reads the structured missing_required refusal (D-14). ⛔ server sentences only; a code routes the line, never words
+
+CLAUDE.md verdict cell: none before 300-01 (the file did not fire); row added by 300-01.
+
+### `backend/app/db/notifications.py`
+
+**Added AT PLANNING (Phase 300, 2026-10-29) with `0 / 0 / 0`** — the file does not exist yet; plan `300-04` creates it and re-derives the triple in its creating commit. young (planned 300-04). Outbox claim (SKIP LOCKED), still-waiting, opt-out, outcome (D-12, D-13, D-20). ⛔ never selects prompt text; state flip inside the claim txn
+
+#### Created 300-04 (D-12, D-13, D-20, D-31, 2026-10-29)
+
+**`1 / 1 / 326` (created).** The asyncpg half of the run-waiting outbox: `claim_due_deliveries` (`FOR UPDATE OF d SKIP LOCKED`, then `'sending'` + `attempts + 1` + `claimed_at` + the payload rendered ONCE from five facts, all inside ONE transaction), `reclaim_stale_sending` (lease 600 s; Resend → `'retry'` due now, SMTP / none / a switched provider / out of attempts → `'failed'` "Interrupted while sending; not retried to avoid a duplicate."), `still_waiting` (one `SELECT EXISTS`: notice open, run `active`/`paused`, an unanswered harness prompt for the run), `email_opted_in` (`preferences.notification_email_enabled`, on unless exactly false), `recipient_email`, the swallowing `record_delivery_outcome` (writes only a `'sending'` row) and `latest_delivery_facts` (the Control Room tile). Binding invariants: ⛔ the send happens OUTSIDE the claim transaction (never a row lock across HTTP/SMTP); ⛔ no SQL constant names a body column or a prompt JSON key, and `tool_calls` is read only for `run_id` / `tool_call_id` (scanned by `test_300_notification_drainer.py` over every `*_SQL`); ⛔ at most `MAX_ATTEMPTS = 3`; ⛔ SMTP at-most-once. Exactly-once driven live by `tests/integration/test_300_drainer_once_live.py`.
+
+Scan-list cell as of 2026-10-29 (replaced by 300-04, moved verbatim): 0 / 0 / 0 | no (planned 300-04) | young (planned 300-04). Outbox claim (SKIP LOCKED), still-waiting, opt-out, outcome (D-12, D-13, D-20). ⛔ never selects prompt text; state flip inside the claim txn |
+
+### `backend/app/services/notification_drainer.py`
+
+**Added AT PLANNING (Phase 300, 2026-10-29) with `0 / 0 / 0`** — the file does not exist yet; plan `300-04` creates it and re-derives the triple in its creating commit. young (planned 300-04). Per-worker outbox drainer, SchedulerService shape (D-20). ⛔ send outside the claim txn; at most 3 attempts; SMTP at-most-once
+
+#### Created 300-04 (D-09, D-12, D-13, D-20, D-31, 2026-10-29)
+
+**`1 / 1 / 208` (created).** `NotificationDrainer(pool, *, send=send_email, poll_interval_seconds=20, max_claims_per_tick=20, lease_seconds=600)` in `SchedulerService`'s shape: `tick(now=None)` = reclaim stale claims, claim due rows (render callback `render_delivery` wraps 300-03's `render_run_waiting`, five facts only), then per row in its own `try`: still waiting → else `skipped_answered`; opted in → else `skipped_opted_out` (notice untouched); an address → else `failed`; then `run_in_threadpool(send, msg, idempotency_key=f"run-waiting/{id}")` and the D-12 mapping (sent / suppressed / `retry` at +60 s then +300 s while retryable and attempts < 3 / failed). A row that raises before its send is `retry` (nothing left the process). `_loop` waits on the stop `Event`; `start` / `stop` idempotent; counters `ticks` / `sent` / `skipped` / `failed`. Binding invariants: ⛔ the duplicate-sending guarantee is NOT here (it is `db/notifications.py`); ⛔ the send is never inside the claim transaction; ⛔ logs carry delivery ids and outcome words only — never an address, subject or body; ⛔ the idempotency key is built exactly once. Started in `main.py`'s lifespan only under `not _setup_mode and RUN_BOOT_SWEEPS` (Task 2).
+
+Scan-list cell as of 2026-10-29 (replaced by 300-04, moved verbatim): 0 / 0 / 0 | no (planned 300-04) | young (planned 300-04). Per-worker outbox drainer, SchedulerService shape (D-20). ⛔ send outside the claim txn; at most 3 attempts; SMTP at-most-once |
+
+### `backend/app/main.py` — 300-04 (D-20, 2026-10-29)
+
+**`98 / 72 / 1020` (was `97 / 71 / 993`).** ONE start block after the scheduler's — `_drainer = NotificationDrainer(await get_pg_pool())`, `.start()`, parked on `app_instance.state.notification_drainer` (``None`` when not started), inside a `try/except` that logs and continues — gated on `if not _setup_mode and RUN_BOOT_SWEEPS:`, the expression the three run sweeps already use (NO new env var, no conftest change, no deploy-artifact owed). ONE stop block beside the scheduler's stop, inside its own `try`. Multi-worker audit (D-PRD-12): the drainer holds no cross-worker state — exactly-once is the database's (`db/notifications.py`). ⛔ a test lifespan never drains the shared local outbox (`test_300_drainer_wiring.py` drives both flag values through the real lifespan). Honoured by construction.
+
+Scan-list cell as of 2026-10-29 (replaced by 300-04, moved verbatim): 97 / 71 / 993 (was `96 / 70 / 992`) | ⚠ **FIRES** | 299-01: ONE `app.include_router(links.router)` + one name in the api import list. Honoured by construction. ⛔ see section |
+
+CLAUDE.md verdict cell as of 2026-10-29 (replaced by 300-04, moved verbatim): | `backend/app/main.py` | 97 / 71 / 993 (was `96 / 70 / 992`) | 299-01: one include_router(links.router) + its import token · ⛔ |
+
+### `backend/app/services/health_probe.py` — 300-04 (D-12, 2026-10-29)
+
+**`2 / 2 / 197` (was `1 / 1 / 116`).** `async probe_email()` beside the three shipped probes, in the `probe_dependencies` gather under the key `email` (the three shipped keys byte-identical) and in `__all__`. Contract: `{state: up|down|off, mode: off|held_back|test|live, provider, last_sent_at, last_failure_at, last_failure_reason, latency_ms: null}`. Provider `none` → off; not production and no Settings test address → `held_back` (state off); a test address → `test`; production → `live`; `down` only when the newest failed delivery is newer than the newest sent one (or the record could not be read — one fixed sentence, never the raw error); the facts read is bounded by `_PROBE_TIMEOUT_S`. Module-level imports of `configured_provider`, `is_production_environment`, `load_app_settings` and `latest_delivery_facts` (the probe's patch path). `admin.py` NOT edited. ⛔ never `down` for a deliberate config; ⛔ never carries a recipient, subject or link.
+
+Scan-list cell as of 2026-10-29 (replaced by 300-04, moved verbatim): 1 / 1 / 116 | no (1 phase) | Added AT PLANNING 300. 300-04: probe_email (D-12). ⛔ off / held back is neutral, never down; a reason never names a recipient |
+
+CLAUDE.md verdict cell: none (the file does not fire).
+
+### `frontend/src/components/admin/HealthSignals.tsx` — 300-04 (D-12 / UI-D13, 2026-10-29)
+
+**`6 / 5 / 407` (was `5 / 4 / 316`).** ONE `DEP_ORDER` entry `{key: "email", label: "Email", sub: "email delivery"}` (the key union widened), a local `EmailProbe` type read off `dependencies` (no `lib/api/tuner.ts` edit), and `emailView` — the one home of the tile's UI-SPEC S5 words: — / Off / Held back / Test mode / Ready / Sending / Last send failed, provider words "Resend" / "your mail server", absolute `toLocaleString()` times, the reason `break-words` and never truncated. The Email tile has S5's own scale (`px-4 py-4`, `mb-2 gap-2`, reveal `mt-2 text-[11px]`, ⌥ `dependencies.email · {provider}`); the dependency grid is `sm:grid-cols-2 lg:grid-cols-4`. The three shipped tiles render exactly as before (`HealthSignals.a11y.test.tsx` green). ⛔ pure leaf; ⛔ only "Last send failed" wears `bg-destructive`.
+
+Scan-list cell as of 2026-10-29 (replaced by 300-04, moved verbatim): 5 / 4 / 316 | ⚠ **FIRES** | Added AT PLANNING 300: absent at 4 phases. 300-04: one Email tile (D-12, UI-D13). ⛔ pure leaf; Off / Held back / Test mode never red |
+
+CLAUDE.md verdict cell as of 2026-10-29 (replaced by 300-04, moved verbatim): | `frontend/src/components/admin/HealthSignals.tsx` | 5 / 4 / 316 | ⚠ absent while FIRING — row added at 300 planning · 300-04 Email tile |
+
+### `frontend/src/components/admin/HealthSignals.tsx` — 300-REVIEW fixes (2026-10-29)
+
+**`7 / 5 / 415` (was `6 / 5 / 407`).** IN-04: one optional field and one `emailView` arm. A new tile state beyond UI-SPEC S5's table (Claude's-discretion words): value "Can't send", sub-line `via {Provider}: {sentence}`, `bg-destructive` — a transport that cannot send is a real failure, not "Ready".
+
+Scan-list cell as of 2026-10-29 (replaced by 300-REVIEW, moved verbatim): 6 / 5 / 407 (was `5 / 4 / 316`) | ⚠ **FIRES** | 300-04: one Email tile (D-12, UI-D13), words in emailView; dep row sm:2 lg:4. ⛔ pure leaf; Off / Held back / Test mode never red
+
+CLAUDE.md verdict cell as of 2026-10-29 (replaced by 300-REVIEW, moved verbatim): | `frontend/src/components/admin/HealthSignals.tsx` | 6 / 5 / 407 (was `5 / 4 / 316`) | 300-04: one Email tile (D-12, UI-D13); Off / Held back never red |
+
+### `scripts/vitest-count-gate.cjs` — 300-04 (2026-10-29)
+
+**`396 / 83 / 6868` (was `395 / 83 / 6865`).** ONE BASELINE pin added beside the a11y suite's — `HealthSignals.email.test.tsx` 11 — and its FILE-LEVEL TARGET beside `HealthSignals.a11y.test.tsx` (the admin tests are named one by one, never a directory entry). None raised, none lowered.
+
+Scan-list cell as of 2026-10-29 (replaced by 300-04, moved verbatim): 395 / 83 / 6865 (was `380 / 81 / 6808`) | ⚠ **FIRES** | 300-01: 2 BASELINE pins added (scheduleOutcomeVocabulary 16, schedulesRefusal 4 + its FILE-LEVEL TARGET), WorkflowScheduleModal 9→29 raised, none lowered |
+
+CLAUDE.md verdict cell as of 2026-10-29 (replaced by 300-04, moved verbatim): | `scripts/vitest-count-gate.cjs` | 395 / 83 / 6865 (was `380 / 81 / 6808`) | 300-01: 2 pins added, 1 raised (ScheduleModal 9→29), none lowered |
+
+### `backend/app/services/run_waiting_email.py`
+
+**Added AT PLANNING (Phase 300, 2026-10-29) with `0 / 0 / 0`** — the file does not exist yet; plan `300-03` creates it and re-derives the triple in its creating commit. young (planned 300-03). Pure run-waiting renderer + duration words (NOTE-03, D-02..D-06). ⛔ never accepts prompt text; subject control chars stripped
+
+### `backend/app/services/run_waiting_email.py` — 300-03 Task 2 (2026-10-29)
+
+**`1 / 1 / 115` (created).** Pure renderer: `duration_words(seconds)` (UI-D7 floor words, the ONE home S2's delay words reuse), `RenderedEmail`, and `render_run_waiting(*, workflow_name, org_name, waited_seconds, run_id, kind)` — keyword-only, exactly those five inputs (signature pinned). Subject `{name} is waiting on you` through `one_line`, clipped at 120; HTML on `shell_html` with the footer block, every value `html.escape`d (attributes `quote=True`); text alternative is UI-SPEC S1's seven-line layout verbatim. Links are `/app/runs/<id>` and `/app/settings` on `primary_frontend_origin()`. ⛔ never accepts prompt text; ⛔ no token, no query string, no expiry. Pinned by `test_300_run_waiting_email.py`; walked by `test_300_clean_image_imports.py`.
+
+Scan-list cell as of 2026-10-29 (replaced by 300-03, moved verbatim): 0 / 0 / 0 | no (planned 300-03) | young (planned 300-03). Pure run-waiting renderer + duration words (NOTE-03, D-02..D-06). ⛔ never accepts prompt text; subject control chars stripped |
+
+### `frontend/src/components/workflows/scheduleOutcomeVocabulary.ts`
+
+**Added AT PLANNING (Phase 300, 2026-10-29) with `0 / 0 / 0`** — the file does not exist yet; plan `300-01` creates it and re-derives the triple in its creating commit. young (planned 300-01). last_status → one sentence (D-15, D-26). ⛔ zero-import leaf; no raw status token reaches the screen
+
+#### 300-01 — created (2026-10-29)
+
+**`1 / 1 / 67`** in its creating commit. `scheduleOutcomeLine(lastStatus) -> {text, tone} | null`: six known tokens (UI-SPEC §S6a + Claude's-discretion words for `cancelled` and `cadence_error`, recorded in the docblock), a value containing a space reads "Didn't run — {sentence}" with a full stop added when missing, any other token reads the neutral sentence, absent reads `null`. Zero imports, asserted over its `?raw` text with a positive control.
+
+Scan-list cell as of 2026-10-29 (replaced by 300-01, moved verbatim): 0 / 0 / 0 | no (planned 300-01) | young (planned 300-01). last_status → one sentence (D-15, D-26). ⛔ zero-import leaf; no raw status token reaches the screen
+
+### `frontend/src/components/settings/EmailSettings.tsx`
+
+**Added AT PLANNING (Phase 300, 2026-10-29) with `0 / 0 / 0`** — the file does not exist yet; plan `300-05` creates it and re-derives the triple in its creating commit. young (planned 300-05). Operator Email card, ApiKeyLimits shape (D-07, D-08, D-10). ⛔ changes()/adopt() handle, no own Save; never sends a cleared delay
+
+### `frontend/src/components/settings/EmailNotificationPreference.tsx`
+
+**Added AT PLANNING (Phase 300, 2026-10-29) with `0 / 0 / 0`** — the file does not exist yet; plan `300-05` creates it and re-derives the triple in its creating commit. young (planned 300-05). Member switch (D-09). ⛔ calls only ungated /me/preferences; never shows On before the read answers
+
+### `frontend/src/components/org/inviteDeliveryCopy.ts`
+
+**Added AT PLANNING (Phase 300, 2026-10-29) with `0 / 0 / 0`** — the file does not exist yet; plan `300-05` creates it and re-derives the triple in its creating commit. young (planned 300-05). Invite delivery sentences (D-11, UI-D12). ⛔ zero-import leaf; D-11 sentence verbatim
+
+### `backend/app/api/settings.py` — 300-05 Task 1 (2026-10-29)
+
+**`48 / 26 / 1398` (was `47 / 25 / 1301`).** Honoured by construction — allow-list, read model, update body, response mapping and the bounded/string writes only, the shape 292.1 and 293 used. `FullSettingsResponse` gains `notification_email_delay_seconds`, `email_from_address`, `email_from_name`, `email_dev_redirect_address` and a READ-ONLY `email_provider: Literal["none","resend","smtp"]` from `email_provider.configured_provider()` (the env's NAME, never its secret; `SettingsUpdate` has no such field, so a PUT naming it is ignored). The delay is bounded 60..3600 through `_range_refusal_detail` (label "Wait before emailing (seconds)") and joins `_BOUNDED_SETTINGS_FIELDS`; migration 218's `app_settings_notification_email_delay_seconds_bound` is the backstop, so `test_242_settings_bounds_have_schema_constraints.py`'s `EXPECTED_BOUNDED_FIELDS` gains it. The two addresses go through one module helper `_is_single_email_address` that mirrors `smtp_adapter._validated_envelope_recipient` (no whitespace or control character, no second address, `parseaddr` must agree with the literal input, `local@domain` with a dot); anything else is 400 "That isn't an email address.". An empty address is stored as `""`, which every reader treats as NULL (`getattr(...) or fallback`) — `save_app_settings` skips `None` by design, so a `None` here would never clear the column. The sender name is refused (never stripped) outside 1-60 characters or with any control character. ⚠ `test_settings.py`'s `SimpleNamespace` stub gains the four fields, per that stub's own rule (the response REQUIRES them).
+
+Scan-list cell as of 2026-10-29 (replaced by 300-05 Task 1, moved verbatim): 47 / 25 / 1301 (was `46 / 24 / 1250`) | ⚠ **FIRES** | 292.1-02: two bounded writes (2..50) via _range_refusal_detail + allow-list +2 (+51 −0). ⛔ never a retyped id list; GET never echoes a key · 293 touch: see §Phase 293 close |
+
+CLAUDE.md verdict cell as of 2026-10-29 (replaced by 300-05 Task 1, moved verbatim): | `backend/app/api/settings.py` | 47 / 25 / 1301 (was `46 / 24 / 1250`) | 293-01: two bounded per-key limit writes; allow-list +2 |
+
+### `backend/app/api/me_preferences.py` — 300-05 Task 1 (2026-10-29)
+
+**`2 / 2 / 190` (was `1 / 1 / 120`).** `GET /me/preferences` gains `notification_email_enabled` (read by `load_user_notification_email_enabled`, the same pool + explicit `WHERE user_id = $1` read `load_user_model_default` uses; only a stored `false` is off — the drainer's `coalesce(..., 'true') <> 'false'` rule — and a read blip shows on), `notification_email_delay_words` (`run_waiting_email.duration_words` of the app delay, so the client never formats seconds) and `email_configured` (`configured_provider() != "none"`). ONE new route `PUT /me/preferences/notification-email` with body `NotificationEmailBody(enabled: bool)` (no user id): ONE RLS-scoped `INSERT … ON CONFLICT … || $1::jsonb` on `get_user_pg_connection`, then the fresh GET view. No `require_visible` — every member reaches their own row. ⛔ `put_my_preferences` is untouched: `test_300_me_preferences_email.py` pins its `inspect.getsource` sha256 to the plan base, because a member's switch saved through it would clear their default model.
+
+Scan-list cell as of 2026-10-29 (replaced by 300-05 Task 1, moved verbatim): 1 / 1 / 120 | no (1 phase) | Added AT PLANNING 300. 300-05: notification-email keys on GET + one PUT route (D-09). ⛔ ungated, auth.uid() merge; default_model semantics byte-identical |
+
+CLAUDE.md verdict cell: none (the file does not fire).
+
+### `frontend/src/pages/SettingsPage.tsx` — 300-05 Task 2 (2026-10-29)
+
+**`63 / 31 / 1698` (was `62 / 30 / 1690`).** Honoured by construction — the 293-03 `ApiKeyLimits` shape, exactly: ONE import (`EmailSettings`, `EmailSettingsHandle`), ONE `useRef<EmailSettingsHandle>(null)`, ONE `...emailSettingsRef.current?.changes()` in `handleSaveIntegrations`'s body after the ApiKeyLimits spread, ONE `emailSettingsRef.current?.adopt(updated)` after the ApiKeyLimits adopt, and ONE `<EmailSettings ref={emailSettingsRef} />` directly after `<ApiKeyLimits …/>`, before the Save Integrations button. `useState(` count 49 → 49 (pinned by both `ApiKeyLimits.test.tsx` and `EmailSettings.test.tsx`); `grep -c emailSettingsRef` = 4. ⛔ Still owed: the page's state split (it is G-5 FIRING); every new settings card lands as a leaf with a handle, never as page state.
+
+Scan-list cell as of 2026-10-29 (replaced by 300-05 Task 2, moved verbatim): 62 / 30 / 1690 (was `60 / 29 / 1674`) | ⚠ **FIRES** | 293 touch: see §Phase 293 close (previous cell moved there verbatim) |
+
+CLAUDE.md verdict cell as of 2026-10-29 (replaced by 300-05 Task 2, moved verbatim): | `frontend/src/pages/SettingsPage.tsx` | 62 / 30 / 1690 (was `61 / 30 / 1681`) | 293-03: one ref + changes() spread + adopt(); useState 49 → 49 · ⛔ |
+
+### `frontend/src/pages/SettingsPage.tsx` — 300-REVIEW fixes (2026-10-29)
+
+**`64 / 31 / 1704` (was `63 / 31 / 1698`).** WR-05: an invalid address was silently left out of the PUT, the save said "Saved" and `adopt()` wiped the typed value. Six lines at the top of `handleSaveIntegrations`: the card's veto sentence goes to the existing error home and the save returns before `setSavingIntegrations(true)`. Pinned by `EmailSettings.test.tsx`'s wiring test (`emailSettingsRef` x5).
+
+Scan-list cell as of 2026-10-29 (replaced by 300-REVIEW, moved verbatim): 63 / 31 / 1698 (was `62 / 30 / 1690`) | ⚠ **FIRES** | 300-05: one EmailSettings import + ref + changes() spread + adopt() + mount after ApiKeyLimits; useState 49 → 49. Honoured by construction · 293 touch: see §Phase 293 close
+
+CLAUDE.md verdict cell as of 2026-10-29 (replaced by 300-REVIEW, moved verbatim): | `frontend/src/pages/SettingsPage.tsx` | 63 / 31 / 1698 (was `62 / 30 / 1690`) | 300-05: one EmailSettings ref/spread/adopt/mount · ⛔ |
+
+### `frontend/src/lib/api/skills.ts` — 300-05 Task 2 (2026-10-29)
+
+**`10 / 7 / 779` (was `9 / 6 / 767`).** Type-only, additive: `notification_email_delay_seconds?`, `email_from_address?`, `email_from_name?`, `email_dev_redirect_address?` on both `FullAppSettings` and `SettingsUpdate`; `email_provider?: "none" | "resend" | "smtp"` on `FullAppSettings` ONLY — the env's provider name is never writable (D-08), so `SettingsUpdate` cannot carry it. Every field optional: an older backend renders the card on its defaults.
+
+Scan-list cell as of 2026-10-29 (replaced by 300-05 Task 2, moved verbatim): 9 / 6 / 767 (was `8 / 5 / 761`) | ⚠ **FIRES** | 292.1-02: two optional fields on FullAppSettings + SettingsUpdate (+6 −0), type-only. Holds FullAppSettings, not only skills · 293 touch: see §Phase 293 close |
+
+CLAUDE.md verdict cell as of 2026-10-29 (replaced by 300-05 Task 2, moved verbatim): | `frontend/src/lib/api/skills.ts` | 9 / 6 / 767 (was `8 / 5 / 761`) | 293-03: two optional limit fields on FullAppSettings + SettingsUpdate |
+
+### `frontend/src/lib/api/settings.ts` — 300-05 Task 2 (2026-10-29)
+
+**`11 / 5 / 529` (was `9 / 3 / 464` in the scan list — ⚠ STALE: measured `10 / 4 / 464` at the 300-05 base, so the file was already FIRING with no CLAUDE.md row).** Two functions copying `getModelDefault` / `setModelDefault` (getAuthHeaders, `cache: "no-store"` on the GET, `ApiError` with a sentence): `getNotificationEmailPreference()` reads `GET /me/preferences`, `setNotificationEmailPreference(enabled)` PUTs `/me/preferences/notification-email`. One private unwrap `notificationEmailFrom` with defensive `?? true` for `enabled` and `emailConfigured` (an older backend never reads as "not set up") and `?? null` for `delayWords`. ⛔ The switch NEVER saves through `setModelDefault`'s `PUT /me/preferences`: that route reads a missing `default_model` as "clear it". ⚠ Deliberately NOT re-exported from the `lib/api.ts` barrel (215 commits): `EmailNotificationPreference.tsx` imports from this module directly.
+
+Scan-list cell as of 2026-10-29 (replaced by 300-05 Task 2, moved verbatim): 9 / 3 / 464 (was `7 / 3 / 460`) | no (2 phases) | ⚠ **absent for its ENTIRE LIFE — row added 249-02** at its third touch. The chat picker's wire type; ⛔ every new field is OPTIONAL, so an older backend renders exactly as before |
+
+CLAUDE.md verdict cell: none before 300-05 Task 2 (row added by 300-05 Task 2).
+
+### `frontend/src/components/settings/PreferencesSection.tsx` — 300-05 Task 2 (2026-10-29)
+
+**`2 / 2 / 43` (was `1 / 1 / 39`).** One import and one mount, `<EmailNotificationPreference />`, after `<ModelDefaultPreference />` (UI-SPEC S2: the third block; the two shipped blocks are not reordered or re-styled). The D-07 invariant holds: the new leaf calls only the ungated `/me/preferences` read and its own `/me/preferences/notification-email` write (recorded-URL test in `EmailNotificationPreference.test.tsx`).
+
+Scan-list cell as of 2026-10-29 (replaced by 300-05 Task 2, moved verbatim): 1 / 1 / 39 (was `0 / 0 / 0`) | no (1 phase) | young (created 283-02). Preferences tab ("6") body: technical-names toggle + default model, moved verbatim from tab "0". ⛔ calls no gated endpoint |
+
+CLAUDE.md verdict cell: none (the file does not fire).
+
+### `frontend/src/components/settings/EmailSettings.tsx` — 300-05 Task 2 (created) (2026-10-29)
+
+**`1 / 1 / 324` (created).** `ApiKeyLimits` copied file-for-file: WHY-A-LEAF docblock, `EmailSettingsHandle { changes, adopt }`, alive ref + `loadState`, changed-fields-only `changes()` (`{}` until loaded), clamp-on-blur delay (60..3600; a cleared field is never sent), failure row with "Retry loading email settings". "Sent through" is read-only text from the GET's `email_provider` (Resend / Your mail server (SMTP) / Nothing yet…). Addresses are `type="email"`, empty or one `local@domain`, an invalid one shows "That isn't an email address." (role=alert, after blur) and is not sent; the name restores the loaded value when cleared. `durationWords` is a local TWIN of `run_waiting_email.duration_words`, pinned by the `DURATION_CASES` literal that both `EmailSettings.test.tsx` and `test_300_settings_email_knobs.py` read.
+
+Scan-list cell as of 2026-10-29 (replaced by 300-05 Task 2 (created), moved verbatim): 0 / 0 / 0 | no (planned 300-05) | young (planned 300-05). Operator Email card, ApiKeyLimits shape (D-07, D-08, D-10). ⛔ changes()/adopt() handle, no own Save; never sends a cleared delay |
+
+CLAUDE.md verdict cell: none (the file does not fire).
+
+### `frontend/src/components/settings/EmailNotificationPreference.tsx` — 300-05 Task 2 (created) (2026-10-29)
+
+**`1 / 1 / 155` (created).** Self-fetching, save-on-flip, server-derived (the `ModelDefaultPreference` pattern). A `<button type="button" role="switch">` labelled by the title and described by the description (`useId`), disabled + `aria-busy` while loading or saving, with the track look COPIED from `SettingsPage.tsx`'s unexported `Toggle` (UI-D1). No "On"/"Off" word until the read answers; a failed PUT keeps the last server value and shows "Couldn't save this. Try again."; a failed GET shows "Couldn't load this setting." + "Retry loading"; `email_configured: false` adds the role=status line. Delay words are the server's (`?? "a short wait"`, UI-D8). Imports `@/lib/api/settings` directly, not the barrel.
+
+Scan-list cell as of 2026-10-29 (replaced by 300-05 Task 2 (created), moved verbatim): 0 / 0 / 0 | no (planned 300-05) | young (planned 300-05). Member switch (D-09). ⛔ calls only ungated /me/preferences; never shows On before the read answers |
+
+CLAUDE.md verdict cell: none (the file does not fire).
+
+### `scripts/vitest-count-gate.cjs` — 300-05 Task 2 (2026-10-29)
+
+**`397 / 83 / 6873` (was `396 / 83 / 6868`).** TWO BASELINE pins beside `ApiKeyLimits.test.tsx`'s — `EmailSettings.test.tsx` 28 and `EmailNotificationPreference.test.tsx` 17 (counts read from the vitest JSON reporter, not estimated) — and their FILE-LEVEL TARGETS beside ApiKeyLimits' (no `src/components/settings` directory entry). None raised, none lowered.
+
+Scan-list cell as of 2026-10-29 (replaced by 300-05 Task 2, moved verbatim): 396 / 83 / 6868 (was `395 / 83 / 6865`) | ⚠ **FIRES** | 300-04: 1 BASELINE pin added (HealthSignals.email 11) + its FILE-LEVEL TARGET beside the a11y suite, none lowered |
+
+CLAUDE.md verdict cell as of 2026-10-29 (replaced by 300-05 Task 2, moved verbatim): | `scripts/vitest-count-gate.cjs` | 396 / 83 / 6868 (was `395 / 83 / 6865`) | 300-04: 1 FILE-LEVEL pin added (HealthSignals.email 11), none lowered |
+
+### `frontend/src/lib/api/org.ts` — 300-05 Task 3 (2026-10-29)
+
+**`12 / 9 / 646` (was `11 / 8 / 629`).** Additive wire types: `InviteEmailDelivery = "sent" | "failed" | "not_configured"`; `Invitation.email_delivery?: … | null` (the list row's latest attempt); `SendInvitationResult.email_delivery` and `resendInvitation`'s `{link, email_delivery}`. ONE private `deliveryFrom(raw)` unwrap: anything but the three values — including an older backend that omits the field — reads `not_configured`, so the inviter is never told about a failure they did not have. `OrgAdminShell.tsx`'s `handleResend` still destructures `{ link }` and is untouched: the list's resend line reads the RE-FETCHED row, not the resend result. ⚠ The fourth wire-type change in this module; the contract is the backend's 300-03 invite wire, stated verbatim in 300-05-PLAN `<interfaces>`.
+
+Scan-list cell as of 2026-10-29 (replaced by 300-05 Task 3, moved verbatim): 11 / 8 / 629 | ⚠ **FIRES** | ⚠ absent for its ENTIRE LIFE at **4 phases** — row added 221, then STALE at `6 / 4 / 562`. **NOT covered by `lib/api.ts`: that row is the BARREL.** ⚠ THIRD wire-type drift here. See §239-03 |
+
+CLAUDE.md verdict cell as of 2026-10-29 (replaced by 300-05 Task 3, moved verbatim): | `frontend/src/lib/api/org.ts` | 11 / 8 / 629 | ⚠ absent its ENTIRE LIFE · THIRD wire-type drift (239) |
+
+### `frontend/src/lib/api/org.ts` — 300-REVIEW fixes (2026-10-29)
+
+**`13 / 9 / 650` (was `12 / 9 / 646`).** IN-01: one field on `SendInvitationResult` and one line in `sendInvitation`'s return (`body.email_to_test_address === true`). `resendInvitation` is unchanged (its list UI never names the recipient).
+
+Scan-list cell as of 2026-10-29 (replaced by 300-REVIEW, moved verbatim): 12 / 9 / 646 (was `11 / 8 / 629`) | ⚠ **FIRES** | 300-05: email_delivery on Invitation (optional) + SendInvitationResult + the resend result, one private `deliveryFrom` unwrap (older backend → not_configured). NOT the barrel. See §239-03
+
+CLAUDE.md verdict cell as of 2026-10-29 (replaced by 300-REVIEW, moved verbatim): | `frontend/src/lib/api/org.ts` | 12 / 9 / 646 (was `11 / 8 / 629`) | 300-05: email_delivery on invite results + rows (D-11) |
+
+### `frontend/src/components/org/InviteMemberDialog.tsx` — 300-05 Task 3 (2026-10-29)
+
+**`4 / 3 / 316` (was `3 / 2 / 281`) — crosses into G-5 at this commit.** Inside the shipped link-first panel, ONE `delivery` state (reset on open) set from `sendInvitation`'s `email_delivery` (`?? "not_configured"`), and the title from `deliveryTitle(delivery)`. Arms: `sent` → "We emailed an invitation to **{email}**. You can also copy the link and send it yourself." (`font-semibold`); `failed` → a NEUTRAL `role="status"` box (`border-border bg-muted/40`, `MailX` aria-hidden) with the D-11 sentence, and one effect focusing the shipped Copy link button through a ref; `not_configured` → the shipped body byte-identical. The expiry line stays on all three. ⛔ The docblock's "reserved operator warning tint is never used" rule holds (UI-D2: no amber in the org zone). ⛔ Next touch should take the result panel out as a leaf: the file now carries form + three result arms.
+
+Scan-list cell as of 2026-10-29 (replaced by 300-05 Task 3, moved verbatim): 3 / 2 / 281 | no (reaches 3 in 300) | Added AT PLANNING 300. 300-05: three result arms (UI-D12). ⛔ never names the provider or an error code; Copy link focused on the failed arm |
+
+CLAUDE.md verdict cell: none before 300-05 Task 3 (row added by 300-05 Task 3).
+
+### `frontend/src/components/org/InviteMemberDialog.tsx` — 300-REVIEW fixes (2026-10-29)
+
+**`5 / 3 / 326` (was `4 / 3 / 316`).** IN-01: outside production a `sent` email went to the Settings test address, but the dialog bolded the invitee as its recipient. One state + one arm: "Outside production, the email went to the test address set in Settings, not to {invitee}. Copy the link and send it yourself." (Claude's-discretion words, in `inviteDeliveryCopy.ts`).
+
+Scan-list cell as of 2026-10-29 (replaced by 300-REVIEW, moved verbatim): 4 / 3 / 316 (was `3 / 2 / 281`) | ⚠ **FIRES** | ⚠ now FIRES (300). 300-05: three result arms by email_delivery (UI-D12), words from inviteDeliveryCopy. ⛔ never names the provider or an error code; Copy link focused on the failed arm
+
+CLAUDE.md verdict cell as of 2026-10-29 (replaced by 300-REVIEW, moved verbatim): | `frontend/src/components/org/InviteMemberDialog.tsx` | 4 / 3 / 316 | ⚠ now FIRES (300) · 300-05: three result arms (UI-D12) · ⛔ |
+
+### `frontend/src/components/org/InvitationsTab.tsx` — 300-05 Task 3 (2026-10-29)
+
+**`4 / 3 / 310` (was `3 / 2 / 290`) — crosses into G-5 at this commit.** In `InvitationRow` only: `emailFailed = isPending && inv.email_delivery === "failed"`; when true a second `<StatusChip tone="muted" testId="invitation-email-status">` (the shipped chip, unchanged) with `MailX` (aria-hidden) and "Email not sent" follows the status chip, and — under a fresh resend link — the line "The email didn't send. Copy the link and send it yourself." (`mt-1 pl-12 text-xs`). ⛔ Both read the row the shell RE-FETCHED after the resend (`OrgAdminShell.handleResend` awaits `fetchInvitations()` before returning the link), so a resend that went removes the chip and the line with no optimistic state and no prop change. Not shown for `sent`, `not_configured`, null, or any non-pending row.
+
+Scan-list cell as of 2026-10-29 (replaced by 300-05 Task 3, moved verbatim): 3 / 2 / 290 | no (reaches 3 in 300) | Added AT PLANNING 300. 300-05: Email not sent chip + resend failure line (D-11). ⛔ server truth on re-fetch, no optimistic flip |
+
+CLAUDE.md verdict cell: none before 300-05 Task 3 (row added by 300-05 Task 3).
+
+### `frontend/src/components/org/inviteDeliveryCopy.ts` — 300-05 Task 3 (created) (2026-10-29)
+
+**`1 / 1 / 32` (created).** Zero imports. `INVITE_DELIVERY` carries the three titles, the `sent` body split around the email, the D-11 sentence verbatim, the list chip "Email not sent" and the resend line; `deliveryTitle(delivery)` and the `InviteDelivery` key type. Read by `InviteMemberDialog.tsx` and `InvitationsTab.tsx`; `inviteDeliveryCopy.test.ts` asserts the words, the absence of provider / error-code / retry words, and the zero-import rule over its source.
+
+Scan-list cell as of 2026-10-29 (replaced by 300-05 Task 3 (created), moved verbatim): 0 / 0 / 0 | no (planned 300-05) | young (planned 300-05). Invite delivery sentences (D-11, UI-D12). ⛔ zero-import leaf; D-11 sentence verbatim |
+
+CLAUDE.md verdict cell: none (the file does not fire).
+
+### `scripts/vitest-count-gate.cjs` — 300-05 Task 3 (2026-10-29)
+
+**`398 / 83 / 6881` (was `397 / 83 / 6873`).** THREE BASELINE pins beside `OrgAuditTab.test.tsx`'s — `InvitationsTab.test.tsx` 17 (⚠ the suite had NO pin before: the plan said "raise InvitationsTab's pin", measured there was none, so it is adopted at 8 shipped + 9 new cases), `InviteMemberDialog.test.tsx` 7, `inviteDeliveryCopy.test.ts` 6 (counts from the vitest JSON reporter) — and their FILE-LEVEL TARGETS beside OrgAuditTab's (no `src/components/org` directory entry). None raised, none lowered.
+
+Scan-list cell as of 2026-10-29 (replaced by 300-05 Task 3, moved verbatim): 397 / 83 / 6873 (was `396 / 83 / 6868`) | ⚠ **FIRES** | 300-05: 2 BASELINE pins added (EmailSettings 28, EmailNotificationPreference 17) + their FILE-LEVEL TARGETS beside ApiKeyLimits, none lowered |
+
+CLAUDE.md verdict cell as of 2026-10-29 (replaced by 300-05 Task 3, moved verbatim): | `scripts/vitest-count-gate.cjs` | 397 / 83 / 6873 (was `396 / 83 / 6868`) | 300-05: 2 pins added (EmailSettings 28, EmailNotificationPreference 17) |

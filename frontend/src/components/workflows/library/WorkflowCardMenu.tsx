@@ -55,6 +55,9 @@ import { FORK_CONSEQUENCE, FORK_CONSEQUENCE_EXISTING, FORK_VERB } from "./librar
 import type { LibraryRow } from "./libraryRow"
 import type { WorkflowDeleteSheetHandle } from "./WorkflowDeleteSheet"
 import { MoveToOrgMenuItem } from "@/components/org/MoveToOrgMenuItem"
+import { ShareLinkMenuSub } from "@/components/share/ShareLinkMenu"
+import { SavesInOrg } from "@/components/org/SavesInOrg"
+import { audienceOf } from "@/lib/linkAudience"
 
 // ── The menu's words and classes (moved verbatim from WorkflowCard.tsx, 286-04) ──────────
 
@@ -224,6 +227,12 @@ export function WorkflowCardMenu({
                 </button>
               </DropdownMenuTrigger>
               <DropdownMenuContent align="end" className="w-56">
+                {/* 299-04 (D-20 / UI-SPEC S4) — ONE mount, the menu's FIRST item: this workflow's own
+                    address. A starter row is the system-global shelf (D-35), so it opens for anyone
+                    signed in; a draft or a published row opens only for its owner (D-33). A
+                    `DropdownMenuSub` whose trigger is a menuitem: WR-03 stays green. */}
+                <ShareLinkMenuSub route={{ view: "workflows", definitionId: row.id }} kind="workflow" audience={audienceOf("workflow", { status: row.provenance === "draft" ? "draft" : "published", is_system_global: row.provenance === "starter" })} orgId={null} />
+
                 {/* ── SEED-190 — THE DOOR TO THIS WORKFLOW'S RUNS ───────────────────
                     FIRST in the menu, and above every other item, because it is the only
                     item here that READS. Everything below it forks or deletes; a
@@ -427,6 +436,9 @@ export function WorkflowCardMenu({
                     className={MENU_NOTE_CLASSES}
                   >
                     {hasExistingFork ? FORK_CONSEQUENCE_EXISTING : FORK_CONSEQUENCE}
+                    {/* 299-04 (UI-D11): ONE mount — where the copy will be saved (2+ orgs only);
+                        an existing fork creates nothing, so it says nothing about saving. */}
+                    {!hasExistingFork && <SavesInOrg asSentence />}
                   </DropdownMenuGroup>
                 )}
               </DropdownMenuContent>

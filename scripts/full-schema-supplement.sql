@@ -861,3 +861,28 @@ REVOKE ALL ON TABLE public.api_keys FROM authenticated;
 REVOKE ALL ON TABLE public.api_keys FROM service_role;
 GRANT SELECT (id, org_id, user_id, label, key_prefix, workflows, expires_at, revoked_at, revoked_by, last_used_at, created_at) ON TABLE public.api_keys TO authenticated;
 GRANT SELECT, INSERT, UPDATE, DELETE ON TABLE public.api_keys TO service_role;
+
+-- migration 218 — notifications: recipients READ (one owner-only policy); only the two notice
+-- trigger functions and the backend write. notification_deliveries (the outbox) is deny-all to
+-- every client role. Copied, not retyped.
+REVOKE ALL ON TABLE public.notifications FROM PUBLIC;
+REVOKE ALL ON TABLE public.notifications FROM anon;
+REVOKE ALL ON TABLE public.notifications FROM authenticated;
+REVOKE ALL ON TABLE public.notifications FROM service_role;
+GRANT SELECT ON TABLE public.notifications TO authenticated;
+GRANT ALL ON TABLE public.notifications TO service_role;
+REVOKE ALL ON TABLE public.notification_deliveries FROM PUBLIC;
+REVOKE ALL ON TABLE public.notification_deliveries FROM anon;
+REVOKE ALL ON TABLE public.notification_deliveries FROM authenticated;
+REVOKE ALL ON TABLE public.notification_deliveries FROM service_role;
+GRANT ALL ON TABLE public.notification_deliveries TO service_role;
+
+-- migration 218 — the two notice trigger functions (Group A shape: trigger-only).
+REVOKE EXECUTE ON FUNCTION public.notify_on_ask_row() FROM PUBLIC;
+REVOKE EXECUTE ON FUNCTION public.notify_on_ask_row() FROM anon;
+REVOKE EXECUTE ON FUNCTION public.notify_on_ask_row() FROM authenticated;
+GRANT EXECUTE ON FUNCTION public.notify_on_ask_row() TO service_role;
+REVOKE EXECUTE ON FUNCTION public.notify_on_run_status() FROM PUBLIC;
+REVOKE EXECUTE ON FUNCTION public.notify_on_run_status() FROM anon;
+REVOKE EXECUTE ON FUNCTION public.notify_on_run_status() FROM authenticated;
+GRANT EXECUTE ON FUNCTION public.notify_on_run_status() TO service_role;

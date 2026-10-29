@@ -17,14 +17,20 @@
  *
  * SECURITY (T-167-17): render courtesy only — every write is server-gated on `org:invite`
  * (Plan 02). `canInvite` gates the affordances for honesty, not authorization.
+ *
+ * Phase 300-05 (NOTE-06 / D-11; UI-SPEC S4): a PENDING row whose latest email failed carries a
+ * second, muted chip "Email not sent"; after a resend, the fresh link carries the line "The email
+ * didn't send…" when the RE-FETCHED row still reads failed. Both read the row the shell
+ * re-fetched (server truth) — there is no optimistic delivery state here.
  */
 import { useState } from "react"
-import { Check, Copy, Link2, Mail, RefreshCw, X } from "lucide-react"
+import { Check, Copy, Link2, Mail, MailX, RefreshCw, X } from "lucide-react"
 
 import type { Invitation } from "@/lib/api"
 import { OrgAvatar, RoleBadge } from "./OrgIdentity"
 import { StatusChip, statusChipMeta } from "./StatusChip"
 import { InviteMemberDialog } from "./InviteMemberDialog"
+import { INVITE_DELIVERY } from "./inviteDeliveryCopy"
 
 interface InvitationsTabProps {
   /** Every invitation the shell fetched; `null` while the fetch is in flight. */
@@ -193,6 +199,8 @@ function InvitationRow({
   const initial = (inv.email ?? "?").trim().charAt(0).toUpperCase() || "?"
   const status = statusChipMeta(inv.status)
   const isPending = inv.status === "pending"
+  // 300-05 (D-11): only a pending invite's email still matters.
+  const emailFailed = isPending && inv.email_delivery === "failed"
 
   return (
     <div className="flex flex-col gap-2 px-3.5 py-3">
@@ -223,6 +231,15 @@ function InvitationRow({
             {status.label}
           </StatusChip>
         </div>
+
+        {emailFailed && (
+          <div className="flex-none">
+            <StatusChip tone="muted" testId="invitation-email-status">
+              <MailX className="mr-1 h-3 w-3" aria-hidden="true" />
+              {INVITE_DELIVERY.chip}
+            </StatusChip>
+          </div>
+        )}
 
         {/* Resend / revoke — only for PENDING invites, only for an inviter (honest-absent). */}
         {isPending && canInvite && (
@@ -282,6 +299,9 @@ function InvitationRow({
             )}
           </button>
         </div>
+      )}
+      {freshLink && emailFailed && (
+        <p className="mt-1 pl-12 text-xs text-muted-foreground">{INVITE_DELIVERY.resendFailed}</p>
       )}
     </div>
   )

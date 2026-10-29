@@ -211,7 +211,9 @@ async function handleResponse<T>(res: Response, fallbackError: string): Promise<
     } catch {
       // Keep default
     }
-    throw new Error(msg)
+    // 299-REVIEW WR-03: the status rides along (additive), so a caller can tell a refusal (4xx)
+    // from an outage (a 5xx, or a fetch that threw before any answer).
+    throw Object.assign(new Error(msg), { status: res.status })
   }
   return res.json() as Promise<T>
 }

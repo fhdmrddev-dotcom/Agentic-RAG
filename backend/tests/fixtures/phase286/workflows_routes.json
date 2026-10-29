@@ -243,7 +243,9 @@
           ]
         }
       ],
-      "query_params": [],
+      "query_params": [
+        "from_definition_id"
+      ],
       "path_params": [],
       "header_params": [],
       "body_params": [

@@ -152,3 +152,59 @@ export function movedTo(org: string): string {
 export const RECORDED_FOOTER = "✎ Recorded with your name in the audit log."
 /** The radio list's accessible name at 4+ orgs. */
 export const PICK_TARGET_LABEL = "Organization to move it to"
+
+// ── Phase 299-03 (D-16 / D-17 / D-19 / D-37 / D-39 / UI-SPEC S3) — "This is in <org> — switch?" ──
+// The Accept button reuses `switchToLabel(org)` above (the 298 vocabulary).
+
+/** The prompt's heading. */
+export function thisIsIn(org: string): string {
+  return `This is in ${org}`
+}
+/** The prompt's body. */
+export function workingIn(current: string, org: string): string {
+  return `You're working in ${current}. Switch to ${org} to open it?`
+}
+/** The body's tail, only while a chat in the active org is answering. Leading space on purpose. */
+export const KEEPS_GOING_TAIL = " Your chat that's answering now keeps going."
+/** The item box caption per kind (rendered uppercase by CSS; the DOM keeps sentence case). */
+export const KIND_CAPTION = {
+  thread: "Chat",
+  workflow: "Workflow",
+  run: "Workflow run",
+  expert: "Expert",
+} as const
+/** The decline (the safe default; outline). */
+export function stayIn(current: string): string {
+  return `Stay in ${current}`
+}
+/** In place of the buttons while the switch lands. */
+export function switchingTo(org: string): string {
+  return `Switching to ${org}…`
+}
+/** The still-answering chip: one chat by title (curly quotes), or a count. */
+export function stillAnsweringOne(title: string): string {
+  return `“${title}” is still answering`
+}
+export function stillAnsweringMany(n: number): string {
+  return `${n} chats are still answering`
+}
+export const BACK_TO_IT = "Back to it"
+/** UI-D9 — the Stay notice on the surface the person lands on. */
+export function stayedIn(current: string): string {
+  return `You stayed in ${current}. The link wasn't opened.`
+}
+export const OPEN_IT_AFTER_ALL = "Open it after all"
+/** UI-D10 — after a Switch with a chat still answering in the org that was left. Present tense
+ *  only: reattach-on-return is research assumption A1, unproven until G-4 row 2. */
+export function yourChatInStill(previous: string): string {
+  return `Your chat in ${previous} is still answering.`
+}
+export const SWITCH_BACK = "Switch back"
+/** When an org's name is not known yet (the memberships have not answered). */
+export const THIS_ORG = "this organization"
+/** 299-04 (UI-D11 / D-18) — the caption on a button that creates an item, for a 2+ org person.
+ *  A hint only: the server's refusal (S8) is the guarantee. */
+export const SAVES_IN_PREFIX = "Saves in "
+export function savesIn(org: string): string {
+  return `${SAVES_IN_PREFIX}${org}`
+}

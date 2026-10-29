@@ -14,30 +14,25 @@
  * T-297-09); the copy below is the only text either state shows, and this module is its home.
  * ⛔ Not the trailing fallback, and never renders it: that element keeps exactly one home, as the
  * switch's last arm, because two fences measure its position.
+ *
+ * ⚠ Phase 299-03 (D-14), beside the paragraphs above rather than through them: S1 is now the
+ * unparseable variant of `CantBeOpened` (the one in-place card), and its copy lives there. This
+ * module keeps `AddressNotFound`, `ADMIN_HOLD_COPY` and `AddressHolding` under the same names.
  */
-import { Button } from "@/components/ui/button"
+import { CantBeOpened } from "./CantBeOpened"
 
-/** S1's words (297-UI-SPEC Copywriting Contract). One home: tests assert these rendered. */
-// eslint-disable-next-line react-refresh/only-export-components -- the copy lives beside the one component that renders it, so its suite asserts the same words the screen shows (the ArtifactTooltip.tsx precedent)
-export const ADDRESS_NOT_FOUND_COPY = {
-  heading: "This address doesn't open anything",
-  body: "It may be mistyped or out of date.",
-  cta: "Go to Chat",
-} as const
+// Phase 299-03 (D-14 / UI-D4): S1's words moved VERBATIM into the one card's module and are
+// re-exported here under the same name, so the admin refusal arms and every 297 suite keep importing
+// them from this file. The import direction is one way (this module → CantBeOpened), so no cycle.
+export { ADDRESS_NOT_FOUND_COPY } from "./CantBeOpened"
 
 /** S2's admin sentence: neutral by design, so it names nothing a non-operator could learn. */
 export const ADMIN_HOLD_COPY = "Opening…"
 
 export function AddressNotFound({ onGoHome }: { onGoHome: () => void }) {
-  return (
-    <div className="flex flex-col items-center justify-center h-full p-8 gap-3 text-center">
-      <h1 className="text-base font-medium text-foreground">{ADDRESS_NOT_FOUND_COPY.heading}</h1>
-      <p className="max-w-sm text-sm text-muted-foreground">{ADDRESS_NOT_FOUND_COPY.body}</p>
-      <Button variant="outline" size="sm" onClick={onGoHome}>
-        {ADDRESS_NOT_FOUND_COPY.cta}
-      </Button>
-    </div>
-  )
+  // Phase 299-03 (D-14): the unparseable variant of the one card — same words, no address line,
+  // no Copy address. Below md it sits over the main region alone.
+  return <CantBeOpened kind={null} route={null} onGo={onGoHome} />
 }
 
 /** S2 — the markup of `WorkflowRunPage`'s own loading state, plus `role="status"`, so the hand-off

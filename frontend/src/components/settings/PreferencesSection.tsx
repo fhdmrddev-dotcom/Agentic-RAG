@@ -1,4 +1,5 @@
 import { ModelDefaultPreference } from "@/components/settings/ModelDefaultPreference"
+import { EmailNotificationPreference } from "@/components/settings/EmailNotificationPreference"
 import { TechnicalNamesToggle } from "@/components/admin/TechnicalNamesToggle"
 import { useTechnicalNames } from "@/providers/TechnicalNamesProvider"
 
@@ -34,6 +35,9 @@ export function PreferencesSection() {
       </div>
 
       <ModelDefaultPreference />
+
+      {/* 300-05 (D-09): the member's own run-waiting email switch, ungated /me/preferences only. */}
+      <EmailNotificationPreference />
     </>
   )
 }

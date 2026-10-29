@@ -5,6 +5,10 @@
  * hook's half: the old org's threads drop AT ONCE, `switching` is true only while an answer for
  * ANOTHER org is held (so first paint is unchanged — BUG-261027-02 stays for Phase 299), a late
  * old-org answer never repaints, and writes land in the active org's list.
+ *
+ * Phase 299-05 (FIX-02 / D-27 / BUG-261027-02): `pending` is the first-load half `switching` left
+ * out on purpose — true until the ACTIVE org's list has answered (first load included), so no
+ * list says "No recent chats" before it has actually answered empty.
  */
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest"
 import { act, renderHook } from "@testing-library/react"
@@ -154,6 +158,58 @@ describe("useThreads — follows the active org (298-04)", () => {
     })
     expect(result.current.switching).toBe(false)
     expect(result.current.loading).toBe(false)
+    expect(result.current.threads).toEqual([])
+  })
+})
+
+describe("useThreads — pending until the active org has answered (299-05, FIX-02)", () => {
+  it("first render: pending is TRUE (nothing has answered yet)", () => {
+    const { result } = renderHook(() => useThreads())
+    expect(result.current.pending).toBe(true)
+    expect(result.current.threads).toEqual([])
+  })
+
+  it("a settled EMPTY answer for the active org ends pending", async () => {
+    const gate = deferred<Thread[]>()
+    api.listThreads.mockReturnValueOnce(gate.promise)
+    const { result } = renderHook(() => useThreads())
+    let loading!: Promise<void>
+    act(() => {
+      loading = result.current.loadThreads()
+    })
+    expect(result.current.pending).toBe(true)
+    await act(async () => {
+      gate.resolve([])
+      await loading
+    })
+    expect(result.current.pending).toBe(false)
+    expect(result.current.threads).toEqual([])
+  })
+
+  it("after a switch pending is true again until the new org answers", async () => {
+    api.listThreads.mockResolvedValueOnce([thread("ta", "Alpha chat")])
+    const { result } = renderHook(() => useThreads())
+    await act(async () => {
+      await result.current.loadThreads()
+    })
+    expect(result.current.pending).toBe(false)
+    act(() => switchOrg("org-b"))
+    expect(result.current.pending).toBe(true)
+    api.listThreads.mockResolvedValueOnce([thread("tb", "Bravo chat")])
+    await act(async () => {
+      await result.current.loadThreads()
+    })
+    expect(result.current.pending).toBe(false)
+  })
+
+  it("a FAILED first load settles [] and ends pending (the WR-03 catch)", async () => {
+    api.listThreads.mockRejectedValueOnce(new Error("502"))
+    const { result } = renderHook(() => useThreads())
+    expect(result.current.pending).toBe(true)
+    await act(async () => {
+      await expect(result.current.loadThreads()).rejects.toThrow("502")
+    })
+    expect(result.current.pending).toBe(false)
     expect(result.current.threads).toEqual([])
   })
 })

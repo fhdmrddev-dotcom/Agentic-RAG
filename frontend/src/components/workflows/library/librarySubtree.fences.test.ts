@@ -126,6 +126,8 @@ const LIBRARY_SUBTREE_PATHS = [
   // ── 298-04 (2026-10-28, ORG-02 / D-26 G-5): WorkflowsPage's three feeds, moved out move-only ──
   // Listed in the commit that creates it, for the reason this array's docblock gives.
   "./useWorkflowLibraryFeeds.ts",
+  // ── 299-02 (D-03): open a draft / focus a published card from the address ──
+  "./useWorkflowLinkTarget.ts",
 ] as const
 
 /** The house `?raw` / `import.meta.glob` idiom (`PhaseFormPanel.rails.test.tsx:422`). */
@@ -181,7 +183,10 @@ describe("the sweep is looking at something (non-vacuity)", () => {
     // out of WorkflowsPage, G-5 seam) joins the corpus, so the length is 18 — the array's measured
     // length after the one addition, and the five `it.each` sweeps grow the suite by +5 (1133 → 1138
     // across the WorkflowsPage suite set, measured).
-    expect(LIBRARY_SUBTREE_PATHS).toHaveLength(18)
+    // ⚠ D-299-02 — amended ON PURPOSE by 299-02: `./useWorkflowLinkTarget.ts` (the address → card /
+    // Builder hook, created in the same commit) joins the corpus, so the length is 19 and the five
+    // `it.each` sweeps grow the suite by +5. The 18 above it is kept as the line it replaced.
+    expect(LIBRARY_SUBTREE_PATHS).toHaveLength(19)
     for (const later of [
       "./RunModal.tsx",
       "./WorkflowDeleteSheet.tsx",

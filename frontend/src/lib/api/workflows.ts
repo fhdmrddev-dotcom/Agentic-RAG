@@ -94,6 +94,31 @@ export class WorkflowFolderRefusedError extends Error {
   }
 }
 
+/**
+ * Phase 299-04 (D-18 / D-38 / UI-SPEC S8) — a Tweak of a workflow that is in ANOTHER of the
+ * caller's orgs, refused by `POST /workflows?from_definition_id=` with a 409 whose string `detail`
+ * is the server's org-named sentence. It is shown VERBATIM in the fork's failure notice, so it is
+ * its own class (named, for the same reason as the folder refusal's).
+ *
+ * ⚠ The only other 409 this endpoint returns is the machine-worded slug / version clash, which
+ * stays today's generic error (its notice says "A version already exists"). The two are told
+ * apart by the refusal's fixed shape, pinned to `backend/app/services/item_org_guard.py` (the
+ * `savesInOrg` suite reads REFUSALS / REFUSALS_UNNAMED there via `?raw`).
+ */
+export class WorkflowOrgRefusedError extends Error {
+  constructor(message: string) {
+    super(message)
+    this.name = "WorkflowOrgRefusedError"
+  }
+}
+
+/** The org refusal's sentence when `body` is the Tweak 409, else `null`. */
+function orgRefusalOf(body: unknown): string | null {
+  const detail = (body as { detail?: unknown } | null)?.detail
+  if (typeof detail !== "string") return null
+  return /^This workflow is in .+\. Switch to .+ to make your own copy\.$/.test(detail) ? detail : null
+}
+
 /** The folder refusal's sentence when `body` is the coded 422, else `null` (D-36). */
 function folderRefusalOf(body: unknown): string | null {
   const detail = (body as { detail?: unknown } | null)?.detail
@@ -466,9 +491,13 @@ export async function uploadWorkflowReference(
 export async function createWorkflowDraft(
   def: WorkflowDefinitionJSON,
   signal?: AbortSignal,
+  // 299-04 (D-38): a Tweak names the published workflow it copies, so the server can refuse a
+  // copy of a workflow in another of the caller's orgs. Absent → the URL is today's, byte for byte.
+  opts?: { fromDefinitionId?: string },
 ): Promise<WorkflowDraftWriteResult> {
   const headers = await getAuthHeaders()
-  const res = await fetch(`${API_BASE}/workflows`, {
+  const query = opts?.fromDefinitionId ? `?from_definition_id=${encodeURIComponent(opts.fromDefinitionId)}` : ""
+  const res = await fetch(`${API_BASE}/workflows${query}`, {
     method: "POST",
     headers,
     body: JSON.stringify(def),
@@ -479,6 +508,8 @@ export async function createWorkflowDraft(
     // 298-02 (D-36): THE CLIENT BRANCHES ON `code`, NEVER ON PROSE — before every other reading.
     const folderRefusal = res.status === 422 ? folderRefusalOf(body) : null
     if (folderRefusal !== null) throw new WorkflowFolderRefusedError(folderRefusal)
+    const orgRefusal = res.status === 409 ? orgRefusalOf(body) : null
+    if (orgRefusal !== null) throw new WorkflowOrgRefusedError(orgRefusal)
     throw new Error(entitlementRefusalMessage(body) ?? `Failed to create workflow draft (status ${res.status})`)
   }
   return (await res.json()) as WorkflowDraftWriteResult
@@ -984,6 +1015,9 @@ export interface WorkflowRunRead {
   end_reason?: string | null
   /** Phase 293 (D-22): how this run started, as recorded at start; null when it was not. */
   origin?: RunOrigin | null
+  /** Phase 299 (D-10): the org the run was started in; null for a run with no org. Feeds the
+   *  link surface's who-can-open line (a FINISHED run opens for that org's members, D-34). */
+  org_id?: string | null
 }
 
 /**

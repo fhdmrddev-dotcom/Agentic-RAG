@@ -3,15 +3,15 @@ seed_id: SEED-312
 title: The boot spinner also waits on supabase.auth.getSession(), which has no timeout and no catch
 created: 2026-09-24
 surface: Agentic-RAG
-status: planted
+status: shipped
 partial: false
-status_note:
+status_note: "Folded into Phase 299 at discuss-phase 2026-10-28 (299-CONTEXT.md). SHIPPED in Phase 299 (closed 2026-10-29, UAT 18/20 PASS; not yet deployed)."
 trigger_when: Any phase touching frontend/src/hooks/useAuth.ts or the App.tsx boot effect, OR a report of the app stuck on the boot spinner while the backend is healthy.
 trigger_paths: ["frontend/src/hooks/useAuth.ts", "frontend/src/App.tsx", "frontend/src/lib/supabase.ts"]
 trigger_surfaces: [auth]
 migration_note:
 relates_to: ["265", "265-REVIEW.md WR-01", "UAT-265-257-2-OBS", "f2d78377e", "6383da2e5"]
-folded_into: null
+folded_into: "299"
 renumbered_from: null
 renumbered_because: null
 ---

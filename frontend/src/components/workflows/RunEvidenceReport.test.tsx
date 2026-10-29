@@ -131,12 +131,14 @@ describe("RunEvidenceReport: the owner's report (D-14a)", () => {
     expect(screen.getByRole("heading", { level: 1 }).textContent).toBe("Vendor-risk portfolio review")
     expect(screen.getByText("Read-only record")).toBeTruthy()
     // The full set by accessible name: the back navigation, the two exports, and the owner's
-    // two links. No answer, cancel, retry or edit control exists.
+    // two links. No answer, cancel, retry or edit control exists. 299-04 (D-20): + "Link", the
+    // run's own address (it reads; it changes nothing).
     expect(buttonNames()).toEqual(
       [
         "‹ Back to Workflows",
         "Download JSON",
         "Download the deliverable",
+        "Link",
         "Open the chat thread",
         "Print / save as PDF",
       ].sort(),
@@ -180,7 +182,8 @@ describe("RunEvidenceReport: a colleague's report (D-05, R-01, R-02, R-04)", () 
   it("offers exactly the two export buttons and the back navigation, nothing writable", async () => {
     const { onBack } = renderReport(colleaguePayload())
     await ready()
-    expect(buttonNames()).toEqual(["Download JSON", "Print / save as PDF", "‹ Back to Workflows"].sort())
+    // 299-04 (D-20 / D-34): + "Link" — a colleague may copy the finished run's address; it writes nothing.
+    expect(buttonNames()).toEqual(["Download JSON", "Link", "Print / save as PDF", "‹ Back to Workflows"].sort())
     fireEvent.click(screen.getByRole("button", { name: "‹ Back to Workflows" }))
     expect(onBack).toHaveBeenCalledTimes(1)
   })

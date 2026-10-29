@@ -3,15 +3,15 @@ gsd_state_version: 1.0
 milestone: v4.8
 milestone_name: Every Page Has a Link
 status: human_needed
-last_updated: 2026-10-27T21:45:44.691Z
-last_activity: 2026-10-28 -- Phase 298 executed; verification human_needed (G-4 owed)
+last_updated: 2026-10-29T00:00:00.000Z
+last_activity: 2026-10-29 -- Phase 300 executed; verification human_needed (5/5 SC in code); UAT owed
 progress:
   total_phases: 13
   completed_phases: 0
   total_plans: 4
   completed_plans: 4
   percent: 0
-stopped_at: Phase 298 executed 5/5 + review fixes; 4/4 SC verified in code; G-4 rows owed (two-org account); not deployed
+stopped_at: Phase 300 executed 5/5 + review fixes (9) + UF-1; 5/5 SC + 6/6 reqs verified in code; security 41/41; UAT owed; NOT deployed (mig 218 local only)
 ---
 
 # Project State
@@ -31,7 +31,7 @@ See: `.planning/PROJECT.md` (updated 2026-10-27)
 
 **Core value:** The agent acts as an AI colleague — it knows your knowledge base, can run code, and
 can be taught new behaviours (skills) that persist and can be shared.
-**Current focus:** Phase 298 — lists follow the active org
+**Current focus:** Phase 300 — told when a run waits (UAT 12/15 PASS locally 2026-10-29; owed: G4-8 + real-mail G4-1 after deploy). NOT deployed; **mig 218 APPLIED TO CLOUD 2026-10-29** (verify PASS, advisors 0 ERROR; new INFO = outbox RLS-no-policy, by design D-19). Phase 299 CLOSED 2026-10-29 (UAT 18/20; 2 rows owed by decision).
 
 ---
 
@@ -44,14 +44,21 @@ reviewer exists, so a phase closes `verification_mode: self-verified`, never `re
 
 ## Current Position
 
-Phase: 298
+Phase: 300
 Plan: 5 of 5
-Status: Executed — human_needed (verification 4/4 SC in code; security 34/34 closed; G-4 rows owed)
-Last activity: 2026-10-28 — 298 executed: 5 plans, review (1 BL + 9 WR) → 9 fixed + WR-08 deferred to 299; not deployed
+Status: Executed — human_needed (verification 5/5 SC + 6/6 reqs in code; security 41/41 closed; G-4 + roster rows owed)
+Last activity: 2026-10-29 — 300 executed: 5 plans (01+02 → 03 → 04 → 05), review 0 BL + 5 WR + 6 IN → 9 fixed (IN-05/06 deferred), security UF-1 fixed in 218 (residual → SEED-396); gates: backend 69 ≤ 71, vitest count gate OK (13300), tsc 61 = base, phase live suites 75 passed. NOT deployed.
+
+Owed for 300 (in order): run `300-HUMAN-UAT.md` (G4-5 first; FIX-05 roster must be re-run after IN-03; G4-6 only after 299 G4-4a); approve 3 fixer-written strings (WR-05, IN-01, IN-04). Before deploy: paste mig 218 into cloud SQL editor (per-action approval) → `get_advisors(security)`; ⏸ Resend DEFERRED by operator 2026-10-29 — deploy without a mail provider (deliveries `suppressed`, invites → Copy link); when revived: Coolify EMAIL_PROVIDER / RESEND_API_KEY / ENVIRONMENT=production; Resend sender + SPF/DKIM/DMARC. At close: REQUIREMENTS NOTE-02/03/04/06 + FIX-04/05 → done; BUG-261027-03/04/05 + BUG-260828-05/06 → closed when their rows pass.
+
+Phase 299 — **CLOSED 2026-10-29** (operator: "proceed until you finish this phase, do not ask"). UAT 18/20 PASS; owed by decision: G4-4b email-link leg
+(cloud — local Supabase auto-confirms), X-7 Moonshot (⛔ Kimi balance); G4-4c ⛔ SSO (D-41). Decisions 1-4 accepted; IN-01..05 deferred (re-open at the next phase on
+`item_org_guard.py` / link hooks). SEED-178/015/312 → shipped, BUG-261027-02 → closed. Before deploy add Supabase Auth Redirect URLs `https://app.<domain>/**`,
+`https://<domain>/**` and the one-box origin (cloud write — per-action approval); after deploy `get_advisors(security)`. No migration ships with 299.
 
 Owed for 298 (in order): run `298-HUMAN-UAT.md` rows as the two-org dev account (G4-1 first); acknowledge residuals
 AR-298-R1 (WR-06 `LIMIT 1`) and AR-298-R2 (WR-05 bind race) in `298-SECURITY.md`; then flip SEED-389/317 → shipped,
-SEED-313 → answered. Mig 217 APPLIED in cloud 2026-10-28 (CHECK 40 types, advisor: no new finding); backend deploy waits on operator "deploy".
+SEED-313 → answered. Mig 217 APPLIED in cloud 2026-10-28 (CHECK 40 types, advisor: no new finding); 297+298 deployed 2026-10-28: master 879c96555, production b813d2711; Vercel + Coolify verified (new /org-items/* routes 401, /docs 401, health ok).
 
 Scope set at intake: per-view URLs (SEED-185/015/178), run-waiting notifications in-app + email
 (SEED-281), lists follow the active org — decided per-org (SEED-389), v4.7 close-out
@@ -84,6 +91,8 @@ applied; `get_advisors(security)` 0 ERROR. Branch `develop`.
 - Moonshot account reinstatement (429 suspended) → re-run its rows; BUG-261024-01 stays `folded` until then.
 - 294-ENV: remove the two dev-only lines from `backend/.env` (`DECISION_ENGINE_FAULT_BASE_URL` and its `ENVIRONMENT` partner).
 - 298: G-4 rows G4-1..7 + A-1 (`298-HUMAN-UAT.md`, sign in as `fhdmrd.dev@gmail.com`); mig 217 already in cloud (2026-10-28).
+- 300: 15 UAT rows (`300-HUMAN-UAT.md`, G4-5 first) + 3 copy approvals; mig 218 to cloud before its deploy.
+- 299: CLOSED 2026-10-29; owed by decision G4-4b email-link leg (cloud) + X-7 Moonshot; Supabase Auth Redirect URLs before its deploy.
 - Optional: restore Supabase MCP `read_only=true` (the write-needing deploy is done).
 - Push tag `v4.7` when wanted (local only).
 - Carried from v4.6: Coolify rebuild confirmation + logged-in production smoke; 282 G4-4 / G4-6 / A1; 281 G-4 rows A, C, D.
@@ -100,5 +109,11 @@ applied; `get_advisors(security)` 0 ERROR. Branch `develop`.
 ## Guardrail overrides
 
 - **298 G-2 (2026-10-28):** the "N more in <org> · Switch" line, the out-of-org picker marker and the move confirm are new UI. Under the operator's autonomous mandate ("continue autonomously end to end") the sketch/UI-SPEC is self-approved in planning; the operator sees it at G-4 (298 D-23).
+
+- **299 G-2 (2026-10-28):** UI-SPEC self-approved under the autonomous mandate (checker 6/6 after one spacing revision). Four details depart from the operator-picked sketch winners and are shown to the operator at G-4: UI-D12 the trigger says "Link" not "Share" (a link grants no access); UI-D14 the "✓ Link copied" receipt sits inside the link surface, not at the bottom (no toast system, rule 062-A); UI-D16 the sign-in return line sits after the whole form (keeps `SignInForm`/`SignUpForm` unedited); UI-D10 the after-switch line is shortened until G-4 row 2 proves reattach.
+
+- **300 G-2 (2026-10-29):** UI hint (Settings email switch + delay knob, invite-dialog failure line, schedule-row words) — small surfaces in existing components; UI-SPEC self-approved under the operator's autonomous mandate ("continue autonomously end to end for this phase"); operator sees it at G-4.
+
+- **300-03 G-5 (2026-10-29):** `backend/app/services/harness/phase_types.py` FIRES ("G-5 OWED") and 300-03 touches it anyway: one hunk inside `_external_action_sent_body` for D-23 (the send_email receipt names the recipient "(via host)" and says the mail server accepted it). Honoured by construction; the owed refactor is NOT discharged.
 
 The 286-296 overrides are in `milestones/v4.7-STATE-at-close.md`.

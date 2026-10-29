@@ -79,7 +79,7 @@ Requirements: [`REQUIREMENTS.md`](REQUIREMENTS.md). **28 v4.8 requirements, 28 m
 
 - [x] **Phase 297: Every View Has an Address**: split `App.tsx` / `ChatLayout.tsx` behaviour-neutral, then give every top-level view an `/app/...` address with refresh, Back/Forward, unsaved-edit guard and a cross-host parity check (REG-09, LINK-01, LINK-07, LINK-08)
 - [ ] **Phase 298: Lists Follow the Active Org**: Library, Workflows, threads and run history narrowed to the active org; foreign-org folders refused with a reason; out-of-org items counted and movable one at a time, audited (ORG-01..06)
-- [ ] **Phase 299: Links to the Thing Itself**: thread, workflow, run and Expert addresses; copy link; one "can't be opened" page; the "switch org?" prompt; sign-in returns to the link; chat list loading state (LINK-02..06, FIX-02)
+- [x] **Phase 299: Links to the Thing Itself**: thread, workflow, run and Expert addresses; copy link; one "can't be opened" page; the "switch org?" prompt; sign-in returns to the link; chat list loading state (LINK-02..06, FIX-02)
 - [ ] **Phase 300: Told When a Run Waits (Backend and Mailer)**: scheduled-run input refusal and resume-on-provider fixed first; notices written by triggers; one content-free email per waiting run after the delay; per-user opt-out; Resend + SMTP from a built image (NOTE-02, NOTE-03, NOTE-04, NOTE-06, FIX-04, FIX-05)
 - [ ] **Phase 301: The Waiting-on-You Notice**: in-app list and badge across all orgs, each item naming its org and opening the run; it leaves once answered (NOTE-01, NOTE-05)
 - [ ] **Phase 302: Close-Out and a True Register**: Workspace panel files, schedule row wording, the six SEED-391 findings, and the register made true (FIX-01, FIX-03, FIX-06, REG-08)
@@ -172,7 +172,14 @@ Plans:
   5. The chat list shows a loading state, not "No recent chats", while threads load (FIX-02).
 
 **How we'd know this failed**: a forbidden link can be told apart from a missing one (status, wording, timing), so the page leaks that an item exists; the org switches without asking; a write from a cross-org page lands in the wrong org; the return-to-link accepts an outside URL (open redirect) or a token rides in the URL; SSO return works locally and fails on cloud because the Redirect URLs lack `https://app.<domain>/**`; the boot screen still hangs with the network throttled; "No recent chats" still flashes on a slow load.
-**Plans**: TBD
+**Plans**: 5 plans (serial waves 1-5: every plan edits docs/HOT-FILE-LEDGER.md, CLAUDE.md and/or scripts/vitest-count-gate.cjs)
+
+- [x] 299-01-PLAN.md — the `GET /links/{kind}/{id}` resolver (one statement per kind, one 404), run `org_id`, and the write-org guards (LINK-04, LINK-05)
+- [x] 299-05-PLAN.md — sign-in returns to the link, the boot screen gives up with a retry, and "Loading your chats…" until the list answers (LINK-06, FIX-02)
+- [x] 299-02-PLAN.md — chat / workflow / Expert addresses, the thread lives in the URL, open a workflow or Expert by id (LINK-02, LINK-03)
+- [x] 299-03-PLAN.md — the one gate: the in-place "can't be opened" card, "This is in <org> — switch?", the sign-in resume (LINK-04, LINK-05, LINK-06)
+- [x] 299-04-PLAN.md — the Link control on five surfaces with an honest who-can-open line, and "Saves in <org>" (LINK-03, LINK-05)
+
 **UI hint**: yes
 **Flags**: **G-2 sketch FIRST** for the "can't be opened" page, the switch prompt, the copy-link control and the loading/not-found states. **G-4** (operator's "I'd recognise failure here" scenarios at scope time). **security_enforcement**: identical 404 for missing and forbidden, same-origin relative return paths only, server resolves each entity's org and writes use it or are refused (research pitfall 4); additive `org_id` on the run read. **Four-axis** (UI state; the switch prompt and a live stream). **G-5**: `ChatLayout.tsx` / `App.tsx` (now through 297's extracted modules), `backend/app/api/threads.py` (95), `backend/app/api/workflow_runs.py` (15), `ChatHistoryColumn.tsx`, `useThreads.ts` (3), `OrgAdminShell.tsx` (6), `SettingsPage.tsx` (30), `ExpertCatalogPage.tsx` (6), `startScopedChat.ts`. **Research flags**: Expert bundle org semantics (what an Expert link means across orgs); one live SSO round trip on cloud; how return-to-link interacts with supabase-js `^2.99.2` hash-token handling. **Operator action**: add `https://app.<domain>/**` (and the one-box origin) to Supabase Auth Redirect URLs — on the deploy parity checklist. Folds `SEED-178`, `SEED-015`, `SEED-312`, `BUG-261027-02`.
 
@@ -190,7 +197,14 @@ Plans:
   5. A built image, with nothing installed by hand, sends through Resend on cloud and SMTP on the one-box; the secret lives in env and every other knob in Settings. Invite email goes through the same sender, and a failed send is shown to the inviter, not only logged (NOTE-06).
 
 **How we'd know this failed**: two workers or a restart send the same email twice; an email goes out after the question was answered; the body carries the question or any document text; a trigger error breaks the engine's fail-closed prompt insert; a notice takes its org from `messages.org_id` (the `LIMIT 1` autofill) instead of `workflow_runs`; the notices or outbox table is readable by `anon` or by another user, or `get_advisors(security)` shows a new ERROR; a send failure is only logged; dev mail reaches a real inbox (no redirect-all guard); a tool-round-cap pause or a chat `ask_user` produces a notice; `harness_engine.py` is edited to emit notices; the clean-image test passes only because the dev venv has the package.
-**Plans**: TBD
+**Plans**: 5 plans in 4 waves (01 ‖ 02 → 03 → 04 → 05; serialized after wave 1 because every plan with a FIRING file edits the CLAUDE.md FIRING table and the ledger, and 02/04 mutate the local DB)
+
+Plans:
+- [x] 300-01-PLAN.md — scheduled runs launch and resume right: blank required input refused by label (FIX-04), starting provider recorded (FIX-05), "waiting" outcome, schedule row words + per-row Run now
+- [x] 300-02-PLAN.md — migration 218: notices + outbox + fail-soft SECURITY DEFINER triggers + Settings/invite columns; local apply, schema regen, trigger/RLS/anon live tests
+- [x] 300-03-PLAN.md — one app mailer (none / Resend REST / SMTP) from a built image, dev guard, run-waiting renderer, invite outcome, email-step honesty (D-23/D-24), deploy parity
+- [x] 300-04-PLAN.md — outbox drainer in every worker (SKIP LOCKED, frozen payload, re-check, opt-out, retries) + the Control Room Email tile
+- [x] 300-05-PLAN.md — Settings email knobs + the member's opt-out switch + the invite dialog/list failure words; phase closing gates
 **UI hint**: yes (the email opt-out and delay knob in Settings)
 **Flags**: **Migration**: next free number, research places `217` here — `notifications` (one open notice per recipient and run, partial unique index) and `notification_deliveries` (outbox, RLS deny-all), plus triggers on the `messages` ask rows and on `workflow_runs` status. Every table gets RLS; any SECURITY DEFINER trigger function has `EXECUTE` revoked from `PUBLIC` (not just `anon`); an **anon-role test** is written; `get_advisors(security)` read on cloud after the operator paste. Pasted via SQL editor, then `regenerate-full-schema.sh`. Trigger bodies swallow their own errors; "still waiting" is re-checked before each send; outbox drained in every worker with `FOR UPDATE SKIP LOCKED`, unique key plus Resend `Idempotency-Key`; a DB-backed test. **Mailer**: Resend REST via existing `httpx` (no new package) and stdlib `smtplib` (`EMAIL_PROVIDER=smtp`) off the event loop; a clean-image import test. **Deployment-artifact parity (same commit)**: new env vars in `deploy/onebox.env.example`, `docs/OPERATOR.md` (incl. the Step-3 seed list for the delay knob), `docker-compose.prod.yml`, `scripts/check-deploy-drift.sh`. **Operator actions**: Coolify env (`EMAIL_PROVIDER`, the Resend key); sender on a `notify.<domain>` subdomain with SPF, DKIM and DMARC `p=none` at Hostinger; check the VPS allows outbound SMTP for the one-box. **security_enforcement** (`/gsd:secure-phase`). **Research flags**: terminal-status literals; per-type pause expiry (never state an expiry in the email); whether production has ever sent an email. **Excluded pause kinds**: tool-round cap and chat `ask_user` (recorded by REG-08). **G-5**: `main.py` (69; drainer start-up, mind the `RUN_BOOT_SWEEPS` flag), `config.py` (54), `models/user_settings.py` (37), `api/settings.py` (25), `SettingsPage.tsx` (30), `scheduler_service.py` (7), `workflow_kickoff.py` (10), `run_lifecycle.py` (7), `run_producer.py` (14) for FIX-04/05; `backend/app/api/org.py` FIRES at 3 phases (166-168) with **no ledger row** — add one at planning; `email_provider.py` reaches 3 phases here. **Four-axis + full native roster** for FIX-05 (resume on provider). Folds `SEED-281` (run-waiting half), `BUG-261027-04`, `BUG-261027-05`, and the pre-existing "built images cannot send invite email" defect once REG-08 files it.
 
@@ -232,10 +246,10 @@ Plans:
 
 | Phase | Plans Complete | Status | Completed |
 |-------|----------------|--------|-----------|
-| 297. Every View Has an Address | 4/4 | Complete (2026-10-28) | verified passed 5/5; security 19/19; review 4 WR fixed; UAT 15 PASS + P7 Moonshot ⛔ (live 429, BUG-261024-01); not deployed |
-| 298. Lists Follow the Active Org | 5/5 | Executed — human_needed | 4/4 SC in code; security 34/34; review 1 BL + 9 WR → 9 fixed, WR-08 → 299; G-4 owed (G4-1 first); mig 217 local only; not deployed |
-| 299. Links to the Thing Itself | 0/TBD | Not started | - |
-| 300. Told When a Run Waits (Backend and Mailer) | 0/TBD | Not started | - |
+| 297. Every View Has an Address | 4/4 | Complete (2026-10-28) | verified passed 5/5; security 19/19; review 4 WR fixed; UAT 15 PASS + P7 Moonshot ⛔ (live 429, BUG-261024-01); LIVE 2026-10-28 (prod b813d2711) |
+| 298. Lists Follow the Active Org | 5/5 | Executed — human_needed | 4/4 SC in code; security 34/34; review 1 BL + 9 WR → 9 fixed, WR-08 → 299; G-4 owed (G4-1 first); mig 217 in cloud; LIVE 2026-10-28 (prod b813d2711) |
+| 299. Links to the Thing Itself | 5/5 | Complete 2026-10-29 | 5/5 SC + 6/6 reqs; security 36/36; UAT 18/20 PASS; owed by decision: G4-4b email-link leg (cloud), X-7 Moonshot (⛔ balance); G4-4c ⛔ SSO; IN-01..05 deferred; not deployed; Redirect URLs before deploy |
+| 300. Told When a Run Waits (Backend and Mailer) | 5/5 | Executed — human_needed | 5/5 SC + 6/6 reqs in code; security 41/41 (UF-1 fixed); review 5 WR + 4 IN fixed; UAT owed (G4-5 first; G4-6 after 299 G4-4a); not deployed; mig 218 local only |
 | 301. The Waiting-on-You Notice | 0/TBD | Not started | - |
 | 302. Close-Out and a True Register | 0/TBD | Not started | - |
 
