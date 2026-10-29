@@ -147,6 +147,36 @@ REG-08 in 302), an owner-facing "your email failed" surface, any change to the r
   `getByRole("menuitem")`; the D-235-04 "no repair control" negative assertion stays. One small hunk in
   `AttentionPopover.tsx`; drive it with the keyboard in Chrome at G-4 (row 4).
 
+### Amendments from research (2026-10-30, , recommended option each time; 301-RESEARCH.md F1-F12)
+- **D-27 (amends D-15, Q2/F6):** the route reads through the shared asyncpg pool with the caller bound as  (the
+  299  pattern), NOT the per-user connection (run visibility requires owning the run's thread, so
+  it would silently hide notices) and NOT  (asyncpg is already async). It also filters
+  , so a missed close (218's triggers swallow errors) can never list a
+  finished run.
+- **D-28 (amends D-06 / UI-SPEC UI-D5, F7):** the wire carries  (); the row adds
+  "· scheduled" for  and "· started by an API key" for  (vocabulary leaf), as the sketch drew it.
+  This overrides UI-SPEC UI-D5.
+- **D-29 (amends D-08, F2):** rows are s with  (Radix blocks Tab inside menus):
+  one ARROW-key stop per row, Enter opens, tests query  (= UI-SPEC UI-D1).
+- **D-30 (amends D-03, F3):** the hamburger dot exists only in ; the mobile bar of every other
+  view () gains the same dot.  reaches 3 phases → ledger row in the
+  same commit. ChatLayout's drawer hunks are several small ones, still honoured by construction (new UI in new files).
+- **D-31 (amends D-12, F4/F8):**  becomes a discriminated union on a REQUIRED :
+  library  / waiting .
+  The badge reads the server  (never ); "and N more" = total − rows. Every typechecked
+  fixture that builds a condition is updated in the same commit (research §pin table, F5).
+- **D-32 (F1):** the new route ships with the OpenAPI snapshot regenerated () and
+  wrote docs/public/api/openapi.public.json (227/269 paths, 312 schemas, version 4.5). gaining the  tag in "Account & org" +  in
+  , in the SAME commit (else  breaks the zero-headroom backend gate).
+- **D-33 (F7 Realtime):** migration 219 also adds its publication line to  §4 (the
+  schema dump omits publication membership). The hook wraps channel creation in try/catch and falls back to
+  poll + focus refetch; 's Supabase mock gains a working  (F8 there).
+- **D-34 (UAT prep):** G-4 rows 1-2 use the published system-global "Doc Q&A" workflow (question step, runs from either
+  org). Row 1 asserts the count goes UP BY ONE (the dev account already has open notices), never "shows 1". The
+  approval kind is proven at unit/DB level; a small approval-checkpoint workflow is authored for G-4 only if cheap.
+- **D-35:**  uses , which is denied in agent shells — the executor attempts it;
+  if denied, the regeneration is handed to the operator as a named step (never skipped silently).
+
 ### Claude's Discretion
 - Exact words of the empty state, kind words, the "and N more" line, the control's tooltip — words-first,
   no raw status values, in a vocabulary leaf.

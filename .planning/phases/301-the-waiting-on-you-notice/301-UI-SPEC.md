@@ -409,7 +409,8 @@ No `npx shadcn add` is run, no third-party registry is declared, and no npm pack
 - **UI-D2** The control sits directly under New chat. D-01 says "under New chat / Search", but the shipped rail has no Search item (that was sketch 076's proposal), so there is nothing else to sit under. No separator is added, which keeps `NavPanel` to one mount.
 - **UI-D3** The control's icon is not tinted amber (light-theme contrast). Only the pill is amber.
 - **UI-D4** `OrgAvatar` gains one additive optional prop, `size?: "default" | "xs"`. `"xs"` = `h-4 w-4 text-[10px]`. The default stays byte-identical at every current caller. The shipped 36px circle would be taller than the 12px line it sits in. `OrgIdentity.tsx` has one commit in its history, so it is not a hot file.
-- **UI-D5** No "· scheduled" suffix on a row. The sketch drew one, but D-06's row fields and D-15's route fields carry no run origin. A scheduled or API-key run looks like any other waiting run, which is what NOTE-01 asks for.
+- ~~**UI-D5**~~ **SUPERSEDED by CONTEXT D-28 (2026-10-30):** the wire now carries `origin`; rows show "· scheduled" / "· started by an API key" as the sketch drew. Original kept below.
+- **UI-D5 (original)** No "· scheduled" suffix on a row. The sketch drew one, but D-06's row fields and D-15's route fields carry no run origin. A scheduled or API-key run looks like any other waiting run, which is what NOTE-01 asks for.
 - **UI-D6** The pill shows the server's total (it can exceed the 50 rows returned), capped at "99+" on screen. The accessible name always carries the exact number.
 - **UI-D7** Loading, never-answered failure and stale-list lines are words only, muted, no amber or red, no retry button (the retry is automatic).
 - **UI-D8** No live region for count changes.
