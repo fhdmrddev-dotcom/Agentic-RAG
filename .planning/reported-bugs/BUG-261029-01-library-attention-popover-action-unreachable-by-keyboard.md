@@ -4,9 +4,9 @@ title: The Library attention popover's one action ("Open Library health") cannot
 reported: 2026-10-29
 surface: Agentic-RAG
 severity: minor
-status: open
+status: folded
 affected_areas: [frontend/navigation, frontend/a11y, frontend/attention]
-folded_into: null
+folded_into: "301"
 verified_closed_by: null
 related_seeds: []
 re_open_trigger: null

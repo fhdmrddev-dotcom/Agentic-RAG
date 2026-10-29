@@ -141,6 +141,12 @@ REG-08 in 302), an owner-facing "your email failed" surface, any change to the r
   parallel-thread = D-24 row 5; long-message = the list with ≥ 10 waiting notices across two orgs. Rows
   authored in VALIDATION.md, not PLAN.md.
 
+### Folded after discuss (2026-10-29)
+- **D-26: BUG-261029-01 folded** — the Library popover's "Open Library health" control becomes a `DropdownMenuItem`
+  (`onSelect`), so it is reachable by arrow keys + Enter like 301's own rows (UI-SPEC UI-D1). Its test moves to
+  `getByRole("menuitem")`; the D-235-04 "no repair control" negative assertion stays. One small hunk in
+  `AttentionPopover.tsx`; drive it with the keyboard in Chrome at G-4 (row 4).
+
 ### Claude's Discretion
 - Exact words of the empty state, kind words, the "and N more" line, the control's tooltip — words-first,
   no raw status values, in a vocabulary leaf.
@@ -151,6 +157,7 @@ REG-08 in 302), an owner-facing "your email failed" surface, any change to the r
 ### Folded seeds and bugs
 - **SEED-281** (nobody is told an approval is waiting) — in-app half folded here; 300 shipped the email
   half. Flip to answered when 301 ships (routing written back into the seed at close).
+- **BUG-261029-01** (Library popover action unreachable by keyboard) → D-26.
 - Seeds sweep: `0 seeds matched` (no plans yet; no structured trigger). Reported bugs: none folded —
   `BUG-260923-01` reviewed and left open (D-04).
 </decisions>
