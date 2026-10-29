@@ -1,7 +1,9 @@
 ---
 phase: 302
 slug: close-out-and-a-true-register
-status: draft
+status: approved
+reviewed_at: 2026-10-30
+reviewed_by: gsd-ui-checker (6/6, 2 non-blocking FLAGs; self-approved under the autonomous mandate)
 shadcn_initialized: true
 preset: not applicable
 created: 2026-10-30
