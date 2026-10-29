@@ -12267,6 +12267,13 @@ cells rot within days.
 | [`frontend/src/components/settings/EmailSettings.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentssettingsemailsettingstsx) | 1 / 1 / 324 (was `0 / 0 / 0`) | no (1 phase) | young (created 300-05). Operator Email card, ApiKeyLimits shape (D-07, D-08, D-10). ⛔ changes()/adopt() handle, no own Save; never sends a cleared delay or an invalid address |
 | [`frontend/src/components/settings/EmailNotificationPreference.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentssettingsemailnotificationpreferencetsx) | 1 / 1 / 155 (was `0 / 0 / 0`) | no (1 phase) | young (created 300-05). Member switch (D-09). ⛔ calls only ungated /me/preferences; never shows On before the read answers |
 | [`frontend/src/components/org/inviteDeliveryCopy.ts`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentsorginvitedeliverycopyts) | 1 / 1 / 32 (was `0 / 0 / 0`) | no (1 phase) | young (created 300-05). Invite delivery sentences (D-11, UI-D12). ⛔ zero-import leaf; D-11 sentence verbatim |
+| [`backend/app/api/notifications.py`](docs/HOT-FILE-LEDGER.md#backendappapinotificationspy) | 0 / 0 / 0 | no (planned 301-01) | young (planned 301-01). GET /notifications: the caller's open waiting notices across member orgs (D-15, D-27). ⛔ pool + $1 caller; no X-Org-Id; 401 router-level |
+| [`frontend/src/lib/api/notifications.ts`](docs/HOT-FILE-LEDGER.md#frontendsrclibapinotificationsts) | 0 / 0 / 0 | no (planned 301-02) | young (planned 301-02). getWaitingNotices(signal) wire client (D-15, D-28). ⛔ kept out of the @/lib/api barrel |
+| [`frontend/src/hooks/useWaitingNotices.ts`](docs/HOT-FILE-LEDGER.md#frontendsrchooksusewaitingnoticests) | 0 / 0 / 0 | no (planned 301-02) | young (planned 301-02). Fetch is truth, Realtime a hint (D-17, D-18, D-33). ⛔ never reads the payload; one call site (D-14) |
+| [`frontend/src/components/layout/waitingVocabulary.ts`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentslayoutwaitingvocabularyts) | 0 / 0 / 0 | no (planned 301-03) | young (planned 301-03). Every waiting-list word (UI-SPEC copy, D-28). ⛔ zero-import leaf |
+| [`frontend/src/components/layout/WaitingOnYouControl.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentslayoutwaitingonyoucontroltsx) | 0 / 0 / 0 | no (planned 301-03) | young (planned 301-03). Rail control + drawer row (D-01, D-02, D-03). ⛔ presentational: no fetch, no supabase; never switchOrg |
+| [`frontend/src/components/layout/WaitingOnYouList.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentslayoutwaitingonyoulisttsx) | 0 / 0 / 0 | no (planned 301-03) | young (planned 301-03). Rows as DropdownMenuItems (D-05..D-10, D-29). ⛔ no dismiss / mark-read; minute tick only while open |
+| [`frontend/src/components/org/OrgIdentity.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentsorgorgidentitytsx) | 1 / 1 / 94 | no (1 phase) | Added AT PLANNING 301 (absent its entire life). 301-03: one optional size "xs" on OrgAvatar (UI-D4). ⛔ default output byte-identical |
 
 
 
@@ -27857,3 +27864,45 @@ CLAUDE.md verdict cell: none (the file does not fire).
 Scan-list cell as of 2026-10-29 (replaced by 300-05 Task 3, moved verbatim): 397 / 83 / 6873 (was `396 / 83 / 6868`) | ⚠ **FIRES** | 300-05: 2 BASELINE pins added (EmailSettings 28, EmailNotificationPreference 17) + their FILE-LEVEL TARGETS beside ApiKeyLimits, none lowered |
 
 CLAUDE.md verdict cell as of 2026-10-29 (replaced by 300-05 Task 3, moved verbatim): | `scripts/vitest-count-gate.cjs` | 397 / 83 / 6873 (was `396 / 83 / 6868`) | 300-05: 2 pins added (EmailSettings 28, EmailNotificationPreference 17) |
+
+### `backend/app/api/notifications.py`
+
+**Added AT PLANNING (Phase 301, 2026-10-30) with `0 / 0 / 0`** — the file does not exist yet; the plan named in the cell creates it, and the triple is re-derived when this phase's ledger refresh runs (301-02 for its own files in their creating commit; 301-03 Task 3 for 301-01's, which runs ledger-free so it can share wave 1 with 301-02).
+
+Planned cell: young (planned 301-01). GET /notifications: the caller's open waiting notices across member orgs (D-15, D-27). ⛔ pool + $1 caller; no X-Org-Id; 401 router-level
+
+### `frontend/src/lib/api/notifications.ts`
+
+**Added AT PLANNING (Phase 301, 2026-10-30) with `0 / 0 / 0`** — the file does not exist yet; the plan named in the cell creates it, and the triple is re-derived when this phase's ledger refresh runs (301-02 for its own files in their creating commit; 301-03 Task 3 for 301-01's, which runs ledger-free so it can share wave 1 with 301-02).
+
+Planned cell: young (planned 301-02). getWaitingNotices(signal) wire client (D-15, D-28). ⛔ kept out of the @/lib/api barrel
+
+### `frontend/src/hooks/useWaitingNotices.ts`
+
+**Added AT PLANNING (Phase 301, 2026-10-30) with `0 / 0 / 0`** — the file does not exist yet; the plan named in the cell creates it, and the triple is re-derived when this phase's ledger refresh runs (301-02 for its own files in their creating commit; 301-03 Task 3 for 301-01's, which runs ledger-free so it can share wave 1 with 301-02).
+
+Planned cell: young (planned 301-02). Fetch is truth, Realtime a hint (D-17, D-18, D-33). ⛔ never reads the payload; one call site (D-14)
+
+### `frontend/src/components/layout/waitingVocabulary.ts`
+
+**Added AT PLANNING (Phase 301, 2026-10-30) with `0 / 0 / 0`** — the file does not exist yet; the plan named in the cell creates it, and the triple is re-derived when this phase's ledger refresh runs (301-02 for its own files in their creating commit; 301-03 Task 3 for 301-01's, which runs ledger-free so it can share wave 1 with 301-02).
+
+Planned cell: young (planned 301-03). Every waiting-list word (UI-SPEC copy, D-28). ⛔ zero-import leaf
+
+### `frontend/src/components/layout/WaitingOnYouControl.tsx`
+
+**Added AT PLANNING (Phase 301, 2026-10-30) with `0 / 0 / 0`** — the file does not exist yet; the plan named in the cell creates it, and the triple is re-derived when this phase's ledger refresh runs (301-02 for its own files in their creating commit; 301-03 Task 3 for 301-01's, which runs ledger-free so it can share wave 1 with 301-02).
+
+Planned cell: young (planned 301-03). Rail control + drawer row (D-01, D-02, D-03). ⛔ presentational: no fetch, no supabase; never switchOrg
+
+### `frontend/src/components/layout/WaitingOnYouList.tsx`
+
+**Added AT PLANNING (Phase 301, 2026-10-30) with `0 / 0 / 0`** — the file does not exist yet; the plan named in the cell creates it, and the triple is re-derived when this phase's ledger refresh runs (301-02 for its own files in their creating commit; 301-03 Task 3 for 301-01's, which runs ledger-free so it can share wave 1 with 301-02).
+
+Planned cell: young (planned 301-03). Rows as DropdownMenuItems (D-05..D-10, D-29). ⛔ no dismiss / mark-read; minute tick only while open
+
+### `frontend/src/components/org/OrgIdentity.tsx`
+
+**Added AT PLANNING (Phase 301, 2026-10-30) with `1 / 1 / 94`** — measured with the recipe (1 commit, phase 177). ⚠ **ABSENT FROM THE SCAN LIST FOR ITS ENTIRE LIFE**, found by `check-hot-file-ledger.cjs` when 301's plans named it (RESEARCH F14). 301-03 Task 1 adds one optional `size?: "default" | "xs"` prop to `OrgAvatar` (UI-SPEC UI-D4); the default class string must stay byte-identical at every current caller.
+
+Planned cell: Added AT PLANNING 301 (absent its entire life). 301-03: one optional size "xs" on OrgAvatar (UI-D4). ⛔ default output byte-identical

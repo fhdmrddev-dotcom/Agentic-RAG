@@ -221,7 +221,12 @@ Plans:
   4. The badge and list match the operator-approved sketch, and the operator's scope-time "I'd recognise failure here" scenarios pass when driven in Chrome.
 
 **How we'd know this failed**: the badge counts only the active org; the badge stays stale after answering until a reload; Realtime is treated as the source of truth; adding the second attention tenant breaks the Library's tab badge, or the `ATTENTION_PRODUCERS` `length === 1` pin is deleted instead of re-baselined; clicking an item switches org silently; a chat `ask_user` shows up as a notice; the list exists but nothing in the shell points at it.
-**Plans**: TBD
+**Plans**: 3 plans in 2 waves (01 ‖ 02 → 03; 301-01 runs ledger-free so it can share wave 1, and 301-03 refreshes its ledger rows)
+
+Plans:
+- [ ] 301-01-PLAN.md — GET /notifications (pool, caller as $1, every member org, active/paused runs only) + migration 219 (notifications in the Realtime publication, supplement §4) + OpenAPI regenerated; route/shape/live tests (anon, cross-user, left-org, ended run, chat-ask exclusion)
+- [ ] 301-02-PLAN.md — useWaitingNotices (fetch is truth, Realtime a hint, 60 s poll, focus, org switch) + waiting-runs as the second ATTENTION_PRODUCERS tenant with a required mark; pins re-baselined to 2; the Library mark stays the Library's
+- [ ] 301-03-PLAN.md — the Waiting on you rail control + list (menu-item rows open the run, never switch org), drawer row, non-chat hamburger dot, Library action keyboard-reachable (BUG-261029-01), 301-VALIDATION.md, phase ledger refresh + closing gates
 **UI hint**: yes
 **Flags**: **G-2 sketch FIRST** (badge placement beyond the Library, row naming its org, mark-read) — the approved mockup is the acceptance bar. **G-4**. **Four-axis UAT** (UI state; parallel-thread: a notice arrives while another thread streams). Realtime is a hint, reconcile on (re)connect (D-v2.5-03). The badge is the second tenant of `ATTENTION_PRODUCERS`; re-baseline its `length === 1` pin in the same commit (research). **G-5**: `ChatLayout.tsx` (33, through 297's extracted modules), `NavPanel.tsx` (14), `PendingAskCard.tsx` (12, if the run page links back); `attentionConditions.ts` reaches 3 phases here. Load `Skill("sketch-findings-agentic-rag")` (IA / attention patterns) before sketching.
 
@@ -250,7 +255,7 @@ Plans:
 | 298. Lists Follow the Active Org | 5/5 | Executed — human_needed | 4/4 SC in code; security 34/34; review 1 BL + 9 WR → 9 fixed, WR-08 → 299; G-4 owed (G4-1 first); mig 217 in cloud; LIVE 2026-10-28 (prod b813d2711) |
 | 299. Links to the Thing Itself | 5/5 | Complete 2026-10-29 | 5/5 SC + 6/6 reqs; security 36/36; UAT 18/20 PASS; owed by decision: G4-4b email-link leg (cloud), X-7 Moonshot (⛔ balance); G4-4c ⛔ SSO; IN-01..05 deferred; Redirect URLs added; LIVE 2026-10-29 (prod 31416d335) |
 | 300. Told When a Run Waits (Backend and Mailer) | 5/5 | Executed — human_needed | 5/5 SC + 6/6 reqs in code; security 41/41 (UF-1 fixed); review 5 WR + 4 IN fixed; UAT 12/15 PASS (G4-8 + real-mail G4-1 owed — Resend deferred); LIVE 2026-10-29 (prod 31416d335); mig 218 in cloud |
-| 301. The Waiting-on-You Notice | 0/TBD | Not started | - |
+| 301. The Waiting-on-You Notice | 0/3 | Planned | - |
 | 302. Close-Out and a True Register | 0/TBD | Not started | - |
 
 ---
