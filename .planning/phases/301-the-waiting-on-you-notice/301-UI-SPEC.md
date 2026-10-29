@@ -72,10 +72,9 @@ All new markup uses 4 / 8 / 16 / 24 / 32 px.
 | 44px drawer row (`min-h-11`) | S3 | Touch target. 44 is on the 4px grid |
 
 ---
+## Typography
 
 > Scale weights are **400 and 600 only**. 500 and 700 are NOT part of this scale; they appear solely inside shipped class strings copied verbatim (`RailItem` `font-medium`, the Library badge `font-bold`).
-
-## Typography
 
 Three sizes, two weights for new text. Two shipped weights are reused verbatim and listed.
 
