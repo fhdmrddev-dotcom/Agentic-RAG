@@ -1,0 +1,174 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Sketch 301 — Waiting on You</title>
+<link rel="stylesheet" href="../themes/default.css">
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Manrope:wght@600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+<style>
+*{box-sizing:border-box}
+body{margin:0;background:var(--color-bg);color:var(--color-text);font-family:var(--font-sans);font-size:var(--text-base)}
+#vnav,#states{display:flex;align-items:center;gap:8px;padding:10px 16px;border-bottom:1px solid var(--color-border);flex-wrap:wrap}
+.lbl{font-family:var(--font-mono);font-size:var(--text-xs);color:var(--color-text-dim);margin-right:6px}
+.vtab,.stab{background:transparent;border:1px solid var(--color-border);color:var(--color-text-muted);font-size:var(--text-xs);padding:6px 12px;border-radius:999px;cursor:pointer;font-family:inherit}
+.vtab.active{background:var(--color-primary-dim);border-color:var(--color-primary);color:var(--color-primary)}
+.stab.active{background:var(--color-accent);color:var(--color-text)}
+#note{padding:8px 16px;font-size:var(--text-sm);color:var(--color-text-muted);border-bottom:1px solid var(--color-border-soft);line-height:1.5}
+#note b{color:var(--color-text)}
+#truth{display:flex;gap:18px;flex-wrap:wrap;padding:8px 16px;font-family:var(--font-mono);font-size:11px;color:var(--color-text-dim);border-bottom:1px solid var(--color-border-soft);background:var(--color-bg-elev1)}
+#truth b{color:var(--color-text-muted);font-weight:500}
+
+.frame{display:grid;grid-template-columns:58px 250px minmax(0,1fr);height:calc(100vh - 170px);min-height:560px}
+.rail{background:var(--color-bg-elev1);border-right:1px solid var(--color-border);display:flex;flex-direction:column;align-items:center;gap:6px;padding:12px 0;position:relative}
+.ic{position:relative;width:36px;height:36px;border-radius:10px;display:grid;place-items:center;color:var(--color-text-dim);font-size:16px;cursor:pointer;border:0;background:transparent}
+.ic:hover{background:var(--color-surface)}
+.ic.on{background:var(--color-primary-dim);color:var(--color-primary)}
+.ic.wait.has{color:var(--color-warning)}
+.sep{width:26px;height:1px;background:var(--color-border);margin:4px 0}
+.badge{position:absolute;top:-3px;right:-4px;min-width:17px;height:17px;padding:0 4px;border-radius:999px;background:var(--color-warning);color:#1b1300;font:700 10px/17px var(--font-mono);text-align:center}
+.badge.lib{background:var(--color-warning)}
+.sp{flex:1}
+.avatar{position:relative;width:34px;height:34px;border-radius:50%;background:#5b5fc7;display:grid;place-items:center;font-weight:700;font-size:13px;color:#fff;cursor:pointer}
+.hist{border-right:1px solid var(--color-border);background:var(--color-bg-elev1);padding:12px 10px;overflow:hidden}
+.hist .h{font-size:var(--text-sm);font-weight:600;margin:2px 6px 10px}
+.hist .row{font-size:var(--text-sm);color:var(--color-text-muted);padding:7px 8px;border-radius:8px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;display:flex;gap:6px;align-items:center}
+.hist .row.on{background:var(--color-surface);color:var(--color-text)}
+.dot{width:7px;height:7px;border-radius:50%;background:var(--color-primary);animation:pulse 1.4s infinite;flex:none}
+@keyframes pulse{50%{opacity:.35}}
+main{position:relative;overflow:hidden;padding:22px 32px}
+.msg-a{max-width:78%;font-size:var(--text-sm);line-height:1.65}
+.strip{display:inline-flex;gap:8px;align-items:center;font-family:var(--font-mono);font-size:11px;color:var(--color-primary);border:1px solid hsl(239 100% 82% / .3);background:var(--color-primary-dim);border-radius:999px;padding:3px 10px;margin-bottom:10px}
+
+/* the list */
+.pop{position:absolute;z-index:20;width:330px;background:var(--color-surface);border:1px solid var(--color-border);border-radius:12px;box-shadow:0 18px 48px rgb(0 0 0 / .45);padding:6px;display:none}
+.pop.open{display:block}
+.pop .ph{font-size:var(--text-xs);font-weight:600;color:var(--color-text-muted);padding:8px 10px 6px}
+.item{display:flex;gap:10px;width:100%;text-align:left;border:0;background:transparent;color:inherit;font-family:inherit;padding:9px 10px;border-radius:8px;cursor:pointer;align-items:flex-start}
+.item:hover,.item:focus-visible{background:var(--color-accent);outline:none}
+.item .k{width:22px;height:22px;border-radius:6px;display:grid;place-items:center;font-size:11px;flex:none;margin-top:1px;background:var(--color-warning-dim);color:var(--color-warning)}
+.item .t{font-size:var(--text-sm);font-weight:600;color:var(--color-text);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.item .s{font-size:var(--text-xs);color:var(--color-text-muted);display:flex;align-items:center;gap:5px;margin-top:2px;flex-wrap:wrap}
+.osq{width:14px;height:14px;border-radius:4px;display:inline-grid;place-items:center;font-size:8px;font-weight:700;color:#fff}
+.empty{font-size:var(--text-sm);color:var(--color-text-muted);padding:14px 10px 16px}
+.more{font-size:var(--text-xs);color:var(--color-text-dim);padding:6px 10px 8px}
+.leaving{animation:leave .6s ease forwards}
+@keyframes leave{to{opacity:0;transform:translateX(12px)}}
+
+/* switch prompt */
+.prompt{position:absolute;inset:0;background:var(--color-bg);display:none;place-items:center}
+.prompt.on{display:grid}
+.prompt .card{width:420px;border:1px solid var(--color-border);border-radius:var(--radius-lg);background:var(--color-surface);padding:22px}
+.prompt h2{font-family:var(--font-headline);font-size:var(--text-lg);margin:0 0 6px}
+.prompt p{font-size:var(--text-sm);color:var(--color-text-muted);margin:0 0 16px}
+.btn{border:1px solid var(--color-border);background:transparent;color:var(--color-text);border-radius:8px;padding:7px 14px;font-family:inherit;font-size:var(--text-sm);cursor:pointer;margin-right:6px}
+.btn.p{background:var(--color-primary);border-color:var(--color-primary);color:#0b0d1a}
+
+/* mobile */
+.phone{display:none;width:360px;height:640px;margin:20px auto;border:1px solid var(--color-border);border-radius:24px;overflow:hidden;background:var(--color-bg);position:relative}
+.phone .top{display:flex;align-items:center;gap:10px;padding:12px 14px;border-bottom:1px solid var(--color-border)}
+.ham{position:relative;font-size:18px}
+.ham .hd{position:absolute;top:-1px;right:-4px;width:8px;height:8px;border-radius:50%;background:var(--color-warning)}
+.drawer{position:absolute;top:0;left:0;bottom:0;width:260px;background:var(--color-bg-elev1);border-right:1px solid var(--color-border);padding:14px 10px}
+.drawer .dr{padding:9px 10px;border-radius:8px;font-size:var(--text-sm);color:var(--color-text-muted);display:flex;justify-content:space-between}
+.drawer .dr.w{color:var(--color-warning);background:var(--color-warning-dim)}
+</style>
+</head>
+<body>
+<div id="vnav"><span class="lbl">VARIANT</span>
+  <button class="vtab active" data-v="A">A · own rail control</button>
+  <button class="vtab" data-v="B">B · on the avatar</button>
+  <button class="vtab" data-v="C">C · on Workflows</button>
+</div>
+<div id="states"><span class="lbl">MOMENT</span>
+  <button class="stab" data-s="zero">nothing waiting</button>
+  <button class="stab active" data-s="one">1 waiting · this org</button>
+  <button class="stab" data-s="many">3 waiting · 2 orgs</button>
+  <button class="stab" data-s="answered">answered in another tab</button>
+  <button class="stab" data-s="other">open the other-org item</button>
+  <button class="stab" data-s="mobile">mobile</button>
+</div>
+<div id="note"></div>
+<div id="truth"></div>
+
+<div class="frame" id="frame">
+  <nav class="rail" id="rail"></nav>
+  <aside class="hist">
+    <div class="h">Chats</div>
+    <div class="row on"><span class="dot"></span>Q3 vendor contracts summary</div>
+    <div class="row">Renewal clauses — Northwind</div>
+    <div class="row">Board pack outline</div>
+  </aside>
+  <main id="main">
+    <div class="strip">⏱ 0:41 · Step 3 · Writing the summary</div>
+    <div class="msg-a" id="stream">The three vendor contracts renew in Q3. Acme's carries a 60-day notice window…</div>
+    <div class="pop" id="pop"></div>
+    <div class="prompt" id="prompt"><div class="card">
+      <h2>This is in Northwind</h2>
+      <p><b>Supplier onboarding check</b> is a workflow run in Northwind. You're in Acme Legal.</p>
+      <button class="btn p">Switch to Northwind</button><button class="btn" id="stay">Stay</button>
+    </div></div>
+  </main>
+</div>
+<div class="phone" id="phone">
+  <div class="top"><span class="ham">☰<span class="hd"></span></span><span style="font-size:var(--text-sm);font-weight:600">Chats</span></div>
+  <div class="drawer">
+    <div class="dr">＋ New chat</div>
+    <div class="dr w">⏳ Waiting on you <b>3</b></div>
+    <div class="dr">💬 Chat</div><div class="dr">📚 Library</div><div class="dr">⛓ Workflows</div>
+  </div>
+</div>
+
+<script>
+const ORGS={acme:{n:"Acme Legal",c:"#5b5fc7",i:"A"},nw:{n:"Northwind",c:"#199e70",i:"N"}};
+const ALL=[
+  {id:1,wf:"Compliance Gap Report",org:"acme",kind:"approval",min:14},
+  {id:2,wf:"Supplier onboarding check",org:"nw",kind:"answer",min:6},
+  {id:3,wf:"Weekly contract digest",org:"acme",kind:"answer",min:2,sched:true},
+];
+let V="A",S="one",open=true;
+const sets={zero:[],one:[ALL[0]],many:ALL,answered:ALL.slice(0,2),other:ALL,mobile:ALL};
+const notes={
+ A:"<b>A — its own rail control</b>, under New chat / Search, on every view. Always there; the amber count appears only when something waits. The Library badge stays the Library's.",
+ B:"<b>B — on the avatar</b>. No new rail slot (rail density, BUG-260923-01). The list lives in the profile menu's top section — one click deeper, and the avatar's dot competes with the org switcher.",
+ C:"<b>C — on the Workflows item</b>. Reuses a slot whose meaning is close. But a schedule's owner may never open Workflows, and clicking the item navigates instead of opening the list."};
+function osq(o){return `<span class="osq" style="background:${ORGS[o].c}">${ORGS[o].i}</span>`}
+function rows(list){
+  if(!list.length) return `<div class="ph">Waiting on you</div><div class="empty">Nothing is waiting on you.</div>`;
+  const sorted=[...list].sort((a,b)=>b.min-a.min);
+  return `<div class="ph">Waiting on you</div>`+sorted.map(n=>`<button class="item" data-id="${n.id}">
+   <span class="k">${n.kind==="approval"?"✓":"?"}</span>
+   <span style="min-width:0"><div class="t">${n.wf}</div>
+   <div class="s">${osq(n.org)} ${ORGS[n.org].n} · needs your ${n.kind} · waiting ${n.min} min${n.sched?" · scheduled":""}</div></span></button>`).join("");
+}
+function render(){
+  const list=sets[S]; const c=list.length;
+  document.getElementById("note").innerHTML=notes[V];
+  document.getElementById("truth").innerHTML=`<span><b>active org</b> Acme Legal</span><span><b>open notices (server)</b> ${c}</span><span><b>badge</b> ${c||"—"}</span><span><b>library badge</b> 1 (a stopped source)</span><span><b>chat stream</b> still writing</span>${S==="answered"?'<span style="color:var(--color-success)">Weekly contract digest answered in tab 2 → refetch → row leaves</span>':""}`;
+  const mob=S==="mobile";
+  document.getElementById("frame").style.display=mob?"none":"grid";
+  document.getElementById("phone").style.display=mob?"block":"none";
+  const b=c?`<span class="badge">${c}</span>`:"";
+  let r=`<button class="ic" title="New chat">＋</button><button class="ic" title="Search">⌕</button>`;
+  if(V==="A") r+=`<button class="ic wait ${c?"has":""}" id="anchor" title="${c?c+" workflow runs are waiting on you":"Waiting on you"}" aria-label="${c?c+" workflow runs are waiting on you":"Waiting on you"}">⏳${b}</button>`;
+  r+=`<div class="sep"></div><button class="ic on" title="Chat">💬</button><button class="ic" title="Library">📚<span class="badge lib">1</span></button>`;
+  r+=`<button class="ic" ${V==="C"?'id="anchor"':""} title="Workflows">⛓${V==="C"?b:""}</button><button class="ic" title="Experts">✦</button>`;
+  r+=`<div class="sp"></div><div class="avatar" ${V==="B"?'id="anchor"':""}>F${V==="B"?b:""}</div>`;
+  document.getElementById("rail").innerHTML=r;
+  const pop=document.getElementById("pop");
+  pop.innerHTML=rows(list)+(V==="B"?`<div class="more" style="border-top:1px solid var(--color-border-soft);margin-top:4px">Profile · Switch org · Theme · Sign out</div>`:"");
+  pop.style.left="8px"; pop.style.top=V==="B"?"auto":(V==="C"?"150px":"60px"); pop.style.bottom=V==="B"?"14px":"auto";
+  pop.classList.toggle("open",open&&!mob&&S!=="other");
+  document.getElementById("prompt").classList.toggle("on",S==="other");
+  const a=document.getElementById("anchor"); if(a) a.onclick=()=>{open=!open;render()};
+  pop.querySelectorAll(".item").forEach(el=>el.onclick=()=>{const n=ALL.find(x=>x.id==el.dataset.id); if(n.org!=="acme"){S="other";syncTabs();} else {open=false;} render();});
+}
+function syncTabs(){document.querySelectorAll(".stab").forEach(x=>x.classList.toggle("active",x.dataset.s===S))}
+document.querySelectorAll(".vtab").forEach(t=>t.onclick=()=>{V=t.dataset.v;document.querySelectorAll(".vtab").forEach(x=>x.classList.toggle("active",x===t));open=true;render()});
+document.querySelectorAll(".stab").forEach(t=>t.onclick=()=>{S=t.dataset.s;syncTabs();open=true;render()});
+document.getElementById("stay").onclick=()=>{S="many";syncTabs();open=false;render()};
+let w=0;setInterval(()=>{w++;const s=document.getElementById("stream");if(s&&w<60)s.textContent+=" …"},1200);
+render();
+</script>
+</body>
+</html>
