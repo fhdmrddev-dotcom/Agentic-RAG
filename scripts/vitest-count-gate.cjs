@@ -3873,8 +3873,8 @@ const BASELINE = {
   // which the behaviour cases are structurally blind to and which is the link that ACTUALLY broke.
   "IngestionTab.reconnectControl.test.tsx": 6,
   "SourcesAttentionSection.test.tsx": 13,
-  "NavPanel.badge.test.tsx": 18, // RAISED 17 -> 18 at 301-03 (D-26 / BUG-261029-01): Open Library health found by role menuitem + an arrow-keys-and-Enter case · RAISED 14 -> 17 at 301-02 (D-11 / D-12): producer pin re-baselined to 2 + both keys; one library + two waiting rows -> badge 1, popover one row; waiting-only -> no badge
-  "ChatLayout.badge.test.tsx": 14, // RAISED 5 -> 14 at 301-02 (D-12 / D-14): waiting-only (no Library badge, dot lit), mixed (1 not 3), one read each on mount, dot without a Library navigator; the pin had trailed the file (5 pinned, 10 shipped)
+  "NavPanel.badge.test.tsx": 22, // RAISED 18 -> 22 at 301-03 Task 3 (D-01 / UI-D2): the waiting control always present at both widths, after New chat and before the first nav item, total pill beside the library-only badge, no pill before an answer · RAISED 17 -> 18 at 301-03 (D-26 / BUG-261029-01): Open Library health found by role menuitem + an arrow-keys-and-Enter case · RAISED 14 -> 17 at 301-02 (D-11 / D-12): producer pin re-baselined to 2 + both keys; one library + two waiting rows -> badge 1, popover one row; waiting-only -> no badge
+  "ChatLayout.badge.test.tsx": 19, // RAISED 14 -> 19 at 301-03 (D-01 / D-03 / D-17 / D-30): rail pill + drawer row named by the count, a drawer row opens THAT run and closes the drawer, no pill before an answer + empty line, a failed refresh keeps 2 + stale line, the non-chat bar dot · RAISED 5 -> 14 at 301-02 (D-12 / D-14): waiting-only (no Library badge, dot lit), mixed (1 not 3), one read each on mount, dot without a Library navigator; the pin had trailed the file (5 pinned, 10 shipped)
   "useSourceAttention.test.tsx": 13,
   "LibraryPage.initialTab.test.tsx": 6,
   // Phase 238 (D-238-08). 6 cases; the load-bearing one is "refuses a service_id that LOOKS
