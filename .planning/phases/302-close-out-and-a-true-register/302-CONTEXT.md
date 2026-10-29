@@ -81,6 +81,33 @@ Out of scope: any new capability (a close-out fix that adds one is a phase, not 
 - **D-21: G-8** — 3 plans: (1) FIX-01; (2) FIX-06 six findings; (3) FIX-03 live verify + REG-08 register. No migration
   expected. Targeted suites per task, full gates once per wave; backend baseline ceiling 71 holds.
 
+### Amendments from research (2026-10-30, `--auto`, recommended option each time; 302-RESEARCH.md F1-F9)
+- **D-22 (amends D-02/D-04, F1):** the hypothesis is CONFIRMED (repro `3586b900`: 0 `workspace_files`, both turns carry
+  `output_files`). The fix is frontend-only: a new pure helper derives produced files from
+  `useThreadMessages(threadId, "chat")` (the chat's own call); rows render below the workspace listbox (its keyboard
+  model and tests unchanged), use `FileRow` at panel density and download via `downloadSandboxOutput`; activating a
+  row downloads (no `FilePreview`). `backend/app/api/workspace.py` is OUT of scope. `WorkspacePanel.tsx` counts the
+  produced files in all three places (activity, FILES count, rail badge — lines ~422/466/631) or "FILES 0" survives.
+- **D-23 (amends D-03, F2):** the panel's live mount is `AppViewSwitch.tsx:308` (not `ChatLayout.tsx`); verify there.
+- **D-24 (amends D-05, F5):** FIX-03 owes ONE fix — 300's G4-5 defect F-1 (the refusal sentence shows twice after Run
+  now) in `WorkflowScheduleModal.tsx` (≤ 10 lines, test driven RED); then the live drive and BUG-261027-03 closure.
+- **D-25 (amends D-08, F6):** BE-IN-04 = bounded `$ref` unrolling for Moonshot (Moonshot itself 400s on recursion and
+  dropping the tool would hide a requested connector tool); the test that expects the `ValueError`
+  (`test_296_moonshot_schema.py:102`) is rewritten as the RED step. Live Moonshot row stays ⛔ (account suspended).
+- **D-26 (amends D-09, F7):** FE-IN-01 — `StreamsProvider.tsx`'s lock arm stamps `code: "workflow_locked"` on the
+  error it substitutes (one expression, honoured by construction); the hook words by code: locked → existing
+  sentence, paused → new client sentence, every other 409 → "{name} didn't start." + the server's own sentence
+  (second recorded exception to the composerCopy-only rule, noted in the hook header). Retry hidden for those.
+- **D-27 (amends D-06, F-research 6):** BE-IN-01 — one shared async liveness predicate used by both the judge and the
+  executor (`_validate_llm_judge_rubric` is already async).
+- **D-28 (amends D-13/D-17, F3/F4/F8/F9):** REG-08 also flips SEED-185 to `shipped` (its own condition — 299 closed —
+  is met); corrects SEED-281 at its false lines (~50, ~106-107, ~124); fixes SEED-391's `trigger_paths`
+  (`TeamPicture.tsx` / `teamVocabulary.ts`, not `WorkflowCanvas.tsx`). No validator exists for bug frontmatter —
+  check against `reported-bugs/TEMPLATE.md` keys inline (a small check in the plan, not a new script).
+- **D-29 (amends D-15, F9):** the `*.vercel.app` bug is filed `open` with the evidence `frontend/vercel.json:5-14`
+  (redirects `/app` on non-`app.` hosts to `app.<host>`, which a preview lacks) + the CORS `FRONTEND_URL` hypothesis;
+  the invite-email bug is filed `folded → 300` with the real-mail G4-1 row owed (Resend deferred).
+
 ### Claude's Discretion
 - Exact wording of the 409 sentences, the disabled-tick reason, the Team-view names; module names.
 
