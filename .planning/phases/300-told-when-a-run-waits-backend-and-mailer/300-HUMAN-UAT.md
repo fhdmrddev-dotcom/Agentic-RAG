@@ -5,7 +5,7 @@ source: [300-VERIFICATION.md, 300-VALIDATION.md]
 started: 2026-10-29
 updated: 2026-10-29
 rows_total: 15
-rows_run: 3
+rows_run: 4
 rows_blocked: 1
 driver: operator (Claude can drive the API/DB rows on request)
 ---
@@ -53,6 +53,7 @@ inputs, as a pre-300 schedule; Rows 2-3 filled).
 | G4-5 | ✅ PASS (1 finding) | Run now on Row 1 → amber "Didn't run — Client name is required and has no value. Add a new schedule with it filled in, then delete this one."; `last_status` holds the sentence, never `launch_failed`. Run now on Row 2 → only Row 2's buttons disabled, list never "Loading…", Row 1's line stayed; Row 2 → "✓ Started…". Run `beb2a281…` paused at 13:54:12 UTC → `last_status = waiting` → reopened dialog reads "Waiting on you — answer in the run." Screenshot: `screenshot-1793282084136-0.jpg` (Chrome temp). **Finding F-1:** right after Run now on Row 1 the same refusal sentence shows TWICE (outcome line + Run-now result line, S6a + S6d both fire). Gone on reopen. ≤ 10-line fix → `/gsd:fast` |
 | G4-2 | ✅ PASS | Run `a95db6a5…`: notice opened 13:56:18, answered "Yes" on the run page 13:56:51 → `closed_reason = answered`; delivery due 13:58:18, claimed 13:58:29 → `skipped_answered`. (Mail is off locally, so "no email" is also trivially true; the status proves the answer check ran first.) |
 | G4-3 | ✅ PASS | Settings → Preferences: switch read On (with "Email isn't set up on this server yet, so nothing is sent for now."); flipped Off → still Off after reload; `user_settings.preferences.notification_email_enabled = 'false'`. Run `4f1cf5f8…`: notice row exists (open), delivery `skipped_opted_out` at 14:00:09; run page still shows "Waiting on … (you) to answer". Switch restored to On afterwards via the PUT. |
+| LM-1 | ✅ PASS (stored render) | Schedule "Row 4 — LM-1 big input" with a 6,640-byte `client_name` (marker `LM1MARKER` + repeated "Confidential clause about the Globex merger terms."). Run `c198fda6…` → delivery rendered and frozen: subject "300 G4-5 schedule rows is waiting on you"; subject / text / HTML contain neither the marker, nor "Globex merger", nor the ask prompt "Approve the note". Status `suppressed` (no provider), so the frozen render was checked, not a received mail; the "[Test]" prefix is the redirect path's and is owed with G4-1 |
 | G4-7 | ⛔ BLOCKED (partial) | Probe in-process: `{state: off, mode: off, provider: none}` — correct for this box. "Held back" / "Test mode" / "Last send failed" need `EMAIL_PROVIDER` set and a backend restart (operator; `backend/.env` is never edited by Claude). Also the browser account is not an operator, so the tile itself was not seen. |
 
 Also observed (no verdict): with no provider, the G4-5 run's delivery recorded `suppressed`, reason "Email is not set
