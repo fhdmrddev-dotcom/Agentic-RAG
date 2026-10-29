@@ -105,9 +105,29 @@ vi.mock("@/lib/supabase", () => ({
         data: { subscription: { unsubscribe: vi.fn() } },
       }),
     },
-    channel: vi.fn(),
+    // Phase 301-02 (F11): `useWaitingNotices` now runs inside every ChatLayout mount and opens a
+    // user-scoped channel. `vi.fn()` alone returned `undefined` (the hook survives that too), but
+    // a real-shaped channel — a chainable `on` and a `subscribe` — is what the shell meets in the
+    // product, so the double carries one. `subscribe` never fires its status callback here.
+    channel: vi.fn(() => {
+      const ch: { on: ReturnType<typeof vi.fn>; subscribe: ReturnType<typeof vi.fn> } = {
+        on: vi.fn(),
+        subscribe: vi.fn(),
+      }
+      ch.on.mockReturnValue(ch)
+      ch.subscribe.mockReturnValue(ch)
+      return ch
+    }),
     removeChannel: vi.fn(),
   },
+}))
+
+// Phase 301-02 (D-14 / D-15): the waiting-notices client is NOT in the `@/lib/api` barrel either,
+// so it is mocked by its own path, exactly like `@/lib/api/sources` above. Zero notices by default:
+// every case below that predates 301 is a world with nothing waiting.
+const { mockGetWaitingNotices } = vi.hoisted(() => ({ mockGetWaitingNotices: vi.fn() }))
+vi.mock("@/lib/api/notifications", () => ({
+  getWaitingNotices: mockGetWaitingNotices,
 }))
 
 // Heavy leaves that are irrelevant to the signal and pull their own seams.
@@ -184,6 +204,7 @@ function renderLayout() {
 beforeEach(() => {
   vi.clearAllMocks()
   mockGetSourceHealth.mockResolvedValue(TWO_STOPPED)
+  mockGetWaitingNotices.mockResolvedValue({ notices: [], total: 0 })
 })
 afterEach(() => cleanup())
 

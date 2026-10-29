@@ -109,14 +109,80 @@ vi.mock("@/lib/api/sources", () => ({
   listSyncRuns: vi.fn().mockResolvedValue([]),
 }))
 
+// Phase 301-02 (D-11 / D-14) — the SECOND tenant reads `useWaitingNotices()`. It is mocked by its
+// own path so each case can hand the producer an exact hook state, and so this suite never opens
+// a Realtime channel or fetches. `waitingState.current` is what the hook returns on every render.
+const waitingState = vi.hoisted(() => ({
+  current: {
+    notices: [] as WaitingNotice[],
+    total: 0,
+    loading: false,
+    verdictKnown: true,
+    failedSinceLast: false,
+    refresh: () => {},
+  },
+}))
+vi.mock("@/hooks/useWaitingNotices", () => ({
+  useWaitingNotices: () => waitingState.current,
+}))
+
 import {
   ATTENTION_PRODUCERS,
+  conditionsForMark,
   useStoppedSourceConditions,
+  useWaitingRunConditions,
+  waitingTotal,
+  attentionCountByTab,
   type AttentionCondition,
+  type AttentionContext,
 } from "../attentionConditions"
 import { AttentionPopover } from "../AttentionPopover"
+import type { WaitingNotice } from "@/lib/api/notifications"
 
-afterEach(() => cleanup())
+/** Phase 301-02 (D-13): producers take ONE context object, never a bare callback. */
+function ctx(over: Partial<AttentionContext> = {}): AttentionContext {
+  return { openLibraryHealth: vi.fn(), openRun: vi.fn(), ...over }
+}
+
+const TWO_WAITING: WaitingNotice[] = [
+  {
+    id: "n-1",
+    run_id: "run-1",
+    org_id: "org-a",
+    org_name: "Acme",
+    workflow_name: "Quarterly review",
+    kind: "question",
+    origin: "app",
+    created_at: "2026-10-30T09:00:00Z",
+  },
+  {
+    id: "n-2",
+    run_id: "run-2",
+    org_id: "org-b",
+    org_name: "Beta",
+    workflow_name: "Contract approval",
+    kind: "approval",
+    origin: "schedule",
+    created_at: "2026-10-30T08:00:00Z",
+  },
+]
+
+function setWaiting(over: Partial<typeof waitingState.current> = {}) {
+  waitingState.current = {
+    notices: TWO_WAITING,
+    total: 7,
+    loading: false,
+    verdictKnown: true,
+    failedSinceLast: false,
+    refresh: () => {},
+    ...over,
+  }
+}
+
+afterEach(() => {
+  cleanup()
+  setWaiting({ notices: [], total: 0 })
+})
 
 // ══ NON-VACUITY FIRST ═════════════════════════════════════════════════════════════════
 //
@@ -125,7 +191,7 @@ afterEach(() => cleanup())
 // before any assertion about their shape runs.
 describe("attention tab attribution — the harness", () => {
   it("the mocked verdict really reaches the producer — two conditions, named", async () => {
-    const { result } = renderHook(() => useStoppedSourceConditions(vi.fn()))
+    const { result } = renderHook(() => useStoppedSourceConditions(ctx()))
     await vi.waitFor(() => expect(result.current.length).toBe(2))
     expect(result.current.map((c) => c.title)).toEqual(["Q4 rate sheets", "Contracts"])
   })
@@ -137,7 +203,7 @@ describe("attention tab attribution — the producer names the tab that owns the
     // The operator's complaint, in one assertion: *"the badge creates a question it then
     // refuses to answer"*. A stopped watched source is owned by the Library's Health tab —
     // and the producer is the only thing in this graph that has ever known that.
-    const { result } = renderHook(() => useStoppedSourceConditions(vi.fn()))
+    const { result } = renderHook(() => useStoppedSourceConditions(ctx()))
     await vi.waitFor(() => expect(result.current.length).toBe(2))
     for (const condition of result.current) {
       expect(condition.tab).toBe("health")
@@ -148,7 +214,7 @@ describe("attention tab attribution — the producer names the tab that owns the
     // ⛔ T-244-04-01. Both fixtures have DIFFERENT causes and both land on the same tab,
     // because the tab follows the PRODUCER, not the cause. A client that read the cause to
     // decide a destination would be a second decider — the thing D-235-05 exists to forbid.
-    const { result } = renderHook(() => useStoppedSourceConditions(vi.fn()))
+    const { result } = renderHook(() => useStoppedSourceConditions(ctx()))
     await vi.waitFor(() => expect(result.current.length).toBe(2))
     expect(new Set(result.current.map((c) => c.tab))).toEqual(new Set(["health"]))
     expect(new Set(stoppedFixture.map((s) => s.cause)).size).toBe(2)
@@ -160,10 +226,17 @@ describe("attention tab attribution — a future producer is not forced to lie",
   it("a condition with NO tab is a valid AttentionCondition and still renders", () => {
     // ⚠ Typed, not cast. If `tab` were required this object would not compile, and the
     // typecheck is where that failure would surface — which is the point of the annotation.
+    //
+    // ⚠ CORRECTED at Phase 301-02 (D-11 / D-31): this fixture used to be the "homeless" waiting
+    // approval, named for SEED-231. That tenant now exists — it is `waiting-runs`, its register id
+    // is SEED-281, and it carries its OWN mark (`"waiting"`) rather than a missing tab. What this
+    // case still guards is the original property: a LIBRARY condition may have no tab and still
+    // renders. So the fixture is now a tab-less library condition, with words that say so.
     const homeless: AttentionCondition = {
-      id: "future-1",
-      title: "An approval is waiting",
-      detail: "Somebody asked for a decision and nobody has been told.",
+      mark: "library",
+      id: "library-no-tab-1",
+      title: "A Library condition with no tab",
+      detail: "It belongs to the Library but to none of its tabs (the SEED-281 tenant has its own mark).",
       onOpen: vi.fn(),
     }
     render(
@@ -180,13 +253,122 @@ describe("attention tab attribution — a future producer is not forced to lie",
 
 // ══ 3 · THE REGISTRY STILL HAS EXACTLY ONE TENANT ═════════════════════════════════════
 describe("attention tab attribution — no second producer was smuggled in", () => {
-  it("⛔ ATTENTION_PRODUCERS.length === 1 and its key is 'stopped-sources' (D-235-03)", () => {
+  it("⛔ ATTENTION_PRODUCERS.length === 2 and its keys are 'stopped-sources', 'waiting-runs' (D-11)", () => {
     // Re-asserted in THIS plan's own suite on purpose. `SEED-231` (nobody is told an approval
     // is waiting) is topical for this phase and was deliberately NOT taken: the registry's
     // seam stays its intended future tenant, re-openable by a deliberate override with the
     // count argued — never as a fill-in while a neighbouring field was being added.
-    expect(ATTENTION_PRODUCERS.length).toBe(1)
-    expect(ATTENTION_PRODUCERS[0].key).toBe("stopped-sources")
+    //
+    // ⚠ RE-BASELINED 1 → 2 at Phase 301-02 (D-11) — the original read `toBe(1)` and key [0] only.
+    // This IS the deliberate override the paragraph above demanded: Phase 301 argued the count
+    // against D-235-03 in its CONTEXT, and the tenant is SEED-281 (SEED-231 above is superseded).
+    // The number is edited, never deleted, and BOTH keys are asserted, so a third tenant still has
+    // to come here and argue.
+    expect(ATTENTION_PRODUCERS.length).toBe(2)
+    expect(ATTENTION_PRODUCERS.map((p) => p.key)).toEqual(["stopped-sources", "waiting-runs"])
+  })
+})
+
+// ══ 3b · PHASE 301-02 — THE SECOND TENANT, THE MARK AND THE CONTEXT OBJECT ═══════════
+describe("301-02 — the stopped-sources tenant under the context object (D-13, D-31)", () => {
+  it("carries mark 'library' and tab 'health'; onOpen opens Library health, never a run", async () => {
+    const c = ctx()
+    const { result } = renderHook(() => useStoppedSourceConditions(c))
+    await vi.waitFor(() => expect(result.current.length).toBe(2))
+    for (const condition of result.current) {
+      expect(condition.mark).toBe("library")
+      if (condition.mark === "library") expect(condition.tab).toBe("health")
+    }
+    result.current[0].onOpen()
+    expect(c.openLibraryHealth).toHaveBeenCalledTimes(1)
+    expect(c.openRun).not.toHaveBeenCalled()
+  })
+})
+
+describe("301-02 — the waiting-runs tenant (D-11, D-14, D-31)", () => {
+  it("maps each notice to a waiting condition with no tab, and the server total on every row", () => {
+    setWaiting()
+    const { result } = renderHook(() => useWaitingRunConditions(ctx()))
+    expect(result.current).toHaveLength(2)
+    const [first, second] = result.current
+    expect(first).toMatchObject({
+      mark: "waiting",
+      id: "n-1",
+      runId: "run-1",
+      orgId: "org-a",
+      orgName: "Acme",
+      since: "2026-10-30T09:00:00Z",
+      kind: "question",
+      origin: "app",
+      total: 7,
+      title: "Quarterly review",
+      detail: "",
+    })
+    expect(second).toMatchObject({ mark: "waiting", id: "n-2", runId: "run-2", kind: "approval", total: 7 })
+    // ⛔ A waiting run has no Library home, so it carries no tab KEY at all (D-12).
+    for (const condition of result.current) expect("tab" in condition).toBe(false)
+  })
+
+  it("onOpen opens the run, never Library health", () => {
+    setWaiting()
+    const c = ctx()
+    const { result } = renderHook(() => useWaitingRunConditions(c))
+    result.current[1].onOpen()
+    expect(c.openRun).toHaveBeenCalledWith("run-2")
+    expect(c.openLibraryHealth).not.toHaveBeenCalled()
+  })
+
+  it("reports loading / failed / stale / answered from the hook's own flags", () => {
+    const report = vi.fn()
+    const cases: [Partial<typeof waitingState.current>, string][] = [
+      [{ verdictKnown: false, loading: true, notices: [], total: 0 }, "loading"],
+      [{ verdictKnown: false, loading: false, notices: [], total: 0 }, "failed"],
+      [{ verdictKnown: true, failedSinceLast: true }, "stale"],
+      [{ verdictKnown: true, failedSinceLast: false }, "answered"],
+    ]
+    for (const [state, expected] of cases) {
+      setWaiting(state)
+      report.mockClear()
+      const { unmount } = renderHook(() => useWaitingRunConditions(ctx({ reportWaitingStatus: report })))
+      expect(report).toHaveBeenLastCalledWith(expected)
+      unmount()
+    }
+  })
+
+  it("a context with no reportWaitingStatus does not throw", () => {
+    setWaiting({ verdictKnown: false, loading: true })
+    expect(() => renderHook(() => useWaitingRunConditions(ctx()))).not.toThrow()
+  })
+})
+
+describe("301-02 — the leaf helpers partition by mark (D-12, F8)", () => {
+  const library: AttentionCondition[] = [
+    { mark: "library", id: "w-1", title: "Rate sheets", detail: "d", onOpen: vi.fn(), tab: "health" },
+    { mark: "library", id: "w-2", title: "Contracts", detail: "d", onOpen: vi.fn(), tab: "health" },
+  ]
+  function waiting(): AttentionCondition[] {
+    setWaiting()
+    const { result, unmount } = renderHook(() => useWaitingRunConditions(ctx()))
+    const out = result.current
+    unmount()
+    return out
+  }
+
+  it("conditionsForMark returns only the asked mark", () => {
+    const mixed = [...library, ...waiting()]
+    expect(conditionsForMark(mixed, "library").map((c) => c.id)).toEqual(["w-1", "w-2"])
+    expect(conditionsForMark(mixed, "waiting").map((c) => c.id)).toEqual(["n-1", "n-2"])
+  })
+
+  it("waitingTotal reads the server total from a waiting row — never the row count", () => {
+    const mixed = [...library, ...waiting()]
+    expect(waitingTotal(mixed)).toBe(7)
+    expect(waitingTotal(library)).toBe(0)
+    expect(waitingTotal([])).toBe(0)
+  })
+
+  it("attentionCountByTab counts only library conditions", () => {
+    expect(attentionCountByTab([...library, ...waiting()])).toEqual({ health: 2 })
   })
 })
 
@@ -206,7 +388,7 @@ describe("attention tab attribution — the cause is still spent into a sentence
     // rendered WORDS, never on the presence of a `detail` key — a presence assertion cannot
     // see content drift, and this project shipped 200 green assertions over a surface that was
     // "nothing at all like what we designed" for exactly that reason.
-    const { result } = renderHook(() => useStoppedSourceConditions(vi.fn()))
+    const { result } = renderHook(() => useStoppedSourceConditions(ctx()))
     await vi.waitFor(() => expect(result.current.length).toBe(2))
 
     expect(result.current[0].detail).toBe(SENTENCE_FOR_CAUSE.folder_gone("Ops Drive"))
@@ -297,6 +479,27 @@ describe("attention tab attribution — no new useSourceAttention() call site", 
       ["components/library/IngestionTab.tsx", 1],
       ["components/library/SourcesAttentionSection.tsx", 1],
     ])
+  })
+
+  // ── Phase 301-02 (D-14) — the sibling fence: ONE `useWaitingNotices(` call site ─────────
+  // Same glob, same stripper, same exclusions. A second reader of the waiting list would mean
+  // a second subscription and a second poll — and, in time, two counts for one person.
+  const waitingCallSites = (src: string) => (codeOf(src).match(/useWaitingNotices\s*\(/g) ?? []).length
+  const waitingInventory = Object.entries(RAW)
+    .filter(([key]) => isProductFile(key) && rel(key) !== "hooks/useWaitingNotices.ts")
+    .map(([key, src]) => [rel(key), waitingCallSites(src)] as const)
+    .filter(([, n]) => n > 0)
+    .sort(([a], [b]) => a.localeCompare(b))
+
+  it("self-guard: the waiting hook's own file is the definition the fence excludes", () => {
+    const hook = Object.entries(RAW).find(([k]) => rel(k) === "hooks/useWaitingNotices.ts")?.[1] as string
+    expect(hook).toBeTypeOf("string")
+    expect(codeOf(hook)).toContain("export function useWaitingNotices(")
+    expect(waitingInventory.map(([p]) => p)).not.toContain("hooks/useWaitingNotices.ts")
+  })
+
+  it("⛔ EXACTLY ONE product call site of useWaitingNotices( — the registry (D-14)", () => {
+    expect(waitingInventory).toEqual([["components/layout/attentionConditions.ts", 1]])
   })
 
   it("⛔ the Library page receives the attribution as DATA — it does not fetch a verdict", () => {

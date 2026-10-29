@@ -25,6 +25,11 @@
  *     later WITHOUT growing a sibling surface. ⛔ Registering a second producer *in Phase 235*
  *     is scope creep and is forbidden. This assertion is what makes that enforceable instead of
  *     aspirational: the next author adding a tenant has to come here and argue with a number.
+ *
+ *     ⚠ CORRECTED at Phase 301-02 (D-11): Phase 301 came here and argued with the number. The
+ *     registry now has TWO tenants (`stopped-sources`, `waiting-runs` — SEED-281), and the case
+ *     below asserts 2 plus both keys. Rule 3 above is kept as written because it is why that
+ *     argument had to happen in a CONTEXT decision rather than in a quiet one-line edit.
  */
 import { describe, it, expect, vi, afterEach } from "vitest"
 import { render, screen, cleanup } from "@testing-library/react"
@@ -111,12 +116,19 @@ describe("NavPanel badge — the harness itself", () => {
 
 // ══ THE REGISTRY — EXACTLY ONE TENANT (D-235-03) ══════════════════════════════════════
 describe("NavPanel badge — the producer registry", () => {
-  it("registers EXACTLY ONE producer in Phase 235 — a second one is forbidden scope creep", () => {
+  // Title was "registers EXACTLY ONE producer in Phase 235 — a second one is forbidden scope
+  // creep"; re-titled at 301-02 (D-11) with the number it now asserts.
+  it("registers EXACTLY TWO producers since Phase 301 — a third one is a decision, not a fill-in", () => {
     // ⛔ D-235-03. The surface is general so the NEXT notification need plugs in; the next
     // need is not this phase's. If you are here because you added a tenant, that is the
     // decision this number exists to force you to take deliberately.
-    expect(ATTENTION_PRODUCERS.length).toBe(1)
-    expect(ATTENTION_PRODUCERS[0].key).toBe("stopped-sources")
+    //
+    // ⚠ RE-BASELINED 1 → 2 at Phase 301-02 (D-11) — the original read `toBe(1)` with key [0]
+    // only. Phase 301 is the deliberate decision this number existed to force: it argued the
+    // count against D-235-03 and registered `waiting-runs` (SEED-281; SEED-231 is superseded).
+    // Edited, never deleted, and both keys asserted, so a THIRD tenant still argues with it.
+    expect(ATTENTION_PRODUCERS.length).toBe(2)
+    expect(ATTENTION_PRODUCERS.map((p) => p.key)).toEqual(["stopped-sources", "waiting-runs"])
   })
 })
 
