@@ -233,7 +233,7 @@ Plans:
 
 **Wave 2** *(blocked on Wave 1 completion)*
 
-- [ ] 301-03-PLAN.md — the Waiting on you rail control + list (menu-item rows open the run, never switch org), drawer row, non-chat hamburger dot, Library action keyboard-reachable (BUG-261029-01), 301-VALIDATION.md, phase ledger refresh + closing gates
+- [x] 301-03-PLAN.md — the Waiting on you rail control + list (menu-item rows open the run, never switch org), drawer row, non-chat hamburger dot, Library action keyboard-reachable (BUG-261029-01), 301-VALIDATION.md, phase ledger refresh + closing gates
 
 **UI hint**: yes
 **Flags**: **G-2 sketch FIRST** (badge placement beyond the Library, row naming its org, mark-read) — the approved mockup is the acceptance bar. **G-4**. **Four-axis UAT** (UI state; parallel-thread: a notice arrives while another thread streams). Realtime is a hint, reconcile on (re)connect (D-v2.5-03). The badge is the second tenant of `ATTENTION_PRODUCERS`; re-baseline its `length === 1` pin in the same commit (research). **G-5**: `ChatLayout.tsx` (33, through 297's extracted modules), `NavPanel.tsx` (14), `PendingAskCard.tsx` (12, if the run page links back); `attentionConditions.ts` reaches 3 phases here. Load `Skill("sketch-findings-agentic-rag")` (IA / attention patterns) before sketching.
