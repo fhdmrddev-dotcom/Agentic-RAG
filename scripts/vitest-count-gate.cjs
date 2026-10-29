@@ -3873,7 +3873,7 @@ const BASELINE = {
   // which the behaviour cases are structurally blind to and which is the link that ACTUALLY broke.
   "IngestionTab.reconnectControl.test.tsx": 6,
   "SourcesAttentionSection.test.tsx": 13,
-  "NavPanel.badge.test.tsx": 17, // RAISED 14 -> 17 at 301-02 (D-11 / D-12): producer pin re-baselined to 2 + both keys; one library + two waiting rows -> badge 1, popover one row; waiting-only -> no badge
+  "NavPanel.badge.test.tsx": 18, // RAISED 17 -> 18 at 301-03 (D-26 / BUG-261029-01): Open Library health found by role menuitem + an arrow-keys-and-Enter case · RAISED 14 -> 17 at 301-02 (D-11 / D-12): producer pin re-baselined to 2 + both keys; one library + two waiting rows -> badge 1, popover one row; waiting-only -> no badge
   "ChatLayout.badge.test.tsx": 14, // RAISED 5 -> 14 at 301-02 (D-12 / D-14): waiting-only (no Library badge, dot lit), mixed (1 not 3), one read each on mount, dot without a Library navigator; the pin had trailed the file (5 pinned, 10 shipped)
   "useSourceAttention.test.tsx": 13,
   "LibraryPage.initialTab.test.tsx": 6,
@@ -4429,6 +4429,7 @@ const BASELINE = {
   // ── Phase 301-03 (NOTE-01 / UI-D4, D-02, D-06, D-28) — FILE-LEVEL in TARGETS, same commit.
   "waitingVocabulary.test.ts": 24, // 301-03 — every waiting-list word verbatim, count sentence / 99+ pill / kind / origin / waited ladder (future + unparseable = under a minute) / and N more / org initial, no raw wire word, zero imports
   "OrgIdentity.test.tsx": 17, // 301-03 — first-ever pin: 13 shipped (roleBadgeMeta, RoleBadge, OrgAvatar) + 4 xs cases (default class string byte-identical, size default, xs 16px / 10px, pending at xs)
+  "WaitingOnYouControl.test.tsx": 24, // 301-03 — rail name = count sentence + TOTAL pill (99+), no pill at 0 / loading, stale keeps it; rows as menuitems naming workflow / org (active too) / need / waited / origin; fallbacks; ArrowDown+Enter and click open the run, never switchOrg; empty / loading / failed / stale / and N more; live replace stays open; minute tick; absences; drawer variant
   // 293-04 — under the `src/components/workflows` directory entry, so a pin only.
   "WorkflowCardMenu.apiKey293.test.tsx": 4, // ⋯ New API key… under Schedules on owned published rows only, payload {id, name}; absent without onApiKey (seam286 pin unchanged)
   // ── Phase 297-01 (REG-09 / D-01, D-03) — adopted, both knobs, same commit (2026-10-27).
@@ -6551,6 +6552,7 @@ const TARGETS = [
   // 301-03 — FILE-LEVEL, SAME commit as their BASELINE pins.
   "src/components/layout/waitingVocabulary.test.ts",
   "src/components/org/OrgIdentity.test.tsx",
+  "src/components/layout/__tests__/WaitingOnYouControl.test.tsx",
   // Phase 297-01 — FILE-LEVEL (no directory entry), in the SAME commit as its BASELINE pin.
   "src/hooks/__tests__/useAppNavigation.test.tsx",
   // Phase 297-02 — FILE-LEVEL (no src/lib/__tests__ directory entry), SAME commit as its BASELINE pin.

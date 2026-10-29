@@ -10519,6 +10519,14 @@ Library, which is a thing the Library says; repeating it in the popover would ha
 author of the same fact on the far side of the door. The `tab` field it now carries passes through
 this component untouched. Triple unchanged: **1 / 1 / 109**.
 
+### 301-03 Task 2 (D-26 / BUG-261029-01, 2026-10-30)
+
+**`2 / 2 / 117` (was `1 / 1 / 109`).** The one action, "Open Library health", was a plain `<button>` inside the Radix menu content — and Radix Menu cancels Tab there, so it could not be reached from the keyboard at all (BUG-261029-01). It is a `DropdownMenuItem` now (same `data-testid="rail-open-health"`, same words, `onSelect={onOpenLibraryHealth}`, `text-primary`), reached with arrow keys + Enter; `NavPanel.badge.test.tsx` finds it by role `menuitem` and drives the keyboard path. The "A plain button rather than a menu item" comment and the stale "NO URL, EVER — twelve views, zero addressable" docblock (false since Phase 297) are struck through beside their corrections, not deleted. Binding invariants unchanged: ⛔ no verdict and no count derived here; ⛔ no repair control (the negatives still pass).
+
+Scan-list cell as of 2026-10-30 (replaced by 301-03 Task 2, moved verbatim): 1 / 1 / 109 | no (1 phase) | young (235) — ⛔ it renders no verdict and derives no count; it is handed conditions and draws them |
+
+CLAUDE.md verdict cell: none (the file does not fire).
+
 ---
 
 ## frontend/src/components/layout/attentionConditions.ts
@@ -11871,7 +11879,7 @@ cells rot within days.
 | [`frontend/src/components/sources/sourceHealthVocabulary.ts`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentssourcessourcehealthvocabularyts) | 8 / 4 / 645 | ⛔ **FIRES — UNDISPOSITIONED** | ⚠ row STALE (`2/1/454`; CLAUDE.md read `6/3/560`). ⛔ G-5 FIRED AND NOBODY SAID SO: the row promised it would fire on the next touch and **252-03 WAS that touch**. Seam OWED |
 | [`frontend/src/components/sources/runHistoryFold.ts`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentssourcesrunhistoryfoldts) | 1 / 1 / 125 | no (1 phase) | young (235) — the pure quiet-run fold; separating it is what proved the fence's collapsed-3/expanded-17 red was a FIXTURE defect |
 | [`frontend/src/components/sources/RunHistoryList.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentssourcesrunhistorylisttsx) | 5 / 3 / 275 (was `2 / 1 / 235`) | ⚠ **FIRES** | ⚠ now FIRES (3 phases). **285-01**: comment only + one vitest pin (a success row's run summary is never rendered, T-235-12). Extraction FIRST at the next feature phase |
-| [`frontend/src/components/layout/AttentionPopover.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentslayoutattentionpopovertsx) | 1 / 1 / 109 | no (1 phase) | young (235) — ⛔ it renders no verdict and derives no count; it is handed conditions and draws them |
+| [`frontend/src/components/layout/AttentionPopover.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentslayoutattentionpopovertsx) | 2 / 2 / 117 (was `1 / 1 / 109`) | no (2 phases) | 301-03 (D-26 / BUG-261029-01): Open Library health is a DropdownMenuItem (keyboard-reachable). ⛔ no verdict, no count, no repair control |
 | [`frontend/src/components/layout/attentionConditions.ts`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentslayoutattentionconditionsts) | 5 / 3 / 424 (was `3 / 2 / 200`) | ⚠ **FIRES** | ⚠ now FIRES (301). 301-02: second tenant waiting-runs; required mark; ctx object; conditionsForMark/waitingTotal. ⛔ one useWaitingNotices( call |
 | [`frontend/src/components/library/SourcesAttentionSection.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentslibrarysourcesattentionsectiontsx) | 2 / 1 / 197 | no (1 phase) | young (235) — three separately-named honest states. ⛔ A DOOR, never a repair; no handler ⇒ no control |
 | [`frontend/src/hooks/useSourceAttention.ts`](docs/HOT-FILE-LEDGER.md#frontendsrchooksusesourceattentionts) | 2 / 1 / 131 | no (1 phase) | young (235) — ⛔ a consumer reading only `loading` + `stopped` will print an all-clear it never received. `verdictKnown` is the sixth field |
@@ -12271,8 +12279,8 @@ cells rot within days.
 | [`frontend/src/lib/api/notifications.ts`](docs/HOT-FILE-LEDGER.md#frontendsrclibapinotificationsts) | 1 / 1 / 51 (was `0 / 0 / 0`) | no (young) | young (created 301-02). getWaitingNotices(signal) wire client (D-15, D-28). ⛔ kept out of the @/lib/api barrel |
 | [`frontend/src/hooks/useWaitingNotices.ts`](docs/HOT-FILE-LEDGER.md#frontendsrchooksusewaitingnoticests) | 1 / 1 / 211 (was `0 / 0 / 0`) | no (young) | young (created 301-02). Fetch is truth, Realtime a hint (D-17, D-18, D-33). ⛔ never reads the payload; one call site (D-14) |
 | [`frontend/src/components/layout/waitingVocabulary.ts`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentslayoutwaitingvocabularyts) | 1 / 1 / 79 (was `0 / 0 / 0`) | no (young) | young (created 301-03). Every waiting-list word (UI-SPEC copy, D-02, D-06, D-10, D-28). ⛔ zero-import leaf; no raw wire word reaches the screen |
-| [`frontend/src/components/layout/WaitingOnYouControl.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentslayoutwaitingonyoucontroltsx) | 0 / 0 / 0 | no (planned 301-03) | young (planned 301-03). Rail control + drawer row (D-01, D-02, D-03). ⛔ presentational: no fetch, no supabase; never switchOrg |
-| [`frontend/src/components/layout/WaitingOnYouList.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentslayoutwaitingonyoulisttsx) | 0 / 0 / 0 | no (planned 301-03) | young (planned 301-03). Rows as DropdownMenuItems (D-05..D-10, D-29). ⛔ no dismiss / mark-read; minute tick only while open |
+| [`frontend/src/components/layout/WaitingOnYouControl.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentslayoutwaitingonyoucontroltsx) | 1 / 1 / 135 (was `0 / 0 / 0`) | no (young) | young (created 301-03). Rail control + drawer row (D-01, D-02, D-03). ⛔ presentational: no fetch, no supabase; never switchOrg; pill = answered total > 0 only |
+| [`frontend/src/components/layout/WaitingOnYouList.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentslayoutwaitingonyoulisttsx) | 1 / 1 / 157 (was `0 / 0 / 0`) | no (young) | young (created 301-03). Rows as DropdownMenuItems (D-05..D-10, D-29). ⛔ no dismiss / mark-read; onSelect → onOpen only; minute tick only while open |
 | [`frontend/src/components/org/OrgIdentity.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentsorgorgidentitytsx) | 2 / 2 / 99 (was `1 / 1 / 94`) | no (2 phases) | 301-03: one optional size "xs" on OrgAvatar (UI-D4). ⛔ default output byte-identical |
 
 
@@ -27953,11 +27961,27 @@ CLAUDE.md verdict cell: none (the file does not fire).
 
 Planned cell: young (planned 301-03). Rail control + drawer row (D-01, D-02, D-03). ⛔ presentational: no fetch, no supabase; never switchOrg
 
+#### 301-03 Task 2 (created, D-01, D-02, D-03, D-17, 2026-10-30)
+
+**`1 / 1 / 135` (created).** One `DropdownMenu` around `WaitingOnYouList`. Rail variant: `RailItem`'s geometry verbatim, the neutral rail tone (icon NOT amber, UI-D3), the expanded label, the Library badge's class string for the pill (`rail-waiting-badge`, aria-hidden), `aria-label` = the count sentence, collapsed wrapped as `Tooltip > TooltipTrigger asChild > DropdownMenuTrigger asChild` (ProfileMenu's nesting); content `side="right" align="start" sideOffset={8}`. Drawer variant: `drawer-waiting-row`, `min-h-11`, `bg-warning/10` when the pill shows, an INLINE `ml-auto` pill; content `side="bottom"`, width `min(320px, 100vw − 32px)`. Effective status = `status ?? (rows ? "answered" : "loading")`; the pill and the counted sentence show only for answered / stale with a total above 0. Binding invariants: ⛔ no fetch, no supabase, no `@/hooks` or `@/lib/api` import; ⛔ always rendered, at zero too (D-01); ⛔ the pill reads `waitingTotal`, never the row count (UI-D6).
+
+Scan-list cell as of 2026-10-30 (replaced by 301-03 Task 2 (created), moved verbatim): 0 / 0 / 0 | no (planned 301-03) | young (planned 301-03). Rail control + drawer row (D-01, D-02, D-03). ⛔ presentational: no fetch, no supabase; never switchOrg |
+
+CLAUDE.md verdict cell: none (the file does not fire).
+
 ### `frontend/src/components/layout/WaitingOnYouList.tsx`
 
 **Added AT PLANNING (Phase 301, 2026-10-30) with `0 / 0 / 0`** — the file does not exist yet; the plan named in the cell creates it, and the triple is re-derived when this phase's ledger refresh runs (301-02 for its own files in their creating commit; 301-03 Task 3 for 301-01's, which runs ledger-free so it can share wave 1 with 301-02).
 
 Planned cell: young (planned 301-03). Rows as DropdownMenuItems (D-05..D-10, D-29). ⛔ no dismiss / mark-read; minute tick only while open
+
+#### 301-03 Task 2 (created, D-05..D-10, D-17, D-28, D-29, 2026-10-30)
+
+**`1 / 1 / 157` (created).** A `DropdownMenuContent` sibling of `AttentionPopover` (`data-testid="waiting-popover"`, `w-80`, max-height capped at 480px): a `DropdownMenuLabel` header, then exactly one state block — loading (`SyrelLoader size="section"`), failed, empty (`waiting-empty`) or the rows — then `waiting-more` when the server's total exceeds the rows, then `waiting-stale` when the status is stale. Each row is ONE `DropdownMenuItem` (`waiting-row`): a 24px aria-hidden kind square, the title (fallback "Untitled workflow"), and a second line of `OrgAvatar size="xs"` + org name (fallback "Unnamed org") · kind words · waited phrase · origin words when present. `onSelect` calls `onAfterSelect?.()` then `condition.onOpen()`. The minute tick is a `setInterval` in this component, which Radix mounts only while the list is open. Binding invariants: ⛔ never changes the active org and never builds a URL (D-08); ⛔ no dismiss / mark-read / snooze / clear control (D-09); ⛔ names are React text only, no question text / run id / ISO time on screen (T-301-18, T-301-20); ⛔ every word from `waitingVocabulary`.
+
+Scan-list cell as of 2026-10-30 (replaced by 301-03 Task 2 (created), moved verbatim): 0 / 0 / 0 | no (planned 301-03) | young (planned 301-03). Rows as DropdownMenuItems (D-05..D-10, D-29). ⛔ no dismiss / mark-read; minute tick only while open |
+
+CLAUDE.md verdict cell: none (the file does not fire).
 
 ### `frontend/src/components/org/OrgIdentity.tsx`
 

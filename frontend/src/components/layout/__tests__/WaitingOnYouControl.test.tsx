@@ -27,7 +27,7 @@ vi.mock("@/lib/api/notifications", () => ({
   getWaitingNotices: vi.fn().mockResolvedValue({ notices: [], total: 0 }),
 }))
 
-const switchOrg = vi.fn()
+const { switchOrg } = vi.hoisted(() => ({ switchOrg: vi.fn() }))
 vi.mock("@/providers/OrgProvider", () => {
   const value = {
     activeOrgId: "org-a",
@@ -214,15 +214,16 @@ describe("WaitingOnYouList — the rows (D-05, D-06, D-07, D-28)", () => {
 })
 
 describe("WaitingOnYouList — selecting opens the run and never switches org (D-08, D-29)", () => {
-  it("keyboard: ArrowDown into the list then Enter calls the first row's onOpen once", async () => {
+  it("keyboard: ArrowDown opens on the first row, Enter calls the first row's onOpen once", async () => {
     const user = userEvent.setup()
     const a = row(1)
     const b = row(2)
     renderControl({ conditions: [a, b] })
     screen.getByTestId("rail-waiting-trigger").focus()
-    await user.keyboard("{Enter}")
-    await screen.findByTestId("waiting-popover")
+    // ArrowDown on the trigger opens the list with focus on the FIRST row (Radix), then Enter.
     await user.keyboard("{ArrowDown}")
+    await screen.findByTestId("waiting-popover")
+    expect(screen.getAllByRole("menuitem")[0]).toHaveFocus()
     await user.keyboard("{Enter}")
     expect(a.onOpen).toHaveBeenCalledTimes(1)
     expect(a.onOpen).toHaveBeenCalledWith()
