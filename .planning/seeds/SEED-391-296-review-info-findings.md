@@ -3,7 +3,7 @@ seed_id: SEED-391
 title: Six minor 296 code-review info findings left for v4.8 (judge freshness, publish-note wording, Moonshot recursive $ref, 409 wording, two a11y names)
 created: 2026-10-27
 surface: Agentic-RAG
-status: planted
+status: folded
 partial: false
 status_note:
 trigger_when: The next phase whose files_modified names any listed file, or /gsd:new-milestone for v4.8.
@@ -11,7 +11,7 @@ trigger_paths: ["backend/app/services/harness/validator_kinds.py", "backend/app/
 trigger_surfaces: ["workflow", "chat", "a11y"]
 migration_note:
 relates_to: ["296-REVIEW.md triage: BE-IN-01, BE-IN-03, BE-IN-04, FE-IN-01, FE-IN-04, FE-IN-06"]
-folded_into: null
+folded_into: "302"
 renumbered_from: null
 renumbered_because: null
 ---

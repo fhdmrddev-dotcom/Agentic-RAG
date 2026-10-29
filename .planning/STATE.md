@@ -121,4 +121,6 @@ carries 299 copy 19:27 UTC; operator smoke: chat list loads on app.superrag.clou
 - **301 schema-drift gate (2026-10-30):** `verify.schema-drift 301` reports blocking drift for `219_notifications_realtime.sql` because no `supabase db push` ran. Overridden by rule: CLAUDE.md forbids `db push`; 219 was applied locally through asyncpg (SQL-editor equivalent, verify PASS twice) and `full-schema.sql` regenerated at `cb74b23dc`. Cloud paste + `get_advisors(security)` stay owed at deploy.
 - **301 vitest count gate (2026-10-30):** not `count gate OK` at HEAD — three loaded runs, one red each in a DIFFERENT provably-unmodified suite (`WorkflowBuilderPage.canvas` ×2, `LibraryPage.review284` ×1), each passing alone; base `d9ff4c5eb` ran clean once. Recorded as an owed clean gate run, not waved through. **DISCHARGED 2026-10-30:** quiet-machine run at HEAD `4274b7367` → `count gate OK — 577/577 pinned files present, no per-file decrease, 0 failing`.
 
+- **302 G-2 (2026-10-30):** FIX-01 restores content into the existing Workspace panel with existing row components; no new visual design, so no sketch. Self-approved under the autonomous mandate ("keep going"); the operator sees it at G-4.
+
 The 286-296 overrides are in `milestones/v4.7-STATE-at-close.md`.
