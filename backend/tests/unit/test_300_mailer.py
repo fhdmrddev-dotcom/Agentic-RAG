@@ -335,6 +335,43 @@ def test_smtp_security_none_neither_tls(smtp, monkeypatch):
     assert not session.ssl and "starttls" not in session.calls
 
 
+@pytest.mark.parametrize("value", ["tls", "TLS", "true", "yes", "on", "587", "STARTTLS/TLS", "sslv3"])
+def test_an_unknown_smtp_security_fails_before_connecting(smtp, monkeypatch, caplog, value):
+    """300-REVIEW WR-02: an unrecognised SMTP_SECURITY used to open a PLAIN session and log in,
+    sending SMTP_PASSWORD unencrypted. It now fails closed before any socket opens."""
+    monkeypatch.setattr(settings, "smtp_security", value)
+    monkeypatch.setattr(settings, "smtp_username", "mailer")
+    _forbid_network(monkeypatch)
+    with caplog.at_level(logging.DEBUG):
+        out = ep.send_email(_msg())
+    assert out.status == "failed" and out.provider == "smtp" and out.retryable is False
+    assert out.reason == "SMTP_SECURITY must be starttls, ssl or none."
+    assert SMTP_PASSWORD not in caplog.text
+
+
+def test_smtp_security_none_with_a_login_is_refused_before_connecting(smtp, monkeypatch, caplog):
+    """300-REVIEW WR-02: `none` is for a no-login relay only — credentials never cross plaintext."""
+    monkeypatch.setattr(settings, "smtp_security", "none")
+    monkeypatch.setattr(settings, "smtp_username", "mailer")
+    _forbid_network(monkeypatch)
+    with caplog.at_level(logging.DEBUG):
+        out = ep.send_email(_msg())
+    assert out.status == "failed" and out.retryable is False
+    assert out.reason == (
+        "SMTP_SECURITY is none, so the login was not sent. Use starttls or ssl."
+    )
+    assert len(out.reason) <= 120
+    assert SMTP_PASSWORD not in caplog.text
+
+
+def test_smtp_security_none_without_a_login_still_sends(smtp, monkeypatch):
+    monkeypatch.setattr(settings, "smtp_security", " None ")
+    out = ep.send_email(_msg())
+    assert out.status == "sent"
+    (session,) = smtp.instances
+    assert session.calls == ["send", "quit"]
+
+
 def test_smtp_refused_recipient_is_a_failure(smtp):
     smtp.refused = {REAL_TO: (550, b"no such user")}
     out = ep.send_email(_msg())

@@ -219,11 +219,35 @@ def _quit_quietly(session) -> None:
         logger.debug("email: the SMTP session did not close cleanly")
 
 
+#: The SMTP_SECURITY values the mailer knows. 300-REVIEW WR-02: anything else used to open a
+#: PLAIN session and then log in, so a likely operator value such as ``tls`` sent SMTP_PASSWORD
+#: unencrypted. An unknown value now fails closed, before any socket opens.
+SMTP_SECURITY_VALUES = ("starttls", "ssl", "none")
+
+
+def smtp_security_problem() -> str | None:
+    """The sentence refusing the SMTP transport settings, else ``None``. Pure; no network.
+
+    ``none`` is kept for a trusted relay that needs NO login. With a username set it is refused:
+    the login (and its password) never crosses a plaintext session.
+    """
+    security = (settings.smtp_security or "starttls").strip().lower()
+    if security not in SMTP_SECURITY_VALUES:
+        return "SMTP_SECURITY must be starttls, ssl or none."
+    if security == "none" and (settings.smtp_username or "").strip():
+        return "SMTP_SECURITY is none, so the login was not sent. Use starttls or ssl."
+    return None
+
+
 def _send_smtp(sender_header: str, sender_address: str, to: str, subject: str,
                msg: OutboundEmail) -> SendOutcome:
     host = (settings.smtp_host or "").strip()
     if not host:
         return SendOutcome("failed", reason="SMTP_HOST is not set.", provider="smtp")
+    problem = smtp_security_problem()
+    if problem:
+        logger.warning("email: not sent, the SMTP security setting was refused")
+        return SendOutcome("failed", reason=problem, provider="smtp")
     port = int(settings.smtp_port or 587)
     security = (settings.smtp_security or "starttls").strip().lower()
     username = (settings.smtp_username or "").strip()
@@ -247,6 +271,7 @@ def _send_smtp(sender_header: str, sender_address: str, to: str, subject: str,
             session = smtplib.SMTP(host, port, timeout=SMTP_TIMEOUT_SECONDS)
             if security == "starttls":
                 session.starttls(context=context)
+        # WR-02: reached only over ssl/starttls, or `none` with no username (refused above).
         if username:
             session.login(username, settings.smtp_password or "")
         refused = session.send_message(message, from_addr=sender_address, to_addrs=[to])

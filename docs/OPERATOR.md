@@ -426,7 +426,9 @@ provider** (every provider ships in the built image):
   - `SMTP_HOST` — your mail relay's host name.
   - `SMTP_PORT` — `587` (default) for STARTTLS, `465` for implicit TLS.
   - `SMTP_SECURITY` — `starttls` (default) | `ssl` | `none` (`none` only for a trusted relay
-    on your own network).
+    on your own network that needs **no login**). Any other value (`tls`, `true`, …) is refused
+    and no email is sent; so is `none` with a username set, because the password would cross the
+    network unencrypted.
   - `SMTP_USERNAME` / `SMTP_PASSWORD` — the relay login (the password is a secret — env only).
     Leave the username empty for a relay that needs no login.
   - ⚠ **Many VPS providers block outbound SMTP by default** (ports 25/465/587). Confirm with
