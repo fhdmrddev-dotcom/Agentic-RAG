@@ -237,7 +237,10 @@ describe("EmailNotificationPreference — accessibility and reach (S2)", () => {
   })
 
   it("names no gated route in its source", () => {
-    expect(leafRaw).not.toMatch(/\/settings"|\/admin/)
+    // A route LITERAL (`"/settings"`, `` `/settings` ``, `/admin`), not the module path
+    // `@/lib/api/settings` it imports from — the recorded-URL case above is the real proof.
+    expect(leafRaw).not.toMatch(/["'`]\/settings["'`/?]|\/admin/)
+    expect(leafRaw).toContain('from "@/lib/api/settings"')
     expect(leafRaw.split('role="switch"').length - 1).toBe(1)
   })
 

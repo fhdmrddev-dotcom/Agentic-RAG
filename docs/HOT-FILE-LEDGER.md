@@ -11679,7 +11679,7 @@ cells rot within days.
 | [`backend/app/api/settings.py`](docs/HOT-FILE-LEDGER.md#backendappapisettingspy) | 48 / 26 / 1398 (was `47 / 25 / 1301`) | ⚠ **FIRES** | 300-05: four email knobs + read-only provider name (D-07/D-08/D-10); delay via _range_refusal_detail + allow-list +1. Honoured by construction. ⛔ no mail secret on the wire |
 | [`backend/app/services/multimodal_service.py`](docs/HOT-FILE-LEDGER.md#backendappservicesmultimodal_servicepy) | 14 / 7 / 984 | ⚠ **FIRES** | ⚠ absent from BOTH for its ENTIRE LIFE at **7 phases** — row added SEED-227, which is also where its silent truncation was found |
 | [`backend/app/api/documents.py`](docs/HOT-FILE-LEDGER.md#backendappapidocumentspy) | 101 / 40 / 2709 (was `99 / 39 / 2698`) | ⚠ **FIRES** | 298-01: list_documents one `org_lists.by_org` in build() (every read, D-32); upload one `org_id=root_upload_org(...)` on the ONE minter call. Honoured by construction. ⛔ see section |
-| [`scripts/vitest-count-gate.cjs`](docs/HOT-FILE-LEDGER.md#scriptsvitest-count-gatecjs) | 396 / 83 / 6868 (was `395 / 83 / 6865`) | ⚠ **FIRES** | 300-04: 1 BASELINE pin added (HealthSignals.email 11) + its FILE-LEVEL TARGET beside the a11y suite, none lowered |
+| [`scripts/vitest-count-gate.cjs`](docs/HOT-FILE-LEDGER.md#scriptsvitest-count-gatecjs) | 397 / 83 / 6873 (was `396 / 83 / 6868`) | ⚠ **FIRES** | 300-05: 2 BASELINE pins added (EmailSettings 28, EmailNotificationPreference 17) + their FILE-LEVEL TARGETS beside ApiKeyLimits, none lowered |
 | [`scripts/check-deploy-drift.sh`](docs/HOT-FILE-LEDGER.md#scriptscheck-deploy-driftsh) | 6 / 5 / 271 (was `5 / 4 / 267`) | ⚠ **FIRES** | 300-03 (D-28): the five SMTP_* vars registered in OMITTED_FROM_ONEBOX (commented in the one-box preset); email comment rewritten. No check changed |
 | [`scripts/build-public-openapi.cjs`](docs/HOT-FILE-LEDGER.md#scriptsbuild-public-openapicjs) | 11 / 5 / 472 (was `7 / 3 / 468`) | ⚠ **FIRES** | 298-01: `org-items` in the Account & org TAG_GROUPS entry + `/org-items/` in FLAGGED_PREFIXES (UI-internal). Two tokens. ⚠ prior row stale (`7 / 3 / 468` vs measured `10 / 4 / 468` pre-298). |
 | [`scripts/check-seeds-register.cjs`](docs/HOT-FILE-LEDGER.md#scriptscheck-seeds-registercjs) | 7 / 3 / 1132 | ⚠ **FIRES** | ⚠ absent its ENTIRE LIFE — row added 296-05, now FIRES (251 / 293 / 296). 296-05: three `\d{3}` → `\d{3,}` (293-IN-07). ⛔ the STATUS_ENUM triple |
@@ -11748,12 +11748,12 @@ cells rot within days.
 | [`backend/app/services/connectors/grants.py`](docs/HOT-FILE-LEDGER.md#backendappservicesconnectorsgrantspy) | 1 / 1 / 92 | no (1 phase) | ⚠ absent — row added 221. It is THE grant-time gate: 92 L deciding every connector call |
 | [`frontend/src/components/settings/connectionsCopy.ts`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentssettingsconnectionscopyts) | 15 / 8 / 784 | ⚠ **FIRES** | no seam proposed — a vocabulary doing one thing many times is the right shape. ⚠ row was STALE at `13 / 7 / 737`. honoured by construction (**239-03**): one word, one union member. See §239-03 |
 | [`frontend/src/components/settings/connectionFormCopy.ts`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentssettingsconnectionformcopyts) | 19 / 8 / 1631 | ⚠ **FIRES** | ⚠ row STALE TWICE (`15 / 8 / 1216`, `17 / 8 / 1293`). ⛔ 239-05 named the seam — `configFromDraft`'s ARM SET; 239-07 RODE it: one serializer both arms call. See §239-07 |
-| [`frontend/src/pages/SettingsPage.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrcpagessettingspagetsx) | 62 / 30 / 1690 (was `60 / 29 / 1674`) | ⚠ **FIRES** | 293 touch: see §Phase 293 close (previous cell moved there verbatim) |
+| [`frontend/src/pages/SettingsPage.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrcpagessettingspagetsx) | 63 / 31 / 1698 (was `62 / 30 / 1690`) | ⚠ **FIRES** | 300-05: one EmailSettings import + ref + changes() spread + adopt() + mount after ApiKeyLimits; useState 49 → 49. Honoured by construction · 293 touch: see §Phase 293 close |
 | [`frontend/src/pages/settingsSearchPayload.ts`](docs/HOT-FILE-LEDGER.md#frontendsrcpagessettingssearchpayloadts) | 2 / 2 / 116 | no (2 phases) | Created by 242. Row added AT CREATION rather than at the third phase — an absent row makes G-5 absent forever, silently, at any count |
 | [`frontend/src/components/settings/SourceFileCeilingCard.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentssettingssourcefileceilingcardtsx) | 1 / 1 / 117 | no (1 phase) | young (239-10) — ⚠ a row minted at creation reads `1 / 1` forever unless RE-DERIVED. Owns no number and no sentence |
 | [`frontend/src/components/settings/sourceCeilingCopy.ts`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentssettingssourceceilingcopyts) | 1 / 1 / 109 | no (1 phase) | young (239-10) — the ONE number it owns (recommendation) is pinned to `user_settings.py` by a `?raw` test; the bounds are SERVED |
 | [`frontend/src/components/settings/ModelPillRow.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentssettingsmodelpillrowtsx) | 5 / 4 / 151 | ⚠ **FIRES** | honoured by construction (**249-02**): its local `_tooltipFor` DELETED for the shared module. ⛔ it had been claiming `timeout=90s` against a real default of 300 |
-| [`frontend/src/lib/api/settings.ts`](docs/HOT-FILE-LEDGER.md#frontendsrclibapisettingsts) | 9 / 3 / 464 (was `7 / 3 / 460`) | no (2 phases) | ⚠ **absent for its ENTIRE LIFE — row added 249-02** at its third touch. The chat picker's wire type; ⛔ every new field is OPTIONAL, so an older backend renders exactly as before |
+| [`frontend/src/lib/api/settings.ts`](docs/HOT-FILE-LEDGER.md#frontendsrclibapisettingsts) | 11 / 5 / 529 (was `9 / 3 / 464`) | ⚠ **FIRES** | ⚠ row was STALE (measured `10 / 4` at 300-05, scan list said 2 phases). 300-05: getNotificationEmailPreference / setNotificationEmailPreference (own PUT, D-09). ⛔ every new field OPTIONAL |
 | [`frontend/src/lib/unverifiedModelCopy.ts`](docs/HOT-FILE-LEDGER.md#frontendsrclibunverifiedmodelcopyts) | 1 / 1 / 88 | no (new) | young (created 249-02). Row added AT CREATION. THE one home for the unverified chip's words, 2 consumers; ⛔ `describeToolsLost` must state the CONSEQUENCE, not that defaults were applied |
 | [`frontend/src/components/settings/servicesCatalog.ts`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentssettingsservicescatalogts) | 2 / 1 / 211 | no (1 phase) | young (212) — the presentation lookup migration 127's `service_id` COMMENT names |
 | [`frontend/src/components/settings/catalogCopy.ts`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentssettingscatalogcopyts) | 1 / 1 / 22 | no (1 phase) | young (212) |
@@ -11806,7 +11806,7 @@ cells rot within days.
 | [`frontend/src/lib/api/knowledge.ts`](docs/HOT-FILE-LEDGER.md#frontendsrclibapiknowledgets) | 10 / 8 / 915 (was `8 / 7 / 910`) | ⚠ **FIRES** | 296-07 (291-IN-05): GenerateField.covered_by may now be null as well as input or step (types only) |
 | [`frontend/src/lib/api/threads.ts`](docs/HOT-FILE-LEDGER.md#frontendsrclibapithreadsts) | 25 / 15 / 2006 (was `24 / 14 / 1994`) | ⚠ **FIRES** | 298-02: postMessage reads detail.message from an OBJECT detail and attaches its string code to the ApiError; a string detail reads as before |
 | [`frontend/src/lib/api/connectors.ts`](docs/HOT-FILE-LEDGER.md#frontendsrclibapiconnectorsts) | 17 / 11 / 740 | ⚠ **FIRES** | ⚠ row was STALE at `16 / 10 / 718`. honoured by construction (**244-06**): `importCloudFile` gains a REQUIRED body declared BESIDE `SourcePreviewRequest` — ⛔ never inline in a component |
-| [`frontend/src/lib/api/skills.ts`](docs/HOT-FILE-LEDGER.md#frontendsrclibapiskillsts) | 9 / 6 / 767 (was `8 / 5 / 761`) | ⚠ **FIRES** | 292.1-02: two optional fields on FullAppSettings + SettingsUpdate (+6 −0), type-only. Holds FullAppSettings, not only skills · 293 touch: see §Phase 293 close |
+| [`frontend/src/lib/api/skills.ts`](docs/HOT-FILE-LEDGER.md#frontendsrclibapiskillsts) | 10 / 7 / 779 (was `9 / 6 / 767`) | ⚠ **FIRES** | 300-05: four optional email fields on FullAppSettings + SettingsUpdate, read-only optional email_provider on FullAppSettings only (+12 −0), type-only · 293 touch: see §Phase 293 close |
 | [`frontend/src/lib/api/workflows.ts`](docs/HOT-FILE-LEDGER.md#frontendsrclibapiworkflowsts) | 17 / 16 / 1395 (was `16 / 16 / 1364`) | ⚠ **FIRES** | 299-04: WorkflowRunRead.org_id; createWorkflowDraft opts.fromDefinitionId → ?from_definition_id= (absent → today's URL); the Tweak org 409 → WorkflowOrgRefusedError (verbatim sentence) |
 | [`frontend/src/lib/connectionMark.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrclibconnectionmarktsx) | 7 / 4 / 313 | ⚠ **FIRES** | ✅ **the move IS the seam, and it was TAKEN (214-08)** — `settings/` → `lib/`; four run + canvas surfaces now import ONE map |
 | [`frontend/src/components/ingestion/DocumentList.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentsingestiondocumentlisttsx) | 31 / 15 / 372 (was `31 / 16 / 372`) | ⚠ **FIRES** | **275-02/04**: 409 → HoldRefusalNotice; ONE `retention` prop; a HELD row's delete opens straight into the refusal (`requestDelete`). Seven `<td>` kept |
@@ -12097,7 +12097,7 @@ cells rot within days.
 | [`frontend/src/components/metadata/DocumentChunksSection.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentsmetadatadocumentchunkssectiontsx) | 4 / 3 / 265 (was `2 / 2 / 161`) | ⚠ **FIRES** | ⚠ now FIRES (3 phases). **284-03**: chunks page by scroll sentinel (200 at a time, `IntersectionObserver`, root = the bounded region); header = exact total. ⛔ no overscroll; one Tab stop |
 | [`frontend/src/components/settings/settingsTabs.ts`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentssettingssettingstabsts) | 3 / 2 / 126 (was `2 / 1 / 123`) | no (1 phase) | young (created 283-01; 283-02 added Preferences "6" + the first-visible fallback). ONE home of tab id / audience / order / fallback; labels stay literal JSX · 293 touch: see §Phase 293 close |
 | [`frontend/src/components/settings/AuditLogSection.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentssettingsauditlogsectiontsx) | 1 / 1 / 221 (was `0 / 0 / 0`) | no (1 phase) | young (created 283-01). Row added AT CREATION. The Audit Log tab body, moved verbatim out of `SettingsPage.tsx`; imports the `@/lib/api` barrel |
-| [`frontend/src/components/settings/PreferencesSection.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentssettingspreferencessectiontsx) | 1 / 1 / 39 (was `0 / 0 / 0`) | no (1 phase) | young (created 283-02). Preferences tab ("6") body: technical-names toggle + default model, moved verbatim from tab "0". ⛔ calls no gated endpoint |
+| [`frontend/src/components/settings/PreferencesSection.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentssettingspreferencessectiontsx) | 2 / 2 / 43 (was `1 / 1 / 39`) | no (2 phases) | 300-05: one `<EmailNotificationPreference />` mount after the default chat model (+4). ⛔ calls no gated endpoint |
 | [`frontend/src/landing/facts.ts`](docs/HOT-FILE-LEDGER.md#frontendsrclandingfactsts) | 8 / 4 / 546 (was `6 / 3 / 546`) | ⚠ **NOW FIRES** (3 phases) | 288-02: Pause stage `what` string corrected (one string, length unchanged) · 293 touch: see §Phase 293 close |
 | [`backend/app/api/document_views.py`](docs/HOT-FILE-LEDGER.md#backendappapidocument_viewspy) | 13 / 6 / 323 (was `11 / 5 / 300`) | ⚠ **FIRES** | ⚠ FIRES (6 phases). **284-04**: both resolve routes page (`offset`/`limit` ≤ 200/`include_archived`) via `resolve_filter(via_view=True)`; honoured by construction. ⛔ 404-not-403 gate |
 | [`backend/app/api/library.py`](docs/HOT-FILE-LEDGER.md#backendappapilibrarypy) | 3 / 3 / 304 (was `2 / 2 / 299`) | ⚠ **FIRES** | ⚠ now FIRES (298). 298-01: LIBRARY_SUMMARY_SQL `AND ($1::uuid IS NULL OR org_id = $1)` + one bind — the same predicate as GET /documents (D-32). NULL = today's scan. |
@@ -12264,8 +12264,8 @@ cells rot within days.
 | [`backend/app/services/notification_drainer.py`](docs/HOT-FILE-LEDGER.md#backendappservicesnotificationdrainerpy) | 1 / 1 / 208 (was `0 / 0 / 0`) | no (young) | young (created 300-04). Per-worker outbox drainer, SchedulerService shape (D-20). ⛔ send outside the claim txn; at most 3 attempts; SMTP at-most-once |
 | [`backend/app/services/run_waiting_email.py`](docs/HOT-FILE-LEDGER.md#backendappservicesrunwaitingemailpy) | 1 / 1 / 115 (was `0 / 0 / 0`) | no (young) | young (created 300-03). Pure run-waiting renderer + duration words (NOTE-03, D-02..D-06). ⛔ never accepts prompt text; subject control chars stripped |
 | [`frontend/src/components/workflows/scheduleOutcomeVocabulary.ts`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentsworkflowsscheduleoutcomevocabularyts) | 1 / 1 / 67 | no (young) | young (created 300-01). last_status → one sentence (D-15, D-26). ⛔ zero-import leaf; no raw status token reaches the screen |
-| [`frontend/src/components/settings/EmailSettings.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentssettingsemailsettingstsx) | 0 / 0 / 0 | no (planned 300-05) | young (planned 300-05). Operator Email card, ApiKeyLimits shape (D-07, D-08, D-10). ⛔ changes()/adopt() handle, no own Save; never sends a cleared delay |
-| [`frontend/src/components/settings/EmailNotificationPreference.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentssettingsemailnotificationpreferencetsx) | 0 / 0 / 0 | no (planned 300-05) | young (planned 300-05). Member switch (D-09). ⛔ calls only ungated /me/preferences; never shows On before the read answers |
+| [`frontend/src/components/settings/EmailSettings.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentssettingsemailsettingstsx) | 1 / 1 / 324 (was `0 / 0 / 0`) | no (1 phase) | young (created 300-05). Operator Email card, ApiKeyLimits shape (D-07, D-08, D-10). ⛔ changes()/adopt() handle, no own Save; never sends a cleared delay or an invalid address |
+| [`frontend/src/components/settings/EmailNotificationPreference.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentssettingsemailnotificationpreferencetsx) | 1 / 1 / 155 (was `0 / 0 / 0`) | no (1 phase) | young (created 300-05). Member switch (D-09). ⛔ calls only ungated /me/preferences; never shows On before the read answers |
 | [`frontend/src/components/org/inviteDeliveryCopy.ts`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentsorginvitedeliverycopyts) | 0 / 0 / 0 | no (planned 300-05) | young (planned 300-05). Invite delivery sentences (D-11, UI-D12). ⛔ zero-import leaf; D-11 sentence verbatim |
 
 
@@ -27679,3 +27679,59 @@ CLAUDE.md verdict cell as of 2026-10-29 (replaced by 300-05 Task 1, moved verbat
 Scan-list cell as of 2026-10-29 (replaced by 300-05 Task 1, moved verbatim): 1 / 1 / 120 | no (1 phase) | Added AT PLANNING 300. 300-05: notification-email keys on GET + one PUT route (D-09). ⛔ ungated, auth.uid() merge; default_model semantics byte-identical |
 
 CLAUDE.md verdict cell: none (the file does not fire).
+
+### `frontend/src/pages/SettingsPage.tsx` — 300-05 Task 2 (2026-10-29)
+
+**`63 / 31 / 1698` (was `62 / 30 / 1690`).** Honoured by construction — the 293-03 `ApiKeyLimits` shape, exactly: ONE import (`EmailSettings`, `EmailSettingsHandle`), ONE `useRef<EmailSettingsHandle>(null)`, ONE `...emailSettingsRef.current?.changes()` in `handleSaveIntegrations`'s body after the ApiKeyLimits spread, ONE `emailSettingsRef.current?.adopt(updated)` after the ApiKeyLimits adopt, and ONE `<EmailSettings ref={emailSettingsRef} />` directly after `<ApiKeyLimits …/>`, before the Save Integrations button. `useState(` count 49 → 49 (pinned by both `ApiKeyLimits.test.tsx` and `EmailSettings.test.tsx`); `grep -c emailSettingsRef` = 4. ⛔ Still owed: the page's state split (it is G-5 FIRING); every new settings card lands as a leaf with a handle, never as page state.
+
+Scan-list cell as of 2026-10-29 (replaced by 300-05 Task 2, moved verbatim): 62 / 30 / 1690 (was `60 / 29 / 1674`) | ⚠ **FIRES** | 293 touch: see §Phase 293 close (previous cell moved there verbatim) |
+
+CLAUDE.md verdict cell as of 2026-10-29 (replaced by 300-05 Task 2, moved verbatim): | `frontend/src/pages/SettingsPage.tsx` | 62 / 30 / 1690 (was `61 / 30 / 1681`) | 293-03: one ref + changes() spread + adopt(); useState 49 → 49 · ⛔ |
+
+### `frontend/src/lib/api/skills.ts` — 300-05 Task 2 (2026-10-29)
+
+**`10 / 7 / 779` (was `9 / 6 / 767`).** Type-only, additive: `notification_email_delay_seconds?`, `email_from_address?`, `email_from_name?`, `email_dev_redirect_address?` on both `FullAppSettings` and `SettingsUpdate`; `email_provider?: "none" | "resend" | "smtp"` on `FullAppSettings` ONLY — the env's provider name is never writable (D-08), so `SettingsUpdate` cannot carry it. Every field optional: an older backend renders the card on its defaults.
+
+Scan-list cell as of 2026-10-29 (replaced by 300-05 Task 2, moved verbatim): 9 / 6 / 767 (was `8 / 5 / 761`) | ⚠ **FIRES** | 292.1-02: two optional fields on FullAppSettings + SettingsUpdate (+6 −0), type-only. Holds FullAppSettings, not only skills · 293 touch: see §Phase 293 close |
+
+CLAUDE.md verdict cell as of 2026-10-29 (replaced by 300-05 Task 2, moved verbatim): | `frontend/src/lib/api/skills.ts` | 9 / 6 / 767 (was `8 / 5 / 761`) | 293-03: two optional limit fields on FullAppSettings + SettingsUpdate |
+
+### `frontend/src/lib/api/settings.ts` — 300-05 Task 2 (2026-10-29)
+
+**`11 / 5 / 529` (was `9 / 3 / 464` in the scan list — ⚠ STALE: measured `10 / 4 / 464` at the 300-05 base, so the file was already FIRING with no CLAUDE.md row).** Two functions copying `getModelDefault` / `setModelDefault` (getAuthHeaders, `cache: "no-store"` on the GET, `ApiError` with a sentence): `getNotificationEmailPreference()` reads `GET /me/preferences`, `setNotificationEmailPreference(enabled)` PUTs `/me/preferences/notification-email`. One private unwrap `notificationEmailFrom` with defensive `?? true` for `enabled` and `emailConfigured` (an older backend never reads as "not set up") and `?? null` for `delayWords`. ⛔ The switch NEVER saves through `setModelDefault`'s `PUT /me/preferences`: that route reads a missing `default_model` as "clear it". ⚠ Deliberately NOT re-exported from the `lib/api.ts` barrel (215 commits): `EmailNotificationPreference.tsx` imports from this module directly.
+
+Scan-list cell as of 2026-10-29 (replaced by 300-05 Task 2, moved verbatim): 9 / 3 / 464 (was `7 / 3 / 460`) | no (2 phases) | ⚠ **absent for its ENTIRE LIFE — row added 249-02** at its third touch. The chat picker's wire type; ⛔ every new field is OPTIONAL, so an older backend renders exactly as before |
+
+CLAUDE.md verdict cell: none before 300-05 Task 2 (row added by 300-05 Task 2).
+
+### `frontend/src/components/settings/PreferencesSection.tsx` — 300-05 Task 2 (2026-10-29)
+
+**`2 / 2 / 43` (was `1 / 1 / 39`).** One import and one mount, `<EmailNotificationPreference />`, after `<ModelDefaultPreference />` (UI-SPEC S2: the third block; the two shipped blocks are not reordered or re-styled). The D-07 invariant holds: the new leaf calls only the ungated `/me/preferences` read and its own `/me/preferences/notification-email` write (recorded-URL test in `EmailNotificationPreference.test.tsx`).
+
+Scan-list cell as of 2026-10-29 (replaced by 300-05 Task 2, moved verbatim): 1 / 1 / 39 (was `0 / 0 / 0`) | no (1 phase) | young (created 283-02). Preferences tab ("6") body: technical-names toggle + default model, moved verbatim from tab "0". ⛔ calls no gated endpoint |
+
+CLAUDE.md verdict cell: none (the file does not fire).
+
+### `frontend/src/components/settings/EmailSettings.tsx` — 300-05 Task 2 (created) (2026-10-29)
+
+**`1 / 1 / 324` (created).** `ApiKeyLimits` copied file-for-file: WHY-A-LEAF docblock, `EmailSettingsHandle { changes, adopt }`, alive ref + `loadState`, changed-fields-only `changes()` (`{}` until loaded), clamp-on-blur delay (60..3600; a cleared field is never sent), failure row with "Retry loading email settings". "Sent through" is read-only text from the GET's `email_provider` (Resend / Your mail server (SMTP) / Nothing yet…). Addresses are `type="email"`, empty or one `local@domain`, an invalid one shows "That isn't an email address." (role=alert, after blur) and is not sent; the name restores the loaded value when cleared. `durationWords` is a local TWIN of `run_waiting_email.duration_words`, pinned by the `DURATION_CASES` literal that both `EmailSettings.test.tsx` and `test_300_settings_email_knobs.py` read.
+
+Scan-list cell as of 2026-10-29 (replaced by 300-05 Task 2 (created), moved verbatim): 0 / 0 / 0 | no (planned 300-05) | young (planned 300-05). Operator Email card, ApiKeyLimits shape (D-07, D-08, D-10). ⛔ changes()/adopt() handle, no own Save; never sends a cleared delay |
+
+CLAUDE.md verdict cell: none (the file does not fire).
+
+### `frontend/src/components/settings/EmailNotificationPreference.tsx` — 300-05 Task 2 (created) (2026-10-29)
+
+**`1 / 1 / 155` (created).** Self-fetching, save-on-flip, server-derived (the `ModelDefaultPreference` pattern). A `<button type="button" role="switch">` labelled by the title and described by the description (`useId`), disabled + `aria-busy` while loading or saving, with the track look COPIED from `SettingsPage.tsx`'s unexported `Toggle` (UI-D1). No "On"/"Off" word until the read answers; a failed PUT keeps the last server value and shows "Couldn't save this. Try again."; a failed GET shows "Couldn't load this setting." + "Retry loading"; `email_configured: false` adds the role=status line. Delay words are the server's (`?? "a short wait"`, UI-D8). Imports `@/lib/api/settings` directly, not the barrel.
+
+Scan-list cell as of 2026-10-29 (replaced by 300-05 Task 2 (created), moved verbatim): 0 / 0 / 0 | no (planned 300-05) | young (planned 300-05). Member switch (D-09). ⛔ calls only ungated /me/preferences; never shows On before the read answers |
+
+CLAUDE.md verdict cell: none (the file does not fire).
+
+### `scripts/vitest-count-gate.cjs` — 300-05 Task 2 (2026-10-29)
+
+**`397 / 83 / 6873` (was `396 / 83 / 6868`).** TWO BASELINE pins beside `ApiKeyLimits.test.tsx`'s — `EmailSettings.test.tsx` 28 and `EmailNotificationPreference.test.tsx` 17 (counts read from the vitest JSON reporter, not estimated) — and their FILE-LEVEL TARGETS beside ApiKeyLimits' (no `src/components/settings` directory entry). None raised, none lowered.
+
+Scan-list cell as of 2026-10-29 (replaced by 300-05 Task 2, moved verbatim): 396 / 83 / 6868 (was `395 / 83 / 6865`) | ⚠ **FIRES** | 300-04: 1 BASELINE pin added (HealthSignals.email 11) + its FILE-LEVEL TARGET beside the a11y suite, none lowered |
+
+CLAUDE.md verdict cell as of 2026-10-29 (replaced by 300-05 Task 2, moved verbatim): | `scripts/vitest-count-gate.cjs` | 396 / 83 / 6868 (was `395 / 83 / 6865`) | 300-04: 1 FILE-LEVEL pin added (HealthSignals.email 11), none lowered |

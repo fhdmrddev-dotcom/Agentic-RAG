@@ -4406,6 +4406,8 @@ const BASELINE = {
   "apiKeyFacts.test.ts": 32, // 293-04 — wire → card facts: refused chips never read active, every reason code worded, raw code for an unknown one
   "curlExamples.test.ts": 8, // 293-04 — the show-once curl: real base, bearer secret, declared fields in order, JSON + shell escaping
   "ApiKeyLimits.test.tsx": 10, // 293-03 — the operator's per-key limits: load lock + Retry, changed fields only, clamps 1..60 / 10..600, adopt, SettingsPage wiring
+  "EmailSettings.test.tsx": 28, // 300-05 (S3) — the operator Email card: words, read-only Sent through, floor-word delay hint (shared case list), changed+valid fields only, clamp 60..3600, adopt, SettingsPage wiring
+  "EmailNotificationPreference.test.tsx": 17, // 300-05 (S2) — the member's switch: no On before the read, own PUT, server's value, save/load failures, a11y switch, only /me/preferences URLs
   "RunOriginLine.test.tsx": 6, // 293-03 — the origin leaf: nothing when absent/unknown, muted, hidden icon, one mount per run surface (src/components/workflows dir TARGET)
   "runOriginVocabulary.test.ts": 11, // 293-03 — the six origin sentences, null for absent/unknown (D-23)
   "apiKeyPrepick.test.ts": 6, // 293-04 — ⋯ menu pre-pick: sessionStorage read-once, only {workflowId, name}, never a secret
@@ -6518,6 +6520,9 @@ const TARGETS = [
   "src/components/settings/apiKeys/__tests__/apiKeyFacts.test.ts",
   // 293-03 — FILE-LEVEL (no `src/components/settings` directory entry), SAME commit as its pin.
   "src/components/settings/__tests__/ApiKeyLimits.test.tsx",
+  // 300-05 — FILE-LEVEL (no `src/components/settings` directory entry), SAME commit as their pins.
+  "src/components/settings/__tests__/EmailSettings.test.tsx",
+  "src/components/settings/EmailNotificationPreference.test.tsx",
   "src/components/settings/apiKeys/__tests__/curlExamples.test.ts",
   "src/components/settings/apiKeys/__tests__/apiKeyPrepick.test.ts",
   "src/components/settings/apiKeys/__tests__/apiKeysContract.test.ts",
