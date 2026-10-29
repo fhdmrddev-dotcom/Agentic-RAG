@@ -265,8 +265,24 @@ describe("NavPanel badge — the popover names what is broken and opens Health",
     renderRail({ attentionConditions: conditions(1), onOpenLibraryHealth })
     await user.click(screen.getByRole("button", { name: COPY.badgeTitle(1) }))
 
-    const action = await screen.findByRole("button", { name: COPY.popOpenHealth })
+    // ⚠ CORRECTED at Phase 301 (D-26 / BUG-261029-01): this read `findByRole("button", …)`.
+    // Radix Menu cancels Tab inside its content, so a plain button there was unreachable from
+    // the keyboard; the action is now a menu item, and is found by that role.
+    const action = await screen.findByRole("menuitem", { name: COPY.popOpenHealth })
     await user.click(action)
+    expect(onOpenLibraryHealth).toHaveBeenCalledTimes(1)
+  })
+
+  it("its ONE action is reachable from the keyboard — arrow keys + Enter (D-26, BUG-261029-01)", async () => {
+    const user = userEvent.setup()
+    const onOpenLibraryHealth = vi.fn()
+    renderRail({ attentionConditions: conditions(1), onOpenLibraryHealth })
+    screen.getByRole("button", { name: COPY.badgeTitle(1) }).focus()
+    await user.keyboard("{Enter}")
+    await screen.findByTestId("rail-popover")
+    await user.keyboard("{ArrowDown}")
+    expect(screen.getByRole("menuitem", { name: COPY.popOpenHealth })).toHaveFocus()
+    await user.keyboard("{Enter}")
     expect(onOpenLibraryHealth).toHaveBeenCalledTimes(1)
   })
 
@@ -298,7 +314,7 @@ describe("NavPanel badge — the popover names what is broken and opens Health",
     expect(screen.getAllByTestId("rail-pop-item")).toHaveLength(1)
     expect(screen.getByText("Rate sheets 1")).toBeInTheDocument()
     expect(screen.queryByText("Waiting workflow 1")).toBeNull()
-    expect(screen.getAllByRole("button", { name: COPY.popOpenHealth })).toHaveLength(1)
+    expect(screen.getAllByRole("menuitem", { name: COPY.popOpenHealth })).toHaveLength(1) // 301-03 D-26: was role "button"
   })
 
   it("a waiting-only world renders no Library badge at all", () => {
@@ -319,5 +335,57 @@ describe("NavPanel badge — the popover names what is broken and opens Health",
     await user.click(screen.getByRole("button", { name: COPY.badgeTitle(1) }))
     await screen.findByTestId("rail-popover")
     expect(onNavigate).not.toHaveBeenCalled()
+  })
+})
+
+// ══ PHASE 301-03 (D-01 / UI-D2) — THE WAITING CONTROL HAS ITS OWN PLACE ON THE RAIL ═══════
+//
+// Always present (zero rows too), at both widths, directly after New chat and before the first
+// nav item. The Library badge keeps counting library conditions only; the waiting pill reads the
+// server's total.
+describe("301-03 — the Waiting on you control on the rail", () => {
+  const waiting = (i: number, total: number): AttentionCondition => ({
+    mark: "waiting", id: `n-${i}`, title: `Waiting workflow ${i}`, detail: "", onOpen: vi.fn(),
+    runId: `run-${i}`, orgId: "org-a", orgName: "Acme", since: "2026-10-30T09:00:00Z",
+    kind: "question", origin: "app", total,
+  })
+
+  it("is present with zero conditions and with some, collapsed and expanded", () => {
+    for (const expanded of [false, true]) {
+      for (const attentionConditions of [[], [waiting(1, 1)]]) {
+        const { unmount } = renderRail({ expanded, attentionConditions })
+        expect(screen.getByTestId("rail-waiting-trigger")).toBeInTheDocument()
+        unmount()
+      }
+    }
+  })
+
+  it("sits after New chat and before the first nav item, in DOM order", () => {
+    renderRail({ attentionConditions: [] })
+    const newChat = screen.getByRole("button", { name: "New chat" })
+    const waitingCtl = screen.getByTestId("rail-waiting-trigger")
+    const firstNav = screen.getByRole("button", { name: "Chat" })
+    expect(newChat.compareDocumentPosition(waitingCtl) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy()
+    expect(waitingCtl.compareDocumentPosition(firstNav) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy()
+  })
+
+  it("the waiting pill reads the server total while the Library badge still counts library only", () => {
+    renderRail({
+      attentionConditions: [...conditions(1), waiting(1, 5), waiting(2, 5)],
+      onOpenLibraryHealth: vi.fn(),
+      waitingStatus: "answered",
+    })
+    expect(screen.getByTestId("rail-badge")).toHaveTextContent(/^1$/)
+    expect(screen.getByTestId("rail-waiting-badge")).toHaveTextContent(/^5$/)
+    expect(screen.getByRole("button", { name: "5 workflow runs are waiting on you" })).toBeInTheDocument()
+  })
+
+  it("is not gated on a Library navigator, and waits for an answer before showing a pill", () => {
+    const { unmount } = renderRail({ attentionConditions: [waiting(1, 2)], waitingStatus: "answered" })
+    expect(screen.getByTestId("rail-waiting-badge")).toHaveTextContent(/^2$/)
+    unmount()
+    renderRail({ attentionConditions: [], waitingStatus: "loading" })
+    expect(screen.getByRole("button", { name: "Waiting on you" })).toBeInTheDocument()
+    expect(screen.queryByTestId("rail-waiting-badge")).toBeNull()
   })
 })

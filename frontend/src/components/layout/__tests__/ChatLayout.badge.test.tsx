@@ -137,6 +137,10 @@ vi.mock("@/components/panel/WorkspacePanel", () => ({
 vi.mock("@/pages/WorkflowRunPage", () => ({
   WorkflowRunPage: () => <div data-testid="run-page-stub" />,
 }))
+// 301-03 (D-30): a cheap non-chat view, so the non-chat mobile bar can be asserted.
+vi.mock("@/pages/SkillsPage", () => ({
+  SkillsPage: () => <div data-testid="skills-page-stub" />,
+}))
 
 import { ChatLayout } from "../ChatLayout"
 import { StreamsProvider } from "@/providers/StreamsProvider"
@@ -175,13 +179,21 @@ const TWO_STOPPED = {
 
 const NONE_STOPPED = { stopped: [], reader_running: true, poll_interval_seconds: 600 }
 
-function renderLayout(overrides: { onOpenLibraryHealth?: (() => void) | undefined } = { onOpenLibraryHealth: vi.fn() }) {
+function renderLayout(
+  overrides: {
+    onOpenLibraryHealth?: (() => void) | undefined
+    // 301-03: a non-chat view (its mobile bar) and the run door the waiting rows open.
+    activeView?: "chat" | "skills"
+    openRun?: (runId: string) => void
+  } = { onOpenLibraryHealth: vi.fn() },
+) {
   return render(
     <TooltipProvider>
       <StreamsProvider>
         <ChatLayout
           onSignOut={vi.fn()}
-          activeView="chat"
+          activeView={overrides.activeView ?? "chat"}
+          openRun={overrides.openRun}
           onNavigate={vi.fn()}
           navItems={navItems}
           isOperator={false}
@@ -360,6 +372,102 @@ describe("301-02 — the mark partition in the shell", () => {
     mockGetWaitingNotices.mockResolvedValue(TWO_WAITING)
     renderLayout({ onOpenLibraryHealth: undefined })
     expect(await screen.findByTestId("drawer-trigger-dot")).toBeInTheDocument()
+  })
+})
+
+// ══ PHASE 301-03 (D-01, D-03, D-17, D-30) — THE CONTROL ON THE RAIL, IN THE DRAWER, ON EVERY BAR ══
+//
+// The shell's one read now feeds the waiting control too: the rail pill, the phone drawer's
+// "Waiting on you" row, and the hamburger dot on the chat view AND on every non-chat view's bar.
+describe("301-03 — Waiting on you in the shell", () => {
+  it("waiting-only: the rail pill reads 2; the drawer row is named by the count with an inline pill; no Library badge", async () => {
+    mockGetSourceHealth.mockResolvedValue(NONE_STOPPED)
+    mockGetWaitingNotices.mockResolvedValue(TWO_WAITING)
+    const user = userEvent.setup()
+    renderLayout()
+
+    expect(await screen.findByTestId("rail-waiting-badge")).toHaveTextContent(/^2$/)
+    await user.click(screen.getByRole("button", { name: /open navigation/i }))
+    const row = await screen.findByTestId("drawer-waiting-row")
+    expect(row).toHaveAttribute("aria-label", "2 workflow runs are waiting on you")
+    expect(row).toHaveTextContent("Waiting on you")
+    const pill = row.querySelector("[aria-hidden='true'].ml-auto")
+    expect(pill).not.toBeNull()
+    expect(pill).toHaveTextContent(/^2$/)
+    expect(screen.queryByTestId("drawer-attention-badge")).toBeNull()
+  })
+
+  it("selecting a row from the drawer list opens THAT run and closes the drawer", async () => {
+    mockGetSourceHealth.mockResolvedValue(NONE_STOPPED)
+    mockGetWaitingNotices.mockResolvedValue(TWO_WAITING)
+    const openRun = vi.fn()
+    const user = userEvent.setup()
+    renderLayout({ onOpenLibraryHealth: vi.fn(), openRun })
+
+    await screen.findByTestId("rail-waiting-badge")
+    await user.click(screen.getByRole("button", { name: /open navigation/i }))
+    await user.click(await screen.findByTestId("drawer-waiting-row"))
+    const pop = await screen.findByTestId("waiting-popover")
+    const rows = pop.querySelectorAll("[role='menuitem']")
+    expect(rows).toHaveLength(2)
+    await user.click(rows[0] as HTMLElement)
+    expect(openRun).toHaveBeenCalledTimes(1)
+    expect(openRun).toHaveBeenCalledWith("run-1")
+    await waitFor(() => expect(screen.queryByTestId("drawer-waiting-row")).toBeNull())
+  })
+
+  it("before the first answer: named 'Waiting on you', no pill; an answer of zero opens the empty line", async () => {
+    mockGetSourceHealth.mockResolvedValue(NONE_STOPPED)
+    let resolve: (v: { notices: never[]; total: number }) => void = () => {}
+    mockGetWaitingNotices.mockReturnValue(new Promise((r) => { resolve = r }))
+    const user = userEvent.setup()
+    renderLayout()
+
+    const trigger = await screen.findByTestId("rail-waiting-trigger")
+    expect(trigger).toHaveAttribute("aria-label", "Waiting on you")
+    expect(screen.queryByTestId("rail-waiting-badge")).toBeNull()
+    await user.click(trigger)
+    expect(await screen.findByText("Checking what's waiting on you…")).toBeInTheDocument()
+    await user.keyboard("{Escape}")
+
+    resolve({ notices: [], total: 0 })
+    await user.click(screen.getByTestId("rail-waiting-trigger"))
+    expect(await screen.findByTestId("waiting-empty")).toHaveTextContent("Nothing is waiting on you.")
+    expect(screen.queryByTestId("rail-waiting-badge")).toBeNull()
+  })
+
+  it("a later failed fetch after a count of 2 keeps the pill at 2 and shows the stale line", async () => {
+    mockGetSourceHealth.mockResolvedValue(NONE_STOPPED)
+    mockGetWaitingNotices.mockResolvedValue(TWO_WAITING)
+    const user = userEvent.setup()
+    renderLayout()
+
+    expect(await screen.findByTestId("rail-waiting-badge")).toHaveTextContent(/^2$/)
+    mockGetWaitingNotices.mockRejectedValue(new Error("offline"))
+    window.dispatchEvent(new Event("focus"))
+    await waitFor(() => expect(mockGetWaitingNotices).toHaveBeenCalledTimes(2))
+
+    await user.click(screen.getByTestId("rail-waiting-trigger"))
+    expect(await screen.findByTestId("waiting-stale")).toHaveTextContent(
+      "Couldn't refresh just now. This is the last list we got.",
+    )
+    expect(screen.getByTestId("rail-waiting-badge")).toHaveTextContent(/^2$/)
+  })
+
+  it("a NON-CHAT view's mobile bar carries the dot when a run waits, and none when nothing does (D-30)", async () => {
+    mockGetSourceHealth.mockResolvedValue(NONE_STOPPED)
+    mockGetWaitingNotices.mockResolvedValue(TWO_WAITING)
+    const { unmount } = renderLayout({ onOpenLibraryHealth: vi.fn(), activeView: "skills" })
+    await screen.findByTestId("skills-page-stub")
+    const bar = await screen.findByRole("button", { name: /open navigation/i })
+    await waitFor(() => expect(bar.querySelector("[data-testid='drawer-trigger-dot']")).not.toBeNull())
+    unmount()
+
+    mockGetWaitingNotices.mockResolvedValue({ notices: [], total: 0 })
+    renderLayout({ onOpenLibraryHealth: vi.fn(), activeView: "skills" })
+    await screen.findByTestId("skills-page-stub")
+    await waitFor(() => expect(mockGetWaitingNotices).toHaveBeenCalledTimes(2))
+    expect(screen.queryByTestId("drawer-trigger-dot")).toBeNull()
   })
 })
 

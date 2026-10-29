@@ -327,9 +327,18 @@ export function AppViewSwitch({
             type="button"
             aria-label="Open navigation"
             onClick={() => setDrawerOpen(true)}
-            className="flex h-11 w-11 items-center justify-center rounded-xl text-muted-foreground transition-colors hover:bg-accent/40 hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/30"
+            className="relative flex h-11 w-11 items-center justify-center rounded-xl text-muted-foreground transition-colors hover:bg-accent/40 hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/30"
           >
             <Menu className="h-5 w-5" />
+            {/* Phase 301-03 (D-30): the same dot ChatArea draws (copied byte for byte), so a phone
+                user on a non-chat view also sees that something needs them. Pure markup. */}
+            {(showAttention ? attentionCount : 0) > 0 && (
+              <span
+                data-testid="drawer-trigger-dot"
+                aria-hidden="true"
+                className="absolute top-1.5 right-1.5 w-2.5 h-2.5 rounded-full bg-warning ring-2 ring-background"
+              />
+            )}
           </button>
         </div>
         {/* Phase 299-03 (UI-D9 / UI-D10): the gate's notice bar, above the region (a flex column,

@@ -12,6 +12,7 @@ import { ThreadCommandPalette } from "./ThreadCommandPalette"
 // Phase 297-01 (REG-09 / D-01): the ActiveView mount switch — and the page imports only it
 // used — moved here verbatim. ChatLayout renders it with same-named props.
 import { AppViewSwitch } from "./AppViewSwitch"
+import { WaitingOnYouControl } from "./WaitingOnYouControl"
 import type { ThreadNavigation } from "@/components/chat/threadNavigation"
 import type { EntityLink } from "@/hooks/useAppNavigation"
 import type { PanelState } from "@/components/panel/WorkspacePanel"
@@ -604,8 +605,12 @@ export function ChatLayout({ onSignOut, activeView, onNavigate, navItems, isOper
   // Phase 301-02 (D-13): producers take ONE context object, memoised, so each tenant reads the
   // door it leads to (Library health, or a run) and the conditions stay stable across renders.
   const openRunForAttention = useCallback((runId: string) => openRun?.(runId), [openRun])
+  // Phase 301-03 (D-17): the waiting tenant reports how fresh its list is (loading / failed /
+  // answered / stale), so the rail and drawer controls never show a pill before an answer and never
+  // drop it on a failed refresh. setState is stable, so the context stays memoised.
+  const [waitingStatus, setWaitingStatus] = useState<attentionRegistry.WaitingStatus>("loading")
   const attentionCtx = useMemo(
-    () => ({ openLibraryHealth, openRun: openRunForAttention }),
+    () => ({ openLibraryHealth, openRun: openRunForAttention, reportWaitingStatus: setWaitingStatus }),
     [openLibraryHealth, openRunForAttention],
   )
   const attentionConditions = attentionRegistry.ATTENTION_PRODUCERS.flatMap((producer) =>
@@ -652,6 +657,7 @@ export function ChatLayout({ onSignOut, activeView, onNavigate, navItems, isOper
         onToggleExpanded={toggleNavExpanded}
         attentionConditions={attentionConditions}
         onOpenLibraryHealth={onOpenLibraryHealth}
+        waitingStatus={waitingStatus}
       />
 
       {/* Phase 156 (POLISH-01 / D-01, Wave 1): the dedicated full-height chat-history
@@ -732,6 +738,16 @@ export function ChatLayout({ onSignOut, activeView, onNavigate, navItems, isOper
                   ))}
                 </select>
               )}
+              {/* Phase 301-03 (D-03 / UI-D10): the phone's "Waiting on you" row — the same count and the
+                  same list as the rail; selecting a row also closes the drawer. */}
+              <div className="mt-2">
+                <WaitingOnYouControl
+                  variant="drawer"
+                  conditions={attentionRegistry.conditionsForMark(attentionConditions, "waiting")}
+                  status={waitingStatus}
+                  onAfterSelect={() => setDrawerOpen(false)}
+                />
+              </div>
             </div>
             {/* Phase 156 Wave 3 (Plan 04 / D-08): the mobile drawer title search —
                 reuses the shared `matchesTitle` predicate so the drawer filters its
