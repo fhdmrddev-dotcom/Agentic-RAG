@@ -14,9 +14,10 @@
  * socket), window focus, the tab becoming visible, an active-org or membership change, and the
  * 60 s poll (D-17).
  *
- * 301 WR-01: those triggers arrive in bursts, so each one only REQUESTS a fetch. Requests
+ * 301 WR-01 / WR-02: those triggers arrive in bursts, so each one only REQUESTS a fetch. Requests
  * inside one short window become one GET, and a request that lands while a GET is already out
- * owes exactly one follow-up after it (never an abort-and-refire).
+ * owes exactly one follow-up after it (never an abort-and-refire). The membership trigger keys on
+ * the actual set of org ids and skips the permissions probe's transient empty list.
  *
  * ── ⛔ HAS A VERDICT EVER ARRIVED? (`verdictKnown`, the T-235-39 shape) ─────────────────
  *
@@ -148,14 +149,26 @@ export function useWaitingNotices(): WaitingNoticesState {
     start()
   }, [start])
 
-  // The refetch keys (D-17 / F17): the active org, and the SET of orgs the person belongs to.
+  // The refetch keys (D-17 / F17): the active org (this effect's first run is the mount fetch)…
   const activeOrgId = useActiveOrgId()
-  const orgs = useOrgOptional()?.orgs
-  const membershipKey = (orgs ?? []).map((o) => o.org_id).sort().join(",")
-
   useEffect(() => {
     request()
-  }, [request, activeOrgId, membershipKey])
+  }, [request, activeOrgId])
+
+  // …and the SET of orgs the person belongs to (301 WR-02). The permissions probe emits `[]` on
+  // every active-org re-key (its fail-closed default while `/org/me` is out) and on any probe
+  // failure, so an empty list is never a membership signal: it is skipped, not recorded. The first
+  // non-empty set is recorded without a fetch (the mount fetch already reflects it — the route
+  // joins memberships server-side); only a later, different non-empty set refetches.
+  const orgs = useOrgOptional()?.orgs
+  const membershipKey = (orgs ?? []).map((o) => o.org_id).sort().join(",")
+  const lastMembershipKey = useRef<string | null>(null)
+  useEffect(() => {
+    if (membershipKey === "") return
+    const previous = lastMembershipKey.current
+    lastMembershipKey.current = membershipKey
+    if (previous !== null && previous !== membershipKey) request()
+  }, [membershipKey, request])
 
   useEffect(() => {
     return () => {

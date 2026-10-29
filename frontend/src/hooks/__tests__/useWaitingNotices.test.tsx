@@ -312,14 +312,14 @@ describe("§3 the triggers", () => {
   })
 })
 
-// ── §3b 301 WR-01 — A BURST OF TRIGGERS IS ONE ASK, AND NONE IS LOST ─────────────
+// ── §3b 301 WR-01 / WR-02 — A BURST OF TRIGGERS IS ONE ASK, AND NONE IS LOST ─────────────
 //
 // The review measured a mount at up to three GETs (mount, the membership probe landing, the
 // channel's SUBSCRIBED), a tab return at two (visibilitychange + focus) and an org switch at three
 // (the probe's transient empty list read as a membership change, then its recovery). Each case
 // below drives the REAL trigger pair, not one trigger alone.
 
-describe("§3b coalescing (WR-01)", () => {
+describe("§3b coalescing (WR-01) and the membership signal (WR-02)", () => {
   it("mount + the membership probe landing + SUBSCRIBED, together, are ONE GET", async () => {
     // The probe has not answered yet: OrgProvider's fail-closed default carries no memberships.
     orgStore.set({ activeOrgId: "org-a", orgs: [] })
@@ -380,6 +380,81 @@ describe("§3b coalescing (WR-01)", () => {
     expect(mockGet).toHaveBeenCalledTimes(2)
     expect(result.current.notices).toEqual(ONE.notices)
     await flush(5_000)
+    expect(mockGet).toHaveBeenCalledTimes(2)
+  })
+
+  it("an org switch is ONE GET: the probe's transient empty list and its recovery are not membership changes", async () => {
+    mockGet.mockResolvedValue(TWO)
+    renderHook(() => useWaitingNotices())
+    await settle()
+    expect(mockGet).toHaveBeenCalledTimes(1)
+
+    // OrgProvider re-keys the probe: the active org moves and memberships go to CLOSED ([]).
+    act(() => {
+      orgStore.set({ activeOrgId: "org-b", orgs: [] })
+    })
+    await settle()
+    expect(mockGet).toHaveBeenCalledTimes(2) // the active-org switch itself (D-17)
+
+    // The probe answers with the SAME set it had before.
+    act(() => {
+      orgStore.set({ activeOrgId: "org-b", orgs: [{ org_id: "org-a", name: "Acme", role: "member" }] })
+    })
+    await settle()
+    await flush(5_000)
+    expect(mockGet).toHaveBeenCalledTimes(2)
+  })
+
+  it("a failed probe ([] after a non-empty set) and its recovery cost no GET", async () => {
+    mockGet.mockResolvedValue(TWO)
+    renderHook(() => useWaitingNotices())
+    await settle()
+
+    act(() => {
+      orgStore.set({ ...orgStore.get(), orgs: [] })
+    })
+    await settle()
+    expect(mockGet).toHaveBeenCalledTimes(1)
+
+    act(() => {
+      orgStore.set({ ...orgStore.get(), orgs: [{ org_id: "org-a", name: "Acme", role: "member" }] })
+    })
+    await settle()
+    expect(mockGet).toHaveBeenCalledTimes(1)
+  })
+
+  it("a GENUINE change between two non-empty sets still refetches, even across a transient empty one", async () => {
+    mockGet.mockResolvedValue(TWO)
+    renderHook(() => useWaitingNotices())
+    await settle()
+
+    act(() => {
+      orgStore.set({ ...orgStore.get(), orgs: [] })
+    })
+    await settle()
+    act(() => {
+      orgStore.set({
+        ...orgStore.get(),
+        orgs: [
+          { org_id: "org-z", name: "Zed", role: "member" },
+          { org_id: "org-a", name: "Acme", role: "member" },
+        ],
+      })
+    })
+    await settle()
+    expect(mockGet).toHaveBeenCalledTimes(2)
+
+    // The same set in a different order is not a change.
+    act(() => {
+      orgStore.set({
+        ...orgStore.get(),
+        orgs: [
+          { org_id: "org-a", name: "Acme", role: "member" },
+          { org_id: "org-z", name: "Zed", role: "member" },
+        ],
+      })
+    })
+    await settle()
     expect(mockGet).toHaveBeenCalledTimes(2)
   })
 })
