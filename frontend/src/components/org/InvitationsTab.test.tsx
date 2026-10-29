@@ -145,3 +145,79 @@ describe("InvitationsTab — invite modal role picker (D-167-03)", () => {
     expect(deptAdmin).toBeDisabled()
   })
 })
+
+// ── Phase 300-05 (NOTE-06 / D-11, UI-SPEC S4) — "Email not sent" on the list ─────────────────
+
+describe("InvitationsTab — the inviter sees a failed send (300-05)", () => {
+  const RESEND_LINE = "The email didn't send. Copy the link and send it yourself."
+
+  it("marks a pending row whose last send failed 'Email not sent'", () => {
+    render(
+      <InvitationsTab
+        {...makeProps({ invitations: [{ ...PENDING_INV, email_delivery: "failed" }, ACCEPTED_INV] })}
+      />,
+    )
+    const chip = screen.getByTestId("invitation-email-status")
+    expect(chip.textContent).toBe("Email not sent")
+    expect(chip).toHaveAttribute("data-tone", "muted")
+    expect(chip.querySelector("svg")).toHaveAttribute("aria-hidden", "true")
+  })
+
+  it.each([["sent"], ["not_configured"], [null], [undefined]] as const)(
+    "shows no chip for a pending row whose delivery is %s",
+    (delivery) => {
+      render(
+        <InvitationsTab {...makeProps({ invitations: [{ ...PENDING_INV, email_delivery: delivery }] })} />,
+      )
+      expect(screen.queryByTestId("invitation-email-status")).toBeNull()
+    },
+  )
+
+  it("shows no chip on a non-pending row, even if its last send failed", () => {
+    render(
+      <InvitationsTab
+        {...makeProps({ invitations: [{ ...ACCEPTED_INV, email_delivery: "failed" }] })}
+      />,
+    )
+    expect(screen.queryByTestId("invitation-email-status")).toBeNull()
+  })
+
+  it("a resend that failed again shows the line under the fresh link (server truth after the re-fetch)", async () => {
+    const props = makeProps({ invitations: [{ ...PENDING_INV, email_delivery: "failed" }] })
+    const { rerender } = render(<InvitationsTab {...props} />)
+    await userEvent.click(
+      screen.getByRole("button", { name: /resend invitation to pending@acme.test/i }),
+    )
+    await waitFor(() => expect(screen.getByTestId("invitation-fresh-link")).toBeInTheDocument())
+    expect(screen.getByText(RESEND_LINE).textContent).toBe(RESEND_LINE)
+    // The re-fetched row says the resend went: the chip and the line both go, no optimistic flip.
+    rerender(
+      <InvitationsTab {...props} invitations={[{ ...PENDING_INV, email_delivery: "sent" }]} />,
+    )
+    expect(screen.queryByTestId("invitation-email-status")).toBeNull()
+    expect(screen.queryByText(RESEND_LINE)).toBeNull()
+    expect(screen.getByTestId("invitation-fresh-link")).toBeInTheDocument()
+  })
+
+  it("a resend whose row still reads failed keeps the chip until the server says otherwise", async () => {
+    render(
+      <InvitationsTab {...makeProps({ invitations: [{ ...PENDING_INV, email_delivery: "failed" }] })} />,
+    )
+    await userEvent.click(
+      screen.getByRole("button", { name: /resend invitation to pending@acme.test/i }),
+    )
+    await waitFor(() => expect(screen.getByTestId("invitation-fresh-link")).toBeInTheDocument())
+    expect(screen.getByTestId("invitation-email-status")).toBeInTheDocument()
+  })
+
+  it("never shows the resend line for a resend whose email went", async () => {
+    render(
+      <InvitationsTab {...makeProps({ invitations: [{ ...PENDING_INV, email_delivery: "sent" }] })} />,
+    )
+    await userEvent.click(
+      screen.getByRole("button", { name: /resend invitation to pending@acme.test/i }),
+    )
+    await waitFor(() => expect(screen.getByTestId("invitation-fresh-link")).toBeInTheDocument())
+    expect(screen.queryByText(RESEND_LINE)).toBeNull()
+  })
+})
