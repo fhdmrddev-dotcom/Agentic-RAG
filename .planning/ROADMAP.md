@@ -124,8 +124,8 @@ Requirements: [`REQUIREMENTS.md`](REQUIREMENTS.md). **29 v4.9 requirements, 29 m
 **Plans**: 6 plans in 4 waves
 - [x] 304-01-PLAN.md — migrations 220/221, the GUC-narrowed current_user_org_ids(), the one dependencies.py edit, acting-member connection, EXPLAIN evidence + RLS live suite (wave 1, mutates local DB)
 - [x] 304-02-PLAN.md — resolver core extracted (pure move first), mcp kind + srl_mcp_, principal_still_allowed, McpPrincipal, KeyScope, tool catalogue + mcp_url (wave 1)
-- [ ] 304-03-PLAN.md — narrowed reads + the headline two-org non-owner parity suite, negative arms, narrowed-key arms (wave 2, mutates local DB)
-- [ ] 304-04-PLAN.md — kind on the 293 key routes, pickable folders, org switch (audited) + operator flag, wire contract + OpenAPI (wave 2)
+- [x] 304-03-PLAN.md — narrowed reads + the headline two-org non-owner parity suite, negative arms, narrowed-key arms (wave 2, mutates local DB)
+- [x] 304-04-PLAN.md — kind on the 293 key routes, pickable folders, org switch (audited) + operator flag, wire contract + OpenAPI (wave 2)
 - [ ] 304-05-PLAN.md — member key screen: kind choice, MCP draft, show-once snippets, MCP card, revoke facts (wave 3)
 - [ ] 304-06-PLAN.md — org switch card, admin list notice, audit words, Control Room switch; phase bookkeeping + full gates (wave 4)
 **UI hint**: yes
