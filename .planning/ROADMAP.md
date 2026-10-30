@@ -122,8 +122,8 @@ Requirements: [`REQUIREMENTS.md`](REQUIREMENTS.md). **29 v4.9 requirements, 29 m
 
 **How we'd know this failed**: any key read goes through the service role and re-implements visibility; the org narrowing loses the `current_user_org_ids()` initPlan shape under `EXPLAIN`, or the backend baseline rises above 71; behaviour with the org setting unset is not identical to today; an empty folder set means "no filter"; a second key resolver appears beside the extracted `authenticate_presented_key` (the W-1 drift class); the secret is stored unhashed or shown twice; a snippet puts the key in a URL; revocation waits for a cache to expire; a new table or column is readable by `anon` or another user, or `get_advisors(security)` shows a new ERROR; the parity test passes only for the org owner.
 **Plans**: 6 plans in 4 waves
-- [ ] 304-01-PLAN.md — migrations 220/221, the GUC-narrowed current_user_org_ids(), the one dependencies.py edit, acting-member connection, EXPLAIN evidence + RLS live suite (wave 1, mutates local DB)
-- [ ] 304-02-PLAN.md — resolver core extracted (pure move first), mcp kind + srl_mcp_, principal_still_allowed, McpPrincipal, KeyScope, tool catalogue + mcp_url (wave 1)
+- [x] 304-01-PLAN.md — migrations 220/221, the GUC-narrowed current_user_org_ids(), the one dependencies.py edit, acting-member connection, EXPLAIN evidence + RLS live suite (wave 1, mutates local DB)
+- [x] 304-02-PLAN.md — resolver core extracted (pure move first), mcp kind + srl_mcp_, principal_still_allowed, McpPrincipal, KeyScope, tool catalogue + mcp_url (wave 1)
 - [ ] 304-03-PLAN.md — narrowed reads + the headline two-org non-owner parity suite, negative arms, narrowed-key arms (wave 2, mutates local DB)
 - [ ] 304-04-PLAN.md — kind on the 293 key routes, pickable folders, org switch (audited) + operator flag, wire contract + OpenAPI (wave 2)
 - [ ] 304-05-PLAN.md — member key screen: kind choice, MCP draft, show-once snippets, MCP card, revoke facts (wave 3)

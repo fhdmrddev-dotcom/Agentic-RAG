@@ -45,8 +45,8 @@ reviewer exists, so a phase closes `verification_mode: self-verified`, never `re
 
 Milestone: v4.9 Use It From Your Own Tools
 Phase: 304 — Personal MCP Keys That Act as You (planned, `--auto`; 303 not started)
-Plan: 0 of 6 (4 waves: 01+02 · 03+04 · 05 · 06)
-Status: Ready to execute 304
+Plan: 2 of 6 (wave 1 merged `ce2343d2e`: 01 migrations 220/221 applied LOCAL only + org narrowing; 02 resolver/liveness/KeyScope). Wave 2 next: 03+04.
+Status: Executing 304
 Last activity: 2026-10-30 — 304 context gathered (`.planning/phases/304-personal-mcp-keys-that-act-as-you/304-CONTEXT.md`); SEED-195 + SEED-013 folded
 
 Phases start at **303**; migrations at **220**. Seeds taken in at intake: SEED-013, SEED-177, SEED-195, SEED-081, SEED-079; bug BUG-261022-01.
@@ -73,6 +73,7 @@ link. Branch `develop`. Tags `v4.7` and `v4.8` pushed 2026-10-30.
 
 ## Owed (operator)
 
+- **BUG-261031-01 — reproduce on a disposable Postgres:** a role-`anon` call to `current_user_org_ids()` crashed the local Postgres into recovery mode twice (should be "permission denied"). Production: anon has no EXECUTE, same PG 17.6, no crash lines in 24 h of logs. If the anon REST path reproduces it, it is an unauthenticated DB crash. Never drive it against production.
 - **304 D-41 — confirm before 304+305 deploy:** MCP keys need no tier capability (any member can mint; the org and deployment switches are the controls). Tier gates are a pricing one-way door (TIER-02); flipping it is one condition.
 
 - Logged-in production smoke of the 301 list (open it once on app.superrag.cloud; expect the empty state).
