@@ -4,10 +4,10 @@ title: The Workspace panel reads FILES 0 · No files yet in a thread whose two t
 reported: 2026-10-27
 surface: Agentic-RAG
 severity: minor
-status: folded
+status: closed  # 2026-10-30: 302 G4-1 PASS live (list + count + download)
 affected_areas: ['frontend/panel', 'frontend/workspace']
 folded_into: "302"
-verified_closed_by: null
+verified_closed_by: "302 G4-1"
 related_seeds: []
 re_open_trigger: "Fold at the next /gsd:discuss-phase whose files touch frontend/panel; found during the 296 G-4 drive, outside 296's inventory"
 status_note: >
