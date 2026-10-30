@@ -119,6 +119,14 @@ SELECT EXISTS (
      WHERE n.id = $1
        AND n.closed_at IS NULL
        AND wr.status IN ('active', 'paused')
+       -- v4.8 audit W-1: the recipient must still belong to the run's org, as LIST_OPEN_SQL and
+       -- link_resolver require. Otherwise the email links to a run that reads "can't be opened".
+       AND EXISTS (
+           SELECT 1
+             FROM public.org_members om
+            WHERE om.org_id = n.org_id
+              AND om.user_id = n.recipient_id
+       )
        AND EXISTS (
            SELECT 1
              FROM public.messages m
