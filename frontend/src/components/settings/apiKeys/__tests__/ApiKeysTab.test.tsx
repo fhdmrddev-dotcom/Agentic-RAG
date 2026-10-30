@@ -477,6 +477,37 @@ describe("304-05 ApiKeysTab — the MCP draft", () => {
     expect(within(draft).getByRole("radio", { name: "365 days" })).toHaveAttribute("aria-checked", "true")
   })
 
+  it("G-4 row 1 (unit): the secret once with the Claude Code snippet, then gone; the card reads its defaults", async () => {
+    const user = userEvent.setup()
+    const MCP_SECRET = "srl_mcp_TESTsecretNOTreal0000000000000000000000"
+    const created = makeMcpKey({ id: "new" })
+    const draft = await openMcpDraft(user)
+    m.createApiKey.mockResolvedValue({ key: created, secret: MCP_SECRET })
+    await user.type(within(draft).getByLabelText("Label"), "claude-code-laptop")
+    m.listApiKeys.mockResolvedValue({ ...MCP_EMPTY, keys: [created] })
+    await user.click(within(draft).getByRole("button", { name: "Create key" }))
+    const once = await screen.findByTestId("api-key-once")
+    expect(within(once).getByTestId("api-key-secret")).toHaveTextContent(MCP_SECRET)
+    const snippet = within(once).getByTestId("mcp-snippet-claudeCode").textContent ?? ""
+    expect(snippet).toContain("${SYREL_MCP_KEY}")
+    expect(snippet).not.toContain(MCP_SECRET)
+    expect(within(once).queryByTestId("curl-start")).toBeNull()
+    expect(within(once).queryByTestId("curl-status")).toBeNull()
+    expect(within(once).getByRole("note")).toHaveTextContent(/Don't paste this key into Claude\.ai/)
+    expect(within(once).getAllByTestId("api-key-chip").map((c) => c.textContent)).toEqual(["Read only", "All folders"])
+    storageNeverHeld(MCP_SECRET)
+
+    await user.click(within(once).getByRole("button", { name: "I've saved the secret" }))
+    expect(screen.queryByTestId("api-key-once")).toBeNull()
+    expect(document.body.textContent).not.toContain(MCP_SECRET)
+    const card = await screen.findByTestId("api-key-card")
+    expect(within(card).getByText("● active")).toBeInTheDocument()
+    expect(within(card).getAllByTestId("api-key-chip").map((c) => c.textContent)).toEqual(["Read only", "All folders"])
+    expect(within(card).getByTestId("api-key-meta")).toHaveTextContent("Not used yet")
+    expect(within(card).getByTestId("api-key-meta")).toHaveTextContent(/expires \w{3} \d+ \w{3}/)
+    storageNeverHeld(MCP_SECRET)
+  })
+
   it("a failed folder read says so and Retry reads again", async () => {
     const user = userEvent.setup()
     m.listPickableFolders.mockRejectedValueOnce(new Error("down")).mockResolvedValueOnce({ folders: FOLDERS })
