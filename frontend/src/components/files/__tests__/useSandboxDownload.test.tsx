@@ -9,16 +9,18 @@ import { describe, it, expect, vi, beforeEach, afterEach } from "vitest"
 import { act, renderHook } from "@testing-library/react"
 import type { MouseEvent } from "react"
 
-class FakeDownloadError extends Error {
-  readonly status: number | "network"
-  constructor(status: number | "network", message: string) {
-    super(message)
-    this.status = status
-    this.name = "DownloadError"
+// vi.hoisted: the mock factory below is hoisted above every top-level statement.
+const { FakeDownloadError, downloadSandboxOutput } = vi.hoisted(() => {
+  class FakeDownloadError extends Error {
+    readonly status: number | "network"
+    constructor(status: number | "network", message: string) {
+      super(message)
+      this.status = status
+      this.name = "DownloadError"
+    }
   }
-}
-
-const downloadSandboxOutput = vi.fn()
+  return { FakeDownloadError, downloadSandboxOutput: vi.fn() }
+})
 vi.mock("@/lib/api", () => ({
   downloadSandboxOutput: (...a: unknown[]) => downloadSandboxOutput(...a),
   DownloadError: FakeDownloadError,
