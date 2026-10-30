@@ -251,7 +251,12 @@ Plans:
   4. The register is true: every seed and bug folded into v4.8 is updated; `SEED-281`'s stale premises ("no app-owned mailer", "unanswered fails the run") are corrected; the excluded pause kinds (tool-round cap, chat `ask_user`) are recorded; bug reports exist for built images being unable to send invite email and for `*.vercel.app` previews being unable to open the app; `node scripts/check-seeds-register.cjs` is clear (REG-08).
 
 **How we'd know this failed**: "No files yet" still shows for a thread with outputs; Run now re-renders every row or a failure still reads as a raw error; a `SEED-391` finding has no disposition; a fix adds a capability (that is a phase, not a close-out); a seed reads `planted` for work that shipped; a gate is weakened to pass.
-**Plans**: TBD
+**Plans**: 3 plans (2 waves)
+
+Plans:
+- [ ] 302-01-PLAN.md — FIX-01: the panel lists a thread's generated files (shared download hook, Generated files group, honest counts) — wave 1
+- [ ] 302-02-PLAN.md — FIX-06: the six SEED-391 findings, each RED-first (liveness predicate, stand-in note, Moonshot unroll, 409 wording, two a11y names) — wave 1
+- [ ] 302-03-PLAN.md — FIX-03 F-1 fix + 302-VALIDATION rows; REG-08 register made true; pins, ledger, full gates — wave 2
 **UI hint**: yes
 **Flags**: **G-4** for FIX-01 and FIX-03 (Chrome). **G-5**: `WorkspacePanel.tsx` (11), `FilesSection.tsx` (8), `backend/app/api/workspace.py` (8), `WorkflowScheduleModal.tsx` (4), `backend/app/api/schedules.py` (4) — one-touch fixes honoured by construction, or defer. Workspace panel changes land in chat first (`ChatLayout.tsx` is its only mount). **Four-axis** for FIX-01 (chat UI state). No migration expected. Filing the two pre-existing bug reports early (before 297 and 300 plan) is allowed and lets those phases fold them; REG-08 still closes here. Folds `BUG-261027-01`, `BUG-261027-03`, `SEED-391`.
 
@@ -264,7 +269,7 @@ Plans:
 | 299. Links to the Thing Itself | 5/5 | Complete 2026-10-29 | 5/5 SC + 6/6 reqs; security 36/36; UAT 18/20 PASS; owed by decision: G4-4b email-link leg (cloud), X-7 Moonshot (⛔ balance); G4-4c ⛔ SSO; IN-01..05 deferred; Redirect URLs added; LIVE 2026-10-29 (prod 31416d335) |
 | 300. Told When a Run Waits (Backend and Mailer) | 5/5 | Executed — human_needed | 5/5 SC + 6/6 reqs in code; security 41/41 (UF-1 fixed); review 5 WR + 4 IN fixed; UAT 12/15 PASS (G4-8 + real-mail G4-1 owed — Resend deferred); LIVE 2026-10-29 (prod 31416d335); mig 218 in cloud |
 | 301. The Waiting-on-You Notice | 3/3 | Executed — human_needed | 3/3 SC in code (SC#1-3 verified); review 2 WR fixed; UAT driven: G4-1/2/3a-b/4 phone/5, XP 7/8 (Moonshot blocked), MT-1/PT-1/LM-1 PASS; owed: SC#4 operator sketch approval (first), G4-4 stopped-source + keyboard, real socket rejoin, live approval row; count gate OK (quiet run); mig 219 local only |
-| 302. Close-Out and a True Register | 0/TBD | Not started | - |
+| 302. Close-Out and a True Register | 0/3 | Planned | - |
 
 ---
 
