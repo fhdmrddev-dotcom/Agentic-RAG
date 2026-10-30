@@ -30,7 +30,7 @@ See: `.planning/PROJECT.md` (updated 2026-10-30)
 
 **Core value:** The agent acts as an AI colleague — it knows your knowledge base, can run code, and
 can be taught new behaviours (skills) that persist and can be shared.
-**Current focus:** between milestones — deploy 301/302, then `/gsd:new-milestone` (v4.9)
+**Current focus:** between milestones — v4.8 fully live (2026-10-30); next `/gsd:new-milestone` (v4.9)
 
 ---
 
@@ -44,7 +44,7 @@ reviewer exists, so a phase closes `verification_mode: self-verified`, never `re
 ## Current Position
 
 Milestone: none (v4.8 closed 2026-10-30)
-Status: milestone_complete — next: operator "deploy" for 301/302, then `/gsd:new-milestone`
+Status: milestone_complete — v4.8 fully live at `ed17bc660`; next: `/gsd:new-milestone`
 Last activity: 2026-10-30 -- v4.8 closed by hand
 
 Phases resume at **303**; migrations at **220**. Open Platform (`SEED-013`) was moved to v4.9 at v4.8 intake.
@@ -61,24 +61,22 @@ Closed core 7 phase types / 1 emitter / 30 tools. Phase folders 297-302 still in
 
 ## Production
 
-Live at `31416d335` (master `f73dc7cb5`), 2026-10-29: v4.7 + v4.8 phases 297-300. Cloud migrations 210-218
-applied; `get_advisors(security)` 0 ERROR. **No mail provider in cloud (Resend deferred)** — deliveries record
-`suppressed`, invites → Copy link. Branch `develop`.
-
-**Not deployed (needs an operator "deploy"):** Phase 301 (waiting-on-you notice), Phase 302 (close-out),
-the 298 chip fix `5f0eb2660`, the audit fix `41198157b`. Migration **219** (notifications in
-`supabase_realtime`) needs its cloud paste with per-action approval, `migration_219_verify = PASS`, then
-`get_advisors(security)` — before the backend ships (AR-301-R1).
+Live at `ed17bc660` (master `4bc4a872f`), 2026-10-30: ALL of v4.8 (297-302) + the 298 chip fix
+`5f0eb2660` + the audit fix `41198157b`. Cloud migrations 210-219 applied; 219 applied first with operator
+approval (`migration_219_verify = PASS`, AR-301-R1 discharged), `get_advisors(security)` 0 ERROR, `notifications`
+grants unchanged (authenticated SELECT only). Live checks: frontend bundle calls `/notifications`; backend
+`/notifications` → 401 `WWW-Authenticate: Bearer`, `/openapi.json` → 401 (gated). Brief 502 during the Coolify
+swap (~1 min). **No mail provider in cloud (Resend deferred)** — deliveries record `suppressed`, invites → Copy
+link. Branch `develop`. Tags `v4.7` and `v4.8` pushed 2026-10-30.
 
 ## Owed (operator)
 
-- Deploy 301/302 + fixes (migration 219 first, above).
+- Logged-in production smoke of the 301 list (open it once on app.superrag.cloud; expect the empty state).
 - Mail provider (Resend deferred 2026-10-29) → 300 G4-8 and the real-provider half of G4-1; BUG-260828-05/06 stay folded until G4-8.
   When revived: Coolify `EMAIL_PROVIDER` / `RESEND_API_KEY` / `ENVIRONMENT=production`; Resend sender + SPF/DKIM/DMARC.
 - 299 G4-4b email-link leg (cloud); G4-4c SSO ⛔ (D-41).
 - Moonshot account reinstatement (429) → re-run its roster rows; BUG-261024-01 stays `folded`.
 - Local dev data: paused approval run `66db79bc` (org 22f9c615) — **do not approve** (it emails fhdmrd.dev@gmail.com); delete or cancel it when convenient.
-- Push tags `v4.7` and `v4.8` when wanted (local only).
 - Optional: restore Supabase MCP `read_only=true`.
 - 294-ENV: remove the two dev-only lines from `backend/.env`.
 - Rerank / citation check stay OFF in cloud until SEED-365's remaining half lands.
