@@ -672,6 +672,7 @@ export function ControlRoomPage({ identity, onBack }: ControlRoomPageProps) {
     sandbox_enabled: settings?.sandbox_enabled ?? true,
     self_improve_enabled: settings?.self_improve_enabled ?? true,
     workflows_enabled: settings?.workflows_enabled ?? true,
+    mcp_enabled: settings?.mcp_enabled ?? true,
   }
   const maintenanceOn = settings?.maintenance_mode ?? false
 

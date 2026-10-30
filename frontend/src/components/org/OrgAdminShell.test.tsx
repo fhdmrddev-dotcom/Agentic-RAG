@@ -18,7 +18,7 @@
  * it via useTechnicalNames and threads it to OrgBand + OrgAuditTab).
  */
 import { describe, it, expect, beforeEach, vi } from "vitest"
-import { act, fireEvent, render, screen } from "@testing-library/react"
+import { act, fireEvent, render, screen, waitFor } from "@testing-library/react"
 import userEvent from "@testing-library/user-event"
 
 import { OrgAdminShell } from "./OrgAdminShell"
@@ -87,6 +87,18 @@ vi.mock("./OrgApiKeysTab", () => ({
     </div>
   ),
 }))
+
+// Phase 304-06: the Settings tab's MCP switch card owns its read + write (its suite is
+// __tests__/OrgMcpSwitchCard.test.tsx); here the two calls are mocked so the shell's pulse wiring
+// and the org-keyed remount can be driven through the REAL card.
+const mcp = vi.hoisted(() => ({
+  getOrgMcpAccess: vi.fn(),
+  setOrgMcpAccess: vi.fn(),
+}))
+vi.mock("@/lib/api/apiKeys", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("@/lib/api/apiKeys")>()
+  return { ...actual, ...mcp }
+})
 
 const MEMBERS_PAGE: OrgMembersPage = {
   members: [
@@ -346,5 +358,44 @@ describe("OrgAdminShell — audit scope threads through (ADMIN-04 / D-166-04 / T
     await userEvent.click(screen.getByRole("tab", { name: "Audit" }))
     expect(await screen.findByText(/any action/i)).toBeInTheDocument()
     expect(screen.queryByTestId("org-audit-own-banner")).toBeNull()
+  })
+})
+
+describe("OrgAdminShell — the org MCP switch in Settings (304-06 / D-02, D-35)", () => {
+  it("a successful flip pulses the band's marker (062-A)", async () => {
+    mcp.getOrgMcpAccess.mockResolvedValue({ enabled: true })
+    mcp.setOrgMcpAccess.mockResolvedValue({ enabled: false })
+    renderShell()
+    await userEvent.click(screen.getByRole("tab", { name: "Settings" }))
+    const sw = await screen.findByRole("switch", { name: "AI tool access (MCP)" })
+    expect(screen.getByText("every action recorded").className).not.toContain("bg-success/15")
+    await userEvent.click(sw)
+    await waitFor(() => expect(sw).toHaveAttribute("aria-checked", "false"))
+    expect(screen.getByText("every action recorded").className).toContain("bg-success/15")
+  })
+
+  it("a failed flip does not pulse the band", async () => {
+    mcp.getOrgMcpAccess.mockResolvedValue({ enabled: true })
+    mcp.setOrgMcpAccess.mockRejectedValue(new Error("boom"))
+    renderShell()
+    await userEvent.click(screen.getByRole("tab", { name: "Settings" }))
+    await userEvent.click(await screen.findByRole("switch", { name: "AI tool access (MCP)" }))
+    expect(await screen.findByText("Couldn't change it. Try again.")).toBeInTheDocument()
+    expect(screen.getByText("every action recorded").className).not.toContain("bg-success/15")
+  })
+
+  it("an org switch remounts the Settings tab, so the switch re-reads for the new org", async () => {
+    mcp.getOrgMcpAccess.mockResolvedValue({ enabled: true })
+    const view = renderShell()
+    await userEvent.click(screen.getByRole("tab", { name: "Settings" }))
+    await screen.findByRole("switch", { name: "AI tool access (MCP)" })
+    expect(mcp.getOrgMcpAccess).toHaveBeenCalledTimes(1)
+    mockOrg({ activeOrgId: "o2", orgs: [{ org_id: "o2", name: "Beta GmbH", role: "org-admin" }] })
+    view.rerender(
+      <TechnicalNamesProvider>
+        <OrgAdminShell onBack={vi.fn()} />
+      </TechnicalNamesProvider>,
+    )
+    await waitFor(() => expect(mcp.getOrgMcpAccess).toHaveBeenCalledTimes(2))
   })
 })

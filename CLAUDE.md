@@ -491,12 +491,12 @@ node scripts/check-hot-file-ledger.cjs <phase-dir>   # 0 clear · 1 missing rows
 | `frontend/src/types/index.ts` | 103 / 82 / 1688 (was `102 / 81 / 1685`) | 299-04: ExpertBundle.org_id (the wire already sent it) · seam OWED |
 | `backend/app/main.py` | 99 / 73 / 1021 (was `98 / 72 / 1020`) | 301-01: one include_router(notifications.router) + its import token · ⛔ |
 | `backend/app/config.py` | 96 / 55 / 1831 (was `93 / 54 / 1809`) | 300-03: SMTP_* fields (D-28) · seam OWED · ⛔ |
-| `backend/app/api/admin.py` | 44 / 17 / 2054 (was `43 / 17 / 2051`) | quick-261024: discover summary gains a `returned` count (+3) · ⛔ |
-| `backend/app/api/settings.py` | 48 / 26 / 1398 (was `47 / 25 / 1301`) | 300-05: four email knobs + read-only provider (D-07/D-08) |
+| `backend/app/api/admin.py` | 45 / 18 / 2055 (was `44 / 17 / 2054`) | 304-04: one _FLAG_HUMAN_NAMES entry (mcp_enabled) · ⛔ |
+| `backend/app/api/settings.py` | 50 / 27 / 1400 (was `48 / 26 / 1398`) | 304-04: mcp_enabled response field + readback (2 lines) |
 | `backend/app/services/multimodal_service.py` | 14 / 7 / 984 | ⚠ absent from BOTH for its ENTIRE LIFE at **7 phases** |
 | `backend/app/api/documents.py` | 101 / 40 / 2709 (was `99 / 39 / 2698`) | 298-01: one by_org in build() + one root_upload_org kwarg · ⛔ |
 | `backend/app/api/library.py` | 3 / 3 / 304 (was `2 / 2 / 299`) | ⚠ now FIRES (298) · 298-01: summary shares the lists' org predicate ($1) |
-| `scripts/vitest-count-gate.cjs` | 406 / 85 / 6910 (was `403 / 84 / 6894`) | 302-03: 3 pins added (302-01 suites); 8 raised; none lowered |
+| `scripts/vitest-count-gate.cjs` | 408 / 86 / 6932 (was `406 / 85 / 6910`) | 304-06: 9 pins added (304 suites); 8 raised; none lowered |
 | `scripts/check-deploy-drift.sh` | 6 / 5 / 271 (was `5 / 4 / 267`) | 300-03: SMTP_* parity |
 | `scripts/build-public-openapi.cjs` | 13 / 7 / 473 (was `11 / 5 / 472`) | 301-01: notifications tag + /notifications FLAGGED (2 lines) |
 | `scripts/check-seeds-register.cjs` | 7 / 3 / 1132 | ⚠ FIRES, absent here — row added 296-05 · `\d{3,}` ids · ⛔ |
@@ -507,8 +507,8 @@ node scripts/check-hot-file-ledger.cjs <phase-dir>   # 0 clear · 1 missing rows
 | `backend/app/api/schedules.py` | 6 / 6 / 341 (was `5 / 5 / 303`) | 300-01: create/patch/resume 422 by label (D-14) |
 | `backend/app/services/inbound_inputs.py` | 9 / 3 / 352 (was `8 / 2 / 312`) | ⚠ now FIRES (300) · 300-01: labels + sentence beside the one predicate |
 | `backend/app/api/inbound.py` | 10 / 3 / 719 (was `9 / 2 / 711`) | ⚠ now FIRES (298) · 298-02: one foreign_folder _refused (plain 422) · ⛔ |
-| `frontend/src/components/settings/apiKeys/apiKeysCopy.ts` | 5 / 3 / 283 (was `4 / 2 / 281`) | ⚠ now FIRES (298) · 298-02: one string (calls.foreignFolder) · ⛔ |
-| `frontend/src/components/settings/apiKeys/apiKeyFacts.ts` | 4 / 3 / 310 (was `3 / 2 / 308`) | ⚠ now FIRES (298) · 298-02: one case, foreign_folder call words · ⛔ |
+| `frontend/src/components/settings/apiKeys/apiKeysCopy.ts` | 6 / 4 / 283 (was `5 / 3 / 283`) | 304-05: four strings reworded for both kinds · ⛔ |
+| `frontend/src/components/settings/apiKeys/apiKeyFacts.ts` | 5 / 4 / 373 (was `4 / 3 / 310`) | 304-05: kind branch + off tag + 3 refusal words · ⛔ |
 | `backend/app/models/schedule.py` | 3 / 3 / 231 | ⚠ FIRES, absent here — row added 296-02 · one additive field (outcome) |
 | `frontend/src/components/panel/PhaseCard.tsx` | 22 / 14 / 821 (was `21 / 14 / 817`) | 296 review FE-WR-01: paused step drops running instruments |
 | `frontend/src/components/panel/PhaseTimeline.tsx` | 11 / 9 / 408 (was `10 / 8 / 404`) | 296-04: derives runPaused from its frame, passes it |
@@ -552,7 +552,7 @@ node scripts/check-hot-file-ledger.cjs <phase-dir>   # 0 clear · 1 missing rows
 | `backend/app/services/sources/__init__.py` | 5 / 3 / 40 | ⚠ absent while FIRING — row added 239-03 |
 | `backend/app/services/mcp_client.py` | 9 / 6 / 526 | ⚠ row STALE TWICE (SEED-258) |
 | `backend/app/models/message.py` | 25 / 17 / 292 (was `24 / 16 / 287`) | 293-03: ONE field (run_origin, a dict: a harness import is circular) |
-| `backend/app/models/user_settings.py` | 62 / 38 / 1788 (was `61 / 37 / 1776`) | 300-03: four email knobs + _val lines · ⛔ |
+| `backend/app/models/user_settings.py` | 63 / 39 / 1790 (was `62 / 38 / 1788`) | 304-04: mcp_enabled field + _val_bool readback (2 lines) · ⛔ |
 | `backend/app/services/harness/reachability.py` | 5 / 5 / 498 (was `4 / 4 / 463`) | 295-02: one pure lint check (no_template_bound) |
 | `backend/app/services/workflow_kickoff.py` | 15 / 12 / 608 (was `14 / 11 / 605`) | 299-01: one refuse_if_other_org beside raise_if_foreign (D-18) |
 | `frontend/src/components/workflows/WorkflowScheduleModal.tsx` | 7 / 6 / 814 (was `6 / 5 / 812`) | 302-03: refused Run now said once (F-1, one condition) |
@@ -604,7 +604,7 @@ node scripts/check-hot-file-ledger.cjs <phase-dir>   # 0 clear · 1 missing rows
 | `frontend/src/components/sources/SourceFolderPicker.tsx` | 2 / 2 / 375 | ⚠ absent its entire life — row added BUG-260912-01 · ⛔ |
 | `frontend/src/components/sources/sourceHealthVocabulary.ts` | 8 / 4 / 645 | ⛔ row STALE · G-5 fires (252-03) · Seam OWED |
 | `backend/app/services/sources/failure_cause.py` | 3 / 2 / 227 | ⚠ absent its entire life — row added BUG-260912-01 · ⛔ |
-| `scripts/full-schema-supplement.sql` | 27 / 19 / 891 (was `26 / 18 / 888`) | 301-01: mig 219 publication line in §4 · ⛔ |
+| `scripts/full-schema-supplement.sql` | 28 / 20 / 909 (was `27 / 19 / 891`) | 304-01: mig 220 api_keys block appended after 215's · ⛔ |
 | `.claude/settings.json` | 14 / 6 / 214 | ⚠ STALE · last touch 276 · ⛔ |
 | `backend/app/services/forced_emit.py` | 15 / 9 / 749 (was `13 / 8 / 724`) | 296 (293-F-4): cross-provider copy names the target provider · ⛔ |
 | `backend/app/services/template_asset_service.py` | 5 / 4 / 379 (was `4 / 3 / 344`) | 295-02: has_staged_template (Branch-2 WHERE shared) |
@@ -617,21 +617,26 @@ node scripts/check-hot-file-ledger.cjs <phase-dir>   # 0 clear · 1 missing rows
 | `backend/app/services/expert_authoring.py` | 7 / 3 / 393 | ⚠ now FIRES (`5/2/393`). **267-01**: one prompt line (tool floor has no effect) |
 | `frontend/src/components/experts/ExpertAuthoringStudio.tsx` | 6 / 3 / 1550 | ⚠ now FIRES · last touch 267-03 · Extraction OWED |
 | `backend/app/api/experts.py` | 16 / 7 / 833 (was `14 / 6 / 822`) | honoured by construction (279-02: ONE expression) · Extraction OWED |
-| `backend/app/dependencies.py` | 24 / 12 / 1147 | ⚠ absent here at 12 phases — row added 267-05 |
+| `backend/app/dependencies.py` | 25 / 13 / 1157 (was `24 / 12 / 1147`) | 304-01: the one sanctioned GUC edit (D-14) · ⛔ |
 | `backend/app/utils/skill_visibility.py` | 3 / 2 / 209 | ⚠ row STALE · last touch 264-02/04 · ⛔ |
 | `frontend/src/components/chat/ActiveExpertChip.tsx` | 2 / 2 / 53 | ⚠ row read 0/0/0 · last touch 268-03 |
 | `frontend/src/components/chat/ExpertSpotlightCard.tsx` | 5 / 4 / 269 (was `2 / 2 / 205`) | ⚠ now FIRES · honoured by construction (279-03) · extraction FIRST · ⛔ |
 | `frontend/src/components/chat/InviteExpertDialog.tsx` | 10 / 5 / 648 (was `4 / 4 / 614`) | honoured by construction (279-03: ONE field + prop) · seam TAKEN |
 | `frontend/src/components/skills/SkillFormDialog.tsx` | 13 / 9 / 657 | ⚠ row STALE · honoured by construction (263-04) · ⛔ |
 | `backend/app/api/skills.py` | 20 / 10 / 859 (was `19 / 10 / 858`) | ⛔ FIRES · last touch 280-01 (6 maybe_row guards) |
-| `frontend/src/lib/api/skills.ts` | 10 / 7 / 779 (was `9 / 6 / 767`) | 300-05: four optional email fields + provider |
+| `frontend/src/lib/api/skills.ts` | 11 / 8 / 783 (was `10 / 7 / 779`) | 304-04: optional mcp_enabled on FullAppSettings (type-only) |
 | `frontend/src/lib/api/settings.ts` | 11 / 5 / 529 | ⚠ FIRES, absent here — row added 300-05 · switch's own PUT (D-09) · ⛔ |
 | `backend/app/services/openai_service.py` | 84 / 42 / 2731 (was `81 / 41 / 2623`) | 292: SHOW_ARTIFACT_TOOL schema + description only (30 tools) · ⛔ |
 | `backend/app/services/provider_gateway/openai_compat.py` | 10 / 7 / 468 (was `9 / 6 / 466`) | 296-06: one moonshot_tools conditional keyed on the endpoint provider |
 | `backend/app/services/provider_gateway/dispatcher.py` | 10 / 4 / 260 (was `6 / 2 / 153`) | ⚠ FIRES (row was stale) · 282-01: off-loop open, shared deadline · ⛔ |
 | `backend/app/services/provider_gateway/openai_responses.py` | 4 / 3 / 570 (was `2 / 2 / 573`) | ⚠ now FIRES · 292.1-REVIEW IN-03: dead dsml_leaked flag deleted · ⛔ |
-| `frontend/src/lib/api/admin.ts` | 10 / 5 / 1125 (was `9 / 5 / 1122`) | ⚠ FIRES · quick-261024: optional `returned` on discovery outcome · ⛔ |
-| `frontend/src/components/admin/CapabilityGrid.tsx` | 3 / 3 / 264 | ⚠ FIRES at 3 phases · row added 263-REVIEW WR-07 · ⛔ |
+| `frontend/src/lib/api/admin.ts` | 11 / 6 / 1127 (was `10 / 5 / 1125`) | 304-04: one FlagKey member (mcp_enabled) · ⛔ |
+| `frontend/src/components/admin/CapabilityGrid.tsx` | 5 / 4 / 273 (was `3 / 3 / 264`) | 304-06: one union member + one entry (mcp_enabled), no count · ⛔ |
+| `frontend/src/components/admin/ControlRoomPage.tsx` | 20 / 11 / 907 (was `19 / 10 / 906`) | 304-06: one capabilityFlags line (mcp_enabled ?? true) · ⛔ |
+| `backend/app/api/api_keys.py` | 5 / 3 / 710 (was `3 / 2 / 421`) | ⚠ now FIRES (304) · 304-04: kind on the 293 routes + org switch · ⛔ |
+| `backend/app/db/api_keys.py` | 6 / 3 / 383 (was `5 / 2 / 307`) | ⚠ now FIRES (304) · 304-02: mcp_switches + kind columns · ⛔ |
+| `backend/app/models/api_key.py` | 3 / 3 / 264 (was `2 / 2 / 117`) | ⚠ now FIRES (304) · 304-04: tagged create union + MCP fields |
+| `frontend/src/lib/api/apiKeys.ts` | 4 / 3 / 280 (was `2 / 2 / 174`) | ⚠ now FIRES (304) · 304-04: MCP wire mirrors + 3 calls · ⛔ |
 | `frontend/src/components/admin/ModelAdvancedCapabilities.tsx` | 0 / 0 / 290 | young (created 262) · ⛔ |
 | `frontend/src/lib/activeViewReachability.ts` | 2 / 2 / 205 (was `1 / 1 / 159`) | 297-02: route leg added (D-25) · AST; throws on a vacuous parse · ⛔ |
 | `frontend/src/components/experts/expertIcon.tsx` | 1 / 1 / 72 | ⚠ 0/0/0 AT PLANNING · measured 1/1/72 at 262-02 · ⛔ |
@@ -646,9 +651,9 @@ node scripts/check-hot-file-ledger.cjs <phase-dir>   # 0 clear · 1 missing rows
 | `frontend/src/components/ingestion/NavRow.tsx` | 6 / 4 / 269 | ⚠ absent its ENTIRE LIFE — row added 266-05 · ⛔ |
 | `backend/app/models/document.py` | 14 / 11 / 275 (was `13 / 10 / 221`) | 284-02: five paged envelopes, additive · ⛔ |
 | `frontend/src/components/ingestion/DocumentRow.tsx` | 11 / 6 / 591 (was `10 / 5 / 583`) | 284-03: one versions page, N of M; still seven `<td>` |
-| `frontend/src/components/org/OrgAdminShell.tsx` | 10 / 6 / 416 (was `7 / 5 / 454`) | ✅ seam TAKEN 293-04 (orgAdminTabs.ts, move-only) · +1 render branch · ⛔ |
+| `frontend/src/components/org/OrgAdminShell.tsx` | 11 / 7 / 416 (was `10 / 6 / 416`) | 304-06: settings branch key + onRecorded={pulse} (+1 −1) · ⛔ |
 | `frontend/src/components/admin/AuditTab.tsx` | 8 / 5 / 771 (was `7 / 4 / 770`) | 298-review WR-07: one map entry (org.item.move), data only |
-| `frontend/src/components/org/OrgAuditTab.tsx` | 5 / 4 / 416 (was `4 / 3 / 415`) | 298-review WR-07: one map entry (org.item.move) · shared vocab OWED |
+| `frontend/src/components/org/OrgAuditTab.tsx` | 6 / 5 / 422 (was `5 / 4 / 416`) | 304-06: one event read (mcp_access on/off) · shared vocab OWED |
 | `frontend/src/lib/api/documents.ts` | 11 / 10 / 599 (was `10 / 9 / 595`) | 298-01: uploadDocument sends X-Org-Id read at send time (D-29) · ⛔ |
 | `frontend/src/providers/OrgProvider.tsx` | 4 / 3 / 222 (was `3 / 2 / 217`) | ⚠ now FIRES (298) · 298-01: self-heal syncs the header first (D-36) · ⛔ |
 | `backend/app/api/folders.py` | 17 / 11 / 298 (was `16 / 10 / 288`) | 298-01: one org_lists.folder_kw keyword ×2 list routes (narrows only) |
