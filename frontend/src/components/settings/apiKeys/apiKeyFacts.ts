@@ -9,10 +9,21 @@
  *
  * Dates format in the viewer's local zone, en-GB parts, with `now` injected for tests.
  */
-import type { ApiKeyCall, ApiKeyLimits, ApiKeyRead, ApiKeyWorkflowRef, StartableWorkflow } from "@/lib/api/apiKeys"
+import type {
+  ApiKeyCall,
+  ApiKeyLimits,
+  ApiKeyRead,
+  ApiKeyWorkflowRef,
+  McpOff,
+  McpToolRef,
+  StartableWorkflow,
+} from "@/lib/api/apiKeys"
 import { API_KEYS_COPY, fillCopy } from "./apiKeysCopy"
+import { MCP_KEY_COPY } from "./mcpKeyCopy"
+import { mcpScopeChips } from "./mcpKeyFacts"
 
 const C = API_KEYS_COPY
+const M = MCP_KEY_COPY
 const DAY_MS = 86_400_000
 
 // ── dates ─────────────────────────────────────────────────────────────────────────────────────
@@ -49,13 +60,15 @@ export function formatCallTime(iso: string, now: Date): string {
 
 // ── one key card ──────────────────────────────────────────────────────────────────────────────
 
-export type KeyTagKind = "active" | "refused" | "expired" | "revoked"
+export type KeyTagKind = "active" | "refused" | "expired" | "revoked" | "off"
 
 export interface KeyChipFacts {
   id: string
   name: string
   refused: boolean
   text: string
+  /** 304-05: an MCP scope chip's full list (the tool names, or the collapsed folders). */
+  title?: string
 }
 
 export interface KeyCardFacts {
@@ -71,6 +84,8 @@ export interface KeyCardFacts {
   created: string
   /** The revoke receipt (`✎ Revoked by …`), or null on a key that was not revoked. */
   receipt: string | null
+  /** 304-05, MCP keys only: which switch has MCP off on a live key (the deployment's wins), or null. */
+  mcpOff?: McpOff | null
 }
 
 const REFUSED_WORDS: Record<Exclude<ApiKeyWorkflowRef["state"], "startable">, { chip: string; line: string }> = {
@@ -110,7 +125,49 @@ function receipt(key: ApiKeyRead, now: Date): string | null {
   return fillCopy(C.card.receiptOwner, { name: key.owner_name ?? key.revoked_by_name ?? C.sheet.unknownOwner, date })
 }
 
-export function keyCardFacts(key: ApiKeyRead, now: Date): KeyCardFacts {
+/** 304-05: an MCP key's scope as card chips — the preset or a tool count, All folders or up to
+ *  four folder names then `+N more`, and the external chip only when included. */
+function mcpChips(key: ApiKeyRead, catalogue: readonly McpToolRef[] | undefined): KeyChipFacts[] {
+  const m = mcpScopeChips(key, catalogue)
+  const chip = (id: string, text: string, title?: string): KeyChipFacts =>
+    title === undefined ? { id, name: text, refused: false, text } : { id, name: text, refused: false, text, title }
+  const toolText =
+    m.tools.preset === "custom" ? fillCopy(M.mcp.chipNTools, { N: m.tools.count }) : M.mcp.presets[m.tools.preset]
+  const chips = [chip("tools", toolText, m.tools.names.join(", "))]
+  if (m.folders.all) chips.push(chip("folders", M.mcp.chipAllFolders))
+  for (const f of m.folders.shown) chips.push(chip(`folder:${f.id}`, f.name))
+  if (m.folders.more.length > 0) {
+    const more = fillCopy(M.mcp.chipMore, { N: m.folders.more.length })
+    chips.push(chip("more", more, m.folders.more.map((f) => f.name).join(", ")))
+  }
+  if (m.external) chips.push(chip("external", M.mcp.chipExternal))
+  return chips
+}
+
+function mcpKeyCardFacts(key: ApiKeyRead, now: Date, catalogue: readonly McpToolRef[] | undefined): KeyCardFacts {
+  let tag: KeyCardFacts["tag"]
+  if (key.state === "revoked") tag = { kind: "revoked", text: C.card.tagRevoked }
+  else if (key.state === "expired") tag = { kind: "expired", text: C.card.tagExpired }
+  else if (key.mcp_off) tag = { kind: "off", text: M.mcp.tagOff }
+  else tag = { kind: "active", text: C.card.tagActive }
+  return {
+    tag,
+    // Switched off is not dead: switching back on restores the key (D-19).
+    dead: key.state !== "active",
+    chips: mcpChips(key, catalogue),
+    refusalLines: [],
+    ...expiryFacts(key, now),
+    lastUsed: key.last_used_at ? formatCallTime(key.last_used_at, now) : M.mcp.notUsedYet,
+    created: formatDay(key.created_at, now),
+    receipt: receipt(key, now),
+    mcpOff: key.state === "active" ? key.mcp_off : null,
+  }
+}
+
+/** The card's facts. `catalogue` is the server's MCP tool list (`list.mcp.tools`), read only for an
+ *  MCP key's preset name; a workflow key's facts never depend on it. */
+export function keyCardFacts(key: ApiKeyRead, now: Date, catalogue?: readonly McpToolRef[]): KeyCardFacts {
+  if (key.kind === "mcp") return mcpKeyCardFacts(key, now, catalogue)
   const parts = key.workflows.map(chipFacts)
   const chips = parts.map((p) => p.chip)
   const refusalLines = parts.map((p) => p.line).filter((l): l is string => l !== null)
@@ -248,6 +305,12 @@ function refusedWords(call: ApiKeyCall, ctx: CallContext): string | null {
       return C.calls.workflowsDisabled
     case "limiter_unavailable":
       return C.calls.limiterUnavailable
+    case "wrong_kind": // 304-02 (D-36)
+      return M.calls.wrongKind
+    case "mcp_off_org":
+      return M.calls.mcpOffOrg
+    case "mcp_off_deployment":
+      return M.calls.mcpOffDeployment
     case "over_limit": {
       const fromDetail = detailNumber(call, "limit")
       const fromLimits = call.verb === "read" ? ctx.limits?.reads_per_minute : ctx.limits?.starts_per_minute

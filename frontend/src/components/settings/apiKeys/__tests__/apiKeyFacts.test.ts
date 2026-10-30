@@ -11,6 +11,8 @@
 import { describe, expect, it } from "vitest"
 import apiKeysCopyRaw from "../apiKeysCopy.ts?raw"
 import apiKeyFactsRaw from "../apiKeyFacts.ts?raw"
+import mcpKeyCopyRaw from "../mcpKeyCopy.ts?raw"
+import { API_KEYS_COPY } from "../apiKeysCopy"
 import inboundPy from "../../../../../../backend/app/api/inbound.py?raw"
 import apiKeyAuthPy from "../../../../../../backend/app/security/api_key_auth.py?raw"
 import inboundInputsPy from "../../../../../../backend/app/services/inbound_inputs.py?raw"
@@ -26,6 +28,7 @@ import {
   runCellText,
   startableRowFacts,
 } from "../apiKeyFacts"
+import { MCP_CATALOGUE } from "./fixtures"
 
 const NOW = new Date(2026, 9, 25, 12, 0) // Sun 25 Oct 2026, 12:00 local
 const iso = (y: number, m: number, d: number, h = 9, min = 0) => new Date(y, m, d, h, min).toISOString()
@@ -366,6 +369,66 @@ describe("293-04 callBars, times, rows", () => {
   })
 })
 
+describe("304-05 keyCardFacts — an MCP key", () => {
+  const mcp = (over: Partial<ApiKeyRead> = {}) =>
+    key({
+      kind: "mcp",
+      workflows: [],
+      tools: ["search_knowledge_base", "list_documents", "read_document"],
+      folders: null,
+      include_external: false,
+      org_name: "Acme",
+      last_used_at: null,
+      ...over,
+    })
+
+  it("a workflow key's facts are unchanged by the catalogue", () => {
+    expect(keyCardFacts(key(), NOW, MCP_CATALOGUE)).toEqual(keyCardFacts(key(), NOW))
+    expect(keyCardFacts(key(), NOW).chips).toEqual([{ id: "w1", name: "Contract review", refused: false, text: "Contract review" }])
+  })
+
+  it("scope chips instead of workflow chips: the preset name and All folders", () => {
+    const f = keyCardFacts(mcp(), NOW, MCP_CATALOGUE)
+    expect(f.tag).toEqual({ kind: "active", text: "● active" })
+    expect(f.chips.map((c) => c.text)).toEqual(["Read only", "All folders"])
+    expect(f.chips[0].title).toBe("search_knowledge_base, list_documents, read_document")
+    expect(f.refusalLines).toEqual([])
+  })
+
+  it("a hand-picked set counts its tools; folders past 4 collapse; the external chip only when included", () => {
+    const folders = ["One", "Two", "Three", "Four", "Five"].map((name, i) => ({ id: String(i), name }))
+    const f = keyCardFacts(mcp({ tools: ["search_knowledge_base"], folders, include_external: true }), NOW, MCP_CATALOGUE)
+    expect(f.chips.map((c) => c.text)).toEqual(["1 tool", "One", "Two", "Three", "Four", "+1 more", "mail & synced sources"])
+    expect(f.chips[5].title).toBe("Five")
+    expect(keyCardFacts(mcp({ tools: ["search_knowledge_base", "read_document"] }), NOW, MCP_CATALOGUE).chips[0].text).toBe("2 tools")
+  })
+
+  it("last use reads Not used yet when null (D-26)", () => {
+    expect(keyCardFacts(mcp(), NOW, MCP_CATALOGUE).lastUsed).toBe("Not used yet")
+    expect(keyCardFacts(mcp({ last_used_at: iso(2026, 9, 25, 10, 42) }), NOW, MCP_CATALOGUE).lastUsed).toBe("10:42")
+  })
+
+  it("tag precedence: revoked → expired → switched off → active", () => {
+    expect(keyCardFacts(mcp({ mcp_off: "org" }), NOW, MCP_CATALOGUE).tag).toEqual({ kind: "off", text: "⏸ switched off" })
+    expect(keyCardFacts(mcp({ mcp_off: "deployment" }), NOW, MCP_CATALOGUE).tag.kind).toBe("off")
+    expect(keyCardFacts(mcp({ mcp_off: "org", state: "expired" }), NOW, MCP_CATALOGUE).tag.kind).toBe("expired")
+    expect(keyCardFacts(mcp({ mcp_off: "org", state: "revoked" }), NOW, MCP_CATALOGUE).tag.kind).toBe("revoked")
+    // A switched-off key is not dead: switching back on restores it.
+    expect(keyCardFacts(mcp({ mcp_off: "org" }), NOW, MCP_CATALOGUE).dead).toBe(false)
+    expect(keyCardFacts(mcp({ mcp_off: "org" }), NOW, MCP_CATALOGUE).mcpOff).toBe("org")
+  })
+
+  it("the three 304 refusal reasons have words", () => {
+    expect(callWords(call({ ok: false, reason: "wrong_kind" })).text).toBe("✕ refused: this kind of key can't make this call")
+    expect(callWords(call({ ok: false, reason: "mcp_off_org" })).text).toBe(
+      "✕ refused: MCP access is switched off for this organisation",
+    )
+    expect(callWords(call({ ok: false, reason: "mcp_off_deployment" })).text).toBe(
+      "✕ refused: MCP access is switched off for this deployment",
+    )
+  })
+})
+
 describe("293-04 the copy module is a true leaf, the facts module spells no copy", () => {
   it("apiKeysCopy.ts imports nothing", () => {
     expect(apiKeysCopyRaw.split("\n").filter((l) => /^\s*import\s/.test(l))).toEqual([])
@@ -373,5 +436,21 @@ describe("293-04 the copy module is a true leaf, the facts module spells no copy
 
   it("apiKeyFacts.ts imports no React", () => {
     expect(apiKeyFactsRaw).not.toMatch(/from "react"/)
+  })
+
+  // 304-05 (orchestrator resolution 1): every new MCP string lives in its own true leaf.
+  it("mcpKeyCopy.ts imports nothing", () => {
+    expect(mcpKeyCopyRaw.split("\n").filter((l) => /^\s*import\s/.test(l))).toEqual([])
+  })
+
+  it("the four 304 rewordings read as the UI-SPEC table", () => {
+    expect(API_KEYS_COPY.tab.description).toBe(
+      "Keys let another tool act as you. An AI tool key lets Claude Code, Cursor or VS Code search and read your knowledge in one organisation. A workflow key lets another system start the published workflows you pick.",
+    )
+    expect(API_KEYS_COPY.tab.empty).toBe(
+      "No keys yet. An AI tool key lets Claude Code, Cursor or VS Code search and read your knowledge as you. A workflow key lets another system, such as n8n or a script, start one of your published workflows.",
+    )
+    expect(API_KEYS_COPY.admin.description).toBe("Every key in {org}. A key acts as the member who made it.")
+    expect(API_KEYS_COPY.admin.descriptionNoOrg).toBe("Every key in this organisation. A key acts as the member who made it.")
   })
 })
