@@ -212,8 +212,11 @@ def test_the_acting_member_module_never_reads_a_request():
 
 FORBIDDEN_IN_READS = (
     "org_members",
-    "get_service_role_supabase",
     "fetch_visible_folders",
+    ".rpc(",
+    ". rpc (",
+    "document_ids",
+    "linked document (no access)",
     ".table(",
     ". table (",
     "document_search_service",
@@ -233,6 +236,132 @@ def test_the_reads_module_is_fenced_from_every_unnarrowed_path():
     # Owner masking is imported, never copied.
     assert re.search(r"from app\.utils\.folder_utils import _null_foreign_global_owner",
                      READS.read_text(encoding="utf-8"))
+
+
+def test_the_service_role_is_used_only_by_the_two_sanctioned_calls():
+    """304-03 (D-38): the module's ONLY supabase-py touches are the service-role client handed to
+    ``search_documents`` (filename enrichment of rows the acting connection's RPC already returned)
+    and to ``resolve_document_scope`` (step 1 PROPOSES ids; step 2, on the RLS connection inside
+    ``acting_as``, DECIDES). Two call sites, each an argument of one of those two calls."""
+    code = _code_only(READS)
+    calls = re.findall(r"get_service_role_supabase \(", code)
+    assert len(calls) == 2, calls
+    for callee in ("search_documents", "resolve_document_scope"):
+        # the service-role client is a DIRECT argument of that call (no other call opens before it)
+        assert re.search(callee + r" \([^()]*get_service_role_supabase \(", code), callee
+
+
+def test_search_never_passes_an_allow_list_and_runs_inside_acting_as():
+    """D-40: connector-fed exclusion is a POST-filter; a ``document_ids`` allow-list would switch
+    retrieval into filtered mode and change ranking against the app."""
+    code = _code_only(READS)
+    assert "document_ids" not in code
+    assert re.search(r"with acting_as \( principal \) :.*?search_documents \(", code, re.S)
+    assert re.search(r"with acting_as \( principal \) :.*?resolve_document_scope \(", code, re.S)
+
+
+def test_relationships_import_the_mask_and_labels_never_copy_them():
+    src = READS.read_text(encoding="utf-8")
+    assert src.count("from app.services.document_relationship_service import") == 1
+    assert re.search(r"from app\.services\.document_relationship_service import .*_NO_ACCESS_MASK", src)
+    assert re.search(r"from app\.services\.document_relationship_service import .*_INVERSE_LABEL", src)
+    code = _code_only(READS)
+    assert "linked document (no access)" not in code
+    for label in ("superseded_by", "amended_by", "referenced_by", "has_attachment"):
+        assert label not in code, label
+
+
+def test_every_read_declares_its_catalogue_tool():
+    """KEY-03 'holds on every tool': each public read maps to a real catalogue tool and checks it
+    before reading anything."""
+    import inspect
+
+    from app.services import acting_member_reads as reads
+    from app.services.mcp_tool_catalogue import MCP_TOOL_NAMES
+
+    expected = {"list_folders", "list_documents", "read_document", "search", "list_views",
+                "view_documents", "related_documents", "list_workflows"}
+    assert set(reads.READ_TOOL) == expected
+    assert set(reads.READ_TOOL.values()) <= MCP_TOOL_NAMES
+    for name in expected:
+        body = inspect.getsource(getattr(reads, name))
+        assert f'_require(principal, "{name}")' in body, name
+
+
+async def test_a_principal_without_the_tool_is_refused_before_any_read(monkeypatch):
+    from app.services import acting_member_reads as reads
+
+    opened: list = []
+
+    @asynccontextmanager
+    async def _no_conn(**kw):
+        opened.append(kw)
+        yield None
+
+    monkeypatch.setattr(reads, "acting_member_connection", _no_conn)
+
+    class _P:
+        user_id, org_id, folder_ids, include_external = USER, ORG_A, None, True
+        tools = ("list_documents",)
+
+    calls = {
+        "read_document": (str(uuid.uuid4()),),
+        "related_documents": (str(uuid.uuid4()),),
+        "search": ("q",),
+        "list_workflows": (),
+    }
+    for name, args in calls.items():
+        with pytest.raises(reads.ToolNotGranted):
+            await getattr(reads, name)(_P(), *args)
+    assert opened == []
+
+
+async def test_an_empty_scope_returns_empty_with_no_sql(monkeypatch):
+    """D-08 / T-304-22: a narrowed key whose every folder vanished composes ``()`` — every read
+    answers empty after the ONE folders read, and never issues the read itself."""
+    from app.services import acting_member_reads as reads
+
+    class _Conn:
+        def __init__(self):
+            self.sql = []
+
+        async def fetch(self, sql, *args):
+            self.sql.append(sql)
+            return []  # the member sees no folders, so the ticked one is gone
+
+        async def fetchrow(self, sql, *args):  # pragma: no cover - must not be reached
+            self.sql.append(sql)
+            return None
+
+        async def fetchval(self, sql, *args):  # pragma: no cover - must not be reached
+            self.sql.append(sql)
+            return 0
+
+    conn = _Conn()
+
+    @asynccontextmanager
+    async def _acting(**kw):
+        yield conn
+
+    monkeypatch.setattr(reads, "acting_member_connection", _acting)
+
+    async def _never(*a, **k):  # pragma: no cover - must not be reached
+        raise AssertionError("retrieval reached with an empty scope")
+
+    monkeypatch.setattr(reads.retrieval_service, "search_documents", _never)
+    monkeypatch.setattr(reads.retrieval_scope, "resolve_document_scope", _never)
+
+    class _P:
+        user_id, org_id, include_external = USER, ORG_A, True
+        folder_ids = (str(uuid.uuid4()),)
+        tools = ("list_documents", "read_document", "search_knowledge_base")
+
+    assert await reads.list_folders(_P()) == []
+    assert await reads.list_documents(_P()) == {"items": [], "total": 0}
+    assert await reads.read_document(_P(), str(uuid.uuid4())) is None
+    assert await reads.search(_P(), "q", user_settings=object()) == []
+    assert await reads.related_documents(_P(), str(uuid.uuid4())) is None
+    assert all("public.folders" in s for s in conn.sql), conn.sql
 
 
 # ── the folders read ───────────────────────────────────────────────────────────

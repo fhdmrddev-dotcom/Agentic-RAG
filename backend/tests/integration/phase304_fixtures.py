@@ -17,8 +17,9 @@ Seeded, every INSERT with an explicit ``org_id``:
   Y, owned by U   FY with ``fy_doc``, ``root_y``, a published workflow, a view, fy_doc→root_y.
   Y, owned by V_Y ``SY`` (org-shared) with ``sy_doc``.
 
-Chunks carry a distinctive per-org token and a per-org one-hot embedding, so a token present only
-in X can only ever retrieve X content (``embed_texts`` is stubbed to the same vectors).
+Chunks carry a distinctive per-org token and a per-org embedding axis, so a token present only in
+X can only ever retrieve X content (``embed_texts`` is stubbed to the org's axis). Within an org
+every chunk has a distinct rank on both arms, so two separate searches cannot order ties apart.
 
 Keys are minted through ``api_key_auth.mint_key`` + ``db.api_keys.create_api_key`` and resolved
 with the real ``resolve_mcp_principal`` — the principal under test is never hand-built.
@@ -58,12 +59,6 @@ def request_for(org: str | None) -> SimpleNamespace:
     """A request carrying ``X-Org-Id`` (the 298 active-org shape); ``None`` = no header."""
     headers = {"X-Org-Id": str(org)} if org else {}
     return SimpleNamespace(headers=headers, state=SimpleNamespace())
-
-
-def one_hot(dim: int, index: int) -> str:
-    vec = ["0"] * dim
-    vec[index] = "1"
-    return "[" + ",".join(vec) + "]"
 
 
 @dataclass
@@ -126,13 +121,19 @@ class World:
         self.docs[label] = str(did)
         return str(did)
 
-    async def chunk(self, label: str, owner: str, org: str, *, words: str) -> None:
-        token, vec = (self.tok_x, 0) if org == self.x else (self.tok_y, 1)
+    async def chunk(self, label: str, owner: str, org: str, *, words: str, rank: int) -> None:
+        """One chunk whose vector arm AND keyword arm both rank it ``rank``-th in its org, so the
+        fused order is strict (no ties for two separate calls to break differently): the vector
+        is the org's axis plus a ``rank``-sized tilt, the token repeats ``8 - rank`` times."""
+        token, axis = (self.tok_x, 0) if org == self.x else (self.tok_y, 1)
+        vec = ["0"] * self.dim
+        vec[axis] = "1"
+        vec[3 + rank] = repr(0.05 * rank)
         await self.pool.execute(
             "INSERT INTO public.document_chunks (document_id, user_id, org_id, content, chunk_index,"
             " embedding, embedding_model) VALUES ($1, $2, $3, $4, 0, $5::text::public.vector, $6)",
-            UUID(self.docs[label]), UUID(owner), UUID(org), f"{token} {words}",
-            one_hot(self.dim, vec), self.model,
+            UUID(self.docs[label]), UUID(owner), UUID(org), f"{' '.join([token] * (8 - rank))} {words}",
+            "[" + ",".join(vec) + "]", self.model,
         )
 
     async def view(self, label: str, owner: str, org: str, *, conditions=(), folder_scope=None) -> str:
@@ -236,7 +237,7 @@ def search_settings():
     provider call. Both sides of every parity arm get the SAME object."""
     from app.models.user_settings import load_app_settings
 
-    return load_app_settings().model_copy(update={"rerank_enabled": False})
+    return load_app_settings().model_copy(update={"rerank_enabled": False, "retrieval_top_k": 10})
 
 
 def patch_search(monkeypatch, w: World) -> None:
@@ -330,9 +331,11 @@ async def world(pg_pool):
             "sy_doc": "shared glossary of product terms",
         }
         owners = {"sx_doc": w.v_x, "px_doc": w.v_x, "sy_doc": w.v_y}
+        ranks = {"f_doc": 0, "f2_doc": 1, "ext_doc": 2, "root_x": 3, "sx_doc": 4, "px_doc": 5,
+                 "fy_doc": 0, "root_y": 1, "sy_doc": 2}
         for label, text in words.items():
             org = org_y if label in ("fy_doc", "root_y", "sy_doc") else org_x
-            await w.chunk(label, owners.get(label, w.u), org, words=text)
+            await w.chunk(label, owners.get(label, w.u), org, words=text, rank=ranks[label])
 
         await w.view("all_x", w.u, org_x)
         await w.view("contract_x", w.u, org_x,
