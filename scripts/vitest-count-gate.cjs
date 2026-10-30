@@ -3190,7 +3190,7 @@ const BASELINE = {
   //     pre-211-04 gate planted back into `McpToolPicker.tsx` — 4 of 10 failing, with case 3
   //     (MCP + empty) correctly still passing, which is what makes the RED discriminating
   //     rather than blanket. Restored md5-identical.
-  "connectionVerbFence.test.ts": 21,
+  "connectionVerbFence.test.ts": 22, // RAISED 21 -> 22 at 304-05 (aef95a6df): the dated REVIEWED exemption for the three MCP draft radiogroups
   "connectionCardReachability.test.tsx": 10,
   // ── Added in 212-05 (GATE-1) — Phase 212 catalog and barrel tests ────────────
   "servicesCatalog.test.ts": 3,
@@ -4340,7 +4340,7 @@ const BASELINE = {
   "RetentionHistory.test.tsx": 21, // RE-PINNED 18 → 21 at 275 G-4 re-look (OBS-R2a drop reasons) · RE-PINNED 17 → 18 at 275-REVIEW frontend fix pass · RE-PINNED 16 → 17 at 275-05 (delete_refused sentence, G-4 FAIL-1) · 275-04 — S5 receipt sentences, ✎ only on writes, no links (D-12/D-13), Show older pages by 50
   // 275-04 — adopted by FILE path in TARGETS (no `src/components/org` entry): the retired
   // locked-Retention fence is REPLACED by unlocked-tab + band-pulse cases (D-01, SEED-177), 9 → 11.
-  "OrgAdminShell.test.tsx": 14, // RE-PINNED 12 → 14 at 293-04 (API keys tab last + pulse/audit door) · RE-PINNED 11 → 12 at 275-REVIEW frontend fix pass
+  "OrgAdminShell.test.tsx": 17, // RAISED 14 -> 17 at 304-06: a real org MCP switch flip pulses the band, a failed flip does not, an org switch remounts the Settings tab · RE-PINNED 12 → 14 at 293-04 (API keys tab last + pulse/audit door) · RE-PINNED 11 → 12 at 275-REVIEW frontend fix pass
   // Phase 282-02 — the one ask-draft home (FIX-07 / D-12): one draft per ask, GC on the ask slice, panel-home refcount, the global reset
   "askDraftStore.test.ts": 7,
   // Phase 282-02 — the D-15 fences: one input per pause across both homes, the pointer, the rail handoff, BUG-260828-07 reachability
@@ -4415,7 +4415,7 @@ const BASELINE = {
   // ── Phase 293-04 (START-02) — adopted, both knobs, same commit. FILE-LEVEL in TARGETS for the
   // `src/components/settings/apiKeys` suites (no `src/components/settings` directory entry);
   // `launchFieldsTwin293.test.ts` sits under the `src/components/workflows` directory entry, pin only.
-  "apiKeyFacts.test.ts": 32, // 293-04 — wire → card facts: refused chips never read active, every reason code worded, raw code for an unknown one
+  "apiKeyFacts.test.ts": 43, // RAISED 32 -> 43 at 304-05: MCP chips from the catalogue, the off tag order, workflow facts unchanged with a catalogue, the three 304 refusal words · 293-04 — wire → card facts: refused chips never read active, every reason code worded, raw code for an unknown one
   "curlExamples.test.ts": 8, // 293-04 — the show-once curl: real base, bearer secret, declared fields in order, JSON + shell escaping
   "ApiKeyLimits.test.tsx": 10, // 293-03 — the operator's per-key limits: load lock + Retry, changed fields only, clamps 1..60 / 10..600, adopt, SettingsPage wiring
   "EmailSettings.test.tsx": 28, // 300-05 (S3) — the operator Email card: words, read-only Sent through, floor-word delay hint (shared case list), changed+valid fields only, clamp 60..3600, adopt, SettingsPage wiring
@@ -4423,17 +4423,17 @@ const BASELINE = {
   "RunOriginLine.test.tsx": 6, // 293-03 — the origin leaf: nothing when absent/unknown, muted, hidden icon, one mount per run surface (src/components/workflows dir TARGET)
   "runOriginVocabulary.test.ts": 11, // 293-03 — the six origin sentences, null for absent/unknown (D-23)
   "apiKeyPrepick.test.ts": 6, // 293-04 — ⋯ menu pre-pick: sessionStorage read-once, only {workflowId, name}, never a secret
-  "apiKeysContract.test.ts": 3, // 293-04 — client wire types vs backend api_keys_contract.json, path by path
+  "apiKeysContract.test.ts": 8, // RAISED 3 -> 8 at 304-04: the MCP wire paths (kind, tools, folders, mcp block, pickable folders, org access) · 293-04 — client wire types vs backend api_keys_contract.json, path by path
   "launchFieldsTwin293.test.ts": 9, // 293-04 — launchInputFields vs launch_fields_cases.json (the server twin reads the same file)
-  "ApiKeysTab.test.tsx": 17, // 293-04 — member tab: load/fail/empty, draft rules, show-once secret never in storage/URL/DOM after save, pre-pick, re-fetched revoke
-  "ApiKeyCard.test.tsx": 8, // 293-04 — every state tag by rendered words, dashed refused chip + line, receipt, owner line, run links only with onOpenRun
+  "ApiKeysTab.test.tsx": 29, // RAISED 17 -> 29 at 304-05: kind choice, MCP draft, show-once snippets with no secret, folders fetched once, off notice, 293 words when MCP is unavailable · 293-04 — member tab: load/fail/empty, draft rules, show-once secret never in storage/URL/DOM after save, pre-pick, re-fetched revoke
+  "ApiKeyCard.test.tsx": 15, // RAISED 8 -> 15 at 304-05: kind chip, MCP scope chips, off tag + card line, acts-in meta, How to connect only on active member cards · 293-04 — every state tag by rendered words, dashed refused chip + line, receipt, owner line, run links only with onOpenRun
   "ApiKeyCallStrip.test.tsx": 5, // 293-04 — one tab stop, arrow keys, Enter/Space detail, bar name = detail sentence, read bars shorter
-  "RevokeApiKeySheet.test.tsx": 7, // 293-04 — focus on Keep it, Esc, Revoking… in flight, onDone only after the server, failure keeps it open, owner named
-  "OrgApiKeysTab.test.tsx": 7, // 293-04 — admin list: owner on every card, no New key, run links only on own keys, revoke names the owner then re-fetches and pulses
+  "RevokeApiKeySheet.test.tsx": 9, // RAISED 7 -> 9 at 304-05: the MCP reach fact (preset or N tools on folders) and the MCP kept sentence · 293-04 — focus on Keep it, Esc, Revoking… in flight, onDone only after the server, failure keeps it open, owner named
+  "OrgApiKeysTab.test.tsx": 12, // RAISED 7 -> 12 at 304-06: both kinds with chips + preset names, the admin sheet names the preset, the org-off admin notice (never for a deployment off), limits only with a workflow key · 293-04 — admin list: owner on every card, no New key, run links only on own keys, revoke names the owner then re-fetches and pulses
   // 293-04 (SEED-287) — OrgAuditTab.test.tsx existed since 166 and was in NEITHER knob, so it ran
   // nowhere the gate could see. Adopted at its measured count: 8 pre-existing + 1 unknown-code case
   // + 7 api_key.* cases (5 labels, the API keys filter group, the ?raw lockstep with admin/AuditTab.tsx).
-  "OrgAuditTab.test.tsx": 19, // 298-review WR-07: 16 → 19 (org.item.move label, Organizing filter, identical line in both maps)
+  "OrgAuditTab.test.tsx": 23, // RAISED 19 -> 23 at 304-06: settings.update + mcp_access reads on/off for the organisation, other rows unchanged, AuditTab untouched · 298-review WR-07: 16 → 19 (org.item.move label, Organizing filter, identical line in both maps)
   // ── Phase 300-05 (D-11 / UI-SPEC S4) — FILE-LEVEL in TARGETS (no `src/components/org` entry), same commit.
   "InvitationsTab.test.tsx": 17, // 300-05 — first-ever pin: 8 shipped (send gate, chips, resend/revoke, role picker) + 9 'Email not sent' chip / resend-line cases
   "InviteMemberDialog.test.tsx": 7, // 300-05 — the three result arms by their words, Copy link focused on failed, older backend never a false failure, org.ts unwraps
@@ -4515,6 +4515,18 @@ const BASELINE = {
   // ── Phase 301-02 (NOTE-01 / NOTE-05 · D-15, D-17, D-18, D-33) — both knobs, same commit (2026-10-30). src/hooks/__tests__
   //    has no directory entry, so the new file is FILE-LEVEL in TARGETS below.
   "useWaitingNotices.test.tsx": 29, // RAISED 26 -> 29 at 301 WR fix (WR-02): an org switch is one GET; a failed probe and its recovery cost none; a genuine non-empty set change still refetches · RAISED 23 -> 26 at 301 WR fix (WR-01): mount + membership load + SUBSCRIBED is one GET; visibilitychange + focus is one GET; an event during a fetch keeps it and owes one follow-up · 301-02 — getWaitingNotices once on mount with a signal; verbatim notices + total; loading / verdictKnown before an answer; a rejected first fetch fabricates nothing; a later failure keeps the list + failedSinceLast, cleared by the next success; newer refresh aborts the old; 60 s poll + none after unmount; focus, visible (not hidden), org and membership changes refetch; user-scoped channel + recipient_id filter; an event refetches and the FETCHED list wins over a forged body; SUBSCRIBED refetches, CHANNEL_ERROR not; removeChannel on unmount; throwing / undefined channel, missing / non-promise / rejecting getSession degrade to the poll; ?raw fence (no payload.new/.old, recipient_id=eq., SUBSCRIBED, no StreamsProvider)
+  // ── Phase 304 (KEY-01..KEY-06) — first pins for the nine new suites, both knobs, same commit (304-06, 2026-10-31).
+  //    None has a directory entry (src/components/settings/apiKeys/__tests__, src/components/org/__tests__,
+  //    src/components/admin/__tests__ are all file-level), so each is FILE-LEVEL in TARGETS below.
+  "mcpSnippets.test.ts": 37, // 304-05 — the five client builders read the env var, never a key; a non-env-var name throws; safeMcpUrl refuses query/fragment/non-http; mcp-remote pinned 0.15.2 or unpinned with the line
+  "mcpKeyFacts.test.ts": 15, // 304-05 — presets from the catalogue, companions, folder flattening (orphans, cycles, subtrees), the Create why-line order, scope chips
+  "McpOffNotice.test.tsx": 5, // 304-05 — member / card / tile / admin sentences, deployment wins, words begin with principal_liveness.py's refusal sentences
+  "ApiKeyKindChoice.test.tsx": 4, // 304-05 — nothing chosen at rest, roving tabindex, the org-off tile disabled with words, hidden when MCP is unavailable
+  "KeyFoldersField.test.tsx": 7, // 304-05 — all vs only, nested checkboxes, subtree inclusion marks, mail/synced gated on the external tick, filter above 12, load states
+  "McpKeyFields.test.tsx": 6, // 304-05 — presets from the catalogue, companions as disabled mirrors, a hand tick moves to Choose tools, unticking external unticks connector-fed folders, 30/90/365
+  "McpConnectSnippets.test.tsx": 10, // 304-05 — four client tabs, Copy per block with the live region, the Claude.ai warning on every tab, the no-address state, no secret prop
+  "OrgMcpSwitchCard.test.tsx": 8, // 304-06 — Loading then the switch, armed OFF words, no switch on a failed read + Retry, never optimistic (disabled in flight, server answer wins), failure stays put, onRecorded once, no confirm
+  "CapabilityGrid.mcp.test.tsx": 5, // 304-06 — the fifth card after Workflows, armed OFF with no count even when counts are passed, flips mcp_enabled, ⌥ raw key, no countImpact + the ControlRoomPage mapping
 }
 
 // Still COMPUTED, never hand-written — the reduce is the single source, so the
@@ -6628,6 +6640,16 @@ const TARGETS = [
   "src/components/share/__tests__/savesInOrg.test.tsx",
   // Phase 301-02 — FILE-LEVEL (no src/hooks/__tests__ directory entry), SAME commit as its pin.
   "src/hooks/__tests__/useWaitingNotices.test.tsx",
+  // Phase 304 — FILE-LEVEL (no apiKeys/__tests__, org/__tests__ or admin/__tests__ directory entry), SAME commit as their pins.
+  "src/components/settings/apiKeys/__tests__/mcpSnippets.test.ts",
+  "src/components/settings/apiKeys/__tests__/mcpKeyFacts.test.ts",
+  "src/components/settings/apiKeys/__tests__/McpOffNotice.test.tsx",
+  "src/components/settings/apiKeys/__tests__/ApiKeyKindChoice.test.tsx",
+  "src/components/settings/apiKeys/__tests__/KeyFoldersField.test.tsx",
+  "src/components/settings/apiKeys/__tests__/McpKeyFields.test.tsx",
+  "src/components/settings/apiKeys/__tests__/McpConnectSnippets.test.tsx",
+  "src/components/org/__tests__/OrgMcpSwitchCard.test.tsx",
+  "src/components/admin/__tests__/CapabilityGrid.mcp.test.tsx",
 ]
 
 const REPO_ROOT = path.resolve(__dirname, "..")
