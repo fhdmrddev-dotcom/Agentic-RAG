@@ -1,16 +1,16 @@
 ---
 gsd_state_version: 1.0
 milestone: v4.8
-milestone_name: Every Page Has a Link
+milestone_name: Every Page Has a Link — IN PROGRESS
 status: executing
-last_updated: "2026-10-29T20:30:34.542Z"
-last_activity: 2026-10-29 -- Phase 301 execution started
+last_updated: "2026-10-30T00:13:33.682Z"
+last_activity: 2026-10-30 -- Phase 302 execution started
 progress:
   total_phases: 13
-  completed_phases: 4
-  total_plans: 22
-  completed_plans: 19
-  percent: 31
+  completed_phases: 5
+  total_plans: 25
+  completed_plans: 22
+  percent: 38
 ---
 
 # Project State
@@ -30,7 +30,7 @@ See: `.planning/PROJECT.md` (updated 2026-10-27)
 
 **Core value:** The agent acts as an AI colleague — it knows your knowledge base, can run code, and
 can be taught new behaviours (skills) that persist and can be shared.
-**Current focus:** Phase 301 — The Waiting-on-You Notice
+**Current focus:** Phase 302 — Close-Out and a True Register
 
 ---
 
@@ -43,10 +43,10 @@ reviewer exists, so a phase closes `verification_mode: self-verified`, never `re
 
 ## Current Position
 
-Phase: 301 (The Waiting-on-You Notice) — EXECUTING
+Phase: 302 (Close-Out and a True Register) — EXECUTING
 Plan: 1 of 3
-Status: Executing Phase 301
-Last activity: 2026-10-29 -- Phase 301 execution started
+Status: Executing Phase 302
+Last activity: 2026-10-30 -- Phase 302 execution started
 
 Owed for 300 (in order): run `300-HUMAN-UAT.md` (G4-5 first; FIX-05 roster must be re-run after IN-03; G4-6 only after 299 G4-4a); approve 3 fixer-written strings (WR-05, IN-01, IN-04). Before deploy: paste mig 218 into cloud SQL editor (per-action approval) → `get_advisors(security)`; ⏸ Resend DEFERRED by operator 2026-10-29 — deploy without a mail provider (deliveries `suppressed`, invites → Copy link); when revived: Coolify EMAIL_PROVIDER / RESEND_API_KEY / ENVIRONMENT=production; Resend sender + SPF/DKIM/DMARC. At close: REQUIREMENTS NOTE-02/03/04/06 + FIX-04/05 → done; BUG-261027-03/04/05 + BUG-260828-05/06 → closed when their rows pass.
 
