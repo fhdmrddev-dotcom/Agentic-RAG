@@ -10,6 +10,11 @@ folded_into: "301"
 verified_closed_by: null
 related_seeds: []
 re_open_trigger: null
+status_note: >
+  2026-10-30 (302 REG-08, D-16): stays folded -> 301. Fixed in code by 301 (D-26 keyboard path; unit-proven).
+  NOT closed: the live arm is 301-HUMAN-UAT.md test 2 (G4-4 stopped source + the D-26 keyboard path —
+  "Open Library health" reached with arrow keys + Enter), owed because the local box has no stopped watched
+  source. 301 is human_needed. Previous status line: `status: folded`.
 reproduces_on:
   branch: develop
   commit: 5ac85b739

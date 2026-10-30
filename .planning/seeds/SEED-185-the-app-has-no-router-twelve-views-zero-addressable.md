@@ -3,10 +3,14 @@ seed_id: SEED-185
 title: The app has no client-side router at all — twelve views, zero addressable URLs — so nothing can be shared, bookmarked, refreshed or opened in a new tab, and the browser Back button does nothing
 created: 2026-08-18
 planted_during: Phase 197 close — operator observation, after watching Claude navigate to localhost:5173/workflows and get the chat page
-status: folded
-partial: true
+status: shipped
+partial: false
 folded_into: "297"
 status_note: |
+  ── 2026-10-30 · SHIPPED (302 REG-08, D-13 / D-28). 297 passed, 299 closed 2026-10-29 — the flip
+  condition this seed wrote for itself ("Flip to `shipped` only when 299 closes too") is met (302
+  RESEARCH F3). 297 gave every `ActiveView` member an `/app/...` address; 299 (LINK-02..06) gave the
+  entity half its links. Previous lines, verbatim: `status: folded` · `partial: true` · `folded_into: "297"`.
   ── 2026-10-27 · FOLDED into Phase 297 at `/gsd:discuss-phase 297` (partial: true). 297 claims the
   TOP-LEVEL half — every `ActiveView` member gets an `/app/...` address, refresh and Back/Forward land
   on it, `/app/runs/<id>` is fixed as the run link, and the bare-path case this seed was planted on
