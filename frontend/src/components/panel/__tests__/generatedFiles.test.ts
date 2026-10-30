@@ -76,9 +76,20 @@ describe("deriveGeneratedFiles (FIX-01 — the panel reads the chat's own source
     expect(out).toEqual([{ filename: "lost.csv", url: undefined, size: undefined, producedAt: "2026-10-27T09:00:00Z" }])
   })
 
-  it("a workspace path equal to the name, or ending in '/' + name, removes that generated entry", () => {
-    const out = deriveGeneratedFiles([OLDER, NEWER], [ws("c1.png"), ws("outputs/report.pdf")])
+  // 302-REVIEW WR-01: was "equal to the name, or ending in '/' + name". A suffix match hid a real
+  // output behind an unrelated workspace file in a subfolder, so only an EXACT path match de-dups.
+  it("a workspace path equal to the name (root '/' or bare) removes that generated entry", () => {
+    const out = deriveGeneratedFiles([OLDER, NEWER], [ws("c1.png"), ws("/report.pdf")])
     expect(out.map((f) => f.filename)).toEqual(["c2.png"])
+  })
+
+  it("a workspace file in a subfolder with the same base name does NOT hide the generated file", () => {
+    const out = deriveGeneratedFiles(
+      [msg("a", "2026-10-27T09:00:00Z", [{ filename: "chart.png", url: "/sandbox-outputs/u/e/chart.png" }])],
+      [ws("drafts/chart.png"), ws("/drafts/chart.png"), ws("/outputs/chart.png")],
+    )
+    expect(out.map((f) => f.filename)).toEqual(["chart.png"])
+    expect(out[0].url).toBe("/sandbox-outputs/u/e/chart.png")
   })
 
   it("a workspace path that merely ENDS with the name (no slash) does not remove it", () => {

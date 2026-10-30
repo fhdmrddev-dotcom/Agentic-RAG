@@ -1624,7 +1624,7 @@ const BASELINE = {
   // ── 302-01 (FIX-01 / D-02 / D-22) — three NEW suites, pinned in the SAME COMMIT as their
   // TARGETS entries (the two-knob rule): `src/components/panel/__tests__/` and
   // `src/components/files/__tests__/` have no directory entry, so an unlisted suite runs in nothing.
-  "generatedFiles.test.ts": 8, // 302-01: the pure fold — keyed by name, newest turn wins, empty arms
+  "generatedFiles.test.ts": 9, // 302-01: the pure fold — keyed by name, newest turn wins, empty arms. RAISED 8 -> 9 at 302 review fix (WR-01: a subfolder workspace file never hides a generated one)
   "GeneratedFilesGroup.test.tsx": 7, // 302-01: the group at panel density, React-text names, downloads via the shared hook
   "useSandboxDownload.test.tsx": 6, // 302-01: one download home, lifted unchanged from OutputFileCard (resolveOutputUrl + the click handler)
   // 195-03 task 1 GREW this file 11 → 41: the widening's own coverage (ribbon /

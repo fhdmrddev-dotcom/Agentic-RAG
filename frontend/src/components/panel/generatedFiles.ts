@@ -10,8 +10,9 @@
  * from the persisted tool calls on reload, so nothing here parses them a second time.
  *
  * UI-D3: one row per file NAME, latest turn wins (the chat keeps the per-turn story and its
- * "Replaces:" line; the panel shows what exists now). A name the workspace already lists is
- * listed once, as the workspace row, because that row can also preview and show versions.
+ * "Replaces:" line; the panel shows what exists now). A name the workspace already lists AT THE
+ * SAME PATH (302-REVIEW WR-01: exact, never a suffix) is listed once, as the workspace row,
+ * because that row can also preview and show versions.
  */
 import type { Message, WorkspaceFile } from "@/types"
 
@@ -29,9 +30,19 @@ export interface GeneratedFile {
 
 const EMPTY: readonly GeneratedFile[] = Object.freeze([])
 
+/** A workspace path without its root slash (`workspace_service.validate_path` makes every stored
+ *  path start with "/"), so `/chart.png` and the sandbox's `chart.png` name the same location. */
+function unrooted(path: string): string {
+  return path.replace(/^\/+/, "")
+}
+
+/** 302-REVIEW WR-01: EXACT path equality only. The old `endsWith("/" + filename)` treated
+ *  `drafts/chart.png` as the generated `chart.png`, so a real output vanished behind an unrelated
+ *  workspace draft (separate storage, separate bytes — 302-RESEARCH F1). */
 function inWorkspace(filename: string, workspace: readonly WorkspaceFile[]): boolean {
+  const name = unrooted(filename)
   for (const f of workspace) {
-    if (f.path === filename || f.path.endsWith("/" + filename)) return true
+    if (unrooted(f.path) === name) return true
   }
   return false
 }
