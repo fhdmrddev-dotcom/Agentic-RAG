@@ -3,7 +3,7 @@ id: BUG-260828-06
 title: The email body is delivered as flattened raw markdown
 surface: Agentic-RAG
 severity: medium
-status: folded  # 2026-10-29: folded into Phase 300 at discuss-phase (300-CONTEXT.md)
+status: folded  # 2026-10-30: fixed in code by 300; live check (300 G4-8) owed until a mail provider exists — 300 closed by decision
 folded_into: "300"
 reported: 2026-08-28
 reported_by: operator, driving Phase 214's G-4 checkpoint

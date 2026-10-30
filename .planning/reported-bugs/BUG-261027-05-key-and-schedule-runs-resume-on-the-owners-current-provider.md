@@ -4,10 +4,10 @@ title: A paused key-started or scheduled run resumes on the owner's current defa
 reported: 2026-10-27
 surface: Agentic-RAG
 severity: minor
-status: folded  # 2026-10-29: folded into Phase 300 at discuss-phase (300-CONTEXT.md)
+status: closed  # 2026-10-30: 300 FIX-05 PASS live (300 closed)
 affected_areas: ['backend/harness', 'backend/runs']
 folded_into: "300"
-verified_closed_by: null
+verified_closed_by: "300 FIX-05"
 related_seeds: ['SEED-362']
 re_open_trigger: "Fold at the next /gsd:discuss-phase whose files touch backend/app/services/unattended_launch.py or backend/app/services/harness/publish_service.py; found by the v4.7 close integration check, outside 296's inventory"
 status_note: >

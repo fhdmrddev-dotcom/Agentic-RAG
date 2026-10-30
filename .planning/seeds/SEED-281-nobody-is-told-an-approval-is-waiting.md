@@ -1,7 +1,7 @@
 ---
 seed_id: SEED-281
 title: Nobody is told an approval is waiting — an unattended run pauses for a person who is never notified, and this is the collection point for every notification need
-status: folded
+status: shipped
 folded_into: "300, 301"
 planted: 2026-08-29
 planted_by: operator, watching a 04:19 scheduled run stop silently at its approval step
@@ -28,6 +28,7 @@ re_open_trigger: >
   Immediately for the DOCUMENTATION half (this file). For the BUILD: the first milestone that
   schedules anything customer-facing, or the second recorded instance of a pause nobody saw.
 status_note: >
+  2026-10-30 (300 close): SHIPPED — 301 (in-app list + badge) and 300 (email after the delay, driven through a local SMTP catcher) both passed. Cloud sends no mail until a provider is configured (Resend deferred); G4-8 is owed then. Previous line: `status: folded`.
   2026-10-30 (301 close): the in-app half is DONE — 301 passed (every row driven, incl. a live "needs your approval" row). Stays folded only for the 300 email half (G4-8 + real-provider G4-1, Resend deferred); flip to shipped when 300 passes.
   2026-10-30 (302 REG-08, D-14): stays folded -> "300, 301". The email half shipped in code in 300 and the
   in-app list + badge half in 301; BOTH phases are human_needed, so this does not flip to shipped yet —

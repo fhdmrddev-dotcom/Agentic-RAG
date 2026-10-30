@@ -38,19 +38,19 @@ Decided at intake (operator, 2026-10-27):
 ### Told when a run waits on you (NOTE)
 
 - [x] **NOTE-01**: When a workflow run starts waiting on a person, its owner sees it in an in-app "waiting on you" list and badge. Waiting means a question or an approval, including on scheduled and API-key runs. The list covers every org the owner belongs to, and each item names its org and links to the run. — `SEED-281`
-- [ ] **NOTE-02**: If the run is still waiting after a delay, the owner gets one email linking to the run. The delay defaults to 2 minutes and is a Settings knob. Answering in time means no email. A restart, a deploy or the second worker never sends it twice. — `SEED-281`
-- [ ] **NOTE-03**: The email contains no document content: only the workflow name, the org, how long the run has waited, and the link.
-- [ ] **NOTE-04**: A user can turn notification email off in their own Settings. The in-app notice stays.
+- [x] **NOTE-02**: If the run is still waiting after a delay, the owner gets one email linking to the run. The delay defaults to 2 minutes and is a Settings knob. Answering in time means no email. A restart, a deploy or the second worker never sends it twice. — `SEED-281`
+- [x] **NOTE-03**: The email contains no document content: only the workflow name, the org, how long the run has waited, and the link.
+- [x] **NOTE-04**: A user can turn notification email off in their own Settings. The in-app notice stays.
 - [x] **NOTE-05**: Once the question is answered or the run ends, its notice leaves the list and the badge.
-- [ ] **NOTE-06**: The app can send email from a built image: through Resend on cloud and through SMTP on the one-box. The secret lives in env and every other knob in Settings. Invite email uses the same sender, and a failed send is visible rather than only logged.
+- [x] **NOTE-06**: The app can send email from a built image: through Resend on cloud and through SMTP on the one-box. The secret lives in env and every other knob in Settings. Invite email uses the same sender, and a failed send is visible rather than only logged.
 
 ### v4.7 close-out (FIX)
 
 - [x] **FIX-01**: The Workspace panel lists the files a thread produced instead of "No files yet". — `BUG-261027-01`
 - [x] **FIX-02**: The chat list shows a loading state, not "No recent chats", while threads are loading. — `BUG-261027-02`
 - [x] **FIX-03**: A schedule row words a launch failure in plain language, and Run now updates only that row. — `BUG-261027-03`
-- [ ] **FIX-04**: A scheduled run whose required input is blank is refused before launch, and the refusal names the input. — `BUG-261027-04`
-- [ ] **FIX-05**: A paused run started by an API key or a schedule resumes on the provider it started on. — `BUG-261027-05`
+- [x] **FIX-04**: A scheduled run whose required input is blank is refused before launch, and the refusal names the input. — `BUG-261027-04`
+- [x] **FIX-05**: A paused run started by an API key or a schedule resumes on the provider it started on. — `BUG-261027-05`
 - [x] **FIX-06**: The six 296 review findings in `SEED-391` are each fixed or accepted with a reason. — `SEED-391`
 
 ### Register hygiene (REG)
@@ -104,16 +104,16 @@ Decided at intake (operator, 2026-10-27):
 | ORG-05 | Phase 298 | Complete |
 | ORG-06 | Phase 298 | Complete |
 | NOTE-01 | Phase 301 | Complete |
-| NOTE-02 | Phase 300 | Pending |
-| NOTE-03 | Phase 300 | Pending |
-| NOTE-04 | Phase 300 | Pending |
+| NOTE-02 | Phase 300 | Complete |
+| NOTE-03 | Phase 300 | Complete |
+| NOTE-04 | Phase 300 | Complete |
 | NOTE-05 | Phase 301 | Complete |
-| NOTE-06 | Phase 300 | Pending |
+| NOTE-06 | Phase 300 | Complete |
 | FIX-01 | Phase 302 | Complete |
 | FIX-02 | Phase 299 | Complete |
 | FIX-03 | Phase 302 | Complete |
-| FIX-04 | Phase 300 | Pending |
-| FIX-05 | Phase 300 | Pending |
+| FIX-04 | Phase 300 | Complete |
+| FIX-05 | Phase 300 | Complete |
 | FIX-06 | Phase 302 | Complete |
 | REG-08 | Phase 302 | Complete |
 | REG-09 | Phase 297 | Complete |

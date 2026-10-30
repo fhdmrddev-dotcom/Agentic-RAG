@@ -30,7 +30,7 @@ See: `.planning/PROJECT.md` (updated 2026-10-27)
 
 **Core value:** The agent acts as an AI colleague — it knows your knowledge base, can run code, and
 can be taught new behaviours (skills) that persist and can be shared.
-**Current focus:** v4.8 close-out — 298/300/301 operator UAT, then /gsd:complete-milestone
+**Current focus:** v4.8 close-out — /gsd:complete-milestone
 
 ---
 
@@ -45,10 +45,10 @@ reviewer exists, so a phase closes `verification_mode: self-verified`, never `re
 
 Phase: 302 (Close-Out and a True Register) — PASSED 2026-10-30 (operator "mark 302 passed")
 Plan: 3 of 3
-Status: All v4.8 phases executed; 298 + 301 + 302 passed; 300 human_needed
+Status: ALL v4.8 phases passed (300 by decision: G4-8 owed until a mail provider) — next: /gsd:complete-milestone
 Last activity: 2026-10-30 -- Phase 302 passed; every live/four-axis row driven (Moonshot blocked, G4-3 (c) not UI-reachable)
 
-Owed for 300 (in order): run `300-HUMAN-UAT.md` (G4-5 first; FIX-05 roster must be re-run after IN-03; G4-6 only after 299 G4-4a); approve 3 fixer-written strings (WR-05, IN-01, IN-04). Before deploy: paste mig 218 into cloud SQL editor (per-action approval) → `get_advisors(security)`; ⏸ Resend DEFERRED by operator 2026-10-29 — deploy without a mail provider (deliveries `suppressed`, invites → Copy link); when revived: Coolify EMAIL_PROVIDER / RESEND_API_KEY / ENVIRONMENT=production; Resend sender + SPF/DKIM/DMARC. At close: REQUIREMENTS NOTE-02/03/04/06 + FIX-04/05 → done; BUG-261027-03/04/05 + BUG-260828-05/06 → closed when their rows pass.
+300 PASSED 2026-10-30 BY DECISION (14/15 UAT; G4-8 + real-provider G4-1 owed until a mail provider; BUG-260828-05/06 await it). Was owed for 300 (in order): run `300-HUMAN-UAT.md` (G4-5 first; FIX-05 roster must be re-run after IN-03; G4-6 only after 299 G4-4a); approve 3 fixer-written strings (WR-05, IN-01, IN-04). Before deploy: paste mig 218 into cloud SQL editor (per-action approval) → `get_advisors(security)`; ⏸ Resend DEFERRED by operator 2026-10-29 — deploy without a mail provider (deliveries `suppressed`, invites → Copy link); when revived: Coolify EMAIL_PROVIDER / RESEND_API_KEY / ENVIRONMENT=production; Resend sender + SPF/DKIM/DMARC. At close: REQUIREMENTS NOTE-02/03/04/06 + FIX-04/05 → done; BUG-261027-03/04/05 + BUG-260828-05/06 → closed when their rows pass.
 
 Phase 299 — **CLOSED 2026-10-29** (operator: "proceed until you finish this phase, do not ask"). UAT 18/20 PASS; owed by decision: G4-4b email-link leg
 (cloud — local Supabase auto-confirms), X-7 Moonshot (⛔ Kimi balance); G4-4c ⛔ SSO (D-41). Decisions 1-4 accepted; IN-01..05 deferred (re-open at the next phase on
