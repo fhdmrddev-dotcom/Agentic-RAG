@@ -27,12 +27,19 @@ active-org reads, as a non-owner member of two orgs) and ``test_304_narrowed_key
 
 from __future__ import annotations
 
+import json
 import uuid
 from contextlib import asynccontextmanager
 from typing import Any, AsyncIterator
 
+from starlette.concurrency import run_in_threadpool
+
 from app.db.workflows import list_published_workflows
-from app.security.acting_member import acting_member_connection
+from app.dependencies import get_service_role_supabase
+from app.models.user_settings import load_user_settings
+from app.security.acting_member import acting_as, acting_member_connection
+from app.services import retrieval_scope, retrieval_service
+from app.services.document_relationship_service import _INVERSE_LABEL, _NO_ACCESS_MASK
 from app.services.key_scope import EXTERNAL_SQL, KeyScope, compose_key_scope
 from app.utils.folder_utils import _null_foreign_global_owner
 
@@ -222,6 +229,205 @@ async def read_document(principal: Any, document_id: Any) -> dict | None:
             f"SELECT {_READ_COLUMNS} FROM public.documents d WHERE {' AND '.join(where)}", *args
         )
     return _plain(row) if row is not None else None
+
+
+async def _compose(principal: Any) -> tuple[KeyScope, list[dict]]:
+    async with _acting(principal) as (_conn, scope, folders):
+        return scope, folders
+
+
+async def search(principal: Any, query: str, *, user_settings: Any = None) -> list[dict]:
+    """The app's own retrieval (``retrieval_service.search_documents``), run inside
+    ``acting_as(principal)`` so its RPCs open GUC-narrowed RLS connections, with the key's folder
+    subtrees as ``folder_ids``.
+
+    Connector-fed rows are dropped AFTERWARDS (D-40): one statement on the acting connection keeps
+    the returned documents that are visible and not connector-fed. Never an allow-list into
+    retrieval — that would switch it into filtered mode and rank differently from the app. The
+    cost is under-return (fewer than ``top_k`` rows when connector-fed rows ranked high), which is
+    safe and is exactly ``[r for r in app_result if not external(r)]``.
+
+    The service-role client handed in is used by retrieval ONLY to enrich filenames of rows the
+    acting connection's RPC already returned.
+    """
+    _require(principal, "search")
+    scope, _folders = await _compose(principal)
+    if _nothing(scope):
+        return []
+    if user_settings is None:
+        # the member's effective settings, loaded the way the app's own search path loads them
+        user_settings = await run_in_threadpool(load_user_settings, principal.user_id)
+    folder_ids = list(scope.folder_ids) if scope.folder_ids is not None else None
+    with acting_as(principal):
+        rows, _avg = await retrieval_service.search_documents(
+            query, principal.user_id, get_service_role_supabase(principal.org_id),
+            user_settings=user_settings, folder_ids=folder_ids,
+        )
+    if not rows or not scope.exclude_external:
+        return rows
+    returned = sorted({str(r.get("document_id")) for r in rows if _uuid_or_none(r.get("document_id"))})
+    async with acting_member_connection(user_id=principal.user_id, org_id=principal.org_id) as conn:
+        kept = {str(r["id"]) for r in await conn.fetch(
+            f"SELECT d.id FROM public.documents d WHERE d.id = ANY($1::uuid[]) AND NOT (d.{EXTERNAL_SQL})",
+            returned,
+        )}
+    return [r for r in rows if str(r.get("document_id")) in kept]
+
+
+async def list_views(principal: Any) -> list[dict]:
+    """The member's saved views in the key's org plus the system-global ones (RLS decides). A
+    global view's seeding owner and its folder scope are masked, as the app's list masks them."""
+    _require(principal, "list_views")
+    async with acting_member_connection(user_id=principal.user_id, org_id=principal.org_id) as conn:
+        records = await conn.fetch(
+            "SELECT v.id, v.user_id, v.name, v.filter_expr, v.folder_scope, v.is_system_global, "
+            "auth.uid() AS caller_id FROM public.document_views v ORDER BY v.name, v.id"
+        )
+    out = []
+    for r in records:
+        row = _plain(r)
+        caller = row.pop("caller_id", None)
+        if row.get("is_system_global") and row.get("user_id") != caller:
+            row["user_id"] = None
+            row["folder_scope"] = None
+        out.append(row)
+    return out
+
+
+def _view_folders(view_scope: Any, scope: KeyScope, folders: list[dict]) -> list[str] | None:
+    """The folder ids a view resolves over through this key: the view's own folder scope (its
+    visible subtree) intersected with the key's subtrees. ``None`` = no folder restriction.
+
+    The view's scope mirrors the app's rule (D-113-5): a view folder the member cannot see narrows
+    nothing. The KEY's scope is never relaxed that way — it still applies, and an empty
+    intersection is ``[]`` (matches nothing)."""
+    view_subtree: tuple[str, ...] | None = None
+    if view_scope is not None:
+        reachable = compose_key_scope(
+            key_folder_ids=[str(view_scope)], include_external=True, tools=(), visible_folders=folders
+        ).folder_ids
+        if reachable:
+            view_subtree = reachable
+    if scope.folder_ids is None:
+        return list(view_subtree) if view_subtree is not None else None
+    if view_subtree is None:
+        return list(scope.folder_ids)
+    keep = set(scope.folder_ids)
+    return [fid for fid in view_subtree if fid in keep]
+
+
+async def view_documents(principal: Any, view_id: Any, *, limit: int = 50, offset: int = 0) -> dict:
+    """``{items, total}`` — one page of a saved view's documents through this key.
+
+    The view row is read on the acting connection (another org's view, or one the member cannot
+    see, is empty). Its conditions resolve through the app's ``retrieval_scope.resolve_document_scope``
+    inside ``acting_as``: step 1 (service role) only PROPOSES ids, step 2 on the GUC-narrowed RLS
+    connection DECIDES. The decided ids are then paged through the same Library list SQL, with the
+    key's scope applied again."""
+    _require(principal, "view_documents")
+    empty = {"items": [], "total": 0}
+    vid = _uuid_or_none(view_id)
+    if vid is None:
+        return empty
+    async with _acting(principal) as (conn, scope, folders):
+        view = await conn.fetchrow(
+            "SELECT v.filter_expr, v.folder_scope FROM public.document_views v WHERE v.id = $1::uuid", vid
+        )
+    if view is None or _nothing(scope):
+        return empty
+    flt = view["filter_expr"]
+    if isinstance(flt, str):
+        flt = json.loads(flt)
+    conditions = list((flt or {}).get("conditions") or [])
+    folder_ids = _view_folders(view["folder_scope"], scope, folders)
+    if folder_ids is not None and len(folder_ids) == 0:
+        return empty
+    with acting_as(principal):
+        resolved = await retrieval_scope.resolve_document_scope(
+            user_id=principal.user_id, conditions=conditions, folder_ids=folder_ids,
+            supabase=get_service_role_supabase(principal.org_id),
+        )
+    ids = list(resolved.document_ids)
+    if not ids:
+        return empty
+    async with acting_member_connection(user_id=principal.user_id, org_id=principal.org_id) as conn:
+        return await _page(conn, scope, limit=limit, offset=offset, ids=ids)
+
+
+async def related_documents(principal: Any, document_id: Any) -> dict | None:
+    """A document's typed links, outgoing then incoming, or ``None`` when the subject is not
+    readable through this key (the same not-found as ``read_document``).
+
+    Edges are the member's own (RLS) over the subject's whole version lineage. Each other endpoint
+    is followed to its latest version and shown only when that version is readable through the
+    key (RLS + the key's scope); otherwise it renders as the app's no-access mask, with no id and
+    no filename. Incoming edges carry the app's inverse label."""
+    _require(principal, "related_documents")
+    doc_id = _uuid_or_none(document_id)
+    if doc_id is None:
+        return None
+    async with _acting(principal) as (conn, scope, _folders):
+        if _nothing(scope):
+            return None
+        args: list = [doc_id]
+        where = ["d.id = $1::uuid", "d.is_latest"] + _scope_clauses(scope, args)
+        subject = await conn.fetchrow(
+            f"SELECT d.id, d.user_id, d.filename FROM public.documents d WHERE {' AND '.join(where)}", *args
+        )
+        if subject is None:
+            return None
+        versions = [r["id"] for r in await conn.fetch(
+            "SELECT d.id FROM public.documents d WHERE d.user_id = $1 AND d.filename = $2",
+            subject["user_id"], subject["filename"],
+        )] or [subject["id"]]
+        edges = await conn.fetch(
+            "SELECT r.id, r.source_doc_id, r.target_doc_id, r.rel_type FROM public.document_relationships r "
+            "WHERE r.source_doc_id = ANY($1::uuid[]) OR r.target_doc_id = ANY($1::uuid[]) "
+            "ORDER BY r.created_at, r.id",
+            versions,
+        )
+        lineage = {str(v) for v in versions}
+        links: list[tuple[Any, str, str]] = []
+        for direction, mine, other in (("outgoing", "source_doc_id", "target_doc_id"),
+                                       ("incoming", "target_doc_id", "source_doc_id")):
+            links += [(e, direction, str(e[other])) for e in edges if str(e[mine]) in lineage]
+        endpoints: dict[str, dict] = {}
+        others = sorted({other for _e, _d, other in links})
+        if others:
+            end_args: list = [others]
+            end_where = ["d.id = ANY($1::uuid[])"] + _scope_clauses(scope, end_args, alias="l")
+            for r in await conn.fetch(
+                "SELECT d.id AS asked_id, l.id, l.filename FROM public.documents d "
+                "JOIN LATERAL (SELECT e.id, e.filename, e.folder_id, e.source_connection_id "
+                "FROM public.documents e WHERE e.user_id = d.user_id AND e.filename = d.filename "
+                "AND e.is_latest ORDER BY e.version_number DESC LIMIT 1) l ON true "
+                f"WHERE {' AND '.join(end_where)}",
+                *end_args,
+            ):
+                endpoints[str(r["asked_id"])] = {"id": str(r["id"]), "filename": r["filename"]}
+
+    compact: list[dict] = []
+    source_refs: list[dict] = []
+    for edge, direction, other in links:
+        rel_type = edge["rel_type"]
+        label = rel_type if direction == "outgoing" else _INVERSE_LABEL.get(rel_type, rel_type)
+        seen = endpoints.get(other)
+        compact.append({
+            "document_id": seen["id"] if seen else None,
+            "filename": seen["filename"] if seen else _NO_ACCESS_MASK,
+            "rel_type": rel_type,
+            "direction": direction,
+            "label": label,
+            "relationship_id": str(edge["id"]),
+        })
+        if seen:
+            source_refs.append({"document_id": seen["id"], "filename": seen["filename"]})
+    return {
+        "subject": {"document_id": str(subject["id"]), "filename": subject["filename"]},
+        "total": len(compact),
+        "documents": compact,
+        "source_refs": source_refs,
+    }
 
 
 async def list_workflows(principal: Any) -> list[dict]:

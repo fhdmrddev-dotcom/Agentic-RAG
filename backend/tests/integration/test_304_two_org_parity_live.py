@@ -181,8 +181,9 @@ async def _facts(pool, doc_ids) -> dict[str, tuple[str, bool]]:
     return {str(r["id"]): (str(r["org_id"]), r["source_connection_id"] is not None) for r in rows}
 
 
-def _hits(rows) -> list[tuple[str, str]]:
-    return [(str(r["id"]), str(r["document_id"])) for r in rows]
+def _hits(rows) -> list[tuple]:
+    """A search hit's identity, in order (enriched rows carry no chunk id)."""
+    return [(str(r["document_id"]), r.get("chunk_index"), r["content"]) for r in rows]
 
 
 async def test_search_parity(world, pg_pool, monkeypatch):

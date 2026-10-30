@@ -215,7 +215,7 @@ FORBIDDEN_IN_READS = (
     "fetch_visible_folders",
     ".rpc(",
     ". rpc (",
-    "document_ids",
+    "document_ids =",
     "linked document (no access)",
     ".table(",
     ". table (",
@@ -255,7 +255,7 @@ def test_search_never_passes_an_allow_list_and_runs_inside_acting_as():
     """D-40: connector-fed exclusion is a POST-filter; a ``document_ids`` allow-list would switch
     retrieval into filtered mode and change ranking against the app."""
     code = _code_only(READS)
-    assert "document_ids" not in code
+    assert "document_ids =" not in code  # never passed as a kwarg; reading ScopeResult.document_ids is fine
     assert re.search(r"with acting_as \( principal \) :.*?search_documents \(", code, re.S)
     assert re.search(r"with acting_as \( principal \) :.*?resolve_document_scope \(", code, re.S)
 
