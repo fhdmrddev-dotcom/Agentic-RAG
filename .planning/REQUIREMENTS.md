@@ -37,11 +37,11 @@ Decided at intake (operator, 2026-10-27):
 
 ### Told when a run waits on you (NOTE)
 
-- [ ] **NOTE-01**: When a workflow run starts waiting on a person, its owner sees it in an in-app "waiting on you" list and badge. Waiting means a question or an approval, including on scheduled and API-key runs. The list covers every org the owner belongs to, and each item names its org and links to the run. — `SEED-281`
+- [x] **NOTE-01**: When a workflow run starts waiting on a person, its owner sees it in an in-app "waiting on you" list and badge. Waiting means a question or an approval, including on scheduled and API-key runs. The list covers every org the owner belongs to, and each item names its org and links to the run. — `SEED-281`
 - [ ] **NOTE-02**: If the run is still waiting after a delay, the owner gets one email linking to the run. The delay defaults to 2 minutes and is a Settings knob. Answering in time means no email. A restart, a deploy or the second worker never sends it twice. — `SEED-281`
 - [ ] **NOTE-03**: The email contains no document content: only the workflow name, the org, how long the run has waited, and the link.
 - [ ] **NOTE-04**: A user can turn notification email off in their own Settings. The in-app notice stays.
-- [ ] **NOTE-05**: Once the question is answered or the run ends, its notice leaves the list and the badge.
+- [x] **NOTE-05**: Once the question is answered or the run ends, its notice leaves the list and the badge.
 - [ ] **NOTE-06**: The app can send email from a built image: through Resend on cloud and through SMTP on the one-box. The secret lives in env and every other knob in Settings. Invite email uses the same sender, and a failed send is visible rather than only logged.
 
 ### v4.7 close-out (FIX)
@@ -103,11 +103,11 @@ Decided at intake (operator, 2026-10-27):
 | ORG-04 | Phase 298 | Pending |
 | ORG-05 | Phase 298 | Pending |
 | ORG-06 | Phase 298 | Pending |
-| NOTE-01 | Phase 301 | Pending |
+| NOTE-01 | Phase 301 | Complete |
 | NOTE-02 | Phase 300 | Pending |
 | NOTE-03 | Phase 300 | Pending |
 | NOTE-04 | Phase 300 | Pending |
-| NOTE-05 | Phase 301 | Pending |
+| NOTE-05 | Phase 301 | Complete |
 | NOTE-06 | Phase 300 | Pending |
 | FIX-01 | Phase 302 | Complete |
 | FIX-02 | Phase 299 | Complete |

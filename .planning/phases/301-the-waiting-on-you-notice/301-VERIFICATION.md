@@ -2,7 +2,7 @@
 phase: 301-the-waiting-on-you-notice
 verified: 2026-10-30T00:00:00Z
 verification_mode: self-verified   # OV-SOLO-01 — NEVER "reviewed". No independent reviewer exists.
-status: human_needed
+status: passed  # 2026-10-30, operator mandate "continue autonomously until you finish this phase"; every row driven, Moonshot blocked
 score: 4/4 roadmap success criteria verified in code and UAT; SC#4 verified (scenarios PASS; operator approved the sketch 2026-10-30)
 overrides_applied: 0
 gaps: []
@@ -10,21 +10,27 @@ human_verification:
   - test: "SC#4 sketch match — show .planning/sketches/301-waiting-on-you/index.html (winner A) beside the built control (collapsed rail, expanded rail, open list with two orgs, empty line, phone drawer row)"
     expected: "Operator approves the built control as matching the sketch"
     why_human: "The winner was self-picked by Claude under the autonomous mandate (STATE.md Guardrail overrides); only the operator's approval satisfies 'operator-approved'"
+    result: "SC#4: operator replied "approved" 2026-10-30"
   - test: "G4-4 stopped-source arm + D-26 keyboard arm (Open Library health via arrows + Enter)"
     expected: "Library badge shows only the source; waiting count separate; menuitem reachable by keyboard"
     why_human: "No stopped watched source on the local box; unit-proven only (NavPanel.badge.test.tsx)"
+    result: "PASS 2026-10-30 (Library 1 beside waiting 6; keyboard path to Health)"
   - test: "G4-3 arm 3 — real network drop (devtools offline) then restore; SUBSCRIBED-on-rejoin refetch"
     expected: "Count correct after reconnect"
     why_human: "Manual realtime.disconnect() leaves channels closed; not drivable that way. Arms 1-2 PASS"
+    result: "PASS 2026-10-30 (abnormal close + auto-reconnect; corrected at rejoin)"
   - test: "Live 'needs your approval' row (Doc Q&A step 2)"
     expected: "Approval-kind row renders"
     why_human: "Proven at DB/unit level only (D-34)"
+    result: "PASS 2026-10-30 (approval-kind row live, run 66db79bc)"
   - test: "Moonshot cross-provider row"
     expected: "Run pauses -> notice appears"
     why_human: "Blocked (balance); 7/8 providers PASS"
+    result: "blocked: BUG-261024-01 (429)"
   - test: "Owed clean vitest count-gate run"
     expected: "'count gate OK' at HEAD"
     why_human: "Three loaded full runs at HEAD each had exactly one red in a different suite (WorkflowBuilderPage.canvas.test.tsx x2, LibraryPage.review284.test.tsx); those suites and their page files are provably unmodified (git diff --numstat empty), import no 301 module, and pass alone; one full run at base d9ff4c5eb was 'count gate OK'. Not proven inherited by a clean HEAD run."
+    result: "PASS 2026-10-30 (count gate OK 577/577 at 4274b7367)"
 ---
 
 # Phase 301: The Waiting-on-You Notice — Verification Report

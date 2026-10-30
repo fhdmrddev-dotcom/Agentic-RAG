@@ -28,6 +28,7 @@ re_open_trigger: >
   Immediately for the DOCUMENTATION half (this file). For the BUILD: the first milestone that
   schedules anything customer-facing, or the second recorded instance of a pause nobody saw.
 status_note: >
+  2026-10-30 (301 close): the in-app half is DONE — 301 passed (every row driven, incl. a live "needs your approval" row). Stays folded only for the 300 email half (G4-8 + real-provider G4-1, Resend deferred); flip to shipped when 300 passes.
   2026-10-30 (302 REG-08, D-14): stays folded -> "300, 301". The email half shipped in code in 300 and the
   in-app list + badge half in 301; BOTH phases are human_needed, so this does not flip to shipped yet —
   300 owes G4-8 + the real-provider half of G4-1 (Resend deferred); 301 owes the SC#4 operator sketch

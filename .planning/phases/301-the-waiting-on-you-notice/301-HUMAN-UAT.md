@@ -1,5 +1,5 @@
 ---
-status: partial
+status: complete
 phase: 301-the-waiting-on-you-notice
 source: [301-VERIFICATION.md, 301-VALIDATION.md]
 started: 2026-10-30T22:45:00Z
@@ -8,7 +8,7 @@ updated: 2026-10-30T23:30:00Z
 
 ## Current Test
 
-2 — G4-4 stopped-source + keyboard arm (SC#4 operator approval received 2026-10-30).
+none — all rows driven 2026-10-30 (Moonshot blocked).
 
 ## Tests
 
@@ -22,11 +22,11 @@ result: PASS — operator replied "approved" in chat, 2026-10-30 (sketch winner 
 ### 2. G4-4 — stopped source beside waiting runs, and the D-26 keyboard path
 With a stopped watched source present: Library badge counts only the source; the waiting count is separate;
 the Library popover's "Open Library health" is reached with arrow keys + Enter (BUG-261029-01).
-result: owed (no stopped source on the local box; unit-proven)
+result: PASS 2026-10-30 — local switched-off source: Library badge 1, waiting count 6 separate; "Open Library health" reached and opened by Enter/ArrowDown/Enter (301-VALIDATION.md G4-4).
 
 ### 3. G4-3 arm 3 — real network drop
 DevTools offline on one tab, answer a run in another, go back online: the count corrects on reconnect.
-result: owed (manual realtime disconnect leaves channels closed, so it cannot stand in)
+result: PASS 2026-10-30 — abnormal socket close with auto-reconnect (not a physical cut): count stale at 6 while down, corrected to 5 at the rejoin instant (38.7 s), back to 6 live via the hint (301-VALIDATION.md G4-3 arm 3).
 
 ### 4. Live "needs your approval" row
 Needs a published workflow with an ARMED action-risk checkpoint owned by the dev account; run it and the row
@@ -35,7 +35,7 @@ Tried 2026-10-30: Doc Q&A's "Wait for your approval" step is a human-input QUEST
 correct per D-04 — approval is only an action-risk checkpoint); "295-07 S7 armed email" is published but owned by
 another user, so it refuses ("Workflow not found", 299 D-33). No `kind = approval` notice has ever been written
 locally. Cheapest path: author + publish a one-step send_email (posture ask) workflow on the dev account.
-result: owed (DB/unit-proven, D-34)
+result: PASS 2026-10-30 — "301 approval row (armed email)" (local copy of the 295-07 S7 definition for the dev account, org 22f9c615) run `66db79bc` paused before send_email; notice `469b82ac` kind=approval; the list row reads "301 approval row (armed email) · fhdmrd@gmail.com's Organization · needs your approval · waiting under a minute" while the other six read "needs your answer". Not approved — no email sent; the run is left paused.
 
 ### 5. Moonshot cross-provider row
 result: blocked — BUG-261024-01 (Moonshot balance)
