@@ -631,7 +631,7 @@ node scripts/check-hot-file-ledger.cjs <phase-dir>   # 0 clear · 1 missing rows
 | `backend/app/services/provider_gateway/dispatcher.py` | 10 / 4 / 260 (was `6 / 2 / 153`) | ⚠ FIRES (row was stale) · 282-01: off-loop open, shared deadline · ⛔ |
 | `backend/app/services/provider_gateway/openai_responses.py` | 4 / 3 / 570 (was `2 / 2 / 573`) | ⚠ now FIRES · 292.1-REVIEW IN-03: dead dsml_leaked flag deleted · ⛔ |
 | `frontend/src/lib/api/admin.ts` | 11 / 6 / 1127 (was `10 / 5 / 1125`) | 304-04: one FlagKey member (mcp_enabled) · ⛔ |
-| `frontend/src/components/admin/CapabilityGrid.tsx` | 4 / 4 / 273 (was `3 / 3 / 264`) | 304-06: one union member + one entry (mcp_enabled), no count · ⛔ |
+| `frontend/src/components/admin/CapabilityGrid.tsx` | 5 / 4 / 273 (was `3 / 3 / 264`) | 304-06: one union member + one entry (mcp_enabled), no count · ⛔ |
 | `frontend/src/components/admin/ControlRoomPage.tsx` | 20 / 11 / 907 (was `19 / 10 / 906`) | 304-06: one capabilityFlags line (mcp_enabled ?? true) · ⛔ |
 | `backend/app/api/api_keys.py` | 5 / 3 / 710 (was `3 / 2 / 421`) | ⚠ now FIRES (304) · 304-04: kind on the 293 routes + org switch · ⛔ |
 | `backend/app/db/api_keys.py` | 6 / 3 / 383 (was `5 / 2 / 307`) | ⚠ now FIRES (304) · 304-02: mcp_switches + kind columns · ⛔ |

@@ -102,7 +102,7 @@ const CAPABILITIES: ReadonlyArray<CapabilityDef> = [
     countImpact: (n) =>
       `${n} running workflow${n === 1 ? "" : "s"} will finish; new launches are blocked.`,
   },
-  // Phase 304-06 (KEY-06, D-03): NO countImpact — no honest per-key count exists in 304 (065-A).
+  // Phase 304-06 (KEY-06, D-03): no count-based impact line — no honest per-key count exists in 304 (065-A).
   {
     key: "mcp_enabled",
     label: "AI tool access (MCP)",
