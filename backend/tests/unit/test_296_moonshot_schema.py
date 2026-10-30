@@ -10,7 +10,10 @@ D-21), so these unit tests are the proof:
 
 1. ``inline_refs`` leaves no ``$ref`` / ``$defs`` / ``definitions`` anywhere;
 2. ``jsonschema`` gives the SAME verdicts on valid and invalid definitions before and after;
-3. a true self-reference is refused with ``ValueError`` naming the definition;
+3. ~~a true self-reference is refused with ``ValueError`` naming the definition;~~
+   CORRECTED at 302-02 (BE-IN-04 / D-25): a true cycle (self or mutual) and a chain deeper than
+   ``_MAX_DEPTH`` are unrolled to a bounded depth ending in a typed leaf, and ``moonshot_tools``
+   warns naming the tool and the definition only;
 4. every chat tool from ``get_tools()`` (all ref-free) comes back as the SAME object, so no other
    provider's bytes and no Moonshot chat bytes change;
 5. the adapter transforms ONLY when the ENDPOINT provider is ``moonshot`` (282-REVIEW CR-01:
@@ -99,17 +102,86 @@ def test_validation_verdicts_are_the_same_before_and_after_inlining():
     assert before[len(valid):] == [False] * len(invalid)
 
 
-def test_a_true_cycle_is_refused_naming_the_definition():
+def _refs_anywhere(node) -> bool:
+    if isinstance(node, dict):
+        return any(k in node for k in ("$ref", "$defs", "definitions")) or any(
+            _refs_anywhere(v) for v in node.values())
+    if isinstance(node, list):
+        return any(_refs_anywhere(v) for v in node)
+    return False
+
+
+# 302-02 (BE-IN-04 / D-25): this case used to be ``pytest.raises(ValueError, match="Node")``.
+# Moonshot itself 400s on recursion, so refusing still failed the whole request; a true cycle is
+# now unrolled to a bounded depth ending in a typed leaf.
+NODE = {
+    "type": "object",
+    "properties": {"root": {"$ref": "#/$defs/Node"}},
+    "$defs": {"Node": {"type": "object", "description": "A tree node.",
+                       "properties": {"children": {"type": "array",
+                                                   "items": {"$ref": "#/$defs/Node"}}}}},
+}
+
+
+def test_a_true_cycle_is_unrolled_to_a_typed_leaf():
     from app.services.provider_gateway.schema_moonshot import inline_refs
 
-    cyclic = {
+    cut: list[str] = []
+    out = inline_refs(NODE, cut=cut)
+    assert not _refs_anywhere(out)
+    leaf = out["properties"]["root"]["properties"]["children"]["items"]
+    assert leaf == {"type": "object", "description": "A tree node."}
+    assert cut == ["Node"]
+
+
+def test_a_mutual_cycle_terminates_with_a_typed_leaf():
+    from app.services.provider_gateway.schema_moonshot import inline_refs
+
+    mutual = {
         "type": "object",
-        "properties": {"root": {"$ref": "#/$defs/Node"}},
-        "$defs": {"Node": {"type": "object",
-                           "properties": {"child": {"$ref": "#/$defs/Node"}}}},
+        "properties": {"a": {"$ref": "#/$defs/A"}},
+        "$defs": {"A": {"type": "object", "properties": {"b": {"$ref": "#/$defs/B"}}},
+                  "B": {"type": "object", "properties": {"a": {"$ref": "#/$defs/A"}}}},
     }
-    with pytest.raises(ValueError, match="Node"):
-        inline_refs(cyclic)
+    out = inline_refs(mutual)
+    assert not _refs_anywhere(out)
+    assert out["properties"]["a"]["properties"]["b"]["properties"]["a"] == {
+        "type": "object", "description": "A"}
+
+
+def test_a_deep_chain_beyond_the_cap_ends_in_a_typed_leaf():
+    from app.services.provider_gateway import schema_moonshot
+
+    n = schema_moonshot._MAX_DEPTH + 4
+    defs = {f"D{i}": {"type": "object", "properties": {"next": {"$ref": f"#/$defs/D{i + 1}"}}}
+            for i in range(n)}
+    defs[f"D{n}"] = {"type": "string"}
+    out = schema_moonshot.inline_refs(
+        {"type": "object", "properties": {"x": {"$ref": "#/$defs/D0"}}, "$defs": defs})
+    assert not _refs_anywhere(out)
+    node, depth = out["properties"]["x"], 0
+    while "properties" in node:
+        node, depth = node["properties"]["next"], depth + 1
+    assert depth <= schema_moonshot._MAX_DEPTH
+    assert node.get("type") == "object" and "description" in node
+
+
+def test_moonshot_tools_keeps_a_recursive_tool_and_warns_without_the_schema(caplog):
+    import logging
+
+    from app.services.provider_gateway.schema_moonshot import moonshot_tools
+
+    rec = {"type": "function", "function": {"name": "tree_tool", "parameters": NODE}}
+    plain = {"type": "function", "function": {"name": "plain", "parameters": {
+        "type": "object", "properties": {"q": {"type": "string"}}}}}
+    with caplog.at_level(logging.WARNING):
+        out = moonshot_tools([rec, plain])
+    assert out[1] is plain
+    assert not _refs_anywhere(out[0]["function"]["parameters"])
+    warned = [r.getMessage() for r in caplog.records if r.levelno == logging.WARNING]
+    assert len(warned) == 1
+    assert "tree_tool" in warned[0] and "Node" in warned[0]
+    assert "A tree node." not in warned[0] and "children" not in warned[0]
 
 
 def test_a_ref_free_schema_is_returned_as_the_same_object():
