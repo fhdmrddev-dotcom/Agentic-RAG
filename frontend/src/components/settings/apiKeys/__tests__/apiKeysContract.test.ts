@@ -11,15 +11,25 @@
  *
  * A failure means the frontend departed from the contract: fix the type, never the fixture.
  */
-import { describe, expect, it } from "vitest"
+import { afterEach, describe, expect, it, vi } from "vitest"
 import contractRaw from "../../../../../../backend/tests/fixtures/phase293/api_keys_contract.json?raw"
-import type {
-  ApiKeyCreated,
-  ApiKeyList,
-  ApiKeyRead,
-  OrgMcpAccess,
-  PickableFolderList,
+
+vi.mock("@/lib/api/_core", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("@/lib/api/_core")>()
+  return { ...actual, getAuthHeaders: vi.fn().mockResolvedValue({ Authorization: "Bearer t" }) }
+})
+
+import {
+  getOrgMcpAccess,
+  listPickableFolders,
+  setOrgMcpAccess,
+  type ApiKeyCreated,
+  type ApiKeyList,
+  type ApiKeyRead,
+  type OrgMcpAccess,
+  type PickableFolderList,
 } from "@/lib/api/apiKeys"
+import { ApiError } from "@/lib/api/_core"
 
 const contract = JSON.parse(contractRaw) as {
   ApiKeyList: unknown
@@ -139,5 +149,50 @@ describe("293-04 api key wire types vs the backend contract fixture", () => {
   it("no list path carries a secret or a digest (the secret lives in one response only)", () => {
     const paths = keyPaths(contract.ApiKeyList)
     expect(paths.some((p) => /secret|hash/i.test(p))).toBe(false)
+  })
+})
+
+describe("304-04 the three MCP calls (the listOrgApiKeys shape)", () => {
+  afterEach(() => vi.unstubAllGlobals())
+
+  function stubFetch(status: number, body: unknown) {
+    const fetchMock = vi.fn().mockResolvedValue(
+      new Response(JSON.stringify(body), { status, headers: { "Content-Type": "application/json" } }),
+    )
+    vi.stubGlobal("fetch", fetchMock)
+    return fetchMock
+  }
+
+  it("listPickableFolders GETs /api-keys/folders with the signal", async () => {
+    const fetchMock = stubFetch(200, contract.PickableFolderList)
+    const ctrl = new AbortController()
+    const out = await listPickableFolders(ctrl.signal)
+    expect(out).toEqual(contract.PickableFolderList)
+    const [url, init] = fetchMock.mock.calls[0]
+    expect(String(url)).toMatch(/\/api-keys\/folders$/)
+    expect(init.signal).toBe(ctrl.signal)
+  })
+
+  it("getOrgMcpAccess GETs /org/api-keys/mcp-access", async () => {
+    const fetchMock = stubFetch(200, { enabled: false })
+    expect(await getOrgMcpAccess()).toEqual({ enabled: false })
+    expect(String(fetchMock.mock.calls[0][0])).toMatch(/\/org\/api-keys\/mcp-access$/)
+  })
+
+  it("setOrgMcpAccess PUTs {enabled} as JSON", async () => {
+    const fetchMock = stubFetch(200, { enabled: true })
+    expect(await setOrgMcpAccess(true)).toEqual({ enabled: true })
+    const [url, init] = fetchMock.mock.calls[0]
+    expect(String(url)).toMatch(/\/org\/api-keys\/mcp-access$/)
+    expect(init.method).toBe("PUT")
+    expect(JSON.parse(init.body)).toEqual({ enabled: true })
+  })
+
+  it("a refusal throws ApiError with the server's own sentence and status", async () => {
+    stubFetch(403, { detail: "You do not have permission to manage this organization." })
+    const err = await setOrgMcpAccess(false).catch((e: unknown) => e)
+    expect(err).toBeInstanceOf(ApiError)
+    expect((err as ApiError).message).toBe("You do not have permission to manage this organization.")
+    expect((err as ApiError).status).toBe(403)
   })
 })
