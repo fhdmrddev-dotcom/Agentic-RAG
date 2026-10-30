@@ -171,7 +171,15 @@ These supersede the decisions they name. The superseded text above is kept so th
 ### Seeds
 - `SEED-195` — folded (the folder-scope / tool-subset credential it still asked for).
 - `SEED-013` — folded in part (keys); the rest lands in 305-309.
-- The register sweep matched 0 seeds by path (the phase has no plans yet, so no `files_modified`); re-run `node scripts/check-seeds-register.cjs --phase 304` after planning.
+- The register sweep matched 0 seeds by path before planning. **Re-run after planning (2026-10-30): 23 seeds matched**, all through broad `trigger_paths` globs (`supabase/migrations/**`, `frontend/src/**`, `backend/app/api/**`, `scripts/vitest-count-gate.cjs`), not through scope overlap. Reviewed, none folded, seed files left unchanged (several are already `shipped` / `answered`; rewriting a settled status because a glob matched would corrupt the index):
+  - `SEED-177` (MCP both ways): its remaining arms land in 305; already routed at intake.
+  - `SEED-306` (server-owned columns writable by `authenticated`, incl. `tier_capabilities` TRUNCATE): same class as BUG-261030-03 but different tables; 304 fixes only `organizations` (D-42), the table it already alters. Left open.
+  - `SEED-266` (full-schema ACLs), `SEED-370` (settings in UI), `SEED-380` (typed-task API key): adjacent, out of scope.
+  - The rest (`SEED-027`, `185`, `188`, `198`, `249`, `271`, `280`, `284`, `287`, `289`, `290`, `313`, `326`, `341`, `350`, `359`, `364`, `374`): unrelated to keys or org narrowing; matched only by glob.
+
+### G-8 justification (6 plans, one above the 3-5 target)
+- 304-03 / 304-04 is the split research proposed (narrowed reads + parity suite mutate the local DB; API + switches are unit-only).
+- The frontend is split (304-05 member screen, 13+ source files; 304-06 admin surfaces) because the shared bookkeeping files (`docs/HOT-FILE-LEDGER.md`, `CLAUDE.md`, `scripts/vitest-count-gate.cjs`) cannot be edited by two plans in one wave — so 304-06 owns them alone in wave 4. Merging 05 and 06 would put 20+ source files in one worktree with the full gates.
 
 </deferred>
 

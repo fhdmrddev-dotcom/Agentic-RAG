@@ -44,9 +44,9 @@ reviewer exists, so a phase closes `verification_mode: self-verified`, never `re
 ## Current Position
 
 Milestone: v4.9 Use It From Your Own Tools
-Phase: 304 — Personal MCP Keys That Act as You (context gathered, `--auto`; 303 not started)
-Plan: —
-Status: Ready to plan 304
+Phase: 304 — Personal MCP Keys That Act as You (planned, `--auto`; 303 not started)
+Plan: 0 of 6 (4 waves: 01+02 · 03+04 · 05 · 06)
+Status: Ready to execute 304
 Last activity: 2026-10-30 — 304 context gathered (`.planning/phases/304-personal-mcp-keys-that-act-as-you/304-CONTEXT.md`); SEED-195 + SEED-013 folded
 
 Phases start at **303**; migrations at **220**. Seeds taken in at intake: SEED-013, SEED-177, SEED-195, SEED-081, SEED-079; bug BUG-261022-01.
