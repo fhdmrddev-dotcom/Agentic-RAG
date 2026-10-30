@@ -3,12 +3,12 @@ status: partial
 phase: 301-the-waiting-on-you-notice
 source: [301-VERIFICATION.md, 301-VALIDATION.md]
 started: 2026-10-30T22:45:00Z
-updated: 2026-10-30T22:45:00Z
+updated: 2026-10-30T23:30:00Z
 ---
 
 ## Current Test
 
-1 — SC#4 operator sketch approval (run this first; it is the only acceptance bar Claude cannot sign).
+2 — G4-4 stopped-source + keyboard arm (SC#4 operator approval received 2026-10-30).
 
 ## Tests
 
@@ -17,7 +17,7 @@ Open `.planning/sketches/301-waiting-on-you/index.html` (serve `.planning/sketch
 collapsed + expanded rail, the open list with rows in two orgs, the empty line, the phone drawer row.
 Two documented departures from the sketch: the rail icon stays neutral (only the count pill is amber, UI-D3);
 "· scheduled" / "· started by an API key" are shown (D-28 restored them).
-result: owed (operator)
+result: PASS — operator replied "approved" in chat, 2026-10-30 (sketch winner A accepted with both departures).
 
 ### 2. G4-4 — stopped source beside waiting runs, and the D-26 keyboard path
 With a stopped watched source present: Library badge counts only the source; the waiting count is separate;

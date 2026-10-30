@@ -3,7 +3,7 @@ phase: 301-the-waiting-on-you-notice
 verified: 2026-10-30T00:00:00Z
 verification_mode: self-verified   # OV-SOLO-01 — NEVER "reviewed". No independent reviewer exists.
 status: human_needed
-score: 3/4 roadmap success criteria verified in code and UAT; SC#4 split (scenarios PASS, operator sketch approval owed)
+score: 4/4 roadmap success criteria verified in code and UAT; SC#4 verified (scenarios PASS; operator approved the sketch 2026-10-30)
 overrides_applied: 0
 gaps: []
 human_verification:
@@ -30,7 +30,7 @@ human_verification:
 # Phase 301: The Waiting-on-You Notice — Verification Report
 
 **Phase Goal:** A person sees, inside the app, every workflow run waiting on them across all their orgs, each naming its org and opening the run, and the notice disappears once answered or the run ends.
-**Status:** human_needed — no success criterion is unmet in code; SC#4's operator approval and several UAT arms are owed.
+**Status:** human_needed — no success criterion is unmet; SC#4 approved by the operator 2026-10-30; several UAT arms are owed.
 **Re-verification:** No (initial).
 
 ## Observable Truths (ROADMAP success criteria)
@@ -42,7 +42,7 @@ human_verification:
 | 3 | Item leaves after answer/run end (any tab/person/engine) and after a missed Realtime event via fetch reconcile | VERIFIED | SQL: `closed_at IS NULL` AND `wr.status IN ('active','paused')` (ended run never listed even if close swallowed); hook refetches on mount, SUBSCRIBED, focus, visibility, org/membership change, 60 s poll, event body never read. UAT G4-3 arm 1 (6 -> 5 in ~3 s) and arm 2 (missed event: stale until focus, one GET -> 5) PASS |
 | 4 | Badge + list match the operator-approved sketch; operator "I'd recognise failure" scenarios pass in Chrome | UNCERTAIN (human) | Scenarios G4-1/2/3(1-2)/4(phone)/5 PASS in Chrome with per-row evidence. Sketch approval is OWED: variant A was self-picked by Claude. Not FAILED: the sketch exists and the control was built to it, but the approval bar cannot be met by Claude |
 
-**Score:** SC#1-3 verified; SC#4 half-verified (WARNING, human decision requested).
+**Score:** SC#1-4 verified. SC#4: operator replied "approved" to sketch winner A on 2026-10-30.
 
 ## "How we'd know this failed" — one by one
 
@@ -93,7 +93,7 @@ No TBD/FIXME/XXX markers in the phase's new source files. No stubs found. Only I
 
 ## Gaps Summary
 
-No code gap and no unmet success criterion: SC#1-3 are implemented, wired and driven in Chrome. Status is `human_needed` because SC#4's operator sketch approval is owed (self-picked variant), plus owed UAT arms (stopped-source/keyboard, real-network rejoin, live approval row, Moonshot) and one clean vitest count-gate run.
+No code gap and no unmet success criterion: SC#1-3 are implemented, wired and driven in Chrome. Status stays `human_needed` for owed UAT arms only (SC#4's sketch approval was given 2026-10-30) (stopped-source/keyboard, real-network rejoin, live approval row, Moonshot) and one clean vitest count-gate run.
 
 ---
 
