@@ -230,6 +230,35 @@ export async function revokeOrgApiKey(keyId: string): Promise<ApiKeyRead> {
   return (await res.json()) as ApiKeyRead
 }
 
+/** Phase 304: the folders the caller can tick on an MCP key in the active org, read on their own
+ *  visibility (never the service role). */
+export async function listPickableFolders(signal?: AbortSignal): Promise<PickableFolderList> {
+  const headers = await getAuthHeaders()
+  const res = await fetch(`${API_BASE}/api-keys/folders`, { headers, signal })
+  if (!res.ok) throw new ApiError(await readApiKeyFailure(res), res.status)
+  return (await res.json()) as PickableFolderList
+}
+
+/** Phase 304 (D-35): the active org's MCP switch (admins only; the server answers 403 otherwise). */
+export async function getOrgMcpAccess(signal?: AbortSignal): Promise<OrgMcpAccess> {
+  const headers = await getAuthHeaders()
+  const res = await fetch(`${API_BASE}/org/api-keys/mcp-access`, { headers, signal })
+  if (!res.ok) throw new ApiError(await readApiKeyFailure(res), res.status)
+  return (await res.json()) as OrgMcpAccess
+}
+
+/** Phase 304 (D-35, D-36): flip the active org's MCP switch. The server writes the audit row. */
+export async function setOrgMcpAccess(enabled: boolean): Promise<OrgMcpAccess> {
+  const headers = await getAuthHeaders()
+  const res = await fetch(`${API_BASE}/org/api-keys/mcp-access`, {
+    method: "PUT",
+    headers: { ...headers, "Content-Type": "application/json" },
+    body: JSON.stringify({ enabled }),
+  })
+  if (!res.ok) throw new ApiError(await readApiKeyFailure(res), res.status)
+  return (await res.json()) as OrgMcpAccess
+}
+
 /** The server's own sentence out of a refusal (the `readScheduleFailure` shape): the plan's
  *  entitlement message first, then a string `detail`, then FastAPI's 422 array `msg`.
  *  ⚠ NOT exported: a runtime export no component calls only costs mock-factory lines. */

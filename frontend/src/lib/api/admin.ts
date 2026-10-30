@@ -419,6 +419,8 @@ export type FlagKey =
   // Phase 159 (MODEL-03 / D-159-04) — the discovery-panel utility filter toggle. Rides
   // `PUT /admin/flags` verbatim (backend added the key to `_FLAG_HUMAN_NAMES`).
   | "model_discovery_filter_enabled"
+  // Phase 304 (KEY-06, D-03) — the deployment MCP switch; backend `_FLAG_HUMAN_NAMES["mcp_enabled"]`.
+  | "mcp_enabled"
 
 /** Read the live active-runs list (`GET /admin/runs`, Plan 147-02). Plain authed
  *  GET — the router gate returns 404 to non-operators. The backend returns an

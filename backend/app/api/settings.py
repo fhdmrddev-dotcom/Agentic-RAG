@@ -166,6 +166,7 @@ class FullSettingsResponse(BaseModel):
     # them to any authed user; the operator WRITE path lands on /admin/flags in a later plan.
     self_improve_enabled: bool
     workflows_enabled: bool
+    mcp_enabled: bool  # Phase 304 (KEY-06): the deployment MCP switch, written via PUT /admin/flags
     maintenance_mode: bool
     # Phase 159 (MODEL-03 / D-159-04) — the persisted discovery-panel utility-filter default,
     # surfaced on the SAME settings read contract so the Control Room shell can read the operator's
@@ -503,6 +504,7 @@ async def _build_response(s=None) -> FullSettingsResponse:
         # Phase 147 (FLAG-01) — the three operator kill-switches from the effective settings.
         self_improve_enabled=s.self_improve_enabled,
         workflows_enabled=s.workflows_enabled,
+        mcp_enabled=s.mcp_enabled,
         maintenance_mode=s.maintenance_mode,
         # Phase 159 (MODEL-03 / D-159-04) — the persisted discovery-filter default (default-ON).
         model_discovery_filter_enabled=s.model_discovery_filter_enabled,

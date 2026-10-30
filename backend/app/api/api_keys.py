@@ -51,12 +51,14 @@ from uuid import UUID
 
 import asyncpg
 from fastapi import APIRouter, BackgroundTasks, Body, Depends, HTTPException, status
+from starlette.concurrency import run_in_threadpool
 
 from app.db import api_keys as api_keys_db
 from app.dependencies import (
     get_active_org_id,
     get_current_user,
     get_pg_pool,
+    get_service_role_supabase,
     require_org_manage,
 )
 from app.models.api_key import (
@@ -72,6 +74,8 @@ from app.models.api_key import (
     McpAvailability,
     McpKeyCreateBody,
     McpToolRef,
+    OrgMcpAccess,
+    OrgMcpAccessUpdate,
     PickableFolder,
     PickableFolderList,
     StartableField,
@@ -83,6 +87,7 @@ from app.security.acting_member import acting_member_connection
 from app.security.api_key_auth import audit_key_call, mint_key
 from app.security.principal_liveness import MCP_OFF_DEPLOYMENT_SENTENCE, MCP_OFF_ORG_SENTENCE
 from app.services.acting_member_reads import list_acting_folders
+from app.services.audit_service import write_audit_entry
 from app.services.entitlement_service import enforce_entitlement
 from app.services.inbound_inputs import declared_fields, needs_file_upload, needs_typed_task
 from app.services.key_scope import EXTERNAL_SQL
@@ -653,3 +658,53 @@ async def revoke_org_key(
         )
     (key,) = await _serialize_keys(pool, [row], caller=caller, org_id=org)
     return key
+
+
+# ── the org's MCP switch (Phase 304; KEY-06, D-02, D-35, D-36) ─────────────────────────────────
+#
+# A dedicated column (``organizations.mcp_enabled``, mig 220) outside the ``authenticated`` column
+# grant, so this audited route is its ONLY writer. No new audit literal (D-36): every flip is
+# ``settings.update`` with ``metadata.event = 'mcp_access'`` and an EXPLICIT org_id (the
+# ``api/org.py`` invite / SSO precedent, T-167-23).
+
+_MCP_ACCESS_AUDIT_ACTION = "settings.update"
+_ORG_NOT_FOUND = "Organization not found."
+
+
+@org_router.get("/mcp-access", response_model=OrgMcpAccess)
+async def get_org_mcp_access(
+    current_user: dict = Depends(require_org_manage),
+    active_org: str = Depends(get_active_org_id),
+    pool: asyncpg.Pool = Depends(get_pg_pool),
+) -> OrgMcpAccess:
+    """The active org's MCP switch, read live (never the settings cache)."""
+    switches = await api_keys_db.mcp_switches(pool, _uuid(active_org))
+    if switches is None:
+        raise HTTPException(status_code=404, detail=_ORG_NOT_FOUND)
+    return OrgMcpAccess(enabled=switches.get("org_on") is True)
+
+
+@org_router.put("/mcp-access", response_model=OrgMcpAccess)
+async def set_org_mcp_access(
+    body: OrgMcpAccessUpdate,
+    current_user: dict = Depends(require_org_manage),
+    active_org: str = Depends(get_active_org_id),
+    pool: asyncpg.Pool = Depends(get_pg_pool),
+) -> OrgMcpAccess:
+    """Flip the active org's MCP switch. The audit row is written only AFTER the write returned;
+    a failed write raises (an error status and no audit row), never a fake success."""
+    org = _uuid(active_org)
+    stored = await api_keys_db.set_org_mcp_enabled(pool, org_id=org, enabled=body.enabled)
+    if stored is None:
+        raise HTTPException(status_code=404, detail=_ORG_NOT_FOUND)
+    # supabase-py client construction off the event loop (D-v2.5-01); the insert itself is
+    # already threadpooled inside write_audit_entry.
+    audit_supabase = await run_in_threadpool(get_service_role_supabase, str(org))
+    await write_audit_entry(
+        user_id=str(current_user["id"]),
+        action_type=_MCP_ACCESS_AUDIT_ACTION,
+        metadata={"event": "mcp_access", "enabled": bool(stored)},
+        supabase=audit_supabase,
+        org_id=str(org),
+    )
+    return OrgMcpAccess(enabled=bool(stored))

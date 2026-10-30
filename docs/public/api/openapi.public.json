@@ -13661,13 +13661,21 @@
           "api-keys"
         ],
         "summary": "Create Key",
-        "description": "Make a key for one or more of the caller's published workflows. The response is the ONLY place the secret ever appears.",
+        "description": "Make a key. A body without ``kind`` (or ``kind=\"workflow\"``) is the 293 workflow key; a ``kind=\"mcp\"`` body is a personal MCP key. The response is the ONLY place the secret ever appears.",
         "operationId": "create_key_api_keys_post",
         "requestBody": {
           "content": {
             "application/json": {
               "schema": {
-                "$ref": "#/components/schemas/ApiKeyCreateBody"
+                "oneOf": [
+                  {
+                    "$ref": "#/components/schemas/ApiKeyCreateBody"
+                  },
+                  {
+                    "$ref": "#/components/schemas/McpKeyCreateBody"
+                  }
+                ],
+                "title": "Body"
               }
             }
           },
@@ -13690,6 +13698,32 @@
               "application/json": {
                 "schema": {
                   "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ]
+      }
+    },
+    "/api-keys/folders": {
+      "get": {
+        "tags": [
+          "api-keys"
+        ],
+        "summary": "List Pickable Folders",
+        "operationId": "list_pickable_folders_api_keys_folders_get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PickableFolderList"
                 }
               }
             }
@@ -13851,6 +13885,78 @@
             }
           }
         }
+      }
+    },
+    "/org/api-keys/mcp-access": {
+      "get": {
+        "tags": [
+          "api-keys"
+        ],
+        "summary": "Get Org Mcp Access",
+        "description": "The active org's MCP switch, read live (never the settings cache).",
+        "operationId": "get_org_mcp_access_org_api_keys_mcp_access_get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/OrgMcpAccess"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ]
+      },
+      "put": {
+        "tags": [
+          "api-keys"
+        ],
+        "summary": "Set Org Mcp Access",
+        "description": "Flip the active org's MCP switch. The audit row is written only AFTER the write returned; a failed write raises (an error status and no audit row), never a fake success.",
+        "operationId": "set_org_mcp_access_org_api_keys_mcp_access_put",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/OrgMcpAccessUpdate"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/OrgMcpAccess"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ]
       }
     },
     "/inbound/workflows/{workflow_id}/runs": {
@@ -14548,6 +14654,12 @@
       },
       "ApiKeyCreateBody": {
         "properties": {
+          "kind": {
+            "type": "string",
+            "const": "workflow",
+            "title": "Kind",
+            "default": "workflow"
+          },
           "label": {
             "type": "string",
             "title": "Label"
@@ -14606,6 +14718,25 @@
         ],
         "title": "ApiKeyCreated"
       },
+      "ApiKeyFolderRef": {
+        "properties": {
+          "id": {
+            "type": "string",
+            "title": "Id"
+          },
+          "name": {
+            "type": "string",
+            "title": "Name"
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "name"
+        ],
+        "title": "ApiKeyFolderRef",
+        "description": "A folder an MCP key ticks, named server-side (a folder since deleted drops out)."
+      },
       "ApiKeyLimits": {
         "properties": {
           "starts_per_minute": {
@@ -14635,6 +14766,9 @@
           },
           "limits": {
             "$ref": "#/components/schemas/ApiKeyLimits"
+          },
+          "mcp": {
+            "$ref": "#/components/schemas/McpAvailability"
           }
         },
         "type": "object",
@@ -14753,6 +14887,74 @@
             },
             "type": "array",
             "title": "Calls"
+          },
+          "kind": {
+            "type": "string",
+            "enum": [
+              "workflow",
+              "mcp"
+            ],
+            "title": "Kind",
+            "default": "workflow"
+          },
+          "tools": {
+            "anyOf": [
+              {
+                "items": {
+                  "type": "string"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Tools"
+          },
+          "folders": {
+            "anyOf": [
+              {
+                "items": {
+                  "$ref": "#/components/schemas/ApiKeyFolderRef"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Folders"
+          },
+          "include_external": {
+            "type": "boolean",
+            "title": "Include External",
+            "default": false
+          },
+          "org_name": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Org Name"
+          },
+          "mcp_off": {
+            "anyOf": [
+              {
+                "type": "string",
+                "enum": [
+                  "org",
+                  "deployment"
+                ]
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Mcp Off"
           }
         },
         "type": "object",
@@ -19959,6 +20161,10 @@
             "type": "boolean",
             "title": "Workflows Enabled"
           },
+          "mcp_enabled": {
+            "type": "boolean",
+            "title": "Mcp Enabled"
+          },
           "maintenance_mode": {
             "type": "boolean",
             "title": "Maintenance Mode"
@@ -20124,6 +20330,7 @@
           "sandbox_enabled",
           "self_improve_enabled",
           "workflows_enabled",
+          "mcp_enabled",
           "maintenance_mode",
           "model_discovery_filter_enabled",
           "context_window_max_tokens",
@@ -21957,6 +22164,51 @@
         "title": "MatrixRunBody",
         "description": "POST body for a matrix launch."
       },
+      "McpAvailability": {
+        "properties": {
+          "available": {
+            "type": "boolean",
+            "title": "Available",
+            "default": false
+          },
+          "off": {
+            "anyOf": [
+              {
+                "type": "string",
+                "enum": [
+                  "org",
+                  "deployment"
+                ]
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Off"
+          },
+          "url": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Url"
+          },
+          "tools": {
+            "items": {
+              "$ref": "#/components/schemas/McpToolRef"
+            },
+            "type": "array",
+            "title": "Tools"
+          }
+        },
+        "type": "object",
+        "title": "McpAvailability",
+        "description": "``available`` is the DEPLOYMENT switch (false hides the MCP choice); ``off`` names the switch that is off, the deployment's winning; ``url`` is ``mcp_url()``."
+      },
       "McpConfig": {
         "properties": {
           "headers": {
@@ -22063,6 +22315,68 @@
         ],
         "title": "McpDiscoverResponse",
         "description": "Discovered tools returned from pre-save MCP endpoint probe."
+      },
+      "McpKeyCreateBody": {
+        "properties": {
+          "kind": {
+            "type": "string",
+            "const": "mcp",
+            "title": "Kind"
+          },
+          "label": {
+            "type": "string",
+            "title": "Label"
+          },
+          "tools": {
+            "items": {
+              "type": "string",
+              "maxLength": 64
+            },
+            "type": "array",
+            "maxItems": 32,
+            "title": "Tools"
+          },
+          "folder_ids": {
+            "anyOf": [
+              {
+                "items": {
+                  "type": "string",
+                  "format": "uuid"
+                },
+                "type": "array",
+                "maxItems": 500
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Folder Ids"
+          },
+          "include_external": {
+            "type": "boolean",
+            "title": "Include External",
+            "default": false
+          },
+          "expires_in_days": {
+            "type": "integer",
+            "enum": [
+              30,
+              90,
+              365
+            ],
+            "title": "Expires In Days",
+            "default": 90
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "kind",
+          "label",
+          "tools"
+        ],
+        "title": "McpKeyCreateBody",
+        "description": "A personal MCP key.\n\n``tools`` is validated and normalised by the route (``normalise_tool_selection``: an empty list, an unknown name and a companion without its lead are each refused in one sentence). ``folder_ids``: ``None`` = every folder the member can see; an EMPTY list is refused, never read as \"all\". No ``workflow_ids`` (``extra=\"forbid\"`` refuses them) and no \"never\" expiry."
       },
       "McpOAuthStartRequest": {
         "properties": {
@@ -22187,6 +22501,45 @@
         ],
         "title": "McpProbeAuthResponse",
         "description": "Bound to `services.mcp_auth_discovery.McpAuthProbe`, and deliberately NARROWER than it. Three of that dataclass's fields are withheld on purpose and their absence is the contract, not an oversight:\n\n· `authorization_endpoint` / `token_endpoint` — the BROWSER never calls these; the backend does. Putting them on the wire invites a frontend to start the flow itself, which would move the PKCE verifier out of the one place that can keep it secret. · the raw metadata documents — attacker-influenced JSON from a host nobody curated. Nothing renders it, so nothing should receive it.\n\nIf the door genuinely needs one of them, that is a design conversation, not a field to add quietly."
+      },
+      "McpToolRef": {
+        "properties": {
+          "name": {
+            "type": "string",
+            "title": "Name"
+          },
+          "group": {
+            "type": "string",
+            "enum": [
+              "read",
+              "ask",
+              "run"
+            ],
+            "title": "Group"
+          },
+          "label": {
+            "type": "string",
+            "title": "Label"
+          },
+          "travels_with": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Travels With"
+          }
+        },
+        "type": "object",
+        "required": [
+          "name",
+          "group",
+          "label"
+        ],
+        "title": "McpToolRef"
       },
       "MessageCreate": {
         "properties": {
@@ -23120,6 +23473,33 @@
         "title": "OAuthTokenResponse",
         "description": "Safe public projection of a connector token (no ciphertexts!)."
       },
+      "OrgMcpAccess": {
+        "properties": {
+          "enabled": {
+            "type": "boolean",
+            "title": "Enabled"
+          }
+        },
+        "type": "object",
+        "required": [
+          "enabled"
+        ],
+        "title": "OrgMcpAccess"
+      },
+      "OrgMcpAccessUpdate": {
+        "properties": {
+          "enabled": {
+            "type": "boolean",
+            "title": "Enabled"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "enabled"
+        ],
+        "title": "OrgMcpAccessUpdate"
+      },
       "OrgRef": {
         "properties": {
           "id": {
@@ -23286,6 +23666,72 @@
           "config"
         ],
         "title": "PhaseSpec"
+      },
+      "PickableFolder": {
+        "properties": {
+          "id": {
+            "type": "string",
+            "title": "Id"
+          },
+          "name": {
+            "type": "string",
+            "title": "Name"
+          },
+          "parent_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Parent Id"
+          },
+          "shared": {
+            "type": "boolean",
+            "title": "Shared"
+          },
+          "source": {
+            "anyOf": [
+              {
+                "type": "string",
+                "enum": [
+                  "mail",
+                  "synced"
+                ]
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Source"
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "name",
+          "shared"
+        ],
+        "title": "PickableFolder",
+        "description": "A folder the member can tick on an MCP key, read on their own acting visibility."
+      },
+      "PickableFolderList": {
+        "properties": {
+          "folders": {
+            "items": {
+              "$ref": "#/components/schemas/PickableFolder"
+            },
+            "type": "array",
+            "title": "Folders"
+          }
+        },
+        "type": "object",
+        "required": [
+          "folders"
+        ],
+        "title": "PickableFolderList"
       },
       "PolicyDeletedOut": {
         "properties": {
