@@ -16649,6 +16649,36 @@
      }
     }
    }
+  },
+  "/notifications": {
+   "get": {
+    "tags": [
+     "notifications"
+    ],
+    "summary": "List Waiting Notices",
+    "description": "The workflow runs waiting on you, across every organization you belong to.\n\nOldest wait first, at most 50 rows. Each names its organization, its workflow, whether it needs\nan answer (`question`) or an approval (`approval`), and how the run was started. `total` counts\nevery open notice, including any beyond the first 50. A run that has ended is never listed.",
+    "operationId": "list_waiting_notices_notifications_get",
+    "responses": {
+     "200": {
+      "description": "Successful Response",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/WaitingNotices"
+        }
+       }
+      }
+     }
+    },
+    "security": [
+     {
+      "HTTPBearer": []
+     },
+     {
+      "HTTPBearer": []
+     }
+    ]
+   }
   }
  },
  "components": {
@@ -32535,6 +32565,97 @@
     ],
     "title": "VisibilityUpdate",
     "description": "Body for PUT /admin/visibility. ``feature`` + ``audience`` + ``roles`` are validated\nagainst code allowlists in the handler (T-148-03 / T-167-12) \u2014 never free text.\n``audience`` is an enum VALUE, never a boolean (SEED-115 forward-compat). ``roles`` is the\ngreenlist for the ``role`` audience (D-167-06) \u2014 empty for everyone/operators."
+   },
+   "WaitingNotice": {
+    "properties": {
+     "id": {
+      "type": "string",
+      "format": "uuid",
+      "title": "Id"
+     },
+     "run_id": {
+      "type": "string",
+      "format": "uuid",
+      "title": "Run Id"
+     },
+     "org_id": {
+      "type": "string",
+      "format": "uuid",
+      "title": "Org Id"
+     },
+     "org_name": {
+      "type": "string",
+      "title": "Org Name"
+     },
+     "workflow_name": {
+      "type": "string",
+      "title": "Workflow Name"
+     },
+     "kind": {
+      "type": "string",
+      "enum": [
+       "question",
+       "approval"
+      ],
+      "title": "Kind"
+     },
+     "origin": {
+      "anyOf": [
+       {
+        "type": "string",
+        "enum": [
+         "app",
+         "schedule",
+         "key"
+        ]
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Origin"
+     },
+     "created_at": {
+      "type": "string",
+      "format": "date-time",
+      "title": "Created At"
+     }
+    },
+    "type": "object",
+    "required": [
+     "id",
+     "run_id",
+     "org_id",
+     "org_name",
+     "workflow_name",
+     "kind",
+     "origin",
+     "created_at"
+    ],
+    "title": "WaitingNotice",
+    "description": "One workflow run that is waiting on you."
+   },
+   "WaitingNotices": {
+    "properties": {
+     "notices": {
+      "items": {
+       "$ref": "#/components/schemas/WaitingNotice"
+      },
+      "type": "array",
+      "title": "Notices"
+     },
+     "total": {
+      "type": "integer",
+      "title": "Total"
+     }
+    },
+    "type": "object",
+    "required": [
+     "notices",
+     "total"
+    ],
+    "title": "WaitingNotices",
+    "description": "Your open notices (at most 50, waited-longest first) and how many are open in total."
    },
    "WatchCreateRequest": {
     "properties": {

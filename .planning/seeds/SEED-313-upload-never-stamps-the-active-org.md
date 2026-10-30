@@ -3,9 +3,13 @@ seed_id: SEED-313
 title: /upload never stamps the caller's active org — a two-org user's upload lands in an arbitrary org
 created: 2026-09-24
 surface: Agentic-RAG
-status: partially-answered
+status: answered
 partial: true
 status_note: |
+  2026-10-30 (298 close): 298 PASSED — all 8 G-4/A-1 rows driven live (298-VALIDATION.md). The Root-upload arm (298-01 Task 2) shipped; flipped partially-answered -> answered. Previous line: `status: partially-answered`.
+  2026-10-30 (302 REG-08): 298 is human_needed — G-4 owed (298-HUMAN-UAT.md: G4-1 Library switch first;
+  G4-5 for the "N more … in {org}" count; G4-6 / G4-7 for the move; 0 of 8 rows run). The no-folder arm is
+  fixed in code (298 D-07); not closed ahead of it. Status unchanged.
   Phase 298 discuss (2026-10-28) FOLDS the open no-folder arm: a Root upload stamps the active org (298 D-07),
   because 298 narrows Root documents by org. Status stays partially-answered until 298 ships.
   Moved `planted` -> `partially-answered` on 2026-10-14 (Phase 280 plan 04). Original line: `status: planted`.

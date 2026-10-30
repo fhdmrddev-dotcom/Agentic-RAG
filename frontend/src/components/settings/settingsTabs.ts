@@ -124,3 +124,18 @@ export function resolveSettingsTab(persisted: string | null, canManageModels: bo
   if (persisted !== null && isSettingsTabVisible(persisted, canManageModels)) return persisted
   return settingsTabFallback(canManageModels)
 }
+
+/**
+ * The tab a link names, as `?tab=<words>`: the registry `name` lowercased, non-letters joined by
+ * `-` ("preferences", "api-keys", "search-retrieval"). v4.8 audit W-2: the run-waiting email links
+ * `/app/settings?tab=preferences` so its "turn them off" line lands on the switch, not on the
+ * reader's last tab. Words, never the routing id, so a link stays readable and the ids stay
+ * private to `<Tabs value>`. An unknown or absent name → null (the remembered choice applies);
+ * the caller's audience is still checked by `resolveSettingsTab`.
+ */
+export function settingsTabFromAddress(search: string): string | null {
+  const wanted = new URLSearchParams(search).get("tab")
+  if (!wanted) return null
+  const slug = (name: string) => name.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "")
+  return SETTINGS_TABS.find((t) => slug(t.name) === wanted)?.id ?? null
+}

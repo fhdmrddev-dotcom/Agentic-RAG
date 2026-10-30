@@ -2,8 +2,8 @@
 phase: 298-lists-follow-the-active-org
 verified: 2026-10-28T00:00:00Z
 verification_mode: self-verified   # OV-SOLO-01 - NEVER "reviewed". No independent reviewer exists.
-status: human_needed
-score: 4/4 roadmap success criteria verified in code and automated tests; 0 failed; G-4 + A-1 rows owed (human)
+status: passed  # 2026-10-30, operator mandate to finish; all G-4 + A-1 rows driven (G4-2 fixed under G-3)
+score: 4/4 roadmap success criteria verified in code, tests and live G-4 (8/8 rows PASS, 2026-10-30)
 gaps: []
 warnings:
   - id: WR-08

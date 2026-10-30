@@ -1162,6 +1162,41 @@ Start a workflow from a thread, from a starter, from a schedule or from outside 
 
 ---
 
+## Milestone: v4.8 — Every Page Has a Link
+
+**Shipped:** 2026-10-30
+**Phases:** 6 (297-302) | **Plans:** 25
+**Timeline:** 2026-10-27 → 2026-10-30 (4 days) | **Commits:** 421 since `v4.7` (before the close commits)
+
+### What Was Built
+Every view, thread, workflow, run and Expert has its own `/app/...` link that survives refresh, sign-in and an org switch; lists follow the active org with an honest count of items elsewhere; a waiting run writes a notice and sends one content-free email after a delay; a waiting-on-you list and badge spans every org. Phase 302 closed the v4.7 defects. See MILESTONES.md.
+
+### What Worked
+- G-5 extraction first: 297 split `App.tsx` / `ChatLayout.tsx` behaviour-neutral before any routing code, and the ~19 guard tests were re-targeted, not deleted.
+- Driving every G-4 row live found defects the unit suites passed over: the Workflows chips read 0 during an org switch (298 G4-2), fixed RED-first under G-3.
+- The close audit's fresh integration check found two seams no phase verification could see (an ex-member emailed an unopenable link; the opt-out link opening the wrong tab), both confirmed in code and fixed RED-first in one pass before the close.
+- Abnormal-close socket drop (dead port + `conn.close(4000)`) proved the Realtime rejoin-and-reconcile path without cutting the network.
+
+### What Was Inefficient
+- Two phases (301, 302) skipped their SECURITY.md although `security_enforcement` is on; 301's was written retroactively at close.
+- SUMMARY files for 299-302 dropped the `requirements-completed` frontmatter, so the 3-source requirement check fell back to VERIFICATION tables.
+- 300 closed by decision because no mail provider exists in cloud; its two real-provider rows stay owed.
+- Moonshot (429) blocked one roster row in every phase.
+
+### Patterns Established
+- A cross-surface notice reuses the existing attention registry as a second tenant with a required `mark`, so a badge can never count another tenant's rows.
+- An email link may carry a public word (`?tab=preferences`) but never an id or a token; the test pins that difference rather than banning every query.
+- Delivery checks must mirror the list's access predicates (membership), or the email and the in-app list disagree about who is waited on.
+
+### Key Lessons
+- Run `/gsd:secure-phase` for every phase that adds a route or migration, even late in a milestone.
+- Re-derive every audit figure at close; an audit written before the last fixes is already stale.
+
+### Cost Observations
+- Not measured this milestone.
+
+---
+
 ## Cross-Milestone Trends
 
 | Milestone | Phases | Plans | Avg Plans/Phase | Timeline |
@@ -1195,6 +1230,7 @@ Start a workflow from a thread, from a starter, from a schedule or from outside 
 | v4.5 Find It, Show It | 7 | 38 | 5.4 | 14 days |
 | v4.6 Pay It Down | 9 | 34 | 3.8 | 5 days |
 | v4.7 Workflows You Can See and Start Anywhere | 12 | 60 | 5.0 | 10 days |
+| v4.8 Every Page Has a Link | 6 | 25 | 4.2 | 4 days |
 
 > ⚠ The v3.4 and v3.5 rows were **missing** from this table and were added at the v3.6 close —
 > both milestones shipped without a trends row. **v3.6 is the project's largest milestone by plan

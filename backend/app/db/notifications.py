@@ -27,6 +27,9 @@ run and to its answer; the email is rendered from five facts (workflow name, org
 kind). ``test_300_notification_drainer`` scans every ``*_SQL`` constant below for it.
 
 Pool reads bypass RLS (the outbox is deny-all to clients); every function scopes by id.
+
+Phase 301 adds the one READ a person makes: ``LIST_OPEN_SQL`` / ``list_open_notices`` — their open
+notices across every org they belong to, scoped by the caller id (``GET /notifications``).
 """
 from __future__ import annotations
 
@@ -116,6 +119,14 @@ SELECT EXISTS (
      WHERE n.id = $1
        AND n.closed_at IS NULL
        AND wr.status IN ('active', 'paused')
+       -- v4.8 audit W-1: the recipient must still belong to the run's org, as LIST_OPEN_SQL and
+       -- link_resolver require. Otherwise the email links to a run that reads "can't be opened".
+       AND EXISTS (
+           SELECT 1
+             FROM public.org_members om
+            WHERE om.org_id = n.org_id
+              AND om.user_id = n.recipient_id
+       )
        AND EXISTS (
            SELECT 1
              FROM public.messages m
@@ -187,6 +198,32 @@ SELECT (SELECT max(s.sent_at) FROM public.notification_deliveries s WHERE s.stat
        ORDER BY x.updated_at DESC
        LIMIT 1
   ) f ON true
+"""
+
+# Phase 301 (NOTE-01 / NOTE-05; D-10, D-15, D-27, D-28) — the read behind GET /notifications: the
+# caller's OPEN notices across EVERY org they are currently a member of, waited-longest first.
+#   * $1 is the caller from the verified session, bound in BOTH the recipient predicate and the
+#     org_members join (D-27). The pool bypasses RLS, so these two predicates ARE the access wall;
+#     auth.uid() would be NULL here. Leaving an org drops its notices at once (F18).
+#   * wr.status IN ('active', 'paused') is the status wall (F10): 218's close is fail-soft, so a
+#     notice left open on a run that ended is still never listed.
+#   * n.org_id is nullable in 218 but always set (workflow_runs.org_id is NOT NULL), so the inner
+#     joins drop nothing real.
+#   * count(*) OVER () is evaluated before LIMIT: the true open total, even when $2 cuts the rows.
+#   * ⛔ NOTE-03: no prompt id, no join to the chat rows, no question text — five facts only.
+LIST_OPEN_SQL = """
+SELECT n.id, n.run_id, n.org_id, o.name AS org_name, n.kind, n.created_at, wr.origin_kind AS origin,
+       COALESCE(NULLIF(wr.definition_snapshot->>'name', ''), NULLIF(d.name, ''), 'Workflow run')
+           AS workflow_name,
+       count(*) OVER () AS total
+  FROM public.notifications n
+  JOIN public.org_members m ON m.org_id = n.org_id AND m.user_id = $1
+  JOIN public.organizations o ON o.id = n.org_id
+  JOIN public.workflow_runs wr ON wr.id = n.run_id AND wr.status IN ('active', 'paused')
+  LEFT JOIN public.workflow_definitions d ON d.id = wr.definition_id
+ WHERE n.recipient_id = $1 AND n.closed_at IS NULL
+ ORDER BY n.created_at ASC, n.id
+ LIMIT $2
 """
 
 
@@ -333,6 +370,12 @@ async def latest_delivery_facts(pool: asyncpg.Pool) -> dict:
     }
 
 
+async def list_open_notices(conn: Any, caller: UUID, limit: int = 50) -> tuple[list, int]:
+    """Phase 301: the caller's open notices (at most ``limit``) and the true open total."""
+    rows = await conn.fetch(LIST_OPEN_SQL, caller, limit)
+    return list(rows), (int(rows[0]["total"]) if rows else 0)
+
+
 __all__ = [
     "ClaimedDelivery",
     "MAX_ATTEMPTS",
@@ -345,4 +388,5 @@ __all__ = [
     "record_delivery_outcome",
     "renew_delivery_lease",
     "latest_delivery_facts",
+    "list_open_notices",
 ]

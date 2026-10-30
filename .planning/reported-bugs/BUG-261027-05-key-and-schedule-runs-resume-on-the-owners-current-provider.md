@@ -4,12 +4,19 @@ title: A paused key-started or scheduled run resumes on the owner's current defa
 reported: 2026-10-27
 surface: Agentic-RAG
 severity: minor
-status: folded  # 2026-10-29: folded into Phase 300 at discuss-phase (300-CONTEXT.md)
+status: closed  # 2026-10-30: 300 FIX-05 PASS live (300 closed)
 affected_areas: ['backend/harness', 'backend/runs']
 folded_into: "300"
-verified_closed_by: null
+verified_closed_by: "300 FIX-05"
 related_seeds: ['SEED-362']
 re_open_trigger: "Fold at the next /gsd:discuss-phase whose files touch backend/app/services/unattended_launch.py or backend/app/services/harness/publish_service.py; found by the v4.7 close integration check, outside 296's inventory"
+status_note: >
+  2026-10-30 (302 REG-08): stays folded -> 300. Fixed in code by 300-01 (FIX-05); the 8-row FIX-05 re-run
+  (required because IN-03 b7e03e417 changed provider derivation) PASSED 8/8 providers on 2026-10-29
+  (300-HUMAN-UAT.md FIX-05 row: 16/16 resumed steps on the STARTING provider; Moonshot and the Zhipu key row
+  hit env 429s on the model calls). Its finding F-5 stands: agent steps keep the run's PROVIDER but not its
+  MODEL across a pause. NOT closed ahead of the phase: 300 is human_needed (G4-8 + the real-provider half of
+  G4-1 owed). Previous status line, verbatim: `status: folded  # 2026-10-29: folded into Phase 300 at discuss-phase (300-CONTEXT.md)`.
 reproduces_on:
   branch: develop
   commit: 7e2c3e5bd

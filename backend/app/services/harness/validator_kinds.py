@@ -247,19 +247,25 @@ def _design_keys(output) -> list[tuple[str, str]]:
     return [(key, note) for key, note in _DESIGN_NOTES if output.get(key)]
 
 
-def recording_by_design(ctx) -> bool:
+async def recording_by_design(ctx) -> bool:
     """296-02 (295-IN-08 / D-07): was a recorded-not-sent step recorded BY DESIGN on this run?
 
     Read the way the external-action executor itself decides: its only by-design recording
     gates are a publish golden run (D-16) and the operator's ``live_connectors`` switch not
     fully on (D-26). On a live run with the switch on, a recorded step was recorded because its
     send grant was MISSING (no connection, disabled, wrong capability ...), which the judge
-    must read as missing — never as "not sending is correct"."""
+    must read as missing — never as "not sending is correct".
+
+    302-02 (BE-IN-01 / D-27): reads the SAME predicate as the executor — awaited, after the
+    settings freshness check — so the two cannot disagree inside the cache TTL (it used to read
+    the audience raw, with no freshness check)."""
     if getattr(ctx, "is_golden_run", False):
         return True
-    from app.models.user_settings import feature_audience  # noqa: PLC0415 — function-local
+    from app.services.harness.live_connectors import (  # noqa: PLC0415 — function-local
+        live_connectors_fully_on,
+    )
 
-    return feature_audience("live_connectors") != "everyone"
+    return not await live_connectors_fully_on()
 
 
 def judge_system_prompt(output, *, business_requirement: str, author_criteria: str,
@@ -697,7 +703,7 @@ async def _validate_llm_judge_rubric(output: dict, config: dict, ctx) -> GateRes
         output,
         business_requirement=business_requirement or "(not declared)",
         author_criteria=author_criteria,
-        by_design=recording_by_design(ctx),  # 296-02 (295-IN-08 / D-07)
+        by_design=await recording_by_design(ctx),  # 296-02 (295-IN-08 / D-07)
     )
     messages = [{"role": "user", "content": graded}]
     # The verdict tool schema is built from JudgeVerdict (Pitfall-4-safe — pure

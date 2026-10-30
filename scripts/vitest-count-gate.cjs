@@ -233,8 +233,8 @@ const BASELINE = {
   //    printed `actual` of the suites run together, never hand-counted. soulData.requiredFields,
   //    starterFork.287 live under the `src/components/workflows` directory TARGETS entry;
   //    the chat + providers ones are named FILE-LEVEL below (no bare directory entry exists).
-  "ThreadWorkflowPicker.test.tsx": 17, // 2026-10-28 298-02: 9 -> 17 (printed actual; +1 a folder refusal shows the server sentence with no Retry)
-  "useStartWorkflowInThread.test.tsx": 24, // 2026-10-28 298-02: 7 -> 24 (printed actual; +5 the coded folder refusal is kind folder, other 422s unchanged)
+  "ThreadWorkflowPicker.test.tsx": 18, // RAISED 17 -> 18 at 302-02 (FE-IN-01 / D-09): a refused start shows its cause with no Retry. 2026-10-28 298-02: 9 -> 17 (printed actual; +1 a folder refusal shows the server sentence with no Retry)
+  "useStartWorkflowInThread.test.tsx": 30, // RAISED 24 -> 30 at 302-02 (FE-IN-01 / D-09 / D-26): the 409 worded by cause (locked by code, paused by prefix, refused by sentence). 2026-10-28 298-02: 7 -> 24 (printed actual; +5 the coded folder refusal is kind folder, other 422s unchanged)
   "ChatArea.threadWorkflowPicker.test.tsx": 7, // RAISED 5 -> 7 at 299-04: the header link mount (after the title, compact, owner-only, the chat's own address) and none on the welcome screen
   "StreamsProvider.inputs.test.tsx": 3,
   "soulData.requiredFields.test.ts": 7,
@@ -1052,7 +1052,9 @@ const BASELINE = {
   // attacker-supplied placeholder names render as TEXT and create no element.
   //
   // Read from THIS SCRIPT'S OWN `actual` column (`DescribeTemplateRow.test.tsx — 42 new`).
-  "DescribeTemplateRow.test.tsx": 42,
+  // RAISED 42 -> 156 at 302-03 (printed actual at the 302-03 phase gate): the pin had trailed the file
+  // since 291/296 grew it; 302-02 added the FE-IN-04 disabled-tick cases. A lagging pin is the gate going blind.
+  "DescribeTemplateRow.test.tsx": 156,
   // 291-04 (AUTH-02, sketch 291-describe-files winner B) — ADOPTED in the plan that creates it.
   // `src/components/workflows` is already a DIRECTORY entry in `TARGETS`, so no `TARGETS` edit.
   // What would be unguarded without this entry: the references section's honesty properties —
@@ -1616,7 +1618,15 @@ const BASELINE = {
   // literals.
   // RAISED 22 → 33 at 274-04 (measured): the base already read 28 (the pin lagged), +5 for the
   // panel row's Save to Library slot, its tabIndex -1 trigger and the Shift+F10 / ContextMenu arm.
-  "FilesSection.test.tsx": 33,
+  // RAISED 33 -> 40 at 302-01 (FIX-01 / D-04, measured): the base already read 34 (the pin lagged
+  // again), +6 for the Generated files group mount, its honest counts and the no-PanelEmpty arm.
+  "FilesSection.test.tsx": 40,
+  // ── 302-01 (FIX-01 / D-02 / D-22) — three NEW suites, pinned in the SAME COMMIT as their
+  // TARGETS entries (the two-knob rule): `src/components/panel/__tests__/` and
+  // `src/components/files/__tests__/` have no directory entry, so an unlisted suite runs in nothing.
+  "generatedFiles.test.ts": 9, // 302-01: the pure fold — keyed by name, newest turn wins, empty arms. RAISED 8 -> 9 at 302 review fix (WR-01: a subfolder workspace file never hides a generated one)
+  "GeneratedFilesGroup.test.tsx": 7, // 302-01: the group at panel density, React-text names, downloads via the shared hook
+  "useSandboxDownload.test.tsx": 6, // 302-01: one download home, lifted unchanged from OutputFileCard (resolveOutputUrl + the click handler)
   // 195-03 task 1 GREW this file 11 → 41: the widening's own coverage (ribbon /
   // tone / className / mimeType / the nine added extensions / the own-property
   // guard), ADDITIONS ONLY — `git diff` showed zero removed lines and all 11
@@ -1761,7 +1771,9 @@ const BASELINE = {
   // all (`194.1-BASELINE.md` §2) — so a new suite would land UNGATED and the phase's single
   // most important case would be the one nothing runs in CI. *A falsification that does not
   // run has falsified nothing.*
-  "WorkspacePanel.test.tsx": 58,
+  // RAISED 58 -> 65 at 302-01 (FIX-01 / D-04, measured): the base already read 62 (the pin lagged),
+  // +3 for the one count feeding hasActivity, the FILES header and the rail.
+  "WorkspacePanel.test.tsx": 65,
   // 189-08 (CONN-01 / D-07 / D-17): 34 → 40. An EXTENSION, not a lowering — nothing was
   // deleted or renamed. The +6 are the sixth `workflow_phases_status_check` slug arriving
   // in the ONE derivation: +2 from the shipped `DB_TABLE` gaining a row (it drives both the
@@ -3570,7 +3582,7 @@ const BASELINE = {
   // took opposite answers, which is why the check is made per file and never inferred.
   "WorkflowBuilderPage.declaredInputs.test.tsx": 9,
   "StepIdentity.coverage.test.tsx": 23,
-  "WorkflowScheduleModal.test.tsx": 29, // RAISED 9 -> 29 at 300-01 (D-15 / D-16 / D-26): +10 row-words / per-row Run now cases; the 9 was the 214 pin, never raised as 296-04 grew the file (the "one result line per modal" case RE-TARGETED to D-16, not dropped)
+  "WorkflowScheduleModal.test.tsx": 31, // RAISED 29 -> 31 at 302-03 (D-24, 300 G4-5 F-1): a refused Run now says its sentence once; a launched one hides the stale outcome line. RAISED 9 -> 29 at 300-01 (D-15 / D-16 / D-26): +10 row-words / per-row Run now cases; the 9 was the 214 pin, never raised as 296-04 grew the file (the "one result line per modal" case RE-TARGETED to D-16, not dropped)
   // ── Phase 300-01 (D-15 / D-26 / D-14 client half) — both knobs, same commit. scheduleOutcomeVocabulary
   //    sits under the "src/components/workflows" directory entry (pin only); schedulesRefusal is FILE-LEVEL in TARGETS.
   "scheduleOutcomeVocabulary.test.ts": 16, // 300-01 — every UI-SPEC S6a row (known tokens, server sentence prefix + full stop, neutral unknown token, null), zero-import leaf over ?raw
@@ -3873,8 +3885,8 @@ const BASELINE = {
   // which the behaviour cases are structurally blind to and which is the link that ACTUALLY broke.
   "IngestionTab.reconnectControl.test.tsx": 6,
   "SourcesAttentionSection.test.tsx": 13,
-  "NavPanel.badge.test.tsx": 14,
-  "ChatLayout.badge.test.tsx": 5,
+  "NavPanel.badge.test.tsx": 22, // RAISED 18 -> 22 at 301-03 Task 3 (D-01 / UI-D2): the waiting control always present at both widths, after New chat and before the first nav item, total pill beside the library-only badge, no pill before an answer · RAISED 17 -> 18 at 301-03 (D-26 / BUG-261029-01): Open Library health found by role menuitem + an arrow-keys-and-Enter case · RAISED 14 -> 17 at 301-02 (D-11 / D-12): producer pin re-baselined to 2 + both keys; one library + two waiting rows -> badge 1, popover one row; waiting-only -> no badge
+  "ChatLayout.badge.test.tsx": 19, // RAISED 14 -> 19 at 301-03 (D-01 / D-03 / D-17 / D-30): rail pill + drawer row named by the count, a drawer row opens THAT run and closes the drawer, no pill before an answer + empty line, a failed refresh keeps 2 + stale line, the non-chat bar dot · RAISED 5 -> 14 at 301-02 (D-12 / D-14): waiting-only (no Library badge, dot lit), mixed (1 not 3), one read each on mount, dot without a Library navigator; the pin had trailed the file (5 pinned, 10 shipped)
   "useSourceAttention.test.tsx": 13,
   "LibraryPage.initialTab.test.tsx": 6,
   // Phase 238 (D-238-08). 6 cases; the load-bearing one is "refuses a service_id that LOOKS
@@ -4029,7 +4041,7 @@ const BASELINE = {
   // to be "health"`); the other EIGHT are controls that were green before the edit and whose
   // job is to prove the edit changed nothing else — the registry's one-tenant count, the five
   // cause sentences asserted on their WORDS, and the `?raw` reader inventory.
-  "attentionTab.test.ts": 10,
+  "attentionTab.test.ts": 20, // RAISED 10 -> 20 at 301-02 (D-11 / D-13 / D-14 / D-31): pin 2 + both keys; ctx-object stopped tenant (mark library); waiting-runs mapping, onOpen -> openRun, four WaitingStatus reports, no-report safe; conditionsForMark / waitingTotal / attentionCountByTab partition; useWaitingNotices( inventory fence + self-guard
   // ── Phase 244 (244-04 T2 / SHELL-05 / BUG-260911-03) ────────────────────────────────────
   // ⛔ BOTH KNOBS, and this script has now recorded the same fact about `src/pages` a dozen
   // times: there is NO `src/pages` bare-directory entry in TARGETS — it is reached by NAMED
@@ -4387,9 +4399,9 @@ const BASELINE = {
   // directory entry in TARGETS (headerPin under __tests__/, two under library/), so they need a pin only.
   // Deleting a case in any of them now reds the gate.
   "teamModel.test.ts": 248, // 290-REVIEW WR-06: 247 -> 248 (max_retries read as lax int, negative = no redo). WR-01: 246 -> 247 (unknown on_failure reads stop the run). CR-01: 243 -> 246 (unflagged external_action armed + its control + ARMED_TYPES drift fence). 290-01 (VIS-01 / D-11): deriveTeam's honesty surface; jump only for a resolvable skip, citations check only for detected
-  "teamVocabulary.test.ts": 15, // 290-01: zero-import leaf, exact strings, no step sentence or seal label copied in
+  "teamVocabulary.test.ts": 16, // RAISED 15 -> 16 at 302-02 (FE-IN-06 / D-11): the region name is distinct from the figure name. 290-01: zero-import leaf, exact strings, no step sentence or seal label copied in
   "WorkflowCanvas.headerPin.test.tsx": 6, // 290-01: canvas header characterization pin (6 snapshots) that 290-03 left byte-unchanged
-  "TeamPicture.test.tsx": 42, // 290-REVIEW WR-03/WR-04: 36 -> 42 (planted-layout geometry: no line inside a card, jumps on own lanes, one rail per gate). 290-03 (VIS-01 / D-06): one SVG path per lines[] item, nothing focusable, author text literal
+  "TeamPicture.test.tsx": 44, // RAISED 42 -> 44 at 302-02 (FE-IN-06 / D-11): region and figure named apart, populated + empty arms. 290-REVIEW WR-03/WR-04: 36 -> 42 (planted-layout geometry: no line inside a card, jumps on own lanes, one rail per gate). 290-03 (VIS-01 / D-06): one SVG path per lines[] item, nothing focusable, author text literal
   "WorkflowCanvas.team.test.tsx": 7, // 290-03: Steps | Team switch only with the team prop; keyboard reorder gated (F-6); run page passes none
   "stepLine.test.ts": 25, // 290-02 (VIS-04 / D-01, D-04): type-sentence chips in run order, first 3 + more, null at 0 steps
   "StepChipLine.test.tsx": 11, // 290-02 (VIS-04 / D-03): row-steps block, +N more / Show less, no title attribute
@@ -4426,6 +4438,10 @@ const BASELINE = {
   "InvitationsTab.test.tsx": 17, // 300-05 — first-ever pin: 8 shipped (send gate, chips, resend/revoke, role picker) + 9 'Email not sent' chip / resend-line cases
   "InviteMemberDialog.test.tsx": 7, // 300-05 — the three result arms by their words, Copy link focused on failed, older backend never a false failure, org.ts unwraps
   "inviteDeliveryCopy.test.ts": 6, // 300-05 — the D-11 sentence verbatim, three titles, chip + resend line, no provider/error/retry words, zero imports
+  // ── Phase 301-03 (NOTE-01 / UI-D4, D-02, D-06, D-28) — FILE-LEVEL in TARGETS, same commit.
+  "waitingVocabulary.test.ts": 24, // 301-03 — every waiting-list word verbatim, count sentence / 99+ pill / kind / origin / waited ladder (future + unparseable = under a minute) / and N more / org initial, no raw wire word, zero imports
+  "OrgIdentity.test.tsx": 17, // 301-03 — first-ever pin: 13 shipped (roleBadgeMeta, RoleBadge, OrgAvatar) + 4 xs cases (default class string byte-identical, size default, xs 16px / 10px, pending at xs)
+  "WaitingOnYouControl.test.tsx": 24, // 301-03 — rail name = count sentence + TOTAL pill (99+), no pill at 0 / loading, stale keeps it; rows as menuitems naming workflow / org (active too) / need / waited / origin; fallbacks; ArrowDown+Enter and click open the run, never switchOrg; empty / loading / failed / stale / and N more; live replace stays open; minute tick; absences; drawer variant
   // 293-04 — under the `src/components/workflows` directory entry, so a pin only.
   "WorkflowCardMenu.apiKey293.test.tsx": 4, // ⋯ New API key… under Schedules on owned published rows only, payload {id, name}; absent without onApiKey (seam286 pin unchanged)
   // ── Phase 297-01 (REG-09 / D-01, D-03) — adopted, both knobs, same commit (2026-10-27).
@@ -4496,6 +4512,9 @@ const BASELINE = {
   "ShareLinkMenu.test.tsx": 12, // RAISED 11 -> 12 at 299-04 (WR-03 sweep over the header surface: every direct child a menuitem or group) · 299-04 (D-20 / D-21 / D-39 / UI-D12..UI-D15) — trigger word Link (not Share), icon hidden, icon-only below md, aria-label per kind; surface label + host address in <code> + ONE Copy link item + audience line (org name foreground), described-by both; unknown / no org falls back; copies origin + path once (no ? / #), stays open, ✓ Link copied 2 s + status; refused selects the code + shortcut word, never success; no toast / popover / input; the ⋯ sub form
   "shareMounts.test.tsx": 14, // 299-04 (D-20 / D-33 / D-34) — card ⋯ menu: Link to this workflow is the FIRST item + WR-03, starter = anyone, published / draft owner-only, copies /app/workflows/<id>; run page: unfinished run trigger after v-chip before Stop + owner-only, a finished run's evidence report carries it and opens for the run's org, no org stays owner-only; Expert detail: trigger before the close control inside pr-8, six visibility / system / off lines, copies /app/experts/<id>
   "savesInOrg.test.tsx": 21, // 21 at GREEN (the header-surface no-caption case split into its own test: an open modal menu blocks a second trigger) · 299-04 (D-18 / D-38 / UI-D11 / S8) — SavesInOrg: 2+ orgs name in foreground, sentence form, nothing at 1 org / no context / unknown active org; RunModal caption under Run + refused launch verbatim; Tweak consequence gains it (not at 1 org, not on an existing fork, never on Copy link); fork sends fromDefinitionId (starter none), org refusal verbatim in forkFailed.sentence, other failures keep the prose-free shape; createWorkflowDraft URL with / without the option, every backend tweak sentence (?raw item_org_guard.py) → WorkflowOrgRefusedError, slug 409 is not; Expert Start a chat caption; postMessage chat sentence verbatim
+  // ── Phase 301-02 (NOTE-01 / NOTE-05 · D-15, D-17, D-18, D-33) — both knobs, same commit (2026-10-30). src/hooks/__tests__
+  //    has no directory entry, so the new file is FILE-LEVEL in TARGETS below.
+  "useWaitingNotices.test.tsx": 29, // RAISED 26 -> 29 at 301 WR fix (WR-02): an org switch is one GET; a failed probe and its recovery cost none; a genuine non-empty set change still refetches · RAISED 23 -> 26 at 301 WR fix (WR-01): mount + membership load + SUBSCRIBED is one GET; visibilitychange + focus is one GET; an event during a fetch keeps it and owes one follow-up · 301-02 — getWaitingNotices once on mount with a signal; verbatim notices + total; loading / verdictKnown before an answer; a rejected first fetch fabricates nothing; a later failure keeps the list + failedSinceLast, cleared by the next success; newer refresh aborts the old; 60 s poll + none after unmount; focus, visible (not hidden), org and membership changes refetch; user-scoped channel + recipient_id filter; an event refetches and the FETCHED list wins over a forged body; SUBSCRIBED refetches, CHANNEL_ERROR not; removeChannel on unmount; throwing / undefined channel, missing / non-promise / rejecting getSession degrade to the poll; ?raw fence (no payload.new/.old, recipient_id=eq., SUBSCRIBED, no StreamsProvider)
 }
 
 // Still COMPUTED, never hand-written — the reduce is the single source, so the
@@ -5527,6 +5546,10 @@ const TARGETS = [
   "src/components/chat/__tests__/OutputFileCard.baseline.test.tsx",
   "src/components/chat/__tests__/StopControl.baseline.test.tsx",
   "src/components/panel/__tests__/FilesSection.test.tsx",
+  // ── Added in 302-03 for 302-01's three new suites, in the SAME COMMIT as their BASELINE pins ──
+  "src/components/panel/__tests__/generatedFiles.test.ts",
+  "src/components/panel/__tests__/GeneratedFilesGroup.test.tsx",
+  "src/components/files/__tests__/useSandboxDownload.test.tsx",
   "src/lib/__tests__/fileIcon.test.tsx",
   "src/__tests__/components/MessageItem.finalOutputs.test.tsx",
   // ── Added in 195-03 task 3, in the SAME COMMIT as their BASELINE entries ────
@@ -6542,6 +6565,10 @@ const TARGETS = [
   "src/components/org/InvitationsTab.test.tsx",
   "src/components/org/InviteMemberDialog.test.tsx",
   "src/components/org/inviteDeliveryCopy.test.ts",
+  // 301-03 — FILE-LEVEL, SAME commit as their BASELINE pins.
+  "src/components/layout/waitingVocabulary.test.ts",
+  "src/components/org/OrgIdentity.test.tsx",
+  "src/components/layout/__tests__/WaitingOnYouControl.test.tsx",
   // Phase 297-01 — FILE-LEVEL (no directory entry), in the SAME commit as its BASELINE pin.
   "src/hooks/__tests__/useAppNavigation.test.tsx",
   // Phase 297-02 — FILE-LEVEL (no src/lib/__tests__ directory entry), SAME commit as its BASELINE pin.
@@ -6599,6 +6626,8 @@ const TARGETS = [
   "src/components/share/__tests__/ShareLinkMenu.test.tsx",
   "src/components/share/__tests__/shareMounts.test.tsx",
   "src/components/share/__tests__/savesInOrg.test.tsx",
+  // Phase 301-02 — FILE-LEVEL (no src/hooks/__tests__ directory entry), SAME commit as its pin.
+  "src/hooks/__tests__/useWaitingNotices.test.tsx",
 ]
 
 const REPO_ROOT = path.resolve(__dirname, "..")

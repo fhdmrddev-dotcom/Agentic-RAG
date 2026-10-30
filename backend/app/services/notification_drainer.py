@@ -12,8 +12,8 @@ lock and no Redis — the database is the arbiter of which row is whose (the ``S
 reasoning: a leader scheme fails silently when the leader dies).
 
 Per claimed row, in this order (D-13, D-09), on a fresh read AFTER the claim committed:
-  1. still waiting? (notice open, run active / paused, an unanswered prompt exists) — else
-     ``skipped_answered``, nothing sent;
+  1. still waiting? (notice open, run active / paused, the recipient still in the run's org
+     [v4.8 audit W-1], an unanswered prompt exists) — else ``skipped_answered``, nothing sent;
   2. opted in? (``user_settings.preferences.notification_email_enabled``, default on) — else
      ``skipped_opted_out``, nothing sent, the notice left alone;
   3. an address on record? — else ``failed``;

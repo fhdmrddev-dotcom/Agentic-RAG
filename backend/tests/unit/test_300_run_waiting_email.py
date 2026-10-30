@@ -52,7 +52,7 @@ def test_the_plain_text_is_the_ui_spec_layout_verbatim():
         f"https://app.example.com/app/runs/{RUN_ID}\n"
         "\n"
         "Don't want these emails? Turn them off in Settings.\n"
-        "https://app.example.com/app/settings"
+        "https://app.example.com/app/settings?tab=preferences"
     )
 
 
@@ -116,17 +116,19 @@ def test_the_html_escapes_every_name_and_shows_them_only_as_text():
     assert len(out.text.splitlines()) == 7
 
 
-def test_the_links_are_the_run_and_settings_with_no_query_and_no_token():
+def test_the_links_are_the_run_and_settings_with_no_token():
+    """v4.8 audit W-2 (amended on purpose): the settings link names the Preferences tab, where the
+    email switch lives, instead of whichever tab the reader used last. The query it carries is one
+    public word (`tab=preferences`), never an id or a token; the run link still carries no query."""
     out = rwe.render_run_waiting(workflow_name="Report", org_name="Acme", waited_seconds=180,
                                  run_id=RUN_ID, kind="approval")
     run_link = f"https://app.example.com/app/runs/{RUN_ID}"
-    settings_link = "https://app.example.com/app/settings"
+    settings_link = "https://app.example.com/app/settings?tab=preferences"
     assert f'href="{run_link}"' in out.html and ">Open the run</a>" in out.html
     assert f'href="{settings_link}"' in out.html
     assert ">Turn them off in Settings.</a>" in out.html
     assert "Don't want these emails?" in out.html
-    for link in (run_link, settings_link):
-        assert "?" not in link and "token" not in link
+    assert "?" not in run_link and "token" not in settings_link
     assert "?" not in out.html.split("href=")[1].split('"')[1]
     assert "token" not in out.html and "token" not in out.text
 
@@ -143,7 +145,7 @@ def test_a_multi_origin_install_links_to_the_primary_origin(monkeypatch):
     out = rwe.render_run_waiting(workflow_name="Report", org_name="Acme", waited_seconds=180,
                                  run_id=RUN_ID, kind="approval")
     assert f"https://a.example.com/app/runs/{RUN_ID}" in out.text
-    assert "https://a.example.com/app/settings" in out.text
+    assert "https://a.example.com/app/settings?tab=preferences" in out.text
     assert "b.example.com" not in out.html and "b.example.com" not in out.text
 
 

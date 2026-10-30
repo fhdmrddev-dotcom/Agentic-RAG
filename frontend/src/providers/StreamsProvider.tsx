@@ -3275,10 +3275,10 @@ export function StreamsProvider({ children }: PropsWithChildren) {
               useStreamsStore.setState((s) => ({
                 reconcileErrors: new Map(s.reconcileErrors).set(
                   threadId,
-                  new ApiError(
+                  Object.assign(new ApiError(
                     "This thread is running a workflow — cancel it to send a Deep message.",
                     409,
-                  ),
+                  ), { code: "workflow_locked" }), // 302-02 (FE-IN-01 / D-26): the lock is a CODE
                 ),
               }))
             } else if (err instanceof ApiError && err.status === 403) {

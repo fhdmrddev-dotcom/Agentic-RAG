@@ -1199,6 +1199,7 @@ export function WorkflowsPage({ folders, onLaunch, onOpenRun, onOpenConnections,
         onProjectChange={setSelectedProjectId}
         folders={folders}
         updating={!allSettled || publishedUpdating}
+        countsPending={!allSettled}
         onCreate={openBuilderFresh}
         onClearAll={clearAllFilters}
       />

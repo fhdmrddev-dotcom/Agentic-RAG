@@ -149,7 +149,9 @@ describe("290-IN-05 — keyboard users can scroll the team plane", () => {
     const plane = screen.getByTestId("team-plane")
     expect(plane.tabIndex).toBe(0)
     expect(plane.getAttribute("role")).toBe("region")
-    expect(plane.getAttribute("aria-label")).toBe(teamFigureLabel("Vendor brief"))
+    // 302-02 (FE-IN-06 / D-11): was teamFigureLabel(...) — the figure's name said twice.
+    expect(plane.getAttribute("aria-label")).toBe("Team view, scrollable")
+    expect(plane.getAttribute("aria-label")).not.toBe(teamFigureLabel("Vendor brief"))
     expect(plane.className).toContain("focus-visible:ring-2")
     expect(plane.className).toContain("focus-visible:ring-primary/30")
   })

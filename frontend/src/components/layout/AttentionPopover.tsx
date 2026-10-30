@@ -17,8 +17,13 @@
  *
  * ── ⛔ NO URL, EVER (SEED-185) ────────────────────────────────────────────────────────
  *
- * Twelve views, zero addressable. The single action is a callback threaded from `App` through
- * `ChatLayout`; there is no location assignment and no hash in this file.
+ * ~~Twelve views, zero addressable. The single action is a callback threaded from `App` through
+ * `ChatLayout`; there is no location assignment and no hash in this file.~~
+ *
+ * ⚠ CORRECTED at Phase 301 (D-26 / BUG-261029-01, RESEARCH F12): "twelve views, zero addressable"
+ * has been false since Phase 297 gave views and runs `/app` addresses. What still holds is the
+ * rule: the single action is a callback threaded from `App` through `ChatLayout`, and this file
+ * assigns no location and writes no hash.
  *
  * ── ⚠ EVERY STRING COMES FROM THE VOCABULARY LEAF ─────────────────────────────────────
  *
@@ -36,6 +41,7 @@
 import {
   DropdownMenu,
   DropdownMenuContent,
+  DropdownMenuItem,
   DropdownMenuLabel,
   DropdownMenuSeparator,
   DropdownMenuTrigger,
@@ -93,16 +99,18 @@ export function AttentionPopover({ conditions, onOpenLibraryHealth }: Props) {
           </div>
         ))}
         <DropdownMenuSeparator />
-        {/* ⛔ THE ONLY CONTROL IN HERE. A plain button rather than a menu item, so it is
-            reachable as a `button` by name — the shape the popover's contract asserts. */}
-        <button
-          type="button"
+        {/* ⛔ THE ONLY CONTROL IN HERE. ~~A plain button rather than a menu item, so it is
+            reachable as a `button` by name — the shape the popover's contract asserts.~~
+            ⚠ CORRECTED at Phase 301 (D-26 / BUG-261029-01): Radix Menu cancels Tab inside its
+            content, so that plain button could not be reached from the keyboard at all. It is a
+            menu item now — arrow keys + Enter — and the contract finds it by role `menuitem`. */}
+        <DropdownMenuItem
           data-testid="rail-open-health"
-          onClick={onOpenLibraryHealth}
-          className="w-full text-left text-sm rounded-sm px-2 py-1.5 text-primary hover:bg-accent/60 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/30"
+          onSelect={onOpenLibraryHealth}
+          className="text-primary"
         >
           {COPY.popOpenHealth}
-        </button>
+        </DropdownMenuItem>
       </DropdownMenuContent>
     </DropdownMenu>
   )

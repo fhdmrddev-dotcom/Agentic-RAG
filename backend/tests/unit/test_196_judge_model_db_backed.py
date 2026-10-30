@@ -241,5 +241,13 @@ async def test_consumer_4_precedence_config_model_wins_and_db_not_consulted(monk
     the rewire untouched; only the THIRD rung changes.
     """
     db_calls = _patch_settings_row(monkeypatch, ROW_MODEL)
+    # 302-02 (BE-IN-01 / D-27): the judge now awaits the executor's liveness predicate, whose
+    # TTL-checked freshness read is not the model resolver this control is about — stub it.
+    from app.models import user_settings as us
+
+    async def _fresh_noop():
+        return None
+
+    monkeypatch.setattr(us, "ensure_settings_fresh", _fresh_noop)
     assert await _drive_consumer_4(monkeypatch, config={"model": "gpt-5.5"}) == "gpt-5.5"
     assert db_calls == [], "rung 1 won — the settings row must never be read"

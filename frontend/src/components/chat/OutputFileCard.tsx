@@ -1,8 +1,6 @@
-import { useState } from "react"
-import type { MouseEvent } from "react"
 import { cn } from "@/lib/utils"
 import { FileRow } from "@/components/files/FileRow"
-import { downloadSandboxOutput, DownloadError } from "@/lib/api"
+import { resolveOutputUrl, useSandboxDownload } from "@/components/files/useSandboxDownload"
 
 /**
  * ── PHASE 195 PLAN 04 — THE INTERIOR MOVED HOUSE; NOTHING ELSE MOVED ────────
@@ -31,6 +29,9 @@ import { downloadSandboxOutput, DownloadError } from "@/lib/api"
  *  · The download call, its status-specific copy and its 3 s auto-clear stay in
  *    THIS component. The shared row holds no business logic and is handed no
  *    thread id, no file id and no URL, so it cannot fetch anything.
+ *    CORRECTED at 302-01 (UI-D5): the behaviour moved, unchanged, to
+ *    components/files/useSandboxDownload so the panel's generated rows share it;
+ *    this component still owns the wrapper element.
  *
  * **What this plan DELETED:** the local byte formatter (the shared row formats
  * the size cell from `sizeBytes`, and `fileRowUtils` proved the hoist
@@ -47,22 +48,10 @@ import { downloadSandboxOutput, DownloadError } from "@/lib/api"
  * dead · downloading · both error kinds), is byte-for-byte what it was.
  */
 
-// D-067.2-03: API_BASE for prepending the host on relative re-sign URLs emitted
-// by the backend's harvest_output_files (e.g. "/sandbox-outputs/{path}"). The
-// `API_BASE` constant inside lib/api.ts is not exported, so we read the env
-// var directly here. Lives alongside OutputFileCard because this is the only
-// site that resolves OutputFile.url across the chat surface.
-const API_BASE = (import.meta.env.VITE_API_BASE_URL as string | undefined) ?? ""
-
-function resolveOutputUrl(url: string): string {
-  // D-067.2-03: new sandbox outputs store relative URLs (`/sandbox-outputs/{path}`);
-  // prepend API_BASE for those. Legacy outputs (already-stored long-form
-  // signed URLs starting with "http") pass through unchanged — they decay
-  // after 1h as before (legacy decay accepted per CONTEXT.md § Claude's
-  // Discretion).
-  if (url.startsWith("/")) return `${API_BASE}${url}`
-  return url
-}
+// D-067.2-03: the API_BASE prefix for relative re-sign URLs, and the resolver
+// itself, moved to `components/files/useSandboxDownload` at 302-01 (UI-D5) so the
+// panel's generated rows resolve a URL exactly as this card does. It is imported
+// above and still called below on the anchor's href.
 
 // ⚠ The local byte formatter that used to live here is GONE (Phase 195 plan
 // 04). The shared row renders the size cell from its `sizeBytes` prop using
@@ -117,8 +106,8 @@ interface OutputFileCardProps {
 export function OutputFileCard({ file, variant = "working" }: OutputFileCardProps) {
   // Hooks declared unconditionally so rules-of-hooks is trivially satisfied
   // regardless of whether the url-optional branch returns early below.
-  const [downloading, setDownloading] = useState(false)
-  const [downloadError, setDownloadError] = useState<{ status: number | "network"; message: string } | null>(null)
+  // 302-01 (UI-D5): the download state and click handler come from the one shared hook.
+  const { downloading, errorText, onClick } = useSandboxDownload(file.url, file.filename)
 
   // Phase 095.1 Plan 05 (D-095.1-06): the per-extension icon is a uniform 30 px
   // glyph on every row — the hero 48 px branch was removed with the hero split.
@@ -153,27 +142,6 @@ export function OutputFileCard({ file, variant = "working" }: OutputFileCardProp
     )
   }
 
-  const handleClick = async (e: MouseEvent<HTMLAnchorElement>) => {
-    e.preventDefault()
-    if (downloading) return
-    setDownloading(true)
-    setDownloadError(null)
-    try {
-      await downloadSandboxOutput(file.url!, file.filename)
-    } catch (err) {
-      // D-067.3-R2-04 status-specific copy; messages already set inside the helper.
-      if (err instanceof DownloadError) {
-        setDownloadError({ status: err.status, message: err.message })
-      } else {
-        setDownloadError({ status: "network", message: "Download failed — try again." })
-      }
-      // Auto-clear after 3s — non-blocking, lightweight feedback (no toast lib in repo).
-      setTimeout(() => setDownloadError(null), 3000)
-    } finally {
-      setDownloading(false)
-    }
-  }
-
   return (
     // ⚠ THE ROW'S OWN CLASSES SPLIT IN TWO, AND THE SPLIT IS NOT ARBITRARY.
     // Radix `mergeProps` JOINS `className` — it does NOT `twMerge` it
@@ -194,7 +162,7 @@ export function OutputFileCard({ file, variant = "working" }: OutputFileCardProp
       name={file.filename}
       sizeBytes={file.size}
       supersedes={file.supersedes}
-      errorText={downloadError?.message ?? null}
+      errorText={errorText}
       trailing={downloading ? "spinner" : "download"}
     >
       <a
@@ -202,7 +170,7 @@ export function OutputFileCard({ file, variant = "working" }: OutputFileCardProp
         download={file.filename}
         target="_blank"
         rel="noopener noreferrer"
-        onClick={handleClick}
+        onClick={onClick}
         aria-disabled={downloading}
         data-variant={variant}
         className={cn(
@@ -211,7 +179,7 @@ export function OutputFileCard({ file, variant = "working" }: OutputFileCardProp
           // the hero split. Every file renders this same calm ghost-border row.
           "px-3 py-2 rounded-md text-xs transition-colors group ghost-border",
           downloading ? "opacity-60 cursor-not-allowed" : "bg-muted/30 hover:bg-accent/40",
-          downloadError ? "border border-red-500/40" : "",
+          errorText ? "border border-red-500/40" : "",
         )}
       />
     </FileRow>

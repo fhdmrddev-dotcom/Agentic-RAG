@@ -2,7 +2,7 @@
 
 ## What This Is
 
-A RAG-based AI agent platform where users organize documents into nested folders and interact with a customizable AI agent. The agent remembers preferences across threads, extracts tables and images from documents, shows confidence and citations, runs code in a sandbox, and can be taught new skills that persist. As of v2.7 the agent also keeps a per-thread workspace of versioned files, manages a todo list, can spawn sub-agents, and can pause to ask the user a question — all surfaced live in a collapsible right-side workspace panel. As of v2.8 the agent can also run inside a deterministic, locked workflow (Harness Mode) — ordered phases the model cannot escape, with per-phase tool whitelists, validation gates, and a live phase timeline — alongside today's free-form Deep Mode chat. The Deep Midnight visual design delivers a glassmorphic, mobile-responsive experience with knowledge health dashboards and user feedback loops. As of v3.0, documents are a first-class, metadata-driven surface: user-defined custom metadata with per-field confidence, metadata-driven saved views ("virtual folders"), typed document relationships, suggest-then-confirm auto-classification, a light governance-health view, and configurable multi-provider embeddings. As of v3.9 a **connection** is `{service identity, auth, discovered tools, per-tool grants}`, so adding a service adds rows rather than code. As of v4.0 the knowledge base **reads itself**: a source — Google Drive, OneDrive/SharePoint via Microsoft Graph, any MCP file server, or a mailbox — is connected once, previewed before it brings anything in, and then watched on the shipped scheduler, with one visibility per connection enforced in RLS and provenance riding every row. As of v4.5 a document is an object you can find by what it is and download, the agent can answer with interactive artifacts from a closed component registry, chat attachments belong to their thread, and an org admin can set retention with legal hold. As of v4.7 a workflow can be started from a thread, a starter, a schedule or an API key, is authored from your own files, and shows what a run did and on what evidence; a run that finds nothing pauses and asks instead of failing.
+A RAG-based AI agent platform where users organize documents into nested folders and interact with a customizable AI agent. The agent remembers preferences across threads, extracts tables and images from documents, shows confidence and citations, runs code in a sandbox, and can be taught new skills that persist. As of v2.7 the agent also keeps a per-thread workspace of versioned files, manages a todo list, can spawn sub-agents, and can pause to ask the user a question — all surfaced live in a collapsible right-side workspace panel. As of v2.8 the agent can also run inside a deterministic, locked workflow (Harness Mode) — ordered phases the model cannot escape, with per-phase tool whitelists, validation gates, and a live phase timeline — alongside today's free-form Deep Mode chat. The Deep Midnight visual design delivers a glassmorphic, mobile-responsive experience with knowledge health dashboards and user feedback loops. As of v3.0, documents are a first-class, metadata-driven surface: user-defined custom metadata with per-field confidence, metadata-driven saved views ("virtual folders"), typed document relationships, suggest-then-confirm auto-classification, a light governance-health view, and configurable multi-provider embeddings. As of v3.9 a **connection** is `{service identity, auth, discovered tools, per-tool grants}`, so adding a service adds rows rather than code. As of v4.0 the knowledge base **reads itself**: a source — Google Drive, OneDrive/SharePoint via Microsoft Graph, any MCP file server, or a mailbox — is connected once, previewed before it brings anything in, and then watched on the shipped scheduler, with one visibility per connection enforced in RLS and provenance riding every row. As of v4.5 a document is an object you can find by what it is and download, the agent can answer with interactive artifacts from a closed component registry, chat attachments belong to their thread, and an org admin can set retention with legal hold. As of v4.7 a workflow can be started from a thread, a starter, a schedule or an API key, is authored from your own files, and shows what a run did and on what evidence; a run that finds nothing pauses and asks instead of failing. As of v4.8 every view, thread, workflow, run and Expert has its own link that survives refresh, sign-in and an org switch; lists follow the active org; and a person is told in-app, and by one content-free email, when a run is waiting on them.
 
 ## Core Value
 
@@ -10,23 +10,37 @@ The agent acts as an AI colleague — it knows your knowledge base, can run code
 
 ---
 
-## Current Milestone: v4.8 Every Page Has a Link
+## Current Milestone: none — v4.8 closed 2026-10-30
 
-**Started:** 2026-10-27. Phases from **297**, migrations from **217**.
-
-**Goal:** Every place in the app has its own URL, and a person is told, with a link, when a run is waiting on them.
-
-**Target features:**
-- **A URL for every view** (`SEED-185`, `SEED-015`, `SEED-178`): each view, thread, workflow run and Expert is addressable; refresh lands back in the same place; browser Back/Forward work; links can be copied and shared (the server still decides who may open them).
-- **Told when a run waits on you** (`SEED-281`): an in-app notice plus an email from an app-owned mailer, each linking straight to the waiting run.
-- **Lists follow the active org** (`SEED-389`): Library folders and the Workflows list show only the active org's items (decided per-org at intake).
-- **v4.7 close-out**: BUG-261027-01..05 and the six `SEED-391` review findings.
-
-**Key context:** Open Platform (`SEED-013`), named as v4.8 at v4.7 intake, moves to v4.9. Addressable URLs come first because notifications, Projects (`SEED-151`) and an external API all need a link to point at. The email half adds one new piece of infrastructure (an app-owned sender: one secret, env only), which also answers `SEED-281`'s deferred option D-235-02 C.
+**Next:** run `/gsd:new-milestone` (v4.9; Open Platform `SEED-013` was moved to v4.9 at v4.8 intake). Phases resume at **303**, migrations at **220**. Sweep `node scripts/check-seeds-register.cjs` first.
 
 ---
 
-## Last Shipped: v4.7 Workflows You Can See and Start Anywhere (2026-10-27)
+## Last Shipped: v4.8 Every Page Has a Link (2026-10-30)
+
+**Started:** 2026-10-27 · **Shipped:** 2026-10-30, git tag `v4.8` · 6 phases (297-302), 25 plans,
+migrations 217-219, 4 days. **28 / 28 requirements satisfied.** Integration 21/21 (two partial seams
+fixed at close, `41198157b`), flows 4/4. Audit `tech_debt`, no blockers.
+⚠ **Partly deployed:** 297-300 live (prod `31416d335`); 301, 302 and the two close fixes await an
+operator deploy, with migration 219 pasted into cloud first.
+
+Every top-level view has an `/app/...` address that survives refresh and Back/Forward, after a
+behaviour-neutral split of `App.tsx` and `ChatLayout.tsx`, with a check that every host agrees (297).
+Library, Workflows, threads and run history show only the active org, and items elsewhere are counted
+and can be moved one at a time with an audit row (298). A thread, workflow, run or Expert can be
+linked and reopened after sign-in; a link you cannot open shows one plain page, and one in another org
+asks before switching (299). A waiting run writes a notice by trigger and, still waiting after a delay,
+sends one email with no document content (Resend on cloud, SMTP on the one-box) (300). A person sees
+every run waiting on them across all their orgs, and the notice leaves once answered (301). Phase 302
+closed the v4.7 defects and made the register true. Closed core unchanged: 7 / 1 / 30.
+
+**Owed (operator):** deploy 301/302 (migration 219 cloud paste + `get_advisors(security)`); a mail
+provider for 300 G4-8 and the real-provider half of G4-1 (Resend deferred 2026-10-29); 299 G4-4b
+email-link leg; Moonshot reinstatement (BUG-261024-01).
+
+---
+
+## Previously Shipped: v4.7 Workflows You Can See and Start Anywhere (2026-10-27)
 
 **Started:** 2026-10-18 · **Shipped:** 2026-10-27, git tag `v4.7` · 12 phases (286-296, 292.1 inserted;
 294, 295 and 296 added in-milestone), 60 plans (+3 gap fixes), migrations 210-216, 10 days.
@@ -1189,6 +1203,22 @@ All 20 v3.3 requirements delivered (16 CORE + 4 STRETCH).
 - ✓ `BUS-171`'s operator queue is a decision list — REG-03, v4.2 (251)
 - ⛔ `DEBT-06` — **8 of 14 rows unmet** (239, 241, 242, 244, 245, 251, 252, 253). Accepted as documented debt at close by operator decision; `done` needs Gemini, `refused` needs an operator ruling (`REG-03`). **A refusal is not a pass.**
 
+### Validated (v4.8 — Every Page Has a Link)
+
+- ✓ Every top-level view has an `/app/...` address; refresh and Back/Forward land on it — LINK-01, v4.8 (297)
+- ✓ Thread, workflow, run and Expert addresses survive refresh; copy link; legacy links kept — LINK-02, LINK-03, v4.8 (299)
+- ✓ One identical "can't be opened" page for missing and forbidden — LINK-04, v4.8 (299)
+- ✓ A link in another org asks before switching; nothing saved under the wrong org — LINK-05, v4.8 (299)
+- ✓ Sign-in returns to the first link; the boot screen cannot hang — LINK-06, v4.8 (299; SSO live row blocked, D-41)
+- ✓ Back/Forward with unsaved edits asks; every host agrees, checked automatically — LINK-07, LINK-08, v4.8 (297)
+- ✓ Library, Workflows, threads and run history follow the active org — ORG-01..04, v4.8 (298)
+- ✓ A foreign-org folder binding is refused with words — ORG-05, v4.8 (298)
+- ✓ Items elsewhere are counted and movable one at a time, audited — ORG-06, v4.8 (298)
+- ✓ In-app waiting-on-you list and badge across every org; leaves once answered — NOTE-01, NOTE-05, v4.8 (301)
+- ✓ One content-free email after a Settings delay, never twice; per-user opt-out; Resend/SMTP from a built image — NOTE-02, NOTE-03, NOTE-04, NOTE-06, v4.8 (300; real-provider leg owed)
+- ✓ v4.7 defects fixed: workspace files, chat loading state, schedule wording, blank required input, resume provider, SEED-391 — FIX-01..06, v4.8 (299, 300, 302)
+- ✓ Register true; G-5 extractions before the router — REG-08, REG-09, v4.8 (302, 297)
+
 ### Validated (v4.7 — Workflows You Can See and Start Anywhere)
 
 - ✓ Start a workflow from inside a thread, run attached to it — START-01, v4.7 (287)
@@ -1544,3 +1574,5 @@ This document evolves at phase transitions and milestone boundaries.
 *Last updated: 2026-10-24 — **Phase 292 More Ways to Show It complete** (VIS-02 validated: diagram / comparison / timeline from a closed registry of six; tool count 30; migration 213 applied to cloud, code not yet deployed).*
 
 *Last updated: 2026-10-27 — **milestone v4.8 Every Page Has a Link STARTED** (phases from 297, migrations from 217). Open Platform moved to v4.9.*
+
+*Last updated: 2026-10-30 — **milestone v4.8 Every Page Has a Link CLOSED** (28/28, tag `v4.8`; 301/302 not yet deployed). Next: v4.9, phases from 303, migrations from 220.*

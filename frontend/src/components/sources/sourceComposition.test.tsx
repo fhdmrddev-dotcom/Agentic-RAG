@@ -550,12 +550,14 @@ async function reveal(testId: string) {
 // matching the two stopped sources the `getSourceHealth` fixture above already reports.
 const RAIL_ATTENTION = [
   {
+    mark: "library", // 301-02 (D-31): every condition carries a required mark
     id: "watch-stopped-token",
     title: "Legal SharePoint stopped",
     detail: "Sign-in expired.",
     onOpen: vi.fn(),
   },
   {
+    mark: "library",
     id: "watch-stopped-folder",
     title: "Ops Drive stopped",
     detail: "The folder is gone.",

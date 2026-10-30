@@ -25,6 +25,11 @@
  *     later WITHOUT growing a sibling surface. ⛔ Registering a second producer *in Phase 235*
  *     is scope creep and is forbidden. This assertion is what makes that enforceable instead of
  *     aspirational: the next author adding a tenant has to come here and argue with a number.
+ *
+ *     ⚠ CORRECTED at Phase 301-02 (D-11): Phase 301 came here and argued with the number. The
+ *     registry now has TWO tenants (`stopped-sources`, `waiting-runs` — SEED-281), and the case
+ *     below asserts 2 plus both keys. Rule 3 above is kept as written because it is why that
+ *     argument had to happen in a CONTEXT decision rather than in a quiet one-line edit.
  */
 import { describe, it, expect, vi, afterEach } from "vitest"
 import { render, screen, cleanup } from "@testing-library/react"
@@ -61,6 +66,7 @@ type NavProps = React.ComponentProps<typeof NavPanel>
 /** Two stopped sources, shaped exactly as the one registered producer emits them. */
 function conditions(n: number, onOpen = vi.fn()): AttentionCondition[] {
   return Array.from({ length: n }, (_, i) => ({
+    mark: "library" as const, // 301-02 (D-31): every condition carries a required mark
     id: `watch-${i + 1}`,
     title: `Rate sheets ${i + 1}`,
     detail: "The watched folder is no longer shared with this connection.",
@@ -111,12 +117,19 @@ describe("NavPanel badge — the harness itself", () => {
 
 // ══ THE REGISTRY — EXACTLY ONE TENANT (D-235-03) ══════════════════════════════════════
 describe("NavPanel badge — the producer registry", () => {
-  it("registers EXACTLY ONE producer in Phase 235 — a second one is forbidden scope creep", () => {
+  // Title was "registers EXACTLY ONE producer in Phase 235 — a second one is forbidden scope
+  // creep"; re-titled at 301-02 (D-11) with the number it now asserts.
+  it("registers EXACTLY TWO producers since Phase 301 — a third one is a decision, not a fill-in", () => {
     // ⛔ D-235-03. The surface is general so the NEXT notification need plugs in; the next
     // need is not this phase's. If you are here because you added a tenant, that is the
     // decision this number exists to force you to take deliberately.
-    expect(ATTENTION_PRODUCERS.length).toBe(1)
-    expect(ATTENTION_PRODUCERS[0].key).toBe("stopped-sources")
+    //
+    // ⚠ RE-BASELINED 1 → 2 at Phase 301-02 (D-11) — the original read `toBe(1)` with key [0]
+    // only. Phase 301 is the deliberate decision this number existed to force: it argued the
+    // count against D-235-03 and registered `waiting-runs` (SEED-281; SEED-231 is superseded).
+    // Edited, never deleted, and both keys asserted, so a THIRD tenant still argues with it.
+    expect(ATTENTION_PRODUCERS.length).toBe(2)
+    expect(ATTENTION_PRODUCERS.map((p) => p.key)).toEqual(["stopped-sources", "waiting-runs"])
   })
 })
 
@@ -252,9 +265,67 @@ describe("NavPanel badge — the popover names what is broken and opens Health",
     renderRail({ attentionConditions: conditions(1), onOpenLibraryHealth })
     await user.click(screen.getByRole("button", { name: COPY.badgeTitle(1) }))
 
-    const action = await screen.findByRole("button", { name: COPY.popOpenHealth })
+    // ⚠ CORRECTED at Phase 301 (D-26 / BUG-261029-01): this read `findByRole("button", …)`.
+    // Radix Menu cancels Tab inside its content, so a plain button there was unreachable from
+    // the keyboard; the action is now a menu item, and is found by that role.
+    const action = await screen.findByRole("menuitem", { name: COPY.popOpenHealth })
     await user.click(action)
     expect(onOpenLibraryHealth).toHaveBeenCalledTimes(1)
+  })
+
+  it("its ONE action is reachable from the keyboard — arrow keys + Enter (D-26, BUG-261029-01)", async () => {
+    const user = userEvent.setup()
+    const onOpenLibraryHealth = vi.fn()
+    renderRail({ attentionConditions: conditions(1), onOpenLibraryHealth })
+    screen.getByRole("button", { name: COPY.badgeTitle(1) }).focus()
+    await user.keyboard("{Enter}")
+    await screen.findByTestId("rail-popover")
+    await user.keyboard("{ArrowDown}")
+    expect(screen.getByRole("menuitem", { name: COPY.popOpenHealth })).toHaveFocus()
+    await user.keyboard("{Enter}")
+    expect(onOpenLibraryHealth).toHaveBeenCalledTimes(1)
+  })
+
+  // Phase 301-02 (D-12): a waiting run is NOT a Library condition. Given one library and two
+  // waiting rows, the Library badge reads 1 and its popover lists exactly the library row.
+  it("counts and lists ONLY library conditions — waiting rows never reach the Library badge (D-12)", async () => {
+    const user = userEvent.setup()
+    const waitingRow = (i: number): AttentionCondition => ({
+      mark: "waiting",
+      id: `n-${i}`,
+      title: `Waiting workflow ${i}`,
+      detail: "",
+      onOpen: vi.fn(),
+      runId: `run-${i}`,
+      orgId: "org-a",
+      orgName: "Acme",
+      since: "2026-10-30T09:00:00Z",
+      kind: "question",
+      origin: "app",
+      total: 2,
+    })
+    renderRail({
+      attentionConditions: [...conditions(1), waitingRow(1), waitingRow(2)],
+      onOpenLibraryHealth: vi.fn(),
+    })
+    expect(screen.getByTestId("rail-badge")).toHaveTextContent(/^1$/)
+    await user.click(screen.getByRole("button", { name: COPY.badgeTitle(1) }))
+    await screen.findByTestId("rail-popover")
+    expect(screen.getAllByTestId("rail-pop-item")).toHaveLength(1)
+    expect(screen.getByText("Rate sheets 1")).toBeInTheDocument()
+    expect(screen.queryByText("Waiting workflow 1")).toBeNull()
+    expect(screen.getAllByRole("menuitem", { name: COPY.popOpenHealth })).toHaveLength(1) // 301-03 D-26: was role "button"
+  })
+
+  it("a waiting-only world renders no Library badge at all", () => {
+    renderRail({
+      attentionConditions: [{
+        mark: "waiting", id: "n-1", title: "W", detail: "", onOpen: vi.fn(), runId: "run-1",
+        orgId: "org-a", orgName: "Acme", since: "2026-10-30T09:00:00Z", kind: "approval", total: 1,
+      }],
+      onOpenLibraryHealth: vi.fn(),
+    })
+    expect(screen.queryByTestId("rail-badge")).toBeNull()
   })
 
   it("opening the popover navigates nowhere — only the action does", async () => {
@@ -264,5 +335,57 @@ describe("NavPanel badge — the popover names what is broken and opens Health",
     await user.click(screen.getByRole("button", { name: COPY.badgeTitle(1) }))
     await screen.findByTestId("rail-popover")
     expect(onNavigate).not.toHaveBeenCalled()
+  })
+})
+
+// ══ PHASE 301-03 (D-01 / UI-D2) — THE WAITING CONTROL HAS ITS OWN PLACE ON THE RAIL ═══════
+//
+// Always present (zero rows too), at both widths, directly after New chat and before the first
+// nav item. The Library badge keeps counting library conditions only; the waiting pill reads the
+// server's total.
+describe("301-03 — the Waiting on you control on the rail", () => {
+  const waiting = (i: number, total: number): AttentionCondition => ({
+    mark: "waiting", id: `n-${i}`, title: `Waiting workflow ${i}`, detail: "", onOpen: vi.fn(),
+    runId: `run-${i}`, orgId: "org-a", orgName: "Acme", since: "2026-10-30T09:00:00Z",
+    kind: "question", origin: "app", total,
+  })
+
+  it("is present with zero conditions and with some, collapsed and expanded", () => {
+    for (const expanded of [false, true]) {
+      for (const attentionConditions of [[], [waiting(1, 1)]]) {
+        const { unmount } = renderRail({ expanded, attentionConditions })
+        expect(screen.getByTestId("rail-waiting-trigger")).toBeInTheDocument()
+        unmount()
+      }
+    }
+  })
+
+  it("sits after New chat and before the first nav item, in DOM order", () => {
+    renderRail({ attentionConditions: [] })
+    const newChat = screen.getByRole("button", { name: "New chat" })
+    const waitingCtl = screen.getByTestId("rail-waiting-trigger")
+    const firstNav = screen.getByRole("button", { name: "Chat" })
+    expect(newChat.compareDocumentPosition(waitingCtl) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy()
+    expect(waitingCtl.compareDocumentPosition(firstNav) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy()
+  })
+
+  it("the waiting pill reads the server total while the Library badge still counts library only", () => {
+    renderRail({
+      attentionConditions: [...conditions(1), waiting(1, 5), waiting(2, 5)],
+      onOpenLibraryHealth: vi.fn(),
+      waitingStatus: "answered",
+    })
+    expect(screen.getByTestId("rail-badge")).toHaveTextContent(/^1$/)
+    expect(screen.getByTestId("rail-waiting-badge")).toHaveTextContent(/^5$/)
+    expect(screen.getByRole("button", { name: "5 workflow runs are waiting on you" })).toBeInTheDocument()
+  })
+
+  it("is not gated on a Library navigator, and waits for an answer before showing a pill", () => {
+    const { unmount } = renderRail({ attentionConditions: [waiting(1, 2)], waitingStatus: "answered" })
+    expect(screen.getByTestId("rail-waiting-badge")).toHaveTextContent(/^2$/)
+    unmount()
+    renderRail({ attentionConditions: [], waitingStatus: "loading" })
+    expect(screen.getByRole("button", { name: "Waiting on you" })).toBeInTheDocument()
+    expect(screen.queryByTestId("rail-waiting-badge")).toBeNull()
   })
 })

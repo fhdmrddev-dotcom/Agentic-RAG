@@ -3,9 +3,9 @@ seed_id: SEED-389
 title: Library folders and the Workflows library list the user's own items from EVERY org, not the active one
 created: 2026-10-27
 surface: Agentic-RAG
-status: folded
+status: shipped
 partial: false
-status_note: "Folded into Phase 298 at discuss (2026-10-28). Decided PER-ORG (298 D-01); lists narrow at the list routes only (D-02..D-04). Original line: `status: planted`."
+status_note: "2026-10-30 (298 close): 298 PASSED — all 8 G-4/A-1 rows driven live (298-VALIDATION.md). Shipped by Phase 298 (per-org lists, D-01). Previous: 2026-10-30 (302 REG-08): 298 is human_needed — G-4 owed (298-HUMAN-UAT.md: G4-1 Library switch first, G4-2 Workflows + run log switch; G4-5 for the move count; 0 of 8 rows run); not closed ahead of it. Status unchanged. Folded into Phase 298 at discuss (2026-10-28). Decided PER-ORG (298 D-01); lists narrow at the list routes only (D-02..D-04). Original line: `status: planted`."
 trigger_when: The next phase that touches fetch_visible_folders / the workflows library list, or the first customer who is a member of two orgs and reports seeing one org's folders in the other.
 trigger_paths: ["backend/app/api/folders.py", "backend/app/utils/folder_utils.py", "backend/app/api/workflows.py"]
 trigger_surfaces: ["library", "workflow"]

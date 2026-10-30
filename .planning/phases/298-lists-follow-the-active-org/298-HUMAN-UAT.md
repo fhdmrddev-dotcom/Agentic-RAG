@@ -1,13 +1,15 @@
 ---
 phase: 298-lists-follow-the-active-org
-status: owed
+status: complete
 created: 2026-10-28
 rows_total: 8
-rows_run: 0
-driver: operator
+rows_run: 8
+driver: claude (Chrome, two-org dev account, 2026-10-30)
 ---
 
-# Phase 298 — Human UAT (owed)
+# Phase 298 — Human UAT (driven 2026-10-30)
+
+**All 8 rows PASS** (G4-2 after the G-3 fast-fix 974ba0c24 → 5f0eb2660). Evidence per row in `298-VALIDATION.md`. The browser was already signed in as the two-org dev account, so no sign-out or password was needed.
 
 Verification returned `human_needed`: 4/4 success criteria are verified in code and tests (`298-VERIFICATION.md`),
 but the G-4 lived-experience rows have not been driven.

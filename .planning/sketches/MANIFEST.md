@@ -3019,3 +3019,9 @@ reuses 267-B's event-card shape.
 | 299 | switch-org | Where "This is in <org> — switch?" appears and how declining visibly changes nothing, live stream included (replaces main area / dialog over current view / banner) | ★ A prompt replaces the main area (operator, 2026-10-28) | phase-299, link-05, org-switch, live-stream |
 | 299 | copy-link | Where copy link sits on chat, workflow, run, Expert, and the one receipt (menu item / header link icon / share popover with who-can-open) | ★ C share popover with who-can-open line (operator, 2026-10-28) | phase-299, link-02, link-03, copy-link |
 | 299 | sign-in-return-and-boot | Whether sign-in names the destination kind, the boot give-up stages, the mobile chat-list loading state (quiet line / card names it / silent) | ★ A quiet line under the form (operator, 2026-10-28) | phase-299, link-06, fix-02, sign-in, boot |
+
+## Sketch 301 — The Waiting-on-You Notice (Phase 301, G-2 gate)
+
+| # | Name | Design Question | Winner | Tags |
+|---|------|----------------|--------|------|
+| 301 | waiting-on-you | Where the cross-org "waiting on you" badge lives, how a row names its org, mark-read or not (own rail control / on the avatar / on Workflows) | ★ A own rail control (self-picked under autonomous mandate 2026-10-29; operator approval owed at G-4) | phase-301, note-01, note-05, attention, rail |

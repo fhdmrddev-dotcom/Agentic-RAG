@@ -84,6 +84,7 @@ const FLAGGED_EXACT = new Set([
   "/threads/{thread_id}/snapshot",
   "/threads/expert-scope-preview",
   "/library/index-summary",
+  "/notifications", // 301-01: the UI's waiting-on-you list (D-32), UI-internal like /links/
 ])
 const FLAGGED_PREFIXES = ["/knowledge-health/", "/org-items/", "/links/"] // 298-01: the UI's org reads (D-15/D-16); 299-01: the link gate (D-06)
 
@@ -128,7 +129,7 @@ const TAG_GROUPS = [
   { name: "Experts", tags: ["experts"] },
   {
     name: "Account & org",
-    tags: ["org", "org-items", "links", "api-keys", "preferences", "features", "model-registry", "settings", "audit", "feedback"],
+    tags: ["org", "org-items", "links", "notifications", "api-keys", "preferences", "features", "model-registry", "settings", "audit", "feedback"],
   },
   { name: "System", tags: [SYSTEM_TAG] },
 ]

@@ -32,6 +32,7 @@ import {
   isSettingsTabVisible,
   resolveSettingsTab,
   SETTINGS_TAB_STORAGE_KEY,
+  settingsTabFromAddress,
 } from "@/components/settings/settingsTabs"
 import { ModelPillRow } from "@/components/settings/ModelPillRow"
 import { RerankEngineBlock } from "@/components/settings/RerankEngineBlock"
@@ -445,9 +446,10 @@ export function SettingsPage({ onOpenRun }: { onOpenRun?: (runId: string) => voi
   const [savingIntegrations, setSavingIntegrations] = useState(false)
   const [savedIntegrations, setSavedIntegrations] = useState(false)
 
-  // Tab persistence
+  // Tab persistence. A link's `?tab=<words>` wins over the remembered tab (v4.8 audit W-2: the
+  // run-waiting email's "turn them off" link names Preferences).
   const [activeTab, setActiveTab] = useState<string>(
-    () => localStorage.getItem(SETTINGS_TAB_STORAGE_KEY) ?? "0",
+    () => settingsTabFromAddress(window.location.search) ?? localStorage.getItem(SETTINGS_TAB_STORAGE_KEY) ?? "0",
   )
 
   // ⚠ A PERSISTED CHOICE CAN NAME A TAB THIS CALLER NO LONGER HAS. `settings_active_tab`
