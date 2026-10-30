@@ -571,8 +571,9 @@ describe("TeamPicture — 302-02 (FE-IN-06 / D-11): the scroll region and the fi
     else renderPicture(productionTwoStep)
     const region = screen.getByRole("region", { name: "Team view, scrollable" })
     expect(region).toBeInTheDocument()
-    const figs = screen.getAllByRole("figure", { name: teamFigureLabel(NAME) })
-    expect(figs).toHaveLength(1)
-    expect(region.getAttribute("aria-label")).not.toBe(figs[0].getAttribute("aria-label"))
+    expect(region.getAttribute("aria-label")).not.toBe(teamFigureLabel(NAME))
+    // The empty arm draws no figure, so it must not borrow the figure's name either.
+    const figs = screen.queryAllByRole("figure", { name: teamFigureLabel(NAME) })
+    expect(figs).toHaveLength(arm === "empty" ? 0 : 1)
   })
 })

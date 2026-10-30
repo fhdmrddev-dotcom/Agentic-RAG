@@ -57,6 +57,9 @@ export function teamFigureLabel(name: string): string {
   return `Team picture for ${name}`
 }
 
+/** 302-02 (FE-IN-06 / D-11, UI-D12): the scroll region's name — the figure inside already says the workflow's name. */
+export const TEAM_SCROLL_REGION_LABEL = "Team view, scrollable"
+
 // ── the orchestrator node (D-09) ──────────────────────────────────────────────────────────
 
 /** The orchestrator's eyebrow. */
