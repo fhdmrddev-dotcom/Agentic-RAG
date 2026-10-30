@@ -166,6 +166,49 @@ def test_a_deep_chain_beyond_the_cap_ends_in_a_typed_leaf():
     assert node.get("type") == "object" and "description" in node
 
 
+def _fan_out(n: int) -> dict:
+    """``n`` definitions, each referencing every other one — the AST/GraphQL shape."""
+    defs = {
+        f"N{i}": {"type": "object",
+                  "properties": {f"p{j}": {"$ref": f"#/$defs/N{j}"} for j in range(n) if j != i}}
+        for i in range(n)
+    }
+    return {"type": "object", "properties": {"root": {"$ref": "#/$defs/N0"}}, "$defs": defs}
+
+
+# 302-REVIEW CR-01: the depth cap alone let output grow ~n!/(n-8)! (8 mutual defs measured
+# 4,438,883 B). A global expansion budget keeps every schema's output bounded.
+@pytest.mark.parametrize("n", [8, 12])
+def test_a_wide_mutual_fan_out_stays_bounded(n):
+    import time
+
+    from app.services.provider_gateway.schema_moonshot import inline_refs
+
+    from app.services.provider_gateway.schema_moonshot import _MAX_EXPANSIONS
+
+    schema = _fan_out(n)
+    cut: list[str] = []
+    started = time.perf_counter()
+    out = inline_refs(schema, cut=cut)
+    elapsed = time.perf_counter() - started
+    assert not _refs_anywhere(out)
+    size = len(json.dumps(out))
+    assert size < 64 * 1024
+    # Linear in the input: at most one definition body per expansion, never a path product.
+    assert size <= (_MAX_EXPANSIONS + 1) * len(json.dumps(schema))
+    assert elapsed < 1.0
+    assert cut, "a cut must be recorded so moonshot_tools warns"
+
+
+def test_the_workflow_schema_fits_inside_the_expansion_budget():
+    """The budget must never cut the schema we ship ourselves (16 expansions measured)."""
+    from app.services.provider_gateway.schema_moonshot import inline_refs
+
+    cut: list[str] = []
+    inline_refs(_wf_schema(), cut=cut)
+    assert cut == []
+
+
 def test_moonshot_tools_keeps_a_recursive_tool_and_warns_without_the_schema(caplog):
     import logging
 
