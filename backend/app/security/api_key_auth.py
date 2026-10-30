@@ -286,6 +286,13 @@ async def resolve_api_key(
     if credentials is None or not credentials.credentials:
         raise HTTPException(status_code=401, detail=NO_KEY_DETAIL)
     presented = credentials.credentials
+    return await authenticate_presented_key(
+        presented, pool=pool, redis=redis, call=_call_kind(request)
+    )
+
+
+async def authenticate_presented_key(presented: str, *, pool, redis, call: str) -> ResolvedKey:
+    """The one resolver core (D-17): digest -> lookup -> compare -> live state -> ResolvedKey."""
     digest = digest_key(presented)
     if digest is None:
         raise _invalid()
@@ -302,7 +309,6 @@ async def resolve_api_key(
     if not hmac.compare_digest(str(row.get("key_hash", "")), digest):
         raise _invalid()
 
-    call = _call_kind(request)
     if row.get("revoked_at") is not None:
         raise await _refuse(row, call=call, reason="revoked", redis=redis)
     expires_at = row.get("expires_at")
