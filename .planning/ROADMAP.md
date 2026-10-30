@@ -256,7 +256,7 @@ Plans:
 Plans:
 - [x] 302-01-PLAN.md — FIX-01: the panel lists a thread's generated files (shared download hook, Generated files group, honest counts) — wave 1
 - [x] 302-02-PLAN.md — FIX-06: the six SEED-391 findings, each RED-first (liveness predicate, stand-in note, Moonshot unroll, 409 wording, two a11y names) — wave 1
-- [ ] 302-03-PLAN.md — FIX-03 F-1 fix + 302-VALIDATION rows; REG-08 register made true; pins, ledger, full gates — wave 2
+- [x] 302-03-PLAN.md — FIX-03 F-1 fix + 302-VALIDATION rows; REG-08 register made true; pins, ledger, full gates — wave 2
 **UI hint**: yes
 **Flags**: **G-4** for FIX-01 and FIX-03 (Chrome). **G-5**: `WorkspacePanel.tsx` (11), `FilesSection.tsx` (8), `backend/app/api/workspace.py` (8), `WorkflowScheduleModal.tsx` (4), `backend/app/api/schedules.py` (4) — one-touch fixes honoured by construction, or defer. Workspace panel changes land in chat first (`ChatLayout.tsx` is its only mount). **Four-axis** for FIX-01 (chat UI state). No migration expected. Filing the two pre-existing bug reports early (before 297 and 300 plan) is allowed and lets those phases fold them; REG-08 still closes here. Folds `BUG-261027-01`, `BUG-261027-03`, `SEED-391`.
 
