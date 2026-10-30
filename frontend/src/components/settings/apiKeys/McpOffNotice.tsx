@@ -5,8 +5,10 @@
  *
  * Words only from `MCP_KEY_COPY`; they begin with the server's own refusal sentences
  * (`principal_liveness.py`), so the screen and a refused tool call say the same thing. The caller
- * passes the scope the server reported; the deployment's wins over the org's (the server already
- * applies that order to `mcp_off`). A 12px warning line, colour never the only signal (it is words).
+ * passes the scope the server reported; the deployment's wins over the org's — the server applies
+ * that one order both to `mcp_off` and to a refused call (`principal_still_allowed`, 304-REVIEW
+ * WR-03), so with both switches off the two name the same switch. A 12px warning line, colour
+ * never the only signal (it is words).
  */
 import type { McpOff } from "@/lib/api/apiKeys"
 import { cn } from "@/lib/utils"
