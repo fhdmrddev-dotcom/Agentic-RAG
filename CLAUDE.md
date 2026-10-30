@@ -412,14 +412,14 @@ node scripts/check-hot-file-ledger.cjs <phase-dir>   # 0 clear · 1 missing rows
 | `frontend/src/components/chat/MessageItem.tsx` | 84 / 39 / 1059 (was `83 / 42 / 1050`) | 292.1 UAT: Deep Continue re-attaches the run's stream (+1 else-if) · ⛔ |
 | `frontend/src/components/chat/CitationList.tsx` | 5 / 5 / 91 | 294-05: ONE CitationCheckAction beside the trigger · extraction FIRST |
 | `backend/app/api/threads.py` | 285 / 97 / 2756 (was `284 / 96 / 2752`) | 299-01: send_message one refuse_if_other_org call (D-18) · ⛔ |
-| `frontend/src/providers/StreamsProvider.tsx` | 120 / 45 / 5250 (was `119 / 45 / 5234`) | 296 G-4 row 12: kickoff terminal reconciles; kickoff clears old steps · ⛔ |
+| `frontend/src/providers/StreamsProvider.tsx` | 121 / 46 / 5250 (was `120 / 45 / 5250`) | 302-02: lock arm stamps code workflow_locked (one expression) · ⛔ |
 | `frontend/src/hooks/useMessages.ts` | 74 / 27 / 127 | extraction due |
 | `backend/app/services/anthropic_service.py` | 12 / 11 / 373 (was `11 / 10 / 354`) | honoured by construction (282-01: constructor kwargs) · adapter audit due |
 | `backend/app/services/embedding_service.py` | 9 / 5 / 354 | ⚠ absent for its entire life at 5 phases — row added 236 (SC#2) |
 | `frontend/src/components/workflows/WorkflowCanvas.tsx` | 33 / 11 / 1757 (was `32 / 10 / 1744`) | 296-07: D-09 one controlled view pair; extraction FIRST next · ⛔ |
 | `frontend/src/components/workflows/FlowEdge.tsx` | 3 / 3 / 462 | honoured by construction (200) |
 | `frontend/src/components/workflows/PhaseNodeCard.tsx` | 18 / 9 / 490 (was `17 / 8 / 489`) | 290: forecast unused — chips went on the library card, not here |
-| `backend/app/services/harness/phase_types.py` | 67 / 34 / 3147 (was `66 / 33 / 3135`) | 300-03: send_email receipt names the recipient (D-23) · G-5 OWED |
+| `backend/app/services/harness/phase_types.py` | 69 / 35 / 3149 (was `67 / 34 / 3147`) | 302-02: executor liveness via live_connectors_fully_on · G-5 OWED |
 | `backend/app/services/tools/render_template.py` | 6 / 3 / 1163 (was `3 / 2 / 1094`) | 296-03: button /V written as a name, read back typed · now FIRES · ⛔ |
 | `frontend/src/pages/WorkflowsPage.tsx` | 56 / 23 / 1403 (was `55 / 23 / 1403`) | 299-REVIEW WR-05: link hook gets visibleRows + clearAllFilters |
 | `frontend/src/components/workflows/library/WorkflowCard.tsx` | 27 / 12 / 1374 (was `26 / 11 / 1373`) | 299-02: one data-row-id |
@@ -444,7 +444,8 @@ node scripts/check-hot-file-ledger.cjs <phase-dir>   # 0 clear · 1 missing rows
 | `frontend/src/components/workflows/evidenceVocabulary.ts` | 5 / 3 / 261 | ⚠ now FIRES (296) · 296-04: neutral NO_MATCH/UNSOURCED + DOWNLOAD_UNAVAILABLE |
 | `backend/app/models/thread.py` | 25 / 17 / 550 (was `24 / 16 / 545`) | 293-03: ONE field (origin) |
 | `frontend/src/components/workflows/canvasModel.ts` | 16 / 8 / 836 (was `15 / 8 / 831`) | 296-07: comparePhaseOrder, engineArmed; isGrounded drops escalated |
-| `frontend/src/components/layout/ChatLayout.tsx` | 73 / 36 / 934 (was `72 / 36 / 933`) | 299-03: history column live behind the card; threadsPending prop |
+| `frontend/src/components/layout/ChatLayout.tsx` | 76 / 37 / 970 (was `75 / 37 / 954`) | honoured by construction (301-03: status state in ctx; one drawer mount) |
+| `frontend/src/components/layout/attentionConditions.ts` | 5 / 3 / 424 (was `3 / 2 / 200`) | ⚠ now FIRES (301) · 301-02: 2nd tenant waiting-runs, required mark · ⛔ |
 | `frontend/src/components/layout/ChatLaunchForm.tsx` | 6 / 4 / 191 (was `5 / 4 / 183`) | 296 G-4 row 11: refused Run scrolls the refusal into view |
 | `frontend/src/components/workflows/LaunchInputFields.tsx` | 3 / 3 / 145 | 287-01: leaf stays non-blocking; docblock only · 214.1-01 trigger TAKEN |
 | `frontend/src/components/layout/ChatHistoryColumn.tsx` | 9 / 3 / 524 (was `8 / 3 / 522`) | 298-05: one ElsewhereLine mount atop hc-list (+ its import) |
@@ -452,11 +453,11 @@ node scripts/check-hot-file-ledger.cjs <phase-dir>   # 0 clear · 1 missing rows
 | `backend/app/services/harness/grounding.py` | 23 / 10 / 1437 (was `21 / 8 / 1414`) | 295-03: ONE pure predicate (is_engine_citation_gate) |
 | `frontend/src/components/workflows/PhaseFormPanel.tsx` | 30 / 14 / 1566 | honoured by construction ×6 (185 / 193 / 193.1 / 199 / 200 / **214**) |
 | `backend/app/db/workflows.py` | 64 / 32 / 2874 (was `63 / 31 / 2862`) | 298-01: keyword-only org_id AND-append on published + drafts feeds |
-| `backend/app/services/harness/publish_service.py` | 36 / 16 / 2061 (was `35 / 16 / 2057`) | 296-06: golden kickoff via launch_kickoff (S6-F8), one statement |
+| `backend/app/services/harness/publish_service.py` | 37 / 17 / 2066 (was `36 / 16 / 2061`) | 302-02: no stand-in for inputs the practice run never asks (BE-IN-03) |
 | `backend/app/services/workflow_authoring.py` | 23 / 13 / 1269 (was `18 / 12 / 1120`) | 296-03: unticked told; provider_error; file-free requirement · seam OWED |
 | `backend/app/models/harness.py` | 22 / 20 / 776 (was `20 / 19 / 766`) | 291-02: InputFieldSpec origin + note, omitted when absent |
 | `frontend/src/components/workflows/builderStore.ts` | 16 / 9 / 1039 (was `14 / 8 / 968`) | 291: two actions (refs, input source), no state field |
-| `frontend/src/components/panel/WorkspacePanel.tsx` | 17 / 11 / 646 (was `16 / 10 / 646`) | honoured by construction (194 / 194.1 / 282-02: one prop) |
+| `frontend/src/components/panel/WorkspacePanel.tsx` | 19 / 12 / 653 (was `17 / 11 / 646`) | honoured by construction (302-01: one files count from useThreadFiles) |
 | `backend/app/services/run_lifecycle.py` | 11 / 7 / 827 (was `10 / 6 / 776`) | 296-02: Stop on a live producer carries who (sibling key, one read) |
 | `backend/app/db/runs.py` | 12 / 9 / 345 (was `11 / 9 / 289`) | 292.1-REVIEW CR-01: run_is_cap_paused, the ONE pause predicate (+56) |
 | `frontend/src/pages/admin/AdminSpendPage.tsx` | 9 / 3 / 974 | ⚠ NOW FIRES (crossed in 268) · extraction FIRST next · ⛔ |
@@ -478,26 +479,26 @@ node scripts/check-hot-file-ledger.cjs <phase-dir>   # 0 clear · 1 missing rows
 | `frontend/src/components/chat/MessageList.tsx` | 24 / 11 / 376 | ⚠ STALE · last touch 267-04 |
 | `frontend/src/components/chat/ChatArea.tsx` | 96 / 45 / 1192 (was `95 / 44 / 1189`) | honoured by construction (299-04: ONE ShareLinkMenu mount, 0 hooks) · ⛔ |
 | `frontend/src/stores/streamsStore.ts` | 28 / 19 / 662 (was `27 / 18 / 660`) | 296-04: initializer typed StreamsState (TS2345 gone) · ⛔ |
-| `frontend/src/components/chat/ThreadWorkflowPicker.tsx` | 4 / 3 / 144 (was `3 / 2 / 144`) | ⚠ now FIRES (298) · 298-02: no Retry for a folder refusal · ⛔ |
-| `frontend/src/components/chat/useStartWorkflowInThread.ts` | 4 / 3 / 186 (was `3 / 2 / 174`) | ⚠ now FIRES (298) · 298-02: kind folder shows the server sentence · ⛔ |
+| `frontend/src/components/chat/ThreadWorkflowPicker.tsx` | 5 / 4 / 144 (was `4 / 3 / 144`) | 302-02: no Retry for a refused start (one condition) · ⛔ |
+| `frontend/src/components/chat/useStartWorkflowInThread.ts` | 5 / 4 / 206 (was `4 / 3 / 186`) | 302-02: 409 worded by cause (locked / paused / refused) · ⛔ |
 | `frontend/src/lib/toolMeta.ts` | 10 / 6 / 218 | ⚠ absent its ENTIRE LIFE — row added 244-13 · ⛔ |
 | `frontend/src/components/panel/PendingAskCard.tsx` | 25 / 12 / 1132 (was `24 / 11 / 1103`) | 296-04: one ask per live workflow run; passed clock waits |
 | `frontend/src/pages/WorkflowRunPage.tsx` | 37 / 17 / 1610 (was `36 / 16 / 1605`) | 299-04: one ShareLinkMenu after the v-chip, before Stop (D-20) · ⛔ |
 | `frontend/src/components/workflows/WaitingOnLine.tsx` | 1 / 1 / 26 | young (created 288-03) · leaf, no hook · ⛔ |
-| `frontend/src/components/chat/OutputFileCard.tsx` | 8 / 7 / 219 | honoured by construction (195) |
-| `frontend/src/components/panel/FilesSection.tsx` | 12 / 8 / 354 (was `10 / 6 / 363`) | ⚠ STALE · last touch 274-04 |
+| `frontend/src/components/chat/OutputFileCard.tsx` | 9 / 8 / 187 (was `8 / 7 / 219`) | honoured by construction (302-01: download moved to useSandboxDownload) |
+| `frontend/src/components/panel/FilesSection.tsx` | 14 / 9 / 366 (was `12 / 8 / 354`) | 302-01: one GeneratedFilesGroup mount; workspace rows byte-identical |
 | `frontend/src/lib/api.ts` | 215 / 128 / 556 (was `214 / 127 / 552`) | 299-03: one links export block |
 | `frontend/src/types/index.ts` | 103 / 82 / 1688 (was `102 / 81 / 1685`) | 299-04: ExpertBundle.org_id (the wire already sent it) · seam OWED |
-| `backend/app/main.py` | 98 / 72 / 1020 (was `97 / 71 / 993`) | 300-04: drainer start/stop under the boot-sweep gate (D-20) · ⛔ |
+| `backend/app/main.py` | 99 / 73 / 1021 (was `98 / 72 / 1020`) | 301-01: one include_router(notifications.router) + its import token · ⛔ |
 | `backend/app/config.py` | 96 / 55 / 1831 (was `93 / 54 / 1809`) | 300-03: SMTP_* fields (D-28) · seam OWED · ⛔ |
 | `backend/app/api/admin.py` | 44 / 17 / 2054 (was `43 / 17 / 2051`) | quick-261024: discover summary gains a `returned` count (+3) · ⛔ |
 | `backend/app/api/settings.py` | 48 / 26 / 1398 (was `47 / 25 / 1301`) | 300-05: four email knobs + read-only provider (D-07/D-08) |
 | `backend/app/services/multimodal_service.py` | 14 / 7 / 984 | ⚠ absent from BOTH for its ENTIRE LIFE at **7 phases** |
 | `backend/app/api/documents.py` | 101 / 40 / 2709 (was `99 / 39 / 2698`) | 298-01: one by_org in build() + one root_upload_org kwarg · ⛔ |
 | `backend/app/api/library.py` | 3 / 3 / 304 (was `2 / 2 / 299`) | ⚠ now FIRES (298) · 298-01: summary shares the lists' org predicate ($1) |
-| `scripts/vitest-count-gate.cjs` | 398 / 83 / 6881 (was `397 / 83 / 6873`) | 300-05: 3 org pins added (InvitationsTab 17, dialog 7, copy 6) |
+| `scripts/vitest-count-gate.cjs` | 406 / 85 / 6910 (was `403 / 84 / 6894`) | 302-03: 3 pins added (302-01 suites); 8 raised; none lowered |
 | `scripts/check-deploy-drift.sh` | 6 / 5 / 271 (was `5 / 4 / 267`) | 300-03: SMTP_* parity |
-| `scripts/build-public-openapi.cjs` | 11 / 5 / 472 (was `7 / 3 / 468`) | 298-01: org-items tag (Account & org) + /org-items/ FLAGGED (2 lines) |
+| `scripts/build-public-openapi.cjs` | 13 / 7 / 473 (was `11 / 5 / 472`) | 301-01: notifications tag + /notifications FLAGGED (2 lines) |
 | `scripts/check-seeds-register.cjs` | 7 / 3 / 1132 | ⚠ FIRES, absent here — row added 296-05 · `\d{3,}` ids · ⛔ |
 | `backend/app/services/eval_runner_service.py` | 14 / 9 / 1056 (was `13 / 8 / 1040`) | 296-06: eval arm on a fixed EVAL_MAX_TOOL_ROUNDS (copy of settings) |
 | `backend/app/services/scheduler_service.py` | 16 / 9 / 375 (was `15 / 9 / 372`) | 300-REVIEW WR-01: outcome reads THIS run by id; failed/cancelled kept |
@@ -512,7 +513,7 @@ node scripts/check-hot-file-ledger.cjs <phase-dir>   # 0 clear · 1 missing rows
 | `frontend/src/components/panel/PhaseCard.tsx` | 22 / 14 / 821 (was `21 / 14 / 817`) | 296 review FE-WR-01: paused step drops running instruments |
 | `frontend/src/components/panel/PhaseTimeline.tsx` | 11 / 9 / 408 (was `10 / 8 / 404`) | 296-04: derives runPaused from its frame, passes it |
 | `frontend/src/components/panel/phaseStatusMeta.ts` | 5 / 5 / 308 (was `4 / 4 / 291`) | 296-04: derived Waiting row (not a wire status) |
-| `backend/app/services/harness/validator_kinds.py` | 19 / 9 / 918 (was `18 / 8 / 899`) | 296-02: design note only when recording was by design (D-07) |
+| `backend/app/services/harness/validator_kinds.py` | 20 / 10 / 924 (was `19 / 9 / 918`) | 302-02: judge reads the executor's liveness predicate (BE-IN-01) |
 | `backend/app/services/harness/programmatic.py` | 4 / 4 / 142 (was `3 / 3 / 137`) | 293-REVIEW WR-03: split_topic splits envelope values; still pure · ⛔ |
 | `backend/app/services/harness/emitters.py` | 4 / 2 / 188 | ⚠ absent its ENTIRE LIFE — row added 255 · ⛔ |
 | `frontend/src/components/admin/ModelRegistryTab.tsx` | 19 / 7 / 1705 (was `17 / 7 / 1679`) | honoured by construction (282-04: Add-form Timeout) · AddModelForm seam OWED · ⛔ |
@@ -554,7 +555,7 @@ node scripts/check-hot-file-ledger.cjs <phase-dir>   # 0 clear · 1 missing rows
 | `backend/app/models/user_settings.py` | 62 / 38 / 1788 (was `61 / 37 / 1776`) | 300-03: four email knobs + _val lines · ⛔ |
 | `backend/app/services/harness/reachability.py` | 5 / 5 / 498 (was `4 / 4 / 463`) | 295-02: one pure lint check (no_template_bound) |
 | `backend/app/services/workflow_kickoff.py` | 15 / 12 / 608 (was `14 / 11 / 605`) | 299-01: one refuse_if_other_org beside raise_if_foreign (D-18) |
-| `frontend/src/components/workflows/WorkflowScheduleModal.tsx` | 6 / 5 / 812 (was `5 / 4 / 723`) | 300-01: outcome words + per-row Run now (D-15/D-16) |
+| `frontend/src/components/workflows/WorkflowScheduleModal.tsx` | 7 / 6 / 814 (was `6 / 5 / 812`) | 302-03: refused Run now said once (F-1, one condition) |
 | `frontend/src/lib/api/schedules.ts` | 3 / 3 / 166 (was `2 / 2 / 129`) | ⚠ now FIRES (300) · 300-01: ScheduleRefusalError for the 422 (D-14) |
 | `frontend/src/components/workflows/nodePresentation.ts` | 8 / 7 / 221 | ⚠ absent from BOTH for its ENTIRE LIFE at **7 phases** |
 | `frontend/src/lib/api/threads.ts` | 25 / 15 / 2006 (was `24 / 14 / 1994`) | 298-02: postMessage reads detail.message + code (object detail) · ⛔ |
@@ -582,7 +583,7 @@ node scripts/check-hot-file-ledger.cjs <phase-dir>   # 0 clear · 1 missing rows
 | `frontend/src/components/workflows/verdictModel.ts` | 8 / 4 / 363 (was `6 / 3 / 355`) | 295-02: one Record entry (BLOCKED_SENTENCE.lint) |
 | `frontend/src/components/library/IngestionTab.tsx` | 20 / 7 / 706 (was `17 / 6 / 512`) | 284-03: summary + three paged status lists; layout unchanged · ⛔ |
 | `frontend/src/components/ingestion/__tests__/IngestionStrip.test.tsx` | 3 / 3 / 516 | ⚠ absent; row added 233, which repaired the INHERITED red `229-03` cau |
-| `frontend/src/components/layout/NavPanel.tsx` | 26 / 14 / 420 (was `25 / 14 / 416`) | last touch 276-01 / 276-06 (D-27) |
+| `frontend/src/components/layout/NavPanel.tsx` | 29 / 15 / 442 (was `28 / 15 / 428`) | honoured by construction (301-03: one WaitingOnYouControl mount + one prop) |
 | `frontend/src/App.tsx` | 44 / 30 / 350 (was `43 / 30 / 349`) | 299-02: one prop (entityLink) |
 | `frontend/src/main.tsx` | 5 / 3 / 32 (was `3 / 1 / 10`) | ⚠ now FIRES (297) · one '*' route, no children, no key · ⛔ |
 | `frontend/src/index.css` | 35 / 19 / 1239 (was `34 / 18 / 1196`) | 294-05: ONE verdict block keyed on citation-marker--v-* (+43) |
@@ -596,14 +597,14 @@ node scripts/check-hot-file-ledger.cjs <phase-dir>   # 0 clear · 1 missing rows
 | `frontend/src/lib/stripComments.testutil.ts` | 1 / 1 / 28 | young (created 244-14 / IN-02) · ⛔ |
 | `frontend/src/lib/workspaceAllowedExt.ts` | 1 / 1 / 54 | young (created 244-02) |
 | `frontend/src/components/chat/ChatAttachmentChip.tsx` | 1 / 1 / 144 | young (created 244-05) |
-| `frontend/src/components/chat/composerCopy.ts` | 5 / 3 / 122 (was `2 / 1 / 103`) | ⚠ now FIRES (296) · 296-04: three start-failure sentences · ⛔ |
+| `frontend/src/components/chat/composerCopy.ts` | 6 / 4 / 127 (was `5 / 3 / 122`) | 302-02: startPaused + startRefusedWith (words only) · ⛔ |
 | `frontend/src/components/chat/ConnectedFilePickerModal.tsx` | 3 / 2 / 336 | ⚠ absent its ENTIRE LIFE — row added 244-06 |
 | `frontend/src/components/chat/useComposerAttachments.ts` | 1 / 1 / 158 | young (created 244-06) · the seam 244-05 named |
 | `backend/app/services/oauth_refresh_service.py` | 5 / 3 / 362 | ⚠ absent its ENTIRE LIFE — row added BUG-260912-01 |
 | `frontend/src/components/sources/SourceFolderPicker.tsx` | 2 / 2 / 375 | ⚠ absent its entire life — row added BUG-260912-01 · ⛔ |
 | `frontend/src/components/sources/sourceHealthVocabulary.ts` | 8 / 4 / 645 | ⛔ row STALE · G-5 fires (252-03) · Seam OWED |
 | `backend/app/services/sources/failure_cause.py` | 3 / 2 / 227 | ⚠ absent its entire life — row added BUG-260912-01 · ⛔ |
-| `scripts/full-schema-supplement.sql` | 26 / 18 / 888 (was `25 / 17 / 863`) | 300-02: mig 218 privilege block copied (dump omits grants) · ⛔ |
+| `scripts/full-schema-supplement.sql` | 27 / 19 / 891 (was `26 / 18 / 888`) | 301-01: mig 219 publication line in §4 · ⛔ |
 | `.claude/settings.json` | 14 / 6 / 214 | ⚠ STALE · last touch 276 · ⛔ |
 | `backend/app/services/forced_emit.py` | 15 / 9 / 749 (was `13 / 8 / 724`) | 296 (293-F-4): cross-provider copy names the target provider · ⛔ |
 | `backend/app/services/template_asset_service.py` | 5 / 4 / 379 (was `4 / 3 / 344`) | 295-02: has_staged_template (Branch-2 WHERE shared) |
@@ -668,7 +669,9 @@ node scripts/check-hot-file-ledger.cjs <phase-dir>   # 0 clear · 1 missing rows
 | `frontend/src/components/workflows/templateFirstVocabulary.ts` | 4 / 3 / 453 | ⚠ now FIRES (296) · 296-07: three describe-door strings (data) |
 | `frontend/src/components/workflows/declaredInputsVocabulary.ts` | 4 / 3 / 172 | ⚠ now FIRES (296) · 296-07: look-up not wired (words); blank options |
 | `frontend/src/components/workflows/describeRefusalVocabulary.ts` | 5 / 3 / 203 | ⚠ now FIRES (296) · 296-07: one refusal row (provider_error) |
-| `frontend/src/components/workflows/DescribeTemplateRow.tsx` | 3 / 3 / 581 | ⚠ now FIRES (296) · 296-07: disabled prop + UnplacedSentencesNote |
+| `frontend/src/components/workflows/DescribeTemplateRow.tsx` | 4 / 4 / 582 (was `3 / 3 / 581`) | 302-02: disabled tick says why (FE-IN-04, one spread) |
+| `frontend/src/components/workflows/teamVocabulary.ts` | 3 / 3 / 206 (was `2 / 2 / 203`) | ⚠ now FIRES (302) · 302-02: one string (scroll region label) |
+| `frontend/src/components/workflows/TeamPicture.tsx` | 4 / 3 / 587 (was `3 / 2 / 585`) | ⚠ now FIRES (302) · 302-02: region named apart from its figure |
 | `frontend/src/components/workflows/TemplateAttachSection.tsx` | 6 / 3 / 450 (was `5 / 3 / 411`) | ⚠ now FIRES (296) · 296-07: labels, PDF Replace, bind split |
 | `frontend/src/components/workflows/GovernanceSection.tsx` | 6 / 3 / 455 | ⚠ absent its entire life — row added 296-07 (D-26) · seal detected-only |
 | `frontend/src/components/workflows/NodeCornerMarks.tsx` | 5 / 3 / 305 | ⚠ absent its entire life — row added 296-07 (D-26) · unmodified |
@@ -694,6 +697,7 @@ node scripts/check-hot-file-ledger.cjs <phase-dir>   # 0 clear · 1 missing rows
 | `backend/app/api/org.py` | 13 / 4 / 1071 (was `12 / 4 / 1068`) | 300-REVIEW IN-01: email_to_test_address on send + resend responses |
 | `backend/app/services/email_provider.py` | 10 / 3 / 413 (was `6 / 3 / 362`) | 300-REVIEW: SMTP_SECURITY fail-closed, redirected flag, config check · ⛔ |
 | `frontend/src/components/admin/HealthSignals.tsx` | 7 / 5 / 415 (was `6 / 5 / 407`) | 300-REVIEW IN-04: config_problem reads "Can't send", red, pre-send |
+| `frontend/src/components/layout/AppViewSwitch.tsx` | 8 / 3 / 609 (was `7 / 2 / 600`) | ⚠ now FIRES (301) · 301-03: the non-chat hamburger dot · ⛔ no hooks |
 
 
 When a new phase enters discuss-phase, the orchestrator must scan PLAN.md `files_modified` against this ledger. Any match against a G-5-firing row means the discuss-phase produces a refactor recommendation as the first option, not the planned feature — and the phase reads that file's section in `docs/HOT-FILE-LEDGER.md` before planning, because that is where the named seam and the binding invariants live.

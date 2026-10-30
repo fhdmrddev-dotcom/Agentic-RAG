@@ -1980,6 +1980,8 @@ describe("099-08 — kickoff refusal surfaces the server detail", () => {
     expect(err).toBeInstanceOf(ApiError)
     expect((err as ApiError).status).toBe(409)
     expect(err?.message).toBe(LOCK_COPY)
+    // 302-02 (FE-IN-01 / D-26): the lock is told by a CODE the provider stamps, never by prose.
+    expect((err as ApiError & { code?: string }).code).toBe("workflow_locked")
 
     // 409 does NOT stash a draft — retrying a doomed Deep send is meaningless.
     expect(useStreamsStore.getState().failedSendDrafts.has("thread-A")).toBe(false)
@@ -2007,6 +2009,7 @@ describe("099-08 — kickoff refusal surfaces the server detail", () => {
     expect((err as ApiError).status).toBe(409)
     expect(err?.message).toBe(detail)
     expect(err?.message).not.toBe(LOCK_COPY)
+    expect((err as ApiError & { code?: string }).code).not.toBe("workflow_locked")
     expect(useStreamsStore.getState().failedSendDrafts.get("thread-A")).toBe("my prompt")
   })
 

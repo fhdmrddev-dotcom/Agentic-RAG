@@ -4,12 +4,18 @@ title: A scheduled run launches with a blank required input (the schedule door s
 reported: 2026-10-27
 surface: Agentic-RAG
 severity: minor
-status: folded  # 2026-10-29: folded into Phase 300 at discuss-phase (300-CONTEXT.md)
+status: closed  # 2026-10-30: 300 G4-5 PASS live (300 closed)
 affected_areas: ['backend/schedules', 'backend/workflows']
 folded_into: "300"
-verified_closed_by: null
+verified_closed_by: "300 G4-5"
 related_seeds: []
 re_open_trigger: "Fold at the next /gsd:discuss-phase whose files touch backend/app/services/scheduler_service.py or backend/app/api/schedules.py; found by the v4.7 close integration check, outside 296's inventory"
+status_note: >
+  2026-10-30 (302 REG-08): stays folded -> 300. Fixed in code by 300-01 (FIX-04) and driven live: 300 G4-5
+  PASS 2026-10-29 (Run now on the blank-input row reads "Didn't run — Client name is required and has no
+  value. …"; last_status holds the sentence). NOT closed ahead of the phase: 300 is human_needed — owed rows
+  G4-8 (email step, real mailbox) and the real-provider half of G4-1 (Resend deferred, 300-HUMAN-UAT.md:43).
+  Close at 300's verification. Previous status line, verbatim: `status: folded  # 2026-10-29: folded into Phase 300 at discuss-phase (300-CONTEXT.md)`.
 reproduces_on:
   branch: develop
   commit: 7e2c3e5bd

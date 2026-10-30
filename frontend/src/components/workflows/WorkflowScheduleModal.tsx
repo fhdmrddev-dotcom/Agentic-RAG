@@ -500,7 +500,9 @@ export function WorkflowScheduleModal({
                             on its own line. It WRAPS, never truncates: a clipped refusal hides
                             the input name, the one fact the author needs. The raw value never
                             reaches the screen. */}
-                        {outcome ? (
+                        {/* 302-03 (D-24, 300 G4-5 F-1): while this row shows its own Run now result, that line is
+                            the newer word on the same press — showing both said the refusal twice. */}
+                        {outcome && !runResult ? (
                           <p
                             data-testid="schedule-last-outcome"
                             className={`mt-1 text-[12px] break-words ${OUTCOME_TONE[outcome.tone]}`}

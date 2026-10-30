@@ -222,6 +222,7 @@ const EXPECTED_LABELS: ReadonlyArray<readonly [LibraryTab, string]> = [
  */
 function stoppedConditions(n: number, tab: LibraryTab | null = "health"): AttentionCondition[] {
   return Array.from({ length: n }, (_, i) => ({
+    mark: "library" as const, // 301-02 (D-31): every condition carries a required mark
     id: `watch-${i + 1}`,
     title: `Rate sheets ${i + 1}`,
     detail: "The watched folder is no longer shared with this connection.",
@@ -411,7 +412,7 @@ describe("attentionCountByTab — the derivation, with nothing mounted", () => {
   it("buckets by tab, not by producer — two tabs, two counts", () => {
     const mixed: AttentionCondition[] = [
       ...stoppedConditions(2, "health"),
-      { id: "x", title: "t", detail: "d", onOpen: vi.fn(), tab: "ingestion" },
+      { mark: "library", id: "x", title: "t", detail: "d", onOpen: vi.fn(), tab: "ingestion" },
     ]
     expect(attentionCountByTab(mixed)).toEqual({ health: 2, ingestion: 1 })
   })

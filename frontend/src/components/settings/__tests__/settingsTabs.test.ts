@@ -34,6 +34,7 @@ import {
   isSettingsTabVisible,
   resolveSettingsTab,
   settingsTabFallback,
+  settingsTabFromAddress,
   visibleSettingsTabs,
 } from "@/components/settings/settingsTabs"
 
@@ -122,5 +123,27 @@ describe("settingsTabs — the literal strip in SettingsPage.tsx follows the reg
     // Non-vacuity: a regex that matched nothing would make the order check meaningless.
     expect(ids.length).toBeGreaterThanOrEqual(6)
     expect(ids).toEqual(SETTINGS_TABS.map((t) => t.id))
+  })
+})
+
+describe("settingsTabs — a link can name its tab (v4.8 audit W-2)", () => {
+  it("?tab=preferences opens Preferences, where the run-waiting email switch lives", () => {
+    expect(settingsTabFromAddress("?tab=preferences")).toBe("6")
+  })
+
+  it("names a tab by its words, never by its routing id", () => {
+    expect(settingsTabFromAddress("?tab=api-keys")).toBe("7")
+    expect(settingsTabFromAddress("?tab=6")).toBeNull()
+  })
+
+  it("no tab, an unknown tab, or a retired tab falls back to the remembered choice (null)", () => {
+    expect(settingsTabFromAddress("")).toBeNull()
+    expect(settingsTabFromAddress("?other=1")).toBeNull()
+    expect(settingsTabFromAddress("?tab=nonsense")).toBeNull()
+  })
+
+  it("SettingsPage asks the address before the remembered tab", () => {
+    const src = stripComments(settingsPageSrc as string)
+    expect(src).toMatch(/settingsTabFromAddress\(window\.location\.search\)\s*\?\?\s*localStorage\.getItem\(SETTINGS_TAB_STORAGE_KEY\)/)
   })
 })

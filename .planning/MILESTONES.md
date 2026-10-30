@@ -1,5 +1,28 @@
 # Milestones
 
+## v4.8 Every Page Has a Link (Shipped: 2026-10-30)
+
+**Phases:** 6 (297-302) · **Plans:** 25 · **Commits:** 421 since `v4.7` (before the close commits) ·
+**Files:** 1,116 (+82,135 / −4,428; backend 16.1k, frontend 23.7k, planning 36.3k) · **Migrations:** 217-219 · **Timeline:** 2026-10-27 → 2026-10-30 (4 days)
+**Audit:** [`v4.8-MILESTONE-AUDIT.md`](milestones/v4.8-MILESTONE-AUDIT.md) — `tech_debt`, no blockers ·
+**28 / 28** satisfied · integration **21/21** (19 + W-1/W-2 fixed at close, `41198157b`) · flows **4/4**.
+⚠ Partly deployed: 297-300 live (prod `31416d335`, migrations 217-218 in cloud); 301, 302 and the two close fixes await an operator deploy (migration 219 first).
+
+Every place in the app has its own link, and a person is told, with a link, when a run is waiting on them.
+
+**Key accomplishments:**
+
+- **Every view has an address** (297). react-router in data mode behind one catch-all route, after a behaviour-neutral split of `App.tsx` / `ChatLayout.tsx`; refresh, Back/Forward and an unsaved-edits guard; a parity check over dev, Vercel and nginx.
+- **Lists follow the active org** (298). Library, Workflows, threads and run history narrow through one home (`org_lists`); a foreign-folder binding is refused with words; items elsewhere are counted and moved one at a time, each move audited.
+- **Links to the thing itself** (299). Thread, workflow, run and Expert addresses; copy link; one "can't be opened" page for missing and forbidden alike; a switch prompt for another org; sign-in returns to the link.
+- **Told when a run waits** (300, 301). Notices written by database triggers; one content-free email after a Settings delay, sent once across workers and restarts; per-user opt-out; Resend or SMTP from a built image; an in-app list and badge across every org that clears once answered.
+- **The close-out** (302). Workspace panel lists a thread's generated files; schedule-row wording; the six SEED-391 findings; seed and bug statuses made true.
+- **Found and fixed at close** (audit). An ex-member could be emailed a link they cannot open (W-1); the email's opt-out link opened the wrong Settings tab (W-2). Phase 301's security register written retroactively (23/23 closed).
+
+Known deferred items at close: 36 from the artifact audit — 31 pre-v4.8 quick tasks, 4 dormant seeds, 1 UAT file (300, complete by decision). Owed by decision: 300 G4-8 and the real-provider half of G4-1 (no mail provider), 299 G4-4b, Moonshot rows (BUG-261024-01). Re-run `gsd-sdk query audit-open`.
+
+---
+
 ## v4.7 Workflows You Can See and Start Anywhere (Shipped: 2026-10-27)
 
 **Phases:** 12 (286-296; 292.1 inserted; 294, 295, 296 added in-milestone) · **Plans:** 60 (+3 gap fixes in 295) · **Commits:** 885 since `v4.6` ·

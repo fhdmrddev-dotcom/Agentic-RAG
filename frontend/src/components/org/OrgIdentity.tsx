@@ -74,6 +74,9 @@ export interface OrgAvatarProps {
   initial: string
   /** Render the dashed indigo "not joined yet" variant instead of the solid gradient. */
   pending?: boolean
+  /** Phase 301-03 (UI-D4): "xs" is the 16px mark that fits a 12px line (the waiting list).
+   *  Omitted or "default" renders the shipped 36px circle, byte-identical. */
+  size?: "default" | "xs"
 }
 
 /**
@@ -81,12 +84,14 @@ export interface OrgAvatarProps {
  * for a still-pending invitee. Decorative (aria-hidden); the accessible identity is
  * the name/email the call site renders alongside it.
  */
-export function OrgAvatar({ initial, pending = false }: OrgAvatarProps) {
+export function OrgAvatar({ initial, pending = false, size = "default" }: OrgAvatarProps) {
+  const base =
+    size === "xs" ? AVATAR_BASE.replace("h-9 w-9", "h-4 w-4").replace("text-sm", "text-[10px]") : AVATAR_BASE
   return (
     <div
       data-testid="org-avatar"
       aria-hidden="true"
-      className={cn(AVATAR_BASE, pending ? AVATAR_PENDING : AVATAR_SOLID)}
+      className={cn(base, pending ? AVATAR_PENDING : AVATAR_SOLID)}
     >
       {initial}
     </div>

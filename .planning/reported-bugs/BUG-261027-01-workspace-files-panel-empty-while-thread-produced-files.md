@@ -4,12 +4,18 @@ title: The Workspace panel reads FILES 0 · No files yet in a thread whose two t
 reported: 2026-10-27
 surface: Agentic-RAG
 severity: minor
-status: open
+status: closed  # 2026-10-30: 302 G4-1 PASS live (list + count + download)
 affected_areas: ['frontend/panel', 'frontend/workspace']
-folded_into: null
-verified_closed_by: null
+folded_into: "302"
+verified_closed_by: "302 G4-1"
 related_seeds: []
 re_open_trigger: "Fold at the next /gsd:discuss-phase whose files touch frontend/panel; found during the 296 G-4 drive, outside 296's inventory"
+status_note: >
+  2026-10-30 (302 REG-08): stays folded -> 302. Fixed IN CODE by 302-01 (0e9aaed94, 19d4589b5): read-side,
+  the panel's FILES section now lists the thread's generated files from its own messages
+  (useThreadMessages(threadId, "chat") -> deriveGeneratedFiles), with one count for the header, the rail and
+  hasActivity. NOT closed: it closes when 302 G4-1 (repro thread 3586b900, 302-VALIDATION.md) passes in
+  Chrome; verification then sets status closed + verified_closed_by. Previous status line: `status: folded`.
 reproduces_on:
   branch: develop
   commit: 01546a07d

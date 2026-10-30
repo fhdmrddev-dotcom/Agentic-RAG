@@ -108,3 +108,37 @@ describe("OrgAvatar — gradient initial circle + dashed pending variant", () =>
     expect(el.className).not.toContain("bg-gradient-to-br")
   })
 })
+
+// Phase 301-03 (UI-SPEC UI-D4) — one additive size so the org mark fits a 12px line in the
+// "Waiting on you" list. The default path must be byte-identical at every existing caller.
+describe("OrgAvatar size — xs for the waiting list (UI-D4)", () => {
+  const DEFAULT_SOLID =
+    "flex h-9 w-9 flex-none items-center justify-center rounded-full text-sm font-semibold bg-gradient-to-br from-primary to-primary/60 text-white"
+
+  it("no size renders today's exact class string", () => {
+    render(<OrgAvatar initial="A" />)
+    expect(screen.getByTestId("org-avatar").className).toBe(DEFAULT_SOLID)
+  })
+
+  it('size="default" renders the same string', () => {
+    render(<OrgAvatar initial="A" size="default" />)
+    expect(screen.getByTestId("org-avatar").className).toBe(DEFAULT_SOLID)
+  })
+
+  it('size="xs" → a 16px circle with a 10px initial, not the 36px one', () => {
+    render(<OrgAvatar initial="A" size="xs" />)
+    const classes = screen.getByTestId("org-avatar").className.split(/\s+/)
+    for (const token of ["h-4", "w-4", "text-[10px]", "rounded-full", "bg-gradient-to-br"]) {
+      expect(classes).toContain(token)
+    }
+    for (const token of ["h-9", "w-9", "text-sm"]) expect(classes).not.toContain(token)
+  })
+
+  it("pending styling still applies at xs", () => {
+    render(<OrgAvatar initial="B" size="xs" pending />)
+    const classes = screen.getByTestId("org-avatar").className.split(/\s+/)
+    expect(classes).toContain("h-4")
+    expect(classes).toContain("border-dashed")
+    expect(classes).not.toContain("bg-gradient-to-br")
+  })
+})

@@ -1,8 +1,9 @@
 ---
 phase: 300-told-when-a-run-waits-backend-and-mailer
 verified: 2026-10-29T14:00:00Z
-status: human_needed
-score: 5/5 roadmap success criteria verified in code; 0 failed
+status: passed  # 2026-10-30, operator mandate to finish — CLOSED BY DECISION with G4-8 + the real-provider half of G4-1 owed (Resend deferred by the operator 2026-10-29; sending real mail needs an explicit OK)
+owed_by_decision: [G4-8, G4-1-real-provider]
+score: 5/5 roadmap success criteria verified in code; UAT 14/15 rows PASS (G4-1 via a local SMTP catcher); G4-8 owed by decision
 overrides_applied: 0
 gaps: []
 human_verification:

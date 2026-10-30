@@ -1,16 +1,18 @@
 ---
-status: partial
+status: complete-by-decision
 phase: 300-told-when-a-run-waits-backend-and-mailer
 source: [300-VERIFICATION.md, 300-VALIDATION.md]
 started: 2026-10-29
 updated: 2026-10-29
 rows_total: 15
-rows_run: 12
-rows_blocked: 0
+rows_run: 14
+rows_blocked: 1  # G4-8 (real mailbox; Resend deferred)
 driver: operator (Claude can drive the API/DB rows on request)
 ---
 
-# Phase 300 — Human UAT (owed)
+# Phase 300 — Human UAT (closed 2026-10-30 by decision)
+
+**14 of 15 rows PASS; G4-8 ⛔ owed by decision.** The phase is closed under the operator's 2026-10-30 mandate ("continue autonomously until you finish this phase"). G4-8 and the real-provider half of G4-1 need a real mail provider, which the operator deferred (2026-10-29), and sending a real email needs an explicit OK. Re-open trigger: the day a mail provider is configured, run G4-8 and the real-provider half of G4-1, then close BUG-260828-05/06.
 
 Verification returned `human_needed` (`300-VERIFICATION.md`): **5/5 ROADMAP success criteria and 6/6 requirements
 (NOTE-02, NOTE-03, NOTE-04, NOTE-06, FIX-04, FIX-05) are verified in code and tests**, with no gaps. What is left
@@ -41,6 +43,8 @@ before G4-6; Phase 300 cannot close until both have run.
 | DEPLOY | Paste migration 218 (incl. WR-04 + UF-1 amendments) into cloud SQL editor → `get_advisors(security)`; Coolify `EMAIL_PROVIDER`, `RESEND_API_KEY`, `ENVIRONMENT=production`; Resend sender on `notify.<domain>` + SPF/DKIM/DMARC at Hostinger; one-box outbound SMTP; CI image build | Operator, only on "deploy" (each cloud write needs per-action approval) | at deploy |
 
 ⏸ **Resend DEFERRED by operator (2026-10-29: "I want to defer resend for now").** 299 + 300 may deploy with `EMAIL_PROVIDER` unset/`none`: notices are still written, deliveries record `suppressed` ("Email is not set up on this server."), invites fall back to Copy link. Migration 218 still goes first (the drainer and triggers need it). G4-8 and the real-mailbox half of G4-1 stay owed until a provider is configured (Resend on cloud, or SMTP on the one-box).
+
+✅ **DEPLOYED 2026-10-29** — production `31416d335` (master `f73dc7cb5`), 299 + 300 together; new backend up 19:26:45 UTC (`/links` 404 → 401), frontend bundle carries 299 copy. Cloud has 0 notices so far.
 
 ✅ **Migration 218 applied to cloud 2026-10-29** (Supabase MCP, operator "apply 218"): verify query PASS; app_settings 4 email columns (delay 120), org_invitations 3; `get_advisors(security)` 0 ERROR — the only new lint is INFO `rls_enabled_no_policy` on `notification_deliveries` (deny-all by design, D-19); the two new definer functions are not flagged (EXECUTE revoked). Supabase Auth Redirect URLs added by the operator (cloud).
 

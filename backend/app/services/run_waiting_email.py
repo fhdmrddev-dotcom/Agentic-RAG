@@ -5,7 +5,7 @@
   * the org's name                — ``<strong>``, HTML-escaped; dropped when the run has none
   * how long the run has waited   — floor words (``duration_words``), never seconds
   * the kind word                 — "answer" for a question, "approval" for an approval (D-04)
-  * two links on ``primary_frontend_origin()`` — ``/app/runs/<id>`` and ``/app/settings``,
+  * two links on ``primary_frontend_origin()`` — ``/app/runs/<id>`` and ``/app/settings?tab=preferences``,
     no token and no query string (D-05)
 
 ⛔ NEVER ACCEPT PROMPT TEXT. The signature takes exactly those inputs, keyword-only; there is no
@@ -81,7 +81,7 @@ def render_run_waiting(
     duration = duration_words(waited_seconds)
     origin = primary_frontend_origin()
     run_link = f"{origin}/app/runs/{run_id}"
-    settings_link = f"{origin}/app/settings"
+    settings_link = f"{origin}/app/settings?tab=preferences"  # v4.8 audit W-2: the switch's tab
 
     subject_name = name if len(name) <= SUBJECT_NAME_MAX else name[: SUBJECT_NAME_MAX - 1] + "…"
     subject = f"{subject_name} is waiting on you"

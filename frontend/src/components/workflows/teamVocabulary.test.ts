@@ -266,3 +266,11 @@ describe("teamVocabulary — a TRUE LEAF that carries no step sentence and no se
     )
   })
 })
+
+describe("teamVocabulary — 302-02 (FE-IN-06 / D-11, UI-D12)", () => {
+  it("the scroll region has its own name, distinct from the figure's", () => {
+    const label = (teamVocabulary as Record<string, unknown>).TEAM_SCROLL_REGION_LABEL
+    expect(label).toBe("Team view, scrollable")
+    expect(label).not.toBe(teamVocabulary.teamFigureLabel("Anything"))
+  })
+})

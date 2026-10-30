@@ -15,8 +15,11 @@ import type { ActiveView } from "@/App"
 import type { NavItem } from "@/lib/nav-items"
 // Phase 235 plan 09 (SURF-03): the badge's words and its popover. ⚠ The TYPE only — the
 // registry that produces the conditions is read by `ChatLayout`, never here.
-import type { AttentionCondition } from "./attentionConditions"
+// Phase 301-02 (D-12): plus `conditionsForMark`, a strict leaf (no hook, no fetch), so the rule
+// above still holds — the registry is RESOLVED only by ChatLayout; this filters what it was handed.
+import { conditionsForMark, type AttentionCondition, type WaitingStatus } from "./attentionConditions"
 import { AttentionPopover } from "./AttentionPopover"
+import { WaitingOnYouControl } from "./WaitingOnYouControl"
 
 // Phase 156 (POLISH-01 / D-01, D-07, Wave 1): NavPanel is a PERMANENT icon rail —
 // logo → New Chat (+) → nav icons → footer icons. The old collapsible w-64↔w-16 column
@@ -67,6 +70,9 @@ interface Props {
   // The one door the popover opens. ⚠ When it is absent NOTHING renders — no badge and no
   // popover — so a caller that has not wired it gets silence rather than a dead control.
   onOpenLibraryHealth?: () => void
+  // Phase 301-03 (D-17): how fresh the waiting list is, as the shell's one read knows it. The
+  // waiting control shows its pill only for an ANSWERED total, so it needs this beside the rows.
+  waitingStatus?: WaitingStatus
 }
 
 // One rail control, two renderings. Collapsed → a 40px icon square wrapped in a
@@ -146,6 +152,7 @@ export function NavPanel({
   onToggleExpanded,
   attentionConditions,
   onOpenLibraryHealth,
+  waitingStatus,
 }: Props) {
   const isControlRoom = activeView === "control-room"
   // Phase 257.1 — mirrors the isControlRoom/isOrgAdmin actives above; see the rail entry below.
@@ -162,7 +169,11 @@ export function NavPanel({
   // instance where one check failed and the next recovered, both arrive as an EMPTY array —
   // so both render nothing, and SC#4's *"a person who has ignored it once has not been
   // trained to ignore it always"* is honoured by having no second decider at all.
-  const attention = attentionConditions ?? []
+  //
+  // Phase 301-02 (D-12): the Library badge, its count and its popover read LIBRARY conditions
+  // only. A waiting run (mark "waiting") belongs to the waiting-on-you control (301-03), never
+  // to the Library's number or rows.
+  const attention = conditionsForMark(attentionConditions ?? [], "library")
   // The navigator is what makes the signal actionable; without it there is nothing to open,
   // so a badge would be a control that does nothing. Silence is the honest answer.
   const showAttention = attention.length > 0 && Boolean(onOpenLibraryHealth)
@@ -286,6 +297,15 @@ export function NavPanel({
             onNavigate("chat")
           }}
           className="text-primary bg-primary/10 hover:bg-primary/20"
+        />
+
+        {/* Phase 301-03 (D-01 / UI-D2): the waiting-on-you control, ALWAYS present, directly under
+            New chat. Not gated on the Library navigator: a waiting run leads to its run. */}
+        <WaitingOnYouControl
+          variant="rail"
+          expanded={expanded}
+          conditions={conditionsForMark(attentionConditions ?? [], "waiting")}
+          status={waitingStatus}
         />
 
         {navItems.map(({ view, icon, label }) => {

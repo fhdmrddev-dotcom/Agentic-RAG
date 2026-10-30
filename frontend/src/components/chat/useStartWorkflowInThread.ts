@@ -7,9 +7,15 @@ import { COPY } from "./composerCopy"
 
 /** 296-04 (287-WR-02 / 287-IN-03): why an in-thread start did not run, worded for the person. */
 export interface StartFailure {
-  kind: "locked" | "inputs" | "folder" | "failed"
+  kind: "locked" | "inputs" | "folder" | "refused" | "failed"
   message: string
 }
+
+/**
+ * 302-02 (FE-IN-01 / D-09): the start of the server's paused 409 (workflow_kickoff.py). A WIRE
+ * match, not copy — the person reads `composerCopy.shared.startPaused`. Cross-pinned by a ?raw test.
+ */
+export const WORKFLOW_PAUSED_DETAIL_PREFIX = "This thread's workflow is paused"
 
 function statusOf(err: unknown): number | null {
   const s = (err as { status?: unknown } | null)?.status
@@ -23,11 +29,24 @@ function statusOf(err: unknown): number | null {
  * sentence. It is authored server-side for exactly this surface: it names the folder, and its
  * org only when the person can see that folder, so the client has nothing to add and no safe
  * way to say it better. The CODE decides, never the prose; every other 422 keeps its sentence.
+ *
+ * 302-02 (D-26 / FE-IN-01): the SECOND recorded exception — a 409 that is neither the lock nor a
+ * pause shows the server's sentence, because those (the org mismatches, 299 D-18 / D-38, 279-02)
+ * are authored for this person on the server. The lock is told by the CODE the provider stamps,
+ * never by prose; a pause by the server's wire prefix, worded here by `startPaused`.
  */
 function failureFor(err: unknown, name: string): StartFailure {
   const status = statusOf(err)
-  if (status === 409) return { kind: "locked", message: COPY.shared.startLocked(name) }
   const code = (err as { code?: unknown } | null)?.code
+  if (status === 409) {
+    const sentence = err instanceof Error ? err.message : ""
+    if (code === "workflow_locked") return { kind: "locked", message: COPY.shared.startLocked(name) }
+    if (sentence.startsWith(WORKFLOW_PAUSED_DETAIL_PREFIX)) {
+      return { kind: "locked", message: COPY.shared.startPaused(name) }
+    }
+    if (sentence) return { kind: "refused", message: COPY.shared.startRefusedWith(name, sentence) }
+    return { kind: "failed", message: COPY.shared.startFailed(name) }
+  }
   if (status === 422 && code === "folder_in_other_org" && err instanceof Error && err.message) {
     return { kind: "folder", message: err.message }
   }
@@ -156,7 +175,8 @@ export function useStartWorkflowInThread(threadId: string) {
   const retry = useCallback(() => {
     const last = lastAttempt.current
     // 298-02: a folder refusal offers no Retry — the same published workflow is refused again.
-    if (!failure || !last || failure.kind === "locked" || failure.kind === "folder") return
+    // 302-02: nor a refused 409 — the same start would be refused again.
+    if (!failure || !last || failure.kind === "locked" || failure.kind === "folder" || failure.kind === "refused") return
     setFailure(null)
     if (failure.kind === "inputs") {
       setPendingValues(last.inputs)
