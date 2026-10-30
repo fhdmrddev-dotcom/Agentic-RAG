@@ -28,7 +28,7 @@ import { axe } from "vitest-axe"
 // ?raw loader to assert the new run-soul wiring is a pure additive SIBLING — it
 // must NOT import PhaseCard nor thread any soul atom into the live timeline.
 import workspacePanelSource from "@/components/panel/WorkspacePanel?raw"
-import type { Todo, WorkspaceFile, PendingAsk, Phase, TaskRunIndexItem } from "@/types"
+import type { Todo, WorkspaceFile, PendingAsk, Phase, TaskRunIndexItem, Message } from "@/types"
 import type { DerivedPanelItem } from "@/lib/workspacePanel"
 // ⚠ The REAL store — deliberately NOT mocked. See the selector block below: it is
 // what makes two mounts rendered for one thread share one source of truth.
@@ -72,6 +72,9 @@ const useWorkflowLockForThread = vi.fn()
 // the gate→derived render path is exercised in WorkspacePanel.derived.test.tsx
 // (which renders the REAL TodosSection — this file sentinel-mocks it).
 const useDerivedPanel = vi.fn()
+// Phase 302-01 (FIX-01): the panel's file count now also counts the thread's GENERATED files,
+// read from the chat's own message bucket through useThreadFiles. setHooks defaults it to [].
+const useThreadMessages = vi.fn()
 // Phase 194 Plan 03 Task 1 (RUN-01 / SC#1) — the NINTH key.
 //
 // ⚠ THIS MOCK IS AN EXPLICIT OBJECT LITERAL, NOT A PASSTHROUGH. It carried exactly
@@ -127,6 +130,7 @@ vi.mock("@/providers/StreamsProvider", () => ({
   useTasks: (...a: unknown[]) => useTasks(...a),
   useWorkflowLockForThread: (...a: unknown[]) => useWorkflowLockForThread(...a),
   useDerivedPanel: (...a: unknown[]) => useDerivedPanel(...a),
+  useThreadMessages: (...a: unknown[]) => useThreadMessages(...a),
   useStreamActions: (...a: unknown[]) => useStreamActions(...a),
   useStoppingForThread: (t: string | null) => useStoppingForThread(t),
   useStopNotConfirmedForThread: (t: string | null) => useStopNotConfirmedForThread(t),
@@ -195,6 +199,7 @@ function setHooks({
   tasks = [] as TaskRunIndexItem[],
   lock = null as { runId: string; mode: "harness"; capPaused: boolean; continuesRemaining: number } | null,
   derived = [] as DerivedPanelItem[],
+  messages = [] as Message[],
 }: {
   todos?: Todo[]
   files?: WorkspaceFile[]
@@ -204,6 +209,7 @@ function setHooks({
   tasks?: TaskRunIndexItem[]
   lock?: { runId: string; mode: "harness"; capPaused: boolean; continuesRemaining: number } | null
   derived?: DerivedPanelItem[]
+  messages?: Message[]
 }) {
   useTodos.mockReturnValue({ data: todos, isLoading: false, error: null, reconcile: vi.fn() })
   useWorkspaceFiles.mockReturnValue({ data: files, isLoading: false, error: null, reconcile: vi.fn() })
@@ -213,6 +219,7 @@ function setHooks({
   useTasks.mockReturnValue({ data: tasks, isLoading: false, error: null, reconcile: vi.fn() })
   useWorkflowLockForThread.mockReturnValue(lock)
   useDerivedPanel.mockReturnValue(derived)
+  useThreadMessages.mockReturnValue(messages)
   // Phase 194 Plan 03 — reset BEFORE wiring, so a "called exactly once" assertion is
   // a measurement of THIS test's click and never of a previous test's.
   stopThread.mockReset()
@@ -378,6 +385,46 @@ describe("WorkspacePanel (PANEL-01) — controlled composition", () => {
     expect(onToggle).not.toHaveBeenCalled()
     expect(onExpand).not.toHaveBeenCalled()
     expect(screen.getByTestId("todos-section")).toBeInTheDocument()
+  })
+
+  // Phase 302-01 (FIX-01 / BUG-261027-01, UI-D6): a thread whose ONLY files are generated must
+  // not short-circuit to PanelEmpty, and every count must include them.
+  const genMsg = (names: string[]): Message =>
+    ({
+      id: "m-gen",
+      thread_id: "thread-1",
+      user_id: "u1",
+      role: "assistant",
+      content: "",
+      created_at: "2026-10-27T10:00:00Z",
+      updated_at: "2026-10-27T10:00:00Z",
+      finalOutputFiles: names.map((filename) => ({ filename, url: `/sandbox-outputs/u/e/${filename}` })),
+    }) as Message
+
+  it("302-01: generated files only — the body renders (no PanelEmpty) and the Files count reads 3", () => {
+    setHooks({ todos: [], files: [], asks: [], messages: [genMsg(["c1.png", "c2.png", "report.pdf"])] })
+    renderPanel({ state: "open" })
+    expect(screen.queryByText(/No workspace activity yet/i)).toBeNull()
+    expect(screen.getByTestId("files-section")).toBeInTheDocument()
+    expect(screen.getByRole("button", { name: /^Files\s*3$/ })).toBeInTheDocument()
+    expect(useThreadMessages).toHaveBeenCalledWith("thread-1", "chat")
+  })
+
+  it("302-01: generated files only — the rail reads 'Files — 3'", () => {
+    setHooks({ todos: [], files: [], asks: [], messages: [genMsg(["c1.png", "c2.png", "report.pdf"])] })
+    renderPanel({ state: "rail" })
+    expect(screen.getByRole("button", { name: "Files — 3" })).toBeInTheDocument()
+  })
+
+  it("302-01: workspace 2 + generated 3 with one shared name counts 4", () => {
+    setHooks({
+      todos: [],
+      files: mockWorkspaceFiles.slice(0, 2),
+      asks: [],
+      messages: [genMsg([mockWorkspaceFiles[0].path, "c1.png", "c2.png"])],
+    })
+    renderPanel({ state: "open" })
+    expect(screen.getByRole("button", { name: /^Files\s*4$/ })).toBeInTheDocument()
   })
 
   it("short-circuits to a single <PanelEmpty/> when todos, files, and asks are all empty (no four empty headers)", () => {

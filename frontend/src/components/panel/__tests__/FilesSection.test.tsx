@@ -6,11 +6,12 @@
  * roles are present. FilePreview is mocked to a thin sentinel (its own routing
  * is covered by FilePreview.test.tsx); the two Phase 086 hooks are mocked.
  */
-import { describe, it, expect, vi, beforeEach } from "vitest"
-import { render, screen } from "@testing-library/react"
+import { describe, it, expect, vi, beforeEach, afterEach } from "vitest"
+import { render, screen, within } from "@testing-library/react"
 import userEvent from "@testing-library/user-event"
 import { axe } from "vitest-axe"
 import { mockWorkspaceFiles } from "./fixtures"
+import type { Message, WorkspaceFile as WsFile } from "@/types"
 
 const useWorkspaceFiles = vi.fn()
 const useViewingThread = vi.fn()
@@ -19,16 +20,25 @@ const useViewingThread = vi.fn()
 // no-op spy here — the upload-reconcile path is exercised live (G-4 UAT), and
 // the render tests below only need the hook to resolve without throwing.
 const setWorkspaceFileForThread = vi.fn()
+// Phase 302-01 (FIX-01): FilesSection now also reads the chat's own message bucket (through
+// useThreadFiles) so it can list the thread's generated files. Default: no messages, so every
+// pre-302 case renders exactly the list it rendered before.
+const useThreadMessages = vi.fn((..._a: unknown[]): Message[] => [])
 vi.mock("@/providers/StreamsProvider", () => ({
   useWorkspaceFiles: (...a: unknown[]) => useWorkspaceFiles(...a),
   useViewingThread: (...a: unknown[]) => useViewingThread(...a),
   useStreamActions: () => ({ setWorkspaceFileForThread }),
+  useThreadMessages: (...a: unknown[]) => useThreadMessages(...a),
 }))
 
 // Phase 100-06: stub the upload client so importing FilesSection never reaches
 // the real fetch path (the button-click upload flow is a live G-4 UAT row).
+// Phase 302-01: plus the sandbox download the generated rows call.
+const downloadSandboxOutput = vi.fn()
 vi.mock("@/lib/api", () => ({
   uploadWorkspaceTemplate: vi.fn(),
+  downloadSandboxOutput: (...a: unknown[]) => downloadSandboxOutput(...a),
+  DownloadError: class DownloadError extends Error {},
 }))
 
 // Phase 274-04: a template_input row's trailing slot reads the thread's Library marks. The store
@@ -771,5 +781,104 @@ describe("FilesSection (Phase 274-04) — Save to Library on the panel row", () 
     await userEvent.setup().keyboard("{ContextMenu}")
     expect(await screen.findAllByRole("menuitem")).toHaveLength(1)
     expect(screen.queryByTestId("file-preview")).toBeNull()
+  })
+})
+
+// ════════════════════════════════════════════════════════════════════════════
+// Phase 302 plan 01 — FIX-01 / BUG-261027-01: the thread's GENERATED files.
+//
+// The bug's own shape (302-RESEARCH F1, thread 3586b900): zero workspace_files rows while the
+// thread's messages carry output files. The panel read only workspace_files, so it said
+// "No files yet." These cases drive that shape and its neighbours.
+// ════════════════════════════════════════════════════════════════════════════
+describe("302-01 — FilesSection lists the thread's generated files (FIX-01)", () => {
+  const genMsg = (files: { filename: string; url?: string; size?: number }[]): Message =>
+    ({
+      id: "m-gen",
+      thread_id: "thread-1",
+      user_id: "u1",
+      role: "assistant",
+      content: "",
+      created_at: "2026-10-27T10:00:00Z",
+      updated_at: "2026-10-27T10:00:00Z",
+      finalOutputFiles: files,
+    }) as Message
+  const wsFile = (path: string): WsFile => ({ id: `ws-${path}`, path, size_bytes: 120, mime_type: "text/plain", version: 1 })
+  const setWorkspace = (data: WsFile[]) =>
+    useWorkspaceFiles.mockReturnValue({ data, isLoading: false, error: null, reconcile: vi.fn() })
+
+  beforeEach(() => {
+    useViewingThread.mockReturnValue("thread-1")
+    downloadSandboxOutput.mockReset()
+    downloadSandboxOutput.mockResolvedValue(undefined)
+  })
+  afterEach(() => {
+    useThreadMessages.mockImplementation(() => [])
+  })
+
+  it("reads the VIEWED thread's chat bucket (the chat's own call)", () => {
+    setWorkspace([])
+    render(<FilesSection />)
+    expect(useThreadMessages).toHaveBeenCalledWith("thread-1", "chat")
+  })
+
+  it("workspace empty + two generated: TemplateUpload, then the group of two links; never 'No files yet.'", () => {
+    setWorkspace([])
+    useThreadMessages.mockImplementation(() => [
+      genMsg([
+        { filename: "c1.png", url: "/sandbox-outputs/u/e/c1.png", size: 2048 },
+        { filename: "c2.png", url: "/sandbox-outputs/u/e/c2.png" },
+      ]),
+    ])
+    render(<FilesSection />)
+    const upload = screen.getByRole("button", { name: "Upload template" })
+    const group = screen.getByRole("group", { name: "Generated files" })
+    expect(upload.compareDocumentPosition(group) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy()
+    const links = within(group).getAllByRole("link")
+    expect(links.map((l) => l.getAttribute("download"))).toEqual(["c1.png", "c2.png"])
+    expect(screen.queryByText("No files yet.")).toBeNull()
+    expect(screen.queryByRole("listbox")).toBeNull()
+  })
+
+  it("workspace one + generated one: one option in the listbox, the group after it, ArrowDown stays in the listbox", async () => {
+    setWorkspace([wsFile("notes.md")])
+    useThreadMessages.mockImplementation(() => [genMsg([{ filename: "c1.png", url: "/sandbox-outputs/u/e/c1.png" }])])
+    render(<FilesSection />)
+    const listbox = screen.getByRole("listbox", { name: "Workspace files" })
+    const options = within(listbox).getAllByRole("option")
+    expect(options).toHaveLength(1)
+    const group = screen.getByRole("group", { name: "Generated files" })
+    expect(listbox.compareDocumentPosition(group) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy()
+    expect(listbox).not.toContainElement(within(group).getByRole("link"))
+    options[0].focus()
+    await userEvent.setup().keyboard("{ArrowDown}")
+    expect(document.activeElement).toBe(options[0])
+  })
+
+  it("both empty: 'No files yet.' as today", () => {
+    setWorkspace([])
+    render(<FilesSection />)
+    expect(screen.getByText("No files yet.")).toBeInTheDocument()
+    expect(screen.queryByRole("group", { name: "Generated files" })).toBeNull()
+  })
+
+  it("clicking a generated row downloads it and never opens FilePreview or calls onSelectFile", async () => {
+    setWorkspace([])
+    useThreadMessages.mockImplementation(() => [genMsg([{ filename: "c1.png", url: "/sandbox-outputs/u/e/c1.png" }])])
+    const onSelectFile = vi.fn()
+    render(<FilesSection onSelectFile={onSelectFile} />)
+    await userEvent.setup().click(screen.getByRole("link", { name: /c1\.png/ }))
+    expect(downloadSandboxOutput).toHaveBeenCalledWith("/sandbox-outputs/u/e/c1.png", "c1.png")
+    expect(screen.queryByTestId("file-preview")).toBeNull()
+    expect(onSelectFile).not.toHaveBeenCalled()
+  })
+
+  it("a generated name the workspace already holds is listed once, as the option", () => {
+    setWorkspace([wsFile("c1.png")])
+    useThreadMessages.mockImplementation(() => [genMsg([{ filename: "c1.png", url: "/sandbox-outputs/u/e/c1.png" }])])
+    render(<FilesSection />)
+    expect(screen.getAllByText("c1.png")).toHaveLength(1)
+    expect(screen.getAllByRole("option")).toHaveLength(1)
+    expect(screen.queryByRole("group", { name: "Generated files" })).toBeNull()
   })
 })
