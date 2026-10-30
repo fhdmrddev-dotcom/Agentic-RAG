@@ -1,7 +1,7 @@
 ---
 phase: 302
 slug: close-out-and-a-true-register
-status: planned
+status: driven  # 2026-10-30: every row driven; Moonshot XP and G4-3 (c) ⛔ with reasons
 created: 2026-10-30
 nyquist_validation: false   # config.json; this file holds the UAT rows the CLAUDE.md scoreboard rule requires
 ---
@@ -49,32 +49,34 @@ per group; re-derive at run time — never trust this list over the registry):
 
 | # | Provider | Representative id (re-derive) | Verdict | Evidence |
 |---|----------|-------------------------------|---------|----------|
-| 1 | OpenAI | gpt-5.6-sol (newest gpt-5.6 in registry) | owed | |
-| 2 | Anthropic | claude-opus-4-8 | owed | |
-| 3 | Google | gemini-3.5-flash | owed (highest-risk row for tool-call emission) | |
-| 4 | DeepSeek | deepseek-v4-pro | owed | |
-| 5 | Zhipu / GLM | glm-5.2 | owed | |
-| 6 | MiniMax | MiniMax-M3 | owed | |
-| 7 | Moonshot / Kimi | kimi-k2.6 | owed — **expected ⛔ — account suspended (296), confirm at run time** | |
-| 8 | OpenRouter | deepseek/deepseek-v4-pro | owed — **expected ⛔ if 402 persists** (292.1) | |
+| 1 | OpenAI | gpt-5.6-luna (newest of the tied gpt-5.6 trio) | **PASS** | 2026-10-30, dev org `c1f18150`, fresh thread, per-request model+provider (no global setting changed). Panel DOM: FILES 1, **Generated files** lists `chart.png · 21.5 KB`; no "No files yet"; download endpoint 200 → 21980 B, PNG signature. Thread `622c901f`. |
+| 2 | Anthropic | claude-opus-5-5 | **PASS** | 2026-10-30, dev org `c1f18150`, fresh thread, per-request model+provider (no global setting changed). Panel DOM: FILES 1, **Generated files** lists `chart.png · 18.0 KB`; no "No files yet"; download endpoint 200 → 18478 B, PNG signature. Thread `65f0fe08`. |
+| 3 | Google | gemini-3.8-flash | **PASS** | 2026-10-30, dev org `c1f18150`, fresh thread, per-request model+provider (no global setting changed). Panel DOM: FILES 1, **Generated files** lists `chart.png · 45.8 KB`; no "No files yet"; download endpoint 200 → 46944 B, PNG signature. Thread `15f6a7eb`. |
+| 4 | DeepSeek | deepseek-v4-pro | **PASS** | 2026-10-30, dev org `c1f18150`, fresh thread, per-request model+provider (no global setting changed). Panel DOM: FILES 1, **Generated files** lists `chart.png · 23.9 KB`; no "No files yet"; download endpoint 200 → 24426 B, PNG signature. Thread `d6fab1cd`. |
+| 5 | Zhipu / GLM | glm-5.3-flash | **PASS** | 2026-10-30, dev org `c1f18150`, fresh thread, per-request model+provider (no global setting changed). Panel DOM: FILES 1, **Generated files** lists `chart.png · 20.7 KB`; no "No files yet"; download endpoint 200 → 21242 B, PNG signature. Thread `7c320e30`. |
+| 6 | MiniMax | MiniMax-M3 | **PASS** | 2026-10-30, dev org `c1f18150`, fresh thread, per-request model+provider (no global setting changed). Panel DOM: FILES 1, **Generated files** lists `chart.png · 25.5 KB`; no "No files yet"; download endpoint 200 → 26124 B, PNG signature. Thread `1bfc1efb`. |
+| 7 | Moonshot / Kimi | kimi-k3.1-pro-highspeed | ⛔ BUG-261024-01 | 2026-10-30: run `f9608826` failed `RateLimitError 429` (account suspended / balance). Thread `3dca5f32`. |
+| 8 | OpenRouter | deepseek/deepseek-v4.1-flash | **PASS** | 2026-10-30, dev org `c1f18150`, fresh thread, per-request model+provider (no global setting changed). Panel DOM: FILES 1, **Generated files** lists `chart.png · 21.5 KB`; no "No files yet"; download endpoint 200 → 22052 B, PNG signature. Thread `b559e421`. |
+
+**Cross-provider: 7/8 PASS, 1 ⛔ (Moonshot).** Roster re-derived at run time with `scripts/run-273-board.py --roster` (effective registry = seed + overrides; the 2026-10-30 list above this table was stale for 5 of 8 ids). Every PASS row: run `completed`, tools `execute_code`.
 
 ### 3b. Multi-tool
 
 | Row | Steps | Expected | Verdict | Evidence |
 |-----|-------|----------|---------|----------|
-| MT-1 | One prompt that uses `search_documents` and then `execute_code` to write a file from what it found | the file lists under Generated files and downloads | owed | |
+| MT-1 | One prompt that uses `search_documents` and then `execute_code` to write a file from what it found | the file lists under Generated files and downloads | **PASS** | 2026-10-30, deepseek-v4-pro, thread `950c85f3`, run `db1817f5`: tools `search_documents,execute_code` in that order; panel FILES 1, Generated files `findings.csv · 1.6 KB`; download 200 → 1,614 B starting `point,source document` / `Employees accrue …`. |
 
 ### 3c. Parallel-thread
 
 | Row | Steps | Expected | Verdict | Evidence |
 |-----|-------|----------|---------|----------|
-| PT-1 | Thread A's `execute_code` turn produces a file while thread B streams a long reply | A's panel lists the file; B's stream is intact | owed | |
+| PT-1 | Thread A's `execute_code` turn produces a file while thread B streams a long reply | A's panel lists the file; B's stream is intact | **PASS** | 2026-10-30, deepseek-v4-pro, launched together: A `46e155f9` (run 03:53:33→03:54:03 UTC) and B `f0bd7d32` (03:53:33→03:54:08) overlap fully. A's panel: FILES 1, `chart.png · 18.7 KB`, download 200 → 19,108 B PNG. B: no tools, 7,851-char essay persisted and rendered (12 'cartograph' mentions), no generated files listed. |
 
 ### 3d. Long-message
 
 | Row | Steps | Expected | Verdict | Evidence |
 |-----|-------|----------|---------|----------|
-| LM-1 | A thread with ≥ 50 messages whose EARLY turn produced a file | the early file still lists (tests RESEARCH A1 — the chat history is unpaged, so the fold sees every turn) | owed | |
+| LM-1 | A thread with ≥ 50 messages whose EARLY turn produced a file | the early file still lists (tests RESEARCH A1 — the chat history is unpaged, so the fold sees every turn) | **PASS** | 2026-10-30: the DeepSeek XP thread `d6fab1cd` (file at message 2) padded with 50 plain text messages by direct local-DB insert (not LLM turns; the panel fold reads the same GET /threads/{id}/messages either way) → 52 messages. On load all 50 fillers render AND the panel still lists `chart.png · 23.9 KB` under Generated files, FILES 1. |
 
 ## 4. Register routing at close
 

@@ -2,7 +2,7 @@
 phase: 302-close-out-and-a-true-register
 verified: 2026-10-30T00:00:00Z
 status: human_needed
-score: 4/4 roadmap SCs code-verified; G4-2 PASS + G4-3 (b) PASS live 2026-10-30; G4-1 download PASS; 4-axis rows owed
+score: 4/4 roadmap SCs code-verified; G4-2 PASS + G4-3 (b) PASS live 2026-10-30; G4-1 download PASS; four-axis 7/8 XP + MT-1 + PT-1 + LM-1 PASS (Moonshot ⛔ BUG-261024-01) — no automated or live row owed
 human_verification:
   - test: "G4-1 download click on a generated file in the panel (needs operator consent)"
     expected: "File downloads"
