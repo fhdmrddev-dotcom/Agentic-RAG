@@ -48,8 +48,20 @@ findings:
   warning: 2
   info: 3
   total: 6
-status: issues_found
+status: all_fixed
+fixed_scope: [CR-01, WR-01, WR-02]
+fixed_at: 2026-10-30
+fix_commits:
+  CR-01: 188394e1e
+  WR-02: 5f202bdfa
+  WR-01: 2bca8ca7e
 ---
+
+> **Fix status (2026-10-30, gsd-code-fixer):** all three in-scope findings fixed, each RED-driven
+> then committed by path. CR-01 `188394e1e` · WR-02 `5f202bdfa` · WR-01 `2bca8ca7e`. Info items
+> IN-01..IN-03 stay recorded, out of the fix scope. Gates after the fixes: backend baseline
+> `[GATE PASSED] Backend unit baseline satisfied (failed: 70 <= 71, errors: 0).`; touched panel
+> suites 125/125; `tsc -p tsconfig.app.json` 61 errors (unchanged).
 
 # Phase 302: Code Review Report
 
@@ -100,6 +112,11 @@ def inline_refs(schema, *, cut=None):
 ```
 Test: the 8-definition all-to-all schema above must come back under a fixed byte ceiling (for example < 64 KB), with `cut` non-empty.
 
+**FIXED — `188394e1e`.** `_MAX_EXPANSIONS = 64` total inlined definitions; once spent, every further
+reference is cut by the depth-cut rule. Output is linear in the input: 8 defs 20,819 B, 12 defs
+33,053 B, 20 defs 58,072 B (was 4,438,883 B at 8). Tests: fan-out n=8 and n=12 under 64 KB, under 1 s,
+`cut` non-empty, and size ≤ (budget+1) × input; plus WF_SCHEMA (16 expansions) is never cut.
+
 ## Warnings
 
 ### WR-01: De-dup matches on base name only, so a workspace file in a subfolder hides a different generated file with the same name
@@ -113,11 +130,20 @@ return workspace.some((f) => norm(f.path) === norm(filename))
 ```
 Add a test where workspace `drafts/chart.png` and generated `chart.png` both appear.
 
+**FIXED — `2bca8ca7e`.** Exact path equality only, both sides compared without the root `/` that
+`workspace_service.validate_path` puts on every stored path. The `drafts/chart.png` vs `chart.png`
+case was driven RED; the old "ending in '/' + name" test was rewritten. Count-gate pin 8 -> 9.
+
 ### WR-02: A cut definition becomes a leaf with the wrong type and loses the keys written beside its `$ref`
 
 **File:** `backend/app/services/provider_gateway/schema_moonshot.py:79-83`
 **Issue:** The leaf is `{"type": target.get("type", "object"), "description": ...}`. If the definition has no top-level `type` (a pure `enum`, `anyOf`/`oneOf`, `const`, or a `$ref` alias), the leaf says `object`. For example, a cut definition `{"enum": ["asc","desc"]}` reaches the model as `type: object`, so the model sends an object where the connector expects a string, and the tool call fails downstream. The cut branch also returns before `rest` is merged, so a `description` or `default` written beside the `$ref` is dropped. The non-cut arm keeps them (`{**walk(defs[name]), **walk(rest)}`), so the two arms behave differently.
 **Fix:** When the definition has no `type`, keep its `enum`/`const` (or fall back to an untyped `{}` plus the description), and merge the walked `rest` siblings into the leaf the same way the non-cut arm does.
+
+**FIXED — `5f202bdfa`.** `_leaf` keeps only the definition's own `type` / `enum` / `const` plus its
+description (else its name) and never invents a type: an untyped definition becomes an untyped leaf
+(justified in the docstring: Moonshot's docs state only a top-level `type: object`, and assumption A2
+is not applied). Walked `rest` siblings merge in exactly as in the expanded arm. Both arms driven RED.
 
 ## Info
 
