@@ -241,6 +241,7 @@ CREATE FUNCTION public.current_user_has_permission(p_org_id uuid, p_permission_k
     WHERE m.org_id = p_org_id
       AND m.user_id = auth.uid()
       AND rp.permission_key = p_permission_key
+      AND m.org_id IN (SELECT public.current_user_org_ids())
   );
 $$;
 
@@ -253,7 +254,10 @@ CREATE FUNCTION public.current_user_org_ids() RETURNS SETOF uuid
     LANGUAGE sql STABLE SECURITY DEFINER
     SET search_path TO 'public'
     AS $$
-  SELECT org_id FROM public.org_members WHERE user_id = auth.uid();
+  SELECT org_id FROM public.org_members
+   WHERE user_id = auth.uid()
+     AND (NULLIF(current_setting('app.acting_org_id', true), '') IS NULL
+          OR org_id = NULLIF(current_setting('app.acting_org_id', true), '')::uuid);
 $$;
 
 
@@ -1365,8 +1369,17 @@ CREATE TABLE public.api_keys (
     revoked_by uuid,
     last_used_at timestamp with time zone,
     created_at timestamp with time zone DEFAULT now() NOT NULL,
+    kind text DEFAULT 'workflow'::text NOT NULL,
+    folder_ids jsonb,
+    tools jsonb,
+    include_external boolean DEFAULT false NOT NULL,
+    CONSTRAINT api_keys_folder_ids_check CHECK (((folder_ids IS NULL) OR ((jsonb_typeof(folder_ids) = 'array'::text) AND (jsonb_array_length(folder_ids) >= 1)))),
+    CONSTRAINT api_keys_kind_check CHECK ((kind = ANY (ARRAY['workflow'::text, 'mcp'::text]))),
     CONSTRAINT api_keys_label_check CHECK (((char_length(btrim(label)) >= 1) AND (char_length(btrim(label)) <= 60))),
-    CONSTRAINT api_keys_workflows_check CHECK (((jsonb_typeof(workflows) = 'array'::text) AND (jsonb_array_length(workflows) >= 1)))
+    CONSTRAINT api_keys_mcp_expiry_check CHECK (((kind <> 'mcp'::text) OR (expires_at IS NOT NULL))),
+    CONSTRAINT api_keys_scope_kind_check CHECK (((kind = 'mcp'::text) OR ((folder_ids IS NULL) AND (include_external = false)))),
+    CONSTRAINT api_keys_tools_check CHECK ((((kind = 'mcp'::text) AND (tools IS NOT NULL) AND (jsonb_typeof(tools) = 'array'::text) AND (jsonb_array_length(tools) >= 1)) OR ((kind = 'workflow'::text) AND (tools IS NULL)))),
+    CONSTRAINT api_keys_workflows_check CHECK (((jsonb_typeof(workflows) = 'array'::text) AND ((kind <> 'workflow'::text) OR (jsonb_array_length(workflows) >= 1))))
 );
 
 
@@ -1381,7 +1394,7 @@ COMMENT ON TABLE public.api_keys IS 'Phase 293 (START-02). One API key per row: 
 -- Name: COLUMN api_keys.key_prefix; Type: COMMENT; Schema: public; Owner: -
 --
 
-COMMENT ON COLUMN public.api_keys.key_prefix IS 'The first 13 characters of the secret (srl_live_ + 4), shown so a member can tell keys apart.';
+COMMENT ON COLUMN public.api_keys.key_prefix IS 'The prefix + 4 characters of the secret (srl_live_ or srl_mcp_), shown so a member can tell keys apart.';
 
 
 --
@@ -1396,6 +1409,34 @@ COMMENT ON COLUMN public.api_keys.workflows IS 'Snapshot [{id, name}] of the wor
 --
 
 COMMENT ON COLUMN public.api_keys.expires_at IS 'NULL = never expires. Re-checked on every call, as are revoked_at and the owner''s membership.';
+
+
+--
+-- Name: COLUMN api_keys.kind; Type: COMMENT; Schema: public; Owner: -
+--
+
+COMMENT ON COLUMN public.api_keys.kind IS 'Phase 304 (D-04). workflow = starts named published workflows (Phase 293); mcp = a personal MCP key that acts as its owner in one org.';
+
+
+--
+-- Name: COLUMN api_keys.folder_ids; Type: COMMENT; Schema: public; Owner: -
+--
+
+COMMENT ON COLUMN public.api_keys.folder_ids IS 'Phase 304 (D-08). MCP keys only. NULL = every folder the owner can see in the org; otherwise a non-empty array of folder ids (each one''s subtree is in scope). Bound as a plain list, never json.dumps.';
+
+
+--
+-- Name: COLUMN api_keys.tools; Type: COMMENT; Schema: public; Owner: -
+--
+
+COMMENT ON COLUMN public.api_keys.tools IS 'Phase 304. MCP keys only: a non-empty array of tool names the key may call. NULL on a workflow key.';
+
+
+--
+-- Name: COLUMN api_keys.include_external; Type: COMMENT; Schema: public; Owner: -
+--
+
+COMMENT ON COLUMN public.api_keys.include_external IS 'Phase 304 (D-23). MCP keys only: whether connector-fed documents (source_connection_id IS NOT NULL) are in scope.';
 
 
 --
@@ -1496,6 +1537,7 @@ CREATE TABLE public.app_settings (
     email_from_address text,
     email_from_name text DEFAULT 'Syrel'::text NOT NULL,
     email_dev_redirect_address text,
+    mcp_enabled boolean DEFAULT true NOT NULL,
     CONSTRAINT app_settings_api_key_reads_per_minute_bound CHECK (((api_key_reads_per_minute >= 10) AND (api_key_reads_per_minute <= 600))),
     CONSTRAINT app_settings_api_key_starts_per_minute_bound CHECK (((api_key_starts_per_minute >= 1) AND (api_key_starts_per_minute <= 60))),
     CONSTRAINT app_settings_chat_max_tool_rounds_bound CHECK (((chat_max_tool_rounds >= 2) AND (chat_max_tool_rounds <= 50))),
@@ -1656,6 +1698,13 @@ COMMENT ON COLUMN public.app_settings.email_from_name IS 'Phase 300 (D-03 / D-08
 --
 
 COMMENT ON COLUMN public.app_settings.email_dev_redirect_address IS 'Phase 300 (D-10). Outside production every app email is rewritten to this address; NULL = the send is recorded as suppressed and only logged. Production ignores it.';
+
+
+--
+-- Name: COLUMN app_settings.mcp_enabled; Type: COMMENT; Schema: public; Owner: -
+--
+
+COMMENT ON COLUMN public.app_settings.mcp_enabled IS 'Phase 304 (D-03, KEY-06). Deployment-wide MCP switch. Only writer: PUT /admin/flags (operator ledger). Read live on every MCP call, never through the 30 s settings cache.';
 
 
 --
@@ -3852,7 +3901,8 @@ CREATE TABLE public.organizations (
     add_ons jsonb DEFAULT '{}'::jsonb NOT NULL,
     settings jsonb DEFAULT '{}'::jsonb NOT NULL,
     created_at timestamp with time zone DEFAULT now() NOT NULL,
-    updated_at timestamp with time zone DEFAULT now() NOT NULL
+    updated_at timestamp with time zone DEFAULT now() NOT NULL,
+    mcp_enabled boolean DEFAULT true NOT NULL
 );
 
 
@@ -3868,6 +3918,13 @@ COMMENT ON COLUMN public.organizations.add_ons IS 'D-01 / ENT-01 entitlements + 
 --
 
 COMMENT ON COLUMN public.organizations.settings IS 'D-01 / SEED-120 forward-compat home: per-org provider config / BYO keys / model selection land here as keys in v3.5 with NO schema rewrite (BYO values reuse the SEC-01 enc:v1: envelope). SEPARATE from add_ons.';
+
+
+--
+-- Name: COLUMN organizations.mcp_enabled; Type: COMMENT; Schema: public; Owner: -
+--
+
+COMMENT ON COLUMN public.organizations.mcp_enabled IS 'Phase 304 (D-35, KEY-06). Per-org MCP switch. Only writer: PUT /org/api-keys/mcp-access (org admin, audited as settings.update). Deliberately OUTSIDE the mig 194 client UPDATE grant.';
 
 
 --
@@ -4728,7 +4785,7 @@ CREATE TABLE public.workflow_runs (
     origin_kind text,
     origin_label text,
     origin_ref uuid,
-    CONSTRAINT workflow_runs_origin_kind_check CHECK (((origin_kind IS NULL) OR (origin_kind = ANY (ARRAY['app'::text, 'schedule'::text, 'key'::text])))),
+    CONSTRAINT workflow_runs_origin_kind_check CHECK (((origin_kind IS NULL) OR (origin_kind = ANY (ARRAY['app'::text, 'schedule'::text, 'key'::text, 'mcp'::text])))),
     CONSTRAINT workflow_runs_status_check CHECK ((status = ANY (ARRAY['active'::text, 'paused'::text, 'cap_paused'::text, 'completed'::text, 'failed'::text, 'cancelled'::text])))
 );
 
@@ -9889,20 +9946,14 @@ ALTER TABLE public.expert_bundles ENABLE ROW LEVEL SECURITY;
 -- Name: expert_bundles expert_bundles_read_policy; Type: POLICY; Schema: public; Owner: -
 --
 
-CREATE POLICY expert_bundles_read_policy ON public.expert_bundles FOR SELECT TO authenticated, service_role USING (((auth.role() = 'service_role'::text) OR (is_system = true) OR ((org_id IN ( SELECT m.org_id
-   FROM public.org_members m
-  WHERE (m.user_id = auth.uid()))) AND ((visibility = ANY (ARRAY['org'::text, 'public'::text])) OR (created_by = auth.uid())))));
+CREATE POLICY expert_bundles_read_policy ON public.expert_bundles FOR SELECT TO authenticated, service_role USING (((auth.role() = 'service_role'::text) OR (is_system = true) OR ((org_id IN ( SELECT public.current_user_org_ids() AS current_user_org_ids)) AND ((visibility = ANY (ARRAY['org'::text, 'public'::text])) OR (created_by = auth.uid())))));
 
 
 --
 -- Name: expert_bundles expert_bundles_write_policy; Type: POLICY; Schema: public; Owner: -
 --
 
-CREATE POLICY expert_bundles_write_policy ON public.expert_bundles TO authenticated, service_role USING (((auth.role() = 'service_role'::text) OR ((is_system = false) AND (org_id IN ( SELECT m.org_id
-   FROM public.org_members m
-  WHERE (m.user_id = auth.uid())))))) WITH CHECK (((auth.role() = 'service_role'::text) OR ((is_system = false) AND (org_id IN ( SELECT m.org_id
-   FROM public.org_members m
-  WHERE (m.user_id = auth.uid()))))));
+CREATE POLICY expert_bundles_write_policy ON public.expert_bundles TO authenticated, service_role USING (((auth.role() = 'service_role'::text) OR ((is_system = false) AND (org_id IN ( SELECT public.current_user_org_ids() AS current_user_org_ids))))) WITH CHECK (((auth.role() = 'service_role'::text) OR ((is_system = false) AND (org_id IN ( SELECT public.current_user_org_ids() AS current_user_org_ids)))));
 
 
 --
@@ -9916,9 +9967,8 @@ ALTER TABLE public.expert_grants ENABLE ROW LEVEL SECURITY;
 --
 
 CREATE POLICY expert_grants_read_policy ON public.expert_grants FOR SELECT TO authenticated, service_role USING (((auth.role() = 'service_role'::text) OR (expert_id IN ( SELECT eb.id
-   FROM (public.expert_bundles eb
-     JOIN public.org_members m ON ((m.org_id = eb.org_id)))
-  WHERE (m.user_id = auth.uid())))));
+   FROM public.expert_bundles eb
+  WHERE (eb.org_id IN ( SELECT public.current_user_org_ids() AS current_user_org_ids))))));
 
 
 --
@@ -9926,12 +9976,10 @@ CREATE POLICY expert_grants_read_policy ON public.expert_grants FOR SELECT TO au
 --
 
 CREATE POLICY expert_grants_write_policy ON public.expert_grants TO authenticated, service_role USING (((auth.role() = 'service_role'::text) OR (expert_id IN ( SELECT eb.id
-   FROM (public.expert_bundles eb
-     JOIN public.org_members m ON ((m.org_id = eb.org_id)))
-  WHERE (m.user_id = auth.uid()))))) WITH CHECK (((auth.role() = 'service_role'::text) OR (expert_id IN ( SELECT eb.id
-   FROM (public.expert_bundles eb
-     JOIN public.org_members m ON ((m.org_id = eb.org_id)))
-  WHERE (m.user_id = auth.uid())))));
+   FROM public.expert_bundles eb
+  WHERE (eb.org_id IN ( SELECT public.current_user_org_ids() AS current_user_org_ids)))))) WITH CHECK (((auth.role() = 'service_role'::text) OR (expert_id IN ( SELECT eb.id
+   FROM public.expert_bundles eb
+  WHERE (eb.org_id IN ( SELECT public.current_user_org_ids() AS current_user_org_ids))))));
 
 
 --
@@ -10087,16 +10135,14 @@ ALTER TABLE public.model_rates ENABLE ROW LEVEL SECURITY;
 
 CREATE POLICY model_rates_insert_policy ON public.model_rates FOR INSERT TO authenticated, service_role WITH CHECK (((auth.role() = 'service_role'::text) OR ((org_id IS NOT NULL) AND (org_id IN ( SELECT m.org_id
    FROM public.org_members m
-  WHERE ((m.user_id = auth.uid()) AND (m.role = ANY (ARRAY['admin'::text, 'owner'::text]))))))));
+  WHERE ((m.user_id = auth.uid()) AND (m.role = ANY (ARRAY['admin'::text, 'owner'::text])) AND (m.org_id IN ( SELECT public.current_user_org_ids() AS current_user_org_ids))))))));
 
 
 --
 -- Name: model_rates model_rates_select_policy; Type: POLICY; Schema: public; Owner: -
 --
 
-CREATE POLICY model_rates_select_policy ON public.model_rates FOR SELECT TO authenticated, service_role USING (((org_id IS NULL) OR (org_id IN ( SELECT m.org_id
-   FROM public.org_members m
-  WHERE (m.user_id = auth.uid())))));
+CREATE POLICY model_rates_select_policy ON public.model_rates FOR SELECT TO authenticated, service_role USING (((org_id IS NULL) OR (org_id IN ( SELECT public.current_user_org_ids() AS current_user_org_ids))));
 
 
 --
@@ -11654,3 +11700,21 @@ REVOKE EXECUTE ON FUNCTION public.notify_on_run_status() FROM PUBLIC;
 REVOKE EXECUTE ON FUNCTION public.notify_on_run_status() FROM anon;
 REVOKE EXECUTE ON FUNCTION public.notify_on_run_status() FROM authenticated;
 GRANT EXECUTE ON FUNCTION public.notify_on_run_status() TO service_role;
+
+-- migration 220 — api_keys: the column grant re-issued with the four MCP-key columns (kind,
+-- folder_ids, tools, include_external); key_hash is still never granted (D-09). The 215 block
+-- above is kept as the history; this one runs after it, so the bootstrap ends on the superset.
+-- organizations.mcp_enabled needs no line: it is outside mig 194's column UPDATE grant (D-35).
+REVOKE ALL ON TABLE public.api_keys FROM PUBLIC;
+REVOKE ALL ON TABLE public.api_keys FROM anon;
+REVOKE ALL ON TABLE public.api_keys FROM authenticated;
+REVOKE ALL ON TABLE public.api_keys FROM service_role;
+GRANT SELECT (id, org_id, user_id, label, key_prefix, workflows, expires_at, revoked_at, revoked_by, last_used_at, created_at, kind, folder_ids, tools, include_external) ON TABLE public.api_keys TO authenticated;
+GRANT SELECT, INSERT, UPDATE, DELETE ON TABLE public.api_keys TO service_role;
+
+-- migration 221 — organizations: no destructive privilege for a client role (D-42, BUG-261030-03).
+-- PUBLIC first (the CLAUDE.md trap). The re-declared current_user_org_ids() /
+-- current_user_has_permission() ACL lines are mig 181's, already mirrored above, verbatim.
+REVOKE DELETE, TRUNCATE, TRIGGER, REFERENCES ON TABLE public.organizations FROM PUBLIC;
+REVOKE DELETE, TRUNCATE, TRIGGER, REFERENCES ON TABLE public.organizations FROM anon;
+REVOKE DELETE, TRUNCATE, TRIGGER, REFERENCES ON TABLE public.organizations FROM authenticated;

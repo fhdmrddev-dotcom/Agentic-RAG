@@ -889,3 +889,21 @@ REVOKE EXECUTE ON FUNCTION public.notify_on_run_status() FROM PUBLIC;
 REVOKE EXECUTE ON FUNCTION public.notify_on_run_status() FROM anon;
 REVOKE EXECUTE ON FUNCTION public.notify_on_run_status() FROM authenticated;
 GRANT EXECUTE ON FUNCTION public.notify_on_run_status() TO service_role;
+
+-- migration 220 — api_keys: the column grant re-issued with the four MCP-key columns (kind,
+-- folder_ids, tools, include_external); key_hash is still never granted (D-09). The 215 block
+-- above is kept as the history; this one runs after it, so the bootstrap ends on the superset.
+-- organizations.mcp_enabled needs no line: it is outside mig 194's column UPDATE grant (D-35).
+REVOKE ALL ON TABLE public.api_keys FROM PUBLIC;
+REVOKE ALL ON TABLE public.api_keys FROM anon;
+REVOKE ALL ON TABLE public.api_keys FROM authenticated;
+REVOKE ALL ON TABLE public.api_keys FROM service_role;
+GRANT SELECT (id, org_id, user_id, label, key_prefix, workflows, expires_at, revoked_at, revoked_by, last_used_at, created_at, kind, folder_ids, tools, include_external) ON TABLE public.api_keys TO authenticated;
+GRANT SELECT, INSERT, UPDATE, DELETE ON TABLE public.api_keys TO service_role;
+
+-- migration 221 — organizations: no destructive privilege for a client role (D-42, BUG-261030-03).
+-- PUBLIC first (the CLAUDE.md trap). The re-declared current_user_org_ids() /
+-- current_user_has_permission() ACL lines are mig 181's, already mirrored above, verbatim.
+REVOKE DELETE, TRUNCATE, TRIGGER, REFERENCES ON TABLE public.organizations FROM PUBLIC;
+REVOKE DELETE, TRUNCATE, TRIGGER, REFERENCES ON TABLE public.organizations FROM anon;
+REVOKE DELETE, TRUNCATE, TRIGGER, REFERENCES ON TABLE public.organizations FROM authenticated;
