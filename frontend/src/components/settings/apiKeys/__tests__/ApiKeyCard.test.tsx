@@ -163,6 +163,16 @@ describe("304-05 ApiKeyCard — an MCP key (KEY-05)", () => {
     expect(screen.getByTestId("api-key-card")).toHaveAttribute("data-dead", "false")
   })
 
+  it("unknown (a failed switch read): no ⏸ switched-off tag, and the card says we couldn't check (304-REVIEW WR-02)", () => {
+    render(<ApiKeyCard apiKey={makeMcpKey({ mcp_off: "unknown" as never })} now={NOW} mcpTools={MCP_CATALOGUE} />)
+    expect(screen.queryByText("⏸ switched off")).toBeNull()
+    expect(screen.getByTestId("mcp-off-notice")).toHaveTextContent(
+      "Couldn't check whether AI tool access is on. Reload to try again.",
+    )
+    expect(screen.queryByText(/by the operator/)).toBeNull()
+    expect(screen.getByTestId("api-key-card")).toHaveAttribute("data-dead", "false")
+  })
+
   it("How to connect toggles the snippets on an active key; never the secret", async () => {
     const user = userEvent.setup()
     render(<ApiKeyCard apiKey={makeMcpKey()} now={NOW} mcpTools={MCP_CATALOGUE} mcpUrl={MCP_URL} />)

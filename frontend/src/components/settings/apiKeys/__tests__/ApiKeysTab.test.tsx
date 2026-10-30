@@ -387,6 +387,21 @@ describe("304-05 ApiKeysTab — the kind choice", () => {
     expect(screen.queryByTestId("mcp-off-notice")).toBeNull()
   })
 
+  it("a failed switch read (unknown): the header and card say we couldn't check, never the operator (304-REVIEW WR-02)", async () => {
+    const unknown = "Couldn't check whether AI tool access is on. Reload to try again."
+    m.listApiKeys.mockResolvedValue({
+      ...MCP_EMPTY,
+      keys: [makeMcpKey({ mcp_off: "unknown" })],
+      mcp: makeMcp({ available: false, off: "unknown" }),
+    } as unknown as ApiKeyList)
+    render(<ApiKeysTab />)
+    const notices = await screen.findAllByTestId("mcp-off-notice")
+    expect(notices.length).toBeGreaterThan(0)
+    for (const n of notices) expect(n).toHaveTextContent(unknown)
+    expect(screen.queryByText(/by the operator/)).toBeNull()
+    expect(screen.queryByText(/by an admin/)).toBeNull()
+  })
+
   it("org off: the MCP tile is disabled with the org sentence; the header says so", async () => {
     const user = userEvent.setup()
     m.listApiKeys.mockResolvedValue({ ...MCP_EMPTY, mcp: makeMcp({ off: "org" }) })
