@@ -11,11 +11,33 @@
  *
  * A failure means the frontend departed from the contract: fix the type, never the fixture.
  */
-import { describe, expect, it } from "vitest"
+import { afterEach, describe, expect, it, vi } from "vitest"
 import contractRaw from "../../../../../../backend/tests/fixtures/phase293/api_keys_contract.json?raw"
-import type { ApiKeyCreated, ApiKeyList, ApiKeyRead } from "@/lib/api/apiKeys"
 
-const contract = JSON.parse(contractRaw) as { ApiKeyList: unknown; ApiKeyCreated: unknown }
+vi.mock("@/lib/api/_core", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("@/lib/api/_core")>()
+  return { ...actual, getAuthHeaders: vi.fn().mockResolvedValue({ Authorization: "Bearer t" }) }
+})
+
+import {
+  getOrgMcpAccess,
+  listPickableFolders,
+  setOrgMcpAccess,
+  type ApiKeyCreated,
+  type ApiKeyList,
+  type ApiKeyRead,
+  type OrgMcpAccess,
+  type PickableFolderList,
+} from "@/lib/api/apiKeys"
+import { ApiError } from "@/lib/api/_core"
+
+const contract = JSON.parse(contractRaw) as {
+  ApiKeyList: unknown
+  ApiKeyCreated: unknown
+  McpApiKeyCreated: unknown
+  PickableFolderList: unknown
+  OrgMcpAccess: unknown
+}
 
 /** Every key path in `value`, arrays read through their first element (`keys[].label`). */
 function keyPaths(value: unknown, prefix = ""): string[] {
@@ -58,17 +80,54 @@ const KEY = {
       detail: null,
     },
   ],
+  // Phase 304 — a workflow key's MCP fields.
+  kind: "workflow",
+  tools: null,
+  folders: null,
+  include_external: false,
+  org_name: null,
+  mcp_off: null,
 } satisfies ApiKeyRead
 
 const SAMPLE_LIST = {
   keys: [KEY],
   limits: { starts_per_minute: 10, reads_per_minute: 120 },
+  mcp: {
+    available: true,
+    off: null,
+    url: "https://syrel.example.com/mcp",
+    tools: [{ name: "search_knowledge_base", group: "read", label: "Search your knowledge base", travels_with: null }],
+  },
 } satisfies ApiKeyList
 
 const SAMPLE_CREATED = {
   key: { ...KEY, last_used_at: null, owner_name: null, calls: [] },
   secret: "srl_live_EXAMPLEnotARealKey0000000000000000000000000",
 } satisfies ApiKeyCreated
+
+// Phase 304: an MCP key, its folders named by the server (keyPaths reads arrays through their
+// first element, so `folders[].id` is pinned here and nowhere else).
+const SAMPLE_MCP_CREATED = {
+  key: {
+    ...KEY,
+    key_prefix: "srl_mcp_Xy9z",
+    workflows: [],
+    last_used_at: null,
+    owner_name: null,
+    calls: [],
+    kind: "mcp",
+    tools: ["search_knowledge_base", "list_documents", "read_document"],
+    folders: [{ id: "f0000000-0000-4000-8000-000000000001", name: "Contracts" }],
+    org_name: "Acme Legal",
+  },
+  secret: "srl_mcp_EXAMPLEnotARealKey00000000000000000000000000",
+} satisfies ApiKeyCreated
+
+const SAMPLE_FOLDERS = {
+  folders: [{ id: "f0000000-0000-4000-8000-000000000001", name: "Contracts", parent_id: null, shared: false, source: null }],
+} satisfies PickableFolderList
+
+const SAMPLE_ORG_ACCESS = { enabled: true } satisfies OrgMcpAccess
 
 describe("293-04 api key wire types vs the backend contract fixture", () => {
   it("ApiKeyList: every fixture key path exists on the typed sample, and no extra one does", () => {
@@ -81,8 +140,59 @@ describe("293-04 api key wire types vs the backend contract fixture", () => {
     expect(keyPaths(contract.ApiKeyCreated)).toContain("secret")
   })
 
+  it("304: an MCP key's created payload, the pickable folders and the org switch", () => {
+    expect(new Set(keyPaths(SAMPLE_MCP_CREATED))).toEqual(new Set(keyPaths(contract.McpApiKeyCreated)))
+    expect(new Set(keyPaths(SAMPLE_FOLDERS))).toEqual(new Set(keyPaths(contract.PickableFolderList)))
+    expect(new Set(keyPaths(SAMPLE_ORG_ACCESS))).toEqual(new Set(keyPaths(contract.OrgMcpAccess)))
+  })
+
   it("no list path carries a secret or a digest (the secret lives in one response only)", () => {
     const paths = keyPaths(contract.ApiKeyList)
     expect(paths.some((p) => /secret|hash/i.test(p))).toBe(false)
+  })
+})
+
+describe("304-04 the three MCP calls (the listOrgApiKeys shape)", () => {
+  afterEach(() => vi.unstubAllGlobals())
+
+  function stubFetch(status: number, body: unknown) {
+    const fetchMock = vi.fn().mockResolvedValue(
+      new Response(JSON.stringify(body), { status, headers: { "Content-Type": "application/json" } }),
+    )
+    vi.stubGlobal("fetch", fetchMock)
+    return fetchMock
+  }
+
+  it("listPickableFolders GETs /api-keys/folders with the signal", async () => {
+    const fetchMock = stubFetch(200, contract.PickableFolderList)
+    const ctrl = new AbortController()
+    const out = await listPickableFolders(ctrl.signal)
+    expect(out).toEqual(contract.PickableFolderList)
+    const [url, init] = fetchMock.mock.calls[0]
+    expect(String(url)).toMatch(/\/api-keys\/folders$/)
+    expect(init.signal).toBe(ctrl.signal)
+  })
+
+  it("getOrgMcpAccess GETs /org/api-keys/mcp-access", async () => {
+    const fetchMock = stubFetch(200, { enabled: false })
+    expect(await getOrgMcpAccess()).toEqual({ enabled: false })
+    expect(String(fetchMock.mock.calls[0][0])).toMatch(/\/org\/api-keys\/mcp-access$/)
+  })
+
+  it("setOrgMcpAccess PUTs {enabled} as JSON", async () => {
+    const fetchMock = stubFetch(200, { enabled: true })
+    expect(await setOrgMcpAccess(true)).toEqual({ enabled: true })
+    const [url, init] = fetchMock.mock.calls[0]
+    expect(String(url)).toMatch(/\/org\/api-keys\/mcp-access$/)
+    expect(init.method).toBe("PUT")
+    expect(JSON.parse(init.body)).toEqual({ enabled: true })
+  })
+
+  it("a refusal throws ApiError with the server's own sentence and status", async () => {
+    stubFetch(403, { detail: "You do not have permission to manage this organization." })
+    const err = await setOrgMcpAccess(false).catch((e: unknown) => e)
+    expect(err).toBeInstanceOf(ApiError)
+    expect((err as ApiError).message).toBe("You do not have permission to manage this organization.")
+    expect((err as ApiError).status).toBe(403)
   })
 })

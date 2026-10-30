@@ -35,6 +35,18 @@ export interface ApiKeyCall {
   detail: Record<string, unknown> | null
 }
 
+/** Phase 304: a workflow key (293) or a personal MCP key that acts as its owner in one org. */
+export type ApiKeyKind = "workflow" | "mcp"
+
+/** D-28 / D-30: which switch turned MCP off; the deployment's wins over the org's. */
+export type McpOff = "org" | "deployment"
+
+/** A folder an MCP key ticks, named by the server (a folder since deleted drops out). */
+export interface ApiKeyFolderRef {
+  id: string
+  name: string
+}
+
 export interface ApiKeyRead {
   id: string
   label: string
@@ -45,11 +57,22 @@ export interface ApiKeyRead {
   revoked_at: string | null
   revoked_by_name: string | null
   revoked_by_admin: boolean
+  /** D-26: null until a call resolves the key (an MCP key: until 305 ships). */
   last_used_at: string | null
   created_at: string
   owner_name: string | null
   owner_is_you: boolean
   calls: ApiKeyCall[]
+  /** Phase 304 — on a workflow key: `"workflow"`, `null`, `null`, `false`, `null`, `null`. */
+  kind: ApiKeyKind
+  /** Catalogue order, companions included. */
+  tools: string[] | null
+  /** `null` = not narrowed: every folder the owner can see in the org. */
+  folders: ApiKeyFolderRef[] | null
+  include_external: boolean
+  /** The org an MCP key acts in. */
+  org_name: string | null
+  mcp_off: McpOff | null
 }
 
 export interface ApiKeyLimits {
@@ -57,16 +80,70 @@ export interface ApiKeyLimits {
   reads_per_minute: number
 }
 
+/** One tool of the server's D-11 catalogue — read from the list, never retyped here. */
+export interface McpToolRef {
+  name: string
+  group: "read" | "ask" | "run"
+  label: string
+  /** The lead tool this one is granted with (D-12), if any. */
+  travels_with: string | null
+}
+
+/** D-28 / D-30. `available` is the deployment switch (false hides the MCP choice); `url` is the
+ *  server's `mcp_url()`, `null` when the deployment has no public address. */
+export interface McpAvailability {
+  available: boolean
+  off: McpOff | null
+  url: string | null
+  tools: McpToolRef[]
+}
+
 export interface ApiKeyList {
   keys: ApiKeyRead[]
   limits: ApiKeyLimits
+  /** Phase 304. The server always sends it; optional only so pre-304 test lists still type. */
+  mcp?: McpAvailability
 }
 
-export interface ApiKeyCreateBody {
+/** The 293 body. `kind` may be omitted (the server reads a body without it as a workflow key). */
+export interface WorkflowKeyCreateBody {
+  kind?: "workflow"
   label: string
   workflow_ids: string[]
   /** D-04: 30 / 90 / 365 days, or `null` for never. */
   expires_in_days: 30 | 90 | 365 | null
+}
+
+/** Phase 304 (D-07, D-08). No "never" expiry; `folder_ids: null` = every folder I can see — an
+ *  empty list is refused, never read as "all". The server adds companions to `tools`. */
+export interface McpKeyCreateBody {
+  kind: "mcp"
+  label: string
+  tools: string[]
+  folder_ids: string[] | null
+  include_external: boolean
+  expires_in_days: 30 | 90 | 365
+}
+
+export type ApiKeyCreateBody = WorkflowKeyCreateBody | McpKeyCreateBody
+
+/** A folder the member can tick on an MCP key, read on their own visibility. `source` is a UI
+ *  hint only (D-40). */
+export interface PickableFolder {
+  id: string
+  name: string
+  parent_id: string | null
+  shared: boolean
+  source: "mail" | "synced" | null
+}
+
+export interface PickableFolderList {
+  folders: PickableFolder[]
+}
+
+/** The org's MCP switch (D-35), read and written by an org admin. */
+export interface OrgMcpAccess {
+  enabled: boolean
 }
 
 export interface ApiKeyCreated {
@@ -151,6 +228,35 @@ export async function revokeOrgApiKey(keyId: string): Promise<ApiKeyRead> {
   })
   if (!res.ok) throw new ApiError(await readApiKeyFailure(res), res.status)
   return (await res.json()) as ApiKeyRead
+}
+
+/** Phase 304: the folders the caller can tick on an MCP key in the active org, read on their own
+ *  visibility (never the service role). */
+export async function listPickableFolders(signal?: AbortSignal): Promise<PickableFolderList> {
+  const headers = await getAuthHeaders()
+  const res = await fetch(`${API_BASE}/api-keys/folders`, { headers, signal })
+  if (!res.ok) throw new ApiError(await readApiKeyFailure(res), res.status)
+  return (await res.json()) as PickableFolderList
+}
+
+/** Phase 304 (D-35): the active org's MCP switch (admins only; the server answers 403 otherwise). */
+export async function getOrgMcpAccess(signal?: AbortSignal): Promise<OrgMcpAccess> {
+  const headers = await getAuthHeaders()
+  const res = await fetch(`${API_BASE}/org/api-keys/mcp-access`, { headers, signal })
+  if (!res.ok) throw new ApiError(await readApiKeyFailure(res), res.status)
+  return (await res.json()) as OrgMcpAccess
+}
+
+/** Phase 304 (D-35, D-36): flip the active org's MCP switch. The server writes the audit row. */
+export async function setOrgMcpAccess(enabled: boolean): Promise<OrgMcpAccess> {
+  const headers = await getAuthHeaders()
+  const res = await fetch(`${API_BASE}/org/api-keys/mcp-access`, {
+    method: "PUT",
+    headers: { ...headers, "Content-Type": "application/json" },
+    body: JSON.stringify({ enabled }),
+  })
+  if (!res.ok) throw new ApiError(await readApiKeyFailure(res), res.status)
+  return (await res.json()) as OrgMcpAccess
 }
 
 /** The server's own sentence out of a refusal (the `readScheduleFailure` shape): the plan's

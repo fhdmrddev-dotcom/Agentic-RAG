@@ -637,6 +637,10 @@ export interface FullAppSettings {
   // self_improve/workflows default true, maintenance_mode false.
   self_improve_enabled: boolean
   workflows_enabled: boolean
+  // Phase 304 (KEY-06) — the deployment MCP switch (default true); written via setFlag("mcp_enabled", …).
+  // The server always sends it; optional only so pre-304 FullAppSettings test literals still type
+  // (read it as `mcp_enabled ?? true`, the backend's own capability-default polarity).
+  mcp_enabled?: boolean
   maintenance_mode: boolean
   // Phase 159 (MODEL-03 / D-159-04) — the persisted operator toggle that hides known
   // non-chat "utility" model ids (embeddings / audio / image / …) from the model-

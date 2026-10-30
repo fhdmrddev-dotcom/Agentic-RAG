@@ -23,6 +23,13 @@ export function makeKey(over: Partial<ApiKeyRead> = {}): ApiKeyRead {
     owner_name: "Dana Kim",
     owner_is_you: true,
     calls: [],
+    // Phase 304 — a workflow key's MCP fields.
+    kind: "workflow",
+    tools: null,
+    folders: null,
+    include_external: false,
+    org_name: null,
+    mcp_off: null,
     ...over,
   }
 }

@@ -233,6 +233,7 @@ class UserEffectiveSettings(BaseModel):
     # False (platform OPEN — a cold/fresh read must never wedge the platform).
     self_improve_enabled: bool = True
     workflows_enabled: bool = True
+    mcp_enabled: bool = True  # Phase 304 (KEY-06, mig 220): deployment MCP switch, operator flag
     maintenance_mode: bool = False
 
     # Phase 158 (DEPLOY-02, migration 102) — the AUDITABLE first-run install-wizard
@@ -1172,6 +1173,7 @@ def _build_settings_from_row(row: dict) -> UserEffectiveSettings:
         # capability switches => True (never silently disable); maintenance => False (OPEN).
         self_improve_enabled=_val_bool(row, "self_improve_enabled", None, True),
         workflows_enabled=_val_bool(row, "workflows_enabled", None, True),
+        mcp_enabled=_val_bool(row, "mcp_enabled", None, True),  # 304: readback only, never the gate
         maintenance_mode=_val_bool(row, "maintenance_mode", None, False),
 
         # Phase 158 (DEPLOY-02, migration 102) — env_attr=None: app_settings-only, no env
