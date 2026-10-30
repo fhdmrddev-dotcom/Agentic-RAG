@@ -6,7 +6,7 @@ status: planning
 last_updated: "2026-10-30T18:00:00.000Z"
 last_activity: 2026-10-30 -- Milestone v4.9 started (defining requirements)
 progress:
-  total_phases: 0
+  total_phases: 7
   completed_phases: 0
   total_plans: 0
   completed_plans: 0
@@ -44,9 +44,9 @@ reviewer exists, so a phase closes `verification_mode: self-verified`, never `re
 ## Current Position
 
 Milestone: v4.9 Use It From Your Own Tools
-Phase: Not started (defining requirements)
+Phase: 303 — Word template bare-token fix (not started)
 Plan: —
-Status: Defining requirements
+Status: Ready to plan
 Last activity: 2026-10-30 — Milestone v4.9 started
 
 Phases start at **303**; migrations at **220**. Seeds taken in at intake: SEED-013, SEED-177, SEED-195, SEED-081, SEED-079; bug BUG-261022-01.

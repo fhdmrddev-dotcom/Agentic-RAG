@@ -95,7 +95,36 @@ Decided at intake (operator, 2026-10-30):
 
 ## Traceability
 
-*Filled by the roadmap.*
+**Coverage:** 29 / 29 v4.9 requirements mapped, 0 orphans, 0 duplicates (roadmap 2026-10-30).
 
 | Requirement | Phase | Status |
 |-------------|-------|--------|
+| KEY-01 | Phase 304 | Pending |
+| KEY-02 | Phase 304 | Pending |
+| KEY-03 | Phase 304 | Pending |
+| KEY-04 | Phase 304 | Pending |
+| KEY-05 | Phase 304 | Pending |
+| KEY-06 | Phase 304 | Pending |
+| KEY-07 | Phase 305 | Pending |
+| MCP-01 | Phase 305 | Pending |
+| MCP-02 | Phase 305 | Pending |
+| MCP-03 | Phase 305 | Pending |
+| MCP-04 | Phase 306 | Pending |
+| MCP-05 | Phase 306 | Pending |
+| MCP-06 | Phase 306 | Pending |
+| MCP-07 | Phase 305 | Pending |
+| OAUTH-04 | Phase 307 | Pending |
+| OAUTH-05 | Phase 307 | Pending |
+| OAUTH-06 | Phase 307 | Pending |
+| OAUTH-07 | Phase 307 | Pending |
+| HOOK-01 | Phase 308 | Pending |
+| HOOK-02 | Phase 308 | Pending |
+| HOOK-03 | Phase 308 | Pending |
+| HOOK-04 | Phase 308 | Pending |
+| HOOK-05 | Phase 308 | Pending |
+| HOOK-06 | Phase 308 | Pending |
+| GUARD-01 | Phase 306 | Pending |
+| GUARD-02 | Phase 305 | Pending |
+| GUARD-03 | Phase 305 | Pending |
+| FIX-15 | Phase 303 | Pending |
+| REG-10 | Phase 309 | Pending |
