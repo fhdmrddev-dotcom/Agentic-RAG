@@ -561,3 +561,18 @@ describe("TeamPicture — source fence (?raw, code only)", () => {
     expect(re.test(code)).toBe(false)
   })
 })
+
+describe("TeamPicture — 302-02 (FE-IN-06 / D-11): the scroll region and the figure are named apart", () => {
+  it.each([
+    ["populated", undefined],
+    ["empty", "empty"],
+  ] as const)("%s: region 'Team view, scrollable', figure 'Team picture for {name}'", (_n, arm) => {
+    if (arm === "empty") renderPicture(emptyDraft)
+    else renderPicture(productionTwoStep)
+    const region = screen.getByRole("region", { name: "Team view, scrollable" })
+    expect(region).toBeInTheDocument()
+    const figs = screen.getAllByRole("figure", { name: teamFigureLabel(NAME) })
+    expect(figs).toHaveLength(1)
+    expect(region.getAttribute("aria-label")).not.toBe(figs[0].getAttribute("aria-label"))
+  })
+})
