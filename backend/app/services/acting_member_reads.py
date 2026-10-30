@@ -283,16 +283,27 @@ async def search(principal: Any, query: str, *, user_settings: Any = None) -> li
 
 async def list_views(principal: Any) -> list[dict]:
     """The member's saved views in the key's org plus the system-global ones (RLS decides). A
-    global view's seeding owner and its folder scope are masked, as the app's list masks them."""
+    global view's seeding owner and its folder scope are masked, as the app's list masks them.
+
+    D-47 (304-REVIEW WR-04): a NARROWED key lists only views whose own folder scope lies inside
+    the key's subtrees (``scope.folder_ids`` is already the expanded subtree set ``list_folders``
+    uses). A view with NO folder scope is hidden from a narrowed key — fail closed, since view
+    names and filters are member-authored free text (D-22: a narrowed key sees only its ticked
+    folders' subtrees). An all-folders key is unchanged."""
     _require(principal, "list_views")
-    async with acting_member_connection(user_id=principal.user_id, org_id=principal.org_id) as conn:
+    async with _acting(principal) as (conn, scope, _folders):
+        if _nothing(scope):
+            return []
         records = await conn.fetch(
             "SELECT v.id, v.user_id, v.name, v.filter_expr, v.folder_scope, v.is_system_global, "
             "auth.uid() AS caller_id FROM public.document_views v ORDER BY v.name, v.id"
         )
+    keep = set(scope.folder_ids) if scope.folder_ids is not None else None
     out = []
     for r in records:
         row = _plain(r)
+        if keep is not None and _s(row.get("folder_scope")) not in keep:
+            continue  # outside the key's subtrees, or unscoped (``None`` is never in ``keep``)
         caller = row.pop("caller_id", None)
         if row.get("is_system_global") and row.get("user_id") != caller:
             row["user_id"] = None
