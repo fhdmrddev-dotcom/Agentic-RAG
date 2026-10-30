@@ -44,10 +44,10 @@ reviewer exists, so a phase closes `verification_mode: self-verified`, never `re
 ## Current Position
 
 Milestone: v4.9 Use It From Your Own Tools
-Phase: 303 — Word template bare-token fix (not started)
+Phase: 304 — Personal MCP Keys That Act as You (context gathered, `--auto`; 303 not started)
 Plan: —
-Status: Ready to plan
-Last activity: 2026-10-30 — Milestone v4.9 started
+Status: Ready to plan 304
+Last activity: 2026-10-30 — 304 context gathered (`.planning/phases/304-personal-mcp-keys-that-act-as-you/304-CONTEXT.md`); SEED-195 + SEED-013 folded
 
 Phases start at **303**; migrations at **220**. Seeds taken in at intake: SEED-013, SEED-177, SEED-195, SEED-081, SEED-079; bug BUG-261022-01.
 
@@ -103,3 +103,6 @@ link. Branch `develop`. Tags `v4.7` and `v4.8` pushed 2026-10-30.
 ## Guardrail overrides
 
 The 297-302 overrides are in `milestones/v4.8-STATE-at-close.md`.
+
+- **304 / G-2 (2026-10-30):** the key screen is UI and G-2 asks for an operator-approved sketch before discuss. The operator ran discuss with "continue autonomously end to end", so no sketch was approved. Mitigation: the key screen extends the shipped Phase 293 API keys tab (an approved design); the acceptance bar is the 304 UI-SPEC plus Claude-driven G-4 rows. Re-open: the operator asks to see a sketch.
+- **304 / G-5 (2026-10-30):** honoured by construction, not overridden — one edit each on `dependencies.py`, `audit_service.py`, `user_settings.py`, `settings.py`; no new mount on `SettingsPage.tsx` or tab on `OrgAdminShell.tsx` (CONTEXT D-01/D-02); `api_key_auth.py` extracted before editing.
