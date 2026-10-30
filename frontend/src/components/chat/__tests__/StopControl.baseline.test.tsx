@@ -99,8 +99,14 @@ const stopThread = vi.fn()
  */
 const useStoppingForThread = vi.fn()
 const useStopNotConfirmedForThread = vi.fn()
+// Phase 302-01 (FIX-01): WorkspacePanel counts the thread's generated files through
+// `useThreadFiles`, which reads the chat's message bucket. No messages here — the panel this
+// suite measures is the one it measured before. (Implementation-defaulted, so
+// `vi.clearAllMocks()` below keeps it.)
+const useThreadMessages = vi.fn((..._a: unknown[]): unknown[] => [])
 
 vi.mock("@/providers/StreamsProvider", () => ({
+  useThreadMessages: (...a: unknown[]) => useThreadMessages(...a),
   useTodos: (...a: unknown[]) => useTodos(...a),
   useWorkspaceFiles: (...a: unknown[]) => useWorkspaceFiles(...a),
   useAskUserPrompt: (...a: unknown[]) => useAskUserPrompt(...a),
