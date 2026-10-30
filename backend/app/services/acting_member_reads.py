@@ -17,6 +17,11 @@ CALL from the folders the member can see right now (D-21: a subfolder created af
 scope on the next call). It can only remove: a folder subtree (``()`` matches nothing and returns
 before any SQL — never "everything") and connector-fed documents (``EXTERNAL_SQL``, D-40).
 
+The MCP reader is an AGENT, so every document read here applies mig 205's agent rule,
+``documents.retrievable`` (archived and source-gone documents leave every agent read) — the same
+rule search's RPCs apply (D-46, 304-REVIEW WR-01; it supersedes D-31's Library parity for archived
+and source-gone documents on this path only).
+
 Each read first checks that the key carries the catalogue tool it serves (KEY-03, ``READ_TOOL``);
 a key without it is refused with ``ToolNotGranted`` before anything is read.
 
@@ -172,7 +177,7 @@ def _nothing(scope: KeyScope) -> bool:
 async def _page(conn: Any, scope: KeyScope, *, limit: int, offset: int, ids: list[str] | None = None) -> dict:
     """One page of the Library list (``GET /documents``'s order and page contract) + exact total."""
     args: list = []
-    where = ["d.is_latest", "d.archived_at IS NULL"]
+    where = ["d.is_latest", "d.retrievable"]  # D-46: the agent rule (mig 205), not Library parity
     if ids is not None:
         args.append(ids)
         where.append(f"d.id = ANY(${len(args)}::uuid[])")
@@ -203,9 +208,10 @@ async def list_folders(principal: Any) -> list[dict]:
 
 
 async def list_documents(principal: Any, *, limit: int = 50, offset: int = 0) -> dict:
-    """``{items, total}`` — the Library's latest, unarchived documents in the key's org, newest
-    first; narrowed keys see only their subtrees (Root documents are out), connector-fed
-    documents only with ``include_external``."""
+    """``{items, total}`` — the Library's latest, RETRIEVABLE documents in the key's org (D-46:
+    archived and source-gone ones are out, as for every agent read), newest first; narrowed keys
+    see only their subtrees (Root documents are out), connector-fed documents only with
+    ``include_external``."""
     _require(principal, "list_documents")
     async with _acting(principal) as (conn, scope, _folders):
         if _nothing(scope):
@@ -215,7 +221,8 @@ async def list_documents(principal: Any, *, limit: int = 50, offset: int = 0) ->
 
 async def read_document(principal: Any, document_id: Any) -> dict | None:
     """One document with its full text, or ``None``. Unreadable, foreign (another org), out of the
-    key's scope, superseded and malformed ids all return the SAME ``None`` (one not-found)."""
+    key's scope, superseded, archived or source-gone (D-46) and malformed ids all return the SAME
+    ``None`` (one not-found)."""
     _require(principal, "read_document")
     doc_id = _uuid_or_none(document_id)
     if doc_id is None:
@@ -224,7 +231,7 @@ async def read_document(principal: Any, document_id: Any) -> dict | None:
         if _nothing(scope):
             return None
         args: list = [doc_id]
-        where = ["d.id = $1::uuid", "d.is_latest"] + _scope_clauses(scope, args)
+        where = ["d.id = $1::uuid", "d.is_latest", "d.retrievable"] + _scope_clauses(scope, args)
         row = await conn.fetchrow(
             f"SELECT {_READ_COLUMNS} FROM public.documents d WHERE {' AND '.join(where)}", *args
         )
@@ -370,7 +377,7 @@ async def related_documents(principal: Any, document_id: Any) -> dict | None:
         if _nothing(scope):
             return None
         args: list = [doc_id]
-        where = ["d.id = $1::uuid", "d.is_latest"] + _scope_clauses(scope, args)
+        where = ["d.id = $1::uuid", "d.is_latest", "d.retrievable"] + _scope_clauses(scope, args)
         subject = await conn.fetchrow(
             f"SELECT d.id, d.user_id, d.filename FROM public.documents d WHERE {' AND '.join(where)}", *args
         )
@@ -400,7 +407,7 @@ async def related_documents(principal: Any, document_id: Any) -> dict | None:
                 "SELECT d.id AS asked_id, l.id, l.filename FROM public.documents d "
                 "JOIN LATERAL (SELECT e.id, e.filename, e.folder_id, e.source_connection_id "
                 "FROM public.documents e WHERE e.user_id = d.user_id AND e.filename = d.filename "
-                "AND e.is_latest ORDER BY e.version_number DESC LIMIT 1) l ON true "
+                "AND e.is_latest AND e.retrievable ORDER BY e.version_number DESC LIMIT 1) l ON true "
                 f"WHERE {' AND '.join(end_where)}",
                 *end_args,
             ):
