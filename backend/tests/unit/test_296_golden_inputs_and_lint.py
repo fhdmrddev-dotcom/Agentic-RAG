@@ -64,6 +64,32 @@ def test_golden_inputs_are_typed_stand_ins_and_addresses_stay_invalid():
     assert stood_in == ["Region", "Due", "Count", "Topic"]
 
 
+# ── 302-02 (BE-IN-03 / D-07): no stand-in for an input the practice run never asks for ──
+
+UNASKED = [
+    {"key": "kb", "label": "Knowledge", "type": "kb_auto", "source": "kb_auto"},
+    {"key": "doc", "label": "Attachment", "type": "file"},
+    {"key": "client", "label": "Client name", "type": "text", "source": "template_derived"},
+]
+
+
+def test_inputs_the_practice_run_never_asks_for_get_no_stand_in():
+    wd = WorkflowDefinition.model_validate(_definition(
+        UNASKED + [{"key": "topic", "label": "Topic", "type": "text"}]
+    ))
+    inputs, stood_in = publish_service.golden_run_inputs(wd, "kickoff")
+    assert stood_in == ["Topic"]
+    assert "kb" not in inputs and "doc" not in inputs and "client" not in inputs
+    assert inputs["topic"]
+
+
+def test_only_unasked_inputs_means_no_stand_in_note():
+    wd = WorkflowDefinition.model_validate(_definition(UNASKED))
+    _inputs, stood_in = publish_service.golden_run_inputs(wd, "kickoff")
+    assert stood_in == []
+    assert publish_service.stand_in_note(stood_in) is None
+
+
 def test_the_stand_in_note_is_worded_for_one_and_for_many():
     assert publish_service.stand_in_note(["Region", "Due", "Count", "Topic"]) == (
         "The practice run had no example for Region, Due, Count and Topic, "

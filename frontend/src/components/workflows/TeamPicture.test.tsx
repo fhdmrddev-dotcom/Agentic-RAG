@@ -561,3 +561,19 @@ describe("TeamPicture — source fence (?raw, code only)", () => {
     expect(re.test(code)).toBe(false)
   })
 })
+
+describe("TeamPicture — 302-02 (FE-IN-06 / D-11): the scroll region and the figure are named apart", () => {
+  it.each([
+    ["populated", undefined],
+    ["empty", "empty"],
+  ] as const)("%s: region 'Team view, scrollable', figure 'Team picture for {name}'", (_n, arm) => {
+    if (arm === "empty") renderPicture(emptyDraft)
+    else renderPicture(productionTwoStep)
+    const region = screen.getByRole("region", { name: "Team view, scrollable" })
+    expect(region).toBeInTheDocument()
+    expect(region.getAttribute("aria-label")).not.toBe(teamFigureLabel(NAME))
+    // The empty arm draws no figure, so it must not borrow the figure's name either.
+    const figs = screen.queryAllByRole("figure", { name: teamFigureLabel(NAME) })
+    expect(figs).toHaveLength(arm === "empty" ? 0 : 1)
+  })
+})

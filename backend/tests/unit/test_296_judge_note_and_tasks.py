@@ -14,6 +14,8 @@ from types import SimpleNamespace
 from unittest.mock import AsyncMock, MagicMock, patch
 from uuid import uuid4
 
+import pytest
+
 OUTPUT = {
     "text": "NOT SENT — recorded only.",
     "recorded_intent": {"capability": "send_email", "inputs": {"recipient": "a@b.example"}},
@@ -42,15 +44,75 @@ def test_a_missing_grant_gets_no_design_note():
                                               author_criteria="(none)")
 
 
+def _fresh_noop():
+    async def _noop():
+        return None
+    return _noop
+
+
 def test_by_design_follows_the_executors_own_recording_gates():
+    import inspect
+
     from app.services.harness.validator_kinds import recording_by_design
 
+    # 302-02 (BE-IN-01 / D-27): async, because it awaits the same freshness the executor does.
+    assert inspect.iscoroutinefunction(recording_by_design)
     live = SimpleNamespace(is_golden_run=False)
-    with patch("app.models.user_settings.feature_audience", return_value="everyone"):
-        assert recording_by_design(SimpleNamespace(is_golden_run=True)) is True
-        assert recording_by_design(live) is False, "live + switch on: recorded = grant missing"
-    with patch("app.models.user_settings.feature_audience", return_value="off"):
-        assert recording_by_design(live) is True, "switch off: recording is the operator's design"
+    with patch("app.models.user_settings.ensure_settings_fresh", new=_fresh_noop()):
+        with patch("app.models.user_settings.feature_audience", return_value="everyone"):
+            assert asyncio.run(recording_by_design(SimpleNamespace(is_golden_run=True))) is True
+            assert asyncio.run(recording_by_design(live)) is False, "live + on: grant missing"
+        with patch("app.models.user_settings.feature_audience", return_value="off"):
+            assert asyncio.run(recording_by_design(live)) is True, "off: operator's design"
+
+
+def _stale_then_refreshed(state: dict):
+    async def _refresh():
+        state["audience"] = "off"  # the operator's flip, arriving on this worker's refresh
+    return _refresh
+
+
+def test_a_stale_cache_refreshed_to_off_agrees_with_the_executor():
+    from app.services.harness.live_connectors import live_connectors_fully_on
+    from app.services.harness.validator_kinds import recording_by_design
+
+    state = {"audience": "everyone"}
+    with patch("app.models.user_settings.ensure_settings_fresh", new=_stale_then_refreshed(state)), \
+         patch("app.models.user_settings.feature_audience",
+               side_effect=lambda _f: state["audience"]):
+        assert asyncio.run(live_connectors_fully_on()) is False, "it awaited the refresh first"
+    state = {"audience": "everyone"}
+    with patch("app.models.user_settings.ensure_settings_fresh", new=_stale_then_refreshed(state)), \
+         patch("app.models.user_settings.feature_audience",
+               side_effect=lambda _f: state["audience"]):
+        assert asyncio.run(recording_by_design(SimpleNamespace(is_golden_run=False))) is True
+
+
+@pytest.mark.parametrize("audience,expected", [
+    ("everyone", True), ("role", False), ("operators", False), ("off", False),
+])
+def test_the_one_predicate_is_a_positive_everyone_test(audience, expected):
+    from app.services.harness.live_connectors import live_connectors_fully_on
+
+    with patch("app.models.user_settings.ensure_settings_fresh", new=_fresh_noop()), \
+         patch("app.models.user_settings.feature_audience", return_value=audience):
+        assert asyncio.run(live_connectors_fully_on()) is expected
+
+
+def _code_only(src: str) -> str:
+    return "\n".join(ln for ln in src.splitlines() if not ln.lstrip().startswith("#"))
+
+
+def test_the_executor_and_the_judge_share_one_liveness_predicate():
+    from pathlib import Path
+
+    root = Path(__file__).resolve().parents[2] / "app" / "services" / "harness"
+    for name in ("phase_types.py", "validator_kinds.py"):
+        src = _code_only((root / name).read_text(encoding="utf-8"))
+        assert src.strip(), name
+        assert "live_connectors_fully_on(" in src, name
+        assert 'feature_audience("live_connectors")' not in src, name
+        assert "feature_audience(_LIVE_CONNECTORS_FEATURE)" not in src, name
 
 
 def test_the_in_run_judge_passes_the_runs_design_reading():
@@ -59,7 +121,7 @@ def test_the_in_run_judge_passes_the_runs_design_reading():
     from app.services.harness import validator_kinds
 
     src = inspect.getsource(validator_kinds)
-    assert "by_design=recording_by_design(ctx)" in src
+    assert "by_design=await recording_by_design(ctx)" in src
 
 
 # ── 293-IN-04 ──────────────────────────────────────────────────────────────────────────────

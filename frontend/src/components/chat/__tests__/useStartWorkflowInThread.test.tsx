@@ -119,11 +119,14 @@ describe("useStartWorkflowInThread", () => {
  * message. So the hook takes the failure over and the composer is never pre-filled with it.
  */
 describe("useStartWorkflowInThread — 296-04: a refused start is worded, never pre-filled", () => {
+  // 302-02: a 409 lock carries the code the real provider's lock arm stamps (FE-IN-01 / D-26).
   class FakeApiError extends Error {
     status: number
-    constructor(message: string, status: number) {
+    code?: string
+    constructor(message: string, status: number, code?: string) {
       super(message)
       this.status = status
+      this.code = code ?? (status === 409 ? "workflow_locked" : undefined)
     }
   }
 
@@ -322,11 +325,13 @@ describe("useStartWorkflowInThread — 298-02: a folder refusal shows the server
     expect(result.current.failure?.message).not.toContain("server words")
   })
 
-  it("a 409 is unchanged", async () => {
+  // 302-02 (FE-IN-01): the folder CODE still never decides a 409 — but a 409 is no longer always
+  // "locked". Without the provider's workflow_locked code it is worded by its server sentence.
+  it("a 409 is never a folder refusal", async () => {
     mockSend.mockRejectedValue(new CodedApiError("x", 409, "folder_in_other_org"))
     const { result } = renderHook(() => useStartWorkflowInThread("t-1"))
     await startPlain(result)
-    await waitFor(() => expect(result.current.failure?.kind).toBe("locked"))
+    await waitFor(() => expect(result.current.failure?.kind).toBe("refused"))
   })
 
   it("no Retry for a folder refusal: the same published workflow would be refused again", async () => {
@@ -336,5 +341,113 @@ describe("useStartWorkflowInThread — 298-02: a folder refusal shows the server
     await waitFor(() => expect(result.current.failure?.kind).toBe("folder"))
     act(() => result.current.retry())
     expect(mockSend).toHaveBeenCalledTimes(1)
+  })
+})
+
+/**
+ * 302-02 (FE-IN-01 / D-09 / D-26) — a 409 is worded by its CAUSE. The lock is told by the code the
+ * provider stamps on its own constructed error; a paused workflow by the server's wire prefix
+ * (cross-pinned below); every other 409 shows "{name} didn't start. {server sentence}". None of
+ * the three offers a Retry: the same start would be refused again.
+ */
+describe("useStartWorkflowInThread — 302-02: a refused 409 says why", () => {
+  const ORG = "Switch to this chat's organization to keep chatting with its Expert."
+  const PAUSED =
+    "This thread's workflow is paused, waiting for your answer. Answer it in the panel or on the run page."
+
+  class CodedApiError extends Error {
+    status: number
+    code?: string
+    constructor(message: string, status: number, code?: string) {
+      super(message)
+      this.status = status
+      this.code = code
+    }
+  }
+
+  beforeEach(() => {
+    useStreamsStore.setState({ failedSendDrafts: new Map(), reconcileErrors: new Map() })
+  })
+
+  async function startPlain(result: { current: ReturnType<typeof useStartWorkflowInThread> }) {
+    act(() => result.current.openPicker())
+    await waitFor(() => expect(result.current.workflows).toHaveLength(2))
+    act(() => result.current.start(PLAIN, {}))
+  }
+
+  it("the provider's lock-arm error (code workflow_locked) → locked, the startLocked sentence", async () => {
+    mockSend.mockImplementation(async (threadId: string) => {
+      useStreamsStore.setState((s) => ({
+        reconcileErrors: new Map(s.reconcileErrors).set(
+          threadId,
+          new CodedApiError(
+            "This thread is running a workflow — cancel it to send a Deep message.",
+            409,
+            "workflow_locked",
+          ),
+        ),
+      }))
+    })
+    const { result } = renderHook(() => useStartWorkflowInThread("t-1"))
+    await startPlain(result)
+    await waitFor(() =>
+      expect(result.current.failure).toEqual({
+        kind: "locked",
+        message: "A workflow is already running in this thread, so Plain flow didn't start.",
+      }),
+    )
+  })
+
+  it("a paused 409 (no code) → locked, the startPaused sentence, never startLocked", async () => {
+    mockSend.mockRejectedValue(new CodedApiError(PAUSED, 409))
+    const { result } = renderHook(() => useStartWorkflowInThread("t-1"))
+    await startPlain(result)
+    await waitFor(() => expect(result.current.failure?.kind).toBe("locked"))
+    expect(result.current.failure?.message).toBe(
+      "Plain flow didn't start because this thread's workflow is paused, waiting for your answer. Answer it in the panel or on the run page.",
+    )
+    expect(result.current.failure?.message).not.toContain("already running")
+  })
+
+  it("any other 409 with a sentence → refused, '{name} didn't start. {sentence}'", async () => {
+    mockSend.mockRejectedValue(new CodedApiError(ORG, 409))
+    const { result } = renderHook(() => useStartWorkflowInThread("t-1"))
+    await startPlain(result)
+    await waitFor(() =>
+      expect(result.current.failure).toEqual({ kind: "refused", message: `Plain flow didn't start. ${ORG}` }),
+    )
+  })
+
+  it("a 409 with an empty message → failed, the generic sentence", async () => {
+    mockSend.mockRejectedValue(new CodedApiError("", 409))
+    const { result } = renderHook(() => useStartWorkflowInThread("t-1"))
+    await startPlain(result)
+    await waitFor(() =>
+      expect(result.current.failure).toEqual({ kind: "failed", message: "Plain flow didn't start. Nothing ran." }),
+    )
+  })
+
+  it("no Retry for a refused start", async () => {
+    mockSend.mockRejectedValueOnce(new CodedApiError(ORG, 409))
+    const { result } = renderHook(() => useStartWorkflowInThread("t-1"))
+    await startPlain(result)
+    await waitFor(() => expect(result.current.failure?.kind).toBe("refused"))
+    act(() => result.current.retry())
+    expect(mockSend).toHaveBeenCalledTimes(1)
+  })
+
+  it("the paused prefix the hook keys on is the backend's literal (?raw)", async () => {
+    const mod = await import("../useStartWorkflowInThread")
+    const prefix = (mod as unknown as { WORKFLOW_PAUSED_DETAIL_PREFIX?: string }).WORKFLOW_PAUSED_DETAIL_PREFIX
+    // @ts-ignore — Vite `?raw` import, typed by vite/client at build time only.
+    const py = (await import("../../../../../backend/app/services/workflow_kickoff.py?raw")).default as string
+    // @ts-ignore — Vite `?raw` import, typed by vite/client at build time only.
+    const ts = (await import("../useStartWorkflowInThread.ts?raw")).default as string
+    expect(py.length).toBeGreaterThan(0)
+    expect(ts.length).toBeGreaterThan(0)
+    expect(typeof prefix).toBe("string")
+    expect(prefix!.length).toBeGreaterThan(10)
+    expect(ts).toContain(prefix!)
+    expect(py).toContain(prefix!)
   })
 })

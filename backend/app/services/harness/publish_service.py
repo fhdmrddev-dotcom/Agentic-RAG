@@ -1560,6 +1560,9 @@ def golden_run_inputs(definition, golden_input: str) -> tuple[dict[str, str], li
     TYPE now picks the stand-in — the first non-blank option, a fixed ISO date, `1`, or a short
     plain answer. `InputFieldSpec` has no example field, so every one of these is a stand-in and
     is NAMED (the second value) so publishing can say it used one; address keys are not listed.
+
+    302-02 (BE-IN-03 / D-07): an input the practice run never asks for — source ``kb_auto`` /
+    ``template_derived``, or type ``file`` / ``kb_auto`` — gets no stand-in and is not named.
     """
     inputs: dict[str, str] = {"kickoff_prompt": golden_input}
     stood_in: list[str] = []
@@ -1567,6 +1570,8 @@ def golden_run_inputs(definition, golden_input: str) -> tuple[dict[str, str], li
         key = getattr(spec, "key", None)
         # Never shadow the kickoff prompt: it carries the author's real golden input.
         if not key or key in inputs:
+            continue
+        if getattr(spec, "source", "user") != "user" or getattr(spec, "type", "text") in ("file", "kb_auto"):
             continue
         k = key.lower()
         if any(t in k for t in ("email", "mail", "recipient", "sender", "cc", "bcc")) or k in {"to", "from"}:

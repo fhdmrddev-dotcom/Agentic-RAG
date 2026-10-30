@@ -725,3 +725,28 @@ describe("DescribeTemplateRow — 291 source fences (T-291-30 and the ?raw spaci
     expect(glyph).toHaveAttribute("aria-hidden", "true")
   })
 })
+
+describe("DescribeTemplateRow — 302-02 (FE-IN-04 / D-10): a disabled Word-blank tick says why", () => {
+  it("while composing, every blank checkbox points at the files-locked note", () => {
+    render(
+      <DescribeTemplateRow
+        state={blanksRead()}
+        filename="supplier.docx"
+        onPickFile={noop}
+        onClear={noop}
+        disabled
+        disabledNoteId="describe-files-locked"
+      />,
+    )
+    const ticks = screen.getAllByRole("checkbox")
+    expect(ticks.length).toBeGreaterThan(0)
+    for (const t of ticks) expect(t).toHaveAttribute("aria-describedby", "describe-files-locked")
+  })
+
+  it("not composing, no blank checkbox carries aria-describedby", () => {
+    renderRow(blanksRead(), "supplier.docx")
+    const ticks = screen.getAllByRole("checkbox")
+    expect(ticks.length).toBeGreaterThan(0)
+    for (const t of ticks) expect(t).not.toHaveAttribute("aria-describedby")
+  })
+})

@@ -59,6 +59,7 @@ import {
   orchestratorTitle,
   seatsLabel,
   teamFigureLabel,
+  TEAM_SCROLL_REGION_LABEL,
 } from "./teamVocabulary"
 
 // ── the Steps | Team switch (D-06) ────────────────────────────────────────────────────────
@@ -464,7 +465,8 @@ export function TeamPicture({ phases, kbTools, nameContext, showTechnical, workf
     "h-full min-w-0 overflow-x-auto bg-background px-6 pb-[72px] pt-6 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/30"
   // 296-07 (290-IN-05) — a scroll REGION a keyboard can reach (Safari does not focus scroll
   // containers by itself). It holds no interactive node (D-06); it is only something to scroll.
-  const region = { tabIndex: 0, role: "region", "aria-label": teamFigureLabel(workflowName) } as const
+  // 302-02 (FE-IN-06 / D-11): named apart from the figure inside it, so neither name is said twice.
+  const region = { tabIndex: 0, role: "region", "aria-label": TEAM_SCROLL_REGION_LABEL } as const
 
   if (n === 0) {
     return (
