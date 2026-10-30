@@ -13,13 +13,15 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest"
 import { render, screen, waitFor, within } from "@testing-library/react"
 import userEvent from "@testing-library/user-event"
 import type { ApiKeyList, StartableWorkflowList } from "@/lib/api/apiKeys"
-import { makeKey, makeStartable } from "./fixtures"
+import { READ_ONLY_TOOLS, makeFolder, makeKey, makeMcp, makeMcpKey, makeStartable } from "./fixtures"
 
 const m = vi.hoisted(() => ({
   listApiKeys: vi.fn(),
   listStartableWorkflows: vi.fn(),
   createApiKey: vi.fn(),
   revokeApiKey: vi.fn(),
+  // 304-05: the MCP draft's folder read.
+  listPickableFolders: vi.fn(),
 }))
 
 vi.mock("@/lib/api/apiKeys", async (importOriginal) => {
@@ -40,12 +42,14 @@ const PICKER: StartableWorkflowList = {
   ],
   drafts_hidden: 2,
 }
+const FOLDERS = [makeFolder({ id: "f1", name: "Contracts" }), makeFolder({ id: "f2", name: "Policies", shared: true })]
 
 let setItemSpy: ReturnType<typeof vi.spyOn>
 
 beforeEach(() => {
   for (const f of Object.values(m)) f.mockReset()
   m.listStartableWorkflows.mockResolvedValue(PICKER)
+  m.listPickableFolders.mockResolvedValue({ folders: FOLDERS })
   sessionStorage.clear()
   localStorage.clear()
   setItemSpy = vi.spyOn(Storage.prototype, "setItem")
@@ -324,5 +328,163 @@ describe("293-04 ApiKeysTab — revoke", () => {
     await waitFor(() => expect(m.revokeApiKey).toHaveBeenCalledWith("k1"))
     expect(await screen.findByTestId("api-key-receipt")).toHaveTextContent(/✎ Revoked by you/)
     expect(m.listApiKeys).toHaveBeenCalledTimes(2)
+  })
+})
+
+// ── Phase 304-05: the MCP kind (D-01, D-07, D-08, D-30; SC2 / KEY-04; G-4 row 2) ─────────────────
+
+const MCP_EMPTY: ApiKeyList = { keys: [], limits: LIMITS, mcp: makeMcp() }
+
+async function openMcpDraft(user: ReturnType<typeof userEvent.setup>, list: ApiKeyList = MCP_EMPTY) {
+  m.listApiKeys.mockResolvedValue(list)
+  render(<ApiKeysTab />)
+  await user.click(await screen.findByRole("button", { name: "New key" }))
+  const draft = await screen.findByTestId("api-key-draft")
+  await user.click(within(draft).getByRole("radio", { name: /For an AI tool \(MCP\)/ }))
+  return draft
+}
+
+describe("304-05 ApiKeysTab — the kind choice", () => {
+  it("New key starts with the choice: no Label, no Create key, only Discard and why; focus on the first tile", async () => {
+    const user = userEvent.setup()
+    m.listApiKeys.mockResolvedValue(MCP_EMPTY)
+    render(<ApiKeysTab />)
+    expect(await screen.findByText(/No keys yet\. An AI tool key lets Claude Code/)).toBeInTheDocument()
+    await user.click(screen.getByRole("button", { name: "New key" }))
+    const draft = await screen.findByTestId("api-key-draft")
+    const group = within(draft).getByRole("radiogroup", { name: "What is this key for?" })
+    expect(within(group).getAllByRole("radio").every((r) => r.getAttribute("aria-checked") === "false")).toBe(true)
+    expect(within(draft).queryByLabelText("Label")).toBeNull()
+    expect(within(draft).queryByRole("button", { name: "Create key" })).toBeNull()
+    expect(within(draft).getByRole("button", { name: "Discard draft" })).toBeInTheDocument()
+    expect(within(draft).getByText("Choose what the key is for.")).toBeInTheDocument()
+    await waitFor(() => expect(document.activeElement).toBe(within(group).getAllByRole("radio")[0]))
+  })
+
+  it("choosing a kind moves focus to Label; switching kind keeps the Label", async () => {
+    const user = userEvent.setup()
+    const draft = await openMcpDraft(user)
+    await waitFor(() => expect(document.activeElement).toBe(within(draft).getByLabelText("Label")))
+    expect(within(draft).getByLabelText("Label")).toHaveAttribute("placeholder", "e.g. claude-code-laptop")
+    await user.type(within(draft).getByLabelText("Label"), "laptop")
+    await user.click(within(draft).getByRole("radio", { name: /For a workflow integration/ }))
+    expect(within(draft).getByLabelText("Label")).toHaveValue("laptop")
+    expect(await within(draft).findByRole("checkbox", { name: /Contract review/ })).toBeInTheDocument()
+    await user.click(within(draft).getByRole("radio", { name: /For an AI tool \(MCP\)/ }))
+    expect(within(draft).getByLabelText("Label")).toHaveValue("laptop")
+  })
+
+  it("deployment off / not available: no choice row, the 293 draft as it was (D-30)", async () => {
+    const user = userEvent.setup()
+    m.listApiKeys.mockResolvedValue({ ...MCP_EMPTY, mcp: makeMcp({ available: false, off: "deployment", url: null }) })
+    render(<ApiKeysTab />)
+    expect(await screen.findByText(/No keys yet\. A key lets another system/)).toBeInTheDocument()
+    await user.click(screen.getByRole("button", { name: "New key" }))
+    const draft = await screen.findByTestId("api-key-draft")
+    expect(within(draft).queryByRole("radiogroup", { name: "What is this key for?" })).toBeNull()
+    await waitFor(() => expect(document.activeElement).toBe(within(draft).getByLabelText("Label")))
+    expect(within(draft).getByRole("radio", { name: "Never" })).toBeInTheDocument()
+    expect(screen.queryByTestId("mcp-off-notice")).toBeNull()
+  })
+
+  it("org off: the MCP tile is disabled with the org sentence; the header says so", async () => {
+    const user = userEvent.setup()
+    m.listApiKeys.mockResolvedValue({ ...MCP_EMPTY, mcp: makeMcp({ off: "org" }) })
+    render(<ApiKeysTab />)
+    expect(await screen.findByTestId("mcp-off-notice")).toHaveTextContent(
+      "MCP access is switched off for this organisation by an admin.",
+    )
+    await user.click(screen.getByRole("button", { name: "New key" }))
+    const draft = await screen.findByTestId("api-key-draft")
+    const mcpTile = within(draft).getByRole("radio", { name: /For an AI tool \(MCP\)/ })
+    expect(mcpTile).toHaveAttribute("aria-disabled", "true")
+    expect(within(mcpTile).getByText("MCP access is switched off for this organisation by an admin.")).toBeInTheDocument()
+  })
+
+  it("the ⋯ menu pre-pick pre-selects the workflow kind and ticks the workflow", async () => {
+    sessionStorage.setItem("api_keys_prepick", JSON.stringify({ workflowId: "w1", name: "Contract review" }))
+    m.listApiKeys.mockResolvedValue(MCP_EMPTY)
+    render(<ApiKeysTab />)
+    const draft = await screen.findByTestId("api-key-draft")
+    expect(await within(draft).findByRole("radio", { name: /For a workflow integration/ })).toHaveAttribute("aria-checked", "true")
+    expect(await within(draft).findByRole("checkbox", { name: /Contract review/ })).toBeChecked()
+  })
+
+  it("the limits line shows only when a workflow key exists", async () => {
+    m.listApiKeys.mockResolvedValue({ ...MCP_EMPTY, keys: [makeMcpKey()] })
+    const { unmount } = render(<ApiKeysTab />)
+    expect(await screen.findByTestId("api-key-card")).toBeInTheDocument()
+    expect(screen.queryByTestId("api-keys-limits")).toBeNull()
+    unmount()
+    m.listApiKeys.mockResolvedValue({ ...MCP_EMPTY, keys: [makeMcpKey(), makeKey()] })
+    render(<ApiKeysTab />)
+    expect(await screen.findByTestId("api-keys-limits")).toBeInTheDocument()
+  })
+})
+
+describe("304-05 ApiKeysTab — the MCP draft", () => {
+  it("the default body: Read only, All folders, no external, 90 days (SC2)", async () => {
+    const user = userEvent.setup()
+    const draft = await openMcpDraft(user)
+    m.createApiKey.mockResolvedValue({ key: makeMcpKey({ id: "new" }), secret: "srl_mcp_TESTsecretNOTreal000000000000000000" })
+    await user.type(within(draft).getByLabelText("Label"), "claude-code-laptop")
+    await user.click(within(draft).getByRole("button", { name: "Create key" }))
+    expect(m.createApiKey).toHaveBeenCalledWith({
+      kind: "mcp",
+      label: "claude-code-laptop",
+      tools: READ_ONLY_TOOLS,
+      folder_ids: null,
+      include_external: false,
+      expires_in_days: 90,
+    })
+  })
+
+  it("Only these folders with none ticked: Create key disabled and says why (G-4 row 2)", async () => {
+    const user = userEvent.setup()
+    const draft = await openMcpDraft(user)
+    await user.type(within(draft).getByLabelText("Label"), "laptop")
+    await user.click(within(draft).getByRole("radio", { name: "Only these folders" }))
+    await waitFor(() => expect(m.listPickableFolders).toHaveBeenCalled())
+    const create = within(draft).getByRole("button", { name: "Create key" })
+    expect(create).toBeDisabled()
+    expect(create).toHaveAccessibleDescription("Tick at least one folder, or choose All folders I can see.")
+    await user.click(await within(draft).findByRole("checkbox", { name: /Contracts/ }))
+    expect(create).toBeEnabled()
+    m.createApiKey.mockResolvedValue({ key: makeMcpKey({ id: "new" }), secret: "srl_mcp_x" })
+    await user.click(create)
+    expect(m.createApiKey).toHaveBeenCalledWith(expect.objectContaining({ folder_ids: ["f1"] }))
+  })
+
+  it("Create key says Add a label first", async () => {
+    const user = userEvent.setup()
+    const draft = await openMcpDraft(user)
+    expect(within(draft).getByRole("button", { name: "Create key" })).toHaveAccessibleDescription("Add a label.")
+  })
+
+  it("a server refusal renders its sentence and keeps every choice", async () => {
+    const user = userEvent.setup()
+    const draft = await openMcpDraft(user)
+    m.createApiKey.mockRejectedValue(new Error("Pick at least one folder, or choose All folders I can see."))
+    await user.type(within(draft).getByLabelText("Label"), "laptop")
+    await user.click(within(draft).getByRole("radio", { name: "Read and ask" }))
+    await user.click(within(draft).getByRole("radio", { name: "365 days" }))
+    await user.click(within(draft).getByRole("button", { name: "Create key" }))
+    expect(await within(draft).findByRole("alert")).toHaveTextContent(
+      "Couldn't create the key. Pick at least one folder, or choose All folders I can see. Your choices are kept; try again.",
+    )
+    expect(within(draft).getByLabelText("Label")).toHaveValue("laptop")
+    expect(within(draft).getByRole("radio", { name: "Read and ask" })).toHaveAttribute("aria-checked", "true")
+    expect(within(draft).getByRole("radio", { name: "365 days" })).toHaveAttribute("aria-checked", "true")
+  })
+
+  it("a failed folder read says so and Retry reads again", async () => {
+    const user = userEvent.setup()
+    m.listPickableFolders.mockRejectedValueOnce(new Error("down")).mockResolvedValueOnce({ folders: FOLDERS })
+    const draft = await openMcpDraft(user)
+    await user.click(within(draft).getByRole("radio", { name: "Only these folders" }))
+    const alert = await within(draft).findByRole("alert")
+    expect(alert).toHaveTextContent("Couldn't load your folders.")
+    await user.click(within(alert).getByRole("button", { name: "Retry" }))
+    expect(await within(draft).findByRole("checkbox", { name: /Contracts/ })).toBeInTheDocument()
   })
 })
