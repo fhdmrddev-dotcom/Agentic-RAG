@@ -10,6 +10,9 @@
  *
  * Data: useWorkspaceFiles(threadId) + useViewingThread() (Phase 086 reactive
  * hooks — `data` is never undefined, empty array is a stable ref). No refresh.
+ * 302-01: also the thread's generated files, via useThreadFiles (FIX-01 — sandbox outputs
+ * never enter workspace_files, so they are folded from the chat's own messages and listed
+ * after the workspace rows in the GeneratedFilesGroup, outside the listbox).
  *
  * A11Y (A11Y-02 / UI-SPEC): role=listbox + role=option rows, roving tabindex,
  * ArrowUp/Down navigation, Enter/Space opens, no mouse-only path. The flash
@@ -72,13 +75,12 @@ import { useEffect, useRef, useState } from "react"
 import { cn } from "@/lib/utils"
 import { FileRow } from "@/components/files/FileRow"
 import { fileAgeLabel } from "@/components/files/fileRowUtils"
-import {
-  useWorkspaceFiles,
-  useViewingThread,
-} from "@/providers/StreamsProvider"
+import { useViewingThread } from "@/providers/StreamsProvider"
 import type { WorkspaceFile } from "@/types"
 import { FilePreview } from "./FilePreview"
 import { TemplateUpload } from "./TemplateUpload"
+import { useThreadFiles } from "./useThreadFiles"
+import { GeneratedFilesGroup } from "./GeneratedFilesGroup"
 import { AttachmentRowTrailing, requestAttachmentMenu } from "@/components/attachments/AttachmentRowTrailing"
 import { attachmentDisplayName, isThreadLifeAttachment } from "@/lib/attachmentLifetime"
 
@@ -167,7 +169,9 @@ export interface FilesSectionProps {
 
 export function FilesSection({ onSelectFile }: FilesSectionProps = {}) {
   const threadId = useViewingThread()
-  const { data: files } = useWorkspaceFiles(threadId)
+  // 302-01: `files` keeps its name (the workspace rows) so the flash, roving and keyboard code
+  // below stay byte-unchanged; `generated` is the thread's sandbox outputs (FIX-01).
+  const { workspace: files, generated } = useThreadFiles(threadId)
 
   const [selected, setSelected] = useState<WorkspaceFile | null>(null)
   const [activeIndex, setActiveIndex] = useState(0)
@@ -272,7 +276,7 @@ export function FilesSection({ onSelectFile }: FilesSectionProps = {}) {
   // ── Upload affordance (D-01): extracted to <TemplateUpload/> so the panel's
   //    no-activity empty state (WorkspacePanel) can render it too. Rendered in
   //    BOTH the empty state and the populated list. ──
-  if (rows.length === 0) {
+  if (rows.length === 0 && generated.length === 0) {
     return (
       <div className="flex flex-col gap-1 p-1">
         <TemplateUpload />
@@ -284,6 +288,7 @@ export function FilesSection({ onSelectFile }: FilesSectionProps = {}) {
   return (
     <div className="flex flex-col gap-0.5 p-1">
       <TemplateUpload />
+      {rows.length > 0 && (
       <div role="listbox" aria-label="Workspace files" className="flex flex-col gap-0.5">
         {rows.map((file, index) => {
           const key = fileKey(file)
@@ -350,6 +355,10 @@ export function FilesSection({ onSelectFile }: FilesSectionProps = {}) {
           )
         })}
       </div>
+      )}
+      {/* 302-01 (FIX-01, UI-D1/UI-D4): the thread's generated files, after the listbox and
+          outside it, on the same one rowsNow. */}
+      <GeneratedFilesGroup files={generated} now={rowsNow} />
     </div>
   )
 }

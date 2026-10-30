@@ -83,7 +83,13 @@ const useLoadingForThread = vi.fn((..._a: unknown[]) => false)
 // doing precisely that (3 failures here against a green base) before this line existed.
 // It defaults FALSE — this suite's scenario is a live run, not a thread mid-reconcile.
 const useReconcilingForThread = vi.fn((..._a: unknown[]) => false)
+// Phase 302-01 (FIX-01) — THE FOURTH ONE, for the same reason: WorkspacePanel now counts the
+// thread's generated files through `useThreadFiles`, which reads the chat's message bucket.
+// Omitting the key throws every case at mount (measured: 4 failures before this line). It
+// defaults to NO messages, so no generated file changes this suite's derived-panel scenarios.
+const useThreadMessages = vi.fn((..._a: unknown[]): unknown[] => [])
 vi.mock("@/providers/StreamsProvider", () => ({
+  useThreadMessages: (...a: unknown[]) => useThreadMessages(...a),
   useStreamingForThread: (...a: unknown[]) => useStreamingForThread(...a),
   useLoadingForThread: (...a: unknown[]) => useLoadingForThread(...a),
   useReconcilingForThread: (...a: unknown[]) => useReconcilingForThread(...a),

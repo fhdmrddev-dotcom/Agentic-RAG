@@ -33,7 +33,8 @@ import { PanelRightClose, X } from "lucide-react"
 import { cn } from "@/lib/utils"
 import {
   useTodos,
-  useWorkspaceFiles,
+  // 302-01: the workspace-files read moved into `useThreadFiles` (below), which also counts
+  // the thread's generated files — so the "EIGHT names" sentence further down now reads seven.
   useAskUserPrompt,
   useViewingThread,
   usePhases,
@@ -67,6 +68,7 @@ import { TemplateUpload } from "./TemplateUpload"
 import { PanelRail } from "./PanelRail"
 import { TodosSection } from "./TodosSection"
 import { FilesSection } from "./FilesSection"
+import { useThreadFiles } from "./useThreadFiles"
 import { VersionDiff } from "./VersionDiff"
 import { PendingAskStack } from "./PendingAskCard"
 import { PhaseTimeline } from "./PhaseTimeline"
@@ -354,7 +356,9 @@ export function WorkspacePanel({
 }: WorkspacePanelProps) {
   const threadId = useViewingThread()
   const { data: todos } = useTodos(threadId)
-  const { data: files } = useWorkspaceFiles(threadId)
+  // 302-01 (FIX-01, UI-D6): workspace rows + the thread's generated files, one number used in
+  // all three places (hasActivity, the FILES count, the rail) so none can disagree.
+  const { count: filesCount } = useThreadFiles(threadId)
   const { data: pendingAsks } = useAskUserPrompt(threadId)
   // Phase 094 (PANEL-08): the harness phase-timeline slice + the server-truth
   // workflow lock (presence ⇒ harness mode). The Workflow section mounts when
@@ -419,7 +423,7 @@ export function WorkspacePanel({
   // the derived rows. Without this the derivation was structurally unreachable.
   const hasActivity =
     todos.length > 0 ||
-    files.length > 0 ||
+    filesCount > 0 ||
     pendingAsks.length > 0 ||
     phases.length > 0 ||
     derived.length > 0
@@ -463,7 +467,7 @@ export function WorkspacePanel({
             <TodosSection />
           </PanelSection>
 
-          <PanelSection title="Files" count={files.length}>
+          <PanelSection title="Files" count={filesCount}>
             <FilesSection onSelectFile={setSelectedFile} />
           </PanelSection>
 
@@ -628,7 +632,7 @@ export function WorkspacePanel({
       {state === "rail" ? (
         <PanelRail
           todos={{ done: todosDone, total: todos.length }}
-          filesCount={files.length}
+          filesCount={filesCount}
           pendingCount={pendingAsks.length}
           // Pulsing-amber-dot (PANEL-01): a pending ask_user while collapsed must
           // never go silent. The rail's always-present Expand control is its
