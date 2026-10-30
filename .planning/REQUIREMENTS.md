@@ -28,12 +28,12 @@ Decided at intake (operator, 2026-10-27):
 
 ### Active org (ORG)
 
-- [ ] **ORG-01**: Library folders show only the active org's items, and switching org refreshes the list. — `SEED-389`
-- [ ] **ORG-02**: The Workflows list, both published and drafts, shows only the active org's workflows. — `SEED-389`
-- [ ] **ORG-03**: The chat thread list shows only the active org's threads.
-- [ ] **ORG-04**: Workflow run history shows only the active org's runs.
-- [ ] **ORG-05**: Saving or launching a workflow that points at another org's folder is refused with a worded reason. Scheduled runs, API-key runs and chat retrieval keep working as before.
-- [ ] **ORG-06**: A user who has items in another org sees an honest count of them rather than a silent gap. Items stamped to the wrong org before Phase 296 can be moved one at a time, and each move is audited. The audit is measured before any filter ships.
+- [x] **ORG-01**: Library folders show only the active org's items, and switching org refreshes the list. — `SEED-389`
+- [x] **ORG-02**: The Workflows list, both published and drafts, shows only the active org's workflows. — `SEED-389`
+- [x] **ORG-03**: The chat thread list shows only the active org's threads.
+- [x] **ORG-04**: Workflow run history shows only the active org's runs.
+- [x] **ORG-05**: Saving or launching a workflow that points at another org's folder is refused with a worded reason. Scheduled runs, API-key runs and chat retrieval keep working as before.
+- [x] **ORG-06**: A user who has items in another org sees an honest count of them rather than a silent gap. Items stamped to the wrong org before Phase 296 can be moved one at a time, and each move is audited. The audit is measured before any filter ships.
 
 ### Told when a run waits on you (NOTE)
 
@@ -97,12 +97,12 @@ Decided at intake (operator, 2026-10-27):
 | LINK-06 | Phase 299 | Complete |
 | LINK-07 | Phase 297 | Complete |
 | LINK-08 | Phase 297 | Complete |
-| ORG-01 | Phase 298 | Pending |
-| ORG-02 | Phase 298 | Pending |
-| ORG-03 | Phase 298 | Pending |
-| ORG-04 | Phase 298 | Pending |
-| ORG-05 | Phase 298 | Pending |
-| ORG-06 | Phase 298 | Pending |
+| ORG-01 | Phase 298 | Complete |
+| ORG-02 | Phase 298 | Complete |
+| ORG-03 | Phase 298 | Complete |
+| ORG-04 | Phase 298 | Complete |
+| ORG-05 | Phase 298 | Complete |
+| ORG-06 | Phase 298 | Complete |
 | NOTE-01 | Phase 301 | Complete |
 | NOTE-02 | Phase 300 | Pending |
 | NOTE-03 | Phase 300 | Pending |

@@ -45,7 +45,7 @@ reviewer exists, so a phase closes `verification_mode: self-verified`, never `re
 
 Phase: 302 (Close-Out and a True Register) — PASSED 2026-10-30 (operator "mark 302 passed")
 Plan: 3 of 3
-Status: All v4.8 phases executed; 301 + 302 passed; 298/300 human_needed
+Status: All v4.8 phases executed; 298 + 301 + 302 passed; 300 human_needed
 Last activity: 2026-10-30 -- Phase 302 passed; every live/four-axis row driven (Moonshot blocked, G4-3 (c) not UI-reachable)
 
 Owed for 300 (in order): run `300-HUMAN-UAT.md` (G4-5 first; FIX-05 roster must be re-run after IN-03; G4-6 only after 299 G4-4a); approve 3 fixer-written strings (WR-05, IN-01, IN-04). Before deploy: paste mig 218 into cloud SQL editor (per-action approval) → `get_advisors(security)`; ⏸ Resend DEFERRED by operator 2026-10-29 — deploy without a mail provider (deliveries `suppressed`, invites → Copy link); when revived: Coolify EMAIL_PROVIDER / RESEND_API_KEY / ENVIRONMENT=production; Resend sender + SPF/DKIM/DMARC. At close: REQUIREMENTS NOTE-02/03/04/06 + FIX-04/05 → done; BUG-261027-03/04/05 + BUG-260828-05/06 → closed when their rows pass.
@@ -55,7 +55,7 @@ Phase 299 — **CLOSED 2026-10-29** (operator: "proceed until you finish this ph
 `item_org_guard.py` / link hooks). SEED-178/015/312 → shipped, BUG-261027-02 → closed. Before deploy add Supabase Auth Redirect URLs `https://app.<domain>/**`,
 `https://<domain>/**` and the one-box origin (cloud write — per-action approval); after deploy `get_advisors(security)`. No migration ships with 299.
 
-Owed for 298 (in order): run `298-HUMAN-UAT.md` rows as the two-org dev account (G4-1 first); acknowledge residuals
+298 PASSED 2026-10-30 (all 8 G-4/A-1 rows live; G4-2 fixed 5f0eb2660; residuals accepted; seeds flipped). Was owed: run `298-HUMAN-UAT.md` rows as the two-org dev account (G4-1 first); acknowledge residuals
 AR-298-R1 (WR-06 `LIMIT 1`) and AR-298-R2 (WR-05 bind race) in `298-SECURITY.md`; then flip SEED-389/317 → shipped,
 SEED-313 → answered. Mig 217 APPLIED in cloud 2026-10-28 (CHECK 40 types, advisor: no new finding); 297+298 deployed 2026-10-28: master 879c96555, production b813d2711; Vercel + Coolify verified (new /org-items/* routes 401, /docs 401, health ok).
 
