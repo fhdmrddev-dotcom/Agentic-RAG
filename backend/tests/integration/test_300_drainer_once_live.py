@@ -239,6 +239,19 @@ async def test_a_still_open_notice_whose_prompt_was_answered_is_skipped():
         assert (await _delivery(w))["status"] == "skipped_answered"
 
 
+async def test_an_owner_who_left_the_org_is_not_emailed():
+    """v4.8 audit W-1: the list hides a notice once its owner leaves the org (LIST_OPEN_SQL's
+    org_members join), and the run link then reads "can't be opened" (link_resolver's membership
+    arm). The email must agree: no send to someone who can no longer open the run."""
+    async with _world() as w:
+        async with w.pool.acquire() as con:
+            await con.execute("DELETE FROM public.org_members WHERE org_id = $1 AND user_id = $2", w.org, w.owner)
+        send = CountingSend()
+        await NotificationDrainer(w.pool, send=send).tick(now=NOW)
+        assert send.calls == [], "an ex-member was emailed a link they cannot open"
+        assert (await _delivery(w))["status"] == "skipped_answered"
+
+
 async def test_an_opted_out_owner_is_skipped_and_the_notice_stays():
     async with _world(opted_out=True) as w:
         send = CountingSend()
