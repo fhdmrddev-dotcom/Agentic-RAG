@@ -17,6 +17,8 @@ from __future__ import annotations
 from uuid import UUID, uuid4
 
 import pytest
+from fastapi import HTTPException
+from starlette.requests import Request as StarletteRequest
 
 from app.api import document_relationships as relationships_api
 from app.api import document_views as views_api
@@ -24,6 +26,10 @@ from app.api import documents as documents_api
 from app.api import folders as folders_api
 from app.api import workflows as workflows_api
 from app.dependencies import get_user_pg_connection
+from app.security import api_key_auth
+from app.security.api_key_auth import KeyRefused
+from app.security.mcp_principal import resolve_mcp_principal
+from app.security.principal_liveness import MCP_OFF_DEPLOYMENT_SENTENCE, MCP_OFF_ORG_SENTENCE
 from app.services import acting_member_reads as reads
 from app.services import retrieval_service
 from app.services.document_relationship_service import _NO_ACCESS_MASK as MASK
@@ -37,6 +43,7 @@ from tests.integration.phase304_fixtures import (  # noqa: F401 — `world` is a
     search_settings,
     world,
 )
+from tests.unit.phase293_inbound_fakes import FakeRedis
 
 pytestmark = requires_pg
 
@@ -297,6 +304,176 @@ async def test_relationships_parity(world, pg_pool):
     assert key["total"] == len(key["documents"]) == 4
     # A Y document as the subject: not found in X.
     assert await reads.related_documents(p, w.docs["fy_doc"]) is None
+
+
+# ── negative arms (D-31, SC1/SC4/SC5): every way access ends, on the NEXT resolution ───────
+
+
+def _record_audits(monkeypatch) -> list[tuple]:
+    """Observe the resolver's audit writes (``auth.write_audit_entry``, the 293 seam)."""
+    calls: list[tuple] = []
+
+    async def _write(user_id, action_type, metadata, supabase=None, **kw):
+        calls.append((str(user_id), action_type, dict(metadata or {}), kw.get("org_id")))
+
+    monkeypatch.setattr(api_key_auth, "write_audit_entry", _write)
+    monkeypatch.setattr(api_key_auth, "get_service_role_supabase", lambda org_id: object())
+    return calls
+
+
+async def _resolve(pool, secret):
+    return await resolve_mcp_principal(secret, pool=pool, redis=FakeRedis())
+
+
+async def _live_key(w, pool) -> tuple[str, str]:
+    """Mint, resolve once successfully, and prove the success was recorded (D-26)."""
+    secret = await w.mint()
+    key_id = str(await pool.fetchval(
+        "SELECT id FROM public.api_keys WHERE key_hash = $1",
+        api_key_auth.digest_key(secret, kind="mcp"),
+    ))
+    assert await pool.fetchval("SELECT last_used_at FROM public.api_keys WHERE id = $1", UUID(key_id)) is None
+    p = await _resolve(pool, secret)
+    assert (p.key_id, p.org_id, p.user_id) == (key_id, w.x, w.u)
+    assert await pool.fetchval(
+        "SELECT last_used_at FROM public.api_keys WHERE id = $1", UUID(key_id)) is not None
+    return secret, key_id
+
+
+async def _refused_with(pool, secret, reason: str, audits: list, key_id: str, sentence=None):
+    before = len(audits)
+    with pytest.raises(KeyRefused) as exc:
+        await _resolve(pool, secret)
+    assert exc.value.reason == reason
+    assert exc.value.sentence == sentence
+    written = audits[before:]
+    assert len(written) == 1, written
+    user_id, action, metadata, org = written[0]
+    assert action == "api_key.refused"
+    assert metadata["kind"] == "mcp" and metadata["reason"] == reason
+    assert metadata["api_key_id"] == key_id and metadata["call"] == "read"
+    assert org is not None
+
+
+async def test_not_member_next_resolution_refused(world, pg_pool, monkeypatch):
+    w = world
+    audits = _record_audits(monkeypatch)
+    secret, key_id = await _live_key(w, pg_pool)
+    await pg_pool.execute(
+        "DELETE FROM public.org_members WHERE org_id = $1 AND user_id = $2", UUID(w.x), UUID(w.u))
+    try:
+        await _refused_with(pg_pool, secret, "not_member", audits, key_id)
+    finally:
+        await pg_pool.execute(
+            "INSERT INTO public.org_members (org_id, user_id, role) VALUES ($1, $2, 'member')"
+            " ON CONFLICT DO NOTHING", UUID(w.x), UUID(w.u))
+    assert (await _resolve(pg_pool, secret)).org_id == w.x  # membership back: the key works again
+
+
+async def test_banned_next_resolution_refused(world, pg_pool, monkeypatch):
+    w = world
+    audits = _record_audits(monkeypatch)
+    secret, key_id = await _live_key(w, pg_pool)
+    # the same column deps._is_banned reads
+    await pg_pool.execute(
+        "UPDATE auth.users SET banned_until = now() + interval '1 day' WHERE id = $1", UUID(w.u))
+    try:
+        await _refused_with(pg_pool, secret, "banned", audits, key_id)
+    finally:
+        await pg_pool.execute("UPDATE auth.users SET banned_until = NULL WHERE id = $1", UUID(w.u))
+    assert (await _resolve(pg_pool, secret)).org_id == w.x
+
+
+async def test_revoked_next_resolution_refused(world, pg_pool, monkeypatch):
+    w = world
+    audits = _record_audits(monkeypatch)
+    secret, key_id = await _live_key(w, pg_pool)
+    await pg_pool.execute("UPDATE public.api_keys SET revoked_at = now() WHERE id = $1", UUID(key_id))
+    await _refused_with(pg_pool, secret, "revoked", audits, key_id)
+
+
+async def test_expired_next_resolution_refused(world, pg_pool, monkeypatch):
+    w = world
+    audits = _record_audits(monkeypatch)
+    secret, key_id = await _live_key(w, pg_pool)
+    await pg_pool.execute(
+        "UPDATE public.api_keys SET expires_at = now() - interval '1 minute' WHERE id = $1", UUID(key_id))
+    await _refused_with(pg_pool, secret, "expired", audits, key_id)
+
+
+async def test_mcp_off_org_refuses_and_switching_back_restores(world, pg_pool, monkeypatch):
+    w = world
+    audits = _record_audits(monkeypatch)
+    secret, key_id = await _live_key(w, pg_pool)
+    await pg_pool.execute("UPDATE public.organizations SET mcp_enabled = false WHERE id = $1", UUID(w.x))
+    try:
+        await _refused_with(pg_pool, secret, "mcp_off_org", audits, key_id, MCP_OFF_ORG_SENTENCE)
+    finally:
+        await pg_pool.execute("UPDATE public.organizations SET mcp_enabled = true WHERE id = $1", UUID(w.x))
+    # the switch neither deleted nor mutated the key: the next resolution succeeds
+    row = await pg_pool.fetchrow(
+        "SELECT revoked_at, expires_at FROM public.api_keys WHERE id = $1", UUID(key_id))
+    assert row["revoked_at"] is None and row["expires_at"] is not None
+    assert (await _resolve(pg_pool, secret)).key_id == key_id
+    # the OTHER org's switch is not this key's switch
+    await pg_pool.execute("UPDATE public.organizations SET mcp_enabled = false WHERE id = $1", UUID(w.y))
+    assert (await _resolve(pg_pool, secret)).key_id == key_id
+
+
+async def test_mcp_off_deployment_refuses_and_switching_back_restores(world, pg_pool, monkeypatch):
+    w = world
+    audits = _record_audits(monkeypatch)
+    secret, key_id = await _live_key(w, pg_pool)
+    original = await pg_pool.fetchval("SELECT mcp_enabled FROM public.app_settings WHERE id = 'global'")
+    assert original is True, "the deployment switch must start ON for this arm to mean anything"
+    await pg_pool.execute("UPDATE public.app_settings SET mcp_enabled = false WHERE id = 'global'")
+    try:
+        await _refused_with(pg_pool, secret, "mcp_off_deployment", audits, key_id,
+                            MCP_OFF_DEPLOYMENT_SENTENCE)
+    finally:
+        await pg_pool.execute("UPDATE public.app_settings SET mcp_enabled = $1 WHERE id = 'global'", original)
+    assert (await _resolve(pg_pool, secret)).key_id == key_id
+
+
+async def _inbound(secret: str):
+    """``resolve_api_key`` as /inbound runs it: a real starlette Request carrying the Bearer header,
+    credentials read by the route's own HTTPBearer scheme."""
+    scope = {
+        "type": "http", "method": "GET", "path": "/inbound/runs/x", "query_string": b"",
+        "headers": [(b"authorization", f"Bearer {secret}".encode())],
+    }
+    req = StarletteRequest(scope)
+    creds = await api_key_auth._key_bearer_scheme(req)
+    return req, creds
+
+
+async def test_workflow_key_at_mcp_is_refused(world, pg_pool, monkeypatch):
+    w = world
+    audits = _record_audits(monkeypatch)
+    secret = await w.mint(kind="workflow")
+    assert secret.startswith("srl_live_")
+    # non-vacuity: the same key IS live at its own door
+    req, creds = await _inbound(secret)
+    assert (await api_key_auth.resolve_api_key(req, creds, pg_pool, FakeRedis())).kind == "workflow"
+    with pytest.raises(KeyRefused) as exc:
+        await _resolve(pg_pool, secret)
+    assert exc.value.reason == "unknown" and exc.value.sentence is None
+    assert [a for a in audits if a[1] == "api_key.refused"] == []  # unattributable: never audited
+
+
+async def test_mcp_key_at_inbound_gets_the_unknown_key_body(world, pg_pool, monkeypatch):
+    w = world
+    _record_audits(monkeypatch)
+    secret, _key_id = await _live_key(w, pg_pool)  # live as an MCP key...
+    req, creds = await _inbound(secret)
+    with pytest.raises(HTTPException) as mcp_at_inbound:
+        await api_key_auth.resolve_api_key(req, creds, pg_pool, FakeRedis())
+    unknown_req, unknown_creds = await _inbound(api_key_auth.mint_key("workflow").secret)
+    with pytest.raises(HTTPException) as unknown:
+        await api_key_auth.resolve_api_key(unknown_req, unknown_creds, pg_pool, FakeRedis())
+    assert mcp_at_inbound.value.status_code == unknown.value.status_code == 401
+    assert mcp_at_inbound.value.detail == unknown.value.detail == api_key_auth.INVALID_KEY_DETAIL
+    assert mcp_at_inbound.value.headers == unknown.value.headers
 
 
 async def test_the_principal_is_resolved_from_a_real_key(world, pg_pool):
