@@ -175,11 +175,14 @@ describe("ThreadWorkflowPicker — 296-04 dismissal (287-IN-04b)", () => {
 })
 
 describe("ThreadWorkflowPicker — 296-04 a refused start (287-WR-02 / 287-IN-03)", () => {
+  // 302-02: a 409 lock carries the code the real provider's lock arm stamps (FE-IN-01 / D-26).
   class FakeApiError extends Error {
     status: number
-    constructor(message: string, status: number) {
+    code?: string
+    constructor(message: string, status: number, code?: string) {
       super(message)
       this.status = status
+      this.code = code ?? (status === 409 ? "workflow_locked" : undefined)
     }
   }
 

@@ -119,11 +119,14 @@ describe("useStartWorkflowInThread", () => {
  * message. So the hook takes the failure over and the composer is never pre-filled with it.
  */
 describe("useStartWorkflowInThread — 296-04: a refused start is worded, never pre-filled", () => {
+  // 302-02: a 409 lock carries the code the real provider's lock arm stamps (FE-IN-01 / D-26).
   class FakeApiError extends Error {
     status: number
-    constructor(message: string, status: number) {
+    code?: string
+    constructor(message: string, status: number, code?: string) {
       super(message)
       this.status = status
+      this.code = code ?? (status === 409 ? "workflow_locked" : undefined)
     }
   }
 

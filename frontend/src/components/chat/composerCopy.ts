@@ -113,6 +113,11 @@ const shared = {
    * inputs were not accepted (422), and anything else.
    */
   startLocked: (name: string): string => `A workflow is already running in this thread, so ${name} didn't start.`,
+  /** 302-02 (FE-IN-01 / D-09, UI-D9): the thread's workflow is paused on a question. */
+  startPaused: (name: string): string =>
+    `${name} didn't start because this thread's workflow is paused, waiting for your answer. Answer it in the panel or on the run page.`,
+  /** 302-02 (FE-IN-01 / D-26): any other 409 — the server's sentence, authored for this person. */
+  startRefusedWith: (name: string, sentence: string): string => `${name} didn't start. ${sentence}`,
   startInputsRefused: (name: string): string => `${name} didn't start because some of its inputs weren't accepted.`,
   startFailed: (name: string): string => `${name} didn't start. Nothing ran.`,
   startRetry: "Retry start",
