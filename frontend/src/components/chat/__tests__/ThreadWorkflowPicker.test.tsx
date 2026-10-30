@@ -272,3 +272,27 @@ describe("ThreadWorkflowPicker — 298-02 a folder refusal (ORG-05 / UI-D12)", (
     expect(screen.getByRole("button", { name: "Dismiss message" })).toBeInTheDocument()
   })
 })
+
+describe("ThreadWorkflowPicker — 302-02 a refused start says why (FE-IN-01 / D-26)", () => {
+  const ORG = "Switch to this chat's organization to keep chatting with its Expert."
+
+  class StatusError extends Error {
+    status: number
+    constructor(message: string, status: number) {
+      super(message)
+      this.status = status
+    }
+  }
+
+  it("a non-lock 409 shows '{name} didn't start. {server sentence}', with Dismiss and no Retry", async () => {
+    mockSend.mockRejectedValue(new StatusError(ORG, 409))
+    render(<ThreadWorkflowPicker thread={THREAD} locked={false} />)
+    await openPicker()
+    fireEvent.click(await screen.findByTestId("thread-workflow-item-wf-plain"))
+    const line = await screen.findByTestId("thread-workflow-start-failure")
+    expect(line).toHaveTextContent(`didn't start. ${ORG}`)
+    expect(line).not.toHaveTextContent("A workflow is already running")
+    expect(screen.queryByRole("button", { name: "Retry start" })).toBeNull()
+    expect(screen.getByRole("button", { name: "Dismiss message" })).toBeInTheDocument()
+  })
+})
