@@ -34,14 +34,14 @@ export const API_KEYS_COPY = {
     label: "API keys",
     title: "API keys",
     description:
-      "Let another system start your published workflows and read the result. Each key starts only the workflows you pick, and its runs run as you.",
+      "Keys let another tool act as you. An AI tool key lets Claude Code, Cursor or VS Code search and read your knowledge in one organisation. A workflow key lets another system start the published workflows you pick.",
     limits: "Each key: {starts} starts and {reads} status reads a minute. Set by your operator.",
     loading: "Loading your keys…",
     loadFailed: "Couldn't load your API keys.",
     retry: "Retry",
     newKey: "New key",
     empty:
-      "No keys yet. A key lets another system, such as n8n, a script or a scheduler elsewhere, start one of your published workflows and read its result.",
+      "No keys yet. An AI tool key lets Claude Code, Cursor or VS Code search and read your knowledge as you. A workflow key lets another system, such as n8n or a script, start one of your published workflows.",
   },
 
   draft: {
@@ -193,8 +193,8 @@ export const API_KEYS_COPY = {
   admin: {
     tabLabel: "API keys",
     title: "API keys · whole organisation",
-    description: "Every key in {org}. Runs started with a key run as the member who made it.",
-    descriptionNoOrg: "Every key in this organisation. Runs started with a key run as the member who made it.",
+    description: "Every key in {org}. A key acts as the member who made it.",
+    descriptionNoOrg: "Every key in this organisation. A key acts as the member who made it.",
     note: "You can see and revoke every member's keys. You can't see their secrets; nobody can.",
     empty: "No member of {org} has made an API key yet.",
     emptyNoOrg: "No member of this organisation has made an API key yet.",
