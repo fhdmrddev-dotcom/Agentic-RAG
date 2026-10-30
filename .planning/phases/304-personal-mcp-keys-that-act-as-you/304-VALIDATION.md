@@ -34,9 +34,50 @@ stands in for another's. Row 1 runs first.
 
 | Row | Steps | Passes when | Verdict | Evidence needed |
 |-----|-------|-------------|---------|-----------------|
-| **G4-1 Mint, see once, reload, gone** (run first) | Settings → API keys → New key → "For an AI tool (MCP)" → keep the defaults → Create key. Read the show-once card. Click "I've saved the secret", then reload. | The show-once card shows the secret, and the Claude Code snippet reads `SYREL_MCP_KEY` with no secret in it. After the reload the card shows `● active`, "Read only", "All folders", "Not used yet" and a 90-day expiry, and the secret appears nowhere in the DOM. | OWED | DOM read of the show-once card (snippet text, no `srl_mcp_` inside it); DOM read after reload (`document.body.textContent` has no secret); screenshot; the `api_keys` row (`kind='mcp'`, `folder_ids` NULL, `tools` = the Read only set, `expires_at` ≈ +90 days). |
-| **G4-2 Empty folder set refused in words** | New key → AI tool → "Only these folders" and tick none. Then force a POST with `folder_ids: []`. | "Create key" is disabled and reads "Tick at least one folder, or choose All folders I can see." The forced POST returns 422, and its sentence renders in the failure line with the label, preset and expiry kept. | OWED | DOM read of the disabled button and its description; the 422 response body; DOM read of the failure line with the choices still set; screenshot. |
-| **G4-3 Admin switches MCP off** | As org admin: Org admin → Settings → switch "AI tool access (MCP)" off. Open Audit. Open Org admin → API keys. Then as the member: Settings → API keys, and New key. | The well turns armed ("off for {org}" + the impact line), the band's "every action recorded" marker pulses, and the Audit tab shows "Switched AI tool access (MCP) off for the organisation". The admin key list shows "MCP access is switched off for {org}. Every member's AI tool key is refused until you switch it back on in the Settings tab." The member's key card reads `⏸ switched off` with the org sentence, and the MCP tile in a new draft is disabled with the same sentence. Switching back on restores the card. | OWED | DOM reads of the armed well, the band marker class during the pulse, the audit row text, the admin notice, the member card tag + sentence, the disabled tile; the `audit_log` row (`action_type='settings.update'`, `metadata.event='mcp_access'`, `metadata.enabled=false`, the active `org_id`); the `organizations.mcp_enabled` value before and after. |
+| **G4-1 Mint, see once, reload, gone** (run first) | Settings → API keys → New key → "For an AI tool (MCP)" → keep the defaults → Create key. Read the show-once card. Click "I've saved the secret", then reload. | The show-once card shows the secret, and the Claude Code snippet reads `SYREL_MCP_KEY` with no secret in it. After the reload the card shows `● active`, "Read only", "All folders", "Not used yet" and a 90-day expiry, and the secret appears nowhere in the DOM. | PASS (2026-10-31, §2.1) | DOM read of the show-once card (snippet text, no `srl_mcp_` inside it); DOM read after reload (`document.body.textContent` has no secret); screenshot; the `api_keys` row (`kind='mcp'`, `folder_ids` NULL, `tools` = the Read only set, `expires_at` ≈ +90 days). |
+| **G4-2 Empty folder set refused in words** | New key → AI tool → "Only these folders" and tick none. Then force a POST with `folder_ids: []`. | "Create key" is disabled and reads "Tick at least one folder, or choose All folders I can see." The forced POST returns 422, and its sentence renders in the failure line with the label, preset and expiry kept. | PASS (2026-10-31, §2.1) | DOM read of the disabled button and its description; the 422 response body; DOM read of the failure line with the choices still set; screenshot. |
+| **G4-3 Admin switches MCP off** | As org admin: Org admin → Settings → switch "AI tool access (MCP)" off. Open Audit. Open Org admin → API keys. Then as the member: Settings → API keys, and New key. | The well turns armed ("off for {org}" + the impact line), the band's "every action recorded" marker pulses, and the Audit tab shows "Switched AI tool access (MCP) off for the organisation". The admin key list shows "MCP access is switched off for {org}. Every member's AI tool key is refused until you switch it back on in the Settings tab." The member's key card reads `⏸ switched off` with the org sentence, and the MCP tile in a new draft is disabled with the same sentence. Switching back on restores the card. | PASS (2026-10-31, §2.1) | DOM reads of the armed well, the band marker class during the pulse, the audit row text, the admin notice, the member card tag + sentence, the disabled tile; the `audit_log` row (`action_type='settings.update'`, `metadata.event='mcp_access'`, `metadata.enabled=false`, the active `org_id`); the `organizations.mcp_enabled` value before and after. |
+
+### 2.1 G-4 evidence (Claude drove Chrome, 2026-10-31, develop `54b5fede8`, local stack)
+
+Screenshots timed out on every attempt (`Page.captureScreenshot` 30 s timeout: the MCP tab is hidden, the known
+hidden-tab artifact), so each row's evidence is DOM reads plus the DB row. The secret was masked inside the page
+script before any read left the browser; no secret value is in this file or the transcript.
+
+**G4-1 — PASS.** Active org `22f9c615` (dev account is `member` there). Label `g4-304-row1`, defaults kept.
+- Show-once card: the full 51-char secret rendered once, plus the 12-char prefix on the card header. Both snippets
+  (`.mcp.json` block and `claude mcp add-json …`) read `Bearer ${SYREL_MCP_KEY}`; neither contains `srl_mcp_`.
+- After "I've saved the secret" + reload: `/srl_mcp_[A-Za-z0-9_-]{20,}/` → `html:absent text:absent`. Card reads
+  `AI tool · MCP · ● active · Read only · All folders · expires Fri 29 Jan 2027 (in 90 days) · Not used yet`.
+- DB: `api_keys` `563a586b…` `kind='mcp'`, `folder_ids` NULL, `tools` = `["search_knowledge_base", "list_documents",
+  "read_document"]`, `org_id` 22f9c615, expiry − created = 90 days, `key_hash` set, not revoked.
+
+**G4-2 — PASS.** Label `g4-304-row2`, AI tool, "Only these folders", none ticked.
+- `Create key` `disabled=true`, `aria-describedby` → "Tick at least one folder, or choose All folders I can see."
+- Forced POST (one folder ticked to enable the button, `window.fetch` rewrote the body to `folder_ids: []`):
+  `422` `{"detail":[{"type":"value_error","loc":["body","mcp","folder_ids"],"msg":"Value error, Tick at least one
+  folder, or choose All folders I can see.","input":[]…}]}`.
+- Failure line (`role=alert`): "Couldn't create the key. Tick at least one folder, or choose All folders I can see.
+  Your choices are kept; try again." Label, `Read only`, `Only these folders`, the ticked folder and `90 days` all kept.
+- DB: 0 rows labelled `g4-304-row2`. Draft discarded.
+
+**G4-3 — PASS.** Active org switched to `c1f18150` (dev account is `org-admin` there); proven by its distinct key list
+and the draft's Organisation field. Member key `g4-304-row3` minted first (`● active`).
+- `organizations.mcp_enabled` before: `True`. Switch `aria-checked`: `true/disabled` ×5 polls (≈1.2 s, saving) →
+  `false/enabled` (state only after the server answered).
+- Armed well: "OFF FOR FHDMRD.DEV@GMAIL.COM'S ORGANIZATION" + "Every member's AI tool key in … is refused on its next
+  call. Keys are kept; switching back on restores them."
+- Band marker ("every action recorded") gained `animate-brandPulse` on the flip (MutationObserver record).
+- Audit tab: "Switched AI tool access (MCP) off for the organisation", 31 Oct 03:29.
+- Admin API keys tab: "MCP access is switched off for fhdmrd.dev@gmail.com's Organization. Every member's AI tool key
+  is refused until you switch it back on in the Settings tab."
+- Member Settings → API keys: card `⏸ switched off` + "MCP access is switched off for this organisation by an admin.
+  This key works again when they switch it back on."; new draft's MCP tile `aria-disabled="true"` with the same sentence.
+- DB after: `mcp_enabled` `False`; `audit_log` `action_type='settings.update'`, `org_id` c1f18150,
+  `metadata={"event":"mcp_access","enabled":false}`.
+- Switched back on: `aria-checked` `false` → `true`, armed text gone, member card back to `● active`.
+- Left behind (local dev data only): active keys `g4-304-row1` (org 22f9c615) and `g4-304-row3` (org c1f18150);
+  `mcp_enabled` restored to `True`; browser active org restored to 22f9c615.
 
 ## 3. Four-axis UAT — does not apply
 
