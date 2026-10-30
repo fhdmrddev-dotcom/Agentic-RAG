@@ -11,6 +11,11 @@
  *   the caller `onDone()`, which re-fetches; the card turns revoked from the server's answer, so it
  *   can never claim a revoke the server refused. A failure keeps the sheet open, says the server's
  *   words, and says the key still works.
+ *
+ * Phase 304-05 (KEY-05; UI-SPEC §1f): for an MCP key the first fact names what it can reach —
+ * "Can use {preset | N tools} on {All folders | N folders}" (+ mail & synced sources) — the last
+ * use reads "Not used yet" when null, and the kept box says any AI tool using it stops on its next
+ * call. Same sheet, same guard, still never optimistic; a workflow key's sheet is unchanged.
  */
 import { useState } from "react"
 
@@ -24,11 +29,23 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog"
-import type { ApiKeyRead } from "@/lib/api/apiKeys"
+import type { ApiKeyRead, McpToolRef } from "@/lib/api/apiKeys"
 import { API_KEYS_COPY, fillCopy } from "./apiKeysCopy"
 import { formatCallTime, formatDay } from "./apiKeyFacts"
+import { MCP_KEY_COPY } from "./mcpKeyCopy"
+import { mcpScopeChips } from "./mcpKeyFacts"
 
 const C = API_KEYS_COPY
+const M = MCP_KEY_COPY.mcp
+
+/** "Read only" / "2 tools" and "All folders" / "3 folders" for the MCP fact line. */
+function mcpReach(key: ApiKeyRead, catalogue: readonly McpToolRef[] | undefined) {
+  const m = mcpScopeChips(key, catalogue)
+  const tools = m.tools.preset === "custom" ? fillCopy(M.chipNTools, { N: m.tools.count }) : M.presets[m.tools.preset]
+  const n = m.folders.shown.length + m.folders.more.length
+  const folders = m.folders.all ? M.chipAllFolders : fillCopy(M.sheetNFolders, { N: n })
+  return { tools, folders, external: m.external }
+}
 const LIVE_OUTCOMES = new Set(["running", "waiting_for_person", "paused"])
 
 /** The newest run this key started that its last read saw still live, or null. */
@@ -48,8 +65,11 @@ export function RevokeApiKeySheet({
   onClose,
   revoke,
   onDone,
+  mcpTools,
 }: {
   target: ApiKeyRead | null
+  /** Phase 304: the server's tool catalogue, for an MCP key's preset name. */
+  mcpTools?: readonly McpToolRef[]
   now?: Date
   onClose: () => void
   /** `revokeApiKey` for the member, `revokeOrgApiKey` for the admin. */
@@ -80,6 +100,7 @@ export function RevokeApiKeySheet({
   const owner = target?.owner_name ?? C.sheet.unknownOwner
   const live = target ? liveRunId(target) : null
   const calls = target?.calls.length ?? 0
+  const reach = target?.kind === "mcp" ? mcpReach(target, mcpTools) : null
 
   return (
     <AlertDialog
@@ -112,19 +133,39 @@ export function RevokeApiKeySheet({
             </AlertDialogHeader>
 
             <ul data-testid="revoke-facts" className="list-disc space-y-1 pl-5 text-sm text-muted-foreground">
-              <li>
-                {C.sheet.factStarts}
-                {target.workflows.map((w, i) => (
-                  <span key={w.id}>
-                    {i > 0 && C.sheet.factAnd}
-                    <b className="font-semibold text-foreground">{w.name}</b>
-                  </span>
-                ))}
-              </li>
+              {reach ? (
+                <li>
+                  {/* The template's two slots are bold facts; the words around them stay plain. */}
+                  {M.sheetFact.split(/(\{tools\}|\{folders\})/).map((part, i) =>
+                    part === "{tools}" || part === "{folders}" ? (
+                      <b key={i} className="font-semibold text-foreground">
+                        {part === "{tools}" ? reach.tools : reach.folders}
+                      </b>
+                    ) : (
+                      <span key={i}>{part}</span>
+                    ),
+                  )}
+                  {reach.external && M.sheetFactExternal}
+                </li>
+              ) : (
+                <li>
+                  {C.sheet.factStarts}
+                  {target.workflows.map((w, i) => (
+                    <span key={w.id}>
+                      {i > 0 && C.sheet.factAnd}
+                      <b className="font-semibold text-foreground">{w.name}</b>
+                    </span>
+                  ))}
+                </li>
+              )}
               <li>
                 {C.sheet.factLastUsed}
                 <b className="font-semibold text-foreground">
-                  {target.last_used_at ? formatCallTime(target.last_used_at, at) : C.card.neverUsed}
+                  {target.last_used_at
+                    ? formatCallTime(target.last_used_at, at)
+                    : reach
+                      ? M.notUsedYet
+                      : C.card.neverUsed}
                 </b>
                 {calls > 0 && fillCopy(C.sheet.factCalls, { N: calls })}
               </li>
@@ -136,7 +177,7 @@ export function RevokeApiKeySheet({
             </ul>
 
             <div data-testid="revoke-kept" className="rounded-md border border-border bg-muted/40 px-3 py-2 text-sm text-muted-foreground">
-              {live ? fillCopy(C.sheet.keptLive, { id: live.slice(0, 6) }) : C.sheet.keptOther}
+              {reach ? M.sheetKept : live ? fillCopy(C.sheet.keptLive, { id: live.slice(0, 6) }) : C.sheet.keptOther}
             </div>
 
             {failure !== null && (

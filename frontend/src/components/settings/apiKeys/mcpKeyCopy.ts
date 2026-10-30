@@ -122,6 +122,8 @@ export const MCP_KEY_COPY = {
     desktopUnverified:
       "The bridge's version couldn't be checked, so no version is pinned. Check the mcp-remote package before you run it.",
     copySetup: "Copy the {client} setup",
+    /** 304-05 authored: the Claude Code terminal form's Copy button. */
+    copyCli: "Copy the {client} command",
     claudeAiWarning:
       "⚠ Don't paste this key into Claude.ai's organisation connector settings. Everyone in that Claude organisation would act as you. Claude.ai and Claude Desktop will connect with sign-in instead.",
     noAddress:

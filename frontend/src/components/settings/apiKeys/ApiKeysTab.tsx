@@ -265,6 +265,8 @@ export function ApiKeysTab({
           secret={justCreated.secret}
           base={base}
           fields={firstFields}
+          mcpUrl={mcp?.url ?? null}
+          mcpTools={mcp?.tools}
           onDone={savedSecret}
         />
       )}
@@ -287,6 +289,8 @@ export function ApiKeysTab({
           apiKey={k}
           fresh={k.id === freshId}
           limits={list?.limits}
+          mcpUrl={mcp?.url ?? null}
+          mcpTools={mcp?.tools}
           onRevoke={setRevokeTarget}
           onOpenRun={onOpenRun}
           onOpenAudit={onOpenAudit}
@@ -295,6 +299,7 @@ export function ApiKeysTab({
 
       <RevokeApiKeySheet
         target={revokeTarget}
+        mcpTools={mcp?.tools}
         onClose={() => setRevokeTarget(null)}
         revoke={revokeApiKey}
         onDone={() => void load()}
