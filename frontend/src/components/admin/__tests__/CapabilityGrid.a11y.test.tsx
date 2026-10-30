@@ -32,6 +32,7 @@ const ALL_ON: Record<CapabilityKey, boolean> = {
   sandbox_enabled: true,
   self_improve_enabled: true,
   workflows_enabled: true,
+  mcp_enabled: true, // 304-06 (D-03)
 }
 
 const ALL_OFF: Record<CapabilityKey, boolean> = {
@@ -39,6 +40,7 @@ const ALL_OFF: Record<CapabilityKey, boolean> = {
   sandbox_enabled: false,
   self_improve_enabled: false,
   workflows_enabled: false,
+  mcp_enabled: false, // 304-06 (D-03)
 }
 
 describe("CapabilityGrid a11y — WCAG 2.1 AA (structural) across honest states", () => {
@@ -76,7 +78,7 @@ describe("CapabilityGrid a11y — D-09 kill-switch roles + names", () => {
   it("each capability is a role=switch reachable by accessible name (keyboard-operable)", () => {
     render(<CapabilityGrid flags={ALL_ON} onToggle={vi.fn()} showTechnical={false} />)
     const switches = screen.getAllByRole("switch")
-    expect(switches).toHaveLength(4)
+    expect(switches).toHaveLength(5) // RAISED 4 -> 5 at 304-06: the MCP switch (D-03)
     expect(screen.getByRole("switch", { name: /web search/i })).toBeInTheDocument()
     expect(screen.getByRole("switch", { name: /code sandbox/i })).toBeInTheDocument()
     expect(screen.getByRole("switch", { name: /self-improvement/i })).toBeInTheDocument()

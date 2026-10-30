@@ -89,6 +89,12 @@ function rowLabel(row: OrgAuditRow): string {
   if (typeof event === "string" && event in INVITE_EVENT_LABEL) {
     return INVITE_EVENT_LABEL[event]
   }
+  // Phase 304-06 (D-36): the org MCP switch rides settings.update + metadata.event "mcp_access"
+  // (no new literal, so AuditTab and audit_service stay untouched); the stored value picks on/off.
+  if (event === "mcp_access") {
+    const on = (meta as Record<string, unknown>).enabled === true
+    return `Switched AI tool access (MCP) ${on ? "on" : "off"} for the organisation`
+  }
   return actionLabel(row.action_type)
 }
 
