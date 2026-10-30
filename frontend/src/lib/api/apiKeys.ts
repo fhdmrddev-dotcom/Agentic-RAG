@@ -38,8 +38,9 @@ export interface ApiKeyCall {
 /** Phase 304: a workflow key (293) or a personal MCP key that acts as its owner in one org. */
 export type ApiKeyKind = "workflow" | "mcp"
 
-/** D-28 / D-30: which switch turned MCP off; the deployment's wins over the org's. */
-export type McpOff = "org" | "deployment"
+/** D-28 / D-30: which switch turned MCP off; the deployment's wins over the org's. `unknown`
+ *  (304-REVIEW WR-02): the server could not read the switches — still off, but no switch is named. */
+export type McpOff = "org" | "deployment" | "unknown"
 
 /** A folder an MCP key ticks, named by the server (a folder since deleted drops out). */
 export interface ApiKeyFolderRef {

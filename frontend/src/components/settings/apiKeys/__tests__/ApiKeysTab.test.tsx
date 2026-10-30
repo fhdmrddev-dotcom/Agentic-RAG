@@ -393,7 +393,7 @@ describe("304-05 ApiKeysTab — the kind choice", () => {
       ...MCP_EMPTY,
       keys: [makeMcpKey({ mcp_off: "unknown" })],
       mcp: makeMcp({ available: false, off: "unknown" }),
-    } as unknown as ApiKeyList)
+    })
     render(<ApiKeysTab />)
     const notices = await screen.findAllByTestId("mcp-off-notice")
     expect(notices.length).toBeGreaterThan(0)

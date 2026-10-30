@@ -148,7 +148,8 @@ function mcpKeyCardFacts(key: ApiKeyRead, now: Date, catalogue: readonly McpTool
   let tag: KeyCardFacts["tag"]
   if (key.state === "revoked") tag = { kind: "revoked", text: C.card.tagRevoked }
   else if (key.state === "expired") tag = { kind: "expired", text: C.card.tagExpired }
-  else if (key.mcp_off) tag = { kind: "off", text: M.mcp.tagOff }
+  // WR-02: `unknown` is not "switched off" — the card's notice line says we couldn't check.
+  else if (key.mcp_off && key.mcp_off !== "unknown") tag = { kind: "off", text: M.mcp.tagOff }
   else tag = { kind: "active", text: C.card.tagActive }
   return {
     tag,

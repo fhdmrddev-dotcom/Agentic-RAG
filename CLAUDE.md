@@ -508,7 +508,7 @@ node scripts/check-hot-file-ledger.cjs <phase-dir>   # 0 clear · 1 missing rows
 | `backend/app/services/inbound_inputs.py` | 9 / 3 / 352 (was `8 / 2 / 312`) | ⚠ now FIRES (300) · 300-01: labels + sentence beside the one predicate |
 | `backend/app/api/inbound.py` | 10 / 3 / 719 (was `9 / 2 / 711`) | ⚠ now FIRES (298) · 298-02: one foreign_folder _refused (plain 422) · ⛔ |
 | `frontend/src/components/settings/apiKeys/apiKeysCopy.ts` | 6 / 4 / 283 (was `5 / 3 / 283`) | 304-05: four strings reworded for both kinds · ⛔ |
-| `frontend/src/components/settings/apiKeys/apiKeyFacts.ts` | 5 / 4 / 373 (was `4 / 3 / 310`) | 304-05: kind branch + off tag + 3 refusal words · ⛔ |
+| `frontend/src/components/settings/apiKeys/apiKeyFacts.ts` | 6 / 4 / 374 (was `5 / 4 / 373`) | 304-REVIEW WR-02: no off tag for "unknown" · ⛔ |
 | `backend/app/models/schedule.py` | 3 / 3 / 231 | ⚠ FIRES, absent here — row added 296-02 · one additive field (outcome) |
 | `frontend/src/components/panel/PhaseCard.tsx` | 22 / 14 / 821 (was `21 / 14 / 817`) | 296 review FE-WR-01: paused step drops running instruments |
 | `frontend/src/components/panel/PhaseTimeline.tsx` | 11 / 9 / 408 (was `10 / 8 / 404`) | 296-04: derives runPaused from its frame, passes it |
@@ -633,10 +633,10 @@ node scripts/check-hot-file-ledger.cjs <phase-dir>   # 0 clear · 1 missing rows
 | `frontend/src/lib/api/admin.ts` | 11 / 6 / 1127 (was `10 / 5 / 1125`) | 304-04: one FlagKey member (mcp_enabled) · ⛔ |
 | `frontend/src/components/admin/CapabilityGrid.tsx` | 5 / 4 / 273 (was `3 / 3 / 264`) | 304-06: one union member + one entry (mcp_enabled), no count · ⛔ |
 | `frontend/src/components/admin/ControlRoomPage.tsx` | 20 / 11 / 907 (was `19 / 10 / 906`) | 304-06: one capabilityFlags line (mcp_enabled ?? true) · ⛔ |
-| `backend/app/api/api_keys.py` | 5 / 3 / 710 (was `3 / 2 / 421`) | ⚠ now FIRES (304) · 304-04: kind on the 293 routes + org switch · ⛔ |
+| `backend/app/api/api_keys.py` | 6 / 3 / 719 (was `5 / 3 / 710`) | 304-REVIEW WR-02: unread switches are "unknown", still off · ⛔ |
 | `backend/app/db/api_keys.py` | 6 / 3 / 383 (was `5 / 2 / 307`) | ⚠ now FIRES (304) · 304-02: mcp_switches + kind columns · ⛔ |
-| `backend/app/models/api_key.py` | 3 / 3 / 264 (was `2 / 2 / 117`) | ⚠ now FIRES (304) · 304-04: tagged create union + MCP fields |
-| `frontend/src/lib/api/apiKeys.ts` | 4 / 3 / 280 (was `2 / 2 / 174`) | ⚠ now FIRES (304) · 304-04: MCP wire mirrors + 3 calls · ⛔ |
+| `backend/app/models/api_key.py` | 4 / 3 / 265 (was `3 / 3 / 264`) | 304-REVIEW WR-02: McpOff gains "unknown" |
+| `frontend/src/lib/api/apiKeys.ts` | 5 / 3 / 281 (was `4 / 3 / 280`) | 304-REVIEW WR-02: McpOff mirror gains "unknown" · ⛔ |
 | `frontend/src/components/admin/ModelAdvancedCapabilities.tsx` | 0 / 0 / 290 | young (created 262) · ⛔ |
 | `frontend/src/lib/activeViewReachability.ts` | 2 / 2 / 205 (was `1 / 1 / 159`) | 297-02: route leg added (D-25) · AST; throws on a vacuous parse · ⛔ |
 | `frontend/src/components/experts/expertIcon.tsx` | 1 / 1 / 72 | ⚠ 0/0/0 AT PLANNING · measured 1/1/72 at 262-02 · ⛔ |

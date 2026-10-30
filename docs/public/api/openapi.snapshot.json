@@ -17347,7 +17347,8 @@
         "type": "string",
         "enum": [
          "org",
-         "deployment"
+         "deployment",
+         "unknown"
         ]
        },
        {
@@ -24857,7 +24858,8 @@
         "type": "string",
         "enum": [
          "org",
-         "deployment"
+         "deployment",
+         "unknown"
         ]
        },
        {

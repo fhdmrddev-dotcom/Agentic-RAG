@@ -164,7 +164,7 @@ describe("304-05 ApiKeyCard — an MCP key (KEY-05)", () => {
   })
 
   it("unknown (a failed switch read): no ⏸ switched-off tag, and the card says we couldn't check (304-REVIEW WR-02)", () => {
-    render(<ApiKeyCard apiKey={makeMcpKey({ mcp_off: "unknown" as never })} now={NOW} mcpTools={MCP_CATALOGUE} />)
+    render(<ApiKeyCard apiKey={makeMcpKey({ mcp_off: "unknown" })} now={NOW} mcpTools={MCP_CATALOGUE} />)
     expect(screen.queryByText("⏸ switched off")).toBeNull()
     expect(screen.getByTestId("mcp-off-notice")).toHaveTextContent(
       "Couldn't check whether AI tool access is on. Reload to try again.",

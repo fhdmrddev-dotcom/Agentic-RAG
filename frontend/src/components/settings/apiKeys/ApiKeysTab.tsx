@@ -188,7 +188,10 @@ export function ApiKeysTab({
   const hasWorkflowKey = keys.some((k) => k.kind !== "mcp")
   const mcpWords = mcp?.available === true || hasMcpKey
   // UI-SPEC §1g: org off is said always; deployment off only to a member who has AI tool keys.
-  const headerOff = mcp && (mcp.off === "org" || (mcp.off === "deployment" && hasMcpKey)) ? mcp.off : null
+  // WR-02: an unread switch state (`unknown`) hides the choice like deployment off, so it follows
+  // the same rule — said only to a member who has AI tool keys.
+  const headerOff =
+    mcp && (mcp.off === "org" || ((mcp.off === "deployment" || mcp.off === "unknown") && hasMcpKey)) ? mcp.off : null
   const orgName =
     org?.orgs.find((o) => o.org_id === org.activeOrgId)?.name ?? keys.find((k) => k.org_name)?.org_name ?? null
 
