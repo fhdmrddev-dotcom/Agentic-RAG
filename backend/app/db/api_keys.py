@@ -38,6 +38,9 @@ logger = logging.getLogger(__name__)
 _KEY_COLUMN_NAMES = (
     "id", "org_id", "user_id", "label", "key_prefix", "workflows", "expires_at",
     "revoked_at", "revoked_by", "last_used_at", "created_at",
+    # Phase 304 (mig 220): the key's kind and an MCP key's narrowing. NULL folder_ids = not
+    # narrowed; tools is NULL on a workflow key (D-02, D-08).
+    "kind", "folder_ids", "tools", "include_external",
 )
 
 # The client-facing projection. NEVER `select *` — see the module docblock.
@@ -63,8 +66,16 @@ async def create_api_key(
     key_hash: str,
     workflows: list[dict[str, Any]],
     expires_at: datetime | None,
+    kind: str = "workflow",
+    folder_ids: list[str] | None = None,
+    tools: list[str] | None = None,
+    include_external: bool = False,
 ) -> dict:
     """Insert one key and return its CLIENT projection (never the digest).
+
+    Phase 304: ``kind`` is ``'workflow'`` (the 293 call shape, unchanged) or ``'mcp'``.
+    ``folder_ids`` and ``tools`` are bound as PLAIN lists, like ``workflows`` (see the module
+    docblock); ``folder_ids=None`` means "not narrowed by folder", never "nothing".
 
     ``org_id`` is BOUND, not left to the ``autofill_org_id_by_owner`` trigger: a member of two
     orgs must get a key in the org they were acting in, and the trigger's ``LIMIT 1`` lookup
@@ -73,8 +84,9 @@ async def create_api_key(
     try:
         row = await pool.fetchrow(
             f"INSERT INTO api_keys "
-            f"(org_id, user_id, label, key_prefix, key_hash, workflows, expires_at) "
-            f"VALUES ($1, $2, $3, $4, $5, $6, $7) "
+            f"(org_id, user_id, label, key_prefix, key_hash, workflows, expires_at, "
+            f"kind, folder_ids, tools, include_external) "
+            f"VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11) "
             f"RETURNING {_KEY_COLUMNS}",
             org_id,
             user_id,
@@ -83,6 +95,10 @@ async def create_api_key(
             key_hash,
             workflows,  # plain list — the pool's jsonb codec encodes it (see the module docblock)
             expires_at,
+            kind,
+            folder_ids,  # plain list or None — same codec, same rule
+            tools,  # plain list or None
+            include_external,
         )
     except asyncpg.UniqueViolationError as exc:
         if getattr(exc, "constraint_name", None) == _LABEL_INDEX:
@@ -213,6 +229,66 @@ async def is_org_member(pool: asyncpg.Pool, *, org_id: UUID, user_id: UUID) -> b
         user_id,
     )
     return value is not None
+
+
+async def get_key_row(pool: asyncpg.Pool, *, key_id: UUID | str, org_id: UUID | str) -> dict | None:
+    """One key by id, in its org — the per-call re-read ``principal_liveness.recheck_principal``
+    makes (306/307/308). Carries every fact the liveness predicate reads (revoked_at, expires_at,
+    org_id, user_id, kind) and NOT the digest: nothing after authentication needs it."""
+    row = await pool.fetchrow(
+        f"SELECT {_KEY_COLUMNS} FROM api_keys WHERE id = $1 AND org_id = $2",
+        key_id,
+        org_id,
+    )
+    return dict(row) if row is not None else None
+
+
+# ── the two MCP switches (Phase 304; D-03, D-18, D-35) ───────────────────────────────────────
+#
+# ⚠ READ LIVE, EVERY CALL. Never through ``load_app_settings()``: its 30 s per-worker TTL would
+#   let a switched-off deployment keep answering for half a minute, and KEY-06 says "refused on
+#   the next call" (304-RESEARCH R-09). The org switch is a dedicated column, outside the
+#   ``authenticated`` column grant (mig 194), so only this audited backend path writes it (D-35).
+
+
+async def mcp_switches(pool: asyncpg.Pool, org_id: UUID | str) -> dict | None:
+    """``{org_on, deploy_on, org_name}`` for one org, in ONE statement; ``None`` when the org row
+    is missing. ``deploy_on`` is NULL when the ``app_settings('global')`` row is missing — the
+    caller refuses on anything but ``True`` (fail closed)."""
+    row = await pool.fetchrow(
+        "SELECT o.mcp_enabled AS org_on, "
+        "(SELECT a.mcp_enabled FROM public.app_settings a WHERE a.id = 'global') AS deploy_on, "
+        "o.name AS org_name "
+        "FROM public.organizations o WHERE o.id = $1",
+        org_id,
+    )
+    return dict(row) if row is not None else None
+
+
+async def set_org_mcp_enabled(pool: asyncpg.Pool, *, org_id: UUID | str, enabled: bool) -> bool | None:
+    """Flip one org's MCP switch; returns the stored value, ``None`` for a missing org. The
+    route that calls this is behind ``require_org_manage`` and writes the audit row."""
+    return await pool.fetchval(
+        "UPDATE public.organizations SET mcp_enabled = $2, updated_at = now() "
+        "WHERE id = $1 RETURNING mcp_enabled",
+        org_id,
+        enabled,
+    )
+
+
+async def folder_names(
+    pool: asyncpg.Pool, *, org_id: UUID | str, folder_ids: list[str]
+) -> list[dict]:
+    """``{id, name}`` for the folders an MCP key ticks, in the key's org — display only (the
+    key card). A folder since deleted or moved out of the org simply does not come back."""
+    if not folder_ids:
+        return []
+    rows = await pool.fetch(
+        "SELECT id, name FROM folders WHERE org_id = $1 AND id = ANY($2::uuid[])",
+        org_id,
+        folder_ids,
+    )
+    return [dict(r) for r in rows]
 
 
 async def list_key_calls(

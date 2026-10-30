@@ -306,7 +306,9 @@ def test_each_check_is_read_live_between_two_calls(world):
     with pytest.raises(auth.KeyRefused) as exc:
         _run(_core(world, secret, expected_kind="mcp"))
     assert exc.value.reason == "mcp_off_deployment"
-    assert len(world["switch_reads"]) == 4   # one live read per MCP resolution, no cache
+    # One live read per MCP resolution that got past membership (the not_member call stops
+    # before the switches), never a cached answer.
+    assert len(world["switch_reads"]) == 3
 
 
 def test_a_live_mcp_key_resolves_with_its_narrowing_and_touches_last_used(world):

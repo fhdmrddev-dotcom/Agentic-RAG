@@ -107,7 +107,8 @@ async def test_an_unnarrowed_mcp_key_binds_null_folders():
 def test_there_is_no_json_import():
     src = pathlib.Path(db.__file__).read_text(encoding="utf-8")
     assert not re.search(r"^\s*(import json|from json)", src, re.M)
-    assert "json.dumps" not in src
+    # (the docblock names ``json.dumps`` as the trap, so the call itself is what is fenced)
+    assert not re.search(r"json\.dumps\(", src)
 
 
 async def test_mcp_switches_is_one_live_select_keyed_by_the_org():

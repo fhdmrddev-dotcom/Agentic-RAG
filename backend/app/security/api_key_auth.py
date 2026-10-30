@@ -22,6 +22,15 @@ does not — never make the ban the only gate (RESEARCH pitfall 11).
 
 This is a separate module from ``dependencies.py`` (a G-5-firing hot file) on purpose: the inbound
 door shares no code path with the browser's Supabase-session authentication.
+
+Phase 304 (D-06, D-17, D-19): ONE resolver core, ``authenticate_presented_key``, serves both key
+kinds. ``resolve_api_key`` is its thin ``/inbound`` wrapper (``expected_kind="workflow"``) and
+``security/mcp_principal.resolve_mcp_principal`` is the MCP one (``expected_kind="mcp"``). A key of
+the other kind is refused TWICE: by its prefix (``srl_live_`` / ``srl_mcp_``) before any database
+read, and by the row's ``kind`` column after the lookup. The live-state checks live in the leaf
+``security/principal_liveness.principal_still_allowed`` (306/307/308 import it without this
+module). The core raises a typed ``KeyRefused(reason, sentence)``; the ``/inbound`` wrapper maps
+every one of them to the one byte-identical 401.
 """
 from __future__ import annotations
 
@@ -32,21 +41,24 @@ import re
 import secrets
 import time
 from dataclasses import dataclass
-from datetime import datetime, timezone
+from datetime import datetime
 from typing import Any, Literal
 
 import asyncpg
 from fastapi import BackgroundTasks, Depends, HTTPException, Request
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 
-from app import dependencies as deps
 from app.db import api_keys as api_keys_db
 from app.dependencies import get_pg_pool, get_redis, get_service_role_supabase
+from app.security.principal_liveness import principal_still_allowed
 from app.services.audit_service import write_audit_entry
 
 logger = logging.getLogger(__name__)
 
 KEY_PREFIX = "srl_live_"
+MCP_KEY_PREFIX = "srl_mcp_"
+KeyKind = Literal["workflow", "mcp"]
+_PREFIXES: dict[str, str] = {"workflow": KEY_PREFIX, "mcp": MCP_KEY_PREFIX}
 _MAX_PRESENTED_LEN = 128
 _KEY_BODY = re.compile(r"[A-Za-z0-9_-]+")
 
@@ -82,30 +94,50 @@ class ResolvedKey:
     label: str
     workflows: list
     expires_at: datetime | None
+    # Phase 304 — defaulted so every 293 construction (``ResolvedKey(**base)``) still works.
+    kind: str = "workflow"
+    folder_ids: tuple[str, ...] | None = None   # None = not narrowed; () = nothing
+    tools: tuple[str, ...] | None = None        # None on a workflow key
+    include_external: bool = False
 
 
-def mint_key() -> MintedKey:
+class KeyRefused(Exception):
+    """The core's typed refusal (D-19). ``reason`` is the ``api_key.refused`` audit reason
+    (``unknown`` for anything unattributable); ``sentence`` is set only for a switched-off org or
+    deployment, the one refusal a caller is told about in words. 305 maps this onto its
+    transport; ``resolve_api_key`` maps every one to the one 401."""
+
+    def __init__(self, reason: str, sentence: str | None = None):
+        super().__init__(reason)
+        self.reason = reason
+        self.sentence = sentence
+
+
+def mint_key(kind: KeyKind = "workflow") -> MintedKey:
     """A new key: the secret (shown once), its SHA-256 hex digest (stored) and its display
-    prefix (``srl_live_`` + 4 characters)."""
-    secret = KEY_PREFIX + secrets.token_urlsafe(32)
+    prefix (the kind's prefix + 4 characters: 13 for ``srl_live_``, 12 for ``srl_mcp_``)."""
+    prefix = _PREFIXES[kind]
+    secret = prefix + secrets.token_urlsafe(32)
     return MintedKey(
         secret=secret,
         key_hash=hashlib.sha256(secret.encode()).hexdigest(),
-        key_prefix=secret[:13],
+        key_prefix=secret[:len(prefix) + 4],
     )
 
 
-def digest_key(presented: str) -> str | None:
+def digest_key(presented: str, *, kind: KeyKind = "workflow") -> str | None:
     """The digest of a presented key, or ``None`` if it cannot be one of ours.
 
-    A malformed string is refused here, before any database read: wrong prefix, longer than 128
-    characters, or anything outside the urlsafe alphabet ``token_urlsafe`` produces.
+    A malformed string is refused here, before any database read: wrong prefix FOR THIS KIND
+    (refusal #1 of D-06's two), longer than 128 characters, or anything outside the urlsafe
+    alphabet ``token_urlsafe`` produces.
     """
+    prefix = _PREFIXES[kind]
     if not presented or len(presented) > _MAX_PRESENTED_LEN:
         return None
-    if not presented.startswith(KEY_PREFIX):
+    if not presented.startswith(prefix):
         return None
-    if not _KEY_BODY.fullmatch(presented[len(KEY_PREFIX):]):
+    if not _KEY_BODY.fullmatch(presented[len(prefix):]):
         return None
     return hashlib.sha256(presented.encode()).hexdigest()
 
@@ -133,9 +165,11 @@ def _audit_args(
     from ``key`` — never the secret (it is never handed one) and never ``key_hash``."""
     if isinstance(key, ResolvedKey):
         key_id, label, user_id, org_id = key.id, key.label, key.user_id, key.org_id
+        kind = key.kind
     else:
         key_id, label = key.get("id"), key.get("label")
         user_id, org_id = key.get("user_id"), key.get("org_id")
+        kind = key.get("kind")
     metadata: dict[str, Any] = {
         "api_key_id": str(key_id) if key_id is not None else None,
         "api_key_label": label,
@@ -145,6 +179,9 @@ def _audit_args(
         "outcome": outcome,
         "reason": reason,
         "detail": detail,
+        # D-36: no new audit literal — an MCP key's rows say so here. A workflow key's metadata
+        # stays byte-identical to 293's (no ``kind`` key at all).
+        "kind": "mcp" if kind == "mcp" else None,
     }
     return str(user_id), {k: v for k, v in metadata.items() if v is not None}, str(org_id)
 
@@ -286,16 +323,35 @@ async def resolve_api_key(
     if credentials is None or not credentials.credentials:
         raise HTTPException(status_code=401, detail=NO_KEY_DETAIL)
     presented = credentials.credentials
-    return await authenticate_presented_key(
-        presented, pool=pool, redis=redis, call=_call_kind(request)
-    )
+    try:
+        return await authenticate_presented_key(
+            presented, pool=pool, redis=redis, call=_call_kind(request),
+            expected_kind="workflow",
+        )
+    except KeyRefused:
+        # Every credential failure is the one byte-identical 401 at /inbound (D-06, SC5).
+        raise _invalid() from None
 
 
-async def authenticate_presented_key(presented: str, *, pool, redis, call: str) -> ResolvedKey:
-    """The one resolver core (D-17): digest -> lookup -> compare -> live state -> ResolvedKey."""
-    digest = digest_key(presented)
+async def _refused(row: dict, *, call: str, reason: str, redis, sentence: str | None = None):
+    """Audit through ``_refuse`` (throttled), then the typed refusal the core raises."""
+    await _refuse(row, call=call, reason=reason, redis=redis)
+    return KeyRefused(reason, sentence)
+
+
+async def authenticate_presented_key(
+    presented: str,
+    *,
+    pool,
+    redis,
+    call: str,
+    expected_kind: KeyKind = "workflow",
+) -> ResolvedKey:
+    """The one resolver core (D-17): digest -> lookup -> compare -> kind -> live state ->
+    ResolvedKey. Raises ``KeyRefused``; never an HTTP error (the transport is the caller's)."""
+    digest = digest_key(presented, kind=expected_kind)
     if digest is None:
-        raise _invalid()
+        raise KeyRefused("unknown")
 
     row = await api_keys_db.get_key_for_auth(pool, digest)
     if row is None:
@@ -305,19 +361,21 @@ async def authenticate_presented_key(presented: str, *, pool, redis, call: str) 
             "api key refused: unknown key fp=%s",
             hashlib.sha256(presented.encode()).hexdigest()[:12],
         )
-        raise _invalid()
+        raise KeyRefused("unknown")
     if not hmac.compare_digest(str(row.get("key_hash", "")), digest):
-        raise _invalid()
+        raise KeyRefused("unknown")
 
-    if row.get("revoked_at") is not None:
-        raise await _refuse(row, call=call, reason="revoked", redis=redis)
+    # Refusal #2 of D-06: the row's own kind. A pre-mig-220 row carries no column: a workflow key.
+    if row.get("kind", "workflow") != expected_kind:
+        raise await _refused(row, call=call, reason="wrong_kind", redis=redis)
+
+    # revoked -> expired -> member -> banned -> (mcp) org switch -> deployment switch (D-18).
+    refusal = await principal_still_allowed(pool, key_row=row)
+    if refusal is not None:
+        raise await _refused(
+            row, call=call, reason=refusal.reason, redis=redis, sentence=refusal.sentence
+        )
     expires_at = row.get("expires_at")
-    if expires_at is not None and expires_at <= datetime.now(timezone.utc):
-        raise await _refuse(row, call=call, reason="expired", redis=redis)
-    if not await api_keys_db.is_org_member(pool, org_id=row["org_id"], user_id=row["user_id"]):
-        raise await _refuse(row, call=call, reason="not_member", redis=redis)
-    if await deps._is_banned(str(row["user_id"])):
-        raise await _refuse(row, call=call, reason="banned", redis=redis)
 
     try:
         await api_keys_db.touch_last_used(pool, row["id"], org_id=row["org_id"])
@@ -331,4 +389,16 @@ async def authenticate_presented_key(presented: str, *, pool, redis, call: str) 
         label=row["label"],
         workflows=list(row.get("workflows") or []),
         expires_at=expires_at,
+        kind=row.get("kind") or "workflow",
+        folder_ids=_ids(row.get("folder_ids")),
+        tools=_ids(row.get("tools")),
+        include_external=bool(row.get("include_external")),
     )
+
+
+def _ids(value) -> tuple[str, ...] | None:
+    """A jsonb id list as a tuple of strings. ``None`` stays ``None`` (not narrowed) and an empty
+    list stays ``()`` (nothing) — never coerced into one another (the 266 CR-01 class)."""
+    if value is None:
+        return None
+    return tuple(str(v) for v in value)
