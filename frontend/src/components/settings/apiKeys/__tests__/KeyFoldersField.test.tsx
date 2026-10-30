@@ -52,7 +52,7 @@ function Harness({
         onTickedChange={setTicked}
         external={external}
       />
-      <output data-testid="ticked">{ticked.join(",")}</output>
+      <div data-testid="ticked">{ticked.join(",")}</div>
     </>
   )
 }

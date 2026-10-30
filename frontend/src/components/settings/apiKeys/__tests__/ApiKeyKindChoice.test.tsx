@@ -67,10 +67,11 @@ describe("304-05 ApiKeyKindChoice", () => {
     expect(mcp).toHaveAttribute("aria-disabled", "true")
     expect(within(mcp).getByText("MCP access is switched off for this organisation by an admin.")).toBeInTheDocument()
     expect(within(mcp).queryByText(/searches and reads your knowledge/)).toBeNull()
-    await user.click(mcp)
-    expect(onChange).not.toHaveBeenCalled()
     // focus starts on the first tile that can be chosen, and arrows skip the disabled one
     expect(document.activeElement).toBe(wf)
+    await user.click(mcp)
+    expect(onChange).not.toHaveBeenCalled()
+    wf.focus()
     await user.keyboard("{ArrowLeft}")
     expect(onChange).toHaveBeenLastCalledWith("workflow")
   })

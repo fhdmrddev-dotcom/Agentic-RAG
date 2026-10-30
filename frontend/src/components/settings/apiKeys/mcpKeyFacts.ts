@@ -134,6 +134,48 @@ export function mcpCreateBlocker(d: {
   return null
 }
 
+// ── the draft ─────────────────────────────────────────────────────────────────────────────────
+
+export type McpExpiry = "30" | "90" | "365"
+export const MCP_EXPIRIES: readonly McpExpiry[] = ["30", "90", "365"]
+export const MCP_EXPIRY_DAYS: Record<McpExpiry, 30 | 90 | 365> = { "30": 30, "90": 90, "365": 365 }
+
+/** The MCP rows' choices, kept by the draft card across a switch of kind (UI-SPEC §1b). */
+export interface McpDraft {
+  preset: McpPresetChoice
+  /** The hand-picked tools; read only while `preset` is `custom`. */
+  custom: string[]
+  folderMode: FolderMode
+  /** Folders the member ticked (not the ones a ticked ancestor includes). */
+  folderIds: string[]
+  external: boolean
+  expiry: McpExpiry
+}
+
+/** SC2 / KEY-04 (D-07, D-12, D-23): Read only, All folders, mail and synced left out, 90 days. */
+export const MCP_DRAFT_DEFAULT: McpDraft = {
+  preset: "read",
+  custom: [],
+  folderMode: "all",
+  folderIds: [],
+  external: false,
+  expiry: "90",
+}
+
+/** The tools the draft grants, companions included, in catalogue order. */
+export function draftTools(d: McpDraft, catalogue: readonly McpToolRef[]): string[] {
+  return withCompanions(d.preset === "custom" ? d.custom : toolsForPreset(d.preset, catalogue), catalogue)
+}
+
+/** The body's `folder_ids`: null for All folders; otherwise each ticked folder still visible, with
+ *  one whose ancestor is also ticked left out (the ancestor already includes it). */
+export function draftFolderIds(d: McpDraft, folders: readonly PickableFolder[] | null): string[] | null {
+  if (d.folderMode === "all") return null
+  if (!folders) return [...d.folderIds]
+  const rows = flattenFolders(folders, new Set(d.folderIds))
+  return rows.filter((r) => d.folderIds.includes(r.folder.id) && !r.included).map((r) => r.folder.id)
+}
+
 // ── the card's scope model ────────────────────────────────────────────────────────────────────
 
 export const MAX_FOLDER_CHIPS = 4

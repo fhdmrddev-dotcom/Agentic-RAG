@@ -42,7 +42,7 @@ function Harness({
         value={value}
         onChange={setValue}
       />
-      <output data-testid="draft">{JSON.stringify(value)}</output>
+      <div data-testid="draft">{JSON.stringify(value)}</div>
     </>
   )
 }
@@ -80,7 +80,7 @@ describe("304-05 McpKeyFields — safe defaults (SC2 / KEY-04)", () => {
   it("All folders, mail and synced sources unticked, 90 days with no Never, and the acts-as note", () => {
     render(<Harness />)
     expect(screen.getByRole("radio", { name: "All folders I can see in Acme" })).toHaveAttribute("aria-checked", "true")
-    expect(screen.getByRole("checkbox", { name: /Include mail and synced sources/ })).not.toBeChecked()
+    expect(screen.getByRole("checkbox", { name: /^Include mail and synced sources/ })).not.toBeChecked()
     const exp = screen.getByRole("radiogroup", { name: "Expires" })
     expect(within(exp).getAllByRole("radio").map((r) => r.textContent)).toEqual(["30 days", "90 days", "365 days"])
     expect(within(exp).getByRole("radio", { name: "90 days" })).toHaveAttribute("aria-checked", "true")
@@ -132,7 +132,7 @@ describe("304-05 McpKeyFields — the external tick owns connector-fed folders (
   it("unticking Include mail and synced sources unticks the mail folder", async () => {
     const user = userEvent.setup()
     render(<Harness initial={{ ...MCP_DRAFT_DEFAULT, folderMode: "only" }} />)
-    const external = screen.getByRole("checkbox", { name: /Include mail and synced sources/ })
+    const external = screen.getByRole("checkbox", { name: /^Include mail and synced sources/ })
     await user.click(external)
     await user.click(screen.getByRole("checkbox", { name: /Mailbox/ }))
     expect(draft().folderIds).toEqual(["m"])
