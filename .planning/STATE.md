@@ -55,7 +55,7 @@ Phases resume at **303**; migrations at **220**. Open Platform (`SEED-013`) was 
 (ROADMAP, REQUIREMENTS, MILESTONE-AUDIT, STATE-at-close), tag `v4.8` (local, not pushed), 28/28
 requirements, audit `tech_debt`, integration 21/21 after two close fixes (`41198157b`: W-1 ex-member
 email, W-2 opt-out link tab), flows 4/4, no blockers. 301-SECURITY.md written at close (23/23).
-Closed core 7 phase types / 1 emitter / 30 tools. Phase folders 297-302 still in `.planning/phases/`.
+Closed core 7 phase types / 1 emitter / 30 tools. Phase folders 297-302 archived to `.planning/milestones/v4.8-phases/` (2026-10-30).
 
 ---
 

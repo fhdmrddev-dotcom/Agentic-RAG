@@ -35,7 +35,7 @@ Each is a one-line item; full text and file:line in `.planning/phases/296-close-
 
 ## Answered 2026-10-30 — Phase 302 (302-02), per-finding disposition
 
-Copied from `.planning/phases/302-close-out-and-a-true-register/302-02-SUMMARY.md`. All six were real at the
+Copied from `.planning/milestones/v4.8-phases/302-close-out-and-a-true-register/302-02-SUMMARY.md`. All six were real at the
 302 base `cf5a463d4`; none was accepted.
 
 | Finding | RED commit | Fix commit | Disposition |
