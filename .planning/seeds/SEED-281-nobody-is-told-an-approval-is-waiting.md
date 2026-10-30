@@ -28,6 +28,12 @@ re_open_trigger: >
   Immediately for the DOCUMENTATION half (this file). For the BUILD: the first milestone that
   schedules anything customer-facing, or the second recorded instance of a pause nobody saw.
 status_note: >
+  2026-10-30 (302 REG-08, D-14): stays folded -> "300, 301". The email half shipped in code in 300 and the
+  in-app list + badge half in 301; BOTH phases are human_needed, so this does not flip to shipped yet —
+  300 owes G4-8 + the real-provider half of G4-1 (Resend deferred); 301 owes the SC#4 operator sketch
+  approval, G4-4 stopped-source + keyboard arm, G4-3 arm 3 and the live approval row. Two false premises
+  corrected beside their originals (no app-owned mailer; unanswered ask resolves to fail_run) and the
+  excluded pause kinds recorded — see the section at the end.
   2026-10-29: FOLDED at /gsd:discuss-phase 300 — the run-waiting EMAIL half is Phase 300 (NOTE-02..04, 06),
   the in-app list + badge half is Phase 301 (NOTE-01, NOTE-05). Flip to `shipped` only when 301 ships.
   Previous note kept below.
@@ -47,8 +53,12 @@ deferred_options:
   - id: D-235-02 option C — email on permanent failure (SURF-03)
     status: DEFERRED, not dropped
     reason: >
-      There is no app-owned mailer in this product. The SMTP path is a USER's connection, not ours,
-      so an "email the owner" producer has no sender it may legitimately use.
+      ~~There is no app-owned mailer in this product. The SMTP path is a USER's connection, not ours,
+      so an "email the owner" producer has no sender it may legitimately use.~~
+      CORRECTED 2026-10-30 (Phase 302, REG-08): false since Phase 300 D-21 — the app now owns ONE mailer
+      seam (providers none / resend / smtp) that sends invite email and run-waiting email. This
+      deferral's own second trigger ("the product gains an app-owned mailer") has therefore FIRED; option C
+      is re-openable on that seam, and is not built by 300 or 301.
     trigger_when: >
       EITHER a customer reports learning about a dead watch from a stale answer, OR the product
       gains an app-owned mailer for any other reason (this seed's own approval notifications being
@@ -103,10 +113,19 @@ So the failure mode is not a crash and not an error — it is **silence with a p
 schedule list shows a run that started. The workflow looks fine. The approval sits there until it
 expires, and the thing the schedule existed to do never happens.
 
-⚠ **AND THE EXPIRY IS THE PART THAT BITES.** An unanswered `ask_user` resolves to an honest
+~~⚠ **AND THE EXPIRY IS THE PART THAT BITES.** An unanswered `ask_user` resolves to an honest
 `fail_run` (`harness_engine._resolve_failure_with_ask_user` — *"unanswered, run failed"*). So the
 end state of an unattended armed run is a FAILED run whose only cause was that nobody was told to
-look. That is indistinguishable, on the run list, from a run that failed on its merits.
+look. That is indistinguishable, on the run list, from a run that failed on its merits.~~
+
+⚠ **CORRECTED 2026-10-30 (Phase 302, REG-08) — the paragraph above is false for the case this seed is
+about.** An unanswered human gate (a question step, or an armed action-risk approval) does NOT fail the
+run: it takes the `pause_run` arm (`harness_engine.py`, "pause_run: a human gate elapsed unanswered (200 /
+D-10)") — the run is durably `paused`, the prompt stays pending, and it resumes when answered (made durable
+across restarts by Phase 295). `_resolve_failure_with_ask_user`'s honest `fail_run` applies only to an
+`on_failure: ask_user` disposition after a validator exhausts its retries — not to the approval checkpoint.
+So the end state of an unattended armed run is a run that WAITS, silently — which is still the gap this
+seed names, but it is not a failure.
 
 ## ⭐ THIS FILE IS THE REGISTER — add to it, do not scatter
 
@@ -121,7 +140,7 @@ evidenced specification.
 | # | What must reach a person | Evidence / source | Urgency |
 |---|---|---|---|
 | N-1 | **An approval is waiting on an unattended run** | measured 2026-08-29, the 04:19 run above | ⛔ blocking the value of scheduling at all |
-| N-2 | **That approval is about to expire** — and what happens when it does | `_resolve_failure_with_ask_user` fails the run on no answer | high — this is the silent-loss path |
+| N-2 | **That approval is about to expire** — and what happens when it does | ~~`_resolve_failure_with_ask_user` fails the run on no answer~~ CORRECTED 2026-10-30 (Phase 302, REG-08): false — an unanswered human gate pauses the run (`pause_run`, 200 D-10), it does not fail it; there is no expiry to warn about, only a wait | ~~high — this is the silent-loss path~~ low — the silent path is the wait itself, which N-1 covers |
 | N-3 | **A scheduled run failed** | `workflow_schedules.last_status` is written and rendered nowhere a person passes | high |
 | N-4 | **A scheduled run's outbound action actually sent something** | D-16's no-send line applies to golden runs ONLY; a scheduled run really sends | high — the honesty twin of N-1 |
 
@@ -195,3 +214,21 @@ this file is the register:
 > approval notifications being the likeliest cause.
 
 Two independent triggers, so it cannot be orphaned by whichever arrives first.
+
+---
+
+## Pause kinds deliberately excluded from the notice (recorded 2026-10-30, Phase 302)
+
+Phases 300 (email) and 301 (in-app list + badge) answer N-1 for workflow runs that wait on a person — a
+question step or an armed action-risk approval. Two other pauses are left out on purpose:
+
+- **The tool-round cap pause** (292.1). It stops an agent turn that used up its tool-round budget and
+  offers Continue on that turn. It is a budget stop the person who started the turn is reading, not a
+  decision a workflow is waiting on, so it is not a "waiting on you" item (excluded at 300 / 301 scope,
+  300-CONTEXT.md:24-25, 301-CONTEXT.md:24).
+- **A chat (non-workflow) `ask_user`.** The question appears in the conversation the person is having.
+  Measured at 300 PT-1: a chat `ask_user` wrote **0** notices, by design (excluded kind).
+
+Where the halves went: the run-waiting **email** shipped in Phase 300 (NOTE-02..04, 06) and the in-app
+**list + badge** in Phase 301 (NOTE-01, NOTE-05). Both are `human_needed` as of 2026-10-30 — the owed rows
+are named in `status_note` above. Flip this seed to `shipped` when both close.

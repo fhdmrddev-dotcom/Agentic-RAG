@@ -233,8 +233,8 @@ const BASELINE = {
   //    printed `actual` of the suites run together, never hand-counted. soulData.requiredFields,
   //    starterFork.287 live under the `src/components/workflows` directory TARGETS entry;
   //    the chat + providers ones are named FILE-LEVEL below (no bare directory entry exists).
-  "ThreadWorkflowPicker.test.tsx": 17, // 2026-10-28 298-02: 9 -> 17 (printed actual; +1 a folder refusal shows the server sentence with no Retry)
-  "useStartWorkflowInThread.test.tsx": 24, // 2026-10-28 298-02: 7 -> 24 (printed actual; +5 the coded folder refusal is kind folder, other 422s unchanged)
+  "ThreadWorkflowPicker.test.tsx": 18, // RAISED 17 -> 18 at 302-02 (FE-IN-01 / D-09): a refused start shows its cause with no Retry. 2026-10-28 298-02: 9 -> 17 (printed actual; +1 a folder refusal shows the server sentence with no Retry)
+  "useStartWorkflowInThread.test.tsx": 30, // RAISED 24 -> 30 at 302-02 (FE-IN-01 / D-09 / D-26): the 409 worded by cause (locked by code, paused by prefix, refused by sentence). 2026-10-28 298-02: 7 -> 24 (printed actual; +5 the coded folder refusal is kind folder, other 422s unchanged)
   "ChatArea.threadWorkflowPicker.test.tsx": 7, // RAISED 5 -> 7 at 299-04: the header link mount (after the title, compact, owner-only, the chat's own address) and none on the welcome screen
   "StreamsProvider.inputs.test.tsx": 3,
   "soulData.requiredFields.test.ts": 7,
@@ -1052,7 +1052,9 @@ const BASELINE = {
   // attacker-supplied placeholder names render as TEXT and create no element.
   //
   // Read from THIS SCRIPT'S OWN `actual` column (`DescribeTemplateRow.test.tsx — 42 new`).
-  "DescribeTemplateRow.test.tsx": 42,
+  // RAISED 42 -> 156 at 302-03 (printed actual at the 302-03 phase gate): the pin had trailed the file
+  // since 291/296 grew it; 302-02 added the FE-IN-04 disabled-tick cases. A lagging pin is the gate going blind.
+  "DescribeTemplateRow.test.tsx": 156,
   // 291-04 (AUTH-02, sketch 291-describe-files winner B) — ADOPTED in the plan that creates it.
   // `src/components/workflows` is already a DIRECTORY entry in `TARGETS`, so no `TARGETS` edit.
   // What would be unguarded without this entry: the references section's honesty properties —
@@ -1616,7 +1618,15 @@ const BASELINE = {
   // literals.
   // RAISED 22 → 33 at 274-04 (measured): the base already read 28 (the pin lagged), +5 for the
   // panel row's Save to Library slot, its tabIndex -1 trigger and the Shift+F10 / ContextMenu arm.
-  "FilesSection.test.tsx": 33,
+  // RAISED 33 -> 40 at 302-01 (FIX-01 / D-04, measured): the base already read 34 (the pin lagged
+  // again), +6 for the Generated files group mount, its honest counts and the no-PanelEmpty arm.
+  "FilesSection.test.tsx": 40,
+  // ── 302-01 (FIX-01 / D-02 / D-22) — three NEW suites, pinned in the SAME COMMIT as their
+  // TARGETS entries (the two-knob rule): `src/components/panel/__tests__/` and
+  // `src/components/files/__tests__/` have no directory entry, so an unlisted suite runs in nothing.
+  "generatedFiles.test.ts": 8, // 302-01: the pure fold — keyed by name, newest turn wins, empty arms
+  "GeneratedFilesGroup.test.tsx": 7, // 302-01: the group at panel density, React-text names, downloads via the shared hook
+  "useSandboxDownload.test.tsx": 6, // 302-01: one download home, lifted unchanged from OutputFileCard (resolveOutputUrl + the click handler)
   // 195-03 task 1 GREW this file 11 → 41: the widening's own coverage (ribbon /
   // tone / className / mimeType / the nine added extensions / the own-property
   // guard), ADDITIONS ONLY — `git diff` showed zero removed lines and all 11
@@ -1761,7 +1771,9 @@ const BASELINE = {
   // all (`194.1-BASELINE.md` §2) — so a new suite would land UNGATED and the phase's single
   // most important case would be the one nothing runs in CI. *A falsification that does not
   // run has falsified nothing.*
-  "WorkspacePanel.test.tsx": 58,
+  // RAISED 58 -> 65 at 302-01 (FIX-01 / D-04, measured): the base already read 62 (the pin lagged),
+  // +3 for the one count feeding hasActivity, the FILES header and the rail.
+  "WorkspacePanel.test.tsx": 65,
   // 189-08 (CONN-01 / D-07 / D-17): 34 → 40. An EXTENSION, not a lowering — nothing was
   // deleted or renamed. The +6 are the sixth `workflow_phases_status_check` slug arriving
   // in the ONE derivation: +2 from the shipped `DB_TABLE` gaining a row (it drives both the
@@ -3570,7 +3582,7 @@ const BASELINE = {
   // took opposite answers, which is why the check is made per file and never inferred.
   "WorkflowBuilderPage.declaredInputs.test.tsx": 9,
   "StepIdentity.coverage.test.tsx": 23,
-  "WorkflowScheduleModal.test.tsx": 29, // RAISED 9 -> 29 at 300-01 (D-15 / D-16 / D-26): +10 row-words / per-row Run now cases; the 9 was the 214 pin, never raised as 296-04 grew the file (the "one result line per modal" case RE-TARGETED to D-16, not dropped)
+  "WorkflowScheduleModal.test.tsx": 31, // RAISED 29 -> 31 at 302-03 (D-24, 300 G4-5 F-1): a refused Run now says its sentence once; a launched one hides the stale outcome line. RAISED 9 -> 29 at 300-01 (D-15 / D-16 / D-26): +10 row-words / per-row Run now cases; the 9 was the 214 pin, never raised as 296-04 grew the file (the "one result line per modal" case RE-TARGETED to D-16, not dropped)
   // ── Phase 300-01 (D-15 / D-26 / D-14 client half) — both knobs, same commit. scheduleOutcomeVocabulary
   //    sits under the "src/components/workflows" directory entry (pin only); schedulesRefusal is FILE-LEVEL in TARGETS.
   "scheduleOutcomeVocabulary.test.ts": 16, // 300-01 — every UI-SPEC S6a row (known tokens, server sentence prefix + full stop, neutral unknown token, null), zero-import leaf over ?raw
@@ -4387,9 +4399,9 @@ const BASELINE = {
   // directory entry in TARGETS (headerPin under __tests__/, two under library/), so they need a pin only.
   // Deleting a case in any of them now reds the gate.
   "teamModel.test.ts": 248, // 290-REVIEW WR-06: 247 -> 248 (max_retries read as lax int, negative = no redo). WR-01: 246 -> 247 (unknown on_failure reads stop the run). CR-01: 243 -> 246 (unflagged external_action armed + its control + ARMED_TYPES drift fence). 290-01 (VIS-01 / D-11): deriveTeam's honesty surface; jump only for a resolvable skip, citations check only for detected
-  "teamVocabulary.test.ts": 15, // 290-01: zero-import leaf, exact strings, no step sentence or seal label copied in
+  "teamVocabulary.test.ts": 16, // RAISED 15 -> 16 at 302-02 (FE-IN-06 / D-11): the region name is distinct from the figure name. 290-01: zero-import leaf, exact strings, no step sentence or seal label copied in
   "WorkflowCanvas.headerPin.test.tsx": 6, // 290-01: canvas header characterization pin (6 snapshots) that 290-03 left byte-unchanged
-  "TeamPicture.test.tsx": 42, // 290-REVIEW WR-03/WR-04: 36 -> 42 (planted-layout geometry: no line inside a card, jumps on own lanes, one rail per gate). 290-03 (VIS-01 / D-06): one SVG path per lines[] item, nothing focusable, author text literal
+  "TeamPicture.test.tsx": 44, // RAISED 42 -> 44 at 302-02 (FE-IN-06 / D-11): region and figure named apart, populated + empty arms. 290-REVIEW WR-03/WR-04: 36 -> 42 (planted-layout geometry: no line inside a card, jumps on own lanes, one rail per gate). 290-03 (VIS-01 / D-06): one SVG path per lines[] item, nothing focusable, author text literal
   "WorkflowCanvas.team.test.tsx": 7, // 290-03: Steps | Team switch only with the team prop; keyboard reorder gated (F-6); run page passes none
   "stepLine.test.ts": 25, // 290-02 (VIS-04 / D-01, D-04): type-sentence chips in run order, first 3 + more, null at 0 steps
   "StepChipLine.test.tsx": 11, // 290-02 (VIS-04 / D-03): row-steps block, +N more / Show less, no title attribute
@@ -5534,6 +5546,10 @@ const TARGETS = [
   "src/components/chat/__tests__/OutputFileCard.baseline.test.tsx",
   "src/components/chat/__tests__/StopControl.baseline.test.tsx",
   "src/components/panel/__tests__/FilesSection.test.tsx",
+  // ── Added in 302-03 for 302-01's three new suites, in the SAME COMMIT as their BASELINE pins ──
+  "src/components/panel/__tests__/generatedFiles.test.ts",
+  "src/components/panel/__tests__/GeneratedFilesGroup.test.tsx",
+  "src/components/files/__tests__/useSandboxDownload.test.tsx",
   "src/lib/__tests__/fileIcon.test.tsx",
   "src/__tests__/components/MessageItem.finalOutputs.test.tsx",
   // ── Added in 195-03 task 3, in the SAME COMMIT as their BASELINE entries ────

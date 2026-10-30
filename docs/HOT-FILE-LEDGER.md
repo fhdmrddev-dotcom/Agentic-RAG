@@ -11610,19 +11610,19 @@ cells rot within days.
 | [`frontend/src/components/chat/InviteExpertDialog.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentschatinviteexpertdialogtsx) | 10 / 5 / 648 (was `4 / 4 / 614`) | ⚠ **FIRES — 5 phases** | honoured by construction (**279-03**): ONE `message` field on the error state + ONE `onThread` prop; copy "Won't search". ⛔ the body stays a list |
 | [`backend/app/db/entitlements.py`](docs/HOT-FILE-LEDGER.md#backendappdbentitlementspy) | 2 / 1 / 169 | no (new) | young (created Phase 258). Row added AT CREATION — absent row is invisible to G-5 (TIER-01/02). |
 | [`backend/app/services/entitlement_service.py`](docs/HOT-FILE-LEDGER.md#backendappservicesentitlement_servicepy) | 2 / 1 / 130 | no (new) | young (created Phase 258). Row added AT CREATION. Single commercial boundary home (TIER-01/03/04/05). |
-| [`frontend/src/components/chat/ThreadWorkflowPicker.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentschatthreadworkflowpickertsx) | 4 / 3 / 144 (was `3 / 2 / 144`) | ⚠ **FIRES** | ⚠ now FIRES (298). 298-02: the Retry condition gains one case (no Retry for kind folder); the failure line already renders message for any kind |
-| [`frontend/src/components/chat/useStartWorkflowInThread.ts`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentschatusestartworkflowinthreadts) | 4 / 3 / 186 (was `3 / 2 / 174`) | ⚠ **FIRES** | ⚠ now FIRES (298). 298-02: StartFailure kind folder — a 422 with code folder_in_other_org shows the server sentence (the ONE recorded exception to never-server-text); no Retry for it |
+| [`frontend/src/components/chat/ThreadWorkflowPicker.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentschatthreadworkflowpickertsx) | 5 / 4 / 144 (was `4 / 3 / 144`) | ⚠ **FIRES** | 302-02 (FE-IN-01): the Retry condition gains one case — no Retry for kind refused (one line); the failure line already renders message for any kind |
+| [`frontend/src/components/chat/useStartWorkflowInThread.ts`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentschatusestartworkflowinthreadts) | 5 / 4 / 206 (was `4 / 3 / 186`) | ⚠ **FIRES** | 302-02 (FE-IN-01 / D-09): a 409 is worded by cause — locked by code, paused by the cross-pinned prefix, else refused with the server sentence; empty 409 stays failed (+23 −3) |
 | [`frontend/src/components/chat/ToolCallPanel.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentschattoolcallpaneltsx) | 55 / 23 / 409 (was `54 / 22 / 407`) | ⚠ **FIRES** | ✅ G-5 DISCHARGED (227-02). **273-05**: `stepLabel` + `ARGS_HIDDEN.livePanel` replace one name check; no new branch |
 | [`frontend/src/components/chat/tool-bodies/SearchDocumentsBody.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentschattool-bodiessearchdocumentsbodytsx) | 3 / 3 / 71 | ⚠ **FIRES** (crossed in 272) | ⚠ absent its ENTIRE LIFE — row added 272-05. **F-3**: `summarize` names refused / invalid / empty / not-searchable / unavailable |
 | [`frontend/src/components/chat/MessageItem.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentschatmessageitemtsx) | 84 / 39 / 1059 (was `83 / 42 / 1050`) | ⚠ **FIRES** | 292.1 UAT: Deep Continue re-attaches the run's stream (+1 else-if) · ⛔ |
 | [`backend/app/api/threads.py`](docs/HOT-FILE-LEDGER.md#backendappapithreadspy) | 285 / 97 / 2756 (was `284 / 96 / 2752`) | ⚠ **FIRES** | 299-01: ONE awaited `item_org_guard.refuse_if_other_org(...)` in send_message after `_require_thread_org` + one import. No branch. Honoured by construction. |
-| [`frontend/src/providers/StreamsProvider.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrcprovidersstreamsprovidertsx) | 120 / 45 / 5250 (was `119 / 45 / 5234`) | ⚠ **FIRES** | 296 G-4 row 12: sendMessage's kickoff follow now reconciles the viewed thread at its terminal (the R5 kickoff has no assistant node) and clears the previous run's step slice at kickoff. |
+| [`frontend/src/providers/StreamsProvider.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrcprovidersstreamsprovidertsx) | 121 / 46 / 5250 (was `120 / 45 / 5250`) | ⚠ **FIRES** | 302-02 (FE-IN-01 / D-26): the provider's lock arm stamps code workflow_locked on the error it builds (one expression, +2 −2) so the start hook tells the lock by a code, not prose |
 | [`frontend/src/hooks/useMessages.ts`](docs/HOT-FILE-LEDGER.md#frontendsrchooksusemessagests) | 74 / 27 / 127 | ⚠ **FIRES** | extraction due |
 | [`backend/app/services/anthropic_service.py`](docs/HOT-FILE-LEDGER.md#backendappservicesanthropic_servicepy) | 12 / 11 / 373 (was `11 / 10 / 354`) | ⚠ **FIRES** | **282-01**: ONE `_anthropic_client` builder (budget in the constructor, connect 5 s, cloud retries 2) + trailing `timeout_s` on `stream_anthropic`. honoured by construction; adapter-pattern audit due |
 | [`frontend/src/components/workflows/WorkflowCanvas.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentsworkflowsworkflowcanvastsx) | 33 / 11 / 1757 (was `32 / 10 / 1744`) | **FIRES** | 296-07 (D-09, operator decision): ONE controlled prop pair (view / onViewChange) + tabpanel attrs on 2 bodies; useState 8→8. ⛔ extraction still FIRST next |
 | [`frontend/src/components/workflows/FlowEdge.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentsworkflowsflowedgetsx) | 3 / 3 / 462 | ⚠ **FIRES — EXACTLY AT THRESHOLD** | honoured by construction (200) — ⚠ absent, and it crossed the threshold in the commit that added its row |
 | [`frontend/src/components/workflows/PhaseNodeCard.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentsworkflowsphasenodecardtsx) | 18 / 9 / 490 (was `17 / 8 / 489`) | **FIRES** | 290: the 286 forecast went UNUSED (the chips went on the library card, UI-SPEC §9); file untouched. honoured by construction (199) — ⚠ the 200 canvas port stays REVERTED |
-| [`backend/app/services/harness/phase_types.py`](docs/HOT-FILE-LEDGER.md#backendappservicesharnessphase_typespy) | 67 / 34 / 3147 (was `66 / 33 / 3135`) | ⚠ **FIRES** | 300-03 (D-23, G-5 override audited in STATE.md): one hunk in _external_action_sent_body — send_email names the recipient (via host). Owed refactor NOT discharged |
+| [`backend/app/services/harness/phase_types.py`](docs/HOT-FILE-LEDGER.md#backendappservicesharnessphase_typespy) | 69 / 35 / 3149 (was `67 / 34 / 3147`) | ⚠ **FIRES** | 302-02 (BE-IN-01): the executor's liveness read is ONE awaited call to live_connectors_fully_on(fresh=…, audience=…), import below the 190 fence's pinned line (+4 −2). Owed refactor NOT discharged |
 | [`frontend/src/pages/WorkflowsPage.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrcpagesworkflowspagetsx) | 56 / 23 / 1403 (was `55 / 23 / 1403`) | ⚠ **FIRES** | honoured by construction (299-REVIEW WR-05): the useWorkflowLinkTarget call passes shown: visibleRows and clearFilters: clearAllFilters (one expression) |
 | [`frontend/src/components/workflows/library/WorkflowCard.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentsworkflowslibraryworkflowcardtsx) | 27 / 12 / 1374 (was `26 / 11 / 1373`) | **FIRES** | 299-02: one attribute data-row-id={row.id} on the root, beside data-provenance (the link target). Honoured by construction; seam286 pin snapshot +5 attrs |
 | [`frontend/src/components/workflows/library/libraryVocabulary.ts`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentsworkflowslibrarylibraryvocabularyts) | 15 / 8 / 820 (was `14 / 7 / 819`) | ⚠ **FIRES** | 296-07 (290-IN-02): STEP_LINE_UNTYPED is a re-export of phaseVocabulary.STEP_UNTYPED (one home); no seam proposed |
@@ -11648,11 +11648,11 @@ cells rot within days.
 | [`backend/app/services/harness/grounding.py`](docs/HOT-FILE-LEDGER.md#backendappservicesharnessgroundingpy) | 23 / 10 / 1437 (was `22 / 9 / 1417`) | ⚠ **FIRES** | 295-03: ONE pure predicate `is_engine_citation_gate` (+1 def, If 24→24); `on_failure="fail_run"` kept (D-51). Honoured by construction |
 | [`frontend/src/components/workflows/PhaseFormPanel.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentsworkflowsphaseformpaneltsx) | 31 / 15 / 1569 (was `30 / 14 / 1566`) | **FIRES** | honoured by construction ×7 (296-07: one optional key on the template prop type, passed through to TemplateAttachSection) |
 | [`backend/app/db/workflows.py`](docs/HOT-FILE-LEDGER.md#backendappdbworkflowspy) | 64 / 32 / 2874 (was `63 / 31 / 2862`) | ⚠ **FIRES** | 298-01: keyword-only `org_id` on list_published_workflows (globals kept, `wd.` qualified) + list_draft_workflows; no org = SQL byte-identical (sha256-pinned); placeholder fence amended D-298-02. |
-| [`backend/app/services/harness/publish_service.py`](docs/HOT-FILE-LEDGER.md#backendappservicesharnesspublish_servicepy) | 36 / 16 / 2061 (was `35 / 16 / 2057`) | ⚠ **FIRES** | 296-06 (291-S6-F8): the golden kickoff is `launch_kickoff(golden_input, def, golden_inputs)` — the stand-in answers reach the first step once (one statement). Honoured by construction |
+| [`backend/app/services/harness/publish_service.py`](docs/HOT-FILE-LEDGER.md#backendappservicesharnesspublish_servicepy) | 37 / 17 / 2066 (was `36 / 16 / 2061`) | ⚠ **FIRES** | 302-02 (BE-IN-03 / D-07): the golden-input loop skips an input the practice run never asks for (non-user source, or type file / kb_auto) — one continue (+5). Honoured by construction |
 | [`backend/app/services/workflow_authoring.py`](docs/HOT-FILE-LEDGER.md#backendappservicesworkflow_authoringpy) | 23 / 13 / 1269 (was `18 / 12 / 1120`) | **FIRES** | 296-03: unticked-named services told (resolver + block), provider_error refused with no strict retry, requirement = describe when files attached. Extraction OWED |
 | [`backend/app/models/harness.py`](docs/HOT-FILE-LEDGER.md#backendappmodelsharnesspy) | 22 / 20 / 776 (was `20 / 19 / 766`) | **FIRES** | 291-02: `InputFieldSpec.origin` + `.note`, omitted from the dump when absent so a no-file draft is byte-identical (+11 −1). Honoured by construction (193.2 / 214 / 291) |
 | [`frontend/src/components/workflows/builderStore.ts`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentsworkflowsbuilderstorets) | 16 / 9 / 1039 (was `14 / 8 / 968`) | **FIRES** | 291: two actions (`addReferenceAssets` 291-04, `setInputSource` 291-05) and NO state field; the ≤ 1 store field forecast held. Honoured by construction (193.2 / 197 / 214.1 / 291) |
-| [`frontend/src/components/panel/WorkspacePanel.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentspanelworkspacepaneltsx) | 17 / 11 / 646 (was `16 / 10 / 646`) | **FIRES** | honoured by construction (194 / 194.1 / **282-02**: ONE `home="panel"` prop on the existing `PendingAskStack` mount; the `pendingAsks.length > 0 &&` condition byte-identical) |
+| [`frontend/src/components/panel/WorkspacePanel.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentspanelworkspacepaneltsx) | 19 / 12 / 653 (was `17 / 11 / 646`) | **FIRES** | honoured by construction (194 / 194.1 / 282-02 / 302-01: hasActivity, the FILES header and the rail read ONE count from useThreadFiles, +9 −5) |
 | [`backend/app/services/run_lifecycle.py`](docs/HOT-FILE-LEDGER.md#backendappservicesrun_lifecyclepy) | 11 / 7 / 827 (was `10 / 6 / 776`) | ⚠ **FIRES** | 296-02 (295-RES-b): broadcast_run_cancellation gains stopped_by (sibling run_cancelled_by key, same TTL) + cancelled_by reader; Step 3a broadcasts the stopper BEFORE task.cancel() |
 | [`backend/app/api/runs.py`](docs/HOT-FILE-LEDGER.md#backendappapirunspy) | 55 / 24 / 2054 (was `54 / 23 / 2050`) | ⚠ **FIRES** | 299-01: ask_user_response stamps the answer with the run's org — `org_id` select token ×2, one synthesized-row key, one insert key. No branch. Honoured by construction. |
 | [`backend/app/services/harness_engine.py`](docs/HOT-FILE-LEDGER.md#backendappservicesharness_enginepy) | 70 / 27 / 2999 (was `69 / 27 / 2992`) | ⚠ **FIRES** | 296 review CR-01: `_build_resume_context` switches the owner's settings to the run's recorded provider (`override_provider`); no key → the safe resolver. One guarded If. Armed seam still OWED |
@@ -11677,8 +11677,8 @@ cells rot within days.
 | [`frontend/src/lib/api/runEvidence.ts`](docs/HOT-FILE-LEDGER.md#frontendsrclibapirunevidencets) | 3 / 3 / 137 (was `2 / 2 / 134`) | ⚠ **FIRES** | 295-05: TS twins for `unsourced` and `end_reason`, widened in lockstep with the contract fixture. Two phases; does not fire · 293 touch: see §Phase 293 close |
 | [`frontend/src/lib/runDeepLink.ts`](docs/HOT-FILE-LEDGER.md#frontendsrclibrundeeplinkts) | 3 / 2 / 41 (was `1 / 1 / 63`) | no (2 phases) | 297-02: write/clear helpers and the window reader deleted (D-18, D-33); isStrictUuid + readRunParam (pure) remain for the route table. ⛔ strict UUID only |
 | [`frontend/src/index.css`](docs/HOT-FILE-LEDGER.md#frontendsrcindexcss) | 35 / 19 / 1239 (was `34 / 18 / 1196`) | ⚠ **FIRES** | 294-05: ONE verdict block keyed only on citation-marker--v-* and __verdict (+43). ⛔ no app-wide rule |
-| [`frontend/src/components/chat/OutputFileCard.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentschatoutputfilecardtsx) | 8 / 7 / 219 | **FIRES** | honoured by construction (195) |
-| [`frontend/src/components/panel/FilesSection.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentspanelfilessectiontsx) | 12 / 8 / 354 (was `10 / 6 / 363`) | ⚠ **FIRES** | ⚠ STALE (`10/6/363`). **274-04**: 1 import, 1 trailing-slot line, 1 Shift+F10 arm, 2 signatures widened to `string \| null`; agent rows byte-identical |
+| [`frontend/src/components/chat/OutputFileCard.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentschatoutputfilecardtsx) | 9 / 8 / 187 (was `8 / 7 / 219`) | **FIRES** | honoured by construction (195 / 302-01: the download body moved out to useSandboxDownload, +13 −45; rendered output byte-identical, OutputFileCard.baseline 21 unchanged) |
+| [`frontend/src/components/panel/FilesSection.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentspanelfilessectiontsx) | 14 / 9 / 366 (was `12 / 8 / 354`) | ⚠ **FIRES** | 302-01: ONE GeneratedFilesGroup mount + the listbox wrapped in rows.length > 0 (+15 −6, not re-indented); workspace rows byte-identical. Honoured by construction |
 | [`frontend/src/lib/api.ts`](docs/HOT-FILE-LEDGER.md#frontendsrclibapits) | 215 / 128 / 556 (was `214 / 127 / 552`) | ⚠ **FIRES** | 299-03: one links export block (resolveLink + LinkKind / LinkTarget / LinkAnswer) beside the orgItems block. No other re-export changed |
 | [`frontend/src/types/index.ts`](docs/HOT-FILE-LEDGER.md#frontendsrctypesindexts) | 103 / 82 / 1688 (was `102 / 81 / 1685`) | ⚠ **FIRES** | 299-04: ONE optional field, ExpertBundle.org_id (the experts read is SELECT *, so the wire always carried it). Additive. Seam still owed |
 | [`backend/app/main.py`](docs/HOT-FILE-LEDGER.md#backendappmainpy) | 99 / 73 / 1021 (was `98 / 72 / 1020`) | ⚠ **FIRES** | 301-01: one include_router(notifications.router) + its import token. Honoured by construction. ⛔ see section |
@@ -11687,7 +11687,7 @@ cells rot within days.
 | [`backend/app/api/settings.py`](docs/HOT-FILE-LEDGER.md#backendappapisettingspy) | 48 / 26 / 1398 (was `47 / 25 / 1301`) | ⚠ **FIRES** | 300-05: four email knobs + read-only provider name (D-07/D-08/D-10); delay via _range_refusal_detail + allow-list +1. Honoured by construction. ⛔ no mail secret on the wire |
 | [`backend/app/services/multimodal_service.py`](docs/HOT-FILE-LEDGER.md#backendappservicesmultimodal_servicepy) | 14 / 7 / 984 | ⚠ **FIRES** | ⚠ absent from BOTH for its ENTIRE LIFE at **7 phases** — row added SEED-227, which is also where its silent truncation was found |
 | [`backend/app/api/documents.py`](docs/HOT-FILE-LEDGER.md#backendappapidocumentspy) | 101 / 40 / 2709 (was `99 / 39 / 2698`) | ⚠ **FIRES** | 298-01: list_documents one `org_lists.by_org` in build() (every read, D-32); upload one `org_id=root_upload_org(...)` on the ONE minter call. Honoured by construction. ⛔ see section |
-| [`scripts/vitest-count-gate.cjs`](docs/HOT-FILE-LEDGER.md#scriptsvitest-count-gatecjs) | 403 / 84 / 6894 (was `400 / 84 / 6886`) | ⚠ **FIRES** | 301-03: 3 BASELINE pins + FILE-LEVEL TARGETS (waitingVocabulary 24, OrgIdentity 17, WaitingOnYouControl 24); RAISED NavPanel.badge 17->22, ChatLayout.badge 14->19; none lowered |
+| [`scripts/vitest-count-gate.cjs`](docs/HOT-FILE-LEDGER.md#scriptsvitest-count-gatecjs) | 406 / 85 / 6910 (was `403 / 84 / 6894`) | ⚠ **FIRES** | 302-03: 3 BASELINE pins + FILE-LEVEL TARGETS (generatedFiles 8, GeneratedFilesGroup 7, useSandboxDownload 6); 8 RAISED to printed actuals; none lowered |
 | [`scripts/check-deploy-drift.sh`](docs/HOT-FILE-LEDGER.md#scriptscheck-deploy-driftsh) | 6 / 5 / 271 (was `5 / 4 / 267`) | ⚠ **FIRES** | 300-03 (D-28): the five SMTP_* vars registered in OMITTED_FROM_ONEBOX (commented in the one-box preset); email comment rewritten. No check changed |
 | [`scripts/build-public-openapi.cjs`](docs/HOT-FILE-LEDGER.md#scriptsbuild-public-openapicjs) | 13 / 7 / 473 (was `11 / 5 / 472`) | ⚠ **FIRES** | 301-01: `notifications` in the Account & org tag group + `/notifications` in FLAGGED_PREFIXES (UI-internal). Two tokens. ⚠ prior row stale |
 | [`scripts/check-seeds-register.cjs`](docs/HOT-FILE-LEDGER.md#scriptscheck-seeds-registercjs) | 7 / 3 / 1132 | ⚠ **FIRES** | ⚠ absent its ENTIRE LIFE — row added 296-05, now FIRES (251 / 293 / 296). 296-05: three `\d{3}` → `\d{3,}` (293-IN-07). ⛔ the STATUS_ENUM triple |
@@ -11697,7 +11697,7 @@ cells rot within days.
 | [`frontend/src/components/panel/PhaseCard.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentspanelphasecardtsx) | 22 / 14 / 821 (was `21 / 14 / 817`) | ⚠ **FIRES** | 296 review FE-WR-01: one derived `isWorking` (running and not paused) gates the progressbar, Working line and aria-busy. useState 1→1, useEffect 1→1 |
 | [`frontend/src/components/panel/PhaseTimeline.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentspanelphasetimelinetsx) | 11 / 9 / 408 (was `10 / 8 / 404`) | ⚠ **FIRES** | 296-04: one derived const (`runPaused`, from the fetched frame) and one prop to each card. Honoured by construction |
 | [`frontend/src/components/panel/phaseStatusMeta.ts`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentspanelphasestatusmetats) | 5 / 5 / 308 (was `4 / 4 / 291`) | ⚠ **FIRES** | 296-04: one derived `WAITING_META` row (`!` · Waiting · warning) and one optional `runPaused` arg on `statusMetaForRun`; not a wire status |
-| [`backend/app/services/harness/validator_kinds.py`](docs/HOT-FILE-LEDGER.md#backendappservicesharnessvalidator_kindspy) | 19 / 9 / 918 (was `18 / 8 / 899`) | ⚠ **FIRES** | 296-02 (295-IN-08 / D-07): judge_system_prompt gains by_design (one condition); the in-run judge passes recording_by_design(ctx) — golden run or live_connectors off; a missing grant gets no note |
+| [`backend/app/services/harness/validator_kinds.py`](docs/HOT-FILE-LEDGER.md#backendappservicesharnessvalidator_kindspy) | 20 / 10 / 924 (was `19 / 9 / 918`) | ⚠ **FIRES** | 302-02 (BE-IN-01 / D-27): recording_by_design is async and reads live_connectors_fully_on() — the executor's predicate, after the freshness check (+11 −5). Honoured by construction |
 | [`frontend/src/components/admin/ModelRegistryTab.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentsadminmodelregistrytabtsx) | 19 / 7 / 1705 (was `17 / 7 / 1679`) | ⚠ **FIRES** | honoured by construction (**282-01** help line; **282-04** ONE Timeout field in `AddModelForm`, placeholder = provider default, blank sends no key). `AddModelForm` seam OWED |
 | [`frontend/src/components/workflows/soulData.ts`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentsworkflowssouldatats) | 15 / 13 / 556 (was `14 / 12 / 554`) | ⚠ **FIRES** | 296-07 (287-IN-02): requiredFieldsMessage falls back to the key for an empty or blank label, so a message never starts ` is required` |
 | [`frontend/src/components/workflows/PublishGauntlet.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentsworkflowspublishgauntlettsx) | 22 / 12 / 1390 (was `21 / 11 / 1385`) | ⚠ **FIRES** | 296-07 (288-F-4): onPublished(version, notes) — the auto_answered messages travel with the success; a phase:null note renders with no prefix |
@@ -11801,7 +11801,7 @@ cells rot within days.
 | [`frontend/src/components/workflows/DeclaredInputsEditor.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentsworkflowsdeclaredinputseditortsx) | 1 / 1 / 333 | no (1 phase) | young (214.1-01) — the authoring surface `BUG-260828-02` says did not exist. ⚠ G-2 OVERRIDDEN, not satisfied |
 | [`frontend/src/components/workflows/PublishRefusalList.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentsworkflowspublishrefusallisttsx) | 2 / 1 / 178 | no (1 phase) | young (214-10) — the refusal renders as a CAUSE, not a status |
 | [`frontend/src/components/workflows/StepIdentity.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentsworkflowsstepidentitytsx) | 1 / 1 / 161 | no (1 phase) | young (214-08) — ONE element, four sizes, both names as props; it resolves nothing |
-| [`frontend/src/components/workflows/WorkflowScheduleModal.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentsworkflowsworkflowschedulemodaltsx) | 6 / 5 / 812 (was `5 / 4 / 723`) | ⚠ **FIRES** | 300-01: outcome sentence line (scheduleOutcomeLine), per-row Run now (runningIds + runResults map, no global busy), quiet refresh. No new component or hook. Extraction FIRST next |
+| [`frontend/src/components/workflows/WorkflowScheduleModal.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentsworkflowsworkflowschedulemodaltsx) | 7 / 6 / 814 (was `6 / 5 / 812`) | ⚠ **FIRES** | 302-03 (D-24, 300 G4-5 F-1): the outcome line hides while the row shows its own Run now result (one condition + a two-line comment, +3 −1). Extraction FIRST next |
 | [`frontend/src/types/schedule.ts`](docs/HOT-FILE-LEDGER.md#frontendsrctypesschedulets) | 2 / 2 / 77 | no (2 phases) | row added 296-04: one optional `outcome` on `ScheduleTriggerResult` (the 296-02 trigger contract). Types only; does not fire |
 | [`frontend/src/components/workflows/argumentModel.ts`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentsworkflowsargumentmodelts) | 1 / 1 / 313 | no (1 phase) | young (214-07) — the three argument sources as data |
 | [`frontend/src/components/workflows/argumentVocabulary.ts`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentsworkflowsargumentvocabularyts) | 1 / 1 / 254 | no (1 phase) | young (214-07) — every sentence the argument form says |
@@ -11910,7 +11910,7 @@ cells rot within days.
 | [`frontend/src/lib/workspaceAllowedExt.ts`](docs/HOT-FILE-LEDGER.md#frontendsrclibworkspaceallowedextts) | 1 / 1 / 54 | no (new) | young (created 244-02). Row added AT CREATION, per the `settingsSearchPayload.ts` precedent — an absent row is invisible to G-5 at any count |
 | [`frontend/src/lib/stripComments.testutil.ts`](docs/HOT-FILE-LEDGER.md#frontendsrclibstripcommentstestutilts) | 1 / 1 / 28 | no (new) | young (created 244-14 / IN-02). Row added AT CREATION. ⛔ The ONE home of *a `?raw` fence cannot tell code from a comment*; 3 consumers. Never apply it to a class-list or string-CONTENT assertion |
 | [`frontend/src/components/chat/ChatAttachmentChip.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentschatchatattachmentchiptsx) | 4 / 2 / 302 (was `1 / 1 / 144`) | no (2 phases) | **274-04**: name via `lib/attachmentLifetime`; thread-life rows show no expiry; the sent chip gets the In Library segment + ⋯. ⚠ FIRES on its next phase |
-| [`frontend/src/components/chat/composerCopy.ts`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentschatcomposercopyts) | 5 / 3 / 122 (was `4 / 2 / 111`) | ⚠ **FIRES** (244, 274, 296) | 296-04: three in-thread start-failure builders + Retry start / Dismiss message labels (UI-SPEC D). Words only; now FIRES |
+| [`frontend/src/components/chat/composerCopy.ts`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentschatcomposercopyts) | 6 / 4 / 127 (was `5 / 3 / 122`) | ⚠ **FIRES** (244, 274, 296, 302) | 302-02 (FE-IN-01): two start-failure builders — startPaused and startRefusedWith(name, sentence). Words only (+5) |
 | [`frontend/src/components/chat/ConnectedFilePickerModal.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentschatconnectedfilepickermodaltsx) | 3 / 2 / 336 | no (2 phases) | ⚠ **absent for its ENTIRE LIFE — row added 244-06, and the ledger gate FAILED on it at this phase's base (C-8).** 244-06 REBUILT it: select-then-confirm, and the commit is the parent's |
 | [`frontend/src/components/chat/useComposerAttachments.ts`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentschatusecomposerattachmentsts) | 3 / 2 / 183 (was `2 / 1 / 183`) | no (2 phases) | Both attach doors' state + verbs. **274-03**: ONE edit — the composer uploads with `lifetime "thread"`. ⛔ it CANNOT reach `setValue` |
 | [`frontend/src/components/chat/ActiveConnectorChips.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentschatactiveconnectorchipstsx) | 2 / 2 / 82 | no (2 phases) | ⚠ absent for its entire life — row added 244-05 at its SECOND phase. **244**: the row container HOISTED out; it is bare chips now, `null` on empty (D-244-26) |
@@ -12072,7 +12072,7 @@ cells rot within days.
 | [`backend/app/services/provider_gateway/openai_compat.py`](docs/HOT-FILE-LEDGER.md#backendappservicesprovider_gatewayopenai_compatpy) | 10 / 7 / 468 (was `9 / 6 / 466`) | ⚠ **FIRES** | 296-06 (BUG-261024-01): ONE conditional — `moonshot_tools(request.tools)` when the ENDPOINT provider is moonshot, else `request.tools` itself; logic in schema_moonshot.py. ⛔ D-14 RED LINE |
 | [`backend/app/services/provider_gateway/dispatcher.py`](docs/HOT-FILE-LEDGER.md#backendappservicesprovider_gatewaydispatcherpy) | 10 / 4 / 260 (was `8 / 3 / 196`) | ⚠ **FIRES** | ⚠ FIRES (4 phases). **282-01**: `GatewayRequest.timeout_s`; OpenAI-family open off the loop under one deadline + late-close (+3 defs, +3 conditionals, measured). ⛔ D-14: chunk/SSE path unbranched |
 | [`backend/app/services/provider_gateway/openai_responses.py`](docs/HOT-FILE-LEDGER.md#backendappservicesprovider_gatewayopenai_responsespy) | 4 / 3 / 570 (was `2 / 2 / 573`) | ⚠ **now FIRES (3 phases)** | **292.1-REVIEW IN-03**: a deletion — the dead `dsml_leaked` flag (+2 −5). honoured by construction. ⛔ budget/retries reach the client only when `timeout_s` is set (282-01) |
-| [`backend/app/services/provider_gateway/schema_moonshot.py`](docs/HOT-FILE-LEDGER.md#backendappservicesprovider_gatewayschema_moonshotpy) | 1 / 1 / 97 (was absent) | no (young) | young (created 296-06, BUG-261024-01). Pure leaf: inline_refs + moonshot_tools. ⛔ a ref-free schema returns the SAME object; called only on a moonshot ENDPOINT |
+| [`backend/app/services/provider_gateway/schema_moonshot.py`](docs/HOT-FILE-LEDGER.md#backendappservicesprovider_gatewayschema_moonshotpy) | 2 / 2 / 122 (was `1 / 1 / 97`) | no (young) | young. 302-02 (BE-IN-04 / D-25): bounded unroll — a re-entered or depth-8 definition becomes a typed leaf; moonshot_tools warns naming only tool + defs. ⛔ ref-free schema = SAME object |
 | [`frontend/src/lib/api/admin.ts`](docs/HOT-FILE-LEDGER.md#frontendsrclibapiadmints) | 10 / 5 / 1125 (was `9 / 5 / 1122`) | ⚠ **FIRES** | ⚠ FIRES. quick-261024: ONE optional field, `returned?: number`, on `DiscoveryProviderOutcome` (older backend omits it; the card then shows only the new count) |
 | [`frontend/src/components/admin/CapabilityGrid.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentsadmincapabilitygridtsx) | 3 / 3 / 264 | ⚠ **FIRES** | ⚠ FIRES at 3 phases · row added 263-REVIEW WR-07 |
 | [`frontend/src/components/admin/ModelAdvancedCapabilities.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentsadminmodeladvancedcapabilitiestsx) | 1 / 1 / 290 | no (1 phase) | young (created 262) |
@@ -12159,8 +12159,8 @@ cells rot within days.
 | [`frontend/src/components/chat/CitationList.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentschatcitationlisttsx) | 5 / 5 / 91 (was `4 / 3 / 73`) | ⚠ **FIRES** | 294-05: optional checkMessageId → ONE CitationCheckAction beside the trigger (+24 −6). Label and defaultOpen false unchanged. Extraction FIRST next |
 | [`frontend/src/components/chat/CitationPeek.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentschatcitationpeektsx) | 2 / 2 / 227 (was `1 / 1 / 189`) | no (2 phases) | 294-05: optional verdict → ONE section between passage and footer (+38). Absent → DOM unchanged |
 | [`frontend/src/components/workflows/teamModel.ts`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentsworkflowsteammodelts) | 6 / 2 / 440 (was `2 / 1 / 403`) | no (young) | 296-07: sorts with phaseVocabulary.comparePhaseOrder (the canvas's comparator, 290-IN-01); the untyped floor is phaseVocabulary.STEP_UNTYPED (290-IN-02) |
-| [`frontend/src/components/workflows/teamVocabulary.ts`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentsworkflowsteamvocabularyts) | 2 / 2 / 203 (was `1 / 1 / 202`) | no (young) | 296-07 (290-IN-02): TEAM_STEP_UNTYPED removed; its one home is phaseVocabulary.STEP_UNTYPED. Still a zero-import leaf |
-| [`frontend/src/components/workflows/TeamPicture.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentsworkflowsteampicturetsx) | 3 / 2 / 585 (was `1 / 1 / 470`) | no (young) | 296-07 (290-IN-04 / IN-05): the switch gets roving tabindex, arrows / Home / End, ids + aria-controls; the plane is a focusable named region inside a tabpanel |
+| [`frontend/src/components/workflows/teamVocabulary.ts`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentsworkflowsteamvocabularyts) | 3 / 3 / 206 (was `2 / 2 / 203`) | ⚠ **FIRES** | ⚠ now FIRES (302). 302-02 (FE-IN-06, UI-D12): TEAM_SCROLL_REGION_LABEL added (one string). Still a zero-import leaf |
+| [`frontend/src/components/workflows/TeamPicture.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentsworkflowsteampicturetsx) | 4 / 3 / 587 (was `3 / 2 / 585`) | ⚠ **FIRES** | ⚠ now FIRES (302). 302-02 (FE-IN-06 / D-11): the scroll region is named TEAM_SCROLL_REGION_LABEL, apart from the figure (one import + one attribute) |
 | [`frontend/src/components/workflows/definitionOps.ts`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentsworkflowsdefinitionopsts) | 16 / 5 / 1140 (was `15 / 5 / 1129`) | ⚠ **FIRES** | ⚠ absent its ENTIRE LIFE at 5 phases — row added 296-07 (D-26). Receipt close says saved; GOVERNANCE_ESCALATED_UNCHECKED added (data) |
 | [`frontend/src/components/workflows/GovernanceSection.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentsworkflowsgovernancesectiontsx) | 6 / 3 / 455 | ⚠ **FIRES** | ⚠ absent its ENTIRE LIFE — row added 296-07 (D-26). The attached gate is detected-only; escalated says nothing is checked (BUG-261021-05 b) |
 | [`frontend/src/components/workflows/NodeCornerMarks.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentsworkflowsnodecornermarkstsx) | 5 / 3 / 305 | ⚠ **FIRES** | ⚠ absent its ENTIRE LIFE — row added 296-07 (D-26). NOT modified: the seal reads `grounded`, narrowed upstream in canvasModel.isGrounded |
@@ -12168,7 +12168,7 @@ cells rot within days.
 | [`frontend/src/components/workflows/library/stepLine.ts`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentsworkflowslibrarysteplinets) | 2 / 1 / 74 (was `0 / 0 / 0`) | no (young) | young (created 290-02). Pure `resolveStepLine(def)`: type-sentence chips in run order, first 3 + more, `null` at 0 steps. ⛔ in `LIBRARY_SUBTREE_PATHS` |
 | [`frontend/src/components/workflows/library/StepChipLine.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentsworkflowslibrarystepchiplinetsx) | 2 / 1 / 110 (was `0 / 0 / 0`) | no (young) | young (created 290-02). The card's `row-steps` block; owns the one expand `useState`, so the card stays at 0. ⛔ no `title=` (F1); no `PhaseSpine` reuse |
 | [`backend/app/services/template_render_service.py`](docs/HOT-FILE-LEDGER.md#backendappservicestemplate_render_servicepy) | 8 / 3 / 988 | ⚠ **FIRES** | ⚠ absent its ENTIRE LIFE at 3 phases — row added 291-01. 291 READS its parser only; 291-03 leaves `select_engine` unedited. ⛔ docxtpl owns the bytes |
-| [`frontend/src/components/workflows/DescribeTemplateRow.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentsworkflowsdescribetemplaterowtsx) | 3 / 3 / 581 (was `2 / 2 / 551`) | ⚠ **FIRES** | ⚠ now FIRES (296). 296-07: optional disabled + note id (291-WR-01); exported UnplacedSentencesNote (291-IN-03). Extraction FIRST next |
+| [`frontend/src/components/workflows/DescribeTemplateRow.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentsworkflowsdescribetemplaterowtsx) | 4 / 4 / 582 (was `3 / 3 / 581`) | ⚠ **FIRES** | 302-02 (FE-IN-04 / D-10): a disabled Word-blank tick carries its reason via aria-describedby (one spread, +1). Extraction FIRST next |
 | [`frontend/src/components/workflows/TemplateAttachSection.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentsworkflowstemplateattachsectiontsx) | 6 / 3 / 450 (was `5 / 3 / 411`) | ⚠ **FIRES** | ⚠ now FIRES (296). 296-07: bind response split; form rows read as labels via declaredInputs (title = raw); PDF Replace accepts .pdf. Extraction FIRST next |
 | [`frontend/src/components/workflows/templateFirstVocabulary.ts`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentsworkflowstemplatefirstvocabularyts) | 4 / 3 / 453 (was `3 / 2 / 430`) | ⚠ **FIRES** | ⚠ now FIRES (296). 296-07: BindFailure type, referencesBindFailedMessage, FILES_LOCKED_WHILE_COMPOSING, unplacedSentencesLead (data + words only) |
 | [`frontend/src/components/workflows/templateDraftBind.ts`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentsworkflowstemplatedraftbindts) | 2 / 1 / 152 (was `1 / 1 / 131`) | no (young) | young (296-07). Task 2: failures carry their kind, the bind response's unplaced sentences are split off (assets[] is extra=forbid), bindFailureLines composes the words |
@@ -12282,11 +12282,11 @@ cells rot within days.
 | [`frontend/src/components/layout/WaitingOnYouControl.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentslayoutwaitingonyoucontroltsx) | 1 / 1 / 135 (was `0 / 0 / 0`) | no (young) | young (created 301-03). Rail control + drawer row (D-01, D-02, D-03). ⛔ presentational: no fetch, no supabase; never switchOrg; pill = answered total > 0 only |
 | [`frontend/src/components/layout/WaitingOnYouList.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentslayoutwaitingonyoulisttsx) | 1 / 1 / 157 (was `0 / 0 / 0`) | no (young) | young (created 301-03). Rows as DropdownMenuItems (D-05..D-10, D-29). ⛔ no dismiss / mark-read; onSelect → onOpen only; minute tick only while open |
 | [`frontend/src/components/org/OrgIdentity.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentsorgorgidentitytsx) | 2 / 2 / 99 (was `1 / 1 / 94`) | no (2 phases) | 301-03: one optional size "xs" on OrgAvatar (UI-D4). ⛔ default output byte-identical |
-| [`frontend/src/components/panel/generatedFiles.ts`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentspanelgeneratedfilests) | 0 / 0 / 0 | no (young) | AT PLANNING (302-01, FIX-01): pure fold of messages' finalOutputFiles into one row per name (D-22, UI-D3). ⛔ never re-parses tool_calls; no fetch |
-| [`frontend/src/components/panel/useThreadFiles.ts`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentspanelusethreadfilests) | 0 / 0 / 0 | no (young) | AT PLANNING (302-01, FIX-01): workspace + generated + one count for the panel (D-22, UI-D6). ⛔ reads the chat's own messages; no second storage path |
-| [`frontend/src/components/panel/GeneratedFilesGroup.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentspanelgeneratedfilesgrouptsx) | 0 / 0 / 0 | no (young) | AT PLANNING (302-01, FIX-01): the Generated files group, FileRow panel density, download rows (UI-D1, UI-D4). ⛔ outside the listbox; never opens FilePreview |
-| [`frontend/src/components/files/useSandboxDownload.ts`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentsfilesusesandboxdownloadts) | 0 / 0 / 0 | no (young) | AT PLANNING (302-01, UI-D5): the ONE home of sandbox-output URL resolution + click download (lifted from OutputFileCard). ⛔ chat output byte-identical |
-| [`backend/app/services/harness/live_connectors.py`](docs/HOT-FILE-LEDGER.md#backendappservicesharnessliveconnectorspy) | 0 / 0 / 0 | no (young) | AT PLANNING (302-02, BE-IN-01): one async live_connectors fully-on predicate for executor + judge (D-06, D-27). ⛔ awaits ensure_settings_fresh; never raises |
+| [`frontend/src/components/panel/generatedFiles.ts`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentspanelgeneratedfilests) | 1 / 1 / 58 | no (young) | young (created 302-01, FIX-01). Pure fold of messages' finalOutputFiles into one row per name, newest turn wins (D-22, UI-D3). ⛔ never re-parses tool_calls; no fetch |
+| [`frontend/src/components/panel/useThreadFiles.ts`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentspanelusethreadfilests) | 1 / 1 / 28 | no (young) | young (created 302-01, FIX-01). workspace + generated + ONE count for the panel (D-22, UI-D6). ⛔ reads the chat's own messages via useThreadMessages; no second storage path |
+| [`frontend/src/components/panel/GeneratedFilesGroup.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentspanelgeneratedfilesgrouptsx) | 1 / 1 / 87 | no (young) | young (created 302-01, FIX-01). The Generated files group at panel density; each row downloads via useSandboxDownload (UI-D1, UI-D4). ⛔ outside the listbox; never opens FilePreview |
+| [`frontend/src/components/files/useSandboxDownload.ts`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentsfilesusesandboxdownloadts) | 1 / 1 / 79 | no (young) | young (created 302-01, UI-D5). The ONE home of sandbox-output URL resolution + click download, lifted unchanged from OutputFileCard. ⛔ chat output byte-identical |
+| [`backend/app/services/harness/live_connectors.py`](docs/HOT-FILE-LEDGER.md#backendappservicesharnessliveconnectorspy) | 1 / 1 / 38 | no (young) | young (created 302-02, BE-IN-01). async live_connectors_fully_on() — one predicate for executor + judge (D-06, D-27); optional fresh/audience callables. ⛔ awaits freshness; never raises |
 
 
 
@@ -28073,3 +28073,175 @@ Planned cell: Added AT PLANNING 301 (absent its entire life). 301-03: one option
 Scan-list cell as of 2026-10-30 (replaced by 301-03 Task 1, moved verbatim): 1 / 1 / 94 | no (1 phase) | Added AT PLANNING 301 (absent its entire life). 301-03: one optional size "xs" on OrgAvatar (UI-D4). ⛔ default output byte-identical |
 
 CLAUDE.md verdict cell: none (the file does not fire).
+
+## Phase 302 refresh — close-out and a true register (302-03, 2026-10-30)
+
+Triples re-derived with the CLAUDE.md recipe (six-digit quick buckets subtracted) after the 302 commits; `scripts/vitest-count-gate.cjs` counts its own 302-03 commit. Two files cross into G-5 here: `TeamPicture.tsx` and `teamVocabulary.ts` (3 phases each).
+
+### `frontend/src/components/panel/generatedFiles.ts` — 302-01 Task 1 (created, D-22, UI-D3, 2026-10-30)
+
+**`1 / 1 / 58` (created).** `deriveGeneratedFiles(messages)` walks the chronological chat bucket BACKWARDS and keeps the first row per file NAME, so the latest turn wins (UI-D3; RESEARCH A3 accepted — name, not url). `GENERATED_FILES_LABEL` is the one home of the group's heading. Pure: no React, no fetch. Binding invariant: ⛔ it reads `finalOutputFiles` only and never re-parses `tool_calls`.
+
+Scan-list cell as of 2026-10-30 (replaced by 302-03, moved verbatim): 0 / 0 / 0 | no (young) | AT PLANNING (302-01, FIX-01): pure fold of messages' finalOutputFiles into one row per name (D-22, UI-D3). ⛔ never re-parses tool_calls; no fetch |
+
+CLAUDE.md verdict cell: none (the file does not fire).
+
+### `frontend/src/components/panel/useThreadFiles.ts` — 302-01 Task 2 (created, D-22, UI-D6, 2026-10-30)
+
+**`1 / 1 / 28` (created).** `useThreadFiles(threadId)` returns `{ workspace, generated, count }`: `useWorkspaceFiles` for the workspace rows, `useThreadMessages(threadId, "chat")` + `useMemo(deriveGeneratedFiles)` for the generated rows (the `useDerivedPanel` precedent). `count` is the ONE number `hasActivity`, the FILES header and the rail read. Binding invariant: ⛔ no second fetch and no second storage path for files.
+
+Scan-list cell as of 2026-10-30 (replaced by 302-03, moved verbatim): 0 / 0 / 0 | no (young) | AT PLANNING (302-01, FIX-01): workspace + generated + one count for the panel (D-22, UI-D6). ⛔ reads the chat's own messages; no second storage path |
+
+CLAUDE.md verdict cell: none (the file does not fire).
+
+### `frontend/src/components/panel/GeneratedFilesGroup.tsx` — 302-01 Task 2 (created, UI-D1, UI-D4, 2026-10-30)
+
+**`1 / 1 / 87` (created).** Renders the `Generated files` heading and one FileRow-density row per generated file; a press downloads through `useSandboxDownload` (the same hook the chat card uses). File names render as React text (no `dangerouslySetInnerHTML`). Binding invariants: ⛔ it sits OUTSIDE the workspace listbox and never opens `FilePreview`.
+
+Scan-list cell as of 2026-10-30 (replaced by 302-03, moved verbatim): 0 / 0 / 0 | no (young) | AT PLANNING (302-01, FIX-01): the Generated files group, FileRow panel density, download rows (UI-D1, UI-D4). ⛔ outside the listbox; never opens FilePreview |
+
+CLAUDE.md verdict cell: none (the file does not fire).
+
+### `frontend/src/components/files/useSandboxDownload.ts` — 302-01 Task 1 (created, UI-D5, 2026-10-30)
+
+**`1 / 1 / 79` (created).** `resolveOutputUrl` moved over word for word from `OutputFileCard.tsx`, plus the click handler (`downloadSandboxOutput`, `DownloadError(status, message)`). `OutputFileCard` now calls the hook, so the chat and the panel always download the same way. Binding invariant: ⛔ the chat card's rendered output stays byte-identical (`OutputFileCard.baseline` 21, `FileRow.sweep` both unchanged and green).
+
+Scan-list cell as of 2026-10-30 (replaced by 302-03, moved verbatim): 0 / 0 / 0 | no (young) | AT PLANNING (302-01, UI-D5): the ONE home of sandbox-output URL resolution + click download (lifted from OutputFileCard). ⛔ chat output byte-identical |
+
+CLAUDE.md verdict cell: none (the file does not fire).
+
+### `backend/app/services/harness/live_connectors.py` — 302-02 (created, BE-IN-01 / D-06 / D-27, 2026-10-30)
+
+**`1 / 1 / 38` (created).** `async live_connectors_fully_on(*, fresh=None, audience=None)` awaits the settings freshness check, then reads the `live_connectors` audience. The executor passes its OWN namespace names (`fresh=ensure_settings_fresh, audience=feature_audience`) so the ten-plus suites that monkeypatch `phase_types.*` still bind; the judge (`validator_kinds.recording_by_design`) calls it bare. Binding invariants: ⛔ one predicate, fail-closed, never raises.
+
+Scan-list cell as of 2026-10-30 (replaced by 302-03, moved verbatim): 0 / 0 / 0 | no (young) | AT PLANNING (302-02, BE-IN-01): one async live_connectors fully-on predicate for executor + judge (D-06, D-27). ⛔ awaits ensure_settings_fresh; never raises |
+
+CLAUDE.md verdict cell: none (the file does not fire).
+
+### `frontend/src/components/chat/OutputFileCard.tsx` — 302-01 Task 1 (UI-D5, 2026-10-30)
+
+**`9 / 8 / 187` (was `8 / 7 / 219`).** One hunk: `resolveOutputUrl` and the click-download body left for `components/files/useSandboxDownload.ts`, and the card calls the hook (+13 −45). Comments-stripped code measures 1758 chars, above the `FileRow.sweep` 1200 `minCode` floor (untouched). Honoured by construction.
+
+Scan-list cell as of 2026-10-30 (replaced by 302-03, moved verbatim): 8 / 7 / 219 | **FIRES** | honoured by construction (195) |
+
+CLAUDE.md verdict cell as of 2026-10-30 (replaced by 302-03, moved verbatim): | `frontend/src/components/chat/OutputFileCard.tsx` | 8 / 7 / 219 | honoured by construction (195) |
+
+### `frontend/src/components/panel/FilesSection.tsx` — 302-01 Task 2 (D-02, D-04, 2026-10-30)
+
+**`14 / 9 / 366` (was `12 / 8 / 354`).** One mount of `<GeneratedFilesGroup>` under the workspace rows, and the listbox wrapped in `{rows.length > 0 && (...)}` without re-indenting (+15 −6). The section reads `useThreadFiles` for its count. Workspace rows, the Save to Library slot and the Shift+F10 arm are byte-identical. Honoured by construction.
+
+Scan-list cell as of 2026-10-30 (replaced by 302-03, moved verbatim): 12 / 8 / 354 (was `10 / 6 / 363`) | ⚠ **FIRES** | ⚠ STALE (`10/6/363`). **274-04**: 1 import, 1 trailing-slot line, 1 Shift+F10 arm, 2 signatures widened to `string \| null`; agent rows byte-identical |
+
+CLAUDE.md verdict cell as of 2026-10-30 (replaced by 302-03, moved verbatim): | `frontend/src/components/panel/FilesSection.tsx` | 12 / 8 / 354 (was `10 / 6 / 363`) | ⚠ STALE · last touch 274-04 |
+
+### `frontend/src/components/panel/WorkspacePanel.tsx` — 302-01 Task 2 (D-04, UI-D6, 2026-10-30)
+
+**`19 / 12 / 653` (was `17 / 11 / 646`).** `useWorkspaceFiles` is now read through `useThreadFiles`, whose `count` feeds `hasActivity`, the FILES header and the rail — so a thread with generated files and nothing else no longer collapses to `PanelEmpty` (+9 −5). A note beside the "EIGHT names" comment records the import count is now seven; the original sentence is kept. Honoured by construction.
+
+Scan-list cell as of 2026-10-30 (replaced by 302-03, moved verbatim): 17 / 11 / 646 (was `16 / 10 / 646`) | **FIRES** | honoured by construction (194 / 194.1 / **282-02**: ONE `home="panel"` prop on the existing `PendingAskStack` mount; the `pendingAsks.length > 0 &&` condition byte-identical) |
+
+CLAUDE.md verdict cell as of 2026-10-30 (replaced by 302-03, moved verbatim): | `frontend/src/components/panel/WorkspacePanel.tsx` | 17 / 11 / 646 (was `16 / 10 / 646`) | honoured by construction (194 / 194.1 / 282-02: one prop) |
+
+### `backend/app/services/harness/validator_kinds.py` — 302-02 (BE-IN-01 / D-27, 2026-10-30)
+
+**`20 / 10 / 924` (was `19 / 9 / 918`).** `recording_by_design(ctx)` became `async` and returns `not await live_connectors_fully_on()`; its one caller awaits it. It used to read `feature_audience("live_connectors")` raw, so it could contradict the executor inside the settings cache TTL (+11 −5). Honoured by construction.
+
+Scan-list cell as of 2026-10-30 (replaced by 302-03, moved verbatim): 19 / 9 / 918 (was `18 / 8 / 899`) | ⚠ **FIRES** | 296-02 (295-IN-08 / D-07): judge_system_prompt gains by_design (one condition); the in-run judge passes recording_by_design(ctx) — golden run or live_connectors off; a missing grant gets no note |
+
+CLAUDE.md verdict cell as of 2026-10-30 (replaced by 302-03, moved verbatim): | `backend/app/services/harness/validator_kinds.py` | 19 / 9 / 918 (was `18 / 8 / 899`) | 296-02: design note only when recording was by design (D-07) |
+
+### `backend/app/services/harness/phase_types.py` — 302-02 (BE-IN-01 / D-06, 2026-10-30)
+
+**`69 / 35 / 3149` (was `67 / 34 / 3147`).** The executor's inline liveness read became `await live_connectors_fully_on(fresh=ensure_settings_fresh, audience=feature_audience)` (its own namespace names, so every `monkeypatch.setattr(phase_types, ...)` stub still binds). The import sits BELOW `phase_types.py:121`, the line `test_190_connector_source_fence` pins (1afa59462). +4 −2. ⛔ The owed G-5 refactor is NOT discharged by this.
+
+Scan-list cell as of 2026-10-30 (replaced by 302-03, moved verbatim): 67 / 34 / 3147 (was `66 / 33 / 3135`) | ⚠ **FIRES** | 300-03 (D-23, G-5 override audited in STATE.md): one hunk in _external_action_sent_body — send_email names the recipient (via host). Owed refactor NOT discharged |
+
+CLAUDE.md verdict cell as of 2026-10-30 (replaced by 302-03, moved verbatim): | `backend/app/services/harness/phase_types.py` | 67 / 34 / 3147 (was `66 / 33 / 3135`) | 300-03: send_email receipt names the recipient (D-23) · G-5 OWED |
+
+### `backend/app/services/harness/publish_service.py` — 302-02 (BE-IN-03 / D-07, 2026-10-30)
+
+**`37 / 17 / 2066` (was `36 / 16 / 2061`).** One guard in the golden-input loop: an input whose `source` is not `user` (`kb_auto`, `template_derived`) or whose `type` is `file` / `kb_auto` gets no stand-in and is not named in the publish note (+5). Honoured by construction.
+
+Scan-list cell as of 2026-10-30 (replaced by 302-03, moved verbatim): 36 / 16 / 2061 (was `35 / 16 / 2057`) | ⚠ **FIRES** | 296-06 (291-S6-F8): the golden kickoff is `launch_kickoff(golden_input, def, golden_inputs)` — the stand-in answers reach the first step once (one statement). Honoured by construction |
+
+CLAUDE.md verdict cell as of 2026-10-30 (replaced by 302-03, moved verbatim): | `backend/app/services/harness/publish_service.py` | 36 / 16 / 2061 (was `35 / 16 / 2057`) | 296-06: golden kickoff via launch_kickoff (S6-F8), one statement |
+
+### `backend/app/services/provider_gateway/schema_moonshot.py` — 302-02 (BE-IN-04 / D-25, T-302-05/06, 2026-10-30)
+
+**`2 / 2 / 122` (was `1 / 1 / 97`).** `inline_refs(schema, *, cut=None)`: a definition re-entered on the stack, or reached at `_MAX_DEPTH = 8`, becomes `{type, description}` instead of raising `ValueError`; `moonshot_tools` logs one warning naming only the tool and the cut definitions (T-302-06). The original docstring sentence is struck through beside its correction. Binding invariant (unchanged): ⛔ a ref-free schema returns the SAME object.
+
+Scan-list cell as of 2026-10-30 (replaced by 302-03, moved verbatim): 1 / 1 / 97 (was absent) | no (young) | young (created 296-06, BUG-261024-01). Pure leaf: inline_refs + moonshot_tools. ⛔ a ref-free schema returns the SAME object; called only on a moonshot ENDPOINT |
+
+CLAUDE.md verdict cell: none (the file does not fire).
+
+### `frontend/src/providers/StreamsProvider.tsx` — 302-02 (FE-IN-01 / D-26, 2026-10-30)
+
+**`121 / 46 / 5250` (was `120 / 45 / 5250`).** One expression: the error the provider constructs for its workflow-lock arm now carries `code: "workflow_locked"` (+2 −2), asserted in `streamsProvider.test.tsx` Test 3 (lock has the code) and 3b (a non-lock 409 has none). Honoured by construction.
+
+Scan-list cell as of 2026-10-30 (replaced by 302-03, moved verbatim): 120 / 45 / 5250 (was `119 / 45 / 5234`) | ⚠ **FIRES** | 296 G-4 row 12: sendMessage's kickoff follow now reconciles the viewed thread at its terminal (the R5 kickoff has no assistant node) and clears the previous run's step slice at kickoff. |
+
+CLAUDE.md verdict cell as of 2026-10-30 (replaced by 302-03, moved verbatim): | `frontend/src/providers/StreamsProvider.tsx` | 120 / 45 / 5250 (was `119 / 45 / 5234`) | 296 G-4 row 12: kickoff terminal reconciles; kickoff clears old steps · ⛔ |
+
+### `frontend/src/components/chat/useStartWorkflowInThread.ts` — 302-02 (FE-IN-01 / D-09 / D-26, 2026-10-30)
+
+**`5 / 4 / 206` (was `4 / 3 / 186`).** `StartFailure` gains `paused` and `refused`: `locked` is told by the provider's `workflow_locked` code, `paused` by the server sentence's prefix (one constant, `?raw` cross-pinned to `workflow_kickoff.py`), any other 409 with a non-empty sentence is `refused` (the server sentence shown as React text), and an empty 409 stays `failed` (+23 −3).
+
+Scan-list cell as of 2026-10-30 (replaced by 302-03, moved verbatim): 4 / 3 / 186 (was `3 / 2 / 174`) | ⚠ **FIRES** | ⚠ now FIRES (298). 298-02: StartFailure kind folder — a 422 with code folder_in_other_org shows the server sentence (the ONE recorded exception to never-server-text); no Retry for it |
+
+CLAUDE.md verdict cell as of 2026-10-30 (replaced by 302-03, moved verbatim): | `frontend/src/components/chat/useStartWorkflowInThread.ts` | 4 / 3 / 186 (was `3 / 2 / 174`) | ⚠ now FIRES (298) · 298-02: kind folder shows the server sentence · ⛔ |
+
+### `frontend/src/components/chat/composerCopy.ts` — 302-02 (FE-IN-01 / UI-SPEC S3, 2026-10-30)
+
+**`6 / 4 / 127` (was `5 / 3 / 122`).** Two builders: `startPaused(name)` and `startRefusedWith(name, sentence)` (UI-SPEC S3). Words only (+5).
+
+Scan-list cell as of 2026-10-30 (replaced by 302-03, moved verbatim): 5 / 3 / 122 (was `4 / 2 / 111`) | ⚠ **FIRES** (244, 274, 296) | 296-04: three in-thread start-failure builders + Retry start / Dismiss message labels (UI-SPEC D). Words only; now FIRES |
+
+CLAUDE.md verdict cell as of 2026-10-30 (replaced by 302-03, moved verbatim): | `frontend/src/components/chat/composerCopy.ts` | 5 / 3 / 122 (was `2 / 1 / 103`) | ⚠ now FIRES (296) · 296-04: three start-failure sentences · ⛔ |
+
+### `frontend/src/components/chat/ThreadWorkflowPicker.tsx` — 302-02 (FE-IN-01, 2026-10-30)
+
+**`5 / 4 / 144` (was `4 / 3 / 144`).** One condition: `&& s.failure.kind !== "refused"` on the Retry render (+1 −1). The failure line's markup is unchanged.
+
+Scan-list cell as of 2026-10-30 (replaced by 302-03, moved verbatim): 4 / 3 / 144 (was `3 / 2 / 144`) | ⚠ **FIRES** | ⚠ now FIRES (298). 298-02: the Retry condition gains one case (no Retry for kind folder); the failure line already renders message for any kind |
+
+CLAUDE.md verdict cell as of 2026-10-30 (replaced by 302-03, moved verbatim): | `frontend/src/components/chat/ThreadWorkflowPicker.tsx` | 4 / 3 / 144 (was `3 / 2 / 144`) | ⚠ now FIRES (298) · 298-02: no Retry for a folder refusal · ⛔ |
+
+### `frontend/src/components/workflows/DescribeTemplateRow.tsx` — 302-02 (FE-IN-04 / D-10, 2026-10-30)
+
+**`4 / 4 / 582` (was `3 / 3 / 581`).** One spread on the disabled tick (`{...lockedBy}`) so a screen reader hears why it cannot be ticked (+1). Extraction is still FIRST next on this file.
+
+Scan-list cell as of 2026-10-30 (replaced by 302-03, moved verbatim): 3 / 3 / 581 (was `2 / 2 / 551`) | ⚠ **FIRES** | ⚠ now FIRES (296). 296-07: optional disabled + note id (291-WR-01); exported UnplacedSentencesNote (291-IN-03). Extraction FIRST next |
+
+CLAUDE.md verdict cell as of 2026-10-30 (replaced by 302-03, moved verbatim): | `frontend/src/components/workflows/DescribeTemplateRow.tsx` | 3 / 3 / 581 | ⚠ now FIRES (296) · 296-07: disabled prop + UnplacedSentencesNote |
+
+### `frontend/src/components/workflows/TeamPicture.tsx` — 302-02 (FE-IN-06 / D-11, 2026-10-30)
+
+**`4 / 3 / 587` (was `3 / 2 / 585`).** ⚠ **NOW FIRES (302).** The scroll region's `aria-label` reads `TEAM_SCROLL_REGION_LABEL` instead of `teamFigureLabel(workflowName)`, so the region and the figure inside it no longer share one name (+3 −1). The empty arm has a region and no figure. The next feature phase on this file owes the G-5 refactor audit first.
+
+Scan-list cell as of 2026-10-30 (replaced by 302-03, moved verbatim): 3 / 2 / 585 (was `1 / 1 / 470`) | no (young) | 296-07 (290-IN-04 / IN-05): the switch gets roving tabindex, arrows / Home / End, ids + aria-controls; the plane is a focusable named region inside a tabpanel |
+
+CLAUDE.md verdict cell as of 2026-10-30 (replaced by 302-03, moved verbatim): none — the file did not fire before 302; row ADDED by 302-03.
+
+### `frontend/src/components/workflows/teamVocabulary.ts` — 302-02 (FE-IN-06 / UI-D12, 2026-10-30)
+
+**`3 / 3 / 206` (was `2 / 2 / 203`).** ⚠ **NOW FIRES (302).** One exported string, `TEAM_SCROLL_REGION_LABEL = "Team view, scrollable"` (+3). Still a zero-import leaf.
+
+Scan-list cell as of 2026-10-30 (replaced by 302-03, moved verbatim): 2 / 2 / 203 (was `1 / 1 / 202`) | no (young) | 296-07 (290-IN-02): TEAM_STEP_UNTYPED removed; its one home is phaseVocabulary.STEP_UNTYPED. Still a zero-import leaf |
+
+CLAUDE.md verdict cell as of 2026-10-30 (replaced by 302-03, moved verbatim): none — the file did not fire before 302; row ADDED by 302-03.
+
+### `frontend/src/components/workflows/WorkflowScheduleModal.tsx` — 302-03 Task 1 (D-24, 300 G4-5 F-1, 2026-10-30)
+
+**`7 / 6 / 814` (was `6 / 5 / 812`).** `{outcome ? (` became `{outcome && !runResult ? (` with a two-line comment, so a refused Run now says its sentence once — on the Run now line — instead of twice after the refresh (+3 −1; G-3-sized inside a FIRING file). RED `dd9610797`, fix `993948b65`. Extraction is still FIRST next.
+
+Scan-list cell as of 2026-10-30 (replaced by 302-03, moved verbatim): 6 / 5 / 812 (was `5 / 4 / 723`) | ⚠ **FIRES** | 300-01: outcome sentence line (scheduleOutcomeLine), per-row Run now (runningIds + runResults map, no global busy), quiet refresh. No new component or hook. Extraction FIRST next |
+
+CLAUDE.md verdict cell as of 2026-10-30 (replaced by 302-03, moved verbatim): | `frontend/src/components/workflows/WorkflowScheduleModal.tsx` | 6 / 5 / 812 (was `5 / 4 / 723`) | 300-01: outcome words + per-row Run now (D-15/D-16) |
+
+### `scripts/vitest-count-gate.cjs` — 302-03 Task 3 (D-21, 2026-10-30)
+
+**`406 / 85 / 6910` (was `403 / 84 / 6894`).** Three new BASELINE pins with FILE-LEVEL TARGETS (`src/components/panel/__tests__/` and `src/components/files/__tests__/` have no directory entry): `generatedFiles.test.ts` 8, `GeneratedFilesGroup.test.tsx` 7, `useSandboxDownload.test.tsx` 6. RAISED: `FilesSection` 33 -> 40, `WorkspacePanel` 58 -> 65, `ThreadWorkflowPicker` 17 -> 18, `useStartWorkflowInThread` 24 -> 30, `TeamPicture` 42 -> 44, `teamVocabulary` 15 -> 16, `WorkflowScheduleModal` 29 -> 31, and `DescribeTemplateRow` 42 -> 156 (the pin had trailed the file since 291/296). `OutputFileCard.baseline` stays 21. None lowered.
+
+Scan-list cell as of 2026-10-30 (replaced by 302-03, moved verbatim): 403 / 84 / 6894 (was `400 / 84 / 6886`) | ⚠ **FIRES** | 301-03: 3 BASELINE pins + FILE-LEVEL TARGETS (waitingVocabulary 24, OrgIdentity 17, WaitingOnYouControl 24); RAISED NavPanel.badge 17->22, ChatLayout.badge 14->19; none lowered |
+
+CLAUDE.md verdict cell as of 2026-10-30 (replaced by 302-03, moved verbatim): | `scripts/vitest-count-gate.cjs` | 403 / 84 / 6894 (was `400 / 84 / 6886`) | 301-03: 3 pins added (vocab 24, OrgIdentity 17, control 24); 2 raised |
