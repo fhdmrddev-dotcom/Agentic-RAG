@@ -590,3 +590,24 @@ describe("LibraryToolbar 199-10 — the create control's colour tokens resolve (
     expect(cssSource199).not.toContain("--primary-container:")
   })
 })
+
+// ── 298 G4-2 (2026-10-30) — no chip reads a number before every feed has answered ────────
+// Driven live: during an org switch the chips read "0 / 0 / 0" under "Loading your
+// workflows…", then "6 / 0 / 0" for ~200 ms before the true "8 / 2 / 0". 298-UI-SPEC forbids
+// "chip counts reading 0" while loading, so a pending count is omitted, never shown as 0.
+
+describe("LibraryToolbar 298 G4-2 — pending counts are omitted, never rendered as 0", () => {
+  it("renders NO number in any chip while countsPending is set", () => {
+    renderToolbar({ countsPending: true, updating: true })
+    for (const chip of CHIP_ORDER) {
+      expect(screen.getByTestId(`library-chip-count-${chip}`).textContent).toBe("")
+    }
+  })
+
+  it("renders every count, including 0, once countsPending is clear", () => {
+    renderToolbar({ countsPending: false })
+    for (const chip of CHIP_ORDER) {
+      expect(screen.getByTestId(`library-chip-count-${chip}`).textContent).toBe(String(COUNTS[chip]))
+    }
+  })
+})
