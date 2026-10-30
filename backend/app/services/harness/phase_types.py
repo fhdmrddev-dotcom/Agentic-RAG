@@ -113,7 +113,6 @@ from app.models.user_settings import (
     ensure_settings_fresh,
     feature_audience,
 )
-from app.services.harness.live_connectors import live_connectors_fully_on
 from app.security.egress import SLACK_API_BASE, validate_destination
 from app.services.connector_service import ConnectorDisabled, resolve_connection
 from app.services.connectors.args import resolve_arguments, schema_for_bound_tool
@@ -121,6 +120,7 @@ from app.services.connectors.grants import resolve_effective_posture
 from app.services.connectors.protocol import AdapterError
 from app.services.connectors.registry import get_adapter
 from app.services.openai_service import RENDER_TEMPLATE_TOOL, apply_tool_budget, get_tools
+from app.services.harness.live_connectors import live_connectors_fully_on
 from app.services.task_service import _stream_one_iteration, run_task_sub_agent
 from app.services.template_asset_service import resolve_template_source
 from app.services.template_render_service import (
