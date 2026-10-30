@@ -32,6 +32,7 @@ every further reference is cut to a leaf by the same rule.
 """
 from __future__ import annotations
 
+import copy
 import logging
 from typing import Any
 
@@ -57,14 +58,38 @@ def _has_ref(node: Any) -> bool:
     return False
 
 
+def _leaf(target: dict, name: str) -> dict:
+    """The leaf a cut definition becomes (302-REVIEW WR-02).
+
+    It keeps the definition's own ``type``, ``enum`` and ``const`` (scalars and scalar lists, so
+    they cannot re-introduce a reference) and its ``description`` (else its name). When the
+    definition has no ``type`` — a pure ``anyOf`` / ``oneOf``, an alias, or an ``enum`` — NO type
+    is invented: the leaf is untyped. That is the smallest faithful choice. Inventing ``"object"``
+    told the model to send an object where the connector expected, say, a string; keeping a
+    combinator would mean walking its branches, which is the expansion being cut. Moonshot's docs
+    state only that the parameters are JSON Schema with a top-level ``type: object`` (RESEARCH F11),
+    which a leaf never is, and the third-party "type on every node" rule is deliberately not
+    applied (assumption A2), so an untyped leaf carries no new evidence-free assumption.
+    """
+    leaf: dict = {}
+    for key in ("type", "enum", "const"):
+        if key in target:
+            leaf[key] = copy.deepcopy(target[key])
+    leaf["description"] = target.get("description") or name
+    return leaf
+
+
 def inline_refs(schema: dict, *, cut: list[str] | None = None) -> dict:
     """``schema`` with every local ``#/$defs/X`` / ``#/definitions/X`` reference replaced by the
     definition it names, and the defs blocks dropped. Returns ``schema`` itself (same object) when
     it holds no reference and no defs. ~~A true cycle cannot be inlined: ``ValueError`` names it.~~
     CORRECTED at 302-02 (D-25): a re-entered definition, one reached at ``_MAX_DEPTH`` nested
     definitions, or (302-REVIEW CR-01) any reference met after ``_MAX_EXPANSIONS`` definitions have
-    been inlined in total, becomes the typed leaf ``{"type": <its type or "object">, "description": <its
-    description or its name>}``; each such name is appended to ``cut`` when one is passed.
+    been inlined in total, becomes ~~the typed leaf ``{"type": <its type or "object">,
+    "description": <its description or its name>}``~~ (302-REVIEW WR-02) the leaf ``_leaf`` builds:
+    its own ``type`` / ``enum`` / ``const`` only, never an invented ``"object"``, plus its
+    description or name, with the keys beside the ``$ref`` merged in; each such name is appended to
+    ``cut`` when one is passed.
 
     Keys beside a ``$ref`` (a ``description``, a ``default``) are kept on the inlined node.
     Never mutates its argument.
@@ -87,14 +112,14 @@ def inline_refs(schema: dict, *, cut: list[str] | None = None) -> dict:
             if isinstance(ref, str) and ref.startswith("#/"):
                 name = ref.rsplit("/", 1)[-1]
                 if name in defs:
+                    rest = {k: v for k, v in node.items() if k != "$ref"}
                     if name in stack or len(stack) >= _MAX_DEPTH or budget[0] <= 0:
                         target = defs[name] if isinstance(defs[name], dict) else {}
                         if cut is not None and name not in cut:
                             cut.append(name)
-                        return {"type": target.get("type", "object"),
-                                "description": target.get("description") or name}
+                        # Keys beside the ``$ref`` are merged in, as the expanded arm does.
+                        return {**_leaf(target, name), **walk(rest, stack)}
                     budget[0] -= 1
-                    rest = {k: v for k, v in node.items() if k != "$ref"}
                     return {**walk(defs[name], stack | {name}), **walk(rest, stack)}
             return {k: walk(v, stack) for k, v in node.items() if k not in _DEF_KEYS}
         if isinstance(node, list):

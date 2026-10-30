@@ -209,6 +209,62 @@ def test_the_workflow_schema_fits_inside_the_expansion_budget():
     assert cut == []
 
 
+# 302-REVIEW WR-02: a cut definition keeps its own type (never an invented "object"), its enum /
+# const, and the keys written beside its ``$ref``, exactly as the expanded arm does.
+def test_a_cut_untyped_definition_is_not_called_an_object():
+    from app.services.provider_gateway.schema_moonshot import inline_refs
+
+    schema = {
+        "type": "object",
+        "properties": {"a": {"$ref": "#/$defs/A"}},
+        "$defs": {
+            "A": {"type": "object", "properties": {
+                "order": {"$ref": "#/$defs/Order"}, "again": {"$ref": "#/$defs/A"},
+                "either": {"$ref": "#/$defs/Either"}}},
+            "Order": {"enum": ["asc", "desc"]},
+            "Either": {"anyOf": [{"type": "string"}, {"$ref": "#/$defs/A"}]},
+        },
+    }
+    out = inline_refs(schema)
+    assert not _refs_anywhere(out)
+    a = out["properties"]["a"]
+    # Order is not cut here (not on the path) — the enum survives whole.
+    assert a["properties"]["order"] == {"enum": ["asc", "desc"]}
+    # Either's own A child is a cut — A has a type, so it keeps it.
+    assert a["properties"]["either"]["anyOf"][1] == {"type": "object", "description": "A"}
+
+    # Now force the untyped definitions themselves to be cut (re-entered).
+    loop = {
+        "type": "object",
+        "properties": {"o": {"$ref": "#/$defs/Order"}, "e": {"$ref": "#/$defs/E"}},
+        "$defs": {
+            "Order": {"enum": ["asc", "desc"], "allOf": [{"$ref": "#/$defs/Order"}]},
+            "E": {"anyOf": [{"type": "string"}, {"$ref": "#/$defs/E"}]},
+        },
+    }
+    out = inline_refs(loop)
+    assert not _refs_anywhere(out)
+    order_leaf = out["properties"]["o"]["allOf"][0]
+    assert order_leaf == {"enum": ["asc", "desc"], "description": "Order"}
+    e_leaf = out["properties"]["e"]["anyOf"][1]
+    assert "type" not in e_leaf, "an untyped definition must not be invented an object type"
+    assert e_leaf == {"description": "E"}
+
+
+def test_a_cut_keeps_the_keys_written_beside_its_ref():
+    from app.services.provider_gateway.schema_moonshot import inline_refs
+
+    schema = {
+        "type": "object",
+        "properties": {"root": {"$ref": "#/$defs/Node"}},
+        "$defs": {"Node": {"type": "object", "properties": {
+            "parent": {"$ref": "#/$defs/Node", "description": "The parent node.", "default": None}}}},
+    }
+    out = inline_refs(schema)
+    leaf = out["properties"]["root"]["properties"]["parent"]
+    assert leaf == {"type": "object", "description": "The parent node.", "default": None}
+
+
 def test_moonshot_tools_keeps_a_recursive_tool_and_warns_without_the_schema(caplog):
     import logging
 
