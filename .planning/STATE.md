@@ -1,10 +1,10 @@
 ---
 gsd_state_version: 1.0
-milestone: none
-milestone_name: v4.8 Every Page Has a Link — CLOSED 2026-10-30
-status: milestone_complete
-last_updated: "2026-10-30T15:30:00.000Z"
-last_activity: 2026-10-30 -- v4.8 closed by hand (archive, tag v4.8 local)
+milestone: v4.9
+milestone_name: Use It From Your Own Tools
+status: planning
+last_updated: "2026-10-30T18:00:00.000Z"
+last_activity: 2026-10-30 -- Milestone v4.9 started (defining requirements)
 progress:
   total_phases: 0
   completed_phases: 0
@@ -30,7 +30,7 @@ See: `.planning/PROJECT.md` (updated 2026-10-30)
 
 **Core value:** The agent acts as an AI colleague — it knows your knowledge base, can run code, and
 can be taught new behaviours (skills) that persist and can be shared.
-**Current focus:** between milestones — v4.8 fully live (2026-10-30); next `/gsd:new-milestone` (v4.9)
+**Current focus:** v4.9 Use It From Your Own Tools — MCP server, personal keys + OAuth, outbound webhooks, SEED-081/079 guardrails on the new paths, BUG-261022-01
 
 ---
 
@@ -43,11 +43,13 @@ reviewer exists, so a phase closes `verification_mode: self-verified`, never `re
 
 ## Current Position
 
-Milestone: none (v4.8 closed 2026-10-30)
-Status: milestone_complete — v4.8 fully live at `ed17bc660`; next: `/gsd:new-milestone`
-Last activity: 2026-10-30 -- v4.8 closed by hand
+Milestone: v4.9 Use It From Your Own Tools
+Phase: Not started (defining requirements)
+Plan: —
+Status: Defining requirements
+Last activity: 2026-10-30 — Milestone v4.9 started
 
-Phases resume at **303**; migrations at **220**. Open Platform (`SEED-013`) was moved to v4.9 at v4.8 intake.
+Phases start at **303**; migrations at **220**. Seeds taken in at intake: SEED-013, SEED-177, SEED-195, SEED-081, SEED-079; bug BUG-261022-01.
 
 ### Previous milestone (v4.8)
 

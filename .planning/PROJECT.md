@@ -10,9 +10,21 @@ The agent acts as an AI colleague — it knows your knowledge base, can run code
 
 ---
 
-## Current Milestone: none — v4.8 closed 2026-10-30
+## Current Milestone: v4.9 Use It From Your Own Tools
 
-**Next:** run `/gsd:new-milestone` (v4.9; Open Platform `SEED-013` was moved to v4.9 at v4.8 intake). Phases resume at **303**, migrations at **220**. Sweep `node scripts/check-seeds-register.cjs` first.
+**Started:** 2026-10-30 · phases from **303**, migrations from **220**.
+
+**Goal:** A person can use their knowledge base, agent and workflows from an MCP client (Claude Desktop, Cursor, Claude Code, Claude.ai) and be told by webhook when something happens, without opening the app.
+
+**Target features:**
+- **MCP server** (`SEED-013`, `SEED-177`) over Streamable HTTP, exposing four tools: search the knowledge base, ask the agent, run a published workflow, list/read documents.
+- **Personal MCP keys** (`SEED-195`): any member mints a key that sees only what they can see, optionally narrowed to a folder set and a tool subset; an org admin can switch MCP off for the org.
+- **OAuth 2.1 sign-in** for MCP, in a later phase than keys, so Claude.ai custom connectors can connect.
+- **Outbound webhooks**: run finished, document ingested — signed, retried, auditable.
+- **Guardrails for outside traffic, scoped to these new paths:** provider admission control (`SEED-081`) and PII redaction on what MCP and webhooks send out (`SEED-079`).
+- **Word template fix** (`BUG-261022-01`): reproduce through the real sandbox driver, then a bare `{{ name }}` either renders the value or fails the integrity check.
+
+**Out of this milestone:** the versioned `/api/v1` REST surface (next milestone). The closed core stays closed (Extension Contract) — the MCP server exposes existing capabilities and adds no phase type, emitter or engine tool. Builds on Phase 293's org-scoped API keys and `/inbound`.
 
 ---
 
@@ -1270,7 +1282,14 @@ All 20 v3.3 requirements delivered (16 CORE + 4 STRETCH).
 
 ### Active (current milestone)
 
+*v4.9 Use It From Your Own Tools — STARTED 2026-10-30. Requirements live in `.planning/REQUIREMENTS.md`; scope summary under "Current Milestone" above.*
+
+<details>
+<summary>Superseded Active note (v4.8-era, preserved)</summary>
+
 *v4.8 Every Page Has a Link — STARTED 2026-10-27. Requirements live in `.planning/REQUIREMENTS.md`; scope summary under "Current Milestone" above.*
+
+</details>
 
 <details>
 <summary>Superseded Active note (v4.6-era, preserved)</summary>
@@ -1576,3 +1595,5 @@ This document evolves at phase transitions and milestone boundaries.
 *Last updated: 2026-10-27 — **milestone v4.8 Every Page Has a Link STARTED** (phases from 297, migrations from 217). Open Platform moved to v4.9.*
 
 *Last updated: 2026-10-30 — **milestone v4.8 Every Page Has a Link CLOSED** (28/28, tag `v4.8`; 301/302 not yet deployed). Next: v4.9, phases from 303, migrations from 220.*
+
+*Last updated: 2026-10-30 — **milestone v4.9 Use It From Your Own Tools STARTED** (MCP server + personal keys + OAuth, outbound webhooks, SEED-081/079 guardrails on the new paths, BUG-261022-01; phases from 303, migrations from 220).*
