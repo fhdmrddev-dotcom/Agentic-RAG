@@ -504,7 +504,7 @@ async def _build_response(s=None) -> FullSettingsResponse:
         # Phase 147 (FLAG-01) — the three operator kill-switches from the effective settings.
         self_improve_enabled=s.self_improve_enabled,
         workflows_enabled=s.workflows_enabled,
-        mcp_enabled=s.mcp_enabled,
+        mcp_enabled=getattr(s, "mcp_enabled", True),  # 304: stubs predating the field read ON
         maintenance_mode=s.maintenance_mode,
         # Phase 159 (MODEL-03 / D-159-04) — the persisted discovery-filter default (default-ON).
         model_discovery_filter_enabled=s.model_discovery_filter_enabled,
