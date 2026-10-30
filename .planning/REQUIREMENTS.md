@@ -46,16 +46,16 @@ Decided at intake (operator, 2026-10-27):
 
 ### v4.7 close-out (FIX)
 
-- [ ] **FIX-01**: The Workspace panel lists the files a thread produced instead of "No files yet". — `BUG-261027-01`
+- [x] **FIX-01**: The Workspace panel lists the files a thread produced instead of "No files yet". — `BUG-261027-01`
 - [x] **FIX-02**: The chat list shows a loading state, not "No recent chats", while threads are loading. — `BUG-261027-02`
-- [ ] **FIX-03**: A schedule row words a launch failure in plain language, and Run now updates only that row. — `BUG-261027-03`
+- [x] **FIX-03**: A schedule row words a launch failure in plain language, and Run now updates only that row. — `BUG-261027-03`
 - [ ] **FIX-04**: A scheduled run whose required input is blank is refused before launch, and the refusal names the input. — `BUG-261027-04`
 - [ ] **FIX-05**: A paused run started by an API key or a schedule resumes on the provider it started on. — `BUG-261027-05`
-- [ ] **FIX-06**: The six 296 review findings in `SEED-391` are each fixed or accepted with a reason. — `SEED-391`
+- [x] **FIX-06**: The six 296 review findings in `SEED-391` are each fixed or accepted with a reason. — `SEED-391`
 
 ### Register hygiene (REG)
 
-- [ ] **REG-08**: Seed and bug statuses match reality:
+- [x] **REG-08**: Seed and bug statuses match reality:
   - every folded seed and bug is updated;
   - SEED-281's stale premises are corrected;
   - the excluded pause kinds (the tool-round cap, chat `ask_user`) are recorded;
@@ -109,11 +109,11 @@ Decided at intake (operator, 2026-10-27):
 | NOTE-04 | Phase 300 | Pending |
 | NOTE-05 | Phase 301 | Pending |
 | NOTE-06 | Phase 300 | Pending |
-| FIX-01 | Phase 302 | Pending |
+| FIX-01 | Phase 302 | Complete |
 | FIX-02 | Phase 299 | Complete |
-| FIX-03 | Phase 302 | Pending |
+| FIX-03 | Phase 302 | Complete |
 | FIX-04 | Phase 300 | Pending |
 | FIX-05 | Phase 300 | Pending |
-| FIX-06 | Phase 302 | Pending |
-| REG-08 | Phase 302 | Pending |
+| FIX-06 | Phase 302 | Complete |
+| REG-08 | Phase 302 | Complete |
 | REG-09 | Phase 297 | Complete |

@@ -1,21 +1,27 @@
 ---
 phase: 302-close-out-and-a-true-register
 verified: 2026-10-30T00:00:00Z
-status: human_needed
+status: passed  # operator "mark 302 passed", 2026-10-30
+verification_mode: self-verified
+independent_review: self
 score: 4/4 roadmap SCs code-verified; G4-2 PASS + G4-3 (b) PASS live 2026-10-30; G4-1 download PASS; four-axis 7/8 XP + MT-1 + PT-1 + LM-1 PASS (Moonshot ⛔ BUG-261024-01) — no automated or live row owed
 human_verification:
   - test: "G4-1 download click on a generated file in the panel (needs operator consent)"
     expected: "File downloads"
     why_human: "Live action, consent required"
+    result: "PASS 2026-10-30 (operator OK; chart.png 38,199 B)"
   - test: "G4-2 schedule row wording after the F-1 fix; Run now updates only that row"
     expected: "Plain-language failure said once; other rows not re-rendered"
     why_human: "Live UI (SC#2), not yet driven"
+    result: "PASS 2026-10-30 (five S2 checks + F-1)"
   - test: "G4-3 409 wording live (FE-IN-01)"
     expected: "Lock/paused/server sentence by code"
     why_human: "Live UI, not yet driven"
+    result: "(b) PASS; (a) pre-empted by the client lock (no picker, no Retry); (c) not UI-reachable (299 switch card), unit-proven"
   - test: "Four-axis UAT rows for FIX-01 (provider x multi-tool x parallel-thread x long-message)"
     expected: "Rows recorded, blocked rows marked with reason"
     why_human: "CLAUDE.md UAT scoreboard rule"
+    result: "XP 7/8 PASS (Moonshot blocked BUG-261024-01), MT-1/PT-1/LM-1 PASS"
 ---
 
 # Phase 302 Verification
