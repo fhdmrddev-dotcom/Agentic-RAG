@@ -2,7 +2,7 @@
 phase: 302-close-out-and-a-true-register
 verified: 2026-10-30T00:00:00Z
 status: human_needed
-score: 4/4 roadmap SCs code-verified; 2 live G-4 rows + 4-axis rows owed
+score: 4/4 roadmap SCs code-verified; G4-2 PASS + G4-3 (b) PASS live 2026-10-30; download click + 4-axis rows owed
 human_verification:
   - test: "G4-1 download click on a generated file in the panel (needs operator consent)"
     expected: "File downloads"
@@ -23,7 +23,7 @@ human_verification:
 | SC | Truth | Status | Evidence |
 |---|---|---|---|
 | 1 FIX-01 | Panel lists produced files | VERIFIED in code + live list/count | GeneratedFilesGroup.tsx, generatedFiles.ts, useThreadFiles.ts added; G4-1 live: thread eb47db96 FILES 2, no "No files yet". Download click owed. |
-| 2 FIX-03 | Launch failure in plain words, Run now touches one row | PARTIAL (code fixed, live owed) | F-1 fix in composerCopy/useStartWorkflowInThread/WorkflowScheduleModal (RED test dd9610797 precedes fix 993948b65). G4-2 not driven. |
+| 2 FIX-03 | Launch failure in plain words, Run now touches one row | VERIFIED | F-1 fix in composerCopy/useStartWorkflowInThread/WorkflowScheduleModal (RED test dd9610797 precedes fix 993948b65). G4-2 driven live 2026-10-30: five S2 checks + F-1 PASS (302-VALIDATION.md). |
 | 3 FIX-06 | Six SEED-391 findings each fixed/accepted | VERIFIED | SEED-391 status answered, per-finding table with RED-first commits; review CR-01/WR-01/WR-02 fixed (all_fixed). BE-IN-04 live Moonshot blocked (account suspended), unit-tested only. |
 | 4 REG-08 | Register true | VERIFIED | SEED-281 premises corrected (struck + CORRECTED); excluded pause kinds section recorded; BUG-261030-01 and -02 exist; seeds gate OK 403/403. |
 
