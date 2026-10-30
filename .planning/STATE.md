@@ -45,8 +45,8 @@ reviewer exists, so a phase closes `verification_mode: self-verified`, never `re
 
 Milestone: v4.9 Use It From Your Own Tools
 Phase: 304 — Personal MCP Keys That Act as You (planned, `--auto`; 303 not started)
-Plan: 5 of 6 (waves 1-3 merged, last `9df1b31fa`: 05 member key screen, apiKeys 208/208). Wave 4 next: 06 admin surfaces + full gates + bookkeeping.
-Status: Executing 304
+Plan: 6 of 6 merged (last `3c6eec0f4`: 06 org + operator MCP switches; full gates: backend 70 ≤ 71, count gate 589/589 OK, tsc 61→61, ledger/size/seeds OK). Post-merge org/admin/apiKeys vitest 468/468.
+Status: Executing 304 — plans done; next: security gate, code review, verifier, G-4 rows 1-3 (Chrome)
 Last activity: 2026-10-30 — 304 context gathered (`.planning/phases/304-personal-mcp-keys-that-act-as-you/304-CONTEXT.md`); SEED-195 + SEED-013 folded
 
 Phases start at **303**; migrations at **220**. Seeds taken in at intake: SEED-013, SEED-177, SEED-195, SEED-081, SEED-079; bug BUG-261022-01.
