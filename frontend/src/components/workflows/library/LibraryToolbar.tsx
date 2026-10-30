@@ -209,6 +209,11 @@ export interface LibraryToolbarProps {
   folders: readonly Folder[]
   /** A project re-query is in flight. Drives the quiet marker; changes no count. */
   updating: boolean
+  /**
+   * 298 G4-2: some feed has not answered yet (first load, or an org switch). Every chip's
+   * number is omitted until it has, because a count of 0 before the answer is a lie.
+   */
+  countsPending?: boolean
   /** Opens the Builder fresh (the shipped `openBuilderFresh` contract, unchanged). */
   onCreate: () => void
   /** The one-click way out of a filtered-to-empty list (sketch 158). */
@@ -227,6 +232,7 @@ export function LibraryToolbar({
   onProjectChange,
   folders,
   updating,
+  countsPending = false,
   onCreate,
   onClearAll,
 }: LibraryToolbarProps) {
@@ -315,7 +321,7 @@ export function LibraryToolbar({
                   "font-mono text-[10.5px] " + (active ? "opacity-80" : "text-muted-foreground")
                 }
               >
-                {counts[chip]}
+                {countsPending ? null : counts[chip]}
               </span>
             </button>
           )
