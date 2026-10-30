@@ -73,6 +73,8 @@ link. Branch `develop`. Tags `v4.7` and `v4.8` pushed 2026-10-30.
 
 ## Owed (operator)
 
+- **304 D-41 — confirm before 304+305 deploy:** MCP keys need no tier capability (any member can mint; the org and deployment switches are the controls). Tier gates are a pricing one-way door (TIER-02); flipping it is one condition.
+
 - Logged-in production smoke of the 301 list (open it once on app.superrag.cloud; expect the empty state).
 - Mail provider (Resend deferred 2026-10-29) → 300 G4-8 and the real-provider half of G4-1; BUG-260828-05/06 stay folded until G4-8.
   When revived: Coolify `EMAIL_PROVIDER` / `RESEND_API_KEY` / `ENVIRONMENT=production`; Resend sender + SPF/DKIM/DMARC.
