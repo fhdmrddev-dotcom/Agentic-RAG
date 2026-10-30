@@ -20,12 +20,24 @@ Pure and provider-local. The ONE caller is ``openai_compat.open_openai_compat_st
 the ENDPOINT provider (282-REVIEW CR-01), so no other provider's request bytes can change. A schema
 with no ``$ref`` and no defs comes back as the SAME object, which is what keeps every ref-free chat
 tool byte-identical even on a Moonshot endpoint.
+
+~~A true cycle cannot be inlined, so ``inline_refs`` raises ``ValueError`` naming it.~~
+CORRECTED at 302-02 (BE-IN-04 / D-25): Moonshot itself 400s on recursion, so a pass-through would
+still fail the request and dropping the tool would hide a connector tool the person asked for;
+bounded unrolling keeps it usable. A re-entered definition, or one reached at ``_MAX_DEPTH``,
+becomes a typed leaf, and ``moonshot_tools`` warns naming only the tool and the definition.
+Provider docs remain silent (RESEARCH A2).
 """
 from __future__ import annotations
 
+import logging
 from typing import Any
 
+logger = logging.getLogger(__name__)
+
 _DEF_KEYS = ("$defs", "definitions")
+#: 302-02 (T-302-05): no external schema expands past this many nested definitions.
+_MAX_DEPTH = 8
 
 
 def _has_ref(node: Any) -> bool:
@@ -36,10 +48,13 @@ def _has_ref(node: Any) -> bool:
     return False
 
 
-def inline_refs(schema: dict) -> dict:
+def inline_refs(schema: dict, *, cut: list[str] | None = None) -> dict:
     """``schema`` with every local ``#/$defs/X`` / ``#/definitions/X`` reference replaced by the
     definition it names, and the defs blocks dropped. Returns ``schema`` itself (same object) when
-    it holds no reference and no defs. A true cycle cannot be inlined: ``ValueError`` names it.
+    it holds no reference and no defs. ~~A true cycle cannot be inlined: ``ValueError`` names it.~~
+    CORRECTED at 302-02 (D-25): a re-entered definition, or one reached at ``_MAX_DEPTH`` nested
+    definitions, becomes the typed leaf ``{"type": <its type or "object">, "description": <its
+    description or its name>}``; each such name is appended to ``cut`` when one is passed.
 
     Keys beside a ``$ref`` (a ``description``, a ``default``) are kept on the inlined node.
     Never mutates its argument.
@@ -60,10 +75,12 @@ def inline_refs(schema: dict) -> dict:
             if isinstance(ref, str) and ref.startswith("#/"):
                 name = ref.rsplit("/", 1)[-1]
                 if name in defs:
-                    if name in stack:
-                        raise ValueError(
-                            f"Recursive $ref to {name!r} cannot be inlined for Moonshot."
-                        )
+                    if name in stack or len(stack) >= _MAX_DEPTH:
+                        target = defs[name] if isinstance(defs[name], dict) else {}
+                        if cut is not None and name not in cut:
+                            cut.append(name)
+                        return {"type": target.get("type", "object"),
+                                "description": target.get("description") or name}
                     rest = {k: v for k, v in node.items() if k != "$ref"}
                     return {**walk(defs[name], stack | {name}), **walk(rest, stack)}
             return {k: walk(v, stack) for k, v in node.items() if k not in _DEF_KEYS}
@@ -88,7 +105,15 @@ def moonshot_tools(tools: list[dict] | None) -> list[dict] | None:
     for tool in tools:
         fn = tool.get("function") if isinstance(tool, dict) else None
         params = fn.get("parameters") if isinstance(fn, dict) else None
-        inlined = inline_refs(params) if isinstance(params, dict) else params
+        cut: list[str] = []
+        inlined = inline_refs(params, cut=cut) if isinstance(params, dict) else params
+        if cut:
+            # T-302-06: the tool's name and the cut definition names only, never the schema.
+            logger.warning(
+                "moonshot_tools: tool %r has a recursive or too-deep schema; unrolled to a "
+                "bounded depth at %s",
+                fn.get("name"), ", ".join(sorted(cut)),
+            )
         if inlined is params:
             out.append(tool)
             continue

@@ -113,6 +113,7 @@ from app.models.user_settings import (
     ensure_settings_fresh,
     feature_audience,
 )
+from app.services.harness.live_connectors import live_connectors_fully_on
 from app.security.egress import SLACK_API_BASE, validate_destination
 from app.services.connector_service import ConnectorDisabled, resolve_connection
 from app.services.connectors.args import resolve_arguments, schema_for_bound_tool
@@ -2747,7 +2748,6 @@ async def _exec_external_action(phase, accumulated_outputs: dict, ctx) -> dict:
     # ``visual_workflow_canvas`` still answering ``true``. This was the only kill switch in
     # the tree reading the flag raw, and the one whose false negative sends real email.
     # TTL-checked (no DB I/O on a warm cache) and NEVER RAISES.
-    await ensure_settings_fresh()
     # ⚠ CR-03 — THE TEST IS POSITIVE, NOT AN ABSENCE, AND THAT IS THE FIX.
     # ``PUT /admin/visibility`` accepts FOUR audiences for any allow-listed feature
     # (``admin.py`` ``_VISIBILITY_AUDIENCES = {"everyone", "operators", "role", "off"}``) and
@@ -2760,7 +2760,9 @@ async def _exec_external_action(phase, accumulated_outputs: dict, ctx) -> dict:
     # Requiring the positive answer is also fail-CLOSED against a hand-edited ``app_settings``
     # row and against any FIFTH audience added later, which a deny-list cannot be (the Phase
     # 185 lesson: *a deny-list cannot be made fail-closed by extension*).
-    if feature_audience(_LIVE_CONNECTORS_FEATURE) != "everyone":
+    # 302-02 (BE-IN-01 / D-27): both reads above are ONE shared predicate, which the judge's
+    # recording_by_design also awaits; this module's names are passed so the drives' stubs hold.
+    if not await live_connectors_fully_on(fresh=ensure_settings_fresh, audience=feature_audience):
         return _record("live_connectors is not fully on — the 189 behaviour, unchanged")
 
     # ── GATE 3 · D-06 — THE EGRESS GUARD, BEFORE ANY CREDENTIAL WORK ────────────────────
