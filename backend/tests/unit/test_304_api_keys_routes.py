@@ -647,6 +647,35 @@ def test_no_folders_is_an_empty_list(client, store):
     assert client.get("/api-keys/folders").json() == {"folders": []}
 
 
+def test_the_mcp_create_and_folder_payloads_match_the_contract_fixture(client, store):
+    """The 304 shapes are pinned in the SAME fixture the frontend's apiKeysContract test reads."""
+    import json
+    from pathlib import Path
+
+    contract = json.loads(
+        (Path(__file__).resolve().parents[1] / "fixtures" / "phase293" / "api_keys_contract.json")
+        .read_text(encoding="utf-8")
+    )
+
+    def paths(obj, prefix=""):
+        out = set()
+        if isinstance(obj, dict):
+            for k, v in obj.items():
+                p = f"{prefix}.{k}" if prefix else k
+                out.add(p)
+                out |= paths(v, p)
+        elif isinstance(obj, list):
+            for v in obj:
+                out |= paths(v, prefix + "[]")
+        return out
+
+    created = _mcp(client, folder_ids=[F_OWN]).json()
+    assert paths(created) == paths(contract["McpApiKeyCreated"])
+    assert created["secret"].startswith("srl_mcp_")
+    folders = client.get("/api-keys/folders").json()
+    assert paths(folders) == paths(contract["PickableFolderList"])
+
+
 def test_the_folder_routes_never_name_the_service_role_visibility_helpers():
     import inspect
 

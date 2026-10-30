@@ -18,8 +18,25 @@ Two routers in one module, the ``api/schedules.py`` shape; ``main.py`` mounts bo
     confirms that someone else's workflow exists.
   * A key PINS the definition row it was made for (orchestrator ruling 1 / assumption A7), as a
     schedule does: a later version is a new row and needs a new key.
-  * Creating a key needs the ``workflows`` capability (assumption A5), the same gate as creating
-    a schedule. Listing and revoking need none — a member can always see and stop their own keys.
+  * Creating a WORKFLOW key needs the ``workflows`` capability (assumption A5), the same gate as
+    creating a schedule. Listing and revoking need none — a member can always see and stop their
+    own keys. ⚠ Phase 304 D-41: an MCP key needs NO tier capability (the org and deployment
+    switches are its controls); the check runs inside ``create_key`` for ``kind='workflow'`` only.
+    Owed: operator confirmation before 304+305 deploy (TIER-02, a pricing one-way door).
+
+**Phase 304 — MCP keys on the same routes (D-25), never a parallel family.**
+
+  * ``kind="mcp"`` is refused, before anything is minted, when the deployment or the org switch
+    is off (403, the ``principal_liveness`` sentences), and with a plain 422 sentence for an
+    empty / unknown / orphaned tool selection (``normalise_tool_selection``), an empty folder list
+    (D-08: empty never means "all") or a folder the member cannot see in the active org.
+  * ⛔ Folders are judged on the member's OWN acting visibility — ``acting_member_connection`` +
+    ``list_acting_folders`` (RLS + the acting-org GUC) — never the service role. A foreign, a
+    deleted and an unknown folder read the same, so the refusal confirms nothing.
+  * The tool catalogue, the MCP URL and the switch state are served on every list (``mcp``), so
+    the client never retypes them. The org switch (``/org/api-keys/mcp-access``) is behind
+    ``require_org_manage`` and audited as ``settings.update`` + ``metadata.event='mcp_access'``
+    (D-36: no new audit literal).
   * Every miss is a 404, never a 403: a member's revoke of someone else's key reads exactly like
     a revoke of a key that does not exist (D-06).
   * All I/O is the asyncpg pool (no supabase-py inside an async handler, D-v2.5-01). Audit rows
@@ -29,10 +46,11 @@ from __future__ import annotations
 
 import logging
 from datetime import datetime, timedelta, timezone
+from typing import Annotated
 from uuid import UUID
 
 import asyncpg
-from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, status
+from fastapi import APIRouter, BackgroundTasks, Body, Depends, HTTPException, status
 
 from app.db import api_keys as api_keys_db
 from app.dependencies import (
@@ -45,18 +63,31 @@ from app.models.api_key import (
     ApiKeyCall,
     ApiKeyCreateBody,
     ApiKeyCreated,
+    ApiKeyCreateRequest,
+    ApiKeyFolderRef,
     ApiKeyLimits,
     ApiKeyList,
     ApiKeyRead,
     ApiKeyWorkflowRef,
+    McpAvailability,
+    McpKeyCreateBody,
+    McpToolRef,
+    PickableFolder,
+    PickableFolderList,
     StartableField,
     StartableWorkflow,
     StartableWorkflowList,
 )
 from app.models.user_settings import load_app_settings_async
+from app.security.acting_member import acting_member_connection
 from app.security.api_key_auth import audit_key_call, mint_key
-from app.services.entitlement_service import require_capability
+from app.security.principal_liveness import MCP_OFF_DEPLOYMENT_SENTENCE, MCP_OFF_ORG_SENTENCE
+from app.services.acting_member_reads import list_acting_folders
+from app.services.entitlement_service import enforce_entitlement
 from app.services.inbound_inputs import declared_fields, needs_file_upload, needs_typed_task
+from app.services.key_scope import EXTERNAL_SQL
+from app.services.mcp_tool_catalogue import MCP_TOOLS, mcp_url, normalise_tool_selection
+from app.services.sources.mail.mailbox import FOLDER_PREFIX, MAIL_MIME, MAIL_ROOT_ID
 
 logger = logging.getLogger(__name__)
 
@@ -66,6 +97,61 @@ org_router = APIRouter(prefix="/org/api-keys", tags=["api-keys"])
 _NOT_FOUND = "API key not found."
 _CALL_WINDOW = timedelta(days=30)
 _CALLS_PER_KEY = 50
+
+# Phase 304 — a foreign, a deleted and an unknown folder all read this one sentence (T-304-28).
+_FOLDER_NOT_VISIBLE = "One of the picked folders can't be found, or you can't see it."
+
+# The catalogue as served to the client, in catalogue order (D-11; never retyped there).
+_MCP_CATALOGUE = [
+    McpToolRef(name=t.name, group=t.group, label=t.label, travels_with=t.travels_with)
+    for t in MCP_TOOLS
+]
+
+# D-40: a UI hint only — which pickable folders are fed by a connector. ONE statement on the
+# member's acting connection (RLS decides what it sees): a folder a watch writes into, or one that
+# holds a connector-fed document (``EXTERNAL_SQL``, the KeyScope module's one predicate home).
+# ``is_mail`` is a watch on a mail label / the mailbox root, or a connector-fed mail message.
+_SOURCE_HINT_SQL = (
+    "SELECT s.folder_id, bool_or(s.is_mail) AS is_mail FROM ("
+    "SELECT library_folder_id AS folder_id, "
+    "(source_folder_id = $1 OR starts_with(source_folder_id, $2)) AS is_mail "
+    "FROM public.connector_watches WHERE library_folder_id IS NOT NULL "
+    "UNION ALL "
+    "SELECT folder_id, (mime_type = $3) AS is_mail "
+    f"FROM public.documents WHERE folder_id IS NOT NULL AND {EXTERNAL_SQL}"
+    ") s GROUP BY s.folder_id"
+)
+
+_UNREAD = object()   # ``_serialize_keys``: the switches have not been read yet
+
+
+def _mcp_off(switches: dict | None) -> str | None:
+    """Which MCP switch is off — the deployment's wins (D-30). Anything not read as ``True`` is
+    off (fail closed), the ``principal_liveness`` rule."""
+    if switches is None or switches.get("deploy_on") is not True:
+        return "deployment"
+    if switches.get("org_on") is not True:
+        return "org"
+    return None
+
+
+async def _read_switches(pool: asyncpg.Pool, org: UUID) -> dict | None:
+    """The switch state for a LIST (display only). A failed read reads as "off" (fail closed:
+    the MCP choice is hidden) and the keys still list — e.g. a backend booted before migration
+    221 reached its database. The create path reads the switches WITHOUT this guard, so a failed
+    read there is an error, never a mint."""
+    try:
+        return await api_keys_db.mcp_switches(pool, org)
+    except Exception as exc:  # noqa: BLE001 — display-only, fail closed, logged
+        logger.warning("could not read the MCP switches for org %s (%s)", org, type(exc).__name__)
+        return None
+
+
+def _mcp_block(switches: dict | None) -> McpAvailability:
+    off = _mcp_off(switches)
+    return McpAvailability(
+        available=off != "deployment", off=off, url=mcp_url(), tools=_MCP_CATALOGUE
+    )
 
 
 def _uuid(value) -> UUID:
@@ -126,17 +212,36 @@ def _call_from_audit(row: dict, names: dict[str, str]) -> ApiKeyCall:
 
 
 async def _serialize_keys(
-    pool: asyncpg.Pool, rows: list[dict], *, caller: UUID, org_id: UUID
+    pool: asyncpg.Pool,
+    rows: list[dict],
+    *,
+    caller: UUID,
+    org_id: UUID,
+    switches: dict | None | object = _UNREAD,
 ) -> list[ApiKeyRead]:
     """Rows -> wire models, with live workflow states and recent calls.
 
     ⚠ ONE of the three places the projection lives (with ``db/api_keys._KEY_COLUMNS`` and
     ``ApiKeyRead``). Workflow readability is judged against each key's OWNER — that is whose
     rights a call with the key runs under.
+
+    Phase 304: an MCP key also carries its tools, its ticked folders (named in ONE read; a folder
+    since deleted drops out), its org's name and which switch is off. ``switches`` is the list's
+    one ``mcp_switches`` read; when not passed it is read here, and only if an MCP row is present.
     """
     if not rows:
         return []
     now = datetime.now(timezone.utc)
+
+    mcp_rows = [r for r in rows if r.get("kind") == "mcp"]
+    if mcp_rows and switches is _UNREAD:
+        switches = await _read_switches(pool, org_id)
+    sw = switches if isinstance(switches, dict) else None
+    ticked = sorted({str(f) for r in mcp_rows for f in (r.get("folder_ids") or [])})
+    folder_name: dict[str, str] = {}
+    if ticked:
+        for f in await api_keys_db.folder_names(pool, org_id=org_id, folder_ids=ticked):
+            folder_name[str(f["id"])] = f["name"]
 
     by_owner: dict[str, set[str]] = {}
     for r in rows:
@@ -173,6 +278,21 @@ async def _serialize_keys(
             for w in snapshot
         ]
         revoked_by = r.get("revoked_by")
+        is_mcp = r.get("kind") == "mcp"
+        mcp_fields: dict = {}
+        if is_mcp:
+            picked = r.get("folder_ids")
+            mcp_fields = {
+                "kind": "mcp",
+                "tools": [str(t) for t in (r.get("tools") or [])],
+                "folders": None if picked is None else [
+                    ApiKeyFolderRef(id=str(f), name=folder_name[str(f)])
+                    for f in picked if str(f) in folder_name
+                ],
+                "include_external": bool(r.get("include_external")),
+                "org_name": sw.get("org_name") if sw else None,
+                "mcp_off": _mcp_off(sw),
+            }
         out.append(
             ApiKeyRead(
                 id=str(r["id"]),
@@ -192,6 +312,7 @@ async def _serialize_keys(
                     _call_from_audit(a, names)
                     for a in calls_by_key.get(str(r["id"]), [])[:_CALLS_PER_KEY]
                 ],
+                **mcp_fields,
             )
         )
     return out
@@ -211,11 +332,42 @@ async def list_my_keys(
     pool: asyncpg.Pool = Depends(get_pg_pool),
 ) -> ApiKeyList:
     """The caller's keys in the active org, the effective per-key limits, and each key's calls
-    in the last 30 days (D-17)."""
+    in the last 30 days (D-17). Phase 304: plus the ``mcp`` block (catalogue, URL, switches)."""
     caller, org = _caller(current_user), _uuid(active_org)
     rows = await api_keys_db.list_keys_for_owner(pool, org_id=org, user_id=caller)
-    keys = await _serialize_keys(pool, rows, caller=caller, org_id=org)
-    return ApiKeyList(keys=keys, limits=await _limits())
+    switches = await _read_switches(pool, org)
+    keys = await _serialize_keys(pool, rows, caller=caller, org_id=org, switches=switches)
+    return ApiKeyList(keys=keys, limits=await _limits(), mcp=_mcp_block(switches))
+
+
+@router.get("/folders", response_model=PickableFolderList)
+async def list_pickable_folders(
+    current_user: dict = Depends(get_current_user),
+    active_org: str = Depends(get_active_org_id),
+) -> PickableFolderList:
+    """The folders the caller can tick on an MCP key in the active org — read on their OWN acting
+    connection (RLS + the acting-org GUC), never the service role. ``shared`` is a folder the
+    caller does not own (or an org-shared one); ``source`` is the D-40 UI hint."""
+    caller, org = str(_caller(current_user)), str(_uuid(active_org))
+    async with acting_member_connection(user_id=caller, org_id=org) as conn:
+        rows = await list_acting_folders(conn)
+        hints = (
+            await conn.fetch(_SOURCE_HINT_SQL, MAIL_ROOT_ID, FOLDER_PREFIX, MAIL_MIME)
+            if rows else []
+        )
+    source = {str(h["folder_id"]): ("mail" if h["is_mail"] else "synced") for h in hints}
+    return PickableFolderList(
+        folders=[
+            PickableFolder(
+                id=f["id"],
+                name=f["name"],
+                parent_id=f.get("parent_id"),
+                shared=bool(f.get("is_org_shared")) or f.get("user_id") != caller,
+                source=source.get(f["id"]),
+            )
+            for f in rows
+        ]
+    )
 
 
 @router.get("/startable-workflows", response_model=StartableWorkflowList)
@@ -249,23 +401,104 @@ async def list_startable_workflows(
     return StartableWorkflowList(workflows=workflows, drafts_hidden=drafts)
 
 
-@router.post(
-    "",
-    response_model=ApiKeyCreated,
-    status_code=status.HTTP_201_CREATED,
-    dependencies=[Depends(require_capability("workflows"))],  # assumption A5
-)
+def _label_taken(label: str) -> HTTPException:
+    # The active-label index spans BOTH kinds, so the sentence names neither.
+    return HTTPException(
+        status_code=409,
+        detail=f"You already have an active key called {label}. Pick another label.",
+    )
+
+
+@router.post("", response_model=ApiKeyCreated, status_code=status.HTTP_201_CREATED)
 async def create_key(
-    body: ApiKeyCreateBody,
+    body: Annotated[ApiKeyCreateRequest, Body()],
     background_tasks: BackgroundTasks,
     current_user: dict = Depends(get_current_user),
     active_org: str = Depends(get_active_org_id),
     pool: asyncpg.Pool = Depends(get_pg_pool),
 ) -> ApiKeyCreated:
-    """Make a key for one or more of the caller's published workflows. The response is the ONLY
-    place the secret ever appears."""
-    caller, org = _caller(current_user), _uuid(active_org)
+    """Make a key. A body without ``kind`` (or ``kind="workflow"``) is the 293 workflow key; a
+    ``kind="mcp"`` body is a personal MCP key. The response is the ONLY place the secret ever
+    appears."""
+    if isinstance(body, McpKeyCreateBody):
+        return await _create_mcp_key(
+            body, background_tasks, caller=_caller(current_user), org=_uuid(active_org), pool=pool
+        )
+    # D-41: the tier gate (assumption A5) moved inside the handler, for workflow keys only —
+    # same exception, same 403 as the old route dependency.
+    await enforce_entitlement(pool, active_org, "workflows")
+    return await _create_workflow_key(
+        body, background_tasks, caller=_caller(current_user), org=_uuid(active_org), pool=pool
+    )
 
+
+async def _create_mcp_key(
+    body: McpKeyCreateBody,
+    background_tasks: BackgroundTasks,
+    *,
+    caller: UUID,
+    org: UUID,
+    pool: asyncpg.Pool,
+) -> ApiKeyCreated:
+    """KEY-01/03/04/05: refuse before minting — switches (403), tools and folders (422)."""
+    switches = await api_keys_db.mcp_switches(pool, org)   # live, never the settings cache
+    off = _mcp_off(switches)
+    if off == "deployment":
+        raise HTTPException(status_code=403, detail=MCP_OFF_DEPLOYMENT_SENTENCE)
+    if off == "org":
+        raise HTTPException(status_code=403, detail=MCP_OFF_ORG_SENTENCE)
+
+    selection = normalise_tool_selection(body.tools)
+    if selection.refusal is not None or selection.tools is None:
+        raise HTTPException(status_code=422, detail=selection.refusal)
+
+    folder_ids: list[str] | None = None
+    if body.folder_ids is not None:
+        async with acting_member_connection(user_id=str(caller), org_id=str(org)) as conn:
+            visible = {f["id"] for f in await list_acting_folders(conn)}
+        folder_ids = [str(f) for f in body.folder_ids]
+        if any(f not in visible for f in folder_ids):
+            raise HTTPException(status_code=422, detail=_FOLDER_NOT_VISIBLE)
+
+    minted = mint_key(kind="mcp")
+    expires_at = datetime.now(timezone.utc) + timedelta(days=body.expires_in_days)
+    try:
+        row = await api_keys_db.create_api_key(
+            pool,
+            org_id=org,
+            user_id=caller,
+            label=body.label,
+            key_prefix=minted.key_prefix,
+            key_hash=minted.key_hash,
+            workflows=[],
+            expires_at=expires_at,
+            kind="mcp",
+            folder_ids=folder_ids,
+            tools=list(selection.tools),
+            include_external=body.include_external,
+        )
+    except api_keys_db.DuplicateKeyLabel:
+        raise _label_taken(body.label)
+
+    audit_key_call(
+        background_tasks,
+        {"id": row["id"], "label": row["label"], "user_id": caller, "org_id": org, "kind": "mcp"},
+        "api_key.create",
+        call="manage",
+    )
+    (key,) = await _serialize_keys(pool, [row], caller=caller, org_id=org, switches=switches)
+    return ApiKeyCreated(key=key, secret=minted.secret)
+
+
+async def _create_workflow_key(
+    body: ApiKeyCreateBody,
+    background_tasks: BackgroundTasks,
+    *,
+    caller: UUID,
+    org: UUID,
+    pool: asyncpg.Pool,
+) -> ApiKeyCreated:
+    """Make a key for one or more of the caller's published workflows (the 293 path)."""
     rows = await api_keys_db.get_key_workflows(
         pool, workflow_ids=list(body.workflow_ids), user_id=caller, org_id=org
     )
@@ -336,10 +569,7 @@ async def create_key(
             expires_at=expires_at,
         )
     except api_keys_db.DuplicateKeyLabel:
-        raise HTTPException(
-            status_code=409,
-            detail=f"You already have an active key called {body.label}. Pick another label.",
-        )
+        raise _label_taken(body.label)
 
     audit_key_call(
         background_tasks,
@@ -369,7 +599,8 @@ async def revoke_my_key(
     if row.get("revoked_now"):  # 296-06 (293-IN-08): a repeat revoke writes no second row
         audit_key_call(
             background_tasks,
-            {"id": row["id"], "label": row["label"], "user_id": caller, "org_id": org},
+            {"id": row["id"], "label": row["label"], "user_id": caller, "org_id": org,
+             "kind": row.get("kind")},
             "api_key.revoke",
             call="manage",
         )
@@ -386,11 +617,13 @@ async def list_org_keys(
     active_org: str = Depends(get_active_org_id),
     pool: asyncpg.Pool = Depends(get_pg_pool),
 ) -> ApiKeyList:
-    """Every key in the active org, with its owner (D-03)."""
+    """Every key in the active org, with its owner (D-03). Phase 304: plus the same ``mcp``
+    block, so the admin surface can say when MCP is switched off."""
     caller, org = _caller(current_user), _uuid(active_org)
     rows = await api_keys_db.list_keys_for_org(pool, org_id=org)
-    keys = await _serialize_keys(pool, rows, caller=caller, org_id=org)
-    return ApiKeyList(keys=keys, limits=await _limits())
+    switches = await _read_switches(pool, org)
+    keys = await _serialize_keys(pool, rows, caller=caller, org_id=org, switches=switches)
+    return ApiKeyList(keys=keys, limits=await _limits(), mcp=_mcp_block(switches))
 
 
 @org_router.post("/{key_id}/revoke", response_model=ApiKeyRead)
@@ -412,7 +645,8 @@ async def revoke_org_key(
     if row.get("revoked_now"):  # 296-06 (293-IN-08): a repeat revoke writes no second row
         audit_key_call(
             background_tasks,
-            {"id": row["id"], "label": row["label"], "user_id": caller, "org_id": org},
+            {"id": row["id"], "label": row["label"], "user_id": caller, "org_id": org,
+             "kind": row.get("kind")},
             "api_key.revoke",
             call="manage",
             detail={"by_admin": True, "owner_id": str(row["user_id"])},

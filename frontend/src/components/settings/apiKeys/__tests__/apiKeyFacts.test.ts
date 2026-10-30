@@ -46,6 +46,13 @@ function key(over: Partial<ApiKeyRead> = {}): ApiKeyRead {
     owner_name: "Dana Kim",
     owner_is_you: true,
     calls: [],
+    // 304-04: a workflow key's MCP fields (the wire grew them).
+    kind: "workflow",
+    tools: null,
+    folders: null,
+    include_external: false,
+    org_name: null,
+    mcp_off: null,
     ...over,
   }
 }
