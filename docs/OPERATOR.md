@@ -535,6 +535,20 @@ recipe: [`./DEPLOYMENT-LESSONS.md`](./DEPLOYMENT-LESSONS.md) B2.)
 The bundled `redis` publishes **no** host port — the backend reaches it only over the compose
 network. Never publish `6379` to the public internet without `--requirepass`.
 
+### Personal data in AI tool (MCP) results — per org, off by default (GUARD-03)
+
+An org admin can turn on **Remove personal data from AI tool results** in Org admin → Settings
+(stored in `organizations.pii_redaction_enabled`, migration 222; it is not an env var and has no
+deployment-wide default other than off). When it is on, every result the `/mcp` tools send to a
+member's AI tool (Claude Code, Cursor, …) has **email addresses, phone numbers, card numbers,
+IBANs and secrets** (known API-key prefixes, JWTs, high-entropy tokens) replaced with
+`[email removed]`, `[phone removed]`, `[card number removed]`, `[IBAN removed]` or
+`[secret removed]`. **Names are not covered.** Document ids, citations, cursors and "Open in Syrel"
+links are never changed. A result that cannot be checked — the redactor fails, or takes longer
+than 2 s — is **withheld**, never sent unredacted, and the key's activity shows it as withheld.
+The redactor is deterministic and in-house (no external DLP service); its measured false-positive
+rate and latency are in `.planning/phases/305-connect-claude-code-and-cursor/305-VALIDATION.md`.
+
 ---
 
 ## Home A — managed SaaS (variant)

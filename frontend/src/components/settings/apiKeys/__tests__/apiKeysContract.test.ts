@@ -21,12 +21,15 @@ vi.mock("@/lib/api/_core", async (importOriginal) => {
 
 import {
   getOrgMcpAccess,
+  getOrgPiiRedaction,
   listPickableFolders,
   setOrgMcpAccess,
+  setOrgPiiRedaction,
   type ApiKeyCreated,
   type ApiKeyList,
   type ApiKeyRead,
   type OrgMcpAccess,
+  type OrgPiiRedaction,
   type PickableFolderList,
 } from "@/lib/api/apiKeys"
 import { ApiError } from "@/lib/api/_core"
@@ -37,6 +40,7 @@ const contract = JSON.parse(contractRaw) as {
   McpApiKeyCreated: unknown
   PickableFolderList: unknown
   OrgMcpAccess: unknown
+  OrgPiiRedaction: unknown
 }
 
 /** Every key path in `value`, arrays read through their first element (`keys[].label`). */
@@ -130,6 +134,8 @@ const SAMPLE_FOLDERS = {
 
 const SAMPLE_ORG_ACCESS = { enabled: true } satisfies OrgMcpAccess
 
+const SAMPLE_PII = { enabled: false } satisfies OrgPiiRedaction
+
 describe("293-04 api key wire types vs the backend contract fixture", () => {
   it("ApiKeyList: every fixture key path exists on the typed sample, and no extra one does", () => {
     expect(new Set(keyPaths(SAMPLE_LIST))).toEqual(new Set(keyPaths(contract.ApiKeyList)))
@@ -145,6 +151,10 @@ describe("293-04 api key wire types vs the backend contract fixture", () => {
     expect(new Set(keyPaths(SAMPLE_MCP_CREATED))).toEqual(new Set(keyPaths(contract.McpApiKeyCreated)))
     expect(new Set(keyPaths(SAMPLE_FOLDERS))).toEqual(new Set(keyPaths(contract.PickableFolderList)))
     expect(new Set(keyPaths(SAMPLE_ORG_ACCESS))).toEqual(new Set(keyPaths(contract.OrgMcpAccess)))
+  })
+
+  it("305-04: the org PII redaction switch", () => {
+    expect(new Set(keyPaths(SAMPLE_PII))).toEqual(new Set(keyPaths(contract.OrgPiiRedaction)))
   })
 
   it("no list path carries a secret or a digest (the secret lives in one response only)", () => {
@@ -187,6 +197,28 @@ describe("304-04 the three MCP calls (the listOrgApiKeys shape)", () => {
     expect(String(url)).toMatch(/\/org\/api-keys\/mcp-access$/)
     expect(init.method).toBe("PUT")
     expect(JSON.parse(init.body)).toEqual({ enabled: true })
+  })
+
+  it("305-04 getOrgPiiRedaction GETs /org/api-keys/pii-redaction with the signal", async () => {
+    const fetchMock = stubFetch(200, { enabled: false })
+    const ctrl = new AbortController()
+    expect(await getOrgPiiRedaction(ctrl.signal)).toEqual({ enabled: false })
+    const [url, init] = fetchMock.mock.calls[0]
+    expect(String(url)).toMatch(/\/org\/api-keys\/pii-redaction$/)
+    expect(init.signal).toBe(ctrl.signal)
+  })
+
+  it("305-04 setOrgPiiRedaction PUTs {enabled} as JSON, and a refusal throws the server's sentence", async () => {
+    const fetchMock = stubFetch(200, { enabled: true })
+    expect(await setOrgPiiRedaction(true)).toEqual({ enabled: true })
+    const [url, init] = fetchMock.mock.calls[0]
+    expect(String(url)).toMatch(/\/org\/api-keys\/pii-redaction$/)
+    expect(init.method).toBe("PUT")
+    expect(JSON.parse(init.body)).toEqual({ enabled: true })
+    stubFetch(403, { detail: "You do not have permission to manage this organization." })
+    const err = await setOrgPiiRedaction(false).catch((e: unknown) => e)
+    expect(err).toBeInstanceOf(ApiError)
+    expect((err as ApiError).status).toBe(403)
   })
 
   it("a refusal throws ApiError with the server's own sentence and status", async () => {

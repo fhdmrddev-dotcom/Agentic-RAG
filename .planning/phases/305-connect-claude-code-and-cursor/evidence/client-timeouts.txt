@@ -1,0 +1,37 @@
+Phase 305-04 — MCP client timeout probe (D-43 / D-57, R-26), recorded for Phase 306
+client: 2.1.312 (Claude Code)  ·  transport: Streamable HTTP, stateless, JSON responses (no progress)
+driven: claude -p --strict-mcp-config --mcp-config <scratch>/probe.json --allowedTools mcp__probe__wait_seconds  ·  probe server: scripts/mcp-timeout-probe.py
+
+wait  30 s | outcome answered     | wall   42.8 s | exit 0 | server saw start True, finish True | client said: waited 30 seconds
+wait  90 s | outcome aborted      | wall   69.3 s | exit 0 | server saw start True, finish False | client said: The operation timed out.
+wait 150 s | outcome aborted      | wall   76.5 s | exit 0 | server saw start True, finish False | client said: The operation timed out.
+wait 310 s | outcome aborted      | wall   77.0 s | exit 0 | server saw start True, finish False | client said: The operation timed out.
+
+Claude Code documents (code.claude.com/docs/en/mcp, read in 305-RESEARCH R-26): MCP_TOOL_TIMEOUT defaults to about 28 h; an HTTP call with no response and no progress aborts after 5 min idle; a main-conversation call is moved to the background after 2 min (CLAUDE_CODE_MCP_AUTO_BACKGROUND_MS).
+
+MEASURED vs DOCUMENTED — the default run above contradicts the documented ~28 h default:
+  * Every call of 90 s or more was aborted by the CLIENT about 60 s after the server saw it start
+    (server log: n=90 START 16:27:35, the client returned at ~16:28:35; n=150 START 16:28:50, the
+    client returned at ~16:29:52). Wall time includes ~10-15 s of claude start-up before the call.
+  * The server is not the limit: it kept running and logged "CALL FINISH n=90 after 90.0s" after the
+    client had gone (stateless + JSON: an abandoned call runs to completion server-side).
+
+Control — the same probe server, a plain HTTP client (httpx, no Claude Code):
+  wait  90 s | HTTP 200 'waited 90 seconds' after 90.0 s
+
+Knob — the same probe with MCP_TOOL_TIMEOUT=600000 in claude's environment:
+  wait  90 s | outcome answered     | wall  100.5 s | server saw start True, finish True | client said: waited 90 seconds
+  wait 150 s | outcome answered     | wall  162.5 s | server saw start True, finish True | client said: waited 150 seconds
+  wait 310 s | outcome aborted      | wall  318.4 s | server saw start True, finish False | client said: MCP server "probe" tool "wait_seconds" sent no response or progress for 300s; aborting. If this server is configured in your MCP settings, set a per-server "timeout" (ms) to allow longer silent runs ...
+
+Reading for 306:
+  1. Effective default on Claude Code 2.1.312: a silent tool call is aborted at ~60 s
+     ("The operation timed out."). A member who has not set MCP_TOOL_TIMEOUT gets ~60 s, not 28 h.
+  2. With MCP_TOOL_TIMEOUT raised, the documented 5-min idle ceiling holds exactly (300 s, worded,
+     naming a per-server "timeout" setting in the MCP config as the escape hatch).
+  3. No backgrounding was observed in `claude -p` (the 150 s call answered in the foreground with the
+     knob raised); the 2-min auto-background is an interactive-session behaviour, not measured here.
+  4. So any 306 tool that can run past ~60 s must answer quickly and let the caller poll (or send
+     progress), never hold one silent JSON response open.
+Cursor, the deployed cloud container, the one-box and Claude Desktop (mcp-remote) are OWED to the
+operator (305-VALIDATION.md §3); none of them were measured here.

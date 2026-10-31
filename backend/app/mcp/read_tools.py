@@ -136,7 +136,9 @@ async def read_document(principal: Any, args: R.ReadArgs) -> R.ReadResult | str:
         return NO_TEXT_SENTENCE
     piece, end = R.chunk(text, start)
     document_id = str(row["id"])
-    return R.ReadResult(
+    # 305-04 (D-56): the chunk travels with its 128-char overlap window (private, never serialised)
+    # so the outbound guard masks a value the boundary cut in half, in this chunk and the next.
+    return R.with_window(R.ReadResult(
         document_id=document_id,
         title=R.defang(str(row.get("filename") or "")),
         link=R.doc_link(document_id),
@@ -146,4 +148,4 @@ async def read_document(principal: Any, args: R.ReadArgs) -> R.ReadResult | str:
         end=end,
         total_chars=total,
         next_cursor=R.encode_read_cursor(document_id, end) if end < total else None,
-    )
+    ), text, start, end)

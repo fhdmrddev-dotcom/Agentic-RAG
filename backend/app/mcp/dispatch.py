@@ -50,6 +50,15 @@ on the service-role pool with the principal's org (``db/mcp_usage``). A search t
 nothing still writes ONE row, with the member's embedding model and provider and NULL tokens, so
 search-only usage is never missing from spend and never priced at zero. ``failed`` when the
 handler raised. A write failure is logged and never fails the call.
+
+305-04 (D-32 / D-34 / D-35 / D-56 / GUARD-03) fills i. Every handler MODEL passes
+``services.outbound_guard.guard`` — the one choke point — with the org's switch read live per call
+(``_pii_on``, the principal's org, the service-role pool). Off: the model is untouched. On: only
+``RedactableText`` fields are rewritten and the text is rendered FROM the redacted model, so the
+structure and the text cannot diverge; a read chunk carries its 128-char overlap window
+(``results.window_of``). ``WITHHELD`` (the redactor raised or ran past 2 s) answers the D-35
+sentence as a tool error and audits ``outcome: redaction_blocked``. A handler's refusal SENTENCE is
+a fixed string and is not guarded.
 """
 from __future__ import annotations
 
@@ -61,10 +70,11 @@ from mcp.shared.exceptions import MCPError
 from pydantic import BaseModel, ValidationError
 from starlette.concurrency import run_in_threadpool
 
+from app.db import outbound_policy
 from app.db.mcp_usage import insert_usage
 from app.dependencies import get_pg_pool, get_redis
 from app.models.user_settings import load_user_settings
-from app.services import usage_sink
+from app.services import outbound_guard, usage_sink
 from app.services.openai_service import resolve_effective_embedding_provider
 from app.mcp import audit as _audit
 from app.mcp import limits as _limits
@@ -114,7 +124,14 @@ async def dispatch(
                      "detail": {"limit": limited.limit} if limited.limit is not None else None}
             return tool_error(limited.sentence)
         outcome = await _run(spec, principal, name, args)
-        # [305-04 outbound guard slot: redact ``outcome`` here, before anything is rendered]
+        if isinstance(outcome, BaseModel):
+            # 305-04 (D-32 / D-35 / D-56): the ONE outbound choke point, before anything is rendered.
+            outcome = await outbound_guard.guard(
+                outcome, org_id=principal.org_id, is_on=_pii_on, window=_results.window_of(outcome)
+            )
+            if outcome is outbound_guard.WITHHELD:
+                audit = {"refused": False, "outcome": "redaction_blocked"}
+                return tool_error(outbound_guard.WITHHELD_SENTENCE)
         result = _finish(outcome)
         audit = {"refused": False, "outcome": "ok"}
         return result
@@ -124,6 +141,12 @@ async def dispatch(
                                        detail=audit.get("detail"))
         else:
             await _audit.audit_answered(principal, tool=name, outcome=audit["outcome"])
+
+
+async def _pii_on(org_id: str) -> bool | None:
+    """The org's redaction switch, read LIVE on the service-role pool for every call (305-04).
+    Any failure here propagates into ``outbound_guard.guard``, which treats it as ON."""
+    return await outbound_policy.pii_redaction_enabled(await get_pg_pool(), org_id)
 
 
 async def _run(spec: Any, principal: Any, name: str, args: BaseModel) -> Any:

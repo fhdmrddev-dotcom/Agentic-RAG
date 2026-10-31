@@ -95,6 +95,11 @@ function rowLabel(row: OrgAuditRow): string {
     const on = (meta as Record<string, unknown>).enabled === true
     return `Switched AI tool access (MCP) ${on ? "on" : "off"} for the organisation`
   }
+  // Phase 305-04 (D-36): the org PII redaction switch, the same shape ("pii_redaction").
+  if (event === "pii_redaction") {
+    const on = (meta as Record<string, unknown>).enabled === true
+    return `Turned personal data removal for AI tools ${on ? "on" : "off"} for the organisation`
+  }
   return actionLabel(row.action_type)
 }
 

@@ -151,6 +151,11 @@ export interface OrgMcpAccess {
   enabled: boolean
 }
 
+/** 305-04 (GUARD-03, D-36): the org's PII redaction switch for AI tool results (off by default). */
+export interface OrgPiiRedaction {
+  enabled: boolean
+}
+
 export interface ApiKeyCreated {
   key: ApiKeyRead
   /** Shown once, never stored anywhere (D-19). */
@@ -262,6 +267,26 @@ export async function setOrgMcpAccess(enabled: boolean): Promise<OrgMcpAccess> {
   })
   if (!res.ok) throw new ApiError(await readApiKeyFailure(res), res.status)
   return (await res.json()) as OrgMcpAccess
+}
+
+/** Phase 305-04 (D-36): the active org's PII redaction switch (admins only; 403 otherwise). */
+export async function getOrgPiiRedaction(signal?: AbortSignal): Promise<OrgPiiRedaction> {
+  const headers = await getAuthHeaders()
+  const res = await fetch(`${API_BASE}/org/api-keys/pii-redaction`, { headers, signal })
+  if (!res.ok) throw new ApiError(await readApiKeyFailure(res), res.status)
+  return (await res.json()) as OrgPiiRedaction
+}
+
+/** Phase 305-04 (D-36): flip the active org's PII redaction switch. The server writes the audit row. */
+export async function setOrgPiiRedaction(enabled: boolean): Promise<OrgPiiRedaction> {
+  const headers = await getAuthHeaders()
+  const res = await fetch(`${API_BASE}/org/api-keys/pii-redaction`, {
+    method: "PUT",
+    headers: { ...headers, "Content-Type": "application/json" },
+    body: JSON.stringify({ enabled }),
+  })
+  if (!res.ok) throw new ApiError(await readApiKeyFailure(res), res.status)
+  return (await res.json()) as OrgPiiRedaction
 }
 
 /** The server's own sentence out of a refusal (the `readScheduleFailure` shape): the plan's

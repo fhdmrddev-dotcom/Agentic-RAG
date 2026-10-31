@@ -54,6 +54,7 @@ from fastapi import APIRouter, BackgroundTasks, Body, Depends, HTTPException, st
 from starlette.concurrency import run_in_threadpool
 
 from app.db import api_keys as api_keys_db
+from app.db import outbound_policy
 from app.dependencies import (
     get_active_org_id,
     get_current_user,
@@ -76,6 +77,8 @@ from app.models.api_key import (
     McpToolRef,
     OrgMcpAccess,
     OrgMcpAccessUpdate,
+    OrgPiiRedaction,
+    OrgPiiRedactionUpdate,
     PickableFolder,
     PickableFolderList,
     StartableField,
@@ -721,3 +724,48 @@ async def set_org_mcp_access(
         org_id=str(org),
     )
     return OrgMcpAccess(enabled=bool(stored))
+
+
+# ── the org's PII redaction switch (Phase 305-04; GUARD-03, D-36, D-56) ──────────────────────
+#
+# ``organizations.pii_redaction_enabled`` (mig 222, off by default) is outside the
+# ``authenticated`` column grant, so these two routes on the EXISTING ``org_router`` (no new
+# include_router, D-04) are its only door. The helpers live in ``db/outbound_policy`` (imported as
+# a module so tests can monkeypatch). No new audit literal: ``settings.update`` +
+# ``metadata.event = 'pii_redaction'``, written AFTER the write returned (the mcp-access shape).
+
+
+@org_router.get("/pii-redaction", response_model=OrgPiiRedaction)
+async def get_org_pii_redaction(
+    current_user: dict = Depends(require_org_manage),
+    active_org: str = Depends(get_active_org_id),
+    pool: asyncpg.Pool = Depends(get_pg_pool),
+) -> OrgPiiRedaction:
+    """The active org's redaction switch, read live."""
+    enabled = await outbound_policy.pii_redaction_enabled(pool, _uuid(active_org))
+    if enabled is None:
+        raise HTTPException(status_code=404, detail=_ORG_NOT_FOUND)
+    return OrgPiiRedaction(enabled=enabled is True)
+
+
+@org_router.put("/pii-redaction", response_model=OrgPiiRedaction)
+async def set_org_pii_redaction(
+    body: OrgPiiRedactionUpdate,
+    current_user: dict = Depends(require_org_manage),
+    active_org: str = Depends(get_active_org_id),
+    pool: asyncpg.Pool = Depends(get_pg_pool),
+) -> OrgPiiRedaction:
+    """Flip the active org's redaction switch; audited after the write, never on a failed one."""
+    org = _uuid(active_org)
+    stored = await outbound_policy.set_pii_redaction_enabled(pool, org_id=org, enabled=body.enabled)
+    if stored is None:
+        raise HTTPException(status_code=404, detail=_ORG_NOT_FOUND)
+    audit_supabase = await run_in_threadpool(get_service_role_supabase, str(org))
+    await write_audit_entry(
+        user_id=str(current_user["id"]),
+        action_type=_MCP_ACCESS_AUDIT_ACTION,
+        metadata={"event": "pii_redaction", "enabled": bool(stored)},
+        supabase=audit_supabase,
+        org_id=str(org),
+    )
+    return OrgPiiRedaction(enabled=bool(stored))

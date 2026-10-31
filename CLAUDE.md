@@ -496,7 +496,7 @@ node scripts/check-hot-file-ledger.cjs <phase-dir>   # 0 clear · 1 missing rows
 | `backend/app/services/multimodal_service.py` | 14 / 7 / 984 | ⚠ absent from BOTH for its ENTIRE LIFE at **7 phases** |
 | `backend/app/api/documents.py` | 101 / 40 / 2709 (was `99 / 39 / 2698`) | 298-01: one by_org in build() + one root_upload_org kwarg · ⛔ |
 | `backend/app/api/library.py` | 3 / 3 / 304 (was `2 / 2 / 299`) | ⚠ now FIRES (298) · 298-01: summary shares the lists' org predicate ($1) |
-| `scripts/vitest-count-gate.cjs` | 411 / 87 / 6944 (was `409 / 86 / 6932`) | 305-03: 2 first pins + 7 raised; none lowered |
+| `scripts/vitest-count-gate.cjs` | 412 / 87 / 6948 (was `411 / 87 / 6944`) | 305-04: 1 first pin + 2 raised; none lowered |
 | `scripts/check-deploy-drift.sh` | 6 / 5 / 271 (was `5 / 4 / 267`) | 300-03: SMTP_* parity |
 | `scripts/build-public-openapi.cjs` | 13 / 7 / 473 (was `11 / 5 / 472`) | 301-01: notifications tag + /notifications FLAGGED (2 lines) |
 | `scripts/check-seeds-register.cjs` | 7 / 3 / 1132 | ⚠ FIRES, absent here — row added 296-05 · `\d{3,}` ids · ⛔ |
@@ -637,10 +637,10 @@ node scripts/check-hot-file-ledger.cjs <phase-dir>   # 0 clear · 1 missing rows
 | `frontend/src/lib/api/admin.ts` | 11 / 6 / 1127 (was `10 / 5 / 1125`) | 304-04: one FlagKey member (mcp_enabled) · ⛔ |
 | `frontend/src/components/admin/CapabilityGrid.tsx` | 5 / 4 / 273 (was `3 / 3 / 264`) | 304-06: one union member + one entry (mcp_enabled), no count · ⛔ |
 | `frontend/src/components/admin/ControlRoomPage.tsx` | 20 / 11 / 907 (was `19 / 10 / 906`) | 304-06: one capabilityFlags line (mcp_enabled ?? true) · ⛔ |
-| `backend/app/api/api_keys.py` | 7 / 4 / 723 (was `6 / 3 / 719`) | 305-03: one ok rule (non-ok MCP never OK) + tool + searches · ⛔ |
+| `backend/app/api/api_keys.py` | 8 / 4 / 771 (was `7 / 4 / 723`) | 305-04: GET/PUT /pii-redaction on org_router, audit after write · ⛔ |
 | `backend/app/db/api_keys.py` | 6 / 3 / 383 (was `5 / 2 / 307`) | ⚠ now FIRES (304) · 304-02: mcp_switches + kind columns · ⛔ |
-| `backend/app/models/api_key.py` | 5 / 4 / 267 (was `4 / 3 / 265`) | 305-03: ApiKeyCall.tool + ApiKeyLimits.searches_per_minute |
-| `frontend/src/lib/api/apiKeys.ts` | 6 / 4 / 285 (was `5 / 3 / 281`) | 305-03: ApiKeyCall.tool? + limits.searches_per_minute (types) · ⛔ |
+| `backend/app/models/api_key.py` | 6 / 4 / 279 (was `5 / 4 / 267`) | 305-04: OrgPiiRedaction + OrgPiiRedactionUpdate (additive) |
+| `frontend/src/lib/api/apiKeys.ts` | 7 / 4 / 310 (was `6 / 4 / 285`) | 305-04: OrgPiiRedaction + get/setOrgPiiRedaction · ⛔ |
 | `frontend/src/components/admin/ModelAdvancedCapabilities.tsx` | 0 / 0 / 290 | young (created 262) · ⛔ |
 | `frontend/src/lib/activeViewReachability.ts` | 2 / 2 / 205 (was `1 / 1 / 159`) | 297-02: route leg added (D-25) · AST; throws on a vacuous parse · ⛔ |
 | `frontend/src/components/experts/expertIcon.tsx` | 1 / 1 / 72 | ⚠ 0/0/0 AT PLANNING · measured 1/1/72 at 262-02 · ⛔ |
@@ -657,7 +657,8 @@ node scripts/check-hot-file-ledger.cjs <phase-dir>   # 0 clear · 1 missing rows
 | `frontend/src/components/ingestion/DocumentRow.tsx` | 11 / 6 / 591 (was `10 / 5 / 583`) | 284-03: one versions page, N of M; still seven `<td>` |
 | `frontend/src/components/org/OrgAdminShell.tsx` | 11 / 7 / 416 (was `10 / 6 / 416`) | 304-06: settings branch key + onRecorded={pulse} (+1 −1) · ⛔ |
 | `frontend/src/components/admin/AuditTab.tsx` | 8 / 5 / 771 (was `7 / 4 / 770`) | 298-review WR-07: one map entry (org.item.move), data only |
-| `frontend/src/components/org/OrgAuditTab.tsx` | 6 / 5 / 422 (was `5 / 4 / 416`) | 304-06: one event read (mcp_access on/off) · shared vocab OWED |
+| `frontend/src/components/org/OrgAuditTab.tsx` | 7 / 6 / 427 (was `6 / 5 / 422`) | 305-04: one event read (pii_redaction on/off) · shared vocab OWED |
+| `frontend/src/components/org/OrgSettingsTab.tsx` | 4 / 3 / 76 (was `3 / 2 / 73`) | ⚠ now FIRES (305) · 305-04: one OrgPiiRedactionCard mount |
 | `frontend/src/lib/api/documents.ts` | 11 / 10 / 599 (was `10 / 9 / 595`) | 298-01: uploadDocument sends X-Org-Id read at send time (D-29) · ⛔ |
 | `frontend/src/providers/OrgProvider.tsx` | 4 / 3 / 222 (was `3 / 2 / 217`) | ⚠ now FIRES (298) · 298-01: self-heal syncs the header first (D-36) · ⛔ |
 | `backend/app/api/folders.py` | 17 / 11 / 298 (was `16 / 10 / 288`) | 298-01: one org_lists.folder_kw keyword ×2 list routes (narrows only) |

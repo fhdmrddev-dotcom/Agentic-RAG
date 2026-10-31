@@ -4423,7 +4423,7 @@ const BASELINE = {
   "RunOriginLine.test.tsx": 6, // 293-03 — the origin leaf: nothing when absent/unknown, muted, hidden icon, one mount per run surface (src/components/workflows dir TARGET)
   "runOriginVocabulary.test.ts": 11, // 293-03 — the six origin sentences, null for absent/unknown (D-23)
   "apiKeyPrepick.test.ts": 6, // 293-04 — ⋯ menu pre-pick: sessionStorage read-once, only {workflowId, name}, never a secret
-  "apiKeysContract.test.ts": 8, // RAISED 3 -> 8 at 304-04: the MCP wire paths (kind, tools, folders, mcp block, pickable folders, org access) · 293-04 — client wire types vs backend api_keys_contract.json, path by path
+  "apiKeysContract.test.ts": 11, // RAISED 8 -> 11 at 305-04: OrgPiiRedaction vs the fixture + GET/PUT /org/api-keys/pii-redaction · RAISED 3 -> 8 at 304-04: the MCP wire paths (kind, tools, folders, mcp block, pickable folders, org access) · 293-04 — client wire types vs backend api_keys_contract.json, path by path
   "launchFieldsTwin293.test.ts": 9, // 293-04 — launchInputFields vs launch_fields_cases.json (the server twin reads the same file)
   "ApiKeysTab.test.tsx": 31, // RAISED 30 -> 31 at 305-03 (2026-10-31): the AI tool limits line, only with an MCP key · RAISED 29 -> 30 at 304-REVIEW WR-02: the header and card say "couldn't check" for an unread switch state · RAISED 17 -> 29 at 304-05: kind choice, MCP draft, show-once snippets with no secret, folders fetched once, off notice, 293 words when MCP is unavailable · 293-04 — member tab: load/fail/empty, draft rules, show-once secret never in storage/URL/DOM after save, pre-pick, re-fetched revoke
   "ApiKeyCard.test.tsx": 17, // RAISED 16 -> 17 at 305-03 (2026-10-31): an MCP key gets the strip + Show activity in MCP words (the 304 no-strip case retired on purpose), and its no-calls state · RAISED 15 -> 16 at 304-REVIEW WR-02: unknown gets no switched-off tag, its own card line · RAISED 8 -> 15 at 304-05: kind chip, MCP scope chips, off tag + card line, acts-in meta, How to connect only on active member cards · 293-04 — every state tag by rendered words, dashed refused chip + line, receipt, owner line, run links only with onOpenRun
@@ -4433,7 +4433,7 @@ const BASELINE = {
   // 293-04 (SEED-287) — OrgAuditTab.test.tsx existed since 166 and was in NEITHER knob, so it ran
   // nowhere the gate could see. Adopted at its measured count: 8 pre-existing + 1 unknown-code case
   // + 7 api_key.* cases (5 labels, the API keys filter group, the ?raw lockstep with admin/AuditTab.tsx).
-  "OrgAuditTab.test.tsx": 23, // RAISED 19 -> 23 at 304-06: settings.update + mcp_access reads on/off for the organisation, other rows unchanged, AuditTab untouched · 298-review WR-07: 16 → 19 (org.item.move label, Organizing filter, identical line in both maps)
+  "OrgAuditTab.test.tsx": 26, // RAISED 23 -> 26 at 305-04: settings.update + pii_redaction reads on/off, beside the mcp_access arm · RAISED 19 -> 23 at 304-06: settings.update + mcp_access reads on/off for the organisation, other rows unchanged, AuditTab untouched · 298-review WR-07: 16 → 19 (org.item.move label, Organizing filter, identical line in both maps)
   // ── Phase 300-05 (D-11 / UI-SPEC S4) — FILE-LEVEL in TARGETS (no `src/components/org` entry), same commit.
   "InvitationsTab.test.tsx": 17, // 300-05 — first-ever pin: 8 shipped (send gate, chips, resend/revoke, role picker) + 9 'Email not sent' chip / resend-line cases
   "InviteMemberDialog.test.tsx": 7, // 300-05 — the three result arms by their words, Copy link focused on failed, older backend never a false failure, org.ts unwraps
@@ -4532,6 +4532,8 @@ const BASELINE = {
   // Phase 305-03 (D-31 / D-53) — FIRST pins, both knobs in the same commit (each is FILE-LEVEL in TARGETS below).
   "mcpCallWords.test.ts": 8, // 305-03 — an MCP call's words: answered, withheld, failed, over the limit (bucket + figure), not granted, shipped reasons kept, time · tool · result
   "ApiKeyActivity.mcp.test.tsx": 4, // 305-03 — Time · Tool · Result with the tool pill, the MCP empty sentence, revoked keeps the shipped one, a workflow key keeps five columns
+  // Phase 305-04 (D-37) — FIRST pin, both knobs in the same commit (FILE-LEVEL in TARGETS below).
+  "OrgPiiRedactionCard.test.tsx": 9, // 305-04 — Loading/failed show no switch, OFF calm, describedby the two sub lines, never optimistic + tag + onRecorded once, server answer wins, direct flip off, failed write as a status, mounted right after OrgMcpSwitchCard
   "citationNav.test.tsx": 18, // 305-02 — first pin (153 contract, 13) + the document address arrival: once per distinct id without navigating, leaveDocumentAddress REPLACE, a no-op off an address, no prop unchanged
 }
 
@@ -6662,6 +6664,8 @@ const TARGETS = [
   // Phase 305-03 — FILE-LEVEL, SAME commit as their pins.
   "src/components/settings/apiKeys/__tests__/mcpCallWords.test.ts",
   "src/components/settings/apiKeys/__tests__/ApiKeyActivity.mcp.test.tsx",
+  // Phase 305-04 — FILE-LEVEL, SAME commit as its pin.
+  "src/components/org/__tests__/OrgPiiRedactionCard.test.tsx",
 ]
 
 const REPO_ROOT = path.resolve(__dirname, "..")
