@@ -20142,6 +20142,22 @@
             "type": "integer",
             "title": "Api Key Searches Per Minute"
           },
+          "mcp_ask_wait_seconds": {
+            "type": "integer",
+            "title": "Mcp Ask Wait Seconds"
+          },
+          "outside_inflight_per_key": {
+            "type": "integer",
+            "title": "Outside Inflight Per Key"
+          },
+          "outside_inflight_per_org": {
+            "type": "integer",
+            "title": "Outside Inflight Per Org"
+          },
+          "outside_inflight_per_provider": {
+            "type": "integer",
+            "title": "Outside Inflight Per Provider"
+          },
           "notification_email_delay_seconds": {
             "type": "integer",
             "title": "Notification Email Delay Seconds"
@@ -20398,6 +20414,10 @@
           "api_key_starts_per_minute",
           "api_key_reads_per_minute",
           "api_key_searches_per_minute",
+          "mcp_ask_wait_seconds",
+          "outside_inflight_per_key",
+          "outside_inflight_per_org",
+          "outside_inflight_per_provider",
           "notification_email_delay_seconds",
           "email_from_address",
           "email_from_name",
@@ -27201,6 +27221,50 @@
               }
             ],
             "title": "Api Key Searches Per Minute"
+          },
+          "mcp_ask_wait_seconds": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Mcp Ask Wait Seconds"
+          },
+          "outside_inflight_per_key": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Outside Inflight Per Key"
+          },
+          "outside_inflight_per_org": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Outside Inflight Per Org"
+          },
+          "outside_inflight_per_provider": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Outside Inflight Per Provider"
           },
           "notification_email_delay_seconds": {
             "anyOf": [

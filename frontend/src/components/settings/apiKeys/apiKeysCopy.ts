@@ -258,6 +258,12 @@ export const API_KEYS_COPY = {
     overStarts: "over the limit: {N} starts a minute",
     overReads: "over the limit: {N} reads a minute",
     overBare: "over the limit",
+    /** 306-02 (GUARD-01, UI-SPEC §Surface 7a): outside admission refused the start. One home for
+     *  a workflow key at /inbound and an AI tool key over MCP; `admission_unavailable` reuses
+     *  `limiterUnavailable`. */
+    admissionKey: "too many questions and runs already in progress for this key",
+    admissionOrg: "too many questions and runs already in progress in this organisation",
+    admissionProvider: "the AI provider was busy with other outside requests",
   },
 
   /** 293-03 (D-14 / UI-SPEC Surface 6): the operator's per-key limits card in Settings →
@@ -273,7 +279,21 @@ export const API_KEYS_COPY = {
     readsHint: "Default 120. Workflow status reads, and AI tool list and read calls.",
     searchesLabel: "Searches per minute, per key",
     searchesHint: "Default 30. AI tool searches only; each one runs an embedding call.",
-    footer: "Applies to every key once you click Save Integrations.",
+    // 306-02 (UI-SPEC §Surface 2): reworded — the card now holds org- and provider-wide limits too.
+    footer: "Applies once you click Save Integrations.",
+    // 306-02 (D-36 / D-35, UI-SPEC §Surface 2): the second group, "Questions and runs from outside".
+    outsideTitle: "Questions and runs from outside",
+    outsideDescription:
+      "For questions and workflow runs that AI tools and API keys start. A start over a limit is refused and told to try again in a few seconds. In-app chats are never counted or held back.",
+    askWaitLabel: "Answer wait, in seconds",
+    askWaitHint:
+      "Default 30, from 5 to 45. How long an AI tool waits for an answer before it gets a handle to fetch it later. AI tools give up on a call after about a minute.",
+    inflightKeyLabel: "Running at once, per key",
+    inflightKeyHint: "Default 2. Questions and runs one key can have in progress.",
+    inflightOrgLabel: "Running at once, per organisation",
+    inflightOrgHint: "Default 4. Across every key in one organisation.",
+    inflightProviderLabel: "Running at once, per AI provider",
+    inflightProviderHint: "Default 6. Across the whole deployment, for each AI provider.",
     loadFailed: "Couldn't load the current API key limits, so they can't be changed here right now.",
     retry: "Retry",
   },

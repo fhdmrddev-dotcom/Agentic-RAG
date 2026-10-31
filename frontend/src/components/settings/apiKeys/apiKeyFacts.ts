@@ -307,6 +307,14 @@ function refusedWords(call: ApiKeyCall, ctx: CallContext): string | null {
       return C.calls.workflowsDisabled
     case "limiter_unavailable":
       return C.calls.limiterUnavailable
+    case "admission:credential": // 306-02 (GUARD-01, D-19)
+      return C.calls.admissionKey
+    case "admission:org":
+      return C.calls.admissionOrg
+    case "admission:provider":
+      return C.calls.admissionProvider
+    case "admission_unavailable":
+      return C.calls.limiterUnavailable
     case "wrong_kind": // 304-02 (D-36)
       return M.calls.wrongKind
     case "mcp_off_org":

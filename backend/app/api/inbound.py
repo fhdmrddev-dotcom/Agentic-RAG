@@ -83,7 +83,7 @@ from app.services.key_run_read import (  # noqa: F401 — re-export (306-01, D-3
 )
 # 306-01 (D-39, D-11): the start validation order moved to key_run_start.py.
 from app.services.key_run_start import KeyStartRefusal, validate_key_start
-from app.services.rate_limit import enforce_ip_limit, enforce_key_limit
+from app.services.rate_limit import UNAVAILABLE_DETAIL, enforce_ip_limit, enforce_key_limit
 
 logger = logging.getLogger(__name__)
 
@@ -277,6 +277,46 @@ async def start_workflow_run(
     wid, definition, values = checked.wid, checked.definition, checked.values
 
     name = checked.name
+
+    # 306-02 (D-16, D-17, D-35): admission, AFTER the per-key limit and the validation (a bad
+    # workflow id never takes a slot). One lease in the org / key / provider scopes; full → 429 +
+    # Retry-After, Redis down → 503 (fail closed). The drive's on_finish gives the lease back.
+    from uuid import uuid4  # noqa: PLC0415
+
+    from app.services import outside_admission  # noqa: PLC0415
+    from app.services.run_model_resolution import resolve_owner_run_model  # noqa: PLC0415
+
+    _m, provider = await resolve_owner_run_model(owner_id)
+    lease_id = str(uuid4())
+    try:
+        outcome = await outside_admission.acquire(
+            redis, org_id=key.org_id, credential_id=key.id, provider=provider, lease_id=lease_id,
+            ttl_s=outside_admission.RUN_LEASE_TTL_S, retry_s=outside_admission.RUN_RETRY_S,
+        )
+    except outside_admission.OutsideStartUnavailable:
+        raise await _refused(
+            key, redis=redis, call="start", reason=outside_admission.UNAVAILABLE_REASON,
+            workflow_id=str(wid),
+            exc=HTTPException(status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+                              detail=UNAVAILABLE_DETAIL),
+        )
+    if isinstance(outcome, outside_admission.Full):
+        raise await _refused(
+            key, redis=redis, call="start", reason=outside_admission.REASON[outcome.scope],
+            workflow_id=str(wid),
+            exc=HTTPException(
+                status_code=status.HTTP_429_TOO_MANY_REQUESTS,
+                detail=outside_admission.INBOUND_FULL_SENTENCE[outcome.scope].format(
+                    retry=outcome.retry_s),
+                headers={"Retry-After": str(outcome.retry_s)},
+            ),
+        )
+
+    async def _release(_status, _run_id) -> None:
+        await outside_admission.release(
+            redis, org_id=key.org_id, credential_id=key.id, provider=provider, lease_id=lease_id,
+        )
+
     try:
         run_id = await unattended_launch.launch_unattended_run(
             owner_id=owner_id,
@@ -299,12 +339,17 @@ async def start_workflow_run(
             origin_kind="key",
             origin_label=key.label,
             origin_ref=UUID(key.id),
+            on_finish=_release,
         )
     except unattended_launch.UnattendedLaunchDisabled as off:  # flipped off mid-request
+        await _release(None, None)
         raise await _refused(
             key, redis=redis, call="start", reason="workflows_disabled", workflow_id=str(wid),
             exc=HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail=str(off)),
         )
+    except BaseException:  # the drive never started, so on_finish never fires: release now
+        await _release(None, None)
+        raise
     audit_key_call(
         background_tasks, key, "api_key.start", call="start", workflow_id=str(wid),
         run_id=str(run_id), outcome="ok",

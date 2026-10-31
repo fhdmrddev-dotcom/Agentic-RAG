@@ -16,6 +16,8 @@ import { API_KEYS_COPY } from "../apiKeysCopy"
 import inboundPy from "../../../../../../backend/app/api/inbound.py?raw"
 import apiKeyAuthPy from "../../../../../../backend/app/security/api_key_auth.py?raw"
 import inboundInputsPy from "../../../../../../backend/app/services/inbound_inputs.py?raw"
+import outsideAdmissionPy from "../../../../../../backend/app/services/outside_admission.py?raw"
+import keyRunStartPy from "../../../../../../backend/app/services/key_run_start.py?raw"
 import type { ApiKeyCall, ApiKeyRead, StartableWorkflow } from "@/lib/api/apiKeys"
 import {
   callBars,
@@ -281,6 +283,9 @@ describe("293-04 callWords — every reason has words", () => {
         if (m[2]) emitted.add(m[2])
       }
     }
+    // 306-02: 306-01 moved the start checks to key_run_start.py, where each reason is the first
+    // argument of `KeyStartRefusal(...)`. Without this the scan fell to 13 and went red.
+    for (const m of keyRunStartPy.matchAll(/KeyStartRefusal\(\s*"([a-z_]+)"/g)) emitted.add(m[1])
     const codes = inboundInputsPy.match(/RefusalCode = Literal\[([^\]]+)\]/)?.[1] ?? ""
     for (const m of codes.matchAll(/"([a-z_]+)"/g)) emitted.add(m[1])
     // Guard the extraction itself: an empty or shrunken set would pass vacuously.
@@ -452,5 +457,52 @@ describe("293-04 the copy module is a true leaf, the facts module spells no copy
     )
     expect(API_KEYS_COPY.admin.description).toBe("Every key in {org}. A key acts as the member who made it.")
     expect(API_KEYS_COPY.admin.descriptionNoOrg).toBe("Every key in this organisation. A key acts as the member who made it.")
+  })
+})
+
+// 306-02 (GUARD-01; D-19, UI-SPEC §Surface 7a): a start refused by outside admission reads in
+// plain words, the same for a workflow key at /inbound and an AI tool key over MCP.
+describe("306-02 callWords — admission refusals", () => {
+  const ctx = { orgName: "Acme" }
+
+  it.each([
+    ["admission:credential", "✕ refused: too many questions and runs already in progress for this key"],
+    ["admission:org", "✕ refused: too many questions and runs already in progress in this organisation"],
+    ["admission:provider", "✕ refused: the AI provider was busy with other outside requests"],
+    ["admission_unavailable", "✕ refused: the limit check was unavailable; try again shortly"],
+  ] as const)("%s", (reason, text) => {
+    expect(callWords(call({ ok: false, outcome: null, run_id: null, reason }), ctx)).toEqual({ ok: false, text })
+  })
+
+  it("the three admission words live in the copy leaf, verbatim", () => {
+    const calls = API_KEYS_COPY.calls as Record<string, string>
+    expect(calls.admissionKey).toBe("too many questions and runs already in progress for this key")
+    expect(calls.admissionOrg).toBe("too many questions and runs already in progress in this organisation")
+    expect(calls.admissionProvider).toBe("the AI provider was busy with other outside requests")
+  })
+
+  // The reasons are constants in outside_admission.py (REASON / UNAVAILABLE_REASON), not
+  // `reason="..."` literals in inbound.py, so the 293 scan above cannot see them. Read them here.
+  it("every admission reason the backend can audit has words, never the raw code", () => {
+    const reasons = new Set<string>()
+    const block = outsideAdmissionPy.match(/REASON: dict\[str, str\] = \{([^}]+)\}/)?.[1] ?? ""
+    for (const m of block.matchAll(/:\s*"([a-z_:]+)"/g)) reasons.add(m[1])
+    const unavailable = outsideAdmissionPy.match(/UNAVAILABLE_REASON = "([a-z_]+)"/)?.[1]
+    if (unavailable) reasons.add(unavailable)
+    expect([...reasons].sort()).toEqual([
+      "admission:credential", "admission:org", "admission:provider", "admission_unavailable",
+    ])
+    for (const reason of reasons) {
+      const t = callWords(call({ ok: false, reason }), ctx).text
+      expect(t.startsWith("✕ refused: "), reason).toBe(true)
+      expect(t, reason).not.toContain(reason)
+    }
+  })
+
+  it("an unknown admission-looking reason still shows its raw code, never a tick", () => {
+    expect(callWords(call({ ok: false, reason: "admission:galaxy" }), ctx)).toEqual({
+      ok: false,
+      text: "✕ refused: admission:galaxy",
+    })
   })
 })
