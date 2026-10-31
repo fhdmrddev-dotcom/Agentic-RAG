@@ -26,6 +26,7 @@ from typing import Any
 
 from app.services.metadata_field_service import list_field_definitions
 from app.services.retrieval_scope import top_document_types
+from app.services.outside_run_scope import narrow_schemas  # 306 Seam A (D-26) — a leaf, cycle-safe
 
 logger = logging.getLogger(__name__)
 
@@ -172,7 +173,12 @@ def with_search_vocabulary(active_tools: list | None, user_settings: Any, vocab:
     "the default get_tools()" downstream (the no-vocabulary path is byte-identical). Otherwise a NEW
     list: ``None`` starts from ``get_tools(user_settings)`` exactly like the connector block; the
     search entry is a deep COPY, every other entry the same object, order preserved.
+
+    306 Seam A (D-26): inside an OUTSIDE run (an MCP ask) the list is first narrowed to the
+    allow-list; outside one ``narrow_schemas`` returns None and nothing changes.
     """
+    narrowed = narrow_schemas(active_tools, user_settings)
+    active_tools = narrowed if narrowed is not None else active_tools
     if vocab is None:
         return active_tools
     note = _vocabulary_note(vocab)

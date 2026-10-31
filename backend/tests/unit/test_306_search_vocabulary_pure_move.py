@@ -72,7 +72,14 @@ _BORROWED = ("DATE_WORDS", "_field_label")
 
 _IMPORTERS = ("backend/app/services/agent_loop.py", "backend/app/services/task_service.py")
 
-RETIRED: dict[str, str] = {}
+RETIRED: dict[str, str] = {
+    "with_search_vocabulary": (
+        "Phase 306 (306-03, D-26, 2026-10-31): deliberate post-move edit. Seam A — the first two "
+        "lines narrow active_tools to the outside-run allow-list (outside_run_scope.narrow_schemas) "
+        "before the vocab-is-None return. Outside an outside run it is pinned byte-identical to the "
+        "306-01 function by test_306_outside_run_scope.py::test_seam_a_outside_an_outside_run_is_the_306_01_function."
+    ),
+}
 
 
 def _blob_at_base(rel_path: str) -> str:
@@ -161,10 +168,11 @@ def test_each_moved_name_has_exactly_one_home():
 
 
 def test_search_vocabulary_binds_nothing_new():
-    """Only the moved names, imports and the module ``logger`` — no narrowing line yet (306-03)."""
+    """Only the moved names, imports and the module ``logger``. 306-03 adds exactly ONE call of
+    ``narrow_schemas`` (Seam A), inside the retired ``with_search_vocabulary``, and binds nothing."""
     src = _source(_VOCAB_REL)
     assert set(_definition_names(src)) == set(MOVE_MAP) | {"logger"}
-    assert "narrow_schemas" not in src
+    assert src.count("narrow_schemas(") == 1
 
 
 def test_the_tool_reexports_from_one_import_statement():
