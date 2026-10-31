@@ -1,5 +1,5 @@
 ---
-status: awaiting_human_verify
+status: resolved
 trigger: "Pool deadlock in the phase 305 MCP server: 32 concurrent search_knowledge_base calls, 10 connections idle in transaction after SELECT set_config('app.acting_org_id', $1, true), rest hang > 3 min"
 created: 2026-10-31T14:45:00Z
 updated: 2026-10-31T15:30:00Z
@@ -43,3 +43,7 @@ root_cause: "backend/app/services/retrieval_tuning.py:124-128 get_server_ef_sear
 fix: "554fe5235 — in-transaction probe reads pg_settings.reset_val on the held connection; never a second pooled connection (RED ccfbb1133)"
 verification: "unit + live RED->GREEN (both MCP and app variants); e2e acting_member_reads.search 12 concurrent on 2-conn pool 0/12 -> 12/12; targeted subset failures identical to base (15 inherited test_retrieval_service); baseline gate 70 <= 71 PASSED"
 files_changed: [backend/app/services/retrieval_tuning.py]
+
+## Human verify (orchestrator, 2026-10-31)
+
+Re-ran the 32-call burst on the operator stack (:8000, `--reload`, fix loaded): 30 answered, 2 refused, 0 connections idle in transaction; 30 `api_key.read` + 1 `api_key.refused` audit rows; 30 `mcp_usage` rows. Recorded in `305-VALIDATION.md` §2.2.

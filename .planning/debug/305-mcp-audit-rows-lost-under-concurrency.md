@@ -1,5 +1,5 @@
 ---
-status: awaiting_human_verify
+status: resolved
 trigger: "Lost MCP audit rows under concurrency (phase 305): 32 concurrent tools/call search_knowledge_base -> 30 answered at ~72.5 s + 2 refused; mcp_usage has all 60 rows, audit_log has ZERO rows for the 32 calls. 1 and 3 concurrent calls audit fine."
 created: 2026-10-31T15:40:00Z
 updated: 2026-10-31T16:45:00Z
@@ -61,3 +61,7 @@ root_cause: "backend/app/mcp/audit.py wrote each row through api_key_auth.audit_
 fix: "audit.py: insert_audit_row = one parameterized INSERT on the asyncpg pool (metadata from the 293 _audit_args builder); dispatch.py: both bookkeeping bounds log at ERROR (tool, key, write) when they fire. audit_key_call_now untouched (293 HTTP refusals have no bound)."
 verification: "live RED->GREEN: 32 dispatches at a 2 s bound 1/30 -> 30+1 rows (3 stable runs, 2.5 s each); unit fired-bound tests RED->GREEN; own-server bursts after the fix: 32 searches 30 read + 1 refused (14.1 s -> 7.7 s), 100 list_documents 100/100 (27.6 s -> 0.85 s), 0 'NOT written' lines; targeted unit 976 passed; 37 live audit/refusal/spend/tools/304-parity passed"
 files_changed: [backend/app/mcp/audit.py, backend/app/mcp/dispatch.py, backend/tests/unit/test_305_audit.py, backend/tests/unit/_mcp305_harness.py, backend/tests/unit/test_305_edge_refusals.py, docs/HOT-FILE-LEDGER.md]
+
+## Human verify (orchestrator, 2026-10-31)
+
+Re-ran the 32-call burst on the operator stack (:8000, `--reload`, fix loaded): 30 answered, 2 refused, 0 connections idle in transaction; 30 `api_key.read` + 1 `api_key.refused` audit rows; 30 `mcp_usage` rows. Recorded in `305-VALIDATION.md` §2.2.
