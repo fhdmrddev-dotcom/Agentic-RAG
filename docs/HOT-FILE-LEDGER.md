@@ -28739,3 +28739,13 @@ CLAUDE.md verdict cell: none (the file does not fire).
 Scan-list cell as of 2026-10-31 (replaced by 304-REVIEW WR-02, moved verbatim): 408 / 86 / 6932 (was `406 / 85 / 6910`) | ⚠ **FIRES** | 304-06: 9 BASELINE pins + FILE-LEVEL TARGETS for the 304 suites; RAISED apiKeyFacts, ApiKeysTab, ApiKeyCard, RevokeApiKeySheet, apiKeysContract, OrgApiKeysTab, OrgAuditTab, OrgAdminShell; none lowered |
 
 CLAUDE.md verdict cell as of 2026-10-31 (replaced by 304-REVIEW WR-02, moved verbatim): | `scripts/vitest-count-gate.cjs` | 408 / 86 / 6932 (was `406 / 85 / 6910`) | 304-06: 9 pins added (304 suites); 8 raised; none lowered |
+
+### `backend/app/middleware/maintenance.py`
+
+*305-01 Task 4 (D-25 / MCP-07), 2026-10-31.*
+
+**`2 / 2 / 121` (was `1 / 1 / 113`).** One allowlist arm in `_is_allowlisted`: `path == MCP_PATH or path.startswith(MCP_PATH + "/")`, with `MCP_PATH` imported from `app.services.mcp_tool_catalogue` (a pure module, so no import cycle). The MCP endpoint is POST-only even for reads, so the write-block would otherwise stop searching and reading too; inside the server, `app/mcp/dispatch.py` refuses any tool whose annotations are not read-only with the maintenance sentence (a JSON-RPC error, never a 503) and reuses this module's `_read_maintenance` rather than a second reader. Pinned by `tests/test_147_maintenance_mw.py` (`/mcp` and `/mcp/` pass, `/mcpx` is still 503) and `tests/unit/test_305_maintenance.py`. Binding invariants: ⛔ pure ASGI, never `BaseHTTPMiddleware`; the flag read stays fail-open and in-memory; every allowlist prefix matches on a path-segment boundary.
+
+Scan-list cell as of 2026-10-31 (planted at 305 planning, kept): 1 / 1 / 113 | no (1 phase) | ⚠ absent its entire life — row added at 305 planning (D-25). 305-01: one MCP_PATH allowlist arm. ⛔ pure ASGI; fail-open flag read; segment-boundary match only |
+
+CLAUDE.md verdict cell: none (the file does not fire).

@@ -126,8 +126,9 @@ export const MCP_KEY_COPY = {
     copyCli: "Copy the {client} command",
     claudeAiWarning:
       "⚠ Don't paste this key into Claude.ai's organisation connector settings. Everyone in that Claude organisation would act as you. Claude.ai and Claude Desktop will connect with sign-in instead.",
+    // 305 D-49: production refuses an unset, loopback or http base (mcp_public_base), so "set it" means https.
     noAddress:
-      "This deployment's public address isn't set, so the connection address can't be shown yet. Ask your operator to set it.",
+      "This deployment doesn't have a public https address for AI tools yet, so the connection address can't be shown. Ask your operator to set it.",
     howToConnect: "How to connect",
     hideHowToConnect: "Hide how to connect",
 

@@ -61,7 +61,7 @@ def test_a_principal_with_no_grant_lists_nothing(monkeypatch):
 
 
 def test_argument_validation_is_a_plain_sentence(monkeypatch):
-    calls = _install(monkeypatch)
+    calls = _install(monkeypatch, replace(h.PRINCIPAL, tools=("t_query",)))
     with TestClient(h.fresh_app(), base_url=h.BASE) as c:
         r = h.call(c, "t_query", {"limit": "many"})
     result = r.json()["result"]

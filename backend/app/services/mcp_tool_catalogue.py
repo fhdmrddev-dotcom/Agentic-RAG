@@ -116,17 +116,45 @@ def normalise_tool_selection(names: Iterable[str]) -> ToolSelection:
 MCP_PATH = "/mcp"
 
 
-def mcp_url() -> str | None:
-    """The address an MCP client connects to, or ``None`` when ``BACKEND_PUBLIC_URL`` is unset.
+def mcp_public_base() -> str | None:
+    """The public base MCP is served under, or ``None`` when this deployment must not serve it.
 
-    Decision (pinned in ``test_304_tool_catalogue``): a LOOPBACK base is served as-is. Unlike
-    ``inbound._public_api_base`` there is no request here to swap it for, and on a local stack a
-    client on the same machine reaches exactly that address. A deployed stack sets
-    ``BACKEND_PUBLIC_URL`` (it is also the OAuth redirect base).
+    Phase 305 (D-49 / R-08 / T-305-20) — the ONE refuse-mount predicate. ``register_mcp`` mounts
+    nothing (and logs CRITICAL) when it returns ``None``, and ``mcp_url()`` returns ``None`` through
+    it, so the key screen shows "no address" rather than an address that answers 404.
+
+    ``None`` when ``BACKEND_PUBLIC_URL`` is unset — and, in production only, when its host is
+    loopback or its scheme is not ``https`` (an AI tool on another machine cannot reach a loopback
+    base, and a key must never travel over plain http). Outside production a loopback base is
+    served as-is (the 304 pin in ``test_304_tool_catalogue``).
     """
+    from urllib.parse import urlsplit  # noqa: PLC0415
+
     from app.config import settings  # noqa: PLC0415 — lazy: this module stays importable bare
 
     base = str(getattr(settings, "backend_public_url", "") or "").strip().rstrip("/")
     if not base:
+        return None
+    from app.api.api_docs import is_production_environment  # noqa: PLC0415
+
+    if is_production_environment():
+        from app.api.inbound import _is_loopback  # noqa: PLC0415
+
+        if _is_loopback(base) or urlsplit(base).scheme.lower() != "https":
+            return None
+    return base
+
+
+def mcp_url() -> str | None:
+    """The address an MCP client connects to, or ``None`` when this deployment does not serve MCP.
+
+    Decision (pinned in ``test_304_tool_catalogue``): outside production a LOOPBACK base is served
+    as-is. Unlike ``inbound._public_api_base`` there is no request here to swap it for, and on a
+    local stack a client on the same machine reaches exactly that address. A deployed stack sets
+    ``BACKEND_PUBLIC_URL`` (it is also the OAuth redirect base). Phase 305: built through
+    ``mcp_public_base()``, the same predicate that decides whether ``/mcp`` is mounted at all.
+    """
+    base = mcp_public_base()
+    if base is None:
         return None
     return base + MCP_PATH

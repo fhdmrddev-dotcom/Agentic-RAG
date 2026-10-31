@@ -26,7 +26,7 @@ from app.models.user_settings import load_app_settings_async
 
 logger = logging.getLogger(__name__)
 
-Kind = Literal["start", "read", "citation"]
+Kind = Literal["start", "read", "citation", "mcp_ip", "expensive"]
 
 UNAVAILABLE_DETAIL = (
     "Rate limiting is unavailable right now, so this call was refused. Try again in a minute."
@@ -136,3 +136,25 @@ async def enforce_user_citation_limit(redis, *, user_id: str) -> None:
             detail={"reason": "rate_limited"},
             headers={"Retry-After": str(retry)},
         )
+
+
+# ── Phase 305 (D-54 / T-305-13) — the MCP edge's per-address limit ──────────────────────────────
+# Its OWN bucket kind (``mcp_ip``), never the inbound door's ``ip``: behind a proxy every caller
+# shares one address (see ``IP_CALLS_PER_MINUTE``), so a shared bucket would let MCP traffic starve
+# ``/inbound``. Same ceiling, same fixed window. The edge calls this BEFORE it reads the key, so an
+# unknown-key flood costs one counter. It raises instead of returning an ``HTTPException``: the MCP
+# edge is a raw ASGI endpoint, where no FastAPI exception handler runs.
+
+
+class LimiterUnavailable(Exception):
+    """The limiter could not count (Redis raised). The caller refuses the call: FAIL CLOSED."""
+
+
+async def check_ip_limit(redis, *, client: str) -> int | None:
+    """Count one MCP call from ``client``. ``None`` within the limit, else the ``Retry-After``
+    seconds; raises ``LimiterUnavailable`` on any Redis failure (fail closed, D-15)."""
+    try:
+        return await hit(redis, key_id=client, kind="mcp_ip", limit=int(IP_CALLS_PER_MINUTE))
+    except Exception as exc:  # noqa: BLE001 — any Redis failure refuses; see the module docblock
+        logger.warning("mcp per-address limiter unavailable; refusing the call", exc_info=True)
+        raise LimiterUnavailable() from exc
