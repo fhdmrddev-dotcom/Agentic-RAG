@@ -258,12 +258,13 @@ def test_the_service_role_is_used_only_by_the_two_sanctioned_calls():
     refs = re.findall(r"\bget_service_role_supabase\b", code)
     # the import line, the threadpooled search build, the resolve_document_scope argument
     assert len(refs) == 3, refs
+    flat = re.sub(r"\s+", " ", code)  # the tokenizer keeps in-bracket line breaks as tokens
     pooled = re.findall(
-        r"(\w+) = await run_in_threadpool \( get_service_role_supabase , principal \. org_id \)", code
+        r"(\w+) = await run_in_threadpool \( get_service_role_supabase , principal \. org_id \)", flat
     )
     assert len(pooled) == 1, pooled
     client = pooled[0]
-    m = re.search(r"search_documents \( query , principal \. user_id , (\w+) ,", code)
+    m = re.search(r"search_documents \( query , principal \. user_id , (\w+) ,", flat)
     assert m and m.group(1) == client, (m and m.group(1), client)
     assert len(re.findall(r"get_service_role_supabase \(", code)) == 1  # one inline call remains
     assert re.search(r"resolve_document_scope \([^()]*get_service_role_supabase \(", code)

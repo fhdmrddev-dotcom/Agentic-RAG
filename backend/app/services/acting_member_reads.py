@@ -174,14 +174,26 @@ def _nothing(scope: KeyScope) -> bool:
     return scope.folder_ids is not None and len(scope.folder_ids) == 0
 
 
-async def _page(conn: Any, scope: KeyScope, *, limit: int, offset: int, ids: list[str] | None = None) -> dict:
-    """One page of the Library list (``GET /documents``'s order and page contract) + exact total."""
+async def _page(
+    conn: Any, scope: KeyScope, *, limit: int, offset: int, ids: list[str] | None = None,
+    folder_id: str | None = None, root_only: bool = False,
+) -> dict:
+    """One page of the Library list (``GET /documents``'s order and page contract) + exact total.
+
+    305-02 (D-51): ``folder_id`` (already validated) narrows to one folder, ``root_only`` to the
+    documents in no folder. Both are predicates NARROWER than RLS, appended after the key's scope
+    clauses, so the ``KeyScope`` still applies; the value is bound as ``$N``, never interpolated."""
     args: list = []
     where = ["d.is_latest", "d.retrievable"]  # D-46: the agent rule (mig 205), not Library parity
     if ids is not None:
         args.append(ids)
         where.append(f"d.id = ANY(${len(args)}::uuid[])")
     where += _scope_clauses(scope, args)
+    if folder_id is not None:
+        args.append(folder_id)
+        where.append(f"d.folder_id = ${len(args)}::uuid")
+    elif root_only:
+        where.append("d.folder_id IS NULL")
     predicate = " AND ".join(where)
     total = await conn.fetchval(f"SELECT count(*) FROM public.library_documents d WHERE {predicate}", *args)
     args += [int(limit), int(offset)]
@@ -207,16 +219,29 @@ async def list_folders(principal: Any) -> list[dict]:
         return [f for f in folders if f["id"] in keep]
 
 
-async def list_documents(principal: Any, *, limit: int = 50, offset: int = 0) -> dict:
+async def list_documents(
+    principal: Any, *, limit: int = 50, offset: int = 0, folder_id: str | None = None,
+    root_only: bool = False,
+) -> dict:
     """``{items, total}`` — the Library's latest, RETRIEVABLE documents in the key's org (D-46:
     archived and source-gone ones are out, as for every agent read), newest first; narrowed keys
     see only their subtrees (Root documents are out), connector-fed documents only with
-    ``include_external``."""
+    ``include_external``.
+
+    305-02 (D-51, one additive change): ``folder_id`` lists one folder's documents and
+    ``root_only`` the documents in no folder — the MCP ``list_documents`` tool pages through
+    folders with them. A malformed ``folder_id`` is an empty page before any SQL. The defaults keep
+    every existing caller byte-identical."""
     _require(principal, "list_documents")
+    fid = None
+    if folder_id is not None:
+        fid = _uuid_or_none(folder_id)
+        if fid is None:
+            return {"items": [], "total": 0}
     async with _acting(principal) as (conn, scope, _folders):
         if _nothing(scope):
             return {"items": [], "total": 0}
-        return await _page(conn, scope, limit=limit, offset=offset)
+        return await _page(conn, scope, limit=limit, offset=offset, folder_id=fid, root_only=root_only)
 
 
 async def read_document(principal: Any, document_id: Any) -> dict | None:
@@ -255,7 +280,9 @@ async def search(principal: Any, query: str, *, user_settings: Any = None) -> li
     safe and is exactly ``[r for r in app_result if not external(r)]``.
 
     The service-role client handed in is used by retrieval ONLY to enrich filenames of rows the
-    acting connection's RPC already returned.
+    acting connection's RPC already returned. 305-02 (D-57, 304-REVIEW IN-03): it is built with
+    ``await run_in_threadpool(...)`` — building a supabase-py client is blocking I/O and must stay
+    off the event loop (D-v2.5-01); the 304 fence pins the threadpooled variable as the argument.
     """
     _require(principal, "search")
     scope, _folders = await _compose(principal)
@@ -265,9 +292,10 @@ async def search(principal: Any, query: str, *, user_settings: Any = None) -> li
         # the member's effective settings, loaded the way the app's own search path loads them
         user_settings = await run_in_threadpool(load_user_settings, principal.user_id)
     folder_ids = list(scope.folder_ids) if scope.folder_ids is not None else None
+    client = await run_in_threadpool(get_service_role_supabase, principal.org_id)
     with acting_as(principal):
         rows, _avg = await retrieval_service.search_documents(
-            query, principal.user_id, get_service_role_supabase(principal.org_id),
+            query, principal.user_id, client,
             user_settings=user_settings, folder_ids=folder_ids,
         )
     if not rows or not scope.exclude_external:
