@@ -4,8 +4,10 @@ No new audit literal (304 D-36) and no change to ``audit_service.py``: rows go t
 writers in ``security/api_key_auth``.
 
 * ``audit_answered`` — ``api_key.read`` with ``{kind: mcp, tool, outcome}``; ``outcome`` is ``ok``,
-  ``error`` or (305-04) ``redaction_blocked``. Not throttled: answered calls are already bounded by
-  the two per-key buckets.
+  ``error``, (305-04) ``redaction_blocked`` or (305-REVIEW WR-04) ``not_available`` — a handler's
+  refusal sentence, which the client receives as ``isError``. Not throttled: answered calls are
+  already bounded by the two per-key buckets, which count every granted call before its arguments
+  are validated (305-REVIEW WR-01).
 * ``audit_refused`` — ``api_key.refused`` with ``outcome: refused`` and a reason from the ONE reason
   vocabulary (``rate_limited:read`` / ``rate_limited:expensive`` / ``tool_not_granted`` /
   ``limiter_unavailable`` / ``maintenance``), throttled through ``refusal_audit_slot`` exactly as

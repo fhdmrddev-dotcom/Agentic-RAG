@@ -8,7 +8,8 @@
  * ONE reason vocabulary, shared with the backend (`app/mcp/audit.py`, `app/mcp/limits.py`):
  *   refused   `rate_limited:read` · `rate_limited:expensive` · `tool_not_granted`
  *             · `limiter_unavailable` · `maintenance` (the last two keep their shipped words)
- *   answered  outcome `ok` · `error` · `redaction_blocked`
+ *   answered  outcome `ok` · `error` · `redaction_blocked` · `not_available` (305-REVIEW WR-04:
+ *             the tool answered with an error, so it never reads as answered)
  *
  * ⚠ A call that was not answered NEVER reads with a tick: an unknown outcome shows its raw code
  *   (the 293 rule). `null` means "not an MCP-specific case — use the shipped 293/304 words".
@@ -46,6 +47,7 @@ export function mcpCallWords(call: ApiKeyCall, ctx: CallContext): { ok: boolean;
   if (call.ok) return { ok: true, text: fillCopy(C.calls.ok, { words: M.calls.answered }) }
   if (call.outcome === "redaction_blocked") return { ok: false, text: M.calls.withheld }
   if (call.outcome === "error") return { ok: false, text: M.calls.failed }
+  if (call.outcome === "not_available") return { ok: false, text: M.calls.notAvailable } // 305-REVIEW WR-04
   const refused = refusalWords(call, ctx)
   if (refused !== null) return { ok: false, text: fillCopy(C.calls.refused, { words: refused }) }
   if (call.reason) return null // a 293/304 reason: the shipped words

@@ -176,6 +176,8 @@ export const MCP_KEY_COPY = {
     answered: "answered",
     withheld: "✕ withheld: it couldn't be checked for personal data",
     failed: "✕ failed: the tool couldn't finish",
+    // 305-REVIEW WR-04: the tool answered with an error (no such document, a stale cursor, no text yet).
+    notAvailable: "✕ not available: nothing this key can read there",
     unknownOutcome: "✕ {outcome}",
     overSearches: "over the limit: {N} searches a minute",
     notGranted: "this key isn't allowed to use {tool}",

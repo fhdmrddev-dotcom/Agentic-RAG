@@ -38,7 +38,8 @@ but a client can call a name it never listed. The maintenance flag is read throu
 305-03 (D-26 / D-27 / D-28 / D-53 / T-305-12) fills e and k. **Exactly one audit row per call, on
 every exit path**: each stage sets the row it would write in ``audit`` and the ``finally`` writes it
 once — refused (grant, maintenance, limit) through ``app.mcp.audit.audit_refused`` (throttled), an
-answered call (a model or a handler's refusal sentence) as ``outcome: ok``, and bad arguments or a
+answered call (a model) as ``outcome: ok``, a handler's refusal sentence (it reaches the client as
+``isError``) as ``outcome: not_available`` (305-REVIEW WR-04), and bad arguments or a
 handler that raised as ``outcome: error`` (the exception still propagates to the catch-all). The
 limit stage counts the spec's bucket (``app.mcp.limits``) and answers over the limit with a
 relayable sentence, never an HTTP 429. The per-key counters and the refusal throttle share the
@@ -141,7 +142,9 @@ async def dispatch(
                 audit = {"refused": False, "outcome": "redaction_blocked"}
                 return tool_error(outbound_guard.WITHHELD_SENTENCE)
         result = _finish(outcome)
-        audit = {"refused": False, "outcome": "ok"}
+        # 305-REVIEW WR-04: the outcome comes from the RESULT, not from the handler having returned —
+        # a refusal sentence reaches the client as ``isError``, so it must never be audited ``ok``.
+        audit = {"refused": False, "outcome": "not_available" if result.is_error else "ok"}
         return result
     finally:
         # 305-REVIEW WR-03: shielded from the request's cancellation (a client that disconnects
