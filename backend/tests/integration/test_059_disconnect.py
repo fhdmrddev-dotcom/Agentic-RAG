@@ -62,35 +62,48 @@ SLOW_CHUNK_DELAY = 0.3   # blocks event loop briefly per chunk; bounded by KI-00
 
 @pytest.fixture(autouse=True)
 def _reset_sse_starlette_app_status():
-    """Reset sse-starlette's module-level AppStatus.should_exit_event before each test.
+    """Reset sse-starlette's module-level AppStatus.should_exit flag around each test.
 
-    sse-starlette caches `AppStatus.should_exit_event = anyio.Event()` on the
-    first call to `_listen_for_exit_signal()`. With pytest's per-function
-    asyncio loop scope (configured in pytest.ini via asyncio_mode = auto),
-    each test gets a fresh loop, but the cached event remains bound to the
-    FIRST loop that created it. A second test awaiting on it raises
-    `RuntimeError: Event is bound to a different event loop`.
+    ⚠ CONSCIOUSLY RETIRED — Phase 305 / D-48 (the D-206-07 precedent: retire a
+    fence DELIBERATELY, with the reason written into the test, never trip it by
+    surprise). The name is kept because 26 test modules import this fixture.
 
-    This fixture clears the cached event before each test so sse-starlette
-    creates a fresh one per test loop.
+    What it used to do (sse-starlette 2.4.x): 2.4 cached a module-level
+    ``AppStatus.should_exit_event = anyio.Event()`` on the first
+    ``_listen_for_exit_signal()`` call. Under pytest's per-function asyncio loop
+    that event stayed bound to the FIRST loop, and a second test awaiting it
+    raised ``RuntimeError: Event is bound to a different event loop`` — so the
+    fixture cleared it before and after every test.
 
-    WR-07: assert the sse-starlette version we validated this against — any
-    minor-version bump that renames or relocates AppStatus would silently
-    break the fixture without obvious failure mode otherwise. Currently
-    pinned to 2.4.x in requirements.txt; bump this guard alongside the pin.
+    Why that reset is now meaningless (sse-starlette 3.0.x, forced by the
+    official ``mcp`` SDK, D-01): 3.0 moved the exit event into a ContextVar
+    (``_exit_event_context`` / ``AppStatus.get_or_create_exit_event()``), so each
+    task context creates its own event and there is no module-level attribute to
+    clear. The only module-level state left is ``AppStatus.should_exit``, which is
+    still reset here so a test that drove ``handle_exit`` cannot poison the next.
+    The same move is why 3.0.3 no longer ends open streams on the exit signal
+    (upstream sysid/sse-starlette #149); ``backend/Dockerfile`` carries
+    ``--timeout-graceful-shutdown 5`` for that (pinned by
+    tests/unit/test_305_dockerfile_graceful.py).
+
+    What makes this trip: any sse-starlette other than 3.0.x, or an
+    ``AppStatus.should_exit_event`` attribute reappearing. A 3.1 bump needs
+    starlette>=0.49.1, i.e. the FastAPI/Starlette upgrade D-01 forbids — so this
+    can only fire on a deliberate decision, and it should then be re-validated.
     """
     import sse_starlette
-    assert sse_starlette.__version__.startswith("2.4."), (
-        f"AppStatus reset fixture validated only for sse-starlette 2.4.x; "
-        f"installed version {sse_starlette.__version__!r} may have moved or "
-        f"renamed AppStatus. Re-validate fixture before bumping the version "
-        f"assertion."
-    )
     from sse_starlette.sse import AppStatus
-    AppStatus.should_exit_event = None
+    assert sse_starlette.__version__.startswith("3.0."), (
+        f"AppStatus reset fixture re-validated for sse-starlette 3.0.x only "
+        f"(Phase 305 / D-48); installed {sse_starlette.__version__!r}. "
+        f"Re-validate the exit-event model before bumping this assertion."
+    )
+    assert not hasattr(AppStatus, "should_exit_event"), (
+        "sse-starlette grew a module-level should_exit_event again — the 3.0 "
+        "ContextVar model this fixture was retired against no longer holds (D-48)."
+    )
     AppStatus.should_exit = False
     yield
-    AppStatus.should_exit_event = None
     AppStatus.should_exit = False
 
 # ---------------------------------------------------------------------

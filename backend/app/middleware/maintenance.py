@@ -17,7 +17,8 @@ Design decisions baked in here:
   reachable, even under maintenance: any ``/auth/*`` (login), **ALL** ``/admin/*`` (the
   operator flag-write ``PUT /admin/flags`` that turns maintenance back OFF), and
   ``DELETE /runs/{id}`` (users self-cancelling their own in-flight run). Reads
-  (``GET``/``HEAD``) and CORS preflight (``OPTIONS``) always pass.
+  (``GET``/``HEAD``) and CORS preflight (``OPTIONS``) always pass. Phase 305 / D-25: ``MCP_PATH``
+  passes too — reads still work there, and start-type tools are refused inside the MCP server.
 
 * **Fail-OPEN on a cold/blip read (D-Q4).** The flag is read from the per-worker 30s TTL
   settings cache via the plan-01 ``maintenance_mode()`` helper — a pure in-memory read
@@ -34,6 +35,8 @@ from __future__ import annotations
 
 from starlette.responses import JSONResponse
 from starlette.types import ASGIApp, Receive, Scope, Send
+
+from app.services.mcp_tool_catalogue import MCP_PATH
 
 # Reads + CORS preflight — always pass, maintenance on or off.
 _PASSTHROUGH_METHODS: frozenset[str] = frozenset({"GET", "HEAD", "OPTIONS"})
@@ -73,6 +76,11 @@ def _is_allowlisted(method: str, path: str) -> bool:
             return True
     # Users self-cancelling their own in-flight run (DELETE /runs/{id}).
     if method == "DELETE" and path.startswith("/runs/"):
+        return True
+    # Phase 305 (D-25 / MCP-07): the MCP endpoint is POST-only even for reads, so the write-block
+    # would stop searching and reading too. It passes here; inside, the dispatch guard refuses
+    # start-type (non-read-only) tools with a JSON-RPC sentence. Segment boundary: /mcpx is blocked.
+    if path == MCP_PATH or path.startswith(MCP_PATH + "/"):
         return True
     return False
 

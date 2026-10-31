@@ -907,3 +907,13 @@ GRANT SELECT, INSERT, UPDATE, DELETE ON TABLE public.api_keys TO service_role;
 REVOKE DELETE, TRUNCATE, TRIGGER, REFERENCES ON TABLE public.organizations FROM PUBLIC;
 REVOKE DELETE, TRUNCATE, TRIGGER, REFERENCES ON TABLE public.organizations FROM anon;
 REVOKE DELETE, TRUNCATE, TRIGGER, REFERENCES ON TABLE public.organizations FROM authenticated;
+
+-- migration 222 — mcp_usage: deny-all to every client role (RLS on, no policy; D-55). Copied from
+-- the 218 notification_deliveries lines, not retyped. Only the backend's service-role pool writes it.
+-- organizations.pii_redaction_enabled needs no line: it is outside mig 194's column UPDATE grant
+-- (D-56, the 220 mcp_enabled precedent above).
+REVOKE ALL ON TABLE public.mcp_usage FROM PUBLIC;
+REVOKE ALL ON TABLE public.mcp_usage FROM anon;
+REVOKE ALL ON TABLE public.mcp_usage FROM authenticated;
+REVOKE ALL ON TABLE public.mcp_usage FROM service_role;
+GRANT ALL ON TABLE public.mcp_usage TO service_role;

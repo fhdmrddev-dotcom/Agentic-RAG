@@ -650,7 +650,8 @@ async def lifespan(app_instance):
             _settings_subscriber = None
     app_instance.state.settings_cache_subscriber = _settings_subscriber
 
-    yield
+    async with mcp_lifespan():
+        yield
 
     # BUG-260902-06 — stop the settings cache subscriber. Best-effort with its own deadline
     # inside `stop()`, so a half-dead Redis socket cannot wedge shutdown.
@@ -912,6 +913,7 @@ async def list_models():
 
 
 from app.api import threads, runs, documents, settings as settings_api, folders, kb, skills, audit, knowledge_health, feedback, sandbox_outputs, workspace, workspace_promote, retention, admin, panel, workflows, workflow_runs, workflow_run_evidence, metadata_fields, document_views, document_search, document_relationships, classification_rules, document_governance, skill_tuner, skill_test_cases, evals, features, setup as setup_api, org, me_preferences, connectors, model_registry, schedules, document_queries, library, checked_queries, takeoff, sources, experts, api_docs, citation_checks, api_keys, inbound, org_items, links, notifications  # noqa: E402
+from app.mcp import mcp_lifespan, register_mcp  # noqa: E402 — Phase 305 MCP-01
 
 app.include_router(threads.router)
 app.include_router(runs.router)
@@ -966,6 +968,7 @@ app.include_router(inbound.router)  # Phase 293 START-02 — /inbound: outside s
 app.include_router(org_items.router)  # Phase 298 D-16/D-15 — /org-items: elsewhere counts, folder labels (move routes added by 298-03)
 app.include_router(links.router)  # Phase 299 D-06 — /links/{kind}/{id}: may I open this item, and in which org
 app.include_router(notifications.router)  # Phase 301 NOTE-01/05 — GET /notifications: the caller's open waiting-run notices across every org they belong to
+register_mcp(app)  # Phase 305 MCP-01 — /mcp and /mcp/ (stateless, key edge; never canvas-gated)
 # Phase 182 (D-182-04): the TEMPORARY Phase-181 "/canvas/ping" canary router was RETIRED here.
 # The real require_canvas-gated routes (POST /workflows/validate + GET /workflows/grounding-bundle,
 # mounted on workflows.router above) now carry the byte-identical 404-when-off gate, so the

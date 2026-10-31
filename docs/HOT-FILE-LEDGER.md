@@ -11681,7 +11681,7 @@ cells rot within days.
 | [`frontend/src/components/panel/FilesSection.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentspanelfilessectiontsx) | 14 / 9 / 366 (was `12 / 8 / 354`) | ⚠ **FIRES** | 302-01: ONE GeneratedFilesGroup mount + the listbox wrapped in rows.length > 0 (+15 −6, not re-indented); workspace rows byte-identical. Honoured by construction |
 | [`frontend/src/lib/api.ts`](docs/HOT-FILE-LEDGER.md#frontendsrclibapits) | 215 / 128 / 556 (was `214 / 127 / 552`) | ⚠ **FIRES** | 299-03: one links export block (resolveLink + LinkKind / LinkTarget / LinkAnswer) beside the orgItems block. No other re-export changed |
 | [`frontend/src/types/index.ts`](docs/HOT-FILE-LEDGER.md#frontendsrctypesindexts) | 103 / 82 / 1688 (was `102 / 81 / 1685`) | ⚠ **FIRES** | 299-04: ONE optional field, ExpertBundle.org_id (the experts read is SELECT *, so the wire always carried it). Additive. Seam still owed |
-| [`backend/app/main.py`](docs/HOT-FILE-LEDGER.md#backendappmainpy) | 99 / 73 / 1021 (was `98 / 72 / 1020`) | ⚠ **FIRES** | 301-01: one include_router(notifications.router) + its import token. Honoured by construction. ⛔ see section |
+| [`backend/app/main.py`](docs/HOT-FILE-LEDGER.md#backendappmainpy) | 100 / 74 / 1024 (was `99 / 73 / 1021`) | ⚠ **FIRES** | 305-01: one import, one register_mcp(app) beside the router block, one async with mcp_lifespan() around the single yield. Honoured by construction. ⛔ see section |
 | [`backend/app/config.py`](docs/HOT-FILE-LEDGER.md#backendappconfigpy) | 96 / 55 / 1831 (was `93 / 54 / 1809`) | ⚠ **FIRES** | 300-03 (D-28): five smtp_* env fields in the existing email block; provider comment none / resend / smtp; stale lazy-import sentence deleted. Honoured by construction |
 | [`backend/app/api/admin.py`](docs/HOT-FILE-LEDGER.md#backendappapiadminpy) | 45 / 18 / 2055 (was `44 / 17 / 2054`) | ⚠ **FIRES** | 304-04: one _FLAG_HUMAN_NAMES entry (mcp_enabled → "MCP access"); the operator flag rides PUT /admin/flags. Honoured by construction. ⛔ add still lands disabled |
 | [`backend/app/api/settings.py`](docs/HOT-FILE-LEDGER.md#backendappapisettingspy) | 50 / 27 / 1400 (was `48 / 26 / 1398`) | ⚠ **FIRES** | 304-04: mcp_enabled on the settings response + its readback (2 lines; tolerates stubs predating the field). Honoured by construction. ⛔ no mail secret on the wire |
@@ -11916,7 +11916,7 @@ cells rot within days.
 | [`frontend/src/components/chat/ActiveConnectorChips.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentschatactiveconnectorchipstsx) | 2 / 2 / 82 | no (2 phases) | ⚠ absent for its entire life — row added 244-05 at its SECOND phase. **244**: the row container HOISTED out; it is bare chips now, `null` on empty (D-244-26) |
 | [`frontend/src/stores/streamsStore.ts`](docs/HOT-FILE-LEDGER.md#frontendsrcstoresstreamsstorets) | 28 / 19 / 662 (was `27 / 18 / 660`) | ⚠ **FIRES** | 296-04 (287-TSC): the initializer is annotated `(): StreamsState`, so the TS2345 at :492 is gone. Type only · ⛔ |
 | [`frontend/src/lib/toolMeta.ts`](docs/HOT-FILE-LEDGER.md#frontendsrclibtoolmetats) | 12 / 8 / 367 (was `11 / 7 / 352`) | ⚠ **FIRES** | **273-05**: `stepLabel` (show_artifact phrase, every other tool byte-identical to `toolLabel`). ⛔ the ONE home of the activity string |
-| [`scripts/full-schema-supplement.sql`](docs/HOT-FILE-LEDGER.md#scriptsfull-schema-supplementsql) | 28 / 20 / 909 (was `27 / 19 / 891`) | ⚠ **FIRES** | 304-01: a mig 220 api_keys block appended after 215's (the bootstrap ends on the superset). Honoured by construction. ACL parity 416/416, greenfield OK |
+| [`scripts/full-schema-supplement.sql`](docs/HOT-FILE-LEDGER.md#scriptsfull-schema-supplementsql) | 29 / 21 / 919 (was `28 / 20 / 909`) | ⚠ **FIRES** | 305-01: a mig 222 mcp_usage deny-all block (copied from 218's outbox lines) appended after 221's. Honoured by construction. ACL parity 421/421, greenfield OK |
 | [`scripts/check-schema-acl-parity.cjs`](docs/HOT-FILE-LEDGER.md#scriptscheck-schema-acl-paritycjs) | 4 / 2 / 1156 | no (2 phases) | ⚠ row STALE at `3/2/883` ONE PLAN LATER, same day — lines rot faster than phases. **253-03**: it finally READS `full-schema.sql` (`assertTailIdentity`); 29 → 35 self-test arms |
 | [`scripts/check-greenfield-privileges.py`](docs/HOT-FILE-LEDGER.md#scriptscheck-greenfield-privilegespy) | 2 / 1 / 1312 | no (1 phase) | ⚠ row STALE at `1/1/1157` the same day it was written. **253-03**: `_statements` replaces `line.find("--")`; ⛔ a SKIP is exit 2, never 0 |
 | [`.claude/hooks/schema-acl-parity-guard.js`](docs/HOT-FILE-LEDGER.md#claudehooksschema-acl-parity-guardjs) | 2 / 1 / 145 | no (1 phase) | young (created 253-02). Row added AT CREATION — `.claude/` is EXEMPT, so no gate can ever demand it. ⛔ its SILENCE reads as "clear": every path a payload can carry must be extracted |
@@ -12185,7 +12185,7 @@ cells rot within days.
 | [`frontend/src/components/settings/AgentRoundLimits.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentssettingsagentroundlimitstsx) | 3 / 1 / 220 (was `2 / 1 / 243`) | no (young) | 292.1 UAT: no own Save; exposes `changes()` / `adopt()` via ref; still owns its read (WR-05 lock kept). ⛔ never sends 0 |
 | [`frontend/src/lib/continueWords.ts`](docs/HOT-FILE-LEDGER.md#frontendsrclibcontinuewordsts) | 1 / 1 / 46 (was `0 / 0 / 0`) | no (young) | young (created 292.1-03) · client hint mirror of the backend continue words + shouldTryTypedContinue. ⛔ the server decides; ?raw lockstep fence |
 | [`backend/app/security/api_key_auth.py`](docs/HOT-FILE-LEDGER.md#backendappsecurityapi_key_authpy) | 5 / 2 / 404 (was `3 / 1 / 328`) | no (young) | extracted 304-02 (pure move first): authenticate_presented_key, the one core for both kinds; KeyRefused; MCP prefix. ⛔ never via get_current_user; one 401 body |
-| [`backend/app/services/rate_limit.py`](docs/HOT-FILE-LEDGER.md#backendappservicesrate_limitpy) | 4 / 2 / 138 (was `3 / 1 / 109`) | no (2 phases) | 296-01: per-user citation limit (10/min, [ASSUMED]) on `hit`. ⛔ no process-local state; no env var; fails CLOSED (503) |
+| [`backend/app/services/rate_limit.py`](docs/HOT-FILE-LEDGER.md#backendappservicesrate_limitpy) | 5 / 3 / 160 (was `4 / 2 / 138`) | ⚠ **FIRES** | 305-01: mcp_ip + expensive kinds, LimiterUnavailable, check_ip_limit (fails closed). Additions only; enforce_* byte-unchanged. ⛔ no process-local state; no env var |
 | [`backend/app/db/api_keys.py`](docs/HOT-FILE-LEDGER.md#backendappdbapi_keyspy) | 6 / 3 / 383 (was `5 / 2 / 307`) | ⚠ **FIRES** | ⚠ now FIRES (304). 304-02: kind columns on create + get_key_row, mcp_switches, set_org_mcp_enabled, folder_names. ⛔ owner predicate in every statement |
 | [`backend/app/models/api_key.py`](docs/HOT-FILE-LEDGER.md#backendappmodelsapi_keypy) | 4 / 3 / 265 (was `3 / 3 / 264`) | ⚠ **FIRES** | 304-REVIEW WR-02: McpOff gains "unknown" (switches unread, still off). ⛔ no field carries the secret except create |
 | [`backend/app/services/inbound_inputs.py`](docs/HOT-FILE-LEDGER.md#backendappservicesinbound_inputspy) | 9 / 3 / 352 (was `8 / 2 / 312`) | ⚠ **FIRES** | 300-01 (D-14): the loop factored into _missing_fields; missing_required_labels + join_labels + blank_required_sentence beside it. ONE predicate. ⛔ pure; strips _-keys |
@@ -12293,7 +12293,7 @@ cells rot within days.
 | [`backend/app/security/mcp_principal.py`](docs/HOT-FILE-LEDGER.md#backendappsecuritymcpprincipalpy) | 1 / 1 / 49 (was `0 / 0 / 0`) | no (young) | young (created 304-02, D-20): frozen McpPrincipal + resolve_mcp_principal over the one core. ⛔ built from ResolvedKey only, never request data |
 | [`backend/app/security/principal_liveness.py`](docs/HOT-FILE-LEDGER.md#backendappsecurityprincipallivenesspy) | 2 / 1 / 99 (was `1 / 1 / 92`) | no (young) | young (304). 304-REVIEW WR-03: deployment switch checked before org (D-30). ⛔ live read every call, no cache; fails closed on both switches |
 | [`backend/app/services/key_scope.py`](docs/HOT-FILE-LEDGER.md#backendappserviceskeyscopepy) | 1 / 1 / 94 (was `0 / 0 / 0`) | no (young) | young (created 304-02, D-21/D-40): pure KeyScope composition + EXTERNAL_SQL / is_external. ⛔ pure, never raises; () never coerced to None |
-| [`backend/app/services/mcp_tool_catalogue.py`](docs/HOT-FILE-LEDGER.md#backendappservicesmcptoolcataloguepy) | 1 / 1 / 132 (was `0 / 0 / 0`) | no (young) | young (created 304-02, D-11/D-12/D-28): the eight MCP tools, presets, companions and mcp_url(). ⛔ code constant, one home; 305 edits only MCP_PATH |
+| [`backend/app/services/mcp_tool_catalogue.py`](docs/HOT-FILE-LEDGER.md#backendappservicesmcptoolcataloguepy) | 2 / 2 / 160 (was `1 / 1 / 132`) | no (2 phases) | 305-01: mcp_public_base(), the one refuse-mount predicate, and mcp_url() built through it. MCP_PATH unchanged. ⛔ still imports nothing from app at top level |
 | [`frontend/src/components/settings/apiKeys/mcpKeyCopy.ts`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentssettingsapikeysmcpkeycopyts) | 3 / 1 / 175 (was `2 / 1 / 173`) | no (young) | young (304). 304-REVIEW WR-02: one string, offUnknown. ⛔ true leaf, imports nothing |
 | [`frontend/src/components/settings/apiKeys/mcpKeyFacts.ts`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentssettingsapikeysmcpkeyfactsts) | 2 / 1 / 206 (was `0 / 0 / 0`) | no (young) | young (created 304-05): presets from the catalogue, companions, scope chips, folder flattening, the Create why-line. ⛔ pure, no React, spells no string |
 | [`frontend/src/components/settings/apiKeys/mcpSnippets.ts`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentssettingsapikeysmcpsnippetsts) | 1 / 1 / 120 (was `0 / 0 / 0`) | no (young) | young (created 304-05, D-27): per-client snippet builders from (mcpUrl, envVarName). ⛔ no secret parameter; throws on a non-env-var name; key never in a URL |
@@ -12305,15 +12305,15 @@ cells rot within days.
 | [`frontend/src/components/org/OrgMcpSwitchCard.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentsorgorgmcpswitchcardtsx) | 1 / 1 / 173 (was `0 / 0 / 0`) | no (young) | young (created 304-06, D-02/D-35): the org MCP switch, own read + write, armed OFF, onRecorded. ⛔ never optimistic; no switch on a failed read |
 | [`frontend/src/components/org/OrgSettingsTab.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentsorgorgsettingstabtsx) | 3 / 2 / 73 (was `2 / 1 / 63`) | no (2 phases) | 304-06: one OrgMcpSwitchCard mount under the identity block + an onRecorded prop (D-02). ⛔ stays a stateless leaf; the card owns its fetch |
 | [`frontend/src/components/admin/ControlRoomPage.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentsadmincontrolroompagetsx) | 20 / 11 / 907 (was `19 / 10 / 906`) | ⚠ **FIRES** | 304-06: one capabilityFlags line (mcp_enabled: settings?.mcp_enabled ?? true); impactCounts untouched. Honoured by construction. ⛔ never a fabricated count |
-| [`backend/app/middleware/maintenance.py`](docs/HOT-FILE-LEDGER.md#backendappmiddlewaremaintenancepy) | 1 / 1 / 113 | no (1 phase) | ⚠ absent its entire life — row added at 305 planning (D-25). 305-01: one MCP_PATH allowlist arm. ⛔ pure ASGI; fail-open flag read; segment-boundary match only |
+| [`backend/app/middleware/maintenance.py`](docs/HOT-FILE-LEDGER.md#backendappmiddlewaremaintenancepy) | 2 / 2 / 121 (was `1 / 1 / 113`) | no (2 phases) | 305-01: one MCP_PATH allowlist arm on a segment boundary (/mcpx still 503). ⛔ pure ASGI; fail-open flag read; segment-boundary match only |
 | [`frontend/src/lib/citationNav.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrclibcitationnavtsx) | 1 / 1 / 199 | no (1 phase) | ⚠ absent its entire life — row added at 305 planning (D-52). 305-02: one optional arrival prop + leaveDocumentAddress. ⛔ one-shot intent; openDocument keeps one identity |
-| [`backend/app/mcp/__init__.py`](docs/HOT-FILE-LEDGER.md#backendappmcp__init__py) | 0 / 0 / 0 | no (young) | AT PLANNING (305-01, D-04/D-49): register_mcp (both routes, refuse-mount) + mcp_lifespan (fresh manager per entry). ⛔ never app.mount; main.py imports only these two |
-| [`backend/app/mcp/server.py`](docs/HOT-FILE-LEDGER.md#backendappmcpserverpy) | 0 / 0 / 0 | no (young) | AT PLANNING (305-01, D-47): lowlevel Server, list = REGISTERED ∩ granted, catch-all. ⛔ never str(exc); never MCPServer |
-| [`backend/app/mcp/dispatch.py`](docs/HOT-FILE-LEDGER.md#backendappmcpdispatchpy) | 0 / 0 / 0 | no (young) | AT PLANNING (305-01..04): the tools/call pipeline — grant, maintenance, args, limits, handler, guard, render, audit. ⛔ one audit row per call; render after the guard |
-| [`backend/app/mcp/tools.py`](docs/HOT-FILE-LEDGER.md#backendappmcptoolspy) | 0 / 0 / 0 | no (young) | AT PLANNING (305-01 registry, 305-02 the three specs, D-20/D-23): static ToolSpecs + READ_ONLY. ⛔ code constants only; titles from McpTool.label |
-| [`backend/app/mcp/edge.py`](docs/HOT-FILE-LEDGER.md#backendappmcpedgepy) | 0 / 0 / 0 | no (young) | AT PLANNING (305-01, D-46/D-08/D-50): pure-ASGI key edge — 405, mcp_ip limit, one 401, 403 for switched off. ⛔ one resolver; header-only bearer; never audits |
-| [`backend/app/mcp/transport.py`](docs/HOT-FILE-LEDGER.md#backendappmcptransportpy) | 0 / 0 / 0 | no (young) | AT PLANNING (305-01, D-05/D-49): allowed hosts from BACKEND_PUBLIC_URL, no allowed origins. ⛔ never hard-coded hosts; loopback only outside production |
-| [`backend/app/mcp/access_log.py`](docs/HOT-FILE-LEDGER.md#backendappmcpaccess_logpy) | 0 / 0 / 0 | no (young) | AT PLANNING (305-01, D-57): strips the query string from MCP_PATH access lines. ⛔ never drops a line; installed once |
+| [`backend/app/mcp/__init__.py`](docs/HOT-FILE-LEDGER.md#backendappmcp__init__py) | 2 / 1 / 75 (was `1 / 1 / 70`) | no (young) | young (305-01, D-04/D-49): register_mcp (POST-only /mcp + /mcp/ to one edge, or nothing + CRITICAL); mcp_lifespan (fresh manager per entry). ⛔ never a Mount |
+| [`backend/app/mcp/server.py`](docs/HOT-FILE-LEDGER.md#backendappmcpserverpy) | 1 / 1 / 82 (was `0 / 0 / 0`) | no (young) | young (created 305-01, D-47): lowlevel Server('syrel'); list = REGISTERED ∩ granted; unknown name -32602; catch-all -> generic sentence. ⛔ never str(exc); never MCPServer |
+| [`backend/app/mcp/dispatch.py`](docs/HOT-FILE-LEDGER.md#backendappmcpdispatchpy) | 1 / 1 / 65 (was `0 / 0 / 0`) | no (young) | young (created 305-01, D-21/D-24/D-25): grant at call -> maintenance guard (MCPError) -> args (plain sentence) -> handler. 305-02..04 insert their stages. ⛔ one audit row per call |
+| [`backend/app/mcp/tools.py`](docs/HOT-FILE-LEDGER.md#backendappmcptoolspy) | 1 / 1 / 50 (was `0 / 0 / 0`) | no (young) | young (created 305-01, D-20/D-23): ToolSpec, READ_ONLY, is_read_only, REGISTERED (empty; 305-02 adds the three read specs). ⛔ code constants only; never the chat registry |
+| [`backend/app/mcp/edge.py`](docs/HOT-FILE-LEDGER.md#backendappmcpedgepy) | 1 / 1 / 171 (was `0 / 0 / 0`) | no (young) | young (created 305-01, D-46/D-08/D-50/D-54): pure-ASGI edge — 405, mcp_ip limit (fail closed), header-only bearer, ONE resolver, one 401, 403 switched off. ⛔ never audits |
+| [`backend/app/mcp/transport.py`](docs/HOT-FILE-LEDGER.md#backendappmcptransportpy) | 1 / 1 / 53 (was `0 / 0 / 0`) | no (young) | young (created 305-01, D-05/D-49): allowed hosts from mcp_public_base() (+ loopback outside production), no allowed origins. ⛔ never hard-coded hosts; always passed explicitly |
+| [`backend/app/mcp/access_log.py`](docs/HOT-FILE-LEDGER.md#backendappmcpaccess_logpy) | 1 / 1 / 45 (was `0 / 0 / 0`) | no (young) | young (created 305-01, D-57): McpQueryStripFilter drops the query on MCP_PATH access lines; install() idempotent. ⛔ rewrites, never drops a line; other paths untouched |
 | [`backend/app/mcp/results.py`](docs/HOT-FILE-LEDGER.md#backendappmcpresultspy) | 0 / 0 / 0 | no (young) | AT PLANNING (305-02, D-13..D-19/D-51): result models, RedactableText, cursors, 8,000-char chunker, link, defang, render. ⛔ no SQL; links from primary_frontend_origin() |
 | [`backend/app/mcp/read_tools.py`](docs/HOT-FILE-LEDGER.md#backendappmcpread_toolspy) | 0 / 0 / 0 | no (young) | AT PLANNING (305-02, D-12/D-16): the three handlers over acting_member_reads. ⛔ no visibility SQL; one not-available sentence for every not-visible id |
 | [`backend/app/mcp/audit.py`](docs/HOT-FILE-LEDGER.md#backendappmcpauditpy) | 0 / 0 / 0 | no (young) | AT PLANNING (305-03, D-26/D-53): per-call api_key.read / api_key.refused rows. ⛔ no new literal; refusals throttled; never query text |
@@ -28739,3 +28739,131 @@ CLAUDE.md verdict cell: none (the file does not fire).
 Scan-list cell as of 2026-10-31 (replaced by 304-REVIEW WR-02, moved verbatim): 408 / 86 / 6932 (was `406 / 85 / 6910`) | ⚠ **FIRES** | 304-06: 9 BASELINE pins + FILE-LEVEL TARGETS for the 304 suites; RAISED apiKeyFacts, ApiKeysTab, ApiKeyCard, RevokeApiKeySheet, apiKeysContract, OrgApiKeysTab, OrgAuditTab, OrgAdminShell; none lowered |
 
 CLAUDE.md verdict cell as of 2026-10-31 (replaced by 304-REVIEW WR-02, moved verbatim): | `scripts/vitest-count-gate.cjs` | 408 / 86 / 6932 (was `406 / 85 / 6910`) | 304-06: 9 pins added (304 suites); 8 raised; none lowered |
+
+### `backend/app/middleware/maintenance.py`
+
+*305-01 Task 4 (D-25 / MCP-07), 2026-10-31.*
+
+**`2 / 2 / 121` (was `1 / 1 / 113`).** One allowlist arm in `_is_allowlisted`: `path == MCP_PATH or path.startswith(MCP_PATH + "/")`, with `MCP_PATH` imported from `app.services.mcp_tool_catalogue` (a pure module, so no import cycle). The MCP endpoint is POST-only even for reads, so the write-block would otherwise stop searching and reading too; inside the server, `app/mcp/dispatch.py` refuses any tool whose annotations are not read-only with the maintenance sentence (a JSON-RPC error, never a 503) and reuses this module's `_read_maintenance` rather than a second reader. Pinned by `tests/test_147_maintenance_mw.py` (`/mcp` and `/mcp/` pass, `/mcpx` is still 503) and `tests/unit/test_305_maintenance.py`. Binding invariants: ⛔ pure ASGI, never `BaseHTTPMiddleware`; the flag read stays fail-open and in-memory; every allowlist prefix matches on a path-segment boundary.
+
+Scan-list cell as of 2026-10-31 (planted at 305 planning, kept): 1 / 1 / 113 | no (1 phase) | ⚠ absent its entire life — row added at 305 planning (D-25). 305-01: one MCP_PATH allowlist arm. ⛔ pure ASGI; fail-open flag read; segment-boundary match only |
+
+CLAUDE.md verdict cell: none (the file does not fire).
+
+### `backend/app/mcp/__init__.py`
+
+*305-01 Task 4 (created), 2026-10-31.*
+
+**`1 / 1 / 70` (created).** `register_mcp(app)` appends `Route("/mcp")` and `Route("/mcp/")` to ONE `McpEdge` (never a Starlette Mount, which redirect-slashes behind TLS) or, when `mcp_public_base()` refuses the deployment, mounts nothing and logs CRITICAL. `mcp_lifespan()` builds a fresh stateless JSON session manager on every lifespan entry and hands its ASGI app to the edge. Binding invariants: ⛔ main.py imports only these two names; the mount and `mcp_url()` share one predicate.
+
+Scan-list cell as of 2026-10-31 (replaced by 305-01, moved verbatim): 0 / 0 / 0 | no (young) | AT PLANNING (305-01, D-04/D-49): register_mcp (both routes, refuse-mount) + mcp_lifespan (fresh manager per entry). ⛔ never app.mount; main.py imports only these two |
+
+CLAUDE.md verdict cell: none (the file does not fire).
+
+### `backend/app/mcp/server.py`
+
+*305-01 Task 4 (created), 2026-10-31.*
+
+**`1 / 1 / 82` (created).** The lowlevel `mcp.server.Server` with `on_list_tools` / `on_call_tool`. The principal is read from `ctx.request.state.mcp_principal` with the edge's ContextVar as fallback (both protocol eras pinned in `test_305_transport`). Any exception becomes `GENERIC_FAILURE_SENTENCE`; only `MCPError` (the maintenance refusal) passes through. Binding invariant: ⛔ no exception text reaches the client (`test_305_errors`, marker string).
+
+Scan-list cell as of 2026-10-31 (replaced by 305-01, moved verbatim): 0 / 0 / 0 | no (young) | AT PLANNING (305-01, D-47): lowlevel Server, list = REGISTERED ∩ granted, catch-all. ⛔ never str(exc); never MCPServer |
+
+CLAUDE.md verdict cell: none (the file does not fire).
+
+### `backend/app/mcp/dispatch.py`
+
+*305-01 Task 4 (created), 2026-10-31.*
+
+**`1 / 1 / 65` (created).** The `tools/call` pipeline. 305-01 ships stages b-d (grant re-checked at call, maintenance guard for non-read-only tools reusing `middleware.maintenance._read_maintenance`, Pydantic validation phrased as one sentence); the docblock lists the final a-l order 305-02..305-04 fill in. Binding invariants: ⛔ the grant runs before the arguments; render after the guard; one audit row per call.
+
+Scan-list cell as of 2026-10-31 (replaced by 305-01, moved verbatim): 0 / 0 / 0 | no (young) | AT PLANNING (305-01..04): the tools/call pipeline — grant, maintenance, args, limits, handler, guard, render, audit. ⛔ one audit row per call; render after the guard |
+
+CLAUDE.md verdict cell: none (the file does not fire).
+
+### `backend/app/mcp/tools.py`
+
+*305-01 Task 4 (created), 2026-10-31.*
+
+**`1 / 1 / 50` (created).** `ToolSpec` (static `types.Tool`, args model, handler, bucket), the `READ_ONLY` annotations, `is_read_only` (a missing hint is NOT read-only) and `REGISTERED`, built from `_SPECS`, empty in 305-01. Tests inject their own specs with `monkeypatch.setitem`. Binding invariants: ⛔ no user text in a tool definition; `_TOOL_REGISTRY` stays 30 and is never imported here.
+
+Scan-list cell as of 2026-10-31 (replaced by 305-01, moved verbatim): 0 / 0 / 0 | no (young) | AT PLANNING (305-01 registry, 305-02 the three specs, D-20/D-23): static ToolSpecs + READ_ONLY. ⛔ code constants only; titles from McpTool.label |
+
+CLAUDE.md verdict cell: none (the file does not fire).
+
+### `backend/app/mcp/edge.py`
+
+*305-01 Task 4 (created), 2026-10-31.*
+
+**`1 / 1 / 171` (created).** Pure ASGI in front of `StreamableHTTPASGIApp`: non-POST 405 + `Allow: POST`; `rate_limit.check_ip_limit` (own `mcp_ip` bucket, 429 / 503) before the key; bearer from the header only; `mcp_principal.resolve_mcp_principal` as the one resolver; the 401 bytes built once at import; 403 + sentence only for the two switched-off reasons; principal into `scope["state"]` and a ContextVar. Binding invariants: ⛔ the org only from the principal; no key digest or lookup here (`test_305_package_fence`).
+
+Scan-list cell as of 2026-10-31 (replaced by 305-01, moved verbatim): 0 / 0 / 0 | no (young) | AT PLANNING (305-01, D-46/D-08/D-50): pure-ASGI key edge — 405, mcp_ip limit, one 401, 403 for switched off. ⛔ one resolver; header-only bearer; never audits |
+
+CLAUDE.md verdict cell: none (the file does not fire).
+
+### `backend/app/mcp/transport.py`
+
+*305-01 Task 4 (created), 2026-10-31.*
+
+**`1 / 1 / 53` (created).** `allowed_hosts()` = the public base's host bare and with any port, plus `127.0.0.1:*` / `localhost:*` / `[::1]:*` only outside production; `transport_security()` passes it with `allowed_origins=[]` (any Origin is 403, a foreign Host 421). Binding invariant: ⛔ always passed explicitly (the SDK's default is loopback-only, Pitfall 5).
+
+Scan-list cell as of 2026-10-31 (replaced by 305-01, moved verbatim): 0 / 0 / 0 | no (young) | AT PLANNING (305-01, D-05/D-49): allowed hosts from BACKEND_PUBLIC_URL, no allowed origins. ⛔ never hard-coded hosts; loopback only outside production |
+
+CLAUDE.md verdict cell: none (the file does not fire).
+
+### `backend/app/mcp/access_log.py`
+
+*305-01 Task 4 (created), 2026-10-31.*
+
+**`1 / 1 / 45` (created).** A `logging.Filter` on `uvicorn.access` that rewrites the path arg of an MCP_PATH line to the part before `?` (segment boundary, so `/mcpx` is untouched); `install()` adds it once. Binding invariant: ⛔ always returns True.
+
+Scan-list cell as of 2026-10-31 (replaced by 305-01, moved verbatim): 0 / 0 / 0 | no (young) | AT PLANNING (305-01, D-57): strips the query string from MCP_PATH access lines. ⛔ never drops a line; installed once |
+
+CLAUDE.md verdict cell: none (the file does not fire).
+
+### `backend/app/main.py` — 305-01, 2026-10-31
+
+**`100 / 74 / 1024` (was `99 / 73 / 1021`).** Exactly three edits (D-04): `from app.mcp import mcp_lifespan, register_mcp` beside the router import, `register_mcp(app)` after the include_router block, and the lifespan's single `yield` wrapped in `async with mcp_lifespan():` (the shutdown code after it stays outside). `git diff --numstat` = 4 added / 1 removed. Honoured by construction; no include_router added; config.py untouched.
+
+Scan-list cell as of 2026-10-31 (replaced by 305-01, moved verbatim): 99 / 73 / 1021 (was `98 / 72 / 1020`) | ⚠ **FIRES** | 301-01: one include_router(notifications.router) + its import token. Honoured by construction. ⛔ see section |
+
+CLAUDE.md verdict cell as of 2026-10-31 (replaced by 305-01, moved verbatim): | `backend/app/main.py` | 99 / 73 / 1021 (was `98 / 72 / 1020`) | 301-01: one include_router(notifications.router) + its import token · ⛔ |
+
+### `scripts/full-schema-supplement.sql` — 305-01, 2026-10-31
+
+**`29 / 21 / 919` (was `28 / 20 / 909`).** One block appended after mig 221's: `-- migration 222 — mcp_usage: deny-all to every client role`, the five REVOKE/GRANT lines copied from 218's `notification_deliveries`, plus the comment that `organizations.pii_redaction_enabled` needs no line (the 220 precedent). `check-schema-acl-parity.cjs` 421/421 mirrored; `check-greenfield-privileges.py` OK. Honoured by construction.
+
+Scan-list cell as of 2026-10-31 (replaced by 305-01, moved verbatim): 28 / 20 / 909 (was `27 / 19 / 891`) | ⚠ **FIRES** | 304-01: a mig 220 api_keys block appended after 215's (the bootstrap ends on the superset). Honoured by construction. ACL parity 416/416, greenfield OK |
+
+CLAUDE.md verdict cell as of 2026-10-31 (replaced by 305-01, moved verbatim): | `scripts/full-schema-supplement.sql` | 28 / 20 / 909 (was `27 / 19 / 891`) | 304-01: mig 220 api_keys block appended after 215's · ⛔ |
+
+### `backend/app/services/rate_limit.py` — 305-01, 2026-10-31
+
+**`5 / 3 / 160` (was `4 / 2 / 138`) — now FIRES (293, 296, 305).** `Kind` gains `mcp_ip` and `expensive` (the one replaced line); `LimiterUnavailable` and `check_ip_limit(redis, *, client)` are appended: the MCP edge's own per-address bucket, raising instead of an HTTPException because the edge is raw ASGI. `enforce_key_limit` / `enforce_ip_limit` byte-unchanged. Seam for the next phase: a raising `check_key_limit` beside `enforce_key_limit` (305-03 R-19).
+
+Scan-list cell as of 2026-10-31 (replaced by 305-01, moved verbatim): 4 / 2 / 138 (was `3 / 1 / 109`) | no (2 phases) | 296-01: per-user citation limit (10/min, [ASSUMED]) on `hit`. ⛔ no process-local state; no env var; fails CLOSED (503) |
+
+CLAUDE.md verdict cell: none before 305-01 (the file did not fire); 305-01 adds one.
+
+### `backend/app/services/mcp_tool_catalogue.py` — 305-01, 2026-10-31
+
+**`2 / 2 / 160` (was `1 / 1 / 132`).** `mcp_public_base()` returns the stripped `BACKEND_PUBLIC_URL`, or None when unset — and in production also when it is loopback or not https (lazy `api_docs.is_production_environment`, lazy `inbound._is_loopback`). `mcp_url()` now goes through it, so the key screen and the mount can never disagree. The 304 pins stay green (`test_304_tool_catalogue`). Binding invariant: ⛔ pure at import.
+
+Scan-list cell as of 2026-10-31 (replaced by 305-01, moved verbatim): 1 / 1 / 132 (was `0 / 0 / 0`) | no (young) | young (created 304-02, D-11/D-12/D-28): the eight MCP tools, presets, companions and mcp_url(). ⛔ code constant, one home; 305 edits only MCP_PATH |
+
+CLAUDE.md verdict cell: none (the file does not fire).
+
+### `backend/app/middleware/maintenance.py` — 305-01 Task 5 (triple filled), 2026-10-31
+
+**`2 / 2 / 121` (was `1 / 1 / 113`).** The scan row's triple re-derived after the Task 4 commit; the section above (305-01 Task 4) carries the reasons.
+
+Scan-list cell as of 2026-10-31 (replaced by 305-01 Task 5, moved verbatim): 1 / 1 / 113 | no (1 phase) | ⚠ absent its entire life — row added at 305 planning (D-25). 305-01: one MCP_PATH allowlist arm. ⛔ pure ASGI; fail-open flag read; segment-boundary match only |
+
+CLAUDE.md verdict cell: none (the file does not fire).
+
+### `backend/app/mcp/__init__.py` — 305-01 Task 5 (baseline fix), 2026-10-31
+
+**`2 / 1 / 75` (was `1 / 1 / 70`).** Both routes now carry `methods=["POST"]`. A method-less ASGI `Route` has `route.methods = None`, which crashed `test_284_list_contract`'s walk over `app.routes` (TypeError) and took the backend unit baseline to 72; measured red with this plan's code and green with the plan base's. The router now answers non-POST 405 + `Allow: POST` before the edge, which still refuses non-POST itself.
+
+Scan-list cell as of 2026-10-31 (replaced by 305-01 Task 5, moved verbatim): 1 / 1 / 70 (was `0 / 0 / 0`) | no (young) | young (created 305-01, D-04/D-49): register_mcp (/mcp + /mcp/ to one edge, or nothing + CRITICAL) and mcp_lifespan (fresh manager per entry). ⛔ never a Mount |
+
+CLAUDE.md verdict cell: none (the file does not fire).

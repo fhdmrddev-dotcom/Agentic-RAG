@@ -88,11 +88,12 @@ describe("304-05 McpConnectSnippets", () => {
     }
   })
 
-  it("no public address: the no-address line and the warning, no tabs, no snippet (D-28)", () => {
+  it("no public address: the no-address line and the warning, no tabs, no snippet (D-28, 305 D-49)", () => {
     render(<McpConnectSnippets mcpUrl={null} />)
+    // 305 D-49: production refuses an unset, loopback or http base, so the line names https.
     expect(
       screen.getByText(
-        "This deployment's public address isn't set, so the connection address can't be shown yet. Ask your operator to set it.",
+        "This deployment doesn't have a public https address for AI tools yet, so the connection address can't be shown. Ask your operator to set it.",
       ),
     ).toBeInTheDocument()
     expect(screen.getByRole("note")).toHaveTextContent(WARNING)

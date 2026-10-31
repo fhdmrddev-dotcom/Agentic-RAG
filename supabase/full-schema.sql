@@ -1538,7 +1538,9 @@ CREATE TABLE public.app_settings (
     email_from_name text DEFAULT 'Syrel'::text NOT NULL,
     email_dev_redirect_address text,
     mcp_enabled boolean DEFAULT true NOT NULL,
+    api_key_searches_per_minute integer DEFAULT 30 NOT NULL,
     CONSTRAINT app_settings_api_key_reads_per_minute_bound CHECK (((api_key_reads_per_minute >= 10) AND (api_key_reads_per_minute <= 600))),
+    CONSTRAINT app_settings_api_key_searches_per_minute_bound CHECK (((api_key_searches_per_minute >= 1) AND (api_key_searches_per_minute <= 120))),
     CONSTRAINT app_settings_api_key_starts_per_minute_bound CHECK (((api_key_starts_per_minute >= 1) AND (api_key_starts_per_minute <= 60))),
     CONSTRAINT app_settings_chat_max_tool_rounds_bound CHECK (((chat_max_tool_rounds >= 2) AND (chat_max_tool_rounds <= 50))),
     CONSTRAINT app_settings_download_ttl_bounds CHECK (((document_download_url_ttl_seconds >= 10) AND (document_download_url_ttl_seconds <= 900))),
@@ -1705,6 +1707,13 @@ COMMENT ON COLUMN public.app_settings.email_dev_redirect_address IS 'Phase 300 (
 --
 
 COMMENT ON COLUMN public.app_settings.mcp_enabled IS 'Phase 304 (D-03, KEY-06). Deployment-wide MCP switch. Only writer: PUT /admin/flags (operator ledger). Read live on every MCP call, never through the 30 s settings cache.';
+
+
+--
+-- Name: COLUMN app_settings.api_key_searches_per_minute; Type: COMMENT; Schema: public; Owner: -
+--
+
+COMMENT ON COLUMN public.app_settings.api_key_searches_per_minute IS 'Phase 305 (D-54). Searches one MCP key may run per minute (the expensive bucket), counted in Redis across every worker. Default 30. Bounded 1..120 by three agreeing bounds: app_settings_api_key_searches_per_minute_bound, the API 400 (app/api/settings.py) and the UI clamp.';
 
 
 --
@@ -3266,6 +3275,40 @@ COMMENT ON VIEW public.library_documents IS 'Phase 284 (mig 207, rewritten by 20
 
 
 --
+-- Name: mcp_usage; Type: TABLE; Schema: public; Owner: -
+--
+
+CREATE TABLE public.mcp_usage (
+    id uuid DEFAULT gen_random_uuid() NOT NULL,
+    org_id uuid NOT NULL,
+    user_id uuid NOT NULL,
+    api_key_id uuid,
+    tool text NOT NULL,
+    model text NOT NULL,
+    provider text NOT NULL,
+    input_tokens integer,
+    output_tokens integer DEFAULT 0 NOT NULL,
+    status text NOT NULL,
+    started_at timestamp with time zone DEFAULT now() NOT NULL,
+    CONSTRAINT mcp_usage_status_check CHECK ((status = ANY (ARRAY['completed'::text, 'failed'::text])))
+);
+
+
+--
+-- Name: TABLE mcp_usage; Type: COMMENT; Schema: public; Owner: -
+--
+
+COMMENT ON TABLE public.mcp_usage IS 'Phase 305 (D-55, GUARD-02). One row per provider call an MCP tool makes (the embedding of a search, a rerank), so MCP spend joins the per_root spend CTE as a second leg. Only writer: app/db/mcp_usage.py (service-role pool). Only reader: the per_root spend CTE. Deny-all to every client role (RLS on, no policy).';
+
+
+--
+-- Name: COLUMN mcp_usage.input_tokens; Type: COMMENT; Schema: public; Owner: -
+--
+
+COMMENT ON COLUMN public.mcp_usage.input_tokens IS 'Measured provider usage (prompt tokens). NULL = the provider returned none (honest unmeasured, never estimated).';
+
+
+--
 -- Name: message_artifacts; Type: TABLE; Schema: public; Owner: -
 --
 
@@ -3902,7 +3945,8 @@ CREATE TABLE public.organizations (
     settings jsonb DEFAULT '{}'::jsonb NOT NULL,
     created_at timestamp with time zone DEFAULT now() NOT NULL,
     updated_at timestamp with time zone DEFAULT now() NOT NULL,
-    mcp_enabled boolean DEFAULT true NOT NULL
+    mcp_enabled boolean DEFAULT true NOT NULL,
+    pii_redaction_enabled boolean DEFAULT false NOT NULL
 );
 
 
@@ -3925,6 +3969,13 @@ COMMENT ON COLUMN public.organizations.settings IS 'D-01 / SEED-120 forward-comp
 --
 
 COMMENT ON COLUMN public.organizations.mcp_enabled IS 'Phase 304 (D-35, KEY-06). Per-org MCP switch. Only writer: PUT /org/api-keys/mcp-access (org admin, audited as settings.update). Deliberately OUTSIDE the mig 194 client UPDATE grant.';
+
+
+--
+-- Name: COLUMN organizations.pii_redaction_enabled; Type: COMMENT; Schema: public; Owner: -
+--
+
+COMMENT ON COLUMN public.organizations.pii_redaction_enabled IS 'Phase 305 (D-36, D-56, GUARD-03). Per-org switch: redact personal data from what MCP tools return. Only writer: PUT /org/api-keys/pii-redaction (org admin, audited as settings.update + metadata.event pii_redaction). Deliberately OUTSIDE the mig 194 client UPDATE grant.';
 
 
 --
@@ -5325,6 +5376,14 @@ ALTER TABLE ONLY public.legal_hold_folders
 
 ALTER TABLE ONLY public.legal_holds
     ADD CONSTRAINT legal_holds_pkey PRIMARY KEY (id);
+
+
+--
+-- Name: mcp_usage mcp_usage_pkey; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.mcp_usage
+    ADD CONSTRAINT mcp_usage_pkey PRIMARY KEY (id);
 
 
 --
@@ -6944,6 +7003,13 @@ CREATE INDEX legal_holds_active_org_idx ON public.legal_holds USING btree (org_i
 
 
 --
+-- Name: mcp_usage_org_started_idx; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX mcp_usage_org_started_idx ON public.mcp_usage USING btree (org_id, started_at);
+
+
+--
 -- Name: message_feedback_user_created_idx; Type: INDEX; Schema: public; Owner: -
 --
 
@@ -8313,6 +8379,22 @@ ALTER TABLE ONLY public.legal_holds
 
 ALTER TABLE ONLY public.legal_holds
     ADD CONSTRAINT legal_holds_released_by_fkey FOREIGN KEY (released_by) REFERENCES auth.users(id) ON DELETE SET NULL;
+
+
+--
+-- Name: mcp_usage mcp_usage_api_key_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.mcp_usage
+    ADD CONSTRAINT mcp_usage_api_key_id_fkey FOREIGN KEY (api_key_id) REFERENCES public.api_keys(id) ON DELETE SET NULL;
+
+
+--
+-- Name: mcp_usage mcp_usage_user_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.mcp_usage
+    ADD CONSTRAINT mcp_usage_user_id_fkey FOREIGN KEY (user_id) REFERENCES auth.users(id) ON DELETE CASCADE;
 
 
 --
@@ -10081,6 +10163,12 @@ CREATE POLICY legal_holds_update ON public.legal_holds FOR UPDATE TO authenticat
 
 
 --
+-- Name: mcp_usage; Type: ROW SECURITY; Schema: public; Owner: -
+--
+
+ALTER TABLE public.mcp_usage ENABLE ROW LEVEL SECURITY;
+
+--
 -- Name: message_artifacts; Type: ROW SECURITY; Schema: public; Owner: -
 --
 
@@ -11718,3 +11806,13 @@ GRANT SELECT, INSERT, UPDATE, DELETE ON TABLE public.api_keys TO service_role;
 REVOKE DELETE, TRUNCATE, TRIGGER, REFERENCES ON TABLE public.organizations FROM PUBLIC;
 REVOKE DELETE, TRUNCATE, TRIGGER, REFERENCES ON TABLE public.organizations FROM anon;
 REVOKE DELETE, TRUNCATE, TRIGGER, REFERENCES ON TABLE public.organizations FROM authenticated;
+
+-- migration 222 — mcp_usage: deny-all to every client role (RLS on, no policy; D-55). Copied from
+-- the 218 notification_deliveries lines, not retyped. Only the backend's service-role pool writes it.
+-- organizations.pii_redaction_enabled needs no line: it is outside mig 194's column UPDATE grant
+-- (D-56, the 220 mcp_enabled precedent above).
+REVOKE ALL ON TABLE public.mcp_usage FROM PUBLIC;
+REVOKE ALL ON TABLE public.mcp_usage FROM anon;
+REVOKE ALL ON TABLE public.mcp_usage FROM authenticated;
+REVOKE ALL ON TABLE public.mcp_usage FROM service_role;
+GRANT ALL ON TABLE public.mcp_usage TO service_role;
