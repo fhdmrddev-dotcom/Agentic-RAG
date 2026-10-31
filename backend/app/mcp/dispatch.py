@@ -66,6 +66,7 @@ from __future__ import annotations
 import logging
 from typing import Any
 
+import anyio
 from mcp import types
 from mcp.shared.exceptions import MCPError
 from pydantic import BaseModel, ValidationError
@@ -89,6 +90,9 @@ MAINTENANCE_SENTENCE = (
     "Searching and reading still work."
 )
 MAINTENANCE_ERROR_CODE = -32000
+# 305-REVIEW WR-03: the most the shielded audit / spend writes may take after a call ends (read at
+# call time, so a test can shorten it).
+BOOKKEEPING_DEADLINE_S = 5.0
 
 logger = logging.getLogger("app.mcp")
 
@@ -140,11 +144,15 @@ async def dispatch(
         audit = {"refused": False, "outcome": "ok"}
         return result
     finally:
-        if audit["refused"]:
-            await _audit.audit_refused(principal, tool=name, reason=audit["reason"], redis=redis,
-                                       detail=audit.get("detail"))
-        else:
-            await _audit.audit_answered(principal, tool=name, outcome=audit["outcome"])
+        # 305-REVIEW WR-03: shielded from the request's cancellation (a client that disconnects
+        # mid-call, a terminated stateless transport, the graceful-shutdown deadline) and bounded,
+        # so the one owed row neither disappears nor hangs the call.
+        with anyio.move_on_after(BOOKKEEPING_DEADLINE_S, shield=True):
+            if audit["refused"]:
+                await _audit.audit_refused(principal, tool=name, reason=audit["reason"], redis=redis,
+                                           detail=audit.get("detail"))
+            else:
+                await _audit.audit_answered(principal, tool=name, outcome=audit["outcome"])
 
 
 async def _pii_on(org_id: str) -> bool | None:
@@ -164,7 +172,9 @@ async def _run(spec: Any, principal: Any, name: str, args: BaseModel) -> Any:
             status = "completed"
             return outcome
         finally:
-            await _write_usage(principal, name, list(entries), status)
+            # 305-REVIEW WR-03: a cancelled search has usually already paid for its embedding.
+            with anyio.move_on_after(BOOKKEEPING_DEADLINE_S, shield=True):
+                await _write_usage(principal, name, list(entries), status)
 
 
 async def _write_usage(principal: Any, name: str, entries: list[dict], status: str) -> None:
