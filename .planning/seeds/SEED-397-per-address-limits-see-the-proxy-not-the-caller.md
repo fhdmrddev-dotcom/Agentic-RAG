@@ -3,9 +3,9 @@ seed_id: SEED-397
 title: Per-address rate limits see the proxy's address, so one keyless flood throttles the whole MCP and API-key door
 created: 2026-10-31
 surface: Agentic-RAG
-status: planted
+status: deferred
 partial: false
-status_note:
+status_note: "ACCEPTED as a risk by the operator 2026-10-31 (\"accept WR-02\"); stays deferred on trigger_when — re-open before a paying org uses MCP or on any trigger_paths edit."
 trigger_when: "Any phase that touches the uvicorn CMD in backend/Dockerfile, the per-address limiter in backend/app/services/rate_limit.py or backend/app/mcp/edge.py, or that opens the MCP door to a paying org"
 trigger_paths: ["backend/Dockerfile", "backend/app/services/rate_limit.py", "backend/app/mcp/edge.py", "docker-compose.prod.yml", "deploy/onebox.env.example"]
 trigger_surfaces: ["deployment"]
@@ -42,7 +42,7 @@ denial of service for every key at once.
 ## When to surface
 
 Any phase touching the files in `trigger_paths`, or the first phase that turns MCP on for a paying
-org. Accepted as a risk at 305 close (the orchestrator's recommendation; the operator may overrule).
+org. Accepted as a risk at 305 close — **ratified by the operator 2026-10-31** ("accept WR-02").
 
 ## Scope estimate
 

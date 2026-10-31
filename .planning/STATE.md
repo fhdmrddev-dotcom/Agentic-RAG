@@ -75,10 +75,10 @@ link. Branch `develop`. Tags `v4.7` and `v4.8` pushed 2026-10-30.
 
 - **BUG-261031-01 — reproduce on a disposable Postgres:** a role-`anon` call to `current_user_org_ids()` crashed the local Postgres into recovery mode twice (should be "permission denied"). Production: anon has no EXECUTE, same PG 17.6, no crash lines in 24 h of logs. If the anon REST path reproduces it, it is an unauthenticated DB crash. Never drive it against production.
 - **304 cloud paste — before 304+305 deploy:** paste migrations 220 then 221 into cloud Supabase (per-action approval each), then `get_advisors(security)`. 221 also closes BUG-261030-03 (anon/authenticated DELETE/TRUNCATE/TRIGGER/REFERENCES on `organizations`) in production.
-- **305 before the 304+305 deploy:** paste mig **222** after 220 and 221 (per-action approval each), then `get_advisors(security)`; Coolify `BACKEND_PUBLIC_URL` = the https public address (else `/mcp` refuses to mount); Coolify stop grace > 5 s (20 s recommended, sse-starlette 3.0.3); decide SEED-397 / AR-01 (per-address limit sees the proxy) — accepted at close, overrule before a paying org uses MCP.
+- **305 before the 304+305 deploy:** paste mig **222** after 220 and 221 (per-action approval each), then `get_advisors(security)`; Coolify `BACKEND_PUBLIC_URL` = the https public address (else `/mcp` refuses to mount); Coolify stop grace > 5 s (20 s recommended, sse-starlette 3.0.3); SEED-397 / AR-01 (per-address limit sees the proxy) — **ACCEPTED by the operator 2026-10-31**; re-open before a paying org uses MCP.
 - **305 client rows (D-43):** Cursor; one `claude` CLI search against the deployed cloud `/mcp`; the one-box; Claude Desktop via the `mcp-remote` bridge.
 - **Local leftovers (305):** MCP test key `g4-305-claude-code` (org 22f9c615, expires 7 Nov); chats "Stream works confirmation reply" and "ACME MSA payment terms search".
-- **304 D-41 — confirm before 304+305 deploy:** MCP keys need no tier capability (any member can mint; the org and deployment switches are the controls). Tier gates are a pricing one-way door (TIER-02); flipping it is one condition.
+- ~~**304 D-41 — confirm before 304+305 deploy**~~ **CONFIRMED by the operator 2026-10-31** ("accept … D-41"): MCP keys need no tier capability.
 
 - Logged-in production smoke of the 301 list (open it once on app.superrag.cloud; expect the empty state).
 - Mail provider (Resend deferred 2026-10-29) → 300 G4-8 and the real-provider half of G4-1; BUG-260828-05/06 stay folded until G4-8.
