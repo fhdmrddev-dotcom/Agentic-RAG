@@ -62,6 +62,7 @@ file and reached the CLI only through `SYREL_MCP_KEY`. No transcript contains th
 | Chat stream | New chat, one message, Enter | Streamed to completion: "The stream works fine." + follow-ups + title "Stream works confirmation reply" (`readback-chat-stream.jpg`). Console errors: none captured, but tracking began after the stream. |
 | Over-limit | 32 parallel `tools/call search_knowledge_base` against :8000 | 2 calls refused "This key has made too many searches in the last minute. Try again in 25 seconds." — the limit works. **But the burst exposed BUG-261031-03:** the other 30 deadlocked the worker's asyncpg pool (10 connections `idle in transaction` on `set_config('app.acting_org_id')` for 3+ min; drained by terminating them, each then audited `outcome: error`), and the 2 refusals wrote **no** `api_key.refused` row. The key card's refused-row readback was therefore not reached. |
 
+| BUG-261031-03 re-run | After `554fe5235` loaded on :8000 (`--reload`): the same 32-call burst | **Deadlock gone:** 30/30 admitted calls answered, 2 refused by the limit, 0 connections idle in transaction afterwards, 60 `mcp_usage` rows. **New finding BUG-261031-04:** all 30 answered at 72.5 s (local CPU-bound reranker `typesafe/jev-1.14`, serial: 1 call 5.7 s, 3 calls 8.9 s; rerank is OFF in cloud) and **0 audit rows** were written for the 32 calls (1- and 3-call runs: 4/4 written). Debugger on it. |
 ## 3. Owed to the operator (D-43 — recorded, not claimed)
 
 | Row | Why it cannot be driven here | What the operator runs |
