@@ -23,6 +23,8 @@ import {
   PanelLeftClose,
 } from "lucide-react"
 import type { Folder, Thread } from "@/types"
+import { RunOriginLine } from "@/components/workflows/RunOriginLine"
+import { originSentence } from "@/components/workflows/runOriginVocabulary"
 // Phase 156 (POLISH-01 / D-01, Wave 1): the dedicated full-height chat-history
 // column. This is a MOVE + wrap (D-09), NOT a rewrite — the entire row body is
 // lifted VERBATIM from the old NavPanel.renderThreadList() (select / inline rename /
@@ -223,6 +225,15 @@ export function ChatHistoryColumn({
                   </span>
                 ) : null}
               </div>
+              {/* 306-04 (MCP-05 / D-09, UI-SPEC §Surface 1a): an ask from an AI tool says so on a
+                  second line. Only an origin-bearing thread renders it, so every in-app row is
+                  byte-identical; it is inside the button, so it joins the accessible name. */}
+              {originSentence(thread.origin) && (
+                <div className="px-3 flex items-center gap-2 overflow-hidden">
+                  <span className="w-3.5 shrink-0" aria-hidden="true" />
+                  <RunOriginLine origin={thread.origin} />
+                </div>
+              )}
             </button>
 
             {/* SEED-064: resting running dot — ambient "this chat is working" signal.

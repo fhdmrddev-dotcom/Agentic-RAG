@@ -29,7 +29,7 @@ export interface WaitingNotice {
   workflow_name: string
   kind: "question" | "approval"
   /** Who started the run: in the app, on a schedule, or through an API key. Null when unknown. */
-  origin: "app" | "schedule" | "key" | null
+  origin: "app" | "schedule" | "key" | "mcp" | null
   /** When the run began waiting (ISO 8601). */
   created_at: string
 }

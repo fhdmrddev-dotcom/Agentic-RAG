@@ -46,6 +46,7 @@ export function kindWords(kind: string): string {
 export function originWords(origin: string | null | undefined): string | null {
   if (origin === "schedule") return "scheduled"
   if (origin === "key") return "started by an API key"
+  if (origin === "mcp") return "started by an AI tool" // 306-04 (§Surface 8)
   return null
 }
 
