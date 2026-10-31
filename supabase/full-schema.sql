@@ -1259,6 +1259,31 @@ $$;
 
 
 --
+-- Name: threads_origin_immutable(); Type: FUNCTION; Schema: public; Owner: -
+--
+
+CREATE FUNCTION public.threads_origin_immutable() RETURNS trigger
+    LANGUAGE plpgsql
+    SET search_path TO ''
+    AS $$
+BEGIN
+    IF TG_OP = 'UPDATE' THEN
+        -- Assign, never raise: an unrelated update of a thread row must keep working.
+        NEW.origin_kind := OLD.origin_kind;
+        NEW.origin_label := OLD.origin_label;
+        NEW.origin_ref := OLD.origin_ref;
+    ELSIF current_user IN ('anon', 'authenticated') THEN
+        -- A client-role INSERT (the owner insert policy) may not claim an origin.
+        NEW.origin_kind := NULL;
+        NEW.origin_label := NULL;
+        NEW.origin_ref := NULL;
+    END IF;
+    RETURN NEW;
+END;
+$$;
+
+
+--
 -- Name: update_search_vector(); Type: FUNCTION; Schema: public; Owner: -
 --
 
@@ -1539,6 +1564,10 @@ CREATE TABLE public.app_settings (
     email_dev_redirect_address text,
     mcp_enabled boolean DEFAULT true NOT NULL,
     api_key_searches_per_minute integer DEFAULT 30 NOT NULL,
+    mcp_ask_wait_seconds integer DEFAULT 30 NOT NULL,
+    outside_inflight_per_key integer DEFAULT 2 NOT NULL,
+    outside_inflight_per_org integer DEFAULT 4 NOT NULL,
+    outside_inflight_per_provider integer DEFAULT 6 NOT NULL,
     CONSTRAINT app_settings_api_key_reads_per_minute_bound CHECK (((api_key_reads_per_minute >= 10) AND (api_key_reads_per_minute <= 600))),
     CONSTRAINT app_settings_api_key_searches_per_minute_bound CHECK (((api_key_searches_per_minute >= 1) AND (api_key_searches_per_minute <= 120))),
     CONSTRAINT app_settings_api_key_starts_per_minute_bound CHECK (((api_key_starts_per_minute >= 1) AND (api_key_starts_per_minute <= 60))),
@@ -1548,8 +1577,12 @@ CREATE TABLE public.app_settings (
     CONSTRAINT app_settings_extraction_table_engine_pdf_check CHECK ((extraction_table_engine_pdf = ANY (ARRAY['camelot'::text, 'pdfplumber'::text]))),
     CONSTRAINT app_settings_hnsw_ef_search_bounds CHECK (((hnsw_ef_search IS NULL) OR ((hnsw_ef_search >= 10) AND (hnsw_ef_search <= 1000)))),
     CONSTRAINT app_settings_hnsw_iterative_scan_values CHECK (((hnsw_iterative_scan IS NULL) OR (hnsw_iterative_scan = ANY (ARRAY['off'::text, 'strict_order'::text, 'relaxed_order'::text])))),
+    CONSTRAINT app_settings_mcp_ask_wait_seconds_bound CHECK (((mcp_ask_wait_seconds >= 5) AND (mcp_ask_wait_seconds <= 45))),
     CONSTRAINT app_settings_multimodal_max_vision_calls_bound CHECK (((multimodal_max_vision_calls IS NULL) OR ((multimodal_max_vision_calls >= 1) AND (multimodal_max_vision_calls <= 1000)))),
     CONSTRAINT app_settings_notification_email_delay_seconds_bound CHECK (((notification_email_delay_seconds >= 60) AND (notification_email_delay_seconds <= 3600))),
+    CONSTRAINT app_settings_outside_inflight_per_key_bound CHECK (((outside_inflight_per_key >= 1) AND (outside_inflight_per_key <= 50))),
+    CONSTRAINT app_settings_outside_inflight_per_org_bound CHECK (((outside_inflight_per_org >= 1) AND (outside_inflight_per_org <= 50))),
+    CONSTRAINT app_settings_outside_inflight_per_provider_bound CHECK (((outside_inflight_per_provider >= 1) AND (outside_inflight_per_provider <= 50))),
     CONSTRAINT app_settings_source_max_file_size_mb_bounds CHECK (((source_max_file_size_mb IS NULL) OR ((source_max_file_size_mb >= 1) AND (source_max_file_size_mb <= 50)))),
     CONSTRAINT app_settings_vision_max_pages_bound CHECK (((vision_max_pages IS NULL) OR ((vision_max_pages >= 1) AND (vision_max_pages <= 500))))
 );
@@ -1714,6 +1747,34 @@ COMMENT ON COLUMN public.app_settings.mcp_enabled IS 'Phase 304 (D-03, KEY-06). 
 --
 
 COMMENT ON COLUMN public.app_settings.api_key_searches_per_minute IS 'Phase 305 (D-54). Searches one MCP key may run per minute (the expensive bucket), counted in Redis across every worker. Default 30. Bounded 1..120 by three agreeing bounds: app_settings_api_key_searches_per_minute_bound, the API 400 (app/api/settings.py) and the UI clamp.';
+
+
+--
+-- Name: COLUMN app_settings.mcp_ask_wait_seconds; Type: COMMENT; Schema: public; Owner: -
+--
+
+COMMENT ON COLUMN public.app_settings.mcp_ask_wait_seconds IS 'Phase 306 (D-04, D-36). Seconds an MCP ask_agent call waits for the answer before it returns a still-working reply. Default 30. Bounded 5..45 by three agreeing bounds: app_settings_mcp_ask_wait_seconds_bound, the API 400 (app/api/settings.py) and the UI clamp.';
+
+
+--
+-- Name: COLUMN app_settings.outside_inflight_per_key; Type: COMMENT; Schema: public; Owner: -
+--
+
+COMMENT ON COLUMN public.app_settings.outside_inflight_per_key IS 'Phase 306 (D-35, GUARD-01). Outside (MCP / API-key) runs one credential may have in flight at once. Default 2. Bounded 1..50 by three agreeing bounds: app_settings_outside_inflight_per_key_bound, the API 400 (app/api/settings.py) and the UI clamp.';
+
+
+--
+-- Name: COLUMN app_settings.outside_inflight_per_org; Type: COMMENT; Schema: public; Owner: -
+--
+
+COMMENT ON COLUMN public.app_settings.outside_inflight_per_org IS 'Phase 306 (D-35, GUARD-01). Outside (MCP / API-key) runs one organization may have in flight at once. Default 4. Bounded 1..50 by three agreeing bounds: app_settings_outside_inflight_per_org_bound, the API 400 (app/api/settings.py) and the UI clamp.';
+
+
+--
+-- Name: COLUMN app_settings.outside_inflight_per_provider; Type: COMMENT; Schema: public; Owner: -
+--
+
+COMMENT ON COLUMN public.app_settings.outside_inflight_per_provider IS 'Phase 306 (D-35, GUARD-01). Outside (MCP / API-key) runs one model provider may have in flight at once, across every org. Default 6. Bounded 1..50 by three agreeing bounds: app_settings_outside_inflight_per_provider_bound, the API 400 (app/api/settings.py) and the UI clamp.';
 
 
 --
@@ -4558,7 +4619,11 @@ CREATE TABLE public.threads (
     active_workflow_run_id uuid,
     is_eval boolean DEFAULT false NOT NULL,
     org_id uuid NOT NULL,
-    active_expert_id uuid
+    active_expert_id uuid,
+    origin_kind text,
+    origin_label text,
+    origin_ref uuid,
+    CONSTRAINT threads_origin_kind_check CHECK (((origin_kind IS NULL) OR (origin_kind = ANY (ARRAY['app'::text, 'schedule'::text, 'key'::text, 'mcp'::text]))))
 );
 
 
@@ -4574,6 +4639,27 @@ COMMENT ON COLUMN public.threads.org_id IS 'Forward-compat (D-PRD-02/D-11): org-
 --
 
 COMMENT ON COLUMN public.threads.active_expert_id IS 'Active consultant expert bundle invited to this thread (PACK-02, Phase 260). Scopes retrieval and tools, preserves chat history. Cleared to NULL on dismissal.';
+
+
+--
+-- Name: COLUMN threads.origin_kind; Type: COMMENT; Schema: public; Owner: -
+--
+
+COMMENT ON COLUMN public.threads.origin_kind IS 'Phase 306 (D-31, MCP-05). app | schedule | key | mcp — what started this thread. NULL on threads from before migration 223 and on every thread a client inserts. Frozen after insert (threads_origin_immutable).';
+
+
+--
+-- Name: COLUMN threads.origin_label; Type: COMMENT; Schema: public; Owner: -
+--
+
+COMMENT ON COLUMN public.threads.origin_label IS 'The key label (or schedule name), snapshotted at start: renaming later never rewrites history.';
+
+
+--
+-- Name: COLUMN threads.origin_ref; Type: COMMENT; Schema: public; Owner: -
+--
+
+COMMENT ON COLUMN public.threads.origin_ref IS 'The API key id (or schedule id) that started this thread. An MCP read is scoped by it (origin_kind = ''mcp'' AND origin_ref = key id).';
 
 
 --
@@ -7157,6 +7243,13 @@ CREATE INDEX threads_folder_id_idx ON public.threads USING btree (folder_id);
 
 
 --
+-- Name: threads_mcp_origin_ref_idx; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX threads_mcp_origin_ref_idx ON public.threads USING btree (origin_ref) WHERE (origin_kind = 'mcp'::text);
+
+
+--
 -- Name: uq_model_rates_identity; Type: INDEX; Schema: public; Owner: -
 --
 
@@ -7679,6 +7772,20 @@ CREATE TRIGGER stale_skill_embedding_from_case AFTER INSERT OR DELETE OR UPDATE 
 --
 
 CREATE TRIGGER threads_autofill_org_id BEFORE INSERT ON public.threads FOR EACH ROW EXECUTE FUNCTION public.autofill_org_id_by_owner('user_id');
+
+
+--
+-- Name: threads threads_origin_freeze_insert; Type: TRIGGER; Schema: public; Owner: -
+--
+
+CREATE TRIGGER threads_origin_freeze_insert BEFORE INSERT ON public.threads FOR EACH ROW EXECUTE FUNCTION public.threads_origin_immutable();
+
+
+--
+-- Name: threads threads_origin_freeze_update; Type: TRIGGER; Schema: public; Owner: -
+--
+
+CREATE TRIGGER threads_origin_freeze_update BEFORE UPDATE ON public.threads FOR EACH ROW EXECUTE FUNCTION public.threads_origin_immutable();
 
 
 --
@@ -11816,3 +11923,11 @@ REVOKE ALL ON TABLE public.mcp_usage FROM anon;
 REVOKE ALL ON TABLE public.mcp_usage FROM authenticated;
 REVOKE ALL ON TABLE public.mcp_usage FROM service_role;
 GRANT ALL ON TABLE public.mcp_usage TO service_role;
+
+-- migration 223 — threads' origin freeze trigger function (Group A shape: trigger-only), the 215
+-- workflow_runs block above copied with threads names. PUBLIC first (the CLAUDE.md trap). The three
+-- threads.origin_* columns need no line: threads carries no column-level grant.
+REVOKE EXECUTE ON FUNCTION public.threads_origin_immutable() FROM PUBLIC;
+REVOKE EXECUTE ON FUNCTION public.threads_origin_immutable() FROM anon;
+REVOKE EXECUTE ON FUNCTION public.threads_origin_immutable() FROM authenticated;
+GRANT EXECUTE ON FUNCTION public.threads_origin_immutable() TO service_role;
