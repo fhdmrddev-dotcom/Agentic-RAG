@@ -113,6 +113,11 @@ def stub_accounting(monkeypatch) -> list[dict]:
     monkeypatch.setattr(rate_limit, "load_app_settings_async", _load)
     monkeypatch.setattr(api_key_auth, "write_audit_entry", _write)
     monkeypatch.setattr(api_key_auth, "get_service_role_supabase", lambda org: object())
+
+    async def _pii_off(org_id):  # 305-04: the org's redaction switch reads OFF (its default)
+        return False
+
+    monkeypatch.setattr(dispatch, "_pii_on", _pii_off)
     stub_usage(monkeypatch)
     return rows
 

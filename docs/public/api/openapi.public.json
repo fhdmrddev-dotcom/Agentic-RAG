@@ -13959,6 +13959,78 @@
         ]
       }
     },
+    "/org/api-keys/pii-redaction": {
+      "get": {
+        "tags": [
+          "api-keys"
+        ],
+        "summary": "Get Org Pii Redaction",
+        "description": "The active org's redaction switch, read live.",
+        "operationId": "get_org_pii_redaction_org_api_keys_pii_redaction_get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/OrgPiiRedaction"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ]
+      },
+      "put": {
+        "tags": [
+          "api-keys"
+        ],
+        "summary": "Set Org Pii Redaction",
+        "description": "Flip the active org's redaction switch; audited after the write, never on a failed one.",
+        "operationId": "set_org_pii_redaction_org_api_keys_pii_redaction_put",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/OrgPiiRedactionUpdate"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/OrgPiiRedaction"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ]
+      }
+    },
     "/inbound/workflows/{workflow_id}/runs": {
       "post": {
         "tags": [
@@ -23522,6 +23594,33 @@
           "enabled"
         ],
         "title": "OrgMcpAccessUpdate"
+      },
+      "OrgPiiRedaction": {
+        "properties": {
+          "enabled": {
+            "type": "boolean",
+            "title": "Enabled"
+          }
+        },
+        "type": "object",
+        "required": [
+          "enabled"
+        ],
+        "title": "OrgPiiRedaction"
+      },
+      "OrgPiiRedactionUpdate": {
+        "properties": {
+          "enabled": {
+            "type": "boolean",
+            "title": "Enabled"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "enabled"
+        ],
+        "title": "OrgPiiRedactionUpdate"
       },
       "OrgRef": {
         "properties": {

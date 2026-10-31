@@ -10,7 +10,9 @@
   "positive": [
     {"id": "email-plain", "recognizer": "email", "text": "Write to jane.doe@example.com about the renewal.", "value": "jane.doe@example.com"},
     {"id": "email-subdomain-tag", "recognizer": "email", "text": "cc: a.b+tag@sub.example.co.uk, thanks", "value": "a.b+tag@sub.example.co.uk"},
-    {"id": "email-in-filename", "recognizer": "email", "text": "Attached: invoice-jane@example.org.pdf", "value": "invoice-jane@example.org.pdf"},
+    {"id": "email-in-filename", "recognizer": "email", "text": "Attached: invoice-jane@example.org.pdf", "value": "invoice-jane@example.org"},
+    {"id": "email-filename-txt", "recognizer": "email", "text": "Contact sheet jane.doe@example.com.txt", "value": "jane.doe@example.com"},
+    {"id": "email-country-tld-md", "recognizer": "email", "text": "Write to office@company.md today", "value": "office@company.md"},
 
     {"id": "phone-e164-plus", "recognizer": "phone", "text": "Reach me on +44 20 7946 0958 after six.", "value": "+44 20 7946 0958"},
     {"id": "phone-e164-00", "recognizer": "phone", "text": "Head office 0049 30 1234567 (Berlin).", "value": "0049 30 1234567"},

@@ -265,3 +265,15 @@ class OrgMcpAccessUpdate(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
     enabled: bool
+
+
+class OrgPiiRedaction(BaseModel):
+    """305-04 (GUARD-03, D-36): the org's PII redaction switch for AI tool results."""
+
+    enabled: bool
+
+
+class OrgPiiRedactionUpdate(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    enabled: bool

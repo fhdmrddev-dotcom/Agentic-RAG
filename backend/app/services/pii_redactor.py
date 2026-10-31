@@ -99,9 +99,24 @@ _EMAIL = re.compile(
 )
 
 
+# A filename such as ``Contact sheet jane@example.com.txt`` must keep its extension: when the last
+# label is a common file extension AND a dotted domain remains without it, the extension is not
+# part of the address (``office@company.md`` keeps ``.md`` — no dot would remain).
+_FILE_EXTENSIONS = frozenset({
+    "pdf", "txt", "doc", "docx", "xls", "xlsx", "csv", "ppt", "pptx", "md", "json", "xml", "html",
+    "htm", "png", "jpg", "jpeg", "gif", "eml", "msg", "zip", "rtf", "odt", "ods", "tsv", "log",
+})
+
+
 def _emails(text: str) -> Iterator[tuple[int, int]]:
     for m in _EMAIL.finditer(text):
-        yield m.start(), m.end()
+        start, end = m.start(), m.end()
+        address = m.group(0)
+        domain = address[address.index("@") + 1:]
+        head, _, last = domain.rpartition(".")
+        if last.lower() in _FILE_EXTENSIONS and "." in head:
+            end -= len(last) + 1
+        yield start, end
 
 
 # ── IBAN ────────────────────────────────────────────────────────────────────────────────────

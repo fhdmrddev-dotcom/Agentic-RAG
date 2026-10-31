@@ -80,13 +80,15 @@ async def guard(
     *,
     org_id: str,
     is_on: Callable[[str], Awaitable[Any]],
-    redactor: Redactor = DEFAULT,
+    redactor: Redactor | None = None,
     deadline_s: float = 2.0,
     window: dict[str, tuple[str, str]] | None = None,
     clock: Callable[[], float] = time.monotonic,
 ) -> BaseModel | _Withheld:
     """``model`` unchanged when the org's switch is off; a redacted copy when on; ``WITHHELD``
-    when it could not be checked (see the module docstring)."""
+    when it could not be checked (see the module docstring). ``redactor`` defaults to the
+    module's ``DEFAULT``, looked up at CALL time."""
+    redactor = redactor if redactor is not None else DEFAULT
     try:
         on = (await is_on(org_id)) is not False
     except Exception:  # noqa: BLE001 — fail SAFE: an unreadable switch redacts

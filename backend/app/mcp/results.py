@@ -34,7 +34,7 @@ import re
 import uuid
 from typing import Annotated, Literal
 
-from pydantic import BaseModel, ConfigDict, Field
+from pydantic import BaseModel, ConfigDict, Field, PrivateAttr
 
 import app.config as _config
 
@@ -140,6 +140,32 @@ class ReadResult(BaseModel):
     end: int
     total_chars: int
     next_cursor: str | None = None
+    # 305-04 (D-56): the redaction overlap window around ``text`` — a PRIVATE attribute, so it is
+    # never serialised, never in the outputSchema, and never reaches the caller.
+    _window: tuple[str, str] | None = PrivateAttr(default=None)
+
+
+# ── the redaction overlap window (305-04; D-56 / Pitfall 8) ─────────────────────────────────
+
+REDACTION_WINDOW = 128
+
+
+def window_around(text: str, start: int, end: int, size: int = REDACTION_WINDOW) -> tuple[str, str]:
+    """The ``size`` characters of the ORIGINAL text before ``start`` and after ``end`` (defanged
+    like the chunk), so the outbound guard can see a value the chunk boundary cut in half."""
+    return defang(text[max(0, start - size):start]), defang(text[end:end + size])
+
+
+def with_window(model: ReadResult, text: str, start: int, end: int) -> ReadResult:
+    model._window = window_around(text, start, end)
+    return model
+
+
+def window_of(model: BaseModel) -> dict[str, tuple[str, str]] | None:
+    """The guard's ``window`` argument for ``model`` (only a read chunk carries one)."""
+    if isinstance(model, ReadResult) and model._window is not None:
+        return {"text": model._window}
+    return None
 
 
 # ── links, origin, hygiene ──────────────────────────────────────────────────────────────────

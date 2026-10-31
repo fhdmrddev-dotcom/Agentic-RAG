@@ -64,7 +64,7 @@ async def test_switch_on_rewrites_only_redactable_text_fields():
     out = await guard(model, org_id=ORG, is_on=_on)
     assert out is not model and out is not WITHHELD
     a, b = out.passages
-    assert a.title == "Contract for [email removed]"
+    assert a.title == "Contract for [email removed].pdf"
     assert a.passage == "Reach Jane on [phone removed] or [email removed]."
     assert b.title == "Q3 revenue"
     assert b.passage == "Pay [IBAN removed] with card [card number removed]."
