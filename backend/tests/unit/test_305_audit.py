@@ -486,3 +486,71 @@ async def test_resolve_mcp_principal_carries_the_key_label(monkeypatch):
     monkeypatch.setattr(auth, "authenticate_presented_key", _core)
     principal = await mcp_principal.resolve_mcp_principal("srl_mcp_x", pool=None, redis=None)
     assert principal.label == "Work laptop"
+
+
+# ── 305-REVIEW LF-03: a refusal row that is not written gives its suppressed count back ──────────
+
+
+_PENDING = f"apikey:refaudit:sup:{PRINCIPAL.key_id}:tool_not_granted"
+
+
+def _open_a_new_minute(redis) -> None:
+    """Drop the per-minute window keys (as if the minute rolled over); keep the pending count."""
+    for k in [k for k in redis.store if k.startswith("apikey:refaudit:") and ":sup:" not in k]:
+        del redis.store[k]
+
+
+async def test_a_failed_refusal_write_restores_the_suppressed_count(world, monkeypatch, caplog):
+    """CR-02: N suppressed refusals are named by the NEXT written row. When that row's INSERT fails,
+    the count used to be gone from Redis AND the ledger. It must be restored, and the next written
+    row must still carry it; the error line names it too."""
+    import logging
+
+    import app.mcp.audit as mcp_audit
+
+    world["redis"].store[_PENDING] = "3"  # three refusals were counted since the last written row
+    recorder = mcp_audit.insert_audit_row
+
+    async def _broken(*a, **k):
+        raise RuntimeError("pool exhausted")
+
+    monkeypatch.setattr(mcp_audit, "insert_audit_row", _broken)
+    with caplog.at_level(logging.ERROR, logger="app.mcp"):
+        await _dispatch(world, "t_hidden")
+    assert world["redis"].store.get(_PENDING) == "3", "the suppressed count was lost"
+    assert any("suppressed=3" in r.getMessage() for r in caplog.records), caplog.records
+
+    monkeypatch.setattr(mcp_audit, "insert_audit_row", recorder)
+    _open_a_new_minute(world["redis"])
+    await _dispatch(world, "t_hidden")
+    row = _only(world)
+    assert row["metadata"]["detail"] == {"suppressed": 3}
+
+
+async def test_a_fired_bound_on_a_refusal_write_restores_the_suppressed_count(world, monkeypatch):
+    """The same when dispatch's bookkeeping bound fires mid-INSERT (BUG-261031-04's case): the
+    cancellation passes ``except Exception``, so the count must be given back on that path too."""
+    import anyio
+
+    import app.mcp.audit as mcp_audit
+    import app.mcp.dispatch as dispatch_mod
+
+    monkeypatch.setattr(dispatch_mod, "BOOKKEEPING_DEADLINE_S", 0.2, raising=False)
+    world["redis"].store[_PENDING] = "5"
+
+    async def _hang(*a, **k):
+        await anyio.sleep(60)
+
+    monkeypatch.setattr(mcp_audit, "insert_audit_row", _hang)
+    with anyio.fail_after(5):
+        await _dispatch(world, "t_hidden")
+    assert world["redis"].store.get(_PENDING) == "5", "the suppressed count was lost"
+
+
+async def test_a_written_refusal_row_still_clears_the_count(world):
+    """CR-02 unchanged on the happy path: the written row takes the count and Redis forgets it."""
+    world["redis"].store[_PENDING] = "2"
+    await _dispatch(world, "t_hidden")
+    row = _only(world)
+    assert row["metadata"]["detail"] == {"suppressed": 2}
+    assert _PENDING not in world["redis"].store
