@@ -21,12 +21,12 @@ Decided at intake (operator, 2026-10-30):
 
 ### Personal MCP keys (KEY)
 
-- [ ] **KEY-01**: A member can create an MCP key in Settings, see the secret once, and copy a ready-made config snippet for Claude Code, Cursor or VS Code that reads the key from an environment variable. The screen warns against pasting a personal key into Claude.ai's org-wide headers and offers a labelled bridge snippet for Claude Desktop until OAuth ships. — `SEED-013`
-- [ ] **KEY-02**: A key acts as the member who made it, inside one org. Every result equals what that member sees in the app with that org active — never more, never another org's items. A two-org parity test proves it.
-- [ ] **KEY-03**: A member can narrow a key to a set of folders (subfolders included) and a subset of tools. Narrowing only removes access, an empty folder set is refused, and the limit holds on every tool (search, read, ask, run). — `SEED-195`
-- [ ] **KEY-04**: A new key defaults to read-only tools with an expiry. Ask and run are explicit opt-ins, and connector-fed folders (mailbox, synced sources) are excluded unless ticked.
-- [ ] **KEY-05**: A member sees each key's last use and can revoke it. A key that is revoked or expired, or whose owner left the org or was banned, is refused on its next call.
-- [ ] **KEY-06**: An org admin can list and revoke every MCP key in the org and switch MCP off for the org; the operator can switch it off for the whole deployment. Both take effect on the next call.
+- [x] **KEY-01**: A member can create an MCP key in Settings, see the secret once, and copy a ready-made config snippet for Claude Code, Cursor or VS Code that reads the key from an environment variable. The screen warns against pasting a personal key into Claude.ai's org-wide headers and offers a labelled bridge snippet for Claude Desktop until OAuth ships. — `SEED-013`
+- [x] **KEY-02**: A key acts as the member who made it, inside one org. Every result equals what that member sees in the app with that org active — never more, never another org's items. A two-org parity test proves it.
+- [x] **KEY-03**: A member can narrow a key to a set of folders (subfolders included) and a subset of tools. Narrowing only removes access, an empty folder set is refused, and the limit holds on every tool (search, read, ask, run). — `SEED-195`
+- [x] **KEY-04**: A new key defaults to read-only tools with an expiry. Ask and run are explicit opt-ins, and connector-fed folders (mailbox, synced sources) are excluded unless ticked.
+- [x] **KEY-05**: A member sees each key's last use and can revoke it. A key that is revoked or expired, or whose owner left the org or was banned, is refused on its next call.
+- [x] **KEY-06**: An org admin can list and revoke every MCP key in the org and switch MCP off for the org; the operator can switch it off for the whole deployment. Both take effect on the next call.
 - [ ] **KEY-07**: Every MCP call is audited (key, tool, outcome) and rate-limited per key, with cheap and expensive tools in separate limits.
 
 ### MCP server and tools (MCP)
@@ -99,12 +99,12 @@ Decided at intake (operator, 2026-10-30):
 
 | Requirement | Phase | Status |
 |-------------|-------|--------|
-| KEY-01 | Phase 304 | Pending |
-| KEY-02 | Phase 304 | Pending |
-| KEY-03 | Phase 304 | Pending |
-| KEY-04 | Phase 304 | Pending |
-| KEY-05 | Phase 304 | Pending |
-| KEY-06 | Phase 304 | Pending |
+| KEY-01 | Phase 304 | Complete (2026-10-31) |
+| KEY-02 | Phase 304 | Complete (2026-10-31) |
+| KEY-03 | Phase 304 | Complete (2026-10-31) — read paths proven; ask/run arms inherit the scope in 305/306 |
+| KEY-04 | Phase 304 | Complete (2026-10-31) |
+| KEY-05 | Phase 304 | Complete (2026-10-31) |
+| KEY-06 | Phase 304 | Complete (2026-10-31) |
 | KEY-07 | Phase 305 | Pending |
 | MCP-01 | Phase 305 | Pending |
 | MCP-02 | Phase 305 | Pending |

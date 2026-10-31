@@ -82,7 +82,7 @@ Requirements: [`REQUIREMENTS.md`](REQUIREMENTS.md). **29 v4.9 requirements, 29 m
 ### Phase Checklist
 
 - [ ] **Phase 303: Word Template Bare Tokens**: reproduce BUG-261022-01 through the real sandbox driver, then a bare `{{ name }}` renders the value or fails the integrity check; `{{ name.value }}` keeps working (FIX-15)
-- [ ] **Phase 304: Personal MCP Keys That Act as You**: acting-member org narrowing, one key resolver and liveness predicate, the key screen with presets and snippets, narrowing, revoke, org and operator kill switches, proven by a two-org parity test (KEY-01..06)
+- [x] **Phase 304: Personal MCP Keys That Act as You**: acting-member org narrowing, one key resolver and liveness predicate, the key screen with presets and snippets, narrowing, revoke, org and operator kill switches, proven by a two-org parity test (KEY-01..06)
 - [ ] **Phase 305: Connect Claude Code and Cursor**: stateless MCP server at one URL, `search_knowledge_base` / `list_documents` / `read_document`, tool labels and plain errors, maintenance behaviour, per-key audit and limits, spend attribution, fail-closed PII redaction (MCP-01, MCP-02, MCP-03, MCP-07, KEY-07, GUARD-02, GUARD-03)
 - [ ] **Phase 306: Ask the Agent and Run Workflows**: `ask_agent` / `get_answer` with a closed read-only tool set, MCP asks in thread history, `list_workflows` / `run_workflow` / `get_workflow_run`, admission control for MCP and `/inbound` starts (MCP-04, MCP-05, MCP-06, GUARD-01)
 - [ ] **Phase 307: Sign In From Claude.ai and Claude Desktop**: own OAuth 2.1 authorization server per the MCP spec, consent page with org and narrowing, rotating refresh, connected apps with revoke (OAUTH-04..07)
@@ -222,7 +222,7 @@ Requirements: [`REQUIREMENTS.md`](REQUIREMENTS.md). **29 v4.9 requirements, 29 m
 | Phase | Plans Complete | Status | Completed |
 |-------|----------------|--------|-----------|
 | 303. Word Template Bare Tokens | 0/TBD | Not started | - |
-| 304. Personal MCP Keys That Act as You | 0/TBD | Not started | - |
+| 304. Personal MCP Keys That Act as You | 6/6 | Complete (self-verified 5/5; G-4 1-3 PASS; deploys WITH 305 — cloud 220/221 + D-41 owed) | 2026-10-31 |
 | 305. Connect Claude Code and Cursor | 0/TBD | Not started | - |
 | 306. Ask the Agent and Run Workflows | 0/TBD | Not started | - |
 | 307. Sign In From Claude.ai and Claude Desktop | 0/TBD | Not started | - |

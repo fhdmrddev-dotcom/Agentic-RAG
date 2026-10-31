@@ -2,15 +2,15 @@
 gsd_state_version: 1.0
 milestone: v4.9
 milestone_name: Use It From Your Own Tools
-status: planning
-last_updated: "2026-10-30T18:00:00.000Z"
-last_activity: 2026-10-30 -- Milestone v4.9 started (defining requirements)
+status: executing
+last_updated: "2026-10-31T05:00:00.000Z"
+last_activity: 2026-10-31 -- Phase 304 complete (self-verified passed 5/5)
 progress:
   total_phases: 7
-  completed_phases: 0
-  total_plans: 0
-  completed_plans: 0
-  percent: 0
+  completed_phases: 1
+  total_plans: 6
+  completed_plans: 6
+  percent: 14
 ---
 
 # Project State
@@ -44,10 +44,10 @@ reviewer exists, so a phase closes `verification_mode: self-verified`, never `re
 ## Current Position
 
 Milestone: v4.9 Use It From Your Own Tools
-Phase: 304 — Personal MCP Keys That Act as You (planned, `--auto`; 303 not started)
-Plan: 6 of 6 merged (last `3c6eec0f4`: 06 org + operator MCP switches; full gates: backend 70 ≤ 71, count gate 589/589 OK, tsc 61→61, ledger/size/seeds OK). Post-merge org/admin/apiKeys vitest 468/468.
-Status: Executing 304 — plans done; SECURITY 47/47 closed (`7a0135dfb`); REVIEW 0 BL / 4 WR / 9 IN (`54b5fede8`); G-4 rows 1-3 PASS in Chrome (`b657cafbe`). In flight: WR-01..04 fixes (D-46 retrievable on all MCP reads, D-47 narrowed key lists only in-scope views). Next: merge fixes → verifier.
-Last activity: 2026-10-30 — 304 context gathered (`.planning/phases/304-personal-mcp-keys-that-act-as-you/304-CONTEXT.md`); SEED-195 + SEED-013 folded
+Phase: 304 — Personal MCP Keys That Act as You — **COMPLETE 2026-10-31, self-verified `passed` 5/5** (KEY-01..06). 303 not started. Next: 305 (`/gsd:discuss-phase 305`).
+Plan: 6 of 6 merged + review-fix merge `bb6ebc2f0` (WR-01..04 test-first; D-46 `retrievable` on every MCP read, D-47 narrowed key lists only in-scope views).
+Status: 304 closed by hand (not `phase.complete`). SECURITY 47/47 closed · REVIEW 0 BL / 4 WR fixed / 9 IN left as recorded · G-4 rows 1-3 PASS in Chrome (DOM + DB; screenshots time out on the hidden tab) · post-merge backend 532 / frontend 433 green · baseline 70 ≤ 71 (one run read 75: 5 flaky extras in test_272_knowledge_health ×4 + test_email_ingestion, shown unrelated). **Not deployed — 304 deploys WITH 305 (D-30).**
+Last activity: 2026-10-31 — 304 verified and closed (`304-VERIFICATION.md`)
 
 Phases start at **303**; migrations at **220**. Seeds taken in at intake: SEED-013, SEED-177, SEED-195, SEED-081, SEED-079; bug BUG-261022-01.
 
@@ -74,6 +74,7 @@ link. Branch `develop`. Tags `v4.7` and `v4.8` pushed 2026-10-30.
 ## Owed (operator)
 
 - **BUG-261031-01 — reproduce on a disposable Postgres:** a role-`anon` call to `current_user_org_ids()` crashed the local Postgres into recovery mode twice (should be "permission denied"). Production: anon has no EXECUTE, same PG 17.6, no crash lines in 24 h of logs. If the anon REST path reproduces it, it is an unauthenticated DB crash. Never drive it against production.
+- **304 cloud paste — before 304+305 deploy:** paste migrations 220 then 221 into cloud Supabase (per-action approval each), then `get_advisors(security)`. 221 also closes BUG-261030-03 (anon/authenticated DELETE/TRUNCATE/TRIGGER/REFERENCES on `organizations`) in production.
 - **304 D-41 — confirm before 304+305 deploy:** MCP keys need no tier capability (any member can mint; the org and deployment switches are the controls). Tier gates are a pricing one-way door (TIER-02); flipping it is one condition.
 
 - Logged-in production smoke of the 301 list (open it once on app.superrag.cloud; expect the empty state).
