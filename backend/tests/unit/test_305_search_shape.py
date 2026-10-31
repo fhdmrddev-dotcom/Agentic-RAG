@@ -15,6 +15,7 @@ Pure units over ``app.mcp.results``:
 """
 from __future__ import annotations
 
+import re
 import typing
 
 import pytest
@@ -102,6 +103,64 @@ def test_the_passage_and_title_are_defanged_when_shaped():
 ])
 def test_defang(raw, clean):
     assert R.defang(raw) == clean
+
+
+# 305-REVIEW WR-05: the planted-document shapes the narrow regexes let through. D-19 promises the
+# caller's client never fetches a URL a document planted, in a markdown OR an HTML renderer.
+EVIL = "https://attacker.example/p.png?d=1"
+
+
+@pytest.mark.parametrize("raw,clean", [
+    # markdown: balanced brackets in alt text, shortcut / collapsed / full references, <dest>
+    (f"![a [b] c]({EVIL})", "[image: a [b] c]"),
+    (f"x ![a [b] [c] d]({EVIL}) y", "x [image: a [b] [c] d] y"),
+    (f"![logo]\n\n[logo]: {EVIL}", f"[image: logo]\n\n[logo]: {EVIL}"),
+    (f"![logo][]\n\n[logo]: {EVIL}", f"[image: logo]\n\n[logo]: {EVIL}"),
+    (f"![a [b] c][ref]\n\n[ref]: {EVIL}", f"[image: a [b] c]\n\n[ref]: {EVIL}"),
+    (f"![a](<{EVIL} x>)", "[image: a]"),
+    (f"Wow![t]({EVIL})", "Wow[image: t]"),
+    # raw HTML that loads a URL on its own
+    (f'<picture><source srcset="{EVIL} 1x"><img src="{EVIL}"></picture>', ""),
+    (f'a<video poster="{EVIL}" src="{EVIL}"></video>b', "ab"),
+    (f"<audio src={EVIL}>", ""),
+    (f'<IFRAME SRC="{EVIL}">inner</IFRAME>', "inner"),
+    (f"<embed src={EVIL}>", ""),
+    (f'<object data="{EVIL}"></object>', ""),
+    (f'<svg><image href="{EVIL}"/></svg>', ""),
+    (f'<svg><use xlink:href="{EVIL}#x"/></svg>', ""),
+    (f'<link rel="stylesheet" href="{EVIL}">', ""),
+    (f'<style>body{{background:url({EVIL})}}</style>', f"body{{background:url({EVIL})}}"),
+    (f'<img srcset="{EVIL} 2x">', ""),
+    (f'<meta http-equiv="refresh" content="0;url={EVIL}">', ""),
+    (f'<base href="{EVIL}">', ""),
+    (f"<script src={EVIL}></script>", ""),
+    (f'<track src="{EVIL}">', ""),
+    # url-bearing attributes on any other tag are stripped; the tag and its text stay
+    (f'<div style="background:url({EVIL})">t</div>', "<div>t</div>"),
+    (f"<table background='{EVIL}'><tr><td>t</td></tr></table>", "<table><tr><td>t</td></tr></table>"),
+    (f'<input type="image" src="{EVIL}">', '<input type="image">'),
+    (f'<p data="{EVIL}" class="k">t</p>', '<p class="k">t</p>'),
+    # what must NOT change: a plain link (text, never auto-loaded), prose with angle brackets
+    (f'<a href="{EVIL}">link</a>', f'<a href="{EVIL}">link</a>'),
+    (f"[t]({EVIL})", f"[t]({EVIL})"),
+    ("a < b and c > d; <imagine> <sources> stay", "a < b and c > d; <imagine> <sources> stay"),
+    ('<p data-x="1">t</p>', '<p data-x="1">t</p>'),
+])
+def test_defang_planted_shapes(raw, clean):
+    assert R.defang(raw) == clean
+
+
+@pytest.mark.parametrize("raw", [
+    f"![a [b] c]({EVIL})",
+    f"![logo]\n\n[logo]: {EVIL}",
+    f"text ![unclosed [x] alt]({EVIL} more",
+    f'<picture><source srcset="{EVIL}"></picture>',
+    f'<div style="background-image: url({EVIL})">t</div>',
+])
+def test_no_image_syntax_and_no_loading_attribute_survives(raw):
+    out = R.defang(raw)
+    assert "![" not in out, out
+    assert not re.search(r"\b(?:src|srcset|poster|style)\s*=", out, re.I), out
 
 
 # ── delimiting ─────────────────────────────────────────────────────────────────────────────
