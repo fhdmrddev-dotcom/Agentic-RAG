@@ -28,6 +28,7 @@ from typing import Callable
 # last-known-good TTL settings cache the get_tools hide layer reads. Module-level
 # (patch-where-used friendly) and cycle-safe: user_settings imports only app.config.
 from app.models.user_settings import load_app_settings
+from app.services.outside_run_scope import outside_allowlist_for, refusal_payload  # 306 (D-26) — a leaf
 
 # ── Back-compat re-exports (Phase 278, D-04) ─────────────────────────────────────────────────
 # These names moved; measured importers still read them from HERE, so they stay importable and are
@@ -146,8 +147,8 @@ _TOOL_REGISTRY: dict[str, Callable] = {
 # and every connector schema dropped by a bare-slug vs namespaced-name mismatch). An Expert now only
 # ever ADDS: it gets the plain thread's tools plus its own approved connections and skills. Deleted
 # rather than kept as documentation, so no dead constant can look live.
-# ⚠ OWED, NOT BUILT: chat has no dispatch-side whitelist — `dispatch_tool`'s only refusal backstop
-# is `ctx.phase_whitelist`, which is None on a chat run. Deferred to SEED-303 (267-CONTEXT).
+# 2026-10-31: 306 (D-26 / D-28 / D-39) built the dispatch-side allow-list for OUTSIDE runs only (MCP
+# asks and MCP-origin threads); in-app chat runs are unchanged; SEED-303 stays partially-answered.
 
 
 def _spawn_tool_refused_audit(ctx: ToolContext, tool_name: str, allowed: list[str]) -> None:
@@ -238,6 +239,11 @@ def _capability_disabled_message(tool_name: str) -> "str | None":
 
 async def dispatch_tool(tool_name: str, args: dict, ctx: ToolContext) -> ToolResult:
     """Route a tool call to its handler. Unknown tools return an error string."""
+    # 306 Seam B (D-26 / D-28 / D-02): an OUTSIDE run (or an mcp-origin thread) may call only the
+    # allow-list; refused before every other gate, so a svc__tool or unknown name never routes.
+    _outside_allow = await outside_allowlist_for(ctx, tool_name)
+    if _outside_allow is not None and tool_name not in _outside_allow:
+        return ToolResult(result=refusal_payload(tool_name))
     # Phase 091 HARNESS-05 (D-05 layer 2 — hard backstop for hallucinated names).
     # phase_whitelist is None in Deep Mode → this branch is skipped → byte-identical
     # to pre-091 dispatch. The refusal is a normal ToolResult.result string (the most
