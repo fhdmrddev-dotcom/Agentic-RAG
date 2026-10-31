@@ -554,3 +554,75 @@ async def test_a_written_refusal_row_still_clears_the_count(world):
     row = _only(world)
     assert row["metadata"]["detail"] == {"suppressed": 2}
     assert _PENDING not in world["redis"].store
+
+
+# ── 305-REVIEW LF-04: the unknown-tool refusal row has dispatch's shielded, bounded bookkeeping ──
+
+
+def _unknown_call(world, monkeypatch):
+    import importlib
+
+    server = importlib.import_module("app.mcp.server")
+    monkeypatch.setattr(server._edge, "current_principal", lambda: PRINCIPAL)
+    import app.mcp.dispatch as dispatch_mod
+
+    monkeypatch.setattr(dispatch_mod, "get_redis", lambda: world["redis"])
+    params = types.CallToolRequestParams(name="no_such_tool_" + QUERY, arguments={})
+    return server, params
+
+
+async def test_a_disconnect_during_the_unknown_tool_row_still_writes_it(world, monkeypatch):
+    """The client goes away while the row is being written: the write is shielded, so it lands."""
+    import anyio
+
+    import app.mcp.audit as mcp_audit
+
+    server, params = _unknown_call(world, monkeypatch)
+    recorder = mcp_audit.insert_audit_row
+    entered = anyio.Event()
+
+    async def _slow(*a):
+        entered.set()
+        await anyio.sleep(0.1)  # the INSERT is in flight
+        await recorder(*a)
+
+    monkeypatch.setattr(mcp_audit, "insert_audit_row", _slow)
+
+    async def _call():
+        with pytest.raises(MCPError):
+            await server.on_call_tool(object(), params)
+
+    with anyio.fail_after(5):
+        async with anyio.create_task_group() as tg:
+            tg.start_soon(_call)
+            await entered.wait()
+            tg.cancel_scope.cancel()
+    row = _only(world)
+    assert (row["action_type"], row["metadata"]["reason"]) == ("api_key.refused", "tool_not_granted")
+
+
+async def test_a_hung_unknown_tool_row_is_bounded_and_logged(world, monkeypatch, caplog):
+    """A full pool must not delay the -32602 without bound, and a fired bound is never silent.
+    The log names no tool: a client-chosen string never reaches it."""
+    import logging
+
+    import anyio
+
+    import app.mcp.audit as mcp_audit
+    import app.mcp.dispatch as dispatch_mod
+
+    server, params = _unknown_call(world, monkeypatch)
+    monkeypatch.setattr(dispatch_mod, "BOOKKEEPING_DEADLINE_S", 0.2, raising=False)
+
+    async def _hang(*a, **k):
+        await anyio.sleep(60)
+
+    monkeypatch.setattr(mcp_audit, "insert_audit_row", _hang)
+    with caplog.at_level(logging.ERROR, logger="app.mcp"), anyio.fail_after(5):
+        with pytest.raises(MCPError) as caught:
+            await server.on_call_tool(object(), params)
+    assert caught.value.error.code == types.INVALID_PARAMS
+    lines = [r.getMessage() for r in caplog.records if r.levelno >= logging.ERROR]
+    assert any(PRINCIPAL.key_id in m and "api_key.refused reason=tool_not_granted" in m
+               for m in lines), lines
+    assert not any(QUERY in m for m in lines), "a client-chosen tool name reached the log"
