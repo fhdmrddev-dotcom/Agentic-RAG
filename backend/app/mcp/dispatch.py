@@ -10,8 +10,9 @@ The FINAL order, once 305-02..305-04 have inserted their stages (305-RESEARCH's 
     a. unknown / unregistered name -> JSON-RPC -32602         (server.on_call_tool)
     b. not granted                 -> isError "This key can't use ..."          [305-01]
     c. maintenance + not read-only -> MCPError(MAINTENANCE_SENTENCE)            [305-01]
-    d. argument validation         -> isError plain sentence                     [305-01]
-    e. per-key bucket (cheap/expensive) -> isError "...too many..."              [305-03]
+    d. per-key bucket (cheap/expensive) -> isError "...too many..."              [305-03]
+    e. argument validation         -> isError plain sentence                     [305-01]
+       (305-REVIEW WR-01: counted BEFORE validation, so bad-argument calls cost their bucket)
     f. the service call (acting_member_reads on the acting connection)          [305-02]
     g. shape (Pydantic result model)                                             [305-02]
     h. hygiene (defang)                                                          [305-02]
@@ -114,15 +115,18 @@ async def dispatch(
         if not _tools.is_read_only(spec) and _maintenance._read_maintenance():
             audit = {"refused": True, "reason": "maintenance"}
             raise MCPError(code=MAINTENANCE_ERROR_CODE, message=MAINTENANCE_SENTENCE)
-        try:
-            args = spec.args_model.model_validate(arguments or {})
-        except ValidationError:
-            return tool_error(f"Those arguments don't fit {name}. Check the tool's inputs and try again.")
+        # 305-REVIEW WR-01: the limit counts BEFORE the arguments are validated, so every granted
+        # call — bad arguments included — costs one unit of its bucket. A loop of bad-argument
+        # calls is then stopped by the per-key limit and its refusals go through the CR-02 throttle.
         limited = await _limits.check_limit(principal, spec, redis)
         if limited is not None:
             audit = {"refused": True, "reason": limited.reason,
                      "detail": {"limit": limited.limit} if limited.limit is not None else None}
             return tool_error(limited.sentence)
+        try:
+            args = spec.args_model.model_validate(arguments or {})
+        except ValidationError:
+            return tool_error(f"Those arguments don't fit {name}. Check the tool's inputs and try again.")
         outcome = await _run(spec, principal, name, args)
         if isinstance(outcome, BaseModel):
             # 305-04 (D-32 / D-35 / D-56): the ONE outbound choke point, before anything is rendered.
