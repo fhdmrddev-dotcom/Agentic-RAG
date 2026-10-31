@@ -172,5 +172,22 @@ export const MCP_KEY_COPY = {
     wrongKind: "this kind of key can't make this call",
     mcpOffOrg: "MCP access is switched off for this organisation",
     mcpOffDeployment: "MCP access is switched off for this deployment",
+    // 305-03 (UI-SPEC §Copywriting): one row per MCP call (D-53).
+    answered: "answered",
+    withheld: "✕ withheld: it couldn't be checked for personal data",
+    failed: "✕ failed: the tool couldn't finish",
+    unknownOutcome: "✕ {outcome}",
+    overSearches: "over the limit: {N} searches a minute",
+    notGranted: "this key isn't allowed to use {tool}",
+    notGrantedBare: "this key isn't allowed to use that tool",
+  },
+
+  /** 305-03 (UI-SPEC §Surface 3): an AI tool key's activity table and call strip. */
+  activity: {
+    colTool: "Tool",
+    noTool: "—",
+    noCalls: "No calls yet. The first search or read will show here.",
+    legendOk: "answered",
+    legendNotOk: "not answered",
   },
 } as const

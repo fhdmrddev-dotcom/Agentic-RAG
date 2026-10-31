@@ -86,7 +86,7 @@ export function ApiKeyCard({
   const f = keyCardFacts(apiKey, at, mcpTools)
   const ctx = { key: apiKey, limits, orgName, now: at }
   const isMcp = apiKey.kind === "mcp"
-  const hasCalls = !isMcp && apiKey.calls.length > 0
+  const hasCalls = apiKey.calls.length > 0
   const canConnect = isMcp && apiKey.state === "active" && !showOwner
 
   return (
@@ -210,7 +210,7 @@ export function ApiKeyCard({
         </div>
       )}
 
-      {!isMcp && (apiKey.state === "active" || hasCalls) && (
+      {(apiKey.state === "active" || hasCalls) && (
         <ApiKeyCallStrip calls={apiKey.calls} now={at} label={apiKey.label} ctx={ctx} />
       )}
 

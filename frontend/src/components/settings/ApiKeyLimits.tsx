@@ -38,6 +38,8 @@ const COPY = API_KEYS_COPY.limits
 
 const STARTS = { min: 1, max: 60, fallback: 10 } as const
 const READS = { min: 10, max: 600, fallback: 120 } as const
+// 305-03 (D-54): the AI tool keys' searches limit; migration 222 CHECK and the PUT 400 agree (1..120).
+const SEARCHES = { min: 1, max: 120, fallback: 30 } as const
 
 /** Empty or non-numeric reports nothing; anything else is clamped to the field's bounds. */
 function limitFrom(raw: string, bounds: { min: number; max: number }): number | null {
@@ -47,14 +49,16 @@ function limitFrom(raw: string, bounds: { min: number; max: number }): number | 
   return Math.min(bounds.max, Math.max(bounds.min, Math.trunc(n)))
 }
 
-type Limits = { starts: number; reads: number }
+type Limits = { starts: number; reads: number; searches: number }
 
 /** What the Integrations save reads before its PUT, and hands the PUT's response back to. */
 export type ApiKeyLimitsHandle = {
   /** The changed limits, ready to spread into the section's body; `{}` until the read has answered. */
   changes: () => SettingsUpdate
   /** Show the values the server now holds. */
-  adopt: (saved: Pick<FullAppSettings, "api_key_starts_per_minute" | "api_key_reads_per_minute">) => void
+  adopt: (
+    saved: Pick<FullAppSettings, "api_key_starts_per_minute" | "api_key_reads_per_minute" | "api_key_searches_per_minute">,
+  ) => void
 }
 
 function LimitRow({
@@ -105,11 +109,12 @@ function LimitRow({
 }
 
 export function ApiKeyLimits({ ref }: { ref?: Ref<ApiKeyLimitsHandle> }) {
-  const [loaded, setLoaded] = useState<Limits>({ starts: STARTS.fallback, reads: READS.fallback })
+  const [loaded, setLoaded] = useState<Limits>({ starts: STARTS.fallback, reads: READS.fallback, searches: SEARCHES.fallback })
   const [loadState, setLoadState] = useState<"loading" | "loaded" | "failed">("loading")
   const [loadError, setLoadError] = useState<string | null>(null)
   const [startsDraft, setStartsDraft] = useState("")
   const [readsDraft, setReadsDraft] = useState("")
+  const [searchesDraft, setSearchesDraft] = useState("")
   const alive = useRef(true)
 
   function load() {
@@ -122,10 +127,12 @@ export function ApiKeyLimits({ ref }: { ref?: Ref<ApiKeyLimitsHandle> }) {
           // An older backend that omits the fields runs on the same 10 / 120 defaults.
           starts: s.api_key_starts_per_minute ?? STARTS.fallback,
           reads: s.api_key_reads_per_minute ?? READS.fallback,
+          searches: s.api_key_searches_per_minute ?? SEARCHES.fallback,
         }
         setLoaded(limits)
         setStartsDraft(String(limits.starts))
         setReadsDraft(String(limits.reads))
+        setSearchesDraft(String(limits.searches))
         setLoadState("loaded")
       })
       .catch((e: unknown) => {
@@ -150,6 +157,8 @@ export function ApiKeyLimits({ ref }: { ref?: Ref<ApiKeyLimitsHandle> }) {
     const reads = limitFrom(readsDraft, READS)
     if (starts !== null && starts !== loaded.starts) body.api_key_starts_per_minute = starts
     if (reads !== null && reads !== loaded.reads) body.api_key_reads_per_minute = reads
+    const searches = limitFrom(searchesDraft, SEARCHES)
+    if (searches !== null && searches !== loaded.searches) body.api_key_searches_per_minute = searches
     return body
   }
 
@@ -162,10 +171,12 @@ export function ApiKeyLimits({ ref }: { ref?: Ref<ApiKeyLimitsHandle> }) {
       const limits = {
         starts: saved.api_key_starts_per_minute ?? loaded.starts,
         reads: saved.api_key_reads_per_minute ?? loaded.reads,
+        searches: saved.api_key_searches_per_minute ?? loaded.searches,
       }
       setLoaded(limits)
       setStartsDraft(String(limits.starts))
       setReadsDraft(String(limits.reads))
+      setSearchesDraft(String(limits.searches))
     },
   }))
 
@@ -204,6 +215,17 @@ export function ApiKeyLimits({ ref }: { ref?: Ref<ApiKeyLimitsHandle> }) {
           disabled={!ready}
           onChange={setReadsDraft}
           onBlur={settle(readsDraft, READS, loaded.reads, setReadsDraft)}
+        />
+        <LimitRow
+          id="api-key-limit-searches"
+          label={COPY.searchesLabel}
+          hint={COPY.searchesHint}
+          value={searchesDraft}
+          min={SEARCHES.min}
+          max={SEARCHES.max}
+          disabled={!ready}
+          onChange={setSearchesDraft}
+          onBlur={settle(searchesDraft, SEARCHES, loaded.searches, setSearchesDraft)}
         />
         {loadState === "failed" && (
           <div role="alert" className="flex flex-wrap items-center gap-3 rounded-lg border border-destructive/40 bg-destructive/15 px-3 py-2 text-sm text-[hsl(0_80%_80%)]">

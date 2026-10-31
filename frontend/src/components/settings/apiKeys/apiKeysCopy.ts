@@ -36,6 +36,7 @@ export const API_KEYS_COPY = {
     description:
       "Keys let another tool act as you. An AI tool key lets Claude Code, Cursor or VS Code search and read your knowledge in one organisation. A workflow key lets another system start the published workflows you pick.",
     limits: "Each key: {starts} starts and {reads} status reads a minute. Set by your operator.",
+    limitsMcp: "Each AI tool key: {searches} searches and {reads} reads a minute. Set by your operator.",
     loading: "Loading your keys…",
     loadFailed: "Couldn't load your API keys.",
     retry: "Retry",
@@ -267,8 +268,11 @@ export const API_KEYS_COPY = {
       "Limits for calls from other systems. Each key gets its own allowance; a call over it is refused and told when to try again.",
     startsLabel: "Starts per minute, per key",
     startsHint: "Default 10.",
-    readsLabel: "Status reads per minute, per key",
-    readsHint: "Default 120.",
+    // 305-03 (D-54): the reads limit also governs AI tool list and read calls, so it says so.
+    readsLabel: "Reads per minute, per key",
+    readsHint: "Default 120. Workflow status reads, and AI tool list and read calls.",
+    searchesLabel: "Searches per minute, per key",
+    searchesHint: "Default 30. AI tool searches only; each one runs an embedding call.",
     footer: "Applies to every key once you click Save Integrations.",
     loadFailed: "Couldn't load the current API key limits, so they can't be changed here right now.",
     retry: "Retry",

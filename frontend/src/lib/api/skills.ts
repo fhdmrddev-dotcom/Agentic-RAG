@@ -583,6 +583,7 @@ export interface FullAppSettings {
   /** 293 (D-14) — per-key allowances for outside calls (1..60 starts, 10..600 reads a minute). */
   api_key_starts_per_minute?: number
   api_key_reads_per_minute?: number
+  api_key_searches_per_minute?: number  // 305 (D-54) — AI tool searches, 1..120
   /** 300 (D-07, D-08, D-10) — the mail knobs. Optional: an older backend omits them. */
   notification_email_delay_seconds?: number
   email_from_address?: string
@@ -741,6 +742,7 @@ export interface SettingsUpdate {
   /** 293 (D-14) — bounded 1..60 / 10..600 by the server (293-01); a refusal is a 400 sentence. */
   api_key_starts_per_minute?: number
   api_key_reads_per_minute?: number
+  api_key_searches_per_minute?: number  // 305 (D-54) — bounded 1..120 by the server
   /** 300 (D-07) — bounded 60..3600 by the server; (D-08, D-10) "" or one address; name 1-60. */
   notification_email_delay_seconds?: number
   email_from_address?: string
