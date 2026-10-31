@@ -3,7 +3,8 @@
 No new audit literal (304 D-36) and no change to ``audit_service.py``: the row's metadata is built
 by the 293 builder ``security/api_key_auth._audit_args`` (one shape for every ``api_key.*`` row).
 
-* ``audit_answered`` — ``api_key.read`` with ``{kind: mcp, tool, outcome}``; ``outcome`` is ``ok``,
+* ``audit_answered`` — ``api_key.read`` with ``{kind: mcp, tool, outcome}`` (306-04: plus ``run_id``
+  for an ask, the handle it answered); ``outcome`` is ``ok``,
   ``error``, (305-04) ``redaction_blocked`` or (305-REVIEW WR-04) ``not_available`` — a handler's
   refusal sentence, which the client receives as ``isError``. Not throttled: answered calls are
   already bounded by the two per-key buckets, which count every granted call before its arguments
@@ -70,16 +71,16 @@ async def insert_audit_row(user_id: str, action_type: str, metadata: dict, org_i
 
 async def _write(principal: Any, action_type: str, **fields: Any) -> None:
     user_id, metadata, org_id = _audit_args(
-        _key(principal), call="read", workflow_id=None, run_id=None,
+        _key(principal), call="read", workflow_id=None, run_id=fields.get("run_id"),
         outcome=fields.get("outcome"), reason=fields.get("reason"),
         detail=fields.get("detail"), tool=fields.get("tool"),
     )
     await insert_audit_row(user_id, action_type, metadata, org_id)
 
 
-async def audit_answered(principal: Any, *, tool: str | None, outcome: str) -> None:
+async def audit_answered(principal: Any, *, tool: str | None, outcome: str, run_id: Any = None) -> None:
     try:
-        await _write(principal, "api_key.read", outcome=outcome, tool=tool)
+        await _write(principal, "api_key.read", outcome=outcome, tool=tool, run_id=run_id)
     except Exception:  # noqa: BLE001 — an audit failure must never fail the call
         logger.error("mcp audit row NOT written (tool=%s key=%s write=api_key.read outcome=%s)",
                      tool, principal.key_id, outcome, exc_info=True)

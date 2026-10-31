@@ -113,7 +113,7 @@ async def dispatch(
     # sets it (the handler, the render) leaves ``error``.
     audit: dict = {"refused": False, "outcome": "error"}
     try:
-        if name not in principal.tools:
+        if not _tools.is_granted(name, principal.tools):
             audit = {"refused": True, "reason": "tool_not_granted"}
             return tool_error(f"This key can't use {name}.")
         if not _tools.is_read_only(spec) and _maintenance._read_maintenance():
@@ -132,6 +132,11 @@ async def dispatch(
         except ValidationError:
             return tool_error(f"Those arguments don't fit {name}. Check the tool's inputs and try again.")
         outcome = await _run(spec, principal, name, args)
+        if isinstance(outcome, _results.HandlerRefusal):
+            # 306-04 (D-19): a handler's REFUSAL (admission, D-29) is audited as refused, with its
+            # reason, exactly like the stages above; its sentence is a fixed string (not guarded).
+            audit = {"refused": True, "reason": outcome.reason, "detail": outcome.detail}
+            return tool_error(outcome.sentence)
         if not isinstance(outcome, str):
             # 305-04 (D-32 / D-35 / D-56): the ONE outbound choke point, before anything is rendered.
             # 305-REVIEW-04 WR-04-02: every shape goes through it, not only a model — a handler's raw
@@ -146,7 +151,9 @@ async def dispatch(
         result = _finish(outcome)
         # 305-REVIEW WR-04: the outcome comes from the RESULT, not from the handler having returned —
         # a refusal sentence reaches the client as ``isError``, so it must never be audited ``ok``.
-        audit = {"refused": False, "outcome": "not_available" if result.is_error else "ok"}
+        audit = {"refused": False, "outcome": "not_available" if result.is_error else "ok",
+                 # 306-04: an ask's row names its run (the handle), so its activity can name it.
+                 "run_id": getattr(outcome, "run_id", None)}
         return result
     finally:
         await write_audit_row(principal, audit, tool=name, redis=redis)
@@ -165,7 +172,8 @@ async def write_audit_row(principal: Any, audit: dict, *, tool: str | None, redi
             await _audit.audit_refused(principal, tool=tool, reason=audit["reason"], redis=redis,
                                        detail=audit.get("detail"))
         else:
-            await _audit.audit_answered(principal, tool=tool, outcome=audit["outcome"])
+            await _audit.audit_answered(principal, tool=tool, outcome=audit["outcome"],
+                                        run_id=audit.get("run_id"))
     if bound.cancelled_caught:
         # BUG-261031-04: a fired bound CANCELS the write; the cancellation passes every
         # ``except Exception``, so without this line the row vanished with no trace.

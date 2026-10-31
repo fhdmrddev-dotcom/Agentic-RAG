@@ -35,6 +35,7 @@ import binascii
 import json
 import re
 import uuid
+from dataclasses import dataclass
 from typing import Annotated, Literal
 
 from pydantic import BaseModel, ConfigDict, Field, PrivateAttr
@@ -94,6 +95,26 @@ class ReadArgs(BaseModel):
     cursor: str | None = Field(default=None, description="The next_cursor of the previous chunk.")
 
 
+class AskArgs(BaseModel):
+    """306-04 (D-37 / T-306-19): a question and an optional idempotency key, and NOTHING else.
+    No model and no provider field, and extras are forbidden, so an AI tool can never pick the model
+    an ask runs on (the member's own effective model is resolved in ``outside_ask``, D-08)."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    question: str = Field(min_length=1, max_length=16000, description="The question to ask the agent.")
+    idempotency_key: str | None = Field(
+        default=None, pattern=r"^[A-Za-z0-9_.:-]{1,128}$",
+        description="Send the same key again to get the same question's answer instead of a new one.",
+    )
+
+
+class GetAnswerArgs(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    handle: str = Field(min_length=1, max_length=64, description="The handle ask_agent returned.")
+
+
 # ── result models ───────────────────────────────────────────────────────────────────────────
 
 
@@ -146,6 +167,61 @@ class ReadResult(BaseModel):
     # 305-04 (D-56): the redaction overlap window around ``text`` — a PRIVATE attribute, so it is
     # never serialised, never in the outputSchema, and never reaches the caller.
     _window: tuple[str, str] | None = PrivateAttr(default=None)
+
+
+# ── the ask (306-04; D-04..D-07 / D-33) ─────────────────────────────────────────────────────
+
+
+@dataclass(frozen=True)
+class HandlerRefusal:
+    """A handler's answer that is a REFUSAL: ``dispatch`` returns ``sentence`` as a tool error and
+    audits ``api_key.refused`` with ``reason`` (and ``detail``) from the one reason vocabulary
+    (admission, D-29), so a refused ask reads as refused in the key's activity."""
+
+    sentence: str
+    reason: str
+    detail: dict | None = None
+
+
+class AskCitation(BaseModel):
+    document_id: str
+    title: RedactableText
+    link: str
+
+
+AskStatus = Literal["answered", "working", "needs_input", "starting", "failed", "timed_out", "stopped"]
+
+
+class AskResult(BaseModel):
+    status: AskStatus
+    run_id: str
+    answer: RedactableText | None = None
+    citations: list[AskCitation] = Field(default_factory=list)
+    confidence: Literal["high", "medium", "low"] | None = None
+    disclaimer: RedactableText | None = None
+    chat_link: str | None = None
+    note: str | None = None
+
+
+# UI-SPEC §Surface 4 (ask_agent / get_answer), verbatim. ``{handle}`` is the run id, ``{link}`` the
+# chat's /app/chat/<thread_id> address.
+ASK_WORKING_SENTENCE = "Still working on it. Call get_answer with handle {handle} in a few seconds."
+ASK_NEEDS_INPUT_SENTENCE = (
+    "This question needs your input in the app before it can finish. Open it in Syrel: {link}"
+)
+ASK_FAILED_SENTENCE = (
+    "The agent couldn't finish this question. Open it in Syrel to see what happened: {link}"
+)
+ASK_TIMED_OUT_SENTENCE = "The agent ran out of time on this question. Open it in Syrel: {link}"
+ASK_STOPPED_SENTENCE = "This question was stopped in the app. Open it in Syrel: {link}"
+ASK_NO_SOURCES_LINE = "Sources: none cited."
+ASK_CHAT_LINE = "Open this chat in Syrel: {link}"
+_ASK_END = {
+    "needs_input": ASK_NEEDS_INPUT_SENTENCE,
+    "failed": ASK_FAILED_SENTENCE,
+    "timed_out": ASK_TIMED_OUT_SENTENCE,
+    "stopped": ASK_STOPPED_SENTENCE,
+}
 
 
 # ── the redaction overlap window (305-04; D-56 / Pitfall 8) ─────────────────────────────────
@@ -464,6 +540,32 @@ def _render_read(result: ReadResult) -> str:
     return "\n".join(lines)
 
 
+def _render_ask(result: AskResult) -> str:
+    link = result.chat_link or ""
+    if result.status in ("working", "starting"):
+        body = ASK_WORKING_SENTENCE.format(handle=result.run_id)
+    elif result.status in _ASK_END:
+        body = _ASK_END[result.status].format(link=link)
+    else:
+        lines = [result.answer or "", ""]
+        if result.citations:
+            lines.append(f"Sources ({len(result.citations)}):")
+            for i, c in enumerate(result.citations, start=1):
+                lines += [f"[{i}] {_neutralise(c.title)}", f"document_id: {c.document_id}",
+                          f"Open in Syrel: {c.link}"]
+        else:
+            lines.append(ASK_NO_SOURCES_LINE)
+        lines.append("")
+        if result.confidence is not None:
+            words = f"{result.confidence.capitalize()} confidence."
+            if result.disclaimer:
+                words += " " + result.disclaimer
+            lines.append(words)
+        lines.append(ASK_CHAT_LINE.format(link=link))
+        body = "\n".join(lines)
+    return f"{result.note}\n\n{body}" if result.note else body
+
+
 def render(model: BaseModel) -> str:
     """The text block a client that ignores ``structuredContent`` reads — derived from the model
     (305-04 redacts the model first, so the text can never carry what the structure withheld)."""
@@ -473,4 +575,6 @@ def render(model: BaseModel) -> str:
         return _render_list(model)
     if isinstance(model, ReadResult):
         return _render_read(model)
+    if isinstance(model, AskResult):
+        return _render_ask(model)
     raise TypeError(f"no rendering for {type(model).__name__}")

@@ -175,6 +175,8 @@ async def check_key_limit(redis, *, key_id: str, kind: Kind) -> tuple[int, int |
     settings = await load_app_settings_async()
     if kind == "expensive":
         limit = int(settings.api_key_searches_per_minute)
+    elif kind == "start":  # 306-04 (D-14): ask_agent / run_workflow, on the /inbound start knob
+        limit = int(settings.api_key_starts_per_minute)
     else:
         limit = int(settings.api_key_reads_per_minute)
     try:

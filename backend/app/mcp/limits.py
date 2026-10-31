@@ -19,8 +19,13 @@ from app.services import rate_limit
 
 SEARCHES_SENTENCE = "This key has made too many searches in the last minute. Try again in {retry} seconds."
 READS_SENTENCE = "This key has made too many reads in the last minute. Try again in {retry} seconds."
+# 306-04 (D-14): ``ask_agent`` (and 307's ``run_workflow``) count on the per-key ``start`` bucket.
+STARTS_SENTENCE = (
+    "This key has started too many questions and runs in the last minute. Try again in {retry} seconds."
+)
 
-_KIND = {"cheap": "read", "expensive": "expensive"}
+_KIND = {"cheap": "read", "expensive": "expensive", "start": "start"}
+_SENTENCE = {"read": READS_SENTENCE, "expensive": SEARCHES_SENTENCE, "start": STARTS_SENTENCE}
 
 
 @dataclass(frozen=True)
@@ -39,5 +44,4 @@ async def check_limit(principal: Any, spec: Any, redis: Any) -> LimitRefusal | N
         return LimitRefusal(rate_limit.UNAVAILABLE_DETAIL, "limiter_unavailable", None)
     if retry is None:
         return None
-    template = SEARCHES_SENTENCE if kind == "expensive" else READS_SENTENCE
-    return LimitRefusal(template.format(retry=retry), f"rate_limited:{kind}", limit)
+    return LimitRefusal(_SENTENCE[kind].format(retry=retry), f"rate_limited:{kind}", limit)

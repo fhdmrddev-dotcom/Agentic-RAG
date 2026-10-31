@@ -55,7 +55,7 @@ async def on_list_tools(ctx: Any, params: Any) -> types.ListToolsResult:
         return types.ListToolsResult(tools=[])
     granted = set(principal.tools)
     return types.ListToolsResult(
-        tools=[spec.tool for name, spec in _tools.REGISTERED.items() if name in granted]
+        tools=[spec.tool for name, spec in _tools.REGISTERED.items() if _tools.is_granted(name, granted)]
     )
 
 
