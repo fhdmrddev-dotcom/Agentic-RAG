@@ -30,6 +30,10 @@ from tests.unit import _mcp305_harness as h
 from tests.unit.phase293_inbound_fakes import FakeRedis
 
 FIVE = {"search_knowledge_base", "list_documents", "read_document", "ask_agent", "get_answer"}
+# 306-05 (D-15) RETIRES the "exactly five" pin DELIBERATELY (SEED-177): the three workflow tools are
+# now served too, so the registry holds every catalogue name.
+RUN3 = ("list_workflows", "run_workflow", "get_workflow_run")
+EIGHT = FIVE | set(RUN3)
 LABELS = {t.name: t.label for t in MCP_TOOLS}
 FIXTURE_STRINGS = ("Contracts 2026", "Q3 revenue.pdf", "Fahad's laptop key", "306-04", "zqx")
 SCOPE_DISCLOSURE = (
@@ -39,8 +43,9 @@ SCOPE_DISCLOSURE = (
 APP = Path(__file__).resolve().parents[2] / "app"
 
 
-def test_the_five_names_are_served():
-    assert set(tools.REGISTERED) == FIVE
+def test_the_eight_names_are_served():
+    assert set(tools.REGISTERED) == EIGHT
+    assert tuple(tools.REGISTERED)[-3:] == RUN3
 
 
 @pytest.mark.parametrize("name", ["ask_agent", "get_answer"])
@@ -248,3 +253,95 @@ async def test_a_model_argument_does_not_fit(audited, monkeypatch):
     out = await dispatch(ASKER, "ask_agent", {"question": "q", "model": "gpt-x"}, redis=FakeRedis())
     assert out.is_error is True
     assert out.content[0].text == "Those arguments don't fit ask_agent. Check the tool's inputs and try again."
+
+
+# ── 306-05: the three workflow tools (D-10..D-15; T-306-17) ───────────────────────────────────
+
+RUNNER = replace(h.PRINCIPAL, tools=READ3 + RUN3, label="Laptop")
+
+
+@pytest.mark.parametrize("name", RUN3)
+def test_each_run_tool_is_static_and_labelled_from_the_catalogue(name):
+    t = tools.REGISTERED[name].tool
+    assert t.name == name and t.title == LABELS[name]
+    assert t.description and len(t.description) < 600
+    for needle in FIXTURE_STRINGS:
+        assert needle not in t.description and needle not in t.title
+
+
+def test_run_workflow_starts_things_and_the_other_two_read():
+    run, lst, get = (tools.REGISTERED[n] for n in ("run_workflow", "list_workflows", "get_workflow_run"))
+    assert run.tool.annotations == tools.STARTS and not tools.is_read_only(run)
+    assert lst.tool.annotations == tools.READ_ONLY and tools.is_read_only(lst)
+    assert get.tool.annotations == tools.READ_ONLY and tools.is_read_only(get)
+    assert (run.bucket, lst.bucket, get.bucket) == ("start", "cheap", "cheap")
+    assert run.args_model is results.RunWorkflowArgs and run.tool.output_schema == results.RunStarted.model_json_schema()
+    assert lst.args_model is results.ListWorkflowsArgs
+    assert lst.tool.output_schema == results.WorkflowList.model_json_schema()
+    assert get.args_model is results.GetRunArgs and get.tool.output_schema == results.RunRead.model_json_schema()
+
+
+def test_the_tools_docblock_names_every_served_tool():
+    doc = tools.__doc__ or ""
+    for name in EIGHT:
+        assert name in doc, name
+
+
+def test_a_key_granting_run_workflow_lists_all_three(monkeypatch):
+    assert _listed(monkeypatch, RUNNER) == list(READ3) + list(RUN3)
+
+
+def test_a_key_without_run_workflow_lists_none_of_them(monkeypatch):
+    lone = replace(h.PRINCIPAL, tools=READ3 + ("list_workflows", "get_workflow_run"))
+    assert _listed(monkeypatch, lone) == list(READ3)
+
+
+def test_a_companion_without_run_workflow_is_not_callable(monkeypatch):
+    lone = replace(h.PRINCIPAL, tools=READ3 + ("list_workflows",))
+    h.configure(monkeypatch)
+    h.stub_edge(monkeypatch, h.Recorder(lone))
+    with TestClient(h.fresh_app(), base_url=h.BASE) as client:
+        result = h.call(client, "list_workflows", {}).json()["result"]
+    assert result["isError"] is True and result["content"][0]["text"] == "This key can't use list_workflows."
+
+
+async def test_maintenance_refuses_run_workflow_and_the_reads_still_answer(audited, monkeypatch):
+    import app.mcp.dispatch as dispatch_mod
+    from app.mcp import run_tools
+    from app.mcp.dispatch import MAINTENANCE_SENTENCE, dispatch
+
+    monkeypatch.setattr(dispatch_mod._maintenance, "_read_maintenance", lambda: True)
+    started: list[str] = []
+
+    async def _never(principal, args):
+        started.append("run")
+        raise AssertionError("run_workflow ran in maintenance")
+
+    async def _none(principal, args):
+        return run_tools.NO_RUN_SENTENCE
+
+    async def _empty(principal, args):
+        return results.WorkflowList(workflows=[])
+
+    monkeypatch.setitem(tools.REGISTERED, "run_workflow", replace(tools.REGISTERED["run_workflow"], handler=_never))
+    monkeypatch.setitem(tools.REGISTERED, "get_workflow_run",
+                        replace(tools.REGISTERED["get_workflow_run"], handler=_none))
+    monkeypatch.setitem(tools.REGISTERED, "list_workflows",
+                        replace(tools.REGISTERED["list_workflows"], handler=_empty))
+    with pytest.raises(MCPError) as err:
+        await dispatch(RUNNER, "run_workflow", {"workflow_id": "w"}, redis=FakeRedis())
+    assert err.value.error.message == MAINTENANCE_SENTENCE and started == []
+    assert audited[-1]["metadata"]["reason"] == "maintenance"
+    out = await dispatch(RUNNER, "get_workflow_run", {"run_id": "r"}, redis=FakeRedis())
+    assert out.content[0].text == run_tools.NO_RUN_SENTENCE
+    out = await dispatch(RUNNER, "list_workflows", {}, redis=FakeRedis())
+    assert out.content[0].text == "No published workflows are available to this key."
+
+
+async def test_run_workflow_counts_on_the_start_bucket(knobs):
+    from app.mcp import limits
+
+    redis = FakeRedis()
+    assert await limits.check_limit(RUNNER, tools.REGISTERED["run_workflow"], redis) is None
+    keys = [k for k in redis.store if k.startswith("apikey:rl:")]
+    assert keys and all(k.startswith(f"apikey:rl:start:{RUNNER.key_id}:") for k in keys)
