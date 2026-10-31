@@ -50,6 +50,15 @@ describe("305-03 an MCP call's result words", () => {
     expect(words(call({ ok: false, outcome: "brand_new" }))).toBe("✕ brand_new")
   })
 
+  it("305-REVIEW WR-04: a call the tool answered with an error (not available) never ticks", () => {
+    // The client was told the call failed (isError), so the owner's row must not read answered.
+    expect(callWords(call({ ok: false, outcome: "not_available" }), ctx)).toEqual({
+      ok: false, text: "✕ not available: nothing this key can read there",
+    })
+    expect(callDetailLine(call({ tool: "read_document", ok: false, outcome: "not_available" }), ctx, NOW))
+      .toBe("10:42 · read_document · ✕ not available: nothing this key can read there")
+  })
+
   it("over the limit names the bucket and the figure: detail first, then the list's limits", () => {
     const over = (reason: string, detail: Record<string, unknown> | null = null) =>
       call({ ok: false, outcome: "refused", reason, detail })

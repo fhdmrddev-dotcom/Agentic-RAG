@@ -304,6 +304,29 @@ async def test_a_hung_audit_write_is_bounded_and_never_hangs_the_call(world, mon
     assert out.is_error is not True
 
 
+@pytest.mark.parametrize("sentence_name", ["NOT_AVAILABLE_SENTENCE", "NO_TEXT_SENTENCE", "BAD_CURSOR_SENTENCE"])
+async def test_a_handler_refusal_sentence_is_never_audited_ok(world, monkeypatch, sentence_name):
+    """WR-04: the client is told the call failed (``isError``), so the owner's activity must not
+    read "✓ answered": the row is ``outcome: not_available`` and the readback is ``ok: false``."""
+    import app.mcp.tools as tools
+    from app.api import api_keys as route
+    from app.mcp import read_tools
+
+    sentence = getattr(read_tools, sentence_name)
+
+    async def refuse(principal, args):
+        return sentence
+
+    monkeypatch.setitem(tools.REGISTERED, "t_read", h.make_spec("t_read", refuse))
+    out = await _dispatch(world, "t_read")
+    assert out.is_error is True and out.content[0].text == sentence
+    row = _only(world)
+    assert row["action_type"] == "api_key.read"
+    assert row["metadata"]["outcome"] == "not_available"
+    call = route._call_from_audit({**row, "created_at": "2026-10-31T10:00:00Z"}, {})
+    assert call.ok is False and call.outcome == "not_available"
+
+
 # ── api_key_auth: the additive tool field and the off-loop client build ───────────────────────
 
 
