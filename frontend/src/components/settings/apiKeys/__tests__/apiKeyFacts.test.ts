@@ -215,7 +215,7 @@ describe("293-04 orderKeys", () => {
 describe("293-04 callWords — every reason has words", () => {
   const ctx = {
     key: key({ revoked_at: iso(2026, 9, 6), expires_at: iso(2026, 9, 6) }),
-    limits: { starts_per_minute: 10, reads_per_minute: 120 },
+    limits: { starts_per_minute: 10, reads_per_minute: 120, searches_per_minute: 30 },
     orgName: "Acme",
   }
 

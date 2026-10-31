@@ -24,7 +24,7 @@ vi.mock("@/lib/api/apiKeys", async (importOriginal) => {
 
 import { OrgApiKeysTab } from "./OrgApiKeysTab"
 
-const LIMITS = { starts_per_minute: 10, reads_per_minute: 120 }
+const LIMITS = { starts_per_minute: 10, reads_per_minute: 120, searches_per_minute: 30 }
 const MINE = makeKey({ id: "mine", label: "my-script", owner_name: "Dana Kim", owner_is_you: true, calls: [makeCall()] })
 const PRIYAS = makeKey({
   id: "priya",
