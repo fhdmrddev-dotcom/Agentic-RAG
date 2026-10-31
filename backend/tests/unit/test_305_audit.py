@@ -314,6 +314,55 @@ async def test_a_hung_audit_write_is_bounded_and_never_hangs_the_call(world, mon
     assert out.is_error is not True
 
 
+@pytest.mark.parametrize("name,write", [
+    ("t_read", "api_key.read outcome=ok"),
+    ("t_hidden", "api_key.refused reason=tool_not_granted"),
+])
+async def test_a_fired_audit_bound_is_logged_naming_the_tool_the_key_and_the_write(
+    world, monkeypatch, caplog, name, write
+):
+    """BUG-261031-04: a bound that fires CANCELS the write, and the cancellation passes every
+    ``except Exception`` — so the row used to vanish with no log line at all. It must be named."""
+    import logging
+
+    import anyio
+
+    import app.mcp.dispatch as dispatch_mod
+
+    monkeypatch.setattr(dispatch_mod, "BOOKKEEPING_DEADLINE_S", 0.2, raising=False)
+
+    async def _hang(*a, **k):
+        await anyio.sleep(60)
+
+    monkeypatch.setattr(dispatch_mod._audit, "audit_answered", _hang)
+    monkeypatch.setattr(dispatch_mod._audit, "audit_refused", _hang)
+    with caplog.at_level(logging.ERROR, logger="app.mcp"), anyio.fail_after(5):
+        await _dispatch(world, name)
+    lines = [r.getMessage() for r in caplog.records if r.levelno >= logging.ERROR]
+    assert any(name in m and PRINCIPAL.key_id in m and write in m for m in lines), lines
+
+
+async def test_a_fired_usage_bound_is_logged_naming_the_tool_and_the_key(world, monkeypatch, caplog):
+    """BUG-261031-04: the same for the spend row of an expensive call."""
+    import logging
+
+    import anyio
+
+    import app.mcp.dispatch as dispatch_mod
+
+    monkeypatch.setattr(dispatch_mod, "BOOKKEEPING_DEADLINE_S", 0.2, raising=False)
+
+    async def _hang(*a, **k):
+        await anyio.sleep(60)
+
+    monkeypatch.setattr(dispatch_mod, "_write_usage", _hang)
+    with caplog.at_level(logging.ERROR, logger="app.mcp"), anyio.fail_after(5):
+        await _dispatch(world, "t_query", {"query": QUERY})
+    lines = [r.getMessage() for r in caplog.records if r.levelno >= logging.ERROR]
+    assert any("t_query" in m and PRINCIPAL.key_id in m and "mcp_usage" in m for m in lines), lines
+    assert len(world["rows"]) == 1  # the audit row is a separate write and still lands
+
+
 @pytest.mark.parametrize("sentence_name", ["NOT_AVAILABLE_SENTENCE", "NO_TEXT_SENTENCE", "BAD_CURSOR_SENTENCE"])
 async def test_a_handler_refusal_sentence_is_never_audited_ok(world, monkeypatch, sentence_name):
     """WR-04: the client is told the call failed (``isError``), so the owner's activity must not
