@@ -984,43 +984,58 @@ async def update_settings(
     # 306 (D-35) — outside-start admission: questions and runs AI tools and API keys may have in
     #   progress at once. Each limit applies on its own; the smallest one bites. Migration 223's
     #   CHECKs are the backstop.
-    #   ⚠ One explicit `if not 1 <= body.<field> <= 50:` per field: the 242 fence detects a bound
-    #   by that AST shape, and a loop over names would hide all three from it.
-    async def _inflight_refusal(field: str, label: str, submitted: int) -> HTTPException:
-        return HTTPException(
-            status_code=400,
-            detail=await _range_refusal_detail(
-                field=field,
-                label=label,
-                submitted=submitted,
-                lo=1,
-                hi=50,
-                typed_detail=(
-                    f"{label} must be between 1 and 50. Above 50, outside work can crowd out the "
-                    "people using the app."
-                ),
-            ),
-        )
-
+    #   ⚠ One explicit `if not 1 <= body.<field> <= 50:` and one call of the range-refusal helper
+    #   per field: the 242 fences detect a bound by that AST shape and count the helper calls, so
+    #   a loop or a shared wrapper would hide the bounds from them.
     if body.outside_inflight_per_key is not None:
         if not 1 <= body.outside_inflight_per_key <= 50:
-            raise await _inflight_refusal(
-                "outside_inflight_per_key", "Running at once, per key",
-                body.outside_inflight_per_key,
+            raise HTTPException(
+                status_code=400,
+                detail=await _range_refusal_detail(
+                    field="outside_inflight_per_key",
+                    label="Running at once, per key",
+                    submitted=body.outside_inflight_per_key,
+                    lo=1,
+                    hi=50,
+                    typed_detail=(
+                        "Running at once, per key must be between 1 and 50. Above 50, outside work can "
+                        "crowd out the people using the app."
+                    ),
+                ),
             )
         updates["outside_inflight_per_key"] = body.outside_inflight_per_key
     if body.outside_inflight_per_org is not None:
         if not 1 <= body.outside_inflight_per_org <= 50:
-            raise await _inflight_refusal(
-                "outside_inflight_per_org", "Running at once, per organisation",
-                body.outside_inflight_per_org,
+            raise HTTPException(
+                status_code=400,
+                detail=await _range_refusal_detail(
+                    field="outside_inflight_per_org",
+                    label="Running at once, per organisation",
+                    submitted=body.outside_inflight_per_org,
+                    lo=1,
+                    hi=50,
+                    typed_detail=(
+                        "Running at once, per organisation must be between 1 and 50. Above 50, outside work can "
+                        "crowd out the people using the app."
+                    ),
+                ),
             )
         updates["outside_inflight_per_org"] = body.outside_inflight_per_org
     if body.outside_inflight_per_provider is not None:
         if not 1 <= body.outside_inflight_per_provider <= 50:
-            raise await _inflight_refusal(
-                "outside_inflight_per_provider", "Running at once, per AI provider",
-                body.outside_inflight_per_provider,
+            raise HTTPException(
+                status_code=400,
+                detail=await _range_refusal_detail(
+                    field="outside_inflight_per_provider",
+                    label="Running at once, per AI provider",
+                    submitted=body.outside_inflight_per_provider,
+                    lo=1,
+                    hi=50,
+                    typed_detail=(
+                        "Running at once, per AI provider must be between 1 and 50. Above 50, outside work can "
+                        "crowd out the people using the app."
+                    ),
+                ),
             )
         updates["outside_inflight_per_provider"] = body.outside_inflight_per_provider
 
