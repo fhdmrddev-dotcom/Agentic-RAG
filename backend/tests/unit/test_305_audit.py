@@ -217,6 +217,34 @@ async def test_an_audit_failure_never_fails_the_call(world, monkeypatch):
     assert out.is_error is not True
 
 
+# ── 305-REVIEW WR-01 / WR-03 / WR-04 ──────────────────────────────────────────────────────────
+
+
+async def test_bad_argument_calls_cost_their_bucket_and_are_then_limited(world):
+    """WR-01: a call with bad arguments is COUNTED (the searches knob is 1 here), so a loop of them
+    is stopped by the per-key limit — and the refusal rows go through the CR-02 throttle."""
+    first = await _dispatch(world, "t_query", {"limit": "many"})
+    assert first.is_error is True
+    assert first.content[0].text.startswith("Those arguments don't fit t_query.")
+    assert len(world["rows"]) == 1
+    world["rows"].clear()
+    second = await _dispatch(world, "t_query", {"limit": "many"})
+    assert second.is_error is True
+    assert second.content[0].text.startswith("This key has made too many searches in the last minute.")
+    row = _only(world)
+    assert row["action_type"] == "api_key.refused"
+    assert row["metadata"]["reason"] == "rate_limited:expensive"
+
+
+async def test_a_flood_of_bad_argument_calls_writes_throttled_refusals(world):
+    """WR-01: N+1 bad-argument calls in one minute — one counted answered row, then refusals that
+    the CR-02 throttle collapses (one written row, the rest counted), never N unthrottled rows."""
+    for _ in range(6):
+        await _dispatch(world, "t_query", {"limit": "many"})
+    kinds = [r["action_type"] for r in world["rows"]]
+    assert kinds == ["api_key.read", "api_key.refused"], kinds
+
+
 # ── api_key_auth: the additive tool field and the off-loop client build ───────────────────────
 
 
