@@ -917,3 +917,11 @@ REVOKE ALL ON TABLE public.mcp_usage FROM anon;
 REVOKE ALL ON TABLE public.mcp_usage FROM authenticated;
 REVOKE ALL ON TABLE public.mcp_usage FROM service_role;
 GRANT ALL ON TABLE public.mcp_usage TO service_role;
+
+-- migration 223 — threads' origin freeze trigger function (Group A shape: trigger-only), the 215
+-- workflow_runs block above copied with threads names. PUBLIC first (the CLAUDE.md trap). The three
+-- threads.origin_* columns need no line: threads carries no column-level grant.
+REVOKE EXECUTE ON FUNCTION public.threads_origin_immutable() FROM PUBLIC;
+REVOKE EXECUTE ON FUNCTION public.threads_origin_immutable() FROM anon;
+REVOKE EXECUTE ON FUNCTION public.threads_origin_immutable() FROM authenticated;
+GRANT EXECUTE ON FUNCTION public.threads_origin_immutable() TO service_role;
