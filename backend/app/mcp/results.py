@@ -21,8 +21,10 @@ decision was already made by ``services/acting_member_reads`` before a row reach
   cut at the last blank line, then newline, then whitespace — never inside a bracketed token
   (``[label](url)``, ``[image: alt]``, ``(...)``) or a surrogate pair; a single token longer than
   the budget is hard-cut only as the last resort. Offsets are offsets in the ORIGINAL text.
-* **Hygiene** (D-19 / T-305-08): markdown images become ``[image: alt]`` and HTML ``<img>`` tags
-  are removed, so the caller's client never fetches a URL a document planted. ``render`` wraps
+* **Hygiene** (D-19 / T-305-08): markdown images (inline, reference, shortcut, bracketed alt)
+  become ``[image: alt]``, raw HTML that loads a URL by itself is removed and every other tag loses
+  its URL-bearing attributes (305-REVIEW WR-05), so the caller's client never fetches a URL a
+  document planted. ``render`` wraps
   every passage and read chunk in a marked block saying it is retrieved document content, not
   instructions, and neutralises the marker words inside the text so it cannot close its block.
 """
