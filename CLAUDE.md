@@ -708,7 +708,8 @@ node scripts/check-hot-file-ledger.cjs <phase-dir>   # 0 clear · 1 missing rows
 | `backend/app/services/email_provider.py` | 10 / 3 / 413 (was `6 / 3 / 362`) | 300-REVIEW: SMTP_SECURITY fail-closed, redirected flag, config check · ⛔ |
 | `frontend/src/components/admin/HealthSignals.tsx` | 7 / 5 / 415 (was `6 / 5 / 407`) | 300-REVIEW IN-04: config_problem reads "Can't send", red, pre-send |
 | `frontend/src/components/layout/AppViewSwitch.tsx` | 8 / 3 / 609 (was `7 / 2 / 600`) | ⚠ now FIRES (301) · 301-03: the non-chat hamburger dot · ⛔ no hooks |
-| `backend/app/security/api_key_auth.py` | 6 / 3 / 413 | ⚠ now FIRES (305) · 305-03: additive tool kwarg; client off the loop · ⛔ |
+| `backend/app/security/api_key_auth.py` | 7 / 3 / 432 (was `6 / 3 / 413`) | 305 LF-03: restore_suppressed_refusals beside the slot · ⛔ |
+| `backend/app/services/retrieval_tuning.py` | 7 / 3 / 412 (was `4 / 2 / 364`) | ⚠ now FIRES (305) · BUG-261031-03 probe + LF-01/02 savepoints · ⛔ |
 | `backend/app/db/rates.py` | 11 / 3 / 950 | ⚠ now FIRES (305) · 305-03: mcp_usage legs in the one per_root CTE · ⛔ |
 | `frontend/src/components/settings/apiKeys/ApiKeyCard.tsx` | 3 / 3 / 239 | ⚠ now FIRES (305) · 305-03: the two !isMcp guards removed |
 | `frontend/src/components/settings/apiKeys/ApiKeysTab.tsx` | 5 / 3 / 317 | ⚠ now FIRES (305) · 305-03: one AI tool limits line · ⛔ |
