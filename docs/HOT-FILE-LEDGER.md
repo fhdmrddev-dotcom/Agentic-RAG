@@ -12307,7 +12307,7 @@ cells rot within days.
 | [`frontend/src/components/admin/ControlRoomPage.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentsadmincontrolroompagetsx) | 20 / 11 / 907 (was `19 / 10 / 906`) | ⚠ **FIRES** | 304-06: one capabilityFlags line (mcp_enabled: settings?.mcp_enabled ?? true); impactCounts untouched. Honoured by construction. ⛔ never a fabricated count |
 | [`backend/app/middleware/maintenance.py`](docs/HOT-FILE-LEDGER.md#backendappmiddlewaremaintenancepy) | 2 / 2 / 121 (was `1 / 1 / 113`) | no (2 phases) | 305-01: one MCP_PATH allowlist arm on a segment boundary (/mcpx still 503). ⛔ pure ASGI; fail-open flag read; segment-boundary match only |
 | [`frontend/src/lib/citationNav.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrclibcitationnavtsx) | 1 / 1 / 199 | no (1 phase) | ⚠ absent its entire life — row added at 305 planning (D-52). 305-02: one optional arrival prop + leaveDocumentAddress. ⛔ one-shot intent; openDocument keeps one identity |
-| [`backend/app/mcp/__init__.py`](docs/HOT-FILE-LEDGER.md#backendappmcp__init__py) | 1 / 1 / 70 (was `0 / 0 / 0`) | no (young) | young (created 305-01, D-04/D-49): register_mcp (/mcp + /mcp/ to one edge, or nothing + CRITICAL) and mcp_lifespan (fresh manager per entry). ⛔ never a Mount |
+| [`backend/app/mcp/__init__.py`](docs/HOT-FILE-LEDGER.md#backendappmcp__init__py) | 2 / 1 / 75 (was `1 / 1 / 70`) | no (young) | young (305-01, D-04/D-49): register_mcp (POST-only /mcp + /mcp/ to one edge, or nothing + CRITICAL); mcp_lifespan (fresh manager per entry). ⛔ never a Mount |
 | [`backend/app/mcp/server.py`](docs/HOT-FILE-LEDGER.md#backendappmcpserverpy) | 1 / 1 / 82 (was `0 / 0 / 0`) | no (young) | young (created 305-01, D-47): lowlevel Server('syrel'); list = REGISTERED ∩ granted; unknown name -32602; catch-all -> generic sentence. ⛔ never str(exc); never MCPServer |
 | [`backend/app/mcp/dispatch.py`](docs/HOT-FILE-LEDGER.md#backendappmcpdispatchpy) | 1 / 1 / 65 (was `0 / 0 / 0`) | no (young) | young (created 305-01, D-21/D-24/D-25): grant at call -> maintenance guard (MCPError) -> args (plain sentence) -> handler. 305-02..04 insert their stages. ⛔ one audit row per call |
 | [`backend/app/mcp/tools.py`](docs/HOT-FILE-LEDGER.md#backendappmcptoolspy) | 1 / 1 / 50 (was `0 / 0 / 0`) | no (young) | young (created 305-01, D-20/D-23): ToolSpec, READ_ONLY, is_read_only, REGISTERED (empty; 305-02 adds the three read specs). ⛔ code constants only; never the chat registry |
@@ -28857,5 +28857,13 @@ CLAUDE.md verdict cell: none (the file does not fire).
 **`2 / 2 / 121` (was `1 / 1 / 113`).** The scan row's triple re-derived after the Task 4 commit; the section above (305-01 Task 4) carries the reasons.
 
 Scan-list cell as of 2026-10-31 (replaced by 305-01 Task 5, moved verbatim): 1 / 1 / 113 | no (1 phase) | ⚠ absent its entire life — row added at 305 planning (D-25). 305-01: one MCP_PATH allowlist arm. ⛔ pure ASGI; fail-open flag read; segment-boundary match only |
+
+CLAUDE.md verdict cell: none (the file does not fire).
+
+### `backend/app/mcp/__init__.py` — 305-01 Task 5 (baseline fix), 2026-10-31
+
+**`2 / 1 / 75` (was `1 / 1 / 70`).** Both routes now carry `methods=["POST"]`. A method-less ASGI `Route` has `route.methods = None`, which crashed `test_284_list_contract`'s walk over `app.routes` (TypeError) and took the backend unit baseline to 72; measured red with this plan's code and green with the plan base's. The router now answers non-POST 405 + `Allow: POST` before the edge, which still refuses non-POST itself.
+
+Scan-list cell as of 2026-10-31 (replaced by 305-01 Task 5, moved verbatim): 1 / 1 / 70 (was `0 / 0 / 0`) | no (young) | young (created 305-01, D-04/D-49): register_mcp (/mcp + /mcp/ to one edge, or nothing + CRITICAL) and mcp_lifespan (fresh manager per entry). ⛔ never a Mount |
 
 CLAUDE.md verdict cell: none (the file does not fire).
