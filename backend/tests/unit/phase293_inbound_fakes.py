@@ -119,13 +119,21 @@ class FakePipeline:
     def expire(self, k, seconds):
         self.ops.append(("expire", k))
 
+    # 305-REVIEW LF-03: a refusal row that was not written gives its suppressed count back.
+    def incrby(self, k, amount):
+        self.ops.append(("incrby", k, amount))
+
     async def execute(self):
         out = []
-        for op, k in self.ops:
+        for op, k, *rest in self.ops:
             if op == "get":
                 out.append(self.redis.store.get(k))
             elif op == "incr":
                 value = int(self.redis.store.get(k) or 0) + 1
+                self.redis.store[k] = str(value)
+                out.append(value)
+            elif op == "incrby":
+                value = int(self.redis.store.get(k) or 0) + int(rest[0])
                 self.redis.store[k] = str(value)
                 out.append(value)
             elif op == "expire":

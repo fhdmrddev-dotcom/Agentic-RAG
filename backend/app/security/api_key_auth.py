@@ -310,6 +310,25 @@ async def refusal_audit_slot(redis, *, key_id: str, reason: str) -> int | None:
         return _local_slot(key_id, reason, minute)
 
 
+async def restore_suppressed_refusals(redis, *, key_id: str, reason: str, count: int) -> bool:
+    """305-REVIEW LF-03: give back the count a slot handed out when its row was NOT written (the
+    INSERT failed, or a bookkeeping bound cancelled it), so the next written row still names it.
+    Best effort: False (never a raise) when Redis cannot take it — the caller logs the count."""
+    if not count:
+        return True
+    pending = f"{_SUPPRESSED_PREFIX}{key_id}:{reason}"
+    try:
+        async with redis.pipeline(transaction=True) as pipe:
+            pipe.incrby(pending, count)
+            pipe.expire(pending, _SUPPRESSED_TTL)
+            await pipe.execute()
+        return True
+    except Exception:  # noqa: BLE001 — a restore failure must never fail the call
+        logger.warning("could not restore %d suppressed refusal(s) for key %s", count, key_id,
+                       exc_info=True)
+        return False
+
+
 async def _refuse(row: dict, *, call: str, reason: str, redis) -> HTTPException:
     """Audit one refusal (at most one row per key, reason and minute; 293-REVIEW CR-02), then
     return the one 401. A suppressed refusal is counted and named on the next row it writes."""

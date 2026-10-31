@@ -31,10 +31,19 @@ import json
 import logging
 from typing import Any
 
+import anyio
+
 from app.dependencies import get_pg_pool
-from app.security.api_key_auth import _audit_args, refusal_audit_slot
+from app.security.api_key_auth import (
+    _audit_args,
+    refusal_audit_slot,
+    restore_suppressed_refusals,
+)
 
 logger = logging.getLogger("app.mcp")
+
+#: 305-REVIEW LF-03: the most a suppressed-count restore may take once the write was cancelled.
+_RESTORE_DEADLINE_S = 1.0
 
 _INSERT = (
     "INSERT INTO public.audit_log (user_id, action_type, metadata, org_id) "
@@ -79,14 +88,35 @@ async def audit_answered(principal: Any, *, tool: str | None, outcome: str) -> N
 async def audit_refused(
     principal: Any, *, tool: str | None, reason: str, redis: Any, detail: dict | None = None
 ) -> None:
+    # 305-REVIEW LF-03: the slot hands this row the count of refusals it suppressed (and clears it
+    # in Redis). If the row is then not written, that count goes BACK, so the next written row of
+    # this (key, reason) still names it — on a failed INSERT and on a fired bookkeeping bound alike.
+    suppressed = 0
     try:
-        suppressed = await refusal_audit_slot(redis, key_id=str(principal.key_id), reason=reason)
-        if suppressed is None:
+        slot = await refusal_audit_slot(redis, key_id=str(principal.key_id), reason=reason)
+        if slot is None:
             return  # counted; the next written row of this (key, reason) names it
+        suppressed = slot
         if suppressed:
             detail = {**(detail or {}), "suppressed": suppressed}
         await _write(principal, "api_key.refused", outcome="refused", reason=reason,
                      detail=detail, tool=tool)
+    except anyio.get_cancelled_exc_class():
+        # dispatch's bound fired mid-write (it logs the lost row). Restore under a short shield of
+        # its own, then let the cancellation through. (If the server had already committed the
+        # row, the count is named twice — an over-count, never a silent loss.)
+        with anyio.move_on_after(_RESTORE_DEADLINE_S, shield=True):
+            await _restore(principal, reason, redis, suppressed)
+        raise
     except Exception:  # noqa: BLE001 — an audit failure must never fail the call
-        logger.error("mcp audit row NOT written (tool=%s key=%s write=api_key.refused reason=%s)",
-                     tool, principal.key_id, reason, exc_info=True)
+        logger.error("mcp audit row NOT written (tool=%s key=%s write=api_key.refused reason=%s "
+                     "suppressed=%d)", tool, principal.key_id, reason, suppressed, exc_info=True)
+        await _restore(principal, reason, redis, suppressed)
+
+
+async def _restore(principal: Any, reason: str, redis: Any, suppressed: int) -> None:
+    if suppressed and not await restore_suppressed_refusals(
+        redis, key_id=str(principal.key_id), reason=reason, count=suppressed
+    ):
+        logger.error("mcp refusal count LOST: %d suppressed refusal(s) (key=%s reason=%s) could not "
+                     "be restored", suppressed, principal.key_id, reason)
