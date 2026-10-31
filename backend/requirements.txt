@@ -7,7 +7,13 @@ fastapi==0.115.6
 sse-starlette==3.0.3
 # mcp: Phase 305 / D-01 — the official MCP Python SDK (lowlevel Server +
 # Streamable HTTP). Pulls httpx2 (provenance approved, T-305-25).
-mcp>=2.3.0,<3
+# T-305-SC (305-SECURITY): EXACT pins for the SDK and the new transitive set the
+# operator approved (2026-10-31) and the tests ran on — a range would let a
+# production image build pick up whatever mcp 2.x / httpx2 is newest that day.
+mcp==2.3.0
+mcp-types==2.3.0
+httpx2==2.16.0
+httpcore2==2.16.0
 uvicorn[standard]==0.32.1
 # supabase: lower bound only — upper bound removed after Docling rip
 # (D-071.3-10). Bumping to a major version must re-verify integration
