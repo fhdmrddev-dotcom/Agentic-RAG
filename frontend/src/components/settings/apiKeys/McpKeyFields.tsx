@@ -103,10 +103,11 @@ export function McpKeyFields({
   value: McpDraft
   onChange: (next: McpDraft) => void
 }) {
-  const ids = { org: useId(), tools: useId(), exp: useId(), ext: useId(), why: useId() }
+  const ids = { org: useId(), tools: useId(), exp: useId(), ext: useId(), why: useId(), askExt: useId() }
   const groupIds = { read: useId(), ask: useId(), run: useId() }
   const org = orgName || M.orgFallback
   const tools = catalogue ? draftTools(value, catalogue) : []
+  const askNeedsExternal = tools.includes("ask_agent") && !value.external
 
   function toggleTool(name: string) {
     if (!catalogue) return
@@ -228,7 +229,7 @@ export function McpKeyFields({
             type="checkbox"
             className="mt-0.5 h-4 w-4 flex-none accent-[hsl(var(--primary))]"
             checked={value.external}
-            aria-describedby={ids.ext}
+            aria-describedby={askNeedsExternal ? `${ids.ext} ${ids.askExt}` : ids.ext}
             onChange={(e) => setExternal(e.target.checked)}
           />
           <span>
@@ -236,6 +237,12 @@ export function McpKeyFields({
             <span id={ids.ext} className="mt-0.5 block text-xs text-muted-foreground">
               {M.externalSub}
             </span>
+            {askNeedsExternal && (
+              // 306-05 (UI-SPEC §7c, D-29): a warning, never a blocker: Create stays enabled.
+              <span id={ids.askExt} className="mt-1 block text-xs text-warning">
+                {M.askNeedsExternalHint}
+              </span>
+            )}
           </span>
         </label>
       </div>

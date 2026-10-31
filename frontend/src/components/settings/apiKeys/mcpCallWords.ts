@@ -8,6 +8,9 @@
  * ONE reason vocabulary, shared with the backend (`app/mcp/audit.py`, `app/mcp/limits.py`):
  *   refused   `rate_limited:read` · `rate_limited:expensive` · `tool_not_granted`
  *             · `limiter_unavailable` · `maintenance` (the last two keep their shipped words)
+ *             · 306-05: `rate_limited:start` · `ask_needs_external`; `admission:*` fall through to
+ *               `apiKeyFacts` (one home for a workflow key and an MCP key alike)
+ *   ok words  306-05: `ask_agent` / `get_answer` read "replied", `run_workflow` "run started"
  *   answered  outcome `ok` · `error` · `redaction_blocked` · `not_available` (305-REVIEW WR-04:
  *             the tool answered with an error, so it never reads as answered)
  *
@@ -33,6 +36,12 @@ function refusalWords(call: ApiKeyCall, ctx: CallContext): string | null {
   if (reason === "tool_not_granted") {
     return call.tool ? fillCopy(M.calls.notGranted, { tool: call.tool }) : M.calls.notGrantedBare
   }
+  // 306-05 (UI-SPEC §7a): MCP-only; the admission reasons live once, in apiKeyFacts (306-02).
+  if (reason === "ask_needs_external") return M.calls.askNeedsExternal
+  if (reason === "rate_limited:start") {
+    const N = limitFigure(call, ctx.limits?.starts_per_minute)
+    return N === null ? C.calls.overBare : fillCopy(C.calls.overStarts, { N })
+  }
   if (reason.startsWith("rate_limited:")) {
     const searches = reason === "rate_limited:expensive"
     const N = limitFigure(call, searches ? ctx.limits?.searches_per_minute : ctx.limits?.reads_per_minute)
@@ -42,9 +51,16 @@ function refusalWords(call: ApiKeyCall, ctx: CallContext): string | null {
   return null
 }
 
+/** 306-05 (UI-SPEC §7a): an ask is a reply, a workflow start a start; every other tool answered. */
+function okWords(tool: string | null | undefined): string {
+  if (tool === "ask_agent" || tool === "get_answer") return M.calls.replied
+  if (tool === "run_workflow") return M.calls.runStarted
+  return M.calls.answered
+}
+
 /** The result words of an MCP call, or `null` to fall through to the shipped 293/304 words. */
 export function mcpCallWords(call: ApiKeyCall, ctx: CallContext): { ok: boolean; text: string } | null {
-  if (call.ok) return { ok: true, text: fillCopy(C.calls.ok, { words: M.calls.answered }) }
+  if (call.ok) return { ok: true, text: fillCopy(C.calls.ok, { words: okWords(call.tool) }) }
   if (call.outcome === "redaction_blocked") return { ok: false, text: M.calls.withheld }
   if (call.outcome === "error") return { ok: false, text: M.calls.failed }
   if (call.outcome === "not_available") return { ok: false, text: M.calls.notAvailable } // 305-REVIEW WR-04

@@ -140,8 +140,15 @@ def _per_root_cte(window_sql: str, expert_param: str) -> str:
                 r.run_id, r.org_id, r.thread_id, r.user_id, r.status, r.model, r.provider,
                 r.started_at, r.completed_at, r.expert_id, r.expert_attributed,
                 (r.model = 'unknown' AND r.provider = 'unknown') AS is_box_shell,
-                'run'::text AS source, NULL::uuid AS api_key_id, NULL::text AS tool
+                'run'::text AS source, t.origin_ref AS api_key_id,
+                CASE WHEN t.id IS NULL THEN NULL::text
+                     WHEN EXISTS (SELECT 1 FROM public.workflow_runs w WHERE w.thread_id = r.thread_id)
+                     THEN 'run_workflow' ELSE 'ask_agent' END AS tool
             FROM public.runs r
+            -- 306-05 (D-18 / D-34): an MCP ask or run carries its key on its THREAD's origin
+            -- (migration 223). A primary-key join: at most one row, so no run is multiplied.
+            -- ``source`` stays 'run': ``members`` joins runs only on it (Pitfall 9).
+            LEFT JOIN public.threads t ON t.id = r.thread_id AND t.origin_kind = 'mcp'
             WHERE r.org_id = $1
               AND r.parent_run_id IS NULL
               """ + window_sql + """
@@ -941,7 +948,10 @@ async def get_spend_runs(
             # 305-03 (D-31): an MCP usage row names its key and tool; a run reads "run" + nulls.
             # ``.get``: an asyncpg Record and every older mock row both answer it. An MCP row has
             # no thread, so its coverage is never complete (``is_coverage_complete`` above).
-            "source": r.get("source") or "run",
+            # 306-05 (D-34): a run row whose thread names a key (an MCP ask or run) reads "mcp", so
+            # 305's ledger MCP arm names the key; the SQL source stays "run" (Pitfall 9).
+            "source": "mcp" if r.get("api_key_id") is not None and (r.get("source") or "run") == "run"
+                      else (r.get("source") or "run"),
             "api_key_id": str(r.get("api_key_id")) if r.get("api_key_id") is not None else None,
             "api_key_label": r.get("api_key_label"),
             "mcp_tool": r.get("mcp_tool"),
