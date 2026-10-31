@@ -489,7 +489,7 @@ node scripts/check-hot-file-ledger.cjs <phase-dir>   # 0 clear · 1 missing rows
 | `frontend/src/components/panel/FilesSection.tsx` | 14 / 9 / 366 (was `12 / 8 / 354`) | 302-01: one GeneratedFilesGroup mount; workspace rows byte-identical |
 | `frontend/src/lib/api.ts` | 215 / 128 / 556 (was `214 / 127 / 552`) | 299-03: one links export block |
 | `frontend/src/types/index.ts` | 103 / 82 / 1688 (was `102 / 81 / 1685`) | 299-04: ExpertBundle.org_id (the wire already sent it) · seam OWED |
-| `backend/app/main.py` | 99 / 73 / 1021 (was `98 / 72 / 1020`) | 301-01: one include_router(notifications.router) + its import token · ⛔ |
+| `backend/app/main.py` | 100 / 74 / 1024 (was `99 / 73 / 1021`) | 305-01: one import + register_mcp(app) + one mcp_lifespan block · ⛔ |
 | `backend/app/config.py` | 96 / 55 / 1831 (was `93 / 54 / 1809`) | 300-03: SMTP_* fields (D-28) · seam OWED · ⛔ |
 | `backend/app/api/admin.py` | 45 / 18 / 2055 (was `44 / 17 / 2054`) | 304-04: one _FLAG_HUMAN_NAMES entry (mcp_enabled) · ⛔ |
 | `backend/app/api/settings.py` | 50 / 27 / 1400 (was `48 / 26 / 1398`) | 304-04: mcp_enabled response field + readback (2 lines) |
@@ -604,7 +604,8 @@ node scripts/check-hot-file-ledger.cjs <phase-dir>   # 0 clear · 1 missing rows
 | `frontend/src/components/sources/SourceFolderPicker.tsx` | 2 / 2 / 375 | ⚠ absent its entire life — row added BUG-260912-01 · ⛔ |
 | `frontend/src/components/sources/sourceHealthVocabulary.ts` | 8 / 4 / 645 | ⛔ row STALE · G-5 fires (252-03) · Seam OWED |
 | `backend/app/services/sources/failure_cause.py` | 3 / 2 / 227 | ⚠ absent its entire life — row added BUG-260912-01 · ⛔ |
-| `scripts/full-schema-supplement.sql` | 28 / 20 / 909 (was `27 / 19 / 891`) | 304-01: mig 220 api_keys block appended after 215's · ⛔ |
+| `scripts/full-schema-supplement.sql` | 29 / 21 / 919 (was `28 / 20 / 909`) | 305-01: mig 222 mcp_usage deny-all block after 221's · ⛔ |
+| `backend/app/services/rate_limit.py` | 5 / 3 / 160 (was `4 / 2 / 138`) | ⚠ now FIRES (305) · 305-01: mcp_ip bucket, check_ip_limit (additions) · ⛔ |
 | `.claude/settings.json` | 14 / 6 / 214 | ⚠ STALE · last touch 276 · ⛔ |
 | `backend/app/services/forced_emit.py` | 15 / 9 / 749 (was `13 / 8 / 724`) | 296 (293-F-4): cross-provider copy names the target provider · ⛔ |
 | `backend/app/services/template_asset_service.py` | 5 / 4 / 379 (was `4 / 3 / 344`) | 295-02: has_staged_template (Branch-2 WHERE shared) |
