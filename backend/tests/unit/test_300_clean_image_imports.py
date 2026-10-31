@@ -50,6 +50,10 @@ IMPORT_TO_DIST = {
     # Phase 305 (D-01): the official MCP SDK. ``mcp.types`` re-exports ``mcp_types`` (a hard
     # ``==`` dependency of ``mcp``); app/mcp imports it only through ``mcp``.
     "mcp": "mcp",
+    # 305-REVIEW WR-03: ``app/mcp/dispatch.py`` shields its bookkeeping with ``anyio``. It is an
+    # unconditional hard dependency of ``mcp`` (``anyio>=4.9``, which has ``move_on_after(shield=)``)
+    # and of ``starlette`` (so of ``fastapi``); the image cannot install either without it.
+    "anyio": "mcp",
 }
 
 #: The Dockerfile drops these lines before ``pip install`` (Dockerfile:32-34).
