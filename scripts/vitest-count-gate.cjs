@@ -4530,7 +4530,7 @@ const BASELINE = {
   // Phase 305-02 (D-52) — FIRST pins, both knobs in the same commit (each is FILE-LEVEL in TARGETS below).
   "DocumentCantBeOpened.test.tsx": 5, // 305-02 — the 299 words rendered for a document, a labelled section never an alert, focus on the heading once, one Dismiss, no hand-typed copy in the source
   // Phase 305-03 (D-31 / D-53) — FIRST pins, both knobs in the same commit (each is FILE-LEVEL in TARGETS below).
-  "mcpCallWords.test.ts": 8, // 305-03 — an MCP call's words: answered, withheld, failed, over the limit (bucket + figure), not granted, shipped reasons kept, time · tool · result
+  "mcpCallWords.test.ts": 9, // 305-03 — an MCP call's words: answered, withheld, failed, not available (305-REVIEW WR-04), over the limit (bucket + figure), not granted, shipped reasons kept, time · tool · result
   "ApiKeyActivity.mcp.test.tsx": 4, // 305-03 — Time · Tool · Result with the tool pill, the MCP empty sentence, revoked keeps the shipped one, a workflow key keeps five columns
   // Phase 305-04 (D-37) — FIRST pin, both knobs in the same commit (FILE-LEVEL in TARGETS below).
   "OrgPiiRedactionCard.test.tsx": 9, // 305-04 — Loading/failed show no switch, OFF calm, describedby the two sub lines, never optimistic + tag + onRecorded once, server answer wins, direct flip off, failed write as a status, mounted right after OrgMcpSwitchCard
