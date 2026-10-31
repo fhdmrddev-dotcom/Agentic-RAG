@@ -244,11 +244,30 @@ def test_the_service_role_is_used_only_by_the_two_sanctioned_calls():
     and to ``resolve_document_scope`` (step 1 PROPOSES ids; step 2, on the RLS connection inside
     ``acting_as``, DECIDES). Two call sites, each an argument of one of those two calls."""
     code = _code_only(READS)
-    calls = re.findall(r"get_service_role_supabase \(", code)
-    assert len(calls) == 2, calls
-    for callee in ("search_documents", "resolve_document_scope"):
-        # the service-role client is a DIRECT argument of that call (no other call opens before it)
-        assert re.search(callee + r" \([^()]*get_service_role_supabase \(", code), callee
+    # ⚠ REWRITTEN DELIBERATELY by Phase 305-02 (D-57, 304-REVIEW IN-03), not tripped by surprise.
+    # Until 305-02 ``search`` built the client INLINE, on the event loop, as a direct argument of
+    # ``search_documents`` — and this arm pinned exactly that shape. Building a supabase-py client
+    # is blocking I/O (D-v2.5-01), so 305-02 moves it to ``await run_in_threadpool(
+    # get_service_role_supabase, principal.org_id)`` and passes the resulting variable instead.
+    # The INTENT is unchanged and still pinned: exactly TWO sanctioned service-role uses in this
+    # module, each feeding exactly one of the two enrichment-only calls.
+    #   · search: the threadpooled client variable is the THIRD positional argument of
+    #     ``search_documents`` (query, user_id, client) — never a different call's argument;
+    #   · view_documents: the client is still a direct ``supabase=`` argument of
+    #     ``resolve_document_scope`` (unchanged arm).
+    refs = re.findall(r"\bget_service_role_supabase\b", code)
+    # the import line, the threadpooled search build, the resolve_document_scope argument
+    assert len(refs) == 3, refs
+    flat = re.sub(r"\s+", " ", code)  # the tokenizer keeps in-bracket line breaks as tokens
+    pooled = re.findall(
+        r"(\w+) = await run_in_threadpool \( get_service_role_supabase , principal \. org_id \)", flat
+    )
+    assert len(pooled) == 1, pooled
+    client = pooled[0]
+    m = re.search(r"search_documents \( query , principal \. user_id , (\w+) ,", flat)
+    assert m and m.group(1) == client, (m and m.group(1), client)
+    assert len(re.findall(r"get_service_role_supabase \(", code)) == 1  # one inline call remains
+    assert re.search(r"resolve_document_scope \([^()]*get_service_role_supabase \(", code)
 
 
 def test_search_never_passes_an_allow_list_and_runs_inside_acting_as():

@@ -313,7 +313,7 @@ function App() {
               No key and a value with ONE identity (the hook holds it for its lifetime), so this
               wrapper never remounts anything — StreamsProvider and the chat tree are above it. */}
           <LeaveGuardContext.Provider value={nav.leaveGuards}>
-          <CitationNavProvider navigate={nav.onNavigate}>
+          <CitationNavProvider navigate={nav.onNavigate} entityLink={nav.entityLink}>
             <ChatLayout
               onSignOut={signOut}
               activeView={nav.activeView}

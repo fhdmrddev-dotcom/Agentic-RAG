@@ -59,6 +59,7 @@ import { Sheet, SheetContent } from "@/components/ui/sheet"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip"
 import { useCitationNavOptional } from "@/lib/citationNav"
+import { DocumentCantBeOpened } from "@/components/library/DocumentCantBeOpened"
 import { clampPageOffset } from "@/lib/pageClamp"
 import { cn } from "@/lib/utils"
 import { EMPTY_FILTER } from "@/types"
@@ -888,6 +889,7 @@ export function LibraryPage({
         {libDocs.selectedDocError && (
           <PageAlert message="Couldn’t open that document." onRetry={libDocs.retrySelectedDoc} />
         )}
+        {libDocs.selectedDocRefused && <DocumentCantBeOpened onDismiss={() => { setSelectedDocId(null); citationNav?.leaveDocumentAddress?.() }} />}
         {findSlots && findSlots.body ? (
           findSlots.body
         ) : (

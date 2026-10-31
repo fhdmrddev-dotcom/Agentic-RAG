@@ -204,3 +204,63 @@ describe("flashCitationRow / flashCitationMarker — marker↔row DOM contract",
     expect(bRow.classList.contains(CITATION_FLASH_CLASS)).toBe(false)
   })
 })
+
+// ── Phase 305-02 (D-17 / D-52; UI-SPEC Surface 4) — the document address arrival.
+describe("CitationNavProvider — the /app/library/<uuid> arrival (305-02)", () => {
+  const DOC_A = "5b0c1d2e-3f40-4a51-8b62-7c83d94ea5f6"
+  const DOC_B = "0a1b2c3d-4e5f-4061-8273-8495a6b7c8d9"
+
+  function harness(initial: string | null) {
+    const navigate = vi.fn()
+    const leave = vi.fn()
+    const state: { document: string | null } = { document: initial }
+    const wrapper = ({ children }: { children: ReactNode }) => (
+      <CitationNavProvider navigate={navigate} entityLink={{ document: state.document, leave }}>
+        {children}
+      </CitationNavProvider>
+    )
+    const hook = renderHook(() => useCitationNav(), { wrapper })
+    const arrive = (next: string | null) => {
+      state.document = next
+      hook.rerender()
+    }
+    return { hook, navigate, leave, arrive }
+  }
+
+  it("a document arrival sets the pending document once per distinct id, without leaving the address", () => {
+    const { hook, navigate, arrive } = harness(DOC_A)
+    expect(hook.result.current.pendingDocumentId).toBe(DOC_A)
+    // UI-SPEC Surface 4: the address stays as opened while the panel shows it, so no navigate
+    expect(navigate).not.toHaveBeenCalled()
+    act(() => hook.result.current.consumePendingDocument())
+    arrive(DOC_A) // the same id again: not re-opened
+    expect(hook.result.current.pendingDocumentId).toBeNull()
+    arrive(DOC_B)
+    expect(hook.result.current.pendingDocumentId).toBe(DOC_B)
+  })
+
+  it("no arrival leaves the pending intent alone", () => {
+    const { hook } = harness(null)
+    expect(hook.result.current.pendingDocumentId).toBeNull()
+  })
+
+  it("leaveDocumentAddress REPLACES the document address with the Library (leave({view: 'documents'}))", () => {
+    const { hook, leave } = harness(DOC_A)
+    act(() => hook.result.current.leaveDocumentAddress())
+    expect(leave).toHaveBeenCalledTimes(1)
+    expect(leave).toHaveBeenCalledWith({ view: "documents" })
+  })
+
+  it("off a document address leaveDocumentAddress writes nothing", () => {
+    const { hook, leave } = harness(null)
+    act(() => hook.result.current.leaveDocumentAddress())
+    expect(leave).not.toHaveBeenCalled()
+  })
+
+  it("without the prop the provider is unchanged (every existing host)", () => {
+    const wrapper = ({ children }: { children: ReactNode }) => <CitationNavProvider>{children}</CitationNavProvider>
+    const { result } = renderHook(() => useCitationNav(), { wrapper })
+    expect(result.current.pendingDocumentId).toBeNull()
+    expect(() => result.current.leaveDocumentAddress()).not.toThrow()
+  })
+})

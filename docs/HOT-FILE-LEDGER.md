@@ -11818,7 +11818,7 @@ cells rot within days.
 | [`frontend/src/lib/api/workflows.ts`](docs/HOT-FILE-LEDGER.md#frontendsrclibapiworkflowsts) | 17 / 16 / 1395 (was `16 / 16 / 1364`) | ⚠ **FIRES** | 299-04: WorkflowRunRead.org_id; createWorkflowDraft opts.fromDefinitionId → ?from_definition_id= (absent → today's URL); the Tweak org 409 → WorkflowOrgRefusedError (verbatim sentence) |
 | [`frontend/src/lib/connectionMark.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrclibconnectionmarktsx) | 7 / 4 / 313 | ⚠ **FIRES** | ✅ **the move IS the seam, and it was TAKEN (214-08)** — `settings/` → `lib/`; four run + canvas surfaces now import ONE map |
 | [`frontend/src/components/ingestion/DocumentList.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentsingestiondocumentlisttsx) | 31 / 15 / 372 (was `31 / 16 / 372`) | ⚠ **FIRES** | **275-02/04**: 409 → HoldRefusalNotice; ONE `retention` prop; a HELD row's delete opens straight into the refusal (`requestDelete`). Seven `<td>` kept |
-| [`frontend/src/pages/LibraryPage.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrcpageslibrarypagetsx) | 70 / 21 / 1347 (was `69 / 21 / 1346`) | ⚠ **FIRES** | 298-review WR-01: one property on the useLibraryOrgSwitch call, listReset: { findDispatch, setListTarget }; the logic lives in the hook. ⛔ no keyed remount; switch resets run during render |
+| [`frontend/src/pages/LibraryPage.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrcpageslibrarypagetsx) | 71 / 22 / 1349 (was `70 / 21 / 1347`) | ⚠ **FIRES** | 305-02: one mount — DocumentCantBeOpened in the S8 slot on libDocs.selectedDocRefused (+1 import). Honoured by construction. ⛔ no keyed remount; switch resets run during render |
 | [`backend/app/services/retrieval_service.py`](docs/HOT-FILE-LEDGER.md#backendappservicesretrievalservicepy) | 25 / 14 / 181 (was `24 / 13 / 176`) | ⚠ **FIRES** | ✅ extraction DISCHARGED (272-01). 294-01: keyword-only instruction, conditional kwargs at the one rerank call, process_inputs (+6 −1). Honoured by construction |
 | [`backend/app/services/recall_eval.py`](docs/HOT-FILE-LEDGER.md#backendappservicesrecallevalpy) | 4 / 3 / 1070 | ⚠ **FIRES** | Phase 246 landing: safe as-is (offline test/eval harness, zero request-path side effects, clean 2-layer design). Added `inspect_execution_plan` (EXPLAIN + `idx_scan > 0`) & latency p50/p95 |
 | [`scripts/build-recall-bench.py`](docs/HOT-FILE-LEDGER.md#scriptsbuild-recall-benchpy) | 4 / 1 / 1088 | no (1 phase) | ⚠ row ADDED at 241-04 — the only `DROP DATABASE` in the repo. Guard + constant-interpolation + AST fence, all driven RED. It built GREEN and unreadable; assert the READ |
@@ -11864,7 +11864,7 @@ cells rot within days.
 | [`frontend/src/components/sources/watchProductMark.ts`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentssourceswatchproductmarkts) | 0 / 0 / 38 | no (new) | young (240) — which PRODUCT a watched folder came from, read from its ADDRESS. ⛔ Never from `service_id`: Gmail and Drive share one connection |
 | [`frontend/src/components/sources/CreateWatchModal.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentssourcescreatewatchmodaltsx) | 4 / 1 / 283 | no (1 phase) | honoured by construction (**240**): byte-unchanged. ⛔ Its auto-select of `capable[0]` is why BUG-260908-02 mattered most here |
 | [`frontend/src/components/layout/NavPanel.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentslayoutnavpaneltsx) | 29 / 15 / 442 (was `28 / 15 / 428`) | ⚠ **FIRES** | honoured by construction (301-03: one WaitingOnYouControl mount after New chat + one optional waitingStatus prop). ⛔ the registry is resolved only by ChatLayout |
-| [`frontend/src/App.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrcapptsx) | 44 / 30 / 350 (was `43 / 30 / 349`) | **FIRES** | 299-02: one prop `entityLink={nav.entityLink}` on `<ChatLayout>` (honoured by construction). See §Phase 299 (299-02) |
+| [`frontend/src/App.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrcapptsx) | 45 / 31 / 350 (was `44 / 30 / 350`) | **FIRES** | 305-02: one prop `entityLink={nav.entityLink}` on `<CitationNavProvider>` (honoured by construction). See §Phase 305 (305-02) |
 | [`frontend/src/lib/nav-items.ts`](docs/HOT-FILE-LEDGER.md#frontendsrclibnav-itemsts) | 13 / 9 / 173 (was `12 / 8 / 153`) | ⚠ **FIRES** | **283-02** (FIX-01): the Settings entry UNGOVERNED (no `feature` key); per-tab gate in the page, per-route `require_visible` at the API. `visibleNavItems` unchanged |
 | [`frontend/src/components/library/HealthTab.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentslibraryhealthtabtsx) | 9 / 2 / 199 | no (2 phases) | row added 235 BELOW threshold on purpose. One import, one optional prop, one mount, ZERO branches; the handler lives at the page boundary |
 | [`frontend/src/pages/librarySelection.ts`](docs/HOT-FILE-LEDGER.md#frontendsrcpageslibraryselectionts) | 2 / 2 / 312 | no (2 phases) | ⚠ absent for its entire life — row added 235, which did NOT modify it but made `App.tsx` import `LibraryTab` from it rather than re-declare it |
@@ -12115,7 +12115,7 @@ cells rot within days.
 | [`frontend/src/components/metadata/DocumentImagesSection.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentsmetadatadocumentimagessectiontsx) | 2 / 2 / 148 (was `1 / 1 / 136`) | no (2 phases) | **284-03**: one bounded page (100) + exact total; "{M} image descriptions in this document, showing the first {N}" only when N < M. ⛔ no image bytes on this wire |
 | [`frontend/src/components/metadata/TakeoffSection.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentsmetadatatakeoffsectiontsx) | 3 / 2 / 438 (was `2 / 1 / 412`) | no (2 phases) | **284-04**: rate sheets = ONE `GET /documents?kind=spreadsheet&limit=50` page (R-05); loading / failed / empty / "50 most recent of M" arms (UI-SPEC S14) |
 | [`frontend/src/lib/api/library.ts`](docs/HOT-FILE-LEDGER.md#frontendsrclibapilibraryts) | 3 / 2 / 96 (was `2 / 1 / 85`) | no (2 phases) | **284-01**: `getLibrarySummary()` beside `getIndexSummary()` (`cache: "no-store"`), re-exported from the barrel |
-| [`frontend/src/hooks/useLibraryDocuments.ts`](docs/HOT-FILE-LEDGER.md#frontendsrchooksuselibrarydocumentsts) | 7 / 2 / 430 (was `6 / 2 / 426`) | no (2 phases) | 298-05: useOrgItemsVersion() in the page AND summary effects' deps — silent refetch after a move (not request identity: rows and numbers stay until the answer) |
+| [`frontend/src/hooks/useLibraryDocuments.ts`](docs/HOT-FILE-LEDGER.md#frontendsrchooksuselibrarydocumentsts) | 8 / 3 / 440 (was `7 / 2 / 430`) | ⚠ **FIRES** | 305-02: one exposed boolean selectedDocRefused (the by-id read answered 404), cleared by a new selection and retrySelectedDoc. ⛔ a 404 never sets selectedDocError (an outage is never a refusal) |
 | [`frontend/src/test-utils/fakeLibraryApi.ts`](docs/HOT-FILE-LEDGER.md#frontendsrctest-utilsfakelibraryapits) | 1 / 1 / 255 (was `0 / 0 / 0`) | no (young) | young (created 284-03). Test-only fake: page / summary / single read from ONE fixture array, answering like the server. ⛔ never imported by product code |
 | [`backend/app/models/document_view.py`](docs/HOT-FILE-LEDGER.md#backendappmodelsdocument_viewpy) | 6 / 4 / 119 (was `5 / 3 / 110`) | ⚠ **FIRES** | ⚠ FIRES (4 phases). **284-04**: `AdHocResolve` gains `offset` / `limit` (≤ 200) / `include_archived` (default True); honoured by construction (additive, `extra` unchanged) |
 | [`frontend/src/components/panel/FilePreview.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentspanelfilepreviewtsx) | 7 / 4 / 406 | ⚠ **FIRES** | ⚠ absent its ENTIRE LIFE at 4 phases — row added quick-261016-u3w (gate demanded). Loading arm → `SyrelLoader` (panel); honoured by construction |
@@ -12217,9 +12217,9 @@ cells rot within days.
 | [`frontend/src/components/workflows/library/automationFacts.ts`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentsworkflowslibraryautomationfactsts) | 2 / 2 / 132 (was `1 / 1 / 95`) | no (young) | absent its ENTIRE LIFE (created 204.1) — row added 293. 293-03: next from server next_run_at. ⛔ spells no string; never computes |
 | [`frontend/src/components/admin/AuditTab.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentsadminaudittabtsx) | 8 / 5 / 771 (was `7 / 4 / 770`) | ⚠ **FIRES** | 298-review WR-07: one PLATFORM_ACTION_META entry, org.item.move → 'Moved an item to another organization' (Organizing), identical to OrgAuditTab's (fenced). Data only |
 | [`frontend/src/components/org/OrgAuditTab.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentsorgorgaudittabtsx) | 6 / 5 / 422 (was `5 / 4 / 416`) | ⚠ **FIRES** | 304-06: rowLabel reads metadata.event mcp_access as 'Switched AI tool access (MCP) on/off for the organisation' (D-36). AuditTab untouched. ⛔ shared audit vocabulary still OWED |
-| [`frontend/src/hooks/useAppNavigation.ts`](docs/HOT-FILE-LEDGER.md#frontendsrchooksuseappnavigationts) | 10 / 2 / 488 (was `9 / 2 / 452`) | no (young) | 299-03: entityLink + address, leave (REPLACE), openRoute (push), resume (/ or /app only). ⛔ ONLY router-hook caller; setLibraryTab( exactly 2; one blocker |
+| [`frontend/src/hooks/useAppNavigation.ts`](docs/HOT-FILE-LEDGER.md#frontendsrchooksuseappnavigationts) | 11 / 3 / 494 (was `10 / 2 / 488`) | ⚠ **FIRES** | 305-02: entityLink.document (the /app/library/<uuid> id; target stays null so LinkGate never sees it); a document address is never lastPlace. ⛔ ONLY router-hook caller; setLibraryTab( exactly 2 |
 | [`frontend/src/components/layout/AppViewSwitch.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentslayoutappviewswitchtsx) | 8 / 3 / 609 (was `7 / 2 / 600`) | ⚠ **FIRES** | ⚠ now FIRES (301) · 301-03: the non-chat hamburger dot (ChatArea's span copied byte for byte; `relative` on the button). ⛔ no hooks; one run comparison; fallback last |
-| [`frontend/src/lib/appRoutes.ts`](docs/HOT-FILE-LEDGER.md#frontendsrclibapproutests) | 2 / 2 / 219 (was `1 / 1 / 198`) | no (young) | 299-02: chat / workflows / experts entity variants beside runs (D-01). STRICT LEAF. ⛔ never throws; strict UUID; ?run= is the chat home's only; no host |
+| [`frontend/src/lib/appRoutes.ts`](docs/HOT-FILE-LEDGER.md#frontendsrclibapproutests) | 3 / 3 / 228 (was `2 / 2 / 219`) | ⚠ **FIRES** | 305-02: one documents entity variant /app/library/<uuid> (D-52) — one format arm, one parse arm. STRICT LEAF. ⛔ never throws; strict UUID; ?run= is the chat home's only; no host |
 | [`frontend/src/components/layout/AddressNotFound.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentslayoutaddressnotfoundtsx) | 2 / 2 / 46 (was `1 / 1 / 51`) | no (young) | 299-03: AddressNotFound renders CantBeOpened's unparseable variant; ADDRESS_NOT_FOUND_COPY re-exported. ⛔ no path prop, no icon; never renders the trailing fallback tag |
 | [`frontend/src/lib/leaveGuard.ts`](docs/HOT-FILE-LEDGER.md#frontendsrclibleaveguardts) | 1 / 1 / 97 (was `0 / 0 / 0`) | no (young) | young (created 297-03). Leave-guard registry, no-op default (D-21); one-shot latch (D-32/D-42). ⛔ no component; react-only imports; never throws |
 | [`backend/app/services/org_lists.py`](docs/HOT-FILE-LEDGER.md#backendappservicesorg_listspy) | 2 / 1 / 108 (was `1 / 1 / 71`) | no | young (298-01). 298-review WR-09: root_upload_org 503s when a sent header cannot be validated. ⛔ list helpers: None → no predicate, never raise |
@@ -12289,7 +12289,7 @@ cells rot within days.
 | [`backend/app/services/harness/live_connectors.py`](docs/HOT-FILE-LEDGER.md#backendappservicesharnessliveconnectorspy) | 1 / 1 / 38 | no (young) | young (created 302-02, BE-IN-01). async live_connectors_fully_on() — one predicate for executor + judge (D-06, D-27); optional fresh/audience callables. ⛔ awaits freshness; never raises |
 | [`backend/app/security/acting_org.py`](docs/HOT-FILE-LEDGER.md#backendappsecurityactingorgpy) | 1 / 1 / 30 (was `0 / 0 / 0`) | no (young) | young (created 304-01, D-14): the acting-org ContextVar leaf + current_acting_org(). ⛔ imports nothing from app.; set only by acting_member.py |
 | [`backend/app/security/acting_member.py`](docs/HOT-FILE-LEDGER.md#backendappsecurityactingmemberpy) | 1 / 1 / 63 (was `0 / 0 / 0`) | no (young) | young (created 304-01, D-13/D-14): acting_org_scope, acting_as, acting_member_connection. ⛔ never reads a header; validates UUID; resets in finally |
-| [`backend/app/services/acting_member_reads.py`](docs/HOT-FILE-LEDGER.md#backendappservicesactingmemberreadspy) | 5 / 1 / 465 (was `4 / 1 / 454`) | no (young) | young (304). 304-REVIEW: d.retrievable on every read (D-46); narrowed list_views (D-47). ⛔ no org_members, no service-role visibility; () returns before SQL |
+| [`backend/app/services/acting_member_reads.py`](docs/HOT-FILE-LEDGER.md#backendappservicesactingmemberreadspy) | 6 / 2 / 493 (was `5 / 1 / 465`) | no (2 phases) | 305-02: list_documents(folder_id=, root_only=) — one bound predicate after the KeyScope (D-51); search client via run_in_threadpool (IN-03, 304 fence moved). ⛔ no org_members; () returns before SQL |
 | [`backend/app/security/mcp_principal.py`](docs/HOT-FILE-LEDGER.md#backendappsecuritymcpprincipalpy) | 1 / 1 / 49 (was `0 / 0 / 0`) | no (young) | young (created 304-02, D-20): frozen McpPrincipal + resolve_mcp_principal over the one core. ⛔ built from ResolvedKey only, never request data |
 | [`backend/app/security/principal_liveness.py`](docs/HOT-FILE-LEDGER.md#backendappsecurityprincipallivenesspy) | 2 / 1 / 99 (was `1 / 1 / 92`) | no (young) | young (304). 304-REVIEW WR-03: deployment switch checked before org (D-30). ⛔ live read every call, no cache; fails closed on both switches |
 | [`backend/app/services/key_scope.py`](docs/HOT-FILE-LEDGER.md#backendappserviceskeyscopepy) | 1 / 1 / 94 (was `0 / 0 / 0`) | no (young) | young (created 304-02, D-21/D-40): pure KeyScope composition + EXTERNAL_SQL / is_external. ⛔ pure, never raises; () never coerced to None |
@@ -12306,16 +12306,16 @@ cells rot within days.
 | [`frontend/src/components/org/OrgSettingsTab.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentsorgorgsettingstabtsx) | 3 / 2 / 73 (was `2 / 1 / 63`) | no (2 phases) | 304-06: one OrgMcpSwitchCard mount under the identity block + an onRecorded prop (D-02). ⛔ stays a stateless leaf; the card owns its fetch |
 | [`frontend/src/components/admin/ControlRoomPage.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentsadmincontrolroompagetsx) | 20 / 11 / 907 (was `19 / 10 / 906`) | ⚠ **FIRES** | 304-06: one capabilityFlags line (mcp_enabled: settings?.mcp_enabled ?? true); impactCounts untouched. Honoured by construction. ⛔ never a fabricated count |
 | [`backend/app/middleware/maintenance.py`](docs/HOT-FILE-LEDGER.md#backendappmiddlewaremaintenancepy) | 2 / 2 / 121 (was `1 / 1 / 113`) | no (2 phases) | 305-01: one MCP_PATH allowlist arm on a segment boundary (/mcpx still 503). ⛔ pure ASGI; fail-open flag read; segment-boundary match only |
-| [`frontend/src/lib/citationNav.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrclibcitationnavtsx) | 1 / 1 / 199 | no (1 phase) | ⚠ absent its entire life — row added at 305 planning (D-52). 305-02: one optional arrival prop + leaveDocumentAddress. ⛔ one-shot intent; openDocument keeps one identity |
+| [`frontend/src/lib/citationNav.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrclibcitationnavtsx) | 2 / 2 / 238 (was `1 / 1 / 199`) | no (2 phases) | 305-02: optional entityLink prop — one arrival per distinct document id (pending set, no navigate); leaveDocumentAddress (REPLACE). ⛔ one-shot intent; openDocument keeps one identity |
 | [`backend/app/mcp/__init__.py`](docs/HOT-FILE-LEDGER.md#backendappmcp__init__py) | 2 / 1 / 75 (was `1 / 1 / 70`) | no (young) | young (305-01, D-04/D-49): register_mcp (POST-only /mcp + /mcp/ to one edge, or nothing + CRITICAL); mcp_lifespan (fresh manager per entry). ⛔ never a Mount |
 | [`backend/app/mcp/server.py`](docs/HOT-FILE-LEDGER.md#backendappmcpserverpy) | 1 / 1 / 82 (was `0 / 0 / 0`) | no (young) | young (created 305-01, D-47): lowlevel Server('syrel'); list = REGISTERED ∩ granted; unknown name -32602; catch-all -> generic sentence. ⛔ never str(exc); never MCPServer |
-| [`backend/app/mcp/dispatch.py`](docs/HOT-FILE-LEDGER.md#backendappmcpdispatchpy) | 1 / 1 / 65 (was `0 / 0 / 0`) | no (young) | young (created 305-01, D-21/D-24/D-25): grant at call -> maintenance guard (MCPError) -> args (plain sentence) -> handler. 305-02..04 insert their stages. ⛔ one audit row per call |
-| [`backend/app/mcp/tools.py`](docs/HOT-FILE-LEDGER.md#backendappmcptoolspy) | 1 / 1 / 50 (was `0 / 0 / 0`) | no (young) | young (created 305-01, D-20/D-23): ToolSpec, READ_ONLY, is_read_only, REGISTERED (empty; 305-02 adds the three read specs). ⛔ code constants only; never the chat registry |
+| [`backend/app/mcp/dispatch.py`](docs/HOT-FILE-LEDGER.md#backendappmcpdispatchpy) | 2 / 1 / 92 (was `1 / 1 / 65`) | no (young) | 305-02: render stage — sentence -> isError; model -> validated structuredContent + text from results.render; the 305-04 guard slot is marked. ⛔ one audit row per call; render after the guard |
+| [`backend/app/mcp/tools.py`](docs/HOT-FILE-LEDGER.md#backendappmcptoolspy) | 2 / 1 / 103 (was `1 / 1 / 50`) | no (young) | 305-02: the three read ToolSpecs — catalogue titles, READ_ONLY, Pydantic in/out schemas, buckets expensive/cheap/cheap. ⛔ code constants only; never the chat registry; 306 names never listed |
 | [`backend/app/mcp/edge.py`](docs/HOT-FILE-LEDGER.md#backendappmcpedgepy) | 1 / 1 / 171 (was `0 / 0 / 0`) | no (young) | young (created 305-01, D-46/D-08/D-50/D-54): pure-ASGI edge — 405, mcp_ip limit (fail closed), header-only bearer, ONE resolver, one 401, 403 switched off. ⛔ never audits |
 | [`backend/app/mcp/transport.py`](docs/HOT-FILE-LEDGER.md#backendappmcptransportpy) | 1 / 1 / 53 (was `0 / 0 / 0`) | no (young) | young (created 305-01, D-05/D-49): allowed hosts from mcp_public_base() (+ loopback outside production), no allowed origins. ⛔ never hard-coded hosts; always passed explicitly |
 | [`backend/app/mcp/access_log.py`](docs/HOT-FILE-LEDGER.md#backendappmcpaccess_logpy) | 1 / 1 / 45 (was `0 / 0 / 0`) | no (young) | young (created 305-01, D-57): McpQueryStripFilter drops the query on MCP_PATH access lines; install() idempotent. ⛔ rewrites, never drops a line; other paths untouched |
-| [`backend/app/mcp/results.py`](docs/HOT-FILE-LEDGER.md#backendappmcpresultspy) | 0 / 0 / 0 | no (young) | AT PLANNING (305-02, D-13..D-19/D-51): result models, RedactableText, cursors, 8,000-char chunker, link, defang, render. ⛔ no SQL; links from primary_frontend_origin() |
-| [`backend/app/mcp/read_tools.py`](docs/HOT-FILE-LEDGER.md#backendappmcpread_toolspy) | 0 / 0 / 0 | no (young) | AT PLANNING (305-02, D-12/D-16): the three handlers over acting_member_reads. ⛔ no visibility SQL; one not-available sentence for every not-visible id |
+| [`backend/app/mcp/results.py`](docs/HOT-FILE-LEDGER.md#backendappmcpresultspy) | 1 / 1 / 398 (was `0 / 0 / 0`) | no (young) | young (created 305-02, D-13..D-19/D-51): models, RedactableText, cursors, 8,000-char chunker, link, defang, render. ⛔ no SQL; links from primary_frontend_origin() |
+| [`backend/app/mcp/read_tools.py`](docs/HOT-FILE-LEDGER.md#backendappmcpread_toolspy) | 1 / 1 / 143 (was `0 / 0 / 0`) | no (young) | young (created 305-02, D-12/D-16): three handlers over acting_member_reads, returning a model or one sentence. ⛔ no visibility SQL; one not-available sentence for every not-visible id |
 | [`backend/app/mcp/audit.py`](docs/HOT-FILE-LEDGER.md#backendappmcpauditpy) | 0 / 0 / 0 | no (young) | AT PLANNING (305-03, D-26/D-53): per-call api_key.read / api_key.refused rows. ⛔ no new literal; refusals throttled; never query text |
 | [`backend/app/mcp/limits.py`](docs/HOT-FILE-LEDGER.md#backendappmcplimitspy) | 0 / 0 / 0 | no (young) | AT PLANNING (305-03, D-27/D-28): cheap/expensive buckets -> relayable tool-error sentences. ⛔ fail closed; never an HTTP 429 |
 | [`backend/app/services/usage_sink.py`](docs/HOT-FILE-LEDGER.md#backendappservicesusage_sinkpy) | 0 / 0 / 0 | no (young) | AT PLANNING (305-03, D-55): ContextVar collector for provider usage. ⛔ LEAF — imports nothing from app.; never raises |
@@ -12323,7 +12323,7 @@ cells rot within days.
 | [`backend/app/services/outbound_guard.py`](docs/HOT-FILE-LEDGER.md#backendappservicesoutbound_guardpy) | 0 / 0 / 0 | no (young) | AT PLANNING (305-04, D-32/D-35): the one outbound redaction choke point (MCP now, webhooks in 308). ⛔ fail closed -> withheld; RedactableText fields only |
 | [`backend/app/services/pii_redactor.py`](docs/HOT-FILE-LEDGER.md#backendappservicespii_redactorpy) | 0 / 0 / 0 | no (young) | AT PLANNING (305-04, D-33/D-56): deterministic recognizers (email, phone, card+Luhn, IBAN+mod-97, secrets, entropy). ⛔ linear patterns; names not covered |
 | [`backend/app/db/outbound_policy.py`](docs/HOT-FILE-LEDGER.md#backendappdboutbound_policypy) | 0 / 0 / 0 | no (young) | AT PLANNING (305-04, D-36/D-56): read/set organizations.pii_redaction_enabled. ⛔ org explicit; route writes the audit row, never this module |
-| [`frontend/src/components/library/DocumentCantBeOpened.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentslibrarydocumentcantbeopenedtsx) | 0 / 0 / 0 | no (young) | AT PLANNING (305-02, D-52): in-page notice for a by-id open that answered 404. ⛔ words from CANT_BE_OPENED_COPY; never role=alert |
+| [`frontend/src/components/library/DocumentCantBeOpened.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentslibrarydocumentcantbeopenedtsx) | 1 / 1 / 58 (was `0 / 0 / 0`) | no (young) | young (created 305-02, D-52): in-page notice for a by-id open that answered 404. ⛔ words from CANT_BE_OPENED_COPY; never role=alert; kind-only words |
 | [`frontend/src/components/org/OrgPiiRedactionCard.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentsorgorgpiiredactioncardtsx) | 0 / 0 / 0 | no (young) | AT PLANNING (305-04, D-37): the org redaction switch, own read + write, onRecorded. ⛔ never optimistic; no switch on a failed read; OFF is calm |
 
 
@@ -28865,5 +28865,109 @@ CLAUDE.md verdict cell: none (the file does not fire).
 **`2 / 1 / 75` (was `1 / 1 / 70`).** Both routes now carry `methods=["POST"]`. A method-less ASGI `Route` has `route.methods = None`, which crashed `test_284_list_contract`'s walk over `app.routes` (TypeError) and took the backend unit baseline to 72; measured red with this plan's code and green with the plan base's. The router now answers non-POST 405 + `Allow: POST` before the edge, which still refuses non-POST itself.
 
 Scan-list cell as of 2026-10-31 (replaced by 305-01 Task 5, moved verbatim): 1 / 1 / 70 (was `0 / 0 / 0`) | no (young) | young (created 305-01, D-04/D-49): register_mcp (/mcp + /mcp/ to one edge, or nothing + CRITICAL) and mcp_lifespan (fresh manager per entry). ⛔ never a Mount |
+
+CLAUDE.md verdict cell: none (the file does not fire).
+
+### `frontend/src/pages/LibraryPage.tsx` — 305-02, 2026-10-31
+
+**`71 / 22 / 1349`** (was `70 / 21 / 1347`). Exactly the UI-SPEC budget: one import line and one mount line, `{libDocs.selectedDocRefused && <DocumentCantBeOpened onDismiss={...} />}`, directly under the shipped S8 `PageAlert` (which still renders for a 5xx). The Dismiss arrow clears the page's own selection (`setSelectedDocId(null)`, so the 404 is not re-asked) and calls `citationNav?.leaveDocumentAddress?.()` (a REPLACE to `/app/library`, a no-op off a document address). `git diff <base> -- LibraryPage.tsx | grep -c '^+[^+]'` = 2. Nothing else in the file changed; the refusal state lives in `useLibraryDocuments.ts`, the words in `DocumentCantBeOpened.tsx`. Pinned by `LibraryPage.states284.test.tsx` (three new arms: 404 notice + Dismiss, 5xx alert without the notice, the address arrival opening by id).
+
+Scan-list cell as of 2026-10-31 (replaced by 305-02, moved verbatim): 70 / 21 / 1347 (was `69 / 21 / 1346`) | ⚠ **FIRES** | 298-review WR-01: one property on the useLibraryOrgSwitch call, listReset: { findDispatch, setListTarget }; the logic lives in the hook. ⛔ no keyed remount; switch resets run during render |
+
+CLAUDE.md verdict cell as of 2026-10-31 (replaced by 305-02, moved verbatim): | `frontend/src/pages/LibraryPage.tsx` | 70 / 21 / 1347 (was `69 / 21 / 1346`) | 298-review WR-01: one listReset property on useLibraryOrgSwitch · ⛔ |
+
+### `frontend/src/App.tsx` — 305-02, 2026-10-31
+
+**`45 / 31 / 350`** (was `44 / 30 / 350`). One prop expression on the existing provider: `<CitationNavProvider navigate={nav.onNavigate} entityLink={nav.entityLink}>` (the 299-02 `ChatLayout` precedent). `git diff --numstat` = 1 added / 1 removed. No hook, state, provider or key added; the provider order is byte-identical. The document address arrival logic lives in `citationNav.tsx`; the address parse in `appRoutes.ts` / `useAppNavigation.ts`.
+
+Scan-list cell as of 2026-10-31 (replaced by 305-02, moved verbatim): 44 / 30 / 350 (was `43 / 30 / 349`) | **FIRES** | 299-02: one prop `entityLink={nav.entityLink}` on `<ChatLayout>` (honoured by construction). See §Phase 299 (299-02) |
+
+CLAUDE.md verdict cell as of 2026-10-31 (replaced by 305-02, moved verbatim): | `frontend/src/App.tsx` | 44 / 30 / 350 (was `43 / 30 / 349`) | 299-02: one prop (entityLink) |
+
+### `frontend/src/hooks/useLibraryDocuments.ts` — 305-02, 2026-10-31
+
+**`8 / 3 / 440`** (was `7 / 2 / 430`). **Now FIRES (284, 298, 305).** `SingleDoc` gains an optional `refused` flag set from the existing `isNotVisible(e)` (status 404) in the one by-id read; `selectedDocRefused = fromLists === null && known && single.refused === true`, so a new selection (not `known`) and `retrySelectedDoc` (`setSingle(null)`) clear it. `selectedDocError` is unchanged: every non-404 failure still sets it and only it. Pinned by `useLibraryDocuments.test.ts` (three new arms). Seam for the next phase on this file: the selection-resolution block (`fromLists` / `single` / `fetchId`) is a self-contained `useSelectedDocument(selectedDocId, rows, findRows, listState)` hook.
+
+Scan-list cell as of 2026-10-31 (replaced by 305-02, moved verbatim): 7 / 2 / 430 (was `6 / 2 / 426`) | no (2 phases) | 298-05: useOrgItemsVersion() in the page AND summary effects' deps — silent refetch after a move (not request identity: rows and numbers stay until the answer) |
+
+CLAUDE.md verdict cell: none before 305-02 (the file did not fire); 305-02 adds one.
+
+### `frontend/src/hooks/useAppNavigation.ts` — 305-02, 2026-10-31
+
+**`11 / 3 / 494`** (was `10 / 2 / 488`). **Now FIRES (297, 299, 305).** `EntityLink` gains `document: string | null` (the parsed `documentId`), deliberately NOT a `target.kind`: LinkGate resolves every non-null target through the link resolver and D-52 rules out a document resolver kind. `entityOf` is unchanged (null for a document). The `lastPlace` writer skips a document address (one condition), so Stay never returns to one — driven RED by removing the condition. Seam for the next phase: the `entityLink` memo plus its navigators are a self-contained `useEntityLink(parsed, go)`.
+
+Scan-list cell as of 2026-10-31 (replaced by 305-02, moved verbatim): 10 / 2 / 488 (was `9 / 2 / 452`) | no (young) | 299-03: entityLink + address, leave (REPLACE), openRoute (push), resume (/ or /app only). ⛔ ONLY router-hook caller; setLibraryTab( exactly 2; one blocker |
+
+CLAUDE.md verdict cell: none before 305-02 (the file did not fire); 305-02 adds one.
+
+### `frontend/src/lib/appRoutes.ts` — 305-02, 2026-10-31
+
+**`3 / 3 / 228`** (was `2 / 2 / 219`). **Now FIRES (297, 299, 305).** `{ view: "documents"; documentId: string }` joins the union beside the 299 entity variants; `formatAppRoute` narrows on `"documentId" in route`; `viewOf` gains `head === "library" && isStrictUuid(id)` (lowercased). `/app/library` stays id-free. The 299 row that pinned `/app/library/<uuid>` as not-found is RETIRED DELIBERATELY in `appRoutes.test.ts` with the reason in its body (malformed and extra-segment library ids still not-found). It is a pure table: the next phase on it should add an entity through one data row (`ENTITY_HEADS`), not a new arm.
+
+Scan-list cell as of 2026-10-31 (replaced by 305-02, moved verbatim): 2 / 2 / 219 (was `1 / 1 / 198`) | no (young) | 299-02: chat / workflows / experts entity variants beside runs (D-01). STRICT LEAF. ⛔ never throws; strict UUID; ?run= is the chat home's only; no host |
+
+CLAUDE.md verdict cell: none before 305-02 (the file did not fire); 305-02 adds one.
+
+### `backend/app/services/acting_member_reads.py` — 305-02, 2026-10-31
+
+**`6 / 2 / 493`** (was `5 / 1 / 465`). `list_documents` gains `folder_id` (validated with `_uuid_or_none`; malformed = empty page before any SQL) and `root_only`; `_page` appends `d.folder_id = $N::uuid` or `d.folder_id IS NULL` AFTER the scope clauses, so the `KeyScope` still applies; the defaults keep every existing caller byte-identical. IN-03 (D-57): `search` builds its service-role client with `await run_in_threadpool(get_service_role_supabase, principal.org_id)` and passes the variable; `test_304_acting_reads_fence.py`'s pin was rewritten in the same commit with the reason in its body (still exactly two sanctioned uses). Pinned by `test_305_paging_chunking.py` (fake connection recording SQL + args).
+
+Scan-list cell as of 2026-10-31 (replaced by 305-02, moved verbatim): 5 / 1 / 465 (was `4 / 1 / 454`) | no (young) | young (304). 304-REVIEW: d.retrievable on every read (D-46); narrowed list_views (D-47). ⛔ no org_members, no service-role visibility; () returns before SQL |
+
+CLAUDE.md verdict cell: none (the file does not fire).
+
+### `frontend/src/lib/citationNav.tsx`
+
+*305-02 (created or first section), 2026-10-31.*
+
+**`2 / 2 / 238`** (was `1 / 1 / 199`). **This file had no section and no row before 305 planning (D-52); this is its first edit, and the section ships in the same commit.** One optional prop `entityLink?: Pick<EntityLink, "document" | "leave">` (type-only import, erased). An effect records the pending document once per distinct non-null id — WITHOUT navigating, because the address already shows the Library and UI-SPEC Surface 4 keeps it as opened while the panel shows it (a reload reopens it); seeing no document address forgets the last id, so Back onto it opens it again. `leaveDocumentAddress()` calls `entityLink.leave({ view: "documents" })` only when an arrival is live. `openDocument`, `pendingDocumentId` and `consumePendingDocument` are byte-identical in behaviour; every existing host passes no prop. Pinned by `citationNav.test.tsx` (five new arms).
+
+Scan-list cell as of 2026-10-31 (replaced by 305-02, moved verbatim): 1 / 1 / 199 | no (1 phase) | ⚠ absent its entire life — row added at 305 planning (D-52). 305-02: one optional arrival prop + leaveDocumentAddress. ⛔ one-shot intent; openDocument keeps one identity |
+
+CLAUDE.md verdict cell: none (the file does not fire).
+
+### `backend/app/mcp/dispatch.py` — 305-02, 2026-10-31
+
+**`2 / 1 / 92`** (was `1 / 1 / 65`). `dispatch` now hands the handler's outcome to `_finish`: a `str` is one `isError` block; a Pydantic model is dumped, re-validated against its own model (structuredContent MUST conform to outputSchema) and rendered with `results.render`; a `CallToolResult` (the 305-01 test specs) passes through. The docblock names where 305-03 inserts limits (before the handler) and audit (after `_finish`) and where 305-04 inserts the outbound guard (between the handler and `_finish`). Pinned by `test_305_tool_defs.py`.
+
+Scan-list cell as of 2026-10-31 (replaced by 305-02, moved verbatim): 1 / 1 / 65 (was `0 / 0 / 0`) | no (young) | young (created 305-01, D-21/D-24/D-25): grant at call -> maintenance guard (MCPError) -> args (plain sentence) -> handler. 305-02..04 insert their stages. ⛔ one audit row per call |
+
+CLAUDE.md verdict cell: none (the file does not fire).
+
+### `backend/app/mcp/tools.py` — 305-02, 2026-10-31
+
+**`2 / 1 / 103`** (was `1 / 1 / 50`). `_SPECS` holds `search_knowledge_base`, `list_documents` and `read_document`: `title` read from `mcp_tool_catalogue.MCP_TOOLS` labels (never retyped), static description constants, `input_schema` / `output_schema` from the `results` models, `READ_ONLY` on all three; search is the `expensive` bucket. A key granted all eight catalogue names lists exactly these three. `_TOOL_REGISTRY` stays 30 (`test_259`). Pinned by `test_305_tool_defs.py` (byte-equal definitions across two keys).
+
+Scan-list cell as of 2026-10-31 (replaced by 305-02, moved verbatim): 1 / 1 / 50 (was `0 / 0 / 0`) | no (young) | young (created 305-01, D-20/D-23): ToolSpec, READ_ONLY, is_read_only, REGISTERED (empty; 305-02 adds the three read specs). ⛔ code constants only; never the chat registry |
+
+CLAUDE.md verdict cell: none (the file does not fire).
+
+### `backend/app/mcp/results.py`
+
+*305-02 (created or first section), 2026-10-31.*
+
+**`1 / 1 / 398`** (was `0 / 0 / 0`). Created. Pure: argument models (`extra="forbid"`, bounded), result models whose text fields are `RedactableText` (305-04 walks by that annotation), `doc_link` = `primary_frontend_origin() + "/app/library/" + id`, `origin_of`, `defang` (markdown images -> `[image: alt]`, HTML `<img>` removed), base64url cursors validated on the way in, the 8,000-character chunker (blank line, newline, whitespace; never inside a bracketed token or a surrogate pair) and `render` (marked passage blocks, marker words neutralised). Measured: the largest local document (266,924 chars) reads in 36 calls. Pinned by `test_305_paging_chunking.py` and `test_305_search_shape.py`.
+
+Scan-list cell as of 2026-10-31 (replaced by 305-02, moved verbatim): 0 / 0 / 0 | no (young) | AT PLANNING (305-02, D-13..D-19/D-51): result models, RedactableText, cursors, 8,000-char chunker, link, defang, render. ⛔ no SQL; links from primary_frontend_origin() |
+
+CLAUDE.md verdict cell: none (the file does not fire).
+
+### `backend/app/mcp/read_tools.py`
+
+*305-02 (created or first section), 2026-10-31.*
+
+**`1 / 1 / 143`** (was `0 / 0 / 0`). Created. `search_knowledge_base` overrides `retrieval_top_k` with `limit` (2x when the key excludes connector-fed documents, then trimmed); `list_documents` computes the top level from `list_folders` (visible folders whose parent is not visible; Root documents for an all-folders key only), a folder's subfolders on the first page then its documents by offset, and refuses a foreign cursor before visibility; `read_document` re-reads the document every call and maps every `None` and every bad cursor to `NOT_AVAILABLE_SENTENCE`. Live proof: `test_305_tools_live.py` (nine cases, one byte-identical body) and `test_305_narrowed_tools_live.py`.
+
+Scan-list cell as of 2026-10-31 (replaced by 305-02, moved verbatim): 0 / 0 / 0 | no (young) | AT PLANNING (305-02, D-12/D-16): the three handlers over acting_member_reads. ⛔ no visibility SQL; one not-available sentence for every not-visible id |
+
+CLAUDE.md verdict cell: none (the file does not fire).
+
+### `frontend/src/components/library/DocumentCantBeOpened.tsx`
+
+*305-02 (created or first section), 2026-10-31.*
+
+**`1 / 1 / 58`** (was `0 / 0 / 0`). Created. A `<section aria-labelledby>` card (`rounded-xl border border-border bg-card p-4`), heading `CANT_BE_OPENED_COPY.heading("document")` focused once (`tabIndex={-1}`), body `CANT_BE_OPENED_COPY.body`, one outline Dismiss. No Copy address (A-7). Pinned by `DocumentCantBeOpened.test.tsx` (rendered words, no hand-typed copy in the source).
+
+Scan-list cell as of 2026-10-31 (replaced by 305-02, moved verbatim): 0 / 0 / 0 | no (young) | AT PLANNING (305-02, D-52): in-page notice for a by-id open that answered 404. ⛔ words from CANT_BE_OPENED_COPY; never role=alert |
 
 CLAUDE.md verdict cell: none (the file does not fire).

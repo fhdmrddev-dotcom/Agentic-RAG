@@ -563,7 +563,7 @@ node scripts/check-hot-file-ledger.cjs <phase-dir>   # 0 clear · 1 missing rows
 | `frontend/src/lib/api/workflows.ts` | 17 / 16 / 1395 (was `16 / 16 / 1364`) | 299-04: run org_id; ?from_definition_id=; WorkflowOrgRefusedError on the 409 |
 | `frontend/src/lib/connectionMark.tsx` | 7 / 4 / 313 | ✅ **the move IS the seam, and it was TAKEN (214-08)** |
 | `frontend/src/components/ingestion/DocumentList.tsx` | 31 / 15 / 372 (was `31 / 16 / 372`) | last touch 275-02/04 |
-| `frontend/src/pages/LibraryPage.tsx` | 70 / 21 / 1347 (was `69 / 21 / 1346`) | 298-review WR-01: one listReset property on useLibraryOrgSwitch · ⛔ |
+| `frontend/src/pages/LibraryPage.tsx` | 71 / 22 / 1349 (was `70 / 21 / 1347`) | 305-02: one DocumentCantBeOpened mount in the S8 slot (+ import) · ⛔ |
 | `backend/app/services/retrieval_service.py` | 25 / 14 / 181 (was `24 / 13 / 176`) | ✅ DISCHARGED 272-01 · 294-01: instruction kwarg + redacted trace (+6 −1) |
 | `backend/app/services/retrieval_scope.py` | 7 / 5 / 503 (was `6 / 4 / 463`) | 284-04: `_fetch_all` moved in verbatim · extraction FIRST next · ⛔ |
 | `backend/app/services/document_search_service.py` | 8 / 4 / 505 (was `5 / 3 / 584`) | 284-04: one view read; two-legs invariant RETIRED deliberately · ⛔ |
@@ -584,7 +584,10 @@ node scripts/check-hot-file-ledger.cjs <phase-dir>   # 0 clear · 1 missing rows
 | `frontend/src/components/library/IngestionTab.tsx` | 20 / 7 / 706 (was `17 / 6 / 512`) | 284-03: summary + three paged status lists; layout unchanged · ⛔ |
 | `frontend/src/components/ingestion/__tests__/IngestionStrip.test.tsx` | 3 / 3 / 516 | ⚠ absent; row added 233, which repaired the INHERITED red `229-03` cau |
 | `frontend/src/components/layout/NavPanel.tsx` | 29 / 15 / 442 (was `28 / 15 / 428`) | honoured by construction (301-03: one WaitingOnYouControl mount + one prop) |
-| `frontend/src/App.tsx` | 44 / 30 / 350 (was `43 / 30 / 349`) | 299-02: one prop (entityLink) |
+| `frontend/src/App.tsx` | 45 / 31 / 350 (was `44 / 30 / 350`) | 305-02: one prop (entityLink) on CitationNavProvider |
+| `frontend/src/lib/appRoutes.ts` | 3 / 3 / 228 (was `2 / 2 / 219`) | ⚠ now FIRES (305) · 305-02: documents entity variant · ⛔ |
+| `frontend/src/hooks/useAppNavigation.ts` | 11 / 3 / 494 (was `10 / 2 / 488`) | ⚠ now FIRES (305) · 305-02: entityLink.document, not a target · ⛔ |
+| `frontend/src/hooks/useLibraryDocuments.ts` | 8 / 3 / 440 (was `7 / 2 / 430`) | ⚠ now FIRES (305) · 305-02: one boolean selectedDocRefused · ⛔ |
 | `frontend/src/main.tsx` | 5 / 3 / 32 (was `3 / 1 / 10`) | ⚠ now FIRES (297) · one '*' route, no children, no key · ⛔ |
 | `frontend/src/index.css` | 35 / 19 / 1239 (was `34 / 18 / 1196`) | 294-05: ONE verdict block keyed on citation-marker--v-* (+43) |
 | `frontend/src/components/library/LibraryCloudImport.tsx` | 1 / 1 / 194 | young (created 244-06) · ⛔ |

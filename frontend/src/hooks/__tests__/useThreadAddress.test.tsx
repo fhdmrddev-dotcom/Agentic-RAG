@@ -316,6 +316,7 @@ function fakeLink(threadId: string | null) {
   const link: EntityLink = {
     target: threadId ? { kind: "thread", id: threadId } : null,
     route: threadId ? { view: "chat", threadId } : null,
+    document: null, // 305-02 (D-52): the document address field, off a document address
     openThread,
     openWorkflow: vi.fn(),
     openExpert: vi.fn(),

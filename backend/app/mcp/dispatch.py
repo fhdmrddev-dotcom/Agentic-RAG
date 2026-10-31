@@ -20,7 +20,15 @@ The FINAL order, once 305-02..305-04 have inserted their stages (305-RESEARCH's 
     k. audit (api_key.read / api_key.refused, throttled)                         [305-03]
     l. catch-all -> GENERIC_FAILURE_SENTENCE                  (server.on_call_tool)
 
-305-01 ships b, c and d, then calls the spec's handler.
+305-01 ships b, c and d, then calls the spec's handler. 305-02 ships f, g, h and j: the handler
+(``app.mcp.read_tools``) returns a result MODEL (already shaped and defanged) or a refusal
+SENTENCE; ``_finish`` turns a sentence into one ``isError`` block and a model into
+``structuredContent`` (validated against the same model, D-18) plus the text rendered FROM the
+model (``results.render``). The slots the later plans fill, in this function:
+
+    305-03 limits  -> before ``spec.handler(...)``
+    305-04 outbound guard (redaction, fail closed) -> between the handler and ``_finish``
+    305-03 audit   -> after ``_finish`` produced the result
 
 The grant is re-checked HERE, at call time (D-21): ``tools/list`` already hides an ungranted tool,
 but a client can call a name it never listed. The maintenance flag is read through
@@ -32,8 +40,9 @@ from typing import Any
 
 from mcp import types
 from mcp.shared.exceptions import MCPError
-from pydantic import ValidationError
+from pydantic import BaseModel, ValidationError
 
+from app.mcp import results as _results
 from app.mcp import tools as _tools
 from app.middleware import maintenance as _maintenance
 
@@ -62,4 +71,22 @@ async def dispatch(principal: Any, name: str, arguments: dict | None) -> types.C
         args = spec.args_model.model_validate(arguments or {})
     except ValidationError:
         return tool_error(f"Those arguments don't fit {name}. Check the tool's inputs and try again.")
-    return await spec.handler(principal, args)
+    outcome = await spec.handler(principal, args)
+    # [305-04 outbound guard slot: redact ``outcome`` here, before anything is rendered]
+    return _finish(outcome)
+
+
+def _finish(outcome: Any) -> types.CallToolResult:
+    if isinstance(outcome, types.CallToolResult):
+        return outcome
+    if isinstance(outcome, str):
+        return tool_error(outcome)
+    if isinstance(outcome, BaseModel):
+        structured = outcome.model_dump(mode="json")
+        type(outcome).model_validate(structured)  # structuredContent MUST conform to outputSchema
+        return types.CallToolResult(
+            content=[types.TextContent(type="text", text=_results.render(outcome))],
+            structured_content=structured,
+            is_error=False,
+        )
+    raise TypeError(f"a tool handler returned {type(outcome).__name__}")
