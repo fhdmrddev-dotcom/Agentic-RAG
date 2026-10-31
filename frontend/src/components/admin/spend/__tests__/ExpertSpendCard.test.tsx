@@ -224,6 +224,40 @@ describe("LedgerExpertCell", () => {
     render(<LedgerExpertCell run={{ ...base, expertAttributed: false }} />)
     expect(screen.getByTestId("ledger-expert-cell")).toHaveTextContent(/^Not recorded$/)
   })
+
+  // 305-03 (D-31 / D-55, UI-SPEC §Surface 2): an AI tool (MCP) call names its key, checked FIRST,
+  // so it can never read "No Expert", "Deleted Expert" or "Not recorded".
+  it("an MCP row names its key: MCP · {label}, the tool in the title", () => {
+    const { unmount } = render(
+      <LedgerExpertCell run={{ ...base, source: "mcp", apiKeyLabel: "Laptop", mcpTool: "search_knowledge_base" }} />,
+    )
+    const cell = screen.getByTestId("ledger-expert-cell")
+    expect(cell).toHaveTextContent(/^MCP · Laptop$/)
+    expect(cell).toHaveAttribute("data-source", "mcp")
+    expect(cell).toHaveAttribute("title", "AI tool key Laptop · search_knowledge_base")
+    unmount()
+    render(<LedgerExpertCell run={{ ...base, source: "mcp", apiKeyLabel: "Laptop", mcpTool: null }} />)
+    expect(screen.getByTestId("ledger-expert-cell")).toHaveAttribute("title", "AI tool key Laptop")
+  })
+
+  it("an MCP row whose key was removed reads MCP · removed key, never No Expert", () => {
+    render(<LedgerExpertCell run={{ ...base, source: "mcp", apiKeyLabel: null, mcpTool: "search_knowledge_base" }} />)
+    const cell = screen.getByTestId("ledger-expert-cell")
+    expect(cell).toHaveTextContent(/^MCP · removed key$/)
+    expect(cell).not.toHaveTextContent("No Expert")
+  })
+
+  it("a key label renders as text, never as HTML", () => {
+    render(<LedgerExpertCell run={{ ...base, source: "mcp", apiKeyLabel: "<b>x</b>", mcpTool: null }} />)
+    const cell = screen.getByTestId("ledger-expert-cell")
+    expect(cell).toHaveTextContent("MCP · <b>x</b>")
+    expect(cell.querySelector("b")).toBeNull()
+  })
+
+  it("a run row (source run, or absent) keeps the shipped arms", () => {
+    render(<LedgerExpertCell run={{ ...base, source: "run", apiKeyLabel: null, mcpTool: null }} />)
+    expect(screen.getByTestId("ledger-expert-cell")).toHaveTextContent("No Expert")
+  })
 })
 
 describe("SubagentTag", () => {
