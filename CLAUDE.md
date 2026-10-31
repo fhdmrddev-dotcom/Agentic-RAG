@@ -492,11 +492,11 @@ node scripts/check-hot-file-ledger.cjs <phase-dir>   # 0 clear · 1 missing rows
 | `backend/app/main.py` | 100 / 74 / 1024 (was `99 / 73 / 1021`) | 305-01: one import + register_mcp(app) + one mcp_lifespan block · ⛔ |
 | `backend/app/config.py` | 96 / 55 / 1831 (was `93 / 54 / 1809`) | 300-03: SMTP_* fields (D-28) · seam OWED · ⛔ |
 | `backend/app/api/admin.py` | 45 / 18 / 2055 (was `44 / 17 / 2054`) | 304-04: one _FLAG_HUMAN_NAMES entry (mcp_enabled) · ⛔ |
-| `backend/app/api/settings.py` | 50 / 27 / 1400 (was `48 / 26 / 1398`) | 304-04: mcp_enabled response field + readback (2 lines) |
+| `backend/app/api/settings.py` | 51 / 28 / 1425 (was `50 / 27 / 1400`) | 305-03: api_key_searches_per_minute + 1..120 bound (D-54) |
 | `backend/app/services/multimodal_service.py` | 14 / 7 / 984 | ⚠ absent from BOTH for its ENTIRE LIFE at **7 phases** |
 | `backend/app/api/documents.py` | 101 / 40 / 2709 (was `99 / 39 / 2698`) | 298-01: one by_org in build() + one root_upload_org kwarg · ⛔ |
 | `backend/app/api/library.py` | 3 / 3 / 304 (was `2 / 2 / 299`) | ⚠ now FIRES (298) · 298-01: summary shares the lists' org predicate ($1) |
-| `scripts/vitest-count-gate.cjs` | 409 / 86 / 6932 (was `408 / 86 / 6932`) | 304-REVIEW WR-02: 3 pins raised; none lowered |
+| `scripts/vitest-count-gate.cjs` | 411 / 87 / 6944 (was `409 / 86 / 6932`) | 305-03: 2 first pins + 7 raised; none lowered |
 | `scripts/check-deploy-drift.sh` | 6 / 5 / 271 (was `5 / 4 / 267`) | 300-03: SMTP_* parity |
 | `scripts/build-public-openapi.cjs` | 13 / 7 / 473 (was `11 / 5 / 472`) | 301-01: notifications tag + /notifications FLAGGED (2 lines) |
 | `scripts/check-seeds-register.cjs` | 7 / 3 / 1132 | ⚠ FIRES, absent here — row added 296-05 · `\d{3,}` ids · ⛔ |
@@ -507,8 +507,8 @@ node scripts/check-hot-file-ledger.cjs <phase-dir>   # 0 clear · 1 missing rows
 | `backend/app/api/schedules.py` | 6 / 6 / 341 (was `5 / 5 / 303`) | 300-01: create/patch/resume 422 by label (D-14) |
 | `backend/app/services/inbound_inputs.py` | 9 / 3 / 352 (was `8 / 2 / 312`) | ⚠ now FIRES (300) · 300-01: labels + sentence beside the one predicate |
 | `backend/app/api/inbound.py` | 10 / 3 / 719 (was `9 / 2 / 711`) | ⚠ now FIRES (298) · 298-02: one foreign_folder _refused (plain 422) · ⛔ |
-| `frontend/src/components/settings/apiKeys/apiKeysCopy.ts` | 6 / 4 / 283 (was `5 / 3 / 283`) | 304-05: four strings reworded for both kinds · ⛔ |
-| `frontend/src/components/settings/apiKeys/apiKeyFacts.ts` | 6 / 4 / 374 (was `5 / 4 / 373`) | 304-REVIEW WR-02: no off tag for "unknown" · ⛔ |
+| `frontend/src/components/settings/apiKeys/apiKeysCopy.ts` | 7 / 5 / 287 (was `6 / 4 / 283`) | 305-03: reads relabel + searches words + limitsMcp · ⛔ |
+| `frontend/src/components/settings/apiKeys/apiKeyFacts.ts` | 7 / 5 / 378 (was `6 / 4 / 374`) | 305-03: callWords/callDetailLine delegate for MCP keys · ⛔ |
 | `backend/app/models/schedule.py` | 3 / 3 / 231 | ⚠ FIRES, absent here — row added 296-02 · one additive field (outcome) |
 | `frontend/src/components/panel/PhaseCard.tsx` | 22 / 14 / 821 (was `21 / 14 / 817`) | 296 review FE-WR-01: paused step drops running instruments |
 | `frontend/src/components/panel/PhaseTimeline.tsx` | 11 / 9 / 408 (was `10 / 8 / 404`) | 296-04: derives runPaused from its frame, passes it |
@@ -552,7 +552,7 @@ node scripts/check-hot-file-ledger.cjs <phase-dir>   # 0 clear · 1 missing rows
 | `backend/app/services/sources/__init__.py` | 5 / 3 / 40 | ⚠ absent while FIRING — row added 239-03 |
 | `backend/app/services/mcp_client.py` | 9 / 6 / 526 | ⚠ row STALE TWICE (SEED-258) |
 | `backend/app/models/message.py` | 25 / 17 / 292 (was `24 / 16 / 287`) | 293-03: ONE field (run_origin, a dict: a harness import is circular) |
-| `backend/app/models/user_settings.py` | 63 / 39 / 1790 (was `62 / 38 / 1788`) | 304-04: mcp_enabled field + _val_bool readback (2 lines) · ⛔ |
+| `backend/app/models/user_settings.py` | 64 / 40 / 1792 (was `63 / 39 / 1790`) | 305-03: api_key_searches_per_minute field + readback (2 lines) · ⛔ |
 | `backend/app/services/harness/reachability.py` | 5 / 5 / 498 (was `4 / 4 / 463`) | 295-02: one pure lint check (no_template_bound) |
 | `backend/app/services/workflow_kickoff.py` | 15 / 12 / 608 (was `14 / 11 / 605`) | 299-01: one refuse_if_other_org beside raise_if_foreign (D-18) |
 | `frontend/src/components/workflows/WorkflowScheduleModal.tsx` | 7 / 6 / 814 (was `6 / 5 / 812`) | 302-03: refused Run now said once (F-1, one condition) |
@@ -608,7 +608,7 @@ node scripts/check-hot-file-ledger.cjs <phase-dir>   # 0 clear · 1 missing rows
 | `frontend/src/components/sources/sourceHealthVocabulary.ts` | 8 / 4 / 645 | ⛔ row STALE · G-5 fires (252-03) · Seam OWED |
 | `backend/app/services/sources/failure_cause.py` | 3 / 2 / 227 | ⚠ absent its entire life — row added BUG-260912-01 · ⛔ |
 | `scripts/full-schema-supplement.sql` | 29 / 21 / 919 (was `28 / 20 / 909`) | 305-01: mig 222 mcp_usage deny-all block after 221's · ⛔ |
-| `backend/app/services/rate_limit.py` | 5 / 3 / 160 (was `4 / 2 / 138`) | ⚠ now FIRES (305) · 305-01: mcp_ip bucket, check_ip_limit (additions) · ⛔ |
+| `backend/app/services/rate_limit.py` | 6 / 3 / 185 (was `5 / 3 / 160`) | 305-03: check_key_limit (read / expensive buckets), additions only · ⛔ |
 | `.claude/settings.json` | 14 / 6 / 214 | ⚠ STALE · last touch 276 · ⛔ |
 | `backend/app/services/forced_emit.py` | 15 / 9 / 749 (was `13 / 8 / 724`) | 296 (293-F-4): cross-provider copy names the target provider · ⛔ |
 | `backend/app/services/template_asset_service.py` | 5 / 4 / 379 (was `4 / 3 / 344`) | 295-02: has_staged_template (Branch-2 WHERE shared) |
@@ -628,19 +628,19 @@ node scripts/check-hot-file-ledger.cjs <phase-dir>   # 0 clear · 1 missing rows
 | `frontend/src/components/chat/InviteExpertDialog.tsx` | 10 / 5 / 648 (was `4 / 4 / 614`) | honoured by construction (279-03: ONE field + prop) · seam TAKEN |
 | `frontend/src/components/skills/SkillFormDialog.tsx` | 13 / 9 / 657 | ⚠ row STALE · honoured by construction (263-04) · ⛔ |
 | `backend/app/api/skills.py` | 20 / 10 / 859 (was `19 / 10 / 858`) | ⛔ FIRES · last touch 280-01 (6 maybe_row guards) |
-| `frontend/src/lib/api/skills.ts` | 11 / 8 / 783 (was `10 / 7 / 779`) | 304-04: optional mcp_enabled on FullAppSettings (type-only) |
+| `frontend/src/lib/api/skills.ts` | 12 / 9 / 785 (was `11 / 8 / 783`) | 305-03: optional api_key_searches_per_minute (type-only) |
 | `frontend/src/lib/api/settings.ts` | 11 / 5 / 529 | ⚠ FIRES, absent here — row added 300-05 · switch's own PUT (D-09) · ⛔ |
-| `backend/app/services/openai_service.py` | 84 / 42 / 2731 (was `81 / 41 / 2623`) | 292: SHOW_ARTIFACT_TOOL schema + description only (30 tools) · ⛔ |
+| `backend/app/services/openai_service.py` | 85 / 43 / 2735 (was `84 / 42 / 2731`) | 305-03: one guarded usage_sink.record in embed_texts · ⛔ |
 | `backend/app/services/provider_gateway/openai_compat.py` | 10 / 7 / 468 (was `9 / 6 / 466`) | 296-06: one moonshot_tools conditional keyed on the endpoint provider |
 | `backend/app/services/provider_gateway/dispatcher.py` | 10 / 4 / 260 (was `6 / 2 / 153`) | ⚠ FIRES (row was stale) · 282-01: off-loop open, shared deadline · ⛔ |
 | `backend/app/services/provider_gateway/openai_responses.py` | 4 / 3 / 570 (was `2 / 2 / 573`) | ⚠ now FIRES · 292.1-REVIEW IN-03: dead dsml_leaked flag deleted · ⛔ |
 | `frontend/src/lib/api/admin.ts` | 11 / 6 / 1127 (was `10 / 5 / 1125`) | 304-04: one FlagKey member (mcp_enabled) · ⛔ |
 | `frontend/src/components/admin/CapabilityGrid.tsx` | 5 / 4 / 273 (was `3 / 3 / 264`) | 304-06: one union member + one entry (mcp_enabled), no count · ⛔ |
 | `frontend/src/components/admin/ControlRoomPage.tsx` | 20 / 11 / 907 (was `19 / 10 / 906`) | 304-06: one capabilityFlags line (mcp_enabled ?? true) · ⛔ |
-| `backend/app/api/api_keys.py` | 6 / 3 / 719 (was `5 / 3 / 710`) | 304-REVIEW WR-02: unread switches are "unknown", still off · ⛔ |
+| `backend/app/api/api_keys.py` | 7 / 4 / 723 (was `6 / 3 / 719`) | 305-03: one ok rule (non-ok MCP never OK) + tool + searches · ⛔ |
 | `backend/app/db/api_keys.py` | 6 / 3 / 383 (was `5 / 2 / 307`) | ⚠ now FIRES (304) · 304-02: mcp_switches + kind columns · ⛔ |
-| `backend/app/models/api_key.py` | 4 / 3 / 265 (was `3 / 3 / 264`) | 304-REVIEW WR-02: McpOff gains "unknown" |
-| `frontend/src/lib/api/apiKeys.ts` | 5 / 3 / 281 (was `4 / 3 / 280`) | 304-REVIEW WR-02: McpOff mirror gains "unknown" · ⛔ |
+| `backend/app/models/api_key.py` | 5 / 4 / 267 (was `4 / 3 / 265`) | 305-03: ApiKeyCall.tool + ApiKeyLimits.searches_per_minute |
+| `frontend/src/lib/api/apiKeys.ts` | 6 / 4 / 285 (was `5 / 3 / 281`) | 305-03: ApiKeyCall.tool? + limits.searches_per_minute (types) · ⛔ |
 | `frontend/src/components/admin/ModelAdvancedCapabilities.tsx` | 0 / 0 / 290 | young (created 262) · ⛔ |
 | `frontend/src/lib/activeViewReachability.ts` | 2 / 2 / 205 (was `1 / 1 / 159`) | 297-02: route leg added (D-25) · AST; throws on a vacuous parse · ⛔ |
 | `frontend/src/components/experts/expertIcon.tsx` | 1 / 1 / 72 | ⚠ 0/0/0 AT PLANNING · measured 1/1/72 at 262-02 · ⛔ |
@@ -707,6 +707,12 @@ node scripts/check-hot-file-ledger.cjs <phase-dir>   # 0 clear · 1 missing rows
 | `backend/app/services/email_provider.py` | 10 / 3 / 413 (was `6 / 3 / 362`) | 300-REVIEW: SMTP_SECURITY fail-closed, redirected flag, config check · ⛔ |
 | `frontend/src/components/admin/HealthSignals.tsx` | 7 / 5 / 415 (was `6 / 5 / 407`) | 300-REVIEW IN-04: config_problem reads "Can't send", red, pre-send |
 | `frontend/src/components/layout/AppViewSwitch.tsx` | 8 / 3 / 609 (was `7 / 2 / 600`) | ⚠ now FIRES (301) · 301-03: the non-chat hamburger dot · ⛔ no hooks |
+| `backend/app/security/api_key_auth.py` | 6 / 3 / 413 | ⚠ now FIRES (305) · 305-03: additive tool kwarg; client off the loop · ⛔ |
+| `backend/app/db/rates.py` | 11 / 3 / 950 | ⚠ now FIRES (305) · 305-03: mcp_usage legs in the one per_root CTE · ⛔ |
+| `frontend/src/components/settings/apiKeys/ApiKeyCard.tsx` | 3 / 3 / 239 | ⚠ now FIRES (305) · 305-03: the two !isMcp guards removed |
+| `frontend/src/components/settings/apiKeys/ApiKeysTab.tsx` | 5 / 3 / 317 | ⚠ now FIRES (305) · 305-03: one AI tool limits line · ⛔ |
+| `frontend/src/types/spend.ts` | 5 / 3 / 128 | ⚠ now FIRES (305) · 305-03: four optional ledger fields |
+| `frontend/src/lib/api/spend.ts` | 5 / 3 / 232 | ⚠ now FIRES (305) · 305-03: ledger mapper source + key + tool · ⛔ |
 
 
 When a new phase enters discuss-phase, the orchestrator must scan PLAN.md `files_modified` against this ledger. Any match against a G-5-firing row means the discuss-phase produces a refactor recommendation as the first option, not the planned feature — and the phase reads that file's section in `docs/HOT-FILE-LEDGER.md` before planning, because that is where the named seam and the binding invariants live.

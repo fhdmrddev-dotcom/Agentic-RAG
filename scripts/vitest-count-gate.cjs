@@ -3729,7 +3729,7 @@ const BASELINE = {
   //   own plant — and the Expert PATCH, create-with-Expert and handoff keep the server's sentence.
   "entitlementRefusal.test.ts": 13, // v4.3 audit (TIER-03)
   "noFrontendTokenPricing.fence.test.ts": 3, // v4.3 audit (257 SC#3)
-  "spendSummaryMapper.test.ts": 2, // 268-REVIEW WR-05 (D-268-28): partly_priced_harness_runs on the wire
+  "spendSummaryMapper.test.ts": 4, // RAISED 2 -> 4 at 305-03 (2026-10-31): getSpendRuns maps an MCP row's source / key / tool; run and older rows read as run · 268-REVIEW WR-05 (D-268-28): partly_priced_harness_runs on the wire
   "connectionFormCopy.mcp.test.ts": 6,
   "McpAuthDoor.test.tsx": 9,
   "McpAuthDoor.byo.test.tsx": 3,
@@ -4204,9 +4204,9 @@ const BASELINE = {
   // times), so each suite is a FILE-LEVEL TARGETS entry at the bottom of this file too.
   // Figures are the suites' own measured counts on the adoption run.
   "ExpertFilterPills.test.tsx": 7,
-  "ExpertSpendCard.test.tsx": 19,
+  "ExpertSpendCard.test.tsx": 23, // RAISED 19 -> 23 at 305-03 (2026-10-31): the MCP arm of LedgerExpertCell (MCP · label + tool title, removed key, label as text, run rows keep the shipped arms)
   "AttributionDisclosures.test.tsx": 2,
-  "expertSpendCopy.test.ts": 10, // +1 268-REVIEW WR-05 (D-268-28 partly-priced words)
+  "expertSpendCopy.test.ts": 11, // RAISED 10 -> 11 at 305-03 (2026-10-31): the MCP ledger words, Expert or key, the extended rule line · +1 268-REVIEW WR-05 (D-268-28 partly-priced words)
   // Added in 257 CR-06 follow-up. Exhaustive arithmetic: three independently-rounded
   // gauge segments summed to 101 on 34 of the combinations swept, and gemini found it
   // reviewing the CR-06 fix. Driven RED against the pre-fix arithmetic, 40 offenders named.
@@ -4417,7 +4417,7 @@ const BASELINE = {
   // `launchFieldsTwin293.test.ts` sits under the `src/components/workflows` directory entry, pin only.
   "apiKeyFacts.test.ts": 43, // RAISED 32 -> 43 at 304-05: MCP chips from the catalogue, the off tag order, workflow facts unchanged with a catalogue, the three 304 refusal words · 293-04 — wire → card facts: refused chips never read active, every reason code worded, raw code for an unknown one
   "curlExamples.test.ts": 8, // 293-04 — the show-once curl: real base, bearer secret, declared fields in order, JSON + shell escaping
-  "ApiKeyLimits.test.tsx": 10, // 293-03 — the operator's per-key limits: load lock + Retry, changed fields only, clamps 1..60 / 10..600, adopt, SettingsPage wiring
+  "ApiKeyLimits.test.tsx": 14, // RAISED 10 -> 14 at 305-03 (2026-10-31): the searches field (words, 1..120 clamp, adopt, an older backend reads 30) · 293-03 — the operator's per-key limits: load lock + Retry, changed fields only, clamps 1..60 / 10..600, adopt, SettingsPage wiring
   "EmailSettings.test.tsx": 28, // 300-05 (S3) — the operator Email card: words, read-only Sent through, floor-word delay hint (shared case list), changed+valid fields only, clamp 60..3600, adopt, SettingsPage wiring
   "EmailNotificationPreference.test.tsx": 17, // 300-05 (S2) — the member's switch: no On before the read, own PUT, server's value, save/load failures, a11y switch, only /me/preferences URLs
   "RunOriginLine.test.tsx": 6, // 293-03 — the origin leaf: nothing when absent/unknown, muted, hidden icon, one mount per run surface (src/components/workflows dir TARGET)
@@ -4425,9 +4425,9 @@ const BASELINE = {
   "apiKeyPrepick.test.ts": 6, // 293-04 — ⋯ menu pre-pick: sessionStorage read-once, only {workflowId, name}, never a secret
   "apiKeysContract.test.ts": 8, // RAISED 3 -> 8 at 304-04: the MCP wire paths (kind, tools, folders, mcp block, pickable folders, org access) · 293-04 — client wire types vs backend api_keys_contract.json, path by path
   "launchFieldsTwin293.test.ts": 9, // 293-04 — launchInputFields vs launch_fields_cases.json (the server twin reads the same file)
-  "ApiKeysTab.test.tsx": 30, // RAISED 29 -> 30 at 304-REVIEW WR-02: the header and card say "couldn't check" for an unread switch state · RAISED 17 -> 29 at 304-05: kind choice, MCP draft, show-once snippets with no secret, folders fetched once, off notice, 293 words when MCP is unavailable · 293-04 — member tab: load/fail/empty, draft rules, show-once secret never in storage/URL/DOM after save, pre-pick, re-fetched revoke
-  "ApiKeyCard.test.tsx": 16, // RAISED 15 -> 16 at 304-REVIEW WR-02: unknown gets no switched-off tag, its own card line · RAISED 8 -> 15 at 304-05: kind chip, MCP scope chips, off tag + card line, acts-in meta, How to connect only on active member cards · 293-04 — every state tag by rendered words, dashed refused chip + line, receipt, owner line, run links only with onOpenRun
-  "ApiKeyCallStrip.test.tsx": 5, // 293-04 — one tab stop, arrow keys, Enter/Space detail, bar name = detail sentence, read bars shorter
+  "ApiKeysTab.test.tsx": 31, // RAISED 30 -> 31 at 305-03 (2026-10-31): the AI tool limits line, only with an MCP key · RAISED 29 -> 30 at 304-REVIEW WR-02: the header and card say "couldn't check" for an unread switch state · RAISED 17 -> 29 at 304-05: kind choice, MCP draft, show-once snippets with no secret, folders fetched once, off notice, 293 words when MCP is unavailable · 293-04 — member tab: load/fail/empty, draft rules, show-once secret never in storage/URL/DOM after save, pre-pick, re-fetched revoke
+  "ApiKeyCard.test.tsx": 17, // RAISED 16 -> 17 at 305-03 (2026-10-31): an MCP key gets the strip + Show activity in MCP words (the 304 no-strip case retired on purpose), and its no-calls state · RAISED 15 -> 16 at 304-REVIEW WR-02: unknown gets no switched-off tag, its own card line · RAISED 8 -> 15 at 304-05: kind chip, MCP scope chips, off tag + card line, acts-in meta, How to connect only on active member cards · 293-04 — every state tag by rendered words, dashed refused chip + line, receipt, owner line, run links only with onOpenRun
+  "ApiKeyCallStrip.test.tsx": 6, // RAISED 5 -> 6 at 305-03 (2026-10-31): an MCP key: answered / not answered legend, bar names time · tool · result · 293-04 — one tab stop, arrow keys, Enter/Space detail, bar name = detail sentence, read bars shorter
   "RevokeApiKeySheet.test.tsx": 9, // RAISED 7 -> 9 at 304-05: the MCP reach fact (preset or N tools on folders) and the MCP kept sentence · 293-04 — focus on Keep it, Esc, Revoking… in flight, onDone only after the server, failure keeps it open, owner named
   "OrgApiKeysTab.test.tsx": 12, // RAISED 7 -> 12 at 304-06: both kinds with chips + preset names, the admin sheet names the preset, the org-off admin notice (never for a deployment off), limits only with a workflow key · 293-04 — admin list: owner on every card, no New key, run links only on own keys, revoke names the owner then re-fetches and pulses
   // 293-04 (SEED-287) — OrgAuditTab.test.tsx existed since 166 and was in NEITHER knob, so it ran
@@ -4529,6 +4529,9 @@ const BASELINE = {
   "CapabilityGrid.mcp.test.tsx": 5, // 304-06 — the fifth card after Workflows, armed OFF with no count even when counts are passed, flips mcp_enabled, ⌥ raw key, no countImpact + the ControlRoomPage mapping
   // Phase 305-02 (D-52) — FIRST pins, both knobs in the same commit (each is FILE-LEVEL in TARGETS below).
   "DocumentCantBeOpened.test.tsx": 5, // 305-02 — the 299 words rendered for a document, a labelled section never an alert, focus on the heading once, one Dismiss, no hand-typed copy in the source
+  // Phase 305-03 (D-31 / D-53) — FIRST pins, both knobs in the same commit (each is FILE-LEVEL in TARGETS below).
+  "mcpCallWords.test.ts": 8, // 305-03 — an MCP call's words: answered, withheld, failed, over the limit (bucket + figure), not granted, shipped reasons kept, time · tool · result
+  "ApiKeyActivity.mcp.test.tsx": 4, // 305-03 — Time · Tool · Result with the tool pill, the MCP empty sentence, revoked keeps the shipped one, a workflow key keeps five columns
   "citationNav.test.tsx": 18, // 305-02 — first pin (153 contract, 13) + the document address arrival: once per distinct id without navigating, leaveDocumentAddress REPLACE, a no-op off an address, no prop unchanged
 }
 
@@ -6656,6 +6659,9 @@ const TARGETS = [
   // Phase 305-02 — FILE-LEVEL (no library/__tests__ or lib/__tests__ directory entry), SAME commit as their pins.
   "src/components/library/__tests__/DocumentCantBeOpened.test.tsx",
   "src/lib/__tests__/citationNav.test.tsx",
+  // Phase 305-03 — FILE-LEVEL, SAME commit as their pins.
+  "src/components/settings/apiKeys/__tests__/mcpCallWords.test.ts",
+  "src/components/settings/apiKeys/__tests__/ApiKeyActivity.mcp.test.tsx",
 ]
 
 const REPO_ROOT = path.resolve(__dirname, "..")
