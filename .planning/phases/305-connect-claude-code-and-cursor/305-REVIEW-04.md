@@ -28,7 +28,7 @@ findings:
   warning: 3
   info: 6
   total: 10
-status: partially_fixed
+status: fixed_blocker_and_warnings
 fix_status: "BL-04-01, WR-04-01, WR-04-03, IN-04-03 fixed (see ## Fix log); WR-04-02 routed separately (dispatch.py); IN-04-01, IN-04-02, IN-04-04, IN-04-05, IN-04-06 open"
 ---
 
@@ -322,7 +322,7 @@ committed failing, then its fix.
 | **WR-04-01** | **fixed.** A token is path-shaped only if it has 3+ segments and either starts with `/` or has word-shaped leading segments (lower case and digits, at most a leading capital). The path rule never applies after a secret keyword within 24 chars, or to a `NAME=` value. Sweeps: after `aws_secret`, misses fell from 274 to 1 out of 2000; for bare keys, from 284 to 25 (1.25%). On the local corpus, the old rule dropped 5 tokens, all absolute paths; the new rule re-admits none of them, so the 305-04 tightenings hold. | RED `362df9830`, fix `150990095` |
 | **WR-04-03** | **fixed.** `measure-redaction.py` has a recall arm: 20 templates, 200 synthetic values each, planted at random word boundaries in real search chunks. A gated template below 95% exits 1. Lowercase IBANs are measured as a residual and not gated. The TP/FP sample is now a seeded random draw (`--seed`, default 305) over rows read `ORDER BY id`. stdout still shows aggregates only. Not done: sampling the *rejected* raw candidates for labelling. The planted-value arm measures misses instead. | `23663512e`; evidence `c92617065` |
 | **IN-04-03** | **fixed.** A killed run's partial output is decoded through `_as_text`, so bytes no longer crash the probe. The unused `finished` parameter is gone. I tested the bytes path directly: the old code raises `TypeError` and the new code returns text. On this Windows 3.12.6 venv, a real killed child returned `str`, so the crash depends on the platform. | `7da2f821e` |
-| WR-04-02 | not in this fixer's scope (lives in `dispatch.py`), routed by the orchestrator | — |
+| WR-04-02 | fixed by the orchestrator: RedactableText found at any depth, dict/tuple/set withheld, a model declaring no RedactableText (raw CallToolResult) withheld when on; dispatch guards every non-str outcome | RED `b59eefaa1`, fix `260c2df99` |
 
 **Re-measured (Run 4, `evidence/redaction-measurement.txt`):**
 - **Validated hits:** identical to Run 3 on every row.
