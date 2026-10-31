@@ -12326,8 +12326,8 @@ cells rot within days.
 | [`backend/app/middleware/maintenance.py`](docs/HOT-FILE-LEDGER.md#backendappmiddlewaremaintenancepy) | 2 / 2 / 121 (was `1 / 1 / 113`) | no (2 phases) | 305-01: one MCP_PATH allowlist arm on a segment boundary (/mcpx still 503). ⛔ pure ASGI; fail-open flag read; segment-boundary match only |
 | [`frontend/src/lib/citationNav.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrclibcitationnavtsx) | 2 / 2 / 238 (was `1 / 1 / 199`) | no (2 phases) | 305-02: optional entityLink prop — one arrival per distinct document id (pending set, no navigate); leaveDocumentAddress (REPLACE). ⛔ one-shot intent; openDocument keeps one identity |
 | [`backend/app/mcp/__init__.py`](docs/HOT-FILE-LEDGER.md#backendappmcp__init__py) | 2 / 1 / 75 (was `1 / 1 / 70`) | no (young) | young (305-01, D-04/D-49): register_mcp (POST-only /mcp + /mcp/ to one edge, or nothing + CRITICAL); mcp_lifespan (fresh manager per entry). ⛔ never a Mount |
-| [`backend/app/mcp/server.py`](docs/HOT-FILE-LEDGER.md#backendappmcpserverpy) | 2 / 1 / 89 (was `1 / 1 / 82`) | no (young) | 305-03: an unknown name audits tool_not_granted with NO tool (a client string never reaches the log), then -32602. ⛔ never str(exc); never MCPServer |
-| [`backend/app/mcp/dispatch.py`](docs/HOT-FILE-LEDGER.md#backendappmcpdispatchpy) | 10 / 1 / 233 (was `5 / 1 / 201`) | no (young) | BUG-261031-04: a fired bookkeeping bound logs the lost write (tool, key, which row) for audit and usage. ⛔ one audit row on every exit; switch read live per call |
+| [`backend/app/mcp/server.py`](docs/HOT-FILE-LEDGER.md#backendappmcpserverpy) | 3 / 1 / 91 (was `2 / 1 / 89`) | no (young) | 305-REVIEW LF-04: the unknown-tool refusal row goes through dispatch.write_audit_row (shielded, bounded, logged), tool=None, then -32602. ⛔ never str(exc); never MCPServer |
+| [`backend/app/mcp/dispatch.py`](docs/HOT-FILE-LEDGER.md#backendappmcpdispatchpy) | 11 / 1 / 241 (was `10 / 1 / 233`) | no (young) | 305-REVIEW LF-04: write_audit_row, the ONE shielded, bounded, logged audit-row wrapper (dispatch's finally + the unknown-tool refusal). ⛔ one audit row on every exit; switch read live per call |
 | [`backend/app/mcp/tools.py`](docs/HOT-FILE-LEDGER.md#backendappmcptoolspy) | 2 / 1 / 103 (was `1 / 1 / 50`) | no (young) | 305-02: the three read ToolSpecs — catalogue titles, READ_ONLY, Pydantic in/out schemas, buckets expensive/cheap/cheap. ⛔ code constants only; never the chat registry; 306 names never listed |
 | [`backend/app/mcp/edge.py`](docs/HOT-FILE-LEDGER.md#backendappmcpedgepy) | 1 / 1 / 171 (was `0 / 0 / 0`) | no (young) | young (created 305-01, D-46/D-08/D-50/D-54): pure-ASGI edge — 405, mcp_ip limit (fail closed), header-only bearer, ONE resolver, one 401, 403 switched off. ⛔ never audits |
 | [`backend/app/mcp/transport.py`](docs/HOT-FILE-LEDGER.md#backendappmcptransportpy) | 1 / 1 / 53 (was `0 / 0 / 0`) | no (young) | young (created 305-01, D-05/D-49): allowed hosts from mcp_public_base() (+ loopback outside production), no allowed origins. ⛔ never hard-coded hosts; always passed explicitly |
@@ -29370,5 +29370,21 @@ CLAUDE.md verdict cell: `CLAUDE.md` line `| backend/app/security/api_key_auth.py
 **`4 / 1 / 122`** (was `3 / 1 / 92`). `audit_refused` keeps the count the slot handed out. On `except Exception` (the INSERT failed) it logs `suppressed=%d` and restores the count through `api_key_auth.restore_suppressed_refusals`; on `anyio.get_cancelled_exc_class()` (dispatch's bookkeeping bound fired mid-write, BUG-261031-04's case) it restores under its own `move_on_after(_RESTORE_DEADLINE_S=1.0, shield=True)` and re-raises, so dispatch still logs the lost row. A restore that fails logs `mcp refusal count LOST` with the number. ⚠ If the bound fires after the server committed the row (LF-08), the count is named twice: an over-count, never a silent loss.
 
 Scan-list cell as of 2026-10-31 (replaced by 305-REVIEW LF-03, moved verbatim): 3 / 1 / 92 (was `1 / 1 / 61`) | no (young) | BUG-261031-04: the row is one asyncpg INSERT (insert_audit_row); no supabase client, no thread hop. ⛔ org explicit; never query text; failure logged (tool, key, write) |
+
+CLAUDE.md verdict cell: none (the file does not fire).
+
+### `backend/app/mcp/dispatch.py` — 305-REVIEW LF-04, 2026-10-31
+
+**`11 / 1 / 241`** (was `10 / 1 / 233`). A pure extraction of the body of `dispatch`'s `finally` into `write_audit_row(principal, audit, *, tool, redis)` — `move_on_after(BOOKKEEPING_DEADLINE_S, shield=True)`, the refused / answered branch and the BUG-261031-04 fired-bound ERROR line, unchanged. `dispatch` calls it with `tool=name`; `server.on_call_tool` now calls it for the unknown-tool refusal with `tool=None`, so that row is shielded from a disconnect and bounded against a full pool, and a fired bound is logged without the client-chosen name. Pinned by `tests/unit/test_305_audit.py` (`test_a_disconnect_during_the_unknown_tool_row_still_writes_it`, `test_a_hung_unknown_tool_row_is_bounded_and_logged`).
+
+Scan-list cell as of 2026-10-31 (replaced by 305-REVIEW LF-04, moved verbatim): 10 / 1 / 233 (was `5 / 1 / 201`) | no (young) | BUG-261031-04: a fired bookkeeping bound logs the lost write (tool, key, which row) for audit and usage. ⛔ one audit row on every exit; switch read live per call |
+
+CLAUDE.md verdict cell: none (the file does not fire).
+
+### `backend/app/mcp/server.py` — 305-REVIEW LF-04, 2026-10-31
+
+**`3 / 1 / 91`** (was `2 / 1 / 89`). The unknown-tool refusal used a bare `await _audit.audit_refused(...)` outside dispatch's shield: a disconnect cancelled the row with no log line, and a saturated pool delayed the `-32602` without bound. It now calls `_dispatch.write_audit_row(principal, {"refused": True, "reason": "tool_not_granted"}, tool=None, ...)`; the now-unused `audit` import is gone.
+
+Scan-list cell as of 2026-10-31 (replaced by 305-REVIEW LF-04, moved verbatim): 2 / 1 / 89 (was `1 / 1 / 82`) | no (young) | 305-03: an unknown name audits tool_not_granted with NO tool (a client string never reaches the log), then -32602. ⛔ never str(exc); never MCPServer |
 
 CLAUDE.md verdict cell: none (the file does not fire).

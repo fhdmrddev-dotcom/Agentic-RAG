@@ -150,23 +150,31 @@ async def dispatch(
         audit = {"refused": False, "outcome": "not_available" if result.is_error else "ok"}
         return result
     finally:
-        # 305-REVIEW WR-03: shielded from the request's cancellation (a client that disconnects
-        # mid-call, a terminated stateless transport, the graceful-shutdown deadline) and bounded,
-        # so the one owed row neither disappears nor hangs the call.
-        with anyio.move_on_after(BOOKKEEPING_DEADLINE_S, shield=True) as bound:
-            if audit["refused"]:
-                await _audit.audit_refused(principal, tool=name, reason=audit["reason"], redis=redis,
-                                           detail=audit.get("detail"))
-            else:
-                await _audit.audit_answered(principal, tool=name, outcome=audit["outcome"])
-        if bound.cancelled_caught:
-            # BUG-261031-04: a fired bound CANCELS the write; the cancellation passes every
-            # ``except Exception``, so without this line the row vanished with no trace.
-            which = (f"api_key.refused reason={audit['reason']}" if audit["refused"]
-                     else f"api_key.read outcome={audit['outcome']}")
-            logger.error("mcp audit row NOT written: the %.1fs bookkeeping bound fired "
-                         "(tool=%s key=%s write=%s)", BOOKKEEPING_DEADLINE_S, name,
-                         principal.key_id, which)
+        await write_audit_row(principal, audit, tool=name, redis=redis)
+
+
+async def write_audit_row(principal: Any, audit: dict, *, tool: str | None, redis: Any) -> None:
+    """The ONE bookkeeping wrapper for an MCP audit row: ``dispatch``'s ``finally`` and the
+    unknown-tool refusal in ``server.on_call_tool`` (305-REVIEW LF-04) both write through it.
+
+    305-REVIEW WR-03: shielded from the request's cancellation (a client that disconnects
+    mid-call, a terminated stateless transport, the graceful-shutdown deadline) and bounded, so the
+    one owed row neither disappears nor hangs the call. ``tool`` is ``None`` for an unknown name: a
+    client-chosen string reaches neither the row nor the log."""
+    with anyio.move_on_after(BOOKKEEPING_DEADLINE_S, shield=True) as bound:
+        if audit["refused"]:
+            await _audit.audit_refused(principal, tool=tool, reason=audit["reason"], redis=redis,
+                                       detail=audit.get("detail"))
+        else:
+            await _audit.audit_answered(principal, tool=tool, outcome=audit["outcome"])
+    if bound.cancelled_caught:
+        # BUG-261031-04: a fired bound CANCELS the write; the cancellation passes every
+        # ``except Exception``, so without this line the row vanished with no trace.
+        which = (f"api_key.refused reason={audit['reason']}" if audit["refused"]
+                 else f"api_key.read outcome={audit['outcome']}")
+        logger.error("mcp audit row NOT written: the %.1fs bookkeeping bound fired "
+                     "(tool=%s key=%s write=%s)", BOOKKEEPING_DEADLINE_S, tool,
+                     principal.key_id, which)
 
 
 async def _pii_on(org_id: str) -> bool | None:

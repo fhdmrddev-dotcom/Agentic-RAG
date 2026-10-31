@@ -27,7 +27,6 @@ from mcp import types
 from mcp.server import Server
 from mcp.shared.exceptions import MCPError
 
-from app.mcp import audit as _audit
 from app.mcp import dispatch as _dispatch
 from app.mcp import edge as _edge
 from app.mcp import tools as _tools
@@ -66,9 +65,12 @@ async def on_call_tool(ctx: Any, params: types.CallToolRequestParams) -> types.C
     if name not in _tools.REGISTERED:
         if principal is not None:
             # 305-03 (D-53): an unknown name is refused like an ungranted one, with NO tool in the
-            # row — a client-chosen string never reaches the audit log.
-            await _audit.audit_refused(principal, tool=None, reason="tool_not_granted",
-                                       redis=_dispatch.get_redis())
+            # row — a client-chosen string never reaches the audit log. 305-REVIEW LF-04: through
+            # dispatch's one shielded, bounded, logged bookkeeping wrapper, never a bare await.
+            await _dispatch.write_audit_row(
+                principal, {"refused": True, "reason": "tool_not_granted"}, tool=None,
+                redis=_dispatch.get_redis(),
+            )
         raise MCPError(code=types.INVALID_PARAMS, message=f"Unknown tool: {name}")
     if principal is None:
         return tool_error(GENERIC_FAILURE_SENTENCE)
