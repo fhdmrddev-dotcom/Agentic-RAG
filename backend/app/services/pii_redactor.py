@@ -14,9 +14,13 @@ What it masks, with exactly these words (the org admin card quotes the first one
   * **IBANs** -> ``[IBAN removed]`` — the ISO 13616 country length table + the mod-97 check.
   * **secrets** -> ``[secret removed]`` — key prefixes (``srl_live_``, ``srl_mcp_``, ``sk-``,
     ``sk-ant-``, ``sk-proj-``, ``gh[pousr]_``, ``github_pat_``, ``AKIA``/``ASIA``,
-    ``xox[baprs]-``, ``whsec_``, ``AIza``), three-part JWTs (``eyJ….eyJ….…``), and high-entropy
-    tokens of 32+ characters that mix upper case, lower case and digits — canonical UUIDs and hex
-    digests are excluded by shape.
+    ``xox[baprs]-``, ``whsec_``, ``AIza``), three-part JWTs (``eyJ….eyJ….…``, wherever they sit,
+    links included — a JWT is a bearer token), and high-entropy tokens of 32..128 characters that
+    mix upper case, lower case and digits. Excluded by shape: canonical UUIDs, hex digests, paths,
+    and anything that is part of a link (a scheme or ``www.`` in the same word, a ``?``/``&`` query
+    parameter, a percent-encoded neighbour) — measured on the local corpus, 30 of 30 sampled
+    entropy hits were link tracking tokens before those exclusions (305-04 v1). ``NAME=value``
+    is judged on the value, so an env line keeps its name.
 
 ⛔ **NAMES ARE NOT COVERED** (GUARD-03). Recognising a person's name needs a model, not a pattern;
 the org admin card, ``docs/OPERATOR.md`` and this docblock all say so. Postal addresses, dates of
@@ -224,7 +228,10 @@ def _cards(text: str) -> Iterator[tuple[int, int]]:
 
 # ── phones ──────────────────────────────────────────────────────────────────────────────────
 
-_PHONE_INTL = re.compile(r"(?<![\w+])(?:\+|(?<!\d)00)[1-9](?:[ .\-()]{0,3}\d){6,14}(?!\d)")
+# The international form must START a token: preceded by nothing, whitespace or ( [ : ; | " ' > *.
+# Measured 305-04 v1: a "00" after a decimal point ("0.002 33.1"), a comma ("1,002") or a hyphen
+# (a UUID group "-0045…") is not a phone number.
+_PHONE_INTL = re.compile(r"(?<![^\s(\[:;|\"'>*])(?:\+|00)[1-9](?:[ .\-()]{0,3}\d){6,14}(?!\d)")
 _PHONE_NATIONAL = (
     re.compile(
         r"(?<![\w+])(?:\(\d{2,5}\)[ .\-]?\d{2,8}|\d{2,5}[ .\-]\d{2,8})(?:[ .\-]\d{2,8}){0,3}(?!\w)"
@@ -258,16 +265,50 @@ def shannon_bits(s: str) -> float:
     return -sum((c / n) * math.log2(c / n) for c in Counter(s).values()) if n else 0.0
 
 
+ENTROPY_MAX_LEN = 128
+_WORD_START = re.compile(r"[\s<(\[{\"']")
+_PERCENT = re.compile(r"%[0-9A-Fa-f]{2}")
+
+
+def _inside_url(text: str, start: int) -> bool:
+    """True when the token sits in a URL: the whitespace-delimited word it belongs to (looked back
+    at most 2,048 chars) carries a scheme or starts with ``www.``."""
+    lo = max(0, start - 2048)
+    i = start
+    while i > lo and not _WORD_START.match(text[i - 1]):
+        i -= 1
+    prefix = text[i:start]
+    return "://" in prefix or prefix.lower().startswith("www.")
+
+
 def _entropy(text: str) -> Iterator[tuple[int, int]]:
+    """Measured 305-04 v1: 30 of 30 sampled hits were URL tracking tokens, so a token in a URL, a
+    path-shaped token and a blob over 128 chars (tracking payloads, base64 data) are not secrets
+    here. A key-shaped secret IN a URL is still caught by the prefix recognizers, which run first."""
     for m in _TOKEN.finditer(text):
+        start, end = m.start(), m.end()
         tok = m.group(0)
+        if text[start - 1:start] in ("?", "&"):
+            continue  # a query parameter of a link (measured 305-04 v2)
+        body = tok.rstrip("=")
+        if "=" in body:  # NAME=value: judge the value alone (an env line keeps its name)
+            cut = body.rfind("=") + 1
+            start, tok = start + cut, tok[cut:]
+            if len(tok) < ENTROPY_MIN_LEN:
+                continue
+        if _PERCENT.match(text, end) or _PERCENT.fullmatch(text[max(0, start - 3):start]):
+            continue  # percent-encoded neighbours: a fragment of a URL (measured 305-04 v2)
         if _UUID.fullmatch(tok) or _HEX.fullmatch(tok):
+            continue
+        if len(tok) > ENTROPY_MAX_LEN or tok.startswith("/") or tok.count("/") >= 2:
+            continue
+        if _inside_url(text, start):
             continue
         if not (any(c.isupper() for c in tok) and any(c.islower() for c in tok)
                 and any(c.isdigit() for c in tok)):
             continue  # slugs, snake_case identifiers and words are not tokens
         if shannon_bits(tok) >= ENTROPY_MIN_BITS:
-            yield m.start(), m.end()
+            yield start, end
 
 
 # ── the chain ───────────────────────────────────────────────────────────────────────────────
