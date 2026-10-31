@@ -66,7 +66,7 @@ async def test_every_spend_query_carries_the_mcp_usage_legs():
         assert "'run'::text AS source" in flat
         assert "'mcp'::text AS source" in flat
         assert "WHERE ro.source = 'run'" in flat
-        assert "JOIN public.mcp_usage u ON u.id = ro.run_id WHERE ro.source = 'mcp'" in flat
+        assert "FROM public.mcp_usage u JOIN roots ro ON ro.run_id = u.id WHERE ro.source = 'mcp'" in flat
         # the 268 invariants, unchanged
         assert "m.run_id = ro.run_id OR m.parent_run_id = ro.run_id" in flat
         assert "m.org_id" not in flat

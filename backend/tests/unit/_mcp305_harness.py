@@ -113,7 +113,28 @@ def stub_accounting(monkeypatch) -> list[dict]:
     monkeypatch.setattr(rate_limit, "load_app_settings_async", _load)
     monkeypatch.setattr(api_key_auth, "write_audit_entry", _write)
     monkeypatch.setattr(api_key_auth, "get_service_role_supabase", lambda org: object())
+    stub_usage(monkeypatch)
     return rows
+
+
+def stub_usage(monkeypatch) -> list[dict]:
+    """305-03: record the ``mcp_usage`` rows an expensive tool would write, with no database."""
+    import app.mcp.dispatch as dispatch
+    from app.models.user_settings import _build_settings_from_row
+
+    written: list[dict] = []
+
+    async def _pool():
+        return object()
+
+    async def _insert(pool, **row):
+        written.append(row)
+        return "usage-id"
+
+    monkeypatch.setattr(dispatch, "get_pg_pool", _pool)
+    monkeypatch.setattr(dispatch, "insert_usage", _insert)
+    monkeypatch.setattr(dispatch, "load_user_settings", lambda uid: _build_settings_from_row({}))
+    return written
 
 
 class NoArgs(BaseModel):

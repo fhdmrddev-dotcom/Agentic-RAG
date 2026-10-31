@@ -148,3 +148,86 @@ def test_embed_texts_carries_exactly_one_record_call():
         encoding="utf-8"
     )
     assert src.count("usage_sink.record(") == 1
+
+
+# ── dispatch: the expensive tool's usage becomes mcp_usage rows (305-03 D-55) ─────────────────
+
+
+@pytest.fixture
+def usage_world(monkeypatch):
+    from dataclasses import replace
+
+    import app.mcp.tools as tools
+    from tests.unit import _mcp305_harness as h
+
+    h.stub_accounting(monkeypatch)
+    written = h.stub_usage(monkeypatch)
+    state = {"tokens": [7]}
+
+    async def search(principal, args):
+        for t in state["tokens"]:
+            usage_sink.record("text-embedding-3-small", t, provider="openai")
+        return h.text_result("found")
+
+    async def boom(principal, args):
+        usage_sink.record("text-embedding-3-small", 3, provider="openai")
+        raise RuntimeError("search broke")
+
+    async def cheap(principal, args):
+        usage_sink.record("text-embedding-3-small", 1, provider="openai")
+        return h.text_result("listed")
+
+    for name, handler, bucket in (("t_s", search, "expensive"), ("t_boom", boom, "expensive"),
+                                  ("t_cheap", cheap, "cheap")):
+        monkeypatch.setitem(tools.REGISTERED, name, replace(h.make_spec(name, handler), bucket=bucket))
+    principal = replace(h.PRINCIPAL, tools=("t_s", "t_boom", "t_cheap"))
+    return {"written": written, "state": state, "principal": principal}
+
+
+async def test_an_expensive_call_writes_one_row_per_measured_entry(usage_world):
+    from app.mcp.dispatch import dispatch
+
+    usage_world["state"]["tokens"] = [7, 4]
+    await dispatch(usage_world["principal"], "t_s", {})
+    rows = usage_world["written"]
+    assert [(r["input_tokens"], r["status"], r["tool"]) for r in rows] == [
+        (7, "completed", "t_s"), (4, "completed", "t_s")]
+    p = usage_world["principal"]
+    assert all((r["org_id"], r["user_id"], r["api_key_id"]) == (p.org_id, p.user_id, p.key_id) for r in rows)
+
+
+async def test_a_search_that_measured_nothing_writes_one_null_token_row(usage_world):
+    from app.mcp.dispatch import dispatch
+
+    usage_world["state"]["tokens"] = []
+    await dispatch(usage_world["principal"], "t_s", {})
+    (row,) = usage_world["written"]
+    assert row["input_tokens"] is None
+    assert row["model"] == "text-embedding-3-small" and row["provider"]
+
+
+async def test_a_raising_search_writes_its_usage_as_failed(usage_world):
+    from app.mcp.dispatch import dispatch
+
+    with pytest.raises(RuntimeError):
+        await dispatch(usage_world["principal"], "t_boom", {})
+    (row,) = usage_world["written"]
+    assert (row["status"], row["input_tokens"]) == ("failed", 3)
+
+
+async def test_a_cheap_call_writes_no_usage(usage_world):
+    from app.mcp.dispatch import dispatch
+
+    await dispatch(usage_world["principal"], "t_cheap", {})
+    assert usage_world["written"] == []
+
+
+async def test_a_usage_write_failure_never_fails_the_call(usage_world, monkeypatch):
+    import app.mcp.dispatch as dispatch_mod
+
+    async def _down(pool, **row):
+        raise ConnectionError("db down")
+
+    monkeypatch.setattr(dispatch_mod, "insert_usage", _down)
+    out = await dispatch_mod.dispatch(usage_world["principal"], "t_s", {})
+    assert out.is_error is not True

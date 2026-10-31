@@ -31,6 +31,7 @@ from starlette.concurrency import run_in_threadpool
 from app.mcp import results as R
 from app.models.user_settings import load_user_settings
 from app.services import acting_member_reads as reads
+from app.services import usage_sink
 from app.services.acting_member_reads import _uuid_or_none
 
 NOT_AVAILABLE_SENTENCE = "No document with that id is available to this key."
@@ -47,6 +48,11 @@ async def search_knowledge_base(principal: Any, args: R.SearchArgs) -> R.SearchR
     top_k = 2 * args.limit if excludes_external else args.limit
     settings = settings.model_copy(update={"retrieval_top_k": top_k})
     rows = await reads.search(principal, args.query, user_settings=settings)
+    if getattr(settings, "rerank_enabled", False) and rows:
+        # 305-03 (D-29): a rerank spends too; its provider reports no tokens, so the row is an
+        # honest unmeasured one (NULL tokens, never 0).
+        usage_sink.record(getattr(settings, "rerank_model", None), None,
+                          provider=getattr(settings, "rerank_provider", None))
     return R.SearchResult(passages=[R.passage_from_row(r) for r in rows[: args.limit]])
 
 

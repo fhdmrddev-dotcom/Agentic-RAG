@@ -71,7 +71,8 @@ def world(monkeypatch):
     monkeypatch.setitem(tools.REGISTERED, "t_boom", h.make_spec("t_boom", boom))
     monkeypatch.setitem(tools.REGISTERED, "t_write", h.make_spec("t_write", ok, read_only=False))
     monkeypatch.setitem(tools.REGISTERED, "t_hidden", h.make_spec("t_hidden", ok))
-    return {"rows": rows, "redis": FakeRedis(), "knobs": knobs}
+    usage = h.stub_usage(monkeypatch)  # t_query is "expensive": its mcp_usage rows land here
+    return {"rows": rows, "redis": FakeRedis(), "knobs": knobs, "usage": usage}
 
 
 async def _dispatch(world, name, arguments=None, principal=PRINCIPAL):

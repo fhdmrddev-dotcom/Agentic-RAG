@@ -42,16 +42,30 @@ handler that raised as ``outcome: error`` (the exception still propagates to the
 limit stage counts the spec's bucket (``app.mcp.limits``) and answers over the limit with a
 relayable sentence, never an HTTP 429. The per-key counters and the refusal throttle share the
 app's Redis (``get_redis``); a caller may pass its own.
+
+305-03 (D-29 / D-55 / GUARD-02 / T-305-14) — spend. An ``expensive`` tool (the search) runs inside
+``usage_sink.collecting()``; whatever the provider calls measured (``embed_texts`` records the
+query embedding, ``read_tools`` an unmeasured rerank) becomes one ``mcp_usage`` row each, written
+on the service-role pool with the principal's org (``db/mcp_usage``). A search that recorded
+nothing still writes ONE row, with the member's embedding model and provider and NULL tokens, so
+search-only usage is never missing from spend and never priced at zero. ``failed`` when the
+handler raised. A write failure is logged and never fails the call.
 """
 from __future__ import annotations
 
+import logging
 from typing import Any
 
 from mcp import types
 from mcp.shared.exceptions import MCPError
 from pydantic import BaseModel, ValidationError
+from starlette.concurrency import run_in_threadpool
 
-from app.dependencies import get_redis
+from app.db.mcp_usage import insert_usage
+from app.dependencies import get_pg_pool, get_redis
+from app.models.user_settings import load_user_settings
+from app.services import usage_sink
+from app.services.openai_service import resolve_effective_embedding_provider
 from app.mcp import audit as _audit
 from app.mcp import limits as _limits
 from app.mcp import results as _results
@@ -64,6 +78,8 @@ MAINTENANCE_SENTENCE = (
     "Searching and reading still work."
 )
 MAINTENANCE_ERROR_CODE = -32000
+
+logger = logging.getLogger("app.mcp")
 
 
 def tool_error(sentence: str) -> types.CallToolResult:
@@ -97,7 +113,7 @@ async def dispatch(
             audit = {"refused": True, "reason": limited.reason,
                      "detail": {"limit": limited.limit} if limited.limit is not None else None}
             return tool_error(limited.sentence)
-        outcome = await spec.handler(principal, args)
+        outcome = await _run(spec, principal, name, args)
         # [305-04 outbound guard slot: redact ``outcome`` here, before anything is rendered]
         result = _finish(outcome)
         audit = {"refused": False, "outcome": "ok"}
@@ -108,6 +124,42 @@ async def dispatch(
                                        detail=audit.get("detail"))
         else:
             await _audit.audit_answered(principal, tool=name, outcome=audit["outcome"])
+
+
+async def _run(spec: Any, principal: Any, name: str, args: BaseModel) -> Any:
+    """Run the handler; an ``expensive`` one inside a usage collection that is written to spend."""
+    if spec.bucket != "expensive":
+        return await spec.handler(principal, args)
+    status = "failed"
+    with usage_sink.collecting() as entries:
+        try:
+            outcome = await spec.handler(principal, args)
+            status = "completed"
+            return outcome
+        finally:
+            await _write_usage(principal, name, list(entries), status)
+
+
+async def _write_usage(principal: Any, name: str, entries: list[dict], status: str) -> None:
+    try:
+        settings = None
+        if not entries or any(e.get("model") is None or e.get("provider") is None for e in entries):
+            settings = await run_in_threadpool(load_user_settings, principal.user_id)
+        if not entries:  # nothing was measured: one honest unmeasured row, never a missing one
+            entries = [{"model": None, "provider": None, "prompt_tokens": None}]
+        pool = await get_pg_pool()
+        for entry in entries:
+            model = entry.get("model") or (settings.embedding_model if settings else None) or "unknown"
+            provider = entry.get("provider") or (
+                resolve_effective_embedding_provider(settings) if settings else None
+            ) or "unknown"
+            await insert_usage(
+                pool, org_id=principal.org_id, user_id=principal.user_id,
+                api_key_id=principal.key_id, tool=name, model=model, provider=provider,
+                input_tokens=entry.get("prompt_tokens"), status=status,
+            )
+    except Exception:  # noqa: BLE001 — a spend write must never fail the call
+        logger.warning("mcp usage write failed (tool=%s)", name, exc_info=True)
 
 
 def _finish(outcome: Any) -> types.CallToolResult:
