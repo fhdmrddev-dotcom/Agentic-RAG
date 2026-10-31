@@ -505,7 +505,7 @@ node scripts/check-hot-file-ledger.cjs <phase-dir>   # 0 clear · 1 missing rows
 | `backend/app/services/unattended_launch.py` | 8 / 3 / 383 (was `7 / 3 / 379`) | 300-REVIEW WR-01: on_finish(status, run_id) names the run it drove |
 | `backend/app/services/run_model_resolution.py` | 5 / 3 / 371 (was `4 / 3 / 344`) | 300-REVIEW IN-03: owner pair via the in-app chain (overlay + resolve) |
 | `backend/app/api/schedules.py` | 6 / 6 / 341 (was `5 / 5 / 303`) | 300-01: create/patch/resume 422 by label (D-14) |
-| `backend/app/services/inbound_inputs.py` | 9 / 3 / 352 (was `8 / 2 / 312`) | ⚠ now FIRES (300) · 300-01: labels + sentence beside the one predicate |
+| `backend/app/services/inbound_inputs.py` | 10 / 4 / 362 (was `9 / 3 / 352`) | 306-03: source/notice kwargs (293 defaults) + ASK_NOTICE · ⛔ |
 | `backend/app/api/inbound.py` | 12 / 4 / 545 (was `11 / 4 / 500`) | 306-02: one admission block + on_finish=_release (D-16/D-35) · ⛔ |
 | `frontend/src/components/settings/apiKeys/apiKeysCopy.ts` | 8 / 6 / 307 (was `7 / 5 / 287`) | 306-02: outside group words + admission call words · ⛔ |
 | `frontend/src/components/settings/apiKeys/apiKeyFacts.ts` | 8 / 6 / 386 (was `7 / 5 / 378`) | 306-02: four admission refusedWords cases · ⛔ |
@@ -575,7 +575,7 @@ node scripts/check-hot-file-ledger.cjs <phase-dir>   # 0 clear · 1 missing rows
 | `frontend/src/pages/KnowledgeHealthPage.tsx` | 12 / 6 / **DELETED** | **RETIRED (217.1-14)** |
 | `backend/app/api/knowledge_health.py` | 11 / 6 / 737 | honoured by construction (**217.1-11**) |
 | `backend/app/services/agent_loop.py` | 78 / 36 / 3782 (was `78 / 35 / 3776`) | 296-06: save-point log w/o preview; substituted notice streamed · ⛔ |
-| `backend/app/services/tool_dispatcher.py` | 99 / 44 / 274 (was `98 / 43 / 5068`) | ✅ G-5 DISCHARGED (278-03): registry only; handlers in services/tools/ · ⛔ |
+| `backend/app/services/tool_dispatcher.py` | 100 / 45 / 280 (was `99 / 44 / 274`) | 306-03: Seam B, one first branch (outside-run allow-list) · ⛔ |
 | `backend/app/services/search_documents_tool.py` | 12 / 4 / 1382 (was `11 / 3 / 1544`) | 306-01: extraction TAKEN (search_vocabulary.py, same objects) |
 | `backend/app/api/document_governance.py` | 5 / 3 / 416 | ⚠ absent at 3 phases. ⚠ Its low-confidence cutoff is the ConfidenceChi |
 | `frontend/src/components/ingestion/ViewsGroup.tsx` | 5 / 3 / 259 | ⚠ absent for its ENTIRE LIFE at **3 phases** |
