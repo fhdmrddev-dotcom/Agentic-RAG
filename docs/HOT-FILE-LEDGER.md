@@ -8571,6 +8571,13 @@ transaction, so a probe error used to abort that transaction and the search fail
 ⛔ **Binding invariants added:** the probe still never takes a second pooled connection (BUG-261031-03);
 a tuning statement on the caller's transaction is always wrapped in a savepoint.
 Pinned by `tests/integration/test_305_tuning_savepoint_live.py` and `tests/unit/test_305_search_pool_deadlock.py`.
+⭐ **305-REVIEW LF-02 (`7 / 3 / 412`):** the same mechanism on `_set_local` (pre-existing since 241). A
+`SET LOCAL` the server rejected was caught as tuning-unavailable, yet the next statement failed
+(`InFailedSQLTransactionError`, measured live with `hnsw.ef_search = 0`). Each `_set_local` now runs in
+`_savepoint(conn)`; a released savepoint keeps its `SET LOCAL` (measured: `current_setting` reads the value).
+`asyncpg.exceptions.InvalidNameError` (42602, *"hnsw is a reserved prefix"*) joined `_TUNING_UNAVAILABLE`:
+it is what a loaded pgvector below 0.8 raises for `hnsw.iterative_scan`. ⚠ Latent today: pgvector is 0.8.0
+locally and in production (measured 2026-10-31).
 
 ---
 
@@ -11832,7 +11839,7 @@ cells rot within days.
 | [`backend/app/services/retrieval_service.py`](docs/HOT-FILE-LEDGER.md#backendappservicesretrievalservicepy) | 25 / 14 / 181 (was `24 / 13 / 176`) | ⚠ **FIRES** | ✅ extraction DISCHARGED (272-01). 294-01: keyword-only instruction, conditional kwargs at the one rerank call, process_inputs (+6 −1). Honoured by construction |
 | [`backend/app/services/recall_eval.py`](docs/HOT-FILE-LEDGER.md#backendappservicesrecallevalpy) | 4 / 3 / 1070 | ⚠ **FIRES** | Phase 246 landing: safe as-is (offline test/eval harness, zero request-path side effects, clean 2-layer design). Added `inspect_execution_plan` (EXPLAIN + `idx_scan > 0`) & latency p50/p95 |
 | [`scripts/build-recall-bench.py`](docs/HOT-FILE-LEDGER.md#scriptsbuild-recall-benchpy) | 4 / 1 / 1088 | no (1 phase) | ⚠ row ADDED at 241-04 — the only `DROP DATABASE` in the repo. Guard + constant-interpolation + AST fence, all driven RED. It built GREEN and unreadable; assert the READ |
-| [`backend/app/services/retrieval_tuning.py`](docs/HOT-FILE-LEDGER.md#backendappservicesretrievaltuningpy) | 6 / 3 / 400 (was `4 / 2 / 364`) | ⚠ **FIRES** | ⚠ now FIRES (305: BUG-261031-03 + LF-01). 305-REVIEW LF-01: the in-transaction probe runs in a SAVEPOINT; a failed probe is never cached. ⛔ never a second pooled connection |
+| [`backend/app/services/retrieval_tuning.py`](docs/HOT-FILE-LEDGER.md#backendappservicesretrievaltuningpy) | 7 / 3 / 412 (was `4 / 2 / 364`) | ⚠ **FIRES** | ⚠ now FIRES (305). LF-01/LF-02: the probe and each SET LOCAL run in a SAVEPOINT; failed probe uncached; InvalidNameError is tuning-unavailable. ⛔ never a second pooled connection |
 | [`frontend/src/components/metadata/DocumentDetailPanel.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentsmetadatadocumentdetailpaneltsx) | 17 / 12 / 668 (was `16 / 11 / 666`) | ⚠ **FIRES** | 298-05: one JSX mount, <MoveToOrgButton document={doc} currentUserId onMoved={onClose}> beside Download; it decides its own eligibility and owns its sheet. No state |
 | [`frontend/src/components/metadata/DocumentConversationSection.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentsmetadatadocumentconversationsectiontsx) | 0 / 0 / 155 | no (new) | young (240) — the read that makes `thread_key` visible. ⛔ Bounded height + a worded truncation, because BUG-260908-01 is the same panel unbounded |
 | [`frontend/src/lib/api/documents.ts`](docs/HOT-FILE-LEDGER.md#frontendsrclibapidocumentsts) | 11 / 10 / 599 (was `10 / 9 / 595`) | ⚠ **FIRES** | 298-01: uploadDocument spreads `X-Org-Id` from getActiveOrgId() at send time (D-29); still no Content-Type. One import name + one expression. Honoured by construction. |

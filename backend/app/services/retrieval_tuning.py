@@ -40,8 +40,9 @@ and — worse — it would silently override a server whose ``postgresql.conf`` 
 from 40 by somebody who meant it. Nothing stored => nothing touched.
 
 ⚠ ``hnsw.iterative_scan`` **DOES NOT EXIST below pgvector 0.8**, and cloud parity is UNVERIFIED
-(D-14). Each knob is therefore applied in its OWN ``try``: an unrecognised parameter degrades the
-TUNING and never the SEARCH (threat T-241-17). That is what lets 241-04's cloud parity check be a
+(D-14). Each knob is therefore applied in its OWN ``try`` and its own SAVEPOINT (305-REVIEW LF-02:
+a caught error would otherwise still abort the search's transaction): an unrecognised parameter
+degrades the TUNING and never the SEARCH (threat T-241-17). That is what lets 241-04's cloud parity check be a
 measurement rather than a prerequisite.
 """
 
@@ -185,9 +186,14 @@ async def get_server_ef_search(
 #: ⛔ Errors that mean *"this server cannot do this tuning"* rather than *"this search failed"*.
 #: `UndefinedObjectError` is what a pre-0.8 pgvector raises for `hnsw.iterative_scan`;
 #: `InvalidParameterValueError` is what a known parameter raises for a value it will not take.
+#: `InvalidNameError` (42602, *"hnsw is a reserved prefix"*) is what an already-loaded pgvector
+#: raises for an ``hnsw.*`` name it does not define — `hnsw.iterative_scan` below 0.8 (305-REVIEW
+#: LF-02; measured live with a non-existent name. Latent today: pgvector is 0.8.0 locally and in
+#: production, measured 2026-10-31).
 _TUNING_UNAVAILABLE = (
     asyncpg.exceptions.UndefinedObjectError,
     asyncpg.exceptions.InvalidParameterValueError,
+    asyncpg.exceptions.InvalidNameError,
 )
 
 
@@ -196,9 +202,15 @@ async def _set_local(conn, statement: str, value: str, *, guc: str) -> bool:
 
     ``statement`` is a module-private constant with the GUC name already inside it — the caller
     never composes it, which is invariant (1) above expressed in the signature.
+
+    305-REVIEW LF-02: inside a SAVEPOINT (``_savepoint``), because a caught error on the caller's
+    open transaction still aborts it, and the search then failed at its next statement — measured
+    live. The savepoint rolls back only this statement; a successful one stays in force after the
+    savepoint is released, until the outer transaction ends.
     """
     try:
-        await conn.execute(statement, value)
+        async with _savepoint(conn):
+            await conn.execute(statement, value)
         return True
     except _TUNING_UNAVAILABLE as exc:
         # ⚠ WARNING, once, naming the knob — never an exception. A search must not fail because
