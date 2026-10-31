@@ -148,7 +148,7 @@ Requirements: [`REQUIREMENTS.md`](REQUIREMENTS.md). **29 v4.9 requirements, 29 m
 **Plans**: 4 plans (4 waves, serialized on the local-DB lock — every plan writes the local DB)
 
 Plans:
-- [ ] 305-01-PLAN.md — SDK bump (httpx2 human-verified, installed once in main), test_059 retired under D-48, graceful shutdown, mig 222, stateless transport + key edge + maintenance, two-worker proof
+- [x] 305-01-PLAN.md — SDK bump (httpx2 human-verified, installed once in main), test_059 retired under D-48, graceful shutdown, mig 222, stateless transport + key edge + maintenance, two-worker proof
 - [ ] 305-02-PLAN.md — search_knowledge_base / list_documents / read_document, result hygiene, identical refusal, narrowing at call, /app/library/<uuid> address
 - [ ] 305-03-PLAN.md — per-call audit, cheap/expensive per-key limits + searches knob, MCP activity on the key card, search usage in operator spend (mcp_usage leg)
 - [ ] 305-04-PLAN.md — outbound_guard + deterministic redactor (fail closed), org redaction switch + card, FP/latency + client-timeout measurement, 305-VALIDATION
