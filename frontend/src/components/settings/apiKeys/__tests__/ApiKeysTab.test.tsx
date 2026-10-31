@@ -32,7 +32,7 @@ vi.mock("@/lib/api/apiKeys", async (importOriginal) => {
 import { ApiKeysTab } from "../ApiKeysTab"
 
 const SECRET = "srl_live_TESTsecretNOTreal0000000000000000000000"
-const LIMITS = { starts_per_minute: 10, reads_per_minute: 120 }
+const LIMITS = { starts_per_minute: 10, reads_per_minute: 120, searches_per_minute: 30 }
 const EMPTY: ApiKeyList = { keys: [], limits: LIMITS }
 const PICKER: StartableWorkflowList = {
   workflows: [
@@ -102,7 +102,7 @@ describe("293-04 ApiKeysTab — reading the list", () => {
   it("has keys: the limits line from the server and the cards in order", async () => {
     m.listApiKeys.mockResolvedValue({
       keys: [makeKey({ id: "old", label: "old-key", state: "revoked" }), makeKey({ id: "live", label: "live-key" })],
-      limits: { starts_per_minute: 7, reads_per_minute: 90 },
+      limits: { starts_per_minute: 7, reads_per_minute: 90, searches_per_minute: 30 },
     })
     render(<ApiKeysTab />)
     expect(await screen.findByTestId("api-keys-limits")).toHaveTextContent(
@@ -434,6 +434,20 @@ describe("304-05 ApiKeysTab — the kind choice", () => {
     m.listApiKeys.mockResolvedValue({ ...MCP_EMPTY, keys: [makeMcpKey(), makeKey()] })
     render(<ApiKeysTab />)
     expect(await screen.findByTestId("api-keys-limits")).toBeInTheDocument()
+  })
+
+  it("305-03: with an AI tool key, the MCP limits line names searches and reads; without one, it is absent", async () => {
+    const limits = { starts_per_minute: 10, reads_per_minute: 90, searches_per_minute: 25 }
+    m.listApiKeys.mockResolvedValue({ ...MCP_EMPTY, limits, keys: [makeMcpKey()] })
+    const { unmount } = render(<ApiKeysTab />)
+    expect(await screen.findByTestId("api-keys-limits-mcp")).toHaveTextContent(
+      "Each AI tool key: 25 searches and 90 reads a minute. Set by your operator.",
+    )
+    unmount()
+    m.listApiKeys.mockResolvedValue({ ...MCP_EMPTY, limits, keys: [makeKey()] })
+    render(<ApiKeysTab />)
+    expect(await screen.findByTestId("api-keys-limits")).toBeInTheDocument()
+    expect(screen.queryByTestId("api-keys-limits-mcp")).toBeNull()
   })
 })
 

@@ -139,10 +139,32 @@ describe("304-05 ApiKeyCard — an MCP key (KEY-05)", () => {
     expect(within(card).getByRole("button", { name: "Revoke claude-code-laptop" })).toBeInTheDocument()
   })
 
-  it("no call strip and no activity toggle (per-call records are KEY-07)", () => {
-    render(<ApiKeyCard apiKey={makeMcpKey({ calls: [makeCall()] })} now={NOW} mcpTools={MCP_CATALOGUE} mcpUrl={MCP_URL} />)
-    expect(screen.queryByText("no calls yet")).toBeNull()
-    expect(screen.queryByRole("group", { name: /Recent calls/ })).toBeNull()
+  // 305-03 (KEY-07, D-53): per-call records now exist, so the 304 "no strip on an MCP key" rule is
+  // retired DELIBERATELY — an MCP key gets the 293 strip and Show activity, in MCP words.
+  it("an MCP key with calls: the call strip and Show activity, in MCP words", async () => {
+    const user = userEvent.setup()
+    const calls = [
+      makeCall({ verb: "read", workflow_id: null, workflow_name: null, run_id: null, ok: false, outcome: "refused",
+                 reason: "rate_limited:expensive", detail: { limit: 30 }, tool: "search_knowledge_base" }),
+      makeCall({ verb: "read", workflow_id: null, workflow_name: null, run_id: null, outcome: "ok", tool: "search_knowledge_base",
+                 at: iso(2026, 9, 25, 10, 41) }),
+    ]
+    render(
+      <ApiKeyCard apiKey={makeMcpKey({ calls, last_used_at: iso(2026, 9, 25, 10, 42) })} now={NOW}
+                  mcpTools={MCP_CATALOGUE} mcpUrl={MCP_URL} />,
+    )
+    const strip = screen.getByRole("group", { name: "Recent calls with claude-code-laptop" })
+    expect(within(strip).getByRole("button", { name: "10:41 · search_knowledge_base · ✓ answered" })).toBeInTheDocument()
+    expect(
+      within(strip).getByRole("button", { name: "10:42 · search_knowledge_base · ✕ refused: over the limit: 30 searches a minute" }),
+    ).toBeInTheDocument()
+    await user.click(screen.getByRole("button", { name: "Show activity" }))
+    expect(screen.getByText("✓ answered")).toBeInTheDocument()
+  })
+
+  it("an active MCP key with no calls: the strip says no calls yet, no activity toggle", () => {
+    render(<ApiKeyCard apiKey={makeMcpKey()} now={NOW} mcpTools={MCP_CATALOGUE} mcpUrl={MCP_URL} />)
+    expect(screen.getByText("no calls yet")).toBeInTheDocument()
     expect(screen.queryByRole("button", { name: "Show activity" })).toBeNull()
   })
 

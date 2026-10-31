@@ -96,6 +96,7 @@ export function makeCall(over: Partial<ApiKeyCall> = {}): ApiKeyCall {
     outcome: "started",
     reason: null,
     detail: null,
+    tool: null, // 305-03: a workflow call has no MCP tool
     ...over,
   }
 }
