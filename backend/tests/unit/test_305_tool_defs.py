@@ -69,7 +69,7 @@ def test_the_search_description_says_passages_are_quoted_content():
 def _listed(monkeypatch, principal) -> list[dict]:
     h.configure(monkeypatch)
     h.stub_edge(monkeypatch, h.Recorder(principal))
-    with TestClient(h.fresh_app()) as client:
+    with TestClient(h.fresh_app(), base_url=h.BASE) as client:
         r = h.list_tools(client)
     assert r.status_code == 200, r.text
     return r.json()["result"]["tools"]
@@ -99,7 +99,7 @@ def test_a_key_granted_every_catalogue_tool_lists_only_the_three(monkeypatch):
 def test_an_unregistered_306_name_is_a_protocol_error_even_when_granted(monkeypatch):
     h.configure(monkeypatch)
     h.stub_edge(monkeypatch, h.Recorder(replace(h.PRINCIPAL, tools=tuple(MCP_TOOL_NAMES))))
-    with TestClient(h.fresh_app()) as client:
+    with TestClient(h.fresh_app(), base_url=h.BASE) as client:
         r = h.call(client, "ask_agent", {"question": "q"})
     assert r.json()["error"]["code"] == -32602
 
@@ -123,7 +123,7 @@ def test_a_model_becomes_structured_content_and_its_rendering(monkeypatch):
     _register(monkeypatch, handler)
     h.configure(monkeypatch)
     h.stub_edge(monkeypatch)
-    with TestClient(h.fresh_app()) as client:
+    with TestClient(h.fresh_app(), base_url=h.BASE) as client:
         result = h.call(client, "t_read").json()["result"]
     assert result["isError"] is False
     assert result["structuredContent"] == model.model_dump(mode="json")
@@ -137,7 +137,7 @@ def test_a_sentence_becomes_one_error_block(monkeypatch):
     _register(monkeypatch, handler)
     h.configure(monkeypatch)
     h.stub_edge(monkeypatch)
-    with TestClient(h.fresh_app()) as client:
+    with TestClient(h.fresh_app(), base_url=h.BASE) as client:
         result = h.call(client, "t_read").json()["result"]
     assert result["isError"] is True
     assert result["content"] == [{"type": "text", "text": read_tools.NOT_AVAILABLE_SENTENCE}]

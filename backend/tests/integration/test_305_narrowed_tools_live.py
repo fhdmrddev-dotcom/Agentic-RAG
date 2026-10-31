@@ -59,10 +59,13 @@ async def _listing(call, folder_id=None) -> tuple[set[str], set[str]]:
 
 
 async def _readable(call, document_id) -> bool:
+    """The key can read the document. The seeded documents carry no ``full_markdown``, so a
+    readable one answers ``NO_TEXT_SENTENCE`` — which is only ever said about a document the key
+    can see; anything it cannot see is the one not-available sentence."""
     reply = await call.tool("read_document", {"document_id": document_id})
     if reply.is_error:
-        assert reply.text == read_tools.NOT_AVAILABLE_SENTENCE, reply.text
-    return not reply.is_error
+        assert reply.text in (read_tools.NOT_AVAILABLE_SENTENCE, read_tools.NO_TEXT_SENTENCE), reply.text
+    return reply.text != read_tools.NOT_AVAILABLE_SENTENCE
 
 
 # ── one arm per tool ─────────────────────────────────────────────────────────────────────────

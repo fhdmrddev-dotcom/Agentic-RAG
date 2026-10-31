@@ -232,7 +232,9 @@ async def test_every_unavailable_document_gets_byte_identical_bodies(world, monk
         for label, cursor in (("tampered cursor", tampered), ("another document's cursor", foreign)):
             reply = await call.tool("read_document", {"document_id": w.docs["f_doc"], "cursor": cursor})
             bodies[label] = reply.raw
-        assert not (await call.tool("read_document", {"document_id": w.docs["root_x"]})).is_error
+        # root_x has no stored text: the key reaches it (NO_TEXT, never the not-available sentence)
+        root = await call.tool("read_document", {"document_id": w.docs["root_x"]})
+        assert root.text == read_tools.NO_TEXT_SENTENCE, root.text
 
     distinct = set(bodies.values())
     assert len(distinct) == 1, {k: v[:200] for k, v in bodies.items()}
