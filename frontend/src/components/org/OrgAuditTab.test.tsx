@@ -269,3 +269,39 @@ describe("OrgAuditTab — the org MCP switch row (304-06 / D-36)", () => {
     expect(controlRoomAuditSrc).not.toContain("mcp_access")
   })
 })
+
+// ── Phase 305-04 (D-36 / D-37) — the org redaction switch's row: settings.update + "pii_redaction" ──
+describe("OrgAuditTab — the org PII redaction switch row (305-04 / D-36)", () => {
+  const row = (id: string, metadata: Record<string, unknown> | null) => ({
+    id,
+    user_id: "u1",
+    action_type: "settings.update",
+    metadata,
+    created_at: "2026-10-31T10:00:00Z",
+    org_id: "o1",
+  })
+
+  it("reads 'Turned personal data removal for AI tools on for the organisation' when enabled", () => {
+    const page: OrgAuditPage = { ...ALL_PAGE, entries: [row("p1", { event: "pii_redaction", enabled: true })], total: 1 }
+    render(<OrgAuditTab {...baseProps} result={page} />)
+    expect(screen.getByText("Turned personal data removal for AI tools on for the organisation")).toBeInTheDocument()
+    expect(screen.queryByText("Changed settings")).toBeNull()
+  })
+
+  it("reads '… off for the organisation' when the stored value is false", () => {
+    const page: OrgAuditPage = { ...ALL_PAGE, entries: [row("p2", { event: "pii_redaction", enabled: false })], total: 1 }
+    render(<OrgAuditTab {...baseProps} result={page} />)
+    expect(screen.getByText("Turned personal data removal for AI tools off for the organisation")).toBeInTheDocument()
+  })
+
+  it("the mcp_access arm keeps its own words beside it", () => {
+    const page: OrgAuditPage = {
+      ...ALL_PAGE,
+      entries: [row("p3", { event: "mcp_access", enabled: true }), row("p4", { event: "pii_redaction", enabled: true })],
+      total: 2,
+    }
+    render(<OrgAuditTab {...baseProps} result={page} />)
+    expect(screen.getByText("Switched AI tool access (MCP) on for the organisation")).toBeInTheDocument()
+    expect(screen.getByText("Turned personal data removal for AI tools on for the organisation")).toBeInTheDocument()
+  })
+})
