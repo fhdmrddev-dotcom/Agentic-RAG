@@ -245,6 +245,65 @@ async def test_a_flood_of_bad_argument_calls_writes_throttled_refusals(world):
     assert kinds == ["api_key.read", "api_key.refused"], kinds
 
 
+async def test_a_cancelled_call_still_writes_its_one_audit_row_and_its_usage_row(world, monkeypatch):
+    """WR-03: the client disconnects mid-search (anyio cancellation is level-triggered). The
+    bookkeeping in ``finally`` is shielded, so the audit row AND the paid-for spend row land."""
+    import anyio
+
+    import app.mcp.dispatch as dispatch_mod
+    import app.mcp.tools as tools
+    from app.services import usage_sink
+
+    usage: list[dict] = []
+
+    async def _insert(pool, **row):
+        await anyio.sleep(0)  # a real insert yields to the loop: a checkpoint cancellation hits
+        usage.append(row)
+        return "usage-id"
+
+    monkeypatch.setattr(dispatch_mod, "insert_usage", _insert)
+    entered = anyio.Event()
+
+    async def slow(principal, args):
+        usage_sink.record("text-embedding-3-small", 7, provider="openai")  # the embedding is paid for
+        entered.set()
+        await anyio.sleep(60)
+
+    monkeypatch.setitem(
+        tools.REGISTERED, "t_slow",
+        replace(h.make_spec("t_slow", slow, args_model=h.NeedsQuery), bucket="expensive"),
+    )
+    principal = replace(PRINCIPAL, tools=PRINCIPAL.tools + ("t_slow",))
+    with anyio.fail_after(10):
+        async with anyio.create_task_group() as tg:
+            tg.start_soon(_dispatch, world, "t_slow", {"query": QUERY}, principal)
+            await entered.wait()
+            tg.cancel_scope.cancel()
+    row = _only(world)
+    assert row["action_type"] == "api_key.read"
+    assert row["metadata"]["tool"] == "t_slow"
+    assert row["metadata"]["outcome"] == "error"
+    assert len(usage) == 1, usage
+    assert usage[0]["input_tokens"] == 7 and usage[0]["status"] == "failed"
+
+
+async def test_a_hung_audit_write_is_bounded_and_never_hangs_the_call(world, monkeypatch):
+    """WR-03: the shield has a deadline — a bookkeeping write that never returns is abandoned."""
+    import anyio
+
+    import app.mcp.dispatch as dispatch_mod
+
+    monkeypatch.setattr(dispatch_mod, "BOOKKEEPING_DEADLINE_S", 0.2, raising=False)
+
+    async def _hang(*a, **k):
+        await anyio.sleep(60)
+
+    monkeypatch.setattr(auth, "write_audit_entry", _hang)
+    with anyio.fail_after(5):
+        out = await _dispatch(world, "t_read")
+    assert out.is_error is not True
+
+
 # ── api_key_auth: the additive tool field and the off-loop client build ───────────────────────
 
 
