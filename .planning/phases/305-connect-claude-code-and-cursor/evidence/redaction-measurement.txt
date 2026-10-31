@@ -92,3 +92,89 @@ Residuals, stated rather than hidden:
     Luhn and mod-97 (Pitfall 8); read chunks are covered by the 128-char overlap window.
   * Card and secret-prefix recognizers had no real hits to label on this corpus; their precision
     rests on the fixture (positive + negative cases per brand/prefix) and on the validators.
+
+
+Run 4 — after the 305-REVIEW-04 fixes (BL-04-01, WR-04-01, WR-04-03), 2026-10-31
+-------------------------------------------------------------------------------------
+What changed: cards are looked for at every digit-group start of a digit run, IBANs from every
+"two letters + two digits" start (BL-04-01); a slash-bearing token is a path only with 3+
+segments and a leading "/" or word-shaped leading segments, never after a secret keyword or as a
+NAME= value (WR-04-01); the script gained a recall arm and draws its TP/FP sample at random with
+a fixed seed over rows read ORDER BY id (WR-04-03). Run 3 above could not see a miss: it labelled
+validated hits only, and took the first N in DB order.
+
+Script: backend/venv/Scripts/python scripts/measure-redaction.py --sample 30 --samples-out <scratch>
+        then --labels <scratch>   (seed 305, recall 200 per template; exit 0 on both runs)
+
+source  recognizer  raw candidates  validated hits  units hit
+search  email                  129             129         63
+search  phone                18285              15         14
+search  card                   489               0          0
+search  iban                    13               2          2
+search  secret                 636               9          3
+read    email                   93              93         42
+read    phone                 6737              13         12
+read    card                   304               0          0
+read    iban                     8               1          1
+read    secret                 498               9          3
+(card and iban raw candidates are now "digit runs of 13+ digits" and "every two-letters-two-digits
+start", so those two columns are not comparable with Run 3. Validated hits are identical to Run 3
+on every row: the fixes found no new value on this corpus, and admitted no new false positive.)
+
+labelled false-positive rate (ceiling 20%), a seeded random sample of up to 30 search hits each:
+  email   0/30 FP = 0.0%   ok   (now 30 of 129, drawn at random; Run 3 took the first 30)
+  phone   0/15 FP = 0.0%   ok   (all 15 hits)
+  card    no hits
+  iban    0/2  FP = 0.0%   ok   (both hits: AE IBANs in an "Account" field)
+  secret  0/9  FP = 0.0%   ok   (all 9 are JWTs)
+The old slash rule dropped 5 corpus tokens (all absolute paths); the new path rule re-admits 0.
+
+recall on planted synthetic values (200 per template, seed 305, planted at a random word boundary
+of a random real search chunk; floor 95% per gated template):
+  email   email plain                              200/200   100.0%  ok
+  phone   phone international +                    200/200   100.0%  ok
+  phone   phone international 00                   195/200    97.5%  ok
+  phone   phone national + keyword                 200/200   100.0%  ok
+  card    card grouped                             200/200   100.0%  ok
+  card    card + expiry                            200/200   100.0%  ok    (0% before BL-04-01)
+  card    card + CVV (dashed)                      200/200   100.0%  ok    (0% before)
+  card    card amex + expiry                       200/200   100.0%  ok    (0% before)
+  card    card after quantity                      200/200   100.0%  ok    (0% before)
+  card    card after year                          200/200   100.0%  ok    (0% before)
+  card    card ungrouped + keyword                 200/200   100.0%  ok
+  iban    iban grouped                             200/200   100.0%  ok
+  iban    iban compact                             200/200   100.0%  ok
+  iban    iban after VAT id                        200/200   100.0%  ok    (0% before)
+  iban    iban after unknown-country token         200/200   100.0%  ok    (partial before)
+  secret  secret key prefix (sk-proj-)             200/200   100.0%  ok
+  secret  secret JWT                               200/200   100.0%  ok
+  secret  secret entropy token                     199/200    99.5%  ok
+  secret  secret base64 + keyword                  199/200    99.5%  ok    (~86% before WR-04-01)
+  secret  secret base64 two slashes, bare          199/200    99.5%  ok    (0% before: every one dropped)
+  iban    iban lowercase (IN-04-02)                  0/200     0.0%  residual, not gated
+  per recognizer (gated): email 100.0% · phone 99.2% · card 100.0% · iban 100.0% · secret 99.7%
+The "before" figures are the review's measurements on the shipped code (305-REVIEW-04) and the
+fixture's RED commits, not a re-run of this arm against the old code.
+Fixture sweeps (backend/tests/unit/test_305_redaction.py, 2,000 random 40-char base64 keys each):
+after "aws_secret" 274 -> 1 missed; bare 284 -> 25 missed (1.25%, a leading "/" plus another "/").
+
+latency per unit (ms), DeterministicRedactor.spans() over the unit incl. its window (two runs):
+  search  p50 0.224  p95 0.359  p99 0.643  max 3.122  mean 0.235
+          p50 0.222  p95 0.352  p99 0.631  max 3.429  mean 0.233
+  read    p50 1.805  p95 2.561  p99 2.861  max 3.406  mean 1.482
+          p50 1.810  p95 2.641  p99 3.328  max 9.012  mean 1.526
+Adversarial worst case, measured in isolation: an 8,256-char read chunk that is one run of
+one-digit groups ("4 4 4 ...") takes ~30 ms (was ~5 ms; every group start is now a card
+candidate); 64,000 chars (MAX_INPUT) ~240 ms. The guard's deadline is 2,000 ms.
+
+Residuals added by this run, stated rather than hidden:
+  * Lowercase IBANs are not caught (IN-04-02, 0/200): the IBAN pattern is upper-case only.
+  * An international phone number directly followed by up to three separators and more digits
+    (a table cell, a year) can still grow past 15 digits and be rejected as a whole: 5 of 200
+    planted "00"-form numbers were missed this way. The every-start fix was applied to cards and
+    IBANs (BL-04-01), not to phones.
+  * Without a keyword, a base64 key that starts with "/" and holds another "/" reads as an
+    absolute path (about 1.25% of random keys). After a secret keyword or as a NAME= value it is
+    always judged as a token.
+  * The rejected raw candidates are still not sampled for labelling; the recall arm measures
+    misses with planted values instead.
