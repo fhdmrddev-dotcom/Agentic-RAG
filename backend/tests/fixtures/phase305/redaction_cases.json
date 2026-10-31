@@ -40,6 +40,8 @@
     {"id": "secret-whsec", "recognizer": "secret", "text_parts": ["signing ", "wh", "sec_", "Mz4Qw8Lr2Tx6Vb9Nk3Pd7Hs1", " set"], "value_parts": ["wh", "sec_", "Mz4Qw8Lr2Tx6Vb9Nk3Pd7Hs1"]},
     {"id": "secret-aiza", "recognizer": "secret", "text_parts": ["maps key ", "AI", "za", "SyD4fG7hJ2kL9mN3pQ6rS8tU1vW5xY0zA_b", " ok"], "value_parts": ["AI", "za", "SyD4fG7hJ2kL9mN3pQ6rS8tU1vW5xY0zA_b"]},
     {"id": "secret-jwt", "recognizer": "secret", "text_parts": ["Bearer ", "eyJ", "hbGciOiJIUzI1NiJ9", ".", "eyJ", "zdWIiOiIxMjM0NTY3ODkwIn0", ".", "dozjgNryP4J3jVmNHl0w5N_XgL0n3I9PlFUP0THsR8U"], "value_parts": ["eyJ", "hbGciOiJIUzI1NiJ9", ".", "eyJ", "zdWIiOiIxMjM0NTY3ODkwIn0", ".", "dozjgNryP4J3jVmNHl0w5N_XgL0n3I9PlFUP0THsR8U"]},
+    {"id": "secret-entropy-env-value", "recognizer": "secret", "text": "SECRET_KEY=q7Xk2PzR9mLw4TcV8bNy3HdF6sGj1KaE5uYo0iZe\n", "value": "q7Xk2PzR9mLw4TcV8bNy3HdF6sGj1KaE5uYo0iZe"},
+    {"id": "secret-jwt-in-link", "recognizer": "secret", "text_parts": ["https://jobs.example.com/ltrk/", "eyJ", "hbGciOiJIUzI1NiJ9", ".", "eyJ", "zdWIiOiIxMjM0NTY3ODkwIn0", ".", "dozjgNryP4J3jVmNHl0w5N_XgL0n3I9PlFUP0THsR8U", " apply"], "value_parts": ["eyJ", "hbGciOiJIUzI1NiJ9", ".", "eyJ", "zdWIiOiIxMjM0NTY3ODkwIn0", ".", "dozjgNryP4J3jVmNHl0w5N_XgL0n3I9PlFUP0THsR8U"]},
     {"id": "secret-entropy-base62", "recognizer": "secret", "text": "session q7Xk2PzR9mLw4TcV8bNy3HdF6sGj1KaE5uYo0iZe expires", "value": "q7Xk2PzR9mLw4TcV8bNy3HdF6sGj1KaE5uYo0iZe"}
   ],
   "negative": [
@@ -64,6 +66,9 @@
     {"id": "secret-tracking-url-path", "recognizer": "secret", "_measured": "305-04 v1: 30/30 sampled entropy hits were URL tracking tokens", "text": "Read more <https://tracking.example.com/ss/c/u001/3H1KLx2pQ9mZ7vB4nC8dF6gJ0hT5sW2y_RkLqPzXa> today"},
     {"id": "secret-url-query-token", "recognizer": "secret", "text": "View post ( https://link.example.com/ls/click?upn=u001.aB3c45dEf-9G8hIjK7lMn-6OpQ5rSt4-UvW3xYz2 )"},
     {"id": "secret-url-www", "recognizer": "secret", "text": "see www.example.com/r/Q3vYk8LpW2zN7tRb5mXc9dFh4jKs6aGe1uTo0iPy for details"},
+    {"id": "secret-query-param-after-amp", "recognizer": "secret", "_measured": "305-04 v2: query parameters of links broken by a space or a chunk edge", "text": "ull-null&eid=3tihun&trk=AQGx-12abC34dEfGhIjK5lMnO6pQrS7tUvW8xYz9AbCdEf0gH Help"},
+    {"id": "secret-query-param-after-qmark", "recognizer": "secret", "text": "profile x12if/?trackingId=AbcD1efGhiJklM2noPqR3stUvW4xyZ%3D%3D next"},
+    {"id": "secret-percent-encoded-neighbour", "recognizer": "secret", "text": "AbCdEfGhIjKlMnOpQrStUvWxYz0123456789AbCdEf%9D  ----"},
     {"id": "secret-long-blob", "recognizer": "secret", "_measured": "a token over 128 chars is a blob (tracking or base64 data), not a key", "text": "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNkYPhfDwAChwGA60e6kgAAAABJRU5ErkJggg8Zx3Qw7Er6Ty5Ui4Op2As1Df0Gh9Jk8Lz7Xc6Vb5Nm4Qw3Er2Ty1Ui0Op9As8Df7Gh6Jk5Lz4Xc3Vb2Nm1Q end"}
   ]
 }
