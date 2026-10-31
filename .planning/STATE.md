@@ -3,14 +3,14 @@ gsd_state_version: 1.0
 milestone: v4.9
 milestone_name: Use It From Your Own Tools
 status: executing
-last_updated: "2026-10-31T17:30:00.000Z"
-last_activity: 2026-10-31 -- Phase 306 planned (5 plans); 305 closed by decision
+last_updated: "2026-10-31T18:59:04.388Z"
+last_activity: 2026-10-31 -- Phase 306 execution started
 progress:
-  total_phases: 7
+  total_phases: 14
   completed_phases: 2
-  total_plans: 10
+  total_plans: 15
   completed_plans: 10
-  percent: 29
+  percent: 14
 ---
 
 # Project State
@@ -30,7 +30,7 @@ See: `.planning/PROJECT.md` (updated 2026-10-30)
 
 **Core value:** The agent acts as an AI colleague — it knows your knowledge base, can run code, and
 can be taught new behaviours (skills) that persist and can be shared.
-**Current focus:** v4.9 Use It From Your Own Tools — MCP server, personal keys + OAuth, outbound webhooks, SEED-081/079 guardrails on the new paths, BUG-261022-01
+**Current focus:** Phase 306 — ask-the-agent-and-run-workflows
 
 ---
 
@@ -44,10 +44,10 @@ reviewer exists, so a phase closes `verification_mode: self-verified`, never `re
 ## Current Position
 
 Milestone: v4.9 Use It From Your Own Tools
-Phase: **305 — Connect Claude Code and Cursor — CLOSED 2026-10-31 by decision, self-verified `human_needed` 4/5 SC** (MCP-01/02/03/07, KEY-07, GUARD-02/03). SC#1 is partial only on the client rows OWED to the operator (Cursor, deployed cloud container, one-box, Claude Desktop via `mcp-remote`); a real Claude Code CLI session was driven locally. 304 COMPLETE 2026-10-31. 303 not started. **306 PLANNED 2026-10-31 (auto):** D-01..D-39 (D-26..D-39 after research), research + UI-SPEC (approved, 0 BLOCK) + patterns; 5 plans / 5 serial waves (`f9c4cc6ac`; G-8: 5 inside 3-5, reason in D-24); plan check 1 doc blocker fixed (research OQs resolved), 3 warnings accepted (04/05 heavy — split 04 if context pressure; connector-schema assertion added to 03). Mig 223 local only; cloud paste owed. Next: `/gsd:execute-phase 306` (start from a cleared context).
-Plan: 305 — 4 of 4 merged (`4d4d013f2`, `1c20943a8`, `cf9f5b683`, `44fb3f9ff`). Three reviews, every finding fixed test-first (01-03: 6 WR; 04: 1 BL + 3 WR; late fixes: 5 WR). SECURITY 38/38 closed (T-305-SC pinned `88d940e9e`; AR-01 SEED-397 + AR-02 log redaction accepted). Found by driving: BUG-261031-03 pool deadlock (`554fe5235`, pre-existing since Phase 246, chat search too) and BUG-261031-04 lost audit rows under load (`d4aacad2e`); both re-verified on :8000 with a 32-call burst. G-4 rows 1-3 + all readbacks PASS (`305-VALIDATION.md` §2.2, `evidence/g4/`). Gates: backend 70 ≤ 71, vitest count gate OK 594/594, tsc 61 = base, ledger + CLAUDE.md size OK.
-Status: 305 closed by hand (not `phase.complete`). **Not deployed — 304+305 deploy together (D-30/D-40).** Known non-blocking: `test_305_audit_live::…over_limit…` flaky under full-set load (8/8 alone); WR-04 / WR-06 calls accepted by the orchestrator; G4-1 non-member arm used a foreign-org document under one login.
-Last activity: 2026-10-31 — 305 verified (`305-VERIFICATION.md`) and closed by decision; BUG-261031-02 (stuck-processing sweep) fixed alongside
+Phase: 306 (ask-the-agent-and-run-workflows) — EXECUTING
+Plan: 1 of 5
+Status: Executing Phase 306
+Last activity: 2026-10-31 -- Phase 306 execution started
 
 Phases start at **303**; migrations at **220**. Seeds taken in at intake: SEED-013, SEED-177, SEED-195, SEED-081, SEED-079; bug BUG-261022-01.
 
@@ -83,6 +83,7 @@ link. Branch `develop`. Tags `v4.7` and `v4.8` pushed 2026-10-30.
 - Logged-in production smoke of the 301 list (open it once on app.superrag.cloud; expect the empty state).
 - Mail provider (Resend deferred 2026-10-29) → 300 G4-8 and the real-provider half of G4-1; BUG-260828-05/06 stay folded until G4-8.
   When revived: Coolify `EMAIL_PROVIDER` / `RESEND_API_KEY` / `ENVIRONMENT=production`; Resend sender + SPF/DKIM/DMARC.
+
 - 299 G4-4b email-link leg (cloud); G4-4c SSO ⛔ (D-41).
 - Moonshot account reinstatement (429) → re-run its roster rows; BUG-261024-01 stays `folded`.
 - Local dev data: paused approval run `66db79bc` (org 22f9c615) — **do not approve** (it emails fhdmrd.dev@gmail.com); delete or cancel it when convenient.

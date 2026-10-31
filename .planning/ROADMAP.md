@@ -172,7 +172,7 @@ Plans:
 **Plans**: 5 plans (5 waves, serialized on the local-DB lock — every plan writes the local DB; G-8 D-24: five, not four, because the ask path splits into the run-path closure and the MCP surface)
 
 Plans:
-- [ ] 306-01-PLAN.md — D-39 extractions first (inbound.py → key_run_read / key_run_start; search_documents_tool.py → search_vocabulary), mig 223 (threads.origin_* + freeze trigger, four app_settings knobs) applied locally
+- [x] 306-01-PLAN.md — D-39 extractions first (inbound.py → key_run_read / key_run_start; search_documents_tool.py → search_vocabulary), mig 223 (threads.origin_* + freeze trigger, four app_settings knobs) applied locally
 - [ ] 306-02-PLAN.md — admission core (Redis ZSET leases by one Lua script) + idempotency claims, fail closed; /inbound 429 + Retry-After; the four knobs end to end in the limits card
 - [ ] 306-03-PLAN.md — tool-set closure (allow-list ContextVar, Seam A in search_vocabulary, Seam B in tool_dispatcher with the durable thread-origin check), TRUST-03 ask envelope, non-HTTP ask start/wait/read, two-org live proof
 - [ ] 306-04-PLAN.md — ask_agent / get_answer on /mcp (idempotency, admission, wait budget, refusals, start bucket); the mcp origin kind end to end + the history-row mark + the question bubble
