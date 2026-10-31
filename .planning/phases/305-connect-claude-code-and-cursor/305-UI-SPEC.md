@@ -1,7 +1,9 @@
 ---
 phase: 305
 slug: connect-claude-code-and-cursor
-status: draft
+status: approved
+reviewed_at: 2026-10-31
+reviewed_by: gsd-ui-checker (6/6 — 2 PASS, 4 FLAG non-blocking; citationNav.tsx ledger row first)
 shadcn_initialized: true
 preset: "style default · baseColor slate · cssVariables · iconLibrary lucide (frontend/components.json), unchanged from 293/304"
 created: 2026-10-31
