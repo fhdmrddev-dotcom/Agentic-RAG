@@ -496,7 +496,7 @@ node scripts/check-hot-file-ledger.cjs <phase-dir>   # 0 clear · 1 missing rows
 | `backend/app/services/multimodal_service.py` | 14 / 7 / 984 | ⚠ absent from BOTH for its ENTIRE LIFE at **7 phases** |
 | `backend/app/api/documents.py` | 101 / 40 / 2709 (was `99 / 39 / 2698`) | 298-01: one by_org in build() + one root_upload_org kwarg · ⛔ |
 | `backend/app/api/library.py` | 3 / 3 / 304 (was `2 / 2 / 299`) | ⚠ now FIRES (298) · 298-01: summary shares the lists' org predicate ($1) |
-| `scripts/vitest-count-gate.cjs` | 408 / 86 / 6932 (was `406 / 85 / 6910`) | 304-06: 9 pins added (304 suites); 8 raised; none lowered |
+| `scripts/vitest-count-gate.cjs` | 409 / 86 / 6932 (was `408 / 86 / 6932`) | 304-REVIEW WR-02: 3 pins raised; none lowered |
 | `scripts/check-deploy-drift.sh` | 6 / 5 / 271 (was `5 / 4 / 267`) | 300-03: SMTP_* parity |
 | `scripts/build-public-openapi.cjs` | 13 / 7 / 473 (was `11 / 5 / 472`) | 301-01: notifications tag + /notifications FLAGGED (2 lines) |
 | `scripts/check-seeds-register.cjs` | 7 / 3 / 1132 | ⚠ FIRES, absent here — row added 296-05 · `\d{3,}` ids · ⛔ |

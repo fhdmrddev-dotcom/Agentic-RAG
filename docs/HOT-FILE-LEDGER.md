@@ -11687,7 +11687,7 @@ cells rot within days.
 | [`backend/app/api/settings.py`](docs/HOT-FILE-LEDGER.md#backendappapisettingspy) | 50 / 27 / 1400 (was `48 / 26 / 1398`) | ⚠ **FIRES** | 304-04: mcp_enabled on the settings response + its readback (2 lines; tolerates stubs predating the field). Honoured by construction. ⛔ no mail secret on the wire |
 | [`backend/app/services/multimodal_service.py`](docs/HOT-FILE-LEDGER.md#backendappservicesmultimodal_servicepy) | 14 / 7 / 984 | ⚠ **FIRES** | ⚠ absent from BOTH for its ENTIRE LIFE at **7 phases** — row added SEED-227, which is also where its silent truncation was found |
 | [`backend/app/api/documents.py`](docs/HOT-FILE-LEDGER.md#backendappapidocumentspy) | 101 / 40 / 2709 (was `99 / 39 / 2698`) | ⚠ **FIRES** | 298-01: list_documents one `org_lists.by_org` in build() (every read, D-32); upload one `org_id=root_upload_org(...)` on the ONE minter call. Honoured by construction. ⛔ see section |
-| [`scripts/vitest-count-gate.cjs`](docs/HOT-FILE-LEDGER.md#scriptsvitest-count-gatecjs) | 408 / 86 / 6932 (was `406 / 85 / 6910`) | ⚠ **FIRES** | 304-06: 9 BASELINE pins + FILE-LEVEL TARGETS for the 304 suites; RAISED apiKeyFacts, ApiKeysTab, ApiKeyCard, RevokeApiKeySheet, apiKeysContract, OrgApiKeysTab, OrgAuditTab, OrgAdminShell; none lowered |
+| [`scripts/vitest-count-gate.cjs`](docs/HOT-FILE-LEDGER.md#scriptsvitest-count-gatecjs) | 409 / 86 / 6932 (was `408 / 86 / 6932`) | ⚠ **FIRES** | 304-REVIEW WR-02: RAISED ApiKeysTab 29->30, ApiKeyCard 15->16, McpOffNotice 5->6; none added, none lowered |
 | [`scripts/check-deploy-drift.sh`](docs/HOT-FILE-LEDGER.md#scriptscheck-deploy-driftsh) | 6 / 5 / 271 (was `5 / 4 / 267`) | ⚠ **FIRES** | 300-03 (D-28): the five SMTP_* vars registered in OMITTED_FROM_ONEBOX (commented in the one-box preset); email comment rewritten. No check changed |
 | [`scripts/build-public-openapi.cjs`](docs/HOT-FILE-LEDGER.md#scriptsbuild-public-openapicjs) | 13 / 7 / 473 (was `11 / 5 / 472`) | ⚠ **FIRES** | 301-01: `notifications` in the Account & org tag group + `/notifications` in FLAGGED_PREFIXES (UI-internal). Two tokens. ⚠ prior row stale |
 | [`scripts/check-seeds-register.cjs`](docs/HOT-FILE-LEDGER.md#scriptscheck-seeds-registercjs) | 7 / 3 / 1132 | ⚠ **FIRES** | ⚠ absent its ENTIRE LIFE — row added 296-05, now FIRES (251 / 293 / 296). 296-05: three `\d{3}` → `\d{3,}` (293-IN-07). ⛔ the STATUS_ENUM triple |
@@ -28711,3 +28711,11 @@ CLAUDE.md verdict cell: none (the file does not fire).
 Scan-list cell as of 2026-10-31 (replaced by 304-REVIEW WR-02, moved verbatim): 2 / 1 / 45 (was `1 / 1 / 43`) | no (young) | young (304). 304-REVIEW WR-03: docblock only (the server orders both paths alike). ⛔ words only from mcpKeyCopy |
 
 CLAUDE.md verdict cell: none (the file does not fire).
+
+### `scripts/vitest-count-gate.cjs` — 304-REVIEW WR-02, 2026-10-31
+
+**`409 / 86 / 6932` (was `408 / 86 / 6932`).** Three BASELINE pins RAISED for the WR-02 vitest cases, each by one: `ApiKeysTab.test.tsx` 29 -> 30, `ApiKeyCard.test.tsx` 15 -> 16, `McpOffNotice.test.tsx` 5 -> 6. All three already had FILE-LEVEL TARGETS. None added, none lowered; the line count is unchanged because the reasons went into the existing pin comments.
+
+Scan-list cell as of 2026-10-31 (replaced by 304-REVIEW WR-02, moved verbatim): 408 / 86 / 6932 (was `406 / 85 / 6910`) | ⚠ **FIRES** | 304-06: 9 BASELINE pins + FILE-LEVEL TARGETS for the 304 suites; RAISED apiKeyFacts, ApiKeysTab, ApiKeyCard, RevokeApiKeySheet, apiKeysContract, OrgApiKeysTab, OrgAuditTab, OrgAdminShell; none lowered |
+
+CLAUDE.md verdict cell as of 2026-10-31 (replaced by 304-REVIEW WR-02, moved verbatim): | `scripts/vitest-count-gate.cjs` | 408 / 86 / 6932 (was `406 / 85 / 6910`) | 304-06: 9 pins added (304 suites); 8 raised; none lowered |
