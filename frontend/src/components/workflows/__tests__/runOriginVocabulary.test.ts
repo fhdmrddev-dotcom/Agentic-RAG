@@ -46,3 +46,20 @@ describe("originSentence (293-03)", () => {
     expect(vocabRaw).not.toContain('"manual"')
   })
 })
+
+describe("originSentence — the mcp arm (306-04, D-09 / D-31)", () => {
+  it("an AI tool key with its recorded label", () => {
+    expect(originSentence(o("mcp", "claude-code-laptop"))).toBe("Started by AI tool key claude-code-laptop")
+  })
+
+  it("an AI tool with no recorded label", () => {
+    expect(originSentence(o("mcp"))).toBe("Started by an AI tool")
+    expect(originSentence(o("mcp", "  "))).toBe("Started by an AI tool")
+  })
+
+  it("the three shipped kinds are unchanged", () => {
+    expect(originSentence(o("app"))).toBe("Started in the app")
+    expect(originSentence(o("schedule", "Monday digest"))).toBe("Started by schedule Monday digest")
+    expect(originSentence(o("key", "n8n-prod"))).toBe("Started by key n8n-prod")
+  })
+})
