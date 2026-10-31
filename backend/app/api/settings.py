@@ -58,6 +58,12 @@ _BOUNDED_SETTINGS_FIELDS = frozenset(
         "api_key_reads_per_minute",
         # 305 (D-54) — the AI tool keys' searches limit, bounded 1..120 (migration 222 CHECK agrees).
         "api_key_searches_per_minute",
+        # 306 (D-36 / D-35) — the ask wait and outside-start admission, bounded 5..45 and 1..50
+        #   (migration 223 CHECKs agree).
+        "mcp_ask_wait_seconds",
+        "outside_inflight_per_key",
+        "outside_inflight_per_org",
+        "outside_inflight_per_provider",
         # 300 (D-07) — the run-waiting email delay, bounded 60..3600 (migration 218 CHECK agrees).
         "notification_email_delay_seconds",
     }
@@ -125,6 +131,11 @@ class FullSettingsResponse(BaseModel):
     api_key_starts_per_minute: int
     api_key_reads_per_minute: int
     api_key_searches_per_minute: int  # 305 (D-54) — the MCP expensive bucket
+    # 306 (D-36 / D-35) — the ask wait budget and the outside-start admission limits.
+    mcp_ask_wait_seconds: int
+    outside_inflight_per_key: int
+    outside_inflight_per_org: int
+    outside_inflight_per_provider: int
     # 300 (D-07, D-08, D-10) — the mail knobs. The provider is READ-ONLY: it is the env's
     # EMAIL_PROVIDER name, never its secret (the API key and the mail-server login stay in the
     # environment and are never read by this module).
@@ -374,6 +385,10 @@ class SettingsUpdate(BaseModel):
     api_key_starts_per_minute: int | None = None  # 293 (D-14) — bounded 1..60
     api_key_reads_per_minute: int | None = None   # 293 (D-14) — bounded 10..600
     api_key_searches_per_minute: int | None = None  # 305 (D-54) — bounded 1..120
+    mcp_ask_wait_seconds: int | None = None           # 306 (D-36) — bounded 5..45
+    outside_inflight_per_key: int | None = None       # 306 (D-35) — bounded 1..50
+    outside_inflight_per_org: int | None = None       # 306 (D-35) — bounded 1..50
+    outside_inflight_per_provider: int | None = None  # 306 (D-35) — bounded 1..50
     notification_email_delay_seconds: int | None = None  # 300 (D-07) — bounded 60..3600
     email_from_address: str | None = None          # 300 (D-08) — "" or one address
     email_from_name: str | None = None             # 300 (D-08) — 1-60 chars, no control chars
@@ -480,6 +495,10 @@ async def _build_response(s=None) -> FullSettingsResponse:
         api_key_starts_per_minute=s.api_key_starts_per_minute,
         api_key_reads_per_minute=s.api_key_reads_per_minute,
         api_key_searches_per_minute=s.api_key_searches_per_minute,
+        mcp_ask_wait_seconds=s.mcp_ask_wait_seconds,
+        outside_inflight_per_key=s.outside_inflight_per_key,
+        outside_inflight_per_org=s.outside_inflight_per_org,
+        outside_inflight_per_provider=s.outside_inflight_per_provider,
         notification_email_delay_seconds=s.notification_email_delay_seconds,
         email_from_address=s.email_from_address or "",
         email_from_name=s.email_from_name,
@@ -940,6 +959,70 @@ async def update_settings(
                 ),
             )
         updates["api_key_searches_per_minute"] = body.api_key_searches_per_minute
+
+    # 306 (D-36) — how long an AI tool's ask waits for an answer before it gets a handle. AI tools
+    #   give up on a call after about a minute, so the ceiling stays well under it. Migration 223's
+    #   CHECK is the backstop.
+    if body.mcp_ask_wait_seconds is not None:
+        if not 5 <= body.mcp_ask_wait_seconds <= 45:
+            raise HTTPException(
+                status_code=400,
+                detail=await _range_refusal_detail(
+                    field="mcp_ask_wait_seconds",
+                    label="Answer wait, in seconds",
+                    submitted=body.mcp_ask_wait_seconds,
+                    lo=5,
+                    hi=45,
+                    typed_detail=(
+                        "Answer wait, in seconds must be between 5 and 45. AI tools give up on a "
+                        "call after about a minute, so a longer wait would never be seen."
+                    ),
+                ),
+            )
+        updates["mcp_ask_wait_seconds"] = body.mcp_ask_wait_seconds
+
+    # 306 (D-35) — outside-start admission: questions and runs AI tools and API keys may have in
+    #   progress at once. Each limit applies on its own; the smallest one bites. Migration 223's
+    #   CHECKs are the backstop.
+    #   ⚠ One explicit `if not 1 <= body.<field> <= 50:` per field: the 242 fence detects a bound
+    #   by that AST shape, and a loop over names would hide all three from it.
+    async def _inflight_refusal(field: str, label: str, submitted: int) -> HTTPException:
+        return HTTPException(
+            status_code=400,
+            detail=await _range_refusal_detail(
+                field=field,
+                label=label,
+                submitted=submitted,
+                lo=1,
+                hi=50,
+                typed_detail=(
+                    f"{label} must be between 1 and 50. Above 50, outside work can crowd out the "
+                    "people using the app."
+                ),
+            ),
+        )
+
+    if body.outside_inflight_per_key is not None:
+        if not 1 <= body.outside_inflight_per_key <= 50:
+            raise await _inflight_refusal(
+                "outside_inflight_per_key", "Running at once, per key",
+                body.outside_inflight_per_key,
+            )
+        updates["outside_inflight_per_key"] = body.outside_inflight_per_key
+    if body.outside_inflight_per_org is not None:
+        if not 1 <= body.outside_inflight_per_org <= 50:
+            raise await _inflight_refusal(
+                "outside_inflight_per_org", "Running at once, per organisation",
+                body.outside_inflight_per_org,
+            )
+        updates["outside_inflight_per_org"] = body.outside_inflight_per_org
+    if body.outside_inflight_per_provider is not None:
+        if not 1 <= body.outside_inflight_per_provider <= 50:
+            raise await _inflight_refusal(
+                "outside_inflight_per_provider", "Running at once, per AI provider",
+                body.outside_inflight_per_provider,
+            )
+        updates["outside_inflight_per_provider"] = body.outside_inflight_per_provider
 
     # 300 (D-07) — the run-waiting email delay. ⚠ BOUNDED ON WRITE; migration 218's CHECK is the
     #   backstop. Below a minute a person answering promptly is emailed anyway; above an hour the
