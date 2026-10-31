@@ -607,15 +607,15 @@ task = asyncio.create_task(_scoped(org_id, **kw), context=outside_run_context(AS
 | A10 | `mcp_tool` in the ledger derived from whether the thread has a workflow run | Pattern 9 | cosmetic |
 | A11 | Prompt length bound for `ask_agent` (e.g. 1..16,000 chars, ≥ 5 KB for the long-message axis) | Validation | too small → long-message axis cannot run |
 
-## Open Questions
+## Open Questions (RESOLVED)
 
-1. **D-20 per-request model vs D-08 no model argument.** An MCP-transport drive cannot choose the model.
+1. RESOLVED: D-37 (internal override, never in the tool schema; UAT driver + 1-2 real CLI rows). **D-20 per-request model vs D-08 no model argument.** An MCP-transport drive cannot choose the model.
    - Recommendation: the start service takes keyword-only `model=None, provider=None` overrides that the tool schema never exposes. A UAT driver (`scripts/`, never imported by `app`) calls it per roster row with the real allow-list and scope. The tool-set closure lives in the run, not the transport. Plus one or two rows through the real `claude` CLI on the member's default model. The alternative, per-row changes to the member's per-user default model, mutates the operator's environment.
-2. **Continue of a cap-paused MCP ask in the app** runs without the allow-list.
+2. RESOLVED: D-28 (fail closed — durable thread-origin check at Seam B; option (b)). **Continue of a cap-paused MCP ask in the app** runs without the allow-list.
    - Options: (a) accept and record the threat (recommended; low likelihood, needs a human click); (b) a durable check in `dispatch_tool` keyed on immutable `threads.origin_kind='mcp'` (cached per thread id, so a born-outside thread stays read-only for every later turn and Continue). Option (b) adds a cached DB read to in-app dispatch, and its failure mode must be decided. Operator call.
-3. **Keys that exclude connected-app documents:** refuse `ask_agent` (recommended), or allow it with a disclosure?
-4. **Spend pins (partly answered):** `test_305_spend_cte.py` pins the CTE and ledger SQL text (see Pattern 9); `test_268_spend_rollup.py` pins the root-only predicate. The runs-leg `api_key_id` join is a deliberate pin update; map the display in Python. The planner re-reads both before editing.
-5. **`claude-sonnet-5` vs `claude-opus-4-8`** for the Anthropic row: the registry lists `claude-sonnet-5` first and 301 used `claude-opus-4-8` ("newest Opus"). Re-derive at UAT time.
+3. RESOLVED: D-29 (refuse `ask_agent`). **Keys that exclude connected-app documents:** refuse `ask_agent` (recommended), or allow it with a disclosure?
+4. RESOLVED by decision: D-34 (pinned SQL text unchanged; display source mapped in Python) — re-derived against the pins at execution. **Spend pins (partly answered):** `test_305_spend_cte.py` pins the CTE and ledger SQL text (see Pattern 9); `test_268_spend_rollup.py` pins the root-only predicate. The runs-leg `api_key_id` join is a deliberate pin update; map the display in Python. The planner re-reads both before editing.
+5. RESOLVED by decision: D-38 (newest registry-backed id read from MODEL_CAPABILITIES at UAT time, never retyped). **`claude-sonnet-5` vs `claude-opus-4-8`** for the Anthropic row: the registry lists `claude-sonnet-5` first and 301 used `claude-opus-4-8` ("newest Opus"). Re-derive at UAT time.
 
 ## Environment Availability
 

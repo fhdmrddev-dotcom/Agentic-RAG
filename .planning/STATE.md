@@ -4,7 +4,7 @@ milestone: v4.9
 milestone_name: Use It From Your Own Tools
 status: executing
 last_updated: "2026-10-31T17:30:00.000Z"
-last_activity: 2026-10-31 -- Phase 305 closed by decision (self-verified 4/5; client rows owed)
+last_activity: 2026-10-31 -- Phase 306 planned (5 plans); 305 closed by decision
 progress:
   total_phases: 7
   completed_phases: 2
@@ -44,7 +44,7 @@ reviewer exists, so a phase closes `verification_mode: self-verified`, never `re
 ## Current Position
 
 Milestone: v4.9 Use It From Your Own Tools
-Phase: **305 — Connect Claude Code and Cursor — CLOSED 2026-10-31 by decision, self-verified `human_needed` 4/5 SC** (MCP-01/02/03/07, KEY-07, GUARD-02/03). SC#1 is partial only on the client rows OWED to the operator (Cursor, deployed cloud container, one-box, Claude Desktop via `mcp-remote`); a real Claude Code CLI session was driven locally. 304 COMPLETE 2026-10-31. 303 not started. **306 DISCUSSED 2026-10-31 (auto):** D-01..D-25, folds SEED-081 (part); next: plan 306.
+Phase: **305 — Connect Claude Code and Cursor — CLOSED 2026-10-31 by decision, self-verified `human_needed` 4/5 SC** (MCP-01/02/03/07, KEY-07, GUARD-02/03). SC#1 is partial only on the client rows OWED to the operator (Cursor, deployed cloud container, one-box, Claude Desktop via `mcp-remote`); a real Claude Code CLI session was driven locally. 304 COMPLETE 2026-10-31. 303 not started. **306 PLANNED 2026-10-31 (auto):** D-01..D-39 (D-26..D-39 after research), research + UI-SPEC (approved, 0 BLOCK) + patterns; 5 plans / 5 serial waves (`f9c4cc6ac`; G-8: 5 inside 3-5, reason in D-24); plan check 1 doc blocker fixed (research OQs resolved), 3 warnings accepted (04/05 heavy — split 04 if context pressure; connector-schema assertion added to 03). Mig 223 local only; cloud paste owed. Next: `/gsd:execute-phase 306` (start from a cleared context).
 Plan: 305 — 4 of 4 merged (`4d4d013f2`, `1c20943a8`, `cf9f5b683`, `44fb3f9ff`). Three reviews, every finding fixed test-first (01-03: 6 WR; 04: 1 BL + 3 WR; late fixes: 5 WR). SECURITY 38/38 closed (T-305-SC pinned `88d940e9e`; AR-01 SEED-397 + AR-02 log redaction accepted). Found by driving: BUG-261031-03 pool deadlock (`554fe5235`, pre-existing since Phase 246, chat search too) and BUG-261031-04 lost audit rows under load (`d4aacad2e`); both re-verified on :8000 with a 32-call burst. G-4 rows 1-3 + all readbacks PASS (`305-VALIDATION.md` §2.2, `evidence/g4/`). Gates: backend 70 ≤ 71, vitest count gate OK 594/594, tsc 61 = base, ledger + CLAUDE.md size OK.
 Status: 305 closed by hand (not `phase.complete`). **Not deployed — 304+305 deploy together (D-30/D-40).** Known non-blocking: `test_305_audit_live::…over_limit…` flaky under full-set load (8/8 alone); WR-04 / WR-06 calls accepted by the orchestrator; G4-1 non-member arm used a foreign-org document under one login.
 Last activity: 2026-10-31 — 305 verified (`305-VERIFICATION.md`) and closed by decision; BUG-261031-02 (stuck-processing sweep) fixed alongside

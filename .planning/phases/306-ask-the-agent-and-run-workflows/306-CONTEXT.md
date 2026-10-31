@@ -116,9 +116,9 @@ per-call model choice.
   1. The MCP ask appears in thread history with the MCP mark.
   2. A paused workflow run shows "waiting on <person>" over MCP, and its link opens the run in the app.
   3. An admission refusal reads "try again in N s" while an in-app chat started at the same moment answers normally.
-- **D-23:** **G-2:** the UI hint is the existing 293 origin mark plus Settings number controls, both shipped surfaces. No sketch;
+- **D-23 [informational]:** **G-2:** the UI hint is the existing 293 origin mark plus Settings number controls, both shipped surfaces. No sketch;
   the override is recorded in STATE. Re-open trigger: the operator asks to see one.
-- **D-24:** **G-8:** target 4 plans.
+- **D-24 [informational]:** **G-8:** target 4 plans (planner chose 5, inside G-8 3-5: the ask path is ~40 files, split into run-path closure 306-03 and MCP surface + mark 306-04).
   1. `key_run_read` extraction plus the admission core.
   2. The tool-set closure plus `ask_agent` / `get_answer`.
   3. The workflow tools.
