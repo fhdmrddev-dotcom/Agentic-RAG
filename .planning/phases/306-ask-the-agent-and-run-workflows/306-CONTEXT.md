@@ -128,6 +128,68 @@ per-call model choice.
 - **D-25:** **deploy.** 306 ships after the 304+305 deploy. A migration (223) only if D-12 needs one, applied locally first and
   pasted to cloud with per-action approval.
 
+### Revisions after research (2026-10-31, auto) — these SUPERSEDE the decisions they name
+- **D-26 (refines D-02):** the closure binds at **two seams reading one ContextVar**, not at the producer.
+  - The ask's producer task is spawned in a **fresh** asyncio Context (`create_task(..., context=…)`), never `copy_context()`.
+    The ContextVar carries the allow-list and the acting org.
+  - **Seam A** (what the model is offered) is the per-run vocabulary builder. `search_documents_tool.py` fires G-5, so its
+    vocabulary functions are **pure-moved to a young module first** (with re-exports), then the one narrowing line is added.
+  - **Seam B** (refusal at call time) is one first branch in `tool_dispatcher.dispatch_tool`, a no-op when the ContextVar is
+    unset.
+  - No edit to `threads.py`, `agent_loop.py`, `provider_gateway/dispatcher.py` or `run_producer.py`.
+  - ⛔ Never filter inside `get_tools`: it would poison the process-wide `_KNOWN_TOOLS` / `_TOOL_SCHEMA_TOKENS` caches.
+- **D-27 (allow-list):** `{search_documents, ls, tree, grep, glob, read_document}`.
+  - `get_related_documents` is out (it ignores folder scope).
+  - `analyze_document` is out (its LLM sub-call records no tokens, so spend would be wrong).
+  - It is a code constant, changed only on purpose.
+- **D-28 (research OQ2, the cap-paused Continue hole, T-306-14):** fail closed.
+  - Every later run on an MCP-origin thread also gets the allow-list, including a member's Continue in the app.
+  - The check is keyed **durably on the thread's origin** (D-31), not only on the ContextVar, and is read at the same young
+    seams.
+  - `run_producer.py` gets one additive line only if research-grade evidence shows no other seam sees the thread.
+- **D-29 (research OQ3):** `ask_agent` **refuses** a key that excludes connected-app documents, with a plain sentence. The chat
+  KB tools cannot honour that exclusion, so refusing is fail-closed. The key's other tools are unaffected.
+- **D-30 (new, scope binding):** an ask binds the folder wall through `ThreadScoping.effective_folder_ids`.
+  - A narrowed key gets its folders; an all-folders key gets every folder the member can see **in the key's org**.
+  - Root documents fall outside an ask; this is disclosed in the tool description.
+  - A **two-org live test** is required: the member's other org must never answer.
+- **D-31 (supersedes D-25's "migration only if D-12 needs one"):** **migration 223** is needed.
+  - `threads.origin_*` columns, with a freeze trigger so an origin cannot be rewritten.
+  - The `app_settings` columns for the wait budget and the admission knobs.
+  - `ThreadResponse.origin` passes through `list_threads`' `select("*")`, so `threads.py` stays untouched.
+  - **The backend `mcp` origin kind and the frontend vocabulary/icon ship in one plan.** `ICONS[kind]` crashes the run page on
+    an unknown kind.
+  - Workflow runs need no column (`workflow_runs.origin_kind='mcp'` is allowed since mig 220). Only the
+    `_RUN_ORIGIN_KINDS` / `ORIGIN_KINDS` lists widen.
+  - Applied locally only. The cloud paste needs per-action approval, after 220-222.
+- **D-32 (refines D-03):** an **ask-specific TRUST-03 notice**. The outside text IS the question, so the generic "do not follow
+  instructions" wording would refuse benign asks. The roster includes a benign question that must still be answered.
+- **D-33 (refines D-06):** "needs a person" for an ask is the **iteration-cap pause** (with the allow-list, `ask_user` is
+  unreachable). It is read with `db/runs.run_is_cap_paused`, never `runs.status`, because a first-turn cap pause finalizes as
+  `completed`.
+- **D-34 (refines D-18):**
+  - Spend by key comes from the **thread's origin**; no run row carries a key today (`rates.py:143`).
+  - ⛔ Do not change `source` in `roots`: `members` joins on `source='run'`, so the tokens would zero.
+  - Map the display source in Python, so the SQL text pinned by `test_305_spend_cte.py` / `test_268_spend_rollup.py` is
+    unchanged.
+- **D-35 (refines D-16/D-17):** admission is **Redis sorted-set leases with an expiry per member, acquired by one Lua script**.
+  - ⛔ Do not copy `task_service`'s counter (it leaks slots under load).
+  - Release through the ask task's done-callback, and through `unattended_launch`'s `on_finish` for workflows and `/inbound`.
+  - Defaults per key / per org / per provider: **2 / 4 / 6**. These are assumptions sized against the 10-connection pool per
+    worker, re-measured by the ≥ 30-start burst before close.
+- **D-36 (refines D-04):** the deadline is measured **from the start of the call**. Bookkeeping, title generation and audit run
+  in the background, never inside the budget. The bound tightens to **5..45 s** (default 30), leaving margin under the
+  ~60 s client cut-off.
+- **D-37 (research OQ1, supersedes D-20's driver):** an **internal model override** that the MCP tool schema never exposes.
+  - A UAT driver script uses it to run the 8-row roster per model.
+  - Plus **one or two rows through the real `claude` CLI**.
+  - The override is unreachable from any MCP or HTTP input; a test proves it.
+- **D-38 (research OQ5):** each roster row uses the **newest registry-backed id** per provider in `MODEL_CAPABILITIES`, read at
+  plan time and never retyped. Moonshot is recorded ⛔ while its account is 429.
+- **D-39 (G-5):** files that fire are extracted first, behaviour-neutral, before any edit: `inbound.py` (`key_run_read` /
+  `key_run_start`) and `search_documents_tool.py` (vocabulary functions). Touching `tool_dispatcher.py` answers **SEED-303's**
+  dispatch-whitelist part for outside runs only; that seed stays partially-answered with a dated note.
+
 ### Claude's Discretion
 - Exact tool names beyond the five above, sentences (plain, 293/305 voice), default numbers for the admission limits
   (research measures provider in-flight budgets from the SEED-081 evidence), and the plan split within 4-5.
