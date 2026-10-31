@@ -70,6 +70,13 @@ _SERVER_DEFAULT_ITERATIVE_SCAN = "off"
 _SERVER_EF_CACHE_TTL = 60.0
 _server_ef_cache: tuple[int | None, float] | None = None
 
+#: BUG-261031-03: the in-transaction probe. ``reset_val`` is the session default (ALTER SYSTEM /
+#: DATABASE / ROLE), unaffected by a SET LOCAL in the open transaction; NULL when pgvector's GUCs
+#: are not registered in this session, which reads as "unknown" exactly like ``current_setting``.
+_SQL_EF_SEARCH_SESSION_DEFAULT = (
+    "SELECT reset_val FROM pg_catalog.pg_settings WHERE name = 'hnsw.ef_search'"
+)
+
 
 def _reset_server_ef_cache() -> None:
     """Reset the server ef_search cache (for tests)."""
@@ -92,8 +99,10 @@ async def get_server_ef_search(
     """Probe the Postgres server's active hnsw.ef_search setting with a 60s TTL cache.
 
     Invariant (Finding 2a / D-246-05):
-    Probes outside request transactions (via pool.fetchval on a clean connection) so that
-    transaction-scoped SET LOCAL on a borrower cannot poison the cached server default.
+    A transaction-scoped SET LOCAL on a borrower cannot poison the cached server default. On a
+    connection inside a transaction the probe reads ``pg_settings.reset_val`` on THAT connection
+    (the session default, which SET LOCAL never changes) — never a second pooled connection, which
+    deadlocks the pool under concurrency (BUG-261031-03).
 
     Returns:
         int | None: The server's ef_search if configured/supported, or None if pgvector
@@ -113,7 +122,16 @@ async def get_server_ef_search(
         raw = None
         if pool is not None:
             raw = await pool.fetchval(query)
-        elif conn is not None and not (hasattr(conn, "is_in_transaction") and conn.is_in_transaction()):
+        elif conn is not None and hasattr(conn, "is_in_transaction") and conn.is_in_transaction():
+            # BUG-261031-03: ⛔ NEVER ask the pool for a second connection here. The caller
+            # (``retrieval_rpc._call_as_user``) holds a pooled connection with its transaction open,
+            # so at concurrency >= the pool's max_size every connection ended up held by a caller
+            # waiting for one more — a deadlock, measured live on 2026-10-31. Read the SESSION
+            # default on the connection already held instead: ``pg_settings.reset_val`` is what
+            # RESET would restore, which a ``SET LOCAL`` in this transaction never changes, so the
+            # D-246-05 non-poisoning invariant holds without leaving the transaction.
+            raw = await conn.fetchval(_SQL_EF_SEARCH_SESSION_DEFAULT)
+        elif conn is not None:
             if hasattr(conn, "fetchval"):
                 raw = await conn.fetchval(query)
             elif hasattr(conn, "fetch"):
