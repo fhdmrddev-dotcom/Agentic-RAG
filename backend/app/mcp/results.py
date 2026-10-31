@@ -181,18 +181,45 @@ def origin_of(row: dict) -> Origin:
     return "external" if row.get("source_connection_id") else "library"
 
 
-_MD_IMAGE = re.compile(r"!\[([^\]\n]*)\]\([^)\n]*\)")
-_MD_IMAGE_REF = re.compile(r"!\[([^\]\n]*)\]\[[^\]\n]*\]")
-_HTML_IMG = re.compile(r"<img\b[^>]*>", re.IGNORECASE)
+# 305-REVIEW WR-05: defang by STRUCTURE, not by one narrow shape. Alt text may hold balanced
+# brackets (CommonMark), so it is matched one nesting level deep; whatever image syntax is left
+# after that (a shortcut ``![logo]`` resolved by a ``[logo]: url`` definition, an unclosed one) loses
+# its ``!``, so no ``![`` survives and nothing renders as an image.
+_ALT = r"((?:[^\[\]\n]|\[[^\[\]\n]*\])*)"
+_MD_IMAGE = re.compile(r"!\[" + _ALT + r"\]\([^)\n]*\)")
+_MD_IMAGE_REF = re.compile(r"!\[" + _ALT + r"\]\[[^\]\n]*\]")
+_MD_IMAGE_BANG = re.compile(r"!\[")
+# Raw HTML that fetches a URL on its own: removed, opening and closing tags alike (any case).
+_HTML_LOADING_TAG = re.compile(
+    r"</?(?:img|image|picture|source|video|audio|track|iframe|frame|frameset|embed|object|applet"
+    r"|svg|use|feimage|link|style|script|meta|base|portal)\b[^<>]*>",
+    re.IGNORECASE,
+)
+# Any other tag keeps its name and text but loses every URL-bearing attribute (``style`` carries
+# ``url(...)``). ``href`` is kept on ``<a>`` only: a link is text the reader chooses to follow.
+_HTML_TAG = re.compile(r"<([a-zA-Z][\w:-]*)\b([^<>]*)>")
+_URL_ATTR = r"(?:src|srcset|poster|background|lowsrc|dynsrc|data|style|xlink:href|formaction|ping|action{href})"
+_ATTR_VALUE = r"""\s*=\s*(?:"[^"]*"|'[^']*'|[^\s>]+)"""
+_LOADING_ATTR = re.compile(r"\s+" + _URL_ATTR.format(href="|href") + r"(?![\w:-])" + _ATTR_VALUE, re.IGNORECASE)
+_LOADING_ATTR_A = re.compile(r"\s+" + _URL_ATTR.format(href="") + r"(?![\w:-])" + _ATTR_VALUE, re.IGNORECASE)
+
+
+def _strip_loading_attrs(m: re.Match) -> str:
+    rx = _LOADING_ATTR_A if m.group(1).lower() == "a" else _LOADING_ATTR
+    return f"<{m.group(1)}{rx.sub('', m.group(2))}>"
 
 
 def defang(text: str) -> str:
-    """Markdown images -> ``[image: alt]``; HTML ``<img>`` removed (any case). Links stay text."""
+    """Markdown images -> ``[image: alt]`` (inline, reference, shortcut, nested-bracket alt); raw
+    HTML that loads a URL by itself removed and URL-bearing attributes stripped from every other
+    tag (any case). Links stay text."""
     if not text:
         return text
     out = _MD_IMAGE.sub(lambda m: f"[image: {m.group(1)}]", text)
     out = _MD_IMAGE_REF.sub(lambda m: f"[image: {m.group(1)}]", out)
-    return _HTML_IMG.sub("", out)
+    out = _MD_IMAGE_BANG.sub("[image: ", out)
+    out = _HTML_LOADING_TAG.sub("", out)
+    return _HTML_TAG.sub(_strip_loading_attrs, out)
 
 
 _MARKER_WORDS = re.compile(r"(BEGIN|END)(\s+)RETRIEVED(\s+)DOCUMENT(\s+)CONTENT", re.IGNORECASE)
