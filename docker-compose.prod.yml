@@ -47,6 +47,11 @@ services:
     build:
       context: ./backend    # backend/Dockerfile — reused unchanged
     restart: unless-stopped
+    # Phase 305 (D-48): the image ends open streams 5s after a stop signal
+    # (--timeout-graceful-shutdown 5 — sse-starlette 3.0.3 no longer ends them itself).
+    # The lifespan shutdown hooks run after that window, so the stop grace must exceed
+    # it with room to spare, or Docker's SIGKILL (default 10s) skips them.
+    stop_grace_period: 20s
     env_file:
       - ./.env              # the operator's filled-in one-box preset (root, gitignored)
     environment:

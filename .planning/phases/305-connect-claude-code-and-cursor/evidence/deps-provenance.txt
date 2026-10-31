@@ -1,0 +1,61 @@
+HUMAN APPROVAL (Task 1, blocking-human, T-305-25) — 2026-10-31, in chat, by the operator:
+  Shown: mcp 2.3.0 (publisher Model Context Protocol / LF Projects, repo
+  github.com/modelcontextprotocol/python-sdk, lists `httpx2>=2.10.0` as a required dependency),
+  httpx2 2.16.0 (author Tom Christie, repo github.com/pydantic/httpx2),
+  sse-starlette 2.4.1 -> 3.0.3.
+  Selected: "Approve install (Recommended)" — "Install mcp 2.3.x, httpx2 (its required dep),
+  sse-starlette 3.0.3 into backend/venv, then pip check."
+  Nothing was installed before this approval.
+
+=====================================================================================
+1. PRE-INSTALL DRY RUN (2026-10-31T06:53Z, backend/venv, which is the MAIN checkout's venv —
+   the worktree path backend/venv is a junction to "C:/Vibe Apps/Agentic RAG/backend/venv")
+=====================================================================================
+$ backend/venv/Scripts/python.exe -m pip install --dry-run "mcp>=2.3.0,<3" "sse-starlette==3.0.3" "fastapi==0.115.6"
+...
+Using cached httpcore2-2.16.0-py3-none-any.whl (85 kB)
+Using cached opentelemetry_api-1.45.2-py3-none-any.whl (60 kB)
+Using cached idna-3.20-py3-none-any.whl (69 kB)
+Using cached truststore-0.10.5-py3-none-any.whl (19 kB)
+Would install httpcore2-2.16.0 httpx2-2.16.0 idna-3.20 mcp-2.3.0 mcp-types-2.3.0 opentelemetry-api-1.45.2 sse-starlette-3.0.3 truststore-0.10.5
+
+Versions before the install (pip show):
+  sse-starlette 2.4.1 · fastapi 0.115.6 · starlette 0.41.3 · mcp (not installed)
+
+=====================================================================================
+2. PyPI JSON FACTS (https://pypi.org/pypi/<name>/json, read 2026-10-31)
+=====================================================================================
+httpx2 | version 2.16.0 | author Tom Christie <tom@tomchristie.com> | maintainer "Pydantic Services Inc." <engineering@pydantic.dev>
+   project_urls {'Changelog': 'https://github.com/pydantic/httpx2/blob/main/src/httpx2/CHANGELOG.md', 'Homepage': 'https://github.com/pydantic/httpx2', 'Source': 'https://github.com/pydantic/httpx2'}
+   first upload 2026-05-11T06:12:34.916478Z | releases 22
+httpcore2 | version 2.16.0 | author Tom Christie <tom@tomchristie.com> | maintainer "Pydantic Services Inc." <engineering@pydantic.dev>
+   project_urls {'Changelog': 'https://github.com/pydantic/httpx2/blob/main/src/httpcore2/CHANGELOG.md', 'Homepage': 'https://github.com/pydantic/httpx2', 'Source': 'https://github.com/pydantic/httpx2/blob/main/src/httpcore2'}
+   first upload 2026-05-11T09:18:45.766107Z | releases 22
+mcp | version 2.3.0 | author Model Context Protocol a Series of LF Projects, LLC. | maintainer David Soria Parra <davidsp@anthropic.com>, Marcelo Trylesinski <marcelotryle@gmail.com>, Max Isbey <maxisbey@anthropic.com>, Felix Weinberger <fweinberger@anthropic.com>
+   project_urls {'Documentation': 'https://py.sdk.modelcontextprotocol.io/', 'Homepage': 'https://modelcontextprotocol.io', 'Issues': 'https://github.com/modelcontextprotocol/python-sdk/issues', 'Repository': 'https://github.com/modelcontextprotocol/python-sdk'}
+   first upload 2024-11-20T11:37:34.333286Z | releases 73
+   mcp 2.3.0 requires_dist ['anyio>=4.10; python_version >= "3.14"', 'anyio>=4.9; python_version < "3.14"', 'httpx2>=2.10.0', 'jsonschema>=4.20.0', 'mcp-types==2.3.0', 'opentelemetry-api>=1.28.0', 'pydantic>=2.12.0', 'pyjwt[crypto]>=2.10.1', 'python-multipart>=0.0.9', 'pywin32>=311; sys_platform == "win32"', 'sse-starlette>=3.0.0', 'starlette>=0.27; python_version < "3.14"', 'starlette>=0.48.0; python_version >= "3.14"', 'typing-extensions>=4.13.0', 'typing-inspection>=0.4.1', 'uvicorn>=0.31.1; sys_platform != "emscripten"', 'python-dotenv>=1.0.0; extra == "cli"', 'typer>=0.16.0; extra == "cli"', 'rich>=13.9.4; extra == "rich"']
+mcp-types | version 2.3.0 | author Model Context Protocol a Series of LF Projects, LLC. | maintainer David Soria Parra <davidsp@anthropic.com>, Marcelo Trylesinski <marcelotryle@gmail.com>, Max Isbey <maxisbey@anthropic.com>, Felix Weinberger <fweinberger@anthropic.com>
+   project_urls {'Documentation': 'https://py.sdk.modelcontextprotocol.io/', 'Homepage': 'https://modelcontextprotocol.io', 'Issues': 'https://github.com/modelcontextprotocol/python-sdk/issues', 'Repository': 'https://github.com/modelcontextprotocol/python-sdk'}
+   first upload 2025-06-21T09:00:18.552585Z | releases 12
+
+Reading: httpx2 is a hard dependency of the official SDK (requires_dist), maintained by Pydantic
+Services Inc., authored by the httpx author, sourced at github.com/pydantic/httpx2. The slopcheck
+[SUS] flag is name similarity only. Our code never imports httpx2 (T-305-25).
+
+=====================================================================================
+3. INSTALL (2026-10-31, after the approval above; ONCE, into the MAIN checkout's venv)
+=====================================================================================
+$ backend/venv/Scripts/python.exe -m pip install "mcp>=2.3.0,<3" "sse-starlette==3.0.3"
+  (backend/venv in this worktree is a junction to "C:/Vibe Apps/Agentic RAG/backend/venv";
+   the main path was confirmed to hold mcp-2.3.0.dist-info and sse_starlette-3.0.3.dist-info)
+Successfully installed httpcore2-2.16.0 httpx2-2.16.0 idna-3.20 mcp-2.3.0 mcp-types-2.3.0 opentelemetry-api-1.45.2 sse-starlette-3.0.3 truststore-0.10.5
+
+$ pip check
+supafunc 0.7.0 has requirement httpx[http2]<0.28,>=0.26, but you have httpx 0.28.1.
+  -> PRE-EXISTING: httpx was not touched by this install (not in the "Successfully installed"
+     list; httpx 0.28.1 was already present). Nothing this install added conflicts.
+
+$ pip show (after)
+  mcp 2.3.0 · mcp-types 2.3.0 · sse-starlette 3.0.3 · fastapi 0.115.6 (unchanged) ·
+  starlette 0.41.3 (unchanged) · httpx2 2.16.0 · httpcore2 2.16.0 · uvicorn 0.32.1 (unchanged)

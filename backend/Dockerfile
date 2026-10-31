@@ -40,4 +40,10 @@ EXPOSE 8000
 
 # Multi-worker is the production default (WORKER_COUNT=2, decision D-PRD-12).
 # exec so uvicorn is PID 1 and receives signals for clean shutdown.
-CMD ["sh", "-c", "exec uvicorn app.main:app --host 0.0.0.0 --port 8000 --workers ${WORKER_COUNT:-2}"]
+# The graceful-shutdown bound of 5 s (Phase 305 / D-48): sse-starlette 3.0.3, forced by the
+# official mcp SDK, no longer ends open streams on the exit signal (upstream
+# sysid/sse-starlette #149). Without a bound, every deploy restart with a live chat
+# stream waits for Docker's SIGKILL and skips the lifespan shutdown hooks (drainer
+# stop, set_app_shutting_down). Keep it below the container stop grace (compose: 20s).
+# Pinned by tests/unit/test_305_dockerfile_graceful.py.
+CMD ["sh", "-c", "exec uvicorn app.main:app --host 0.0.0.0 --port 8000 --workers ${WORKER_COUNT:-2} --timeout-graceful-shutdown 5"]

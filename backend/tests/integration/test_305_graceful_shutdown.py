@@ -48,6 +48,19 @@ def _shipped_graceful_timeout() -> int | None:
     return int(m.group(1)) if m else None
 
 
+class _InProcessServer(uvicorn.Server):
+    """uvicorn.Server minus its signal capture.
+
+    ``Server.handle_exit`` records the signal and ``capture_signals`` RE-RAISES it
+    when ``serve()`` returns — a real KeyboardInterrupt inside pytest. The exit
+    path under test (sse-starlette's ``AppStatus.handle_exit`` patched onto
+    ``Server.handle_exit`` -> uvicorn's own handler) is untouched.
+    """
+
+    def capture_signals(self):  # type: ignore[override]
+        return contextlib.nullcontext()
+
+
 def _free_port() -> int:
     with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
         s.bind(("127.0.0.1", 0))
@@ -97,7 +110,7 @@ async def _serve_and_signal(timeout_graceful_shutdown: int | None, observe_for: 
         log_level="warning",
         timeout_graceful_shutdown=timeout_graceful_shutdown,
     )
-    server = uvicorn.Server(config)
+    server = _InProcessServer(config)
     serve_task = asyncio.create_task(server.serve())
     for _ in range(100):
         if server.started:

@@ -355,6 +355,17 @@ This builds and starts three services (defined in
 
 Supabase is **not** a service here — the app talks to your external Supabase over the network.
 
+**Stopping and redeploying (Phase 305 / D-48).** The backend ends any open stream (a live chat
+answer, a workflow run being watched) **5 seconds** after it receives a stop signal
+(`--timeout-graceful-shutdown 5` in the image), then runs its shutdown hooks. The container's
+stop grace must be longer than that, or Docker's SIGKILL cuts the shutdown hooks off:
+
+- **One-box:** `docker-compose.prod.yml` sets `stop_grace_period: 20s` on the backend — nothing to do.
+- **Coolify:** check the backend service's stop grace / stop timeout and set it above 5 s
+  (20 s is a safe value). This is an owed operator check; Coolify's default is not recorded here.
+- **Local development:** pressing Ctrl+C once while a chat is still streaming may leave uvicorn
+  waiting on that stream; press Ctrl+C a second time to force it.
+
 ### Step 5 — Open the app
 
 Browse to **`http://localhost:8080`** (or your server's address / domain on port 8080). Log
