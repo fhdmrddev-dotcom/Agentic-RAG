@@ -1,0 +1,57 @@
+{
+  "_doc": "Phase 305-04 (GUARD-03; D-33 / D-56). Positive and negative cases per recognizer. A positive case names the exact `value` inside `text` that must become `mask`; a negative case must come back byte-identical. Secret-shaped values are stored as `value_parts` and joined at load time, so no secret-scanner reads a key-shaped literal in this file. Every value here is fabricated (RFC 2606 / RFC 5737-style example data, published test card numbers, the ISO 13616 example IBAN).",
+  "masks": {
+    "email": "[email removed]",
+    "phone": "[phone removed]",
+    "card": "[card number removed]",
+    "iban": "[IBAN removed]",
+    "secret": "[secret removed]"
+  },
+  "positive": [
+    {"id": "email-plain", "recognizer": "email", "text": "Write to jane.doe@example.com about the renewal.", "value": "jane.doe@example.com"},
+    {"id": "email-subdomain-tag", "recognizer": "email", "text": "cc: a.b+tag@sub.example.co.uk, thanks", "value": "a.b+tag@sub.example.co.uk"},
+    {"id": "email-in-filename", "recognizer": "email", "text": "Attached: invoice-jane@example.org.pdf", "value": "invoice-jane@example.org.pdf"},
+
+    {"id": "phone-e164-plus", "recognizer": "phone", "text": "Reach me on +44 20 7946 0958 after six.", "value": "+44 20 7946 0958"},
+    {"id": "phone-e164-00", "recognizer": "phone", "text": "Head office 0049 30 1234567 (Berlin).", "value": "0049 30 1234567"},
+    {"id": "phone-national-keyword", "recognizer": "phone", "text": "tel: 020 7946 0958", "value": "020 7946 0958"},
+    {"id": "phone-national-mobile", "recognizer": "phone", "text": "Mobile 07700 900123 is the out-of-hours line.", "value": "07700 900123"},
+
+    {"id": "card-visa-grouped", "recognizer": "card", "text": "Paid with 4111 1111 1111 1111 on the 3rd.", "value": "4111 1111 1111 1111"},
+    {"id": "card-visa-dashed", "recognizer": "card", "text": "Number 4111-1111-1111-1111 expired.", "value": "4111-1111-1111-1111"},
+    {"id": "card-amex-465", "recognizer": "card", "text": "Amex 3782 822463 10005 on file", "value": "3782 822463 10005"},
+    {"id": "card-keyword-ungrouped", "recognizer": "card", "text": "credit card 5105105105105100 was declined", "value": "5105105105105100"},
+
+    {"id": "iban-gb-grouped", "recognizer": "iban", "text": "Pay to GB82 WEST 1234 5698 7654 32 by Friday.", "value": "GB82 WEST 1234 5698 7654 32"},
+    {"id": "iban-de-compact", "recognizer": "iban", "text": "IBAN DE89370400440532013000 (Commerzbank)", "value": "DE89370400440532013000"},
+
+    {"id": "secret-srl-mcp", "recognizer": "secret", "text_parts": ["key ", "srl_", "mcp_", "Q3vYk8LpW2zN7tRb5mXc9dFh4jKs6aGe1uTo0iPyBn", " in config"], "value_parts": ["srl_", "mcp_", "Q3vYk8LpW2zN7tRb5mXc9dFh4jKs6aGe1uTo0iPyBn"]},
+    {"id": "secret-srl-live", "recognizer": "secret", "text_parts": ["X-Api-Key: ", "srl_", "live_", "7hGt2Lm9Qw4Rz8Xc", "."], "value_parts": ["srl_", "live_", "7hGt2Lm9Qw4Rz8Xc"]},
+    {"id": "secret-sk-ant", "recognizer": "secret", "text_parts": ["ANTHROPIC_API_KEY=", "sk-", "ant-", "api03-Zx81Lq2Wm7Rt4Yp9Kd3Hs6Nv0Bc5Fj", "\n"], "value_parts": ["sk-", "ant-", "api03-Zx81Lq2Wm7Rt4Yp9Kd3Hs6Nv0Bc5Fj"]},
+    {"id": "secret-sk-proj", "recognizer": "secret", "text_parts": ["token ", "sk-", "proj-", "Hq4Lz7Wm2Xr9Tk5Np8Vb3Cd6Fs1Gj0", " rotated"], "value_parts": ["sk-", "proj-", "Hq4Lz7Wm2Xr9Tk5Np8Vb3Cd6Fs1Gj0"]},
+    {"id": "secret-ghp", "recognizer": "secret", "text_parts": ["git token ", "gh", "p_", "a1B2c3D4e5F6g7H8i9J0k1L2m3N4o5P6q7R8", " (old)"], "value_parts": ["gh", "p_", "a1B2c3D4e5F6g7H8i9J0k1L2m3N4o5P6q7R8"]},
+    {"id": "secret-github-pat", "recognizer": "secret", "text_parts": ["pat ", "github_", "pat_", "11ABCDEFG0123456789_abcdefghijklmnop", " end"], "value_parts": ["github_", "pat_", "11ABCDEFG0123456789_abcdefghijklmnop"]},
+    {"id": "secret-akia", "recognizer": "secret", "text_parts": ["aws id ", "AK", "IA", "Z7Q4X2L9W8R3T6Y1", " here"], "value_parts": ["AK", "IA", "Z7Q4X2L9W8R3T6Y1"]},
+    {"id": "secret-xoxb", "recognizer": "secret", "text_parts": ["slack ", "xo", "xb-", "1234567890-0987654321-AbCdEfGhIjKl", " bot"], "value_parts": ["xo", "xb-", "1234567890-0987654321-AbCdEfGhIjKl"]},
+    {"id": "secret-whsec", "recognizer": "secret", "text_parts": ["signing ", "wh", "sec_", "Mz4Qw8Lr2Tx6Vb9Nk3Pd7Hs1", " set"], "value_parts": ["wh", "sec_", "Mz4Qw8Lr2Tx6Vb9Nk3Pd7Hs1"]},
+    {"id": "secret-aiza", "recognizer": "secret", "text_parts": ["maps key ", "AI", "za", "SyD4fG7hJ2kL9mN3pQ6rS8tU1vW5xY0zA_b", " ok"], "value_parts": ["AI", "za", "SyD4fG7hJ2kL9mN3pQ6rS8tU1vW5xY0zA_b"]},
+    {"id": "secret-jwt", "recognizer": "secret", "text_parts": ["Bearer ", "eyJ", "hbGciOiJIUzI1NiJ9", ".", "eyJ", "zdWIiOiIxMjM0NTY3ODkwIn0", ".", "dozjgNryP4J3jVmNHl0w5N_XgL0n3I9PlFUP0THsR8U"], "value_parts": ["eyJ", "hbGciOiJIUzI1NiJ9", ".", "eyJ", "zdWIiOiIxMjM0NTY3ODkwIn0", ".", "dozjgNryP4J3jVmNHl0w5N_XgL0n3I9PlFUP0THsR8U"]},
+    {"id": "secret-entropy-base62", "recognizer": "secret", "text": "session q7Xk2PzR9mLw4TcV8bNy3HdF6sGj1KaE5uYo0iZe expires", "value": "q7Xk2PzR9mLw4TcV8bNy3HdF6sGj1KaE5uYo0iZe"}
+  ],
+  "negative": [
+    {"id": "phone-table-no-keyword", "recognizer": "phone", "text": "| Region | 020 7946 0958 | 1 234 567 |"},
+    {"id": "phone-year-range", "recognizer": "phone", "text": "Revenue 2019 2020 2021 2022 rose."},
+    {"id": "card-ungrouped-no-keyword", "recognizer": "card", "text": "Reference 4111111111111111 in the ledger."},
+    {"id": "card-docusign-envelope", "recognizer": "card", "text": "Envelope Id: 5105105105105100 Status: Completed"},
+    {"id": "card-luhn-fails", "recognizer": "card", "text": "Paid with 4111 1111 1111 1112 on the 3rd."},
+    {"id": "iban-mod97-fails", "recognizer": "iban", "text": "Pay to GB82 WEST 1234 5698 7654 33 by Friday."},
+    {"id": "iban-wrong-length", "recognizer": "iban", "text": "Code GB82 WEST 1234 5698 7654 in the memo."},
+    {"id": "secret-uuid", "recognizer": "secret", "text": "document 123e4567-e89b-42d3-a456-426614174000 opened"},
+    {"id": "secret-sha256", "recognizer": "secret", "text": "sha256 9f86d081884c7d659a2feaa0c55ad015a3bf4f1b2b0b822cd15d6c15b0f00a08 matches"},
+    {"id": "secret-md5", "recognizer": "secret", "text": "md5 d41d8cd98f00b204e9800998ecf8427e"},
+    {"id": "secret-slug", "recognizer": "secret", "text": "see phase-305-connect-claude-code-and-cursor/notes"},
+    {"id": "secret-snake-identifier", "recognizer": "secret", "text": "test_every_allowed_mime_type_has_a_case_or_a_named_alias failed"},
+    {"id": "email-no-tld", "recognizer": "email", "text": "Mention @team and user@localhost in chat."},
+    {"id": "plain-prose", "recognizer": "none", "text": "The northern region grew revenue by twelve percent in Q3 2024."}
+  ]
+}
