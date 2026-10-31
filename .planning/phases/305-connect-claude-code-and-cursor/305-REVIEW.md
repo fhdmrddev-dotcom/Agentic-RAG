@@ -64,7 +64,8 @@ findings:
   warning: 6
   info: 7
   total: 13
-status: issues_found
+status: fixed
+fixed_at: 2026-10-31
 ---
 
 # Phase 305 (plans 01-03): Code Review Report
@@ -326,6 +327,33 @@ visible data and its folders open to an empty page. Whether folder names count a
 is a scope decision that D-22 does not make explicit.
 **Fix:** Decide and record it. If names are out, hide folders whose subtree contains only
 connector-fed documents (or folders created by a watch) when `exclude_external` is set.
+
+## Fix log
+
+Fixed 2026-10-31 by `gsd-code-fixer` in the main checkout on `develop` (base `d40839fc1`), scope:
+WR-01, WR-03, WR-04, WR-05 and WR-06 (+ IN-04 only if it was a one-line copy addition). Each finding
+was first re-driven against the current code. Every one reproduced, and each has a RED commit (its
+failing test) before its fix. The 305-04 outbound guard in `dispatch.py` is untouched and still runs
+on every model result.
+
+| Finding | Outcome | RED (test) | Fix | How it was reproduced / what changed |
+|---|---|---|---|---|
+| **WR-01** | fixed | `4c383ce30` | `02ee2274c` | Reproduced: 6 bad-argument calls with the searches knob at 1 wrote **6** unthrottled `api_key.read` rows. `check_limit` now runs **before** `model_validate`, so every granted call costs one unit of its bucket. Result: one `api_key.read` (`error`) row, then refusals through `refusal_audit_slot` (one row written, the rest counted). Still exactly one audit row per call. |
+| **WR-02** | skipped (by decision) | — | — | Out of scope for this fix pass. The orchestrator records the door-wide `mcp_ip` bucket as an accepted risk and a seed. |
+| **WR-03** | fixed | `9123b1dd8` | `37abc6cd3` | Reproduced: a mid-search anyio cancel left **0** audit rows, and a hung audit write hung the call. Both `finally` writes (the audit row in `dispatch`, the `mcp_usage` rows in `_run`) now run inside `anyio.move_on_after(BOOKKEEPING_DEADLINE_S=5, shield=True)`. The test cancels after `usage_sink.record` and sees exactly one audit row (`outcome: error`) and one `mcp_usage` row (`status: failed`, tokens kept). |
+| **WR-04** | fixed: requires human verification | `cb9db2cda` | `aafc212a6` (+ pin `080a2dbb3`) | Reproduced: all three handler refusal sentences were audited `outcome: ok`. The outcome now comes from the result: `not_available` when `result.is_error`, so `_call_from_audit` reads `ok: false`. This overrules 305-03 SUMMARY deviation 6. The key card has its own words for it (`mcpKeyCopy.calls.notAvailable` = "✕ not available: nothing this key can read there"), and the raw-code fallback is no longer used. No wire field changed (`outcome` is already `str`), so the OpenAPI snapshot does not move. Human check: confirm the one literal should cover not-available, bad-cursor and no-text alike. |
+| **WR-05** | fixed | `0eec1837d` | `732e66a4e` (+ docstring `831c7cfae`) | Reproduced: 27 planted shapes passed through. Alt text is now matched one bracket level deep. Any `![` left after that loses its `!`, which covers shortcut and unclosed images. HTML tags that load a URL by themselves (img, image, picture, source, video, audio, track, iframe, frame(set), embed, object, applet, svg, use, feimage, link, style, script, meta, base, portal) are removed. Every other tag loses `src`, `srcset`, `poster`, `background`, `lowsrc`, `dynsrc`, `data`, `style`, `xlink:href`, `formaction`, `ping`, `action`, and `href` (except on `<a>`). The cases are in `test_305_search_shape.py`. |
+| **WR-06** | fixed: requires human verification | `53c20c562` | `bde9a4e66` | Reproduced: with 250 top-level folders or 130 subfolders, nothing past the 100th was ever listed. Folders now page `SUBFOLDER_CAP` at a time alongside the document pages, through the same validated cursor (`fo` is optional and present only while folders remain). A listing of 100 folders or fewer keeps the 305-02 cursor byte for byte, and a cursor stays bound to its folder. Proven with mocked reads at 250 / 130 / 101 folders. Human check: the paging order (folders and documents advance together, not folders first). |
+| WR-03 follow-up | fixed | (the gate) | `ad474d071` | The first backend baseline run read **71** against the measured 70. The extra failure was mine: `test_300_clean_image_imports::test_every_mcp_module_import_ships_in_the_built_image`, because `dispatch.py` now imports `anyio`. That fence's map now says which declared distribution ships it: `anyio` maps to `mcp`, which hard-depends on `anyio>=4.9` (and so does `starlette`). The re-run reads 70. |
+| **IN-04** | skipped | — | — | This is not a one-line copy addition in `mcpCallWords.ts`. The words have to live in `mcpKeyCopy.ts` (the one string home) and need a case line plus a test. Left for 306, which first makes `maintenance` reachable. |
+
+**Gates (final, at `ad474d071`, under the local-DB lock):**
+
+- Targeted backend (`pytest tests/unit -q -k "305 or test_304 or test_268 or test_276"`): `803 passed, 10629 deselected, 1 warning in 95.99s`.
+- Backend baseline: `[GATE PASSED] Backend unit baseline satisfied (failed: 70 <= 71, errors: 0).` Summary: `70 failed, 11357 passed, 1 skipped, 2 xfailed, 2 xpassed, 62 warnings in 523.08s (0:08:43)`. 70 equals the measured base. No failing id matches `305|293|304|mcp|pii|redact|outbound|clean_image` (grep over the 70 `FAILED` lines = 0).
+- Frontend vitest (`src/components/settings/apiKeys`, `--maxWorkers=2`): `Test Files 17 passed (17)` · `Tests 230 passed (230)`. The `mcpCallWords.test.ts` pin was raised from 8 to 9 (`080a2dbb3`).
+- Frontend typecheck (`npx tsc -p tsconfig.app.json --noEmit`): 61 errors, the same count as base. None is in a file this pass touched (`mcpCallWords.ts`, `mcpKeyCopy.ts`, `mcpCallWords.test.ts`: 0 errors).
+- OpenAPI snapshot: not regenerated. No wire field changed (`ApiKeyCall.outcome` is `str`), and `test_276` is green inside the targeted run.
 
 ---
 
