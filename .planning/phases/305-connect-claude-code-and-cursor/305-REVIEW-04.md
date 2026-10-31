@@ -28,7 +28,8 @@ findings:
   warning: 3
   info: 6
   total: 10
-status: issues_found
+status: partially_fixed
+fix_status: "BL-04-01, WR-04-01, WR-04-03, IN-04-03 fixed (see ## Fix log); WR-04-02 routed separately (dispatch.py); IN-04-01, IN-04-02, IN-04-04, IN-04-05, IN-04-06 open"
 ---
 
 # Phase 305: Code Review Report, plan 305-04 (second pass)
@@ -307,6 +308,35 @@ It also sends the operator of a deployed box to `.planning/phases/.../305-VALIDA
 a planning artifact and not a deploy document. **Suggestion:** add a short "Not covered" list
 that mirrors the redactor docblock, and move the measured FP and latency figures inline or into
 `docs/`.
+
+## Fix log
+
+2026-10-31, gsd-code-fixer, main checkout on `develop`. Each finding was re-run against the code
+before it was fixed. All seven BL-04-01 rows, the two WR-04-01 inputs, and the 270/2000 sweep
+(274/2000 with this fixture's seed) reproduced exactly. Tests came first: each RED commit was
+committed failing, then its fix.
+
+| Finding | Outcome | Commits |
+|---|---|---|
+| **BL-04-01** | **fixed.** `_cards` now tries every digit-group start of a `_DIGIT_RUN`, at every brand length (longest first), and each window must end on a group boundary. The validators are unchanged: IIN + length + Luhn + grouping or keyword. `_ibans` uses a zero-width `_IBAN_START`, so a failed earlier token no longer swallows the real IBAN. Ten fixture cases were added: the seven table rows, plus three negatives (a VAT id alone, an ungrouped Luhn-valid window inside a longer run with no keyword, a year table). Worst-case latency: an 8,256-char run of one-digit groups now takes about 30 ms (was about 5 ms), and 64k chars about 240 ms. A new test pins it under 250 ms. | RED `3221e67f1`, fix `d33d491e1` |
+| **WR-04-01** | **fixed.** A token is path-shaped only if it has 3+ segments and either starts with `/` or has word-shaped leading segments (lower case and digits, at most a leading capital). The path rule never applies after a secret keyword within 24 chars, or to a `NAME=` value. Sweeps: after `aws_secret`, misses fell from 274 to 1 out of 2000; for bare keys, from 284 to 25 (1.25%). On the local corpus, the old rule dropped 5 tokens, all absolute paths; the new rule re-admits none of them, so the 305-04 tightenings hold. | RED `362df9830`, fix `150990095` |
+| **WR-04-03** | **fixed.** `measure-redaction.py` has a recall arm: 20 templates, 200 synthetic values each, planted at random word boundaries in real search chunks. A gated template below 95% exits 1. Lowercase IBANs are measured as a residual and not gated. The TP/FP sample is now a seeded random draw (`--seed`, default 305) over rows read `ORDER BY id`. stdout still shows aggregates only. Not done: sampling the *rejected* raw candidates for labelling. The planted-value arm measures misses instead. | `23663512e`; evidence `c92617065` |
+| **IN-04-03** | **fixed.** A killed run's partial output is decoded through `_as_text`, so bytes no longer crash the probe. The unused `finished` parameter is gone. I tested the bytes path directly: the old code raises `TypeError` and the new code returns text. On this Windows 3.12.6 venv, a real killed child returned `str`, so the crash depends on the platform. | `7da2f821e` |
+| WR-04-02 | not in this fixer's scope (lives in `dispatch.py`), routed by the orchestrator | — |
+
+**Re-measured (Run 4, `evidence/redaction-measurement.txt`):**
+- **Validated hits:** identical to Run 3 on every row.
+- **Labelled FP:** 0% for every recognizer: email 0/30 (random), phone 0/15, iban 0/2, secret 0/9. Card has no corpus hits. All are under the 20% ceiling.
+- **Recall on gated templates:** email 100%, phone 99.2%, card 100%, iban 100%, secret 99.7%.
+- **Latency (ms):** search p50/p95/p99 0.224/0.359/0.643; read 1.805/2.561/2.861.
+
+**New residuals, stated in the evidence:**
+- Lowercase IBANs are not masked (IN-04-02, 0/200).
+- An international phone number followed by separators and more digits can still grow past 15 digits and be rejected whole (5 of 200 `00`-form numbers). The every-start fix was not applied to phones.
+- Without a keyword, a key that starts with `/` and contains another `/` reads as a path.
+
+Gate: `venv/Scripts/python.exe -m pytest tests/unit -q -k "redact or pii or outbound or 305"` gave
+`407 passed, 11025 deselected, 1 warning`.
 
 ---
 
