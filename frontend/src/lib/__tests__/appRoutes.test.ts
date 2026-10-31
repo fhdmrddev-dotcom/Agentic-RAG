@@ -379,3 +379,36 @@ describe("appRoutes · entity addresses normalise by the same rules (299-02 / D-
     }
   })
 })
+
+// ── Phase 305-02 (D-17 / D-52; UI-SPEC Surface 4) — the document address `/app/library/<uuid>`.
+describe("appRoutes · the document address (305-02 / D-52)", () => {
+  const DOC = "5b0c1d2e-3f40-4a51-8b62-7c83d94ea5f6"
+
+  it("parses /app/library/<uuid> to the documents view with the id, lowercased", () => {
+    expect(parseAppLocation(`/app/library/${DOC}`, "")).toEqual({ view: "documents", documentId: DOC })
+    expect(parseAppLocation(`/app/library/${DOC.toUpperCase()}`, "")).toEqual({ view: "documents", documentId: DOC })
+  })
+
+  it("a malformed or partial id is not-found, and nothing throws", () => {
+    for (const p of ["/app/library/not-a-uuid", `/app/library/${DOC.slice(0, 30)}`, `/app/library/${DOC}x`,
+                     `/app/library/${DOC}/extra`, "/app/library/a.b"]) {
+      expect(parseAppLocation(p, "")).toEqual({ view: "not-found" })
+    }
+  })
+
+  it("the id-less Library stays id-free", () => {
+    expect(parseAppLocation("/app/library", "")).toEqual({ view: "documents" })
+    expect(formatAppRoute({ view: "documents" })).toBe("/app/library")
+  })
+
+  it("formats and round-trips, and an uppercase address is normalised", () => {
+    expect(formatAppRoute({ view: "documents", documentId: DOC.toUpperCase() })).toBe(`/app/library/${DOC}`)
+    expect(parseAppLocation(formatAppRoute({ view: "documents", documentId: DOC }), "")).toEqual({
+      view: "documents",
+      documentId: DOC,
+    })
+    expect(canonicalAddress(`/app/library/${DOC}`, "")).toBeNull()
+    expect(canonicalAddress(`/app/library/${DOC.toUpperCase()}`, "")).toBe(`/app/library/${DOC}`)
+    expect(canonicalAddress(`/library/${DOC}`, "")).toBe(`/app/library/${DOC}`)
+  })
+})

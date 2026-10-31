@@ -683,3 +683,51 @@ describe("useAppNavigation — entityLink.resume (299-03 / D-24, Pitfall 7)", ()
     expect(router.state.location.key).toBe(key)
   })
 })
+
+// ── Phase 305-02 (D-17 / D-52) — the document address is NOT an entity target.
+// LinkGate resolves every non-null `entityLink.target` through the link resolver, and D-52 rules
+// out a document resolver kind — so the id travels in its own field, `entityLink.document`.
+describe("useAppNavigation — the document address (305-02 / D-52)", () => {
+  const DOC = "5b0c1d2e-3f40-4a51-8b62-7c83d94ea5f6"
+
+  it("/app/library/<uuid> opens the Library; target stays null and the id is entityLink.document", () => {
+    mount(`/app/library/${DOC}`)
+    expect(nav().activeView).toBe("documents")
+    expect(nav().entityLink.target).toBeNull()
+    expect(nav().entityLink.route).toBeNull()
+    expect(nav().entityLink.document).toBe(DOC)
+    expect(nav().addressNotFound).toBe(false)
+  })
+
+  it("off a document address the field is null", () => {
+    mount("/app/library")
+    expect(nav().entityLink.document).toBeNull()
+    cleanup()
+    mount(`/app/chat/${DOC}`)
+    expect(nav().entityLink.document).toBeNull()
+  })
+
+  it("a malformed document id is the not-found address, never a document", () => {
+    mount("/app/library/not-a-uuid")
+    expect(nav().addressNotFound).toBe(true)
+    expect(nav().entityLink.document).toBeNull()
+  })
+
+  it("leave({ view: 'documents' }) REPLACES the document address with /app/library", async () => {
+    const router = mount(`/app/library/${DOC}`)
+    act(() => nav().entityLink.leave({ view: "documents" }))
+    await waitFor(() => expect(where(router)).toBe("/app/library"))
+    expect(router.state.historyAction).toBe("REPLACE")
+  })
+
+  it("a document address is never remembered as the place Stay returns to", async () => {
+    const router = mount("/app/workflows")
+    act(() => nav().onNavigate("documents"))
+    await waitFor(() => expect(where(router)).toBe("/app/library"))
+    await act(async () => {
+      await router.navigate(`/app/library/${DOC}`)
+    })
+    act(() => nav().entityLink.leave())
+    await waitFor(() => expect(where(router)).toBe("/app/library"))
+  })
+})
