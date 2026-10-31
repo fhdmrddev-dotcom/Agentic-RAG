@@ -45,8 +45,13 @@ def register_mcp(app) -> None:
         )
         return
     mcp_edge = edge.McpEdge()
-    app.router.routes.append(Route(MCP_PATH, endpoint=mcp_edge, include_in_schema=False))
-    app.router.routes.append(Route(MCP_PATH + "/", endpoint=mcp_edge, include_in_schema=False))
+    # methods=["POST"]: the router answers any other method 405 + ``Allow: POST`` before the edge
+    # (which refuses non-POST itself as well), and the route carries a real method set — code that
+    # walks ``app.routes`` reading ``route.methods`` must never meet ``None`` (test_284).
+    for path in (MCP_PATH, MCP_PATH + "/"):
+        app.router.routes.append(
+            Route(path, endpoint=mcp_edge, methods=["POST"], include_in_schema=False)
+        )
     access_log.install()
 
 
