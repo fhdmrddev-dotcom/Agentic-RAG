@@ -360,3 +360,130 @@ on every model result.
 _Reviewed: 2026-10-31_
 _Reviewer: Claude (gsd-code-reviewer)_
 _Depth: standard (deep on security-bearing paths)_
+
+---
+
+## Late fixes review (554fe5235, d4aacad2e)
+
+**Reviewed:** 2026-10-31 · **Depth:** deep (cross-file call chains, plus a live read-only probe of the local Postgres) · **Reviewer:** Claude (gsd-code-reviewer, fresh context) · `independent_review: self`
+
+**Scope:** `554fe5235` (BUG-261031-03: `backend/app/services/retrieval_tuning.py`) and `d4aacad2e` (BUG-261031-04: `backend/app/mcp/audit.py`, `backend/app/mcp/dispatch.py`). Callers traced: `retrieval_rpc._call_as_user` (every vector and keyword arm, the filtered path, `agent_loop.py:1635`), `retrieval_scope.py`, `document_search_service.py`, `acting_member_reads.py`, `api_key_auth._audit_args` / `audit_key_call_now` / `refusal_audit_slot`, `audit_service.write_audit_entry`, `api_keys._call_from_audit`, `mcp/server.py`.
+
+**Verdict:** both fixes are correct for the bug each one names. No BLOCKER. Three of the findings below are pre-existing defects on the same two paths, and they matter because each one breaks a claim the fix depends on ("degrade the tuning, never the search", "never a silent loss"). Each is labelled.
+
+### What was verified clean (traced or measured, not assumed)
+
+- **`reset_val` semantics, measured live (read-only, the local stack, under `SET LOCAL ROLE authenticated`).** In a fresh session both `current_setting` and `reset_val` read `None` (pgvector's GUCs are not registered yet, and `pg_settings` has 0 `hnsw.*` rows). Once the library is loaded both read `40`. After `set_config('hnsw.ef_search','177',true)`, `current_setting` reads `177` and `reset_val` reads `40`. So D-246-05 holds on the caller's own connection, and `pg_settings` can be read as `authenticated`. asyncpg's `RESET ALL` on release means a borrowed connection has no session-level `SET`, so `reset_val` equals the old clean-connection `current_setting`. The values are the same; only the connection changed.
+- **No nested acquire is left under a held connection** in `retrieval_rpc.py`, `retrieval_scope.py` (`_rls_intersect`, the month/dimension/spelling/type reads: one statement each), `document_search_service.py` (no pool or acquire at all), `acting_member_reads.py` (`search` and `view_documents` release `_compose` / `_acting` before retrieval acquires) or `_apply_rls_user_context`. `agent_loop.py:1635` calls `_call_as_user` with no knobs, so it never probes. `recall_eval.py` has its own `_apply_hnsw_knobs` and does not call the probe.
+- **No RLS or GUC leak from the probe.** It is a read with no `set_config`. The cache holds a server-wide default, and that default does not vary by user: `reset_val` follows the login role and the database, never `SET ROLE`.
+- **The audit row shape equals the 293 writer's row.** It has the same four columns (`user_id, action_type, metadata, org_id`). `id` and `created_at` take their defaults, as before. `audit_log_autofill_org_id` returns early because `org_id` is set, as before. Both literals are in the `audit_log_action_type_check` CHECK and in `VALID_ACTION_TYPES`, so the boot drift guard covers them. The metadata comes from the same `_audit_args`, so `_call_from_audit`, OrgAuditTab and the Control Room browser read identical rows.
+- **jsonb binding is correct.** `$3::text::jsonb` with `json.dumps` sidesteps the pool's jsonb codec (`dependencies._init_pg_connection`), so the value cannot be double-encoded. This is the `org_move.py:1076` precedent.
+- **No injection and no secret.** The statement is fully parameterised and `action_type` is a code literal. The metadata carries no query, argument or key material (`_audit_args` is never given the secret).
+- **No fence was bypassed.** No test or gate requires audit writes to go through `write_audit_entry`. `audit_service.py` is byte-unchanged. The 305 harnesses patch `insert_audit_row`.
+- **Cancellation under the shield is correct.** `CancelScope.cancelled_caught` is True only when the deadline fired. An outer cancel during a completed shielded write is re-delivered after the scope and never logged as a loss.
+
+### Warnings
+
+#### LF-01 — WARNING (introduced by 554fe5235): the in-transaction probe can abort the caller's search transaction, and the error is swallowed
+
+**File:** `backend/app/services/retrieval_tuning.py:125-133`, `:154-163`
+**Failure scenario:** Before the fix, the in-transaction branch never ran a statement on the caller's connection. Now it runs `SELECT reset_val …` inside `_call_as_user`'s open RLS transaction. If that statement errors for any reason (a statement or lock timeout, a catalog error, a server-side cancel), `except Exception` logs a warning, caches `None` for 60 s and returns. Postgres has already aborted the transaction, so the next statement fails with `InFailedSQLTransactionError`. That statement is the `set_config` or the `match_document_chunks` call, so the user sees a failed search and the log blames the wrong statement. The mechanism was measured live: see LF-02, where the same swallow-and-continue pattern leaves the transaction aborted.
+**Fix:** run the probe under a savepoint, so a failure rolls back only the probe. Do not cache a failed probe:
+
+```python
+elif conn is not None and hasattr(conn, "is_in_transaction") and conn.is_in_transaction():
+    async with conn.transaction():          # SAVEPOINT: a probe failure cannot poison the caller
+        raw = await conn.fetchval(_SQL_EF_SEARCH_SESSION_DEFAULT)
+...
+except Exception as exc:
+    logger.warning("Failed to probe hnsw.ef_search setting: %s", exc)
+    return None                             # do not pin a failure for 60 s
+```
+
+#### LF-02 — WARNING (pre-existing, Phase 241/272, the same path; measured): "degrade the TUNING, never the SEARCH" is false inside the transaction this path always runs in
+
+**File:** `backend/app/services/retrieval_tuning.py:170-195` (`_TUNING_UNAVAILABLE`, `_set_local`), `backend/app/services/retrieval_rpc.py:53,171`
+**Failure scenario:** This was measured live on the local stack (read-only, then rolled back). After `_set_local(conn, set_config('hnsw.ef_search', $1, true), "0")` returned `False` with the warning *"The search continues untuned"*, the next statement raised `InFailedSQLTransactionError: current transaction is aborted`. So every caught "tuning unavailable" error fails the search anyway, and the module's own docstring (T-241-17) says it must not. There is a second problem: on a server whose pgvector is already loaded and older than 0.8, `set_config('hnsw.iterative_scan', …)` raises **`InvalidNameError` (42602, "hnsw is a reserved prefix")**. That was measured with a non-existent `hnsw.*` name, and it is not in `_TUNING_UNAVAILABLE`, so it propagates. `FILTERED_ITERATIVE_SCAN = "relaxed_order"` is hard-coded on every filtered search (`retrieval_rpc.py:171`), so on pgvector < 0.8 **every filtered search on a warm connection fails**. Cloud pgvector parity is recorded as unverified (D-14). This is not introduced by 554fe5235, but the fix routes the probe onto the same transaction (LF-01).
+**Fix:** wrap each `_set_local` in a savepoint and add `asyncpg.exceptions.InvalidNameError` to `_TUNING_UNAVAILABLE`. Run `SELECT extversion FROM pg_extension WHERE extname = 'vector'` on cloud (a free MCP read).
+
+```python
+async def _set_local(conn, statement, value, *, guc):
+    try:
+        async with conn.transaction():      # SAVEPOINT: an unavailable knob cannot abort the search
+            await conn.execute(statement, value)
+        return True
+    except _TUNING_UNAVAILABLE as exc:      # now incl. InvalidNameError (pre-0.8 reserved prefix)
+        ...
+```
+
+#### LF-03 — WARNING (pre-existing ordering; the d4aacad2e logging does not cover it): a failed refusal write drops the CR-02 suppressed count silently
+
+**File:** `backend/app/mcp/audit.py:79-92`, `backend/app/security/api_key_auth.py:303-307`
+**Failure scenario:** `refusal_audit_slot` does `GET` + `DEL` of `apikey:refaudit:sup:{key}:{reason}` **before** the row is written. If the INSERT then fails (a pool error, an FK violation for a deleted owner), or dispatch's bound fires (the case BUG-261031-04 is about), the N refusals that row was meant to name are gone from both Redis and the ledger. The new ERROR line names the tool, key and reason but not `suppressed`, and dispatch's bound-fired line cannot know it. A flood of N refusals can therefore leave no row and no count. That breaks the CR-02 contract ("a suppressed refusal is COUNTED … never silently dropped") on exactly the failure this commit set out to make loud.
+**Fix:** put `suppressed=%s` in `audit_refused`'s error line. On a write failure, re-credit the counter as a best-effort step (`INCRBY pending suppressed`, `EXPIRE`) so the next written row still carries the count. Credit it again for the fired bound by moving the write and the re-credit into one helper that catches `get_cancelled_exc_class()` and re-raises.
+
+#### LF-04 — WARNING (pre-existing; contradicts "never a silent loss"): the unknown-tool refusal row is neither shielded nor bounded
+
+**File:** `backend/app/mcp/server.py:66-72`
+**Failure scenario:** `on_call_tool` awaits `_audit.audit_refused(...)` for an unregistered tool name **outside** dispatch's `move_on_after(…, shield=True)`. If the client disconnects or the stateless transport terminates while the row is being written (Redis pipeline plus pool acquire plus INSERT), the `CancelledError` passes `except Exception` and the row disappears with no log line. That is the BUG-261031-04 mechanism, on the one MCP audit path the fix did not touch. With no bound, a saturated pool (an asyncpg `acquire` has no timeout) also delays the `-32602` response for as long as the pool stays full.
+**Fix:** use the same shielded bound and fired-bound log as `dispatch`. The simplest form is a small `_audit.bounded_refused(...)` helper that both call sites use, so there is one bookkeeping wrapper.
+
+#### LF-05 — WARNING (residual; the same mechanism the debug session isolated): the spend write still has a threadpool hop inside its bound
+
+**File:** `backend/app/mcp/dispatch.py:190-205`
+**Failure scenario:** `embed_texts` records usage with `provider=None` (`openai_service.py:2727`), so `_write_usage` takes `await run_in_threadpool(load_user_settings, …)` on **every** search before `insert_usage`. The debug session's own finding (`305-mcp-audit-rows-lost-under-concurrency.md:51`) is that a deadline passing during a shielded thread hop is re-delivered at the next checkpoint, here `insert_usage`, so the row is cancelled before the INSERT starts. The 32-call burst kept 60/60 `mcp_usage` rows, but the search embeds share the same anyio thread limiter (`run_in_threadpool(embed_texts)` in `_vector_search`). Under a larger burst the hop can wait past 5 s and lose spend rows (GUARD-02, billing). They are now logged, but still lost. `load_user_settings` is `return load_app_settings()`, an in-memory cache read with no I/O, so the hop buys nothing.
+**Fix:** call it directly, `settings = load_user_settings(principal.user_id)`, with a comment that it is a cache read (D-v2.5-01 concerns blocking I/O, not CPU-trivial reads). Alternatively record `provider` in `usage_sink.record` at the embed site so the branch is never taken.
+
+### Info
+
+#### LF-06 — INFO: a fresh-session `None` is cached process-wide for 60 s, and the live test masks the real call order
+
+**File:** `backend/app/services/retrieval_tuning.py:133,163`, `backend/tests/integration/test_305_search_pool_deadlock_live.py:76`
+`_call_as_user` probes **before** its first vector operation. On a backend that has never loaded pgvector (the first borrow of a new pool connection, measured `None`), the probe returns `None` and caches it for 60 s, so every search in that window issues a redundant `SET LOCAL hnsw.ef_search = 40`. The behaviour is unchanged (the value equals the default, and the old pool probe had the same exposure), so this is not a correctness defect. But the live test runs `SELECT '[1]'::public.vector` first ("make sure the vector extension's GUCs are registered"), so it pins the property only in the order production does not use. The unit fake returns `server_ef` for `reset_val` unconditionally. **Fix:** do not cache a `None` from the in-transaction branch (re-probe next call), and add a live case without the pre-load that asserts `None`.
+
+#### LF-07 — INFO: `get_server_ef_search` still has two nested-acquire branches
+
+**File:** `backend/app/services/retrieval_tuning.py:123-124`, `:141-148`
+The `pool=` branch and the no-argument `else` branch (`get_pg_pool().fetchval`) both take a pooled connection. No current caller reaches them while holding one, but a future `get_server_ef_search()` call from inside a `get_user_pg_connection` block silently brings BUG-261031-03 back. `test_no_task_acquires_a_second_connection_while_holding_one` only covers `apply_hnsw_session_knobs`. **Fix:** delete the `else` branch (no production caller) or make `conn` required. Keep `pool=` only for tests and say so in the docstring.
+
+#### LF-08 — INFO: "audit row NOT written" can be false when the bound fires mid-INSERT
+
+**File:** `backend/app/mcp/dispatch.py:162-169`
+If the bound fires while the autocommit INSERT is in flight, asyncpg sends a cancel request, but the server may already have committed the row. The ERROR line then states a loss that did not happen, which misleads anyone reconciling the ledger against the log. **Fix:** word it as "may not have been written (bound fired during the write)", or tell the acquire-wait case (definitely not written) apart from the in-INSERT case.
+
+| ID | Severity | Introduced by the late fix? |
+|---|---|---|
+| LF-01 | WARNING | yes (554fe5235) |
+| LF-02 | WARNING | no (241/272, same path; measured) |
+| LF-03 | WARNING | no (CR-02 ordering; d4aacad2e's logging does not cover it) |
+| LF-04 | WARNING | no (server.py unknown-tool path) |
+| LF-05 | WARNING | residual (dispatch spend path) |
+| LF-06 | INFO | test gap |
+| LF-07 | INFO | latent |
+| LF-08 | INFO | yes (log wording) |
+
+_Late fixes reviewed: 2026-10-31 · Claude (gsd-code-reviewer) · deep · read-only (two read-only probes of the local DB; the one `set_config` demonstration ran in a rolled-back transaction)_
+
+### Late fixes — fix log
+
+Fixed 2026-10-31 by `gsd-code-fixer` in the main checkout on `develop` (base `6e015acef`). Scope: LF-01..LF-05; LF-06..LF-08 are Info and were left alone. Each finding was re-driven against the current code first, and every one reproduced. Each has a RED commit (its failing test) before its fix. Every commit was made by path. The live tests ran on the local stack only (127.0.0.1:54322), under the local-DB lock. No migration, no install, and no production read or write.
+
+| Finding | Outcome | RED (test) | Fix | How it was reproduced / what changed |
+|---|---|---|---|---|
+| **LF-01** | fixed | `72d02b21c` | `2e66177b5` | **Reproduced live:** with the probe statement forced to error inside `_call_as_user`'s RLS transaction, the search raised `InFailedSQLTransactionError`, and the failed probe was cached for 60 s. **Change:** the in-transaction probe now runs inside `_savepoint(conn)`. On an asyncpg connection already inside `conn.transaction()`, a nested `conn.transaction()` is a SAVEPOINT. It still reads `reset_val` on the connection the caller already holds, so it never takes a second pooled connection. A failed probe now returns `None` and is not cached. The BUG-261031-03 unit and live suites stay green. The unit pool fake now treats a nested `transaction()` as a savepoint, as asyncpg does. The ledger row was re-derived: the file now FIRES (241, 246, 305). |
+| **LF-02** | fixed | `2f7d7f94c` | `bc0e95d5e` | **Reproduced live:** `set_config('hnsw.ef_search','0',true)` was caught as "tuning unavailable", and the next `SELECT` then failed with `InFailedSQLTransactionError`. `set_config('hnsw.no_such_knob…')` raised `InvalidNameError` (42602, "hnsw is a reserved prefix"), which escaped `_set_local`. **Change:** each `_set_local` runs inside `_savepoint(conn)`, and `asyncpg.exceptions.InvalidNameError` was added to `_TUNING_UNAVAILABLE`. **Live proof:** after a rejected `SET LOCAL`, the following `SELECT 1` succeeds. A `SET LOCAL` that succeeds is still in force after its savepoint is released (`current_setting` reads `123`). End to end, with the iterative-scan statement rejected, `ef_search` stays `200` and the search still runs. ⚠ **The `InvalidNameError` arm is latent:** pgvector is 0.8.0 both locally and in cloud production (the orchestrator measured this with a read-only query), and 0.8.0 defines `hnsw.iterative_scan`. It was added as a cheap defensive step. |
+| **LF-03** | fixed | `a86ee447e` | `dc918e4bf` | **Reproduced:** with 3 (or 5) refusals pending, a failed INSERT or a fired bookkeeping bound left the pending key empty in Redis, and no row carried the count. **Change:** the "restore on failure" option. `refusal_audit_slot` itself is byte-unchanged, so the CR-02 throttle semantics hold. A new helper next to it, `api_key_auth.restore_suppressed_refusals`, does `INCRBY` + `EXPIRE` on the same key, best effort. `audit_refused` restores the count after `except Exception` and logs `suppressed=N`. On cancellation it restores under its own `move_on_after(1.0, shield=True)` and then re-raises, so dispatch still logs the lost row. If the restore itself fails, it logs `mcp refusal count LOST` with the number. The test shows the next written row carries `suppressed: 3`, and that the happy path still clears the key. `FakePipeline` gained `incrby`. ⚠ If the bound fires after the server already committed the row (the LF-08 case), the count is named twice. That is an over-count, never a silent loss. The 293 HTTP writers (`api_key_auth._refuse`, `inbound._refused`) were not changed. |
+| **LF-04** | fixed | `36f608502` | `6017437d7` | **Reproduced:** a cancel while the unknown-tool row was being written left 0 rows and no log line. A hung write held back the `-32602` until the test's own 5 s `fail_after` fired. **Change:** the body of dispatch's `finally` was moved, unchanged, into `dispatch.write_audit_row(principal, audit, *, tool, redis)`. That is the one wrapper: shielded, bounded, and it logs a fired bound. `dispatch` calls it with `tool=name`. `server.on_call_tool` calls it for the unknown name with `tool=None`, so no client-chosen string reaches the row or the log (the test asserts this). The now-unused `audit` import in `server.py` was removed. |
+| **LF-05** | fixed | `b85be49ab` | `5d964ceed` | **Reproduced:** with anyio's default thread limiter full (every token borrowed, as during a burst of search embeds) and a 0.3 s bound, the provider-less `mcp_usage` row was lost: 0 rows. **Proven non-blocking, not assumed:** an AST walk of `load_user_settings`'s call graph reaches only `load_app_settings`, `_build_settings_from_row`, `_decrypt_secret_columns` (Fernet, CPU only), `_build_providers`, `_resolve_llm`, `_val` and `_val_bool`. None of them awaits, uses a pool or builds a client, whether the cache is warm or cold (a cold cache returns the defaults). Measured at about 0.19 ms per call. `api/threads.py` already calls it directly on the loop. **Change:** `_write_usage` now calls `load_user_settings(principal.user_id)` directly, and the unused `run_in_threadpool` import was dropped. No blocking I/O was added to the loop (D-v2.5-01). |
+| LF-06 | accepted (Info) | — | — | Not changed, as instructed. LF-01's fix does not cache a *failed* probe. A *successful* probe that reads `None` (pgvector not yet loaded in that session) is still cached for 60 s. The cost is one redundant `SET LOCAL hnsw.ef_search = 40`, which does not affect correctness. |
+| LF-07 | accepted (Info) | — | — | Not changed. The `pool=` branch and the no-argument branch of `get_server_ef_search` still take a pooled connection. No current caller reaches them while holding one. |
+| LF-08 | accepted (Info) | — | — | Not changed. The wording "audit row NOT written" can still overstate a loss when the bound fires mid-INSERT. LF-03 now records the over-count risk this creates for `suppressed`. |
+
+**Ledger:** rows and sections were updated in the same commit as each fix for `retrieval_tuning.py` (now ⚠ FIRES), `api_key_auth.py`, `mcp/audit.py`, `mcp/dispatch.py` and `mcp/server.py`. `node scripts/check-hot-file-ledger.cjs .planning/phases/305-connect-claude-code-and-cursor` reports `ledger gate OK — every watched file has a row.` `audit_service.py` and `rate_limit.py` were not touched. (`refusal_audit_slot` lives in `api_key_auth.py`, not in `rate_limit.py`.) ⚠ This pass did not edit `CLAUDE.md`. Its FIRING-table row for `api_key_auth.py` still reads `6 / 3 / 413` (now `7 / 3 / 432`), and it has no row for `retrieval_tuning.py`, which now fires.
+
+**Gates (final, at `5d964ceed`, under the local-DB lock):**
+
+- Targeted backend (`pytest tests/unit -q -k "305 or test_304 or test_293 or test_241 or test_246 or retrieval or audit"`): `15 failed, 1144 passed, 10296 deselected, 15 warnings in 68.27s (0:01:08)`. All 15 failures are in `tests/unit/test_retrieval_service.py` ("Expected 'embed_texts' to be called once. Called 0 times."). They are **inherited**. That file and `retrieval_service.py` / `retrieval_rpc.py` are byte-unchanged since base (`git diff --numstat 6e015acef HEAD` = empty). Running the file at base `6e015acef` (a `git archive` copy) gives `15 failed`. The same 15 are inside the baseline's 70. Every 305 / 304 / 293 / 241 / 246 / audit test in the run passes.
+- Live (`test_305_search_pool_deadlock_live.py`, `test_305_audit_concurrency_live.py`, `test_305_audit_live.py`, plus the new `test_305_tuning_savepoint_live.py`): `13 passed, 3 warnings in 9.24s`.
+- Backend baseline: `[GATE PASSED] Backend unit baseline satisfied (failed: 70 <= 71, errors: 0).` Summary: `70 failed, 11380 passed, 1 skipped, 2 xfailed, 2 xpassed, 61 warnings in 534.04s (0:08:54)`. 70 equals the measured base. No failing id matches `305|293|304|mcp|retrieval_tuning|hnsw|audit|clean_image` (grep over the 70 `FAILED` lines = 0).
+- Hot-file ledger: `ledger gate OK — every watched file has a row.` · CLAUDE.md size: `claude-md size gate OK — every CLAUDE.md loads, all under 120000 chars.`
