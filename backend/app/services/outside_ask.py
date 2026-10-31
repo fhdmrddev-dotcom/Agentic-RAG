@@ -28,6 +28,8 @@ dropped, and it makes no HTTP self-call (D-01):
   5. ``read_ask``           — the ONE access statement (run, member, key, org, mcp origin, root
                               run), then ``run_is_cap_paused`` BEFORE any status branch: a
                               first-turn cap pause finalizes as ``completed`` by design (D-33).
+                              A completed run that was Continued in the app reads
+                              ``answered_in_app``: the chat link only, never its content (CR-01).
 
 The question is never logged (length + sha only, the 296-06 rule).
 """
@@ -98,7 +100,7 @@ class StartedAsk:
 
 @dataclass(frozen=True)
 class AskRead:
-    status: str      # answered | working | needs_input | failed | timed_out | stopped
+    status: str      # answered | answered_in_app | working | needs_input | failed | timed_out | stopped
     run_id: uuid.UUID
     thread_id: uuid.UUID
     chat_link: str
@@ -337,7 +339,8 @@ async def wait_for_ask(started: StartedAsk, *, deadline: float) -> bool:
 # ── 5. the read ───────────────────────────────────────────────────────────────────────────────
 
 _ACCESS_SQL = (
-    "SELECT r.run_id, r.status, r.message_id, r.thread_id "
+    "SELECT r.run_id, r.status, r.message_id, r.thread_id, "
+    "COALESCE(r.continues_used, 0) AS continues_used "
     "FROM public.runs r JOIN public.threads t ON t.id = r.thread_id "
     "WHERE r.run_id = $1 AND r.user_id = $2 AND t.origin_kind = 'mcp' AND t.origin_ref = $3 "
     "AND t.org_id = $4 AND r.parent_run_id IS NULL"
@@ -397,8 +400,12 @@ async def read_ask(pool: Any, *, run_id: Any, principal: Any) -> AskRead | None:
     status = row["status"]
     if status != "completed":
         return AskRead(status=_STATUS_WORDS.get(status, "failed"), **base)
+    # CR-01 (D-10 / D-30): an in-app Continue re-resolved scope without the key's folder wall, so
+    # its answer may draw on folders the key cannot read: the chat link only, never content or citations.
+    if (row["continues_used"] or 0) > 0:
+        return AskRead(status="answered_in_app", **base)
 
-    msg = await pool.fetchrow(_MESSAGE_SQL, row["message_id"]) if row["message_id"] else None
+    msg =await pool.fetchrow(_MESSAGE_SQL, row["message_id"]) if row["message_id"] else None
     if msg is None:
         return AskRead(status="answered", **base)
     return AskRead(
