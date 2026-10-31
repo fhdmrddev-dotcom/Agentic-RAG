@@ -160,6 +160,21 @@ async def test_no_task_acquires_a_second_connection_while_holding_one(pool):
 
 
 @pytest.mark.asyncio
+async def test_a_failed_in_transaction_probe_is_never_cached(pool, monkeypatch):
+    """305-REVIEW LF-01: a probe that errored must not pin ``None`` for the 60 s TTL — the next
+    call probes again. (The live suite proves the error cannot abort the caller's transaction.)"""
+
+    async def _boom(sql, *args):
+        raise RuntimeError("canceling statement due to statement timeout")
+
+    async with deps.get_user_pg_connection(None, {"id": str(uuid.uuid4())}) as conn:
+        monkeypatch.setattr(conn, "fetchval", _boom)
+        assert await rt.get_server_ef_search(conn, force_refresh=True) is None
+    assert rt._server_ef_cache is None, "a FAILED probe was cached for the TTL"
+    assert pool.nested == 0
+
+
+@pytest.mark.asyncio
 async def test_in_transaction_probe_is_not_poisoned_by_a_prior_set_local(pool):
     """D-246-05 kept: a SET LOCAL already on the caller's transaction must not become the cached
     server default. The probe reads the session default, which SET LOCAL never changes."""
