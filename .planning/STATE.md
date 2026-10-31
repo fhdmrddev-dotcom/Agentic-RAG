@@ -4,7 +4,7 @@ milestone: v4.9
 milestone_name: Use It From Your Own Tools
 status: executing
 last_updated: "2026-10-31T05:00:00.000Z"
-last_activity: 2026-10-31 -- Phase 305 context gathered (auto)
+last_activity: 2026-10-31 -- Phase 305 planned (4 plans)
 progress:
   total_phases: 7
   completed_phases: 1
@@ -44,7 +44,7 @@ reviewer exists, so a phase closes `verification_mode: self-verified`, never `re
 ## Current Position
 
 Milestone: v4.9 Use It From Your Own Tools
-Phase: 304 — Personal MCP Keys That Act as You — **COMPLETE 2026-10-31, self-verified `passed` 5/5** (KEY-01..06). 303 not started. 305 discuss done (`305-CONTEXT.md`, D-01..D-45, auto); next: `/gsd:plan-phase 305` (research flagged).
+Phase: 304 — Personal MCP Keys That Act as You — **COMPLETE 2026-10-31, self-verified `passed` 5/5** (KEY-01..06). 303 not started. 305 PLANNED 2026-10-31: 4 plans / 4 serial waves (every plan writes the local DB), D-01..D-58, research + UI-SPEC (approved) + patterns; plan check 1 docs blocker fixed, 3 size warnings accepted (G-8). Operator approved the `mcp` 2.3 / `httpx2` / `sse-starlette` 3.0.3 install (305-01 Task 1). Next: execute 305.
 Plan: 6 of 6 merged + review-fix merge `bb6ebc2f0` (WR-01..04 test-first; D-46 `retrievable` on every MCP read, D-47 narrowed key lists only in-scope views).
 Status: 304 closed by hand (not `phase.complete`). SECURITY 47/47 closed · REVIEW 0 BL / 4 WR fixed / 9 IN left as recorded · G-4 rows 1-3 PASS in Chrome (DOM + DB; screenshots time out on the hidden tab) · post-merge backend 532 / frontend 433 green · baseline 70 ≤ 71 (one run read 75: 5 flaky extras in test_272_knowledge_health ×4 + test_email_ingestion, shown unrelated). **Not deployed — 304 deploys WITH 305 (D-30).**
 Last activity: 2026-10-31 — 304 verified and closed (`304-VERIFICATION.md`)

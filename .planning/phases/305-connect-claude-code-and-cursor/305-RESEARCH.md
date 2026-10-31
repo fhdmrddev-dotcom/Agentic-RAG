@@ -933,15 +933,19 @@ All `test_305_*` files above, the two-worker log-config fixture (`tests/fixtures
 | A8 | `ctx.request` is present in the modern (2026-07-28) era too | R-03 | Use the ContextVar fallback (proven both eras) |
 | A9 | Cursor reacts to a 401 without `resource_metadata` with an error rather than a broken OAuth attempt | R-27 | Operator UAT finding; 307 adds PRM |
 
-## Open Questions
+## Open Questions (RESOLVED)
 
 1. **Is the switched-off sentence ever visible to the member in Claude Code?**
    - What we know: Claude Code shows "Failed to connect" for a 401 or 403 on a server with a configured header [CITED].
    - Unclear: whether the body sentence appears anywhere but `--debug`.
    - Recommendation: ship 403 + sentence (R-27) and record what G-4 sees. If invisible, a later option is to admit a switched-off principal into a "refusing" state where every `tools/call` returns the sentence as `isError` (no member SQL). That is a decision for the operator, not a 305 default.
+   - **RESOLVED (D-50):** 403 + sentence ships; G-4 row 1 in `305-VALIDATION.md` (plan 04) records what Claude Code shows. A "refusing" state is not a 305 default.
 2. **Do the Expert column and wording carry "MCP · <key>"?** The UI-SPEC decides (G-2). The data path is fixed by R-20.
+   - **RESOLVED (D-55 + approved `305-UI-SPEC.md`):** the ledger cell reads "MCP · {label}" in `LedgerExpertCell` (plan 03).
 3. **Does the R-17 document address need a `link_resolver` `document` kind in 305?** Not for correctness: `GET /documents/{id}` RLS spans the member's orgs, and the refusal shows in-app. Recommend deferring the org-switch prompt unless the UI-SPEC wants it.
+   - **RESOLVED (D-52):** no `document` link-resolver kind in 305; plan 02 builds `EntityLink.document` and the in-app refusal notice.
 4. **Exact Coolify stop grace period** (A7): read it from the Coolify service settings before choosing the graceful timeout.
+   - **RESOLVED as an owed operator check (D-48):** plan 01 sets `--timeout-graceful-shutdown 5` + compose `stop_grace_period: 20s`; confirming Coolify's grace period is on the D-40 / D-43 owed list in `305-VALIDATION.md`.
 
 ## Sources
 
