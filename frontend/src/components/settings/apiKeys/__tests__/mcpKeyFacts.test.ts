@@ -10,6 +10,7 @@ import factsRaw from "../mcpKeyFacts.ts?raw"
 import {
   filterFolderRows,
   flattenFolders,
+  mcpBarKind,
   mcpCreateBlocker,
   mcpScopeChips,
   presetFor,
@@ -148,6 +149,21 @@ describe("304-05 mcpScopeChips — the card's scope model", () => {
 
   it("no catalogue → counted, never a guessed preset", () => {
     expect(mcpScopeChips({ tools: READ_ONLY_TOOLS, folders: null, include_external: false }, undefined).tools.preset).toBe("custom")
+  })
+})
+
+describe("306-05 an MCP call's bar kind (UI-SPEC §7b)", () => {
+  const c = (tool: string | null, ok = true) => ({ ok, tool })
+  it("an ok ask_agent or run_workflow call is a start bar", () => {
+    expect(mcpBarKind(c("ask_agent"))).toBe("start")
+    expect(mcpBarKind(c("run_workflow"))).toBe("start")
+  })
+  it("every other ok call is a read bar; a not-ok call is refused", () => {
+    for (const tool of ["get_answer", "list_workflows", "get_workflow_run", "search_knowledge_base", null]) {
+      expect(mcpBarKind(c(tool))).toBe("read")
+    }
+    expect(mcpBarKind(c("ask_agent", false))).toBe("refused")
+    expect(mcpBarKind(c("read_document", false))).toBe("refused")
   })
 })
 

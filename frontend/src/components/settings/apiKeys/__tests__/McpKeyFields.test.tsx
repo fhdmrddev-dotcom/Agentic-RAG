@@ -128,6 +128,37 @@ describe("304-05 McpKeyFields — tools", () => {
   })
 })
 
+describe("306-05 McpKeyFields — asking needs connected-app documents (UI-SPEC §7c, D-29)", () => {
+  const HINT =
+    "⚠ Asking the agent needs this ticked. Without it, this key's questions are refused, because the agent's search can't leave mail and synced sources out."
+
+  it("shows the hint while ask_agent is ticked and the box is not, tied to the checkbox", async () => {
+    const user = userEvent.setup()
+    render(<Harness />)
+    expect(screen.queryByText(HINT)).toBeNull()
+    await user.click(screen.getByRole("radio", { name: "Read and ask" }))
+    const hint = screen.getByText(HINT)
+    expect(hint.className).toContain("text-warning")
+    expect(hint.className).toContain("text-xs")
+    expect(hint.className).toContain("mt-1")
+    const box = screen.getByRole("checkbox", { name: /^Include mail and synced sources/ })
+    expect((box.getAttribute("aria-describedby") ?? "").split(" ")).toContain(hint.id)
+    expect(screen.queryByRole("button", { name: /Create/ })).toBeNull() // the fields never own Create
+    await user.click(box)
+    expect(screen.queryByText(HINT)).toBeNull()
+    expect((box.getAttribute("aria-describedby") ?? "").split(" ")).toHaveLength(1)
+  })
+
+  it("unticking ask_agent removes it", async () => {
+    const user = userEvent.setup()
+    render(<Harness />)
+    await user.click(screen.getByRole("radio", { name: "Read and ask" }))
+    expect(screen.getByText(HINT)).toBeInTheDocument()
+    await user.click(screen.getByRole("radio", { name: "Read only" }))
+    expect(screen.queryByText(HINT)).toBeNull()
+  })
+})
+
 describe("304-05 McpKeyFields — the external tick owns connector-fed folders (D-23)", () => {
   it("unticking Include mail and synced sources unticks the mail folder", async () => {
     const user = userEvent.setup()

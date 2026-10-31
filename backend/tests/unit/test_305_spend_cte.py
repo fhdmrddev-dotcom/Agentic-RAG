@@ -64,6 +64,10 @@ async def test_every_spend_query_carries_the_mcp_usage_legs():
         flat = _flat(sql)
         assert flat.count("FROM public.mcp_usage") >= 2, "a roots leg AND a members leg"
         assert "'run'::text AS source" in flat
+        # 306-05 (D-34): the runs arm's ``NULL::uuid AS api_key_id`` literal is RETIRED on purpose;
+        # the key now comes from the thread's mcp origin (test_306_spend_by_key pins the new text).
+        # ``source`` stays 'run' and a plain run row still reads ("run", None, None, None) below.
+        assert "t.origin_ref AS api_key_id" in flat and "NULL::uuid AS api_key_id" not in flat
         assert "'mcp'::text AS source" in flat
         assert "WHERE ro.source = 'run'" in flat
         assert "FROM public.mcp_usage u JOIN roots ro ON ro.run_id = u.id WHERE ro.source = 'mcp'" in flat
