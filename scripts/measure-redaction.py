@@ -64,8 +64,9 @@ def _raw_candidates(text: str, R) -> dict[str, int]:
     """How often each recognizer's CANDIDATE pattern fires, before any validator."""
     counts = {
         "email": sum(1 for _ in R._EMAIL.finditer(text)),
-        "iban": sum(1 for _ in R._IBAN.finditer(text)),
-        "card": sum(1 for _ in R._CARD.finditer(text)),
+        "iban": sum(1 for _ in R._IBAN_START.finditer(text)),
+        "card": sum(1 for m in R._DIGIT_RUN.finditer(text)
+                    if sum(c.isdigit() for c in m.group(0)) >= 13),
         "phone": sum(1 for _ in R._PHONE_INTL.finditer(text))
         + sum(1 for rx in R._PHONE_NATIONAL for _ in rx.finditer(text)),
         "secret": sum(1 for rx in R._SECRET_PATTERNS for _ in rx.finditer(text))

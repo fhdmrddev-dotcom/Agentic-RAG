@@ -117,6 +117,15 @@ def test_an_8000_char_dense_chunk_redacts_in_under_20_ms():
     assert best < 0.020, f"{best * 1000:.2f} ms"
 
 
+def test_a_read_chunk_of_single_digit_groups_stays_far_inside_the_deadline():
+    """305-REVIEW-04 BL-04-01: every group start of a digit run is now a card candidate, so the
+    worst case is a read chunk that is one long run of one-digit groups (measured ~30 ms)."""
+    chunk = ("4 " * 4128)[:8256]
+    R.spans(chunk)
+    best = min(_timed(chunk) for _ in range(3))
+    assert best < 0.250, f"{best * 1000:.2f} ms"
+
+
 def _timed(chunk: str) -> float:
     t0 = time.perf_counter()
     R.redact(chunk)

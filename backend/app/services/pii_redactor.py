@@ -10,8 +10,10 @@ What it masks, with exactly these words (the org admin card quotes the first one
   * **card numbers** -> ``[card number removed]`` — brand IIN + brand length + Luhn, AND a
     4-4-4-4 / 4-6-5 grouping or a card keyword within 24 characters. Luhn alone accepts about one
     random digit run in ten, and the two corpus runs that passed IIN + length were DocuSign
-    envelope ids (Pitfall 9).
-  * **IBANs** -> ``[IBAN removed]`` — the ISO 13616 country length table + the mod-97 check.
+    envelope ids (Pitfall 9). The card is looked for at every digit-group start of a run, so an
+    expiry, a CVV or a quantity next to it does not hide it (305-REVIEW-04 BL-04-01).
+  * **IBANs** -> ``[IBAN removed]`` — the ISO 13616 country length table + the mod-97 check,
+    tried from every "two letters + two digits" start (a VAT id before it cannot swallow it).
   * **secrets** -> ``[secret removed]`` — key prefixes (``srl_live_``, ``srl_mcp_``, ``sk-``,
     ``sk-ant-``, ``sk-proj-``, ``gh[pousr]_``, ``github_pat_``, ``AKIA``/``ASIA``,
     ``xox[baprs]-``, ``whsec_``, ``AIza``), three-part JWTs (``eyJ….eyJ….…``, wherever they sit,
@@ -45,6 +47,7 @@ from __future__ import annotations
 import math
 import re
 from collections import Counter
+from functools import lru_cache
 from typing import Callable, Iterator, NamedTuple
 
 MAX_INPUT = 64_000
@@ -138,7 +141,11 @@ IBAN_LENGTHS = {
     "TN": 24, "TR": 26, "UA": 29, "VA": 22, "VG": 24, "XK": 20, "YE": 30,
 }
 
-_IBAN = re.compile(r"\b([A-Z]{2})(\d{2})((?: ?[A-Z0-9]){10,30})")
+# Zero-width, so EVERY "two letters + two digits" start is tried (305-REVIEW-04 BL-04-01): a
+# consuming pattern let an earlier token (a VAT id, an unknown country code) swallow the real IBAN,
+# and when that token failed validation the IBAN inside it was never looked at.
+_IBAN_START = re.compile(r"\b(?=([A-Z]{2})\d{2})")
+_IBAN_BODY = frozenset("ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789")
 
 
 def _mod97(compact: str) -> bool:
@@ -149,28 +156,44 @@ def _mod97(compact: str) -> bool:
     return total == 1
 
 
+def _iban_end(text: str, start: int, need: int) -> int | None:
+    """End of ``need`` body characters after ``start + 4``, each optionally after ONE space."""
+    i, n = start + 4, len(text)
+    while need:
+        if i < n and text[i] == " " and i + 1 < n and text[i + 1] in _IBAN_BODY:
+            i += 1
+        if i >= n or text[i] not in _IBAN_BODY:
+            return None
+        i += 1
+        need -= 1
+    return i
+
+
 def _ibans(text: str) -> Iterator[tuple[int, int]]:
-    for m in _IBAN.finditer(text):
+    taken = -1
+    for m in _IBAN_START.finditer(text):
+        start = m.start()
+        if start < taken:
+            continue
         length = IBAN_LENGTHS.get(m.group(1))
         if length is None:
             continue
-        need, end = length - 4, None
-        for i in range(m.start(3), m.end(3)):
-            if text[i] != " ":
-                need -= 1
-                if need == 0:
-                    end = i + 1
-                    break
+        end = _iban_end(text, start, length - 4)
         if end is None or (end < len(text) and text[end].isalnum()):
             continue  # too short, or the country length would cut a word in half
-        compact = text[m.start():end].replace(" ", "")
-        if _mod97(compact):
-            yield m.start(), end
+        if _mod97(text[start:end].replace(" ", "")):
+            taken = end
+            yield start, end
 
 
 # ── cards ───────────────────────────────────────────────────────────────────────────────────
 
-_CARD = re.compile(r"(?<![\d])(?:\d[ \-]?){12,18}\d(?!\d)")
+# A whole run of digits joined by single spaces or hyphens. The card is looked for at every GROUP
+# start inside it (305-REVIEW-04 BL-04-01): a greedy, non-overlapping candidate grew into the
+# expiry, the CVV or a quantity next to the card, failed the brand or Luhn check as a whole, and
+# the real number inside it was never tried.
+_DIGIT_RUN = re.compile(r"(?<!\d)\d(?:[ \-]?\d)*")
+_CARD_LENGTHS = (19, 18, 17, 16, 15, 14, 13)  # longest first: a 19-digit Visa is not cut to 16
 _CARD_GROUPED = (
     re.compile(r"\d{4}([ \-])\d{4}\1\d{4}\1\d{4}"),
     re.compile(r"\d{4}([ \-])\d{6}\1\d{5}"),
@@ -209,6 +232,13 @@ def card_brand(digits: str) -> str | None:
     return None
 
 
+@lru_cache(maxsize=4096)
+def _brand_lengths(head: str) -> tuple[int, ...]:
+    """The card lengths, longest first, that some brand allows for this 6-digit IIN head
+    (``card_brand`` reads only the first six digits and the length)."""
+    return tuple(n for n in _CARD_LENGTHS if card_brand(head + "0" * (n - len(head))))
+
+
 def _keyword_near(rx: re.Pattern, text: str, start: int, end: int) -> bool:
     before = text[max(0, start - KEYWORD_WINDOW):start]
     after = text[end:end + KEYWORD_WINDOW]
@@ -216,14 +246,37 @@ def _keyword_near(rx: re.Pattern, text: str, start: int, end: int) -> bool:
 
 
 def _cards(text: str) -> Iterator[tuple[int, int]]:
-    for m in _CARD.finditer(text):
-        raw = m.group(0)
-        digits = re.sub(r"\D", "", raw)
-        if not 13 <= len(digits) <= 19 or card_brand(digits) is None or not _luhn(digits):
+    for m in _DIGIT_RUN.finditer(text):
+        raw, base = m.group(0), m.start()
+        idx = [i for i, c in enumerate(raw) if c != " " and c != "-"]  # offsets of the digits
+        if len(idx) < 13:
             continue
-        grouped = any(rx.fullmatch(raw) for rx in _CARD_GROUPED)
-        if grouped or _keyword_near(_CARD_KEYWORD, text, m.start(), m.end()):
-            yield m.start(), m.end()
+        run = "".join(raw[i] for i in idx)
+        # A window may start only where a group starts and end only where a group ends, so a
+        # compact run (one group) is judged whole, never as its digit-by-digit sub-windows.
+        a, count = 0, len(idx)
+        while a <= count - 13:
+            if (a and idx[a] == idx[a - 1] + 1) or run[a] not in "23456":
+                a += 1
+                continue  # not a group start, or no brand IIN starts with this digit
+            hit = None
+            for n in _brand_lengths(run[a:a + 6]):
+                b = a + n - 1
+                if b >= count or (b + 1 < count and idx[b + 1] == idx[b] + 1):
+                    continue
+                digits = run[a:b + 1]
+                if not _luhn(digits):
+                    continue
+                s, e = idx[a], idx[b] + 1
+                if any(rx.fullmatch(raw[s:e]) for rx in _CARD_GROUPED) or _keyword_near(
+                        _CARD_KEYWORD, text, base + s, base + e):
+                    hit = (base + s, base + e, b)
+                    break
+            if hit is None:
+                a += 1
+                continue
+            yield hit[0], hit[1]
+            a = hit[2] + 1
 
 
 # ── phones ──────────────────────────────────────────────────────────────────────────────────
