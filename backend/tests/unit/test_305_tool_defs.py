@@ -257,3 +257,83 @@ async def test_read_refusals_are_one_sentence(fake_reads):
         assert out == read_tools.NOT_AVAILABLE_SENTENCE, cursor
     ok = await read_tools.read_document(h.PRINCIPAL, results.ReadArgs(document_id=D1))
     assert isinstance(ok, results.ReadResult) and ok.text == "x" * 100 and ok.next_cursor is None
+
+
+# ── 305-REVIEW WR-06: subfolders past the 100th are paged, never silently dropped ─────────────
+
+
+def _fid(i: int) -> str:
+    return "f0f0f0f0-0000-4000-8000-%012d" % i
+
+
+def _did(i: int) -> str:
+    return "d0d0d0d0-0000-4000-8000-%012d" % i
+
+
+async def _walk(principal, folder_id=None, limit=50, max_pages=50):
+    """Follow ``next_cursor`` to the end; every folder and document id seen, in order."""
+    folders, documents, cursor, pages = [], [], None, 0
+    while True:
+        out = await read_tools.list_documents(
+            principal, results.ListArgs(folder_id=folder_id, cursor=cursor, limit=limit)
+        )
+        assert isinstance(out, results.ListResult), out
+        pages += 1
+        assert pages <= max_pages, "the listing never ended"
+        assert len(out.folders) <= results.SUBFOLDER_CAP
+        folders += [f.folder_id for f in out.folders]
+        documents += [d.document_id for d in out.documents]
+        if out.next_cursor is None:
+            return folders, documents, pages
+        cursor = out.next_cursor
+
+
+async def test_more_than_a_hundred_top_level_folders_all_reach_a_page(fake_reads):
+    tops = [{"id": _fid(i), "name": f"T{i}", "parent_id": None} for i in range(250)]
+    fake_reads(folders=tops, docs={None: [{"id": _did(i), "filename": f"r{i}"} for i in range(30)]})
+    folders, documents, pages = await _walk(h.PRINCIPAL)
+    assert folders == [f["id"] for f in tops]  # all 250, each once, in order
+    assert documents == [_did(i) for i in range(30)]
+    assert pages == 3
+
+
+async def test_more_than_a_hundred_subfolders_and_their_siblings_documents(fake_reads):
+    subs = [{"id": _fid(i), "name": f"S{i}", "parent_id": F1} for i in range(130)]
+    docs = [{"id": _did(i), "filename": f"d{i}"} for i in range(120)]
+    fake_reads(folders=[{"id": F1, "name": "A", "parent_id": None}, *subs], docs={F1: docs})
+    folders, documents, _ = await _walk(h.PRINCIPAL, folder_id=F1, limit=50)
+    assert folders == [s["id"] for s in subs]
+    assert documents == [d["id"] for d in docs]
+
+
+async def test_a_narrowed_key_pages_its_top_level_folders_too(fake_reads):
+    tops = [{"id": _fid(i), "name": f"T{i}", "parent_id": None} for i in range(101)]
+    fake = fake_reads(folders=tops)
+    narrowed = replace(h.PRINCIPAL, folder_ids=tuple(f["id"] for f in tops))
+    folders, documents, pages = await _walk(narrowed)
+    assert folders == [f["id"] for f in tops] and documents == [] and pages == 2
+    assert fake.list_calls == []  # still no Root documents for a narrowed key
+
+
+async def test_a_hundred_folders_or_fewer_page_exactly_as_before(fake_reads):
+    subs = [{"id": _fid(i), "name": f"S{i}", "parent_id": F1} for i in range(100)]
+    docs = [{"id": _did(i), "filename": f"d{i}"} for i in range(60)]
+    fake_reads(folders=[{"id": F1, "name": "A", "parent_id": None}, *subs], docs={F1: docs})
+    first = await read_tools.list_documents(h.PRINCIPAL, results.ListArgs(folder_id=F1, limit=50))
+    assert len(first.folders) == 100 and len(first.documents) == 50
+    assert first.next_cursor == results.encode_list_cursor(F1, 50)  # the 305-02 cursor, byte-equal
+    second = await read_tools.list_documents(
+        h.PRINCIPAL, results.ListArgs(folder_id=F1, cursor=first.next_cursor, limit=50)
+    )
+    assert second.folders == [] and len(second.documents) == 10 and second.next_cursor is None
+
+
+async def test_a_folder_page_cursor_is_bound_to_its_folder(fake_reads):
+    subs = [{"id": _fid(i), "name": f"S{i}", "parent_id": F1} for i in range(150)]
+    fake_reads(folders=[{"id": F1, "name": "A", "parent_id": None},
+                        {"id": F2, "name": "B", "parent_id": None}, *subs])
+    first = await read_tools.list_documents(h.PRINCIPAL, results.ListArgs(folder_id=F1))
+    assert first.next_cursor is not None
+    for folder in (F2, None):
+        out = await read_tools.list_documents(h.PRINCIPAL, results.ListArgs(folder_id=folder, cursor=first.next_cursor))
+        assert out == read_tools.BAD_CURSOR_SENTENCE
