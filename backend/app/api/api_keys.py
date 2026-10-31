@@ -129,11 +129,18 @@ _SOURCE_HINT_SQL = (
 
 _UNREAD = object()   # ``_serialize_keys``: the switches have not been read yet
 
+# 304-REVIEW WR-02: the switches could not be read (a failed read, or no organisations row).
+# Said in place of a switch's sentence, so the screen never names an off switch nobody read.
+MCP_STATE_UNKNOWN_SENTENCE = "Couldn't check whether AI tool access is on. Reload to try again."
+
 
 def _mcp_off(switches: dict | None) -> str | None:
-    """Which MCP switch is off — the deployment's wins (D-30). Anything not read as ``True`` is
-    off (fail closed), the ``principal_liveness`` rule."""
-    if switches is None or switches.get("deploy_on") is not True:
+    """Which MCP switch is off — the deployment's wins (D-30), the order
+    ``principal_still_allowed`` uses too. Anything not read as ``True`` is off (fail closed).
+    No switch state at all (``None``) is ``"unknown"`` (WR-02): still off, but naming no switch."""
+    if switches is None:
+        return "unknown"
+    if switches.get("deploy_on") is not True:
         return "deployment"
     if switches.get("org_on") is not True:
         return "org"
@@ -141,10 +148,10 @@ def _mcp_off(switches: dict | None) -> str | None:
 
 
 async def _read_switches(pool: asyncpg.Pool, org: UUID) -> dict | None:
-    """The switch state for a LIST (display only). A failed read reads as "off" (fail closed:
-    the MCP choice is hidden) and the keys still list — e.g. a backend booted before migration
-    221 reached its database. The create path reads the switches WITHOUT this guard, so a failed
-    read there is an error, never a mint."""
+    """The switch state for a LIST (display only). A failed read is ``None`` -> ``"unknown"``
+    (fail closed: the MCP choice is hidden, and no switch is named) and the keys still list —
+    e.g. a backend booted before migration 221 reached its database. The create path reads the
+    switches WITHOUT this guard, so a failed read there is an error, never a mint."""
     try:
         return await api_keys_db.mcp_switches(pool, org)
     except Exception as exc:  # noqa: BLE001 — display-only, fail closed, logged
@@ -155,7 +162,7 @@ async def _read_switches(pool: asyncpg.Pool, org: UUID) -> dict | None:
 def _mcp_block(switches: dict | None) -> McpAvailability:
     off = _mcp_off(switches)
     return McpAvailability(
-        available=off != "deployment", off=off, url=mcp_url(), tools=_MCP_CATALOGUE
+        available=off not in ("deployment", "unknown"), off=off, url=mcp_url(), tools=_MCP_CATALOGUE
     )
 
 
@@ -448,6 +455,8 @@ async def _create_mcp_key(
     """KEY-01/03/04/05: refuse before minting — switches (403), tools and folders (422)."""
     switches = await api_keys_db.mcp_switches(pool, org)   # live, never the settings cache
     off = _mcp_off(switches)
+    if off == "unknown":   # no organisations row: refuse (fail closed) without naming a switch
+        raise HTTPException(status_code=403, detail=MCP_STATE_UNKNOWN_SENTENCE)
     if off == "deployment":
         raise HTTPException(status_code=403, detail=MCP_OFF_DEPLOYMENT_SENTENCE)
     if off == "org":

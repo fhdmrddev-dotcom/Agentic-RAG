@@ -5,8 +5,13 @@
  *
  * Words only from `MCP_KEY_COPY`; they begin with the server's own refusal sentences
  * (`principal_liveness.py`), so the screen and a refused tool call say the same thing. The caller
- * passes the scope the server reported; the deployment's wins over the org's (the server already
- * applies that order to `mcp_off`). A 12px warning line, colour never the only signal (it is words).
+ * passes the scope the server reported; the deployment's wins over the org's — the server applies
+ * that one order both to `mcp_off` and to a refused call (`principal_still_allowed`, 304-REVIEW
+ * WR-03), so with both switches off the two name the same switch. A 12px warning line, colour
+ * never the only signal (it is words).
+ *
+ * `unknown` (304-REVIEW WR-02) is a switch read that failed: it gets its own sentence in every
+ * variant, so the screen never says "the operator switched it off" for a fact nobody read.
  */
 import type { McpOff } from "@/lib/api/apiKeys"
 import { cn } from "@/lib/utils"
@@ -18,6 +23,8 @@ const M = MCP_KEY_COPY.mcp
 export type McpOffVariant = "member" | "card" | "tile" | "admin"
 
 export function mcpOffSentence(scope: McpOff, variant: McpOffVariant, orgName?: string | null): string {
+  // WR-02: a switch state the server could not read names no switch, in any variant.
+  if (scope === "unknown") return M.offUnknown
   if (variant === "card") return scope === "deployment" ? M.offDeployment : M.offOrg
   if (variant === "admin" && scope === "org") return fillCopy(M.offAdmin, { org: orgName || M.orgFallback })
   return scope === "deployment" ? M.offTileDeployment : M.offTileOrg

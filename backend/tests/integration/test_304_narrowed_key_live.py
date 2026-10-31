@@ -7,7 +7,9 @@ related_documents), plus the rules narrowing must keep:
   · a co-member's org-shared folder is OUT unless it is itself ticked (D-22);
   · connector-fed documents (``source_connection_id IS NOT NULL``) are OUT unless
     ``include_external`` — by document provenance, even inside a ticked folder (D-40);
-  · a ticked folder the member can no longer see leaves NOTHING, never everything (D-08).
+  · a ticked folder the member can no longer see leaves NOTHING, never everything (D-08);
+  · an archived or source-gone document (``retrievable`` false) leaves every read (D-46);
+  · a narrowed key lists only the saved views scoped inside its subtree (D-47).
 
 Every arm also shows the un-narrowed key reaching the thing the narrowed key may not — so no arm
 passes on an empty seed. The principal is always resolved from a real minted key.
@@ -159,3 +161,72 @@ async def test_a_vanished_ticked_folder_returns_nothing_never_everything(world, 
     assert await reads.search(p, w.tok_x, user_settings=search_settings()) == []
     assert await reads.view_documents(p, w.views["all_x"], limit=200) == {"items": [], "total": 0}
     assert await reads.related_documents(p, w.docs["f_doc"]) is None
+
+
+# ── 304-REVIEW WR-01 / D-46: the agent rule, ``documents.retrievable`` (mig 205) ───────────────
+
+
+async def _not_retrievable(w, pg_pool) -> tuple[str, str]:
+    """An ARCHIVED document and a SOURCE-GONE one, both U's, both in ticked F, both linked from
+    f_doc — so every read below would reach them if ``retrievable`` were not applied."""
+    arch = await w.doc("arch_doc", w.u, w.x, folder=w.f, doc_type="Contract", minutes_ago=35)
+    gone = await w.doc("gone_doc", w.u, w.x, folder=w.f, doc_type="Contract", minutes_ago=36)
+    await pg_pool.execute("UPDATE public.documents SET archived_at = now() WHERE id = $1", UUID(arch))
+    await pg_pool.execute(
+        "UPDATE public.documents SET source_state = 'missing_at_source' WHERE id = $1", UUID(gone)
+    )
+    await w.edge(w.u, w.x, "f_doc", "arch_doc", "references")
+    await w.edge(w.u, w.x, "f_doc", "gone_doc", "references")
+    flags = {str(r["id"]): r["retrievable"] for r in await pg_pool.fetch(
+        "SELECT id, retrievable FROM public.documents WHERE id = ANY($1::uuid[])", [UUID(arch), UUID(gone)]
+    )}
+    assert flags == {arch: False, gone: False}, flags  # non-vacuity: the seed is what it claims
+    return arch, gone
+
+
+async def test_archived_and_source_gone_documents_leave_every_acting_read(world, pg_pool, monkeypatch):
+    w = world
+    patch_search(monkeypatch, w)
+    arch, gone = await _not_retrievable(w, pg_pool)
+    for p in (await w.principal(), await w.principal(folder_ids=[w.f])):
+        # non-vacuity: a retrievable sibling in the same folder IS read, listed and linked
+        assert (await reads.read_document(p, w.docs["f_doc"]))["id"] == w.docs["f_doc"]
+        assert w.docs["f_doc"] in await _list_ids(p)
+
+        assert {arch, gone}.isdisjoint(await _list_ids(p))
+        view = {r["id"] for r in (await reads.view_documents(p, w.views["all_x"], limit=200))["items"]}
+        assert w.docs["f_doc"] in view and {arch, gone}.isdisjoint(view)
+        for did in (arch, gone):
+            assert await reads.read_document(p, did) is None, did
+            assert await reads.related_documents(p, did) is None, did
+
+        rel = await reads.related_documents(p, w.docs["f_doc"])
+        assert {arch, gone}.isdisjoint({r["document_id"] for r in rel["documents"]})
+        # both edges are still there — masked, exactly like an endpoint the key cannot read
+        masked = [r for r in rel["documents"] if r["direction"] == "outgoing" and r["document_id"] is None]
+        assert len(masked) == 4, masked  # fy_doc (other org), px_doc (private), arch_doc, gone_doc
+
+
+# ── 304-REVIEW WR-04 / D-47: a narrowed key lists only the views inside its subtree ────────────
+
+
+async def test_a_narrowed_key_lists_only_the_views_inside_its_subtree(world):
+    w = world
+    g = await w.folder(w.u, w.x, "G-outside")
+    await w.view("scoped_f2", w.u, w.x, folder_scope=w.f2)
+    await w.view("scoped_g", w.u, w.x, folder_scope=g)
+
+    async def view_ids(principal) -> set[str]:
+        return {v["id"] for v in await reads.list_views(principal)}
+
+    wide = await view_ids(await w.principal())
+    mine_x = {w.views[k] for k in ("all_x", "contract_x", "scoped_x", "scoped_f2", "scoped_g")}
+    assert mine_x <= wide  # the all-folders key is unchanged: every view, scoped or not
+    assert w.views["all_y"] not in wide  # still one org
+
+    # ticked F: F and F2 are its subtree; unscoped views and G's view are hidden (D-47, fail closed)
+    narrowed = await reads.list_views(await w.principal(folder_ids=[w.f]))
+    assert {v["id"] for v in narrowed} == {w.views["scoped_x"], w.views["scoped_f2"]}
+    assert {v["folder_scope"] for v in narrowed} == {w.f, w.f2}
+    # ticked F2 only: the view scoped to F lies OUTSIDE the key's subtree, so it is hidden too
+    assert await view_ids(await w.principal(folder_ids=[w.f2])) == {w.views["scoped_f2"]}

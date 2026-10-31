@@ -35,8 +35,9 @@ WorkflowRefState = Literal[
 ]
 KeyState = Literal["active", "expired", "revoked"]
 KeyKind = Literal["workflow", "mcp"]
-# D-28 / D-30: why MCP is off — the deployment switch wins over the org's.
-McpOff = Literal["org", "deployment"]
+# D-28 / D-30: why MCP is off — the deployment switch wins over the org's. ``unknown`` (304-REVIEW
+# WR-02): the switches could not be read — still OFF (fail closed), but no switch is named.
+McpOff = Literal["org", "deployment", "unknown"]
 
 # D-07 / D-08 — the sentences the key form shows as-is (the client strips "Value error, ").
 MCP_EXPIRY_SENTENCE = "An AI tool key must have an expiry: 30, 90 or 365 days."

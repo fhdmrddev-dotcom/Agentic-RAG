@@ -559,6 +559,47 @@ def test_the_list_says_the_org_is_off(client, store):
     assert mcp == {**mcp, "available": True, "off": "org"}
 
 
+def _switch_read_fails(monkeypatch):
+    async def _boom(pool, org_id):
+        raise RuntimeError("db down")
+
+    monkeypatch.setattr(route.api_keys_db, "mcp_switches", _boom)
+
+
+def test_a_failed_switch_read_is_unknown_never_the_operator(client, store, monkeypatch):
+    """304-REVIEW WR-02: a switch read that RAISES is ``unknown`` — still fail closed (the MCP
+    choice stays hidden), but never reported as "the operator switched it off"."""
+    _mcp(client)
+    _switch_read_fails(monkeypatch)
+    body = client.get("/api-keys").json()
+    assert body["mcp"]["off"] == "unknown"
+    assert body["mcp"]["available"] is False
+    (key,) = body["keys"]
+    assert key["mcp_off"] == "unknown"
+
+
+def test_the_admin_list_says_unknown_when_the_switch_read_fails(client, store, monkeypatch):
+    _mcp(client)
+    store.caller = ADMIN
+    store.is_admin = True
+    _switch_read_fails(monkeypatch)
+    body = client.get("/org/api-keys").json()
+    assert body["mcp"] == {**body["mcp"], "available": False, "off": "unknown"}
+    assert body["keys"][0]["mcp_off"] == "unknown"
+
+
+def test_a_missing_org_row_refuses_the_mint_without_naming_a_switch(client, store, monkeypatch):
+    async def _missing(pool, org_id):
+        return None
+
+    monkeypatch.setattr(route.api_keys_db, "mcp_switches", _missing)
+    r = _mcp(client)
+    assert r.status_code == 403
+    # fail closed (no mint), and never the operator's sentence for a fact nobody read
+    assert r.json()["detail"] == "Couldn't check whether AI tool access is on. Reload to try again."
+    assert store.keys == []
+
+
 def test_a_null_mcp_url_is_served_as_null(client, store, monkeypatch):
     monkeypatch.setattr(route, "mcp_url", lambda: None)
     assert client.get("/api-keys").json()["mcp"]["url"] is None

@@ -4,9 +4,12 @@ Every credential this app accepts on someone's behalf re-checks the same live fa
 in this order, with no cache:
 
     not revoked -> not expired -> owner still a member of the key's org -> owner not banned
-    -> (MCP keys only) the org's MCP switch is on -> the deployment's MCP switch is on
+    -> (MCP keys only) the org row exists -> the deployment's MCP switch is on
+    -> the org's MCP switch is on
 
-The first failing fact names the refusal. The key resolver core (``authenticate_presented_key``)
+The first failing fact names the refusal. The two switches are checked deployment first (D-30,
+304-REVIEW WR-03), the order the key screen uses, so a refused tool call and the screen name the
+same switch when both are off. The key resolver core (``authenticate_presented_key``)
 calls ``principal_still_allowed`` after its credential checks; 306/307/308 call
 ``recheck_principal`` at the start of each tool call so a key revoked mid-session stops on the
 next call, not the next connection.
@@ -72,10 +75,14 @@ async def principal_still_allowed(pool: Any, *, key_row: Mapping[str, Any]) -> R
         return None
 
     switches = await api_keys_db.mcp_switches(pool, key_row["org_id"])
-    if switches is None or switches.get("org_on") is not True:
+    if switches is None:  # no organisations row: refuse before reading either switch
         return Refusal("mcp_off_org", MCP_OFF_ORG_SENTENCE)
+    # 304-REVIEW WR-03: the deployment's switch wins (D-30) — the same order the key screen's
+    # ``api_keys._mcp_off`` applies, so a refused call and the card name the same switch.
     if switches.get("deploy_on") is not True:
         return Refusal("mcp_off_deployment", MCP_OFF_DEPLOYMENT_SENTENCE)
+    if switches.get("org_on") is not True:
+        return Refusal("mcp_off_org", MCP_OFF_ORG_SENTENCE)
     return None
 
 

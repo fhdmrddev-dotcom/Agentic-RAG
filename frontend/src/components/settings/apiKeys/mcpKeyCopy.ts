@@ -144,6 +144,8 @@ export const MCP_KEY_COPY = {
     offTileOrg: "MCP access is switched off for this organisation by an admin.",
     /** 304-05 authored: the member header line when the deployment switch is off. */
     offTileDeployment: "MCP access is switched off for this deployment by the operator.",
+    /** 304-REVIEW WR-02: the server could not read the switches (`mcp_off: "unknown"`) — every variant. */
+    offUnknown: "Couldn't check whether AI tool access is on. Reload to try again.",
     offAdmin:
       "MCP access is switched off for {org}. Every member's AI tool key is refused until you switch it back on in the Settings tab.",
 

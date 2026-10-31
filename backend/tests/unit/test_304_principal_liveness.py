@@ -115,8 +115,9 @@ def test_a_row_without_kind_is_a_workflow_key(world):
           "org_on": False, "deploy_on": False}, "expired"),
         ({"member": False, "banned": True, "org_on": False, "deploy_on": False}, "not_member"),
         ({"banned": True, "org_on": False, "deploy_on": False}, "banned"),
-        ({"org_on": False, "deploy_on": False}, "mcp_off_org"),
-        ({"deploy_on": False}, "mcp_off_deployment"),
+        # 304-REVIEW WR-03: the deployment's switch wins (D-30), the same order the screen uses.
+        ({"org_on": False, "deploy_on": False}, "mcp_off_deployment"),
+        ({"org_on": False}, "mcp_off_org"),
     ],
 )
 def test_the_order_is_exactly_d18(world, facts, reason):
@@ -132,6 +133,19 @@ def test_the_order_is_exactly_d18(world, facts, reason):
     refusal = _run(_ask(row))
     assert refusal is not None
     assert refusal.reason == reason
+
+
+def test_both_switches_off_names_the_deployment_like_the_screen(world):
+    """304-REVIEW WR-03: with both switches off, a refused call and the key screen (``_mcp_off``)
+    name the SAME switch — the deployment's (D-30)."""
+    from app.api.api_keys import _mcp_off
+
+    world["switches"]["org_on"] = False
+    world["switches"]["deploy_on"] = False
+    refusal = _run(_ask(_row()))
+    assert refusal.reason == "mcp_off_deployment"
+    assert refusal.sentence == liveness.MCP_OFF_DEPLOYMENT_SENTENCE
+    assert _mcp_off(world["switches"]) == "deployment"
 
 
 def test_a_workflow_key_reports_its_credential_refusals_with_no_sentence(world):

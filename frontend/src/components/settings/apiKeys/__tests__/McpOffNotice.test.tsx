@@ -35,6 +35,17 @@ describe("304-05 McpOffNotice", () => {
     expect(screen.getByTestId("mcp-off-notice")).toHaveTextContent(/^MCP access is switched off for this deployment by the operator\.$/)
   })
 
+  it("unknown (a failed switch read): its own sentence in every variant, never the operator's (304-REVIEW WR-02)", () => {
+    const unknown = "Couldn't check whether AI tool access is on. Reload to try again."
+    for (const variant of ["member", "card", "tile", "admin"] as const) {
+      const { unmount } = render(<McpOffNotice scope="unknown" variant={variant} orgName="Acme" />)
+      const notice = screen.getByTestId("mcp-off-notice")
+      expect(notice).toHaveTextContent(new RegExp(`^${unknown.replace(/[.?]/g, "\\$&")}$`))
+      expect(notice).toHaveAttribute("data-scope", "unknown")
+      unmount()
+    }
+  })
+
   it("admin: names the org", () => {
     const { rerender } = render(<McpOffNotice scope="org" variant="admin" orgName="Acme" />)
     expect(screen.getByTestId("mcp-off-notice")).toHaveTextContent(
