@@ -1,7 +1,7 @@
 ---
 phase: 305
 slug: connect-claude-code-and-cursor
-status: owed  # 2026-10-31: automated gates recorded below; the three G-4 rows, the must-have readback and the post-bump chat stream are OWED to verification (Claude drives them after the merge); four client rows are OWED to the operator
+status: driven  # 2026-10-31: G-4 rows 1-3 + all §2.1 readbacks PASS (§2.2, Claude-driven); four client rows (§3) OWED to the operator
 created: 2026-10-31
 nyquist_validation: false   # config.json; this file holds the G-4 rows, the measurements and the gate record
 independent_review: self
@@ -14,7 +14,7 @@ three operator-recognisable G-4 scenarios set at scope time (305-CONTEXT **D-42*
 §"Lived-experience (G-4) rows"), the redactor measurement (D-38), the client-timeout measurement for 306
 (D-43 / D-57), the gate record (D-45), and the items owed to the operator (D-40 / D-43).
 
-**Nothing in §2 or §3 has been run yet. Every row there is OWED — Claude drives it after the merge.** A row
+~~Nothing in §2 or §3 has been run yet.~~ **Superseded 2026-10-31:** §2 was driven after the merge (results in §2.2); §3 stays OWED to the operator. A row
 may be blocked (⛔ with the reason), but never silently omitted.
 
 ## 1. Automated coverage (where each requirement is proven in code)
@@ -23,8 +23,8 @@ may be blocked (⛔ with the reason), but never silently omitted.
 |-----|-----------|------|
 | MCP-01 (an AI tool connects to `/mcp` with a personal key; stateless, two workers) | `test_305_transport.py`, `test_305_edge_refusals.py`, `test_305_mount_predicate.py`, `test_305_lifespan_reentry.py`; live `test_305_two_worker_stateless.py` (both worker PIDs served `POST /mcp`), `test_305_refusals_live.py` (one 401 body for every credential failure) | 305-01 |
 | MCP-02 (search, list, read as the member, narrowed by the key) | `test_305_search_shape.py`, `test_305_paging_chunking.py`, `test_305_tool_defs.py`; live `test_305_tools_live.py` (D-16: seven unavailable cases, ONE byte-identical body), `test_305_narrowed_tools_live.py` | 305-02 |
-| MCP-03 (the "Open in Syrel" address) | `citationNav.test.tsx`, `DocumentCantBeOpened.test.tsx`, `test_305_tools_live.py` (links) | 305-02 |
-| MCP-07 / KEY-07 / GUARD-02 (audit, limits, spend) | `test_305_audit.py`, `test_305_limits.py`, `test_305_usage_sink.py`, `test_305_spend_cte.py`, `test_305_settings_knob.py`; live `test_305_audit_live.py`, `test_305_spend_live.py` | 305-03 |
+| MCP-02 (the "Open in Syrel" address) | `citationNav.test.tsx`, `DocumentCantBeOpened.test.tsx`, `test_305_tools_live.py` (links) | 305-02 |
+| KEY-07 / GUARD-02 (audit, limits, spend; MCP-07's maintenance / error / dispatch proof is in 305-01's `test_305_transport.py`, `test_305_dispatch.py`, maintenance suites) | `test_305_audit.py`, `test_305_limits.py`, `test_305_usage_sink.py`, `test_305_spend_cte.py`, `test_305_settings_knob.py`; live `test_305_audit_live.py`, `test_305_spend_live.py` | 305-03 |
 | **GUARD-03** (org-admin PII redaction, off by default; masks without breaking ids; blocks on failure; names not covered) | `test_305_redaction.py` (every positive case masked with its exact mask, every negative byte-identical, ordered spans, 8k chunk < 20 ms) + `fixtures/phase305/redaction_cases.json`; `test_305_outbound_guard.py` (off -> same object; only `RedactableText` rewritten; overlap window masks a split phone / email / IBAN in both chunks; raise and deadline -> withheld; unreadable switch -> redact); `test_305_pii_routes.py` (admin wall, audit after write, 422/404/5xx with no row; guard before the one render; live read per call; `redaction_blocked`); live `test_305_pii_switch_live.py` (masks in `structuredContent` AND text, document id + link unchanged and `read_document` still answers, a phone split by the read boundary masked in both chunks with the cursor still paging, withheld arm audited `redaction_blocked`, column outside the `authenticated` UPDATE grant); `OrgPiiRedactionCard.test.tsx`, `OrgAuditTab.test.tsx`, `apiKeysContract.test.ts` | 305-04 |
 
 ## 2. G-4 lived-experience scenarios (D-42 — Claude drives these after the merge)
@@ -64,6 +64,7 @@ file and reached the CLI only through `SYREL_MCP_KEY`. No transcript contains th
 
 | BUG-261031-03 re-run | After `554fe5235` loaded on :8000 (`--reload`): the same 32-call burst | **Deadlock gone:** 30/30 admitted calls answered, 2 refused by the limit, 0 connections idle in transaction afterwards, 60 `mcp_usage` rows. **New finding BUG-261031-04:** all 30 answered at 72.5 s (rerank ON locally — `typesafe/jev-1.14` is Jev **via OpenRouter**, a hosted engine, not a local CPU model as first written here; 1 call 5.7 s, 3 calls 8.9 s; rerank is OFF in cloud) and **0 audit rows** were written for the 32 calls (1- and 3-call runs: 4/4 written). Debugger on it. |
 | BUG-261031-04 re-run | After `d4aacad2e` (MCP audit row = one asyncpg INSERT; a fired bookkeeping bound now logs at ERROR) loaded on :8000: the same 32-call burst | 30 answered (39.7 s, rerank-bound), 2 refused at 1.7 s; `audit_log`: **30 `api_key.read ok` + 1 `api_key.refused rate_limited:expensive`** (the 2nd refusal folded by the CR-02 throttle, by design); 30 `mcp_usage` embedding rows; 0 idle in transaction. Key card → Show activity: **`19:54 search_knowledge_base ✕ refused: over the limit: 30 searches a minute`**, no ✓ on it (`readback-over-limit.jpg`). |
+| Chat search after `554fe5235` | Verifier warning 3: the BUG-261031-03 fix changes the ef_search probe every search uses (chat agent loop included) | New chat (deepseek-v4-flash): "what are the payment terms in the ACME MSA?" → searched, answered **NET 60 days from invoice date, 1.0%/month late interest** with citations, 5 sources, High confidence (`readback-chat-search-after-554fe5235.jpg`). Provider-independent change, so the 8-provider scoreboard stays N/A (D-44). |
 ## 3. Owed to the operator (D-43 — recorded, not claimed)
 
 | Row | Why it cannot be driven here | What the operator runs |

@@ -198,7 +198,7 @@ Commands run for this audit. All were read-only on implementation files and none
 - [x] `threats_open: 0` — T-305-SC closed by `88d940e9e`
 - [x] `status: verified` (2026-10-31, after the T-305-SC pin)
 
-**Approval:** not verified. One BLOCKER (T-305-SC). All other mitigations are present in the code and pinned. The deploy gate is also open on the operator-owed items O-1 … O-7.
+**Approval:** ~~not verified. One BLOCKER (T-305-SC).~~ **Verified 2026-10-31** after T-305-SC was closed by `88d940e9e`; every mitigation is present in the code and pinned. The deploy gate is also open on the operator-owed items O-1 … O-7.
 
 
 | 2026-10-31 (re-check) | 38 rows (37 unique ids) | 38 | 0 | orchestrator: T-305-SC closed by the exact pins in `88d940e9e`; no other row changed |
