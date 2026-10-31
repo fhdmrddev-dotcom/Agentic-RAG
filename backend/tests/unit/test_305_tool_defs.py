@@ -5,9 +5,15 @@
   input and output schemas are the Pydantic models' own ``model_json_schema()``; the limit bucket
   is ``expensive`` for search (it embeds the query) and ``cheap`` for the other two.
 * ``tools/list`` through a fresh app: two principals with different grants get BYTE-EQUAL entries
-  for every tool they share; a principal granted all eight catalogue names still lists exactly the
-  three (the 306 names are never listed); no title or description carries a fixture string (a
-  folder name, a document title, a key label) — they are code constants (T-305-09).
+  for every tool they share; a principal granted all eight catalogue names lists exactly the names
+  the server SERVES; no title or description carries a fixture string (a folder name, a document
+  title, a key label) — they are code constants (T-305-09).
+
+306-04 (D-15) RETIRES this file's "exactly the three" pin DELIBERATELY (SEED-177: retire a fence on
+purpose, never trip it by surprise): ``ask_agent`` and ``get_answer`` are now served, so the
+registry holds five and a fully-granted key lists five. The three read tools' own definitions are
+still pinned here unchanged; the two ask tools are pinned by ``test_306_tool_defs.py``. The 307
+names (``list_workflows`` / ``run_workflow`` / ``get_workflow_run``) are still never listed.
 * the dispatch render stage: a handler's model becomes ``structuredContent`` (validated against the
   same model) plus the text rendered from it; a handler's sentence becomes one ``isError`` block.
 """
@@ -28,8 +34,12 @@ LABELS = {t.name: t.label for t in MCP_TOOLS}
 FIXTURE_STRINGS = ("Contracts 2026", "Q3 revenue.pdf", "Fahad's laptop key", "304-03", "305-01", "zqx")
 
 
-def test_exactly_the_three_read_tools_are_registered():
-    assert tuple(tools.REGISTERED) == THREE
+# 306-04 (D-15): the registry now SERVES the two ask tools after the three read tools.
+SERVED = THREE + ("ask_agent", "get_answer")
+
+
+def test_the_three_read_tools_lead_the_registry():
+    assert tuple(tools.REGISTERED) == SERVED
 
 
 @pytest.mark.parametrize("name", THREE)
@@ -54,7 +64,7 @@ def test_the_schemas_and_buckets():
     assert reg["search_knowledge_base"].tool.output_schema == results.SearchResult.model_json_schema()
     assert reg["list_documents"].tool.output_schema == results.ListResult.model_json_schema()
     assert reg["read_document"].tool.output_schema == results.ReadResult.model_json_schema()
-    assert {n: s.bucket for n, s in reg.items()} == {
+    assert {n: s.bucket for n, s in reg.items() if n in THREE} == {
         "search_knowledge_base": "expensive", "list_documents": "cheap", "read_document": "cheap"}
     assert reg["search_knowledge_base"].handler is read_tools.search_knowledge_base
     assert reg["list_documents"].handler is read_tools.list_documents
@@ -90,17 +100,17 @@ def test_two_keys_see_byte_equal_definitions_for_the_tools_they_share(monkeypatc
             assert needle not in blob
 
 
-def test_a_key_granted_every_catalogue_tool_lists_only_the_three(monkeypatch):
+def test_a_key_granted_every_catalogue_tool_lists_only_the_served_names(monkeypatch):
     everything = replace(h.PRINCIPAL, tools=tuple(t.name for t in MCP_TOOLS))
     assert set(everything.tools) == MCP_TOOL_NAMES and len(everything.tools) == 8
-    assert [t["name"] for t in _listed(monkeypatch, everything)] == list(THREE)
+    assert [t["name"] for t in _listed(monkeypatch, everything)] == list(SERVED)
 
 
-def test_an_unregistered_306_name_is_a_protocol_error_even_when_granted(monkeypatch):
+def test_an_unregistered_307_name_is_a_protocol_error_even_when_granted(monkeypatch):
     h.configure(monkeypatch)
     h.stub_edge(monkeypatch, h.Recorder(replace(h.PRINCIPAL, tools=tuple(MCP_TOOL_NAMES))))
     with TestClient(h.fresh_app(), base_url=h.BASE) as client:
-        r = h.call(client, "ask_agent", {"question": "q"})
+        r = h.call(client, "run_workflow", {"workflow_id": "w"})
     assert r.json()["error"]["code"] == -32602
 
 
