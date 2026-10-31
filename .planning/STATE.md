@@ -45,9 +45,9 @@ reviewer exists, so a phase closes `verification_mode: self-verified`, never `re
 
 Milestone: v4.9 Use It From Your Own Tools
 Phase: 306 (ask-the-agent-and-run-workflows) — EXECUTING
-Plan: 1 of 5
-Status: Executing Phase 306
-Last activity: 2026-10-31 -- Phase 306 execution started
+Plan: 5 of 5 (all merged)
+Status: Phase 306 executed — verification gaps CR-01/CR-02 fixed by quick 261101-4y9; re-verification pending
+Last activity: 2026-11-01 - Completed quick task 261101-4y9: fix 306 CR-01 and CR-02 with a test each
 
 Phases start at **303**; migrations at **220**. Seeds taken in at intake: SEED-013, SEED-177, SEED-195, SEED-081, SEED-079; bug BUG-261022-01.
 
@@ -107,6 +107,12 @@ link. Branch `develop`. Tags `v4.7` and `v4.8` pushed 2026-10-30.
 - 31 pre-v4.8 quick tasks with no SUMMARY (2026-03 to 2026-10-16).
 - 4 dormant seeds: SEED-041, SEED-043, SEED-046, SEED-127.
 - 1 UAT file: 300-HUMAN-UAT.md (`complete-by-decision`, 0 open scenarios).
+
+### Quick Tasks Completed
+
+| # | Description | Date | Commit | Directory |
+|---|-------------|------|--------|-----------|
+| 261101-4y9 | fix 306 CR-01 and CR-02 with a test each | 2026-11-01 | c2b3225b0 | [261101-4y9-fix-306-cr-01-and-cr-02-with-a-test-each](./quick/261101-4y9-fix-306-cr-01-and-cr-02-with-a-test-each/) |
 
 ## Guardrail overrides
 
