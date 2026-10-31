@@ -17,7 +17,7 @@ import pytest
 from app.mcp import results as R
 from app.mcp import run_tools
 from app.services.key_run_read import InboundRunRead
-from app.services.outbound_guard import guard
+from app.services.outbound_guard import guard, redactable_fields
 
 ORG = "44444444-4444-4444-8444-444444444444"
 RUN = "55555555-5555-4555-8555-555555555555"
@@ -34,7 +34,9 @@ async def _off(_org):
 
 
 def test_end_reason_is_annotated_redactable():
-    assert R.REDACTABLE in R.RunRead.model_fields["end_reason"].metadata
+    # Read through the guard's OWN walk: the marker of an Optional field sits one level down, so
+    # ``FieldInfo.metadata`` alone is empty for it (305-REVIEW-04 WR-04-02).
+    assert "end_reason" in redactable_fields(R.RunRead)
 
 
 async def test_an_email_in_end_reason_is_masked_when_the_switch_is_on():

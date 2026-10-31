@@ -307,7 +307,7 @@ class RunRead(BaseModel):
     waiting_on: RedactableText | None = None
     output: RedactableText | None = None
     files: list[RedactableText] = Field(default_factory=list)
-    end_reason: str | None = None
+    end_reason: RedactableText | None = None  # 306-REVIEW CR-02: through the outbound guard (D-07)
     link: str
 
 
