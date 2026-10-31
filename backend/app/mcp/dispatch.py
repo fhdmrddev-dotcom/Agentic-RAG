@@ -71,7 +71,6 @@ import anyio
 from mcp import types
 from mcp.shared.exceptions import MCPError
 from pydantic import BaseModel, ValidationError
-from starlette.concurrency import run_in_threadpool
 
 from app.db import outbound_policy
 from app.db.mcp_usage import insert_usage
@@ -207,7 +206,13 @@ async def _write_usage(principal: Any, name: str, entries: list[dict], status: s
     try:
         settings = None
         if not entries or any(e.get("model") is None or e.get("provider") is None for e in entries):
-            settings = await run_in_threadpool(load_user_settings, principal.user_id)
+            # 305-REVIEW LF-05: called directly, never through ``run_in_threadpool``. It is an
+            # in-memory read (``load_app_settings`` over the settings cache; a cold cache returns
+            # the defaults) with no I/O on any path, ~0.2 ms of CPU. A thread hop here shared
+            # anyio's limiter with the search's own embed calls and, under a burst, waited past
+            # the bookkeeping bound, cancelling the spend row (GUARD-02). D-v2.5-01 concerns
+            # blocking I/O; this is none.
+            settings = load_user_settings(principal.user_id)
         if not entries:  # nothing was measured: one honest unmeasured row, never a missing one
             entries = [{"model": None, "provider": None, "prompt_tokens": None}]
         pool = await get_pg_pool()
