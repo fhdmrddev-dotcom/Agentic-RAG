@@ -496,19 +496,21 @@ node scripts/check-hot-file-ledger.cjs <phase-dir>   # 0 clear · 1 missing rows
 | `backend/app/services/multimodal_service.py` | 14 / 7 / 984 | ⚠ absent from BOTH for its ENTIRE LIFE at **7 phases** |
 | `backend/app/api/documents.py` | 101 / 40 / 2709 (was `99 / 39 / 2698`) | 298-01: one by_org in build() + one root_upload_org kwarg · ⛔ |
 | `backend/app/api/library.py` | 3 / 3 / 304 (was `2 / 2 / 299`) | ⚠ now FIRES (298) · 298-01: summary shares the lists' org predicate ($1) |
-| `scripts/vitest-count-gate.cjs` | 415 / 88 / 6956 (was `412 / 87 / 6948`) | 306-04: 3 first pins + 2 raised; none lowered |
+| `scripts/vitest-count-gate.cjs` | 416 / 88 / 6956 (was `415 / 88 / 6956`) | 306-05: 4 pins raised; none lowered |
 | `scripts/check-deploy-drift.sh` | 6 / 5 / 271 (was `5 / 4 / 267`) | 300-03: SMTP_* parity |
 | `scripts/build-public-openapi.cjs` | 13 / 7 / 473 (was `11 / 5 / 472`) | 301-01: notifications tag + /notifications FLAGGED (2 lines) |
 | `scripts/check-seeds-register.cjs` | 7 / 3 / 1132 | ⚠ FIRES, absent here — row added 296-05 · `\d{3,}` ids · ⛔ |
 | `backend/app/services/eval_runner_service.py` | 14 / 9 / 1056 (was `13 / 8 / 1040`) | 296-06: eval arm on a fixed EVAL_MAX_TOOL_ROUNDS (copy of settings) |
 | `backend/app/services/scheduler_service.py` | 16 / 9 / 375 (was `15 / 9 / 372`) | 300-REVIEW WR-01: outcome reads THIS run by id; failed/cancelled kept |
-| `backend/app/services/unattended_launch.py` | 8 / 3 / 383 (was `7 / 3 / 379`) | 300-REVIEW WR-01: on_finish(status, run_id) names the run it drove |
+| `backend/app/services/unattended_launch.py` | 9 / 4 / 385 (was `8 / 3 / 383`) | 306-05: one thread_origin kwarg + one ** expression · ⛔ |
 | `backend/app/services/run_model_resolution.py` | 5 / 3 / 371 (was `4 / 3 / 344`) | 300-REVIEW IN-03: owner pair via the in-app chain (overlay + resolve) |
 | `backend/app/api/schedules.py` | 6 / 6 / 341 (was `5 / 5 / 303`) | 300-01: create/patch/resume 422 by label (D-14) |
 | `backend/app/services/inbound_inputs.py` | 10 / 4 / 362 (was `9 / 3 / 352`) | 306-03: source/notice kwargs (293 defaults) + ASK_NOTICE · ⛔ |
 | `backend/app/api/inbound.py` | 12 / 4 / 545 (was `11 / 4 / 500`) | 306-02: one admission block + on_finish=_release (D-16/D-35) · ⛔ |
 | `frontend/src/components/settings/apiKeys/apiKeysCopy.ts` | 8 / 6 / 307 (was `7 / 5 / 287`) | 306-02: outside group words + admission call words · ⛔ |
 | `frontend/src/components/settings/apiKeys/apiKeyFacts.ts` | 8 / 6 / 386 (was `7 / 5 / 378`) | 306-02: four admission refusedWords cases · ⛔ |
+| `frontend/src/components/settings/apiKeys/ApiKeyCallStrip.tsx` | 3 / 3 / 140 (was `2 / 2 / 130`) | ⚠ now FIRES (306) · 306-05: MCP start bars + started legend · ⛔ |
+| `frontend/src/components/settings/apiKeys/mcpKeyCopy.ts` | 8 / 3 / 222 (was `6 / 2 / 206`) | ⚠ now FIRES (306) · 306-05: ask / run words + 3 rewordings · ⛔ |
 | `frontend/src/components/settings/ApiKeyLimits.tsx` | 3 / 3 / 320 (was `2 / 2 / 245`) | ⚠ now FIRES (306) · 306-02: outside limits group · extraction FIRST · ⛔ |
 | `backend/app/models/schedule.py` | 3 / 3 / 231 | ⚠ FIRES, absent here — row added 296-02 · one additive field (outcome) |
 | `frontend/src/components/panel/PhaseCard.tsx` | 22 / 14 / 821 (was `21 / 14 / 817`) | 296 review FE-WR-01: paused step drops running instruments |
@@ -712,7 +714,7 @@ node scripts/check-hot-file-ledger.cjs <phase-dir>   # 0 clear · 1 missing rows
 | `frontend/src/components/layout/AppViewSwitch.tsx` | 8 / 3 / 609 (was `7 / 2 / 600`) | ⚠ now FIRES (301) · 301-03: the non-chat hamburger dot · ⛔ no hooks |
 | `backend/app/security/api_key_auth.py` | 7 / 3 / 432 (was `6 / 3 / 413`) | 305 LF-03: restore_suppressed_refusals beside the slot · ⛔ |
 | `backend/app/services/retrieval_tuning.py` | 7 / 3 / 412 (was `4 / 2 / 364`) | ⚠ now FIRES (305) · BUG-261031-03 probe + LF-01/02 savepoints · ⛔ |
-| `backend/app/db/rates.py` | 11 / 3 / 950 | ⚠ now FIRES (305) · 305-03: mcp_usage legs in the one per_root CTE · ⛔ |
+| `backend/app/db/rates.py` | 12 / 4 / 960 (was `11 / 3 / 950`) | 306-05: runs-arm key from the thread's mcp origin; source run · ⛔ |
 | `frontend/src/components/settings/apiKeys/ApiKeyCard.tsx` | 3 / 3 / 239 | ⚠ now FIRES (305) · 305-03: the two !isMcp guards removed |
 | `frontend/src/components/settings/apiKeys/ApiKeysTab.tsx` | 5 / 3 / 317 | ⚠ now FIRES (305) · 305-03: one AI tool limits line · ⛔ |
 | `frontend/src/types/spend.ts` | 5 / 3 / 128 | ⚠ now FIRES (305) · 305-03: four optional ledger fields |
