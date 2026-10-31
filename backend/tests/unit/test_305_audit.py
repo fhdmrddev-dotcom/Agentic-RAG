@@ -14,8 +14,9 @@ Every ``tools/call`` writes EXACTLY ONE row naming the key (id + label), the too
 Refusals go through ``refusal_audit_slot`` (CR-02): a suppressed one writes nothing and the next
 written row names the suppressed count. No metadata value ever carries the query text.
 
-The writer is ``api_key_auth.write_audit_entry`` (patched here as the row recorder); the per-key
-counters run on ``FakeRedis``. Nothing touches a database.
+The writer is ``app.mcp.audit.insert_audit_row`` (patched here as the row recorder; BUG-261031-04
+moved the row off the supabase-py / threadpool path onto the asyncpg pool); the per-key counters run
+on ``FakeRedis``. Nothing touches a database.
 """
 from __future__ import annotations
 
@@ -41,12 +42,13 @@ PRINCIPAL = replace(h.PRINCIPAL, label="Laptop", tools=("t_read", "t_query", "t_
 def world(monkeypatch):
     rows: list[dict] = []
 
-    async def _write(user_id, action_type, metadata, supabase, org_id=None):
+    async def _write(user_id, action_type, metadata, org_id):
         rows.append({"user_id": user_id, "action_type": action_type, "metadata": metadata,
                      "org_id": org_id})
 
-    monkeypatch.setattr(auth, "write_audit_entry", _write)
-    monkeypatch.setattr(auth, "get_service_role_supabase", lambda org: object())
+    import app.mcp.audit as mcp_audit
+
+    monkeypatch.setattr(mcp_audit, "insert_audit_row", _write)
 
     knobs = {"api_key_reads_per_minute": 50, "api_key_searches_per_minute": 1}
 
@@ -222,9 +224,52 @@ async def test_an_audit_failure_never_fails_the_call(world, monkeypatch):
     async def _broken(*a, **k):
         raise RuntimeError("audit store down")
 
-    monkeypatch.setattr(auth, "write_audit_entry", _broken)
+    import app.mcp.audit as mcp_audit
+
+    monkeypatch.setattr(mcp_audit, "insert_audit_row", _broken)
     out = await _dispatch(world, "t_read")
     assert out.is_error is not True
+
+
+async def test_an_mcp_audit_row_never_builds_a_supabase_client_or_hops_the_threadpool(world, monkeypatch):
+    """BUG-261031-04: the per-row service-role client build (~0.19 s of GIL-held work) and the
+    PostgREST insert were two threadpool hops that serialized under concurrency, past the bound.
+    The MCP row is one asyncpg INSERT: the 293 HTTP writer is never reached from dispatch."""
+    reached: list[str] = []
+
+    def _build(org):
+        reached.append("get_service_role_supabase")
+        return object()
+
+    async def _old(*a, **k):
+        reached.append("write_audit_entry")
+
+    monkeypatch.setattr(auth, "get_service_role_supabase", _build)
+    monkeypatch.setattr(auth, "write_audit_entry", _old)
+    await _dispatch(world, "t_read")
+    await _dispatch(world, "t_hidden")
+    assert reached == []
+    assert [r["action_type"] for r in world["rows"]] == ["api_key.read", "api_key.refused"]
+
+
+async def test_insert_audit_row_is_one_parameterized_insert_on_the_pool(monkeypatch):
+    """The write's own shape: explicit org, metadata as JSON text, nothing interpolated."""
+    import app.mcp.audit as mcp_audit
+
+    seen: list[tuple] = []
+
+    class _Pool:
+        async def execute(self, sql, *args):
+            seen.append((sql, args))
+
+    async def _pool():
+        return _Pool()
+
+    monkeypatch.setattr(mcp_audit, "get_pg_pool", _pool)
+    await mcp_audit.insert_audit_row("u1", "api_key.read", {"tool": "t", "outcome": "ok"}, "o1")
+    ((sql, args),) = seen
+    assert sql.startswith("INSERT INTO public.audit_log (user_id, action_type, metadata, org_id)")
+    assert args == ("u1", "api_key.read", json.dumps({"tool": "t", "outcome": "ok"}), "o1")
 
 
 # ── 305-REVIEW WR-01 / WR-03 / WR-04 ──────────────────────────────────────────────────────────
@@ -308,7 +353,9 @@ async def test_a_hung_audit_write_is_bounded_and_never_hangs_the_call(world, mon
     async def _hang(*a, **k):
         await anyio.sleep(60)
 
-    monkeypatch.setattr(auth, "write_audit_entry", _hang)
+    import app.mcp.audit as mcp_audit
+
+    monkeypatch.setattr(mcp_audit, "insert_audit_row", _hang)
     with anyio.fail_after(5):
         out = await _dispatch(world, "t_read")
     assert out.is_error is not True

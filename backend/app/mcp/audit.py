@@ -1,7 +1,7 @@
 """Phase 305-03 (KEY-07; D-26 / D-53; T-305-12 / T-305-29) — the one audit row per MCP call.
 
-No new audit literal (304 D-36) and no change to ``audit_service.py``: rows go through the 293
-writers in ``security/api_key_auth``.
+No new audit literal (304 D-36) and no change to ``audit_service.py``: the row's metadata is built
+by the 293 builder ``security/api_key_auth._audit_args`` (one shape for every ``api_key.*`` row).
 
 * ``audit_answered`` — ``api_key.read`` with ``{kind: mcp, tool, outcome}``; ``outcome`` is ``ok``,
   ``error``, (305-04) ``redaction_blocked`` or (305-REVIEW WR-04) ``not_available`` — a handler's
@@ -14,18 +14,32 @@ writers in ``security/api_key_auth``.
   ``inbound._refused`` is (293-REVIEW CR-02): a suppressed refusal is COUNTED, and the next written
   row carries ``detail.suppressed`` — never silently dropped.
 
-Always ``audit_key_call_now`` (awaited), never ``audit_key_call``: there is no FastAPI handler here
-whose BackgroundTasks would run. Neither helper takes a query or any tool argument (T-305-29). A
-failure to audit is logged and never fails the call.
+BUG-261031-04: the row is ONE parameterized INSERT on the asyncpg pool (``insert_audit_row``), the
+path ``mcp_usage`` rows take. It used to go through ``audit_key_call_now``: a NEW supabase-py client
+per row (~0.19 s of GIL-held work) plus a PostgREST insert, two threadpool hops inside dispatch's
+shielded bound. Under concurrency those hops serialized (30 rows ~7-25 s), the bound fired between
+them, and the row was cancelled with no log line — measured: 32 concurrent calls, 0 rows. An
+asyncpg insert takes milliseconds and is cancellable, so the bound really bounds it too.
+
+``org_id`` is explicit in every row (the pool is service-role; ``BYPASSRLS``), taken from the
+principal and nowhere else. Neither helper takes a query or any tool argument (T-305-29). A failure
+to audit is logged (tool, key, write) and never fails the call.
 """
 from __future__ import annotations
 
+import json
 import logging
 from typing import Any
 
-from app.security.api_key_auth import audit_key_call_now, refusal_audit_slot
+from app.dependencies import get_pg_pool
+from app.security.api_key_auth import _audit_args, refusal_audit_slot
 
 logger = logging.getLogger("app.mcp")
+
+_INSERT = (
+    "INSERT INTO public.audit_log (user_id, action_type, metadata, org_id) "
+    "VALUES ($1::uuid, $2, $3::text::jsonb, $4::uuid)"
+)
 
 
 def _key(principal: Any) -> dict:
@@ -39,11 +53,27 @@ def _key(principal: Any) -> dict:
     }
 
 
+async def insert_audit_row(user_id: str, action_type: str, metadata: dict, org_id: str) -> None:
+    """The ONE write: an ``audit_log`` row on the asyncpg pool. Raises on failure (callers log)."""
+    pool = await get_pg_pool()
+    await pool.execute(_INSERT, user_id, action_type, json.dumps(metadata), org_id)
+
+
+async def _write(principal: Any, action_type: str, **fields: Any) -> None:
+    user_id, metadata, org_id = _audit_args(
+        _key(principal), call="read", workflow_id=None, run_id=None,
+        outcome=fields.get("outcome"), reason=fields.get("reason"),
+        detail=fields.get("detail"), tool=fields.get("tool"),
+    )
+    await insert_audit_row(user_id, action_type, metadata, org_id)
+
+
 async def audit_answered(principal: Any, *, tool: str | None, outcome: str) -> None:
     try:
-        await audit_key_call_now(_key(principal), "api_key.read", call="read", outcome=outcome, tool=tool)
+        await _write(principal, "api_key.read", outcome=outcome, tool=tool)
     except Exception:  # noqa: BLE001 — an audit failure must never fail the call
-        logger.warning("mcp audit write failed (tool=%s outcome=%s)", tool, outcome, exc_info=True)
+        logger.error("mcp audit row NOT written (tool=%s key=%s write=api_key.read outcome=%s)",
+                     tool, principal.key_id, outcome, exc_info=True)
 
 
 async def audit_refused(
@@ -55,9 +85,8 @@ async def audit_refused(
             return  # counted; the next written row of this (key, reason) names it
         if suppressed:
             detail = {**(detail or {}), "suppressed": suppressed}
-        await audit_key_call_now(
-            _key(principal), "api_key.refused", call="read", outcome="refused",
-            reason=reason, detail=detail, tool=tool,
-        )
+        await _write(principal, "api_key.refused", outcome="refused", reason=reason,
+                     detail=detail, tool=tool)
     except Exception:  # noqa: BLE001 — an audit failure must never fail the call
-        logger.warning("mcp refusal audit failed (tool=%s reason=%s)", tool, reason, exc_info=True)
+        logger.error("mcp audit row NOT written (tool=%s key=%s write=api_key.refused reason=%s)",
+                     tool, principal.key_id, reason, exc_info=True)

@@ -43,8 +43,11 @@ def _audit_spy(monkeypatch) -> list:
     async def _spy(*a, **k):
         writes.append((a, k))
 
+    import app.mcp.audit as mcp_audit
+
     monkeypatch.setattr(api_key_auth, "audit_key_call_now", _spy)
     monkeypatch.setattr(audit_service, "write_audit_entry", _spy)
+    monkeypatch.setattr(mcp_audit, "insert_audit_row", _spy)  # BUG-261031-04: dispatch's writer
     return writes
 
 

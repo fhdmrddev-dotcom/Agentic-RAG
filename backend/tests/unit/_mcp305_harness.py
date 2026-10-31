@@ -106,12 +106,20 @@ def stub_accounting(monkeypatch) -> list[dict]:
     async def _load():
         return _build_settings_from_row({})
 
-    async def _write(user_id, action_type, metadata, supabase, org_id=None):
+    async def _write(user_id, action_type, metadata, org_id):
         rows.append({"action_type": action_type, "metadata": metadata, "org_id": org_id})
+
+    async def _write_293(user_id, action_type, metadata, supabase, org_id=None):
+        rows.append({"action_type": action_type, "metadata": metadata, "org_id": org_id})
+
+    import app.mcp.audit as mcp_audit
 
     monkeypatch.setattr(dispatch, "get_redis", lambda: fake)
     monkeypatch.setattr(rate_limit, "load_app_settings_async", _load)
-    monkeypatch.setattr(api_key_auth, "write_audit_entry", _write)
+    # BUG-261031-04: dispatch's row is one asyncpg INSERT (``insert_audit_row``); the 293 writer
+    # stays recorded too, for the resolver's own refusal rows.
+    monkeypatch.setattr(mcp_audit, "insert_audit_row", _write)
+    monkeypatch.setattr(api_key_auth, "write_audit_entry", _write_293)
     monkeypatch.setattr(api_key_auth, "get_service_role_supabase", lambda org: object())
 
     async def _pii_off(org_id):  # 305-04: the org's redaction switch reads OFF (its default)

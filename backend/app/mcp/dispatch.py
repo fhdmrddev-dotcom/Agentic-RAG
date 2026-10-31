@@ -153,12 +153,20 @@ async def dispatch(
         # 305-REVIEW WR-03: shielded from the request's cancellation (a client that disconnects
         # mid-call, a terminated stateless transport, the graceful-shutdown deadline) and bounded,
         # so the one owed row neither disappears nor hangs the call.
-        with anyio.move_on_after(BOOKKEEPING_DEADLINE_S, shield=True):
+        with anyio.move_on_after(BOOKKEEPING_DEADLINE_S, shield=True) as bound:
             if audit["refused"]:
                 await _audit.audit_refused(principal, tool=name, reason=audit["reason"], redis=redis,
                                            detail=audit.get("detail"))
             else:
                 await _audit.audit_answered(principal, tool=name, outcome=audit["outcome"])
+        if bound.cancelled_caught:
+            # BUG-261031-04: a fired bound CANCELS the write; the cancellation passes every
+            # ``except Exception``, so without this line the row vanished with no trace.
+            which = (f"api_key.refused reason={audit['reason']}" if audit["refused"]
+                     else f"api_key.read outcome={audit['outcome']}")
+            logger.error("mcp audit row NOT written: the %.1fs bookkeeping bound fired "
+                         "(tool=%s key=%s write=%s)", BOOKKEEPING_DEADLINE_S, name,
+                         principal.key_id, which)
 
 
 async def _pii_on(org_id: str) -> bool | None:
@@ -179,8 +187,12 @@ async def _run(spec: Any, principal: Any, name: str, args: BaseModel) -> Any:
             return outcome
         finally:
             # 305-REVIEW WR-03: a cancelled search has usually already paid for its embedding.
-            with anyio.move_on_after(BOOKKEEPING_DEADLINE_S, shield=True):
+            with anyio.move_on_after(BOOKKEEPING_DEADLINE_S, shield=True) as bound:
                 await _write_usage(principal, name, list(entries), status)
+            if bound.cancelled_caught:  # BUG-261031-04: never a silent loss
+                logger.error("mcp_usage rows NOT written: the %.1fs bookkeeping bound fired "
+                             "(tool=%s key=%s status=%s rows=%d)", BOOKKEEPING_DEADLINE_S, name,
+                             principal.key_id, status, max(len(entries), 1))
 
 
 async def _write_usage(principal: Any, name: str, entries: list[dict], status: str) -> None:
