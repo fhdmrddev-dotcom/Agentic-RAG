@@ -107,7 +107,9 @@ export function McpKeyFields({
   const groupIds = { read: useId(), ask: useId(), run: useId() }
   const org = orgName || M.orgFallback
   const tools = catalogue ? draftTools(value, catalogue) : []
-  const askNeedsExternal = tools.includes("ask_agent") && !value.external
+  // 306-05 (D-29): the ask group's lead, read from the server's catalogue (D-11: no name retyped).
+  const askLead = catalogue?.find((t) => t.group === "ask" && !t.travels_with)?.name
+  const askNeedsExternal = !!askLead && tools.includes(askLead) && !value.external
 
   function toggleTool(name: string) {
     if (!catalogue) return
