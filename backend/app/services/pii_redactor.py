@@ -18,8 +18,9 @@ What it masks, with exactly these words (the org admin card quotes the first one
     ``sk-ant-``, ``sk-proj-``, ``gh[pousr]_``, ``github_pat_``, ``AKIA``/``ASIA``,
     ``xox[baprs]-``, ``whsec_``, ``AIza``), three-part JWTs (``eyJ….eyJ….…``, wherever they sit,
     links included — a JWT is a bearer token), and high-entropy tokens of 32..128 characters that
-    mix upper case, lower case and digits. Excluded by shape: canonical UUIDs, hex digests, paths,
-    and anything that is part of a link (a scheme or ``www.`` in the same word, a ``?``/``&`` query
+    mix upper case, lower case and digits. Excluded by shape: canonical UUIDs, hex digests, paths
+    (a leading ``/``, or leading segments that are words — never after a secret keyword or as a
+    ``NAME=`` value, so a slash-bearing base64 key is still caught), and anything that is part of a link (a scheme or ``www.`` in the same word, a ``?``/``&`` query
     parameter, a percent-encoded neighbour) — measured on the local corpus, 30 of 30 sampled
     entropy hits were link tracking tokens before those exclusions (305-04 v1). ``NAME=value``
     is judged on the value, so an env line keeps its name.
@@ -323,6 +324,25 @@ _WORD_START = re.compile(r"[\s<(\[{\"']")
 _PERCENT = re.compile(r"%[0-9A-Fa-f]{2}")
 
 
+# A path's leading segments are words ("docs/archive/…", "ss/c/u001/…"): lower case and digits,
+# with at most a leading capital. A base64 secret's segments are not (305-REVIEW-04 WR-04-01:
+# "two or more slashes" alone let 13.5% of random 40-char base64 keys through. With no keyword,
+# this shape lets about 1% through (mostly a leading "/" plus another "/": an absolute-path
+# shape); after a secret keyword or as a NAME= value, none. It re-admitted 0 of the 5 corpus
+# tokens the old rule dropped — all five were absolute paths).
+_PATH_SEGMENT = re.compile(r"[A-Za-z]?[a-z0-9_\-]*")
+_SECRET_KEYWORD = re.compile(
+    r"(?<![a-z])(?:key|secret|token|passw(?:or)?d|pwd|credential|auth)", re.IGNORECASE
+)
+
+
+def _path_shaped(tok: str) -> bool:
+    segments = tok.split("/")
+    if len(segments) < 3:
+        return False  # one slash is no path: "/<token>" and "<a>/<b>" are judged as tokens
+    return tok.startswith("/") or all(_PATH_SEGMENT.fullmatch(s) for s in segments[:-1])
+
+
 def _inside_url(text: str, start: int) -> bool:
     """True when the token sits in a URL: the whitespace-delimited word it belongs to (looked back
     at most 2,048 chars) carries a scheme or starts with ``www.``."""
@@ -344,7 +364,8 @@ def _entropy(text: str) -> Iterator[tuple[int, int]]:
         if text[start - 1:start] in ("?", "&"):
             continue  # a query parameter of a link (measured 305-04 v2)
         body = tok.rstrip("=")
-        if "=" in body:  # NAME=value: judge the value alone (an env line keeps its name)
+        named = "=" in body
+        if named:  # NAME=value: judge the value alone (an env line keeps its name)
             cut = body.rfind("=") + 1
             start, tok = start + cut, tok[cut:]
             if len(tok) < ENTROPY_MIN_LEN:
@@ -353,8 +374,11 @@ def _entropy(text: str) -> Iterator[tuple[int, int]]:
             continue  # percent-encoded neighbours: a fragment of a URL (measured 305-04 v2)
         if _UUID.fullmatch(tok) or _HEX.fullmatch(tok):
             continue
-        if len(tok) > ENTROPY_MAX_LEN or tok.startswith("/") or tok.count("/") >= 2:
+        if len(tok) > ENTROPY_MAX_LEN:
             continue
+        if "/" in tok and _path_shaped(tok) and not (
+                named or _SECRET_KEYWORD.search(text[max(0, start - KEYWORD_WINDOW):start])):
+            continue  # a path — unless it is a NAME= value or follows a secret keyword
         if _inside_url(text, start):
             continue
         if not (any(c.isupper() for c in tok) and any(c.islower() for c in tok)

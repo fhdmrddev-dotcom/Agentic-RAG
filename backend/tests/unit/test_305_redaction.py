@@ -127,8 +127,9 @@ def test_slash_bearing_base64_secrets_after_a_keyword_are_all_masked():
 def test_slash_bearing_base64_secrets_without_a_keyword_are_masked_unless_path_shaped():
     keys = _random_b64_keys(2000, seed=30505)
     missed = [k for k in keys if k in R.redact(f"value {k} end")]
-    # Measured: ~1.3% start with "/" (an absolute-path shape) and are left alone without a keyword.
-    assert len(missed) <= 2000 * 0.03, len(missed)
+    # Measured 25 / 2,000 (1.25%): mostly a leading "/" plus another "/" (an absolute-path shape),
+    # left alone without a keyword. Was 284 / 2,000 before WR-04-01.
+    assert len(missed) <= 2000 * 0.02, len(missed)
 
 
 def test_an_8000_char_dense_chunk_redacts_in_under_20_ms():

@@ -52,7 +52,7 @@
     {"id": "secret-aws-example-after-key", "recognizer": "secret", "_review": "305-REVIEW-04 WR-04-01: two slashes made a base64 secret read as a path", "text_parts": ["key: ", "wJalrXUtnFEMI/", "K7MDENG/", "bPxRfiCYEXAMPLEKEY"], "value_parts": ["wJalrXUtnFEMI/", "K7MDENG/", "bPxRfiCYEXAMPLEKEY"]},
     {"id": "secret-aws-example-env-line", "recognizer": "secret", "_review": "305-REVIEW-04 WR-04-01", "text_parts": ["AWS_SECRET_", "ACCESS_KEY=", "wJalrXUtnFEMI/", "K7MDENG/", "bPxRfiCYEXAMPLEKEY", "\n"], "value_parts": ["wJalrXUtnFEMI/", "K7MDENG/", "bPxRfiCYEXAMPLEKEY"]},
     {"id": "secret-base64-two-slashes-bare", "recognizer": "secret", "_review": "305-REVIEW-04 WR-04-01: no keyword, segments are not words", "text_parts": ["blob ", "Zq3/Xk9pLm2Rt7Wv/", "Bn4Hy8Jd6Fs1Gc5Ke0Ua", " end"], "value_parts": ["Zq3/Xk9pLm2Rt7Wv/", "Bn4Hy8Jd6Fs1Gc5Ke0Ua"]},
-    {"id": "secret-entropy-base62","recognizer": "secret", "text": "session q7Xk2PzR9mLw4TcV8bNy3HdF6sGj1KaE5uYo0iZe expires", "value": "q7Xk2PzR9mLw4TcV8bNy3HdF6sGj1KaE5uYo0iZe"}
+    {"id": "secret-entropy-base62", "recognizer": "secret", "text": "session q7Xk2PzR9mLw4TcV8bNy3HdF6sGj1KaE5uYo0iZe expires", "value": "q7Xk2PzR9mLw4TcV8bNy3HdF6sGj1KaE5uYo0iZe"}
   ],
   "negative": [
     {"id": "phone-table-no-keyword", "recognizer": "phone", "text": "| Region | 020 7946 0958 | 1 234 567 |"},
@@ -85,6 +85,6 @@
     {"id": "secret-relative-path-with-token", "recognizer": "secret", "_review": "305-REVIEW-04 WR-04-01: a path whose leading segments are words stays a path", "text": "see docs/archive/Q3vYk8LpW2zN7tRb5mXc9dFh4jKs6aGe1uTo0iPy for details"},
     {"id": "secret-tracking-path-scheme-cut-off", "recognizer": "secret", "_review": "305-REVIEW-04 WR-04-01: a link path whose scheme sat beyond a chunk edge", "text": "ss/c/u001/3H1KLx2pQ9mZ7vB4nC8dF6gJ0hT5sW2y_RkLqPzXa today"},
     {"id": "secret-absolute-path-with-token", "recognizer": "secret", "text": "file /var/cache/Q3vYk8LpW2zN7tRb5mXc9dFh4jKs6aGe1uTo0iPy opened"},
-    {"id": "secret-long-blob","recognizer": "secret", "_measured": "a token over 128 chars is a blob (tracking or base64 data), not a key", "text": "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNkYPhfDwAChwGA60e6kgAAAABJRU5ErkJggg8Zx3Qw7Er6Ty5Ui4Op2As1Df0Gh9Jk8Lz7Xc6Vb5Nm4Qw3Er2Ty1Ui0Op9As8Df7Gh6Jk5Lz4Xc3Vb2Nm1Q end"}
+    {"id": "secret-long-blob", "recognizer": "secret", "_measured": "a token over 128 chars is a blob (tracking or base64 data), not a key", "text": "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNkYPhfDwAChwGA60e6kgAAAABJRU5ErkJggg8Zx3Qw7Er6Ty5Ui4Op2As1Df0Gh9Jk8Lz7Xc6Vb5Nm4Qw3Er2Ty1Ui0Op9As8Df7Gh6Jk5Lz4Xc3Vb2Nm1Q end"}
   ]
 }
