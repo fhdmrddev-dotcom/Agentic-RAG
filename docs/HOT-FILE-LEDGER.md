@@ -8562,6 +8562,16 @@ can ever reach a `SET` statement. And each GUC is applied INDEPENDENTLY inside i
 `hnsw.iterative_scan` does not exist below pgvector 0.8 — an unrecognised parameter must degrade the
 tuning, never the search.
 
+⚠ **RE-DERIVED AT 305-REVIEW LF-01 (2026-10-31): `6 / 3 / 400` (was `4 / 2 / 364`) — G-5: ⚠ FIRES (241, 246, 305).**
+The row read `no (2 phases)` after `554fe5235` (BUG-261031-03) had already made 305 the third phase.
+⭐ **305-REVIEW LF-01:** the BUG-261031-03 probe reads `pg_settings.reset_val` on the CALLER's open RLS
+transaction, so a probe error used to abort that transaction and the search failed at its next statement
+(`InFailedSQLTransactionError`, measured live). It now runs inside `_savepoint(conn)` (a nested asyncpg
+`conn.transaction()` = a SAVEPOINT), and a FAILED probe returns `None` without being cached.
+⛔ **Binding invariants added:** the probe still never takes a second pooled connection (BUG-261031-03);
+a tuning statement on the caller's transaction is always wrapped in a savepoint.
+Pinned by `tests/integration/test_305_tuning_savepoint_live.py` and `tests/unit/test_305_search_pool_deadlock.py`.
+
 ---
 
 ### `frontend/src/components/metadata/DocumentDetailPanel.tsx`
@@ -11822,7 +11832,7 @@ cells rot within days.
 | [`backend/app/services/retrieval_service.py`](docs/HOT-FILE-LEDGER.md#backendappservicesretrievalservicepy) | 25 / 14 / 181 (was `24 / 13 / 176`) | ⚠ **FIRES** | ✅ extraction DISCHARGED (272-01). 294-01: keyword-only instruction, conditional kwargs at the one rerank call, process_inputs (+6 −1). Honoured by construction |
 | [`backend/app/services/recall_eval.py`](docs/HOT-FILE-LEDGER.md#backendappservicesrecallevalpy) | 4 / 3 / 1070 | ⚠ **FIRES** | Phase 246 landing: safe as-is (offline test/eval harness, zero request-path side effects, clean 2-layer design). Added `inspect_execution_plan` (EXPLAIN + `idx_scan > 0`) & latency p50/p95 |
 | [`scripts/build-recall-bench.py`](docs/HOT-FILE-LEDGER.md#scriptsbuild-recall-benchpy) | 4 / 1 / 1088 | no (1 phase) | ⚠ row ADDED at 241-04 — the only `DROP DATABASE` in the repo. Guard + constant-interpolation + AST fence, all driven RED. It built GREEN and unreadable; assert the READ |
-| [`backend/app/services/retrieval_tuning.py`](docs/HOT-FILE-LEDGER.md#backendappservicesretrievaltuningpy) | 4 / 2 / 364 | no (2 phases) | young (241, 246). ⛔ `ef_search` is the lever (200 → recall 1.000); dynamic server probe + 60s TTL cache (246, SEED-268) |
+| [`backend/app/services/retrieval_tuning.py`](docs/HOT-FILE-LEDGER.md#backendappservicesretrievaltuningpy) | 6 / 3 / 400 (was `4 / 2 / 364`) | ⚠ **FIRES** | ⚠ now FIRES (305: BUG-261031-03 + LF-01). 305-REVIEW LF-01: the in-transaction probe runs in a SAVEPOINT; a failed probe is never cached. ⛔ never a second pooled connection |
 | [`frontend/src/components/metadata/DocumentDetailPanel.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentsmetadatadocumentdetailpaneltsx) | 17 / 12 / 668 (was `16 / 11 / 666`) | ⚠ **FIRES** | 298-05: one JSX mount, <MoveToOrgButton document={doc} currentUserId onMoved={onClose}> beside Download; it decides its own eligibility and owns its sheet. No state |
 | [`frontend/src/components/metadata/DocumentConversationSection.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentsmetadatadocumentconversationsectiontsx) | 0 / 0 / 155 | no (new) | young (240) — the read that makes `thread_key` visible. ⛔ Bounded height + a worded truncation, because BUG-260908-01 is the same panel unbounded |
 | [`frontend/src/lib/api/documents.ts`](docs/HOT-FILE-LEDGER.md#frontendsrclibapidocumentsts) | 11 / 10 / 599 (was `10 / 9 / 595`) | ⚠ **FIRES** | 298-01: uploadDocument spreads `X-Org-Id` from getActiveOrgId() at send time (D-29); still no Content-Type. One import name + one expression. Honoured by construction. |

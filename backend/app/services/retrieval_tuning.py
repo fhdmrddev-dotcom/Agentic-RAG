@@ -47,6 +47,7 @@ measurement rather than a prerequisite.
 
 from __future__ import annotations
 
+import contextlib
 import logging
 import time
 
@@ -76,6 +77,20 @@ _server_ef_cache: tuple[int | None, float] | None = None
 _SQL_EF_SEARCH_SESSION_DEFAULT = (
     "SELECT reset_val FROM pg_catalog.pg_settings WHERE name = 'hnsw.ef_search'"
 )
+
+
+def _savepoint(conn):
+    """305-REVIEW LF-01 / LF-02: a SAVEPOINT around one tuning statement on the caller's open
+    transaction, so a server-side error rolls back only that statement. Without it Postgres aborts
+    the whole transaction and the caught error fails the search anyway, at its NEXT statement
+    (``InFailedSQLTransactionError``, measured live). On an asyncpg connection already inside
+    ``conn.transaction()`` a nested ``conn.transaction()`` IS a savepoint; a released savepoint keeps
+    its ``SET LOCAL`` until the outer transaction ends. Outside a transaction (or on a test double
+    with no ``transaction``) nothing is wrapped: there is no transaction to protect."""
+    in_txn = getattr(conn, "is_in_transaction", None)
+    if callable(in_txn) and in_txn() and hasattr(conn, "transaction"):
+        return conn.transaction()
+    return contextlib.nullcontext()
 
 
 def _reset_server_ef_cache() -> None:
@@ -130,7 +145,10 @@ async def get_server_ef_search(
             # default on the connection already held instead: ``pg_settings.reset_val`` is what
             # RESET would restore, which a ``SET LOCAL`` in this transaction never changes, so the
             # D-246-05 non-poisoning invariant holds without leaving the transaction.
-            raw = await conn.fetchval(_SQL_EF_SEARCH_SESSION_DEFAULT)
+            # 305-REVIEW LF-01: inside a savepoint, so a probe error cannot abort the caller's
+            # transaction (the search would then fail at its next statement).
+            async with _savepoint(conn):
+                raw = await conn.fetchval(_SQL_EF_SEARCH_SESSION_DEFAULT)
         elif conn is not None:
             if hasattr(conn, "fetchval"):
                 raw = await conn.fetchval(query)
@@ -158,7 +176,7 @@ async def get_server_ef_search(
         probed_val = None
     except Exception as exc:
         logger.warning("Failed to probe hnsw.ef_search setting: %s", exc)
-        probed_val = None
+        return None  # 305-REVIEW LF-01: a FAILED probe is never cached; the next call re-probes
 
     _server_ef_cache = (probed_val, now + _SERVER_EF_CACHE_TTL)
     return probed_val

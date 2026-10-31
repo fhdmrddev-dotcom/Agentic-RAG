@@ -49,12 +49,16 @@ class _Conn:
 
     @asynccontextmanager
     async def transaction(self):
+        # asyncpg: a nested ``transaction()`` is a SAVEPOINT; only the outermost one ends the
+        # transaction (305-REVIEW LF-01/LF-02 wrap each tuning statement in one).
+        nested = self._in_txn
         self._in_txn = True
         try:
             yield
         finally:
-            self._in_txn = False
-            self.local.clear()  # SET LOCAL reverts at COMMIT
+            if not nested:
+                self._in_txn = False
+                self.local.clear()  # SET LOCAL reverts at COMMIT
 
     async def execute(self, sql: str, *args):
         await asyncio.sleep(0)  # a real round trip yields to the loop
