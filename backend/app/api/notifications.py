@@ -66,7 +66,7 @@ class WaitingNotice(BaseModel):
     org_name: str
     workflow_name: str
     kind: Literal["question", "approval"]
-    origin: Literal["app", "schedule", "key"] | None
+    origin: Literal["app", "schedule", "key", "mcp"] | None  # 306-04 (D-31): + mcp
     created_at: datetime
 
 

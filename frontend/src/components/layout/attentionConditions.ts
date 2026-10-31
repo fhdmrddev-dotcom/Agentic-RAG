@@ -227,7 +227,7 @@ export interface WaitingCondition {
   /** What the run is waiting for. */
   kind: "question" | "approval"
   /** Who started the run, when known. */
-  origin?: "app" | "schedule" | "key" | null
+  origin?: "app" | "schedule" | "key" | "mcp" | null
   /**
    * The server's count of ALL open notices for this person — the same on every row, and it can
    * EXCEED the number of rows when the server caps them. A badge reads this (`waitingTotal`),

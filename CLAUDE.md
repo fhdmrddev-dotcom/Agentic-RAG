@@ -442,17 +442,17 @@ node scripts/check-hot-file-ledger.cjs <phase-dir>   # 0 clear · 1 missing rows
 | `frontend/src/components/workflows/evidenceView.ts` | 4 / 3 / 387 | ⚠ now FIRES (293) — row added 293-03 · origin passed through |
 | `frontend/src/components/workflows/RunEvidenceReport.tsx` | 8 / 6 / 497 (was `7 / 5 / 492`) | 299-04: one ShareLinkMenu in the actions row (finished run, D-34) |
 | `frontend/src/components/workflows/evidenceVocabulary.ts` | 5 / 3 / 261 | ⚠ now FIRES (296) · 296-04: neutral NO_MATCH/UNSOURCED + DOWNLOAD_UNAVAILABLE |
-| `backend/app/models/thread.py` | 25 / 17 / 550 (was `24 / 16 / 545`) | 293-03: ONE field (origin) |
+| `backend/app/models/thread.py` | 26 / 18 / 566 (was `25 / 17 / 550`) | 306-04: ThreadResponse.origin via origin_for_wire (one validator) · ⛔ |
 | `frontend/src/components/workflows/canvasModel.ts` | 16 / 8 / 836 (was `15 / 8 / 831`) | 296-07: comparePhaseOrder, engineArmed; isGrounded drops escalated |
 | `frontend/src/components/layout/ChatLayout.tsx` | 76 / 37 / 970 (was `75 / 37 / 954`) | honoured by construction (301-03: status state in ctx; one drawer mount) |
-| `frontend/src/components/layout/attentionConditions.ts` | 5 / 3 / 424 (was `3 / 2 / 200`) | ⚠ now FIRES (301) · 301-02: 2nd tenant waiting-runs, required mark · ⛔ |
+| `frontend/src/components/layout/attentionConditions.ts` | 6 / 4 / 424 (was `5 / 3 / 424`) | 306-04: one token (origin + mcp) · ⛔ |
 | `frontend/src/components/layout/ChatLaunchForm.tsx` | 6 / 4 / 191 (was `5 / 4 / 183`) | 296 G-4 row 11: refused Run scrolls the refusal into view |
 | `frontend/src/components/workflows/LaunchInputFields.tsx` | 3 / 3 / 145 | 287-01: leaf stays non-blocking; docblock only · 214.1-01 trigger TAKEN |
-| `frontend/src/components/layout/ChatHistoryColumn.tsx` | 9 / 3 / 524 (was `8 / 3 / 522`) | 298-05: one ElsewhereLine mount atop hc-list (+ its import) |
+| `frontend/src/components/layout/ChatHistoryColumn.tsx` | 10 / 4 / 535 (was `9 / 3 / 524`) | 306-04: one conditional RunOriginLine mount in the row button |
 | `frontend/src/hooks/useThreads.ts` | 9 / 5 / 128 (was `8 / 4 / 121`) | 299-05: pending flag (one const + one key) · ⛔ |
 | `backend/app/services/harness/grounding.py` | 23 / 10 / 1437 (was `21 / 8 / 1414`) | 295-03: ONE pure predicate (is_engine_citation_gate) |
 | `frontend/src/components/workflows/PhaseFormPanel.tsx` | 30 / 14 / 1566 | honoured by construction ×6 (185 / 193 / 193.1 / 199 / 200 / **214**) |
-| `backend/app/db/workflows.py` | 64 / 32 / 2874 (was `63 / 31 / 2862`) | 298-01: keyword-only org_id AND-append on published + drafts feeds |
+| `backend/app/db/workflows.py` | 65 / 33 / 2874 (was `64 / 32 / 2874`) | 306-04: _RUN_ORIGIN_KINDS + mcp (mig 220 CHECK mirror) |
 | `backend/app/services/harness/publish_service.py` | 37 / 17 / 2066 (was `36 / 16 / 2061`) | 302-02: no stand-in for inputs the practice run never asks (BE-IN-03) |
 | `backend/app/services/workflow_authoring.py` | 23 / 13 / 1269 (was `18 / 12 / 1120`) | 296-03: unticked told; provider_error; file-free requirement · seam OWED |
 | `backend/app/models/harness.py` | 22 / 20 / 776 (was `20 / 19 / 766`) | 291-02: InputFieldSpec origin + note, omitted when absent |
@@ -488,7 +488,7 @@ node scripts/check-hot-file-ledger.cjs <phase-dir>   # 0 clear · 1 missing rows
 | `frontend/src/components/chat/OutputFileCard.tsx` | 9 / 8 / 187 (was `8 / 7 / 219`) | honoured by construction (302-01: download moved to useSandboxDownload) |
 | `frontend/src/components/panel/FilesSection.tsx` | 14 / 9 / 366 (was `12 / 8 / 354`) | 302-01: one GeneratedFilesGroup mount; workspace rows byte-identical |
 | `frontend/src/lib/api.ts` | 215 / 128 / 556 (was `214 / 127 / 552`) | 299-03: one links export block |
-| `frontend/src/types/index.ts` | 103 / 82 / 1688 (was `102 / 81 / 1685`) | 299-04: ExpertBundle.org_id (the wire already sent it) · seam OWED |
+| `frontend/src/types/index.ts` | 104 / 83 / 1690 (was `103 / 82 / 1688`) | 306-04: RunOrigin.kind + mcp; Thread.origin (types only) · seam OWED |
 | `backend/app/main.py` | 100 / 74 / 1024 (was `99 / 73 / 1021`) | 305-01: one import + register_mcp(app) + one mcp_lifespan block · ⛔ |
 | `backend/app/config.py` | 96 / 55 / 1831 (was `93 / 54 / 1809`) | 300-03: SMTP_* fields (D-28) · seam OWED · ⛔ |
 | `backend/app/api/admin.py` | 45 / 18 / 2055 (was `44 / 17 / 2054`) | 304-04: one _FLAG_HUMAN_NAMES entry (mcp_enabled) · ⛔ |
@@ -496,7 +496,7 @@ node scripts/check-hot-file-ledger.cjs <phase-dir>   # 0 clear · 1 missing rows
 | `backend/app/services/multimodal_service.py` | 14 / 7 / 984 | ⚠ absent from BOTH for its ENTIRE LIFE at **7 phases** |
 | `backend/app/api/documents.py` | 101 / 40 / 2709 (was `99 / 39 / 2698`) | 298-01: one by_org in build() + one root_upload_org kwarg · ⛔ |
 | `backend/app/api/library.py` | 3 / 3 / 304 (was `2 / 2 / 299`) | ⚠ now FIRES (298) · 298-01: summary shares the lists' org predicate ($1) |
-| `scripts/vitest-count-gate.cjs` | 412 / 87 / 6948 (was `411 / 87 / 6944`) | 305-04: 1 first pin + 2 raised; none lowered |
+| `scripts/vitest-count-gate.cjs` | 415 / 88 / 6956 (was `412 / 87 / 6948`) | 306-04: 3 first pins + 2 raised; none lowered |
 | `scripts/check-deploy-drift.sh` | 6 / 5 / 271 (was `5 / 4 / 267`) | 300-03: SMTP_* parity |
 | `scripts/build-public-openapi.cjs` | 13 / 7 / 473 (was `11 / 5 / 472`) | 301-01: notifications tag + /notifications FLAGGED (2 lines) |
 | `scripts/check-seeds-register.cjs` | 7 / 3 / 1132 | ⚠ FIRES, absent here — row added 296-05 · `\d{3,}` ids · ⛔ |
@@ -517,6 +517,7 @@ node scripts/check-hot-file-ledger.cjs <phase-dir>   # 0 clear · 1 missing rows
 | `backend/app/services/harness/validator_kinds.py` | 20 / 10 / 924 (was `19 / 9 / 918`) | 302-02: judge reads the executor's liveness predicate (BE-IN-01) |
 | `backend/app/services/harness/programmatic.py` | 4 / 4 / 142 (was `3 / 3 / 137`) | 293-REVIEW WR-03: split_topic splits envelope values; still pure · ⛔ |
 | `backend/app/services/harness/emitters.py` | 4 / 2 / 188 | ⚠ absent its ENTIRE LIFE — row added 255 · ⛔ |
+| `backend/app/services/harness/run_read_wire.py` | 3 / 3 / 183 (was `2 / 2 / 183`) | ⚠ now FIRES (306) · 306-04: mcp in ORIGIN_KINDS + RunOriginWire · ⛔ |
 | `frontend/src/components/admin/ModelRegistryTab.tsx` | 19 / 7 / 1705 (was `17 / 7 / 1679`) | honoured by construction (282-04: Add-form Timeout) · AddModelForm seam OWED · ⛔ |
 | `frontend/src/components/workflows/soulData.ts` | 15 / 13 / 556 (was `14 / 12 / 554`) | 296-07: blank label falls back to the key (287-IN-02) |
 | `frontend/src/components/workflows/PublishGauntlet.tsx` | 22 / 12 / 1390 (was `21 / 11 / 1385`) | 296-07: onPublished carries the auto_answered notes (one arg) |
@@ -609,7 +610,7 @@ node scripts/check-hot-file-ledger.cjs <phase-dir>   # 0 clear · 1 missing rows
 | `frontend/src/components/sources/sourceHealthVocabulary.ts` | 8 / 4 / 645 | ⛔ row STALE · G-5 fires (252-03) · Seam OWED |
 | `backend/app/services/sources/failure_cause.py` | 3 / 2 / 227 | ⚠ absent its entire life — row added BUG-260912-01 · ⛔ |
 | `scripts/full-schema-supplement.sql` | 30 / 22 / 927 (was `29 / 21 / 919`) | 306-01: mig 223 threads_origin_immutable() ACL after 222's · ⛔ |
-| `backend/app/services/rate_limit.py` | 6 / 3 / 185 (was `5 / 3 / 160`) | 305-03: check_key_limit (read / expensive buckets), additions only · ⛔ |
+| `backend/app/services/rate_limit.py` | 7 / 4 / 187 (was `6 / 3 / 185`) | 306-04: check_key_limit start arm (api_key_starts_per_minute) · ⛔ |
 | `.claude/settings.json` | 14 / 6 / 214 | ⚠ STALE · last touch 276 · ⛔ |
 | `backend/app/services/forced_emit.py` | 15 / 9 / 749 (was `13 / 8 / 724`) | 296 (293-F-4): cross-provider copy names the target provider · ⛔ |
 | `backend/app/services/template_asset_service.py` | 5 / 4 / 379 (was `4 / 3 / 344`) | 295-02: has_staged_template (Branch-2 WHERE shared) |

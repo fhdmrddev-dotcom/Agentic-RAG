@@ -38,7 +38,7 @@ END_REASON_AUDIT_KINDS: tuple[str, ...] = ("run_failed", "policy_applied")
 _CANCEL_POLICY = "run_cancelled"
 _ENDED = frozenset({"failed", "cancelled"})
 # Phase 293 — the three recorded start kinds (migration 215's CHECK). Anything else reads None.
-ORIGIN_KINDS = frozenset({"app", "schedule", "key"})
+ORIGIN_KINDS = frozenset({"app", "schedule", "key", "mcp"})  # 306-04 (D-31): + mcp
 
 
 class UnsourcedMark(BaseModel):
@@ -134,7 +134,7 @@ def _instant(raw: Any) -> datetime | None:
 class RunOriginWire(BaseModel):
     """Phase 293 — how a run started, as recorded at start. Every run read declares this."""
 
-    kind: Literal["app", "schedule", "key"]
+    kind: Literal["app", "schedule", "key", "mcp"]
     label: str | None = None
     actor_name: str | None = None
 

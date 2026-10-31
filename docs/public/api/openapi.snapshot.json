@@ -29462,7 +29462,8 @@
       "enum": [
        "app",
        "schedule",
-       "key"
+       "key",
+       "mcp"
       ],
       "title": "Kind"
      },
@@ -32169,6 +32170,18 @@
       "type": "string",
       "format": "date-time",
       "title": "Updated At"
+     },
+     "origin": {
+      "anyOf": [
+       {
+        "additionalProperties": true,
+        "type": "object"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Origin"
      }
     },
     "type": "object",
@@ -33253,7 +33266,8 @@
         "enum": [
          "app",
          "schedule",
-         "key"
+         "key",
+         "mcp"
         ]
        },
        {

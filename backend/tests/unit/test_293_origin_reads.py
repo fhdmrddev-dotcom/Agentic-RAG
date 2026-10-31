@@ -72,7 +72,9 @@ def test_origin_wire_model_admits_only_the_three_kinds():
 
     from app.services.harness.run_read_wire import ORIGIN_KINDS, RunOriginWire
 
-    assert ORIGIN_KINDS == frozenset({"app", "schedule", "key"})
+    # 306-04 (D-31) widened this DELIBERATELY: an MCP ask's thread reaches the wire with kind
+    # "mcp", so the read wire admits it in the same plan as the frontend arm. Still no coercion.
+    assert ORIGIN_KINDS == frozenset({"app", "schedule", "key", "mcp"})
     assert RunOriginWire(kind="key", label="x").actor_name is None
     with pytest.raises(ValidationError):
         RunOriginWire(kind="manual")

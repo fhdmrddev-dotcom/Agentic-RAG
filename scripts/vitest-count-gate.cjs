@@ -4420,8 +4420,8 @@ const BASELINE = {
   "ApiKeyLimits.test.tsx": 24, // RAISED 14 -> 24 at 306-02 (2026-10-31): the outside group (words + a11y, 5..45 / 1..50 bounds, load lock, failed read, older backend, changed only, cleared, clamp, adopt, shipped rows snapshot) · RAISED 10 -> 14 at 305-03 (2026-10-31): the searches field (words, 1..120 clamp, adopt, an older backend reads 30) · 293-03 — the operator's per-key limits: load lock + Retry, changed fields only, clamps 1..60 / 10..600, adopt, SettingsPage wiring
   "EmailSettings.test.tsx": 28, // 300-05 (S3) — the operator Email card: words, read-only Sent through, floor-word delay hint (shared case list), changed+valid fields only, clamp 60..3600, adopt, SettingsPage wiring
   "EmailNotificationPreference.test.tsx": 17, // 300-05 (S2) — the member's switch: no On before the read, own PUT, server's value, save/load failures, a11y switch, only /me/preferences URLs
-  "RunOriginLine.test.tsx": 6, // 293-03 — the origin leaf: nothing when absent/unknown, muted, hidden icon, one mount per run surface (src/components/workflows dir TARGET)
-  "runOriginVocabulary.test.ts": 11, // 293-03 — the six origin sentences, null for absent/unknown (D-23)
+  "RunOriginLine.test.tsx": 9, // RAISED 6 -> 9 at 306-04 (2026-11-01): the mcp kind (Bot, title, truncating inner span), an unknown kind renders nothing behind the icon guard, the shipped kinds unchanged · 293-03 — the origin leaf: nothing when absent/unknown, muted, hidden icon, one mount per run surface (src/components/workflows dir TARGET)
+  "runOriginVocabulary.test.ts": 14, // RAISED 11 -> 14 at 306-04 (2026-11-01): the mcp arm with and without a label, the three shipped kinds unchanged · 293-03 — the six origin sentences, null for absent/unknown (D-23)
   "apiKeyPrepick.test.ts": 6, // 293-04 — ⋯ menu pre-pick: sessionStorage read-once, only {workflowId, name}, never a secret
   "apiKeysContract.test.ts": 11, // RAISED 8 -> 11 at 305-04: OrgPiiRedaction vs the fixture + GET/PUT /org/api-keys/pii-redaction · RAISED 3 -> 8 at 304-04: the MCP wire paths (kind, tools, folders, mcp block, pickable folders, org access) · 293-04 — client wire types vs backend api_keys_contract.json, path by path
   "launchFieldsTwin293.test.ts": 9, // 293-04 — launchInputFields vs launch_fields_cases.json (the server twin reads the same file)
@@ -4535,6 +4535,10 @@ const BASELINE = {
   // Phase 305-04 (D-37) — FIRST pin, both knobs in the same commit (FILE-LEVEL in TARGETS below).
   "OrgPiiRedactionCard.test.tsx": 9, // 305-04 — Loading/failed show no switch, OFF calm, describedby the two sub lines, never optimistic + tag + onRecorded once, server answer wins, direct flip off, failed write as a status, mounted right after OrgMcpSwitchCard
   "citationNav.test.tsx": 18, // 305-02 — first pin (153 contract, 13) + the document address arrival: once per distinct id without navigating, leaveDocumentAddress REPLACE, a no-op off an address, no prop unchanged
+  // Phase 306-04 (MCP-05 / D-09 / D-31 / D-32) — FIRST pins, both knobs in the same commit (each is FILE-LEVEL in TARGETS below).
+  "ChatHistoryColumn.origin306.test.tsx": 9, // 306-04 — the mcp history row: one origin line inside the row button (Bot, sentence, accessible name), in-app row byte-identical to the base, selected stays muted, title-only filter, both groupings, unknown kind no line, no new hook, originWords("mcp")
+  "outsideAskEnvelope.test.ts": 8, // 306-04 — the shared phase306 fixture's stored question, never un-escaped, api_key / typed / trailing / leading text is not an ask, any notice text, the note's words, zero-import leaf
+  "UserMessageBubble.outsideAsk.test.tsx": 5, // 306-04 — question + one note (Bot, class contract), clamp measures the question, the note after Read more, a plain bubble byte-identical to the base, clamp/toggle code unchanged
 }
 
 // Still COMPUTED, never hand-written — the reduce is the single source, so the
@@ -6666,6 +6670,10 @@ const TARGETS = [
   "src/components/settings/apiKeys/__tests__/ApiKeyActivity.mcp.test.tsx",
   // Phase 305-04 — FILE-LEVEL, SAME commit as its pin.
   "src/components/org/__tests__/OrgPiiRedactionCard.test.tsx",
+  // Phase 306-04 — FILE-LEVEL (no layout/__tests__ or chat/__tests__ directory entry), SAME commit as their pins.
+  "src/components/layout/__tests__/ChatHistoryColumn.origin306.test.tsx",
+  "src/components/chat/__tests__/outsideAskEnvelope.test.ts",
+  "src/components/chat/__tests__/UserMessageBubble.outsideAsk.test.tsx",
 ]
 
 const REPO_ROOT = path.resolve(__dirname, "..")
