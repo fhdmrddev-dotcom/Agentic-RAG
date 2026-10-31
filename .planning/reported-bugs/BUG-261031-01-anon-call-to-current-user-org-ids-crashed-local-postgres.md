@@ -4,12 +4,12 @@ title: A role-anon call to current_user_org_ids() crashed the local Postgres bac
 reported: 2026-10-31
 surface: Agentic-RAG
 severity: major
-status: open
+status: deferred
 affected_areas: [database/postgres, security/availability, database/rls]
 folded_into: null
 verified_closed_by: null
 related_seeds: []
-re_open_trigger: null
+re_open_trigger: "The operator reproduces it on a disposable Postgres 17.6 (STATE Owed), OR any path is found that runs current_user_org_ids() as anon. Phase 305 (discuss 2026-10-31) assigns it a threat id and D-10: the MCP path never runs member-scoped SQL as anon."
 reproduces_on:
   branch: develop
   commit: ce2343d2e

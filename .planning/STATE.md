@@ -4,7 +4,7 @@ milestone: v4.9
 milestone_name: Use It From Your Own Tools
 status: executing
 last_updated: "2026-10-31T05:00:00.000Z"
-last_activity: 2026-10-31 -- Phase 304 complete (self-verified passed 5/5)
+last_activity: 2026-10-31 -- Phase 305 context gathered (auto)
 progress:
   total_phases: 7
   completed_phases: 1
@@ -44,7 +44,7 @@ reviewer exists, so a phase closes `verification_mode: self-verified`, never `re
 ## Current Position
 
 Milestone: v4.9 Use It From Your Own Tools
-Phase: 304 — Personal MCP Keys That Act as You — **COMPLETE 2026-10-31, self-verified `passed` 5/5** (KEY-01..06). 303 not started. Next: 305 (`/gsd:discuss-phase 305`).
+Phase: 304 — Personal MCP Keys That Act as You — **COMPLETE 2026-10-31, self-verified `passed` 5/5** (KEY-01..06). 303 not started. 305 discuss done (`305-CONTEXT.md`, D-01..D-45, auto); next: `/gsd:plan-phase 305` (research flagged).
 Plan: 6 of 6 merged + review-fix merge `bb6ebc2f0` (WR-01..04 test-first; D-46 `retrievable` on every MCP read, D-47 narrowed key lists only in-scope views).
 Status: 304 closed by hand (not `phase.complete`). SECURITY 47/47 closed · REVIEW 0 BL / 4 WR fixed / 9 IN left as recorded · G-4 rows 1-3 PASS in Chrome (DOM + DB; screenshots time out on the hidden tab) · post-merge backend 532 / frontend 433 green · baseline 70 ≤ 71 (one run read 75: 5 flaky extras in test_272_knowledge_health ×4 + test_email_ingestion, shown unrelated). **Not deployed — 304 deploys WITH 305 (D-30).**
 Last activity: 2026-10-31 — 304 verified and closed (`304-VERIFICATION.md`)
@@ -109,4 +109,5 @@ link. Branch `develop`. Tags `v4.7` and `v4.8` pushed 2026-10-30.
 The 297-302 overrides are in `milestones/v4.8-STATE-at-close.md`.
 
 - **304 / G-2 (2026-10-30):** the key screen is UI and G-2 asks for an operator-approved sketch before discuss. The operator ran discuss with "continue autonomously end to end", so no sketch was approved. Mitigation: the key screen extends the shipped Phase 293 API keys tab (an approved design); the acceptance bar is the 304 UI-SPEC plus Claude-driven G-4 rows. Re-open: the operator asks to see a sketch.
+- **305 / G-2 (2026-10-31):** UI hint (org redaction card, possibly a spend view); no operator-approved sketch because the operator ran discuss with "continue autonomously end to end". Mitigation: both extend shipped, approved surfaces (`OrgMcpSwitchCard`, the spend breakdown); acceptance bar is the 305 UI-SPEC plus Claude-driven G-4 rows. Re-open: the operator asks to see a sketch.
 - **304 / G-5 (2026-10-30):** honoured by construction, not overridden — one edit each on `dependencies.py`, `audit_service.py`, `user_settings.py`, `settings.py`; no new mount on `SettingsPage.tsx` or tab on `OrgAdminShell.tsx` (CONTEXT D-01/D-02); `api_key_auth.py` extracted before editing.

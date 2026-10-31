@@ -1,7 +1,10 @@
 ---
 seed_id: SEED-079
 title: PII detection / redaction (DLP) across retrieval, prompts, provider egress, and logs — no data-loss-prevention gate before regulated data leaves the boundary
-status: planted
+status: folded
+partial: true
+folded_into: "305"
+status_note: "Folded in part into Phase 305 (v4.9, discuss 2026-10-31, GUARD-03): a fail-closed deterministic redactor behind one outbound_guard choke point for MCP tool results, per-org and off by default; webhooks (308) reuse it. Still OPEN: ingestion-time detection, provider egress, LangSmith traces and logs, and names (NER)."
 planted: 2026-06-10
 phase_origin: "Phase 101 plan-phase — future-milestone alignment sweep 2026-06-10 (workflow wf_13ed5033)"
 category: security / compliance / data-governance — a data-loss-prevention (DLP) gate at the ingestion, retrieval-context, provider-egress, and log-capture boundaries; a cross-cutting policy seam, NOT a single feature

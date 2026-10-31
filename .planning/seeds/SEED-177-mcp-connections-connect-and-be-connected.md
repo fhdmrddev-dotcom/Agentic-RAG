@@ -20,6 +20,9 @@ status_note: |
   reviving this seed should read `252-RESEARCH.md` §3 first — the DCR path now refuses a
   server-issued `client_id` the inbound boundary would reject.
 
+  ── 2026-10-31 · routed at `/gsd:discuss-phase 305` (REG-02). The INBOUND arm ("expose us" as an MCP
+  server) is built in Phase 305 (read tools) and 306 (ask/run); status stays partially-answered
+  because the outbound user-level "just connect" breadth (triggers #1, #4) is still a capability decision.
 priority: high
 relates_to:
   - SEED-013 (External Integrations — public API, MCP server, webhooks) — the INBOUND twin; "expose us" is its second consumer mode
