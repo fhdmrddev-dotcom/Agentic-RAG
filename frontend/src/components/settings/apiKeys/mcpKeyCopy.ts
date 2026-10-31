@@ -190,4 +190,17 @@ export const MCP_KEY_COPY = {
     legendOk: "answered",
     legendNotOk: "not answered",
   },
+
+  /** 305-04 (UI-SPEC §Copywriting `pii` block, verbatim): the org's PII redaction card. The
+   *  example in `sub` is the redactor's real email mask (backend `pii_redactor.MASKS`). */
+  pii: {
+    title: "Remove personal data from AI tool results",
+    sub: "When on, search results and documents sent to members' AI tools in {org} have email addresses, phone numbers, card numbers, IBANs and secrets such as API keys replaced with a short note, like [email removed].",
+    notCovered:
+      "Names are not covered. If a result can't be checked, it is withheld rather than sent. Document ids, citations and Open in Syrel links are never changed.",
+    onTag: "on for {org}",
+    loading: "Loading…",
+    loadFailed: "Couldn't load this setting.",
+    failed: "Couldn't change it. Try again.",
+  },
 } as const
