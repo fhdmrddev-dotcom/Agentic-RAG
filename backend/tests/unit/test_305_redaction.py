@@ -105,6 +105,32 @@ def test_an_oversized_input_is_refused_rather_than_scanned():
         R.spans("a" * (pii_redactor.MAX_INPUT + 1))
 
 
+_B64 = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/"
+
+
+def _random_b64_keys(n: int, seed: int) -> list[str]:
+    import random
+
+    rng = random.Random(seed)
+    return ["".join(rng.choice(_B64) for _ in range(40)) for _ in range(n)]
+
+
+def test_slash_bearing_base64_secrets_after_a_keyword_are_all_masked():
+    """305-REVIEW-04 WR-04-01: 270 of 2,000 random 40-char base64 keys after ``aws_secret`` passed
+    through because two slashes read as a path. After a secret keyword the path rule is off."""
+    keys = _random_b64_keys(2000, seed=30504)
+    missed = [k for k in keys if k in R.redact(f"aws_secret {k}\n")]
+    # The only allowed misses are keys that are not mixed-case-plus-digit or under 4.0 bits.
+    assert len(missed) <= 4, len(missed)
+
+
+def test_slash_bearing_base64_secrets_without_a_keyword_are_masked_unless_path_shaped():
+    keys = _random_b64_keys(2000, seed=30505)
+    missed = [k for k in keys if k in R.redact(f"value {k} end")]
+    # Measured: ~1.3% start with "/" (an absolute-path shape) and are left alone without a keyword.
+    assert len(missed) <= 2000 * 0.03, len(missed)
+
+
 def test_an_8000_char_dense_chunk_redacts_in_under_20_ms():
     unit = (
         "Call +44 20 7946 0958 or mail jane.doe@example.com; card 4111 1111 1111 1111; "
