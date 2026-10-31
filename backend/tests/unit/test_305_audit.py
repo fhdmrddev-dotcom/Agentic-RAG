@@ -72,6 +72,16 @@ def world(monkeypatch):
     monkeypatch.setitem(tools.REGISTERED, "t_write", h.make_spec("t_write", ok, read_only=False))
     monkeypatch.setitem(tools.REGISTERED, "t_hidden", h.make_spec("t_hidden", ok))
     usage = h.stub_usage(monkeypatch)  # t_query is "expensive": its mcp_usage rows land here
+
+    import app.mcp.dispatch as dispatch_mod
+
+    async def _pii_off(org_id):
+        # The org's redaction switch reads OFF (its default). Unstubbed, the live read fails here and
+        # the guard fails SAFE (ON) — which, since 305-REVIEW-04 WR-04-02, withholds these test
+        # tools' raw CallToolResult. These tests are about the audit row, not redaction.
+        return False
+
+    monkeypatch.setattr(dispatch_mod, "_pii_on", _pii_off)
     return {"rows": rows, "redis": FakeRedis(), "knobs": knobs, "usage": usage}
 
 

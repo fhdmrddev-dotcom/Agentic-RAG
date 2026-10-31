@@ -34,7 +34,7 @@ bound).
 from __future__ import annotations
 
 import time
-from typing import Any, Awaitable, Callable, Protocol
+from typing import Any, Awaitable, Callable, Protocol, get_args
 
 from pydantic import BaseModel
 
@@ -67,16 +67,51 @@ class _DeadlinePassed(Exception):
     pass
 
 
+class _Unreadable(Exception):
+    """A value the walker cannot see inside — the guard withholds rather than guess (WR-04-02)."""
+
+
+def _marks_redactable(annotation: Any) -> bool:
+    """``RedactableText`` at any depth: ``RedactableText | None``, ``list[RedactableText]``, ..."""
+    if any(meta is REDACTABLE for meta in getattr(annotation, "__metadata__", ())):
+        return True
+    return any(_marks_redactable(a) for a in get_args(annotation))
+
+
+def _models_in(annotation: Any) -> list[type[BaseModel]]:
+    found = [annotation] if isinstance(annotation, type) and issubclass(annotation, BaseModel) else []
+    for arg in get_args(annotation):
+        found.extend(_models_in(arg))
+    return found
+
+
+def _declares_redactable(model_type: type[BaseModel], _seen: set | None = None) -> bool:
+    """True when ``model_type`` or any model nested in its fields declares a ``RedactableText``."""
+    seen = _seen if _seen is not None else set()
+    if model_type in seen:
+        return False
+    seen.add(model_type)
+    if redactable_fields(model_type):
+        return True
+    return any(
+        _declares_redactable(sub, seen)
+        for info in model_type.model_fields.values()
+        for sub in _models_in(info.annotation)
+    )
+
+
 def redactable_fields(model_type: type[BaseModel]) -> set[str]:
-    """The names of the fields typed ``RedactableText`` on ``model_type`` (by annotation)."""
+    """The names of the fields typed ``RedactableText`` on ``model_type`` (by annotation, at any
+    depth — 305-REVIEW-04 WR-04-02: the marker of an ``Optional`` or ``list`` field sits one level
+    down, and the top-level ``metadata`` alone missed it)."""
     return {
         name for name, info in model_type.model_fields.items()
-        if any(meta is REDACTABLE for meta in info.metadata)
+        if any(meta is REDACTABLE for meta in info.metadata) or _marks_redactable(info.annotation)
     }
 
 
 async def guard(
-    model: BaseModel,
+    model: Any,
     *,
     org_id: str,
     is_on: Callable[[str], Awaitable[Any]],
@@ -87,7 +122,8 @@ async def guard(
 ) -> BaseModel | _Withheld:
     """``model`` unchanged when the org's switch is off; a redacted copy when on; ``WITHHELD``
     when it could not be checked (see the module docstring). ``redactor`` defaults to the
-    module's ``DEFAULT``, looked up at CALL time."""
+    module's ``DEFAULT``, looked up at CALL time. Anything that is not a Pydantic model (a raw
+    ``CallToolResult``, a dict) is ``WITHHELD`` when the switch is on — it cannot be read by type."""
     redactor = redactor if redactor is not None else DEFAULT
     try:
         on = (await is_on(org_id)) is not False
@@ -95,6 +131,10 @@ async def guard(
         on = True
     if not on:
         return model
+    if not isinstance(model, BaseModel) or not _declares_redactable(type(model)):
+        # A model whose type tree declares no ``RedactableText`` (a raw ``CallToolResult``, any
+        # untyped payload) cannot be read by type, so it is withheld rather than guessed at.
+        return WITHHELD
     deadline = clock() + deadline_s
     try:
         return _walk(model, redactor, deadline, clock, window or {}, top=True)
@@ -120,7 +160,17 @@ def _walk(value: Any, redactor: Redactor, deadline: float, clock, window: dict, 
                 _check(deadline, clock)
                 if redacted != current:
                     update[name] = redacted
-            elif isinstance(current, (BaseModel, list)):
+            elif name in targets and isinstance(current, list) and all(isinstance(v, str) for v in current):
+                redacted_items = []
+                for item in current:
+                    _check(deadline, clock)
+                    redacted_items.append(_redact_field(item, redactor, None))
+                _check(deadline, clock)
+                if redacted_items != current:
+                    update[name] = redacted_items
+            elif name in targets and current is not None:
+                raise _Unreadable(name)
+            elif isinstance(current, (BaseModel, list, dict, tuple, set, frozenset)):
                 walked = _walk(current, redactor, deadline, clock, window, top=False)
                 if walked is not current:
                     update[name] = walked
@@ -128,6 +178,10 @@ def _walk(value: Any, redactor: Redactor, deadline: float, clock, window: dict, 
     if isinstance(value, list):
         walked = [_walk(v, redactor, deadline, clock, window, top=False) for v in value]
         return walked if any(a is not b for a, b in zip(walked, value)) else value
+    if isinstance(value, (dict, tuple, set, frozenset)):
+        # 305-REVIEW-04 WR-04-02: no shipped result model carries one, and the walker cannot tell
+        # an id from text inside it — withhold rather than send it unread.
+        raise _Unreadable(type(value).__name__)
     return value
 
 

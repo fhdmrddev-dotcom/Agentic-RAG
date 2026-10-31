@@ -133,10 +133,13 @@ async def dispatch(
         except ValidationError:
             return tool_error(f"Those arguments don't fit {name}. Check the tool's inputs and try again.")
         outcome = await _run(spec, principal, name, args)
-        if isinstance(outcome, BaseModel):
+        if not isinstance(outcome, str):
             # 305-04 (D-32 / D-35 / D-56): the ONE outbound choke point, before anything is rendered.
+            # 305-REVIEW-04 WR-04-02: every shape goes through it, not only a model — a handler's raw
+            # ``CallToolResult`` is withheld when the switch is on. A ``str`` is a fixed refusal sentence.
             outcome = await outbound_guard.guard(
-                outcome, org_id=principal.org_id, is_on=_pii_on, window=_results.window_of(outcome)
+                outcome, org_id=principal.org_id, is_on=_pii_on,
+                window=_results.window_of(outcome) if isinstance(outcome, BaseModel) else None,
             )
             if outcome is outbound_guard.WITHHELD:
                 audit = {"refused": False, "outcome": "redaction_blocked"}
