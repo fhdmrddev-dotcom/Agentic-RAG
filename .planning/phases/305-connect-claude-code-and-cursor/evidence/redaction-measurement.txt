@@ -1,0 +1,94 @@
+Phase 305-04 — PII redactor measurement (D-38), local corpus, read-only
+=========================================================================
+
+Script: backend/venv/Scripts/python scripts/measure-redaction.py  (SELECT-only; default_transaction_read_only)
+Corpus: 10,279 search units (document_chunks.content — what a search passage carries)
+      +    872 read units  (latest documents.full_markdown cut into 8,000-char read_document chunks,
+                            each scanned with its 128-char overlap window — what a read carries)
+      = 13,161,950 characters. Measured 2026-10-31 on the operator's local database.
+
+AGGREGATES ONLY. No matched value is recorded here. The labelled samples were written as SHAPES
+(letters -> a/A, digits -> 9, context digits scrubbed and other matches masked) to a scratch file
+outside the repository, labelled TP/FP there, and never committed (T-305-34).
+
+Labelling rule: a hit is TP when the masked text really is that class of data (an email address,
+a phone number, an IBAN, a credential); FP otherwise. A JWT is a bearer token and is TP wherever it
+sits, links included. Up to 30 hits per recognizer were sampled, from the search units.
+
+
+Run 1 — the recognizers as first written (Task 1)
+-------------------------------------------------
+source  recognizer  raw candidates  validated hits  units hit
+search  email                  129             129         63
+search  phone                18335              19         18
+search  card                   487               0          0
+search  iban                     2               2          2
+search  secret                 636             203         97
+read    email                   93              93         42
+read    phone                 6772              17         16
+read    card                   303               0          0
+read    iban                     1               1          1
+read    secret                 498             136         21
+
+labelled false-positive rate (ceiling 20%):
+  email   0/30 FP = 0.0%    ok
+  phone   4/19 FP = 21.1%   OVER  — 3 statistics-table decimals ("0.00x" read as a 00-form
+                                    international number) + 1 UUID whose last group starts "00"
+  card    no hits           (487 raw candidates, 0 survive IIN + length + Luhn + grouping/keyword)
+  iban    0/2 FP = 0.0%     ok
+  secret  30/30 FP = 100%   OVER  — every sampled hit was a link tracking token (high-entropy URL
+                                    path or query segments in newsletter / job-alert e-mails)
+
+-> phone and secret over the 20% ceiling: both tightened within D-56, test first
+   (db1a0c5d5 RED -> the fix), then re-measured.
+
+
+Run 2 — after tightening 1 (phone: the international form must start a token; entropy: no
+          token in a link with its scheme in the same word, no path-shaped token, none over 128)
+------------------------------------------------------------------------------------------------
+search  phone  validated hits 15 (14 units)      search  secret  validated hits 18 (12 units)
+read    phone  validated hits 13 (12 units)      read    secret  validated hits 10 (4 units)
+labelled: phone 0/15 FP = 0.0% ok · secret 9/18 FP = 50.0% OVER — the 9 TPs were JWTs inside links;
+the 9 FPs were query parameters / percent-encoded link fragments whose scheme sat beyond a space or
+a chunk edge.
+
+-> secret tightened again (a843c9a9b RED -> the fix): a "?"/"&" query parameter and a token with a
+   percent-encoded neighbour are link fragments; NAME=value is judged on the value alone, so an env
+   line ("SECRET_KEY=...") still masks its value.
+
+
+Run 3 — final (what ships)
+--------------------------
+source  recognizer  raw candidates  validated hits  units hit
+search  email                  129             129         63
+search  phone                18285              15         14
+search  card                   487               0          0
+search  iban                     2               2          2
+search  secret                 636               9          3
+read    email                   93              93         42
+read    phone                 6737              13         12
+read    card                   303               0          0
+read    iban                     1               1          1
+read    secret                 498               9          3
+
+labelled false-positive rate (ceiling 20%), script exit 0:
+  email   0/30 FP = 0.0%   ok
+  phone   0/15 FP = 0.0%   ok
+  card    no hits on this corpus (the fixture carries the positive and negative card cases)
+  iban    0/2  FP = 0.0%   ok   (small sample: 2 hits exist)
+  secret  0/9  FP = 0.0%   ok   (all 9 are JWTs; no key-prefix secret exists in this corpus)
+
+latency per unit (ms), DeterministicRedactor.spans() over the unit incl. its window:
+  search  p50 0.259  p95 0.439  p99 0.749  max 4.245  mean 0.274
+  read    p50 2.026  p95 2.799  p99 3.030  max 4.001  mean 1.654
+The guard's cooperative deadline is 2,000 ms per result: the slowest read unit measured is 4.0 ms.
+
+Residuals, stated rather than hidden:
+  * Names are NOT covered (GUARD-03) — no pattern recognizer can find them.
+  * The entropy recognizer now ignores tokens inside links. A credential pasted as a bare link
+    parameter of an unknown format would pass; known key prefixes and JWTs are still caught in
+    links because their recognizers run first.
+  * A value split across two INGEST chunks in a search passage leaks only partial digits, which fail
+    Luhn and mod-97 (Pitfall 8); read chunks are covered by the 128-char overlap window.
+  * Card and secret-prefix recognizers had no real hits to label on this corpus; their precision
+    rests on the fixture (positive + negative cases per brand/prefix) and on the validators.
