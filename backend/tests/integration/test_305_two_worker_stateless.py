@@ -13,6 +13,11 @@ Infra: local Postgres :54322, Redis :6379 and the Supabase API (GoTrue, to creat
 missing piece SKIPS with the reason (``-rs``), reported NOT RUN — never a pass.
 
 Driven RED: with ``P305_WORKERS=1`` the same suite fails on the ">= 2 PIDs" assertion.
+
+305-02 extension: every legacy set ALSO calls ``tools/call list_documents`` — on ``/mcp/`` (the
+second registered route, same edge), so the access log can tell a tool call from the handshake
+lines — and every one is a non-error result. ``POST /mcp/`` served by >= 2 PIDs proves a real
+tool ran statelessly on BOTH workers through the full ``app.main.app`` (every middleware).
 """
 from __future__ import annotations
 
@@ -42,7 +47,10 @@ def _legacy_set(base: str, key: str) -> list[httpx.Response]:
                           json={"jsonrpc": "2.0", "method": "notifications/initialized"})
         listed = c.post("/mcp", headers=live.mcp_headers(key, era=version),
                         json={"jsonrpc": "2.0", "id": 2, "method": "tools/list", "params": {}})
-    return [init, notified, listed]
+        called = c.post("/mcp/", headers=live.mcp_headers(key, era=version),
+                        json={"jsonrpc": "2.0", "id": 4, "method": "tools/call",
+                              "params": {"name": "list_documents", "arguments": {}}})
+    return [init, notified, listed, called]
 
 
 def _modern_set(base: str, key: str) -> list[httpx.Response]:
@@ -73,6 +81,14 @@ async def test_twenty_fresh_connections_are_served_by_two_workers(server, pg_poo
             assert "error" not in body, body
     listed = [r for r in responses if r.status_code == 200 and "tools" in r.json().get("result", {})]
     assert len(listed) == LEGACY_SETS + MODERN_SETS
+    for r in listed:
+        assert [t["name"] for t in r.json()["result"]["tools"]] == [
+            "search_knowledge_base", "list_documents", "read_document"]
+    called = [r for r in responses if r.status_code == 200 and r.json().get("id") == 4]
+    assert len(called) == LEGACY_SETS
+    for r in called:
+        result = r.json()["result"]
+        assert result.get("isError") is False and "structuredContent" in result, result
 
     import time
 
@@ -82,3 +98,7 @@ async def test_twenty_fresh_connections_are_served_by_two_workers(server, pg_poo
     print(f"\n[305-01 two-worker proof] POST /mcp served by worker PIDs: {pids} "
           f"({len(responses)} responses over {LEGACY_SETS + MODERN_SETS} fresh connections)")
     assert len(pids) >= 2, f"only {pids} served POST /mcp — the proof needs two workers"
+    tool_pids = sorted({pid for pid, method, path, status in server.access()
+                        if method == "POST" and path.split("?")[0] == "/mcp/" and status == 200})
+    print(f"[305-02 two-worker proof] tools/call list_documents served by worker PIDs: {tool_pids}")
+    assert len(tool_pids) >= 2, f"only {tool_pids} served a tools/call — the proof needs two workers"
