@@ -778,7 +778,7 @@ describe("AdminSpendPage — Phase 268: spend by Expert", () => {
     await screen.findByText("run-rate…")
     const headers = screen.getAllByRole("columnheader").map((h) => h.textContent)
     const ledgerStart = headers.indexOf("Run Identity")
-    expect(headers[ledgerStart + 1]).toBe("Expert")
+    expect(headers[ledgerStart + 1]).toBe("Expert or key") // 305-03 (D-31): the column also names an AI tool key
     const cells = screen.getAllByTestId("ledger-expert-cell")
     expect(cells[0]).toHaveTextContent("HR Advisor")
     expect(cells[1]).toHaveTextContent("Not recorded")
