@@ -42,6 +42,7 @@ from __future__ import annotations
 
 import ast
 import builtins
+import copy
 import importlib
 import subprocess
 import symtable
@@ -236,6 +237,30 @@ RETIRED: dict[str, str] = {
     ),
 }
 
+# UNMOVED name → (reason, the leading body statements a later phase added on purpose). The rest of
+# the body is still compared AST-identical to PHASE_BASE, so only the named statements are exempt.
+UNMOVED_AMENDED: dict[str, tuple[str, int]] = {
+    "dispatch_tool": (
+        "Phase 306 (306-03, D-26 / D-28, 2026-10-31): deliberate post-move edit. Seam B — the first "
+        "two statements after the docstring read the outside-run allow-list "
+        "(outside_run_scope.outside_allowlist_for) and refuse a non-listed name. Pinned by "
+        "test_306_dispatch_closure.py; every statement after them is still compared here.",
+        2,
+    ),
+}
+
+
+def _without_amended_lead(name: str, node: ast.AST) -> ast.AST:
+    if name not in UNMOVED_AMENDED:
+        return node
+    _reason, count = UNMOVED_AMENDED[name]
+    node = copy.deepcopy(node)
+    first = node.body[0] if node.body else None
+    doc = 1 if isinstance(first, ast.Expr) and isinstance(first.value, ast.Constant) else 0
+    del node.body[doc:doc + count]
+    return node
+
+
 _EXPECTED_FAMILY_COUNTS = {
     "base.py": 2,
     "documents.py": 21,
@@ -375,11 +400,12 @@ def test_unmoved_bindings_are_ast_identical():
     for name in UNMOVED:
         assert name in base, f"{name} not at {PHASE_BASE_SHA}"
         assert name in head, f"{name} is no longer in {_BASE_REL} — D-03 keeps it in the registry module"
-        assert ast.dump(head[name]) == ast.dump(base[name]), (
+        assert ast.dump(_without_amended_lead(name, head[name])) == ast.dump(base[name]), (
             f"{name} in {_BASE_REL} is not AST-identical to PHASE_BASE"
         )
         compared.append(name)
     assert len(compared) == len(UNMOVED) == 5
+    assert set(UNMOVED_AMENDED) <= set(UNMOVED)
 
 
 # ── 3. AST equality of every moved binding ───────────────────────────────────────────────────
