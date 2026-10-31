@@ -492,7 +492,7 @@ node scripts/check-hot-file-ledger.cjs <phase-dir>   # 0 clear · 1 missing rows
 | `backend/app/main.py` | 100 / 74 / 1024 (was `99 / 73 / 1021`) | 305-01: one import + register_mcp(app) + one mcp_lifespan block · ⛔ |
 | `backend/app/config.py` | 96 / 55 / 1831 (was `93 / 54 / 1809`) | 300-03: SMTP_* fields (D-28) · seam OWED · ⛔ |
 | `backend/app/api/admin.py` | 45 / 18 / 2055 (was `44 / 17 / 2054`) | 304-04: one _FLAG_HUMAN_NAMES entry (mcp_enabled) · ⛔ |
-| `backend/app/api/settings.py` | 52 / 29 / 1508 (was `51 / 28 / 1425`) | 306-02: four outside knobs, one explicit bound each (D-36/D-35) |
+| `backend/app/api/settings.py` | 53 / 29 / 1523 (was `51 / 28 / 1425`) | 306-02: four outside knobs, one explicit bound each (D-36/D-35) |
 | `backend/app/services/multimodal_service.py` | 14 / 7 / 984 | ⚠ absent from BOTH for its ENTIRE LIFE at **7 phases** |
 | `backend/app/api/documents.py` | 101 / 40 / 2709 (was `99 / 39 / 2698`) | 298-01: one by_org in build() + one root_upload_org kwarg · ⛔ |
 | `backend/app/api/library.py` | 3 / 3 / 304 (was `2 / 2 / 299`) | ⚠ now FIRES (298) · 298-01: summary shares the lists' org predicate ($1) |
