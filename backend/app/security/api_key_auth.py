@@ -47,6 +47,7 @@ from typing import Any, Literal
 import asyncpg
 from fastapi import BackgroundTasks, Depends, HTTPException, Request
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
+from starlette.concurrency import run_in_threadpool
 
 from app.db import api_keys as api_keys_db
 from app.dependencies import get_pg_pool, get_redis, get_service_role_supabase
@@ -160,6 +161,7 @@ def _audit_args(
     outcome: str | None,
     reason: str | None,
     detail: dict | None,
+    tool: str | None = None,
 ) -> tuple[str, dict[str, Any], str]:
     """(user_id, metadata, org_id) for one ``api_key.*`` row. Reads ONLY id, label, owner and org
     from ``key`` — never the secret (it is never handed one) and never ``key_hash``."""
@@ -182,6 +184,9 @@ def _audit_args(
         # D-36: no new audit literal — an MCP key's rows say so here. A workflow key's metadata
         # stays byte-identical to 293's (no ``kind`` key at all).
         "kind": "mcp" if kind == "mcp" else None,
+        # 305-03 (D-26): the MCP tool a call used. Dropped when None, so every 293/304 row stays
+        # byte-identical. Never the query or any argument (T-305-29).
+        "tool": tool,
     }
     return str(user_id), {k: v for k, v in metadata.items() if v is not None}, str(org_id)
 
@@ -197,6 +202,7 @@ def audit_key_call(
     outcome: str | None = None,
     reason: str | None = None,
     detail: dict | None = None,
+    tool: str | None = None,
 ) -> None:
     """Schedule one ``api_key.*`` audit row, attributed to the key's owner in the key's org.
 
@@ -210,7 +216,7 @@ def audit_key_call(
     """
     user_id, metadata, org = _audit_args(
         key, call=call, workflow_id=workflow_id, run_id=run_id,
-        outcome=outcome, reason=reason, detail=detail,
+        outcome=outcome, reason=reason, detail=detail, tool=tool,
     )
     background_tasks.add_task(
         write_audit_entry, user_id, action_type, metadata,
@@ -228,19 +234,22 @@ async def audit_key_call_now(
     outcome: str | None = None,
     reason: str | None = None,
     detail: dict | None = None,
+    tool: str | None = None,
 ) -> None:
     """Write one ``api_key.*`` audit row BEFORE an error response (see ``audit_key_call``).
 
     ``write_audit_entry`` swallows and logs its own failures, so awaiting it can delay a refusal
     but can never turn one into a 500.
+
+    305-03 (IN-03 / T-305-31): the service-role client is built off the event loop — the MCP path
+    awaits this on every call, so a supabase-py client build must never block the loop.
     """
     user_id, metadata, org = _audit_args(
         key, call=call, workflow_id=workflow_id, run_id=run_id,
-        outcome=outcome, reason=reason, detail=detail,
+        outcome=outcome, reason=reason, detail=detail, tool=tool,
     )
-    await write_audit_entry(
-        user_id, action_type, metadata, get_service_role_supabase(org), org_id=org
-    )
+    client = await run_in_threadpool(get_service_role_supabase, org)
+    await write_audit_entry(user_id, action_type, metadata, client, org_id=org)
 
 
 # ── 293-REVIEW CR-02 — refusal audits are counted, then written at most once a minute ───────

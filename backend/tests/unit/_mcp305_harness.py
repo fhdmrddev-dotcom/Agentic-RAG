@@ -87,7 +87,33 @@ def stub_edge(monkeypatch, resolver=None) -> Any:
     monkeypatch.setattr(rate_limit, "check_ip_limit", _ip_ok)
     resolver = resolver if resolver is not None else Recorder()
     monkeypatch.setattr(mcp_principal, "resolve_mcp_principal", resolver)
+    stub_accounting(monkeypatch)
     return resolver
+
+
+def stub_accounting(monkeypatch) -> list[dict]:
+    """305-03: keep the REAL per-key limits and audit code running, on a fake Redis and the
+    settings defaults, with the audit writer replaced by a recorder. Returns the recorded rows."""
+    import app.mcp.dispatch as dispatch
+    from app.models.user_settings import _build_settings_from_row
+    from app.security import api_key_auth
+    from app.services import rate_limit
+    from tests.unit.phase293_inbound_fakes import FakeRedis
+
+    rows: list[dict] = []
+    fake = FakeRedis()
+
+    async def _load():
+        return _build_settings_from_row({})
+
+    async def _write(user_id, action_type, metadata, supabase, org_id=None):
+        rows.append({"action_type": action_type, "metadata": metadata, "org_id": org_id})
+
+    monkeypatch.setattr(dispatch, "get_redis", lambda: fake)
+    monkeypatch.setattr(rate_limit, "load_app_settings_async", _load)
+    monkeypatch.setattr(api_key_auth, "write_audit_entry", _write)
+    monkeypatch.setattr(api_key_auth, "get_service_role_supabase", lambda org: object())
+    return rows
 
 
 class NoArgs(BaseModel):

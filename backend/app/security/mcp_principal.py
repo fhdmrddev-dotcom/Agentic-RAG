@@ -27,6 +27,8 @@ class McpPrincipal:
     tools: tuple[str, ...]
     include_external: bool
     credential_kind: Literal["key"] = "key"
+    # 305-03 (D-26): the key's label, so every MCP audit row names the key it was made with.
+    label: str | None = None
 
 
 async def resolve_mcp_principal(presented: str, *, pool, redis) -> McpPrincipal:
@@ -46,4 +48,5 @@ async def resolve_mcp_principal(presented: str, *, pool, redis) -> McpPrincipal:
         # An MCP row always carries tools (mig 220 CHECK); a missing list grants nothing.
         tools=tuple(key.tools or ()),
         include_external=key.include_external,
+        label=key.label,
     )

@@ -130,8 +130,9 @@ async def test_an_ungranted_call_writes_a_refused_row_naming_the_tool(world):
 
 
 async def test_an_unknown_tool_name_writes_a_refused_row_with_no_tool(world, monkeypatch):
-    from app.mcp import server
+    import importlib
 
+    server = importlib.import_module("app.mcp.server")  # the package re-exports the Server object
     monkeypatch.setattr(server._edge, "current_principal", lambda: PRINCIPAL)
     import app.mcp.dispatch as dispatch_mod
 

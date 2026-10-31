@@ -56,6 +56,8 @@ _BOUNDED_SETTINGS_FIELDS = frozenset(
         # 293 (D-14) — the per-key API limits, bounded 1..60 and 10..600 (migration 215 CHECKs agree).
         "api_key_starts_per_minute",
         "api_key_reads_per_minute",
+        # 305 (D-54) — the AI tool keys' searches limit, bounded 1..120 (migration 222 CHECK agrees).
+        "api_key_searches_per_minute",
         # 300 (D-07) — the run-waiting email delay, bounded 60..3600 (migration 218 CHECK agrees).
         "notification_email_delay_seconds",
     }
@@ -122,6 +124,7 @@ class FullSettingsResponse(BaseModel):
     # 293 (D-14) — per-key API limits a minute, shared by every worker. App-wide.
     api_key_starts_per_minute: int
     api_key_reads_per_minute: int
+    api_key_searches_per_minute: int  # 305 (D-54) — the MCP expensive bucket
     # 300 (D-07, D-08, D-10) — the mail knobs. The provider is READ-ONLY: it is the env's
     # EMAIL_PROVIDER name, never its secret (the API key and the mail-server login stay in the
     # environment and are never read by this module).
@@ -370,6 +373,7 @@ class SettingsUpdate(BaseModel):
     explorer_max_tool_rounds: int | None = None  # 292.1 (D-18) — bounded 2..50
     api_key_starts_per_minute: int | None = None  # 293 (D-14) — bounded 1..60
     api_key_reads_per_minute: int | None = None   # 293 (D-14) — bounded 10..600
+    api_key_searches_per_minute: int | None = None  # 305 (D-54) — bounded 1..120
     notification_email_delay_seconds: int | None = None  # 300 (D-07) — bounded 60..3600
     email_from_address: str | None = None          # 300 (D-08) — "" or one address
     email_from_name: str | None = None             # 300 (D-08) — 1-60 chars, no control chars
@@ -475,6 +479,7 @@ async def _build_response(s=None) -> FullSettingsResponse:
         explorer_max_tool_rounds=s.explorer_max_tool_rounds,
         api_key_starts_per_minute=s.api_key_starts_per_minute,
         api_key_reads_per_minute=s.api_key_reads_per_minute,
+        api_key_searches_per_minute=s.api_key_searches_per_minute,
         notification_email_delay_seconds=s.notification_email_delay_seconds,
         email_from_address=s.email_from_address or "",
         email_from_name=s.email_from_name,
@@ -915,6 +920,26 @@ async def update_settings(
                 ),
             )
         updates["api_key_reads_per_minute"] = body.api_key_reads_per_minute
+
+    # 305 (D-54) — the AI tool keys' searches limit. Each search runs an embedding call, so the
+    #   ceiling is lower than the reads one. Migration 222's CHECK is the backstop.
+    if body.api_key_searches_per_minute is not None:
+        if not 1 <= body.api_key_searches_per_minute <= 120:
+            raise HTTPException(
+                status_code=400,
+                detail=await _range_refusal_detail(
+                    field="api_key_searches_per_minute",
+                    label="Searches per minute, per key",
+                    submitted=body.api_key_searches_per_minute,
+                    lo=1,
+                    hi=120,
+                    typed_detail=(
+                        "Searches per minute, per key must be between 1 and 120. Each search runs "
+                        "an embedding call, so above 120 one AI tool key can run up provider spend."
+                    ),
+                ),
+            )
+        updates["api_key_searches_per_minute"] = body.api_key_searches_per_minute
 
     # 300 (D-07) — the run-waiting email delay. ⚠ BOUNDED ON WRITE; migration 218's CHECK is the
     #   backstop. Below a minute a person answering promptly is emailed anyway; above an hour the

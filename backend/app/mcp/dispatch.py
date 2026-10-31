@@ -33,6 +33,15 @@ model (``results.render``). The slots the later plans fill, in this function:
 The grant is re-checked HERE, at call time (D-21): ``tools/list`` already hides an ungranted tool,
 but a client can call a name it never listed. The maintenance flag is read through
 ``middleware.maintenance._read_maintenance`` — the HTTP write-block's own reader, never a second one.
+
+305-03 (D-26 / D-27 / D-28 / D-53 / T-305-12) fills e and k. **Exactly one audit row per call, on
+every exit path**: each stage sets the row it would write in ``audit`` and the ``finally`` writes it
+once — refused (grant, maintenance, limit) through ``app.mcp.audit.audit_refused`` (throttled), an
+answered call (a model or a handler's refusal sentence) as ``outcome: ok``, and bad arguments or a
+handler that raised as ``outcome: error`` (the exception still propagates to the catch-all). The
+limit stage counts the spec's bucket (``app.mcp.limits``) and answers over the limit with a
+relayable sentence, never an HTTP 429. The per-key counters and the refusal throttle share the
+app's Redis (``get_redis``); a caller may pass its own.
 """
 from __future__ import annotations
 
@@ -42,6 +51,9 @@ from mcp import types
 from mcp.shared.exceptions import MCPError
 from pydantic import BaseModel, ValidationError
 
+from app.dependencies import get_redis
+from app.mcp import audit as _audit
+from app.mcp import limits as _limits
 from app.mcp import results as _results
 from app.mcp import tools as _tools
 from app.middleware import maintenance as _maintenance
@@ -59,21 +71,43 @@ def tool_error(sentence: str) -> types.CallToolResult:
     return types.CallToolResult(content=[types.TextContent(type="text", text=sentence)], is_error=True)
 
 
-async def dispatch(principal: Any, name: str, arguments: dict | None) -> types.CallToolResult:
+async def dispatch(
+    principal: Any, name: str, arguments: dict | None, *, redis: Any = None
+) -> types.CallToolResult:
     """Run one granted, registered tool for ``principal``. ``name`` is a registered code constant
     by the time it reaches here (``server.on_call_tool`` refuses anything else)."""
+    redis = redis if redis is not None else get_redis()
     spec = _tools.REGISTERED[name]
-    if name not in principal.tools:
-        return tool_error(f"This key can't use {name}.")
-    if not _tools.is_read_only(spec) and _maintenance._read_maintenance():
-        raise MCPError(code=MAINTENANCE_ERROR_CODE, message=MAINTENANCE_SENTENCE)
+    # The ONE row this call writes; a stage that exits sets it. Anything that raises before a stage
+    # sets it (the handler, the render) leaves ``error``.
+    audit: dict = {"refused": False, "outcome": "error"}
     try:
-        args = spec.args_model.model_validate(arguments or {})
-    except ValidationError:
-        return tool_error(f"Those arguments don't fit {name}. Check the tool's inputs and try again.")
-    outcome = await spec.handler(principal, args)
-    # [305-04 outbound guard slot: redact ``outcome`` here, before anything is rendered]
-    return _finish(outcome)
+        if name not in principal.tools:
+            audit = {"refused": True, "reason": "tool_not_granted"}
+            return tool_error(f"This key can't use {name}.")
+        if not _tools.is_read_only(spec) and _maintenance._read_maintenance():
+            audit = {"refused": True, "reason": "maintenance"}
+            raise MCPError(code=MAINTENANCE_ERROR_CODE, message=MAINTENANCE_SENTENCE)
+        try:
+            args = spec.args_model.model_validate(arguments or {})
+        except ValidationError:
+            return tool_error(f"Those arguments don't fit {name}. Check the tool's inputs and try again.")
+        limited = await _limits.check_limit(principal, spec, redis)
+        if limited is not None:
+            audit = {"refused": True, "reason": limited.reason,
+                     "detail": {"limit": limited.limit} if limited.limit is not None else None}
+            return tool_error(limited.sentence)
+        outcome = await spec.handler(principal, args)
+        # [305-04 outbound guard slot: redact ``outcome`` here, before anything is rendered]
+        result = _finish(outcome)
+        audit = {"refused": False, "outcome": "ok"}
+        return result
+    finally:
+        if audit["refused"]:
+            await _audit.audit_refused(principal, tool=name, reason=audit["reason"], redis=redis,
+                                       detail=audit.get("detail"))
+        else:
+            await _audit.audit_answered(principal, tool=name, outcome=audit["outcome"])
 
 
 def _finish(outcome: Any) -> types.CallToolResult:

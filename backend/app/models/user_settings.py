@@ -305,6 +305,7 @@ class UserEffectiveSettings(BaseModel):
     #   `services/rate_limit.py`. App-wide, bounded 1..60 and 10..600 (API + CHECK).
     api_key_starts_per_minute: int = 10
     api_key_reads_per_minute: int = 120
+    api_key_searches_per_minute: int = 30  # 305 D-54 (mig 222): the MCP expensive bucket, 1..120
     # 300 (migration 218): D-07 the wait before a run-waiting email (bounded 60..3600), D-08 the
     #   sender (an empty address means the env INVITE_FROM_EMAIL — applied in send_email, not
     #   here), D-10 the test address every email goes to outside production.
@@ -1216,6 +1217,7 @@ def _build_settings_from_row(row: dict) -> UserEffectiveSettings:
         # 293 D-14 — a database without migration 215 still reads 10 / 120.
         api_key_starts_per_minute=int(_val(row, "api_key_starts_per_minute", None, 10)),
         api_key_reads_per_minute=int(_val(row, "api_key_reads_per_minute", None, 120)),
+        api_key_searches_per_minute=int(_val(row, "api_key_searches_per_minute", None, 30)),
         # 300 D-07/D-08/D-10 — a database without migration 218 still reads 120 / "" / Syrel / "".
         notification_email_delay_seconds=int(_val(row, "notification_email_delay_seconds", None, 120)),
         email_from_address=str(_val(row, "email_from_address", None, "")),
