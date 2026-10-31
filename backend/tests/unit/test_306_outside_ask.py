@@ -375,8 +375,11 @@ class _Pool:
         raise AssertionError(sql)
 
 
-def _run_row(status):
-    return {"run_id": uuid.uuid4(), "status": status, "message_id": uuid.uuid4(), "thread_id": uuid.uuid4()}
+def _run_row(status, continues_used=0):
+    return {
+        "run_id": uuid.uuid4(), "status": status, "message_id": uuid.uuid4(), "thread_id": uuid.uuid4(),
+        "continues_used": continues_used,
+    }
 
 
 @pytest.fixture
@@ -397,7 +400,8 @@ async def test_no_row_is_none(paused):
     pool = _Pool(None)
     assert await oa.read_ask(pool, run_id=uuid.uuid4(), principal=_principal()) is None
     sql, args = pool.calls[0]
-    for clause in ("r.user_id = $2", "t.origin_kind = 'mcp'", "t.origin_ref = $3", "t.org_id = $4", "r.parent_run_id IS NULL"):
+    for clause in ("r.user_id = $2", "t.origin_kind = 'mcp'", "t.origin_ref = $3", "t.org_id = $4", "r.parent_run_id IS NULL",
+                   "continues_used"):
         assert clause in sql
     assert [str(a) for a in args[1:]] == [USER, KEY, ORG]
 
@@ -451,6 +455,56 @@ async def test_a_completed_run_reads_the_answer_with_citations_by_document(pause
     ]
     assert out.confidence_level == "high"
     assert out.disclaimer is None
+
+
+# ── read_ask: a run finished by an in-app Continue (306-REVIEW CR-01; D-10 / D-30 / D-33) ─────────
+#
+# A Continue keeps the same run_id and re-resolves scope WITHOUT the key's folder wall, so the
+# answer it produced may draw on folders the key cannot read. The key gets the chat link only.
+
+
+def _secret_message():
+    return {
+        "content": "Secret from outside the folder.",
+        "source_refs": [{"document_id": str(uuid.uuid4()), "filename": "Outside.pdf", "chunk_index": 0}],
+        "confidence_level": "high",
+        "confidence_avg_similarity": 0.9,
+        "confidence_disclaimer": None,
+    }
+
+
+@pytest.mark.asyncio
+async def test_a_continued_run_reads_answered_in_app_and_never_reads_the_message(paused):
+    row = _run_row("completed", continues_used=1)
+    pool = _Pool(row, _secret_message())
+    out = await oa.read_ask(pool, run_id=row["run_id"], principal=_principal())
+    assert out.status == "answered_in_app"
+    assert out.answer is None
+    assert out.citations == []
+    assert out.confidence_level is None and out.disclaimer is None
+    assert out.chat_link == f"https://app.example.com/app/chat/{row['thread_id']}"
+    assert not [c for c in pool.calls if "FROM public.messages" in c[0]]
+
+
+@pytest.mark.asyncio
+async def test_an_uncontinued_run_still_reads_its_answer_and_citations(paused, monkeypatch):
+    monkeypatch.setattr("app.mcp.results.doc_link", lambda d: f"https://app.example.com/app/library/{d}")
+    row = _run_row("completed", continues_used=0)
+    msg = _secret_message()
+    out = await oa.read_ask(_Pool(row, msg), run_id=row["run_id"], principal=_principal())
+    assert out.status == "answered"
+    assert out.answer == "Secret from outside the folder."
+    assert [c["document_id"] for c in out.citations] == [msg["source_refs"][0]["document_id"]]
+
+
+@pytest.mark.asyncio
+async def test_a_continued_run_that_cap_paused_again_reads_needs_input(paused):
+    paused.value = True
+    row = _run_row("completed", continues_used=1)
+    pool = _Pool(row, _secret_message())
+    out = await oa.read_ask(pool, run_id=row["run_id"], principal=_principal())
+    assert out.status == "needs_input"
+    assert not [c for c in pool.calls if "FROM public.messages" in c[0]]
 
 
 # ── static ────────────────────────────────────────────────────────────────────────────────────

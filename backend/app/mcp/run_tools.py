@@ -275,10 +275,12 @@ def _shape(read: Any, link: str) -> R.RunRead:
             output=R.defang(read.output_text) if read.output_text else None,
             files=[R.defang(f.name) for f in read.files],
         )
+    # 306-REVIEW CR-02: a failure reason is often LLM-written about document content — defanged.
+    end_reason = R.defang(read.end_reason) if read.end_reason else None
     if status == "failed":
-        return R.RunRead(run_id=read.run_id, status="failed", end_reason=read.end_reason, link=link)
+        return R.RunRead(run_id=read.run_id, status="failed", end_reason=end_reason, link=link)
     if status in _STOP_STATES:
-        return R.RunRead(run_id=read.run_id, status="stopped", end_reason=read.end_reason, link=link)
+        return R.RunRead(run_id=read.run_id, status="stopped", end_reason=end_reason, link=link)
     step_name = None
     if read.step_index is not None and 0 < read.step_index <= len(read.steps):
         step_name = R.defang(read.steps[read.step_index - 1].name) or None

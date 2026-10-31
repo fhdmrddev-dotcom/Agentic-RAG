@@ -189,7 +189,9 @@ class AskCitation(BaseModel):
     link: str
 
 
-AskStatus = Literal["answered", "working", "needs_input", "starting", "failed", "timed_out", "stopped"]
+AskStatus = Literal[
+    "answered", "answered_in_app", "working", "needs_input", "starting", "failed", "timed_out", "stopped",
+]
 
 
 class AskResult(BaseModel):
@@ -209,6 +211,11 @@ ASK_WORKING_SENTENCE = "Still working on it. Call get_answer with handle {handle
 ASK_NEEDS_INPUT_SENTENCE = (
     "This question needs your input in the app before it can finish. Open it in Syrel: {link}"
 )
+# 306-REVIEW CR-01: an answer finished by an in-app Continue stays in the app (D-10 / D-30).
+ASK_ANSWERED_IN_APP_SENTENCE = (
+    "This question was finished in the app, so its answer stays there. "
+    "Open it in Syrel to read it: {link}"
+)
 ASK_FAILED_SENTENCE = (
     "The agent couldn't finish this question. Open it in Syrel to see what happened: {link}"
 )
@@ -218,6 +225,7 @@ ASK_NO_SOURCES_LINE = "Sources: none cited."
 ASK_CHAT_LINE = "Open this chat in Syrel: {link}"
 _ASK_END = {
     "needs_input": ASK_NEEDS_INPUT_SENTENCE,
+    "answered_in_app": ASK_ANSWERED_IN_APP_SENTENCE,
     "failed": ASK_FAILED_SENTENCE,
     "timed_out": ASK_TIMED_OUT_SENTENCE,
     "stopped": ASK_STOPPED_SENTENCE,
@@ -299,7 +307,7 @@ class RunRead(BaseModel):
     waiting_on: RedactableText | None = None
     output: RedactableText | None = None
     files: list[RedactableText] = Field(default_factory=list)
-    end_reason: str | None = None
+    end_reason: RedactableText | None = None  # 306-REVIEW CR-02: through the outbound guard (D-07)
     link: str
 
 

@@ -307,6 +307,21 @@ async def test_get_answer_repeats_the_needs_input_sentence(world):
     assert "needs your input in the app" in results.render(out) and CHAT in results.render(out)
 
 
+async def test_get_answer_on_an_ask_finished_in_the_app_points_at_the_chat_only(world):
+    """306-REVIEW CR-01: an answer produced by an in-app Continue never crosses to the key."""
+    world.read = _read("answered_in_app")
+    out = await ask_tools.get_answer(PRINCIPAL, results.GetAnswerArgs(handle=str(RUN)))
+    assert out.status == "answered_in_app"
+    text = results.render(out)
+    assert text == (
+        "This question was finished in the app, so its answer stays there. "
+        f"Open it in Syrel to read it: {CHAT}"
+    )
+    assert "The answer." not in text and DOC not in text
+    dumped = out.model_dump()
+    assert dumped["answer"] is None and dumped["citations"] == []
+
+
 # ── render (D-07) ─────────────────────────────────────────────────────────────────────────────
 
 
