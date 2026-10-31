@@ -23,6 +23,13 @@ read-only: maintenance refuses it, D-14) and counts on the per-key ``start`` buc
 still never listed. ``is_granted``: a companion (``get_answer``) is granted only WITH its lead
 (``ask_agent``), the catalogue's ``travels_with`` rule, at list time and at call time.
 
+306-05 (D-10..D-15): and the three workflow tools (``app.mcp.run_tools``), so the server SERVES all
+eight catalogue names: ``search_knowledge_base``, ``list_documents``, ``read_document``,
+``ask_agent``, ``get_answer``, ``list_workflows``, ``run_workflow``, ``get_workflow_run``.
+``run_workflow`` starts a run, so it carries ``STARTS`` and counts on the ``start`` bucket;
+``list_workflows`` and ``get_workflow_run`` are ``READ_ONLY`` and ``cheap`` and keep answering under
+maintenance. Both travel with ``run_workflow`` (``is_granted``), so a key without it lists none.
+
 ``READ_ONLY`` is the annotation every read tool carries. The maintenance guard in ``dispatch``
 refuses any tool whose annotations are not read-only while maintenance is on (D-25).
 """
@@ -34,7 +41,7 @@ from typing import Any, Awaitable, Callable, Literal
 from mcp import types
 from pydantic import BaseModel
 
-from app.mcp import ask_tools, read_tools, results
+from app.mcp import ask_tools, read_tools, results, run_tools
 from app.services.mcp_tool_catalogue import MCP_TOOLS
 
 Bucket = Literal["cheap", "expensive", "start"]
@@ -106,6 +113,20 @@ GET_ANSWER_DESCRIPTION = (
     "if it is still being worked on or needs your input in Syrel."
 )
 
+LIST_WORKFLOWS_DESCRIPTION = (
+    "List the published workflows this key can run, with each one's workflow_id, version and the "
+    "inputs it takes. Pass a workflow_id to run_workflow."
+)
+RUN_WORKFLOW_DESCRIPTION = (
+    "Start a published workflow with its inputs as text. Returns the run id at once and never "
+    "waits for the run: check it with get_workflow_run. Send the same idempotency_key again to get "
+    "the same run instead of a new one. A step that needs a person is answered in Syrel."
+)
+GET_WORKFLOW_RUN_DESCRIPTION = (
+    "Check a workflow run this key started: running and at which step, waiting on a person, "
+    "completed with its output and file names, failed or stopped. Links open the run in Syrel."
+)
+
 
 def _spec(name: str, description: str, args_model, result_model, handler, bucket: Bucket,
           annotations: types.ToolAnnotations = READ_ONLY) -> ToolSpec:
@@ -135,6 +156,12 @@ _SPECS: tuple[ToolSpec, ...] = (
           ask_tools.ask_agent, "start", annotations=STARTS),
     _spec("get_answer", GET_ANSWER_DESCRIPTION, results.GetAnswerArgs, results.AskResult,
           ask_tools.get_answer, "cheap"),
+    _spec("list_workflows", LIST_WORKFLOWS_DESCRIPTION, results.ListWorkflowsArgs, results.WorkflowList,
+          run_tools.list_workflows, "cheap"),
+    _spec("run_workflow", RUN_WORKFLOW_DESCRIPTION, results.RunWorkflowArgs, results.RunStarted,
+          run_tools.run_workflow, "start", annotations=STARTS),
+    _spec("get_workflow_run", GET_WORKFLOW_RUN_DESCRIPTION, results.GetRunArgs, results.RunRead,
+          run_tools.get_workflow_run, "cheap"),
 )
 
 REGISTERED: dict[str, ToolSpec] = {spec.tool.name: spec for spec in _SPECS}

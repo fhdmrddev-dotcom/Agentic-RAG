@@ -38,7 +38,7 @@ describe("304-06 OrgMcpSwitchCard", () => {
     expect(sw).toHaveAttribute("aria-checked", "true")
     expect(
       screen.getByText(
-        "Members can make personal keys that let Claude Code, Cursor or VS Code search and read as them in Acme Inc.",
+        "Members can make personal keys that let Claude Code, Cursor or VS Code search, ask the agent and run workflows as them in Acme Inc.", // 306-05 reworded (UI-SPEC)
       ),
     ).toBeInTheDocument()
     const card = screen.getByTestId("org-mcp-switch")

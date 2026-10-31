@@ -78,6 +78,41 @@ describe("293-04 ApiKeyCallStrip", () => {
     ).toBeInTheDocument()
   })
 
+  it("306-05 an MCP key: an ok ask_agent / run_workflow call is a start bar and the caption names started", () => {
+    const mcp = { key: makeMcpKey(), limits: { starts_per_minute: 10, reads_per_minute: 120, searches_per_minute: 30 } }
+    const calls = [
+      makeCall({ at: iso(2026, 9, 25, 10, 45), verb: "read", outcome: "ok", tool: "run_workflow" }),
+      makeCall({ at: iso(2026, 9, 25, 10, 44), verb: "read", ok: false, outcome: "error", tool: "get_workflow_run" }),
+      makeCall({ at: iso(2026, 9, 25, 10, 43), verb: "read", outcome: "ok", tool: "get_answer" }),
+      makeCall({ at: iso(2026, 9, 25, 10, 42), verb: "read", outcome: "ok", tool: "ask_agent" }),
+    ]
+    render(<ApiKeyCallStrip calls={calls} now={NOW} label="claude-code-laptop" ctx={mcp} />)
+    expect(screen.getAllByTestId("call-bar").map((b) => b.getAttribute("data-kind"))).toEqual([
+      "start", "read", "refused", "start",
+    ])
+    const [start] = screen.getAllByTestId("call-bar-mark")
+    expect(start.className).toContain("h-4")
+    expect(start.className).toContain("bg-primary")
+    expect(screen.getByTestId("call-strip-caption").textContent).toBe(
+      "last 4 calls · ■ started ■ answered ■ not answered · tap one",
+    )
+    expect(screen.getByRole("button", { name: "10:42 · ask_agent · ✓ replied" })).toBeInTheDocument()
+    expect(screen.getByRole("button", { name: "10:45 · run_workflow · ✓ run started" })).toBeInTheDocument()
+  })
+
+  it("306-05 an MCP key without a start bar keeps 305's caption, byte for byte", () => {
+    const mcp = { key: makeMcpKey() }
+    const calls = [
+      makeCall({ at: iso(2026, 9, 25, 10, 44), verb: "read", outcome: "ok", tool: "list_workflows" }),
+      makeCall({ at: iso(2026, 9, 25, 10, 43), verb: "read", ok: false, outcome: "error", tool: "run_workflow" }),
+    ]
+    render(<ApiKeyCallStrip calls={calls} now={NOW} label="claude-code-laptop" ctx={mcp} />)
+    expect(screen.getAllByTestId("call-bar").map((b) => b.getAttribute("data-kind"))).toEqual(["refused", "read"])
+    expect(screen.getByTestId("call-strip-caption").textContent).toBe(
+      "last 2 calls · ■ answered ■ not answered · tap one",
+    )
+  })
+
   it("no calls → the no-calls caption and no bars", () => {
     render(<ApiKeyCallStrip calls={[]} now={NOW} label="n8n-prod" />)
     expect(screen.queryAllByTestId("call-bar")).toHaveLength(0)

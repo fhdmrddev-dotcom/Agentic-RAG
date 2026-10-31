@@ -107,3 +107,46 @@ describe("305-03 an MCP call's result words", () => {
     expect(mcpCallWordsRaw).not.toMatch(/from "react"/)
   })
 })
+
+describe("306-05 the ask and run tools' words (UI-SPEC §7a)", () => {
+  it("ask_agent and get_answer replied; run_workflow run started; the reads answered", () => {
+    expect(callWords(call({ tool: "ask_agent" }), ctx)).toEqual({ ok: true, text: "✓ replied" })
+    expect(words(call({ tool: "get_answer" }))).toBe("✓ replied")
+    expect(callWords(call({ tool: "run_workflow" }), ctx)).toEqual({ ok: true, text: "✓ run started" })
+    for (const tool of ["list_workflows", "get_workflow_run", "search_knowledge_base", "list_documents", "read_document"]) {
+      expect(words(call({ tool }))).toBe("✓ answered")
+    }
+    expect(callDetailLine(call({ tool: "ask_agent" }), ctx, NOW)).toBe("10:42 · ask_agent · ✓ replied")
+  })
+
+  it("a new tool's not-ok outcomes keep the shipped 305 words", () => {
+    expect(words(call({ tool: "run_workflow", ok: false, outcome: "not_available" }))).toBe(
+      "✕ not available: nothing this key can read there",
+    )
+    expect(words(call({ tool: "ask_agent", ok: false, outcome: "error" }))).toBe("✕ failed: the tool couldn't finish")
+  })
+
+  it("ask_needs_external reads why the key can't ask", () => {
+    expect(callWords(call({ tool: "ask_agent", ok: false, outcome: "refused", reason: "ask_needs_external" }), ctx)).toEqual({
+      ok: false, text: "✕ refused: this key leaves out mail and synced sources, so it can't ask",
+    })
+  })
+
+  it("rate_limited:start names the starts figure: detail first, then the list's limits", () => {
+    const over = (detail: Record<string, unknown> | null = null) =>
+      call({ tool: "ask_agent", ok: false, outcome: "refused", reason: "rate_limited:start", detail })
+    expect(words(over({ limit: 4 }))).toBe("✕ refused: over the limit: 4 starts a minute")
+    expect(words(over())).toBe("✕ refused: over the limit: 10 starts a minute")
+    expect(words(over(), { key: KEY, now: NOW })).toBe("✕ refused: over the limit")
+  })
+
+  it("admission reasons fall through to the one shared vocabulary, never a raw code", () => {
+    const refused = (reason: string) => call({ tool: "run_workflow", ok: false, outcome: "refused", reason })
+    expect(mcpCallWords(refused("admission:org"), ctx)).toBeNull()
+    expect(words(refused("admission:credential"))).toBe(
+      "✕ refused: too many questions and runs already in progress for this key",
+    )
+    expect(words(refused("admission:org"))).not.toContain("admission:org")
+    expect(words(refused("brand_new_reason"))).toBe("✕ refused: brand_new_reason")
+  })
+})

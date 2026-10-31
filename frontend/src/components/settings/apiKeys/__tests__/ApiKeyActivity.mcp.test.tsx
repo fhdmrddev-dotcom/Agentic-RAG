@@ -45,7 +45,7 @@ describe("305-03 ApiKeyActivity — an MCP key", () => {
 
   it("an MCP key never called reads the MCP empty sentence", () => {
     render(<ApiKeyActivity calls={[]} revoked={false} lastUsed="—" now={NOW} ctx={{ key: KEY, now: NOW }} />)
-    expect(screen.getByText("No calls yet. The first search or read will show here.")).toBeInTheDocument()
+    expect(screen.getByText("No calls yet. The first call from an AI tool will show here.") /* 306-05 reworded */).toBeInTheDocument()
   })
 
   it("a revoked MCP key with no calls keeps the shipped revoked sentence", () => {

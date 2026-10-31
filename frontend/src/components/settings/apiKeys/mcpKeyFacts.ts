@@ -176,6 +176,21 @@ export function draftFolderIds(d: McpDraft, folders: readonly PickableFolder[] |
   return rows.filter((r) => d.folderIds.includes(r.folder.id) && !r.included).map((r) => r.folder.id)
 }
 
+// ── an MCP call's bar (306-05; UI-SPEC §7b) ───────────────────────────────────────────────────
+
+/** The two tools whose `ok` call STARTS something: the server's `STARTS` annotation
+ *  (`app/mcp/tools.py`). The one place this module names a tool: a bar kind is not a preset. */
+const STARTS_SOMETHING: ReadonlySet<string> = new Set(["ask_agent", "run_workflow"])
+
+export type McpBarKind = "start" | "read" | "refused"
+
+/** An ok `ask_agent` / `run_workflow` call is a start bar; every other ok call the short read bar;
+ *  a call that was not answered the tall refused bar. */
+export function mcpBarKind(call: { ok: boolean; tool?: string | null }): McpBarKind {
+  if (!call.ok) return "refused"
+  return call.tool && STARTS_SOMETHING.has(call.tool) ? "start" : "read"
+}
+
 // ── the card's scope model ────────────────────────────────────────────────────────────────────
 
 export const MAX_FOLDER_CHIPS = 4

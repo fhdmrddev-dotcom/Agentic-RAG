@@ -12,8 +12,11 @@
 306-04 (D-15) RETIRES this file's "exactly the three" pin DELIBERATELY (SEED-177: retire a fence on
 purpose, never trip it by surprise): ``ask_agent`` and ``get_answer`` are now served, so the
 registry holds five and a fully-granted key lists five. The three read tools' own definitions are
-still pinned here unchanged; the two ask tools are pinned by ``test_306_tool_defs.py``. The 307
-names (``list_workflows`` / ``run_workflow`` / ``get_workflow_run``) are still never listed.
+still pinned here unchanged; the two ask tools are pinned by ``test_306_tool_defs.py``.
+
+306-05 (D-15) retires the last of it, DELIBERATELY: the workflow names (``list_workflows`` /
+``run_workflow`` / ``get_workflow_run``) are now served, so a fully-granted key lists all eight and
+the "unregistered workflow name is a protocol error" case becomes an unknown-name case.
 * the dispatch render stage: a handler's model becomes ``structuredContent`` (validated against the
   same model) plus the text rendered from it; a handler's sentence becomes one ``isError`` block.
 """
@@ -36,6 +39,8 @@ FIXTURE_STRINGS = ("Contracts 2026", "Q3 revenue.pdf", "Fahad's laptop key", "30
 
 # 306-04 (D-15): the registry now SERVES the two ask tools after the three read tools.
 SERVED = THREE + ("ask_agent", "get_answer")
+# 306-05 (D-15): and the three workflow tools.
+SERVED = SERVED + ("list_workflows", "run_workflow", "get_workflow_run")
 
 
 def test_the_three_read_tools_lead_the_registry():
@@ -106,11 +111,12 @@ def test_a_key_granted_every_catalogue_tool_lists_only_the_served_names(monkeypa
     assert [t["name"] for t in _listed(monkeypatch, everything)] == list(SERVED)
 
 
-def test_an_unregistered_307_name_is_a_protocol_error_even_when_granted(monkeypatch):
+def test_an_unregistered_name_is_a_protocol_error_even_when_every_tool_is_granted(monkeypatch):
+    # 306-05 (D-15): run_workflow is served now; an unknown name keeps the protocol error.
     h.configure(monkeypatch)
     h.stub_edge(monkeypatch, h.Recorder(replace(h.PRINCIPAL, tools=tuple(MCP_TOOL_NAMES))))
     with TestClient(h.fresh_app(), base_url=h.BASE) as client:
-        r = h.call(client, "run_workflow", {"workflow_id": "w"})
+        r = h.call(client, "delete_workflow", {"workflow_id": "w"})
     assert r.json()["error"]["code"] == -32602
 
 

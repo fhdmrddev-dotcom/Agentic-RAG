@@ -20,7 +20,8 @@ export const MCP_KEY_COPY = {
   kind: {
     question: "What is this key for?",
     mcpTitle: "For an AI tool (MCP)",
-    mcpSub: "Claude Code, Cursor or VS Code searches and reads your knowledge as you.",
+    // 306-05 (UI-SPEC §Copywriting): reworded now that a key can ask and run.
+    mcpSub: "Claude Code, Cursor or VS Code searches your knowledge, asks the agent and runs your workflows, as you.",
     workflowTitle: "For a workflow integration",
     workflowSub: "n8n, a script or a scheduler starts the published workflows you pick.",
     chooseFirst: "Choose what the key is for.",
@@ -79,6 +80,9 @@ export const MCP_KEY_COPY = {
     foldersNone: "You can't see any folders in {org} yet.",
     externalField: "Include mail and synced sources",
     externalSub: "Documents that arrived from a mailbox or a synced source. Left out unless you tick this.",
+    // 306-05 (UI-SPEC §7c, D-29): shown under externalSub while ask_agent is ticked and this is not.
+    askNeedsExternalHint:
+      "⚠ Asking the agent needs this ticked. Without it, this key's questions are refused, because the agent's search can't leave mail and synced sources out.",
     expiresHint: "AI tool keys always expire. You can revoke it any time before then.",
     actsLead: "This key ",
     actsBold: "acts as you",
@@ -158,7 +162,9 @@ export const MCP_KEY_COPY = {
       "Revoking can't be undone. Any AI tool using this key stops working on its next call; a replacement is a new key with a new secret.",
 
     orgSwitchTitle: "AI tool access (MCP)",
-    orgSwitchSub: "Members can make personal keys that let Claude Code, Cursor or VS Code search and read as them in {org}.",
+    // 306-05 (UI-SPEC §Copywriting): reworded now that a key can ask and run.
+    orgSwitchSub:
+      "Members can make personal keys that let Claude Code, Cursor or VS Code search, ask the agent and run workflows as them in {org}.",
     orgSwitchOffTag: "off for {org}",
     orgSwitchImpact:
       "Every member's AI tool key in {org} is refused on its next call. Keys are kept; switching back on restores them.",
@@ -182,15 +188,23 @@ export const MCP_KEY_COPY = {
     overSearches: "over the limit: {N} searches a minute",
     notGranted: "this key isn't allowed to use {tool}",
     notGrantedBare: "this key isn't allowed to use that tool",
+    // 306-05 (UI-SPEC §7a): an ask is a reply (an answer, a handle or a needs-input sentence),
+    // never "answered"; a workflow start is a start.
+    replied: "replied",
+    runStarted: "run started",
+    askNeedsExternal: "this key leaves out mail and synced sources, so it can't ask",
   },
 
   /** 305-03 (UI-SPEC §Surface 3): an AI tool key's activity table and call strip. */
   activity: {
     colTool: "Tool",
     noTool: "—",
-    noCalls: "No calls yet. The first search or read will show here.",
+    // 306-05 (UI-SPEC §Copywriting): reworded now that a key can ask and run.
+    noCalls: "No calls yet. The first call from an AI tool will show here.",
     legendOk: "answered",
     legendNotOk: "not answered",
+    // 306-05 (UI-SPEC §7b): named only while a start bar is on screen.
+    legendStarted: "started",
   },
 
   /** 305-04 (UI-SPEC §Copywriting `pii` block, verbatim): the org's PII redaction card. The

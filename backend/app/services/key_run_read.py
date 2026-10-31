@@ -108,10 +108,18 @@ def _step_position(phase_rows: list[dict]) -> int | None:
 
 
 async def _file_links(
-    pool, redis, *, key: ResolvedKey, run: dict, base: str
+    pool, redis, *, key: ResolvedKey | None, run: dict, base: str | None
 ) -> list[InboundFile]:
     rows = await pool.fetch(_FILES_SQL, run["thread_id"])
     files: list[InboundFile] = []
+    if base is None:
+        # 306-05 (D-12 / Pitfall 13): the MCP arm. File NAMES only — no one-time link is minted
+        # (``/inbound/files`` serves key-origin runs only); the caller points at /app/runs/<id>.
+        return [
+            InboundFile(name=posixpath.basename(str(r.get("path") or "").replace("\\", "/")) or "file",
+                        size_bytes=r.get("size_bytes"), url="", expires_in=0)
+            for r in rows or []
+        ]
     for r in rows or []:
         token = secrets.token_urlsafe(24)
         await redis.set(
@@ -130,12 +138,13 @@ async def _file_links(
 
 
 async def read_key_run(
-    pool, redis, *, run: dict, key: ResolvedKey, files_base: str
+    pool, redis, *, run: dict, key: ResolvedKey | None, files_base: str | None
 ) -> InboundRunRead:
     """The status read of a run the caller has ALREADY proven is this key's (its own access SQL).
 
     ``files_base`` is the absolute API base each one-time file link is built on (the route's
     ``_public_api_base(request)``). The caller writes the read audit row with ``result.status``.
+    306-05: ``files_base=None`` is the MCP arm — file names, no link, no token (``_file_links``).
     """
     from app.db import workflows as workflows_db  # noqa: PLC0415
     from app.models.thread import phase_output_object  # noqa: PLC0415

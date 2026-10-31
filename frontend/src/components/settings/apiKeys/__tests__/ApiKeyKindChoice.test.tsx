@@ -36,7 +36,7 @@ describe("304-05 ApiKeyKindChoice", () => {
     expect(wf).toHaveAccessibleName(/For a workflow integration/)
     expect(mcp).toHaveAttribute("aria-checked", "false")
     expect(wf).toHaveAttribute("aria-checked", "false")
-    expect(within(mcp).getByText("Claude Code, Cursor or VS Code searches and reads your knowledge as you.")).toBeInTheDocument()
+    expect(within(mcp).getByText("Claude Code, Cursor or VS Code searches your knowledge, asks the agent and runs your workflows, as you.") /* 306-05 reworded */).toBeInTheDocument()
     expect(within(wf).getByText("n8n, a script or a scheduler starts the published workflows you pick.")).toBeInTheDocument()
     expect(document.activeElement).toBe(mcp)
     expect(mcp).toHaveAttribute("tabindex", "0")
