@@ -117,7 +117,17 @@ def _wait_for_port(port: int, seconds: float = 30.0) -> bool:
     return False
 
 
-def _classify(stdout: str, finished: bool, n: int) -> str:
+def _as_text(value) -> str:
+    """``TimeoutExpired.stdout``/``.stderr`` are BYTES even under ``text=True`` (305-REVIEW-04
+    IN-04-03), so a killed run's partial output is decoded here rather than crashing the probe."""
+    if value is None:
+        return ""
+    if isinstance(value, bytes):
+        return value.decode("utf-8", "replace")
+    return value
+
+
+def _classify(stdout: str, n: int) -> str:
     text = stdout.lower()
     if f"waited {n} seconds" in text:
         return "answered"
@@ -166,13 +176,14 @@ def drive(scratch: str, waits: list[int], out: str | None) -> int:
                     )
                     rc, stdout, stderr = res.returncode, res.stdout, res.stderr
                 except subprocess.TimeoutExpired as exc:
-                    rc, stdout, stderr = "killed", (exc.stdout or ""), (exc.stderr or "")
+                    rc, stdout, stderr = "killed", _as_text(exc.stdout), _as_text(exc.stderr)
                 wall = time.monotonic() - t0
                 log_fh.flush()
                 server_text = server_log.read_text(encoding="utf-8", errors="replace")
                 finished = f"CALL FINISH n={n} " in server_text
                 started = f"CALL START n={n}" in server_text
-                outcome = _classify(stdout if isinstance(stdout, str) else "", finished, n)
+                stdout, stderr = _as_text(stdout), _as_text(stderr)
+                outcome = _classify(stdout, n)
                 reply = " ".join((stdout or "").split())[:200]
                 rows.append({"n": n, "outcome": outcome, "wall_s": round(wall, 1), "exit": rc,
                              "server_started": started, "server_finished": finished, "reply": reply,
