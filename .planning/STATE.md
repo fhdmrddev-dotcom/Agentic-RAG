@@ -3,14 +3,14 @@ gsd_state_version: 1.0
 milestone: v4.9
 milestone_name: Use It From Your Own Tools
 status: executing
-last_updated: "2026-10-31T05:00:00.000Z"
-last_activity: 2026-10-31 -- Phase 305 planned (4 plans)
+last_updated: "2026-10-31T17:30:00.000Z"
+last_activity: 2026-10-31 -- Phase 305 closed by decision (self-verified 4/5; client rows owed)
 progress:
   total_phases: 7
-  completed_phases: 1
-  total_plans: 6
-  completed_plans: 6
-  percent: 14
+  completed_phases: 2
+  total_plans: 10
+  completed_plans: 10
+  percent: 29
 ---
 
 # Project State
@@ -44,10 +44,10 @@ reviewer exists, so a phase closes `verification_mode: self-verified`, never `re
 ## Current Position
 
 Milestone: v4.9 Use It From Your Own Tools
-Phase: 304 — Personal MCP Keys That Act as You — **COMPLETE 2026-10-31, self-verified `passed` 5/5** (KEY-01..06). 303 not started. 305 PLANNED 2026-10-31: 4 plans / 4 serial waves (every plan writes the local DB), D-01..D-58, research + UI-SPEC (approved) + patterns; plan check 1 docs blocker fixed, 3 size warnings accepted (G-8). Operator approved the `mcp` 2.3 / `httpx2` / `sse-starlette` 3.0.3 install (305-01 Task 1). **305 EXECUTED: 4 of 4 plans merged** — 305-01 (`4d4d013f2`): /mcp edge, mig 222 local only, SDK bump; 305-02 (`1c20943a8`): three read tools, identical refusal (9 cases), `/app/library/<uuid>` address; 305-03 (`cf9f5b683`): per-call MCP audit, read + search key limits, `mcp_usage` spend leg, key activity UI; baseline 70 ≤ 71 every wave. 305-04 (`44fb3f9ff`): outbound guard + PII redactor (FP 0 on every recognizer after 2 tightenings; p95 0.44 ms search / 2.8 ms read), org switch + card, Claude Code ~60 s client timeout measured. Review of 01-03: 0 BL / 6 WR / 7 IN. Also BUG-261031-02 fixed (`472414970`, stuck-processing sweep). Review 04: 1 BL / 3 WR (all fixed). Both reviews fixed test-first. SECURITY 38/38 closed (T-305-SC pinned `88d940e9e`; AR-01 = SEED-397, AR-02 log redaction, both accepted). G-4 rows 1-3 PASS (Claude-driven, `evidence/g4/`). **Open: BUG-261031-03** — >10 concurrent MCP searches deadlock the asyncpg pool (found by the over-limit readback); debugger fixing test-first. Next: merge that fix, verifier, close.
-Plan: 6 of 6 merged + review-fix merge `bb6ebc2f0` (WR-01..04 test-first; D-46 `retrievable` on every MCP read, D-47 narrowed key lists only in-scope views).
-Status: 304 closed by hand (not `phase.complete`). SECURITY 47/47 closed · REVIEW 0 BL / 4 WR fixed / 9 IN left as recorded · G-4 rows 1-3 PASS in Chrome (DOM + DB; screenshots time out on the hidden tab) · post-merge backend 532 / frontend 433 green · baseline 70 ≤ 71 (one run read 75: 5 flaky extras in test_272_knowledge_health ×4 + test_email_ingestion, shown unrelated). **Not deployed — 304 deploys WITH 305 (D-30).**
-Last activity: 2026-10-31 — 304 verified and closed (`304-VERIFICATION.md`)
+Phase: **305 — Connect Claude Code and Cursor — CLOSED 2026-10-31 by decision, self-verified `human_needed` 4/5 SC** (MCP-01/02/03/07, KEY-07, GUARD-02/03). SC#1 is partial only on the client rows OWED to the operator (Cursor, deployed cloud container, one-box, Claude Desktop via `mcp-remote`); a real Claude Code CLI session was driven locally. 304 COMPLETE 2026-10-31. 303 not started. Next: 306 (start-type tools) or 307 (OAuth) — or the 304+305 deploy.
+Plan: 305 — 4 of 4 merged (`4d4d013f2`, `1c20943a8`, `cf9f5b683`, `44fb3f9ff`). Three reviews, every finding fixed test-first (01-03: 6 WR; 04: 1 BL + 3 WR; late fixes: 5 WR). SECURITY 38/38 closed (T-305-SC pinned `88d940e9e`; AR-01 SEED-397 + AR-02 log redaction accepted). Found by driving: BUG-261031-03 pool deadlock (`554fe5235`, pre-existing since Phase 246, chat search too) and BUG-261031-04 lost audit rows under load (`d4aacad2e`); both re-verified on :8000 with a 32-call burst. G-4 rows 1-3 + all readbacks PASS (`305-VALIDATION.md` §2.2, `evidence/g4/`). Gates: backend 70 ≤ 71, vitest count gate OK 594/594, tsc 61 = base, ledger + CLAUDE.md size OK.
+Status: 305 closed by hand (not `phase.complete`). **Not deployed — 304+305 deploy together (D-30/D-40).** Known non-blocking: `test_305_audit_live::…over_limit…` flaky under full-set load (8/8 alone); WR-04 / WR-06 calls accepted by the orchestrator; G4-1 non-member arm used a foreign-org document under one login.
+Last activity: 2026-10-31 — 305 verified (`305-VERIFICATION.md`) and closed by decision; BUG-261031-02 (stuck-processing sweep) fixed alongside
 
 Phases start at **303**; migrations at **220**. Seeds taken in at intake: SEED-013, SEED-177, SEED-195, SEED-081, SEED-079; bug BUG-261022-01.
 
@@ -75,6 +75,9 @@ link. Branch `develop`. Tags `v4.7` and `v4.8` pushed 2026-10-30.
 
 - **BUG-261031-01 — reproduce on a disposable Postgres:** a role-`anon` call to `current_user_org_ids()` crashed the local Postgres into recovery mode twice (should be "permission denied"). Production: anon has no EXECUTE, same PG 17.6, no crash lines in 24 h of logs. If the anon REST path reproduces it, it is an unauthenticated DB crash. Never drive it against production.
 - **304 cloud paste — before 304+305 deploy:** paste migrations 220 then 221 into cloud Supabase (per-action approval each), then `get_advisors(security)`. 221 also closes BUG-261030-03 (anon/authenticated DELETE/TRUNCATE/TRIGGER/REFERENCES on `organizations`) in production.
+- **305 before the 304+305 deploy:** paste mig **222** after 220 and 221 (per-action approval each), then `get_advisors(security)`; Coolify `BACKEND_PUBLIC_URL` = the https public address (else `/mcp` refuses to mount); Coolify stop grace > 5 s (20 s recommended, sse-starlette 3.0.3); decide SEED-397 / AR-01 (per-address limit sees the proxy) — accepted at close, overrule before a paying org uses MCP.
+- **305 client rows (D-43):** Cursor; one `claude` CLI search against the deployed cloud `/mcp`; the one-box; Claude Desktop via the `mcp-remote` bridge.
+- **Local leftovers (305):** MCP test key `g4-305-claude-code` (org 22f9c615, expires 7 Nov); chats "Stream works confirmation reply" and "ACME MSA payment terms search".
 - **304 D-41 — confirm before 304+305 deploy:** MCP keys need no tier capability (any member can mint; the org and deployment switches are the controls). Tier gates are a pricing one-way door (TIER-02); flipping it is one condition.
 
 - Logged-in production smoke of the 301 list (open it once on app.superrag.cloud; expect the empty state).
@@ -110,4 +113,5 @@ The 297-302 overrides are in `milestones/v4.8-STATE-at-close.md`.
 
 - **304 / G-2 (2026-10-30):** the key screen is UI and G-2 asks for an operator-approved sketch before discuss. The operator ran discuss with "continue autonomously end to end", so no sketch was approved. Mitigation: the key screen extends the shipped Phase 293 API keys tab (an approved design); the acceptance bar is the 304 UI-SPEC plus Claude-driven G-4 rows. Re-open: the operator asks to see a sketch.
 - **305 / G-2 (2026-10-31):** UI hint (org redaction card, possibly a spend view); no operator-approved sketch because the operator ran discuss with "continue autonomously end to end". Mitigation: both extend shipped, approved surfaces (`OrgMcpSwitchCard`, the spend breakdown); acceptance bar is the 305 UI-SPEC plus Claude-driven G-4 rows. Re-open: the operator asks to see a sketch.
+- **305 / G-4 (2026-10-31):** rows 1-3 driven by Claude, not the operator, with three recorded substitutions (G4-1 non-member arm = a foreign-org document under one login; G4-2 band pulse not observed; chat-stream console read began after the stream). Closed with SC#1's client rows OWED — a decision, not a claim (CLAUDE.md G-7 detail).
 - **304 / G-5 (2026-10-30):** honoured by construction, not overridden — one edit each on `dependencies.py`, `audit_service.py`, `user_settings.py`, `settings.py`; no new mount on `SettingsPage.tsx` or tab on `OrgAdminShell.tsx` (CONTEXT D-01/D-02); `api_key_auth.py` extracted before editing.
