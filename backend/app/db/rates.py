@@ -95,7 +95,7 @@ class SpendSummary:
 #             reinstate 257's exclusion (pinned by test_268_spend_rollup.py).
 #   members   the root itself + its DIRECT sub-agents. Depth is 1: `_handle_task` refuses
 #             inside a sub-agent (tool_dispatcher.py, D-085-12), so no recursive CTE.
-#             ⛔ NO predicate on m.org_id: a pre-268 sub-agent row may carry the trigger's
+#             ⛔ NO predicate on the member row's org: a pre-268 sub-agent row may carry the trigger's
 #             org rather than its parent's (Pitfall 7). Members are reached only THROUGH a
 #             root of this org, which is the whole org boundary (T-268-12).
 #   priced    each member priced at ITS OWN model/provider/started_at through
@@ -139,10 +139,24 @@ def _per_root_cte(window_sql: str, expert_param: str) -> str:
             SELECT
                 r.run_id, r.org_id, r.thread_id, r.user_id, r.status, r.model, r.provider,
                 r.started_at, r.completed_at, r.expert_id, r.expert_attributed,
-                (r.model = 'unknown' AND r.provider = 'unknown') AS is_box_shell
+                (r.model = 'unknown' AND r.provider = 'unknown') AS is_box_shell,
+                'run'::text AS source, NULL::uuid AS api_key_id, NULL::text AS tool
             FROM public.runs r
             WHERE r.org_id = $1
               AND r.parent_run_id IS NULL
+              """ + window_sql + """
+              """ + _expert_filter_sql(expert_param) + """
+          UNION ALL
+            SELECT
+                r.run_id, r.org_id, NULL::uuid, r.user_id, r.status, r.model, r.provider,
+                r.started_at, r.started_at, r.expert_id, r.expert_attributed,
+                false,
+                'mcp'::text AS source, r.api_key_id, r.tool
+            FROM (
+                SELECT u.id AS run_id, u.*, NULL::uuid AS expert_id, true AS expert_attributed
+                FROM public.mcp_usage u
+            ) r
+            WHERE r.org_id = $1
               """ + window_sql + """
               """ + _expert_filter_sql(expert_param) + """
         ),
@@ -155,6 +169,13 @@ def _per_root_cte(window_sql: str, expert_param: str) -> str:
                 m.model, m.provider, m.started_at, m.input_tokens, m.output_tokens
             FROM roots ro
             JOIN public.runs m ON m.run_id = ro.run_id OR m.parent_run_id = ro.run_id
+            WHERE ro.source = 'run'
+          UNION ALL
+            SELECT
+                ro.run_id, ro.org_id, false, true,
+                u.model, u.provider, u.started_at, u.input_tokens, u.output_tokens
+            FROM public.mcp_usage u
+            JOIN roots ro ON ro.run_id = u.id WHERE ro.source = 'mcp'
         ),
         priced AS (
             SELECT
@@ -828,6 +849,9 @@ async def get_spend_runs(
             ORDER BY wr2.created_at DESC
             LIMIT 1
         ) wr ON true
+        -- 305-03 (D-31 / T-305-30): the key an MCP usage row was made with, ORG-CONSTRAINED so a
+        -- key id can never pull another org's label. ``k.id`` is the primary key: at most one row.
+        LEFT JOIN public.api_keys k ON k.id = ro.api_key_id AND k.org_id = ro.org_id
         WHERE true
     """
 
@@ -869,7 +893,11 @@ async def get_spend_runs(
             ro.expert_id,
             ro.expert_attributed,
             eb.name AS expert_name,
-            (eb.id IS NOT NULL) AS expert_found
+            (eb.id IS NOT NULL) AS expert_found,
+            ro.source,
+            ro.api_key_id,
+            k.label AS api_key_label,
+            ro.tool AS mcp_tool
     """ + base_query + status_filter_clause + """
         ORDER BY ro.started_at DESC
         LIMIT $3 OFFSET $4
@@ -910,6 +938,13 @@ async def get_spend_runs(
             "expert_deleted": bool(attributed_id is not None and not r["expert_found"]),
             "expert_attributed": bool(r["expert_attributed"]),
             "subagent_count": int(r["subagent_count"] or 0),
+            # 305-03 (D-31): an MCP usage row names its key and tool; a run reads "run" + nulls.
+            # ``.get``: an asyncpg Record and every older mock row both answer it. An MCP row has
+            # no thread, so its coverage is never complete (``is_coverage_complete`` above).
+            "source": r.get("source") or "run",
+            "api_key_id": str(r.get("api_key_id")) if r.get("api_key_id") is not None else None,
+            "api_key_label": r.get("api_key_label"),
+            "mcp_tool": r.get("mcp_tool"),
         })
 
     return items, total_count

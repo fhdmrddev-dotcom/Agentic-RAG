@@ -53,7 +53,10 @@ describe("ApiKeyLimits — loading (293-03)", () => {
     expect(screen.getByText(COPY.title)).toBeInTheDocument()
     expect(screen.getByText(COPY.title).textContent).toBe("API keys")
     expect(screen.getByText(COPY.startsHint).textContent).toBe("Default 10.")
-    expect(screen.getByText(COPY.readsHint).textContent).toBe("Default 120.")
+    // 305-03 (D-54): the reads limit now also governs AI tool list/read calls, so it says so.
+    expect(screen.getByText(COPY.readsHint).textContent).toBe(
+      "Default 120. Workflow status reads, and AI tool list and read calls.",
+    )
     expect(screen.getByText(COPY.footer).textContent).toBe(
       "Applies to every key once you click Save Integrations.",
     )
@@ -158,6 +161,53 @@ describe("ApiKeyLimits — through the tab's one save (293-03)", () => {
     expect(starts().max).toBe("60")
     expect(reads().min).toBe("10")
     expect(reads().max).toBe("600")
+  })
+})
+
+describe("ApiKeyLimits — the AI tool searches limit (305-03, D-54)", () => {
+  const searches = () => screen.getByLabelText("Searches per minute, per key") as HTMLInputElement
+
+  beforeEach(() => {
+    getSettings.mockResolvedValue(
+      settingsWith({ api_key_starts_per_minute: 10, api_key_reads_per_minute: 120, api_key_searches_per_minute: 30 }),
+    )
+  })
+
+  it("a third field with its words, and the reads field relabelled", async () => {
+    renderLeaf()
+    await waitFor(() => expect(searches().value).toBe("30"))
+    expect(screen.getByText("Default 30. AI tool searches only; each one runs an embedding call.")).toBeInTheDocument()
+    expect(screen.getByLabelText("Reads per minute, per key")).toBeInTheDocument()
+    expect(searches().min).toBe("1")
+    expect(searches().max).toBe("120")
+  })
+
+  it("hands over only a changed searches limit, clamped to 1..120", async () => {
+    const ref = renderLeaf()
+    await waitFor(() => expect(searches().value).toBe("30"))
+    expect(ref.current!.changes()).toEqual({})
+    fireEvent.change(searches(), { target: { value: "45" } })
+    expect(ref.current!.changes()).toEqual({ api_key_searches_per_minute: 45 })
+    fireEvent.change(searches(), { target: { value: "500" } })
+    expect(ref.current!.changes()).toEqual({ api_key_searches_per_minute: 120 })
+    fireEvent.change(searches(), { target: { value: "0" } })
+    expect(ref.current!.changes()).toEqual({ api_key_searches_per_minute: 1 })
+    fireEvent.change(searches(), { target: { value: "" } })
+    expect(ref.current!.changes()).toEqual({})
+  })
+
+  it("adopts the server's searches value after the save", async () => {
+    const ref = renderLeaf()
+    await waitFor(() => expect(searches().value).toBe("30"))
+    act(() => ref.current!.adopt({ api_key_starts_per_minute: 10, api_key_reads_per_minute: 120, api_key_searches_per_minute: 12 }))
+    expect(searches().value).toBe("12")
+    expect(ref.current!.changes()).toEqual({})
+  })
+
+  it("an older backend without the field reads the default 30 once loaded", async () => {
+    getSettings.mockResolvedValue(settingsWith({ api_key_starts_per_minute: 10, api_key_reads_per_minute: 120 }))
+    renderLeaf()
+    await waitFor(() => expect(searches().value).toBe("30"))
   })
 })
 

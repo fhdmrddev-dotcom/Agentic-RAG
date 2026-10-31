@@ -158,3 +158,28 @@ async def check_ip_limit(redis, *, client: str) -> int | None:
     except Exception as exc:  # noqa: BLE001 — any Redis failure refuses; see the module docblock
         logger.warning("mcp per-address limiter unavailable; refusing the call", exc_info=True)
         raise LimiterUnavailable() from exc
+
+
+# ── Phase 305-03 (D-27 / D-54 / T-305-13) — the MCP per-key buckets ─────────────────────────────
+# Two buckets per key on the same fixed window: ``read`` (the cheap tools, ``list_documents`` and
+# ``read_document``, sharing the /inbound status-read knob) and ``expensive`` (``search_knowledge_base``
+# — it embeds the query — on its own knob). Independent counters: searches cannot exhaust reads.
+# Returns instead of raising an ``HTTPException``: an over-limit MCP call is a TOOL error the
+# caller's model can relay (D-28), never an HTTP 429. ``enforce_key_limit`` above is untouched.
+
+
+async def check_key_limit(redis, *, key_id: str, kind: Kind) -> tuple[int, int | None]:
+    """Count one MCP call for ``key_id`` in ``kind``'s bucket. Returns ``(limit, retry)``: ``retry``
+    is ``None`` within the limit, else the seconds until the window resets (1..60). Raises
+    ``LimiterUnavailable`` on any Redis failure (fail closed, D-15)."""
+    settings = await load_app_settings_async()
+    if kind == "expensive":
+        limit = int(settings.api_key_searches_per_minute)
+    else:
+        limit = int(settings.api_key_reads_per_minute)
+    try:
+        retry = await hit(redis, key_id=key_id, kind=kind, limit=limit)
+    except Exception as exc:  # noqa: BLE001 — any Redis failure refuses; see the module docblock
+        logger.warning("mcp per-key limiter unavailable; refusing the call", exc_info=True)
+        raise LimiterUnavailable() from exc
+    return limit, retry

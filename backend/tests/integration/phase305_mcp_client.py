@@ -108,14 +108,21 @@ def mcp_app():
 
 @contextlib.asynccontextmanager
 async def mcp_session(monkeypatch, secret: str):
+    import app.mcp.dispatch as dispatch
     import app.mcp.edge as edge
     from app.config import settings
+    from app.security import api_key_auth
+    from tests.integration._271_gotrue_users import _admin
     from tests.unit.phase293_inbound_fakes import FakeRedis
 
     monkeypatch.setattr(settings, "backend_public_url", BASE, raising=False)
     monkeypatch.setattr(settings, "environment", "", raising=False)
     fake = FakeRedis()
     monkeypatch.setattr(edge, "get_redis", lambda: fake)
+    # 305-03: the per-key buckets and the refusal throttle count on the same fake, and the audit
+    # row goes to the LOCAL stack (the unit conftest points ``settings`` at a placeholder project).
+    monkeypatch.setattr(dispatch, "get_redis", lambda: fake)
+    monkeypatch.setattr(api_key_auth, "get_service_role_supabase", lambda org: _admin())
     application = mcp_app()
     async with application.router.lifespan_context(application):
         transport = httpx.ASGITransport(app=application)

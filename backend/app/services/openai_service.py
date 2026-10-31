@@ -16,6 +16,8 @@ from app.config import (
 # Phase 273 (I-1) — the show_artifact enums are derived from the closed Literals (pydantic +
 # stdlib only; no cycle).
 from app.models.artifact import ARTIFACT_COMPONENTS, CHART_KINDS, NODE_KINDS, VERDICTS
+# Phase 305-03 (D-55) — a leaf usage collector; embed_texts reports measured tokens to it.
+from app.services import usage_sink
 
 logger = logging.getLogger(__name__)
 
@@ -2721,6 +2723,8 @@ def embed_texts(
             model=effective_model,
             input=batch,
         )
+        # 305-03 (D-55): measured usage to the MCP spend sink; a no-op outside one, never raises.
+        usage_sink.record(getattr(response, "model", None) or effective_model, getattr(getattr(response, "usage", None), "prompt_tokens", None))
         for item in response.data:
             all_embeddings.append(item.embedding)
 

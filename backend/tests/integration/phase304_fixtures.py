@@ -199,6 +199,8 @@ class World:
         p = self.pool
         uids = [UUID(x) for x in (self.u, self.v_x, self.v_y) if x]
         steps = [
+            # 305-03: the MCP usage rows a search writes (its api_key_id is ON DELETE SET NULL)
+            "DELETE FROM public.mcp_usage WHERE user_id = ANY($1::uuid[])",
             "DELETE FROM public.api_keys WHERE user_id = ANY($1::uuid[])",
             "DELETE FROM public.workflow_runs WHERE user_id = ANY($1::uuid[])",
             "DELETE FROM public.workflow_definitions WHERE created_by = ANY($1::uuid[])",

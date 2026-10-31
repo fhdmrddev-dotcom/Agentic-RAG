@@ -33,6 +33,8 @@ export interface ApiKeyCall {
   outcome: string | null
   reason: string | null
   detail: Record<string, unknown> | null
+  /** 305-03 (D-53): the MCP tool a call used; null on a workflow call or a credential refusal. */
+  tool?: string | null
 }
 
 /** Phase 304: a workflow key (293) or a personal MCP key that acts as its owner in one org. */
@@ -79,6 +81,8 @@ export interface ApiKeyRead {
 export interface ApiKeyLimits {
   starts_per_minute: number
   reads_per_minute: number
+  /** 305-03 (D-54): the AI tool keys' searches limit (the expensive bucket). */
+  searches_per_minute: number
 }
 
 /** One tool of the server's D-11 catalogue — read from the list, never retyped here. */

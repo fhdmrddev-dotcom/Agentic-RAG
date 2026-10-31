@@ -78,6 +78,7 @@ const KEY = {
       outcome: "started",
       reason: null,
       detail: null,
+      tool: null, // 305-03 (D-53): the MCP tool a call used
     },
   ],
   // Phase 304 — a workflow key's MCP fields.
@@ -91,7 +92,7 @@ const KEY = {
 
 const SAMPLE_LIST = {
   keys: [KEY],
-  limits: { starts_per_minute: 10, reads_per_minute: 120 },
+  limits: { starts_per_minute: 10, reads_per_minute: 120, searches_per_minute: 30 },
   mcp: {
     available: true,
     off: null,

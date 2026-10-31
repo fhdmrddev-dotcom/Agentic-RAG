@@ -163,6 +163,11 @@ export async function getSpendRuns(params?: {
     expertDeleted: Boolean(r.expert_deleted),
     expertAttributed: Boolean(r.expert_attributed),
     subagentCount: r.subagent_count || 0,
+    // 305-03 (D-31 / D-55): an MCP usage row's key and tool; an older backend sends none.
+    source: r.source === "mcp" ? "mcp" : "run",
+    apiKeyId: r.api_key_id ?? null,
+    apiKeyLabel: r.api_key_label ?? null,
+    mcpTool: r.mcp_tool ?? null,
   }))
 
   return {

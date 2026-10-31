@@ -11531,7 +11531,7 @@ cells rot within days.
 | [`frontend/src/components/panel/AskFolderChoice.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentspanelaskfolderchoicetsx) | 1 / 1 / 70 | no (young) | young (295-06). Leaf on the shadcn Select: rows only from `engine_pause.folders`, visible label `Folder to search`. ⛔ no API import, no folder picker |
 | [`frontend/src/components/panel/enginePause.ts`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentspanelenginepausets) | 1 / 1 / 102 | no (young) | young (295-06). Pure helper: readEnginePause, needsFolder, answeredHeader, answeredReceipt + the three choice labels. ⛔ no React, no API import |
 | [`frontend/src/components/workflows/RunEndReasonLine.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentsworkflowsrunendreasonlinetsx) | 1 / 1 / 36 | no (young) | young (295-05). Leaf rendering UI-SPEC C.1: `Why it stopped: …` / `No reason was recorded…` / nothing for a cancelled run with no reason |
-| [`backend/app/services/openai_service.py`](docs/HOT-FILE-LEDGER.md#backendappservicesopenai_servicepy) | 84 / 42 / 2731 (was `81 / 41 / 2623`) | ⚠ **FIRES** | honoured by construction (292-01 schema + description; 292 F-1 description line; 30 tools). ⛔ no anyOf/oneOf/type arrays (Gemini probed live) |
+| [`backend/app/services/openai_service.py`](docs/HOT-FILE-LEDGER.md#backendappservicesopenai_servicepy) | 85 / 43 / 2735 (was `84 / 42 / 2731`) | ⚠ **FIRES** | 305-03: one guarded usage_sink.record after each embeddings.create in embed_texts, honoured by construction (+1 import, no line removed) |
 | [`backend/app/services/retrieval_rpc.py`](docs/HOT-FILE-LEDGER.md#backendappservicesretrieval_rpcpy) | 3 / 1 / 232 (was `0 / 0 / 0`) | no (young) | young. 272-03 `document_ids`; **272-05** constants MEASURED (T=2000, relaxed_order). ⛔ unfiltered SQL byte-identical; both RPCs pin custom plans (mig 201) |
 | [`backend/app/services/retrieval_rank.py`](docs/HOT-FILE-LEDGER.md#backendappservicesretrieval_rankpy) | 4 / 1 / 161 (was `3 / 1 / 151`) | no (young) | young. **272-05 D-27**: best row per matched doc (marked); coverage cut; filtered dedup same-document only. ⛔ no I/O |
 | [`backend/app/services/retrieval_documents.py`](docs/HOT-FILE-LEDGER.md#backendappservicesretrieval_documentspy) | 3 / 3 / 206 (was `1 / 1 / 174`) | ⚠ **FIRES** | ⚠ now FIRES (3 phases). **275-02**: `.eq(RETRIEVABLE_COLUMN, True)` on resolve_document_id / resolve_document / fetch_full_document; 272 pins retired by name |
@@ -11684,10 +11684,10 @@ cells rot within days.
 | [`backend/app/main.py`](docs/HOT-FILE-LEDGER.md#backendappmainpy) | 100 / 74 / 1024 (was `99 / 73 / 1021`) | ⚠ **FIRES** | 305-01: one import, one register_mcp(app) beside the router block, one async with mcp_lifespan() around the single yield. Honoured by construction. ⛔ see section |
 | [`backend/app/config.py`](docs/HOT-FILE-LEDGER.md#backendappconfigpy) | 96 / 55 / 1831 (was `93 / 54 / 1809`) | ⚠ **FIRES** | 300-03 (D-28): five smtp_* env fields in the existing email block; provider comment none / resend / smtp; stale lazy-import sentence deleted. Honoured by construction |
 | [`backend/app/api/admin.py`](docs/HOT-FILE-LEDGER.md#backendappapiadminpy) | 45 / 18 / 2055 (was `44 / 17 / 2054`) | ⚠ **FIRES** | 304-04: one _FLAG_HUMAN_NAMES entry (mcp_enabled → "MCP access"); the operator flag rides PUT /admin/flags. Honoured by construction. ⛔ add still lands disabled |
-| [`backend/app/api/settings.py`](docs/HOT-FILE-LEDGER.md#backendappapisettingspy) | 50 / 27 / 1400 (was `48 / 26 / 1398`) | ⚠ **FIRES** | 304-04: mcp_enabled on the settings response + its readback (2 lines; tolerates stubs predating the field). Honoured by construction. ⛔ no mail secret on the wire |
+| [`backend/app/api/settings.py`](docs/HOT-FILE-LEDGER.md#backendappapisettingspy) | 51 / 28 / 1425 (was `50 / 27 / 1400`) | ⚠ **FIRES** | 305-03: api_key_searches_per_minute in the allowlist, response, body and _build_response; bounded 1..120 via _range_refusal_detail (D-54; mig 222 CHECK agrees) |
 | [`backend/app/services/multimodal_service.py`](docs/HOT-FILE-LEDGER.md#backendappservicesmultimodal_servicepy) | 14 / 7 / 984 | ⚠ **FIRES** | ⚠ absent from BOTH for its ENTIRE LIFE at **7 phases** — row added SEED-227, which is also where its silent truncation was found |
 | [`backend/app/api/documents.py`](docs/HOT-FILE-LEDGER.md#backendappapidocumentspy) | 101 / 40 / 2709 (was `99 / 39 / 2698`) | ⚠ **FIRES** | 298-01: list_documents one `org_lists.by_org` in build() (every read, D-32); upload one `org_id=root_upload_org(...)` on the ONE minter call. Honoured by construction. ⛔ see section |
-| [`scripts/vitest-count-gate.cjs`](docs/HOT-FILE-LEDGER.md#scriptsvitest-count-gatecjs) | 409 / 86 / 6932 (was `408 / 86 / 6932`) | ⚠ **FIRES** | 304-REVIEW WR-02: RAISED ApiKeysTab 29->30, ApiKeyCard 15->16, McpOffNotice 5->6; none added, none lowered |
+| [`scripts/vitest-count-gate.cjs`](docs/HOT-FILE-LEDGER.md#scriptsvitest-count-gatecjs) | 411 / 87 / 6944 (was `409 / 86 / 6932`) | ⚠ **FIRES** | 305-03: 2 first pins + FILE-LEVEL targets (mcpCallWords, ApiKeyActivity.mcp); 7 pins raised; none lowered |
 | [`scripts/check-deploy-drift.sh`](docs/HOT-FILE-LEDGER.md#scriptscheck-deploy-driftsh) | 6 / 5 / 271 (was `5 / 4 / 267`) | ⚠ **FIRES** | 300-03 (D-28): the five SMTP_* vars registered in OMITTED_FROM_ONEBOX (commented in the one-box preset); email comment rewritten. No check changed |
 | [`scripts/build-public-openapi.cjs`](docs/HOT-FILE-LEDGER.md#scriptsbuild-public-openapicjs) | 13 / 7 / 473 (was `11 / 5 / 472`) | ⚠ **FIRES** | 301-01: `notifications` in the Account & org tag group + `/notifications` in FLAGGED_PREFIXES (UI-internal). Two tokens. ⚠ prior row stale |
 | [`scripts/check-seeds-register.cjs`](docs/HOT-FILE-LEDGER.md#scriptscheck-seeds-registercjs) | 7 / 3 / 1132 | ⚠ **FIRES** | ⚠ absent its ENTIRE LIFE — row added 296-05, now FIRES (251 / 293 / 296). 296-05: three `\d{3}` → `\d{3,}` (293-IN-07). ⛔ the STATUS_ENUM triple |
@@ -11783,7 +11783,7 @@ cells rot within days.
 | [`frontend/src/components/settings/grantsVocabulary.ts`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentssettingsgrantsvocabularyts) | 3 / 2 / 115 | no (2 phases) | ⚠ absent for its entire life — row added 221-02. There is deliberately NO `READY` string in it |
 | [`backend/app/services/connector_service.py`](docs/HOT-FILE-LEDGER.md#backendappservicesconnector_servicepy) | 28 / 11 / 1858 | ⚠ **FIRES** | ⚠ row STALE (`25/9/1772`) — 248 and 252 touched it. NOT modified by 253; re-derived under CR-08. honoured by construction (**239-06**) |
 | [`backend/app/models/message.py`](docs/HOT-FILE-LEDGER.md#backendappmodelsmessagepy) | 25 / 17 / 292 (was `24 / 16 / 287`) | ⚠ **FIRES** | **292.1 D-UAT-2**: `run_status` Literal gains `cap_paused` (+2). ⛔ deleting `artifacts` makes reload render no artifacts, silently · 293 touch: see §Phase 293 close |
-| [`backend/app/models/user_settings.py`](docs/HOT-FILE-LEDGER.md#backendappmodelsuser_settingspy) | 63 / 39 / 1790 (was `62 / 38 / 1788`) | ⚠ **FIRES** | 304-04: mcp_enabled field + its _val_bool readback, default true (2 lines). Honoured by construction |
+| [`backend/app/models/user_settings.py`](docs/HOT-FILE-LEDGER.md#backendappmodelsuser_settingspy) | 64 / 40 / 1792 (was `63 / 39 / 1790`) | ⚠ **FIRES** | 305-03: ONE field + ONE readback (api_key_searches_per_minute, default 30, D-54), honoured by construction. ⛔ FIRES — nothing else in this file |
 | [`backend/app/api/setup.py`](docs/HOT-FILE-LEDGER.md#backendappapisetuppy) | 7 / 2 / 490 | no (1 phase) | ⚠ **absent for its ENTIRE LIFE — row added 249-03**. ⛔ it deliberately does NOT catch `SettingsWriteRefused`: a refused `setup_complete` reported as success is the bug one layer up |
 | [`backend/app/services/setup_service.py`](docs/HOT-FILE-LEDGER.md#backendappservicessetup_servicepy) | 4 / 2 / 514 | no (1 phase) | ⚠ **absent for its ENTIRE LIFE — row added 249-03**. Same deliberate non-catch as `api/setup.py`; its bool cannot express *the database refused the value* |
 | [`backend/app/api/evals.py`](docs/HOT-FILE-LEDGER.md#backendappapievalspy) | 24 / 7 / 3237 | ⚠ **FIRES** | ⚠ **absent for its ENTIRE LIFE at 7 phases — row added 249-04, which left the file BYTE-UNCHANGED.** ⛔ `_tile_for_run`'s engine-shaped sentence must stay the LAST resort |
@@ -11814,7 +11814,7 @@ cells rot within days.
 | [`frontend/src/lib/api/knowledge.ts`](docs/HOT-FILE-LEDGER.md#frontendsrclibapiknowledgets) | 10 / 8 / 915 (was `8 / 7 / 910`) | ⚠ **FIRES** | 296-07 (291-IN-05): GenerateField.covered_by may now be null as well as input or step (types only) |
 | [`frontend/src/lib/api/threads.ts`](docs/HOT-FILE-LEDGER.md#frontendsrclibapithreadsts) | 25 / 15 / 2006 (was `24 / 14 / 1994`) | ⚠ **FIRES** | 298-02: postMessage reads detail.message from an OBJECT detail and attaches its string code to the ApiError; a string detail reads as before |
 | [`frontend/src/lib/api/connectors.ts`](docs/HOT-FILE-LEDGER.md#frontendsrclibapiconnectorsts) | 17 / 11 / 740 | ⚠ **FIRES** | ⚠ row was STALE at `16 / 10 / 718`. honoured by construction (**244-06**): `importCloudFile` gains a REQUIRED body declared BESIDE `SourcePreviewRequest` — ⛔ never inline in a component |
-| [`frontend/src/lib/api/skills.ts`](docs/HOT-FILE-LEDGER.md#frontendsrclibapiskillsts) | 11 / 8 / 783 (was `10 / 7 / 779`) | ⚠ **FIRES** | 304-04: optional mcp_enabled on FullAppSettings (read as ?? true), type-only (+4). Honoured by construction |
+| [`frontend/src/lib/api/skills.ts`](docs/HOT-FILE-LEDGER.md#frontendsrclibapiskillsts) | 12 / 9 / 785 (was `11 / 8 / 783`) | ⚠ **FIRES** | 305-03: optional api_key_searches_per_minute at both settings types (type only) |
 | [`frontend/src/lib/api/workflows.ts`](docs/HOT-FILE-LEDGER.md#frontendsrclibapiworkflowsts) | 17 / 16 / 1395 (was `16 / 16 / 1364`) | ⚠ **FIRES** | 299-04: WorkflowRunRead.org_id; createWorkflowDraft opts.fromDefinitionId → ?from_definition_id= (absent → today's URL); the Tweak org 409 → WorkflowOrgRefusedError (verbatim sentence) |
 | [`frontend/src/lib/connectionMark.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrclibconnectionmarktsx) | 7 / 4 / 313 | ⚠ **FIRES** | ✅ **the move IS the seam, and it was TAKEN (214-08)** — `settings/` → `lib/`; four run + canvas surfaces now import ONE map |
 | [`frontend/src/components/ingestion/DocumentList.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentsingestiondocumentlisttsx) | 31 / 15 / 372 (was `31 / 16 / 372`) | ⚠ **FIRES** | **275-02/04**: 409 → HoldRefusalNotice; ONE `retention` prop; a HELD row's delete opens straight into the refusal (`requestDelete`). Seven `<td>` kept |
@@ -11928,16 +11928,16 @@ cells rot within days.
 | [`backend/app/services/run_reconciler.py`](docs/HOT-FILE-LEDGER.md#backendappservicesrun_reconcilerpy) | 7 / 4 / 419 (was `6 / 4 / 415`) | ⚠ **FIRES** | 296 review BE-WR-04: all_completed counts `skipped` as finished and needs one completed/recorded step; failed/cancelled still unfinished. Same one column |
 | [`backend/app/services/forced_emit.py`](docs/HOT-FILE-LEDGER.md#backendappservicesforced_emitpy) | 15 / 9 / 749 (was `13 / 8 / 724`) | ⚠ **FIRES** | 296 fast-fix (293-F-4): the cross-provider settings copy also sets `active_provider` to the target (one dict key). Honoured by construction |
 | [`backend/app/services/pricing_service.py`](docs/HOT-FILE-LEDGER.md#backendappservicespricing_servicepy) | 4 / 2 / 156 (was `2 / 1 / 103`) | no (2 phases) | 294-01: + compute_token_cost_usd_unquantized (a ~$0.00002 engine call quantised to 0.0000). ⛔ the single token × rate home (test_257) |
-| [`backend/app/db/rates.py`](docs/HOT-FILE-LEDGER.md#backendappdbratespy) | 9 / 2 / 898 (was `2 / 1 / 507`) | no (2 phases) | **268-02**: ONE `per_root` CTE feeds every spend query; root-only predicate appears ONCE. ⛔ never register a rate for model `unknown` (shell USD would double-count) |
+| [`backend/app/db/rates.py`](docs/HOT-FILE-LEDGER.md#backendappdbratespy) | 11 / 3 / 950 (was `9 / 2 / 898`) | ⚠ **FIRES** | ⚠ now FIRES (3 phases with 305). 305-03: mcp_usage UNION ALL legs in roots + members; ledger source / key / tool with an org-constrained key join in rows AND count. ⛔ root predicate on ONE line |
 | [`backend/app/api/admin_spend.py`](docs/HOT-FILE-LEDGER.md#backendappapiadmin_spendpy) | 4 / 2 / 247 (was `1 / 1 / 202`) | no (2 phases) | honoured by construction (**268-02**): ONE validated `expert` Query on both routes (422 before the rates layer); 4 additive summary keys, every 257 key unchanged |
-| [`frontend/src/types/spend.ts`](docs/HOT-FILE-LEDGER.md#frontendsrctypesspendts) | 3 / 2 / 115 (was `1 / 1 / 70`) | no (2 phases) | **268-02**: `ExpertSpendLine` + additive summary/run fields. Not firing |
+| [`frontend/src/types/spend.ts`](docs/HOT-FILE-LEDGER.md#frontendsrctypesspendts) | 5 / 3 / 128 (was `3 / 2 / 115`) | ⚠ **FIRES** | ⚠ now FIRES (3 phases with 305). 305-03: optional source / apiKeyId / apiKeyLabel / mcpTool on SpendRunItem (older literals still type-check) |
 | [`frontend/src/pages/admin/AdminSpendPage.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrcpagesadminadminspendpagetsx) | 9 / 3 / 974 (was `2 / 1 / 567`) | ⚠ **NOW FIRES — 3 phases** | ⚠ NOW FIRES (3 phases, crossed in 268). **268-02**: pills, statement line, Spend by Expert, ledger Expert column. ⛔ next phase proposes extraction FIRST |
 | [`frontend/src/components/admin/spend/DailySpendChart.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentsadminspenddailyspendcharttsx) | 1 / 1 / 147 | no (new) | young (created 257-03). Interactive 14-day SVG bar chart with overlaid amber unrated volume segments. |
 | [`frontend/src/components/admin/spend/SpendDonutChart.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentsadminspendspenddonutcharttsx) | 1 / 1 / 148 | no (new) | young (created 257-03). Segmented SVG donut chart showing model spend distribution. |
 | [`frontend/src/components/admin/spend/BlindSpotsCard.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentsadminspendblindspotscardtsx) | 5 / 2 / 285 (was `2 / 1 / 162`) | no (2 phases) | **268-02**: grid `xl:grid-cols-3` + the 2 attribution tiles + the unpriced-sub-agent sentence. ⚠ dark-only classes (§9-D9) — light theme seeded |
 | [`frontend/src/components/admin/spend/RepriceModal.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentsadminspendrepricemodaltsx) | 1 / 1 / 212 | no (new) | young (created 257-03). Reprice dialog allowing append-only rate entry for models. |
 | [`frontend/src/components/workflow/RunCostBadge.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentsworkflowruncostbadgetsx) | 1 / 1 / 101 | no (new) | young (created 257-04). Reusable run cost pill. ⛔ THREE states, not two: rated / unrated model / rated-but-unmeasured — collapsing the last two makes it state a FALSE cause. |
-| [`frontend/src/lib/api/spend.ts`](docs/HOT-FILE-LEDGER.md#frontendsrclibapispendts) | 3 / 2 / 226 (was `1 / 1 / 184`) | no (2 phases) | **268-02**: `expert` sent only when given; maps the 4 new summary keys. ⛔ the one spend client (the 257 review moved a second home here) |
+| [`frontend/src/lib/api/spend.ts`](docs/HOT-FILE-LEDGER.md#frontendsrclibapispendts) | 5 / 3 / 232 (was `3 / 2 / 226`) | ⚠ **FIRES** | ⚠ now FIRES (3 phases with 305). 305-03: the ledger mapper adds source (default run), api key id / label and tool. ⛔ the one spend client |
 | [`frontend/src/components/skills/SkillFormDialog.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentsskillsskillformdialogtsx) | 13 / 9 / 657 | ⚠ **FIRES** | ⚠ row STALE at `12/8/635` one plan later. honoured by construction (**263-04**): ONE optional prop + three `??` + one dep-array entry. ⛔ callers pass a STABLE reference or the reset wipes typing. |
 | [`backend/app/api/skills.py`](docs/HOT-FILE-LEDGER.md#backendappapiskillspy) | 20 / 10 / 859 (was `19 / 10 / 858`) | ⚠ **FIRES** | **280-01**: 6 `maybe_row` guards, 0 `status_code` lines changed. ⛔ `is_org_shared` HARD-SET False; D-263-06 routes around it by provenance, never through the gate. |
 | [`frontend/src/lib/activeViewReachability.ts`](docs/HOT-FILE-LEDGER.md#frontendsrclibactiveviewreachabilityts) | 2 / 2 / 205 (was `1 / 1 / 159`) | no (2 phases) | 297-02: activeViewRouteLeg (D-25) — every member round-trips the route table, functions passed in. ⛔ AST, never grep; THROWS on a vacuous parse |
@@ -11963,9 +11963,9 @@ cells rot within days.
 | [`frontend/src/components/chat/threadNavigation.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentschatthreadnavigationtsx) | 1 / 1 / 45 (was `0 / 0 / 0`) | no (young) | young (created 267-04). The pointer's `Open →` door; no router exists, so it selects the thread. Live G4-3: Open lands on the new thread |
 | [`backend/app/db/runs.py`](docs/HOT-FILE-LEDGER.md#backendappdbrunspy) | 12 / 9 / 345 (was `11 / 9 / 289`) | ⚠ **FIRES — 9 phases** | 292.1-REVIEW CR-01: + `run_is_cap_paused`, the ONE pause predicate (one SQL, `$N` only; a first-turn pause reads `completed` + carrier). +56. ⛔ finalize_run untouched (SEED-297) |
 | [`frontend/src/components/admin/spend/ExpertFilterPills.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentsadminspendexpertfilterpillstsx) | 1 / 1 / 179 (was `0 / 0 / 0`) | no (new) | young (created 268-02). ⛔ ONE `expert` filter that every card follows (D-268-08); owns `filterPillClass` for all 3 ribbon groups |
-| [`frontend/src/components/admin/spend/ExpertSpendCard.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentsadminspendexpertspendcardtsx) | 1 / 1 / 316 (was `0 / 0 / 0`) | no (new) | young (created 268-02). Spend by Expert + recon footer + `LedgerExpertCell`. ⛔ the table never follows the filter; No Expert always shown |
+| [`frontend/src/components/admin/spend/ExpertSpendCard.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentsadminspendexpertspendcardtsx) | 3 / 2 / 342 (was `1 / 1 / 316`) | no (young) | 305-03: one leading MCP arm in LedgerExpertCell (MCP · label, tool in title, removed key dashed); shipped arms unchanged. ⛔ the table never follows the filter |
 | [`frontend/src/components/admin/spend/AttributionDisclosures.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentsadminspendattributiondisclosurestsx) | 1 / 1 / 44 (was `0 / 0 / 0`) | no (new) | young (created 268-02). The two Blind Spots tiles (sub-agent tokens counted; handoff not metered). ⛔ no button — no filter lands on either population |
-| [`frontend/src/components/admin/spend/expertSpendCopy.ts`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentsadminspendexpertspendcopyts) | 1 / 1 / 74 (was `0 / 0 / 0`) | no (new) | young (created 268-02). ⛔ the ONE home of spend-by-Expert wording; shared literals imported, never re-spelled |
+| [`frontend/src/components/admin/spend/expertSpendCopy.ts`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentsadminspendexpertspendcopyts) | 3 / 2 / 84 (was `1 / 1 / 74`) | no (young) | 305-03: ledgerColumn Expert or key; ledgerMcp / ledgerMcpRemoved / ledgerMcpTitle; ruleLine extended by one sentence. ⛔ the ONE home of spend-by-Expert wording |
 | [`frontend/src/components/chat/ScopeChip.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentschatscopechiptsx) | 1 / 1 / 102 (was `0 / 0 / 0`) | no (new) | young (created 268-03). The composer scope chip. ⛔ reads `held` from the payload, never `scope_mode` (D-268-12c) |
 | [`frontend/src/components/chat/ScopePicker.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentschatscopepickertsx) | 1 / 1 / 285 (was `0 / 0 / 0`) | no (new) | young (created 268-03). DropdownMenu picker; Apply/Cancel are menu items (Radix traps Tab). ⛔ no `scope_mode` token |
 | [`frontend/src/components/chat/scopeCopy.ts`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentschatscopecopyts) | 2 / 1 / 196 (was `0 / 0 / 0`) | no (new) | young (created 268-03). ⛔ the ONE home of chip/picker/pending-note wording; `explainFor` keeps the Expert rule out of the leaves |
@@ -12184,31 +12184,31 @@ cells rot within days.
 | [`backend/app/services/typed_continue.py`](docs/HOT-FILE-LEDGER.md#backendappservicestyped_continuepy) | 1 / 1 / 33 (was `0 / 0 / 0`) | no (young) | young (created 292.1-03) · CONTINUE_WORDS + is_continue_word (D-13). ⛔ pure, no I/O, no model call; lockstep with continueWords.ts |
 | [`frontend/src/components/settings/AgentRoundLimits.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentssettingsagentroundlimitstsx) | 3 / 1 / 220 (was `2 / 1 / 243`) | no (young) | 292.1 UAT: no own Save; exposes `changes()` / `adopt()` via ref; still owns its read (WR-05 lock kept). ⛔ never sends 0 |
 | [`frontend/src/lib/continueWords.ts`](docs/HOT-FILE-LEDGER.md#frontendsrclibcontinuewordsts) | 1 / 1 / 46 (was `0 / 0 / 0`) | no (young) | young (created 292.1-03) · client hint mirror of the backend continue words + shouldTryTypedContinue. ⛔ the server decides; ?raw lockstep fence |
-| [`backend/app/security/api_key_auth.py`](docs/HOT-FILE-LEDGER.md#backendappsecurityapi_key_authpy) | 5 / 2 / 404 (was `3 / 1 / 328`) | no (young) | extracted 304-02 (pure move first): authenticate_presented_key, the one core for both kinds; KeyRefused; MCP prefix. ⛔ never via get_current_user; one 401 body |
-| [`backend/app/services/rate_limit.py`](docs/HOT-FILE-LEDGER.md#backendappservicesrate_limitpy) | 5 / 3 / 160 (was `4 / 2 / 138`) | ⚠ **FIRES** | 305-01: mcp_ip + expensive kinds, LimiterUnavailable, check_ip_limit (fails closed). Additions only; enforce_* byte-unchanged. ⛔ no process-local state; no env var |
+| [`backend/app/security/api_key_auth.py`](docs/HOT-FILE-LEDGER.md#backendappsecurityapi_key_authpy) | 6 / 3 / 413 (was `5 / 2 / 404`) | ⚠ **FIRES** | ⚠ now FIRES (3 phases with 305). 305-03: additive tool kwarg (None-filtered); audit_key_call_now builds its client off the loop. ⛔ one 401 body; never get_current_user |
+| [`backend/app/services/rate_limit.py`](docs/HOT-FILE-LEDGER.md#backendappservicesrate_limitpy) | 6 / 3 / 185 (was `5 / 3 / 160`) | ⚠ **FIRES** | 305-03: check_key_limit (read / expensive kinds; LimiterUnavailable on a Redis failure). Additions only; enforce_key_limit hash-pinned. ⛔ no process-local state; no env var |
 | [`backend/app/db/api_keys.py`](docs/HOT-FILE-LEDGER.md#backendappdbapi_keyspy) | 6 / 3 / 383 (was `5 / 2 / 307`) | ⚠ **FIRES** | ⚠ now FIRES (304). 304-02: kind columns on create + get_key_row, mcp_switches, set_org_mcp_enabled, folder_names. ⛔ owner predicate in every statement |
-| [`backend/app/models/api_key.py`](docs/HOT-FILE-LEDGER.md#backendappmodelsapi_keypy) | 4 / 3 / 265 (was `3 / 3 / 264`) | ⚠ **FIRES** | 304-REVIEW WR-02: McpOff gains "unknown" (switches unread, still off). ⛔ no field carries the secret except create |
+| [`backend/app/models/api_key.py`](docs/HOT-FILE-LEDGER.md#backendappmodelsapi_keypy) | 5 / 4 / 267 (was `4 / 3 / 265`) | ⚠ **FIRES** | 305-03: ApiKeyCall.tool and ApiKeyLimits.searches_per_minute (additive). ⛔ no field carries the secret except create |
 | [`backend/app/services/inbound_inputs.py`](docs/HOT-FILE-LEDGER.md#backendappservicesinbound_inputspy) | 9 / 3 / 352 (was `8 / 2 / 312`) | ⚠ **FIRES** | 300-01 (D-14): the loop factored into _missing_fields; missing_required_labels + join_labels + blank_required_sentence beside it. ONE predicate. ⛔ pure; strips _-keys |
-| [`backend/app/api/api_keys.py`](docs/HOT-FILE-LEDGER.md#backendappapiapi_keyspy) | 6 / 3 / 719 (was `5 / 3 / 710`) | ⚠ **FIRES** | 304-REVIEW WR-02: _mcp_off(None) is "unknown"; available false; mint refuses with its own sentence. ⛔ 404 for miss AND foreign |
+| [`backend/app/api/api_keys.py`](docs/HOT-FILE-LEDGER.md#backendappapiapi_keyspy) | 7 / 4 / 723 (was `6 / 3 / 719`) | ⚠ **FIRES** | 305-03: _limits adds searches_per_minute; _call_from_audit ONE ok rule (a non-ok MCP outcome is never OK) + tool (D-53 / T-305-28) |
 | [`backend/app/services/unattended_launch.py`](docs/HOT-FILE-LEDGER.md#backendappservicesunattended_launchpy) | 8 / 3 / 383 (was `7 / 3 / 379`) | ⚠ **FIRES** | 300-REVIEW WR-01: OnFinish is (status, run_id); _drive_run passes its own run_id on every exit path. One call site changed. ⛔ owner identity, explicit org_id, caps armed first |
 | [`backend/app/api/schedules.py`](docs/HOT-FILE-LEDGER.md#backendappapischedulespy) | 6 / 6 / 341 (was `5 / 5 / 303`) | ⚠ **FIRES** | 300-01 (D-14): one _refuse_blank_required helper; create calls it before the INSERT, patch only for inputs / resume after the owner-scoped read. A pause reads nothing new |
 | [`backend/app/models/schedule.py`](docs/HOT-FILE-LEDGER.md#backendappmodelsschedulepy) | 3 / 3 / 231 | ⚠ **FIRES** | ⚠ absent its ENTIRE LIFE — row added 296-02 (D-26). 296-02 (295-IN-05): ScheduleTriggerResult gains one additive `outcome` Literal (launched/refused/not_loaded/error) |
 | [`backend/app/services/harness/run_read_words.py`](docs/HOT-FILE-LEDGER.md#backendappservicesharnessrun_read_wordspy) | 1 / 1 / 99 (was `0 / 0 / 0`) | no (young) | young (planned 293-02). MOVED waiting_who / unsourced_who / compose_waiting_on (workflow_runs seam). ⛔ pure leaf; re-exported |
 | [`backend/app/api/inbound.py`](docs/HOT-FILE-LEDGER.md#backendappapiinboundpy) | 10 / 3 / 719 (was `9 / 2 / 711`) | ⚠ **FIRES** | ⚠ now FIRES (298). 298-02: one foreign_binding_refusal beside template_refusal → _refused(reason="foreign_folder"), plain-string 422 (pool only). ⛔ no get_active_org_id on this path |
-| [`frontend/src/lib/api/apiKeys.ts`](docs/HOT-FILE-LEDGER.md#frontendsrclibapiapikeysts) | 5 / 3 / 281 (was `4 / 3 / 280`) | ⚠ **FIRES** | 304-REVIEW WR-02: McpOff mirror gains "unknown" (type only). ⛔ not re-exported from the lib/api barrel |
-| [`frontend/src/components/settings/apiKeys/apiKeysCopy.ts`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentssettingsapikeysapikeyscopyts) | 6 / 4 / 283 (was `5 / 3 / 283`) | ⚠ **FIRES** | 304-05: four string values reworded (tab.description, tab.empty, admin.description, admin.descriptionNoOrg); no key added or removed. ⛔ true leaf, imports nothing |
-| [`frontend/src/components/settings/apiKeys/apiKeyFacts.ts`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentssettingsapikeysapikeyfactsts) | 6 / 4 / 374 (was `5 / 4 / 373`) | ⚠ **FIRES** | 304-REVIEW WR-02: mcp_off "unknown" gets no switched-off tag (one condition). ⛔ pure, no React, spells no string |
+| [`frontend/src/lib/api/apiKeys.ts`](docs/HOT-FILE-LEDGER.md#frontendsrclibapiapikeysts) | 6 / 4 / 285 (was `5 / 3 / 281`) | ⚠ **FIRES** | 305-03: ApiKeyCall.tool? and ApiKeyLimits.searches_per_minute (types only). ⛔ the secret is never stored |
+| [`frontend/src/components/settings/apiKeys/apiKeysCopy.ts`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentssettingsapikeysapikeyscopyts) | 7 / 5 / 287 (was `6 / 4 / 283`) | ⚠ **FIRES** | 305-03: limits.readsLabel / readsHint reworded; searchesLabel / searchesHint / tab.limitsMcp added; no key renamed or removed. ⛔ true leaf |
+| [`frontend/src/components/settings/apiKeys/apiKeyFacts.ts`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentssettingsapikeysapikeyfactsts) | 7 / 5 / 378 (was `6 / 4 / 374`) | ⚠ **FIRES** | 305-03: callWords / callDetailLine delegate to mcpCallWords for kind mcp (one early return each, +4 lines). ⛔ the server is the truth |
 | [`frontend/src/components/settings/apiKeys/curlExamples.ts`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentssettingsapikeyscurlexamplests) | 3 / 2 / 77 (was `2 / 1 / 76`) | no (2 phases) | 296-04: the completed sample's step_index is null, as the server sends it. Data only |
 | [`frontend/nginx.conf`](docs/HOT-FILE-LEDGER.md#frontendnginxconf) | 3 / 3 / 76 (was absent) | ⚠ **FIRES** | ⚠ absent its ENTIRE LIFE — row added 293-REVIEW WR-01 (one `X-Forwarded-Prefix /api` header). Phases 157, 276, 293. ⛔ /api/ prefix strip |
 | [`frontend/src/components/settings/apiKeys/apiKeyPrepick.ts`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentssettingsapikeysapikeyprepickts) | 1 / 1 / 45 (was `0 / 0 / 0`) | no (young) | young (planned 293-04). sessionStorage pre-pick from the card menu, read once then cleared. ⛔ never stores the secret |
-| [`frontend/src/components/settings/apiKeys/ApiKeysTab.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentssettingsapikeysapikeystabtsx) | 4 / 2 / 312 (was `3 / 2 / 309`) | no (2 phases) | 304-REVIEW WR-02: the header says unknown under deployment-off's rule (MCP keys only). ⛔ secret in state only |
-| [`frontend/src/components/settings/apiKeys/ApiKeyCard.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentssettingsapikeysapikeycardtsx) | 2 / 2 / 239 (was `1 / 1 / 182`) | no (2 phases) | 304-05: kind chip; MCP keys get scope chips, off tag + card notice, acts-in meta, How to connect (not in admin view), no call strip. ⛔ presentational, no fetch |
+| [`frontend/src/components/settings/apiKeys/ApiKeysTab.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentssettingsapikeysapikeystabtsx) | 5 / 3 / 317 (was `4 / 2 / 312`) | ⚠ **FIRES** | ⚠ now FIRES (3 phases with 305). 305-03: one AI tool limits line when an MCP key exists. ⛔ secret in state only |
+| [`frontend/src/components/settings/apiKeys/ApiKeyCard.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentssettingsapikeysapikeycardtsx) | 3 / 3 / 239 (was `2 / 2 / 239`) | ⚠ **FIRES** | ⚠ now FIRES (3 phases with 305). 305-03: the two !isMcp guards removed, so MCP keys get the strip and Show activity. ⛔ presentational, no fetch |
 | [`frontend/src/components/settings/apiKeys/ApiKeyDraftCard.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentssettingsapikeysapikeydraftcardtsx) | 2 / 2 / 369 (was `1 / 1 / 248`) | no (2 phases) | 304-05: kind choice first; MCP body from McpKeyFields; each kind keeps its choices; workflow submit unchanged. ⛔ Esc never discards |
 | [`frontend/src/components/settings/apiKeys/ApiKeySecretOnce.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentssettingsapikeysapikeysecretoncetsx) | 2 / 2 / 189 (was `1 / 1 / 176`) | no (2 phases) | 304-05: an MCP key shows scope chips and McpConnectSnippets in place of both curl blocks. ⛔ never writes the secret to storage, URL or log |
-| [`frontend/src/components/settings/apiKeys/ApiKeyCallStrip.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentssettingsapikeysapikeycallstriptsx) | 1 / 1 / 117 (was `0 / 0 / 0`) | no (young) | young (planned 293-04). Last-20-calls bar strip, roving tabindex. ⛔ colour never the only signal |
-| [`frontend/src/components/settings/apiKeys/ApiKeyActivity.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentssettingsapikeysapikeyactivitytsx) | 1 / 1 / 98 (was `0 / 0 / 0`) | no (young) | young (planned 293-04). Recent-calls table inside a key card. ⛔ run link only when onOpenRun is given |
+| [`frontend/src/components/settings/apiKeys/ApiKeyCallStrip.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentssettingsapikeysapikeycallstriptsx) | 2 / 2 / 130 (was `1 / 1 / 117`) | no (young) | 305-03: an MCP caption (answered / not answered); bars and the workflow caption unchanged. ⛔ colour never the only signal |
+| [`frontend/src/components/settings/apiKeys/ApiKeyActivity.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentssettingsapikeysapikeyactivitytsx) | 2 / 2 / 161 (was `1 / 1 / 98`) | no (young) | 305-03: an McpActivity branch (Time · Tool · Result, the MCP empty sentence); the workflow branch unchanged. ⛔ run link only when onOpenRun is given; never query text |
 | [`frontend/src/components/settings/apiKeys/RevokeApiKeySheet.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentssettingsapikeysrevokeapikeysheettsx) | 2 / 2 / 205 (was `1 / 1 / 164`) | no (2 phases) | 304-05: MCP facts (Can use {preset or N tools} on {folders}), Not used yet, MCP kept sentence; 304-06 passes the catalogue from the admin list. ⛔ never optimistic |
-| [`frontend/src/components/settings/ApiKeyLimits.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentssettingsapikeylimitstsx) | 1 / 1 / 223 (was `0 / 0 / 0`) | no (young) | young (planned 293-03). Two per-key limits; changes()/adopt() handle, no own Save. ⛔ AgentRoundLimits pattern; never sends a cleared field |
+| [`frontend/src/components/settings/ApiKeyLimits.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentssettingsapikeylimitstsx) | 2 / 2 / 245 (was `1 / 1 / 223`) | no (young) | 305-03: a third field (searches, 1..120, default 30), reads relabelled. ⛔ AgentRoundLimits pattern; changed fields only; never sends a cleared field |
 | [`frontend/src/components/org/orgAdminTabs.ts`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentsorgorgadmintabsts) | 2 / 1 / 59 (was `0 / 0 / 0`) | no (young) | young (planned 293-04). MOVED OrgAdminTab / TabDef / TABS out of OrgAdminShell (extract FIRST). ⛔ no React (react-refresh rule) |
 | [`frontend/src/components/org/OrgApiKeysTab.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentsorgorgapikeystabtsx) | 2 / 2 / 148 (was `1 / 1 / 134`) | no (2 phases) | 304-06: McpOffNotice admin variant when the org is off; limits only with a workflow key; catalogue to card + sheet. ⛔ own fetch; onRecorded after a revoke |
 | [`frontend/src/components/workflows/RunOriginLine.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentsworkflowsrunoriginlinetsx) | 1 / 1 / 32 (was `0 / 0 / 0`) | no (young) | young (planned 293-03). One origin sentence, null when absent (D-23). ⛔ leaf: no API import, no hook |
@@ -12290,12 +12290,13 @@ cells rot within days.
 | [`backend/app/security/acting_org.py`](docs/HOT-FILE-LEDGER.md#backendappsecurityactingorgpy) | 1 / 1 / 30 (was `0 / 0 / 0`) | no (young) | young (created 304-01, D-14): the acting-org ContextVar leaf + current_acting_org(). ⛔ imports nothing from app.; set only by acting_member.py |
 | [`backend/app/security/acting_member.py`](docs/HOT-FILE-LEDGER.md#backendappsecurityactingmemberpy) | 1 / 1 / 63 (was `0 / 0 / 0`) | no (young) | young (created 304-01, D-13/D-14): acting_org_scope, acting_as, acting_member_connection. ⛔ never reads a header; validates UUID; resets in finally |
 | [`backend/app/services/acting_member_reads.py`](docs/HOT-FILE-LEDGER.md#backendappservicesactingmemberreadspy) | 6 / 2 / 493 (was `5 / 1 / 465`) | no (2 phases) | 305-02: list_documents(folder_id=, root_only=) — one bound predicate after the KeyScope (D-51); search client via run_in_threadpool (IN-03, 304 fence moved). ⛔ no org_members; () returns before SQL |
-| [`backend/app/security/mcp_principal.py`](docs/HOT-FILE-LEDGER.md#backendappsecuritymcpprincipalpy) | 1 / 1 / 49 (was `0 / 0 / 0`) | no (young) | young (created 304-02, D-20): frozen McpPrincipal + resolve_mcp_principal over the one core. ⛔ built from ResolvedKey only, never request data |
+| [`backend/app/security/mcp_principal.py`](docs/HOT-FILE-LEDGER.md#backendappsecuritymcpprincipalpy) | 2 / 2 / 52 (was `1 / 1 / 49`) | no (young) | 305-03: label field filled from ResolvedKey.label (every MCP audit row names its key). ⛔ built from ResolvedKey only, never request data |
 | [`backend/app/security/principal_liveness.py`](docs/HOT-FILE-LEDGER.md#backendappsecurityprincipallivenesspy) | 2 / 1 / 99 (was `1 / 1 / 92`) | no (young) | young (304). 304-REVIEW WR-03: deployment switch checked before org (D-30). ⛔ live read every call, no cache; fails closed on both switches |
 | [`backend/app/services/key_scope.py`](docs/HOT-FILE-LEDGER.md#backendappserviceskeyscopepy) | 1 / 1 / 94 (was `0 / 0 / 0`) | no (young) | young (created 304-02, D-21/D-40): pure KeyScope composition + EXTERNAL_SQL / is_external. ⛔ pure, never raises; () never coerced to None |
 | [`backend/app/services/mcp_tool_catalogue.py`](docs/HOT-FILE-LEDGER.md#backendappservicesmcptoolcataloguepy) | 2 / 2 / 160 (was `1 / 1 / 132`) | no (2 phases) | 305-01: mcp_public_base(), the one refuse-mount predicate, and mcp_url() built through it. MCP_PATH unchanged. ⛔ still imports nothing from app at top level |
-| [`frontend/src/components/settings/apiKeys/mcpKeyCopy.ts`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentssettingsapikeysmcpkeycopyts) | 3 / 1 / 175 (was `2 / 1 / 173`) | no (young) | young (304). 304-REVIEW WR-02: one string, offUnknown. ⛔ true leaf, imports nothing |
+| [`frontend/src/components/settings/apiKeys/mcpKeyCopy.ts`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentssettingsapikeysmcpkeycopyts) | 5 / 2 / 193 (was `3 / 1 / 175`) | no (young) | 305-03: calls.* MCP result words + activity block (UI-SPEC §Copywriting verbatim). ⛔ true leaf, imports nothing |
 | [`frontend/src/components/settings/apiKeys/mcpKeyFacts.ts`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentssettingsapikeysmcpkeyfactsts) | 2 / 1 / 206 (was `0 / 0 / 0`) | no (young) | young (created 304-05): presets from the catalogue, companions, scope chips, folder flattening, the Create why-line. ⛔ pure, no React, spells no string |
+| [`frontend/src/components/settings/apiKeys/mcpCallWords.ts`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentssettingsapikeysmcpcallwordsts) | 1 / 1 / 63 (was `0 / 0 / 0`) | no (young) | young (created 305-03, D-53): an MCP call's words in the one reason vocabulary; null = the shipped 293/304 words. ⛔ never ticks an unanswered call; no React |
 | [`frontend/src/components/settings/apiKeys/mcpSnippets.ts`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentssettingsapikeysmcpsnippetsts) | 1 / 1 / 120 (was `0 / 0 / 0`) | no (young) | young (created 304-05, D-27): per-client snippet builders from (mcpUrl, envVarName). ⛔ no secret parameter; throws on a non-env-var name; key never in a URL |
 | [`frontend/src/components/settings/apiKeys/ApiKeyKindChoice.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentssettingsapikeysapikeykindchoicetsx) | 1 / 1 / 109 (was `0 / 0 / 0`) | no (young) | young (created 304-05, D-01): the two kind tiles, a roving-tabindex radiogroup. ⛔ renders nothing when MCP is unavailable; org off = disabled with words |
 | [`frontend/src/components/settings/apiKeys/McpKeyFields.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentssettingsapikeysmcpkeyfieldstsx) | 1 / 1 / 266 (was `0 / 0 / 0`) | no (young) | young (created 304-05, D-12): org fact, tool presets + grouped checklist, folders, external tick, 30/90/365. ⛔ tool names only from the server catalogue |
@@ -12308,18 +12309,18 @@ cells rot within days.
 | [`backend/app/middleware/maintenance.py`](docs/HOT-FILE-LEDGER.md#backendappmiddlewaremaintenancepy) | 2 / 2 / 121 (was `1 / 1 / 113`) | no (2 phases) | 305-01: one MCP_PATH allowlist arm on a segment boundary (/mcpx still 503). ⛔ pure ASGI; fail-open flag read; segment-boundary match only |
 | [`frontend/src/lib/citationNav.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrclibcitationnavtsx) | 2 / 2 / 238 (was `1 / 1 / 199`) | no (2 phases) | 305-02: optional entityLink prop — one arrival per distinct document id (pending set, no navigate); leaveDocumentAddress (REPLACE). ⛔ one-shot intent; openDocument keeps one identity |
 | [`backend/app/mcp/__init__.py`](docs/HOT-FILE-LEDGER.md#backendappmcp__init__py) | 2 / 1 / 75 (was `1 / 1 / 70`) | no (young) | young (305-01, D-04/D-49): register_mcp (POST-only /mcp + /mcp/ to one edge, or nothing + CRITICAL); mcp_lifespan (fresh manager per entry). ⛔ never a Mount |
-| [`backend/app/mcp/server.py`](docs/HOT-FILE-LEDGER.md#backendappmcpserverpy) | 1 / 1 / 82 (was `0 / 0 / 0`) | no (young) | young (created 305-01, D-47): lowlevel Server('syrel'); list = REGISTERED ∩ granted; unknown name -32602; catch-all -> generic sentence. ⛔ never str(exc); never MCPServer |
-| [`backend/app/mcp/dispatch.py`](docs/HOT-FILE-LEDGER.md#backendappmcpdispatchpy) | 2 / 1 / 92 (was `1 / 1 / 65`) | no (young) | 305-02: render stage — sentence -> isError; model -> validated structuredContent + text from results.render; the 305-04 guard slot is marked. ⛔ one audit row per call; render after the guard |
+| [`backend/app/mcp/server.py`](docs/HOT-FILE-LEDGER.md#backendappmcpserverpy) | 2 / 1 / 89 (was `1 / 1 / 82`) | no (young) | 305-03: an unknown name audits tool_not_granted with NO tool (a client string never reaches the log), then -32602. ⛔ never str(exc); never MCPServer |
+| [`backend/app/mcp/dispatch.py`](docs/HOT-FILE-LEDGER.md#backendappmcpdispatchpy) | 4 / 1 / 178 (was `2 / 1 / 92`) | no (young) | 305-03: limits before the handler; ONE audit row on every exit (set per stage, written in finally); expensive tools run in usage_sink.collecting -> mcp_usage rows. ⛔ render after the 305-04 guard |
 | [`backend/app/mcp/tools.py`](docs/HOT-FILE-LEDGER.md#backendappmcptoolspy) | 2 / 1 / 103 (was `1 / 1 / 50`) | no (young) | 305-02: the three read ToolSpecs — catalogue titles, READ_ONLY, Pydantic in/out schemas, buckets expensive/cheap/cheap. ⛔ code constants only; never the chat registry; 306 names never listed |
 | [`backend/app/mcp/edge.py`](docs/HOT-FILE-LEDGER.md#backendappmcpedgepy) | 1 / 1 / 171 (was `0 / 0 / 0`) | no (young) | young (created 305-01, D-46/D-08/D-50/D-54): pure-ASGI edge — 405, mcp_ip limit (fail closed), header-only bearer, ONE resolver, one 401, 403 switched off. ⛔ never audits |
 | [`backend/app/mcp/transport.py`](docs/HOT-FILE-LEDGER.md#backendappmcptransportpy) | 1 / 1 / 53 (was `0 / 0 / 0`) | no (young) | young (created 305-01, D-05/D-49): allowed hosts from mcp_public_base() (+ loopback outside production), no allowed origins. ⛔ never hard-coded hosts; always passed explicitly |
 | [`backend/app/mcp/access_log.py`](docs/HOT-FILE-LEDGER.md#backendappmcpaccess_logpy) | 1 / 1 / 45 (was `0 / 0 / 0`) | no (young) | young (created 305-01, D-57): McpQueryStripFilter drops the query on MCP_PATH access lines; install() idempotent. ⛔ rewrites, never drops a line; other paths untouched |
 | [`backend/app/mcp/results.py`](docs/HOT-FILE-LEDGER.md#backendappmcpresultspy) | 1 / 1 / 398 (was `0 / 0 / 0`) | no (young) | young (created 305-02, D-13..D-19/D-51): models, RedactableText, cursors, 8,000-char chunker, link, defang, render. ⛔ no SQL; links from primary_frontend_origin() |
-| [`backend/app/mcp/read_tools.py`](docs/HOT-FILE-LEDGER.md#backendappmcpread_toolspy) | 1 / 1 / 143 (was `0 / 0 / 0`) | no (young) | young (created 305-02, D-12/D-16): three handlers over acting_member_reads, returning a model or one sentence. ⛔ no visibility SQL; one not-available sentence for every not-visible id |
-| [`backend/app/mcp/audit.py`](docs/HOT-FILE-LEDGER.md#backendappmcpauditpy) | 0 / 0 / 0 | no (young) | AT PLANNING (305-03, D-26/D-53): per-call api_key.read / api_key.refused rows. ⛔ no new literal; refusals throttled; never query text |
-| [`backend/app/mcp/limits.py`](docs/HOT-FILE-LEDGER.md#backendappmcplimitspy) | 0 / 0 / 0 | no (young) | AT PLANNING (305-03, D-27/D-28): cheap/expensive buckets -> relayable tool-error sentences. ⛔ fail closed; never an HTTP 429 |
-| [`backend/app/services/usage_sink.py`](docs/HOT-FILE-LEDGER.md#backendappservicesusage_sinkpy) | 0 / 0 / 0 | no (young) | AT PLANNING (305-03, D-55): ContextVar collector for provider usage. ⛔ LEAF — imports nothing from app.; never raises |
-| [`backend/app/db/mcp_usage.py`](docs/HOT-FILE-LEDGER.md#backendappdbmcp_usagepy) | 0 / 0 / 0 | no (young) | AT PLANNING (305-03, D-55): insert one mcp_usage row on the service-role pool. ⛔ org explicit on every statement |
+| [`backend/app/mcp/read_tools.py`](docs/HOT-FILE-LEDGER.md#backendappmcpread_toolspy) | 2 / 1 / 149 (was `1 / 1 / 143`) | no (young) | 305-03: rerank-on records one unmeasured usage entry (NULL tokens). ⛔ no visibility SQL; one not-available sentence for every not-visible id |
+| [`backend/app/mcp/audit.py`](docs/HOT-FILE-LEDGER.md#backendappmcpauditpy) | 1 / 1 / 61 (was `0 / 0 / 0`) | no (young) | young (created 305-03, D-26/D-53): api_key.read {kind, tool, outcome} / api_key.refused through refusal_audit_slot. ⛔ audit_key_call_now only; never query text; never fails a call |
+| [`backend/app/mcp/limits.py`](docs/HOT-FILE-LEDGER.md#backendappmcplimitspy) | 1 / 1 / 43 (was `0 / 0 / 0`) | no (young) | young (created 305-03, D-27/D-28): spec.bucket picks the read / expensive counter; LimitRefusal(sentence, reason, limit). ⛔ fail closed; a relayable tool error, never an HTTP 429 |
+| [`backend/app/services/usage_sink.py`](docs/HOT-FILE-LEDGER.md#backendappservicesusage_sinkpy) | 1 / 1 / 64 (was `0 / 0 / 0`) | no (young) | young (created 305-03, D-55): ContextVar collector; record() is a no-op outside collecting() and never raises; A4 proven. ⛔ LEAF — imports nothing from app. |
+| [`backend/app/db/mcp_usage.py`](docs/HOT-FILE-LEDGER.md#backendappdbmcp_usagepy) | 1 / 1 / 48 (was `0 / 0 / 0`) | no (young) | young (created 305-03, D-55): insert_usage, the ONLY writer of mcp_usage, one bound INSERT ... RETURNING id. ⛔ org explicit on every row (the service-role pool is BYPASSRLS) |
 | [`backend/app/services/outbound_guard.py`](docs/HOT-FILE-LEDGER.md#backendappservicesoutbound_guardpy) | 0 / 0 / 0 | no (young) | AT PLANNING (305-04, D-32/D-35): the one outbound redaction choke point (MCP now, webhooks in 308). ⛔ fail closed -> withheld; RedactableText fields only |
 | [`backend/app/services/pii_redactor.py`](docs/HOT-FILE-LEDGER.md#backendappservicespii_redactorpy) | 0 / 0 / 0 | no (young) | AT PLANNING (305-04, D-33/D-56): deterministic recognizers (email, phone, card+Luhn, IBAN+mod-97, secrets, entropy). ⛔ linear patterns; names not covered |
 | [`backend/app/db/outbound_policy.py`](docs/HOT-FILE-LEDGER.md#backendappdboutbound_policypy) | 0 / 0 / 0 | no (young) | AT PLANNING (305-04, D-36/D-56): read/set organizations.pii_redaction_enabled. ⛔ org explicit; route writes the audit row, never this module |
@@ -28971,3 +28972,259 @@ CLAUDE.md verdict cell: none (the file does not fire).
 Scan-list cell as of 2026-10-31 (replaced by 305-02, moved verbatim): 0 / 0 / 0 | no (young) | AT PLANNING (305-02, D-52): in-page notice for a by-id open that answered 404. ⛔ words from CANT_BE_OPENED_COPY; never role=alert |
 
 CLAUDE.md verdict cell: none (the file does not fire).
+
+### `backend/app/mcp/audit.py` — 305-03, 2026-10-31
+
+**`1 / 1 / 61`** (was `0 / 0 / 0`). Created. `_key(principal)` builds the writer's key from the principal only; `audit_answered` writes `api_key.read` with `{kind: mcp, tool, outcome}` (not throttled: answered calls are bounded by the two buckets); `audit_refused` copies `inbound._refused` — `refusal_audit_slot` first, a suppressed refusal is counted and the next written row carries `detail.suppressed`. Both swallow and log their own failure. Pinned by `test_305_audit.py` (one row per dispatch on every path; no query text in any row) and `test_305_audit_live.py`.
+
+Scan-list cell as of 2026-10-31 (replaced by 305-03, moved verbatim): 0 / 0 / 0 | no (young) | AT PLANNING (305-03, D-26/D-53): per-call api_key.read / api_key.refused rows. ⛔ no new literal; refusals throttled; never query text |
+
+CLAUDE.md verdict cell: none (the file does not fire).
+
+### `backend/app/mcp/limits.py` — 305-03, 2026-10-31
+
+**`1 / 1 / 43`** (was `0 / 0 / 0`). Created. `check_limit(principal, spec, redis)` maps `cheap` -> kind `read` and `expensive` -> kind `expensive`, calls `rate_limit.check_key_limit`, and returns `None` or a `LimitRefusal` carrying the D-28 sentence, the reason (`rate_limited:read` / `rate_limited:expensive` / `limiter_unavailable`) and the limit for the audit row. Pinned by `test_305_limits.py` (independent buckets, fail closed).
+
+Scan-list cell as of 2026-10-31 (replaced by 305-03, moved verbatim): 0 / 0 / 0 | no (young) | AT PLANNING (305-03, D-27/D-28): cheap/expensive buckets -> relayable tool-error sentences. ⛔ fail closed; never an HTTP 429 |
+
+CLAUDE.md verdict cell: none (the file does not fire).
+
+### `backend/app/services/usage_sink.py` — 305-03, 2026-10-31
+
+**`1 / 1 / 64`** (was `0 / 0 / 0`). Created. `collecting()` sets a fresh list and resets its token in `finally`; `record(model, prompt_tokens, provider=None)` appends `{model, provider, prompt_tokens}` (non-str model/provider and non-int or bool tokens become `None`) and swallows everything. **A4 held**: a record made inside `run_in_threadpool` is visible after it (the copied context points at the same list). Pinned by `test_305_usage_sink.py`, which also fences the leaf.
+
+Scan-list cell as of 2026-10-31 (replaced by 305-03, moved verbatim): 0 / 0 / 0 | no (young) | AT PLANNING (305-03, D-55): ContextVar collector for provider usage. ⛔ LEAF — imports nothing from app.; never raises |
+
+CLAUDE.md verdict cell: none (the file does not fire).
+
+### `backend/app/db/mcp_usage.py` — 305-03, 2026-10-31
+
+**`1 / 1 / 48`** (was `0 / 0 / 0`). Created. `insert_usage(pool, *, org_id, user_id, api_key_id, tool, model, provider, input_tokens, output_tokens=0, status)`. `input_tokens` is measured or NULL, never 0. Called only from `app/mcp/dispatch._write_usage`; read only by the `per_root` CTE in `db/rates.py`. Live proof: `test_305_spend_live.py`.
+
+Scan-list cell as of 2026-10-31 (replaced by 305-03, moved verbatim): 0 / 0 / 0 | no (young) | AT PLANNING (305-03, D-55): insert one mcp_usage row on the service-role pool. ⛔ org explicit on every statement |
+
+CLAUDE.md verdict cell: none (the file does not fire).
+
+### `backend/app/security/api_key_auth.py` — 305-03, 2026-10-31
+
+**`6 / 3 / 413`** (was `5 / 2 / 404`). `_audit_args`, `audit_key_call` and `audit_key_call_now` gain `tool: str | None = None`, emitted beside `kind` and dropped when `None` (the 293/304 dict-equality arms in `test_305_audit.py`). `audit_key_call_now` now builds the service-role client with `await run_in_threadpool(get_service_role_supabase, org)` (IN-03 / T-305-31), proven off-loop. **Now FIRES**: the next phase on it should take a seam (the refusal-audit throttle is a separable unit).
+
+Scan-list cell as of 2026-10-31 (replaced by 305-03, moved verbatim): 5 / 2 / 404 (was `3 / 1 / 328`) | no (young) | extracted 304-02 (pure move first): authenticate_presented_key, the one core for both kinds; KeyRefused; MCP prefix. ⛔ never via get_current_user; one 401 body |
+
+CLAUDE.md verdict cell: none before 305-03 (the file was not in the FIRING table); 305-03 adds one.
+
+### `backend/app/security/mcp_principal.py` — 305-03, 2026-10-31
+
+**`2 / 2 / 52`** (was `1 / 1 / 49`). `McpPrincipal.label: str | None = None` after `credential_kind`; `resolve_mcp_principal` passes `label=key.label`. Pinned by `test_305_audit.py`.
+
+Scan-list cell as of 2026-10-31 (replaced by 305-03, moved verbatim): 1 / 1 / 49 (was `0 / 0 / 0`) | no (young) | young (created 304-02, D-20): frozen McpPrincipal + resolve_mcp_principal over the one core. ⛔ built from ResolvedKey only, never request data |
+
+CLAUDE.md verdict cell: none (the file does not fire).
+
+### `backend/app/mcp/dispatch.py` — 305-03, 2026-10-31
+
+**`4 / 1 / 178`** (was `2 / 1 / 92`). `dispatch(principal, name, arguments, *, redis=None)`: each stage sets the one row it would write and the `finally` writes it (grant -> `tool_not_granted`, maintenance -> `maintenance`, arguments -> outcome `error`, limit -> `rate_limited:*` / `limiter_unavailable`, answered -> `ok`, raised -> `error`). `_run` wraps an `expensive` handler in `usage_sink.collecting()`; `_write_usage` writes one `mcp_usage` row per entry, ONE NULL-token row when nothing was measured, `failed` when the handler raised, and logs instead of failing. The 305-04 guard slot is unchanged. Pinned by `test_305_audit.py` and `test_305_usage_sink.py`.
+
+Scan-list cell as of 2026-10-31 (replaced by 305-03, moved verbatim): 2 / 1 / 92 (was `1 / 1 / 65`) | no (young) | 305-02: render stage — sentence -> isError; model -> validated structuredContent + text from results.render; the 305-04 guard slot is marked. ⛔ one audit row per call; render after the guard |
+
+CLAUDE.md verdict cell: none (the file does not fire).
+
+### `backend/app/mcp/server.py` — 305-03, 2026-10-31
+
+**`2 / 1 / 89`** (was `1 / 1 / 82`). `on_call_tool` reads the principal first; an unregistered name calls `audit.audit_refused(principal, tool=None, reason="tool_not_granted")` before raising `-32602`. Pinned by `test_305_audit.py`.
+
+Scan-list cell as of 2026-10-31 (replaced by 305-03, moved verbatim): 1 / 1 / 82 (was `0 / 0 / 0`) | no (young) | young (created 305-01, D-47): lowlevel Server('syrel'); list = REGISTERED ∩ granted; unknown name -32602; catch-all -> generic sentence. ⛔ never str(exc); never MCPServer |
+
+CLAUDE.md verdict cell: none (the file does not fire).
+
+### `backend/app/mcp/read_tools.py` — 305-03, 2026-10-31
+
+**`2 / 1 / 149`** (was `1 / 1 / 143`). After `reads.search`, when the effective settings have rerank on and rows came back, `usage_sink.record(rerank_model, None, provider=rerank_provider)` — an honest unmeasured row. Read through `getattr` so a stub settings object without rerank fields stays valid.
+
+Scan-list cell as of 2026-10-31 (replaced by 305-03, moved verbatim): 1 / 1 / 143 (was `0 / 0 / 0`) | no (young) | young (created 305-02, D-12/D-16): three handlers over acting_member_reads, returning a model or one sentence. ⛔ no visibility SQL; one not-available sentence for every not-visible id |
+
+CLAUDE.md verdict cell: none (the file does not fire).
+
+### `backend/app/services/rate_limit.py` — 305-03, 2026-10-31
+
+**`6 / 3 / 185`** (was `5 / 3 / 160`). `check_key_limit(redis, *, key_id, kind) -> (limit, retry)` appended after `check_ip_limit`: the limit from `api_key_searches_per_minute` for `expensive`, else `api_key_reads_per_minute`; any Redis exception raises `LimiterUnavailable` (fail closed). `git diff` removes no line; `test_305_limits.py` pins the sha256 of `enforce_key_limit`'s source.
+
+Scan-list cell as of 2026-10-31 (replaced by 305-03, moved verbatim): 5 / 3 / 160 (was `4 / 2 / 138`) | ⚠ **FIRES** | 305-01: mcp_ip + expensive kinds, LimiterUnavailable, check_ip_limit (fails closed). Additions only; enforce_* byte-unchanged. ⛔ no process-local state; no env var |
+
+CLAUDE.md verdict cell replaced by 305-03 (moved verbatim): `5 / 3 / 160` | ⚠ now FIRES (305) · 305-01: mcp_ip bucket, check_ip_limit (additions) · ⛔
+
+### `backend/app/models/user_settings.py` — 305-03, 2026-10-31
+
+**`64 / 40 / 1792`** (was `63 / 39 / 1790`). `api_key_searches_per_minute: int = 30` beside the two 293 fields and `int(_val(row, "api_key_searches_per_minute", None, 30))` in `_build_settings_from_row`: `+2 / -0`. Pinned by `test_305_settings_knob.py`.
+
+Scan-list cell as of 2026-10-31 (replaced by 305-03, moved verbatim): 63 / 39 / 1790 (was `62 / 38 / 1788`) | ⚠ **FIRES** | 304-04: mcp_enabled field + its _val_bool readback, default true (2 lines). Honoured by construction |
+
+CLAUDE.md verdict cell replaced by 305-03 (moved verbatim): `63 / 39 / 1790` | 304-04: mcp_enabled field + _val_bool readback (2 lines) · ⛔
+
+### `backend/app/api/settings.py` — 305-03, 2026-10-31
+
+**`51 / 28 / 1425`** (was `50 / 27 / 1400`). Five additive hunks on the 293 pattern. `test_242_settings_bounds_have_schema_constraints.py` gains the field in `EXPECTED_BOUNDED_FIELDS` (a new bound is a decision) and `test_settings.py`'s stub carries it (the response requires it). Pinned by `test_305_settings_knob.py`.
+
+Scan-list cell as of 2026-10-31 (replaced by 305-03, moved verbatim): 50 / 27 / 1400 (was `48 / 26 / 1398`) | ⚠ **FIRES** | 304-04: mcp_enabled on the settings response + its readback (2 lines; tolerates stubs predating the field). Honoured by construction. ⛔ no mail secret on the wire |
+
+CLAUDE.md verdict cell replaced by 305-03 (moved verbatim): `50 / 27 / 1400` | 304-04: mcp_enabled response field + readback (2 lines)
+
+### `backend/app/models/api_key.py` — 305-03, 2026-10-31
+
+**`5 / 4 / 267`** (was `4 / 3 / 265`). Two additive fields; the contract fixture `api_keys_contract.json` lists both in the same commit as the route change.
+
+Scan-list cell as of 2026-10-31 (replaced by 305-03, moved verbatim): 4 / 3 / 265 (was `3 / 3 / 264`) | ⚠ **FIRES** | 304-REVIEW WR-02: McpOff gains "unknown" (switches unread, still off). ⛔ no field carries the secret except create |
+
+CLAUDE.md verdict cell replaced by 305-03 (moved verbatim): `4 / 3 / 265` | 304-REVIEW WR-02: McpOff gains "unknown"
+
+### `backend/app/api/api_keys.py` — 305-03, 2026-10-31
+
+**`7 / 4 / 723`** (was `6 / 3 / 719`). `ok = action != "api_key.refused" and not (md.get("kind") == "mcp" and md.get("outcome") not in (None, "ok"))` — one expression; a workflow key's read row is unchanged. `tool=md.get("tool")`. Pinned by `test_293_api_keys_routes.py` (seven parametrised rows) and `test_305_audit_live.py`.
+
+Scan-list cell as of 2026-10-31 (replaced by 305-03, moved verbatim): 6 / 3 / 719 (was `5 / 3 / 710`) | ⚠ **FIRES** | 304-REVIEW WR-02: _mcp_off(None) is "unknown"; available false; mint refuses with its own sentence. ⛔ 404 for miss AND foreign |
+
+CLAUDE.md verdict cell replaced by 305-03 (moved verbatim): `6 / 3 / 719` | 304-REVIEW WR-02: unread switches are "unknown", still off · ⛔
+
+### `backend/app/services/openai_service.py` — 305-03, 2026-10-31
+
+**`85 / 43 / 2735`** (was `84 / 42 / 2731`). `usage_sink.record(getattr(response, "model", None) or effective_model, getattr(getattr(response, "usage", None), "prompt_tokens", None))`, a no-op outside a collection. `git diff` removes nothing; `grep -c "usage_sink.record("` = 1 (pinned). Pinned by `test_305_usage_sink.py`.
+
+Scan-list cell as of 2026-10-31 (replaced by 305-03, moved verbatim): 84 / 42 / 2731 (was `81 / 41 / 2623`) | ⚠ **FIRES** | honoured by construction (292-01 schema + description; 292 F-1 description line; 30 tools). ⛔ no anyOf/oneOf/type arrays (Gemini probed live) |
+
+CLAUDE.md verdict cell replaced by 305-03 (moved verbatim): `84 / 42 / 2731` | 292: SHOW_ARTIFACT_TOOL schema + description only (30 tools) · ⛔
+
+### `backend/app/db/rates.py` — 305-03, 2026-10-31
+
+**`11 / 3 / 950`** (was `9 / 2 / 898`). `roots` gains `'run'::text AS source, NULL::uuid AS api_key_id, NULL::text AS tool` and a `UNION ALL` leg over `(SELECT u.id AS run_id, u.*, NULL::uuid AS expert_id, true AS expert_attributed FROM public.mcp_usage u) r` with the SAME window and Expert texts; `members` restricts the runs join to `ro.source = 'run'` and adds a leg `FROM public.mcp_usage u JOIN roots ro ON ro.run_id = u.id WHERE ro.source = 'mcp'`. The ledger's base query (rows AND count) gains `LEFT JOIN public.api_keys k ON k.id = ro.api_key_id AND k.org_id = ro.org_id`; items add `source` / `api_key_id` / `api_key_label` / `mcp_tool` via `.get`. **No test_268 pin changed.** One comment reworded so the source has no `m.org_id` text. **Now FIRES**: the next phase should split the ledger query builder out of the CTE module.
+
+Scan-list cell as of 2026-10-31 (replaced by 305-03, moved verbatim): 9 / 2 / 898 (was `2 / 1 / 507`) | no (2 phases) | **268-02**: ONE `per_root` CTE feeds every spend query; root-only predicate appears ONCE. ⛔ never register a rate for model `unknown` (shell USD would double-count) |
+
+CLAUDE.md verdict cell: none before 305-03 (the file was not in the FIRING table); 305-03 adds one.
+
+### `frontend/src/lib/api/apiKeys.ts` — 305-03, 2026-10-31
+
+**`6 / 4 / 285`** (was `5 / 3 / 281`). Two type additions; `searches_per_minute` is required on the wire (UI-SPEC A-13), so `OrgApiKeysTab.test.tsx` and `apiKeyFacts.test.ts` literals gained it (tsc).
+
+Scan-list cell as of 2026-10-31 (replaced by 305-03, moved verbatim): 5 / 3 / 281 (was `4 / 3 / 280`) | ⚠ **FIRES** | 304-REVIEW WR-02: McpOff mirror gains "unknown" (type only). ⛔ not re-exported from the lib/api barrel |
+
+CLAUDE.md verdict cell replaced by 305-03 (moved verbatim): `5 / 3 / 281` | 304-REVIEW WR-02: McpOff mirror gains "unknown" · ⛔
+
+### `frontend/src/lib/api/skills.ts` — 305-03, 2026-10-31
+
+**`12 / 9 / 785`** (was `11 / 8 / 783`). One optional field in `FullAppSettings` and one in `SettingsUpdate`.
+
+Scan-list cell as of 2026-10-31 (replaced by 305-03, moved verbatim): 11 / 8 / 783 (was `10 / 7 / 779`) | ⚠ **FIRES** | 304-04: optional mcp_enabled on FullAppSettings (read as ?? true), type-only (+4). Honoured by construction |
+
+CLAUDE.md verdict cell replaced by 305-03 (moved verbatim): `11 / 8 / 783` | 304-04: optional mcp_enabled on FullAppSettings (type-only)
+
+### `frontend/src/components/settings/apiKeys/mcpCallWords.ts` — 305-03, 2026-10-31
+
+**`1 / 1 / 63`** (was `0 / 0 / 0`). Created as a SIBLING of `mcpKeyFacts.ts`, not inside it: that module is copy-free by contract (304-05, fenced by `mcpKeyFacts.test.ts`). `mcpCallWords(call, ctx)` -> answered / withheld / failed / over the limit (bucket + figure from `detail.limit`, else the list's limits, else bare) / not granted / `✕ {outcome}`; `null` for every reason the shipped table words. `mcpCallDetailLine(call, time, words)` = time · tool or — · words. Type-only import of `CallContext` (no runtime cycle). Pinned by `mcpCallWords.test.ts`.
+
+Scan-list cell as of 2026-10-31 (replaced by 305-03, moved verbatim): none (the row did not exist)
+
+CLAUDE.md verdict cell: none (the file does not fire).
+
+### `frontend/src/components/settings/apiKeys/apiKeyFacts.ts` — 305-03, 2026-10-31
+
+**`7 / 5 / 378`** (was `6 / 4 / 374`). `+4 / -0`: one import, two lines at the top of `callWords`, one at the top of `callDetailLine`. Every workflow-key case in `apiKeyFacts.test.ts` unchanged.
+
+Scan-list cell as of 2026-10-31 (replaced by 305-03, moved verbatim): 6 / 4 / 374 (was `5 / 4 / 373`) | ⚠ **FIRES** | 304-REVIEW WR-02: mcp_off "unknown" gets no switched-off tag (one condition). ⛔ pure, no React, spells no string |
+
+CLAUDE.md verdict cell replaced by 305-03 (moved verbatim): `6 / 4 / 374` | 304-REVIEW WR-02: no off tag for "unknown" · ⛔
+
+### `frontend/src/components/settings/apiKeys/mcpKeyCopy.ts` — 305-03, 2026-10-31
+
+**`5 / 2 / 193`** (was `3 / 1 / 175`). Seven `calls` keys and a five-key `activity` block, verbatim from UI-SPEC. Still a leaf (no `import` line). The `mcp.noAddress` rewording belongs to Surface 5 and was not in this plan.
+
+Scan-list cell as of 2026-10-31 (replaced by 305-03, moved verbatim): 3 / 1 / 175 (was `2 / 1 / 173`) | no (young) | young (304). 304-REVIEW WR-02: one string, offUnknown. ⛔ true leaf, imports nothing |
+
+CLAUDE.md verdict cell: none (the file does not fire).
+
+### `frontend/src/components/settings/apiKeys/apiKeysCopy.ts` — 305-03, 2026-10-31
+
+**`7 / 5 / 287`** (was `6 / 4 / 283`). The reads field now names AI tool list and read calls (D-54). The backend's range-refusal label for reads stays "Status reads per minute, per key" (backend copy, unchanged).
+
+Scan-list cell as of 2026-10-31 (replaced by 305-03, moved verbatim): 6 / 4 / 283 (was `5 / 3 / 283`) | ⚠ **FIRES** | 304-05: four string values reworded (tab.description, tab.empty, admin.description, admin.descriptionNoOrg); no key added or removed. ⛔ true leaf, imports nothing |
+
+CLAUDE.md verdict cell replaced by 305-03 (moved verbatim): `6 / 4 / 283` | 304-05: four strings reworded for both kinds · ⛔
+
+### `frontend/src/components/settings/apiKeys/ApiKeyCard.tsx` — 305-03, 2026-10-31
+
+**`3 / 3 / 239`** (was `2 / 2 / 239`). Exactly the two guards (`hasCalls`, the strip condition) and nothing else; `isMcp` count 8 -> 6. The 304 card test "no call strip" is retired DELIBERATELY with the reason in the test. **Now FIRES**: the next phase should extract the meta line.
+
+Scan-list cell as of 2026-10-31 (replaced by 305-03, moved verbatim): 2 / 2 / 239 (was `1 / 1 / 182`) | no (2 phases) | 304-05: kind chip; MCP keys get scope chips, off tag + card notice, acts-in meta, How to connect (not in admin view), no call strip. ⛔ presentational, no fetch |
+
+CLAUDE.md verdict cell: none before 305-03 (the file was not in the FIRING table); 305-03 adds one.
+
+### `frontend/src/components/settings/apiKeys/ApiKeyActivity.tsx` — 305-03, 2026-10-31
+
+**`2 / 2 / 161`** (was `1 / 1 / 98`). A local `McpActivity` component plus an MCP empty line; the 293 table is byte-identical. Pinned by `ApiKeyActivity.mcp.test.tsx` (rendered words).
+
+Scan-list cell as of 2026-10-31 (replaced by 305-03, moved verbatim): 1 / 1 / 98 (was `0 / 0 / 0`) | no (young) | young (planned 293-04). Recent-calls table inside a key card. ⛔ run link only when onOpenRun is given |
+
+CLAUDE.md verdict cell: none (the file does not fire).
+
+### `frontend/src/components/settings/apiKeys/ApiKeyCallStrip.tsx` — 305-03, 2026-10-31
+
+**`2 / 2 / 130`** (was `1 / 1 / 117`). The caption branches on `ctx.key?.kind === "mcp"`; bar names come from `callDetailLine`, which delegates for MCP keys.
+
+Scan-list cell as of 2026-10-31 (replaced by 305-03, moved verbatim): 1 / 1 / 117 (was `0 / 0 / 0`) | no (young) | young (planned 293-04). Last-20-calls bar strip, roving tabindex. ⛔ colour never the only signal |
+
+CLAUDE.md verdict cell: none (the file does not fire).
+
+### `frontend/src/components/settings/apiKeys/ApiKeysTab.tsx` — 305-03, 2026-10-31
+
+**`5 / 3 / 317`** (was `4 / 2 / 312`). One conditional `<p data-testid="api-keys-limits-mcp">` under the shipped workflow limits line. **Now FIRES**: the next phase should extract the header block.
+
+Scan-list cell as of 2026-10-31 (replaced by 305-03, moved verbatim): 4 / 2 / 312 (was `3 / 2 / 309`) | no (2 phases) | 304-REVIEW WR-02: the header says unknown under deployment-off's rule (MCP keys only). ⛔ secret in state only |
+
+CLAUDE.md verdict cell: none before 305-03 (the file was not in the FIRING table); 305-03 adds one.
+
+### `frontend/src/components/settings/ApiKeyLimits.tsx` — 305-03, 2026-10-31
+
+**`2 / 2 / 245`** (was `1 / 1 / 223`). `SEARCHES = { min: 1, max: 120, fallback: 30 }`, one draft, one `changes()` line, one `adopt()` field. Pinned by `ApiKeyLimits.test.tsx` (+4).
+
+Scan-list cell as of 2026-10-31 (replaced by 305-03, moved verbatim): 1 / 1 / 223 (was `0 / 0 / 0`) | no (young) | young (planned 293-03). Two per-key limits; changes()/adopt() handle, no own Save. ⛔ AgentRoundLimits pattern; never sends a cleared field |
+
+CLAUDE.md verdict cell: none (the file does not fire).
+
+### `frontend/src/types/spend.ts` — 305-03, 2026-10-31
+
+**`5 / 3 / 128`** (was `3 / 2 / 115`). Four optional fields, documented beside the 268 block.
+
+Scan-list cell as of 2026-10-31 (replaced by 305-03, moved verbatim): 3 / 2 / 115 (was `1 / 1 / 70`) | no (2 phases) | **268-02**: `ExpertSpendLine` + additive summary/run fields. Not firing |
+
+CLAUDE.md verdict cell: none before 305-03 (the file was not in the FIRING table); 305-03 adds one.
+
+### `frontend/src/lib/api/spend.ts` — 305-03, 2026-10-31
+
+**`5 / 3 / 232`** (was `3 / 2 / 226`). Four mapped fields; an older backend's row reads as `source: "run"` with null key fields. Pinned by `src/lib/api/__tests__/spendSummaryMapper.test.ts`.
+
+Scan-list cell as of 2026-10-31 (replaced by 305-03, moved verbatim): 3 / 2 / 226 (was `1 / 1 / 184`) | no (2 phases) | **268-02**: `expert` sent only when given; maps the 4 new summary keys. ⛔ the one spend client (the 257 review moved a second home here) |
+
+CLAUDE.md verdict cell: none before 305-03 (the file was not in the FIRING table); 305-03 adds one.
+
+### `frontend/src/components/admin/spend/ExpertSpendCard.tsx` — 305-03, 2026-10-31
+
+**`3 / 2 / 342`** (was `1 / 1 / 316`). `LedgerAttribution` gains source / apiKeyLabel / mcpTool; the arm is checked FIRST (`grep -c 'source === "mcp"'` = 1), theme tokens only, label as React text. `AdminSpendPage.tsx` untouched (D-55); its test's column-header pin follows `ledgerColumn`.
+
+Scan-list cell as of 2026-10-31 (replaced by 305-03, moved verbatim): 1 / 1 / 316 (was `0 / 0 / 0`) | no (new) | young (created 268-02). Spend by Expert + recon footer + `LedgerExpertCell`. ⛔ the table never follows the filter; No Expert always shown |
+
+CLAUDE.md verdict cell: none (the file does not fire).
+
+### `frontend/src/components/admin/spend/expertSpendCopy.ts` — 305-03, 2026-10-31
+
+**`3 / 2 / 84`** (was `1 / 1 / 74`). Verbatim from UI-SPEC §Copywriting `expertSpendCopy.ts`.
+
+Scan-list cell as of 2026-10-31 (replaced by 305-03, moved verbatim): 1 / 1 / 74 (was `0 / 0 / 0`) | no (new) | young (created 268-02). ⛔ the ONE home of spend-by-Expert wording; shared literals imported, never re-spelled |
+
+CLAUDE.md verdict cell: none (the file does not fire).
+
+### `scripts/vitest-count-gate.cjs` — 305-03, 2026-10-31
+
+**`411 / 87 / 6944`** (was `409 / 86 / 6932`). First pins: `mcpCallWords.test.ts` 8, `ApiKeyActivity.mcp.test.tsx` 4, each FILE-LEVEL in TARGETS. Raised: spendSummaryMapper 2 -> 4 (the ledger cases went into the existing `src/lib/api/__tests__/spendSummaryMapper.test.ts`; a second file of that basename would have shadowed its pin), ExpertSpendCard 19 -> 23, expertSpendCopy 10 -> 11, ApiKeyLimits 10 -> 14, ApiKeysTab 30 -> 31, ApiKeyCard 16 -> 17, ApiKeyCallStrip 5 -> 6. apiKeyFacts (43), mcpKeyFacts (15) and apiKeysContract (8) did not change count.
+
+Scan-list cell as of 2026-10-31 (replaced by 305-03, moved verbatim): 409 / 86 / 6932 (was `408 / 86 / 6932`) | ⚠ **FIRES** | 304-REVIEW WR-02: RAISED ApiKeysTab 29->30, ApiKeyCard 15->16, McpOffNotice 5->6; none added, none lowered |
+
+CLAUDE.md verdict cell replaced by 305-03 (moved verbatim): `409 / 86 / 6932` | 304-REVIEW WR-02: 3 pins raised; none lowered

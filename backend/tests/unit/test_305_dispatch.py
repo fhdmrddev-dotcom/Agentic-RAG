@@ -81,6 +81,7 @@ async def test_dispatch_order_grant_before_validation(monkeypatch):
     async def handler(principal, args):  # pragma: no cover - must never run
         raise AssertionError("handler ran")
 
+    h.stub_accounting(monkeypatch)  # 305-03: limits + audit on a fake Redis and a row recorder
     monkeypatch.setitem(
         tools.REGISTERED, "t_query", h.make_spec("t_query", handler, args_model=h.NeedsQuery)
     )
@@ -99,6 +100,7 @@ async def test_dispatch_runs_a_granted_valid_call(monkeypatch):
         seen["query"] = args.query
         return h.text_result("ok")
 
+    h.stub_accounting(monkeypatch)  # 305-03: limits + audit on a fake Redis and a row recorder
     monkeypatch.setitem(
         tools.REGISTERED, "t_query", h.make_spec("t_query", handler, args_model=h.NeedsQuery)
     )

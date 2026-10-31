@@ -211,6 +211,11 @@ export function ApiKeysTab({
                 {fillCopy(C.tab.limits, { starts: list.limits.starts_per_minute, reads: list.limits.reads_per_minute })}
               </p>
             )}
+            {list !== null && keys.some((k) => k.kind === "mcp") && (
+              <p data-testid="api-keys-limits-mcp" className="mt-1 text-xs text-muted-foreground">
+                {fillCopy(C.tab.limitsMcp, { searches: list.limits.searches_per_minute, reads: list.limits.reads_per_minute })}
+              </p>
+            )}
           </div>
           {showNewKey && (
             <Button type="button" className="gradient-primary" onClick={() => openDraft(null)}>

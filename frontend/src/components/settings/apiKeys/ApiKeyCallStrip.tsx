@@ -15,8 +15,10 @@ import { cn } from "@/lib/utils"
 import type { ApiKeyCall } from "@/lib/api/apiKeys"
 import { API_KEYS_COPY, fillCopy } from "./apiKeysCopy"
 import { callBars, callDetailLine, type BarKind, type CallContext } from "./apiKeyFacts"
+import { MCP_KEY_COPY } from "./mcpKeyCopy"
 
 const C = API_KEYS_COPY
+const M = MCP_KEY_COPY
 
 const BAR_CLASS: Record<BarKind, string> = {
   start: "h-4 bg-primary",
@@ -97,13 +99,24 @@ export function ApiKeyCallStrip({
           )
         })}
       </div>
-      <div data-testid="call-strip-caption" className="mt-1 font-mono text-xs text-muted-foreground">
-        {fillCopy(C.strip.caption, { N: bars.length })}
-        <span aria-hidden="true" className="text-primary">■</span> {C.strip.legendStart}{" "}
-        <span aria-hidden="true" className="text-muted-foreground/60">■</span> {C.strip.legendRead}{" "}
-        <span aria-hidden="true" className="text-destructive">■</span> {C.strip.legendRefused}
-        {C.strip.tapOne}
-      </div>
+      {ctx.key?.kind === "mcp" ? (
+        // 305-03 (UI-SPEC §Surface 3): an AI tool key has no starts, and "refused" alone would be
+        // untrue for a withheld or failed call, so its legend names the two kinds that can occur.
+        <div data-testid="call-strip-caption" className="mt-1 font-mono text-xs text-muted-foreground">
+          {fillCopy(C.strip.caption, { N: bars.length })}
+          <span aria-hidden="true" className="text-muted-foreground/60">■</span> {M.activity.legendOk}{" "}
+          <span aria-hidden="true" className="text-destructive">■</span> {M.activity.legendNotOk}
+          {C.strip.tapOne}
+        </div>
+      ) : (
+        <div data-testid="call-strip-caption" className="mt-1 font-mono text-xs text-muted-foreground">
+          {fillCopy(C.strip.caption, { N: bars.length })}
+          <span aria-hidden="true" className="text-primary">■</span> {C.strip.legendStart}{" "}
+          <span aria-hidden="true" className="text-muted-foreground/60">■</span> {C.strip.legendRead}{" "}
+          <span aria-hidden="true" className="text-destructive">■</span> {C.strip.legendRefused}
+          {C.strip.tapOne}
+        </div>
+      )}
       {detail !== null && (
         <div
           data-testid="call-detail"

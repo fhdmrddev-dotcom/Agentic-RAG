@@ -49,6 +49,7 @@ def _fake_settings(**overrides):
         # 293 (D-14) — the per-key API limits; the response REQUIRES them as well.
         api_key_starts_per_minute=10,
         api_key_reads_per_minute=120,
+        api_key_searches_per_minute=30,  # 305 (D-54) — the response REQUIRES it too
         # 300 (D-07, D-08, D-10) — the mail knobs; the response REQUIRES them as well.
         notification_email_delay_seconds=120,
         email_from_address="",

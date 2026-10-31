@@ -16,7 +16,7 @@
  * `expertThemeContrast.test.tsx` fences this file line by line.
  */
 import React from "react"
-import { CheckCircle2, CornerDownRight, Sparkles, XCircle } from "lucide-react"
+import { CheckCircle2, CornerDownRight, KeyRound, Sparkles, XCircle } from "lucide-react"
 import type { ExpertSpendLine, SpendRunItem } from "@/types/spend"
 import { EXPERT_SPEND_COPY as C } from "./expertSpendCopy"
 import { expertLineLabel } from "./ExpertFilterPills"
@@ -263,7 +263,10 @@ export const ExpertSpendCard: React.FC<ExpertSpendCardProps> = ({
   )
 }
 
-type LedgerAttribution = Pick<SpendRunItem, "expertId" | "expertName" | "expertDeleted" | "expertAttributed">
+type LedgerAttribution = Pick<
+  SpendRunItem,
+  "expertId" | "expertName" | "expertDeleted" | "expertAttributed" | "source" | "apiKeyLabel" | "mcpTool"
+>
 
 const LEDGER_PILL = "rounded-full px-2 text-[11px] inline-flex items-center gap-1"
 const LEDGER_DASHED = `${LEDGER_PILL} border border-dashed border-border bg-transparent text-muted-foreground italic`
@@ -271,6 +274,29 @@ const LEDGER_DASHED = `${LEDGER_PILL} border border-dashed border-border bg-tran
 /** The ledger's Expert column (§5.8). Three words that must never merge: No Expert, Deleted
  * Expert, Not recorded — each is a different fact about the row. */
 export const LedgerExpertCell: React.FC<{ run: LedgerAttribution }> = ({ run }) => {
+  // 305-03 (D-31 / D-55): an AI tool (MCP) call names its key, checked FIRST so it can never read
+  // as No Expert / Deleted Expert / Not recorded. The label is member text: React text, never HTML.
+  if (run.source === "mcp") {
+    if (!run.apiKeyLabel) {
+      return (
+        <span className={LEDGER_DASHED} data-testid="ledger-expert-cell" data-source="mcp">
+          {C.ledgerMcpRemoved}
+        </span>
+      )
+    }
+    return (
+      <span
+        className={`${LEDGER_PILL} border border-border bg-muted/40 text-foreground`}
+        title={C.ledgerMcpTitle(run.apiKeyLabel, run.mcpTool ?? null)}
+        data-testid="ledger-expert-cell"
+        data-source="mcp"
+      >
+        <KeyRound className="h-3 w-3 flex-none" aria-hidden="true" />
+        {C.ledgerMcp("")}
+        <span className="truncate max-w-[16ch]">{run.apiKeyLabel}</span>
+      </span>
+    )
+  }
   if (!run.expertAttributed) {
     return (
       <span className="text-[11px] text-muted-foreground" data-testid="ledger-expert-cell">

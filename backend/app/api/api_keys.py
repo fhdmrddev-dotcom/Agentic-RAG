@@ -175,6 +175,7 @@ async def _limits() -> ApiKeyLimits:
     return ApiKeyLimits(
         starts_per_minute=int(s.api_key_starts_per_minute),
         reads_per_minute=int(s.api_key_reads_per_minute),
+        searches_per_minute=int(s.api_key_searches_per_minute),
     )
 
 
@@ -216,10 +217,13 @@ def _call_from_audit(row: dict, names: dict[str, str]) -> ApiKeyCall:
         workflow_id=wf,
         workflow_name=names.get(str(wf)) if wf else None,
         run_id=md.get("run_id"),
-        ok=action != "api_key.refused",
+        # 305-03 (D-53 / T-305-28): ONE rule — a refusal, or an MCP read whose outcome is anything
+        # but ok, is never OK (a withheld, failed or limited call must not read as a success).
+        ok=action != "api_key.refused" and not (md.get("kind") == "mcp" and md.get("outcome") not in (None, "ok")),
         outcome=md.get("outcome"),
         reason=md.get("reason"),
         detail=md.get("detail") if isinstance(md.get("detail"), dict) else None,
+        tool=md.get("tool"),
     )
 
 

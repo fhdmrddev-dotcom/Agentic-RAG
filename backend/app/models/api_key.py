@@ -60,6 +60,7 @@ class ApiKeyCall(BaseModel):
     outcome: str | None = None
     reason: str | None = None
     detail: dict | None = None
+    tool: str | None = None   # 305-03 (D-53): the MCP tool a call used; None on a workflow key
 
 
 class ApiKeyFolderRef(BaseModel):
@@ -96,6 +97,7 @@ class ApiKeyRead(BaseModel):
 class ApiKeyLimits(BaseModel):
     starts_per_minute: int
     reads_per_minute: int
+    searches_per_minute: int   # 305-03 (D-54): the AI tool keys' expensive bucket
 
 
 class McpToolRef(BaseModel):

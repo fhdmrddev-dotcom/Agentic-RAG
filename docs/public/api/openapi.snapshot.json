@@ -17042,6 +17042,17 @@
        }
       ],
       "title": "Detail"
+     },
+     "tool": {
+      "anyOf": [
+       {
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Tool"
      }
     },
     "type": "object",
@@ -17146,12 +17157,17 @@
      "reads_per_minute": {
       "type": "integer",
       "title": "Reads Per Minute"
+     },
+     "searches_per_minute": {
+      "type": "integer",
+      "title": "Searches Per Minute"
      }
     },
     "type": "object",
     "required": [
      "starts_per_minute",
-     "reads_per_minute"
+     "reads_per_minute",
+     "searches_per_minute"
     ],
     "title": "ApiKeyLimits"
    },
@@ -22728,6 +22744,10 @@
       "type": "integer",
       "title": "Api Key Reads Per Minute"
      },
+     "api_key_searches_per_minute": {
+      "type": "integer",
+      "title": "Api Key Searches Per Minute"
+     },
      "notification_email_delay_seconds": {
       "type": "integer",
       "title": "Notification Email Delay Seconds"
@@ -22983,6 +23003,7 @@
      "explorer_max_tool_rounds",
      "api_key_starts_per_minute",
      "api_key_reads_per_minute",
+     "api_key_searches_per_minute",
      "notification_email_delay_seconds",
      "email_from_address",
      "email_from_name",
@@ -29922,6 +29943,17 @@
        }
       ],
       "title": "Api Key Reads Per Minute"
+     },
+     "api_key_searches_per_minute": {
+      "anyOf": [
+       {
+        "type": "integer"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Api Key Searches Per Minute"
      },
      "notification_email_delay_seconds": {
       "anyOf": [

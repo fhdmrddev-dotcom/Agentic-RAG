@@ -21,6 +21,7 @@ import type {
 import { API_KEYS_COPY, fillCopy } from "./apiKeysCopy"
 import { MCP_KEY_COPY } from "./mcpKeyCopy"
 import { mcpScopeChips } from "./mcpKeyFacts"
+import { mcpCallDetailLine, mcpCallWords } from "./mcpCallWords" // 305-03 (D-53)
 
 const C = API_KEYS_COPY
 const M = MCP_KEY_COPY
@@ -330,6 +331,8 @@ function refusedWords(call: ApiKeyCall, ctx: CallContext): string | null {
 
 /** The result words of one call: `✓ started`, `✕ refused: key revoked on Tue 6 Oct`, … */
 export function callWords(call: ApiKeyCall, ctx: CallContext = {}): { ok: boolean; text: string } {
+  const mcp = ctx.key?.kind === "mcp" ? mcpCallWords(call, ctx) : null
+  if (mcp) return mcp
   if (call.ok) return { ok: true, text: fillCopy(C.calls.ok, { words: okWords(call) }) }
   const words = refusedWords(call, ctx)
   return { ok: false, text: words === null ? C.calls.refusedBare : fillCopy(C.calls.refused, { words }) }
@@ -352,6 +355,7 @@ export function runCellText(runId: string | null): string {
 
 /** The tapped bar's one line: `{time} · {verb} · {workflow} · {run} · {result}`. */
 export function callDetailLine(call: ApiKeyCall, ctx: CallContext, now: Date): string {
+  if (ctx.key?.kind === "mcp") return mcpCallDetailLine(call, formatCallTime(call.at, now), callWords(call, { ...ctx, now }).text)
   return [
     formatCallTime(call.at, now),
     call.verb,
