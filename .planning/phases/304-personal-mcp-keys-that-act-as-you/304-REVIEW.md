@@ -268,6 +268,30 @@ Record the decision for unscoped views, and add a narrowed-key arm to `test_304_
 
 **Fix:** Get operator confirmation. If the answer is no, the gate is one `enforce_entitlement` call inside `_create_mcp_key`.
 
+## Fixes applied 2026-10-31
+
+All four warnings are fixed, each test-first: a RED commit that failed for the stated reason, then the fix. The Info findings were out of scope and are untouched. `b0cff6e85` raised three count-gate pins for the WR-02 vitest cases.
+
+Gates after the fixes:
+- `test_304_*_live.py` (all three, `-rs`): **45 passed**, no SKIPPED.
+- `pytest tests/unit -k "test_304 or test_293"`: **492 passed**.
+- Vitest over `settings/apiKeys` and `org`: **29 files, 415 passed**.
+- Count gate: **OK** (589/589 pinned files present, no per-file decrease, 0 failing).
+- `tsc -p tsconfig.app.json`: **61 error lines**, the same as base, with none in any touched file.
+- Backend baseline: **PASSED at 70** on the second sample. The first sample read 75. Its 5 extra failures (`test_272_knowledge_health_kinds` ×4, `test_email_ingestion` ×1) passed on the second run. All 75 failing ids were re-run in isolation with HEAD sources and with the four touched sources byte-swapped to base `54b5fede8`: both gave the identical set, 68 failed / 7 passed.
+
+| Finding | Status | RED commit | Fix commit | Decision |
+|---|---|---|---|---|
+| WR-01 | fixed | `c4ae3c97c` | `0a6328f0e` | D-46 |
+| WR-02 | fixed | `e6aa83976` | `e142601e8` | (orchestrator ruling, no D-number) |
+| WR-03 | fixed | `5d6d4eec6` | `aedbeb8bf` | D-30 order; D-18 annotated |
+| WR-04 | fixed | `f9a3ee19f` | `211e0726a` | D-47 |
+
+- **WR-01 (D-46).** All four acting-member reads now use mig 205's agent rule. `read_document` and the `related_documents` subject add `d.retrievable`. `_page` (list and view documents) uses `d.retrievable` in place of `archived_at IS NULL`. The `related_documents` endpoint LATERAL adds `e.retrievable`, so an archived or source-gone endpoint renders as the no-access mask. This supersedes D-31's Library parity for archived and source-gone documents on the MCP path only. Pinned by `test_archived_and_source_gone_documents_leave_every_acting_read` (`test_304_narrowed_key_live.py`). RED: the source-gone document was in `list_documents`.
+- **WR-02.** `McpOff` gains `"unknown"` in the backend `Literal`, the TS mirror and the OpenAPI snapshot and public spec (regenerated; the only diff is the two enum additions). `_mcp_off(None)` returns `"unknown"`, and `available` stays false for `deployment` and `unknown`. The create path refuses `unknown` (a missing org row) with its own sentence and mints nothing. The frontend says "Couldn't check whether AI tool access is on. Reload to try again." (`mcpKeyCopy.offUnknown`) in every `McpOffNotice` variant. The card shows no `⏸ switched off` tag for `unknown`, and the header follows deployment-off's rule. Pinned by three route tests and three vitest cases (McpOffNotice, ApiKeyCard, ApiKeysTab).
+- **WR-03.** `principal_still_allowed` still refuses a missing org row first (`mcp_off_org`). It then checks the deployment switch (`mcp_off_deployment`), then the org switch (`mcp_off_org`), the one order `_mcp_off` uses (D-30). `McpOffNotice`'s docblock claim is now true and names both server paths. D-18 in `304-CONTEXT.md` is annotated rather than rewritten. Pinned by `test_both_switches_off_names_the_deployment_like_the_screen`, plus the D-18-order parametrize row, which now expects the deployment.
+- **WR-04 (D-47).** `list_views` runs inside `_acting` and composes the key's scope. `scope.folder_ids` is already the expanded subtree set that `list_folders` uses. A narrowed key lists only views whose own `folder_scope` is inside it; a view with no folder scope is hidden (fail closed). The filter reads the raw `folder_scope` before a global view's scope is masked. All-folders keys are unchanged. Pinned by `test_a_narrowed_key_lists_only_the_views_inside_its_subtree`.
+
 ---
 
 _Reviewed: 2026-10-31_
