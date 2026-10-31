@@ -70,3 +70,50 @@ async def test_a_successful_in_transaction_probe_still_reads_the_session_default
         probed = await rt.get_server_ef_search(conn, force_refresh=True)
         assert await conn.fetchval("SELECT current_setting('hnsw.ef_search', true)") == "177"
     assert probed is not None and probed != 177
+
+
+# ── LF-02: a rejected SET LOCAL ────────────────────────────────────────────────────────────────
+
+
+async def test_a_rejected_value_leaves_the_transaction_usable(small_pool):
+    async with deps.get_user_pg_connection(None, {"id": str(uuid.uuid4())}) as conn:
+        await conn.execute("SELECT '[1]'::public.vector")  # load pgvector so it validates the value
+        applied = await rt._set_local(conn, rt._SQL_EF_SEARCH, "0", guc="hnsw.ef_search")
+        assert applied is False
+        assert await conn.fetchval("SELECT 1") == 1
+
+
+async def test_an_hnsw_name_the_server_does_not_define_is_tuning_unavailable(small_pool):
+    """pgvector reserves the ``hnsw.`` prefix once loaded, so a name it does not define (what
+    ``hnsw.iterative_scan`` is below 0.8) raises 42602 ``InvalidNameError``. It must degrade the
+    tuning, not propagate and not abort the search. (pgvector is 0.8.0 locally and in production,
+    so this arm is latent today.)"""
+    async with deps.get_user_pg_connection(None, {"id": str(uuid.uuid4())}) as conn:
+        await conn.execute("SELECT '[1]'::public.vector")
+        applied = await rt._set_local(
+            conn, "SELECT set_config('hnsw.no_such_knob_lf02', $1, true)", "on",
+            guc="hnsw.no_such_knob_lf02",
+        )
+        assert applied is False
+        assert await conn.fetchval("SELECT 1") == 1
+
+
+async def test_a_set_local_that_succeeds_is_still_in_force_after_its_savepoint(small_pool):
+    """The savepoint must not undo the tuning: a released savepoint keeps its SET LOCAL until the
+    outer transaction ends."""
+    async with deps.get_user_pg_connection(None, {"id": str(uuid.uuid4())}) as conn:
+        await conn.execute("SELECT '[1]'::public.vector")
+        assert await rt._set_local(conn, rt._SQL_EF_SEARCH, "123", guc="hnsw.ef_search") is True
+        assert await conn.fetchval("SELECT current_setting('hnsw.ef_search', true)") == "123"
+
+
+async def test_apply_knobs_with_a_rejected_knob_still_answers_the_search(small_pool, monkeypatch):
+    """End to end on the real call path: every knob statement rejected, the search still runs."""
+    monkeypatch.setattr(rt, "_SQL_ITERATIVE_SCAN", "SELECT set_config('hnsw.no_such_knob_lf02b', $1, true)")
+    rt._set_server_ef_cache(40)
+    uid = str(uuid.uuid4())
+    async with deps.get_user_pg_connection(None, {"id": uid}) as conn:
+        await conn.execute("SELECT '[1]'::public.vector")
+        await rt.apply_hnsw_session_knobs(conn, ef_search=200, iterative_scan="relaxed_order")
+        assert await conn.fetchval("SELECT current_setting('hnsw.ef_search', true)") == "200"
+        assert await conn.fetchval("SELECT 1") == 1
