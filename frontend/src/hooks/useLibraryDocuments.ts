@@ -96,6 +96,10 @@ export interface UseLibraryDocuments {
   selectedDoc: Document | null
   /** Opening a document failed for a reason other than "not visible" (S8). */
   selectedDocError: Error | null
+  /** Phase 305-02 (D-52): the by-id read answered 404 — the in-page "can't be opened" notice.
+   *  Never set for any other failure (that is `selectedDocError`); cleared by a new selection
+   *  and by `retrySelectedDoc`. */
+  selectedDocRefused: boolean
   retrySelectedDoc: () => void
   /** Re-read the page and the summary SILENTLY (after an edit, a move, an import). */
   refresh: () => Promise<void>
@@ -138,6 +142,8 @@ interface SingleDoc {
   id: string
   doc: Document | null
   error: Error | null
+  /** 305-02: the read answered 404 (missing and forbidden alike). */
+  refused?: boolean
 }
 
 function isNotVisible(e: unknown): boolean {
@@ -357,7 +363,9 @@ export function useLibraryDocuments({
       (e: unknown) => {
         if (!alive) return
         // 404 → the panel stays closed with no copy that could confirm the document exists.
-        setSingle({ id: fetchId, doc: null, error: isNotVisible(e) ? null : asError(e, "Couldn't open that document.") })
+        // 305-02: it is REFUSED — the kind-only notice, the same DOM for missing and forbidden.
+        const refused = isNotVisible(e)
+        setSingle({ id: fetchId, doc: null, error: refused ? null : asError(e, "Couldn't open that document."), refused })
       },
     )
     return () => {
@@ -367,6 +375,7 @@ export function useLibraryDocuments({
   const retrySelectedDoc = useCallback(() => setSingle(null), [])
   const selectedDoc = fromLists ?? (known ? single.doc : null)
   const selectedDocError = fromLists === null && known ? single.error : null
+  const selectedDocRefused = fromLists === null && known && single.refused === true
 
   // ── the doors ─────────────────────────────────────────────────────────────────────────
   const { upload: baseUpload, deleteDoc: baseDelete } = base
@@ -417,6 +426,7 @@ export function useLibraryDocuments({
     error,
     selectedDoc,
     selectedDocError,
+    selectedDocRefused,
     retrySelectedDoc,
     refresh,
     retry,

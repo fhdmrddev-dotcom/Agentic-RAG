@@ -21,16 +21,28 @@
  * The CSS that animates these classes lives in `index.css` (the additive citation
  * block); `prefers-reduced-motion` is owned there — these helpers only toggle the
  * class, never inline an animation.
+ *
+ * Phase 305-02 (MCP-02 / D-17 / D-52; UI-SPEC Surface 4) — the DOCUMENT ADDRESS arrival.
+ * `/app/library/<uuid>` (the "Open in Syrel" link an MCP search result carries) opens through
+ * THIS hand-off, never through LinkGate or the link resolver: App passes `entityLink` (one prop
+ * expression) and, once per distinct document id the address names, the provider records the
+ * pending document exactly as `openDocument` does — but WITHOUT navigating, because the address
+ * already shows the Library and must stay as opened while the panel shows it (a reload reopens
+ * it). `LibraryPage` then reads it by id on the member's own JWT; a 404 is its in-page notice.
+ * `leaveDocumentAddress()` is that notice's Dismiss: a REPLACE back to `/app/library`.
  */
 import {
   createContext,
   useCallback,
   useContext,
+  useEffect,
   useMemo,
   useRef,
   useState,
 } from "react"
 import type { ReactNode } from "react"
+// Type-only (erased): the document field of the address and its REPLACE navigator.
+import type { EntityLink } from "@/hooks/useAppNavigation"
 
 // ── Shared DOM contract (the single source of truth) ─────────────────────────
 /** Attribute a footer row carries: `[data-citation-row="{n}"]`. */
@@ -59,6 +71,8 @@ export interface CitationNavValue {
   /** Clear the pending intent after a consumer has acted on it (so re-opening
    *  the same document, or closing the panel, is never fought). */
   consumePendingDocument: () => void
+  /** Phase 305-02: REPLACE a document address with `/app/library`; a no-op off one. */
+  leaveDocumentAddress: () => void
 }
 
 const CitationNavContext = createContext<CitationNavValue | null>(null)
@@ -72,6 +86,9 @@ export interface CitationNavProviderProps {
    *  pending intent via the hook, but a host that owns the selector may pass it
    *  here as well (belt-and-suspenders). */
   selectDocument?: (documentId: string) => void
+  /** Phase 305-02 (D-52): the address's document (`/app/library/<uuid>`) and its REPLACE
+   *  navigator — App passes `nav.entityLink`. Absent: no address arrival (every other host). */
+  entityLink?: Pick<EntityLink, "document" | "leave">
 }
 
 /**
@@ -82,6 +99,7 @@ export function CitationNavProvider({
   children,
   navigate,
   selectDocument,
+  entityLink,
 }: CitationNavProviderProps) {
   const [pendingDocumentId, setPendingDocumentId] = useState<string | null>(null)
   // Keep the injected callbacks in refs so `openDocument` stays referentially
@@ -104,9 +122,30 @@ export function CitationNavProvider({
     setPendingDocumentId(null)
   }, [])
 
+  // Phase 305-02: one arrival per distinct document id the address names. Seeing no document
+  // address forgets the last one, so Back onto the same address opens it again.
+  const arrival = entityLink?.document ?? null
+  const arrivedRef = useRef<string | null>(null)
+  useEffect(() => {
+    if (arrival === null) {
+      arrivedRef.current = null
+      return
+    }
+    if (arrival === arrivedRef.current) return
+    arrivedRef.current = arrival
+    setPendingDocumentId(arrival)
+    selectDocumentRef.current?.(arrival)
+  }, [arrival])
+  const leaveRef = useRef(entityLink?.leave)
+  leaveRef.current = entityLink?.leave
+  const leaveDocumentAddress = useCallback(() => {
+    if (arrivedRef.current === null) return
+    leaveRef.current?.({ view: "documents" })
+  }, [])
+
   const value = useMemo<CitationNavValue>(
-    () => ({ openDocument, pendingDocumentId, consumePendingDocument }),
-    [openDocument, pendingDocumentId, consumePendingDocument],
+    () => ({ openDocument, pendingDocumentId, consumePendingDocument, leaveDocumentAddress }),
+    [openDocument, pendingDocumentId, consumePendingDocument, leaveDocumentAddress],
   )
 
   return <CitationNavContext.Provider value={value}>{children}</CitationNavContext.Provider>

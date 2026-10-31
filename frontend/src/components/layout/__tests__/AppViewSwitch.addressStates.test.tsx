@@ -263,6 +263,7 @@ function linkTo(kind: Kind, id = LINKED): EntityLink {
   return {
     target: { kind, id },
     route,
+    document: null, // 305-02 (D-52): the document address field, off a document address
     address: `/x/${id}`,
     openThread: vi.fn(),
     openWorkflow: vi.fn(),

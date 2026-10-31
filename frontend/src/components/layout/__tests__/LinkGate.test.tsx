@@ -61,6 +61,7 @@ function fakeLink(kind: Kind | null, id = ID): EntityLink {
   return {
     target: kind === null ? null : { kind, id },
     route: kind === null ? null : routeOf(kind, id),
+    document: null, // 305-02 (D-52): the document address field, off a document address
     address: kind === null ? "/app" : `/app/x/${id}`,
     openThread: vi.fn(),
     openWorkflow: vi.fn(),

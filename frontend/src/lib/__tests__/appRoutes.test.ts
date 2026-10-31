@@ -308,7 +308,12 @@ describe("appRoutes · entity addresses parse, lowercased (299-02 / D-01)", () =
     "/app/experts/not-a-uuid",
     `/app/experts/${BUNDLE}/extra`,
     `/app/experts/${BUNDLE}.json`,
-    "/app/library/" + THREAD,
+    // ⚠ RETIRED DELIBERATELY by Phase 305-02 (D-52): `"/app/library/" + THREAD` was pinned here as
+    // not-found because the Library had no id address in 299. 305 gives it one — the MCP "Open in
+    // Syrel" document address — so a strict UUID there now parses (pinned in the 305-02 block at
+    // the end of this file); a malformed or partial id there is still not-found.
+    "/app/library/not-a-uuid",
+    `/app/library/${THREAD}/extra`,
     "/app/settings/" + THREAD,
   ])("%s is not-found and never canonicalised", (path) => {
     expect(() => parseAppLocation(path, "")).not.toThrow()

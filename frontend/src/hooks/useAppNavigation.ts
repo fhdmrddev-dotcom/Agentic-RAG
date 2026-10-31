@@ -30,6 +30,10 @@ export interface EntityLink {
   target: { kind: "thread" | "workflow" | "run" | "expert"; id: string } | null
   /** The parsed entity route (for `formatAppRoute` in a copy / share control), or `null`. */
   route: AppRoute | null
+  /** Phase 305-02 (D-17 / D-52): the document `/app/library/<uuid>` names, else `null`. NOT a
+   *  `target` kind on purpose: LinkGate resolves every non-null target through the link resolver,
+   *  and a document has no resolver kind — it opens through the citation hand-off instead. */
+  document: string | null
   /** Push `/app/chat/<id>` (`replace` swaps the entry instead — for correcting a stale address). */
   openThread: (id: string, opts?: { replace?: boolean }) => void
   /** Push `/app/workflows/<id>`. */
@@ -174,7 +178,8 @@ export function useAppNavigation(): AppNavigation {
     if (studioSkillId) lastSkillId.current = studioSkillId
     if (threadId) lastThreadId.current = threadId
     else if (onChatHome) lastThreadId.current = null
-    if (parsed.view !== "not-found" && parsed.view !== "pre-auth" && entityOf(parsed) === null) lastPlace.current = parsed
+    // 305-02: a document address is id-bearing too, so Stay never returns to it.
+    if (parsed.view !== "not-found" && parsed.view !== "pre-auth" && entityOf(parsed) === null && !("documentId" in parsed)) lastPlace.current = parsed
   }, [location.pathname, location.search, runId, studioSkillId, threadId, onChatHome, parsed])
 
   // ── 297-REVIEW WR-01 (2026-10-28) — every entry the router writes FROM carries an `idx`. ──
@@ -443,6 +448,7 @@ export function useAppNavigation(): AppNavigation {
     return {
       target,
       route: target && isRoute ? parsed : null,
+      document: "documentId" in parsed ? parsed.documentId : null,
       address: isRoute ? formatAppRoute(parsed) : `${location.pathname}${location.search}`,
       openThread,
       openWorkflow,
