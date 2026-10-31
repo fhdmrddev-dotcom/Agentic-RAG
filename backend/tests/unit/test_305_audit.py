@@ -626,3 +626,45 @@ async def test_a_hung_unknown_tool_row_is_bounded_and_logged(world, monkeypatch,
     assert any(PRINCIPAL.key_id in m and "api_key.refused reason=tool_not_granted" in m
                for m in lines), lines
     assert not any(QUERY in m for m in lines), "a client-chosen tool name reached the log"
+
+
+# ── 305-REVIEW LF-05: the spend write takes no threadpool hop inside its bound ─────────────────
+
+
+async def test_a_spend_row_lands_when_the_threadpool_is_saturated(world, monkeypatch):
+    """``embed_texts`` records usage with ``provider=None``, so ``_write_usage`` resolved the
+    member's settings through ``run_in_threadpool`` on every search. That hop shares anyio's thread
+    limiter with the search's own embed calls; with the limiter full, the hop waited past the bound
+    and the spend row (GUARD-02, billing) was cancelled before its INSERT. ``load_user_settings`` is
+    an in-memory read (``load_app_settings``: no I/O on a hit or a cold cache), so no hop is owed."""
+    import anyio
+    import anyio.to_thread
+
+    import app.mcp.dispatch as dispatch_mod
+    import app.mcp.tools as tools
+    from app.services import usage_sink
+
+    monkeypatch.setattr(dispatch_mod, "BOOKKEEPING_DEADLINE_S", 0.3, raising=False)
+
+    async def embeds(principal, args):
+        usage_sink.record("text-embedding-3-small", 11)  # provider unknown at the embed site
+        return h.text_result("ran")
+
+    monkeypatch.setitem(
+        tools.REGISTERED, "t_embed",
+        replace(h.make_spec("t_embed", embeds, args_model=h.NeedsQuery), bucket="expensive"),
+    )
+    principal = replace(PRINCIPAL, tools=PRINCIPAL.tools + ("t_embed",))
+    limiter = anyio.to_thread.current_default_thread_limiter()
+    borrowers = [object() for _ in range(int(limiter.total_tokens))]
+    for b in borrowers:  # every worker thread is busy (a burst of searches embedding)
+        await limiter.acquire_on_behalf_of(b)
+    try:
+        with anyio.fail_after(5):
+            await _dispatch(world, "t_embed", {"query": QUERY}, principal)
+    finally:
+        for b in borrowers:
+            limiter.release_on_behalf_of(b)
+    assert len(world["usage"]) == 1, "the spend row was lost behind a threadpool hop"
+    assert world["usage"][0]["input_tokens"] == 11
+    assert world["usage"][0]["provider"] != "unknown"
