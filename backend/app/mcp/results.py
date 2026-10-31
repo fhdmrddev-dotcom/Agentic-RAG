@@ -12,7 +12,8 @@ decision was already made by ``services/acting_member_reads`` before a row reach
   by pattern; ids, links, cursors and citations are plain ``str`` and are never rewritten (D-34).
 * **The link** is ``config.primary_frontend_origin() + "/app/library/" + id`` (D-17 / D-52) — the
   one origin, never the configured list of origins.
-* **Cursors** are base64url JSON — ``{v, d, o}`` for a read, ``{v, f, o}`` for a listing —
+* **Cursors** are base64url JSON — ``{v, d, o}`` for a read, ``{v, f, o}`` for a listing, plus
+  ``fo`` (the next folder) while a listing's folders remain (305-REVIEW WR-06) —
   validated on the way back in (version, the same document or folder, bounds). Anything that does
   not decode cleanly is ``None``, and the caller maps ``None`` to the same refusal as a missing
   document (T-305-18). They are positions, not grants: every call re-authorises the read.
@@ -255,7 +256,7 @@ def _encode(payload: dict) -> str:
     return base64.urlsafe_b64encode(raw).decode().rstrip("=")
 
 
-def _decode(cursor: object, keys: set[str]) -> dict | None:
+def _decode(cursor: object, keys: set[str], optional: frozenset[str] = frozenset()) -> dict | None:
     if not isinstance(cursor, str) or not cursor or len(cursor) > _CURSOR_MAX:
         return None
     if not _B64URL.fullmatch(cursor):
@@ -265,7 +266,9 @@ def _decode(cursor: object, keys: set[str]) -> dict | None:
         payload = json.loads(raw.decode("utf-8"))
     except (binascii.Error, ValueError, UnicodeDecodeError):
         return None
-    if not isinstance(payload, dict) or set(payload) != keys or payload.get("v") != 1:
+    if not isinstance(payload, dict) or not (keys <= set(payload) <= keys | optional):
+        return None
+    if payload.get("v") != 1:
         return None
     if isinstance(payload["v"], bool):
         return None
@@ -301,14 +304,21 @@ def decode_read_cursor(cursor: object, document_id: str, length: int) -> int | N
     return _offset(payload["o"], int(length))
 
 
-def encode_list_cursor(folder_id: str | None, offset: int) -> str:
-    return _encode({"v": 1, "f": _norm_id(folder_id) if folder_id is not None else None, "o": int(offset)})
+def encode_list_cursor(folder_id: str | None, offset: int, folder_offset: int | None = None) -> str:
+    """305-REVIEW WR-06: ``fo`` is the next folder to show, present only while folders remain; a
+    cursor without it means every folder was already shown (so a listing of at most
+    ``SUBFOLDER_CAP`` folders keeps the 305-02 cursor byte for byte)."""
+    payload: dict = {"v": 1, "f": _norm_id(folder_id) if folder_id is not None else None, "o": int(offset)}
+    if folder_offset is not None:
+        payload["fo"] = int(folder_offset)
+    return _encode(payload)
 
 
-def decode_list_cursor(cursor: object, folder_id: str | None) -> int | None:
-    """The document offset a listing cursor carries, or ``None`` unless it is for THIS folder (or
-    the top level when ``folder_id`` is ``None``)."""
-    payload = _decode(cursor, {"v", "f", "o"})
+def decode_list_position(cursor: object, folder_id: str | None) -> tuple[int, int | None] | None:
+    """``(document offset, folder offset)`` of a listing cursor — the folder offset ``None`` once
+    every folder was shown — or ``None`` unless it is for THIS folder (or the top level when
+    ``folder_id`` is ``None``) and both offsets are in bounds."""
+    payload = _decode(cursor, {"v", "f", "o"}, frozenset({"fo"}))
     if payload is None:
         return None
     want = _norm_id(folder_id) if folder_id is not None else None
@@ -318,7 +328,20 @@ def decode_list_cursor(cursor: object, folder_id: str | None) -> int | None:
             return None
     elif _norm_id(got) != want:
         return None
-    return _offset(payload["o"], 1_000_000)
+    offset = _offset(payload["o"], 1_000_000)
+    if offset is None:
+        return None
+    if "fo" not in payload:
+        return offset, None
+    folder_offset = _offset(payload["fo"], 1_000_000)
+    return None if folder_offset is None else (offset, folder_offset)
+
+
+def decode_list_cursor(cursor: object, folder_id: str | None) -> int | None:
+    """The document offset a listing cursor carries, or ``None`` unless it is for THIS folder (or
+    the top level when ``folder_id`` is ``None``)."""
+    position = decode_list_position(cursor, folder_id)
+    return None if position is None else position[0]
 
 
 # ── the read chunker ────────────────────────────────────────────────────────────────────────

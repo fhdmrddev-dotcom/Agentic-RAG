@@ -13,8 +13,9 @@ rendering (``dispatch`` does the rendering).
   ``limit`` (D-51); twice ``limit`` when the key leaves connector-fed documents out, because the
   reads drop those rows AFTER ranking, then trimmed back to ``limit``.
 * ``list_documents`` — the top level is the visible folders whose parent is not visible, plus (for
-  an all-folders key only) the Root documents; a folder lists its visible subfolders (first page
-  only, capped) then its documents by offset. A folder the key cannot see is the SAME empty page
+  an all-folders key only) the Root documents; a folder lists its visible subfolders then its
+  documents. Folders page ``SUBFOLDER_CAP`` at a time and documents by offset, through the one
+  cursor, so no folder past the 100th is dropped (305-REVIEW WR-06). A folder the key cannot see is the SAME empty page
   as an empty folder. A cursor that does not belong to this listing is refused before visibility
   is consulted, so the refusal says nothing about the folder.
 * ``read_document`` — one bounded chunk per call. Missing, forbidden, other-org, out-of-scope,
@@ -77,12 +78,12 @@ async def list_documents(principal: Any, args: R.ListArgs) -> R.ListResult | str
     folder_id = None
     if args.folder_id is not None:
         folder_id = _uuid_or_none(args.folder_id)
-    offset = 0
+    offset, folder_offset = 0, 0
     if args.cursor is not None:
-        decoded = R.decode_list_cursor(args.cursor, folder_id if args.folder_id is not None else None)
+        decoded = R.decode_list_position(args.cursor, folder_id if args.folder_id is not None else None)
         if decoded is None:
             return BAD_CURSOR_SENTENCE
-        offset = decoded
+        offset, folder_offset = decoded  # folder_offset None: every folder was already shown
     empty = R.ListResult(folders=[], documents=[], next_cursor=None)
     if args.folder_id is not None and folder_id is None:
         return empty  # a malformed folder id: the same page as an empty folder
@@ -107,9 +108,22 @@ async def list_documents(principal: Any, args: R.ListArgs) -> R.ListResult | str
         page = await reads.list_documents(principal, limit=args.limit, offset=offset, folder_id=folder_id)
         documents, total = page["items"], page["total"]
 
-    shown_folders = folders[: R.SUBFOLDER_CAP] if offset == 0 else []
+    # 305-REVIEW WR-06: folders page through the same cursor, SUBFOLDER_CAP at a time, alongside
+    # the document pages; the listing ends only when both are exhausted.
+    if folder_offset is None:
+        shown_folders: list[dict] = []
+        next_folder = None
+    else:
+        shown_folders = folders[folder_offset:folder_offset + R.SUBFOLDER_CAP]
+        next_folder = folder_offset + R.SUBFOLDER_CAP
+        if next_folder >= len(folders):
+            next_folder = None
     end = offset + len(documents)
-    next_cursor = R.encode_list_cursor(folder_id, end) if documents and end < total else None
+    more_documents = bool(documents) and end < total
+    next_cursor = (
+        R.encode_list_cursor(folder_id, end, next_folder)
+        if more_documents or next_folder is not None else None
+    )
     return R.ListResult(
         folders=[_folder_entry(f) for f in shown_folders],
         documents=[_document_entry(d) for d in documents],
