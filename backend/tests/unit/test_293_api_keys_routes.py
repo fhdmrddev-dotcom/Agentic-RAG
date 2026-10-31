@@ -380,7 +380,8 @@ def test_list_matches_the_contract_and_never_carries_secret_or_digest(client, st
     assert _paths(body) == _paths(CONTRACT["ApiKeyList"])
     assert "secret" not in _all_keys(body)
     assert "key_hash" not in _all_keys(body)
-    assert body["limits"] == {"starts_per_minute": 7, "reads_per_minute": 90}
+    # 305-03 (D-54): the AI tool keys' searches limit rides beside the two 293 limits.
+    assert body["limits"] == {"starts_per_minute": 7, "reads_per_minute": 90, "searches_per_minute": 30}
     (call,) = body["keys"][0]["calls"]
     assert call["verb"] == "start" and call["ok"] is True
     assert call["workflow_name"] == "Contract review"
@@ -392,6 +393,36 @@ def test_a_refused_call_reads_as_not_ok_with_its_reason(client, store):
     _seed_call(store, key_id, action="api_key.refused", call="read", reason="over_limit")
     (call,) = client.get("/api-keys").json()["keys"][0]["calls"]
     assert call == {**call, "verb": "read", "ok": False, "reason": "over_limit"}
+
+
+# ── 305-03 (D-53 / Pitfall 7 / T-305-28): an MCP call that was not answered never reads as OK ──
+
+
+def _mcp_row(action, **md):
+    return {"action_type": action, "created_at": datetime.now(timezone.utc),
+            "metadata": {"api_key_id": "k", "api_key_label": "Laptop", "call": "read", **md}}
+
+
+@pytest.mark.parametrize("action,md,ok", [
+    ("api_key.read", {"kind": "mcp", "tool": "search_knowledge_base", "outcome": "ok"}, True),
+    ("api_key.read", {"kind": "mcp", "tool": "read_document"}, True),
+    ("api_key.read", {"kind": "mcp", "tool": "read_document", "outcome": "redaction_blocked"}, False),
+    ("api_key.read", {"kind": "mcp", "tool": "list_documents", "outcome": "error"}, False),
+    ("api_key.read", {"kind": "mcp", "tool": "list_documents", "outcome": "something_new"}, False),
+    ("api_key.refused", {"kind": "mcp", "tool": "search_knowledge_base",
+                         "outcome": "refused", "reason": "rate_limited:expensive"}, False),
+    # a workflow key's status read (no kind) stays OK whatever its outcome says (unchanged 293 rule)
+    ("api_key.read", {"outcome": "running"}, True),
+])
+def test_call_from_audit_ok_is_one_rule(action, md, ok):
+    call = route._call_from_audit(_mcp_row(action, **md), {})
+    assert call.ok is ok
+
+
+def test_call_from_audit_carries_the_tool():
+    call = route._call_from_audit(_mcp_row("api_key.read", kind="mcp", tool="list_documents", outcome="ok"), {})
+    assert call.tool == "list_documents"
+    assert route._call_from_audit(_mcp_row("api_key.read"), {}).tool is None
 
 
 def test_list_shows_only_the_callers_keys(client, store):
