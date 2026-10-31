@@ -36,9 +36,9 @@ import json
 import re
 import uuid
 from dataclasses import dataclass
-from typing import Annotated, Literal
+from typing import Annotated, Any, Literal
 
-from pydantic import BaseModel, ConfigDict, Field, PrivateAttr
+from pydantic import BaseModel, ConfigDict, Field, PrivateAttr, WithJsonSchema
 
 import app.config as _config
 
@@ -224,6 +224,102 @@ _ASK_END = {
 }
 
 
+# ── the workflow tools (306-05; D-10..D-13) ─────────────────────────────────────────────────
+
+# The inputs are the declared launch fields, as text (``validate_inbound_inputs`` refuses anything
+# else with 293's own sentences). The bound here is a backstop above 293's 50-field cap, so 293's
+# sentence (not a schema error) is what a caller with 51..100 fields reads.
+RUN_INPUTS_MAX = 100
+_RunInputs = Annotated[
+    dict[str, Any],
+    WithJsonSchema({"type": "object", "additionalProperties": {"type": "string"},
+                    "maxProperties": RUN_INPUTS_MAX}),
+]
+
+
+class ListWorkflowsArgs(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+
+class RunWorkflowArgs(BaseModel):
+    """306-05 (D-11): a workflow id, its declared inputs as text, an optional idempotency key, and
+    NOTHING else: no model, no provider (the owner's resolved model runs it)."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    workflow_id: str = Field(min_length=1, max_length=64, description="A workflow_id from list_workflows.")
+    inputs: _RunInputs = Field(
+        default_factory=dict, max_length=RUN_INPUTS_MAX,
+        description="The workflow's inputs by key, as text. list_workflows names them.",
+    )
+    idempotency_key: str | None = Field(
+        default=None, pattern=r"^[A-Za-z0-9_.:-]{1,128}$",
+        description="Send the same key again to get the same run instead of starting a new one.",
+    )
+
+
+class GetRunArgs(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    run_id: str = Field(min_length=1, max_length=64, description="The run id run_workflow returned.")
+
+
+class WorkflowInput(BaseModel):
+    key: str
+    required: bool
+
+
+class WorkflowEntry(BaseModel):
+    workflow_id: str
+    name: RedactableText
+    version: int | None = None
+    inputs: list[WorkflowInput] = Field(default_factory=list)
+
+
+class WorkflowList(BaseModel):
+    workflows: list[WorkflowEntry]
+
+
+class RunStarted(BaseModel):
+    run_id: str
+    name: RedactableText
+    link: str
+    note: str | None = None
+
+
+RunStatus = Literal["running", "waiting", "completed", "failed", "stopped"]
+
+
+class RunRead(BaseModel):
+    run_id: str
+    status: RunStatus
+    step_index: int | None = None
+    step_count: int | None = None
+    step_name: RedactableText | None = None
+    waiting_on: RedactableText | None = None
+    output: RedactableText | None = None
+    files: list[RedactableText] = Field(default_factory=list)
+    end_reason: str | None = None
+    link: str
+
+
+# UI-SPEC §Surface 4 (list_workflows / run_workflow / get_workflow_run), verbatim. ``{link}`` is
+# the run's /app/runs/<id> address, never a one-time file link (Pitfall 13).
+WORKFLOWS_HEAD = "{n} workflow(s) this key can run."
+WORKFLOWS_NONE = "No published workflows are available to this key."
+INPUTS_NONE = "Inputs: none"
+RUN_STARTED_SENTENCE = "Started {name}. Run id: {run_id}. Check it with get_workflow_run."
+RUN_OPEN_LINE = "Open in Syrel: {link}"
+RUN_RUNNING_STEP = "Running · step {i} of {n}: {step}."
+RUN_RUNNING = "Running."
+RUN_WAITING = "Waiting on {who}. It can only be answered in Syrel: {link}"
+RUN_COMPLETED = "Completed."
+RUN_FILES = "Files: {names}. Download them in Syrel: {link}"
+RUN_FAILED_REASON = "Failed: {reason}."
+RUN_FAILED = "Failed."
+RUN_STOPPED = "Stopped."
+
+
 # ── the redaction overlap window (305-04; D-56 / Pitfall 8) ─────────────────────────────────
 
 REDACTION_WINDOW = 128
@@ -253,6 +349,11 @@ def window_of(model: BaseModel) -> dict[str, tuple[str, str]] | None:
 def doc_link(document_id: str) -> str:
     """The "Open in Syrel" address of a document (D-17 / D-52)."""
     return _config.primary_frontend_origin().rstrip("/") + "/app/library/" + str(document_id)
+
+
+def run_link(run_id: str) -> str:
+    """306-05: the "Open in Syrel" address of a workflow run (``/app/runs/<id>``, 297's route)."""
+    return _config.primary_frontend_origin().rstrip("/") + "/app/runs/" + str(run_id)
 
 
 def origin_of(row: dict) -> Origin:
@@ -566,6 +667,53 @@ def _render_ask(result: AskResult) -> str:
     return f"{result.note}\n\n{body}" if result.note else body
 
 
+def _render_workflows(result: WorkflowList) -> str:
+    if not result.workflows:
+        return WORKFLOWS_NONE
+    lines = [WORKFLOWS_HEAD.format(n=len(result.workflows))]
+    for i, w in enumerate(result.workflows, start=1):
+        version = f" (v{w.version})" if w.version is not None else ""
+        inputs = ", ".join(f"{f.key} (required)" if f.required else f.key for f in w.inputs)
+        lines += [
+            "",
+            f"[{i}] {_neutralise(w.name)}{version}",
+            f"workflow_id: {w.workflow_id}",
+            f"Inputs: {inputs}" if inputs else INPUTS_NONE,
+        ]
+    return "\n".join(lines)
+
+
+def _render_started(result: RunStarted) -> str:
+    body = "\n".join([
+        RUN_STARTED_SENTENCE.format(name=_neutralise(result.name), run_id=result.run_id),
+        RUN_OPEN_LINE.format(link=result.link),
+    ])
+    return f"{result.note}\n\n{body}" if result.note else body
+
+
+def _render_run(result: RunRead) -> str:
+    link = result.link
+    if result.status == "running":
+        if result.step_index is not None and result.step_count and result.step_name:
+            return RUN_RUNNING_STEP.format(i=result.step_index, n=result.step_count,
+                                           step=_neutralise(result.step_name))
+        return RUN_RUNNING
+    if result.status == "waiting":
+        return RUN_WAITING.format(who=_neutralise(result.waiting_on or ""), link=link)
+    if result.status == "completed":
+        parts = [RUN_COMPLETED]
+        if result.output:
+            parts.append(result.output)
+        if result.files:
+            parts.append(RUN_FILES.format(names=", ".join(_neutralise(f) for f in result.files), link=link))
+        return "\n\n".join(parts)
+    if result.status == "failed":
+        reason = (result.end_reason or "").strip().rstrip(".")
+        head = RUN_FAILED_REASON.format(reason=reason) if reason else RUN_FAILED
+        return f"{head}\n{RUN_OPEN_LINE.format(link=link)}"
+    return f"{RUN_STOPPED}\n{RUN_OPEN_LINE.format(link=link)}"
+
+
 def render(model: BaseModel) -> str:
     """The text block a client that ignores ``structuredContent`` reads — derived from the model
     (305-04 redacts the model first, so the text can never carry what the structure withheld)."""
@@ -577,4 +725,10 @@ def render(model: BaseModel) -> str:
         return _render_read(model)
     if isinstance(model, AskResult):
         return _render_ask(model)
+    if isinstance(model, WorkflowList):
+        return _render_workflows(model)
+    if isinstance(model, RunStarted):
+        return _render_started(model)
+    if isinstance(model, RunRead):
+        return _render_run(model)
     raise TypeError(f"no rendering for {type(model).__name__}")

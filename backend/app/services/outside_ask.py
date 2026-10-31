@@ -120,10 +120,10 @@ def _as_uuid(value: Any) -> uuid.UUID:
 # ── 1. the scope ──────────────────────────────────────────────────────────────────────────────
 
 
-async def ask_scope(principal: Any) -> tuple[str, ...] | AskScopeRefusal:
-    """The folder ids an ask may read, or the refusal (D-29 / D-30)."""
-    if not principal.include_external:
-        return AskScopeRefusal("ask_needs_external", ASK_NEEDS_EXTERNAL_SENTENCE)
+async def _compose(principal: Any) -> tuple[tuple[str, ...] | None, list[dict]]:
+    """The key's composed folder scope on the ACTING connection, and the folders it was composed
+    from. ONE composition: ``ask_scope`` and ``composed_folder_ids`` (306-05's workflow narrowing)
+    both read through here."""
     async with acting_member_connection(user_id=principal.user_id, org_id=principal.org_id) as conn:
         folders = await list_acting_folders(conn)
     scope = compose_key_scope(
@@ -132,8 +132,22 @@ async def ask_scope(principal: Any) -> tuple[str, ...] | AskScopeRefusal:
         tools=principal.tools,
         visible_folders=folders,
     )
-    if scope.folder_ids is not None:
-        effective = tuple(scope.folder_ids)
+    return scope.folder_ids, folders
+
+
+async def composed_folder_ids(principal: Any) -> tuple[str, ...] | None:
+    """306-05 (D-10): the key's composed folder ids (every visible folder at or under the ones it
+    ticked), or ``None`` when the key is not narrowed by folder."""
+    return (await _compose(principal))[0]
+
+
+async def ask_scope(principal: Any) -> tuple[str, ...] | AskScopeRefusal:
+    """The folder ids an ask may read, or the refusal (D-29 / D-30)."""
+    if not principal.include_external:
+        return AskScopeRefusal("ask_needs_external", ASK_NEEDS_EXTERNAL_SENTENCE)
+    narrowed, folders = await _compose(principal)
+    if narrowed is not None:
+        effective = tuple(narrowed)
     else:
         effective = tuple(str(f["id"]) for f in folders if f.get("id") is not None)
     if not effective:

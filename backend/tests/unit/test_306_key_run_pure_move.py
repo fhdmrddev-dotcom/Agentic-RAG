@@ -90,7 +90,12 @@ _START_CALLS = (
 )
 
 # name -> why it is no longer compared. EMPTY in 306-01: a pure move changes nothing on purpose.
-RETIRED: dict[str, str] = {}
+RETIRED: dict[str, str] = {
+    # 306-05 (D-12 / Pitfall 13): the MCP file arm. ``base=None`` returns file NAMES and mints no
+    # one-time link (``/inbound/files`` serves key-origin runs only); the base-given path is the
+    # moved body unchanged, and the 293 file-link suites still pin it.
+    "_file_links": "306-05 adds the files_base=None MCP arm (names only, no link)",
+}
 
 
 def _blob_at_base(rel_path: str) -> str:

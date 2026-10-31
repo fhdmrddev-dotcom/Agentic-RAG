@@ -46,8 +46,13 @@ NOTE = "The notes, written by the phase."
 
 
 def _definition(slug: str, name: str, phases: list[dict], *, folder: str) -> dict:
+    # One declared launch field: a key cannot send a typed task (293-IN-06, ``needs_task``).
     return {"slug": slug, "version": 1, "name": name, "status": "published", "phases": phases,
-            "project_folder_id": folder}
+            "project_folder_id": folder,
+            "inputs": [{"key": "topic", "label": "Topic", "type": "text", "required": True}]}
+
+
+TOPIC = {"topic": "quarterly notes"}
 
 
 def _agent_phase(folder: str) -> dict:
@@ -87,6 +92,12 @@ async def wf(ask, monkeypatch):
         return None
 
     monkeypatch.setattr(entitlement_service, "enforce_entitlement", _entitled)
+    # The launch and the drive build their service-role client lazily from app.dependencies: point
+    # it at the local stack, as the ask fixture does for outside_ask.
+    import app.dependencies as deps
+    from tests.integration._271_gotrue_users import _admin
+
+    monkeypatch.setattr(deps, "get_service_role_supabase", lambda org_id=None: _admin())
     monkeypatch.setattr(run_tools, "get_redis", lambda: s.redis)
     state = SimpleNamespace(s=s, w=w, ids=ids)
     try:
@@ -158,7 +169,7 @@ async def test_run_workflow_returns_at_once_and_the_phase_tool_still_runs(wf, mo
 
         loop = asyncio.get_running_loop()
         t = loop.time()
-        started = await mcp.tool("run_workflow", {"workflow_id": wf.ids["agent"]})
+        started = await mcp.tool("run_workflow", {"workflow_id": wf.ids["agent"], "inputs": TOPIC})
         elapsed = loop.time() - t
         assert not started.is_error, started.text
         run_id = started.structured["run_id"]
@@ -173,7 +184,7 @@ async def test_run_workflow_returns_at_once_and_the_phase_tool_still_runs(wf, mo
             " t.origin_label AS t_label FROM public.workflow_runs r JOIN public.threads t ON t.id = r.thread_id"
             " WHERE r.id = $1", UUID(run_id))
         key_id = await wf.w.pool.fetchval(
-            "SELECT id FROM public.api_keys WHERE user_id = $1 AND tools @> ARRAY['run_workflow']"
+            "SELECT id FROM public.api_keys WHERE user_id = $1 AND folder_ids IS NOT NULL"
             " ORDER BY created_at LIMIT 1", UUID(wf.w.u))
         assert row["origin_kind"] == "mcp" and row["origin_ref"] == key_id
         assert row["t_kind"] == "mcp" and row["t_ref"] == key_id and row["t_label"]
@@ -214,7 +225,7 @@ async def test_an_input_step_reads_waiting_on_a_person(wf, monkeypatch):
     monkeypatch.setattr("app.services.provider_gateway.open_stream", _Script([_text("unused")]))
     secret = await _mint(wf)
     async with mcp_session(monkeypatch, secret) as mcp:
-        started = await mcp.tool("run_workflow", {"workflow_id": wf.ids["input"]})
+        started = await mcp.tool("run_workflow", {"workflow_id": wf.ids["input"], "inputs": TOPIC})
         assert not started.is_error, started.text
         run_id = started.structured["run_id"]
         text = ""
@@ -239,7 +250,7 @@ async def test_maintenance_refuses_the_start_and_the_reads_keep_answering(wf, mo
     secret = await _mint(wf)
     async with mcp_session(monkeypatch, secret) as mcp:
         monkeypatch.setattr(dispatch_mod._maintenance, "_read_maintenance", lambda: True)
-        refused = await mcp.tool("run_workflow", {"workflow_id": wf.ids["agent"]})
+        refused = await mcp.tool("run_workflow", {"workflow_id": wf.ids["agent"], "inputs": TOPIC})
         assert "error" in refused.body and dispatch_mod.MAINTENANCE_SENTENCE in json.dumps(refused.body)
         listed = await mcp.tool("list_workflows", {})
         assert not listed.is_error, listed.text
@@ -251,12 +262,13 @@ async def test_maintenance_refuses_the_start_and_the_reads_keep_answering(wf, mo
 
 async def test_a_key_narrowed_to_another_folder_neither_lists_nor_starts_it(wf, monkeypatch):
     monkeypatch.setattr("app.services.provider_gateway.open_stream", _Script([_text("unused")]))
-    secret = await _mint(wf, folders=(wf.w.f,))
+    elsewhere = await wf.w.folder(wf.w.u, wf.w.x, "elsewhere")  # a sibling of F, outside F2
+    secret = await _mint(wf, folders=(elsewhere,))
     async with mcp_session(monkeypatch, secret) as mcp:
         listed = await mcp.tool("list_workflows", {})
         ids = [w["workflow_id"] for w in (listed.structured or {}).get("workflows", [])]
         assert wf.ids["agent"] not in ids and wf.ids["input"] not in ids
-        refused = await mcp.tool("run_workflow", {"workflow_id": wf.ids["agent"]})
+        refused = await mcp.tool("run_workflow", {"workflow_id": wf.ids["agent"], "inputs": TOPIC})
         assert refused.is_error and refused.text == run_tools.NO_WORKFLOW_SENTENCE
     n = await wf.w.pool.fetchval("SELECT count(*) FROM public.workflow_runs WHERE user_id = $1", UUID(wf.w.u))
     assert n == 0
