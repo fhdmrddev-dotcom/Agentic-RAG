@@ -49,7 +49,7 @@ describe("304-05 McpOffNotice", () => {
   it("admin: names the org", () => {
     const { rerender } = render(<McpOffNotice scope="org" variant="admin" orgName="Acme" />)
     expect(screen.getByTestId("mcp-off-notice")).toHaveTextContent(
-      "MCP access is switched off for Acme. Every member's AI tool key is refused until you switch it back on in the Settings tab.",
+      "MCP access is switched off for Acme. Every member's AI tool key and connected app is refused until you switch it back on in the Settings tab.", // 307-04 (D-21)
     )
     rerender(<McpOffNotice scope="org" variant="admin" />)
     expect(screen.getByTestId("mcp-off-notice")).toHaveTextContent("MCP access is switched off for this organisation.")

@@ -11,9 +11,13 @@
  * left to research or did not write are marked `304-05 authored`, in the house voice:
  *   · the per-client placement and reload sentences (`stepPlace.*`, `stepReload.*`), written from
  *     each client's own docs as read in 304-RESEARCH §"Client snippets (D-27)";
- *   · the Claude Desktop env step and the bridge-version line (D-45);
  *   · the words for the three 304 refusal reasons in the activity rows;
  *   · `offTileDeployment`, `sheetNFolders`, `orgFallback`.
+ *
+ * Phase 307-04 (D-29, D-52, D-21; 307-UI-SPEC §"Changed strings"): the fourth tab connects Claude.ai
+ * and Claude Desktop by sign-in (menu names from Claude's own connector docs, 307-RESEARCH F-6, which
+ * govern over the UI-SPEC draft's "open Settings"); the bridge's strings are removed; the switch
+ * sentences name connected apps, because a switch also stops every grant.
  */
 
 export const MCP_KEY_COPY = {
@@ -98,38 +102,46 @@ export const MCP_KEY_COPY = {
       claudeCode: "Claude Code",
       cursor: "Cursor",
       vscode: "VS Code",
-      desktop: "Claude Desktop",
+      // 307-04 (D-29): the tab covers both, by sign-in.
+      desktop: "Claude.ai and Desktop",
     },
-    workaroundChip: "Workaround",
-    desktopLead:
-      "A developer workaround until Claude Desktop connects with sign-in. It needs Node.js and runs a small bridge on your computer.",
     stepEnv: "Put the secret in an environment variable named {env}.",
-    /** 304-05 authored: Claude Desktop's config does not read the host environment (304-RESEARCH). */
-    stepEnvDesktop:
-      "Claude Desktop can't read environment variables, so the secret goes in its config file, in place of the placeholder below. Keep that file private.",
-    /** 304-05 authored, from each client's own docs (304-RESEARCH §Client snippets). */
+    /** 304-05 authored, from each client's own docs (304-RESEARCH §Client snippets). 307-04: the
+     *  desktop step uses Claude's verified menu names (307-RESEARCH F-6, D-52). */
     stepPlace: {
       claudeCode: "Add this to .mcp.json in your project's folder, or run the command under it from that folder.",
       cursor: "Add this to .cursor/mcp.json in your project, or to ~/.cursor/mcp.json for every project.",
       vscode: "Add this to .vscode/mcp.json in your workspace.",
-      desktop: "Add this to claude_desktop_config.json (Settings, Developer, Edit Config).",
+      desktop: "In Claude.ai or Claude Desktop, open Customize, then Connectors, and choose Add custom connector.",
+    },
+    /** 307-04 (D-29): the Claude.ai and Desktop tab's second step, above the address block. */
+    stepPaste: {
+      desktop: "Paste this address as the connector's URL.",
     },
     stepReload: {
       claudeCode: "Start Claude Code again in that folder, approve the syrel server when it asks, then run /mcp to check it is connected.",
       cursor: "Restart Cursor, then check that syrel is switched on in Cursor's MCP settings.",
       vscode: "Click Start above syrel in mcp.json, or open a chat in agent mode and let VS Code start it.",
-      desktop: "Quit Claude Desktop fully and open it again.",
+      desktop: "Click Add, then Connect. Sign in to Syrel and choose what Claude can use. No key is needed.",
     },
+    /** 307-04 (D-52, F-6 confirmed): on Team/Enterprise only an owner adds a custom connector. */
+    desktopPlanNote:
+      "On a Team or Enterprise plan, an owner adds the connector for the whole Claude organisation first, then you choose Connect.",
+    /** 307-04 (D-29, D-52): the Claude Code tab's sign-in alternative, after its three steps. */
+    claudeCodeSignIn:
+      "Or skip the key: add the address without a header, then run /mcp in Claude Code and choose to sign in.",
     /** 304-05 authored: the Claude Code terminal alternative's header. */
     cliHeading: "Or add it from the terminal, in your project's folder",
-    /** 304-05 authored (D-45): shown on the Desktop tab only if the bridge version is not pinned. */
-    desktopUnverified:
-      "The bridge's version couldn't be checked, so no version is pinned. Check the mcp-remote package before you run it.",
     copySetup: "Copy the {client} setup",
     /** 304-05 authored: the Claude Code terminal form's Copy button. */
     copyCli: "Copy the {client} command",
+    /** 307-04: the Claude Code sign-in command's Copy button. */
+    copyCommandAria: "Copy the {client} sign-in command",
+    /** 307-04: the Claude.ai and Desktop address block's Copy button. */
+    copyAddressAria: "Copy the connector address",
+    // 307-04 (UI-SPEC): the old "will connect with sign-in" is now true; tense fixed.
     claudeAiWarning:
-      "⚠ Don't paste this key into Claude.ai's organisation connector settings. Everyone in that Claude organisation would act as you. Claude.ai and Claude Desktop will connect with sign-in instead.",
+      "⚠ Don't paste this key into Claude.ai's organisation connector settings. Everyone in that Claude organisation would act as you. Claude.ai and Claude Desktop connect by signing in instead, with no key.",
     // 305 D-49: production refuses an unset, loopback or http base (mcp_public_base), so "set it" means https.
     noAddress:
       "This deployment doesn't have a public https address for AI tools yet, so the connection address can't be shown. Ask your operator to set it.",
@@ -151,8 +163,9 @@ export const MCP_KEY_COPY = {
     offTileDeployment: "MCP access is switched off for this deployment by the operator.",
     /** 304-REVIEW WR-02: the server could not read the switches (`mcp_off: "unknown"`) — every variant. */
     offUnknown: "Couldn't check whether AI tool access is on. Reload to try again.",
+    // 307-04 (D-21): the switch also stops connected apps.
     offAdmin:
-      "MCP access is switched off for {org}. Every member's AI tool key is refused until you switch it back on in the Settings tab.",
+      "MCP access is switched off for {org}. Every member's AI tool key and connected app is refused until you switch it back on in the Settings tab.",
 
     sheetFact: "Can use {tools} on {folders}",
     sheetFactExternal: " and mail & synced sources",
@@ -162,12 +175,14 @@ export const MCP_KEY_COPY = {
       "Revoking can't be undone. Any AI tool using this key stops working on its next call; a replacement is a new key with a new secret.",
 
     orgSwitchTitle: "AI tool access (MCP)",
-    // 306-05 (UI-SPEC §Copywriting): reworded now that a key can ask and run.
+    // 306-05 (UI-SPEC §Copywriting): reworded now that a key can ask and run. 307-04 (D-21): members
+    // can also connect by signing in; 306's ask/run capability words are kept (a grant can carry them).
     orgSwitchSub:
-      "Members can make personal keys that let Claude Code, Cursor or VS Code search, ask the agent and run workflows as them in {org}.",
+      "Members can let Claude.ai, Claude Desktop, Claude Code, Cursor or VS Code search, ask the agent and run workflows as them in {org}, with a personal key or by signing in.",
     orgSwitchOffTag: "off for {org}",
+    // 307-04 (D-21): the switch also stops connected apps.
     orgSwitchImpact:
-      "Every member's AI tool key in {org} is refused on its next call. Keys are kept; switching back on restores them.",
+      "Every member's AI tool key and connected app in {org} is refused on its next call. They are kept; switching back on restores them.",
     orgSwitchFailed: "Couldn't change it. Try again.",
     orgSwitchLoading: "Loading…",
     orgSwitchLoadFailed: "Couldn't load this setting.",

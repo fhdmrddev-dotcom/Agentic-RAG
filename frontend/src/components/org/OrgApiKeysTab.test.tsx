@@ -137,7 +137,7 @@ describe("293-04 OrgApiKeysTab", () => {
 // ── Phase 304-06 (KEY-06, D-02; UI-SPEC Surface 2) — both kinds, one list, the admin's off notice ──
 const MCP_KEY = makeMcpKey({ id: "priya-mcp", label: "claude-code-laptop", owner_name: "Priya Shah", owner_is_you: false })
 const OFF_SENTENCE =
-  "MCP access is switched off for Acme Inc. Every member's AI tool key is refused until you switch it back on in the Settings tab."
+  "MCP access is switched off for Acme Inc. Every member's AI tool key and connected app is refused until you switch it back on in the Settings tab." // 307-04 (D-21)
 
 describe("304-06 OrgApiKeysTab — AI tool keys in the admin list", () => {
   it("lists both kinds with their kind chips and the same revoke, with preset names from the catalogue", async () => {

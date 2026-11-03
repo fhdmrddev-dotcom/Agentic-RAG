@@ -11,7 +11,14 @@
 
 type HostHas = { type: string; value: string }
 export type VercelRule = { source: string; destination: string; has?: HostHas[]; permanent?: boolean }
-export type VercelConfig = { redirects?: VercelRule[]; rewrites?: VercelRule[]; cleanUrls?: boolean }
+// Phase 307-04 (P-5): Vercel `headers` entries — the consent route's anti-framing headers.
+export type VercelHeaderRule = { source: string; has?: HostHas[]; headers: { key: string; value: string }[] }
+export type VercelConfig = {
+  redirects?: VercelRule[]
+  rewrites?: VercelRule[]
+  headers?: VercelHeaderRule[]
+  cleanUrls?: boolean
+}
 
 // The static output a `vite build` produces (the three entries + emitted docs assets).
 export const FILESYSTEM = new Set([
@@ -29,7 +36,7 @@ export function sourceRegex(source: string): RegExp {
   return new RegExp("^" + source + "$")
 }
 
-function hostMatches(rule: VercelRule, host: string): boolean {
+function hostMatches(rule: { has?: HostHas[] }, host: string): boolean {
   if (!rule.has) return true
   return rule.has.every((h) => h.type !== "host" || new RegExp("^(?:" + h.value + ")$").test(host))
 }
@@ -54,6 +61,21 @@ export function resolveVercel(config: VercelConfig, host: string, pathname: stri
 }
 
 /**
+ * Phase 307-04 (P-5): the response headers Vercel attaches to a path — every `headers` entry whose
+ * source (same pattern logic as rewrites) and host `has` rule match, merged in array order (a later
+ * entry's key wins, as on Vercel). Kept apart from `resolveVercel` so its outcome shape — which the
+ * 297 parity rows and the 276 docs rows compare with `toEqual` — is unchanged.
+ */
+export function vercelHeadersFor(config: VercelConfig, host: string, pathname: string): Record<string, string> {
+  const out: Record<string, string> = {}
+  for (const r of config.headers ?? []) {
+    if (!sourceRegex(r.source).test(pathname) || !hostMatches(r, host)) continue
+    for (const h of r.headers) out[h.key] = h.value
+  }
+  return out
+}
+
+/**
  * Where the first matching redirect actually sends the browser: `$N` from the source's groups and
  * `:name` from the host `has` rule's named groups substituted, the way Vercel substitutes them.
  * `null` when no redirect matches.
@@ -75,36 +97,97 @@ export function followVercelRedirect(config: VercelConfig, host: string, pathnam
 }
 
 /**
- * The document nginx serves for a path, from the conf TEXT.
+ * Phase 307-04 (P-5) — what nginx DOES for a path, from the conf TEXT:
+ * - `try_files`: the document served (`target`) and the response headers it carries;
+ * - `proxy`: `proxy_pass` to `target`, with `rewrite` lines recorded so a test can pin "no rewrite";
+ * - `return`: `return <code>` (and `=404` when no location matches at all).
  *
  * Precedence (nginx docs): an exact `location = /x` match wins; otherwise the longest matching
- * prefix. ⛔ This file has no regex locations, and the evaluator does not model them — so a regex
+ * prefix (`^~` only additionally stops the regex search, and there are no regex locations).
+ * ⛔ This file has no regex locations, and the evaluator does not model them — so a regex
  * (`~` / `~*`) location THROWS rather than being ignored, and a future one reds the parity suite
- * instead of being silently mis-evaluated. Blocks with no `try_files` (the `/api/` proxy) are
- * skipped. `try_files` is evaluated against FILESYSTEM: route paths are never files, so for every
- * app address the answer is the last argument (the fallback).
+ * instead of being silently mis-evaluated.
+ *
+ * `try_files` is evaluated against FILESYSTEM. ⚠ F-10 is MODELLED, not assumed: when no candidate
+ * is a file and the last argument is a URI, nginx makes an INTERNAL REDIRECT to it and re-matches
+ * locations — so the original location's `add_header` lines are LOST. Only a document served in the
+ * matched location itself (e.g. `try_files /app.html =404`) keeps that location's headers.
  */
-export function resolveNginx(confText: string, pathname: string): string {
-  const path = pathname.split("?")[0]
+export type NginxOutcome =
+  | { kind: "try_files"; target: string; headers: Record<string, string>; location: string }
+  | { kind: "proxy"; target: string; rewrites: string[]; headers: Record<string, string>; location: string }
+  | { kind: "return"; target: string; headers: Record<string, string>; location: string | null }
+
+type NginxLocation = {
+  modifier: string | undefined
+  loc: string
+  tryFiles: string[] | null
+  proxyPass: string | null
+  returnCode: string | null
+  rewrites: string[]
+  headers: Record<string, string>
+}
+
+function parseNginxLocations(confText: string): NginxLocation[] {
+  // Strip comments, but not a `#` inside a quoted add_header value (none today — kept simple).
   const text = confText.replace(/#[^\n]*/g, "")
-  const exact: { loc: string; args: string[] }[] = []
-  const prefix: { loc: string; args: string[] }[] = []
+  const out: NginxLocation[] = []
   const locationRe = /location\s+(?:(=|\^~|~\*|~)\s*)?(\S+)\s*\{([^}]*)\}/g
   for (const m of text.matchAll(locationRe)) {
     const [, modifier, loc, body] = m
     if (modifier === "~" || modifier === "~*") throw new Error(`nginx evaluator: regex location "${modifier} ${loc}" is not modelled`)
-    const tryFiles = /try_files\s+([^;]+);/.exec(body)
-    if (!tryFiles) continue
-    const entry = { loc, args: tryFiles[1].trim().split(/\s+/) }
-    if (modifier === "=") exact.push(entry)
-    else prefix.push(entry)
+    const headers: Record<string, string> = {}
+    for (const h of body.matchAll(/add_header\s+(\S+)\s+(?:"([^"]*)"|'([^']*)'|([^\s;]+))(?:\s+always)?\s*;/g)) {
+      headers[h[1]] = h[2] ?? h[3] ?? h[4] ?? ""
+    }
+    out.push({
+      modifier,
+      loc,
+      tryFiles: /try_files\s+([^;]+);/.exec(body)?.[1].trim().split(/\s+/) ?? null,
+      proxyPass: /proxy_pass\s+([^;]+);/.exec(body)?.[1].trim() ?? null,
+      returnCode: /(?:^|\s)return\s+([^;]+);/.exec(body)?.[1].trim() ?? null,
+      rewrites: [...body.matchAll(/rewrite\s+([^;]+);/g)].map((r) => r[1].trim()),
+      headers,
+    })
   }
+  return out
+}
+
+export function resolveNginxLocation(confText: string, pathname: string, depth = 0): NginxOutcome {
+  if (depth > 5) throw new Error("nginx evaluator: internal redirect loop")
+  const path = pathname.split("?")[0]
+  // A block that does nothing the evaluator models (no try_files / proxy_pass / return) is skipped.
+  const locations = parseNginxLocations(confText).filter((l) => l.tryFiles || l.proxyPass || l.returnCode)
   const hit =
-    exact.find((e) => e.loc === path) ??
-    prefix.filter((e) => path.startsWith(e.loc)).sort((a, b) => b.loc.length - a.loc.length)[0]
-  if (!hit) return "=404"
-  const candidates = hit.args.slice(0, -1).map((a) => a.split("$uri").join(path))
-  return candidates.find((c) => FILESYSTEM.has(c)) ?? hit.args[hit.args.length - 1]
+    locations.find((l) => l.modifier === "=" && l.loc === path) ??
+    locations
+      .filter((l) => l.modifier !== "=" && path.startsWith(l.loc))
+      .sort((a, b) => b.loc.length - a.loc.length)[0]
+  if (!hit) return { kind: "return", target: "404", headers: {}, location: null }
+  if (hit.returnCode) return { kind: "return", target: hit.returnCode, headers: hit.headers, location: hit.loc }
+  if (hit.proxyPass) {
+    return { kind: "proxy", target: hit.proxyPass, rewrites: hit.rewrites, headers: hit.headers, location: hit.loc }
+  }
+  const args = hit.tryFiles as string[]
+  const candidates = args.slice(0, -1).map((a) => a.split("$uri").join(path))
+  const served = candidates.find((c) => FILESYSTEM.has(c))
+  if (served) return { kind: "try_files", target: served, headers: hit.headers, location: hit.loc }
+  const fallback = args[args.length - 1]
+  if (fallback.startsWith("=")) return { kind: "return", target: fallback.slice(1), headers: hit.headers, location: hit.loc }
+  // Internal redirect: re-matched from the top, the original location's headers are gone (F-10).
+  return resolveNginxLocation(confText, fallback, depth + 1)
+}
+
+/**
+ * The document nginx serves for a path, as one string — the projection the 297 parity rows use:
+ * the served file for `try_files`, `=<code>` for a `return` (and for no match), `proxy:<upstream>`
+ * for a proxy. Every pre-307 caller asserts on a served file, which is unchanged.
+ */
+export function resolveNginx(confText: string, pathname: string): string {
+  const outcome = resolveNginxLocation(confText, pathname)
+  if (outcome.kind === "try_files") return outcome.target
+  if (outcome.kind === "proxy") return "proxy:" + outcome.target
+  return "=" + outcome.target
 }
 
 /**

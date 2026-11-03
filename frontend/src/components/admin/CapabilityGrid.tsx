@@ -106,8 +106,8 @@ const CAPABILITIES: ReadonlyArray<CapabilityDef> = [
   {
     key: "mcp_enabled",
     label: "AI tool access (MCP)",
-    sub: "Members can connect AI tools with personal keys.",
-    fallbackImpact: "Every AI tool key is refused on its next call, in every organisation. Keys are kept.",
+    sub: "Members can connect AI tools with personal keys or by signing in.",
+    fallbackImpact: "Every AI tool key and connected app is refused on its next call, in every organisation. They are kept.",
   },
 ]
 
