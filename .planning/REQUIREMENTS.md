@@ -34,9 +34,9 @@ Decided at intake (operator, 2026-10-30):
 - [ ] **MCP-01**: A member can connect Claude Code or Cursor to one stable MCP URL with their key and see the tool list. It works across both backend workers, on local, cloud and the one-box install. — `SEED-013`, `SEED-177`
 - [ ] **MCP-02**: `search_knowledge_base` returns ranked passages with document title, citation and an "open in Syrel" link, and marks connector-fed content as external.
 - [ ] **MCP-03**: `list_documents` and `read_document` page through folders and documents and return a document's text in bounded chunks. A missing document and a forbidden one get the same refusal.
-- [ ] **MCP-04**: `ask_agent` returns an answer with citations and confidence, using read-only tools only (no sandbox, web search, connector writes, memory or skill saves). If it is not done within the wait budget (a setting, about 30 s by default), it returns a handle that `get_answer` reads later; a retry with the same idempotency key returns the same run.
-- [ ] **MCP-05**: An MCP ask appears in the member's thread history, marked as started from MCP.
-- [ ] **MCP-06**: `list_workflows` lists what the key may run; `run_workflow` returns a run id at once; `get_workflow_run` returns status and result. A paused run shows "waiting on <person>" with a link and is never answered over MCP. A key reads only the runs it started, and a workflow whose scope lies outside a narrowed key is refused.
+- [x] **MCP-04**: `ask_agent` returns an answer with citations and confidence, using read-only tools only (no sandbox, web search, connector writes, memory or skill saves). If it is not done within the wait budget (a setting, about 30 s by default), it returns a handle that `get_answer` reads later; a retry with the same idempotency key returns the same run.
+- [x] **MCP-05**: An MCP ask appears in the member's thread history, marked as started from MCP.
+- [x] **MCP-06**: `list_workflows` lists what the key may run; `run_workflow` returns a run id at once; `get_workflow_run` returns status and result. A paused run shows "waiting on <person>" with a link and is never answered over MCP. A key reads only the runs it started, and a workflow whose scope lies outside a narrowed key is refused.
 - [ ] **MCP-07**: Every tool is labelled read-only or not, and errors come back as tool errors with a plain sentence. In maintenance mode reads still work and starts are refused.
 
 ### OAuth sign-in for Claude.ai and Claude Desktop (OAUTH)
@@ -57,7 +57,7 @@ Decided at intake (operator, 2026-10-30):
 
 ### Guardrails for outside traffic (GUARD)
 
-- [ ] **GUARD-01**: Outside starts (MCP ask and run, and `/inbound`) are admitted under per-org, per-credential and per-provider limits. When full, the caller gets a plain "try again in N s", and in-app users are not slowed. — `SEED-081`
+- [x] **GUARD-01**: Outside starts (MCP ask and run, and `/inbound`) are admitted under per-org, per-credential and per-provider limits. When full, the caller gets a plain "try again in N s", and in-app users are not slowed. — `SEED-081`
 - [ ] **GUARD-02**: MCP usage, including search-only calls, appears in operator spend attributed to the org and the key.
 - [ ] **GUARD-03**: An org admin can turn on PII redaction for MCP results and webhook payloads (off by default). When on, it masks emails, phone numbers, card numbers, IBANs and secrets without breaking citations or ids, and blocks rather than sends unredacted on failure. Names are not covered. — `SEED-079`
 
@@ -109,9 +109,9 @@ Decided at intake (operator, 2026-10-30):
 | MCP-01 | Phase 305 | Pending |
 | MCP-02 | Phase 305 | Pending |
 | MCP-03 | Phase 305 | Pending |
-| MCP-04 | Phase 306 | Pending |
-| MCP-05 | Phase 306 | Pending |
-| MCP-06 | Phase 306 | Pending |
+| MCP-04 | Phase 306 | Complete |
+| MCP-05 | Phase 306 | Complete |
+| MCP-06 | Phase 306 | Complete |
 | MCP-07 | Phase 305 | Pending |
 | OAUTH-04 | Phase 307 | Pending |
 | OAUTH-05 | Phase 307 | Pending |
@@ -123,7 +123,7 @@ Decided at intake (operator, 2026-10-30):
 | HOOK-04 | Phase 308 | Pending |
 | HOOK-05 | Phase 308 | Pending |
 | HOOK-06 | Phase 308 | Pending |
-| GUARD-01 | Phase 306 | Pending |
+| GUARD-01 | Phase 306 | Complete |
 | GUARD-02 | Phase 305 | Pending |
 | GUARD-03 | Phase 305 | Pending |
 | FIX-15 | Phase 303 | Pending |

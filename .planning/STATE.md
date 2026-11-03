@@ -2,15 +2,16 @@
 gsd_state_version: 1.0
 milestone: v4.9
 milestone_name: Use It From Your Own Tools
-status: executing
-last_updated: "2026-10-31T18:59:04.388Z"
+status: ready_to_plan
+last_updated: 2026-11-03T13:59:23.092Z
 last_activity: 2026-10-31 -- Phase 306 execution started
 progress:
   total_phases: 14
   completed_phases: 2
   total_plans: 15
-  completed_plans: 10
+  completed_plans: 15
   percent: 14
+stopped_at: Phase 306 complete (5/5) — ready to discuss Phase 307
 ---
 
 # Project State
@@ -30,7 +31,7 @@ See: `.planning/PROJECT.md` (updated 2026-10-30)
 
 **Core value:** The agent acts as an AI colleague — it knows your knowledge base, can run code, and
 can be taught new behaviours (skills) that persist and can be shared.
-**Current focus:** Phase 306 — ask-the-agent-and-run-workflows
+**Current focus:** Phase 307 — sign in from claude.ai and claude desktop
 
 ---
 
@@ -44,10 +45,10 @@ reviewer exists, so a phase closes `verification_mode: self-verified`, never `re
 ## Current Position
 
 Milestone: v4.9 Use It From Your Own Tools
-Phase: 306 (ask-the-agent-and-run-workflows) — EXECUTING
-Plan: 5 of 5 (all merged)
-Status: Phase 306 executed — verification gaps CR-01/CR-02 fixed by quick 261101-4y9; re-verification pending
-Last activity: 2026-11-01 - Completed quick task 261101-4y9: fix 306 CR-01 and CR-02 with a test each
+Phase: 307
+Plan: Not started
+Status: Ready to plan
+Last activity: 2026-11-03
 
 Phases start at **303**; migrations at **220**. Seeds taken in at intake: SEED-013, SEED-177, SEED-195, SEED-081, SEED-079; bug BUG-261022-01.
 
@@ -76,6 +77,7 @@ link. Branch `develop`. Tags `v4.7` and `v4.8` pushed 2026-10-30.
 - **BUG-261031-01 — reproduce on a disposable Postgres:** a role-`anon` call to `current_user_org_ids()` crashed the local Postgres into recovery mode twice (should be "permission denied"). Production: anon has no EXECUTE, same PG 17.6, no crash lines in 24 h of logs. If the anon REST path reproduces it, it is an unauthenticated DB crash. Never drive it against production.
 - **304 cloud paste — before 304+305 deploy:** paste migrations 220 then 221 into cloud Supabase (per-action approval each), then `get_advisors(security)`. 221 also closes BUG-261030-03 (anon/authenticated DELETE/TRUNCATE/TRIGGER/REFERENCES on `organizations`) in production.
 - **305 before the 304+305 deploy:** paste mig **222** after 220 and 221 (per-action approval each), then `get_advisors(security)`; Coolify `BACKEND_PUBLIC_URL` = the https public address (else `/mcp` refuses to mount); Coolify stop grace > 5 s (20 s recommended, sse-starlette 3.0.3); SEED-397 / AR-01 (per-address limit sees the proxy) — **ACCEPTED by the operator 2026-10-31**; re-open before a paying org uses MCP.
+- **306 closed by decision 2026-11-03 — 5 live UAT rows OWED** (`306-HUMAN-UAT.md`): run **row 5 first** (narrowed key: cap pause → in-app Continue → `get_answer` reads `answered_in_app`), then the 8-row roster (`scripts/uat-306-ask-roster.py`), the burst + Redis-down drill (`scripts/burst-306-outside-starts.py`, re-measure D-35 defaults), G-4 (MCP mark, waiting-on link), real-client wait budget. Before deploy: cloud mig **223** after 220→221→222 (per-action approval), `get_advisors(security)`, `/gsd:secure-phase 306`. Carried: 306-REVIEW WR-01..06 (top: WR-05 spend-by-key over-counts in-app follow-ups) + persist ask folder scope on the thread.
 - **305 client rows (D-43):** Cursor; one `claude` CLI search against the deployed cloud `/mcp`; the one-box; Claude Desktop via the `mcp-remote` bridge.
 - **Local leftovers (305):** MCP test key `g4-305-claude-code` (org 22f9c615, expires 7 Nov); chats "Stream works confirmation reply" and "ACME MSA payment terms search".
 - ~~**304 D-41 — confirm before 304+305 deploy**~~ **CONFIRMED by the operator 2026-10-31** ("accept … D-41"): MCP keys need no tier capability.
