@@ -28,7 +28,7 @@ from tests.integration import _307_live as o
 
 @pytest.fixture(scope="module")
 def server():
-    with live.serve(workers=1) as srv:
+    with o.serve(workers=1) as srv:
         yield srv
 
 

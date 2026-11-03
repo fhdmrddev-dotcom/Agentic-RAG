@@ -192,6 +192,7 @@ export const MCP_KEY_COPY = {
   calls: {
     wrongKind: "this kind of key can't make this call",
     wrongResource: "this sign-in was made for a different Syrel address",
+    refreshReuse: "an old sign-in token was used again, so this connection was ended to keep it safe",
     mcpOffOrg: "MCP access is switched off for this organisation",
     mcpOffDeployment: "MCP access is switched off for this deployment",
     // 305-03 (UI-SPEC §Copywriting): one row per MCP call (D-53).

@@ -75,6 +75,12 @@ def register_mcp(app) -> None:
     app.router.routes.append(Route(
         "/oauth/authorize", endpoint=oauth_server.authorize, methods=["GET"], include_in_schema=False,
     ))
+    app.router.routes.append(Route(
+        "/oauth/token", endpoint=oauth_server.token, methods=["POST"], include_in_schema=False,
+    ))
+    app.router.routes.append(Route(
+        "/oauth/revoke", endpoint=oauth_server.revoke, methods=["POST"], include_in_schema=False,
+    ))
     # Phase 307 (D-22): the one 401 names this base's protected-resource document.
     edge.configure_challenge(oauth_metadata.prm_url())
     access_log.install()

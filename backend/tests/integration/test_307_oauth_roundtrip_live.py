@@ -29,7 +29,7 @@ from tests.integration import _307_live as o
 
 @pytest.fixture(scope="module")
 def server():
-    with live.serve(workers=1) as srv:
+    with o.serve(workers=1) as srv:
         yield srv
 
 
@@ -135,7 +135,7 @@ async def test_the_whole_spec_round_trip(server, pg_pool):
         rows = await gw.w.audit_rows()
         reuse_rows = [r for r in rows if r["action_type"] == "api_key.refused"
                       and (r["metadata"] or {}).get("reason") == "refresh_reuse"]
-        assert len(reuse_rows) == 1, rows
+        assert len(reuse_rows) == 1, [(r["action_type"], (r["metadata"] or {}).get("reason")) for r in rows]
         assert reuse_rows[0]["metadata"]["detail"]["credential"] == "oauth"
 
         # 5 · a second sign-in, revoked through /oauth/revoke: the next /mcp call is 401

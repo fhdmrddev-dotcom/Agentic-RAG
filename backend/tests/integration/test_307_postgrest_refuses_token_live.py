@@ -21,7 +21,7 @@ from tests.integration._271_gotrue_users import _local_env, require_gotrue
 
 @pytest.fixture(scope="module")
 def server():
-    with live.serve(workers=1) as srv:
+    with o.serve(workers=1) as srv:
         yield srv
 
 

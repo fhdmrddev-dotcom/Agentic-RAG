@@ -38,6 +38,39 @@ VERIFIER = "dBjftJeZ4CVP-mB92K27uhbUJU1p1r_wW1gFWFOEjXk"           # RFC 7636 ap
 CHALLENGE = "E9Melhoa2OwvFrEMTJguCHaoeK1t8URWbuGJSstw-cM"          # its S256 (307-01 SUMMARY)
 
 
+@contextlib.contextmanager
+def serve(*, workers: int = 1):
+    """``_305_live.serve`` with the LOCAL Supabase URL and keys in the spawned server's env.
+
+    ⚠ MEASURED (307-02): ``tests/conftest.py`` puts placeholder ``SUPABASE_URL`` /
+    ``SUPABASE_SERVICE_ROLE_KEY`` into ``os.environ`` before any app import, and ``_305_live.serve``
+    copies ``os.environ`` into the spawned uvicorn — so every supabase-py write the server makes
+    (``api_key_auth.audit_key_call_now`` among them) goes to a host that does not exist and is
+    swallowed by ``write_audit_entry``. The asyncpg paths are unaffected (``SUPABASE_DB_URL``),
+    which is why ``api_key.read`` rows appeared and ``api_key.refused`` rows never did. The env
+    is set only while the process is spawned; the test process's own settings are unchanged.
+    """
+    import os
+
+    from tests.integration._271_gotrue_users import _local_env, require_gotrue
+
+    require_gotrue()
+    real = _local_env()
+    saved = {k: os.environ.get(k) for k in real}
+    stack = contextlib.ExitStack()
+    try:
+        os.environ.update(real)
+        server = stack.enter_context(live.serve(workers=workers))
+    finally:
+        for k, v in saved.items():
+            if v is None:
+                os.environ.pop(k, None)
+            else:
+                os.environ[k] = v
+    with stack:
+        yield server
+
+
 def s256(verifier: str) -> str:
     return base64.urlsafe_b64encode(hashlib.sha256(verifier.encode()).digest()).rstrip(b"=").decode()
 
