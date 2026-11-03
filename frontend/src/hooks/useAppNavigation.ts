@@ -154,8 +154,9 @@ export function useAppNavigation(): AppNavigation {
     [location.pathname, location.search],
   )
   const addressNotFound = parsed.view === "not-found"
+  // 307-03: the consent address is not a view (App renders it before the shell), so it reads as chat.
   const activeView: ActiveView =
-    parsed.view === "not-found" || parsed.view === "pre-auth" ? "chat" : parsed.view
+    parsed.view === "not-found" || parsed.view === "pre-auth" || parsed.view === "connect" ? "chat" : parsed.view
   const runId = parsed.view === "workflow-run" ? parsed.runId : null
   const studioSkillId = parsed.view === "skill-studio" ? parsed.skillId : null
   // Phase 299-02 (D-02): the thread on screen (`/app/chat/<id>`); `null` on the chat home and off chat.

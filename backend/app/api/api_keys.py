@@ -88,13 +88,19 @@ from app.models.api_key import (
 from app.models.user_settings import load_app_settings_async
 from app.security.acting_member import acting_member_connection
 from app.security.api_key_auth import audit_key_call, mint_key
-from app.security.principal_liveness import MCP_OFF_DEPLOYMENT_SENTENCE, MCP_OFF_ORG_SENTENCE
 from app.services.acting_member_reads import list_acting_folders
 from app.services.audit_service import write_audit_entry
 from app.services.entitlement_service import enforce_entitlement
 from app.services.inbound_inputs import declared_fields, needs_file_upload, needs_typed_task
 from app.services.key_scope import EXTERNAL_SQL
-from app.services.mcp_tool_catalogue import MCP_TOOLS, mcp_url, normalise_tool_selection
+from app.services.mcp_narrowing import (
+    _FOLDER_NOT_VISIBLE,  # noqa: F401 — re-exported, the same object (307-03 move fence)
+    MCP_STATE_UNKNOWN_SENTENCE,  # noqa: F401 — re-exported, the same object
+    NarrowingRefusal,
+    mcp_off,
+    validate_mcp_narrowing,
+)
+from app.services.mcp_tool_catalogue import MCP_TOOLS, mcp_url
 from app.services.sources.mail.mailbox import FOLDER_PREFIX, MAIL_MIME, MAIL_ROOT_ID
 
 logger = logging.getLogger(__name__)
@@ -106,8 +112,9 @@ _NOT_FOUND = "API key not found."
 _CALL_WINDOW = timedelta(days=30)
 _CALLS_PER_KEY = 50
 
-# Phase 304 — a foreign, a deleted and an unknown folder all read this one sentence (T-304-28).
-_FOLDER_NOT_VISIBLE = "One of the picked folders can't be found, or you can't see it."
+# Phase 304 — a foreign, a deleted and an unknown folder all read ``_FOLDER_NOT_VISIBLE`` (T-304-28).
+# 307-03: it moved to ``services/mcp_narrowing.py`` with the checks that say it; the name imported
+# above is the SAME object (``test_307_narrowing_move``).
 
 # The catalogue as served to the client, in catalogue order (D-11; never retyped there).
 _MCP_CATALOGUE = [
@@ -132,22 +139,9 @@ _SOURCE_HINT_SQL = (
 
 _UNREAD = object()   # ``_serialize_keys``: the switches have not been read yet
 
-# 304-REVIEW WR-02: the switches could not be read (a failed read, or no organisations row).
-# Said in place of a switch's sentence, so the screen never names an off switch nobody read.
-MCP_STATE_UNKNOWN_SENTENCE = "Couldn't check whether AI tool access is on. Reload to try again."
-
-
-def _mcp_off(switches: dict | None) -> str | None:
-    """Which MCP switch is off — the deployment's wins (D-30), the order
-    ``principal_still_allowed`` uses too. Anything not read as ``True`` is off (fail closed).
-    No switch state at all (``None``) is ``"unknown"`` (WR-02): still off, but naming no switch."""
-    if switches is None:
-        return "unknown"
-    if switches.get("deploy_on") is not True:
-        return "deployment"
-    if switches.get("org_on") is not True:
-        return "org"
-    return None
+# 304-REVIEW WR-02 (``MCP_STATE_UNKNOWN_SENTENCE``) and the switch order (``_mcp_off``) moved to
+# ``services/mcp_narrowing.py`` in 307-03; both names here are the SAME objects, re-exported.
+_mcp_off = mcp_off
 
 
 async def _read_switches(pool: asyncpg.Pool, org: UUID) -> dict | None:
@@ -451,6 +445,13 @@ async def create_key(
     )
 
 
+async def _visible_folder_ids(user_id: str, org_id: str) -> set[str]:
+    """The member's visible folder ids in ``org_id`` through THIS module's acting seams (the ones
+    ``list_pickable_folders`` uses), handed to ``validate_mcp_narrowing`` (307-03)."""
+    async with acting_member_connection(user_id=user_id, org_id=org_id) as conn:
+        return {f["id"] for f in await list_acting_folders(conn)}
+
+
 async def _create_mcp_key(
     body: McpKeyCreateBody,
     background_tasks: BackgroundTasks,
@@ -459,27 +460,17 @@ async def _create_mcp_key(
     org: UUID,
     pool: asyncpg.Pool,
 ) -> ApiKeyCreated:
-    """KEY-01/03/04/05: refuse before minting — switches (403), tools and folders (422)."""
-    switches = await api_keys_db.mcp_switches(pool, org)   # live, never the settings cache
-    off = _mcp_off(switches)
-    if off == "unknown":   # no organisations row: refuse (fail closed) without naming a switch
-        raise HTTPException(status_code=403, detail=MCP_STATE_UNKNOWN_SENTENCE)
-    if off == "deployment":
-        raise HTTPException(status_code=403, detail=MCP_OFF_DEPLOYMENT_SENTENCE)
-    if off == "org":
-        raise HTTPException(status_code=403, detail=MCP_OFF_ORG_SENTENCE)
+    """KEY-01/03/04/05: refuse before minting — switches (403), tools and folders (422).
 
-    selection = normalise_tool_selection(body.tools)
-    if selection.refusal is not None or selection.tools is None:
-        raise HTTPException(status_code=422, detail=selection.refusal)
-
-    folder_ids: list[str] | None = None
-    if body.folder_ids is not None:
-        async with acting_member_connection(user_id=str(caller), org_id=str(org)) as conn:
-            visible = {f["id"] for f in await list_acting_folders(conn)}
-        folder_ids = [str(f) for f in body.folder_ids]
-        if any(f not in visible for f in folder_ids):
-            raise HTTPException(status_code=422, detail=_FOLDER_NOT_VISIBLE)
+    307-03 (D-13 / T-307-25): the checks live in ``services/mcp_narrowing.py``, which the consent
+    approve calls too; a refusal is raised here with the SAME status and sentence as before."""
+    verdict = await validate_mcp_narrowing(
+        pool, caller=caller, org=org, tools=body.tools, folder_ids=body.folder_ids,
+        visible_folders=_visible_folder_ids,
+    )
+    if isinstance(verdict, NarrowingRefusal):
+        raise HTTPException(status_code=verdict.status, detail=verdict.detail)
+    switches, folder_ids = verdict.switches, verdict.folder_ids
 
     minted = mint_key(kind="mcp")
     expires_at = datetime.now(timezone.utc) + timedelta(days=body.expires_in_days)
@@ -495,7 +486,7 @@ async def _create_mcp_key(
             expires_at=expires_at,
             kind="mcp",
             folder_ids=folder_ids,
-            tools=list(selection.tools),
+            tools=list(verdict.tools),
             include_external=body.include_external,
         )
     except api_keys_db.DuplicateKeyLabel:

@@ -13,7 +13,7 @@
  *
  * Controlled (`value` / `onChange`), so the draft card keeps these choices across a switch of kind.
  */
-import { useId, useRef, type KeyboardEvent } from "react"
+import { Fragment, useId, useRef, type KeyboardEvent, type ReactNode } from "react"
 
 import { Button } from "@/components/ui/button"
 import { cn } from "@/lib/utils"
@@ -91,7 +91,13 @@ export function McpKeyFields({
   onRetryFolders,
   value,
   onChange,
+  variant = "draft",
 }: {
+  /** 307-03 (D-13, UI-SPEC A-6): `"consent"` is the consent page's use — no Organisation row (the page
+   *  has its own org field), no Expires row (a grant's lifetime is the server's) and no acts-as note
+   *  (the page's summary sentence says it), every label stacked above its control. `"draft"` (the
+   *  default) is the 304 key draft, byte for byte. */
+  variant?: "draft" | "consent"
   orgName: string | null
   /** The server's catalogue (`list.mcp.tools`); null while it is not known. */
   catalogue: readonly McpToolRef[] | null
@@ -110,6 +116,9 @@ export function McpKeyFields({
   // 306-05 (D-29): the ask group's lead, read from the server's catalogue (D-11: no name retyped).
   const askLead = catalogue?.find((t) => t.group === "ask" && !t.travels_with)?.name
   const askNeedsExternal = !!askLead && tools.includes(askLead) && !value.external
+  const consent = variant === "consent"
+  // The draft renders a Fragment (its 304 DOM, byte for byte); the consent page a stacking container.
+  const Wrap = consent ? ConsentStack : Fragment
 
   function toggleTool(name: string) {
     if (!catalogue) return
@@ -125,18 +134,20 @@ export function McpKeyFields({
   }
 
   return (
-    <>
-      <div className="grid gap-1 md:grid-cols-[128px_1fr] md:gap-4">
-        <span id={ids.org} className="text-sm">
-          {M.orgField}
-        </span>
-        <div>
-          <b data-testid="mcp-org" className="text-sm font-semibold">
-            {org}
-          </b>
-          <p className="mt-1 text-xs text-muted-foreground">{M.orgHint}</p>
+    <Wrap>
+      {!consent && (
+        <div className="grid gap-1 md:grid-cols-[128px_1fr] md:gap-4">
+          <span id={ids.org} className="text-sm">
+            {M.orgField}
+          </span>
+          <div>
+            <b data-testid="mcp-org" className="text-sm font-semibold">
+              {org}
+            </b>
+            <p className="mt-1 text-xs text-muted-foreground">{M.orgHint}</p>
+          </div>
         </div>
-      </div>
+      )}
 
       <div className="grid gap-1 md:grid-cols-[128px_1fr] md:gap-4">
         <span id={ids.tools} className="pt-1.5 text-sm">
@@ -249,27 +260,42 @@ export function McpKeyFields({
         </label>
       </div>
 
-      <div className="grid gap-1 md:grid-cols-[128px_1fr] md:gap-4">
-        <span id={ids.exp} className="pt-1.5 text-sm">
-          {API_KEYS_COPY.draft.expiresField}
-        </span>
-        <div>
-          <Segments
-            labelledBy={ids.exp}
-            options={MCP_EXPIRIES}
-            value={value.expiry}
-            label={(e) => API_KEYS_COPY.draft.expiresOptions[e]}
-            onChange={(expiry) => onChange({ ...value, expiry })}
-          />
-          <p className="mt-1 text-xs text-muted-foreground">{M.expiresHint}</p>
+      {!consent && (
+        <div className="grid gap-1 md:grid-cols-[128px_1fr] md:gap-4">
+          <span id={ids.exp} className="pt-1.5 text-sm">
+            {API_KEYS_COPY.draft.expiresField}
+          </span>
+          <div>
+            <Segments
+              labelledBy={ids.exp}
+              options={MCP_EXPIRIES}
+              value={value.expiry}
+              label={(e) => API_KEYS_COPY.draft.expiresOptions[e]}
+              onChange={(expiry) => onChange({ ...value, expiry })}
+            />
+            <p className="mt-1 text-xs text-muted-foreground">{M.expiresHint}</p>
+          </div>
         </div>
-      </div>
+      )}
 
-      <p data-testid="mcp-acts-as" className="border-l-[3px] border-primary bg-muted/40 px-3 py-2 text-xs text-muted-foreground">
-        {M.actsLead}
-        <b className="font-semibold text-foreground">{M.actsBold}</b>
-        {fillCopy(M.actsTail, { org })}
-      </p>
-    </>
+      {!consent && (
+        <p data-testid="mcp-acts-as" className="border-l-[3px] border-primary bg-muted/40 px-3 py-2 text-xs text-muted-foreground">
+          {M.actsLead}
+          <b className="font-semibold text-foreground">{M.actsBold}</b>
+          {fillCopy(M.actsTail, { org })}
+        </p>
+      )}
+    </Wrap>
+  )
+}
+
+/** 307-03: the consent variant's container. Every row is a direct `div` child, so the one
+ *  `md:[&>div]:grid-cols-1` override stacks each row's label above its control — the rows (and
+ *  `KeyFoldersField`) keep their 304 classes untouched. */
+function ConsentStack({ children }: { children: ReactNode }) {
+  return (
+    <div data-variant="consent" className="grid gap-4 [&>div]:gap-2 md:[&>div]:grid-cols-1">
+      {children}
+    </div>
   )
 }

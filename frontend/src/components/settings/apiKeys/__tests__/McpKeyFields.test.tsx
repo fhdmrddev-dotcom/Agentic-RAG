@@ -21,17 +21,22 @@ function Harness({
   onRetryCatalogue = () => {},
   folders = [makeFolder({ id: "m", name: "Mailbox", source: "mail" }), makeFolder({ id: "p", name: "Projects" })],
   initial = MCP_DRAFT_DEFAULT,
+  variant,
 }: {
   catalogue?: McpToolRef[] | null
   catalogueFailed?: boolean
   onRetryCatalogue?: () => void
   folders?: PickableFolder[] | null
   initial?: McpDraft
+  variant?: "draft" | "consent"
 }) {
   const [value, setValue] = useState<McpDraft>(initial)
+  // 307-03: `variant` is passed only when a test names it, so the default render is the 304 call.
+  const variantProp = variant ? { variant } : {}
   return (
     <>
       <McpKeyFields
+        {...variantProp}
         orgName="Acme"
         catalogue={catalogue}
         catalogueFailed={catalogueFailed}
@@ -170,5 +175,52 @@ describe("304-05 McpKeyFields — the external tick owns connector-fed folders (
     await user.click(external)
     expect(draft().folderIds).toEqual([])
     expect(screen.getByRole("checkbox", { name: /Mailbox/ })).toBeDisabled()
+  })
+})
+
+// ── 307-03 (D-13, UI-SPEC §G-5 mount budget): ONE optional prop, `variant` ───────────────────────
+
+/** React's useId values depend on how many components mounted earlier in the file: normalise them. */
+// React 19.2 writes `_r_3c_`; older formats were `:r3c:` and `«r3c»`.
+const normaliseIds = (html: string) => html.replace(/[«:_]r_?[0-9a-z]+[»:_]/g, "«id»")
+
+describe("307-03 McpKeyFields — variant", () => {
+  it("the default variant renders byte-identical DOM to before 307 (snapshot taken at the RED commit)", () => {
+    const a = render(<Harness />)
+    expect(normaliseIds(a.container.innerHTML)).toMatchSnapshot("default, All folders")
+    a.unmount()
+    const b = render(<Harness initial={{ ...MCP_DRAFT_DEFAULT, folderMode: "only", external: true }} catalogue={null} />)
+    expect(normaliseIds(b.container.innerHTML)).toMatchSnapshot("Only these folders, catalogue loading")
+  })
+
+  it("variant='draft' is the default, byte for byte", () => {
+    const a = render(<Harness />)
+    const before = normaliseIds(a.container.innerHTML)
+    a.unmount()
+    const b = render(<Harness variant="draft" />)
+    expect(normaliseIds(b.container.innerHTML)).toBe(before)
+  })
+
+  it("variant='consent' hides the Organisation row, the Expires row and the acts-as note", () => {
+    render(<Harness variant="consent" />)
+    expect(screen.queryByTestId("mcp-org")).toBeNull()
+    expect(screen.queryByTestId("mcp-acts-as")).toBeNull()
+    expect(screen.queryByRole("radiogroup", { name: "Expires" })).toBeNull()
+    expect(screen.queryByText(/The key acts as you in this organisation only/)).toBeNull()
+    // The tools, the folders and the external tick stay: one vocabulary for keys and apps (A-6).
+    expect(screen.getByRole("radiogroup", { name: "Tools" })).toBeInTheDocument()
+    expect(screen.getByRole("radiogroup", { name: "Folders" })).toBeInTheDocument()
+    expect(screen.getByRole("checkbox", { name: /^Include mail and synced sources/ })).toBeInTheDocument()
+  })
+
+  it("variant='consent' stacks every row's label above its control", () => {
+    const { container } = render(<Harness variant="consent" />)
+    const stack = container.querySelector("[data-variant='consent']")
+    expect(stack).not.toBeNull()
+    expect(stack?.className).toMatch(/md:\[&>div\]:grid-cols-1/)
+    // Every row is a direct child of the stack, so the override reaches each one.
+    const rows = Array.from(stack?.children ?? [])
+    expect(rows.length).toBeGreaterThanOrEqual(3)
+    for (const row of rows) expect(row.tagName).toBe("DIV")
   })
 })

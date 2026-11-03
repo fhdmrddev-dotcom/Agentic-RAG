@@ -6,6 +6,8 @@ import "./index.css"
 import { useAuth } from "./hooks/useAuth"
 import { AuthPage } from "./pages/AuthPage"
 import { AcceptInvitePage } from "./pages/AcceptInvitePage"
+import { ConsentPage } from "./components/connect/ConsentPage"
+import { parseAppLocation } from "./lib/appRoutes"
 import { ChatLayout } from "./components/layout/ChatLayout"
 // Phase 297-01 (REG-09 / D-01): the view/tab state, the studio + Library navigators and the
 // boot initializer moved into this hook verbatim, with their own imports.
@@ -260,6 +262,10 @@ function App() {
   if (!user) {
     return <AuthPage onSignIn={signIn} onSignUp={signUp} />
   }
+
+  // Phase 307-03 (OAUTH-04 / D-11): an AI tool's sign-in request renders outside the app shell.
+  const connect = parseAppLocation(window.location.pathname, window.location.search)
+  if (connect.view === "connect") return <ConsentPage user={user} requestId={connect.requestId} onSignOut={signOut} />
 
   return (
     <OrgProvider userId={user?.id ?? null}>

@@ -110,6 +110,19 @@ async def deployment_mcp_on(pool: asyncpg.Pool) -> bool:
     return value is True
 
 
+async def member_orgs(pool: asyncpg.Pool, user_id: UUID | str) -> list[dict]:
+    """307-03 (D-13): every org the member belongs to, by name, with its MCP switch — the consent
+    page's org list. Display only: approve re-validates membership and the switches live
+    (``api_keys.is_org_member`` + ``mcp_narrowing``). Owner predicate on the member's id."""
+    rows = await pool.fetch(
+        "SELECT o.id, o.name, o.mcp_enabled AS org_on "
+        "FROM public.org_members m JOIN public.organizations o ON o.id = m.org_id "
+        "WHERE m.user_id = $1 ORDER BY o.name, o.id",
+        user_id if isinstance(user_id, UUID) else UUID(str(user_id)),
+    )
+    return [dict(r) for r in rows]
+
+
 # ── clients ──────────────────────────────────────────────────────────────────────────────────
 
 
