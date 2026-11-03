@@ -11,7 +11,7 @@ progress:
   total_plans: 15
   completed_plans: 15
   percent: 14
-stopped_at: Phase 307 planned — 5 plans / 4 waves, checker PASSED after 1 revision, decisions 52/52 — executing (/gsd:execute-phase 307)
+stopped_at: Phase 307 executing — wave 1/4 merged (307-01 mig 224 local + one resolver; 307-04 routing parity + sign-in snippet); next wave 2 (307-02 AS protocol)
 ---
 
 # Project State

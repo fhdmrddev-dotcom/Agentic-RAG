@@ -204,8 +204,8 @@ Plans:
 Plans:
 **Wave 1**
 
-- [ ] 307-01-PLAN.md — mig 224 (oauth_clients, oauth_tokens, api_keys.oauth_client_id, label index without grants, redirect-host allowlist) applied locally; token primitives + db layer incl. refresh rotation / 60 s grace / family revoke; the ONE resolver (key and access token share one admission tail)
-- [ ] 307-04-PLAN.md — routing parity: nginx .well-known proxy + consent anti-framing on all three layers pinned by the 297 suite with negative controls; operator docs (both Anthropic ranges, CIMD probe, mig 224 order, owed rows); Claude.ai and Desktop snippet tab by sign-in (bridge retired)
+- [x] 307-01-PLAN.md — mig 224 (oauth_clients, oauth_tokens, api_keys.oauth_client_id, label index without grants, redirect-host allowlist) applied locally; token primitives + db layer incl. refresh rotation / 60 s grace / family revoke; the ONE resolver (key and access token share one admission tail)
+- [x] 307-04-PLAN.md — routing parity: nginx .well-known proxy + consent anti-framing on all three layers pinned by the 297 suite with negative controls; operator docs (both Anthropic ranges, CIMD probe, mig 224 order, owed rows); Claude.ai and Desktop snippet tab by sign-in (bridge retired)
 
 **Wave 2** *(blocked on Wave 1 completion)*
 
