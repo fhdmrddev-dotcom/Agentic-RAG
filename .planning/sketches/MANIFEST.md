@@ -3025,3 +3025,11 @@ reuses 267-B's event-card shape.
 | # | Name | Design Question | Winner | Tags |
 |---|------|----------------|--------|------|
 | 301 | waiting-on-you | Where the cross-org "waiting on you" badge lives, how a row names its org, mark-read or not (own rail control / on the avatar / on Workflows) | ★ A own rail control (self-picked under autonomous mandate 2026-10-29; operator approval owed at G-4) | phase-301, note-01, note-05, attention, rail |
+
+
+## Sketch 307 — Sign In From Claude.ai and Claude Desktop (Phase 307, G-2 gate)
+
+| # | Name | Design Question | Winner | Tags |
+|---|------|----------------|--------|------|
+| 307 | consent-page | How the consent page names the client (claim) and redirect host (fact), and takes org, tools and folders | ★ A one card ending on the agreed sentence (self-picked under autonomous mandate 2026-11-03; operator approval owed at the real Claude.ai connect) | phase-307, oauth-04, oauth-05, consent |
+| 307 | connected-apps | Where connected apps live, the row, and org-admin Disconnect all | ★ A own section above Keys in the API keys tab; victim-naming sheet for Disconnect all (self-picked 2026-11-03; operator approval owed at G-4) | phase-307, oauth-07, revoke, org-admin |

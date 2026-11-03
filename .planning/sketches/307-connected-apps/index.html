@@ -1,0 +1,165 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Sketch 307 — Connected Apps</title>
+<link rel="stylesheet" href="../themes/default.css">
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Manrope:wght@600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+<style>
+*{box-sizing:border-box}
+body{margin:0;background:var(--color-bg);color:var(--color-text);font-family:var(--font-sans);font-size:var(--text-base)}
+#vnav,#states{display:flex;align-items:center;gap:8px;padding:10px 16px;border-bottom:1px solid var(--color-border);flex-wrap:wrap}
+.lbl{font-family:var(--font-mono);font-size:var(--text-xs);color:var(--color-text-dim);margin-right:6px}
+.vtab,.stab{background:transparent;border:1px solid var(--color-border);color:var(--color-text-muted);font-size:var(--text-xs);padding:6px 12px;border-radius:999px;cursor:pointer;font-family:inherit}
+.vtab.active{background:var(--color-primary-dim);border-color:var(--color-primary);color:var(--color-primary)}
+.stab.active{background:var(--color-accent);color:var(--color-text)}
+#note{padding:8px 16px;font-size:var(--text-sm);color:var(--color-text-muted);border-bottom:1px solid var(--color-border-soft);line-height:1.5}
+#note b{color:var(--color-text)}
+
+.page{max-width:880px;margin:0 auto;padding:24px 20px 60px;position:relative}
+.band{display:flex;align-items:center;gap:10px;margin-bottom:6px}
+.band h1{font-family:var(--font-headline);font-size:var(--text-xl);margin:0}
+.band.org{border-bottom:2px solid hsl(239 60% 60% / .5);padding-bottom:10px;margin-bottom:14px}
+.orgchip{font-size:var(--text-xs);color:hsl(239 100% 85%);background:hsl(239 60% 40% / .25);border-radius:999px;padding:2px 9px}
+.tabs{display:flex;gap:16px;font-size:var(--text-sm);color:var(--color-text-muted);border-bottom:1px solid var(--color-border);margin-bottom:18px}
+.tabs span{padding:8px 0}
+.tabs .on{color:var(--color-text);border-bottom:2px solid var(--color-primary)}
+.sec{margin-bottom:26px}
+.sec h2{font-size:var(--text-md);margin:0 0 3px;display:flex;align-items:center;gap:8px}
+.sec .sub{font-size:var(--text-sm);color:var(--color-text-muted);margin:0 0 12px;line-height:1.5}
+.cnt{font-family:var(--font-mono);font-size:11px;color:var(--color-text-dim);font-weight:400}
+.btn{background:transparent;border:1px solid var(--color-border);color:var(--color-text);border-radius:8px;padding:7px 13px;font-size:var(--text-sm);cursor:pointer;font-family:inherit;white-space:nowrap}
+.btn:hover{border-color:var(--color-primary)}
+.btn.primary{background:var(--color-primary-strong);border-color:transparent;color:#fff}
+.btn.danger{border-color:hsl(0 70% 60% / .45);color:var(--color-danger)}
+.btn.danger.solid{background:var(--color-danger);color:#fff;border-color:transparent}
+.btn.sm{padding:5px 10px;font-size:var(--text-xs)}
+
+/* app rows */
+.list{border:1px solid var(--color-border);border-radius:12px;overflow:hidden}
+.app{display:grid;grid-template-columns:36px minmax(0,1fr) auto;gap:12px;align-items:center;padding:12px 14px;border-top:1px solid var(--color-border-soft)}
+.app:first-child{border-top:0}
+.mk{width:34px;height:34px;border-radius:9px;display:grid;place-items:center;font-weight:700;font-size:13px}
+.mk.claude{background:#d97757;color:#fff}.mk.local{background:hsl(220 20% 22%);font-family:var(--font-mono);font-size:12px}.mk.unknown{background:var(--color-accent);border:1px dashed var(--color-border);color:var(--color-text-muted)}
+.nm{font-weight:600;font-size:var(--text-sm);display:flex;align-items:center;gap:6px;flex-wrap:wrap}
+.claim{font-weight:400;color:var(--color-text-dim);font-size:var(--text-xs)}
+.host{font-family:var(--font-mono);font-size:11px;color:var(--color-text-muted);background:hsl(220 30% 11% / .6);border:1px solid var(--color-border);border-radius:5px;padding:1px 6px}
+.meta{font-size:var(--text-xs);color:var(--color-text-muted);margin-top:3px;line-height:1.5}
+.meta b{color:var(--color-text);font-weight:500}
+.chip{font-size:10px;border-radius:999px;padding:2px 8px;font-weight:500}
+.chip.app{background:hsl(262 60% 50% / .2);color:hsl(262 90% 82%)}
+.chip.mcp{background:var(--color-primary-dim);color:var(--color-primary)}
+.chip.wf{background:var(--color-accent);color:var(--color-text-muted)}
+.chip.gone{background:var(--color-danger-dim);color:var(--color-danger)}
+.leaving{animation:leave .5s ease forwards}
+@keyframes leave{to{opacity:0;transform:translateX(14px)}}
+.empty{border:1px dashed var(--color-border);border-radius:12px;padding:18px;font-size:var(--text-sm);color:var(--color-text-muted);line-height:1.55}
+.grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(250px,1fr));gap:10px}
+.tile{border:1px solid var(--color-border);border-radius:12px;padding:14px;display:grid;gap:8px}
+.tile .top{display:flex;gap:10px;align-items:center}
+.receipt{font-size:var(--text-xs);color:var(--color-success);margin-top:8px}
+
+/* sheet */
+.scrim{position:fixed;inset:0;background:rgb(0 0 0 / .55);display:none;place-items:center;z-index:50}
+.scrim.on{display:grid}
+.sheet{width:min(460px,92%);background:var(--color-surface);border:1px solid var(--color-border);border-left:3px solid var(--color-danger);border-radius:12px;padding:20px}
+.sheet h3{margin:0 0 8px;font-size:var(--text-md)}
+.sheet p{font-size:var(--text-sm);color:var(--color-text-muted);line-height:1.55;margin:0 0 12px}
+.facts{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:12px}
+.facts div{background:var(--color-bg-elev1);border-radius:8px;padding:8px 10px;font-size:var(--text-xs);color:var(--color-text-muted)}
+.facts b{display:block;font-size:var(--text-md);color:var(--color-text)}
+.cons{font-size:var(--text-sm);margin:0 0 14px;padding-left:18px;line-height:1.6;color:var(--color-text-muted)}
+.cons .keep{color:var(--color-success)}
+.sheet .acts{display:flex;gap:8px;justify-content:flex-end}
+.ledger{border:1px solid var(--color-border-soft);border-radius:10px;padding:10px 12px;font-size:var(--text-xs);color:var(--color-text-muted);margin-top:14px}
+.ledger .row{display:flex;gap:8px;padding:4px 0}
+.ledger .new{color:var(--color-text);animation:flash 1.2s}
+@keyframes flash{0%{background:var(--color-primary-dim)}100%{background:transparent}}
+</style>
+</head>
+<body>
+<div id="vnav"><span class="lbl">VARIANT</span>
+  <button class="vtab active" data-v="a">A: Own section above keys ★ Selected</button>
+  <button class="vtab" data-v="b">B: One list with keys</button>
+  <button class="vtab" data-v="c">C: Tiles</button>
+</div>
+<div id="states"><span class="lbl">VIEW</span>
+  <button class="stab active" data-s="member">Member · Settings → API keys</button>
+  <button class="stab" data-s="none">Member · nothing connected</button>
+  <button class="stab" data-s="admin">Org admin · API keys tab</button>
+</div>
+<div id="note"></div>
+<div class="page" id="page"></div>
+<div class="scrim" id="scrim"><div class="sheet" id="sheet"></div></div>
+
+<script>
+let V="a",S="member";
+let apps=[
+  {id:1,mk:"claude",ch:"C",name:"Claude",claim:"",host:"claude.ai",org:"Acme Legal",access:"Read only · everything you can see",since:"Oct 31",used:"4 minutes ago"},
+  {id:2,mk:"local",ch:">_",name:"Claude Code",claim:"calls itself",host:"localhost",org:"Acme Legal",access:"Read and ask · Contracts, Policies",since:"Nov 2",used:"yesterday"},
+  {id:3,mk:"unknown",ch:"?",name:"Claude",claim:"calls itself",host:"claude.com",org:"Northwind Ops",access:"Read, ask and run workflows · everything",since:"Sep 18",used:"Not used yet"},
+];
+const keys=[{label:"Cursor laptop",kind:"mcp",org:"Acme Legal",used:"2 hours ago"},{label:"n8n invoices",kind:"wf",org:"Acme Legal",used:"today"}];
+const orgApps=[{who:"Maria Ruiz",n:2},{who:"Tom Chen",n:3},{who:"Ana Silva",n:1},{who:"Ravi Patel",n:1}];
+let ledger=[],revokedAll=false,receipt="";
+
+function appRow(a){return `<div class="app" id="app${a.id}"><div class="mk ${a.mk}">${a.ch}</div><div>
+  <div class="nm">${a.name}${a.claim?`<span class="claim">${a.claim}</span>`:""}<span class="host">${a.host}</span>${V==="b"?'<span class="chip app">Connected app</span>':""}</div>
+  <div class="meta"><b>${a.org}</b> · ${a.access}<br>Connected ${a.since} · last used ${a.used}</div></div>
+  <button class="btn danger sm" data-rev="${a.id}">Disconnect</button></div>`}
+function keyRow(k){return `<div class="app"><div class="mk unknown">⚿</div><div><div class="nm">${k.label}<span class="chip ${k.kind==="mcp"?"mcp":"wf"}">${k.kind==="mcp"?"AI tool · MCP":"Workflow"}</span></div>
+  <div class="meta"><b>${k.org}</b> · last used ${k.used}</div></div><button class="btn sm">Revoke</button></div>`}
+function tile(a){return `<div class="tile" id="app${a.id}"><div class="top"><div class="mk ${a.mk}">${a.ch}</div><div><div class="nm">${a.name}</div><span class="host">${a.host}</span></div></div>
+  <div class="meta"><b>${a.org}</b><br>${a.access}<br>Last used ${a.used}</div><button class="btn danger sm" data-rev="${a.id}">Disconnect</button></div>`}
+
+function member(){
+  const head=`<div class="band"><h1>Settings</h1></div><div class="tabs"><span>Profile</span><span>Models</span><span class="on">API keys</span><span>Notifications</span></div>`;
+  const list=S==="none"||!apps.length?`<div class="empty">No apps connected. When you add Syrel as a connector in Claude.ai, Claude Desktop or Claude Code and sign in, it appears here — with what it can reach and a Disconnect button.</div>`
+    :V==="c"?`<div class="grid">${apps.map(tile).join("")}</div>`:`<div class="list">${apps.map(appRow).join("")}</div>`;
+  const connected=`<div class="sec"><h2>Connected apps <span class="cnt">${S==="none"?0:apps.length}</span></h2>
+    <p class="sub">Apps you signed in to with your Syrel account. Each acts as you, only in the org and folders you picked. Disconnect one and its next call is refused.</p>${list}${receipt?`<div class="receipt">${receipt}</div>`:""}</div>`;
+  const keysSec=`<div class="sec"><h2>Keys <span class="cnt">${keys.length}</span><span style="flex:1"></span><button class="btn primary sm">New key</button></h2>
+    <p class="sub">For tools that take a key instead of a sign-in.</p><div class="list">${keys.map(keyRow).join("")}</div></div>`;
+  if(V==="b")return head+`<div class="sec"><h2>Keys and connected apps <span class="cnt">${keys.length+(S==="none"?0:apps.length)}</span><span style="flex:1"></span><button class="btn primary sm">New key</button></h2>
+    <p class="sub">Everything that can act as you from outside Syrel.</p><div class="list">${(S==="none"?[]:apps).map(appRow).join("")}${keys.map(keyRow).join("")}</div>${receipt?`<div class="receipt">${receipt}</div>`:""}</div>`;
+  return head+connected+keysSec;
+}
+function admin(){
+  const total=orgApps.reduce((s,o)=>s+o.n,0);
+  return `<div class="band org"><h1>Acme Legal</h1><span class="orgchip">◆ Org admin</span></div>
+  <div class="tabs"><span>Members</span><span>Audit</span><span class="on">API keys</span><span>Settings</span></div>
+  <div class="sec"><h2>Keys and connected apps in this org <span style="flex:1"></span>${revokedAll?"":`<button class="btn danger" id="all">Disconnect all connected apps</button>`}</h2>
+  <p class="sub">Connected apps signed in through Syrel's sign-in page. Keys are listed below them and are not touched by Disconnect all.</p>
+  <div class="list">${orgApps.map(o=>`<div class="app"><div class="mk claude">C</div><div><div class="nm">${o.n} connected app${o.n>1?"s":""}<span class="chip ${revokedAll?"gone":"app"}">${revokedAll?"Disconnected":"Connected app"}</span></div><div class="meta"><b>${o.who}</b> · Claude, Claude Code</div></div><button class="btn danger sm" ${revokedAll?"disabled":""}>Disconnect</button></div>`).join("")}
+  ${keys.map(keyRow).join("")}</div>
+  <div class="ledger"><b>Recent actions</b>${ledger.map((l,i)=>`<div class="row ${i===0?"new":""}">✎ ${l}</div>`).join("")||'<div class="row">—</div>'}</div></div>`;
+}
+function render(){
+  document.getElementById("page").innerHTML=S==="admin"?admin():member();
+  const notes={a:"<b>A</b>: Connected apps is its own section ABOVE Keys in the existing API keys tab (one mount, no new Settings tab). The host is shown on every row, as on the consent page.",
+    b:"<b>B</b>: one merged list with a kind chip. Rejected: a connected app has no secret, label or expiry choice, so half the key card is empty, and CONTEXT D-25 keeps grants out of the key list.",
+    c:"<b>C</b>: tiles. Rejected: the list will hold 1–5 rows; tiles waste the width and hide the host under the name."};
+  document.getElementById("note").innerHTML=S==="admin"?"<b>Org admin.</b> One victim-naming sheet for Disconnect all (graded-guard rule: target-specific with victims → sheet). Keys are named as NOT affected. The receipt is the ledger row.":notes[V];
+  document.querySelectorAll("[data-rev]").forEach(b=>b.onclick=()=>openOne(+b.dataset.rev));
+  const all=document.getElementById("all");if(all)all.onclick=openAll;
+}
+function openOne(id){const a=apps.find(x=>x.id===id);
+  sheet(`<h3>Disconnect ${a.name} (${a.host})?</h3><p>Its next call to Syrel is refused. To use it again, add Syrel in ${a.name} and sign in again.</p>
+  <ul class="cons"><li>Org: ${a.org}</li><li>It could: ${a.access}</li><li class="keep">Your chats, documents and keys are not touched.</li></ul>`,"Disconnect",()=>{
+    const el=document.getElementById("app"+id);if(el)el.classList.add("leaving");setTimeout(()=>{apps=apps.filter(x=>x.id!==id);receipt="✓ "+a.name+" disconnected · recorded";render()},500)})}
+function openAll(){const total=orgApps.reduce((s,o)=>s+o.n,0);
+  sheet(`<h3>Disconnect all connected apps in Acme Legal?</h3><p>Every app signed in through Syrel in this org stops on its next call. People can connect again afterwards.</p>
+  <div class="facts"><div><b>${total}</b>apps</div><div><b>${orgApps.length}</b>members: ${orgApps.map(o=>o.who.split(" ")[0]).join(", ")}</div></div>
+  <ul class="cons"><li>Claude.ai, Claude Desktop and Claude Code sessions sign out</li><li class="keep">API keys (AI tool and workflow) are not touched</li><li class="keep">Other orgs are not touched</li></ul>`,"Disconnect "+total+" apps",()=>{revokedAll=true;ledger.unshift("You disconnected "+total+" connected apps in Acme Legal");render()})}
+function sheet(html,label,ok){document.getElementById("sheet").innerHTML=html+`<div class="acts"><button class="btn" id="cx">Cancel</button><button class="btn danger solid" id="ok">${label}</button></div>`;
+  const s=document.getElementById("scrim");s.classList.add("on");
+  const close=()=>{s.classList.remove("on");document.getElementById("sheet").innerHTML=""};
+  document.getElementById("cx").onclick=close;
+  document.getElementById("ok").onclick=()=>{close();ok()}}
+document.querySelectorAll(".vtab").forEach(t=>t.onclick=()=>{V=t.dataset.v;document.querySelectorAll(".vtab").forEach(x=>x.classList.toggle("active",x===t));render()});
+document.querySelectorAll(".stab").forEach(t=>t.onclick=()=>{S=t.dataset.s;document.querySelectorAll(".stab").forEach(x=>x.classList.toggle("active",x===t));render()});
+render();
+</script>
+</body>
+</html>
