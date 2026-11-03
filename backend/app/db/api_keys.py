@@ -208,8 +208,12 @@ async def revoke_key(
         *args,
         revoked_by,
     )
+    # Phase 307-05 (D-27): the read-back also says whether the row is an OAuth GRANT, and its
+    # client's registered redirects, so the route can audit ``credential: oauth`` with the host.
     row = await pool.fetchrow(
-        f"SELECT {_named_columns()} FROM api_keys k {_NAME_JOINS}WHERE {k_scope}",
+        f"SELECT {_named_columns()}, k.oauth_client_id, oc.redirect_uris AS oauth_redirect_uris "
+        f"FROM api_keys k {_NAME_JOINS}"
+        f"LEFT JOIN public.oauth_clients oc ON oc.id = k.oauth_client_id WHERE {k_scope}",
         *args,
     )
     if row is None:
@@ -217,6 +221,72 @@ async def revoke_key(
     # 296-06 (293-IN-08): whether THIS call set revoked_at (asyncpg's status tag "UPDATE 1"), so
     # the route audits a revoke once and a repeat revoke stays quiet.
     return {**dict(row), "revoked_now": str(status or "").strip() == "UPDATE 1"}
+
+
+# ── connected apps: OAuth GRANTS (Phase 307-05; D-25, D-26, D-27) ─────────────────────────────
+#
+# A grant is an ``api_keys`` row with ``oauth_client_id`` set (D-15). These are the only reads that
+# LIST grants; the key lists above exclude them. Every statement carries the owner predicate: the
+# member's ``user_id`` for their own list, the org for the admin's list and the bulk revoke.
+# Expired grants and grants in an org the member has left are not listed: neither can act.
+
+_GRANT_COLUMNS = (
+    "k.id, k.org_id, k.user_id, k.label, k.tools, k.folder_ids, k.include_external, "
+    "k.created_at, k.last_used_at, k.expires_at, "
+    "c.kind AS client_kind, c.redirect_uris, "
+    "o.name AS org_name, o.mcp_enabled AS org_on, "
+    "(SELECT a.mcp_enabled FROM public.app_settings a WHERE a.id = 'global') AS deploy_on, "
+    "(SELECT jsonb_agg(jsonb_build_object('id', f.id, 'name', f.name) ORDER BY f.name) "
+    " FROM public.folders f WHERE f.org_id = k.org_id "
+    " AND f.id::text IN (SELECT jsonb_array_elements_text(k.folder_ids))) AS folder_refs"
+)
+_GRANT_FROM = (
+    "FROM public.api_keys k "
+    "JOIN public.oauth_clients c ON c.id = k.oauth_client_id "
+    "JOIN public.organizations o ON o.id = k.org_id "
+)
+_GRANT_LIVE = (
+    "k.oauth_client_id IS NOT NULL AND k.revoked_at IS NULL "
+    "AND (k.expires_at IS NULL OR k.expires_at > now()) "
+    "AND EXISTS (SELECT 1 FROM public.org_members m WHERE m.org_id = k.org_id AND m.user_id = k.user_id)"
+)
+_GRANT_ORDER = "ORDER BY k.last_used_at DESC NULLS LAST, k.created_at DESC"
+
+
+async def list_grants_for_user(pool: asyncpg.Pool, *, user_id: UUID) -> list[dict]:
+    """The member's live grants in EVERY org (D-25), most recently used first, then newest."""
+    rows = await pool.fetch(
+        f"SELECT {_GRANT_COLUMNS} {_GRANT_FROM}"
+        f"WHERE k.user_id = $1 AND {_GRANT_LIVE} {_GRANT_ORDER}",
+        user_id,
+    )
+    return [dict(r) for r in rows]
+
+
+async def list_grants_for_org(pool: asyncpg.Pool, *, org_id: UUID) -> list[dict]:
+    """Every live grant in this org with its owner's name (D-26, admin only)."""
+    rows = await pool.fetch(
+        f"SELECT {_GRANT_COLUMNS}, COALESCE(NULLIF(po.display_name, ''), uo.email) AS owner_name "
+        f"{_GRANT_FROM}"
+        "LEFT JOIN profiles po ON po.id = k.user_id LEFT JOIN auth.users uo ON uo.id = k.user_id "
+        f"WHERE k.org_id = $1 AND {_GRANT_LIVE} {_GRANT_ORDER}",
+        org_id,
+    )
+    return [dict(r) for r in rows]
+
+
+async def revoke_all_grants_in_org(pool: asyncpg.Pool, *, org_id: UUID, revoked_by: UUID) -> list[dict]:
+    """Revoke every live GRANT in one org, in ONE statement (D-26 / T-307-27): never a key
+    (``oauth_client_id IS NOT NULL``), never another org (``org_id = $1``). Returns
+    ``[{id, user_id}]`` for exactly the rows THIS call revoked."""
+    rows = await pool.fetch(
+        "UPDATE api_keys SET revoked_at = now(), revoked_by = $2 "
+        "WHERE org_id = $1 AND oauth_client_id IS NOT NULL AND revoked_at IS NULL "
+        "RETURNING id, user_id",
+        org_id,
+        revoked_by,
+    )
+    return [dict(r) for r in rows]
 
 
 async def touch_last_used(pool: asyncpg.Pool, key_id: UUID, *, org_id: UUID) -> None:

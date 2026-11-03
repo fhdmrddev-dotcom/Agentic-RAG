@@ -101,6 +101,47 @@ async def get_redirect_hosts(pool: asyncpg.Pool) -> list[dict]:
     return [dict(e) for e in (value or []) if isinstance(e, dict)]
 
 
+def _host_list(value: Any) -> list[dict] | None:
+    return None if value is None else [dict(e) for e in value if isinstance(e, dict)]
+
+
+async def add_redirect_host(
+    pool: asyncpg.Pool, *, host: str, added_by: str, added_by_name: str | None
+) -> list[dict] | None:
+    """307-05 (D-08): append ``host`` to the allowlist in ONE statement and return the new list;
+    ``None`` when it is already there (or the global row is missing). One UPDATE whose WHERE
+    re-checks the array under the row lock, so two operators adding at once cannot lose a write or
+    add a host twice. ``host`` is already validated by the route; it is stored as given."""
+    value = await pool.fetchval(
+        "UPDATE public.app_settings SET mcp_oauth_redirect_hosts = mcp_oauth_redirect_hosts || "
+        "jsonb_build_array(jsonb_build_object('host', $1::text, 'added_by', $2::text, "
+        "'added_by_name', $3::text, 'added_at', now())) "
+        "WHERE id = 'global' AND NOT EXISTS ("
+        "SELECT 1 FROM jsonb_array_elements(mcp_oauth_redirect_hosts) e WHERE lower(e->>'host') = $1) "
+        "RETURNING mcp_oauth_redirect_hosts",
+        host,
+        added_by,
+        added_by_name,
+    )
+    return _host_list(value)
+
+
+async def remove_redirect_host(pool: asyncpg.Pool, *, host: str) -> list[dict] | None:
+    """307-05 (D-08): drop ``host`` from the allowlist in ONE statement (order kept) and return the
+    new list; ``None`` when it was not there. A built-in host may be removed; the empty list is
+    allowed (only loopback sign-ins then work). Existing grants are not touched (D-51)."""
+    value = await pool.fetchval(
+        "UPDATE public.app_settings SET mcp_oauth_redirect_hosts = COALESCE(("
+        "SELECT jsonb_agg(x.e ORDER BY x.o) FROM jsonb_array_elements(mcp_oauth_redirect_hosts) "
+        "WITH ORDINALITY AS x(e, o) WHERE lower(x.e->>'host') IS DISTINCT FROM $1), '[]'::jsonb) "
+        "WHERE id = 'global' AND EXISTS ("
+        "SELECT 1 FROM jsonb_array_elements(mcp_oauth_redirect_hosts) e WHERE lower(e->>'host') = $1) "
+        "RETURNING mcp_oauth_redirect_hosts",
+        host,
+    )
+    return _host_list(value)
+
+
 async def deployment_mcp_on(pool: asyncpg.Pool) -> bool:
     """``app_settings('global').mcp_enabled``, read LIVE (307-02, D-10: an authorize while the
     deployment switch is off stores a ``deployment_off`` request). The ``api_keys.mcp_switches``
