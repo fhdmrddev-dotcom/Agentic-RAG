@@ -46,6 +46,8 @@ _BLOCKED_METHODS: frozenset[str] = frozenset({"POST", "PUT", "PATCH", "DELETE"})
 #   /auth  -> login/session (an operator must be able to log in to reach the off-switch)
 #   /admin -> ALL operator routes, incl. PUT /admin/flags (the off-switch itself)
 _ALLOWLIST_PREFIXES: tuple[str, ...] = ("/auth", "/admin")
+# Phase 307 (D-31): the three OAuth writes that keep connected apps working. Exact paths.
+_OAUTH_WRITE_PATHS: frozenset[str] = frozenset({"/oauth/token", "/oauth/revoke", "/oauth/register"})
 
 
 def _read_maintenance() -> bool:
@@ -81,6 +83,11 @@ def _is_allowlisted(method: str, path: str) -> bool:
     # would stop searching and reading too. It passes here; inside, the dispatch guard refuses
     # start-type (non-read-only) tools with a JSON-RPC sentence. Segment boundary: /mcpx is blocked.
     if path == MCP_PATH or path.startswith(MCP_PATH + "/"):
+        return True
+    # Phase 307 (D-31): a connected AI app must not be disconnected by maintenance — the token
+    # refresh, revoke and client registration pass. EXACT paths only: the consent approve creates a
+    # grant, so it stays blocked.
+    if path in _OAUTH_WRITE_PATHS:
         return True
     return False
 
