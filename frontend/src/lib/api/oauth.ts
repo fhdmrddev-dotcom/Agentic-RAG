@@ -13,7 +13,7 @@
  *   ANOTHER org, so `listFoldersForOrg` overrides that header with the PICKED org explicitly. The
  *   approve call names its org in the BODY; the server never reads the header for it.
  */
-import type { McpToolRef, PickableFolderList } from "./apiKeys"
+import type { ApiKeyFolderRef, McpOff, McpToolRef, PickableFolderList } from "./apiKeys"
 import { API_BASE, ApiError, getAuthHeaders } from "./_core"
 
 export type ConsentRefusalReason = "host_not_allowed" | "not_registered" | "unknown_client" | "metadata_unreadable"
@@ -106,6 +106,83 @@ export async function denyConsent(id: string): Promise<ConsentRedirect> {
   const res = await fetch(`${requestUrl(id)}/deny`, { method: "POST", headers })
   if (!res.ok) throw new ApiError(await readFailure(res), res.status)
   return (await res.json()) as ConsentRedirect
+}
+
+// ── connected apps (307-05; D-25, D-26, D-27) ─────────────────────────────────────────────────
+//
+// A connected app is an OAuth GRANT. It is listed on its own routes and disconnected through the
+// EXISTING key revoke routes (D-27). Field names are pinned against `models/api_key.py` by
+// `oauthContract.test.ts`.
+
+/** One app acting as a member. `client_name` is the app's own (sanitised) claim; `redirect_host` the fact. */
+export interface ConnectedApp {
+  id: string
+  client_name: string
+  name_source: "cimd" | "dcr"
+  redirect_host: string | null
+  redirect_kind: "web" | "loopback" | null
+  org_id: string
+  org_name: string | null
+  tools: string[]
+  /** `null` = every folder the member can see in the org. */
+  folders: ApiKeyFolderRef[] | null
+  include_external: boolean
+  created_at: string
+  last_used_at: string | null
+  /** The sliding disconnect-by date (D-16): 90 days after the last refresh. */
+  expires_at: string | null
+  mcp_off: McpOff | null
+}
+
+export interface OrgConnectedApp extends ConnectedApp {
+  owner_name: string | null
+  owner_is_you: boolean
+}
+
+/** What the SERVER revoked: the receipt reads this, never the sheet's own count. */
+export interface RevokeAllResult {
+  revoked: number
+  members: number
+}
+
+/** Every app acting as the caller, in every org (no org header needed). */
+export async function listMyConnectedApps(signal?: AbortSignal): Promise<{ apps: ConnectedApp[] }> {
+  const headers = await getAuthHeaders()
+  const res = await fetch(`${API_BASE}/api-keys/connected-apps`, { headers, signal })
+  if (!res.ok) throw new ApiError(await readFailure(res), res.status)
+  return (await res.json()) as { apps: ConnectedApp[] }
+}
+
+/** Disconnect one of the caller's apps: the 293 revoke route, in the GRANT's org (P-6 / D-27). */
+export async function disconnectApp(app: Pick<ConnectedApp, "id" | "org_id">): Promise<unknown> {
+  const headers = { ...((await getAuthHeaders()) as Record<string, string>), "X-Org-Id": app.org_id }
+  const res = await fetch(`${API_BASE}/api-keys/${encodeURIComponent(app.id)}/revoke`, { method: "POST", headers })
+  if (!res.ok) throw new ApiError(await readFailure(res), res.status)
+  return res.json()
+}
+
+/** The active org's apps, with owners (org admins only; 403 otherwise). */
+export async function listOrgConnectedApps(signal?: AbortSignal): Promise<{ apps: OrgConnectedApp[] }> {
+  const headers = await getAuthHeaders()
+  const res = await fetch(`${API_BASE}/org/api-keys/connected-apps`, { headers, signal })
+  if (!res.ok) throw new ApiError(await readFailure(res), res.status)
+  return (await res.json()) as { apps: OrgConnectedApp[] }
+}
+
+/** An org admin disconnects one app in the active org (the existing org revoke route). */
+export async function disconnectOrgApp(id: string): Promise<unknown> {
+  const headers = await getAuthHeaders()
+  const res = await fetch(`${API_BASE}/org/api-keys/${encodeURIComponent(id)}/revoke`, { method: "POST", headers })
+  if (!res.ok) throw new ApiError(await readFailure(res), res.status)
+  return res.json()
+}
+
+/** An org admin disconnects EVERY app in the active org. Keys are never touched (D-26). */
+export async function revokeAllConnectedApps(): Promise<RevokeAllResult> {
+  const headers = await getAuthHeaders()
+  const res = await fetch(`${API_BASE}/org/api-keys/connected-apps/revoke-all`, { method: "POST", headers })
+  if (!res.ok) throw new ApiError(await readFailure(res), res.status)
+  return (await res.json()) as RevokeAllResult
 }
 
 /** The folders the member can tick in the PICKED org (P-6: the org sent explicitly). */

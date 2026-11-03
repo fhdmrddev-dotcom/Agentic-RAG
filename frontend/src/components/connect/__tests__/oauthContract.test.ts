@@ -194,7 +194,7 @@ describe("307-03 consent client calls", () => {
     expect(init.method).toBe("POST")
     expect((init.headers as Record<string, string>)["X-Org-Id"]).toBe("grant-org")
     fetchMock.mockResolvedValueOnce(fail(404, { detail: "API key not found." }))
-    const err = await disconnectApp(SAMPLE_APP).catch((e) => e)
+    const err = (await disconnectApp(SAMPLE_APP).catch((e: unknown) => e)) as ApiError
     expect(err).toBeInstanceOf(ApiError)
     expect(err.message).toBe("API key not found.")
   })

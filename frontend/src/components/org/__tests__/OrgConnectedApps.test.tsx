@@ -56,16 +56,23 @@ beforeEach(() => {
 })
 
 describe("307-05 OrgConnectedApps", () => {
+  it("renders NOTHING and reads nothing when sign-in is not served (the tab is 306's)", async () => {
+    const { container } = render(<OrgConnectedApps oauthAvailable={false} orgName="Acme Legal" />)
+    await new Promise((r) => setTimeout(r, 0))
+    expect(container).toBeEmptyDOMElement()
+    expect(m.listOrgConnectedApps).not.toHaveBeenCalled()
+  })
+
   it("empty: one line, no card, no Disconnect all", async () => {
     m.listOrgConnectedApps.mockResolvedValue({ apps: [] })
-    render(<OrgConnectedApps orgName="Acme Legal" />)
+    render(<OrgConnectedApps oauthAvailable orgName="Acme Legal" />)
     expect(await screen.findByText("No connected apps in Acme Legal.")).toBeInTheDocument()
     expect(screen.queryByRole("button", { name: "Disconnect all connected apps" })).toBeNull()
   })
 
   it("lists the org's apps with the Connected app chip and the owner first, each with its own Disconnect", async () => {
     m.listOrgConnectedApps.mockResolvedValue({ apps: [app("a", "Lee Park")] })
-    render(<OrgConnectedApps orgName="Acme Legal" />)
+    render(<OrgConnectedApps oauthAvailable orgName="Acme Legal" />)
     expect(await screen.findByRole("heading", { name: /Connected apps in Acme Legal/ })).toBeInTheDocument()
     expect(screen.getByText("Apps members signed in to through Syrel's sign-in page. Disconnect all doesn't touch API keys.")).toBeInTheDocument()
     const card = screen.getByTestId("connected-app-a")
@@ -80,7 +87,7 @@ describe("307-05 OrgConnectedApps", () => {
     m.listOrgConnectedApps.mockResolvedValueOnce({ apps: [a] }).mockResolvedValueOnce({ apps: [] })
     m.disconnectOrgApp.mockResolvedValue({})
     const onRecorded = vi.fn()
-    render(<OrgConnectedApps orgName="Acme Legal" onRecorded={onRecorded} />)
+    render(<OrgConnectedApps oauthAvailable orgName="Acme Legal" onRecorded={onRecorded} />)
     await userEvent.click(await screen.findByRole("button", { name: "Disconnect Claude (claude.ai)" }))
     const sheet = await screen.findByRole("alertdialog")
     expect(sheet).toHaveTextContent("This disconnects Lee Park's app.")
@@ -92,7 +99,7 @@ describe("307-05 OrgConnectedApps", () => {
 
   it("Disconnect all names the victims, keeps focus on Keep them, and says what is kept", async () => {
     m.listOrgConnectedApps.mockResolvedValue({ apps: FOUR })
-    render(<OrgConnectedApps orgName="Acme Legal" />)
+    render(<OrgConnectedApps oauthAvailable orgName="Acme Legal" />)
     await userEvent.click(await screen.findByRole("button", { name: "Disconnect all connected apps" }))
     const sheet = await screen.findByRole("alertdialog")
     expect(within(sheet).getByText("Disconnect all connected apps in Acme Legal?")).toBeInTheDocument()
@@ -119,7 +126,7 @@ describe("307-05 OrgConnectedApps", () => {
     m.listOrgConnectedApps.mockResolvedValueOnce({ apps: FOUR }).mockResolvedValueOnce({ apps: [] })
     m.revokeAllConnectedApps.mockResolvedValue({ revoked: 6, members: 4 })
     const onRecorded = vi.fn()
-    render(<OrgConnectedApps orgName="Acme Legal" onRecorded={onRecorded} />)
+    render(<OrgConnectedApps oauthAvailable orgName="Acme Legal" onRecorded={onRecorded} />)
     await userEvent.click(await screen.findByRole("button", { name: "Disconnect all connected apps" }))
     const sheet = await screen.findByRole("alertdialog")
     await userEvent.click(within(sheet).getByRole("button", { name: "Disconnect 5 apps" }))
@@ -135,7 +142,7 @@ describe("307-05 OrgConnectedApps", () => {
     m.listOrgConnectedApps.mockResolvedValue({ apps: FOUR })
     m.revokeAllConnectedApps.mockRejectedValue(new Error("Only an admin can do that."))
     const onRecorded = vi.fn()
-    render(<OrgConnectedApps orgName="Acme Legal" onRecorded={onRecorded} />)
+    render(<OrgConnectedApps oauthAvailable orgName="Acme Legal" onRecorded={onRecorded} />)
     await userEvent.click(await screen.findByRole("button", { name: "Disconnect all connected apps" }))
     const sheet = await screen.findByRole("alertdialog")
     await userEvent.click(within(sheet).getByRole("button", { name: "Disconnect 5 apps" }))
@@ -147,7 +154,7 @@ describe("307-05 OrgConnectedApps", () => {
 
   it("a failed read says so with Retry", async () => {
     m.listOrgConnectedApps.mockRejectedValueOnce(new Error("Down.")).mockResolvedValueOnce({ apps: [] })
-    render(<OrgConnectedApps orgName="Acme Legal" />)
+    render(<OrgConnectedApps oauthAvailable orgName="Acme Legal" />)
     const alert = await screen.findByRole("alert")
     expect(alert).toHaveTextContent("Couldn't load the connected apps. Down.")
     await userEvent.click(within(alert).getByRole("button", { name: "Retry" }))
