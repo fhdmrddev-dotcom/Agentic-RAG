@@ -122,12 +122,14 @@ Requirements: [`REQUIREMENTS.md`](REQUIREMENTS.md). **29 v4.9 requirements, 29 m
 
 **How we'd know this failed**: any key read goes through the service role and re-implements visibility; the org narrowing loses the `current_user_org_ids()` initPlan shape under `EXPLAIN`, or the backend baseline rises above 71; behaviour with the org setting unset is not identical to today; an empty folder set means "no filter"; a second key resolver appears beside the extracted `authenticate_presented_key` (the W-1 drift class); the secret is stored unhashed or shown twice; a snippet puts the key in a URL; revocation waits for a cache to expire; a new table or column is readable by `anon` or another user, or `get_advisors(security)` shows a new ERROR; the parity test passes only for the org owner.
 **Plans**: 6 plans in 4 waves
+
 - [x] 304-01-PLAN.md — migrations 220/221, the GUC-narrowed current_user_org_ids(), the one dependencies.py edit, acting-member connection, EXPLAIN evidence + RLS live suite (wave 1, mutates local DB)
 - [x] 304-02-PLAN.md — resolver core extracted (pure move first), mcp kind + srl_mcp_, principal_still_allowed, McpPrincipal, KeyScope, tool catalogue + mcp_url (wave 1)
 - [x] 304-03-PLAN.md — narrowed reads + the headline two-org non-owner parity suite, negative arms, narrowed-key arms (wave 2, mutates local DB)
 - [x] 304-04-PLAN.md — kind on the 293 key routes, pickable folders, org switch (audited) + operator flag, wire contract + OpenAPI (wave 2)
 - [x] 304-05-PLAN.md — member key screen: kind choice, MCP draft, show-once snippets, MCP card, revoke facts (wave 3)
 - [x] 304-06-PLAN.md — org switch card, admin list notice, audit words, Control Room switch; phase bookkeeping + full gates (wave 4)
+
 **UI hint**: yes
 **Flags**: **Headline must-have: the two-org parity integration test**, as a non-owner member, with the removed-membership negative arm. **Research (focused)**: the `EXPLAIN` check and a baseline-gate run for the org GUC narrowing in `current_user_org_ids()` (D4); fallback if `EXPLAIN` fails is explicit org predicates at each MCP read plus the same parity test. **Migrations** (research: 220 key `kind` / `folder_ids` / `tools` / `srl_mcp_` prefix, mig 215's `workflows >= 1` CHECK relaxed for `kind='mcp'`, `'mcp'` origin on `workflow_runs` / `threads` / `runs`, audit literals; 221 org narrowing + settings knobs) — next free numbers; any SECURITY DEFINER function has `EXECUTE` revoked from `PUBLIC`, not only `anon`. **security_enforcement** (`/gsd:secure-phase`). **G-2 sketch FIRST** for the key screen (create, show-once, presets, narrowing, snippets, warnings, last use, revoke) and the admin list. **G-4**. **G-5**: `backend/app/dependencies.py` (`24 / 12 / 1147`; the single sanctioned ~6-line edit for the org contextvar), `backend/app/services/audit_service.py` (lockstep literals), `backend/app/models/user_settings.py` (38) and `backend/app/api/settings.py` (26) for knobs, `frontend/src/pages/SettingsPage.tsx` (31; one mount), `frontend/src/components/org/OrgAdminShell.tsx` (6) for the admin list; extract `authenticate_presented_key` from `api_key_auth.py` before editing it. Reuse Phase 293's key, limiter and audit paths and `expert_scope` intersection semantics. Folds `SEED-195`; `SEED-013` in part.
 
@@ -148,10 +150,12 @@ Requirements: [`REQUIREMENTS.md`](REQUIREMENTS.md). **29 v4.9 requirements, 29 m
 **Plans**: 4 plans (4 waves, serialized on the local-DB lock — every plan writes the local DB)
 
 Plans:
+
 - [x] 305-01-PLAN.md — SDK bump (httpx2 human-verified, installed once in main), test_059 retired under D-48, graceful shutdown, mig 222, stateless transport + key edge + maintenance, two-worker proof
 - [x] 305-02-PLAN.md — search_knowledge_base / list_documents / read_document, result hygiene, identical refusal, narrowing at call, /app/library/<uuid> address
 - [x] 305-03-PLAN.md — per-call audit, cheap/expensive per-key limits + searches knob, MCP activity on the key card, search usage in operator spend (mcp_usage leg)
 - [x] 305-04-PLAN.md — outbound_guard + deterministic redactor (fail closed), org redaction switch + card, FP/latency + client-timeout measurement, 305-VALIDATION
+
 **UI hint**: yes
 **Flags**: **Research** (`/gsd:plan-phase --research-phase`): SDK `TokenVerifier` vs a pure-ASGI wrapper (D5 — either way it calls the one `authenticate_presented_key`); stateless behaviour on both workers with a 2025-11-25 client; static-bearer behaviour in Claude Code and Cursor; redactor false-positive rate and latency on the real corpus; host allowlist and proxy behaviour on cloud and one-box; the canonical MCP URL per topology (Q19 — refuse the mount if `BACKEND_PUBLIC_URL` is loopback in production). **Dependencies**: `mcp>=2.3.0,<3` + `sse-starlette>=3.0.3,<3.1`, no FastAPI upgrade; re-validate the SSE endpoints in `runs.py` and `skill_tuner.py` and retire the `test_059_disconnect` version fixture under a `D-NN`. **Redaction choke point** (`outbound_guard`) ships here behind a `Redactor` interface; webhooks reuse it in 308; names are not covered and the docs say so. **G-5**: `backend/app/main.py` (`99 / 73`; one mount + one lifespan block), `backend/app/config.py` (55), `frontend/src/pages/admin/AdminSpendPage.tsx` (FIRES, "extraction FIRST next" ⛔) — prefer showing MCP spend through the existing breakdown; if the page must change, take its seam first. ⚠ `backend/app/middleware/maintenance.py` has **no ledger row** — add it before any plan names it. **Deployment-artifact parity** (same commit) for any new env var. **security_enforcement**. **UAT**: Claude Code and Cursor on the deployed two-worker container; Claude Desktop only through the labelled bridge. Measure client timeouts here for 306. Folds `SEED-177`, `SEED-079`; `SEED-013` in part.
 
@@ -172,11 +176,13 @@ Plans:
 **Plans**: 5 plans (5 waves, serialized on the local-DB lock — every plan writes the local DB; G-8 D-24: five, not four, because the ask path splits into the run-path closure and the MCP surface)
 
 Plans:
+
 - [x] 306-01-PLAN.md — D-39 extractions first (inbound.py → key_run_read / key_run_start; search_documents_tool.py → search_vocabulary), mig 223 (threads.origin_* + freeze trigger, four app_settings knobs) applied locally
 - [x] 306-02-PLAN.md — admission core (Redis ZSET leases by one Lua script) + idempotency claims, fail closed; /inbound 429 + Retry-After; the four knobs end to end in the limits card
 - [x] 306-03-PLAN.md — tool-set closure (allow-list ContextVar, Seam A in search_vocabulary, Seam B in tool_dispatcher with the durable thread-origin check), TRUST-03 ask envelope, non-HTTP ask start/wait/read, two-org live proof
 - [x] 306-04-PLAN.md — ask_agent / get_answer on /mcp (idempotency, admission, wait budget, refusals, start bucket); the mcp origin kind end to end + the history-row mark + the question bubble
 - [x] 306-05-PLAN.md — list_workflows / run_workflow / get_workflow_run; spend by key through the runs leg; MCP key activity words; roster + burst scripts and 306-VALIDATION.md (UAT rows OWED)
+
 **UI hint**: yes
 **Flags**: **Research**: how the MCP-origin tool set can be closed through `run_producer` / `ThreadScoping` without editing `agent_loop.py` or `run_producer.py` (unverified — the gap to close first; start from `POWER_TOOLS` as the deny list plus every connector write); measured client timeouts from 305 before any default moves; provider in-flight budgets (`SEED-081` evidence table); idempotency design (Redis-deduped, bound to the credential). **Cross-provider UAT roster (CLAUDE.md, MANDATORY)**: the agent run path is touched, so the full 8-row board (OpenAI, Anthropic, Google, DeepSeek, Zhipu/GLM, MiniMax, Moonshot/Kimi, OpenRouter), derived from `MODEL_CAPABILITIES`, registry-backed ids, blocked rows recorded ⛔ with reason, never omitted. **Four-axis UAT**: multi-tool (search + read in one ask), parallel-thread (an in-app thread streams while an MCP ask runs), long-message (a ≥ 5 KB MCP prompt). **G-5**: `backend/app/api/inbound.py` (`10 / 3 / 719`, FIRES) — the `key_run_read` pure-move extraction is the first plan, proven behaviour-neutral; `backend/app/services/run_producer.py` (14) only if research shows no other path; `unattended_launch.py` (3), `workflow_kickoff.py` (12) one expression each. ⛔ No edit to `threads.py`, `agent_loop.py`, `dispatcher.py`, `lib/api.ts`. MCP-05 reuses Phase 293's thread origin field and its existing mark. **G-4** for the thread-history mark. **security_enforcement**. Folds `SEED-081`; `SEED-013` in part.
 
@@ -196,11 +202,23 @@ Plans:
 **Plans**: 5 plans (4 waves; 307-04 writes no DB and runs beside 307-01, the other four serialize on the local-DB lock; G-8 D-43: five, not four, because the AS core splits into its data half and its protocol half by context budget)
 
 Plans:
+**Wave 1**
+
 - [ ] 307-01-PLAN.md — mig 224 (oauth_clients, oauth_tokens, api_keys.oauth_client_id, label index without grants, redirect-host allowlist) applied locally; token primitives + db layer incl. refresh rotation / 60 s grace / family revoke; the ONE resolver (key and access token share one admission tail)
-- [ ] 307-02-PLAN.md — the authorization server: redirect / DCR / CIMD rules, client_metadata egress capability, OAuth limiter buckets, .well-known docs + 401 resource_metadata, Redis store, register / authorize / token / revoke; live round trip, per-case removal, PostgREST refusal
-- [ ] 307-03-PLAN.md — consent: one narrowing validator shared with key create, /oauth/requests read / approve / deny, the consent page with every state + host-match and frame guards, one App.tsx branch, one appRoutes arm, one returnTo kind
 - [ ] 307-04-PLAN.md — routing parity: nginx .well-known proxy + consent anti-framing on all three layers pinned by the 297 suite with negative controls; operator docs (both Anthropic ranges, CIMD probe, mig 224 order, owed rows); Claude.ai and Desktop snippet tab by sign-in (bridge retired)
+
+**Wave 2** *(blocked on Wave 1 completion)*
+
+- [ ] 307-02-PLAN.md — the authorization server: redirect / DCR / CIMD rules, client_metadata egress capability, OAuth limiter buckets, .well-known docs + 401 resource_metadata, Redis store, register / authorize / token / revoke; live round trip, per-case removal, PostgREST refusal
+
+**Wave 3** *(blocked on Wave 2 completion)*
+
+- [ ] 307-03-PLAN.md — consent: one narrowing validator shared with key create, /oauth/requests read / approve / deny, the consent page with every state + host-match and frame guards, one App.tsx branch, one appRoutes arm, one returnTo kind
+
+**Wave 4** *(blocked on Wave 3 completion)*
+
 - [ ] 307-05-PLAN.md — connected apps (member) + Disconnect, org connected apps + Disconnect all, Control Room return-address allowlist, audit words, live removal via routes; phase ledger + CLAUDE.md bookkeeping and full gates
+
 **UI hint**: yes
 **Flags**: **Research spike**: own authorization server (decided at intake, D1/Q9 — opaque, hashed, per-call-looked-up tokens that are MCP grants; Supabase OAuth is out of scope) vs the SDK's `OAuthAuthorizationServerProvider` as the fast path; Claude's DCR vs CIMD selection; port-agnostic loopback matching; refresh-rotation reuse detection; `.well-known` routing on Vercel, Coolify and the one-box; WAF reachability from Anthropic's egress range. **Migration** (the grants table; next free number); RLS, anon-role test, `get_advisors(security)` after the cloud paste. **security_enforcement**. **G-2 sketch FIRST** for the consent page and the connected-apps list. **G-4**. **Routing parity**: the Phase 297 three-layer suite (`frontend/devRouting.ts`, `frontend/vercel.json`, `frontend/nginx.conf` — `nginx.conf` FIRES) covers the consent route and `.well-known`. **G-5**: `backend/app/main.py` (one mount), `backend/app/security/egress.py` (one capability for the client-metadata fetch). **Deployment-artifact parity** for any new env var. **Operator actions**: a real Claude.ai connect, refresh and revoke on cloud; Claude callback hosts on the redirect allowlist. Until this phase ships, the milestone does not claim Claude.ai or Claude Desktop works.
 

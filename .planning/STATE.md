@@ -11,7 +11,7 @@ progress:
   total_plans: 15
   completed_plans: 15
   percent: 14
-stopped_at: Phase 307 UI-SPEC approved (6/6, 1 revision) — next /gsd:plan-phase 307
+stopped_at: Phase 307 planned — 5 plans / 4 waves, checker PASSED after 1 revision, decisions 52/52 — executing (/gsd:execute-phase 307)
 ---
 
 # Project State
@@ -47,7 +47,7 @@ reviewer exists, so a phase closes `verification_mode: self-verified`, never `re
 Milestone: v4.9 Use It From Your Own Tools
 Phase: 307
 Plan: Not started
-Status: Context + sketches + UI-SPEC done — ready to plan (`/gsd:plan-phase 307`)
+Status: Planned (5 plans, 4 waves) — executing (`/gsd:execute-phase 307`); operator delegated execution 2026-11-03 ("do not ask me even for the execution"); cloud mig 224 paste, deploy and real Claude.ai connect stay operator-gated
 Last activity: 2026-11-03
 
 Phases start at **303**; migrations at **220**. Seeds taken in at intake: SEED-013, SEED-177, SEED-195, SEED-081, SEED-079; bug BUG-261022-01.
