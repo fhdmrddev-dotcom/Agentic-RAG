@@ -53,7 +53,8 @@ def _transport(status=200, body: bytes | None = None, headers: dict | None = Non
         if seen is not None:
             seen.append(request)
         payload = json.dumps(DOC).encode() if body is None else body
-        return httpx.Response(status, content=payload, headers=headers or {})
+        # A raw stream, not ``content=``: the binder reads with ``aiter_raw`` (the test_190 shape).
+        return httpx.Response(status, stream=httpx.ByteStream(payload), headers=headers or {})
 
     return httpx.MockTransport(handler)
 

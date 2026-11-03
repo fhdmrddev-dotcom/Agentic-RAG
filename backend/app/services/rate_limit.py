@@ -26,7 +26,10 @@ from app.models.user_settings import load_app_settings_async
 
 logger = logging.getLogger(__name__)
 
-Kind = Literal["start", "read", "citation", "mcp_ip", "expensive"]
+Kind = Literal[
+    "start", "read", "citation", "mcp_ip", "expensive",
+    "oauth_register", "oauth_authorize", "oauth_token", "oauth_revoke",
+]
 
 UNAVAILABLE_DETAIL = (
     "Rate limiting is unavailable right now, so this call was refused. Try again in a minute."
@@ -185,3 +188,41 @@ async def check_key_limit(redis, *, key_id: str, kind: Kind) -> tuple[int, int |
         logger.warning("mcp per-key limiter unavailable; refusing the call", exc_info=True)
         raise LimiterUnavailable() from exc
     return limit, retry
+
+
+# ── Phase 307-02 (D-34 / D-05 / T-307-10) — the four OAuth door buckets ─────────────────────────
+# ``/oauth/register``, ``/oauth/authorize``, ``/oauth/token`` and ``/oauth/revoke`` each count on
+# their OWN bucket kind, never ``mcp_ip``: a burst of registrations cannot starve token refreshes,
+# and none of them can starve ``/mcp``. Same Redis fixed window, same fail-closed rule.
+#
+# ⚠ DOOR-WIDE CEILINGS, NOT PER-CALLER LIMITS. As ``IP_CALLS_PER_MINUTE`` above records, every
+# caller behind the proxy shares one address — and every Claude.ai call comes from Anthropic's
+# published ranges anyway. These are sized as ceilings for the whole door (Pitfall 4). Real
+# per-caller attribution needs proxy-aware client addresses, which is SEED-397 (a uvicorn / proxy
+# change, deliberately left deferred by 307). Module constants on the ``IP_CALLS_PER_MINUTE``
+# precedent: ⛔ no env var, no setting.
+OAUTH_REGISTER_PER_MINUTE = 60
+OAUTH_AUTHORIZE_PER_MINUTE = 120
+OAUTH_TOKEN_PER_MINUTE = 600
+OAUTH_REVOKE_PER_MINUTE = 120
+
+_OAUTH_LIMITS: dict[str, int] = {
+    "oauth_register": OAUTH_REGISTER_PER_MINUTE,
+    "oauth_authorize": OAUTH_AUTHORIZE_PER_MINUTE,
+    "oauth_token": OAUTH_TOKEN_PER_MINUTE,
+    "oauth_revoke": OAUTH_REVOKE_PER_MINUTE,
+}
+
+
+async def check_oauth_limit(redis, *, client: str, kind: Kind) -> int | None:
+    """Count one call on an OAuth door from ``client``. ``None`` within the limit, else the
+    ``Retry-After`` seconds; raises ``LimiterUnavailable`` on any Redis failure (fail closed) and
+    ``ValueError`` for a kind that is not an OAuth door (never admitted uncounted)."""
+    limit = _OAUTH_LIMITS.get(kind)
+    if limit is None:
+        raise ValueError(f"{kind!r} is not an OAuth door bucket")
+    try:
+        return await hit(redis, key_id=client, kind=kind, limit=int(limit))
+    except Exception as exc:  # noqa: BLE001 — any Redis failure refuses; see the module docblock
+        logger.warning("oauth door limiter unavailable; refusing the call", exc_info=True)
+        raise LimiterUnavailable() from exc
