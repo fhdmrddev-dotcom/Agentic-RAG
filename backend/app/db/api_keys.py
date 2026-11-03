@@ -47,7 +47,9 @@ _KEY_COLUMN_NAMES = (
 _KEY_COLUMNS = ", ".join(_KEY_COLUMN_NAMES)
 
 # The resolver's projection: the client columns plus the digest it compares in constant time.
-_AUTH_COLUMNS = _KEY_COLUMNS + ", key_hash"
+# Phase 307 (D-15): plus ``oauth_client_id``, so the ONE admission tail can tell a grant from a key.
+# Deliberately NOT in the client projection above: a grant is never listed as a key (D-25).
+_AUTH_COLUMNS = _KEY_COLUMNS + ", oauth_client_id, key_hash"
 
 _LABEL_INDEX = "api_keys_owner_label_active_uq"
 
@@ -70,6 +72,7 @@ async def create_api_key(
     folder_ids: list[str] | None = None,
     tools: list[str] | None = None,
     include_external: bool = False,
+    oauth_client_id: UUID | None = None,
 ) -> dict:
     """Insert one key and return its CLIENT projection (never the digest).
 
@@ -77,16 +80,23 @@ async def create_api_key(
     ``folder_ids`` and ``tools`` are bound as PLAIN lists, like ``workflows`` (see the module
     docblock); ``folder_ids=None`` means "not narrowed by folder", never "nothing".
 
+    Phase 307 (D-15): ``oauth_client_id`` set makes the row an OAuth GRANT (kind ``'mcp'`` only,
+    ``api_keys_oauth_kind_check``); its ``key_hash`` is the digest of a secret nobody is shown.
+
     ``org_id`` is BOUND, not left to the ``autofill_org_id_by_owner`` trigger: a member of two
     orgs must get a key in the org they were acting in, and the trigger's ``LIMIT 1`` lookup
     would guess.
     """
+    # A personal key binds exactly the 304 statement; only a grant adds the twelfth column.
+    grant_col, grant_val, grant_args = (
+        ("", "", ()) if oauth_client_id is None else (", oauth_client_id", ", $12", (oauth_client_id,))
+    )
     try:
         row = await pool.fetchrow(
             f"INSERT INTO api_keys "
             f"(org_id, user_id, label, key_prefix, key_hash, workflows, expires_at, "
-            f"kind, folder_ids, tools, include_external) "
-            f"VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11) "
+            f"kind, folder_ids, tools, include_external{grant_col}) "
+            f"VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11{grant_val}) "
             f"RETURNING {_KEY_COLUMNS}",
             org_id,
             user_id,
@@ -99,6 +109,7 @@ async def create_api_key(
             folder_ids,  # plain list or None — same codec, same rule
             tools,  # plain list or None
             include_external,
+            *grant_args,
         )
     except asyncpg.UniqueViolationError as exc:
         if getattr(exc, "constraint_name", None) == _LABEL_INDEX:
@@ -127,10 +138,10 @@ _NAME_JOINS = (
 
 async def list_keys_for_owner(pool: asyncpg.Pool, *, org_id: UUID, user_id: UUID) -> list[dict]:
     """Every key this member owns in this org, newest first (revoked and expired included), with
-    the revoker's display name (an admin may have revoked it)."""
+    the revoker's display name (an admin may have revoked it). Never an OAuth grant (D-25)."""
     rows = await pool.fetch(
         f"SELECT {_named_columns()} FROM api_keys k {_NAME_JOINS}"
-        f"WHERE k.org_id = $1 AND k.user_id = $2 "
+        f"WHERE k.org_id = $1 AND k.user_id = $2 AND k.oauth_client_id IS NULL "
         f"ORDER BY k.created_at DESC",
         org_id,
         user_id,
@@ -139,10 +150,11 @@ async def list_keys_for_owner(pool: asyncpg.Pool, *, org_id: UUID, user_id: UUID
 
 
 async def list_keys_for_org(pool: asyncpg.Pool, *, org_id: UUID) -> list[dict]:
-    """Every key in this org, with the owner's and the revoker's display names (D-03, admin)."""
+    """Every key in this org, with the owner's and the revoker's display names (D-03, admin).
+    Never an OAuth grant (D-25): grants have their own connected-apps list."""
     rows = await pool.fetch(
         f"SELECT {_named_columns()} FROM api_keys k {_NAME_JOINS}"
-        f"WHERE k.org_id = $1 "
+        f"WHERE k.org_id = $1 AND k.oauth_client_id IS NULL "
         f"ORDER BY k.created_at DESC",
         org_id,
     )

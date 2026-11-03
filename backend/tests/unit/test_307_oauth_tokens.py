@@ -15,7 +15,11 @@ import pytest
 from app.security import oauth_tokens as ot
 
 RFC7636_VERIFIER = "dBjftJeZ4CVP-mB92K27uhbUJU1p1r_wW1gFWFOEjXk"
-RFC7636_CHALLENGE = "E9Melhoa2OwvFrEMTJguCHaoeK1t8URWbuGgSN6cXdM"
+# RFC 7636 appendix B, verbatim. ⚠ The 307-01 PLAN quoted the challenge as "...URWbuGgSN6cXdM",
+# which is NOT the RFC's value (measured: sha256 of the verifier gives "...URWbuGJSstw-cM", the
+# RFC's own text). That mistyped string is kept below as a wrong-challenge case.
+RFC7636_CHALLENGE = "E9Melhoa2OwvFrEMTJguCHaoeK1t8URWbuGJSstw-cM"
+PLAN_MISTYPED_CHALLENGE = "E9Melhoa2OwvFrEMTJguCHaoeK1t8URWbuGgSN6cXdM"
 
 
 def test_constants():
@@ -69,7 +73,8 @@ def test_pkce_rfc7636_appendix_b_vector():
 @pytest.mark.parametrize(
     "verifier,challenge",
     [
-        (RFC7636_VERIFIER, "E9Melhoa2OwvFrEMTJguCHaoeK1t8URWbuGgSN6cXdN"),   # wrong challenge
+        (RFC7636_VERIFIER, "E9Melhoa2OwvFrEMTJguCHaoeK1t8URWbuGJSstw-cN"),   # wrong challenge
+        (RFC7636_VERIFIER, PLAN_MISTYPED_CHALLENGE),
         (RFC7636_VERIFIER, ""),
         ("a" * 42, None),                                                   # too short
         ("a" * 129, None),                                                  # too long
