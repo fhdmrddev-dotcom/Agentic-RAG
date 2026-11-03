@@ -185,6 +185,52 @@ export async function revokeAllConnectedApps(): Promise<RevokeAllResult> {
   return (await res.json()) as RevokeAllResult
 }
 
+// ── the operator's redirect-host allowlist (307-05; D-08) ─────────────────────────────────────
+// `backend/app/api/oauth_admin.py`, operator only (anyone else reads the admin 404). The typed host
+// is sent VERBATIM: the server validates and never rewrites; a refusal is its sentence (422).
+
+export interface SignInHost {
+  host: string
+  /** One of the seeded hosts (claude.ai, claude.com). */
+  built_in: boolean
+  added_by_name: string | null
+  added_at: string | null
+}
+
+export interface SignInHostList {
+  hosts: SignInHost[]
+}
+
+const HOSTS_URL = `${API_BASE}/admin/mcp-sign-in-hosts`
+
+export async function getSignInHosts(signal?: AbortSignal): Promise<SignInHostList> {
+  const headers = await getAuthHeaders()
+  const res = await fetch(HOSTS_URL, { headers, signal })
+  if (!res.ok) throw new ApiError(await readFailure(res), res.status)
+  return (await res.json()) as SignInHostList
+}
+
+async function writeHost(url: string, host: string): Promise<SignInHostList> {
+  const headers = await getAuthHeaders()
+  const res = await fetch(url, {
+    method: "POST",
+    headers: { ...headers, "Content-Type": "application/json" },
+    body: JSON.stringify({ host }),
+  })
+  if (!res.ok) throw new ApiError(await readFailure(res), res.status)
+  return (await res.json()) as SignInHostList
+}
+
+/** Add a host (direct). Returns the list the server stored. */
+export function allowSignInHost(host: string): Promise<SignInHostList> {
+  return writeHost(HOSTS_URL, host)
+}
+
+/** Remove a host (arm-to-confirm in the UI). Apps already connected keep working (D-51). */
+export function removeSignInHost(host: string): Promise<SignInHostList> {
+  return writeHost(`${HOSTS_URL}/remove`, host)
+}
+
 /** The folders the member can tick in the PICKED org (P-6: the org sent explicitly). */
 export async function listFoldersForOrg(orgId: string, signal?: AbortSignal): Promise<PickableFolderList> {
   const headers = { ...((await getAuthHeaders()) as Record<string, string>), "X-Org-Id": orgId }

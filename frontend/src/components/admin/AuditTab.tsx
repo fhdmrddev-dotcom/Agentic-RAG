@@ -28,6 +28,7 @@ import { Download, Eye, X } from "lucide-react"
 import type { OperatorAuditRow, PlatformAuditFilters, PlatformAuditPage } from "@/lib/api"
 import { cn } from "@/lib/utils"
 import { TechnicalNamesToggle } from "./TechnicalNamesToggle"
+import { oauthAuditLabel } from "@/components/connect/oauthCopy"
 
 /** The two ledgers the one browser reads (067-A source switch). */
 export type AuditSource = "operator" | "platform"
@@ -114,6 +115,9 @@ const OPERATOR_ACTION_LABELS: Record<string, string> = {
   "operator.grant": "Granted operator access",
   "operator.revoke": "Removed operator access",
   "visibility.set": "Changed feature visibility",
+  // 307-05 (D-08): the AI tool sign-in return-address allowlist (api/oauth_admin.py).
+  "settings.mcp_sign_in_hosts.add": "Allowed an AI tool sign-in address",
+  "settings.mcp_sign_in_hosts.remove": "Removed an AI tool sign-in address",
 }
 
 function operatorActionLabel(code: string): string {
@@ -726,7 +730,10 @@ export function AuditTab({
                 >
                   {shortUser(row.user_id)}
                 </button>
-                <span className="text-foreground">{platformLabel(row.action_type)}</span>
+                {/* 307-05 (D-28): a connected app's api_key.* row reads the shared oauth words. */}
+                <span className="text-foreground">
+                  {oauthAuditLabel(row.action_type, row.metadata) ?? platformLabel(row.action_type)}
+                </span>
                 {showTechnical && (
                   <code className="flex-none rounded bg-muted/60 px-1 py-0.5 font-mono text-[10px] text-muted-foreground">
                     {row.action_type}

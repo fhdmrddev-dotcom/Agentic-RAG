@@ -781,7 +781,9 @@ async def revoke_org_key(
             "api_key.revoke",
             call="manage",
             detail={"by_admin": True, "owner_id": str(row["user_id"]),
-                    **(_grant_audit_detail(row) or {})},   # 307-05 (D-28): + credential oauth
+                    # 307-05 (D-28): + credential oauth, and the owner's name for the audit words
+                    **({**detail, "owner_name": row.get("owner_name")}
+                       if (detail := _grant_audit_detail(row)) else {})},
         )
     (key,) = await _serialize_keys(pool, [row], caller=caller, org_id=org)
     return key

@@ -174,4 +174,92 @@ export const OAUTH_COPY = {
     /** A member with no name on file (the 304 fallback shape). */
     unknownOwner: "a member",
   },
+
+  // ── 307-05 (UI-SPEC §"Control Room allowlist"; D-08, D-51, A-25). The armed prompt's last clause
+  //    is TRUE: /oauth/token never reads the allowlist (307-02), so a removal stops new sign-ins
+  //    only. ──
+  hosts: {
+    title: "AI tool sign-in: return addresses",
+    sub: "After someone signs in, an app may only send them back to one of these addresses. Apps on the person's own computer (localhost) are always allowed and are not listed.",
+    technicalKey: "mcp_oauth_redirect_hosts",
+    builtIn: "built in",
+    addedBy: "added by {name} on {date}",
+    /** 307-05 authored: an added row whose author or date is not on file. */
+    addedByUnknown: "added by an operator",
+    inputAria: "Address to allow",
+    placeholder: "e.g. claude.ai",
+    hint: "A host name only, like claude.ai. No https://, path, port or *.",
+    add: "Allow address",
+    remove: "Remove",
+    removeAria: "Remove {host}",
+    armed:
+      "Stop sending sign-ins to {host}? Apps that return there can't connect until it is added again. Apps already connected keep working.",
+    keep: "Keep {host}",
+    keepAria: "Keep {host} on the list",
+    confirmRemove: "Remove {host}",
+    empty: "No web app can sign in. Only apps on a person's own computer can.",
+    loading: "Loading…",
+    loadFailed: "Couldn't load this setting.",
+    retry: "Retry",
+    saveFailed: "Couldn't save it. {sentence}",
+  },
+
+  // ── 307-05 (UI-SPEC §"Audit words"; D-28: no new literal). Read by AuditTab AND OrgAuditTab
+  //    through `oauthAuditLabel` below, so the two browsers say the same words. ──
+  audit: {
+    created: "Connected {client} ({host}) as an app",
+    disconnected: "Disconnected {client} ({host})",
+    disconnectedByAdmin: "Disconnected {owner}'s app {client} ({host})",
+    disconnectedAll: "Disconnected all {N} connected app(s) in the organisation",
+    refreshReuse: "Refused a reused sign-in from {client} ({host}) and disconnected it",
+    wrongResource: "Refused a sign-in meant for another server from {client} ({host})",
+    clientFallback: "an app",
+    ownerFallback: "a member",
+  },
 } as const
+
+/** The client's name as the audit tables show it: plain text, capped at 60 (T-307-23). */
+const CLIENT_CAP = 60
+
+function auditFill(template: string, vars: Record<string, string | number | null>): string {
+  // A missing host drops its " ({host})" rather than printing an empty pair of brackets.
+  const t = vars.host ? template : template.replace(/ \(\{host\}\)/g, "")
+  const n = typeof vars.N === "number" ? vars.N : undefined
+  return t
+    .replace(/\(s\)/g, n === 1 ? "" : "s")
+    .replace(/\{([a-zA-Z]+)\}/g, (whole, k: string) => (vars[k] === null || vars[k] === undefined ? whole : String(vars[k])))
+}
+
+/**
+ * Plain words for an `api_key.*` audit row written for a CONNECTED APP (`credential: "oauth"`,
+ * in `metadata.detail` — or at the top level), or `null` for any other row, which keeps its 293
+ * label. Pure and import-free, so both audit browsers share it without a new literal (D-28).
+ */
+export function oauthAuditLabel(actionType: string, metadata: Record<string, unknown> | null | undefined): string | null {
+  if (!metadata || typeof metadata !== "object") return null
+  const raw = metadata.detail
+  const detail = raw && typeof raw === "object" ? (raw as Record<string, unknown>) : {}
+  const credential = detail.credential ?? metadata.credential
+  if (credential !== "oauth") return null
+  const pick = (k: string): unknown => detail[k] ?? metadata[k]
+  const str = (v: unknown): string | null => (typeof v === "string" && v.trim() ? v : null)
+  const W = OAUTH_COPY.audit
+  const client = (str(pick("client_name")) ?? str(metadata.api_key_label) ?? W.clientFallback).slice(0, CLIENT_CAP)
+  const host = str(pick("redirect_host"))
+  if (actionType === "api_key.create") return auditFill(W.created, { client, host })
+  if (actionType === "api_key.revoke") {
+    const count = pick("count")
+    if (pick("scope") === "org" && typeof count === "number") return auditFill(W.disconnectedAll, { N: count })
+    if (pick("by_admin") === true) {
+      const owner = str(pick("owner_name")) ?? W.ownerFallback
+      return auditFill(W.disconnectedByAdmin, { owner, client, host })
+    }
+    return auditFill(W.disconnected, { client, host })
+  }
+  if (actionType === "api_key.refused") {
+    const reason = pick("reason")
+    if (reason === "refresh_reuse") return auditFill(W.refreshReuse, { client, host })
+    if (reason === "wrong_resource") return auditFill(W.wrongResource, { client, host })
+  }
+  return null
+}
