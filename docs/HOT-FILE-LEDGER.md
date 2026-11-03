@@ -12353,6 +12353,26 @@ cells rot within days.
 | [`backend/app/mcp/run_tools.py`](docs/HOT-FILE-LEDGER.md#backendappmcprun_toolspy) | 1 / 1 / 298 (was `0 / 0 / 0`) | no (young) | young (306-05, D-10..D-13): list / run / get run over the shared start, read and admission seams. ⛔ returns at once; ONE credential-bound access statement |
 | [`frontend/src/components/chat/outsideAskEnvelope.ts`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentschatoutsideaskenvelopets) | 1 / 1 / 33 (was `0 / 0 / 0`) | no (young) | young (created 306-04, D-32): outsideAskQuestion (exact mcp envelope only, inner text verbatim) + OUTSIDE_ASK_NOTE. ⛔ zero-import leaf; pinned with the backend writer by the phase306 fixture |
 | [`frontend/src/components/chat/UserMessageBubble.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentschatusermessagebubbletsx) | 2 / 2 / 79 (was `1 / 1 / 67`) | no (2 phases) | 306-04 (D-32): renders and measures question ?? content; one Bot note after Read more when an ask. Plain bubble pinned byte-identical to base. ⛔ clamp, fade and toggle unchanged |
+| [`backend/app/security/oauth_tokens.py`](docs/HOT-FILE-LEDGER.md#backendappsecurityoauth_tokenspy) | 0 / 0 / 0 | no (young) | AT PLANNING (307-01): token prefixes srl_oat_/srl_ort_, mint, sha256 digest, PKCE S256, canonical resource (D-17). ⛔ pure, no I/O; tokens never logged |
+| [`backend/app/db/oauth.py`](docs/HOT-FILE-LEDGER.md#backendappdboauthpy) | 0 / 0 / 0 | no (young) | AT PLANNING (307-01): clients, tokens, rotate_refresh (D-19/D-46 grace + family revoke), live allowlist read (D-08). ⛔ digests only; owner predicate except 2 digest lookups |
+| [`backend/app/mcp/oauth_clients.py`](docs/HOT-FILE-LEDGER.md#backendappmcpoauth_clientspy) | 0 / 0 / 0 | no (young) | AT PLANNING (307-02): redirect match (D-07 loopback any port), DCR/CIMD rules, CIMD fetch via egress only (D-06). ⛔ no httpx; never AnyUrl |
+| [`backend/app/mcp/oauth_metadata.py`](docs/HOT-FILE-LEDGER.md#backendappmcpoauth_metadatapy) | 0 / 0 / 0 | no (young) | AT PLANNING (307-02): issuer, PRM URL, .well-known bodies from mcp_public_base() (D-02/D-04/D-49). ⛔ never Host-derived; one issuer string |
+| [`backend/app/mcp/oauth_store.py`](docs/HOT-FILE-LEDGER.md#backendappmcpoauth_storepy) | 0 / 0 / 0 | no (young) | AT PLANNING (307-02): Redis pending requests + codes, atomic MULTI GET+DEL (D-45). ⛔ never copy oauth_state's non-atomic take (P-2) |
+| [`backend/app/mcp/oauth_server.py`](docs/HOT-FILE-LEDGER.md#backendappmcpoauth_serverpy) | 0 / 0 / 0 | no (young) | AT PLANNING (307-02): /oauth/register, authorize, token, revoke + .well-known handlers (D-44 hand-rolled). ⛔ never redirect to an unproven URI; no-store |
+| [`backend/app/services/mcp_narrowing.py`](docs/HOT-FILE-LEDGER.md#backendappservicesmcp_narrowingpy) | 0 / 0 / 0 | no (young) | AT PLANNING (307-03): the ONE MCP narrowing validator moved out of api_keys.py, shared by key create + consent approve. ⛔ no fastapi import; sentences imported |
+| [`backend/app/api/oauth_consent.py`](docs/HOT-FILE-LEDGER.md#backendappapioauth_consentpy) | 0 / 0 / 0 | no (young) | AT PLANNING (307-03): GET/approve/deny /oauth/requests/{id} on the member session (D-13/D-14/D-50). ⛔ org = body org_id, never X-Org-Id |
+| [`backend/app/api/oauth_admin.py`](docs/HOT-FILE-LEDGER.md#backendappapioauth_adminpy) | 0 / 0 / 0 | no (young) | AT PLANNING (307-05): operator routes for the redirect-host allowlist (D-08), keeps admin.py untouched. ⛔ require_operator on the router; audited |
+| [`frontend/src/lib/api/oauth.ts`](docs/HOT-FILE-LEDGER.md#frontendsrclibapioauthts) | 0 / 0 / 0 | no (young) | AT PLANNING (307-03): consent, connected apps and allowlist client calls; explicit X-Org-Id for a picked org (P-6). ⛔ lib/api.ts barrel never edited |
+| [`frontend/src/components/connect/oauthCopy.ts`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentsconnectoauthcopyts) | 0 / 0 / 0 | no (young) | AT PLANNING (307-03): every consent / connected-apps / allowlist string (import-free leaf). ⛔ imports nothing |
+| [`frontend/src/components/connect/consentFacts.ts`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentsconnectconsentfactsts) | 0 / 0 / 0 | no (young) | AT PLANNING (307-03): summary sentence, first unmet Allow reason, why-line, redirect host-match guard. ⛔ pure |
+| [`frontend/src/components/connect/ConsentPage.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentsconnectconsentpagetsx) | 0 / 0 / 0 | no (young) | AT PLANNING (307-03): the consent route: every state, Allow/Deny, host-match + frame guards (D-12/D-35). ⛔ location.replace only after host match |
+| [`frontend/src/components/connect/ConsentWhoIsAsking.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentsconnectconsentwhoisaskingtsx) | 0 / 0 / 0 | no (young) | AT PLANNING (307-03): who-well: name as a claim, redirect host as the fact (D-12). ⛔ text only; no logo, no link |
+| [`frontend/src/components/connect/ConsentOrgField.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentsconnectconsentorgfieldtsx) | 0 / 0 / 0 | no (young) | AT PLANNING (307-03): org radiogroup; switched-off orgs listed with the 304 sentence (D-13). ⛔ never hide a switched-off org |
+| [`frontend/src/components/settings/apiKeys/ConnectedAppsSection.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentssettingsapikeysconnectedappssectiontsx) | 0 / 0 / 0 | no (young) | AT PLANNING (307-05): member's connected apps: own read, states, receipt (D-25). ⛔ never optimistic |
+| [`frontend/src/components/settings/apiKeys/ConnectedAppCard.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentssettingsapikeysconnectedappcardtsx) | 0 / 0 / 0 | no (young) | AT PLANNING (307-05): one connected app card (member + admin showOwner). ⛔ no secret/prefix/label shown |
+| [`frontend/src/components/settings/apiKeys/DisconnectAppSheet.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentssettingsapikeysdisconnectappsheettsx) | 0 / 0 / 0 | no (young) | AT PLANNING (307-05): victim-naming Disconnect sheet on the RevokeApiKeySheet shape. ⛔ RevokeApiKeySheet stays unchanged |
+| [`frontend/src/components/org/OrgConnectedApps.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentsorgorgconnectedappstsx) | 0 / 0 / 0 | no (young) | AT PLANNING (307-05): org's connected apps + Disconnect all sheet (D-26). ⛔ grants only, never keys; server count |
+| [`frontend/src/components/admin/McpSignInHostsCard.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentsadminmcpsigninhostscardtsx) | 0 / 0 / 0 | no (young) | AT PLANNING (307-05): Control Room allowlist: add direct, remove arm-to-confirm (D-08/D-51). ⛔ no control on a failed read |
 
 
 
@@ -29840,3 +29860,127 @@ CLAUDE.md verdict cell: none (the file does not fire).
 Scan-list cell as of 2026-11-01 (replaced by 306-05, moved verbatim): 415 / 88 / 6956 (was `412 / 87 / 6948`) | ⚠ **FIRES** | 306-04: three first pins + FILE-LEVEL targets (origin306 9, outsideAskEnvelope 8, bubble 5); raised RunOriginLine 6->9, runOriginVocabulary 11->14; none lowered |
 
 CLAUDE.md verdict cell as of 2026-11-01 (replaced by 306-05, moved verbatim): | `scripts/vitest-count-gate.cjs` | 415 / 88 / 6956 (was `412 / 87 / 6948`) | 306-04: 3 first pins + 2 raised; none lowered |
+
+## Phase 307 — new files (rows planted at planning, 2026-11-03)
+
+Planted by the 307 planner so the G-5 gate can see every file the phase creates. Each executor re-derives the triple when the file lands; 307-05 Task 3 records what shipped.
+
+### `backend/app/security/oauth_tokens.py`
+
+**`0 / 0 / 0`** (planned 307-01). token prefixes srl_oat_/srl_ort_, mint, sha256 digest, PKCE S256, canonical resource (D-17). ⛔ Binding: pure, no I/O; tokens never logged.
+
+CLAUDE.md verdict cell: none (the file does not fire).
+
+### `backend/app/db/oauth.py`
+
+**`0 / 0 / 0`** (planned 307-01). clients, tokens, rotate_refresh (D-19/D-46 grace + family revoke), live allowlist read (D-08). ⛔ Binding: digests only; owner predicate except 2 digest lookups.
+
+CLAUDE.md verdict cell: none (the file does not fire).
+
+### `backend/app/mcp/oauth_clients.py`
+
+**`0 / 0 / 0`** (planned 307-02). redirect match (D-07 loopback any port), DCR/CIMD rules, CIMD fetch via egress only (D-06). ⛔ Binding: no httpx; never AnyUrl.
+
+CLAUDE.md verdict cell: none (the file does not fire).
+
+### `backend/app/mcp/oauth_metadata.py`
+
+**`0 / 0 / 0`** (planned 307-02). issuer, PRM URL, .well-known bodies from mcp_public_base() (D-02/D-04/D-49). ⛔ Binding: never Host-derived; one issuer string.
+
+CLAUDE.md verdict cell: none (the file does not fire).
+
+### `backend/app/mcp/oauth_store.py`
+
+**`0 / 0 / 0`** (planned 307-02). Redis pending requests + codes, atomic MULTI GET+DEL (D-45). ⛔ Binding: never copy oauth_state's non-atomic take (P-2).
+
+CLAUDE.md verdict cell: none (the file does not fire).
+
+### `backend/app/mcp/oauth_server.py`
+
+**`0 / 0 / 0`** (planned 307-02). /oauth/register, authorize, token, revoke + .well-known handlers (D-44 hand-rolled). ⛔ Binding: never redirect to an unproven URI; no-store.
+
+CLAUDE.md verdict cell: none (the file does not fire).
+
+### `backend/app/services/mcp_narrowing.py`
+
+**`0 / 0 / 0`** (planned 307-03). the ONE MCP narrowing validator moved out of api_keys.py, shared by key create + consent approve. ⛔ Binding: no fastapi import; sentences imported.
+
+CLAUDE.md verdict cell: none (the file does not fire).
+
+### `backend/app/api/oauth_consent.py`
+
+**`0 / 0 / 0`** (planned 307-03). GET/approve/deny /oauth/requests/{id} on the member session (D-13/D-14/D-50). ⛔ Binding: org = body org_id, never X-Org-Id.
+
+CLAUDE.md verdict cell: none (the file does not fire).
+
+### `backend/app/api/oauth_admin.py`
+
+**`0 / 0 / 0`** (planned 307-05). operator routes for the redirect-host allowlist (D-08), keeps admin.py untouched. ⛔ Binding: require_operator on the router; audited.
+
+CLAUDE.md verdict cell: none (the file does not fire).
+
+### `frontend/src/lib/api/oauth.ts`
+
+**`0 / 0 / 0`** (planned 307-03). consent, connected apps and allowlist client calls; explicit X-Org-Id for a picked org (P-6). ⛔ Binding: lib/api.ts barrel never edited.
+
+CLAUDE.md verdict cell: none (the file does not fire).
+
+### `frontend/src/components/connect/oauthCopy.ts`
+
+**`0 / 0 / 0`** (planned 307-03). every consent / connected-apps / allowlist string (import-free leaf). ⛔ Binding: imports nothing.
+
+CLAUDE.md verdict cell: none (the file does not fire).
+
+### `frontend/src/components/connect/consentFacts.ts`
+
+**`0 / 0 / 0`** (planned 307-03). summary sentence, first unmet Allow reason, why-line, redirect host-match guard. ⛔ Binding: pure.
+
+CLAUDE.md verdict cell: none (the file does not fire).
+
+### `frontend/src/components/connect/ConsentPage.tsx`
+
+**`0 / 0 / 0`** (planned 307-03). the consent route: every state, Allow/Deny, host-match + frame guards (D-12/D-35). ⛔ Binding: location.replace only after host match.
+
+CLAUDE.md verdict cell: none (the file does not fire).
+
+### `frontend/src/components/connect/ConsentWhoIsAsking.tsx`
+
+**`0 / 0 / 0`** (planned 307-03). who-well: name as a claim, redirect host as the fact (D-12). ⛔ Binding: text only; no logo, no link.
+
+CLAUDE.md verdict cell: none (the file does not fire).
+
+### `frontend/src/components/connect/ConsentOrgField.tsx`
+
+**`0 / 0 / 0`** (planned 307-03). org radiogroup; switched-off orgs listed with the 304 sentence (D-13). ⛔ Binding: never hide a switched-off org.
+
+CLAUDE.md verdict cell: none (the file does not fire).
+
+### `frontend/src/components/settings/apiKeys/ConnectedAppsSection.tsx`
+
+**`0 / 0 / 0`** (planned 307-05). member's connected apps: own read, states, receipt (D-25). ⛔ Binding: never optimistic.
+
+CLAUDE.md verdict cell: none (the file does not fire).
+
+### `frontend/src/components/settings/apiKeys/ConnectedAppCard.tsx`
+
+**`0 / 0 / 0`** (planned 307-05). one connected app card (member + admin showOwner). ⛔ Binding: no secret/prefix/label shown.
+
+CLAUDE.md verdict cell: none (the file does not fire).
+
+### `frontend/src/components/settings/apiKeys/DisconnectAppSheet.tsx`
+
+**`0 / 0 / 0`** (planned 307-05). victim-naming Disconnect sheet on the RevokeApiKeySheet shape. ⛔ Binding: RevokeApiKeySheet stays unchanged.
+
+CLAUDE.md verdict cell: none (the file does not fire).
+
+### `frontend/src/components/org/OrgConnectedApps.tsx`
+
+**`0 / 0 / 0`** (planned 307-05). org's connected apps + Disconnect all sheet (D-26). ⛔ Binding: grants only, never keys; server count.
+
+CLAUDE.md verdict cell: none (the file does not fire).
+
+### `frontend/src/components/admin/McpSignInHostsCard.tsx`
+
+**`0 / 0 / 0`** (planned 307-05). Control Room allowlist: add direct, remove arm-to-confirm (D-08/D-51). ⛔ Binding: no control on a failed read.
+
+CLAUDE.md verdict cell: none (the file does not fire).
