@@ -44,7 +44,10 @@ export function returnTarget(pathname: string, search: string): string | null {
   }
 }
 
-export type ReturnKind = "a chat" | "a workflow" | "a workflow run" | "an Expert"
+/** Phase 307-03 (D-11): an AI tool's sign-in request — the kind, never the app's name. */
+const CONNECT_KIND = "the page that connects your app"
+
+export type ReturnKind = "a chat" | "a workflow" | "a workflow run" | "an Expert" | typeof CONNECT_KIND
 
 /** Id key → the kind word. Order is irrelevant: a route carries at most one of them. */
 const KIND_BY_KEY: ReadonlyArray<readonly [string, ReturnKind]> = [
@@ -52,6 +55,7 @@ const KIND_BY_KEY: ReadonlyArray<readonly [string, ReturnKind]> = [
   ["threadId", "a chat"],
   ["definitionId", "a workflow"],
   ["bundleId", "an Expert"],
+  ["requestId", CONNECT_KIND],
 ]
 
 /** What kind of thing the address opens — entity routes only; views and home name nothing. */
