@@ -11,7 +11,7 @@ progress:
   total_plans: 15
   completed_plans: 15
   percent: 14
-stopped_at: Phase 307 executing — wave 1/4 merged (307-01 mig 224 local + one resolver; 307-04 routing parity + sign-in snippet); next wave 2 (307-02 AS protocol)
+stopped_at: Phase 307 executing — waves 1-2/4 merged (01 data+resolver, 04 routing, 02 authorization server live round trip); next wave 3 (307-03 consent)
 ---
 
 # Project State

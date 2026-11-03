@@ -209,7 +209,7 @@ Plans:
 
 **Wave 2** *(blocked on Wave 1 completion)*
 
-- [ ] 307-02-PLAN.md — the authorization server: redirect / DCR / CIMD rules, client_metadata egress capability, OAuth limiter buckets, .well-known docs + 401 resource_metadata, Redis store, register / authorize / token / revoke; live round trip, per-case removal, PostgREST refusal
+- [x] 307-02-PLAN.md — the authorization server: redirect / DCR / CIMD rules, client_metadata egress capability, OAuth limiter buckets, .well-known docs + 401 resource_metadata, Redis store, register / authorize / token / revoke; live round trip, per-case removal, PostgREST refusal
 
 **Wave 3** *(blocked on Wave 2 completion)*
 
