@@ -11,7 +11,7 @@ progress:
   total_plans: 15
   completed_plans: 15
   percent: 14
-stopped_at: Phase 307 sketched (307-consent-page A, 307-connected-apps A, self-picked) — next /gsd:ui-phase 307, then /gsd:plan-phase 307
+stopped_at: Phase 307 UI-SPEC approved (6/6, 1 revision) — next /gsd:plan-phase 307
 ---
 
 # Project State
@@ -47,7 +47,7 @@ reviewer exists, so a phase closes `verification_mode: self-verified`, never `re
 Milestone: v4.9 Use It From Your Own Tools
 Phase: 307
 Plan: Not started
-Status: Context + sketches done — UI-SPEC next (`/gsd:ui-phase 307`)
+Status: Context + sketches + UI-SPEC done — ready to plan (`/gsd:plan-phase 307`)
 Last activity: 2026-11-03
 
 Phases start at **303**; migrations at **220**. Seeds taken in at intake: SEED-013, SEED-177, SEED-195, SEED-081, SEED-079; bug BUG-261022-01.
