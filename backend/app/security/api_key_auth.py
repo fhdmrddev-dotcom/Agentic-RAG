@@ -41,7 +41,7 @@ import re
 import secrets
 import time
 from dataclasses import dataclass
-from datetime import datetime
+from datetime import datetime, timezone
 from typing import Any, Literal
 
 import asyncpg
@@ -50,8 +50,10 @@ from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 from starlette.concurrency import run_in_threadpool
 
 from app.db import api_keys as api_keys_db
+from app.db import oauth as oauth_db
 from app.dependencies import get_pg_pool, get_redis, get_service_role_supabase
-from app.security.principal_liveness import principal_still_allowed
+from app.security import oauth_tokens
+from app.security.principal_liveness import Refusal, principal_still_allowed
 from app.services.audit_service import write_audit_entry
 
 logger = logging.getLogger(__name__)
@@ -393,12 +395,98 @@ async def authenticate_presented_key(
     if not hmac.compare_digest(str(row.get("key_hash", "")), digest):
         raise KeyRefused("unknown")
 
+    return await _admit(row, pool=pool, redis=redis, call=call, expected_kind=expected_kind,
+                        credential="key")
+
+
+async def authenticate_presented_access_token(
+    presented: str,
+    *,
+    pool,
+    redis,
+    call: str = "read",
+    resource: str | None,
+) -> ResolvedKey:
+    """Phase 307 (D-21, D-18, D-23) — the OAuth access-token LOOKUP in front of the same tail.
+
+    digest -> ``oauth_db.get_access_token_for_auth`` (the token row JOINed to its grant's
+    ``_AUTH_COLUMNS``) -> constant-time compare -> token revoked / expired -> resource -> ``_admit``
+    with ``credential="oauth"`` (which requires the grant row to name its client, D-15).
+
+    An unknown, malformed, expired or revoked token is the plain ``KeyRefused("unknown")``,
+    UNAUDITED: it is routine (the client refreshes on it) and it is the same refusal the edge
+    already turns into its one identical 401 (D-23). A token minted for another resource is
+    attributable, so it is audited (``wrong_resource``, D-18). ``resource`` is the address this
+    deployment serves (``mcp_url()``); ``None`` (not served) refuses every token.
+
+    ⚠ The token is never logged and never put in audit metadata (D-17) — not even a fingerprint.
+    """
+    digest = oauth_tokens.digest_token(presented, "access")
+    if digest is None:
+        raise KeyRefused("unknown")
+    row = await oauth_db.get_access_token_for_auth(pool, digest)
+    if row is None:
+        raise KeyRefused("unknown")
+    if not hmac.compare_digest(str(row.get("token_hash", "")), digest):
+        raise KeyRefused("unknown")
+    token_expires_at = row.get("token_expires_at")
+    if row.get("token_revoked_at") is not None or (
+        token_expires_at is None or token_expires_at <= datetime.now(timezone.utc)
+    ):
+        raise KeyRefused("unknown")
+    wanted = oauth_tokens.canonical_resource(resource) if resource is not None else None
+    if wanted is None or oauth_tokens.canonical_resource(row.get("resource")) != wanted:
+        raise await _refused(row, call=call, reason="wrong_resource", redis=redis)
+    return await _admit(row, pool=pool, redis=redis, call=call, expected_kind="mcp",
+                        credential="oauth")
+
+
+async def _liveness(pool, row: dict) -> Refusal | None:
+    """The ONE call site of ``principal_still_allowed`` in this module (D-21; the AST fence in
+    ``test_307_one_resolver_fence``). Reached only by ``_admit`` and
+    ``grant_still_live_for_refresh``: revoked -> expired -> member -> banned -> (mcp) deployment
+    switch -> org switch (D-18)."""
+    return await principal_still_allowed(pool, key_row=row)
+
+
+async def grant_still_live_for_refresh(pool, key_row: dict) -> Refusal | None:
+    """The D-48 subset — the one place ``/oauth/token`` asks whether a grant is still alive.
+
+    ``backend/app/mcp/`` must call this, never ``principal_still_allowed``
+    (``test_307_one_resolver_fence``; D-21: one liveness call site). Returns the ``Refusal`` for
+    ``revoked`` / ``expired`` / ``not_member`` / ``banned`` and ``None`` for a live grant AND for
+    ``mcp_off_org`` / ``mcp_off_deployment``: a switched-off org or deployment never blocks a
+    refresh (the next ``/mcp`` call is refused instead). Exact, because ``principal_still_allowed``
+    checks all four life-or-death facts BEFORE either switch. No audit, no ``touch_last_used``,
+    never raises on a refusal.
+    """
+    refusal = await _liveness(pool, key_row)
+    if refusal is None or refusal.reason in ("mcp_off_org", "mcp_off_deployment"):
+        return None
+    return refusal
+
+
+async def _admit(
+    row: dict,
+    *,
+    pool,
+    redis,
+    call: str,
+    expected_kind: KeyKind,
+    credential: Literal["key", "oauth"],
+) -> ResolvedKey:
+    """The ONE admission tail (D-21), shared by a key and an OAuth access token: kind ->
+    grant-vs-key -> liveness -> touch -> ``ResolvedKey``. ``row`` is an ``api_keys`` row (for a
+    token, its GRANT's row), so every rule a key obeys applies to a grant by construction."""
     # Refusal #2 of D-06: the row's own kind. A pre-mig-220 row carries no column: a workflow key.
     if row.get("kind", "workflow") != expected_kind:
         raise await _refused(row, call=call, reason="wrong_kind", redis=redis)
 
-    # revoked -> expired -> member -> banned -> (mcp) org switch -> deployment switch (D-18).
-    refusal = await principal_still_allowed(pool, key_row=row)
+    # D-15: a grant row never acts as a key, and a token whose row names no client is no grant.
+    if (row.get("oauth_client_id") is not None) != (credential == "oauth"):
+        raise await _refused(row, call=call, reason="wrong_kind", redis=redis)
+
+    refusal = await _liveness(pool, row)
     if refusal is not None:
         raise await _refused(
             row, call=call, reason=refusal.reason, redis=redis, sentence=refusal.sentence
