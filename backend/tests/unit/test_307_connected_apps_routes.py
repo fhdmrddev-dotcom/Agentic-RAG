@@ -315,9 +315,11 @@ def test_admin_revoke_of_a_grant_keeps_by_admin_and_adds_oauth(client, store):
     assert r.status_code == 200, r.text
     (row,) = store.audits
     assert row["user_id"] == ADMIN
+    # 307-05 Task 3: the owner's NAME rides along so the audit tables can say "Disconnected
+    # {owner}'s app" (the row carries only owner_id otherwise).
     assert row["metadata"]["detail"] == {
         "by_admin": True, "owner_id": OTHER, "credential": "oauth",
-        "client_name": "Cursor", "redirect_host": "cursor.example.com",
+        "client_name": "Cursor", "redirect_host": "cursor.example.com", "owner_name": "Lee Park",
     }
 
 
