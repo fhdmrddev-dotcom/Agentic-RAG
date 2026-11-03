@@ -268,6 +268,18 @@ def test_a_cimd_client_reads_its_published_host(client, world):
     assert client_wire["name_source"] == "cimd" and client_wire["published_host"] == "claude.ai"
 
 
+def test_bidi_and_zero_width_characters_are_dropped_from_the_name():
+    """T-307-23 (Rule 2, found during 307-03): a self-registered name cannot reorder or hide its
+    letters with Unicode format characters to pass for another app."""
+    from app.api.oauth_consent import client_label
+
+    assert client_label("Cl‮edua‬") == "Cledua"
+    assert client_label("Cla​ude") == "Claude"
+    assert client_label("Claude\x07\x1b[31m") == "Claude[31m"
+    assert client_label("‮​") == "Connected app"
+    assert client_label("  two\n\tlines  ") == "two lines"
+
+
 def test_a_missing_name_reads_connected_app_and_a_long_one_is_capped(client, world):
     rid = world.save(client_name=None)
     assert client.get(f"/oauth/requests/{rid}", headers=AUTH).json()["client"]["name"] == "Connected app"

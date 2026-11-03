@@ -31,6 +31,7 @@ from __future__ import annotations
 
 import logging
 import secrets
+import unicodedata
 from datetime import datetime, timedelta, timezone
 from typing import Annotated, Any
 from urllib.parse import urlencode
@@ -102,10 +103,16 @@ class ConsentApprove(BaseModel):
 
 
 def client_label(name: Any) -> str:
-    """The client's self-chosen name as Syrel stores and shows it: trimmed, capped at 60, or
-    ``Connected app``. It is a CLAIM (D-12) — the host beside it is the fact."""
-    text = " ".join(str(name).split()) if isinstance(name, str) else ""
-    return text[:LABEL_MAX].strip() or LABEL_FALLBACK
+    """The client's self-chosen name as Syrel stores and shows it: whitespace collapsed, control
+    and format characters dropped, trimmed, capped at 60, or ``Connected app``. It is a CLAIM
+    (D-12) — the host beside it is the fact.
+
+    ⛔ T-307-23: format characters (Unicode ``Cf`` — bidi overrides such as U+202E, zero-width
+    joiners) are dropped, so a self-registered name cannot reorder or hide its own letters to read
+    as another app's name on the consent page or in the audit log."""
+    text = " ".join(name.split()) if isinstance(name, str) else ""
+    text = "".join(ch for ch in text if unicodedata.category(ch)[0] != "C")
+    return " ".join(text.split())[:LABEL_MAX].strip() or LABEL_FALLBACK
 
 
 def _catalogue() -> list[dict]:
