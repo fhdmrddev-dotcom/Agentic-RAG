@@ -117,6 +117,8 @@ environment. When a change touches the left column, do the right column **in clo
 | **`ENVIRONMENT=production` on the backend (Phase 276, DOCS-04, D-23)** | **Coolify → backend → Environment Variables** must carry `ENVIRONMENT=production`. Since Phase 276 it is no longer just a marker: it is what makes `/docs`, `/redoc` and `/openapi.json` refuse unauthenticated callers. ⚠ Unset, the live API explorer **fails OPEN** silently — the boot log says `API docs: OPEN (ENVIRONMENT='')` instead of `API docs: GATED`. **CORRECTED 2026-10-05 (276-REVIEW A-WR-01):** only unset / `local` / `development` / `dev` / `test` open it; `staging` and every other value are gated (fail-closed), and an open explorer under `dev`/`development`/`test` logs at WARNING. |
 | **Vercel "Include source files outside of the Root Directory in the Build Step" (Phase 276, D-23)** | Must be **ON** in the Vercel project settings. The docs build reads `docs/public/**` and `docs/history/**`, which sit outside the `frontend/` root directory. |
 | **Sign-in return to a link (Phase 299, D-25)** | Supabase Auth → URL Configuration → Redirect URLs include `https://app.<domain>/**` and the one-box origin (Phase 299 sign-in return). SSO and sign-up send `redirectTo` / `emailRedirectTo` = `<origin>/app/...`; a value off the list falls back to the Site URL, so the person lands on chat instead of the link. Local Supabase CLI config is not in the repo: check the local allow-list by hand before testing SSO return. |
+| **Sign-in from Claude.ai / Claude Desktop / Claude Code (Phase 307) — migration 224** | Paste `supabase/migrations/224_*.sql` into the cloud SQL editor **after 220 → 221 → 222 → 223**, in that order, once each — **every paste is its own operator-approved action** (approval for one is never approval for the next). Then run `get_advisors(security)` against the cloud project: zero ERROR-level findings, and no new table or column readable by `anon` / `authenticated`. **No env var is added** (D-32): the issuer derives from `BACKEND_PUBLIC_URL`. |
+| **Anthropic egress through a WAF (Phase 307, D-52)** | Any WAF / Cloudflare rule in front of `api.<domain>` must allow **`160.79.104.0/21` and `153.61.208.0/20`** to `/.well-known/*`, `/oauth/*` and `/mcp`. And from **inside the backend container**: `curl -sS -o /dev/null -w "%{http_code} %{content_type}" https://claude.ai/oauth/claude-code-client-metadata` must print `200 application/json` (else every Claude Code sign-in fails). Details: `docs/OPERATOR.md` → *Sign-in from Claude.ai, Claude Desktop and Claude Code*. |
 | **Subdomain routing (`app.<domain>`)** | Attach `app.<domain>` to Vercel project, set `VITE_APP_URL=https://app.<domain>`, add to Coolify `FRONTEND_URL`, and update Cloud Supabase Auth Site URL & redirect allowlist (full 7-step runbook in `docs/OPERATOR.md`). |
 
 **Settings drift is the #1 cloud gotcha.** Many settings columns exist in the DB but some are
@@ -163,6 +165,36 @@ Before `master → production`:
       is open to the internet.
 - [ ] **Coolify backend has `ENVIRONMENT=production`** and **Vercel's "Include source files outside
       of the Root Directory in the Build Step" is ON** (Phase 276, D-23 — both are §5 rows).
+- [ ] **OAuth discovery answers JSON on every topology (Phase 307, D-30).** Each must print
+      `application/json` (an HTML content type means the SPA swallowed it):
+      - cloud: `curl -s -o /dev/null -w "%{content_type}" https://api.<domain>/.well-known/oauth-authorization-server`
+      - cloud: `curl -s -o /dev/null -w "%{content_type}" https://api.<domain>/.well-known/oauth-protected-resource/mcp`
+      - one-box: `curl -s -o /dev/null -w "%{content_type}" https://<host>/.well-known/oauth-authorization-server/api`
+        and `https://<host>/.well-known/oauth-protected-resource/api/mcp`
+      - one-box: `https://<host>/.well-known/openid-configuration` must be a **404**, not the SPA.
+- [ ] **The consent page cannot be framed (Phase 307, D-35):**
+      `curl -sI https://app.<domain>/app/connect/00000000-0000-4000-8000-000000000000` must carry
+      `x-frame-options: DENY`, `content-security-policy: frame-ancestors 'none'` and
+      `referrer-policy: no-referrer` (one-box: the same on `https://<host>/app/connect/<any-uuid>`).
+- [ ] **The one-box nginx config parses (Phase 307):**
+      `docker run --rm -v "$PWD/frontend/nginx.conf:/etc/nginx/conf.d/default.conf:ro" nginx:1.27-alpine nginx -t`
+      must print `syntax is ok`. ⚠ Owed: the plan that added the `.well-known` / `/app/connect/`
+      blocks (307-04) ran in a shell where Docker is denied, so this probe has **not** been run yet.
+
+### OWED to the operator (Phase 307, D-39) — never claimed
+
+These need the 304 → 307 bundle deployed and a real Claude account. Until each is run and recorded,
+"Claude.ai works" is **not** a claim this project makes:
+
+- [ ] **Claude.ai (cloud):** add the custom connector, sign in, use a tool; **refresh at least 1 h
+      later** (a tool call after the access token has expired still works); then **revoke** (Disconnect)
+      and confirm the next call is refused.
+- [ ] **Claude Desktop (cloud):** the same connect → refresh (≥ 1 h) → revoke. Both Claude.ai and
+      Claude Desktop broker through Anthropic's servers, so neither can reach `localhost`.
+- [ ] **The one-box:** a real connect against `https://<host>/api/mcp` (proves the root
+      `.well-known` proxy end to end).
+- [ ] **Any further Claude callback host** Claude's docs name beyond the seeded `claude.ai` /
+      `claude.com` is added in Control Room → AI tool sign-in.
 
 ---
 
@@ -180,6 +212,7 @@ Before `master → production`:
 ---
 
 ## Changelog
+- **2026-11-03** — Phase 307-04 (OAUTH-05, D-32 / D-33 / D-39 / D-52): §5 rows for migration 224 (after 220 → 221 → 222 → 223, per-action approval, then `get_advisors(security)`) and Anthropic egress (`160.79.104.0/21`, `153.61.208.0/20`) + the CIMD reachability probe; §6 `.well-known` content-type probes per topology, the consent-page anti-framing probe and the owed `nginx -t` container probe; an "OWED to the operator" block for the real Claude.ai / Claude Desktop / one-box connect. No env var added.
 - **2026-10-28** — Phase 299-05 (LINK-06, D-25): added the §5 row for Supabase Redirect URLs (`https://app.<domain>/**` + the one-box origin), because SSO and sign-up now return to the link the person opened. Operator step only; no code reads a new env var.
 - **2026-10-05** — 276-REVIEW A-WR-01: the docs gate is now fail-closed. `/docs`, `/redoc`, `/openapi.json` and the oauth2 redirect stay open only for an unset `ENVIRONMENT` or `local` / `development` / `dev` / `test`; `staging` and every other value are gated. A-IN-11: the refuse-to-start checks for `ENABLE_TEST_FIXTURES` / `MOCK_LLM_MODE` now read the same `settings.environment` (so `ENVIRONMENT` set only in `backend/.env` counts).
 - **2026-10-04** — Phase 276 (DOCS-04, D-03 / D-20 / D-23): `ENVIRONMENT=production` now ALSO gates `/docs`, `/redoc` and `/openapi.json` (401 without a signed-in token; local stays open). Added §5 rows for `ENVIRONMENT=production` on Coolify and the Vercel "Include source files outside of the Root Directory" setting, and a §6 post-deploy `curl` that must print `401`. Not deployed by this change.

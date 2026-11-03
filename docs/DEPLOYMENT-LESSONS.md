@@ -148,6 +148,26 @@ from local. Most of these bugs were config/data, not code.*
 - **Prevention:** user-facing counts should reflect reality (total searchable rows), not an
   internal subset — "honest numbers" reduce false alarms.
 
+## Part C — Lessons recorded before they bite
+
+### C1. OAuth discovery is path-inserted at the ORIGIN ROOT — a SPA catch-all swallows it silently (Phase 307)
+- **Symptom (the failure this prevents):** Claude.ai / Claude Code add the connector, then never
+  get to a sign-in page. No error in the backend log, because the discovery request never reaches
+  the backend.
+- **Root cause:** RFC 8414 / RFC 9728 put the discovery documents at
+  `<origin>/.well-known/<name><path>` when the issuer or resource has a path. On the one-box the
+  issuer is `https://<host>/api`, so the documents live at
+  `/.well-known/oauth-authorization-server/api` and `/.well-known/oauth-protected-resource/api/mcp`
+  — **outside `/api/`**, where nginx's `location /` SPA fallback answers `index.html` with a
+  **200**. A client reading HTML as metadata fails without a useful message.
+- **Fix:** `frontend/nginx.conf` → `location ^~ /.well-known/oauth-` proxies to the backend with the
+  path **unchanged** (no rewrite); `/.well-known/openid-configuration` returns 404. Cloud needs no
+  rule (the issuer is the API origin itself); Vercel is never asked.
+- **Prevention:** `frontend/src/__tests__/routing/oauthRouting.test.ts` pins the proxy rows with a
+  negative control that removes the block and watches them flip back to the SPA; the post-deploy
+  check in `DEPLOYMENT-WORKFLOW.md` §6 asserts `application/json` on every topology. A 200 is not
+  proof — check the **content type**.
+
 ---
 
 ## Recurring themes (the meta-lessons)
@@ -168,6 +188,8 @@ from local. Most of these bugs were config/data, not code.*
 ---
 
 ## Changelog
+- **2026-11-03** — Part C / C1 (Phase 307-04): OAuth discovery path insertion at the origin root
+  on the one-box, and why a SPA catch-all hides it.
 - **2026-07-12** — B2 recurrence logged: Coolify Docker cleanup pruned the host-built sandbox
   image after a deploy; rebuilt + added the `sandbox-image-keeper` pin container.
 - **2026-06-29** — Created. Logged Part A (initial-deploy gotchas) + Part B (post-deploy bugs:
