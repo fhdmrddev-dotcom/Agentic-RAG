@@ -102,6 +102,7 @@ const SAMPLE_LIST = {
     off: null,
     url: "https://syrel.example.com/mcp",
     tools: [{ name: "search_knowledge_base", group: "read", label: "Search your knowledge base", travels_with: null }],
+    oauth: false, // 307-05 (D-15)
   },
 } satisfies ApiKeyList
 

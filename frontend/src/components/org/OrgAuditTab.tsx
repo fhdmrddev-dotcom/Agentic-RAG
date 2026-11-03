@@ -26,6 +26,7 @@ import { Eye, X } from "lucide-react"
 import type { OrgAuditFilters, OrgAuditPage, OrgAuditRow } from "@/lib/api"
 import { cn } from "@/lib/utils"
 import { TechnicalNamesToggle } from "@/components/admin/TechnicalNamesToggle"
+import { oauthAuditLabel } from "@/components/connect/oauthCopy"
 
 // ── Plain-first vocabulary (067-A) — the raw audit_log code → plain label + group.
 //    Copied from the operator AuditTab (the SAME audit_log vocabulary; a shared export
@@ -100,7 +101,9 @@ function rowLabel(row: OrgAuditRow): string {
     const on = (meta as Record<string, unknown>).enabled === true
     return `Turned personal data removal for AI tools ${on ? "on" : "off"} for the organisation`
   }
-  return actionLabel(row.action_type)
+  // Phase 307-05 (D-28): a connected app's api_key.* row (credential oauth) — the SAME words helper
+  // the Control Room reads, so the two browsers stay in lockstep with no new literal.
+  return oauthAuditLabel(row.action_type, meta as Record<string, unknown> | null) ?? actionLabel(row.action_type)
 }
 
 /** The `since` chip presets the backend understands (`_since_to_dt`: 7d/30d/90d). */

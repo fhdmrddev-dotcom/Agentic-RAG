@@ -101,6 +101,8 @@ export interface McpAvailability {
   off: McpOff | null
   url: string | null
   tools: McpToolRef[]
+  /** Phase 307-05 (D-15): sign-in from an AI tool is served (optional: pre-307 lists still type). */
+  oauth?: boolean
 }
 
 export interface ApiKeyList {

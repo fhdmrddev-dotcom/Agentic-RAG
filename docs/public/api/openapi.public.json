@@ -13631,6 +13631,33 @@
         }
       }
     },
+    "/api-keys/connected-apps": {
+      "get": {
+        "tags": [
+          "api-keys"
+        ],
+        "summary": "List My Connected Apps",
+        "description": "Never another member's grant.",
+        "operationId": "list_my_connected_apps_api_keys_connected_apps_get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ConnectedAppList"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ]
+      }
+    },
     "/api-keys": {
       "get": {
         "tags": [
@@ -13810,6 +13837,59 @@
             }
           }
         }
+      }
+    },
+    "/org/api-keys/connected-apps": {
+      "get": {
+        "tags": [
+          "api-keys"
+        ],
+        "summary": "List Org Connected Apps",
+        "operationId": "list_org_connected_apps_org_api_keys_connected_apps_get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/OrgConnectedAppList"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ]
+      }
+    },
+    "/org/api-keys/connected-apps/revoke-all": {
+      "post": {
+        "tags": [
+          "api-keys"
+        ],
+        "summary": "Revoke All Org Connected Apps",
+        "description": "The counts are the SERVER's, so the receipt can never show the number the sheet guessed.",
+        "operationId": "revoke_all_org_connected_apps_org_api_keys_connected_apps_revoke_all_post",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RevokeAllResult"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ]
       }
     },
     "/org/api-keys": {
@@ -16099,6 +16179,163 @@
           "skipped"
         ],
         "title": "ConfirmOut"
+      },
+      "ConnectedApp": {
+        "properties": {
+          "id": {
+            "type": "string",
+            "title": "Id"
+          },
+          "client_name": {
+            "type": "string",
+            "title": "Client Name"
+          },
+          "name_source": {
+            "type": "string",
+            "enum": [
+              "cimd",
+              "dcr"
+            ],
+            "title": "Name Source"
+          },
+          "redirect_host": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Redirect Host"
+          },
+          "redirect_kind": {
+            "anyOf": [
+              {
+                "type": "string",
+                "enum": [
+                  "web",
+                  "loopback"
+                ]
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Redirect Kind"
+          },
+          "org_id": {
+            "type": "string",
+            "title": "Org Id"
+          },
+          "org_name": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Org Name"
+          },
+          "tools": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Tools"
+          },
+          "folders": {
+            "anyOf": [
+              {
+                "items": {
+                  "$ref": "#/components/schemas/ApiKeyFolderRef"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Folders"
+          },
+          "include_external": {
+            "type": "boolean",
+            "title": "Include External",
+            "default": false
+          },
+          "created_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Created At"
+          },
+          "last_used_at": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Last Used At"
+          },
+          "expires_at": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Expires At"
+          },
+          "mcp_off": {
+            "anyOf": [
+              {
+                "type": "string",
+                "enum": [
+                  "org",
+                  "deployment",
+                  "unknown"
+                ]
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Mcp Off"
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "client_name",
+          "name_source",
+          "org_id",
+          "created_at"
+        ],
+        "title": "ConnectedApp"
+      },
+      "ConnectedAppList": {
+        "properties": {
+          "apps": {
+            "items": {
+              "$ref": "#/components/schemas/ConnectedApp"
+            },
+            "type": "array",
+            "title": "Apps"
+          }
+        },
+        "type": "object",
+        "required": [
+          "apps"
+        ],
+        "title": "ConnectedAppList"
       },
       "ConnectionFileImportRequest": {
         "properties": {
@@ -22318,6 +22555,11 @@
             },
             "type": "array",
             "title": "Tools"
+          },
+          "oauth": {
+            "type": "boolean",
+            "title": "Oauth",
+            "default": false
           }
         },
         "type": "object",
@@ -23587,6 +23829,179 @@
         ],
         "title": "OAuthTokenResponse",
         "description": "Safe public projection of a connector token (no ciphertexts!)."
+      },
+      "OrgConnectedApp": {
+        "properties": {
+          "id": {
+            "type": "string",
+            "title": "Id"
+          },
+          "client_name": {
+            "type": "string",
+            "title": "Client Name"
+          },
+          "name_source": {
+            "type": "string",
+            "enum": [
+              "cimd",
+              "dcr"
+            ],
+            "title": "Name Source"
+          },
+          "redirect_host": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Redirect Host"
+          },
+          "redirect_kind": {
+            "anyOf": [
+              {
+                "type": "string",
+                "enum": [
+                  "web",
+                  "loopback"
+                ]
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Redirect Kind"
+          },
+          "org_id": {
+            "type": "string",
+            "title": "Org Id"
+          },
+          "org_name": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Org Name"
+          },
+          "tools": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Tools"
+          },
+          "folders": {
+            "anyOf": [
+              {
+                "items": {
+                  "$ref": "#/components/schemas/ApiKeyFolderRef"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Folders"
+          },
+          "include_external": {
+            "type": "boolean",
+            "title": "Include External",
+            "default": false
+          },
+          "created_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Created At"
+          },
+          "last_used_at": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Last Used At"
+          },
+          "expires_at": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Expires At"
+          },
+          "mcp_off": {
+            "anyOf": [
+              {
+                "type": "string",
+                "enum": [
+                  "org",
+                  "deployment",
+                  "unknown"
+                ]
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Mcp Off"
+          },
+          "owner_name": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Owner Name"
+          },
+          "owner_is_you": {
+            "type": "boolean",
+            "title": "Owner Is You",
+            "default": false
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "client_name",
+          "name_source",
+          "org_id",
+          "created_at"
+        ],
+        "title": "OrgConnectedApp"
+      },
+      "OrgConnectedAppList": {
+        "properties": {
+          "apps": {
+            "items": {
+              "$ref": "#/components/schemas/OrgConnectedApp"
+            },
+            "type": "array",
+            "title": "Apps"
+          }
+        },
+        "type": "object",
+        "required": [
+          "apps"
+        ],
+        "title": "OrgConnectedAppList"
       },
       "OrgMcpAccess": {
         "properties": {
@@ -25764,6 +26179,24 @@
           "counts"
         ],
         "title": "RetentionSummary"
+      },
+      "RevokeAllResult": {
+        "properties": {
+          "revoked": {
+            "type": "integer",
+            "title": "Revoked"
+          },
+          "members": {
+            "type": "integer",
+            "title": "Members"
+          }
+        },
+        "type": "object",
+        "required": [
+          "revoked",
+          "members"
+        ],
+        "title": "RevokeAllResult"
       },
       "RuleCreate": {
         "properties": {

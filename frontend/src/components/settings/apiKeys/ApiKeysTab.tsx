@@ -48,6 +48,7 @@ import { MCP_KEY_COPY } from "./mcpKeyCopy"
 import { ApiKeyCard } from "./ApiKeyCard"
 import { ApiKeyDraftCard } from "./ApiKeyDraftCard"
 import { ApiKeySecretOnce } from "./ApiKeySecretOnce"
+import { ConnectedAppsSection } from "./ConnectedAppsSection"
 import { McpOffNotice } from "./McpOffNotice"
 import { RevokeApiKeySheet } from "./RevokeApiKeySheet"
 
@@ -197,6 +198,7 @@ export function ApiKeysTab({
 
   return (
     <div className="grid gap-3">
+      <ConnectedAppsSection mcpUrl={mcp?.url ?? null} mcpTools={mcp?.tools} oauthAvailable={mcp?.oauth ?? false} />
       <div className="ghost-border rounded-xl bg-card/60 p-6 shadow-sm">
         <div className="flex flex-wrap items-start justify-between gap-3">
           <div className="min-w-0 flex-1">

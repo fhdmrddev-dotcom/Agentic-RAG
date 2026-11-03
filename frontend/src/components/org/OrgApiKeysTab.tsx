@@ -27,6 +27,7 @@ import { RevokeApiKeySheet } from "@/components/settings/apiKeys/RevokeApiKeyShe
 import { API_KEYS_COPY, fillCopy } from "@/components/settings/apiKeys/apiKeysCopy"
 import { orderKeys } from "@/components/settings/apiKeys/apiKeyFacts"
 import { McpOffNotice } from "@/components/settings/apiKeys/McpOffNotice"
+import { OrgConnectedApps } from "./OrgConnectedApps"
 
 const C = API_KEYS_COPY
 
@@ -92,6 +93,7 @@ export function OrgApiKeysTab({
           </p>
         )}
       </div>
+      <OrgConnectedApps orgName={orgName} mcpTools={mcpTools} oauthAvailable={list?.mcp?.oauth ?? false} onRecorded={onRecorded} />
 
       {list === null && loadError === null && (
         <p role="status" className="px-1 text-sm text-muted-foreground">

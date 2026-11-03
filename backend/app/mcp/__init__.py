@@ -36,6 +36,14 @@ __all__ = ["register_mcp", "mcp_lifespan"]
 
 def register_mcp(app) -> None:
     """Register ``/mcp`` and ``/mcp/`` (no redirect) — or nothing, loudly, when the base is refused."""
+    # Phase 307-05 (D-08): the operator's redirect-host allowlist routes go in BEFORE the
+    # refuse-mount guard on purpose. They are deployment policy, editable in the Control Room even
+    # before BACKEND_PUBLIC_URL is set; nothing an AI tool can reach is mounted by them. FastAPI
+    # only (P-3): a bare Starlette test app gets none. main.py and admin.py are not edited (D-40).
+    if hasattr(app, "include_router"):
+        from app.api import oauth_admin  # noqa: PLC0415 — FastAPI-only, imported where used
+
+        app.include_router(oauth_admin.router)
     base = mcp_public_base()
     if base is None:
         logger.critical(

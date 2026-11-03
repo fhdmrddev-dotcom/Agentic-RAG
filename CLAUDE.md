@@ -496,7 +496,7 @@ node scripts/check-hot-file-ledger.cjs <phase-dir>   # 0 clear · 1 missing rows
 | `backend/app/services/multimodal_service.py` | 14 / 7 / 984 | ⚠ absent from BOTH for its ENTIRE LIFE at **7 phases** |
 | `backend/app/api/documents.py` | 101 / 40 / 2709 (was `99 / 39 / 2698`) | 298-01: one by_org in build() + one root_upload_org kwarg · ⛔ |
 | `backend/app/api/library.py` | 3 / 3 / 304 (was `2 / 2 / 299`) | ⚠ now FIRES (298) · 298-01: summary shares the lists' org predicate ($1) |
-| `scripts/vitest-count-gate.cjs` | 416 / 88 / 6956 (was `415 / 88 / 6956`) | 306-05: 4 pins raised; none lowered |
+| `scripts/vitest-count-gate.cjs` | 417 / 89 / 6986 (was `416 / 88 / 6956`) | 307-05: 13 first pins + McpKeyFields 8 -> 12; none lowered |
 | `scripts/check-deploy-drift.sh` | 6 / 5 / 271 (was `5 / 4 / 267`) | 300-03: SMTP_* parity |
 | `scripts/build-public-openapi.cjs` | 13 / 7 / 473 (was `11 / 5 / 472`) | 301-01: notifications tag + /notifications FLAGGED (2 lines) |
 | `scripts/check-seeds-register.cjs` | 7 / 3 / 1132 | ⚠ FIRES, absent here — row added 296-05 · `\d{3,}` ids · ⛔ |
@@ -508,9 +508,9 @@ node scripts/check-hot-file-ledger.cjs <phase-dir>   # 0 clear · 1 missing rows
 | `backend/app/services/inbound_inputs.py` | 10 / 4 / 362 (was `9 / 3 / 352`) | 306-03: source/notice kwargs (293 defaults) + ASK_NOTICE · ⛔ |
 | `backend/app/api/inbound.py` | 12 / 4 / 545 (was `11 / 4 / 500`) | 306-02: one admission block + on_finish=_release (D-16/D-35) · ⛔ |
 | `frontend/src/components/settings/apiKeys/apiKeysCopy.ts` | 8 / 6 / 307 (was `7 / 5 / 287`) | 306-02: outside group words + admission call words · ⛔ |
-| `frontend/src/components/settings/apiKeys/apiKeyFacts.ts` | 8 / 6 / 386 (was `7 / 5 / 378`) | 306-02: four admission refusedWords cases · ⛔ |
+| `frontend/src/components/settings/apiKeys/apiKeyFacts.ts` | 10 / 7 / 390 (was `8 / 6 / 386`) | 307-02: refresh_reuse words; wave-1 fix wrong_resource · ⛔ |
 | `frontend/src/components/settings/apiKeys/ApiKeyCallStrip.tsx` | 3 / 3 / 140 (was `2 / 2 / 130`) | ⚠ now FIRES (306) · 306-05: MCP start bars + started legend · ⛔ |
-| `frontend/src/components/settings/apiKeys/mcpKeyCopy.ts` | 8 / 3 / 222 (was `6 / 2 / 206`) | ⚠ now FIRES (306) · 306-05: ask / run words + 3 rewordings · ⛔ |
+| `frontend/src/components/settings/apiKeys/mcpKeyCopy.ts` | 11 / 4 / 239 (was `8 / 3 / 222`) | 307-04: sign-in tab words + switch sentences; 307-02 call words · ⛔ |
 | `frontend/src/components/settings/ApiKeyLimits.tsx` | 3 / 3 / 320 (was `2 / 2 / 245`) | ⚠ now FIRES (306) · 306-02: outside limits group · extraction FIRST · ⛔ |
 | `backend/app/models/schedule.py` | 3 / 3 / 231 | ⚠ FIRES, absent here — row added 296-02 · one additive field (outcome) |
 | `frontend/src/components/panel/PhaseCard.tsx` | 22 / 14 / 821 (was `21 / 14 / 817`) | 296 review FE-WR-01: paused step drops running instruments |
@@ -550,7 +550,7 @@ node scripts/check-hot-file-ledger.cjs <phase-dir>   # 0 clear · 1 missing rows
 | `backend/app/api/connectors.py` | 46 / 22 / 2166 | ⚠ STALE · last touch 276-07 · extraction OWED · ⛔ |
 | `backend/app/services/sources/preview_service.py` | 8 / 4 / 826 | ⚠ row STALE TWICE · last touch 238-04 |
 | `backend/app/security/secret_cipher.py` | 4 / 2 / 256 | ⚠ absent its ENTIRE LIFE — row added mig 180 · ⛔ |
-| `backend/app/security/egress.py` | 13 / 5 / 982 | honoured by construction (232): Google Drive read/export pins; docstri |
+| `backend/app/security/egress.py` | 14 / 6 / 991 (was `13 / 5 / 982`) | 307-02: client_metadata capability (CIMD fetch); test_190 amended on purpose |
 | `backend/app/services/connector_service.py` | 28 / 11 / 1858 | ⚠ row STALE · honoured by construction (239-06) |
 | `backend/app/services/sources/base.py` | 9 / 5 / 336 | ⚠ absent while FIRING · honoured by construction (239) |
 | `backend/app/services/sources/__init__.py` | 5 / 3 / 40 | ⚠ absent while FIRING — row added 239-03 |
@@ -588,9 +588,9 @@ node scripts/check-hot-file-ledger.cjs <phase-dir>   # 0 clear · 1 missing rows
 | `frontend/src/components/library/IngestionTab.tsx` | 20 / 7 / 706 (was `17 / 6 / 512`) | 284-03: summary + three paged status lists; layout unchanged · ⛔ |
 | `frontend/src/components/ingestion/__tests__/IngestionStrip.test.tsx` | 3 / 3 / 516 | ⚠ absent; row added 233, which repaired the INHERITED red `229-03` cau |
 | `frontend/src/components/layout/NavPanel.tsx` | 29 / 15 / 442 (was `28 / 15 / 428`) | honoured by construction (301-03: one WaitingOnYouControl mount + one prop) |
-| `frontend/src/App.tsx` | 45 / 31 / 350 (was `44 / 30 / 350`) | 305-02: one prop (entityLink) on CitationNavProvider |
-| `frontend/src/lib/appRoutes.ts` | 3 / 3 / 228 (was `2 / 2 / 219`) | ⚠ now FIRES (305) · 305-02: documents entity variant · ⛔ |
-| `frontend/src/hooks/useAppNavigation.ts` | 11 / 3 / 494 (was `10 / 2 / 488`) | ⚠ now FIRES (305) · 305-02: entityLink.document, not a target · ⛔ |
+| `frontend/src/App.tsx` | 46 / 32 / 356 (was `45 / 31 / 350`) | 307-03: one ConsentPage branch after the !user return |
+| `frontend/src/lib/appRoutes.ts` | 4 / 4 / 234 (was `3 / 3 / 228`) | 307-03: one connect/<uuid> arm (strict UUID) · ⛔ |
+| `frontend/src/hooks/useAppNavigation.ts` | 12 / 4 / 495 (was `11 / 3 / 494`) | 307-03: one condition (connect falls back to chat) · ⛔ |
 | `frontend/src/hooks/useLibraryDocuments.ts` | 8 / 3 / 440 (was `7 / 2 / 430`) | ⚠ now FIRES (305) · 305-02: one boolean selectedDocRefused · ⛔ |
 | `frontend/src/main.tsx` | 5 / 3 / 32 (was `3 / 1 / 10`) | ⚠ now FIRES (297) · one '*' route, no children, no key · ⛔ |
 | `frontend/src/index.css` | 35 / 19 / 1239 (was `34 / 18 / 1196`) | 294-05: ONE verdict block keyed on citation-marker--v-* (+43) |
@@ -611,8 +611,8 @@ node scripts/check-hot-file-ledger.cjs <phase-dir>   # 0 clear · 1 missing rows
 | `frontend/src/components/sources/SourceFolderPicker.tsx` | 2 / 2 / 375 | ⚠ absent its entire life — row added BUG-260912-01 · ⛔ |
 | `frontend/src/components/sources/sourceHealthVocabulary.ts` | 8 / 4 / 645 | ⛔ row STALE · G-5 fires (252-03) · Seam OWED |
 | `backend/app/services/sources/failure_cause.py` | 3 / 2 / 227 | ⚠ absent its entire life — row added BUG-260912-01 · ⛔ |
-| `scripts/full-schema-supplement.sql` | 30 / 22 / 927 (was `29 / 21 / 919`) | 306-01: mig 223 threads_origin_immutable() ACL after 222's · ⛔ |
-| `backend/app/services/rate_limit.py` | 7 / 4 / 187 (was `6 / 3 / 185`) | 306-04: check_key_limit start arm (api_key_starts_per_minute) · ⛔ |
+| `scripts/full-schema-supplement.sql` | 31 / 23 / 942 (was `30 / 22 / 927`) | 307-01: migration 224 block; 220 grant line byte-unchanged · ⛔ |
+| `backend/app/services/rate_limit.py` | 8 / 5 / 228 (was `7 / 4 / 187`) | 307-02: four OAuth door buckets (door-wide ceilings) · ⛔ |
 | `.claude/settings.json` | 14 / 6 / 214 | ⚠ STALE · last touch 276 · ⛔ |
 | `backend/app/services/forced_emit.py` | 15 / 9 / 749 (was `13 / 8 / 724`) | 296 (293-F-4): cross-provider copy names the target provider · ⛔ |
 | `backend/app/services/template_asset_service.py` | 5 / 4 / 379 (was `4 / 3 / 344`) | 295-02: has_staged_template (Branch-2 WHERE shared) |
@@ -639,12 +639,12 @@ node scripts/check-hot-file-ledger.cjs <phase-dir>   # 0 clear · 1 missing rows
 | `backend/app/services/provider_gateway/dispatcher.py` | 10 / 4 / 260 (was `6 / 2 / 153`) | ⚠ FIRES (row was stale) · 282-01: off-loop open, shared deadline · ⛔ |
 | `backend/app/services/provider_gateway/openai_responses.py` | 4 / 3 / 570 (was `2 / 2 / 573`) | ⚠ now FIRES · 292.1-REVIEW IN-03: dead dsml_leaked flag deleted · ⛔ |
 | `frontend/src/lib/api/admin.ts` | 11 / 6 / 1127 (was `10 / 5 / 1125`) | 304-04: one FlagKey member (mcp_enabled) · ⛔ |
-| `frontend/src/components/admin/CapabilityGrid.tsx` | 5 / 4 / 273 (was `3 / 3 / 264`) | 304-06: one union member + one entry (mcp_enabled), no count · ⛔ |
-| `frontend/src/components/admin/ControlRoomPage.tsx` | 20 / 11 / 907 (was `19 / 10 / 906`) | 304-06: one capabilityFlags line (mcp_enabled ?? true) · ⛔ |
-| `backend/app/api/api_keys.py` | 8 / 4 / 771 (was `7 / 4 / 723`) | 305-04: GET/PUT /pii-redaction on org_router, audit after write · ⛔ |
-| `backend/app/db/api_keys.py` | 6 / 3 / 383 (was `5 / 2 / 307`) | ⚠ now FIRES (304) · 304-02: mcp_switches + kind columns · ⛔ |
-| `backend/app/models/api_key.py` | 6 / 4 / 279 (was `5 / 4 / 267`) | 305-04: OrgPiiRedaction + OrgPiiRedactionUpdate (additive) |
-| `frontend/src/lib/api/apiKeys.ts` | 7 / 4 / 310 (was `6 / 4 / 285`) | 305-04: OrgPiiRedaction + get/setOrgPiiRedaction · ⛔ |
+| `frontend/src/components/admin/CapabilityGrid.tsx` | 6 / 5 / 273 (was `5 / 4 / 273`) | 307-04: mcp_enabled sub + fallbackImpact reworded (data only) · ⛔ |
+| `frontend/src/components/admin/ControlRoomPage.tsx` | 21 / 12 / 909 (was `20 / 11 / 907`) | 307-05: one McpSignInHostsCard mount (onRecorded=pulseRecording) · ⛔ |
+| `backend/app/api/api_keys.py` | 11 / 5 / 884 (was `8 / 4 / 771`) | 307-05: connected-apps list + revoke-all; oauth revoke detail · split OWED · ⛔ |
+| `backend/app/db/api_keys.py` | 8 / 4 / 465 (was `6 / 3 / 383`) | 307-05: grant lists + revoke_all_grants_in_org; one WHERE · ⛔ |
+| `backend/app/models/api_key.py` | 7 / 5 / 323 (was `6 / 4 / 279`) | 307-05: McpAvailability.oauth + ConnectedApp/RevokeAllResult models |
+| `frontend/src/lib/api/apiKeys.ts` | 8 / 5 / 312 (was `7 / 4 / 310`) | 307-05: McpAvailability.oauth (type only) · ⛔ |
 | `frontend/src/components/admin/ModelAdvancedCapabilities.tsx` | 0 / 0 / 290 | young (created 262) · ⛔ |
 | `frontend/src/lib/activeViewReachability.ts` | 2 / 2 / 205 (was `1 / 1 / 159`) | 297-02: route leg added (D-25) · AST; throws on a vacuous parse · ⛔ |
 | `frontend/src/components/experts/expertIcon.tsx` | 1 / 1 / 72 | ⚠ 0/0/0 AT PLANNING · measured 1/1/72 at 262-02 · ⛔ |
@@ -660,8 +660,8 @@ node scripts/check-hot-file-ledger.cjs <phase-dir>   # 0 clear · 1 missing rows
 | `backend/app/models/document.py` | 14 / 11 / 275 (was `13 / 10 / 221`) | 284-02: five paged envelopes, additive · ⛔ |
 | `frontend/src/components/ingestion/DocumentRow.tsx` | 11 / 6 / 591 (was `10 / 5 / 583`) | 284-03: one versions page, N of M; still seven `<td>` |
 | `frontend/src/components/org/OrgAdminShell.tsx` | 11 / 7 / 416 (was `10 / 6 / 416`) | 304-06: settings branch key + onRecorded={pulse} (+1 −1) · ⛔ |
-| `frontend/src/components/admin/AuditTab.tsx` | 8 / 5 / 771 (was `7 / 4 / 770`) | 298-review WR-07: one map entry (org.item.move), data only |
-| `frontend/src/components/org/OrgAuditTab.tsx` | 7 / 6 / 427 (was `6 / 5 / 422`) | 305-04: one event read (pii_redaction on/off) · shared vocab OWED |
+| `frontend/src/components/admin/AuditTab.tsx` | 9 / 6 / 778 (was `8 / 5 / 771`) | 307-05: one oauthAuditLabel read + 2 operator labels; maps unchanged |
+| `frontend/src/components/org/OrgAuditTab.tsx` | 8 / 7 / 430 (was `7 / 6 / 427`) | 307-05: one oauthAuditLabel arm (shared with AuditTab) |
 | `frontend/src/components/org/OrgSettingsTab.tsx` | 4 / 3 / 76 (was `3 / 2 / 73`) | ⚠ now FIRES (305) · 305-04: one OrgPiiRedactionCard mount |
 | `frontend/src/lib/api/documents.ts` | 11 / 10 / 599 (was `10 / 9 / 595`) | 298-01: uploadDocument sends X-Org-Id read at send time (D-29) · ⛔ |
 | `frontend/src/providers/OrgProvider.tsx` | 4 / 3 / 222 (was `3 / 2 / 217`) | ⚠ now FIRES (298) · 298-01: self-heal syncs the header first (D-36) · ⛔ |
@@ -704,7 +704,7 @@ node scripts/check-hot-file-ledger.cjs <phase-dir>   # 0 clear · 1 missing rows
 | `backend/app/services/watch_service.py` | 8 / 6 / 769 | ⚠ FIRES, absent here — row added 285-03 · honoured by construction (285-01) |
 | `backend/app/db/watches.py` | 6 / 4 / 828 | ⚠ FIRES, absent here — row added 285-03 · honoured by construction (285-02) |
 | `frontend/src/components/sources/RunHistoryList.tsx` | 5 / 3 / 275 | ⚠ now FIRES (285) — row added 285-03 · comment-only change (285-01) |
-| `frontend/nginx.conf` | 3 / 3 / 76 | ⚠ now FIRES — row added 293-REVIEW WR-01 · one proxy header · ⛔ |
+| `frontend/nginx.conf` | 4 / 4 / 98 (was `3 / 3 / 76`) | 307-04: .well-known/oauth- proxied unchanged; /app/connect/ headers · ⛔ |
 | `frontend/src/hooks/useFolders.ts` | 5 / 4 / 200 (was `4 / 4 / 197`) | 298-05: useOrgItemsVersion() in the load deps (a move refetches) |
 | `frontend/src/hooks/useAuth.ts` | 6 / 5 / 128 (was `5 / 4 / 100`) | ⚠ absent while FIRING — row added 299-05 · redirect + .catch · ⛔ |
 | `frontend/src/pages/AuthPage.tsx` | 5 / 3 / 32 (was `4 / 2 / 26`) | ⚠ now FIRES (299) · 299-05: one quiet S5 line (kind only) |
@@ -712,13 +712,19 @@ node scripts/check-hot-file-ledger.cjs <phase-dir>   # 0 clear · 1 missing rows
 | `backend/app/services/email_provider.py` | 10 / 3 / 413 (was `6 / 3 / 362`) | 300-REVIEW: SMTP_SECURITY fail-closed, redirected flag, config check · ⛔ |
 | `frontend/src/components/admin/HealthSignals.tsx` | 7 / 5 / 415 (was `6 / 5 / 407`) | 300-REVIEW IN-04: config_problem reads "Can't send", red, pre-send |
 | `frontend/src/components/layout/AppViewSwitch.tsx` | 8 / 3 / 609 (was `7 / 2 / 600`) | ⚠ now FIRES (301) · 301-03: the non-chat hamburger dot · ⛔ no hooks |
-| `backend/app/security/api_key_auth.py` | 7 / 3 / 432 (was `6 / 3 / 413`) | 305 LF-03: restore_suppressed_refusals beside the slot · ⛔ |
+| `backend/app/security/api_key_auth.py` | 8 / 4 / 520 (was `7 / 3 / 432`) | 307-01: ONE _admit tail; _liveness owns principal_still_allowed · ⛔ |
 | `backend/app/services/retrieval_tuning.py` | 7 / 3 / 412 (was `4 / 2 / 364`) | ⚠ now FIRES (305) · BUG-261031-03 probe + LF-01/02 savepoints · ⛔ |
 | `backend/app/db/rates.py` | 12 / 4 / 960 (was `11 / 3 / 950`) | 306-05: runs-arm key from the thread's mcp origin; source run · ⛔ |
 | `frontend/src/components/settings/apiKeys/ApiKeyCard.tsx` | 3 / 3 / 239 | ⚠ now FIRES (305) · 305-03: the two !isMcp guards removed |
-| `frontend/src/components/settings/apiKeys/ApiKeysTab.tsx` | 5 / 3 / 317 | ⚠ now FIRES (305) · 305-03: one AI tool limits line · ⛔ |
+| `frontend/src/components/settings/apiKeys/ApiKeysTab.tsx` | 6 / 4 / 319 (was `5 / 3 / 317`) | 307-05: one ConnectedAppsSection mount, first grid child · ⛔ |
 | `frontend/src/types/spend.ts` | 5 / 3 / 128 | ⚠ now FIRES (305) · 305-03: four optional ledger fields |
 | `frontend/src/lib/api/spend.ts` | 5 / 3 / 232 | ⚠ now FIRES (305) · 305-03: ledger mapper source + key + tool · ⛔ |
+| `backend/app/middleware/maintenance.py` | 3 / 3 / 128 | ⚠ now FIRES (307) · 307-02: the /oauth arm of the maintenance refusal |
+| `backend/app/security/mcp_principal.py` | 3 / 3 / 65 | ⚠ now FIRES (307) · 307-01: srl_oat_ prefix dispatch; one class · ⛔ |
+| `frontend/src/components/org/OrgApiKeysTab.tsx` | 3 / 3 / 150 | ⚠ now FIRES (307) · 307-05: one OrgConnectedApps mount (mcp.oauth) · ⛔ |
+| `frontend/src/components/settings/apiKeys/McpKeyFields.tsx` | 4 / 3 / 301 | ⚠ now FIRES (307) · 307-03: variant=consent (default byte-identical) · ⛔ |
+| `frontend/vite.config.ts` | 10 / 4 / 100 | ⚠ FIRES, absent here — row added 307-05 · 307-04: devHeadersFor middleware |
+| `frontend/vercel.json` | 6 / 5 / 141 | ⚠ FIRES, absent here — row added 307-05 · 307-04: consent headers |
 
 
 When a new phase enters discuss-phase, the orchestrator must scan PLAN.md `files_modified` against this ledger. Any match against a G-5-firing row means the discuss-phase produces a refactor recommendation as the first option, not the planned feature — and the phase reads that file's section in `docs/HOT-FILE-LEDGER.md` before planning, because that is where the named seam and the binding invariants live.

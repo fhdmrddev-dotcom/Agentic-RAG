@@ -72,15 +72,20 @@ from app.models.api_key import (
     ApiKeyList,
     ApiKeyRead,
     ApiKeyWorkflowRef,
+    ConnectedApp,
+    ConnectedAppList,
     McpAvailability,
     McpKeyCreateBody,
     McpToolRef,
+    OrgConnectedApp,
+    OrgConnectedAppList,
     OrgMcpAccess,
     OrgMcpAccessUpdate,
     OrgPiiRedaction,
     OrgPiiRedactionUpdate,
     PickableFolder,
     PickableFolderList,
+    RevokeAllResult,
     StartableField,
     StartableWorkflow,
     StartableWorkflowList,
@@ -100,7 +105,8 @@ from app.services.mcp_narrowing import (
     mcp_off,
     validate_mcp_narrowing,
 )
-from app.services.mcp_tool_catalogue import MCP_TOOLS, mcp_url
+from app.mcp.oauth_clients import redirect_host_kind
+from app.services.mcp_tool_catalogue import MCP_TOOLS, mcp_public_base, mcp_url
 from app.services.sources.mail.mailbox import FOLDER_PREFIX, MAIL_MIME, MAIL_ROOT_ID
 
 logger = logging.getLogger(__name__)
@@ -159,7 +165,8 @@ async def _read_switches(pool: asyncpg.Pool, org: UUID) -> dict | None:
 def _mcp_block(switches: dict | None) -> McpAvailability:
     off = _mcp_off(switches)
     return McpAvailability(
-        available=off not in ("deployment", "unknown"), off=off, url=mcp_url(), tools=_MCP_CATALOGUE
+        available=off not in ("deployment", "unknown"), off=off, url=mcp_url(), tools=_MCP_CATALOGUE,
+        oauth=mcp_public_base() is not None,   # 307-05 (D-15): sign-in from an AI tool is served
     )
 
 
@@ -333,6 +340,74 @@ async def _serialize_keys(
 
 def _caller(current_user: dict) -> UUID:
     return _uuid(current_user["id"])
+
+
+# ── connected apps (Phase 307-05; D-25, D-26, D-27, D-28) ─────────────────────────────────────
+#
+# A connected app is an OAuth GRANT (an ``api_keys`` row with ``oauth_client_id``). It is listed on
+# its own routes, never in the key lists, and revoked through the SAME revoke routes as a key
+# (D-27); the audit row then says ``credential: oauth`` (D-28: no new audit literal).
+
+
+def _redirect_facts(uris) -> tuple[str | None, str | None]:
+    """``(host, "web" | "loopback")`` from the client's first registered redirect — the same
+    derivation ``/oauth/revoke`` audits with (307-02). Parsed strictly, never echoed raw."""
+    first = uris[0] if isinstance(uris, list) and uris else None
+    facts = redirect_host_kind(first) if isinstance(first, str) else None
+    return (facts[1], facts[0]) if facts else (None, None)
+
+
+def _grant_audit_detail(row: dict) -> dict | None:
+    """The ``credential: oauth`` facts for a revoked GRANT; ``None`` for a key (its row stays 293's)."""
+    if row.get("oauth_client_id") is None:
+        return None
+    host, _kind = _redirect_facts(row.get("oauth_redirect_uris"))
+    return {"credential": "oauth", "client_name": row.get("label"), "redirect_host": host}
+
+
+def _by_recent_use(rows: list[dict]) -> list[dict]:
+    """Most recently used first; never-used apps after them, newest connection first (UI-SPEC 2b).
+    The SQL orders the same way; this keeps the wire order a property of the route."""
+    def key(r: dict):
+        used = r.get("last_used_at")
+        return (used is None, -(used.timestamp() if used else 0.0), -r["created_at"].timestamp())
+
+    return sorted(rows, key=key)
+
+
+def _connected_app_fields(row: dict) -> dict:
+    host, kind = _redirect_facts(row.get("redirect_uris"))
+    refs = row.get("folder_refs")
+    return {
+        "id": str(row["id"]),
+        # the grant's label IS the client's name as approved, sanitised (307-03 client_label)
+        "client_name": row.get("label") or "Connected app",
+        "name_source": "cimd" if row.get("client_kind") == "cimd" else "dcr",
+        "redirect_host": host,
+        "redirect_kind": kind,
+        "org_id": str(row["org_id"]),
+        "org_name": row.get("org_name"),
+        "tools": [str(t) for t in (row.get("tools") or [])],
+        "folders": None if row.get("folder_ids") is None else [
+            ApiKeyFolderRef(id=str(f["id"]), name=f["name"]) for f in (refs or [])
+        ],
+        "include_external": bool(row.get("include_external")),
+        "created_at": row["created_at"],
+        "last_used_at": row.get("last_used_at"),
+        "expires_at": row.get("expires_at"),
+        "mcp_off": _mcp_off({"org_on": row.get("org_on"), "deploy_on": row.get("deploy_on")}),
+    }
+
+
+@router.get("/connected-apps", response_model=ConnectedAppList)
+async def list_my_connected_apps(
+    current_user: dict = Depends(get_current_user),
+    pool: asyncpg.Pool = Depends(get_pg_pool),
+) -> ConnectedAppList:
+    """Every app acting as the caller, in EVERY org (D-25) — no org header: an app acting as you
+    anywhere is visible from one place, each naming its org. Never another member's grant."""
+    rows = await api_keys_db.list_grants_for_user(pool, user_id=_caller(current_user))
+    return ConnectedAppList(apps=[ConnectedApp(**_connected_app_fields(r)) for r in _by_recent_use(rows)])
 
 
 # ── the member's own keys ───────────────────────────────────────────────────────────────────────
@@ -615,12 +690,56 @@ async def revoke_my_key(
              "kind": row.get("kind")},
             "api_key.revoke",
             call="manage",
+            detail=_grant_audit_detail(row),   # 307-05 (D-28): None for a key, so its row is 293's
         )
     (key,) = await _serialize_keys(pool, [row], caller=caller, org_id=org)
     return key
 
 
 # ── the org admin's view ────────────────────────────────────────────────────────────────────────
+
+
+@org_router.get("/connected-apps", response_model=OrgConnectedAppList)
+async def list_org_connected_apps(
+    current_user: dict = Depends(require_org_manage),
+    active_org: str = Depends(get_active_org_id),
+    pool: asyncpg.Pool = Depends(get_pg_pool),
+) -> OrgConnectedAppList:
+    """Every app members connected in the active org, with its owner (D-26, admin only)."""
+    caller, org = _caller(current_user), _uuid(active_org)
+    rows = await api_keys_db.list_grants_for_org(pool, org_id=org)
+    return OrgConnectedAppList(apps=[
+        OrgConnectedApp(
+            **_connected_app_fields(r),
+            owner_name=r.get("owner_name"),
+            owner_is_you=str(r["user_id"]) == str(caller),
+        )
+        for r in _by_recent_use(rows)
+    ])
+
+
+@org_router.post("/connected-apps/revoke-all", response_model=RevokeAllResult)
+async def revoke_all_org_connected_apps(
+    background_tasks: BackgroundTasks,
+    current_user: dict = Depends(require_org_manage),
+    active_org: str = Depends(get_active_org_id),
+    pool: asyncpg.Pool = Depends(get_pg_pool),
+) -> RevokeAllResult:
+    """Disconnect every app in the active org (D-26 / T-307-27): grants only, this org only — a
+    key is never touched. ONE ``api_key.revoke`` row (D-28) names the count, only when N > 0. The
+    counts are the SERVER's, so the receipt can never show the number the sheet guessed."""
+    caller, org = _caller(current_user), _uuid(active_org)
+    revoked = await api_keys_db.revoke_all_grants_in_org(pool, org_id=org, revoked_by=caller)
+    count, members = len(revoked), len({str(r["user_id"]) for r in revoked})
+    if count:
+        audit_key_call(
+            background_tasks,
+            {"id": None, "label": None, "user_id": caller, "org_id": org, "kind": "mcp"},
+            "api_key.revoke",
+            call="manage",
+            detail={"credential": "oauth", "scope": "org", "count": count, "members": members},
+        )
+    return RevokeAllResult(revoked=count, members=members)
 
 
 @org_router.get("", response_model=ApiKeyList)
@@ -661,7 +780,10 @@ async def revoke_org_key(
              "kind": row.get("kind")},
             "api_key.revoke",
             call="manage",
-            detail={"by_admin": True, "owner_id": str(row["user_id"])},
+            detail={"by_admin": True, "owner_id": str(row["user_id"]),
+                    # 307-05 (D-28): + credential oauth, and the owner's name for the audit words
+                    **({**detail, "owner_name": row.get("owner_name")}
+                       if (detail := _grant_audit_detail(row)) else {})},
         )
     (key,) = await _serialize_keys(pool, [row], caller=caller, org_id=org)
     return key
