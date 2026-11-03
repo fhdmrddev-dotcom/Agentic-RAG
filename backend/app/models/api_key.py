@@ -117,12 +117,56 @@ class McpAvailability(BaseModel):
     off: McpOff | None = None
     url: str | None = None
     tools: list[McpToolRef] = Field(default_factory=list)
+    # Phase 307-05 (D-15): sign-in from an AI tool is available (``mcp_public_base()`` is set).
+    oauth: bool = False
 
 
 class ApiKeyList(BaseModel):
     keys: list[ApiKeyRead]
     limits: ApiKeyLimits
     mcp: McpAvailability = Field(default_factory=McpAvailability)
+
+
+# ── connected apps (Phase 307-05; D-25, D-26, D-27) ──────────────────────────────────────────
+# A connected app is an OAuth GRANT. It has no secret, prefix, label or call strip on the wire:
+# ``client_name`` is the client's own (sanitised) claim; ``redirect_host`` is the fact.
+
+
+class ConnectedApp(BaseModel):
+    id: str
+    client_name: str
+    name_source: Literal["cimd", "dcr"]
+    redirect_host: str | None = None
+    redirect_kind: Literal["web", "loopback"] | None = None
+    org_id: str
+    org_name: str | None = None
+    tools: list[str] = Field(default_factory=list)
+    folders: list[ApiKeyFolderRef] | None = None
+    include_external: bool = False
+    created_at: datetime
+    last_used_at: datetime | None = None
+    expires_at: datetime | None = None
+    mcp_off: McpOff | None = None
+
+
+class ConnectedAppList(BaseModel):
+    apps: list[ConnectedApp]
+
+
+class OrgConnectedApp(ConnectedApp):
+    owner_name: str | None = None
+    owner_is_you: bool = False
+
+
+class OrgConnectedAppList(BaseModel):
+    apps: list[OrgConnectedApp]
+
+
+class RevokeAllResult(BaseModel):
+    """What the server revoked (D-26): the receipt reads THIS count, never the client's."""
+
+    revoked: int
+    members: int
 
 
 def _clean_label(v: str) -> str:
