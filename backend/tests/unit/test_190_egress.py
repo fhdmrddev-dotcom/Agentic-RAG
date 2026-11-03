@@ -574,9 +574,25 @@ def test_the_capability_keys_agree_with_the_shipped_closed_set():
     # So an extra key is allowed — and it must be WHOLLY wired, because a key present here
     # and missing from either table below is a `KeyError` at the socket rather than a
     # refusal, which fails OPEN in the sense that matters: no answer instead of a clear no.
+    #
+    # ⚠ AMENDED 2026-11-03 (Phase 307, D-06 / P-1) — a fence retired on purpose, never tripped by
+    # accident. The empty-tuple clause below used to refuse EVERY non-capability key with an empty
+    # host tuple. `client_metadata` (307) is such a key BY DESIGN: the destination is the CIMD
+    # client_id URL's own host, passed per call as `allowed_host` under the `_CALLER` arm — the
+    # same arm `send_email` uses. An empty tuple is therefore allowed exactly when the key's match
+    # mode is `_CALLER` (where `_host_is_allowed` fails closed on a missing `allowed_host`), and
+    # still refused for every suffix/exact key, where an empty tuple would allow nothing silently.
+    from app.security.egress import _CALLER
+
     for key in set(ALLOWED_HOST_SUFFIXES) - set(EXTERNAL_ACTION_CAPABILITIES):
         assert key in _HOST_MATCH, f"{key} has hosts but no match MODE"
         assert key in _TLS_SCHEMES, f"{key} has hosts but no permitted SCHEME"
+        if _HOST_MATCH[key] == _CALLER:
+            assert ALLOWED_HOST_SUFFIXES[key] == (), (
+                f"{key} is a caller-supplied (_CALLER) key; a host tuple beside it would be a "
+                "second, staler source of truth for its destination"
+            )
+            continue
         assert ALLOWED_HOST_SUFFIXES[key], (
             f"{key} is a non-capability key with an EMPTY host tuple; only the caller-supplied"
             " arm (send_email) may be empty, and this key has no such arm"
