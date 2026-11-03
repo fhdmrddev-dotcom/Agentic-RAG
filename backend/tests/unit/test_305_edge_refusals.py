@@ -123,7 +123,10 @@ def test_every_credential_failure_is_one_identical_401(monkeypatch, setup):
         prints[label] = _fingerprint(_response_for(monkeypatch, auth, resolver, real=real))
     first = prints["no header"]
     assert first[0] == 401
-    assert (b"www-authenticate", b"Bearer") in [(k.lower(), v) for k, v in first[2]]
+    # D-22/D-53: resource_metadata added in 307-02 — the one 401 now points an OAuth client at the
+    # protected-resource document (RFC 9728), still built once per base and identical for every case.
+    challenge = b'Bearer resource_metadata="http://localhost:8000/.well-known/oauth-protected-resource/mcp"'
+    assert (b"www-authenticate", challenge) in [(k.lower(), v) for k, v in first[2]]
     for label, fp in prints.items():
         assert fp == first, f"{label!r} differs from the one 401: {fp!r} vs {first!r}"
     assert setup == [], "the edge (or a stubbed path) wrote an audit row"

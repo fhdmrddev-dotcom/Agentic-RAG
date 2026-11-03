@@ -19,8 +19,16 @@ from app.services.mcp_tool_catalogue import MCP_PATH
 ACCESS_LOGGER = "uvicorn.access"
 
 
+OAUTH_PATH = "/oauth"
+
+
 def _is_mcp_path(path: str) -> bool:
-    return path == MCP_PATH or path.startswith(MCP_PATH + "/")
+    # Phase 307 (D-31 / T-307-08): /oauth too — an authorize URL carries state and code_challenge
+    # in its query. Segment boundary: /oauthx is untouched.
+    for root in (MCP_PATH, OAUTH_PATH):
+        if path == root or path.startswith(root + "/"):
+            return True
+    return False
 
 
 class McpQueryStripFilter(logging.Filter):

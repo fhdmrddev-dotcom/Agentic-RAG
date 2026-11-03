@@ -326,6 +326,13 @@ ALLOWED_HOST_SUFFIXES: dict[str, tuple[str, ...]] = {
     # 1drv.com is KEPT rather than replaced — it is still what the documentation describes
     # and may still serve some accounts; sharepoint.com is what OneDrive for Business uses.
     "graph_download": ("1drv.com", "sharepoint.com", "microsoftpersonalcontent.com"),
+    # ⚠ A NEW KEY, ADDED DELIBERATELY (307, D-06): the caller passes the client_id URL's host as
+    # allowed_host; public addresses only, pinned, no redirects, size-capped. An OAuth client's
+    # Client ID Metadata Document lives at an https URL the CLIENT chooses, so there is no host
+    # list to write here — the `_CALLER` arm (send_email's) matches that one host exactly and fails
+    # closed without it. Empty on purpose, and test_190_egress allows an empty tuple ONLY for a
+    # `_CALLER` key (P-1: a fence retired on purpose, never tripped by accident).
+    "client_metadata": (),
 }
 
 _HOST_MATCH: dict[str, str] = {
@@ -346,6 +353,7 @@ _HOST_MATCH: dict[str, str] = {
     "contacts_write": _SUFFIX,
     "graph_read": _SUFFIX,
     "graph_download": _SUFFIX,
+    "client_metadata": _CALLER,  # 307 D-06: the CIMD URL's own host, per call
 }
 
 # D-07 step 1. TLS is STATED, never assumed: a destination with no scheme is refused, so a
@@ -368,6 +376,7 @@ _TLS_SCHEMES: dict[str, frozenset[str]] = {
     "contacts_write": frozenset({"https"}),
     "graph_read": frozenset({"https"}),
     "graph_download": frozenset({"https"}),
+    "client_metadata": frozenset({"https"}),
 }
 
 _DEFAULT_PORTS: dict[str, int] = {

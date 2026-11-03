@@ -89,6 +89,16 @@ describe("305-03 an MCP call's result words", () => {
     expect(mcpCallWords(refused("mcp_off_org"), ctx)).toBeNull()
   })
 
+  it("the two OAuth refusal reasons 307 audits have words, never the raw code", () => {
+    const refused = (reason: string) => call({ ok: false, outcome: null, reason, tool: null })
+    expect(words(refused("wrong_resource"))).toBe(
+      "✕ refused: this sign-in was made for a different Syrel address",
+    )
+    expect(words(refused("refresh_reuse"))).toBe(
+      "✕ refused: an old sign-in token was used again, so this connection was ended to keep it safe",
+    )
+  })
+
   it("a workflow key's words are untouched (no delegation without kind mcp)", () => {
     const wf = { key: makeKey(), now: NOW }
     expect(callWords(call({ verb: "read", outcome: "ok" }), wf).text).toBe("✓ ok")

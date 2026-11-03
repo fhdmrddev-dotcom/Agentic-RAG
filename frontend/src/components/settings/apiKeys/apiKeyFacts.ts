@@ -317,6 +317,8 @@ function refusedWords(call: ApiKeyCall, ctx: CallContext): string | null {
       return C.calls.limiterUnavailable
     case "wrong_resource": // 307 (D-18) — an OAuth token minted for another resource
       return M.calls.wrongResource
+    case "refresh_reuse": // 307-02 (D-19) — a used refresh token came back; the grant was ended
+      return M.calls.refreshReuse
     case "wrong_kind": // 304-02 (D-36)
       return M.calls.wrongKind
     case "mcp_off_org":
