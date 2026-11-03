@@ -9,6 +9,7 @@ fence (the test_304_acting_reads_fence tokenizer, imported rather than copied).
 """
 from __future__ import annotations
 
+import re
 from pathlib import Path
 
 from tests.unit.test_304_acting_reads_fence import _code_only
@@ -46,14 +47,29 @@ def test_the_package_has_the_seven_modules():
     assert EXPECTED_MODULES <= names, EXPECTED_MODULES - names
 
 
+def _carries(code: str, banned: str) -> bool:
+    # ⚠ AMENDED 2026-11-04 (307-02): "anon" (the Supabase role / key) is matched only where it
+    # STARTS an identifier or literal, so ``canonical_resource`` (307's RFC 8707 helper) is not read
+    # as the anon role. "anon", 'anon', anon_key, SUPABASE_anon... all still fail.
+    if banned == "anon":
+        return re.search(r"(?<![A-Za-z0-9])anon", code) is not None
+    return banned in code
+
+
 def test_no_mcp_module_carries_a_banned_token():
     offenders = []
     for path in _modules():
         code = _code_only(path)
         for banned in BANNED:
-            if banned in code:
+            if _carries(code, banned):
                 offenders.append(f"{path.name}: {banned}")
     assert offenders == []
+
+
+def test_the_anon_match_still_catches_the_role():
+    assert _carries('role = "anon"', "anon")
+    assert _carries("supabase_anon_key", "anon")
+    assert not _carries("canonical_resource(x)", "anon")
 
 
 def test_the_edge_calls_the_one_resolver():

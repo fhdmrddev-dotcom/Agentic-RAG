@@ -121,9 +121,43 @@ def _git(*args: str) -> subprocess.CompletedProcess:
     return subprocess.run(["git", *args], cwd=str(REPO), capture_output=True, text=True)
 
 
-@pytest.mark.parametrize("rel", ["backend/app/security/principal_liveness.py", "backend/app/mcp/edge.py"])
+@pytest.mark.parametrize("rel", ["backend/app/security/principal_liveness.py"])
 def test_leaf_and_edge_are_byte_unchanged_since_the_phase_base(rel):
     if _git("cat-file", "-e", f"{PHASE_BASE_SHA}^{{commit}}").returncode != 0:
         pytest.skip(f"phase base {PHASE_BASE_SHA[:9]} is not in this clone")
     diff = _git("diff", "--exit-code", "--stat", PHASE_BASE_SHA, "--", rel)
     assert diff.returncode == 0, diff.stdout
+
+
+# ⚠ AMENDED 2026-11-04 (307-02, D-22 / D-53) — the edge clause was BYTE-unchanged, and 307-02 is
+# REQUIRED to edit edge.py: the one 401 must name the protected-resource document, which is one
+# function, ``configure_challenge``, that rebuilds the header constant. A byte pin could not tell
+# that from a token check smuggled into the edge, so the clause is now exact about what may change:
+# edge.py at HEAD, with ``configure_challenge`` removed, is AST-IDENTICAL to the phase base. Any
+# other edit — a second resolver, a token lookup, a changed refusal — still fails here. The
+# one-resolver clauses above are unchanged.
+_EDGE = "backend/app/mcp/edge.py"
+_EDGE_ALLOWED_ADDITIONS = {"configure_challenge"}
+
+
+def _without(tree: ast.Module, names: set[str]) -> str:
+    tree.body = [n for n in tree.body if not (isinstance(n, ast.FunctionDef) and n.name in names)]
+    return ast.dump(tree, include_attributes=False)
+
+
+def test_the_edge_changed_only_by_configure_challenge_since_the_phase_base():
+    if _git("cat-file", "-e", f"{PHASE_BASE_SHA}^{{commit}}").returncode != 0:
+        pytest.skip(f"phase base {PHASE_BASE_SHA[:9]} is not in this clone")
+    shown = subprocess.run(
+        ["git", "show", f"{PHASE_BASE_SHA}:{_EDGE}"], cwd=str(REPO), capture_output=True
+    )
+    assert shown.returncode == 0, shown.stderr
+    base_src = shown.stdout.decode("utf-8").replace("\r\n", "\n")
+    head_tree = _tree(REPO / _EDGE)
+    added = {n.name for n in head_tree.body if isinstance(n, ast.FunctionDef)} - {
+        n.name for n in ast.parse(base_src).body if isinstance(n, ast.FunctionDef)
+    }
+    assert added <= _EDGE_ALLOWED_ADDITIONS, added
+    assert _without(head_tree, _EDGE_ALLOWED_ADDITIONS) == _without(ast.parse(base_src), set()), (
+        "edge.py changed outside configure_challenge since the phase base"
+    )
