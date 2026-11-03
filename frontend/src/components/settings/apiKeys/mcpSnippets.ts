@@ -10,27 +10,20 @@
  *   · Claude Code  `.mcp.json`          `mcpServers` · `"type": "http"` · `${VAR}`
  *   · Cursor       `.cursor/mcp.json`   `mcpServers` · `${env:VAR}`
  *   · VS Code      `.vscode/mcp.json`   top-level `servers` · `"type": "http"` · `${env:VAR}`
- *   · Claude Desktop                    the `mcp-remote` bridge; its config does not read the host
- *     environment, so the key goes in that local file in place of a placeholder (labelled).
+ *   · Claude.ai and Claude Desktop      Phase 307 (D-29, D-52): a custom connector with the ADDRESS
+ *     only, then sign-in — no key, no header, no env var. The 304 local bridge this tab carried
+ *     "until sign-in ships" is retired with its version pin (D-45), because sign-in shipped.
  *
  * The Claude Code terminal form is `claude mcp add-json` in SINGLE quotes with `--scope project`:
  * single quotes so the shell never expands the variable into the stored config, project scope so
  * it lands in `.mcp.json`, where the docs state `${VAR}` expansion applies (research A1).
- *
- * D-45 (supply chain): `mcp-remote` is pinned to a version only after its npm ownership was
- * verified at execution (304-05 SUMMARY records the evidence). `MCP_REMOTE_VERSION = null` emits
- * the unpinned package and the Desktop tab says the version is unverified.
+ * Claude Code can also skip the key and sign in (307 D-52): `claudeCodeSignInCommand` below.
  */
 
 export const SYREL_MCP_ENV = "SYREL_MCP_KEY"
 
 /** The server's name in every client config. */
 export const MCP_SERVER_NAME = "syrel"
-
-/** D-45: verified 2026-10-31 — npm `mcp-remote` latest 0.15.2; repository `punkpeye/mcp-remote` is
- *  the same GitHub repository as `geelen/mcp-remote` (id 951601187, a transfer, not a fork); the
- *  npm maintainer is the repository's committer; the tag v0.15.2 exists there. */
-export const MCP_REMOTE_VERSION: string | null = "0.15.2"
 
 export type McpClient = "claudeCode" | "cursor" | "vscode" | "desktop"
 export const MCP_CLIENTS: readonly McpClient[] = ["claudeCode", "cursor", "vscode", "desktop"]
@@ -92,23 +85,30 @@ export function vscodeSnippet(mcpUrl: string, envVarName: string): string {
   return json({ servers: { [MCP_SERVER_NAME]: { type: "http", url: mcpUrl, headers: bearerHeader(`\${env:${env}}`) } } })
 }
 
-/** `mcp-remote@{version}` when D-45 verification passed, the bare name otherwise. */
-export function mcpRemotePackage(version: string | null): string {
-  return version ? `mcp-remote@${version}` : "mcp-remote"
+/** A safe address or a throw: the sign-in blocks are built from the URL alone, so they refuse
+ *  anything `safeMcpUrl` would not show (the screen never reaches here with one). */
+function requireSafeUrl(mcpUrl: string): string {
+  const url = safeMcpUrl(mcpUrl)
+  if (url === null) throw new Error("mcpSnippets: expected a plain http(s) MCP address")
+  return url
 }
 
-/** The README's Windows-safe form: no space inside an argument, the header value from `env`. */
-export function desktopBridgeSnippet(mcpUrl: string, envVarName: string): string {
-  const env = envName(envVarName)
-  return json({
-    mcpServers: {
-      [MCP_SERVER_NAME]: {
-        command: "npx",
-        args: ["-y", mcpRemotePackage(MCP_REMOTE_VERSION), mcpUrl, "--header", "Authorization:${AUTH_HEADER}"],
-        env: { AUTH_HEADER: `Bearer <your ${env} value>` },
-      },
-    },
-  })
+/**
+ * Phase 307 (D-29): the Claude.ai and Desktop block — the connector's address and nothing else. The
+ * builder keeps the shared `(mcpUrl, envVarName)` shape (and still refuses a value that is not a
+ * variable name), but no variable, header or key appears in what it returns.
+ */
+export function desktopConnectorAddress(mcpUrl: string, envVarName: string): string {
+  envName(envVarName)
+  return requireSafeUrl(mcpUrl)
+}
+
+const SHELL_SAFE = /^[A-Za-z0-9:/._~%+@=,-]+$/
+
+/** Phase 307 (D-52): Claude Code's sign-in form — the address with no header, then `/mcp`. */
+export function claudeCodeSignInCommand(mcpUrl: string): string {
+  const url = requireSafeUrl(mcpUrl)
+  return `claude mcp add --transport http ${MCP_SERVER_NAME} ${SHELL_SAFE.test(url) ? url : shellSingleQuoted(url)}`
 }
 
 /** The builder per client tab, in tab order. */
@@ -116,5 +116,5 @@ export const MCP_SNIPPET_BUILDERS: Record<McpClient, (mcpUrl: string, envVarName
   claudeCode: claudeCodeSnippet,
   cursor: cursorSnippet,
   vscode: vscodeSnippet,
-  desktop: desktopBridgeSnippet,
+  desktop: desktopConnectorAddress,
 }

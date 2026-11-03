@@ -9,9 +9,14 @@
  *   That is also why the snippets may be shown again after the show-once card is gone.
  *
  *  · tabs are WORDS only (no client logos: the icon convention has no editor marks), Claude Code
- *    first; Claude Desktop carries the warning chip "Workaround" and leads with the bridge line;
+ *    first;
  *  · three numbered steps per tab: the env variable, where the snippet goes (with Copy), and how to
- *    reload. Claude Desktop's config can't read the environment, so its first step says so;
+ *    reload;
+ *  · Phase 307-04 (D-29, D-52): the fourth tab, "Claude.ai and Desktop", connects by SIGN-IN — add a
+ *    custom connector, paste the address (a block with the URL only), click Add then Connect — plus
+ *    the Team/Enterprise owner note. No key, header or env var appears on it; the 304 bridge it
+ *    carried "until sign-in ships" is retired. The Claude Code tab gains the sign-in alternative
+ *    (`claude mcp add --transport http …`, then /mcp), built from the URL alone;
  *  · the Claude.ai organisation-connector warning (D-29) is a note under the tabs, on every tab and
  *    in the no-address state;
  *  · no public address (or one that could carry anything but an address) → the no-address line.
@@ -28,10 +33,10 @@ import { API_KEYS_COPY, fillCopy } from "./apiKeysCopy"
 import { MCP_KEY_COPY } from "./mcpKeyCopy"
 import {
   MCP_CLIENTS,
-  MCP_REMOTE_VERSION,
   MCP_SNIPPET_BUILDERS,
   SYREL_MCP_ENV,
   claudeCodeCliSnippet,
+  claudeCodeSignInCommand,
   safeMcpUrl,
   type McpClient,
 } from "./mcpSnippets"
@@ -58,7 +63,7 @@ export function CopyButton({ state, label, onCopy }: { state: CopyState; label: 
   )
 }
 
-type BlockId = McpClient | "claudeCodeCli"
+type BlockId = McpClient | "claudeCodeCli" | "claudeCodeSignIn"
 
 function Block({
   id,
@@ -133,31 +138,46 @@ export function McpConnectSnippets({ mcpUrl }: { mcpUrl: string | null }) {
             {MCP_CLIENTS.map((c) => (
               <TabsTrigger key={c} value={c} className="gap-1">
                 {M.clients[c]}
-                {c === "desktop" && (
-                  <span className="rounded-md border border-warning/50 px-1 text-xs text-warning">{M.workaroundChip}</span>
-                )}
               </TabsTrigger>
             ))}
           </TabsList>
           {MCP_CLIENTS.map((c) => {
             const name = M.clients[c]
             const text = MCP_SNIPPET_BUILDERS[c](url, SYREL_MCP_ENV)
+            if (c === "desktop") {
+              // 307-04 (D-29): sign-in, no key — add the connector, paste the address, Add then Connect.
+              return (
+                <TabsContent key={c} value={c} className="mt-2">
+                  <ol className="grid list-decimal gap-2 pl-5 text-xs text-muted-foreground">
+                    <li>{M.stepPlace.desktop}</li>
+                    <li>
+                      {M.stepPaste.desktop}
+                      {block(c, text, M.copyAddressAria)}
+                    </li>
+                    <li>{M.stepReload.desktop}</li>
+                  </ol>
+                  <p className="mt-2 text-xs text-muted-foreground">{M.desktopPlanNote}</p>
+                </TabsContent>
+              )
+            }
             return (
               <TabsContent key={c} value={c} className="mt-2">
-                {c === "desktop" && <p className="mb-2 text-xs text-warning">{M.desktopLead}</p>}
                 <ol className="grid list-decimal gap-2 pl-5 text-xs text-muted-foreground">
-                  <li>{c === "desktop" ? M.stepEnvDesktop : fillCopy(M.stepEnv, { env: SYREL_MCP_ENV })}</li>
+                  <li>{fillCopy(M.stepEnv, { env: SYREL_MCP_ENV })}</li>
                   <li>
                     {M.stepPlace[c]}
                     {block(c, text, fillCopy(M.copySetup, { client: name }))}
                     {c === "claudeCode" &&
                       block("claudeCodeCli", claudeCodeCliSnippet(url, SYREL_MCP_ENV), fillCopy(M.copyCli, { client: name }), M.cliHeading)}
-                    {c === "desktop" && MCP_REMOTE_VERSION === null && (
-                      <p className="mt-1 text-xs text-warning">{M.desktopUnverified}</p>
-                    )}
                   </li>
                   <li>{M.stepReload[c]}</li>
                 </ol>
+                {c === "claudeCode" && (
+                  <div className="mt-2">
+                    <p className="text-xs text-muted-foreground">{M.claudeCodeSignIn}</p>
+                    {block("claudeCodeSignIn", claudeCodeSignInCommand(url), fillCopy(M.copyCommandAria, { client: name }))}
+                  </div>
+                )}
               </TabsContent>
             )
           })}
