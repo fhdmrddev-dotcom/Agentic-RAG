@@ -11,7 +11,7 @@ progress:
   total_plans: 15
   completed_plans: 15
   percent: 14
-stopped_at: Phase 307 executing — waves 1-3/4 merged (01 data+resolver, 04 routing, 02 authorization server, 03 consent page); next wave 4 (307-05 connected apps + bookkeeping)
+stopped_at: Phase 307 executed — 5/5 plans merged (01 data+resolver, 04 routing, 02 AS, 03 consent, 05 connected apps); post-execution gates next (code review, verify)
 ---
 
 # Project State
