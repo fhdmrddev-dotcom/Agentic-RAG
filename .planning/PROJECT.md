@@ -24,6 +24,8 @@ The agent acts as an AI colleague — it knows your knowledge base, can run code
 - **Guardrails for outside traffic, scoped to these new paths:** provider admission control (`SEED-081`) and PII redaction on what MCP and webhooks send out (`SEED-079`).
 - **Word template fix** (`BUG-261022-01`): reproduce through the real sandbox driver, then a bare `{{ name }}` either renders the value or fails the integrity check.
 
+**Progress:** 304 + 305 closed 2026-10-31; **306 closed by decision 2026-11-03** — MCP-04/05/06 + GUARD-01 validated in code (ask the agent over MCP with a closed six-read-tool set, asks marked in thread history, list/run/follow workflows, outside-start admission per org/key/provider); 5 live UAT rows owed. None deployed yet (cloud 220→223 owed). Next: 307 (OAuth).
+
 **Out of this milestone:** the versioned `/api/v1` REST surface (next milestone). The closed core stays closed (Extension Contract) — the MCP server exposes existing capabilities and adds no phase type, emitter or engine tool. Builds on Phase 293's org-scoped API keys and `/inbound`.
 
 ---
@@ -1597,3 +1599,5 @@ This document evolves at phase transitions and milestone boundaries.
 *Last updated: 2026-10-30 — **milestone v4.8 Every Page Has a Link CLOSED** (28/28, tag `v4.8`; 301/302 not yet deployed). Next: v4.9, phases from 303, migrations from 220.*
 
 *Last updated: 2026-10-30 — **milestone v4.9 Use It From Your Own Tools STARTED** (MCP server + personal keys + OAuth, outbound webhooks, SEED-081/079 guardrails on the new paths, BUG-261022-01; phases from 303, migrations from 220).*
+
+*Last updated: 2026-11-03 — **Phase 306 Ask the Agent and Run Workflows CLOSED by decision** (5/5 SC self-verified; 5 live UAT rows owed; not deployed).*
