@@ -101,6 +101,15 @@ async def get_redirect_hosts(pool: asyncpg.Pool) -> list[dict]:
     return [dict(e) for e in (value or []) if isinstance(e, dict)]
 
 
+async def deployment_mcp_on(pool: asyncpg.Pool) -> bool:
+    """``app_settings('global').mcp_enabled``, read LIVE (307-02, D-10: an authorize while the
+    deployment switch is off stores a ``deployment_off`` request). The ``api_keys.mcp_switches``
+    rule: anything but ``True`` — a missing row, NULL — reads as off (fail closed). No org is known
+    yet at authorize, so this is the deployment half of that statement on its own."""
+    value = await pool.fetchval("SELECT mcp_enabled FROM public.app_settings WHERE id = 'global'")
+    return value is True
+
+
 # ── clients ──────────────────────────────────────────────────────────────────────────────────
 
 

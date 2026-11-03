@@ -25,7 +25,7 @@ from contextlib import asynccontextmanager
 from mcp.server.streamable_http_manager import StreamableHTTPASGIApp
 from starlette.routing import Route
 
-from app.mcp import access_log, edge, oauth_metadata, transport
+from app.mcp import access_log, edge, oauth_metadata, oauth_server, transport
 from app.mcp.server import server
 from app.services.mcp_tool_catalogue import MCP_PATH, mcp_public_base
 
@@ -52,6 +52,29 @@ def register_mcp(app) -> None:
         app.router.routes.append(
             Route(path, endpoint=mcp_edge, methods=["POST"], include_in_schema=False)
         )
+    # Phase 307 (OAUTH-05; D-02 / D-03): the authorization server's routes, AFTER the refuse-mount
+    # guard — with no public base none of them exists. Literal paths derived from the base (the
+    # one-box proxy passes the origin-root .well-known paths through unchanged). Hidden from the
+    # public OpenAPI document like /mcp; main.py is not edited.
+    paths = oauth_metadata.well_known_paths()
+    app.router.routes.append(Route(
+        paths["prm_suffixed"], endpoint=oauth_server.well_known_prm, methods=["GET"],
+        include_in_schema=False,
+    ))
+    app.router.routes.append(Route(
+        paths["prm_root"], endpoint=oauth_server.well_known_prm, methods=["GET"],
+        include_in_schema=False,
+    ))
+    app.router.routes.append(Route(
+        paths["as_metadata"], endpoint=oauth_server.well_known_as, methods=["GET"],
+        include_in_schema=False,
+    ))
+    app.router.routes.append(Route(
+        "/oauth/register", endpoint=oauth_server.register, methods=["POST"], include_in_schema=False,
+    ))
+    app.router.routes.append(Route(
+        "/oauth/authorize", endpoint=oauth_server.authorize, methods=["GET"], include_in_schema=False,
+    ))
     # Phase 307 (D-22): the one 401 names this base's protected-resource document.
     edge.configure_challenge(oauth_metadata.prm_url())
     access_log.install()

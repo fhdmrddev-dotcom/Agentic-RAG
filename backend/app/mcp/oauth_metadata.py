@@ -1,8 +1,8 @@
 """Phase 307 (OAUTH-05; D-02, D-04, D-22, D-49; T-307-04) — the discovery documents. PURE.
 
 Every value here is a pure function of ``mcp_public_base()`` — the ONE refuse-mount predicate.
-Never ``request.url``, never ``Host``, never ``X-Forwarded-*``: an absolute URL a client trusts
-must not be steerable by the request that asked for it.
+Never the request's own URL, its ``Host`` or any proxy-forwarded header: an absolute URL a client
+trusts must not be steerable by the request that asked for it.
 
 * **issuer** = ``mcp_public_base()`` exactly (no trailing slash). It appears byte-identical in the
   authorization-server document, as the protected-resource document's ``authorization_servers[0]``
