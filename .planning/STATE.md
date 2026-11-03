@@ -11,7 +11,7 @@ progress:
   total_plans: 15
   completed_plans: 15
   percent: 14
-stopped_at: Phase 307 executed — 5/5 plans merged (01 data+resolver, 04 routing, 02 AS, 03 consent, 05 connected apps); post-execution gates next (code review, verify)
+stopped_at: Phase 307 executed — 5/5 plans merged; TDD gate OK; schema-drift gate bypassed (mig 224 applied locally by hand, check-migration-224-live.py = live; project forbids db push); NEXT /gsd:code-review 307 (55 source files, standard) → regression gate → verifier → /gsd:secure-phase 307 → /gsd:verify-work 307
 ---
 
 # Project State
