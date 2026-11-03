@@ -76,7 +76,10 @@ async def test_every_refusal_is_one_identical_401(server, pg_pool):
 
     first = prints["no header"]
     assert first[0] == 401, first
-    assert (b"www-authenticate", b"Bearer") in first[2]
+    # D-22/D-53: resource_metadata added in 307-02 — the one 401 carries the RFC 9728 PRM URL of
+    # THIS server (BACKEND_PUBLIC_URL is the server's own loopback base), identical for every case.
+    prm = f"{server.base_url}/.well-known/oauth-protected-resource/mcp"
+    assert (b"www-authenticate", f'Bearer resource_metadata="{prm}"'.encode()) in first[2]
     for label, fp in prints.items():
         assert fp == first, f"{label!r} differs from the one 401:\n{fp!r}\nvs\n{first!r}"
     # Only the core's own throttled refusal rows, for the two attributable keys.
