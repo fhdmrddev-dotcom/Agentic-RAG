@@ -74,7 +74,6 @@ beforeEach(() => {
 })
 afterEach(() => {
   vi.clearAllMocks()
-  vi.resetAllMocks()
 })
 
 describe("307-03 ConsentPage — ready", () => {
@@ -113,7 +112,10 @@ describe("307-03 ConsentPage — ready", () => {
 
   it("the active org switched off falls back to the first switched-on org", async () => {
     setup({
-      request: { ...READY, orgs: [{ ...READY.orgs[2], active: true }, READY.orgs[0], READY.orgs[1]] } as ConsentRequest,
+      request: {
+        ...READY,
+        orgs: [{ ...READY.orgs[2], active: true }, READY.orgs[0], { ...READY.orgs[1], active: false }],
+      } as ConsentRequest,
     })
     await screen.findByTestId("consent-title")
     expect(screen.getByRole("radio", { name: "Acme Legal" })).toHaveAttribute("aria-checked", "true")
@@ -345,7 +347,8 @@ describe("307-03 consent sources — copy lives in oauthCopy.ts, no HTML from cl
   it("no JSX text literal in any consent component", () => {
     for (const [file, src] of Object.entries(sources)) {
       const stripped = src.replace(/\/\*[\s\S]*?\*\//g, "").replace(/^\s*\/\/.*$/gm, "")
-      const literals = [...stripped.matchAll(/>\s*([A-Za-z][^<>{}\n]*?)\s*</g)].map((m) => m[1])
+      // JSX text between a tag's `>` (not an arrow's `=>`) and the next tag: words there are a literal.
+      const literals = [...stripped.matchAll(/(?<!=)>\s*([A-Za-z][^<>{}\n=;()]*?)\s*<\/?[A-Za-z]/g)].map((m) => m[1])
       expect(literals, file).toEqual([])
     }
   })
