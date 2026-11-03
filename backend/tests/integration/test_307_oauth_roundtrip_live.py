@@ -33,6 +33,18 @@ def server():
         yield srv
 
 
+# D-05: Claude gives discovery, registration and token 10 s each. Every endpoint's wall time on
+# the live server is recorded here and bounded below; printed with ``-s`` for the SUMMARY.
+TIMINGS: dict[str, float] = {}
+
+
+def _t(label: str, r: httpx.Response) -> httpx.Response:
+    seconds = r.elapsed.total_seconds()
+    TIMINGS[label] = max(TIMINGS.get(label, 0.0), seconds)
+    assert seconds < 10.0, f"{label} took {seconds:.2f}s — Claude gives up at 10 s"
+    return r
+
+
 def _authorize(base: str, client_id: str, redirect_uri: str, *, state: str = "st-307") -> httpx.Response:
     with httpx.Client(base_url=base, timeout=30, follow_redirects=False) as c:
         return c.get("/oauth/authorize", params={
@@ -72,7 +84,7 @@ def _mcp_ok(base: str, access: str) -> list[str]:
 
 
 async def _sign_in(server, gw: o.GrantWorld, redis, client_id: str, redirect_uri: str) -> dict:
-    a = _authorize(server.base_url, client_id, redirect_uri)
+    a = _t("GET /oauth/authorize", _authorize(server.base_url, client_id, redirect_uri))
     assert a.status_code == 302, a.text
     location = a.headers["location"]
     assert "/app/connect/" in location, location
@@ -81,7 +93,8 @@ async def _sign_in(server, gw: o.GrantWorld, redis, client_id: str, redirect_uri
     back = await gw.approve_for_test(redis, request_id)
     q = o.query_of(back)
     assert q["state"] == "st-307" and q["iss"] == server.base_url
-    return _assert_token_body(_exchange(server.base_url, q["code"], client_id, redirect_uri))
+    return _assert_token_body(_t("POST /oauth/token (code)",
+                                 _exchange(server.base_url, q["code"], client_id, redirect_uri)))
 
 
 async def test_the_whole_spec_round_trip(server, pg_pool):
@@ -89,24 +102,25 @@ async def test_the_whole_spec_round_trip(server, pg_pool):
     redis = o.redis_client()
     async with o.grant_world(pg_pool) as gw:
         # 1 · the 401 names the PRM document, which names the AS, whose metadata is complete
-        first = o.mcp_post(base, None, live.initialize_body())
+        first = _t("POST /mcp (401)", o.mcp_post(base, None, live.initialize_body()))
         assert first.status_code == 401
         challenge = first.headers["www-authenticate"]
         prm_url = challenge.split('resource_metadata="', 1)[1].rstrip('"')
         assert prm_url == f"{base}/.well-known/oauth-protected-resource/mcp"
-        prm = httpx.get(prm_url, timeout=10).json()
+        prm = _t("GET PRM", httpx.get(prm_url, timeout=10)).json()
         assert prm["resource"] == f"{base}/mcp" and prm["authorization_servers"] == [base]
-        as_meta = httpx.get(f"{base}/.well-known/oauth-authorization-server", timeout=10).json()
+        as_meta = _t("GET AS metadata",
+                     httpx.get(f"{base}/.well-known/oauth-authorization-server", timeout=10)).json()
         assert as_meta["issuer"] == base
         assert as_meta["code_challenge_methods_supported"] == ["S256"]
         assert as_meta["client_id_metadata_document_supported"] is True
 
         # 2 · DCR
-        reg = httpx.post(as_meta["registration_endpoint"], json={
+        reg = _t("POST /oauth/register", httpx.post(as_meta["registration_endpoint"], json={
             "client_name": "Claude (307 live)", "redirect_uris": [o.CLAUDE_REDIRECT],
             "grant_types": ["authorization_code", "refresh_token"], "response_types": ["code"],
             "token_endpoint_auth_method": "none",
-        }, timeout=10)
+        }, timeout=10))
         assert reg.status_code == 201, reg.text
         client_id = reg.json()["client_id"]
         assert "client_secret" not in reg.json()
@@ -119,7 +133,7 @@ async def test_the_whole_spec_round_trip(server, pg_pool):
 
         # 4 · refresh rotates; the old refresh reused after the grace kills the family
         old_refresh = pair["refresh_token"]
-        new = _assert_token_body(o.refresh(base, old_refresh, client_id))
+        new = _assert_token_body(_t("POST /oauth/token (refresh)", o.refresh(base, old_refresh, client_id)))
         assert new["refresh_token"] != old_refresh
         _mcp_ok(base, new["access_token"])
         from app.security.oauth_tokens import digest_token
@@ -142,12 +156,14 @@ async def test_the_whole_spec_round_trip(server, pg_pool):
         pair2 = await _sign_in(server, gw, redis, client_id, o.CLAUDE_REDIRECT)
         _mcp_ok(base, pair2["access_token"])
         with httpx.Client(base_url=base, timeout=30) as c:
-            rv = c.post("/oauth/revoke", data={"token": pair2["refresh_token"], "client_id": client_id})
+            rv = _t("POST /oauth/revoke",
+                    c.post("/oauth/revoke", data={"token": pair2["refresh_token"], "client_id": client_id}))
         assert rv.status_code == 200
         assert o.mcp_post(base, pair2["access_token"], live.initialize_body()).status_code == 401
         revoke_rows = [r for r in await gw.w.audit_rows() if r["action_type"] == "api_key.revoke"]
         assert len(revoke_rows) == 1 and revoke_rows[0]["metadata"]["detail"]["credential"] == "oauth"
     await redis.aclose()
+    print("\n[307-02 live endpoint timings, max seconds]", {k: round(v, 3) for k, v in TIMINGS.items()})
 
 
 async def test_a_cimd_client_on_a_random_loopback_port(server, pg_pool):
