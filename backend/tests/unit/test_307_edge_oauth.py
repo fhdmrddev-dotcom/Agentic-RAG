@@ -33,7 +33,8 @@ def _post(monkeypatch, auth, resolver=None, base=h.BASE):
     headers = {"accept": "application/json, text/event-stream", "content-type": "application/json"}
     if auth is not None:
         headers["authorization"] = auth
-    with TestClient(h.fresh_app(), base_url=base) as c:
+    # The backend sees UNPREFIXED paths on every topology (the one-box proxy strips /api).
+    with TestClient(h.fresh_app(), base_url=h.BASE) as c:
         return c.post("/mcp", headers=headers, json=h.initialize_body())
 
 

@@ -60,6 +60,24 @@ _INVALID_HEADERS = [
     (b"content-length", str(len(_INVALID_BODY)).encode()),
 ]
 
+
+def configure_challenge(prm: str) -> None:
+    """Phase 307 (D-22 / D-23 / D-53; T-307-16) — point the one 401 at the OAuth discovery chain.
+
+    ``register_mcp`` calls this ONCE per base with ``oauth_metadata.prm_url()``; it rebuilds
+    ``_INVALID_HEADERS`` so the challenge reads ``Bearer resource_metadata="<PRM URL>"`` (RFC 9728).
+    The body constant is untouched and every key AND token failure still sends these same bytes,
+    so no refusal kind can be told from another. A key-holding client never sees a difference
+    (Claude Code with a configured header does not fall back to OAuth). No ``scope`` (D-50).
+    """
+    global _INVALID_HEADERS
+    challenge = f'Bearer resource_metadata="{prm}"'.encode("latin-1")
+    _INVALID_HEADERS = [
+        (b"content-type", b"application/json"),
+        (b"www-authenticate", challenge),
+        (b"content-length", str(len(_INVALID_BODY)).encode()),
+    ]
+
 _RESOLVER_UNAVAILABLE = "Syrel can't check this key right now. Try again in a minute."
 _STARTING = "The MCP server is starting. Try again in a moment."
 

@@ -25,7 +25,7 @@ from contextlib import asynccontextmanager
 from mcp.server.streamable_http_manager import StreamableHTTPASGIApp
 from starlette.routing import Route
 
-from app.mcp import access_log, edge, transport
+from app.mcp import access_log, edge, oauth_metadata, transport
 from app.mcp.server import server
 from app.services.mcp_tool_catalogue import MCP_PATH, mcp_public_base
 
@@ -52,6 +52,8 @@ def register_mcp(app) -> None:
         app.router.routes.append(
             Route(path, endpoint=mcp_edge, methods=["POST"], include_in_schema=False)
         )
+    # Phase 307 (D-22): the one 401 names this base's protected-resource document.
+    edge.configure_challenge(oauth_metadata.prm_url())
     access_log.install()
 
 
