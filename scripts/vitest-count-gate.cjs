@@ -4523,7 +4523,7 @@ const BASELINE = {
   "McpOffNotice.test.tsx": 6, // RAISED 5 -> 6 at 304-REVIEW WR-02: unknown says its own sentence in every variant · 304-05 — member / card / tile / admin sentences, deployment wins, words begin with principal_liveness.py's refusal sentences
   "ApiKeyKindChoice.test.tsx": 4, // 304-05 — nothing chosen at rest, roving tabindex, the org-off tile disabled with words, hidden when MCP is unavailable
   "KeyFoldersField.test.tsx": 7, // 304-05 — all vs only, nested checkboxes, subtree inclusion marks, mail/synced gated on the external tick, filter above 12, load states
-  "McpKeyFields.test.tsx": 8, // RAISED 6 -> 8 at 306-05 (2026-11-01): the D-29 draft hint (shown, tied, removed) · 304-05 — presets from the catalogue, companions as disabled mirrors, a hand tick moves to Choose tools, unticking external unticks connector-fed folders, 30/90/365
+  "McpKeyFields.test.tsx": 12, // RAISED 8 -> 12 at 307-05 (2026-11-04): 307-03's variant="consent" (hides the org fact, expires and acts-as note; stacks rows) + the default-render snapshot · RAISED 6 -> 8 at 306-05 (2026-11-01): the D-29 draft hint (shown, tied, removed) · 304-05 — presets from the catalogue, companions as disabled mirrors, a hand tick moves to Choose tools, unticking external unticks connector-fed folders, 30/90/365
   "McpConnectSnippets.test.tsx": 10, // 304-05 — four client tabs, Copy per block with the live region, the Claude.ai warning on every tab, the no-address state, no secret prop
   "OrgMcpSwitchCard.test.tsx": 8, // 304-06 — Loading then the switch, armed OFF words, no switch on a failed read + Retry, never optimistic (disabled in flight, server answer wins), failure stays put, onRecorded once, no confirm
   "CapabilityGrid.mcp.test.tsx": 5, // 304-06 — the fifth card after Workflows, armed OFF with no count even when counts are passed, flips mcp_enabled, ⌥ raw key, no countImpact + the ControlRoomPage mapping
@@ -4539,6 +4539,22 @@ const BASELINE = {
   "ChatHistoryColumn.origin306.test.tsx": 9, // 306-04 — the mcp history row: one origin line inside the row button (Bot, sentence, accessible name), in-app row byte-identical to the base, selected stays muted, title-only filter, both groupings, unknown kind no line, no new hook, originWords("mcp")
   "outsideAskEnvelope.test.ts": 8, // 306-04 — the shared phase306 fixture's stored question, never un-escaped, api_key / typed / trailing / leading text is not an ask, any notice text, the note's words, zero-import leaf
   "UserMessageBubble.outsideAsk.test.tsx": 5, // 306-04 — question + one note (Bot, class contract), clamp measures the question, the note after Read more, a plain bubble byte-identical to the base, clamp/toggle code unchanged
+  // Phase 307 (OAUTH-04/05/07; D-42) — FIRST pins for every suite the phase created, both knobs in the
+  // same commit (each is FILE-LEVEL in TARGETS below). Counts are the vitest JSON reporter's own
+  // per-file assertion counts at 307-05 (2026-11-04), never hand-counted. 307-04 left its two unpinned.
+  "oauthRouting.test.ts": 17, // 307-04 — .well-known proxied unchanged on nginx, openid 404, consent anti-framing on Vite/Vercel/nginx, the try_files header-loss negative control
+  "CapabilityGrid.oauthCopy.test.tsx": 2, // 307-04 — the mcp_enabled sub + impact name connected apps
+  "consentFacts.test.ts": 17, // 307-03 — the summary sentence, the first unmet Allow condition, the host-match guard, the "Only allow it" clause on every web why-line
+  "ConsentPage.test.tsx": 32, // 307-03 — every state of /app/connect/<id>, framed refusal, never-optimistic Allow/Deny, location.replace only to the shown host, signed-out return line
+  "ConsentWhoIsAsking.test.tsx": 6, // 307-03 — the who-well: name as a claim, host as the fact, tags, the why line
+  "ConsentOrgField.test.tsx": 5, // 307-03 — the org radio group, switched-off rows disabled with the reason
+  "oauthContract.test.ts": 11, // 307-03 + 307-05 — consent and connected-app wire types vs the Python source, client routes, X-Org-Id
+  "ConnectedAppsSection.test.tsx": 11, // 307-05 — renders nothing without sign-in, states, card facts, name as text, never-optimistic disconnect + lasting receipt, no key verb
+  "DisconnectAppSheet.test.tsx": 4, // 307-05 — victim facts, Keep it focus, admin sub names the owner, waits for the server, failure keeps it open
+  "OrgConnectedApps.test.tsx": 9, // 307-05 — nothing without sign-in, empty line, Connected app chip + owner, Disconnect all names victims, receipt from the server's count, refusal stays open
+  "McpSignInHostsCard.test.tsx": 8, // 307-05 — failed read shows no rows, verbatim add from the server's answer, refusal kept, arm-to-confirm remove + Esc, empty warning, technical reveal
+  "AuditTab.oauthWords.test.tsx": 3, // 307-05 — credential oauth words on api_key.* rows, 60-char text cap, operator allowlist rows
+  "OrgAuditTab.oauthWords.test.tsx": 2, // 307-05 — the same words in the org browser, one shared helper (lockstep)
 }
 
 // Still COMPUTED, never hand-written — the reduce is the single source, so the
@@ -6674,6 +6690,20 @@ const TARGETS = [
   "src/components/layout/__tests__/ChatHistoryColumn.origin306.test.tsx",
   "src/components/chat/__tests__/outsideAskEnvelope.test.ts",
   "src/components/chat/__tests__/UserMessageBubble.outsideAsk.test.tsx",
+  // Phase 307 (D-42) — FILE-LEVEL (no routing, connect, admin or org __tests__ directory entry), SAME commit as their pins.
+  "src/__tests__/routing/oauthRouting.test.ts",
+  "src/components/admin/__tests__/CapabilityGrid.oauthCopy.test.tsx",
+  "src/components/connect/__tests__/consentFacts.test.ts",
+  "src/components/connect/__tests__/ConsentPage.test.tsx",
+  "src/components/connect/__tests__/ConsentWhoIsAsking.test.tsx",
+  "src/components/connect/__tests__/ConsentOrgField.test.tsx",
+  "src/components/connect/__tests__/oauthContract.test.ts",
+  "src/components/settings/apiKeys/__tests__/ConnectedAppsSection.test.tsx",
+  "src/components/settings/apiKeys/__tests__/DisconnectAppSheet.test.tsx",
+  "src/components/org/__tests__/OrgConnectedApps.test.tsx",
+  "src/components/admin/__tests__/McpSignInHostsCard.test.tsx",
+  "src/components/admin/__tests__/AuditTab.oauthWords.test.tsx",
+  "src/components/org/__tests__/OrgAuditTab.oauthWords.test.tsx",
 ]
 
 const REPO_ROOT = path.resolve(__dirname, "..")
