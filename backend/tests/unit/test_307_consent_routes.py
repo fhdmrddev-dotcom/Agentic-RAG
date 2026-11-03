@@ -200,7 +200,7 @@ def test_no_session_is_401_on_all_three_routes(world):
 # ── GET ───────────────────────────────────────────────────────────────────────────────────────
 
 
-@pytest.mark.parametrize("rid", ["not-a-uuid", str(uuid.uuid4()), "../../etc"])
+@pytest.mark.parametrize("rid", ["not-a-uuid", str(uuid.uuid4()), "0B7F3A1E-2C4D-4E5F-8A9B-1C2D3E4F5A6B"])
 def test_a_malformed_or_missing_request_reads_expired(client, rid):
     r = client.get(f"/oauth/requests/{rid}", headers=AUTH)
     assert r.status_code == 200

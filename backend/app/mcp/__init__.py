@@ -81,6 +81,13 @@ def register_mcp(app) -> None:
     app.router.routes.append(Route(
         "/oauth/revoke", endpoint=oauth_server.revoke, methods=["POST"], include_in_schema=False,
     ))
+    # Phase 307-03 (OAUTH-04; D-03 / P-3): the consent API the /app/connect page answers on the
+    # member's session. A FastAPI router, so only an app that can include one gets it: a bare
+    # Starlette test app (the 305 harness) keeps working with no consent routes.
+    if hasattr(app, "include_router"):
+        from app.api import oauth_consent  # noqa: PLC0415 — FastAPI-only, imported where used
+
+        app.include_router(oauth_consent.router)
     # Phase 307 (D-22): the one 401 names this base's protected-resource document.
     edge.configure_challenge(oauth_metadata.prm_url())
     access_log.install()
