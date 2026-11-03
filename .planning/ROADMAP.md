@@ -213,7 +213,7 @@ Plans:
 
 **Wave 3** *(blocked on Wave 2 completion)*
 
-- [ ] 307-03-PLAN.md — consent: one narrowing validator shared with key create, /oauth/requests read / approve / deny, the consent page with every state + host-match and frame guards, one App.tsx branch, one appRoutes arm, one returnTo kind
+- [x] 307-03-PLAN.md — consent: one narrowing validator shared with key create, /oauth/requests read / approve / deny, the consent page with every state + host-match and frame guards, one App.tsx branch, one appRoutes arm, one returnTo kind
 
 **Wave 4** *(blocked on Wave 3 completion)*
 
