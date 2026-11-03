@@ -925,3 +925,18 @@ REVOKE EXECUTE ON FUNCTION public.threads_origin_immutable() FROM PUBLIC;
 REVOKE EXECUTE ON FUNCTION public.threads_origin_immutable() FROM anon;
 REVOKE EXECUTE ON FUNCTION public.threads_origin_immutable() FROM authenticated;
 GRANT EXECUTE ON FUNCTION public.threads_origin_immutable() TO service_role;
+
+-- migration 224 — oauth_clients and oauth_tokens: deny-all to every client role (RLS on, no
+-- policy; D-33). Copied from the 222 mcp_usage lines above, not retyped. Only the backend's
+-- service-role pool writes them. api_keys.oauth_client_id needs no line: it is deliberately
+-- OUTSIDE the authenticated column grant (the 220 block above stays the superset, unchanged).
+REVOKE ALL ON TABLE public.oauth_clients FROM PUBLIC;
+REVOKE ALL ON TABLE public.oauth_clients FROM anon;
+REVOKE ALL ON TABLE public.oauth_clients FROM authenticated;
+REVOKE ALL ON TABLE public.oauth_clients FROM service_role;
+GRANT ALL ON TABLE public.oauth_clients TO service_role;
+REVOKE ALL ON TABLE public.oauth_tokens FROM PUBLIC;
+REVOKE ALL ON TABLE public.oauth_tokens FROM anon;
+REVOKE ALL ON TABLE public.oauth_tokens FROM authenticated;
+REVOKE ALL ON TABLE public.oauth_tokens FROM service_role;
+GRANT ALL ON TABLE public.oauth_tokens TO service_role;

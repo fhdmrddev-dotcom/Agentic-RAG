@@ -1398,10 +1398,12 @@ CREATE TABLE public.api_keys (
     folder_ids jsonb,
     tools jsonb,
     include_external boolean DEFAULT false NOT NULL,
+    oauth_client_id uuid,
     CONSTRAINT api_keys_folder_ids_check CHECK (((folder_ids IS NULL) OR ((jsonb_typeof(folder_ids) = 'array'::text) AND (jsonb_array_length(folder_ids) >= 1)))),
     CONSTRAINT api_keys_kind_check CHECK ((kind = ANY (ARRAY['workflow'::text, 'mcp'::text]))),
     CONSTRAINT api_keys_label_check CHECK (((char_length(btrim(label)) >= 1) AND (char_length(btrim(label)) <= 60))),
     CONSTRAINT api_keys_mcp_expiry_check CHECK (((kind <> 'mcp'::text) OR (expires_at IS NOT NULL))),
+    CONSTRAINT api_keys_oauth_kind_check CHECK (((oauth_client_id IS NULL) OR (kind = 'mcp'::text))),
     CONSTRAINT api_keys_scope_kind_check CHECK (((kind = 'mcp'::text) OR ((folder_ids IS NULL) AND (include_external = false)))),
     CONSTRAINT api_keys_tools_check CHECK ((((kind = 'mcp'::text) AND (tools IS NOT NULL) AND (jsonb_typeof(tools) = 'array'::text) AND (jsonb_array_length(tools) >= 1)) OR ((kind = 'workflow'::text) AND (tools IS NULL)))),
     CONSTRAINT api_keys_workflows_check CHECK (((jsonb_typeof(workflows) = 'array'::text) AND ((kind <> 'workflow'::text) OR (jsonb_array_length(workflows) >= 1))))
@@ -1462,6 +1464,13 @@ COMMENT ON COLUMN public.api_keys.tools IS 'Phase 304. MCP keys only: a non-empt
 --
 
 COMMENT ON COLUMN public.api_keys.include_external IS 'Phase 304 (D-23). MCP keys only: whether connector-fed documents (source_connection_id IS NOT NULL) are in scope.';
+
+
+--
+-- Name: COLUMN api_keys.oauth_client_id; Type: COMMENT; Schema: public; Owner: -
+--
+
+COMMENT ON COLUMN public.api_keys.oauth_client_id IS 'Phase 307 (D-15). Set = this row is an OAuth GRANT approved for that client, not a personal key. Its key_hash is the digest of a random secret nobody is shown, and the resolver refuses it on the key path (wrong_kind). Read only by the backend: NOT in the authenticated column grant.';
 
 
 --
@@ -1568,6 +1577,7 @@ CREATE TABLE public.app_settings (
     outside_inflight_per_key integer DEFAULT 2 NOT NULL,
     outside_inflight_per_org integer DEFAULT 4 NOT NULL,
     outside_inflight_per_provider integer DEFAULT 6 NOT NULL,
+    mcp_oauth_redirect_hosts jsonb DEFAULT '[{"host": "claude.ai"}, {"host": "claude.com"}]'::jsonb NOT NULL,
     CONSTRAINT app_settings_api_key_reads_per_minute_bound CHECK (((api_key_reads_per_minute >= 10) AND (api_key_reads_per_minute <= 600))),
     CONSTRAINT app_settings_api_key_searches_per_minute_bound CHECK (((api_key_searches_per_minute >= 1) AND (api_key_searches_per_minute <= 120))),
     CONSTRAINT app_settings_api_key_starts_per_minute_bound CHECK (((api_key_starts_per_minute >= 1) AND (api_key_starts_per_minute <= 60))),
@@ -1578,6 +1588,7 @@ CREATE TABLE public.app_settings (
     CONSTRAINT app_settings_hnsw_ef_search_bounds CHECK (((hnsw_ef_search IS NULL) OR ((hnsw_ef_search >= 10) AND (hnsw_ef_search <= 1000)))),
     CONSTRAINT app_settings_hnsw_iterative_scan_values CHECK (((hnsw_iterative_scan IS NULL) OR (hnsw_iterative_scan = ANY (ARRAY['off'::text, 'strict_order'::text, 'relaxed_order'::text])))),
     CONSTRAINT app_settings_mcp_ask_wait_seconds_bound CHECK (((mcp_ask_wait_seconds >= 5) AND (mcp_ask_wait_seconds <= 45))),
+    CONSTRAINT app_settings_mcp_oauth_redirect_hosts_array CHECK ((jsonb_typeof(mcp_oauth_redirect_hosts) = 'array'::text)),
     CONSTRAINT app_settings_multimodal_max_vision_calls_bound CHECK (((multimodal_max_vision_calls IS NULL) OR ((multimodal_max_vision_calls >= 1) AND (multimodal_max_vision_calls <= 1000)))),
     CONSTRAINT app_settings_notification_email_delay_seconds_bound CHECK (((notification_email_delay_seconds >= 60) AND (notification_email_delay_seconds <= 3600))),
     CONSTRAINT app_settings_outside_inflight_per_key_bound CHECK (((outside_inflight_per_key >= 1) AND (outside_inflight_per_key <= 50))),
@@ -1775,6 +1786,13 @@ COMMENT ON COLUMN public.app_settings.outside_inflight_per_org IS 'Phase 306 (D-
 --
 
 COMMENT ON COLUMN public.app_settings.outside_inflight_per_provider IS 'Phase 306 (D-35, GUARD-01). Outside (MCP / API-key) runs one model provider may have in flight at once, across every org. Default 6. Bounded 1..50 by three agreeing bounds: app_settings_outside_inflight_per_provider_bound, the API 400 (app/api/settings.py) and the UI clamp.';
+
+
+--
+-- Name: COLUMN app_settings.mcp_oauth_redirect_hosts; Type: COMMENT; Schema: public; Owner: -
+--
+
+COMMENT ON COLUMN public.app_settings.mcp_oauth_redirect_hosts IS 'Phase 307 (D-08). Hosts an OAuth client may redirect to over https. Entries {host, added_by?, added_by_name?, added_at?}; entries without added_by are built in (claude.ai, claude.com). Read live by app/db/oauth.py, never through load_app_settings.';
 
 
 --
@@ -3897,6 +3915,83 @@ COMMENT ON COLUMN public.notifications.closed_reason IS 'answered = an ask_user_
 
 
 --
+-- Name: oauth_clients; Type: TABLE; Schema: public; Owner: -
+--
+
+CREATE TABLE public.oauth_clients (
+    id uuid DEFAULT gen_random_uuid() NOT NULL,
+    client_id text NOT NULL,
+    kind text NOT NULL,
+    client_name text,
+    client_uri text,
+    redirect_uris jsonb NOT NULL,
+    metadata_fetched_at timestamp with time zone,
+    metadata_expires_at timestamp with time zone,
+    created_at timestamp with time zone DEFAULT now() NOT NULL,
+    last_grant_at timestamp with time zone,
+    CONSTRAINT oauth_clients_client_id_check CHECK (((char_length(client_id) >= 1) AND (char_length(client_id) <= 2048))),
+    CONSTRAINT oauth_clients_client_name_check CHECK (((client_name IS NULL) OR (char_length(client_name) <= 200))),
+    CONSTRAINT oauth_clients_client_uri_check CHECK (((client_uri IS NULL) OR (char_length(client_uri) <= 2048))),
+    CONSTRAINT oauth_clients_kind_check CHECK ((kind = ANY (ARRAY['dcr'::text, 'cimd'::text]))),
+    CONSTRAINT oauth_clients_redirect_uris_check CHECK (((jsonb_typeof(redirect_uris) = 'array'::text) AND ((jsonb_array_length(redirect_uris) >= 1) AND (jsonb_array_length(redirect_uris) <= 10))))
+);
+
+
+--
+-- Name: TABLE oauth_clients; Type: COMMENT; Schema: public; Owner: -
+--
+
+COMMENT ON TABLE public.oauth_clients IS 'Phase 307 (D-33, OAUTH-05). One row per OAuth client: registered (dcr) or fetched from its metadata document (cimd, client_id = the https URL). Only writer: app/db/oauth.py (service-role pool). Deny-all to every client role (RLS on, no policy).';
+
+
+--
+-- Name: COLUMN oauth_clients.metadata_expires_at; Type: COMMENT; Schema: public; Owner: -
+--
+
+COMMENT ON COLUMN public.oauth_clients.metadata_expires_at IS 'CIMD only: when the cached metadata document must be fetched again (D-06). NULL for dcr.';
+
+
+--
+-- Name: COLUMN oauth_clients.last_grant_at; Type: COMMENT; Schema: public; Owner: -
+--
+
+COMMENT ON COLUMN public.oauth_clients.last_grant_at IS 'When a member last approved this client. NULL = never approved; an unused dcr row is pruned.';
+
+
+--
+-- Name: oauth_tokens; Type: TABLE; Schema: public; Owner: -
+--
+
+CREATE TABLE public.oauth_tokens (
+    id uuid DEFAULT gen_random_uuid() NOT NULL,
+    grant_id uuid NOT NULL,
+    kind text NOT NULL,
+    token_hash text NOT NULL,
+    resource text NOT NULL,
+    expires_at timestamp with time zone NOT NULL,
+    created_at timestamp with time zone DEFAULT now() NOT NULL,
+    used_at timestamp with time zone,
+    replaced_by uuid,
+    revoked_at timestamp with time zone,
+    CONSTRAINT oauth_tokens_kind_check CHECK ((kind = ANY (ARRAY['access'::text, 'refresh'::text])))
+);
+
+
+--
+-- Name: TABLE oauth_tokens; Type: COMMENT; Schema: public; Owner: -
+--
+
+COMMENT ON TABLE public.oauth_tokens IS 'Phase 307 (D-17, D-19, D-46). OAuth access and refresh tokens as sha256 hex digests ONLY (never the token), each tied to its grant (api_keys row, cascade) and the resource it was issued for. Only writer: app/db/oauth.py (service-role pool). Deny-all to every client role (RLS on, no policy).';
+
+
+--
+-- Name: COLUMN oauth_tokens.replaced_by; Type: COMMENT; Schema: public; Owner: -
+--
+
+COMMENT ON COLUMN public.oauth_tokens.replaced_by IS 'A used refresh token''s successor (the rotation chain). A used token presented again outside the bounded grace revokes the whole grant (D-19).';
+
+
+--
 -- Name: operator_audit_log; Type: TABLE; Schema: public; Owner: -
 --
 
@@ -5569,6 +5664,38 @@ ALTER TABLE ONLY public.notifications
 
 
 --
+-- Name: oauth_clients oauth_clients_client_id_key; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.oauth_clients
+    ADD CONSTRAINT oauth_clients_client_id_key UNIQUE (client_id);
+
+
+--
+-- Name: oauth_clients oauth_clients_pkey; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.oauth_clients
+    ADD CONSTRAINT oauth_clients_pkey PRIMARY KEY (id);
+
+
+--
+-- Name: oauth_tokens oauth_tokens_pkey; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.oauth_tokens
+    ADD CONSTRAINT oauth_tokens_pkey PRIMARY KEY (id);
+
+
+--
+-- Name: oauth_tokens oauth_tokens_token_hash_key; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.oauth_tokens
+    ADD CONSTRAINT oauth_tokens_token_hash_key UNIQUE (token_hash);
+
+
+--
 -- Name: operator_audit_log operator_audit_log_pkey; Type: CONSTRAINT; Schema: public; Owner: -
 --
 
@@ -5969,6 +6096,13 @@ ALTER TABLE ONLY public.workspace_file_versions
 
 
 --
+-- Name: api_keys_oauth_org_idx; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX api_keys_oauth_org_idx ON public.api_keys USING btree (org_id) WHERE (oauth_client_id IS NOT NULL);
+
+
+--
 -- Name: api_keys_org_id_idx; Type: INDEX; Schema: public; Owner: -
 --
 
@@ -5979,7 +6113,7 @@ CREATE INDEX api_keys_org_id_idx ON public.api_keys USING btree (org_id);
 -- Name: api_keys_owner_label_active_uq; Type: INDEX; Schema: public; Owner: -
 --
 
-CREATE UNIQUE INDEX api_keys_owner_label_active_uq ON public.api_keys USING btree (org_id, user_id, lower(btrim(label))) WHERE (revoked_at IS NULL);
+CREATE UNIQUE INDEX api_keys_owner_label_active_uq ON public.api_keys USING btree (org_id, user_id, lower(btrim(label))) WHERE ((revoked_at IS NULL) AND (oauth_client_id IS NULL));
 
 
 --
@@ -7145,6 +7279,20 @@ CREATE INDEX notifications_run_idx ON public.notifications USING btree (run_id);
 
 
 --
+-- Name: oauth_tokens_grant_idx; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX oauth_tokens_grant_idx ON public.oauth_tokens USING btree (grant_id);
+
+
+--
+-- Name: oauth_tokens_replaced_by_idx; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX oauth_tokens_replaced_by_idx ON public.oauth_tokens USING btree (replaced_by);
+
+
+--
 -- Name: retention_policies_org_class_uniq; Type: INDEX; Schema: public; Owner: -
 --
 
@@ -7929,6 +8077,14 @@ CREATE TRIGGER workspace_files_autofill_org_id BEFORE INSERT ON public.workspace
 
 
 --
+-- Name: api_keys api_keys_oauth_client_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.api_keys
+    ADD CONSTRAINT api_keys_oauth_client_id_fkey FOREIGN KEY (oauth_client_id) REFERENCES public.oauth_clients(id) ON DELETE RESTRICT;
+
+
+--
 -- Name: api_keys api_keys_user_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
 --
 
@@ -8646,6 +8802,22 @@ ALTER TABLE ONLY public.notifications
 
 ALTER TABLE ONLY public.notifications
     ADD CONSTRAINT notifications_run_id_fkey FOREIGN KEY (run_id) REFERENCES public.workflow_runs(id) ON DELETE CASCADE;
+
+
+--
+-- Name: oauth_tokens oauth_tokens_grant_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.oauth_tokens
+    ADD CONSTRAINT oauth_tokens_grant_id_fkey FOREIGN KEY (grant_id) REFERENCES public.api_keys(id) ON DELETE CASCADE;
+
+
+--
+-- Name: oauth_tokens oauth_tokens_replaced_by_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.oauth_tokens
+    ADD CONSTRAINT oauth_tokens_replaced_by_fkey FOREIGN KEY (replaced_by) REFERENCES public.oauth_tokens(id) ON DELETE SET NULL;
 
 
 --
@@ -10353,6 +10525,18 @@ ALTER TABLE public.notification_deliveries ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.notifications ENABLE ROW LEVEL SECURITY;
 
 --
+-- Name: oauth_clients; Type: ROW SECURITY; Schema: public; Owner: -
+--
+
+ALTER TABLE public.oauth_clients ENABLE ROW LEVEL SECURITY;
+
+--
+-- Name: oauth_tokens; Type: ROW SECURITY; Schema: public; Owner: -
+--
+
+ALTER TABLE public.oauth_tokens ENABLE ROW LEVEL SECURITY;
+
+--
 -- Name: operator_audit_log; Type: ROW SECURITY; Schema: public; Owner: -
 --
 
@@ -11931,3 +12115,18 @@ REVOKE EXECUTE ON FUNCTION public.threads_origin_immutable() FROM PUBLIC;
 REVOKE EXECUTE ON FUNCTION public.threads_origin_immutable() FROM anon;
 REVOKE EXECUTE ON FUNCTION public.threads_origin_immutable() FROM authenticated;
 GRANT EXECUTE ON FUNCTION public.threads_origin_immutable() TO service_role;
+
+-- migration 224 — oauth_clients and oauth_tokens: deny-all to every client role (RLS on, no
+-- policy; D-33). Copied from the 222 mcp_usage lines above, not retyped. Only the backend's
+-- service-role pool writes them. api_keys.oauth_client_id needs no line: it is deliberately
+-- OUTSIDE the authenticated column grant (the 220 block above stays the superset, unchanged).
+REVOKE ALL ON TABLE public.oauth_clients FROM PUBLIC;
+REVOKE ALL ON TABLE public.oauth_clients FROM anon;
+REVOKE ALL ON TABLE public.oauth_clients FROM authenticated;
+REVOKE ALL ON TABLE public.oauth_clients FROM service_role;
+GRANT ALL ON TABLE public.oauth_clients TO service_role;
+REVOKE ALL ON TABLE public.oauth_tokens FROM PUBLIC;
+REVOKE ALL ON TABLE public.oauth_tokens FROM anon;
+REVOKE ALL ON TABLE public.oauth_tokens FROM authenticated;
+REVOKE ALL ON TABLE public.oauth_tokens FROM service_role;
+GRANT ALL ON TABLE public.oauth_tokens TO service_role;
