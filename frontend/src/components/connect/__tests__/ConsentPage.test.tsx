@@ -20,8 +20,23 @@ vi.mock("@/lib/api/oauth", () => ({
   denyConsent: vi.fn(),
   listFoldersForOrg: vi.fn(),
 }))
+// For the App-level route cases at the bottom (the BootScreen.test App-mount shape).
+vi.mock("@/hooks/useAuth", () => ({ useAuth: vi.fn() }))
+vi.mock("@/lib/api", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("@/lib/api")>()
+  return { ...actual, getSetupStatus: vi.fn() }
+})
+vi.mock("@/lib/supabase", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("@/lib/supabase")>()
+  return { ...actual, hydrateSupabaseFromRuntime: vi.fn().mockResolvedValue(undefined) }
+})
 
+import { createMemoryRouter } from "react-router"
+import { RouterProvider } from "react-router/dom"
 import * as oauth from "@/lib/api/oauth"
+import { getSetupStatus } from "@/lib/api"
+import { useAuth } from "@/hooks/useAuth"
+import App from "@/App"
 import { ConsentPage } from "../ConsentPage"
 
 const RID = "0b7f3a1e-2c4d-4e5f-8a9b-1c2d3e4f5a6b"
@@ -329,6 +344,41 @@ describe("307-03 ConsentPage — every other state", () => {
     expect(screen.queryByRole("button", { name: "Allow access" })).toBeNull()
     expect(screen.queryAllByRole("button")).toHaveLength(0)
     expect(api.getConsentRequest).not.toHaveBeenCalled()
+  })
+})
+
+describe("307-03 App — the /app/connect/<uuid> branch (D-11, D-41)", () => {
+  function renderAppAt(path: string, user: unknown) {
+    window.history.replaceState(null, "", path)
+    vi.mocked(useAuth).mockReturnValue({
+      user,
+      session: null,
+      loading: false,
+      signIn: vi.fn(),
+      signUp: vi.fn(),
+      signInWithSSO: vi.fn(),
+      signOut: vi.fn(),
+    } as unknown as ReturnType<typeof useAuth>)
+    vi.mocked(getSetupStatus).mockResolvedValue({ needs_setup: false, finalized: false, has_token: false })
+    const router = createMemoryRouter([{ path: "*", Component: App }], { initialEntries: [path] })
+    return render(<RouterProvider router={router} />)
+  }
+  afterEach(() => window.history.replaceState(null, "", "/"))
+
+  it("signed out: the sign-in card with the return line, and no app name", async () => {
+    renderAppAt(`/app/connect/${RID}`, null)
+    expect(await screen.findByText("Sign in to your account")).toBeInTheDocument()
+    expect(screen.getByText("After you sign in, you'll go to the page that connects your app.")).toBeInTheDocument()
+    expect(api.getConsentRequest).not.toHaveBeenCalled()
+  })
+
+  it("signed in: the consent page, outside the app shell", async () => {
+    api.getConsentRequest.mockResolvedValue(READY)
+    renderAppAt(`/app/connect/${RID}`, { id: "u1", email: "dana@acme.example" })
+    expect(await screen.findByTestId("consent-account")).toHaveTextContent("dana@acme.example")
+    expect(api.getConsentRequest).toHaveBeenCalledWith(RID)
+    // No nav rail, no chat composer: ChatLayout and the providers never mounted.
+    expect(screen.queryByRole("navigation")).toBeNull()
   })
 })
 

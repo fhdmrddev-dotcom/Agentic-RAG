@@ -111,6 +111,15 @@ describe("kindWord — the kind only, never a title (D-22 / T-299-14)", () => {
     expect(kindWord(path, "")).toBeNull()
   })
 
+  it("307-03: the consent address is 'the page that connects your app'", () => {
+    const REQ = "0b7f3a1e-2c4d-4e5f-8a9b-1c2d3e4f5a6b"
+    expect(kindWord(`/app/connect/${REQ}`, "")).toBe("the page that connects your app")
+    expect(RETURN_LINE.signin("the page that connects your app")).toBe(
+      "After you sign in, you'll go to the page that connects your app.",
+    )
+    expect(kindWord("/app/connect/not-a-uuid", "")).toBeNull()
+  })
+
   it("the two return lines carry the exact S5 words", () => {
     expect(RETURN_LINE.signin("a workflow run")).toBe("After you sign in, you'll go to a workflow run.")
     expect(RETURN_LINE.signup("an Expert")).toBe("After you sign up, you'll go to an Expert.")
@@ -196,5 +205,22 @@ describe("the stored copy — re-validated, 15-minute TTL, consumed once (D-24 /
     expect(() => takeReturnTarget()).not.toThrow()
     expect(takeReturnTarget()).toBeNull()
     expect(() => forgetReturnTarget()).not.toThrow()
+  })
+})
+
+describe("307-03 — the consent request survives the SSO round trip (D-11)", () => {
+  const REQ = "0b7f3a1e-2c4d-4e5f-8a9b-1c2d3e4f5a6b"
+  afterEach(() => forgetReturnTarget())
+
+  it("is rebuilt to the same address, lowercased", () => {
+    expect(returnTarget(`/app/connect/${REQ}`, "")).toBe(`/app/connect/${REQ}`)
+    expect(returnTarget(`/app/connect/${REQ.toUpperCase()}`, "")).toBe(`/app/connect/${REQ}`)
+    expect(returnTarget("/app/connect/nope", "")).toBeNull()
+  })
+
+  it("is stored and taken back exactly once", () => {
+    rememberReturnTarget(`/app/connect/${REQ}`)
+    expect(takeReturnTarget()).toBe(`/app/connect/${REQ}`)
+    expect(takeReturnTarget()).toBeNull()
   })
 })

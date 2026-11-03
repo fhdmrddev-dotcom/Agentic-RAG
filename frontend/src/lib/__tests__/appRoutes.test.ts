@@ -417,3 +417,39 @@ describe("appRoutes · the document address (305-02 / D-52)", () => {
     expect(canonicalAddress(`/library/${DOC}`, "")).toBe(`/app/library/${DOC}`)
   })
 })
+
+// Phase 307-03 (D-11, UI-SPEC A-8): the consent route. NOT an ActiveView (P-4): App renders it
+// itself, outside the app shell, so the twelve-member table and the reachability leg are unchanged.
+describe("appRoutes · the consent address /app/connect/<uuid> (307-03)", () => {
+  const REQ = "0b7f3a1e-2c4d-4e5f-8a9b-1c2d3e4f5a6b"
+
+  it("parses a strict UUID, lowercased", () => {
+    expect(parseAppLocation(`/app/connect/${REQ.toUpperCase()}`, "")).toEqual({ view: "connect", requestId: REQ })
+    expect(parseAppLocation(`/app/connect/${REQ}`, "")).toEqual({ view: "connect", requestId: REQ })
+  })
+
+  it.each([
+    "/app/connect/not-a-uuid",
+    "/app/connect",
+    `/app/connect/${REQ}/extra`,
+    `/connect/${REQ}`,
+    `/app/connect/${REQ.slice(0, -1)}`,
+    `/app/connect/%2F%2Fevil.com`,
+  ])("%s is not-found", (p) => {
+    expect(parseAppLocation(p, "")).toEqual({ view: "not-found" })
+  })
+
+  it("formats and round-trips, and the canonical address is the lowercase one", () => {
+    expect(formatAppRoute({ view: "connect", requestId: REQ.toUpperCase() })).toBe(`/app/connect/${REQ}`)
+    expect(parseAppLocation(formatAppRoute({ view: "connect", requestId: REQ }), "")).toEqual({
+      view: "connect",
+      requestId: REQ,
+    })
+    expect(canonicalAddress(`/app/connect/${REQ}`, "")).toBeNull()
+  })
+
+  it("is not an ActiveView: the view table still names exactly twelve members", () => {
+    expect(Object.keys(VIEW_PATHS)).not.toContain("connect")
+    expect(Object.keys(VIEW_PATHS).length).toBe(12)
+  })
+})
