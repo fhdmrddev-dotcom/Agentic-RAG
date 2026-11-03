@@ -24,7 +24,8 @@ const ALL_ON: Record<CapabilityKey, boolean> = {
 }
 
 const LABEL = "AI tool access (MCP)"
-const IMPACT = "Every AI tool key is refused on its next call, in every organisation. Keys are kept."
+// 307-04 (D-21): the switch also stops connected apps, so both sentences say so.
+const IMPACT = "Every AI tool key and connected app is refused on its next call, in every organisation. They are kept."
 
 function card(): HTMLElement {
   const el = document.querySelector('[data-capability="mcp_enabled"]')
@@ -38,7 +39,7 @@ describe("304-06 CapabilityGrid — the deployment MCP switch", () => {
     const switches = screen.getAllByRole("switch")
     expect(switches).toHaveLength(5)
     expect(switches[4]).toHaveAccessibleName(LABEL)
-    expect(screen.getByText("Members can connect AI tools with personal keys.")).toBeInTheDocument()
+    expect(screen.getByText("Members can connect AI tools with personal keys or by signing in.")).toBeInTheDocument()
     expect(card()).toHaveAttribute("data-armed", "false")
     expect(screen.queryByText(IMPACT)).toBeNull()
   })

@@ -38,7 +38,7 @@ describe("304-06 OrgMcpSwitchCard", () => {
     expect(sw).toHaveAttribute("aria-checked", "true")
     expect(
       screen.getByText(
-        "Members can make personal keys that let Claude Code, Cursor or VS Code search, ask the agent and run workflows as them in Acme Inc.", // 306-05 reworded (UI-SPEC)
+        "Members can let Claude.ai, Claude Desktop, Claude Code, Cursor or VS Code search, ask the agent and run workflows as them in Acme Inc, with a personal key or by signing in.", // 307-04 reworded (D-21)
       ),
     ).toBeInTheDocument()
     const card = screen.getByTestId("org-mcp-switch")
@@ -58,7 +58,7 @@ describe("304-06 OrgMcpSwitchCard", () => {
     expect(within(card).getByText("off for Acme Inc")).toBeInTheDocument()
     expect(
       within(card).getByText(
-        "Every member's AI tool key in Acme Inc is refused on its next call. Keys are kept; switching back on restores them.",
+        "Every member's AI tool key and connected app in Acme Inc is refused on its next call. They are kept; switching back on restores them.", // 307-04 (D-21)
       ),
     ).toBeInTheDocument()
   })

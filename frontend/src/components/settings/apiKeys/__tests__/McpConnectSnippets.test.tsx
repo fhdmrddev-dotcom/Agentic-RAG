@@ -5,6 +5,10 @@
  * SYREL_MCP_KEY and puts it in a header, the Claude Desktop bridge labelled as a workaround, and the
  * Claude.ai organisation-connector warning on every tab and in the no-address state.
  *
+ * Phase 307-04 (D-29, D-52): the fourth tab is "Claude.ai and Desktop" — add a custom connector with
+ * the address and sign in; no key, no header, no bridge. Claude Code gains the sign-in alternative.
+ * Assertions read the rendered TEXT (presence assertions cannot see content drift).
+ *
  * ⛔ THE COMPONENT NEVER RECEIVES THE SECRET. Its only data prop is the server's MCP URL; a secret on
  *   the same page must never appear in its output.
  */
@@ -17,14 +21,15 @@ import { MCP_URL } from "./fixtures"
 
 const SECRET = "srl_mcp_TESTsecretNOTreal0000000000000000000000"
 const WARNING =
-  "⚠ Don't paste this key into Claude.ai's organisation connector settings. Everyone in that Claude organisation would act as you. Claude.ai and Claude Desktop will connect with sign-in instead."
+  "⚠ Don't paste this key into Claude.ai's organisation connector settings. Everyone in that Claude organisation would act as you. Claude.ai and Claude Desktop connect by signing in instead, with no key."
+const DESKTOP_TAB = "Claude.ai and Desktop"
 
 describe("304-05 McpConnectSnippets", () => {
-  it("tabs in order, Claude Code first; the Desktop tab carries the Workaround chip", () => {
+  it("tabs in order, Claude Code first; the fourth is Claude.ai and Desktop, with no Workaround chip", () => {
     render(<McpConnectSnippets mcpUrl={MCP_URL} />)
     expect(screen.getByText("Connect a tool")).toBeInTheDocument()
     const tabs = screen.getAllByRole("tab")
-    expect(tabs.map((t) => t.textContent)).toEqual(["Claude Code", "Cursor", "VS Code", "Claude DesktopWorkaround"])
+    expect(tabs.map((t) => t.textContent)).toEqual(["Claude Code", "Cursor", "VS Code", DESKTOP_TAB])
     expect(tabs[0]).toHaveAttribute("aria-selected", "true")
   })
 
@@ -40,6 +45,23 @@ describe("304-05 McpConnectSnippets", () => {
     expect(snippet).toContain(`"url": "${MCP_URL}"`)
     expect(within(panel).getByTestId("mcp-snippet-claudeCodeCli").textContent).toContain("claude mcp add-json syrel '")
     expect(within(panel).getByText(/run \/mcp to check it is connected/)).toBeInTheDocument()
+  })
+
+  it("Claude Code: the sign-in alternative after its three steps, a command with no header and its own Copy", async () => {
+    const user = userEvent.setup()
+    render(<McpConnectSnippets mcpUrl={MCP_URL} />)
+    const panel = screen.getByRole("tabpanel")
+    expect(
+      within(panel).getByText(
+        "Or skip the key: add the address without a header, then run /mcp in Claude Code and choose to sign in.",
+      ),
+    ).toBeInTheDocument()
+    const cmd = within(panel).getByTestId("mcp-snippet-claudeCodeSignIn").textContent ?? ""
+    expect(cmd).toBe(`claude mcp add --transport http syrel ${MCP_URL}`)
+    expect(cmd).not.toMatch(/Authorization|Bearer|SYREL_MCP_KEY/)
+    const copy = within(panel).getByRole("button", { name: "Copy the Claude Code sign-in command" })
+    await user.click(copy)
+    expect(await navigator.clipboard.readText()).toBe(`claude mcp add --transport http syrel ${MCP_URL}`)
   })
 
   it("Copy copies that client's setup and says Copied", async () => {
@@ -64,25 +86,54 @@ describe("304-05 McpConnectSnippets", () => {
     expect(vs).toContain("Bearer ${env:SYREL_MCP_KEY}")
   })
 
-  it("Claude Desktop leads with the workaround line, its own env step, and the pinned bridge", async () => {
+  it("Claude.ai and Desktop: Customize, Connectors, Add custom connector; the address only; sign in, no key", async () => {
     const user = userEvent.setup()
     render(<McpConnectSnippets mcpUrl={MCP_URL} />)
-    await user.click(screen.getByRole("tab", { name: /Claude Desktop/ }))
+    await user.click(screen.getByRole("tab", { name: DESKTOP_TAB }))
     const panel = screen.getByRole("tabpanel")
+    const steps = within(panel).getAllByRole("listitem")
+    expect(steps).toHaveLength(3)
+    expect(steps[0]).toHaveTextContent(
+      "In Claude.ai or Claude Desktop, open Customize, then Connectors, and choose Add custom connector.",
+    )
+    expect(steps[1]).toHaveTextContent("Paste this address as the connector's URL.")
+    expect(steps[2]).toHaveTextContent(
+      "Click Add, then Connect. Sign in to Syrel and choose what Claude can use. No key is needed.",
+    )
+    // The block carries the MCP URL and nothing else.
+    expect(within(panel).getByTestId("mcp-snippet-desktop").textContent).toBe(MCP_URL)
+    expect(within(panel).getByRole("button", { name: "Copy the connector address" })).toBeInTheDocument()
     expect(
       within(panel).getByText(
-        "A developer workaround until Claude Desktop connects with sign-in. It needs Node.js and runs a small bridge on your computer.",
+        "On a Team or Enterprise plan, an owner adds the connector for the whole Claude organisation first, then you choose Connect.",
       ),
     ).toBeInTheDocument()
-    expect(within(panel).getByText(/Claude Desktop can't read environment variables/)).toBeInTheDocument()
-    expect(within(panel).getByTestId("mcp-snippet-desktop").textContent).toContain("mcp-remote@0.15.2")
-    expect(within(panel).queryByText(/version couldn't be checked/)).toBeNull()
+  })
+
+  it("Claude.ai and Desktop: no bridge, no workaround, no key, no environment variable anywhere in the tab", async () => {
+    const user = userEvent.setup()
+    render(<McpConnectSnippets mcpUrl={MCP_URL} />)
+    await user.click(screen.getByRole("tab", { name: DESKTOP_TAB }))
+    const panel = screen.getByRole("tabpanel")
+    const text = panel.textContent ?? ""
+    for (const gone of ["Workaround", "workaround", "mcp-remote", "npx", "SYREL_MCP_KEY", "Bearer", "environment variable", "Node.js"]) {
+      expect(text, gone).not.toContain(gone)
+    }
+    expect(document.body.textContent).not.toContain("Workaround")
+  })
+
+  it("Copy the connector address copies the URL only", async () => {
+    const user = userEvent.setup()
+    render(<McpConnectSnippets mcpUrl={MCP_URL} />)
+    await user.click(screen.getByRole("tab", { name: DESKTOP_TAB }))
+    await user.click(screen.getByRole("button", { name: "Copy the connector address" }))
+    expect(await navigator.clipboard.readText()).toBe(MCP_URL)
   })
 
   it("the Claude.ai warning is a note on every tab", async () => {
     const user = userEvent.setup()
     render(<McpConnectSnippets mcpUrl={MCP_URL} />)
-    for (const name of ["Claude Code", "Cursor", "VS Code", /Claude Desktop/]) {
+    for (const name of ["Claude Code", "Cursor", "VS Code", DESKTOP_TAB]) {
       await user.click(screen.getByRole("tab", { name }))
       expect(screen.getByRole("note")).toHaveTextContent(WARNING)
     }
@@ -117,7 +168,7 @@ describe("304-05 McpConnectSnippets", () => {
         </div>
       </div>,
     )
-    for (const name of ["Claude Code", "Cursor", "VS Code", /Claude Desktop/]) {
+    for (const name of ["Claude Code", "Cursor", "VS Code", DESKTOP_TAB]) {
       await user.click(screen.getByRole("tab", { name }))
       expect(screen.getByTestId("snippets").textContent).not.toContain(SECRET)
       expect(screen.getByTestId("snippets").textContent).not.toContain("srl_")

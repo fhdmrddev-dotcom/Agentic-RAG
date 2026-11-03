@@ -1,5 +1,8 @@
 /**
  * Phase 304-05 (D-27, D-28, D-45; T-304-38) — the per-client MCP setup snippets.
+ * Phase 307-04 (D-29, D-52): the Claude.ai and Desktop tab is the connector ADDRESS only (sign-in,
+ * no key, no bridge); the mcp-remote bridge and its version pin are retired; Claude Code gains the
+ * sign-in command `claude mcp add --transport http syrel <url>`.
  *
  * The ROADMAP failure this prices: "a snippet puts the key in a URL". Every builder takes the
  * server's MCP URL and an environment-variable NAME, never a secret, so a key cannot be inlined;
@@ -8,21 +11,22 @@
  */
 import { describe, expect, it } from "vitest"
 import snippetsRaw from "../mcpSnippets.ts?raw"
+import * as snippetsModule from "../mcpSnippets"
 import {
-  MCP_REMOTE_VERSION,
+  MCP_SNIPPET_BUILDERS,
   SYREL_MCP_ENV,
   claudeCodeCliSnippet,
+  claudeCodeSignInCommand,
   claudeCodeSnippet,
   cursorSnippet,
-  desktopBridgeSnippet,
-  mcpRemotePackage,
+  desktopConnectorAddress,
   safeMcpUrl,
   vscodeSnippet,
 } from "../mcpSnippets"
 
 const URL = "https://syrel.example.com/mcp"
-const JSON_BUILDERS = { claudeCodeSnippet, cursorSnippet, vscodeSnippet, desktopBridgeSnippet }
-const ALL_BUILDERS = { ...JSON_BUILDERS, claudeCodeCliSnippet }
+const JSON_BUILDERS = { claudeCodeSnippet, cursorSnippet, vscodeSnippet }
+const ALL_BUILDERS = { ...JSON_BUILDERS, claudeCodeCliSnippet, desktopConnectorAddress }
 
 describe("304-05 mcpSnippets — no secret can travel", () => {
   it("the env var is SYREL_MCP_KEY", () => {
@@ -91,25 +95,46 @@ describe("304-05 mcpSnippets — each client's own syntax (D-27)", () => {
       servers: { syrel: { type: "http", url: URL, headers: { Authorization: "Bearer ${env:SYREL_MCP_KEY}" } } },
     })
   })
+})
 
-  it("Claude Desktop: the mcp-remote bridge, header from AUTH_HEADER (no space in the arg), a placeholder for the key", () => {
-    const cfg = JSON.parse(desktopBridgeSnippet(URL, SYREL_MCP_ENV))
-    const server = cfg.mcpServers.syrel
-    expect(server.command).toBe("npx")
-    expect(server.args).toEqual(["-y", mcpRemotePackage(MCP_REMOTE_VERSION), URL, "--header", "Authorization:${AUTH_HEADER}"])
-    expect(server.args.every((a: string) => !a.includes(" "))).toBe(true)
-    expect(server.env.AUTH_HEADER).toMatch(/^Bearer <.*SYREL_MCP_KEY.*>$/)
+describe("307-04 Claude.ai and Desktop — the connector address, by sign-in (D-29, D-52)", () => {
+  it("the desktop builder is the address only: no header, no env var, no key, no bridge", () => {
+    expect(MCP_SNIPPET_BUILDERS.desktop).toBe(desktopConnectorAddress)
+    expect(desktopConnectorAddress(URL, SYREL_MCP_ENV)).toBe(URL)
+    const text = desktopConnectorAddress(URL, SYREL_MCP_ENV)
+    expect(text).not.toContain(SYREL_MCP_ENV)
+    expect(text).not.toMatch(/Bearer|Authorization|npx|mcp-remote/)
+  })
+
+  it("the desktop builder refuses an unsafe address through safeMcpUrl", () => {
+    expect(() => desktopConnectorAddress("https://x/mcp?key=abc", SYREL_MCP_ENV)).toThrow()
+    expect(() => desktopConnectorAddress("javascript:alert(1)", SYREL_MCP_ENV)).toThrow()
+  })
+
+  it("the bridge is retired: no mcp-remote, no version pin, no bridge builder (no dead exports)", () => {
+    const exported = Object.keys(snippetsModule)
+    for (const gone of ["MCP_REMOTE_VERSION", "mcpRemotePackage", "desktopBridgeSnippet"]) {
+      expect(exported, gone).not.toContain(gone)
+    }
+    expect(snippetsRaw).not.toMatch(/mcp-remote|npx/)
   })
 })
 
-describe("304-05 mcpSnippets — D-45 the bridge version", () => {
-  it("a verified version is pinned; an unverified one is not", () => {
-    expect(mcpRemotePackage("0.15.2")).toBe("mcp-remote@0.15.2")
-    expect(mcpRemotePackage(null)).toBe("mcp-remote")
+describe("307-04 Claude Code — sign in instead of a key (D-29, D-52)", () => {
+  it("is `claude mcp add --transport http syrel <url>`: no header, no env reference, no key", () => {
+    const cmd = claudeCodeSignInCommand(URL)
+    expect(cmd).toBe(`claude mcp add --transport http syrel ${URL}`)
+    expect(cmd).not.toMatch(/--header|Authorization|Bearer|\$\{|SYREL_MCP_KEY|srl_/)
+    expect(claudeCodeSignInCommand.length).toBe(1)
   })
 
-  it("the verified version is the one recorded at execution (npm + repository, 2026-10-31)", () => {
-    expect(MCP_REMOTE_VERSION).toBe("0.15.2")
+  it("quotes an address that carries a shell character", () => {
+    expect(claudeCodeSignInCommand("https://x.example/a;b/mcp")).toBe("claude mcp add --transport http syrel 'https://x.example/a;b/mcp'")
+  })
+
+  it("refuses an unsafe address through safeMcpUrl", () => {
+    expect(() => claudeCodeSignInCommand("https://x/mcp?key=abc")).toThrow()
+    expect(() => claudeCodeSignInCommand("")).toThrow()
   })
 })
 
