@@ -37,6 +37,7 @@ from typing import Annotated, Any
 from urllib.parse import urlencode
 from uuid import UUID
 
+import asyncpg
 from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, Request, Response
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 from pydantic import BaseModel, ConfigDict, Field, StringConstraints, field_validator
@@ -271,6 +272,10 @@ async def approve_request(
             })
     except oauth_store.OAuthStoreUnavailable as exc:
         raise _store_down(exc)
+    except asyncpg.ForeignKeyViolationError:
+        # IN-04: the client was pruned (D-09, never granted in 24 h) while this request waited.
+        # The request is already consumed and the transaction rolled back: it reads as expired.
+        raise _gone()
 
     audit_key_call(
         background_tasks,

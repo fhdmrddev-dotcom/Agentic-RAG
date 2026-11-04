@@ -580,6 +580,21 @@ def test_wr01_a_database_failure_marking_the_client_leaves_no_live_grant(world, 
     assert world.grants == [] and world.audits == []
 
 
+def test_in04_a_client_pruned_mid_consent_is_410_not_500(world, monkeypatch):
+    import asyncpg
+
+    from app.api import oauth_consent as route
+
+    async def pruned(pool, **kw):
+        raise asyncpg.ForeignKeyViolationError("api_keys_oauth_client_id_fkey")
+
+    monkeypatch.setattr(route.api_keys_db, "create_api_key", pruned)
+    rid = world.save()
+    r = _approve(TestClient(_app(world), raise_server_exceptions=False), rid)
+    assert r.status_code == 410 and r.json()["detail"] == route._GONE
+    assert world.grants == [] and world.audits == []
+
+
 def test_wr01_a_successful_approve_commits_once(client, world):
     rid = world.save()
     assert _approve(client, rid).status_code == 200
