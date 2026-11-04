@@ -119,11 +119,15 @@ async def guard(
     deadline_s: float = 2.0,
     window: dict[str, tuple[str, str]] | None = None,
     clock: Callable[[], float] = time.monotonic,
+    textless_ok: bool = False,
 ) -> BaseModel | _Withheld:
     """``model`` unchanged when the org's switch is off; a redacted copy when on; ``WITHHELD``
     when it could not be checked (see the module docstring). ``redactor`` defaults to the
     module's ``DEFAULT``, looked up at CALL time. Anything that is not a Pydantic model (a raw
     ``CallToolResult``, a dict) is ``WITHHELD`` when the switch is on — it cannot be read by type."""
+    # 308 D-41: textless_ok lets a caller whose payload is text-free BY TYPE pass through unchanged;
+    # MCP never sets it. The model is still walked under the same deadline and fail-closed ``try``,
+    # so a dict, tuple or set anywhere in its tree is still ``WITHHELD``.
     redactor = redactor if redactor is not None else DEFAULT
     try:
         on = (await is_on(org_id)) is not False
@@ -134,7 +138,9 @@ async def guard(
     if not isinstance(model, BaseModel) or not _declares_redactable(type(model)):
         # A model whose type tree declares no ``RedactableText`` (a raw ``CallToolResult``, any
         # untyped payload) cannot be read by type, so it is withheld rather than guessed at.
-        return WITHHELD
+        if not (textless_ok and isinstance(model, BaseModel)):
+            return WITHHELD
+        # 308 D-41: a text-free model falls through to the same walk (it comes back unchanged).
     deadline = clock() + deadline_s
     try:
         return _walk(model, redactor, deadline, clock, window or {}, top=True)

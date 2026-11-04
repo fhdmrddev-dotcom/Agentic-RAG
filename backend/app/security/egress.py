@@ -333,6 +333,7 @@ ALLOWED_HOST_SUFFIXES: dict[str, tuple[str, ...]] = {
     # closed without it. Empty on purpose, and test_190_egress allows an empty tuple ONLY for a
     # `_CALLER` key (P-1: a fence retired on purpose, never tripped by accident).
     "client_metadata": (),
+    "webhook": (),  # 308 D-23: the endpoint URL's own host, per call; https only, pinned, no redirects
 }
 
 _HOST_MATCH: dict[str, str] = {
@@ -354,6 +355,7 @@ _HOST_MATCH: dict[str, str] = {
     "graph_read": _SUFFIX,
     "graph_download": _SUFFIX,
     "client_metadata": _CALLER,  # 307 D-06: the CIMD URL's own host, per call
+    "webhook": _CALLER,  # 308 D-23: the endpoint URL's own host, per call; https only, pinned, no redirects
 }
 
 # D-07 step 1. TLS is STATED, never assumed: a destination with no scheme is refused, so a
@@ -377,6 +379,7 @@ _TLS_SCHEMES: dict[str, frozenset[str]] = {
     "graph_read": frozenset({"https"}),
     "graph_download": frozenset({"https"}),
     "client_metadata": frozenset({"https"}),
+    "webhook": frozenset({"https"}),  # 308 D-23: the endpoint URL's own host, per call; https only, pinned, no redirects
 }
 
 _DEFAULT_PORTS: dict[str, int] = {
