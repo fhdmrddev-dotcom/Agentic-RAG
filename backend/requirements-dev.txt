@@ -1,0 +1,4 @@
+# Test-only dependencies (Phase 308, D-54). Never installed into the production image:
+# backend/Dockerfile installs requirements.txt only. CI installs this file in backend-tests.yml.
+# standardwebhooks: the reference Standard Webhooks verifier the signer is proven against (D-11, D-57).
+standardwebhooks==1.1.0

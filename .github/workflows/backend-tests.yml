@@ -52,6 +52,8 @@ jobs:
           # COLLECTION, and all 40 runs of this workflow have failed. Test-only dep,
           # so it is installed here rather than added to the app's requirements.
           pip install psycopg2-binary
+          # 308 (D-54): test-only Standard Webhooks verifier
+          pip install -r requirements-dev.txt
 
       # Phase 061 (D-061-14): boot Redis from docker-compose.dev.yml.
       # Streams semantics drift between Redis and fakeredis; tests run
