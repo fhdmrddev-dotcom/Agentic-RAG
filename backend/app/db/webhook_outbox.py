@@ -61,13 +61,15 @@ NOTICE_REASONS = frozenset({"failing", "gone"})
 # ── fan-out ───────────────────────────────────────────────────────────────────────────────
 
 # The oldest event nobody has fanned out yet, locked for this transaction. A test event is fanned
-# out by the route at creation and is excluded anyway.
+# out by the route at creation and is excluded anyway. 308-REVIEW WR-05 (D-64): $2 is the ids this
+# worker is backing off from (their fan-out raised), so one bad event never blocks the later ones.
 CLAIM_EVENT_SQL = """
 SELECT id, type, org_id, item_id, owner_id, status, origin_kind, definition_id, folder_id, created_at
   FROM public.webhook_events
  WHERE fanned_out_at IS NULL
    AND type <> 'webhook.test'
    AND created_at <= COALESCE($1::timestamptz, now())
+   AND NOT (id = ANY($2::uuid[]))
  ORDER BY created_at
  LIMIT 1
  FOR UPDATE SKIP LOCKED
@@ -294,9 +296,9 @@ class ClaimedWebhookDelivery:
 # ── fan-out ───────────────────────────────────────────────────────────────────────────────
 
 
-async def claim_next_event(con: asyncpg.Connection, *, now: Any = None) -> dict | None:
-    """Lock the oldest un-fanned event (the caller holds the transaction), or ``None``."""
-    row = await con.fetchrow(CLAIM_EVENT_SQL, now)
+async def claim_next_event(con: asyncpg.Connection, *, now: Any = None, skip: Any = ()) -> dict | None:
+    """Lock the oldest un-fanned event not in ``skip`` (the caller holds the transaction), or ``None``."""
+    row = await con.fetchrow(CLAIM_EVENT_SQL, now, list(skip))
     return dict(row) if row is not None else None
 
 

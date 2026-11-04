@@ -6,7 +6,8 @@ A poll loop that runs in EVERY uvicorn worker (no leader; ``main.py``'s lifespan
 
   1. FAN-OUT. Claim the oldest event nobody has fanned out (``webhook_outbox.claim_next_event``, one
      transaction per event), decide who receives it, freeze its payload ONCE, insert one delivery per
-     recipient, mark the event fanned out.
+     recipient, mark the event fanned out. An event whose fan-out raises is skipped with a backoff so
+     the next one is claimed, and given up after ``FAN_OUT_MAX_FAILURES`` (308-REVIEW WR-05).
        * run events: the run owner's subscribed endpoints in the run's org (D-03);
        * document events: every subscribed endpoint in the org whose owner can SEE the document —
          asked once per owner on that owner's acting connection; an owner who cannot see it gets
@@ -92,6 +93,11 @@ JITTER_FRACTION = 0.1
 #: receiver (each send bounded at 15 s) can never stall every other org's deliveries behind it.
 SEND_CONCURRENCY = 5
 MAX_PER_ENDPOINT_PER_PASS = 2
+#: 308-REVIEW WR-05 (D-64): an event whose fan-out raises is skipped (the next one is claimed) and
+#: tried again after these waits; the failure after the last wait gives it up: marked fanned out with
+#: no payload and no deliveries, and logged by id. Per worker, in memory: no schema change.
+FAN_OUT_BACKOFF_SECONDS = (60, 300, 1800, 7200)
+FAN_OUT_MAX_FAILURES = len(FAN_OUT_BACKOFF_SECONDS) + 1
 
 AUTO_DISABLED_ACTION = "webhook.endpoint.auto_disabled"
 DOCUMENT_TYPE = "document.ingested"
@@ -201,6 +207,8 @@ class WebhookDrainer:
         self._rng = rng
         self._clock = clock
         self._last_purge: float | None = None
+        #: WR-05: event id -> (failures so far, clock time before which it is skipped)
+        self._fan_out_failures: dict[UUID, tuple[int, float]] = {}
         self._task: asyncio.Future | None = None
         self._stopping = asyncio.Event()
         # Observability for the only question an operator has about a background loop.
@@ -232,48 +240,90 @@ class WebhookDrainer:
     async def _fan_out(self, *, now: datetime | None) -> int:
         done = 0
         for _ in range(self._max_claims_per_tick):
+            moment = self._clock()
+            skip = [eid for eid, (_, retry_at) in self._fan_out_failures.items() if retry_at > moment]
             try:
-                handled = await self._fan_out_one(now=now)
-            except Exception:  # noqa: BLE001 — the event's transaction rolled back; next tick retries
+                handled = await self._fan_out_one(now=now, skip=skip)
+            except _FanOutFailed as failed:
+                # WR-05: THIS event's transaction rolled back; skip it and claim the next one.
+                await self._fan_out_failed(failed.event_id, now=now, cause=failed.__cause__)
+                continue
+            except Exception:  # noqa: BLE001 — no event was claimed (pool / claim): next tick retries
                 logger.exception("webhook drainer: fan-out failed (retried next tick)")
                 break
-            if not handled:
+            if handled is None:
+                # Nothing claimable: an entry whose wait is over is no longer un-fanned (another
+                # worker fanned it out, or it was purged) — forget it.
+                for eid in [e for e, (_, retry_at) in self._fan_out_failures.items() if retry_at <= moment]:
+                    self._fan_out_failures.pop(eid, None)
                 break
+            self._fan_out_failures.pop(handled, None)
             done += 1
         return done
 
-    async def _fan_out_one(self, *, now: datetime | None) -> bool:
-        owners_gone: list[UUID] = []
+    async def _fan_out_failed(self, event_id: UUID, *, now: datetime | None, cause: BaseException | None = None) -> None:
+        """WR-05 (D-64): count one failed fan-out of ``event_id``; back off, or give it up."""
+        failures = self._fan_out_failures.get(event_id, (0, 0.0))[0] + 1
+        if failures < FAN_OUT_MAX_FAILURES:
+            wait = FAN_OUT_BACKOFF_SECONDS[failures - 1]
+            self._fan_out_failures[event_id] = (failures, self._clock() + wait)
+            logger.warning("webhook event %s: fan-out failed (%d of %d); skipped for %d s",
+                           event_id, failures, FAN_OUT_MAX_FAILURES, wait, exc_info=cause)
+            return
+        try:
+            async with self._pool.acquire() as con:
+                await outbox.mark_fanned_out(con, event_id=event_id, payload=None, now=now)
+        except Exception:  # noqa: BLE001 — not given up yet: tried again after the longest wait
+            self._fan_out_failures[event_id] = (failures - 1, self._clock() + FAN_OUT_BACKOFF_SECONDS[-1])
+            logger.exception("webhook event %s: could not be given up; retried later", event_id)
+            return
+        self._fan_out_failures.pop(event_id, None)
+        logger.error("webhook event %s: fan-out failed %d times; given up, nothing sent", event_id, failures,
+                     exc_info=cause)
+
+    async def _fan_out_one(self, *, now: datetime | None, skip: list[UUID] | None = None) -> UUID | None:
+        """Fan out the oldest claimable event; its id, or ``None`` when there is none. A failure after
+        the claim rolls the event's transaction back and raises ``_FanOutFailed`` naming it."""
         async with self._pool.acquire() as con:
             async with con.transaction():
-                event = await outbox.claim_next_event(con, now=now)
+                event = await outbox.claim_next_event(con, now=now, skip=skip or [])
                 if event is None:
-                    return False
-                candidates = await outbox.candidate_endpoints(con, event=event)
-                if candidates and event["type"] == DOCUMENT_TYPE:
-                    candidates = await self._who_can_see(event, candidates)
-                rows: list[tuple[UUID, str]] = []
-                allowed: dict[EndpointOwner, bool] = {}
-                for endpoint in candidates:
-                    owner = EndpointOwner(endpoint["user_id"], endpoint["org_id"])
-                    if owner not in allowed:
-                        allowed[owner] = bool(await self._liveness(owner))
-                    if allowed[owner]:
-                        rows.append((endpoint["id"], "pending"))
-                    else:
-                        rows.append((endpoint["id"], "skipped_owner_gone"))
-                        owners_gone.append(endpoint["id"])
-                to_send = any(status == "pending" for _, status in rows)
-                frozen = await self._freeze(event) if to_send else None
-                if rows:
-                    await outbox.insert_deliveries(con, event_id=event["id"], rows=rows, now=now)
-                if to_send and frozen is None:
-                    await outbox.fail_unfrozen_deliveries(con, event_id=event["id"], reason="redaction_failed")
-                    logger.warning("webhook event %s: the payload could not be guarded; nothing sent", event["id"])
-                await outbox.mark_fanned_out(con, event_id=event["id"], payload=frozen, now=now)
+                    return None
+                try:
+                    owners_gone = await self._fan_out_event(con, event, now=now)
+                except Exception as exc:  # noqa: BLE001 — named, so the caller can skip THIS event
+                    raise _FanOutFailed(event["id"]) from exc
         for endpoint_id in owners_gone:
             await self._disable(endpoint_id, "owner_removed", now=now)
-        return True
+        return event["id"]
+
+    async def _fan_out_event(self, con, event: dict, *, now: datetime | None) -> list[UUID]:
+        """Inside the event's transaction: deliveries, the frozen payload, the fanned-out mark. Returns
+        the endpoints whose owner the liveness predicate refused (turned off after the commit)."""
+        owners_gone: list[UUID] = []
+        candidates = await outbox.candidate_endpoints(con, event=event)
+        if candidates and event["type"] == DOCUMENT_TYPE:
+            candidates = await self._who_can_see(event, candidates)
+        rows: list[tuple[UUID, str]] = []
+        allowed: dict[EndpointOwner, bool] = {}
+        for endpoint in candidates:
+            owner = EndpointOwner(endpoint["user_id"], endpoint["org_id"])
+            if owner not in allowed:
+                allowed[owner] = bool(await self._liveness(owner))
+            if allowed[owner]:
+                rows.append((endpoint["id"], "pending"))
+            else:
+                rows.append((endpoint["id"], "skipped_owner_gone"))
+                owners_gone.append(endpoint["id"])
+        to_send = any(status == "pending" for _, status in rows)
+        frozen = await self._freeze(event) if to_send else None
+        if rows:
+            await outbox.insert_deliveries(con, event_id=event["id"], rows=rows, now=now)
+        if to_send and frozen is None:
+            await outbox.fail_unfrozen_deliveries(con, event_id=event["id"], reason="redaction_failed")
+            logger.warning("webhook event %s: the payload could not be guarded; nothing sent", event["id"])
+        await outbox.mark_fanned_out(con, event_id=event["id"], payload=frozen, now=now)
+        return owners_gone
 
     async def _who_can_see(self, event: dict, candidates: list[dict]) -> list[dict]:
         """D-03 / D-26: keep only endpoints whose owner can see the document — asked once per owner."""
@@ -538,6 +588,14 @@ class WebhookDrainer:
             pass
 
 
+class _FanOutFailed(Exception):
+    """WR-05: the fan-out of ONE claimed event raised; its transaction rolled back."""
+
+    def __init__(self, event_id: UUID) -> None:
+        super().__init__(f"webhook event fan-out failed: {event_id}")
+        self.event_id = event_id
+
+
 class _PassCache:
     """Per send pass: liveness once per owner, visibility once per (owner, org, table) over every
     claimed item of that group. One lock per key, so rows sent concurrently (WR-02) still ask once."""
@@ -574,6 +632,8 @@ class _PassCache:
 __all__ = [
     "AUTO_DISABLE_AFTER",
     "EndpointOwner",
+    "FAN_OUT_BACKOFF_SECONDS",
+    "FAN_OUT_MAX_FAILURES",
     "JITTER_FRACTION",
     "MAX_ATTEMPTS",
     "MAX_PER_ENDPOINT_PER_PASS",
