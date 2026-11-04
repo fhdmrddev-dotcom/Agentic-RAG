@@ -231,7 +231,7 @@ export const WEBHOOKS_COPY = Object.freeze({
     heading: "Webhooks in {org}",
     count: "{N} endpoint(s) · {M} member(s)",
     description:
-      "Every webhook endpoint a member of {org} has added. Turning one off stops its deliveries; only an admin can turn it back on. Query strings are hidden — they may hold a receiver's password.",
+      "Every webhook endpoint a member of {org} has added. Turning one off stops its deliveries; only an admin can turn it back on. Addresses show the host only — the path and query may hold a receiver's password.",
     col: {
       owner: "Owner",
       address: "Address",
@@ -242,7 +242,10 @@ export const WEBHOOKS_COPY = Object.freeze({
     },
     you: "(you)",
     never: "Never",
+    // CR-01 / D-59: the address cell names what it hides; it never shows a path.
+    pathHidden: "path hidden",
     queryHidden: "query hidden",
+    pathQueryHidden: "path and query hidden",
     off: "Turn off",
     on: "Turn on",
     delete: "Delete",

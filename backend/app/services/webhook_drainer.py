@@ -450,7 +450,7 @@ class WebhookDrainer:
         try:
             await self._audit(
                 owner_id=won["user_id"], org_id=won["org_id"], endpoint_id=won["id"],
-                host=webhook_urls.host_of(won["url"]), reason=reason,
+                host=webhook_urls.display_host(won["url"]), reason=reason,  # CR-01 / D-59
             )
         except Exception:  # noqa: BLE001 — the endpoint is off either way; the audit is a record
             logger.exception("webhook endpoint %s: the auto-disable audit could not be written", won["id"])

@@ -130,10 +130,8 @@ def _not_found() -> HTTPException:
 
 
 def _host(url: str) -> str:
-    try:
-        return webhook_urls.host_of(url)
-    except ValueError:
-        return ""
+    """The audit row's host (CR-01 / D-59): ``display_host`` — a token-looking label masked."""
+    return webhook_urls.display_host(url)
 
 
 async def _checked_url(url: str) -> str:

@@ -12,8 +12,10 @@ the URL that would be called. Neither may reach egress.
 **The URL is returned unchanged, never normalised**, so the stored URL is exactly the sent URL.
 
 **Nothing here logs, and the query never leaves ``admin_display``.** A receiver's token sits in the
-path (Zapier / Slack style) or in the query; ``admin_display`` masks every path segment of 16 or more
-characters and reports only whether a query exists. ``WebhookUrlError`` carries a code, never the URL.
+path (Zapier / Slack style), in the query, or in the leftmost host label (Pipedream / ngrok style).
+``admin_display`` (CR-01 / D-59) shows the ``display_host`` and a neutral "path hidden" marker only,
+and reports whether a query exists; the audit rows record ``display_host`` too. ``WebhookUrlError``
+carries a code, never the URL.
 """
 from __future__ import annotations
 
@@ -23,8 +25,11 @@ from urllib.parse import urlsplit
 import httpx
 
 MAX_URL_LENGTH = 2048
-MASK_SEGMENT_AT = 16
 MASK = "…"
+#: CR-01 / D-59: what an admin sees in place of a path — every segment hidden, whatever its length.
+PATH_HIDDEN = "/" + MASK
+#: CR-01 / D-59: a leftmost host label this long is treated as a token.
+TOKEN_LABEL_AT = 12
 
 WebhookUrlErrorCode = Literal["not_https", "too_long", "userinfo", "fragment", "not_url", "no_host"]
 
@@ -78,10 +83,39 @@ def host_of(url: str) -> str:
     return (urlsplit(url).hostname or "").lower()
 
 
+def _looks_like_token(label: str) -> bool:
+    """A host label that may be a credential: long (12+), or a hex / digit run of 6+ with a digit."""
+    if len(label) >= TOKEN_LABEL_AT:
+        return True
+    if len(label) < 6 or not any(ch.isdigit() for ch in label):
+        return False
+    hexish = sum(1 for ch in label if ch in "0123456789abcdef-")
+    return hexish / len(label) >= 0.6
+
+
+def display_host(url: str) -> str:
+    """The host an org admin and an audit row may see (CR-01 / D-59): lower-cased, no port, and a
+    token-looking LEFTMOST label of a 3+-label name replaced by ``…`` (Pipedream / ngrok style
+    receivers carry the credential there). A registrable domain and an IP literal are kept."""
+    try:
+        host = (urlsplit(url).hostname or "").lower()
+    except ValueError:
+        return ""
+    labels = host.split(".")
+    if len(labels) < 3 or ":" in host or all(label.isdigit() for label in labels):
+        return host
+    if _looks_like_token(labels[0]):
+        labels[0] = MASK
+    return ".".join(labels)
+
+
 def admin_display(url: str) -> tuple[str, str, bool]:
-    """``(host, masked path, has_query)`` for the org-admin list (D-51). The query itself never."""
+    """``(display host, path marker, has_query)`` for the org-admin list (D-30 / D-59).
+
+    ⚠ CR-01: D-51 masked path segments of 16+ characters, and a real Zapier catch hook has none that
+    long — the whole working URL reached every admin. No path segment is shown now: the marker is
+    ``PATH_HIDDEN`` when the URL has a path beyond ``/``, else ``""``. The query itself never.
+    """
     parts = urlsplit(url)
-    masked = "/".join(
-        MASK if len(segment) >= MASK_SEGMENT_AT else segment for segment in parts.path.split("/")
-    )
-    return (parts.hostname or "").lower(), masked, bool(parts.query)
+    path = PATH_HIDDEN if parts.path not in ("", "/") else ""
+    return display_host(url), path, bool(parts.query)

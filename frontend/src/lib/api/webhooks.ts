@@ -133,7 +133,8 @@ export interface WebhookResendResult {
   delivery: WebhookDeliveryQueued
 }
 
-/** An org admin's row: host and a masked path only — never the URL or its query (D-30). */
+/** An org admin's row: a display host and a "path hidden" marker (`/…` or "") only — never the URL,
+ *  a path segment or its query (D-30; CR-01 / D-59). The UI renders the host alone. */
 export interface OrgWebhook {
   id: string
   owner_name: string | null

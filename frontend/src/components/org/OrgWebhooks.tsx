@@ -13,9 +13,10 @@
  * ⚠ NEVER OPTIMISTIC. Every write changes the table only from the server's answer, then
  *   `onRecorded()` pulses the band's "every action recorded" marker (the 304/307 precedent), the
  *   receipt line names owner and host, and the table re-reads. No toast, no timer (062-A).
- * ⛔ A QUERY STRING NEVER REACHES THIS VIEW (D-30, T-308-15). The server sends host + masked path +
- *   `has_query` only; the cell says "query hidden" and nothing else. Owner names and addresses render
- *   as React text — the address is never a link.
+ * ⛔ NO PATH AND NO QUERY STRING REACH THIS VIEW (D-30, T-308-15; CR-01 / D-59). The server sends a
+ *   display host + a "path hidden" marker + `has_query` only, and this cell renders the HOST alone plus
+ *   a note naming what is hidden — never `path`, so even a server that sent one could not show it.
+ *   Owner names and addresses render as React text — the address is never a link.
  * ⚠ TURN ON ONLY FOR AN ADMIN-OFF ROW (A-24, T-308-20): a failing, gone or owner-left endpoint is the
  *   owner's to fix, and the server refuses it anyway (308-04).
  */
@@ -38,6 +39,13 @@ import { statusTag, type StatusTone } from "@/components/settings/webhooks/webho
 import { WEBHOOKS_COPY } from "@/components/settings/webhooks/webhooksCopy"
 
 const A = WEBHOOKS_COPY.admin
+
+/** CR-01 / D-59: what the address cell says it hides — the path, the query, both, or nothing. */
+function hiddenNote(e: OrgWebhook): string | null {
+  if (e.path && e.has_query) return A.pathQueryHidden
+  if (e.path) return A.pathHidden
+  return e.has_query ? A.queryHidden : null
+}
 
 /** The shipped status-tag pairs (the member card's, AA on `--card`). */
 const TAG_CLASS: Record<StatusTone, string> = {
@@ -194,8 +202,8 @@ export function OrgWebhooks({
                       {e.owner_is_you && <span className="text-muted-foreground"> {A.you}</span>}
                     </td>
                     <td className="px-3 py-2">
-                      <span className="break-all font-mono">{e.host + e.path}</span>
-                      {e.has_query && <span className="ml-1.5 text-muted-foreground">{A.queryHidden}</span>}
+                      <span className="break-all font-mono">{e.host}</span>
+                      {hiddenNote(e) && <span className="ml-1.5 text-muted-foreground">{hiddenNote(e)}</span>}
                     </td>
                     <td className="px-3 py-2" title={e.event_types.join(", ")}>
                       <span className="font-mono">{e.event_types.length}</span>
@@ -258,7 +266,7 @@ export function OrgWebhooks({
       )}
 
       <DeleteWebhookSheet
-        target={target ? { id: target.id, address: target.host + target.path } : null}
+        target={target ? { id: target.id, address: target.host } : null}
         admin={target ? { ownerName: ownerOf(target), orgName: org } : undefined}
         onClose={() => setTarget(null)}
         remove={() => (target ? adminDeleteWebhook(target.id) : Promise.resolve())}
