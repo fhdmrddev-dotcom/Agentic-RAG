@@ -438,9 +438,12 @@ async def send_test(
     event_id, delivery_id = created
 
     outcome = None
+    not_sent_reason = "redaction_failed" if frozen is None else None
     if frozen is not None:
         secrets = await _signing_secrets(pool, endpoint_id, org, now)
-        if secrets is not None:
+        if secrets is None:
+            not_sent_reason = "secret_unreadable"
+        else:
             body = frozen.encode("ascii")
             headers = webhook_signer.build_headers(
                 msg_id=webhook_signer.message_id(event_id),
@@ -462,7 +465,7 @@ async def send_test(
         )
     await webhooks_db.record_test_outcome(
         pool, delivery_id=delivery_id, sent=result.delivered, status_code=result.status_code,
-        latency_ms=result.latency_ms, error=result.error,
+        latency_ms=result.latency_ms, error=result.error, reason=not_sent_reason,
     )
     await _audit(current_user, org, "test_sent", endpoint_id, endpoint["url"], "owner")
     return result

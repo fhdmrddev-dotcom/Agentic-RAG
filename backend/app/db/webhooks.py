@@ -221,7 +221,7 @@ RETURNING id
 RECORD_TEST_SQL = """
 UPDATE public.webhook_deliveries d
    SET status = CASE WHEN $2 THEN 'sent' ELSE 'failed' END,
-       reason = CASE WHEN $2 THEN NULL ELSE 'not_retried' END,
+       reason = CASE WHEN $2 THEN NULL ELSE COALESCE($6, 'not_retried') END,
        last_status_code = $3,
        last_latency_ms = $4,
        last_error = $5,
@@ -507,15 +507,17 @@ async def record_test_outcome(
     status_code: int | None,
     latency_ms: int | None,
     error: str | None,
+    reason: str | None = None,
 ) -> bool:
-    """Record a test send: 'sent', or 'failed' with reason ``not_retried``, plus one attempt row.
+    """Record a test send: 'sent', or 'failed' with reason ``not_retried`` (or the given ``reason`` —
+    ``redaction_failed`` / ``secret_unreadable`` when nothing was sent), plus one attempt row.
 
     Never touches the endpoint's failure count or last success (a test never counts toward
     auto-disable). Returns whether the delivery was still a test in flight.
     """
     async with pool.acquire() as con:
         async with con.transaction():
-            attempts = await con.fetchval(RECORD_TEST_SQL, delivery_id, sent, status_code, latency_ms, error)
+            attempts = await con.fetchval(RECORD_TEST_SQL, delivery_id, sent, status_code, latency_ms, error, reason)
             if attempts is None:
                 return False
             await insert_attempt(
