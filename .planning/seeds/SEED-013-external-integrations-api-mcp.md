@@ -3,7 +3,10 @@ seed_id: SEED-013
 title: External Integrations — public API, MCP server, webhooks, service accounts
 created: 2026-05-09
 planted_during: v2.5 close-out
-status: planted
+status: folded
+partial: true
+status_note: "Folded in part into Phase 304 (v4.9, discuss 2026-10-30): personal MCP keys (KEY-01..06). The MCP server, OAuth and webhooks land in 305-308; the /api/v1 REST surface and service accounts are deferred to the next milestone. 2026-10-31: 305 closed (MCP server, read tools); 306 takes ask_agent / run_workflow over MCP."
+folded_into: "304"
 priority: high
 relates_to:
   - SEED-001 (Scale Readiness) — public API would amplify concurrent load; the asyncpg / multi-worker work in SEED-001 is a prerequisite for serious external traffic

@@ -210,6 +210,72 @@ async def reclaim_stale_ingestion_claims(
         return total
 
 
+STOPPED_BEFORE_FINISHING_SENTENCE = (
+    "Ingestion stopped before this file finished, so none of its text is searchable. "
+    "Please upload it again."
+)
+
+
+async def reconcile_finished_job_documents(
+    pool: asyncpg.Pool,
+    *,
+    grace_seconds: int = 600,
+) -> int:
+    """Close documents still in status='processing' after their ingestion job finished (BUG-261031-02).
+
+    The sweep above reads JOBS only, so a document whose job reads 'completed' while the document
+    itself still reads 'processing' is never looked at again and shows as ingesting forever.
+    Measured once (2026-10-31, local): job completed with 0 retries, chunk embedded, metadata
+    saved — only the document's status was wrong.
+
+    - chunks exist -> 'completed' (the work is there; only the label was wrong)
+    - no chunks    -> 'failed' with a sentence (completing it would claim text that is not there)
+    A document with any job still in flight is left alone (a re-ingest owns it), and a job that
+    finished inside `grace_seconds` is left alone so this never races a live completion write.
+    """
+    async with pool.acquire() as con:
+        rows = await con.fetch(
+            """
+            WITH stuck AS (
+                SELECT d.id,
+                       EXISTS (SELECT 1 FROM document_chunks c WHERE c.document_id = d.id) AS has_chunks
+                FROM documents d
+                WHERE d.status = 'processing'
+                  AND EXISTS (
+                      SELECT 1 FROM ingestion_jobs j
+                      WHERE j.document_id = d.id
+                        AND j.status = 'completed'
+                        AND j.updated_at < now() - make_interval(secs => $1::double precision)
+                  )
+                  AND NOT EXISTS (
+                      SELECT 1 FROM ingestion_jobs j
+                      WHERE j.document_id = d.id
+                        AND j.status IN ('pending', 'processing', 'paused', 'retry_queued')
+                  )
+            )
+            UPDATE documents d
+            SET status = CASE WHEN s.has_chunks THEN 'completed' ELSE 'failed' END,
+                error_message = CASE WHEN s.has_chunks THEN d.error_message ELSE $2 END,
+                updated_at = now()
+            FROM stuck s
+            WHERE d.id = s.id
+              AND d.status = 'processing'
+            RETURNING d.id, d.status
+            """,
+            float(grace_seconds),
+            STOPPED_BEFORE_FINISHING_SENTENCE,
+        )
+    if rows:
+        logger.warning(
+            "Closed %d document(s) left in 'processing' after their ingestion job finished "
+            "(%d completed, %d failed)",
+            len(rows),
+            sum(1 for r in rows if r["status"] == "completed"),
+            sum(1 for r in rows if r["status"] == "failed"),
+        )
+    return len(rows)
+
+
 async def update_job_progress(
     pool: asyncpg.Pool,
     job_id: UUID,

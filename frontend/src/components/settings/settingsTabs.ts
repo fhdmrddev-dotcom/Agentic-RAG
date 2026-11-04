@@ -55,6 +55,8 @@ export const SETTINGS_TABS: readonly SettingsTabDef[] = [
   // 293-04 (START-02 / D-18): every member's one home for API keys, LAST after Audit Log. "7" is
   // new — never the retired "5". The workflow card's ⋯ menu writes "7" before navigating here.
   { id: "7", audience: "everyone", name: "API keys" },
+  // 308 (D-28): every member's webhook endpoints, LAST after API keys. "8" is new — never a retired id.
+  { id: "8", audience: "everyone", name: "Webhooks" },
 ]
 
 /**

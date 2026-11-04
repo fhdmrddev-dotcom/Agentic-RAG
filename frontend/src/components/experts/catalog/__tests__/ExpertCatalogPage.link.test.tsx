@@ -199,6 +199,7 @@ function link(kind: "workflow" | "expert" | "thread", id: string): EntityLink {
   return {
     target: { kind, id },
     route: null,
+    document: null, // 305-02 (D-52): the document address field, off a document address
     openThread: vi.fn(),
     openWorkflow: vi.fn(),
     openExpert: vi.fn(),

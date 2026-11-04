@@ -14,6 +14,7 @@ from starlette.concurrency import run_in_threadpool
 from supabase import create_client, Client, ClientOptions
 
 from app.config import settings
+from app.security.acting_org import current_acting_org
 from app.services.operator_service import is_operator, write_operator_audit
 
 logger = logging.getLogger(__name__)
@@ -141,6 +142,12 @@ async def _apply_rls_user_context(conn: asyncpg.Connection, uid: str) -> None:
        pool: every ``SET LOCAL`` auto-reverts at COMMIT, so claims can never leak to
        the next pool borrower (Pitfall 3). ``false`` would leak identity across users.
 
+    4. Phase 304 (D-13, D-14): ONLY when the acting-org ContextVar is set (by
+       ``app/security/acting_member.py`` alone — never a header or request value), one
+       more parameterised, ``is_local`` GUC: ``app.acting_org_id``. ``current_user_org_ids()``
+       (mig 221) intersects membership with it, so it can only NARROW. Unset = the
+       three statements above, byte-identical to before.
+
     Reused verbatim by the Phase-163 test harness (``tests/integration/_rls_harness``)
     so the request factory and the leak / cluster tests can never drift on the exact
     role-first + both-GUC-forms shape.
@@ -153,6 +160,9 @@ async def _apply_rls_user_context(conn: asyncpg.Connection, uid: str) -> None:
         "SELECT set_config('request.jwt.claims', $1, true)",
         json.dumps({"sub": str(uid), "role": "authenticated"}),
     )
+    acting_org = current_acting_org()
+    if acting_org is not None:
+        await conn.execute("SELECT set_config('app.acting_org_id', $1, true)", acting_org)
 
 
 @asynccontextmanager

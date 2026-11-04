@@ -91,6 +91,12 @@ def _row(total: int, **over):
         "kind": "question",
         "origin": None,
         "created_at": datetime(2026, 10, 30, 9, 0, tzinfo=timezone.utc),
+        # Phase 308 (D-48): LIST_OPEN_SQL also selects these; they are NULL on a run row and the
+        # wire omits them for a run notice (WIRE_KEYS below stays the eight).
+        "endpoint_id": None,
+        "reason": None,
+        "title": None,
+        "title_is_address": None,
         "total": total,
     }
     base.update(over)

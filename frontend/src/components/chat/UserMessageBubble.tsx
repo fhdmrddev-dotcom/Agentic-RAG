@@ -6,7 +6,9 @@
  *   - UserBubble: 7-line clamp, Read more/Show less toggle, and gradient fade
  */
 import { useRef, useState, useLayoutEffect } from "react"
+import { Bot } from "lucide-react"
 import { cn } from "@/lib/utils"
+import { OUTSIDE_ASK_NOTE, outsideAskQuestion } from "./outsideAskEnvelope"
 
 /**
  * Phase 128 Plan 02 (D-01 / D-03 / D-04) — user bubble 7-line clamp.
@@ -26,13 +28,17 @@ export function UserBubble({ content }: { content: string }) {
   const pRef = useRef<HTMLParagraphElement>(null)
   const [overflowing, setOverflowing] = useState(false)
   const [expanded, setExpanded] = useState(false)
+  // 306-04 (D-32): an ask from an AI tool is stored inside its TRUST-03 envelope; the bubble shows
+  // (and the clamp measures) only the question. Every other message: `question` is null.
+  const question = outsideAskQuestion(content)
+  const shown = question ?? content
 
   // useLayoutEffect (NOT useEffect) so the measure runs pre-paint — avoids the
   // one-frame full-height flash before the clamp applies (RESEARCH Pitfall 5).
   useLayoutEffect(() => {
     const el = pRef.current
     if (el) setOverflowing(el.scrollHeight > el.clientHeight + 1)
-  }, [content])
+  }, [shown])
 
   return (
     <div className="relative" data-testid="user-bubble">
@@ -43,7 +49,7 @@ export function UserBubble({ content }: { content: string }) {
           !expanded && "[display:-webkit-box] [-webkit-line-clamp:7] [-webkit-box-orient:vertical] overflow-hidden",
         )}
       >
-        {content}
+        {shown}
       </p>
       {/* Fade dissolves into the bubble violet (the 135° gradient's END,
           index.css:199), NOT the page bg — D-03. Only while clamped + overflowing. */}
@@ -61,6 +67,12 @@ export function UserBubble({ content }: { content: string }) {
         >
           {expanded ? "Show less" : "Read more"}
         </button>
+      )}
+      {question !== null && (
+        <p className="mt-2 pt-2 border-t border-white/25 flex items-start gap-1 text-xs text-white">
+          <Bot size={12} aria-hidden="true" className="shrink-0" />
+          {OUTSIDE_ASK_NOTE}
+        </p>
       )}
     </div>
   )

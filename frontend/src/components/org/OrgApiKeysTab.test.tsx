@@ -10,7 +10,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest"
 import { render, screen, waitFor, within } from "@testing-library/react"
 import userEvent from "@testing-library/user-event"
 import type { ApiKeyList } from "@/lib/api/apiKeys"
-import { makeCall, makeKey } from "@/components/settings/apiKeys/__tests__/fixtures"
+import { makeCall, makeKey, makeMcp, makeMcpKey } from "@/components/settings/apiKeys/__tests__/fixtures"
 
 const m = vi.hoisted(() => ({
   listOrgApiKeys: vi.fn(),
@@ -22,9 +22,13 @@ vi.mock("@/lib/api/apiKeys", async (importOriginal) => {
   return { ...actual, ...m }
 })
 
+// 308-06: the Webhooks section reads its own route and has its own suite (__tests__/OrgWebhooks.test.tsx);
+// stubbed here so this suite keeps pricing the KEYS list alone (its single status/alert/button queries).
+vi.mock("./OrgWebhooks", () => ({ OrgWebhooks: () => null }))
+
 import { OrgApiKeysTab } from "./OrgApiKeysTab"
 
-const LIMITS = { starts_per_minute: 10, reads_per_minute: 120 }
+const LIMITS = { starts_per_minute: 10, reads_per_minute: 120, searches_per_minute: 30 }
 const MINE = makeKey({ id: "mine", label: "my-script", owner_name: "Dana Kim", owner_is_you: true, calls: [makeCall()] })
 const PRIYAS = makeKey({
   id: "priya",
@@ -46,7 +50,8 @@ describe("293-04 OrgApiKeysTab", () => {
     render(<OrgApiKeysTab orgName="Acme Inc" />)
     expect(screen.getByRole("status")).toHaveTextContent("Loading the organisation's keys…")
     expect(await screen.findByText("API keys · whole organisation")).toBeInTheDocument()
-    expect(screen.getByText("Every key in Acme Inc. Runs started with a key run as the member who made it.")).toBeInTheDocument()
+    // 304-05 reworded admin.description for both kinds (UI-SPEC §Changed strings); 304-06 moves the assertion.
+    expect(screen.getByText("Every key in Acme Inc. A key acts as the member who made it.")).toBeInTheDocument()
     expect(screen.getByText("You can see and revoke every member's keys. You can't see their secrets; nobody can.")).toBeInTheDocument()
     expect(screen.getByTestId("api-keys-limits")).toHaveTextContent("Each key: 10 starts and 120 status reads a minute.")
     const metas = screen.getAllByTestId("api-key-meta").map((el) => el.textContent ?? "")
@@ -130,5 +135,65 @@ describe("293-04 OrgApiKeysTab", () => {
     await user.click(within(card).getByRole("button", { name: "Show activity" }))
     await user.click(within(card).getByRole("button", { name: "All in the audit log →" }))
     expect(onOpenAudit).toHaveBeenCalledTimes(1)
+  })
+})
+
+// ── Phase 304-06 (KEY-06, D-02; UI-SPEC Surface 2) — both kinds, one list, the admin's off notice ──
+const MCP_KEY = makeMcpKey({ id: "priya-mcp", label: "claude-code-laptop", owner_name: "Priya Shah", owner_is_you: false })
+const OFF_SENTENCE =
+  "MCP access is switched off for Acme Inc. Every member's AI tool key and connected app is refused until you switch it back on in the Settings tab." // 307-04 (D-21)
+
+describe("304-06 OrgApiKeysTab — AI tool keys in the admin list", () => {
+  it("lists both kinds with their kind chips and the same revoke, with preset names from the catalogue", async () => {
+    m.listOrgApiKeys.mockResolvedValue({ keys: [PRIYAS, MCP_KEY], limits: LIMITS, mcp: makeMcp() })
+    render(<OrgApiKeysTab orgName="Acme Inc" />)
+    const cards = await screen.findAllByTestId("api-key-card")
+    expect(cards).toHaveLength(2)
+    const kinds = screen.getAllByTestId("api-key-kind").map((el) => el.textContent)
+    expect(kinds.sort()).toEqual(["AI tool · MCP", "Workflow"])
+    const mcpCard = cards.find((c) => within(c).getByTestId("api-key-label").textContent === "claude-code-laptop")!
+    expect(within(mcpCard).getByRole("button", { name: "Revoke claude-code-laptop" })).toBeInTheDocument()
+    // The catalogue reaches the admin card, so the preset is named, not counted.
+    expect(within(mcpCard).getByText("Read only")).toBeInTheDocument()
+    // The admin view never offers "How to connect" (showOwner hides it).
+    expect(within(mcpCard).queryByRole("button", { name: "How to connect" })).toBeNull()
+  })
+
+  it("the admin's revoke sheet names the MCP key's preset from the catalogue", async () => {
+    const user = userEvent.setup()
+    m.listOrgApiKeys.mockResolvedValue({ keys: [MCP_KEY], limits: LIMITS, mcp: makeMcp() })
+    render(<OrgApiKeysTab orgName="Acme Inc" />)
+    await user.click(await screen.findByRole("button", { name: "Revoke claude-code-laptop" }))
+    const sheet = await screen.findByRole("alertdialog")
+    expect(sheet.textContent ?? "").toContain("Can use Read only on All folders")
+  })
+
+  it("when the org switch is off, the admin notice sits under the header", async () => {
+    m.listOrgApiKeys.mockResolvedValue({ keys: [MCP_KEY], limits: LIMITS, mcp: makeMcp({ off: "org" }) })
+    render(<OrgApiKeysTab orgName="Acme Inc" />)
+    expect(await screen.findByText(OFF_SENTENCE)).toBeInTheDocument()
+  })
+
+  it("no notice when the switch is on, or when only the deployment is off (that is the operator's)", async () => {
+    m.listOrgApiKeys.mockResolvedValueOnce({ keys: [MCP_KEY], limits: LIMITS, mcp: makeMcp() })
+    const view = render(<OrgApiKeysTab orgName="Acme Inc" />)
+    await screen.findAllByTestId("api-key-card")
+    expect(screen.queryByText(OFF_SENTENCE)).toBeNull()
+    view.unmount()
+    m.listOrgApiKeys.mockResolvedValueOnce({ keys: [MCP_KEY], limits: LIMITS, mcp: makeMcp({ off: "deployment" }) })
+    render(<OrgApiKeysTab orgName="Acme Inc" />)
+    await screen.findAllByTestId("api-key-card")
+    expect(screen.queryByText(OFF_SENTENCE)).toBeNull()
+  })
+
+  it("the limits line shows only when a workflow key exists", async () => {
+    m.listOrgApiKeys.mockResolvedValueOnce({ keys: [MCP_KEY], limits: LIMITS, mcp: makeMcp() })
+    const view = render(<OrgApiKeysTab orgName="Acme Inc" />)
+    await screen.findAllByTestId("api-key-card")
+    expect(screen.queryByTestId("api-keys-limits")).toBeNull()
+    view.unmount()
+    m.listOrgApiKeys.mockResolvedValueOnce({ keys: [MCP_KEY, PRIYAS], limits: LIMITS, mcp: makeMcp() })
+    render(<OrgApiKeysTab orgName="Acme Inc" />)
+    expect(await screen.findByTestId("api-keys-limits")).toBeInTheDocument()
   })
 })

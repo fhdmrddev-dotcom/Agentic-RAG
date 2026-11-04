@@ -29,3 +29,19 @@ export function rewriteDevUrl(rawUrl: string): string {
 
   return "/app.html" + search
 }
+
+// Phase 307-04 (D-11 / D-35) — the response headers the dev/preview server attaches to a path.
+// The consent page an AI tool's sign-in lands on (/app/connect/<request id>) must never be framed
+// (T-307-05) or leak its request id through a Referer (T-307-07). The same three headers are set by
+// vercel.json's `headers` entry and nginx.conf's `location ^~ /app/connect/`; the three must agree.
+const CONSENT_PREFIX = "/app/connect/"
+const CONSENT_HEADERS: Readonly<Record<string, string>> = {
+  "Content-Security-Policy": "frame-ancestors 'none'",
+  "X-Frame-Options": "DENY",
+  "Referrer-Policy": "no-referrer",
+}
+
+export function devHeadersFor(pathname: string): Record<string, string> {
+  const path = (pathname || "/").split("?")[0]
+  return path.startsWith(CONSENT_PREFIX) ? { ...CONSENT_HEADERS } : {}
+}

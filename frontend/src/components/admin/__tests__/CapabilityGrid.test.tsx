@@ -28,6 +28,8 @@ const ALL_ON: Record<CapabilityKey, boolean> = {
   sandbox_enabled: true,
   self_improve_enabled: true,
   workflows_enabled: true,
+  // 304-06 (KEY-06, D-03): the fifth flag; its own cases are in CapabilityGrid.mcp.test.tsx.
+  mcp_enabled: true,
 }
 
 describe("CapabilityGrid (065-A) — armed-OFF switches + concrete impact copy", () => {
@@ -35,7 +37,8 @@ describe("CapabilityGrid (065-A) — armed-OFF switches + concrete impact copy",
     const onToggle = vi.fn().mockResolvedValue(undefined)
     render(<CapabilityGrid flags={ALL_ON} onToggle={onToggle} showTechnical={false} />)
 
-    expect(screen.getAllByRole("switch")).toHaveLength(4)
+    // RAISED 4 -> 5 at 304-06: the deployment MCP switch is the fifth card (D-03).
+    expect(screen.getAllByRole("switch")).toHaveLength(5)
     expect(screen.getByRole("switch", { name: /web search/i })).toBeInTheDocument()
     expect(screen.getByRole("switch", { name: /code sandbox/i })).toBeInTheDocument()
     expect(screen.getByRole("switch", { name: /self-improvement/i })).toBeInTheDocument()

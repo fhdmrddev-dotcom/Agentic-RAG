@@ -372,3 +372,58 @@ describe("S8 — opening a document that is on neither the page nor Find's rows"
     expect(await screen.findByLabelText("Document details")).toHaveTextContent("panel:elsewhere.pdf")
   })
 })
+
+// Phase 305-02 (D-17 / D-52; UI-SPEC Surface 4): a by-id open that answers 404 shows ONE in-page
+// notice in the S8 slot (299's words, kind only), the panel closed; a 5xx keeps the shipped alert.
+describe("305-02 — the document address refusal (DocumentCantBeOpened in the S8 slot)", () => {
+  function Opener() {
+    const nav = useCitationNav()
+    return (
+      <button type="button" onClick={() => nav.openDocument("off-page")}>
+        open-off-page
+      </button>
+    )
+  }
+
+  it("a 404 shows the notice with the panel closed, and Dismiss clears it without asking again", async () => {
+    libraryApi.getDocument.mockRejectedValueOnce(new DocumentListError(404, "x"))
+    renderPage(<Opener />)
+    await screen.findByText("alpha.pdf")
+    fireEvent.click(screen.getByText("open-off-page"))
+    const notice = await screen.findByTestId("document-cant-be-opened")
+    expect(within(notice).getByRole("heading").textContent).toBe("This document can't be opened")
+    expect(notice).toHaveTextContent("If someone sent you this link, ask them to check it.")
+    expect(screen.queryByLabelText("Document details")).toBeNull()
+    expect(screen.queryByText("Couldn’t open that document.")).toBeNull()
+    fireEvent.click(within(notice).getByRole("button", { name: "Dismiss" }))
+    await waitFor(() => expect(screen.queryByTestId("document-cant-be-opened")).toBeNull())
+    await act(async () => {})
+    expect(libraryApi.getDocument).toHaveBeenCalledTimes(1)
+    expect(screen.getByText("alpha.pdf")).toBeInTheDocument() // the list behind was never hidden
+  })
+
+  it("a 5xx keeps the shipped alert and shows no refusal notice", async () => {
+    libraryApi.getDocument.mockRejectedValueOnce(new DocumentListError(500, "x"))
+    renderPage(<Opener />)
+    await screen.findByText("alpha.pdf")
+    fireEvent.click(screen.getByText("open-off-page"))
+    await screen.findByText("Couldn’t open that document.")
+    expect(screen.queryByTestId("document-cant-be-opened")).toBeNull()
+  })
+
+  it("the document address arrival opens by id, and Dismiss leaves the address for the Library", async () => {
+    libraryApi.getDocument.mockRejectedValueOnce(new DocumentListError(404, "x"))
+    const leave = vi.fn()
+    render(
+      <CitationNavProvider entityLink={{ document: "off-page", leave }}>
+        <TooltipProvider>
+          <LibraryPageUnderTest />
+        </TooltipProvider>
+      </CitationNavProvider>,
+    )
+    const notice = await screen.findByTestId("document-cant-be-opened")
+    expect(libraryApi.getDocument).toHaveBeenCalledWith("off-page")
+    fireEvent.click(within(notice).getByRole("button", { name: "Dismiss" }))
+    expect(leave).toHaveBeenCalledWith({ view: "documents" })
+  })
+})

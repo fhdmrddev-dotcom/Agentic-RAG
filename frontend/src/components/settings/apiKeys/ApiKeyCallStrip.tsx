@@ -15,8 +15,11 @@ import { cn } from "@/lib/utils"
 import type { ApiKeyCall } from "@/lib/api/apiKeys"
 import { API_KEYS_COPY, fillCopy } from "./apiKeysCopy"
 import { callBars, callDetailLine, type BarKind, type CallContext } from "./apiKeyFacts"
+import { MCP_KEY_COPY } from "./mcpKeyCopy"
+import { mcpBarKind } from "./mcpKeyFacts"
 
 const C = API_KEYS_COPY
+const M = MCP_KEY_COPY
 
 const BAR_CLASS: Record<BarKind, string> = {
   start: "h-4 bg-primary",
@@ -35,7 +38,10 @@ export function ApiKeyCallStrip({
   label: string
   ctx?: CallContext
 }) {
-  const bars = callBars(calls)
+  const isMcp = ctx.key?.kind === "mcp"
+  // 306-05 (UI-SPEC §7b): an MCP key's ok ask_agent / run_workflow call is a start bar.
+  const bars = isMcp ? callBars(calls).map((b) => ({ ...b, kind: mcpBarKind(b.call) })) : callBars(calls)
+  const showsStart = bars.some((b) => b.kind === "start")
   const [focusIdx, setFocusIdx] = useState(() => bars.length - 1)
   const [openIdx, setOpenIdx] = useState<number | null>(null)
   const refs = useRef<(HTMLButtonElement | null)[]>([])
@@ -97,13 +103,30 @@ export function ApiKeyCallStrip({
           )
         })}
       </div>
-      <div data-testid="call-strip-caption" className="mt-1 font-mono text-xs text-muted-foreground">
-        {fillCopy(C.strip.caption, { N: bars.length })}
-        <span aria-hidden="true" className="text-primary">■</span> {C.strip.legendStart}{" "}
-        <span aria-hidden="true" className="text-muted-foreground/60">■</span> {C.strip.legendRead}{" "}
-        <span aria-hidden="true" className="text-destructive">■</span> {C.strip.legendRefused}
-        {C.strip.tapOne}
-      </div>
+      {isMcp ? (
+        // 305-03 (UI-SPEC §Surface 3): "refused" alone would be untrue for a withheld or failed
+        // call, so the legend names answered / not answered. 306-05 (§7b): it names "started" only
+        // while a start bar is on screen; without one the caption is 305's, byte for byte.
+        <div data-testid="call-strip-caption" className="mt-1 font-mono text-xs text-muted-foreground">
+          {fillCopy(C.strip.caption, { N: bars.length })}
+          {showsStart && (
+            <>
+              <span aria-hidden="true" className="text-primary">■</span> {M.activity.legendStarted}{" "}
+            </>
+          )}
+          <span aria-hidden="true" className="text-muted-foreground/60">■</span> {M.activity.legendOk}{" "}
+          <span aria-hidden="true" className="text-destructive">■</span> {M.activity.legendNotOk}
+          {C.strip.tapOne}
+        </div>
+      ) : (
+        <div data-testid="call-strip-caption" className="mt-1 font-mono text-xs text-muted-foreground">
+          {fillCopy(C.strip.caption, { N: bars.length })}
+          <span aria-hidden="true" className="text-primary">■</span> {C.strip.legendStart}{" "}
+          <span aria-hidden="true" className="text-muted-foreground/60">■</span> {C.strip.legendRead}{" "}
+          <span aria-hidden="true" className="text-destructive">■</span> {C.strip.legendRefused}
+          {C.strip.tapOne}
+        </div>
+      )}
       {detail !== null && (
         <div
           data-testid="call-detail"

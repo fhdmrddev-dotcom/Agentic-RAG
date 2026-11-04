@@ -583,6 +583,12 @@ export interface FullAppSettings {
   /** 293 (D-14) — per-key allowances for outside calls (1..60 starts, 10..600 reads a minute). */
   api_key_starts_per_minute?: number
   api_key_reads_per_minute?: number
+  api_key_searches_per_minute?: number  // 305 (D-54) — AI tool searches, 1..120
+  // 306 (D-36 / D-35) — the ask wait budget and outside-start admission limits
+  mcp_ask_wait_seconds?: number
+  outside_inflight_per_key?: number
+  outside_inflight_per_org?: number
+  outside_inflight_per_provider?: number
   /** 300 (D-07, D-08, D-10) — the mail knobs. Optional: an older backend omits them. */
   notification_email_delay_seconds?: number
   email_from_address?: string
@@ -637,6 +643,10 @@ export interface FullAppSettings {
   // self_improve/workflows default true, maintenance_mode false.
   self_improve_enabled: boolean
   workflows_enabled: boolean
+  // Phase 304 (KEY-06) — the deployment MCP switch (default true); written via setFlag("mcp_enabled", …).
+  // The server always sends it; optional only so pre-304 FullAppSettings test literals still type
+  // (read it as `mcp_enabled ?? true`, the backend's own capability-default polarity).
+  mcp_enabled?: boolean
   maintenance_mode: boolean
   // Phase 159 (MODEL-03 / D-159-04) — the persisted operator toggle that hides known
   // non-chat "utility" model ids (embeddings / audio / image / …) from the model-
@@ -737,6 +747,12 @@ export interface SettingsUpdate {
   /** 293 (D-14) — bounded 1..60 / 10..600 by the server (293-01); a refusal is a 400 sentence. */
   api_key_starts_per_minute?: number
   api_key_reads_per_minute?: number
+  api_key_searches_per_minute?: number  // 305 (D-54) — bounded 1..120 by the server
+  // 306 (D-36 / D-35) — bounded 5..45 and 1..50 by the server
+  mcp_ask_wait_seconds?: number
+  outside_inflight_per_key?: number
+  outside_inflight_per_org?: number
+  outside_inflight_per_provider?: number
   /** 300 (D-07) — bounded 60..3600 by the server; (D-08, D-10) "" or one address; name 1-60. */
   notification_email_delay_seconds?: number
   email_from_address?: string

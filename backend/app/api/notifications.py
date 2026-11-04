@@ -29,7 +29,7 @@ from uuid import UUID
 
 from fastapi import APIRouter, Depends, HTTPException, status
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
-from pydantic import BaseModel
+from pydantic import BaseModel, model_serializer
 
 from app.db.notifications import list_open_notices
 from app.dependencies import get_current_user, get_pg_pool
@@ -57,17 +57,36 @@ router = APIRouter(
 )
 
 
+#: Phase 308: the keys only a webhook notice carries. A run notice omits them, so it serialises
+#: exactly as it did before 308.
+_WEBHOOK_ONLY_KEYS = ("endpoint_id", "reason", "title", "title_is_address")
+
+
 class WaitingNotice(BaseModel):
-    """One workflow run that is waiting on you."""
+    """One thing waiting on you: a workflow run (a question or an approval), or one of your webhooks
+    that was turned off because it kept failing (``webhook_disabled``)."""
 
     id: UUID
-    run_id: UUID
+    run_id: UUID | None  # 308 (D-48): null on a webhook notice
     org_id: UUID
     org_name: str
-    workflow_name: str
-    kind: Literal["question", "approval"]
-    origin: Literal["app", "schedule", "key"] | None
+    workflow_name: str | None = None  # 308: null on a webhook notice
+    kind: Literal["question", "approval", "webhook_disabled"]
+    origin: Literal["app", "schedule", "key", "mcp"] | None  # 306-04 (D-31): + mcp
     created_at: datetime
+    # Phase 308 (D-48 / D-56) — a webhook notice only:
+    endpoint_id: UUID | None = None
+    reason: Literal["failing", "gone"] | None = None
+    title: str | None = None  # the endpoint's description, else host + path (no query)
+    title_is_address: bool | None = None  # true when ``title`` is the host + path
+
+    @model_serializer(mode="wrap")
+    def _omit_webhook_keys_on_a_run_notice(self, handler):
+        data = handler(self)
+        if self.kind != "webhook_disabled":
+            for key in _WEBHOOK_ONLY_KEYS:
+                data.pop(key, None)
+        return data
 
 
 class WaitingNotices(BaseModel):
@@ -100,6 +119,10 @@ async def list_waiting_notices(current_user: dict = Depends(get_current_user)) -
                 kind=r["kind"],
                 origin=r["origin"],
                 created_at=r["created_at"],
+                endpoint_id=r["endpoint_id"],
+                reason=r["reason"],
+                title=r["title"],
+                title_is_address=r["title_is_address"],
             )
             for r in rows
         ],

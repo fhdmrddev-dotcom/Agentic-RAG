@@ -241,6 +241,7 @@ CREATE FUNCTION public.current_user_has_permission(p_org_id uuid, p_permission_k
     WHERE m.org_id = p_org_id
       AND m.user_id = auth.uid()
       AND rp.permission_key = p_permission_key
+      AND m.org_id IN (SELECT public.current_user_org_ids())
   );
 $$;
 
@@ -253,7 +254,10 @@ CREATE FUNCTION public.current_user_org_ids() RETURNS SETOF uuid
     LANGUAGE sql STABLE SECURITY DEFINER
     SET search_path TO 'public'
     AS $$
-  SELECT org_id FROM public.org_members WHERE user_id = auth.uid();
+  SELECT org_id FROM public.org_members
+   WHERE user_id = auth.uid()
+     AND (NULLIF(current_setting('app.acting_org_id', true), '') IS NULL
+          OR org_id = NULLIF(current_setting('app.acting_org_id', true), '')::uuid);
 $$;
 
 
@@ -1255,6 +1259,31 @@ $$;
 
 
 --
+-- Name: threads_origin_immutable(); Type: FUNCTION; Schema: public; Owner: -
+--
+
+CREATE FUNCTION public.threads_origin_immutable() RETURNS trigger
+    LANGUAGE plpgsql
+    SET search_path TO ''
+    AS $$
+BEGIN
+    IF TG_OP = 'UPDATE' THEN
+        -- Assign, never raise: an unrelated update of a thread row must keep working.
+        NEW.origin_kind := OLD.origin_kind;
+        NEW.origin_label := OLD.origin_label;
+        NEW.origin_ref := OLD.origin_ref;
+    ELSIF current_user IN ('anon', 'authenticated') THEN
+        -- A client-role INSERT (the owner insert policy) may not claim an origin.
+        NEW.origin_kind := NULL;
+        NEW.origin_label := NULL;
+        NEW.origin_ref := NULL;
+    END IF;
+    RETURN NEW;
+END;
+$$;
+
+
+--
 -- Name: update_search_vector(); Type: FUNCTION; Schema: public; Owner: -
 --
 
@@ -1288,6 +1317,85 @@ EXCEPTION WHEN others THEN
   RETURN NULL;  -- calendar-invalid (2026-13-99 / 2026-02-31) → NULL, never raises
 END;
 $_$;
+
+
+--
+-- Name: webhook_emit_document_event(); Type: FUNCTION; Schema: public; Owner: -
+--
+
+CREATE FUNCTION public.webhook_emit_document_event() RETURNS trigger
+    LANGUAGE plpgsql SECURITY DEFINER
+    SET search_path TO ''
+    AS $$
+BEGIN
+    BEGIN
+        -- T-308-19: no enabled endpoint in this org subscribes, no row. Recipients are decided at
+        -- fan-out (D-03), so owner_id stays NULL.
+        IF EXISTS (
+            SELECT 1
+              FROM public.webhook_endpoints e
+             WHERE e.org_id = NEW.org_id
+               AND e.enabled
+               AND 'document.ingested' = ANY (e.event_types)
+        ) THEN
+            INSERT INTO public.webhook_events (type, org_id, item_id, status, folder_id)
+            VALUES ('document.ingested', NEW.org_id, NEW.id, NEW.status, NEW.folder_id)
+            ON CONFLICT DO NOTHING;
+        END IF;
+    EXCEPTION WHEN OTHERS THEN
+        RAISE WARNING 'webhook_emit_document_event swallowed: %', SQLERRM;
+    END;
+    RETURN NULL;
+END;
+$$;
+
+
+--
+-- Name: webhook_emit_run_event(); Type: FUNCTION; Schema: public; Owner: -
+--
+
+CREATE FUNCTION public.webhook_emit_run_event() RETURNS trigger
+    LANGUAGE plpgsql SECURITY DEFINER
+    SET search_path TO ''
+    AS $$
+DECLARE
+    v_type text;
+BEGIN
+    BEGIN
+        -- D-42: a golden (publish validation) run or a run without an owner emits nothing.
+        IF NEW.user_id IS NULL OR coalesce(NEW.is_golden_run, false) THEN
+            RETURN NULL;
+        END IF;
+        -- D-01 / D-43: cap_paused stays in the set for forward compatibility (no writer today).
+        v_type := CASE
+                      WHEN NEW.status IN ('completed', 'failed', 'cancelled') THEN 'run.finished'
+                      WHEN NEW.status IN ('paused', 'cap_paused') THEN 'run.waiting'
+                  END;
+        IF v_type IS NULL THEN
+            RETURN NULL;
+        END IF;
+        IF v_type = 'run.finished' AND OLD.status IN ('completed', 'failed', 'cancelled') THEN
+            RETURN NULL;
+        END IF;
+        -- T-308-19: no enabled endpoint of the owner in this org subscribes, no row.
+        IF EXISTS (
+            SELECT 1
+              FROM public.webhook_endpoints e
+             WHERE e.org_id = NEW.org_id
+               AND e.user_id = NEW.user_id
+               AND e.enabled
+               AND v_type = ANY (e.event_types)
+        ) THEN
+            INSERT INTO public.webhook_events (type, org_id, item_id, owner_id, status, origin_kind, definition_id)
+            VALUES (v_type, NEW.org_id, NEW.id, NEW.user_id, NEW.status, NEW.origin_kind, NEW.definition_id)
+            ON CONFLICT DO NOTHING;
+        END IF;
+    EXCEPTION WHEN OTHERS THEN
+        RAISE WARNING 'webhook_emit_run_event swallowed: %', SQLERRM;
+    END;
+    RETURN NULL;
+END;
+$$;
 
 
 --
@@ -1365,8 +1473,19 @@ CREATE TABLE public.api_keys (
     revoked_by uuid,
     last_used_at timestamp with time zone,
     created_at timestamp with time zone DEFAULT now() NOT NULL,
+    kind text DEFAULT 'workflow'::text NOT NULL,
+    folder_ids jsonb,
+    tools jsonb,
+    include_external boolean DEFAULT false NOT NULL,
+    oauth_client_id uuid,
+    CONSTRAINT api_keys_folder_ids_check CHECK (((folder_ids IS NULL) OR ((jsonb_typeof(folder_ids) = 'array'::text) AND (jsonb_array_length(folder_ids) >= 1)))),
+    CONSTRAINT api_keys_kind_check CHECK ((kind = ANY (ARRAY['workflow'::text, 'mcp'::text]))),
     CONSTRAINT api_keys_label_check CHECK (((char_length(btrim(label)) >= 1) AND (char_length(btrim(label)) <= 60))),
-    CONSTRAINT api_keys_workflows_check CHECK (((jsonb_typeof(workflows) = 'array'::text) AND (jsonb_array_length(workflows) >= 1)))
+    CONSTRAINT api_keys_mcp_expiry_check CHECK (((kind <> 'mcp'::text) OR (expires_at IS NOT NULL))),
+    CONSTRAINT api_keys_oauth_kind_check CHECK (((oauth_client_id IS NULL) OR (kind = 'mcp'::text))),
+    CONSTRAINT api_keys_scope_kind_check CHECK (((kind = 'mcp'::text) OR ((folder_ids IS NULL) AND (include_external = false)))),
+    CONSTRAINT api_keys_tools_check CHECK ((((kind = 'mcp'::text) AND (tools IS NOT NULL) AND (jsonb_typeof(tools) = 'array'::text) AND (jsonb_array_length(tools) >= 1)) OR ((kind = 'workflow'::text) AND (tools IS NULL)))),
+    CONSTRAINT api_keys_workflows_check CHECK (((jsonb_typeof(workflows) = 'array'::text) AND ((kind <> 'workflow'::text) OR (jsonb_array_length(workflows) >= 1))))
 );
 
 
@@ -1381,7 +1500,7 @@ COMMENT ON TABLE public.api_keys IS 'Phase 293 (START-02). One API key per row: 
 -- Name: COLUMN api_keys.key_prefix; Type: COMMENT; Schema: public; Owner: -
 --
 
-COMMENT ON COLUMN public.api_keys.key_prefix IS 'The first 13 characters of the secret (srl_live_ + 4), shown so a member can tell keys apart.';
+COMMENT ON COLUMN public.api_keys.key_prefix IS 'The prefix + 4 characters of the secret (srl_live_ or srl_mcp_), shown so a member can tell keys apart.';
 
 
 --
@@ -1396,6 +1515,41 @@ COMMENT ON COLUMN public.api_keys.workflows IS 'Snapshot [{id, name}] of the wor
 --
 
 COMMENT ON COLUMN public.api_keys.expires_at IS 'NULL = never expires. Re-checked on every call, as are revoked_at and the owner''s membership.';
+
+
+--
+-- Name: COLUMN api_keys.kind; Type: COMMENT; Schema: public; Owner: -
+--
+
+COMMENT ON COLUMN public.api_keys.kind IS 'Phase 304 (D-04). workflow = starts named published workflows (Phase 293); mcp = a personal MCP key that acts as its owner in one org.';
+
+
+--
+-- Name: COLUMN api_keys.folder_ids; Type: COMMENT; Schema: public; Owner: -
+--
+
+COMMENT ON COLUMN public.api_keys.folder_ids IS 'Phase 304 (D-08). MCP keys only. NULL = every folder the owner can see in the org; otherwise a non-empty array of folder ids (each one''s subtree is in scope). Bound as a plain list, never json.dumps.';
+
+
+--
+-- Name: COLUMN api_keys.tools; Type: COMMENT; Schema: public; Owner: -
+--
+
+COMMENT ON COLUMN public.api_keys.tools IS 'Phase 304. MCP keys only: a non-empty array of tool names the key may call. NULL on a workflow key.';
+
+
+--
+-- Name: COLUMN api_keys.include_external; Type: COMMENT; Schema: public; Owner: -
+--
+
+COMMENT ON COLUMN public.api_keys.include_external IS 'Phase 304 (D-23). MCP keys only: whether connector-fed documents (source_connection_id IS NOT NULL) are in scope.';
+
+
+--
+-- Name: COLUMN api_keys.oauth_client_id; Type: COMMENT; Schema: public; Owner: -
+--
+
+COMMENT ON COLUMN public.api_keys.oauth_client_id IS 'Phase 307 (D-15). Set = this row is an OAuth GRANT approved for that client, not a personal key. Its key_hash is the digest of a random secret nobody is shown, and the resolver refuses it on the key path (wrong_kind). Read only by the backend: NOT in the authenticated column grant.';
 
 
 --
@@ -1496,7 +1650,15 @@ CREATE TABLE public.app_settings (
     email_from_address text,
     email_from_name text DEFAULT 'Syrel'::text NOT NULL,
     email_dev_redirect_address text,
+    mcp_enabled boolean DEFAULT true NOT NULL,
+    api_key_searches_per_minute integer DEFAULT 30 NOT NULL,
+    mcp_ask_wait_seconds integer DEFAULT 30 NOT NULL,
+    outside_inflight_per_key integer DEFAULT 2 NOT NULL,
+    outside_inflight_per_org integer DEFAULT 4 NOT NULL,
+    outside_inflight_per_provider integer DEFAULT 6 NOT NULL,
+    mcp_oauth_redirect_hosts jsonb DEFAULT '[{"host": "claude.ai"}, {"host": "claude.com"}]'::jsonb NOT NULL,
     CONSTRAINT app_settings_api_key_reads_per_minute_bound CHECK (((api_key_reads_per_minute >= 10) AND (api_key_reads_per_minute <= 600))),
+    CONSTRAINT app_settings_api_key_searches_per_minute_bound CHECK (((api_key_searches_per_minute >= 1) AND (api_key_searches_per_minute <= 120))),
     CONSTRAINT app_settings_api_key_starts_per_minute_bound CHECK (((api_key_starts_per_minute >= 1) AND (api_key_starts_per_minute <= 60))),
     CONSTRAINT app_settings_chat_max_tool_rounds_bound CHECK (((chat_max_tool_rounds >= 2) AND (chat_max_tool_rounds <= 50))),
     CONSTRAINT app_settings_download_ttl_bounds CHECK (((document_download_url_ttl_seconds >= 10) AND (document_download_url_ttl_seconds <= 900))),
@@ -1504,8 +1666,13 @@ CREATE TABLE public.app_settings (
     CONSTRAINT app_settings_extraction_table_engine_pdf_check CHECK ((extraction_table_engine_pdf = ANY (ARRAY['camelot'::text, 'pdfplumber'::text]))),
     CONSTRAINT app_settings_hnsw_ef_search_bounds CHECK (((hnsw_ef_search IS NULL) OR ((hnsw_ef_search >= 10) AND (hnsw_ef_search <= 1000)))),
     CONSTRAINT app_settings_hnsw_iterative_scan_values CHECK (((hnsw_iterative_scan IS NULL) OR (hnsw_iterative_scan = ANY (ARRAY['off'::text, 'strict_order'::text, 'relaxed_order'::text])))),
+    CONSTRAINT app_settings_mcp_ask_wait_seconds_bound CHECK (((mcp_ask_wait_seconds >= 5) AND (mcp_ask_wait_seconds <= 45))),
+    CONSTRAINT app_settings_mcp_oauth_redirect_hosts_array CHECK ((jsonb_typeof(mcp_oauth_redirect_hosts) = 'array'::text)),
     CONSTRAINT app_settings_multimodal_max_vision_calls_bound CHECK (((multimodal_max_vision_calls IS NULL) OR ((multimodal_max_vision_calls >= 1) AND (multimodal_max_vision_calls <= 1000)))),
     CONSTRAINT app_settings_notification_email_delay_seconds_bound CHECK (((notification_email_delay_seconds >= 60) AND (notification_email_delay_seconds <= 3600))),
+    CONSTRAINT app_settings_outside_inflight_per_key_bound CHECK (((outside_inflight_per_key >= 1) AND (outside_inflight_per_key <= 50))),
+    CONSTRAINT app_settings_outside_inflight_per_org_bound CHECK (((outside_inflight_per_org >= 1) AND (outside_inflight_per_org <= 50))),
+    CONSTRAINT app_settings_outside_inflight_per_provider_bound CHECK (((outside_inflight_per_provider >= 1) AND (outside_inflight_per_provider <= 50))),
     CONSTRAINT app_settings_source_max_file_size_mb_bounds CHECK (((source_max_file_size_mb IS NULL) OR ((source_max_file_size_mb >= 1) AND (source_max_file_size_mb <= 50)))),
     CONSTRAINT app_settings_vision_max_pages_bound CHECK (((vision_max_pages IS NULL) OR ((vision_max_pages >= 1) AND (vision_max_pages <= 500))))
 );
@@ -1659,6 +1826,55 @@ COMMENT ON COLUMN public.app_settings.email_dev_redirect_address IS 'Phase 300 (
 
 
 --
+-- Name: COLUMN app_settings.mcp_enabled; Type: COMMENT; Schema: public; Owner: -
+--
+
+COMMENT ON COLUMN public.app_settings.mcp_enabled IS 'Phase 304 (D-03, KEY-06). Deployment-wide MCP switch. Only writer: PUT /admin/flags (operator ledger). Read live on every MCP call, never through the 30 s settings cache.';
+
+
+--
+-- Name: COLUMN app_settings.api_key_searches_per_minute; Type: COMMENT; Schema: public; Owner: -
+--
+
+COMMENT ON COLUMN public.app_settings.api_key_searches_per_minute IS 'Phase 305 (D-54). Searches one MCP key may run per minute (the expensive bucket), counted in Redis across every worker. Default 30. Bounded 1..120 by three agreeing bounds: app_settings_api_key_searches_per_minute_bound, the API 400 (app/api/settings.py) and the UI clamp.';
+
+
+--
+-- Name: COLUMN app_settings.mcp_ask_wait_seconds; Type: COMMENT; Schema: public; Owner: -
+--
+
+COMMENT ON COLUMN public.app_settings.mcp_ask_wait_seconds IS 'Phase 306 (D-04, D-36). Seconds an MCP ask_agent call waits for the answer before it returns a still-working reply. Default 30. Bounded 5..45 by three agreeing bounds: app_settings_mcp_ask_wait_seconds_bound, the API 400 (app/api/settings.py) and the UI clamp.';
+
+
+--
+-- Name: COLUMN app_settings.outside_inflight_per_key; Type: COMMENT; Schema: public; Owner: -
+--
+
+COMMENT ON COLUMN public.app_settings.outside_inflight_per_key IS 'Phase 306 (D-35, GUARD-01). Outside (MCP / API-key) runs one credential may have in flight at once. Default 2. Bounded 1..50 by three agreeing bounds: app_settings_outside_inflight_per_key_bound, the API 400 (app/api/settings.py) and the UI clamp.';
+
+
+--
+-- Name: COLUMN app_settings.outside_inflight_per_org; Type: COMMENT; Schema: public; Owner: -
+--
+
+COMMENT ON COLUMN public.app_settings.outside_inflight_per_org IS 'Phase 306 (D-35, GUARD-01). Outside (MCP / API-key) runs one organization may have in flight at once. Default 4. Bounded 1..50 by three agreeing bounds: app_settings_outside_inflight_per_org_bound, the API 400 (app/api/settings.py) and the UI clamp.';
+
+
+--
+-- Name: COLUMN app_settings.outside_inflight_per_provider; Type: COMMENT; Schema: public; Owner: -
+--
+
+COMMENT ON COLUMN public.app_settings.outside_inflight_per_provider IS 'Phase 306 (D-35, GUARD-01). Outside (MCP / API-key) runs one model provider may have in flight at once, across every org. Default 6. Bounded 1..50 by three agreeing bounds: app_settings_outside_inflight_per_provider_bound, the API 400 (app/api/settings.py) and the UI clamp.';
+
+
+--
+-- Name: COLUMN app_settings.mcp_oauth_redirect_hosts; Type: COMMENT; Schema: public; Owner: -
+--
+
+COMMENT ON COLUMN public.app_settings.mcp_oauth_redirect_hosts IS 'Phase 307 (D-08). Hosts an OAuth client may redirect to over https. Entries {host, added_by?, added_by_name?, added_at?}; entries without added_by are built in (claude.ai, claude.com). Read live by app/db/oauth.py, never through load_app_settings.';
+
+
+--
 -- Name: audit_log; Type: TABLE; Schema: public; Owner: -
 --
 
@@ -1669,7 +1885,7 @@ CREATE TABLE public.audit_log (
     metadata jsonb DEFAULT '{}'::jsonb NOT NULL,
     created_at timestamp with time zone DEFAULT now() NOT NULL,
     org_id uuid NOT NULL,
-    CONSTRAINT audit_log_action_type_check CHECK ((action_type = ANY (ARRAY['document.upload'::text, 'document.delete'::text, 'search.query'::text, 'code.execute'::text, 'skill.load'::text, 'thread.create'::text, 'thread.delete'::text, 'settings.update'::text, 'memory.remember'::text, 'memory.recall'::text, 'feedback.submit'::text, 'view.create'::text, 'view.delete'::text, 'relationship.create'::text, 'relationship.delete'::text, 'classification.apply'::text, 'classification.rule.create'::text, 'metadata.update'::text, 'metadata.field.create'::text, 'connector.call'::text, 'connector.grant'::text, 'connector.watch.create'::text, 'connector.watch.delete'::text, 'connector.watch.sync'::text, 'retention.policy.create'::text, 'retention.policy.update'::text, 'retention.policy.delete'::text, 'retention.hold.create'::text, 'retention.hold.update'::text, 'retention.hold.release'::text, 'retention.disposition.confirm'::text, 'retention.document.unarchive'::text, 'retention.document.keep'::text, 'folder.delete'::text, 'api_key.create'::text, 'api_key.revoke'::text, 'api_key.start'::text, 'api_key.read'::text, 'api_key.refused'::text, 'org.item.move'::text])))
+    CONSTRAINT audit_log_action_type_check CHECK ((action_type = ANY (ARRAY['document.upload'::text, 'document.delete'::text, 'search.query'::text, 'code.execute'::text, 'skill.load'::text, 'thread.create'::text, 'thread.delete'::text, 'settings.update'::text, 'memory.remember'::text, 'memory.recall'::text, 'feedback.submit'::text, 'view.create'::text, 'view.delete'::text, 'relationship.create'::text, 'relationship.delete'::text, 'classification.apply'::text, 'classification.rule.create'::text, 'metadata.update'::text, 'metadata.field.create'::text, 'connector.call'::text, 'connector.grant'::text, 'connector.watch.create'::text, 'connector.watch.delete'::text, 'connector.watch.sync'::text, 'retention.policy.create'::text, 'retention.policy.update'::text, 'retention.policy.delete'::text, 'retention.hold.create'::text, 'retention.hold.update'::text, 'retention.hold.release'::text, 'retention.disposition.confirm'::text, 'retention.document.unarchive'::text, 'retention.document.keep'::text, 'folder.delete'::text, 'api_key.create'::text, 'api_key.revoke'::text, 'api_key.start'::text, 'api_key.read'::text, 'api_key.refused'::text, 'org.item.move'::text, 'webhook.endpoint.created'::text, 'webhook.endpoint.updated'::text, 'webhook.endpoint.deleted'::text, 'webhook.endpoint.enabled'::text, 'webhook.endpoint.disabled'::text, 'webhook.endpoint.secret_rolled'::text, 'webhook.endpoint.test_sent'::text, 'webhook.endpoint.delivery_resent'::text, 'webhook.endpoint.auto_disabled'::text])))
 );
 
 
@@ -3217,6 +3433,40 @@ COMMENT ON VIEW public.library_documents IS 'Phase 284 (mig 207, rewritten by 20
 
 
 --
+-- Name: mcp_usage; Type: TABLE; Schema: public; Owner: -
+--
+
+CREATE TABLE public.mcp_usage (
+    id uuid DEFAULT gen_random_uuid() NOT NULL,
+    org_id uuid NOT NULL,
+    user_id uuid NOT NULL,
+    api_key_id uuid,
+    tool text NOT NULL,
+    model text NOT NULL,
+    provider text NOT NULL,
+    input_tokens integer,
+    output_tokens integer DEFAULT 0 NOT NULL,
+    status text NOT NULL,
+    started_at timestamp with time zone DEFAULT now() NOT NULL,
+    CONSTRAINT mcp_usage_status_check CHECK ((status = ANY (ARRAY['completed'::text, 'failed'::text])))
+);
+
+
+--
+-- Name: TABLE mcp_usage; Type: COMMENT; Schema: public; Owner: -
+--
+
+COMMENT ON TABLE public.mcp_usage IS 'Phase 305 (D-55, GUARD-02). One row per provider call an MCP tool makes (the embedding of a search, a rerank), so MCP spend joins the per_root spend CTE as a second leg. Only writer: app/db/mcp_usage.py (service-role pool). Only reader: the per_root spend CTE. Deny-all to every client role (RLS on, no policy).';
+
+
+--
+-- Name: COLUMN mcp_usage.input_tokens; Type: COMMENT; Schema: public; Owner: -
+--
+
+COMMENT ON COLUMN public.mcp_usage.input_tokens IS 'Measured provider usage (prompt tokens). NULL = the provider returned none (honest unmeasured, never estimated).';
+
+
+--
 -- Name: message_artifacts; Type: TABLE; Schema: public; Owner: -
 --
 
@@ -3711,14 +3961,16 @@ CREATE TABLE public.notifications (
     id uuid DEFAULT gen_random_uuid() NOT NULL,
     recipient_id uuid NOT NULL,
     org_id uuid,
-    run_id uuid NOT NULL,
+    run_id uuid,
     kind text NOT NULL,
     tool_call_id text,
     created_at timestamp with time zone DEFAULT now() NOT NULL,
     closed_at timestamp with time zone,
     closed_reason text,
-    CONSTRAINT notifications_closed_reason_check CHECK (((closed_reason IS NULL) OR (closed_reason = ANY (ARRAY['answered'::text, 'run_ended'::text])))),
-    CONSTRAINT notifications_kind_check CHECK ((kind = ANY (ARRAY['question'::text, 'approval'::text])))
+    endpoint_id uuid,
+    CONSTRAINT notifications_closed_reason_check CHECK (((closed_reason IS NULL) OR (closed_reason = ANY (ARRAY['answered'::text, 'run_ended'::text, 'endpoint_enabled'::text])))),
+    CONSTRAINT notifications_kind_check CHECK ((kind = ANY (ARRAY['question'::text, 'approval'::text, 'webhook_disabled'::text]))),
+    CONSTRAINT notifications_kind_shape_check CHECK ((((kind = ANY (ARRAY['question'::text, 'approval'::text])) AND (run_id IS NOT NULL) AND (endpoint_id IS NULL)) OR ((kind = 'webhook_disabled'::text) AND (endpoint_id IS NOT NULL) AND (run_id IS NULL))))
 );
 
 
@@ -3741,6 +3993,90 @@ COMMENT ON COLUMN public.notifications.kind IS 'question | approval. approval wh
 --
 
 COMMENT ON COLUMN public.notifications.closed_reason IS 'answered = an ask_user_response with the same tool_call_id; run_ended = the run reached a terminal status, or the engine expired the prompt.';
+
+
+--
+-- Name: COLUMN notifications.endpoint_id; Type: COMMENT; Schema: public; Owner: -
+--
+
+COMMENT ON COLUMN public.notifications.endpoint_id IS 'Phase 308 (D-48). Set only on a webhook_disabled notice: the endpoint that was turned off (failing or gone). Deleting the endpoint deletes the notice.';
+
+
+--
+-- Name: oauth_clients; Type: TABLE; Schema: public; Owner: -
+--
+
+CREATE TABLE public.oauth_clients (
+    id uuid DEFAULT gen_random_uuid() NOT NULL,
+    client_id text NOT NULL,
+    kind text NOT NULL,
+    client_name text,
+    client_uri text,
+    redirect_uris jsonb NOT NULL,
+    metadata_fetched_at timestamp with time zone,
+    metadata_expires_at timestamp with time zone,
+    created_at timestamp with time zone DEFAULT now() NOT NULL,
+    last_grant_at timestamp with time zone,
+    CONSTRAINT oauth_clients_client_id_check CHECK (((char_length(client_id) >= 1) AND (char_length(client_id) <= 2048))),
+    CONSTRAINT oauth_clients_client_name_check CHECK (((client_name IS NULL) OR (char_length(client_name) <= 200))),
+    CONSTRAINT oauth_clients_client_uri_check CHECK (((client_uri IS NULL) OR (char_length(client_uri) <= 2048))),
+    CONSTRAINT oauth_clients_kind_check CHECK ((kind = ANY (ARRAY['dcr'::text, 'cimd'::text]))),
+    CONSTRAINT oauth_clients_redirect_uris_check CHECK (((jsonb_typeof(redirect_uris) = 'array'::text) AND ((jsonb_array_length(redirect_uris) >= 1) AND (jsonb_array_length(redirect_uris) <= 10))))
+);
+
+
+--
+-- Name: TABLE oauth_clients; Type: COMMENT; Schema: public; Owner: -
+--
+
+COMMENT ON TABLE public.oauth_clients IS 'Phase 307 (D-33, OAUTH-05). One row per OAuth client: registered (dcr) or fetched from its metadata document (cimd, client_id = the https URL). Only writer: app/db/oauth.py (service-role pool). Deny-all to every client role (RLS on, no policy).';
+
+
+--
+-- Name: COLUMN oauth_clients.metadata_expires_at; Type: COMMENT; Schema: public; Owner: -
+--
+
+COMMENT ON COLUMN public.oauth_clients.metadata_expires_at IS 'CIMD only: when the cached metadata document must be fetched again (D-06). NULL for dcr.';
+
+
+--
+-- Name: COLUMN oauth_clients.last_grant_at; Type: COMMENT; Schema: public; Owner: -
+--
+
+COMMENT ON COLUMN public.oauth_clients.last_grant_at IS 'When a member last approved this client. NULL = never approved; an unused dcr row is pruned.';
+
+
+--
+-- Name: oauth_tokens; Type: TABLE; Schema: public; Owner: -
+--
+
+CREATE TABLE public.oauth_tokens (
+    id uuid DEFAULT gen_random_uuid() NOT NULL,
+    grant_id uuid NOT NULL,
+    kind text NOT NULL,
+    token_hash text NOT NULL,
+    resource text NOT NULL,
+    expires_at timestamp with time zone NOT NULL,
+    created_at timestamp with time zone DEFAULT now() NOT NULL,
+    used_at timestamp with time zone,
+    replaced_by uuid,
+    revoked_at timestamp with time zone,
+    CONSTRAINT oauth_tokens_kind_check CHECK ((kind = ANY (ARRAY['access'::text, 'refresh'::text])))
+);
+
+
+--
+-- Name: TABLE oauth_tokens; Type: COMMENT; Schema: public; Owner: -
+--
+
+COMMENT ON TABLE public.oauth_tokens IS 'Phase 307 (D-17, D-19, D-46). OAuth access and refresh tokens as sha256 hex digests ONLY (never the token), each tied to its grant (api_keys row, cascade) and the resource it was issued for. Only writer: app/db/oauth.py (service-role pool). Deny-all to every client role (RLS on, no policy).';
+
+
+--
+-- Name: COLUMN oauth_tokens.replaced_by; Type: COMMENT; Schema: public; Owner: -
+--
+
+COMMENT ON COLUMN public.oauth_tokens.replaced_by IS 'A used refresh token''s successor (the rotation chain). A used token presented again outside the bounded grace revokes the whole grant (D-19).';
 
 
 --
@@ -3852,7 +4188,9 @@ CREATE TABLE public.organizations (
     add_ons jsonb DEFAULT '{}'::jsonb NOT NULL,
     settings jsonb DEFAULT '{}'::jsonb NOT NULL,
     created_at timestamp with time zone DEFAULT now() NOT NULL,
-    updated_at timestamp with time zone DEFAULT now() NOT NULL
+    updated_at timestamp with time zone DEFAULT now() NOT NULL,
+    mcp_enabled boolean DEFAULT true NOT NULL,
+    pii_redaction_enabled boolean DEFAULT false NOT NULL
 );
 
 
@@ -3868,6 +4206,20 @@ COMMENT ON COLUMN public.organizations.add_ons IS 'D-01 / ENT-01 entitlements + 
 --
 
 COMMENT ON COLUMN public.organizations.settings IS 'D-01 / SEED-120 forward-compat home: per-org provider config / BYO keys / model selection land here as keys in v3.5 with NO schema rewrite (BYO values reuse the SEC-01 enc:v1: envelope). SEPARATE from add_ons.';
+
+
+--
+-- Name: COLUMN organizations.mcp_enabled; Type: COMMENT; Schema: public; Owner: -
+--
+
+COMMENT ON COLUMN public.organizations.mcp_enabled IS 'Phase 304 (D-35, KEY-06). Per-org MCP switch. Only writer: PUT /org/api-keys/mcp-access (org admin, audited as settings.update). Deliberately OUTSIDE the mig 194 client UPDATE grant.';
+
+
+--
+-- Name: COLUMN organizations.pii_redaction_enabled; Type: COMMENT; Schema: public; Owner: -
+--
+
+COMMENT ON COLUMN public.organizations.pii_redaction_enabled IS 'Phase 305 (D-36, D-56, GUARD-03). Per-org switch: redact personal data from what MCP tools return. Only writer: PUT /org/api-keys/pii-redaction (org admin, audited as settings.update + metadata.event pii_redaction). Deliberately OUTSIDE the mig 194 client UPDATE grant.';
 
 
 --
@@ -4450,7 +4802,11 @@ CREATE TABLE public.threads (
     active_workflow_run_id uuid,
     is_eval boolean DEFAULT false NOT NULL,
     org_id uuid NOT NULL,
-    active_expert_id uuid
+    active_expert_id uuid,
+    origin_kind text,
+    origin_label text,
+    origin_ref uuid,
+    CONSTRAINT threads_origin_kind_check CHECK (((origin_kind IS NULL) OR (origin_kind = ANY (ARRAY['app'::text, 'schedule'::text, 'key'::text, 'mcp'::text]))))
 );
 
 
@@ -4466,6 +4822,27 @@ COMMENT ON COLUMN public.threads.org_id IS 'Forward-compat (D-PRD-02/D-11): org-
 --
 
 COMMENT ON COLUMN public.threads.active_expert_id IS 'Active consultant expert bundle invited to this thread (PACK-02, Phase 260). Scopes retrieval and tools, preserves chat history. Cleared to NULL on dismissal.';
+
+
+--
+-- Name: COLUMN threads.origin_kind; Type: COMMENT; Schema: public; Owner: -
+--
+
+COMMENT ON COLUMN public.threads.origin_kind IS 'Phase 306 (D-31, MCP-05). app | schedule | key | mcp — what started this thread. NULL on threads from before migration 223 and on every thread a client inserts. Frozen after insert (threads_origin_immutable).';
+
+
+--
+-- Name: COLUMN threads.origin_label; Type: COMMENT; Schema: public; Owner: -
+--
+
+COMMENT ON COLUMN public.threads.origin_label IS 'The key label (or schedule name), snapshotted at start: renaming later never rewrites history.';
+
+
+--
+-- Name: COLUMN threads.origin_ref; Type: COMMENT; Schema: public; Owner: -
+--
+
+COMMENT ON COLUMN public.threads.origin_ref IS 'The API key id (or schedule id) that started this thread. An MCP read is scoped by it (origin_kind = ''mcp'' AND origin_ref = key id).';
 
 
 --
@@ -4625,6 +5002,156 @@ COMMENT ON COLUMN public.user_settings.org_id IS 'Forward-compat (D-PRD-02/D-11)
 
 
 --
+-- Name: webhook_deliveries; Type: TABLE; Schema: public; Owner: -
+--
+
+CREATE TABLE public.webhook_deliveries (
+    id uuid DEFAULT gen_random_uuid() NOT NULL,
+    endpoint_id uuid NOT NULL,
+    event_id uuid NOT NULL,
+    status text DEFAULT 'pending'::text NOT NULL,
+    reason text,
+    attempts integer DEFAULT 0 NOT NULL,
+    next_attempt_at timestamp with time zone DEFAULT now() NOT NULL,
+    claimed_at timestamp with time zone,
+    last_status_code integer,
+    last_latency_ms integer,
+    last_error text,
+    last_attempt_at timestamp with time zone,
+    sent_at timestamp with time zone,
+    created_at timestamp with time zone DEFAULT now() NOT NULL,
+    updated_at timestamp with time zone DEFAULT now() NOT NULL,
+    CONSTRAINT webhook_deliveries_attempts_check CHECK ((attempts >= 0)),
+    CONSTRAINT webhook_deliveries_last_error_check CHECK (((last_error IS NULL) OR (last_error = ANY (ARRAY['http_status'::text, 'timeout'::text, 'connect'::text, 'tls'::text, 'redirect'::text, 'refused_address'::text, 'response_too_large'::text, 'gone'::text, 'invalid_url'::text])))),
+    CONSTRAINT webhook_deliveries_reason_check CHECK (((reason IS NULL) OR (reason = ANY (ARRAY['redaction_failed'::text, 'secret_unreadable'::text, 'invalid_url'::text, 'max_attempts'::text, 'not_retried'::text, 'stale_lease'::text])))),
+    CONSTRAINT webhook_deliveries_status_check CHECK ((status = ANY (ARRAY['pending'::text, 'retrying'::text, 'sending'::text, 'sent'::text, 'failed'::text, 'skipped_not_visible'::text, 'skipped_owner_gone'::text, 'skipped_disabled'::text])))
+);
+
+
+--
+-- Name: TABLE webhook_deliveries; Type: COMMENT; Schema: public; Owner: -
+--
+
+COMMENT ON TABLE public.webhook_deliveries IS 'Phase 308 (D-07, D-17, D-20). One delivery per (endpoint, event), UNIQUE. Words-only outcome columns: no body, response or headers is ever stored. Drained by every backend worker with FOR UPDATE SKIP LOCKED. Deny-all to every client role (RLS on, no policy).';
+
+
+--
+-- Name: webhook_delivery_attempts; Type: TABLE; Schema: public; Owner: -
+--
+
+CREATE TABLE public.webhook_delivery_attempts (
+    id uuid DEFAULT gen_random_uuid() NOT NULL,
+    delivery_id uuid NOT NULL,
+    attempt integer NOT NULL,
+    status_code integer,
+    latency_ms integer,
+    error text,
+    created_at timestamp with time zone DEFAULT now() NOT NULL,
+    CONSTRAINT webhook_delivery_attempts_attempt_check CHECK ((attempt >= 1)),
+    CONSTRAINT webhook_delivery_attempts_error_check CHECK (((error IS NULL) OR (error = ANY (ARRAY['http_status'::text, 'timeout'::text, 'connect'::text, 'tls'::text, 'redirect'::text, 'refused_address'::text, 'response_too_large'::text, 'gone'::text, 'invalid_url'::text]))))
+);
+
+
+--
+-- Name: TABLE webhook_delivery_attempts; Type: COMMENT; Schema: public; Owner: -
+--
+
+COMMENT ON TABLE public.webhook_delivery_attempts IS 'Phase 308 (D-20). One row per HTTP attempt: number, status code, latency, an error word. No body, response or headers. Deny-all to every client role (RLS on, no policy).';
+
+
+--
+-- Name: webhook_endpoints; Type: TABLE; Schema: public; Owner: -
+--
+
+CREATE TABLE public.webhook_endpoints (
+    id uuid DEFAULT gen_random_uuid() NOT NULL,
+    user_id uuid NOT NULL,
+    org_id uuid NOT NULL,
+    url text NOT NULL,
+    description text,
+    event_types text[] NOT NULL,
+    enabled boolean DEFAULT true NOT NULL,
+    disabled_reason text,
+    disabled_at timestamp with time zone,
+    secret_ciphertext text NOT NULL,
+    previous_secret_ciphertext text,
+    previous_secret_expires_at timestamp with time zone,
+    consecutive_failures integer DEFAULT 0 NOT NULL,
+    last_success_at timestamp with time zone,
+    created_at timestamp with time zone DEFAULT now() NOT NULL,
+    updated_at timestamp with time zone DEFAULT now() NOT NULL,
+    CONSTRAINT webhook_endpoints_consecutive_failures_check CHECK ((consecutive_failures >= 0)),
+    CONSTRAINT webhook_endpoints_description_check CHECK (((description IS NULL) OR (char_length(description) <= 100))),
+    CONSTRAINT webhook_endpoints_disabled_reason_check CHECK (((disabled_reason IS NULL) OR (disabled_reason = ANY (ARRAY['failing'::text, 'gone'::text, 'admin'::text, 'owner_removed'::text])))),
+    CONSTRAINT webhook_endpoints_enabled_reason_check CHECK (((NOT enabled) OR (disabled_reason IS NULL))),
+    CONSTRAINT webhook_endpoints_event_types_check CHECK (((cardinality(event_types) >= 1) AND (event_types <@ ARRAY['run.finished'::text, 'run.waiting'::text, 'document.ingested'::text]))),
+    CONSTRAINT webhook_endpoints_previous_secret_ciphertext_check CHECK (((previous_secret_ciphertext IS NULL) OR (previous_secret_ciphertext ~~ 'enc:v1:%'::text))),
+    CONSTRAINT webhook_endpoints_previous_secret_pair_check CHECK (((previous_secret_ciphertext IS NULL) = (previous_secret_expires_at IS NULL))),
+    CONSTRAINT webhook_endpoints_secret_ciphertext_check CHECK ((secret_ciphertext ~~ 'enc:v1:%'::text)),
+    CONSTRAINT webhook_endpoints_url_check CHECK (((char_length(url) <= 2048) AND (url ~~ 'https://%'::text) AND (POSITION(('#'::text) IN (url)) = 0) AND (url !~ '^https://[^/?#]*@'::text)))
+);
+
+
+--
+-- Name: TABLE webhook_endpoints; Type: COMMENT; Schema: public; Owner: -
+--
+
+COMMENT ON TABLE public.webhook_endpoints IS 'Phase 308 (D-12, D-27, D-32, D-58). One outbound webhook endpoint per row, owned by one member in one org. The signing secret is stored ENCRYPTED ONLY (secret_cipher enc:v1:). Only writer: app/db/webhooks.py and the drainer (service-role pool). Deny-all to every client role (RLS on, no policy).';
+
+
+--
+-- Name: COLUMN webhook_endpoints.disabled_reason; Type: COMMENT; Schema: public; Owner: -
+--
+
+COMMENT ON COLUMN public.webhook_endpoints.disabled_reason IS 'Why the endpoint is off: failing (5 failed deliveries in a row), gone (410), admin (an org admin turned it off), owner_removed. NULL while on, and NULL when the owner turned it off themselves (D-58).';
+
+
+--
+-- Name: COLUMN webhook_endpoints.previous_secret_ciphertext; Type: COMMENT; Schema: public; Owner: -
+--
+
+COMMENT ON COLUMN public.webhook_endpoints.previous_secret_ciphertext IS 'The secret before the last roll, kept for 24 h so the receiver can switch over (D-13). Set together with previous_secret_expires_at or not at all.';
+
+
+--
+-- Name: webhook_events; Type: TABLE; Schema: public; Owner: -
+--
+
+CREATE TABLE public.webhook_events (
+    id uuid DEFAULT gen_random_uuid() NOT NULL,
+    type text NOT NULL,
+    org_id uuid NOT NULL,
+    item_id uuid,
+    owner_id uuid,
+    status text,
+    origin_kind text,
+    definition_id uuid,
+    folder_id uuid,
+    endpoint_id uuid,
+    payload text,
+    fanned_out_at timestamp with time zone,
+    created_at timestamp with time zone DEFAULT now() NOT NULL,
+    CONSTRAINT webhook_events_item_check CHECK (((type = 'webhook.test'::text) OR (item_id IS NOT NULL))),
+    CONSTRAINT webhook_events_test_endpoint_check CHECK (((type = 'webhook.test'::text) = (endpoint_id IS NOT NULL))),
+    CONSTRAINT webhook_events_type_check CHECK ((type = ANY (ARRAY['run.finished'::text, 'run.waiting'::text, 'document.ingested'::text, 'webhook.test'::text])))
+);
+
+
+--
+-- Name: TABLE webhook_events; Type: COMMENT; Schema: public; Owner: -
+--
+
+COMMENT ON TABLE public.webhook_events IS 'Phase 308 (D-05, D-07, D-58). One row per thing that happened, written by the emit triggers (or by the test route for webhook.test). payload is the frozen thin JSON, set once at fan-out — the only payload column in the schema. Deny-all to every client role (RLS on, no policy).';
+
+
+--
+-- Name: COLUMN webhook_events.owner_id; Type: COMMENT; Schema: public; Owner: -
+--
+
+COMMENT ON COLUMN public.webhook_events.owner_id IS 'The run owner for run events (endpoints are the owner''s, D-03). NULL for document events: recipients are decided at fan-out.';
+
+
+--
 -- Name: workflow_definitions; Type: TABLE; Schema: public; Owner: -
 --
 
@@ -4728,7 +5255,7 @@ CREATE TABLE public.workflow_runs (
     origin_kind text,
     origin_label text,
     origin_ref uuid,
-    CONSTRAINT workflow_runs_origin_kind_check CHECK (((origin_kind IS NULL) OR (origin_kind = ANY (ARRAY['app'::text, 'schedule'::text, 'key'::text])))),
+    CONSTRAINT workflow_runs_origin_kind_check CHECK (((origin_kind IS NULL) OR (origin_kind = ANY (ARRAY['app'::text, 'schedule'::text, 'key'::text, 'mcp'::text])))),
     CONSTRAINT workflow_runs_status_check CHECK ((status = ANY (ARRAY['active'::text, 'paused'::text, 'cap_paused'::text, 'completed'::text, 'failed'::text, 'cancelled'::text])))
 );
 
@@ -5271,6 +5798,14 @@ ALTER TABLE ONLY public.legal_holds
 
 
 --
+-- Name: mcp_usage mcp_usage_pkey; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.mcp_usage
+    ADD CONSTRAINT mcp_usage_pkey PRIMARY KEY (id);
+
+
+--
 -- Name: message_artifacts message_artifacts_pkey; Type: CONSTRAINT; Schema: public; Owner: -
 --
 
@@ -5364,6 +5899,38 @@ ALTER TABLE ONLY public.notification_deliveries
 
 ALTER TABLE ONLY public.notifications
     ADD CONSTRAINT notifications_pkey PRIMARY KEY (id);
+
+
+--
+-- Name: oauth_clients oauth_clients_client_id_key; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.oauth_clients
+    ADD CONSTRAINT oauth_clients_client_id_key UNIQUE (client_id);
+
+
+--
+-- Name: oauth_clients oauth_clients_pkey; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.oauth_clients
+    ADD CONSTRAINT oauth_clients_pkey PRIMARY KEY (id);
+
+
+--
+-- Name: oauth_tokens oauth_tokens_pkey; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.oauth_tokens
+    ADD CONSTRAINT oauth_tokens_pkey PRIMARY KEY (id);
+
+
+--
+-- Name: oauth_tokens oauth_tokens_token_hash_key; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.oauth_tokens
+    ADD CONSTRAINT oauth_tokens_token_hash_key UNIQUE (token_hash);
 
 
 --
@@ -5695,6 +6262,46 @@ ALTER TABLE ONLY public.user_settings
 
 
 --
+-- Name: webhook_deliveries webhook_deliveries_endpoint_event_uq; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.webhook_deliveries
+    ADD CONSTRAINT webhook_deliveries_endpoint_event_uq UNIQUE (endpoint_id, event_id);
+
+
+--
+-- Name: webhook_deliveries webhook_deliveries_pkey; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.webhook_deliveries
+    ADD CONSTRAINT webhook_deliveries_pkey PRIMARY KEY (id);
+
+
+--
+-- Name: webhook_delivery_attempts webhook_delivery_attempts_pkey; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.webhook_delivery_attempts
+    ADD CONSTRAINT webhook_delivery_attempts_pkey PRIMARY KEY (id);
+
+
+--
+-- Name: webhook_endpoints webhook_endpoints_pkey; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.webhook_endpoints
+    ADD CONSTRAINT webhook_endpoints_pkey PRIMARY KEY (id);
+
+
+--
+-- Name: webhook_events webhook_events_pkey; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.webhook_events
+    ADD CONSTRAINT webhook_events_pkey PRIMARY KEY (id);
+
+
+--
 -- Name: workflow_definitions workflow_definitions_pkey; Type: CONSTRAINT; Schema: public; Owner: -
 --
 
@@ -5767,6 +6374,13 @@ ALTER TABLE ONLY public.workspace_file_versions
 
 
 --
+-- Name: api_keys_oauth_org_idx; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX api_keys_oauth_org_idx ON public.api_keys USING btree (org_id) WHERE (oauth_client_id IS NOT NULL);
+
+
+--
 -- Name: api_keys_org_id_idx; Type: INDEX; Schema: public; Owner: -
 --
 
@@ -5777,7 +6391,7 @@ CREATE INDEX api_keys_org_id_idx ON public.api_keys USING btree (org_id);
 -- Name: api_keys_owner_label_active_uq; Type: INDEX; Schema: public; Owner: -
 --
 
-CREATE UNIQUE INDEX api_keys_owner_label_active_uq ON public.api_keys USING btree (org_id, user_id, lower(btrim(label))) WHERE (revoked_at IS NULL);
+CREATE UNIQUE INDEX api_keys_owner_label_active_uq ON public.api_keys USING btree (org_id, user_id, lower(btrim(label))) WHERE ((revoked_at IS NULL) AND (oauth_client_id IS NULL));
 
 
 --
@@ -6887,6 +7501,13 @@ CREATE INDEX legal_holds_active_org_idx ON public.legal_holds USING btree (org_i
 
 
 --
+-- Name: mcp_usage_org_started_idx; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX mcp_usage_org_started_idx ON public.mcp_usage USING btree (org_id, started_at);
+
+
+--
 -- Name: message_feedback_user_created_idx; Type: INDEX; Schema: public; Owner: -
 --
 
@@ -6905,6 +7526,20 @@ CREATE INDEX model_capabilities_overrides_removed_idx ON public.model_capabiliti
 --
 
 CREATE INDEX notification_deliveries_due_idx ON public.notification_deliveries USING btree (status, due_at) WHERE (status = ANY (ARRAY['pending'::text, 'retry'::text]));
+
+
+--
+-- Name: notifications_endpoint_idx; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX notifications_endpoint_idx ON public.notifications USING btree (endpoint_id) WHERE (endpoint_id IS NOT NULL);
+
+
+--
+-- Name: notifications_one_open_per_endpoint; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE UNIQUE INDEX notifications_one_open_per_endpoint ON public.notifications USING btree (endpoint_id) WHERE ((closed_at IS NULL) AND (kind = 'webhook_disabled'::text));
 
 
 --
@@ -6933,6 +7568,20 @@ CREATE INDEX notifications_recipient_created_idx ON public.notifications USING b
 --
 
 CREATE INDEX notifications_run_idx ON public.notifications USING btree (run_id);
+
+
+--
+-- Name: oauth_tokens_grant_idx; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX oauth_tokens_grant_idx ON public.oauth_tokens USING btree (grant_id);
+
+
+--
+-- Name: oauth_tokens_replaced_by_idx; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX oauth_tokens_replaced_by_idx ON public.oauth_tokens USING btree (replaced_by);
 
 
 --
@@ -7034,6 +7683,13 @@ CREATE INDEX threads_folder_id_idx ON public.threads USING btree (folder_id);
 
 
 --
+-- Name: threads_mcp_origin_ref_idx; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX threads_mcp_origin_ref_idx ON public.threads USING btree (origin_ref) WHERE (origin_kind = 'mcp'::text);
+
+
+--
 -- Name: uq_model_rates_identity; Type: INDEX; Schema: public; Owner: -
 --
 
@@ -7052,6 +7708,83 @@ COMMENT ON INDEX public.uq_model_rates_identity IS 'Phase 257.1. Makes ON CONFLI
 --
 
 CREATE INDEX user_memory_user_updated_idx ON public.user_memory USING btree (user_id, updated_at DESC);
+
+
+--
+-- Name: webhook_deliveries_due_idx; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX webhook_deliveries_due_idx ON public.webhook_deliveries USING btree (status, next_attempt_at) WHERE (status = ANY (ARRAY['pending'::text, 'retrying'::text]));
+
+
+--
+-- Name: webhook_deliveries_event_idx; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX webhook_deliveries_event_idx ON public.webhook_deliveries USING btree (event_id);
+
+
+--
+-- Name: webhook_deliveries_log_idx; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX webhook_deliveries_log_idx ON public.webhook_deliveries USING btree (endpoint_id, created_at DESC, id DESC);
+
+
+--
+-- Name: webhook_deliveries_sending_idx; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX webhook_deliveries_sending_idx ON public.webhook_deliveries USING btree (claimed_at) WHERE (status = 'sending'::text);
+
+
+--
+-- Name: webhook_delivery_attempts_delivery_idx; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX webhook_delivery_attempts_delivery_idx ON public.webhook_delivery_attempts USING btree (delivery_id);
+
+
+--
+-- Name: webhook_endpoints_org_enabled_idx; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX webhook_endpoints_org_enabled_idx ON public.webhook_endpoints USING btree (org_id) WHERE enabled;
+
+
+--
+-- Name: webhook_endpoints_owner_idx; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX webhook_endpoints_owner_idx ON public.webhook_endpoints USING btree (user_id, org_id);
+
+
+--
+-- Name: webhook_events_created_idx; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX webhook_events_created_idx ON public.webhook_events USING btree (created_at);
+
+
+--
+-- Name: webhook_events_endpoint_idx; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX webhook_events_endpoint_idx ON public.webhook_events USING btree (endpoint_id) WHERE (endpoint_id IS NOT NULL);
+
+
+--
+-- Name: webhook_events_run_finished_once; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE UNIQUE INDEX webhook_events_run_finished_once ON public.webhook_events USING btree (item_id) WHERE (type = 'run.finished'::text);
+
+
+--
+-- Name: webhook_events_unfanned_idx; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX webhook_events_unfanned_idx ON public.webhook_events USING btree (created_at) WHERE (fanned_out_at IS NULL);
 
 
 --
@@ -7234,6 +7967,20 @@ CREATE TRIGGER documents_refuse_truncate BEFORE TRUNCATE ON public.documents FOR
 --
 
 CREATE TRIGGER documents_sticky_hold_on_move BEFORE UPDATE OF folder_id ON public.documents FOR EACH ROW WHEN ((old.folder_id IS DISTINCT FROM new.folder_id)) EXECUTE FUNCTION public.documents_sticky_hold_on_move();
+
+
+--
+-- Name: documents documents_webhook_emit_insert; Type: TRIGGER; Schema: public; Owner: -
+--
+
+CREATE TRIGGER documents_webhook_emit_insert AFTER INSERT ON public.documents FOR EACH ROW WHEN ((new.status = 'completed'::text)) EXECUTE FUNCTION public.webhook_emit_document_event();
+
+
+--
+-- Name: documents documents_webhook_emit_update; Type: TRIGGER; Schema: public; Owner: -
+--
+
+CREATE TRIGGER documents_webhook_emit_update AFTER UPDATE OF status ON public.documents FOR EACH ROW WHEN (((old.status IS DISTINCT FROM new.status) AND (new.status = 'completed'::text))) EXECUTE FUNCTION public.webhook_emit_document_event();
 
 
 --
@@ -7559,6 +8306,20 @@ CREATE TRIGGER threads_autofill_org_id BEFORE INSERT ON public.threads FOR EACH 
 
 
 --
+-- Name: threads threads_origin_freeze_insert; Type: TRIGGER; Schema: public; Owner: -
+--
+
+CREATE TRIGGER threads_origin_freeze_insert BEFORE INSERT ON public.threads FOR EACH ROW EXECUTE FUNCTION public.threads_origin_immutable();
+
+
+--
+-- Name: threads threads_origin_freeze_update; Type: TRIGGER; Schema: public; Owner: -
+--
+
+CREATE TRIGGER threads_origin_freeze_update BEFORE UPDATE ON public.threads FOR EACH ROW EXECUTE FUNCTION public.threads_origin_immutable();
+
+
+--
 -- Name: todos todos_autofill_org_id; Type: TRIGGER; Schema: public; Owner: -
 --
 
@@ -7598,6 +8359,20 @@ CREATE TRIGGER user_memory_updated_at BEFORE UPDATE ON public.user_memory FOR EA
 --
 
 CREATE TRIGGER user_settings_autofill_org_id BEFORE INSERT ON public.user_settings FOR EACH ROW EXECUTE FUNCTION public.autofill_org_id_by_owner('user_id');
+
+
+--
+-- Name: webhook_deliveries webhook_deliveries_set_updated_at; Type: TRIGGER; Schema: public; Owner: -
+--
+
+CREATE TRIGGER webhook_deliveries_set_updated_at BEFORE UPDATE ON public.webhook_deliveries FOR EACH ROW EXECUTE FUNCTION public.set_updated_at();
+
+
+--
+-- Name: webhook_endpoints webhook_endpoints_set_updated_at; Type: TRIGGER; Schema: public; Owner: -
+--
+
+CREATE TRIGGER webhook_endpoints_set_updated_at BEFORE UPDATE ON public.webhook_endpoints FOR EACH ROW EXECUTE FUNCTION public.set_updated_at();
 
 
 --
@@ -7671,6 +8446,13 @@ CREATE TRIGGER workflow_runs_set_updated_at BEFORE UPDATE ON public.workflow_run
 
 
 --
+-- Name: workflow_runs workflow_runs_webhook_emit; Type: TRIGGER; Schema: public; Owner: -
+--
+
+CREATE TRIGGER workflow_runs_webhook_emit AFTER UPDATE OF status ON public.workflow_runs FOR EACH ROW WHEN (((old.status IS DISTINCT FROM new.status) AND (new.status = ANY (ARRAY['completed'::text, 'failed'::text, 'cancelled'::text, 'paused'::text, 'cap_paused'::text])))) EXECUTE FUNCTION public.webhook_emit_run_event();
+
+
+--
 -- Name: workflow_schedules workflow_schedules_autofill_org_id; Type: TRIGGER; Schema: public; Owner: -
 --
 
@@ -7696,6 +8478,14 @@ CREATE TRIGGER workspace_file_versions_autofill_org_id BEFORE INSERT ON public.w
 --
 
 CREATE TRIGGER workspace_files_autofill_org_id BEFORE INSERT ON public.workspace_files FOR EACH ROW EXECUTE FUNCTION public.autofill_org_id_by_owner('created_by');
+
+
+--
+-- Name: api_keys api_keys_oauth_client_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.api_keys
+    ADD CONSTRAINT api_keys_oauth_client_id_fkey FOREIGN KEY (oauth_client_id) REFERENCES public.oauth_clients(id) ON DELETE RESTRICT;
 
 
 --
@@ -8259,6 +9049,22 @@ ALTER TABLE ONLY public.legal_holds
 
 
 --
+-- Name: mcp_usage mcp_usage_api_key_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.mcp_usage
+    ADD CONSTRAINT mcp_usage_api_key_id_fkey FOREIGN KEY (api_key_id) REFERENCES public.api_keys(id) ON DELETE SET NULL;
+
+
+--
+-- Name: mcp_usage mcp_usage_user_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.mcp_usage
+    ADD CONSTRAINT mcp_usage_user_id_fkey FOREIGN KEY (user_id) REFERENCES auth.users(id) ON DELETE CASCADE;
+
+
+--
 -- Name: message_artifacts message_artifacts_parent_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
 --
 
@@ -8379,6 +9185,14 @@ ALTER TABLE ONLY public.notification_deliveries
 
 
 --
+-- Name: notifications notifications_endpoint_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.notifications
+    ADD CONSTRAINT notifications_endpoint_id_fkey FOREIGN KEY (endpoint_id) REFERENCES public.webhook_endpoints(id) ON DELETE CASCADE;
+
+
+--
 -- Name: notifications notifications_org_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
 --
 
@@ -8400,6 +9214,22 @@ ALTER TABLE ONLY public.notifications
 
 ALTER TABLE ONLY public.notifications
     ADD CONSTRAINT notifications_run_id_fkey FOREIGN KEY (run_id) REFERENCES public.workflow_runs(id) ON DELETE CASCADE;
+
+
+--
+-- Name: oauth_tokens oauth_tokens_grant_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.oauth_tokens
+    ADD CONSTRAINT oauth_tokens_grant_id_fkey FOREIGN KEY (grant_id) REFERENCES public.api_keys(id) ON DELETE CASCADE;
+
+
+--
+-- Name: oauth_tokens oauth_tokens_replaced_by_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.oauth_tokens
+    ADD CONSTRAINT oauth_tokens_replaced_by_fkey FOREIGN KEY (replaced_by) REFERENCES public.oauth_tokens(id) ON DELETE SET NULL;
 
 
 --
@@ -8840,6 +9670,62 @@ ALTER TABLE ONLY public.tuner_runs
 
 ALTER TABLE ONLY public.user_memory
     ADD CONSTRAINT user_memory_user_id_fkey FOREIGN KEY (user_id) REFERENCES auth.users(id) ON DELETE CASCADE;
+
+
+--
+-- Name: webhook_deliveries webhook_deliveries_endpoint_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.webhook_deliveries
+    ADD CONSTRAINT webhook_deliveries_endpoint_id_fkey FOREIGN KEY (endpoint_id) REFERENCES public.webhook_endpoints(id) ON DELETE CASCADE;
+
+
+--
+-- Name: webhook_deliveries webhook_deliveries_event_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.webhook_deliveries
+    ADD CONSTRAINT webhook_deliveries_event_id_fkey FOREIGN KEY (event_id) REFERENCES public.webhook_events(id) ON DELETE CASCADE;
+
+
+--
+-- Name: webhook_delivery_attempts webhook_delivery_attempts_delivery_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.webhook_delivery_attempts
+    ADD CONSTRAINT webhook_delivery_attempts_delivery_id_fkey FOREIGN KEY (delivery_id) REFERENCES public.webhook_deliveries(id) ON DELETE CASCADE;
+
+
+--
+-- Name: webhook_endpoints webhook_endpoints_org_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.webhook_endpoints
+    ADD CONSTRAINT webhook_endpoints_org_id_fkey FOREIGN KEY (org_id) REFERENCES public.organizations(id) ON DELETE CASCADE;
+
+
+--
+-- Name: webhook_endpoints webhook_endpoints_user_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.webhook_endpoints
+    ADD CONSTRAINT webhook_endpoints_user_id_fkey FOREIGN KEY (user_id) REFERENCES auth.users(id) ON DELETE CASCADE;
+
+
+--
+-- Name: webhook_events webhook_events_endpoint_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.webhook_events
+    ADD CONSTRAINT webhook_events_endpoint_id_fkey FOREIGN KEY (endpoint_id) REFERENCES public.webhook_endpoints(id) ON DELETE CASCADE;
+
+
+--
+-- Name: webhook_events webhook_events_org_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.webhook_events
+    ADD CONSTRAINT webhook_events_org_id_fkey FOREIGN KEY (org_id) REFERENCES public.organizations(id) ON DELETE CASCADE;
 
 
 --
@@ -9889,20 +10775,14 @@ ALTER TABLE public.expert_bundles ENABLE ROW LEVEL SECURITY;
 -- Name: expert_bundles expert_bundles_read_policy; Type: POLICY; Schema: public; Owner: -
 --
 
-CREATE POLICY expert_bundles_read_policy ON public.expert_bundles FOR SELECT TO authenticated, service_role USING (((auth.role() = 'service_role'::text) OR (is_system = true) OR ((org_id IN ( SELECT m.org_id
-   FROM public.org_members m
-  WHERE (m.user_id = auth.uid()))) AND ((visibility = ANY (ARRAY['org'::text, 'public'::text])) OR (created_by = auth.uid())))));
+CREATE POLICY expert_bundles_read_policy ON public.expert_bundles FOR SELECT TO authenticated, service_role USING (((auth.role() = 'service_role'::text) OR (is_system = true) OR ((org_id IN ( SELECT public.current_user_org_ids() AS current_user_org_ids)) AND ((visibility = ANY (ARRAY['org'::text, 'public'::text])) OR (created_by = auth.uid())))));
 
 
 --
 -- Name: expert_bundles expert_bundles_write_policy; Type: POLICY; Schema: public; Owner: -
 --
 
-CREATE POLICY expert_bundles_write_policy ON public.expert_bundles TO authenticated, service_role USING (((auth.role() = 'service_role'::text) OR ((is_system = false) AND (org_id IN ( SELECT m.org_id
-   FROM public.org_members m
-  WHERE (m.user_id = auth.uid())))))) WITH CHECK (((auth.role() = 'service_role'::text) OR ((is_system = false) AND (org_id IN ( SELECT m.org_id
-   FROM public.org_members m
-  WHERE (m.user_id = auth.uid()))))));
+CREATE POLICY expert_bundles_write_policy ON public.expert_bundles TO authenticated, service_role USING (((auth.role() = 'service_role'::text) OR ((is_system = false) AND (org_id IN ( SELECT public.current_user_org_ids() AS current_user_org_ids))))) WITH CHECK (((auth.role() = 'service_role'::text) OR ((is_system = false) AND (org_id IN ( SELECT public.current_user_org_ids() AS current_user_org_ids)))));
 
 
 --
@@ -9916,9 +10796,8 @@ ALTER TABLE public.expert_grants ENABLE ROW LEVEL SECURITY;
 --
 
 CREATE POLICY expert_grants_read_policy ON public.expert_grants FOR SELECT TO authenticated, service_role USING (((auth.role() = 'service_role'::text) OR (expert_id IN ( SELECT eb.id
-   FROM (public.expert_bundles eb
-     JOIN public.org_members m ON ((m.org_id = eb.org_id)))
-  WHERE (m.user_id = auth.uid())))));
+   FROM public.expert_bundles eb
+  WHERE (eb.org_id IN ( SELECT public.current_user_org_ids() AS current_user_org_ids))))));
 
 
 --
@@ -9926,12 +10805,10 @@ CREATE POLICY expert_grants_read_policy ON public.expert_grants FOR SELECT TO au
 --
 
 CREATE POLICY expert_grants_write_policy ON public.expert_grants TO authenticated, service_role USING (((auth.role() = 'service_role'::text) OR (expert_id IN ( SELECT eb.id
-   FROM (public.expert_bundles eb
-     JOIN public.org_members m ON ((m.org_id = eb.org_id)))
-  WHERE (m.user_id = auth.uid()))))) WITH CHECK (((auth.role() = 'service_role'::text) OR (expert_id IN ( SELECT eb.id
-   FROM (public.expert_bundles eb
-     JOIN public.org_members m ON ((m.org_id = eb.org_id)))
-  WHERE (m.user_id = auth.uid())))));
+   FROM public.expert_bundles eb
+  WHERE (eb.org_id IN ( SELECT public.current_user_org_ids() AS current_user_org_ids)))))) WITH CHECK (((auth.role() = 'service_role'::text) OR (expert_id IN ( SELECT eb.id
+   FROM public.expert_bundles eb
+  WHERE (eb.org_id IN ( SELECT public.current_user_org_ids() AS current_user_org_ids))))));
 
 
 --
@@ -10033,6 +10910,12 @@ CREATE POLICY legal_holds_update ON public.legal_holds FOR UPDATE TO authenticat
 
 
 --
+-- Name: mcp_usage; Type: ROW SECURITY; Schema: public; Owner: -
+--
+
+ALTER TABLE public.mcp_usage ENABLE ROW LEVEL SECURITY;
+
+--
 -- Name: message_artifacts; Type: ROW SECURITY; Schema: public; Owner: -
 --
 
@@ -10087,16 +10970,14 @@ ALTER TABLE public.model_rates ENABLE ROW LEVEL SECURITY;
 
 CREATE POLICY model_rates_insert_policy ON public.model_rates FOR INSERT TO authenticated, service_role WITH CHECK (((auth.role() = 'service_role'::text) OR ((org_id IS NOT NULL) AND (org_id IN ( SELECT m.org_id
    FROM public.org_members m
-  WHERE ((m.user_id = auth.uid()) AND (m.role = ANY (ARRAY['admin'::text, 'owner'::text]))))))));
+  WHERE ((m.user_id = auth.uid()) AND (m.role = ANY (ARRAY['admin'::text, 'owner'::text])) AND (m.org_id IN ( SELECT public.current_user_org_ids() AS current_user_org_ids))))))));
 
 
 --
 -- Name: model_rates model_rates_select_policy; Type: POLICY; Schema: public; Owner: -
 --
 
-CREATE POLICY model_rates_select_policy ON public.model_rates FOR SELECT TO authenticated, service_role USING (((org_id IS NULL) OR (org_id IN ( SELECT m.org_id
-   FROM public.org_members m
-  WHERE (m.user_id = auth.uid())))));
+CREATE POLICY model_rates_select_policy ON public.model_rates FOR SELECT TO authenticated, service_role USING (((org_id IS NULL) OR (org_id IN ( SELECT public.current_user_org_ids() AS current_user_org_ids))));
 
 
 --
@@ -10110,6 +10991,18 @@ ALTER TABLE public.notification_deliveries ENABLE ROW LEVEL SECURITY;
 --
 
 ALTER TABLE public.notifications ENABLE ROW LEVEL SECURITY;
+
+--
+-- Name: oauth_clients; Type: ROW SECURITY; Schema: public; Owner: -
+--
+
+ALTER TABLE public.oauth_clients ENABLE ROW LEVEL SECURITY;
+
+--
+-- Name: oauth_tokens; Type: ROW SECURITY; Schema: public; Owner: -
+--
+
+ALTER TABLE public.oauth_tokens ENABLE ROW LEVEL SECURITY;
 
 --
 -- Name: operator_audit_log; Type: ROW SECURITY; Schema: public; Owner: -
@@ -10549,6 +11442,30 @@ CREATE POLICY user_settings_owner_select ON public.user_settings FOR SELECT TO a
 
 CREATE POLICY user_settings_owner_update ON public.user_settings FOR UPDATE TO authenticated USING ((user_id = auth.uid())) WITH CHECK ((user_id = auth.uid()));
 
+
+--
+-- Name: webhook_deliveries; Type: ROW SECURITY; Schema: public; Owner: -
+--
+
+ALTER TABLE public.webhook_deliveries ENABLE ROW LEVEL SECURITY;
+
+--
+-- Name: webhook_delivery_attempts; Type: ROW SECURITY; Schema: public; Owner: -
+--
+
+ALTER TABLE public.webhook_delivery_attempts ENABLE ROW LEVEL SECURITY;
+
+--
+-- Name: webhook_endpoints; Type: ROW SECURITY; Schema: public; Owner: -
+--
+
+ALTER TABLE public.webhook_endpoints ENABLE ROW LEVEL SECURITY;
+
+--
+-- Name: webhook_events; Type: ROW SECURITY; Schema: public; Owner: -
+--
+
+ALTER TABLE public.webhook_events ENABLE ROW LEVEL SECURITY;
 
 --
 -- Name: workflow_definitions; Type: ROW SECURITY; Schema: public; Owner: -
@@ -11654,3 +12571,87 @@ REVOKE EXECUTE ON FUNCTION public.notify_on_run_status() FROM PUBLIC;
 REVOKE EXECUTE ON FUNCTION public.notify_on_run_status() FROM anon;
 REVOKE EXECUTE ON FUNCTION public.notify_on_run_status() FROM authenticated;
 GRANT EXECUTE ON FUNCTION public.notify_on_run_status() TO service_role;
+
+-- migration 220 — api_keys: the column grant re-issued with the four MCP-key columns (kind,
+-- folder_ids, tools, include_external); key_hash is still never granted (D-09). The 215 block
+-- above is kept as the history; this one runs after it, so the bootstrap ends on the superset.
+-- organizations.mcp_enabled needs no line: it is outside mig 194's column UPDATE grant (D-35).
+REVOKE ALL ON TABLE public.api_keys FROM PUBLIC;
+REVOKE ALL ON TABLE public.api_keys FROM anon;
+REVOKE ALL ON TABLE public.api_keys FROM authenticated;
+REVOKE ALL ON TABLE public.api_keys FROM service_role;
+GRANT SELECT (id, org_id, user_id, label, key_prefix, workflows, expires_at, revoked_at, revoked_by, last_used_at, created_at, kind, folder_ids, tools, include_external) ON TABLE public.api_keys TO authenticated;
+GRANT SELECT, INSERT, UPDATE, DELETE ON TABLE public.api_keys TO service_role;
+
+-- migration 221 — organizations: no destructive privilege for a client role (D-42, BUG-261030-03).
+-- PUBLIC first (the CLAUDE.md trap). The re-declared current_user_org_ids() /
+-- current_user_has_permission() ACL lines are mig 181's, already mirrored above, verbatim.
+REVOKE DELETE, TRUNCATE, TRIGGER, REFERENCES ON TABLE public.organizations FROM PUBLIC;
+REVOKE DELETE, TRUNCATE, TRIGGER, REFERENCES ON TABLE public.organizations FROM anon;
+REVOKE DELETE, TRUNCATE, TRIGGER, REFERENCES ON TABLE public.organizations FROM authenticated;
+
+-- migration 222 — mcp_usage: deny-all to every client role (RLS on, no policy; D-55). Copied from
+-- the 218 notification_deliveries lines, not retyped. Only the backend's service-role pool writes it.
+-- organizations.pii_redaction_enabled needs no line: it is outside mig 194's column UPDATE grant
+-- (D-56, the 220 mcp_enabled precedent above).
+REVOKE ALL ON TABLE public.mcp_usage FROM PUBLIC;
+REVOKE ALL ON TABLE public.mcp_usage FROM anon;
+REVOKE ALL ON TABLE public.mcp_usage FROM authenticated;
+REVOKE ALL ON TABLE public.mcp_usage FROM service_role;
+GRANT ALL ON TABLE public.mcp_usage TO service_role;
+
+-- migration 223 — threads' origin freeze trigger function (Group A shape: trigger-only), the 215
+-- workflow_runs block above copied with threads names. PUBLIC first (the CLAUDE.md trap). The three
+-- threads.origin_* columns need no line: threads carries no column-level grant.
+REVOKE EXECUTE ON FUNCTION public.threads_origin_immutable() FROM PUBLIC;
+REVOKE EXECUTE ON FUNCTION public.threads_origin_immutable() FROM anon;
+REVOKE EXECUTE ON FUNCTION public.threads_origin_immutable() FROM authenticated;
+GRANT EXECUTE ON FUNCTION public.threads_origin_immutable() TO service_role;
+
+-- migration 224 — oauth_clients and oauth_tokens: deny-all to every client role (RLS on, no
+-- policy; D-33). Copied from the 222 mcp_usage lines above, not retyped. Only the backend's
+-- service-role pool writes them. api_keys.oauth_client_id needs no line: it is deliberately
+-- OUTSIDE the authenticated column grant (the 220 block above stays the superset, unchanged).
+REVOKE ALL ON TABLE public.oauth_clients FROM PUBLIC;
+REVOKE ALL ON TABLE public.oauth_clients FROM anon;
+REVOKE ALL ON TABLE public.oauth_clients FROM authenticated;
+REVOKE ALL ON TABLE public.oauth_clients FROM service_role;
+GRANT ALL ON TABLE public.oauth_clients TO service_role;
+REVOKE ALL ON TABLE public.oauth_tokens FROM PUBLIC;
+REVOKE ALL ON TABLE public.oauth_tokens FROM anon;
+REVOKE ALL ON TABLE public.oauth_tokens FROM authenticated;
+REVOKE ALL ON TABLE public.oauth_tokens FROM service_role;
+GRANT ALL ON TABLE public.oauth_tokens TO service_role;
+
+-- migration 225 — the four webhook tables: deny-all to every client role (RLS on, no policy; D-32),
+-- copied from the 224 lines above, not retyped; and the two emit trigger functions (Group A shape:
+-- trigger-only), PUBLIC first (the CLAUDE.md trap). Only the backend's service-role pool reads or
+-- writes the tables. notifications.endpoint_id needs no line: notifications keeps its 218 grant.
+REVOKE ALL ON TABLE public.webhook_endpoints FROM PUBLIC;
+REVOKE ALL ON TABLE public.webhook_endpoints FROM anon;
+REVOKE ALL ON TABLE public.webhook_endpoints FROM authenticated;
+REVOKE ALL ON TABLE public.webhook_endpoints FROM service_role;
+GRANT ALL ON TABLE public.webhook_endpoints TO service_role;
+REVOKE ALL ON TABLE public.webhook_events FROM PUBLIC;
+REVOKE ALL ON TABLE public.webhook_events FROM anon;
+REVOKE ALL ON TABLE public.webhook_events FROM authenticated;
+REVOKE ALL ON TABLE public.webhook_events FROM service_role;
+GRANT ALL ON TABLE public.webhook_events TO service_role;
+REVOKE ALL ON TABLE public.webhook_deliveries FROM PUBLIC;
+REVOKE ALL ON TABLE public.webhook_deliveries FROM anon;
+REVOKE ALL ON TABLE public.webhook_deliveries FROM authenticated;
+REVOKE ALL ON TABLE public.webhook_deliveries FROM service_role;
+GRANT ALL ON TABLE public.webhook_deliveries TO service_role;
+REVOKE ALL ON TABLE public.webhook_delivery_attempts FROM PUBLIC;
+REVOKE ALL ON TABLE public.webhook_delivery_attempts FROM anon;
+REVOKE ALL ON TABLE public.webhook_delivery_attempts FROM authenticated;
+REVOKE ALL ON TABLE public.webhook_delivery_attempts FROM service_role;
+GRANT ALL ON TABLE public.webhook_delivery_attempts TO service_role;
+REVOKE EXECUTE ON FUNCTION public.webhook_emit_run_event() FROM PUBLIC;
+REVOKE EXECUTE ON FUNCTION public.webhook_emit_run_event() FROM anon;
+REVOKE EXECUTE ON FUNCTION public.webhook_emit_run_event() FROM authenticated;
+GRANT EXECUTE ON FUNCTION public.webhook_emit_run_event() TO service_role;
+REVOKE EXECUTE ON FUNCTION public.webhook_emit_document_event() FROM PUBLIC;
+REVOKE EXECUTE ON FUNCTION public.webhook_emit_document_event() FROM anon;
+REVOKE EXECUTE ON FUNCTION public.webhook_emit_document_event() FROM authenticated;
+GRANT EXECUTE ON FUNCTION public.webhook_emit_document_event() TO service_role;

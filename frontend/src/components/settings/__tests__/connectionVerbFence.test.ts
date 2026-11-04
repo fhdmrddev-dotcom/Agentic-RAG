@@ -591,9 +591,17 @@ describe("211-05 · SC#3 — no verb CATEGORY is offered anywhere (CONN-04 / CON
     // ⚠ REVIEWED 2026-10-25 (Phase 293-04): the API key draft card's Expires control is a
     // radiogroup of DURATIONS (30 / 90 / 365 days / Never, 293-UI-SPEC §Interaction), not a verb
     // category. Exempted by path on the same terms.
+    // ⚠ REVIEWED 2026-10-31 (Phase 304-05): the MCP key draft's radiogroups are a KEY KIND
+    // (AI tool / workflow, ApiKeyKindChoice), a FOLDER SCOPE (All / Only these, KeyFoldersField)
+    // and, in McpKeyFields, a TOOL-GRANT preset plus the 30 / 90 / 365 expiry (304-UI-SPEC §1b/§1c).
+    // They choose what a personal key may reach, not a connection's verb category (CONN-04/05).
+    // Exempted by path on the same terms.
     const REVIEWED_RADIOGROUPS = [
       "/src/components/settings/RerankEngineBlock.tsx",
       "/src/components/settings/apiKeys/ApiKeyDraftCard.tsx",
+      "/src/components/settings/apiKeys/ApiKeyKindChoice.tsx",
+      "/src/components/settings/apiKeys/KeyFoldersField.tsx",
+      "/src/components/settings/apiKeys/McpKeyFields.tsx",
       "/src/components/workflows/TeamPicture.tsx",
     ]
     expect(carriers.map(([path]) => path).sort()).toEqual([...REVIEWED_RADIOGROUPS].sort())

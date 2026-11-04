@@ -23,9 +23,12 @@ export const WAITING_COPY = {
   unnamedOrg: "Unnamed org",
 } as const
 
-/** The control's accessible name and tooltip (D-02). Always contains the visible label. */
-export function countSentence(total: number | null): string {
+/** The control's accessible name and tooltip (D-02). Always contains the visible label.
+ *  308-06 (A-21): when any listed row is not a run (a webhook Syrel turned off), "workflow runs are
+ *  waiting" would be false, so it says "things"; the one-argument call keeps the 301 run words. */
+export function countSentence(total: number | null, opts: { anyNonRun?: boolean } = {}): string {
   if (total === null || !Number.isFinite(total) || total <= 0) return WAITING_COPY.label
+  if (opts.anyNonRun) return total === 1 ? "1 thing is waiting on you" : `${total} things are waiting on you`
   if (total === 1) return "1 workflow run is waiting on you"
   return `${total} workflow runs are waiting on you`
 }
@@ -39,13 +42,22 @@ export function pillText(total: number): string {
 export function kindWords(kind: string): string {
   if (kind === "question") return "needs your answer"
   if (kind === "approval") return "needs your approval"
+  if (kind === "webhook_disabled") return "webhook turned off" // 308-06 (D-19)
   return "needs you"
+}
+
+/** 308-06 (D-19): why Syrel turned a webhook endpoint off. Null for anything it does not know. */
+export function reasonWords(reason: string | null | undefined): string | null {
+  if (reason === "failing") return "kept failing"
+  if (reason === "gone") return "the receiver said it is gone"
+  return null
 }
 
 /** How the run started, only when that is worth saying (D-28). */
 export function originWords(origin: string | null | undefined): string | null {
   if (origin === "schedule") return "scheduled"
   if (origin === "key") return "started by an API key"
+  if (origin === "mcp") return "started by an AI tool" // 306-04 (§Surface 8)
   return null
 }
 
@@ -66,6 +78,21 @@ export function waitedPhrase(createdAtIso: string, nowMs: number): string {
   if (elapsed < DAY_MS) return `waiting ${Math.floor(elapsed / HOUR_MS)} hr`
   const days = Math.floor(elapsed / DAY_MS)
   return days === 1 ? "waiting 1 day" : `waiting ${days} days`
+}
+
+/**
+ * 308-06 (D-19): when a webhook endpoint was turned off — "waiting {N} hr" would be false for an
+ * endpoint. The `waitedPhrase` arithmetic: a future or unparseable time reads "under a minute".
+ */
+export function offPhrase(createdAtIso: string, nowMs: number): string {
+  const created = Date.parse(createdAtIso)
+  const raw = nowMs - created
+  const elapsed = Number.isNaN(raw) ? 0 : Math.max(0, raw)
+  if (elapsed < MINUTE_MS) return "turned off under a minute ago"
+  if (elapsed < HOUR_MS) return `turned off ${Math.floor(elapsed / MINUTE_MS)} min ago`
+  if (elapsed < DAY_MS) return `turned off ${Math.floor(elapsed / HOUR_MS)} hr ago`
+  const days = Math.floor(elapsed / DAY_MS)
+  return days === 1 ? "turned off 1 day ago" : `turned off ${days} days ago`
 }
 
 /** The plain line after the last row when the server holds more than it returned (D-10). */

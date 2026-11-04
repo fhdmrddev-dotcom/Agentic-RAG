@@ -29,6 +29,7 @@ from app.db.ingestion_jobs import (
     claim_due_ingestion_jobs,
     pause_jobs_for_provider,
     reclaim_stale_ingestion_claims,
+    reconcile_finished_job_documents,
     record_job_failure,
     record_job_success,
     resume_paused_jobs,
@@ -174,6 +175,12 @@ class IngestionQueueService:
                 await self.run_stale_sweep()
             except Exception:
                 logger.exception("Ingestion stale-claim sweep failed (loop continues)")
+            # BUG-261031-02 — the sweep above reads jobs only; this closes documents whose job
+            # finished while the document itself still reads 'processing'.
+            try:
+                await reconcile_finished_job_documents(self.pool)
+            except Exception:
+                logger.exception("Finished-job document reconcile failed (loop continues)")
 
         # 2. Outage probe when breaker is tripped
         if self.circuit_breaker.tripped:

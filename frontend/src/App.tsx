@@ -6,6 +6,8 @@ import "./index.css"
 import { useAuth } from "./hooks/useAuth"
 import { AuthPage } from "./pages/AuthPage"
 import { AcceptInvitePage } from "./pages/AcceptInvitePage"
+import { ConsentPage } from "./components/connect/ConsentPage"
+import { parseAppLocation } from "./lib/appRoutes"
 import { ChatLayout } from "./components/layout/ChatLayout"
 // Phase 297-01 (REG-09 / D-01): the view/tab state, the studio + Library navigators and the
 // boot initializer moved into this hook verbatim, with their own imports.
@@ -261,6 +263,10 @@ function App() {
     return <AuthPage onSignIn={signIn} onSignUp={signUp} />
   }
 
+  // Phase 307-03 (OAUTH-04 / D-11): an AI tool's sign-in request renders outside the app shell.
+  const connect = parseAppLocation(window.location.pathname, window.location.search)
+  if (connect.view === "connect") return <ConsentPage user={user} requestId={connect.requestId} onSignOut={signOut} />
+
   return (
     <OrgProvider userId={user?.id ?? null}>
       <StreamsProvider>
@@ -313,7 +319,7 @@ function App() {
               No key and a value with ONE identity (the hook holds it for its lifetime), so this
               wrapper never remounts anything — StreamsProvider and the chat tree are above it. */}
           <LeaveGuardContext.Provider value={nav.leaveGuards}>
-          <CitationNavProvider navigate={nav.onNavigate}>
+          <CitationNavProvider navigate={nav.onNavigate} entityLink={nav.entityLink}>
             <ChatLayout
               onSignOut={signOut}
               activeView={nav.activeView}

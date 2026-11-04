@@ -308,7 +308,12 @@ describe("appRoutes · entity addresses parse, lowercased (299-02 / D-01)", () =
     "/app/experts/not-a-uuid",
     `/app/experts/${BUNDLE}/extra`,
     `/app/experts/${BUNDLE}.json`,
-    "/app/library/" + THREAD,
+    // ⚠ RETIRED DELIBERATELY by Phase 305-02 (D-52): `"/app/library/" + THREAD` was pinned here as
+    // not-found because the Library had no id address in 299. 305 gives it one — the MCP "Open in
+    // Syrel" document address — so a strict UUID there now parses (pinned in the 305-02 block at
+    // the end of this file); a malformed or partial id there is still not-found.
+    "/app/library/not-a-uuid",
+    `/app/library/${THREAD}/extra`,
     "/app/settings/" + THREAD,
   ])("%s is not-found and never canonicalised", (path) => {
     expect(() => parseAppLocation(path, "")).not.toThrow()
@@ -377,5 +382,74 @@ describe("appRoutes · entity addresses normalise by the same rules (299-02 / D-
       expect(out.startsWith("/app")).toBe(true)
       expect(out).not.toContain("://")
     }
+  })
+})
+
+// ── Phase 305-02 (D-17 / D-52; UI-SPEC Surface 4) — the document address `/app/library/<uuid>`.
+describe("appRoutes · the document address (305-02 / D-52)", () => {
+  const DOC = "5b0c1d2e-3f40-4a51-8b62-7c83d94ea5f6"
+
+  it("parses /app/library/<uuid> to the documents view with the id, lowercased", () => {
+    expect(parseAppLocation(`/app/library/${DOC}`, "")).toEqual({ view: "documents", documentId: DOC })
+    expect(parseAppLocation(`/app/library/${DOC.toUpperCase()}`, "")).toEqual({ view: "documents", documentId: DOC })
+  })
+
+  it("a malformed or partial id is not-found, and nothing throws", () => {
+    for (const p of ["/app/library/not-a-uuid", `/app/library/${DOC.slice(0, 30)}`, `/app/library/${DOC}x`,
+                     `/app/library/${DOC}/extra`, "/app/library/a.b"]) {
+      expect(parseAppLocation(p, "")).toEqual({ view: "not-found" })
+    }
+  })
+
+  it("the id-less Library stays id-free", () => {
+    expect(parseAppLocation("/app/library", "")).toEqual({ view: "documents" })
+    expect(formatAppRoute({ view: "documents" })).toBe("/app/library")
+  })
+
+  it("formats and round-trips, and an uppercase address is normalised", () => {
+    expect(formatAppRoute({ view: "documents", documentId: DOC.toUpperCase() })).toBe(`/app/library/${DOC}`)
+    expect(parseAppLocation(formatAppRoute({ view: "documents", documentId: DOC }), "")).toEqual({
+      view: "documents",
+      documentId: DOC,
+    })
+    expect(canonicalAddress(`/app/library/${DOC}`, "")).toBeNull()
+    expect(canonicalAddress(`/app/library/${DOC.toUpperCase()}`, "")).toBe(`/app/library/${DOC}`)
+    expect(canonicalAddress(`/library/${DOC}`, "")).toBe(`/app/library/${DOC}`)
+  })
+})
+
+// Phase 307-03 (D-11, UI-SPEC A-8): the consent route. NOT an ActiveView (P-4): App renders it
+// itself, outside the app shell, so the twelve-member table and the reachability leg are unchanged.
+describe("appRoutes · the consent address /app/connect/<uuid> (307-03)", () => {
+  const REQ = "0b7f3a1e-2c4d-4e5f-8a9b-1c2d3e4f5a6b"
+
+  it("parses a strict UUID, lowercased", () => {
+    expect(parseAppLocation(`/app/connect/${REQ.toUpperCase()}`, "")).toEqual({ view: "connect", requestId: REQ })
+    expect(parseAppLocation(`/app/connect/${REQ}`, "")).toEqual({ view: "connect", requestId: REQ })
+  })
+
+  it.each([
+    "/app/connect/not-a-uuid",
+    "/app/connect",
+    `/app/connect/${REQ}/extra`,
+    `/connect/${REQ}`,
+    `/app/connect/${REQ.slice(0, -1)}`,
+    `/app/connect/%2F%2Fevil.com`,
+  ])("%s is not-found", (p) => {
+    expect(parseAppLocation(p, "")).toEqual({ view: "not-found" })
+  })
+
+  it("formats and round-trips, and the canonical address is the lowercase one", () => {
+    expect(formatAppRoute({ view: "connect", requestId: REQ.toUpperCase() })).toBe(`/app/connect/${REQ}`)
+    expect(parseAppLocation(formatAppRoute({ view: "connect", requestId: REQ }), "")).toEqual({
+      view: "connect",
+      requestId: REQ,
+    })
+    expect(canonicalAddress(`/app/connect/${REQ}`, "")).toBeNull()
+  })
+
+  it("is not an ActiveView: the view table still names exactly twelve members", () => {
+    expect(Object.keys(VIEW_PATHS)).not.toContain("connect")
+    expect(Object.keys(VIEW_PATHS).length).toBe(12)
   })
 })

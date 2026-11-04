@@ -28,6 +28,7 @@ from types import SimpleNamespace
 import pytest
 
 import app.services.search_documents_tool as sdt
+import app.services.search_vocabulary as search_vocabulary
 from app.services.openai_service import SEARCH_DOCUMENTS_TOOL, get_tools
 
 SERVICES = pathlib.Path(sdt.__file__).parent
@@ -132,8 +133,10 @@ async def test_load_search_vocabulary_reads_defs_and_types(monkeypatch):
         seen["types"] = (user_id, limit)
         return [("report", 12)]
 
-    monkeypatch.setattr(sdt, "list_field_definitions", _defs)
-    monkeypatch.setattr(sdt, "top_document_types", _types)
+    # 306-01 (D-39): load_search_vocabulary moved to search_vocabulary.py, so its collaborators are
+    # looked up THERE (patch where the name is read; the assertions below are unchanged).
+    monkeypatch.setattr(search_vocabulary, "list_field_definitions", _defs)
+    monkeypatch.setattr(search_vocabulary, "top_document_types", _types)
     sb = object()
     vocab = await sdt.load_search_vocabulary("user-1", sb)
     assert vocab.fields == (ENUM,) and vocab.document_types == (("report", 12),)
@@ -144,7 +147,7 @@ async def test_a_vocabulary_failure_never_breaks_chat(monkeypatch):
     async def _boom(*a, **k):
         raise RuntimeError("db down")
 
-    monkeypatch.setattr(sdt, "list_field_definitions", _boom)
+    monkeypatch.setattr(search_vocabulary, "list_field_definitions", _boom)  # 306-01 (D-39)
     assert await sdt.load_search_vocabulary("user-1", object()) is None
 
 

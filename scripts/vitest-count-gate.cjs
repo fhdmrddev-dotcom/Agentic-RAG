@@ -1820,7 +1820,7 @@ const BASELINE = {
   "SettingsPage.sourceCeiling.test.tsx": 9,
   "SettingsPage.changedFields.test.tsx": 17,
   // Phase 283-01 (D-14) — the Settings tab registry suite. Registered in BOTH knobs in one commit.
-  "settingsTabs.test.ts": 11,
+  "settingsTabs.test.ts": 15, // RAISED 11 -> 15 at 308-05 (2026-11-04), the gate's own measured count (it had grown unpinned since 283-01; 308-05 extended cases for the "8" Webhooks row, adding none)
   // Phase 283-02 (FIX-01 / D-12) — a member's and an operator's Settings page as rendered content
   // (tab strips, landing tab, moved blocks, Reset, zero gated calls + the operator positive
   // control). Registered in BOTH knobs in one commit.
@@ -3190,7 +3190,7 @@ const BASELINE = {
   //     pre-211-04 gate planted back into `McpToolPicker.tsx` — 4 of 10 failing, with case 3
   //     (MCP + empty) correctly still passing, which is what makes the RED discriminating
   //     rather than blanket. Restored md5-identical.
-  "connectionVerbFence.test.ts": 21,
+  "connectionVerbFence.test.ts": 22, // RAISED 21 -> 22 at 304-05 (aef95a6df): the dated REVIEWED exemption for the three MCP draft radiogroups
   "connectionCardReachability.test.tsx": 10,
   // ── Added in 212-05 (GATE-1) — Phase 212 catalog and barrel tests ────────────
   "servicesCatalog.test.ts": 3,
@@ -3664,7 +3664,7 @@ const BASELINE = {
   "LibraryPage.test.tsx": 12,
   "librarySelection.test.ts": 25,
   "useDocuments.test.ts": 14, // RAISED 7 → 14 at 284-REVIEW WR-01 (a membership-changing Realtime UPDATE refetches; a cosmetic one merges)
-  "useLibraryDocuments.test.ts": 30, // 284-01 Task 2 — the D-24 Library data hook. BOTH KNOBS, SAME COMMIT. · RAISED 13 → 24 at 284-03 (the server body: page + summary + read by id, the Realtime hint) · RAISED 24 → 25 at 284-REVIEW WR-01 (the on-page rows reach useDocuments) · RAISED 25 → 28 at 298-04 (2026-10-28): an org switch is cold + drops the late answer, the summary is null until the new org answers, a failed first summary there reads error · RAISED 28 → 30 at 298-05: a move re-asks the page (silently, row kept until the answer) and the summary (last numbers kept)
+  "useLibraryDocuments.test.ts": 33, // RAISED 30 -> 33 at 305-02 (2026-10-31): a by-id 404 sets selectedDocRefused (no error; a new selection clears it), a 5xx leaves it false, retrySelectedDoc clears it · 284-01 Task 2 — the D-24 Library data hook. BOTH KNOBS, SAME COMMIT. · RAISED 13 → 24 at 284-03 (the server body: page + summary + read by id, the Realtime hint) · RAISED 24 → 25 at 284-REVIEW WR-01 (the on-page rows reach useDocuments) · RAISED 25 → 28 at 298-04 (2026-10-28): an org switch is cold + drops the late answer, the summary is null until the new org answers, a failed first summary there reads error · RAISED 28 → 30 at 298-05: a move re-asks the page (silently, row kept until the answer) and the summary (last numbers kept)
   "DocumentList.test.tsx": 7,
   "DocumentList.moveToFolder.test.tsx": 4,
   "ViewsGroup.test.tsx": 10,
@@ -3729,7 +3729,7 @@ const BASELINE = {
   //   own plant — and the Expert PATCH, create-with-Expert and handoff keep the server's sentence.
   "entitlementRefusal.test.ts": 13, // v4.3 audit (TIER-03)
   "noFrontendTokenPricing.fence.test.ts": 3, // v4.3 audit (257 SC#3)
-  "spendSummaryMapper.test.ts": 2, // 268-REVIEW WR-05 (D-268-28): partly_priced_harness_runs on the wire
+  "spendSummaryMapper.test.ts": 4, // RAISED 2 -> 4 at 305-03 (2026-10-31): getSpendRuns maps an MCP row's source / key / tool; run and older rows read as run · 268-REVIEW WR-05 (D-268-28): partly_priced_harness_runs on the wire
   "connectionFormCopy.mcp.test.ts": 6,
   "McpAuthDoor.test.tsx": 9,
   "McpAuthDoor.byo.test.tsx": 3,
@@ -4204,9 +4204,9 @@ const BASELINE = {
   // times), so each suite is a FILE-LEVEL TARGETS entry at the bottom of this file too.
   // Figures are the suites' own measured counts on the adoption run.
   "ExpertFilterPills.test.tsx": 7,
-  "ExpertSpendCard.test.tsx": 19,
+  "ExpertSpendCard.test.tsx": 23, // RAISED 19 -> 23 at 305-03 (2026-10-31): the MCP arm of LedgerExpertCell (MCP · label + tool title, removed key, label as text, run rows keep the shipped arms)
   "AttributionDisclosures.test.tsx": 2,
-  "expertSpendCopy.test.ts": 10, // +1 268-REVIEW WR-05 (D-268-28 partly-priced words)
+  "expertSpendCopy.test.ts": 11, // RAISED 10 -> 11 at 305-03 (2026-10-31): the MCP ledger words, Expert or key, the extended rule line · +1 268-REVIEW WR-05 (D-268-28 partly-priced words)
   // Added in 257 CR-06 follow-up. Exhaustive arithmetic: three independently-rounded
   // gauge segments summed to 101 on 34 of the combinations swept, and gemini found it
   // reviewing the CR-06 fix. Driven RED against the pre-fix arithmetic, 40 offenders named.
@@ -4340,7 +4340,7 @@ const BASELINE = {
   "RetentionHistory.test.tsx": 21, // RE-PINNED 18 → 21 at 275 G-4 re-look (OBS-R2a drop reasons) · RE-PINNED 17 → 18 at 275-REVIEW frontend fix pass · RE-PINNED 16 → 17 at 275-05 (delete_refused sentence, G-4 FAIL-1) · 275-04 — S5 receipt sentences, ✎ only on writes, no links (D-12/D-13), Show older pages by 50
   // 275-04 — adopted by FILE path in TARGETS (no `src/components/org` entry): the retired
   // locked-Retention fence is REPLACED by unlocked-tab + band-pulse cases (D-01, SEED-177), 9 → 11.
-  "OrgAdminShell.test.tsx": 14, // RE-PINNED 12 → 14 at 293-04 (API keys tab last + pulse/audit door) · RE-PINNED 11 → 12 at 275-REVIEW frontend fix pass
+  "OrgAdminShell.test.tsx": 17, // RAISED 14 -> 17 at 304-06: a real org MCP switch flip pulses the band, a failed flip does not, an org switch remounts the Settings tab · RE-PINNED 12 → 14 at 293-04 (API keys tab last + pulse/audit door) · RE-PINNED 11 → 12 at 275-REVIEW frontend fix pass
   // Phase 282-02 — the one ask-draft home (FIX-07 / D-12): one draft per ask, GC on the ask slice, panel-home refcount, the global reset
   "askDraftStore.test.ts": 7,
   // Phase 282-02 — the D-15 fences: one input per pause across both homes, the pointer, the rail handoff, BUG-260828-07 reachability
@@ -4348,7 +4348,7 @@ const BASELINE = {
   // ── Phase 284 (FIX-11) — every suite 284-03 / 284-05 CREATED, plus TakeoffSection, which was in
   // NEITHER knob (284-04 rewrote it to one bounded spreadsheet page). Each read from a real
   // `npx vitest run <file>` on the merged tree (284-05 Task 2). BOTH KNOBS, SAME COMMIT. ──
-  "LibraryPage.states284.test.tsx": 15, // 284-03 — cold / warm / failed / empty are four states (SEED-248 Library half)
+  "LibraryPage.states284.test.tsx": 18, // RAISED 15 -> 18 at 305-02 (2026-10-31): a 404 shows DocumentCantBeOpened in the S8 slot (Dismiss clears it, no re-ask), a 5xx keeps the alert only, the document address arrival opens by id and Dismiss leaves it · 284-03 — cold / warm / failed / empty are four states (SEED-248 Library half)
   "DocumentChunksSection.paging284.test.tsx": 8, // 284-03 — chunks page by scroll sentinel, N of M
   "DocumentRow.versions284.test.tsx": 3, // 284-03 — versions say N of M
   "libraryListFence.test.ts": 3, // 284-05 — D-16: no product code asks for the whole library (planted-source self-test)
@@ -4415,25 +4415,25 @@ const BASELINE = {
   // ── Phase 293-04 (START-02) — adopted, both knobs, same commit. FILE-LEVEL in TARGETS for the
   // `src/components/settings/apiKeys` suites (no `src/components/settings` directory entry);
   // `launchFieldsTwin293.test.ts` sits under the `src/components/workflows` directory entry, pin only.
-  "apiKeyFacts.test.ts": 32, // 293-04 — wire → card facts: refused chips never read active, every reason code worded, raw code for an unknown one
+  "apiKeyFacts.test.ts": 50, // RAISED 43 -> 50 at 306-02 (2026-10-31): the four admission refusal words, the copy leaf, the backend reasons read from outside_admission.py, an unknown admission reason stays raw · RAISED 32 -> 43 at 304-05: MCP chips from the catalogue, the off tag order, workflow facts unchanged with a catalogue, the three 304 refusal words · 293-04 — wire → card facts: refused chips never read active, every reason code worded, raw code for an unknown one
   "curlExamples.test.ts": 8, // 293-04 — the show-once curl: real base, bearer secret, declared fields in order, JSON + shell escaping
-  "ApiKeyLimits.test.tsx": 10, // 293-03 — the operator's per-key limits: load lock + Retry, changed fields only, clamps 1..60 / 10..600, adopt, SettingsPage wiring
+  "ApiKeyLimits.test.tsx": 24, // RAISED 14 -> 24 at 306-02 (2026-10-31): the outside group (words + a11y, 5..45 / 1..50 bounds, load lock, failed read, older backend, changed only, cleared, clamp, adopt, shipped rows snapshot) · RAISED 10 -> 14 at 305-03 (2026-10-31): the searches field (words, 1..120 clamp, adopt, an older backend reads 30) · 293-03 — the operator's per-key limits: load lock + Retry, changed fields only, clamps 1..60 / 10..600, adopt, SettingsPage wiring
   "EmailSettings.test.tsx": 28, // 300-05 (S3) — the operator Email card: words, read-only Sent through, floor-word delay hint (shared case list), changed+valid fields only, clamp 60..3600, adopt, SettingsPage wiring
   "EmailNotificationPreference.test.tsx": 17, // 300-05 (S2) — the member's switch: no On before the read, own PUT, server's value, save/load failures, a11y switch, only /me/preferences URLs
-  "RunOriginLine.test.tsx": 6, // 293-03 — the origin leaf: nothing when absent/unknown, muted, hidden icon, one mount per run surface (src/components/workflows dir TARGET)
-  "runOriginVocabulary.test.ts": 11, // 293-03 — the six origin sentences, null for absent/unknown (D-23)
+  "RunOriginLine.test.tsx": 9, // RAISED 6 -> 9 at 306-04 (2026-11-01): the mcp kind (Bot, title, truncating inner span), an unknown kind renders nothing behind the icon guard, the shipped kinds unchanged · 293-03 — the origin leaf: nothing when absent/unknown, muted, hidden icon, one mount per run surface (src/components/workflows dir TARGET)
+  "runOriginVocabulary.test.ts": 14, // RAISED 11 -> 14 at 306-04 (2026-11-01): the mcp arm with and without a label, the three shipped kinds unchanged · 293-03 — the six origin sentences, null for absent/unknown (D-23)
   "apiKeyPrepick.test.ts": 6, // 293-04 — ⋯ menu pre-pick: sessionStorage read-once, only {workflowId, name}, never a secret
-  "apiKeysContract.test.ts": 3, // 293-04 — client wire types vs backend api_keys_contract.json, path by path
+  "apiKeysContract.test.ts": 11, // RAISED 8 -> 11 at 305-04: OrgPiiRedaction vs the fixture + GET/PUT /org/api-keys/pii-redaction · RAISED 3 -> 8 at 304-04: the MCP wire paths (kind, tools, folders, mcp block, pickable folders, org access) · 293-04 — client wire types vs backend api_keys_contract.json, path by path
   "launchFieldsTwin293.test.ts": 9, // 293-04 — launchInputFields vs launch_fields_cases.json (the server twin reads the same file)
-  "ApiKeysTab.test.tsx": 17, // 293-04 — member tab: load/fail/empty, draft rules, show-once secret never in storage/URL/DOM after save, pre-pick, re-fetched revoke
-  "ApiKeyCard.test.tsx": 8, // 293-04 — every state tag by rendered words, dashed refused chip + line, receipt, owner line, run links only with onOpenRun
-  "ApiKeyCallStrip.test.tsx": 5, // 293-04 — one tab stop, arrow keys, Enter/Space detail, bar name = detail sentence, read bars shorter
-  "RevokeApiKeySheet.test.tsx": 7, // 293-04 — focus on Keep it, Esc, Revoking… in flight, onDone only after the server, failure keeps it open, owner named
-  "OrgApiKeysTab.test.tsx": 7, // 293-04 — admin list: owner on every card, no New key, run links only on own keys, revoke names the owner then re-fetches and pulses
+  "ApiKeysTab.test.tsx": 31, // RAISED 30 -> 31 at 305-03 (2026-10-31): the AI tool limits line, only with an MCP key · RAISED 29 -> 30 at 304-REVIEW WR-02: the header and card say "couldn't check" for an unread switch state · RAISED 17 -> 29 at 304-05: kind choice, MCP draft, show-once snippets with no secret, folders fetched once, off notice, 293 words when MCP is unavailable · 293-04 — member tab: load/fail/empty, draft rules, show-once secret never in storage/URL/DOM after save, pre-pick, re-fetched revoke
+  "ApiKeyCard.test.tsx": 17, // RAISED 16 -> 17 at 305-03 (2026-10-31): an MCP key gets the strip + Show activity in MCP words (the 304 no-strip case retired on purpose), and its no-calls state · RAISED 15 -> 16 at 304-REVIEW WR-02: unknown gets no switched-off tag, its own card line · RAISED 8 -> 15 at 304-05: kind chip, MCP scope chips, off tag + card line, acts-in meta, How to connect only on active member cards · 293-04 — every state tag by rendered words, dashed refused chip + line, receipt, owner line, run links only with onOpenRun
+  "ApiKeyCallStrip.test.tsx": 8, // RAISED 6 -> 8 at 306-05 (2026-11-01): an MCP key's ok ask_agent / run_workflow is a start bar, caption names started only when shown · RAISED 5 -> 6 at 305-03 (2026-10-31): an MCP key: answered / not answered legend, bar names time · tool · result · 293-04 — one tab stop, arrow keys, Enter/Space detail, bar name = detail sentence, read bars shorter
+  "RevokeApiKeySheet.test.tsx": 9, // RAISED 7 -> 9 at 304-05: the MCP reach fact (preset or N tools on folders) and the MCP kept sentence · 293-04 — focus on Keep it, Esc, Revoking… in flight, onDone only after the server, failure keeps it open, owner named
+  "OrgApiKeysTab.test.tsx": 12, // RAISED 7 -> 12 at 304-06: both kinds with chips + preset names, the admin sheet names the preset, the org-off admin notice (never for a deployment off), limits only with a workflow key · 293-04 — admin list: owner on every card, no New key, run links only on own keys, revoke names the owner then re-fetches and pulses
   // 293-04 (SEED-287) — OrgAuditTab.test.tsx existed since 166 and was in NEITHER knob, so it ran
   // nowhere the gate could see. Adopted at its measured count: 8 pre-existing + 1 unknown-code case
   // + 7 api_key.* cases (5 labels, the API keys filter group, the ?raw lockstep with admin/AuditTab.tsx).
-  "OrgAuditTab.test.tsx": 19, // 298-review WR-07: 16 → 19 (org.item.move label, Organizing filter, identical line in both maps)
+  "OrgAuditTab.test.tsx": 26, // RAISED 23 -> 26 at 305-04: settings.update + pii_redaction reads on/off, beside the mcp_access arm · RAISED 19 -> 23 at 304-06: settings.update + mcp_access reads on/off for the organisation, other rows unchanged, AuditTab untouched · 298-review WR-07: 16 → 19 (org.item.move label, Organizing filter, identical line in both maps)
   // ── Phase 300-05 (D-11 / UI-SPEC S4) — FILE-LEVEL in TARGETS (no `src/components/org` entry), same commit.
   "InvitationsTab.test.tsx": 17, // 300-05 — first-ever pin: 8 shipped (send gate, chips, resend/revoke, role picker) + 9 'Email not sent' chip / resend-line cases
   "InviteMemberDialog.test.tsx": 7, // 300-05 — the three result arms by their words, Copy link focused on failed, older backend never a false failure, org.ts unwraps
@@ -4445,12 +4445,12 @@ const BASELINE = {
   // 293-04 — under the `src/components/workflows` directory entry, so a pin only.
   "WorkflowCardMenu.apiKey293.test.tsx": 4, // ⋯ New API key… under Schedules on owned published rows only, payload {id, name}; absent without onApiKey (seam286 pin unchanged)
   // ── Phase 297-01 (REG-09 / D-01, D-03) — adopted, both knobs, same commit (2026-10-27).
-  "useAppNavigation.test.tsx": 72, // RAISED 63 -> 72 at 299-03 (2026-10-28): entityLink.address canonical, leave() REPLACES with the last non-entity place / /app / a given route, openRoute PUSHES (Back returns to the card), resume() replaces only on / and /app, consumes once, nothing stored writes nothing · RAISED 35 -> 63 at 299-02 (2026-10-28): entityLink target per kind, one identity, openThread/openWorkflow/openExpert push one entry, replace opt, leaveThread replaces, non-UUID pushes nothing, Chat returns to the last thread (cleared by the home), token hash kept on a bare entity address ·  297-01 characterization (13), re-targeted to the URL by 297-02: refresh, push/replace, Back/Forward, same-address no-op, legacy + bare + pre-auth + unknown addresses, POP spends the hand-off (13 -> 30). 2026-10-28 297-REVIEW IN-02: 30 -> 33, Chat at / and /app?code= adds no entry; bounceHome at / rewrites nothing and arms no latch. IN-03: 33 -> 34, single-flush positive control (/workflows replaced). IN-01: 34 -> 35, a non-UUID run/skill id pushes nothing
+  "useAppNavigation.test.tsx": 77, // RAISED 72 -> 77 at 305-02 (2026-10-31): /app/library/<uuid> is entityLink.document with target null, null off it, a malformed id is not-found, leave({view:documents}) REPLACES, a document address is never lastPlace · RAISED 63 -> 72 at 299-03 (2026-10-28): entityLink.address canonical, leave() REPLACES with the last non-entity place / /app / a given route, openRoute PUSHES (Back returns to the card), resume() replaces only on / and /app, consumes once, nothing stored writes nothing · RAISED 35 -> 63 at 299-02 (2026-10-28): entityLink target per kind, one identity, openThread/openWorkflow/openExpert push one entry, replace opt, leaveThread replaces, non-UUID pushes nothing, Chat returns to the last thread (cleared by the home), token hash kept on a bare entity address ·  297-01 characterization (13), re-targeted to the URL by 297-02: refresh, push/replace, Back/Forward, same-address no-op, legacy + bare + pre-auth + unknown addresses, POP spends the hand-off (13 -> 30). 2026-10-28 297-REVIEW IN-02: 30 -> 33, Chat at / and /app?code= adds no entry; bounceHome at / rewrites nothing and arms no latch. IN-03: 33 -> 34, single-flush positive control (/workflows replaced). IN-01: 34 -> 35, a non-UUID run/skill id pushes nothing
   // ── Phase 297-02 (LINK-01 / D-11, D-12, D-25) — adopted, both knobs, same commit (2026-10-27).
   "noRawHistoryWrites.test.ts": 4, // 297-02 (D-297-15 / D-33) — tree-wide: no raw History write in stripped product code; planted fixture caught; > 200 files swept. 2026-10-28 297-REVIEW WR-01: 3 -> 4, the one sanctioned idx stamp in useAppNavigation (exact text, counted once, nowhere else)
   "AppViewSwitch.addressStates.test.tsx": 30, // RAISED 19 -> 30 at 299-03 (2026-10-28): the gate in the layout — run/workflow/Expert/chat refused show the one card over the generic area (inert, no linked id, never the run page; the chat history column live), exits push through openRoute, made-up vs foreign main region identical, holding sentences per kind, an in-org answer opens with the linked id, one <LinkGate + no hook; the 297 history-column case RE-TARGETED under D-14 (column now live behind S1) · 297-02 (D-14, D-19, D-34, D-35) — S1 words + Go to Chat, history column hidden, run hold vs fallback vs page, admin hold / S1 / console, one run comparison, fallback last. 2026-10-28 297-REVIEW WR-03: 16 -> 19, the sign-in edge driven through the REAL probes (admin / spend / run: no S1, no fallback in any commit)
   "navigationKeepsStreams.test.tsx": 5, // RAISED 4 -> 5 at 299-03 (2026-10-28): Stay on the switch prompt (real LinkGate + SwitchOrgPrompt in the probe, real OrgProvider) keeps org A, the one subscription unaborted and its size, the address REPLACED with /app, the stayed notice shown · RAISED 3 -> 4 at 299-02 (2026-10-28): a live stream survives /app/chat/U -> /app/chat/V -> Back -> Library -> Chat (one subscription, never aborted, probe mounted once) ·  297-02 (D-10 / D-07) — real App + OrgProvider + StreamsProvider: six navigations, one subscription, signal not aborted, probe mounted once; main.tsx one route, no provider key
-  "appRoutes.test.ts": 144, // RAISED 111 -> 144 at 299-02 (2026-10-28): chat/workflows/experts entity addresses parse lowercased, id-less forms carry no id key, wrong-shape ids not-found, format + round-trip, bare + uppercase + trailing-slash normalise, ?run= home-only ·  297-02 — route table: 12-member round-trip, D-11 table, strict ids, legacy ?run= / ?connections=1 / /admin/spend, bare prefixes, pre-auth untouched, hostile inputs never throw or leave the origin
+  "appRoutes.test.ts": 149, // RAISED 144 -> 149 at 305-02 (2026-10-31): /app/library/<uuid> parses lowercased, malformed/partial not-found, id-less stays id-free, format + canonical round-trip (the 299 not-found row for it retired; two library rows replace it) · RAISED 111 -> 144 at 299-02 (2026-10-28): chat/workflows/experts entity addresses parse lowercased, id-less forms carry no id key, wrong-shape ids not-found, format + round-trip, bare + uppercase + trailing-slash normalise, ?run= home-only ·  297-02 — route table: 12-member round-trip, D-11 table, strict ids, legacy ?run= / ?connections=1 / /admin/spend, bare prefixes, pre-auth untouched, hostile inputs never throw or leave the origin
   // ── Phase 297-03 (LINK-07 / D-21, D-24, D-32, D-42) — adopted, both knobs, same commit (2026-10-27).
   "useAppNavigation.leaveGuard.test.tsx": 26, // 297-03 — one app blocker: dirty asks EXACTLY once under StrictMode (Back/Forward/rail), clean 0, no-op default, forced bounce 0, one-shot latch, reverted POP 1/2/3, registry unit. 2026-10-28 297-REVIEW WR-01: 23 -> 24, browser router over a raw hash-write entry (Cancel keeps the Builder). WR-04: 24 -> 26, a cancelled attention-route click spends the Health hand-off (+ OK positive control)
   "WorkflowsPage.leaveGuard.test.tsx": 15, // 297-03 — the Builder tenant: connect control + golden-run link asked EXACTLY once (latch), Test Run 0 and no armed latch, dirty Back/rail 1, clean / no Builder 0. 2026-10-28 297-REVIEW WR-02: 12 -> 15, a refused-save Test Run asks once (Cancel launches nothing, OK asks once), latch not armed across the launch await
@@ -4515,6 +4515,66 @@ const BASELINE = {
   // ── Phase 301-02 (NOTE-01 / NOTE-05 · D-15, D-17, D-18, D-33) — both knobs, same commit (2026-10-30). src/hooks/__tests__
   //    has no directory entry, so the new file is FILE-LEVEL in TARGETS below.
   "useWaitingNotices.test.tsx": 29, // RAISED 26 -> 29 at 301 WR fix (WR-02): an org switch is one GET; a failed probe and its recovery cost none; a genuine non-empty set change still refetches · RAISED 23 -> 26 at 301 WR fix (WR-01): mount + membership load + SUBSCRIBED is one GET; visibilitychange + focus is one GET; an event during a fetch keeps it and owes one follow-up · 301-02 — getWaitingNotices once on mount with a signal; verbatim notices + total; loading / verdictKnown before an answer; a rejected first fetch fabricates nothing; a later failure keeps the list + failedSinceLast, cleared by the next success; newer refresh aborts the old; 60 s poll + none after unmount; focus, visible (not hidden), org and membership changes refetch; user-scoped channel + recipient_id filter; an event refetches and the FETCHED list wins over a forged body; SUBSCRIBED refetches, CHANNEL_ERROR not; removeChannel on unmount; throwing / undefined channel, missing / non-promise / rejecting getSession degrade to the poll; ?raw fence (no payload.new/.old, recipient_id=eq., SUBSCRIBED, no StreamsProvider)
+  // ── Phase 304 (KEY-01..KEY-06) — first pins for the nine new suites, both knobs, same commit (304-06, 2026-10-31).
+  //    None has a directory entry (src/components/settings/apiKeys/__tests__, src/components/org/__tests__,
+  //    src/components/admin/__tests__ are all file-level), so each is FILE-LEVEL in TARGETS below.
+  "mcpSnippets.test.ts": 37, // 304-05 — the five client builders read the env var, never a key; a non-env-var name throws; safeMcpUrl refuses query/fragment/non-http; mcp-remote pinned 0.15.2 or unpinned with the line
+  "mcpKeyFacts.test.ts": 17, // RAISED 15 -> 17 at 306-05 (2026-11-01): mcpBarKind (start / read / refused) · 304-05 — presets from the catalogue, companions, folder flattening (orphans, cycles, subtrees), the Create why-line order, scope chips
+  "McpOffNotice.test.tsx": 6, // RAISED 5 -> 6 at 304-REVIEW WR-02: unknown says its own sentence in every variant · 304-05 — member / card / tile / admin sentences, deployment wins, words begin with principal_liveness.py's refusal sentences
+  "ApiKeyKindChoice.test.tsx": 4, // 304-05 — nothing chosen at rest, roving tabindex, the org-off tile disabled with words, hidden when MCP is unavailable
+  "KeyFoldersField.test.tsx": 7, // 304-05 — all vs only, nested checkboxes, subtree inclusion marks, mail/synced gated on the external tick, filter above 12, load states
+  "McpKeyFields.test.tsx": 12, // RAISED 8 -> 12 at 307-05 (2026-11-04): 307-03's variant="consent" (hides the org fact, expires and acts-as note; stacks rows) + the default-render snapshot · RAISED 6 -> 8 at 306-05 (2026-11-01): the D-29 draft hint (shown, tied, removed) · 304-05 — presets from the catalogue, companions as disabled mirrors, a hand tick moves to Choose tools, unticking external unticks connector-fed folders, 30/90/365
+  "McpConnectSnippets.test.tsx": 10, // 304-05 — four client tabs, Copy per block with the live region, the Claude.ai warning on every tab, the no-address state, no secret prop
+  "OrgMcpSwitchCard.test.tsx": 8, // 304-06 — Loading then the switch, armed OFF words, no switch on a failed read + Retry, never optimistic (disabled in flight, server answer wins), failure stays put, onRecorded once, no confirm
+  "CapabilityGrid.mcp.test.tsx": 5, // 304-06 — the fifth card after Workflows, armed OFF with no count even when counts are passed, flips mcp_enabled, ⌥ raw key, no countImpact + the ControlRoomPage mapping
+  // Phase 305-02 (D-52) — FIRST pins, both knobs in the same commit (each is FILE-LEVEL in TARGETS below).
+  "DocumentCantBeOpened.test.tsx": 5, // 305-02 — the 299 words rendered for a document, a labelled section never an alert, focus on the heading once, one Dismiss, no hand-typed copy in the source
+  // Phase 305-03 (D-31 / D-53) — FIRST pins, both knobs in the same commit (each is FILE-LEVEL in TARGETS below).
+  "mcpCallWords.test.ts": 14, // RAISED 9 -> 14 at 306-05 (2026-11-01): replied / run started, ask_needs_external, starts limit, admission falls through · 305-03 — an MCP call's words: answered, withheld, failed, not available (305-REVIEW WR-04), over the limit (bucket + figure), not granted, shipped reasons kept, time · tool · result
+  "ApiKeyActivity.mcp.test.tsx": 4, // 305-03 — Time · Tool · Result with the tool pill, the MCP empty sentence, revoked keeps the shipped one, a workflow key keeps five columns
+  // Phase 305-04 (D-37) — FIRST pin, both knobs in the same commit (FILE-LEVEL in TARGETS below).
+  "OrgPiiRedactionCard.test.tsx": 9, // 305-04 — Loading/failed show no switch, OFF calm, describedby the two sub lines, never optimistic + tag + onRecorded once, server answer wins, direct flip off, failed write as a status, mounted right after OrgMcpSwitchCard
+  "citationNav.test.tsx": 18, // 305-02 — first pin (153 contract, 13) + the document address arrival: once per distinct id without navigating, leaveDocumentAddress REPLACE, a no-op off an address, no prop unchanged
+  // Phase 306-04 (MCP-05 / D-09 / D-31 / D-32) — FIRST pins, both knobs in the same commit (each is FILE-LEVEL in TARGETS below).
+  "ChatHistoryColumn.origin306.test.tsx": 9, // 306-04 — the mcp history row: one origin line inside the row button (Bot, sentence, accessible name), in-app row byte-identical to the base, selected stays muted, title-only filter, both groupings, unknown kind no line, no new hook, originWords("mcp")
+  "outsideAskEnvelope.test.ts": 8, // 306-04 — the shared phase306 fixture's stored question, never un-escaped, api_key / typed / trailing / leading text is not an ask, any notice text, the note's words, zero-import leaf
+  "UserMessageBubble.outsideAsk.test.tsx": 5, // 306-04 — question + one note (Bot, class contract), clamp measures the question, the note after Read more, a plain bubble byte-identical to the base, clamp/toggle code unchanged
+  // Phase 307 (OAUTH-04/05/07; D-42) — FIRST pins for every suite the phase created, both knobs in the
+  // same commit (each is FILE-LEVEL in TARGETS below). Counts are the vitest JSON reporter's own
+  // per-file assertion counts at 307-05 (2026-11-04), never hand-counted. 307-04 left its two unpinned.
+  "oauthRouting.test.ts": 17, // 307-04 — .well-known proxied unchanged on nginx, openid 404, consent anti-framing on Vite/Vercel/nginx, the try_files header-loss negative control
+  "CapabilityGrid.oauthCopy.test.tsx": 2, // 307-04 — the mcp_enabled sub + impact name connected apps
+  "consentFacts.test.ts": 17, // 307-03 — the summary sentence, the first unmet Allow condition, the host-match guard, the "Only allow it" clause on every web why-line
+  "ConsentPage.test.tsx": 32, // 307-03 — every state of /app/connect/<id>, framed refusal, never-optimistic Allow/Deny, location.replace only to the shown host, signed-out return line
+  "ConsentWhoIsAsking.test.tsx": 6, // 307-03 — the who-well: name as a claim, host as the fact, tags, the why line
+  "ConsentOrgField.test.tsx": 5, // 307-03 — the org radio group, switched-off rows disabled with the reason
+  "oauthContract.test.ts": 11, // 307-03 + 307-05 — consent and connected-app wire types vs the Python source, client routes, X-Org-Id
+  "ConnectedAppsSection.test.tsx": 11, // 307-05 — renders nothing without sign-in, states, card facts, name as text, never-optimistic disconnect + lasting receipt, no key verb
+  "DisconnectAppSheet.test.tsx": 4, // 307-05 — victim facts, Keep it focus, admin sub names the owner, waits for the server, failure keeps it open
+  "OrgConnectedApps.test.tsx": 9, // 307-05 — nothing without sign-in, empty line, Connected app chip + owner, Disconnect all names victims, receipt from the server's count, refusal stays open
+  "McpSignInHostsCard.test.tsx": 8, // 307-05 — failed read shows no rows, verbatim add from the server's answer, refusal kept, arm-to-confirm remove + Esc, empty warning, technical reveal
+  "AuditTab.oauthWords.test.tsx": 3, // 307-05 — credential oauth words on api_key.* rows, 60-char text cap, operator allowlist rows
+  "OrgAuditTab.oauthWords.test.tsx": 2, // 307-05 — the same words in the org browser, one shared helper (lockstep)
+  // Phase 308-05 (HOOK-01/02/04/05; D-28) — FIRST pins for the Settings → Webhooks suites, both knobs in
+  // the same commit (each is FILE-LEVEL in TARGETS below). Counts read from the gate's own JSON report
+  // at 308-05 (2026-11-04), never hand-counted.
+  "webhooksContract.test.ts": 12, // 308-05 — every route's method/path/body, {code, message} refusals, rate_limited never "status 429", the secret kept nowhere
+  "webhookFacts.test.ts": 21, // 308-05 — copy leaf + verbatim sentences + no enabled/disabled/rotated/revoked, status tags, masked query values, log cells, form checks, verdicts
+  "webhookSnippets.test.ts": 3, // 308-05 — standardwebhooks import lines, SYREL_WEBHOOK_SECRET, raw body, no argument
+  "webhookFocus.test.ts": 4, // 308-05 — writes exactly {endpointId, orgId}, read once, malformed/blocked storage is null
+  "WebhookEndpointForm.test.tsx": 8, // 308-05 — events group, Save's DOM reason, form lines, the D-24 refusal keeps values, server sentences, edit + counter
+  "WebhookSecretOnce.test.tsx": 6, // 308-05 — create/roll words, Send test verdict, rate limit in our words, overlap line, secret gone after done, no storage
+  "WebhookSheets.test.tsx": 9, // 308-05 — delete victim facts + Keep it focus + never optimistic + admin variant; roll calm sheet, overlap fact, failure stays open
+  "WebhookDeliveryLog.test.tsx": 12, // 308-05 — real table, words only, run link, Resend + rate limit, off endpoint, Show older, states, refresh, 15 s poll only while in flight
+  "WebhookEndpointCard.test.tsx": 12, // 308-05 — masked address toggle, off tags, actions per host, test verdicts, never-optimistic flip keeps focus, admin-off reason, roll in place, edit in place
+  "WebhooksTab.test.tsx": 11, // 308-05 — header + scope, empty, cap reason, kept list on a failed re-read, one open card, create → secret once, org switch re-read (P-2), delete receipt + focus, focus hints
+  // Phase 308-06 (HOOK-04/06; D-30, D-31, D-19) — FIRST pins for the org-admin section, the audit words and
+  // the Waiting row, both knobs in the same commit (each FILE-LEVEL in TARGETS below). Counts read from
+  // the gate's own JSON report at 308-06 (2026-11-04), never hand-counted.
+  "OrgWebhooks.test.tsx": 9, // 308-06 — no gate, table words + no query/token/link, owner order, direct Turn off + receipt + one pulse, Turn on admin-off only, refusal kept, admin Delete sheet, Retry, one mount
+  "AuditTab.webhookWords.test.tsx": 3, // 308-06 — nine webhook.endpoint.* sentences + host as text, 253 cap, the Webhooks filter group
+  "OrgAuditTab.webhookWords.test.tsx": 3, // 308-06 — the same nine words + host in the org browser, its filter group, lockstep with AuditTab
+  "webhookWaitingRow.test.tsx": 9, // 308-06 — run arm byte-equal, webhook arm → openWebhooks, no-op without the door, words, neutral count, zero-import leaf, mixed list, ChatLayout door
 }
 
 // Still COMPUTED, never hand-written — the reduce is the single source, so the
@@ -6628,6 +6688,58 @@ const TARGETS = [
   "src/components/share/__tests__/savesInOrg.test.tsx",
   // Phase 301-02 — FILE-LEVEL (no src/hooks/__tests__ directory entry), SAME commit as its pin.
   "src/hooks/__tests__/useWaitingNotices.test.tsx",
+  // Phase 304 — FILE-LEVEL (no apiKeys/__tests__, org/__tests__ or admin/__tests__ directory entry), SAME commit as their pins.
+  "src/components/settings/apiKeys/__tests__/mcpSnippets.test.ts",
+  "src/components/settings/apiKeys/__tests__/mcpKeyFacts.test.ts",
+  "src/components/settings/apiKeys/__tests__/McpOffNotice.test.tsx",
+  "src/components/settings/apiKeys/__tests__/ApiKeyKindChoice.test.tsx",
+  "src/components/settings/apiKeys/__tests__/KeyFoldersField.test.tsx",
+  "src/components/settings/apiKeys/__tests__/McpKeyFields.test.tsx",
+  "src/components/settings/apiKeys/__tests__/McpConnectSnippets.test.tsx",
+  "src/components/org/__tests__/OrgMcpSwitchCard.test.tsx",
+  "src/components/admin/__tests__/CapabilityGrid.mcp.test.tsx",
+  // Phase 305-02 — FILE-LEVEL (no library/__tests__ or lib/__tests__ directory entry), SAME commit as their pins.
+  "src/components/library/__tests__/DocumentCantBeOpened.test.tsx",
+  "src/lib/__tests__/citationNav.test.tsx",
+  // Phase 305-03 — FILE-LEVEL, SAME commit as their pins.
+  "src/components/settings/apiKeys/__tests__/mcpCallWords.test.ts",
+  "src/components/settings/apiKeys/__tests__/ApiKeyActivity.mcp.test.tsx",
+  // Phase 305-04 — FILE-LEVEL, SAME commit as its pin.
+  "src/components/org/__tests__/OrgPiiRedactionCard.test.tsx",
+  // Phase 306-04 — FILE-LEVEL (no layout/__tests__ or chat/__tests__ directory entry), SAME commit as their pins.
+  "src/components/layout/__tests__/ChatHistoryColumn.origin306.test.tsx",
+  "src/components/chat/__tests__/outsideAskEnvelope.test.ts",
+  "src/components/chat/__tests__/UserMessageBubble.outsideAsk.test.tsx",
+  // Phase 307 (D-42) — FILE-LEVEL (no routing, connect, admin or org __tests__ directory entry), SAME commit as their pins.
+  "src/__tests__/routing/oauthRouting.test.ts",
+  "src/components/admin/__tests__/CapabilityGrid.oauthCopy.test.tsx",
+  "src/components/connect/__tests__/consentFacts.test.ts",
+  "src/components/connect/__tests__/ConsentPage.test.tsx",
+  "src/components/connect/__tests__/ConsentWhoIsAsking.test.tsx",
+  "src/components/connect/__tests__/ConsentOrgField.test.tsx",
+  "src/components/connect/__tests__/oauthContract.test.ts",
+  "src/components/settings/apiKeys/__tests__/ConnectedAppsSection.test.tsx",
+  "src/components/settings/apiKeys/__tests__/DisconnectAppSheet.test.tsx",
+  "src/components/org/__tests__/OrgConnectedApps.test.tsx",
+  "src/components/admin/__tests__/McpSignInHostsCard.test.tsx",
+  "src/components/admin/__tests__/AuditTab.oauthWords.test.tsx",
+  "src/components/org/__tests__/OrgAuditTab.oauthWords.test.tsx",
+  // Phase 308-05 (HOOK-01/04; D-28) — FILE-LEVEL (no settings/webhooks __tests__ directory entry), SAME commit as their pins.
+  "src/components/settings/webhooks/__tests__/webhooksContract.test.ts",
+  "src/components/settings/webhooks/__tests__/webhookFacts.test.ts",
+  "src/components/settings/webhooks/__tests__/webhookSnippets.test.ts",
+  "src/components/settings/webhooks/__tests__/webhookFocus.test.ts",
+  "src/components/settings/webhooks/__tests__/WebhookEndpointForm.test.tsx",
+  "src/components/settings/webhooks/__tests__/WebhookSecretOnce.test.tsx",
+  "src/components/settings/webhooks/__tests__/WebhookSheets.test.tsx",
+  "src/components/settings/webhooks/__tests__/WebhookDeliveryLog.test.tsx",
+  "src/components/settings/webhooks/__tests__/WebhookEndpointCard.test.tsx",
+  "src/components/settings/webhooks/__tests__/WebhooksTab.test.tsx",
+  // Phase 308-06 (HOOK-04/06) — FILE-LEVEL (no org, admin or layout __tests__ directory entry), SAME commit as their pins.
+  "src/components/org/__tests__/OrgWebhooks.test.tsx",
+  "src/components/admin/__tests__/AuditTab.webhookWords.test.tsx",
+  "src/components/org/__tests__/OrgAuditTab.webhookWords.test.tsx",
+  "src/components/layout/__tests__/webhookWaitingRow.test.tsx",
 ]
 
 const REPO_ROOT = path.resolve(__dirname, "..")

@@ -1,0 +1,190 @@
+SSE endpoint re-validation — Phase 305-01 Task 2 (D-01 / D-48)
+Run from backend/ with backend/venv, one pytest process per file, under the local-DB lock, 2026-10-31.
+Suite set: test_059_disconnect, every test_061_*, test_062_*, test_063_*, test_066_*, test_075_*,
+test_skill_tuner_routes, test_123_1_tuner_runs_timestamp (35 files).
+
+=== BEFORE (sse-starlette 2.4.1) ===
+tests/integration/test_059_disconnect.py :: 2 failed, 1 warning in 4.64s
+tests/integration/test_061_consumer_cursor_race.py :: 3 xfailed, 1 warning in 0.72s
+tests/integration/test_061_hard_timeout.py :: 4 passed, 1 warning in 0.25s
+tests/integration/test_061_producer_survives_disconnect.py :: 1 failed, 1 warning in 2.41s
+tests/integration/test_061_runs_table.py :: 1 failed, 1 passed, 1 warning in 2.46s
+tests/integration/test_061_ttl.py :: 2 failed, 1 warning in 4.26s
+tests/integration/test_062_active_runs.py :: 5 passed, 1 warning in 0.25s
+tests/integration/test_062_cross_user_404.py :: 3 passed, 1 warning in 0.26s
+tests/integration/test_062_delete_happy.py :: 1 failed, 1 warning in 2.44s
+tests/integration/test_062_delete_terminal_idempotent.py :: 3 passed, 1 warning in 0.28s
+tests/integration/test_062_delete_zombie.py :: 1 failed, 1 warning in 0.69s
+tests/integration/test_062_multi_consumer_fanout.py :: 1 failed, 1 warning in 2.41s
+tests/integration/test_062_redis_down.py :: 1 failed, 1 passed, 1 warning in 0.72s
+tests/integration/test_062_stream_replay.py :: 1 failed, 1 passed, 1 warning in 2.40s
+tests/integration/test_062_stream_terminal.py :: 1 passed, 1 warning in 0.31s
+tests/integration/test_062_stream_ttl_expired.py :: 4 passed, 1 warning in 0.28s
+tests/integration/test_063_1_messages_runs_join.py :: 1 failed, 2 passed, 1 warning in 0.89s
+tests/integration/test_063_cross_user_no_runid_leak.py :: 2 passed, 1 warning in 0.23s
+tests/integration/test_063_legacy_path_deleted.py :: 2 passed, 1 warning in 0.22s
+tests/integration/test_063_post_contract.py :: 2 failed, 1 warning in 2.82s
+tests/integration/test_063_post_then_subscribe.py :: 1 failed, 1 warning in 2.39s
+tests/integration/test_066_langsmith_clean.py :: 2 failed, 1 warning in 0.74s
+tests/integration/test_066_per_call_timer.py :: 4 failed, 1 warning in 4.33s
+tests/integration/test_066_sse_terminal.py :: 2 failed, 1 warning in 4.27s
+tests/integration/test_066_status_enum.py :: 4 passed, 1 warning in 0.23s
+tests/integration/test_066_terminal_classification.py :: 3 failed, 1 passed, 1 warning in 4.32s
+tests/integration/test_075_4_anthropic_langsmith_trace.py :: 1 passed, 1 skipped, 1 warning in 0.24s
+tests/integration/test_075_4_subagent_truncation.py :: 3 passed, 1 warning in 0.23s
+tests/integration/test_075_4_terminal_race.py :: 1 failed, 2 passed, 1 warning in 0.65s
+tests/integration/test_075_6_code_so_far_monotonic.py :: 3 passed, 1 warning in 6.15s
+tests/integration/test_075_code_stdout_progressive.py :: 4 failed, 1 warning in 7.76s
+tests/integration/test_075_snapshot.py :: 1 failed, 2 passed, 1 warning in 0.96s
+tests/integration/test_075_tool_args_progress.py :: 1 failed, 8 passed, 1 warning in 20.37s
+tests/integration/test_skill_tuner_routes.py :: 16 failed, 24 passed, 1 warning in 4.18s
+tests/integration/test_123_1_tuner_runs_timestamp.py :: 1 passed, 1 warning in 0.29s
+
+Failing test ids BEFORE (49):
+FAILED tests/integration/test_059_disconnect.py::test_agent_task_SURVIVES_on_disconnect
+FAILED tests/integration/test_059_disconnect.py::test_normal_stream_unchanged
+FAILED tests/integration/test_061_producer_survives_disconnect.py::test_producer_continues_after_consumer_disconnect
+FAILED tests/integration/test_061_runs_table.py::test_runs_lifecycle_row
+FAILED tests/integration/test_061_ttl.py::test_completed_run_expires_600s
+FAILED tests/integration/test_061_ttl.py::test_failed_run_expires_60s
+FAILED tests/integration/test_062_delete_happy.py::test_cancels_in_flight_producer
+FAILED tests/integration/test_062_delete_zombie.py::test_heals_zombie_state
+FAILED tests/integration/test_062_multi_consumer_fanout.py::test_two_consumers_receive_identical_sequences
+FAILED tests/integration/test_062_redis_down.py::test_delete_returns_204_on_redis_unreachable
+FAILED tests/integration/test_062_stream_replay.py::test_replay_then_tail_to_terminal
+FAILED tests/integration/test_063_1_messages_runs_join.py::test_get_messages_includes_run_id_and_run_status_for_assistant_rows
+FAILED tests/integration/test_063_post_contract.py::test_post_returns_before_producer_first_xadd
+FAILED tests/integration/test_063_post_contract.py::test_post_returns_message_and_run_ids
+FAILED tests/integration/test_063_post_then_subscribe.py::test_post_then_get_stream_renders_full_response
+FAILED tests/integration/test_066_langsmith_clean.py::test_no_generator_exit_on_timeout
+FAILED tests/integration/test_066_langsmith_clean.py::test_track_a_clean_trace_exception
+FAILED tests/integration/test_066_per_call_timer.py::test_per_call_timer_fires_at_budget
+FAILED tests/integration/test_066_per_call_timer.py::test_quick_call_within_budget_completes
+FAILED tests/integration/test_066_per_call_timer.py::test_timer_resets_per_iteration
+FAILED tests/integration/test_066_per_call_timer.py::test_tool_exec_outside_timer
+FAILED tests/integration/test_066_sse_terminal.py::test_consumer_receives_timed_out_sentinel
+FAILED tests/integration/test_066_sse_terminal.py::test_timed_out_sentinel_distinct_from_error_and_cancelled
+FAILED tests/integration/test_066_terminal_classification.py::test_delete_writes_cancelled_not_timed_out
+FAILED tests/integration/test_066_terminal_classification.py::test_failed_error_truncated_to_200_chars
+FAILED tests/integration/test_066_terminal_classification.py::test_timeout_branch_writes_timed_out
+FAILED tests/integration/test_075_4_terminal_race.py::test_shielded_finalize_step_order_finalize_run_before_sentinel
+FAILED tests/integration/test_075_code_stdout_progressive.py::test_captured_at_monotonic
+FAILED tests/integration/test_075_code_stdout_progressive.py::test_five_step_printer_produces_progressive_events
+FAILED tests/integration/test_075_code_stdout_progressive.py::test_no_duplicate_emit_at_completion
+FAILED tests/integration/test_075_code_stdout_progressive.py::test_silent_workload_emits_heartbeat
+FAILED tests/integration/test_075_snapshot.py::test_snapshot_returns_messages_active_runs_cursors
+FAILED tests/integration/test_075_tool_args_progress.py::test_openrouter_independent_buffer_from_openai
+FAILED tests/integration/test_skill_tuner_routes.py::test_cancel_cross_user_returns_404
+FAILED tests/integration/test_skill_tuner_routes.py::test_cancel_foreign_run_id_returns_404
+FAILED tests/integration/test_skill_tuner_routes.py::test_cancel_owned_inflight_run_sets_flag_and_keeps_claim
+FAILED tests/integration/test_skill_tuner_routes.py::test_duplicate_concurrent_run_returns_409
+FAILED tests/integration/test_skill_tuner_routes.py::test_empty_model_targets_dropped_from_count_and_dispatch
+FAILED tests/integration/test_skill_tuner_routes.py::test_get_latest_cross_user_returns_404
+FAILED tests/integration/test_skill_tuner_routes.py::test_get_latest_global_skill_visible
+FAILED tests/integration/test_skill_tuner_routes.py::test_get_results_cross_user_returns_404
+FAILED tests/integration/test_skill_tuner_routes.py::test_latest_result_persists_after_run
+FAILED tests/integration/test_skill_tuner_routes.py::test_results_carry_both_fires_and_no_false_subscores
+FAILED tests/integration/test_skill_tuner_routes.py::test_seeded_cases_GET_returns_capped_slice_plus_total
+FAILED tests/integration/test_skill_tuner_routes.py::test_seeded_cases_returned
+FAILED tests/integration/test_skill_tuner_routes.py::test_start_caps_targets_no_unbounded_fanout
+FAILED tests/integration/test_skill_tuner_routes.py::test_start_cross_user_returns_404
+FAILED tests/integration/test_skill_tuner_routes.py::test_start_returns_run_id_and_zadds_run_buffer
+FAILED tests/integration/test_skill_tuner_routes.py::test_visible_skill_foreign_run_id_returns_404_both_routes
+
+=== AFTER (sse-starlette 3.0.3, mcp 2.3.0) ===
+tests/integration/test_059_disconnect.py :: 2 failed, 1 warning in 4.26s
+tests/integration/test_061_consumer_cursor_race.py :: 3 xfailed, 1 warning in 0.66s
+tests/integration/test_061_hard_timeout.py :: 4 passed, 1 warning in 0.21s
+tests/integration/test_061_producer_survives_disconnect.py :: 1 failed, 1 warning in 2.48s
+tests/integration/test_061_runs_table.py :: 1 failed, 1 passed, 1 warning in 2.47s
+tests/integration/test_061_ttl.py :: 2 failed, 1 warning in 4.25s
+tests/integration/test_062_active_runs.py :: 5 passed, 1 warning in 0.35s
+tests/integration/test_062_cross_user_404.py :: 3 passed, 1 warning in 0.24s
+tests/integration/test_062_delete_happy.py :: 1 failed, 1 warning in 2.47s
+tests/integration/test_062_delete_terminal_idempotent.py :: 3 passed, 1 warning in 0.23s
+tests/integration/test_062_delete_zombie.py :: 1 failed, 1 warning in 0.84s
+tests/integration/test_062_multi_consumer_fanout.py :: 1 failed, 1 warning in 2.55s
+tests/integration/test_062_redis_down.py :: 1 failed, 1 passed, 1 warning in 0.81s
+tests/integration/test_062_stream_replay.py :: 1 failed, 1 passed, 1 warning in 2.51s
+tests/integration/test_062_stream_terminal.py :: 1 passed, 1 warning in 0.23s
+tests/integration/test_062_stream_ttl_expired.py :: 4 passed, 1 warning in 0.36s
+tests/integration/test_063_1_messages_runs_join.py :: 1 failed, 2 passed, 1 warning in 0.97s
+tests/integration/test_063_cross_user_no_runid_leak.py :: 2 passed, 1 warning in 0.22s
+tests/integration/test_063_legacy_path_deleted.py :: 2 passed, 1 warning in 0.30s
+tests/integration/test_063_post_contract.py :: 2 failed, 1 warning in 2.84s
+tests/integration/test_063_post_then_subscribe.py :: 1 failed, 1 warning in 2.51s
+tests/integration/test_066_langsmith_clean.py :: 2 failed, 1 warning in 0.95s
+tests/integration/test_066_per_call_timer.py :: 4 failed, 1 warning in 4.50s
+tests/integration/test_066_sse_terminal.py :: 2 failed, 1 warning in 4.33s
+tests/integration/test_066_status_enum.py :: 4 passed, 1 warning in 0.24s
+tests/integration/test_066_terminal_classification.py :: 3 failed, 1 passed, 1 warning in 4.58s
+tests/integration/test_075_4_anthropic_langsmith_trace.py :: 1 passed, 1 skipped, 1 warning in 0.25s
+tests/integration/test_075_4_subagent_truncation.py :: 3 passed, 1 warning in 0.27s
+tests/integration/test_075_4_terminal_race.py :: 1 failed, 2 passed, 1 warning in 0.71s
+tests/integration/test_075_6_code_so_far_monotonic.py :: 3 passed, 1 warning in 6.37s
+tests/integration/test_075_code_stdout_progressive.py :: 4 failed, 1 warning in 7.85s
+tests/integration/test_075_snapshot.py :: 1 failed, 2 passed, 1 warning in 1.01s
+tests/integration/test_075_tool_args_progress.py :: 1 failed, 8 passed, 1 warning in 20.80s
+tests/integration/test_skill_tuner_routes.py :: 16 failed, 24 passed, 1 warning in 4.27s
+tests/integration/test_123_1_tuner_runs_timestamp.py :: 1 passed, 1 warning in 0.32s
+
+Failing test ids AFTER (49):
+FAILED tests/integration/test_059_disconnect.py::test_agent_task_SURVIVES_on_disconnect
+FAILED tests/integration/test_059_disconnect.py::test_normal_stream_unchanged
+FAILED tests/integration/test_061_producer_survives_disconnect.py::test_producer_continues_after_consumer_disconnect
+FAILED tests/integration/test_061_runs_table.py::test_runs_lifecycle_row
+FAILED tests/integration/test_061_ttl.py::test_completed_run_expires_600s
+FAILED tests/integration/test_061_ttl.py::test_failed_run_expires_60s
+FAILED tests/integration/test_062_delete_happy.py::test_cancels_in_flight_producer
+FAILED tests/integration/test_062_delete_zombie.py::test_heals_zombie_state
+FAILED tests/integration/test_062_multi_consumer_fanout.py::test_two_consumers_receive_identical_sequences
+FAILED tests/integration/test_062_redis_down.py::test_delete_returns_204_on_redis_unreachable
+FAILED tests/integration/test_062_stream_replay.py::test_replay_then_tail_to_terminal
+FAILED tests/integration/test_063_1_messages_runs_join.py::test_get_messages_includes_run_id_and_run_status_for_assistant_rows
+FAILED tests/integration/test_063_post_contract.py::test_post_returns_before_producer_first_xadd
+FAILED tests/integration/test_063_post_contract.py::test_post_returns_message_and_run_ids
+FAILED tests/integration/test_063_post_then_subscribe.py::test_post_then_get_stream_renders_full_response
+FAILED tests/integration/test_066_langsmith_clean.py::test_no_generator_exit_on_timeout
+FAILED tests/integration/test_066_langsmith_clean.py::test_track_a_clean_trace_exception
+FAILED tests/integration/test_066_per_call_timer.py::test_per_call_timer_fires_at_budget
+FAILED tests/integration/test_066_per_call_timer.py::test_quick_call_within_budget_completes
+FAILED tests/integration/test_066_per_call_timer.py::test_timer_resets_per_iteration
+FAILED tests/integration/test_066_per_call_timer.py::test_tool_exec_outside_timer
+FAILED tests/integration/test_066_sse_terminal.py::test_consumer_receives_timed_out_sentinel
+FAILED tests/integration/test_066_sse_terminal.py::test_timed_out_sentinel_distinct_from_error_and_cancelled
+FAILED tests/integration/test_066_terminal_classification.py::test_delete_writes_cancelled_not_timed_out
+FAILED tests/integration/test_066_terminal_classification.py::test_failed_error_truncated_to_200_chars
+FAILED tests/integration/test_066_terminal_classification.py::test_timeout_branch_writes_timed_out
+FAILED tests/integration/test_075_4_terminal_race.py::test_shielded_finalize_step_order_finalize_run_before_sentinel
+FAILED tests/integration/test_075_code_stdout_progressive.py::test_captured_at_monotonic
+FAILED tests/integration/test_075_code_stdout_progressive.py::test_five_step_printer_produces_progressive_events
+FAILED tests/integration/test_075_code_stdout_progressive.py::test_no_duplicate_emit_at_completion
+FAILED tests/integration/test_075_code_stdout_progressive.py::test_silent_workload_emits_heartbeat
+FAILED tests/integration/test_075_snapshot.py::test_snapshot_returns_messages_active_runs_cursors
+FAILED tests/integration/test_075_tool_args_progress.py::test_openrouter_independent_buffer_from_openai
+FAILED tests/integration/test_skill_tuner_routes.py::test_cancel_cross_user_returns_404
+FAILED tests/integration/test_skill_tuner_routes.py::test_cancel_foreign_run_id_returns_404
+FAILED tests/integration/test_skill_tuner_routes.py::test_cancel_owned_inflight_run_sets_flag_and_keeps_claim
+FAILED tests/integration/test_skill_tuner_routes.py::test_duplicate_concurrent_run_returns_409
+FAILED tests/integration/test_skill_tuner_routes.py::test_empty_model_targets_dropped_from_count_and_dispatch
+FAILED tests/integration/test_skill_tuner_routes.py::test_get_latest_cross_user_returns_404
+FAILED tests/integration/test_skill_tuner_routes.py::test_get_latest_global_skill_visible
+FAILED tests/integration/test_skill_tuner_routes.py::test_get_results_cross_user_returns_404
+FAILED tests/integration/test_skill_tuner_routes.py::test_latest_result_persists_after_run
+FAILED tests/integration/test_skill_tuner_routes.py::test_results_carry_both_fires_and_no_false_subscores
+FAILED tests/integration/test_skill_tuner_routes.py::test_seeded_cases_GET_returns_capped_slice_plus_total
+FAILED tests/integration/test_skill_tuner_routes.py::test_seeded_cases_returned
+FAILED tests/integration/test_skill_tuner_routes.py::test_start_caps_targets_no_unbounded_fanout
+FAILED tests/integration/test_skill_tuner_routes.py::test_start_cross_user_returns_404
+FAILED tests/integration/test_skill_tuner_routes.py::test_start_returns_run_id_and_zadds_run_buffer
+FAILED tests/integration/test_skill_tuner_routes.py::test_visible_skill_foreign_run_id_returns_404_both_routes
+
+=== SET DIFF (sorted test-id sets) ===
+red AFTER and green BEFORE (would be this plan's): 0
+red BEFORE and green AFTER: 0
+
+VERDICT: identical failing sets (49 = 49, 0 new, 0 fixed).
+Every red is INHERITED at base 43e95f6b5. The dominant cause is the same before and after:
+asyncpg ForeignKeyViolationError on runs_thread_id_fkey (the mocked-supabase suites insert runs rows
+for threads that do not exist in the live local DB). test_059's two reds are that FK violation both
+times; its retired fixture itself passes on 3.0.3 (the 3.0.x / no-should_exit_event asserts hold).

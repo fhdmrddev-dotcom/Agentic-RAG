@@ -16,16 +16,26 @@
 //
 // PURE PRESENTATIONAL LEAF: props in, DOM out. The shell (Plan 04) supplies the org
 // identity from the `useOrg` context.
+//
+// Phase 304-06 (KEY-06, D-02): ONE mount — the org MCP switch card under the identity block —
+// plus the `onRecorded` prop it forwards. The card owns its own read/write; this tab stays
+// stateless. The shell keys this tab on the active org, so an org switch re-reads.
+// Phase 305-04 (GUARD-03, D-37): ONE more mount — the PII redaction card, directly under it.
 // ─────────────────────────────────────────────────────────────────────────────
 import { Building2 } from "lucide-react"
+
+import { OrgMcpSwitchCard } from "./OrgMcpSwitchCard"
+import { OrgPiiRedactionCard } from "./OrgPiiRedactionCard"
 
 interface OrgSettingsTabProps {
   /** The active org's display name (from the shell's org context). */
   orgName: string
+  /** Pulses the band's "every action recorded" marker after a recorded write (062-A). */
+  onRecorded?: () => void
 }
 
 /** The light org-config home — org identity + the three-homes seam (D-166-03). */
-export function OrgSettingsTab({ orgName }: OrgSettingsTabProps) {
+export function OrgSettingsTab({ orgName, onRecorded }: OrgSettingsTabProps) {
   return (
     <div className="mx-auto max-w-6xl w-full px-6 py-6">
       <section
@@ -49,6 +59,9 @@ export function OrgSettingsTab({ orgName }: OrgSettingsTabProps) {
             {orgName}
           </div>
         </div>
+
+        <OrgMcpSwitchCard orgName={orgName} onRecorded={onRecorded} />
+        <OrgPiiRedactionCard orgName={orgName} onRecorded={onRecorded} />
 
         {/* The three-homes seam (D-166-03) — honest about what this home is and what
             arrives here next; no scope-reduction language, a genuine light home. */}

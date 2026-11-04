@@ -1,518 +1,419 @@
-# Architecture Research — v4.8 "Every Page Has a Link"
+# Architecture Research: v4.9 "Use It From Your Own Tools"
 
-**Domain:** Integrating addressable URLs, waiting-run notifications (in-app + email) and an active-org list filter into an existing React 19 / FastAPI / Supabase app with no router
-**Researched:** 2026-10-27
-**Confidence:** HIGH for every claim about existing code (each read directly, cited `file:line`). MEDIUM for the recommended designs (they follow precedents already in this repo, but are not yet built). LOW items are flagged inline.
-
-> Line numbers are as of `develop` @ `de569cfce` (2026-10-27). Hot files move fast — re-derive before planning against a number.
+**Domain:** Outside-caller surfaces (remote MCP server, personal MCP keys, OAuth 2.1, outbound webhooks, outside-traffic guardrails) bolted onto a brownfield FastAPI + Supabase + Redis RAG/agent platform
+**Researched:** 2026-10-30
+**Confidence:** HIGH for integration points (read from the code at `f267f2949`); MEDIUM for MCP SDK specifics (official docs, fast-moving v2 line); MEDIUM-LOW for Supabase OAuth 2.1 server (public beta, discovery path inconsistent across docs)
 
 ---
 
-## 0. Six findings that change the plan
+## 0. The five facts that decide this milestone's shape
 
-1. **A router precedent already exists in this repo, just not in the app entry.** `frontend/src/docs/router.ts:11-55` is a hand-rolled pure resolver (`resolveRoute(pathname, manifest)`) plus a History API `navigate()` that pushes and dispatches a synthetic `popstate` (`:52-55`), and `DocsApp.tsx:150` listens for it. The app entry can copy that shape. It does not have to adopt a framework router.
-2. **`/app/...` already resolves to the SPA on every host, with no infra change.** Dev: `devRouting.ts:30` sends every dot-less path to `app.html`. Vercel: `vercel.json` rewrites `/app/(.*)` → `/app.html` on any host, rewrites *everything* on `app.*` hosts, and redirects apex `/app/(.*)` → `https://app.:host/app/$1`, so the path survives. Onebox nginx: `nginx.conf` `location /app/ { try_files $uri /app.html; }`. **Bare paths such as `/runs/<id>` would break on onebox** (`location /` → `/index.html`, the landing page) **and on `*.vercel.app` previews.** So the canonical URL scheme must be `/app/...`.
-3. **An app-owned mailer already exists.** `backend/app/services/email_provider.py:1-105` (Phase 167) has a `ResendProvider` behind `EMAIL_PROVIDER=resend` + `RESEND_API_KEY` + `INVITE_FROM_EMAIL` (`config.py:1718-1725`), with the link base taken from `primary_frontend_origin()`. SEED-281's *"there is no app-owned mailer"* is out of date. ⚠ But the `resend` package is **not** in `backend/requirements.txt` or any Dockerfile (grep found nothing). `ResendProvider.send_invite` imports it lazily (`email_provider.py:70`), so on a deployed image with `EMAIL_PROVIDER=resend` that import fails, and `org.py:409-413` catches and logs it. Invite email has probably never sent from production (LOW confidence: production env not inspected). Building the email half is therefore *generalise and actually ship the sender*, not *add a sender*.
-4. **The durable "ask" record is a `messages` row, and its answer is another `messages` row.** Prompt: `role='system'`, `tool_calls[0].kind='ask_user_prompt'`, carrying `run_id` + `tool_call_id`. Answer or expiry: a `kind='ask_user_response'` row with the matching `tool_call_id` (`harness_engine.py:215-235`, `db/workflows.py:1793-1830`). Every workflow-run pause kind writes that prompt row: human gate `human_input.py:233-256`, action-risk / ask disposition `engine_ask.py:451-475`, engine no-match pause `engine_ask.py:1013-1040`, and chat `ask_user` `tools/agent_control.py:377-392`. Every resolution writes the response row: answer route `api/runs.py:933+`, terminal expiry `_expire_pending_ask_user`. **A database trigger on those two row shapes covers every producer and every resolution path without editing a single G-5 engine file.**
-5. **`messages.org_id` is wrong for two-org users on prompt rows.** None of the four prompt INSERTs sets `org_id`, so `messages_autofill_org_id` (`full-schema.sql:7050`) runs `autofill_org_id_by_owner`, which takes `org_members … LIMIT 1` with no `ORDER BY` (`full-schema.sql:75-79`). For a two-org user that is an arbitrary org. **A notification must take its org from `workflow_runs.org_id`, never from the prompt row.**
-6. **The SEED-389 defect has siblings the seed does not name.** `GET /threads` filters only on `user_id` + `is_eval` (`api/threads.py:279-286`). RLS lets the caller see every org they belong to (`full-schema.sql:9117`, `org_id IN current_user_org_ids()`). So the thread sidebar is also all-orgs, even though `ChatLayout.tsx:193-197` claims an org switch *"fetches the NEW org's threads"*. `GET /workflow-runs` (`api/workflow_runs.py:658-700`) is owner-scoped across orgs too. Both need an explicit per-org decision at intake (MEDIUM: read from code, not driven live).
+These were measured in the code, not assumed. Everything below follows from them.
+
+1. **The house way to "act as a member" is a uid-synthesized RLS connection, not a JWT.**
+   `dependencies._apply_rls_user_context` does `SET LOCAL ROLE authenticated` and sets both `request.jwt.claim.sub` and `request.jwt.claims` from a user id. `get_user_pg_connection(None, {"id": uid})` is already used **without any token** by retrieval (`retrieval_rpc._call_as_user`), `retrieval_scope.py`, `kb.py`, `sql_service.py` and `workflow_run_evidence.py`. No JWT signing secret is configured anywhere (`grep jwt_secret` finds nothing in `config.py`, `.env.example` or `deploy/onebox.env.example`). **An MCP key acts as its member through this seam. Do not mint Supabase JWTs.**
+2. **RLS shows a member every org they belong to, not "the active org".** `current_user_org_ids()` is `SELECT org_id FROM org_members WHERE user_id = auth.uid()`, and `match_document_chunks` gates on `dc.org_id = ANY (SELECT current_user_org_ids())`. Chat search today spans all of a two-org member's orgs (the `ExpertScopeUnavailable` docblock says so: *"an empty scope reaches retrieval as 'no folder filter' and would search every org the user is in"*). A key is minted in one org (`api_keys.org_id`), so **"sees exactly what the member sees" has to mean "what the member sees in the key's org"**, and that needs a narrowing step RLS does not provide today.
+3. **The inbound door (Phase 293) already proves the access posture, but it is FastAPI-dependency-shaped.** `resolve_api_key` is a `Depends()` chain (digest, constant-time compare, revoked, expired, still a member, not banned), with one 401 body for every failure, a Redis fixed-window limiter that fails closed (`rate_limit.py`), and `api_key.*` audit rows. A mounted MCP ASGI app cannot use `Depends`, so the resolver core has to be lifted into a plain async function first.
+4. **Workflow runs from outside already have a shared core; chat runs do not.** `services/unattended_launch.launch_unattended_run` (schedules + keys) creates the thread and run, arms caps, drives the run and finalizes the producer shell. There is **no equivalent for a chat turn**: `threads.send_message` (97 phases, the second-hottest file in the repo) requires a user-JWT supabase client for its request-scoped reads. `run_producer.run_producer` itself runs on the service role and takes `scoping: ThreadScoping`, so an "ask" core can call it directly without touching `threads.py`.
+5. **"Something happened" already flows through DB triggers into an outbox drained by every worker.** Phase 300: `workflow_runs_notify_on_status` (AFTER UPDATE OF status, WHEN terminal) and `messages_notify_on_ask` write `notifications` / `notification_deliveries`; `NotificationDrainer` runs in every uvicorn worker and claims with `FOR UPDATE SKIP LOCKED`, a `sending` flip, a lease and frozen payloads. No leader election, no Redis. Webhooks should copy this pattern exactly.
 
 ---
 
 ## 1. Standard Architecture
 
-### System Overview (target state)
+### System Overview
 
 ```
-┌──────────────────────────── Browser (app.html) ────────────────────────────────┐
-│                                                                                 │
-│  location (/app/...)  ──parse──►  useAppNavigation()  ◄──popstate──  History    │
-│        ▲                         (NEW, App.tsx seam)                            │
-│        └──── navigate(route,{replace}) ─────┘   │ route: AppRoute               │
-│                                                 ▼                               │
-│   App.tsx ── activeView + per-view ids ──► ChatLayout ──► AppViewSwitch (NEW)   │
-│                                               │                                 │
-│        useDeepLinkResolver (NEW) ── entity GET ─► org check ─► OrgProvider      │
-│               │                                     .switchOrg (existing)       │
-│               ▼                                                                 │
-│     useThreads.selectThread (existing) ──► ChatArea useLayoutEffect             │
-│                                  ──► StreamsProvider.setViewingThread (SOLE     │
-│                                      writer of activeThreadIdRef — unchanged)   │
-│                                                                                 │
-│   ATTENTION_PRODUCERS: [stopped-sources, waiting-runs (NEW)]                    │
-│        └── GET /notifications?state=open (server verdict, polled)               │
-└─────────────────────────────────────────────────────────────────────────────────┘
-                          │ X-Org-Id (validated server-side)
-┌──────────────────────────── FastAPI (2 workers) ───────────────────────────────┐
-│  /folders, /workflows/published|drafts ─► resolve_active_org_or_none ─► filter  │
-│  /notifications (NEW router)  ─ read / mark-read                                │
-│  NotificationDrainer (NEW, every worker) ─ FOR UPDATE SKIP LOCKED ─► Resend     │
-│  app_links.run_link() (NEW) = primary_frontend_origin() + "/app/runs/<id>"     │
-└─────────────────────────────────────────────────────────────────────────────────┘
-                          │
-┌──────────────────────────── Postgres (Supabase) ───────────────────────────────┐
-│  messages ──AFTER INSERT trigger (NEW, mig 217)──► notifications               │
-│                                                     └─► notification_deliveries │
-│  workflow_runs ──AFTER UPDATE OF status (NEW)──► resolve open notification     │
-└─────────────────────────────────────────────────────────────────────────────────┘
+ Outside callers: Claude Desktop / Cursor / Claude Code / Claude.ai (MCP)      n8n / Zapier (inbound 293)
+          │  Authorization: Bearer srl_mcp_…   (later: OAuth 2.1 access token)          │ srl_live_…
+          ▼                                                                             ▼
+┌──────────────────────────────────────────────────────────────────────────────────────────────────┐
+│ uvicorn worker ×2 (WORKER_COUNT=2)                                                                │
+│ CORS (outermost) → SetupMiddleware → MaintenanceMiddleware → CanvasGateMiddleware → router/mounts │
+│                                                                                                   │
+│  /mcp  (Mount, stateless Streamable HTTP)               /inbound/* (293, unchanged)               │
+│  ┌──────────────────────────────────────────┐            ┌─────────────────────────┐              │
+│  │ McpAuthASGI  (NEW, pure ASGI wrapper)    │            │ resolve_api_key (Depends)│              │
+│  │  → authenticate_presented_key() ◄────────┼── shared ──┤  → authenticate core     │              │
+│  │  → org MCP switch + operator switch      │   core     └─────────────────────────┘              │
+│  │  → McpPrincipal contextvar               │                                                     │
+│  ├──────────────────────────────────────────┤                                                     │
+│  │ MCP server (SDK) — 4 tool families        │                                                     │
+│  │  search_knowledge │ list/read_documents   │                                                     │
+│  │  ask_agent        │ run_workflow/get_run  │                                                     │
+│  └───────┬──────────────────────────────────┘                                                     │
+│          │ per-key limiter (rate_limit.py) → admission (NEW outside_admission.py) → audit          │
+│          ▼                                                                                        │
+│  Service layer (EXISTING, called, not edited)            Outbound guard (NEW outbound_guard.py)   │
+│   retrieval_service.search_documents(folder_ids=…)  ──►  redact(text) on every result / payload   │
+│   acting-member RLS reads (documents, runs)                                                       │
+│   unattended_chat.ask() (NEW) ──► run_producer.run_producer(scoping=ThreadScoping(...))           │
+│   unattended_launch.launch_unattended_run(origin_kind='mcp')                                      │
+│                                                                                                   │
+│  Lifespan loops (every worker): NotificationDrainer (300) · WebhookDrainer (NEW) · Scheduler …    │
+└──────────┬───────────────────────────────────────────┬───────────────────────────────────────────┘
+           │ asyncpg pool (BYPASSRLS) + uid-synth RLS   │ Redis: run:{id} streams, limiter buckets,
+           ▼                                            ▼        admission leases
+┌─────────────────────────────────────────────┐   ┌────────────────────────┐
+│ Postgres (Supabase)                          │   │ Redis                  │
+│  api_keys (+kind, +folder_ids, +tools)       │   └────────────────────────┘
+│  webhook_subscriptions / webhook_deliveries  │
+│  triggers: workflow_runs status → deliveries │ ──► WebhookDrainer ──► send_pinned_http('webhook', …)
+│            documents status   → deliveries   │        (SSRF-pinned, signed, retried)  ──► customer URL
+│  current_user_org_ids() (+ optional org GUC) │
+└─────────────────────────────────────────────┘
 ```
 
 ### Component Responsibilities
 
-| Component | Owns | Status |
-|---|---|---|
-| `frontend/src/lib/appRoutes.ts` | Pure leaf: `AppRoute` union, `parseAppLocation(pathname, search)`, `formatAppRoute(route)`, legacy aliases, strict UUID check | **NEW** |
-| `frontend/src/hooks/useAppNavigation.ts` | The one URL reader/writer: route state, `navigate(route, {replace})`, `popstate` listener, the `onNavigate(view)` adapter | **NEW**. This is the seam the ledger names for `App.tsx` (*"extract an `useAppNavigation()` hook rather than adding a fifth pair"*, HOT-FILE-LEDGER `App.tsx` section) |
-| `frontend/src/components/layout/AppViewSwitch.tsx` | The `activeView` mount ternary moved out of ChatLayout | **NEW**. The ledger's named candidate seam for `ChatLayout.tsx` (*"the `ActiveView` mount switch, ~150 lines of branch, owns none of the state around it"*) |
-| `frontend/src/hooks/useDeepLinkResolver.ts` | Entity id in route → fetch → org check → switch → apply selection; not-found state | **NEW** |
-| `App.tsx` | Auth/setup/invite gates, provider stack. Delegates view state to the hook | **MODIFIED** (shrinks) |
-| `ChatLayout.tsx` | Threads, `doRun`, panel. Writes the route instead of local `activeRunId` | **MODIFIED** |
-| `lib/runDeepLink.ts` + its 3 call sites | `?run=` writer/reader | **RETIRED** (parser keeps it as a legacy alias) |
-| `attentionConditions.ts` | Registry gains a second tenant; conditions gain a home view | **MODIFIED** (deliberate re-baseline of the `length === 1` pin) |
-| `NavPanel.tsx` | Badge placed per condition home instead of Library-only | **MODIFIED** |
-| `hooks/useWaitingRuns.ts` | Polls `GET /notifications?state=open` at the server-named interval | **NEW** |
-| `supabase/migrations/217_notifications.sql` | Tables, RLS, triggers, grants | **NEW** |
-| `backend/app/db/notifications.py` | Claim/advance/read helpers (`$N` binds only) | **NEW** |
-| `backend/app/api/notifications.py` | `GET /notifications`, `POST /notifications/{id}/read` | **NEW** |
-| `backend/app/services/notification_drainer.py` | Per-worker poll loop that sends email | **NEW** |
-| `backend/app/services/app_links.py` | `app_link(path)`, `run_path(id)`, `thread_path(id)` | **NEW** |
-| `services/email_provider.py` | Gains `send_notification(to, subject, html, idempotency_key)` | **MODIFIED** |
-| `api/folders.py`, `api/workflows.py`, `db/workflows.py` | Active-org narrowing on list routes | **MODIFIED** |
-| `hooks/useFolders.ts`, `pages/WorkflowsPage.tsx` | Refetch on `activeOrgId` change | **MODIFIED** |
+| Component | Responsibility | New / Modified | File |
+|---|---|---|---|
+| Key authentication core | Digest → lookup → constant-time compare → revoked → expired → member → not banned, as a plain `async def` usable outside FastAPI `Depends` | **Modified** (extract, behaviour byte-identical; `resolve_api_key` becomes a thin wrapper) | `backend/app/security/api_key_auth.py` |
+| `McpPrincipal` | Frozen value: `user_id, org_id, credential_id, credential_kind ('key'\|'oauth'), label, folder_ids, tools, expires_at` | **New** | `backend/app/security/mcp_principal.py` |
+| Acting-member DB context | `acting_member_connection(principal)` = `get_user_pg_connection(None, {"id": user_id})` + org narrowing | **New** (+ one small hot edit, see §5) | `backend/app/security/acting_member.py`, `backend/app/dependencies.py` |
+| MCP ASGI auth wrapper | Pure-ASGI: reads Bearer, resolves the principal, refuses with one 401 body, sets a contextvar, applies the per-client IP limit | **New** | `backend/app/mcp/auth_asgi.py` |
+| MCP server + tools | SDK server object, stateless HTTP, tool handlers that call services only | **New** | `backend/app/mcp/server.py`, `backend/app/mcp/tools/{search,documents,ask,workflows}.py` |
+| Unattended chat core ("ask") | Create (or reuse a key-owned) thread, insert the user message, resolve the owner's model, `register_run_start`, spawn `run_producer` with `ThreadScoping(effective_folder_ids=…)`, await the terminal sentinel on `run:{id}` | **New** | `backend/app/services/unattended_chat.py` |
+| Key run read | The inbound run-read composition (steps, status, waiting-on, end reason, file links), shared by `/inbound/runs/{id}` and the MCP `get_run` tool | **Modified** (pure-move extraction out of `inbound.py` first) | `backend/app/services/key_run_read.py`, `backend/app/api/inbound.py` |
+| Outside admission control | Redis lease set per org, per credential and per resolved provider for outside-started runs; fails closed | **New** | `backend/app/services/outside_admission.py` |
+| Outbound guard (PII) | `redact_outbound(text, policy) -> (text, counts)`, applied at the MCP result and webhook payload boundaries only | **New** | `backend/app/services/outbound_guard.py` |
+| Webhook subscriptions API | Member CRUD (create shows secret once, rotate, pause, revoke, delivery log, "send test"), org-admin list/revoke | **New** | `backend/app/api/webhooks.py`, `backend/app/db/webhooks.py`, `backend/app/models/webhook.py` |
+| Webhook drainer | Per-worker poll loop: claim (`SKIP LOCKED`) → re-check visibility as subscriber → render frozen payload → redact → sign → pinned POST → record outcome / backoff / auto-disable | **New** | `backend/app/services/webhook_drainer.py` |
+| Egress capability | A `webhook` capability in the closed capability set, caller-configured host, HTTPS only, DNS-pinned | **Modified** | `backend/app/security/egress.py` |
+| MCP key management API | `kind='mcp'` keys: create with optional folder set and tool subset, list, revoke; org admin view + org MCP switch | **Modified** | `backend/app/api/api_keys.py`, `backend/app/db/api_keys.py`, `backend/app/models/api_key.py` |
+| Settings knobs | Operator kill switch, MCP limits, admission caps, webhook retry/auto-disable, redaction default | **Modified** (additive) | `backend/app/models/user_settings.py`, `backend/app/api/settings.py` |
+| Audit vocabulary | `mcp.call`, `mcp.refused`, `api_key.create`… reuse, `webhook.create/revoke/rotate/disable` | **Modified** (lockstep with the DB CHECK) | `backend/app/services/audit_service.py` + migration |
+| Word template fix | Bare `{{ name }}` against a cited-record context renders the value or fails integrity | **Modified** | `backend/app/services/tools/render_template.py` (`_RENDER_DRIVER_SRC`, `residual_tags_in` / `assert_integrity`) |
 
 ---
 
-## 2. Recommended Project Structure (new files only)
+## 2. Recommended Project Structure (new code only)
 
 ```
-frontend/src/
-├── lib/appRoutes.ts                  # pure: AppRoute, parse/format, aliases (no React)
-├── lib/appRoutes.test.ts
-├── hooks/useAppNavigation.ts         # the ONLY History API writer in the app entry
-├── hooks/useDeepLinkResolver.ts      # entity → org → selection
-├── hooks/useWaitingRuns.ts           # server-verdict poll for the attention tenant
-└── components/layout/
-    ├── AppViewSwitch.tsx             # moved verbatim from ChatLayout (extraction-first)
-    └── LinkNotFound.tsx              # "not found, or not yours" in-view state
-
 backend/app/
-├── api/notifications.py
-├── db/notifications.py
-├── services/notification_drainer.py
-└── services/app_links.py
-supabase/migrations/217_notifications.sql   # 218+ for any follow-up
+├── mcp/                              # NEW package — the outside MCP edge. Not engine code.
+│   ├── __init__.py
+│   ├── server.py                     # builds the SDK server, registers the tool families, stateless
+│   ├── auth_asgi.py                  # pure-ASGI Bearer → McpPrincipal (contextvar), one 401 body
+│   ├── refusals.py                   # the house sentences + the one "Not found." for every miss
+│   └── tools/
+│       ├── search.py                 # search_knowledge → retrieval_service.search_documents
+│       ├── documents.py              # list_documents / read_document → acting-member SELECTs
+│       ├── ask.py                    # ask_agent → unattended_chat.ask
+│       └── workflows.py              # list_workflows / run_workflow / get_run → unattended_launch + key_run_read
+├── security/
+│   ├── api_key_auth.py               # MODIFIED: authenticate_presented_key() extracted
+│   ├── mcp_principal.py              # NEW
+│   └── acting_member.py              # NEW
+├── services/
+│   ├── unattended_chat.py            # NEW — sibling of unattended_launch.py
+│   ├── key_run_read.py               # NEW — moved out of api/inbound.py
+│   ├── outside_admission.py          # NEW
+│   ├── outbound_guard.py             # NEW
+│   └── webhook_drainer.py            # NEW — sibling of notification_drainer.py
+├── api/webhooks.py                   # NEW
+├── db/webhooks.py                    # NEW
+└── models/webhook.py                 # NEW
+supabase/migrations/220_… 22N_…       # see §6
+frontend/src/
+├── lib/api/mcpKeys.ts, lib/api/webhooks.ts       # NEW modules — do NOT grow lib/api.ts (128 phases)
+└── components/settings/{mcp,webhooks}/…          # NEW folders beside settings/apiKeys/
 ```
 
-**Structure rationale:** `appRoutes.ts` is a strict leaf, the same discipline as `attentionCountByTab` (`attentionConditions.ts:205-214`) and `docs/router.ts`, so it is unit-testable without mounting anything and it is the one place the path vocabulary is spelled. The backend mirrors only the run and thread paths it emails (`app_links.py`). It does not import frontend source, because `?raw` cross-tree imports are a known rot vector in this repo (memory: *"?raw imports backend .py red-at-BASE"*).
+### Structure Rationale
+
+- **`app/mcp/` is its own package, not a router in `app/api/`.** It is a separate ASGI app with its own transport, auth wrapper and error vocabulary. Keeping it out of `api/` keeps `scripts/build-public-openapi.cjs` and the OpenAPI schema untouched (a `Mount` is not in FastAPI's schema anyway).
+- **MCP tools are not engine tools.** `test_259_closed_core_inventory.py` pins `len(_TOOL_REGISTRY) == 30`. The MCP tool handlers call services and must never import from `tool_dispatcher.py` or `services/tools/`, and must never call `handle_search_documents` (which is `ToolContext`-bound, emits SSE events and writes run-scoped audits). That keeps the Extension Contract intact: the MCP server is an outer edge exposing existing capabilities.
+- **Siblings, not edits, for the unattended cores.** `unattended_chat.py` sits beside `unattended_launch.py` and `webhook_drainer.py` beside `notification_drainer.py`, so the hot files stay closed.
 
 ---
 
-## 3. URL scheme and source-of-truth split
+## 3. Architectural Patterns
 
-### 3.1 Route table (canonical form always starts `/app`)
+### Pattern 1: One principal, many credentials (key now, OAuth later)
 
-| Path | `ActiveView` | Per-view id currently held in | Current holder (file:line) |
-|---|---|---|---|
-| `/app` (also bare `/` on an `app.*` host) | `chat` (new chat) | n/a | `App.tsx:156-171` initializer |
-| `/app/chat/:threadId` | `chat` | `useThreads.selectedThread` | `hooks/useThreads.ts:25,38-40` |
-| `/app/runs/:workflowRunId` | `workflow-run` | `activeRunId` | `ChatLayout.tsx:309` |
-| `/app/workflows` | `workflows` | `pageView` (library/builder) | `pages/WorkflowsPage.tsx:304` |
-| `/app/library` (`?tab=`) | `documents` | `libraryTab` | `App.tsx:222-226` |
-| `/app/experts`, `/app/experts/:bundleId` | `experts` | `inspected` (modal) | `experts/catalog/ExpertCatalogPage.tsx:100,351` |
-| `/app/skills`, `/app/skills/:skillId/:tab` | `skills` / `skill-studio` | `studioSkillId`, `studioTab` | `App.tsx:183-188` |
-| `/app/settings/:tab` | `settings` | localStorage `SETTINGS_TAB_STORAGE_KEY` | `pages/SettingsPage.tsx:449,477` |
-| `/app/connections` | `connections` | n/a | `ChatLayout.tsx:938` |
-| `/app/org/:tab` | `org-admin` | `activeTab` | `org/OrgAdminShell.tsx:82` |
-| `/admin` | `control-room` | n/a (probe-gated) | `ChatLayout.tsx:996-1004` |
-| `/admin/spend` | `admin-spend` | n/a | `App.tsx:158` (existing path read, keep it) |
+**What:** Every MCP request resolves to one `McpPrincipal` before any tool runs. Phase-1 credentials are `api_keys` rows with `kind='mcp'`. The OAuth phase adds a second resolver: a Supabase OAuth access token (a JWT carrying `user_id` + `client_id`) plus an app-side `mcp_grants` row keyed by `(user_id, client_id)` that records the org, folder set and tool subset the member picked at consent. Tools only ever see the principal.
+**When to use:** Always. It is what lets OAuth land later without touching any tool.
+**Trade-offs:** One extra table for OAuth grants. Worth it, because a raw OAuth token carries identity but no org or narrowing, and the key model's narrowing has to survive the switch.
 
-**Legacy aliases (parse, then `replace` to canonical):** `/app?run=<uuid>` (`lib/runDeepLink.ts:24-33`, shipped 289-04, may already be in the wild), `/app?connections=1&…` (OAuth callbacks built at `api/connectors.py:1443-1479,1638-1770`; keep the query so the Connections tab can read `oauth_error`), and bare `/` on `app.*` (`frontend/middleware.ts` rewrites it to `app.html`).
-
-**Scope note:** the milestone lists "view, thread, workflow run, Expert". The Builder draft (`/app/workflows/drafts/:id`) and per-document links are natural next members, but they sit on `WorkflowBuilderPage.tsx` (27 phases) and `LibraryPage.tsx` (20 phases). Add them only as route members plus a resolver arm, never inside the same plan as the router core.
-
-**Never put a dot in a route segment.** `devRouting.ts:28` treats any dotted path as a file. Vercel serves the filesystem before rewrites (memory: *"Vercel: filesystem beats rewrites"*).
-
-**Never put the org in the path.** Every routed entity is a UUID that already carries `org_id`. Putting the org in the URL would make the URL a second source of truth against `OrgProvider`'s localStorage hint (`providers/OrgProvider.tsx:90-105`) and the server-validated header (`dependencies.py:899-951`).
-
-**Tradeoff to state at intake:** canonical `/app/...` puts `/app` back in the address bar on `app.superrag.cloud`, which SEED-242's middleware removed for the root only. The parser accepts both `/chat/:id` and `/app/chat/:id` on an `app.*` host. The formatter, emailed links and copy-link always emit `/app/...`, because that is the only form that works on all four hosts.
-
-### 3.2 What becomes source of truth, and what stays a store
-
-| Concern | Source of truth after v4.8 | Notes |
-|---|---|---|
-| Which view is open | **URL** (via `useAppNavigation`) | `App.tsx:156` `useState<ActiveView>` becomes derived |
-| Which thread / run / expert / skill+tab / settings tab is open | **URL** (ids only) | |
-| Thread list, thread objects, message buckets, SSE subscriptions | **Stores, unchanged** | `useThreads`, `streamsStore`, `StreamsProvider` |
-| `activeThreadIdRef` | **StreamsProvider.setViewingThread, sole writer, unchanged** | `StreamsProvider.tsx:30,2108-2119`. Called only from `ChatArea.tsx:463-465` (`useLayoutEffect`) and `:575` (first-send path) |
-| Active org | **OrgProvider (localStorage hint + server validation), unchanged** | A deep link may *request* a switch; it never writes the org itself |
-| Library tab hand-off lifetime | URL `?tab=` replaces `libraryTabAfterNavigate` | The `setLibraryTab(` writer-count pin in `LibraryPage.tabAttention.test.tsx` must be re-baselined in the same commit, never broken by surprise |
-
-**The rule that keeps SSE ownership intact:** the router selects *which thread*; it never talks to StreamsProvider. The chain is `URL → route.threadId → useDeepLinkResolver → useThreads.selectThread(thread) → ChatArea prop → useLayoutEffect → setViewingThread`. Each link already exists except the first two. Nothing new may call `setViewingThread`, because the L-068-03 sole-writer gate counts assignments.
-
-### 3.3 Incremental migration from `ActiveView` (no big bang)
-
-1. **Introduce, don't replace.** `useAppNavigation` returns `{ route, activeView, navigate, onNavigate }`, where `onNavigate(view: ActiveView)` is `navigate({ view })`. The props `ChatLayout` already takes (`onNavigate`, `activeView`, `studioSkillId`, `studioTab`, `libraryTab`, `ChatLayout.tsx:143`) are fed from the hook, so the ~40 existing `onNavigate("…")` call sites compile and behave unchanged. They now also push a history entry, which is the point: Back works for every existing door on day one.
-2. **Move state holders to the route one at a time**, each in its own task with its own RED test: `activeRunId` (`ChatLayout.tsx:309`) first, since it already has a URL; then `studioSkillId`/`studioTab` (`App.tsx:183-188`); then `libraryTab`; then thread selection; then the Expert modal; then the Settings and OrgAdmin tabs.
-3. **Retire the competing URL writers in the same commit as their replacement.** `RunEvidenceReport.tsx:443-444` (`writeRunDeepLink` / `clearRunDeepLink`) and `ChatLayout.tsx:314-316` (`clearRunDeepLink` effect) both `replaceState` the address bar. Left alive, they fight the router: `?run=` gets written onto `/app/runs/<id>`, or stripped mid-navigation.
-4. **Route the two other view writers through `navigate`.** The 403 visibility bounce `App.tsx:285-287` (`setActiveView("chat")`) becomes `navigate({view:"chat"}, {replace:true})`. `CitationNavProvider navigate={handleNavigate}` (`App.tsx:394`) gets the adapter.
-5. **Preserve the pre-auth gates byte-for-byte.** `/setup` (`App.tsx:320-326`) and `/invite` (`App.tsx:337-340`) are evaluated before the router mounts. `useAppNavigation` lives inside the authenticated branch or ignores those two paths. Its first parse must not `replaceState` them away.
-
----
-
-## 4. Deep-link resolution: entity → view → org
-
-### 4.1 What the server already tells us
-
-| Entity | Read | Org-scoped? | Exposes `org_id`? |
-|---|---|---|---|
-| Thread | `GET /threads/{id}` `api/threads.py:1040-1054`, filtered by `user_id` only; RLS = any member org | No, across the caller's orgs | Yes (`select("*")`) |
-| Workflow run | `GET /workflow-runs/{id}` `api/workflow_runs.py:1010-1044`, owner-scoped, 404 on miss, canvas-gated | No, across orgs | Selected (`:1025`) but **not on `WorkflowRunRead`** (`:379-440`). Needs one additive field |
-| Expert bundle | `GET /experts/{bundle_id}` `api/experts.py:566` | Not verified (LOW) | Not verified. Check at phase research |
-
-### 4.2 Resolver algorithm (`useDeepLinkResolver`)
-
-```
-on route change with an entity id:
-  1. if the entity is already in a loaded store (threads list) and its org == activeOrgId → select, done
-  2. else GET the entity (owner-scoped read above)
-       404 → render LinkNotFound in that view ("not found, or not shared with you").
-             NEVER bounce to chat silently — SEED-185's own failure test
-       ok  → entity.org_id == activeOrgId  → select
-             entity.org_id != activeOrgId  → membership in OrgProvider.memberships?
-                  yes → pendingSelection = {route, org: entity.org_id}
-                        org.switchOrg(entity.org_id)            (OrgProvider.tsx:173-180)
-                        show "Opened in <Org name>" banner (role=status, auto-dismiss)
-                  no  → LinkNotFound (cannot happen today: RLS already filters to member orgs)
-  3. effect on [activeOrgId]: when pendingSelection.org === activeOrgId,
-       re-fetch (the switch's teardown has cleared buckets) → select → clear pending
+```python
+@dataclass(frozen=True)
+class McpPrincipal:
+    user_id: UUID
+    org_id: UUID
+    credential_kind: Literal["key", "oauth"]
+    credential_id: UUID          # api_keys.id or mcp_grants.id — origin_ref on everything it starts
+    label: str
+    folder_ids: tuple[UUID, ...] | None   # None = whole org as the member sees it; () is REFUSED at mint
+    tools: frozenset[str] | None          # None = all four families
 ```
 
-**Why step 3 is a separate effect:** an org switch fires two existing effects that would destroy a selection made in the same tick. `ChatLayout.tsx:202-210` calls `selectThread(null)` and `loadThreads()` on every real org change. `StreamsProvider.tsx:4483-4532` aborts every subscription and clears the viewed bucket. The selection must land *after* both. `ChatLayout`'s IN-01 `selectThread(null)` must also become route-aware: clear the selection only when the route's entity does not belong to the new org, and do it with `navigate({view:"chat"},{replace:true})`, so the URL never names a thread the screen is not showing.
+### Pattern 2: Act as the member through the uid-synthesized RLS context, narrowed to the key's org
 
-**Back/Forward across orgs:** a `popstate` onto an entity in another org goes through the same resolver, so it switches orgs with the banner. That is acceptable, because the switch is visible and reversible. The alternative (refusing) makes Back feel broken.
-
-**Gating while capabilities load:** `useEffectiveFeatures` fails closed to `{}` until resolved (`App.tsx:256-262`). The `workflow-run` branch requires `canvasEnabled === true` (`ChatLayout.tsx:337-338,1014`). On a cold deep link the resolver must wait for `featuresLoading === false` before deciding refusal or `UnknownViewFallback`. Otherwise every cold `/app/runs/<id>` flashes the fallback, or gets refused, during the first features fetch.
-
-**A route the audience cannot see** (SEED-185 note 5): render the existing plain refusal (`VISIBILITY_REFUSAL`, `App.tsx:275-293`) in place and keep the URL. Do not `replace` to chat, so a reload after an audience change still works.
-
----
-
-## 5. Notifications data model
-
-### 5.1 Tables (migration `217_notifications.sql`)
+**What:** Every read a tool makes either (a) runs on `get_user_pg_connection(None, {"id": principal.user_id})`, or (b) is a service-role read with explicit `org_id = principal.org_id AND <owner/visibility>` predicates that a parity test proves equal to (a). Org narrowing comes from a transaction-local GUC that `current_user_org_ids()` intersects with when it is set:
 
 ```sql
--- One row per "a person should know X" fact. The in-app inbox AND the delivery ledger's parent.
-CREATE TABLE public.notifications (
-  id               uuid PRIMARY KEY DEFAULT gen_random_uuid(),
-  recipient_user_id uuid NOT NULL REFERENCES auth.users(id) ON DELETE CASCADE,
-  org_id           uuid NOT NULL,                 -- from workflow_runs.org_id, NEVER messages.org_id
-  kind             text NOT NULL CHECK (kind IN ('run_waiting')),   -- SEED-281 N-1; N-2..N-4 extend the CHECK
-  subject_type     text NOT NULL CHECK (subject_type IN ('workflow_run')),
-  subject_id       uuid NOT NULL,                 -- workflow_runs.id
-  dedupe_key       text NOT NULL,                 -- 'run_waiting:<workflow_run_id>'
-  source_ref       text,                          -- current prompt tool_call_id (updated on re-ask)
-  title            text NOT NULL,                 -- workflow name, server-composed
-  body             text,                          -- prompt sentence, truncated
-  created_at       timestamptz NOT NULL DEFAULT now(),
-  read_at          timestamptz,
-  resolved_at      timestamptz,
-  resolution       text CHECK (resolution IN ('answered','expired','run_ended','superseded'))
-);
--- ONE OPEN notice per (recipient, subject). Re-asks update it; they never multiply.
-CREATE UNIQUE INDEX notifications_one_open
-  ON public.notifications (recipient_user_id, dedupe_key) WHERE resolved_at IS NULL;
-CREATE INDEX notifications_recipient_open
-  ON public.notifications (recipient_user_id, created_at DESC) WHERE resolved_at IS NULL;
-
--- Outbox: one row per (notification, channel). Service-role only.
-CREATE TABLE public.notification_deliveries (
-  id              uuid PRIMARY KEY DEFAULT gen_random_uuid(),
-  notification_id uuid NOT NULL REFERENCES public.notifications(id) ON DELETE CASCADE,
-  channel         text NOT NULL CHECK (channel IN ('email')),
-  status          text NOT NULL DEFAULT 'pending'
-                  CHECK (status IN ('pending','sending','sent','skipped','failed')),
-  not_before      timestamptz NOT NULL,           -- created_at + grace (quiet when attended)
-  attempts        int NOT NULL DEFAULT 0,
-  claimed_at      timestamptz,                    -- lease; a stale 'sending' is re-claimable
-  sent_at         timestamptz,
-  skip_reason     text,                           -- 'resolved_before_send' | 'no_provider' | 'opted_out' | 'no_email'
-  last_error      text,                           -- sanitized; never a token or raw provider body
-  idempotency_key text NOT NULL,                  -- = notification_id || ':email'; also sent to Resend
-  UNIQUE (notification_id, channel)
-);
-CREATE INDEX notification_deliveries_due
-  ON public.notification_deliveries (not_before) WHERE status IN ('pending','sending');
+-- migration 22x: narrowing only; unset GUC = byte-identical behaviour
+CREATE OR REPLACE FUNCTION public.current_user_org_ids() RETURNS SETOF uuid
+LANGUAGE sql STABLE SECURITY DEFINER SET search_path TO 'public' AS $$
+  SELECT org_id FROM public.org_members
+   WHERE user_id = auth.uid()
+     AND (nullif(current_setting('app.acting_org_id', true), '') IS NULL
+          OR org_id = nullif(current_setting('app.acting_org_id', true), '')::uuid);
+$$;
 ```
 
-**RLS (mandatory, and remember BUG-260911-01):**
-- `ALTER TABLE … ENABLE ROW LEVEL SECURITY` on both tables.
-- `notifications`: `SELECT` and `UPDATE (read_at)` `TO authenticated USING (recipient_user_id = auth.uid() AND org_id IN (SELECT public.current_user_org_ids()))`. No INSERT/DELETE policy, so only the trigger (SECURITY DEFINER) and the service pool write.
-- `notification_deliveries`: RLS enabled with **no policies** (deny-all to `authenticated`/`anon`).
-- `REVOKE ALL … FROM anon` on both. Trigger functions get `REVOKE EXECUTE … FROM PUBLIC`, because of the PUBLIC-grant trap CLAUDE.md records for migration 177. Then run `get_advisors(security)` in the deploy parity check.
-- Settings: `app_settings.notify_email_grace_seconds` (default 120) and `user_settings.notify_email_run_waiting` (default true), each with a Settings UI control, per the *settings live in app_settings/user_settings* rule.
-
-### 5.2 Producer: one trigger, not N engine hooks
-
-```
-AFTER INSERT ON public.messages
-FOR EACH ROW
-WHEN (NEW.role = 'system' AND NEW.tool_calls @> '[{"kind":"ask_user_prompt"}]')
-  → notify_on_ask_prompt()   SECURITY DEFINER, SET search_path = ''
-     wr := workflow_runs WHERE id = (NEW.tool_calls->0->>'run_id')::uuid
-     IF wr IS NULL OR wr.is_golden_run THEN RETURN NEW   -- chat Deep asks + publish golden runs: no notice
-     INSERT notifications (recipient = wr.user_id, org_id = wr.org_id, kind='run_waiting',
-            subject_id = wr.id, dedupe_key = 'run_waiting:'||wr.id, source_ref = tool_call_id, …)
-       ON CONFLICT (recipient_user_id, dedupe_key) WHERE resolved_at IS NULL
-       DO UPDATE SET source_ref = EXCLUDED.source_ref, body = EXCLUDED.body   -- re-ask: no new row, no new email
-     INSERT notification_deliveries (…, not_before = now() + grace) ON CONFLICT DO NOTHING
-     EXCEPTION WHEN OTHERS → RAISE WARNING; RETURN NEW      -- ⛔ MUST NOT FAIL THE PROMPT INSERT
-
-AFTER INSERT ON public.messages
-WHEN (NEW.role = 'system' AND NEW.tool_calls @> '[{"kind":"ask_user_response"}]')
-  → UPDATE notifications SET resolved_at = now(),
-         resolution = CASE WHEN (NEW.tool_calls->0->>'expired')::bool THEN 'expired' ELSE 'answered' END
-     WHERE resolved_at IS NULL AND source_ref = NEW.tool_calls->0->>'tool_call_id'
-
-AFTER UPDATE OF status ON public.workflow_runs
-WHEN (NEW.status IN ('completed','failed','cancelled') AND OLD.status IS DISTINCT FROM NEW.status)
-  → UPDATE notifications SET resolved_at = now(), resolution = 'run_ended'
-     WHERE resolved_at IS NULL AND subject_type='workflow_run' AND subject_id = NEW.id
+```python
+# dependencies._apply_rls_user_context — the ONE hot edit: read a contextvar, set_config(..., true)
+_acting_org: ContextVar[str | None] = ContextVar("acting_org_id", default=None)
+...
+org = _acting_org.get()
+if org:
+    await conn.execute("SELECT set_config('app.acting_org_id', $1, true)", org)
 ```
 
-(The exact terminal-status literals must be re-derived from the `workflow_runs` CHECK at phase time. The list above is illustrative.)
+**Why a GUC and not folder lists or an RPC parameter:** a folder list cannot express root documents (`folder_id IS NULL`, which 298's `root_upload_org` creates). An RPC parameter would have to be added to `match_document_chunks`, the keyword RPC, every RLS policy and every DEFINER function separately — five-plus homes for one rule. The GUC narrows every policy that already calls `current_user_org_ids()` in one place, it is `SET LOCAL` (`is_local := true`) so it cannot leak to the next pool borrower, and it can only shrink the set.
+**Trade-offs:** It touches a SECURITY DEFINER function every RLS policy depends on. The phase that does it must (1) EXPLAIN-check that the `(SELECT current_user_org_ids())` initPlan shape survives, (2) run the backend baseline gate, and (3) prove "unset = identical" with the existing RLS harness. **Confidence: MEDIUM.** This is a recommendation to validate, not a measured result.
+**Proof of "sees exactly what the member sees" (required deliverable):** a parity integration test on the Phase-163 RLS harness (`tests/integration/_rls_harness`). Use a fixture member in two orgs, with owned, org-shared-folder, connection-visible, private-to-someone-else, archived/non-retrievable and root documents. Assert that the MCP `list_documents` id set == the browser path's id set with `X-Org-Id = key org` (user-JWT PostgREST), that `search_knowledge` never returns a chunk whose document is outside that set, and that the other org's documents appear in neither. Add a negative arm: revoke membership and the next call is a 401. Without this test, the "exactly" claim is an assertion and not a proof.
 
-**Why a trigger beats Python hooks here:**
-- **Coverage without hot-file edits.** The four prompt INSERT sites live in `human_input.py` (G-5 FIRES), `engine_ask.py`, `agent_control.py` and, by extension, `harness_engine.py` (27 phases). The trigger touches none of them. A future pause kind that writes the same row shape is covered automatically.
-- **Two workers and boot sweeps are handled by the data, not by coordination.** A restart re-drive of a human step mints a new `uuid4` `tool_call_id` and inserts a new prompt row (`human_input.py:137`; see the comment at `:166`). The partial unique index turns that into an UPDATE of the one open notice, so there is no duplicate notice or email. `resume_pending_prompt` re-emits without re-inserting (`ask_user_service.py:256-302`), so it never touches the trigger at all.
-- **Resolution has every path.** Answer (`api/runs.py:933+`, response row insert near `:1076`), expiry on terminalisation (`harness_engine.py:215` inserts an `expired` response row), and any terminal path that skips `_expire_pending_ask_user` (caught by the `workflow_runs` status trigger).
+### Pattern 3: Unattended chat core beside the unattended workflow core
 
-**The one hard rule:** `engine_ask.py`'s prompt INSERT is fail-closed (*"3. The durable prompt row — FAIL-CLOSED (D-50)"*, `engine_ask.py:1013`). A raising trigger would turn a notification bug into a run that cannot pause. The trigger body must wrap all of its work in `BEGIN … EXCEPTION WHEN OTHERS THEN RAISE WARNING … END`. A test must prove that a planted failure inside the trigger still lets the prompt row insert.
+**What:** `unattended_chat.ask(principal, question, conversation_id=None, wait_seconds=N)`:
+1. Admission check (Pattern 5), then the per-key `start` limit.
+2. Thread: if `conversation_id` is given it must be a thread with `origin_kind='mcp' AND origin_ref=<credential> AND user_id=<owner>` (the D-12 one-query rule: every miss is the same 404). Otherwise insert a new thread through the pool with `org_id`, title `"<first words> · via <label>"` and origin columns. **It is a visible thread in the owner's history**, the same choice 293 made for key-started workflow runs.
+3. Insert the user message through the pool (`org_id` explicit, `run_origin` set).
+4. Model: `run_model_resolution.resolve_owner_run_model(owner_id)` (300 already built the owner-pair resolution for unattended runs).
+5. `register_run_start(pool=…, org_id=principal.org_id, …)`, then spawn `run_producer.run_producer(..., current_user={"id": owner, "org_id": org}, supabase=service_role, scoping=ThreadScoping(effective_folder_ids=<key folder subtree ids or None>, ...))`, registered in `RUN_TASKS` with the `_spawn` strong reference.
+6. Await: `XREAD BLOCK` on `run:{run_id}` until the terminal sentinel or `wait_seconds` runs out (Redis, so it works whichever worker owns the producer). Then read the persisted assistant message from Postgres, which is the source of truth (Realtime/stream is a hint). On timeout, return `{status: "running", run_id, conversation_id}`, and the client calls `get_answer(run_id)`.
+**When to use:** MCP `ask_agent` only. In-app chat stays on `send_message`.
+**Trade-offs:** It duplicates roughly 60 lines of `send_message` preflight (thread ownership, message insert, run registration). That is deliberate: `threads.py` is at 97 phases. The duplication should be one service with tests that pin parity on the `runs` / `messages` row shapes, and the module docblock should name `send_message` as its twin (the 293 "share, not copy" note applies the other way here, because sharing would mean editing the hottest backend file).
+**Hard limits:** `wait_seconds` must stay under the proxy's `proxy_read_timeout 300s` (onebox nginx) and Traefik's equivalent. Recommend a 120 s default, operator-tunable. An `ask_user` interrupt or a connector approval pause is answered in the app, never over MCP (293's D-10 rule): the tool returns `waiting_for_person` with WHO, never the question.
 
-**Scope of "waits on a person" in v4.8:** ask-prompt-backed workflow-run pauses only (human gate, action-risk approval, engine ask, and the timeout pause, which leaves its prompt open). Two cases are excluded deliberately, and both should be appended to the SEED-281 register:
-- the **tool-round cap pause**: it has no prompt row, and its predicate is the complex `run_is_cap_paused` (`db/runs.py:236-270`);
-- **chat Deep `ask_user`**: the person is in the chat.
+### Pattern 4: Trigger-fed outbox, drained by every worker (webhooks)
 
-### 5.3 Email outbox and retry (the scheduler's pattern, verbatim in shape)
+**What:** Copy Phase 300 exactly. Postgres triggers fan out `webhook_deliveries` rows for matching subscriptions. `WebhookDrainer` runs in every worker, claims with `FOR UPDATE SKIP LOCKED` and a `sending` flip plus a lease, freezes the payload at first claim, sends, and records the outcome. The `webhook-id` header is the delivery id, stable across retries, so receivers can dedupe; delivery is at-least-once by design.
+**Triggers:**
+- `workflow_runs AFTER UPDATE OF status … WHEN (NEW.status IS DISTINCT FROM OLD.status AND NEW.status IN ('completed','failed','cancelled'))`. This is the same predicate as `workflow_runs_notify_on_status`; add a second trigger rather than editing 300's function. It fans out to subscriptions in `NEW.org_id` with `'run.finished' = ANY(events)` and `user_id = NEW.user_id` (owner-own runs by default). It skips `is_golden_run` (publish practice runs).
+- `documents AFTER UPDATE OF status … WHEN (NEW.status IS DISTINCT FROM OLD.status AND NEW.status IN ('completed','failed') AND NEW.is_latest)`. This catches every writer: `ingest_splice.py:1126`, `api/documents.py:2677`, watch sync and email ingestion. A Python emit at each writer would be four or more homes that drift.
+- Both functions `RAISE WARNING` and swallow (the 300 precedent), so a webhook defect can never fail a run's or a document's status update.
+**Visibility is re-checked at delivery, as the subscriber, under the acting-member context narrowed to the subscription's org** (and the subscription's folder set for documents). This is the 300 "still waiting / still a member" re-check. A trigger cannot evaluate `auth.uid()` RLS for each subscriber, so the trigger fans out by org and the drainer decides: not visible → `skipped_not_visible`, nothing sent.
+**Trade-offs:** A watch sync that ingests 5,000 documents fans out 5,000 deliveries per subscription. Mitigations: an index on `(org_id)` for active subscriptions so the trigger's EXISTS check is cheap for orgs with none, an optional folder filter on the subscription, and per-subscription send pacing in the drainer. Batched "digest" events are a v2 idea, deferred.
 
-`NotificationDrainer` copies `SchedulerService` (`scheduler_service.py:226-310`, wired in `main.py:498-535`):
+### Pattern 5: Admission at the outside door, not in the provider gateway
 
-- runs in **every** worker, with no leader election (`scheduler_service.py:8-14`);
-- each tick: `BEGIN; SELECT d.* … WHERE d.status IN ('pending','sending') AND d.not_before <= now() AND (d.status='pending' OR d.claimed_at < now() - lease) FOR UPDATE OF d SKIP LOCKED LIMIT N; UPDATE … SET status='sending', claimed_at=now(), attempts=attempts+1; COMMIT`. **The in-transaction advance is load-bearing**, exactly as `db/schedules.py` documents for `next_run_at`;
-- for each claimed row, re-read `notifications.resolved_at`. If resolved → `skipped/resolved_before_send`. This is what keeps an attended run quiet: the grace window lets the person answer before any email exists (SEED-281 rule 3);
-- recipient email from `auth.users` on the service pool, the opt-out from `user_settings`, and `EMAIL_PROVIDER=none` → `skipped/no_provider`. The link is still logged, as `NoneLogProvider` does for invites (`email_provider.py:57-61`). The status must say *skipped*, never *sent*;
-- send through `run_in_threadpool` (the blocking-call rule, same as `org.py:411`), passing `idempotency_key`. Resend keeps keys for 24 h and returns the original response on a duplicate (verified: resend.com/docs/dashboard/emails/idempotency-keys). So a worker that dies between send and `UPDATE … 'sent'` cannot double-send inside that window;
-- failure → back to `pending`, with `not_before = now() + backoff(attempts)` (e.g. 1m, 5m, 30m) and `failed` after 5 attempts. `last_error` is sanitized;
-- gated by a module flag like `RUN_BOOT_SWEEPS` (`main.py:44`) so tests boot without it. Skipped in setup mode, like every sweep in `main.py:415-463`.
+**What:** SEED-081 is scoped by this milestone to the new paths. Admission sits in front of `unattended_chat.ask`, `run_workflow` and (optionally) 293's `/inbound` start. It is a Redis lease set (sorted set, score = lease expiry) for each of `outside:inflight:org:{org}`, `outside:inflight:cred:{id}` and `outside:inflight:provider:{provider}` (provider resolved before start). It is acquired atomically with a Lua script or a MULTI that prunes expired leases first. It is released on terminal: `on_finish` for unattended workflow runs (the parameter already exists) and the ask core's finalize for chat runs. Leases expire as a backstop against a crashed worker. Refusals answer honestly (*"Your organization already has N outside runs in progress. Try again shortly."*) with `Retry-After`, and **fail closed** (503) when Redis cannot count, the same as `rate_limit.py`.
+**Why not in `provider_gateway/dispatcher.py`:** that file fires G-5 (4 phases). A semaphore there changes the in-app hot path for every provider. Retry-After honouring inside the gateway is the real SEED-081 fix, and it belongs to a later scale milestone.
 
-### 5.4 In-app notice: the second tenant of the attention registry
+### Pattern 6: Redact at the two new egress boundaries only
 
-- **Server verdict, not client derivation** (D-235-05): `GET /notifications?state=open` returns `{ items: [...], poll_interval_seconds }`. That mirrors `useSourceAttention`'s server-named cadence (`hooks/useSourceAttention.ts:113-116`). Items are the caller's open notices **across all their orgs**, each with its org name: a notice is addressed to a person, not to an org library, and hiding org B's waiting approval while the person is in org A is the SEED-281 failure again.
-- **Registration is deliberate:** add `{ key: "waiting-runs", use: useWaitingRunConditions }` to `ATTENTION_PRODUCERS` (`attentionConditions.ts:220-222`) and re-baseline `NavPanel.badge.test.tsx:118-119` (`length === 1`) in the same commit, citing SEED-281. That is the path the seam's own docblock prescribes (`attentionConditions.ts:10-16`).
-- **Two shell generalisations are required, because the shell hard-wires the Library today.**
-  1. `AttentionProducer.use(onOpen)` receives only `openLibraryHealth` (`ChatLayout.tsx:590-592`). Widen it to `use(ctx: { openLibraryHealth, navigate })` so a waiting-run condition's `onOpen` is `navigate({view:"workflow-run", runId})`.
-  2. Two places gate the badge on `Boolean(onOpenLibraryHealth)` (`ChatLayout.tsx:599`, `NavPanel.tsx:168`), and the badge is attached only to the Library rail item (`NavPanel.tsx:304`). Add an optional `home?: ActiveView` to `AttentionCondition`. Conditions with `tab` badge the Library, `run_waiting` conditions badge Workflows, and the popover lists them all.
-- **Mark read vs resolved:** opening the popover or the run calls `POST /notifications/{id}/read`, which sets `read_at`. Resolution is server-only (the triggers). A badge counts unresolved notices, so it clears only when the ask is answered or the run ends. It never clears because someone glanced at it.
-- **Realtime:** optionally add `notifications` to the `supabase_realtime` publication as a refetch *hint* only (D-v2.5-03). The poll remains the truth.
-
-### 5.5 How email links are built
-
-`primary_frontend_origin()` (`config.py:1786-1825`) splits the comma-separated `FRONTEND_URL`, strips trailing slashes, prefers an `://app.` origin, and falls back to the first entry. It never uses the raw string, which is the BUG-260904-04 lesson recorded in its docstring. Rules:
-
-- `services/app_links.py`: `def run_link(run_id: UUID) -> str: return f"{primary_frontend_origin()}{run_path(run_id)}"`, with `run_path` returning `f"/app/runs/{run_id}"`. One function per routed entity the backend emails. No new `APP_BASE_URL` env var (the Phase 167 decision, `email_provider.py:12-13`).
-- A backend unit test pins `run_path` to the literal `/app/runs/<uuid>`. A frontend test pins `parseAppLocation("/app/runs/<uuid>")` to the run route. Both cite this section. Run a multi-origin `FRONTEND_URL` case (`https://superrag.cloud,https://app.superrag.cloud`) because, as `config.py:1806-1808` warns, *"only a multi-origin install reproduces it"*.
-- No token or secret in the link. Opening it goes through the normal auth gate. With password sign-in, `App.tsx:342-344` renders `AuthPage` at the same URL, so the path survives. **SSO sign-in does not:** `useAuth.ts:74-78` calls `signInWithSSO({ domain })` with no `redirectTo`, so GoTrue returns to its site URL and the deep link is lost. Stash the intended path in `sessionStorage` before the redirect and restore it once after auth (MEDIUM; drive it live).
-- HTML-escape every interpolated value (workflow name, prompt, org name), as `ResendProvider` does (`email_provider.py:72-80`). These are tenant-controlled strings at an outbound-email trust boundary.
+**What:** `outbound_guard.redact_outbound()` is a pure function that runs on (a) every MCP tool result's text fields (chunk content, document text, agent answer, run output) and (b) every webhook payload's free-text fields, never on ids, statuses or URLs. The policy is per-org (`organizations.settings.outbound_redaction`: `off | mask | block`) with an operator default in `app_settings`. Counts of what was redacted go in the audit row's metadata; the redacted values never do.
+**Why only there:** SEED-079 covers ingestion, provider egress and LangSmith too. Redacting retrieval context in-app would change chat answers for every user. This milestone's promise is "what MCP and webhooks send out", so the seam sits at those two serializers.
+**Webhook payloads should be thin by default:** ids, kind, status, timestamps, a deep link (`/app/...` addresses exist since Phase 297), and a bounded, redacted `output_excerpt`. The receiver fetches the full result through MCP or `/inbound` with a credential. A thin payload is the strongest PII control there is.
 
 ---
 
-## 6. Active-org list filter (SEED-389) and its blast radius
+## 4. Data Flow
 
-### 6.1 The change
+### Request flow: one MCP tool call
 
-| Route | Today | Change |
-|---|---|---|
-| `GET /folders` `api/folders.py:24-33` | `fetch_visible_folders(supabase, uid)`, no org narrowing | `org = await resolve_active_org_or_none(request, current_user)`; pass `restrict_org_ids={org}` when `org` is set |
-| `GET /folders/{id}/children` `api/folders.py:36-47` | same | same |
-| `GET /workflows/published` `api/workflows.py:403-440` → `db/workflows.py:588+` | `is_system_global OR created_by=$1` | add `org_id` kwarg: `(is_system_global OR (created_by=$1 AND ($2::uuid IS NULL OR org_id=$2)))` in **both** branches (`owned_only` and default) |
-| `GET /workflows/drafts` `api/workflows.py:1233-1250` → `db/workflows.py:1091` | `status='draft' AND created_by=$1` | add `AND ($2::uuid IS NULL OR org_id=$2)` |
+```
+POST /mcp (or /api/mcp behind onebox nginx — X-Forwarded-Prefix /api)
+  → CORSMiddleware (outermost; expose Mcp-Session-Id only if a stateful leg is ever enabled)
+  → SetupMiddleware (unfinalized box → 503, fine)
+  → MaintenanceMiddleware  ⚠ every MCP call is a POST → 503 under maintenance (decision, §8)
+  → CanvasGateMiddleware   (not gated; /mcp is not a canvas path)
+  → Mount("/mcp") → McpAuthASGI
+        enforce_ip_limit (rate_limit.py, fail closed)
+        authenticate_presented_key(token, expected_kind='mcp')  ← live re-check every call
+        operator switch (app_settings.mcp_enabled) → org switch (organizations.settings.mcp_enabled)
+        set McpPrincipal + acting_org contextvars
+  → MCP SDK (stateless_http=True) → tools/call
+        tool in principal.tools?            else refusal (audited)
+        enforce_key_limit(kind='mcp_read'|'mcp_start')
+        outside_admission.acquire()          (start-type tools only)
+        service call as the member (§3 P2/P3)
+        outbound_guard.redact_outbound()
+        audit (mcp.call / mcp.refused, key id + label, tool, run_id, counts) — AWAITED before an error
+  ← JSON-RPC result (JSON or a short SSE response)
+```
 
-**Reuse the existing narrowing; do not write a second one.** `fetch_visible_folders` already has `restrict_org_ids` (`utils/folder_utils.py:222-287`), with the asymmetric semantics documented at `:239-270`: `None` means no narrowing, `set()` fails closed, and since 295-10 a non-empty set narrows **owned** folders too (`:265-268,284`). That is exactly SEED-389's per-org reading. `_authorize_thread_folder` already calls it this way (`api/threads.py:1194-1203`). Do **not** change the function's default: its docstring records why a post-filter or a changed default reopens the SEED-124 leak class.
+### Key data flows
 
-`resolve_active_org_or_none` (`dependencies.py:1020-1069`) is the right resolver, and it is the one 296-01 used for create (`api/folders.py:56-60`, `api/workflows.py:1216-1220`). An absent header → `None` → unchanged behaviour (tests and old clients). A non-member header → `None`, logged, never trusted. `workflow_definitions.org_id` is NOT NULL since migration 105 (`105_personal_org_backfill.sql:580`), so no NULL arm is needed.
+1. **search_knowledge.** `load_user_settings(owner)` → folder scope = expand `principal.folder_ids` to subtree ids (`folder_utils`), or `None` → `retrieval_service.search_documents(query, owner_id, service_role_client, user_settings=…, folder_ids=…)` with the acting-org contextvar set, so `_call_as_user` RPCs see only the key's org → redact → return passages with filename / document id / folder. Write a `search.query` audit row with `origin: mcp` so 217's "questions that found it" includes outside queries. ⚠ Pass `folder_ids=None` for unscoped keys, never `[]` (272 D-18: empty means nothing).
+2. **list_documents / read_document.** Acting-member `SELECT` on `documents` (or the 207 `library_documents` view) `WHERE is_latest AND retrievable [AND folder_id = ANY(subtree)]`, paged. Read returns `full_markdown` paged by character offset. ⛔ Do **not** reuse `retrieval_documents.fetch_full_document`: it is owner-scoped (`.eq("user_id", user_id)`), a documented fifth read path that hides org-shared documents a member can see (Phase 231 finding). A member-equivalent read has to go through RLS.
+3. **run_workflow / get_run.** Candidates = `api_keys_db.list_startable_candidates(user, org)` (+ readable globals), optionally narrowed by the key → the 293 refusal ladder (published, entitlement, template, `foreign_binding_refusal`, `validate_inbound_inputs`) → `launch_unattended_run(..., origin_kind='mcp', origin_ref=credential_id, run_label='mcp-started')`. `get_run` uses `key_run_read` (moved from `inbound.py`). Open decision: should it also read the member's other runs in the org, which the member can see in-app (§8)?
+4. **ask_agent.** §3 Pattern 3.
+5. **Webhook.** Status UPDATE → trigger fan-out → `webhook_deliveries(pending)` → drainer claims → acting-member visibility re-check → frozen thin payload → redact → Standard-Webhooks headers (`webhook-id`, `webhook-timestamp`, `webhook-signature: v1,<base64 HMAC-SHA256(id.ts.body)>`) → `send_pinned_http('webhook', 'POST', url, content=body)` → 2xx = `sent`, 410 = disable subscription, else `retry` on a backoff schedule → `failed` after N attempts → auto-disable after M consecutive failures, which raises a Phase-301 in-app notice to the owner.
 
-### 6.2 Blast radius — every caller, and whether it changes
+### State management
 
-**Folder visibility (`fetch_visible_folders`, ~20 callers): only the two list routes change.** Every other caller keeps calling it without `restrict_org_ids`, so it is unchanged by construction:
-- `api/folders.py:64` (create parent check, already re-checks the active org), `:273` (move);
-- `api/kb.py:21-345`;
-- `services/agent_loop.py:1498`, `document_search_service.py:304`, `document_view_resolver.py:389`, `expert_scope_statement.py:157,287`, `run_producer.py:615`;
-- `harness/scope.py:138,245`, `harness/grounding.py:424`, `engine_ask.py:857`, `workflow_kickoff.py:431`.
-
-⚠ **Product consequence to decide at intake:** chat retrieval and the KB picker (`api/kb.py`) will still see every org's folders while the Library shows one. Either accept that (retrieval scope is a separate question, already governed by thread org for threads with a folder) or file it as a follow-up seed. Do not widen this phase to retrieval.
-
-**`/workflows/published` frontend callers, all affected, all intended:**
-- `pages/WorkflowsPage.tsx:420` (`scope:"mine"`, the "Yours N" count SEED-389 measured);
-- `chat/useStartWorkflowInThread.ts:68` (thread picker);
-- `panel/WorkspacePanel.tsx:149`;
-- `settings/ConnectionsTab.tsx:1446` (connection grants; connections are org-scoped, so this is a correctness gain).
-
-`/workflows/starters` is global and untouched.
-
-**Client refetch is required:**
-- `hooks/useFolders.ts:24-29` loads once with no `activeOrgId` key, so after the server filter it would show the old org's folders until reload. Key it on `useOrgOptional()?.activeOrgId`, following the precedent at `ChatLayout.tsx:201-210`.
-- The Workflows page lists must refetch on the same key.
-- Folder Realtime events (`useFolders.ts:33+`) stay refetch hints.
-
-**Siblings to decide at intake (same defect class, not in SEED-389's text):** the thread list (`api/threads.py:279-286`) and the run log (`api/workflow_runs.py:658+`). If the thread list goes per-org, §4's resolver is what keeps an email link to an org-B thread working. That ordering is why this phase lands before the entity deep links.
+- **Source of truth:** Postgres (`workflow_runs`, `runs`, `messages`, `webhook_deliveries`). Redis streams, limiter buckets and admission leases are transport and counters only (D-v2.5-03).
+- **No MCP session state.** Use `stateless_http=True` (or the 2026-07-28 protocol's sessionless default), so either worker answers any request. SDK docs: legacy stateful sessions live in one worker's memory and 404 on the other worker without sticky routing. Nothing here needs server-to-client sampling or elicitation.
 
 ---
 
-## 7. Architectural Patterns to Follow
-
-### Pattern 1: Pure route leaf plus one History writer
-**What:** `parse`/`format` as pure functions; one hook owns `pushState`/`replaceState`/`popstate`.
-**Precedent:** `docs/router.ts:11-55`, `lib/runDeepLink.ts` (strict UUID, never throws).
-**Trade-off:** no nested layouts or loaders. That suits a closed 12-member union rendered by one ternary.
-
-```ts
-// appRoutes.ts — leaf, no React
-export type AppRoute =
-  | { view: "chat"; threadId?: string }
-  | { view: "workflow-run"; runId: string }
-  | { view: "experts"; expertId?: string }
-  | { view: "skill-studio"; skillId: string; tab: StudioTab }
-  | { view: Exclude<ActiveView, "chat" | "workflow-run" | "experts" | "skill-studio"> }
-export function parseAppLocation(pathname: string, search: string): AppRoute | { view: "not-found" }
-export function formatAppRoute(r: AppRoute): string   // always "/app/..."
-```
-
-### Pattern 2: The database owns exactly-once
-**What:** claim with `FOR UPDATE SKIP LOCKED` and advance state inside the same transaction. A partial unique index makes producers idempotent.
-**Precedent:** `scheduler_service.py:8-14`, `db/schedules.py` `claim_due_schedules`.
-**Trade-off:** logic in SQL is invisible to mocked-supabase unit tests. Mitigate with a DB-backed test (serialize it: it mutates the local DB, worktree rule 4).
-
-### Pattern 3: Server verdict, client renderer
-**What:** the attention producer shapes a server answer and derives nothing.
-**Precedent:** `attentionConditions.ts:18-25` (D-235-05), `useSourceAttention.ts:113`.
-
----
-
-## 8. Data Flow
-
-### Deep link (cold load from an email)
-```
-https://app.superrag.cloud/app/runs/<id>
-  → Vercel rewrite (app.* host) → app.html
-  → App: setup probe, auth gate (AuthPage keeps the URL) → providers mount
-  → useAppNavigation parses → {view:"workflow-run", runId}
-  → wait featuresLoading=false (canvas gate)
-  → GET /workflow-runs/<id> (owner 404 | ok + org_id)
-  → org differs → switchOrg → [ChatLayout org effect, StreamsProvider teardown]
-  → effect on activeOrgId → setActiveRun → WorkflowRunPage renders PendingAskCard
-```
-
-### Waiting run → person
-```
-engine writes ask_user_prompt row (any of 4 sites)
-  → trigger: notifications (open, 1 per run) + delivery (not_before = +grace)
-  → /notifications poll → waiting-runs condition → Workflows rail badge + popover
-  → drainer tick (any worker) claims due delivery → still open? → Resend (idempotency key)
-person answers → POST /runs/<id>/ask_user_response → response row → trigger resolves
-run ends any other way → workflow_runs status trigger resolves ('run_ended')
-```
-
----
-
-## 9. Anti-Patterns
-
-### AP-1: The router calls StreamsProvider
-**Why bad:** it breaks the L-068-03 sole-writer gate and the useLayoutEffect ordering that keeps F5 replay correct (`ChatArea.tsx:445-465`).
-**Instead:** the router selects a thread; ChatArea's existing effect does the rest.
-
-### AP-2: Keeping `?run=` writers alongside the router
-**Why bad:** two `replaceState` writers race. 289-REVIEW WR-05 already found one such leak (`ChatLayout.tsx:311-316`).
-**Instead:** retire `writeRunDeepLink`/`clearRunDeepLink` in the commit that routes runs. Keep only the parser alias.
-
-### AP-3: Notification hooks inside engine executors
-**Why bad:** four G-5 files edited, the restart re-ask producing duplicates, and resolution paths missed.
-**Instead:** the §5.2 triggers.
-
-### AP-4: Trusting `messages.org_id` or the client for the notice's org
-**Why bad:** the `LIMIT 1` autofill (`full-schema.sql:75-79`) picks an arbitrary org for two-org users.
-**Instead:** `workflow_runs.org_id`.
-
-### AP-5: Changing `fetch_visible_folders`' default
-**Why bad:** it silently re-scopes retrieval, grounding, kickoff and publish (~20 callers).
-**Instead:** pass `restrict_org_ids` at the two list routes only.
-
-### AP-6: Emailing on every pause immediately
-**Why bad:** attended runs get noise, the channel gets muted, and then N-1 is not delivered either (SEED-281 rule 3).
-**Instead:** a grace window plus a resolved-before-send skip.
-
-### AP-7: A bare-path URL scheme
-**Why bad:** it works in dev and on `app.*`, then 404s or shows the landing page on onebox and previews (SEED-185 "how we'd know this failed" #2).
-**Instead:** canonical `/app/...`.
-
----
-
-## 10. Scaling Considerations
-
-| Concern | Now (single-digit orgs) | 10k users | Notes |
-|---|---|---|---|
-| Notification poll | 1 GET / user / interval | Server-named interval lets ops slow it without a deploy | Same lever as `useSourceAttention` |
-| Trigger cost on `messages` | `WHEN` clause filters to system ask rows | negligible | The `WHEN` is evaluated before the function call |
-| Drainer | 2 workers × 1 tick/30-60 s | batch `LIMIT N` per tick | Resend rate limits; backoff covers 429 |
-| Thread list size (1,400+ threads, BUG-261027-02) | full list load | the deep-link resolver must not depend on the list containing the thread | §4.2 step 2 fetches by id |
-
----
-
-## 11. Integration Points
-
-### External
-| Service | Pattern | Notes |
-|---|---|---|
-| Resend | `send_notification` on the existing `EmailProvider` protocol, via `run_in_threadpool`, plus `Idempotency-Key` | ⚠ `resend` is missing from `requirements.txt`. Either add it (deploy-artifact parity, same commit) or call the Resend REST API through the existing shared `httpx` client (`dependencies.py:183`). The httpx route adds no dependency and is the leaner choice (STACK.md decides). Reuse `RESEND_API_KEY`/`INVITE_FROM_EMAIL`; a new generic `EMAIL_FROM` would need the `check-deploy-drift.sh` same-commit update |
-| Vercel / nginx / dev | `/app/*` → `app.html` already on all three | No routing change needed. Add a smoke check for one deep path per host to the parity checklist |
+## 5. Integration Points
 
 ### Internal boundaries
+
 | Boundary | Communication | Notes |
 |---|---|---|
-| useAppNavigation ↔ ChatLayout | props (`activeView`, ids, `onNavigate`) | Existing prop surface, so the migration is incremental |
-| Resolver ↔ OrgProvider | `switchOrg` + effect on `activeOrgId` | Never writes localStorage directly |
-| Engine ↔ notifications | Postgres triggers only | No Python import edge into the engine |
-| Drainer ↔ email provider | `get_email_provider()` | `none` path logs and marks `skipped` |
+| `app/mcp/*` → `security/api_key_auth.py` | direct call of the extracted `authenticate_presented_key` | `resolve_api_key` keeps its exact behaviour (`test_293_key_auth.py` must stay green unmodified) |
+| `app/mcp/*` → `dependencies._apply_rls_user_context` | via the `acting_org` contextvar | ⚠ contextvars copy into tasks created with `create_task`. Set it only inside tool handlers, never in a lifespan or drainer context, so it cannot leak into an in-app run |
+| `unattended_chat` → `run_producer.run_producer` | direct call, late import | no edit to `run_producer.py`; `ThreadScoping` is data |
+| `unattended_chat` → `run_lifecycle.register_run_start` / `finalize_run_terminal` | direct call | already pool-based, no JWT |
+| MCP workflows → `unattended_launch.launch_unattended_run` | direct call | already takes `origin_kind/label/ref` and `on_finish`; no code edit, only the DB CHECK widens to `'mcp'` |
+| MCP `get_run` & `/inbound/runs/{id}` → `key_run_read` | shared service | pure-move extraction FIRST (G-5 discipline: `inbound.py` is at 3 phases) |
+| `WebhookDrainer` → `security/egress.send_pinned_http` | new `webhook` capability | HTTPS only, caller host, DNS-pinned, redirects refused, response cap |
+| `WebhookDrainer` → `security/secret_cipher` | decrypt the signing secret per send | `get_cipher()` returns `None` when no key is configured → creating a webhook must fail closed |
+| `main.py` lifespan → `mcp.session_manager.run()` + `WebhookDrainer.start()` | lifespan block | the SDK raises "Task group is not initialized" if the mounted app's session manager is not entered in the HOST lifespan |
+| audit → `audit_log` CHECK | migration + `audit_service.VALID_ACTION_TYPES` in lockstep | ⚠ `assert_action_types_synced` runs at boot: **apply the migration before deploying the code** or both workers refuse to start |
+
+### External services
+
+| Service | Integration pattern | Notes |
+|---|---|---|
+| MCP clients (Claude Desktop/Code, Cursor, Claude.ai) | Streamable HTTP at `/mcp` | SDK `TransportSecuritySettings.allowed_hosts` must include the public API host (derive from `BACKEND_PUBLIC_URL`) or every request gets 421 behind a real hostname |
+| Supabase Auth OAuth 2.1 server (OAuth phase) | Authorization server (DCR, PKCE); our `/mcp` is the resource server publishing RFC 9728 metadata | Public beta since 2025-11-26. The app must host the consent page. Discovery path differs between doc copies; verify on a live project. Local CLI support unverified |
+| Customer webhook endpoints | Signed POST from the drainer | SSRF: refuse private/loopback/RFC1918 via `validate_destination`; re-validate at every send (DNS can change) |
+| LLM providers | unchanged (through `open_stream`) | admission is at the door; the gateway is not edited |
 
 ---
 
-## 12. Suggested Build Order (phases from 297)
+## 6. New tables, columns and RLS (migrations from 220)
 
-| # | Phase | Depends on | Hot files / extraction-first |
+| # | Change | RLS / grants |
+|---|---|---|
+| 220 | `api_keys` + `kind text NOT NULL DEFAULT 'workflow' CHECK (kind IN ('workflow','mcp'))`, `folder_ids uuid[] NULL`, `tools text[] NULL`; relax `workflows` CHECK to `kind <> 'workflow' OR jsonb_array_length(workflows) >= 1`. Separate prefix `srl_mcp_` so a workflow key can never authenticate MCP and the reverse | existing: SELECT-own for `authenticated` (column grant excludes `key_hash`), service_role writes. Add the new columns to the column grant |
+| 220 | `workflow_runs_origin_kind_check` + `'mcp'`; `threads` + `origin_kind/origin_label/origin_ref` (frozen by a trigger like `workflow_runs_origin_immutable`, nulled on client insert); `runs` + `origin_kind` for chat runs started over MCP | existing table policies unchanged; the origin columns are not client-writable (trigger) |
+| 221 | `current_user_org_ids()` reads `app.acting_org_id` (narrowing only) | function grants unchanged (revoke PUBLIC/anon, grant authenticated/service_role) |
+| 221 | `organizations.settings.mcp_enabled` / `webhooks_enabled` / `outbound_redaction` (jsonb keys, no DDL) + `app_settings` columns `mcp_enabled`, `mcp_reads_per_minute`, `mcp_starts_per_minute`, `outside_max_inflight_per_org`, `…_per_credential`, `…_per_provider`, `mcp_ask_wait_seconds`, `webhook_max_attempts`, `webhook_disable_after_failures`, `outbound_redaction_default` with bound CHECKs (the 215 precedent) | app_settings: existing posture (the 177 fix: RLS on, no anon) |
+| 222 | `webhook_subscriptions (id, org_id, user_id, label, url, events text[], folder_ids uuid[] NULL, secret_enc text, secret_prev_enc text NULL, status active/paused/disabled/revoked, consecutive_failures, disabled_reason, created_at, revoked_at/by)` + autofill-org trigger | RLS on; SELECT own (`auth.uid() = user_id AND org_id IN current_user_org_ids()`) with a column grant that excludes `secret_enc`; org-admin reads go through the backend pool behind `require_org_manage` (the 293 pattern); writes service_role only |
+| 222 | `webhook_deliveries (id, subscription_id FK, org_id, event_kind, subject_id, payload jsonb NULL (frozen at first claim), status pending/retry/sending/sent/failed/skipped_not_visible/skipped_disabled, attempts, due_at, lease_until, last_status_code, last_error, created_at, sent_at)`, `UNIQUE (subscription_id, event_kind, subject_id, <event instance>)`, partial index `(status, due_at) WHERE status IN ('pending','retry')` | RLS on; SELECT for the subscription owner (delivery log); service_role writes. A deny-all-to-clients outbox, like `notification_deliveries` |
+| 222 | triggers `workflow_runs_webhook_on_status`, `documents_webhook_on_status`: SECURITY DEFINER, `SET search_path = ''`, swallow-and-warn, EXECUTE revoked from PUBLIC/anon/authenticated | run `get_advisors(security)` after applying (CLAUDE.md: revoke from **PUBLIC**, not just anon) |
+| 22x | `audit_log_action_type_check` + `mcp.call`, `mcp.refused`, `webhook.create`, `webhook.revoke`, `webhook.rotate`, `webhook.disable` | `VALID_ACTION_TYPES` in the same commit |
+| 22y (OAuth phase) | `mcp_grants (id, user_id, org_id, client_id, client_name, folder_ids, tools, created_at, revoked_at)` | SELECT own; admin via pool |
+
+Deploy parity: each migration is pasted into cloud before the code ships (boot-time audit sync, and run origin columns are read by the UI). Run `get_advisors(security)` after each. No new env vars are expected. If one appears (for example an MCP allowed-hosts override), it owes `deploy/onebox.env.example`, `docs/OPERATOR.md` and `check-deploy-drift.sh` in the same commit.
+
+---
+
+## 7. Hot-file collisions (G-5) — measured 2026-10-30 with the ledger recipe
+
+| File | Phases (ledger / recipe) | What v4.9 would do | Verdict |
 |---|---|---|---|
-| **297** | **Router core + extractions.** Plan 1 is extraction only: move ChatLayout's mount switch into `AppViewSwitch.tsx` verbatim, and App's four view/tab `useState` pairs into `useAppNavigation` (the ledger's two named seams). Then `appRoutes.ts`, top-level view URLs, Back/Forward, legacy aliases, `?run=` writers retired, the run route `/app/runs/:id`, and pre-auth gates kept byte-identical | nothing | App.tsx (28 phases), ChatLayout.tsx (33), the G-5 refactor recommendation is satisfied by taking the named seams *first* |
-| **298** | **Lists follow the active org** (SEED-389 + the thread-list/run-log decision) | none (backend + two hooks). Can run **in parallel with 297**: no shared files | `api/workflows.py` (26), `db/workflows.py` (31), `api/folders.py`. Honour by construction (one kwarg per route); the `api/workflows.py` split stays owed |
-| **299** | **Entity deep links + org resolution:** `/app/chat/:id` (SEED-178), Experts modal, skill studio, settings/org tabs, `LinkNotFound`, cross-org switch banner, SSO path stash, additive `org_id` on `WorkflowRunRead` | 297 (navigate), 298 (per-org lists make the switch observable and testable) | `useThreads.ts`, `ExpertCatalogPage.tsx`, `SettingsPage.tsx` (30), `OrgAdminShell.tsx`. Fold BUG-261027-02 here (it touches the same thread-list load path, and "loading" vs "not found" matters to the resolver) |
-| **300** | **Notifications backend:** migration 217, triggers, RLS, `/notifications` API, drainer, `app_links`, generalized email provider | 297's **path contract only** (`/app/runs/<id>`, fixed in 297 plan 1), so it can start right after that plan lands | New files plus a `main.py` lifespan registration (69 phases: one guarded block, the scheduler shape). **Fold BUG-261027-04/-05 first or alongside:** notifications send people to answer scheduled and key-started runs, which then resume on the wrong provider or with a blank required input |
-| **301** | **In-app notice:** second attention tenant, `home` on conditions, badge placement, popover rows, mark-read | 297 + 300 | `attentionConditions.ts`, `NavPanel.tsx` (14), `ChatLayout.tsx`. G-2/G-4: sketch the popover and run-row first, then lived-experience UAT |
-| **302** | **Close-out:** BUG-261027-01, -03, SEED-391's six findings | independent; can parallel 298/300 | the SEED-391 trigger paths (publish_service, WorkflowCanvas, …) |
+| `backend/app/api/threads.py` | **97** | nothing | ⛔ **Do not touch.** The ask core is a sibling service calling `run_producer`; never route MCP through `send_message` |
+| `backend/app/services/agent_loop.py` | 36 | nothing | ⛔ do not touch |
+| `backend/app/services/run_producer.py` | 14 | called only | no edit; `ThreadScoping` is data |
+| `backend/app/main.py` | **73** | one `Mount("/mcp", …)`, lifespan: `session_manager.run()` + `WebhookDrainer` start/stop | ⚠ FIRES. Unavoidable. Keep it to one mount + one lifespan block per phase, the 301 "one include_router" discipline |
+| `backend/app/dependencies.py` | 12 | ~6 lines in `_apply_rls_user_context` (contextvar → `set_config(…, true)`) | ⚠ FIRES. The one sanctioned edit; everything else lives in `security/acting_member.py` |
+| `backend/app/security/egress.py` | 5 | add the `webhook` capability to the closed set (`_TLS_SCHEMES`, `_HOST_MATCH` caller mode) | ⚠ FIRES. Additive data entries only; driven RED for the private-IP / redirect / bad-scheme cases |
+| `backend/app/services/audit_service.py` | 10 | lockstep literals | ⚠ FIRES. Data only (the 298-03 precedent) |
+| `backend/app/models/user_settings.py` | 38 | new `app_settings` fields | ⚠ FIRES. Additive fields + `_val` lines (the 300-03 precedent) |
+| `backend/app/api/settings.py` | 26 | operator knobs | ⚠ FIRES. Additive (the 300-05 precedent) |
+| `backend/app/api/inbound.py` | 3 | pure-move of the run-read composition into `services/key_run_read.py`; `resolve_api_key` signature unchanged | ⚠ FIRES. **Extraction first, behaviour after** |
+| `backend/app/services/unattended_launch.py` | 3 | none expected (origin params exist) | FIRES; aim for zero edits |
+| `backend/app/services/tools/render_template.py` | 3 | the BUG-261022-01 fix | ⚠ FIRES (1163 lines). Fix inside the driver / integrity check only; RED drive through the real sandbox driver first |
+| `backend/app/services/provider_gateway/dispatcher.py` | 4 | nothing (admission is at the door) | ⛔ keep out |
+| `backend/app/db/workflows.py` | 32 | nothing; use `db/api_keys.py` helpers | keep out |
+| `frontend/src/lib/api.ts` | **128** | nothing; new `lib/api/mcpKeys.ts`, `lib/api/webhooks.ts` | keep out |
+| `frontend/src/pages/SettingsPage.tsx` | 31 | one tab mount each for MCP and Webhooks | ⚠ FIRES. One mount line per phase |
+| `frontend/src/components/settings/apiKeys/apiKeysCopy.ts`, `apiKeyFacts.ts` | 3 / 3 | only if MCP keys share the API-keys tab | ⚠ FIRES. Prefer a sibling `settings/mcp/` folder that reuses `ApiKeySecretOnce`/`RevokeApiKeySheet` by import |
+| `frontend/src/components/org/OrgAdminShell.tsx` | 6 | org MCP / webhook switch + admin lists | ⚠ FIRES. The tabs seam was taken in 293-04 (`orgAdminTabs.ts`); add data entries there |
+| `scripts/vitest-count-gate.cjs` | 85 | new pins for new suites | routine; never lower a pin |
+| `scripts/full-schema-supplement.sql` | 19 | only if a new table joins the Realtime publication (webhook delivery log live updates) | avoid; poll the delivery log instead |
+| Not yet in the ledger: `security/api_key_auth.py` (1), `db/api_keys.py` (2), `api/api_keys.py` (2), `services/rate_limit.py` (2), `db/notifications.py` (2), `services/notification_drainer.py` (1), `middleware/maintenance.py` (1, no row) | — | extract-auth-core, `kind` column, new limiter kinds | below threshold; **`middleware/maintenance.py` and `services/ingestion_queue_service.py` have NO ledger row**, so `check-hot-file-ledger.cjs` will fail a plan that names them until a row is added |
 
-**Ordering rationale:**
-- URLs come first because every later feature needs a link to point at. That is the milestone's own stated reason.
-- The extraction comes first inside 297 because App.tsx and ChatLayout.tsx both fire G-5 and the ledger names the seam for each.
-- Lists-per-org lands before entity deep links, because the cross-org switch path is only exercised once lists are per-org.
-- The notification backend depends only on the path *contract*, not on the router UI, which lets 300 overlap with 299.
-- The in-app notice is last, because it needs both `navigate` and the server verdict.
+---
 
-**Research flags:**
-- 297 needs a decision recorded at discuss time: hand-rolled vs library router (STACK.md).
-- 299 needs Expert bundle org semantics verified (LOW here).
-- 300 needs the terminal-status literals and a live check of whether production has ever sent an email (LOW).
-- 298 and 302 are standard patterns.
+## 8. Decisions the roadmap must surface (not resolved by code reading)
+
+1. **Maintenance mode vs MCP.** Every MCP message is a POST, so `MaintenanceMiddleware` would 503 read-only tools too. Recommend allow-listing `/mcp` in the middleware and enforcing "no starts under maintenance" in the start-type tools (the honest per-tool answer). The alternative is to accept a whole-door 503.
+2. **What `get_run` may read.** Runs this credential started (293's D-12 posture), or every run the member can read in the org (true member-equivalence)? Recommend credential-started plus the member's own runs, never org-mates' runs, and decide it explicitly.
+3. **Org narrowing mechanism.** The GUC in `current_user_org_ids()` (recommended) vs an explicit `p_org_ids` on each retrieval RPC. This needs an EXPLAIN check and the backend baseline gate in the phase that does it.
+4. **Does the in-app chat also get org-narrowed search?** Out of scope (it would change today's chat answers for two-org members). Plant a seed. The GUC makes it a one-line follow-up.
+5. **MCP SDK version vs pinned deps.** `mcp` 2.3.0 (PyPI, latest) requires `sse-starlette>=3.0.0` and `httpx2`. The backend pins `sse-starlette==2.4.1` (the chat SSE path) and runs `starlette 0.41.3`. Bumping `sse-starlette` touches the chat SSE transport, so the STACK research must decide between bump+UAT, an older 1.x `mcp` line, or a hand-rolled JSON-RPC server (`mcp_client.py` is already hand-rolled on the client side). **This gates Phase B.**
+6. **Webhook ownership.** Member-owned (mirrors keys; visibility = the owner's) vs org-owned (admin-managed). Recommend member-owned with admin list/revoke/kill, matching 293.
+
+---
+
+## 9. Suggested build order (phases from 303)
+
+Dependencies first, so each phase ships something usable and the security core is proven before anything uses it.
+
+| Phase | Scope | Depends on | Why here |
+|---|---|---|---|
+| **303 — Word template fix** (BUG-261022-01) | RED repro through `_RENDER_DRIVER_SRC` with a bare-token library template; then coerce a cited record to its `.value` at render, **or** extend `assert_integrity` to fail on a rendered record repr. Keep it as a fast phase if it really is a few lines (G-3) | nothing | Independent and quick. It clears a known-open major bug before the milestone's new surface lands, and can run in parallel with 304 |
+| **304 — Acting member + personal MCP keys** | Migration 220/221 (key `kind`, folder set, tools, origin columns, GUC narrowing, settings knobs, audit literals). Extract `authenticate_presented_key`. `McpPrincipal`, `acting_member.py`, the `dependencies.py` contextvar edit. Key mint/list/revoke for `kind='mcp'`, org-admin view, org + operator MCP switches, Settings UI. **The parity test (§3 P2) is the phase's headline must-have** | — | Every tool, OAuth and webhook visibility depend on "act as member in org Y" being proven. Ship it with no transport so it is reviewed on its own |
+| **305 — MCP server + read tools** | Resolve the SDK/dependency decision (§8.5). `app/mcp/` package, stateless mount in `main.py`, `McpAuthASGI`, host allowlist from `BACKEND_PUBLIC_URL`, per-key read limits, audit, `search_knowledge`, `list_documents`, `read_document`. **`outbound_guard.py` ships here**, because this is the first phase that sends content out. Maintenance decision (§8.1). Cross-client UAT: Claude Desktop, Claude Code, Cursor | 304 | Read-only first: the lowest-risk way to prove transport, auth, limits and redaction end to end |
+| **306 — Ask the agent + run workflows over MCP + admission** | `key_run_read` pure-move extraction first. Then `unattended_chat.py`, `ask_agent` + `get_answer`, `list_workflows` / `run_workflow` / `get_run`, `outside_admission.py` (SEED-081 scoped), optionally applied to `/inbound` starts too. Full 8-row cross-provider scoreboard (it touches the agent loop's run path) | 304, 305 | Start-type tools cost money and create threads, so they come after the read path is proven. Admission lands with the first thing it guards |
+| **307 — Outbound webhooks** | Migration 222, triggers, `WebhookDrainer`, `egress.py` `webhook` capability, Standard-Webhooks signing, retries + auto-disable + 301 notice, delivery log, "send test", member + admin UI. Reuses `outbound_guard` and the acting-member re-check | 304 (acting member), 305 (`outbound_guard`) | Independent of 306 beyond shared seams. It can run in parallel with 306 if the DB-mutating test suites are serialized (worktree rule 4) |
+| **308 — OAuth 2.1 sign-in for MCP** | Supabase OAuth 2.1 server as the AS (enable DCR), RFC 9728 protected-resource metadata on `/mcp`, consent page in the app (pick org, folder set, tools → `mcp_grants`), token verification (JWKS or GoTrue) → `McpPrincipal`. Routing: `/.well-known/oauth-protected-resource…` must reach the backend. ⚠ The onebox nginx only proxies `/api/*`, so the root `.well-known` path would hit the SPA. Claude.ai custom-connector UAT | 304, 305 | Last, because it depends on a beta external service and has the most deploy-parity surface (cloud Auth config, redirect URLs, local CLI support unknown) |
+| **309 — Close-out** (optional, inside the 6–7 target) | Public docs (MCP quick-start per client, webhook verification snippets), landing facts, G-4 lived-experience rows, seeds sweep (SEED-013/177/195/081/079 status flips), deploy parity | all | The milestone's promise is outside use without opening the app, so the docs are the product |
+
+**Ordering rationale:** 304 is the trust root. 305 proves transport and redaction on reads before 306 adds spending writes. 307 shares 304/305's seams but nothing of 306's, so it parallelises. 308 swaps only the credential resolver behind the same principal, which is why Pattern 1 is set up in 304.
+
+**Research flags:** 305 (SDK version vs `sse-starlette` pin; stateless behaviour across the two workers; Claude Desktop/Cursor auth header support for a static bearer) and 308 (Supabase OAuth server discovery path, local CLI support, consent-page contract, `.well-known` routing on onebox and Vercel/Coolify) need phase research. 303, 304 and 307 follow established in-repo patterns (215, 293, 300).
+
+---
+
+## 10. Anti-Patterns
+
+### Anti-Pattern 1: Minting a Supabase JWT for the key's owner
+**What people do:** Sign a short-lived JWT so the existing PostgREST user-client paths "just work".
+**Why it's wrong:** No signing secret exists in config, cloud projects may use asymmetric signing keys, it adds a forgeable-identity secret to deploy parity, and a token can expire mid-run (the reason 163 chose uid-synthesized claims).
+**Do this instead:** `get_user_pg_connection(None, {"id": uid})` plus the org GUC, and asyncpg reads.
+
+### Anti-Pattern 2: Routing MCP "ask" through `send_message`
+**What people do:** Fake a Request with headers and call the route.
+**Why it's wrong:** It needs a user-JWT client, it edits or couples to a 97-phase file, and its preflight runs on PostgREST.
+**Do this instead:** `unattended_chat.py` calling `run_producer` with `ThreadScoping`.
+
+### Anti-Pattern 3: Registering MCP tools in `_TOOL_REGISTRY` or calling `handle_search_documents`
+**Why it's wrong:** It breaks the closed-core inventory pin (30 tools), drags `ToolContext`/SSE emit semantics into a request path, and violates the Extension Contract.
+**Do this instead:** Call services (`retrieval_service.search_documents`, `launch_unattended_run`).
+
+### Anti-Pattern 4: Emitting webhooks from Python at each writer
+**Why it's wrong:** Document completion has 4+ writers and run terminalization several. A Python emit per site drifts, which is the 231 "fifth definition" hazard.
+**Do this instead:** One trigger per event and one drainer (the Phase 300 pattern).
+
+### Anti-Pattern 5: A process-local limiter or admission counter
+**Why it's wrong:** Two workers admit twice the limit (`rate_limit.py` documents this against `api/setup.py`'s dict).
+**Do this instead:** Redis, atomic, fail closed.
+
+### Anti-Pattern 6: `folder_ids=[]` meaning "no narrowing"
+**Why it's wrong:** 272 D-18 says empty means nothing, and the reverse coercion widens to every org.
+**Do this instead:** Refuse an empty folder set at mint time. `None` = whole org (narrowed by the GUC).
+
+### Anti-Pattern 7: Stateful MCP sessions on two workers
+**Why it's wrong:** A legacy session lives in one worker's memory, so the next request 404s on the other worker.
+**Do this instead:** `stateless_http=True` (legacy leg) or the sessionless 2026-07-28 protocol. No sticky sessions.
+
+---
+
+## 11. Scaling Considerations
+
+| Concern | Small team (today) | Hosted multi-tenant | Notes |
+|---|---|---|---|
+| MCP request load | stateless, 2 workers | add workers; stateless scales linearly | per-key + per-IP Redis limits already shared |
+| Provider pressure from outside runs | admission caps per org / credential / provider | caps become the binding control; true SEED-081 gateway backoff needed | door-level only this milestone |
+| Long `ask_agent` calls | bounded wait (120 s), then poll | same; worker connections held during the wait | keep the wait under proxy timeouts (300 s nginx) |
+| Webhook fan-out on bulk ingest | fine | 1 delivery per document per subscription becomes thousands | folder filters, drainer pacing, a future digest event |
+| Outbox growth | small | retention sweep on `webhook_deliveries` (e.g. 30 days) | the 300 tables have no sweep yet either; plant a seed |
+
+**First bottleneck:** provider rate limits from parallel `ask_agent` calls, which admission bounds. **Second:** the webhook outbox during a watch sync.
 
 ---
 
 ## Sources
 
-- Code read directly, `develop` @ `de569cfce`. Every `file:line` above.
-- `.planning/seeds/SEED-185`, `SEED-178`, `SEED-281`, `SEED-389`; `.planning/PROJECT.md` §Current Milestone; `docs/HOT-FILE-LEDGER.md` sections for `App.tsx`, `ChatLayout.tsx`, `NavPanel.tsx`, `attentionConditions.ts` (HIGH).
-- Resend idempotency keys: https://resend.com/docs/dashboard/emails/idempotency-keys (header `Idempotency-Key`, 24 h retention, same response on duplicate, Python `resend.Emails.send(params, {"idempotency_key": …})`) (HIGH, official docs).
+- Code read at `f267f2949` (HIGH): `backend/app/api/inbound.py`, `api/api_keys.py`, `security/api_key_auth.py`, `services/rate_limit.py`, `dependencies.py` (`_apply_rls_user_context`, `get_user_pg_connection`, `get_active_org_id`), `services/retrieval_service.py`, `retrieval_rpc.py`, `retrieval_scope.py`, `retrieval_documents.py`, `search_documents_tool.py`, `run_producer.py` (`run_producer`, `ThreadScoping`, `spawn_continuation_run`), `run_lifecycle.py`, `unattended_launch.py`, `run_model_resolution.py`, `notification_drainer.py`, `db/notifications.py`, `security/egress.py`, `security/secret_cipher.py`, `middleware/maintenance.py`, `main.py`, `frontend/nginx.conf`; migrations `215_api_keys_and_run_origin.sql`, `218_run_waiting_notifications.sql`; `supabase/full-schema.sql` (`current_user_org_ids`, `match_document_chunks`, `organizations`, `documents_status_check`)
+- `docs/EXTENSION-CONTRACT.md`; `backend/tests/unit/test_259_closed_core_inventory.py` (30-tool pin)
+- Seeds: SEED-081, SEED-079, SEED-195; bug BUG-261022-01
+- MCP Python SDK docs (MEDIUM): https://py.sdk.modelcontextprotocol.io/run/asgi/, https://py.sdk.modelcontextprotocol.io/run/authorization/, https://py.sdk.modelcontextprotocol.io/run/deploy/
+- PyPI `mcp` 2.3.0 requirements (HIGH for the dependency conflict): https://pypi.org/pypi/mcp/json
+- Supabase OAuth 2.1 server (MEDIUM-LOW, beta): [OAuth 2.1 Server](https://supabase.com/docs/guides/auth/oauth-server), [MCP Authentication](https://supabase.com/docs/guides/auth/oauth-server/mcp-authentication), [changelog](https://supabase.com/changelog/38022-oauth-2-1-server-capabilities-for-supabase-auth)
+
+---
+*Architecture research for: v4.9 Use It From Your Own Tools*
+*Researched: 2026-10-30*

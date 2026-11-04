@@ -2,14 +2,16 @@ import path from "path"
 import { defineConfig, loadEnv, searchForWorkspaceRoot, type Plugin } from 'vite'
 import react from '@vitejs/plugin-react'
 import Icons from "unplugin-icons/vite"
-import { rewriteDevUrl } from "./devRouting"
+import { devHeadersFor, rewriteDevUrl } from "./devRouting"
 import { docsContent } from "./plugins/docsContent"
 import { brandMeta } from "./plugins/brandMeta"
 
 // Entry routing for the dev + preview servers. The decision lives in devRouting.ts (a pure,
 // unit-tested function); this plugin only applies it. Phase 276 added the /docs → docs.html rule.
 function appRoutingPlugin(): Plugin {
-  const rewrite = (req: any, _res: any, next: () => void) => {
+  const rewrite = (req: any, res: any, next: () => void) => {
+    // Phase 307-04: headers are decided on the ORIGINAL path, before the rewrite to app.html.
+    for (const [key, value] of Object.entries(devHeadersFor(req.url || "/"))) res.setHeader(key, value)
     req.url = rewriteDevUrl(req.url || "/")
     next()
   }

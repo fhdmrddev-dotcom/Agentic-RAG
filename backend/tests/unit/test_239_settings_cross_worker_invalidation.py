@@ -410,7 +410,12 @@ def test_lifespan_starts_and_stops_the_subscriber():
     behaviour, and the plant fires.
     """
     src = (BACKEND_DIR / "app" / "main.py").read_text(encoding="utf-8")
-    head, sep, tail = src.partition("\n    yield\n")
+    # Phase 305 (D-04): the lifespan's single yield now sits inside `async with mcp_lifespan():`,
+    # one indent deeper. Split on that block; the plain form is kept so the fence still reads a
+    # main.py without it. Startup is everything before the yield, shutdown everything after.
+    head, sep, tail = src.partition("\n    async with mcp_lifespan():\n        yield\n")
+    if not sep:
+        head, sep, tail = src.partition("\n    yield\n")
     assert sep, "main.py lifespan has no `yield` — cannot locate startup vs shutdown"
 
     # Startup half: the subscriber is CONSTRUCTED and STARTED before yield.

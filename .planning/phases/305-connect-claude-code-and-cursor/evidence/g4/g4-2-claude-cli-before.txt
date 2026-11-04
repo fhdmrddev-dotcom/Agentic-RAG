@@ -1,0 +1,14 @@
+Warning: no stdin data received in 3s, proceeding without it. If piping from a slow command, redirect stdin explicitly: < /dev/null to skip, or wait longer.
+All 3 passages contain a literal email address, and none contain `[email removed]`. That means redaction is not being applied to search results.
+
+| # | Title | document_id | Link | Literal email? | `[email removed]`? |
+|---|---|---|---|---|---|
+| 1 | Dubai DoF_Document Management and Archival System Project- GCG_ Technical Proposal V1.0.pdf | 8924f33b-625a-4b05-8f43-ebe0a8fd878d | http://localhost:5173/app/library/8924f33b-625a-4b05-8f43-ebe0a8fd878d | YES | NO |
+| 2 | Dubai DoF_Document Management and Archival System Project- GCG_ Technical Proposal V1.0.pdf | 8924f33b-625a-4b05-8f43-ebe0a8fd878d | http://localhost:5173/app/library/8924f33b-625a-4b05-8f43-ebe0a8fd878d | YES | NO |
+| 3 | Dubai DoF_Document Management and Archival System Project- GCG_ Technical Proposal V1.0.pdf | 8924f33b-625a-4b05-8f43-ebe0a8fd878d | http://localhost:5173/app/library/8924f33b-625a-4b05-8f43-ebe0a8fd878d | YES | NO |
+
+- Passages 1 and 2 (citation passages 11 and 3) contain Gamal Hameed's personal email.
+- Passage 3 (citation passage 65) contains a general company contact email.
+- I made one other tool call before the search: `ToolSearch`. The search tool's schema had to be loaded before it could be called.
+
+**Next:** check whether email redaction is turned on for this key or for the `origin: external` documents.

@@ -1,0 +1,23 @@
+Searched `search_knowledge_base` once (query `ACME payment terms late payment interest`, limit 3). It returned 3 passages. In the quotes below, `\n` stands for a newline in the source text and counts as one character.
+
+**1. ACME_MSA_2026.md**
+- document_id: `1417fc12-a581-4068-adcc-ddbc1e3a848a`
+- link: `http://localhost:5173/app/library/1417fc12-a581-4068-adcc-ddbc1e3a848a`
+- First 120 chars: `# ACME Master Services Agreement 2026\n\nParties: Our Company and ACME Corp.\n\n## Payment terms\nPayment terms under the Mas`
+
+**2. ACME_Q3_SOW_Contract.md**
+- document_id: `95b41fa9-f772-4aef-9c79-ad8b3c7ef6d6`
+- link: `http://localhost:5173/app/library/95b41fa9-f772-4aef-9c79-ad8b3c7ef6d6`
+- First 120 chars: `# ACME Q3 Statement of Work (Q3 Contracts)\n\nThis Q3 contract between Our Company and ACME Corp covers the Q3 data platfo`
+
+**3. acme_contract_renewal_schedule_2026.md**
+- document_id: `a15ddea3-fa90-4462-833a-d0edfaddd71a`
+- link: `http://localhost:5173/app/library/a15ddea3-fa90-4462-833a-d0edfaddd71a`
+- First 120 chars: `lier - facilities | 2026-12-31 | Yes, 12 months | 45 days | $286K |\n| OEM-2024-VRT-019 | Vertex Medical Imaging Inc. | C`
+
+**What the passages say:**
+- **Payment terms:** The MSA sets NET 60 days and late interest of 1.0% per month. The Q3 SOW overrides that with NET 15 days and a 2% discount for paying within 5 days.
+- **Passage 3 doesn't answer the query:** it's about renewal notice windows, not payment terms. It also starts mid-word ("lier") because it was cut out of the middle of the document.
+- **Links:** all 3 point to `localhost:5173`, so they only open on a machine where Syrel is running locally.
+
+Next: open link 2 to read the rest of the Q3 SOW's payment terms. The returned passage doesn't say whether the SOW also changes the 1.0% late interest.

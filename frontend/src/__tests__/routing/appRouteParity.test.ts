@@ -70,7 +70,13 @@ const ENTITY: string[] = [
   formatAppRoute({ view: "experts", bundleId: BUNDLE_ID }),
 ]
 
-const ALL = [...CANONICAL, ...ENTITY, ...LEGACY, ...PRE_AUTH]
+// Phase 307-04 (D-11 / P-4): the consent page an AI tool's sign-in lands on. It is NOT a view (the
+// '*' catch-all renders it), so it is a literal row like LEGACY and VIEWS stays 12. Its anti-framing
+// headers are pinned per layer in ./oauthRouting.test.ts.
+const CONSENT_REQUEST_ID = "0b7f3a1e-2c4d-4e5f-8a9b-1c2d3e4f5a6b"
+const CONSENT = [`/app/connect/${CONSENT_REQUEST_ID}`]
+
+const ALL = [...CANONICAL, ...ENTITY, ...LEGACY, ...PRE_AUTH, ...CONSENT]
 
 function split(url: string): { pathname: string; search: string } {
   const i = url.indexOf("?")

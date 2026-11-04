@@ -74,6 +74,14 @@ EXPECTED_BOUNDED_FIELDS = {
     # 293 (D-14) — CHECKs in migration 215 (app_settings_api_key_*_per_minute_bound).
     "api_key_starts_per_minute",
     "api_key_reads_per_minute",
+    # 305 (D-54) — CHECK in migration 222 (app_settings_api_key_searches_per_minute_bound).
+    "api_key_searches_per_minute",
+    # 306 (D-36 / D-35) — CHECKs in migration 223 (app_settings_mcp_ask_wait_seconds_bound,
+    #   app_settings_outside_inflight_per_*_bound).
+    "mcp_ask_wait_seconds",
+    "outside_inflight_per_key",
+    "outside_inflight_per_org",
+    "outside_inflight_per_provider",
     # 300 (D-07) — CHECK in migration 218 (app_settings_notification_email_delay_seconds_bound).
     "notification_email_delay_seconds",
 }

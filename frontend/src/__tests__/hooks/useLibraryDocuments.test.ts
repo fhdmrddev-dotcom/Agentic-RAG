@@ -343,6 +343,35 @@ describe("useLibraryDocuments — the server body (284-03)", () => {
     expect(mockGetDocument).toHaveBeenCalledTimes(2)
   })
 
+  // Phase 305-02 (D-52 / UI-SPEC Surface 4): a by-id open answering 404 is REFUSED (one in-page
+  // notice), never an error; every other failure keeps the shipped S8 alert.
+  it("a by-id 404 sets selectedDocRefused and no error; a new selection clears it", async () => {
+    const { result, rerender } = renderHook((p: { id: string }) => useLibraryDocuments({ ...BASE_ARGS, selectedDocId: p.id }), {
+      initialProps: { id: "nope" },
+    })
+    await waitFor(() => expect(result.current.selectedDocRefused).toBe(true))
+    expect(result.current.selectedDocError).toBeNull()
+    expect(result.current.selectedDoc).toBeNull()
+    rerender({ id: "r1" })
+    await waitFor(() => expect(result.current.selectedDoc?.id).toBe("r1"))
+    expect(result.current.selectedDocRefused).toBe(false)
+  })
+
+  it("a 5xx sets selectedDocError and leaves selectedDocRefused false", async () => {
+    mockGetDocument.mockRejectedValueOnce(new DocumentListError(500, "boom"))
+    const { result } = renderHook(() => useLibraryDocuments({ ...BASE_ARGS, selectedDocId: "f2" }))
+    await waitFor(() => expect(result.current.selectedDocError).not.toBeNull())
+    expect(result.current.selectedDocRefused).toBe(false)
+  })
+
+  it("retrySelectedDoc clears the refusal before it re-asks", async () => {
+    const { result } = renderHook(() => useLibraryDocuments({ ...BASE_ARGS, selectedDocId: "nope" }))
+    await waitFor(() => expect(result.current.selectedDocRefused).toBe(true))
+    mockGetDocument.mockImplementationOnce(() => new Promise(() => {}))
+    act(() => result.current.retrySelectedDoc())
+    expect(result.current.selectedDocRefused).toBe(false)
+  })
+
   it("a saved view resolves ONE page on the server, with the archived count from ONE count read", async () => {
     serve(FIXTURE, { views: { v1: [f1, r2, f2, r1] } })
     const { result } = renderHook(() =>

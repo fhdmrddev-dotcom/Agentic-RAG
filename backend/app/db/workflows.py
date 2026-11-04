@@ -394,7 +394,7 @@ _AUDIT_EVENT_TYPES = frozenset(
 
 # ── run creation (Phase 092 MODE-01 / Q5 — the net-new atomic transaction) ───
 # Phase 293 (D-22): the migration-215 CHECK's literals, mirrored for a refusal before the write.
-_RUN_ORIGIN_KINDS: frozenset[str] = frozenset({"app", "schedule", "key"})
+_RUN_ORIGIN_KINDS: frozenset[str] = frozenset({"app", "schedule", "key", "mcp"})  # + mig 220 (306 D-31)
 
 
 async def create_workflow_run(

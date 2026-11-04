@@ -389,7 +389,7 @@ export function OrgAdminShell({ onBack }: OrgAdminShellProps) {
             onToggleTechnical={toggleTechnical}
           />
         ) : activeTab === "settings" ? (
-          <OrgSettingsTab orgName={orgName} />
+          <OrgSettingsTab key={activeOrgId ?? "none"} orgName={orgName} onRecorded={pulse} />
         ) : activeTab === "retention" ? (
           // 275-REVIEW F-WR-10: keyed on the active org, so a switch remounts it (fresh reads)
           // instead of showing the previous org's posture/policies/holds over writes sent as the new one.

@@ -26,7 +26,11 @@ from app.models.user_settings import load_app_settings_async
 
 logger = logging.getLogger(__name__)
 
-Kind = Literal["start", "read", "citation"]
+Kind = Literal[
+    "start", "read", "citation", "mcp_ip", "expensive",
+    "oauth_register", "oauth_authorize", "oauth_token", "oauth_revoke",
+    "webhook_test", "webhook_resend",  # 308 (D-21 / D-29): per member, see the end of the file
+]
 
 UNAVAILABLE_DETAIL = (
     "Rate limiting is unavailable right now, so this call was refused. Try again in a minute."
@@ -134,5 +138,136 @@ async def enforce_user_citation_limit(redis, *, user_id: str) -> None:
         raise HTTPException(
             status_code=429,
             detail={"reason": "rate_limited"},
+            headers={"Retry-After": str(retry)},
+        )
+
+
+# ── Phase 305 (D-54 / T-305-13) — the MCP edge's per-address limit ──────────────────────────────
+# Its OWN bucket kind (``mcp_ip``), never the inbound door's ``ip``: behind a proxy every caller
+# shares one address (see ``IP_CALLS_PER_MINUTE``), so a shared bucket would let MCP traffic starve
+# ``/inbound``. Same ceiling, same fixed window. The edge calls this BEFORE it reads the key, so an
+# unknown-key flood costs one counter. It raises instead of returning an ``HTTPException``: the MCP
+# edge is a raw ASGI endpoint, where no FastAPI exception handler runs.
+
+
+class LimiterUnavailable(Exception):
+    """The limiter could not count (Redis raised). The caller refuses the call: FAIL CLOSED."""
+
+
+async def check_ip_limit(redis, *, client: str) -> int | None:
+    """Count one MCP call from ``client``. ``None`` within the limit, else the ``Retry-After``
+    seconds; raises ``LimiterUnavailable`` on any Redis failure (fail closed, D-15)."""
+    try:
+        return await hit(redis, key_id=client, kind="mcp_ip", limit=int(IP_CALLS_PER_MINUTE))
+    except Exception as exc:  # noqa: BLE001 — any Redis failure refuses; see the module docblock
+        logger.warning("mcp per-address limiter unavailable; refusing the call", exc_info=True)
+        raise LimiterUnavailable() from exc
+
+
+# ── Phase 305-03 (D-27 / D-54 / T-305-13) — the MCP per-key buckets ─────────────────────────────
+# Two buckets per key on the same fixed window: ``read`` (the cheap tools, ``list_documents`` and
+# ``read_document``, sharing the /inbound status-read knob) and ``expensive`` (``search_knowledge_base``
+# — it embeds the query — on its own knob). Independent counters: searches cannot exhaust reads.
+# Returns instead of raising an ``HTTPException``: an over-limit MCP call is a TOOL error the
+# caller's model can relay (D-28), never an HTTP 429. ``enforce_key_limit`` above is untouched.
+
+
+async def check_key_limit(redis, *, key_id: str, kind: Kind) -> tuple[int, int | None]:
+    """Count one MCP call for ``key_id`` in ``kind``'s bucket. Returns ``(limit, retry)``: ``retry``
+    is ``None`` within the limit, else the seconds until the window resets (1..60). Raises
+    ``LimiterUnavailable`` on any Redis failure (fail closed, D-15)."""
+    settings = await load_app_settings_async()
+    if kind == "expensive":
+        limit = int(settings.api_key_searches_per_minute)
+    elif kind == "start":  # 306-04 (D-14): ask_agent / run_workflow, on the /inbound start knob
+        limit = int(settings.api_key_starts_per_minute)
+    else:
+        limit = int(settings.api_key_reads_per_minute)
+    try:
+        retry = await hit(redis, key_id=key_id, kind=kind, limit=limit)
+    except Exception as exc:  # noqa: BLE001 — any Redis failure refuses; see the module docblock
+        logger.warning("mcp per-key limiter unavailable; refusing the call", exc_info=True)
+        raise LimiterUnavailable() from exc
+    return limit, retry
+
+
+# ── Phase 307-02 (D-34 / D-05 / T-307-10) — the four OAuth door buckets ─────────────────────────
+# ``/oauth/register``, ``/oauth/authorize``, ``/oauth/token`` and ``/oauth/revoke`` each count on
+# their OWN bucket kind, never ``mcp_ip``: a burst of registrations cannot starve token refreshes,
+# and none of them can starve ``/mcp``. Same Redis fixed window, same fail-closed rule.
+#
+# ⚠ DOOR-WIDE CEILINGS, NOT PER-CALLER LIMITS. As ``IP_CALLS_PER_MINUTE`` above records, every
+# caller behind the proxy shares one address — and every Claude.ai call comes from Anthropic's
+# published ranges anyway. These are sized as ceilings for the whole door (Pitfall 4). Real
+# per-caller attribution needs proxy-aware client addresses, which is SEED-397 (a uvicorn / proxy
+# change, deliberately left deferred by 307). Module constants on the ``IP_CALLS_PER_MINUTE``
+# precedent: ⛔ no env var, no setting.
+OAUTH_REGISTER_PER_MINUTE = 60
+OAUTH_AUTHORIZE_PER_MINUTE = 120
+OAUTH_TOKEN_PER_MINUTE = 600
+OAUTH_REVOKE_PER_MINUTE = 120
+
+_OAUTH_LIMITS: dict[str, int] = {
+    "oauth_register": OAUTH_REGISTER_PER_MINUTE,
+    "oauth_authorize": OAUTH_AUTHORIZE_PER_MINUTE,
+    "oauth_token": OAUTH_TOKEN_PER_MINUTE,
+    "oauth_revoke": OAUTH_REVOKE_PER_MINUTE,
+}
+
+
+async def check_oauth_limit(redis, *, client: str, kind: Kind) -> int | None:
+    """Count one call on an OAuth door from ``client``. ``None`` within the limit, else the
+    ``Retry-After`` seconds; raises ``LimiterUnavailable`` on any Redis failure (fail closed) and
+    ``ValueError`` for a kind that is not an OAuth door (never admitted uncounted)."""
+    limit = _OAUTH_LIMITS.get(kind)
+    if limit is None:
+        raise ValueError(f"{kind!r} is not an OAuth door bucket")
+    try:
+        return await hit(redis, key_id=client, kind=kind, limit=int(limit))
+    except Exception as exc:  # noqa: BLE001 — any Redis failure refuses; see the module docblock
+        logger.warning("oauth door limiter unavailable; refusing the call", exc_info=True)
+        raise LimiterUnavailable() from exc
+
+
+# ── Phase 308 (D-21 / D-29 / T-308-16) — the per-MEMBER webhook Test and Resend buckets ──────────
+# A webhook Test is a synchronous POST to an address the member chose, and a Resend queues one; both
+# could be used to hammer a third party. One bucket per member per kind on the same Redis fixed
+# window, so the count holds across both uvicorn workers. Module constants on the
+# ``CITATION_CHECKS_PER_MINUTE`` precedent: ⛔ no env var, no setting.
+#
+# ⚠ The detail is ``{code, message}`` (308 P-6): ``message`` is the sentence the Webhooks tab shows,
+# so the client never falls back to "the request was refused (status 429)". 503 when the limiter
+# cannot count — FAIL CLOSED, like every limiter in this file.
+WEBHOOK_TESTS_PER_MINUTE = 5
+WEBHOOK_RESENDS_PER_MINUTE = 20
+
+_WEBHOOK_LIMITS: dict[str, tuple[int, str]] = {
+    "webhook_test": (
+        WEBHOOK_TESTS_PER_MINUTE, "You've sent several tests in a row. Try again in a minute.",
+    ),
+    "webhook_resend": (
+        WEBHOOK_RESENDS_PER_MINUTE,
+        "You've resent several deliveries in a row. Try again in a minute.",
+    ),
+}
+
+
+async def enforce_user_webhook_limit(redis, *, user_id: str, kind: Kind) -> None:
+    """Refuse with 429 ``{code: "rate_limited", message}`` + ``Retry-After`` when ``user_id`` is over
+    ``kind``'s per-minute bucket, and with 503 ``{code: "unavailable", message}`` when the limiter
+    cannot count (fail closed). ``ValueError`` for a kind that is not a webhook bucket."""
+    entry = _WEBHOOK_LIMITS.get(kind)
+    if entry is None:
+        raise ValueError(f"{kind!r} is not a webhook bucket")
+    limit, sentence = entry
+    try:
+        retry = await hit(redis, key_id=user_id, kind=kind, limit=int(limit))
+    except Exception:  # noqa: BLE001 — any Redis failure refuses; see the module docblock
+        logger.warning("webhook rate limiter unavailable; refusing the call", exc_info=True)
+        raise HTTPException(status_code=503, detail={"code": "unavailable", "message": UNAVAILABLE_DETAIL})
+    if retry is not None:
+        raise HTTPException(
+            status_code=429,
+            detail={"code": "rate_limited", "message": sentence},
             headers={"Retry-After": str(retry)},
         )

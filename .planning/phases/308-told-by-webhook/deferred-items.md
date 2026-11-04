@@ -1,0 +1,9 @@
+# Phase 308 — deferred items
+
+| # | Item | Found by | Routed to | Why not here |
+|---|------|----------|-----------|--------------|
+| 1 | Public docs still say webhooks don't exist: `docs/public/README.md` ("Not available today"), `docs/public/api/concepts/webhooks.md`, `api/roadmap-open-platform.md`, `get-started/overview.md`, `security/egress-controls.md`, `api/concepts/authentication.md` | 308-04 executor | **Phase 309** (REG-10: "public docs … webhook signature verification") | 308 ships a stub page only (D-49); the content is 309's by roadmap. Must be fixed before 308 deploys to production. |
+| 2 | ~~A never-sent test delivery recorded `not_retried`~~ | 308-04 executor | fixed by the orchestrator, `b7f681a37` (RED `c171b5c5d`) | — |
+| 3 | **308-REVIEW IN-03** — the webhook owner check inherits `_is_banned`'s fail-open read, so a banned owner keeps receiving if that read fails | 308 code review | **Plant a seed at Phase 309** (REG-10: deferred items become seeds with a structured trigger); trigger: next phase touching `backend/app/dependencies.py` or `backend/app/security/principal_liveness.py` | Needs a strict mode on `_is_banned` (FIRING `dependencies.py`) passed through the ONE liveness predicate; a drainer-only check would be the second predicate D-25 forbids. |
+| 4 | 308-REVIEW IN-01 (reclaimed last-attempt send never counts toward auto-disable) | 308 code review | not a defect — refuted in `308-REVIEW-FIX.md` | A lease only expires when our worker dies (15 s send cap vs 600 s lease); counting it would blame the receiver for our crash. |
+| 5 | 308-REVIEW IN-02, IN-04, IN-05, IN-07 (Info) | 308 code review | left documented in `308-REVIEW.md` | Out of the fixer's Critical+Warning scope; none is on the phase failure list. Revisit at `/gsd:secure-phase 308` (IN-07 port probing via Test). |
