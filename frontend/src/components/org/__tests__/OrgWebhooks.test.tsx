@@ -37,7 +37,7 @@ function ep(id: string, over: Partial<OrgWebhook> = {}): OrgWebhook {
     owner_is_you: false,
     owner_is_member: true,
     host: "hooks.example.com",
-    path: "/in/syrel",
+    path: "/…",
     has_query: false,
     event_types: ["run.finished", "document.ingested"],
     enabled: true,
@@ -69,8 +69,8 @@ describe("308-06 OrgWebhooks", () => {
     m.listOrgWebhooks.mockResolvedValue({
       endpoints: [
         ep("a", { has_query: true, consecutive_failures: 3 }),
-        ep("b", { owner_name: "Ada Admin", owner_is_you: true, host: "ada.example.org", path: "/x", event_types: ["run.waiting"] }),
-        ep("c", { owner_name: "", owner_is_member: false, enabled: false, disabled_reason: "owner_removed", host: "gone.example.net", path: "/" }),
+        ep("b", { owner_name: "Ada Admin", owner_is_you: true, host: "ada.example.org", event_types: ["run.waiting"] }),
+        ep("c", { owner_name: "", owner_is_member: false, enabled: false, disabled_reason: "owner_removed", host: "gone.example.net", path: "" }),
       ],
       org_name: "Acme Legal",
     })
@@ -82,14 +82,14 @@ describe("308-06 OrgWebhooks", () => {
     expect(screen.getByText("3 endpoints · 3 members")).toBeInTheDocument()
     expect(
       screen.getByText(
-        "Every webhook endpoint a member of Acme Legal has added. Turning one off stops its deliveries; only an admin can turn it back on. Query strings are hidden — they may hold a receiver's password.",
+        "Every webhook endpoint a member of Acme Legal has added. Turning one off stops its deliveries; only an admin can turn it back on. Addresses show the host only — the path and query may hold a receiver's password.",
       ),
     ).toBeInTheDocument()
 
     const rowA = screen.getByTestId("org-webhook-a")
     expect(within(rowA).getByText("Lee Park")).toBeInTheDocument()
-    expect(within(rowA).getByText("hooks.example.com/in/syrel")).toBeInTheDocument()
-    expect(within(rowA).getByText("query hidden")).toBeInTheDocument()
+    expect(within(rowA).getByText("hooks.example.com")).toBeInTheDocument()
+    expect(within(rowA).getByText("path and query hidden")).toBeInTheDocument()
     expect(within(rowA).getByText("On")).toBeInTheDocument()
     expect(within(rowA).getByText("Never")).toBeInTheDocument()
     expect(within(rowA).getByText("3")).toBeInTheDocument()
@@ -97,14 +97,28 @@ describe("308-06 OrgWebhooks", () => {
 
     const rowB = screen.getByTestId("org-webhook-b")
     expect(rowB).toHaveTextContent("Ada Admin (you)")
+    expect(within(rowB).getByText("path hidden")).toBeInTheDocument()
 
     const rowC = screen.getByTestId("org-webhook-c")
     expect(within(rowC).getByText("A former member")).toBeInTheDocument()
     expect(within(rowC).getByText("Off — the owner left Acme Legal")).toBeInTheDocument()
+    expect(rowC).not.toHaveTextContent("hidden")
 
     expect(container.textContent).not.toContain("?")
     expect(container.innerHTML).not.toContain(TOKEN)
     expect(container.querySelector("a[href]")).toBeNull()
+  })
+
+  it("CR-01: renders the host only — a raw path from the server never reaches the screen", async () => {
+    m.listOrgWebhooks.mockResolvedValue({
+      endpoints: [ep("z", { host: "hooks.zapier.com", path: "/hooks/catch/1234567/abc1234/" })],
+      org_name: "Acme Legal",
+    })
+    const { container } = render(<OrgWebhooks orgName="Acme Legal" />)
+    const row = await screen.findByTestId("org-webhook-z")
+    expect(within(row).getByText("hooks.zapier.com")).toBeInTheDocument()
+    expect(within(row).getByText("path hidden")).toBeInTheDocument()
+    for (const piece of ["1234567", "abc1234", "catch"]) expect(container.innerHTML).not.toContain(piece)
   })
 
   it("orders by owner name A–Z, keeping the server's order within an owner", async () => {
@@ -193,7 +207,8 @@ describe("308-06 OrgWebhooks", () => {
     await userEvent.click(await screen.findByRole("button", { name: "Delete Lee Park's endpoint hooks.example.com" }))
     const sheet = await screen.findByRole("alertdialog")
     expect(within(sheet).getByText("Delete Lee Park's endpoint?")).toBeInTheDocument()
-    expect(sheet).toHaveTextContent("hooks.example.com/in/syrel")
+    expect(sheet).toHaveTextContent("hooks.example.com")
+    expect(sheet).not.toHaveTextContent("/")
     expect(sheet).toHaveTextContent("Lee Park's system stops getting events from Acme Legal.")
     expect(sheet).toHaveTextContent("Lee Park sees it gone; the audit log records you.")
     expect(sheet).toHaveTextContent("Lee Park's other endpoints and orgs are not touched.")

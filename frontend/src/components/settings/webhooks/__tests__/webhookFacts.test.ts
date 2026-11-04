@@ -84,8 +84,14 @@ describe("308-05 webhooksCopy — a true leaf, every locked sentence", () => {
     expect(C.roll.title).toBe("Roll the signing secret?")
     expect(C.del.title).toBe("Delete this endpoint?")
     expect(C.admin.description).toBe(
-      "Every webhook endpoint a member of {org} has added. Turning one off stops its deliveries; only an admin can turn it back on. Query strings are hidden — they may hold a receiver's password.",
+      "Every webhook endpoint a member of {org} has added. Turning one off stops its deliveries; only an admin can turn it back on. Addresses show the host only — the path and query may hold a receiver's password.",
     )
+    // CR-01 / D-59: the admin cell's hidden-part words
+    expect([C.admin.pathHidden, C.admin.queryHidden, C.admin.pathQueryHidden]).toEqual([
+      "path hidden",
+      "query hidden",
+      "path and query hidden",
+    ])
     expect(C.act.onAdminWhy).toBe("Only an org admin can turn this back on.")
     expect(C.act.testOffWhy).toBe("Turn the endpoint on to send a test.")
     expect(C.tab.capReached).toBe("You have 10 endpoints in {org}, the most allowed. Delete one to add another.")
