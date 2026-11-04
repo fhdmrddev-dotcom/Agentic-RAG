@@ -29,6 +29,7 @@ logger = logging.getLogger(__name__)
 Kind = Literal[
     "start", "read", "citation", "mcp_ip", "expensive",
     "oauth_register", "oauth_authorize", "oauth_token", "oauth_revoke",
+    "webhook_test", "webhook_resend",  # 308 (D-21 / D-29): per member, see the end of the file
 ]
 
 UNAVAILABLE_DETAIL = (
@@ -226,3 +227,47 @@ async def check_oauth_limit(redis, *, client: str, kind: Kind) -> int | None:
     except Exception as exc:  # noqa: BLE001 — any Redis failure refuses; see the module docblock
         logger.warning("oauth door limiter unavailable; refusing the call", exc_info=True)
         raise LimiterUnavailable() from exc
+
+
+# ── Phase 308 (D-21 / D-29 / T-308-16) — the per-MEMBER webhook Test and Resend buckets ──────────
+# A webhook Test is a synchronous POST to an address the member chose, and a Resend queues one; both
+# could be used to hammer a third party. One bucket per member per kind on the same Redis fixed
+# window, so the count holds across both uvicorn workers. Module constants on the
+# ``CITATION_CHECKS_PER_MINUTE`` precedent: ⛔ no env var, no setting.
+#
+# ⚠ The detail is ``{code, message}`` (308 P-6): ``message`` is the sentence the Webhooks tab shows,
+# so the client never falls back to "the request was refused (status 429)". 503 when the limiter
+# cannot count — FAIL CLOSED, like every limiter in this file.
+WEBHOOK_TESTS_PER_MINUTE = 5
+WEBHOOK_RESENDS_PER_MINUTE = 20
+
+_WEBHOOK_LIMITS: dict[str, tuple[int, str]] = {
+    "webhook_test": (
+        WEBHOOK_TESTS_PER_MINUTE, "You've sent several tests in a row. Try again in a minute.",
+    ),
+    "webhook_resend": (
+        WEBHOOK_RESENDS_PER_MINUTE,
+        "You've resent several deliveries in a row. Try again in a minute.",
+    ),
+}
+
+
+async def enforce_user_webhook_limit(redis, *, user_id: str, kind: Kind) -> None:
+    """Refuse with 429 ``{code: "rate_limited", message}`` + ``Retry-After`` when ``user_id`` is over
+    ``kind``'s per-minute bucket, and with 503 ``{code: "unavailable", message}`` when the limiter
+    cannot count (fail closed). ``ValueError`` for a kind that is not a webhook bucket."""
+    entry = _WEBHOOK_LIMITS.get(kind)
+    if entry is None:
+        raise ValueError(f"{kind!r} is not a webhook bucket")
+    limit, sentence = entry
+    try:
+        retry = await hit(redis, key_id=user_id, kind=kind, limit=int(limit))
+    except Exception:  # noqa: BLE001 — any Redis failure refuses; see the module docblock
+        logger.warning("webhook rate limiter unavailable; refusing the call", exc_info=True)
+        raise HTTPException(status_code=503, detail={"code": "unavailable", "message": UNAVAILABLE_DETAIL})
+    if retry is not None:
+        raise HTTPException(
+            status_code=429,
+            detail={"code": "rate_limited", "message": sentence},
+            headers={"Retry-After": str(retry)},
+        )

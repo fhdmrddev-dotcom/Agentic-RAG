@@ -32,6 +32,10 @@ logging.getLogger("asyncio").setLevel(logging.ERROR)
 # backend/.env (documented in .env.example) — no code change required.
 logging.getLogger("langsmith").setLevel(logging.ERROR)
 
+# Phase 308 (T-308 log leak) — at INFO httpx logs the FULL request URL, and a webhook receiver's
+# token lives in its path or query; the opt-in file sink lowers logging to INFO with no redaction.
+logging.getLogger("httpx").setLevel(logging.WARNING)
+
 logger = logging.getLogger(__name__)
 
 # SEED-363 (Phase 296) — the boot sweeps that CLAIM runs (resume_stranded_workflows and
@@ -551,6 +555,23 @@ async def lifespan(app_instance):
             _drainer = None
     app_instance.state.notification_drainer = _drainer
 
+    # Phase 308 (D-10) — the webhook drainer, in EVERY worker with no leader: exactly-once is owned
+    # by db/webhook_outbox.py (SKIP LOCKED + the 'sending' flip), never by this process. Same gate
+    # as the email drainer, so a test lifespan never drains the shared local outbox. Maintenance
+    # mode does not stop deliveries (it gates requests, not this loop).
+    _webhook_drainer = None
+    if not _setup_mode and RUN_BOOT_SWEEPS:  # 308 (D-10): every worker drains, no leader
+        try:
+            from app.services.webhook_drainer import WebhookDrainer
+
+            _webhook_drainer = WebhookDrainer(await get_pg_pool())
+            _webhook_drainer.start()
+            logger.info("Webhook drainer started")
+        except Exception:
+            logger.exception("Webhook drainer failed to start (app continues)")
+            _webhook_drainer = None
+    app_instance.state.webhook_drainer = _webhook_drainer
+
     # Phase 230 (QUEUE-01 / QUEUE-05 / D-05) — the durable ingestion queue daemon.
     # Runs in every worker with concurrency bounding and stale claim recovery (G-1).
     _ingestion_queue = None
@@ -682,6 +703,15 @@ async def lifespan(app_instance):
             await _nd.stop()
     except Exception:  # noqa: BLE001
         logger.exception("Run-waiting email drainer stop failed at lifespan shutdown")
+
+    # Phase 308 (D-10) — stop the webhook drainer. A delivery it had claimed but not recorded stays
+    # 'sending' and is re-claimed by the next worker's stale-lease recovery.
+    try:
+        _wd = getattr(app_instance.state, "webhook_drainer", None)
+        if _wd is not None:
+            await _wd.stop()
+    except Exception:  # noqa: BLE001
+        logger.exception("Webhook drainer stop failed at lifespan shutdown")
 
     # Phase 230 — stop the ingestion queue worker before cancelling in-flight tasks
     try:
@@ -912,7 +942,7 @@ async def list_models():
     return {"models": models, "default": settings.llm_model}
 
 
-from app.api import threads, runs, documents, settings as settings_api, folders, kb, skills, audit, knowledge_health, feedback, sandbox_outputs, workspace, workspace_promote, retention, admin, panel, workflows, workflow_runs, workflow_run_evidence, metadata_fields, document_views, document_search, document_relationships, classification_rules, document_governance, skill_tuner, skill_test_cases, evals, features, setup as setup_api, org, me_preferences, connectors, model_registry, schedules, document_queries, library, checked_queries, takeoff, sources, experts, api_docs, citation_checks, api_keys, inbound, org_items, links, notifications  # noqa: E402
+from app.api import threads, runs, documents, settings as settings_api, folders, kb, skills, audit, knowledge_health, feedback, sandbox_outputs, workspace, workspace_promote, retention, admin, panel, workflows, workflow_runs, workflow_run_evidence, metadata_fields, document_views, document_search, document_relationships, classification_rules, document_governance, skill_tuner, skill_test_cases, evals, features, setup as setup_api, org, me_preferences, connectors, model_registry, schedules, document_queries, library, checked_queries, takeoff, sources, experts, api_docs, citation_checks, api_keys, inbound, org_items, links, notifications, webhooks  # noqa: E402
 from app.mcp import mcp_lifespan, register_mcp  # noqa: E402 — Phase 305 MCP-01
 
 app.include_router(threads.router)
@@ -964,6 +994,8 @@ app.include_router(experts.router)  # Phase 259 (PACK-01 / PACK-06) — expert b
 app.include_router(api_docs.router)  # Phase 276 DOCS-04 — gated live API explorer
 app.include_router(api_keys.router)  # Phase 293 D-18 — /api-keys: a member's own API keys (create, list, revoke)
 app.include_router(api_keys.org_router)  # Phase 293 D-03 — /org/api-keys: org admins see and revoke every key
+app.include_router(webhooks.router)  # Phase 308 (HOOK-01): member webhooks
+app.include_router(webhooks.org_router)  # Phase 308 (HOOK-06): org-admin webhooks
 app.include_router(inbound.router)  # Phase 293 START-02 — /inbound: outside systems start a published workflow and read it back with an API key (never canvas-gated)
 app.include_router(org_items.router)  # Phase 298 D-16/D-15 — /org-items: elsewhere counts, folder labels (move routes added by 298-03)
 app.include_router(links.router)  # Phase 299 D-06 — /links/{kind}/{id}: may I open this item, and in which org
