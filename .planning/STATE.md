@@ -115,6 +115,7 @@ link. Branch `develop`. Tags `v4.7` and `v4.8` pushed 2026-10-30.
 
 | # | Description | Date | Commit | Directory |
 |---|-------------|------|--------|-----------|
+| fast-308-uat3 | 308 UAT row 3: webhook focus hint survives StrictMode double mount | 2026-11-04 | 89d29c391 | — (/gsd:fast) |
 | 261101-4y9 | fix 306 CR-01 and CR-02 with a test each | 2026-11-01 | c2b3225b0 | [261101-4y9-fix-306-cr-01-and-cr-02-with-a-test-each](./quick/261101-4y9-fix-306-cr-01-and-cr-02-with-a-test-each/) |
 
 ## Guardrail overrides
