@@ -7,6 +7,7 @@
  * leaves a receipt and moves focus to the header title. A "Waiting on you" focus hint opens its card,
  * or says the endpoint is in another org with "Switch to {org}". Assertions read rendered words.
  */
+import { StrictMode } from "react"
 import { beforeEach, describe, expect, it, vi } from "vitest"
 import { act, render, screen, waitFor, within } from "@testing-library/react"
 import userEvent from "@testing-library/user-event"
@@ -205,6 +206,20 @@ describe("308-05 WebhooksTab", () => {
     await waitFor(() => expect(screen.getByRole("button", { expanded: true })).toHaveTextContent("b.example.com"))
     expect(sessionStorage.getItem("webhook_focus")).toBeNull()
     await waitFor(() => expect(screen.getByRole("button", { expanded: true })).toHaveFocus())
+  })
+
+  // 308 UAT row 3: the app mounts under <StrictMode> (main.tsx), whose dev double-run of the mount
+  // effect read the hint once, then read null and overwrote it — the card stayed shut.
+  it("a focus hint survives a StrictMode double mount and still opens that card", async () => {
+    writeWebhookFocus({ endpointId: "b", orgId: "o1" })
+    m.listWebhooks.mockResolvedValue(list([endpoint("a"), endpoint("b", { enabled: false, disabled_reason: "failing" })]))
+    render(
+      <StrictMode>
+        <WebhooksTab />
+      </StrictMode>,
+    )
+    await waitFor(() => expect(screen.getByRole("button", { expanded: true })).toHaveTextContent("b.example.com"))
+    expect(sessionStorage.getItem("webhook_focus")).toBeNull()
   })
 
   it("WR-06: a hint written while the tab is ALREADY open opens that card and is consumed at once", async () => {

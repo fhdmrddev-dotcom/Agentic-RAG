@@ -99,7 +99,9 @@ export function WebhooksTab({ onOpenRun }: { onOpenRun?: (runId: string) => void
 
   useEffect(() => {
     alive.current = true
-    setFocus(readWebhookFocusOnce())
+    // 308 UAT row 3: never set null — StrictMode's dev re-run reads null after the first run consumed the hint.
+    const hint = readWebhookFocusOnce()
+    if (hint) setFocus(hint)
     return () => {
       alive.current = false
     }
