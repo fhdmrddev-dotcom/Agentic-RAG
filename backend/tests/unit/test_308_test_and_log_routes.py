@@ -204,8 +204,25 @@ def test_test_with_a_guard_failure_sends_nothing(client, store, sends, monkeypat
     assert sends.calls == []
     (rec,) = store.test_outcomes
     assert rec["sent"] is False
+    # 308 orchestrator fix: the log names WHY nothing was sent, not a generic "not retried".
+    assert rec["reason"] == "redaction_failed"
     (created,) = store.test_deliveries
     assert created["payload"] is None
+
+
+def test_test_with_an_unreadable_secret_records_secret_unreadable(client, store, sends, monkeypatch):
+    from app.api import webhooks as webhooks_api
+
+    async def unreadable(pool, endpoint_id, org, now):
+        return None
+
+    monkeypatch.setattr(webhooks_api, "_signing_secrets", unreadable)
+    eid = store.add(secret=SECRET)
+    r = client.post(f"/webhooks/{eid}/test")
+    assert r.status_code == 200
+    assert sends.calls == []
+    (rec,) = store.test_outcomes
+    assert rec["sent"] is False and rec["reason"] == "secret_unreadable"
 
 
 def test_test_on_an_off_endpoint_is_refused(client, store, sends):

@@ -304,11 +304,13 @@ def store(monkeypatch):
                                   "payload": payload, "event_id": event_id, "delivery_id": did})
         return event_id, did
 
-    async def record_test_outcome(pool, *, delivery_id, sent, status_code, latency_ms, error):
+    async def record_test_outcome(pool, *, delivery_id, sent, status_code, latency_ms, error, reason=None):
         s.test_outcomes.append({"delivery_id": delivery_id, "sent": sent, "status_code": status_code,
                                 "latency_ms": latency_ms, "error": error})
+        if reason is not None:
+            s.test_outcomes[-1]["reason"] = reason
         d = s.deliveries[str(delivery_id)]
-        d.update(status="sent" if sent else "failed", reason=None if sent else "not_retried",
+        d.update(status="sent" if sent else "failed", reason=None if sent else (reason or "not_retried"),
                  last_status_code=status_code, last_latency_ms=latency_ms, last_error=error)
         return True
 
