@@ -204,6 +204,10 @@ None. Every new surface reads real data. The "webhooks kill switch" in the OrgWe
 - `graphify update .` was not run in this worktree: the graph is regenerated on the merged tree, so it is not churned per worktree.
 - Public docs that still say webhooks don't exist: routed to Phase 309 (`deferred-items.md` #1; not touched here).
 
+## Addendum — vitest count gate, second sample
+
+Second run, HEAD `500769181`, same command, after the ledger commit: **`total 14030 · failed 0 · pinned total 12971` → `count gate OK — 624/624 pinned files present, no per-file decrease, 0 failing.`** The two reds in the first sample were in byte-unchanged suites, and both were green here. That is one more green sample, not proof that the two suites are stable.
+
 ## Self-Check: PASSED
 
 All created files exist on disk, and the seven task commits (`524d77994`, `6045eaaa6`, `c329d2309`, `68606a39b`, `fb6985b20`, `788b89a63`, `7b4ec964d`) are in `git log`. STATE.md and ROADMAP.md were not touched.
