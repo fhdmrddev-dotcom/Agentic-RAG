@@ -11,7 +11,7 @@ progress:
   total_plans: 15
   completed_plans: 15
   percent: 14
-stopped_at: Phase 308 context gathered 2026-11-04 (auto) — next G-2 sketch, then UI-SPEC, then plan-phase 308
+stopped_at: Phase 308 PLANNED 2026-11-04 (6 plans / 4 waves, checker passed 0 blockers) — next execute-phase 308
 ---
 
 # Project State
@@ -46,8 +46,8 @@ reviewer exists, so a phase closes `verification_mode: self-verified`, never `re
 
 Milestone: v4.9 Use It From Your Own Tools
 Phase: 308
-Plan: Not started
-Status: Phase 308 context gathered (`308-CONTEXT.md`, D-01..D-40); next: G-2 sketch (self-approved), UI-SPEC, plan-phase
+Plan: 0 of 6
+Status: Phase 308 planned — sketch 308-webhooks (A, self-approved), UI-SPEC approved, research D-41..D-54, plans 308-01..06 (D-55: 6 not 5); next: execute-phase 308
 Last activity: 2026-11-04
 
 Phases start at **303**; migrations at **220**. Seeds taken in at intake: SEED-013, SEED-177, SEED-195, SEED-081, SEED-079; bug BUG-261022-01.

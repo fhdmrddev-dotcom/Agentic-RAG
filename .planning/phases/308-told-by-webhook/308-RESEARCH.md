@@ -633,14 +633,17 @@ Standard Webhooks also defines `v1a` (ed25519), deferred by REQUIREMENTS.
 | A4 | npm `standardwebhooks` exposes `Webhook#verify(payload, headers)` for the Node snippet | Q7 | Snippet text wrong; verify against the official JS README when writing `webhookSnippets.ts` |
 | A5 | 64 KiB is enough of a response cap for real receivers | Pitfalls | A receiver with a big 2xx body logs `response_too_large` and is not retried |
 
-## Open Questions
+## Open Questions (RESOLVED)
 
 1. **Admin sees host + path, and the path can carry the receiver's token** (Zapier `hooks.zapier.com/hooks/catch/<id>/<token>/`, Slack `hooks.slack.com/services/T…/B…/<token>`; PITFALLS `:284`).
    - Known: D-30 hides only the query.
    - Unclear: whether showing the path to an org admin is acceptable.
    - Recommendation: the admin view and the audit metadata show **host only**, plus the owner's description. If the path stays, mask any path segment of 16 or more characters. Record as D-NN in the planner, the UI-SPEC amendment it needs is one cell.
+   - RESOLVED: D-51 (host + path, segments of 16+ chars masked, query never sent).
 2. **Is `webhook` a FLAGGED (UI-internal) OpenAPI tag or public?** Recommendation: FLAGGED, like `/notifications`. These routes serve Syrel's own screen, and a public contract is Phase 309's call.
+   - RESOLVED: D-52 (UI-internal, FLAGGED).
 3. **Is `SECRETS_ENCRYPTION_KEY` set locally?** Reading `backend/.env` is denied here. The plan must prove it with `venv/Scripts/python -c "from app.security.secret_cipher import get_cipher; print(get_cipher() is not None)"` before the G-4 rows. With no key, endpoint creation is refused by design (D-12).
+   - RESOLVED: D-53 — probed 2026-11-04 by the orchestrator: `get_cipher() is not None` → True.
 
 ## Environment Availability
 

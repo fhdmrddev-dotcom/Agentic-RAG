@@ -12376,6 +12376,27 @@ cells rot within days.
 | [`frontend/devRouting.ts`](docs/HOT-FILE-LEDGER.md#frontenddevroutingts) | 2 / 2 / 47 (was absent) | no (2 phases) | absent until 307-05. 307-04: pure devHeadersFor beside rewriteDevUrl (the consent route's headers in dev). ⛔ pure; mirrors vercel.json and nginx |
 | [`frontend/vercel.json`](docs/HOT-FILE-LEDGER.md#frontendverceljson) | 6 / 5 / 141 (was absent) | ⚠ **FIRES** | ⚠ FIRES, absent until 307-05. 307-04: a headers block for /app/connect/ (frame-ancestors none, DENY, no-referrer); no .well-known entry. ⛔ filesystem beats rewrites |
 | [`frontend/vite.config.ts`](docs/HOT-FILE-LEDGER.md#frontendviteconfigts) | 10 / 4 / 100 (was absent) | ⚠ **FIRES** | ⚠ FIRES, absent until 307-05. 307-04: the dev server applies devHeadersFor (consent anti-framing) beside rewriteDevUrl. ⛔ dev routing mirrors Vercel and nginx |
+| [`backend/app/db/webhooks.py`](docs/HOT-FILE-LEDGER.md#backendappdbwebhookspy) | 0 / 0 / 0 | no (young) | young (planned 308-01): endpoint CRUD (owner predicate in every statement), log reads, test and resend writes, the shared attempt insert. ⛔ ciphertext read only via _SIGNING_COLUMNS; no body column |
+| [`backend/app/services/webhook_urls.py`](docs/HOT-FILE-LEDGER.md#backendappserviceswebhook_urlspy) | 0 / 0 / 0 | no (young) | young (planned 308-02): D-46 URL rules (https, no userinfo, no fragment, <= 2048), host, admin host + path with 16+ char segments masked (D-51). ⛔ pure; never logs a URL |
+| [`backend/app/services/webhook_signer.py`](docs/HOT-FILE-LEDGER.md#backendappserviceswebhook_signerpy) | 0 / 0 / 0 | no (young) | young (planned 308-02): whsec_ secrets, the Standard Webhooks v1 HMAC, per-attempt headers with the overlap signature (D-11, D-13). ⛔ pure stdlib; a secret is never logged |
+| [`backend/app/services/webhook_sender.py`](docs/HOT-FILE-LEDGER.md#backendappserviceswebhook_senderpy) | 0 / 0 / 0 | no (young) | young (planned 308-02): one POST via egress.send_pinned_http('webhook'), latency around it, the outcome classification table. ⛔ no HTTP client of its own; response body and headers discarded |
+| [`backend/app/models/webhook.py`](docs/HOT-FILE-LEDGER.md#backendappmodelswebhookpy) | 0 / 0 / 0 | no (young) | young (planned 308-02 / 308-04): typed text-free payload models (D-41) and the route request and response models. ⛔ no payload field may carry a person's words; no read model carries a secret |
+| [`backend/app/db/webhook_outbox.py`](docs/HOT-FILE-LEDGER.md#backendappdbwebhook_outboxpy) | 0 / 0 / 0 | no (young) | young (planned 308-03): fan-out claim, SKIP LOCKED send claim, lease renew, guarded record, one auto-disable winner, notice, purge. ⛔ record only on a 'sending' row; no HTTP in a transaction |
+| [`backend/app/services/webhook_drainer.py`](docs/HOT-FILE-LEDGER.md#backendappserviceswebhook_drainerpy) | 0 / 0 / 0 | no (young) | young (planned 308-03): the per-worker fan-out, send and hourly purge loop (D-10, D-44). ⛔ logs ids only; one liveness predicate; one acting connection per (owner, org) |
+| [`backend/app/api/webhooks.py`](docs/HOT-FILE-LEDGER.md#backendappapiwebhookspy) | 0 / 0 / 0 | no (young) | young (planned 308-04): member /webhooks and admin /org/webhooks routes, test, roll, resend. ⛔ 404 for another member's row; save-time egress check off-loop; secret only in create and roll answers |
+| [`frontend/src/lib/api/webhooks.ts`](docs/HOT-FILE-LEDGER.md#frontendsrclibapiwebhooksts) | 0 / 0 / 0 | no (young) | young (planned 308-05): member and admin client calls, readWebhookFailure for {code, message}. ⛔ not re-exported from lib/api.ts; the secret is returned and kept nowhere |
+| [`frontend/src/components/settings/webhooks/webhooksCopy.ts`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentssettingswebhookswebhookscopyts) | 0 / 0 / 0 | no (young) | young (planned 308-05): every Webhooks tab and admin string (UI-SPEC Copywriting). ⛔ imports nothing; fillCopy comes from apiKeysCopy |
+| [`frontend/src/components/settings/webhooks/webhookFacts.ts`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentssettingswebhookswebhookfactsts) | 0 / 0 / 0 | no (young) | young (planned 308-05): status tag, display address (query values masked), delivery words, latency, test verdict. ⛔ pure |
+| [`frontend/src/components/settings/webhooks/webhookSnippets.ts`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentssettingswebhookswebhooksnippetsts) | 0 / 0 / 0 | no (young) | young (planned 308-05): Python and Node verify snippets that read SYREL_WEBHOOK_SECRET. ⛔ pure; takes no secret (T-293-21) |
+| [`frontend/src/components/settings/webhooks/webhookFocus.ts`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentssettingswebhookswebhookfocusts) | 0 / 0 / 0 | no (young) | young (planned 308-05): the one-shot {endpointId, orgId} sessionStorage hint. ⛔ the read removes the key in the same read |
+| [`frontend/src/components/settings/webhooks/WebhooksTab.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentssettingswebhookswebhookstabtsx) | 0 / 0 / 0 | no (young) | young (planned 308-05): the member tab: own reads (re-read on org change, P-2), add form, secret once, cards, focus hint. ⛔ never optimistic |
+| [`frontend/src/components/settings/webhooks/WebhookEndpointCard.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentssettingswebhookswebhookendpointcardtsx) | 0 / 0 / 0 | no (young) | young (planned 308-05): one endpoint, collapsed and open: status, actions, test verdict, roll panel, edit, log. ⛔ the address is text, never a link |
+| [`frontend/src/components/settings/webhooks/WebhookEndpointForm.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentssettingswebhookswebhookendpointformtsx) | 0 / 0 / 0 | no (young) | young (planned 308-05): add and edit form; form checks only, reachability is the server's sentence. ⛔ keeps typed values on a refusal |
+| [`frontend/src/components/settings/webhooks/WebhookSecretOnce.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentssettingswebhookswebhooksecretoncetsx) | 0 / 0 / 0 | no (young) | young (planned 308-05): the secret shown once (create and roll) with the verify snippets. ⛔ receives the secret as a prop and keeps it nowhere else |
+| [`frontend/src/components/settings/webhooks/WebhookDeliveryLog.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentssettingswebhookswebhookdeliverylogtsx) | 0 / 0 / 0 | no (young) | young (planned 308-05): paged log, Resend, Refresh, a 15 s poll only while open with in-flight rows. ⛔ never renders a body |
+| [`frontend/src/components/settings/webhooks/RollWebhookSecretSheet.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentssettingswebhooksrollwebhooksecretsheettsx) | 0 / 0 / 0 | no (young) | young (planned 308-05): the calm roll confirm naming the 24 h overlap. ⛔ never optimistic; Keep this secret holds focus |
+| [`frontend/src/components/settings/webhooks/DeleteWebhookSheet.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentssettingswebhooksdeletewebhooksheettsx) | 0 / 0 / 0 | no (young) | young (planned 308-05): the victim-naming delete sheet, member and admin variants. ⛔ never optimistic; Keep it holds focus |
+| [`frontend/src/components/org/OrgWebhooks.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentsorgorgwebhookstsx) | 0 / 0 / 0 | no (young) | young (planned 308-06): the org's endpoints (host + masked path, no query), admin Turn off / Turn on / Delete, receipt. ⛔ no feature gate (P-1); never optimistic |
 
 
 
@@ -30323,3 +30344,133 @@ CLAUDE.md verdict cell as of 2026-11-04 (replaced by 307-05, moved verbatim): | 
 ### `frontend/devRouting.ts` — 307-05 refresh (Phase 307 close), 2026-11-04
 
 **`2 / 2 / 47`.** Phases: 276, 307. Added by 307-05 (2 phases). 307-04: `devHeadersFor`. ⛔ Binding: pure.
+
+## Phase 308 — new files (rows planted at planning, 2026-11-04)
+
+Planted by the 308 planner so the G-5 gate can see every file the phase creates. Each executor re-derives the triple when the file lands; 308-06 Task 4 records what shipped.
+
+### `backend/app/db/webhooks.py`
+
+**`0 / 0 / 0`** (planned 308-01). endpoint CRUD (owner predicate in every statement), log reads, test and resend writes, the shared attempt insert. ⛔ Binding: ciphertext read only via _SIGNING_COLUMNS; no body column.
+
+CLAUDE.md verdict cell: none (the file does not fire).
+
+### `backend/app/services/webhook_urls.py`
+
+**`0 / 0 / 0`** (planned 308-02). D-46 URL rules (https, no userinfo, no fragment, <= 2048), host, admin host + path with 16+ char segments masked (D-51). ⛔ Binding: pure; never logs a URL.
+
+CLAUDE.md verdict cell: none (the file does not fire).
+
+### `backend/app/services/webhook_signer.py`
+
+**`0 / 0 / 0`** (planned 308-02). whsec_ secrets, the Standard Webhooks v1 HMAC, per-attempt headers with the overlap signature (D-11, D-13). ⛔ Binding: pure stdlib; a secret is never logged.
+
+CLAUDE.md verdict cell: none (the file does not fire).
+
+### `backend/app/services/webhook_sender.py`
+
+**`0 / 0 / 0`** (planned 308-02). one POST via egress.send_pinned_http('webhook'), latency around it, the outcome classification table. ⛔ Binding: no HTTP client of its own; response body and headers discarded.
+
+CLAUDE.md verdict cell: none (the file does not fire).
+
+### `backend/app/models/webhook.py`
+
+**`0 / 0 / 0`** (planned 308-02 / 308-04). typed text-free payload models (D-41) and the route request and response models. ⛔ Binding: no payload field may carry a person's words; no read model carries a secret.
+
+CLAUDE.md verdict cell: none (the file does not fire).
+
+### `backend/app/db/webhook_outbox.py`
+
+**`0 / 0 / 0`** (planned 308-03). fan-out claim, SKIP LOCKED send claim, lease renew, guarded record, one auto-disable winner, notice, purge. ⛔ Binding: record only on a 'sending' row; no HTTP in a transaction.
+
+CLAUDE.md verdict cell: none (the file does not fire).
+
+### `backend/app/services/webhook_drainer.py`
+
+**`0 / 0 / 0`** (planned 308-03). the per-worker fan-out, send and hourly purge loop (D-10, D-44). ⛔ Binding: logs ids only; one liveness predicate; one acting connection per (owner, org).
+
+CLAUDE.md verdict cell: none (the file does not fire).
+
+### `backend/app/api/webhooks.py`
+
+**`0 / 0 / 0`** (planned 308-04). member /webhooks and admin /org/webhooks routes, test, roll, resend. ⛔ Binding: 404 for another member's row; save-time egress check off-loop; secret only in create and roll answers.
+
+CLAUDE.md verdict cell: none (the file does not fire).
+
+### `frontend/src/lib/api/webhooks.ts`
+
+**`0 / 0 / 0`** (planned 308-05). member and admin client calls, readWebhookFailure for {code, message}. ⛔ Binding: not re-exported from lib/api.ts; the secret is returned and kept nowhere.
+
+CLAUDE.md verdict cell: none (the file does not fire).
+
+### `frontend/src/components/settings/webhooks/webhooksCopy.ts`
+
+**`0 / 0 / 0`** (planned 308-05). every Webhooks tab and admin string (UI-SPEC Copywriting). ⛔ Binding: imports nothing; fillCopy comes from apiKeysCopy.
+
+CLAUDE.md verdict cell: none (the file does not fire).
+
+### `frontend/src/components/settings/webhooks/webhookFacts.ts`
+
+**`0 / 0 / 0`** (planned 308-05). status tag, display address (query values masked), delivery words, latency, test verdict. ⛔ Binding: pure.
+
+CLAUDE.md verdict cell: none (the file does not fire).
+
+### `frontend/src/components/settings/webhooks/webhookSnippets.ts`
+
+**`0 / 0 / 0`** (planned 308-05). Python and Node verify snippets that read SYREL_WEBHOOK_SECRET. ⛔ Binding: pure; takes no secret (T-293-21).
+
+CLAUDE.md verdict cell: none (the file does not fire).
+
+### `frontend/src/components/settings/webhooks/webhookFocus.ts`
+
+**`0 / 0 / 0`** (planned 308-05). the one-shot {endpointId, orgId} sessionStorage hint. ⛔ Binding: the read removes the key in the same read.
+
+CLAUDE.md verdict cell: none (the file does not fire).
+
+### `frontend/src/components/settings/webhooks/WebhooksTab.tsx`
+
+**`0 / 0 / 0`** (planned 308-05). the member tab: own reads (re-read on org change, P-2), add form, secret once, cards, focus hint. ⛔ Binding: never optimistic.
+
+CLAUDE.md verdict cell: none (the file does not fire).
+
+### `frontend/src/components/settings/webhooks/WebhookEndpointCard.tsx`
+
+**`0 / 0 / 0`** (planned 308-05). one endpoint, collapsed and open: status, actions, test verdict, roll panel, edit, log. ⛔ Binding: the address is text, never a link.
+
+CLAUDE.md verdict cell: none (the file does not fire).
+
+### `frontend/src/components/settings/webhooks/WebhookEndpointForm.tsx`
+
+**`0 / 0 / 0`** (planned 308-05). add and edit form; form checks only, reachability is the server's sentence. ⛔ Binding: keeps typed values on a refusal.
+
+CLAUDE.md verdict cell: none (the file does not fire).
+
+### `frontend/src/components/settings/webhooks/WebhookSecretOnce.tsx`
+
+**`0 / 0 / 0`** (planned 308-05). the secret shown once (create and roll) with the verify snippets. ⛔ Binding: receives the secret as a prop and keeps it nowhere else.
+
+CLAUDE.md verdict cell: none (the file does not fire).
+
+### `frontend/src/components/settings/webhooks/WebhookDeliveryLog.tsx`
+
+**`0 / 0 / 0`** (planned 308-05). paged log, Resend, Refresh, a 15 s poll only while open with in-flight rows. ⛔ Binding: never renders a body.
+
+CLAUDE.md verdict cell: none (the file does not fire).
+
+### `frontend/src/components/settings/webhooks/RollWebhookSecretSheet.tsx`
+
+**`0 / 0 / 0`** (planned 308-05). the calm roll confirm naming the 24 h overlap. ⛔ Binding: never optimistic; Keep this secret holds focus.
+
+CLAUDE.md verdict cell: none (the file does not fire).
+
+### `frontend/src/components/settings/webhooks/DeleteWebhookSheet.tsx`
+
+**`0 / 0 / 0`** (planned 308-05). the victim-naming delete sheet, member and admin variants. ⛔ Binding: never optimistic; Keep it holds focus.
+
+CLAUDE.md verdict cell: none (the file does not fire).
+
+### `frontend/src/components/org/OrgWebhooks.tsx`
+
+**`0 / 0 / 0`** (planned 308-06). the org's endpoints (host + masked path, no query), admin Turn off / Turn on / Delete, receipt. ⛔ Binding: no feature gate (P-1); never optimistic.
+
+CLAUDE.md verdict cell: none (the file does not fire).

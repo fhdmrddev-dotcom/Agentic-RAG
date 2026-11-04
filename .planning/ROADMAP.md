@@ -236,7 +236,15 @@ Plans:
   5. An org admin lists, disables and deletes the org's webhook endpoints (HOOK-06).
 
 **How we'd know this failed**: two workers send the same event twice; an ingest or finalization path emits nothing (document completion has 4+ writers); events are emitted from application code and a path is missed; a trigger error breaks run finalization or ingestion; a delivery bypasses `egress.py`; the log shows a response body; a payload carries document text; signing departs from Standard Webhooks; the secret is stored in plain text; a webhook table is readable by `anon` or another user, or `get_advisors(security)` shows a new ERROR; Redis is treated as the record; a removed member's endpoint keeps receiving events.
-**Plans**: TBD
+**Plans**: 6 plans in 4 waves (D-55: 01 ‖ 02 → 03 ‖ 04 → 05 → 06)
+
+Plans:
+- [ ] 308-01-PLAN.md — migration 225 (deny-all tables, swallow-and-warn emit triggers, notifications widening, audit CHECK), db/webhooks.py, the notice read path
+- [ ] 308-02-PLAN.md — egress `webhook` capability + SSRF corpus, URL rules, typed text-free payloads through the guard, signer, sender
+- [ ] 308-03-PLAN.md — WebhookDrainer + outbox: fan-out with visibility/liveness, retries, auto-disable + notice, purge; emission matrix and two-drainer live proofs
+- [ ] 308-04-PLAN.md — member + admin routes, test/log/resend, rate limits, main.py wiring, OpenAPI flagging, docs stub
+- [ ] 308-05-PLAN.md — Settings → Webhooks tab (cards, form, secret once, log, sheets) and its one mount
+- [ ] 308-06-PLAN.md — org-admin Webhooks section, Waiting-on-you row, audit words, standardwebhooks interop (legitimacy checkpoint), bookkeeping + phase gates
 **UI hint**: yes
 **Flags**: Standard patterns, no research (Phase 300's trigger-fed outbox + per-worker drainer with `SKIP LOCKED`, lease, frozen payload, `next_attempt_at`; Phase 293's audit lockstep; a hand-rolled Standard Webhooks signer with the secret through `secret_cipher`; `standardwebhooks==1.1.0` test-only). **Migration** (webhook subscriptions + deliveries + swallow-and-warn triggers on `workflow_runs` and `documents` status; next free number); every table has RLS; SECURITY DEFINER functions have `EXECUTE` revoked from `PUBLIC`; an **anon-role test**; `get_advisors(security)` after the cloud paste. **security_enforcement** (SSRF refusal corpus at save and at delivery). **G-2 sketch FIRST** for the webhook screen (endpoint, events, test, secret roll, delivery log, resend) and the admin list. **G-4**. **G-5**: `backend/app/security/egress.py` (one closed `webhook` capability: https only, DNS-pinned, redirects refused), `backend/app/main.py` (one lifespan block for the drainer), `frontend/src/pages/SettingsPage.tsx` (one mount). ⚠ `backend/app/services/ingestion_queue_service.py` has **no ledger row** — add it before any plan names it. **Worktree rule 4**: DB-mutating suites serialize against 306/307 work. **Deployment-artifact parity** for any new env var.
 
@@ -264,7 +272,7 @@ Plans:
 | 305. Connect Claude Code and Cursor | 5/5 | Complete by decision (self-verified 4/5 SC; SC#1 client rows OWED; deploys WITH 304) | 2026-10-31 |
 | 306. Ask the Agent and Run Workflows | 5/5 | Complete by decision (self-verified 5/5 SC; 5 live UAT rows OWED — row 5 first; cloud 220→223 owed) | 2026-11-03 |
 | 307. Sign In From Claude.ai and Claude Desktop | 5/5 | Complete by decision (self-verified 4/4 SC; 8 human rows OWED — postponed by operator, row 5 first; secure-phase owed; cloud 220→224 owed) | 2026-11-04 |
-| 308. Told by Webhook | 0/TBD | Not started | - |
+| 308. Told by Webhook | 0/6 | Planned | - |
 | 309. Close-Out: Docs, Register, Deploy Parity | 0/TBD | Not started | - |
 
 ---
