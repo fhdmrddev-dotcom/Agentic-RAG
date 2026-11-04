@@ -34,14 +34,15 @@ export const API_KEYS_COPY = {
     label: "API keys",
     title: "API keys",
     description:
-      "Let another system start your published workflows and read the result. Each key starts only the workflows you pick, and its runs run as you.",
+      "Keys let another tool act as you. An AI tool key lets Claude Code, Cursor or VS Code search and read your knowledge in one organisation. A workflow key lets another system start the published workflows you pick.",
     limits: "Each key: {starts} starts and {reads} status reads a minute. Set by your operator.",
+    limitsMcp: "Each AI tool key: {searches} searches and {reads} reads a minute. Set by your operator.",
     loading: "Loading your keys…",
     loadFailed: "Couldn't load your API keys.",
     retry: "Retry",
     newKey: "New key",
     empty:
-      "No keys yet. A key lets another system, such as n8n, a script or a scheduler elsewhere, start one of your published workflows and read its result.",
+      "No keys yet. An AI tool key lets Claude Code, Cursor or VS Code search and read your knowledge as you. A workflow key lets another system, such as n8n or a script, start one of your published workflows.",
   },
 
   draft: {
@@ -193,8 +194,8 @@ export const API_KEYS_COPY = {
   admin: {
     tabLabel: "API keys",
     title: "API keys · whole organisation",
-    description: "Every key in {org}. Runs started with a key run as the member who made it.",
-    descriptionNoOrg: "Every key in this organisation. Runs started with a key run as the member who made it.",
+    description: "Every key in {org}. A key acts as the member who made it.",
+    descriptionNoOrg: "Every key in this organisation. A key acts as the member who made it.",
     note: "You can see and revoke every member's keys. You can't see their secrets; nobody can.",
     empty: "No member of {org} has made an API key yet.",
     emptyNoOrg: "No member of this organisation has made an API key yet.",
@@ -257,6 +258,12 @@ export const API_KEYS_COPY = {
     overStarts: "over the limit: {N} starts a minute",
     overReads: "over the limit: {N} reads a minute",
     overBare: "over the limit",
+    /** 306-02 (GUARD-01, UI-SPEC §Surface 7a): outside admission refused the start. One home for
+     *  a workflow key at /inbound and an AI tool key over MCP; `admission_unavailable` reuses
+     *  `limiterUnavailable`. */
+    admissionKey: "too many questions and runs already in progress for this key",
+    admissionOrg: "too many questions and runs already in progress in this organisation",
+    admissionProvider: "the AI provider was busy with other outside requests",
   },
 
   /** 293-03 (D-14 / UI-SPEC Surface 6): the operator's per-key limits card in Settings →
@@ -267,9 +274,26 @@ export const API_KEYS_COPY = {
       "Limits for calls from other systems. Each key gets its own allowance; a call over it is refused and told when to try again.",
     startsLabel: "Starts per minute, per key",
     startsHint: "Default 10.",
-    readsLabel: "Status reads per minute, per key",
-    readsHint: "Default 120.",
-    footer: "Applies to every key once you click Save Integrations.",
+    // 305-03 (D-54): the reads limit also governs AI tool list and read calls, so it says so.
+    readsLabel: "Reads per minute, per key",
+    readsHint: "Default 120. Workflow status reads, and AI tool list and read calls.",
+    searchesLabel: "Searches per minute, per key",
+    searchesHint: "Default 30. AI tool searches only; each one runs an embedding call.",
+    // 306-02 (UI-SPEC §Surface 2): reworded — the card now holds org- and provider-wide limits too.
+    footer: "Applies once you click Save Integrations.",
+    // 306-02 (D-36 / D-35, UI-SPEC §Surface 2): the second group, "Questions and runs from outside".
+    outsideTitle: "Questions and runs from outside",
+    outsideDescription:
+      "For questions and workflow runs that AI tools and API keys start. A start over a limit is refused and told to try again in a few seconds. In-app chats are never counted or held back.",
+    askWaitLabel: "Answer wait, in seconds",
+    askWaitHint:
+      "Default 30, from 5 to 45. How long an AI tool waits for an answer before it gets a handle to fetch it later. AI tools give up on a call after about a minute.",
+    inflightKeyLabel: "Running at once, per key",
+    inflightKeyHint: "Default 2. Questions and runs one key can have in progress.",
+    inflightOrgLabel: "Running at once, per organisation",
+    inflightOrgHint: "Default 4. Across every key in one organisation.",
+    inflightProviderLabel: "Running at once, per AI provider",
+    inflightProviderHint: "Default 6. Across the whole deployment, for each AI provider.",
     loadFailed: "Couldn't load the current API key limits, so they can't be changed here right now.",
     retry: "Retry",
   },

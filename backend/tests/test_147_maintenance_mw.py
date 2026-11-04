@@ -73,6 +73,19 @@ def _make_app() -> FastAPI:
     async def cancel_run(run_id: str):  # self-cancel — MUST stay reachable
         return Response(status_code=204)
 
+    # Phase 305 (D-25): the MCP endpoint and a boundary sibling.
+    @application.post("/mcp")
+    async def mcp_root():
+        return {"ok": True}
+
+    @application.post("/mcp/")
+    async def mcp_slash():
+        return {"ok": True}
+
+    @application.post("/mcpx")
+    async def mcp_sibling():
+        return {"ok": True}
+
     return application
 
 
@@ -209,3 +222,19 @@ def test_health_maintenance_reflects_flag(monkeypatch):
     client = TestClient(main_app)
     body = client.get("/health").json()
     assert body["maintenance"] is True
+
+
+# ── Phase 305 (D-25 / MCP-07) — the MCP endpoint passes; reads still work inside ─────
+
+@pytest.mark.parametrize("path", ["/mcp", "/mcp/"])
+def test_mcp_endpoint_passes_under_maintenance(on_client, path):
+    # The server refuses start-type tools itself, with a JSON-RPC sentence (test_305_maintenance);
+    # the HTTP write-block must not 503 the whole endpoint, or searching and reading would stop too.
+    resp = on_client.post(path)
+    assert resp.status_code != 503
+    assert resp.status_code == 200
+
+
+def test_mcp_prefix_boundary_not_over_allowlisted(on_client):
+    # Allowlisted on a path-segment boundary: /mcpx is a different resource and stays blocked.
+    assert on_client.post("/mcpx").status_code == 503

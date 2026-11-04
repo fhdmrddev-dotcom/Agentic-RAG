@@ -889,3 +889,87 @@ REVOKE EXECUTE ON FUNCTION public.notify_on_run_status() FROM PUBLIC;
 REVOKE EXECUTE ON FUNCTION public.notify_on_run_status() FROM anon;
 REVOKE EXECUTE ON FUNCTION public.notify_on_run_status() FROM authenticated;
 GRANT EXECUTE ON FUNCTION public.notify_on_run_status() TO service_role;
+
+-- migration 220 — api_keys: the column grant re-issued with the four MCP-key columns (kind,
+-- folder_ids, tools, include_external); key_hash is still never granted (D-09). The 215 block
+-- above is kept as the history; this one runs after it, so the bootstrap ends on the superset.
+-- organizations.mcp_enabled needs no line: it is outside mig 194's column UPDATE grant (D-35).
+REVOKE ALL ON TABLE public.api_keys FROM PUBLIC;
+REVOKE ALL ON TABLE public.api_keys FROM anon;
+REVOKE ALL ON TABLE public.api_keys FROM authenticated;
+REVOKE ALL ON TABLE public.api_keys FROM service_role;
+GRANT SELECT (id, org_id, user_id, label, key_prefix, workflows, expires_at, revoked_at, revoked_by, last_used_at, created_at, kind, folder_ids, tools, include_external) ON TABLE public.api_keys TO authenticated;
+GRANT SELECT, INSERT, UPDATE, DELETE ON TABLE public.api_keys TO service_role;
+
+-- migration 221 — organizations: no destructive privilege for a client role (D-42, BUG-261030-03).
+-- PUBLIC first (the CLAUDE.md trap). The re-declared current_user_org_ids() /
+-- current_user_has_permission() ACL lines are mig 181's, already mirrored above, verbatim.
+REVOKE DELETE, TRUNCATE, TRIGGER, REFERENCES ON TABLE public.organizations FROM PUBLIC;
+REVOKE DELETE, TRUNCATE, TRIGGER, REFERENCES ON TABLE public.organizations FROM anon;
+REVOKE DELETE, TRUNCATE, TRIGGER, REFERENCES ON TABLE public.organizations FROM authenticated;
+
+-- migration 222 — mcp_usage: deny-all to every client role (RLS on, no policy; D-55). Copied from
+-- the 218 notification_deliveries lines, not retyped. Only the backend's service-role pool writes it.
+-- organizations.pii_redaction_enabled needs no line: it is outside mig 194's column UPDATE grant
+-- (D-56, the 220 mcp_enabled precedent above).
+REVOKE ALL ON TABLE public.mcp_usage FROM PUBLIC;
+REVOKE ALL ON TABLE public.mcp_usage FROM anon;
+REVOKE ALL ON TABLE public.mcp_usage FROM authenticated;
+REVOKE ALL ON TABLE public.mcp_usage FROM service_role;
+GRANT ALL ON TABLE public.mcp_usage TO service_role;
+
+-- migration 223 — threads' origin freeze trigger function (Group A shape: trigger-only), the 215
+-- workflow_runs block above copied with threads names. PUBLIC first (the CLAUDE.md trap). The three
+-- threads.origin_* columns need no line: threads carries no column-level grant.
+REVOKE EXECUTE ON FUNCTION public.threads_origin_immutable() FROM PUBLIC;
+REVOKE EXECUTE ON FUNCTION public.threads_origin_immutable() FROM anon;
+REVOKE EXECUTE ON FUNCTION public.threads_origin_immutable() FROM authenticated;
+GRANT EXECUTE ON FUNCTION public.threads_origin_immutable() TO service_role;
+
+-- migration 224 — oauth_clients and oauth_tokens: deny-all to every client role (RLS on, no
+-- policy; D-33). Copied from the 222 mcp_usage lines above, not retyped. Only the backend's
+-- service-role pool writes them. api_keys.oauth_client_id needs no line: it is deliberately
+-- OUTSIDE the authenticated column grant (the 220 block above stays the superset, unchanged).
+REVOKE ALL ON TABLE public.oauth_clients FROM PUBLIC;
+REVOKE ALL ON TABLE public.oauth_clients FROM anon;
+REVOKE ALL ON TABLE public.oauth_clients FROM authenticated;
+REVOKE ALL ON TABLE public.oauth_clients FROM service_role;
+GRANT ALL ON TABLE public.oauth_clients TO service_role;
+REVOKE ALL ON TABLE public.oauth_tokens FROM PUBLIC;
+REVOKE ALL ON TABLE public.oauth_tokens FROM anon;
+REVOKE ALL ON TABLE public.oauth_tokens FROM authenticated;
+REVOKE ALL ON TABLE public.oauth_tokens FROM service_role;
+GRANT ALL ON TABLE public.oauth_tokens TO service_role;
+
+-- migration 225 — the four webhook tables: deny-all to every client role (RLS on, no policy; D-32),
+-- copied from the 224 lines above, not retyped; and the two emit trigger functions (Group A shape:
+-- trigger-only), PUBLIC first (the CLAUDE.md trap). Only the backend's service-role pool reads or
+-- writes the tables. notifications.endpoint_id needs no line: notifications keeps its 218 grant.
+REVOKE ALL ON TABLE public.webhook_endpoints FROM PUBLIC;
+REVOKE ALL ON TABLE public.webhook_endpoints FROM anon;
+REVOKE ALL ON TABLE public.webhook_endpoints FROM authenticated;
+REVOKE ALL ON TABLE public.webhook_endpoints FROM service_role;
+GRANT ALL ON TABLE public.webhook_endpoints TO service_role;
+REVOKE ALL ON TABLE public.webhook_events FROM PUBLIC;
+REVOKE ALL ON TABLE public.webhook_events FROM anon;
+REVOKE ALL ON TABLE public.webhook_events FROM authenticated;
+REVOKE ALL ON TABLE public.webhook_events FROM service_role;
+GRANT ALL ON TABLE public.webhook_events TO service_role;
+REVOKE ALL ON TABLE public.webhook_deliveries FROM PUBLIC;
+REVOKE ALL ON TABLE public.webhook_deliveries FROM anon;
+REVOKE ALL ON TABLE public.webhook_deliveries FROM authenticated;
+REVOKE ALL ON TABLE public.webhook_deliveries FROM service_role;
+GRANT ALL ON TABLE public.webhook_deliveries TO service_role;
+REVOKE ALL ON TABLE public.webhook_delivery_attempts FROM PUBLIC;
+REVOKE ALL ON TABLE public.webhook_delivery_attempts FROM anon;
+REVOKE ALL ON TABLE public.webhook_delivery_attempts FROM authenticated;
+REVOKE ALL ON TABLE public.webhook_delivery_attempts FROM service_role;
+GRANT ALL ON TABLE public.webhook_delivery_attempts TO service_role;
+REVOKE EXECUTE ON FUNCTION public.webhook_emit_run_event() FROM PUBLIC;
+REVOKE EXECUTE ON FUNCTION public.webhook_emit_run_event() FROM anon;
+REVOKE EXECUTE ON FUNCTION public.webhook_emit_run_event() FROM authenticated;
+GRANT EXECUTE ON FUNCTION public.webhook_emit_run_event() TO service_role;
+REVOKE EXECUTE ON FUNCTION public.webhook_emit_document_event() FROM PUBLIC;
+REVOKE EXECUTE ON FUNCTION public.webhook_emit_document_event() FROM anon;
+REVOKE EXECUTE ON FUNCTION public.webhook_emit_document_event() FROM authenticated;
+GRANT EXECUTE ON FUNCTION public.webhook_emit_document_event() TO service_role;

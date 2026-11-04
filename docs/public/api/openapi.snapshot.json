@@ -15991,13 +15991,40 @@
     }
    }
   },
+  "/api-keys/connected-apps": {
+   "get": {
+    "tags": [
+     "api-keys"
+    ],
+    "summary": "List My Connected Apps",
+    "description": "Every app acting as the caller, in EVERY org (D-25) \u2014 no org header: an app acting as you\nanywhere is visible from one place, each naming its org. Never another member's grant.",
+    "operationId": "list_my_connected_apps_api_keys_connected_apps_get",
+    "responses": {
+     "200": {
+      "description": "Successful Response",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/ConnectedAppList"
+        }
+       }
+      }
+     }
+    },
+    "security": [
+     {
+      "HTTPBearer": []
+     }
+    ]
+   }
+  },
   "/api-keys": {
    "get": {
     "tags": [
      "api-keys"
     ],
     "summary": "List My Keys",
-    "description": "The caller's keys in the active org, the effective per-key limits, and each key's calls\nin the last 30 days (D-17).",
+    "description": "The caller's keys in the active org, the effective per-key limits, and each key's calls\nin the last 30 days (D-17). Phase 304: plus the ``mcp`` block (catalogue, URL, switches).",
     "operationId": "list_my_keys_api_keys_get",
     "responses": {
      "200": {
@@ -16022,13 +16049,21 @@
      "api-keys"
     ],
     "summary": "Create Key",
-    "description": "Make a key for one or more of the caller's published workflows. The response is the ONLY\nplace the secret ever appears.",
+    "description": "Make a key. A body without ``kind`` (or ``kind=\"workflow\"``) is the 293 workflow key; a\n``kind=\"mcp\"`` body is a personal MCP key. The response is the ONLY place the secret ever\nappears.",
     "operationId": "create_key_api_keys_post",
     "requestBody": {
      "content": {
       "application/json": {
        "schema": {
-        "$ref": "#/components/schemas/ApiKeyCreateBody"
+        "oneOf": [
+         {
+          "$ref": "#/components/schemas/ApiKeyCreateBody"
+         },
+         {
+          "$ref": "#/components/schemas/McpKeyCreateBody"
+         }
+        ],
+        "title": "Body"
        }
       }
      },
@@ -16051,6 +16086,33 @@
        "application/json": {
         "schema": {
          "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      }
+     }
+    },
+    "security": [
+     {
+      "HTTPBearer": []
+     }
+    ]
+   }
+  },
+  "/api-keys/folders": {
+   "get": {
+    "tags": [
+     "api-keys"
+    ],
+    "summary": "List Pickable Folders",
+    "description": "The folders the caller can tick on an MCP key in the active org \u2014 read on their OWN acting\nconnection (RLS + the acting-org GUC), never the service role. ``shared`` is a folder the\ncaller does not own (or an org-shared one); ``source`` is the D-40 UI hint.",
+    "operationId": "list_pickable_folders_api_keys_folders_get",
+    "responses": {
+     "200": {
+      "description": "Successful Response",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/PickableFolderList"
         }
        }
       }
@@ -16139,13 +16201,67 @@
     }
    }
   },
+  "/org/api-keys/connected-apps": {
+   "get": {
+    "tags": [
+     "api-keys"
+    ],
+    "summary": "List Org Connected Apps",
+    "description": "Every app members connected in the active org, with its owner (D-26, admin only).",
+    "operationId": "list_org_connected_apps_org_api_keys_connected_apps_get",
+    "responses": {
+     "200": {
+      "description": "Successful Response",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/OrgConnectedAppList"
+        }
+       }
+      }
+     }
+    },
+    "security": [
+     {
+      "HTTPBearer": []
+     }
+    ]
+   }
+  },
+  "/org/api-keys/connected-apps/revoke-all": {
+   "post": {
+    "tags": [
+     "api-keys"
+    ],
+    "summary": "Revoke All Org Connected Apps",
+    "description": "Disconnect every app in the active org (D-26 / T-307-27): grants only, this org only \u2014 a\nkey is never touched. ONE ``api_key.revoke`` row (D-28) names the count, only when N > 0. The\ncounts are the SERVER's, so the receipt can never show the number the sheet guessed.",
+    "operationId": "revoke_all_org_connected_apps_org_api_keys_connected_apps_revoke_all_post",
+    "responses": {
+     "200": {
+      "description": "Successful Response",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/RevokeAllResult"
+        }
+       }
+      }
+     }
+    },
+    "security": [
+     {
+      "HTTPBearer": []
+     }
+    ]
+   }
+  },
   "/org/api-keys": {
    "get": {
     "tags": [
      "api-keys"
     ],
     "summary": "List Org Keys",
-    "description": "Every key in the active org, with its owner (D-03).",
+    "description": "Every key in the active org, with its owner (D-03). Phase 304: plus the same ``mcp``\nblock, so the admin surface can say when MCP is switched off.",
     "operationId": "list_org_keys_org_api_keys_get",
     "responses": {
      "200": {
@@ -16201,6 +16317,820 @@
         }
        }
       }
+     },
+     "422": {
+      "description": "Validation Error",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      }
+     }
+    }
+   }
+  },
+  "/org/api-keys/mcp-access": {
+   "get": {
+    "tags": [
+     "api-keys"
+    ],
+    "summary": "Get Org Mcp Access",
+    "description": "The active org's MCP switch, read live (never the settings cache).",
+    "operationId": "get_org_mcp_access_org_api_keys_mcp_access_get",
+    "responses": {
+     "200": {
+      "description": "Successful Response",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/OrgMcpAccess"
+        }
+       }
+      }
+     }
+    },
+    "security": [
+     {
+      "HTTPBearer": []
+     }
+    ]
+   },
+   "put": {
+    "tags": [
+     "api-keys"
+    ],
+    "summary": "Set Org Mcp Access",
+    "description": "Flip the active org's MCP switch. The audit row is written only AFTER the write returned;\na failed write raises (an error status and no audit row), never a fake success.",
+    "operationId": "set_org_mcp_access_org_api_keys_mcp_access_put",
+    "requestBody": {
+     "content": {
+      "application/json": {
+       "schema": {
+        "$ref": "#/components/schemas/OrgMcpAccessUpdate"
+       }
+      }
+     },
+     "required": true
+    },
+    "responses": {
+     "200": {
+      "description": "Successful Response",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/OrgMcpAccess"
+        }
+       }
+      }
+     },
+     "422": {
+      "description": "Validation Error",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      }
+     }
+    },
+    "security": [
+     {
+      "HTTPBearer": []
+     }
+    ]
+   }
+  },
+  "/org/api-keys/pii-redaction": {
+   "get": {
+    "tags": [
+     "api-keys"
+    ],
+    "summary": "Get Org Pii Redaction",
+    "description": "The active org's redaction switch, read live.",
+    "operationId": "get_org_pii_redaction_org_api_keys_pii_redaction_get",
+    "responses": {
+     "200": {
+      "description": "Successful Response",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/OrgPiiRedaction"
+        }
+       }
+      }
+     }
+    },
+    "security": [
+     {
+      "HTTPBearer": []
+     }
+    ]
+   },
+   "put": {
+    "tags": [
+     "api-keys"
+    ],
+    "summary": "Set Org Pii Redaction",
+    "description": "Flip the active org's redaction switch; audited after the write, never on a failed one.",
+    "operationId": "set_org_pii_redaction_org_api_keys_pii_redaction_put",
+    "requestBody": {
+     "content": {
+      "application/json": {
+       "schema": {
+        "$ref": "#/components/schemas/OrgPiiRedactionUpdate"
+       }
+      }
+     },
+     "required": true
+    },
+    "responses": {
+     "200": {
+      "description": "Successful Response",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/OrgPiiRedaction"
+        }
+       }
+      }
+     },
+     "422": {
+      "description": "Validation Error",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      }
+     }
+    },
+    "security": [
+     {
+      "HTTPBearer": []
+     }
+    ]
+   }
+  },
+  "/webhooks": {
+   "get": {
+    "tags": [
+     "webhooks"
+    ],
+    "summary": "List My Endpoints",
+    "description": "The caller's endpoints in the active org (D-04), newest first. Never a secret.",
+    "operationId": "list_my_endpoints_webhooks_get",
+    "responses": {
+     "200": {
+      "description": "Successful Response",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/WebhookEndpointList"
+        }
+       }
+      }
+     }
+    },
+    "security": [
+     {
+      "HTTPBearer": []
+     }
+    ]
+   },
+   "post": {
+    "tags": [
+     "webhooks"
+    ],
+    "summary": "Create Endpoint",
+    "description": "Add an endpoint in the active org. The response is the ONLY place the secret ever appears\n(the roll answer is the only other one, for a NEW secret).",
+    "operationId": "create_endpoint_webhooks_post",
+    "requestBody": {
+     "content": {
+      "application/json": {
+       "schema": {
+        "$ref": "#/components/schemas/WebhookEndpointCreate"
+       }
+      }
+     },
+     "required": true
+    },
+    "responses": {
+     "201": {
+      "description": "Successful Response",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/WebhookEndpointCreated"
+        }
+       }
+      }
+     },
+     "422": {
+      "description": "Validation Error",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      }
+     }
+    },
+    "security": [
+     {
+      "HTTPBearer": []
+     }
+    ]
+   }
+  },
+  "/webhooks/{endpoint_id}": {
+   "patch": {
+    "tags": [
+     "webhooks"
+    ],
+    "summary": "Update Endpoint",
+    "description": "Change the address, the events or the description. A NEW address runs both checks again.",
+    "operationId": "update_endpoint_webhooks__endpoint_id__patch",
+    "security": [
+     {
+      "HTTPBearer": []
+     }
+    ],
+    "parameters": [
+     {
+      "name": "endpoint_id",
+      "in": "path",
+      "required": true,
+      "schema": {
+       "type": "string",
+       "format": "uuid",
+       "title": "Endpoint Id"
+      }
+     }
+    ],
+    "requestBody": {
+     "required": true,
+     "content": {
+      "application/json": {
+       "schema": {
+        "$ref": "#/components/schemas/WebhookEndpointUpdate"
+       }
+      }
+     }
+    },
+    "responses": {
+     "200": {
+      "description": "Successful Response",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/WebhookEndpointOne"
+        }
+       }
+      }
+     },
+     "422": {
+      "description": "Validation Error",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      }
+     }
+    }
+   },
+   "delete": {
+    "tags": [
+     "webhooks"
+    ],
+    "summary": "Delete Endpoint",
+    "description": "Delete one of the caller's endpoints; its log and queued deliveries go with it.",
+    "operationId": "delete_endpoint_webhooks__endpoint_id__delete",
+    "security": [
+     {
+      "HTTPBearer": []
+     }
+    ],
+    "parameters": [
+     {
+      "name": "endpoint_id",
+      "in": "path",
+      "required": true,
+      "schema": {
+       "type": "string",
+       "format": "uuid",
+       "title": "Endpoint Id"
+      }
+     }
+    ],
+    "responses": {
+     "204": {
+      "description": "Successful Response"
+     },
+     "422": {
+      "description": "Validation Error",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      }
+     }
+    }
+   }
+  },
+  "/webhooks/{endpoint_id}/disable": {
+   "post": {
+    "tags": [
+     "webhooks"
+    ],
+    "summary": "Disable Endpoint",
+    "description": "Turn one of the caller's endpoints off; its queued deliveries are dropped.",
+    "operationId": "disable_endpoint_webhooks__endpoint_id__disable_post",
+    "security": [
+     {
+      "HTTPBearer": []
+     }
+    ],
+    "parameters": [
+     {
+      "name": "endpoint_id",
+      "in": "path",
+      "required": true,
+      "schema": {
+       "type": "string",
+       "format": "uuid",
+       "title": "Endpoint Id"
+      }
+     }
+    ],
+    "responses": {
+     "200": {
+      "description": "Successful Response",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/WebhookEndpointOne"
+        }
+       }
+      }
+     },
+     "422": {
+      "description": "Validation Error",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      }
+     }
+    }
+   }
+  },
+  "/webhooks/{endpoint_id}/enable": {
+   "post": {
+    "tags": [
+     "webhooks"
+    ],
+    "summary": "Enable Endpoint",
+    "description": "Turn one of the caller's endpoints back on. 403 when an org admin turned it off (D-30).",
+    "operationId": "enable_endpoint_webhooks__endpoint_id__enable_post",
+    "security": [
+     {
+      "HTTPBearer": []
+     }
+    ],
+    "parameters": [
+     {
+      "name": "endpoint_id",
+      "in": "path",
+      "required": true,
+      "schema": {
+       "type": "string",
+       "format": "uuid",
+       "title": "Endpoint Id"
+      }
+     }
+    ],
+    "responses": {
+     "200": {
+      "description": "Successful Response",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/WebhookEndpointOne"
+        }
+       }
+      }
+     },
+     "422": {
+      "description": "Validation Error",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      }
+     }
+    }
+   }
+  },
+  "/webhooks/{endpoint_id}/roll-secret": {
+   "post": {
+    "tags": [
+     "webhooks"
+    ],
+    "summary": "Roll Secret",
+    "description": "A new signing secret, shown once; the old one keeps signing for 24 hours (D-13).",
+    "operationId": "roll_secret_webhooks__endpoint_id__roll_secret_post",
+    "security": [
+     {
+      "HTTPBearer": []
+     }
+    ],
+    "parameters": [
+     {
+      "name": "endpoint_id",
+      "in": "path",
+      "required": true,
+      "schema": {
+       "type": "string",
+       "format": "uuid",
+       "title": "Endpoint Id"
+      }
+     }
+    ],
+    "responses": {
+     "200": {
+      "description": "Successful Response",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/WebhookSecretRolled"
+        }
+       }
+      }
+     },
+     "422": {
+      "description": "Validation Error",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      }
+     }
+    }
+   }
+  },
+  "/webhooks/{endpoint_id}/test": {
+   "post": {
+    "tags": [
+     "webhooks"
+    ],
+    "summary": "Send Test",
+    "description": "Send one ``webhook.test`` event now and answer the verdict. The SAME freezing, signer and\nsend path as the drainer; recorded in the log with one attempt; never retried; never counted\ntoward auto-disable. Rate-limited per member (fail closed).",
+    "operationId": "send_test_webhooks__endpoint_id__test_post",
+    "security": [
+     {
+      "HTTPBearer": []
+     }
+    ],
+    "parameters": [
+     {
+      "name": "endpoint_id",
+      "in": "path",
+      "required": true,
+      "schema": {
+       "type": "string",
+       "format": "uuid",
+       "title": "Endpoint Id"
+      }
+     }
+    ],
+    "responses": {
+     "200": {
+      "description": "Successful Response",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/WebhookTestResult"
+        }
+       }
+      }
+     },
+     "422": {
+      "description": "Validation Error",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      }
+     }
+    }
+   }
+  },
+  "/webhooks/{endpoint_id}/deliveries": {
+   "get": {
+    "tags": [
+     "webhooks"
+    ],
+    "summary": "List Deliveries",
+    "description": "One page of the endpoint's log, newest first. Status words and numbers only \u2014 the log holds\nno body, no response and no headers. ``limit`` is capped at 50.",
+    "operationId": "list_deliveries_webhooks__endpoint_id__deliveries_get",
+    "security": [
+     {
+      "HTTPBearer": []
+     }
+    ],
+    "parameters": [
+     {
+      "name": "endpoint_id",
+      "in": "path",
+      "required": true,
+      "schema": {
+       "type": "string",
+       "format": "uuid",
+       "title": "Endpoint Id"
+      }
+     },
+     {
+      "name": "limit",
+      "in": "query",
+      "required": false,
+      "schema": {
+       "type": "integer",
+       "minimum": 1,
+       "default": 20,
+       "title": "Limit"
+      }
+     },
+     {
+      "name": "before",
+      "in": "query",
+      "required": false,
+      "schema": {
+       "anyOf": [
+        {
+         "type": "string",
+         "maxLength": 200
+        },
+        {
+         "type": "null"
+        }
+       ],
+       "title": "Before"
+      }
+     }
+    ],
+    "responses": {
+     "200": {
+      "description": "Successful Response",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/WebhookDeliveryPage"
+        }
+       }
+      }
+     },
+     "422": {
+      "description": "Validation Error",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      }
+     }
+    }
+   }
+  },
+  "/webhooks/{endpoint_id}/deliveries/{delivery_id}/resend": {
+   "post": {
+    "tags": [
+     "webhooks"
+    ],
+    "summary": "Resend Delivery",
+    "description": "Queue a sent or failed delivery again, with the SAME ``webhook-id`` (D-21). Not on an endpoint\nthat is off (409); a test, skipped or in-flight delivery is a 404. Rate-limited per member.",
+    "operationId": "resend_delivery_webhooks__endpoint_id__deliveries__delivery_id__resend_post",
+    "security": [
+     {
+      "HTTPBearer": []
+     }
+    ],
+    "parameters": [
+     {
+      "name": "endpoint_id",
+      "in": "path",
+      "required": true,
+      "schema": {
+       "type": "string",
+       "format": "uuid",
+       "title": "Endpoint Id"
+      }
+     },
+     {
+      "name": "delivery_id",
+      "in": "path",
+      "required": true,
+      "schema": {
+       "type": "string",
+       "format": "uuid",
+       "title": "Delivery Id"
+      }
+     }
+    ],
+    "responses": {
+     "200": {
+      "description": "Successful Response",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/WebhookResendResult"
+        }
+       }
+      }
+     },
+     "422": {
+      "description": "Validation Error",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      }
+     }
+    }
+   }
+  },
+  "/org/webhooks": {
+   "get": {
+    "tags": [
+     "webhooks"
+    ],
+    "summary": "List Org Endpoints",
+    "description": "Every webhook endpoint in the active org, with its owner (admin only).",
+    "operationId": "list_org_endpoints_org_webhooks_get",
+    "responses": {
+     "200": {
+      "description": "Successful Response",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/OrgWebhookList"
+        }
+       }
+      }
+     }
+    },
+    "security": [
+     {
+      "HTTPBearer": []
+     }
+    ]
+   }
+  },
+  "/org/webhooks/{endpoint_id}/disable": {
+   "post": {
+    "tags": [
+     "webhooks"
+    ],
+    "summary": "Admin Disable Endpoint",
+    "description": "An admin turns any endpoint in the org off, with reason ``admin``: only an admin can turn it\nback on. The audit row is the ADMIN's.",
+    "operationId": "admin_disable_endpoint_org_webhooks__endpoint_id__disable_post",
+    "security": [
+     {
+      "HTTPBearer": []
+     }
+    ],
+    "parameters": [
+     {
+      "name": "endpoint_id",
+      "in": "path",
+      "required": true,
+      "schema": {
+       "type": "string",
+       "format": "uuid",
+       "title": "Endpoint Id"
+      }
+     }
+    ],
+    "responses": {
+     "200": {
+      "description": "Successful Response",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/OrgWebhookOne"
+        }
+       }
+      }
+     },
+     "422": {
+      "description": "Validation Error",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      }
+     }
+    }
+   }
+  },
+  "/org/webhooks/{endpoint_id}/enable": {
+   "post": {
+    "tags": [
+     "webhooks"
+    ],
+    "summary": "Admin Enable Endpoint",
+    "description": "An admin turns back on an endpoint an ADMIN turned off. One Syrel turned off (failing, gone)\nis its owner's to turn back on (409); one already on answers as it stands, unchanged.",
+    "operationId": "admin_enable_endpoint_org_webhooks__endpoint_id__enable_post",
+    "security": [
+     {
+      "HTTPBearer": []
+     }
+    ],
+    "parameters": [
+     {
+      "name": "endpoint_id",
+      "in": "path",
+      "required": true,
+      "schema": {
+       "type": "string",
+       "format": "uuid",
+       "title": "Endpoint Id"
+      }
+     }
+    ],
+    "responses": {
+     "200": {
+      "description": "Successful Response",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/OrgWebhookOne"
+        }
+       }
+      }
+     },
+     "422": {
+      "description": "Validation Error",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      }
+     }
+    }
+   }
+  },
+  "/org/webhooks/{endpoint_id}": {
+   "delete": {
+    "tags": [
+     "webhooks"
+    ],
+    "summary": "Admin Delete Endpoint",
+    "description": "An admin deletes any endpoint in the org; its log and queued deliveries go with it.",
+    "operationId": "admin_delete_endpoint_org_webhooks__endpoint_id__delete",
+    "security": [
+     {
+      "HTTPBearer": []
+     }
+    ],
+    "parameters": [
+     {
+      "name": "endpoint_id",
+      "in": "path",
+      "required": true,
+      "schema": {
+       "type": "string",
+       "format": "uuid",
+       "title": "Endpoint Id"
+      }
+     }
+    ],
+    "responses": {
+     "204": {
+      "description": "Successful Response"
      },
      "422": {
       "description": "Validation Error",
@@ -16935,6 +17865,17 @@
        }
       ],
       "title": "Detail"
+     },
+     "tool": {
+      "anyOf": [
+       {
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Tool"
      }
     },
     "type": "object",
@@ -16947,6 +17888,12 @@
    },
    "ApiKeyCreateBody": {
     "properties": {
+     "kind": {
+      "type": "string",
+      "const": "workflow",
+      "title": "Kind",
+      "default": "workflow"
+     },
      "label": {
       "type": "string",
       "title": "Label"
@@ -16986,7 +17933,7 @@
      "workflow_ids"
     ],
     "title": "ApiKeyCreateBody",
-    "description": "D-04: label, one or more published workflows, and an expiry of 30 / 90 / 365 days or\nnever (``null``). The default is 90."
+    "description": "D-04: label, one or more published workflows, and an expiry of 30 / 90 / 365 days or\nnever (``null``). The default is 90.\n\nPhase 304: ``kind`` may be omitted (the 293 body) or sent as ``\"workflow\"``."
    },
    "ApiKeyCreated": {
     "properties": {
@@ -17005,6 +17952,25 @@
     ],
     "title": "ApiKeyCreated"
    },
+   "ApiKeyFolderRef": {
+    "properties": {
+     "id": {
+      "type": "string",
+      "title": "Id"
+     },
+     "name": {
+      "type": "string",
+      "title": "Name"
+     }
+    },
+    "type": "object",
+    "required": [
+     "id",
+     "name"
+    ],
+    "title": "ApiKeyFolderRef",
+    "description": "A folder an MCP key ticks, named server-side (a folder since deleted drops out)."
+   },
    "ApiKeyLimits": {
     "properties": {
      "starts_per_minute": {
@@ -17014,12 +17980,17 @@
      "reads_per_minute": {
       "type": "integer",
       "title": "Reads Per Minute"
+     },
+     "searches_per_minute": {
+      "type": "integer",
+      "title": "Searches Per Minute"
      }
     },
     "type": "object",
     "required": [
      "starts_per_minute",
-     "reads_per_minute"
+     "reads_per_minute",
+     "searches_per_minute"
     ],
     "title": "ApiKeyLimits"
    },
@@ -17034,6 +18005,9 @@
      },
      "limits": {
       "$ref": "#/components/schemas/ApiKeyLimits"
+     },
+     "mcp": {
+      "$ref": "#/components/schemas/McpAvailability"
      }
     },
     "type": "object",
@@ -17152,6 +18126,75 @@
       },
       "type": "array",
       "title": "Calls"
+     },
+     "kind": {
+      "type": "string",
+      "enum": [
+       "workflow",
+       "mcp"
+      ],
+      "title": "Kind",
+      "default": "workflow"
+     },
+     "tools": {
+      "anyOf": [
+       {
+        "items": {
+         "type": "string"
+        },
+        "type": "array"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Tools"
+     },
+     "folders": {
+      "anyOf": [
+       {
+        "items": {
+         "$ref": "#/components/schemas/ApiKeyFolderRef"
+        },
+        "type": "array"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Folders"
+     },
+     "include_external": {
+      "type": "boolean",
+      "title": "Include External",
+      "default": false
+     },
+     "org_name": {
+      "anyOf": [
+       {
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Org Name"
+     },
+     "mcp_off": {
+      "anyOf": [
+       {
+        "type": "string",
+        "enum": [
+         "org",
+         "deployment",
+         "unknown"
+        ]
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Mcp Off"
      }
     },
     "type": "object",
@@ -18292,6 +19335,163 @@
      "skipped"
     ],
     "title": "ConfirmOut"
+   },
+   "ConnectedApp": {
+    "properties": {
+     "id": {
+      "type": "string",
+      "title": "Id"
+     },
+     "client_name": {
+      "type": "string",
+      "title": "Client Name"
+     },
+     "name_source": {
+      "type": "string",
+      "enum": [
+       "cimd",
+       "dcr"
+      ],
+      "title": "Name Source"
+     },
+     "redirect_host": {
+      "anyOf": [
+       {
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Redirect Host"
+     },
+     "redirect_kind": {
+      "anyOf": [
+       {
+        "type": "string",
+        "enum": [
+         "web",
+         "loopback"
+        ]
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Redirect Kind"
+     },
+     "org_id": {
+      "type": "string",
+      "title": "Org Id"
+     },
+     "org_name": {
+      "anyOf": [
+       {
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Org Name"
+     },
+     "tools": {
+      "items": {
+       "type": "string"
+      },
+      "type": "array",
+      "title": "Tools"
+     },
+     "folders": {
+      "anyOf": [
+       {
+        "items": {
+         "$ref": "#/components/schemas/ApiKeyFolderRef"
+        },
+        "type": "array"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Folders"
+     },
+     "include_external": {
+      "type": "boolean",
+      "title": "Include External",
+      "default": false
+     },
+     "created_at": {
+      "type": "string",
+      "format": "date-time",
+      "title": "Created At"
+     },
+     "last_used_at": {
+      "anyOf": [
+       {
+        "type": "string",
+        "format": "date-time"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Last Used At"
+     },
+     "expires_at": {
+      "anyOf": [
+       {
+        "type": "string",
+        "format": "date-time"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Expires At"
+     },
+     "mcp_off": {
+      "anyOf": [
+       {
+        "type": "string",
+        "enum": [
+         "org",
+         "deployment",
+         "unknown"
+        ]
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Mcp Off"
+     }
+    },
+    "type": "object",
+    "required": [
+     "id",
+     "client_name",
+     "name_source",
+     "org_id",
+     "created_at"
+    ],
+    "title": "ConnectedApp"
+   },
+   "ConnectedAppList": {
+    "properties": {
+     "apps": {
+      "items": {
+       "$ref": "#/components/schemas/ConnectedApp"
+      },
+      "type": "array",
+      "title": "Apps"
+     }
+    },
+    "type": "object",
+    "required": [
+     "apps"
+    ],
+    "title": "ConnectedAppList"
    },
    "ConnectionFileImportRequest": {
     "properties": {
@@ -22524,6 +23724,26 @@
       "type": "integer",
       "title": "Api Key Reads Per Minute"
      },
+     "api_key_searches_per_minute": {
+      "type": "integer",
+      "title": "Api Key Searches Per Minute"
+     },
+     "mcp_ask_wait_seconds": {
+      "type": "integer",
+      "title": "Mcp Ask Wait Seconds"
+     },
+     "outside_inflight_per_key": {
+      "type": "integer",
+      "title": "Outside Inflight Per Key"
+     },
+     "outside_inflight_per_org": {
+      "type": "integer",
+      "title": "Outside Inflight Per Org"
+     },
+     "outside_inflight_per_provider": {
+      "type": "integer",
+      "title": "Outside Inflight Per Provider"
+     },
      "notification_email_delay_seconds": {
       "type": "integer",
       "title": "Notification Email Delay Seconds"
@@ -22635,6 +23855,10 @@
      "workflows_enabled": {
       "type": "boolean",
       "title": "Workflows Enabled"
+     },
+     "mcp_enabled": {
+      "type": "boolean",
+      "title": "Mcp Enabled"
      },
      "maintenance_mode": {
       "type": "boolean",
@@ -22775,6 +23999,11 @@
      "explorer_max_tool_rounds",
      "api_key_starts_per_minute",
      "api_key_reads_per_minute",
+     "api_key_searches_per_minute",
+     "mcp_ask_wait_seconds",
+     "outside_inflight_per_key",
+     "outside_inflight_per_org",
+     "outside_inflight_per_provider",
      "notification_email_delay_seconds",
      "email_from_address",
      "email_from_name",
@@ -22801,6 +24030,7 @@
      "sandbox_enabled",
      "self_improve_enabled",
      "workflows_enabled",
+     "mcp_enabled",
      "maintenance_mode",
      "model_discovery_filter_enabled",
      "context_window_max_tokens",
@@ -24636,6 +25866,57 @@
     "title": "MatrixRunBody",
     "description": "POST body for a matrix launch. ``gate_provider`` designates the ONE arm whose rows feed the\npublish gate (D-05); it defaults SERVER-SIDE to the caller's active provider when omitted.\n``user_id``/``skill_id`` come from the caller + path, NEVER this body (T-133-03)."
    },
+   "McpAvailability": {
+    "properties": {
+     "available": {
+      "type": "boolean",
+      "title": "Available",
+      "default": false
+     },
+     "off": {
+      "anyOf": [
+       {
+        "type": "string",
+        "enum": [
+         "org",
+         "deployment",
+         "unknown"
+        ]
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Off"
+     },
+     "url": {
+      "anyOf": [
+       {
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Url"
+     },
+     "tools": {
+      "items": {
+       "$ref": "#/components/schemas/McpToolRef"
+      },
+      "type": "array",
+      "title": "Tools"
+     },
+     "oauth": {
+      "type": "boolean",
+      "title": "Oauth",
+      "default": false
+     }
+    },
+    "type": "object",
+    "title": "McpAvailability",
+    "description": "D-28 / D-30. ``available`` is the DEPLOYMENT switch (false hides the MCP choice); ``off``\nnames the switch that is off, the deployment's winning; ``url`` is ``mcp_url()``."
+   },
    "McpConfig": {
     "properties": {
      "headers": {
@@ -24742,6 +26023,68 @@
     ],
     "title": "McpDiscoverResponse",
     "description": "Discovered tools returned from pre-save MCP endpoint probe."
+   },
+   "McpKeyCreateBody": {
+    "properties": {
+     "kind": {
+      "type": "string",
+      "const": "mcp",
+      "title": "Kind"
+     },
+     "label": {
+      "type": "string",
+      "title": "Label"
+     },
+     "tools": {
+      "items": {
+       "type": "string",
+       "maxLength": 64
+      },
+      "type": "array",
+      "maxItems": 32,
+      "title": "Tools"
+     },
+     "folder_ids": {
+      "anyOf": [
+       {
+        "items": {
+         "type": "string",
+         "format": "uuid"
+        },
+        "type": "array",
+        "maxItems": 500
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Folder Ids"
+     },
+     "include_external": {
+      "type": "boolean",
+      "title": "Include External",
+      "default": false
+     },
+     "expires_in_days": {
+      "type": "integer",
+      "enum": [
+       30,
+       90,
+       365
+      ],
+      "title": "Expires In Days",
+      "default": 90
+     }
+    },
+    "additionalProperties": false,
+    "type": "object",
+    "required": [
+     "kind",
+     "label",
+     "tools"
+    ],
+    "title": "McpKeyCreateBody",
+    "description": "Phase 304 (KEY-01, KEY-03, KEY-04; D-07, D-08). A personal MCP key.\n\n``tools`` is validated and normalised by the route (``normalise_tool_selection``: an empty\nlist, an unknown name and a companion without its lead are each refused in one sentence).\n``folder_ids``: ``None`` = every folder the member can see; an EMPTY list is refused, never\nread as \"all\". No ``workflow_ids`` (``extra=\"forbid\"`` refuses them) and no \"never\" expiry."
    },
    "McpOAuthStartRequest": {
     "properties": {
@@ -24866,6 +26209,46 @@
     ],
     "title": "McpProbeAuthResponse",
     "description": "\u26a0 THE WIRE CONTRACT THE CONNECT SURFACE READS (BUS-047).\n\nBound to `services.mcp_auth_discovery.McpAuthProbe`, and deliberately NARROWER than it.\nThree of that dataclass's fields are withheld on purpose and their absence is the\ncontract, not an oversight:\n\n  \u00b7 `authorization_endpoint` / `token_endpoint` \u2014 the BROWSER never calls these; the\n    backend does. Putting them on the wire invites a frontend to start the flow itself,\n    which would move the PKCE verifier out of the one place that can keep it secret.\n  \u00b7 the raw metadata documents \u2014 attacker-influenced JSON from a host nobody curated.\n    Nothing renders it, so nothing should receive it.\n\nIf the door genuinely needs one of them, that is a design conversation, not a field to\nadd quietly."
+   },
+   "McpToolRef": {
+    "properties": {
+     "name": {
+      "type": "string",
+      "title": "Name"
+     },
+     "group": {
+      "type": "string",
+      "enum": [
+       "read",
+       "ask",
+       "run"
+      ],
+      "title": "Group"
+     },
+     "label": {
+      "type": "string",
+      "title": "Label"
+     },
+     "travels_with": {
+      "anyOf": [
+       {
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Travels With"
+     }
+    },
+    "type": "object",
+    "required": [
+     "name",
+     "group",
+     "label"
+    ],
+    "title": "McpToolRef",
+    "description": "One entry of ``mcp_tool_catalogue.MCP_TOOLS`` (D-11), served in catalogue order."
    },
    "MessageCreate": {
     "properties": {
@@ -25865,6 +27248,235 @@
     "title": "OperatorBody",
     "description": "The first operator + the infra it is minted against (D-11). Infra travels in the body\nbecause the store is not written until finalize \u2014 each step is stateless + re-entrant."
    },
+   "OrgConnectedApp": {
+    "properties": {
+     "id": {
+      "type": "string",
+      "title": "Id"
+     },
+     "client_name": {
+      "type": "string",
+      "title": "Client Name"
+     },
+     "name_source": {
+      "type": "string",
+      "enum": [
+       "cimd",
+       "dcr"
+      ],
+      "title": "Name Source"
+     },
+     "redirect_host": {
+      "anyOf": [
+       {
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Redirect Host"
+     },
+     "redirect_kind": {
+      "anyOf": [
+       {
+        "type": "string",
+        "enum": [
+         "web",
+         "loopback"
+        ]
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Redirect Kind"
+     },
+     "org_id": {
+      "type": "string",
+      "title": "Org Id"
+     },
+     "org_name": {
+      "anyOf": [
+       {
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Org Name"
+     },
+     "tools": {
+      "items": {
+       "type": "string"
+      },
+      "type": "array",
+      "title": "Tools"
+     },
+     "folders": {
+      "anyOf": [
+       {
+        "items": {
+         "$ref": "#/components/schemas/ApiKeyFolderRef"
+        },
+        "type": "array"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Folders"
+     },
+     "include_external": {
+      "type": "boolean",
+      "title": "Include External",
+      "default": false
+     },
+     "created_at": {
+      "type": "string",
+      "format": "date-time",
+      "title": "Created At"
+     },
+     "last_used_at": {
+      "anyOf": [
+       {
+        "type": "string",
+        "format": "date-time"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Last Used At"
+     },
+     "expires_at": {
+      "anyOf": [
+       {
+        "type": "string",
+        "format": "date-time"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Expires At"
+     },
+     "mcp_off": {
+      "anyOf": [
+       {
+        "type": "string",
+        "enum": [
+         "org",
+         "deployment",
+         "unknown"
+        ]
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Mcp Off"
+     },
+     "owner_name": {
+      "anyOf": [
+       {
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Owner Name"
+     },
+     "owner_is_you": {
+      "type": "boolean",
+      "title": "Owner Is You",
+      "default": false
+     }
+    },
+    "type": "object",
+    "required": [
+     "id",
+     "client_name",
+     "name_source",
+     "org_id",
+     "created_at"
+    ],
+    "title": "OrgConnectedApp"
+   },
+   "OrgConnectedAppList": {
+    "properties": {
+     "apps": {
+      "items": {
+       "$ref": "#/components/schemas/OrgConnectedApp"
+      },
+      "type": "array",
+      "title": "Apps"
+     }
+    },
+    "type": "object",
+    "required": [
+     "apps"
+    ],
+    "title": "OrgConnectedAppList"
+   },
+   "OrgMcpAccess": {
+    "properties": {
+     "enabled": {
+      "type": "boolean",
+      "title": "Enabled"
+     }
+    },
+    "type": "object",
+    "required": [
+     "enabled"
+    ],
+    "title": "OrgMcpAccess",
+    "description": "The org's MCP switch (D-35), read and written by an org admin."
+   },
+   "OrgMcpAccessUpdate": {
+    "properties": {
+     "enabled": {
+      "type": "boolean",
+      "title": "Enabled"
+     }
+    },
+    "additionalProperties": false,
+    "type": "object",
+    "required": [
+     "enabled"
+    ],
+    "title": "OrgMcpAccessUpdate"
+   },
+   "OrgPiiRedaction": {
+    "properties": {
+     "enabled": {
+      "type": "boolean",
+      "title": "Enabled"
+     }
+    },
+    "type": "object",
+    "required": [
+     "enabled"
+    ],
+    "title": "OrgPiiRedaction",
+    "description": "305-04 (GUARD-03, D-36): the org's PII redaction switch for AI tool results."
+   },
+   "OrgPiiRedactionUpdate": {
+    "properties": {
+     "enabled": {
+      "type": "boolean",
+      "title": "Enabled"
+     }
+    },
+    "additionalProperties": false,
+    "type": "object",
+    "required": [
+     "enabled"
+    ],
+    "title": "OrgPiiRedactionUpdate"
+   },
    "OrgRef": {
     "properties": {
      "id": {
@@ -25882,6 +27494,139 @@
      "name"
     ],
     "title": "OrgRef"
+   },
+   "OrgWebhookList": {
+    "properties": {
+     "endpoints": {
+      "items": {
+       "$ref": "#/components/schemas/OrgWebhookRead"
+      },
+      "type": "array",
+      "title": "Endpoints"
+     },
+     "org_name": {
+      "type": "string",
+      "title": "Org Name"
+     }
+    },
+    "type": "object",
+    "required": [
+     "endpoints",
+     "org_name"
+    ],
+    "title": "OrgWebhookList"
+   },
+   "OrgWebhookOne": {
+    "properties": {
+     "endpoint": {
+      "$ref": "#/components/schemas/OrgWebhookRead"
+     }
+    },
+    "type": "object",
+    "required": [
+     "endpoint"
+    ],
+    "title": "OrgWebhookOne"
+   },
+   "OrgWebhookRead": {
+    "properties": {
+     "id": {
+      "type": "string",
+      "title": "Id"
+     },
+     "owner_name": {
+      "anyOf": [
+       {
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Owner Name"
+     },
+     "owner_is_you": {
+      "type": "boolean",
+      "title": "Owner Is You"
+     },
+     "owner_is_member": {
+      "type": "boolean",
+      "title": "Owner Is Member"
+     },
+     "host": {
+      "type": "string",
+      "title": "Host"
+     },
+     "path": {
+      "type": "string",
+      "title": "Path"
+     },
+     "has_query": {
+      "type": "boolean",
+      "title": "Has Query"
+     },
+     "event_types": {
+      "items": {
+       "type": "string"
+      },
+      "type": "array",
+      "title": "Event Types"
+     },
+     "enabled": {
+      "type": "boolean",
+      "title": "Enabled"
+     },
+     "disabled_reason": {
+      "anyOf": [
+       {
+        "type": "string",
+        "enum": [
+         "failing",
+         "gone",
+         "admin",
+         "owner_removed"
+        ]
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Disabled Reason"
+     },
+     "last_success_at": {
+      "anyOf": [
+       {
+        "type": "string",
+        "format": "date-time"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Last Success At"
+     },
+     "consecutive_failures": {
+      "type": "integer",
+      "title": "Consecutive Failures"
+     }
+    },
+    "type": "object",
+    "required": [
+     "id",
+     "owner_name",
+     "owner_is_you",
+     "owner_is_member",
+     "host",
+     "path",
+     "has_query",
+     "event_types",
+     "enabled",
+     "disabled_reason",
+     "last_success_at",
+     "consecutive_failures"
+    ],
+    "title": "OrgWebhookRead",
+    "description": "An org admin's row (D-30 / D-51). \u26d4 No ``url``: host, masked path and ``has_query`` only."
    },
    "PaletteFolder": {
     "properties": {
@@ -26031,6 +27776,72 @@
      "config"
     ],
     "title": "PhaseSpec"
+   },
+   "PickableFolder": {
+    "properties": {
+     "id": {
+      "type": "string",
+      "title": "Id"
+     },
+     "name": {
+      "type": "string",
+      "title": "Name"
+     },
+     "parent_id": {
+      "anyOf": [
+       {
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Parent Id"
+     },
+     "shared": {
+      "type": "boolean",
+      "title": "Shared"
+     },
+     "source": {
+      "anyOf": [
+       {
+        "type": "string",
+        "enum": [
+         "mail",
+         "synced"
+        ]
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Source"
+     }
+    },
+    "type": "object",
+    "required": [
+     "id",
+     "name",
+     "shared"
+    ],
+    "title": "PickableFolder",
+    "description": "A folder the member can tick on an MCP key, read on their own acting visibility.\n``source`` is a UI hint only (D-40), never a server-side scope rule."
+   },
+   "PickableFolderList": {
+    "properties": {
+     "folders": {
+      "items": {
+       "$ref": "#/components/schemas/PickableFolder"
+      },
+      "type": "array",
+      "title": "Folders"
+     }
+    },
+    "type": "object",
+    "required": [
+     "folders"
+    ],
+    "title": "PickableFolderList"
    },
    "PolicyDeletedOut": {
     "properties": {
@@ -28026,6 +29837,25 @@
     ],
     "title": "RetentionSummary"
    },
+   "RevokeAllResult": {
+    "properties": {
+     "revoked": {
+      "type": "integer",
+      "title": "Revoked"
+     },
+     "members": {
+      "type": "integer",
+      "title": "Members"
+     }
+    },
+    "type": "object",
+    "required": [
+     "revoked",
+     "members"
+    ],
+    "title": "RevokeAllResult",
+    "description": "What the server revoked (D-26): the receipt reads THIS count, never the client's."
+   },
    "RuleCreate": {
     "properties": {
      "name": {
@@ -28870,7 +30700,8 @@
       "enum": [
        "app",
        "schedule",
-       "key"
+       "key",
+       "mcp"
       ],
       "title": "Kind"
      },
@@ -29471,6 +31302,61 @@
        }
       ],
       "title": "Api Key Reads Per Minute"
+     },
+     "api_key_searches_per_minute": {
+      "anyOf": [
+       {
+        "type": "integer"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Api Key Searches Per Minute"
+     },
+     "mcp_ask_wait_seconds": {
+      "anyOf": [
+       {
+        "type": "integer"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Mcp Ask Wait Seconds"
+     },
+     "outside_inflight_per_key": {
+      "anyOf": [
+       {
+        "type": "integer"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Outside Inflight Per Key"
+     },
+     "outside_inflight_per_org": {
+      "anyOf": [
+       {
+        "type": "integer"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Outside Inflight Per Org"
+     },
+     "outside_inflight_per_provider": {
+      "anyOf": [
+       {
+        "type": "integer"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Outside Inflight Per Provider"
      },
      "notification_email_delay_seconds": {
       "anyOf": [
@@ -31522,6 +33408,18 @@
       "type": "string",
       "format": "date-time",
       "title": "Updated At"
+     },
+     "origin": {
+      "anyOf": [
+       {
+        "additionalProperties": true,
+        "type": "object"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Origin"
      }
     },
     "type": "object",
@@ -32574,8 +34472,15 @@
       "title": "Id"
      },
      "run_id": {
-      "type": "string",
-      "format": "uuid",
+      "anyOf": [
+       {
+        "type": "string",
+        "format": "uuid"
+       },
+       {
+        "type": "null"
+       }
+      ],
       "title": "Run Id"
      },
      "org_id": {
@@ -32588,14 +34493,22 @@
       "title": "Org Name"
      },
      "workflow_name": {
-      "type": "string",
+      "anyOf": [
+       {
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
       "title": "Workflow Name"
      },
      "kind": {
       "type": "string",
       "enum": [
        "question",
-       "approval"
+       "approval",
+       "webhook_disabled"
       ],
       "title": "Kind"
      },
@@ -32606,7 +34519,8 @@
         "enum": [
          "app",
          "schedule",
-         "key"
+         "key",
+         "mcp"
         ]
        },
        {
@@ -32619,6 +34533,55 @@
       "type": "string",
       "format": "date-time",
       "title": "Created At"
+     },
+     "endpoint_id": {
+      "anyOf": [
+       {
+        "type": "string",
+        "format": "uuid"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Endpoint Id"
+     },
+     "reason": {
+      "anyOf": [
+       {
+        "type": "string",
+        "enum": [
+         "failing",
+         "gone"
+        ]
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Reason"
+     },
+     "title": {
+      "anyOf": [
+       {
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Title"
+     },
+     "title_is_address": {
+      "anyOf": [
+       {
+        "type": "boolean"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Title Is Address"
      }
     },
     "type": "object",
@@ -32627,13 +34590,12 @@
      "run_id",
      "org_id",
      "org_name",
-     "workflow_name",
      "kind",
      "origin",
      "created_at"
     ],
     "title": "WaitingNotice",
-    "description": "One workflow run that is waiting on you."
+    "description": "One thing waiting on you: a workflow run (a question or an approval), or one of your webhooks\nthat was turned off because it kept failing (``webhook_disabled``)."
    },
    "WaitingNotices": {
     "properties": {
@@ -33433,6 +35395,548 @@
     },
     "type": "object",
     "title": "WatchUpdateRequest"
+   },
+   "WebhookDeliveryPage": {
+    "properties": {
+     "deliveries": {
+      "items": {
+       "$ref": "#/components/schemas/WebhookDeliveryRead"
+      },
+      "type": "array",
+      "title": "Deliveries"
+     },
+     "next_cursor": {
+      "anyOf": [
+       {
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Next Cursor"
+     }
+    },
+    "type": "object",
+    "required": [
+     "deliveries",
+     "next_cursor"
+    ],
+    "title": "WebhookDeliveryPage"
+   },
+   "WebhookDeliveryQueued": {
+    "properties": {
+     "id": {
+      "type": "string",
+      "title": "Id"
+     },
+     "status": {
+      "type": "string",
+      "const": "pending",
+      "title": "Status"
+     },
+     "attempts": {
+      "type": "integer",
+      "title": "Attempts"
+     },
+     "next_attempt_at": {
+      "anyOf": [
+       {
+        "type": "string",
+        "format": "date-time"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Next Attempt At"
+     }
+    },
+    "type": "object",
+    "required": [
+     "id",
+     "status",
+     "attempts",
+     "next_attempt_at"
+    ],
+    "title": "WebhookDeliveryQueued",
+    "description": "A resent delivery, back in the queue (D-21). The log is re-read for the full row."
+   },
+   "WebhookDeliveryRead": {
+    "properties": {
+     "id": {
+      "type": "string",
+      "title": "Id"
+     },
+     "event_type": {
+      "type": "string",
+      "title": "Event Type"
+     },
+     "item_kind": {
+      "type": "string",
+      "enum": [
+       "run",
+       "document",
+       "test"
+      ],
+      "title": "Item Kind"
+     },
+     "item_id": {
+      "anyOf": [
+       {
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Item Id"
+     },
+     "status": {
+      "type": "string",
+      "title": "Status"
+     },
+     "reason": {
+      "anyOf": [
+       {
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Reason"
+     },
+     "attempts": {
+      "type": "integer",
+      "title": "Attempts"
+     },
+     "last_status_code": {
+      "anyOf": [
+       {
+        "type": "integer"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Last Status Code"
+     },
+     "last_latency_ms": {
+      "anyOf": [
+       {
+        "type": "integer"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Last Latency Ms"
+     },
+     "last_error": {
+      "anyOf": [
+       {
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Last Error"
+     },
+     "last_attempt_at": {
+      "anyOf": [
+       {
+        "type": "string",
+        "format": "date-time"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Last Attempt At"
+     },
+     "next_attempt_at": {
+      "anyOf": [
+       {
+        "type": "string",
+        "format": "date-time"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Next Attempt At"
+     },
+     "created_at": {
+      "type": "string",
+      "format": "date-time",
+      "title": "Created At"
+     }
+    },
+    "type": "object",
+    "required": [
+     "id",
+     "event_type",
+     "item_kind",
+     "item_id",
+     "status",
+     "reason",
+     "attempts",
+     "last_status_code",
+     "last_latency_ms",
+     "last_error",
+     "last_attempt_at",
+     "next_attempt_at",
+     "created_at"
+    ],
+    "title": "WebhookDeliveryRead",
+    "description": "One delivery log row (D-20): no body, no response, no headers. ``item_id`` is null when the\nowner can no longer see the item (``skipped_not_visible``, D-26)."
+   },
+   "WebhookEndpointCreate": {
+    "properties": {
+     "url": {
+      "type": "string",
+      "maxLength": 2048,
+      "title": "Url"
+     },
+     "event_types": {
+      "items": {
+       "type": "string",
+       "enum": [
+        "run.finished",
+        "run.waiting",
+        "document.ingested"
+       ]
+      },
+      "type": "array",
+      "minItems": 1,
+      "title": "Event Types"
+     },
+     "description": {
+      "anyOf": [
+       {
+        "type": "string",
+        "maxLength": 100
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Description"
+     }
+    },
+    "type": "object",
+    "required": [
+     "url",
+     "event_types"
+    ],
+    "title": "WebhookEndpointCreate",
+    "description": "``POST /webhooks``. The URL rules (https, no userinfo, no fragment) and the reachability check\nrun in the route, so a refusal can answer ``{code, message}`` (D-46 / D-24)."
+   },
+   "WebhookEndpointCreated": {
+    "properties": {
+     "endpoint": {
+      "$ref": "#/components/schemas/WebhookEndpointRead"
+     },
+     "secret": {
+      "type": "string",
+      "title": "Secret"
+     }
+    },
+    "type": "object",
+    "required": [
+     "endpoint",
+     "secret"
+    ],
+    "title": "WebhookEndpointCreated"
+   },
+   "WebhookEndpointList": {
+    "properties": {
+     "endpoints": {
+      "items": {
+       "$ref": "#/components/schemas/WebhookEndpointRead"
+      },
+      "type": "array",
+      "title": "Endpoints"
+     },
+     "cap": {
+      "type": "integer",
+      "title": "Cap"
+     },
+     "org_name": {
+      "type": "string",
+      "title": "Org Name"
+     }
+    },
+    "type": "object",
+    "required": [
+     "endpoints",
+     "cap",
+     "org_name"
+    ],
+    "title": "WebhookEndpointList"
+   },
+   "WebhookEndpointOne": {
+    "properties": {
+     "endpoint": {
+      "$ref": "#/components/schemas/WebhookEndpointRead"
+     }
+    },
+    "type": "object",
+    "required": [
+     "endpoint"
+    ],
+    "title": "WebhookEndpointOne",
+    "description": "Edit and turn on / off answer the endpoint as it now stands \u2014 never optimistic."
+   },
+   "WebhookEndpointRead": {
+    "properties": {
+     "id": {
+      "type": "string",
+      "title": "Id"
+     },
+     "url": {
+      "type": "string",
+      "title": "Url"
+     },
+     "description": {
+      "anyOf": [
+       {
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Description"
+     },
+     "event_types": {
+      "items": {
+       "type": "string"
+      },
+      "type": "array",
+      "title": "Event Types"
+     },
+     "enabled": {
+      "type": "boolean",
+      "title": "Enabled"
+     },
+     "disabled_reason": {
+      "anyOf": [
+       {
+        "type": "string",
+        "enum": [
+         "failing",
+         "gone",
+         "admin",
+         "owner_removed"
+        ]
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Disabled Reason"
+     },
+     "disabled_at": {
+      "anyOf": [
+       {
+        "type": "string",
+        "format": "date-time"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Disabled At"
+     },
+     "last_success_at": {
+      "anyOf": [
+       {
+        "type": "string",
+        "format": "date-time"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Last Success At"
+     },
+     "consecutive_failures": {
+      "type": "integer",
+      "title": "Consecutive Failures"
+     },
+     "previous_secret_expires_at": {
+      "anyOf": [
+       {
+        "type": "string",
+        "format": "date-time"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Previous Secret Expires At"
+     },
+     "created_at": {
+      "type": "string",
+      "format": "date-time",
+      "title": "Created At"
+     }
+    },
+    "type": "object",
+    "required": [
+     "id",
+     "url",
+     "description",
+     "event_types",
+     "enabled",
+     "disabled_reason",
+     "disabled_at",
+     "last_success_at",
+     "consecutive_failures",
+     "previous_secret_expires_at",
+     "created_at"
+    ],
+    "title": "WebhookEndpointRead",
+    "description": "A member's own endpoint, with its full URL (D-51: the member's own card shows it)."
+   },
+   "WebhookEndpointUpdate": {
+    "properties": {
+     "url": {
+      "anyOf": [
+       {
+        "type": "string",
+        "maxLength": 2048
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Url"
+     },
+     "event_types": {
+      "anyOf": [
+       {
+        "items": {
+         "type": "string",
+         "enum": [
+          "run.finished",
+          "run.waiting",
+          "document.ingested"
+         ]
+        },
+        "type": "array",
+        "minItems": 1
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Event Types"
+     },
+     "description": {
+      "anyOf": [
+       {
+        "type": "string",
+        "maxLength": 100
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Description"
+     }
+    },
+    "type": "object",
+    "title": "WebhookEndpointUpdate",
+    "description": "``PATCH /webhooks/{id}``. A field left out is unchanged; ``description`` \"\" or null clears it\n(the route reads ``model_fields_set`` to tell the two apart)."
+   },
+   "WebhookResendResult": {
+    "properties": {
+     "delivery": {
+      "$ref": "#/components/schemas/WebhookDeliveryQueued"
+     }
+    },
+    "type": "object",
+    "required": [
+     "delivery"
+    ],
+    "title": "WebhookResendResult"
+   },
+   "WebhookSecretRolled": {
+    "properties": {
+     "endpoint": {
+      "$ref": "#/components/schemas/WebhookEndpointRead"
+     },
+     "secret": {
+      "type": "string",
+      "title": "Secret"
+     },
+     "previous_secret_expires_at": {
+      "type": "string",
+      "format": "date-time",
+      "title": "Previous Secret Expires At"
+     }
+    },
+    "type": "object",
+    "required": [
+     "endpoint",
+     "secret",
+     "previous_secret_expires_at"
+    ],
+    "title": "WebhookSecretRolled"
+   },
+   "WebhookTestResult": {
+    "properties": {
+     "delivered": {
+      "type": "boolean",
+      "title": "Delivered"
+     },
+     "status_code": {
+      "anyOf": [
+       {
+        "type": "integer"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Status Code"
+     },
+     "latency_ms": {
+      "anyOf": [
+       {
+        "type": "integer"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Latency Ms"
+     },
+     "error": {
+      "anyOf": [
+       {
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Error"
+     }
+    },
+    "type": "object",
+    "required": [
+     "delivered",
+     "status_code",
+     "latency_ms",
+     "error"
+    ],
+    "title": "WebhookTestResult",
+    "description": "``POST /webhooks/{id}/test`` (D-29). ``error`` is the sender's word, never a body."
    },
    "WorkflowDefinition": {
     "properties": {

@@ -62,6 +62,6 @@ The invite dialog's Copy link — send the link by hand.
 
 ## Reference / evidence links
 
-- `.planning/phases/300-told-when-a-run-waits-backend-and-mailer/300-CONTEXT.md` D-21 (§ "One sender (NOTE-06)") and the folded-bugs list ("The pre-existing 'built images cannot send invite email' defect → D-21")
+- `.planning/milestones/v4.8-phases/300-told-when-a-run-waits-backend-and-mailer/300-CONTEXT.md` D-21 (§ "One sender (NOTE-06)") and the folded-bugs list ("The pre-existing 'built images cannot send invite email' defect → D-21")
 - `backend/tests/unit/test_300_clean_image_imports.py`
-- `.planning/phases/300-told-when-a-run-waits-backend-and-mailer/300-HUMAN-UAT.md:43` (Resend deferred) and its G4-1 row (local catcher PASS; real provider owed)
+- `.planning/milestones/v4.8-phases/300-told-when-a-run-waits-backend-and-mailer/300-HUMAN-UAT.md:43` (Resend deferred) and its G4-1 row (local catcher PASS; real provider owed)

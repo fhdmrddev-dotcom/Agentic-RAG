@@ -82,3 +82,36 @@ describe("RunOriginLine (293-03)", () => {
     expect(count(reportRaw, "useEffect(")).toBe(1)
   })
 })
+
+describe("RunOriginLine — the mcp kind (306-04, D-31 / T-306-31)", () => {
+  it("an mcp origin: the Bot mark, its kind, the sentence in a truncating span, title = sentence", () => {
+    render(<RunOriginLine origin={{ kind: "mcp", label: "claude-code-laptop", actor_name: null }} />)
+    const el = screen.getByTestId("run-origin")
+    const sentence = "Started by AI tool key claude-code-laptop"
+    expect(el.textContent).toBe(sentence)
+    expect(el.getAttribute("data-origin-kind")).toBe("mcp")
+    expect(el.getAttribute("title")).toBe(sentence)
+    expect(el.className).toContain("min-w-0")
+    expect(el.className).toContain("max-w-full")
+    expect(el.className).toContain("text-muted-foreground")
+    const icon = el.querySelector("svg")!
+    expect(icon.getAttribute("aria-hidden")).toBe("true")
+    expect(icon.getAttribute("class")).toContain("lucide-bot")
+    expect(el.querySelector("span.truncate")?.textContent).toBe(sentence)
+  })
+
+  it("an unknown kind renders nothing and never throws, and the icon lookup is guarded", () => {
+    const { container } = render(
+      <RunOriginLine origin={{ kind: "carrier-pigeon", label: "x", actor_name: null } as unknown as never} />,
+    )
+    expect(container.innerHTML).toBe("")
+    expect(count(lineRaw, "if (!Icon) return null")).toBe(1)
+  })
+
+  it("the shipped kinds keep their text and icon", () => {
+    render(<RunOriginLine origin={{ kind: "key", label: "n8n-prod", actor_name: null }} />)
+    const el = screen.getByTestId("run-origin")
+    expect(el.textContent).toBe("Started by key n8n-prod")
+    expect(el.querySelector("svg")!.getAttribute("class")).toContain("lucide-key-round")
+  })
+})

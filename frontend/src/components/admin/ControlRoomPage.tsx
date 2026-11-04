@@ -87,6 +87,7 @@ import { AuditTab, type AuditSource } from "./AuditTab"
 import { ActiveRunsSection } from "./ActiveRunsSection"
 import { CapabilityGrid, type CapabilityKey } from "./CapabilityGrid"
 import { MaintenancePanel } from "./MaintenancePanel"
+import { McpSignInHostsCard } from "./McpSignInHostsCard"
 import { UsersAndAccess } from "./UsersAndAccess"
 import { FeatureVisibility } from "./FeatureVisibility"
 import { ModelRegistryTab } from "./ModelRegistryTab"
@@ -672,6 +673,7 @@ export function ControlRoomPage({ identity, onBack }: ControlRoomPageProps) {
     sandbox_enabled: settings?.sandbox_enabled ?? true,
     self_improve_enabled: settings?.self_improve_enabled ?? true,
     workflows_enabled: settings?.workflows_enabled ?? true,
+    mcp_enabled: settings?.mcp_enabled ?? true,
   }
   const maintenanceOn = settings?.maintenance_mode ?? false
 
@@ -792,6 +794,7 @@ export function ControlRoomPage({ identity, onBack }: ControlRoomPageProps) {
                     onToggle={handleToggle}
                     showTechnical={showTechnical}
                   />
+                  <McpSignInHostsCard onRecorded={pulseRecording} />
                   <MaintenancePanel
                     maintenanceOn={maintenanceOn}
                     onSetMaintenance={handleSetMaintenance}

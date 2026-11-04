@@ -9,7 +9,7 @@ import { describe, expect, it, vi } from "vitest"
 import { render, screen, waitFor } from "@testing-library/react"
 import userEvent from "@testing-library/user-event"
 import { RevokeApiKeySheet } from "../RevokeApiKeySheet"
-import { NOW, makeCall, makeKey } from "./fixtures"
+import { MCP_CATALOGUE, NOW, makeCall, makeKey, makeMcpKey } from "./fixtures"
 
 function deferred<T>() {
   let resolve!: (v: T) => void
@@ -109,5 +109,46 @@ describe("293-04 RevokeApiKeySheet", () => {
   it("renders nothing with no target", () => {
     render(<RevokeApiKeySheet target={null} now={NOW} onClose={() => {}} revoke={vi.fn()} onDone={() => {}} />)
     expect(screen.queryByRole("alertdialog")).toBeNull()
+  })
+})
+
+describe("304-05 RevokeApiKeySheet — an MCP key", () => {
+  it("names the tools and folders, Not used yet, the owner, and the MCP kept sentence; Keep it focused", async () => {
+    render(
+      <RevokeApiKeySheet target={makeMcpKey()} now={NOW} mcpTools={MCP_CATALOGUE} onClose={() => {}} revoke={vi.fn()} onDone={() => {}} />,
+    )
+    expect(await screen.findByRole("alertdialog")).toBeInTheDocument()
+    expect(screen.getByText("Revoke claude-code-laptop?")).toBeInTheDocument()
+    expect(screen.getByTestId("revoke-sub")).toHaveTextContent("The next call with this key is refused.")
+    const facts = screen.getByTestId("revoke-facts")
+    expect(facts).toHaveTextContent("Can use Read only on All folders")
+    expect(facts).not.toHaveTextContent("Starts")
+    expect(facts).toHaveTextContent("Last used Not used yet")
+    expect(facts).toHaveTextContent("Owner Dana Kim · created Thu 1 Oct")
+    expect(screen.getByTestId("revoke-kept")).toHaveTextContent(
+      "Revoking can't be undone. Any AI tool using this key stops working on its next call; a replacement is a new key with a new secret.",
+    )
+    await waitFor(() => expect(document.activeElement).toBe(screen.getByRole("button", { name: "Keep it" })))
+  })
+
+  it("a narrowed key with mail: counted tools and folders, and the external words", () => {
+    render(
+      <RevokeApiKeySheet
+        target={makeMcpKey({
+          tools: ["search_knowledge_base", "read_document"],
+          folders: [
+            { id: "a", name: "Contracts" },
+            { id: "b", name: "HR" },
+          ],
+          include_external: true,
+        })}
+        now={NOW}
+        mcpTools={MCP_CATALOGUE}
+        onClose={() => {}}
+        revoke={vi.fn()}
+        onDone={() => {}}
+      />,
+    )
+    expect(screen.getByTestId("revoke-facts")).toHaveTextContent("Can use 2 tools on 2 folders and mail & synced sources")
   })
 })

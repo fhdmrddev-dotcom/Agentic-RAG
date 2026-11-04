@@ -1,0 +1,254 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Sketch 308 — Webhooks</title>
+<link rel="stylesheet" href="../themes/default.css">
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Manrope:wght@600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+<style>
+*{box-sizing:border-box}
+body{margin:0;background:var(--color-bg);color:var(--color-text);font-family:var(--font-sans);font-size:var(--text-base)}
+#vnav,#states{display:flex;align-items:center;gap:8px;padding:10px 16px;border-bottom:1px solid var(--color-border);flex-wrap:wrap}
+.lbl{font-family:var(--font-mono);font-size:var(--text-xs);color:var(--color-text-dim);margin-right:6px}
+.vtab,.stab{background:transparent;border:1px solid var(--color-border);color:var(--color-text-muted);font-size:var(--text-xs);padding:6px 12px;border-radius:999px;cursor:pointer;font-family:inherit}
+.vtab.active{background:var(--color-primary-dim);border-color:var(--color-primary);color:var(--color-primary)}
+.stab.active{background:var(--color-accent);color:var(--color-text)}
+#note{padding:8px 16px;font-size:var(--text-sm);color:var(--color-text-muted);border-bottom:1px solid var(--color-border-soft);line-height:1.5}
+#note b{color:var(--color-text)}
+.page{max-width:880px;margin:0 auto;padding:24px 20px 60px}
+.band{display:flex;align-items:center;gap:10px;margin-bottom:6px}
+.band h1{font-family:var(--font-headline);font-size:var(--text-xl);margin:0}
+.band.org{border-bottom:2px solid hsl(239 60% 60% / .5);padding-bottom:10px;margin-bottom:14px}
+.orgchip{font-size:var(--text-xs);color:hsl(239 100% 85%);background:hsl(239 60% 40% / .25);border-radius:999px;padding:2px 9px}
+.tabs{display:flex;gap:16px;font-size:var(--text-sm);color:var(--color-text-muted);border-bottom:1px solid var(--color-border);margin-bottom:18px;flex-wrap:wrap}
+.tabs span{padding:8px 0}.tabs .on{color:var(--color-text);border-bottom:2px solid var(--color-primary)}
+.sec{margin-bottom:26px}
+.sec h2{font-size:var(--text-md);margin:0 0 3px;display:flex;align-items:center;gap:8px}
+.sec .sub{font-size:var(--text-sm);color:var(--color-text-muted);margin:0 0 12px;line-height:1.5}
+.cnt{font-family:var(--font-mono);font-size:11px;color:var(--color-text-dim);font-weight:400}
+.btn{background:transparent;border:1px solid var(--color-border);color:var(--color-text);border-radius:8px;padding:7px 13px;font-size:var(--text-sm);cursor:pointer;font-family:inherit;white-space:nowrap}
+.btn:hover{border-color:var(--color-primary)}
+.btn.primary{background:var(--color-primary-strong);border-color:transparent;color:#fff}
+.btn.danger{border-color:hsl(0 70% 60% / .45);color:var(--color-danger)}
+.btn.danger.solid{background:var(--color-danger);color:#fff;border-color:transparent}
+.btn.sm{padding:5px 10px;font-size:var(--text-xs)}
+.btn[disabled]{opacity:.45;cursor:not-allowed}
+.list{border:1px solid var(--color-border);border-radius:12px;overflow:hidden}
+.ep{border-top:1px solid var(--color-border-soft)}
+.ep:first-child{border-top:0}
+.eprow{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:12px;align-items:center;padding:12px 14px;cursor:pointer}
+.eprow:hover{background:hsl(220 30% 14% / .5)}
+.url{font-family:var(--font-mono);font-size:12px;color:var(--color-text);word-break:break-all}
+.url .q{color:var(--color-text-dim)}
+.desc{font-size:var(--text-xs);color:var(--color-text-muted);margin-top:2px}
+.meta{font-size:var(--text-xs);color:var(--color-text-muted);margin-top:5px;display:flex;gap:6px;flex-wrap:wrap;align-items:center}
+.chip{font-size:10px;border-radius:999px;padding:2px 8px;font-weight:500}
+.chip.ev{background:var(--color-accent);color:var(--color-text-muted);font-family:var(--font-mono)}
+.chip.ok{background:hsl(150 60% 40% / .18);color:var(--color-success)}
+.chip.bad{background:var(--color-danger-dim);color:var(--color-danger)}
+.chip.warn{background:hsl(38 90% 50% / .18);color:hsl(38 95% 70%)}
+.chip.off{background:var(--color-accent);color:var(--color-text-dim)}
+.detail{padding:4px 14px 16px;display:none;border-top:1px dashed var(--color-border-soft)}
+.ep.open .detail{display:block}
+.notice{border-radius:10px;padding:10px 12px;font-size:var(--text-sm);line-height:1.5;margin:10px 0}
+.notice.bad{background:var(--color-danger-dim);border:1px solid hsl(0 70% 60% / .35)}
+.notice.info{background:var(--color-bg-elev1);border:1px solid var(--color-border)}
+.acts{display:flex;gap:8px;flex-wrap:wrap;margin:10px 0}
+table{width:100%;border-collapse:collapse;font-size:var(--text-xs)}
+th{text-align:left;color:var(--color-text-dim);font-weight:500;padding:6px 8px;border-bottom:1px solid var(--color-border)}
+td{padding:7px 8px;border-bottom:1px solid var(--color-border-soft);color:var(--color-text-muted);vertical-align:middle}
+td.mono{font-family:var(--font-mono)}
+a{color:var(--color-primary);text-decoration:none}
+.form{border:1px solid var(--color-border);border-radius:12px;padding:16px;display:grid;gap:12px}
+.form label{font-size:var(--text-sm);font-weight:500;display:grid;gap:5px}
+.form input[type=text]{background:var(--color-bg-elev1);border:1px solid var(--color-border);border-radius:8px;padding:8px 10px;color:var(--color-text);font-family:var(--font-mono);font-size:12px}
+.form input.err{border-color:var(--color-danger)}
+.hint{font-size:var(--text-xs);color:var(--color-text-muted);font-weight:400}
+.errline{font-size:var(--text-xs);color:var(--color-danger)}
+.checks{display:grid;gap:6px}
+.checks label{display:flex;gap:8px;align-items:flex-start;font-weight:400}
+.checks small{display:block;color:var(--color-text-dim)}
+.secret{border:1px solid var(--color-primary);border-radius:12px;padding:14px;background:var(--color-primary-dim)}
+.secret code{display:block;font-family:var(--font-mono);font-size:12px;background:var(--color-bg);padding:8px 10px;border-radius:8px;margin:8px 0;word-break:break-all}
+pre{font-family:var(--font-mono);font-size:11px;background:var(--color-bg);border:1px solid var(--color-border);border-radius:8px;padding:10px;overflow:auto;color:var(--color-text-muted);margin:6px 0 0}
+.verdict{font-size:var(--text-sm);margin-top:6px}
+.verdict.ok{color:var(--color-success)}.verdict.bad{color:var(--color-danger)}
+.split{display:grid;grid-template-columns:260px minmax(0,1fr);gap:14px}
+.side{border:1px solid var(--color-border);border-radius:12px;overflow:hidden}
+.side div{padding:10px 12px;border-top:1px solid var(--color-border-soft);font-size:var(--text-xs);cursor:pointer}
+.side div:first-child{border-top:0}.side .sel{background:var(--color-primary-dim)}
+.panel{border:1px solid var(--color-border);border-radius:12px;padding:14px}
+.scrim{position:fixed;inset:0;background:rgb(0 0 0 / .55);display:none;place-items:center;z-index:50}
+.scrim.on{display:grid}
+.sheet{width:min(470px,92%);background:var(--color-surface);border:1px solid var(--color-border);border-left:3px solid var(--color-danger);border-radius:12px;padding:20px}
+.sheet.calm{border-left-color:var(--color-primary)}
+.sheet h3{margin:0 0 8px;font-size:var(--text-md)}
+.sheet p{font-size:var(--text-sm);color:var(--color-text-muted);line-height:1.55;margin:0 0 12px}
+.cons{font-size:var(--text-sm);margin:0 0 14px;padding-left:18px;line-height:1.6;color:var(--color-text-muted)}
+.cons .keep{color:var(--color-success)}
+.sheet .acts{justify-content:flex-end}
+.receipt{font-size:var(--text-xs);color:var(--color-success);margin-top:8px}
+.view{display:none}.view.on{display:block}
+#sketch-tools{position:fixed;bottom:12px;right:12px;z-index:9999;font-family:system-ui;font-size:12px;background:rgba(0,0,0,.7);color:#fff;padding:8px 12px;border-radius:8px;opacity:.4}
+#sketch-tools:hover{opacity:1}
+</style>
+</head>
+<body>
+<div id="vnav"><span class="lbl">VARIANT</span>
+  <button class="vtab active" data-v="a">A: Rows expand in place ★ Selected</button>
+  <button class="vtab" data-v="b">B: List + detail split</button>
+  <button class="vtab" data-v="c">C: One log under all endpoints</button>
+</div>
+<div id="states"><span class="lbl">VIEW</span>
+  <button class="stab active" data-s="list">Member · endpoints</button>
+  <button class="stab" data-s="add">Member · add (+ refused address)</button>
+  <button class="stab" data-s="secret">Member · just created (secret once)</button>
+  <button class="stab" data-s="none">Member · none yet</button>
+  <button class="stab" data-s="admin">Org admin · API keys tab</button>
+</div>
+<div id="note"></div>
+
+<div class="page" id="page"></div>
+
+<div class="scrim" id="scrim"><div class="sheet" id="sheet"></div></div>
+<div id="sketch-tools">Sketch 308 · 880px settings column · Deep Midnight</div>
+
+<script>
+const EP = [
+  {id:'e1', url:'https://hooks.acme-ops.com/syrel', q:'', desc:'Ops alerts', ev:['run.finished','run.waiting'], st:'ok', last:'Delivered 4 min ago', fails:0},
+  {id:'e2', url:'https://api.example-crm.io/inbound/syrel', q:'?token=••••', desc:'CRM sync', ev:['document.ingested'], st:'failing', last:'Last delivered 2 days ago', fails:5},
+  {id:'e3', url:'https://n8n.acme.internal-tools.net/webhook/7c1', q:'', desc:'', ev:['run.finished'], st:'admin', last:'Turned off 1 Nov', fails:0},
+];
+const STATUS = {
+  ok:['ok','On'],
+  failing:['bad','Off — kept failing'],
+  gone:['bad','Off — the receiver said it is gone'],
+  admin:['off','Off — turned off by an org admin'],
+};
+const LOG = [
+  ['run.finished','<a href="#">run 8f3a…</a>','sent','1','200','212 ms','10:42'],
+  ['run.waiting','<a href="#">run 8f3a…</a>','sent','1','204','188 ms','10:31'],
+  ['document.ingested','<a href="#">doc 41c0…</a>','retrying','3','503','10 000 ms (timed out)','10:20 · next 10:50'],
+  ['run.finished','<a href="#">run 2be9…</a>','failed','6','500','341 ms','yesterday'],
+  ['webhook.test','—','sent','1','200','97 ms','yesterday'],
+];
+const NOTES = {
+  a:'<b>A.</b> Each endpoint is a row (URL, events, status, last delivery). Click to open it in place: actions and its own delivery log. Same shape as an API key card.',
+  b:'<b>B.</b> Endpoints on the left, the selected one on the right. Needs width the 880px Settings column does not have.',
+  c:'<b>C.</b> Compact endpoint rows, one delivery log for all of them below with an endpoint filter. The log is separated from the thing it is about.',
+};
+let V='a', S='list', open='e2';
+
+function chips(ev){return ev.map(e=>`<span class="chip ev">${e}</span>`).join('')}
+function statusChip(st){const [c,t]=STATUS[st];return `<span class="chip ${c}">${t}</span>`}
+function logTable(withEp){
+  return `<table><tr>${withEp?'<th>Endpoint</th>':''}<th>Event</th><th>About</th><th>Status</th><th>Tries</th><th>HTTP</th><th>Latency</th><th>When</th><th></th></tr>`+
+  LOG.map((r,i)=>`<tr>${withEp?`<td class="mono">${i%2?'acme-ops':'example-crm'}</td>`:''}<td class="mono">${r[0]}</td><td>${r[1]}</td><td>${r[2]==='sent'?'<span class="chip ok">Sent</span>':r[2]==='failed'?'<span class="chip bad">Failed</span>':'<span class="chip warn">Retrying</span>'}</td><td>${r[3]}</td><td class="mono">${r[4]}</td><td>${r[5]}</td><td>${r[6]}</td><td>${r[2]==='retrying'?'':'<button class="btn sm" onclick="resend(this)">Resend</button>'}</td></tr>`).join('')+
+  `</table><div class="hint" style="margin-top:6px">Shows the receiver's status code and how long it took. The reply itself is never stored.</div>`;
+}
+function actions(e){
+  const off = e.st!=='ok';
+  return `<div class="acts">
+    <button class="btn sm" ${off?'disabled':''} onclick="test(this)">Send test</button>
+    <button class="btn sm" onclick="sheet('roll','${e.id}')">Roll secret</button>
+    ${e.st==='ok'?`<button class="btn sm">Turn off</button>`:e.st==='admin'?`<button class="btn sm" disabled title="Only an org admin can turn this back on">Turn on</button>`:`<button class="btn sm primary">Turn on</button>`}
+    <button class="btn sm">Edit</button>
+    <button class="btn sm danger" onclick="sheet('del','${e.id}')">Delete</button>
+  </div><div class="verdict" id="v-${e.id}"></div>`;
+}
+function stateNotice(e){
+  if(e.st==='failing')return `<div class="notice bad">Turned off after 5 deliveries in a row failed. Fix the receiver, then turn it back on. Nothing is sent while it is off.</div>`;
+  if(e.st==='gone')return `<div class="notice bad">The receiver answered 410 Gone, so Syrel stopped sending. Turn it back on only if the address is live again.</div>`;
+  if(e.st==='admin')return `<div class="notice info">Turned off by an org admin. Ask them to turn it back on.</div>`;
+  return '';
+}
+function row(e){
+  return `<div class="eprow" onclick="toggle('${e.id}')"><div><div class="url">${e.url}<span class="q">${e.q}</span></div>${e.desc?`<div class="desc">${e.desc}</div>`:''}<div class="meta">${chips(e.ev)} · ${e.last}</div></div><div>${statusChip(e.st)}</div></div>`;
+}
+function head(){return `<div class="band"><h1>Settings</h1></div><div class="tabs"><span>AI Model</span><span>Preferences</span><span>Memory</span><span>Audit Log</span><span>API keys</span><span class="on">Webhooks</span></div>`}
+function secHead(n){return `<div class="sec"><h2>Webhooks <span class="cnt">${n} of 10</span><button class="btn sm primary" style="margin-left:auto" onclick="go('add')">Add endpoint</button></h2><p class="sub">Syrel tells your own systems when a run finishes, a run waits on you, or a document is ingested. Each message is signed and carries ids, a status and a link — never document text.</p>`}
+
+function render(){
+  document.querySelectorAll('.vtab').forEach(b=>b.classList.toggle('active',b.dataset.v===V));
+  document.querySelectorAll('.stab').forEach(b=>b.classList.toggle('active',b.dataset.s===S));
+  document.getElementById('note').innerHTML=NOTES[V];
+  const p=document.getElementById('page');
+  if(S==='admin'){p.innerHTML=admin();return}
+  if(S==='add'){p.innerHTML=head()+addForm();return}
+  if(S==='secret'){p.innerHTML=head()+secretOnce();return}
+  if(S==='none'){p.innerHTML=head()+secHead(0)+`<div class="notice info" style="border-style:dashed">No endpoints yet. Add an https address your system listens on, pick the events, and send a test.</div></div>`;return}
+  if(V==='a'){
+    p.innerHTML=head()+secHead(EP.length)+`<div class="list">`+EP.map(e=>`<div class="ep ${open===e.id?'open':''}" id="${e.id}">${row(e)}<div class="detail">${stateNotice(e)}${actions(e)}<h2 style="font-size:var(--text-sm);margin:14px 0 6px">Deliveries</h2>${logTable(false)}</div></div>`).join('')+`</div></div>`;
+  } else if(V==='b'){
+    const e=EP.find(x=>x.id===open)||EP[0];
+    p.innerHTML=head()+secHead(EP.length)+`<div class="split"><div class="side">`+EP.map(x=>`<div class="${x.id===e.id?'sel':''}" onclick="open='${x.id}';render()"><div class="url" style="font-size:11px">${x.url.replace('https://','')}</div><div style="margin-top:4px">${statusChip(x.st)}</div></div>`).join('')+`</div><div class="panel"><div class="url">${e.url}<span class="q">${e.q}</span></div><div class="meta">${chips(e.ev)}</div>${stateNotice(e)}${actions(e)}${logTable(false)}</div></div></div>`;
+  } else {
+    p.innerHTML=head()+secHead(EP.length)+`<div class="list">`+EP.map(e=>`<div class="ep">${row(e)}</div>`).join('')+`</div><div class="acts"><button class="btn sm">Send test</button><button class="btn sm">Roll secret</button></div><h2 style="font-size:var(--text-sm);margin:18px 0 6px">Deliveries <select style="margin-left:8px;background:var(--color-bg-elev1);color:var(--color-text);border:1px solid var(--color-border);border-radius:6px;font-size:11px"><option>All endpoints</option></select></h2>${logTable(true)}</div>`;
+  }
+}
+function addForm(){
+  return secHead(EP.length)+`<div class="form">
+  <label>Address <span class="hint">https only. Must be reachable from the internet.</span>
+    <input type="text" id="u" value="http://169.254.169.254/latest/meta-data" class="err"></label>
+  <div class="errline" id="uerr">That address can't be reached from the internet, so Syrel won't send to it.</div>
+  <div><div style="font-size:var(--text-sm);font-weight:500;margin-bottom:6px">Events</div><div class="checks">
+    <label><input type="checkbox" checked> <span><span class="chip ev">run.finished</span> A run you started finished, failed or was stopped.</span></label>
+    <label><input type="checkbox" checked> <span><span class="chip ev">run.waiting</span> A run you started is waiting on a person in the app.</span></label>
+    <label><input type="checkbox"> <span><span class="chip ev">document.ingested</span> A document you can see finished ingesting.</span></label>
+  </div></div>
+  <label>Description <span class="hint">Optional, for you. Up to 100 characters.</span><input type="text" style="font-family:var(--font-sans)" placeholder="e.g. Ops alerts"></label>
+  <div class="acts" style="margin:0"><button class="btn primary" onclick="fix()">Save</button><button class="btn" onclick="go('list')">Cancel</button></div>
+  <div class="hint">Tries the address: <a href="#" onclick="fix();return false">make it https://hooks.acme-ops.com/syrel</a></div>
+  </div></div>`;
+}
+function fix(){const u=document.getElementById('u');if(u.value.startsWith('http://')){u.value='https://hooks.acme-ops.com/syrel';u.classList.remove('err');document.getElementById('uerr').textContent=''}else{go('secret')}}
+function secretOnce(){
+  return secHead(EP.length+1)+`<div class="secret"><b>Signing secret — shown once</b>
+  <div class="hint" style="color:var(--color-text-muted)">Copy it into your receiver now. Syrel can't show it again; roll it to get a new one.</div>
+  <code>whsec_MfKQ9r2Lg0Xv7yH1bN3sT8pW4eZ6aC5dJ0uR2iO9kE=</code>
+  <div class="acts" style="margin:0"><button class="btn sm primary">Copy</button><button class="btn sm" onclick="test(this)">Send test</button></div>
+  <div class="verdict" id="v-new"></div>
+  <details style="margin-top:10px"><summary class="hint" style="cursor:pointer">How to check the signature</summary>
+<pre>pip install standardwebhooks
+
+from standardwebhooks import Webhook
+wh = Webhook(os.environ["SYREL_WEBHOOK_SECRET"])
+event = wh.verify(request_body, request_headers)  # raises if not from Syrel</pre>
+<pre>npm install standardwebhooks
+
+import { Webhook } from "standardwebhooks";
+const event = new Webhook(process.env.SYREL_WEBHOOK_SECRET).verify(body, headers);</pre></details>
+  <div class="acts"><button class="btn sm" onclick="go('list')">Done — I saved it</button></div></div></div>`;
+}
+function admin(){
+  return `<div class="band org"><h1>Acme Legal</h1><span class="orgchip">Org admin</span></div><div class="tabs"><span>Members</span><span>Invitations</span><span>Audit</span><span>Settings</span><span class="on">API keys</span></div>
+  <div class="sec"><h2>Connected apps <span class="cnt">2</span></h2><p class="sub" style="opacity:.6">(307 section — unchanged)</p></div>
+  <div class="sec"><h2>Webhooks <span class="cnt">4 endpoints · 3 members</span></h2><p class="sub">Every webhook endpoint a member of Acme Legal has added. Turning one off stops its deliveries; only an admin can turn it back on. Query strings are hidden — they may hold a receiver's password.</p>
+  <div class="list"><table><tr><th>Owner</th><th>Address</th><th>Events</th><th>Status</th><th>Last delivered</th><th>Failed in a row</th><th></th></tr>
+  <tr><td>Dana Ruiz</td><td class="mono">hooks.acme-ops.com/syrel</td><td>2</td><td>${statusChip('ok')}</td><td>4 min ago</td><td>0</td><td><button class="btn sm" onclick="adminOff(this)">Turn off</button> <button class="btn sm danger" onclick="sheet('adel','x')">Delete</button></td></tr>
+  <tr><td>Dana Ruiz</td><td class="mono">api.example-crm.io/inbound/syrel <span class="q" style="color:var(--color-text-dim)">?…</span></td><td>1</td><td>${statusChip('failing')}</td><td>2 days ago</td><td>5</td><td><button class="btn sm danger" onclick="sheet('adel','x')">Delete</button></td></tr>
+  <tr><td>Sam Okafor</td><td class="mono">n8n.acme.internal-tools.net/webhook/7c1</td><td>1</td><td>${statusChip('admin')}</td><td>1 Nov</td><td>0</td><td><button class="btn sm primary">Turn on</button> <button class="btn sm danger" onclick="sheet('adel','x')">Delete</button></td></tr>
+  <tr><td>Lee Chen</td><td class="mono">zap.example.com/hooks/catch/88</td><td>3</td><td>${statusChip('ok')}</td><td>1 h ago</td><td>0</td><td><button class="btn sm" onclick="adminOff(this)">Turn off</button> <button class="btn sm danger" onclick="sheet('adel','x')">Delete</button></td></tr>
+  </table></div><div id="ar"></div></div>`;
+}
+function adminOff(b){b.closest('tr').children[3].innerHTML=statusChip('admin');b.outerHTML='<button class="btn sm primary">Turn on</button>';document.getElementById('ar').innerHTML='<div class="receipt">✎ Recorded in the org audit log · webhook.endpoint.disabled · by you</div>'}
+function test(b){const v=b.closest('.detail,.secret,.panel').querySelector('.verdict');v.className='verdict ok';v.textContent='Delivered — your receiver answered 200 in 212 ms. It is in the log below.'}
+function resend(b){const tr=b.closest('tr');tr.querySelector('td .chip').parentElement.innerHTML='<span class="chip warn">Queued</span>';b.remove()}
+function toggle(id){open=open===id?null:id;render()}
+function go(s){S=s;render()}
+function sheet(kind,id){
+  const e=EP.find(x=>x.id===id)||EP[0];const sh=document.getElementById('sheet');sh.className='sheet';
+  if(kind==='roll'){sh.className='sheet calm';sh.innerHTML=`<h3>Roll the signing secret?</h3><p>A new secret is made and shown once. For the next <b>24 hours</b> every message carries both signatures, so your receiver keeps working while you swap it in.</p><ul class="cons"><li>After 24 hours the old secret stops working.</li><li>Rolling again within 24 hours ends the current overlap early.</li><li class="keep">Deliveries keep flowing; nothing is paused.</li></ul><div class="acts"><button class="btn" onclick="closeS()">Cancel</button><button class="btn primary" onclick="closeS();go('secret')">Roll secret</button></div>`}
+  else if(kind==='del'){sh.innerHTML=`<h3>Delete this endpoint?</h3><p><span class="url">${e.url}</span></p><ul class="cons"><li>Pending and retrying deliveries to it are dropped.</li><li>Its delivery log is deleted.</li><li class="keep">Your other endpoints are not touched.</li></ul><div class="acts"><button class="btn" onclick="closeS()">Cancel</button><button class="btn danger solid" onclick="closeS()">Delete endpoint</button></div>`}
+  else {sh.innerHTML=`<h3>Delete Dana Ruiz's endpoint?</h3><p><span class="url">api.example-crm.io/inbound/syrel</span></p><ul class="cons"><li>Dana's system stops getting events from Acme Legal.</li><li>Pending deliveries and the log are deleted.</li><li>Dana sees it gone; the audit log records you.</li><li class="keep">Dana's other endpoints and orgs are not touched.</li></ul><div class="acts"><button class="btn" onclick="closeS()">Cancel</button><button class="btn danger solid" onclick="closeS();document.getElementById('ar').innerHTML='<div class=receipt>✎ Recorded · webhook.endpoint.deleted · by you</div>'">Delete endpoint</button></div>`}
+  document.getElementById('scrim').classList.add('on');
+}
+function closeS(){document.getElementById('scrim').classList.remove('on')}
+document.querySelectorAll('.vtab').forEach(b=>b.onclick=()=>{V=b.dataset.v;render()});
+document.querySelectorAll('.stab').forEach(b=>b.onclick=()=>{S=b.dataset.s;render()});
+document.getElementById('scrim').onclick=e=>{if(e.target.id==='scrim')closeS()};
+render();
+</script>
+</body>
+</html>

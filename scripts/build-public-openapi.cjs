@@ -85,8 +85,10 @@ const FLAGGED_EXACT = new Set([
   "/threads/expert-scope-preview",
   "/library/index-summary",
   "/notifications", // 301-01: the UI's waiting-on-you list (D-32), UI-internal like /links/
+  "/webhooks", // 308 (D-52): the Webhooks tab and org-admin section, UI-internal like /notifications
+  "/org/webhooks",
 ])
-const FLAGGED_PREFIXES = ["/knowledge-health/", "/org-items/", "/links/"] // 298-01: the UI's org reads (D-15/D-16); 299-01: the link gate (D-06)
+const FLAGGED_PREFIXES = ["/knowledge-health/", "/org-items/", "/links/", "/webhooks/", "/org/webhooks/"] // 298-01: the UI's org reads (D-15/D-16); 299-01: the link gate (D-06); 308 (D-52): webhooks
 
 /**
  * Unreleased operations, badged "Not yet released". A listed op missing from the snapshot is a
@@ -129,7 +131,7 @@ const TAG_GROUPS = [
   { name: "Experts", tags: ["experts"] },
   {
     name: "Account & org",
-    tags: ["org", "org-items", "links", "notifications", "api-keys", "preferences", "features", "model-registry", "settings", "audit", "feedback"],
+    tags: ["org", "org-items", "links", "notifications", "api-keys", "webhooks", "preferences", "features", "model-registry", "settings", "audit", "feedback"],
   },
   { name: "System", tags: [SYSTEM_TAG] },
 ]

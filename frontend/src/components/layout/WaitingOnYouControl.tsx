@@ -43,7 +43,7 @@ export function WaitingOnYouControl({ variant, expanded = false, conditions, sta
   const effective: WaitingStatus = status ?? (conditions.length > 0 ? "answered" : "loading")
   const total = waitingTotal(conditions)
   const counted = (effective === "answered" || effective === "stale") && total > 0
-  const name = countSentence(counted ? total : null)
+  const name = countSentence(counted ? total : null, { anyNonRun: conditions.some((c) => c.kind === "webhook_disabled") }) // 308-06 (A-21)
 
   if (variant === "drawer") {
     return (

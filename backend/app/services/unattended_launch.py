@@ -133,6 +133,7 @@ async def launch_unattended_run(
     origin_kind: str | None = None,
     origin_label: str | None = None,
     origin_ref: Any = None,
+    thread_origin: dict | None = None,
 ) -> UUID:
     """Start ONE unattended workflow run as ``owner_id``. Returns the ``workflow_runs`` id.
 
@@ -176,6 +177,7 @@ async def launch_unattended_run(
         "user_id": str(owner_id),
         "title": title,
         **({"org_id": str(org_id)} if org_id is not None else {}),
+        **(thread_origin or {}),
     }
     thread_resp = await run_in_threadpool(
         lambda: supabase.table("threads").insert(thread_row).execute()

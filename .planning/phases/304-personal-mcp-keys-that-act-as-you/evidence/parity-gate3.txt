@@ -1,0 +1,30 @@
+Phase 304 — D-15 gate 3 (the two-org parity suite) + wave-2 backend baseline
+Recorded by plan 304-03, 2026-10-30T20:58Z (UTC), local Supabase (Postgres :54322, GoTrue :54321),
+under the noclobber local-DB lock. Worktree base dadc7008ab3528c54c55c88abe6c289c6ade2cd1.
+
+Command (backend/, venv):
+  pytest tests/integration/test_304_two_org_parity_live.py tests/integration/test_304_narrowed_key_live.py \
+         tests/unit/test_304_acting_reads_fence.py -q -rs
+
+Result (verbatim pass line; `-rs` printed no SKIPPED line; exit 0):
+  50 passed, 67 warnings in 100.97s (0:01:40)
+
+  = 21 parity + negative arms (test_304_two_org_parity_live.py)
+  +  9 narrowed-key arms     (test_304_narrowed_key_live.py)
+  + 20 static fence tests    (test_304_acting_reads_fence.py)
+  SKIPPED: 0. A skip would have been NOT RUN, never a pass.
+
+Subject: U is role 'member' in X and role 'member' in Y (asserted in the fixture). The shared folder
+and document checked on both sides belong to co-member V_X.
+
+Counterfactual (scratch pytest plugin, not committed): principal_still_allowed admits everything and
+digest_key ignores the kind. 7 of the 8 negative arms FAIL. mcp_key_at_inbound still passes because
+the kind-column refusal holds (D-06 has two refusals).
+
+Backend unit baseline (node scripts/check-backend-unit-baseline.cjs), verbatim:
+  Summary:        70 failed, 10887 passed, 1 skipped, 2 xfailed, 2 xpassed, 60 warnings in 567.57s (0:09:27)
+  [GATE PASSED] Backend unit baseline satisfied (failed: 70 <= 71, errors: 0).
+  0 of the 70 failures are in a test_304_* file. The count matches 304-01 and 304-02 (70).
+
+Fixture leftovers after the run (read-only count): orgs 0, folders 0, documents 0, workflows 0,
+keys 0, GoTrue users 0, connections 0, views 0; app_settings.mcp_enabled restored to true.

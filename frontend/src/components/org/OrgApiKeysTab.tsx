@@ -11,6 +11,11 @@
  *   live, so a link on someone else's key would open a door that refuses them.
  * ⚠ The UI hides this tab from non-admins (the shell is admin-only), but the WALL is the server's
  *   `require_org_manage` on `/org/api-keys` (T-293-23): a forced call gets 403.
+ *
+ * Phase 304-06 (KEY-06, D-02): both kinds in one list, in `orderKeys` order, each with its kind chip
+ * and the same revoke. The server's MCP catalogue reaches the cards and the sheet so an AI tool key
+ * names its preset. When the ORG switch is off, the admin's sentence sits under the note. The
+ * limits line shows only when a workflow key exists. `showOwner` already hides "How to connect".
  */
 import { useCallback, useEffect, useRef, useState } from "react"
 import { KeyRound } from "lucide-react"
@@ -21,6 +26,9 @@ import { ApiKeyCard } from "@/components/settings/apiKeys/ApiKeyCard"
 import { RevokeApiKeySheet } from "@/components/settings/apiKeys/RevokeApiKeySheet"
 import { API_KEYS_COPY, fillCopy } from "@/components/settings/apiKeys/apiKeysCopy"
 import { orderKeys } from "@/components/settings/apiKeys/apiKeyFacts"
+import { McpOffNotice } from "@/components/settings/apiKeys/McpOffNotice"
+import { OrgConnectedApps } from "./OrgConnectedApps"
+import { OrgWebhooks } from "./OrgWebhooks"
 
 const C = API_KEYS_COPY
 
@@ -62,6 +70,9 @@ export function OrgApiKeysTab({
   }, [load])
 
   const keys = list ? orderKeys(list.keys) : []
+  // 304-06: the per-minute limits are a workflow key's; an AI tool key has none of its own (as the member tab).
+  const hasWorkflowKey = keys.some((k) => k.kind !== "mcp")
+  const mcpTools = list?.mcp?.tools
 
   return (
     <div className="grid gap-3">
@@ -74,12 +85,17 @@ export function OrgApiKeysTab({
           {orgName ? fillCopy(C.admin.description, { org: orgName }) : C.admin.descriptionNoOrg}
         </p>
         <p className="mt-1 text-xs text-muted-foreground">{C.admin.note}</p>
-        {list !== null && keys.length > 0 && (
+        {/* 304-06 (KEY-06, D-02): the ORG's switch is the admin's to name; a deployment-wide off is
+            the operator's and is said on each member's card instead. */}
+        {list?.mcp?.off === "org" && <McpOffNotice scope="org" variant="admin" orgName={orgName} className="mt-2" />}
+        {list !== null && hasWorkflowKey && (
           <p data-testid="api-keys-limits" className="mt-2 text-xs text-muted-foreground">
             {fillCopy(C.tab.limits, { starts: list.limits.starts_per_minute, reads: list.limits.reads_per_minute })}
           </p>
         )}
       </div>
+      <OrgConnectedApps orgName={orgName} mcpTools={mcpTools} oauthAvailable={list?.mcp?.oauth ?? false} onRecorded={onRecorded} />
+      <OrgWebhooks orgName={orgName} onRecorded={onRecorded} />
 
       {list === null && loadError === null && (
         <p role="status" className="px-1 text-sm text-muted-foreground">
@@ -114,6 +130,7 @@ export function OrgApiKeysTab({
           showOwner
           limits={list?.limits}
           orgName={orgName}
+          mcpTools={mcpTools}
           onRevoke={setRevokeTarget}
           onOpenRun={k.owner_is_you ? onOpenRun : undefined}
           onOpenAudit={onOpenAudit}
@@ -124,6 +141,7 @@ export function OrgApiKeysTab({
         target={revokeTarget}
         onClose={() => setRevokeTarget(null)}
         revoke={revokeOrgApiKey}
+        mcpTools={mcpTools}
         onDone={() => {
           onRecorded?.()
           void load()

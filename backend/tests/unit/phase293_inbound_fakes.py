@@ -119,13 +119,21 @@ class FakePipeline:
     def expire(self, k, seconds):
         self.ops.append(("expire", k))
 
+    # 305-REVIEW LF-03: a refusal row that was not written gives its suppressed count back.
+    def incrby(self, k, amount):
+        self.ops.append(("incrby", k, amount))
+
     async def execute(self):
         out = []
-        for op, k in self.ops:
+        for op, k, *rest in self.ops:
             if op == "get":
                 out.append(self.redis.store.get(k))
             elif op == "incr":
                 value = int(self.redis.store.get(k) or 0) + 1
+                self.redis.store[k] = str(value)
+                out.append(value)
+            elif op == "incrby":
+                value = int(self.redis.store.get(k) or 0) + int(rest[0])
                 self.redis.store[k] = str(value)
                 out.append(value)
             elif op == "expire":
@@ -178,6 +186,20 @@ def audit_spies(monkeypatch, events: list | None = None):
     monkeypatch.setattr(inbound, "audit_key_call_now", now)
     monkeypatch.setattr(inbound, "audit_key_call", later)
     monkeypatch.setattr(inbound, "enforce_key_limit", limiter)
+    # 306-02 (D-16 / D-35): a start now takes an admission lease after its validation. These
+    # suites test everything else, so admission admits and the owner's provider resolves without
+    # a database; ``test_306_inbound_admission.py`` drives the refusals.
+    from app.services import outside_admission  # noqa: PLC0415
+
+    async def _admit(_redis, **kw):
+        return outside_admission.Admitted(lease_id=kw["lease_id"])
+
+    async def _owner_model(_owner_id):
+        return (None, None)
+
+    monkeypatch.setattr(outside_admission, "acquire", _admit)
+    monkeypatch.setattr(outside_admission, "release", AsyncMock(return_value=None))
+    monkeypatch.setattr("app.services.run_model_resolution.resolve_owner_run_model", _owner_model)
     return now, later, limiter
 
 

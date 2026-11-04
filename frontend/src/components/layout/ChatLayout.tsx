@@ -13,6 +13,8 @@ import { ThreadCommandPalette } from "./ThreadCommandPalette"
 // used — moved here verbatim. ChatLayout renders it with same-named props.
 import { AppViewSwitch } from "./AppViewSwitch"
 import { WaitingOnYouControl } from "./WaitingOnYouControl"
+import { writeWebhookFocus } from "@/components/settings/webhooks/webhookFocus"
+import { SETTINGS_TAB_STORAGE_KEY } from "@/components/settings/settingsTabs"
 import type { ThreadNavigation } from "@/components/chat/threadNavigation"
 import type { EntityLink } from "@/hooks/useAppNavigation"
 import type { PanelState } from "@/components/panel/WorkspacePanel"
@@ -605,13 +607,19 @@ export function ChatLayout({ onSignOut, activeView, onNavigate, navItems, isOper
   // Phase 301-02 (D-13): producers take ONE context object, memoised, so each tenant reads the
   // door it leads to (Library health, or a run) and the conditions stay stable across renders.
   const openRunForAttention = useCallback((runId: string) => openRun?.(runId), [openRun])
+  // 308-06 (D-19, A-22): a turned-off webhook's door — focus hint, Settings tab "8", Settings; never switches org.
+  const openWebhooksForAttention = useCallback((endpointId: string, orgId: string) => {
+    writeWebhookFocus({ endpointId, orgId })
+    try { localStorage.setItem(SETTINGS_TAB_STORAGE_KEY, "8") } catch { /* WR-06: blocked storage never stops the door */ }
+    onNavigate("settings")
+  }, [onNavigate])
   // Phase 301-03 (D-17): the waiting tenant reports how fresh its list is (loading / failed /
   // answered / stale), so the rail and drawer controls never show a pill before an answer and never
   // drop it on a failed refresh. setState is stable, so the context stays memoised.
   const [waitingStatus, setWaitingStatus] = useState<attentionRegistry.WaitingStatus>("loading")
   const attentionCtx = useMemo(
-    () => ({ openLibraryHealth, openRun: openRunForAttention, reportWaitingStatus: setWaitingStatus }),
-    [openLibraryHealth, openRunForAttention],
+    () => ({ openLibraryHealth, openRun: openRunForAttention, openWebhooks: openWebhooksForAttention, reportWaitingStatus: setWaitingStatus }),
+    [openLibraryHealth, openRunForAttention, openWebhooksForAttention],
   )
   const attentionConditions = attentionRegistry.ATTENTION_PRODUCERS.flatMap((producer) =>
     producer.use(attentionCtx),

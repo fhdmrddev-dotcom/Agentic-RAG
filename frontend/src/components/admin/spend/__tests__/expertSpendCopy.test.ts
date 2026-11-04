@@ -41,14 +41,22 @@ describe("EXPERT_SPEND_COPY", () => {
     expect(C.cardFailed).toBe("Spend by Expert unavailable — spend data did not load.")
   })
 
-  it("pins the D-268-23 rule line verbatim", () => {
+  it("pins the D-268-23 rule line verbatim, extended by 305-03 (MCP calls have no Expert)", () => {
     expect(C.ruleLine).toBe(
-      "A run counts toward the Expert active when it started. Sub-agent and continued runs count toward their parent run's Expert. Runs from before this was recorded show as Not recorded (before 268), never as No Expert.",
+      "A run counts toward the Expert active when it started. Sub-agent and continued runs count toward their parent run's Expert. Runs from before this was recorded show as Not recorded (before 268), never as No Expert. AI tool (MCP) calls have no Expert, so they count under No Expert and show their key in the ledger.",
     )
   })
 
+  it("305-03 pins the MCP ledger words", () => {
+    expect(C.ledgerMcp("Laptop")).toBe("MCP · Laptop")
+    expect(C.ledgerMcpRemoved).toBe("MCP · removed key")
+    expect(C.ledgerMcpTitle("Laptop", "search_knowledge_base")).toBe("AI tool key Laptop · search_knowledge_base")
+    expect(C.ledgerMcpTitle("Laptop", null)).toBe("AI tool key Laptop")
+  })
+
   it("pins the ledger words", () => {
-    expect(C.ledgerColumn).toBe("Expert")
+    // 305-03 (D-31): the column now holds an Expert OR an AI tool key.
+    expect(C.ledgerColumn).toBe("Expert or key")
     expect(C.ledgerNotRecorded).toBe("Not recorded")
     expect(C.subagentTag(1)).toBe("incl. 1 sub-agent")
     expect(C.subagentTag(2)).toBe("incl. 2 sub-agents")

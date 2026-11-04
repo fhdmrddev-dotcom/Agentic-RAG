@@ -27,13 +27,15 @@
 import { useState } from "react"
 import { cn } from "@/lib/utils"
 
-/** The four capability flags this grid controls — the FLAG-01 subset of `FlagKey`
- *  (maintenance is a different KIND of power → the separate MaintenancePanel). */
+/** The five capability flags this grid controls — the FLAG-01 subset of `FlagKey`
+ *  (maintenance is a different KIND of power → the separate MaintenancePanel).
+ *  Phase 304-06 (KEY-06, D-03): `mcp_enabled`, the deployment MCP switch, appended last. */
 export type CapabilityKey =
   | "web_search_enabled"
   | "sandbox_enabled"
   | "self_improve_enabled"
   | "workflows_enabled"
+  | "mcp_enabled"
 
 interface CapabilityGridProps {
   /** The live on/off state of each capability (from the shell's settings fetch). */
@@ -99,6 +101,13 @@ const CAPABILITIES: ReadonlyArray<CapabilityDef> = [
     fallbackImpact: "New workflow launches are blocked.",
     countImpact: (n) =>
       `${n} running workflow${n === 1 ? "" : "s"} will finish; new launches are blocked.`,
+  },
+  // Phase 304-06 (KEY-06, D-03): no count-based impact line — no honest per-key count exists in 304 (065-A).
+  {
+    key: "mcp_enabled",
+    label: "AI tool access (MCP)",
+    sub: "Members can connect AI tools with personal keys or by signing in.",
+    fallbackImpact: "Every AI tool key and connected app is refused on its next call, in every organisation. They are kept.",
   },
 ]
 

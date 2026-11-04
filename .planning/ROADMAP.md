@@ -32,6 +32,248 @@
 - ✅ **v4.6 Pay It Down** — Phases **277-285** (shipped 2026-10-16, git tag `v4.6`). 9 phases, **34 plans**, migrations **207-209**, 5 days. **24/24 requirements satisfied** (audit `tech_debt`, no blockers). Repair only: 14 major-bug fixes, 5 v4.5 debt items, 3 G-5 extractions, 2 register-hygiene items. ✅ **DEPLOYED 2026-10-16** (prod `4e767a3a2`).
 - ✅ **v4.7 Workflows You Can See and Start Anywhere** — Phases **286-296** (shipped 2026-10-27, git tag `v4.7`). 12 phases (292.1, 294, 295, 296 added in-milestone), **60 plans**, migrations **210-216**, 10 days. **21/21 requirements satisfied** (audit `tech_debt`, no blockers). Workflows start from a thread, a starter, a schedule or an API key; authoring finishes from your own files; a run shows what it did and on what evidence; runs pause instead of dead-ending. ✅ **DEPLOYED 2026-10-27** (prod `3ec36f998`).
 - ✅ **v4.8 Every Page Has a Link** — Phases **297-302** (shipped 2026-10-30, git tag `v4.8`). 6 phases, **25 plans**, migrations **217-219**, 4 days. **28/28 requirements satisfied** (audit `tech_debt`, no blockers; integration 21/21 after two close fixes). Every view, thread, workflow, run and Expert has its own link that works across orgs and sign-in; lists follow the active org; a person is told in-app and by one content-free email when a run waits on them. ⚠ 297-300 LIVE (prod `31416d335`); 301, 302 and two fixes await an operator deploy (migration 219 first).
+- 🚧 **v4.9 Use It From Your Own Tools** — Phases 303-309 (started 2026-10-30)
+
+---
+
+## v4.9 Use It From Your Own Tools — IN PROGRESS
+
+**Started:** 2026-10-30. **Roadmap created:** 2026-10-30.
+Requirements: [`REQUIREMENTS.md`](REQUIREMENTS.md). **29 v4.9 requirements, 29 mapped, 0 orphans** (7 KEY · 7 MCP · 4 OAUTH · 6 HOOK · 3 GUARD · 1 FIX · 1 REG). Research: [`research/SUMMARY.md`](research/SUMMARY.md).
+
+**Goal:** A person can use their knowledge base, agent and workflows from an MCP client (Claude Code, Cursor, Claude.ai, Claude Desktop) and be told by webhook when something happens, without opening the app.
+
+**Milestone rule (every phase):** a capability is proven by **driving it as a user** on the path the requirement names (a real MCP client, a real webhook receiver, a DB row, a request/response, a screenshot). A mocked test alone does not close a requirement. ⛔ Presence assertions cannot see content drift: where the words are the deliverable (a refusal sentence, a tool error, the consent page, a webhook payload, a redacted result), assert the **content**.
+⛔ **Measure before building.** Every research figure (ledger triples, client timeouts, provider in-flight budgets, redactor false-positive rate) is a claim about the tree or the world on 2026-10-30. Re-measure at discuss.
+⛔ **Outside callers read through the member, never the service role.** Every MCP read and every webhook visibility check goes through the acting-member RLS connection (`get_user_pg_connection(None, {"id": uid})`) narrowed to the credential's org. Every existing gate reads through the service role and nothing in the suite requests as `anon` (BUG-260911-01), so each new table gets an **anon-role test** and each cloud migration is followed by `get_advisors(security)`.
+
+**Red line (every phase, the Extension Contract):** the closed core (**7 phase types / 1 emitter / 30 tools**) is re-counted against each phase's base commit with `test_259_closed_core_inventory.py`. **MCP tools are not engine tools**: they call services and never touch `_TOOL_REGISTRY`, `handle_search_documents` or `send_message`. No phase adds a tool, a phase type, an emitter or a validator kind. ⛔ **Do not touch** `backend/app/api/threads.py`, `backend/app/services/agent_loop.py`, `backend/app/services/provider_gateway/dispatcher.py` or `frontend/src/lib/api.ts` for this milestone's features (new client calls go in `frontend/src/lib/api/*.ts`). `harness_engine.py` and `StreamsProvider.tsx` are not edited unless a phase flags it and the operator approves.
+
+**Baseline gates (every phase):** backend `pytest tests/unit -q --continue-on-collection-errors` at **<= 71 failed, 0 collection errors** (zero headroom); frontend `GSD_VITEST_MAX_WORKERS=2 node scripts/vitest-count-gate.cjs` with no per-file decrease and 0 failing; frontend typecheck as `npx tsc -p tsconfig.app.json --noEmit` as a **set diff** against base; `node scripts/check-claude-md-size.cjs`, `node scripts/check-hot-file-ledger.cjs <phase>` and `node scripts/check-seeds-register.cjs` clear.
+
+**Numbering:** Phases **303-309**. **Migrations resume at `220`** (`ls supabase/migrations | tail -1` reads `219_notifications_realtime.sql`). Research places 220 (key kind, origin columns, audit literals) and 221 (org narrowing, settings knobs) in 304, a grants table in 307 and the webhook tables in 308. **No number is pre-assigned:** whichever phase needs one takes the next free number after re-running `ls`. Each migration is pasted into the local SQL editor, then `bash scripts/regenerate-full-schema.sh` (no `--reset`). The cloud paste is an operator step before the code that needs it deploys (per-action approval; `assert_action_types_synced` refuses boot otherwise).
+
+**Solo running:** Claude builds and reviews. Phases close `verification_mode: self-verified`; review runs as a fresh-context `/gsd:code-review`.
+
+**Out of scope:** the versioned `/api/v1` REST surface (next milestone) · full-agent `ask_agent` (sandbox, web search, connector writes) · org-shared MCP keys · answering a paused run over MCP · full-content webhook payloads · Claude Connectors Directory listing (`SEED-294`) · Presidio / spaCy redaction · Supabase's OAuth 2.1 server · active-org scoping of in-app chat search (see REQUIREMENTS "Future").
+
+### Phase Table
+
+| Phase | Name | Goal | Requirements | SC# | Flags |
+|-------|------|------|--------------|-----|-------|
+| 303 | Word Template Bare Tokens | A bare `{{ name }}` in a Word template fills in the value or fails the integrity check, instead of writing a cited record's dict text into the document | FIX-15 | 4 | independent · **repro through the real sandbox driver first** · may collapse to `/gsd:quick` (G-3) · G-5 (`render_template.py`) · no research |
+| 304 | Personal MCP Keys That Act as You | A member mints, narrows, sees and revokes a key that acts exactly as them in one org; admins and the operator can switch MCP off; proven at the credential and data layer before any transport exists | KEY-01, KEY-02, KEY-03, KEY-04, KEY-05, KEY-06 | 5 | **trust root, no transport** · **headline: two-org parity test** · focused research (EXPLAIN + baseline for the org GUC) · migrations (220/221) · security_enforcement · anon test · **G-2 sketch** (key screen) · G-4 · G-5 (`dependencies.py`, `SettingsPage.tsx`) · UI hint |
+| 305 | Connect Claude Code and Cursor | A member connects Claude Code or Cursor to one stable MCP URL with their key and searches, lists and reads their documents, every call audited, limited, counted in spend, and redacted when the org asks | MCP-01, MCP-02, MCP-03, MCP-07, KEY-07, GUARD-02, GUARD-03 | 5 | **research** · SDK bump + `test_059` retired under a `D-NN` · stateless on two workers · redaction choke point ships here · G-5 (`main.py`, `config.py`, `AdminSpendPage.tsx`) · ledger row owed (`middleware/maintenance.py`) · deploy parity · UI hint |
+| 306 | Ask the Agent and Run Workflows | From an MCP client a member asks the agent and gets a cited answer, and starts and follows a published workflow, under admission limits that leave in-app users unaffected, with no path from an outside prompt to the sandbox, the web or a write | MCP-04, MCP-05, MCP-06, GUARD-01 | 5 | **research** · **8-row cross-provider roster** · four-axis UAT · `inbound.py` extraction FIRST (`key_run_read`) · ⛔ no edit to `threads.py` / `agent_loop.py` / `dispatcher.py` · security_enforcement · G-4 · UI hint |
+| 307 | Sign In From Claude.ai and Claude Desktop | A member adds Syrel as a custom connector in Claude.ai or Claude Desktop, signs in on a Syrel consent page and uses the same tools under the same limits as a key, on cloud and the one-box | OAUTH-04, OAUTH-05, OAUTH-06, OAUTH-07 | 4 | **research spike** · own authorization server (decided) · **G-2 sketch** (consent page, connected apps) · G-4 · security_enforcement · migration (grants) · `.well-known` routing parity (`nginx.conf` FIRES) · operator: real Claude.ai connect · UI hint |
+| 308 | Told by Webhook | A member's own systems receive one signed, thin event per endpoint when a run finishes, a run waits on a person, or a document is ingested, retried and logged, never to an internal address or about something the owner can no longer see | HOOK-01, HOOK-02, HOOK-03, HOOK-04, HOOK-05, HOOK-06 | 5 | parallel with 306/307 (serialize DB-mutating suites) · migration (webhooks) · RLS + anon test · `egress.py` one capability · ledger row owed (`ingestion_queue_service.py`) · **G-2 sketch** (webhook screen) · G-4 · security_enforcement · UI hint |
+| 309 | Close-Out: Docs, Register, Deploy Parity | A person can connect any supported client from the public docs alone, and the register and the deploy checklist say what actually shipped | REG-10 | 3 | runs last · no research · no new capability |
+
+**Dependency order:** 303 anywhere; 304 → 305 → 306; 307 after 305; 308 after 305 (beside 306 and 307); 309 last. The real constraints:
+
+- **303 is independent.** It touches only the Word template path and can run in any gap, or as `/gsd:quick` if the repro shows a few-line fix.
+- **304 comes before every MCP phase.** It is the only phase whose failure is a cross-org data leak, and every tool, the OAuth path and webhook visibility inherit its acting-member context and its one liveness predicate. It ships no transport so the trust root is reviewed alone.
+- **305 after 304.** Reads before spend: the transport, auth, limits, result shape and the redaction choke point are proven on read tools before anything costs money or creates a thread.
+- **306 after 305.** Start-type tools reuse 305's server, limits and guard; admission control lands with the first thing it protects.
+- **307 after 305** (operator decision D2: OAuth is the fourth build phase, before webhooks). An OAuth grant is a key minted through a consent screen, so it swaps only the credential resolver behind 304's principal and needs 305's 401 challenge. It does not depend on 306.
+- **308 after 305**, beside 306 and 307. It reuses 304's liveness re-check and 305's outbound guard and shares no files with 306/307 beyond the one-line `main.py` lifespan block. Worktree rule 4: suites that mutate the local database serialize across these phases.
+- **309 last.** Its docs describe what 303-308 shipped.
+
+### Phase Checklist
+
+- [ ] **Phase 303: Word Template Bare Tokens**: reproduce BUG-261022-01 through the real sandbox driver, then a bare `{{ name }}` renders the value or fails the integrity check; `{{ name.value }}` keeps working (FIX-15)
+- [x] **Phase 304: Personal MCP Keys That Act as You**: acting-member org narrowing, one key resolver and liveness predicate, the key screen with presets and snippets, narrowing, revoke, org and operator kill switches, proven by a two-org parity test (KEY-01..06)
+- [x] **Phase 305: Connect Claude Code and Cursor**: stateless MCP server at one URL, `search_knowledge_base` / `list_documents` / `read_document`, tool labels and plain errors, maintenance behaviour, per-key audit and limits, spend attribution, fail-closed PII redaction (MCP-01, MCP-02, MCP-03, MCP-07, KEY-07, GUARD-02, GUARD-03) — **CLOSED 2026-10-31 by decision** (self-verified 4/5 SC; SC#1 client rows Cursor / cloud / one-box / Claude Desktop OWED to the operator; NOT deployed — deploys with 304)
+- [x] **Phase 306: Ask the Agent and Run Workflows**: `ask_agent` / `get_answer` with a closed read-only tool set, MCP asks in thread history, `list_workflows` / `run_workflow` / `get_workflow_run`, admission control for MCP and `/inbound` starts (MCP-04, MCP-05, MCP-06, GUARD-01) — **CLOSED 2026-11-03 by decision** (self-verified 5/5 SC after quick 261101-4y9 fixed review CR-01/CR-02; 5 live UAT rows OWED in 306-HUMAN-UAT.md, run row 5 first; NOT deployed — cloud 220→223 owed)
+- [x] **Phase 307: Sign In From Claude.ai and Claude Desktop**: own OAuth 2.1 authorization server per the MCP spec, consent page with org and narrowing, rotating refresh, connected apps with revoke (OAUTH-04..07) — **CLOSED 2026-11-04 by decision** (self-verified 4/4 SC in code; review 10 fixed, WR-05 deferred SEED-397; 8 human rows OWED in 307-HUMAN-UAT.md — operator postponed, run row 5 first; /gsd:secure-phase 307 owed; NOT deployed — cloud 220→224 owed)
+- [ ] **Phase 308: Told by Webhook**: endpoints, event choice and test event, Standard Webhooks signing with rotation, exactly-once emission from triggers, retries and delivery log, visibility re-check and SSRF refusal, admin control (HOOK-01..06)
+- [ ] **Phase 309: Close-Out: Docs, Register, Deploy Parity**: per-client quick starts, webhook verification, "Claude.ai needs OAuth", the register made true, the deploy-parity checklist (REG-10)
+
+### Phase Details
+
+#### Phase 303: Word Template Bare Tokens
+
+**Goal**: A Word template that uses a bare `{{ name }}` against a cited record fills in the value, or the run stops at the integrity check with a reason, instead of writing the record's dict text into the document; templates that use `{{ name.value }}` keep working.
+**Depends on**: Nothing (independent; can run in any gap).
+**Requirements**: FIX-15
+**Success Criteria** (what must be TRUE):
+
+  1. Before any fix, the defect is reproduced through the real sandbox driver, not a unit-level mirror: a template with a bare `{{ name }}` filled from a cited-record context produces a document containing the record's dict text, and the evidence (template, run id, the produced document) is kept (FIX-15).
+  2. After the fix, the same template produces a document whose body, headers, footers and nested tables show the value, or the run stops at the integrity check with a worded reason. No document with record text in it reaches the user (FIX-15).
+  3. Templates using `{{ name.value }}`, `|default` and `score` produce the same output as before the fix, shown by re-running the existing golden runs (FIX-15).
+  4. The sandbox driver and `template_render_service._replace_in_paragraph` behave the same on a bare token, pinned by one test that fails if the two copies diverge (FIX-15).
+
+**How we'd know this failed**: the repro ran only through a mirror and the driver still writes record text; only one of the two rendering copies is fixed; `residual_tags_in` still cannot see a rendered repr; the fix blanks the token so the document reads empty where a value belongs; `{{ name.value }}` or `|default` output changes; the integrity check skips headers, footers or nested tables; `Dockerfile.sandbox` changes without a new image tag and `SANDBOX_IMAGE` in the same commit.
+**Plans**: TBD
+**Flags**: **The repro decides the size.** If the fix is a few lines in one file with no schema or API surface, run it as `/gsd:quick` (G-3), not a phase. **G-5**: `backend/app/services/tools/render_template.py` (`6 / 3 / 1163`, FIRES) — a minimal edit honoured by construction, or take its named seam first; read its section of `docs/HOT-FILE-LEDGER.md` at discuss. No image rebuild expected. No migration. No research. Folds `BUG-261022-01`.
+
+#### Phase 304: Personal MCP Keys That Act as You
+
+**Goal**: A member can mint a personal MCP key that acts exactly as them inside one org, narrow it, see its last use and revoke it; an org admin and the operator can switch MCP off; and all of it is proven at the credential and data layer, before any MCP transport exists.
+**Depends on**: Nothing (first MCP phase; independent of 303).
+**Requirements**: KEY-01, KEY-02, KEY-03, KEY-04, KEY-05, KEY-06
+**Success Criteria** (what must be TRUE):
+
+  1. A two-org parity test, run as a non-owner member through the acting-member RLS connection (never the service role), shows that every read a key can make (folders, documents, search, views, relationships, workflows) returns exactly what that member sees in the app with that org active, and nothing from their other org. Removing the membership makes the next resolution refuse (KEY-02).
+  2. A member creates a key in Settings and sees the secret once. The new key defaults to read-only tools with an expiry; ask and run are unticked; connector-fed folders (mailbox, synced sources) are unticked. The screen gives a copy-ready snippet for Claude Code, Cursor and VS Code that reads the key from an environment variable, warns against pasting a personal key into Claude.ai's org-wide headers, and offers a Claude Desktop bridge snippet labelled as a workaround until OAuth ships (KEY-01, KEY-04).
+  3. A member narrows a key to a folder set (subfolders included) and a tool subset. An empty folder set is refused at save. Narrowing only removes access: one driven test per read path (search, document read, list, views, relationships) shows a narrowed key reaches nothing outside its folders, and global folders are excluded unless ticked (KEY-03).
+  4. The member sees each key's last use and can revoke it. A key that is revoked, expired, or whose owner left the org or was banned is refused on its next resolution, with the same refusal each time (KEY-05).
+  5. An org admin lists and revokes every MCP key in the org and switches MCP off for the org; the operator switches it off for the whole deployment; each takes effect on the next resolution. A workflow API key never authenticates as an MCP key, and an MCP key never authenticates `/inbound` (KEY-06).
+
+**How we'd know this failed**: any key read goes through the service role and re-implements visibility; the org narrowing loses the `current_user_org_ids()` initPlan shape under `EXPLAIN`, or the backend baseline rises above 71; behaviour with the org setting unset is not identical to today; an empty folder set means "no filter"; a second key resolver appears beside the extracted `authenticate_presented_key` (the W-1 drift class); the secret is stored unhashed or shown twice; a snippet puts the key in a URL; revocation waits for a cache to expire; a new table or column is readable by `anon` or another user, or `get_advisors(security)` shows a new ERROR; the parity test passes only for the org owner.
+**Plans**: 6 plans in 4 waves
+
+- [x] 304-01-PLAN.md — migrations 220/221, the GUC-narrowed current_user_org_ids(), the one dependencies.py edit, acting-member connection, EXPLAIN evidence + RLS live suite (wave 1, mutates local DB)
+- [x] 304-02-PLAN.md — resolver core extracted (pure move first), mcp kind + srl_mcp_, principal_still_allowed, McpPrincipal, KeyScope, tool catalogue + mcp_url (wave 1)
+- [x] 304-03-PLAN.md — narrowed reads + the headline two-org non-owner parity suite, negative arms, narrowed-key arms (wave 2, mutates local DB)
+- [x] 304-04-PLAN.md — kind on the 293 key routes, pickable folders, org switch (audited) + operator flag, wire contract + OpenAPI (wave 2)
+- [x] 304-05-PLAN.md — member key screen: kind choice, MCP draft, show-once snippets, MCP card, revoke facts (wave 3)
+- [x] 304-06-PLAN.md — org switch card, admin list notice, audit words, Control Room switch; phase bookkeeping + full gates (wave 4)
+
+**UI hint**: yes
+**Flags**: **Headline must-have: the two-org parity integration test**, as a non-owner member, with the removed-membership negative arm. **Research (focused)**: the `EXPLAIN` check and a baseline-gate run for the org GUC narrowing in `current_user_org_ids()` (D4); fallback if `EXPLAIN` fails is explicit org predicates at each MCP read plus the same parity test. **Migrations** (research: 220 key `kind` / `folder_ids` / `tools` / `srl_mcp_` prefix, mig 215's `workflows >= 1` CHECK relaxed for `kind='mcp'`, `'mcp'` origin on `workflow_runs` / `threads` / `runs`, audit literals; 221 org narrowing + settings knobs) — next free numbers; any SECURITY DEFINER function has `EXECUTE` revoked from `PUBLIC`, not only `anon`. **security_enforcement** (`/gsd:secure-phase`). **G-2 sketch FIRST** for the key screen (create, show-once, presets, narrowing, snippets, warnings, last use, revoke) and the admin list. **G-4**. **G-5**: `backend/app/dependencies.py` (`24 / 12 / 1147`; the single sanctioned ~6-line edit for the org contextvar), `backend/app/services/audit_service.py` (lockstep literals), `backend/app/models/user_settings.py` (38) and `backend/app/api/settings.py` (26) for knobs, `frontend/src/pages/SettingsPage.tsx` (31; one mount), `frontend/src/components/org/OrgAdminShell.tsx` (6) for the admin list; extract `authenticate_presented_key` from `api_key_auth.py` before editing it. Reuse Phase 293's key, limiter and audit paths and `expert_scope` intersection semantics. Folds `SEED-195`; `SEED-013` in part.
+
+#### Phase 305: Connect Claude Code and Cursor
+
+**Goal**: A member connects Claude Code or Cursor to one stable MCP URL with their key and can search, list and read their documents; every call is audited, limited per key, counted in operator spend, and redacted when their org asks for it.
+**Depends on**: Phase 304 (the key, the acting-member context and the liveness predicate).
+**Requirements**: MCP-01, MCP-02, MCP-03, MCP-07, KEY-07, GUARD-02, GUARD-03
+**Success Criteria** (what must be TRUE):
+
+  1. Claude Code and Cursor connect to one stable MCP URL with a key and show the tool list, on local, on the deployed two-worker cloud backend and on the one-box. Consecutive calls served by different workers succeed with no sticky session, and an app session JWT presented at the MCP URL is refused (MCP-01).
+  2. `search_knowledge_base` returns ranked passages with document title, citation and an "Open in Syrel" link, with connector-fed passages marked external and quoted content delimited. `list_documents` and `read_document` page through folders and return a document's text in bounded chunks. A missing document and a forbidden one get the same refusal in words and shape, and a narrowed key gets nothing outside its folders from any of the three tools (MCP-02, MCP-03).
+  3. Every tool is labelled read-only or not, every error comes back as a tool error with a plain sentence, and in maintenance mode reads still work while the MCP path answers starts with a JSON-RPC error carrying the maintenance sentence, never the HTML 503 (MCP-07).
+  4. Every call writes an audit row naming the key, the tool and the outcome, and counts against per-key limits with cheap and expensive tools in separate buckets; a key over its limit gets an error the client's model can relay. A search-only session shows up in operator spend attributed to the org and the key (KEY-07, GUARD-02).
+  5. With PII redaction turned on by an org admin (off by default), MCP results mask emails, phone numbers, card numbers, IBANs and secrets while citations, ids and links still work; when the redactor fails, the result is blocked, not sent unredacted. False-positive rate and latency are measured on real documents and recorded (GUARD-03).
+
+**How we'd know this failed**: the server answers 421 in production only (host allowlist not derived from `BACKEND_PUBLIC_URL`) or advertises `http://` URLs; it works on one worker and fails on the other; the `test_059` fixture trips by surprise instead of being retired under a `D-NN`; tool narrowing holds at `tools/list` but not at `tools/call`; a forbidden document can be told apart from a missing one; tool descriptions change at runtime or contain user-authored text; retrieved markdown images are not defanged; redaction breaks a citation id or a link, or sends unredacted on error; search-only calls are missing from spend; `_TOOL_REGISTRY` changes from 30; maintenance mode returns HTML that clients report as "couldn't reach".
+**Plans**: 4 plans (4 waves, serialized on the local-DB lock — every plan writes the local DB)
+
+Plans:
+
+- [x] 305-01-PLAN.md — SDK bump (httpx2 human-verified, installed once in main), test_059 retired under D-48, graceful shutdown, mig 222, stateless transport + key edge + maintenance, two-worker proof
+- [x] 305-02-PLAN.md — search_knowledge_base / list_documents / read_document, result hygiene, identical refusal, narrowing at call, /app/library/<uuid> address
+- [x] 305-03-PLAN.md — per-call audit, cheap/expensive per-key limits + searches knob, MCP activity on the key card, search usage in operator spend (mcp_usage leg)
+- [x] 305-04-PLAN.md — outbound_guard + deterministic redactor (fail closed), org redaction switch + card, FP/latency + client-timeout measurement, 305-VALIDATION
+
+**UI hint**: yes
+**Flags**: **Research** (`/gsd:plan-phase --research-phase`): SDK `TokenVerifier` vs a pure-ASGI wrapper (D5 — either way it calls the one `authenticate_presented_key`); stateless behaviour on both workers with a 2025-11-25 client; static-bearer behaviour in Claude Code and Cursor; redactor false-positive rate and latency on the real corpus; host allowlist and proxy behaviour on cloud and one-box; the canonical MCP URL per topology (Q19 — refuse the mount if `BACKEND_PUBLIC_URL` is loopback in production). **Dependencies**: `mcp>=2.3.0,<3` + `sse-starlette>=3.0.3,<3.1`, no FastAPI upgrade; re-validate the SSE endpoints in `runs.py` and `skill_tuner.py` and retire the `test_059_disconnect` version fixture under a `D-NN`. **Redaction choke point** (`outbound_guard`) ships here behind a `Redactor` interface; webhooks reuse it in 308; names are not covered and the docs say so. **G-5**: `backend/app/main.py` (`99 / 73`; one mount + one lifespan block), `backend/app/config.py` (55), `frontend/src/pages/admin/AdminSpendPage.tsx` (FIRES, "extraction FIRST next" ⛔) — prefer showing MCP spend through the existing breakdown; if the page must change, take its seam first. ⚠ `backend/app/middleware/maintenance.py` has **no ledger row** — add it before any plan names it. **Deployment-artifact parity** (same commit) for any new env var. **security_enforcement**. **UAT**: Claude Code and Cursor on the deployed two-worker container; Claude Desktop only through the labelled bridge. Measure client timeouts here for 306. Folds `SEED-177`, `SEED-079`; `SEED-013` in part.
+
+#### Phase 306: Ask the Agent and Run Workflows
+
+**Goal**: From an MCP client, a member can ask the agent a question and get a cited answer, and can start a published workflow and follow it to its result, under admission limits that leave in-app users unaffected, with no path from an outside prompt to the sandbox, the web or any write.
+**Depends on**: Phase 305 (the server, per-key limits, audit, spend attribution and the outbound guard).
+**Requirements**: MCP-04, MCP-05, MCP-06, GUARD-01
+**Success Criteria** (what must be TRUE):
+
+  1. `ask_agent` returns an answer with citations and confidence within the wait budget (a Settings value, about 30 s by default). Past the budget it returns a handle that `get_answer` reads later, and a retry with the same idempotency key returns the same run, not a second one (MCP-04).
+  2. Driven across the 8-row native roster plus OpenRouter, an MCP ask's audit shows only read-only tools: no `execute_code`, web search, connector write, memory save or skill save, even when the prompt asks for them. An ask that would need a person ends with "needs input in the app" and a link instead of waiting (MCP-04).
+  3. The ask appears in the member's thread history in the app, marked as started from MCP (MCP-05).
+  4. `list_workflows` lists only what the key may run; `run_workflow` returns a run id at once; `get_workflow_run` returns status and result. A paused run shows "waiting on <person>" with a link and cannot be answered over MCP. A key reads only the runs it started, and a workflow whose scope lies outside a narrowed key is refused (MCP-06).
+  5. When an org, a credential or a provider is at its limit, MCP ask and run and `/inbound` starts get a plain "try again in N s" (a tool error over MCP, a 429 with `Retry-After` on `/inbound`), while an in-app chat started at the same moment is not slowed. With Redis unavailable, outside starts are refused and in-app use continues. Ask and run usage appears in operator spend by org and key (GUARD-01).
+
+**How we'd know this failed**: a power tool appears in an MCP-origin run's audit on any provider; `threads.py`, `agent_loop.py` or `dispatcher.py` is edited to restrict the tool set; the outside prompt reaches the model without the TRUST-03 envelope; `run_workflow` blocks until the run ends; a retried ask creates a second run; `get_workflow_run` returns a run another credential started; a question is answered over MCP; admission slows in-app chats or fails open when Redis is down; the `key_run_read` extraction changes `/inbound` behaviour; an MCP ask is missing from thread history or unmarked; a workflow outside a narrowed key starts.
+**Plans**: 5 plans (5 waves, serialized on the local-DB lock — every plan writes the local DB; G-8 D-24: five, not four, because the ask path splits into the run-path closure and the MCP surface)
+
+Plans:
+
+- [x] 306-01-PLAN.md — D-39 extractions first (inbound.py → key_run_read / key_run_start; search_documents_tool.py → search_vocabulary), mig 223 (threads.origin_* + freeze trigger, four app_settings knobs) applied locally
+- [x] 306-02-PLAN.md — admission core (Redis ZSET leases by one Lua script) + idempotency claims, fail closed; /inbound 429 + Retry-After; the four knobs end to end in the limits card
+- [x] 306-03-PLAN.md — tool-set closure (allow-list ContextVar, Seam A in search_vocabulary, Seam B in tool_dispatcher with the durable thread-origin check), TRUST-03 ask envelope, non-HTTP ask start/wait/read, two-org live proof
+- [x] 306-04-PLAN.md — ask_agent / get_answer on /mcp (idempotency, admission, wait budget, refusals, start bucket); the mcp origin kind end to end + the history-row mark + the question bubble
+- [x] 306-05-PLAN.md — list_workflows / run_workflow / get_workflow_run; spend by key through the runs leg; MCP key activity words; roster + burst scripts and 306-VALIDATION.md (UAT rows OWED)
+
+**UI hint**: yes
+**Flags**: **Research**: how the MCP-origin tool set can be closed through `run_producer` / `ThreadScoping` without editing `agent_loop.py` or `run_producer.py` (unverified — the gap to close first; start from `POWER_TOOLS` as the deny list plus every connector write); measured client timeouts from 305 before any default moves; provider in-flight budgets (`SEED-081` evidence table); idempotency design (Redis-deduped, bound to the credential). **Cross-provider UAT roster (CLAUDE.md, MANDATORY)**: the agent run path is touched, so the full 8-row board (OpenAI, Anthropic, Google, DeepSeek, Zhipu/GLM, MiniMax, Moonshot/Kimi, OpenRouter), derived from `MODEL_CAPABILITIES`, registry-backed ids, blocked rows recorded ⛔ with reason, never omitted. **Four-axis UAT**: multi-tool (search + read in one ask), parallel-thread (an in-app thread streams while an MCP ask runs), long-message (a ≥ 5 KB MCP prompt). **G-5**: `backend/app/api/inbound.py` (`10 / 3 / 719`, FIRES) — the `key_run_read` pure-move extraction is the first plan, proven behaviour-neutral; `backend/app/services/run_producer.py` (14) only if research shows no other path; `unattended_launch.py` (3), `workflow_kickoff.py` (12) one expression each. ⛔ No edit to `threads.py`, `agent_loop.py`, `dispatcher.py`, `lib/api.ts`. MCP-05 reuses Phase 293's thread origin field and its existing mark. **G-4** for the thread-history mark. **security_enforcement**. Folds `SEED-081`; `SEED-013` in part.
+
+#### Phase 307: Sign In From Claude.ai and Claude Desktop
+
+**Goal**: A member adds Syrel as a custom connector in Claude.ai or Claude Desktop, signs in on a Syrel consent page that names the client, picks the org and any narrowing, and then uses the same tools under the same limits and kill switches as a key, on cloud and on the one-box.
+**Depends on**: Phase 304 (principal, narrowing, liveness predicate), Phase 305 (the MCP server and its 401 challenge). Not on 306.
+**Requirements**: OAUTH-04, OAUTH-05, OAUTH-06, OAUTH-07
+**Success Criteria** (what must be TRUE):
+
+  1. A member adds Syrel as a custom connector in Claude.ai and in Claude Desktop, signs in, and uses the tools. The consent page names the client and its redirect host and lets the member pick the org and optional folder and tool narrowing. Claude Code signs in through a loopback redirect on any port (OAUTH-04).
+  2. Sign-in follows the current MCP authorization spec: an unauthenticated call gets a 401 pointing at protected-resource metadata; S256 PKCE is required and `plain` is refused; dynamic client registration and client ID metadata documents are both advertised; tokens are bound to this server. The `.well-known` paths answer JSON, not the app page, on local, cloud and the one-box (OAUTH-05).
+  3. An OAuth grant obeys the same narrowing, liveness checks and kill switches as a key, shown by a removal test per case (membership, ban, org switch-off, deployment switch-off). Its access token presented to the database API is refused. A refresh token rotates on use, and presenting an already-used one is refused (OAUTH-06).
+  4. A member sees their connected apps and revokes each; an org admin revokes all of them in the org; the next call from a revoked app is refused (OAUTH-07).
+
+**How we'd know this failed**: the access token is a Supabase user JWT that PostgREST accepts; redirect matching accepts an unregistered host (an open redirect) or rejects Claude's loopback on a new port; `.well-known` returns the SPA on Vercel or nginx; the client-metadata fetch bypasses `egress.py`; a second principal resolver appears beside 304's; the consent page does not name the client or the redirect host; refresh-token reuse goes undetected; it works locally and fails on cloud or the one-box; "Claude.ai works" is claimed without a real connect, refresh and revoke; an endpoint takes longer than 10 s.
+**Plans**: 5 plans (4 waves; 307-04 writes no DB and runs beside 307-01, the other four serialize on the local-DB lock; G-8 D-43: five, not four, because the AS core splits into its data half and its protocol half by context budget)
+
+Plans:
+**Wave 1**
+
+- [x] 307-01-PLAN.md — mig 224 (oauth_clients, oauth_tokens, api_keys.oauth_client_id, label index without grants, redirect-host allowlist) applied locally; token primitives + db layer incl. refresh rotation / 60 s grace / family revoke; the ONE resolver (key and access token share one admission tail)
+- [x] 307-04-PLAN.md — routing parity: nginx .well-known proxy + consent anti-framing on all three layers pinned by the 297 suite with negative controls; operator docs (both Anthropic ranges, CIMD probe, mig 224 order, owed rows); Claude.ai and Desktop snippet tab by sign-in (bridge retired)
+
+**Wave 2** *(blocked on Wave 1 completion)*
+
+- [x] 307-02-PLAN.md — the authorization server: redirect / DCR / CIMD rules, client_metadata egress capability, OAuth limiter buckets, .well-known docs + 401 resource_metadata, Redis store, register / authorize / token / revoke; live round trip, per-case removal, PostgREST refusal
+
+**Wave 3** *(blocked on Wave 2 completion)*
+
+- [x] 307-03-PLAN.md — consent: one narrowing validator shared with key create, /oauth/requests read / approve / deny, the consent page with every state + host-match and frame guards, one App.tsx branch, one appRoutes arm, one returnTo kind
+
+**Wave 4** *(blocked on Wave 3 completion)*
+
+- [x] 307-05-PLAN.md — connected apps (member) + Disconnect, org connected apps + Disconnect all, Control Room return-address allowlist, audit words, live removal via routes; phase ledger + CLAUDE.md bookkeeping and full gates
+
+**UI hint**: yes
+**Flags**: **Research spike**: own authorization server (decided at intake, D1/Q9 — opaque, hashed, per-call-looked-up tokens that are MCP grants; Supabase OAuth is out of scope) vs the SDK's `OAuthAuthorizationServerProvider` as the fast path; Claude's DCR vs CIMD selection; port-agnostic loopback matching; refresh-rotation reuse detection; `.well-known` routing on Vercel, Coolify and the one-box; WAF reachability from Anthropic's egress range. **Migration** (the grants table; next free number); RLS, anon-role test, `get_advisors(security)` after the cloud paste. **security_enforcement**. **G-2 sketch FIRST** for the consent page and the connected-apps list. **G-4**. **Routing parity**: the Phase 297 three-layer suite (`frontend/devRouting.ts`, `frontend/vercel.json`, `frontend/nginx.conf` — `nginx.conf` FIRES) covers the consent route and `.well-known`. **G-5**: `backend/app/main.py` (one mount), `backend/app/security/egress.py` (one capability for the client-metadata fetch). **Deployment-artifact parity** for any new env var. **Operator actions**: a real Claude.ai connect, refresh and revoke on cloud; Claude callback hosts on the redirect allowlist. Until this phase ships, the milestone does not claim Claude.ai or Claude Desktop works.
+
+#### Phase 308: Told by Webhook
+
+**Goal**: A member's own systems receive a signed, thin event when a run finishes, a run waits on a person, or a document is ingested: exactly one per endpoint, retried and logged, never sent to an internal address or about an item the owner can no longer see.
+**Depends on**: Phase 304 (the liveness predicate and acting-member visibility), Phase 305 (the outbound guard). Runs beside 306 and 307.
+**Requirements**: HOOK-01, HOOK-02, HOOK-03, HOOK-04, HOOK-05, HOOK-06
+**Success Criteria** (what must be TRUE):
+
+  1. A member adds an https endpoint, chooses events (run finished, run waiting on a person, document ingested) and sends a test event that arrives and verifies with the `standardwebhooks` library. Rolling the secret leaves both signatures valid during the overlap. Payloads carry ids, status and a link, never document content, and pass through the redaction guard when the org has it on (HOOK-01, HOOK-02).
+  2. Every path that finishes a run (in-app, scheduled, API key, MCP, cancelled, failed) and every path that completes a document ingest (upload, watched source, mail, re-ingest) produces exactly one event per subscribed endpoint with two backend workers running, and the `webhook-id` stays the same across retries (HOOK-03).
+  3. A failing endpoint is retried with backoff. The member sees a delivery log with status and latency, never the response body, and can resend. An endpoint that keeps failing is disabled and its owner sees an in-app notice (HOOK-04).
+  4. A delivery about an item the owner can no longer see at send time is not sent. Endpoints at private, internal, loopback or metadata addresses are refused when saved and again when sent, including through DNS changes and redirects (HOOK-05).
+  5. An org admin lists, disables and deletes the org's webhook endpoints (HOOK-06).
+
+**How we'd know this failed**: two workers send the same event twice; an ingest or finalization path emits nothing (document completion has 4+ writers); events are emitted from application code and a path is missed; a trigger error breaks run finalization or ingestion; a delivery bypasses `egress.py`; the log shows a response body; a payload carries document text; signing departs from Standard Webhooks; the secret is stored in plain text; a webhook table is readable by `anon` or another user, or `get_advisors(security)` shows a new ERROR; Redis is treated as the record; a removed member's endpoint keeps receiving events.
+**Plans**: 6 plans in 4 waves (D-55: 01 ‖ 02 → 03 ‖ 04 → 05 → 06)
+
+Plans:
+- [x] 308-01-PLAN.md — migration 225 (deny-all tables, swallow-and-warn emit triggers, notifications widening, audit CHECK), db/webhooks.py, the notice read path
+- [x] 308-02-PLAN.md — egress `webhook` capability + SSRF corpus, URL rules, typed text-free payloads through the guard, signer, sender
+- [x] 308-03-PLAN.md — WebhookDrainer + outbox: fan-out with visibility/liveness, retries, auto-disable + notice, purge; emission matrix and two-drainer live proofs
+- [x] 308-04-PLAN.md — member + admin routes, test/log/resend, rate limits, main.py wiring, OpenAPI flagging, docs stub
+- [x] 308-05-PLAN.md — Settings → Webhooks tab (cards, form, secret once, log, sheets) and its one mount
+- [x] 308-06-PLAN.md — org-admin Webhooks section, Waiting-on-you row, audit words, standardwebhooks interop (legitimacy checkpoint), bookkeeping + phase gates
+**UI hint**: yes
+**Flags**: Standard patterns, no research (Phase 300's trigger-fed outbox + per-worker drainer with `SKIP LOCKED`, lease, frozen payload, `next_attempt_at`; Phase 293's audit lockstep; a hand-rolled Standard Webhooks signer with the secret through `secret_cipher`; `standardwebhooks==1.1.0` test-only). **Migration** (webhook subscriptions + deliveries + swallow-and-warn triggers on `workflow_runs` and `documents` status; next free number); every table has RLS; SECURITY DEFINER functions have `EXECUTE` revoked from `PUBLIC`; an **anon-role test**; `get_advisors(security)` after the cloud paste. **security_enforcement** (SSRF refusal corpus at save and at delivery). **G-2 sketch FIRST** for the webhook screen (endpoint, events, test, secret roll, delivery log, resend) and the admin list. **G-4**. **G-5**: `backend/app/security/egress.py` (one closed `webhook` capability: https only, DNS-pinned, redirects refused), `backend/app/main.py` (one lifespan block for the drainer), `frontend/src/pages/SettingsPage.tsx` (one mount). ⚠ `backend/app/services/ingestion_queue_service.py` has **no ledger row** — add it before any plan names it. **Worktree rule 4**: DB-mutating suites serialize against 306/307 work. **Deployment-artifact parity** for any new env var.
+
+#### Phase 309: Close-Out: Docs, Register, Deploy Parity
+
+**Goal**: A person can connect any supported client and verify a webhook from the public docs alone, and every seed and bug this milestone took in, plus the deploy checklist, says what actually shipped.
+**Depends on**: Phases 303-308.
+**Requirements**: REG-10
+**Success Criteria** (what must be TRUE):
+
+  1. The public docs give a quick start for Claude Code, Cursor, VS Code, Claude.ai and Claude Desktop, webhook signature verification snippets, and the plain statement that Claude.ai needs OAuth because personal keys do not reach it. Each quick start is followed once from a clean client and connects (REG-10).
+  2. `SEED-013`, `SEED-177`, `SEED-195`, `SEED-081`, `SEED-079` and `BUG-261022-01` read what actually shipped (status and where); items deferred during the milestone are planted as seeds with a structured trigger; `node scripts/check-seeds-register.cjs` is clear (REG-10).
+  3. The deploy-parity checklist names every migration from 220 on (cloud paste with per-action approval, `get_advisors(security)` after each), every new env var, the `.well-known` and MCP routes per topology, and the Claude callback hosts, and `scripts/check-deploy-drift.sh` is green (REG-10).
+
+**How we'd know this failed**: a doc tells Claude.ai users to paste a personal key; a quick start describes something never driven; landing or docs figures are typed in rather than derived from code; a seed reads `planted` for work that shipped; a gate is weakened to pass; the close-out adds a capability (that is a phase, not a close-out).
+**Plans**: TBD
+**Flags**: Runs last. No research. Landing facts (`frontend/src/landing/facts.ts`) data-only if touched. Ledger rows for every hot file the milestone touched are re-derived.
+
+### Progress
+
+| Phase | Plans Complete | Status | Completed |
+|-------|----------------|--------|-----------|
+| 303. Word Template Bare Tokens | 0/TBD | Not started | - |
+| 304. Personal MCP Keys That Act as You | 6/6 | Complete (self-verified 5/5; G-4 1-3 PASS; deploys WITH 305 — cloud 220/221 + D-41 owed) | 2026-10-31 |
+| 305. Connect Claude Code and Cursor | 5/5 | Complete by decision (self-verified 4/5 SC; SC#1 client rows OWED; deploys WITH 304) | 2026-10-31 |
+| 306. Ask the Agent and Run Workflows | 5/5 | Complete by decision (self-verified 5/5 SC; 5 live UAT rows OWED — row 5 first; cloud 220→223 owed) | 2026-11-03 |
+| 307. Sign In From Claude.ai and Claude Desktop | 5/5 | Complete by decision (self-verified 4/4 SC; 8 human rows OWED — postponed by operator, row 5 first; secure-phase owed; cloud 220→224 owed) | 2026-11-04 |
+| 308. Told by Webhook | 0/6 | Planned | - |
+| 309. Close-Out: Docs, Register, Deploy Parity | 0/TBD | Not started | - |
 
 ---
 

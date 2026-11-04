@@ -49,6 +49,12 @@ def _fake_settings(**overrides):
         # 293 (D-14) — the per-key API limits; the response REQUIRES them as well.
         api_key_starts_per_minute=10,
         api_key_reads_per_minute=120,
+        api_key_searches_per_minute=30,  # 305 (D-54) — the response REQUIRES it too
+        # 306 (D-36 / D-35) — the ask wait and the admission limits; the response REQUIRES them.
+        mcp_ask_wait_seconds=30,
+        outside_inflight_per_key=2,
+        outside_inflight_per_org=4,
+        outside_inflight_per_provider=6,
         # 300 (D-07, D-08, D-10) — the mail knobs; the response REQUIRES them as well.
         notification_email_delay_seconds=120,
         email_from_address="",

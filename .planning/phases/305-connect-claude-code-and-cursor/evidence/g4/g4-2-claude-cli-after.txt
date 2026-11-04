@@ -1,0 +1,26 @@
+No email addresses came back in any of the 3 passages. Every one shows `[email removed]` instead.
+
+**Passage 1** (citation passage 11)
+- Title: Dubai DoF_Document Management and Archival System Project- GCG_ Technical Proposal V1.0.pdf
+- document_id: `8924f33b-625a-4b05-8f43-ebe0a8fd878d`
+- Link: http://localhost:5173/app/library/8924f33b-625a-4b05-8f43-ebe0a8fd878d
+- Literal email address: NO
+- Contains `[email removed]`: YES
+
+**Passage 2** (citation passage 3)
+- Title: Dubai DoF_Document Management and Archival System Project- GCG_ Technical Proposal V1.0.pdf
+- document_id: `8924f33b-625a-4b05-8f43-ebe0a8fd878d`
+- Link: http://localhost:5173/app/library/8924f33b-625a-4b05-8f43-ebe0a8fd878d
+- Literal email address: NO
+- Contains `[email removed]`: YES
+
+**Passage 3** (citation passage 65)
+- Title: Dubai DoF_Document Management and Archival System Project- GCG_ Technical Proposal V1.0.pdf
+- document_id: `8924f33b-625a-4b05-8f43-ebe0a8fd878d`
+- Link: http://localhost:5173/app/library/8924f33b-625a-4b05-8f43-ebe0a8fd878d
+- Literal email address: NO. It has `@ GCG_ES` and a lone `@`, which look like social media handles and have no domain.
+- Contains `[email removed]`: YES (twice)
+
+All 3 passages come from the same document.
+
+To call the search tool, I first had to make one tool-loading call (ToolSearch), because the search tool can't run until it's loaded. Apart from that, I called only `search_knowledge_base`, once.

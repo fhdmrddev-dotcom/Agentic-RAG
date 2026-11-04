@@ -8,7 +8,7 @@ import { describe, expect, it, vi } from "vitest"
 import { render, screen, within } from "@testing-library/react"
 import userEvent from "@testing-library/user-event"
 import { ApiKeyCard } from "../ApiKeyCard"
-import { NOW, iso, makeCall, makeKey } from "./fixtures"
+import { MCP_CATALOGUE, MCP_URL, NOW, iso, makeCall, makeKey, makeMcpKey } from "./fixtures"
 
 describe("293-04 ApiKeyCard", () => {
   it("an active key: label, ● active, prefix, plain chip, meta facts, Revoke", () => {
@@ -106,6 +106,12 @@ describe("293-04 ApiKeyCard", () => {
     expect(screen.getByText("no calls yet")).toBeInTheDocument()
   })
 
+  it("304-05: a workflow key gains only the Workflow kind chip", () => {
+    render(<ApiKeyCard apiKey={makeKey()} now={NOW} />)
+    expect(screen.getByTestId("api-key-kind")).toHaveTextContent("Workflow")
+    expect(screen.queryByRole("button", { name: "How to connect" })).toBeNull()
+  })
+
   it("the audit link appears only when onOpenAudit is given", async () => {
     const user = userEvent.setup()
     const onOpenAudit = vi.fn()
@@ -113,5 +119,96 @@ describe("293-04 ApiKeyCard", () => {
     await user.click(screen.getByRole("button", { name: "Show activity" }))
     await user.click(screen.getByRole("button", { name: "All in the audit log →" }))
     expect(onOpenAudit).toHaveBeenCalledTimes(1)
+  })
+})
+
+describe("304-05 ApiKeyCard — an MCP key (KEY-05)", () => {
+  it("kind chip, ● active, the scope chips, and the meta line with Not used yet", () => {
+    render(<ApiKeyCard apiKey={makeMcpKey()} now={NOW} mcpTools={MCP_CATALOGUE} mcpUrl={MCP_URL} onRevoke={() => {}} />)
+    const card = screen.getByTestId("api-key-card")
+    expect(within(card).getByTestId("api-key-kind")).toHaveTextContent("AI tool · MCP")
+    expect(within(card).getByText("● active")).toBeInTheDocument()
+    expect(within(card).getByText("srl_mcp_Xy12…")).toBeInTheDocument()
+    expect(within(card).getAllByTestId("api-key-chip").map((c) => c.textContent)).toEqual(["Read only", "All folders"])
+    const meta = within(card).getByTestId("api-key-meta")
+    expect(meta).toHaveTextContent("acts in Acme")
+    expect(meta).toHaveTextContent("expires Sat 23 Jan 2027 (in 90 days)")
+    expect(meta).toHaveTextContent("Not used yet")
+    expect(meta).not.toHaveTextContent("last used")
+    expect(meta).toHaveTextContent("created Thu 1 Oct")
+    expect(within(card).getByRole("button", { name: "Revoke claude-code-laptop" })).toBeInTheDocument()
+  })
+
+  // 305-03 (KEY-07, D-53): per-call records now exist, so the 304 "no strip on an MCP key" rule is
+  // retired DELIBERATELY — an MCP key gets the 293 strip and Show activity, in MCP words.
+  it("an MCP key with calls: the call strip and Show activity, in MCP words", async () => {
+    const user = userEvent.setup()
+    const calls = [
+      makeCall({ verb: "read", workflow_id: null, workflow_name: null, run_id: null, ok: false, outcome: "refused",
+                 reason: "rate_limited:expensive", detail: { limit: 30 }, tool: "search_knowledge_base" }),
+      makeCall({ verb: "read", workflow_id: null, workflow_name: null, run_id: null, outcome: "ok", tool: "search_knowledge_base",
+                 at: iso(2026, 9, 25, 10, 41) }),
+    ]
+    render(
+      <ApiKeyCard apiKey={makeMcpKey({ calls, last_used_at: iso(2026, 9, 25, 10, 42) })} now={NOW}
+                  mcpTools={MCP_CATALOGUE} mcpUrl={MCP_URL} />,
+    )
+    const strip = screen.getByRole("group", { name: "Recent calls with claude-code-laptop" })
+    expect(within(strip).getByRole("button", { name: "10:41 · search_knowledge_base · ✓ answered" })).toBeInTheDocument()
+    expect(
+      within(strip).getByRole("button", { name: "10:42 · search_knowledge_base · ✕ refused: over the limit: 30 searches a minute" }),
+    ).toBeInTheDocument()
+    await user.click(screen.getByRole("button", { name: "Show activity" }))
+    expect(screen.getByText("✓ answered")).toBeInTheDocument()
+  })
+
+  it("an active MCP key with no calls: the strip says no calls yet, no activity toggle", () => {
+    render(<ApiKeyCard apiKey={makeMcpKey()} now={NOW} mcpTools={MCP_CATALOGUE} mcpUrl={MCP_URL} />)
+    expect(screen.getByText("no calls yet")).toBeInTheDocument()
+    expect(screen.queryByRole("button", { name: "Show activity" })).toBeNull()
+  })
+
+  it("used: last used {time}", () => {
+    render(<ApiKeyCard apiKey={makeMcpKey({ last_used_at: iso(2026, 9, 25, 10, 42) })} now={NOW} mcpTools={MCP_CATALOGUE} />)
+    expect(screen.getByTestId("api-key-meta")).toHaveTextContent("last used 10:42")
+  })
+
+  it("switched off: the ⏸ tag and the card line; deployment's words when the deployment is off", () => {
+    const { rerender } = render(<ApiKeyCard apiKey={makeMcpKey({ mcp_off: "org" })} now={NOW} mcpTools={MCP_CATALOGUE} />)
+    expect(screen.getByText("⏸ switched off")).toBeInTheDocument()
+    expect(screen.queryByText("● active")).toBeNull()
+    expect(screen.getByTestId("mcp-off-notice")).toHaveTextContent(
+      "MCP access is switched off for this organisation by an admin. This key works again when they switch it back on.",
+    )
+    rerender(<ApiKeyCard apiKey={makeMcpKey({ mcp_off: "deployment" })} now={NOW} mcpTools={MCP_CATALOGUE} />)
+    expect(screen.getByTestId("mcp-off-notice")).toHaveTextContent(/for this deployment by the operator/)
+    expect(screen.getByTestId("api-key-card")).toHaveAttribute("data-dead", "false")
+  })
+
+  it("unknown (a failed switch read): no ⏸ switched-off tag, and the card says we couldn't check (304-REVIEW WR-02)", () => {
+    render(<ApiKeyCard apiKey={makeMcpKey({ mcp_off: "unknown" })} now={NOW} mcpTools={MCP_CATALOGUE} />)
+    expect(screen.queryByText("⏸ switched off")).toBeNull()
+    expect(screen.getByTestId("mcp-off-notice")).toHaveTextContent(
+      "Couldn't check whether AI tool access is on. Reload to try again.",
+    )
+    expect(screen.queryByText(/by the operator/)).toBeNull()
+    expect(screen.getByTestId("api-key-card")).toHaveAttribute("data-dead", "false")
+  })
+
+  it("How to connect toggles the snippets on an active key; never the secret", async () => {
+    const user = userEvent.setup()
+    render(<ApiKeyCard apiKey={makeMcpKey()} now={NOW} mcpTools={MCP_CATALOGUE} mcpUrl={MCP_URL} />)
+    await user.click(screen.getByRole("button", { name: "How to connect" }))
+    expect(screen.getByText("Connect a tool")).toBeInTheDocument()
+    expect(screen.getByTestId("mcp-snippet-claudeCode").textContent).toContain("${SYREL_MCP_KEY}")
+    await user.click(screen.getByRole("button", { name: "Hide how to connect" }))
+    expect(screen.queryByText("Connect a tool")).toBeNull()
+  })
+
+  it("no How to connect in the admin view, or on a key that no longer works", () => {
+    const { rerender } = render(<ApiKeyCard apiKey={makeMcpKey()} now={NOW} mcpTools={MCP_CATALOGUE} showOwner />)
+    expect(screen.queryByRole("button", { name: "How to connect" })).toBeNull()
+    rerender(<ApiKeyCard apiKey={makeMcpKey({ state: "expired", expires_at: iso(2026, 9, 22) })} now={NOW} mcpTools={MCP_CATALOGUE} />)
+    expect(screen.queryByRole("button", { name: "How to connect" })).toBeNull()
   })
 })

@@ -43,6 +43,7 @@ _WORKFLOW = _REPO_ROOT / ".github" / "workflows" / "backend-tests.yml"
 _MODULES_THAT_REACH_OUTSIDE_BACKEND = (
     "tests.unit.test_253_supplement_column_parity",
     "tests.unit.test_253_greenfield_sql_lexer",
+    "tests.unit.test_308_check_script",  # 308-REVIEW IN-06: reads scripts/check-migration-225-live.py
 )
 
 

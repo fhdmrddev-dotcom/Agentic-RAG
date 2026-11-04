@@ -44,9 +44,7 @@ from __future__ import annotations
 
 import json
 import logging
-import posixpath
 import re
-import secrets
 from datetime import datetime, timezone
 from typing import Annotated, Any
 from uuid import UUID
@@ -70,12 +68,22 @@ from app.services.inbound_inputs import (
     BODY_TOO_LARGE_DETAIL,
     INBOUND_MAX_BODY_BYTES,
     UNTRUSTED_FLAG,
-    InboundInputRefused,
     inbound_kickoff,
-    validate_inbound_inputs,
 )
-from app.services.foreign_folder_refusal import foreign_binding_refusal  # 298 ORG-05 (D-30)
-from app.services.rate_limit import enforce_ip_limit, enforce_key_limit
+# 306-01 (D-39, D-12): the read shape, its wire models and the link constants moved to
+# key_run_read.py; re-exported here as the SAME objects (public OpenAPI names unchanged).
+from app.services.key_run_read import (  # noqa: F401 — re-export (306-01, D-39)
+    _DOWNLOAD_PREFIX,
+    _DOWNLOAD_TTL,
+    InboundFile,
+    InboundRunRead,
+    InboundStep,
+    InboundWaitingOn,
+    read_key_run,
+)
+# 306-01 (D-39, D-11): the start validation order moved to key_run_start.py.
+from app.services.key_run_start import KeyStartRefusal, validate_key_start
+from app.services.rate_limit import UNAVAILABLE_DETAIL, enforce_ip_limit, enforce_key_limit
 
 logger = logging.getLogger(__name__)
 
@@ -114,9 +122,7 @@ router = APIRouter(prefix="/inbound", tags=["inbound"], route_class=_BodyCapRout
 # A1 — the scheduler's defaults: an inbound run is equally unattended.
 _DEFAULT_MAX_TOKENS = 500_000
 _DEFAULT_MAX_DURATION = 1_800
-# A2 — a file link lives 300 s and works once; a fresh one comes with every status read.
-_DOWNLOAD_TTL = 300
-_DOWNLOAD_PREFIX = "apikey:dl:"
+# A2 — the one-time link's TTL and key prefix live with the read (key_run_read.py).
 _TOKEN_RE = re.compile(r"[A-Za-z0-9_-]{16,64}")
 
 CANNOT_RUN_DETAIL = "The key's owner can no longer run this workflow."
@@ -148,45 +154,13 @@ class InboundStartResult(BaseModel):
     status: str
 
 
-class InboundStep(BaseModel):
-    name: str
-    state: str
-
-
-class InboundFile(BaseModel):
-    name: str
-    size_bytes: int | None = None
-    url: str = Field(description=(
-        "An absolute, one-time link to the file. Fetch it with no header; it works once and "
-        "for `expires_in` seconds."
-    ))
-    expires_in: int
-
-
-class InboundWaitingOn(BaseModel):
-    who: str
-
-
-class InboundRunRead(BaseModel):
-    run_id: str
-    status: str
-    step_index: int | None = None
-    step_total: int | None = None
-    waiting_on: InboundWaitingOn | None = None
-    output_text: str | None = None
-    end_reason: str | None = None
-    steps: list[InboundStep] = Field(default_factory=list)
-    files: list[InboundFile] = Field(default_factory=list)
+# InboundStep / InboundFile / InboundWaitingOn / InboundRunRead: defined in key_run_read.py,
+# re-exported above (306-01).
 
 
 # ── SQL (explicit columns, explicit owner / org predicates — the pool bypasses RLS) ──────────
 
-# The scoped existence read: a row outside the key's org (and not system-global) reads exactly
-# like a row that does not exist (D-06).
-_SCOPE_SQL = (
-    "SELECT id FROM workflow_definitions "
-    "WHERE id = $1 AND (org_id = $2 OR is_system_global = true)"
-)
+# The scoped existence read (`_SCOPE_SQL`) lives with the start validation (key_run_start.py).
 
 # THE access query (D-12). id, origin and owner travel together, so every miss is one miss.
 _RUN_ACCESS_SQL = (
@@ -199,26 +173,7 @@ _RUN_THREAD_SQL = (
     "WHERE id = $1 AND origin_kind = 'key' AND origin_ref = $2 AND user_id = $3"
 )
 
-# The evidence read's phase shape (api/workflow_run_evidence.py `_PHASES_SQL`).
-_PHASES_SQL = (
-    "SELECT slug, phase_index, status, started_at, completed_at, output "
-    "FROM workflow_phases WHERE workflow_run_id = $1 ORDER BY phase_index"
-)
-
-_END_REASON_AUDIT_SQL = (
-    "SELECT event_type, metadata, created_at FROM harness_audit "
-    "WHERE run_id = $1 AND event_type = ANY($2::text[]) ORDER BY created_at, id"
-)
-
-_DISPLAY_NAME_SQL = "SELECT display_name FROM profiles WHERE id = $1"
-
-# The run's own thread (one thread per run, D-09). `IS DISTINCT FROM`, never `<>`: a NULL kind
-# (every ordinary produced file) must be listed, and `NULL <> 'x'` is NULL.
-_FILES_SQL = (
-    "SELECT id, path, size_bytes FROM workspace_files "
-    "WHERE thread_id = $1 AND kind IS DISTINCT FROM 'template_input' "
-    "AND (expires_at IS NULL OR expires_at > now()) ORDER BY created_at, path"
-)
+# The read's phase / end-reason / display-name / files SQL live with it (key_run_read.py).
 
 # The link's key, by id. Owner-agnostic BY DESIGN, like `get_key_for_auth`: the one-time token
 # is the credential, and every live check runs on the row this returns.
@@ -276,15 +231,6 @@ async def _limit(redis, key: ResolvedKey, kind: str, *, workflow_id: str | None 
                              workflow_id=workflow_id, run_id=run_id)
 
 
-def _raw_definition(value: Any) -> dict | None:
-    if isinstance(value, str):
-        try:
-            value = json.loads(value)
-        except (ValueError, TypeError):
-            return None
-    return value if isinstance(value, dict) else None
-
-
 # ── start ───────────────────────────────────────────────────────────────────────────────────
 
 
@@ -307,86 +253,70 @@ async def start_workflow_run(
 
     from app.services import unattended_launch  # noqa: PLC0415
 
-    # 293-REVIEW CR-01: the operator's workflows kill switch stops this door too, before any
-    # other read, in the in-app kickoff's own 403 sentence.
-    if unattended_launch.workflows_disabled():
+    # 306-01 (D-11): kill switch -> listed -> org scope -> readable -> published -> entitled ->
+    # parses -> template -> foreign folder -> inputs, in that order, in key_run_start.py.
+    checked = await validate_key_start(
+        pool,
+        workflow_id=workflow_id,
+        listed_ids={str(w.get("id")) for w in key.workflows if isinstance(w, dict)},
+        org_id=UUID(key.org_id),
+        owner_id=UUID(key.user_id),
+        inputs=(body.inputs if body is not None else {}),
+        log_ref=f"key {key.id}",
+    )
+    if isinstance(checked, KeyStartRefusal):
         raise await _refused(
-            key, redis=redis, call="start", reason="workflows_disabled", workflow_id=workflow_id,
-            exc=HTTPException(status_code=status.HTTP_403_FORBIDDEN,
-                              detail=unattended_launch.WORKFLOWS_DISABLED_DETAIL),
+            key, redis=redis, call="start", reason=checked.reason,
+            workflow_id=checked.workflow_ref, detail=checked.extra,
+            exc=checked.exc if checked.exc is not None else (
+                _not_found() if checked.http_status == status.HTTP_404_NOT_FOUND
+                else HTTPException(status_code=checked.http_status, detail=checked.detail)
+            ),
         )
-
-    listed ={str(w.get("id")) for w in key.workflows if isinstance(w, dict)}
-    wid = _as_uuid(workflow_id)
-    if wid is None or str(wid) not in listed:
-        raise await _refused(key, redis=redis, call="start", reason="not_on_key", exc=_not_found(),
-                             workflow_id=workflow_id)
-
     org_id, owner_id = UUID(key.org_id), UUID(key.user_id)
-    if await pool.fetchrow(_SCOPE_SQL, wid, org_id) is None:
-        raise await _refused(key, redis=redis, call="start", reason="not_on_key", exc=_not_found(),
-                             workflow_id=str(wid), detail={"deleted": True})
+    wid, definition, values = checked.wid, checked.definition, checked.values
 
-    rows = await api_keys_db.get_key_workflows(
-        pool, workflow_ids=[wid], user_id=owner_id, org_id=org_id
-    )
-    row = next((r for r in rows if str(r.get("id")) == str(wid)), None)
-    if row is None or not row.get("readable"):
-        raise await _refused(
-            key, redis=redis, call="start", reason="cannot_run", workflow_id=str(wid),
-            exc=HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail=CANNOT_RUN_DETAIL),
-        )
-    if row.get("status") != "published":
-        raise await _refused(
-            key, redis=redis, call="start", reason="unpublished", workflow_id=str(wid),
-            exc=HTTPException(status_code=status.HTTP_409_CONFLICT, detail=UNPUBLISHED_DETAIL),
-        )
+    name = checked.name
 
-    from app.services import entitlement_service  # noqa: PLC0415
+    # 306-02 (D-16, D-17, D-35): admission, AFTER the per-key limit and the validation (a bad
+    # workflow id never takes a slot). One lease in the org / key / provider scopes; full → 429 +
+    # Retry-After, Redis down → 503 (fail closed). The drive's on_finish gives the lease back.
+    from uuid import uuid4  # noqa: PLC0415
 
+    from app.services import outside_admission  # noqa: PLC0415
+    from app.services.run_model_resolution import resolve_owner_run_model  # noqa: PLC0415
+
+    _m, provider = await resolve_owner_run_model(owner_id)
+    lease_id = str(uuid4())
     try:
-        await entitlement_service.enforce_entitlement(pool, org_id, "workflows")
-    except HTTPException as exc:
-        raise await _refused(key, redis=redis, call="start", reason="entitlement", exc=exc,
-                             workflow_id=str(wid))
-
-    raw = _raw_definition(row.get("definition"))
-    definition = (
-        unattended_launch.parse_definition_row({"definition": raw}, log_ref=f"key {key.id}")
-        if raw is not None else None
-    )
-    if definition is None:
-        raise await _refused(
-            key, redis=redis, call="start", reason="cannot_run", workflow_id=str(wid),
-            exc=HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail=CANNOT_RUN_DETAIL),
+        outcome = await outside_admission.acquire(
+            redis, org_id=key.org_id, credential_id=key.id, provider=provider, lease_id=lease_id,
+            ttl_s=outside_admission.RUN_LEASE_TTL_S, retry_s=outside_admission.RUN_RETRY_S,
         )
-
-    sentence = unattended_launch.template_refusal(definition)
-    if sentence is not None:
+    except outside_admission.OutsideStartUnavailable:
         raise await _refused(
-            key, redis=redis, call="start", reason="no_template", workflow_id=str(wid),
-            exc=HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, detail=sentence),
+            key, redis=redis, call="start", reason=outside_admission.UNAVAILABLE_REASON,
+            workflow_id=str(wid),
+            exc=HTTPException(status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+                              detail=UNAVAILABLE_DETAIL),
         )
-    # 298 (D-13/D-30): a folder outside the definition's org (read from the row) → plain-string 422.
-    sentence = await foreign_binding_refusal(definition, definition_id=wid, pool=pool, user_id=owner_id)
-    if sentence is not None:
+    if isinstance(outcome, outside_admission.Full):
         raise await _refused(
-            key, redis=redis, call="start", reason="foreign_folder", workflow_id=str(wid),
-            exc=HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, detail=sentence),
-        )
-
-    try:
-        values = validate_inbound_inputs(raw, (body.inputs if body is not None else {}))
-    except InboundInputRefused as refusal:
-        raise await _refused(
-            key, redis=redis, call="start", reason=refusal.code, workflow_id=str(wid),
-            detail={"names": refusal.names} if refusal.names else None,
+            key, redis=redis, call="start", reason=outside_admission.REASON[outcome.scope],
+            workflow_id=str(wid),
             exc=HTTPException(
-                status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, detail=refusal.detail
+                status_code=status.HTTP_429_TOO_MANY_REQUESTS,
+                detail=outside_admission.INBOUND_FULL_SENTENCE[outcome.scope].format(
+                    retry=outcome.retry_s),
+                headers={"Retry-After": str(outcome.retry_s)},
             ),
         )
 
-    name = definition.name or row.get("name") or "workflow"
+    async def _release(_status, _run_id) -> None:
+        await outside_admission.release(
+            redis, org_id=key.org_id, credential_id=key.id, provider=provider, lease_id=lease_id,
+        )
+
     try:
         run_id = await unattended_launch.launch_unattended_run(
             owner_id=owner_id,
@@ -409,12 +339,17 @@ async def start_workflow_run(
             origin_kind="key",
             origin_label=key.label,
             origin_ref=UUID(key.id),
+            on_finish=_release,
         )
     except unattended_launch.UnattendedLaunchDisabled as off:  # flipped off mid-request
+        await _release(None, None)
         raise await _refused(
             key, redis=redis, call="start", reason="workflows_disabled", workflow_id=str(wid),
             exc=HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail=str(off)),
         )
+    except BaseException:  # the drive never started, so on_finish never fires: release now
+        await _release(None, None)
+        raise
     audit_key_call(
         background_tasks, key, "api_key.start", call="start", workflow_id=str(wid),
         run_id=str(run_id), outcome="ok",
@@ -423,24 +358,6 @@ async def start_workflow_run(
 
 
 # ── status read ─────────────────────────────────────────────────────────────────────────────
-
-
-async def _optional(label: str, run_id: Any, awaitable: Any) -> Any:
-    """An affordance read: on failure, log the run id and degrade to None (never 500)."""
-    try:
-        return await awaitable
-    except Exception:  # noqa: BLE001 — a status read never fails over an additional fact
-        logger.warning("inbound %s read failed for run %s", label, run_id, exc_info=True)
-        return None
-
-
-def _step_position(phase_rows: list[dict]) -> int | None:
-    """1-based position of the step running now, else of the next step to run."""
-    for i, r in enumerate(phase_rows, start=1):
-        if r.get("status") == "active":
-            return i
-    done = sum(1 for r in phase_rows if r.get("status") == "completed")
-    return min(done + 1, len(phase_rows)) if phase_rows else None
 
 
 _FWD_HOST_RE = re.compile(r"[A-Za-z0-9.-]+(:[0-9]{1,5})?|\[[0-9A-Fa-f:.]+\](:[0-9]{1,5})?")
@@ -490,28 +407,6 @@ def _public_api_base(request: Request) -> str:
     return seen
 
 
-async def _file_links(
-    pool, redis, *, key: ResolvedKey, run: dict, base: str
-) -> list[InboundFile]:
-    rows = await pool.fetch(_FILES_SQL, run["thread_id"])
-    files: list[InboundFile] = []
-    for r in rows or []:
-        token = secrets.token_urlsafe(24)
-        await redis.set(
-            f"{_DOWNLOAD_PREFIX}{token}",
-            json.dumps({"key_id": key.id, "run_id": str(run["id"]), "file_id": str(r["id"])}),
-            ex=_DOWNLOAD_TTL,
-        )
-        path = str(r.get("path") or "")
-        files.append(InboundFile(
-            name=posixpath.basename(path.replace("\\", "/")) or "file",
-            size_bytes=r.get("size_bytes"),
-            url=f"{base}/inbound/files/{token}",
-            expires_in=_DOWNLOAD_TTL,
-        ))
-    return files
-
-
 @router.get("/runs/{run_id}", response_model=InboundRunRead, dependencies=[Depends(_client_limit)])
 async def read_inbound_run(
     run_id: str,
@@ -535,84 +430,15 @@ async def read_inbound_run(
             run_id=run_id)
     run = dict(run)
 
-    from app.db import workflows as workflows_db  # noqa: PLC0415
-    from app.models.thread import phase_output_object  # noqa: PLC0415
-    from app.services import run_evidence as ev  # noqa: PLC0415
-    from app.services.harness.run_read_wire import (  # noqa: PLC0415
-        END_REASON_AUDIT_KINDS,
-        resolve_end_reason,
+    # 306-01 (D-12): the read shape lives in key_run_read.py; the access query above stays here.
+    result = await read_key_run(
+        pool, redis, run=run, key=key, files_base=_public_api_base(request),
     )
-    from app.services.harness.run_read_words import waiting_who  # noqa: PLC0415
-
-    phase_rows = sorted(
-        (dict(r) for r in (await pool.fetch(_PHASES_SQL, run["id"]) or [])),
-        key=lambda r: r.get("phase_index") if isinstance(r.get("phase_index"), int) else 1 << 30,
-    )
-    names = {p["slug"]: p["name"] for p in ev.compose_definition(
-        run.get("definition_snapshot"), None
-    )["phases"]}
-    steps = [
-        InboundStep(name=names.get(r.get("slug")) or str(r.get("slug") or ""),
-                    state=str(r.get("status") or ""))
-        for r in phase_rows
-    ]
-
-    db_status = run.get("status")
-    wire_status = "running" if db_status == "active" else str(db_status)
-    waiting_on = None
-    if db_status in ("paused", "cap_paused"):
-        wire_status = "paused"
-    # 293-05: a human-input STEP keeps the run `active` while its question is open (only an
-    # engine pause flips it to `paused`), so the open question is read for both, exactly as the
-    # run page's `_read_waiting_on` does.
-    if db_status in ("active", "paused"):
-        prompt = await _optional(
-            "waiting", run["id"], workflows_db.get_unanswered_ask_user(pool, run["id"])
-        )
-        if prompt:
-            wire_status = "waiting_for_person"
-            display = await _optional(
-                "profile", run["id"], pool.fetchval(_DISPLAY_NAME_SQL, run["user_id"])
-            )
-            # The name only: a non-owner reader never gets the question (T-293-19).
-            waiting_on = InboundWaitingOn(
-                who=waiting_who(is_owner=False, display_name=display, viewer_email=None)
-            )
-
-    failed_reasons = []
-    for r in phase_rows:
-        if r.get("status") == "failed":
-            obj = phase_output_object(r.get("output"))
-            failed_reasons.append(obj.get("_failure_reason") if isinstance(obj, dict) else None)
-    end_reason = resolve_end_reason(db_status, failed_reasons, [])
-    if end_reason is None and db_status in ("failed", "cancelled"):
-        audit_rows = await _optional(
-            "end reason", run["id"],
-            pool.fetch(_END_REASON_AUDIT_SQL, run["id"], list(END_REASON_AUDIT_KINDS)),
-        )
-        end_reason = resolve_end_reason(
-            db_status, failed_reasons, [dict(r) for r in (audit_rows or [])]
-        )
-
-    files = await _optional("files", run["id"], _file_links(
-        pool, redis, key=key, run=run, base=_public_api_base(request),
-    ))
-
     audit_key_call(
         background_tasks, key, "api_key.read", call="read", run_id=str(run["id"]),
-        outcome=wire_status,
+        outcome=result.status,
     )
-    return InboundRunRead(
-        run_id=str(run["id"]),
-        status=wire_status,
-        step_index=_step_position(phase_rows) if db_status == "active" else None,
-        step_total=len(phase_rows) if db_status == "active" else None,
-        waiting_on=waiting_on,
-        output_text=ev.final_output_text(phase_rows),
-        end_reason=end_reason,
-        steps=steps,
-        files=files or [],
-    )
+    return result
 
 
 # ── one-time file link ──────────────────────────────────────────────────────────────────────

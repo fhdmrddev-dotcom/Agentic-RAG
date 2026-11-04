@@ -20,7 +20,7 @@ import { describe, it, expect, vi, beforeEach, afterEach } from "vitest"
 import { renderHook, act, cleanup } from "@testing-library/react"
 
 import * as notificationsApi from "@/lib/api/notifications"
-import type { WaitingNotice, WaitingNotices } from "@/lib/api/notifications"
+import type { RunWaitingNotice, WaitingNotice, WaitingNotices } from "@/lib/api/notifications"
 
 import { useWaitingNotices, REFETCH_COALESCE_MS } from "../useWaitingNotices"
 // The hook's own source, read as text for the fence below.
@@ -81,7 +81,8 @@ const mockGet = vi.mocked(notificationsApi.getWaitingNotices)
 
 // ── FIXTURES ──────────────────────────────────────────────────────────────────────────
 
-function notice(over: Partial<WaitingNotice> = {}): WaitingNotice {
+// 308-06 (D-56): WaitingNotice is now a run | webhook union; these fixtures are run notices.
+function notice(over: Partial<RunWaitingNotice> = {}): WaitingNotice {
   return {
     id: "n-1",
     run_id: "run-1",

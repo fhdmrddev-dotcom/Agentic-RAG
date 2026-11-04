@@ -23,7 +23,7 @@
  *   mounted tab "0" for a member would be caught on the function it actually calls.
  */
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest"
-import { render, screen, within, waitFor, cleanup } from "@testing-library/react"
+import { act, render, screen, within, waitFor, cleanup } from "@testing-library/react"
 import userEvent from "@testing-library/user-event"
 import type { FullAppSettings } from "@/lib/api"
 import { EffectiveFeaturesProvider } from "@/providers/EffectiveFeaturesProvider"
@@ -56,6 +56,8 @@ vi.mock("@/lib/api", async () => {
 vi.mock("@/components/settings/MemorySection", () => ({ MemorySection: () => <p>memory-stub</p> }))
 
 import { SettingsPage } from "../SettingsPage"
+import { writeWebhookFocus } from "@/components/settings/webhooks/webhookFocus"
+import { SETTINGS_TAB_STORAGE_KEY } from "@/components/settings/settingsTabs"
 
 const MEMBER = { model_management: false }
 const OPERATOR = { model_management: true }
@@ -173,11 +175,22 @@ afterEach(() => {
   vi.clearAllMocks()
 })
 
+describe("308-REVIEW WR-06 — the Waiting-on-you webhook row when Settings is ALREADY open", () => {
+  it("a focus hint moves the open Settings page to the Webhooks tab (no remount needed)", async () => {
+    renderSettings(MEMBER)
+    const prefs = await screen.findByRole("tab", { name: "Preferences" })
+    expect(prefs).toHaveAttribute("aria-selected", "true")
+    act(() => writeWebhookFocus({ endpointId: "ep-1", orgId: "org-1" }))
+    await waitFor(() => expect(screen.getByRole("tab", { name: "Webhooks" })).toHaveAttribute("aria-selected", "true"))
+    expect(localStorage.getItem(SETTINGS_TAB_STORAGE_KEY)).toBe("8")
+  })
+})
+
 describe("SettingsPage — a member reaches their own Settings (283-02 / FIX-01)", () => {
   it("shows exactly Preferences · Memory · Audit Log · API keys and lands on Preferences (D-04; 293-04 adds API keys)", async () => {
     renderSettings(MEMBER)
     const prefs = await screen.findByRole("tab", { name: "Preferences" })
-    expect(tabNames()).toEqual(["Preferences", "Memory", "Audit Log", "API keys"])
+    expect(tabNames()).toEqual(["Preferences", "Memory", "Audit Log", "API keys", "Webhooks"])
     expect(prefs).toHaveAttribute("aria-selected", "true")
   })
 
@@ -240,7 +253,7 @@ describe("SettingsPage — an operator's view is unchanged apart from the two mo
     renderSettings(OPERATOR)
     const ai = await screen.findByRole("tab", { name: "AI Model" })
     // "Search" is the plain default of the term-map relabel (reveal OFF).
-    expect(tabNames()).toEqual(["AI Model", "Search", "Integrations", "Preferences", "Memory", "Audit Log", "API keys"])
+    expect(tabNames()).toEqual(["AI Model", "Search", "Integrations", "Preferences", "Memory", "Audit Log", "API keys", "Webhooks"])
     expect(ai).toHaveAttribute("aria-selected", "true")
   })
 
@@ -330,7 +343,7 @@ describe("SettingsPage — the features-loading window decides nothing (WR-02)",
 
     rerender(settingsTree(OPERATOR, false))
     const ai = await screen.findByRole("tab", { name: "AI Model" })
-    expect(tabNames()).toEqual(["AI Model", "Search", "Integrations", "Preferences", "Memory", "Audit Log", "API keys"])
+    expect(tabNames()).toEqual(["AI Model", "Search", "Integrations", "Preferences", "Memory", "Audit Log", "API keys", "Webhooks"])
     expect(ai).toHaveAttribute("aria-selected", "true")
     // ⚠ 2, not 1, since 292.1 (D-20): the page's own hydrate PLUS the AgentRoundLimits leaf on the
     //   AI Model tab, which owns its fetch by design (SettingsPage's state split is owed). A page
@@ -348,7 +361,7 @@ describe("SettingsPage — the features-loading window decides nothing (WR-02)",
 
     rerender(settingsTree(MEMBER, false))
     const prefs = await screen.findByRole("tab", { name: "Preferences" })
-    expect(tabNames()).toEqual(["Preferences", "Memory", "Audit Log", "API keys"])
+    expect(tabNames()).toEqual(["Preferences", "Memory", "Audit Log", "API keys", "Webhooks"])
     expect(prefs).toHaveAttribute("aria-selected", "true")
     for (const [fn, spy] of Object.entries(gated)) {
       expect(spy, `${fn} must never be called for a member`).not.toHaveBeenCalled()

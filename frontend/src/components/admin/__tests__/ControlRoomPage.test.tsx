@@ -142,8 +142,9 @@ describe("ControlRoomPage (066) — the assembled Control Plane", () => {
     expect(screen.getByText(/agents working/i)).toBeInTheDocument()
     // Active runs (ActiveRunsSection — calm empty state).
     expect(await screen.findByText(/no runs in flight/i)).toBeInTheDocument()
-    // Controls: the four capability switches + the separate Platform-state panel.
-    expect(screen.getAllByRole("switch")).toHaveLength(4)
+    // Controls: the five capability switches + the separate Platform-state panel.
+    // RAISED 4 -> 5 at 304-06: the deployment MCP switch (D-03), defaulting ON when unset.
+    expect(screen.getAllByRole("switch")).toHaveLength(5)
     expect(screen.getByRole("region", { name: /platform state/i })).toBeInTheDocument()
   })
 

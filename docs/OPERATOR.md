@@ -355,6 +355,17 @@ This builds and starts three services (defined in
 
 Supabase is **not** a service here — the app talks to your external Supabase over the network.
 
+**Stopping and redeploying (Phase 305 / D-48).** The backend ends any open stream (a live chat
+answer, a workflow run being watched) **5 seconds** after it receives a stop signal
+(`--timeout-graceful-shutdown 5` in the image), then runs its shutdown hooks. The container's
+stop grace must be longer than that, or Docker's SIGKILL cuts the shutdown hooks off:
+
+- **One-box:** `docker-compose.prod.yml` sets `stop_grace_period: 20s` on the backend — nothing to do.
+- **Coolify:** check the backend service's stop grace / stop timeout and set it above 5 s
+  (20 s is a safe value). This is an owed operator check; Coolify's default is not recorded here.
+- **Local development:** pressing Ctrl+C once while a chat is still streaming may leave uvicorn
+  waiting on that stream; press Ctrl+C a second time to force it.
+
 ### Step 5 — Open the app
 
 Browse to **`http://localhost:8080`** (or your server's address / domain on port 8080). Log
@@ -523,6 +534,64 @@ recipe: [`./DEPLOYMENT-LESSONS.md`](./DEPLOYMENT-LESSONS.md) B2.)
 
 The bundled `redis` publishes **no** host port — the backend reaches it only over the compose
 network. Never publish `6379` to the public internet without `--requirepass`.
+
+### Personal data in AI tool (MCP) results — per org, off by default (GUARD-03)
+
+An org admin can turn on **Remove personal data from AI tool results** in Org admin → Settings
+(stored in `organizations.pii_redaction_enabled`, migration 222; it is not an env var and has no
+deployment-wide default other than off). When it is on, every result the `/mcp` tools send to a
+member's AI tool (Claude Code, Cursor, …) has **email addresses, phone numbers, card numbers,
+IBANs and secrets** (known API-key prefixes, JWTs, high-entropy tokens) replaced with
+`[email removed]`, `[phone removed]`, `[card number removed]`, `[IBAN removed]` or
+`[secret removed]`. **Names are not covered.** Document ids, citations, cursors and "Open in Syrel"
+links are never changed. A result that cannot be checked — the redactor fails, or takes longer
+than 2 s — is **withheld**, never sent unredacted, and the key's activity shows it as withheld.
+The redactor is deterministic and in-house (no external DLP service); its measured false-positive
+rate and latency are in `.planning/phases/305-connect-claude-code-and-cursor/305-VALIDATION.md`.
+
+### Sign-in from Claude.ai, Claude Desktop and Claude Code (Phase 307)
+
+A member can add Syrel to Claude.ai or Claude Desktop as a **custom connector** and sign in, with
+no key. Claude Code can do the same instead of pasting a key. There is **no new environment
+variable** for this (D-32): the sign-in issuer and every OAuth address derive from
+`BACKEND_PUBLIC_URL` — `https://api.<domain>` on cloud (`/.well-known/oauth-authorization-server`,
+`/.well-known/oauth-protected-resource/mcp`, `/oauth/authorize`, `/oauth/token`, …) and
+`https://<host>/api` on the one-box.
+
+- ⚠ **Changing `BACKEND_PUBLIC_URL` later invalidates every connected app.** Tokens are bound to the
+  MCP address they were issued for (the old resource), so after a change every member must connect
+  again. Pick the final public address before people connect.
+- **WAF / proxy in front of the API.** Claude.ai and Claude Desktop connect from **Anthropic's
+  servers**, not from the member's machine. Any WAF, firewall or Cloudflare rule in front of the
+  backend must allow **both** Anthropic outbound ranges, **`160.79.104.0/21` and
+  `153.61.208.0/20`**, to `/.well-known/*`, `/oauth/*` and `/mcp`. A block shows up as a connector
+  that never finishes connecting, because Claude's requests never reach the backend.
+- **Return addresses (redirect hosts).** Which hosts an AI tool may send a member back to lives in
+  **Control Room → AI tool sign-in**, seeded with **`claude.ai`** and **`claude.com`** (Claude's
+  hosted callback is `https://claude.ai/api/mcp/auth_callback`; Anthropic has said it may move to
+  `https://claude.com/api/mcp/auth_callback`). Loopback (`localhost`, `127.0.0.1`, `[::1]`, any
+  port) is always allowed — that is how Claude Code signs in. **Removing a host stops NEW sign-ins
+  only**; apps already connected keep working until the member or an org admin disconnects them.
+- **Claude Code's client details must be reachable from the backend.** Claude Code identifies itself
+  with a metadata document the backend fetches at sign-in. Run this from **inside the backend
+  container** (Coolify terminal, or `docker compose exec backend sh` on the one-box):
+
+  ```bash
+  curl -sS -o /dev/null -w "%{http_code} %{content_type}\n" https://claude.ai/oauth/claude-code-client-metadata
+  ```
+
+  It must print **`200 application/json`**. That document is Cloudflare-fronted: if Cloudflare
+  challenges or blocks the VPS's IP, **every Claude Code sign-in fails** and the consent page says
+  the app's details could not be read. Claude.ai and Claude Desktop are not affected by this one.
+- **One-box.** On the one-box the issuer has a path (`/api`), so the spec puts both discovery
+  documents at the **origin root** (`/.well-known/oauth-authorization-server/api`,
+  `/.well-known/oauth-protected-resource/api/mcp`). `frontend/nginx.conf` carries a
+  `location ^~ /.well-known/oauth-` block that passes them to the backend unchanged, and answers
+  `/.well-known/openid-configuration` with a 404 — never the SPA. The consent page
+  (`/app/connect/<id>`) is served with `frame-ancestors 'none'`, `X-Frame-Options: DENY` and
+  `Referrer-Policy: no-referrer` on Vercel, nginx and the Vite dev server alike.
+- **Post-deploy probes** and the rows owed to a real Claude account are in
+  [`./DEPLOYMENT-WORKFLOW.md`](./DEPLOYMENT-WORKFLOW.md) §5 / §6.
 
 ---
 

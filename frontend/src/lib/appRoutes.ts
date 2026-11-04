@@ -36,6 +36,10 @@
  * unchanged; the id-less forms still carry no id key at all (`/app` is exactly `{ view: "chat" }`).
  * Every rule above holds for them unchanged: strict UUIDs, lowercased, never throws, no host.
  * The legacy `?run=` alias stays the chat HOME's — a thread address keeps its thread.
+ *
+ * Phase 305-02 (2026-10-31, MCP-02 / D-17 / D-52): one more id-bearing variant, the DOCUMENT
+ * address `/app/library/<uuid>` — the "Open in Syrel" link an MCP search result carries. Same
+ * strict-UUID rule, lowercased, never throws; `/app/library` stays id-free.
  */
 
 import type { ActiveView } from "@/App"
@@ -48,6 +52,11 @@ export type AppRoute =
   | { view: "chat"; threadId: string }
   | { view: "workflows"; definitionId: string }
   | { view: "experts"; bundleId: string }
+  // Phase 305-02 (D-52): the document address an MCP "Open in Syrel" link points at.
+  | { view: "documents"; documentId: string }
+  // Phase 307-03 (D-11, A-8): the consent page an AI tool's sign-in lands on. NOT an ActiveView
+  // (P-4): App renders it itself, outside the app shell, so VIEW_PATHS stays twelve members.
+  | { view: "connect"; requestId: string }
   | { view: Exclude<ActiveView, "workflow-run" | "skill-studio"> }
 
 /** What an address resolves to: a view, nothing (`not-found`), or a pre-auth page App owns. */
@@ -87,6 +96,8 @@ export function formatAppRoute(route: AppRoute): string {
   if ("threadId" in route) return `/app/chat/${route.threadId.toLowerCase()}`
   if ("definitionId" in route) return `${VIEW_PATHS.workflows}/${route.definitionId.toLowerCase()}`
   if ("bundleId" in route) return `${VIEW_PATHS.experts}/${route.bundleId.toLowerCase()}`
+  if ("documentId" in route) return `${VIEW_PATHS.documents}/${route.documentId.toLowerCase()}`
+  if (route.view === "connect") return `/app/connect/${route.requestId.toLowerCase()}`
   return VIEW_PATHS[route.view]
 }
 
@@ -140,6 +151,10 @@ function viewOf(rest: string[]): ParsedLocation {
   if (head === "chat" && isStrictUuid(id)) return { view: "chat", threadId: id.toLowerCase() }
   if (head === "workflows" && isStrictUuid(id)) return { view: "workflows", definitionId: id.toLowerCase() }
   if (head === "experts" && isStrictUuid(id)) return { view: "experts", bundleId: id.toLowerCase() }
+  // Phase 305-02 (D-52): the document address, by the same strict-UUID rule.
+  if (head === "library" && isStrictUuid(id)) return { view: "documents", documentId: id.toLowerCase() }
+  // Phase 307-03 (D-11): the consent page, by the same strict-UUID rule.
+  if (head === "connect" && isStrictUuid(id)) return { view: "connect", requestId: id.toLowerCase() }
   return NOT_FOUND
 }
 

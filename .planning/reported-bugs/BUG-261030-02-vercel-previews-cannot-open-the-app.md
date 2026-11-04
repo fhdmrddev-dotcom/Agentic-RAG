@@ -73,4 +73,4 @@ page and the docs.
 
 - `frontend/vercel.json:5-14` (and the five sibling redirects to line 92)
 - `docs/DEPLOYMENT-LESSONS.md:76-80` (FRONTEND_URL is a list)
-- `.planning/phases/297-every-view-has-an-address/297-RESEARCH.md:172`, `297-04-PLAN.md:214`
+- `.planning/milestones/v4.8-phases/297-every-view-has-an-address/297-RESEARCH.md:172`, `297-04-PLAN.md:214`

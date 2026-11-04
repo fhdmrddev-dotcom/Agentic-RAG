@@ -1,27 +1,25 @@
-# Stack Research — v4.8 "Every Page Has a Link"
+# Stack Research: v4.9 "Use It From Your Own Tools"
 
-**Domain:** Adding URL routing, an app-owned mailer and run-waiting notifications to a shipped React + Vite SPA with a FastAPI backend (Agentic RAG / "Syrel")
-**Researched:** 2026-10-27
-**Confidence:** HIGH for versions, bundle cost and hosting behaviour (measured). MEDIUM for the router choice, which is a judgement between two good options. LOW for SMTP egress from the Hostinger VPS (not measured; we avoid depending on it).
+**Domain:** making an existing FastAPI RAG and agent platform reachable from outside: a remote MCP server, personal and OAuth credentials, outbound webhooks, admission control and PII redaction
+**Researched:** 2026-10-30
+**Confidence:** HIGH for the MCP SDK, the spec and the dependency resolution. MEDIUM for the OAuth authorization-server choice. MEDIUM for PII.
 
-> Scope: only what the three new capabilities need. RAG, SSE, the harness, connectors, the scheduler, org RLS and Auth are validated and are not re-researched here.
+> Scope: this file covers only the stack these new capabilities need. The existing stack is unchanged: FastAPI 0.115.6, Starlette 0.41.3, Pydantic 2.12.5, uvicorn 0.32.1 with `--workers 2`, redis-py 5.3.1, asyncpg, httpx 0.28.1, PyJWT 2.12.1, cryptography 46.0.7, Python 3.12 (`python:3.12-slim`). Every version below comes from the installed venv (`pip list`) or from PyPI JSON, read 2026-10-30.
 
 ---
 
-## TL;DR — what changes in the stack
+## TL;DR: what changes in `requirements.txt`
 
-| Decision | Recommendation | New dependency? |
+| Change | Line | Why |
 |---|---|---|
-| Client router | **`react-router@^8.5.0`, data mode (`createBrowserRouter` + `RouterProvider` from `react-router/dom`), used as a router only, with no loaders or actions** | **Yes, one** (frontend) |
-| React | Bump `react` and `react-dom` from `^19.2.4` to **`^19.2.9`** (React Router 8 requires `>=19.2.7`) | Version bump |
-| CI Node | Bump `frontend-tests.yml` from `node-version: "20"` to **`"22"`** (React Router 8 declares `engines.node >=22.22.0`; Node 20 is past end of life) | No |
-| SPA fallback | **No rewrite changes if every new route lives under `/app/…`.** Both hosts already serve `app.html` there (measured on production). Add a parity test instead. | No |
-| Mailer transport (cloud) | **Resend REST API called with `httpx`**, which is already a dependency. This replaces the lazy `import resend` in `backend/app/services/email_provider.py`; that package was never installed in any built image. | **No** |
-| Mailer transport (one-box / any SMTP) | **stdlib `smtplib`** run off the event loop (`asyncio.to_thread` or `run_in_threadpool`), added as `EMAIL_PROVIDER=smtp` | **No** |
-| Email templates | **Jinja2 3.1.6** (already declared) with `select_autoescape(["html"])` and an HTML part plus a plain-text part | No |
-| In-app notification store | **A Postgres table with RLS, an outbox drained with `FOR UPDATE SKIP LOCKED`, Realtime as a hint, and TanStack Query fetching the real answer.** No notification library or SaaS. | No |
+| **ADD** | `mcp>=2.3.0,<3` | The official SDK, at current stable 2.3.0 (2026-10-02). It provides the Streamable HTTP server, the protected-resource metadata, the `WWW-Authenticate` challenge and the `TokenVerifier` hook. |
+| **BUMP** | `sse-starlette==2.4.1` → `sse-starlette>=3.0.3,<3.1` | Forced by `mcp` 2.x (`sse-starlette>=3.0.0`). Measured with a pip dry-run: `mcp==2.3.0` + `fastapi==0.115.6` resolves to **sse-starlette 3.0.3 with Starlette 0.41.3 unchanged**, so **no FastAPI or Starlette upgrade is needed**. Cap below 3.1, because sse-starlette 3.6.0 requires `starlette>=0.49.1`, which FastAPI 0.115.6 forbids (`starlette<0.42`). |
+| **ADD (test only)** | `standardwebhooks==1.1.0` | Used only to verify that our hand-rolled signer interoperates with the reference verifier. It installs alone, with no transitive dependencies (measured). |
+| **DO NOT ADD** | `authlib`, `fastmcp`, `svix`, `presidio-analyzer`/`spacy`, `limits`, `aiolimiter`, `celery`/`arq`/`rq`, Kafka/NATS | See "What NOT to use". |
 
-Net: **one new frontend package, zero new Python packages.**
+Transitive dependencies that `mcp` 2.3.0 pulls in (measured): `mcp-types 2.3.0`, `httpx2 2.16.0`, `httpcore2 2.16.0`, `truststore 0.10.5`, `opentelemetry-api 1.45.2`, `idna 3.20`. `httpx2` has its own import name and sits beside our `httpx` 0.28 without conflict.
+
+⚠ **The sse-starlette bump trips a guard deliberately.** `backend/tests/integration/test_059_disconnect.py` (lines 65-93) and `tests/conftest.py:332` reset `sse_starlette.sse.AppStatus.should_exit_event` and **assert that the version is 2.4.x**. sse-starlette 3.0.0 replaced that global with context-local events (its release notes say "No breaking changes expected" and "Automatic Test Isolation: No more manual state resets needed"). The phase that adds `mcp` must re-validate the two SSE endpoints that use it (`api/runs.py:44`, `api/skill_tuner.py:56`) and retire that fixture consciously, in the same `D-NN` spirit as the retired `test_189_no_egress` fence. It must not loosen the version assertion silently.
 
 ---
 
@@ -31,227 +29,189 @@ Net: **one new frontend package, zero new Python packages.**
 
 | Technology | Version | Purpose | Why Recommended |
 |---|---|---|---|
-| `react-router` | **8.5.0** (2026-10-19; v8.0.0 shipped 2026-06-17) | URL ↔ view and entity routing, Back/Forward, link clicks, navigation blocking | Most proven SPA router. Declarative and data modes run against the same route table, so we can adopt it without restructuring the app. Data mode adds `useBlocker`, which we need now that Back/Forward can leave a dirty Builder, connection form, round-limits or model-registry editor. It is headless, so all data stays in TanStack Query. |
-| `react` / `react-dom` | **19.2.9** (patch on the installed 19.2 line, 2026-10-14) | Peer requirement of React Router 8 (`>=19.2.7`) | Patch-only bump that stays on 19.2.x. **19.3.x is deliberately not adopted here**: it is a minor-line change with its own surface (including `<ViewTransition>`), and nothing in this milestone needs it. Every pinned peer accepts 19.2.9 (checked: remotion and @remotion/* `>=16.8`, @xyflow/react `>=17`, @scalar `^18 \|\| ^19`, @lobehub/icons `^19`). |
-| Resend REST API via `httpx` | API `POST https://api.resend.com/emails`; `httpx>=0.28.0` already declared | App-owned transactional email in cloud | **Port 443, so the open question of whether the Hostinger VPS allows outbound SMTP never arises.** `Idempotency-Key` (24 h window, at most 256 chars) prevents a double send across the two uvicorn workers. Async-native. The `test_189_no_egress` sentinel already intercepts `httpx.AsyncClient.send`. Free tier: 3,000/month and 100/day; Pro is $20/month for 50k. |
-| stdlib `smtplib` | Python stdlib | `EMAIL_PROVIDER=smtp` for the self-hosted one-box and any operator-supplied relay | No dependency. It is the library `security/egress.py` already binds, `test_189_no_egress` already patches `smtplib.SMTP.__init__`, and `test_190_smtp_header_injection` gives a CRLF-refusal precedent to copy. Every major provider (Resend, Postmark, SES, Mailgun, Workspace relay, Postfix) speaks SMTP, so one-box operators can use whatever they have. |
-| Jinja2 | **3.1.6** (already in `requirements.txt`) | HTML and text email bodies | Already a direct dependency (`docxtpl` uses it). Turning autoescape on replaces the hand `html.escape` calls in `ResendProvider`, which is the WR-02 class of bug fixed once for all templates. |
-| Postgres + Supabase Realtime + TanStack Query | existing (`@tanstack/react-query ^5.90.21`, `@supabase/supabase-js ^2.99.2`) | In-app notice of a waiting run, plus the email outbox | Already the pattern (`useDocuments`/`useFolders` use `postgres_changes` as an invalidation hint). It satisfies D-v2.5-03 (Realtime is a hint; reconcile by fetch) and SEED-281's rule that the server derives the verdict. |
+| **`mcp` (official MCP Python SDK), `MCPServer` + `streamable_http_app()`** | **2.3.0** (`>=2.3.0,<3`) | The remote MCP server over Streamable HTTP, mounted inside the existing FastAPI app | It is the reference implementation, and 2.x is the supported line (SECURITY.md: "1.x newest release … maintenance: critical bug fixes and security fixes" only). It serves **both protocol eras from one app**. Spec **2026-07-28** is sessionless, so "any worker serves any request". Clients still on **2025-11-25 and earlier**, which today is most of them, get a per-request throwaway session under `stateless_http=True`. That property is what makes `WORKER_COUNT=2` work with no sticky sessions and no shared session store. The SDK also provides `AuthSettings` + `TokenVerifier`, the RFC 9728 metadata route and the 401 `WWW-Authenticate` challenge, so we never hand-write them. |
+| **MCP spec revision 2026-07-28** (current) | — | The protocol we target | Per modelcontextprotocol.io/specification/versioning, this is the current revision. The SDK negotiates per request through the `MCP-Protocol-Version` header and needs no era knob. |
+| **Our own OAuth 2.1 authorization server, thin, issuing opaque tokens that are MCP keys** | no library (stdlib `hashlib`/`secrets` + the SDK's pydantic wire models in `mcp.shared.auth`) | OAuth sign-in so Claude.ai custom connectors can connect | See "OAuth decision" below. In short: an OAuth access token becomes **a personal MCP key minted through a consent screen**. It has the same table, the same scope model (user + optional folders + tool subset), the same SHA-256-at-rest, the same live re-check on every call and the same audit trail as the Phase 293 keys. Audience binding (RFC 8707) is trivially exact because we issue the token for exactly one resource. Confidence: MEDIUM. Flagged for phase research. |
+| **Postgres outbox + per-worker drainer (existing pattern)** | — (asyncpg, already present) | Webhook delivery, retry and audit | This is the exact pattern Phase 300 shipped for email (`db/notifications.py` + `services/notification_drainer.py`): DB trigger → `*_deliveries` row → `FOR UPDATE SKIP LOCKED` claim with the `'sending'` flip inside the claiming transaction → payload frozen at first claim → `next_attempt_at` backoff → stale-claim reclaim. It needs no leader election and no new infrastructure, and the row *is* the audit record. Redis stays a hint (D-v2.5-03), never the system of record for something we promised to retry. |
+| **Standard Webhooks spec (v1 = HMAC-SHA256), hand-rolled signer** | spec, not a dependency | Signing outbound webhooks | It is the de-facto standard, and the format Svix, Supabase, Clerk and others emit. The headers are `webhook-id`, `webhook-timestamp`, `webhook-signature: v1,<base64>` over `"{id}.{ts}.{body}"`, with secrets as `whsec_` + base64 of 24-64 random bytes, and **space-delimited multiple signatures for rotation**. It is about 30 lines of stdlib `hmac` + `base64`. A library cannot be used for *sending* anyway, because every outbound byte must leave through `egress.send_pinned_http` (SSRF pinning, no redirects). |
+| **Redis Lua admission semaphore (existing pattern)** | redis-py 5.3.1 (present) | Provider admission control for outside traffic | `task_service.py:133` and `citation_checks.py:183` already run atomic Lua acquire and release-if-owned scripts. An admission limiter keyed by **provider account** (not by API key) has to be shared across both workers, which in-process limiters cannot be. It must **fail closed**, the same rule as `rate_limit.py` D-15. |
+| **In-house deterministic redactor** (`app/security/redaction.py`) | stdlib `re` + checksum validators | PII redaction on the MCP and webhook outbound paths | Typed recognizers: email; card numbers with **Luhn**; IBAN with **mod-97**; national IDs by pattern with the documented validators; IPv4/IPv6; phone numbers in E.164 form; secrets and tokens (`sk-…`, `srl_live_…`, `whsec_…`, JWTs). It is deterministic, cheap enough to run on every tool result, adds no model download, and is testable to the byte. Put it behind a `Redactor` protocol so Presidio can be plugged in later for SEED-079's full-DLP scope. |
 
 ### Supporting Libraries
 
 | Library | Version | Purpose | When to Use |
 |---|---|---|---|
-| (none new) | | Route parameter validation | Validate with a **project-owned pure resolver** (`parseAppLocation(pathname, search) → AppRoute` discriminated union), extending the strict-UUID discipline already in `frontend/src/lib/runDeepLink.ts` and the `resolveRoute` shape in `frontend/src/docs/router.ts`. Do **not** add zod or valibot just for route params. |
-| `aiosmtplib` | 5.1.3 (2026-09-08, zero deps) | asyncio-native SMTP | **Only if** SMTP must ever be sent from inside a hot async path. Not recommended now: (1) the outbox worker can use `to_thread` cheaply at notification volume; (2) aiosmtplib bypasses `smtplib.SMTP.__init__`, so `test_189`'s egress sentinel would not see it, and whether its `socket.socket.connect` floor catches an asyncio connect depends on the event loop. That last point is **unverified**. |
-| `resend` (PyPI) | 2.50.0 (2026-10-16) | Official Resend SDK | **Not recommended.** The sync path pulls in `requests`; async needs the `[async]` extra. The SDK covers one POST that `httpx` already makes. Note the current state: `email_provider.py` lazy-imports it, it is **absent from `requirements.txt`**, and it is **not installed in the local venv** (`ModuleNotFoundError`, measured). So `EMAIL_PROVIDER=resend` cannot work in any built image today; `org.py` catches the error and only logs it. |
+| `mcp.server.transport_security.TransportSecuritySettings` | (in `mcp`) | Host/Origin allowlist | **Mandatory at go-live.** Without it, the SDK's default DNS-rebinding guard accepts only `localhost` Hosts and answers **421 Misdirected Request** to every request behind a real hostname. The error appears only in the server log; the client sees a generic transport error. Derive `allowed_hosts` from `BACKEND_PUBLIC_URL`, plus a `host:*` form. |
+| `mcp.server.auth.settings.AuthSettings` + a `TokenVerifier` | (in `mcp`) | Resource-server half of OAuth | **OAuth phase only.** Set `resource_server_url` = the exact public MCP URL (Claude matches the PRM `resource` against the URL the user typed, path included). Set `validate_token_resource=True`, because our AS binds tokens to that resource. In 3.0 that becomes the default. |
+| `mcp.shared.auth` models (`OAuthMetadata`, `OAuthClientMetadata`, `OAuthToken`, …) | (in `mcp`) | Wire shapes for our AS endpoints | Reuse them so the metadata JSON matches what MCP clients parse. Do not hand-type RFC 8414 field names. |
+| `PyJWT` | 2.12.1 (present; also `mcp`'s `pyjwt[crypto]`) | Only if the AS issues JWTs instead of opaque tokens | Not needed under the recommended design, which uses opaque hashed tokens looked up per call. That lookup happens on every call anyway, because revocation, membership and ban checks are live (Phase 293 D-05). |
+| `app.security.secret_cipher` (Fernet/MultiFernet) | cryptography 46.0.7 (present) | Store webhook signing secrets | Webhook secrets **must be reversible** (we sign with them), unlike API keys (SHA-256 one-way). Reuse the Phase 150 cipher. |
+| `croniter` | present | — | Not needed. Retry backoff is a `next_attempt_at` column, not a cron. |
+| `standardwebhooks` | 1.1.0 | **Test only** | A unit test signs with our signer and verifies with `standardwebhooks.Webhook(secret).verify(...)`. That proves receivers using the official verifiers in any language will accept us. |
 
 ### Development Tools
 
 | Tool | Purpose | Notes |
 |---|---|---|
-| Mailpit (bundled with local `supabase start`) | Catch local SMTP mail | Point `EMAIL_PROVIDER=smtp` at the local Mailpit SMTP port to drive the SMTP path without a real provider. **Verify the published port** with `docker ps` on the `supabase_inbucket_*` container; no `config.toml` was found in the repo. It falls inside the reserved 54320-54335 block. |
-| `frontend/src/lib/activeViewReachability.ts` | Executable inventory of views | Extend it with a **fourth leg** (each `ActiveView` member maps to a route path) so a view without a URL fails CI the way a view without a render branch does today. |
-| `scripts/check-landing-first-paint.cjs` | Proves landing first paint carries no app code | Re-run after adding the router. It must be imported only from the `app.html` entry chain, never from `index.html` (landing) or `docs.html`. |
+| MCP Inspector (`npx @modelcontextprotocol/inspector`) | Drive the server by hand: tool listing, OAuth discovery dance | Run it against `http://localhost:8000/mcp` locally. It exercises the PRM → AS metadata → DCR → PKCE flow. |
+| SDK `examples/servers/simple-auth` + `examples/clients/simple-auth-client` | Reference for the RS/AS split | Read before building the AS endpoints. |
+| Claude Code `claude mcp add --transport http <name> <url> --header "Authorization: Bearer srl_…"` | Personal-key UAT without OAuth | Claude Code also does OAuth with **loopback callbacks on an ephemeral port** (`http://localhost:<port>/callback`, `127.0.0.1` too). The AS must match those with the port ignored. |
+| Cursor `mcp.json` `"headers": {"Authorization": "Bearer ${env:SYREL_MCP_KEY}"}` | Personal-key UAT | Cursor also supports OAuth with **DCR (public client)** or a static client id. It does not mention CIMD. Callbacks: `https://www.cursor.com/agents/mcp/oauth/callback` and `http://localhost:8787/callback`. |
+
+---
+
+## Integration points in the existing code
+
+| New capability | Hooks into | Notes |
+|---|---|---|
+| MCP mount | `backend/app/main.py` `lifespan` (a G-5-firing hot file) | `app.mount("/mcp", mcp.streamable_http_app(stateless_http=True, transport_security=…))`, and **the host lifespan must enter `async with mcp.session_manager.run():`**. A mounted sub-app's lifespan never runs. Forgetting it gives `RuntimeError: Task group is not initialized` on every request. `session_manager` exists only after `streamable_http_app()` is called, so build at module import and enter the context in the lifespan. Keep it a few lines in `main.py` and put everything else in `app/mcp_server/`, the same discipline as `include_router`. |
+| Trailing slash | `/mcp` vs `/mcp/` | The SDK deploy guide warns that a redirect behind a TLS-terminating proxy points at `http://`, and clients then refuse it. Pick one canonical URL, use it as `resource_server_url`, and avoid the redirect. |
+| Proxy headers | `backend/Dockerfile` CMD: `uvicorn … --workers ${WORKER_COUNT:-2}` | It has no `--forwarded-allow-ips`. Uvicorn trusts `X-Forwarded-*` only from 127.0.0.1 by default, so behind Coolify/Traefik `request.url` reads `http://`. **Do not derive the MCP resource URL or the issuer from the request.** Take them from the existing `BACKEND_PUBLIC_URL` setting (`inbound.py::_public_api_base` already treats it as "where a third party reaches this API"). |
+| Personal-key auth (phase 1) | `app/security/api_key_auth.py::resolve_api_key` (Phase 293) | Reuse the resolver's order: digest → constant-time compare → revoked → expired → still a member → not banned, with one byte-identical 401. MCP keys need a **user-scoped** variant: the Phase 293 keys are org-scoped and start *listed* workflows. Use a new prefix (e.g. `srl_mcp_`), plus folder-set and tool-subset columns (migration 220+). Phase 1 can authenticate in the `TokenVerifier` without advertising OAuth (verify the bearer, return `AccessToken`; tools read it with `mcp.server.auth.middleware.auth_context.get_access_token()`), or in a thin ASGI wrapper. Pick one and keep the OAuth phase a superset of it. |
+| Per-key limits | `app/services/rate_limit.py` (Redis fixed window, fail closed) | Add `Kind`s for MCP tools. Do **not** model it on the in-process limiter in `api/setup.py` (the module docstring already says why). |
+| Admission control | `task_service.py` Lua acquire/release, `provider_gateway/dispatcher.py` | Key the semaphore by provider (and later by BYOK key id), with a lease TTL so a crashed worker cannot leak slots. Apply it to outside-origin calls (MCP and webhook-triggered work), so a busy MCP caller is refused with 429 + `Retry-After` before it exhausts the shared key. |
+| Tool implementations | existing services (`search_documents_tool.py`, `agent_loop.py`, `workflow_kickoff.py`/`inbound.py`, `api/documents.py`) | The Extension Contract holds: tools **call** existing capabilities and add no phase type, emitter or engine tool. Write MCP tool handlers as `async def`. SDK v2 runs sync handlers on a worker thread, and supabase-py calls must still be wrapped in `run_in_threadpool` (D-v2.5-01). |
+| Webhook egress | `app/security/egress.py` `_TLS_SCHEMES` + `send_pinned_http` | Add a closed capability (e.g. `webhook_deliver`, https only) with a caller-supplied host, like `send_email`'s `_CALLER`. Then every delivery is DNS-resolved, public-IP-checked and pinned, and **redirects are refused**. That matches the Standard Webhooks rule that "3xx is failure (update the URL instead of following redirects)". Validate the endpoint URL at subscription time too. The Extension Contract's refusal of generic webhook *nodes* is untouched, because these are event subscriptions, not a workflow node. |
+| Webhook events | DB triggers, as with migration 218 for notifications | Use a trigger on `workflow_runs` terminal-status transitions and on documents reaching ingested/failed. It writes one `webhook_deliveries` row per matching subscription. A trigger catches every writer, including service-role paths. |
+| Webhook drainer | `main.py` lifespan, beside `NotificationDrainer` | Run it in every worker; the DB arbitrates which row is whose. Retry schedule per the Standard Webhooks recommendation: 5s, 5m, 30m, 2h, 5h, 10h, 14h, 20h, 24h, with jitter. Use a 15-30 s request timeout. A `410` disables the endpoint; `429`/`502`/`504` back off. Keep `webhook-id` stable across retries; it is the receiver's idempotency key. |
+| Audit | `app/services/audit_service.py` (`assert_action_types_synced` at boot) | New action types (`mcp.call`, `mcp.key.*`, `oauth.grant`/`revoke`, `webhook.endpoint.*`, `webhook.delivery.failed`) need the lockstep literal and its migration CHECK in the **same commit**, or boot refuses. |
+| Redaction | the MCP tool result path and the webhook payload builder | One `redact(text, policy)` choke point. Keep webhook payloads **thin** (ids, type, status, timestamps, an authenticated link back), as the spec recommends ("future proof"). PII then mostly never enters a webhook body, and redaction concentrates on MCP tool outputs: search snippets, document text, agent answers. |
+| Existing MCP **client** | `backend/app/services/mcp_client.py` | It is a **hand-rolled httpx JSON-RPC client** (no SDK import), speaking `MCP_PROTOCOL_VERSION = "2025-06-18"`, with every socket pinned through `validate_mcp_destination`. **Do not port it to the SDK client.** The SDK client uses `httpx2` and would bypass `send_pinned_http`, losing the SSRF guarantees. The server and client share nothing but the protocol. |
+
+---
+
+## OAuth decision (MEDIUM confidence: flag for phase research)
+
+**What the current spec (2026-07-28) requires** (HIGH, from modelcontextprotocol.io):
+- An MCP server **MUST** implement **RFC 9728 Protected Resource Metadata** and answer 401 with `WWW-Authenticate: Bearer resource_metadata="…"`. It **SHOULD** include `scope=`. For runtime insufficient scope: 403 + `error="insufficient_scope"`.
+- An MCP server **MUST** validate that the token was issued **for it** (RFC 8707 audience). It **MUST NOT** accept or pass through other tokens. Tokens are never accepted in query strings.
+- An AS **MUST** be OAuth 2.1 (PKCE) and expose **RFC 8414** or OIDC discovery. It **SHOULD** support **Client ID Metadata Documents (CIMD)**. It **MAY** support **DCR (RFC 7591)**, which is "deprecated and retained for backwards compatibility". It **SHOULD** emit `iss` in authorization responses (RFC 9207) and advertise `authorization_response_iss_parameter_supported`.
+- `offline_access` should **not** appear in the RS's `scopes_supported`.
+
+**What Claude actually needs** (HIGH, from claude.com/docs/connectors/building/authentication):
+- It supports **DCR and CIMD out of the box**. It uses CIMD **only if** AS metadata has `client_id_metadata_document_supported: true` **and** `"none"` in `token_endpoint_auth_methods_supported`. With DCR, it needs a `registration_endpoint`.
+- `code_challenge_methods_supported` must include `S256`.
+- Hosted callback: `https://claude.ai/api/mcp/auth_callback`. An older help article warned it may move to `claude.com`, so allowlist both. Claude Code uses loopback callbacks with any port.
+- PRM `resource` must equal the URL the user typed, **path included**. Claude uses only the **first** `authorization_servers` entry.
+- `/token` takes form-encoded input; `/register` takes JSON. Time limits: 10 s for discovery, registration and token; 30 s for refresh. **Rotate refresh tokens for public clients**; return `invalid_grant` when one is dead. Claude refreshes on 401 and up to 5 min before expiry.
+- **Static bearer headers are a limited beta**, so a Claude.ai custom connector effectively means OAuth. **`client_credentials` (machine-to-machine) is not supported.**
+- Egress comes from `160.79.104.0/21`. A WAF in front of the AS can break discovery.
+
+**Recommendation: build a thin AS in our backend that issues opaque tokens which are MCP keys.** Endpoints: `/.well-known/oauth-authorization-server`, `/oauth/authorize` (redirects to a React consent page that uses the existing Supabase session), `/oauth/token` (code + PKCE S256, refresh with rotation), `/oauth/register` (DCR, public clients, redirect-URI allowlist policy) and `/oauth/revoke`. Advertise CIMD in the same phase or the next. Why this design:
+1. **Scope is exactly MCP.** The token opens the four tools for one user, narrowed by folders and tools, and nothing else.
+2. **One credential model.** OAuth grants and personal keys live in one table, one revocation UI, one audit trail and one rate-limit key.
+3. **Audience binding is exact by construction.**
+4. **Local, cloud and onebox all work identically.** There is no dependency on a beta feature of the hosted IdP.
+
+**Alternatives considered:**
+
+| Option | Verdict | Reason |
+|---|---|---|
+| **Supabase Auth OAuth 2.1 Server** (beta, all plans; local CLI `[auth.oauth_server]` with `enabled`, `authorization_url_path`, `allow_dynamic_registration`; DCR supported; endpoints `/auth/v1/oauth/authorize`, `/auth/v1/oauth/token`; discovery at `/.well-known/oauth-authorization-server/auth/v1`) | **Strong runner-up. Re-evaluate in the OAuth phase.** | It reuses the existing user directory and needs only a consent page (`supabase.auth.oauth.getAuthorizationDetails / approveAuthorization / denyAuthorization`). **But:** (a) the tokens are **ordinary Supabase session JWTs** (`role: authenticated`, `aud: authenticated`, plus a `client_id` claim) and "existing RLS policies automatically apply". An MCP OAuth token would therefore also be a **full Data-API credential** for that user, unless every RLS policy gains a `client_id IS NULL` gate. That inverts least privilege and is exactly the blind spot BUG-260911-01 recorded (nothing in the suite requests as a non-first-party principal). (b) RFC 8707 audience binding needs a **Custom Access Token Hook that fires for all token issuance**, first-party login included, so a hook bug can break sign-in. (c) The docs do not mention CIMD. (d) HS256 is the project default, and `openid` needs asymmetric keys. (e) Onebox/self-hosted GoTrue support is unverified. |
+| `mcp` SDK's embedded `auth_server_provider=` | Usable as a fast path, but not chosen | The SDK's own docs say it "predates the AS/RS separation … New servers should not reach for it." It does give ready `/authorize`, `/token`, `/register` and `/revoke` handlers. If the phase prefers less hand-written code, implementing `OAuthAuthorizationServerProvider` against our Postgres tables is acceptable. Keep the RS side on `TokenVerifier` either way. |
+| **Authlib** 1.9.1 (`joserfc` 1.7.7) | Not chosen | Its AS framework integrations are Flask and Django. On FastAPI we would write the framework glue *and* adapt Authlib's grant model, more code than the five endpoints themselves. We need neither JOSE (opaque tokens) nor its client side. |
+| Hosted IdP (WorkOS AuthKit / Auth0 / Stytch) | Rejected | A second user directory and a new vendor. Account linking with Supabase users is required anyway. |
+| Standalone `fastmcp` 4.1.4 (Prefect) | Rejected | An opinionated framework layered on top of the official SDK, with its own auth-provider and OAuth-proxy stack. It is more surface than we need, and it ties our auth to a third party's release cadence. The official SDK already does what we need. |
+
+---
+
+## Multi-worker and MCP session facts (HIGH, from SDK docs/run/deploy.md and legacy-clients.md)
+
+- **2026-07-28 clients:** there is no `Mcp-Session-Id`. Any worker answers any request, with nothing to configure.
+- **2025-11-25-and-earlier clients (most clients today):** the default is a session held in **one worker's memory**. Under `--workers 2`, a follow-up that hits the other worker gets **404 "Session not found"**. **Set `stateless_http=True`.** It affects only this legacy leg.
+- **The cost of `stateless_http=True` on the legacy leg:** no server-to-client back-channel. `ctx.elicit()` and sampling raise `NoBackChannelError`, and standalone notifications are dropped. Our four tools need none of these. **Design the tools as request/response.** For long work (a workflow run, a long agent turn), return a run id and add a read-result tool. Do not hold a stream open for minutes.
+- **Multi-round-trip `request_state`** is sealed with a per-process `os.urandom(32)` key by default. If any tool ever uses it, pass `RequestStateSecurity(keys=[…])` from a secret env var **and** use the same server name on both workers. Otherwise retries fail with `-32602 "Invalid or expired requestState"` some of the time.
+- The SDK ships **no `EventStore`** and **no cross-process subscription bus**. Do not plan resumability or `subscriptions/listen` fan-out without a Redis-backed `SubscriptionBus` of our own. Not needed for v4.9.
 
 ---
 
 ## Installation
 
 ```bash
-# frontend/ — one new package plus a patch bump of React (legacy-peer-deps=true is already set in .npmrc)
-npm install react-router@^8.5.0 react@^19.2.9 react-dom@^19.2.9
+# backend/requirements.txt (in the venv)
+mcp>=2.3.0,<3
+sse-starlette>=3.0.3,<3.1          # was ==2.4.1; forced by mcp 2.x; <3.1 keeps Starlette 0.41.x
+# test-only (requirements-dev or the test section)
+standardwebhooks==1.1.0
 
-# backend/ — nothing to install. httpx, jinja2 and smtplib (stdlib) are already present.
+# verify the resolution before committing (measured 2026-10-30):
+backend/venv/Scripts/python.exe -m pip install --dry-run "mcp==2.3.0" "fastapi==0.115.6"
+#   -> Would install httpcore2-2.16.0 httpx2-2.16.0 idna-3.20 mcp-2.3.0 mcp-types-2.3.0
+#      opentelemetry-api-1.45.2 sse-starlette-3.0.3 truststore-0.10.5
 ```
 
-```yaml
-# .github/workflows/frontend-tests.yml — both jobs (lines 36 and 68)
-node-version: "22"   # was "20"; react-router@8 declares engines.node >=22.22.0
-```
-
-`frontend/Dockerfile` already builds on `node:22-alpine` (a floating tag, so it resolves to the current 22.x). **Vercel's project Node version was not checked**: confirm it is 22.x or 24.x in project settings. npm only warns on `engines` (no `engine-strict`), so a mismatch would not fail the build. It would only mean running outside React Router's support window.
-
----
-
-## (a) Router choice: the evidence
-
-### Measured bundle cost
-
-I built a minimal app with esbuild (minified, React external, `NODE_ENV=production`, router + params + search + navigate + Link) against React 19.3.1 in the scratchpad:
-
-| Router | min | **min+gzip** | Notes |
-|---|---|---|---|
-| wouter 3.13.0 | 6.4 KB | **3.1 KB** | |
-| react-router 8.5.0, declarative (`BrowserRouter`) | 42.3 KB | **15.1 KB** | no `useBlocker` |
-| @tanstack/react-router 1.170.46 | 78.5 KB | **28.3 KB** | |
-| react-router 8.5.0, data mode (`createBrowserRouter`) | 100.6 KB | **33.4 KB** | `useBlocker`, `ScrollRestoration`, `useNavigation` |
-
-(Bundlephobia's whole-package figures, 63.7 KB gz for react-router and 31 KB for TanStack, overstate the tree-shaken cost; use the table above.) All of these load **only in the `app.html` chunk**. The landing page and docs are unaffected.
-
-### Why React Router 8 in data mode
-
-1. **Incremental adoption fits this code.** Navigation today is one `useState<ActiveView>` in `App.tsx`, with about 13 call sites going through `handleNavigate` and the setters passed down to `ChatLayout`. The lowest-risk migration keeps those signatures. `activeView` becomes **derived** from `useLocation()` via the pure resolver, and `setActiveView(v)` becomes `navigate(pathFor(v))`. React Router does this with one layout route whose `Component` is the existing shell. No component below `ChatLayout` has to change.
-2. **`useBlocker` is the reason to choose data mode over declarative.** Back/Forward is a new exit from views with unsaved state (`BuilderSaveRegion`, `ConnectionFormPanel`, `AgentRoundLimits`, `ModelRegistryTab`, `InlineEdit` all carry dirty state). In React Router, `useBlocker` exists **only** in data mode (confirmed in the official "Picking a mode" docs). The extra 18 KB gz buys that guard without changing library later.
-3. **Use it as a router, not a data layer.** No `loader`/`action`/`Form`. Data stays in TanStack Query and the SSE providers. Mixing two data layers is the expensive mistake.
-4. **Typed params come from our resolver, not the library.** The values arrive in shared links and are attacker-controlled. The project already treats them that way (`runDeepLink.ts` accepts a strict UUID or `null`). One resolver, unit-tested as a pure function, is stronger and more auditable here than library-level typing.
-
-### Why not TanStack Router (a close second)
-
-Its strengths are real: first-class typed params, `validateSearch`, it pairs with the TanStack Query we already use, and it is smaller than RR data mode (28 vs 33 KB gz). It loses on **adoption cost in G-5 hot files**. Its type safety is earned by making the route tree the architecture: a registered router type, `from`-scoped hooks, and in practice the file-based codegen plugin that emits `routeTree.gen.ts`. That restructures `App.tsx` (28 phases) and `ChatLayout.tsx` (33 phases) far more than a derived `activeView` does, and adds a generated file to a repo with hot-file and size gates. **Choose it instead if** the team decides to make routes the primary architecture (per-route code splitting, route-level data preloading) rather than an address bar for the existing shell.
-
-### Why not wouter
-
-At 3 KB it is the lightest, and its hooks work **without** a provider, which would spare many existing tests. But it has **no navigation blocker**, no navigation-type signal for scroll restoration, and a much smaller maintainer base. The blocker gap alone disqualifies it for a product with dirty editors.
-
-### Why not keep hand-rolling (the `docs/router.ts` pattern)
-
-That pattern is fine for read-only docs. For the app it would mean reimplementing correct `<a>` click semantics (modifier keys, middle-click, `target`), history listening via `useSyncExternalStore`, blocking on POP navigations, and scroll restoration. Each is a known bug farm.
-
-### React Router 8 facts that bind the plan (from the official CHANGELOG)
-
-- **ESM-only**; minimums **React 19.2.7+**, **Node 22.22.0+**. **Vite 7+** applies only to `@react-router/dev` (framework mode, which we do not use). We are on Vite 8 regardless.
-- **`react-router-dom` is removed.** Import from `react-router`, and import `RouterProvider` from **`react-router/dom`**. Training data and most web examples still say `react-router-dom`, and that import fails under v8.
-- Middleware is always on in data mode; harmless with no loaders.
-- 8.5 deprecates the RR view-transition APIs in favour of React 19.3's `<ViewTransition>`. Do not adopt either.
-- Yearly major cadence: **v9 is expected around May 2027** (when Node 22 reaches end of life). Budget an upgrade then.
-
-### Integration rules (the ones that prevent a rewrite)
-
-- **Keep router hooks at the shell boundary** (`App`/`ChatLayout`) and keep passing navigator callbacks down as props, as today. `useNavigate()` outside a router **throws**. Pushing hooks into leaf components would force a router wrapper into a large share of existing vitest suites and collide with the per-file count gate.
-- **`/setup` and `/invite` keep their current pre-router short-circuits** (`App.tsx:320`/`:337`) so the finalized-lockout and invite flows stay byte-for-byte (SEED-185 note 3).
-- **Legacy URLs keep working:** `/app?run=<uuid>` (Phase 289, already shared in production) becomes `<Navigate replace>` to the canonical run path. `/app?connections=1&…` is built server-side by the OAuth callbacks (eight redirect sites via `primary_frontend_origin()`). Keep reading it, or change those sites in the same phase. `/admin/spend` is the same.
-- **`app.<domain>/`** is rewritten to `app.html` by `frontend/middleware.ts` *without* changing the URL (SEED-242 wanted no path in the bar). So the route table needs `/` **and** `/app` both mapped to home. **Do not** add a redirect from `/` to `/app`.
-
----
-
-## (b) SPA fallback on Vercel and nginx
-
-**Measured against production on 2026-10-27:**
-
-| Request | Result |
-|---|---|
-| `https://app.superrag.cloud/app/runs/<uuid>` | **200**, `<title>Syrel</title>` (app.html) |
-| `https://app.superrag.cloud/app/a.b` (a dot in the path) | **200**, app.html |
-| `https://superrag.cloud/app/runs/x` | **308** → `https://app.superrag.cloud/app/runs/x` |
-| `https://superrag.cloud/app?run=abc` | **308** → `https://app.superrag.cloud/app?run=abc` (query preserved) |
-| `https://agentic-rag-rho.vercel.app/app` | **308** → `https://app.agentic-rag-rho.vercel.app/app` → **DNS failure (curl 000)** |
-
-**Conclusions:**
-
-1. **Put every new route under `/app/…` and Vercel needs no change.** The `app.*` host-scoped catch-all `/(.*) → /app.html` already covers it, and the apex redirects preserve path and query.
-2. **nginx (one-box) needs no change either.** `location /app/ { try_files $uri /app.html; }` already serves every `/app/*` deep link. `app.html` references assets by absolute `/assets/…` (Vite `base` is the default `/`), so nested paths load correctly.
-3. ⚠ **Do not create top-level app routes outside `/app/`** (for example `/threads/:id`). On the one-box, `location /` falls back to **`index.html`, the landing page**, so such a link would silently open marketing. Adding one would need matching edits in `vercel.json` redirects and rewrites, `frontend/nginx.conf` and `frontend/devRouting.ts` (the three files `devRouting.ts` says must agree). Keeping one prefix avoids that.
-4. ⚠ **No dots in route path segments.** Production serves dotted paths, but `devRouting.ts` passes any dotted path through as a file, so it **404s in dev only**. UUIDs and slugs are fine; put filenames or versions in the search string.
-5. ⚠ **Pre-existing, out of scope but relevant:** the apex redirect's host regex matches `*.vercel.app`, so **preview and `vercel.app` deployments cannot open the app at all** (they redirect to a non-existent `app.<preview>.vercel.app`). Deep links make that host more visible; record it, do not silently fix it inside the router phase.
-6. **Add a parity test, not a rule change:** enumerate the route table's top-level prefixes and assert that each one is covered by `devRouting.ts`, `vercel.json` and `nginx.conf`. This is the same three-file agreement as the existing `devRouting.test.ts`, driven from the router's own table.
-
----
-
-## (c) App-owned transactional email
-
-**A mailer seam already exists, and it is broken in every built image.** `backend/app/services/email_provider.py` (Phase 167) has an `EmailProvider` protocol switched by `EMAIL_PROVIDER = none | resend`, with `RESEND_API_KEY` and `INVITE_FROM_EMAIL` already in `onebox.env.example`, `docker-compose.prod.yml`, `docs/OPERATOR.md` and `check-deploy-drift.sh`. The `resend` provider lazy-imports a package that is in no requirements file and no image, so it raises, and `org.py` swallows the error into a log line. (SEED-281's "no app-owned mailer exists" was therefore half-true: there is a seam, but no working sender.)
-
-**Recommendation: extend that seam rather than build a second one.**
-
-| Provider value | Transport | For | Secrets (env only) | Infra (env) |
-|---|---|---|---|---|
-| `none` (default, unchanged) | log the link | offline and dev | none | none |
-| `resend` | **`httpx.AsyncClient` → `POST https://api.resend.com/emails`**, `Authorization: Bearer`, `Idempotency-Key: <outbox row id>` | Vercel/Coolify cloud | `RESEND_API_KEY` (existing) | none |
-| `smtp` (new) | stdlib `smtplib` (`SMTP_SSL` on 465 or `starttls` on 587) via `to_thread` | one-box, any relay | `SMTP_PASSWORD` | `SMTP_HOST`, `SMTP_PORT`, `SMTP_USERNAME`, `SMTP_SECURITY` (`ssl\|starttls`) |
-
-- **Generalize the protocol** from `send_invite(...)` to `send(message: OutboundEmail)`. Re-express invites on it so both kinds of mail share one transport and one escaping boundary.
-- **Non-secret knobs go to `app_settings` and the Settings UI** (CLAUDE.md rule, plus the operator's "everything in the UI except secrets"): notifications on or off, sender display name and from-address (env `INVITE_FROM_EMAIL` stays as a seed or fallback), and the N-2 "about to expire" lead time. Per-user opt-out goes in `user_settings`. SMTP host and port are infra; they also belong in the one-box first-run setup overlay (`INFRA_KEYS`).
-- **Links in mail** are built with the existing `primary_frontend_origin()` + `/app/runs/<id>` (never the raw comma-separated `FRONTEND_URL`, per BUG-260904-04). On cloud, if the primary origin is the apex, the link takes one 308 hop to `app.` and still lands correctly (measured above).
-- **The mailer is not a connector.** Put it beside `email_provider.py`, never under `services/connectors/`. The connector source fences ban `smtplib.`, `httpx.` and `.sendmail(` there, and egress pinning exists for *user-configured* hosts, whereas these hosts are operator env.
-- **Deployment-artifact parity (same commit):** the new `SMTP_*` vars plus any changed meaning of `EMAIL_PROVIDER` must update `deploy/onebox.env.example`, `docs/OPERATOR.md` (which today tells operators to `pip install resend` into the container, a step that dies with the container), `docker-compose.prod.yml` and `scripts/check-deploy-drift.sh`.
-
-### Provider comparison (cost and ecosystem, for the cloud sender)
-
-| Option | Python story | Price (verified 2026-10-27) | Verdict |
-|---|---|---|---|
-| **Resend (REST via httpx)** | No SDK needed; official SDK 2.50.0 exists | Free 3k/month, 100/day; Pro $20/month for 50k | **Recommended.** It is already the configured provider name, has idempotency keys, uses port 443, and the free tier covers approval notices. |
-| Postmark | **No official Python SDK**; community `postmarker` was last released 2022-01 | Free 100/month; $15/month for 10k, then $1.80 per 1k | Strong deliverability, but costs more and has a stale client. Reachable later through `smtp` with no code change. |
-| AWS SES | `boto3` 1.43.x (heavy, sync), IAM setup, sandbox exit request | about $0.10 per 1k (training data, not re-verified) | Cheapest at volume, highest setup cost. Overkill for N-1..N-4. Reachable through `smtp` if ever wanted. |
-| Plain SMTP only | stdlib | provider-dependent | Shipped as the one-box path. As the *cloud* path it depends on outbound SMTP ports from the Hostinger VPS: Hostinger says port 25 is open and caps at 5 mails/minute, and **465/587 are unverified**. Resend's alternative ports 2465/2587 are a fallback if needed. |
-
----
-
-## (d) In-app notification store: build on what exists
-
-**Use Postgres + RLS + the existing Realtime-as-hint + TanStack Query. Add no library.**
-
-- **Read side:** a server-computed answer to "is anything waiting on me", registered as the second `ATTENTION_PRODUCERS` tenant in `frontend/src/components/layout/attentionConditions.ts` (the seam SEED-281 names; re-baseline `NavPanel.badge.test.tsx`'s literal `length === 1` in the same commit). The verdict comes from the server (D-235-05), derived from the existing pending-ask rows, **not** from a client scan.
-- **Write and delivery side:** a migration (from 217) adds an outbox or notification table with RLS on `user_id` and `org_id`, plus a unique key on `(kind, subject_id, recipient)` so one waiting run produces exactly one email. Drain it in **every** uvicorn worker with `FOR UPDATE SKIP LOCKED` and a lease column. This is the `scheduler_service.py` and `watch_service.py` pattern: no leader election, which matters because a dead leader means silently no email.
-- **Realtime:** if the table joins the `supabase_realtime` publication, treat each event only as `queryClient.invalidateQueries(...)`, then fetch (D-v2.5-03). The anon-role blind spot (BUG-260911-01) applies: write an RLS test that queries **as `anon` and as a second user**, not only through the service role.
+Deploy-artifact parity (same-commit rule, `check-deploy-drift.sh`): new env vars are secrets only, for example `MCP_REQUEST_STATE_KEYS` if `request_state` is ever used, and an AS token-signing secret only if tokens become JWTs. Feature knobs go in `app_settings`: MCP on/off per org, limits, admission caps, redaction policy, webhook retry ceiling. `BACKEND_PUBLIC_URL` already exists and becomes **load-bearing** for the resource URL and issuer. Treat a loopback value in production as a startup refusal for the MCP mount.
 
 ---
 
 ## Alternatives Considered
 
-| Recommended | Alternative | When to Use the Alternative |
+| Recommended | Alternative | When to Use Alternative |
 |---|---|---|
-| React Router 8 data mode | React Router 8 declarative (15 KB gz) | If the team accepts no Back/Forward guard on dirty editors. The swap is mechanical later (same route objects). |
-| React Router 8 data mode | TanStack Router 1.170 | If routes become the primary architecture (route-level code splitting and preloading tied to TanStack Query), not just an address bar for the existing shell. |
-| Resend over httpx | Resend Python SDK 2.50 | If we later need SDK-only features (batch, templates, webhook verification helpers) and accept `requests` plus a new pin. |
-| stdlib smtplib (threaded) | aiosmtplib 5.1.3 | If SMTP is ever sent from an async request path at volume. Extend the egress sentinel first. |
-| Postgres outbox + Realtime hint | Novu / Knock / MagicBell / Courier | Never for this product shape. See below. |
+| `mcp` 2.3.x | `mcp` 1.30.0 (`<2`) | Only if the sse-starlette bump cannot be validated in time. 1.30 accepts `sse-starlette>=1.6.1` and `httpx`. But it is maintenance-only and its `FastMCP` API is removed in 2.x, so this is a migration deferred, not avoided. |
+| Postgres outbox + drainer | Redis Streams consumer group | If delivery volume ever exceeds what a polled table handles (thousands/min). Not this milestone. Redis is not the system of record here (D-v2.5-03, Upstash eviction). |
+| Hand-rolled Standard Webhooks signer | `svix` 2.9.1 (hosted Svix) | If the operator wants a hosted delivery dashboard and portal and accepts a vendor. The `svix` SDK pulls `attrs`, `deprecated`, `python-dateutil`, `httpx` and `pydantic` and sends through Svix's cloud, which our egress pinning cannot guard. |
+| In-house regex + checksum redactor | `presidio-analyzer` 2.2.366 | When SEED-079's full DLP lands (ingestion, prompt egress, LangSmith traces) and a regulated customer needs name/location NER. Measured install: **spaCy 3.8.18, thinc, blis, srsly, weasel, cloudpathlib, smart_open, tldextract, phonenumbers, …**, plus a spaCy model download (`en_core_web_lg` is the default, several hundred MB). NER is English-centric and probabilistic. That is a poor fit for a deterministic "never emit" gate on a hot path, and the docs show no supported pattern-only mode. |
+| Redis Lua semaphore | `limits` library (async Redis moving window) | If we want a ready token-bucket or moving-window with storage abstraction. Our Lua precedent already exists, and admission is a *concurrency* lease, which `limits` does not model. |
 
 ## What NOT to Use
 
 | Avoid | Why | Use Instead |
 |---|---|---|
-| `react-router-dom` | **Removed in React Router v8**; imports fail. Most examples online still use it. | `react-router`, and `react-router/dom` for `RouterProvider` |
-| React Router framework mode / `@react-router/dev` | Takes over the Vite build and entry points, and conflicts with the three-entry (`index.html`/`app.html`/`docs.html`) `rollupOptions.input` build and `middleware.ts` | Data mode inside the existing `app.html` entry |
-| RR `loader`/`action`/`<Form>` | A second data layer beside TanStack Query and the SSE providers | Router for addressing only |
-| Hash routing (`/#/…`) | Avoids rewrites, but breaks the existing `?run=` and OAuth `?connections=1` contracts, cannot be read server-side for email link building, and looks wrong in a B2B product | History routing under `/app/` (rewrites already exist) |
-| Routes outside `/app/` | The one-box falls back to the **landing** `index.html` | `/app/<view>/<id>` |
-| Novu (self-hosted) | Single-VM minimum is **4 vCPU / 8 GB + MongoDB + Redis with AOF + object storage** (official docs). Our VPS is KVM 1 (1 vCPU / 4 GB). | Postgres table + outbox |
-| Knock / MagicBell / Courier (SaaS) | Third-party data processor for org data, a second source of truth, and no one-box story | Same |
-| Web Push / service worker | VAPID keys, a service-worker lifecycle and permission prompts. Not needed for N-1 (email already reaches someone outside the app). | Defer; record in SEED-281's register if wanted |
-| `premailer` | Last release 2021 | Hand-inline the few styles in one Jinja template |
-| Putting the decision (approve/deny) inside the email | SEED-281 rule 2: it needs its own auth story and becomes a second source of truth | Email says "go and look" with a link to `/app/runs/<id>` |
-| Using a user's SMTP connector as the sender | Belongs to the user (D-235-02) | `EMAIL_PROVIDER` app-owned sender |
+| `from mcp.server.fastmcp import FastMCP` (blog posts, v1 docs) | **Removed in 2.x** (`ModuleNotFoundError`); renamed `MCPServer` | `from mcp.server import MCPServer` |
+| Leaving `stateless_http` at default with 2 workers | Legacy clients get intermittent `404 Session not found` (half of requests on round-robin) | `streamable_http_app(stateless_http=True, …)` |
+| Omitting `transport_security=` | Every production request is a `421 Invalid Host header`, logged only server-side | `TransportSecuritySettings(allowed_hosts=[host, host+":*"])`, or `enable_dns_rebinding_protection=False` only if the proxy pins Host |
+| Relying on the mounted app's own lifespan | Mounted lifespans never run → `Task group is not initialized` | Enter `mcp.session_manager.run()` in `main.py`'s lifespan |
+| SSE-only (legacy HTTP+SSE) transport | Deprecated in the spec; Claude documents it as deprecated | Streamable HTTP only |
+| Tokens in query strings (`?token=`) | The spec forbids it; Claude explicitly says don't | `Authorization: Bearer` |
+| `client_credentials` grant for "server-to-server MCP" | Claude does not support it, and it is not the user-delegation model | Personal keys (header) or the auth-code + PKCE flow |
+| Supabase session JWTs as MCP bearer tokens | They grant the whole Data API and are not audience-bound to the MCP resource; this violates the spec MUST | Opaque MCP-scoped tokens |
+| `aiolimiter` / `asyncio.Semaphore` for admission | Per process: two workers admit twice the cap | Redis Lua lease semaphore |
+| Following redirects on webhook delivery | SSRF pivot, and the spec says 3xx = failure | `send_pinned_http` (refuses redirects) |
+| Full webhook payloads with document text or agent output | They maximize PII egress, go stale and are hard to version | Thin payloads + an authenticated fetch link |
+| Porting `mcp_client.py` to the SDK client | The SDK client uses `httpx2`, which bypasses the pinned-egress guard | Keep the hand-rolled, pinned client |
+| Celery / RQ / arq / a new queue service | New infrastructure for what `SKIP LOCKED` + the existing per-worker loop already does | Outbox + drainer |
+| Google Cloud DLP / AWS Comprehend PII APIs | They send the very data we are trying not to egress to another processor, and add cost and latency | In-house redactor (Presidio later, in-process) |
 
 ## Stack Patterns by Variant
 
-**Vercel + Coolify cloud:**
-- `EMAIL_PROVIDER=resend`, `RESEND_API_KEY` in Coolify env; from-address on a Resend-verified domain (SPF/DKIM DNS at Hostinger is an operator step).
-- Deep links: `https://app.superrag.cloud/app/...`; no `vercel.json` change.
+**If a deployment serves the backend under a path prefix (the onebox nginx `/api`):**
+- The canonical MCP URL is `https://host/api/mcp`. Point the `resource_metadata` URL in `WWW-Authenticate` at the prefixed path. Clients must use that URL.
+- **But RFC 8414 AS-metadata discovery for an issuer `https://host/api` is `https://host/.well-known/oauth-authorization-server/api`, at the origin root.** That path reaches the *frontend* nginx (or Vercel) unless it is proxied. Add a `/.well-known/oauth-*` proxy rule (`frontend/nginx.conf` is a hot file), or give the backend its own origin. Verify the cloud topology (Vercel frontend + Coolify backend) in the OAuth phase.
 
-**Self-hosted one-box (nginx):**
-- `EMAIL_PROVIDER=smtp` + `SMTP_*`, or `none` for link-only (still the default).
-- Deep links: `http(s)://<host>/app/...`; no `nginx.conf` change.
+**If the client is Claude.ai, Claude Desktop or mobile (custom connector):**
+- OAuth is required (static headers are a limited beta). Phase 1, personal keys only, serves Claude Code, Cursor and other header-capable clients. Claude.ai arrives with the OAuth phase.
 
-**Local dev:**
-- `EMAIL_PROVIDER=none`, or `smtp` pointed at local Mailpit.
-- Vite `appRoutingPlugin` already rewrites non-dotted `/app/*` to `app.html`.
+**If a tool runs long (`ask_agent`, `run_workflow`):**
+- Return promptly with an id and a status; expose `get_run_result`. Client-side MCP tool timeouts are not documented uniformly (LOW confidence), and the legacy stateless leg has no back-channel for progress.
 
 ## Version Compatibility
 
 | Package A | Compatible With | Notes |
 |---|---|---|
-| react-router@8.5.0 | react / react-dom `>=19.2.7` | Installed is 19.2.4, so the **bump is required**. `npm install` honours `^19.2.4` but lock files pin 19.2.4. |
-| react-router@8.5.0 | Node `>=22.22.0` (engines) | CI `frontend-tests.yml` is on Node 20, so bump it. Docker is `node:22-alpine`. Vercel: verify. |
-| react-router@8.5.0 | Vite 8.0 (installed) | The Vite 7+ floor applies only to `@react-router/dev`, which we do not use. |
-| react@19.2.9 | remotion 4.0.532, @xyflow/react 12.11.2, @scalar/api-reference-react 0.9.77, @lobehub/icons 5.10.0 | All peer ranges accept it (checked via `npm view`). |
-| httpx>=0.28 | Resend REST API | Already pinned; egress residual fence (`test_190_residual_fence`) triggers on any httpx bump; that is unrelated to this, but do not bump httpx in the same phase. |
-| jinja2 3.1.6 | docxtpl 0.20.x | Already co-installed. |
+| `mcp==2.3.0` | `fastapi==0.115.6` / `starlette==0.41.3` | ✅ Measured with a pip dry-run. `mcp` needs `starlette>=0.27` on Python < 3.14. |
+| `mcp==2.3.0` | `sse-starlette==2.4.1` | ❌ ResolutionImpossible (measured). It needs `>=3.0.0`. |
+| `sse-starlette==3.0.3` | `starlette==0.41.3` | ✅ (resolved by pip). sse-starlette **3.6.0 needs `starlette>=0.49.1`**, so cap `<3.1` until FastAPI is upgraded. |
+| `mcp==2.3.0` | `pydantic 2.12.5`, `pyjwt 2.12.1`, `python-multipart 0.0.20`, `uvicorn 0.32.1`, `anyio 4.12.1`, `jsonschema` | ✅ All already satisfy its floors. |
+| `mcp==2.3.0` (`httpx2`) | `httpx 0.28.1` | ✅ Different import names. Note that `httpx2` brings `truststore`, which is used by httpx2 clients only. |
+| FastAPI upgrade (0.115.6 → 0.16x) | — | **Not required for v4.9. Do not bundle it.** FastAPI 0.120 still caps `starlette<0.49`. A FastAPI/Starlette 1.x upgrade is its own phase. |
 
 ## Sources
 
-- React Router CHANGELOG (raw, `remix-run/react-router` main): v8.0.0 (2026-06-17) baseline, ESM-only, removed `react-router-dom`; v8.5.0 (2026-10-19). **HIGH**
-- https://reactrouter.com/start/modes: declarative vs data mode API availability (`useBlocker`, `ScrollRestoration` are data-mode only). **HIGH**
-- npm registry (`npm view`): react-router 8.5.0, @tanstack/react-router 1.170.46 (2026-10-22), wouter 3.13.0, react 19.2.9 / 19.3.1, peer ranges. **HIGH**
-- Local esbuild measurement of tree-shaken bundles (scratchpad `rbench/`). **HIGH**, for the shapes measured
-- Production probes with `curl` against `superrag.cloud`, `app.superrag.cloud`, `agentic-rag-rho.vercel.app` (2026-10-27). **HIGH**
-- PyPI JSON: resend 2.50.0, aiosmtplib 5.1.3, boto3 1.43.119, postmarker 1.0 (2022), premailer 3.10.0 (2021), jinja2 3.1.6. **HIGH**
-- https://resend.com/docs/api-reference/emails/send-email (endpoint, `Idempotency-Key` 24 h); https://resend.com/docs/send-with-smtp (ports 465/2465 SMTPS, 25/587/2587 STARTTLS); https://resend.com/pricing. **HIGH**
-- https://postmarkapp.com/pricing. **HIGH**
-- https://docs.novu.co/community/self-hosting-novu/overview (self-host infrastructure). **HIGH**
-- https://www.hostinger.com/support/7854530-is-smtp-port-25-blocked-on-vps/ (port 25 open, 5/minute cap; nothing published on 465/587). **MEDIUM** (465/587 unverified)
-- Repo: `frontend/package.json`, `frontend/vite.config.ts`, `frontend/vercel.json`, `frontend/middleware.ts`, `frontend/devRouting.ts`, `frontend/nginx.conf`, `frontend/Dockerfile`, `frontend/src/App.tsx`, `frontend/src/lib/runDeepLink.ts`, `frontend/src/docs/router.ts`, `frontend/src/components/layout/attentionConditions.ts`, `backend/requirements.txt`, `backend/app/services/email_provider.py`, `backend/app/api/org.py`, `backend/app/config.py` (`primary_frontend_origin`), `backend/app/security/egress.py`, `backend/tests/unit/test_189_no_egress.py`, `test_190_residual_fence.py`, `deploy/onebox.env.example`, `backend/.env.example`, `.github/workflows/frontend-tests.yml`, `docs/DEPLOYMENT-PIPELINE.md`.
+- PyPI JSON `https://pypi.org/pypi/mcp/json` (2.3.0, 2026-10-02; 2.0.0 2026-07-28; 1.30.0 2026-09-07), `…/sse-starlette`, `…/fastapi/0.115.6`, `…/authlib` (1.9.1), `…/presidio-analyzer` (2.2.366), `…/standardwebhooks` (1.1.0), `…/svix` (2.9.1), `…/fastmcp` (4.1.4): HIGH
+- pip `--dry-run` resolution in `backend/venv` (2026-10-30): HIGH (measured)
+- Context7 `/modelcontextprotocol/python-sdk`: `docs/run/asgi.md`, `docs/run/deploy.md`, `docs/run/legacy-clients.md`, `docs/run/authorization.md`, `docs/migration.md`, `docs/whats-new.md`, `SECURITY.md`, `src/mcp/server/auth/settings.py`, `src/mcp/server/auth/routes.py`, `src/mcp/server/transport_security.py`: HIGH
+- https://modelcontextprotocol.io/specification/versioning (current = 2026-07-28): HIGH
+- https://modelcontextprotocol.io/specification/latest/basic/authorization (RFC 9728 MUST, CIMD SHOULD, DCR MAY/deprecated, RFC 8707, RFC 9207): HIGH
+- https://www.claude.com/docs/connectors/building/authentication (DCR/CIMD, callback, S256, refresh rotation, static headers beta, egress CIDR): HIGH
+- https://cursor.com/docs/context/mcp (Streamable HTTP + SSE, headers with `${env:}`, OAuth DCR / static client, callbacks): HIGH
+- https://supabase.com/docs/guides/auth/oauth-server (+ `/getting-started`, `/mcp-authentication`, `/token-security`): beta, DCR, token claims, hook-based `aud`: MEDIUM (the docs are silent on CIMD, RFC 8707 and self-hosting)
+- https://github.com/standard-webhooks/standard-webhooks/blob/main/spec/standard-webhooks.md (headers, `whsec_`, rotation, retry schedule, 3xx/410/429): HIGH
+- sse-starlette v3.0.0 release notes (`gh release view v3.0.0 -R sysid/sse-starlette`): HIGH
+- Presidio docs (spaCy `en_core_web_lg` default; no documented pattern-only engine): MEDIUM
+- Archived Anthropic help article (SSE deprecated; callback may move to claude.com): LOW (secondary)
+- Codebase: `backend/requirements.txt`, `app/services/mcp_client.py`, `app/security/egress.py`, `app/security/api_key_auth.py`, `app/services/rate_limit.py`, `app/services/task_service.py`, `app/services/notification_drainer.py`, `app/db/notifications.py`, `app/api/inbound.py`, `app/main.py`, `backend/Dockerfile`, `tests/integration/test_059_disconnect.py`
 
 ---
-*Stack research for: v4.8 Every Page Has a Link*
-*Researched: 2026-10-27*
+*Stack research for: v4.9 Use It From Your Own Tools (MCP server, personal keys, OAuth, webhooks, admission, redaction)*
+*Researched: 2026-10-30*

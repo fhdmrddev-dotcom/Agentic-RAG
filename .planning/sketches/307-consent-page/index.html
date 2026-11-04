@@ -1,0 +1,209 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Sketch 307 — The Consent Page</title>
+<link rel="stylesheet" href="../themes/default.css">
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Manrope:wght@600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+<style>
+*{box-sizing:border-box}
+body{margin:0;background:var(--color-bg);color:var(--color-text);font-family:var(--font-sans);font-size:var(--text-base)}
+#vnav,#states{display:flex;align-items:center;gap:8px;padding:10px 16px;border-bottom:1px solid var(--color-border);flex-wrap:wrap}
+.lbl{font-family:var(--font-mono);font-size:var(--text-xs);color:var(--color-text-dim);margin-right:6px}
+.vtab,.stab{background:transparent;border:1px solid var(--color-border);color:var(--color-text-muted);font-size:var(--text-xs);padding:6px 12px;border-radius:999px;cursor:pointer;font-family:inherit}
+.vtab.active{background:var(--color-primary-dim);border-color:var(--color-primary);color:var(--color-primary)}
+.stab.active{background:var(--color-accent);color:var(--color-text)}
+#note{padding:8px 16px;font-size:var(--text-sm);color:var(--color-text-muted);border-bottom:1px solid var(--color-border-soft);line-height:1.5}
+#note b{color:var(--color-text)}
+#truth{display:flex;gap:18px;flex-wrap:wrap;padding:8px 16px;font-family:var(--font-mono);font-size:11px;color:var(--color-text-dim);border-bottom:1px solid var(--color-border-soft);background:var(--color-bg-elev1)}
+#truth b{color:var(--color-text-muted);font-weight:500}
+
+.screen{position:relative;min-height:calc(100vh - 190px);display:grid;place-items:start center;padding:56px 16px 40px;background:radial-gradient(ellipse at 50% -10%,hsl(239 60% 30% / .25),transparent 60%)}
+.addr{position:absolute;top:0;left:0;right:0;font-family:var(--font-mono);font-size:11px;color:var(--color-text-dim);padding:7px 12px;border-bottom:1px solid var(--color-border-soft);background:var(--color-bg);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.addr .lock{color:var(--color-success)}
+.brand{display:flex;gap:10px;align-items:center;justify-content:center;margin-bottom:14px}
+.iris{width:30px;height:30px;border-radius:50%;background:radial-gradient(circle at 50% 50%,var(--color-primary) 0 18%,hsl(239 60% 40%) 19% 46%,transparent 47%),conic-gradient(from 0deg,hsl(239 100% 82% / .9),hsl(262 80% 70% / .5),hsl(239 100% 82% / .9))}
+.brand b{font-family:var(--font-headline);font-size:var(--text-lg)}
+.card{border:1px solid var(--color-border);border-radius:var(--radius-lg);background:var(--color-surface);padding:22px;width:min(460px,100%)}
+.card.wide{width:min(860px,100%);padding:0;display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1.1fr)}
+@media (max-width:760px){.card.wide{grid-template-columns:1fr}}
+.card h1{font-family:var(--font-headline);font-size:var(--text-xl);margin:0 0 6px;line-height:1.3}
+.card .lead{font-size:var(--text-sm);color:var(--color-text-muted);margin:0 0 16px;line-height:1.55}
+
+/* who is asking */
+.who{display:flex;gap:12px;align-items:flex-start;border:1px solid var(--color-border);border-radius:12px;padding:12px;background:var(--color-bg-elev1);margin-bottom:12px}
+.who .mk{width:38px;height:38px;border-radius:10px;display:grid;place-items:center;font-weight:700;flex:none;font-size:15px}
+.mk.claude{background:#d97757;color:#fff}
+.mk.unknown{background:var(--color-accent);color:var(--color-text-muted);border:1px dashed var(--color-border)}
+.mk.local{background:hsl(220 20% 22%);color:var(--color-text);font-family:var(--font-mono);font-size:13px}
+.who .nm{font-weight:600;font-size:var(--text-sm)}
+.who .claim{font-size:var(--text-xs);color:var(--color-text-dim);font-weight:400;margin-left:4px}
+.host{display:inline-flex;align-items:center;gap:6px;margin-top:5px;font-family:var(--font-mono);font-size:12px;color:var(--color-text);background:hsl(220 30% 11% / .6);border:1px solid var(--color-border);border-radius:6px;padding:2px 8px}
+.host .tag{font-family:var(--font-sans);font-size:10px;padding:1px 6px;border-radius:999px}
+.tag.ver{background:var(--color-success-dim);color:var(--color-success)}
+.tag.self{background:var(--color-warning-dim);color:var(--color-warning)}
+.tag.loc{background:var(--color-primary-dim);color:var(--color-primary)}
+.who .why{font-size:var(--text-xs);color:var(--color-text-muted);margin-top:6px;line-height:1.5}
+.acct{display:flex;align-items:center;gap:8px;font-size:var(--text-xs);color:var(--color-text-muted);margin-bottom:16px}
+.av{width:22px;height:22px;border-radius:50%;background:#5b5fc7;display:grid;place-items:center;color:#fff;font-weight:700;font-size:10px}
+.acct a{color:var(--color-primary);text-decoration:none;margin-left:auto}
+
+/* choices */
+.fld{margin-bottom:14px}
+.fld>span{display:block;font-size:var(--text-xs);font-weight:600;color:var(--color-text-muted);margin-bottom:6px}
+select,.opt{font-family:inherit}
+select{width:100%;height:36px;border-radius:8px;background:hsl(220 30% 11% / .5);border:1px solid var(--color-border);color:var(--color-text);padding:0 10px;font-size:var(--text-sm)}
+.opts{display:grid;gap:6px}
+.opt{display:flex;gap:10px;align-items:flex-start;text-align:left;border:1px solid var(--color-border);background:transparent;color:var(--color-text);border-radius:9px;padding:9px 11px;cursor:pointer;font-size:var(--text-sm)}
+.opt small{display:block;color:var(--color-text-muted);font-size:var(--text-xs);margin-top:2px}
+.opt.on{border-color:var(--color-primary);background:var(--color-primary-dim)}
+.opt .rd{width:14px;height:14px;border-radius:50%;border:1.5px solid var(--color-text-dim);flex:none;margin-top:2px}
+.opt.on .rd{border-color:var(--color-primary);box-shadow:inset 0 0 0 3px var(--color-surface);background:var(--color-primary)}
+.fold{display:grid;gap:4px;margin:6px 0 0 24px}
+.fold label{display:flex;gap:8px;align-items:center;font-size:var(--text-sm);color:var(--color-text-muted)}
+.off{font-size:var(--text-xs);color:var(--color-warning);margin-top:6px}
+.sum{border-left:2px solid var(--color-primary);padding:8px 12px;font-size:var(--text-sm);line-height:1.55;background:var(--color-primary-dim);border-radius:0 8px 8px 0;margin:4px 0 16px}
+.sum b{color:var(--color-text)}
+.acts{display:flex;gap:8px;justify-content:flex-end}
+.btn{background:transparent;border:1px solid var(--color-border);color:var(--color-text);border-radius:8px;padding:9px 16px;font-size:var(--text-sm);cursor:pointer;font-family:inherit}
+.btn:hover{border-color:var(--color-primary)}
+.btn.primary{background:var(--color-primary-strong);border-color:transparent;color:#fff}
+.btn:disabled{opacity:.45;cursor:not-allowed}
+.fine{font-size:var(--text-xs);color:var(--color-text-dim);margin-top:14px;line-height:1.55}
+.steps{display:flex;gap:6px;margin-bottom:14px}
+.steps i{flex:1;height:3px;border-radius:2px;background:var(--color-border)}
+.steps i.on{background:var(--color-primary)}
+.pane{padding:22px}
+.pane.l{background:var(--color-bg-elev1);border-right:1px solid var(--color-border);border-radius:var(--radius-lg) 0 0 var(--radius-lg)}
+.can{list-style:none;padding:0;margin:8px 0 0;display:grid;gap:7px;font-size:var(--text-sm)}
+.can li{display:flex;gap:8px}
+.can .y{color:var(--color-success)} .can .n{color:var(--color-text-dim)}
+
+/* end states */
+.end{text-align:center}
+.end .big{font-size:30px;margin-bottom:8px}
+.err{border-color:hsl(0 70% 60% / .35)}
+.err h1{color:var(--color-text)}
+code{font-family:var(--font-mono);font-size:12px;background:hsl(220 30% 11% / .6);padding:1px 6px;border-radius:5px}
+</style>
+</head>
+<body>
+<div id="vnav"><span class="lbl">VARIANT</span>
+  <button class="vtab active" data-v="a">A: One card ★ Selected</button>
+  <button class="vtab" data-v="b">B: Two steps</button>
+  <button class="vtab" data-v="c">C: Split — what it can do / your choices</button>
+</div>
+<div id="states"><span class="lbl">MOMENT</span>
+  <button class="stab active" data-s="cimd">Claude.ai (CIMD)</button>
+  <button class="stab" data-s="dcr">Registered client (DCR)</button>
+  <button class="stab" data-s="loop">Claude Code (loopback)</button>
+  <button class="stab" data-s="orgoff">One org switched off</button>
+  <button class="stab" data-s="done">After Allow</button>
+  <button class="stab" data-s="denied">After Deny</button>
+  <button class="stab" data-s="badredir">Redirect not allowed</button>
+  <button class="stab" data-s="stale">Request expired</button>
+</div>
+<div id="note"></div>
+<div id="truth"></div>
+<div class="screen" id="screen"></div>
+
+<script>
+const ORGS=[{id:"acme",name:"Acme Legal",on:true},{id:"north",name:"Northwind Ops",on:true}];
+const CLIENTS={
+  cimd:{mk:"claude",ch:"C",name:"Claude",claim:"",host:"claude.ai",tag:["ver","verified"],why:"Its details were published at <code>https://claude.ai/…/client-metadata</code>, so the name and address belong to claude.ai.",cb:"https://claude.ai/api/mcp/auth_callback"},
+  dcr:{mk:"unknown",ch:"?",name:"Claude",claim:"calls itself",host:"claude.com",tag:["self","name not checked"],why:"This app registered itself. Syrel can't check its name, only where it sends you back: <code>claude.com</code>, which this deployment allows.",cb:"https://claude.com/api/mcp/auth_callback"},
+  loop:{mk:"local",ch:">_",name:"Claude Code",claim:"calls itself",host:"localhost:53182",tag:["loc","this computer"],why:"It sends you back to an app on this computer. Only allow it if you just started a sign-in in Claude Code, Cursor or VS Code yourself.",cb:"http://localhost:53182/callback"},
+};
+const PRESETS=[
+  {id:"read",t:"Read only",s:"Search your knowledge and read documents."},
+  {id:"ask",t:"Read and ask",s:"Also ask the agent questions."},
+  {id:"run",t:"Read, ask and run workflows",s:"Also start your published workflows."},
+];
+let V="a",S="cimd",step=1,st={org:"acme",preset:"read",scope:"all",folders:["Contracts"]};
+
+function client(){return CLIENTS[S==="dcr"?"dcr":S==="loop"?"loop":"cimd"]}
+function orgs(){return S==="orgoff"?[ORGS[0],{...ORGS[1],on:false}]:ORGS}
+function orgName(){return ORGS.find(o=>o.id===st.org).name}
+function presetT(){return PRESETS.find(p=>p.id===st.preset).t.toLowerCase()}
+function summary(){const c=client();
+  const where=st.scope==="all"?"everything you can see in <b>"+orgName()+"</b> (not connected sources)":"only <b>"+st.folders.join(", ")+"</b> in <b>"+orgName()+"</b>";
+  const can=st.preset==="read"?"search and read":st.preset==="ask"?"search, read and ask the agent":"search, read, ask the agent and run workflows";
+  const cant=st.preset==="read"?" It can't ask the agent or run workflows.":st.preset==="ask"?" It can't run workflows.":"";
+  return `<b>${c.name}</b> will ${can} in ${where}, as you.${cant} It stops working if you leave the org, and you can disconnect it any time in Settings.`}
+
+function whoHTML(){const c=client();
+  return `<div class="who"><div class="mk ${c.mk}">${c.ch}</div><div><div class="nm">${c.name}<span class="claim">${c.claim}</span></div>
+  <div class="host">${c.host}<span class="tag ${c.tag[0]}">${c.tag[1]}</span></div><div class="why">${c.why}</div></div></div>`}
+function acctHTML(){return `<div class="acct"><div class="av">MR</div>Signing in as <b>maria@acmelegal.com</b><a href="#">Not you?</a></div>`}
+function orgHTML(){const os=orgs();
+  return `<div class="fld"><span>Organisation</span><select id="org">${os.map(o=>`<option value="${o.id}" ${o.id===st.org?"selected":""} ${o.on?"":"disabled"}>${o.name}${o.on?"":" — MCP access is switched off"}</option>`).join("")}</select>
+  ${os.some(o=>!o.on)?`<div class="off">⚠ Northwind Ops: MCP access is switched off for this organisation by an admin.</div>`:""}</div>`}
+function toolsHTML(){return `<div class="fld"><span>What it can do</span><div class="opts">${PRESETS.map(p=>`<button class="opt ${st.preset===p.id?"on":""}" data-p="${p.id}"><i class="rd"></i><span>${p.t}<small>${p.s}</small></span></button>`).join("")}</div></div>`}
+function scopeHTML(){return `<div class="fld"><span>Which documents</span><div class="opts">
+  <button class="opt ${st.scope==="all"?"on":""}" data-sc="all"><i class="rd"></i><span>Everything I can see<small>Connected sources (mail, Drive) stay out unless you tick them.</small></span></button>
+  <button class="opt ${st.scope==="some"?"on":""}" data-sc="some"><i class="rd"></i><span>Only these folders</span></button></div>
+  ${st.scope==="some"?`<div class="fold">${["Contracts","Policies","Board minutes","Mailbox (connected)"].map(f=>`<label><input type="checkbox" data-f="${f}" ${st.folders.includes(f)?"checked":""}> ${f}</label>`).join("")}</div>`:""}</div>`}
+function actsHTML(){const bad=st.scope==="some"&&!st.folders.length;
+  return `<div class="acts"><button class="btn" data-go="denied">Deny</button><button class="btn primary" data-go="done" ${bad?"disabled":""}>Allow</button></div>
+  ${bad?`<div class="off" style="text-align:right">Tick at least one folder, or choose Everything I can see.</div>`:""}`}
+const head=()=>`<div class="brand"><div class="iris"></div><b>Syrel</b></div>`;
+const addr=()=>`<div class="addr"><span class="lock">🔒</span> app.superrag.cloud/app/connect/authorize?request=•••••</div>`;
+
+function variantA(){return head()+`<div class="card"><h1>Connect ${client().name} to Syrel</h1>
+  ${whoHTML()}${acctHTML()}${orgHTML()}${toolsHTML()}${scopeHTML()}<div class="sum">${summary()}</div>${actsHTML()}
+  <div class="fine">Allowing sends you back to <code>${client().host}</code>. Syrel never shows ${client().name} your password.</div></div>`}
+function variantB(){if(step===1)return head()+`<div class="card"><div class="steps"><i class="on"></i><i></i></div><h1>Who is asking?</h1>
+  <p class="lead">An app wants to use Syrel as you. Check it is the one you just connected.</p>${whoHTML()}${acctHTML()}
+  <div class="acts"><button class="btn" data-go="denied">This isn't me</button><button class="btn primary" id="next">Continue</button></div></div>`;
+  return head()+`<div class="card"><div class="steps"><i class="on"></i><i class="on"></i></div><h1>What can ${client().name} use?</h1>
+  ${orgHTML()}${toolsHTML()}${scopeHTML()}<div class="sum">${summary()}</div>
+  <div class="acts"><button class="btn" id="back">Back</button><button class="btn" data-go="denied">Deny</button><button class="btn primary" data-go="done">Allow</button></div></div>`}
+function variantC(){const p=st.preset;
+  return head()+`<div class="card wide"><div class="pane l"><h1>Connect ${client().name}</h1>${whoHTML()}${acctHTML()}
+  <span class="lbl">IT WILL BE ABLE TO</span><ul class="can">
+  <li><span class="y">✓</span>Search and read in ${orgName()}${st.scope==="some"?" ("+st.folders.length+" folders)":""}</li>
+  <li><span class="${p!=="read"?"y":"n"}">${p!=="read"?"✓":"—"}</span>Ask the agent</li>
+  <li><span class="${p==="run"?"y":"n"}">${p==="run"?"✓":"—"}</span>Run your published workflows</li>
+  <li><span class="n">—</span>Change settings, invite people or see other orgs</li></ul></div>
+  <div class="pane">${orgHTML()}${toolsHTML()}${scopeHTML()}${actsHTML()}</div></div>`}
+
+function endHTML(){const c=client();
+  if(S==="done")return head()+`<div class="card end"><div class="big">✓</div><h1>${c.name} is connected</h1><p class="lead">Taking you back to <code>${c.host}</code>…<br>If nothing happens, close this tab and return to ${c.name}.</p><div class="fine">Disconnect it any time: Settings → API keys → Connected apps.</div></div>`;
+  if(S==="denied")return head()+`<div class="card end"><div class="big">✕</div><h1>Not connected</h1><p class="lead">Taking you back to <code>${c.host}</code>. ${c.name} gets no access.</p></div>`;
+  if(S==="badredir")return head()+`<div class="card end err"><div class="big">⛔</div><h1>This app can't sign in here</h1><p class="lead">It asked to send you to <code>evil-example.net</code>, which this Syrel deployment doesn't allow. You have <b>not</b> been sent there.</p><div class="fine">If you expected this to work, ask your administrator to add the app's address in Control Room → MCP sign-in.</div></div>`;
+  if(S==="stale")return head()+`<div class="card end"><div class="big">⌛</div><h1>This sign-in request has expired</h1><p class="lead">Requests last 10 minutes and work once. Go back to the app and start connecting again.</p></div>`;
+}
+const NOTES={
+  cimd:"<b>Claude.ai with a client metadata document.</b> The name and host are verified, so the tag is green. The redirect host is always shown — it is the fact; the name is the claim.",
+  dcr:"<b>A dynamically registered client.</b> It typed its own name, so the page says <b>calls itself</b> and tags the name <b>not checked</b>. The host is on the operator's allowlist, or the page would never render (see Redirect not allowed).",
+  loop:"<b>Claude Code via a loopback redirect.</b> Any port matches; the page names it as an app on this computer and tells the member when to allow it.",
+  orgoff:"<b>One org's MCP switch is off.</b> It stays in the list, disabled, with the same sentence the key screen uses — never silently hidden.",
+  done:"<b>After Allow.</b> The page names where you're going next; Connected apps is named as the place to undo it.",
+  denied:"<b>After Deny.</b> Redirects back with <code>error=access_denied</code>.",
+  badredir:"<b>Unregistered redirect.</b> Shown on a Syrel page — never redirected to (the open-redirect failure). Names the admin control that would fix it.",
+  stale:"<b>Expired or reused request.</b> Single use, 10 minutes. No redirect.",
+};
+function render(){
+  const end=["done","denied","badredir","stale"].includes(S);
+  document.getElementById("screen").innerHTML=addr()+(end?endHTML():V==="a"?variantA():V==="b"?variantB():variantC());
+  document.getElementById("note").innerHTML=NOTES[S]+(V==="b"?" · <b>B</b> splits trust from choice: one more click, and the identity step can be clicked through without reading.":V==="c"?" · <b>C</b> shows a live can/can't list, but its width breaks in a narrow sign-in window.":" · <b>A</b>: one card, top to bottom = who · you · org · what · which docs · the sentence you're agreeing to.");
+  document.getElementById("truth").innerHTML=`<span><b>client_id</b> ${S==="cimd"?"https://claude.ai/…/client-metadata":S==="loop"?"dcr_7f3c…":"dcr_91ab…"}</span><span><b>redirect_uri</b> ${client().cb}</span><span><b>PKCE</b> S256</span><span><b>resource</b> https://api.superrag.cloud/mcp</span><span><b>grant →</b> api_keys row · kind mcp · oauth_client_id set</span>`;
+  wire();
+}
+function wire(){
+  document.querySelectorAll("[data-p]").forEach(b=>b.onclick=()=>{st.preset=b.dataset.p;render()});
+  document.querySelectorAll("[data-sc]").forEach(b=>b.onclick=()=>{st.scope=b.dataset.sc;render()});
+  document.querySelectorAll("[data-f]").forEach(c=>c.onchange=()=>{const f=c.dataset.f;st.folders=c.checked?[...st.folders,f]:st.folders.filter(x=>x!==f);render()});
+  const o=document.getElementById("org");if(o)o.onchange=()=>{st.org=o.value;render()};
+  document.querySelectorAll("[data-go]").forEach(b=>b.onclick=()=>{S=b.dataset.go;sync();render()});
+  const n=document.getElementById("next");if(n)n.onclick=()=>{step=2;render()};
+  const bk=document.getElementById("back");if(bk)bk.onclick=()=>{step=1;render()};
+}
+function sync(){document.querySelectorAll(".stab").forEach(t=>t.classList.toggle("active",t.dataset.s===S))}
+document.querySelectorAll(".vtab").forEach(t=>t.onclick=()=>{V=t.dataset.v;step=1;document.querySelectorAll(".vtab").forEach(x=>x.classList.toggle("active",x===t));render()});
+document.querySelectorAll(".stab").forEach(t=>t.onclick=()=>{S=t.dataset.s;step=1;if(S==="orgoff")st.org="acme";sync();render()});
+render();
+</script>
+</body>
+</html>

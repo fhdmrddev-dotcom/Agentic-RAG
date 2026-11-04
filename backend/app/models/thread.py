@@ -3,7 +3,7 @@ from datetime import datetime
 from typing import Literal
 from uuid import UUID
 
-from pydantic import BaseModel
+from pydantic import BaseModel, model_validator
 
 from app.models.message import (
     MessageResponse,
@@ -97,6 +97,22 @@ class ThreadResponse(BaseModel):
     active_expert_id: UUID | None = None
     created_at: datetime
     updated_at: datetime
+    # 306-04 (MCP-05 / D-09 / D-31): how the thread started, from its frozen origin columns (mig
+    # 223), through the ONE run-origin wire helper. ``None`` for every in-app thread.
+    origin: dict | None = None
+
+    @model_validator(mode="before")
+    @classmethod
+    def _origin_from_columns(cls, data):
+        if not isinstance(data, dict) or ("origin" in data and "origin_kind" not in data):
+            return data  # an already-composed thread (a re-validated dump) keeps its origin
+        # Function-local: a module-level import of the harness package is circular here
+        # (harness/__init__ imports phase_types).
+        from app.services.harness.run_read_wire import origin_for_wire  # noqa: PLC0415
+
+        data = dict(data)  # never mutate the caller's row
+        data["origin"] = origin_for_wire(data.get("origin_kind"), data.get("origin_label"), None)
+        return data
 
 
 class ThreadSnapshotResponse(BaseModel):

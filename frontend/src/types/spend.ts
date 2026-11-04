@@ -105,6 +105,14 @@ export interface SpendRunItem {
   expertAttributed: boolean;
   /** D-268-09: sub-agent rows rolled into this root's tokens and cost. */
   subagentCount: number;
+  /**
+   * Phase 305-03 (D-31 / D-55): an AI tool (MCP) usage row names its key and tool. OPTIONAL so
+   * every older `SpendRunItem` literal still type-checks; the mapper always fills them.
+   */
+  source?: "run" | "mcp";
+  apiKeyId?: string | null;
+  apiKeyLabel?: string | null;
+  mcpTool?: string | null;
 }
 
 export interface ModelRateItem {

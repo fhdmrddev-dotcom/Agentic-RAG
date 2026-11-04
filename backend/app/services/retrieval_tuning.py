@@ -40,13 +40,15 @@ and — worse — it would silently override a server whose ``postgresql.conf`` 
 from 40 by somebody who meant it. Nothing stored => nothing touched.
 
 ⚠ ``hnsw.iterative_scan`` **DOES NOT EXIST below pgvector 0.8**, and cloud parity is UNVERIFIED
-(D-14). Each knob is therefore applied in its OWN ``try``: an unrecognised parameter degrades the
-TUNING and never the SEARCH (threat T-241-17). That is what lets 241-04's cloud parity check be a
+(D-14). Each knob is therefore applied in its OWN ``try`` and its own SAVEPOINT (305-REVIEW LF-02:
+a caught error would otherwise still abort the search's transaction): an unrecognised parameter
+degrades the TUNING and never the SEARCH (threat T-241-17). That is what lets 241-04's cloud parity check be a
 measurement rather than a prerequisite.
 """
 
 from __future__ import annotations
 
+import contextlib
 import logging
 import time
 
@@ -70,6 +72,27 @@ _SERVER_DEFAULT_ITERATIVE_SCAN = "off"
 _SERVER_EF_CACHE_TTL = 60.0
 _server_ef_cache: tuple[int | None, float] | None = None
 
+#: BUG-261031-03: the in-transaction probe. ``reset_val`` is the session default (ALTER SYSTEM /
+#: DATABASE / ROLE), unaffected by a SET LOCAL in the open transaction; NULL when pgvector's GUCs
+#: are not registered in this session, which reads as "unknown" exactly like ``current_setting``.
+_SQL_EF_SEARCH_SESSION_DEFAULT = (
+    "SELECT reset_val FROM pg_catalog.pg_settings WHERE name = 'hnsw.ef_search'"
+)
+
+
+def _savepoint(conn):
+    """305-REVIEW LF-01 / LF-02: a SAVEPOINT around one tuning statement on the caller's open
+    transaction, so a server-side error rolls back only that statement. Without it Postgres aborts
+    the whole transaction and the caught error fails the search anyway, at its NEXT statement
+    (``InFailedSQLTransactionError``, measured live). On an asyncpg connection already inside
+    ``conn.transaction()`` a nested ``conn.transaction()`` IS a savepoint; a released savepoint keeps
+    its ``SET LOCAL`` until the outer transaction ends. Outside a transaction (or on a test double
+    with no ``transaction``) nothing is wrapped: there is no transaction to protect."""
+    in_txn = getattr(conn, "is_in_transaction", None)
+    if callable(in_txn) and in_txn() and hasattr(conn, "transaction"):
+        return conn.transaction()
+    return contextlib.nullcontext()
+
 
 def _reset_server_ef_cache() -> None:
     """Reset the server ef_search cache (for tests)."""
@@ -92,8 +115,10 @@ async def get_server_ef_search(
     """Probe the Postgres server's active hnsw.ef_search setting with a 60s TTL cache.
 
     Invariant (Finding 2a / D-246-05):
-    Probes outside request transactions (via pool.fetchval on a clean connection) so that
-    transaction-scoped SET LOCAL on a borrower cannot poison the cached server default.
+    A transaction-scoped SET LOCAL on a borrower cannot poison the cached server default. On a
+    connection inside a transaction the probe reads ``pg_settings.reset_val`` on THAT connection
+    (the session default, which SET LOCAL never changes) — never a second pooled connection, which
+    deadlocks the pool under concurrency (BUG-261031-03).
 
     Returns:
         int | None: The server's ef_search if configured/supported, or None if pgvector
@@ -113,7 +138,19 @@ async def get_server_ef_search(
         raw = None
         if pool is not None:
             raw = await pool.fetchval(query)
-        elif conn is not None and not (hasattr(conn, "is_in_transaction") and conn.is_in_transaction()):
+        elif conn is not None and hasattr(conn, "is_in_transaction") and conn.is_in_transaction():
+            # BUG-261031-03: ⛔ NEVER ask the pool for a second connection here. The caller
+            # (``retrieval_rpc._call_as_user``) holds a pooled connection with its transaction open,
+            # so at concurrency >= the pool's max_size every connection ended up held by a caller
+            # waiting for one more — a deadlock, measured live on 2026-10-31. Read the SESSION
+            # default on the connection already held instead: ``pg_settings.reset_val`` is what
+            # RESET would restore, which a ``SET LOCAL`` in this transaction never changes, so the
+            # D-246-05 non-poisoning invariant holds without leaving the transaction.
+            # 305-REVIEW LF-01: inside a savepoint, so a probe error cannot abort the caller's
+            # transaction (the search would then fail at its next statement).
+            async with _savepoint(conn):
+                raw = await conn.fetchval(_SQL_EF_SEARCH_SESSION_DEFAULT)
+        elif conn is not None:
             if hasattr(conn, "fetchval"):
                 raw = await conn.fetchval(query)
             elif hasattr(conn, "fetch"):
@@ -140,7 +177,7 @@ async def get_server_ef_search(
         probed_val = None
     except Exception as exc:
         logger.warning("Failed to probe hnsw.ef_search setting: %s", exc)
-        probed_val = None
+        return None  # 305-REVIEW LF-01: a FAILED probe is never cached; the next call re-probes
 
     _server_ef_cache = (probed_val, now + _SERVER_EF_CACHE_TTL)
     return probed_val
@@ -149,9 +186,14 @@ async def get_server_ef_search(
 #: ⛔ Errors that mean *"this server cannot do this tuning"* rather than *"this search failed"*.
 #: `UndefinedObjectError` is what a pre-0.8 pgvector raises for `hnsw.iterative_scan`;
 #: `InvalidParameterValueError` is what a known parameter raises for a value it will not take.
+#: `InvalidNameError` (42602, *"hnsw is a reserved prefix"*) is what an already-loaded pgvector
+#: raises for an ``hnsw.*`` name it does not define — `hnsw.iterative_scan` below 0.8 (305-REVIEW
+#: LF-02; measured live with a non-existent name. Latent today: pgvector is 0.8.0 locally and in
+#: production, measured 2026-10-31).
 _TUNING_UNAVAILABLE = (
     asyncpg.exceptions.UndefinedObjectError,
     asyncpg.exceptions.InvalidParameterValueError,
+    asyncpg.exceptions.InvalidNameError,
 )
 
 
@@ -160,9 +202,15 @@ async def _set_local(conn, statement: str, value: str, *, guc: str) -> bool:
 
     ``statement`` is a module-private constant with the GUC name already inside it — the caller
     never composes it, which is invariant (1) above expressed in the signature.
+
+    305-REVIEW LF-02: inside a SAVEPOINT (``_savepoint``), because a caught error on the caller's
+    open transaction still aborts it, and the search then failed at its next statement — measured
+    live. The savepoint rolls back only this statement; a successful one stays in force after the
+    savepoint is released, until the outer transaction ends.
     """
     try:
-        await conn.execute(statement, value)
+        async with _savepoint(conn):
+            await conn.execute(statement, value)
         return True
     except _TUNING_UNAVAILABLE as exc:
         # ⚠ WARNING, once, naming the knob — never an exception. A search must not fail because

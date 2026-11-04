@@ -14,6 +14,12 @@ import { API_KEYS_COPY } from "@/components/settings/apiKeys/apiKeysCopy"
  * are app-wide `app_settings` columns (migration 215), bounded in three places that agree: the
  * migration CHECK, the `PUT /settings` 400, and the clamp below (1..60 and 10..600).
  *
+ * 306-02 (GUARD-01; D-36 / D-35, UI-SPEC Surface 2) adds a second group under a divider,
+ * "Questions and runs from outside": the ask wait budget (5..45, default 30) and how many outside
+ * questions and runs may be in progress at once per key / organisation / AI provider (1..50,
+ * defaults 2 / 4 / 6). Same handle, same Save, same rules below; the shipped three rows are
+ * unchanged.
+ *
  * WHY A LEAF. `SettingsPage.tsx` is G-5 FIRING, so (the 292.1 `AgentRoundLimits` precedent this
  * file copies) this component owns its own fetch and draft state, and the page holds only a ref.
  *
@@ -38,6 +44,29 @@ const COPY = API_KEYS_COPY.limits
 
 const STARTS = { min: 1, max: 60, fallback: 10 } as const
 const READS = { min: 10, max: 600, fallback: 120 } as const
+// 305-03 (D-54): the AI tool keys' searches limit; migration 222 CHECK and the PUT 400 agree (1..120).
+const SEARCHES = { min: 1, max: 120, fallback: 30 } as const
+// 306-02 (D-36 / D-35): the ask wait budget and the outside-start admission limits; migration 223
+// CHECKs and the PUT 400s agree (5..45, 1..50). Same rules as the three rows above.
+const ASK_WAIT = { min: 5, max: 45, fallback: 30 } as const
+const INFLIGHT_KEY = { min: 1, max: 50, fallback: 2 } as const
+const INFLIGHT_ORG = { min: 1, max: 50, fallback: 4 } as const
+const INFLIGHT_PROVIDER = { min: 1, max: 50, fallback: 6 } as const
+
+/** The second group, "Questions and runs from outside" — one entry per field, in screen order. */
+const OUTSIDE = [
+  { field: "mcp_ask_wait_seconds", id: "api-key-limit-ask-wait", label: COPY.askWaitLabel, hint: COPY.askWaitHint, bounds: ASK_WAIT },
+  { field: "outside_inflight_per_key", id: "api-key-limit-inflight-key", label: COPY.inflightKeyLabel, hint: COPY.inflightKeyHint, bounds: INFLIGHT_KEY },
+  { field: "outside_inflight_per_org", id: "api-key-limit-inflight-org", label: COPY.inflightOrgLabel, hint: COPY.inflightOrgHint, bounds: INFLIGHT_ORG },
+  { field: "outside_inflight_per_provider", id: "api-key-limit-inflight-provider", label: COPY.inflightProviderLabel, hint: COPY.inflightProviderHint, bounds: INFLIGHT_PROVIDER },
+] as const
+
+type OutsideField = (typeof OUTSIDE)[number]["field"]
+type Outside = Record<OutsideField, number>
+
+const OUTSIDE_DEFAULTS = Object.fromEntries(OUTSIDE.map((o) => [o.field, o.bounds.fallback])) as Outside
+const OUTSIDE_EMPTY = Object.fromEntries(OUTSIDE.map((o) => [o.field, ""])) as Record<OutsideField, string>
+const OUTSIDE_HEADING_ID = "api-key-limits-outside-title"
 
 /** Empty or non-numeric reports nothing; anything else is clamped to the field's bounds. */
 function limitFrom(raw: string, bounds: { min: number; max: number }): number | null {
@@ -47,14 +76,19 @@ function limitFrom(raw: string, bounds: { min: number; max: number }): number | 
   return Math.min(bounds.max, Math.max(bounds.min, Math.trunc(n)))
 }
 
-type Limits = { starts: number; reads: number }
+type Limits = { starts: number; reads: number; searches: number }
 
 /** What the Integrations save reads before its PUT, and hands the PUT's response back to. */
 export type ApiKeyLimitsHandle = {
   /** The changed limits, ready to spread into the section's body; `{}` until the read has answered. */
   changes: () => SettingsUpdate
   /** Show the values the server now holds. */
-  adopt: (saved: Pick<FullAppSettings, "api_key_starts_per_minute" | "api_key_reads_per_minute">) => void
+  adopt: (
+    saved: Pick<
+      FullAppSettings,
+      "api_key_starts_per_minute" | "api_key_reads_per_minute" | "api_key_searches_per_minute" | OutsideField
+    >,
+  ) => void
 }
 
 function LimitRow({
@@ -105,12 +139,24 @@ function LimitRow({
 }
 
 export function ApiKeyLimits({ ref }: { ref?: Ref<ApiKeyLimitsHandle> }) {
-  const [loaded, setLoaded] = useState<Limits>({ starts: STARTS.fallback, reads: READS.fallback })
+  const [loaded, setLoaded] = useState<Limits>({ starts: STARTS.fallback, reads: READS.fallback, searches: SEARCHES.fallback })
   const [loadState, setLoadState] = useState<"loading" | "loaded" | "failed">("loading")
   const [loadError, setLoadError] = useState<string | null>(null)
   const [startsDraft, setStartsDraft] = useState("")
   const [readsDraft, setReadsDraft] = useState("")
+  const [searchesDraft, setSearchesDraft] = useState("")
+  const [loadedOutside, setLoadedOutside] = useState<Outside>(OUTSIDE_DEFAULTS)
+  const [outsideDrafts, setOutsideDrafts] = useState<Record<OutsideField, string>>(OUTSIDE_EMPTY)
   const alive = useRef(true)
+
+  function showOutside(values: Outside) {
+    setLoadedOutside(values)
+    setOutsideDrafts(Object.fromEntries(OUTSIDE.map((o) => [o.field, String(values[o.field])])) as Record<OutsideField, string>)
+  }
+
+  function setOutsideDraft(field: OutsideField, raw: string) {
+    setOutsideDrafts((d) => ({ ...d, [field]: raw }))
+  }
 
   function load() {
     setLoadState("loading")
@@ -122,10 +168,14 @@ export function ApiKeyLimits({ ref }: { ref?: Ref<ApiKeyLimitsHandle> }) {
           // An older backend that omits the fields runs on the same 10 / 120 defaults.
           starts: s.api_key_starts_per_minute ?? STARTS.fallback,
           reads: s.api_key_reads_per_minute ?? READS.fallback,
+          searches: s.api_key_searches_per_minute ?? SEARCHES.fallback,
         }
         setLoaded(limits)
         setStartsDraft(String(limits.starts))
         setReadsDraft(String(limits.reads))
+        setSearchesDraft(String(limits.searches))
+        // An older backend that omits the 306 fields runs on the same 30 / 2 / 4 / 6 defaults.
+        showOutside(Object.fromEntries(OUTSIDE.map((o) => [o.field, s[o.field] ?? o.bounds.fallback])) as Outside)
         setLoadState("loaded")
       })
       .catch((e: unknown) => {
@@ -150,6 +200,12 @@ export function ApiKeyLimits({ ref }: { ref?: Ref<ApiKeyLimitsHandle> }) {
     const reads = limitFrom(readsDraft, READS)
     if (starts !== null && starts !== loaded.starts) body.api_key_starts_per_minute = starts
     if (reads !== null && reads !== loaded.reads) body.api_key_reads_per_minute = reads
+    const searches = limitFrom(searchesDraft, SEARCHES)
+    if (searches !== null && searches !== loaded.searches) body.api_key_searches_per_minute = searches
+    for (const o of OUTSIDE) {
+      const v = limitFrom(outsideDrafts[o.field], o.bounds)
+      if (v !== null && v !== loadedOutside[o.field]) body[o.field] = v
+    }
     return body
   }
 
@@ -162,10 +218,13 @@ export function ApiKeyLimits({ ref }: { ref?: Ref<ApiKeyLimitsHandle> }) {
       const limits = {
         starts: saved.api_key_starts_per_minute ?? loaded.starts,
         reads: saved.api_key_reads_per_minute ?? loaded.reads,
+        searches: saved.api_key_searches_per_minute ?? loaded.searches,
       }
       setLoaded(limits)
       setStartsDraft(String(limits.starts))
       setReadsDraft(String(limits.reads))
+      setSearchesDraft(String(limits.searches))
+      showOutside(Object.fromEntries(OUTSIDE.map((o) => [o.field, saved[o.field] ?? loadedOutside[o.field]])) as Outside)
     },
   }))
 
@@ -205,6 +264,44 @@ export function ApiKeyLimits({ ref }: { ref?: Ref<ApiKeyLimitsHandle> }) {
           onChange={setReadsDraft}
           onBlur={settle(readsDraft, READS, loaded.reads, setReadsDraft)}
         />
+        <LimitRow
+          id="api-key-limit-searches"
+          label={COPY.searchesLabel}
+          hint={COPY.searchesHint}
+          value={searchesDraft}
+          min={SEARCHES.min}
+          max={SEARCHES.max}
+          disabled={!ready}
+          onChange={setSearchesDraft}
+          onBlur={settle(searchesDraft, SEARCHES, loaded.searches, setSearchesDraft)}
+        />
+        <div
+          role="group"
+          aria-labelledby={OUTSIDE_HEADING_ID}
+          data-outside-limits
+          className="mt-4 space-y-2 border-t border-border/60 pt-4"
+        >
+          <div>
+            <p id={OUTSIDE_HEADING_ID} className="text-sm font-semibold">
+              {COPY.outsideTitle}
+            </p>
+            <p className="mt-1 text-xs text-muted-foreground">{COPY.outsideDescription}</p>
+          </div>
+          {OUTSIDE.map((o) => (
+            <LimitRow
+              key={o.field}
+              id={o.id}
+              label={o.label}
+              hint={o.hint}
+              value={outsideDrafts[o.field]}
+              min={o.bounds.min}
+              max={o.bounds.max}
+              disabled={!ready}
+              onChange={(raw) => setOutsideDraft(o.field, raw)}
+              onBlur={settle(outsideDrafts[o.field], o.bounds, loadedOutside[o.field], (v) => setOutsideDraft(o.field, v))}
+            />
+          ))}
+        </div>
         {loadState === "failed" && (
           <div role="alert" className="flex flex-wrap items-center gap-3 rounded-lg border border-destructive/40 bg-destructive/15 px-3 py-2 text-sm text-[hsl(0_80%_80%)]">
             <span>

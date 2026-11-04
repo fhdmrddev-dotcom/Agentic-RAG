@@ -17,6 +17,8 @@ export interface Thread {
   active_expert_id?: string | null
   created_at: string
   updated_at: string
+  /** 306-04 (MCP-05 / D-09): how the thread started; absent or null for every in-app thread. */
+  origin?: RunOrigin | null
 }
 
 export interface ExpertBundle {
@@ -181,7 +183,7 @@ export interface SkillActivation {
 /** Phase 293 (START-04 / D-22): how a run was started, as recorded at start. Every run read
  *  carries it or `null`; an unrecorded run is never given a default kind (D-23). */
 export interface RunOrigin {
-  kind: "app" | "schedule" | "key"
+  kind: "app" | "schedule" | "key" | "mcp"
   label: string | null
   actor_name: string | null
 }

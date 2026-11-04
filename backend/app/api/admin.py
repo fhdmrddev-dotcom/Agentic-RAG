@@ -86,6 +86,7 @@ _FLAG_HUMAN_NAMES = {
     # The app_settings column it writes is created by Plan 03's migration 103 (the readback is
     # fail-soft until then — this Wave-1 plan lands AHEAD of the operator-applied migration).
     "model_discovery_filter_enabled": "model discovery filter",
+    "mcp_enabled": "MCP access",  # Phase 304 (KEY-06, D-03): the deployment MCP switch, mig 220
 }
 _FLAG_KEYS = set(_FLAG_HUMAN_NAMES)
 

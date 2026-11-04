@@ -1,7 +1,10 @@
 ---
 seed_id: SEED-081
 title: Provider rate-limit resilience + fan-out admission control under load (shared keys, no Retry-After backoff, uncapped concurrent fan-out against the shared per-account limit)
-status: planted
+status: folded
+partial: true
+folded_into: "306"
+status_note: "Folded in part into Phase 306 (v4.9, discuss 2026-10-31, auto): admission control + per-org/credential/provider in-flight budgets in front of OUTSIDE starts (MCP ask/run, /inbound), fail closed without Redis, in-app unaffected (GUARD-01). Retry-After backoff on provider 429s and in-app fan-out admission (llm_batch_agents) stay open."
 planted: 2026-06-10
 phase_origin: "Phase 101 plan-phase — future-milestone alignment sweep 2026-06-10 (workflow wf_13ed5033)"
 category: scale / performance — provider availability under load; an admission-control + backoff seam in front of the shared provider keys, NOT a new feature

@@ -48,11 +48,16 @@ export const EXPERT_SPEND_COPY = {
   reconRunsFail: (counted: number, windowRuns: number): string =>
     `✗ Lines count ${counted} runs; the window has ${windowRuns}. ${windowRuns - counted} runs are unattributed.`,
   ruleLine:
-    "A run counts toward the Expert active when it started. Sub-agent and continued runs count toward their parent run's Expert. Runs from before this was recorded show as Not recorded (before 268), never as No Expert.",
+    "A run counts toward the Expert active when it started. Sub-agent and continued runs count toward their parent run's Expert. Runs from before this was recorded show as Not recorded (before 268), never as No Expert. AI tool (MCP) calls have no Expert, so they count under No Expert and show their key in the ledger.",
   cardLoading: "Loading…",
   cardFailed: "Spend by Expert unavailable — spend data did not load.",
-  ledgerColumn: "Expert",
+  // 305-03 (D-31, UI-SPEC §Surface 2): the column holds an Expert OR an AI tool key.
+  ledgerColumn: "Expert or key",
   ledgerNotRecorded: "Not recorded",
+  ledgerMcp: (label: string): string => `MCP · ${label}`,
+  ledgerMcpRemoved: "MCP · removed key",
+  ledgerMcpTitle: (label: string, tool: string | null): string =>
+    tool ? `AI tool key ${label} · ${tool}` : `AI tool key ${label}`,
   subagentTag: (n: number): string => (n === 1 ? "incl. 1 sub-agent" : `incl. ${n} sub-agents`),
   ledgerHeaderChip: (name: string): string => `filtered to ${name}`,
   ledgerEmptyFiltered: (name: string, w: string): string =>

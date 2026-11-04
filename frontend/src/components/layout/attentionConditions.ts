@@ -214,20 +214,26 @@ export interface WaitingCondition {
   title: string
   /** Always `""` for this mark: the row's words are composed at render time (see above). */
   detail: string
-  /** Opens the run (`ctx.openRun(runId)`), never Library health. */
+  /** Opens the run (`ctx.openRun(runId)`), never Library health. 308: a webhook row opens Settings →
+   *  Webhooks on its endpoint (`ctx.openWebhooks(endpointId, orgId)`). */
   onOpen: () => void
-  /** The waiting run. */
-  runId: string
+  /** The waiting run. 308 (D-19): null on a webhook row — every reader tolerates it. */
+  runId: string | null
   /** The org the run lives in — may differ from the active org (the list spans every org, D-27). */
   orgId: string
   /** That org's name (the renderer owns the "Unnamed org" fallback). */
   orgName: string
   /** When the run began waiting: the notice's `created_at`, ISO 8601. */
   since: string
-  /** What the run is waiting for. */
-  kind: "question" | "approval"
+  /** What the run is waiting for. 308: `webhook_disabled` is an endpoint Syrel turned off. */
+  kind: "question" | "approval" | "webhook_disabled"
+  /** 308 (D-19): a webhook row only — the endpoint, why it was turned off, and whether `title` is its
+   *  host + path (the renderer sets it mono). Never a query string, never a secret. */
+  endpointId?: string | null
+  reason?: "failing" | "gone" | null
+  titleIsAddress?: boolean | null
   /** Who started the run, when known. */
-  origin?: "app" | "schedule" | "key" | null
+  origin?: "app" | "schedule" | "key" | "mcp" | null
   /**
    * The server's count of ALL open notices for this person — the same on every row, and it can
    * EXCEED the number of rows when the server caps them. A badge reads this (`waitingTotal`),
@@ -256,6 +262,9 @@ export interface AttentionContext {
   openLibraryHealth: () => void
   /** A run's surface — the waiting-runs tenant's door. */
   openRun: (runId: string) => void
+  /** 308-06 (D-19): Settings → Webhooks on one endpoint — the turned-off-webhook tenant's door. Never
+   *  switches the active org; the tab says when the endpoint lives in another one. */
+  openWebhooks?: (endpointId: string, orgId: string) => void
   /** Optional: told the waiting list's freshness, so a renderer can say "loading" / "may be out of date". */
   reportWaitingStatus?: (status: WaitingStatus) => void
 }
@@ -311,6 +320,7 @@ export function useStoppedSourceConditions(ctx: AttentionContext): AttentionCond
 export function useWaitingRunConditions(ctx: AttentionContext): AttentionCondition[] {
   const { notices, total, loading, verdictKnown, failedSinceLast } = useWaitingNotices()
   const openRun = ctx.openRun
+  const openWebhooks = ctx.openWebhooks
   const report = ctx.reportWaitingStatus
 
   const status: WaitingStatus = !verdictKnown
@@ -327,7 +337,24 @@ export function useWaitingRunConditions(ctx: AttentionContext): AttentionConditi
 
   return useMemo(
     () =>
-      notices.map((notice) => ({
+      notices.map((notice): WaitingCondition => notice.kind === "webhook_disabled" ? {
+        // 308-06 (D-19, D-48): an endpoint Syrel turned off — no run, so no run id and no origin.
+        mark: "waiting" as const,
+        id: notice.id,
+        title: notice.title ?? "",
+        detail: "",
+        onOpen: () => { if (notice.endpoint_id) openWebhooks?.(notice.endpoint_id, notice.org_id) },
+        runId: null,
+        endpointId: notice.endpoint_id ?? null,
+        reason: notice.reason ?? null,
+        titleIsAddress: notice.title_is_address ?? null,
+        orgId: notice.org_id,
+        orgName: notice.org_name,
+        since: notice.created_at,
+        kind: notice.kind,
+        origin: null,
+        total,
+      } : ({
         mark: "waiting" as const,
         id: notice.id,
         title: notice.workflow_name,
@@ -341,7 +368,7 @@ export function useWaitingRunConditions(ctx: AttentionContext): AttentionConditi
         origin: notice.origin,
         total,
       })),
-    [notices, total, openRun],
+    [notices, total, openRun, openWebhooks],
   )
 }
 

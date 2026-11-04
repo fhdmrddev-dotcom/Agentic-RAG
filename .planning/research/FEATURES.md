@@ -1,308 +1,358 @@
-# Feature Research — v4.8 "Every Page Has a Link"
+# Feature Research
 
-**Domain:** Multi-tenant B2B AI agent / workflow platform (React SPA + FastAPI + Supabase). New capabilities only: addressable URLs, "a run is waiting on you" notifications (in-app + email), and active-org-scoped lists.
-**Researched:** 2026-10-27
-**Confidence:** MEDIUM overall. Notification behaviour of Linear, Slack, Zapier, Knock, GitHub and the email legal rules are sourced from official docs (HIGH). Most URL *shapes* of other products are not in official docs; they come from third-party guides or common knowledge and are marked as such (MEDIUM/LOW). Repo facts were measured in this session (HIGH).
+**Domain:** Remote MCP server, personal MCP keys, OAuth sign-in, outbound webhooks and outside-traffic guardrails, added to a mature multi-tenant RAG agent platform (Syrel, milestone v4.9 "Use It From Your Own Tools")
+**Researched:** 2026-10-30
+**Confidence:** HIGH for the client-side facts (Claude connector, Claude Code and Cursor docs, MCP spec changelogs, Stripe and Standard Webhooks docs, all read directly). MEDIUM for competitor admin UX (vendor docs, partly through search summaries). LOW for PII-redaction market expectations and ChatGPT `search`/`fetch` naming (secondary sources only).
 
----
-
-## 0. Repo facts that change the picture (measured 2026-10-27)
-
-Read these before the tables. Several of them move a feature's cost, or make a seed's premise out of date.
-
-| Fact | Where | Consequence for v4.8 |
-|---|---|---|
-| `ActiveView` now has **12 members**: `chat, documents, skills, settings, workflows, connections, skill-studio, control-room, org-admin, workflow-run, admin-spend, experts`. The member list differs from SEED-185's 2026-08-18 list (`library-health`, `classification-rules` and `governance` are gone; `connections`, `admin-spend` and `experts` were added). | `frontend/src/App.tsx:132` | The route table comes from the current union, not from the seed. `frontend/src/lib/activeViewReachability.ts` (262-01) already lists the members, so it can serve as the router's coverage test. |
-| **Three ad-hoc deep links already exist and are live contracts.** `/app?run=<uuid>` opens a run (289-04, and the reload is kept). `/admin/spend` opens admin-spend (257). `/app?connections=1&…` is the **OAuth callback landing** (BUG-260903-01). | `App.tsx:156-171` | ⛔ The OAuth redirect URI is **registered with Google and Microsoft**. Changing it breaks connectors outside our deploy. The router must keep all three working, either as permanent redirects or as aliases. Emails or bookmarks that already carry `?run=` must still resolve. |
-| **Host rewrites already exist**: `app.<host>/(.*)` → `/app.html`, `/app/(.*)` → `/app.html`, with nginx mirroring it and `devRouting.ts` in dev. The root domain serves the landing page (`index.html`). | `frontend/vercel.json`, `frontend/nginx.conf` | SEED-185's note "needs a rewrite-all rule" is **mostly done already** for the app host. The open questions are **which base the routes live under** (`app.<domain>/…` in cloud, `/app/…` on one-box or self-hosted), and the Vercel rule that a real file beats a rewrite (a route can never be named like a built file). |
-| Active org = a **localStorage hint plus an `X-Org-Id` header** that the server validates. It is not in the URL. | `frontend/src/hooks/useAuth.ts:87-91`, `lib/api/*.ts` | The "org slug in the path" decision is a real fork (see §2.1). Today a link carries no org, so a two-org user can open a link while the wrong org is active. |
-| **Scheduled and API-key runs are owned by a person.** The schedule's `user_id` and the key's owner `user_id` become the run's `user_id`, in the key's or schedule's org. | `scheduler_service.py:103`, `api/inbound.py:24` | "Who gets notified" has a well-defined default (**the run owner**) even for 4 a.m. unattended runs. No routing design is needed for v1. |
-| The **inbound API already returns a no-existence-leak 404** (`{"detail":"Not found."}` for a miss whatever the cause). | `api/inbound.py:18-22` | There is already an in-house precedent for "a link you can't open fails without leaking". Reuse the same rule. |
-| An unanswered human-input step **no longer fails the run**. Since Phase 200 (D-10), a timeout raises `HumanInputTimeout`, so *"the run is paused and stays resumable"*. Per-call wait is 300 s by default, with a hard cap of 1800 s. | `harness/human_input.py:80-86, 319-339`, `config.py:1408-1416` | ⚠ **SEED-281's N-2 premise ("unanswered → fail_run") is partly stale.** At least for `human_input` steps, a waiting run now sits paused for as long as nobody acts, so "waiting on you" is a **durable state, not a 30-minute window**. Engine asks still route through `_resolve_failure_with_ask_user`, and its dispositions need re-measuring per type in the requirements step. This changes the reminder design (§3.2). |
-| Pending asks are looked up **per thread** (`GET /panel/ask_user/pending`). There is no per-user "everything waiting on me" query. | `api/panel.py:164` | The notification producer needs a **new server-side, per-user, per-org "waiting on you" query**. `attentionConditions.ts` forbids deriving the verdict on the client (D-235-05). |
-| The attention seam has exactly one tenant, and a test asserts `ATTENTION_PRODUCERS.length === 1` literally. | `layout/attentionConditions.ts`, `NavPanel.badge.test.tsx` | Registering the "waiting on you" producer is the **intended way in**. The test's number is re-baselined in the same commit. Do not build a second badge beside it. |
-| The org model is flat, with only **two access levels** (member / admin). | memory: `project_org_model_flat_with_inert_departments` | Approver groups, "first to respond" and escalation chains have nothing to attach to. They are anti-features for v1. |
+> Scope: only the five new capability areas. The Word-template bug (`BUG-261022-01`) is a defect fix, not a feature, and is left out.
 
 ---
 
-## 1. Feature Landscape
+## Five findings that change scope
 
-### Table Stakes (users assume these exist)
+1. **Personal keys alone do NOT reach Claude.ai or Claude Desktop for most users.** On Claude's hosted apps (claude.ai, Desktop, mobile, Cowork), a fixed bearer credential is only possible through "Request headers". That option is **beta, limited to some organizations, and entered by an organization Owner as a credential shared by the whole org**. Anthropic says outright: *"don't use it to identify which user is calling. If your tools need to act as the individual user, use OAuth."* Personal keys therefore cover **Claude Code, Cursor, VS Code, Codex and n8n** (anything with a `headers` config). **Claude.ai and Claude Desktop need the OAuth phase.** The milestone goal lists Claude Desktop beside keys, so the roadmap has to say this out loud. A stop-gap is an `npx mcp-remote <url> --header ...` stdio bridge snippet for Desktop. It works, but it is a developer workaround and should not be sold as "Desktop support". (HIGH: claude.com/docs/connectors/building/authentication.md, add-unlisted.md)
 
-#### A. A URL for every view
+2. **Hard per-call ceilings decide how "ask the agent" and "run a workflow" must behave.** Claude.ai and Desktop cap one tool call at **240 s** and a result at **about 150,000 characters**. Claude Code caps output at **25,000 tokens** by default and **aborts a call that sends nothing for 5 minutes** (HTTP). Claude says it does **not support "advanced or draft capabilities"**, and MCP *tasks* were experimental in 2025-11-25 and moved to an optional extension in 2026-07-28. **So no task-based design can be relied on.** The portable pattern, used by n8n and Syrel's own Phase 293 `/inbound`, is **start, return a handle, then poll with a tool**. (HIGH)
 
-| Feature | Why expected | Complexity | Depends on (existing) | Notes |
-|---|---|---|---|---|
-| **Each top-level view has a path** (`/chat`, `/workflows`, `/library`, `/experts`, `/settings`, `/admin`, `/org`) | Every comparable product does this. Loading `/workflows` cold and getting chat (measured in SEED-185) reads as broken. | MEDIUM | `ActiveView` union, `activeViewReachability.ts`, existing host rewrites | Mechanical once a router is chosen. The union *is* the route table. |
-| **Entity deep links**: thread, workflow (builder), workflow run, Expert | ChatGPT `/c/{id}` and Claude.ai `/chat/{uuid}` (LOW: common knowledge, not documented), Temporal `/namespaces/{ns}/workflows/{wfId}/{runId}/history` (MEDIUM: community forum + third-party guide), n8n execution views. A run that can't be linked has to be described in prose. | HIGH | SEED-178 (thread restore), `WorkflowRunPage`, `ExpertDetailModal` (today a modal held in page state) | The real work is **restore-from-id**: the entity must load *from the URL*, not from a click that came before it. The Expert detail modal needs a URL of its own (`/experts/:id`) and must open over the catalog. |
-| **Refresh lands in the same place** | F5 losing your place is the most-felt defect (SEED-015, SEED-178). | Falls out of the above | Same | The definition of done is SEED-178's console check: the URL carries the id, and F5 restores the conversation. |
-| **Back / Forward work** | Standard browser behaviour. Users notice when it is missing. | LOW once routed | Router | ⚠ Decide which changes **push** a history entry and which **replace** one (§2.2). Pushing every tab click makes Back unusable. |
-| **Open in new tab / middle-click / Cmd-click** | Links must be real `<a href>`, not click handlers. | MEDIUM (sweep) | NavPanel, list rows, cards | Every nav row, run row, thread row and Expert card should render an anchor. This is a broad but shallow sweep over many G-5-firing files. |
-| **"Copy link" affordance** on a thread, run, workflow and Expert | Linear has a link icon on the issue sidebar (LOW: third-party guide). Notion has "Copy link". GitHub has permalinks. | LOW | The routes | A button that copies the canonical URL. It does **not** create a public or share token (see Anti-features). |
-| **A link to something you can't open fails clearly and leaks nothing** | GitHub returns **404 instead of 403** for private repos so it does not reveal they exist (HIGH: GitHub REST docs). Slack deep links show **an HTTP 404 page** if you lack access or the channel doesn't exist (HIGH: Slack deep-linking docs). | MEDIUM | RLS, the inbound-API 404 precedent, the feature-visibility map | One worded page: *"This link can't be opened. It may not exist, or you may not have access."* The same text for missing and forbidden. Never render an empty shell of the view (SEED-185 failure criterion #1). |
-| **Signed-out user opens a deep link → sign in → lands on the link** | Slack: *"users will be sent to their default team or asked to sign in"* (HIGH). Universal pattern. | MEDIUM | `useAuth`, the `/setup` and `/invite` entry flows | Keep the intended path across login (a `?next=` or saved path). ⛔ Only accept same-origin relative paths, to avoid an open redirect. `/setup` and `/invite` must behave exactly as before (SEED-185 #3). |
-| **A view the user's audience can't see → refusal, not blank** | Admin-only routes typed by a member. | LOW | The API-enforced feature-visibility map, Control Room and Org Admin gates | The server already decides. The route only needs a refusal render. |
-| **Existing link contracts keep working** (`/app?run=`, `/admin/spend`, `/app?connections=1`) | OAuth redirect URIs are registered outside the product. | LOW | App.tsx boot readers | Redirect them to canonical routes, or alias them. Never remove them. |
+3. **The MCP spec moved under us.** The current revision (**2026-07-28**) removes protocol sessions and `Mcp-Session-Id`, removes the `initialize` handshake, removes SSE resumability, moves tasks to an extension, and **deprecates DCR in favour of Client ID Metadata Documents (CIMD)**. Claude's OAuth client still follows the **2025-03-26 / 2025-06-18 / 2025-11-25** authorization specs and uses CIMD *only if* the AS advertises it, otherwise DCR. **Build stateless (no reliance on session ids) and support both DCR and CIMD.** This also fits the multi-worker uvicorn default, where a session id would need sticky routing. (HIGH: modelcontextprotocol.io/specification/latest/changelog)
 
-#### B. Told when a run waits on you
+4. **The market has settled on small, read-heavy, admin-curatable tool sets.** Glean warns *against one server with all tools enabled* because it hurts tool-selection accuracy and hits host limits. GitHub exposes toolsets plus a read-only path or header. Linear has `/mcp/readonly`. Supabase has `read_only`, `project_ref` and `features=`. Sentry scopes by URL path. Stripe folds a whole API into `api_read` / `api_write`. Claude's directory **rejects** mixed read/write tools and requires `title` plus `readOnlyHint` or `destructiveHint` on every tool. Those annotations drive Claude's auto-permission: read-only tools run without a prompt, destructive ones always prompt. (HIGH/MEDIUM)
 
-| Feature | Why expected | Complexity | Depends on (existing) | Notes |
-|---|---|---|---|---|
-| **In-app "waiting on you" indicator** (nav badge + popover list) | Every approval product shows pending items. GitHub shows *"a notification for the review request"* on the run (HIGH: GitHub docs). | LOW–MEDIUM | `attentionConditions.ts` seam (one tenant), `NavPanel` badge, `ChatLayout` single reader | Register the producer. Re-baseline `length === 1` → `2` in the same commit. The server provides the verdict. |
-| **Each notice links straight to the waiting run** | The point of the milestone. Linear: clicking a notification opens the issue (HIGH: Linear inbox docs). Zapier: *"the notification includes a link to the step that needs review"* (HIGH: Zapier help). | LOW once routing exists | Routing (§A), run deep link | **Hard dependency: routing ships first.** |
-| **Email to the run owner when a run starts waiting**, from an app-owned sender | Nobody is in the app at 4 a.m. (SEED-281 rule 1). Zapier notifies reviewers by email, Slack or another Zap (HIGH). | MEDIUM | New: app-owned mailer (one secret, env only), the run-owner `user_id` | Must cover schedule, API-key, thread and starter runs alike. That works because all of them have an owner `user_id`. |
-| **The notice clears itself when the wait is resolved** (answered, approved, cancelled, run stopped) | A stale "waiting" badge trains people to ignore it. This is SEED-281's own "muted channel" warning. | MEDIUM | `/pending` liveness checks (`_prompt_run_is_live`), the run lifecycle | The in-app list is **derived from current state** (server query), not from a log of sent events, so it cannot go stale. |
-| **Quiet about routine success** | SEED-281 rule 3. Linear and Slack both default to only important events. | — (a scoping rule) | — | v1 triggers: *waiting for an answer* and *waiting for approval*. Nothing for "completed". |
-| **Email is legal and deliverable**: SPF/DKIM, aligned From, a working reply-to or a clearly no-reply sender, a footer naming the app and why you got it, a link to notification settings | Gmail requires **SPF or DKIM, valid PTR, TLS and a spam rate below 0.3%** from *all* senders (HIGH: Google sender guidelines). | LOW (code) / MEDIUM (ops: DNS) | New mailer, deploy parity checklist | Domain DNS records are the non-code half. Add them to `docs/DEPLOYMENT-WORKFLOW.md` parity. |
-| **A per-user email off switch for this notification type** | Every reference product has per-type and per-channel settings (Linear: *"choose which update types to receive on each channel"*, HIGH). | LOW | `user_settings` (settings live in the UI, not env) | One toggle: "Email me when a run is waiting on me" (default **on**). The in-app badge cannot be turned off. |
-
-#### C. Lists follow the active org
-
-| Feature | Why expected | Complexity | Depends on (existing) | Notes |
-|---|---|---|---|---|
-| **Library folders and the Workflows list show only the active org's items** | Linear: *"Each workspace will have distinct member lists and separate billing plans"* (HIGH). Temporal: selecting a namespace opens *its* workflows (HIGH). Vercel and Slack scope the dashboard to the selected team. No reference product mixes two workspaces' items in one list. | LOW–MEDIUM | `X-Org-Id` validation (create already stamps the org since 296-01), `fetch_visible_folders`, the workflows list query | Filter by the **validated** active org, using the same read that create uses. Global folders and skills stay visible (CLAUDE.md: the only shared scope). |
-| **Switching org refetches every scoped list and leaves org-specific deep pages** | After a switch, the Builder of an org-A workflow is not valid in org B. | MEDIUM | `ChatLayout.orgRefetch.test.tsx` (a refetch seam exists), the router | On switch, go to the list view of the current section (`/workflows`, `/library`), not the entity. Slack, Linear and Vercel all land you on the workspace home. |
-| **Pickers follow the same scope** (KB folder picker inside a workflow, Expert scope picker) | SEED-389's concrete harm: picking org A's folder as the KB in an org-B workflow. | MEDIUM | `DescribeKbPicker`, the workflow KB picker, Expert scope | ⚠ This is where a cross-org mix becomes a *wrong run*, not just a cluttered list. The server must reject a foreign-org folder id at save or launch, not only hide it in the UI. |
-| **Existing items created before org-stamping are handled deliberately** | Older rows may carry a null or first-org `org_id`. | MEDIUM (decision + possible migration) | Migrations from 217 | Decide: backfill to the user's oldest org, or show them in every org they belong to. This needs measuring (count of null-`org_id` rows) before planning. |
-
-### Differentiators (where this product can do better than the references)
-
-| Feature | Value proposition | Complexity | Notes |
-|---|---|---|---|
-| **The run page *is* the answer page.** The email and the badge carry no decision buttons. They open the run, where `PendingAskCard` shows the question with its evidence. | SEED-281 rule 2: *"the notification says go and look; the run surface stays the authority"*. Power Automate's actionable approval emails need a special sender, and guest users must use the portal (HIGH: Microsoft docs), which shows how much auth surface an email-borne decision brings. Approving from inside the evidence is safer and more honest. | LOW | This is also cheaper than actionable email, so the differentiator and the cost saving agree. |
-| **The notice says *why* it is waiting, in words**: "Paused for your approval before *sending an email to 3 recipients*", or "Asking: *Which quarter should the report cover?*", plus the origin ("scheduled run at 04:19", "started by API key *Zapier prod*"). | Glean, n8n and Zapier emails mostly say "approval requested". Naming the action, the origin and the question lets a person triage from a phone. | LOW–MEDIUM | Origin is already on the run (`origin_kind` / `origin_ref`, Phase 293). The armed-checkpoint action description already exists for the review moment. |
-| **The email is skipped if you already saw it in-app** (a short delay, then send only if unread or unresolved) | Linear: email digests are *"only sent if you haven't already read the Linear inbox notification"* (HIGH). Slack: email only *"when you're not active in Slack"*, bundled every 15 min or hourly (HIGH). Knock lists *"email only if the in-app message has not been seen"* as a standard step condition (MEDIUM). | MEDIUM | Needs a delayed job, which the existing scheduler or Redis can host. ⚠ For the 4 a.m. case the delay costs little, since nobody is looking. For an active user it avoids a duplicate email. **v1 can ship "send when still unresolved after N minutes"**: resolved state is already server truth, and read-tracking can come later. |
-| **One reminder if it's still waiting** | Zapier has a **"Send reminder" value + unit after the initial notification** (HIGH). Because a waiting run is now durable (§0), a single reminder (e.g. at 24 h) is the honest form of SEED-281's N-2. | LOW–MEDIUM | Exactly one reminder, not a cadence. Name it in the email ("Still waiting since 04:19 yesterday"). |
-| **A link that names the org it belongs to, and offers to switch** | If a two-org user opens an org-B run while org A is active, say *"This run is in **Acme Ops**. Switch to Acme Ops to open it."* instead of 404-ing. Slack sends you to your default team or asks you to sign in (HIGH). This is only possible because the user **is** a member of B. | MEDIUM | ⚠ Only reveal the org name when the user is a member of that org. For non-members the response must be the same no-leak 404. This needs a server endpoint that resolves an entity id to the requester's membership. |
-| **The schedule shows "last run is waiting on you"** | Closes SEED-281 N-3's sibling: `last_status` is rendered nowhere a person passes. | LOW | Reuses the same "waiting on you" query. Optional. |
-
-### Anti-Features (seem good, cause problems — explicitly do NOT build in v4.8)
-
-| Anti-feature | Why requested | Why problematic | Alternative |
-|---|---|---|---|
-| **Approve/Reject buttons inside the email** (actionable or magic-link email) | Faster. Power Automate and n8n "send and wait" do it. | A link that *acts* is a bearer credential. It can be forwarded, prefetched by mail scanners (link scanners click GET links), and needs its own expiry, replay and CSRF story. SEED-281 rule 2 forbids it. Power Automate restricts actionable mails to its own sender and excludes guests (HIGH), which shows the cost. | The email links to the run; the decision happens behind normal auth. |
-| **Public / anonymous share links** (ChatGPT `/share/…` style snapshots) | "Share a link" sounds like this. ChatGPT consumer links let *"anyone who has access to a shared link"* view (HIGH: OpenAI FAQ). | This is a new access model (a token beside RLS) on a B2B product with retention and legal hold. Snapshot-vs-live, revocation and what happens on delete all need policy. The milestone's own wording is *"the server still decides who may open them"*. | v4.8 links are **same-auth links only**: they work for anyone RLS already allows. Plant a seed for external sharing. |
-| **Org slug in every path** (`/o/acme/workflows/…`) as part of v4.8 | Linear, Vercel, Slack and Temporal put the workspace in the URL. | It pulls in slug minting, uniqueness and rename handling (Linear lets admins change the *"domain key"*, HIGH, so old links must redirect), and every route and test changes. The entity ids are already globally unique UUIDs, so the server can resolve the org from the id. | **Keep the org out of the path.** Resolve it from the entity, and handle a mismatch with the "switch to org X" prompt above. Revisit at Open Platform (v4.9), which needs stable public URLs anyway. |
-| **Full notification centre / inbox with history, snooze, archive and every event type** | Linear, GitHub and Slack have one. | Scope explosion. SEED-281 rule 3 (quiet by default). Linear itself caps at 2,000 open notifications and doesn't support archive (HIGH), so even the leaders keep it narrow. | A **derived "waiting on you" list**: current state, not an event log. Add an event log when a second notification type with no live state appears (e.g. N-3 "scheduled run failed"). |
-| **Approver groups / "first to respond" / "everyone must approve" / escalation to admins** | Retool assigns tasks to user *groups* (MEDIUM: archived docs). Power Automate has all-must-approve modes. | The org model has two access levels and inert departments, so there is nothing to route to. Microsoft *deprecated* "first to respond" (HIGH). Escalation to admins puts an org admin in the path of every member's run. | **Run owner only** in v1. SEED-281 rule 4 says the recipient question must not be assumed. Record it as a seed with a trigger such as "the first org that needs someone other than the owner to approve". |
-| **Auto-approve or auto-skip on timeout** | Zapier offers *"Skip and continue"* on timeout (HIGH). | SEED-281: *"Auto-approving an unattended run because nobody was told is the wrong repair."* An armed checkpoint is the one thing that behaved correctly. | Notify, remind once, leave the run durably paused. An author may choose to keep armed steps out of scheduled workflows. |
-| **Email on every run completion / daily digest of all activity** | Feels informative. | A muted channel then fails to deliver the one email that matters (SEED-281 rule 3). | Event-specific, only when a person must act. |
-| **Putting ephemeral UI state in the URL** (scroll position, open popovers, the composer draft, panel width, every tab of every page) | "Everything should survive refresh." | Makes URLs long and noisy, and every interaction becomes a history entry, which breaks Back. | URL = **identity + the major sub-view** (see §2.2). Everything else stays in local state or localStorage, as today. |
-| **Web push / mobile push / Slack DM channel in v4.8** | Slack and Linear offer push. | Each is its own delivery stack (service worker + VAPID, an app, a Slack app install). The milestone already adds one new piece of infra (the mailer). | Email + in-app. Push goes to a seed. |
-| **Marketing-style unsubscribe machinery** (List-Unsubscribe one-click, preference centre for a product email that is transactional) | Gmail bulk-sender rules. | Google's one-click requirement applies to *"marketing messages and subscribed messages"* from senders above **5,000/day** (HIGH). CAN-SPAM exempts transactional or relationship messages from most provisions; they only must not carry false routing information (HIGH: FTC). | A clear "Manage notification emails" link to the in-app setting, and honest headers. Revisit if volume or content ever turns promotional. ⚠ Not legal advice. EU/UK operators (GDPR/PECR) should confirm. |
+5. **Webhooks have a de-facto standard: Standard Webhooks.** The headers are `webhook-id`, `webhook-timestamp` and `webhook-signature`. The signature is HMAC-SHA256 over `id.timestamp.body` with a `whsec_` secret. Rotation sends multiple signatures at once. Only 2xx counts as success, redirects are never followed, a 410 disables the endpoint, and retries back off over days. Expected management UX comes from Stripe (Event deliveries tab, Resend for up to 15 days, Roll secret with up to 24 h overlap, 3-day retries) and Svix (8 attempts over about 27 h, auto-disable after 5 days of failure, Recover-failed-since-date). **Signing a different way is a self-inflicted anti-feature.** (HIGH)
 
 ---
 
-## 2. How comparable products do it — the specifics the roadmap needs
+## Feature Landscape
 
-### 2.1 URL shapes and where the org lives
+### A. Remote MCP server: tools and call behaviour
 
-| Product | Shape (observed) | Org/workspace in URL? | Confidence |
+#### Table Stakes
+
+| Feature | Why Expected | Complexity | Notes / existing dependency |
 |---|---|---|---|
-| Linear | `linear.app/<workspace>/issue/<TEAM-123>/<slug>` | Yes, a path slug ("domain key", admin-editable) | Slug editability HIGH (docs); exact path LOW (third-party + common knowledge) |
-| Slack | `app.slack.com/client/<T_TEAM>/<C_CHANNEL>`; permalinks `<ws>.slack.com/archives/<C>/p<ts>` | Yes, a team id in the path or subdomain | MEDIUM (Slack API `chat.getPermalink` example + third-party guides) |
-| Temporal UI | `/namespaces/<ns>/workflows/<workflowId>/<runId>/history` | Yes (namespace) | MEDIUM (community forum + third-party guide; namespace switcher HIGH) |
-| Vercel | `vercel.com/<team-slug>/<project>/…` | Yes | LOW (common knowledge; docs only describe a scope selector) |
-| GitHub | `github.com/<org>/<repo>/actions/runs/<id>` | Yes (owner is part of the resource's identity) | LOW (common knowledge) |
-| ChatGPT / Claude.ai | `chatgpt.com/c/<id>`, `claude.ai/chat/<uuid>` | **No.** Workspace is session state | LOW (common knowledge) |
-| Notion | `notion.so/<workspace>/<Title>-<id>` | Cosmetic. The id resolves the page | LOW |
+| **Streamable HTTP endpoint at a stable URL** (e.g. `https://<host>/mcp`) | Every product studied (Linear, Sentry, Stripe, Supabase, Glean, Notion) is "paste a URL". SSE is deprecated. | MEDIUM | Mounts in FastAPI via the official Python SDK. **Stateless mode** (no session affinity) is required by the multi-worker default and by spec 2026-07-28. Must answer 403 on a bad `Origin`. |
+| **`search_knowledge_base`**: query, optional folder filter, top-k; returns ranked chunks with document title, id, app link and score | The core reason anyone connects a RAG product (Glean's defaults are search, chat and read_document) | LOW-MED | Reuses `retrieval_service` / `search_documents_tool` `folder_ids`. Must apply the **caller's visibility AND the key's folder narrowing as an intersection, never a union**. `readOnlyHint: true`. |
+| **`list_documents` / `read_document`** (or one `fetch` by id) with pagination and an offset or page on long text | Clients cannot read what they cannot list. Results must fit the 150k-char / 25k-token ceilings. | LOW-MED | Cursor-paginated list. `read_document` returns extracted text in pages and states the total. Original file through a one-time link (Phase 293 already mints file links). `readOnlyHint: true`. |
+| **`ask_agent`**: question, optional folders, optional conversation handle; returns answer text, numbered citations, **response-level confidence** (`level`, `avg_similarity`, `disclaimer`) and a link to open the thread in Syrel | It is the product's core value. SEED-013 names confidence as *the* field external callers branch on. | HIGH | **Internal deadline below 240 s** (target about 180 s). Send `notifications/progress` when the client passed a `progressToken`, which also keeps Claude Code's 5-min idle timer alive. On deadline, return `status: running` + `run_id` + "call `get_answer`" instead of failing. Agent toolset for MCP turns should be **retrieval/read only**: no sandbox, no connector writes, no `ask_user` (nobody can answer it; degrade to returning the question as text). Thread recorded with an `origin` of MCP so it is legible in the app (the Phase 293 `origin_kind` pattern). |
+| **`list_workflows`** (published workflows the caller may run, with input schema) | `run_workflow` is unusable if the model cannot discover names and inputs. n8n's MCP needs the same discovery step. | LOW | Reads published definitions, filtered by visibility and by the key's tool/workflow narrowing. `readOnlyHint: true`. |
+| **`run_workflow`** returns `run_id` immediately; **`get_workflow_run`** returns status, step position, final output, evidence summary, file links, and "waiting on <person>" with an app link | Workflows run for minutes. Start-and-poll is the portable pattern (n8n `execute_workflow` + `get_workflow_execution`; Phase 293 `/inbound` POST + GET). | MEDIUM | Reuses `workflow_kickoff`, the inbound start path, run evidence (289) and v4.8 `/app/...` run links. `run_workflow` is **not** read-only, so it carries `destructiveHint` or omits `readOnlyHint` and the client prompts. Origin recorded as MCP + key/connection label. |
+| **Tool annotations on every tool** (`title`, `readOnlyHint` / `destructiveHint`, `openWorldHint:false`) | They drive Claude's auto-approval. Directory review requires them. | LOW | Mechanical, but missing them means every read prompts the user. |
+| **Short, factual tool descriptions with no behavioural instructions** | Claude review rejects descriptions that steer the model. Long descriptions bloat every client's context. | LOW | Target ≤ 2 sentences + parameter docs. Deterministic `tools/list` order (spec 2026-07-28 SHOULD, which also helps prompt-cache hits). |
+| **Errors as tool results (`isError: true`) with actionable text**, not protocol errors | Spec 2025-11-25 (SEP-1303) says so, so the model can self-correct. Claude review fails generic "Bad Request". | LOW | Covers rate-limited, folder not visible, workflow not found, MCP disabled by admin, provider capacity. Each needs a plain sentence. |
+| **Bounded result sizes** | Above about 150k chars (claude.ai) or 25k tokens (Claude Code) the result is truncated or spilled to a file | LOW | Hard cap per tool, with a "results truncated, page with `cursor`" sentence. |
+| **Every MCP call leaves an audit row and appears in run/thread history** | Atlassian, Stripe ("MCP tool call logs in Workbench") and Glean all expose this. SEED-195: *"An inbound run must appear in the run log like any other."* | LOW-MED | `audit_log_action_type_check` lockstep pattern from mig 215. New origin kind for workflow runs and threads. |
 
-**Read-across:** products whose entities are *named within* a workspace (Linear `ENG-123`, GitHub repos, Temporal workflow ids) need the workspace in the path to be unique. Products with **globally unique ids** (ChatGPT, Claude.ai, Notion) don't. All our entities (threads, runs, workflows, Experts) are UUIDs, so the Claude.ai/ChatGPT pattern fits: **no org in the path; the server resolves it.**
+#### Differentiators
 
-**Recommended shapes** (relative to the app base: `app.<domain>/` in cloud, `/app/` on one-box):
+| Feature | Value Proposition | Complexity | Notes |
+|---|---|---|---|
+| **Grounded answers that carry citations + confidence as `structuredContent`** (plus readable text) | No studied competitor returns a machine-branchable confidence verdict. Lets n8n/agents choose auto-reply or escalate (SEED-013's triage case). | LOW (fields exist on `messages`) | `outputSchema` declared. Response-level only; per-claim confidence stays out of scope. |
+| **"Open in Syrel" deep link on every answer, run and document** | Moves the user from their tool back to the evidence. Uses v4.8 links that survive sign-in and org switch. | LOW | Unique advantage from v4.8. |
+| **`ask_agent` with an Expert parameter** (answer as the "Legal" Expert, scoped to its bundle) | Turns Experts (the SKU) into something sellable outside the app | MEDIUM | Expert scope already intersects retrieval (Phase 279 `expert_scope`). Optional in v1. **P2.** |
+| **Conversation continuity by a server-minted handle** (`conversation_id` returned, passed back) | Follow-up questions without resending history. Matches spec 2026-07-28's "explicit server-minted handles as tool args". | MEDIUM | Stateless per call. History stored by us (the stateless-completions rule). The handle must be bound to the caller and refused for anyone else. |
+| **A run that waits on a person is legible through MCP** ("waiting on Dana for approval: <link>"), with the v4.8 notice + email already firing | Competitors mostly fail or hang. Syrel already has the waiting-run notification system. | LOW | Reads 300/301 state. **Do not** answer the person's question over MCP in v1. |
+| **ChatGPT-compatible `search` + `fetch` pair** | ChatGPT's deep-research / company-knowledge path reportedly calls only tools named `search` and `fetch` | LOW | LOW confidence (secondary sources). Could be aliases of the two read tools. Verify against OpenAI docs before committing. **P3.** |
+| **MCP Apps / interactive UI** (render a v4.5 artifact inside Claude) | Visual answers inside Claude | HIGH | Claude supports MCP Apps. Defer. |
+
+#### Anti-Features
+
+| Feature | Why Requested | Why Problematic | Alternative |
+|---|---|---|---|
+| **Expose every internal capability as a tool** (execute_code, skills, connectors, folder CRUD, settings) | "Everything in Syrel over MCP" | Tool-selection accuracy drops (Glean's explicit warning). Context bloats in every client. Each write tool is unattended blast radius (SEED-195: an inbound surface removes the human from the loop). Breaks the Extension Contract's closed-core spirit. | 6-7 tools: search, list/read documents, ask, list/run/get workflow. Grow by evidence. |
+| **Catch-all `api_request` tool, or one tool that both reads and writes** | Saves tool slots | Rejected by Claude's directory review. Defeats read-only auto-approval. | Separate read and write tools. |
+| **Blocking `run_workflow` until done** | Simpler for the model | Dies at 240 s on claude.ai; multi-minute runs are normal. Ties a worker per call. | Start + poll (`get_workflow_run`). |
+| **Relying on MCP tasks, sampling, elicitation or resource subscriptions** | Spec-native long-running / human-input story | Claude says it does not support subscriptions, sampling or draft capabilities. Tasks were redesigned and moved to an extension in 2026-07-28. Elicitation semantics changed (MRTR). | Polling tools now. Revisit tasks when a target client ships them. |
+| **Agent `ask_user` / HITL answered through the MCP call** | Workflows that pause for a person | No reliable cross-client way to ask mid-call. A model answering on the person's behalf defeats the approval gate. | Report "waiting on <person> + link". The person answers in the app; v4.8 notifies them. |
+| **Exposing documents as MCP *resources* as the primary read path** | Spec-native | Resources are app-controlled, not model-controlled. Many clients surface them poorly. Claude has no subscriptions. | Tools for reads. Resources optional later. |
+| **Tool descriptions with usage instructions** ("always call search first…") | Steer the model | Directory rejection and prompt-injection pattern. Bloats context. | Facts only. |
+| **Session-based state on the MCP endpoint** | SDK default in older versions | Sessions are removed in spec 2026-07-28. Breaks under 2 uvicorn workers without sticky routing. Session hijack class. | Stateless mode. Auth on every request. |
+
+---
+
+### B. Personal MCP keys and the connection-management page
+
+#### Table Stakes
+
+| Feature | Why Expected | Complexity | Notes / existing dependency |
+|---|---|---|---|
+| **Any member can mint a key; the secret is shown once; only a hash is stored; a prefix is shown for identification** | Universal (Stripe, Linear, Zapier "shown once", GitHub PATs). Already the Phase 293 pattern. | LOW | Reuses mig 215 `api_keys` design and `ApiKeySecretOnce.tsx`. ⚠ **mig 215 requires `workflows` to hold ≥ 1 entry (CHECK)**, so an MCP key either needs a `kind` column with a relaxed CHECK, or a sibling table. That is a requirements decision; both are cheap. Use a distinct prefix (e.g. `srl_mcp_`) so a leaked key is identifiable and scannable. |
+| **The key acts as the member, sees only what they see, and re-checks membership/revocation/expiry on every call** | Atlassian: *"MCP actions respect the user's existing permissions."* Supabase warns its PAT runs with full developer permissions, which is the failure to avoid. | MEDIUM | Phase 293 re-checks revocation, expiry and membership per call. Retrieval must run **as the member** (RLS-equivalent), not as service role with a filter bolted on. That service-role-only blind spot is the BUG-260911-01 class. |
+| **Bound to one org** | A key reading another org is a customer-loss event (SEED-013) | LOW | 293 pattern: one member, one org. |
+| **Optional narrowing: folder set, tool subset, read-only preset** | GitHub toolsets/readonly, Linear `/readonly`, Supabase `features`/`read_only`, Glean per-server tool choice | MEDIUM | Store narrowing **on the key, server-side**, never in user-editable URL params. **Narrowing can only shrink**: effective folders = member-visible ∩ key folders, re-evaluated per call so a lost folder grant takes effect at once. |
+| **Key list: label, prefix, scope chips (folders, tools), created, last used, expiry, Revoke** | Standard settings-page shape (GitHub, Stripe, Linear, Zapier "Rotate secret") | LOW | Reuses `ApiKeyCard`, `RevokeApiKeySheet`, `ApiKeyActivity`. "Last used" is cheap (`last_used_at` already exists). |
+| **Copy-paste connection snippets per client** | Every vendor ships them (Stripe, Supabase, Linear, Sentry) | LOW | Minimum set, each with the key as an **env-var reference, not inline**: Claude Code `claude mcp add --transport http syrel <url> --header "Authorization: Bearer $SYREL_MCP_KEY"` plus the `.mcp.json` form using `${SYREL_MCP_KEY}`; Cursor `mcp.json` with `${env:SYREL_MCP_KEY}`; VS Code `.vscode/mcp.json`; Codex `bearer_token_env_var`; a generic `{url, headers}`; Claude Desktop via the `mcp-remote` bridge (labelled as a workaround until OAuth). Reuse the `curlExamples.ts` pattern. |
+| **Org-admin kill switch: MCP off for this org**, effective on the next call | Stripe ("enable or disable MCP access for your entire team"), Atlassian (API-token toggle), Notion Enterprise client allowlist | LOW | `app_settings`/org setting plus a check on every call. Fits the Control Room capability grid (146-148). A switched-off call returns a plain tool error naming the admin action. |
+| **Admin view of every member's keys/connections with revoke** | Stripe admin "OAuth sessions… Revoke all"; Notion Admin API lists and revokes member connections | LOW-MED | Phase 293 D-04 already has an admin listing route for API keys. |
+| **Per-key rate limits, audited refusals** | 293 ships them for `/inbound` | LOW | Extends `rate_limit.py`. Separate buckets for `ask_agent` / `run_workflow` (expensive) and reads (cheap). |
+
+#### Differentiators
+
+| Feature | Value Proposition | Complexity | Notes |
+|---|---|---|---|
+| **"Test this key" button**: runs one search as the key and shows exactly what it can see (folder count, tools) | Ends "why can't Claude see my doc" support loops. Makes narrowing visible. | LOW | |
+| **Recent calls per key** (tool, time, outcome, refused reason) | Stripe Workbench MCP logs; Syrel already has `ApiKeyActivity` | LOW | Audit-row read. |
+| **Expiry presets with a nudge before expiry** (in-app notice) | Safer default than never-expiring | LOW | Reuses the 300/301 notification system. |
+| **Scoped preset templates** ("Read-only research", "Run workflows") | One click instead of a matrix | LOW | |
+
+#### Anti-Features
+
+| Feature | Why Requested | Why Problematic | Alternative |
+|---|---|---|---|
+| **Narrowing through URL query params or path segments** (Supabase/GitHub style) | Easy to compose; works in clients without config UI | The holder of the URL can edit it to widen scope. That is safe only when the server re-validates against a stored ceiling. Two sources of truth. | Narrowing lives on the key. If a URL variant is ever offered, it may only narrow further below the key's ceiling. |
+| **Key embedded in the URL** (`?token=`, Zapier-style secret URL) | Works in clients that cannot set headers | The MCP spec prohibits tokens in the query string. URLs leak into logs, proxies and history. Claude's docs say never accept it. | Bearer header now, OAuth for header-less clients. |
+| **Org-shared / service-account MCP keys in v1** | One key for a team bot | Breaks "sees only what the member sees". Nobody to attribute. Claude's static-header model is exactly this and Anthropic warns against identifying users with it. | Personal keys only. A service account is a later decision with its own security review (SEED-013). |
+| **Keys that can widen beyond the member** (admin-granted extra folders) | Convenience | Breaks the core invariant | Never. |
+| **Inline secret in generated config snippets** | Fewer steps | Ends up committed in `.mcp.json` | Env-var reference in every snippet (Stripe and Claude Code docs do this). |
+
+---
+
+### C. OAuth 2.1 sign-in for MCP (Claude.ai custom connectors)
+
+#### Table Stakes
+
+What Claude's client requires, read from Anthropic's connector docs. Missing any one means "Couldn't reach the MCP server" or "Authorization failed".
+
+| Feature | Why Expected | Complexity | Notes |
+|---|---|---|---|
+| **401 + `WWW-Authenticate: Bearer resource_metadata="…"` on unauthenticated calls** | Claude starts sign-in only on a 401 and ignores the header on a 200 | LOW | |
+| **Protected Resource Metadata (RFC 9728)** whose `resource` exactly equals the URL the user pastes; primary issuer **first** in `authorization_servers` | Claude uses only the first entry and does not fall back | LOW | |
+| **AS metadata (RFC 8414 or OIDC discovery)** reachable from Anthropic's egress `160.79.104.0/21`; `code_challenge_methods_supported: ["S256"]` | Discovery fails silently otherwise; a WAF in front of the IdP breaks it | LOW-MED | Cloud deploy parity item (Coolify/Vercel routing of `/.well-known/*`). |
+| **Authorization code + PKCE S256** | Required by spec and by Claude | MED | |
+| **Client registration: DCR now, CIMD as well** | Claude uses CIMD only if the AS advertises `client_id_metadata_document_supported: true` **and** `none` in `token_endpoint_auth_methods_supported`, otherwise DCR. DCR is deprecated in spec 2026-07-28. | MED | Support both. DCR creates a client per connection, so plan cleanup. |
+| **Redirects: exactly `https://claude.ai/api/mcp/auth_callback` + loopback any-port for `localhost` and `127.0.0.1`** (Claude Code, Cursor) | Claude docs. Anthropic says the hosted callback may move to `claude.com`, so allow both. | LOW | Exact-match registered URIs; port-agnostic loopback only. |
+| **Refresh tokens with rotation; `invalid_grant` on dead refresh; form-urlencoded token endpoint** | Claude refreshes on 401 and up to 5 min before expiry. Public clients must rotate. | MED | |
+| **OAuth endpoints respond in < 10 s (refresh < 30 s)** | Claude fails the flow otherwise | LOW | No slow DB fan-out on `/token`. |
+| **A consent screen we own**: client name, **redirect host shown**, what it can do, **which org**, Approve/Deny; anti-framing and CSRF `state` | MCP security best practices MUST list (confused-deputy mitigation). Supabase MCP and Stripe both have the user pick the org/account at consent. | MED | If Supabase Auth's OAuth 2.1 server is used (public beta since 2025-11-26), **the consent UI is ours to build** and Supabase supplies approve/deny. Extra warning when only loopback redirects are registered. |
+| **Tokens are audience-bound to our MCP resource; no token passthrough** | Spec MUST NOT accept tokens not issued for this server | MED | The MCP server must never accept a raw app session JWT as an MCP token. |
+| **"Connected apps" list: client, org, granted scope, last used, Revoke; admin "revoke all"** | Stripe "OAuth sessions", Notion admin revoke, Glean "sign users out of all sessions" | LOW-MED | Same page as keys: one "MCP access" surface with two credential kinds. |
+| **The same narrowing model as keys** (folders, tools) applied to an OAuth grant | Users expect a Claude.ai connection to be no wider than a key | MED | v1: org + preset (read-only / full) chosen at consent; folder narrowing edited afterwards on the connections page. |
+
+#### Differentiators
+
+| Feature | Value Proposition | Complexity | Notes |
+|---|---|---|---|
+| **Incremental scope** (start read-only, step up with a `WWW-Authenticate scope=` challenge when `run_workflow` is first called) | Spec 2025-11-25 SEP-835; least-privilege; fewer abandoned consents | MED | Claude honours a `scope` on the 401. **P2.** |
+| **Org-admin allowlist of which MCP clients may connect** (Claude, Cursor, …) | Notion Enterprise, Atlassian domain allowlist | MED | CIMD gives a verifiable client identity. **P3.** |
+| **Directory listing in Claude's Connectors Directory** | Discovery without a URL | HIGH (process) | Needs review criteria, test account, docs. **Blocked by SEED-294** (no legal entity). Post-milestone. |
+| **Enterprise Managed Auth / SSO without consent** | Enterprise ask | HIGH | Defer. |
+
+#### Anti-Features
+
+| Feature | Why Requested | Why Problematic | Alternative |
+|---|---|---|---|
+| **Hand-rolling a full authorization server** | Control | Large security surface (PKCE, rotation, DCR, CIMD, revocation). The MCP auth spec has changed every revision. | Delegate to Supabase Auth's OAuth 2.1 server if verified fit (STACK question), or a proven library. Own only the consent page and the narrowing. |
+| **Omnibus scopes / publishing every scope in `scopes_supported`** | Simplicity | Named as a "common mistake" in the MCP security best practices | 2-3 scopes: `mcp:read`, `mcp:run` (+ `offline_access`). |
+| **Shipping OAuth before keys** | Claude.ai is the headline client | OAuth is the harder half. Keys validate the tool surface with Claude Code/Cursor first. The milestone already orders keys first. | Keep the order. |
+| **`client_credentials` machine grant** | Bots | Claude does not support it. Recreates the service-account question. | Out of scope. |
+
+---
+
+### D. Outbound webhooks
+
+#### Table Stakes
+
+| Feature | Why Expected | Complexity | Notes / existing dependency |
+|---|---|---|---|
+| **Endpoint CRUD: HTTPS URL, description, event-type selection, enable/disable** | Stripe, GitHub, Svix all have this | LOW-MED | HTTPS only. **SSRF guard at create AND at every send**: reuse `app.security.egress` (`validate_destination` / `send_pinned_http` with DNS pinning). This is a security-bearing must. |
+| **Event catalog with sample payloads**: `workflow_run.completed`, `workflow_run.failed` (+ cancelled), `document.ingested`, `document.ingest_failed` | Stripe/Svix event catalogs; "only listen to what you need" | LOW | Dot-delimited `type`. Event names are a public contract, so freeze them. |
+| **Standard Webhooks signing**: `webhook-id` (stable across retries), `webhook-timestamp`, `webhook-signature: v1,<base64 HMAC-SHA256(id.ts.body)>`, `whsec_` secret, unique per endpoint | De-facto standard; verifier libraries exist in every language | LOW | Sign the exact bytes sent. |
+| **Secret shown once / revealable; roll secret with an overlap window** (both signatures sent during the window) | Stripe "Roll secret… delay expiration up to 24 hours"; Standard Webhooks multi-signature | LOW-MED | |
+| **Retries with exponential backoff + jitter over about 1-3 days; only 2xx is success; never follow 3xx; 410 disables; honour `Retry-After` on 429/502/504; 15-30 s timeout** | Standard Webhooks, Svix (8 attempts about 27 h), Stripe (3 days) | MED | Reuse the **notification drainer's claim/process/record outbox shape** (`notification_drainer.py`) rather than a new queue. Multi-worker safe claims. |
+| **Delivery log per endpoint**: event, attempt count, status code, latency, short response excerpt, next retry time, Delivered/Pending/Failed | Stripe "Event deliveries" tab, GitHub "Recent Deliveries", Svix logs | MED | Retention bounded (e.g. 15-30 days) and stated. |
+| **Manual resend of one delivery; "send test event"** | Stripe Resend (15 days), GitHub Redeliver + ping, Svix "Send example" | LOW-MED | The test event uses a fixture payload, never real content. |
+| **Auto-disable after sustained failure + tell the owner** | Svix (5 days), Standard Webhooks ("notify through other channels") | LOW | Reuse 300/301 in-app notice + content-free email. |
+| **Idempotency guidance + no ordering guarantee, stated in docs** | Stripe: *"doesn't guarantee delivery order… track event IDs"* | LOW | Docs + stable `webhook-id`. |
+| **Visibility-correct fan-out**: an endpoint receives only events about runs/documents its **owner can see at send time** | Implicit; a leak otherwise | MED | ⚠ The easy-to-miss part. Fan-out runs as the endpoint owner, not service role. Re-checks membership and org MCP/webhook switch per send. |
+| **Audit rows** for endpoint create/edit/delete/roll/disable | Platform norm; mig 215 audit lockstep | LOW | |
+
+#### Differentiators
+
+| Feature | Value Proposition | Complexity | Notes |
+|---|---|---|---|
+| **Thin payloads by default**: ids, status, timestamps, app link, plus a "fetch it" pointer (MCP `get_workflow_run` / document id) | Stripe now recommends **Thin**. Standard Webhooks praises thin. Pairs with PII policy and Phase 300's content-free email precedent. Safe by construction. | LOW | Full payload is an opt-in per endpoint later, subject to redaction. |
+| **`workflow_run.waiting` event** (run paused for a person) | "Post to Slack when a run needs me." Syrel uniquely has this state, and 300/301 already detect it. | LOW | Not in the milestone list. Strong, cheap candidate. **P2.** |
+| **Per-endpoint filters by workflow or folder** | Fewer irrelevant deliveries | LOW-MED | |
+| **"Recover failed since <date>" bulk resend** | Svix feature; ends outage clean-up by hand | MED | **P3.** |
+| **Asymmetric (ed25519) signatures** | Standard Webhooks recommends it when the consumer does not control both sides | MED | **P3.** |
+
+#### Anti-Features
+
+| Feature | Why Requested | Why Problematic | Alternative |
+|---|---|---|---|
+| **Full content in payloads** (answer text, document text, extracted fields) | One less API call | PII egress to arbitrary URLs. Payload size (Standard Webhooks: keep under about 20 KB). Stale snapshots. | Thin payload + fetch with credentials. |
+| **Custom signing scheme or unsigned "secret in URL"** | Quick | Every consumer must hand-roll verification; no libraries | Standard Webhooks. |
+| **Ordering / exactly-once guarantees** | Consumers ask | Nobody provides it (Stripe explicitly does not) | At-least-once + stable id + documented. |
+| **Payload transformations / templating per endpoint** | Fit the target (Slack) directly | Code-in-config. Turns an event bus into an integration platform. Extension Contract pressure. | Point Slack at n8n/Zapier, which reshape. |
+| **Following redirects / allowing http or private IPs** | "My endpoint redirects" | SSRF into the one-box network (Redis 6379, Postgres 54322) | Refuse. The delivery log names the reason. |
+| **Inbound webhooks** in this milestone | Symmetry | Already covered by Phase 293 `/inbound` | Out of scope. |
+| **Adopting Svix (SaaS) as a dependency** | Ready-made portal | New vendor + data processor. Self-hosted one-box parity. The outbox pattern already exists. | Build on the drainer pattern; copy Svix/Stripe UX. |
+
+---
+
+### E. Guardrails for outside traffic (admission control, PII redaction)
+
+#### Table Stakes
+
+| Feature | Why Expected | Complexity | Notes |
+|---|---|---|---|
+| **Per-key / per-connection rate limits**, separate buckets for expensive (`ask_agent`, `run_workflow`) vs cheap (search/read) calls | Every API product has them; 293 has per-key starts/reads per minute | LOW | Extends `rate_limit.py` + `app_settings` bounds. |
+| **Per-org concurrency cap on outside-started agent turns/runs, with interactive in-app users protected** | SEED-081: shared provider keys plus uncapped fan-out means an MCP burst starves the app | MED | Admission at the MCP/webhook-trigger boundary only, as milestone scope says. |
+| **Refusals the model can relay**: tool error text "Syrel is at capacity, try again in ~N s" (no transport-level 429 on `tools/call`) | Spec: tool errors for model self-correction. Transport errors break some clients. | LOW | HTTP 429 + `Retry-After` stays correct for webhook-consumer-facing and REST paths. |
+| **Spend/budget respected** | Phase 256 caps; Admin Spend page exists | LOW | Outside runs attributed to the key/connection so the spend view can name the source. |
+
+#### Differentiators
+
+| Feature | Value Proposition | Complexity | Notes |
+|---|---|---|---|
+| **Org-policy PII redaction on what leaves through MCP results and webhook payloads** (emails, phones, card/IBAN, national IDs → `[redacted: email]` marker), never inside the app | Studied competitors rely on permissions, not DLP, so this is a genuine regulated-buyer differentiator (SEED-079) | MED-HIGH | Must not mangle citations or ids. A visible marker beats silent removal. A per-org switch, default decided in requirements. LOW confidence on what buyers expect. |
+| **Redaction preview / "what would be redacted" check** on the keys page | Trust | MED | **P3.** |
+| **Origin column in the spend view** (in-app / key / MCP / schedule) | Attributable cost (SEED-073/074 line) | LOW | |
+
+#### Anti-Features
+
+| Feature | Why Requested | Why Problematic | Alternative |
+|---|---|---|---|
+| **Global PII redaction across the whole app** (retrieval, prompts, logs) in this milestone | SEED-079's full scope | A huge blast radius. Hurts in-app answer quality. The milestone deliberately scopes to new egress paths. | Redact only at the two new egress boundaries. |
+| **LLM-based PII detection on every outbound result** | Higher recall | Cost and latency on every call; non-deterministic | Deterministic recognisers (pattern + checksum, e.g. Presidio-class). STACK decides. |
+| **Silent truncation/denial under load** | Simplicity | Users blame the client; nobody can debug it | Explicit capacity sentence + audit row. |
+
+---
+
+## Feature Dependencies
 
 ```
-/chat                      new chat
-/chat/:threadId            a thread                          (SEED-178, SEED-015)
-/library                   Library (folder via ?folder=:id or /library/folders/:id)
-/workflows                 Workflows library
-/workflows/:workflowId     Builder / workflow detail
-/runs/:runId               a workflow run                    (notification target)
-/experts                   Expert catalog
-/experts/:expertId         Expert detail (today a modal)
-/skills, /skills/:skillId/:tab     Skill Studio
-/settings/:tab             Settings (tabs are real sub-views)
-/connections               Connections (OAuth callback lands here: keep ?connections=1 alias)
-/admin/:tab                Control Room (keep /admin/spend)
-/org/:tab                  Org Admin
+Phase 293 api_keys + /inbound + per-key rate limits + audit lockstep + origin_kind
+    └──extended by──> Personal MCP keys (kind/sibling table, folder+tool narrowing)
+                           └──requires──> MCP server (Streamable HTTP, stateless)
+                                              ├── search_knowledge_base ──uses──> retrieval_service folder_ids (∩ member visibility)
+                                              ├── list/read_document ──uses──> 293 one-time file links
+                                              ├── ask_agent ──uses──> agent_loop (read-only toolset) + run buffer + message confidence fields
+                                              ├── list/run/get_workflow ──uses──> workflow_kickoff, run evidence (289), v4.8 /app links
+                                              └── "waiting on <person>" ──reads──> 300/301 waiting-run state
+
+MCP server + keys ──validated first by──> Claude Code / Cursor / Codex / n8n
+OAuth 2.1 (PRM, AS, PKCE, DCR+CIMD, consent+org picker, refresh) ──requires──> MCP server, the same narrowing model as keys
+    └──unlocks──> Claude.ai + Claude Desktop custom connectors (keys cannot, finding 1)
+
+Outbound webhooks ──reuses──> notification_drainer outbox shape, egress.send_pinned_http (SSRF), 300/301 notices (auto-disable alert)
+    └──payload links ──> v4.8 links; "fetch the rest" ──> MCP get_workflow_run
+
+Admission control ──gates──> ask_agent, run_workflow, webhook-triggered nothing (webhooks are outbound only)
+PII redaction ──applies at──> MCP tool results, webhook payloads (thin payloads shrink its job)
+Org MCP kill switch ──checked by──> every MCP call, every OAuth token use, webhook fan-out (if one switch covers both)
 ```
 
-`/runs/:runId` is flat rather than nested under `/workflows/:id/runs/:runId`. The run is the notification target, and the email builder shouldn't need the workflow id. Temporal nests because run ids are only unique within a workflow, and ours are UUIDs. (Nesting is fine if preferred. Flat keeps the email link a single id.)
+### Dependency Notes
 
-### 2.2 What belongs in the URL vs not
+- **Keys before OAuth:** OAuth adds a second credential type, but the tool surface, narrowing and audit are shared. Keys let the tool surface be proven in clients that accept headers. The narrowing model must be designed once for both credential kinds, so its data model belongs in the keys phase.
+- **The ask_agent deadline/handle design needs the run buffer** (Redis stream per run). Polling `get_answer` reads the same run. This reuses Phase 061+ infrastructure, with no new infra.
+- **Webhook fan-out depends on a visibility check as the endpoint owner.** Doing it as service role reproduces the BUG-260911-01 class ("every gate reads through the service role").
+- **The PII redaction phase is easiest after thin webhook payloads are decided.** Thin payloads leave redaction mainly an MCP-results problem.
+- **Conflict:** "Narrow by URL params" conflicts with "narrowing lives on the credential". Pick the latter.
+- **Conflict:** "Answer HITL over MCP" conflicts with the approval-gate rule (no outbound or unattended capability before the approval model). Keep HITL in-app.
 
-| In the URL (path or query) | NOT in the URL |
-|---|---|
-| Section (view), entity id (thread/run/workflow/Expert/skill), a sub-view that is a *place* (Settings tab, Skill Studio tab, Admin tab), Library folder, a saved Library View id, a search query on the Find page if shareable | Active org (header + localStorage; resolved from the entity on deep link), panel open/collapsed and width, scroll position, composer draft, model picker selection, popovers/dialogs except entity-detail modals, streaming state |
+---
 
-**Push vs replace:** push on section and entity changes; **replace** on tab or filter changes inside one entity, so Back leaves the entity rather than replaying its tabs. Never push during streaming or auto-redirects (e.g. "new chat → created thread id" should *replace* `/chat` with `/chat/:id`).
+## MVP Definition
 
-### 2.3 Link to something in another org / without access
+### Launch With (v4.9)
 
-- **GitHub:** 404, not 403, to avoid revealing existence (HIGH).
-- **Slack:** not signed in → default team or sign-in; private channel without membership or nonexistent → HTTP 404 page (HIGH).
-- **Notion:** offers to request access, and tells users to check they're signed into the right account (HIGH: help article).
-- **Recommended:** (1) Not signed in → sign in → return to the link. (2) The entity exists in an org the user **is a member of** but which isn't active → interstitial "This is in *Org B*. Switch?" (3) Anything else (deleted, other user's private thread, org you're not in) → one identical "can't be opened" page. Request-access is an anti-feature for v4.8 because there is no sharing model to request into.
+- [ ] MCP server, stateless Streamable HTTP, with **six to seven tools**: `search_knowledge_base`, `list_documents`, `read_document`, `ask_agent` (deadline + progress + handle), `list_workflows`, `run_workflow`, `get_workflow_run`. Annotated, short descriptions, bounded results, tool errors, audit + origin. *Proves "use it from your own tools".*
+- [ ] Personal MCP keys: mint/show-once/revoke, member-as-caller, folder + tool narrowing (intersection only), last used, per-client snippets with env vars, org kill switch, admin list + revoke, per-key rate buckets. *Cheapest path to real clients.*
+- [ ] OAuth 2.1 per Claude's checklist (PRM, 401 challenge, PKCE S256, DCR + CIMD, Claude callback + loopback, rotation, < 10 s endpoints, owned consent page with org picker, connected-apps list with revoke). *The only way to reach Claude.ai and Desktop.*
+- [ ] Outbound webhooks: endpoints + event selection, Standard Webhooks signing, roll-with-overlap, backoff retries, delivery log, resend, test event, auto-disable + notice, thin payloads, SSRF guard, owner-visibility fan-out. *Completes "be told without opening the app".*
+- [ ] Admission control at the new boundaries (per-org concurrency for outside agent turns/runs, capacity tool errors) and PII redaction at MCP result and webhook egress.
 
-### 2.4 Notifications — reference behaviour
+### Add After Validation (v4.9.x / v5.x)
 
-| Concern | Reference behaviour | Source / confidence | Recommendation for v4.8 |
+- [ ] `workflow_run.waiting` webhook event. Trigger: the first user asks "ping Slack when it needs me" (likely immediately; cheap).
+- [ ] `ask_agent` with an Expert parameter. Trigger: an Expert customer wants it outside the app.
+- [ ] Incremental OAuth scope step-up. Trigger: consent abandonment or a security review asking for least privilege.
+- [ ] "Test this key" and per-key recent-calls view. Trigger: the first "Claude can't see my doc" report.
+- [ ] Webhook recover-since-date, per-endpoint workflow/folder filters.
+
+### Future Consideration
+
+- [ ] Claude Connectors Directory listing. Blocked by SEED-294 (no legal entity).
+- [ ] MCP Apps rendering artifacts inside Claude.
+- [ ] Tasks-extension support once Claude/Cursor ship it.
+- [ ] HITL answered from the MCP client (MRTR / elicitation) once client support is real.
+- [ ] Org service-account credentials, which need their own security review.
+- [ ] `/api/v1` REST surface (already named as next milestone).
+
+---
+
+## Feature Prioritization Matrix
+
+| Feature | User Value | Implementation Cost | Priority |
 |---|---|---|---|
-| In-app inbox vs badge | Linear: always-on inbox, read/unread (`U`), snooze, *Priority* tab, max 2,000, no archive. GitHub: run page shows "a notification for the review request". | Linear docs HIGH; GitHub docs HIGH | Badge + popover list of **currently waiting runs** via the existing attention seam. No event log. |
-| Read/unread | Linear toggles and uses it to suppress email. | HIGH | Not needed in v1: the list is derived from live state, so "resolved" replaces "read". |
-| Email: immediate vs digest | Linear: digest or immediate, digest delayed by urgency, skipped if read. Slack: bundled every 15 min / hourly when not active. | HIGH | **Immediate-ish** (short delay, skip if already resolved). An approval is urgent; a digest would defeat N-1. |
-| Per-user preferences | Linear: per type × channel. GitHub: per-org email routing (pick a verified address per org). | HIGH | One toggle per user. ⚠ Per-org email address (GitHub style) is a nice later touch for two-org users; v1 uses the auth email. |
-| Reminder / escalation | Zapier: one reminder value + unit, timeout with *Skip and continue* or *End run*. GitHub deployments: reviewers up to 6, one approval unblocks. n8n Wait: indefinite unless a limit is set (third-party). | Zapier HIGH; GitHub env reviewers MEDIUM; n8n LOW | One reminder. No escalation. No auto-continue. |
-| Who is notified | Zapier: specific account members or anyone by email (must log in). Retool: user groups. Power Automate: assigned approvers. | Zapier HIGH; Retool MEDIUM; MS HIGH | **Run owner** (the schedule owner or key owner for unattended runs, already the run's `user_id`). |
-| Notify on resolution | Linear and GitHub update the item in place; no "it was approved" email by default. | MEDIUM | The in-app item disappears. No resolution email. ⚠ N-4 (a scheduled run's outbound action really sent something) is a *different* notification. Leave it in the SEED-281 register. |
-| Transactional email legal | CAN-SPAM: transactional/relationship messages exempt from most provisions, must not have false routing info; categories construed narrowly. Gmail: SPF/DKIM, PTR, TLS and spam rate below 0.3% for all senders; one-click unsubscribe only for marketing/subscribed mail from >5k/day senders. | FTC HIGH; Google HIGH | Treat as transactional: accurate From/Reply-To, no promotional content, a link to the setting. Configure SPF + DKIM (+ DMARC `p=none`, cheap insurance). |
-
-### 2.5 Per-org list scoping on switch
-
-Linear (distinct members and billing per workspace; switch via `O W`), Temporal (namespace switcher opens that namespace's Recent Workflows) and Slack (team in the URL) all treat the workspace as a **hard boundary on lists**. None show a cross-workspace union by default. The union (a cross-workspace inbox, as in Linear's or Slack's multi-workspace clients) only exists for **notifications**, which leads to one decision worth making explicitly:
-
-> **Does the "waiting on you" badge count runs in *all* your orgs, or only the active one?** Recommendation: **the badge counts all orgs** (a 4 a.m. approval in org B must not be invisible because org A is active), and **each list row names its org** and offers the switch. That is the one place where crossing the org boundary is the right call. It means the producer query is per-user, not per-active-org. Flag this for the requirements step.
-
----
-
-## 3. Feature Dependencies
-
-```
-Router + route table (A)
-    ├──requires──> preserve /setup, /invite, /admin/spend, ?run=, ?connections=1 (OAuth URIs)
-    ├──requires──> restore-from-id for thread / run / workflow / Expert   (SEED-178 inside)
-    ├──requires──> "can't be opened" page + post-login return-to
-    └──enables───> Copy link, new-tab anchors, Back/Forward
-
-Org-mismatch interstitial ──requires──> Router + server "which org is this entity in, for me?"
-                          ──enhances──> Lists follow active org (C)
-
-"Waiting on you" server query (per user, all orgs)
-    ├──requires──> run pause states measured per type (human_input = durable pause since 200;
-    │              engine-ask dispositions re-measured)
-    ├──feeds─────> attention producer #2 (badge + list)   ──requires──> Router (/runs/:id)
-    └──feeds─────> Email job ──requires──> app-owned mailer (secret + DNS + deploy parity)
-                             └──requires──> Router (link target must exist BEFORE first email)
-    One reminder ──requires──> Email job + a delayed/scheduled check
-
-Lists follow active org (C)
-    ├──requires──> validated X-Org-Id read in list queries (create already uses it, 296-01)
-    ├──requires──> decision on legacy rows with null/other org_id
-    └──should pair──> server-side rejection of foreign-org folder ids at save/launch
-
-Public share links ──conflicts──> "server/RLS decides" (milestone wording) — defer
-Actionable approve-in-email ──conflicts──> SEED-281 rule 2 — never
-```
-
-### Dependency notes
-
-- **Notifications require routing.** An email that links to `/app` lands on chat, which repeats the exact failure SEED-185 lists ("every link lands on the chat home"). Ship routing, including `/runs/:id` restore, before the first email is sent. PROJECT.md already states this ordering.
-- **Lists-follow-org is independent of routing** and is the smallest piece. It can run in parallel or first. It *enhances* routing, because the org-mismatch interstitial is how a deep link interacts with the active org.
-- **The "waiting on you" query is the shared core.** Badge, email and reminder all read it. Build it once on the server (D-235-05), then add each channel on top.
-- **The mailer is new infra with a non-code half** (DNS records, a provider secret in Coolify, one-box env example, `check-deploy-drift.sh` registration). It falls under the deployment-artifact parity rule.
+| MCP read tools (search, list, read) | HIGH | LOW-MED | P1 |
+| `ask_agent` with deadline/handle/progress + citations + confidence | HIGH | HIGH | P1 |
+| list/run/get workflow (start + poll) | HIGH | MEDIUM | P1 |
+| Personal keys + narrowing + snippets + kill switch | HIGH | MEDIUM | P1 |
+| OAuth 2.1 (Claude.ai / Desktop) | HIGH | HIGH | P1 |
+| Webhooks core (sign, retry, log, resend, test, auto-disable) | HIGH | MEDIUM | P1 |
+| Admission control at new boundaries | MEDIUM (invisible until it fails) | MEDIUM | P1 |
+| PII redaction at MCP/webhook egress | MEDIUM (HIGH for regulated buyers) | MED-HIGH | P1 (milestone scope) |
+| `workflow_run.waiting` event | HIGH | LOW | P2 |
+| Expert-scoped `ask_agent` | MEDIUM | MEDIUM | P2 |
+| Scope step-up | MEDIUM | MEDIUM | P2 |
+| ChatGPT `search`/`fetch` aliases | MEDIUM | LOW | P3 (verify first) |
+| Webhook recover-since-date, ed25519 | LOW | MEDIUM | P3 |
+| MCP Apps, directory listing | MEDIUM | HIGH | P3 |
 
 ---
 
-## 4. MVP Definition
+## Competitor Feature Analysis
 
-### Launch with (v4.8)
-
-- [ ] **Router with the full route table** from the current 12-member `ActiveView`, canonical paths for every view, and entity routes for thread, run, workflow and Expert (essential: the milestone's namesake and the link target for everything else).
-- [ ] **Restore-from-id** for those four entities, plus F5/Back/Forward working (SEED-178's definition of done).
-- [ ] **Legacy link contracts kept** (`?run=`, `?connections=1`, `/admin/spend`, `/setup`, `/invite`).
-- [ ] **One no-leak "can't be opened" page**, plus sign-in → return-to-link.
-- [ ] **Copy link** on thread, run, workflow and Expert, and real anchors so new tabs work.
-- [ ] **Server "waiting on you" query** (per user, all orgs, live-state derived).
-- [ ] **Attention producer #2**: badge + popover list, each row linking to `/runs/:id` and naming its org.
-- [ ] **App-owned mailer + one email per newly-waiting run** to the run owner, sent only if still unresolved after a short delay, with words (what it's waiting for, origin, when). One user setting to turn it off.
-- [ ] **Library folders + Workflows list + KB pickers scoped to the active org**, with a server-side guard against foreign-org ids, and a decision on legacy rows.
-
-### Add after validation (v4.8.x / next)
-
-- [ ] **One reminder email** after N hours still waiting. Trigger: the first real wait that outlives a working day. Cheap if the email job is built with a "check again later" step from day one.
-- [ ] **Org-mismatch interstitial** ("This is in Org B — switch?"). Trigger: the first two-org user who follows a link while the wrong org is active. Can ship in v4.8 if the routing phase has room; without it, show the same 404.
-- [ ] **N-3 "a scheduled run failed" notification**. Trigger: as SEED-281 records. Uses the same mailer, but needs an event log because a failure has no live waiting state.
-- [ ] **Per-org notification email address** (GitHub custom routing). Trigger: a two-org user asks.
-
-### Future consideration (v4.9+ / seeds)
-
-- [ ] **External / public share links**: needs a sharing and access model (Open Platform era).
-- [ ] **Org slug in URLs**: revisit with Open Platform's public URLs.
-- [ ] **Approver groups, delegation, escalation**: needs an org role model beyond member/admin.
-- [ ] **Web/mobile push, Slack/Teams delivery**.
-- [ ] **Notification centre with history, snooze, read state**: only once a second non-live notification type exists.
-
----
-
-## 5. Feature Prioritization Matrix
-
-| Feature | User value | Implementation cost | Priority |
-|---|---|---|---|
-| Router + view paths + Back/Forward | HIGH | MEDIUM | P1 |
-| Entity restore-from-id (thread/run/workflow/Expert) | HIGH | HIGH | P1 |
-| Legacy link + OAuth callback preservation | HIGH (breakage otherwise) | LOW | P1 |
-| No-leak "can't be opened" + login return-to | HIGH | MEDIUM | P1 |
-| Copy link + real anchors | MEDIUM | LOW–MEDIUM | P1 |
-| "Waiting on you" server query | HIGH | MEDIUM | P1 |
-| Badge/list producer #2 | HIGH | LOW | P1 |
-| App-owned mailer + waiting email | HIGH | MEDIUM (+ ops) | P1 |
-| Email off-switch setting | MEDIUM | LOW | P1 |
-| Lists + pickers follow active org (+ server guard) | MEDIUM–HIGH | LOW–MEDIUM | P1 |
-| Worded notice (action, origin, question) | MEDIUM | LOW | P1 (it's mostly copy) |
-| Skip email if already resolved (delay) | MEDIUM | MEDIUM | P2 |
-| One reminder | MEDIUM | LOW once delay exists | P2 |
-| Org-mismatch interstitial | MEDIUM | MEDIUM | P2 |
-| Public share links | MEDIUM | HIGH | P3 (anti for v4.8) |
-| Approve-from-email | MEDIUM | HIGH + risk | Never (anti) |
-
----
-
-## 6. Competitor Feature Analysis
-
-| Feature | Linear | Slack | Zapier HITL | GitHub (Actions/Repos) | ChatGPT/Claude.ai | Our approach |
-|---|---|---|---|---|---|---|
-| Entity URL | Workspace slug + issue id | Team id + channel id | Link to the step needing review | Owner/repo/run id | `/c/:id`, `/chat/:uuid`, no workspace | UUID routes, no org in path |
-| No-access link | — | 404 page; sign-in or default team | Reviewer must log in to a Zapier account | 404, not 403 | — | One identical 404 page; interstitial only for orgs you're in |
-| In-app | Inbox, read/unread, snooze, Priority tab | Badges/mentions | — | Notification on the run | — | Badge + live "waiting on you" list |
-| Email | Digest or immediate; skipped if read | Bundled 15 min/hourly when inactive | Email/Slack/Zap to reviewers | Notification email (MEDIUM) | — | Per waiting run, delayed + skipped if resolved |
-| Reminder | Reminders on issues | — | One reminder (value + unit) | 30-day job timeout (MEDIUM) | — | One reminder (P2) |
-| Timeout behaviour | — | — | Skip and continue / End run | Job fails | — | Run stays durably paused; never auto-approve |
-| Who | Subscribers | Mentioned/DM | Account members or any email | Up to 6 reviewers/teams; 1 unblocks | — | Run owner only |
-| Workspace scoping | Distinct per workspace; `O W` switch | Per team | Per account | Per org | Per workspace | Lists per active org; badge spans orgs |
+| Feature | Glean | Linear | GitHub | Supabase | Stripe | Sentry | Zapier | Atlassian | Notion | **Syrel plan** |
+|---|---|---|---|---|---|---|---|---|---|---|
+| Transport | Streamable HTTP | Streamable HTTP (+ SSE fallback) | Streamable HTTP | Streamable HTTP | Streamable HTTP | Streamable HTTP | Streamable HTTP | Streamable HTTP | Streamable HTTP | Streamable HTTP, stateless |
+| Auth | OAuth (scopes MCP/SEARCH/TOOLS/ENTITIES) | OAuth 2.1 + DCR; **or API key bearer** | OAuth or PAT bearer | OAuth + DCR (pick org); PAT bearer for CI | OAuth (per-account perms); **agent API keys** | OAuth only | Secret URL / token (rotate) | OAuth 2.1; admin-toggleable API tokens | OAuth | Personal key bearer, then OAuth 2.1 (DCR + CIMD) |
+| Tool narrowing | Admin-built servers with chosen tools, per path | `/mcp/readonly`, `read` scope | Toolsets + readonly via header or path | `read_only`, `project_ref`, `features` params | Key permissions; `api_read`/`api_write` split | Org/project path scoping | Per-server action config | Token scopes + domain/IP allowlists | Workspace client allowlist (Ent.) | Stored on credential: folders ∩ visibility, tool subset, read-only preset |
+| Admin controls | Enable server, sign out all sessions | Okta-managed auth | — | — | Team-wide MCP on/off; admin revoke sessions | — | Owner-only add in Claude | Domain + IP allowlist, token toggle | Manage/revoke member connections | Org kill switch, admin list + revoke |
+| Long-running work | Chat tool (synchronous) | n/a | n/a | Elicitation confirmations | Human confirmation via approval URL, retry | n/a | Actions synchronous | n/a | n/a | Start + poll; ask deadline → handle; waiting-on-person link |
+| Audit / logs | Platform logs | — | — | — | MCP tool-call logs in Workbench | — | — | Audit log | Admin API | Audit rows + origin on runs/threads |
+| Webhooks (product's own) | — | Yes | Yes (no auto-retry; manual redeliver) | DB webhooks | Event destinations, thin/snapshot, 3-day retry, roll secret 24 h | — | — | — | — | Standard Webhooks, thin, retry, log, resend, roll |
 
 ---
 
 ## Sources
 
-**Official (HIGH)**
-- Linear — Notifications: https://linear.app/docs/notifications (channels, digest vs immediate, *"only sent if you haven't already read"*)
-- Linear — Inbox: https://linear.app/docs/inbox (read/unread, snooze, Priority tab, 2,000 cap, no archive)
-- Linear — Workspaces: https://linear.app/docs/workspaces (distinct members/billing, editable domain key, `O W` switch)
-- Slack — Deep linking: https://docs.slack.dev/interactivity/deep-linking (team id, sign-in/default team, 404 for no access)
-- Slack — Guide to notifications: https://slack.com/help/articles/360025446073 (email when not active, bundled 15 min/hourly)
-- Slack — `chat.getPermalink`: https://api.slack.com/methods/chat.getPermalink
-- Zapier — Human in the Loop Collect Data/approval: https://help.zapier.com/hc/en-us/articles/38731264910733/ (reviewer types, channels, timeout + *Skip and continue/End run*, reminder)
-- GitHub — REST troubleshooting (404 instead of 403): https://docs.github.com/en/enterprise-server@3.0/rest/overview/troubleshooting
-- GitHub — Reviewing deployments: https://docs.github.com/en/actions/how-tos/deploy/configure-and-manage-deployments/review-deployments
-- GitHub — Managing organization notifications (custom routing): https://docs.github.com/subscriptions-and-notifications/how-tos/managing-organization-notifications
-- Temporal — Web UI (namespace switcher): https://docs.temporal.io/web-ui
-- Google — Email sender guidelines: https://support.google.com/a/answer/81126
-- FTC — CAN-SPAM Act compliance guide: https://www.ftc.gov/business-guidance/resources/can-spam-act-compliance-guide-business
-- Microsoft — Approvals connector (deprecated first-to-respond, guest limitation): https://learn.microsoft.com/en-us/connectors/approvals/
-- OpenAI — ChatGPT shared links FAQ: https://help.openai.com/en/articles/7925741
-- Notion — Can't access my own page: https://www.notion.com/help/cant-access-my-own-page
+**Official, read directly (HIGH):**
+- Claude connectors: build guide (limits 240 s / ~150k chars; Claude Code 25k tokens; unsupported features): https://claude.com/docs/connectors/building/index.md
+- Claude connector authentication (401 rule, PRM, CIMD vs DCR selection, callbacks, refresh, 10 s/30 s latency, static headers beta and org-shared, egress 160.79.104.0/21): https://claude.com/docs/connectors/building/authentication.md
+- Add a custom connector (Request headers beta, Owner-only on Team/Ent, up to four headers, tool Blocked setting): https://claude.com/docs/connectors/custom/add-unlisted.md
+- Connector review criteria (annotations, separate read/write, ≤ 64-char names, no behavioural descriptions): https://claude.com/docs/connectors/building/review-criteria.md
+- Claude Code MCP (`--header`, `.mcp.json` `${VAR}`, `MCP_TOOL_TIMEOUT`, 5-min idle timeout, 10k warn / 25k cap, tool search): https://code.claude.com/docs/en/mcp
+- Cursor MCP (url + headers, `${env:NAME}`, OAuth PKCE + RFC 9728, static `auth` client): https://cursor.com/docs/context/mcp
+- MCP spec changelog 2025-11-25 (CIMD, tasks experimental, URL elicitation, SEP-1303 tool errors): https://modelcontextprotocol.io/specification/2025-11-25/changelog
+- MCP spec changelog latest / 2026-07-28 (stateless, sessions removed, tasks → extension, DCR deprecated, deterministic tool order): https://modelcontextprotocol.io/specification/latest/changelog
+- MCP progress utility: https://modelcontextprotocol.io/specification/2025-11-25/basic/utilities/progress
+- MCP security best practices (confused deputy, token passthrough, SSRF, session hijack, scope minimisation): https://modelcontextprotocol.io/specification/2025-11-25/basic/security_best_practices
+- Standard Webhooks spec: https://github.com/standard-webhooks/standard-webhooks/blob/main/spec/standard-webhooks.md
+- Stripe webhooks (3-day retries, Resend 15 d, roll secret ≤ 24 h, no ordering, 5-min tolerance, thin vs snapshot): https://docs.stripe.com/webhooks
+- Stripe MCP (agent API keys, team MCP on/off, admin revoke sessions, human confirmation, snippets per client): https://docs.stripe.com/mcp
+- GitHub failed deliveries (no auto-retry, 10 s timeout): https://docs.github.com/en/webhooks/using-webhooks/handling-failed-webhook-deliveries
+- Svix retries (schedule, 5-day auto-disable, recover/replay): https://docs.svix.com/retries
+- Supabase MCP (OAuth + DCR, PAT header, `read_only`/`project_ref`/`features`, prompt-injection warnings): https://supabase.com/docs/guides/getting-started/mcp
+- Linear MCP (`/mcp/readonly`, OAuth 2.1 + DCR, API key bearer): https://linear.app/docs/mcp
+- Sentry MCP (org/project path scoping, OAuth only): https://mcp.sentry.dev/
+- Glean MCP servers (per-server tool subsets, "don't enable all tools"): https://docs.glean.com/administration/platform/mcp/create-mcp-servers
 
-**Secondary (MEDIUM/LOW, flagged inline)**
-- Temporal run-URL shape: https://community.temporal.io/t/web-ui-only-shows-most-recent-run-history-cannot-view-history-of-old-runs/11254
-- Knock step conditions / read-status sequencing: https://docs.knock.app/getting-started/knocks-features, https://knock.app/changelog/2021-05-12
-- Retool user tasks (archived 3.75 docs): https://docs.retool.com/3.75/workflows/guides/user-tasks
-- GitHub environment reviewers / 30-day timeout (third-party): https://oneuptime.com/blog/post/2026-01-25-github-actions-environment-protection-rules/view
-- n8n Wait/HITL timeout advice (third-party): https://en.kirim.email/blog/email-approval-workflow-n8n-human-in-the-loop/
-- Linear "copy issue URL" chain icon (third-party): https://www.guideflow.com/tutorial/how-to-copy-a-url-from-an-issue-on-linear
+**Vendor docs, partly via search summaries (MEDIUM):**
+- Notion MCP admin controls: https://developers.notion.com/docs/mcp
+- Atlassian Rovo MCP admin settings: https://support.atlassian.com/security-and-access-policies/docs/control-atlassian-rovo-mcp-server-settings/
+- Zapier MCP client setup / rotate secret: https://help.zapier.com/hc/en-us/articles/36265392843917
+- GitHub MCP toolsets/readonly headers: https://github.com/github/github-mcp-server
+- Supabase Auth OAuth 2.1 server (public beta 2025-11-26, consent UI is yours): https://supabase.com/changelog/38022-oauth-2-1-server-capabilities-for-supabase-auth
+- MCP tasks extension: https://modelcontextprotocol.io/extensions/tasks/overview
 
-**Repo (HIGH, measured this session)**
-- `frontend/src/App.tsx:132, 156-171, 319-337`; `frontend/vercel.json`; `frontend/nginx.conf`; `frontend/src/components/layout/attentionConditions.ts`; `backend/app/services/harness/human_input.py`; `backend/app/config.py:1408-1416`; `backend/app/api/panel.py:164`; `backend/app/api/inbound.py`; `backend/app/services/scheduler_service.py:103`; seeds SEED-015, SEED-178, SEED-185, SEED-281, SEED-389.
+**Secondary only (LOW, verify before relying):**
+- ChatGPT deep-research `search`/`fetch` tool convention: https://medium.com/@alexeylark/chatgpt-custom-mcp-connectors-with-developer-mode-d791fde17d25
+
+**Project context:** `.planning/PROJECT.md` (v4.9 scope), `SEED-013`, `SEED-177`, `SEED-195`, `SEED-079`, `SEED-081`, `supabase/migrations/215_api_keys_and_run_origin.sql`, `backend/app/api/inbound.py`, `backend/app/security/egress.py`, `backend/app/services/notification_drainer.py`, `frontend/src/components/settings/apiKeys/`.
 
 ---
-*Feature research for: v4.8 Every Page Has a Link (addressable URLs, waiting-run notifications, per-org lists)*
-*Researched: 2026-10-27*
+*Feature research for: remote MCP server + personal keys + OAuth + outbound webhooks on a multi-tenant agentic RAG platform*
+*Researched: 2026-10-30*

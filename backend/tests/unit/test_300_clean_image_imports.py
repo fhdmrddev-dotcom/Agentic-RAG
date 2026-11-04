@@ -47,6 +47,13 @@ IMPORT_TO_DIST = {
     "markdown_it": "markdown-it-py",
     "supabase": "supabase",
     "asyncpg": "asyncpg",
+    # Phase 305 (D-01): the official MCP SDK. ``mcp.types`` re-exports ``mcp_types`` (a hard
+    # ``==`` dependency of ``mcp``); app/mcp imports it only through ``mcp``.
+    "mcp": "mcp",
+    # 305-REVIEW WR-03: ``app/mcp/dispatch.py`` shields its bookkeeping with ``anyio``. It is an
+    # unconditional hard dependency of ``mcp`` (``anyio>=4.9``, which has ``move_on_after(shield=)``)
+    # and of ``starlette`` (so of ``fastapi``); the image cannot install either without it.
+    "anyio": "mcp",
 }
 
 #: The Dockerfile drops these lines before ``pip install`` (Dockerfile:32-34).
@@ -115,3 +122,31 @@ def test_nothing_under_app_imports_resend():
         if "resend" in _top_level_imports(path):
             offenders.append(path.relative_to(BACKEND).as_posix())
     assert offenders == [], f"the resend SDK is not in the image; imported by {offenders}"
+
+
+#: Phase 305 — the MCP server package (D-01 / D-04). Listed explicitly so a module added to the
+#: package without a declared distribution, or a module silently dropped, fails here.
+MCP_MODULES = [
+    APP / "mcp" / name
+    for name in ("__init__.py", "server.py", "dispatch.py", "tools.py", "edge.py", "transport.py",
+                 "access_log.py")
+]
+
+
+def test_every_mcp_module_import_ships_in_the_built_image():
+    declared = _declared_distributions()
+    assert "mcp" in declared, "backend/requirements.txt does not declare the mcp SDK (D-01)"
+    for path in MCP_MODULES:
+        assert path.exists(), f"{path} is listed in the MCP package but does not exist"
+        for name in sorted(_top_level_imports(path)):
+            if name in sys.stdlib_module_names or name == "app" or name == "__future__":
+                continue
+            dist = IMPORT_TO_DIST.get(name)
+            assert dist is not None, (
+                f"{path.name} imports {name!r}, which is neither stdlib nor app nor mapped to a "
+                "declared distribution — state which requirements.txt line ships it"
+            )
+            assert dist in declared, (
+                f"{path.name} imports {name!r} from {dist!r}, which backend/requirements.txt does "
+                "not declare — the built image would not have it"
+            )
