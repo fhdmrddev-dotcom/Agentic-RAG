@@ -452,6 +452,81 @@ async def test_revoke_with_redis_down_is_503(monkeypatch):
     assert w.revoke(token=REFRESH, client_id="dcr-1").status_code == 503
 
 
+# ── CR-01: the 16 KB form cap holds when no Content-Length is sent ──────────────────────────
+#
+# Starlette's TestClient buffers a generator body before the app sees it, so these drive the app
+# with raw ASGI messages instead: one 1 KB chunk per ``receive()``, no ``content-length`` header
+# (what ``Transfer-Encoding: chunked`` looks like to the app), and a count of the chunks pulled.
+
+
+async def _chunked_post(app, path: str, *, chunks: int, chunk: bytes = b"a" * 1024) -> tuple[int, bytes, int]:
+    pulled = 0
+    first = b"grant_type="
+    sent: list[dict] = []
+
+    async def receive():
+        nonlocal pulled
+        if pulled >= chunks:
+            return {"type": "http.disconnect"}
+        pulled += 1
+        body = (first + chunk) if pulled == 1 else chunk
+        return {"type": "http.request", "body": body, "more_body": pulled < chunks}
+
+    async def send(message):
+        sent.append(message)
+
+    scope = {
+        "type": "http", "asgi": {"version": "3.0"}, "http_version": "1.1", "method": "POST",
+        "scheme": "http", "path": path, "raw_path": path.encode(), "root_path": "",
+        "query_string": b"", "server": ("localhost", 8000), "client": ("127.0.0.1", 5555),
+        "headers": [
+            (b"host", b"localhost:8000"),
+            (b"content-type", b"application/x-www-form-urlencoded"),
+            (b"transfer-encoding", b"chunked"),
+        ],
+    }
+    await app(scope, receive, send)
+    status = next(m["status"] for m in sent if m["type"] == "http.response.start")
+    body = b"".join(m.get("body", b"") for m in sent if m["type"] == "http.response.body")
+    return status, body, pulled
+
+
+async def test_a_chunked_token_body_over_16kb_is_refused_without_reading_it_all(w):
+    import json
+
+    status, body, pulled = await _chunked_post(w.client.app, "/oauth/token", chunks=200)
+    assert status == 400 and json.loads(body)["error"] == "invalid_request"
+    assert pulled <= 17, f"read {pulled} KB of a body the 16 KB cap should have stopped"
+    assert w.issued == []
+
+
+async def test_a_chunked_revoke_body_over_16kb_is_200_without_reading_it_all(w):
+    status, _, pulled = await _chunked_post(w.client.app, "/oauth/revoke", chunks=200)
+    assert status == 200  # RFC 7009: always 200, but nothing past the cap is read or acted on
+    assert pulled <= 17, f"read {pulled} KB of a body the 16 KB cap should have stopped"
+    assert w.revoked_grants == [] and w.revoked_access == []
+
+
+async def test_a_chunked_token_body_under_the_cap_still_parses(w):
+    import json
+
+    # 2 KB of grant_type=aaaa… is a well-formed form: it reaches the grant_type dispatch.
+    status, body, _ = await _chunked_post(w.client.app, "/oauth/token", chunks=2)
+    assert status == 400 and json.loads(body)["error"] == "unsupported_grant_type"
+
+
+@pytest.mark.parametrize("raw", [
+    b"grant_type=refresh_token&grant_type=authorization_code",   # sent twice
+    b"grant_type=\xff\xfe",                                      # not ASCII
+    b"grant_type=password&" + b"&".join(b"k%d=v" % i for i in range(40)),  # more fields than any request has
+])
+async def test_a_malformed_form_is_invalid_request(w, raw):
+    w.add_client()
+    r = w.client.post("/oauth/token", content=raw,
+                      headers={"content-type": "application/x-www-form-urlencoded"})
+    assert r.status_code == 400 and r.json()["error"] == "invalid_request"
+
+
 # ── the source rules ──────────────────────────────────────────────────────────────────────────
 
 

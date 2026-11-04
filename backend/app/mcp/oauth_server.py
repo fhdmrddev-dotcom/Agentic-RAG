@@ -31,7 +31,7 @@ import secrets
 import time
 from datetime import datetime, timedelta, timezone
 from typing import Any
-from urllib.parse import urlencode, urlsplit
+from urllib.parse import parse_qsl, urlencode, urlsplit
 
 from starlette.requests import Request
 from starlette.responses import JSONResponse, PlainTextResponse, Response
@@ -361,6 +361,7 @@ async def _authorize(request: Request) -> Response:
 # ── /oauth/token (D-14, D-17, D-19, D-46, D-47, D-48) ─────────────────────────────────────────
 
 _TOKEN_FORM_MAX = 16_384
+_TOKEN_FORM_FIELDS = 32   # a token or revoke request carries at most ~8 parameters
 _FORM_TYPE = "application/x-www-form-urlencoded"
 _INVALID_GRANT = {
     "error": "invalid_grant",
@@ -389,23 +390,30 @@ def _invalid_target() -> JSONResponse:
 
 async def _form(request: Request) -> dict[str, str] | None:
     """The urlencoded form with each parameter at most once, or ``None`` (``invalid_request``).
-    A JSON or multipart body is refused before it is read (Claude sends a form, RFC 6749 §3.2)."""
+    A JSON or multipart body is refused before it is read (Claude sends a form, RFC 6749 §3.2).
+
+    ⛔ CR-01: the body is read through ``_read_capped`` — the same stream ``register`` uses — so the
+    16 KB cap holds whether or not a ``Content-Length`` was declared. ``request.form()`` is never
+    called: Starlette's urlencoded parser has no size or field limit, so a chunked body would be
+    buffered whole. The form is parsed here, strictly, with a field-count ceiling."""
     ctype = (request.headers.get("content-type") or "").split(";", 1)[0].strip().lower()
     if ctype != _FORM_TYPE:
         return None
-    declared = request.headers.get("content-length")
-    try:
-        if declared is not None and int(declared) > _TOKEN_FORM_MAX:
-            return None
-    except ValueError:
+    raw = await _read_capped(request, _TOKEN_FORM_MAX)
+    if raw is None:
         return None
-    form = await request.form()
+    try:
+        pairs = parse_qsl(
+            raw.decode("ascii"), keep_blank_values=True, strict_parsing=False,
+            errors="strict", max_num_fields=_TOKEN_FORM_FIELDS,
+        )
+    except (UnicodeDecodeError, ValueError):
+        return None
     out: dict[str, str] = {}
-    for key in form.keys():
-        values = form.getlist(key)
-        if len(values) != 1 or not isinstance(values[0], str):
+    for key, value in pairs:
+        if key in out:   # RFC 6749 §3.1: a parameter sent more than once is invalid
             return None
-        out[key] = values[0]
+        out[key] = value
     return out
 
 
