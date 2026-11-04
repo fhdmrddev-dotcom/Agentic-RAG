@@ -176,7 +176,8 @@
           "administer/settings/ai-model",
           "administer/settings/search",
           "administer/settings/integrations",
-          "administer/settings/api-keys"
+          "administer/settings/api-keys",
+          "administer/settings/webhooks"
         ]
       },
       {
@@ -208,6 +209,7 @@
       "administer/settings/search",
       "administer/settings/integrations",
       "administer/settings/api-keys",
+      "administer/settings/webhooks",
       "administer/models/providers",
       "administer/control-room/control-plane",
       "administer/control-room/users-and-access",
