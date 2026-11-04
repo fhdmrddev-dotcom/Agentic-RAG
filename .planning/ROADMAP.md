@@ -241,8 +241,8 @@ Plans:
 Plans:
 - [x] 308-01-PLAN.md — migration 225 (deny-all tables, swallow-and-warn emit triggers, notifications widening, audit CHECK), db/webhooks.py, the notice read path
 - [x] 308-02-PLAN.md — egress `webhook` capability + SSRF corpus, URL rules, typed text-free payloads through the guard, signer, sender
-- [ ] 308-03-PLAN.md — WebhookDrainer + outbox: fan-out with visibility/liveness, retries, auto-disable + notice, purge; emission matrix and two-drainer live proofs
-- [ ] 308-04-PLAN.md — member + admin routes, test/log/resend, rate limits, main.py wiring, OpenAPI flagging, docs stub
+- [x] 308-03-PLAN.md — WebhookDrainer + outbox: fan-out with visibility/liveness, retries, auto-disable + notice, purge; emission matrix and two-drainer live proofs
+- [x] 308-04-PLAN.md — member + admin routes, test/log/resend, rate limits, main.py wiring, OpenAPI flagging, docs stub
 - [ ] 308-05-PLAN.md — Settings → Webhooks tab (cards, form, secret once, log, sheets) and its one mount
 - [ ] 308-06-PLAN.md — org-admin Webhooks section, Waiting-on-you row, audit words, standardwebhooks interop (legitimacy checkpoint), bookkeeping + phase gates
 **UI hint**: yes
