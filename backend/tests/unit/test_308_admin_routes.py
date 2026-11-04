@@ -60,11 +60,36 @@ def test_the_admin_list_shows_every_endpoint_in_the_org_without_the_query(client
     assert all(set(e) == ADMIN_ROW_KEYS for e in body["endpoints"])
     z = rows[theirs]
     assert z["host"] == HOST
-    assert z["path"] == "/hooks/catch/123/…/"
+    assert z["path"] == "/…"  # CR-01 / D-59: no path segment reaches an admin, whatever its length
     assert z["has_query"] is True
     assert z["owner_name"] == "Lee Park" and z["owner_is_you"] is False and z["owner_is_member"] is True
     assert rows[mine]["owner_is_you"] is True
     _scan_clean(body)
+
+
+ZAPIER_SHORT = "https://hooks.zapier.com/hooks/catch/1234567/abc1234/"
+PIPEDREAM = "https://eo3x9k2m7q1zpd4.m.pipedream.net/"
+
+
+def test_cr01_a_real_zapier_catch_hook_never_reaches_the_admin(client, admin):
+    """CR-01: every segment of a real Zapier hook is under 16 characters, so D-51's length mask
+    showed the whole working URL. The admin row now carries the host and a neutral marker only."""
+    eid = admin.add(user=OTHER, url=ZAPIER_SHORT)
+    (row,) = [e for e in client.get("/org/webhooks").json()["endpoints"] if e["id"] == eid]
+    assert (row["host"], row["path"], row["has_query"]) == ("hooks.zapier.com", "/…", False)
+    flat = " ".join(strings_of(row))
+    assert "1234567" not in flat and "abc1234" not in flat and "catch" not in flat
+
+
+def test_cr01_a_token_in_the_host_is_masked_in_the_list_and_the_audit(client, admin):
+    """CR-01: Pipedream-style receivers carry the token in the leftmost label; it is masked in the
+    admin row AND in the audit metadata host (which reaches the org and operator audit tabs)."""
+    eid = admin.add(user=OTHER, url=PIPEDREAM)
+    (row,) = [e for e in client.get("/org/webhooks").json()["endpoints"] if e["id"] == eid]
+    assert row["host"] == "….m.pipedream.net" and row["path"] == ""
+    assert client.post(f"/org/webhooks/{eid}/disable").status_code == 200
+    assert admin.audits[-1]["metadata"]["host"] == "….m.pipedream.net"
+    assert "eo3x9k2m7q1zpd4" not in repr(admin.audits)
 
 
 def test_the_admin_list_marks_an_owner_who_left(client, admin):

@@ -272,6 +272,23 @@ async def test_gone_fails_turns_the_endpoint_off_and_audits_once(monkeypatch):
     assert meta["host"] == "hooks.example.com"
 
 
+async def test_cr01_the_auto_disable_audit_masks_a_token_in_the_host(monkeypatch):
+    """CR-01: the audit host reaches the org and operator audit tabs; a Pipedream-style token label
+    is masked there exactly as in the admin list."""
+    fake = FakeOutbox().install(monkeypatch)
+    pipedream = "https://eo3x9k2m7q1zpd4.m.pipedream.net/"
+
+    async def disable(pool, *, endpoint_id, reason, now=None):
+        return {"id": endpoint_id, "user_id": uuid4(), "org_id": uuid4(), "url": pipedream}
+
+    monkeypatch.setattr(outbox, "disable_endpoint", disable)
+    audit = Recorder(None)
+    await _drainer(fake, audit=audit)._record(_row(url=pipedream), _fail(410, "gone", retryable=False, gone=True),
+                                              now=NOW)
+    (call,) = audit.calls
+    assert call[1]["host"] == "….m.pipedream.net"
+
+
 @pytest.mark.parametrize("attempts", [1, 2, 3, 4, 5])
 async def test_a_retryable_failure_with_attempts_left_is_retrying_on_schedule(monkeypatch, attempts):
     fake = FakeOutbox().install(monkeypatch)

@@ -15,9 +15,11 @@ import pytest
 from app.services import webhook_urls
 from app.services.webhook_urls import (
     MAX_URL_LENGTH,
+    PATH_HIDDEN,
     WebhookUrlError,
     admin_display,
     check_webhook_url,
+    display_host,
     host_of,
 )
 
@@ -95,22 +97,41 @@ def test_host_of_is_lower_cased_and_portless():
     assert host_of("https://hooks.example.com/x") == "hooks.example.com"
 
 
-def test_admin_display_masks_long_segments_and_drops_the_query():
+# ── CR-01 / D-59: the admin view shows the HOST only, plus a neutral "path hidden" marker ─────────
+#
+# D-51 masked path segments of 16+ characters. Measured by the 308 review: a real Zapier catch hook
+# (``/hooks/catch/<7-digit id>/<7-char token>/``) has no segment that long, so the whole working
+# capability URL reached every org admin. A length rule cannot know which segment is the token, so
+# no path segment is shown at all.
+
+
+def test_admin_display_hides_a_zapier_catch_hook_path_entirely():
+    url = "https://hooks.zapier.com/hooks/catch/1234567/abc1234/"
+    host, path, has_query = admin_display(url)
+    assert (host, path, has_query) == ("hooks.zapier.com", PATH_HIDDEN, False)
+    for piece in ("hooks/catch", "1234567", "abc1234"):
+        assert piece not in path
+
+
+def test_admin_display_hides_every_path_and_drops_the_query():
     assert admin_display(
         "https://hooks.zapier.com/hooks/catch/123/abcdefghijklmnopqrstu/?t=1"
-    ) == ("hooks.zapier.com", "/hooks/catch/123/…/", True)
+    ) == ("hooks.zapier.com", PATH_HIDDEN, True)
 
 
 def test_admin_display_without_a_query():
     host, path, has_query = admin_display("https://hooks.example.com/a/b")
-    assert (host, path, has_query) == ("hooks.example.com", "/a/b", False)
+    assert (host, path, has_query) == ("hooks.example.com", PATH_HIDDEN, False)
 
 
-def test_admin_display_masks_at_exactly_sixteen_and_keeps_fifteen():
-    fifteen = "a" * 15
-    sixteen = "b" * 16
-    _, path, _ = admin_display(f"https://h.example.com/{fifteen}/{sixteen}")
-    assert path == f"/{fifteen}/…"
+@pytest.mark.parametrize("url", ["https://hooks.example.com", "https://hooks.example.com/"])
+def test_admin_display_with_no_path_says_nothing_is_hidden(url):
+    assert admin_display(url) == ("hooks.example.com", "", False)
+
+
+def test_admin_display_short_segments_are_hidden_too():
+    _, path, _ = admin_display("https://h.example.com/a/b1")
+    assert path == PATH_HIDDEN
 
 
 def test_admin_display_slack_style_path_is_masked():
@@ -118,9 +139,40 @@ def test_admin_display_slack_style_path_is_masked():
         "https://hooks.slack.com/services/T00000000/B00000000/XXXXXXXXXXXXXXXXXXXXXXXX"
     )
     assert host == "hooks.slack.com"
-    assert path == "/services/T00000000/B00000000/…"
-    assert "XXXX" not in path
+    assert path == PATH_HIDDEN
+    assert "XXXX" not in path and "T00000000" not in path
     assert has_query is False
+
+
+@pytest.mark.parametrize("url, shown", [
+    # Pipedream: the per-endpoint subdomain IS the credential.
+    ("https://eo3x9k2m7q1zpd4.m.pipedream.net/", "….m.pipedream.net"),
+    # ngrok-style tunnels: a hex / digit label.
+    ("https://1a2b-3c4d-5e6f.ngrok-free.app/hook", "….ngrok-free.app"),
+    ("https://abcd1234.ngrok.io/hook", "….ngrok.io"),
+    # long leftmost label (12+): masked whatever it spells
+    ("https://my-team-receiver.example.com/x", "….example.com"),
+    # ordinary names are kept
+    ("https://hooks.example.com/x", "hooks.example.com"),
+    ("https://hooks.zapier.com/x", "hooks.zapier.com"),
+    ("https://api2.example.com/x", "api2.example.com"),
+    ("https://eu-west-1.example.com/x", "eu-west-1.example.com"),
+    # a registrable domain (two labels) is never masked — it is the receiver's own name
+    ("https://abcdef123456789.com/x", "abcdef123456789.com"),
+    # an IP literal is an address, not a token
+    ("https://203.0.113.7/x", "203.0.113.7"),
+])
+def test_display_host_masks_a_token_looking_leftmost_label(url, shown):
+    assert display_host(url) == shown
+    assert admin_display(url)[0] == shown
+
+
+def test_display_host_is_lower_cased_and_portless():
+    assert display_host("https://Hooks.Example.com:8443/x") == "hooks.example.com"
+
+
+def test_display_host_of_an_unparseable_url_is_empty():
+    assert display_host("https://[::1/") == ""
 
 
 def test_admin_display_never_returns_the_query_text():
