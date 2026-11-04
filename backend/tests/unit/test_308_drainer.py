@@ -326,7 +326,8 @@ async def test_the_sixth_retryable_failure_is_failed_max_attempts(monkeypatch):
 
 @pytest.mark.parametrize("outcome", [
     _fail(400, retryable=False), _fail(302, "redirect", retryable=False),
-    _fail(None, "refused_address", retryable=False), _fail(None, "response_too_large", retryable=False),
+    _fail(None, "refused_address", retryable=False),
+    # response_too_large is NOT here since WR-03 (D-61): see the test that pins it never counts.
 ])
 async def test_a_not_retried_failure_counts_toward_auto_disable(monkeypatch, outcome):
     fake = FakeOutbox().install(monkeypatch)

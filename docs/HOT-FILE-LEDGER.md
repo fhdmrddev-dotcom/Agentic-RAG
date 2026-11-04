@@ -11792,7 +11792,7 @@ cells rot within days.
 | [`backend/app/models/connector.py`](docs/HOT-FILE-LEDGER.md#backendappmodelsconnectorpy) | 26 / 14 / 835 | ⚠ **FIRES** | ⚠ row was STALE at `24 / 13 / 772`. honoured by construction (**244-06**): a NEW request model, ⛔ no field added to an existing one — `folder_id: str` REQUIRED, so 422 fires before the handler |
 | [`backend/app/services/mcp_client.py`](docs/HOT-FILE-LEDGER.md#backendappservicesmcp_clientpy) | 9 / 6 / 526 | ⚠ **FIRES** | ⚠ row STALE TWICE (`4/2/407` reading `no`, then `7/5/480`). honoured by construction (**SEED-258**): the body cap is DERIVED, so no envelope knob exists to disagree |
 | [`backend/app/api/connectors.py`](docs/HOT-FILE-LEDGER.md#backendappapiconnectorspy) | 46 / 22 / 2166 (was `45 / 21 / 2162`) | ⚠ **FIRES** | **276-07**: honoured by construction, ONE literal (`client_name="Syrel"`) + a comment. ⛔ extraction still OWED |
-| [`backend/app/security/egress.py`](docs/HOT-FILE-LEDGER.md#backendappsecurityegresspy) | 15 / 7 / 994 (was `14 / 6 / 991`) | ⚠ **FIRES** | 308-02 (D-23): one closed `webhook` capability, _CALLER (the member's address), three dict entries; the shared guard (public addresses, pinned DNS, no redirects). test_190 unchanged |
+| [`backend/app/security/egress.py`](docs/HOT-FILE-LEDGER.md#backendappsecurityegresspy) | 16 / 7 / 1003 (was `15 / 7 / 994`) | ⚠ **FIRES** | 308-REVIEW WR-03: EgressResponseTooLarge / Undecodable carry the response status_code (one except arm before finally). ⛔ no new client; test_190 unchanged |
 | [`backend/app/services/google/availability.py`](docs/HOT-FILE-LEDGER.md#backendappservicesgoogleavailabilitypy) | 0 / 0 / 277 | no (new) | young (221-02) — the per-application probe. ⚠ It imports `_http`'s parser and writes NO second one |
 | [`backend/app/services/google/writes.py`](docs/HOT-FILE-LEDGER.md#backendappservicesgooglewritespy) | 2 / 1 / 625 | no (1 phase) | ⚠ absent for its entire life — row added 221-02, which found `create_event` REFUSING every naive local time |
 | [`frontend/src/components/settings/applicationAvailability.ts`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentssettingsapplicationavailabilityts) | 0 / 0 / 152 | no (new) | young (221-02) — server decides the STATE, this decides the WORDS. It classifies nothing |
@@ -30786,3 +30786,10 @@ CLAUDE.md verdict cell as of 2026-11-04 (replaced by 308-06, moved verbatim): | 
 
 Scan-list cell as of 2026-11-04 (replaced by 308-06, moved verbatim): 417 / 89 / 6986 (was `416 / 88 / 6956`) | ⚠ **FIRES** | 307-05: 13 first pins for the phase's suites (both knobs, FILE-LEVEL) and McpKeyFields raised 8 -> 12. ⛔ no pin lowered |
 CLAUDE.md verdict cell as of 2026-11-04 (replaced by 308-06, moved verbatim): | `scripts/vitest-count-gate.cjs` | 417 / 89 / 6986 (was `416 / 88 / 6956`) | 307-05: 13 first pins + McpKeyFields 8 -> 12; none lowered |
+
+### `backend/app/security/egress.py` — 308-REVIEW-FIX refresh, 2026-11-04
+
+**`16 / 7 / 1003`.** 308-REVIEW WR-03 (D-61): the two size exceptions gain a `status_code` class attribute (default `None`), and `send_pinned_http` sets it from the response — already read before the body — in one `except` arm before its `finally`. Every raise site and every security property is unchanged; a caller may now classify an over-cap response by its status (the webhook sender does). ⛔ Binding: the webhook sender still opens no HTTP client of its own.
+
+Scan-list cell as of 2026-11-04 (replaced by 308-REVIEW-FIX, moved verbatim): 15 / 7 / 994 (was `14 / 6 / 991`) | ⚠ **FIRES** | 308-02 (D-23): one closed `webhook` capability, _CALLER (the member's address), three dict entries; the shared guard (public addresses, pinned DNS, no redirects). test_190 unchanged |
+CLAUDE.md verdict cell as of 2026-11-04 (replaced by 308-REVIEW-FIX, moved verbatim): | `backend/app/security/egress.py` | 15 / 7 / 994 (was `14 / 6 / 991`) | 308-02: one `webhook` _CALLER capability (3 entries); test_190 unchanged |

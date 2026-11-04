@@ -550,7 +550,7 @@ node scripts/check-hot-file-ledger.cjs <phase-dir>   # 0 clear · 1 missing rows
 | `backend/app/api/connectors.py` | 46 / 22 / 2166 | ⚠ STALE · last touch 276-07 · extraction OWED · ⛔ |
 | `backend/app/services/sources/preview_service.py` | 8 / 4 / 826 | ⚠ row STALE TWICE · last touch 238-04 |
 | `backend/app/security/secret_cipher.py` | 4 / 2 / 256 | ⚠ absent its ENTIRE LIFE — row added mig 180 · ⛔ |
-| `backend/app/security/egress.py` | 15 / 7 / 994 (was `14 / 6 / 991`) | 308-02: one `webhook` _CALLER capability (3 entries); test_190 unchanged |
+| `backend/app/security/egress.py` | 16 / 7 / 1003 (was `15 / 7 / 994`) | 308-REVIEW WR-03: size exceptions carry status_code (one except arm) |
 | `backend/app/services/connector_service.py` | 28 / 11 / 1858 | ⚠ row STALE · honoured by construction (239-06) |
 | `backend/app/services/sources/base.py` | 9 / 5 / 336 | ⚠ absent while FIRING · honoured by construction (239) |
 | `backend/app/services/sources/__init__.py` | 5 / 3 / 40 | ⚠ absent while FIRING — row added 239-03 |

@@ -617,6 +617,9 @@ class EgressResponseTooLarge(Exception):
     reported from an exception nobody can classify.
     """
 
+    #: 308-REVIEW WR-03: the response's status when ``send_pinned_http`` raised after reading it.
+    status_code: int | None = None
+
 
 class EgressResponseUndecodable(Exception):
     """A response carried a Content-Encoding this module will not expand, or a truncated one.
@@ -624,6 +627,8 @@ class EgressResponseUndecodable(Exception):
     Returning still-compressed bytes to an adapter would be a silent wrong answer, and
     expanding an arbitrary encoding is how the cap below stops being a cap.
     """
+
+    status_code: int | None = None  # as EgressResponseTooLarge (308-REVIEW WR-03)
 
 
 class PinnedResponse(NamedTuple):
@@ -870,6 +875,10 @@ async def send_pinned_http(
                 headers=dict(response.headers),
                 body=body,
             )
+        except (EgressResponseTooLarge, EgressResponseUndecodable) as exc:
+            # 308-REVIEW WR-03: the status was read before the body; a caller may classify by it.
+            exc.status_code = response.status_code
+            raise
         finally:
             await response.aclose()
 

@@ -412,7 +412,9 @@ class WebhookDrainer:
         landed = await outbox.record_outcome(self._pool, status="failed", reason=reason, **common)
         self.failed += 1
         logger.warning("webhook delivery %s failed (attempt %d, %s)", row.id, row.attempts, outcome.error)
-        if landed:
+        # WR-03 (D-61): an over-cap response with no status to judge by says nothing about whether
+        # the receiver processed it, so it is recorded failed but never counted toward auto-disable.
+        if landed and outcome.error != "response_too_large":
             won = await outbox.register_failure(
                 self._pool, endpoint_id=row.endpoint_id, threshold=AUTO_DISABLE_AFTER, now=now
             )

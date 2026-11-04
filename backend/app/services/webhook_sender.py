@@ -29,14 +29,19 @@ connect / network / protocol error                 yes      ``connect``
 TLS (``ssl.SSLError`` anywhere in the cause chain) yes      ``tls``
 3xx (egress ``redirected``)                        no       ``redirect``
 any other egress refusal (DNS changed since save)  no       ``refused_address``
-response over the cap, or undecodable              no       ``response_too_large``
+response over the cap, or undecodable: by STATUS  (WR-03, the rows above; the body is never needed)
+  ... with no status, or a status not listed above  no       ``response_too_large``
 410                                                no       ``gone`` (endpoint off)
 other 4xx                                          no       ``http_status``
 URL fails the rules                                no       ``invalid_url``
 =================================================  =======  =====================
 
-An oversized 2xx body is NOT retried: the receiver probably processed the request, and a retry
-risks a duplicate.
+⚠ 308-REVIEW WR-03 (D-61): egress attaches the response's ``status_code`` to the size exceptions, and
+the sender classifies by it — an oversized or undecodable **2xx is delivered** (the receiver took it;
+retrying would duplicate it, failing it would count toward auto-disable), a 5xx / 408 / 429 with a
+large error page **is retried**, a 410 is gone. Only an over-cap response whose status is not one of
+those stays ``response_too_large`` (not retried), and the drainer never counts that word toward
+auto-disable.
 """
 from __future__ import annotations
 
@@ -164,7 +169,12 @@ def _classify_exception(exc: BaseException) -> SendOutcome:
             return _failed("redirect", retryable=False)
         return _failed("refused_address", retryable=False)
     if isinstance(exc, (egress.EgressResponseTooLarge, egress.EgressResponseUndecodable)):
-        return _failed("response_too_large", retryable=False)
+        status = getattr(exc, "status_code", None)  # WR-03: egress read it before the body
+        if status is not None:
+            by_status = classify(status_code=status)
+            if by_status.delivered or by_status.gone or by_status.retryable:
+                return by_status
+        return _failed("response_too_large", retryable=False, status_code=status)
     if isinstance(exc, (httpx.TimeoutException, asyncio.TimeoutError, TimeoutError)):
         return _failed("timeout", retryable=True)
     if _is_tls(exc):
