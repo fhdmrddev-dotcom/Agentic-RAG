@@ -3033,3 +3033,9 @@ reuses 267-B's event-card shape.
 |---|------|----------------|--------|------|
 | 307 | consent-page | How the consent page names the client (claim) and redirect host (fact), and takes org, tools and folders | ★ A one card ending on the agreed sentence (self-picked under autonomous mandate 2026-11-03; operator approval owed at the real Claude.ai connect) | phase-307, oauth-04, oauth-05, consent |
 | 307 | connected-apps | Where connected apps live, the row, and org-admin Disconnect all | ★ A own section above Keys in the API keys tab; victim-naming sheet for Disconnect all (self-picked 2026-11-03; operator approval owed at G-4) | phase-307, oauth-07, revoke, org-admin |
+
+## Sketch 308 — Told by Webhook (Phase 308, G-2 gate)
+
+| # | Name | Design Question | Winner | Tags |
+|---|------|----------------|--------|------|
+| 308 | webhooks | Where an endpoint's delivery log lives, how each endpoint state reads, and the org-admin list | ★ A rows expand in place with actions + own log; admin table in the API keys org tab with Turn off receipt and victim-naming Delete (self-picked 2026-11-04 under autonomous mandate; operator approval owed at G-4) | phase-308, hook-01..06, webhooks, delivery-log, org-admin |
