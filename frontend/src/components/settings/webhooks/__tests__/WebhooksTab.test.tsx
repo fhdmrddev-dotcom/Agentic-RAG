@@ -207,6 +207,17 @@ describe("308-05 WebhooksTab", () => {
     await waitFor(() => expect(screen.getByRole("button", { expanded: true })).toHaveFocus())
   })
 
+  it("WR-06: a hint written while the tab is ALREADY open opens that card and is consumed at once", async () => {
+    m.listWebhooks.mockResolvedValue(list([endpoint("a"), endpoint("b", { enabled: false, disabled_reason: "failing" })]))
+    render(<WebhooksTab />)
+    await waitFor(() => expect(m.listWebhooks).toHaveBeenCalled())
+    await screen.findAllByText(/b\.example\.com/)
+    expect(screen.queryByRole("button", { expanded: true })).toBeNull()
+    act(() => writeWebhookFocus({ endpointId: "b", orgId: "o1" }))
+    await waitFor(() => expect(screen.getByRole("button", { expanded: true })).toHaveTextContent("b.example.com"))
+    expect(sessionStorage.getItem("webhook_focus")).toBeNull()
+  })
+
   it("a focus hint for ANOTHER org says so; Switch to {org} switches and the card opens", async () => {
     const user = userEvent.setup()
     writeWebhookFocus({ endpointId: "b", orgId: "o2" })

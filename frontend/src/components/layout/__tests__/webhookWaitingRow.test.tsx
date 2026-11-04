@@ -338,4 +338,26 @@ describe("308-06 ChatLayout — the webhooks door", () => {
     expect(onNavigate).toHaveBeenCalledWith("settings")
     expect(h.switchOrg).not.toHaveBeenCalled()
   })
+
+  it("WR-06: with storage blocked the door still opens Settings (no throw before onNavigate)", async () => {
+    vi.stubGlobal("fetch", vi.fn(() => Promise.resolve(new Response("[]", { status: 200 }))))
+    vi.spyOn(console, "error").mockImplementation(() => {})
+    const onNavigate = vi.fn()
+    const router = createMemoryRouter([{ path: "*", Component: () => <Shell onNavigate={onNavigate} /> }], {
+      initialEntries: ["/app"],
+    })
+    render(<RouterProvider router={router} />)
+    await waitFor(() => expect(h.captured.ctx).not.toBeNull())
+    const ctx = h.captured.ctx as unknown as AttentionContext
+    onNavigate.mockClear()
+    const blocked = vi.spyOn(Storage.prototype, "setItem").mockImplementation(() => {
+      throw new Error("blocked")
+    })
+    try {
+      expect(() => ctx.openWebhooks?.("ep-42", "org-b")).not.toThrow()
+    } finally {
+      blocked.mockRestore()
+    }
+    expect(onNavigate).toHaveBeenCalledWith("settings")
+  })
 })

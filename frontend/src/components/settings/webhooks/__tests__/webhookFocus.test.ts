@@ -3,7 +3,7 @@
  * writes and the Webhooks tab reads once (the `apiKeyPrepick.ts` shape).
  */
 import { afterEach, describe, expect, it, vi } from "vitest"
-import { WEBHOOK_FOCUS_KEY, readWebhookFocusOnce, writeWebhookFocus } from "../webhookFocus"
+import { WEBHOOK_FOCUS_EVENT, WEBHOOK_FOCUS_KEY, readWebhookFocusOnce, writeWebhookFocus } from "../webhookFocus"
 
 afterEach(() => {
   sessionStorage.clear()
@@ -29,6 +29,22 @@ describe("308-05 webhookFocus", () => {
     expect(sessionStorage.getItem(WEBHOOK_FOCUS_KEY)).toBeNull()
     sessionStorage.setItem(WEBHOOK_FOCUS_KEY, JSON.stringify({ endpointId: "e1" }))
     expect(readWebhookFocusOnce()).toBeNull()
+  })
+
+  it("WR-06: every write is announced on window, even when storage is blocked", () => {
+    const seen = vi.fn()
+    window.addEventListener(WEBHOOK_FOCUS_EVENT, seen)
+    try {
+      writeWebhookFocus({ endpointId: "e1", orgId: "o1" })
+      expect(seen).toHaveBeenCalledTimes(1)
+      vi.spyOn(Storage.prototype, "setItem").mockImplementation(() => {
+        throw new Error("blocked")
+      })
+      writeWebhookFocus({ endpointId: "e1", orgId: "o1" })
+      expect(seen).toHaveBeenCalledTimes(2)
+    } finally {
+      window.removeEventListener(WEBHOOK_FOCUS_EVENT, seen)
+    }
   })
 
   it("storage that throws reads as null and writes nothing", () => {
