@@ -135,8 +135,9 @@ class FakeOutbox:
         self.calls.append(("reclaim_stale_sending", {"lease_seconds": lease_seconds, "max_attempts": max_attempts}))
         return 0
 
-    async def claim_due_deliveries(self, pool, *, limit, now=None, max_attempts):
-        self.calls.append(("claim_due_deliveries", {"limit": limit, "max_attempts": max_attempts}))
+    async def claim_due_deliveries(self, pool, *, limit, now=None, max_attempts, per_endpoint=None):
+        self.calls.append(("claim_due_deliveries", {"limit": limit, "max_attempts": max_attempts,
+                                                    "per_endpoint": per_endpoint}))
         rows, self.claimed = self.claimed, []
         self._claimed_rows.update({r.id: r for r in rows})
         return rows
@@ -233,6 +234,9 @@ def test_the_constants():
     assert wd.JITTER_FRACTION == 0.1
     d = wd.WebhookDrainer(FakePool())
     assert (d._poll_interval_seconds, d._max_claims_per_tick, d._lease_seconds) == (20, 20, 600)
+    # WR-02 (D-63): a bounded concurrent send, and at most two rows per endpoint per pass
+    assert (wd.SEND_CONCURRENCY, wd.MAX_PER_ENDPOINT_PER_PASS) == (5, 2)
+    assert (d._send_concurrency, d._max_per_endpoint) == (5, 2)
 
 
 @pytest.mark.parametrize("done", [1, 2, 3, 4, 5])
@@ -553,6 +557,84 @@ async def test_visibility_is_asked_once_per_owner_org_and_table(monkeypatch):
     assert len(send.calls) == 6
     groups = sorted(((c[1]["owner_id"], c[1]["table"], len(c[1]["ids"])) for c in visibility.calls), key=str)
     assert groups == sorted([(owner, "workflow_runs", 3), (owner, "documents", 2), (other.user_id, "workflow_runs", 1)], key=str)
+
+
+# ── WR-02: one slow receiver never stalls the batch ──────────────────────────────────────────
+
+
+async def test_wr02_the_claim_caps_rows_per_endpoint(monkeypatch):
+    fake = FakeOutbox().install(monkeypatch)
+    await _drainer(fake)._send_pass(now=NOW)
+    (call,) = fake.named("claim_due_deliveries")
+    assert call["per_endpoint"] == 2
+
+
+def test_wr02_the_claim_sql_ranks_rows_per_endpoint():
+    sql = outbox.CLAIM_DELIVERIES_SQL
+    assert "row_number() OVER (PARTITION BY d.endpoint_id" in sql
+    assert "due.rn <= $4" in sql
+
+
+async def test_wr02_a_blackholed_receiver_does_not_hold_up_the_other_rows(monkeypatch):
+    """WR-02: rows are sent concurrently. A receiver that never answers (until released) must not
+    stop the other rows of the same pass from being sent — before the fix they queued behind it."""
+    slow, fast = _row(url="https://slow.example.com/x"), [_row() for _ in range(4)]
+    fake = FakeOutbox(claimed=[slow, *fast]).install(monkeypatch)
+    release = asyncio.Event()
+    fast_sent: list = []
+
+    async def send(url, body, headers):
+        if url.startswith("https://slow."):
+            await release.wait()
+        else:
+            fast_sent.append(url)
+        return _ok()
+
+    task = asyncio.ensure_future(_drainer(fake, send=send)._send_pass(now=NOW))
+    for _ in range(200):
+        if len(fast_sent) == 4:
+            break
+        await asyncio.sleep(0)
+    assert len(fast_sent) == 4, "the fast rows waited behind the blackholed one"
+    release.set()
+    assert await asyncio.wait_for(task, 2) == 5
+
+
+async def test_wr02_no_more_than_the_cap_are_in_flight_at_once(monkeypatch):
+    rows = [_row() for _ in range(12)]
+    fake = FakeOutbox(claimed=rows).install(monkeypatch)
+    in_flight, peak = 0, 0
+
+    async def send(url, body, headers):
+        nonlocal in_flight, peak
+        in_flight += 1
+        peak = max(peak, in_flight)
+        await asyncio.sleep(0.01)
+        in_flight -= 1
+        return _ok()
+
+    assert await _drainer(fake, send=send)._send_pass(now=NOW) == 12
+    assert peak == wd.SEND_CONCURRENCY
+
+
+async def test_wr02_liveness_and_visibility_are_still_asked_once_under_concurrency(monkeypatch):
+    owner, org = uuid4(), uuid4()
+    rows = [_row(user_id=owner, org_id=org) for _ in range(6)]
+    fake = FakeOutbox(claimed=rows).install(monkeypatch)
+
+    async def slow_liveness(o):
+        await asyncio.sleep(0.01)
+        return True
+
+    calls: list = []
+
+    async def visibility(**k):
+        calls.append(k)
+        await asyncio.sleep(0.01)
+        return set(k["ids"])
+
+    await _drainer(fake, liveness=slow_liveness, visibility=visibility)._send_pass(now=NOW)
+    assert len(calls) == 1
 
 
 async def test_a_lost_lease_never_sends_and_records_nothing(monkeypatch):

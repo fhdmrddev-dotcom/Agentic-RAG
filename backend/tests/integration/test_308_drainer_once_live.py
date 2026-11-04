@@ -307,6 +307,25 @@ async def _claim_one(w, d):
     return row, cache
 
 
+async def test_wr02_the_claim_takes_at_most_two_rows_per_endpoint_per_pass():
+    """WR-02, live: one endpoint with three due deliveries and another with one; a claim capped at
+    two per endpoint takes 2 + 1, and the third row is left for the next pass."""
+    async with world() as w:
+        busy = await w.endpoint(w.alice, url="https://hooks.example.com/busy")
+        quiet = await w.endpoint(w.bob, url="https://hooks.example.com/quiet")
+        for _ in range(3):
+            assert await w.finish(await w.run(w.alice))
+        assert await w.finish(await w.run(w.bob))
+        d = w.drainer(CountingSend())
+        assert await d._fan_out(now=NOW) == 4
+        rows = await outbox.claim_due_deliveries(w.pool, limit=10, now=NOW, max_attempts=wd.MAX_ATTEMPTS,
+                                                 per_endpoint=2)
+        by_endpoint = sorted(str(r.endpoint_id) for r in rows)
+        assert by_endpoint == sorted([str(busy), str(busy), str(quiet)])
+        left = [r for r in await w.deliveries(busy) if r["status"] == "pending"]
+        assert len(left) == 1
+
+
 async def test_wr01_an_endpoint_turned_off_after_the_claim_is_never_sent_to():
     """WR-01, live: the claim snapshot says on; an org admin turns the endpoint off before the row's
     send. The renew re-reads the endpoint, so nothing is sent and the row is skipped_disabled."""

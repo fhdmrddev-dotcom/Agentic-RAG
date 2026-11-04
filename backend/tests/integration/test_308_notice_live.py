@@ -41,7 +41,8 @@ async def test_five_failures_turn_the_endpoint_off_with_one_notice():
         # fan out all six, then send five at a time
         assert await w.drainer(CountingSend())._fan_out(now=NOW) == 6
         send, audit = CountingSend(failed(400)), CountingAudit()
-        await w.drainer(send, audit=audit, max_claims_per_tick=5).tick(now=NOW)
+        # WR-02: five rows of ONE endpoint in one pass needs the per-endpoint cap raised to five
+        await w.drainer(send, audit=audit, max_claims_per_tick=5, max_per_endpoint_per_tick=5).tick(now=NOW)
 
         assert len(send.calls) == 5
         endpoint = await w.endpoint_row(ep)
