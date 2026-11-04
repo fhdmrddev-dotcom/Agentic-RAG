@@ -46,7 +46,7 @@ reviewer exists, so a phase closes `verification_mode: self-verified`, never `re
 
 Milestone: v4.9 Use It From Your Own Tools
 Phase: 308
-Plan: 5 of 6 (waves 1-3 merged)
+Plan: 6 of 6 (all waves merged; review + verification next)
 Status: Phase 308 planned — sketch 308-webhooks (A, self-approved), UI-SPEC approved, research D-41..D-54, plans 308-01..06 (D-55: 6 not 5); next: execute-phase 308
 Last activity: 2026-11-04
 
