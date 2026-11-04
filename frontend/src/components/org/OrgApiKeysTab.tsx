@@ -28,6 +28,7 @@ import { API_KEYS_COPY, fillCopy } from "@/components/settings/apiKeys/apiKeysCo
 import { orderKeys } from "@/components/settings/apiKeys/apiKeyFacts"
 import { McpOffNotice } from "@/components/settings/apiKeys/McpOffNotice"
 import { OrgConnectedApps } from "./OrgConnectedApps"
+import { OrgWebhooks } from "./OrgWebhooks"
 
 const C = API_KEYS_COPY
 
@@ -94,6 +95,7 @@ export function OrgApiKeysTab({
         )}
       </div>
       <OrgConnectedApps orgName={orgName} mcpTools={mcpTools} oauthAvailable={list?.mcp?.oauth ?? false} onRecorded={onRecorded} />
+      <OrgWebhooks orgName={orgName} onRecorded={onRecorded} />
 
       {list === null && loadError === null && (
         <p role="status" className="px-1 text-sm text-muted-foreground">
