@@ -367,6 +367,18 @@ async def test_logs_never_carry_the_url_body_or_signature(caplog):
             assert forbidden not in text, (forbidden, text)
 
 
+async def test_r308_04_logs_mask_a_token_looking_host_label(caplog):
+    # 308-SECURITY R-308-04: the sender logged host_of(url) unmasked, so a Pipedream / ngrok style
+    # credential in the leftmost label reached an opt-in log file. Both log sites use display_host.
+    caplog.set_level(logging.DEBUG)
+    token_host = "https://eo1a2b3c4d5e6f7a8.m.pipedream.net/x"
+    await send(token_host, BODY, HEADERS, resolver=_resolver(PUBLIC), transport=_transport(200))
+    await send("https://u:PASSWORD@eo1a2b3c4d5e6f7a8.m.pipedream.net/x", BODY, HEADERS)
+    lines = [r.getMessage() for r in caplog.records if r.name == "app.services.webhook_sender"]
+    assert len(lines) == 2 and all("m.pipedream.net" in line for line in lines), lines  # not vacuous
+    assert not any("eo1a2b3c4d5e6f7a8" in line for line in lines), lines
+
+
 def test_the_sender_has_no_http_client_of_its_own():
     src = inspect.getsource(webhook_sender)
     assert "AsyncClient" not in src

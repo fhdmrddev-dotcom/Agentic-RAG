@@ -191,13 +191,6 @@ _CLASSIFIED = (
 )
 
 
-def _safe_host(url: str) -> str:
-    try:
-        return webhook_urls.host_of(url)
-    except ValueError:
-        return ""
-
-
 async def send(
     url: str,
     body: bytes,
@@ -212,8 +205,9 @@ async def send(
         webhook_urls.check_webhook_url(url)
     except webhook_urls.WebhookUrlError:
         outcome = _failed("invalid_url", retryable=False)
-        refused_host = _safe_host(url)
-        logger.warning("webhook send: host=%s outcome=%s", refused_host, outcome.error)
+        # R-308-04: logs name the masked host (display_host), never a token-looking host label.
+        shown_host = webhook_urls.display_host(url)
+        logger.warning("webhook send: host=%s outcome=%s", shown_host, outcome.error)
         return outcome
 
     host = webhook_urls.host_of(url)
@@ -232,7 +226,8 @@ async def send(
         )
         del response  # the body and every other header are discarded here (D-20)
     outcome = replace(outcome, latency_ms=max(0, int(round((clock() - started) * 1000))))
-    logger.info("webhook send: host=%s outcome=%s", host, outcome.error or "sent")
+    shown_host = webhook_urls.display_host(url)
+    logger.info("webhook send: host=%s outcome=%s", shown_host, outcome.error or "sent")
     return outcome
 
 

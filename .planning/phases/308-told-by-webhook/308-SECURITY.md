@@ -67,22 +67,23 @@ register_authored_at_plan_time: true
 ## Accepted Risks Log
 
 Non-blocking residuals the auditor found next to closed mitigations. None breaks a declared mitigation.
-Accepted by the orchestrator under the operator's standing end-to-end delegation — **operator to ratify**.
+Accepted by the orchestrator under the operator's standing end-to-end delegation; R-308-01/02/03/05 **ratified by the operator in chat on 2026-11-04**. R-308-04 was fixed instead.
 
 | Risk ID | Threat Ref | Rationale | Accepted By | Date |
 |---------|------------|-----------|-------------|------|
-| R-308-01 | T-308-09 | `principal_still_allowed` inherits `_is_banned`'s fail-open read: if the `auth.users` read fails, a banned owner keeps receiving. Membership still fails closed. Review IN-03, skipped as larger than a safe edit; already routed to a 309 seed. | orchestrator (delegated) — ratify | 2026-11-04 |
-| R-308-02 | T-308-16 | Send test works as a rate-limited port probe of PUBLIC hosts (any port; answer shows connect/tls/timeout + latency). Internal addresses stay blocked. Unregistered surface, WARNING level. Follow-up: restrict ports or flatten the error words. | orchestrator (delegated) — ratify | 2026-11-04 |
-| R-308-03 | T-308-21 | A Test that sent nothing (redaction failure / unreadable key) still writes an attempt row and a `test_sent` audit (review IN-02). Accuracy, not a leak. | orchestrator (delegated) — ratify | 2026-11-04 |
-| R-308-04 | T-308-15 / T-308-13 | `webhook_sender.py:216,235` logs the UNMASKED host via `_safe_host` → `host_of`. Under the opt-in file log sink a Pipedream/ngrok-style token label in the host reaches the operator's log file (no path/query). One-line follow-up: log `display_host`. Pre-CR-01 audit rows with unmasked hosts exist in the local DB only (308 not deployed). | orchestrator (delegated) — ratify | 2026-11-04 |
-| R-308-05 | T-308-SC | The plan said the `standardwebhooks` human verify would "never be auto-approved"; it was resolved by the orchestrator under delegation (`STATE.md:132`) on the evidence in `308-standardwebhooks-evidence.md`. Dev/test-only dependency. | orchestrator (delegated) — **operator must ratify** | 2026-11-04 |
+| R-308-01 | T-308-09 | `principal_still_allowed` inherits `_is_banned`'s fail-open read: if the `auth.users` read fails, a banned owner keeps receiving. Membership still fails closed. Review IN-03, skipped as larger than a safe edit; already routed to a 309 seed. | orchestrator (delegated); **ratified by operator** | 2026-11-04 |
+| R-308-02 | T-308-16 | Send test works as a rate-limited port probe of PUBLIC hosts (any port; answer shows connect/tls/timeout + latency). Internal addresses stay blocked. Unregistered surface, WARNING level. Follow-up: restrict ports or flatten the error words. | orchestrator (delegated); **ratified by operator** | 2026-11-04 |
+| R-308-03 | T-308-21 | A Test that sent nothing (redaction failure / unreadable key) still writes an attempt row and a `test_sent` audit (review IN-02). Accuracy, not a leak. | orchestrator (delegated); **ratified by operator** | 2026-11-04 |
+| R-308-04 | T-308-15 / T-308-13 | **FIXED 2026-11-04** — both sender log lines now name `webhook_urls.display_host(url)`, so a Pipedream/ngrok-style token label is masked to `…`; egress still pins to the real host. Test `test_308_sender::test_r308_04_logs_mask_a_token_looking_host_label` (RED before, GREEN after). Pre-CR-01 audit rows with unmasked hosts remain in the LOCAL DB only (308 not deployed). | fixed — no ratification needed | 2026-11-04 |
+| R-308-05 | T-308-SC | The plan said the `standardwebhooks` human verify would "never be auto-approved"; it was resolved by the orchestrator under delegation (`STATE.md:132`) on the evidence in `308-standardwebhooks-evidence.md`. Dev/test-only dependency. | orchestrator (delegated); **ratified by operator** | 2026-11-04 |
 
 *Accepted risks do not resurface in future audit runs.*
 
 ### Deploy preconditions (deferred, not gaps)
 
-- Cloud paste of migrations 220→221→222→223→224→225, each with its own operator approval, before the 308 backend deploys (boot hard-fails without 225).
-- Then `get_advisors(security)` on cloud (T-308-10 / D-33).
+- ✅ **DONE 2026-11-04:** migrations 220→221→222→223→224→225 applied to production via the Supabase MCP, each under its own operator approval in chat; every migration's VERIFY block read PASS (220 8/8, 221 8/8, 222 8/8, 223 7/7, 224 8/8, 225 PASS). Pre-flights: prod rows satisfied every new CHECK; 225 keeps all 40 live audit literals. No Postgres crash/recovery line in the 24 h log after 221 (BUG-261031-01 watch).
+- ✅ **DONE 2026-11-04:** `get_advisors(security)` on production — no ERROR. New entries are INFO `rls_enabled_no_policy` on the six new deny-all tables (intended: mcp_usage, oauth_clients, oauth_tokens, webhook_endpoints/events/deliveries/delivery_attempts). Every WARN (mutable search_path ×7, vector in public, 9 authenticated-callable SECURITY DEFINER helpers, leaked-password protection off) predates 220–225.
+- Still owed for the 308 deploy itself: the operator's deploy instruction (304–308 code is not on `production`).
 
 ---
 
@@ -91,6 +92,7 @@ Accepted by the orchestrator under the operator's standing end-to-end delegation
 | Audit Date | Threats Total | Closed | Open | Run By |
 |------------|---------------|--------|------|--------|
 | 2026-11-04 | 25 (+1 SUMMARY flag, mapped to T-308-13) | 25 | 0 | gsd-security-auditor (opus); unit `-k 308` 516 passed, webhooks vitest 111 + 10 passed; live suites 154 passed in UAT row 6 |
+| 2026-11-04 | R-308-04 fix | — | 0 | orchestrator; unit `-k 308` 517 passed |
 
 ---
 
@@ -101,4 +103,4 @@ Accepted by the orchestrator under the operator's standing end-to-end delegation
 - [x] `threats_open: 0` confirmed
 - [x] `status: verified` set in frontmatter
 
-**Approval:** verified 2026-11-04 (R-308-01..05 await operator ratification)
+**Approval:** verified 2026-11-04 — R-308-04 fixed; R-308-01/02/03/05 ratified by the operator 2026-11-04
