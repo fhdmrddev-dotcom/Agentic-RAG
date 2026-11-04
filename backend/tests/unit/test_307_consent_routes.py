@@ -82,6 +82,7 @@ class _World:
         self.visible = {ORG_A: {F_A}, ORG_B: {F_B}}
         self.folder_reads: list[tuple[str, str]] = []
         self.tx: list[str] = []
+        self.allowlist = [{"host": "claude.ai"}, {"host": "claude.com"}]   # migration 224's default
 
     def save(self, **kw) -> str:
         return asyncio.run(oauth_store.save_request(self.redis, _record(**kw)))
@@ -134,7 +135,11 @@ def world(monkeypatch):
         w.folder_reads.append((str(user_id), str(org_id)))
         return set(w.visible.get(str(org_id), set()))
 
+    async def get_redirect_hosts(pool):
+        return [dict(e) for e in w.allowlist]
+
     monkeypatch.setattr(route.oauth_db, "member_orgs", member_orgs)
+    monkeypatch.setattr(route.oauth_db, "get_redirect_hosts", get_redirect_hosts)
     monkeypatch.setattr(route.oauth_db, "deployment_mcp_on", deployment_mcp_on)
     monkeypatch.setattr(route.oauth_db, "mark_client_granted", mark_client_granted)
     monkeypatch.setattr(route.api_keys_db, "is_org_member", is_org_member)
@@ -303,6 +308,19 @@ def test_a_ready_request_reads_the_whole_consent_wire_and_is_not_consumed(client
 def test_host_seeded_is_true_only_for_the_built_in_web_hosts(client, world, host, kind, seeded):
     rid = world.save(redirect_host=host, redirect_kind=kind)
     assert client.get(f"/oauth/requests/{rid}", headers=AUTH).json()["client"]["host_seeded"] is seeded
+
+
+def test_in03_host_seeded_follows_the_live_allowlist_entry_not_a_constant(client, world):
+    # An operator removed claude.ai and added it back: the entry now has added_by, so it is no
+    # longer built in, and the "seeded" why-line must not show.
+    world.allowlist = [{"host": "claude.ai", "added_by": USER, "added_by_name": "Dana"},
+                       {"host": "claude.com"}]
+    rid = world.save(redirect_host="claude.ai", redirect_kind="web")
+    assert client.get(f"/oauth/requests/{rid}", headers=AUTH).json()["client"]["host_seeded"] is False
+    # And a web host an operator added is never "seeded", built-in or not.
+    world.allowlist = []
+    rid = world.save(redirect_host="claude.com", redirect_kind="web")
+    assert client.get(f"/oauth/requests/{rid}", headers=AUTH).json()["client"]["host_seeded"] is False
 
 
 def test_a_cimd_client_reads_its_published_host(client, world):

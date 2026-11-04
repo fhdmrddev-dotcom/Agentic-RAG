@@ -59,9 +59,10 @@ router = APIRouter(prefix="/oauth/requests", tags=["oauth"], include_in_schema=F
 
 LABEL_MAX = 60
 LABEL_FALLBACK = "Connected app"
-# The built-in allowlist hosts (migration 224's default): the "registered itself" why-line on the
-# consent page reads differently for them (UI-SPEC §1a), never their trust.
-SEEDED_HOSTS = frozenset({"claude.ai", "claude.com"})
+# The built-in allowlist hosts (an entry with no ``added_by``, as ``oauth_admin._wire`` reads it):
+# the "registered itself" why-line on the consent page reads differently for them (UI-SPEC §1a),
+# never their trust. IN-03: read from the LIVE allowlist, never a constant — a host an operator
+# removed and added back is no longer built in.
 
 _NO_SESSION = "Sign in to continue."
 _NOT_MEMBER = "You aren't a member of that organisation, so the app can't act there."
@@ -182,6 +183,11 @@ async def read_request(
     ]
     redirect_host = record.get("redirect_host")
     redirect_kind = record.get("redirect_kind")
+    seeded = redirect_kind == "web" and any(
+        isinstance(e.get("host"), str) and e["host"].strip().lower() == redirect_host
+        and e.get("added_by") is None
+        for e in await oauth_db.get_redirect_hosts(pool)
+    )
     return {
         "status": "ready",
         "client": {
@@ -190,7 +196,7 @@ async def read_request(
             "published_host": record.get("published_host"),
             "redirect_host": redirect_host,
             "redirect_kind": redirect_kind,
-            "host_seeded": redirect_kind == "web" and redirect_host in SEEDED_HOSTS,
+            "host_seeded": seeded,
         },
         "account": {"email": current_user.get("email")},
         "orgs": orgs,
