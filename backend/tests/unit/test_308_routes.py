@@ -516,6 +516,43 @@ def test_create_refuses_a_malformed_body(client, store, payload):
     assert store.create_calls == []
 
 
+# ── WR-04: an upper-case scheme is stored lower-case, so 225's case-sensitive CHECK agrees ────────
+
+
+def test_wr04_create_stores_an_upper_case_scheme_lower_case(client, store):
+    r = client.post("/webhooks", json={"url": "HTTPS://hooks.example.com/syrel?token=abc",
+                                       "event_types": ["run.finished"]})
+    assert r.status_code == 201, r.text
+    assert store.create_calls[0]["url"] == URL
+    assert r.json()["endpoint"]["url"] == URL
+    assert store.validate_calls == [("webhook", URL, None, HOST)]
+
+
+def test_wr04_patch_stores_an_upper_case_scheme_lower_case(client, store):
+    eid = store.add(url="https://old.example.org/in")
+    r = client.patch(f"/webhooks/{eid}", json={"url": "Https://hooks.example.com/syrel?token=abc"})
+    assert r.status_code == 200, r.text
+    assert store.endpoints[eid]["url"] == URL
+
+
+@pytest.mark.parametrize("method", ["post", "patch"])
+def test_wr04_a_check_violation_is_the_worded_422_not_a_500(client, store, monkeypatch, method):
+    import asyncpg
+
+    async def violates(*a, **kw):
+        raise asyncpg.CheckViolationError("webhook_endpoints_url_check")
+
+    monkeypatch.setattr(webhooks_db, "create_endpoint" if method == "post" else "update_endpoint", violates)
+    if method == "post":
+        r = client.post("/webhooks", json={"url": URL, "event_types": ["run.finished"]})
+    else:
+        eid = store.add(url="https://old.example.org/in")
+        r = client.patch(f"/webhooks/{eid}", json={"url": URL})
+    assert r.status_code == 422, r.text
+    assert r.json()["detail"] == {"code": "invalid_url", "message": "That isn't a web address."}
+    assert store.audits == []
+
+
 def test_the_eleventh_endpoint_is_refused(client, store):
     for _ in range(10):
         store.add()

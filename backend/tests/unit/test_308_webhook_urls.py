@@ -38,6 +38,18 @@ def test_the_url_is_never_normalised():
     assert check_webhook_url(url) == url
 
 
+@pytest.mark.parametrize("url, stored", [
+    ("HTTPS://Example.com/hook", "https://Example.com/hook"),
+    ("Https://hooks.example.com/A?b=C", "https://hooks.example.com/A?b=C"),
+    ("hTTpS://hooks.example.com", "https://hooks.example.com"),
+])
+def test_wr04_the_scheme_alone_is_lower_cased(url, stored):
+    """WR-04: 225's CHECK is ``url LIKE 'https://%'`` (case-sensitive). The scheme is normalised so
+    the stored URL passes it and is still exactly the sent URL; nothing after the scheme changes."""
+    assert check_webhook_url(url) == stored
+    assert check_webhook_url(stored) == stored
+
+
 def test_max_length_is_2048():
     assert MAX_URL_LENGTH == 2048
     base = "https://hooks.example.com/"
