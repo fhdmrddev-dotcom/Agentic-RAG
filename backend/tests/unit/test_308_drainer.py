@@ -289,6 +289,16 @@ async def test_cr01_the_auto_disable_audit_masks_a_token_in_the_host(monkeypatch
     assert call[1]["host"] == "….m.pipedream.net"
 
 
+async def test_wr03_a_response_too_large_failure_never_counts_toward_auto_disable(monkeypatch):
+    """WR-03: an over-cap body with no status the sender could read says nothing about whether the
+    receiver processed it — recorded failed, but never a step toward turning the endpoint off."""
+    fake = FakeOutbox().install(monkeypatch)
+    await _drainer(fake)._record(_row(), _fail(None, "response_too_large", retryable=False), now=NOW)
+    (rec,) = fake.named("record_outcome")
+    assert (rec["status"], rec["reason"], rec["error"]) == ("failed", "not_retried", "response_too_large")
+    assert fake.named("register_failure") == []
+
+
 @pytest.mark.parametrize("attempts", [1, 2, 3, 4, 5])
 async def test_a_retryable_failure_with_attempts_left_is_retrying_on_schedule(monkeypatch, attempts):
     fake = FakeOutbox().install(monkeypatch)

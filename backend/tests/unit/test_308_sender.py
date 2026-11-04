@@ -213,10 +213,65 @@ async def test_an_internal_address_at_send_is_refused_address():
     assert seen == []
 
 
-async def test_an_oversized_2xx_body_is_response_too_large_not_retried():
+# ── WR-03: an over-cap body is classified by its STATUS — webhooks never need the body ──────────
+#
+# Before the fix egress raised before returning a status, so a receiver answering 200 with a large
+# echo body was recorded failed and counted toward auto-disable, and a 503 with a large error page was
+# never retried. Egress now attaches the response's status to the exception it raises.
+
+_BIG = b"x" * (RESPONSE_CAP_BYTES + 1)
+
+
+@pytest.mark.parametrize("declared", [True, False], ids=["content-length", "streamed"])
+async def test_wr03_an_oversized_2xx_body_is_delivered(declared):
+    headers = {"content-length": str(len(_BIG))} if declared else {}
+    out = await send(URL, BODY, HEADERS, resolver=_resolver(PUBLIC), transport=_transport(200, _BIG, headers))
+    assert (out.delivered, out.retryable, out.error, out.status_code) == (True, False, None, 200)
+
+
+async def test_wr03_an_undecodable_2xx_body_is_delivered():
     out = await send(URL, BODY, HEADERS, resolver=_resolver(PUBLIC),
-                     transport=_transport(200, b"x" * (RESPONSE_CAP_BYTES + 1)))
-    assert (out.delivered, out.retryable, out.error) == (False, False, "response_too_large")
+                     transport=_transport(204, b"\x00\x01", {"content-encoding": "br"}))
+    assert (out.delivered, out.error, out.status_code) == (True, None, 204)
+
+
+async def test_wr03_a_503_with_an_oversized_body_is_retried():
+    out = await send(URL, BODY, HEADERS, resolver=_resolver(PUBLIC),
+                     transport=_transport(503, _BIG, {"content-length": str(len(_BIG))}))
+    assert (out.delivered, out.retryable, out.error, out.status_code) == (False, True, "http_status", 503)
+
+
+async def test_wr03_a_410_with_an_oversized_body_is_gone():
+    out = await send(URL, BODY, HEADERS, resolver=_resolver(PUBLIC), transport=_transport(410, _BIG))
+    assert (out.delivered, out.gone, out.error, out.status_code) == (False, True, "gone", 410)
+
+
+async def test_wr03_another_status_with_an_oversized_body_stays_response_too_large():
+    out = await send(URL, BODY, HEADERS, resolver=_resolver(PUBLIC), transport=_transport(404, _BIG))
+    assert (out.delivered, out.retryable, out.error, out.status_code) == (False, False, "response_too_large", 404)
+
+
+@pytest.mark.parametrize("status, delivered, error", [
+    (200, True, None), (503, False, "http_status"), (None, False, "response_too_large"),
+])
+def test_wr03_classify_reads_the_status_on_the_size_exceptions(status, delivered, error):
+    for cls in (egress.EgressResponseTooLarge, egress.EgressResponseUndecodable):
+        exc = cls("big")
+        if status is not None:
+            exc.status_code = status
+        out = classify(exc=exc)
+        assert (out.delivered, out.error, out.status_code) == (delivered, error, status)
+
+
+async def test_wr03_egress_attaches_the_status_to_the_size_exception():
+    with pytest.raises(egress.EgressResponseTooLarge) as err:
+        await egress.send_pinned_http(
+            "webhook", "POST", URL, content=BODY, timeout=5.0, max_bytes=RESPONSE_CAP_BYTES,
+            allowed_host="hooks.example.com", resolver=_resolver(PUBLIC), transport=_transport(201, _BIG),
+        )
+    assert err.value.status_code == 201
+    assert egress.EgressResponseTooLarge("x").status_code is None
+    assert egress.EgressResponseUndecodable("x").status_code is None
 
 
 async def test_a_tls_failure_is_tls_retryable():
