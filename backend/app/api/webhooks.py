@@ -372,3 +372,323 @@ async def delete_endpoint(
         raise _not_found()
     await _audit(current_user, org, "deleted", row["id"], row["url"], "owner")
     return Response(status_code=status.HTTP_204_NO_CONTENT)
+
+
+# ── Send test (D-29) ───────────────────────────────────────────────────────────────────────────
+
+
+async def _signing_secrets(
+    pool: asyncpg.Pool, endpoint_id: UUID, org: UUID, now: datetime
+) -> tuple[str, str | None] | None:
+    """The current secret and, while its overlap runs, the previous one — decrypted for THIS send
+    only and never returned, logged or stored. ``None`` when either cannot be read (fail closed:
+    nothing is sent)."""
+    cipher = secret_cipher.get_cipher()
+    if cipher is None:
+        return None
+    row = await webhooks_db.get_endpoint_signing(pool, endpoint_id=endpoint_id, org_id=org)
+    if row is None or not row.get("secret_ciphertext"):
+        return None
+    try:
+        current = secret_cipher.decrypt_secret(row["secret_ciphertext"], cipher)
+    except Exception:  # noqa: BLE001 — an unreadable secret sends nothing
+        return None
+    previous = None
+    expires = row.get("previous_secret_expires_at")
+    if row.get("previous_secret_ciphertext") and expires is not None and expires > now:
+        try:
+            previous = secret_cipher.decrypt_secret(row["previous_secret_ciphertext"], cipher)
+        except Exception:  # noqa: BLE001 — the new secret alone still signs
+            previous = None
+    return current, previous
+
+
+@router.post("/{endpoint_id}/test", response_model=WebhookTestResult)
+async def send_test(
+    endpoint_id: UUID,
+    current_user: dict = Depends(get_current_user),
+    active_org: str = Depends(get_active_org_id),
+    pool: asyncpg.Pool = Depends(get_pg_pool),
+    redis: aioredis.Redis = Depends(get_redis),
+) -> WebhookTestResult:
+    """Send one ``webhook.test`` event now and answer the verdict. The SAME freezing, signer and
+    send path as the drainer; recorded in the log with one attempt; never retried; never counted
+    toward auto-disable. Rate-limited per member (fail closed)."""
+    caller, org = _caller(current_user), _uuid(active_org)
+    await rate_limit.enforce_user_webhook_limit(redis, user_id=str(caller), kind="webhook_test")
+    endpoint = await webhooks_db.get_endpoint_for_owner(
+        pool, endpoint_id=endpoint_id, user_id=caller, org_id=org
+    )
+    if endpoint is None:
+        raise _not_found()
+    if not endpoint["enabled"]:
+        raise _refuse(409, "endpoint_off", TEST_OFF)
+
+    now = datetime.now(timezone.utc)
+    frozen = await webhook_sender.freeze_payload(
+        build_test_event(endpoint_id, now),
+        org_id=str(org),
+        is_on=lambda o: outbound_policy.pii_redaction_enabled(pool, o),
+    )
+    created = await webhooks_db.create_test_delivery(
+        pool, endpoint_id=endpoint_id, org_id=org, payload=frozen
+    )
+    if created is None:
+        raise _not_found()
+    event_id, delivery_id = created
+
+    outcome = None
+    if frozen is not None:
+        secrets = await _signing_secrets(pool, endpoint_id, org, now)
+        if secrets is not None:
+            body = frozen.encode("ascii")
+            headers = webhook_signer.build_headers(
+                msg_id=webhook_signer.message_id(event_id),
+                timestamp=int(now.timestamp()),
+                body=body,
+                current=secrets[0],
+                previous=secrets[1],
+            )
+            outcome = await webhook_sender.send(endpoint["url"], body, headers)
+
+    if outcome is None:
+        # The guard withheld the payload or the secret could not be read: nothing was sent.
+        logger.warning("webhook test %s not sent (payload withheld or signing key unreadable)", endpoint_id)
+        result = WebhookTestResult(delivered=False, status_code=None, latency_ms=None, error=None)
+    else:
+        result = WebhookTestResult(
+            delivered=outcome.delivered, status_code=outcome.status_code,
+            latency_ms=outcome.latency_ms, error=outcome.error,
+        )
+    await webhooks_db.record_test_outcome(
+        pool, delivery_id=delivery_id, sent=result.delivered, status_code=result.status_code,
+        latency_ms=result.latency_ms, error=result.error,
+    )
+    await _audit(current_user, org, "test_sent", endpoint_id, endpoint["url"], "owner")
+    return result
+
+
+# ── the delivery log (D-20) and Resend (D-21) ──────────────────────────────────────────────────
+
+
+def _encode_cursor(cursor: tuple[datetime, UUID] | None) -> str | None:
+    if cursor is None:
+        return None
+    created_at, delivery_id = cursor
+    raw = f"{created_at.isoformat()}|{delivery_id}".encode("ascii")
+    return base64.urlsafe_b64encode(raw).decode("ascii").rstrip("=")
+
+
+def _decode_cursor(value: str | None) -> tuple[datetime, UUID] | None:
+    if not value:
+        return None
+    try:
+        raw = base64.urlsafe_b64decode(value + "=" * (-len(value) % 4)).decode("ascii")
+        at, _, did = raw.partition("|")
+        created_at = datetime.fromisoformat(at)
+        if created_at.tzinfo is None:
+            raise ValueError("naive cursor")
+        return created_at, UUID(did)
+    except (ValueError, binascii.Error, UnicodeDecodeError):
+        raise _refuse(422, "bad_cursor", BAD_CURSOR) from None
+
+
+def _item_kind(event_type: str) -> str:
+    if event_type == "webhook.test":
+        return "test"
+    if event_type == "document.ingested":
+        return "document"
+    return "run"
+
+
+def _delivery(row: dict) -> WebhookDeliveryRead:
+    item_id = row.get("item_id")
+    return WebhookDeliveryRead(
+        id=str(row["id"]),
+        event_type=row["event_type"],
+        item_kind=_item_kind(row["event_type"]),
+        item_id=None if item_id is None else str(item_id),
+        status=row["status"],
+        reason=row.get("reason"),
+        attempts=int(row.get("attempts") or 0),
+        last_status_code=row.get("last_status_code"),
+        last_latency_ms=row.get("last_latency_ms"),
+        last_error=row.get("last_error"),
+        last_attempt_at=row.get("last_attempt_at"),
+        next_attempt_at=row.get("next_attempt_at"),
+        created_at=row["created_at"],
+    )
+
+
+@router.get("/{endpoint_id}/deliveries", response_model=WebhookDeliveryPage)
+async def list_deliveries(
+    endpoint_id: UUID,
+    limit: int = Query(LOG_PAGE_DEFAULT, ge=1),
+    before: str | None = Query(None, max_length=200),
+    current_user: dict = Depends(get_current_user),
+    active_org: str = Depends(get_active_org_id),
+    pool: asyncpg.Pool = Depends(get_pg_pool),
+) -> WebhookDeliveryPage:
+    """One page of the endpoint's log, newest first. Status words and numbers only — the log holds
+    no body, no response and no headers. ``limit`` is capped at 50."""
+    caller, org = _caller(current_user), _uuid(active_org)
+    page = await webhooks_db.list_deliveries(
+        pool, endpoint_id=endpoint_id, user_id=caller, org_id=org,
+        before=_decode_cursor(before), limit=min(limit, LOG_PAGE_MAX),
+    )
+    if page is None:
+        raise _not_found()
+    return WebhookDeliveryPage(
+        deliveries=[_delivery(r) for r in page["items"]],
+        next_cursor=_encode_cursor(page["next_cursor"]),
+    )
+
+
+@router.post("/{endpoint_id}/deliveries/{delivery_id}/resend", response_model=WebhookResendResult)
+async def resend_delivery(
+    endpoint_id: UUID,
+    delivery_id: UUID,
+    current_user: dict = Depends(get_current_user),
+    active_org: str = Depends(get_active_org_id),
+    pool: asyncpg.Pool = Depends(get_pg_pool),
+    redis: aioredis.Redis = Depends(get_redis),
+) -> WebhookResendResult:
+    """Queue a sent or failed delivery again, with the SAME ``webhook-id`` (D-21). Not on an endpoint
+    that is off (409); a test, skipped or in-flight delivery is a 404. Rate-limited per member."""
+    caller, org = _caller(current_user), _uuid(active_org)
+    await rate_limit.enforce_user_webhook_limit(redis, user_id=str(caller), kind="webhook_resend")
+    endpoint = await webhooks_db.get_endpoint_for_owner(
+        pool, endpoint_id=endpoint_id, user_id=caller, org_id=org
+    )
+    if endpoint is None:
+        raise _not_found()
+    try:
+        row = await webhooks_db.resend_delivery(
+            pool, delivery_id=delivery_id, endpoint_id=endpoint_id, user_id=caller, org_id=org
+        )
+    except webhooks_db.EndpointOff:
+        raise _refuse(409, "endpoint_off", RESEND_OFF) from None
+    if row is None:
+        raise HTTPException(status_code=404, detail=_DELIVERY_NOT_FOUND)
+    await _audit(current_user, org, "delivery_resent", endpoint_id, endpoint["url"], "owner")
+    return WebhookResendResult(
+        delivery=WebhookDeliveryQueued(
+            id=str(row["id"]), status="pending", attempts=int(row.get("attempts") or 0),
+            next_attempt_at=row.get("next_attempt_at"),
+        )
+    )
+
+
+# ── the org admin's view (D-30 / D-51) ─────────────────────────────────────────────────────────
+
+
+def _org_read(row: dict, caller: UUID) -> OrgWebhookRead:
+    """An admin row: host, masked path and ``has_query`` from ``admin_display`` — never the URL,
+    never the query (a receiver's token lives in either)."""
+    host, path, has_query = webhook_urls.admin_display(row["url"])
+    return OrgWebhookRead(
+        id=str(row["id"]),
+        owner_name=row.get("owner_name"),
+        owner_is_you=str(row["user_id"]) == str(caller),
+        owner_is_member=bool(row.get("owner_is_member")),
+        host=host,
+        path=path,
+        has_query=has_query,
+        event_types=[str(t) for t in (row.get("event_types") or [])],
+        enabled=bool(row["enabled"]),
+        disabled_reason=row.get("disabled_reason"),
+        last_success_at=row.get("last_success_at"),
+        consecutive_failures=int(row.get("consecutive_failures") or 0),
+    )
+
+
+async def _org_row(pool: asyncpg.Pool, org: UUID, endpoint_id: UUID) -> dict | None:
+    """One endpoint in the org with its owner facts (the admin list's own read; no ciphertext)."""
+    for row in await webhooks_db.list_endpoints_for_org(pool, org_id=org):
+        if str(row["id"]) == str(endpoint_id):
+            return row
+    return None
+
+
+async def _org_answer(pool: asyncpg.Pool, org: UUID, endpoint_id: UUID, caller: UUID) -> OrgWebhookOne:
+    row = await _org_row(pool, org, endpoint_id)
+    if row is None:
+        raise _not_found()
+    return OrgWebhookOne(endpoint=_org_read(row, caller))
+
+
+@org_router.get("", response_model=OrgWebhookList)
+async def list_org_endpoints(
+    current_user: dict = Depends(require_org_manage),
+    active_org: str = Depends(get_active_org_id),
+    pool: asyncpg.Pool = Depends(get_pg_pool),
+) -> OrgWebhookList:
+    """Every webhook endpoint in the active org, with its owner (admin only)."""
+    caller, org = _caller(current_user), _uuid(active_org)
+    rows = await webhooks_db.list_endpoints_for_org(pool, org_id=org)
+    return OrgWebhookList(
+        endpoints=[_org_read(r, caller) for r in rows], org_name=await _org_name(pool, org)
+    )
+
+
+@org_router.post("/{endpoint_id}/disable", response_model=OrgWebhookOne)
+async def admin_disable_endpoint(
+    endpoint_id: UUID,
+    current_user: dict = Depends(require_org_manage),
+    active_org: str = Depends(get_active_org_id),
+    pool: asyncpg.Pool = Depends(get_pg_pool),
+) -> OrgWebhookOne:
+    """An admin turns any endpoint in the org off, with reason ``admin``: only an admin can turn it
+    back on. The audit row is the ADMIN's."""
+    caller, org = _caller(current_user), _uuid(active_org)
+    row = await webhooks_db.set_endpoint_enabled(
+        pool, endpoint_id=endpoint_id, org_id=org, owner_id=None, enabled=False, reason="admin"
+    )
+    if row is None or row is webhooks_db.EndpointAdminOff:
+        raise _not_found()
+    if row.get("changed_now"):
+        await _audit(current_user, org, "disabled", row["id"], row["url"], "admin")
+    return await _org_answer(pool, org, endpoint_id, caller)
+
+
+@org_router.post("/{endpoint_id}/enable", response_model=OrgWebhookOne)
+async def admin_enable_endpoint(
+    endpoint_id: UUID,
+    current_user: dict = Depends(require_org_manage),
+    active_org: str = Depends(get_active_org_id),
+    pool: asyncpg.Pool = Depends(get_pg_pool),
+) -> OrgWebhookOne:
+    """An admin turns back on an endpoint an ADMIN turned off. One Syrel turned off (failing, gone)
+    is its owner's to turn back on (409); one already on answers as it stands, unchanged."""
+    caller, org = _caller(current_user), _uuid(active_org)
+    current = await _org_row(pool, org, endpoint_id)
+    if current is None:
+        raise _not_found()
+    if current["enabled"]:
+        return OrgWebhookOne(endpoint=_org_read(current, caller))
+    if current.get("disabled_reason") != "admin":
+        raise _refuse(409, "not_admin_off", NOT_ADMIN_OFF)
+    row = await webhooks_db.set_endpoint_enabled(
+        pool, endpoint_id=endpoint_id, org_id=org, owner_id=None, enabled=True, reason=None
+    )
+    if row is None or row is webhooks_db.EndpointAdminOff:
+        raise _not_found()
+    if row.get("changed_now"):
+        await _audit(current_user, org, "enabled", row["id"], row["url"], "admin")
+    return await _org_answer(pool, org, endpoint_id, caller)
+
+
+@org_router.delete("/{endpoint_id}", status_code=status.HTTP_204_NO_CONTENT)
+async def admin_delete_endpoint(
+    endpoint_id: UUID,
+    current_user: dict = Depends(require_org_manage),
+    active_org: str = Depends(get_active_org_id),
+    pool: asyncpg.Pool = Depends(get_pg_pool),
+) -> Response:
+    """An admin deletes any endpoint in the org; its log and queued deliveries go with it."""
+    org = _uuid(active_org)
+    row = await webhooks_db.delete_endpoint(pool, endpoint_id=endpoint_id, org_id=org, owner_id=None)
+    if row is None:
+        raise _not_found()
+    await _audit(current_user, org, "deleted", row["id"], row["url"], "admin")
+    return Response(status_code=status.HTTP_204_NO_CONTENT)
