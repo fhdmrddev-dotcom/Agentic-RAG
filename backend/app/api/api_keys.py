@@ -105,7 +105,7 @@ from app.services.mcp_narrowing import (
     mcp_off,
     validate_mcp_narrowing,
 )
-from app.mcp.oauth_clients import redirect_host_kind
+from app.mcp.oauth_clients import grant_redirect_facts
 from app.services.mcp_tool_catalogue import MCP_TOOLS, mcp_public_base, mcp_url
 from app.services.sources.mail.mailbox import FOLDER_PREFIX, MAIL_MIME, MAIL_ROOT_ID
 
@@ -349,19 +349,13 @@ def _caller(current_user: dict) -> UUID:
 # (D-27); the audit row then says ``credential: oauth`` (D-28: no new audit literal).
 
 
-def _redirect_facts(uris) -> tuple[str | None, str | None]:
-    """``(host, "web" | "loopback")`` from the client's first registered redirect — the same
-    derivation ``/oauth/revoke`` audits with (307-02). Parsed strictly, never echoed raw."""
-    first = uris[0] if isinstance(uris, list) and uris else None
-    facts = redirect_host_kind(first) if isinstance(first, str) else None
-    return (facts[1], facts[0]) if facts else (None, None)
-
-
-def _grant_audit_detail(row: dict) -> dict | None:
-    """The ``credential: oauth`` facts for a revoked GRANT; ``None`` for a key (its row stays 293's)."""
+async def _grant_audit_detail(pool, row: dict) -> dict | None:
+    """The ``credential: oauth`` facts for a revoked GRANT; ``None`` for a key (its row stays 293's).
+    WR-03: the host is the one the grant was APPROVED with, the same as its ``api_key.create`` row."""
     if row.get("oauth_client_id") is None:
         return None
-    host, _kind = _redirect_facts(row.get("oauth_redirect_uris"))
+    approved = await api_keys_db.grant_approved_hosts(pool, grant_ids=[row["id"]])
+    host, _kind = grant_redirect_facts(approved.get(str(row["id"])), row.get("oauth_redirect_uris"))
     return {"credential": "oauth", "client_name": row.get("label"), "redirect_host": host}
 
 
@@ -375,8 +369,9 @@ def _by_recent_use(rows: list[dict]) -> list[dict]:
     return sorted(rows, key=key)
 
 
-def _connected_app_fields(row: dict) -> dict:
-    host, kind = _redirect_facts(row.get("redirect_uris"))
+def _connected_app_fields(row: dict, approved: dict[str, str]) -> dict:
+    # WR-03: the redirect the member approved, never the client's first registered one
+    host, kind = grant_redirect_facts(approved.get(str(row["id"])), row.get("redirect_uris"))
     refs = row.get("folder_refs")
     return {
         "id": str(row["id"]),
@@ -407,7 +402,10 @@ async def list_my_connected_apps(
     """Every app acting as the caller, in EVERY org (D-25) — no org header: an app acting as you
     anywhere is visible from one place, each naming its org. Never another member's grant."""
     rows = await api_keys_db.list_grants_for_user(pool, user_id=_caller(current_user))
-    return ConnectedAppList(apps=[ConnectedApp(**_connected_app_fields(r)) for r in _by_recent_use(rows)])
+    approved = await api_keys_db.grant_approved_hosts(pool, grant_ids=[r["id"] for r in rows])
+    return ConnectedAppList(apps=[
+        ConnectedApp(**_connected_app_fields(r, approved)) for r in _by_recent_use(rows)
+    ])
 
 
 # ── the member's own keys ───────────────────────────────────────────────────────────────────────
@@ -690,7 +688,7 @@ async def revoke_my_key(
              "kind": row.get("kind")},
             "api_key.revoke",
             call="manage",
-            detail=_grant_audit_detail(row),   # 307-05 (D-28): None for a key, so its row is 293's
+            detail=await _grant_audit_detail(pool, row),   # 307-05 (D-28): None for a key
         )
     (key,) = await _serialize_keys(pool, [row], caller=caller, org_id=org)
     return key
@@ -708,9 +706,10 @@ async def list_org_connected_apps(
     """Every app members connected in the active org, with its owner (D-26, admin only)."""
     caller, org = _caller(current_user), _uuid(active_org)
     rows = await api_keys_db.list_grants_for_org(pool, org_id=org)
+    approved = await api_keys_db.grant_approved_hosts(pool, grant_ids=[r["id"] for r in rows])
     return OrgConnectedAppList(apps=[
         OrgConnectedApp(
-            **_connected_app_fields(r),
+            **_connected_app_fields(r, approved),
             owner_name=r.get("owner_name"),
             owner_is_you=str(r["user_id"]) == str(caller),
         )
@@ -783,7 +782,7 @@ async def revoke_org_key(
             detail={"by_admin": True, "owner_id": str(row["user_id"]),
                     # 307-05 (D-28): + credential oauth, and the owner's name for the audit words
                     **({**detail, "owner_name": row.get("owner_name")}
-                       if (detail := _grant_audit_detail(row)) else {})},
+                       if (detail := await _grant_audit_detail(pool, row)) else {})},
         )
     (key,) = await _serialize_keys(pool, [row], caller=caller, org_id=org)
     return key

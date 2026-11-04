@@ -38,7 +38,7 @@ NOW = datetime.now(timezone.utc)
 
 
 def _grant(*, user=USER, org=ORG, label="Claude", kind="dcr", redirect="https://claude.ai/api/mcp/auth_callback",
-           last_used=None, created=NOW, folder_ids=None, revoked=False, oauth=True):
+           last_used=None, created=NOW, folder_ids=None, revoked=False, oauth=True, redirects=None):
     gid = uuid.uuid4()
     return {
         "id": gid, "org_id": uuid.UUID(org), "user_id": uuid.UUID(user), "label": label,
@@ -48,7 +48,7 @@ def _grant(*, user=USER, org=ORG, label="Claude", kind="dcr", redirect="https://
         "tools": ["search_knowledge_base", "list_documents", "read_document"],
         "include_external": False,
         "oauth_client_id": uuid.uuid4() if oauth else None,
-        "client_kind": kind, "redirect_uris": [redirect],
+        "client_kind": kind, "redirect_uris": list(redirects) if redirects else [redirect],
     }
 
 
@@ -63,6 +63,7 @@ class _Store:
         self.deploy_on = True
         self.names = {USER: "Dana Kim", OTHER: "Lee Park", ADMIN: "Ada Admin"}
         self.revoke_all_calls: list[tuple] = []
+        self.approved: dict[str, str] = {}   # grant id -> the redirect host its api_key.create row names
 
     def grant_view(self, r: dict) -> dict:
         folders = None if r["folder_ids"] is None else [
@@ -146,7 +147,11 @@ def store(monkeypatch):
     async def folder_names(pool, *, org_id, folder_ids):
         return [{"id": uuid.UUID(f), "name": "Contracts"} for f in folder_ids]
 
+    async def grant_approved_hosts(pool, *, grant_ids):
+        return {str(g): s.approved[str(g)] for g in grant_ids if str(g) in s.approved}
+
     for name, fn in {
+        "grant_approved_hosts": grant_approved_hosts,
         "list_grants_for_user": list_grants_for_user, "list_grants_for_org": list_grants_for_org,
         "revoke_all_grants_in_org": revoke_all_grants_in_org, "revoke_key": revoke_key,
         "list_keys_for_owner": list_keys_for_owner, "list_keys_for_org": list_keys_for_owner,
@@ -321,6 +326,52 @@ def test_admin_revoke_of_a_grant_keeps_by_admin_and_adds_oauth(client, store):
         "by_admin": True, "owner_id": OTHER, "credential": "oauth",
         "client_name": "Cursor", "redirect_host": "cursor.example.com", "owner_name": "Lee Park",
     }
+
+
+# ── WR-03: the redirect host shown and audited is the one the member APPROVED ─────────────────
+
+_TWO = ["https://claude.ai/x", "http://localhost/cb"]   # a self-registered client's two redirects
+
+
+def test_wr03_the_list_shows_the_approved_redirect_not_the_first_registered(client, store):
+    g = _grant(label="Claude", redirects=_TWO)
+    store.rows.append(g)
+    store.approved[str(g["id"])] = "localhost"   # it signed in through localhost
+    (a,) = client.get("/api-keys/connected-apps").json()["apps"]
+    assert (a["redirect_host"], a["redirect_kind"]) == ("localhost", "loopback")
+    store.is_admin = True
+    (o,) = client.get("/org/api-keys/connected-apps").json()["apps"]
+    assert (o["redirect_host"], o["redirect_kind"]) == ("localhost", "loopback")
+
+
+def test_wr03_with_no_approval_record_two_registered_hosts_name_neither(client, store):
+    store.rows.append(_grant(redirects=_TWO))
+    (a,) = client.get("/api-keys/connected-apps").json()["apps"]
+    assert a["redirect_host"] is None and a["redirect_kind"] is None   # "unknown", never a guess
+
+
+def test_wr03_the_revoke_audit_names_the_approved_host(client, store):
+    g = _grant(label="Claude", redirects=_TWO)
+    store.rows.append(g)
+    store.approved[str(g["id"])] = "localhost"
+    assert client.post(f"/api-keys/{g['id']}/revoke").status_code == 200
+    (row,) = store.audits
+    assert row["metadata"]["detail"]["redirect_host"] == "localhost"
+
+
+async def test_wr03_the_approved_host_sql_reads_each_grants_own_create_row():
+    from app.db import api_keys as db
+
+    gid = uuid.uuid4()
+    pool = _Pool(rows=[{"grant_id": str(gid), "host": "localhost"}])
+    assert await db.grant_approved_hosts(pool, grant_ids=[gid]) == {str(gid): "localhost"}
+    ((_, sql, args),) = pool.calls
+    assert "action_type = 'api_key.create'" in sql
+    assert "metadata->>'api_key_id' = ANY($1::text[])" in sql   # audit_log_api_key_id_idx
+    assert "'credential' = 'oauth'" in sql
+    assert args == ([str(gid)],)
+    empty = _Pool()
+    assert await db.grant_approved_hosts(empty, grant_ids=[]) == {} and empty.calls == []
 
 
 # ── the org admin's list and revoke-all ───────────────────────────────────────────────────────

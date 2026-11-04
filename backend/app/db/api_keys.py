@@ -373,6 +373,38 @@ async def folder_names(
     return [dict(r) for r in rows]
 
 
+async def grant_approved_hosts(pool: asyncpg.Pool, *, grant_ids: list) -> dict[str, str]:
+    """``{grant id: redirect host}`` — the host each OAuth grant was APPROVED with (307 WR-03).
+
+    Read from the grant's own ``api_key.create`` row (D-28: ``detail.redirect_host`` is written by
+    the consent route at approve time, from the redirect the member actually saw), NOT re-derived
+    from ``oauth_clients.redirect_uris`` — a client may register up to ten redirects, and the first
+    one is not necessarily the one that was approved. No new column: the audit row IS the record.
+
+    The ids only ever come from an owner-scoped read above; the row must also be the grant OWNER's
+    own, in the grant's org (``k.user_id`` / ``k.org_id``), so no other row can stand in for it.
+    The expression index ``audit_log_api_key_id_idx`` (migration 215) serves the id match. A grant
+    with no such row (its audit write failed) is simply absent from the answer.
+    """
+    ids = [str(g) for g in grant_ids]
+    if not ids:
+        return {}
+    rows = await pool.fetch(
+        "SELECT DISTINCT ON (a.metadata->>'api_key_id') a.metadata->>'api_key_id' AS grant_id, "
+        "a.metadata->'detail'->>'redirect_host' AS host "
+        "FROM public.audit_log a "
+        "JOIN public.api_keys k ON k.id::text = a.metadata->>'api_key_id' "
+        "AND k.user_id = a.user_id AND k.org_id = a.org_id AND k.oauth_client_id IS NOT NULL "
+        # the LIKE restates audit_log_api_key_id_idx's partial predicate so the planner may use it
+        "WHERE a.action_type LIKE 'api_key.%' AND a.action_type = 'api_key.create' "
+        "AND a.metadata->>'api_key_id' = ANY($1::text[]) "
+        "AND a.metadata->'detail'->>'credential' = 'oauth' "
+        "ORDER BY a.metadata->>'api_key_id', a.created_at",
+        ids,
+    )
+    return {str(r["grant_id"]): r["host"] for r in rows if isinstance(r["host"], str) and r["host"]}
+
+
 async def list_key_calls(
     pool: asyncpg.Pool, *, org_id: UUID, key_ids: list[str], since: datetime, per_key: int = 50
 ) -> list[dict]:

@@ -591,6 +591,7 @@ async def revoke(request: Request) -> Response:
 
 
 async def _revoke(form: dict[str, str]) -> None:
+    from app.db import api_keys as api_keys_db  # noqa: PLC0415
     from app.security import api_key_auth  # noqa: PLC0415
     from app.security.oauth_tokens import digest_token  # noqa: PLC0415
 
@@ -609,13 +610,18 @@ async def _revoke(form: dict[str, str]) -> None:
         return  # another client's token: nothing done, nothing said
     if row.get("token_kind") == "refresh":
         if await oauth_db.revoke_grant(pool, row["id"]):
-            redirect_uris = client.get("redirect_uris") or []
+            # WR-03: the host the grant was APPROVED with (its api_key.create row), never the
+            # client's first registered redirect — the two audit rows of one grant agree.
+            approved = await api_keys_db.grant_approved_hosts(pool, grant_ids=[row["id"]])
+            host, _kind = oauth_clients.grant_redirect_facts(
+                approved.get(str(row["id"])), client.get("redirect_uris"),
+            )
             await api_key_auth.audit_key_call_now(
                 row, "api_key.revoke", call="revoke",
                 detail={
                     "credential": "oauth",
                     "client_name": client.get("client_name"),
-                    "redirect_host": _host_of(redirect_uris[0]) if redirect_uris else None,
+                    "redirect_host": host,
                 },
             )
         return

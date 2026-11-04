@@ -126,6 +126,13 @@ class World:
         async def audit_now(key, action_type, **kw):
             self.audits.append((action_type, kw))
 
+        self.approved: dict[str, str] = {}
+
+        async def grant_approved_hosts(pool, *, grant_ids):
+            return {str(g): self.approved[str(g)] for g in grant_ids if str(g) in self.approved}
+
+        monkeypatch.setattr(api_keys_db, "grant_approved_hosts", grant_approved_hosts, raising=False)
+
         for mod, name, fn in (
             (oauth_db, "get_client", get_client), (oauth_db, "issue_token_pair", issue_token_pair),
             (oauth_db, "mark_client_granted", mark_client_granted),
@@ -140,9 +147,9 @@ class World:
         self.client = TestClient(h.fresh_app(), base_url=h.BASE)
 
     # ── seeding ──
-    def add_client(self, client_id="dcr-1"):
+    def add_client(self, client_id="dcr-1", redirect_uris=None):
         row = {"id": uuid.uuid4(), "client_id": client_id, "kind": "dcr", "client_name": "Claude",
-               "redirect_uris": [CLAUDE]}
+               "redirect_uris": list(redirect_uris or [CLAUDE])}
         self.clients[client_id] = row
         return row
 
@@ -429,6 +436,16 @@ async def test_revoking_a_refresh_token_ends_the_grant_audited_once(w):
     assert kw["detail"]["credential"] == "oauth"
     assert kw["detail"]["client_name"] == "Claude"
     assert kw["detail"]["redirect_host"] == "claude.ai"
+
+
+async def test_wr03_the_oauth_revoke_audit_names_the_approved_host(w):
+    client = w.add_client(redirect_uris=[CLAUDE, "http://localhost/cb"])
+    grant = w.add_grant(client)
+    w.add_token(grant, REFRESH, "refresh")
+    w.approved[str(grant["id"])] = "localhost"
+    assert w.revoke(token=REFRESH, client_id="dcr-1").status_code == 200
+    (_, kw), = w.audits
+    assert kw["detail"]["redirect_host"] == "localhost"
 
 
 async def test_revoking_an_access_token_kills_only_itself(w):

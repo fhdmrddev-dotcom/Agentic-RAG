@@ -162,6 +162,27 @@ def redirect_host_kind(uri: str) -> tuple[Literal["web", "loopback"], str] | Non
     return ("web", p.host.lower())
 
 
+def grant_redirect_facts(approved_host: Any, registered_uris: Any) -> tuple[str | None, str | None]:
+    """``(host, "web" | "loopback")`` for a GRANT — what Connected apps and the revoke audits show.
+
+    307 WR-03: the host the member APPROVED (``db.api_keys.grant_approved_hosts``) when it is
+    known. Otherwise the client's registered redirects only when they all name ONE host and kind;
+    a client with several says ``(None, None)`` ("unknown") rather than guess at the first one,
+    which would launder a self-registered client into the look of a built-in host."""
+    if isinstance(approved_host, str) and approved_host:
+        host = approved_host[:253]
+        return host, ("loopback" if host in LOOPBACK_HOSTS else "web")
+    facts = {
+        redirect_host_kind(u) for u in (registered_uris if isinstance(registered_uris, list) else [])
+        if isinstance(u, str)
+    }
+    facts.discard(None)
+    if len(facts) != 1:
+        return None, None
+    kind, host = facts.pop()
+    return host[:253], kind
+
+
 def host_allowed(host: str, allowlist: Sequence[Any]) -> bool:
     """A loopback host always; a web host only when it is an EXACT entry of the live allowlist
     (``[{"host": "claude.ai"}, ...]``). No suffix match: ``sub.claude.ai`` is not ``claude.ai``."""
