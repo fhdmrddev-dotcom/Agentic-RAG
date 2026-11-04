@@ -99,6 +99,8 @@ class FakeOutbox:
         # WR-01: what the lease renew reads back from the endpoint NOW (overrides the claimed values)
         self.endpoint_now: dict = {}
         self._claimed_rows: dict = {}
+        # WR-05: events whose fan-out raises (candidate_endpoints throws for these ids)
+        self.raise_for: set = set()
 
     def install(self, monkeypatch) -> "FakeOutbox":
         for name in (
@@ -113,12 +115,15 @@ class FakeOutbox:
     def named(self, name):
         return [c[1] for c in self.calls if c[0] == name]
 
-    async def claim_next_event(self, con, *, now=None):
-        self.calls.append(("claim_next_event", {"now": now}))
-        return self.events.pop(0) if self.events else None
+    async def claim_next_event(self, con, *, now=None, skip=()):
+        # an event leaves the queue when it is marked fanned out (a failed fan-out rolls back)
+        self.calls.append(("claim_next_event", {"now": now, "skip": list(skip)}))
+        return next((e for e in self.events if e["id"] not in set(skip)), None)
 
     async def candidate_endpoints(self, con, *, event):
         self.calls.append(("candidate_endpoints", {"event": event["id"]}))
+        if event["id"] in self.raise_for:
+            raise RuntimeError("a DB error specific to this event")
         return list(self.candidates.get(event["id"], []))
 
     async def insert_deliveries(self, con, *, event_id, rows, now=None):
@@ -130,6 +135,7 @@ class FakeOutbox:
 
     async def mark_fanned_out(self, con, *, event_id, payload, now=None):
         self.calls.append(("mark_fanned_out", {"event_id": event_id, "payload": payload}))
+        self.events = [e for e in self.events if e["id"] != event_id]
 
     async def reclaim_stale_sending(self, pool, *, lease_seconds, max_attempts, now=None):
         self.calls.append(("reclaim_stale_sending", {"lease_seconds": lease_seconds, "max_attempts": max_attempts}))
@@ -499,6 +505,68 @@ async def test_no_candidates_still_marks_the_event_fanned_out(monkeypatch):
     await _drainer(fake)._fan_out(now=NOW)
     assert fake.named("insert_deliveries") == []
     assert fake.named("mark_fanned_out") == [{"event_id": ev["id"], "payload": None}]
+
+
+# ── WR-05: one event whose fan-out keeps raising never blocks the others ─────────────────────
+
+
+class Clock:
+    def __init__(self) -> None:
+        self.t = 0.0
+
+    def __call__(self) -> float:
+        return self.t
+
+
+async def test_wr05_a_failing_event_does_not_block_later_events(monkeypatch):
+    bad, good = _event(), _event()
+    fake = FakeOutbox(events=[bad, good]).install(monkeypatch)
+    fake.raise_for = {bad["id"]}
+    assert await _drainer(fake)._fan_out(now=NOW) == 1
+    assert fake.named("mark_fanned_out") == [{"event_id": good["id"], "payload": None}]
+    claims = fake.named("claim_next_event")
+    assert claims[0]["skip"] == [] and claims[1]["skip"] == [bad["id"]]
+
+
+async def test_wr05_a_failing_event_waits_out_its_backoff_then_is_tried_again(monkeypatch):
+    bad = _event()
+    fake = FakeOutbox(events=[bad]).install(monkeypatch)
+    fake.raise_for = {bad["id"]}
+    clock = Clock()
+    d = _drainer(fake, clock=clock)
+    await d._fan_out(now=NOW)
+    tried = lambda: len(fake.named("candidate_endpoints"))  # noqa: E731
+    assert tried() == 1
+    clock.t = wd.FAN_OUT_BACKOFF_SECONDS[0] - 1
+    await d._fan_out(now=NOW)
+    assert tried() == 1, "inside its backoff the event is skipped"
+    clock.t = wd.FAN_OUT_BACKOFF_SECONDS[0] + 1
+    fake.raise_for = set()
+    assert await d._fan_out(now=NOW) == 1
+    assert tried() == 2 and fake.named("mark_fanned_out")[-1]["event_id"] == bad["id"]
+
+
+async def test_wr05_after_the_last_failure_the_event_is_given_up_and_logged_by_id(monkeypatch, caplog):
+    assert wd.FAN_OUT_MAX_FAILURES == 5 == len(wd.FAN_OUT_BACKOFF_SECONDS) + 1
+    bad = _event()
+    fake = FakeOutbox(events=[bad]).install(monkeypatch)
+    fake.raise_for = {bad["id"]}
+    clock = Clock()
+    d = _drainer(fake, clock=clock)
+    for step in range(wd.FAN_OUT_MAX_FAILURES):
+        await d._fan_out(now=NOW)
+        clock.t += max(wd.FAN_OUT_BACKOFF_SECONDS) + 1
+    assert len(fake.named("candidate_endpoints")) == wd.FAN_OUT_MAX_FAILURES
+    assert fake.named("mark_fanned_out") == [{"event_id": bad["id"], "payload": None}]
+    assert fake.named("insert_deliveries") == []
+    assert fake.events == []
+    assert any(str(bad["id"]) in r.getMessage() and "given up" in r.getMessage() for r in caplog.records)
+    await d._fan_out(now=NOW)
+    assert len(fake.named("candidate_endpoints")) == wd.FAN_OUT_MAX_FAILURES, "never tried again"
+
+
+def test_wr05_the_event_claim_can_skip_ids():
+    assert "NOT (id = ANY($2::uuid[]))" in outbox.CLAIM_EVENT_SQL
 
 
 async def test_fan_out_stops_at_the_claim_limit(monkeypatch):

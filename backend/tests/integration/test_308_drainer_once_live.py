@@ -307,6 +307,24 @@ async def _claim_one(w, d):
     return row, cache
 
 
+async def test_wr05_the_event_claim_skips_the_ids_it_is_given():
+    """WR-05, live: the oldest un-fanned event is skipped when its id is in ``skip``, so the next one
+    is claimed instead of one failing event blocking every later one."""
+    async with world() as w:
+        await w.endpoint(w.alice)
+        first = await w.finish(await w.run(w.alice))
+        second = await w.finish(await w.run(w.alice))
+        await w.pool.execute("UPDATE public.webhook_events SET created_at = $2 WHERE id = $1",
+                             second, NOW - timedelta(minutes=1))
+        await w.pool.execute("UPDATE public.webhook_events SET created_at = $2 WHERE id = $1",
+                             first, NOW - timedelta(minutes=2))
+        async with w.pool.acquire() as c:
+            async with c.transaction():
+                assert (await outbox.claim_next_event(c, now=NOW))["id"] == first
+            async with c.transaction():
+                assert (await outbox.claim_next_event(c, now=NOW, skip=[first]))["id"] == second
+
+
 async def test_wr02_the_claim_takes_at_most_two_rows_per_endpoint_per_pass():
     """WR-02, live: one endpoint with three due deliveries and another with one; a claim capped at
     two per endpoint takes 2 + 1, and the third row is left for the next pass."""
