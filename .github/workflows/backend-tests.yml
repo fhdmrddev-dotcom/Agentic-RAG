@@ -17,6 +17,7 @@ on:
       # DERIVES this set from the test modules rather than trusting this list.
       - "scripts/full-schema-supplement.sql"        # tests/unit/test_253_supplement_column_parity.py
       - "scripts/check-greenfield-privileges.py"    # tests/unit/test_253_greenfield_sql_lexer.py
+      - "scripts/check-migration-225-live.py"       # tests/unit/test_308_check_script.py (308-REVIEW IN-06)
   pull_request:
     paths:
       - "backend/**"
@@ -28,6 +29,7 @@ on:
       # so a future reader meets a fact rather than an accident.
       - "scripts/full-schema-supplement.sql"        # tests/unit/test_253_supplement_column_parity.py
       - "scripts/check-greenfield-privileges.py"    # tests/unit/test_253_greenfield_sql_lexer.py
+      - "scripts/check-migration-225-live.py"       # tests/unit/test_308_check_script.py (308-REVIEW IN-06)
 
 jobs:
   pytest:
