@@ -237,33 +237,38 @@ async def approve_request(
         name = client_label(record.get("client_name"))
         client_row_id = UUID(str(record["client_row_id"]))
         minted = mint_key(kind="mcp")   # its secret is discarded here: nobody is ever shown it
-        row = await api_keys_db.create_api_key(
-            pool,
-            org_id=org,
-            user_id=caller,
-            label=name,
-            key_prefix=minted.key_prefix,
-            key_hash=minted.key_hash,
-            workflows=[],
-            expires_at=datetime.now(timezone.utc) + timedelta(days=GRANT_TTL_DAYS),
-            kind="mcp",
-            folder_ids=verdict.folder_ids,
-            tools=list(verdict.tools),
-            include_external=body.include_external,
-            oauth_client_id=client_row_id,
-        )
-        await oauth_db.mark_client_granted(pool, client_row_id)
-
         code = secrets.token_urlsafe(32)
-        await oauth_store.save_code(redis, code_digest=oauth_store.digest_code(code), record={
-            "grant_id": str(row["id"]),
-            "org_id": str(org),
-            "client_id": record["client_id"],
-            "client_row_id": str(client_row_id),
-            "redirect_uri": record["redirect_uri"],
-            "code_challenge": record["code_challenge"],
-            "resource": record["resource"],
-        })
+        # ⛔ WR-01: the grant, the client's granted mark and the code are written as ONE unit. The
+        # transaction commits only after the code is saved, so a Redis or database failure part
+        # way through rolls the grant back — never a live "connected app" that can never connect.
+        # (If the COMMIT itself failed after the save, the code would name a grant that does not
+        # exist: /oauth/token answers invalid_grant, and nothing is listed.)
+        async with pool.acquire() as conn, conn.transaction():
+            row = await api_keys_db.create_api_key(
+                conn,
+                org_id=org,
+                user_id=caller,
+                label=name,
+                key_prefix=minted.key_prefix,
+                key_hash=minted.key_hash,
+                workflows=[],
+                expires_at=datetime.now(timezone.utc) + timedelta(days=GRANT_TTL_DAYS),
+                kind="mcp",
+                folder_ids=verdict.folder_ids,
+                tools=list(verdict.tools),
+                include_external=body.include_external,
+                oauth_client_id=client_row_id,
+            )
+            await oauth_db.mark_client_granted(conn, client_row_id)
+            await oauth_store.save_code(redis, code_digest=oauth_store.digest_code(code), record={
+                "grant_id": str(row["id"]),
+                "org_id": str(org),
+                "client_id": record["client_id"],
+                "client_row_id": str(client_row_id),
+                "redirect_uri": record["redirect_uri"],
+                "code_challenge": record["code_challenge"],
+                "resource": record["resource"],
+            })
     except oauth_store.OAuthStoreUnavailable as exc:
         raise _store_down(exc)
 

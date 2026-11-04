@@ -81,6 +81,7 @@ class _World:
         self.deploy_on = True
         self.visible = {ORG_A: {F_A}, ORG_B: {F_B}}
         self.folder_reads: list[tuple[str, str]] = []
+        self.tx: list[str] = []
 
     def save(self, **kw) -> str:
         return asyncio.run(oauth_store.save_request(self.redis, _record(**kw)))
@@ -151,6 +152,49 @@ def world(monkeypatch):
     return w
 
 
+class _TxPool:
+    """A pool whose ``acquire()`` yields a connection with a transaction: on an exception inside
+    it, every grant written inside it is rolled back (as Postgres would), and the exception
+    propagates. ``w.tx`` records each transaction's outcome."""
+
+    def __init__(self, w: "_World"):
+        self.w = w
+
+    def acquire(self):
+        return _TxConn(self.w)
+
+
+class _TxConn:
+    def __init__(self, w: "_World"):
+        self.w = w
+
+    def transaction(self):
+        return _Tx(self.w)
+
+    async def __aenter__(self):
+        return self
+
+    async def __aexit__(self, *exc):
+        return False
+
+
+class _Tx:
+    def __init__(self, w: "_World"):
+        self.w = w
+
+    async def __aenter__(self):
+        self._before = len(self.w.grants)
+        return self
+
+    async def __aexit__(self, exc_type, exc, tb):
+        if exc_type is not None:
+            del self.w.grants[self._before:]
+            self.w.tx.append("rolled_back")
+        else:
+            self.w.tx.append("committed")
+        return False
+
+
 def _app(w: _World, *, signed_in: bool = True) -> FastAPI:
     from app.api import oauth_consent as route
 
@@ -161,7 +205,7 @@ def _app(w: _World, *, signed_in: bool = True) -> FastAPI:
         return {"id": USER, "email": "dana@acme.example"}
 
     async def _pool():
-        return object()
+        return _TxPool(w)
 
     if signed_in:
         app.dependency_overrides[deps.get_current_user] = _user
@@ -500,6 +544,46 @@ def test_a_store_outage_is_503_with_a_sentence(world):
         assert r.status_code == 503
         assert isinstance(r.json()["detail"], str) and r.json()["detail"].endswith(".")
     assert world.grants == []
+
+
+# ── WR-01: a failure after the grant is written never leaves a grant that cannot connect ──────
+
+
+class _CodeStoreDown(FakeRedis):
+    """Requests are read and taken normally; saving a CODE fails (a Redis blip mid-approve)."""
+
+    async def setex(self, key, seconds, value):
+        if key.startswith("oauth:code:"):
+            raise ConnectionError("redis dropped")
+        return await super().setex(key, seconds, value)
+
+
+def test_wr01_a_code_store_failure_after_the_grant_leaves_no_live_grant(world):
+    rid = world.save()
+    world.redis.__class__ = _CodeStoreDown
+    r = _approve(TestClient(_app(world)), rid)
+    assert r.status_code == 503 and r.json()["detail"].endswith(".")
+    assert world.grants == [], "a grant with no code is a connected app that can never connect"
+    assert world.audits == []
+
+
+def test_wr01_a_database_failure_marking_the_client_leaves_no_live_grant(world, monkeypatch):
+    from app.api import oauth_consent as route
+
+    async def boom(conn, client_row_id):
+        raise RuntimeError("connection lost")
+
+    monkeypatch.setattr(route.oauth_db, "mark_client_granted", boom)
+    rid = world.save()
+    with pytest.raises(RuntimeError):
+        _approve(TestClient(_app(world)), rid)
+    assert world.grants == [] and world.audits == []
+
+
+def test_wr01_a_successful_approve_commits_once(client, world):
+    rid = world.save()
+    assert _approve(client, rid).status_code == 200
+    assert world.tx == ["committed"] and len(world.grants) == 1
 
 
 # ── where it is mounted (D-03 / P-3) ──────────────────────────────────────────────────────────
