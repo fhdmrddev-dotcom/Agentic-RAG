@@ -215,9 +215,9 @@ describe("308-05 WebhooksTab", () => {
       org.value.activeOrgId = id
     })
     const { rerender } = render(<WebhooksTab />)
-    expect(await screen.findByText(/The endpoint Syrel turned off is in/)).toHaveTextContent(
-      "The endpoint Syrel turned off is in Beta Corp.",
-    )
+    const lead = await screen.findByText(/The endpoint Syrel turned off is in/)
+    expect(lead.parentElement).toHaveTextContent("The endpoint Syrel turned off is in Beta Corp.")
+    expect(screen.getByText("Beta Corp").tagName).toBe("B")
     await user.click(screen.getByRole("button", { name: "Switch to Beta Corp" }))
     expect(org.value.switchOrg).toHaveBeenCalledWith("o2")
     rerender(<WebhooksTab />)

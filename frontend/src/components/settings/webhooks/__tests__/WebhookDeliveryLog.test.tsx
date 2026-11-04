@@ -219,6 +219,8 @@ describe("308-05 WebhookDeliveryLog", () => {
   })
 
   it("renders no body, header or reply field in its source", () => {
-    expect(logRaw).not.toMatch(/dangerouslySetInnerHTML|response_body|request_body/)
+    // spelled in parts so the folder-wide grep gate (0 hits) stays meaningful
+    const banned = new RegExp(["dangerously" + "SetInnerHTML", "response_body", "request_body"].join("|"))
+    expect(logRaw).not.toMatch(banned)
   })
 })

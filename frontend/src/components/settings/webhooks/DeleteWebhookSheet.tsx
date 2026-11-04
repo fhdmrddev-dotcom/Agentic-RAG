@@ -11,7 +11,7 @@
  *   re-reads. A failure keeps the sheet open, says the server's words, and says it is still there.
  * ⚠ The address renders as text — never a link.
  */
-import { useState } from "react"
+import { useRef, useState } from "react"
 
 import { Button } from "@/components/ui/button"
 import {
@@ -34,6 +34,7 @@ export function DeleteWebhookSheet({
   onClose,
   remove,
   onDone,
+  focusAfterDelete,
 }: {
   /** The endpoint to delete and its display address (member: query masked; admin: host + path). */
   target: { id: string; address: string } | null
@@ -43,9 +44,13 @@ export function DeleteWebhookSheet({
   remove: () => Promise<void>
   /** Called after the server answered OK; the caller re-reads. */
   onDone: () => void
+  /** After a delete the opener is gone with its card: where focus lands instead (never <body>).
+   *  Keep it / Esc still return focus to the opener (Radix's own restore). */
+  focusAfterDelete?: () => void
 }) {
   const [busy, setBusy] = useState(false)
   const [failure, setFailure] = useState<string | null>(null)
+  const deleted = useRef(false)
 
   async function handleDelete() {
     if (!target || busy) return
@@ -53,6 +58,7 @@ export function DeleteWebhookSheet({
     setFailure(null)
     try {
       await remove()
+      deleted.current = true
       onDone()
       onClose()
     } catch (err) {
@@ -79,7 +85,16 @@ export function DeleteWebhookSheet({
         }
       }}
     >
-      <AlertDialogContent className="max-w-[480px] border-destructive/45 border-t-[3px] border-t-destructive">
+      <AlertDialogContent
+        className="max-w-[480px] border-destructive/45 border-t-[3px] border-t-destructive"
+        onCloseAutoFocus={(ev) => {
+          if (deleted.current && focusAfterDelete) {
+            ev.preventDefault()
+            focusAfterDelete()
+          }
+          deleted.current = false
+        }}
+      >
         {target && (
           <>
             <AlertDialogHeader>
