@@ -11,7 +11,7 @@ progress:
   total_plans: 15
   completed_plans: 15
   percent: 14
-stopped_at: Phase 308 PLANNED 2026-11-04 (6 plans / 4 waves, checker passed 0 blockers) — next execute-phase 308
+stopped_at: Phase 308 EXECUTED 2026-11-05 — verification human_needed (5/5 SC in code); 6 human rows owed (308-HUMAN-UAT.md, row 1 first); not closed, not deployed
 ---
 
 # Project State
@@ -46,8 +46,8 @@ reviewer exists, so a phase closes `verification_mode: self-verified`, never `re
 
 Milestone: v4.9 Use It From Your Own Tools
 Phase: 308
-Plan: 6 of 6 (all waves merged; review + verification next)
-Status: Phase 308 planned — sketch 308-webhooks (A, self-approved), UI-SPEC approved, research D-41..D-54, plans 308-01..06 (D-55: 6 not 5); next: execute-phase 308
+Plan: 6 of 6 (complete; human UAT owed)
+Status: Phase 308 executed — 6/6 plans merged, review 1C/6W fixed, verification human_needed; owed: 308-HUMAN-UAT.md rows 1-6, cloud mig 225 after 220→224 (per-action approval) + get_advisors(security), public docs (309) before deploy
 Last activity: 2026-11-04
 
 Phases start at **303**; migrations at **220**. Seeds taken in at intake: SEED-013, SEED-177, SEED-195, SEED-081, SEED-079; bug BUG-261022-01.
@@ -78,6 +78,7 @@ link. Branch `develop`. Tags `v4.7` and `v4.8` pushed 2026-10-30.
 - **304 cloud paste — before 304+305 deploy:** paste migrations 220 then 221 into cloud Supabase (per-action approval each), then `get_advisors(security)`. 221 also closes BUG-261030-03 (anon/authenticated DELETE/TRUNCATE/TRIGGER/REFERENCES on `organizations`) in production.
 - **305 before the 304+305 deploy:** paste mig **222** after 220 and 221 (per-action approval each), then `get_advisors(security)`; Coolify `BACKEND_PUBLIC_URL` = the https public address (else `/mcp` refuses to mount); Coolify stop grace > 5 s (20 s recommended, sse-starlette 3.0.3); SEED-397 / AR-01 (per-address limit sees the proxy) — **ACCEPTED by the operator 2026-10-31**; re-open before a paying org uses MCP.
 - **306 closed by decision 2026-11-03 — 5 live UAT rows OWED** (`306-HUMAN-UAT.md`): run **row 5 first** (narrowed key: cap pause → in-app Continue → `get_answer` reads `answered_in_app`), then the 8-row roster (`scripts/uat-306-ask-roster.py`), the burst + Redis-down drill (`scripts/burst-306-outside-starts.py`, re-measure D-35 defaults), G-4 (MCP mark, waiting-on link), real-client wait budget. Before deploy: cloud mig **223** after 220→221→222 (per-action approval), `get_advisors(security)`, `/gsd:secure-phase 306`. Carried: 306-REVIEW WR-01..06 (top: WR-05 spend-by-key over-counts in-app follow-ups) + persist ask folder scope on the thread.
+- **308 executed 2026-11-05 — 6 human rows OWED** (`308-HUMAN-UAT.md`): run **row 1 first** (needs a public receiver, e.g. webhook.site — an operator call: test payloads go to an outside service), then rows 2-5 (row 3 on LOCAL DB only) and the four review fixes WR-01/02/03/05. Stop the local `uvicorn --reload` before driving live suites (its drainer reclaims test rows). Before any 308 deploy: cloud mig **225** after 220→224 (per-action approval; boot refuses without it) + `get_advisors(security)`; Phase 309 must fix the public docs that still say webhooks don't exist. `/gsd:secure-phase 308` owed (IN-07 port probing via Test). Review IN-03 (fail-open ban read) → plant a seed at 309.
 - **305 client rows (D-43):** Cursor; one `claude` CLI search against the deployed cloud `/mcp`; the one-box; Claude Desktop via the `mcp-remote` bridge.
 - **Local leftovers (305):** MCP test key `g4-305-claude-code` (org 22f9c615, expires 7 Nov); chats "Stream works confirmation reply" and "ACME MSA payment terms search".
 - ~~**304 D-41 — confirm before 304+305 deploy**~~ **CONFIRMED by the operator 2026-10-31** ("accept … D-41"): MCP keys need no tier capability.
