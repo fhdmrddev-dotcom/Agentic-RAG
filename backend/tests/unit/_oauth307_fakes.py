@@ -108,3 +108,17 @@ class FakeRedis:
 
     def pipeline(self, transaction: bool = True):
         return FakePipe(self, transaction)
+
+    async def eval(self, script, numkeys, *args):
+        """The one Lua script the OAuth store runs (``oauth:take-code``), applied with no ``await``
+        between its commands — atomic on one event loop, as a script is on a server."""
+        self._check()
+        keys, argv = args[:numkeys], args[numkeys:]
+        if "oauth:take-code" not in script:
+            raise AssertionError(f"unknown script: {script[:40]!r}")
+        self.calls.append(("eval", "oauth:take-code"))
+        value = self.store.get(keys[0])
+        if value is not None:
+            self._apply(("delete", keys[0]))
+            self._apply(("setex", keys[1], int(argv[0]), value))
+        return value

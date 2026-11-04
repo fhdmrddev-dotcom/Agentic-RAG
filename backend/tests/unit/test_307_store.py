@@ -82,7 +82,7 @@ async def test_a_code_is_keyed_by_its_digest_and_taken_once():
     assert r.ttls[f"oauth:codeused:{digest}"] == 600
     assert await s.take_code(r, digest) is None
     assert await s.code_was_used(r, digest) == "g-1"
-    assert r.pipelines[-1]["transaction"] is True
+    assert ("eval", "oauth:take-code") in r.calls   # one atomic script, never two round trips
 
 
 async def test_concurrent_code_takes_get_exactly_one_value():
@@ -91,6 +91,67 @@ async def test_concurrent_code_takes_get_exactly_one_value():
     await s.save_code(r, code_digest=digest, record={"grant_id": "g"})
     results = await asyncio.gather(*(s.take_code(r, digest) for _ in range(5)))
     assert sum(1 for x in results if x is not None) == 1
+
+
+class _ObservedRedis(FakeRedis):
+    """Calls ``observe(store)`` right after every ATOMIC step (a MULTI or a script) — the instant a
+    replay racing the legitimate exchange could land."""
+
+    def __init__(self, observe, **kw):
+        super().__init__(**kw)
+        self.observe = observe
+
+    def pipeline(self, transaction: bool = True):
+        pipe = super().pipeline(transaction)
+        execute, observe, store = pipe.execute, self.observe, self.store
+
+        async def run():
+            out = await execute()
+            observe(store)
+            return out
+
+        pipe.execute = run
+        return pipe
+
+    async def eval(self, script, numkeys, *args):
+        out = await super().eval(script, numkeys, *args)
+        self.observe(self.store)
+        return out
+
+
+async def test_wr02_the_used_marker_exists_the_instant_the_code_is_gone():
+    """WR-02: a replay that lands between "code taken" and "marked used" would find neither key,
+    get a plain invalid_grant and leave the grant it bought alive. There must be no such instant."""
+    digest = s.digest_code("raced")
+    seen: list[tuple[bool, bool]] = []
+
+    def observe(store):
+        seen.append((f"oauth:code:{digest}" in store, f"oauth:codeused:{digest}" in store))
+
+    r = _ObservedRedis(observe)
+    await s.save_code(r, code_digest=digest, record={"grant_id": "g-raced"})
+    seen.clear()
+    assert await s.take_code(r, digest) == {"grant_id": "g-raced"}
+    # every observed state after an atomic step: the code is present, or the marker is
+    assert seen and all(code or used for code, used in seen), seen
+    assert await s.code_was_used(r, digest) == "g-raced"
+
+
+async def test_wr02_a_redis_error_cannot_strike_between_the_take_and_the_marker():
+    """WR-02: the take and the marker are ONE round trip. A Redis that fails every write after the
+    first atomic step must not leave the code consumed and the replay rule blind."""
+
+    class FailsAfterFirstAtomic(FakeRedis):
+        async def setex(self, key, seconds, value):
+            raise ConnectionError("redis dropped between commands")
+
+    r = FailsAfterFirstAtomic()
+    digest = s.digest_code("one-trip")
+    r.store[f"oauth:code:{digest}"] = json.dumps({"grant_id": "g-1"})
+    assert await s.take_code(r, digest) == {"grant_id": "g-1"}
+    assert f"oauth:code:{digest}" not in r.store
+    assert await s.code_was_used(r, digest) == "g-1"
+    assert r.ttls[f"oauth:codeused:{digest}"] == 600
 
 
 async def test_cimd_negative_cache():

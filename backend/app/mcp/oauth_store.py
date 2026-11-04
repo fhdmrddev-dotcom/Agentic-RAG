@@ -4,10 +4,11 @@
 |---|---|---|---|
 | ``oauth:req:{uuid4}`` | the authorize request (JSON) | 600 s | peeked by the consent page; TAKEN by approve / deny |
 | ``oauth:code:{sha256(code)}`` | the code's binding (JSON) | 60 s | TAKEN once at ``/oauth/token`` |
-| ``oauth:codeused:{sha256(code)}`` | the grant id | 600 s | a later miss that finds this revokes the grant |
+| ``oauth:codeused:{sha256(code)}`` | the code's binding (JSON, holds the grant id) | 600 s | written in the SAME script as the take (WR-02); a later miss that finds this revokes the grant |
 | ``oauth:cimdfail:{sha256(client_id)}`` | ``"1"`` | 60 s | negative cache for an unreadable CIMD document |
 
-⚠ **EVERY TAKE IS ONE ``MULTI`` GET+DEL** (``pipeline(transaction=True)``), so two concurrent takes
+⚠ **EVERY TAKE IS ONE ATOMIC STEP** — a request is one ``MULTI`` GET+DEL
+(``pipeline(transaction=True)``); a code is one Lua script GET+DEL+SETEX(used), so two concurrent takes
 get exactly one value — the shape ``api_key_auth.py``'s file-token take uses. ``services/oauth_state``
 (the connectors flow) does its read and its delete as two round trips; that is not reused (P-2).
 
@@ -133,17 +134,31 @@ async def save_code(redis, *, code_digest: str, record: dict) -> None:
     )
 
 
+# ⛔ WR-02: the take and the used-marker are ONE server-side step. A MULTI cannot make the marker's
+# write depend on the GET's result, and two round trips leave an instant where a racing replay finds
+# neither key (and escapes the revoke), or where a Redis error strikes after the code is consumed.
+# The marker holds the code's own binding JSON; ``code_was_used`` reads the grant id out of it, so
+# the script needs no JSON decoding (no ``cjson`` dependency). The tag line lets the test fake
+# recognise the script.
+_TAKE_CODE_LUA = """-- oauth:take-code
+local v = redis.call('GET', KEYS[1])
+if v then
+  redis.call('DEL', KEYS[1])
+  redis.call('SETEX', KEYS[2], tonumber(ARGV[1]), v)
+end
+return v
+"""
+
+
 async def take_code(redis, code_digest: str) -> dict | None:
-    """Consume a code — one MULTI GET+DEL. On success, mark it used (600 s, the grant id) so a
-    replay is recognised as one and the grant it bought can be revoked."""
+    """Consume a code and mark it used (600 s) in ONE atomic script, so a replay is always
+    recognised as one and the grant it bought can be revoked. Fails closed on any Redis error."""
     if not _valid_digest(code_digest):
         return None
-    record = _loads(await _take(redis, _CODE + code_digest))
-    if record is not None:
-        await _guard(
-            redis.setex(_CODE_USED + code_digest, CODE_USED_TTL_SECONDS, str(record.get("grant_id") or ""))
-        )
-    return record
+    raw = await _guard(redis.eval(
+        _TAKE_CODE_LUA, 2, _CODE + code_digest, _CODE_USED + code_digest, CODE_USED_TTL_SECONDS,
+    ))
+    return _loads(raw)
 
 
 async def code_was_used(redis, code_digest: str) -> str | None:
@@ -151,7 +166,10 @@ async def code_was_used(redis, code_digest: str) -> str | None:
     if not _valid_digest(code_digest):
         return None
     value = await _guard(redis.get(_CODE_USED + code_digest))
-    if isinstance(value, bytes):
+    record = _loads(value)
+    if record is not None:
+        return str(record.get("grant_id") or "") or None
+    if isinstance(value, bytes):   # a marker written before WR-02 held the bare grant id
         value = value.decode("utf-8")
     return value or None
 
