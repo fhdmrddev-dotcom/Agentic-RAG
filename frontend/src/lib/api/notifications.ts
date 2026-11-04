@@ -20,8 +20,12 @@
  */
 import { API_BASE, ApiError, getAuthHeaders } from "./_core"
 
-/** One open waiting notice addressed to the caller (301-01 `WaitingNotice`). */
-export interface WaitingNotice {
+/** One open waiting notice addressed to the caller (301-01 `WaitingNotice`): a run, or (308) a webhook
+ *  endpoint Syrel turned off. `run_id` and `workflow_name` are null on the webhook kind (D-48). */
+export type WaitingNotice = RunWaitingNotice | WebhookWaitingNotice
+
+/** A run waiting on the caller (301): an answer or an approval. */
+export interface RunWaitingNotice {
   id: string
   run_id: string
   org_id: string
@@ -32,6 +36,26 @@ export interface WaitingNotice {
   origin: "app" | "schedule" | "key" | "mcp" | null
   /** When the run began waiting (ISO 8601). */
   created_at: string
+}
+
+/** Phase 308-06 (D-19, D-48, D-56): one of the caller's webhook endpoints Syrel turned off. The wire
+ *  carries host + path or the description as `title` — never a query string, never a secret. */
+export interface WebhookWaitingNotice {
+  id: string
+  run_id: null
+  org_id: string
+  org_name: string
+  workflow_name: null
+  kind: "webhook_disabled"
+  origin: null
+  /** When the endpoint was turned off (ISO 8601). */
+  created_at: string
+  endpoint_id?: string | null
+  reason?: "failing" | "gone" | null
+  /** The endpoint's description, else its host + path. */
+  title?: string | null
+  /** True when `title` is the host + path (rendered mono). */
+  title_is_address?: boolean | null
 }
 
 /** The route's 200 answer. `total` counts every open notice; `notices` may be capped. */
