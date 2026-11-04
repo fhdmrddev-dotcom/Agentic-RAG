@@ -1820,7 +1820,7 @@ const BASELINE = {
   "SettingsPage.sourceCeiling.test.tsx": 9,
   "SettingsPage.changedFields.test.tsx": 17,
   // Phase 283-01 (D-14) — the Settings tab registry suite. Registered in BOTH knobs in one commit.
-  "settingsTabs.test.ts": 11,
+  "settingsTabs.test.ts": 15, // RAISED 11 -> 15 at 308-05 (2026-11-04), the gate's own measured count (it had grown unpinned since 283-01; 308-05 extended cases for the "8" Webhooks row, adding none)
   // Phase 283-02 (FIX-01 / D-12) — a member's and an operator's Settings page as rendered content
   // (tab strips, landing tab, moved blocks, Reset, zero gated calls + the operator positive
   // control). Registered in BOTH knobs in one commit.
@@ -4555,6 +4555,19 @@ const BASELINE = {
   "McpSignInHostsCard.test.tsx": 8, // 307-05 — failed read shows no rows, verbatim add from the server's answer, refusal kept, arm-to-confirm remove + Esc, empty warning, technical reveal
   "AuditTab.oauthWords.test.tsx": 3, // 307-05 — credential oauth words on api_key.* rows, 60-char text cap, operator allowlist rows
   "OrgAuditTab.oauthWords.test.tsx": 2, // 307-05 — the same words in the org browser, one shared helper (lockstep)
+  // Phase 308-05 (HOOK-01/02/04/05; D-28) — FIRST pins for the Settings → Webhooks suites, both knobs in
+  // the same commit (each is FILE-LEVEL in TARGETS below). Counts read from the gate's own JSON report
+  // at 308-05 (2026-11-04), never hand-counted.
+  "webhooksContract.test.ts": 12, // 308-05 — every route's method/path/body, {code, message} refusals, rate_limited never "status 429", the secret kept nowhere
+  "webhookFacts.test.ts": 21, // 308-05 — copy leaf + verbatim sentences + no enabled/disabled/rotated/revoked, status tags, masked query values, log cells, form checks, verdicts
+  "webhookSnippets.test.ts": 3, // 308-05 — standardwebhooks import lines, SYREL_WEBHOOK_SECRET, raw body, no argument
+  "webhookFocus.test.ts": 4, // 308-05 — writes exactly {endpointId, orgId}, read once, malformed/blocked storage is null
+  "WebhookEndpointForm.test.tsx": 8, // 308-05 — events group, Save's DOM reason, form lines, the D-24 refusal keeps values, server sentences, edit + counter
+  "WebhookSecretOnce.test.tsx": 6, // 308-05 — create/roll words, Send test verdict, rate limit in our words, overlap line, secret gone after done, no storage
+  "WebhookSheets.test.tsx": 9, // 308-05 — delete victim facts + Keep it focus + never optimistic + admin variant; roll calm sheet, overlap fact, failure stays open
+  "WebhookDeliveryLog.test.tsx": 12, // 308-05 — real table, words only, run link, Resend + rate limit, off endpoint, Show older, states, refresh, 15 s poll only while in flight
+  "WebhookEndpointCard.test.tsx": 12, // 308-05 — masked address toggle, off tags, actions per host, test verdicts, never-optimistic flip keeps focus, admin-off reason, roll in place, edit in place
+  "WebhooksTab.test.tsx": 11, // 308-05 — header + scope, empty, cap reason, kept list on a failed re-read, one open card, create → secret once, org switch re-read (P-2), delete receipt + focus, focus hints
 }
 
 // Still COMPUTED, never hand-written — the reduce is the single source, so the
@@ -6704,6 +6717,17 @@ const TARGETS = [
   "src/components/admin/__tests__/McpSignInHostsCard.test.tsx",
   "src/components/admin/__tests__/AuditTab.oauthWords.test.tsx",
   "src/components/org/__tests__/OrgAuditTab.oauthWords.test.tsx",
+  // Phase 308-05 (HOOK-01/04; D-28) — FILE-LEVEL (no settings/webhooks __tests__ directory entry), SAME commit as their pins.
+  "src/components/settings/webhooks/__tests__/webhooksContract.test.ts",
+  "src/components/settings/webhooks/__tests__/webhookFacts.test.ts",
+  "src/components/settings/webhooks/__tests__/webhookSnippets.test.ts",
+  "src/components/settings/webhooks/__tests__/webhookFocus.test.ts",
+  "src/components/settings/webhooks/__tests__/WebhookEndpointForm.test.tsx",
+  "src/components/settings/webhooks/__tests__/WebhookSecretOnce.test.tsx",
+  "src/components/settings/webhooks/__tests__/WebhookSheets.test.tsx",
+  "src/components/settings/webhooks/__tests__/WebhookDeliveryLog.test.tsx",
+  "src/components/settings/webhooks/__tests__/WebhookEndpointCard.test.tsx",
+  "src/components/settings/webhooks/__tests__/WebhooksTab.test.tsx",
 ]
 
 const REPO_ROOT = path.resolve(__dirname, "..")
