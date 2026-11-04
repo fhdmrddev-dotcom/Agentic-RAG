@@ -81,6 +81,9 @@ class FakePool:
         return _acm(self.con)
 
 
+_FRESH_FIELDS = ("enabled", "url", "secret_ciphertext", "previous_secret_ciphertext", "previous_secret_expires_at")
+
+
 class FakeOutbox:
     """Every outbox function the drainer calls, recording its calls."""
 
@@ -93,6 +96,9 @@ class FakeOutbox:
         self.register = register
         self.disable_wins = disable_wins
         self.calls: list[tuple] = []
+        # WR-01: what the lease renew reads back from the endpoint NOW (overrides the claimed values)
+        self.endpoint_now: dict = {}
+        self._claimed_rows: dict = {}
 
     def install(self, monkeypatch) -> "FakeOutbox":
         for name in (
@@ -132,11 +138,17 @@ class FakeOutbox:
     async def claim_due_deliveries(self, pool, *, limit, now=None, max_attempts):
         self.calls.append(("claim_due_deliveries", {"limit": limit, "max_attempts": max_attempts}))
         rows, self.claimed = self.claimed, []
+        self._claimed_rows.update({r.id: r for r in rows})
         return rows
 
     async def renew_lease(self, pool, *, delivery_id, attempts, now=None):
         self.calls.append(("renew_lease", {"delivery_id": delivery_id, "attempts": attempts}))
-        return self.renew
+        if not self.renew:
+            return None
+        row = self._claimed_rows.get(delivery_id)
+        fresh = {"enabled": True} if row is None else {k: getattr(row, k) for k in _FRESH_FIELDS}
+        fresh.update(self.endpoint_now)
+        return fresh
 
     async def record_outcome(self, pool, **kw):
         self.calls.append(("record_outcome", kw))
@@ -550,6 +562,54 @@ async def test_a_lost_lease_never_sends_and_records_nothing(monkeypatch):
     await _drainer(fake, send=send)._send_pass(now=NOW)
     assert send.calls == []
     assert fake.named("record_outcome") == [] and fake.named("skip_delivery") == []
+
+
+# ── WR-01: the endpoint is re-read at the lease renew, right before the send ──────────────────
+
+
+async def test_wr01_an_endpoint_turned_off_after_the_claim_is_skipped_not_sent(monkeypatch):
+    """WR-01: an admin (or the owner, or auto-disable on another worker) turned the endpoint off
+    while this batch was claimed. The claim snapshot says on; the renew's fresh read says off."""
+    row = _row(enabled=True)
+    fake = FakeOutbox(claimed=[row]).install(monkeypatch)
+    fake.endpoint_now = {"enabled": False}
+    send = CountingSend()
+    assert await _drainer(fake, send=send)._send_pass(now=NOW) == 0
+    assert send.calls == []
+    assert fake.named("skip_delivery") == [{"delivery_id": row.id, "status": "skipped_disabled"}]
+    assert fake.named("record_outcome") == []
+
+
+async def test_wr01_an_endpoint_whose_url_changed_after_the_claim_gets_the_new_url(monkeypatch):
+    """WR-01: the owner moved off a compromised receiver mid-batch; the claimed row goes to the URL
+    the endpoint has NOW, never the old one."""
+    row = _row()
+    fake = FakeOutbox(claimed=[row]).install(monkeypatch)
+    fake.endpoint_now = {"url": "https://new.example.org/in"}
+    send = CountingSend()
+    assert await _drainer(fake, send=send)._send_pass(now=NOW) == 1
+    ((url, _, _),) = send.calls
+    assert url == "https://new.example.org/in"
+
+
+async def test_wr01_a_secret_rolled_after_the_claim_signs_with_the_new_secret(monkeypatch):
+    row = _row()
+    fake = FakeOutbox(claimed=[row]).install(monkeypatch)
+    fake.endpoint_now = {
+        "secret_ciphertext": secret_cipher.encrypt_secret(PREVIOUS, CIPHER),
+        "previous_secret_ciphertext": None, "previous_secret_expires_at": None,
+    }
+    send = CountingSend()
+    await _drainer(fake, send=send)._send_pass(now=NOW)
+    ((_, body, headers),) = send.calls
+    assert _verify(PREVIOUS, headers["webhook-id"], headers["webhook-timestamp"], body, headers["webhook-signature"])
+
+
+def test_wr01_the_renew_reads_the_endpoint_in_the_same_statement():
+    sql = outbox.RENEW_LEASE_SQL
+    assert "FROM public.webhook_endpoints e" in sql
+    assert "e.id = webhook_deliveries.endpoint_id" in sql
+    assert "RETURNING e.enabled, e.url" in sql
 
 
 @pytest.mark.parametrize("variant", ["no_cipher", "invalid_token"])

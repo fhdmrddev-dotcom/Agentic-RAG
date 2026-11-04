@@ -300,6 +300,44 @@ async def test_a_row_reclaimed_and_claimed_again_elsewhere_is_not_sent_by_its_fi
         assert (row["status"], row["attempts"]) == ("sending", 2)
 
 
+async def _claim_one(w, d):
+    assert await d._fan_out(now=NOW) == 1
+    (row,) = await outbox.claim_due_deliveries(w.pool, limit=5, now=NOW, max_attempts=wd.MAX_ATTEMPTS)
+    cache = wd._PassCache(d._liveness, d._visibility, {(row.user_id, row.org_id, "workflow_runs"): [row.item_id]})
+    return row, cache
+
+
+async def test_wr01_an_endpoint_turned_off_after_the_claim_is_never_sent_to():
+    """WR-01, live: the claim snapshot says on; an org admin turns the endpoint off before the row's
+    send. The renew re-reads the endpoint, so nothing is sent and the row is skipped_disabled."""
+    async with world() as w:
+        ep = await w.endpoint(w.alice)
+        assert await w.finish(await w.run(w.alice))
+        send = CountingSend()
+        d = w.drainer(send)
+        row, cache = await _claim_one(w, d)
+        assert row.enabled is True, "non-vacuity: the claim saw it on"
+        assert await outbox.disable_endpoint(w.pool, endpoint_id=ep, reason="admin", now=NOW) is not None
+        assert await d._process(row, now=NOW, cache=cache) is False
+        assert send.calls == [], "WR-01: a turned-off endpoint received a claimed delivery"
+        (final,) = await w.deliveries(ep)
+        assert final["status"] == "skipped_disabled"
+
+
+async def test_wr01_a_url_changed_after_the_claim_is_where_the_row_goes():
+    async with world() as w:
+        ep = await w.endpoint(w.alice, url="https://hooks.example.com/old")
+        assert await w.finish(await w.run(w.alice))
+        send = CountingSend()
+        d = w.drainer(send)
+        row, cache = await _claim_one(w, d)
+        assert row.url == "https://hooks.example.com/old", "non-vacuity: the claim saw the old URL"
+        await w.pool.execute("UPDATE public.webhook_endpoints SET url = $2 WHERE id = $1",
+                             ep, "https://hooks.example.com/moved")
+        assert await d._process(row, now=NOW, cache=cache) is True
+        assert [c[0] for c in send.calls] == ["https://hooks.example.com/moved"]
+
+
 async def test_a_stale_test_delivery_is_failed_and_never_retried():
     """D-58: the drainer never claims a webhook.test delivery; a stranded one is failed, not retried."""
     async with world() as w:
