@@ -163,6 +163,8 @@ export function ConsentPage({
       setPhase({ kind: "ready", request: req })
       setOrgId((prev) => {
         const keep = prev !== null && req.orgs.some((o) => o.id === prev && o.mcp_off === null)
+        // 307 WR-06: an org swapped in automatically starts from a clean draft, as a manual pick does.
+        if (!keep) setDraft((dr) => ({ ...dr, folderMode: "all", folderIds: [], external: false }))
         return keep ? prev : defaultOrg(req.orgs)
       })
     } else if (req.status === "refused") setPhase({ kind: "refused", reason: req.reason, host: req.host })
@@ -416,6 +418,7 @@ export function ConsentPage({
     draft,
     catalogue: req.tools,
     foldersLoaded: folders !== null,
+    sentFolderCount: folders !== null && sentFolders !== null ? sentFolders.length : undefined,
   })
   const blockerText = blocker === null ? null : blocker === "needOrg" ? C.needOrg : BLOCKER_WORDS[blocker]
   const host = displayHost(client.redirect_host)

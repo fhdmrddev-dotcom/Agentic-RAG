@@ -84,11 +84,14 @@ export function firstUnmetAllow(d: {
   draft: McpDraft
   catalogue: readonly McpToolRef[] | null
   foldersLoaded: boolean
+  /** 307 WR-06: how many folders Allow would actually SEND (`draftFolderIds`), when known. */
+  sentFolderCount?: number
 }): AllowBlocker | null {
   if (!d.orgOn) return "needOrg"
   const tools = d.catalogue ? draftTools(d.draft, d.catalogue) : []
   if (d.catalogue && tools.length === 0) return "needTool"
-  if (d.draft.folderMode === "only" && d.draft.folderIds.length === 0) return "needFolder"
+  const folderCount = d.sentFolderCount ?? d.draft.folderIds.length
+  if (d.draft.folderMode === "only" && folderCount === 0) return "needFolder"
   if (!d.catalogue) return "waitTools"
   if (d.draft.folderMode === "only" && !d.foldersLoaded) return "waitFolders"
   return null

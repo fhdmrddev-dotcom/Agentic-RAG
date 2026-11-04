@@ -75,6 +75,11 @@ describe("307-03 firstUnmetAllow — the UI-SPEC order", () => {
   it("then Only these folders with none ticked", () => {
     expect(firstUnmetAllow({ ...base, draft: d({ folderMode: "only", folderIds: [] }) })).toBe("needFolder")
   })
+  it("307 WR-06: ticked folders that would not be SENT (another org's picks) still block Allow", () => {
+    const stale = d({ folderMode: "only", folderIds: ["old-org-folder"] })
+    expect(firstUnmetAllow({ ...base, draft: stale, sentFolderCount: 0 })).toBe("needFolder")
+    expect(firstUnmetAllow({ ...base, draft: stale, sentFolderCount: 1 })).toBeNull()
+  })
   it("then the catalogue or the folders still loading", () => {
     expect(firstUnmetAllow({ ...base, catalogue: null })).toBe("waitTools")
     expect(firstUnmetAllow({ ...base, foldersLoaded: false, draft: d({ folderMode: "only", folderIds: ["x"] }) })).toBe("waitFolders")
