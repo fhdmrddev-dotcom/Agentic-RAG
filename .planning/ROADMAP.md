@@ -85,7 +85,7 @@ Requirements: [`REQUIREMENTS.md`](REQUIREMENTS.md). **29 v4.9 requirements, 29 m
 - [x] **Phase 304: Personal MCP Keys That Act as You**: acting-member org narrowing, one key resolver and liveness predicate, the key screen with presets and snippets, narrowing, revoke, org and operator kill switches, proven by a two-org parity test (KEY-01..06)
 - [x] **Phase 305: Connect Claude Code and Cursor**: stateless MCP server at one URL, `search_knowledge_base` / `list_documents` / `read_document`, tool labels and plain errors, maintenance behaviour, per-key audit and limits, spend attribution, fail-closed PII redaction (MCP-01, MCP-02, MCP-03, MCP-07, KEY-07, GUARD-02, GUARD-03) — **CLOSED 2026-10-31 by decision** (self-verified 4/5 SC; SC#1 client rows Cursor / cloud / one-box / Claude Desktop OWED to the operator; NOT deployed — deploys with 304)
 - [x] **Phase 306: Ask the Agent and Run Workflows**: `ask_agent` / `get_answer` with a closed read-only tool set, MCP asks in thread history, `list_workflows` / `run_workflow` / `get_workflow_run`, admission control for MCP and `/inbound` starts (MCP-04, MCP-05, MCP-06, GUARD-01) — **CLOSED 2026-11-03 by decision** (self-verified 5/5 SC after quick 261101-4y9 fixed review CR-01/CR-02; 5 live UAT rows OWED in 306-HUMAN-UAT.md, run row 5 first; NOT deployed — cloud 220→223 owed)
-- [ ] **Phase 307: Sign In From Claude.ai and Claude Desktop**: own OAuth 2.1 authorization server per the MCP spec, consent page with org and narrowing, rotating refresh, connected apps with revoke (OAUTH-04..07)
+- [x] **Phase 307: Sign In From Claude.ai and Claude Desktop**: own OAuth 2.1 authorization server per the MCP spec, consent page with org and narrowing, rotating refresh, connected apps with revoke (OAUTH-04..07) — **CLOSED 2026-11-04 by decision** (self-verified 4/4 SC in code; review 10 fixed, WR-05 deferred SEED-397; 8 human rows OWED in 307-HUMAN-UAT.md — operator postponed, run row 5 first; /gsd:secure-phase 307 owed; NOT deployed — cloud 220→224 owed)
 - [ ] **Phase 308: Told by Webhook**: endpoints, event choice and test event, Standard Webhooks signing with rotation, exactly-once emission from triggers, retries and delivery log, visibility re-check and SSRF refusal, admin control (HOOK-01..06)
 - [ ] **Phase 309: Close-Out: Docs, Register, Deploy Parity**: per-client quick starts, webhook verification, "Claude.ai needs OAuth", the register made true, the deploy-parity checklist (REG-10)
 
@@ -263,7 +263,7 @@ Plans:
 | 304. Personal MCP Keys That Act as You | 6/6 | Complete (self-verified 5/5; G-4 1-3 PASS; deploys WITH 305 — cloud 220/221 + D-41 owed) | 2026-10-31 |
 | 305. Connect Claude Code and Cursor | 5/5 | Complete by decision (self-verified 4/5 SC; SC#1 client rows OWED; deploys WITH 304) | 2026-10-31 |
 | 306. Ask the Agent and Run Workflows | 5/5 | Complete by decision (self-verified 5/5 SC; 5 live UAT rows OWED — row 5 first; cloud 220→223 owed) | 2026-11-03 |
-| 307. Sign In From Claude.ai and Claude Desktop | 0/TBD | Not started | - |
+| 307. Sign In From Claude.ai and Claude Desktop | 5/5 | Complete by decision (self-verified 4/4 SC; 8 human rows OWED — postponed by operator, row 5 first; secure-phase owed; cloud 220→224 owed) | 2026-11-04 |
 | 308. Told by Webhook | 0/TBD | Not started | - |
 | 309. Close-Out: Docs, Register, Deploy Parity | 0/TBD | Not started | - |
 
