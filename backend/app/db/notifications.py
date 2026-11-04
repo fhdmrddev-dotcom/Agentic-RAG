@@ -211,17 +211,39 @@ SELECT (SELECT max(s.sent_at) FROM public.notification_deliveries s WHERE s.stat
 #     joins drop nothing real.
 #   * count(*) OVER () is evaluated before LIMIT: the true open total, even when $2 cuts the rows.
 #   * ⛔ NOTE-03: no prompt id, no join to the chat rows, no question text — five facts only.
+#
+# Phase 308 (D-19 / D-48 / D-56) — a second kind of notice, ``webhook_disabled``: one of the caller's
+# webhook endpoints was turned off by the sender (``failing``: five failed deliveries in a row, or
+# ``gone``: the receiver answered 410). It has no run, so the run join became a LEFT JOIN and the
+# status wall moved into the WHERE, per kind:
+#   * question / approval rows keep exactly the 301 wall: wr.status IN ('active', 'paused'). They are
+#     selected as kind <> 'webhook_disabled' (the 225 kind CHECK allows exactly three kinds), because
+#     the 300 fence forbids a quoted 'question' literal in any statement here (a JSON-key read);
+#   * webhook_disabled rows need the endpoint to be the caller's ($1 a THIRD time), still off, and
+#     off for failing / gone — an admin's off and an owner_removed off are not the owner's to act on.
+#   * The org_members and organizations joins stay INNER (P-8): leaving the org drops these too.
+#   * title is the endpoint's description, else host + path with the query cut off — the query is
+#     never selected (T-308-18); title_is_address says which, so the row can set it in mono.
 LIST_OPEN_SQL = """
 SELECT n.id, n.run_id, n.org_id, o.name AS org_name, n.kind, n.created_at, wr.origin_kind AS origin,
-       COALESCE(NULLIF(wr.definition_snapshot->>'name', ''), NULLIF(d.name, ''), 'Workflow run')
-           AS workflow_name,
+       CASE WHEN n.kind <> 'webhook_disabled' THEN
+           COALESCE(NULLIF(wr.definition_snapshot->>'name', ''), NULLIF(d.name, ''), 'Workflow run')
+       END AS workflow_name,
+       n.endpoint_id,
+       e.disabled_reason AS reason,
+       COALESCE(NULLIF(e.description, ''), split_part(substring(e.url from 9), '?', 1)) AS title,
+       CASE WHEN n.kind = 'webhook_disabled' THEN NULLIF(e.description, '') IS NULL END AS title_is_address,
        count(*) OVER () AS total
   FROM public.notifications n
   JOIN public.org_members m ON m.org_id = n.org_id AND m.user_id = $1
   JOIN public.organizations o ON o.id = n.org_id
-  JOIN public.workflow_runs wr ON wr.id = n.run_id AND wr.status IN ('active', 'paused')
+  LEFT JOIN public.workflow_runs wr ON wr.id = n.run_id
   LEFT JOIN public.workflow_definitions d ON d.id = wr.definition_id
+  LEFT JOIN public.webhook_endpoints e ON e.id = n.endpoint_id
  WHERE n.recipient_id = $1 AND n.closed_at IS NULL
+   AND ((n.kind <> 'webhook_disabled' AND wr.status IN ('active', 'paused'))
+     OR (n.kind = 'webhook_disabled' AND e.user_id = $1 AND NOT e.enabled
+         AND e.disabled_reason IN ('failing', 'gone')))
  ORDER BY n.created_at ASC, n.id
  LIMIT $2
 """
