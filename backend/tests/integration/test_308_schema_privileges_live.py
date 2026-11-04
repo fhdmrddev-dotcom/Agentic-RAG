@@ -269,7 +269,9 @@ async def test_one_run_finished_per_run_and_waiting_on_pause():
         await c.execute("UPDATE public.workflow_runs SET status = 'completed' WHERE id = $1", run)
         await c.execute("UPDATE public.workflow_runs SET status = 'failed' WHERE id = $1", run)
         await c.execute("UPDATE public.workflow_runs SET status = 'failed' WHERE id = $1", run)
-        assert await _events(c, run) == ["run.waiting", "run.finished"]
+        # One transaction: both events carry the same created_at (now()), so ORDER BY created_at, id
+        # falls to a random uuid. The contract is one of each, not their order (flaked 3 runs in 4).
+        assert sorted(await _events(c, run)) == ["run.finished", "run.waiting"]
         row = await c.fetchrow(
             "SELECT org_id, owner_id, status, definition_id FROM public.webhook_events"
             " WHERE item_id = $1 AND type = 'run.finished'", run,
