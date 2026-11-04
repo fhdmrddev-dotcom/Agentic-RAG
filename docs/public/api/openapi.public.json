@@ -30711,8 +30711,15 @@
             "title": "Id"
           },
           "run_id": {
-            "type": "string",
-            "format": "uuid",
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "uuid"
+              },
+              {
+                "type": "null"
+              }
+            ],
             "title": "Run Id"
           },
           "org_id": {
@@ -30725,14 +30732,22 @@
             "title": "Org Name"
           },
           "workflow_name": {
-            "type": "string",
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
             "title": "Workflow Name"
           },
           "kind": {
             "type": "string",
             "enum": [
               "question",
-              "approval"
+              "approval",
+              "webhook_disabled"
             ],
             "title": "Kind"
           },
@@ -30757,6 +30772,55 @@
             "type": "string",
             "format": "date-time",
             "title": "Created At"
+          },
+          "endpoint_id": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "uuid"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Endpoint Id"
+          },
+          "reason": {
+            "anyOf": [
+              {
+                "type": "string",
+                "enum": [
+                  "failing",
+                  "gone"
+                ]
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Reason"
+          },
+          "title": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Title"
+          },
+          "title_is_address": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Title Is Address"
           }
         },
         "type": "object",
@@ -30765,13 +30829,12 @@
           "run_id",
           "org_id",
           "org_name",
-          "workflow_name",
           "kind",
           "origin",
           "created_at"
         ],
         "title": "WaitingNotice",
-        "description": "One workflow run that is waiting on you."
+        "description": "One thing waiting on you: a workflow run (a question or an approval), or one of your webhooks that was turned off because it kept failing (``webhook_disabled``)."
       },
       "WaitingNotices": {
         "properties": {

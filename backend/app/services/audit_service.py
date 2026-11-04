@@ -36,6 +36,16 @@ VALID_ACTION_TYPES = frozenset({
     "api_key.create", "api_key.revoke", "api_key.start", "api_key.read", "api_key.refused",
     # Phase 298 (D-20 / lockstep with migration 217 CHECK) — the per-item org move:
     "org.item.move",
+    # Phase 308 (D-31 / lockstep with migration 225 CHECK) — webhooks:
+    "webhook.endpoint.created",
+    "webhook.endpoint.updated",
+    "webhook.endpoint.deleted",
+    "webhook.endpoint.enabled",
+    "webhook.endpoint.disabled",
+    "webhook.endpoint.secret_rolled",
+    "webhook.endpoint.test_sent",
+    "webhook.endpoint.delivery_resent",
+    "webhook.endpoint.auto_disabled",
 })
 
 
