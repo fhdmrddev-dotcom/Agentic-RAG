@@ -52,3 +52,7 @@ Small in code, medium in deploy parity:
   `scripts/check-deploy-drift.sh`, all in one commit.
 - The operator must read Traefik's network range in Coolify.
 - A test proving a spoofed `X-Forwarded-For` from outside that range is ignored.
+
+## 2026-11-04 — Phase 307 touched trigger paths (`rate_limit.py`, `edge.py`); left deferred, impact widened
+
+307 added four door-wide OAuth buckets (register / authorize / token / revoke). Code review WR-05: because the limiter keys on the proxy's address, one anonymous script hammering `/oauth/token` throttles **every connected app's refresh deployment-wide** — existing Claude.ai / Desktop connections drop, not just new sign-ins. Not fixed in 307 (the operator's 2026-10-31 acceptance stands; per-caller addressing is this seed's fix). Re-open trigger unchanged, with this added weight: re-open before a paying org connects Claude.ai through OAuth.
