@@ -336,9 +336,11 @@ async def _refuse(row: dict, *, call: str, reason: str, redis) -> HTTPException:
     return the one 401. A suppressed refusal is counted and named on the next row it writes."""
     suppressed = await refusal_audit_slot(redis, key_id=str(row.get("id")), reason=reason)
     if suppressed is not None:
+        detail: dict = {"suppressed": suppressed} if suppressed else {}
+        if row.get("oauth_client_id") is not None:  # 307 IN-01: a grant row reads as a connected app
+            detail["credential"] = "oauth"
         await audit_key_call_now(
-            row, "api_key.refused", call=call, reason=reason,
-            detail={"suppressed": suppressed} if suppressed else None,
+            row, "api_key.refused", call=call, reason=reason, detail=detail or None,
         )
     return _invalid()
 

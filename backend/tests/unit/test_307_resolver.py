@@ -117,7 +117,8 @@ def world(monkeypatch):
 
     async def _audit_now(key, action_type, *, call, reason=None, detail=None, **_):
         state["audits"].append({"action_type": action_type, "reason": reason, "call": call,
-                                "key_id": key.get("id") if isinstance(key, dict) else key.id})
+                                "key_id": key.get("id") if isinstance(key, dict) else key.id,
+                                "detail": detail})
 
     monkeypatch.setattr(auth.oauth_db, "get_access_token_for_auth", _get_access_token_for_auth)
     monkeypatch.setattr(auth.api_keys_db, "get_key_for_auth", _get_key_for_auth)
@@ -229,6 +230,22 @@ async def test_a_token_for_another_resource_is_refused_and_audited(world):
     assert [a["reason"] for a in world["audits"]] == ["wrong_resource"]
     assert world["audits"][0]["call"] == "read"
     assert world["touched"] == []
+
+
+async def test_307_in01_grant_refusals_are_audited_as_oauth_and_key_refusals_are_not(world):
+    """307 IN-01: a refused GRANT row carries ``credential: oauth`` in the audit detail (the audit
+    words key off it); a refused KEY row's detail stays exactly as 304/305 wrote it."""
+    world["token_row"]["resource"] = "https://other.example/mcp"
+    with pytest.raises(auth.KeyRefused):
+        await _resolve(world["access"])
+    assert world["audits"][-1]["detail"] == {"credential": "oauth"}
+
+    world["refusal"] = Refusal("revoked")
+    secret = _use_key(world)
+    with pytest.raises(auth.KeyRefused):
+        await _resolve(secret)
+    assert world["audits"][-1]["reason"] == "revoked"
+    assert world["audits"][-1]["detail"] is None
 
 
 async def test_a_canonically_equal_resource_is_accepted(world):
