@@ -27,6 +27,7 @@ import { cn } from "@/lib/utils"
 import { MemorySection } from "@/components/settings/MemorySection"
 import { AuditLogSection } from "@/components/settings/AuditLogSection"
 import { ApiKeysTab } from "@/components/settings/apiKeys/ApiKeysTab"
+import { WebhooksTab } from "@/components/settings/webhooks/WebhooksTab"
 import { PreferencesSection } from "@/components/settings/PreferencesSection"
 import {
   isSettingsTabVisible,
@@ -1015,6 +1016,7 @@ export function SettingsPage({ onOpenRun }: { onOpenRun?: (runId: string) => voi
             {isSettingsTabVisible("3", canManageModels) && <TabsTrigger className={SETTINGS_TAB_CLASS} value="3">Memory</TabsTrigger>}
             {isSettingsTabVisible("4", canManageModels) && <TabsTrigger className={SETTINGS_TAB_CLASS} value="4">Audit Log</TabsTrigger>}
             {isSettingsTabVisible("7", canManageModels) && <TabsTrigger className={SETTINGS_TAB_CLASS} value="7">API keys</TabsTrigger>}
+            {isSettingsTabVisible("8", canManageModels) && <TabsTrigger className={SETTINGS_TAB_CLASS} value="8">Webhooks</TabsTrigger>}
           </TabsList>
 
           {/* Tab 0: AI Model — operator-only, and NOT RENDERED for a member (Phase 283, D-07).
@@ -1686,6 +1688,7 @@ export function SettingsPage({ onOpenRun }: { onOpenRun?: (runId: string) => voi
           <TabsContent value="7">
             <ApiKeysTab onOpenRun={onOpenRun} onOpenAudit={() => handleTabChange("4")} />
           </TabsContent>
+          <TabsContent value="8"><WebhooksTab onOpenRun={onOpenRun} /></TabsContent>
 
           {/* Tab 5 (rendered fourth): Connections — Phase 190-16 (CONN-02 / D-25).
               UNLIKE the five tabs above, this one is NOT a single-value form saved en

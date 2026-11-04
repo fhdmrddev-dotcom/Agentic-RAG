@@ -5,7 +5,7 @@ section: administer
 audience: user
 status: stub
 release: shipped
-covers: [router:webhooks]
+covers: [settings-tab:webhooks, router:webhooks]
 summary: >-
   Syrel can tell your own systems when a run finishes, a run waits on you, or a document is
   ingested. Until the full guide is written, start with What Syrel is.
