@@ -4568,6 +4568,13 @@ const BASELINE = {
   "WebhookDeliveryLog.test.tsx": 12, // 308-05 — real table, words only, run link, Resend + rate limit, off endpoint, Show older, states, refresh, 15 s poll only while in flight
   "WebhookEndpointCard.test.tsx": 12, // 308-05 — masked address toggle, off tags, actions per host, test verdicts, never-optimistic flip keeps focus, admin-off reason, roll in place, edit in place
   "WebhooksTab.test.tsx": 11, // 308-05 — header + scope, empty, cap reason, kept list on a failed re-read, one open card, create → secret once, org switch re-read (P-2), delete receipt + focus, focus hints
+  // Phase 308-06 (HOOK-04/06; D-30, D-31, D-19) — FIRST pins for the org-admin section, the audit words and
+  // the Waiting row, both knobs in the same commit (each FILE-LEVEL in TARGETS below). Counts read from
+  // the gate's own JSON report at 308-06 (2026-11-04), never hand-counted.
+  "OrgWebhooks.test.tsx": 9, // 308-06 — no gate, table words + no query/token/link, owner order, direct Turn off + receipt + one pulse, Turn on admin-off only, refusal kept, admin Delete sheet, Retry, one mount
+  "AuditTab.webhookWords.test.tsx": 3, // 308-06 — nine webhook.endpoint.* sentences + host as text, 253 cap, the Webhooks filter group
+  "OrgAuditTab.webhookWords.test.tsx": 3, // 308-06 — the same nine words + host in the org browser, its filter group, lockstep with AuditTab
+  "webhookWaitingRow.test.tsx": 9, // 308-06 — run arm byte-equal, webhook arm → openWebhooks, no-op without the door, words, neutral count, zero-import leaf, mixed list, ChatLayout door
 }
 
 // Still COMPUTED, never hand-written — the reduce is the single source, so the
@@ -6728,6 +6735,11 @@ const TARGETS = [
   "src/components/settings/webhooks/__tests__/WebhookDeliveryLog.test.tsx",
   "src/components/settings/webhooks/__tests__/WebhookEndpointCard.test.tsx",
   "src/components/settings/webhooks/__tests__/WebhooksTab.test.tsx",
+  // Phase 308-06 (HOOK-04/06) — FILE-LEVEL (no org, admin or layout __tests__ directory entry), SAME commit as their pins.
+  "src/components/org/__tests__/OrgWebhooks.test.tsx",
+  "src/components/admin/__tests__/AuditTab.webhookWords.test.tsx",
+  "src/components/org/__tests__/OrgAuditTab.webhookWords.test.tsx",
+  "src/components/layout/__tests__/webhookWaitingRow.test.tsx",
 ]
 
 const REPO_ROOT = path.resolve(__dirname, "..")
