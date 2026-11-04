@@ -31,8 +31,8 @@ import { oauthAuditLabel } from "@/components/connect/oauthCopy"
 // ── Plain-first vocabulary (067-A) — the raw audit_log code → plain label + group.
 //    Copied from the operator AuditTab (the SAME audit_log vocabulary; a shared export
 //    would touch a file outside this plan's surface). ─────────────────────────────
-type ActionGroup = "Documents" | "Chat & agent" | "Organizing" | "API keys" | "Other"
-const GROUP_ORDER: readonly ActionGroup[] = ["Documents", "Chat & agent", "Organizing", "API keys", "Other"]
+type ActionGroup = "Documents" | "Chat & agent" | "Organizing" | "API keys" | "Webhooks" | "Other"
+const GROUP_ORDER: readonly ActionGroup[] = ["Documents", "Chat & agent", "Organizing", "API keys", "Webhooks", "Other"]
 
 const ACTION_META: Record<string, { label: string; group: ActionGroup }> = {
   "document.upload": { label: "Uploaded a document", group: "Documents" },
@@ -62,12 +62,31 @@ const ACTION_META: Record<string, { label: string; group: ActionGroup }> = {
   "api_key.start": { label: "Started a run with an API key", group: "API keys" },
   "api_key.read": { label: "Read a run with an API key", group: "API keys" },
   "api_key.refused": { label: "Refused an API key call", group: "API keys" },
+  // Phase 308-06 (D-31): the nine webhook rows, worded — the SAME nine lines live in the other
+  // audit browser (OrgAuditTab.webhookWords.test.tsx fences the two as identical). The host shows beside.
+  "webhook.endpoint.created": { label: "Added a webhook endpoint", group: "Webhooks" },
+  "webhook.endpoint.updated": { label: "Changed a webhook endpoint", group: "Webhooks" },
+  "webhook.endpoint.deleted": { label: "Deleted a webhook endpoint", group: "Webhooks" },
+  "webhook.endpoint.enabled": { label: "Turned on a webhook endpoint", group: "Webhooks" },
+  "webhook.endpoint.disabled": { label: "Turned off a webhook endpoint", group: "Webhooks" },
+  "webhook.endpoint.secret_rolled": { label: "Rolled a webhook signing secret", group: "Webhooks" },
+  "webhook.endpoint.test_sent": { label: "Sent a webhook test", group: "Webhooks" },
+  "webhook.endpoint.delivery_resent": { label: "Resent a webhook delivery", group: "Webhooks" },
+  "webhook.endpoint.auto_disabled": { label: "Syrel turned off a webhook endpoint after repeated failures", group: "Webhooks" },
 }
 
 /** Prettify an `action_type` for a row label; unknown codes fall back to the raw
  *  code (honest — never invents a label for a code we do not know). */
 function actionLabel(code: string): string {
   return ACTION_META[code]?.label ?? code
+}
+
+/** 308-06 (D-31): a webhook row's host from metadata, as text, capped at 253 characters. Never a query
+ *  or a secret — neither is in the metadata. Null for every other row. */
+function webhookHost(row: OrgAuditRow): string | null {
+  if (ACTION_META[row.action_type]?.group !== "Webhooks") return null
+  const host = row.metadata?.host
+  return typeof host === "string" && host ? host.slice(0, 253) : null
 }
 
 // Phase 167-02: invitation lifecycle rows reuse action_type='settings.update' + a
@@ -388,6 +407,9 @@ export function OrgAuditTab({
                   {shortUser(row.user_id)}
                 </span>
                 <span className="text-foreground">{rowLabel(row)}</span>
+                {webhookHost(row) !== null && (
+                  <span className="min-w-0 truncate font-mono text-xs text-muted-foreground">{webhookHost(row)}</span>
+                )}
                 {showTechnical && (
                   <code className="flex-none rounded bg-muted/60 px-1 py-0.5 font-mono text-[10px] text-muted-foreground">
                     {row.action_type}

@@ -444,8 +444,8 @@ node scripts/check-hot-file-ledger.cjs <phase-dir>   # 0 clear · 1 missing rows
 | `frontend/src/components/workflows/evidenceVocabulary.ts` | 5 / 3 / 261 | ⚠ now FIRES (296) · 296-04: neutral NO_MATCH/UNSOURCED + DOWNLOAD_UNAVAILABLE |
 | `backend/app/models/thread.py` | 26 / 18 / 566 (was `25 / 17 / 550`) | 306-04: ThreadResponse.origin via origin_for_wire (one validator) · ⛔ |
 | `frontend/src/components/workflows/canvasModel.ts` | 16 / 8 / 836 (was `15 / 8 / 831`) | 296-07: comparePhaseOrder, engineArmed; isGrounded drops escalated |
-| `frontend/src/components/layout/ChatLayout.tsx` | 76 / 37 / 970 (was `75 / 37 / 954`) | honoured by construction (301-03: status state in ctx; one drawer mount) |
-| `frontend/src/components/layout/attentionConditions.ts` | 6 / 4 / 424 (was `5 / 3 / 424`) | 306-04: one token (origin + mcp) · ⛔ |
+| `frontend/src/components/layout/ChatLayout.tsx` | 77 / 38 / 978 (was `76 / 37 / 970`) | 308-06: one memoised openWebhooks door in the attention ctx · ⛔ |
+| `frontend/src/components/layout/attentionConditions.ts` | 7 / 5 / 451 (was `6 / 4 / 424`) | 308-06: openWebhooks door + one webhook_disabled arm; run arm unchanged · ⛔ |
 | `frontend/src/components/layout/ChatLaunchForm.tsx` | 6 / 4 / 191 (was `5 / 4 / 183`) | 296 G-4 row 11: refused Run scrolls the refusal into view |
 | `frontend/src/components/workflows/LaunchInputFields.tsx` | 3 / 3 / 145 | 287-01: leaf stays non-blocking; docblock only · 214.1-01 trigger TAKEN |
 | `frontend/src/components/layout/ChatHistoryColumn.tsx` | 10 / 4 / 535 (was `9 / 3 / 524`) | 306-04: one conditional RunOriginLine mount in the row button |
@@ -489,16 +489,16 @@ node scripts/check-hot-file-ledger.cjs <phase-dir>   # 0 clear · 1 missing rows
 | `frontend/src/components/panel/FilesSection.tsx` | 14 / 9 / 366 (was `12 / 8 / 354`) | 302-01: one GeneratedFilesGroup mount; workspace rows byte-identical |
 | `frontend/src/lib/api.ts` | 215 / 128 / 556 (was `214 / 127 / 552`) | 299-03: one links export block |
 | `frontend/src/types/index.ts` | 104 / 83 / 1690 (was `103 / 82 / 1688`) | 306-04: RunOrigin.kind + mcp; Thread.origin (types only) · seam OWED |
-| `backend/app/main.py` | 100 / 74 / 1024 (was `99 / 73 / 1021`) | 305-01: one import + register_mcp(app) + one mcp_lifespan block · ⛔ |
+| `backend/app/main.py` | 101 / 75 / 1056 (was `100 / 74 / 1024`) | 308-04: routers + WebhookDrainer lifespan (D-50); httpx log WARNING · ⛔ |
 | `backend/app/config.py` | 96 / 55 / 1831 (was `93 / 54 / 1809`) | 300-03: SMTP_* fields (D-28) · seam OWED · ⛔ |
 | `backend/app/api/admin.py` | 45 / 18 / 2055 (was `44 / 17 / 2054`) | 304-04: one _FLAG_HUMAN_NAMES entry (mcp_enabled) · ⛔ |
 | `backend/app/api/settings.py` | 53 / 29 / 1523 (was `51 / 28 / 1425`) | 306-02: four outside knobs, one explicit bound each (D-36/D-35) |
 | `backend/app/services/multimodal_service.py` | 14 / 7 / 984 | ⚠ absent from BOTH for its ENTIRE LIFE at **7 phases** |
 | `backend/app/api/documents.py` | 101 / 40 / 2709 (was `99 / 39 / 2698`) | 298-01: one by_org in build() + one root_upload_org kwarg · ⛔ |
 | `backend/app/api/library.py` | 3 / 3 / 304 (was `2 / 2 / 299`) | ⚠ now FIRES (298) · 298-01: summary shares the lists' org predicate ($1) |
-| `scripts/vitest-count-gate.cjs` | 417 / 89 / 6986 (was `416 / 88 / 6956`) | 307-05: 13 first pins + McpKeyFields 8 -> 12; none lowered |
+| `scripts/vitest-count-gate.cjs` | 419 / 90 / 7022 (was `417 / 89 / 6986`) | 308-05 + 308-06: 14 first pins (both knobs, file-level); none lowered |
 | `scripts/check-deploy-drift.sh` | 6 / 5 / 271 (was `5 / 4 / 267`) | 300-03: SMTP_* parity |
-| `scripts/build-public-openapi.cjs` | 13 / 7 / 473 (was `11 / 5 / 472`) | 301-01: notifications tag + /notifications FLAGGED (2 lines) |
+| `scripts/build-public-openapi.cjs` | 14 / 8 / 475 (was `13 / 7 / 473`) | 308-04: webhooks tag + /webhooks, /org/webhooks FLAGGED (D-52) |
 | `scripts/check-seeds-register.cjs` | 7 / 3 / 1132 | ⚠ FIRES, absent here — row added 296-05 · `\d{3,}` ids · ⛔ |
 | `backend/app/services/eval_runner_service.py` | 14 / 9 / 1056 (was `13 / 8 / 1040`) | 296-06: eval arm on a fixed EVAL_MAX_TOOL_ROUNDS (copy of settings) |
 | `backend/app/services/scheduler_service.py` | 16 / 9 / 375 (was `15 / 9 / 372`) | 300-REVIEW WR-01: outcome reads THIS run by id; failed/cancelled kept |
@@ -523,7 +523,7 @@ node scripts/check-hot-file-ledger.cjs <phase-dir>   # 0 clear · 1 missing rows
 | `frontend/src/components/admin/ModelRegistryTab.tsx` | 19 / 7 / 1705 (was `17 / 7 / 1679`) | honoured by construction (282-04: Add-form Timeout) · AddModelForm seam OWED · ⛔ |
 | `frontend/src/components/workflows/soulData.ts` | 15 / 13 / 556 (was `14 / 12 / 554`) | 296-07: blank label falls back to the key (287-IN-02) |
 | `frontend/src/components/workflows/PublishGauntlet.tsx` | 22 / 12 / 1390 (was `21 / 11 / 1385`) | 296-07: onPublished carries the auto_answered notes (one arg) |
-| `frontend/src/landing/facts.ts` | 8 / 4 / 546 (was `6 / 3 / 546`) | 293-04: API keys in SURFACE_TABS.settings + .orgAdmin (data only) |
+| `frontend/src/landing/facts.ts` | 9 / 5 / 546 (was `8 / 4 / 546`) | 308-05: Webhooks appended to SURFACE_TABS.settings (data only) |
 | `frontend/src/components/workflows/PhaseSpineGraph.tsx` | 8 / 6 / 723 (was `5 / 5 / 473`) | 290: forecast unused — chips went on the library card, not here |
 | `frontend/src/components/workflows/doorVocabulary.ts` | 6 / 4 / 540 | no seam proposed |
 | `frontend/src/components/workflows/StepTypePicker.tsx` | 7 / 3 / 522 | honoured by construction (199) |
@@ -539,7 +539,7 @@ node scripts/check-hot-file-ledger.cjs <phase-dir>   # 0 clear · 1 missing rows
 | `frontend/src/components/org/InvitationsTab.tsx` | 4 / 3 / 310 | ⚠ now FIRES (300) · 300-05: Email not sent chip + resend line · ⛔ |
 | `frontend/src/components/settings/connectionsCopy.ts` | 16 / 9 / 804 | ⚠ row STALE · honoured by construction (BUG-260912-01) |
 | `frontend/src/components/settings/connectionFormCopy.ts` | 19 / 8 / 1631 | seam named (239-05), RODE it (239-07) · ⛔ |
-| `frontend/src/pages/SettingsPage.tsx` | 64 / 31 / 1704 (was `63 / 31 / 1698`) | 300-REVIEW WR-05: EmailSettings invalid() vetoes the save · ⛔ |
+| `frontend/src/pages/SettingsPage.tsx` | 66 / 32 / 1709 (was `64 / 31 / 1704`) | 308-05: one WebhooksTab mount for tab 8 (+ import) · ⛔ |
 | `frontend/src/pages/settingsSearchPayload.ts` | 2 / 2 / 116 | young (created 242) |
 | `frontend/src/components/settings/ModelPillRow.tsx` | 5 / 4 / 151 | ⚠ FIRES · honoured by construction (249-02) · ⛔ |
 | `frontend/src/components/workflows/phaseVocabulary.ts` | 18 / 8 / 1102 (was `16 / 6 / 990`) | 296-07: own() lookups, STEP_UNTYPED, comparePhaseOrder, engineArmed |
@@ -550,7 +550,7 @@ node scripts/check-hot-file-ledger.cjs <phase-dir>   # 0 clear · 1 missing rows
 | `backend/app/api/connectors.py` | 46 / 22 / 2166 | ⚠ STALE · last touch 276-07 · extraction OWED · ⛔ |
 | `backend/app/services/sources/preview_service.py` | 8 / 4 / 826 | ⚠ row STALE TWICE · last touch 238-04 |
 | `backend/app/security/secret_cipher.py` | 4 / 2 / 256 | ⚠ absent its ENTIRE LIFE — row added mig 180 · ⛔ |
-| `backend/app/security/egress.py` | 14 / 6 / 991 (was `13 / 5 / 982`) | 307-02: client_metadata capability (CIMD fetch); test_190 amended on purpose |
+| `backend/app/security/egress.py` | 15 / 7 / 994 (was `14 / 6 / 991`) | 308-02: one `webhook` _CALLER capability (3 entries); test_190 unchanged |
 | `backend/app/services/connector_service.py` | 28 / 11 / 1858 | ⚠ row STALE · honoured by construction (239-06) |
 | `backend/app/services/sources/base.py` | 9 / 5 / 336 | ⚠ absent while FIRING · honoured by construction (239) |
 | `backend/app/services/sources/__init__.py` | 5 / 3 / 40 | ⚠ absent while FIRING — row added 239-03 |
@@ -611,8 +611,8 @@ node scripts/check-hot-file-ledger.cjs <phase-dir>   # 0 clear · 1 missing rows
 | `frontend/src/components/sources/SourceFolderPicker.tsx` | 2 / 2 / 375 | ⚠ absent its entire life — row added BUG-260912-01 · ⛔ |
 | `frontend/src/components/sources/sourceHealthVocabulary.ts` | 8 / 4 / 645 | ⛔ row STALE · G-5 fires (252-03) · Seam OWED |
 | `backend/app/services/sources/failure_cause.py` | 3 / 2 / 227 | ⚠ absent its entire life — row added BUG-260912-01 · ⛔ |
-| `scripts/full-schema-supplement.sql` | 31 / 23 / 942 (was `30 / 22 / 927`) | 307-01: migration 224 block; 220 grant line byte-unchanged · ⛔ |
-| `backend/app/services/rate_limit.py` | 8 / 5 / 228 (was `7 / 4 / 187`) | 307-02: four OAuth door buckets (door-wide ceilings) · ⛔ |
+| `scripts/full-schema-supplement.sql` | 32 / 24 / 975 (was `31 / 23 / 942`) | 308-01: migration 225 block (deny-all webhook tables, triggers) · ⛔ |
+| `backend/app/services/rate_limit.py` | 9 / 6 / 273 (was `8 / 5 / 228`) | 308-04: per-member webhook_test / webhook_resend buckets, fail closed · ⛔ |
 | `.claude/settings.json` | 14 / 6 / 214 | ⚠ STALE · last touch 276 · ⛔ |
 | `backend/app/services/forced_emit.py` | 15 / 9 / 749 (was `13 / 8 / 724`) | 296 (293-F-4): cross-provider copy names the target provider · ⛔ |
 | `backend/app/services/template_asset_service.py` | 5 / 4 / 379 (was `4 / 3 / 344`) | 295-02: has_staged_template (Branch-2 WHERE shared) |
@@ -660,14 +660,14 @@ node scripts/check-hot-file-ledger.cjs <phase-dir>   # 0 clear · 1 missing rows
 | `backend/app/models/document.py` | 14 / 11 / 275 (was `13 / 10 / 221`) | 284-02: five paged envelopes, additive · ⛔ |
 | `frontend/src/components/ingestion/DocumentRow.tsx` | 11 / 6 / 591 (was `10 / 5 / 583`) | 284-03: one versions page, N of M; still seven `<td>` |
 | `frontend/src/components/org/OrgAdminShell.tsx` | 11 / 7 / 416 (was `10 / 6 / 416`) | 304-06: settings branch key + onRecorded={pulse} (+1 −1) · ⛔ |
-| `frontend/src/components/admin/AuditTab.tsx` | 9 / 6 / 778 (was `8 / 5 / 771`) | 307-05: one oauthAuditLabel read + 2 operator labels; maps unchanged |
-| `frontend/src/components/org/OrgAuditTab.tsx` | 8 / 7 / 430 (was `7 / 6 / 427`) | 307-05: one oauthAuditLabel arm (shared with AuditTab) |
+| `frontend/src/components/admin/AuditTab.tsx` | 10 / 7 / 802 (was `9 / 6 / 778`) | 308-06: nine webhook labels in a Webhooks group + host as text (data) |
+| `frontend/src/components/org/OrgAuditTab.tsx` | 9 / 8 / 452 (was `8 / 7 / 430`) | 308-06: nine webhook labels (lockstep with AuditTab) + host as text |
 | `frontend/src/components/org/OrgSettingsTab.tsx` | 4 / 3 / 76 (was `3 / 2 / 73`) | ⚠ now FIRES (305) · 305-04: one OrgPiiRedactionCard mount |
 | `frontend/src/lib/api/documents.ts` | 11 / 10 / 599 (was `10 / 9 / 595`) | 298-01: uploadDocument sends X-Org-Id read at send time (D-29) · ⛔ |
 | `frontend/src/providers/OrgProvider.tsx` | 4 / 3 / 222 (was `3 / 2 / 217`) | ⚠ now FIRES (298) · 298-01: self-heal syncs the header first (D-36) · ⛔ |
 | `backend/app/api/folders.py` | 17 / 11 / 298 (was `16 / 10 / 288`) | 298-01: one org_lists.folder_kw keyword ×2 list routes (narrows only) |
 | `backend/app/api/kb.py` | 14 / 9 / 515 (was `13 / 8 / 504`) | last touch 275-02 · ⛔ |
-| `backend/app/services/audit_service.py` | 10 / 10 / 100 (was `9 / 9 / 98`) | 298-03: one lockstep literal (org.item.move, mig 217) · ⛔ |
+| `backend/app/services/audit_service.py` | 11 / 11 / 110 (was `10 / 10 / 100`) | 308-01: nine webhook.endpoint.* lockstep literals (mig 225 CHECK) · ⛔ |
 | `backend/app/services/expert_scope.py` | 8 / 4 / 159 (was `6 / 3 / 632`) | ✅ G-5 DISCHARGED (279-01): pure / statement / events |
 | `backend/app/services/document_relationship_service.py` | 6 / 4 / 465 (was `5 / 3 / 457`) | honoured by construction |
 | `backend/app/api/sources.py` | 11 / 5 / 713 (was `10 / 4 / 698`) | honoured by construction (285-02: purge scope via db helper) · ⛔ |
@@ -721,10 +721,16 @@ node scripts/check-hot-file-ledger.cjs <phase-dir>   # 0 clear · 1 missing rows
 | `frontend/src/lib/api/spend.ts` | 5 / 3 / 232 | ⚠ now FIRES (305) · 305-03: ledger mapper source + key + tool · ⛔ |
 | `backend/app/middleware/maintenance.py` | 3 / 3 / 128 | ⚠ now FIRES (307) · 307-02: the /oauth arm of the maintenance refusal |
 | `backend/app/security/mcp_principal.py` | 3 / 3 / 65 | ⚠ now FIRES (307) · 307-01: srl_oat_ prefix dispatch; one class · ⛔ |
-| `frontend/src/components/org/OrgApiKeysTab.tsx` | 3 / 3 / 150 | ⚠ now FIRES (307) · 307-05: one OrgConnectedApps mount (mcp.oauth) · ⛔ |
+| `frontend/src/components/org/OrgApiKeysTab.tsx` | 4 / 4 / 152 (was `3 / 3 / 150`) | 308-06: one OrgWebhooks mount after OrgConnectedApps (no gate) · ⛔ |
 | `frontend/src/components/settings/apiKeys/McpKeyFields.tsx` | 4 / 3 / 301 | ⚠ now FIRES (307) · 307-03: variant=consent (default byte-identical) · ⛔ |
 | `frontend/vite.config.ts` | 10 / 4 / 100 | ⚠ FIRES, absent here — row added 307-05 · 307-04: devHeadersFor middleware |
 | `frontend/vercel.json` | 6 / 5 / 141 | ⚠ FIRES, absent here — row added 307-05 · 307-04: consent headers |
+| `.github/workflows/backend-tests.yml` | 7 / 3 / 118 | ⚠ now FIRES (308) · 308-06: installs requirements-dev.txt (test-only) |
+| `backend/app/api/notifications.py` | 3 / 3 / 130 | ⚠ now FIRES (308) · 308-01: webhook_disabled notice; run wire unchanged |
+| `backend/app/db/notifications.py` | 5 / 3 / 414 | ⚠ now FIRES (308) · 308-01: list + count include webhook notices · ⛔ |
+| `frontend/src/components/layout/waitingVocabulary.ts` | 3 / 3 / 106 | ⚠ now FIRES (308) · 308-06: webhook words + neutral count; zero-import · ⛔ |
+| `frontend/src/components/settings/settingsTabs.ts` | 5 / 3 / 143 | ⚠ now FIRES (308) · 308-05: Webhooks tab id 8, last (never reused) · ⛔ |
+| `frontend/src/lib/api/notifications.ts` | 3 / 3 / 75 | ⚠ now FIRES (308) · 308-06: WaitingNotice is a run-or-webhook union (types) |
 
 
 When a new phase enters discuss-phase, the orchestrator must scan PLAN.md `files_modified` against this ledger. Any match against a G-5-firing row means the discuss-phase produces a refactor recommendation as the first option, not the planned feature — and the phase reads that file's section in `docs/HOT-FILE-LEDGER.md` before planning, because that is where the named seam and the binding invariants live.

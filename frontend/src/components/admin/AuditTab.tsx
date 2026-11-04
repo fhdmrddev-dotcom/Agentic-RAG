@@ -59,8 +59,8 @@ const EMPTY_FILTERS: AuditFilters = {
 const OPERATOR_PAGE_SIZE = 25
 
 // ── Plain-first vocabularies (067-A) ─────────────────────────────────────────
-type ActionGroup = "Documents" | "Chat & agent" | "Organizing" | "API keys" | "Other"
-const GROUP_ORDER: readonly ActionGroup[] = ["Documents", "Chat & agent", "Organizing", "API keys", "Other"]
+type ActionGroup = "Documents" | "Chat & agent" | "Organizing" | "API keys" | "Webhooks" | "Other"
+const GROUP_ORDER: readonly ActionGroup[] = ["Documents", "Chat & agent", "Organizing", "API keys", "Webhooks", "Other"]
 
 /** The platform `audit_log` 19-action vocabulary (migs 030/071) → plain label + group.
  *  This is the ONLY place the raw code → plain-language mapping lives (067-A). */
@@ -92,12 +92,31 @@ const PLATFORM_ACTION_META: Record<string, { label: string; group: ActionGroup }
   "api_key.start": { label: "Started a run with an API key", group: "API keys" },
   "api_key.read": { label: "Read a run with an API key", group: "API keys" },
   "api_key.refused": { label: "Refused an API key call", group: "API keys" },
+  // Phase 308-06 (D-31): the nine webhook rows, worded — the SAME nine lines live in the other
+  // audit browser (OrgAuditTab.webhookWords.test.tsx fences the two as identical). The host shows beside.
+  "webhook.endpoint.created": { label: "Added a webhook endpoint", group: "Webhooks" },
+  "webhook.endpoint.updated": { label: "Changed a webhook endpoint", group: "Webhooks" },
+  "webhook.endpoint.deleted": { label: "Deleted a webhook endpoint", group: "Webhooks" },
+  "webhook.endpoint.enabled": { label: "Turned on a webhook endpoint", group: "Webhooks" },
+  "webhook.endpoint.disabled": { label: "Turned off a webhook endpoint", group: "Webhooks" },
+  "webhook.endpoint.secret_rolled": { label: "Rolled a webhook signing secret", group: "Webhooks" },
+  "webhook.endpoint.test_sent": { label: "Sent a webhook test", group: "Webhooks" },
+  "webhook.endpoint.delivery_resent": { label: "Resent a webhook delivery", group: "Webhooks" },
+  "webhook.endpoint.auto_disabled": { label: "Syrel turned off a webhook endpoint after repeated failures", group: "Webhooks" },
 }
 
 /** Prettify a platform `action_type` code for a row label; unknown codes fall back
  *  to the raw code (honest — never invents a label for a code we do not know). */
 function platformLabel(code: string): string {
   return PLATFORM_ACTION_META[code]?.label ?? code
+}
+
+/** 308-06 (D-31): a webhook row's host from metadata, as text, capped at 253 characters. Never a query
+ *  or a secret — neither is in the metadata. Null for every other row. */
+function webhookHost(code: string, metadata: Record<string, unknown> | null): string | null {
+  if (PLATFORM_ACTION_META[code]?.group !== "Webhooks") return null
+  const host = metadata?.host
+  return typeof host === "string" && host ? host.slice(0, 253) : null
 }
 
 /** Plain labels for the operator ledger's own action codes (the `flag.*.*` family is
@@ -734,6 +753,11 @@ export function AuditTab({
                 <span className="text-foreground">
                   {oauthAuditLabel(row.action_type, row.metadata) ?? platformLabel(row.action_type)}
                 </span>
+                {webhookHost(row.action_type, row.metadata) !== null && (
+                  <span className="min-w-0 truncate font-mono text-xs text-muted-foreground">
+                    {webhookHost(row.action_type, row.metadata)}
+                  </span>
+                )}
                 {showTechnical && (
                   <code className="flex-none rounded bg-muted/60 px-1 py-0.5 font-mono text-[10px] text-muted-foreground">
                     {row.action_type}

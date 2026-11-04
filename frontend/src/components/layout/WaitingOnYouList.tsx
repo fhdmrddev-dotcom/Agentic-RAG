@@ -9,6 +9,9 @@
  * ⛔ Rows are DropdownMenuItems (UI-D1). Radix Menu cancels Tab inside its content, so a plain
  *   button here could not be reached from the keyboard; a menu item is reached with arrow keys,
  *   Home/End and typeahead, and activates on Enter or Space.
+ * ⚠ 308-06 (D-19): a row may be a webhook endpoint Syrel turned off (`run_id` null): its glyph is
+ *   `Webhook`, its line says why and when it was turned off, and selecting it opens Settings →
+ *   Webhooks on that endpoint (`ctx.openWebhooks`). Never a run link, never a query string.
  * ⛔ Selecting a row calls `condition.onOpen()` (→ openRun(run_id)) and nothing else. It never
  *   changes the active org and never builds a URL: for a run in another org, 299's LinkGate asks
  *   Stay / Switch (D-08).
@@ -20,7 +23,7 @@
  *   closed list costs the shell nothing (T-301-22).
  */
 import { useEffect, useState } from "react"
-import { CircleCheck, MessageCircleQuestion } from "lucide-react"
+import { CircleCheck, MessageCircleQuestion, Webhook } from "lucide-react"
 
 import { DropdownMenuContent, DropdownMenuItem, DropdownMenuLabel } from "@/components/ui/dropdown-menu"
 import { SyrelLoader } from "@/components/ui/SyrelLoader"
@@ -32,8 +35,10 @@ import {
   WAITING_COPY,
   kindWords,
   moreLine,
+  offPhrase,
   orgInitial,
   originWords,
+  reasonWords,
   waitedPhrase,
 } from "./waitingVocabulary"
 
@@ -89,8 +94,11 @@ export function WaitingOnYouList({
     body = conditions.map((condition) => {
       const title = condition.title.trim() ? condition.title : WAITING_COPY.untitledWorkflow
       const orgName = condition.orgName.trim() ? condition.orgName : WAITING_COPY.unnamedOrg
-      const origin = originWords(condition.origin)
-      const Glyph = condition.kind === "approval" ? CircleCheck : MessageCircleQuestion
+      // 308-06 (D-19): a webhook Syrel turned off — its own glyph, why, and when it was turned off.
+      const isHook = condition.kind === "webhook_disabled"
+      const origin = isHook ? null : originWords(condition.origin)
+      const reason = isHook ? reasonWords(condition.reason) : null
+      const Glyph = isHook ? Webhook : condition.kind === "approval" ? CircleCheck : MessageCircleQuestion
       return (
         <DropdownMenuItem
           key={condition.id}
@@ -108,14 +116,22 @@ export function WaitingOnYouList({
             <Glyph className="!h-3.5 !w-3.5" />
           </span>
           <span className="min-w-0 flex-1">
-            <span className="block truncate font-semibold text-foreground">{title}</span>
+            <span className={cn("block truncate font-semibold text-foreground", condition.titleIsAddress && "font-mono text-xs")}>
+              {title}
+            </span>
             <span className="mt-1 flex flex-wrap items-center gap-x-1 text-xs leading-normal text-muted-foreground">
               <OrgAvatar size="xs" initial={orgInitial(condition.orgName)} />
               <span>{orgName}</span>
               <Sep />
               <span>{kindWords(condition.kind)}</span>
+              {reason && (
+                <>
+                  <Sep />
+                  <span>{reason}</span>
+                </>
+              )}
               <Sep />
-              <span>{waitedPhrase(condition.since, now)}</span>
+              <span>{isHook ? offPhrase(condition.since, now) : waitedPhrase(condition.since, now)}</span>
               {origin && (
                 <>
                   <Sep />

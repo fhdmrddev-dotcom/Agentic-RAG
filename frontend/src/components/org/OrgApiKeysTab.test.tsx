@@ -22,6 +22,10 @@ vi.mock("@/lib/api/apiKeys", async (importOriginal) => {
   return { ...actual, ...m }
 })
 
+// 308-06: the Webhooks section reads its own route and has its own suite (__tests__/OrgWebhooks.test.tsx);
+// stubbed here so this suite keeps pricing the KEYS list alone (its single status/alert/button queries).
+vi.mock("./OrgWebhooks", () => ({ OrgWebhooks: () => null }))
+
 import { OrgApiKeysTab } from "./OrgApiKeysTab"
 
 const LIMITS = { starts_per_minute: 10, reads_per_minute: 120, searches_per_minute: 30 }

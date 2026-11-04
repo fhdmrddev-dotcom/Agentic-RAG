@@ -11655,7 +11655,7 @@ cells rot within days.
 | [`backend/app/middleware/canvas_gate.py`](docs/HOT-FILE-LEDGER.md#backendappmiddlewarecanvas_gatepy) | 9 / 6 / 396 (was `8 / 5 / 391`) | **FIRES** | **289-03**: ONE CANVAS_GATED_PATHS member (`…/evidence`) + comment, same commit as its include_router. ⛔ test_182 never imports the set |
 | [`backend/app/models/thread.py`](docs/HOT-FILE-LEDGER.md#backendappmodelsthreadpy) | 26 / 18 / 566 (was `25 / 17 / 550`) | ⚠ **FIRES** | 306-04 (D-09/D-31): ThreadResponse.origin + one before-validator composing it via origin_for_wire (function-local import: circular otherwise). ⛔ no threads.py edit |
 | [`frontend/src/components/workflows/canvasModel.ts`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentsworkflowscanvasmodelts) | 16 / 8 / 836 (was `15 / 8 / 831`) | ⚠ **FIRES** | 296-07: comparePhaseOrder + engineArmed delegations (290-IN-01/FU); isGrounded is every cause except escalated (BUG-261021-05 b) |
-| [`frontend/src/components/layout/ChatLayout.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentslayoutchatlayouttsx) | 76 / 37 / 970 (was `75 / 37 / 954`) | ⚠ **FIRES** | honoured by construction (301-03: waitingStatus state + reportWaitingStatus in the one memoised ctx; one drawer WaitingOnYouControl mount). ⛔ one flatMap |
+| [`frontend/src/components/layout/ChatLayout.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentslayoutchatlayouttsx) | 77 / 38 / 978 (was `76 / 37 / 970`) | ⚠ **FIRES** | 308-06 (D-19, A-22): one useCallback openWebhooksForAttention (focus hint, Settings tab 8, onNavigate settings) in the memoised attention ctx (+10 −2). Never switches org. ⛔ see section |
 | [`frontend/src/components/library/LibraryCloudImport.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentslibrarylibrarycloudimporttsx) | 1 / 1 / 194 | no (new) | young (created 244-06). Row added AT CREATION. The Library's single-file cloud door — ⛔ it renders a REASON in every unavailable state; a silent grey-out is the same failure as a silent root write |
 | [`frontend/src/components/library/LibraryHeaderBar.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentslibrarylibraryheaderbartsx--row-added-244-04) | 5 / 4 / 262 (was `4 / 3 / 249`) | ⚠ **FIRES** | **284-03**: optional `totalState`: "Counting…" while loading, "Count not known yet" on failure, never "0 documents" before an answer; numbers grouped |
 | [`frontend/src/components/layout/ChatHistoryColumn.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentslayoutchathistorycolumntsx) | 10 / 4 / 535 (was `9 / 3 / 524`) | ⚠ **FIRES** | 306-04 (D-09): one conditional origin line inside renderRow's button after the title line (+2 imports). In-app row HTML pinned to base. No state, no effect |
@@ -11698,15 +11698,15 @@ cells rot within days.
 | [`frontend/src/components/panel/FilesSection.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentspanelfilessectiontsx) | 14 / 9 / 366 (was `12 / 8 / 354`) | ⚠ **FIRES** | 302-01: ONE GeneratedFilesGroup mount + the listbox wrapped in rows.length > 0 (+15 −6, not re-indented); workspace rows byte-identical. Honoured by construction |
 | [`frontend/src/lib/api.ts`](docs/HOT-FILE-LEDGER.md#frontendsrclibapits) | 215 / 128 / 556 (was `214 / 127 / 552`) | ⚠ **FIRES** | 299-03: one links export block (resolveLink + LinkKind / LinkTarget / LinkAnswer) beside the orgItems block. No other re-export changed |
 | [`frontend/src/types/index.ts`](docs/HOT-FILE-LEDGER.md#frontendsrctypesindexts) | 104 / 83 / 1690 (was `103 / 82 / 1688`) | ⚠ **FIRES** | 306-04: RunOrigin.kind gains mcp; Thread gains an optional origin (RunOrigin or null). Two type edits, additive. Seam still owed |
-| [`backend/app/main.py`](docs/HOT-FILE-LEDGER.md#backendappmainpy) | 100 / 74 / 1024 (was `99 / 73 / 1021`) | ⚠ **FIRES** | 305-01: one import, one register_mcp(app) beside the router block, one async with mcp_lifespan() around the single yield. Honoured by construction. ⛔ see section |
+| [`backend/app/main.py`](docs/HOT-FILE-LEDGER.md#backendappmainpy) | 101 / 75 / 1056 (was `100 / 74 / 1024`) | ⚠ **FIRES** | 308-04 (D-50): two include_router lines (webhooks.router, org_router), the WebhookDrainer start/stop in the lifespan (every worker, RUN_BOOT_SWEEPS), httpx logger at WARNING. ⛔ see section |
 | [`backend/app/config.py`](docs/HOT-FILE-LEDGER.md#backendappconfigpy) | 96 / 55 / 1831 (was `93 / 54 / 1809`) | ⚠ **FIRES** | 300-03 (D-28): five smtp_* env fields in the existing email block; provider comment none / resend / smtp; stale lazy-import sentence deleted. Honoured by construction |
 | [`backend/app/api/admin.py`](docs/HOT-FILE-LEDGER.md#backendappapiadminpy) | 45 / 18 / 2055 (was `44 / 17 / 2054`) | ⚠ **FIRES** | 304-04: one _FLAG_HUMAN_NAMES entry (mcp_enabled → "MCP access"); the operator flag rides PUT /admin/flags. Honoured by construction. ⛔ add still lands disabled |
 | [`backend/app/api/settings.py`](docs/HOT-FILE-LEDGER.md#backendappapisettingspy) | 53 / 29 / 1523 (was `51 / 28 / 1425`) | ⚠ **FIRES** | 306-02: four knobs in the allowlist, response, body and _build_response; one explicit `if not lo <= body.x <= hi` each (5..45, 1..50; D-36/D-35; mig 223 CHECKs agree) |
 | [`backend/app/services/multimodal_service.py`](docs/HOT-FILE-LEDGER.md#backendappservicesmultimodal_servicepy) | 14 / 7 / 984 | ⚠ **FIRES** | ⚠ absent from BOTH for its ENTIRE LIFE at **7 phases** — row added SEED-227, which is also where its silent truncation was found |
 | [`backend/app/api/documents.py`](docs/HOT-FILE-LEDGER.md#backendappapidocumentspy) | 101 / 40 / 2709 (was `99 / 39 / 2698`) | ⚠ **FIRES** | 298-01: list_documents one `org_lists.by_org` in build() (every read, D-32); upload one `org_id=root_upload_org(...)` on the ONE minter call. Honoured by construction. ⛔ see section |
-| [`scripts/vitest-count-gate.cjs`](docs/HOT-FILE-LEDGER.md#scriptsvitest-count-gatecjs) | 417 / 89 / 6986 (was `416 / 88 / 6956`) | ⚠ **FIRES** | 307-05: 13 first pins for the phase's suites (both knobs, FILE-LEVEL) and McpKeyFields raised 8 -> 12. ⛔ no pin lowered |
+| [`scripts/vitest-count-gate.cjs`](docs/HOT-FILE-LEDGER.md#scriptsvitest-count-gatecjs) | 419 / 90 / 7022 (was `417 / 89 / 6986`) | ⚠ **FIRES** | 308-05: 10 first pins for the Settings → Webhooks suites; 308-06: 4 more (OrgWebhooks, both webhookWords, webhookWaitingRow) — both knobs, FILE-LEVEL, counts from the gate's JSON. None lowered |
 | [`scripts/check-deploy-drift.sh`](docs/HOT-FILE-LEDGER.md#scriptscheck-deploy-driftsh) | 6 / 5 / 271 (was `5 / 4 / 267`) | ⚠ **FIRES** | 300-03 (D-28): the five SMTP_* vars registered in OMITTED_FROM_ONEBOX (commented in the one-box preset); email comment rewritten. No check changed |
-| [`scripts/build-public-openapi.cjs`](docs/HOT-FILE-LEDGER.md#scriptsbuild-public-openapicjs) | 13 / 7 / 473 (was `11 / 5 / 472`) | ⚠ **FIRES** | 301-01: `notifications` in the Account & org tag group + `/notifications` in FLAGGED_PREFIXES (UI-internal). Two tokens. ⚠ prior row stale |
+| [`scripts/build-public-openapi.cjs`](docs/HOT-FILE-LEDGER.md#scriptsbuild-public-openapicjs) | 14 / 8 / 475 (was `13 / 7 / 473`) | ⚠ **FIRES** | 308-04 (D-52): webhooks in the Account & org tag group; /webhooks and /org/webhooks in FLAGGED_PREFIXES (UI-internal, like /notifications) (+4 −2) |
 | [`scripts/check-seeds-register.cjs`](docs/HOT-FILE-LEDGER.md#scriptscheck-seeds-registercjs) | 7 / 3 / 1132 | ⚠ **FIRES** | ⚠ absent its ENTIRE LIFE — row added 296-05, now FIRES (251 / 293 / 296). 296-05: three `\d{3}` → `\d{3,}` (293-IN-07). ⛔ the STATUS_ENUM triple |
 | [`scripts/decision-fault-server.py`](docs/HOT-FILE-LEDGER.md#scriptsdecision-fault-serverpy) | 2 / 2 / 216 | no (young) | young (294 / 296). 296-05: `ok` answers a `choice` question with its first offered option (294-IN-03). ⛔ loopback only, never logs a body |
 | [`scripts/check-backend-unit-baseline.cjs`](docs/HOT-FILE-LEDGER.md#scriptscheck-backend-unit-baselinecjs) | 2 / 2 / 268 | no (young) | young (228 / 296). 296-05: no summary / a signal / exit ≥ 2 is `[GATE ERROR]`; a run with no `tests` path keeps `tests/unit` |
@@ -11773,7 +11773,7 @@ cells rot within days.
 | [`backend/app/services/connectors/grants.py`](docs/HOT-FILE-LEDGER.md#backendappservicesconnectorsgrantspy) | 1 / 1 / 92 | no (1 phase) | ⚠ absent — row added 221. It is THE grant-time gate: 92 L deciding every connector call |
 | [`frontend/src/components/settings/connectionsCopy.ts`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentssettingsconnectionscopyts) | 15 / 8 / 784 | ⚠ **FIRES** | no seam proposed — a vocabulary doing one thing many times is the right shape. ⚠ row was STALE at `13 / 7 / 737`. honoured by construction (**239-03**): one word, one union member. See §239-03 |
 | [`frontend/src/components/settings/connectionFormCopy.ts`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentssettingsconnectionformcopyts) | 19 / 8 / 1631 | ⚠ **FIRES** | ⚠ row STALE TWICE (`15 / 8 / 1216`, `17 / 8 / 1293`). ⛔ 239-05 named the seam — `configFromDraft`'s ARM SET; 239-07 RODE it: one serializer both arms call. See §239-07 |
-| [`frontend/src/pages/SettingsPage.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrcpagessettingspagetsx) | 64 / 31 / 1704 (was `63 / 31 / 1698`) | ⚠ **FIRES** | 300-REVIEW WR-05: handleSaveIntegrations reads emailSettingsRef.current?.invalid() first; a sentence → setError + return before the PUT. useState count unchanged (49) |
+| [`frontend/src/pages/SettingsPage.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrcpagessettingspagetsx) | 66 / 32 / 1709 (was `64 / 31 / 1704`) | ⚠ **FIRES** | 308-05 (D-28): one TabsTrigger + one TabsContent mounting WebhooksTab for tab 8, plus its import (+3 −0). ⛔ see section |
 | [`frontend/src/pages/settingsSearchPayload.ts`](docs/HOT-FILE-LEDGER.md#frontendsrcpagessettingssearchpayloadts) | 2 / 2 / 116 | no (2 phases) | Created by 242. Row added AT CREATION rather than at the third phase — an absent row makes G-5 absent forever, silently, at any count |
 | [`frontend/src/components/settings/SourceFileCeilingCard.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentssettingssourcefileceilingcardtsx) | 1 / 1 / 117 | no (1 phase) | young (239-10) — ⚠ a row minted at creation reads `1 / 1` forever unless RE-DERIVED. Owns no number and no sentence |
 | [`frontend/src/components/settings/sourceCeilingCopy.ts`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentssettingssourceceilingcopyts) | 1 / 1 / 109 | no (1 phase) | young (239-10) — the ONE number it owns (recommendation) is pinned to `user_settings.py` by a `?raw` test; the bounds are SERVED |
@@ -11792,7 +11792,7 @@ cells rot within days.
 | [`backend/app/models/connector.py`](docs/HOT-FILE-LEDGER.md#backendappmodelsconnectorpy) | 26 / 14 / 835 | ⚠ **FIRES** | ⚠ row was STALE at `24 / 13 / 772`. honoured by construction (**244-06**): a NEW request model, ⛔ no field added to an existing one — `folder_id: str` REQUIRED, so 422 fires before the handler |
 | [`backend/app/services/mcp_client.py`](docs/HOT-FILE-LEDGER.md#backendappservicesmcp_clientpy) | 9 / 6 / 526 | ⚠ **FIRES** | ⚠ row STALE TWICE (`4/2/407` reading `no`, then `7/5/480`). honoured by construction (**SEED-258**): the body cap is DERIVED, so no envelope knob exists to disagree |
 | [`backend/app/api/connectors.py`](docs/HOT-FILE-LEDGER.md#backendappapiconnectorspy) | 46 / 22 / 2166 (was `45 / 21 / 2162`) | ⚠ **FIRES** | **276-07**: honoured by construction, ONE literal (`client_name="Syrel"`) + a comment. ⛔ extraction still OWED |
-| [`backend/app/security/egress.py`](docs/HOT-FILE-LEDGER.md#backendappsecurityegresspy) | 14 / 6 / 991 (was `13 / 5 / 982`) | ⚠ **FIRES — EXACTLY AT THRESHOLD** | 307-02: the client_metadata capability (CIMD document fetch: public addresses, pinned DNS, no redirects, 16 KB). ⛔ test_190 amended on purpose; no new client |
+| [`backend/app/security/egress.py`](docs/HOT-FILE-LEDGER.md#backendappsecurityegresspy) | 15 / 7 / 994 (was `14 / 6 / 991`) | ⚠ **FIRES** | 308-02 (D-23): one closed `webhook` capability, _CALLER (the member's address), three dict entries; the shared guard (public addresses, pinned DNS, no redirects). test_190 unchanged |
 | [`backend/app/services/google/availability.py`](docs/HOT-FILE-LEDGER.md#backendappservicesgoogleavailabilitypy) | 0 / 0 / 277 | no (new) | young (221-02) — the per-application probe. ⚠ It imports `_http`'s parser and writes NO second one |
 | [`backend/app/services/google/writes.py`](docs/HOT-FILE-LEDGER.md#backendappservicesgooglewritespy) | 2 / 1 / 625 | no (1 phase) | ⚠ absent for its entire life — row added 221-02, which found `create_event` REFUSING every naive local time |
 | [`frontend/src/components/settings/applicationAvailability.ts`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentssettingsapplicationavailabilityts) | 0 / 0 / 152 | no (new) | young (221-02) — server decides the STATE, this decides the WORDS. It classifies nothing |
@@ -11897,7 +11897,7 @@ cells rot within days.
 | [`frontend/src/components/sources/runHistoryFold.ts`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentssourcesrunhistoryfoldts) | 1 / 1 / 125 | no (1 phase) | young (235) — the pure quiet-run fold; separating it is what proved the fence's collapsed-3/expanded-17 red was a FIXTURE defect |
 | [`frontend/src/components/sources/RunHistoryList.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentssourcesrunhistorylisttsx) | 5 / 3 / 275 (was `2 / 1 / 235`) | ⚠ **FIRES** | ⚠ now FIRES (3 phases). **285-01**: comment only + one vitest pin (a success row's run summary is never rendered, T-235-12). Extraction FIRST at the next feature phase |
 | [`frontend/src/components/layout/AttentionPopover.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentslayoutattentionpopovertsx) | 2 / 2 / 117 (was `1 / 1 / 109`) | no (2 phases) | 301-03 (D-26 / BUG-261029-01): Open Library health is a DropdownMenuItem (keyboard-reachable). ⛔ no verdict, no count, no repair control |
-| [`frontend/src/components/layout/attentionConditions.ts`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentslayoutattentionconditionsts) | 6 / 4 / 424 (was `5 / 3 / 424`) | ⚠ **FIRES** | 306-04 (D-31): one token — WaitingRun.origin gains mcp. ⛔ one useWaitingNotices( call |
+| [`frontend/src/components/layout/attentionConditions.ts`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentslayoutattentionconditionsts) | 7 / 5 / 451 (was `6 / 4 / 424`) | ⚠ **FIRES** | 308-06 (D-19, D-56): WaitingCondition widens (runId null, endpointId, reason, titleIsAddress), AttentionContext gains openWebhooks, ONE webhook_disabled arm; the run arm's lines unchanged |
 | [`frontend/src/components/library/SourcesAttentionSection.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentslibrarysourcesattentionsectiontsx) | 2 / 1 / 197 | no (1 phase) | young (235) — three separately-named honest states. ⛔ A DOOR, never a repair; no handler ⇒ no control |
 | [`frontend/src/hooks/useSourceAttention.ts`](docs/HOT-FILE-LEDGER.md#frontendsrchooksusesourceattentionts) | 2 / 1 / 131 | no (1 phase) | young (235) — ⛔ a consumer reading only `loading` + `stopped` will print an all-clear it never received. `verdictKnown` is the sixth field |
 | [`frontend/src/lib/libraryTabHandoff.ts`](docs/HOT-FILE-LEDGER.md#frontendsrcliblibrarytabhandoffts) | 1 / 1 / 59 | no (1 phase) | young (235-15) — the hand-off LIFETIME rule. ⛔ An intent consumed once, never a mode; a strict leaf with zero runtime imports, so it is tested without mounting anything |
@@ -11933,11 +11933,11 @@ cells rot within days.
 | [`frontend/src/components/chat/ActiveConnectorChips.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentschatactiveconnectorchipstsx) | 2 / 2 / 82 | no (2 phases) | ⚠ absent for its entire life — row added 244-05 at its SECOND phase. **244**: the row container HOISTED out; it is bare chips now, `null` on empty (D-244-26) |
 | [`frontend/src/stores/streamsStore.ts`](docs/HOT-FILE-LEDGER.md#frontendsrcstoresstreamsstorets) | 28 / 19 / 662 (was `27 / 18 / 660`) | ⚠ **FIRES** | 296-04 (287-TSC): the initializer is annotated `(): StreamsState`, so the TS2345 at :492 is gone. Type only · ⛔ |
 | [`frontend/src/lib/toolMeta.ts`](docs/HOT-FILE-LEDGER.md#frontendsrclibtoolmetats) | 12 / 8 / 367 (was `11 / 7 / 352`) | ⚠ **FIRES** | **273-05**: `stepLabel` (show_artifact phrase, every other tool byte-identical to `toolLabel`). ⛔ the ONE home of the activity string |
-| [`scripts/full-schema-supplement.sql`](docs/HOT-FILE-LEDGER.md#scriptsfull-schema-supplementsql) | 31 / 23 / 942 (was `30 / 22 / 927`) | ⚠ **FIRES** | 307-01: the migration 224 block (deny-all oauth tables, label index); the 220 column-grant line byte-unchanged. ⛔ regenerated, never hand-edited downstream |
+| [`scripts/full-schema-supplement.sql`](docs/HOT-FILE-LEDGER.md#scriptsfull-schema-supplementsql) | 32 / 24 / 975 (was `31 / 23 / 942`) | ⚠ **FIRES** | 308-01: the migration 225 block — four deny-all webhook tables, swallow-and-warn emit triggers, the notice and audit CHECK widenings (+33). Earlier blocks byte-unchanged. ⛔ see section |
 | [`scripts/check-schema-acl-parity.cjs`](docs/HOT-FILE-LEDGER.md#scriptscheck-schema-acl-paritycjs) | 4 / 2 / 1156 | no (2 phases) | ⚠ row STALE at `3/2/883` ONE PLAN LATER, same day — lines rot faster than phases. **253-03**: it finally READS `full-schema.sql` (`assertTailIdentity`); 29 → 35 self-test arms |
 | [`scripts/check-greenfield-privileges.py`](docs/HOT-FILE-LEDGER.md#scriptscheck-greenfield-privilegespy) | 2 / 1 / 1312 | no (1 phase) | ⚠ row STALE at `1/1/1157` the same day it was written. **253-03**: `_statements` replaces `line.find("--")`; ⛔ a SKIP is exit 2, never 0 |
 | [`.claude/hooks/schema-acl-parity-guard.js`](docs/HOT-FILE-LEDGER.md#claudehooksschema-acl-parity-guardjs) | 2 / 1 / 145 | no (1 phase) | young (created 253-02). Row added AT CREATION — `.claude/` is EXEMPT, so no gate can ever demand it. ⛔ its SILENCE reads as "clear": every path a payload can carry must be extracted |
-| [`.github/workflows/backend-tests.yml`](docs/HOT-FILE-LEDGER.md#githubworkflowsbackend-testsyml) | 4 / 2 / 84 | no (2 phases) | ⚠ absent for its ENTIRE LIFE — row added 253-03. `.github/` is EXEMPT. ⛔ its `paths:` decide which fences a change is measured by; two `scripts/` files were read by unit tests and matched by none |
+| [`.github/workflows/backend-tests.yml`](docs/HOT-FILE-LEDGER.md#githubworkflowsbackend-testsyml) | 7 / 3 / 118 (was `4 / 2 / 84`) | ⚠ **NOW FIRES** (308) | ⚠ now FIRES (308). 308-06: one `pip install -r requirements-dev.txt` after psycopg2 (D-54, the standardwebhooks verifier). `.github/` stays EXEMPT from the gate. ⛔ test-only deps never reach the image |
 | [`.claude/settings.json`](docs/HOT-FILE-LEDGER.md#claudesettingsjson) | 9 / 4 / 202 | ⚠ **FIRES** | ⚠ **absent from BOTH registers its ENTIRE LIFE at 4 phases — rows added 253-03.** `.claude/` is EXEMPT: no gate could ask. The ONE hook dispatch table; a too-narrow `matcher` fires NEVER, in silence |
 | [`backend/app/services/circuit_breaker.py`](docs/HOT-FILE-LEDGER.md#backendappservicescircuit_breakerpy) | 1 / 1 / 331 | no (1 phase) | ⚠ absent its ENTIRE LIFE — row added 256-02 at 256-01's touch, BELOW threshold. ⛔ the `max(0,…)` clamp stays on the RETURNED delta, or a reset box hands the DB a negative and SUBTRACTS real spend |
 | [`backend/app/services/task_service.py`](docs/HOT-FILE-LEDGER.md#backendappservicestask_servicepy) | 28 / 15 / 1038 (was `27 / 14 / 1023`) | **FIRES** | **292.1-REVIEW WR-02**: `_stream_one_iteration` runs the provider-blind `strip_markup` after the structured post-parse; never parses or runs text calls. +15 L |
@@ -12048,7 +12048,7 @@ cells rot within days.
 | [`backend/app/services/template_asset_service.py`](docs/HOT-FILE-LEDGER.md#backendappservicestemplate_asset_servicepy) | 5 / 4 / 379 (was `4 / 3 / 344`) | ⚠ **FIRES** | 295-02: Branch 2's WHERE moved verbatim into `_STAGED_TEMPLATE_WHERE`; one `has_staged_template` probe (+1 def, If 12→12). Honoured by construction |
 | [`backend/app/api/folders.py`](docs/HOT-FILE-LEDGER.md#backendappapifolderspy) | 17 / 11 / 298 (was `16 / 10 / 288`) | ⚠ **FIRES** | 298-01: list_folders + list_children pass `**org_lists.folder_kw(...)` — `{}` without an org, so byte-identical; fetch_visible_folders untouched (sha256-pinned). Honoured by construction. |
 | [`backend/app/api/kb.py`](docs/HOT-FILE-LEDGER.md#backendappapikbpy) | 14 / 9 / 515 (was `13 / 8 / 504`) | ⚠ **FIRES** | **275-02**: ls/tree/glob's 7 document reads gain `.eq(RETRIEVABLE_COLUMN, True)`. ⛔ `read_path` untouched (Library GET content shares it) |
-| [`backend/app/services/audit_service.py`](docs/HOT-FILE-LEDGER.md#backendappservicesaudit_servicepy) | 10 / 10 / 100 (was `9 / 9 / 98`) | ⚠ **FIRES** | 298-03: one lockstep literal `org.item.move` (mig 217), honoured by construction. ⛔ ⊆ the live CHECK (boot) · 275 / 293 touches: see its section |
+| [`backend/app/services/audit_service.py`](docs/HOT-FILE-LEDGER.md#backendappservicesaudit_servicepy) | 11 / 11 / 110 (was `10 / 10 / 100`) | ⚠ **FIRES** | 308-01 (D-31): nine webhook.endpoint.* literals in lockstep with migration 225's audit CHECK; the UI words live in AuditTab + OrgAuditTab (308-06). ⛔ ⊆ the live CHECK |
 | [`backend/app/services/document_relationship_service.py`](docs/HOT-FILE-LEDGER.md#backendappservicesdocument_relationship_servicepy) | 6 / 4 / 465 (was `5 / 3 / 457`) | ⚠ **FIRES** | honoured by construction — one default-False kwarg + one `.eq` per read leg, Library callers unchanged, source fence (row column, not a 2nd query) |
 | [`backend/app/services/retention/__init__.py`](docs/HOT-FILE-LEDGER.md#backendappservicesretention__init__py) | 1 / 1 / 6 | no (young) | young (created 275-01). Package docstring only. Row added AT CREATION |
 | [`backend/app/services/retention/hold_guard.py`](docs/HOT-FILE-LEDGER.md#backendappservicesretentionhold_guardpy) | 1 / 1 / 319 | no (young) | young (275-01). The ONE Python hold check (D-32): folders FIRST (B-1); PT409→one 409; a member never sees a matter. ⛔ call sites add a line |
@@ -12120,10 +12120,10 @@ cells rot within days.
 | [`frontend/src/setupTests.ts`](docs/HOT-FILE-LEDGER.md#frontendsrcsetupteststs) | 5 / 4 / 21 (was `3 / 2 / 12`) | no (2 phases) | 298-05: + afterEach(resetElsewhereCounts) — the org-items store is a module singleton; it loads its client lazily so this import caches nothing a suite mocks |
 | [`frontend/src/stores/askDraftStore.ts`](docs/HOT-FILE-LEDGER.md#frontendsrcstoresaskdraftstorets) | 2 / 2 / 136 (was `1 / 1 / 128`) | no (2 phases) | 295-06: one optional field `folderId` + one action `setFolder`; EMPTY_DRAFT, markSettled, clearDraft unchanged. Two phases; does not fire |
 | [`frontend/src/components/metadata/DocumentChunksSection.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentsmetadatadocumentchunkssectiontsx) | 4 / 3 / 265 (was `2 / 2 / 161`) | ⚠ **FIRES** | ⚠ now FIRES (3 phases). **284-03**: chunks page by scroll sentinel (200 at a time, `IntersectionObserver`, root = the bounded region); header = exact total. ⛔ no overscroll; one Tab stop |
-| [`frontend/src/components/settings/settingsTabs.ts`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentssettingssettingstabsts) | 3 / 2 / 126 (was `2 / 1 / 123`) | no (1 phase) | young (created 283-01; 283-02 added Preferences "6" + the first-visible fallback). ONE home of tab id / audience / order / fallback; labels stay literal JSX · 293 touch: see §Phase 293 close |
+| [`frontend/src/components/settings/settingsTabs.ts`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentssettingssettingstabsts) | 5 / 3 / 143 (was `3 / 2 / 126`) | ⚠ **NOW FIRES** (308) | ⚠ now FIRES (308). 308-05 (D-28): one registry entry { id: "8", audience: everyone, name: Webhooks }, last after API keys. ⛔ ids are never reused |
 | [`frontend/src/components/settings/AuditLogSection.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentssettingsauditlogsectiontsx) | 1 / 1 / 221 (was `0 / 0 / 0`) | no (1 phase) | young (created 283-01). Row added AT CREATION. The Audit Log tab body, moved verbatim out of `SettingsPage.tsx`; imports the `@/lib/api` barrel |
 | [`frontend/src/components/settings/PreferencesSection.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentssettingspreferencessectiontsx) | 2 / 2 / 43 (was `1 / 1 / 39`) | no (2 phases) | 300-05: one `<EmailNotificationPreference />` mount after the default chat model (+4). ⛔ calls no gated endpoint |
-| [`frontend/src/landing/facts.ts`](docs/HOT-FILE-LEDGER.md#frontendsrclandingfactsts) | 8 / 4 / 546 (was `6 / 3 / 546`) | ⚠ **NOW FIRES** (3 phases) | 288-02: Pause stage `what` string corrected (one string, length unchanged) · 293 touch: see §Phase 293 close |
+| [`frontend/src/landing/facts.ts`](docs/HOT-FILE-LEDGER.md#frontendsrclandingfactsts) | 9 / 5 / 546 (was `8 / 4 / 546`) | ⚠ **FIRES** | 308-05: "Webhooks" appended to SURFACE_TABS.settings (the landing-drift gate reads the literal strip); data only |
 | [`backend/app/api/document_views.py`](docs/HOT-FILE-LEDGER.md#backendappapidocument_viewspy) | 13 / 6 / 323 (was `11 / 5 / 300`) | ⚠ **FIRES** | ⚠ FIRES (6 phases). **284-04**: both resolve routes page (`offset`/`limit` ≤ 200/`include_archived`) via `resolve_filter(via_view=True)`; honoured by construction. ⛔ 404-not-403 gate |
 | [`backend/app/api/library.py`](docs/HOT-FILE-LEDGER.md#backendappapilibrarypy) | 3 / 3 / 304 (was `2 / 2 / 299`) | ⚠ **FIRES** | ⚠ now FIRES (298). 298-01: LIBRARY_SUMMARY_SQL `AND ($1::uuid IS NULL OR org_id = $1)` + one bind — the same predicate as GET /documents (D-32). NULL = today's scan. |
 | [`frontend/src/components/ingestion/FolderDetail.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentsingestionfolderdetailtsx) | 4 / 3 / 83 (was `3 / 2 / 59`) | ⚠ **FIRES** | ⚠ now FIRES (3 phases). **284-01**: number props (`count`, `sizeBytes`, load state): `…` while loading, ONE "Count not known yet" on failure (UI-SPEC S5). Layout unchanged |
@@ -12202,7 +12202,7 @@ cells rot within days.
 | [`frontend/src/components/settings/AgentRoundLimits.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentssettingsagentroundlimitstsx) | 3 / 1 / 220 (was `2 / 1 / 243`) | no (young) | 292.1 UAT: no own Save; exposes `changes()` / `adopt()` via ref; still owns its read (WR-05 lock kept). ⛔ never sends 0 |
 | [`frontend/src/lib/continueWords.ts`](docs/HOT-FILE-LEDGER.md#frontendsrclibcontinuewordsts) | 1 / 1 / 46 (was `0 / 0 / 0`) | no (young) | young (created 292.1-03) · client hint mirror of the backend continue words + shouldTryTypedContinue. ⛔ the server decides; ?raw lockstep fence |
 | [`backend/app/security/api_key_auth.py`](docs/HOT-FILE-LEDGER.md#backendappsecurityapi_key_authpy) | 8 / 4 / 520 (was `7 / 3 / 432`) | ⚠ **FIRES** | 307-01: authenticate_presented_access_token + _admit (one admission tail), _liveness, grant_still_live_for_refresh (D-48). ⛔ principal_still_allowed called once, in _liveness |
-| [`backend/app/services/rate_limit.py`](docs/HOT-FILE-LEDGER.md#backendappservicesrate_limitpy) | 8 / 5 / 228 (was `7 / 4 / 187`) | ⚠ **FIRES** | 307-02: four OAuth door buckets (register, authorize, token, revoke) as door-wide ceilings; Kind widened. ⛔ no process-local state; SEED-397 deferred (per-caller IPs) |
+| [`backend/app/services/rate_limit.py`](docs/HOT-FILE-LEDGER.md#backendappservicesrate_limitpy) | 9 / 6 / 273 (was `8 / 5 / 228`) | ⚠ **FIRES** | 308-04 (D-21/D-29): per-member webhook_test (5/min) and webhook_resend (20/min) buckets on the shared Redis window; 429 {code, message}, 503 when it cannot count. ⛔ module constants, no env |
 | [`backend/app/db/api_keys.py`](docs/HOT-FILE-LEDGER.md#backendappdbapi_keyspy) | 8 / 4 / 465 (was `6 / 3 / 383`) | ⚠ **FIRES** | 307-01: oauth_client_id in _AUTH_COLUMNS; key lists exclude grants. 307-05: list_grants_for_user/org, revoke_all_grants_in_org, revoke read-back grant facts. ⛔ owner predicate everywhere |
 | [`backend/app/models/api_key.py`](docs/HOT-FILE-LEDGER.md#backendappmodelsapi_keypy) | 7 / 5 / 323 (was `6 / 4 / 279`) | ⚠ **FIRES** | 307-05: McpAvailability.oauth (D-15); ConnectedApp, ConnectedAppList, OrgConnectedApp, OrgConnectedAppList, RevokeAllResult (additive). ⛔ no secret/key_hash field |
 | [`backend/app/services/inbound_inputs.py`](docs/HOT-FILE-LEDGER.md#backendappservicesinbound_inputspy) | 10 / 4 / 362 (was `9 / 3 / 352`) | ⚠ **FIRES** | 306-03 (D-03/D-32): keyword source + notice on wrap_untrusted_input (defaults = 293 shape) + ASK_NOTICE. ⛔ pure; _ENVELOPE_RE parses only the 293 shape |
@@ -12227,13 +12227,13 @@ cells rot within days.
 | [`frontend/src/components/settings/apiKeys/RevokeApiKeySheet.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentssettingsapikeysrevokeapikeysheettsx) | 2 / 2 / 205 (was `1 / 1 / 164`) | no (2 phases) | 304-05: MCP facts (Can use {preset or N tools} on {folders}), Not used yet, MCP kept sentence; 304-06 passes the catalogue from the admin list. ⛔ never optimistic |
 | [`frontend/src/components/settings/ApiKeyLimits.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentssettingsapikeylimitstsx) | 3 / 3 / 320 (was `2 / 2 / 245`) | ⚠ **FIRES** | ⚠ now FIRES (306). 306-02: second group 'Questions and runs from outside' (ask wait 5..45 + three in-flight 1..50), same load/changes/adopt rules. ⛔ shipped rows unchanged; extraction FIRST next |
 | [`frontend/src/components/org/orgAdminTabs.ts`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentsorgorgadmintabsts) | 2 / 1 / 59 (was `0 / 0 / 0`) | no (young) | young (planned 293-04). MOVED OrgAdminTab / TabDef / TABS out of OrgAdminShell (extract FIRST). ⛔ no React (react-refresh rule) |
-| [`frontend/src/components/org/OrgApiKeysTab.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentsorgorgapikeystabtsx) | 3 / 3 / 150 (was `2 / 2 / 148`) | ⚠ **FIRES** | ⚠ now FIRES (307). 307-05: one OrgConnectedApps mount between the header card and the key list, gated on mcp.oauth. ⛔ one import + one element |
+| [`frontend/src/components/org/OrgApiKeysTab.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentsorgorgapikeystabtsx) | 4 / 4 / 152 (was `3 / 3 / 150`) | ⚠ **FIRES** | 308-06 (D-30, P-1): one <OrgWebhooks orgName onRecorded /> directly after OrgConnectedApps + its import (+2 −0); no feature gate. Its suite stubs the section. ⛔ see section |
 | [`frontend/src/components/workflows/RunOriginLine.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentsworkflowsrunoriginlinetsx) | 2 / 2 / 38 (was `1 / 1 / 32`) | no (young) | 306-04 (D-31): ICONS.mcp = Bot; if (!Icon) return null; outer span min-w-0 max-w-full + title, sentence in an inner truncate span. ⛔ leaf: no API import, no hook |
 | [`frontend/src/components/workflows/runOriginVocabulary.ts`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentsworkflowsrunoriginvocabularyts) | 2 / 2 / 35 (was `1 / 1 / 33`) | no (young) | 306-04 (D-09): one case mcp — Started by AI tool key {label} / Started by an AI tool. ⛔ never returns app/manual for NULL |
 | [`frontend/src/components/workflows/history/runLogRow.ts`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentsworkflowshistoryrunlogrowts) | 2 / 1 / 143 (was `1 / 1 / 138`) | no (young) | absent its ENTIRE LIFE (created 200) — row added 293. 293-03: origin as the LAST atom. ⛔ pure; unmeasured duration stays unsaid |
 | [`frontend/src/components/workflows/library/automationFacts.ts`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentsworkflowslibraryautomationfactsts) | 2 / 2 / 132 (was `1 / 1 / 95`) | no (young) | absent its ENTIRE LIFE (created 204.1) — row added 293. 293-03: next from server next_run_at. ⛔ spells no string; never computes |
-| [`frontend/src/components/admin/AuditTab.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentsadminaudittabtsx) | 9 / 6 / 778 (was `8 / 5 / 771`) | ⚠ **FIRES** | 307-05: platform rows read oauthAuditLabel (credential oauth) before the 293 label; two operator labels for the allowlist actions. ⛔ the api_key.* literal map unchanged |
-| [`frontend/src/components/org/OrgAuditTab.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentsorgorgaudittabtsx) | 8 / 7 / 430 (was `7 / 6 / 427`) | ⚠ **FIRES** | 307-05: rowLabel reads oauthAuditLabel before the action label (the SAME helper AuditTab reads). ⛔ literal map unchanged; shared vocabulary started |
+| [`frontend/src/components/admin/AuditTab.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentsadminaudittabtsx) | 10 / 7 / 802 (was `9 / 6 / 778`) | ⚠ **FIRES** | 308-06 (D-31): nine webhook.endpoint.* labels in a new Webhooks filter group (lockstep with OrgAuditTab) and the row's metadata host as mono text, capped at 253. ⛔ labels data only |
+| [`frontend/src/components/org/OrgAuditTab.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentsorgorgaudittabtsx) | 9 / 8 / 452 (was `8 / 7 / 430`) | ⚠ **FIRES** | 308-06 (D-31): the same nine webhook.endpoint.* labels in a Webhooks group as AuditTab (fenced identical) and the metadata host as mono text, capped at 253 |
 | [`frontend/src/hooks/useAppNavigation.ts`](docs/HOT-FILE-LEDGER.md#frontendsrchooksuseappnavigationts) | 12 / 4 / 495 (was `11 / 3 / 494`) | ⚠ **FIRES** | 307-03 (outside its plan, Rule 3): one condition so a connect route falls back to the chat view (TS2322 fix). ⛔ nothing else |
 | [`frontend/src/components/layout/AppViewSwitch.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentslayoutappviewswitchtsx) | 8 / 3 / 609 (was `7 / 2 / 600`) | ⚠ **FIRES** | ⚠ now FIRES (301) · 301-03: the non-chat hamburger dot (ChatArea's span copied byte for byte; `relative` on the button). ⛔ no hooks; one run comparison; fallback last |
 | [`frontend/src/lib/appRoutes.ts`](docs/HOT-FILE-LEDGER.md#frontendsrclibapproutests) | 4 / 4 / 234 (was `3 / 3 / 228`) | ⚠ **FIRES** | 307-03: one connect/<strict lowercase UUID> arm in viewOf / formatAppRoute. ⛔ strict leaf; ActiveView union untouched |
@@ -12285,19 +12285,19 @@ cells rot within days.
 | [`frontend/src/components/org/InvitationsTab.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentsorginvitationstabtsx) | 4 / 3 / 310 (was `3 / 2 / 290`) | ⚠ **FIRES** | ⚠ now FIRES (300). 300-05: Email not sent chip (shipped StatusChip, muted) + resend failure line (D-11). ⛔ server truth on re-fetch, no optimistic flip |
 | [`frontend/src/components/org/InviteMemberDialog.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentsorginvitememberdialogtsx) | 5 / 3 / 326 (was `4 / 3 / 316`) | ⚠ **FIRES** | 300-REVIEW IN-01: one useState (toTestAddress) reset on open; a sent-to-test arm before the sent arm, words from inviteDeliveryCopy. The three shipped arms unchanged |
 | [`frontend/src/lib/api/schedules.ts`](docs/HOT-FILE-LEDGER.md#frontendsrclibapischedulests) | 3 / 3 / 166 (was `2 / 2 / 129`) | ⚠ **FIRES** | 300-01: ScheduleRefusalError (an ApiError) for {detail:{code,message,missing}}; string + array arms unchanged. ⛔ not re-exported via lib/api.ts |
-| [`backend/app/db/notifications.py`](docs/HOT-FILE-LEDGER.md#backendappdbnotificationspy) | 3 / 2 / 384 (was `1 / 1 / 326`) | no (2 phases) | 301-01: list_open_notices for GET /notifications (one pool read across member orgs). ⛔ never selects prompt text; state flip inside the claim txn |
+| [`backend/app/db/notifications.py`](docs/HOT-FILE-LEDGER.md#backendappdbnotificationspy) | 5 / 3 / 414 (was `3 / 2 / 384`) | ⚠ **NOW FIRES** (308) | ⚠ now FIRES (308). 308-01: list_open_notices + the count read webhook_disabled notices (owner + membership scoped) beside run notices, waited-longest first. ⛔ one ordering, one cap |
 | [`backend/app/services/notification_drainer.py`](docs/HOT-FILE-LEDGER.md#backendappservicesnotificationdrainerpy) | 1 / 1 / 208 (was `0 / 0 / 0`) | no (young) | young (created 300-04). Per-worker outbox drainer, SchedulerService shape (D-20). ⛔ send outside the claim txn; at most 3 attempts; SMTP at-most-once |
 | [`backend/app/services/run_waiting_email.py`](docs/HOT-FILE-LEDGER.md#backendappservicesrunwaitingemailpy) | 1 / 1 / 115 (was `0 / 0 / 0`) | no (young) | young (created 300-03). Pure run-waiting renderer + duration words (NOTE-03, D-02..D-06). ⛔ never accepts prompt text; subject control chars stripped |
 | [`frontend/src/components/workflows/scheduleOutcomeVocabulary.ts`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentsworkflowsscheduleoutcomevocabularyts) | 1 / 1 / 67 | no (young) | young (created 300-01). last_status → one sentence (D-15, D-26). ⛔ zero-import leaf; no raw status token reaches the screen |
 | [`frontend/src/components/settings/EmailSettings.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentssettingsemailsettingstsx) | 1 / 1 / 324 (was `0 / 0 / 0`) | no (1 phase) | young (created 300-05). Operator Email card, ApiKeyLimits shape (D-07, D-08, D-10). ⛔ changes()/adopt() handle, no own Save; never sends a cleared delay or an invalid address |
 | [`frontend/src/components/settings/EmailNotificationPreference.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentssettingsemailnotificationpreferencetsx) | 1 / 1 / 155 (was `0 / 0 / 0`) | no (1 phase) | young (created 300-05). Member switch (D-09). ⛔ calls only ungated /me/preferences; never shows On before the read answers |
 | [`frontend/src/components/org/inviteDeliveryCopy.ts`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentsorginvitedeliverycopyts) | 1 / 1 / 32 (was `0 / 0 / 0`) | no (1 phase) | young (created 300-05). Invite delivery sentences (D-11, UI-D12). ⛔ zero-import leaf; D-11 sentence verbatim |
-| [`backend/app/api/notifications.py`](docs/HOT-FILE-LEDGER.md#backendappapinotificationspy) | 2 / 2 / 107 (was `1 / 1 / 107`) | no (young) | 306-04 (D-31): WaitingNotice.origin Literal gains mcp (an MCP-started run's notice validates; no 500). ⛔ pool + $1 caller; no X-Org-Id; 401 router-level |
-| [`frontend/src/lib/api/notifications.ts`](docs/HOT-FILE-LEDGER.md#frontendsrclibapinotificationsts) | 2 / 2 / 51 (was `1 / 1 / 51`) | no (young) | 306-04 (D-31): one token — the origin union gains mcp. ⛔ kept out of the @/lib/api barrel |
+| [`backend/app/api/notifications.py`](docs/HOT-FILE-LEDGER.md#backendappapinotificationspy) | 3 / 3 / 130 (was `2 / 2 / 107`) | ⚠ **NOW FIRES** (308) | ⚠ now FIRES (308). 308-01: the notice widens to webhook_disabled (run_id null, endpoint_id, reason, title, title_is_address); a run notice omits those keys, so it serialises as before |
+| [`frontend/src/lib/api/notifications.ts`](docs/HOT-FILE-LEDGER.md#frontendsrclibapinotificationsts) | 3 / 3 / 75 (was `2 / 2 / 51`) | ⚠ **NOW FIRES** (308) | ⚠ now FIRES (308). 308-06 (D-56): WaitingNotice becomes RunWaitingNotice or WebhookWaitingNotice (run_id null, endpoint_id, reason, title, title_is_address) with its one consumer. Types only |
 | [`frontend/src/hooks/useWaitingNotices.ts`](docs/HOT-FILE-LEDGER.md#frontendsrchooksusewaitingnoticests) | 1 / 1 / 211 (was `0 / 0 / 0`) | no (young) | young (created 301-02). Fetch is truth, Realtime a hint (D-17, D-18, D-33). ⛔ never reads the payload; one call site (D-14) |
-| [`frontend/src/components/layout/waitingVocabulary.ts`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentslayoutwaitingvocabularyts) | 2 / 2 / 80 (was `1 / 1 / 79`) | no (young) | 306-04 (§Surface 8): originWords("mcp") -> started by an AI tool; app and absent stay null. ⛔ zero-import leaf; no raw wire word reaches the screen |
-| [`frontend/src/components/layout/WaitingOnYouControl.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentslayoutwaitingonyoucontroltsx) | 1 / 1 / 135 (was `0 / 0 / 0`) | no (young) | young (created 301-03). Rail control + drawer row (D-01, D-02, D-03). ⛔ presentational: no fetch, no supabase; never switchOrg; pill = answered total > 0 only |
-| [`frontend/src/components/layout/WaitingOnYouList.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentslayoutwaitingonyoulisttsx) | 1 / 1 / 157 (was `0 / 0 / 0`) | no (young) | young (created 301-03). Rows as DropdownMenuItems (D-05..D-10, D-29). ⛔ no dismiss / mark-read; onSelect → onOpen only; minute tick only while open |
+| [`frontend/src/components/layout/waitingVocabulary.ts`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentslayoutwaitingvocabularyts) | 3 / 3 / 106 (was `2 / 2 / 80`) | ⚠ **NOW FIRES** (308) | ⚠ now FIRES (308). 308-06: kindWords webhook_disabled, reasonWords, offPhrase, countSentence's optional anyNonRun (things) — the one-argument call is unchanged. ⛔ still a zero-import leaf |
+| [`frontend/src/components/layout/WaitingOnYouControl.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentslayoutwaitingonyoucontroltsx) | 2 / 2 / 135 (was `1 / 1 / 135`) | no (2 phases) | 308-06: one argument — countSentence gets anyNonRun when any row is webhook_disabled (A-21), its only caller. Not in the plan's files_modified (deviation, recorded) |
+| [`frontend/src/components/layout/WaitingOnYouList.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentslayoutwaitingonyoulisttsx) | 2 / 2 / 173 (was `1 / 1 / 157`) | no (2 phases) | 308-06 (D-19): a webhook row — Webhook glyph in the shipped tile, mono title when it is an address, line 2 org · webhook turned off · reason · turned off N ago. ⛔ no run link, no query |
 | [`frontend/src/components/org/OrgIdentity.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentsorgorgidentitytsx) | 2 / 2 / 99 (was `1 / 1 / 94`) | no (2 phases) | 301-03: one optional size "xs" on OrgAvatar (UI-D4). ⛔ default output byte-identical |
 | [`frontend/src/components/panel/generatedFiles.ts`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentspanelgeneratedfilests) | 1 / 1 / 58 | no (young) | young (created 302-01, FIX-01). Pure fold of messages' finalOutputFiles into one row per name, newest turn wins (D-22, UI-D3). ⛔ never re-parses tool_calls; no fetch |
 | [`frontend/src/components/panel/useThreadFiles.ts`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentspanelusethreadfilests) | 1 / 1 / 28 | no (young) | young (created 302-01, FIX-01). workspace + generated + ONE count for the panel (D-22, UI-D6). ⛔ reads the chat's own messages via useThreadMessages; no second storage path |
@@ -12338,7 +12338,7 @@ cells rot within days.
 | [`backend/app/mcp/limits.py`](docs/HOT-FILE-LEDGER.md#backendappmcplimitspy) | 2 / 2 / 47 (was `1 / 1 / 43`) | no (young) | 306-04 (D-14): _KIND start -> start; STARTS_SENTENCE; reason rate_limited:start; one sentence table. ⛔ fail closed; a relayable tool error, never an HTTP 429 |
 | [`backend/app/services/usage_sink.py`](docs/HOT-FILE-LEDGER.md#backendappservicesusage_sinkpy) | 1 / 1 / 64 (was `0 / 0 / 0`) | no (young) | young (created 305-03, D-55): ContextVar collector; record() is a no-op outside collecting() and never raises; A4 proven. ⛔ LEAF — imports nothing from app. |
 | [`backend/app/db/mcp_usage.py`](docs/HOT-FILE-LEDGER.md#backendappdbmcp_usagepy) | 1 / 1 / 48 (was `0 / 0 / 0`) | no (young) | young (created 305-03, D-55): insert_usage, the ONLY writer of mcp_usage, one bound INSERT ... RETURNING id. ⛔ org explicit on every row (the service-role pool is BYPASSRLS) |
-| [`backend/app/services/outbound_guard.py`](docs/HOT-FILE-LEDGER.md#backendappservicesoutbound_guardpy) | 2 / 1 / 147 (was `0 / 0 / 0`) | no (young) | young (created 305-04, D-32/D-35/D-56): the one outbound choke point; RedactableText walker, overlap window, 2 s deadline. ⛔ raise/deadline -> WITHHELD; unreadable switch -> redact |
+| [`backend/app/services/outbound_guard.py`](docs/HOT-FILE-LEDGER.md#backendappservicesoutbound_guardpy) | 4 / 2 / 207 (was `2 / 1 / 147`) | no (2 phases) | 308-02 (D-41): one textless_ok opt-in — a model text-free BY TYPE passes through the same walk; MCP never sets it. ⛔ a dict/tuple/set anywhere in the tree is still WITHHELD |
 | [`backend/app/services/pii_redactor.py`](docs/HOT-FILE-LEDGER.md#backendappservicespii_redactorpy) | 3 / 1 / 362 (was `0 / 0 / 0`) | no (young) | young (created 305-04, D-33/D-56): deterministic recognizers, tightened twice to the measured corpus FPs (D-38). ⛔ linear, bounded input; names not covered; no dependency |
 | [`backend/app/db/outbound_policy.py`](docs/HOT-FILE-LEDGER.md#backendappdboutbound_policypy) | 1 / 1 / 43 (was `0 / 0 / 0`) | no (young) | young (created 305-04, D-36/D-56): read/set organizations.pii_redaction_enabled, live every call. ⛔ org explicit; the route writes the audit row, never this module |
 | [`frontend/src/components/library/DocumentCantBeOpened.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentslibrarydocumentcantbeopenedtsx) | 1 / 1 / 58 (was `0 / 0 / 0`) | no (young) | young (created 305-02, D-52): in-page notice for a by-id open that answered 404. ⛔ words from CANT_BE_OPENED_COPY; never role=alert; kind-only words |
@@ -12376,27 +12376,27 @@ cells rot within days.
 | [`frontend/devRouting.ts`](docs/HOT-FILE-LEDGER.md#frontenddevroutingts) | 2 / 2 / 47 (was absent) | no (2 phases) | absent until 307-05. 307-04: pure devHeadersFor beside rewriteDevUrl (the consent route's headers in dev). ⛔ pure; mirrors vercel.json and nginx |
 | [`frontend/vercel.json`](docs/HOT-FILE-LEDGER.md#frontendverceljson) | 6 / 5 / 141 (was absent) | ⚠ **FIRES** | ⚠ FIRES, absent until 307-05. 307-04: a headers block for /app/connect/ (frame-ancestors none, DENY, no-referrer); no .well-known entry. ⛔ filesystem beats rewrites |
 | [`frontend/vite.config.ts`](docs/HOT-FILE-LEDGER.md#frontendviteconfigts) | 10 / 4 / 100 (was absent) | ⚠ **FIRES** | ⚠ FIRES, absent until 307-05. 307-04: the dev server applies devHeadersFor (consent anti-framing) beside rewriteDevUrl. ⛔ dev routing mirrors Vercel and nginx |
-| [`backend/app/db/webhooks.py`](docs/HOT-FILE-LEDGER.md#backendappdbwebhookspy) | 0 / 0 / 0 | no (young) | young (planned 308-01): endpoint CRUD (owner predicate in every statement), log reads, test and resend writes, the shared attempt insert. ⛔ ciphertext read only via _SIGNING_COLUMNS; no body column |
-| [`backend/app/services/webhook_urls.py`](docs/HOT-FILE-LEDGER.md#backendappserviceswebhook_urlspy) | 0 / 0 / 0 | no (young) | young (planned 308-02): D-46 URL rules (https, no userinfo, no fragment, <= 2048), host, admin host + path with 16+ char segments masked (D-51). ⛔ pure; never logs a URL |
-| [`backend/app/services/webhook_signer.py`](docs/HOT-FILE-LEDGER.md#backendappserviceswebhook_signerpy) | 0 / 0 / 0 | no (young) | young (planned 308-02): whsec_ secrets, the Standard Webhooks v1 HMAC, per-attempt headers with the overlap signature (D-11, D-13). ⛔ pure stdlib; a secret is never logged |
-| [`backend/app/services/webhook_sender.py`](docs/HOT-FILE-LEDGER.md#backendappserviceswebhook_senderpy) | 0 / 0 / 0 | no (young) | young (planned 308-02): one POST via egress.send_pinned_http('webhook'), latency around it, the outcome classification table. ⛔ no HTTP client of its own; response body and headers discarded |
-| [`backend/app/models/webhook.py`](docs/HOT-FILE-LEDGER.md#backendappmodelswebhookpy) | 0 / 0 / 0 | no (young) | young (planned 308-02 / 308-04): typed text-free payload models (D-41) and the route request and response models. ⛔ no payload field may carry a person's words; no read model carries a secret |
-| [`backend/app/db/webhook_outbox.py`](docs/HOT-FILE-LEDGER.md#backendappdbwebhook_outboxpy) | 0 / 0 / 0 | no (young) | young (planned 308-03): fan-out claim, SKIP LOCKED send claim, lease renew, guarded record, one auto-disable winner, notice, purge. ⛔ record only on a 'sending' row; no HTTP in a transaction |
-| [`backend/app/services/webhook_drainer.py`](docs/HOT-FILE-LEDGER.md#backendappserviceswebhook_drainerpy) | 0 / 0 / 0 | no (young) | young (planned 308-03): the per-worker fan-out, send and hourly purge loop (D-10, D-44). ⛔ logs ids only; one liveness predicate; one acting connection per (owner, org) |
-| [`backend/app/api/webhooks.py`](docs/HOT-FILE-LEDGER.md#backendappapiwebhookspy) | 0 / 0 / 0 | no (young) | young (planned 308-04): member /webhooks and admin /org/webhooks routes, test, roll, resend. ⛔ 404 for another member's row; save-time egress check off-loop; secret only in create and roll answers |
-| [`frontend/src/lib/api/webhooks.ts`](docs/HOT-FILE-LEDGER.md#frontendsrclibapiwebhooksts) | 0 / 0 / 0 | no (young) | young (planned 308-05): member and admin client calls, readWebhookFailure for {code, message}. ⛔ not re-exported from lib/api.ts; the secret is returned and kept nowhere |
-| [`frontend/src/components/settings/webhooks/webhooksCopy.ts`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentssettingswebhookswebhookscopyts) | 0 / 0 / 0 | no (young) | young (planned 308-05): every Webhooks tab and admin string (UI-SPEC Copywriting). ⛔ imports nothing; fillCopy comes from apiKeysCopy |
-| [`frontend/src/components/settings/webhooks/webhookFacts.ts`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentssettingswebhookswebhookfactsts) | 0 / 0 / 0 | no (young) | young (planned 308-05): status tag, display address (query values masked), delivery words, latency, test verdict. ⛔ pure |
-| [`frontend/src/components/settings/webhooks/webhookSnippets.ts`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentssettingswebhookswebhooksnippetsts) | 0 / 0 / 0 | no (young) | young (planned 308-05): Python and Node verify snippets that read SYREL_WEBHOOK_SECRET. ⛔ pure; takes no secret (T-293-21) |
-| [`frontend/src/components/settings/webhooks/webhookFocus.ts`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentssettingswebhookswebhookfocusts) | 0 / 0 / 0 | no (young) | young (planned 308-05): the one-shot {endpointId, orgId} sessionStorage hint. ⛔ the read removes the key in the same read |
-| [`frontend/src/components/settings/webhooks/WebhooksTab.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentssettingswebhookswebhookstabtsx) | 0 / 0 / 0 | no (young) | young (planned 308-05): the member tab: own reads (re-read on org change, P-2), add form, secret once, cards, focus hint. ⛔ never optimistic |
-| [`frontend/src/components/settings/webhooks/WebhookEndpointCard.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentssettingswebhookswebhookendpointcardtsx) | 0 / 0 / 0 | no (young) | young (planned 308-05): one endpoint, collapsed and open: status, actions, test verdict, roll panel, edit, log. ⛔ the address is text, never a link |
-| [`frontend/src/components/settings/webhooks/WebhookEndpointForm.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentssettingswebhookswebhookendpointformtsx) | 0 / 0 / 0 | no (young) | young (planned 308-05): add and edit form; form checks only, reachability is the server's sentence. ⛔ keeps typed values on a refusal |
-| [`frontend/src/components/settings/webhooks/WebhookSecretOnce.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentssettingswebhookswebhooksecretoncetsx) | 0 / 0 / 0 | no (young) | young (planned 308-05): the secret shown once (create and roll) with the verify snippets. ⛔ receives the secret as a prop and keeps it nowhere else |
-| [`frontend/src/components/settings/webhooks/WebhookDeliveryLog.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentssettingswebhookswebhookdeliverylogtsx) | 0 / 0 / 0 | no (young) | young (planned 308-05): paged log, Resend, Refresh, a 15 s poll only while open with in-flight rows. ⛔ never renders a body |
-| [`frontend/src/components/settings/webhooks/RollWebhookSecretSheet.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentssettingswebhooksrollwebhooksecretsheettsx) | 0 / 0 / 0 | no (young) | young (planned 308-05): the calm roll confirm naming the 24 h overlap. ⛔ never optimistic; Keep this secret holds focus |
-| [`frontend/src/components/settings/webhooks/DeleteWebhookSheet.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentssettingswebhooksdeletewebhooksheettsx) | 0 / 0 / 0 | no (young) | young (planned 308-05): the victim-naming delete sheet, member and admin variants. ⛔ never optimistic; Keep it holds focus |
-| [`frontend/src/components/org/OrgWebhooks.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentsorgorgwebhookstsx) | 0 / 0 / 0 | no (young) | young (planned 308-06): the org's endpoints (host + masked path, no query), admin Turn off / Turn on / Delete, receipt. ⛔ no feature gate (P-1); never optimistic |
+| [`backend/app/db/webhooks.py`](docs/HOT-FILE-LEDGER.md#backendappdbwebhookspy) | 2 / 1 / 566 (was `0 / 0 / 0`) | no (young) | young (308-01 + the orchestrator fix): endpoint CRUD with the owner predicate in every statement, log reads, test and resend writes. ⛔ ciphertext read only via _SIGNING_COLUMNS; no body column |
+| [`backend/app/services/webhook_urls.py`](docs/HOT-FILE-LEDGER.md#backendappserviceswebhook_urlspy) | 1 / 1 / 87 (was `0 / 0 / 0`) | no (young) | young (308-02): D-46 URL rules, host, admin host + path with long segments masked (D-51). ⛔ pure; never logs a URL |
+| [`backend/app/services/webhook_signer.py`](docs/HOT-FILE-LEDGER.md#backendappserviceswebhook_signerpy) | 1 / 1 / 60 (was `0 / 0 / 0`) | no (young) | young (308-02; interop proven 308-06): whsec_ secrets, Standard Webhooks v1 HMAC, per-attempt headers with the overlap signature. ⛔ pure stdlib; verified by standardwebhooks 1.1.0 |
+| [`backend/app/services/webhook_sender.py`](docs/HOT-FILE-LEDGER.md#backendappserviceswebhook_senderpy) | 1 / 1 / 241 (was `0 / 0 / 0`) | no (young) | young (308-02): one POST via egress.send_pinned_http('webhook'), latency around it, the outcome table. ⛔ no HTTP client of its own; response body and headers discarded |
+| [`backend/app/models/webhook.py`](docs/HOT-FILE-LEDGER.md#backendappmodelswebhookpy) | 2 / 1 / 352 (was `0 / 0 / 0`) | no (young) | young (308-02 / 308-04): typed text-free payload models (D-41) and the route request/response models. ⛔ no payload field carries a person's words; no read model carries a secret |
+| [`backend/app/db/webhook_outbox.py`](docs/HOT-FILE-LEDGER.md#backendappdbwebhook_outboxpy) | 1 / 1 / 501 (was `0 / 0 / 0`) | no (young) | young (308-03): fan-out claim, SKIP LOCKED send claim, lease renew, guarded record, one auto-disable winner, notice, purge. ⛔ record only on a 'sending' row; no HTTP in a transaction |
+| [`backend/app/services/webhook_drainer.py`](docs/HOT-FILE-LEDGER.md#backendappserviceswebhook_drainerpy) | 1 / 1 / 551 (was `0 / 0 / 0`) | no (young) | young (308-03, wired by 308-04): the per-worker fan-out, send and hourly purge loop (D-10, D-44). ⛔ logs ids only; one liveness predicate; one acting connection per (owner, org) |
+| [`backend/app/api/webhooks.py`](docs/HOT-FILE-LEDGER.md#backendappapiwebhookspy) | 3 / 1 / 697 (was `0 / 0 / 0`) | no (young) | young (308-04 + the orchestrator fix b7f681a37): member /webhooks and admin /org/webhooks — CRUD, test, roll, log, resend. ⛔ 404 for another member's row; secret only in create and roll |
+| [`frontend/src/lib/api/webhooks.ts`](docs/HOT-FILE-LEDGER.md#frontendsrclibapiwebhooksts) | 1 / 1 / 279 (was `0 / 0 / 0`) | no (young) | young (308-05): the /webhooks and /org/webhooks client; WebhookError carries {code}. ⛔ not in the barrel; the secret is returned to its caller and kept nowhere |
+| [`frontend/src/components/settings/webhooks/webhooksCopy.ts`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentssettingswebhookswebhookscopyts) | 1 / 1 / 265 (was `0 / 0 / 0`) | no (young) | young (308-05): every Webhooks string, member and admin. ⛔ no href from an address; never a secret after the once panel |
+| [`frontend/src/components/settings/webhooks/webhookFacts.ts`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentssettingswebhookswebhookfactsts) | 1 / 1 / 228 (was `0 / 0 / 0`) | no (young) | young (308-05): pure wire → words: status tags, masked address, log cells, verdicts. ⛔ no href from an address; never a secret after the once panel |
+| [`frontend/src/components/settings/webhooks/webhookSnippets.ts`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentssettingswebhookswebhooksnippetsts) | 1 / 1 / 36 (was `0 / 0 / 0`) | no (young) | young (308-05): the receiver snippets (standardwebhooks import lines). ⛔ no href from an address; never a secret after the once panel |
+| [`frontend/src/components/settings/webhooks/webhookFocus.ts`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentssettingswebhookswebhookfocusts) | 1 / 1 / 46 (was `0 / 0 / 0`) | no (young) | young (308-05): the one-shot sessionStorage focus hint {endpointId, orgId}. ⛔ no href from an address; never a secret after the once panel |
+| [`frontend/src/components/settings/webhooks/WebhooksTab.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentssettingswebhookswebhookstabtsx) | 1 / 1 / 320 (was `0 / 0 / 0`) | no (young) | young (308-05): the member tab: header, scope, cap, one open card, focus hint from Waiting on you. ⛔ no href from an address; never a secret after the once panel |
+| [`frontend/src/components/settings/webhooks/WebhookEndpointCard.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentssettingswebhookswebhookendpointcardtsx) | 1 / 1 / 401 (was `0 / 0 / 0`) | no (young) | young (308-05): one card per endpoint, opens in place; masked query; never-optimistic flip. ⛔ no href from an address; never a secret after the once panel |
+| [`frontend/src/components/settings/webhooks/WebhookEndpointForm.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentssettingswebhookswebhookendpointformtsx) | 1 / 1 / 221 (was `0 / 0 / 0`) | no (young) | young (308-05): add/edit form; form checks only, reachability is the server's sentence. ⛔ no href from an address; never a secret after the once panel |
+| [`frontend/src/components/settings/webhooks/WebhookSecretOnce.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentssettingswebhookswebhooksecretoncetsx) | 1 / 1 / 193 (was `0 / 0 / 0`) | no (young) | young (308-05): the secret shown once from props, Send test verdict. ⛔ no href from an address; never a secret after the once panel |
+| [`frontend/src/components/settings/webhooks/WebhookDeliveryLog.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentssettingswebhookswebhookdeliverylogtsx) | 1 / 1 / 272 (was `0 / 0 / 0`) | no (young) | young (308-05): the words-only paged log, Resend, 15 s poll only while in flight. ⛔ no href from an address; never a secret after the once panel |
+| [`frontend/src/components/settings/webhooks/RollWebhookSecretSheet.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentssettingswebhooksrollwebhooksecretsheettsx) | 1 / 1 / 134 (was `0 / 0 / 0`) | no (young) | young (308-05): the calm roll-secret confirm with the overlap fact. ⛔ no href from an address; never a secret after the once panel |
+| [`frontend/src/components/settings/webhooks/DeleteWebhookSheet.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentssettingswebhooksdeletewebhooksheettsx) | 2 / 1 / 144 (was `0 / 0 / 0`) | no (young) | young (308-05): the 066 victim-naming delete sheet, member and admin variants (308-06 reuses the admin one). ⛔ no href from an address; never a secret after the once panel |
+| [`frontend/src/components/org/OrgWebhooks.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentsorgorgwebhookstsx) | 1 / 1 / 272 (was `0 / 0 / 0`) | no (young) | young (308-06): Webhooks in {org} — table of every member endpoint, Turn off direct, Turn on admin-off only, admin Delete sheet, receipts + onRecorded. ⛔ never a query or link; never optimistic |
 
 
 
@@ -30474,3 +30474,315 @@ CLAUDE.md verdict cell: none (the file does not fire).
 **`0 / 0 / 0`** (planned 308-06). the org's endpoints (host + masked path, no query), admin Turn off / Turn on / Delete, receipt. ⛔ Binding: no feature gate (P-1); never optimistic.
 
 CLAUDE.md verdict cell: none (the file does not fire).
+
+## Phase 308 refresh — told by webhook (308-06, 2026-11-04)
+
+Every non-test source file in the six 308 PLAN.md `files_modified` lists, plus `frontend/src/components/layout/WaitingOnYouControl.tsx` (touched by 308-06, not listed — a recorded deviation), re-derived with the CLAUDE.md recipe (six-digit quick buckets subtracted) at the 308-06 bookkeeping commit; the orchestrator fix commits `c171b5c5d` / `b7f681a37` are bucket `308` and are counted. Six files cross into G-5 and gain CLAUDE.md FIRING rows: `.github/workflows/backend-tests.yml`, `backend/app/api/notifications.py`, `backend/app/db/notifications.py`, `frontend/src/components/layout/waitingVocabulary.ts`, `frontend/src/components/settings/settingsTabs.ts` and `frontend/src/lib/api/notifications.ts`. `scripts/check-migration-225-live.py` and the generated `supabase/full-schema.sql` carry no scan-list row, and the ledger gate does not watch them. `backend/app/services/ingestion_queue_service.py` was not touched (D-37: emission is in triggers).
+
+### `.github/workflows/backend-tests.yml` — 308-06 refresh (Phase 308 close), 2026-11-04
+
+**`7 / 3 / 118`.** Phases: 061, 253, 308. 308-06 (D-54): one install line + one comment after the psycopg2 line — `pip install -r requirements-dev.txt`, the test-only `standardwebhooks==1.1.0` that `test_308_signer_interop.py` hard-imports. `backend/Dockerfile` installs `requirements.txt` only, so the verifier never reaches the production image. ⛔ Binding: a test-only dependency lives in `requirements-dev.txt`, never in `requirements.txt`.
+
+Scan-list cell as of 2026-11-04 (replaced by 308-06, moved verbatim): 4 / 2 / 84 | no (2 phases) | ⚠ absent for its ENTIRE LIFE — row added 253-03. `.github/` is EXEMPT. ⛔ its `paths:` decide which fences a change is measured by; two `scripts/` files were read by unit tests and matched by none |
+CLAUDE.md verdict cell: added by 308-06 (the file now fires).
+
+### `backend/app/api/notifications.py` — 308-06 refresh (Phase 308 close), 2026-11-04
+
+**`3 / 3 / 130`.** Phases: 301, 306, 308. 308-01 (D-48, D-56): `WaitingNotice` gains `kind: webhook_disabled` with `run_id` / `workflow_name` null and four webhook-only keys; a `model_serializer` pops them on a run notice, so the 301 wire is byte-unchanged. ⛔ Binding: the notice carries host + path or the description as `title`, never a query string or a secret.
+
+Scan-list cell as of 2026-11-04 (replaced by 308-06, moved verbatim): 2 / 2 / 107 (was `1 / 1 / 107`) | no (young) | 306-04 (D-31): WaitingNotice.origin Literal gains mcp (an MCP-started run's notice validates; no 500). ⛔ pool + $1 caller; no X-Org-Id; 401 router-level |
+CLAUDE.md verdict cell: added by 308-06 (the file now fires).
+
+### `backend/app/api/webhooks.py` — 308-06 refresh (Phase 308 close), 2026-11-04
+
+**`3 / 1 / 697`.** Phases: 308. 308-04: member routes (list, create with the save-time egress refusal, edit, on/off, roll, delete, test through the drainer's send path, paged log, rate-limited resend) and the admin `org_router` behind `require_org_manage` (host + masked path, never the query). The orchestrator fix `b7f681a37` makes a never-sent test delivery record `redaction_failed` / `secret_unreadable`. ⛔ Binding: 404 (never 403) for another member's endpoint; the secret appears only in the create and roll answers.
+
+Scan-list cell as of 2026-11-04 (replaced by 308-06, moved verbatim): 0 / 0 / 0 | no (young) | young (planned 308-04): member /webhooks and admin /org/webhooks routes, test, roll, resend. ⛔ 404 for another member's row; save-time egress check off-loop; secret only in create and roll answers |
+CLAUDE.md verdict cell: none (the file does not fire).
+
+### `backend/app/db/notifications.py` — 308-06 refresh (Phase 308 close), 2026-11-04
+
+**`5 / 3 / 414`.** Phases: 300, 301, 308. 308-01 (D-19, D-48): the open-notice list and count include a `webhook_disabled` notice for the endpoint's owner while they are still a member of its org, with the endpoint's title and reason joined in. ⛔ Binding: the list is recipient-scoped and membership-checked; a webhook notice leaves when the endpoint is turned on or deleted.
+
+Scan-list cell as of 2026-11-04 (replaced by 308-06, moved verbatim): 3 / 2 / 384 (was `1 / 1 / 326`) | no (2 phases) | 301-01: list_open_notices for GET /notifications (one pool read across member orgs). ⛔ never selects prompt text; state flip inside the claim txn |
+CLAUDE.md verdict cell: added by 308-06 (the file now fires).
+
+### `backend/app/db/webhook_outbox.py` — 308-06 refresh (Phase 308 close), 2026-11-04
+
+**`1 / 1 / 501`.** Phases: 308. 308-03: the outbox data module the drainer drives. Fan-out with visibility and liveness, a SKIP LOCKED claim that flips rows to `sending`, lease renewal, a record guarded on `sending`, exactly one auto-disable winner with one notice and one audit row, and the hourly purge. ⛔ Binding: no HTTP inside a transaction; exactly-once is owned here, never by a process.
+
+Scan-list cell as of 2026-11-04 (replaced by 308-06, moved verbatim): 0 / 0 / 0 | no (young) | young (planned 308-03): fan-out claim, SKIP LOCKED send claim, lease renew, guarded record, one auto-disable winner, notice, purge. ⛔ record only on a 'sending' row; no HTTP in a transaction |
+CLAUDE.md verdict cell: none (the file does not fire).
+
+### `backend/app/db/webhooks.py` — 308-06 refresh (Phase 308 close), 2026-11-04
+
+**`2 / 1 / 566`.** Phases: 308. 308-01: owner-scoped endpoint CRUD, roll (previous secret kept 24 h), on/off with the admin-off rule, the log read, test and resend inserts. The orchestrator fix commits `c171b5c5d` (test) / `b7f681a37` (fix) touched the never-sent test delivery's recorded reason. ⛔ Binding: the owner predicate sits in every statement; ciphertext is read only through `_SIGNING_COLUMNS`.
+
+Scan-list cell as of 2026-11-04 (replaced by 308-06, moved verbatim): 0 / 0 / 0 | no (young) | young (planned 308-01): endpoint CRUD (owner predicate in every statement), log reads, test and resend writes, the shared attempt insert. ⛔ ciphertext read only via _SIGNING_COLUMNS; no body column |
+CLAUDE.md verdict cell: none (the file does not fire).
+
+### `backend/app/main.py` — 308-06 refresh (Phase 308 close), 2026-11-04
+
+**`101 / 75 / 1056`.** Phases: … 276, 280, 289, 293, 294, 296, 298, 299, 300, 301, 305, 308. 308-04 (D-50): all four hunks in one plan — the import token, two `include_router` lines, the `WebhookDrainer` started in every worker behind the same `RUN_BOOT_SWEEPS` gate as the email drainer and stopped at shutdown, and `logging.getLogger("httpx").setLevel(logging.WARNING)` because httpx logs the full request URL at INFO and a receiver's token can live in it. ⛔ Binding: no leader election — exactly-once is the outbox's (SKIP LOCKED), never this process's.
+
+Scan-list cell as of 2026-11-04 (replaced by 308-06, moved verbatim): 100 / 74 / 1024 (was `99 / 73 / 1021`) | ⚠ **FIRES** | 305-01: one import, one register_mcp(app) beside the router block, one async with mcp_lifespan() around the single yield. Honoured by construction. ⛔ see section |
+CLAUDE.md verdict cell as of 2026-11-04 (replaced by 308-06, moved verbatim): | `backend/app/main.py` | 100 / 74 / 1024 (was `99 / 73 / 1021`) | 305-01: one import + register_mcp(app) + one mcp_lifespan block · ⛔ |
+
+### `backend/app/models/webhook.py` — 308-06 refresh (Phase 308 close), 2026-11-04
+
+**`2 / 1 / 352`.** Phases: 308. 308-02 built the typed, text-free event payloads (`run.finished`, `run.waiting`, `document.ingested`, `webhook.test`); 308-04 added the route models (member endpoint, admin row with host + masked path + `has_query`, delivery row, test result). ⛔ Binding: no payload field may carry document text or a person's words; no read model carries a secret or ciphertext.
+
+Scan-list cell as of 2026-11-04 (replaced by 308-06, moved verbatim): 0 / 0 / 0 | no (young) | young (planned 308-02 / 308-04): typed text-free payload models (D-41) and the route request and response models. ⛔ no payload field may carry a person's words; no read model carries a secret |
+CLAUDE.md verdict cell: none (the file does not fire).
+
+### `backend/app/security/egress.py` — 308-06 refresh (Phase 308 close), 2026-11-04
+
+**`15 / 7 / 994`.** Phases: 190, 206, 221, 232, 238, 307, 308. 308-02 (D-23, T-308-05): the `webhook` capability is `_CALLER` — the URL is the member's — with three dict entries and the same guard every capability gets: public addresses only, DNS pinned, no redirects, a response cap. `test_190_egress` was not edited; `test_308_egress_capability.py` names the capability. ⛔ Binding: the webhook sender opens no HTTP client of its own.
+
+Scan-list cell as of 2026-11-04 (replaced by 308-06, moved verbatim): 14 / 6 / 991 (was `13 / 5 / 982`) | ⚠ **FIRES — EXACTLY AT THRESHOLD** | 307-02: the client_metadata capability (CIMD document fetch: public addresses, pinned DNS, no redirects, 16 KB). ⛔ test_190 amended on purpose; no new client |
+CLAUDE.md verdict cell as of 2026-11-04 (replaced by 308-06, moved verbatim): | `backend/app/security/egress.py` | 14 / 6 / 991 (was `13 / 5 / 982`) | 307-02: client_metadata capability (CIMD fetch); test_190 amended on purpose |
+
+### `backend/app/services/audit_service.py` — 308-06 refresh (Phase 308 close), 2026-11-04
+
+**`11 / 11 / 110`.** Phases: 30, 33, 039, 058, 110, 167, 223, 275, 293, 298, 308. 308-01 (D-31): nine `webhook.endpoint.*` action literals, in lockstep with migration 225's widened `audit_log` CHECK; 308-06 gave both audit browsers the plain words. Metadata carries `actor`, `endpoint_id` and `host` — never a query string or a secret. ⛔ Binding: the literal set stays a subset of the live CHECK.
+
+Scan-list cell as of 2026-11-04 (replaced by 308-06, moved verbatim): 10 / 10 / 100 (was `9 / 9 / 98`) | ⚠ **FIRES** | 298-03: one lockstep literal `org.item.move` (mig 217), honoured by construction. ⛔ ⊆ the live CHECK (boot) · 275 / 293 touches: see its section |
+CLAUDE.md verdict cell as of 2026-11-04 (replaced by 308-06, moved verbatim): | `backend/app/services/audit_service.py` | 10 / 10 / 100 (was `9 / 9 / 98`) | 298-03: one lockstep literal (org.item.move, mig 217) · ⛔ |
+
+### `backend/app/services/outbound_guard.py` — 308-06 refresh (Phase 308 close), 2026-11-04
+
+**`4 / 2 / 207`.** Phases: 305, 308. 308-02 (D-41): `textless_ok` lets the webhook payload — text-free by type — pass the guard unchanged; the model is still walked under the same deadline and fail-closed `try`. MCP never sets the flag. ⛔ Binding: a dict, tuple or set anywhere in the tree is still `WITHHELD`.
+
+Scan-list cell as of 2026-11-04 (replaced by 308-06, moved verbatim): 2 / 1 / 147 (was `0 / 0 / 0`) | no (young) | young (created 305-04, D-32/D-35/D-56): the one outbound choke point; RedactableText walker, overlap window, 2 s deadline. ⛔ raise/deadline -> WITHHELD; unreadable switch -> redact |
+CLAUDE.md verdict cell: none (the file does not fire).
+
+### `backend/app/services/rate_limit.py` — 308-06 refresh (Phase 308 close), 2026-11-04
+
+**`9 / 6 / 273`.** Phases: 293, 296, 305, 306, 307, 308. 308-04 (D-21, D-29, T-308-16): `enforce_user_webhook_limit` with `webhook_test` 5/min and `webhook_resend` 20/min per member on the same Redis fixed window, so the count holds across both workers. The refusal is `{code: rate_limited, message}` so the tab never says "status 429"; 503 `unavailable` when the limiter cannot count. ⛔ Binding: module constants, no env var, no setting; fail closed.
+
+Scan-list cell as of 2026-11-04 (replaced by 308-06, moved verbatim): 8 / 5 / 228 (was `7 / 4 / 187`) | ⚠ **FIRES** | 307-02: four OAuth door buckets (register, authorize, token, revoke) as door-wide ceilings; Kind widened. ⛔ no process-local state; SEED-397 deferred (per-caller IPs) |
+CLAUDE.md verdict cell as of 2026-11-04 (replaced by 308-06, moved verbatim): | `backend/app/services/rate_limit.py` | 8 / 5 / 228 (was `7 / 4 / 187`) | 307-02: four OAuth door buckets (door-wide ceilings) · ⛔ |
+
+### `backend/app/services/webhook_drainer.py` — 308-06 refresh (Phase 308 close), 2026-11-04
+
+**`1 / 1 / 551`.** Phases: 308. 308-03: `WebhookDrainer` — fan-out, signed sends with a stable `webhook-id`, the D-17 retry schedule, skip-not-visible / owner-gone, auto-disable with one notice, hourly purge; `tick(now=…)` is the test and UAT seam (Pitfall 11). 308-04 started it in `main.py`. ⛔ Binding: logs ids only, never a URL or a secret.
+
+Scan-list cell as of 2026-11-04 (replaced by 308-06, moved verbatim): 0 / 0 / 0 | no (young) | young (planned 308-03): the per-worker fan-out, send and hourly purge loop (D-10, D-44). ⛔ logs ids only; one liveness predicate; one acting connection per (owner, org) |
+CLAUDE.md verdict cell: none (the file does not fire).
+
+### `backend/app/services/webhook_sender.py` — 308-06 refresh (Phase 308 close), 2026-11-04
+
+**`1 / 1 / 241`.** Phases: 308. 308-02: one signed POST through `egress.send_pinned_http('webhook')`, the latency measured around it, and the outcome classification (2xx, http_status, timeout, connect, tls, refused_address, redirect, gone). ⛔ Binding: the response body and headers are never kept.
+
+Scan-list cell as of 2026-11-04 (replaced by 308-06, moved verbatim): 0 / 0 / 0 | no (young) | young (planned 308-02): one POST via egress.send_pinned_http('webhook'), latency around it, the outcome classification table. ⛔ no HTTP client of its own; response body and headers discarded |
+CLAUDE.md verdict cell: none (the file does not fire).
+
+### `backend/app/services/webhook_signer.py` — 308-06 refresh (Phase 308 close), 2026-11-04
+
+**`1 / 1 / 60`.** Phases: 308. 308-02: `new_secret`, `sign`, `message_id`, `build_headers` (D-09, D-11, D-13). 308-06 proved it against the reference library: `test_308_signer_interop.py` hard-imports `standardwebhooks==1.1.0` and verifies a plain message, both overlap signatures, a one-byte tamper, a stale-vs-fresh resend and the `whsec_` round trip. ⛔ Binding: pure stdlib; a secret is never logged.
+
+Scan-list cell as of 2026-11-04 (replaced by 308-06, moved verbatim): 0 / 0 / 0 | no (young) | young (planned 308-02): whsec_ secrets, the Standard Webhooks v1 HMAC, per-attempt headers with the overlap signature (D-11, D-13). ⛔ pure stdlib; a secret is never logged |
+CLAUDE.md verdict cell: none (the file does not fire).
+
+### `backend/app/services/webhook_urls.py` — 308-06 refresh (Phase 308 close), 2026-11-04
+
+**`1 / 1 / 87`.** Phases: 308. 308-02 (D-46, D-51): https only, no userinfo, no fragment, at most 2048 chars; `host`; the admin view's host + path with 16+ character segments masked and `has_query`. ⛔ Binding: pure; never logs a URL.
+
+Scan-list cell as of 2026-11-04 (replaced by 308-06, moved verbatim): 0 / 0 / 0 | no (young) | young (planned 308-02): D-46 URL rules (https, no userinfo, no fragment, <= 2048), host, admin host + path with 16+ char segments masked (D-51). ⛔ pure; never logs a URL |
+CLAUDE.md verdict cell: none (the file does not fire).
+
+### `frontend/src/components/admin/AuditTab.tsx` — 308-06 refresh (Phase 308 close), 2026-11-04
+
+**`10 / 7 / 802`.** Phases: 146, 148, 155, 293, 298, 307, 308. 308-06 (D-31): nine `{ label, group: "Webhooks" }` entries (the UI-SPEC words), `Webhooks` added to the group order before Other, and one `webhookHost` read that shows `metadata.host` as text (capped at 253) on a webhook row only. `OrgAuditTab.webhookWords.test.tsx` fences the nine lines as identical in both browsers.
+
+Scan-list cell as of 2026-11-04 (replaced by 308-06, moved verbatim): 9 / 6 / 778 (was `8 / 5 / 771`) | ⚠ **FIRES** | 307-05: platform rows read oauthAuditLabel (credential oauth) before the 293 label; two operator labels for the allowlist actions. ⛔ the api_key.* literal map unchanged |
+CLAUDE.md verdict cell as of 2026-11-04 (replaced by 308-06, moved verbatim): | `frontend/src/components/admin/AuditTab.tsx` | 9 / 6 / 778 (was `8 / 5 / 771`) | 307-05: one oauthAuditLabel read + 2 operator labels; maps unchanged |
+
+### `frontend/src/components/layout/ChatLayout.tsx` — 308-06 refresh (Phase 308 close), 2026-11-04
+
+**`77 / 38 / 978`.** Phases: … 257, 262, 267, 271, 281, 289, 293, 297, 298, 299, 301, 308. 308-06 (D-19, A-22): ONE memoised callback — `writeWebhookFocus({endpointId, orgId})`, `localStorage[SETTINGS_TAB_STORAGE_KEY] = "8"`, `onNavigate("settings")` — added to the existing memoised attention context (deps updated), plus two imports: +10 −2, inside the plan's budget. It never changes the active org; the Webhooks tab says "Switch to {org}" when needed. ⛔ Binding: one context object, memoised; a new door is a new key, never a branch in a renderer.
+
+Scan-list cell as of 2026-11-04 (replaced by 308-06, moved verbatim): 76 / 37 / 970 (was `75 / 37 / 954`) | ⚠ **FIRES** | honoured by construction (301-03: waitingStatus state + reportWaitingStatus in the one memoised ctx; one drawer WaitingOnYouControl mount). ⛔ one flatMap |
+CLAUDE.md verdict cell as of 2026-11-04 (replaced by 308-06, moved verbatim): | `frontend/src/components/layout/ChatLayout.tsx` | 76 / 37 / 970 (was `75 / 37 / 954`) | honoured by construction (301-03: status state in ctx; one drawer mount) |
+
+### `frontend/src/components/layout/WaitingOnYouControl.tsx` — 308-06 refresh (Phase 308 close), 2026-11-04
+
+**`2 / 2 / 135`.** Phases: 301, 308. 308-06 (A-21): the control is `countSentence`'s only caller, so the neutral "things are waiting" arm needed its one-argument change here; the plan named `WaitingOnYouList` instead (recorded as a deviation in the 308-06 SUMMARY). One line.
+
+Scan-list cell as of 2026-11-04 (replaced by 308-06, moved verbatim): 1 / 1 / 135 (was `0 / 0 / 0`) | no (young) | young (created 301-03). Rail control + drawer row (D-01, D-02, D-03). ⛔ presentational: no fetch, no supabase; never switchOrg; pill = answered total > 0 only |
+CLAUDE.md verdict cell: none (the file does not fire).
+
+### `frontend/src/components/layout/WaitingOnYouList.tsx` — 308-06 refresh (Phase 308 close), 2026-11-04
+
+**`2 / 2 / 173`.** Phases: 301, 308. 308-06 (D-19): one glyph arm (`Webhook`), the reason words between kind and time, `offPhrase` instead of `waitedPhrase` for a webhook row, and the title in mono when `titleIsAddress`. Selecting the row still calls `condition.onOpen()` and nothing else.
+
+Scan-list cell as of 2026-11-04 (replaced by 308-06, moved verbatim): 1 / 1 / 157 (was `0 / 0 / 0`) | no (young) | young (created 301-03). Rows as DropdownMenuItems (D-05..D-10, D-29). ⛔ no dismiss / mark-read; onSelect → onOpen only; minute tick only while open |
+CLAUDE.md verdict cell: none (the file does not fire).
+
+### `frontend/src/components/layout/attentionConditions.ts` — 308-06 refresh (Phase 308 close), 2026-11-04
+
+**`7 / 5 / 451`.** Phases: 235, 244, 301, 306, 308. 308-06 (D-19, D-48, D-56): the condition type widens with its consumer in one commit; `AttentionContext.openWebhooks?` is the new door; `useWaitingRunConditions` gains ONE `notice.kind === "webhook_disabled"` arm (a no-op `onOpen` when the door is absent) while the run arm's property lines are byte-unchanged. `ATTENTION_PRODUCERS` still has exactly two entries. ⛔ Binding: no third producer without an argued decision.
+
+Scan-list cell as of 2026-11-04 (replaced by 308-06, moved verbatim): 6 / 4 / 424 (was `5 / 3 / 424`) | ⚠ **FIRES** | 306-04 (D-31): one token — WaitingRun.origin gains mcp. ⛔ one useWaitingNotices( call |
+CLAUDE.md verdict cell as of 2026-11-04 (replaced by 308-06, moved verbatim): | `frontend/src/components/layout/attentionConditions.ts` | 6 / 4 / 424 (was `5 / 3 / 424`) | 306-04: one token (origin + mcp) · ⛔ |
+
+### `frontend/src/components/layout/waitingVocabulary.ts` — 308-06 refresh (Phase 308 close), 2026-11-04
+
+**`3 / 3 / 106`.** Phases: 301, 306, 308. 308-06 (D-19, A-21): "webhook turned off", `reasonWords` (kept failing / the receiver said it is gone), `offPhrase` on the `waitedPhrase` arithmetic, and `countSentence(total, { anyNonRun })`. ⛔ Binding: zero import statements; no raw wire value reaches the screen.
+
+Scan-list cell as of 2026-11-04 (replaced by 308-06, moved verbatim): 2 / 2 / 80 (was `1 / 1 / 79`) | no (young) | 306-04 (§Surface 8): originWords("mcp") -> started by an AI tool; app and absent stay null. ⛔ zero-import leaf; no raw wire word reaches the screen |
+CLAUDE.md verdict cell: added by 308-06 (the file now fires).
+
+### `frontend/src/components/org/OrgApiKeysTab.tsx` — 308-06 refresh (Phase 308 close), 2026-11-04
+
+**`4 / 4 / 152`.** Phases: 293, 304, 307, 308. 308-06 (D-30, P-1): one mount line and one import (+2 −0). The section has no feature gate — it always reads `/org/webhooks`. `OrgApiKeysTab.test.tsx` now stubs `./OrgWebhooks` (one `vi.mock`) so its single status/alert/button queries keep pricing the keys list alone. ⛔ Binding: every new admin section is its own leaf with its own read.
+
+Scan-list cell as of 2026-11-04 (replaced by 308-06, moved verbatim): 3 / 3 / 150 (was `2 / 2 / 148`) | ⚠ **FIRES** | ⚠ now FIRES (307). 307-05: one OrgConnectedApps mount between the header card and the key list, gated on mcp.oauth. ⛔ one import + one element |
+CLAUDE.md verdict cell as of 2026-11-04 (replaced by 308-06, moved verbatim): | `frontend/src/components/org/OrgApiKeysTab.tsx` | 3 / 3 / 150 | ⚠ now FIRES (307) · 307-05: one OrgConnectedApps mount (mcp.oauth) · ⛔ |
+
+### `frontend/src/components/org/OrgAuditTab.tsx` — 308-06 refresh (Phase 308 close), 2026-11-04
+
+**`9 / 8 / 452`.** Phases: 166, 167, 293, 298, 304, 305, 307, 308. 308-06 (D-31): the nine labels, the `Webhooks` group, and one `webhookHost(row)` read — the same shape as AuditTab, fenced line-for-line by `OrgAuditTab.webhookWords.test.tsx`.
+
+Scan-list cell as of 2026-11-04 (replaced by 308-06, moved verbatim): 8 / 7 / 430 (was `7 / 6 / 427`) | ⚠ **FIRES** | 307-05: rowLabel reads oauthAuditLabel before the action label (the SAME helper AuditTab reads). ⛔ literal map unchanged; shared vocabulary started |
+CLAUDE.md verdict cell as of 2026-11-04 (replaced by 308-06, moved verbatim): | `frontend/src/components/org/OrgAuditTab.tsx` | 8 / 7 / 430 (was `7 / 6 / 427`) | 307-05: one oauthAuditLabel arm (shared with AuditTab) |
+
+### `frontend/src/components/org/OrgWebhooks.tsx` — 308-06 refresh (Phase 308 close), 2026-11-04
+
+**`1 / 1 / 272`.** Phases: 308. 308-06 (HOOK-06, D-30, D-51, P-1): the org admin's section on the `OrgConnectedApps` shape minus its gate — own read, alive ref, last-known list kept on a failed re-read; owner A-Z (server order within); host + masked path in mono with "query hidden"; status from `statusTag(e, org)`; Turn off direct, Turn on only for `disabled_reason == admin` (A-24); Delete through `DeleteWebhookSheet admin`; a receipt and one `onRecorded()` after each server-confirmed write. ⛔ Binding: no `href`, no query string, nothing optimistic.
+
+Scan-list cell as of 2026-11-04 (replaced by 308-06, moved verbatim): 0 / 0 / 0 | no (young) | young (planned 308-06): the org's endpoints (host + masked path, no query), admin Turn off / Turn on / Delete, receipt. ⛔ no feature gate (P-1); never optimistic |
+CLAUDE.md verdict cell: none (the file does not fire).
+
+### `frontend/src/components/settings/settingsTabs.ts` — 308-06 refresh (Phase 308 close), 2026-11-04
+
+**`5 / 3 / 143`.** Phases: 283, 293, 308. 308-05 (D-28, A-18): one entry, id `8` (new — never a retired id), audience everyone, label `Webhooks` (one word, BUG-260923-01). 308-06's Waiting door writes `SETTINGS_TAB_STORAGE_KEY = "8"`. ⛔ Binding: tab ids are never reused.
+
+Scan-list cell as of 2026-11-04 (replaced by 308-06, moved verbatim): 3 / 2 / 126 (was `2 / 1 / 123`) | no (1 phase) | young (created 283-01; 283-02 added Preferences "6" + the first-visible fallback). ONE home of tab id / audience / order / fallback; labels stay literal JSX · 293 touch: see §Phase 293 close |
+CLAUDE.md verdict cell: added by 308-06 (the file now fires).
+
+### `frontend/src/components/settings/webhooks/DeleteWebhookSheet.tsx` — 308-06 refresh (Phase 308 close), 2026-11-04
+
+**`2 / 1 / 144`.** Phases: 308. 308-05: the 066 victim-naming delete sheet, member and admin variants (308-06 reuses the admin one). 308-06 consumed it (OrgWebhooks / the Waiting door) without editing it.
+
+Scan-list cell as of 2026-11-04 (replaced by 308-06, moved verbatim): 0 / 0 / 0 | no (young) | young (planned 308-05): the victim-naming delete sheet, member and admin variants. ⛔ never optimistic; Keep it holds focus |
+CLAUDE.md verdict cell: none (the file does not fire).
+
+### `frontend/src/components/settings/webhooks/RollWebhookSecretSheet.tsx` — 308-06 refresh (Phase 308 close), 2026-11-04
+
+**`1 / 1 / 134`.** Phases: 308. 308-05: the calm roll-secret confirm with the overlap fact. 308-06 consumed it (OrgWebhooks / the Waiting door) without editing it.
+
+Scan-list cell as of 2026-11-04 (replaced by 308-06, moved verbatim): 0 / 0 / 0 | no (young) | young (planned 308-05): the calm roll confirm naming the 24 h overlap. ⛔ never optimistic; Keep this secret holds focus |
+CLAUDE.md verdict cell: none (the file does not fire).
+
+### `frontend/src/components/settings/webhooks/WebhookDeliveryLog.tsx` — 308-06 refresh (Phase 308 close), 2026-11-04
+
+**`1 / 1 / 272`.** Phases: 308. 308-05: the words-only paged log, Resend, 15 s poll only while in flight. 308-06 consumed it (OrgWebhooks / the Waiting door) without editing it.
+
+Scan-list cell as of 2026-11-04 (replaced by 308-06, moved verbatim): 0 / 0 / 0 | no (young) | young (planned 308-05): paged log, Resend, Refresh, a 15 s poll only while open with in-flight rows. ⛔ never renders a body |
+CLAUDE.md verdict cell: none (the file does not fire).
+
+### `frontend/src/components/settings/webhooks/WebhookEndpointCard.tsx` — 308-06 refresh (Phase 308 close), 2026-11-04
+
+**`1 / 1 / 401`.** Phases: 308. 308-05: one card per endpoint, opens in place; masked query; never-optimistic flip. 308-06 consumed it (OrgWebhooks / the Waiting door) without editing it.
+
+Scan-list cell as of 2026-11-04 (replaced by 308-06, moved verbatim): 0 / 0 / 0 | no (young) | young (planned 308-05): one endpoint, collapsed and open: status, actions, test verdict, roll panel, edit, log. ⛔ the address is text, never a link |
+CLAUDE.md verdict cell: none (the file does not fire).
+
+### `frontend/src/components/settings/webhooks/WebhookEndpointForm.tsx` — 308-06 refresh (Phase 308 close), 2026-11-04
+
+**`1 / 1 / 221`.** Phases: 308. 308-05: add/edit form; form checks only, reachability is the server's sentence. 308-06 consumed it (OrgWebhooks / the Waiting door) without editing it.
+
+Scan-list cell as of 2026-11-04 (replaced by 308-06, moved verbatim): 0 / 0 / 0 | no (young) | young (planned 308-05): add and edit form; form checks only, reachability is the server's sentence. ⛔ keeps typed values on a refusal |
+CLAUDE.md verdict cell: none (the file does not fire).
+
+### `frontend/src/components/settings/webhooks/WebhookSecretOnce.tsx` — 308-06 refresh (Phase 308 close), 2026-11-04
+
+**`1 / 1 / 193`.** Phases: 308. 308-05: the secret shown once from props, Send test verdict. 308-06 consumed it (OrgWebhooks / the Waiting door) without editing it.
+
+Scan-list cell as of 2026-11-04 (replaced by 308-06, moved verbatim): 0 / 0 / 0 | no (young) | young (planned 308-05): the secret shown once (create and roll) with the verify snippets. ⛔ receives the secret as a prop and keeps it nowhere else |
+CLAUDE.md verdict cell: none (the file does not fire).
+
+### `frontend/src/components/settings/webhooks/WebhooksTab.tsx` — 308-06 refresh (Phase 308 close), 2026-11-04
+
+**`1 / 1 / 320`.** Phases: 308. 308-05: the member tab: header, scope, cap, one open card, focus hint from Waiting on you. 308-06 consumed it (OrgWebhooks / the Waiting door) without editing it.
+
+Scan-list cell as of 2026-11-04 (replaced by 308-06, moved verbatim): 0 / 0 / 0 | no (young) | young (planned 308-05): the member tab: own reads (re-read on org change, P-2), add form, secret once, cards, focus hint. ⛔ never optimistic |
+CLAUDE.md verdict cell: none (the file does not fire).
+
+### `frontend/src/components/settings/webhooks/webhookFacts.ts` — 308-06 refresh (Phase 308 close), 2026-11-04
+
+**`1 / 1 / 228`.** Phases: 308. 308-05: pure wire → words: status tags, masked address, log cells, verdicts. 308-06 consumed it (OrgWebhooks / the Waiting door) without editing it.
+
+Scan-list cell as of 2026-11-04 (replaced by 308-06, moved verbatim): 0 / 0 / 0 | no (young) | young (planned 308-05): status tag, display address (query values masked), delivery words, latency, test verdict. ⛔ pure |
+CLAUDE.md verdict cell: none (the file does not fire).
+
+### `frontend/src/components/settings/webhooks/webhookFocus.ts` — 308-06 refresh (Phase 308 close), 2026-11-04
+
+**`1 / 1 / 46`.** Phases: 308. 308-05: the one-shot sessionStorage focus hint {endpointId, orgId}. 308-06 consumed it (OrgWebhooks / the Waiting door) without editing it.
+
+Scan-list cell as of 2026-11-04 (replaced by 308-06, moved verbatim): 0 / 0 / 0 | no (young) | young (planned 308-05): the one-shot {endpointId, orgId} sessionStorage hint. ⛔ the read removes the key in the same read |
+CLAUDE.md verdict cell: none (the file does not fire).
+
+### `frontend/src/components/settings/webhooks/webhookSnippets.ts` — 308-06 refresh (Phase 308 close), 2026-11-04
+
+**`1 / 1 / 36`.** Phases: 308. 308-05: the receiver snippets (standardwebhooks import lines). 308-06 consumed it (OrgWebhooks / the Waiting door) without editing it.
+
+Scan-list cell as of 2026-11-04 (replaced by 308-06, moved verbatim): 0 / 0 / 0 | no (young) | young (planned 308-05): Python and Node verify snippets that read SYREL_WEBHOOK_SECRET. ⛔ pure; takes no secret (T-293-21) |
+CLAUDE.md verdict cell: none (the file does not fire).
+
+### `frontend/src/components/settings/webhooks/webhooksCopy.ts` — 308-06 refresh (Phase 308 close), 2026-11-04
+
+**`1 / 1 / 265`.** Phases: 308. 308-05: every Webhooks string, member and admin. 308-06 consumed it (OrgWebhooks / the Waiting door) without editing it.
+
+Scan-list cell as of 2026-11-04 (replaced by 308-06, moved verbatim): 0 / 0 / 0 | no (young) | young (planned 308-05): every Webhooks tab and admin string (UI-SPEC Copywriting). ⛔ imports nothing; fillCopy comes from apiKeysCopy |
+CLAUDE.md verdict cell: none (the file does not fire).
+
+### `frontend/src/landing/facts.ts` — 308-06 refresh (Phase 308 close), 2026-11-04
+
+**`9 / 5 / 546`.** Phases: 226, 283, 288, 293, 308. 308-05: one literal appended to `SURFACE_TABS.settings` so `check-landing-drift` matches the Settings strip. Data only.
+
+Scan-list cell as of 2026-11-04 (replaced by 308-06, moved verbatim): 8 / 4 / 546 (was `6 / 3 / 546`) | ⚠ **NOW FIRES** (3 phases) | 288-02: Pause stage `what` string corrected (one string, length unchanged) · 293 touch: see §Phase 293 close |
+CLAUDE.md verdict cell as of 2026-11-04 (replaced by 308-06, moved verbatim): | `frontend/src/landing/facts.ts` | 8 / 4 / 546 (was `6 / 3 / 546`) | 293-04: API keys in SURFACE_TABS.settings + .orgAdmin (data only) |
+
+### `frontend/src/lib/api/notifications.ts` — 308-06 refresh (Phase 308 close), 2026-11-04
+
+**`3 / 3 / 75`.** Phases: 301, 306, 308. 308-06 (D-48, D-56): a discriminated union so the run arm in `attentionConditions` narrows to `run_id: string` with its lines unchanged; the webhook arm carries the four optional keys. Types only; the reader is unchanged. ⛔ Binding: not in the `@/lib/api` barrel.
+
+Scan-list cell as of 2026-11-04 (replaced by 308-06, moved verbatim): 2 / 2 / 51 (was `1 / 1 / 51`) | no (young) | 306-04 (D-31): one token — the origin union gains mcp. ⛔ kept out of the @/lib/api barrel |
+CLAUDE.md verdict cell: added by 308-06 (the file now fires).
+
+### `frontend/src/lib/api/webhooks.ts` — 308-06 refresh (Phase 308 close), 2026-11-04
+
+**`1 / 1 / 279`.** Phases: 308. 308-05: every member and admin route, wire types mirroring `models/webhook.py`, `WebhookError` with the server's `code`; 308-06's `OrgWebhooks` reads the admin half. ⛔ Binding: not re-exported from `lib/api.ts`; the secret lives only in one component's props.
+
+Scan-list cell as of 2026-11-04 (replaced by 308-06, moved verbatim): 0 / 0 / 0 | no (young) | young (planned 308-05): member and admin client calls, readWebhookFailure for {code, message}. ⛔ not re-exported from lib/api.ts; the secret is returned and kept nowhere |
+CLAUDE.md verdict cell: none (the file does not fire).
+
+### `frontend/src/pages/SettingsPage.tsx` — 308-06 refresh (Phase 308 close), 2026-11-04
+
+**`66 / 32 / 1709`.** Phases: … 190, 239, 241, 242, 246, 249, 283, 292.1, 293, 294, 300, 308. 308-05 (D-28): the import, one `TabsTrigger` gated by `isSettingsTabVisible("8", …)` and one `TabsContent` — three lines. Everything else lives in `components/settings/webhooks/`.
+
+Scan-list cell as of 2026-11-04 (replaced by 308-06, moved verbatim): 64 / 31 / 1704 (was `63 / 31 / 1698`) | ⚠ **FIRES** | 300-REVIEW WR-05: handleSaveIntegrations reads emailSettingsRef.current?.invalid() first; a sentence → setError + return before the PUT. useState count unchanged (49) |
+CLAUDE.md verdict cell as of 2026-11-04 (replaced by 308-06, moved verbatim): | `frontend/src/pages/SettingsPage.tsx` | 64 / 31 / 1704 (was `63 / 31 / 1698`) | 300-REVIEW WR-05: EmailSettings invalid() vetoes the save · ⛔ |
+
+### `scripts/build-public-openapi.cjs` — 308-06 refresh (Phase 308 close), 2026-11-04
+
+**`14 / 8 / 475`.** Phases: 275, 276, 293, 294, 298, 299, 301, 308. 308-04 (D-52): the `webhooks` tag joins the Account & org group and both route families are flagged UI-internal. The public docs still describe webhooks as absent — routed to Phase 309 (`deferred-items.md` #1).
+
+Scan-list cell as of 2026-11-04 (replaced by 308-06, moved verbatim): 13 / 7 / 473 (was `11 / 5 / 472`) | ⚠ **FIRES** | 301-01: `notifications` in the Account & org tag group + `/notifications` in FLAGGED_PREFIXES (UI-internal). Two tokens. ⚠ prior row stale |
+CLAUDE.md verdict cell as of 2026-11-04 (replaced by 308-06, moved verbatim): | `scripts/build-public-openapi.cjs` | 13 / 7 / 473 (was `11 / 5 / 472`) | 301-01: notifications tag + /notifications FLAGGED (2 lines) |
+
+### `scripts/full-schema-supplement.sql` — 308-06 refresh (Phase 308 close), 2026-11-04
+
+**`32 / 24 / 975`.** Phases: … 275, 284, 293, 294, 296, 300, 301, 304, 305, 306, 307, 308. 308-01: the 225 block mirrors what `regenerate-full-schema.sh` cannot dump on its own. Earlier blocks (220-224) are byte-unchanged. Cloud paste of 225 is OWED (D-33): after 220 → 224, before the 308 backend deploy, with per-action approval, then `get_advisors(security)`.
+
+Scan-list cell as of 2026-11-04 (replaced by 308-06, moved verbatim): 31 / 23 / 942 (was `30 / 22 / 927`) | ⚠ **FIRES** | 307-01: the migration 224 block (deny-all oauth tables, label index); the 220 column-grant line byte-unchanged. ⛔ regenerated, never hand-edited downstream |
+CLAUDE.md verdict cell as of 2026-11-04 (replaced by 308-06, moved verbatim): | `scripts/full-schema-supplement.sql` | 31 / 23 / 942 (was `30 / 22 / 927`) | 307-01: migration 224 block; 220 grant line byte-unchanged · ⛔ |
+
+### `scripts/vitest-count-gate.cjs` — 308-06 refresh (Phase 308 close), 2026-11-04
+
+**`419 / 90 / 7022`.** Phases: … 295, 297, 298, 299, 300, 301, 302, 304, 305, 306, 307, 308. 308-05 pinned `webhooksContract` 12, `webhookFacts` 21, `webhookSnippets` 3, `webhookFocus` 4, `WebhookEndpointForm` 8, `WebhookSecretOnce` 6, `WebhookSheets` 9, `WebhookDeliveryLog` 12, `WebhookEndpointCard` 12, `WebhooksTab` 11. 308-06 pinned `OrgWebhooks` 9, `AuditTab.webhookWords` 3, `OrgAuditTab.webhookWords` 3, `webhookWaitingRow` 9. No pin was lowered.
+
+Scan-list cell as of 2026-11-04 (replaced by 308-06, moved verbatim): 417 / 89 / 6986 (was `416 / 88 / 6956`) | ⚠ **FIRES** | 307-05: 13 first pins for the phase's suites (both knobs, FILE-LEVEL) and McpKeyFields raised 8 -> 12. ⛔ no pin lowered |
+CLAUDE.md verdict cell as of 2026-11-04 (replaced by 308-06, moved verbatim): | `scripts/vitest-count-gate.cjs` | 417 / 89 / 6986 (was `416 / 88 / 6956`) | 307-05: 13 first pins + McpKeyFields 8 -> 12; none lowered |
