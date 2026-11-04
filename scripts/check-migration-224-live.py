@@ -6,7 +6,12 @@ Run with the backend venv from the repo root:
 
 Opens ONE asyncpg connection to ``settings.postgres_dsn`` (the backend's local DB URL), runs
 read-only catalog checks, prints ``224 live`` and exits 0 — or names each missing item and
-exits 1. Exit 2 means the database could not be reached (a harness error, never a pass).
+exits 1. Exit 2 means the database could not be reached or refused the connection (any
+``asyncpg.PostgresError``, e.g. a wrong password) — a harness error, never a pass.
+
+⚠ 307 WR-07: it checks the SCHEMA only. The live ``app_settings('global')`` host list is the
+operator's data (D-08 lets them remove a built-in host, and the empty list is allowed), so it is
+printed as a note, never counted as a missing item.
 
 It applies nothing. Migration 224 is applied by pasting it into the Supabase SQL editor
 (CLAUDE.md); this script only confirms the paste took. ⛔ It never switches role: every privilege
@@ -48,11 +53,13 @@ async def _check() -> list[str]:
 
     conn = await asyncpg.connect(settings.postgres_dsn)
     missing: list[str] = []
+    present: set[str] = set()
     try:
         for table, columns in TABLE_COLUMNS.items():
             if not await conn.fetchval(f"SELECT to_regclass('public.{table}') IS NOT NULL"):
                 missing.append(f"public.{table} table")
                 continue
+            present.add(table)
             cols = {
                 r["column_name"]
                 for r in await conn.fetch(
@@ -132,6 +139,8 @@ async def _check() -> list[str]:
             ):
                 missing.append(f"index {idx}")
         for fk_like, rule in (("api_keys", "ON DELETE CASCADE"), ("oauth_tokens(id)", "ON DELETE SET NULL")):
+            if "oauth_tokens" not in present:   # already named missing; a ::regclass would raise
+                break
             fk = await conn.fetchval(
                 "SELECT pg_get_constraintdef(oid) FROM pg_constraint WHERE conrelid = "
                 "'public.oauth_tokens'::regclass AND contype = 'f' AND pg_get_constraintdef(oid) LIKE $1",
@@ -152,11 +161,21 @@ async def _check() -> list[str]:
                   and "claude.com" in (col["column_default"] or "")):
             missing.append(f"mcp_oauth_redirect_hosts is not jsonb NOT NULL DEFAULT the two hosts ({dict(col)})")
         else:
+            # The live row is DATA, not schema: an operator may remove a built-in host (D-08).
             raw = await conn.fetchval(
                 "SELECT mcp_oauth_redirect_hosts::text FROM public.app_settings WHERE id = 'global'"
             )
-            if raw is None or not {"claude.ai", "claude.com"} <= {e.get("host") for e in json.loads(raw)}:
-                missing.append("app_settings('global') does not read the two built-in hosts")
+            try:
+                entries = json.loads(raw) if raw is not None else []
+            except ValueError:
+                entries = []
+            hosts = {e.get("host") for e in entries if isinstance(e, dict)} if isinstance(entries, list) else set()
+            absent = sorted({"claude.ai", "claude.com"} - hosts)
+            if raw is None:
+                print("note: there is no app_settings('global') row yet (the column default applies).")
+            elif absent:
+                print(f"note: the live sign-in host list does not include {', '.join(absent)} "
+                      "(an operator may remove a built-in host; the schema default is correct).")
         arr = await def_of("app_settings_mcp_oauth_redirect_hosts_array") or ""
         if "jsonb_typeof" not in arr:
             missing.append("CHECK app_settings_mcp_oauth_redirect_hosts_array")
@@ -166,14 +185,17 @@ async def _check() -> list[str]:
 
 
 def main() -> int:
+    import asyncpg
+
     try:
         sys.stdout.reconfigure(encoding="utf-8", errors="replace")
     except Exception:  # pragma: no cover
         pass
     try:
         missing = asyncio.run(_check())
-    except (OSError, ConnectionError) as exc:
-        print(f"FATAL: could not reach the local database: {type(exc).__name__}: {exc}")
+    except (OSError, ConnectionError, asyncpg.PostgresError, asyncpg.InterfaceError) as exc:
+        # a refused login or a missing database is a harness error, never "migration missing"
+        print(f"FATAL: could not reach or query the local database: {type(exc).__name__}: {exc}")
         return 2
     if missing:
         print("migration 224 is NOT live. Missing:")
