@@ -11,7 +11,7 @@ progress:
   total_plans: 15
   completed_plans: 15
   percent: 14
-stopped_at: Phase 307 CLOSED by decision 2026-11-04 (real tests postponed by operator) — next /gsd:discuss-phase 308 in a fresh session
+stopped_at: Phase 308 context gathered 2026-11-04 (auto) — next G-2 sketch, then UI-SPEC, then plan-phase 308
 ---
 
 # Project State
@@ -47,7 +47,7 @@ reviewer exists, so a phase closes `verification_mode: self-verified`, never `re
 Milestone: v4.9 Use It From Your Own Tools
 Phase: 308
 Plan: Not started
-Status: Phase 307 closed by decision (8 human rows + secure-phase owed); ready to discuss Phase 308 (`/gsd:discuss-phase 308`)
+Status: Phase 308 context gathered (`308-CONTEXT.md`, D-01..D-40); next: G-2 sketch (self-approved), UI-SPEC, plan-phase
 Last activity: 2026-11-04
 
 Phases start at **303**; migrations at **220**. Seeds taken in at intake: SEED-013, SEED-177, SEED-195, SEED-081, SEED-079; bug BUG-261022-01.
@@ -126,4 +126,5 @@ The 297-302 overrides are in `milestones/v4.8-STATE-at-close.md`.
 - **305 / G-4 (2026-10-31):** rows 1-3 driven by Claude, not the operator, with three recorded substitutions (G4-1 non-member arm = a foreign-org document under one login; G4-2 band pulse not observed; chat-stream console read began after the stream). Closed with SC#1's client rows OWED — a decision, not a claim (CLAUDE.md G-7 detail).
 - **307 / G-2 (2026-11-03):** the consent page, connected-apps list and revoke-all sheet are NEW surfaces (unlike 304-306, which extended shipped ones). The operator ran discuss with "continue by yourself, do not ask me end to end", so Claude builds the sketch and self-approves it; the auto-advance to plan-phase was NOT taken, so the sketch still comes first. Mitigation: the operator's look at the consent page is folded into the owed real Claude.ai connect (D-39). Re-open: the operator asks to see the sketch before planning.
 - **307 / close with owed rows (2026-11-04):** operator: "postpone real tests for now and start next phase". Phase 307 closes BY DECISION with all automated gates green (verifier human_needed 4/4 SC, baseline 70/71). OWED, not claimed: the 8 rows in `307-HUMAN-UAT.md` (run row 5, Claude Code loopback sign-in, first), `/gsd:secure-phase 307` (incl. IN-02 badge wording and the every-web-case warning copy), cloud migrations 220→224 with per-action approval + `get_advisors(security)`, deploy of 304-307. Re-open: before any deploy of 304-307, or when the operator resumes UAT.
+- **308 / G-2 (2026-11-04):** the Settings "Webhooks" tab and the org-admin Webhooks section are NEW surfaces. The operator ran discuss with "continue autonomously end to end", so Claude builds the sketch and self-approves it (the 307 precedent); sketch → UI-SPEC → plan order kept. Re-open: the operator asks to see the sketch before planning.
 - **304 / G-5 (2026-10-30):** honoured by construction, not overridden — one edit each on `dependencies.py`, `audit_service.py`, `user_settings.py`, `settings.py`; no new mount on `SettingsPage.tsx` or tab on `OrgAdminShell.tsx` (CONTEXT D-01/D-02); `api_key_auth.py` extracted before editing.
