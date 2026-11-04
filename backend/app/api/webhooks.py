@@ -137,7 +137,7 @@ def _host(url: str) -> str:
 async def _checked_url(url: str) -> str:
     """The URL rules, then the reachability check off the event loop. Raises the worded 422."""
     try:
-        webhook_urls.check_webhook_url(url)
+        url = webhook_urls.check_webhook_url(url)  # WR-04: the scheme comes back lower-cased
     except webhook_urls.WebhookUrlError as exc:
         if exc.code == "not_https":
             raise _refuse(422, "address_refused", ADDRESS_REFUSED) from None
@@ -243,6 +243,9 @@ async def create_endpoint(
             event_types=list(body.event_types),
             secret_ciphertext=secret_cipher.encrypt_secret(secret, cipher),
         )
+    except asyncpg.CheckViolationError:
+        # WR-04 backstop: 225's URL CHECK and the app rules disagreeing is a worded 422, never a 500.
+        raise _refuse(422, "invalid_url", NOT_A_URL) from None
     except webhooks_db.EndpointCapReached:
         name = await _org_name(pool, org)
         cap = webhooks_db.MAX_ENDPOINTS_PER_MEMBER
@@ -274,15 +277,18 @@ async def update_endpoint(
     changes: dict = {}
     if "description" in fields:
         changes["description"] = body.description
-    row = await webhooks_db.update_endpoint(
-        pool,
-        endpoint_id=endpoint_id,
-        user_id=caller,
-        org_id=org,
-        url=url,
-        event_types=list(body.event_types) if body.event_types is not None else None,
-        **changes,
-    )
+    try:
+        row = await webhooks_db.update_endpoint(
+            pool,
+            endpoint_id=endpoint_id,
+            user_id=caller,
+            org_id=org,
+            url=url,
+            event_types=list(body.event_types) if body.event_types is not None else None,
+            **changes,
+        )
+    except asyncpg.CheckViolationError:
+        raise _refuse(422, "invalid_url", NOT_A_URL) from None  # WR-04 backstop, as create
     if row is None:
         raise _not_found()
     if url is not None or changes or body.event_types is not None:

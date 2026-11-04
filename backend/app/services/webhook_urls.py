@@ -9,7 +9,8 @@ parsed ``.host`` only, so ``https://user:pw@host/`` passes egress — and httpx 
 userinfo as Basic auth to the receiver. A fragment is never sent at all, so a URL carrying one is not
 the URL that would be called. Neither may reach egress.
 
-**The URL is returned unchanged, never normalised**, so the stored URL is exactly the sent URL.
+**The URL is returned unchanged except for its scheme, which is lower-cased (WR-04)**, and the
+routes store the returned value, so the stored URL is exactly the sent URL.
 
 **Nothing here logs, and the query never leaves ``admin_display``.** A receiver's token sits in the
 path (Zapier / Slack style), in the query, or in the leftmost host label (Pipedream / ngrok style).
@@ -47,7 +48,8 @@ def _has_space_or_control(url: str) -> bool:
 
 
 def check_webhook_url(url: str) -> str:
-    """Return ``url`` unchanged when it may be a webhook destination; raise ``WebhookUrlError``."""
+    """Return ``url`` (scheme lower-cased, nothing else changed) when it may be a webhook
+    destination; raise ``WebhookUrlError``."""
     if not isinstance(url, str) or not url:
         raise WebhookUrlError("not_url")
     if len(url) > MAX_URL_LENGTH:
@@ -75,7 +77,10 @@ def check_webhook_url(url: str) -> str:
         raise WebhookUrlError("not_url") from None
     if not parsed.host:
         raise WebhookUrlError("no_host")
-    return url
+    # WR-04: the scheme ALONE is lower-cased. Migration 225's CHECK is ``url LIKE 'https://%'``
+    # (case-sensitive), and httpx lower-cases the scheme it sends — so ``HTTPS://…`` stored as typed
+    # would 500 on the CHECK. Storing the returned value keeps "the stored URL is the sent URL".
+    return "https" + url[len(parts.scheme):]
 
 
 def host_of(url: str) -> str:
