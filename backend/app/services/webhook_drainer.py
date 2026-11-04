@@ -17,7 +17,8 @@ A poll loop that runs in EVERY uvicorn worker (no leader; ``main.py``'s lifespan
          (the org's redaction guard, D-15 / D-41). Frozen as ``None`` means nothing may be sent:
          every delivery of that event is recorded ``failed`` / ``redaction_failed``.
   2. SEND. Reclaim stale ``'sending'`` rows, claim due deliveries (``FOR UPDATE OF d SKIP LOCKED``,
-     the ``'sending'`` flip inside the claiming transaction), then per row, OUTSIDE any transaction,
+     the ``'sending'`` flip inside the claiming transaction; at most two rows per endpoint, WR-02),
+     then per row (concurrently, at most ``SEND_CONCURRENCY`` in flight) OUTSIDE any transaction,
      on fresh reads, in this order:
        enabled? (else ``skipped_disabled``) -> owner still allowed? (else ``skipped_owner_gone`` and
        the endpoint off, ``owner_removed``) -> item still visible to the owner? (one acting
@@ -86,6 +87,11 @@ PURGE_EVERY_SECONDS = 3600
 RETENTION_DAYS = 30
 #: The spread on a scheduled retry, so a dead receiver's retries do not arrive in lockstep.
 JITTER_FRACTION = 0.1
+#: 308-REVIEW WR-02 (D-63): a pass sends its claimed rows concurrently, at most this many in flight,
+#: and claims at most ``MAX_PER_ENDPOINT_PER_PASS`` rows of any one endpoint, so one blackholed
+#: receiver (each send bounded at 15 s) can never stall every other org's deliveries behind it.
+SEND_CONCURRENCY = 5
+MAX_PER_ENDPOINT_PER_PASS = 2
 
 AUTO_DISABLED_ACTION = "webhook.endpoint.auto_disabled"
 DOCUMENT_TYPE = "document.ingested"
@@ -175,6 +181,8 @@ class WebhookDrainer:
         poll_interval_seconds: float = 20,
         max_claims_per_tick: int = 20,
         lease_seconds: int = 600,
+        send_concurrency: int = SEND_CONCURRENCY,
+        max_per_endpoint_per_tick: int = MAX_PER_ENDPOINT_PER_PASS,
         rng: Callable[[], float] = random.random,
         clock: Callable[[], float] = time.monotonic,
     ) -> None:
@@ -188,6 +196,8 @@ class WebhookDrainer:
         self._poll_interval_seconds = poll_interval_seconds
         self._max_claims_per_tick = max_claims_per_tick
         self._lease_seconds = lease_seconds
+        self._send_concurrency = max(1, int(send_concurrency))
+        self._max_per_endpoint = max(1, int(max_per_endpoint_per_tick))
         self._rng = rng
         self._clock = clock
         self._last_purge: float | None = None
@@ -308,22 +318,29 @@ class WebhookDrainer:
         except Exception:  # noqa: BLE001 — a failed reclaim never blocks new claims
             logger.exception("webhook drainer: stale-claim recovery failed")
         claimed = await outbox.claim_due_deliveries(
-            self._pool, limit=self._max_claims_per_tick, now=now, max_attempts=MAX_ATTEMPTS
+            self._pool, limit=self._max_claims_per_tick, now=now, max_attempts=MAX_ATTEMPTS,
+            per_endpoint=self._max_per_endpoint,
         )
         groups: dict[tuple[UUID, UUID, str], list[UUID]] = {}
         for row in claimed:
             if row.item_id is not None:
                 groups.setdefault((row.user_id, row.org_id, _table_for(row.event_type)), []).append(row.item_id)
         cache = _PassCache(self._liveness, self._visibility, groups)
-        sent = 0
-        for row in claimed:
-            try:
-                if await self._process(row, now=now, cache=cache):
-                    sent += 1
-            except Exception:  # noqa: BLE001 — one row never stops the batch
-                logger.exception("webhook delivery %s failed before sending", row.id)
-                await self._record_unsent_error(row, now=now)
-        return sent
+        # WR-02 (D-63): concurrent, bounded. Safe because every row is its own claim: the lease renew
+        # and every record are still guarded on ``status = 'sending' AND attempts = $n`` per row.
+        slots = asyncio.Semaphore(self._send_concurrency)
+
+        async def one(row: outbox.ClaimedWebhookDelivery) -> bool:
+            async with slots:
+                try:
+                    return await self._process(row, now=now, cache=cache)
+                except Exception:  # noqa: BLE001 — one row never stops the batch
+                    logger.exception("webhook delivery %s failed before sending", row.id)
+                    await self._record_unsent_error(row, now=now)
+                    return False
+
+        results = await asyncio.gather(*(one(row) for row in claimed))
+        return sum(1 for done in results if done)
 
     async def _process(self, row: outbox.ClaimedWebhookDelivery, *, now: datetime | None, cache: "_PassCache") -> bool:
         if not row.enabled:
@@ -523,7 +540,7 @@ class WebhookDrainer:
 
 class _PassCache:
     """Per send pass: liveness once per owner, visibility once per (owner, org, table) over every
-    claimed item of that group."""
+    claimed item of that group. One lock per key, so rows sent concurrently (WR-02) still ask once."""
 
     def __init__(self, liveness, visibility, groups: dict) -> None:
         self._liveness = liveness
@@ -531,20 +548,26 @@ class _PassCache:
         self._groups = groups
         self._allowed: dict[EndpointOwner, bool] = {}
         self._visible: dict[tuple, set] = {}
+        self._locks: dict[tuple, asyncio.Lock] = {}
+
+    def _lock(self, key: tuple) -> asyncio.Lock:
+        return self._locks.setdefault(key, asyncio.Lock())
 
     async def allowed(self, owner: EndpointOwner) -> bool:
-        if owner not in self._allowed:
-            self._allowed[owner] = bool(await self._liveness(owner))
+        async with self._lock(("allowed", owner)):
+            if owner not in self._allowed:
+                self._allowed[owner] = bool(await self._liveness(owner))
         return self._allowed[owner]
 
     async def visible(self, owner: EndpointOwner, table: str) -> set:
         key = (owner.user_id, owner.org_id, table)
-        if key not in self._visible:
-            ids = self._groups.get(key, [])
-            self._visible[key] = (
-                set(await self._visibility(owner_id=owner.user_id, org_id=owner.org_id, table=table, ids=ids))
-                if ids else set()
-            )
+        async with self._lock(("visible", *key)):
+            if key not in self._visible:
+                ids = self._groups.get(key, [])
+                self._visible[key] = (
+                    set(await self._visibility(owner_id=owner.user_id, org_id=owner.org_id, table=table, ids=ids))
+                    if ids else set()
+                )
         return self._visible[key]
 
 
@@ -553,9 +576,11 @@ __all__ = [
     "EndpointOwner",
     "JITTER_FRACTION",
     "MAX_ATTEMPTS",
+    "MAX_PER_ENDPOINT_PER_PASS",
     "PURGE_EVERY_SECONDS",
     "RETENTION_DAYS",
     "RETRY_SCHEDULE_SECONDS",
+    "SEND_CONCURRENCY",
     "WebhookDrainer",
     "audit_auto_disabled",
     "endpoint_owner_allowed",

@@ -135,12 +135,27 @@ UPDATE public.webhook_deliveries t
 RETURNING t.id
 """
 
+# 308-REVIEW WR-02 (D-63): at most $4 due rows PER ENDPOINT per claim (ranked in the CTE: a window
+# function cannot share a query level with FOR UPDATE), so one endpoint's backlog can never fill a
+# batch and a blackholed receiver holds at most $4 of a worker's concurrent send slots. The outer WHERE
+# repeats the due test so a locked row is re-checked (EvalPlanQual) exactly as before.
 CLAIM_DELIVERIES_SQL = """
+WITH due AS (
+    SELECT d.id,
+           row_number() OVER (PARTITION BY d.endpoint_id ORDER BY d.next_attempt_at, d.id) AS rn
+      FROM public.webhook_deliveries d
+      JOIN public.webhook_events ev ON ev.id = d.event_id
+     WHERE d.status IN ('pending', 'retrying')
+       AND d.attempts < $3
+       AND d.next_attempt_at <= COALESCE($2::timestamptz, now())
+       AND ev.type <> 'webhook.test'
+)
 SELECT d.id, d.endpoint_id, d.event_id,
        ev.type AS event_type, ev.item_id, ev.payload, ev.created_at AS event_created_at,
        e.user_id, e.org_id, e.url, e.enabled,
        e.secret_ciphertext, e.previous_secret_ciphertext, e.previous_secret_expires_at
   FROM public.webhook_deliveries d
+  JOIN due ON due.id = d.id AND due.rn <= $4
   JOIN public.webhook_events ev ON ev.id = d.event_id
   JOIN public.webhook_endpoints e ON e.id = d.endpoint_id
  WHERE d.status IN ('pending', 'retrying')
@@ -336,16 +351,17 @@ async def reclaim_stale_sending(
 
 
 async def claim_due_deliveries(
-    pool: asyncpg.Pool, *, limit: int, now: Any = None, max_attempts: int
+    pool: asyncpg.Pool, *, limit: int, now: Any = None, max_attempts: int, per_endpoint: int | None = None
 ) -> list[ClaimedWebhookDelivery]:
-    """Claim up to ``limit`` due deliveries and flip them to ``'sending'`` in ONE transaction.
+    """Claim up to ``limit`` due deliveries, at most ``per_endpoint`` of any one endpoint (WR-02;
+    ``None`` = no per-endpoint cap), and flip them to ``'sending'`` in ONE transaction.
 
     The caller sends after this returns — never inside it.
     """
     claimed: list[ClaimedWebhookDelivery] = []
     async with pool.acquire() as con:
         async with con.transaction():
-            due = await con.fetch(CLAIM_DELIVERIES_SQL, limit, now, max_attempts)
+            due = await con.fetch(CLAIM_DELIVERIES_SQL, limit, now, max_attempts, per_endpoint or limit)
             for row in due:
                 attempts = await con.fetchval(CLAIM_FLIP_SQL, row["id"], now)
                 claimed.append(ClaimedWebhookDelivery(
