@@ -91,7 +91,8 @@ describe("308-05 WebhookSecretOnce", () => {
   it("roll: the roll warning and the overlap line, no Send test", () => {
     render(<Host mode="roll" />)
     expect(screen.getByText("⚠ Copy the new secret into your receiver now. Syrel can't show it again.")).toBeInTheDocument()
-    const overlap = screen.getByText(/every message carries both the old and the new signature/)
+    const overlap = screen.getByText(/every message carries both the old and the new signature/).closest("p")
+    expect(screen.getByText("5 Nov 12:00").tagName).toBe("B")
     expect(overlap).toHaveTextContent(
       "Until 5 Nov 12:00, every message carries both the old and the new signature, so your receiver keeps working while you swap it in.",
     )
