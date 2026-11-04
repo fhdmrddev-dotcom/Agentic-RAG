@@ -11,7 +11,7 @@ progress:
   total_plans: 15
   completed_plans: 15
   percent: 14
-stopped_at: Phase 307 executed — 5/5 plans merged; TDD gate OK; schema-drift gate bypassed (mig 224 applied locally by hand, check-migration-224-live.py = live; project forbids db push); NEXT /gsd:code-review 307 (55 source files, standard) → regression gate → verifier → /gsd:secure-phase 307 → /gsd:verify-work 307
+stopped_at: Phase 307 executed + reviewed + verified (human_needed) — 5/5 plans, review 10 fixed (WR-05 deferred SEED-397, IN-02 → secure-phase), baseline 70/71; 8 owed rows in 307-HUMAN-UAT.md (run row 5 Claude Code loopback first); NOT deployed, cloud mig 224 owed
 ---
 
 # Project State
