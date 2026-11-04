@@ -8,7 +8,13 @@
  *
  * ⛔ `writeWebhookFocus` copies exactly those two fields rather than serialising what it was handed:
  *   nothing else — and certainly no secret — can ride along.
+ * ⚠ 308-REVIEW WR-06: a mount-time read cannot see a hint written while Settings (or the Webhooks
+ *   tab) is ALREADY open — the row then did nothing and the stale hint fired on a later, unrelated
+ *   mount. Every write is therefore announced as `WEBHOOK_FOCUS_EVENT` on `window`: `SettingsPage`
+ *   moves to the Webhooks tab and a mounted `WebhooksTab` consumes the hint at once.
  */
+
+export const WEBHOOK_FOCUS_EVENT = "syrel:webhook-focus"
 
 export const WEBHOOK_FOCUS_KEY = "webhook_focus"
 
@@ -22,6 +28,11 @@ export function writeWebhookFocus(focus: WebhookFocus): void {
     sessionStorage.setItem(WEBHOOK_FOCUS_KEY, JSON.stringify({ endpointId: focus.endpointId, orgId: focus.orgId }))
   } catch {
     // storage blocked: the tab still opens, just without the focus
+  }
+  try {
+    window.dispatchEvent(new Event(WEBHOOK_FOCUS_EVENT)) // WR-06: an already-open Settings acts on it
+  } catch {
+    // no window (never in the app)
   }
 }
 

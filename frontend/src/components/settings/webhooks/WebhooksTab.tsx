@@ -16,7 +16,8 @@
  *   unmount (a Settings tab switch or a reload), so it can never be shown twice. Re-reads of
  *   `/webhooks` never carry one.
  * ⚠ The "Waiting on you" focus hint is read ONCE on mount (`readWebhookFocusOnce` clears it in the
- *   same read): in this org it opens and scrolls to that card; in another it says so with
+ *   same read), and again whenever one is written while this tab is open (`WEBHOOK_FOCUS_EVENT`,
+ *   308-REVIEW WR-06): in this org it opens and scrolls to that card; in another it says so with
  *   "Switch to {org}" (the `ElsewhereLine` behaviour: no navigation, the list re-reads).
  */
 import { useCallback, useEffect, useRef, useState } from "react"
@@ -35,7 +36,7 @@ import {
 import { useOrgOptional } from "@/providers/OrgProvider"
 import { fillCopy } from "@/components/settings/apiKeys/apiKeysCopy"
 import { hostOf, memberAddress, slotParts } from "./webhookFacts"
-import { readWebhookFocusOnce, type WebhookFocus } from "./webhookFocus"
+import { readWebhookFocusOnce, WEBHOOK_FOCUS_EVENT, type WebhookFocus } from "./webhookFocus"
 import { WEBHOOKS_COPY } from "./webhooksCopy"
 import { DeleteWebhookSheet } from "./DeleteWebhookSheet"
 import { WebhookEndpointCard } from "./WebhookEndpointCard"
@@ -102,6 +103,16 @@ export function WebhooksTab({ onOpenRun }: { onOpenRun?: (runId: string) => void
     return () => {
       alive.current = false
     }
+  }, [])
+
+  // WR-06: a hint written while this tab is already open is consumed here at once, never left behind.
+  useEffect(() => {
+    const onHint = () => {
+      const hint = readWebhookFocusOnce()
+      if (hint) setFocus(hint)
+    }
+    window.addEventListener(WEBHOOK_FOCUS_EVENT, onHint)
+    return () => window.removeEventListener(WEBHOOK_FOCUS_EVENT, onHint)
   }, [])
 
   // P-2: the list is the ACTIVE org's. A switch drops what belonged to the old org — the list, the

@@ -610,7 +610,7 @@ export function ChatLayout({ onSignOut, activeView, onNavigate, navItems, isOper
   // 308-06 (D-19, A-22): a turned-off webhook's door — focus hint, Settings tab "8", Settings; never switches org.
   const openWebhooksForAttention = useCallback((endpointId: string, orgId: string) => {
     writeWebhookFocus({ endpointId, orgId })
-    localStorage.setItem(SETTINGS_TAB_STORAGE_KEY, "8")
+    try { localStorage.setItem(SETTINGS_TAB_STORAGE_KEY, "8") } catch { /* WR-06: blocked storage never stops the door */ }
     onNavigate("settings")
   }, [onNavigate])
   // Phase 301-03 (D-17): the waiting tenant reports how fresh its list is (loading / failed /

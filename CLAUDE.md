@@ -444,7 +444,7 @@ node scripts/check-hot-file-ledger.cjs <phase-dir>   # 0 clear · 1 missing rows
 | `frontend/src/components/workflows/evidenceVocabulary.ts` | 5 / 3 / 261 | ⚠ now FIRES (296) · 296-04: neutral NO_MATCH/UNSOURCED + DOWNLOAD_UNAVAILABLE |
 | `backend/app/models/thread.py` | 26 / 18 / 566 (was `25 / 17 / 550`) | 306-04: ThreadResponse.origin via origin_for_wire (one validator) · ⛔ |
 | `frontend/src/components/workflows/canvasModel.ts` | 16 / 8 / 836 (was `15 / 8 / 831`) | 296-07: comparePhaseOrder, engineArmed; isGrounded drops escalated |
-| `frontend/src/components/layout/ChatLayout.tsx` | 77 / 38 / 978 (was `76 / 37 / 970`) | 308-06: one memoised openWebhooks door in the attention ctx · ⛔ |
+| `frontend/src/components/layout/ChatLayout.tsx` | 78 / 38 / 978 (was `77 / 38 / 978`) | 308-REVIEW WR-06: openWebhooks' tab write in try/catch (one line) · ⛔ |
 | `frontend/src/components/layout/attentionConditions.ts` | 7 / 5 / 451 (was `6 / 4 / 424`) | 308-06: openWebhooks door + one webhook_disabled arm; run arm unchanged · ⛔ |
 | `frontend/src/components/layout/ChatLaunchForm.tsx` | 6 / 4 / 191 (was `5 / 4 / 183`) | 296 G-4 row 11: refused Run scrolls the refusal into view |
 | `frontend/src/components/workflows/LaunchInputFields.tsx` | 3 / 3 / 145 | 287-01: leaf stays non-blocking; docblock only · 214.1-01 trigger TAKEN |
@@ -539,7 +539,7 @@ node scripts/check-hot-file-ledger.cjs <phase-dir>   # 0 clear · 1 missing rows
 | `frontend/src/components/org/InvitationsTab.tsx` | 4 / 3 / 310 | ⚠ now FIRES (300) · 300-05: Email not sent chip + resend line · ⛔ |
 | `frontend/src/components/settings/connectionsCopy.ts` | 16 / 9 / 804 | ⚠ row STALE · honoured by construction (BUG-260912-01) |
 | `frontend/src/components/settings/connectionFormCopy.ts` | 19 / 8 / 1631 | seam named (239-05), RODE it (239-07) · ⛔ |
-| `frontend/src/pages/SettingsPage.tsx` | 66 / 32 / 1709 (was `64 / 31 / 1704`) | 308-05: one WebhooksTab mount for tab 8 (+ import) · ⛔ |
+| `frontend/src/pages/SettingsPage.tsx` | 67 / 32 / 1721 (was `66 / 32 / 1709`) | 308-REVIEW WR-06: one focus-event listener moves an open page to tab 8 · ⛔ |
 | `frontend/src/pages/settingsSearchPayload.ts` | 2 / 2 / 116 | young (created 242) |
 | `frontend/src/components/settings/ModelPillRow.tsx` | 5 / 4 / 151 | ⚠ FIRES · honoured by construction (249-02) · ⛔ |
 | `frontend/src/components/workflows/phaseVocabulary.ts` | 18 / 8 / 1102 (was `16 / 6 / 990`) | 296-07: own() lookups, STEP_UNTYPED, comparePhaseOrder, engineArmed |

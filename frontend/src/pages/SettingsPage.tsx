@@ -28,6 +28,7 @@ import { MemorySection } from "@/components/settings/MemorySection"
 import { AuditLogSection } from "@/components/settings/AuditLogSection"
 import { ApiKeysTab } from "@/components/settings/apiKeys/ApiKeysTab"
 import { WebhooksTab } from "@/components/settings/webhooks/WebhooksTab"
+import { WEBHOOK_FOCUS_EVENT } from "@/components/settings/webhooks/webhookFocus"
 import { PreferencesSection } from "@/components/settings/PreferencesSection"
 import {
   isSettingsTabVisible,
@@ -480,6 +481,17 @@ export function SettingsPage({ onOpenRun }: { onOpenRun?: (runId: string) => voi
     setActiveTab(value)
     localStorage.setItem(SETTINGS_TAB_STORAGE_KEY, value)
   }
+
+  // 308-REVIEW WR-06: the "Waiting on you" webhook row while Settings is ALREADY open (the tab read
+  // above runs once, on mount) moves to the Webhooks tab, which then consumes the focus hint.
+  useEffect(() => {
+    const openWebhooks = () => {
+      setActiveTab("8")
+      try { localStorage.setItem(SETTINGS_TAB_STORAGE_KEY, "8") } catch { /* storage blocked */ }
+    }
+    window.addEventListener(WEBHOOK_FOCUS_EVENT, openWebhooks)
+    return () => window.removeEventListener(WEBHOOK_FOCUS_EVENT, openWebhooks)
+  }, [])
 
   // Provider states
   const [providerStates, setProviderStates] = useState<ProviderState[]>([])
