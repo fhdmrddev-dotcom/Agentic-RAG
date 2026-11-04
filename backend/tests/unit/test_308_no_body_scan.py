@@ -146,6 +146,80 @@ def test_no_log_line_carries_a_url_secret_or_body(mod_name):
             )
 
 
+# ── the outbox statements carry the exactly-once guards (D-07, D-58) ───────────────────────
+
+
+def _outbox():
+    return importlib.import_module("app.db.webhook_outbox")
+
+
+def test_every_outbox_statement_is_a_module_level_sql_constant():
+    """No SQL is composed inside a function: every statement the drainer runs is scannable."""
+    source = Path(_outbox().__file__).read_text(encoding="utf-8")
+    tree = ast.parse(source)
+    for node in ast.walk(tree):
+        if isinstance(node, ast.Call) and isinstance(node.func, ast.Attribute) and node.func.attr in {
+            "execute", "fetch", "fetchrow", "fetchval",
+        }:
+            first = node.args[0] if node.args else None
+            assert isinstance(first, (ast.Name, ast.Attribute)), (
+                f"line {node.lineno}: {node.func.attr} is passed an inline statement, not a *_SQL constant"
+            )
+            name = first.id if isinstance(first, ast.Name) else first.attr
+            assert name.endswith("_SQL"), f"line {node.lineno}: {name} is not a *_SQL constant"
+
+
+def test_the_send_claim_skips_locked_rows_caps_attempts_and_never_claims_a_test():
+    sql = _outbox().CLAIM_DELIVERIES_SQL
+    assert "FOR UPDATE OF d SKIP LOCKED" in sql
+    assert "d.attempts < $" in sql
+    assert "<> 'webhook.test'" in sql
+    assert "d.status IN ('pending', 'retrying')" in sql
+
+
+def test_the_event_claim_never_takes_a_test_event():
+    sql = _outbox().CLAIM_EVENT_SQL
+    assert "fanned_out_at IS NULL" in sql and "<> 'webhook.test'" in sql and "SKIP LOCKED" in sql
+
+
+def test_the_flip_happens_with_the_attempt_count_and_lease_stamp():
+    sql = _outbox().CLAIM_FLIP_SQL
+    assert "status = 'sending'" in sql and "attempts = attempts + 1" in sql and "claimed_at" in sql
+
+
+@pytest.mark.parametrize("name", ["RECORD_SQL", "SKIP_SQL", "RENEW_LEASE_SQL"])
+def test_every_record_update_is_guarded_on_sending(name):
+    assert "AND status = 'sending'" in getattr(_outbox(), name)
+
+
+def test_the_renew_refuses_a_row_claimed_again_elsewhere():
+    assert "status = 'sending' AND attempts = $" in _outbox().RENEW_LEASE_SQL
+    assert "status = 'sending' AND attempts = $" in _outbox().RECORD_SQL
+
+
+def test_the_reclaim_skips_locked_rows_and_never_requeues_a_test_delivery():
+    sql = _outbox().RECLAIM_SQL
+    assert "FOR UPDATE OF d SKIP LOCKED" in sql
+    assert "WHEN stale.is_test THEN 'stale_lease'" in sql
+    assert "CASE WHEN stale.is_test OR stale.attempts >= $3 THEN 'failed' ELSE 'retrying' END" in sql
+
+
+def test_fan_out_is_unique_per_endpoint_and_event_and_disable_has_one_winner():
+    outbox = _outbox()
+    assert "ON CONFLICT (endpoint_id, event_id) DO NOTHING" in outbox.INSERT_DELIVERIES_SQL
+    assert "AND enabled" in outbox.DISABLE_SQL and "RETURNING" in outbox.DISABLE_SQL
+    assert "consecutive_failures = consecutive_failures + 1" in outbox.REGISTER_FAILURE_SQL
+    assert "WHERE closed_at IS NULL AND kind = 'webhook_disabled' DO NOTHING" in outbox.INSERT_NOTICE_SQL
+    assert "e.created_at <= $3" in outbox.CANDIDATES_SQL  # Pitfall 10
+
+
+def test_the_one_attempt_insert_stays_in_db_webhooks_and_no_http_is_imported():
+    source = Path(_outbox().__file__).read_text(encoding="utf-8")
+    assert "def insert_attempt" not in source
+    assert "INSERT INTO public.webhook_delivery_attempts" not in source
+    assert not re.search(r"^\s*(import|from) +(httpx|requests)", source, re.MULTILINE)
+
+
 def test_the_drainer_and_outbox_do_log_something_by_id():
     """Non-vacuity for the scan above: the two new modules carry logger calls."""
     for mod_name in ("app.db.webhook_outbox", "app.services.webhook_drainer"):
