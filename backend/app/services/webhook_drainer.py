@@ -22,7 +22,9 @@ A poll loop that runs in EVERY uvicorn worker (no leader; ``main.py``'s lifespan
        enabled? (else ``skipped_disabled``) -> owner still allowed? (else ``skipped_owner_gone`` and
        the endpoint off, ``owner_removed``) -> item still visible to the owner? (one acting
        connection per (owner, org, table) per pass; else ``skipped_not_visible``) -> renew the lease
-       (lost = never send, record nothing) -> decrypt the current secret, and the previous one only
+       (lost = never send, record nothing), which RE-READS the endpoint (308-REVIEW WR-01): off now
+       -> ``skipped_disabled``; its current URL and secrets are the ones used below -> decrypt the
+       current secret, and the previous one only
        while its overlap runs (else ``secret_unreadable``) -> sign NOW, for this attempt
        (``webhook-id`` = ``msg_<event id>``, stable across retries and resends; timestamp and
        signature per attempt) -> one awaited send through ``webhook_sender`` -> record.
@@ -55,7 +57,7 @@ import asyncio
 import logging
 import random
 import time
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 from datetime import datetime, timedelta, timezone
 from typing import Any, Awaitable, Callable, Iterable
 from uuid import UUID
@@ -340,8 +342,17 @@ class WebhookDrainer:
             return False
 
         # WR-03: stamp the lease as this row's send STARTS. Lost = another worker owns it now.
-        if not await outbox.renew_lease(self._pool, delivery_id=row.id, attempts=row.attempts, now=now):
+        fresh = await outbox.renew_lease(self._pool, delivery_id=row.id, attempts=row.attempts, now=now)
+        if fresh is None:
             logger.warning("webhook delivery %s was reclaimed before sending; not sent", row.id)
+            return False
+        # 308-REVIEW WR-01 (D-62): the endpoint as it stands NOW — the claim snapshot may be minutes
+        # old. Turned off since (owner, admin, or auto-disable elsewhere): skipped. A new URL or a
+        # rolled secret is what this send uses.
+        row = replace(row, **fresh)
+        if not row.enabled:
+            await outbox.skip_delivery(self._pool, delivery_id=row.id, status="skipped_disabled", attempts=row.attempts)
+            self.skipped += 1
             return False
         if row.payload is None:
             await self._fail_unsent(row, "redaction_failed", now=now)

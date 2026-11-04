@@ -20,7 +20,8 @@ route-facing reads and writes live in ``app/db/webhooks.py``; the ONE attempt in
   3. The lease renew that refuses a reclaimed row: ``renew_lease`` matches ``status = 'sending' AND
      attempts = $n``, so a row another worker reclaimed — or reclaimed AND claimed again, one attempt
      later — is never sent by the worker that lost it (300-REVIEW WR-03). Every record UPDATE carries
-     the same guard.
+     the same guard. The renew also returns the endpoint as it stands NOW (308-REVIEW WR-01), so a
+     turn-off or URL edit after the claim is honoured for every row still waiting to send.
   4. A stable ``webhook-id`` (``msg_<event id>``, D-09), so the one duplicate this design admits — a
      worker that dies mid-send, whose row is reclaimed and retried — is safe at the receiver.
 
@@ -159,12 +160,17 @@ RETURNING attempts
 """
 
 # WR-03: matching attempts as well as 'sending' is load-bearing — see the module docblock (3).
+# 308-REVIEW WR-01 (D-62): the renew also READS THE ENDPOINT AS IT STANDS NOW, in the same statement,
+# so the enabled check, the send target and the signing keys all come from one fresh read — never the
+# claim-time snapshot (a turn-off, URL edit or roll mid-batch would otherwise be ignored).
 RENEW_LEASE_SQL = """
 UPDATE public.webhook_deliveries
    SET claimed_at = COALESCE($3::timestamptz, now())
- WHERE id = $1
+  FROM public.webhook_endpoints e
+ WHERE webhook_deliveries.id = $1
    AND status = 'sending' AND attempts = $2
-RETURNING true
+   AND e.id = webhook_deliveries.endpoint_id
+RETURNING e.enabled, e.url, e.secret_ciphertext, e.previous_secret_ciphertext, e.previous_secret_expires_at
 """
 
 RECORD_SQL = """
@@ -362,10 +368,14 @@ async def claim_due_deliveries(
     return claimed
 
 
-async def renew_lease(pool: asyncpg.Pool, *, delivery_id: UUID, attempts: int, now: Any = None) -> bool:
-    """WR-03: stamp this row's lease, if it is still this worker's claim. ``False`` = lost: the
-    caller must NOT send and must record nothing."""
-    return bool(await pool.fetchval(RENEW_LEASE_SQL, delivery_id, attempts, now))
+async def renew_lease(pool: asyncpg.Pool, *, delivery_id: UUID, attempts: int, now: Any = None) -> dict | None:
+    """WR-03: stamp this row's lease, if it is still this worker's claim. ``None`` = lost: the
+    caller must NOT send and must record nothing.
+
+    WR-01 (D-62): otherwise the endpoint's CURRENT ``enabled``, ``url`` and signing columns — the
+    caller checks ``enabled`` and sends to / signs with these, never the claim-time snapshot."""
+    row = await pool.fetchrow(RENEW_LEASE_SQL, delivery_id, attempts, now)
+    return dict(row) if row is not None else None
 
 
 async def record_outcome(
