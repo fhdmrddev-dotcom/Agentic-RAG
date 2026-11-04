@@ -40,8 +40,9 @@ import {
 
 describe("settingsTabs — the registry (D-14)", () => {
   it("declares every tab once, in strip order, with its audience", () => {
-    // 293-04 (D-18): API keys is "7", everyone, LAST after Audit Log — never the retired "5".
-    expect(SETTINGS_TABS.map((t) => t.id)).toEqual(["0", "1", "2", "6", "3", "4", "7"])
+    // 293-04 (D-18): API keys is "7", everyone, after Audit Log — never the retired "5".
+    // 308-05 (D-28): Webhooks is "8", everyone, LAST after API keys.
+    expect(SETTINGS_TABS.map((t) => t.id)).toEqual(["0", "1", "2", "6", "3", "4", "7", "8"])
     const audience = Object.fromEntries(SETTINGS_TABS.map((t) => [t.id, t.audience]))
     expect(audience).toEqual({
       "0": "model_management",
@@ -51,19 +52,23 @@ describe("settingsTabs — the registry (D-14)", () => {
       "3": "everyone",
       "4": "everyone",
       "7": "everyone",
+      "8": "everyone",
     })
+    expect(SETTINGS_TABS[SETTINGS_TABS.length - 1]).toEqual({ id: "8", audience: "everyone", name: "Webhooks" })
   })
 
   it("lists \"5\" as retired and keeps the persisted-choice key (D-03)", () => {
     expect(RETIRED_SETTINGS_TABS).toEqual(["5"])
+    expect(RETIRED_SETTINGS_TABS).not.toContain("8")
     expect(SETTINGS_TAB_STORAGE_KEY).toBe("settings_active_tab")
   })
 })
 
 describe("settingsTabs — visibility (fail-closed boolean)", () => {
-  it("shows an operator every tab and a member only Preferences, Memory, Audit Log and API keys", () => {
-    expect(visibleSettingsTabs(true).map((t) => t.id)).toEqual(["0", "1", "2", "6", "3", "4", "7"])
-    expect(visibleSettingsTabs(false).map((t) => t.id)).toEqual(["6", "3", "4", "7"])
+  it("shows an operator every tab and a member only Preferences, Memory, Audit Log, API keys and Webhooks", () => {
+    expect(visibleSettingsTabs(true).map((t) => t.id)).toEqual(["0", "1", "2", "6", "3", "4", "7", "8"])
+    expect(visibleSettingsTabs(false).map((t) => t.id)).toEqual(["6", "3", "4", "7", "8"])
+    expect(resolveSettingsTab("8", false)).toBe("8")
   })
 
   it("never shows the retired \"5\" to anyone (D-03)", () => {
@@ -133,6 +138,7 @@ describe("settingsTabs — a link can name its tab (v4.8 audit W-2)", () => {
 
   it("names a tab by its words, never by its routing id", () => {
     expect(settingsTabFromAddress("?tab=api-keys")).toBe("7")
+    expect(settingsTabFromAddress("?tab=webhooks")).toBe("8")
     expect(settingsTabFromAddress("?tab=6")).toBeNull()
   })
 
