@@ -182,6 +182,7 @@ async def register(request: Request) -> Response:
             await oauth_db.delete_unused_dcr_clients(pool, older_than_hours=24)
         except Exception:  # noqa: BLE001
             logger.warning("oauth: pruning unused DCR clients failed", exc_info=True)
+        await _prune_cimd(pool)   # WR-04: the CIMD rows get the same bound
         row = await oauth_db.insert_dcr_client(
             pool,
             client_id=secrets.token_urlsafe(24),  # opaque, random, unguessable
@@ -234,6 +235,15 @@ async def _refuse(redis, reason: str, host: str | None) -> Response:
     return _to_consent(rid)
 
 
+async def _prune_cimd(pool) -> None:
+    """WR-04: lazily prune CIMD clients nobody approved whose document is over 24 h old. Never
+    blocks a register or a sign-in."""
+    try:
+        await oauth_db.delete_unused_cimd_clients(pool, older_than_hours=24)
+    except Exception:  # noqa: BLE001
+        logger.warning("oauth: pruning unused CIMD clients failed", exc_info=True)
+
+
 async def _cimd_client(redis, pool, client_id: str) -> dict | str:
     """The CIMD client row (cached, or freshly fetched through egress), or a refusal reason."""
     row = await oauth_db.get_client(pool, client_id)
@@ -252,6 +262,7 @@ async def _cimd_client(redis, pool, client_id: str) -> dict | str:
     if not isinstance(parsed, oauth_clients.CimdClient):
         await oauth_store.mark_cimd_failed(redis, client_id)
         return oauth_clients.METADATA_UNREADABLE
+    await _prune_cimd(pool)   # before the write, so a fresh row is never its own victim
     try:
         return await oauth_db.upsert_cimd_client(
             pool,

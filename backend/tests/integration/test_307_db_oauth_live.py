@@ -395,6 +395,38 @@ async def test_clients(world):
         await pool.execute("DELETE FROM public.oauth_clients WHERE id = $1", stale["id"])
 
 
+async def test_wr04_cimd_prune_takes_only_stale_never_granted_unreferenced_cimd_rows(world):
+    from app.db import oauth as oauth_db
+
+    pool = world["pool"]
+    now = datetime.now(timezone.utc)
+    urls = {k: f"https://example.test/p307-wr04/{k}-{uuid4().hex}.json" for k in ("stale", "fresh", "granted")}
+    rows = {}
+    try:
+        for k, url in urls.items():
+            rows[k] = await oauth_db.upsert_cimd_client(
+                pool, client_id=url, client_name=k, client_uri=None,
+                redirect_uris=["https://claude.ai/cb"], fetched_at=now, expires_at=now + timedelta(hours=1),
+            )
+        await pool.execute(
+            "UPDATE public.oauth_clients SET metadata_fetched_at = now() - interval '25 hours', "
+            "created_at = now() - interval '25 hours' WHERE id = ANY($1::uuid[])",
+            [rows["stale"]["id"], rows["granted"]["id"]],
+        )
+        async with pool.acquire() as conn:
+            await oauth_db.mark_client_granted(conn, rows["granted"]["id"])
+        assert await oauth_db.delete_unused_cimd_clients(pool, older_than_hours=24, limit=500) >= 1
+        assert await oauth_db.get_client(pool, urls["stale"]) is None
+        assert await oauth_db.get_client(pool, urls["fresh"]) is not None     # fetched just now
+        assert await oauth_db.get_client(pool, urls["granted"]) is not None   # someone approved it
+        # the DCR prune never touches a CIMD row
+        await oauth_db.delete_unused_dcr_clients(pool, older_than_hours=24, limit=500)
+        assert await oauth_db.get_client(pool, urls["granted"]) is not None
+    finally:
+        await pool.execute("DELETE FROM public.oauth_clients WHERE client_id = ANY($1::text[])",
+                           list(urls.values()))
+
+
 async def test_mark_client_granted(world):
     from app.db import oauth as oauth_db
 

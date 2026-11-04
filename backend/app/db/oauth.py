@@ -251,6 +251,29 @@ async def delete_unused_dcr_clients(
     return _status_count(status)
 
 
+async def delete_unused_cimd_clients(
+    pool: asyncpg.Pool, *, older_than_hours: int = 24, limit: int = 500
+) -> int:
+    """307 WR-04 — the CIMD twin of ``delete_unused_dcr_clients``. Every ``/oauth/authorize`` with a
+    fresh https ``client_id`` serving a valid document writes a ``cimd`` row before its redirect is
+    proven, with no session, so without this an anonymous caller grows the table without bound.
+    Prunes ``kind='cimd'`` rows never granted, whose document was last fetched (or, never fetched,
+    created) more than ``older_than_hours`` ago, named by no ``api_keys`` row. A row still in use is
+    re-fetched (its ``metadata_fetched_at`` moves), so it is never a candidate. Bounded by ``limit``
+    per call. Returns how many rows went."""
+    status = await pool.execute(
+        "DELETE FROM public.oauth_clients WHERE id IN ("
+        "SELECT c.id FROM public.oauth_clients c "
+        "WHERE c.kind = 'cimd' AND c.last_grant_at IS NULL "
+        "AND COALESCE(c.metadata_fetched_at, c.created_at) < now() - make_interval(hours => $1) "
+        "AND NOT EXISTS (SELECT 1 FROM public.api_keys k WHERE k.oauth_client_id = c.id) "
+        "LIMIT $2)",
+        int(older_than_hours),
+        int(limit),
+    )
+    return _status_count(status)
+
+
 async def mark_client_granted(conn: Any, client_row_id: UUID) -> None:
     """Stamp ``last_grant_at`` on the client a member just approved (keeps it out of the prune).
     Takes a connection so it joins the caller's grant transaction. Server-derived id."""

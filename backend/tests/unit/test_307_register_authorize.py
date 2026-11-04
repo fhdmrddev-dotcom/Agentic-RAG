@@ -48,6 +48,8 @@ class FakeDb:
         self.clients: dict[str, dict] = {}
         self.deploy_on = True
         self.pruned: list[dict] = []
+        self.cimd_pruned: list[dict] = []
+        self.cimd_prune_fails = False
         self.upserts: list[dict] = []
 
     def add_dcr(self, client_id, redirect_uris, name="Claude"):
@@ -93,6 +95,15 @@ class FakeDb:
 
         async def deployment_mcp_on(pool):
             return self.deploy_on
+
+        async def delete_unused_cimd_clients(pool, *, older_than_hours=24, limit=500):
+            if self.cimd_prune_fails:
+                raise ConnectionError("db blip")
+            self.cimd_pruned.append({"older_than_hours": older_than_hours, "upserts": len(self.upserts)})
+            return 0
+
+        monkeypatch.setattr(oauth_db, "delete_unused_cimd_clients", delete_unused_cimd_clients,
+                            raising=False)
 
         for name, fn in {
             "get_redirect_hosts": get_redirect_hosts, "insert_dcr_client": insert_dcr_client,
@@ -269,6 +280,51 @@ def test_a_cimd_request_fetches_validates_and_caches_the_client(w):
     assert len(w.db.upserts) == 1
     up = w.db.upserts[0]
     assert timedelta(seconds=290) < up["metadata_expires_at"] - up["metadata_fetched_at"] <= timedelta(seconds=300)
+
+
+def test_wr04_a_cimd_fetch_prunes_never_granted_cimd_clients_before_upserting(w):
+    w.authorize(client_id=CIMD_URL, redirect_uri="http://localhost:54001/callback")
+    # the prune ran once, BEFORE the fresh row was written (so it can never be its own victim)
+    assert w.db.cimd_pruned == [{"older_than_hours": 24, "upserts": 0}]
+    assert len(w.db.upserts) == 1
+    # a cached client is not fetched, so nothing new is written and nothing is pruned
+    w.authorize(client_id=CIMD_URL, redirect_uri="http://localhost:2/callback")
+    assert len(w.db.cimd_pruned) == 1
+
+
+def test_wr04_register_prunes_cimd_clients_too(w):
+    assert w.client.post("/oauth/register", json=CLAUDE_AI_DCR).status_code == 201
+    assert w.db.pruned == [{"older_than_hours": 24}]
+    assert w.db.cimd_pruned == [{"older_than_hours": 24, "upserts": 0}]
+
+
+def test_wr04_a_failed_cimd_prune_never_blocks_a_sign_in(w):
+    w.db.cimd_prune_fails = True
+    r = w.authorize(client_id=CIMD_URL, redirect_uri="http://localhost:54001/callback")
+    assert w.stored(w.request_id(r))["status"] == "ready"
+    assert w.client.post("/oauth/register", json=CLAUDE_AI_DCR).status_code == 201
+
+
+async def test_wr04_the_cimd_prune_sql_takes_only_never_granted_stale_unreferenced_cimd_rows():
+    from app.db import oauth as oauth_db
+
+    class Pool:
+        calls: list = []
+
+        async def execute(self, sql, *args):
+            self.calls.append((sql, args))
+            return "DELETE 3"
+
+    pool = Pool()
+    assert await oauth_db.delete_unused_cimd_clients(pool, older_than_hours=24, limit=500) == 3
+    ((sql, args),) = pool.calls
+    assert sql.startswith("DELETE FROM public.oauth_clients WHERE id IN (")
+    for part in ("c.kind = 'cimd'", "c.last_grant_at IS NULL",
+                 "COALESCE(c.metadata_fetched_at, c.created_at) < now() - make_interval(hours => $1)",
+                 "NOT EXISTS (SELECT 1 FROM public.api_keys k WHERE k.oauth_client_id = c.id)",
+                 "LIMIT $2"):
+        assert part in sql, part
+    assert args == (24, 500)
 
 
 def test_a_fresh_cached_cimd_client_is_not_fetched_again(w):
