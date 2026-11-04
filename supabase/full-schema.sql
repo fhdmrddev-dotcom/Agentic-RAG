@@ -1320,6 +1320,85 @@ $_$;
 
 
 --
+-- Name: webhook_emit_document_event(); Type: FUNCTION; Schema: public; Owner: -
+--
+
+CREATE FUNCTION public.webhook_emit_document_event() RETURNS trigger
+    LANGUAGE plpgsql SECURITY DEFINER
+    SET search_path TO ''
+    AS $$
+BEGIN
+    BEGIN
+        -- T-308-19: no enabled endpoint in this org subscribes, no row. Recipients are decided at
+        -- fan-out (D-03), so owner_id stays NULL.
+        IF EXISTS (
+            SELECT 1
+              FROM public.webhook_endpoints e
+             WHERE e.org_id = NEW.org_id
+               AND e.enabled
+               AND 'document.ingested' = ANY (e.event_types)
+        ) THEN
+            INSERT INTO public.webhook_events (type, org_id, item_id, status, folder_id)
+            VALUES ('document.ingested', NEW.org_id, NEW.id, NEW.status, NEW.folder_id)
+            ON CONFLICT DO NOTHING;
+        END IF;
+    EXCEPTION WHEN OTHERS THEN
+        RAISE WARNING 'webhook_emit_document_event swallowed: %', SQLERRM;
+    END;
+    RETURN NULL;
+END;
+$$;
+
+
+--
+-- Name: webhook_emit_run_event(); Type: FUNCTION; Schema: public; Owner: -
+--
+
+CREATE FUNCTION public.webhook_emit_run_event() RETURNS trigger
+    LANGUAGE plpgsql SECURITY DEFINER
+    SET search_path TO ''
+    AS $$
+DECLARE
+    v_type text;
+BEGIN
+    BEGIN
+        -- D-42: a golden (publish validation) run or a run without an owner emits nothing.
+        IF NEW.user_id IS NULL OR coalesce(NEW.is_golden_run, false) THEN
+            RETURN NULL;
+        END IF;
+        -- D-01 / D-43: cap_paused stays in the set for forward compatibility (no writer today).
+        v_type := CASE
+                      WHEN NEW.status IN ('completed', 'failed', 'cancelled') THEN 'run.finished'
+                      WHEN NEW.status IN ('paused', 'cap_paused') THEN 'run.waiting'
+                  END;
+        IF v_type IS NULL THEN
+            RETURN NULL;
+        END IF;
+        IF v_type = 'run.finished' AND OLD.status IN ('completed', 'failed', 'cancelled') THEN
+            RETURN NULL;
+        END IF;
+        -- T-308-19: no enabled endpoint of the owner in this org subscribes, no row.
+        IF EXISTS (
+            SELECT 1
+              FROM public.webhook_endpoints e
+             WHERE e.org_id = NEW.org_id
+               AND e.user_id = NEW.user_id
+               AND e.enabled
+               AND v_type = ANY (e.event_types)
+        ) THEN
+            INSERT INTO public.webhook_events (type, org_id, item_id, owner_id, status, origin_kind, definition_id)
+            VALUES (v_type, NEW.org_id, NEW.id, NEW.user_id, NEW.status, NEW.origin_kind, NEW.definition_id)
+            ON CONFLICT DO NOTHING;
+        END IF;
+    EXCEPTION WHEN OTHERS THEN
+        RAISE WARNING 'webhook_emit_run_event swallowed: %', SQLERRM;
+    END;
+    RETURN NULL;
+END;
+$$;
+
+
+--
 -- Name: workflow_definitions_block_published_update(); Type: FUNCTION; Schema: public; Owner: -
 --
 
@@ -1806,7 +1885,7 @@ CREATE TABLE public.audit_log (
     metadata jsonb DEFAULT '{}'::jsonb NOT NULL,
     created_at timestamp with time zone DEFAULT now() NOT NULL,
     org_id uuid NOT NULL,
-    CONSTRAINT audit_log_action_type_check CHECK ((action_type = ANY (ARRAY['document.upload'::text, 'document.delete'::text, 'search.query'::text, 'code.execute'::text, 'skill.load'::text, 'thread.create'::text, 'thread.delete'::text, 'settings.update'::text, 'memory.remember'::text, 'memory.recall'::text, 'feedback.submit'::text, 'view.create'::text, 'view.delete'::text, 'relationship.create'::text, 'relationship.delete'::text, 'classification.apply'::text, 'classification.rule.create'::text, 'metadata.update'::text, 'metadata.field.create'::text, 'connector.call'::text, 'connector.grant'::text, 'connector.watch.create'::text, 'connector.watch.delete'::text, 'connector.watch.sync'::text, 'retention.policy.create'::text, 'retention.policy.update'::text, 'retention.policy.delete'::text, 'retention.hold.create'::text, 'retention.hold.update'::text, 'retention.hold.release'::text, 'retention.disposition.confirm'::text, 'retention.document.unarchive'::text, 'retention.document.keep'::text, 'folder.delete'::text, 'api_key.create'::text, 'api_key.revoke'::text, 'api_key.start'::text, 'api_key.read'::text, 'api_key.refused'::text, 'org.item.move'::text])))
+    CONSTRAINT audit_log_action_type_check CHECK ((action_type = ANY (ARRAY['document.upload'::text, 'document.delete'::text, 'search.query'::text, 'code.execute'::text, 'skill.load'::text, 'thread.create'::text, 'thread.delete'::text, 'settings.update'::text, 'memory.remember'::text, 'memory.recall'::text, 'feedback.submit'::text, 'view.create'::text, 'view.delete'::text, 'relationship.create'::text, 'relationship.delete'::text, 'classification.apply'::text, 'classification.rule.create'::text, 'metadata.update'::text, 'metadata.field.create'::text, 'connector.call'::text, 'connector.grant'::text, 'connector.watch.create'::text, 'connector.watch.delete'::text, 'connector.watch.sync'::text, 'retention.policy.create'::text, 'retention.policy.update'::text, 'retention.policy.delete'::text, 'retention.hold.create'::text, 'retention.hold.update'::text, 'retention.hold.release'::text, 'retention.disposition.confirm'::text, 'retention.document.unarchive'::text, 'retention.document.keep'::text, 'folder.delete'::text, 'api_key.create'::text, 'api_key.revoke'::text, 'api_key.start'::text, 'api_key.read'::text, 'api_key.refused'::text, 'org.item.move'::text, 'webhook.endpoint.created'::text, 'webhook.endpoint.updated'::text, 'webhook.endpoint.deleted'::text, 'webhook.endpoint.enabled'::text, 'webhook.endpoint.disabled'::text, 'webhook.endpoint.secret_rolled'::text, 'webhook.endpoint.test_sent'::text, 'webhook.endpoint.delivery_resent'::text, 'webhook.endpoint.auto_disabled'::text])))
 );
 
 
@@ -3882,14 +3961,16 @@ CREATE TABLE public.notifications (
     id uuid DEFAULT gen_random_uuid() NOT NULL,
     recipient_id uuid NOT NULL,
     org_id uuid,
-    run_id uuid NOT NULL,
+    run_id uuid,
     kind text NOT NULL,
     tool_call_id text,
     created_at timestamp with time zone DEFAULT now() NOT NULL,
     closed_at timestamp with time zone,
     closed_reason text,
-    CONSTRAINT notifications_closed_reason_check CHECK (((closed_reason IS NULL) OR (closed_reason = ANY (ARRAY['answered'::text, 'run_ended'::text])))),
-    CONSTRAINT notifications_kind_check CHECK ((kind = ANY (ARRAY['question'::text, 'approval'::text])))
+    endpoint_id uuid,
+    CONSTRAINT notifications_closed_reason_check CHECK (((closed_reason IS NULL) OR (closed_reason = ANY (ARRAY['answered'::text, 'run_ended'::text, 'endpoint_enabled'::text])))),
+    CONSTRAINT notifications_kind_check CHECK ((kind = ANY (ARRAY['question'::text, 'approval'::text, 'webhook_disabled'::text]))),
+    CONSTRAINT notifications_kind_shape_check CHECK ((((kind = ANY (ARRAY['question'::text, 'approval'::text])) AND (run_id IS NOT NULL) AND (endpoint_id IS NULL)) OR ((kind = 'webhook_disabled'::text) AND (endpoint_id IS NOT NULL) AND (run_id IS NULL))))
 );
 
 
@@ -3912,6 +3993,13 @@ COMMENT ON COLUMN public.notifications.kind IS 'question | approval. approval wh
 --
 
 COMMENT ON COLUMN public.notifications.closed_reason IS 'answered = an ask_user_response with the same tool_call_id; run_ended = the run reached a terminal status, or the engine expired the prompt.';
+
+
+--
+-- Name: COLUMN notifications.endpoint_id; Type: COMMENT; Schema: public; Owner: -
+--
+
+COMMENT ON COLUMN public.notifications.endpoint_id IS 'Phase 308 (D-48). Set only on a webhook_disabled notice: the endpoint that was turned off (failing or gone). Deleting the endpoint deletes the notice.';
 
 
 --
@@ -4911,6 +4999,156 @@ CREATE TABLE public.user_settings (
 --
 
 COMMENT ON COLUMN public.user_settings.org_id IS 'Forward-compat (D-PRD-02/D-11): org-level multi-tenancy. NULL in v3.4; no FK until backfill/RLS (Phase 162/163).';
+
+
+--
+-- Name: webhook_deliveries; Type: TABLE; Schema: public; Owner: -
+--
+
+CREATE TABLE public.webhook_deliveries (
+    id uuid DEFAULT gen_random_uuid() NOT NULL,
+    endpoint_id uuid NOT NULL,
+    event_id uuid NOT NULL,
+    status text DEFAULT 'pending'::text NOT NULL,
+    reason text,
+    attempts integer DEFAULT 0 NOT NULL,
+    next_attempt_at timestamp with time zone DEFAULT now() NOT NULL,
+    claimed_at timestamp with time zone,
+    last_status_code integer,
+    last_latency_ms integer,
+    last_error text,
+    last_attempt_at timestamp with time zone,
+    sent_at timestamp with time zone,
+    created_at timestamp with time zone DEFAULT now() NOT NULL,
+    updated_at timestamp with time zone DEFAULT now() NOT NULL,
+    CONSTRAINT webhook_deliveries_attempts_check CHECK ((attempts >= 0)),
+    CONSTRAINT webhook_deliveries_last_error_check CHECK (((last_error IS NULL) OR (last_error = ANY (ARRAY['http_status'::text, 'timeout'::text, 'connect'::text, 'tls'::text, 'redirect'::text, 'refused_address'::text, 'response_too_large'::text, 'gone'::text, 'invalid_url'::text])))),
+    CONSTRAINT webhook_deliveries_reason_check CHECK (((reason IS NULL) OR (reason = ANY (ARRAY['redaction_failed'::text, 'secret_unreadable'::text, 'invalid_url'::text, 'max_attempts'::text, 'not_retried'::text, 'stale_lease'::text])))),
+    CONSTRAINT webhook_deliveries_status_check CHECK ((status = ANY (ARRAY['pending'::text, 'retrying'::text, 'sending'::text, 'sent'::text, 'failed'::text, 'skipped_not_visible'::text, 'skipped_owner_gone'::text, 'skipped_disabled'::text])))
+);
+
+
+--
+-- Name: TABLE webhook_deliveries; Type: COMMENT; Schema: public; Owner: -
+--
+
+COMMENT ON TABLE public.webhook_deliveries IS 'Phase 308 (D-07, D-17, D-20). One delivery per (endpoint, event), UNIQUE. Words-only outcome columns: no body, response or headers is ever stored. Drained by every backend worker with FOR UPDATE SKIP LOCKED. Deny-all to every client role (RLS on, no policy).';
+
+
+--
+-- Name: webhook_delivery_attempts; Type: TABLE; Schema: public; Owner: -
+--
+
+CREATE TABLE public.webhook_delivery_attempts (
+    id uuid DEFAULT gen_random_uuid() NOT NULL,
+    delivery_id uuid NOT NULL,
+    attempt integer NOT NULL,
+    status_code integer,
+    latency_ms integer,
+    error text,
+    created_at timestamp with time zone DEFAULT now() NOT NULL,
+    CONSTRAINT webhook_delivery_attempts_attempt_check CHECK ((attempt >= 1)),
+    CONSTRAINT webhook_delivery_attempts_error_check CHECK (((error IS NULL) OR (error = ANY (ARRAY['http_status'::text, 'timeout'::text, 'connect'::text, 'tls'::text, 'redirect'::text, 'refused_address'::text, 'response_too_large'::text, 'gone'::text, 'invalid_url'::text]))))
+);
+
+
+--
+-- Name: TABLE webhook_delivery_attempts; Type: COMMENT; Schema: public; Owner: -
+--
+
+COMMENT ON TABLE public.webhook_delivery_attempts IS 'Phase 308 (D-20). One row per HTTP attempt: number, status code, latency, an error word. No body, response or headers. Deny-all to every client role (RLS on, no policy).';
+
+
+--
+-- Name: webhook_endpoints; Type: TABLE; Schema: public; Owner: -
+--
+
+CREATE TABLE public.webhook_endpoints (
+    id uuid DEFAULT gen_random_uuid() NOT NULL,
+    user_id uuid NOT NULL,
+    org_id uuid NOT NULL,
+    url text NOT NULL,
+    description text,
+    event_types text[] NOT NULL,
+    enabled boolean DEFAULT true NOT NULL,
+    disabled_reason text,
+    disabled_at timestamp with time zone,
+    secret_ciphertext text NOT NULL,
+    previous_secret_ciphertext text,
+    previous_secret_expires_at timestamp with time zone,
+    consecutive_failures integer DEFAULT 0 NOT NULL,
+    last_success_at timestamp with time zone,
+    created_at timestamp with time zone DEFAULT now() NOT NULL,
+    updated_at timestamp with time zone DEFAULT now() NOT NULL,
+    CONSTRAINT webhook_endpoints_consecutive_failures_check CHECK ((consecutive_failures >= 0)),
+    CONSTRAINT webhook_endpoints_description_check CHECK (((description IS NULL) OR (char_length(description) <= 100))),
+    CONSTRAINT webhook_endpoints_disabled_reason_check CHECK (((disabled_reason IS NULL) OR (disabled_reason = ANY (ARRAY['failing'::text, 'gone'::text, 'admin'::text, 'owner_removed'::text])))),
+    CONSTRAINT webhook_endpoints_enabled_reason_check CHECK (((NOT enabled) OR (disabled_reason IS NULL))),
+    CONSTRAINT webhook_endpoints_event_types_check CHECK (((cardinality(event_types) >= 1) AND (event_types <@ ARRAY['run.finished'::text, 'run.waiting'::text, 'document.ingested'::text]))),
+    CONSTRAINT webhook_endpoints_previous_secret_ciphertext_check CHECK (((previous_secret_ciphertext IS NULL) OR (previous_secret_ciphertext ~~ 'enc:v1:%'::text))),
+    CONSTRAINT webhook_endpoints_previous_secret_pair_check CHECK (((previous_secret_ciphertext IS NULL) = (previous_secret_expires_at IS NULL))),
+    CONSTRAINT webhook_endpoints_secret_ciphertext_check CHECK ((secret_ciphertext ~~ 'enc:v1:%'::text)),
+    CONSTRAINT webhook_endpoints_url_check CHECK (((char_length(url) <= 2048) AND (url ~~ 'https://%'::text) AND (POSITION(('#'::text) IN (url)) = 0) AND (url !~ '^https://[^/?#]*@'::text)))
+);
+
+
+--
+-- Name: TABLE webhook_endpoints; Type: COMMENT; Schema: public; Owner: -
+--
+
+COMMENT ON TABLE public.webhook_endpoints IS 'Phase 308 (D-12, D-27, D-32, D-58). One outbound webhook endpoint per row, owned by one member in one org. The signing secret is stored ENCRYPTED ONLY (secret_cipher enc:v1:). Only writer: app/db/webhooks.py and the drainer (service-role pool). Deny-all to every client role (RLS on, no policy).';
+
+
+--
+-- Name: COLUMN webhook_endpoints.disabled_reason; Type: COMMENT; Schema: public; Owner: -
+--
+
+COMMENT ON COLUMN public.webhook_endpoints.disabled_reason IS 'Why the endpoint is off: failing (5 failed deliveries in a row), gone (410), admin (an org admin turned it off), owner_removed. NULL while on, and NULL when the owner turned it off themselves (D-58).';
+
+
+--
+-- Name: COLUMN webhook_endpoints.previous_secret_ciphertext; Type: COMMENT; Schema: public; Owner: -
+--
+
+COMMENT ON COLUMN public.webhook_endpoints.previous_secret_ciphertext IS 'The secret before the last roll, kept for 24 h so the receiver can switch over (D-13). Set together with previous_secret_expires_at or not at all.';
+
+
+--
+-- Name: webhook_events; Type: TABLE; Schema: public; Owner: -
+--
+
+CREATE TABLE public.webhook_events (
+    id uuid DEFAULT gen_random_uuid() NOT NULL,
+    type text NOT NULL,
+    org_id uuid NOT NULL,
+    item_id uuid,
+    owner_id uuid,
+    status text,
+    origin_kind text,
+    definition_id uuid,
+    folder_id uuid,
+    endpoint_id uuid,
+    payload text,
+    fanned_out_at timestamp with time zone,
+    created_at timestamp with time zone DEFAULT now() NOT NULL,
+    CONSTRAINT webhook_events_item_check CHECK (((type = 'webhook.test'::text) OR (item_id IS NOT NULL))),
+    CONSTRAINT webhook_events_test_endpoint_check CHECK (((type = 'webhook.test'::text) = (endpoint_id IS NOT NULL))),
+    CONSTRAINT webhook_events_type_check CHECK ((type = ANY (ARRAY['run.finished'::text, 'run.waiting'::text, 'document.ingested'::text, 'webhook.test'::text])))
+);
+
+
+--
+-- Name: TABLE webhook_events; Type: COMMENT; Schema: public; Owner: -
+--
+
+COMMENT ON TABLE public.webhook_events IS 'Phase 308 (D-05, D-07, D-58). One row per thing that happened, written by the emit triggers (or by the test route for webhook.test). payload is the frozen thin JSON, set once at fan-out — the only payload column in the schema. Deny-all to every client role (RLS on, no policy).';
+
+
+--
+-- Name: COLUMN webhook_events.owner_id; Type: COMMENT; Schema: public; Owner: -
+--
+
+COMMENT ON COLUMN public.webhook_events.owner_id IS 'The run owner for run events (endpoints are the owner''s, D-03). NULL for document events: recipients are decided at fan-out.';
 
 
 --
@@ -6021,6 +6259,46 @@ ALTER TABLE ONLY public.user_memory
 
 ALTER TABLE ONLY public.user_settings
     ADD CONSTRAINT user_settings_pkey PRIMARY KEY (user_id);
+
+
+--
+-- Name: webhook_deliveries webhook_deliveries_endpoint_event_uq; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.webhook_deliveries
+    ADD CONSTRAINT webhook_deliveries_endpoint_event_uq UNIQUE (endpoint_id, event_id);
+
+
+--
+-- Name: webhook_deliveries webhook_deliveries_pkey; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.webhook_deliveries
+    ADD CONSTRAINT webhook_deliveries_pkey PRIMARY KEY (id);
+
+
+--
+-- Name: webhook_delivery_attempts webhook_delivery_attempts_pkey; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.webhook_delivery_attempts
+    ADD CONSTRAINT webhook_delivery_attempts_pkey PRIMARY KEY (id);
+
+
+--
+-- Name: webhook_endpoints webhook_endpoints_pkey; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.webhook_endpoints
+    ADD CONSTRAINT webhook_endpoints_pkey PRIMARY KEY (id);
+
+
+--
+-- Name: webhook_events webhook_events_pkey; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.webhook_events
+    ADD CONSTRAINT webhook_events_pkey PRIMARY KEY (id);
 
 
 --
@@ -7251,6 +7529,20 @@ CREATE INDEX notification_deliveries_due_idx ON public.notification_deliveries U
 
 
 --
+-- Name: notifications_endpoint_idx; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX notifications_endpoint_idx ON public.notifications USING btree (endpoint_id) WHERE (endpoint_id IS NOT NULL);
+
+
+--
+-- Name: notifications_one_open_per_endpoint; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE UNIQUE INDEX notifications_one_open_per_endpoint ON public.notifications USING btree (endpoint_id) WHERE ((closed_at IS NULL) AND (kind = 'webhook_disabled'::text));
+
+
+--
 -- Name: notifications_one_open_per_recipient_run; Type: INDEX; Schema: public; Owner: -
 --
 
@@ -7416,6 +7708,83 @@ COMMENT ON INDEX public.uq_model_rates_identity IS 'Phase 257.1. Makes ON CONFLI
 --
 
 CREATE INDEX user_memory_user_updated_idx ON public.user_memory USING btree (user_id, updated_at DESC);
+
+
+--
+-- Name: webhook_deliveries_due_idx; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX webhook_deliveries_due_idx ON public.webhook_deliveries USING btree (status, next_attempt_at) WHERE (status = ANY (ARRAY['pending'::text, 'retrying'::text]));
+
+
+--
+-- Name: webhook_deliveries_event_idx; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX webhook_deliveries_event_idx ON public.webhook_deliveries USING btree (event_id);
+
+
+--
+-- Name: webhook_deliveries_log_idx; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX webhook_deliveries_log_idx ON public.webhook_deliveries USING btree (endpoint_id, created_at DESC, id DESC);
+
+
+--
+-- Name: webhook_deliveries_sending_idx; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX webhook_deliveries_sending_idx ON public.webhook_deliveries USING btree (claimed_at) WHERE (status = 'sending'::text);
+
+
+--
+-- Name: webhook_delivery_attempts_delivery_idx; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX webhook_delivery_attempts_delivery_idx ON public.webhook_delivery_attempts USING btree (delivery_id);
+
+
+--
+-- Name: webhook_endpoints_org_enabled_idx; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX webhook_endpoints_org_enabled_idx ON public.webhook_endpoints USING btree (org_id) WHERE enabled;
+
+
+--
+-- Name: webhook_endpoints_owner_idx; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX webhook_endpoints_owner_idx ON public.webhook_endpoints USING btree (user_id, org_id);
+
+
+--
+-- Name: webhook_events_created_idx; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX webhook_events_created_idx ON public.webhook_events USING btree (created_at);
+
+
+--
+-- Name: webhook_events_endpoint_idx; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX webhook_events_endpoint_idx ON public.webhook_events USING btree (endpoint_id) WHERE (endpoint_id IS NOT NULL);
+
+
+--
+-- Name: webhook_events_run_finished_once; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE UNIQUE INDEX webhook_events_run_finished_once ON public.webhook_events USING btree (item_id) WHERE (type = 'run.finished'::text);
+
+
+--
+-- Name: webhook_events_unfanned_idx; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX webhook_events_unfanned_idx ON public.webhook_events USING btree (created_at) WHERE (fanned_out_at IS NULL);
 
 
 --
@@ -7598,6 +7967,20 @@ CREATE TRIGGER documents_refuse_truncate BEFORE TRUNCATE ON public.documents FOR
 --
 
 CREATE TRIGGER documents_sticky_hold_on_move BEFORE UPDATE OF folder_id ON public.documents FOR EACH ROW WHEN ((old.folder_id IS DISTINCT FROM new.folder_id)) EXECUTE FUNCTION public.documents_sticky_hold_on_move();
+
+
+--
+-- Name: documents documents_webhook_emit_insert; Type: TRIGGER; Schema: public; Owner: -
+--
+
+CREATE TRIGGER documents_webhook_emit_insert AFTER INSERT ON public.documents FOR EACH ROW WHEN ((new.status = 'completed'::text)) EXECUTE FUNCTION public.webhook_emit_document_event();
+
+
+--
+-- Name: documents documents_webhook_emit_update; Type: TRIGGER; Schema: public; Owner: -
+--
+
+CREATE TRIGGER documents_webhook_emit_update AFTER UPDATE OF status ON public.documents FOR EACH ROW WHEN (((old.status IS DISTINCT FROM new.status) AND (new.status = 'completed'::text))) EXECUTE FUNCTION public.webhook_emit_document_event();
 
 
 --
@@ -7979,6 +8362,20 @@ CREATE TRIGGER user_settings_autofill_org_id BEFORE INSERT ON public.user_settin
 
 
 --
+-- Name: webhook_deliveries webhook_deliveries_set_updated_at; Type: TRIGGER; Schema: public; Owner: -
+--
+
+CREATE TRIGGER webhook_deliveries_set_updated_at BEFORE UPDATE ON public.webhook_deliveries FOR EACH ROW EXECUTE FUNCTION public.set_updated_at();
+
+
+--
+-- Name: webhook_endpoints webhook_endpoints_set_updated_at; Type: TRIGGER; Schema: public; Owner: -
+--
+
+CREATE TRIGGER webhook_endpoints_set_updated_at BEFORE UPDATE ON public.webhook_endpoints FOR EACH ROW EXECUTE FUNCTION public.set_updated_at();
+
+
+--
 -- Name: workflow_definitions workflow_definitions_autofill_org_id; Type: TRIGGER; Schema: public; Owner: -
 --
 
@@ -8046,6 +8443,13 @@ CREATE TRIGGER workflow_runs_origin_immutable BEFORE UPDATE ON public.workflow_r
 --
 
 CREATE TRIGGER workflow_runs_set_updated_at BEFORE UPDATE ON public.workflow_runs FOR EACH ROW EXECUTE FUNCTION public.set_updated_at();
+
+
+--
+-- Name: workflow_runs workflow_runs_webhook_emit; Type: TRIGGER; Schema: public; Owner: -
+--
+
+CREATE TRIGGER workflow_runs_webhook_emit AFTER UPDATE OF status ON public.workflow_runs FOR EACH ROW WHEN (((old.status IS DISTINCT FROM new.status) AND (new.status = ANY (ARRAY['completed'::text, 'failed'::text, 'cancelled'::text, 'paused'::text, 'cap_paused'::text])))) EXECUTE FUNCTION public.webhook_emit_run_event();
 
 
 --
@@ -8781,6 +9185,14 @@ ALTER TABLE ONLY public.notification_deliveries
 
 
 --
+-- Name: notifications notifications_endpoint_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.notifications
+    ADD CONSTRAINT notifications_endpoint_id_fkey FOREIGN KEY (endpoint_id) REFERENCES public.webhook_endpoints(id) ON DELETE CASCADE;
+
+
+--
 -- Name: notifications notifications_org_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
 --
 
@@ -9258,6 +9670,62 @@ ALTER TABLE ONLY public.tuner_runs
 
 ALTER TABLE ONLY public.user_memory
     ADD CONSTRAINT user_memory_user_id_fkey FOREIGN KEY (user_id) REFERENCES auth.users(id) ON DELETE CASCADE;
+
+
+--
+-- Name: webhook_deliveries webhook_deliveries_endpoint_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.webhook_deliveries
+    ADD CONSTRAINT webhook_deliveries_endpoint_id_fkey FOREIGN KEY (endpoint_id) REFERENCES public.webhook_endpoints(id) ON DELETE CASCADE;
+
+
+--
+-- Name: webhook_deliveries webhook_deliveries_event_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.webhook_deliveries
+    ADD CONSTRAINT webhook_deliveries_event_id_fkey FOREIGN KEY (event_id) REFERENCES public.webhook_events(id) ON DELETE CASCADE;
+
+
+--
+-- Name: webhook_delivery_attempts webhook_delivery_attempts_delivery_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.webhook_delivery_attempts
+    ADD CONSTRAINT webhook_delivery_attempts_delivery_id_fkey FOREIGN KEY (delivery_id) REFERENCES public.webhook_deliveries(id) ON DELETE CASCADE;
+
+
+--
+-- Name: webhook_endpoints webhook_endpoints_org_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.webhook_endpoints
+    ADD CONSTRAINT webhook_endpoints_org_id_fkey FOREIGN KEY (org_id) REFERENCES public.organizations(id) ON DELETE CASCADE;
+
+
+--
+-- Name: webhook_endpoints webhook_endpoints_user_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.webhook_endpoints
+    ADD CONSTRAINT webhook_endpoints_user_id_fkey FOREIGN KEY (user_id) REFERENCES auth.users(id) ON DELETE CASCADE;
+
+
+--
+-- Name: webhook_events webhook_events_endpoint_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.webhook_events
+    ADD CONSTRAINT webhook_events_endpoint_id_fkey FOREIGN KEY (endpoint_id) REFERENCES public.webhook_endpoints(id) ON DELETE CASCADE;
+
+
+--
+-- Name: webhook_events webhook_events_org_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.webhook_events
+    ADD CONSTRAINT webhook_events_org_id_fkey FOREIGN KEY (org_id) REFERENCES public.organizations(id) ON DELETE CASCADE;
 
 
 --
@@ -10976,6 +11444,30 @@ CREATE POLICY user_settings_owner_update ON public.user_settings FOR UPDATE TO a
 
 
 --
+-- Name: webhook_deliveries; Type: ROW SECURITY; Schema: public; Owner: -
+--
+
+ALTER TABLE public.webhook_deliveries ENABLE ROW LEVEL SECURITY;
+
+--
+-- Name: webhook_delivery_attempts; Type: ROW SECURITY; Schema: public; Owner: -
+--
+
+ALTER TABLE public.webhook_delivery_attempts ENABLE ROW LEVEL SECURITY;
+
+--
+-- Name: webhook_endpoints; Type: ROW SECURITY; Schema: public; Owner: -
+--
+
+ALTER TABLE public.webhook_endpoints ENABLE ROW LEVEL SECURITY;
+
+--
+-- Name: webhook_events; Type: ROW SECURITY; Schema: public; Owner: -
+--
+
+ALTER TABLE public.webhook_events ENABLE ROW LEVEL SECURITY;
+
+--
 -- Name: workflow_definitions; Type: ROW SECURITY; Schema: public; Owner: -
 --
 
@@ -12130,3 +12622,36 @@ REVOKE ALL ON TABLE public.oauth_tokens FROM anon;
 REVOKE ALL ON TABLE public.oauth_tokens FROM authenticated;
 REVOKE ALL ON TABLE public.oauth_tokens FROM service_role;
 GRANT ALL ON TABLE public.oauth_tokens TO service_role;
+
+-- migration 225 — the four webhook tables: deny-all to every client role (RLS on, no policy; D-32),
+-- copied from the 224 lines above, not retyped; and the two emit trigger functions (Group A shape:
+-- trigger-only), PUBLIC first (the CLAUDE.md trap). Only the backend's service-role pool reads or
+-- writes the tables. notifications.endpoint_id needs no line: notifications keeps its 218 grant.
+REVOKE ALL ON TABLE public.webhook_endpoints FROM PUBLIC;
+REVOKE ALL ON TABLE public.webhook_endpoints FROM anon;
+REVOKE ALL ON TABLE public.webhook_endpoints FROM authenticated;
+REVOKE ALL ON TABLE public.webhook_endpoints FROM service_role;
+GRANT ALL ON TABLE public.webhook_endpoints TO service_role;
+REVOKE ALL ON TABLE public.webhook_events FROM PUBLIC;
+REVOKE ALL ON TABLE public.webhook_events FROM anon;
+REVOKE ALL ON TABLE public.webhook_events FROM authenticated;
+REVOKE ALL ON TABLE public.webhook_events FROM service_role;
+GRANT ALL ON TABLE public.webhook_events TO service_role;
+REVOKE ALL ON TABLE public.webhook_deliveries FROM PUBLIC;
+REVOKE ALL ON TABLE public.webhook_deliveries FROM anon;
+REVOKE ALL ON TABLE public.webhook_deliveries FROM authenticated;
+REVOKE ALL ON TABLE public.webhook_deliveries FROM service_role;
+GRANT ALL ON TABLE public.webhook_deliveries TO service_role;
+REVOKE ALL ON TABLE public.webhook_delivery_attempts FROM PUBLIC;
+REVOKE ALL ON TABLE public.webhook_delivery_attempts FROM anon;
+REVOKE ALL ON TABLE public.webhook_delivery_attempts FROM authenticated;
+REVOKE ALL ON TABLE public.webhook_delivery_attempts FROM service_role;
+GRANT ALL ON TABLE public.webhook_delivery_attempts TO service_role;
+REVOKE EXECUTE ON FUNCTION public.webhook_emit_run_event() FROM PUBLIC;
+REVOKE EXECUTE ON FUNCTION public.webhook_emit_run_event() FROM anon;
+REVOKE EXECUTE ON FUNCTION public.webhook_emit_run_event() FROM authenticated;
+GRANT EXECUTE ON FUNCTION public.webhook_emit_run_event() TO service_role;
+REVOKE EXECUTE ON FUNCTION public.webhook_emit_document_event() FROM PUBLIC;
+REVOKE EXECUTE ON FUNCTION public.webhook_emit_document_event() FROM anon;
+REVOKE EXECUTE ON FUNCTION public.webhook_emit_document_event() FROM authenticated;
+GRANT EXECUTE ON FUNCTION public.webhook_emit_document_event() TO service_role;

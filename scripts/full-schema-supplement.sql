@@ -940,3 +940,36 @@ REVOKE ALL ON TABLE public.oauth_tokens FROM anon;
 REVOKE ALL ON TABLE public.oauth_tokens FROM authenticated;
 REVOKE ALL ON TABLE public.oauth_tokens FROM service_role;
 GRANT ALL ON TABLE public.oauth_tokens TO service_role;
+
+-- migration 225 — the four webhook tables: deny-all to every client role (RLS on, no policy; D-32),
+-- copied from the 224 lines above, not retyped; and the two emit trigger functions (Group A shape:
+-- trigger-only), PUBLIC first (the CLAUDE.md trap). Only the backend's service-role pool reads or
+-- writes the tables. notifications.endpoint_id needs no line: notifications keeps its 218 grant.
+REVOKE ALL ON TABLE public.webhook_endpoints FROM PUBLIC;
+REVOKE ALL ON TABLE public.webhook_endpoints FROM anon;
+REVOKE ALL ON TABLE public.webhook_endpoints FROM authenticated;
+REVOKE ALL ON TABLE public.webhook_endpoints FROM service_role;
+GRANT ALL ON TABLE public.webhook_endpoints TO service_role;
+REVOKE ALL ON TABLE public.webhook_events FROM PUBLIC;
+REVOKE ALL ON TABLE public.webhook_events FROM anon;
+REVOKE ALL ON TABLE public.webhook_events FROM authenticated;
+REVOKE ALL ON TABLE public.webhook_events FROM service_role;
+GRANT ALL ON TABLE public.webhook_events TO service_role;
+REVOKE ALL ON TABLE public.webhook_deliveries FROM PUBLIC;
+REVOKE ALL ON TABLE public.webhook_deliveries FROM anon;
+REVOKE ALL ON TABLE public.webhook_deliveries FROM authenticated;
+REVOKE ALL ON TABLE public.webhook_deliveries FROM service_role;
+GRANT ALL ON TABLE public.webhook_deliveries TO service_role;
+REVOKE ALL ON TABLE public.webhook_delivery_attempts FROM PUBLIC;
+REVOKE ALL ON TABLE public.webhook_delivery_attempts FROM anon;
+REVOKE ALL ON TABLE public.webhook_delivery_attempts FROM authenticated;
+REVOKE ALL ON TABLE public.webhook_delivery_attempts FROM service_role;
+GRANT ALL ON TABLE public.webhook_delivery_attempts TO service_role;
+REVOKE EXECUTE ON FUNCTION public.webhook_emit_run_event() FROM PUBLIC;
+REVOKE EXECUTE ON FUNCTION public.webhook_emit_run_event() FROM anon;
+REVOKE EXECUTE ON FUNCTION public.webhook_emit_run_event() FROM authenticated;
+GRANT EXECUTE ON FUNCTION public.webhook_emit_run_event() TO service_role;
+REVOKE EXECUTE ON FUNCTION public.webhook_emit_document_event() FROM PUBLIC;
+REVOKE EXECUTE ON FUNCTION public.webhook_emit_document_event() FROM anon;
+REVOKE EXECUTE ON FUNCTION public.webhook_emit_document_event() FROM authenticated;
+GRANT EXECUTE ON FUNCTION public.webhook_emit_document_event() TO service_role;

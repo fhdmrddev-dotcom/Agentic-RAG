@@ -124,4 +124,8 @@ def test_the_code_names_the_move_type_and_stays_a_subset_of_217():
 
     assert NEW_TYPE in VALID_ACTION_TYPES
     now = _check_literals(_code(_migration("217")))
-    assert VALID_ACTION_TYPES <= now, sorted(VALID_ACTION_TYPES - now)
+    # Phase 308 (D-31): migration 225 restates the CHECK with nine webhook.endpoint.* types on top of
+    # 217's; those (and only those) are excused here and pinned by test_308_migration_225_static.py.
+    later = {t for t in VALID_ACTION_TYPES if t.startswith("webhook.endpoint.")}
+    assert len(later) == 9, sorted(later)
+    assert VALID_ACTION_TYPES - later <= now, sorted(VALID_ACTION_TYPES - later - now)
