@@ -1,0 +1,43 @@
+{
+  "version": "1.0",
+  "timestamp": "2026-11-06T18:03:12.669Z",
+  "phase": null,
+  "phase_name": "tester bug-fix session (Syrel testing report)",
+  "phase_dir": null,
+  "plan": null,
+  "task": null,
+  "total_tasks": null,
+  "status": "paused",
+  "completed_tasks": [
+    {"id": 1, "name": "BUG-261106-01 dead citation gate (tester BUG-19)", "status": "done", "commit": "afb2ff667 (develop) / bcebbd6cc (prod)"},
+    {"id": 2, "name": "BUG-261106-02 dead file gate (tester BUG-19b)", "status": "done", "commit": "b40748a93 (develop) / 2cc9b4845 (prod)"},
+    {"id": 3, "name": "BUG-261106-03 live run driven twice by sibling worker boot (tester BUG-30)", "status": "done", "commit": "eaca92e63 (develop) / 729733468 (prod)"},
+    {"id": 4, "name": "Chat answer key HR-01..HR-26 run on prod (DeepSeek)", "status": "done", "commit": "n/a (results in tester report rev 3)"},
+    {"id": 5, "name": "Golden workflow cases WF-C1..WF-C5 on draft A", "status": "done", "commit": "n/a (results in tester report rev 3)"},
+    {"id": 6, "name": "Tester report revision 3 uploaded to Drive", "status": "done", "commit": "Drive file 1AIuVuHh6CAh8dURNyIxzqYmtI0sFEpQz"},
+    {"id": 7, "name": "BUG-261106-05 grep case-insensitive (tester BUG-32)", "status": "done", "commit": "8dae0d0fb (develop) / 58d6363a9 (prod); verified HR-25"},
+    {"id": 8, "name": "BUG-261106-04 email dates typed, migration 226 (tester BUG-31)", "status": "done", "commit": "f1474ebd5 (develop); applied to cloud 2026-11-06; verified HR-22"}
+  ],
+  "remaining_tasks": [
+    {"id": 9, "name": "Publish tester report revision 4 (HR-22/HR-25 now pass; BUG-31/BUG-32 fixed; answer key 23/2/1)", "status": "not_started"},
+    {"id": 10, "name": "Correct workflow spec for OUR-02 (no pause steps) and OUR-03 (WF-C4 expects blank email)", "status": "not_started"},
+    {"id": 11, "name": "Publish tests WF-P1..WF-P4 (needs full design with Word template; also verifies BUG-11/phase 303 via WF-P4)", "status": "not_started"},
+    {"id": 12, "name": "Promote today's hotfixes + migration 226 + phase 303 from production/develop to master", "status": "not_started"}
+  ],
+  "blockers": [
+    {"description": "No manual workflow builder: 'Build it myself' opens the AI drafter (tester BUG-27 / SEED-156)", "type": "technical", "workaround": "Describe the full design to the drafter and inspect the definition before running"}
+  ],
+  "human_actions_pending": [
+    {"action": "Decide whether to retire phase-278 fences (test_278_pure_move, test_278_registry_pin) so the agent's grep tool can offer case_sensitive", "context": "They pin every tool schema/handler byte-identical to an old commit", "blocking": false},
+    {"action": "Check Coolify backend logs for 'Child process [...] died' at 05:06:53 and 12:20:17 UTC on 2026-11-06", "context": "Why a uvicorn worker restarted (root trigger of BUG-261106-03)", "blocking": false},
+    {"action": "Approve promotion of today's work to master", "context": "master has none of it", "blocking": false}
+  ],
+  "decisions": [
+    {"decision": "Heartbeat on workflow_runs.updated_at, not claimed_at", "rationale": "claimed_at anchors the circuit-breaker duration cap and displayed start", "phase": null},
+    {"decision": "Grep fix kept inside grep_path only; agent tool schema/handler untouched", "rationale": "phase-278 fences pin them; retiring fences is an operator decision", "phase": null},
+    {"decision": "Hotfixes promoted by worktree cherry-pick onto production, master untouched", "rationale": "never drag unfinished develop work into live", "phase": null}
+  ],
+  "uncommitted_files": [],
+  "next_action": "Publish tester report revision 4 to Drive (local copy ~/Downloads/Syrel-Testing-and-Bug-Report.md; upload as a new file, rename rev 3 'superseded')",
+  "context_notes": "Production 58d6363a9 + cloud migration 226. Test org 5edbb089 'My organization'. Default model deepseek-v4-flash. Draft A = workflow d0437304. See memory project_hotfix_bug261106_01_live.md."
+}
