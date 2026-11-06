@@ -4,10 +4,10 @@ title: AI-drafted agent steps carry a citation check they can never pass
 reported: 2026-11-06
 surface: Agentic-RAG
 severity: blocking
-status: open
+status: closed
 affected_areas: [backend/workflow-authoring, backend/harness-gates]
 folded_into: null
-verified_closed_by: null
+verified_closed_by: "hotfix bcebbd6cc on production; live runs dc6e4c56 (step 1 passed) and cff40665 (completed) 2026-11-06"
 related_seeds: [SEED-156]
 re_open_trigger: null
 reproduces_on:

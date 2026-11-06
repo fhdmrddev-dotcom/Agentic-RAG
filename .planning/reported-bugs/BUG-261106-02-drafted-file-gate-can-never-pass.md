@@ -4,10 +4,10 @@ title: AI-drafted agent steps carry a file check they can never pass
 reported: 2026-11-06
 surface: Agentic-RAG
 severity: blocking
-status: open
+status: closed
 affected_areas: [backend/workflow-authoring, backend/harness-gates]
 folded_into: null
-verified_closed_by: null
+verified_closed_by: "hotfix 2cc9b4845 on production; live run cff40665 completed 2026-11-06 13:36 UTC"
 related_seeds: [SEED-156]
 re_open_trigger: null
 reproduces_on:
@@ -42,7 +42,16 @@ It failed 3 attempts with `output_file_valid: unsupported format '' ('')` and fa
 `config["path"]`, and opens docx/pptx/xlsx (pdf is a pass stub). The three config keys
 are invented; none is read. On an agent step the filename is `''`, so every attempt fails.
 
-## Fix (develop, not deployed)
+## Verified live (2026-11-06)
+
+Production `2cc9b4845`, run `cff40665-080e-477e-b589-984692ccaa0c`, same draft and input,
+model `custom` / `unsloth/Qwen3.8-27B-GGUF:UD-Q4_K_XL` (operator's local GPU via a
+Cloudflare quick tunnel). Step 1 passed (27 citations, 7m19s). Step 2 try 1 failed on a
+model-call outage (not a gate); try 2 wrote `/welcome_pack_AFM-0431.md` and passed with 25
+citations. Run `completed` 13:36:40 UTC. The dead file gate never ran: the first failure on
+step 2 came from `citations_required`, which would have been preceded by it.
+
+## Fix (develop b40748a93; production 2cc9b4845)
 
 - `harness/grounding.py`: new pure predicate `file_gate_can_never_pass` (not `llm_emit`
   and no openable `config.path`), and `gate_can_never_pass` (either dead arm).
