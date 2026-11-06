@@ -2,13 +2,13 @@
 gsd_state_version: 1.0
 milestone: v4.9
 milestone_name: Use It From Your Own Tools
-status: verifying
-last_updated: "2026-11-06T02:59:19.736Z"
-last_activity: 2026-11-04
+status: executing
+last_updated: "2026-11-06T03:16:53.803Z"
+last_activity: 2026-11-06 -- Phase 303 planning complete
 progress:
   total_phases: 14
   completed_phases: 5
-  total_plans: 26
+  total_plans: 27
   completed_plans: 26
   percent: 36
 ---
@@ -46,8 +46,8 @@ reviewer exists, so a phase closes `verification_mode: self-verified`, never `re
 Milestone: v4.9 Use It From Your Own Tools
 Phase: 308
 Plan: 6 of 6 (complete; human UAT owed)
-Status: Phase 308 executed — 6/6 plans merged, review 1C/6W fixed, verification human_needed; owed: 308-HUMAN-UAT.md rows 1-6, cloud mig 225 after 220→224 (per-action approval) + get_advisors(security), public docs (309) before deploy
-Last activity: 2026-11-04
+Status: Ready to execute
+Last activity: 2026-11-06 -- Phase 303 planning complete
 
 Phases start at **303**; migrations at **220**. Seeds taken in at intake: SEED-013, SEED-177, SEED-195, SEED-081, SEED-079; bug BUG-261022-01.
 
