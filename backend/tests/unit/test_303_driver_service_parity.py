@@ -65,6 +65,12 @@ _CASES = [
     ("run-split-tight", ["X: {{na", "me}}"], {"name": "Ann"}, "X: Ann"),
     ("run-split-spaced", ["X: {{ na", "me }}"], {"name": "Ann"}, "X: Ann"),
     ("backslash", ["X: {{ name }}"], {"name": BACKSLASH_VALUE}, "X: " + BACKSLASH_VALUE),
+    # D-18 (303-REVIEW WR-02): one pass over the original text, so an inserted value is
+    # never re-scanned by a later key or by the unknown-token blank.
+    ("value-contains-token", ["X: {{a}}"], {"a": "{{ b }}", "b": "B"}, "X: {{ b }}"),
+    ("value-contains-earlier-key", ["X: {{b}} {{a}}"], {"a": "{{ b }}", "b": "B"}, "X: B {{ b }}"),
+    ("value-contains-unknown", ["X: {{a}}"], {"a": "{{ zz }}"}, "X: {{ zz }}"),
+    ("prefix-keys", ["X: {{ name }}/{{ name2 }}"], {"name": "A", "name2": "B"}, "X: A/B"),
 ]
 
 
