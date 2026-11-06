@@ -14,6 +14,7 @@ findings:
   info: 3
   total: 7
 status: issues_found
+fix_status: fixed 6 / skipped 1 (WR-01 accepted, D-20) — see "Fix status" at the end
 ---
 
 # Phase 303: Code Review Report
@@ -196,6 +197,22 @@ The result is that the record-text document the phase says is "never handed back
 - No test drives the oracle step from CR-01.
 
 **Fix:** Extend the `where` parametrisation to all seven locations. Add `driver["_RECORD_TEXT_MARK"] == service._RECORD_TEXT_MARK == "'source_chunk_id':"`. Add the oracle test described in CR-01.
+
+---
+
+## Fix status (2026-11-06, gsd-code-fixer, dispositions D-17..D-21 in 303-CONTEXT.md)
+
+| Finding | Status | Commit | What changed |
+|---|---|---|---|
+| CR-01 | fixed: requires human verification (logic) | `1b2233402` | D-17. `parse_docx_template_variables` records `{{ r.col }}` as well as `{{ r.col.value }}` as a column, except `score` (`_DERIVED_ROW_KEYS`). The four shipped templates parse identically: measured before == after, and pinned against the legacy rule by `test_oracle_unchanged_for_shipped_templates`. The oracle step is tested (`test_oracle_records_bare_loop_column_but_not_score`). Filtered tokens (`{{ r.x|upper }}`) are still not read, for scalars and columns alike (pre-existing limit). |
+| WR-01 | skipped: accepted, D-20 | — | Known limit, recorded under Deferred in CONTEXT. No code change. |
+| WR-02 | fixed: requires human verification (logic) | `7c6c9ce13` | D-18. Both copies of `_replace_in_paragraph` run ONE alternation pass over the paragraph's original text (known keys `re.escape`d, longest first, then the unknown-placeholder blank; function replacement). An inserted value is never rewritten or erased. `matched` counts template keys only. ⚠ **Residual consequence, accepted:** a cited value that contains a literal `{{ x }}` (or any `{{`/`}}`/`{%`) now survives into the document, so the residual scan flags it and the file is NOT delivered. That is an honest refusal of content the engine cannot tell apart from a tag, never a silent rewrite. |
+| WR-03 | fixed | `da008d678` | D-19. On `residual_tokens`, `integrity` and `no_verdict` the handler runs `rm -f <shlex-quoted /sandbox/output path>` through the same `sandbox_manager` session (in the threadpool) before returning. A failed delete is logged (`could not remove refused output`) and the refusal is returned unchanged. A delivered file is never deleted. `harvest_failed` does not delete: that file passed integrity. The `sandbox_error` path (an exception inside the sandbox run) also does not delete, because the session state is unknown there. |
+| IN-01 | fixed | `161276fc7` | The `run_replace_docx` docstring now says the default header/footer part is still created when absent (pre-existing). |
+| IN-02 | fixed | `161276fc7` | An all-record-text verdict leads with "A field printed as raw record text: the template printed a whole cited record …", says "NOT delivered" once and names the template-side fix. A mixed verdict names both causes, once. The plain residual and integrity messages are byte-identical to before. |
+| IN-03 | fixed | `161276fc7` | The residual-scan reach test covers all eight locations (nested, header, footer, header table, first-page header/footer, even-page header/footer), for both a surviving token and record text. `_RECORD_TEXT_MARK` is pinned across the copies. The oracle test landed with CR-01. |
+
+**Verification.** The eight in-scope suites (`test_303_bare_tokens`, `test_303_driver_service_parity`, `test_template_render`, `test_296_render_template`, `test_291_pdf_fill_driver`, `test_291_acroform_reader_parity`, `test_278_pure_move`, `test_190_ssti_fence`) went from 153 to **200 passed, 0 failed**. The handler suites `test_citation_policy`, `test_emitters` and `test_llm_emit_executor` pass (62), and so do the oracle consumers (258). Golden: `evidence/golden/after-review` vs `base` → **RESULT: ALL IDENTICAL**. The ledger and size gates exit 0. The full backend baseline was not run here.
 
 ---
 

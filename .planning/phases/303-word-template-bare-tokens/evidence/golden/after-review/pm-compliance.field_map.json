@@ -1,0 +1,140 @@
+{
+ "collections": {
+  "rows": [
+   {
+    "current_state": {
+     "source_chunk_id": "chunk-0",
+     "source_doc": "doc.pdf",
+     "source_page": 0,
+     "value": "current_state row 0"
+    },
+    "gap": {
+     "source_chunk_id": "chunk-0",
+     "source_doc": "doc.pdf",
+     "source_page": 0,
+     "value": "gap row 0"
+    },
+    "owner": {
+     "source_chunk_id": "chunk-0",
+     "source_doc": "doc.pdf",
+     "source_page": 0,
+     "value": "owner row 0"
+    },
+    "requirement": {
+     "source_chunk_id": "chunk-0",
+     "source_doc": "doc.pdf",
+     "source_page": 0,
+     "value": "requirement row 0"
+    },
+    "severity": {
+     "source_chunk_id": "chunk-0",
+     "source_doc": "doc.pdf",
+     "source_page": 0,
+     "value": "severity row 0"
+    },
+    "source_clause": {
+     "source_chunk_id": "chunk-0",
+     "source_doc": "doc.pdf",
+     "source_page": 0,
+     "value": "source_clause row 0"
+    }
+   },
+   {
+    "current_state": {
+     "source_chunk_id": "chunk-0",
+     "source_doc": "doc.pdf",
+     "source_page": 0,
+     "value": null
+    },
+    "gap": {
+     "source_chunk_id": "chunk-1",
+     "source_doc": "doc.pdf",
+     "source_page": 1,
+     "value": "gap row 1"
+    },
+    "owner": {
+     "source_chunk_id": "chunk-1",
+     "source_doc": "doc.pdf",
+     "source_page": 1,
+     "value": "owner row 1"
+    },
+    "requirement": {
+     "source_chunk_id": "chunk-1",
+     "source_doc": "doc.pdf",
+     "source_page": 1,
+     "value": "requirement row 1"
+    },
+    "severity": {
+     "source_chunk_id": "chunk-1",
+     "source_doc": "doc.pdf",
+     "source_page": 1,
+     "value": "severity row 1"
+    },
+    "source_clause": {
+     "source_chunk_id": "chunk-1",
+     "source_doc": "doc.pdf",
+     "source_page": 1,
+     "value": "source_clause row 1"
+    }
+   },
+   {
+    "current_state": {
+     "source_chunk_id": "chunk-2",
+     "source_doc": "doc.pdf",
+     "source_page": 2,
+     "value": "current_state row 2"
+    },
+    "gap": {
+     "source_chunk_id": "chunk-2",
+     "source_doc": "doc.pdf",
+     "source_page": 2,
+     "value": "gap row 2"
+    },
+    "owner": {
+     "source_chunk_id": "chunk-2",
+     "source_doc": "doc.pdf",
+     "source_page": 2,
+     "value": "owner row 2"
+    },
+    "requirement": {
+     "source_chunk_id": "chunk-2",
+     "source_doc": "doc.pdf",
+     "source_page": 2,
+     "value": "requirement row 2"
+    },
+    "severity": {
+     "source_chunk_id": "chunk-2",
+     "source_doc": "doc.pdf",
+     "source_page": 2,
+     "value": "severity row 2"
+    },
+    "source_clause": {
+     "source_chunk_id": "chunk-2",
+     "source_doc": "doc.pdf",
+     "source_page": 2,
+     "value": "source_clause row 2"
+    }
+   }
+  ]
+ },
+ "scalars": {
+  "report_date": {
+   "source_chunk_id": "chunk-0",
+   "source_doc": "doc.pdf",
+   "source_page": 0,
+   "value": "Value of report_date & <x>"
+  },
+  "report_title": {
+   "source_chunk_id": "chunk-1",
+   "source_doc": "doc.pdf",
+   "source_page": 1,
+   "value": "Value of report_title & <x>"
+  },
+  "scope": {
+   "source_chunk_id": "chunk-2",
+   "source_doc": "doc.pdf",
+   "source_page": 2,
+   "value": "Value of scope & <x>"
+  }
+ }
+}
