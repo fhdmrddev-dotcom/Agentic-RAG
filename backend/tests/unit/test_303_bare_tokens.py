@@ -361,6 +361,46 @@ def test_run_replace_inserts_backslash_values_literally(which, tmp_path):
     assert [p.text for p in Document(str(out)).paragraphs] == ["V: " + BACKSLASH_VALUE]
 
 
+_TOKEN_IN_VALUE_ORDERS = {
+    # The defect depended on dict order alone: an earlier key's inserted value was
+    # re-scanned by every later key (rewritten) or by the unknown-token blank (erased).
+    "client-first": ["client", "salary"],
+    "salary-first": ["salary", "client"],
+}
+
+
+@COPIES
+@pytest.mark.parametrize("order", sorted(_TOKEN_IN_VALUE_ORDERS))
+def test_run_replace_never_rescans_an_inserted_value(which, order, tmp_path):
+    """D-18 (303-REVIEW WR-02): a cited value is user data. A token-shaped string inside it
+    is neither replaced by another key's value nor blanked; it survives literally, and the
+    residual scan then fails the file honestly (never a silent rewrite)."""
+    c = _Copy(which)
+    values = {
+        "client": {"value": "see {{ salary }} and {{ ghost }}", "source_chunk_id": "c1"},
+        "salary": {"value": "120000", "source_chunk_id": "c2"},
+    }
+    scalars = {k: values[k] for k in _TOKEN_IN_VALUE_ORDERS[order]}
+    tpl = build(tmp_path / "cascade.docx", paragraphs=["Client: {{client}} / Salary: {{ salary }}"])
+    out = tmp_path / "out.docx"
+    c.run_replace(tpl, scalars, out)
+    body = [p.text for p in Document(str(out)).paragraphs]
+    assert body == ["Client: see {{ salary }} and {{ ghost }} / Salary: 120000"], body
+    assert c.residual_tags_in(str(out), "docx"), "a surviving token in a value must fail the scan"
+
+
+def test_service_run_replace_counts_only_keys_in_the_template(tmp_path):
+    """D-18: ``matched`` counts keys found in the template text, never inside an inserted value."""
+    tpl = build(tmp_path / "m.docx", paragraphs=["Client: {{client}}"])
+    res = svc.run_replace_docx(
+        str(tpl),
+        {"client": {"value": "see {{ salary }}"}, "salary": {"value": "120000"}},
+        str(tmp_path / "out.docx"),
+    )
+    assert res["replaced_keys"] == ["client"], res
+    assert res["unmatched_keys"] == ["salary"], res
+
+
 @COPIES
 def test_run_replace_still_blanks_unknown_tokens(which, tmp_path):
     """Regression guard (passes at base): the lean-blank design for unknown placeholder

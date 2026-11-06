@@ -183,19 +183,27 @@ def _replace_in_paragraph(paragraph, flat_scalars):
         return
     full = paragraph.text
     matched = set()
-    replaced_text = full
-    for key, value in flat_scalars.items():
-        # Phase 303 (D-08): {{key}}, {{ key }} and {{ key.value }} with any inner spacing.
-        # re.escape keeps the key literal; the FUNCTION replacement keeps a value's
-        # backslashes literal (a template string would read \1 as a group).
-        pat = re.compile(r"\{\{\s*" + re.escape(key) + r"(?:\.value)?\s*\}\}")
-        if pat.search(replaced_text):
+    blanked = []
+    # Phase 303 (D-08): {{key}}, {{ key }} and {{ key.value }} with any inner spacing.
+    # D-18 (303-REVIEW WR-02): ONE pass over the ORIGINAL text - a known key, else an
+    # unknown placeholder-shaped token (blanked) - so an inserted value is never re-scanned
+    # by a later key or by the blank. A token inside a value is user data and survives; the
+    # residual scan then fails the file honestly. re.escape keeps each key literal (longest
+    # first); the FUNCTION replacement keeps a value's backslashes literal.
+    alts = "|".join(re.escape(k) for k in sorted(flat_scalars, key=len, reverse=True))
+    known = r"\{\{\s*(?P<key>" + alts + r")(?:\.value)?\s*\}\}|" if alts else ""
+    token_re = re.compile(known + r"(?P<unknown>" + _PLACEHOLDER_TOKEN_RE.pattern + r")")
+
+    def _sub(m):
+        key = m.group("key") if alts else None
+        if key is not None:
             matched.add(key)
-            replaced_text = pat.sub(lambda _m, _v=value: _v, replaced_text)
-    # Blank any remaining placeholder-shaped token (unmatched intended placeholders).
-    blanked_text = _PLACEHOLDER_TOKEN_RE.sub("", replaced_text)
-    touched = matched or (blanked_text != replaced_text)
-    replaced_text = blanked_text
+            return flat_scalars[key]
+        blanked.append(True)  # unmatched intended placeholder
+        return ""
+
+    replaced_text = token_re.sub(_sub, full)
+    touched = matched or blanked
     if not touched:
         return  # no token here -> leave runs (and their formatting) intact
     # Coalesce: whole replaced text into run[0], clear the rest.
