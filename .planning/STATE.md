@@ -2,15 +2,15 @@
 gsd_state_version: 1.0
 milestone: v4.9
 milestone_name: Use It From Your Own Tools
-status: executing
-last_updated: "2026-11-06T03:16:53.803Z"
-last_activity: 2026-11-06 -- Phase 303 planning complete
+status: verifying
+last_updated: "2026-11-06T03:36:18.632Z"
+last_activity: 2026-11-06
 progress:
   total_phases: 14
-  completed_phases: 5
+  completed_phases: 6
   total_plans: 27
-  completed_plans: 26
-  percent: 36
+  completed_plans: 27
+  percent: 43
 ---
 
 # Project State
@@ -30,7 +30,7 @@ See: `.planning/PROJECT.md` (updated 2026-10-30)
 
 **Core value:** The agent acts as an AI colleague — it knows your knowledge base, can run code, and
 can be taught new behaviours (skills) that persist and can be shared.
-**Current focus:** Phase 307 — sign in from claude.ai and claude desktop
+**Current focus:** Phase 303 — Word Template Bare Tokens
 
 ---
 
@@ -44,10 +44,10 @@ reviewer exists, so a phase closes `verification_mode: self-verified`, never `re
 ## Current Position
 
 Milestone: v4.9 Use It From Your Own Tools
-Phase: 308
-Plan: 6 of 6 (complete; human UAT owed)
-Status: Ready to execute
-Last activity: 2026-11-06 -- Phase 303 planning complete
+Phase: 303 (Word Template Bare Tokens)
+Plan: 1 of 1
+Status: Phase complete — ready for verification
+Last activity: 2026-11-06
 
 Phases start at **303**; migrations at **220**. Seeds taken in at intake: SEED-013, SEED-177, SEED-195, SEED-081, SEED-079; bug BUG-261022-01.
 

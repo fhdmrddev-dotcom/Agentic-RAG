@@ -106,7 +106,7 @@ Requirements: [`REQUIREMENTS.md`](REQUIREMENTS.md). **29 v4.9 requirements, 29 m
 **How we'd know this failed**: the repro ran only through a mirror and the driver still writes record text; only one of the two rendering copies is fixed; `residual_tags_in` still cannot see a rendered repr; the fix blanks the token so the document reads empty where a value belongs; `{{ name.value }}` or `|default` output changes; the integrity check skips headers, footers or nested tables; `Dockerfile.sandbox` changes without a new image tag and `SANDBOX_IMAGE` in the same commit.
 **Plans**: 1 plan in 1 wave
 
-- [ ] 303-01-PLAN.md — RED tests (driver script + service + D-10 parity), the fix in both copies (str-coercing cell, spaced/.value key match, nested + header-variant reach, record-text integrity fail), golden-identical, ledgers same commit, VALIDATION U-1/U-2 (wave 1, no DB)
+- [x] 303-01-PLAN.md — RED tests (driver script + service + D-10 parity), the fix in both copies (str-coercing cell, spaced/.value key match, nested + header-variant reach, record-text integrity fail), golden-identical, ledgers same commit, VALIDATION U-1/U-2 (wave 1, no DB)
 **Flags**: **The repro decides the size.** If the fix is a few lines in one file with no schema or API surface, run it as `/gsd:quick` (G-3), not a phase. **G-5**: `backend/app/services/tools/render_template.py` (`6 / 3 / 1163`, FIRES) — a minimal edit honoured by construction, or take its named seam first; read its section of `docs/HOT-FILE-LEDGER.md` at discuss. No image rebuild expected. No migration. No research. Folds `BUG-261022-01`.
 
 #### Phase 304: Personal MCP Keys That Act as You
