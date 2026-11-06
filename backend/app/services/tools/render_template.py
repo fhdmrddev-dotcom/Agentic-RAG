@@ -83,17 +83,34 @@ import sys
 
 _PLACEHOLDER_TOKEN_RE = re.compile(r"\{\{\s*[A-Za-z_][\w.]*\s*\}\}")
 _RESIDUAL_TOKENS = ("{{", "}}", "{%", "%}")
+# Phase 303 (D-07): a rendered span carrying this is a whole cited record printed as text.
+_RECORD_TEXT_MARK = "'source_chunk_id':"
+_RECORD_TEXT_PREFIX = "record text: "
+
+
+class _CitedCell(dict):
+    # Phase 303 (D-06, FIX-15): a cited cell IS a dict, so {{ name.value }}, {% if name %},
+    # == and |default resolve exactly as before; str() is the value, so a bare {{ name }}
+    # prints "Ann" instead of the whole record. Deliberately NO repr override (a whole row
+    # or list printed must still show the record marker, so the residual scan catches it),
+    # NO html hook (markupsafe must still escape str(cell) like {{ name.value }}), and no
+    # getattr/format hooks (nothing new for the Jinja sandbox to reach).
+    __slots__ = ()
+
+    def __str__(self):
+        v = self.get("value")
+        return "" if v is None else str(v)
 
 
 def _cell(cited):
     cited = cited or {}
     v = cited.get("value") if isinstance(cited, dict) else None
-    return {
+    return _CitedCell({
         "value": "" if v is None else v,
         "source_chunk_id": cited.get("source_chunk_id") if isinstance(cited, dict) else None,
         "source_doc": cited.get("source_doc") if isinstance(cited, dict) else None,
         "source_page": cited.get("source_page") if isinstance(cited, dict) else None,
-    }
+    })
 
 
 def _build_row(row):
@@ -168,10 +185,13 @@ def _replace_in_paragraph(paragraph, flat_scalars):
     matched = set()
     replaced_text = full
     for key, value in flat_scalars.items():
-        token = "{{" + key + "}}"
-        if token in replaced_text:
+        # Phase 303 (D-08): {{key}}, {{ key }} and {{ key.value }} with any inner spacing.
+        # re.escape keeps the key literal; the FUNCTION replacement keeps a value's
+        # backslashes literal (a template string would read \1 as a group).
+        pat = re.compile(r"\{\{\s*" + re.escape(key) + r"(?:\.value)?\s*\}\}")
+        if pat.search(replaced_text):
             matched.add(key)
-            replaced_text = replaced_text.replace(token, value)
+            replaced_text = pat.sub(lambda _m, _v=value: _v, replaced_text)
     # Blank any remaining placeholder-shaped token (unmatched intended placeholders).
     blanked_text = _PLACEHOLDER_TOKEN_RE.sub("", replaced_text)
     touched = matched or (blanked_text != replaced_text)
@@ -193,14 +213,28 @@ def run_replace_docx(template_path, flat_scalars, out_path):
         for p in paragraphs:
             _replace_in_paragraph(p, flat_scalars)
 
+    def _walk_tables(tables):
+        # Phase 303 (D-09): every cell, then every table nested inside it.
+        for table in tables:
+            for row in table.rows:
+                for cell in row.cells:
+                    _walk(cell.paragraphs)
+                    _walk_tables(cell.tables)
+
     _walk(doc.paragraphs)
-    for table in doc.tables:
-        for row in table.rows:
-            for cell in row.cells:
-                _walk(cell.paragraphs)
+    _walk_tables(doc.tables)
     for section in doc.sections:
         _walk(section.header.paragraphs)
         _walk(section.footer.paragraphs)
+        _walk_tables(section.header.tables)
+        _walk_tables(section.footer.tables)
+        # First-page / even-page variants only when the template defines them: touching
+        # .paragraphs on an undefined one ADDS a header part to the output.
+        for hf in (section.first_page_header, section.first_page_footer,
+                   section.even_page_header, section.even_page_footer):
+            if not hf.is_linked_to_previous:
+                _walk(hf.paragraphs)
+                _walk_tables(hf.tables)
     doc.save(out_path)
     return {"rendered": True, "error": None}
 
@@ -540,12 +574,41 @@ def _pdf_documented_limit(fill):
     return " ".join(parts) or None
 
 
-def _hits(texts):
+def _hits(texts, mark_records=False):
     out = []
     for txt in texts:
-        if txt and any(tok in txt for tok in _RESIDUAL_TOKENS):
+        if not txt:
+            continue
+        if mark_records and _RECORD_TEXT_MARK in txt:
+            # Phase 303 (D-07): the prefix goes on AFTER the 80-char cut, so a long value
+            # can never push the marker out of the hit the handler reads.
+            out.append(_RECORD_TEXT_PREFIX + txt.strip()[:80])
+        elif any(tok in txt for tok in _RESIDUAL_TOKENS):
             out.append(txt.strip()[:80])
     return out
+
+
+def _docx_texts(doc):
+    # Phase 303 (D-09): body paragraphs, every table cell recursively (python-docx's
+    # cell.text leaves nested tables out), and every header/footer variant a section
+    # defines (is_linked_to_previous is read-only; .paragraphs on an undefined one adds it).
+    texts = [p.text for p in doc.paragraphs]
+
+    def _tables(tables):
+        for t in tables:
+            for row in t.rows:
+                for cell in row.cells:
+                    texts.append(cell.text)
+                    _tables(cell.tables)
+
+    _tables(doc.tables)
+    for section in doc.sections:
+        for hf in (section.header, section.first_page_header, section.even_page_header,
+                   section.footer, section.first_page_footer, section.even_page_footer):
+            if not hf.is_linked_to_previous:
+                texts.extend(p.text for p in hf.paragraphs)
+                _tables(hf.tables)
+    return texts
 
 
 def residual_tags_in(out_path, fmt):
@@ -553,13 +616,7 @@ def residual_tags_in(out_path, fmt):
     if fmt == "docx":
         from docx import Document
 
-        doc = Document(out_path)
-        texts = [p.text for p in doc.paragraphs]
-        for t in doc.tables:
-            for row in t.rows:
-                for cell in row.cells:
-                    texts.append(cell.text)
-        return _hits(texts)
+        return _hits(_docx_texts(Document(out_path)), mark_records=True)
     if fmt == "pptx":
         from pptx import Presentation
 
@@ -738,6 +795,9 @@ _SAFE_OUT_FILENAME_RE = _re_filename.compile(r"^[A-Za-z0-9._ -]+\.(docx|pptx|xls
 # The engine token is server-generated (select_engine, or "acroform" for a .pdf template —
 # Phase 291) but we whitelist it before interpolation anyway (defense-in-depth — CR-01 step 3).
 _VALID_RENDER_ENGINES = frozenset({"docxtpl", "run_replace", "acroform"})
+# Phase 303 (D-07): the driver prefixes a residual hit with this when the rendered text is
+# a whole cited record. Equal to the driver's and the service's copy (test_303 parity pin).
+_RECORD_TEXT_PREFIX = "record text: "
 
 
 def _safe_out_filename(raw: str | None, template_ext: str) -> str:
@@ -1093,6 +1153,14 @@ async def _handle_render_template(args: dict, ctx: ToolContext) -> ToolResult:
             else "The rendered file failed the integrity re-open and was NOT delivered. "
                  "The cited field-map is preserved below as fallback."
         )
+        if reason == "residual_tokens" and any(
+            isinstance(t, str) and t.startswith(_RECORD_TEXT_PREFIX)
+            for t in (verdict.get("residual_tags") or [])
+        ):
+            msg += (
+                " A field printed as raw record text (a whole cited record instead of its "
+                "value), so the file was not delivered."
+            )
         return ToolResult(result=_json_local.dumps({
             "status": "failed",
             "reason": reason,
