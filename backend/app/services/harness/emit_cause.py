@@ -68,6 +68,7 @@ __all__ = [
     "classify_rejection",
     "terminal_failure_value",
     "compose_emit_failure",
+    "integrity_detail",
     "no_template_bound_sentence",
 ]
 
@@ -124,6 +125,13 @@ _RENDER_FAILED_SENTENCE = "the template could not be filled in{detail}."
 _INTEGRITY_FAILED_SENTENCE = (
     "the filled file did not open cleanly, or still had unfilled placeholders."
 )
+#: Phase 303 (U-1): the template printed a whole cited record; a new fill cannot change it.
+_RECORD_TEXT_SENTENCE = (
+    "a field in the template printed a whole cited record instead of one value (a single "
+    "field reads {{ name }} or {{ name.value }}), so the file was not delivered."
+)
+_RECORD_TEXT_DETAIL = "record_text"
+_RECORD_TEXT_PREFIX = "record text: "  # the driver's residual-scan label (render_template.py)
 _UNEXPECTED_SENTENCE = "the step stopped on an unexpected error."
 
 #: Phase 295 (D-12 / UI-SPEC E.1) — the PRE-RUN refusal for a fill step with no template.
@@ -196,6 +204,17 @@ def record_terminal(records: list, attempt: int, kind: str, *, detail: str | Non
             last["detail"] = str(detail)
         return
     records.append(shot_record(attempt, [kind], detail=detail))
+
+
+def integrity_detail(verdict: dict | None) -> str | None:
+    """``"record_text"`` when EVERY residual hit is printed record text, else ``None``.
+
+    Same rule as the handler's 303 message: only then is the template itself the cause.
+    """
+    tags = (verdict or {}).get("residual_tags") or []
+    if tags and all(isinstance(t, str) and t.startswith(_RECORD_TEXT_PREFIX) for t in tags):
+        return _RECORD_TEXT_DETAIL
+    return None
 
 
 def classify_forced_failure(failure: str | None, truncated: bool) -> str:
@@ -274,6 +293,8 @@ def _sentence(kind: str, recs: list[dict]) -> str:
         else:
             template = _UNCITED_SENTENCE if kind == KIND_UNCITED else _INVENTED_SENTENCE
         return template.format(n=n, values=values)
+    if kind == KIND_INTEGRITY_FAILED and any(rec.get("detail") == _RECORD_TEXT_DETAIL for rec in recs):
+        return _RECORD_TEXT_SENTENCE
     if kind in (KIND_NO_TEMPLATE, KIND_RENDER_FAILED):
         # The most recent detail wins: it is the cause the author met last.
         detail = next((rec.get("detail") for rec in reversed(recs) if rec.get("detail")), None)

@@ -1586,6 +1586,7 @@ async def _exec_llm_emit(phase, accumulated_outputs: dict, ctx) -> dict:
         classify_forced_failure,
         classify_rejection,
         compose_emit_failure,
+        integrity_detail,
         record_terminal,
         shot_record,
         terminal_failure_value,
@@ -2032,7 +2033,7 @@ async def _exec_llm_emit(phase, accumulated_outputs: dict, ctx) -> dict:
         reason = (render_out or {}).get("reason")
         if status == "failed" and reason in ("integrity", "residual_tokens", "harvest_failed", "no_verdict"):
             # State (d): the rendered file won't open / has residual tokens — NEVER persisted.
-            record_terminal(records, attempt, KIND_INTEGRITY_FAILED)
+            record_terminal(records, attempt, KIND_INTEGRITY_FAILED, detail=integrity_detail((render_out or {}).get("verdict")))
             msg = compose_emit_failure(records, step_name=step_name)
             await _emit_audit(ctx, event_type="emit_integrity_failed", metadata=_emit_audit_metadata(
                 definition=definition, phase=phase, emitter=emitter, result=result, gate=gate,

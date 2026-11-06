@@ -125,6 +125,9 @@ def test_dunder_all_is_the_pinned_contract():
         "classify_rejection",
         "terminal_failure_value",
         "compose_emit_failure",
+        # Phase 303 (U-1): added deliberately — the executor passes the record-text cause of
+        # an integrity refusal, so the run's message names it instead of the generic one.
+        "integrity_detail",
         # Phase 295 (D-12): added deliberately — the ONE pre-run refusal sentence for a fill
         # step with no template; lint, kickoff and the scheduler read it off the lint finding.
         "no_template_bound_sentence",
