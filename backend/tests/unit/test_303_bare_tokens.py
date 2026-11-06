@@ -403,6 +403,66 @@ def test_residual_scan_reaches_nested_header_footer_and_first_page(which, where,
     assert hits, f"a surviving {{{{name}}}} in the {where} was not seen"
 
 
+def _parse(path):
+    return svc.parse_docx_template_variables(pathlib.Path(path).read_bytes())
+
+
+# ── D-17 (303-REVIEW CR-01): the parse oracle names a bare loop column ──────
+
+
+def test_oracle_records_bare_loop_column_but_not_score(tmp_path):
+    """A bare ``{{ r.cause }}`` is a column the model must emit. Before D-17 the oracle only
+    recorded ``{{ r.col.value }}``, so the emit prompt never named ``cause``, the model
+    guessed another key, and the cell rendered blank with a clean verdict. ``score`` stays
+    out: the driver computes it (``_build_row``'s default-blank derived field)."""
+    tpl = build(tmp_path / "bare_loop.docx", body="{{ name }}", loop=("{{ r.cause }}", "{{ r.score }}"))
+    parsed = _parse(tpl)
+    assert parsed is not None
+    assert parsed["collections"] == ["rows"], parsed
+    assert parsed["columns"] == {"rows": ["cause"]}, parsed
+    assert parsed["scalars"] == ["name"], parsed
+    assert svc.placeholder_names_from_parsed(parsed) == ["cause", "name"]
+
+
+def test_oracle_records_bare_and_value_loop_columns_together(tmp_path):
+    tpl = build(tmp_path / "mixed_loop.docx", loop=("{{ r.cause.value }}", "{{r.owner}}"))
+    assert _parse(tpl)["columns"] == {"rows": ["cause", "owner"]}
+
+
+_SHIPPED_DOCXTPL_TEMPLATES = [
+    _FIXTURES / "risk-register.docx",
+    *sorted((pathlib.Path(__file__).resolve().parents[3] / "scripts" / "pm-pack" / "templates").glob("*.docx")),
+]
+
+
+def _legacy_parse(path):
+    """The pre-D-17 column rule (``.value`` loop derefs only), kept here as the reference
+    every shipped template must still match."""
+    import re as _re
+
+    parsed = _parse(path)
+    text = "".join(
+        _re.sub(r"<[^>]+>", "", zipfile.ZipFile(str(path)).read(n).decode("utf-8", errors="ignore"))
+        for n in zipfile.ZipFile(str(path)).namelist()
+        if n == "word/document.xml" or _re.match(r"word/(?:header|footer)\d*\.xml$", n)
+    )
+    loop_vars = dict(
+        _re.findall(r"\{%[^%]*?\bfor\s+([A-Za-z_]\w*)\s+in\s+([A-Za-z_]\w*)[^%]*?%\}", text)
+    )
+    columns: dict = {}
+    for var, col in _re.findall(r"\{\{\s*([A-Za-z_]\w*)\.([A-Za-z_]\w*)\.value\s*\}\}", text):
+        if var in loop_vars:
+            columns.setdefault(loop_vars[var], set()).add(col)
+    return {**parsed, "columns": {c: sorted(v) for c, v in columns.items()}}
+
+
+@pytest.mark.parametrize("path", _SHIPPED_DOCXTPL_TEMPLATES, ids=lambda p: f"{p.parent.name}/{p.name}")
+def test_oracle_unchanged_for_shipped_templates(path):
+    """D-17: every shipped (``.value`` / ``{{ r.score }}``) template parses exactly as before."""
+    assert len(_SHIPPED_DOCXTPL_TEMPLATES) == 4, _SHIPPED_DOCXTPL_TEMPLATES
+    assert _parse(path) == _legacy_parse(path)
+
+
 def test_service_run_replace_reports_spaced_keys_as_replaced(tmp_path):
     tpl = build(tmp_path / "sp.docx", paragraphs=["B {{ name }}"])
     res = svc.run_replace_docx(str(tpl), FM["scalars"], str(tmp_path / "out.docx"))

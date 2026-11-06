@@ -353,6 +353,11 @@ def _iter_leaves(fm_dict: dict):
         # other shapes (bare scalars, nested non-cited) are ignored as non-leaves
 
 
+# Row keys the driver computes itself (``_build_row``'s ``r.setdefault("score", "")``), so
+# the parse oracle never asks the model for them (Phase 303, D-17).
+_DERIVED_ROW_KEYS = frozenset({"score"})
+
+
 def parse_docx_template_variables(data: bytes) -> dict | None:
     """Parse a TRUSTED docx template's Jinja placeholders WITHOUT docxtpl (Pitfall 4 —
     the heavy lib never enters backend/app/**; a docx is a zip and the tokens are plain
@@ -364,10 +369,14 @@ def parse_docx_template_variables(data: bytes) -> dict | None:
     ``{{ root(.attr)* }}`` token (the 097/101 trusted templates dereference ``Cited``
     dicts: ``{{ project_name.value }}`` → context key ``project_name``); roots that are
     loop VARIABLES (``{{ r.cause.value }}`` where ``{%tr for r in rows %}``) or
-    collection names are excluded — those are loop-local. A COLUMN is a loop-var deref
-    ending in ``.value`` (``{{ r.risk_id.value }}`` → column ``risk_id`` of ``rows``) —
-    the Cited cells the MODEL must emit; bare loop derefs (``{{ r.score }}``) are
-    driver-computed (the D-11 derived-compute hook) and excluded from the oracle.
+    collection names are excluded — those are loop-local. A COLUMN is a loop-var deref,
+    with or without ``.value`` (``{{ r.risk_id.value }}`` or ``{{ r.risk_id }}`` → column
+    ``risk_id`` of ``rows``) — the Cited cells the MODEL must emit. Phase 303 (D-17):
+    the bare form counts too, because a bare loop column nobody asked the model for
+    renders blank with a clean verdict. The one exception is ``score``
+    (``_DERIVED_ROW_KEYS``): ``_build_row`` computes it (the D-11 derived-compute hook),
+    so ``{{ r.score }}`` stays out of the oracle. A filtered token (``{{ r.x|upper }}``)
+    is not read here, for scalars and columns alike (pre-existing limit).
 
     101.1-06: this is the 097 "parse template first" coverage oracle, productized — the
     emit prompt names EXACTLY these keys and ``check_coverage`` validates against them
@@ -400,9 +409,9 @@ def parse_docx_template_variables(data: bytes) -> dict | None:
     scalars = roots - set(loop_vars) - collections
     columns: dict[str, set] = {}
     for var, col in re.findall(
-        r"\{\{\s*([A-Za-z_]\w*)\.([A-Za-z_]\w*)\.value\s*\}\}", text
+        r"\{\{\s*([A-Za-z_]\w*)\.([A-Za-z_]\w*)(?:\.value)?\s*\}\}", text
     ):
-        if var in loop_vars:
+        if var in loop_vars and col not in _DERIVED_ROW_KEYS:
             columns.setdefault(loop_vars[var], set()).add(col)
     if not scalars and not collections:
         return None
