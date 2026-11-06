@@ -173,3 +173,12 @@ def test_record_text_prefix_parity(driver):
     service_prefix = getattr(service, "_RECORD_TEXT_PREFIX", None)
     driver_prefix = driver.get("_RECORD_TEXT_PREFIX")
     assert module_prefix == service_prefix == driver_prefix == "record text: "
+
+
+def test_record_text_mark_parity(driver):
+    """D-21 (303-REVIEW IN-03): the marker itself is pinned, so a matching edit to both
+    copies' mark cannot pass silently."""
+    assert driver.get("_RECORD_TEXT_MARK") == service._RECORD_TEXT_MARK == "'source_chunk_id':"
+    # The mark is exactly what repr() of a cited cell prints, in both copies.
+    assert driver["_RECORD_TEXT_MARK"] in repr(driver["_cell"]({"value": "x"}))
+    assert service._RECORD_TEXT_MARK in repr(service._cell({"value": "x"}))
