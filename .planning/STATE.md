@@ -2,16 +2,15 @@
 gsd_state_version: 1.0
 milestone: v4.9
 milestone_name: Use It From Your Own Tools
-status: ready_to_plan
-last_updated: 2026-11-03T13:59:23.092Z
-last_activity: 2026-10-31 -- Phase 306 execution started
+status: verifying
+last_updated: "2026-11-06T02:59:19.736Z"
+last_activity: 2026-11-04
 progress:
   total_phases: 14
-  completed_phases: 2
-  total_plans: 15
-  completed_plans: 15
-  percent: 14
-stopped_at: Phase 308 EXECUTED 2026-11-05 — verification human_needed (5/5 SC in code); 6 human rows owed (308-HUMAN-UAT.md, row 1 first); not closed, not deployed
+  completed_phases: 5
+  total_plans: 26
+  completed_plans: 26
+  percent: 36
 ---
 
 # Project State
