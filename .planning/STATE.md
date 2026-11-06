@@ -11,7 +11,7 @@ progress:
   total_plans: 27
   completed_plans: 27
   percent: 43
-stopped_at: Phase 303 CLOSED 2026-11-06 — verification passed; live U-1 (826d3eaf, 6bc7da96) + U-2 (f125d3e5; pre-303 replays identical) PASSED; U-1 found + fixed a generic refusal message (emit_cause); BUG-261022-01 CLOSED; SECURE 9/9; baseline 70/71; NOT deployed. Phase 308 EXECUTED 2026-11-05 — verification human_needed (5/5 SC in code); 6 human rows owed (308-HUMAN-UAT.md, row 1 first); not closed, not deployed
+stopped_at: Phase 303 CLOSED 2026-11-06 — verification passed; live U-1 (826d3eaf, 6bc7da96) + U-2 (f125d3e5; pre-303 replays identical) PASSED; U-1 found + fixed a generic refusal message (emit_cause); BUG-261022-01 CLOSED; SECURE 9/9; baseline 70/71; DEPLOYED 2026-11-06 — production 6bc320f3c (8 code commits cherry-picked onto 2cc9b4845, fast-forward). Phase 308 EXECUTED 2026-11-05 — verification human_needed (5/5 SC in code); 6 human rows owed (308-HUMAN-UAT.md, row 1 first); not closed, not deployed
 ---
 
 # Project State
@@ -47,7 +47,7 @@ reviewer exists, so a phase closes `verification_mode: self-verified`, never `re
 Milestone: v4.9 Use It From Your Own Tools
 Phase: 303 (Word Template Bare Tokens)
 Plan: 1 of 1 (complete; human UAT owed)
-Status: Phase 303 executed — 1/1 plan, review 1C/3W (6 fixed, WR-01 accepted D-20), SECURE 9/9, baseline 70/71, verification human_needed; U-1 PASSED live 2026-11-06 after one fix (record-text refusal message on the workflow path, emit_cause + one phase_types kwarg); BUG-261022-01 closed; U-2 PASSED live 2026-11-06; phase CLOSED (verification passed), NOT deployed
+Status: Phase 303 executed — 1/1 plan, review 1C/3W (6 fixed, WR-01 accepted D-20), SECURE 9/9, baseline 70/71, verification human_needed; U-1 PASSED live 2026-11-06 after one fix (record-text refusal message on the workflow path, emit_cause + one phase_types kwarg); BUG-261022-01 closed; U-2 PASSED live 2026-11-06; phase CLOSED (verification passed), LIVE on production 6bc320f3c 2026-11-06
 Last activity: 2026-11-06
 
 Also open (restored by hand 2026-11-06 — the `state.*` SDK verbs overwrote it, see the header warning): Phase 308 executed — 6/6 plans merged, review 1C/6W fixed, verification human_needed; owed: 308-HUMAN-UAT.md rows 1-6, cloud mig 225 after 220→224 (per-action approval) + get_advisors(security), public docs (309) before deploy
