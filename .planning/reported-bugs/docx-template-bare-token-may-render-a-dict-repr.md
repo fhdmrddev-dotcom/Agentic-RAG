@@ -4,9 +4,9 @@ title: A Word template with bare {{ name }} may render a dict repr and still pas
 reported: 2026-10-22
 surface: Agentic-RAG
 severity: major
-status: open
+status: folded
 affected_areas: [backend/template-render, sandbox, workflows/render_template]
-folded_into: null
+folded_into: 303
 verified_closed_by: null
 related_seeds: [SEED-368]
 re_open_trigger: null
