@@ -34,7 +34,20 @@ Postgres `~` is case-sensitive, and neither the tool nor the route exposes a cas
 option, so a natural-language question ("mention probation") silently loses every capitalised
 occurrence: headings, table labels, sentence starts.
 
-## Fix direction (not done)
+## Fix (develop, not deployed)
+
+- `grep_path` matches with `~*` by default; `case_sensitive=True` keeps `~`. The operator is
+  one of two fixed literals. The result and `GrepResponse` report `case_sensitive`.
+- `/kb/grep` takes `case_sensitive` (default false). The agent tool reaches the new default
+  unchanged: its handler (`tools/documents._handle_grep`) and schema (`GREP_TOOL`) are pinned
+  byte-identical by the phase-278 fences (`test_278_pure_move`, `test_278_registry_pin`), so the
+  agent cannot yet ask for exact case, and `GREP_TOOL` still says "Postgres ~ operator". Offering
+  the option to the agent means consciously retiring those fences (an operator decision).
+- OpenAPI snapshot and public spec regenerated (17 lines each, only this change).
+- Test: `backend/tests/unit/test_261106_grep_case.py`, including an HR-25 replay of the built
+  SQL against a session TEMP table in real Postgres (default finds the capitalised profile).
+
+## Fix direction (original note)
 
 - Default to case-insensitive (`~*`) and add an optional `case_sensitive` argument, or expose
   `ignore_case` in the tool schema. Keep the result honest about which mode ran.

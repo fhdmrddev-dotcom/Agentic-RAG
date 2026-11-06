@@ -253,8 +253,15 @@ async def tree(
     return TreeResponse(**result)
 
 
-async def grep_path(pattern: str, path: str | None, user_id: str, supabase: Client) -> dict:
+async def grep_path(
+    pattern: str, path: str | None, user_id: str, supabase: Client, *, case_sensitive: bool = False
+) -> dict:
     """Search document full_markdown for regex pattern, optionally scoped to a folder subtree.
+
+    BUG-261106-05: case-INSENSITIVE by default (Postgres ``~*``). A question such as "which
+    documents mention probation" must find "Probation" in a heading or table label; with ``~``
+    it silently missed all three role profiles (HR-25). ``case_sensitive=True`` keeps exact case,
+    and the result reports which mode ran.
 
     Phase 164 (D-164-04): the cross-user WHERE-injection grep regex is DELETED — the
     query_user_documents INVOKER RPC now runs over the asyncpg user-context (get_user_pg_connection),
@@ -274,7 +281,8 @@ async def grep_path(pattern: str, path: str | None, user_id: str, supabase: Clie
 
     # Build SQL query using Postgres regex operator ~
     escaped_pattern = pattern.replace("'", "''")
-    sql = f"SELECT id, filename, folder_id FROM documents WHERE full_markdown ~ '{escaped_pattern}'"
+    operator = "~" if case_sensitive else "~*"  # one of two fixed literals, never caller text
+    sql = f"SELECT id, filename, folder_id FROM documents WHERE full_markdown {operator} '{escaped_pattern}'"
     if folder_ids is not None:
         ids_list = ", ".join(f"'{fid}'" for fid in folder_ids)
         sql += f" AND folder_id IN ({ids_list})"
@@ -287,17 +295,21 @@ async def grep_path(pattern: str, path: str | None, user_id: str, supabase: Clie
 
     rows = data or []
     matches = [{"document_id": r["id"], "filename": r["filename"], "folder_id": r.get("folder_id")} for r in rows]
-    return {"pattern": pattern, "path": path, "matches": matches, "total": len(matches)}
+    return {
+        "pattern": pattern, "path": path, "matches": matches, "total": len(matches),
+        "case_sensitive": case_sensitive,
+    }
 
 
 @router.get("/grep", response_model=GrepResponse)
 async def grep(
     pattern: str = Query(description="Regex pattern to search in document content"),
     path: str | None = Query(default=None, description="Optional folder path to scope search, e.g. /reports"),
+    case_sensitive: bool = Query(default=False, description="Match exact letter case (default: case-insensitive)"),
     current_user: dict = Depends(get_current_user),
     supabase: Client = Depends(get_user_supabase_client),
 ):
-    result = await grep_path(pattern, path, current_user["id"], supabase)
+    result = await grep_path(pattern, path, current_user["id"], supabase, case_sensitive=case_sensitive)
     if "error" in result:
         raise HTTPException(status_code=404, detail=result["error"])
     return GrepResponse(**result)

@@ -3058,6 +3058,18 @@
               "title": "Path"
             },
             "description": "Optional folder path to scope search, e.g. /reports"
+          },
+          {
+            "name": "case_sensitive",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "boolean",
+              "description": "Match exact letter case (default: case-insensitive)",
+              "default": false,
+              "title": "Case Sensitive"
+            },
+            "description": "Match exact letter case (default: case-insensitive)"
           }
         ],
         "responses": {
@@ -21685,6 +21697,11 @@
           "total": {
             "type": "integer",
             "title": "Total"
+          },
+          "case_sensitive": {
+            "type": "boolean",
+            "title": "Case Sensitive",
+            "default": false
           }
         },
         "type": "object",

@@ -52,6 +52,7 @@ class GrepResponse(BaseModel):
     path: str | None
     matches: list[GrepMatch]
     total: int
+    case_sensitive: bool = False  # BUG-261106-05: which matching mode ran
 
 
 class GlobMatch(BaseModel):

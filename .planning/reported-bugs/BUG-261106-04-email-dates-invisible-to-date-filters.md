@@ -49,8 +49,10 @@ date filter, the Library date views and the D-06 "undated" count.
   rewrite (for example `UPDATE documents SET metadata = metadata WHERE metadata->>'date' ~ 'T'`).
   Production DB change: needs operator approval.
 - Or store a date-only value at email ingest and keep the timestamp under another key.
-- Secondary (model behaviour): after a zero-match date filter that reports undated documents,
-  the agent should retry without the filter. It did not.
+- Secondary: after a zero-match date filter that reports undated documents, the agent did not
+  retry without the filter. That is instructed, not model whim: `backend/app/services/agent_loop.py`
+  (~line 792) tells the agent to "name it, cite nothing, and do not search again without the
+  filter". Revisit that instruction once undated documents can be told apart from dated ones.
 
 ## Surface classification
 
