@@ -55,6 +55,13 @@ Not in scope: new template features, a new engine, PDF/pptx/xlsx behaviour, the 
 - **U-1 (SC#1, first to run):** a real app run, with its run id kept, of a library template carrying bare `{{ name }}` in body, header and a nested table. Before the fix it would show record text; after, the values.
 - **U-2 (SC#3):** the live golden run of one published template workflow, output unchanged.
 
+### Code-review rulings (added 2026-11-06 after `303-REVIEW.md`, delegated)
+- **D-17 (CR-01 → fix in this phase):** the parse oracle `parse_docx_template_variables` (both doors read it) also records a bare loop-column deref `{{ r.col }}` as a column of its collection, EXCEPT the driver-computed `score`. Without it the model is never told to emit `col`, so a bare loop column reads blank with a clean verdict, which is this phase's own failure condition ("a blank where a value belongs"). This amends the boundary line "the parse oracle" (read-only) for this one rule. Existing `.value` templates and `{{ r.score }}` produce the same placeholder list as before.
+- **D-18 (WR-02 → fix):** run_replace substitutes every known key in ONE pass over the paragraph's original text (one alternation regex, function replacement), in both copies, so a cited value containing `{{ other }}` is never rewritten or erased by a later key.
+- **D-19 (WR-03 → fix):** when the integrity gate refuses a file, the produced file is removed from `/sandbox/output` before the handler returns, so a later `execute_code` sweep or a `sandbox_output` attach cannot deliver it. SC#2's "no document with record text in it reaches the user".
+- **D-20 (WR-01 → accepted, known limit):** comparisons and filters on a bare cell (`== 'x'`, `|int`, `|length`, `|default(.., true)`, `or`) act on the record, exactly as they did before 303. Not overridden (`__eq__`/`__bool__` would change `.value` templates' semantics). Recorded under Deferred.
+- **D-21 (IN-01/02/03 → fix):** correct the `run_replace_docx` docstring (the default header/footer part can still be added — old behaviour), word the failure message for an all-record-text verdict without the "unsubstituted placeholder tokens" lead or a doubled "not delivered", and add tests for the remaining header/footer variants, the cross-copy marker string, and the oracle step behind D-17.
+
 ### Claude's Discretion
 - Exact wording of the record-text failure clause (D-07).
 - Name of the `dict` subclass and whether it is shared by scalar and row cells (it should be).
@@ -120,6 +127,7 @@ Not in scope: new template features, a new engine, PDF/pptx/xlsx behaviour, the 
 <deferred>
 ## Deferred Ideas
 
+- D-20: comparisons/filters on a bare cell (`{% if status == 'Open' %}`, `|int`, `|length`, `|default(.., true)`) act on the record dict, as before 303. A template-read/bind-time lint that flags these forms is the natural follow-up; re-open when a real template uses one.
 - Unknown placeholder tokens in run_replace are still blanked silently. Whether an unknown token should fail the run instead is a separate design choice, not part of FIX-15.
 - Text boxes, footnotes and SmartArt stay unscanned (documented limit). Scanning raw `word/*.xml` would reach them; a future phase can take it if a real template needs it.
 - Seeds sweep: 0 seeds matched (the phase declared no `files_modified` yet at discuss time; re-run at plan time once the PLAN names its files).
