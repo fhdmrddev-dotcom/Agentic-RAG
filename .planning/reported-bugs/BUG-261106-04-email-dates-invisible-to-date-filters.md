@@ -4,10 +4,10 @@ title: Every email is invisible to date filters (its date carries a time, so dat
 reported: 2026-11-06
 surface: Agentic-RAG
 severity: high
-status: open
+status: closed
 affected_areas: [backend/retrieval-scope, database/documents-typed-columns, ingestion/email]
 folded_into: null
-verified_closed_by: null
+verified_closed_by: "migration 226 applied to production 2026-11-06 (116 rows typed, 0 left, advisors 0 ERROR); HR-22 retest thread f31dc539 found and cited the 2025-12-15 email via the same date filter"
 related_seeds: []
 re_open_trigger: null
 reproduces_on:
