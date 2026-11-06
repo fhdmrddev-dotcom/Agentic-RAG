@@ -1088,7 +1088,8 @@ async def generate_workflow_definition(
     # wrote `citations_required` with an invented `require_citations` key on agent steps; it
     # fell back to field_map mode and failed every run. The engine's seam drops it too, but
     # only on steps it gates itself, so a step that reads nothing is cleaned here or nowhere.
-    from app.services.harness.grounding import citation_gate_can_never_pass  # function-local
+    # BUG-261106-02: the same for an `output_file_valid` gate on a step that makes no file.
+    from app.services.harness.grounding import gate_can_never_pass  # function-local
 
     ordered = sorted(enumerate(wd.phases), key=lambda ip: (ip[1].phase_index, ip[0]))
     wd = wd.model_copy(
@@ -1099,7 +1100,7 @@ async def generate_workflow_definition(
                         "name_seeded_by_ai": bool(p.name and p.name.strip()),
                         "phase_index": i,
                         "validators": [
-                            v for v in p.validators if not citation_gate_can_never_pass(p, v)
+                            v for v in p.validators if not gate_can_never_pass(p, v)
                         ],
                     }
                 )
