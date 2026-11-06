@@ -787,3 +787,57 @@ def test_handler_refusal_reason_survives_a_failed_delete(monkeypatch, caplog):
     assert payload["status"] == "failed" and payload["reason"] == "residual_tokens", payload
     assert _rm_commands(commands) == [_EXPECTED_RM]
     assert "could not remove" in caplog.text, caplog.text
+
+
+# ── 303 U-1 (live run ca440cc9, 2026-11-06): the WORKFLOW path's words ─────────────────
+# The live run refused a record-printing template correctly, but the person read the
+# generic integrity sentence ("did not open cleanly, or still had unfilled placeholders"),
+# neither of which was true. The emit path names the cause through emit_cause, not the
+# handler, so the record-text cause must travel there.
+_RECORD_HIT = "record text: All risks: [{'description': {'value': 'The legacy CRM"
+
+
+@pytest.mark.parametrize(
+    "tags, expected",
+    [
+        ([_RECORD_HIT], "record_text"),
+        ([_RECORD_HIT, "{{ x }}"], None),
+        (["{{ x }}"], None),
+        ([], None),
+    ],
+    ids=["all-record-text", "mixed", "plain-token", "none"],
+)
+def test_integrity_detail_names_record_text_only_when_every_hit_is_one(tags, expected):
+    from app.services.harness.emit_cause import integrity_detail
+
+    verdict = {"rendered": True, "opened": True, "residual_clean": False, "residual_tags": tags}
+    assert integrity_detail(verdict) == expected
+    assert integrity_detail(None) is None
+
+
+def test_workflow_failure_message_names_record_text():
+    from app.services.harness.emit_cause import (
+        KIND_INTEGRITY_FAILED,
+        compose_emit_failure,
+        integrity_detail,
+        record_terminal,
+    )
+
+    verdict = {"rendered": True, "opened": True, "residual_clean": False, "residual_tags": [_RECORD_HIT]}
+    records: list = []
+    for attempt in range(3):
+        record_terminal(records, attempt, KIND_INTEGRITY_FAILED, detail=integrity_detail(verdict))
+    msg = compose_emit_failure(records)
+    assert "whole cited record" in msg, msg
+    assert "{{ name.value }}" in msg, msg
+    assert "did not open cleanly" not in msg, msg
+
+    plain: list = []
+    record_terminal(plain, 0, KIND_INTEGRITY_FAILED, detail=integrity_detail({"residual_tags": ["{{ x }}"]}))
+    assert "did not open cleanly" in compose_emit_failure(plain)
+
+
+def test_emit_path_passes_the_integrity_detail():
+    src = pathlib.Path(__file__).resolve().parents[2] / "app" / "services" / "harness" / "phase_types.py"
+    text = src.read_text(encoding="utf-8")
+    assert "record_terminal(records, attempt, KIND_INTEGRITY_FAILED, detail=integrity_detail(" in text
