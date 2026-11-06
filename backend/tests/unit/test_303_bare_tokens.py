@@ -434,13 +434,35 @@ def test_run_replace_adds_no_header_footer_part(which, tmp_path):
 # ── D-09: the residual scan's reach ─────────────────────────────────────────
 
 
+_SCAN_LOCATIONS = [
+    "nested",
+    "header",
+    "footer",
+    "header_cell",
+    "first_header",
+    "first_footer",
+    "even_header",
+    "even_footer",
+]
+
+
 @COPIES
-@pytest.mark.parametrize("where", ["nested", "header", "footer", "first_header"])
+@pytest.mark.parametrize("where", _SCAN_LOCATIONS)
 def test_residual_scan_reaches_nested_header_footer_and_first_page(which, where, tmp_path):
+    """D-09 / D-21 (303-REVIEW IN-03): every location run_replace walks, the scan reads."""
     c = _Copy(which)
     p = build(tmp_path / f"surv_{where}.docx", **{where: "{{name}}"})
     hits = c.residual_tags_in(str(p), "docx")
     assert hits, f"a surviving {{{{name}}}} in the {where} was not seen"
+
+
+@COPIES
+@pytest.mark.parametrize("where", _SCAN_LOCATIONS)
+def test_residual_scan_marks_record_text_in_every_location(which, where, tmp_path):
+    c = _Copy(which)
+    p = build(tmp_path / f"rec_{where}.docx", **{where: "{'value': 'Ann', 'source_chunk_id': 'c1'}"})
+    hits = c.residual_tags_in(str(p), "docx")
+    assert hits and all(h.startswith(RECORD_PREFIX) for h in hits), hits
 
 
 def _parse(path):
@@ -606,6 +628,35 @@ def test_handler_plain_residual_message_has_no_record_clause(monkeypatch):
     assert payload["status"] == "failed"
     assert payload["reason"] == "residual_tokens"
     assert "raw record text" not in payload["message"], payload["message"]
+    assert "unsubstituted placeholder tokens" in payload["message"], payload["message"]
+    assert payload["message"].lower().count("not delivered") == 1, payload["message"]
+
+
+def test_handler_all_record_text_message_leads_with_the_record_cause(monkeypatch):
+    """D-21 (303-REVIEW IN-02): when every hit is record text the stated cause is the
+    template printing a whole record, said once, with the template-side fix (re-emitting
+    the field map, which is all the bounded retry changes, cannot fix it)."""
+    payload = _run_handler_with_residuals(
+        monkeypatch,
+        [RECORD_PREFIX + "Body: {'value': 'Ann', 'source_chunk_id': 'c1'", RECORD_PREFIX + "[{'cause': {"],
+    )
+    msg = payload["message"]
+    assert payload["reason"] == "residual_tokens"
+    assert msg.startswith("A field printed as raw record text"), msg
+    assert "unsubstituted placeholder tokens" not in msg, msg
+    assert msg.lower().count("not delivered") == 1, msg
+    assert "{{ name.value }}" in msg, msg
+    assert "fallback" in msg, msg
+
+
+def test_handler_mixed_residual_message_names_both_causes_once(monkeypatch):
+    payload = _run_handler_with_residuals(
+        monkeypatch, ["{{project_name}}", RECORD_PREFIX + "Body: {'value': 'Ann', 'source_chunk_id': 'c1'"]
+    )
+    msg = payload["message"]
+    assert "unsubstituted placeholder tokens" in msg, msg
+    assert "raw record text" in msg, msg
+    assert msg.lower().count("not delivered") == 1, msg
 
 
 # ── D-19 (303-REVIEW WR-03): a refused file is removed from /sandbox/output ──

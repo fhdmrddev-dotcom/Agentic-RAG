@@ -806,9 +806,12 @@ def run_replace_docx(template_path: str, scalars: dict, out_path: str) -> dict:
     None → '' (blank). Walks: each body paragraph, each table cell paragraph including
     nested tables (Phase 303, D-09), and the paragraphs and tables of the default,
     first-page and even-page header and footer of every section (the
-    python-docx-traversable surface; a variant the template does not define is never
-    touched, so no header part is added). A key matches ``{{key}}``, ``{{ key }}`` and
-    ``{{ key.value }}`` with any inner spacing (D-08). Text boxes /
+    python-docx-traversable surface). A first-page / even-page variant the template does
+    not define is never touched, so no such part is added; the DEFAULT header and footer
+    are walked unguarded, so python-docx creates them when absent (pre-existing, and
+    blank — 303-REVIEW IN-01). A key matches ``{{key}}``, ``{{ key }}`` and
+    ``{{ key.value }}`` with any inner spacing (D-08), in one pass over the template's
+    own text, so a token inside an inserted value is never filled or blanked (D-18). Text boxes /
     SmartArt / footnotes python-docx cannot reach are a documented limit — the residual
     scan (``residual_tags_in``) catches a surviving token as an honest fail, never a
     silent corruption (T-101-02-05).

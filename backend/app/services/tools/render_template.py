@@ -1179,22 +1179,31 @@ async def _handle_render_template(args: dict, ctx: ToolContext) -> ToolResult:
         # Preserve the cited field-map as fallback output so the extracted data isn't
         # lost (D-08), and the harness bounded-retry loop re-renders.
         reason = "residual_tokens" if (verdict.get("rendered") and verdict.get("opened")) else "integrity"
-        msg = (
-            "The rendered file opened but still contains unsubstituted placeholder tokens "
-            "(a silent non-fill) and was NOT delivered. The cited field-map is preserved "
-            "below as fallback."
-            if reason == "residual_tokens"
-            else "The rendered file failed the integrity re-open and was NOT delivered. "
-                 "The cited field-map is preserved below as fallback."
-        )
-        if reason == "residual_tokens" and any(
-            isinstance(t, str) and t.startswith(_RECORD_TEXT_PREFIX)
-            for t in (verdict.get("residual_tags") or [])
-        ):
-            msg += (
-                " A field printed as raw record text (a whole cited record instead of its "
-                "value), so the file was not delivered."
+        tags = verdict.get("residual_tags") or []
+        record_hits = [t for t in tags if isinstance(t, str) and t.startswith(_RECORD_TEXT_PREFIX)]
+        fallback = " The cited field-map is preserved below as fallback."
+        if reason == "residual_tokens" and record_hits and len(record_hits) == len(tags):
+            # Phase 303 (D-21, 303-REVIEW IN-02): every hit is record text, so the cause is
+            # the TEMPLATE printing a whole record; re-emitting the field map cannot fix it.
+            msg = (
+                "A field printed as raw record text: the template printed a whole cited "
+                "record (for example {{ r }} or {{ rows }}) instead of a value, so the file "
+                "was NOT delivered. Use {{ name }} or {{ name.value }} for a single field; "
+                "a new field map will not change this." + fallback
             )
+        elif reason == "residual_tokens":
+            msg = (
+                "The rendered file opened but still contains unsubstituted placeholder tokens "
+                "(a silent non-fill) and was NOT delivered."
+            )
+            if record_hits:
+                msg += (
+                    " A field also printed as raw record text (a whole cited record instead "
+                    "of its value)."
+                )
+            msg += fallback
+        else:
+            msg = "The rendered file failed the integrity re-open and was NOT delivered." + fallback
         await _discard_refused_output()
         return ToolResult(result=_json_local.dumps({
             "status": "failed",

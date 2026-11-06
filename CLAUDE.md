@@ -420,8 +420,8 @@ node scripts/check-hot-file-ledger.cjs <phase-dir>   # 0 clear · 1 missing rows
 | `frontend/src/components/workflows/FlowEdge.tsx` | 3 / 3 / 462 | honoured by construction (200) |
 | `frontend/src/components/workflows/PhaseNodeCard.tsx` | 18 / 9 / 490 (was `17 / 8 / 489`) | 290: forecast unused — chips went on the library card, not here |
 | `backend/app/services/harness/phase_types.py` | 69 / 35 / 3149 (was `67 / 34 / 3147`) | 302-02: executor liveness via live_connectors_fully_on · G-5 OWED |
-| `backend/app/services/tools/render_template.py` | 7 / 4 / 1231 (was `6 / 3 / 1163`) | 303-01: bare tokens fill or fail the scan; driver+service parity pin · ⛔ |
-| `backend/app/services/template_render_service.py` | 9 / 4 / 1064 (was `8 / 3 / 988`) | ⚠ FIRES, absent here — row added 303-01 · the driver's fix, parity-pinned · ⛔ |
+| `backend/app/services/tools/render_template.py` | 10 / 4 / 1275 (was `7 / 4 / 1231`) | 303-REVIEW: one-pass replace; refused file removed from output · ⛔ |
+| `backend/app/services/template_render_service.py` | 12 / 4 / 1083 (was `9 / 4 / 1064`) | 303-REVIEW: oracle reads bare loop columns (not score); one-pass · ⛔ |
 | `frontend/src/pages/WorkflowsPage.tsx` | 56 / 23 / 1403 (was `55 / 23 / 1403`) | 299-REVIEW WR-05: link hook gets visibleRows + clearAllFilters |
 | `frontend/src/components/workflows/library/WorkflowCard.tsx` | 27 / 12 / 1374 (was `26 / 11 / 1373`) | 299-02: one data-row-id |
 | `frontend/src/components/workflows/library/WorkflowCardMenu.tsx` | 5 / 4 / 510 (was `4 / 4 / 506`) | 299-04: link sub first + Saves in on the fork line (D-20, UI-D11) |
