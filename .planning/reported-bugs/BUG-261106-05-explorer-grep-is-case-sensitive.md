@@ -4,10 +4,10 @@ title: Explorer grep is case-sensitive with no option, so it misses capitalised 
 reported: 2026-11-06
 surface: Agentic-RAG
 severity: medium
-status: open
+status: closed
 affected_areas: [backend/kb-explorer-tools]
 folded_into: null
-verified_closed_by: null
+verified_closed_by: "production 58d6363a9; HR-25 retest thread e582de69 found 8 documents incl. all 3 role profiles (case_sensitive false), 2026-11-06"
 related_seeds: []
 re_open_trigger: null
 reproduces_on:
