@@ -1344,6 +1344,9 @@ async def run_workflow(
     # now fails the existing golden-run stage and blocks publish. Every
     # `workflow_definitions` row today is throwaway test data, so this is acceptable.
     from app.services.harness.grounding import effective_phase
+    # BUG-261106-03 — function-local for the same reason as the line above: importing the
+    # ``harness`` package at module top loads ``phase_types``, which imports this module.
+    from app.services.harness.run_heartbeat import run_heartbeat
 
     _total = len(definition.phases)
     spec_by_slug = {p.slug: effective_phase(p, total_phases=_total) for p in definition.phases}
@@ -1734,9 +1737,13 @@ async def run_workflow(
             # down on every exit path so a long run accumulates no tasks. The deadline
             # is ABSOLUTE, so re-entering per phase re-computes the remaining time; a
             # per-phase TIMER would let an N-phase run outlive an N-times deadline.
+            #
+            # BUG-261106-03: ``run_heartbeat`` is the third per-step scope. It proves this
+            # producer is alive (``claim_run`` will not take a run whose beat is fresh), so a
+            # sibling worker's boot sweep can no longer start a second copy of this step.
             async with cancellation_watch(redis, run_id), breaker.duration_watch(
                 pool, redis, run_id, user_id=_audit_user_id
-            ):
+            ), run_heartbeat(pool, run_id):
                 outcome = await _run_phase_with_gates(
                     phase,
                     accumulated_outputs,
@@ -2690,7 +2697,7 @@ async def _resume_run(run_id: UUID, definition: WorkflowDefinition, ctx, *, pool
     )
 
 
-async def resume_stranded_workflows(*, pool, redis) -> int:
+async def resume_stranded_workflows(*, pool, redis, include_paused: bool = True) -> int:
     """Startup sweep: re-run runs left ``active`` by a restart (HARNESS-03).
 
     For each stranded run (``find_resumable_runs`` — anchored on the per-thread
@@ -2716,9 +2723,16 @@ async def resume_stranded_workflows(*, pool, redis) -> int:
 
     Returns the count of runs this worker resumed (for the lifespan log). Never
     re-runs a run it did not claim (the OQ6 anti-pattern: no unclaimed re-run loop).
+
+    BUG-261106-03: step 1's claim now also refuses an ``active`` run whose producer is
+    still beating (``run_heartbeat``), so a sibling worker's boot no longer re-drives a live
+    run. The cost: a run whose OWN worker just died still shows a fresh beat at that
+    worker's boot, so the lifespan runs a second, late pass (``include_paused=False``) one
+    lease later to pick it up.
     """
     resumed = 0
-    runs = await find_resumable_runs(pool)
+    runs = await (find_resumable_runs(pool) if include_paused
+                  else find_resumable_runs(pool, include_paused=False))
     for run in runs:
         run_id = run["run_id"]
         # 1. CAS claim — single-producer-per-run (Pitfall 7). Loser skips.

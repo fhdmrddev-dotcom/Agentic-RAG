@@ -419,6 +419,28 @@ async def lifespan(app_instance):
     if not _setup_mode and RUN_BOOT_SWEEPS:  # Phase 158 (D-03); SEED-363 (296)
         asyncio.create_task(_resume_stranded())
 
+    # BUG-261106-03 — the LATE pass. ``claim_run`` now refuses an ``active`` run whose producer
+    # heartbeat is fresher than the lease, which is what stops a booting worker re-driving a
+    # run its sibling is still driving. The other side of that rule: when THIS worker died
+    # mid-run, its run still shows a beat from moments ago, so the first pass skips it. One
+    # lease later the beat is provably stale and this pass takes it. Active runs only — paused
+    # runs were handled by the first pass and are re-driven by the answer route.
+    async def _resume_stranded_late():
+        await asyncio.sleep(settings.harness_resume_lease_seconds + 30)
+        try:
+            from app.services.harness_engine import resume_stranded_workflows
+            from app.dependencies import get_redis
+            count = await resume_stranded_workflows(
+                pool=await get_pg_pool(), redis=get_redis(), include_paused=False
+            )
+            if count:
+                logger.info("Harness late resume pass re-ran %d stranded run(s)", count)
+        except Exception:
+            logger.exception("Harness late resume pass failed (app continues)")
+
+    if not _setup_mode and RUN_BOOT_SWEEPS:  # same gate as the first pass (SEED-363)
+        asyncio.create_task(_resume_stranded_late())
+
     # Phase 137.1 (EVAL-05g / BUG-260702-02) — boot-time orphan reconciler. When a
     # restart kills the in-process task driving a run, its terminal DB transition is
     # never written and the row is stranded non-terminal forever (the user sees a run
