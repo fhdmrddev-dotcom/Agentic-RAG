@@ -517,7 +517,7 @@ def _noop_emit(*args, **kwargs):
     return None
 
 
-def _make_ctx():
+def _make_ctx(emit=_noop_emit):
     from app.services.tool_dispatcher import ToolContext
 
     return ToolContext(
@@ -530,7 +530,7 @@ def _make_ctx():
         current_user={"id": "22222222-2222-2222-2222-222222222222"},
         folder_subtree_ids=None,
         scoped_folder_path=None,
-        emit=_noop_emit,
+        emit=emit,
         spawn=lambda *a, **k: None,
     )
 
@@ -606,3 +606,133 @@ def test_handler_plain_residual_message_has_no_record_clause(monkeypatch):
     assert payload["status"] == "failed"
     assert payload["reason"] == "residual_tokens"
     assert "raw record text" not in payload["message"], payload["message"]
+
+
+# ── D-19 (303-REVIEW WR-03): a refused file is removed from /sandbox/output ──
+
+
+_OUT_NAME = "Q3 risk report.docx"  # passes _safe_out_filename, and needs quoting in a shell
+
+
+def _run_handler_through_fake_sandbox(monkeypatch, verdict_stdout, *, rm_raises=False):
+    """The real _ship_and_run against a fake session that records every command, with the
+    produced file present in the harvested /sandbox/output copy."""
+    import os
+
+    import app.services.tools.render_template as td
+
+    async def _fake_resolve(*args, **kwargs):
+        return {
+            "bytes": b"PK\x03\x04 fake docx bytes",
+            "filename": "template.docx",
+            "provenance": "library",
+            "mime": "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+            "error": None,
+        }
+
+    monkeypatch.setattr("app.services.template_asset_service.resolve_template_source", _fake_resolve)
+    monkeypatch.setattr(td.settings, "sandbox_enabled", True)
+    commands: list[str] = []
+
+    class _FakeSession:
+        def execute_command(self, cmd):
+            commands.append(cmd)
+            if cmd.startswith("rm ") and rm_raises:
+                raise RuntimeError("sandbox went away")
+
+            class _R:
+                stdout = verdict_stdout if cmd.startswith("python ") else ""
+                exit_code = 0
+
+            return _R()
+
+        def copy_to_runtime(self, local, remote):
+            return None
+
+        def copy_from_runtime(self, remote, local):
+            with open(os.path.join(local, _OUT_NAME), "wb") as fp:
+                fp.write(b"PK\x03\x04 produced")
+
+    monkeypatch.setattr(td.sandbox_manager, "get_or_create", lambda *a, **k: _FakeSession())
+
+    async def _passthrough_threadpool(fn, *a, **k):
+        return fn(*a, **k)
+
+    monkeypatch.setattr(td, "run_in_threadpool", _passthrough_threadpool)
+    written: list[str] = []
+
+    async def _fake_write(*a, **k):
+        written.append(k["path"])
+        return {
+            "file_id": "f1", "path": k["path"], "version": 1,
+            "size_bytes": 10, "mime_type": "application/octet-stream",
+        }
+
+    monkeypatch.setattr(td, "ws_write_file", _fake_write)
+
+    async def _emit(*a, **k):
+        return None
+
+    ctx = _make_ctx(emit=_emit)
+    args = {
+        "field_map": {
+            "scalars": {"project_name": {"value": "Meridian", "source_chunk_id": "chunk-1"}},
+            "collections": {},
+        },
+        "retrieved_ids": ["chunk-1"],
+        "out_filename": _OUT_NAME,
+        "asset": {
+            "asset_id": "user/_library/template.docx",
+            "filename": "template.docx",
+            "kind": "template",
+            "mime": "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+        },
+    }
+    payload = json.loads(asyncio.run(td._handle_render_template(args, ctx)).result)
+    return payload, commands, written
+
+
+def _rm_commands(commands):
+    return [c for c in commands if c.startswith("rm ")]
+
+
+_EXPECTED_RM = "rm -f '/sandbox/output/Q3 risk report.docx'"
+
+
+@pytest.mark.parametrize(
+    "verdict, reason",
+    [
+        ({"rendered": True, "opened": True, "residual_clean": False,
+          "residual_tags": [RECORD_PREFIX + "Body: {'value': 'Ann', 'source_chunk_id': 'c1'"]},
+         "residual_tokens"),
+        ({"rendered": True, "opened": False, "residual_clean": True, "residual_tags": []}, "integrity"),
+        (None, "no_verdict"),
+    ],
+    ids=["residual", "integrity", "no-verdict"],
+)
+def test_handler_removes_a_refused_file_from_sandbox_output(monkeypatch, verdict, reason):
+    stdout = json.dumps(verdict) if verdict is not None else "Traceback: driver died"
+    payload, commands, written = _run_handler_through_fake_sandbox(monkeypatch, stdout)
+    assert payload["status"] == "failed", payload
+    assert payload["reason"] == reason, payload
+    assert written == [], "a refused file must never be persisted"
+    assert _rm_commands(commands) == [_EXPECTED_RM], commands
+
+
+def test_handler_keeps_a_delivered_file(monkeypatch):
+    verdict = {"rendered": True, "opened": True, "residual_clean": True, "residual_tags": []}
+    payload, commands, written = _run_handler_through_fake_sandbox(monkeypatch, json.dumps(verdict))
+    assert payload["status"] == "ok", payload
+    assert written == ["/" + _OUT_NAME]
+    assert _rm_commands(commands) == [], commands
+
+
+def test_handler_refusal_reason_survives_a_failed_delete(monkeypatch, caplog):
+    verdict = {"rendered": True, "opened": True, "residual_clean": False, "residual_tags": ["{{x}}"]}
+    with caplog.at_level("WARNING", logger="app.services.tools.render_template"):
+        payload, commands, _ = _run_handler_through_fake_sandbox(
+            monkeypatch, json.dumps(verdict), rm_raises=True
+        )
+    assert payload["status"] == "failed" and payload["reason"] == "residual_tokens", payload
+    assert _rm_commands(commands) == [_EXPECTED_RM]
+    assert "could not remove" in caplog.text, caplog.text
