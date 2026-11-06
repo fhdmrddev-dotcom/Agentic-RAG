@@ -19,7 +19,7 @@ tok = anon.auth.sign_in_with_password({"email": os.environ["DEV_LOGIN_EMAIL"], "
 h = {"Authorization": f"Bearer {tok}", "X-Org-Id": ORG}
 
 with httpx.Client(timeout=60) as c:
-    r = c.post(f"{API}/threads", json={"title": "303 U-1 bare tokens"}, headers=h)
+    r = c.post(f"{API}/threads", json={"title": "303 U-1/U-2"}, headers=h)
     print("thread", r.status_code, r.text[:200])
     tid = r.json()["id"]
     r = c.post(f"{API}/threads/{tid}/messages", headers=h, json={

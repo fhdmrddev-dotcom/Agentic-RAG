@@ -1,8 +1,8 @@
 ---
 phase: 303-word-template-bare-tokens
 verified: 2026-11-06T00:00:00Z
-status: human_needed
-score: 4/4 roadmap truths verified (automatable parts); 2 live rows owed
+status: passed
+score: 4/4 roadmap truths verified; live rows U-1 + U-2 PASSED 2026-11-06
 overrides_applied: 0
 human_verification:
   - test: "U-1 - bare-token library template run through the app (SC#1/SC#2 live)"
@@ -59,3 +59,10 @@ None blocking. REVIEW fix status shows 6 fixed and WR-01 accepted by ruling D-20
 No gaps. All four roadmap success criteria are met by evidence I re-derived: the targeted tests, the golden compare, and the RED-then-GREEN commit order. Only the live-app rows U-1 and U-2 remain, and the phase cannot be marked `passed` until they are driven or consciously recorded as owed.
 
 _Verifier: Claude (gsd-verifier)_
+
+## Live verification (2026-11-06) — both owed rows PASSED
+
+- **U-1** (SC#1/SC#2 live): run `826d3eaf` filled bare tokens in header, body and nested table (0 record text, 0 leftover tokens). A record-printing template was refused with 0 files delivered, but the FIRST refusal (`ca440cc9`) showed the generic integrity sentence; fixed in `emit_cause` (RED `d024a6892`, fix `ee367fcf9`), re-verified live in run `6bc7da96`. Evidence: `evidence/uat/U-1-RESULT.md`.
+- **U-2** (SC#3 live): two real pre-303 runs (`9854abae`, `397432ff`) replayed through today's driver: 19/19 text lines and 8/8 XML parts identical. Live run `f125d3e5` of the published Weekly Status Report: same layout, 8/8 fields filled, clean. Evidence: `evidence/uat/U-2-RESULT.md`.
+- Not observable from this shell: the in-container `/sandbox/output` delete (Docker denied). Covered by unit test; 0 files reached `workspace_files` on every refusal.
+- Status flipped `human_needed` → `passed`. Not deployed.
