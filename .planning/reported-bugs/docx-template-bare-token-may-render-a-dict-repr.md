@@ -4,10 +4,10 @@ title: A Word template with bare {{ name }} may render a dict repr and still pas
 reported: 2026-10-22
 surface: Agentic-RAG
 severity: major
-status: folded
+status: closed
 affected_areas: [backend/template-render, sandbox, workflows/render_template]
 folded_into: 303
-verified_closed_by: null
+verified_closed_by: 303 U-1 live runs 826d3eaf + 6bc7da96 (2026-11-06)
 related_seeds: [SEED-368]
 re_open_trigger: null
 reproduces_on:
@@ -56,3 +56,7 @@ Author tokens as `{{ name.value }}`.
 
 - `.planning/phases/291-describe-it-from-your-own-files/291-RESEARCH.md` (lines ~134, ~300, ~460)
 - `backend/app/services/tools/render_template.py` (`residual_tags_in`, `assert_integrity`)
+
+## Closed 2026-11-06 (Phase 303 U-1, live)
+
+Reproduced through the real driver (303 RED evidence), fixed in both rendering copies, and verified through the running app: run `826d3eaf` fills bare tokens in header, body and a nested table with no record text; run `6bc7da96` refuses a template that prints a whole record, names the cause and delivers nothing. Evidence: `.planning/phases/303-word-template-bare-tokens/evidence/uat/U-1-RESULT.md`.
