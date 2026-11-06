@@ -1,0 +1,16 @@
+{
+ "scalars": {
+  "a": {
+   "source_chunk_id": "chunk-1",
+   "source_doc": "doc.pdf",
+   "source_page": 1,
+   "value": null
+  },
+  "b": {
+   "source_chunk_id": "chunk-2",
+   "source_doc": "doc.pdf",
+   "source_page": 2,
+   "value": "Bee"
+  }
+ }
+}
