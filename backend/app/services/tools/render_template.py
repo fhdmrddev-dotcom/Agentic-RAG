@@ -1130,8 +1130,34 @@ async def _handle_render_template(args: dict, ctx: ToolContext) -> ToolResult:
     verdict = run_out.get("verdict")
     produced = run_out.get("produced")
 
+    def _remove_from_output() -> None:
+        """Synchronous sandbox delete of the produced file (run in a threadpool)."""
+        import shlex as _shlex_local
+
+        session = sandbox_manager.get_or_create(ctx.thread_id)
+        res = session.execute_command(
+            " ".join(_shlex_local.quote(tok) for tok in ("rm", "-f", container_out))
+        )
+        code = getattr(res, "exit_code", 0)
+        if code not in (0, None):
+            raise RuntimeError(f"rm exited {code}")
+
+    async def _discard_refused_output() -> None:
+        # Phase 303 (D-19, 303-REVIEW WR-03): the driver writes straight into /sandbox/output,
+        # and a later execute_code harvest or a source='sandbox_output' attach publishes
+        # whatever sits there. A file this handler refused must not stay there to be
+        # delivered by another door. A failed delete is logged and never masks the refusal.
+        try:
+            await run_in_threadpool(_remove_from_output)
+        except Exception as exc:  # noqa: BLE001 — the refusal reason is what the model needs
+            logger.warning(
+                "render_template could not remove refused output thread=%s path=%s err=%s",
+                ctx.thread_id, container_out, exc,
+            )
+
     if not verdict:
         # A missing/garbled verdict is a FAILURE — never persist (T-101-04-05).
+        await _discard_refused_output()
         return ToolResult(result=_json_local.dumps({
             "status": "failed",
             "reason": "no_verdict",
@@ -1169,6 +1195,7 @@ async def _handle_render_template(args: dict, ctx: ToolContext) -> ToolResult:
                 " A field printed as raw record text (a whole cited record instead of its "
                 "value), so the file was not delivered."
             )
+        await _discard_refused_output()
         return ToolResult(result=_json_local.dumps({
             "status": "failed",
             "reason": reason,
