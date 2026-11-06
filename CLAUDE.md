@@ -419,7 +419,8 @@ node scripts/check-hot-file-ledger.cjs <phase-dir>   # 0 clear · 1 missing rows
 | `frontend/src/components/workflows/WorkflowCanvas.tsx` | 33 / 11 / 1757 (was `32 / 10 / 1744`) | 296-07: D-09 one controlled view pair; extraction FIRST next · ⛔ |
 | `frontend/src/components/workflows/FlowEdge.tsx` | 3 / 3 / 462 | honoured by construction (200) |
 | `frontend/src/components/workflows/PhaseNodeCard.tsx` | 18 / 9 / 490 (was `17 / 8 / 489`) | 290: forecast unused — chips went on the library card, not here |
-| `backend/app/services/harness/phase_types.py` | 69 / 35 / 3149 (was `67 / 34 / 3147`) | 302-02: executor liveness via live_connectors_fully_on · G-5 OWED |
+| `backend/app/services/harness/phase_types.py` | 70 / 36 / 3150 (was `69 / 35 / 3149`) | 303 U-1: integrity refusal passes its record-text cause (one kwarg) · G-5 OWED |
+| `backend/app/services/harness/emit_cause.py` | 4 / 3 / 378 (was `3 / 2 / 357`) | ⚠ now FIRES (303) · U-1: integrity_detail + one record-text sentence |
 | `backend/app/services/tools/render_template.py` | 10 / 4 / 1275 (was `7 / 4 / 1231`) | 303-REVIEW: one-pass replace; refused file removed from output · ⛔ |
 | `backend/app/services/template_render_service.py` | 12 / 4 / 1083 (was `9 / 4 / 1064`) | 303-REVIEW: oracle reads bare loop columns (not score); one-pass · ⛔ |
 | `frontend/src/pages/WorkflowsPage.tsx` | 56 / 23 / 1403 (was `55 / 23 / 1403`) | 299-REVIEW WR-05: link hook gets visibleRows + clearAllFilters |
