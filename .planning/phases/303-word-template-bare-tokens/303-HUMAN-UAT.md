@@ -1,5 +1,5 @@
 ---
-status: partial
+status: complete
 phase: 303-word-template-bare-tokens
 source: [303-VERIFICATION.md, 303-VALIDATION.md]
 started: 2026-11-06T03:59:55Z
@@ -8,7 +8,7 @@ updated: 2026-11-06T10:05:00Z
 
 ## Current Test
 
-U-1 PASSED live 2026-11-06 (after one fix). U-2 pending.
+[testing complete] U-1 and U-2 PASSED live 2026-11-06.
 
 ## Tests
 
@@ -20,14 +20,14 @@ result: pass (after fix) — run 826d3eaf filled header, body and nested table (
 ### 2. U-2 — one published pm-pack template workflow, unchanged
 steps: re-run the golden run of one published template workflow (compliance gap report, risk register or weekly status report) through the app.
 expected: the output document's text matches the last pre-303 run.
-result: [pending]
+result: pass — pre-303 runs 9854abae + 397432ff replayed through today's driver: 19/19 text lines, 8/8 XML parts identical; live run f125d3e5 same layout, 8/8 fields, clean. Evidence: evidence/uat/U-2-RESULT.md
 
 ## Summary
 
 total: 2
-passed: 1
+passed: 2
 issues: 0
-pending: 1
+pending: 0
 skipped: 0
 blocked: 0
 
