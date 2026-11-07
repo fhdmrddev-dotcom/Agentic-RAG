@@ -81,11 +81,12 @@ async function flush(ms = 0) {
 }
 
 /** Mount, answer the open read with `none`, and click Publish with a POST answering `outcome`. */
-async function submitFromIdle(outcome: () => Promise<PublishOutcome>) {
+async function submitFromIdle(outcome: () => Promise<PublishOutcome>, nextRead?: PublishAttempt) {
   const ctx = setup(() => Promise.resolve(NONE))
   await flush()
   expect(ctx.hook.result.current.phase).toBe("idle")
   ctx.start.mockImplementationOnce(outcome)
+  if (nextRead) ctx.read.mockResolvedValue(nextRead)
   act(() => {
     void ctx.hook.result.current.submit("do the thing")
   })
@@ -181,8 +182,7 @@ describe("usePublishAttempt — submitting and terminal POST answers", () => {
 
 describe("usePublishAttempt — following (D-19)", () => {
   it("a 202 -> running, an immediate read, then one read every 3000 ms", async () => {
-    const { hook, read } = await submitFromIdle(() => Promise.resolve(HANDLE))
-    read.mockResolvedValue(running())
+    const { hook, read } = await submitFromIdle(() => Promise.resolve(HANDLE), running())
     await flush()
     expect(hook.result.current.phase).toBe("running")
     expect(hook.result.current.goldenRunId).toBe("run-1")
@@ -309,16 +309,14 @@ describe("usePublishAttempt — the clock (D-21)", () => {
 
 describe("usePublishAttempt — a POST that throws (rule 6)", () => {
   it("one read: a running attempt is followed", async () => {
-    const { hook, read } = await submitFromIdle(() => Promise.reject(new Error("Failed to fetch")))
-    read.mockResolvedValue(running())
+    const { hook } = await submitFromIdle(() => Promise.reject(new Error("Failed to fetch")), running())
     await flush()
     expect(hook.result.current.phase).toBe("running")
     expect(hook.result.current.error).toBeNull()
   })
 
   it("no attempt -> idle with the thrown message as error", async () => {
-    const { hook, read } = await submitFromIdle(() => Promise.reject(new Error("Failed to fetch")))
-    read.mockResolvedValue(NONE)
+    const { hook, read } = await submitFromIdle(() => Promise.reject(new Error("Failed to fetch")), NONE)
     await flush()
     expect(read).toHaveBeenCalledTimes(2)
     expect(hook.result.current.phase).toBe("idle")
